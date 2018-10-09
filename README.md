@@ -17,6 +17,9 @@ If it builds (takes about 1 hour) test it with: ./mach run
 Now package it: ./mach package 
 The built package will be in /obj_x86_blah_blah/dist 
 
+I lost all my initial commits before creating this repository, but here is a short list of some changes:
+Rebranding / Fixed google captchas & craiglist reply button not working / Partially fixed the default OSX theme missing private window caption buttons (add-on themes now seem to display them properly now however) / Updated certs from FF60ESR / Enabled canvas anti-fingerprinting and enabled private browsing by default / Changed feedback and release notes urls / tweaked some about:config settings
+
 ## Resources
 
  * [Mozilla Source Code Directory Structure and links to project pages](https://developer.mozilla.org/en/Mozilla_Source_Code_Directory_Structure)
