@@ -1,0 +1,193 @@
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+if CONFIG['LIBXUL_SDK']:
+    error('toolkit.mozbuild is not compatible with --enable-libxul-sdk=')
+
+if CONFIG['MOZ_SANDBOX']:
+    DIRS += ['/security/sandbox']
+
+DIRS += [
+    # Depends on NSS and NSPR, and must be built after sandbox or else B2G emulator
+    # builds fail.
+    '/security/certverifier',
+    # Depends on certverifier
+    '/security/apps',
+]
+
+# the signing related bits of libmar depend on nss
+if CONFIG['MOZ_UPDATER']:
+    DIRS += ['/modules/libmar']
+
+DIRS += [
+    '/config/external/freetype2',
+    '/xpcom',
+    '/modules/libpref',
+    '/intl',
+    '/netwerk',
+]
+
+if CONFIG['MOZ_AUTH_EXTENSION']:
+    DIRS += ['/extensions/auth']
+
+if CONFIG['MOZ_UPDATER']:
+    DIRS += ['/other-licenses/bsdiff']
+
+# Goanna/Core components.
+
+DIRS += [
+    '/ipc',
+    '/js/ipc',
+    '/hal',
+    '/js/xpconnect',
+    '/intl/chardet',
+    '/media/libyuv',
+    '/modules/libjar',
+    '/storage',
+]
+
+if CONFIG['MOZ_PERMISSIONS']:
+    DIRS += [
+        '/extensions/cookie',
+        '/extensions/permissions',
+    ]
+
+DIRS += [
+    '/rdf',
+]
+
+if CONFIG['MOZ_WEBRTC']:
+    DIRS += [
+        '/media/webrtc',
+        '/media/mtransport/third_party',
+        '/media/mtransport/build',
+        '/media/mtransport/standalone',
+    ]
+
+if CONFIG['MOZ_OMX_PLUGIN']:
+    DIRS += [
+        '/media/omx-plugin/lib/ics/libutils',
+        '/media/omx-plugin/lib/ics/libstagefright',
+        '/media/omx-plugin/lib/ics/libvideoeditorplayer',
+        '/media/omx-plugin/lib/gb/libutils',
+        '/media/omx-plugin/lib/gb/libstagefright',
+        '/media/omx-plugin/lib/gb/libstagefright_color_conversion',
+        '/media/omx-plugin/lib/gb235/libstagefright',
+        '/media/omx-plugin',
+        '/media/omx-plugin/gb',
+        '/media/omx-plugin/gb235',
+        '/media/omx-plugin/lib/hc/libstagefright',
+        '/media/omx-plugin/hc',
+        '/media/omx-plugin/kk',
+    ]
+
+if CONFIG['ENABLE_TESTS']:
+    DIRS += ['/testing/specialpowers']
+
+DIRS += [
+    '/testing/gtest',
+    '/uriloader',
+    '/caps',
+    '/parser',
+    '/gfx',
+    '/image',
+    '/dom',
+    '/view',
+    '/widget',
+    '/content',
+    '/editor',
+    '/layout',
+    '/docshell',
+    '/embedding',
+    '/xpfe/appshell'
+]
+
+# This needs to be built after the gfx/ directory
+# to ensure all dependencies for skia (e.g. mozalloc, xpcom)
+# have been built
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
+    DIRS += ['/other-licenses/skia-npapi']
+
+if CONFIG['MOZ_UNIVERSALCHARDET']:
+    DIRS += ['/extensions/universalchardet']
+
+if CONFIG['ACCESSIBILITY']:
+    DIRS += ['/accessible']
+else:
+    DIRS += ['/accessible/ipc']
+
+# toolkit
+
+DIRS += ['/profile']
+
+# This must precede xpfe.
+if CONFIG['MOZ_JPROF']:
+    DIRS += ['/tools/jprof']
+
+DIRS += [
+    '/tools/profiler',
+    '/xpfe/components',
+]
+
+if CONFIG['MOZ_ENABLE_XREMOTE']:
+    DIRS += ['/widget/xremoteclient']
+
+if CONFIG['MOZ_SPELLCHECK']:
+    DIRS += ['/extensions/spellcheck']
+
+DIRS += [
+    '/security/manager',
+    '/toolkit',
+]
+
+if CONFIG['MOZ_PREF_EXTENSIONS']:
+    DIRS += ['/extensions/pref']
+
+DIRS += [
+    '/services',
+    '/startupcache',
+    '/js/ductwork/debugger',
+    '/other-licenses/snappy',
+]
+
+if CONFIG['MOZ_GIO_COMPONENT']:
+    DIRS += ['/extensions/gio']
+
+DIRS += [
+    '/toolkit/library/StaticXULComponentsEnd',
+    '/toolkit/library',
+]
+
+if CONFIG['MOZ_ENABLE_GNOME_COMPONENT']:
+    DIRS += ['/toolkit/system/gnome']
+
+# if QtNetwork is present, it will do its own network monitoring
+if not CONFIG['MOZ_ENABLE_QTNETWORK'] and CONFIG['MOZ_ENABLE_DBUS']:
+    DIRS += ['/toolkit/system/dbus']
+
+if CONFIG['ENABLE_MARIONETTE'] or CONFIG['MOZ_WIDGET_TOOLKIT'] not in ('gonk', 'android'):
+    DIRS += ['/testing/marionette']
+
+DIRS += [
+    '/tools/quitter',
+    '/media/gmp-clearkey/0.1',
+]
+
+if CONFIG['ENABLE_TESTS']:
+    DIRS += [
+        '/testing/mochitest',
+        '/testing/xpcshell',
+        '/testing/tools/screenshot',
+        '/testing/profiles',
+        '/testing/mozbase',
+        '/testing/modules',
+        '/testing/web-platform',
+    ]
+
+    if CONFIG['MOZ_WEBRTC'] and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
+            DIRS += [
+                '/media/webrtc/signaling/test',
+                '/media/mtransport/test',
+            ]

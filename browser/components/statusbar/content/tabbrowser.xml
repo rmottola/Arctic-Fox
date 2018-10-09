@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<bindings id="status4evar-bindings"
+          xmlns="http://www.mozilla.org/xbl"
+          xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:xbl="http://www.mozilla.org/xbl">
+
+	<binding id="statuspanel" display="xul:hbox" extends="chrome://browser/content/tabbrowser.xml#statuspanel">
+		<implementation>
+			<!--                          -->
+			<!-- Inverted mirror handling -->
+			<!--                          -->
+
+			<field name="_invertMirror"><![CDATA[
+				false
+			]]></field>
+
+			<property name="invertMirror">
+				<setter><![CDATA[
+					this._invertMirror = val;
+					this.mirror = this._isMirrored;
+					return val;
+				]]></setter>
+				<getter><![CDATA[
+					return this._invertMirror;
+				]]></getter>
+			</property>
+
+			<!--                       -->
+			<!-- Mouse mirror handling -->
+			<!--                       -->
+
+			<field name="_mouseMirror"><![CDATA[
+				true
+			]]></field>
+
+			<field name="_mouseMirrorListen"><![CDATA[
+				false
+			]]></field>
+
+			<property name="mouseMirror">
+				<setter><![CDATA[
+					this._mouseMirror = val;
+					this.setupMouseMirror(this.value);
+					return val;
+				]]></setter>
+				<getter><![CDATA[
+					return this._mouseMirror;
+				]]></getter>
+			</property>
+
+			<method name="setupMouseMirror">
+				<parameter name="val"/>
+				<body><![CDATA[
+					if(val && this._mouseMirror)
+					{
+						this._calcMouseTargetRect();
+						if(!this._mouseMirrorListen)
+						{
+							MousePosTracker.addListener(this);
+							this._mouseMirrorListen = true;
+						}
+					}
+					else
+					{
+						this.mirror = false;
+						if(this._mouseMirrorListen)
+						{
+							MousePosTracker.removeListener(this);
+							this._mouseMirrorListen = false;
+						}
+					}
+				]]></body>
+			</method>
+
+			<method name="_calcMouseTargetRect">
+				<body><![CDATA[
+					let alignRight = false;
+					let isRTL = (getComputedStyle(document.documentElement).direction == "rtl");
+					if((this._invertMirror && !isRTL) || (!this._invertMirror && isRTL))
+					{
+						alignRight = true;
+					}
+
+					let rect = this.getBoundingClientRect();
+					this._mouseTargetRect =
+					{
+						top:    rect.top,
+						bottom: rect.bottom,
+						left:   ((alignRight) ? window.innerWidth - rect.width : 0),
+						right:  ((alignRight) ? window.innerWidth : rect.width)
+					};
+				]]></body>
+			</method>
+
+			<method name="onMouseEnter">
+				<body><![CDATA[
+					this.mirror = true;
+				]]></body>
+			</method>
+
+			<method name="onMouseLeave">
+				<body><![CDATA[
+					this.mirror = false;
+				]]></body>
+			</method>
+
+			<!--                 -->
+			<!-- Mirror handling -->
+			<!--                 -->
+
+			<field name="_isMirrored"><![CDATA[
+				false
+			]]></field>
+
+			<property name="mirror">
+				<setter><![CDATA[
+					this._isMirrored = val;
+					if(this._invertMirror)
+					{
+						val = !val;
+					}
+
+					this.setBooleanAttr("mirror", val);
+				]]></setter>
+				<getter><![CDATA[
+					return this._isMirrored;
+				]]></getter>
+			</property>
+
+			<method name="_mirror">
+				<body><![CDATA[
+					this.mirror = !this._isMirrored;
+				]]></body>
+			</method>
+
+			<!--                -->
+			<!-- Value handling -->
+			<!--                -->
+
+			<property name="label">
+				<setter><![CDATA[
+					if(window.caligon && window.caligon.status4evar)
+					{
+						window.caligon.status4evar.statusService.setStatusText(val);
+					}
+					return undefined;
+				]]></setter>
+				<getter><![CDATA[
+					if(window.caligon && window.caligon.status4evar)
+					{
+						return window.caligon.status4evar.statusService.getStatusText();
+					}
+					return "";
+				]]></getter>
+			</property>
+
+			<property name="value">
+				<setter><![CDATA[
+					this.setValue(val);
+					this.setupMouseMirror(val);
+					return val;
+				]]></setter>
+				<getter><![CDATA[
+					return ((this.hasAttribute("inactive")) ? "" : this.getAttribute("label"));
+				]]></getter>
+			</property>
+
+			<method name="setValue">
+				<parameter name="val"/>
+				<body><![CDATA[
+					if((this.getAttribute("type") || "").indexOf("network") > -1 && (this.getAttribute("previoustype") || "").indexOf("network") > -1)
+					{
+						this.style.minWidth = getComputedStyle(this).width;
+					}
+					else
+					{
+						this.style.minWidth = "";
+					}
+
+					if(val)
+					{
+						this.setAttribute("label", val);
+						this.setBooleanAttr("inactive", false);
+					}
+					else
+					{
+						this.setBooleanAttr("inactive", true);
+					}
+				]]></body>
+			</method>
+
+			<!--         -->
+			<!-- Helpers -->
+			<!--         -->
+
+			<method name="setBooleanAttr">
+				<parameter name="name"/>
+				<parameter name="val"/>
+				<body><![CDATA[
+					if(val)
+					{
+						this.setAttribute(name, "true");
+					}
+					else
+					{
+						this.removeAttribute(name);
+					}
+				]]></body>
+			</method>
+		</implementation>
+	</binding>
+</bindings>
+

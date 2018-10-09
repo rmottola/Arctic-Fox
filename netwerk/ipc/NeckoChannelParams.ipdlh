@@ -1,0 +1,139 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set sw=2 ts=8 et tw=80 ft=c: */
+
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PHttpChannel;
+include protocol PFTPChannel;
+include protocol PRtspChannel;
+include URIParams;
+include InputStreamParams;
+include PBackgroundSharedTypes;
+
+using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
+using RequestHeaderTuples from "mozilla/net/PHttpChannelParams.h";
+using struct nsHttpAtom from "nsHttp.h";
+
+namespace mozilla {
+namespace net {
+
+//-----------------------------------------------------------------------------
+// HTTP IPDL structs
+//-----------------------------------------------------------------------------
+
+struct HttpChannelOpenArgs
+{
+  URIParams                   uri;
+  // - TODO: bug 571161: unclear if any HTTP channel clients ever
+  // set originalURI != uri (about:credits?); also not clear if
+  // chrome channel would ever need to know.  Get rid of next arg?
+  OptionalURIParams           original;
+  OptionalURIParams           doc;
+  OptionalURIParams           referrer;
+  uint32_t                    referrerPolicy;
+  OptionalURIParams           apiRedirectTo;
+  OptionalURIParams           topWindowURI;
+  uint32_t                    loadFlags;
+  RequestHeaderTuples         requestHeaders;
+  nsCString                   requestMethod;
+  OptionalInputStreamParams   uploadStream;
+  bool                        uploadStreamHasHeaders;
+  uint16_t                    priority;
+  uint32_t                    classOfService;
+  uint8_t                     redirectionLimit;
+  bool                        allowPipelining;
+  bool                        allowSTS;
+  uint32_t                    thirdPartyFlags;
+  bool                        resumeAt;
+  uint64_t                    startPos;
+  nsCString                   entityID;
+  bool                        chooseApplicationCache;
+  nsCString                   appCacheClientID;
+  bool                        allowSpdy;
+  OptionalFileDescriptorSet   fds;
+  PrincipalInfo               requestingPrincipalInfo;
+  PrincipalInfo               triggeringPrincipalInfo;
+  uint32_t                    securityFlags;
+  uint32_t                    contentPolicyType;
+  uint32_t                    innerWindowID;
+  bool                        allowStaleCacheContent;
+};
+
+struct HttpChannelConnectArgs
+{
+  uint32_t channelId;
+};
+
+union HttpChannelCreationArgs
+{
+  HttpChannelOpenArgs;      // For AsyncOpen: the common case.
+  HttpChannelConnectArgs;   // Used for redirected-to channels
+};
+
+//-----------------------------------------------------------------------------
+// FTP IPDL structs
+//-----------------------------------------------------------------------------
+
+struct FTPChannelOpenArgs
+{
+  URIParams                 uri;
+  uint64_t                  startPos;
+  nsCString                 entityID;
+  OptionalInputStreamParams uploadStream;
+  PrincipalInfo             requestingPrincipalInfo;
+  PrincipalInfo             triggeringPrincipalInfo;
+  uint32_t                  securityFlags;
+  uint32_t                  contentPolicyType;
+  uint32_t                  innerWindowID;
+};
+
+struct FTPChannelConnectArgs
+{
+  uint32_t channelId;
+};
+
+union FTPChannelCreationArgs
+{
+  FTPChannelOpenArgs;      // For AsyncOpen: the common case.
+  FTPChannelConnectArgs;   // Used for redirected-to channels
+};
+
+struct HttpChannelDiverterArgs
+{
+  PHttpChannel mChannel;
+  bool mApplyConversion;
+};
+
+union ChannelDiverterArgs
+{
+  HttpChannelDiverterArgs;
+  PFTPChannel;
+};
+
+//-----------------------------------------------------------------------------
+// RTSP IPDL structs
+//-----------------------------------------------------------------------------
+
+struct RtspChannelConnectArgs
+{
+  URIParams uri;
+  uint32_t channelId;
+};
+
+//-----------------------------------------------------------------------------
+// WS IPDL structs
+//-----------------------------------------------------------------------------
+
+struct WebSocketLoadInfoArgs
+{
+  PrincipalInfo requestingPrincipalInfo;
+  PrincipalInfo triggeringPrincipalInfo;
+  uint32_t      securityFlags;
+  uint32_t      contentPolicyType;
+  uint32_t      innerWindowID;
+};
+
+} // namespace ipc
+} // namespace mozilla

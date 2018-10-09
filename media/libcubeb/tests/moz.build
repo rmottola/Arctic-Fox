@@ -1,0 +1,58 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+GoannaCppUnitTests([
+  'test_tone'
+])
+
+if CONFIG['OS_TARGET'] != 'Android':
+  GoannaCppUnitTests([
+    'test_audio',
+    'test_latency',
+    'test_sanity'
+  ])
+
+LOCAL_INCLUDES += [
+    '../include'
+]
+
+FAIL_ON_WARNINGS = True
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    # On windows, the WASAPI backend needs the resampler we have in
+    # /media/libspeex_resampler, so we can't get away with just linking cubeb's
+    # .o
+    USE_LIBS += [
+        'cubeb',
+        'speex',
+    ]
+    OS_LIBS += [
+        'ole32'
+    ]
+else:
+    # Otherwise, we can just grab all the compiled .o and compile against that,
+    # linking the appriopriate libraries.
+    USE_LIBS += [
+        'cubeb',
+    ]
+    # Don't link gkmedias for it introduces dependencies on Android.
+    if CONFIG['OS_TARGET'] == 'Android':
+        USE_LIBS += [
+            'speex',
+        ]
+
+if CONFIG['OS_TARGET'] == 'Darwin':
+    OS_LIBS += [
+        '-framework AudioUnit',
+        '-framework CoreAudio',
+    ]
+elif CONFIG['OS_TARGET'] == 'OpenBSD':
+    OS_LIBS += [
+        'sndio',
+    ]
+else:
+    OS_LIBS += CONFIG['MOZ_ALSA_LIBS']
+    OS_LIBS += CONFIG['MOZ_PULSEAUDIO_LIBS']

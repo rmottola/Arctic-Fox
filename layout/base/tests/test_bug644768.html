@@ -1,0 +1,28 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bug 644768 test</title>
+    <style>
+      iframe {
+        width: 600px;
+        height: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+  </body>
+  <script>
+  // Touch caret's pref is checked only when PresShell is initialized. To turn
+  // off the pref, we test bug 644768 in an iframe.
+  SpecialPowers.pushPrefEnv({"set": [['touchcaret.enabled', false]]}, function() {
+    var iframe = document.createElement("iframe");
+    iframe.src = "bug644768.html";
+    document.getElementById('container').appendChild(iframe);
+  });
+  </script>
+</html>

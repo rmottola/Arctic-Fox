@@ -1,0 +1,61 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# These are native to Windows but need to be added for other platforms.
+if CONFIG['OS_ARCH'] != 'WINNT':
+    EXPORTS += [
+        'common/include/guiddef.h',
+        'common/include/wmsal.h',
+        'common/include/wmspecstring.h',
+        'common/include/wmspecstrings_adt.h',
+        'common/include/wmspecstrings_strict.h',
+        'common/include/wmspecstrings_undef.h',
+    ]
+
+    LOCAL_INCLUDES += [
+        'common/include',
+    ]
+
+EXPORTS.jxrlib += [
+    'image/sys/windowsmediaphoto.h',
+    'jxrgluelib/JXRGlue.h',
+    'jxrgluelib/JXRMeta.h',
+]
+
+LOCAL_INCLUDES += [
+    'image/decode',
+    'image/sys',
+    'image/x86',
+    'jxrgluelib',
+]
+
+SOURCES += [
+    'image/decode/decode.c',
+    'image/decode/postprocess.c',
+    'image/decode/segdec.c',
+    'image/decode/strdec.c',
+    'image/decode/strInvTransform.c',
+    'image/decode/strPredQuantDec.c',
+    'image/sys/adapthuff.c',
+    'image/sys/image.c',
+    'image/sys/strcodec.c',
+    'image/sys/strPredQuant.c',
+    'image/sys/strTransform.c',
+    'jxrgluelib/JXRGlue.c',
+    'jxrgluelib/JXRGlueDec.c',
+    'jxrgluelib/JXRGluePFC.c',
+    'jxrgluelib/JXRMeta.c',
+]
+
+FAIL_ON_WARNINGS = False
+
+# TODO: [rhinoduck] This comes from the jxr example. Is it necessary?
+DEFINES['DISABLE_PERF_MEASUREMENT'] = True
+
+if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
+    NO_VISIBILITY_FLAGS = True
+
+FINAL_LIBRARY = 'gkmedias'

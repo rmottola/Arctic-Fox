@@ -1,0 +1,59 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * nsISessionStore keeps track of the current browsing state - i.e.
+ * tab history, cookies, scroll state, form data, POSTDATA and window features
+ * - and allows to restore everything into one window.
+ */
+
+[scriptable, uuid(51f4b9f0-f3d2-11e2-bb62-2c24dd830245)]
+interface nsISessionStartup: nsISupports
+{
+  /**
+   * Return a promise that is resolved once initialization
+   * is complete.
+   */
+  readonly attribute jsval onceInitialized;
+
+  // Get session state
+  readonly attribute jsval state;
+
+  /**
+   * Determines whether there is a pending session restore and makes sure that
+   * we're initialized before returning. If we're not yet this will read the
+   * session file synchronously.
+   */
+  boolean doRestore();
+
+  /**
+   * Returns whether we will restore a session that ends up replacing the
+   * homepage. The browser uses this to not start loading the homepage if
+   * we're going to stop its load anyway shortly after.
+   *
+   * This is meant to be an optimization for the average case that loading the
+   * session file finishes before we may want to start loading the default
+   * homepage. Should this be called before the session file has been read it
+   * will just return false.
+   */
+  readonly attribute bool willOverrideHomepage;
+
+  /**
+   * What type of session we're restoring.
+   * NO_SESSION       There is no data available from the previous session
+   * RECOVER_SESSION  The last session crashed. It will either be restored or
+   *                  about:sessionrestore will be shown.
+   * RESUME_SESSION   The previous session should be restored at startup
+   * DEFER_SESSION    The previous session is fine, but it shouldn't be restored
+   *                  without explicit action (with the exception of pinned tabs)
+   */
+  const unsigned long NO_SESSION = 0;
+  const unsigned long RECOVER_SESSION = 1;
+  const unsigned long RESUME_SESSION = 2;
+  const unsigned long DEFER_SESSION = 3;
+
+  readonly attribute unsigned long sessionType;
+};

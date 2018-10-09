@@ -1,0 +1,25 @@
+BACKGROUND:
+
+    I started coding this because I couldn't find a fixed point FFT that didn't 
+use assembly code.  I started with floating point numbers so I could get the 
+theory straight before working on fixed point issues.  In the end, I had a 
+little bit of code that could be recompiled easily to do ffts with short, float
+or double (other types should be easy too).  
+
+    Once I got my FFT working, I was curious about the speed compared to
+a well respected and highly optimized fft library.  I don't want to criticize 
+this great library, so let's call it FFT_BRANDX.
+During this process, I learned:
+
+    1. FFT_BRANDX has more than 100K lines of code. The core of kiss_fft is about 500 lines (cpx 1-d).
+    2. It took me an embarrassingly long time to get FFT_BRANDX working.
+    3. A simple program using FFT_BRANDX is 522KB. A similar program using kiss_fft is 18KB (without optimizing for size).
+    4. FFT_BRANDX is roughly twice as fast as KISS FFT in default mode.
+
+    It is wonderful that free, highly optimized libraries like FFT_BRANDX exist.
+But such libraries carry a huge burden of complexity necessary to extract every 
+last bit of performance.
+
+    Sometimes simpler is better, even if it's not better.
+    
+    -- Mark Borgerding

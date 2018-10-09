@@ -1,0 +1,153 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+XPIDL_SOURCES += [
+    'nsIHangReport.idl',
+]
+
+XPIDL_MODULE = 'dom'
+
+EXPORTS += [
+    'nsICachedFileDescriptorListener.h',
+]
+
+EXPORTS.mozilla.dom.ipc += [
+    'BlobChild.h',
+    'BlobParent.h',
+    'IdType.h',
+    'nsIRemoteBlob.h',
+]
+
+EXPORTS.mozilla.dom += [
+    'ContentBridgeChild.h',
+    'ContentBridgeParent.h',
+    'ContentChild.h',
+    'ContentParent.h',
+    'ContentProcess.h',
+    'ContentProcessManager.h',
+    'CPOWManagerGetter.h',
+    'FilePickerParent.h',
+    'nsIContentChild.h',
+    'nsIContentParent.h',
+    'PermissionMessageUtils.h',
+    'StructuredCloneUtils.h',
+    'TabChild.h',
+    'TabContext.h',
+    'TabMessageUtils.h',
+    'TabParent.h',
+]
+
+EXPORTS.mozilla += [
+    'AppProcessChecker.h',
+    'PreallocatedProcessManager.h',
+    'ProcessHangMonitor.h',
+    'ProcessHangMonitorIPC.h',
+    'ProcessPriorityManager.h',
+]
+
+UNIFIED_SOURCES += [
+    'AppProcessChecker.cpp',
+    'ColorPickerParent.cpp',
+    'ContentBridgeChild.cpp',
+    'ContentBridgeParent.cpp',
+    'ContentParent.cpp',
+    'ContentProcess.cpp',
+    'ContentProcessManager.cpp',
+    'FilePickerParent.cpp',
+    'nsIContentChild.cpp',
+    'nsIContentParent.cpp',
+    'PermissionMessageUtils.cpp',
+    'PreallocatedProcessManager.cpp',
+    'ProcessPriorityManager.cpp',
+    'ScreenManagerParent.cpp',
+    'StructuredCloneUtils.cpp',
+    'TabChild.cpp',
+    'TabContext.cpp',
+    'TabMessageUtils.cpp',
+    'TabParent.cpp',
+]
+
+# Blob.cpp cannot be compiled in unified mode because it triggers a fatal gcc warning.
+# ContentChild.cpp cannot be compiled in unified mode on  linux due to Time conflict
+SOURCES += [
+    'Blob.cpp',
+    'ContentChild.cpp',
+    'ProcessHangMonitor.cpp',
+]
+
+IPDL_SOURCES += [
+    'DOMTypes.ipdlh',
+    'PBlob.ipdl',
+    'PBlobStream.ipdl',
+    'PBrowser.ipdl',
+    'PBrowserOrId.ipdlh',
+    'PColorPicker.ipdl',
+    'PContent.ipdl',
+    'PContentBridge.ipdl',
+    'PContentPermission.ipdlh',
+    'PContentPermissionRequest.ipdl',
+    'PCycleCollectWithLogs.ipdl',
+    'PDocumentRenderer.ipdl',
+    'PFilePicker.ipdl',
+    'PMemoryReportRequest.ipdl',
+    'PPluginWidget.ipdl',
+    'PProcessHangMonitor.ipdl',
+    'PScreenManager.ipdl',
+    'PTabContext.ipdlh',
+]
+
+FAIL_ON_WARNINGS = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+FINAL_LIBRARY = 'xul'
+LOCAL_INCLUDES += [
+    '/caps',
+    '/chrome',
+    '/docshell/base',
+    '/dom/base',
+    '/dom/bluetooth',
+    '/dom/bluetooth/ipc',
+    '/dom/devicestorage',
+    '/dom/filesystem',
+    '/dom/fmradio/ipc',
+    '/dom/geolocation',
+    '/dom/media/webspeech/synth/ipc',
+    '/dom/mobilemessage/ipc',
+    '/dom/storage',
+    '/dom/workers',
+    '/editor/libeditor',
+    '/embedding/components/printingui/ipc',
+    '/extensions/cookie',
+    '/extensions/spellcheck/src',
+    '/hal/sandbox',
+    '/layout/base',
+    '/netwerk/base',
+    '/toolkit/xre',
+    '/uriloader/exthandler',
+    '/widget',
+    '/xpcom/base',
+    '/xpcom/threads',
+]
+
+DEFINES['BIN_SUFFIX'] = '"%s"' % CONFIG['BIN_SUFFIX']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gonk', 'qt'):
+    DEFINES['MOZ_ENABLE_FREETYPE'] = True
+
+if CONFIG['MOZ_TOOLKIT_SEARCH']:
+    DEFINES['MOZ_TOOLKIT_SEARCH'] = True
+
+for var in ('MOZ_PERMISSIONS', 'MOZ_CHILD_PERMISSIONS'):
+    if CONFIG[var]:
+        DEFINES[var] = True
+
+JAR_MANIFESTS += ['jar.mn']
+
+MOCHITEST_CHROME_MANIFESTS += ['tests/chrome.ini']
+MOCHITEST_MANIFESTS += ['tests/mochitest.ini']
+
+CXXFLAGS += CONFIG['TK_CFLAGS']

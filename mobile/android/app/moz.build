@@ -1,0 +1,19 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+for var in ('APP_NAME', 'APP_VERSION'):
+    DEFINES[var] = CONFIG['MOZ_%s' % var]
+
+for var in ('MOZ_UPDATER', 'MOZ_APP_UA_NAME', 'ANDROID_PACKAGE_NAME'):
+    DEFINES[var] = CONFIG[var]
+
+if CONFIG['MOZ_PKG_SPECIAL']:
+    DEFINES['MOZ_PKG_SPECIAL'] = CONFIG['MOZ_PKG_SPECIAL']
+
+JS_PREFERENCE_FILES += [
+    'mobile.js',
+]
+

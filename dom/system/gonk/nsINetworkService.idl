@@ -1,0 +1,489 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+interface nsINetworkInterface;
+
+[scriptable, function, uuid(91824160-fb25-11e1-a21f-0800200c9a66)]
+interface nsIWifiTetheringCallback : nsISupports
+{
+  /**
+   * Callback function used to report status to WifiManager.
+   *
+   * @param error
+   *        An error message if the operation wasn't successful,
+   *        or `null` if it was.
+   */
+  void wifiTetheringEnabledChange(in jsval error);
+};
+
+[scriptable, function, uuid(9c128e68-5e4b-4626-bb88-84ec54cce5d8)]
+interface nsINetworkStatsCallback : nsISupports
+{
+  void networkStatsAvailable(in boolean success,
+                             in unsigned long rxBytes,
+                             in unsigned long txBytes,
+                             in unsigned long long timestamp);
+};
+
+[scriptable, function, uuid(0706bfa2-ac2d-11e2-9a8d-7b6d988d4767)]
+interface nsINetworkUsageAlarmCallback : nsISupports
+{
+  void networkUsageAlarmResult(in jsval error);
+};
+
+[scriptable, function, uuid(9ede8720-f8bc-11e2-b778-0800200c9a66)]
+interface nsIWifiOperationModeCallback : nsISupports
+{
+  /**
+   * Callback function used to report result to WifiManager.
+   *
+   * @param error
+   *        An error message if the operation wasn't successful,
+   *        or `null` if it was.
+   */
+  void wifiOperationModeResult(in jsval error);
+};
+
+[scriptable, function, uuid(097878b0-19fc-11e3-8ffd-0800200c9a66)]
+interface nsISetDhcpServerCallback : nsISupports
+{
+  /**
+   * Callback function used to report the DHCP server set result
+   *
+   * @param error
+   *        An error message if the operation wasn't successful,
+   *        or `null` if it was.
+   */
+  void dhcpServerResult(in jsval error);
+};
+
+[scriptable, function, uuid(32407c50-46c7-11e3-8f96-0800200c9a66)]
+interface nsIUsbTetheringCallback : nsISupports
+{
+  /**
+   * Callback function used to report status of enabling usb tethering.
+   *
+   * @param error
+   *        An error message if the operation wasn't successful,
+   *        or `null` if it was.
+   */
+  void usbTetheringEnabledChange(in jsval error);
+};
+
+[scriptable, function, uuid(055fd560-46ad-11e3-8f96-0800200c9a66)]
+interface nsIEnableUsbRndisCallback : nsISupports
+{
+  /**
+   * Callback function used to report the status of enabling/disabling usb rndis.
+   *
+   * @param success
+   *        Boolean to indicate the operation is successful or not.
+   * @param enable
+   *        Boolean to indicate if we are enabling or disabling usb rndis.
+   */
+  void enableUsbRndisResult(in boolean success, in boolean enable);
+};
+
+[scriptable, function, uuid(4f08cc30-46ad-11e3-8f96-0800200c9a66)]
+interface nsIUpdateUpStreamCallback : nsISupports
+{
+  /**
+   * Callback function used to report the result of updating upstream.
+   *
+   * @param success
+   *        Boolean to indicate the operation is successful or not.
+   * @param externalIfname
+   *        The external interface name.
+   */
+  void updateUpStreamResult(in boolean success, in DOMString externalIfname);
+};
+
+[scriptable, function, uuid(eedca6c0-1310-11e4-9191-0800200c9a66)]
+interface nsISetDnsCallback : nsISupports
+{
+  /**
+   * Callback function used to report the result of setting DNS server.
+   *
+   * @param error
+   *        An error message if the operation wasn't successful,
+   *        or `null` if it was.
+   */
+  void setDnsResult(in jsval error);
+};
+
+[scriptable, function, uuid(5d0e1a60-1187-11e4-9191-0800200c9a66)]
+interface nsINativeCommandCallback : nsISupports
+{
+  /**
+   * Callback function used to report the result of a network native command.
+   *
+   * @param success
+   *        Boolean to indicate the operation is successful or not.
+   */
+  void nativeCommandResult(in boolean success);
+};
+
+[scriptable, function, uuid(694abb80-1187-11e4-9191-0800200c9a66)]
+interface nsIDhcpRequestCallback : nsISupports
+{
+  /**
+   * Callback function used to report the result of DHCP client request.
+   *
+   * @param success
+   *        Boolean to indicate the operation is successful or not.
+   *
+   * @param dhcpInfo
+   *        An object to represent the successful DHCP request:
+   *
+   *          - gateway_str: string
+   *          - dns1_str:    string
+   *          - dns2_str:    string
+   *          - mask_str:    string
+   *          - server_str:  string
+   *          - vendor_str:  string
+   *          - lease:       long
+   *          - mask:        long
+   *          - ipaddr:      long
+   *          - gateway:     long
+   *          - dns1:        long
+   *          - dns2:        long
+   *          - server:      long
+   */
+  void dhcpRequestResult(in boolean success, in jsval dhcpInfo);
+};
+
+
+/**
+ * Provide network services.
+ */
+[scriptable, uuid(e40dd966-cb04-4dc7-ac4b-6382769c00b9)]
+interface nsINetworkService : nsISupports
+{
+  const long MODIFY_ROUTE_ADD    = 0;
+  const long MODIFY_ROUTE_REMOVE = 1;
+
+  /**
+   * Enable or disable Wifi Tethering
+   *
+   * @param enabled
+   *        Boolean that indicates whether tethering should be enabled (true) or disabled (false).
+   * @param config
+   *        The Wifi Tethering configuration from settings db.
+   * @param callback
+   *        Callback function used to report status to WifiManager.
+   */
+  void setWifiTethering(in boolean enabled,
+                        in jsval config,
+                        in nsIWifiTetheringCallback callback);
+
+  /**
+   * Enable or disable DHCP server
+   *
+   * @param enabled
+   *        Boolean that indicates enabling or disabling DHCP server.
+   *
+   * @param config
+   *        Config used to enable the DHCP server. It contains
+   *        .startIp    start of the ip lease range (string)
+   *        .endIp      end of the ip lease range (string)
+   *        .serverIp   ip of the DHCP server (string)
+   *        .maskLength the length of the subnet mask
+   *        .ifname     the interface name
+   *
+   *        As for disabling the DHCP server, put this value |null|.
+   *
+   * @param callback
+   *        Callback function used to report status.
+   */
+  void setDhcpServer(in boolean enabled,
+                     in jsval config,
+                     in nsISetDhcpServerCallback callback);
+
+
+  /**
+   * Retrieve network interface stats.
+   *
+   * @param networkName
+   *        Select the Network interface to request estats.
+   *
+   * @param callback
+   *        Callback to notify result and provide stats, connectionType
+   *        and the date when stats are retrieved
+   */
+  void getNetworkInterfaceStats(in DOMString networkName, in nsINetworkStatsCallback callback);
+
+  /**
+   * Set Alarm of usage per interface
+   *
+   * @param networkName
+   *        Select the Network interface to set an alarm.
+   *
+   * @param threshold
+   *        Amount of data that will trigger the alarm.
+   *
+   * @param callback
+   *        Callback to notify the result.
+   *
+   * @return false if there is no interface registered for the networkType param.
+   */
+  boolean setNetworkInterfaceAlarm(in DOMString networkName,
+                                   in long threshold,
+                                   in nsINetworkUsageAlarmCallback callback);
+
+  /**
+   * Reload Wifi firmware to specific operation mode.
+   *
+   * @param interfaceName
+   *        Wifi Network interface name.
+   *
+   * @param mode
+   *        AP  - Access pointer mode.
+   *        P2P - Peer to peer connection mode.
+   *        STA - Station mode.
+   *
+   * @param callback
+   *        Callback to notify Wifi firmware reload result.
+   */
+  void setWifiOperationMode(in DOMString interfaceName,
+                            in DOMString mode,
+                            in nsIWifiOperationModeCallback callback);
+
+  /**
+   * Set http proxy for specific network
+   *
+   * @param networkInterface
+   *        The network interface which contains the http proxy host/port
+   *        we want to set.
+   */
+  void setNetworkProxy(in nsINetworkInterface networkInterface);
+
+  /**
+   * Clear all http proxy.
+   */
+  void clearNetworkProxy();
+
+  /**
+   * Set USB tethering.
+   *
+   * @param enabled
+   *        Boolean to indicate we are going to enable or disable usb tethering.
+   * @param config
+   *        The usb tethering configuration.
+   * @param callback
+   *        Callback function used to report the result enabling/disabling usb tethering.
+   */
+  void setUSBTethering(in boolean enabled,
+                       in jsval config,
+                       in nsIUsbTetheringCallback callback);
+
+  /**
+   * Reset routing table.
+   *
+   * @param networkInterface
+   *        The network interface we want remove from the routing table.
+   */
+  void resetRoutingTable(in nsINetworkInterface networkInterface);
+
+  /**
+   * Set DNS.
+   *
+   * @param networkInterface
+   *        The network interface which contains the DNS we want to set.
+   *
+   * @param callback
+   *        Callback to notify the result of setting DNS server.
+   */
+  void setDNS(in nsINetworkInterface networkInterface,
+              in nsISetDnsCallback callback);
+
+  /**
+   * Set default route.
+   *
+   * @param networkInterface
+   *        The network interface we want to set to the default route.
+   * @param oldInterface
+   *        The previous network interface.
+   * @param callback
+   *        Callback to notify the result of setting default route.
+   */
+  void setDefaultRoute(in nsINetworkInterface networkInterface,
+                       in nsINetworkInterface oldInterface,
+                       in nsINativeCommandCallback callback);
+
+  /**
+   * Remove default route.
+   *
+   * @param networkInterface
+   *        The network interface we want remove from the default route.
+   */
+  void removeDefaultRoute(in nsINetworkInterface networkInterface);
+
+  /**
+   * Modify route.
+   *
+   * @param action
+   *        nsINetworkService.MODIFY_ROUTE_ADD to add route and
+   *        nsINetworkService.MODIFY_ROUTE_REMOVE to remove.
+   * @param interfaceName
+   *        Network interface name for the output of the host route.
+   * @param host
+   *        Host ip we want to remove route for.
+   * @param prefixLength
+   *        The prefix length of the route we'd like to modify.
+   * @param [optional] gateway
+   *        Gateway ip for the output of the host route.
+   *
+   * @return A deferred promise that resolves on success or rejects with a
+   *         specified reason otherwise.
+   */
+  jsval modifyRoute(in long      action,
+                    in DOMString interfaceName,
+                    in DOMString host,
+                    in long      prefixLength,
+                    [optional] in DOMString gateway);
+
+  /**
+   * Add route to secondary routing table.
+   *
+   * @param interfaceName
+   *        The network interface for this route.
+   * @param route
+   *        The route info should have the following fields:
+   *        .ip: destination ip address
+   *        .prefix: destination prefix
+   *        .gateway: gateway ip address
+   */
+  void addSecondaryRoute(in DOMString interfaceName, in jsval route);
+
+  /**
+   * Remove route from secondary routing table.
+   *
+   * @param interfaceName
+   *        The network interface for the route we want to remove.
+   * @param route
+   *        The route info should have the following fields:
+   *        .ip: destination ip address
+   *        .prefix: destination prefix
+   *        .gateway: gateway ip address
+   */
+  void removeSecondaryRoute(in DOMString interfaceName, in jsval route);
+
+  /**
+   * Enable or disable usb rndis.
+   *
+   * @param enable
+   *        Boolean to indicate we want enable or disable usb rndis.
+   * @param callback
+   *        Callback function to report the result.
+   */
+  void enableUsbRndis(in boolean enable,
+                      in nsIEnableUsbRndisCallback callback);
+
+  /**
+   * Update upstream.
+   *
+   * @param previous
+   *        The previous internal and external interface.
+   * @param current
+   *        The current internal and external interface.
+   * @param callback
+   *        Callback function to report the result.
+   */
+  void updateUpStream(in jsval previous,
+                      in jsval current,
+                      in nsIUpdateUpStreamCallback callback);
+
+  /**
+   * Configure a network interface.
+   *
+   * @param config
+   *        An object containing the detail that we want to configure the interface:
+   *
+   *          - ifname:  string
+   *          - ipaddr:  long
+   *          - mask:    long
+   *          - gateway: long
+   *          - dns1:    long
+   *          - dns2:    long
+   *
+   * @param callback
+   *        Callback to notify the result of configurating network interface.
+   */
+  void configureInterface(in jsval config,
+                          in nsINativeCommandCallback callback);
+
+  /**
+   * Issue a DHCP client request.
+   *
+   * @param networkInterface
+   *        The network interface which we wnat to do the DHCP request on.
+   *
+   * @param callback
+   *        Callback to notify the result of the DHCP request.
+   */
+  void dhcpRequest(in DOMString interfaceName,
+                   in nsIDhcpRequestCallback callback);
+
+  /**
+   * Enable a network interface.
+   *
+   * @param networkInterface
+   *        The network interface name which we want to enable.
+   *
+   * @param callback
+   *        Callback to notify the result of disabling network interface.
+   */
+  void enableInterface(in DOMString interfaceName,
+                       in nsINativeCommandCallback callback);
+
+  /**
+   * Disable a network interface.
+   *
+   * @param networkInterface
+   *        The network interface name which we want to disable.
+   *
+   * @param callback
+   *        Callback to notify the result of disabling network interface.
+   */
+  void disableInterface(in DOMString interfaceName,
+                        in nsINativeCommandCallback callback);
+
+  /**
+   * Reset all connections
+   *
+   * @param networkInterface
+   *        The network interface name which we want to reset.
+   *
+   * @param callback
+   *        Callback to notify the result of resetting connections.
+   */
+  void resetConnections(in DOMString interfaceName,
+                        in nsINativeCommandCallback callback);
+
+  /**
+   * Create network (required to call prior to any networking operation)
+   *
+   * @param networkInterface
+   *        The network interface name which we want to reset.
+   *
+   * @param callback
+   *        Callback to notify the result of resetting connections.
+   */
+  void createNetwork(in DOMString interfaceName,
+                     in nsINativeCommandCallback callback);
+
+  /**
+   * Destroy network (required to call prior to any networking operation)
+   *
+   * @param networkInterface
+   *        The network interface name which we want to reset.
+   *
+   * @param callback
+   *        Callback to notify the result of resetting connections.
+   */
+  void destroyNetwork(in DOMString interfaceName,
+                      in nsINativeCommandCallback callback);
+};

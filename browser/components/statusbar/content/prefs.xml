@@ -1,0 +1,704 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE bindings SYSTEM "chrome://browser/locale/statusbar/statusbar-prefs.dtd">
+
+<bindings id="status4evar-prefs-bindings"
+          xmlns="http://www.mozilla.org/xbl"
+          xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:xbl="http://www.mozilla.org/xbl">
+
+	<binding id="css-bg-editor">
+		<content sizetopopup="pref">
+			<xul:vbox flex="1">
+				<xul:deck anonid="css-bg-editor-deck" flex="1">
+					<xul:vbox>
+						<xul:hbox align="center">
+							<xul:label xbl:inherits="disabled">&status4evar.editor.css.color.label;</xul:label>
+							<xul:colorpicker anonid="css-bg-editor-color" type="button" onchange="this._editor._buildCSS();" xbl:inherits="disabled" />
+						</xul:hbox>
+
+						<xul:hbox align="center">
+							<xul:label xbl:inherits="disabled">&status4evar.editor.css.image.label;</xul:label>
+							<xul:textbox anonid="css-bg-editor-image" readonly="true" flex="1" xbl:inherits="disabled" />
+							<xul:button anonid="css-bg-editor-image-browse" label="&status4evar.option.browse;" oncommand="this._editor._imageBrowse();" xbl:inherits="disabled" />
+						</xul:hbox>
+						<xul:hbox align="center" pack="end">
+							<xul:button anonid="css-bg-editor-image-clear" label="&status4evar.option.clear;" oncommand="this._editor._imageClear();" xbl:inherits="disabled=no-image" />
+						</xul:hbox>
+
+						<xul:hbox>
+							<xul:groupbox pack="center">
+								<xul:caption label="" />
+								<xul:hbox flex="1" align="center">
+									<xul:label>X</xul:label>
+								</xul:hbox>
+								<xul:separator class="groove" orient="horizontal" />
+								<xul:hbox flex="1" align="center">
+									<xul:label>Y</xul:label>
+								</xul:hbox>
+							</xul:groupbox>
+
+							<xul:groupbox>
+								<xul:caption label="&status4evar.editor.css.image.repeat;" xbl:inherits="disabled=no-image" />
+								<xul:menulist anonid="css-bg-editor-image-repeat-x" sizetopopup="always" onselect="this._editor._buildCSS();" xbl:inherits="disabled=no-image">
+									<xul:menupopup>
+										<xul:menuitem label="&status4evar.option.no-repeat;" value="no-repeat" />
+										<xul:menuitem label="&status4evar.option.repeat;"    value="repeat" />
+<!--
+										<xul:menuitem label="&status4evar.option.space;"     value="space" />
+										<xul:menuitem label="&status4evar.option.round;"     value="round" />
+-->
+									</xul:menupopup>
+								</xul:menulist>
+								<xul:separator class="groove" orient="horizontal" />
+								<xul:menulist anonid="css-bg-editor-image-repeat-y" sizetopopup="always" onselect="this._editor._buildCSS();" xbl:inherits="disabled=no-image">
+									<xul:menupopup>
+										<xul:menuitem label="&status4evar.option.no-repeat;" value="no-repeat" />
+										<xul:menuitem label="&status4evar.option.repeat;"    value="repeat" />
+<!--
+										<xul:menuitem label="&status4evar.option.space;"     value="space" />
+										<xul:menuitem label="&status4evar.option.round;"     value="round" />
+-->
+									</xul:menupopup>
+								</xul:menulist>
+							</xul:groupbox>
+
+							<xul:groupbox>
+								<xul:caption label="&status4evar.editor.css.image.position;" xbl:inherits="disabled=no-image" />
+								<xul:menulist anonid="css-bg-editor-image-position-x" sizetopopup="always" onselect="this._editor._updatePositionX();" xbl:inherits="disabled=no-image">
+									<xul:menupopup>
+											<xul:menuitem label="&status4evar.option.left;"   value="left" />
+											<xul:menuitem label="&status4evar.option.center;" value="center" />
+											<xul:menuitem label="&status4evar.option.right;"  value="right" />
+											<xul:menuitem label="&status4evar.option.offset;" value="offset" />
+									</xul:menupopup>
+								</xul:menulist>
+								<xul:separator class="groove" orient="horizontal" />
+								<xul:menulist anonid="css-bg-editor-image-position-y" sizetopopup="always" onselect="this._editor._updatePositionY();" xbl:inherits="disabled=no-image">
+									<xul:menupopup>
+											<xul:menuitem label="&status4evar.option.top;"    value="top" />
+											<xul:menuitem label="&status4evar.option.center;" value="center" />
+											<xul:menuitem label="&status4evar.option.bottom;" value="bottom" />
+											<xul:menuitem label="&status4evar.option.offset;" value="offset" />
+									</xul:menupopup>
+								</xul:menulist>
+							</xul:groupbox>
+
+							<xul:groupbox>
+								<xul:caption label="&status4evar.editor.css.image.offset;" xbl:inherits="disabled=no-image" />
+								<xul:hbox>
+									<xul:textbox anonid="css-bg-editor-image-offset-x" type="number" size="4" min="-65535" onchange="this._editor._buildCSS();" />
+									<xul:menulist anonid="css-bg-editor-image-offset-unit-x" sizetopopup="always" onselect="this._editor._buildCSS();">
+										<xul:menupopup>
+												<xul:menuitem label="%" value="%" />
+												<xul:menuitem label="px" value="px" />
+												<xul:menuitem label="em" value="em" />
+												<xul:menuitem label="in" value="in" />
+												<xul:menuitem label="cm" value="cm" />
+												<xul:menuitem label="mm" value="mm" />
+												<xul:menuitem label="pt" value="pt" />
+												<xul:menuitem label="pc" value="pc" />
+										</xul:menupopup>
+									</xul:menulist>
+								</xul:hbox>
+								<xul:separator class="groove" orient="horizontal" />
+								<xul:hbox>
+									<xul:textbox anonid="css-bg-editor-image-offset-y" type="number" size="4" min="-65535" onchange="this._editor._buildCSS();" />
+									<xul:menulist anonid="css-bg-editor-image-offset-unit-y" sizetopopup="always" onselect="this._editor._buildCSS();">
+										<xul:menupopup>
+												<xul:menuitem label="%" value="%" />
+												<xul:menuitem label="px" value="px" />
+												<xul:menuitem label="em" value="em" />
+												<xul:menuitem label="in" value="in" />
+												<xul:menuitem label="cm" value="cm" />
+												<xul:menuitem label="mm" value="mm" />
+												<xul:menuitem label="pt" value="pt" />
+												<xul:menuitem label="pc" value="pc" />
+										</xul:menupopup>
+									</xul:menulist>
+								</xul:hbox>
+							</xul:groupbox>
+						</xul:hbox>
+					</xul:vbox>
+
+					<xul:textbox anonid="css-bg-editor-css-text" multiline="true" rows="6" xbl:inherits="disabled" />
+				</xul:deck>
+			</xul:vbox>
+
+			<xul:hbox align="center" pack="end">
+				<children includes="progressmeter|toolbox" />
+				<xul:label xbl:inherits="disabled">&status4evar.editor.label;</xul:label>
+				<xul:menulist anonid="css-bg-editor-mode-menu" sizetopopup="always" onselect="this._editor._updateMode();" xbl:inherits="disabled">
+					<xul:menupopup>
+						<xul:menuitem label="&status4evar.option.simple;" />
+						<xul:menuitem label="&status4evar.option.advanced;" />
+					</xul:menupopup>
+				</xul:menulist>
+			</xul:hbox>
+		</content>
+
+		<implementation>
+			<constructor><![CDATA[
+				[
+					"_editorColor",
+					"_editorImageBrowse",
+					"_editorImageClear",
+					"_editorImageRepeatX",
+					"_editorImageRepeatY",
+					"_editorImagePositionX",
+					"_editorImagePositionY",
+					"_editorImageOffsetX",
+					"_editorImageOffsetY",
+					"_editorImageOffsetUnitX",
+					"_editorImageOffsetUnitY",
+					"_editorMode"
+				].forEach(function(prop)
+				{
+					this[prop]._editor = this;
+				}, this);
+
+				this.setAdvanced(true, false);
+			]]></constructor>
+
+			<destructor><![CDATA[
+			]]></destructor>
+
+			<field name="_disableBuildCSS"><![CDATA[
+				true
+			]]></field>
+
+			<field name="_editorColor" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-color");
+			]]></field>
+
+			<field name="_editorCSS" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-css-text");
+			]]></field>
+
+			<field name="_editorDeck" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-deck");
+			]]></field>
+
+			<field name="_editorImage" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image");
+			]]></field>
+
+			<field name="_editorImageBrowse" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-browse");
+			]]></field>
+
+			<field name="_editorImageClear" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-clear");
+			]]></field>
+
+			<field name="_editorImageRepeatX" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-repeat-x");
+			]]></field>
+
+			<field name="_editorImageRepeatY" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-repeat-y");
+			]]></field>
+
+			<field name="_editorImagePositionX" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-position-x");
+			]]></field>
+
+			<field name="_editorImagePositionY" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-position-y");
+			]]></field>
+
+			<field name="_editorImageOffsetX" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-offset-x");
+			]]></field>
+
+			<field name="_editorImageOffsetY" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-offset-y");
+			]]></field>
+
+			<field name="_editorImageOffsetUnitX" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-offset-unit-x");
+			]]></field>
+
+			<field name="_editorImageOffsetUnitY" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-image-offset-unit-y");
+			]]></field>
+
+			<field name="_editorMode" readonly="true"><![CDATA[
+				document.getAnonymousElementByAttribute(this, "anonid", "css-bg-editor-mode-menu");
+			]]></field>
+
+			<field name="_initialized"><![CDATA[
+				false
+			]]></field>
+
+			<field name="_reRGB" readonly="true"><![CDATA[
+				/^rgb\((\d+), (\d+), (\d+)\)$/
+			]]></field>
+
+			<field name="_reURL" readonly="true"><![CDATA[
+				/^url\(\s*['"]?(.+?)['"]?\s*\)$/
+			]]></field>
+
+			<field name="_reBgPosition" readonly="true"><![CDATA[
+				/^(left|center|right)? ?(-?\d+[^\s\d]+)? ?(top|center|bottom)? ?(-?\d+[^\s\d]+)?$/
+			]]></field>
+
+			<field name="_reCSSUnit" readonly="true"><![CDATA[
+				/^(-?\d+)([^\s\d]+)$/
+			]]></field>
+
+			<field name="_strings" readonly="true"><![CDATA[
+				document.getElementById("bundle_status4evar");
+			]]></field>
+
+			<property name="value">
+				<getter><![CDATA[
+					return this._editorCSS.value;
+				]]></getter>
+				<setter><![CDATA[
+					this._editorCSS.value = val;
+
+					if(!this._initialized)
+					{
+						this.setAdvanced(false, false);
+						this._initialized = true;
+					}
+
+					return val;
+				]]></setter>
+			</property>
+
+			<property name="disabled">
+				<getter><![CDATA[
+					return this.getAttribute("disabled") == "true";
+				]]></getter>
+				<setter><![CDATA[
+					if(val)
+					{ 
+						this.setAttribute("disabled", "true");
+					}
+					else
+					{
+						this.removeAttribute("disabled");
+					}
+
+					this._updateImageControllDisable();
+
+					return val;
+				]]></setter>
+			</property>
+
+			<method name="setAdvanced">
+				<parameter name="aVal"/>
+				<parameter name="aPrompt"/>
+				<body><![CDATA[
+					if(!aVal)
+					{
+						let success = this._parseCSS();
+						if(!success)
+						{
+							let result = aPrompt && Services.prompt.confirm(window,
+							                                                this._strings.getString("simpleEditorTitle"),
+							                                                this._strings.getString("simpleEditorMessage"));
+							if(result)
+							{	// Continue to simple mode
+								this._buildCSS();
+							}
+							else
+							{	// Stay on advanced mode
+								aVal = true;
+							}
+						}
+					}
+
+					this._disableBuildCSS = aVal;
+					this._editorDeck.selectedIndex = ((aVal) ? 1 : 0);
+					this._editorMode.selectedIndex = ((aVal) ? 1 : 0);
+				]]></body>
+			</method>
+
+			<method name="_buildCSS">
+				<body><![CDATA[
+					if(this._disableBuildCSS)
+					{
+						return;
+					}
+
+					let cssVal = this._editorColor.color;
+					let imgVal = this._editorImage.value;
+					if(imgVal)
+					{
+						cssVal += " url(\"" + imgVal + "\")";
+
+						//
+						// Print the background repeat
+						//
+						let bgRX = this._editorImageRepeatX.value;
+						let bgRY = this._editorImageRepeatY.value;
+						if(bgRX == "repeat" && bgRY == "no-repeat")
+						{
+							cssVal += " repeat-x";
+						}
+						else if(bgRX == "no-repeat" && bgRY == "repeat")
+						{
+							cssVal += " repeat-y";
+						}
+						else
+						{
+							cssVal += " " + bgRX;
+							if(bgRX != bgRY)
+							{
+								cssVal += " " + bgRY;
+							}
+						}
+
+						//
+						// Print the background position
+						//
+						let bgPX = this._editorImagePositionX.value;
+						let bgPOX = this._editorImageOffsetX.value;
+						if(bgPX != "offset")
+						{
+							cssVal += " " + bgPX;
+						}
+						else
+						{
+							cssVal += " " + bgPOX + this._editorImageOffsetUnitX.value;
+						}
+
+						let bgPY = this._editorImagePositionY.value;
+						let bgPOY = this._editorImageOffsetY.value;
+						if(bgPY != "offset")
+						{
+							cssVal += " " + bgPY;
+						}
+						else
+						{
+							cssVal += " " + bgPOY + this._editorImageOffsetUnitY.value;
+						}
+					}
+
+					this._editorCSS.value = cssVal;
+
+					let event = document.createEvent("Event");
+					event.initEvent("change", true, true);
+					this._editorCSS.dispatchEvent(event);
+				]]></body>
+			</method>
+
+			<method name="_parseCSS">
+				<body><![CDATA[
+					let retVal = true;
+
+					let cssParser = document.createElement("div");
+					cssParser.style.background = this._editorCSS.value;
+					if(!cssParser.style.background)
+					{
+						Components.utils.reportError("Error parsing background CSS rule: " + this._editorCSS.value);
+						cssParser.style.background = "#33FF33";
+						retVal = false;
+					}
+
+					//
+					// Parse the background color
+					//
+					let bgC = cssParser.style.backgroundColor;
+					if(this._reRGB.test(bgC))
+					{
+						let digits = this._reRGB.exec(bgC);
+
+						let red = parseInt(digits[1]);
+						let green = parseInt(digits[2]);
+						let blue = parseInt(digits[3]);
+
+						let rgb = blue | (green << 8) | (red << 16);
+						bgC =  "#" + rgb.toString(16);
+					}
+					else
+					{
+						Components.utils.reportError("Error parsing background-color value: " + bgC);
+						bgC = "#33FF33";
+						retVal = false;
+					}
+
+					//
+					// Parse the background image
+					//
+					let bgI = cssParser.style.backgroundImage;
+					if(bgI != "none" && !this._reURL.test(bgI))
+					{
+						Components.utils.reportError("Error parsing background-image value: " + bgI);
+						bgI = "none";
+						retVal = false;
+					}
+					bgI = ((bgI != "none") ? this._reURL.exec(bgI)[1].trim() : "");
+
+					//
+					// Parse the background repeat
+					//
+					let bgR = cssParser.style.backgroundRepeat.split(" ");
+					let bgRX = bgR[0];
+					if(bgRX == "repeat-x")
+					{
+						bgRX = "repeat";
+					}
+					else if(bgRX == "repeat-y")
+					{
+						bgRX = "no-repeat";
+					}
+
+					let bgRY = bgR[bgR.length - 1];
+					if(bgRY == "repeat-x")
+					{
+						bgRY = "no-repeat";
+					}
+					else if(bgRY == "repeat-y")
+					{
+						bgRY = "repeat";
+					}
+
+					//
+					// Parse the background position
+					//
+					let bgP = cssParser.style.backgroundPosition;
+					let bgPParts = this._reBgPosition.exec(bgP);
+					let bgPValues = new Array();
+					for(let i = 1; i <= 4; i++)
+					{
+						if(bgPParts[i])
+						{
+							bgPValues.push({
+								"value": bgPParts[i],
+								"group": i
+							});
+						}
+					}
+
+					if(bgPValues.length == 1)
+					{
+						bgPValues.splice(((bgPValues[0].group == 2) ? 0 : 1), 0, {
+							"value": "center",
+							"group": ((bgPValues[0].group == 2) ? 0 : 2)
+						});
+					}
+
+					if(bgPValues.length == 2 && bgPValues[1].group == 2)
+					{
+						bgPValues[1].group = 4;
+					}
+
+					for(let i = 0; i < 4; i++)
+					{
+						let group = (i + 1);
+						if(bgPValues[i] != undefined && bgPValues[i].group == group)
+						{
+							continue;
+						}
+
+						let tmp = "0px";
+						switch(i)
+						{
+							case 0:
+								tmp = "offset";
+								break;
+							case 2:
+								tmp = "offset";
+								break;
+						}
+
+						bgPValues.splice(i, 0, {
+							"value": tmp,
+							"group": group
+						});
+					}
+
+					let bgPOXParts = this._reCSSUnit.exec(bgPValues[1].value);
+					let bgPOYParts = this._reCSSUnit.exec(bgPValues[3].value);
+
+					//
+					// Parse the background size
+					//
+
+					//
+					// Initialize the UI
+					//
+					let disableBuildCSS = this._disableBuildCSS;
+					this._disableBuildCSS = true;
+
+					this._editorColor.color = bgC;
+					this._editorImage.value = bgI;
+					this._editorImageOffsetX.value = bgPOXParts[1];
+					this._editorImageOffsetY.value = bgPOYParts[1];
+
+					[
+						[this._editorImageRepeatX,	bgRX,			"repeat",	"repeat X"],
+						[this._editorImageRepeatY,	bgRY,			"repeat",	"repeat Y"],
+						[this._editorImagePositionX,	bgPValues[0].value,	"left",		"position X"],
+						[this._editorImagePositionY,	bgPValues[2].value,	"top",		"position Y"],
+						[this._editorImageOffsetUnitX,	bgPOXParts[2],		"px",		"offset X unit"],
+						[this._editorImageOffsetUnitY,	bgPOYParts[2],		"px",		"offset Y unit"]
+					].forEach(function(info)
+					{
+						if(!this._setSelectedItemSafe(info[0], info[1], info[2]))
+						{
+							Components.utils.reportError("Error setting " + info[3] + " to " + info[1]);
+							retVal = false;
+						}
+					}, this);
+
+					this._updateImageControllDisable();
+
+					this._disableBuildCSS = disableBuildCSS;
+
+					return retVal;
+				]]></body>
+			</method>
+
+			<method name="_imageBrowse">
+				<body><![CDATA[
+					let nsIFilePicker = Components.interfaces.nsIFilePicker;
+					let filePicker = Components.classes["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
+					filePicker.init(window, this._strings.getString("imageSelectTitle"), nsIFilePicker.modeOpen);
+					filePicker.appendFilters(nsIFilePicker.filterImages);
+
+					let res = filePicker.show();
+					if(res == nsIFilePicker.returnOK)
+					{
+						this._editorImage.value =  Services.io.newFileURI(filePicker.file).spec;
+						this._updateImageControllDisable();
+						this._buildCSS();
+					}
+				]]></body>
+			</method>
+
+			<method name="_imageClear">
+				<body><![CDATA[
+					this._editorImage.value =  "";
+					this._editorImageRepeatX.value = "repeat";
+					this._editorImageRepeatY.value = "repeat";
+					this._editorImagePositionX.value = "left";
+					this._editorImagePositionY.value = "top";
+					this._editorImageOffsetX.value = 0;
+					this._editorImageOffsetY.value = 0;
+					this._editorImageOffsetUnitX.value = "px";
+					this._editorImageOffsetUnitY.value = "px";
+					this._updateImageControllDisable();
+					this._buildCSS();
+				]]></body>
+			</method>
+
+			<method name="_processEvent">
+				<parameter name="event"/>
+				<body><![CDATA[
+					if(!("css-bg-editor-css-text" == event.originalTarget.getAttribute("anonid")
+					|| "css-bg-editor-css-text" == document.getBindingParent(event.originalTarget).getAttribute("anonid")))
+					{
+						event.stopPropagation();
+					}
+
+					//Components.utils.reportError("Editor event " + event.type + " on " + event.originalTarget.tagName + "::" + event.originalTarget.getAttribute("anonid"));
+				]]></body>
+			</method>
+
+			<method name="_setSelectedItemSafe">
+				<parameter name="aElement"/>
+				<parameter name="aValue"/>
+				<parameter name="aDefault"/>
+				<body><![CDATA[
+					aElement.value = aValue;
+					if(!aElement.selectedItem || aElement.selectedItem.value != aValue)
+					{
+						aElement.value = aDefault;
+						return false;
+					}
+					return true;
+				]]></body>
+			</method>
+
+			<method name="_updateImageControllDisable">
+				<body><![CDATA[
+					if(this.disabled || !this._editorImage.value)
+					{
+						this.setAttribute("no-image", "true");
+						this._updatePositionOffsetXDisabled(true);
+						this._updatePositionOffsetYDisabled(true);
+					}
+					else
+					{
+						this.removeAttribute("no-image");
+						this._updatePositionOffsetXDisabled(false);
+						this._updatePositionOffsetYDisabled(false);
+					}
+				]]></body>
+			</method>
+
+			<method name="_updateMode">
+				<body><![CDATA[
+					if(this._editorMode.selectedIndex == this._editorDeck.selectedIndex)
+					{
+						return;
+					}
+
+					this.setAdvanced(((this._editorMode.selectedIndex == 1) ? true : false), true);
+				]]></body>
+			</method>
+
+			<method name="_updatePositionOffsetXDisabled">
+				<parameter name="aVal"/>
+				<body><![CDATA[
+					let bgPX = this._editorImagePositionX.value;
+					let disableOffsetX = aVal || (bgPX != "offset");// || bgPX == "center");
+					this._editorImageOffsetX.disabled = disableOffsetX;
+					this._editorImageOffsetUnitX.disabled = disableOffsetX;
+				]]></body>
+			</method>
+
+			<method name="_updatePositionOffsetYDisabled">
+				<parameter name="aVal"/>
+				<body><![CDATA[
+					let bgPY = this._editorImagePositionY.value;
+					var disableOffsetY = aVal || (bgPY != "offset");// || bgPY == "center");
+					this._editorImageOffsetY.disabled = disableOffsetY;
+					this._editorImageOffsetUnitY.disabled = disableOffsetY;
+				]]></body>
+			</method>
+
+			<method name="_updatePositionX">
+				<body><![CDATA[
+					this._updatePositionOffsetXDisabled(false);
+					this._buildCSS();
+				]]></body>
+			</method>
+
+			<method name="_updatePositionY">
+				<body><![CDATA[
+					this._updatePositionOffsetYDisabled(false);
+					this._buildCSS();
+				]]></body>
+			</method>
+		</implementation>
+
+		<handlers>
+			<handler event="command"><![CDATA[
+				this._processEvent(event);
+			]]></handler>
+
+			<handler event="change"><![CDATA[
+				this._processEvent(event);
+			]]></handler>
+
+			<handler event="input"><![CDATA[
+				this._processEvent(event);
+			]]></handler>
+
+			<handler event="select"><![CDATA[
+				this._processEvent(event);
+			]]></handler>
+		</handlers>
+	</binding>
+</bindings>
+

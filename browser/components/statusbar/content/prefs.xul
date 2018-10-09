@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE prefwindow [
+	<!ENTITY % prefsDTD SYSTEM "chrome://browser/locale/statusbar/statusbar-prefs.dtd">
+	%prefsDTD;
+]>
+
+<?xml-stylesheet href="chrome://global/skin/config.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/browser.css" type="text/css" ?>
+
+<?xml-stylesheet href="chrome://browser/content/statusbar/overlay.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/statusbar/overlay.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/statusbar/dynamic.css" type="text/css" ?>
+
+<?xml-stylesheet href="chrome://browser/content/statusbar/prefs.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/statusbar/prefs.css" type="text/css" ?>
+
+<prefwindow id="status4evar-prefs" title="&status4evar.window.title;"
+            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+            onload="status4evarPrefs.onPrefWindowLoad();" onunload="status4evarPrefs.onPrefWindowUnLoad();">
+
+	<stringbundleset id="stringbundleset">  
+		<stringbundle id="bundle_status4evar" src="chrome://browser/locale/statusbar/prefs.properties" />   
+	</stringbundleset>
+	<script type="application/javascript" src="chrome://browser/content/statusbar/prefs.js" />
+ 
+	<prefpane id="status4evar-pane-status" label="&status4evar.pane.status;">
+		<preferences>
+			<preference id="status4evar-pref-status"                     name="status4evar.status"                     type="int" />
+			<preference id="status4evar-pref-status-default"             name="status4evar.status.default"             type="bool" />
+			<preference id="status4evar-pref-status-network"             name="status4evar.status.network"             type="bool"
+			            onchange="status4evarPrefs.statusNetworkChanged();" />
+			<preference id="status4evar-pref-status-network-xhr"         name="status4evar.status.network.xhr"         type="bool" />
+			<preference id="status4evar-pref-status-timeout"             name="status4evar.status.timeout"             type="int"
+			            onchange="status4evarPrefs.statusTimeoutChanged();" />
+			<preference id="status4evar-pref-status-linkOver"            name="status4evar.status.linkOver"            type="int" />
+			<preference id="status4evar-pref-status-linkOver-delay-show" name="status4evar.status.linkOver.delay.show" type="int" />
+			<preference id="status4evar-pref-status-linkOver-delay-hide" name="status4evar.status.linkOver.delay.hide" type="int" />
+			<preference id="status4evar-pref-status-toolbar-maxLength"   name="status4evar.status.toolbar.maxLength"   type="int"
+			            onchange="status4evarPrefs.textLengthChanged();" />
+			<preference id="status4evar-pref-status-popup-invertMirror"  name="status4evar.status.popup.invertMirror"  type="bool" />
+			<preference id="status4evar-pref-status-popup-mouseMirror"   name="status4evar.status.popup.mouseMirror"   type="bool" />
+			<preference id="toolkit-pref-dom-status-change"              name="dom.disable_window_status_change"       type="bool" inverted="true" />
+		</preferences>
+
+		<commandset id="status4evar-commandset-status">
+			<command id="status4evar-command-status-timeout"           oncommand="status4evarPrefs.statusTimeoutToggle();" />
+			<command id="status4evar-command-status-toolbar-maxLength" oncommand="status4evarPrefs.textLengthToggle();" />
+		</commandset>
+
+		<tabbox id="status4evar-tabbox-status" flex="1">
+			<tabs id="status4evar-tabs-status">
+				<tab id="status4evar-tab-status-general" label="&status4evar.tab.general;" />
+				<tab id="status4evar-tab-status-toolbar" label="&status4evar.tab.toolbar;" />
+				<tab id="status4evar-tab-status-popup"   label="&status4evar.tab.popup;" />
+			</tabs>
+
+			<tabpanels id="status4evar-tabpanels-status" flex="1">
+				<tabpanel id="status4evar-tabpanel-status-general" orient="vertical">
+					<groupbox id="status4evar-status-general-status">
+						<caption label="&status4evar.status.general.status.caption;" />
+
+						<hbox align="center">
+							<label id="status4evar-status-label" control="status4evar-status-menu">&status4evar.status.label;</label>
+							<menulist id="status4evar-status-menu" preference="status4evar-pref-status" sizetopopup="always">
+								<menupopup>
+									<menuitem label="&status4evar.option.none;"    value="0" />
+									<menuitem label="&status4evar.option.toolbar;" value="1" />
+									<menuitem label="&status4evar.option.popup;"   value="3" />
+								</menupopup>
+							</menulist>
+						</hbox>
+
+						<hbox align="center">
+							<checkbox id="status4evar-status-timeout-check" label="&status4evar.status.timeout.label;"
+							          command="status4evar-command-status-timeout" />
+							<textbox id="status4evar-status-timeout-value" preference="status4evar-pref-status-timeout" type="number" size="4" 
+							         onsyncfrompreference="return status4evarPrefs.statusTimeoutSync();" />
+							<label id="status4evar-status-timeout-unit">&status4evar.unit.seconds;</label>
+						</hbox>
+
+						<checkbox id="status4evar-status-default-check" preference="status4evar-pref-status-default" label="&status4evar.status.default.label;" />
+
+						<checkbox id="status4evar-status-network-check" preference="status4evar-pref-status-network" label="&status4evar.status.network.label;"
+						          onsyncfrompreference="return status4evarPrefs.statusNetworkSync();" />
+
+						<hbox align="center" class="indent">
+							<checkbox id="status4evar-status-network-xhr-check" preference="status4evar-pref-status-network-xhr" label="&status4evar.status.network.xhr.label;" />
+						</hbox>
+
+						<checkbox id="toolkit-dom-status-change-check" preference="toolkit-pref-dom-status-change" label="&toolkit.dom.status.change.label;" />
+					</groupbox>
+
+					<groupbox id="status4evar-status-general-linkOver">
+						<caption label="&status4evar.status.general.linkOver.caption;" />
+
+						<hbox align="center">
+							<label id="status4evar-status-linkOver-label" control="status4evar-status-linkOver-menu">&status4evar.status.linkOver.label;</label>
+							<menulist id="status4evar-status-linkOver-menu" preference="status4evar-pref-status-linkOver" sizetopopup="always">
+								<menupopup>
+									<menuitem label="&status4evar.option.none;"    value="0" />
+									<menuitem label="&status4evar.option.toolbar;" value="1" />
+									<menuitem label="&status4evar.option.popup;"   value="3" />
+								</menupopup>
+							</menulist>
+						</hbox>
+
+						<hbox align="center">
+							<label id="status4evar-status-linkOver-delay-show-label" control="status4evar-status-linkOver-delay-show-value">&status4evar.status.linkOver.delay.show.label;</label>
+							<textbox id="status4evar-status-linkOver-delay-show-value" preference="status4evar-pref-status-linkOver-delay-show" type="number" size="5" />
+							<label id="status4evar-status-linkOver-delay-show-unit">&status4evar.unit.milliseconds;</label>
+						</hbox>
+
+						<hbox align="center">
+							<label id="status4evar-status-linkOver-delay-hide-label" control="status4evar-status-linkOver-delay-hide-value">&status4evar.status.linkOver.delay.hide.label;</label>
+							<textbox id="status4evar-status-linkOver-delay-hide-value" preference="status4evar-pref-status-linkOver-delay-hide" type="number" size="5" />
+							<label id="status4evar-status-linkOver-delay-hide-unit">&status4evar.unit.milliseconds;</label>
+						</hbox>
+					</groupbox>
+
+				</tabpanel>
+
+				<tabpanel id="status4evar-tabpanel-status-toolbar" orient="vertical">
+					<hbox align="center">
+						<checkbox id="status4evar-status-toolbar-maxLength-check" label="&status4evar.status.toolbar.maxLength.label;"
+						          command="status4evar-command-status-toolbar-maxLength" />
+						<textbox id="status4evar-status-toolbar-maxLength-value" preference="status4evar-pref-status-toolbar-maxLength" type="number" size="4"
+						         onsyncfrompreference="return status4evarPrefs.textLengthSync();" />
+						<label id="status4evar-status-toolbar-maxLength-unit">&status4evar.unit.px;</label>
+					</hbox>
+				</tabpanel>
+
+				<tabpanel id="status4evar-tabpanel-status-popup" orient="vertical">
+					<checkbox id="status4evar-status-popup-invertMirror-check" preference="status4evar-pref-status-popup-invertMirror" label="&status4evar.status.popup.invertMirror.label;" />
+
+					<checkbox id="status4evar-status-popup-mouseMirror-check" preference="status4evar-pref-status-popup-mouseMirror" label="&status4evar.status.popup.mouseMirror.label;" />
+				</tabpanel>
+
+			</tabpanels>
+		</tabbox>
+	</prefpane>
+
+	<prefpane id="status4evar-pane-progress" label="&status4evar.pane.progress;">
+		<preferences>
+			<preference id="status4evar-pref-progress-toolbar-force"          name="status4evar.progress.toolbar.force"          type="bool" />
+			<preference id="status4evar-pref-progress-toolbar-style"          name="status4evar.progress.toolbar.style"          type="bool"
+			            onchange="status4evarPrefs.progressToolbarStyleChanged();" />
+			<preference id="status4evar-pref-progress-toolbar-css"            name="status4evar.progress.toolbar.css"            type="string"
+			            onchange="status4evarPrefs.progressToolbarCSSChanged();" />
+		</preferences>
+
+		<commandset id="status4evar-commandset-status">
+		</commandset>
+
+		<checkbox id="status4evar-progress-toolbar-force-check" preference="status4evar-pref-progress-toolbar-force" label="&status4evar.progress.toolbar.force.label;" />
+
+		<checkbox id="status4evar-progress-toolbar-style-check" preference="status4evar-pref-progress-toolbar-style" label="&status4evar.progress.style.label;"
+							onsyncfrompreference="return status4evarPrefs.progressToolbarStyleSync();" />
+
+		<vbox class="css-bg-editor" preference="status4evar-pref-progress-toolbar-css" preference-editable="true" flex="1">
+			<progressmeter id="status4evar-progress-bar" value="75" flex="1" />
+		</vbox>
+	</prefpane>
+
+	<prefpane id="status4evar-pane-download" label="&status4evar.pane.download;">
+		<preferences>
+			<preference id="status4evar-pref-download-button-action"  name="status4evar.download.button.action"  type="int" />
+			<preference id="status4evar-pref-download-color-active"   name="status4evar.download.color.active"   type="string" />
+			<preference id="status4evar-pref-download-color-paused"   name="status4evar.download.color.paused"   type="string" />
+			<preference id="status4evar-pref-download-force"          name="status4evar.download.force"          type="bool" />
+			<preference id="status4evar-pref-download-label"          name="status4evar.download.label"          type="int" />
+			<preference id="status4evar-pref-download-label-force"    name="status4evar.download.label.force"    type="bool" />
+			<preference id="status4evar-pref-download-notify-animate" name="status4evar.download.notify.animate" type="bool" />
+			<preference id="status4evar-pref-download-notify-timeout" name="status4evar.download.notify.timeout" type="int" />
+			<preference id="status4evar-pref-download-progress"       name="status4evar.download.progress"       type="int" />
+			<preference id="status4evar-pref-download-tooltip"        name="status4evar.download.tooltip"        type="int" />
+
+			<preference id="status4evar-pref-download-button-action-command" name="status4evar.download.button.action.command" type="string"/>
+		</preferences>
+
+		<commandset id="status4evar-commandset-download">
+			<command id="status4evar-command-download-progress" oncommand="status4evarPrefs.downloadProgressToggle();" />
+		</commandset>
+
+		<checkbox id="status4evar-download-force-check" preference="status4evar-pref-download-force" label="&status4evar.download.force.label;" />
+
+		<checkbox id="status4evar-download-label-force-check" preference="status4evar-pref-download-label-force" label="&status4evar.download.label.force.label;" />
+
+		<hbox align="center">
+			<label id="status4evar-download-label-label" control="status4evar-download-label-menu">&status4evar.download.label.label;</label>
+			<menulist id="status4evar-download-label-menu" preference="status4evar-pref-download-label" sizetopopup="always">
+				<menupopup>
+					<menuitem value="0" label="&status4evar.option.dlcount;" />
+					<menuitem value="1" label="&status4evar.option.dltime;" />
+					<menuitem value="2" label="&status4evar.option.both;" />
+				</menupopup>
+			</menulist>
+		</hbox>
+
+		<hbox align="center">
+			<label id="status4evar-download-tooltip-label" control="status4evar-download-tooltip-menu">&status4evar.download.tooltip.label;</label>
+			<menulist id="status4evar-download-tooltip-menu" preference="status4evar-pref-download-tooltip" sizetopopup="always">
+				<menupopup>
+					<menuitem value="0" label="&status4evar.option.dlcount;" />
+					<menuitem value="1" label="&status4evar.option.dltime;" />
+					<menuitem value="2" label="&status4evar.option.both;" />
+				</menupopup>
+			</menulist>
+		</hbox>
+
+		<hbox align="center">
+			<label id="status4evar-download-button-action-label" control="status4evar-download-button-action-menu">&status4evar.download.button.action.label;</label>
+			<menulist id="status4evar-download-button-action-menu" preference="status4evar-pref-download-button-action" sizetopopup="always">
+				<menupopup>
+					<menuitem value="0" label="&status4evar.option.nothing;" />
+					<menuitem value="1" label="&status4evar.option.firefoxdefault;" />
+					<menuitem value="2" label="&status4evar.option.download.library;" />
+					<menuitem value="3" label="&status4evar.option.download.tab;" />
+					<menuitem value="4" label="&status4evar.option.download.thirdparty;" id="status4evar-download-button-action-menu-thirdparty" />
+				</menupopup>
+			</menulist>
+		</hbox>
+
+		<hbox align="center">
+			<label id="status4evar-download-notify-timeout-label" control="status4evar-download-notify-timeout-value">&status4evar.download.notify.timeout.label;</label>
+			<textbox id="status4evar-download-notify-timeout-value" preference="status4evar-pref-download-notify-timeout" type="number" size="3" />
+			<label id="status4evar-download-notify-timeout-unit">&status4evar.unit.seconds;</label>
+		</hbox>
+
+		<checkbox id="status4evar-download-notify-animate-check" preference="status4evar-pref-download-notify-animate" label="&status4evar.download.notify.animate.label;" />
+
+		<checkbox id="status4evar-download-progress-check" command="status4evar-command-download-progress" label="&status4evar.download.progress.label;" />
+
+		<vbox class="indent">
+			<hbox align="center">
+				<radiogroup id="status4evar-download-progress-radiogroup" preference="status4evar-pref-download-progress"
+				            onsyncfrompreference="return status4evarPrefs.downloadProgressSync();">
+					<radio value="1" label="&status4evar.download.progress.average.label;" />
+					<radio value="2" label="&status4evar.download.progress.max.label;" />
+					<radio value="3" label="&status4evar.download.progress.min.label;" />
+				</radiogroup>
+			</hbox>
+
+			<hbox align="center">
+				<label id="status4evar-download-color-active-label" control="status4evar-download-color-active-picker">&status4evar.download.color.active.label;</label>
+				<colorpicker id="status4evar-download-color-active-picker" preference="status4evar-pref-download-color-active" type="button" />
+			</hbox>
+
+			<hbox align="center">
+				<label id="status4evar-download-color-paused-label" control="status4evar-download-color-paused-picker">&status4evar.download.color.paused.label;</label>
+				<colorpicker id="status4evar-download-color-paused-picker" preference="status4evar-pref-download-color-paused" type="button" />
+			</hbox>
+		</vbox>
+	</prefpane>
+
+	<prefpane id="status4evar-pane-addonbar" label="&status4evar.pane.statusbar;">
+		<preferences>
+			<preference id="status4evar-pref-addonbar-borderStyle"   name="status4evar.addonbar.borderStyle"   type="bool" />
+			<preference id="status4evar-pref-addonbar-closeButton"   name="status4evar.addonbar.closeButton"   type="bool" />
+			<preference id="status4evar-pref-addonbar-windowGripper" name="status4evar.addonbar.windowGripper" type="bool" />
+		</preferences>
+
+		<checkbox id="status4evar-addonbar-borderStyle-check" preference="status4evar-pref-addonbar-borderStyle" label="&status4evar.addonbar.borderStyle;" />
+
+		<checkbox id="status4evar-addonbar-closeButton-check" preference="status4evar-pref-addonbar-closeButton" label="&status4evar.addonbar.closeButton;" />
+
+		<checkbox id="status4evar-addonbar-windowGripper-check" preference="status4evar-pref-addonbar-windowGripper" label="&status4evar.addonbar.windowGripper;" />
+	</prefpane>
+
+	<prefpane id="status4evar-pane-advanced" label="&status4evar.pane.advanced;">
+		<preferences>
+			<preference id="status4evar-pref-advanced-status-detectFullScreen" name="status4evar.advanced.status.detectFullScreen" type="bool" />
+			<preference id="status4evar-pref-advanced-status-detectVideo"      name="status4evar.advanced.status.detectVideo"      type="bool" />
+			<preference id="browser-pref-urlbar-trimming-enabled"              name="browser.urlbar.trimURLs"                      type="bool" />
+		</preferences>
+
+		<vbox flex="1">
+			<groupbox id="status4evar-status-urlbar-builtin">
+				<caption label="&status4evar.status.urlbar.firefox.builtin.caption;" />
+
+				<checkbox id="browser-urlbar-trimming-enabled-ckeck" preference="browser-pref-urlbar-trimming-enabled" label="&browser.urlbar.trimming.enabled.label;" />
+			</groupbox>
+
+			<groupbox id="status4evar-advanced-status">
+				<caption label="&status4evar.pane.status;" />
+
+				<checkbox id="status4evar-advanced-status-detectFullScreen-check" preference="status4evar-pref-advanced-status-detectFullScreen" label="&status4evar.advanced.status.detectFullScreen;" />
+				<checkbox id="status4evar-advanced-status-detectVideo-check" preference="status4evar-pref-advanced-status-detectVideo" label="&status4evar.advanced.status.detectVideo;" />
+			</groupbox>
+		</vbox>
+	</prefpane>
+</prefwindow>
+

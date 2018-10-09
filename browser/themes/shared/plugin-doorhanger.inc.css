@@ -1,0 +1,53 @@
+#notification-popup[popupid="click-to-play-plugins"] > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0px;
+}
+
+.click-to-play-plugins-notification-content {
+  width: 28em;
+}
+
+.click-to-play-plugins-notification-center-box {
+  border: 1px solid ThreeDShadow;
+  margin: 10px;
+}
+
+.plugin-popupnotification-centeritem:nth-child(odd) {
+  background-color: rgba(0,0,0,0.1);
+}
+
+.center-item-label {
+  -moz-margin-start: 6px;
+  margin-bottom: 0;
+  text-overflow: ellipsis;
+}
+
+.center-item-warning-icon {
+  background-image: url("chrome://mozapps/skin/extensions/alerticon-info-negative.png");
+  background-repeat: no-repeat;
+  width: 16px;
+  height: 15px;
+  -moz-margin-start: 6px;
+}
+
+.click-to-play-plugins-notification-button-container {
+  background: linear-gradient(rgba(0,0,0,0.04) 60%, transparent);
+  padding: 10px;
+  margin-top: 5px;
+}
+
+.click-to-play-popup-button {
+  width: 50%;
+}
+
+.click-to-play-plugins-notification-description-box {
+  padding: 10px;
+}
+
+.click-to-play-plugins-outer-description {
+  margin-top: 8px;
+}
+
+.click-to-play-plugins-notification-link,
+.center-item-link {
+  margin: 0;
+}

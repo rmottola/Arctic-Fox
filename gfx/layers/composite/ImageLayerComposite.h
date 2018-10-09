@@ -1,0 +1,84 @@
+/* -*- Mode: C++; tab-width: 20; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef GFX_ImageLayerComposite_H
+#define GFX_ImageLayerComposite_H
+
+#include "GLTextureImage.h"             // for TextureImage
+#include "ImageLayers.h"                // for ImageLayer
+#include "mozilla/Attributes.h"         // for override
+#include "mozilla/RefPtr.h"             // for RefPtr
+#include "mozilla/layers/LayerManagerComposite.h"  // for LayerComposite, etc
+#include "mozilla/layers/LayersTypes.h"  // for LayerRenderState, etc
+#include "nsISupportsImpl.h"            // for TextureImage::AddRef, etc
+#include "nscore.h"                     // for nsACString
+#include "CompositableHost.h"           // for CompositableHost
+
+struct nsIntPoint;
+struct nsIntRect;
+
+namespace mozilla {
+namespace layers {
+
+class ImageHost;
+class Layer;
+
+class ImageLayerComposite : public ImageLayer,
+                            public LayerComposite
+{
+  typedef gl::TextureImage TextureImage;
+
+public:
+  explicit ImageLayerComposite(LayerManagerComposite* aManager);
+
+protected:
+  virtual ~ImageLayerComposite();
+
+public:
+  virtual LayerRenderState GetRenderState() override;
+
+  virtual void Disconnect() override;
+
+  virtual bool SetCompositableHost(CompositableHost* aHost) override;
+
+  virtual Layer* GetLayer() override;
+
+  virtual void SetLayerManager(LayerManagerComposite* aManager) override
+  {
+    LayerComposite::SetLayerManager(aManager);
+    mManager = aManager;
+    if (mImageHost) {
+      mImageHost->SetCompositor(mCompositor);
+    }
+  }
+
+  virtual void RenderLayer(const nsIntRect& aClipRect) override;
+
+  virtual void ComputeEffectiveTransforms(const mozilla::gfx::Matrix4x4& aTransformToSurface) override;
+
+  virtual void CleanupResources() override;
+
+  CompositableHost* GetCompositableHost() override;
+
+  virtual void GenEffectChain(EffectChain& aEffect) override;
+
+  virtual LayerComposite* AsLayerComposite() override { return this; }
+
+  virtual const char* Name() const override { return "ImageLayerComposite"; }
+
+protected:
+  virtual void PrintInfo(std::stringstream& aStream, const char* aPrefix) override;
+
+private:
+  gfx::Filter GetEffectFilter();
+
+private:
+  RefPtr<CompositableHost> mImageHost;
+};
+
+} /* layers */
+} /* mozilla */
+
+#endif /* GFX_ImageLayerComposite_H */

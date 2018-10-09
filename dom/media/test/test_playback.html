@@ -1,0 +1,146 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Test playback of media files that should play OK</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+  <script type="text/javascript" src="manifest.js"></script>
+</head>
+<body>
+<pre id="test">
+<script class="testbody" type="text/javascript">
+
+function isSlowPlatform() {
+  return SpecialPowers.Services.appinfo.name == "B2G" ||
+         navigator.userAgent.indexOf("Mobile") != -1 && androidVersion == 10;
+}
+
+// longer timeout for slow platforms
+if (isSlowPlatform()) {
+  SimpleTest.requestLongerTimeout(3);
+  SimpleTest.requestCompleteLog();
+}
+
+var manager = new MediaTestManager;
+
+function startTest(test, token) {
+  var v = document.createElement('video');
+  v.preload = "metadata";
+  v.token = token;
+  v.prevTime = 0;
+  manager.started(token);
+
+  v.src = test.name;
+  v.name = test.name;
+
+  var check = function(test, v) { return function() {
+    is(test.name, v.name, test.name + ": Name should match #1");
+    checkMetadata(test.name, v, test);
+  }}(test, v);
+
+  var noLoad = function(test, v) { return function() {
+    ok(false, test.name + " should not fire 'load' event");
+  }}(test, v);
+
+  // Used to cancel timer callback.
+  var timer = null;
+
+  var cancelTimer = function() {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+
+  var finish = function() {
+    cancelTimer();
+    v.finished = true;
+    v.removeEventListener("timeupdate", timeUpdate, false);
+    removeNodeAndSource(v);
+    manager.finished(v.token);
+  }
+
+  // We should get "ended" and "suspend" events to finish the test.
+  var mayFinish = function() {
+    if (v.seenEnded && v.seenSuspend) {
+      finish();
+    }
+  }
+
+  var onTimeout = function() {
+    ok(v.seenEnded, v.name + " timed out, should get 'ended'");
+    ok(v.seenSuspend, v.name + " timed out, should get 'suspend'");
+    finish();
+  }
+
+  // Check if we time out in waiting for some events.
+  var registerTimer = function() {
+    cancelTimer();
+    timer = setTimeout(onTimeout, 30000);
+  }
+
+  var checkEnded = function(test, v) { return function() {
+    is(test.name, v.name, test.name + ": Name should match #2");
+    checkMetadata(test.name, v, test);
+    is(v.readyState, v.HAVE_CURRENT_DATA, test.name + " checking readyState");
+    ok(v.readyState != v.NETWORK_LOADED, test.name + " shouldn't report NETWORK_LOADED");
+    ok(v.ended, test.name + " checking playback has ended");
+    ok(!v.finished, test.name + " shouldn't be finished");
+    ok(!v.seenEnded, test.name + " shouldn't be ended");
+
+    v.seenEnded = true;
+    registerTimer();
+    mayFinish();
+  }}(test, v);
+
+  var checkSuspended = function(test, v) { return function() {
+    if (v.seenSuspend) {
+      return;
+    }
+    is(test.name, v.name, test.name + ": Name should match #3");
+
+    v.seenSuspend = true;
+    registerTimer();
+    mayFinish();
+  }}(test, v);
+
+  var timeUpdate = function(test, v) { return function() {
+    if (v.prevTime > v.currentTime) {
+      ok(false, test.name + " time should run forwards: p=" +
+                v.prevTime + " c=" + v.currentTime);
+    }
+    v.prevTime = v.currentTime;
+    registerTimer();
+  }}(test, v);
+
+  v.addEventListener("load", noLoad, false);
+  v.addEventListener("loadedmetadata", check, false);
+  v.addEventListener("timeupdate", timeUpdate, false);
+
+  // We should get "ended" and "suspend" events for every resource
+  v.addEventListener("ended", checkEnded, false);
+  v.addEventListener("suspend", checkSuspended, false);
+
+  document.body.appendChild(v);
+  v.play();
+
+  // Debug timeouts on slow platforms.
+  if (isSlowPlatform()) {
+    var events = ["suspend", "play", "canplay", "canplaythrough", "loadstart", "loadedmetadata",
+                  "loadeddata", "playing", "ended", "error", "stalled", "emptied", "abort",
+                  "waiting", "pause"];
+    function logEvent(e) {
+      var v = e.target;
+      Log(e.target.token, "got " + e.type);
+    }
+    events.forEach(function(e) {
+      v.addEventListener(e, logEvent, false);
+    });
+  }
+}
+
+manager.runTests(gPlayTests, startTest);
+
+</script>
+</pre>
+</body>
+</html>

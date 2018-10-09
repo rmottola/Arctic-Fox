@@ -1,0 +1,36 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'nsBrowserCompsCID.h',
+]
+
+SOURCES += [
+    'nsModule.cpp',
+]
+
+XPCOMBinaryComponent('browsercomps')
+
+LOCAL_INCLUDES += [
+    '../about',
+    '../dirprovider',
+    '../feeds',
+    '../migration',
+    '../shell',
+]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    OS_LIBS += [
+        'ole32',
+        'shell32',
+        'shlwapi',
+        'version',
+    ]
+
+# Mac: Need to link with CoreFoundation for Mac Migrators (PList reading code)
+# GTK2: Need to link with glib for GNOME shell service
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('cocoa', 'gtk2', 'gtk3'):
+    OS_LIBS += CONFIG['TK_LIBS']

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+  <Description about="urn:mozilla:install-manifest">
+    <em:id>tps@mozilla.org</em:id>
+    <em:version>0.5</em:version>
+
+    <em:targetApplication>
+      <!-- Firefox -->
+      <Description>
+        <em:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</em:id>
+        <em:minVersion>24.0.*</em:minVersion>
+        <em:maxVersion>31.0.*</em:maxVersion>
+      </Description>
+    </em:targetApplication>
+
+    <!-- front-end metadata -->
+    <em:name>TPS</em:name>
+    <em:description>Sync test extension</em:description>
+    <em:creator>Jonathan Griffin</em:creator>
+    <em:contributor>Henrik Skupin</em:contributor>
+    <em:homepageURL>https://developer.mozilla.org/en-US/docs/TPS</em:homepageURL>
+  </Description>
+</RDF>

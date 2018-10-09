@@ -1,0 +1,37 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+XPIDL_SOURCES += [
+    'nsIDOMAnimationEvent.idl',
+    'nsIDOMBeforeUnloadEvent.idl',
+    'nsIDOMClipboardEvent.idl',
+    'nsIDOMCommandEvent.idl',
+    'nsIDOMCompositionEvent.idl',
+    'nsIDOMCustomEvent.idl',
+    'nsIDOMDataContainerEvent.idl',
+    'nsIDOMDataTransfer.idl',
+    'nsIDOMDragEvent.idl',
+    'nsIDOMEvent.idl',
+    'nsIDOMEventListener.idl',
+    'nsIDOMEventTarget.idl',
+    'nsIDOMFocusEvent.idl',
+    'nsIDOMKeyEvent.idl',
+    'nsIDOMMessageEvent.idl',
+    'nsIDOMMouseEvent.idl',
+    'nsIDOMMouseScrollEvent.idl',
+    'nsIDOMMutationEvent.idl',
+    'nsIDOMNotifyPaintEvent.idl',
+    'nsIDOMNSEvent.idl',
+    'nsIDOMPaintRequest.idl',
+    'nsIDOMScrollAreaEvent.idl',
+    'nsIDOMSimpleGestureEvent.idl',
+    'nsIDOMTransitionEvent.idl',
+    'nsIDOMUIEvent.idl',
+    'nsIDOMWheelEvent.idl',
+]
+
+XPIDL_MODULE = 'dom_events'
+

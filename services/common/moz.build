@@ -1,0 +1,40 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+TEST_DIRS += ['tests']
+
+EXTRA_COMPONENTS += [
+    'servicesComponents.manifest',
+]
+
+EXTRA_JS_MODULES['services-common'] += [
+    'hawkclient.js',
+    'hawkrequest.js',
+    'logmanager.js',
+    'storageservice.js',
+    'stringbundle.js',
+    'tokenserverclient.js',
+    'utils.js',
+]
+
+EXTRA_PP_JS_MODULES['services-common'] += [
+    'async.js',
+    'bagheeraclient.js',
+    'observers.js',
+    'rest.js',
+]
+
+TESTING_JS_MODULES.services.common += [
+    'modules-testing/bagheeraserver.js',
+    'modules-testing/logging.js',
+    'modules-testing/storageserver.js',
+    'modules-testing/utils.js',
+]
+
+JS_PREFERENCE_FILES += [
+    'services-common.js',
+]
+

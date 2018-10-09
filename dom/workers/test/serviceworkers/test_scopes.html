@@ -1,0 +1,90 @@
+<!--
+  Any copyright is dedicated to the Public Domain.
+  http://creativecommons.org/publicdomain/zero/1.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Bug 984048 - Test scope glob matching.</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<p id="display"></p>
+<div id="content" style="display: none"></div>
+<pre id="test"></pre>
+<script class="testbody" type="text/javascript">
+
+  var scriptsAndScopes = [
+    [ "worker.js", "." ],
+    [ "worker.js", "./sub/dir/"],
+    [ "worker.js", "./sub/dir" ],
+    [ "worker.js", "./sub/dir.html" ],
+    [ "worker.js", "./sub/dir/a" ],
+    [ "worker.js", "./sub" ],
+    [ "worker.js", "./star*" ], // '*' has no special meaning
+  ];
+
+  function registerWorkers() {
+    var registerArray = [];
+    scriptsAndScopes.forEach(function(item) {
+      registerArray.push(navigator.serviceWorker.register(item[0], { scope: item[1] }));
+    });
+    return Promise.all(registerArray);
+  }
+
+  function unregisterWorkers() {
+    var unregisterArray = [];
+    scriptsAndScopes.forEach(function(item) {
+      var p = navigator.serviceWorker.getRegistration(item[1]);
+      unregisterArray.push(p.then(function(reg) {
+        return reg.unregister();
+      }));
+    });
+    return Promise.all(unregisterArray);
+  }
+
+  function testScopes() {
+    return new Promise(function(resolve, reject) {
+      var getScope = navigator.serviceWorker.getScopeForUrl.bind(navigator.serviceWorker);
+      var base = new URL(".", document.baseURI);
+
+      function p(s) {
+        return base + s;
+      }
+
+      ok(getScope(p("index.html")) === p(""), "Scope should match");
+      ok(getScope(p("sua.html")) === p(""), "Scope should match");
+      ok(getScope(p("sub.html")) === p("sub"), "Scope should match");
+      ok(getScope(p("sub/dir.html")) === p("sub/dir.html"), "Scope should match");
+      ok(getScope(p("sub/dir")) === p("sub/dir"), "Scope should match");
+      ok(getScope(p("sub/dir/foo")) === p("sub/dir/"), "Scope should match");
+      ok(getScope(p("sub/dir/afoo")) === p("sub/dir/a"), "Scope should match");
+      ok(getScope(p("star*wars")) === p("star*"), "Scope should match");
+      ok(getScope(p("star/a.html")) === p(""), "Scope should match");
+      resolve();
+    });
+  }
+
+  function runTest() {
+    registerWorkers()
+      .then(testScopes)
+      .then(unregisterWorkers)
+      .then(function() {
+        SimpleTest.finish();
+      }).catch(function(e) {
+        ok(false, "Some test failed with error " + e);
+        SimpleTest.finish();
+      });
+  }
+
+  SimpleTest.waitForExplicitFinish();
+  SpecialPowers.pushPrefEnv({"set": [
+    ["dom.serviceWorkers.enabled", true],
+    ["dom.serviceWorkers.testing.enabled", true]
+  ]}, runTest);
+</script>
+</pre>
+</body>
+</html>
+

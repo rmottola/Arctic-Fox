@@ -1,0 +1,134 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Toolbar */
+#placesToolbar {
+  padding: 3px;
+  -moz-padding-end: 6px;
+}
+
+#placesToolbar > toolbarbutton[disabled] > .toolbarbutton-icon {
+  opacity: .4;
+}
+
+#back-button,
+#forward-button {
+  list-style-image: url("chrome://browser/skin/Toolbar.png");
+}
+
+#back-button {
+  -moz-image-region: rect(0, 18px, 18px, 0);
+}
+
+#forward-button {
+  -moz-image-region: rect(0, 36px, 18px, 18px);
+}
+
+#back-button:-moz-locale-dir(rtl) > .toolbarbutton-icon,
+#forward-button:-moz-locale-dir(rtl) > .toolbarbutton-icon {
+  transform: scaleX(-1);
+}
+
+/* organize, view and maintenance buttons icons */
+#organizeButton, 
+#viewMenu, 
+#maintenanceButton {
+  list-style-image: url("chrome://browser/skin/places/libraryToolbar.png");
+}
+
+/* organize button */
+#organizeButton {
+  -moz-image-region: rect(0px, 16px, 16px, 0px);
+}
+#organizeButton:hover,
+#organizeButton[open="true"] {
+  -moz-image-region: rect(16px, 16px, 32px, 0px);
+}
+
+/* view button */
+#viewMenu {
+  -moz-image-region: rect(0px, 32px, 16px, 16px);
+}
+#viewMenu:hover,
+#viewMenu[open="true"] {
+  -moz-image-region: rect(16px, 32px, 32px, 16px);
+}
+
+/* maintenance button */
+#maintenanceButton {
+  -moz-image-region: rect(0px, 48px, 16px, 32px);
+}
+#maintenanceButton:hover,
+#maintenanceButton[open="true"] {
+  -moz-image-region: rect(16px, 48px, 32px, 32px);
+}
+
+/* Root View */
+#placesView {
+  border-top: 1px solid ThreeDDarkShadow;
+}
+
+/* Info box */
+#detailsDeck {
+  border-top: 1px solid ThreeDShadow;
+  padding: 5px;
+}
+
+#infoBoxExpanderLabel {
+  -moz-padding-start: 2px;
+}
+
+#searchFilter {
+  margin: 0;
+}
+
+/**
+ * Downloads pane
+ */
+
+#clearDownloadsButton > .toolbarbutton-icon {
+  display: none;
+}
+
+#clearDownloadsButton {
+  -moz-padding-start: 9px;
+  -moz-padding-end: 9px;
+}
+
+/* hover-over/open button highlighting */
+
+#organizeButton,
+#viewMenu, 
+#maintenanceButton,
+#organizeButton,
+#clearDownloadsButton {
+    color: #222;
+    border: 0;
+    border-radius: 10000px;
+    padding: 1px 8px;
+    margin: 0 0 1px;
+}
+
+#back-button,
+#forward-button {
+    color: #222;
+    border: 0;
+    border-radius: 10000px;
+    padding: 1px 1px;
+    margin: 0 0 1px;
+}
+
+#organizeButton:hover,
+#organizeButton[open="true"], 
+#viewMenu:hover,
+#viewMenu[open="true"],
+#maintenanceButton:hover,
+#maintenanceButton[open="true"],
+#organizeButton:hover,
+#organizeButton[open="true"],
+#clearDownloadsButton:hover,
+#back-button:not([disabled]):hover,
+#forward-button:not([disabled]):hover {
+    background-color: rgba(0, 0, 0, .205);
+}

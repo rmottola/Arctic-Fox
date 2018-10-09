@@ -1,0 +1,42 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DIRS += ['internal']
+
+EXPORTS += [
+    'GreekCasing.h',
+    'ICUUtils.h',
+    'IrishCasing.h',
+    'nsBidiUtils.h',
+    'nsSpecialCasingData.h',
+    'nsUnicharUtils.h',
+    'nsUnicodeProperties.h',
+    'nsUnicodeScriptCodes.h',
+]
+
+include('objs.mozbuild')
+
+UNIFIED_SOURCES += intl_unicharutil_util_cppsrcs
+
+Library('unicharutil_external_s')
+
+FORCE_STATIC_LIB = True
+
+SDK_LIBRARY = True
+
+USE_STATIC_LIBS = True
+
+if CONFIG['_MSC_VER']:
+    DEFINES['_USE_ANSI_CPP'] = True
+    # Don't include directives about which CRT to use
+    CFLAGS += ['-Zl']
+    CXXFLAGS += ['-Zl']
+
+if CONFIG['ENABLE_INTL_API']:
+    CXXFLAGS += CONFIG['MOZ_ICU_CFLAGS']
+
+if CONFIG['GNU_CXX']:
+    FAIL_ON_WARNINGS = True

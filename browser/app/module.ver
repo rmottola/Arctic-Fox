@@ -1,0 +1,8 @@
+WIN32_MODULE_COMPANYNAME=Moonchild Productions
+WIN32_MODULE_COPYRIGHT=©Pale Moon, Firefox and Mozilla Developers, available under the MPL 2.0.
+WIN32_MODULE_PRODUCTVERSION=@MOZ_APP_WINVERSION@
+WIN32_MODULE_PRODUCTVERSION_STRING=@MOZ_APP_VERSION@
+WIN32_MODULE_TRADEMARKS=The Pale Moon logo and project names are the property of Moonchild Productions.
+WIN32_MODULE_DESCRIPTION=Pale Moon web browser
+WIN32_MODULE_PRODUCTNAME=Pale Moon
+WIN32_MODULE_NAME=Pale Moon

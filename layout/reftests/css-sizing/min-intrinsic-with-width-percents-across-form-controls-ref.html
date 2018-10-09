@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><title>Tests for bug 823483 / bug 1247929</title>
+<style>
+
+body, input { font-size: 10px }
+input { padding: 0 1px; border: 1px solid maroon; font-family: monospace }
+
+td:first-child {
+   background: aqua;
+   border: thin solid;
+   padding: 1px 0;
+}
+
+td:nth-child(2) {
+  width: 100%;
+}
+
+td:nth-child(1) > * { visibility: hidden; vertical-align: bottom }
+
+</style>
+
+</head><body><table><tbody><tr>
+  <td><input style="width: 0" type="text"></td>
+  <td>input type="text"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input value="Button" type="button"></td>
+  <td>input type="button"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><button>Button</button></td>
+  <td>button</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><fieldset>Fieldset</fieldset></td>
+  <td>fieldset</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input style="width: 0" type="file"></td>
+  <td>input type="file"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input style="width: 0" type="radio"></td>
+  <td>input type="radio"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input style="width: 0" type="checkbox"></td>
+  <td>input type="checkbox"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAAXNSR0IArs4c6QAAAChJREFUSMftzUEBAAAEBLCjf2dK8NsKrJLJp84zgUAgEAgEAoFAcGUBocYBP+pqhN4AAAAASUVORK5CYII=" style="width: 0" type="image"></td>
+  <td>input type="image"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><select style="width: 0"><option selected="selected">One</option><option>Two</option></select></td>
+  <td>select</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><select size="2" style="width: 0"><option>One</option><option>Two</option></select></td>
+  <td>select size="2"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><meter max="10" value="5" style="width: 0"></meter></td>
+  <td>meter</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input style="width: 0" type="number"></td>
+  <td>input type="number"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><progress style="width: 0"></progress></td>
+  <td>progress</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><input style="width: 0" value="50" type="range"></td>
+  <td>input type="range"</td>
+</tr></tbody></table>
+
+<table><tbody><tr>
+  <td><textarea style="width: 0"></textarea></td>
+  <td>textarea</td>
+</tr></tbody></table>
+</body></html>

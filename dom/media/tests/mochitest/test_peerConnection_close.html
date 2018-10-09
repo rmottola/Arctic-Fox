@@ -1,0 +1,133 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <script type="application/javascript" src="pc.js"></script>
+</head>
+<body>
+<pre id="test">
+<script type="application/javascript">
+  createHTML({
+    bug: "991877",
+    title: "Basic RTCPeerConnection.close() tests"
+  });
+
+  runNetworkTest(function () {
+    var pc = new mozRTCPeerConnection();
+    var exception = null;
+    var eTimeout = null;
+
+    // everything should be in initial state
+    is(pc.signalingState, "stable", "Initial signalingState is 'stable'");
+    is(pc.iceConnectionState, "new", "Initial iceConnectionState is 'new'");
+    is(pc.iceGatheringState, "new", "Initial iceGatheringState is 'new'");
+
+    var finish;
+    var finished = new Promise(resolve => finish = resolve);
+
+    pc.onsignalingstatechange = function(e) {
+      clearTimeout(eTimeout);
+      is(pc.signalingState, "closed", "signalingState is 'closed'");
+      is(pc.iceConnectionState, "closed", "iceConnectionState is 'closed'");
+
+      try {
+        pc.close();
+      } catch (e) {
+        exception = e;
+      }
+      is(exception, null, "A second close() should not raise an exception");
+      is(pc.signalingState, "closed", "Final signalingState stays at 'closed'");
+      is(pc.iceConnectionState, "closed", "Final iceConnectionState stays at 'closed'");
+
+      // Due to a limitation in our WebIDL compiler that prevents overloads with
+      // both Promise and non-Promise return types, legacy APIs with callbacks
+      // are unable to continue to throw exceptions. Luckily the spec uses
+      // exceptions solely for "programming errors" so this should not hinder
+      // working code from working, which is the point of the legacy API. All
+      // new code should use the promise API.
+      //
+      // The legacy methods that no longer throw on programming errors like
+      // "invalid-on-close" are:
+      // - createOffer
+      // - createAnswer
+      // - setLocalDescription
+      // - setRemoteDescription
+      // - addIceCandidate
+      // - getStats
+      //
+      // These legacy methods fire the error callback instead. This is not
+      // entirely to spec but is better than ignoring programming errors.
+
+      var offer = new mozRTCSessionDescription({ sdp: "sdp", type: "offer" });
+      var answer = new mozRTCSessionDescription({ sdp: "sdp", type: "answer" });
+      var candidate = new mozRTCIceCandidate({ candidate: "dummy",
+                                               sdpMid: "test",
+                                               sdpMLineIndex: 3 });
+
+      var doesFail = (p, msg) => p.then(generateErrorCallback(),
+                                        r => is(r.name, "InvalidStateError", msg));
+
+      doesFail(pc.createOffer(), "createOffer fails on close")
+      .then(() => doesFail(pc.createAnswer(), "createAnswer fails on close"))
+      .then(() => doesFail(pc.setLocalDescription(offer),
+                           "setLocalDescription fails on close"))
+      .then(() => doesFail(pc.setRemoteDescription(answer),
+                           "setRemoteDescription fails on close"))
+      .then(() => doesFail(pc.addIceCandidate(candidate),
+                           "addIceCandidate fails on close"))
+      .then(() => doesFail(new Promise((y, n) => pc.createOffer(y, n)),
+                           "Legacy createOffer fails on close"))
+      .then(() => doesFail(new Promise((y, n) => pc.createAnswer(y, n)),
+                           "Legacy createAnswer fails on close"))
+      .then(() => doesFail(new Promise((y, n) => pc.setLocalDescription(offer, y, n)),
+                           "Legacy setLocalDescription fails on close"))
+      .then(() => doesFail(new Promise((y, n) => pc.setRemoteDescription(answer, y, n)),
+                           "Legacy setRemoteDescription fails on close"))
+      .then(() => doesFail(new Promise((y, n) => pc.addIceCandidate(candidate, y, n)),
+                           "Legacy addIceCandidate fails on close"))
+      .catch(reason => ok(false, "unexpected failure: " + reason))
+      .then(finish);
+
+      // Other methods are unaffected.
+
+      SimpleTest.doesThrow(function() {
+        pc.updateIce("Invalid RTC Configuration")},
+        "updateIce() on closed PC raised expected exception");
+
+      SimpleTest.doesThrow(function() {
+        pc.addStream("Invalid Media Stream")},
+        "addStream() on closed PC raised expected exception");
+
+      SimpleTest.doesThrow(function() {
+        pc.removeStream("Invalid Media Stream")},
+        "removeStream() on closed PC raised expected exception");
+
+      SimpleTest.doesThrow(function() {
+        pc.createDataChannel({})},
+        "createDataChannel() on closed PC raised expected exception");
+
+      SimpleTest.doesThrow(function() {
+        pc.setIdentityProvider("Invalid Provider")},
+        "setIdentityProvider() on closed PC raised expected exception");
+    };
+
+    // This prevents a mochitest timeout in case the event does not fire
+    eTimeout = setTimeout(function() {
+      ok(false, "Failed to receive expected onsignalingstatechange event in 60s");
+      finish();
+    }, 60000);
+
+    try {
+      pc.close();
+    } catch (e) {
+      exception = e;
+    }
+    is(exception, null, "closing the connection raises no exception");
+    is(pc.signalingState, "closed", "Final signalingState is 'closed'");
+    is(pc.iceConnectionState, "closed", "Final iceConnectionState is 'closed'");
+
+    finished.then(networkTestFinished);
+  });
+</script>
+</pre>
+</body>
+</html>

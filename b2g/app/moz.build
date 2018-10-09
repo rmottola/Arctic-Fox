@@ -1,0 +1,83 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+if not CONFIG['LIBXUL_SDK']:
+    if CONFIG['GAIADIR']:
+        GoannaProgram(CONFIG['MOZ_APP_NAME'] + "-bin")
+    else:
+        GoannaProgram(CONFIG['MOZ_APP_NAME'])
+    if CONFIG['MOZ_B2G_LOADER']:
+        SOURCES += [
+            'B2GLoader.cpp',
+        ]
+
+    SOURCES += [
+        'nsBrowserApp.cpp',
+    ]
+    if CONFIG['_MSC_VER']:
+        # Always enter a Windows program through wmain, whether or not we're
+        # a console application.
+        WIN32_EXE_LDFLAGS += ['-ENTRY:wmainCRTStartup']
+
+    USE_LIBS += [
+        'zlib',
+    ]
+
+for var in ('MOZ_APP_NAME', 'MOZ_APP_VERSION', 'MOZ_UPDATER'):
+    DEFINES[var] = CONFIG[var]
+
+GENERATED_INCLUDES += [
+    '/build',
+]
+
+LOCAL_INCLUDES += [
+    '/toolkit/xre',
+    '/xpcom/base',
+    '/xpcom/build',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    LOCAL_INCLUDES += [
+        '/widget/gonk/libdisplay',
+    ]
+
+    LDFLAGS += ['-Wl,--export-dynamic']
+
+    USE_LIBS += [
+        'display',
+        'mozpng',
+    ]
+    OS_LIBS += [
+        'ui',
+        'EGL',
+        'hardware_legacy',
+        'hardware',
+        'cutils',
+    ]
+    OS_LIBS += CONFIG['MOZ_ZLIB_LIBS']
+    if CONFIG['ANDROID_VERSION'] in ('17', '18', '19', '21'):
+        OS_LIBS += [
+            'gui',
+            'suspend',
+        ]
+    OS_LIBS += [
+        'binder',
+        'utils',
+    ]
+
+DISABLE_STL_WRAPPING = True
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    OS_LIBS += [
+        'version',
+    ]
+
+FAIL_ON_WARNINGS = True
+
+JS_PREFERENCE_FILES += [
+    'b2g.js',
+]
+

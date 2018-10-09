@@ -1,0 +1,43 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!ENTITY  blockPopups.label           "Block pop-up windows">
+<!ENTITY  blockPopups.accesskey       "B">
+<!ENTITY  popupExceptions.label       "Exceptions…">
+<!ENTITY  popupExceptions.accesskey   "E">
+
+<!ENTITY  loadImages.label            "Load images:">
+<!ENTITY  loadImages.always           "Automatically">
+<!ENTITY  loadImages.never            "Never">
+<!ENTITY  loadImages.no3rdparty       "Originating server only">
+
+<!ENTITY  fontsAndColors.label        "Fonts &amp; Colors">
+
+<!ENTITY  defaultFont.label           "Default font:">
+<!ENTITY  defaultFont.accesskey       "D">
+<!ENTITY  defaultSize.label           "Size:">
+<!ENTITY  defaultSize.accesskey       "S">
+
+<!ENTITY  advancedFonts.label         "Advanced…">
+<!ENTITY  advancedFonts.accesskey     "A">
+
+<!ENTITY  colors.label                "Colors…">
+<!ENTITY  colors.accesskey            "C">
+
+<!ENTITY  languages.label             "Languages">
+<!ENTITY  chooseLanguage.label        "Choose your preferred language for displaying pages">
+<!ENTITY  chooseButton.label          "Choose…">
+<!ENTITY  chooseButton.accesskey      "o">
+
+<!ENTITY  video.label                 "Video">
+<!ENTITY  videoMSE.label              "Enable Media Source Extensions (MSE)">
+<!ENTITY  videoMSE.accesskey          "M">
+<!ENTITY  videoMSENFR.label           "Use MSE asynchronously">
+<!ENTITY  videoMSENFR.accesskey       "U">
+<!ENTITY  videoMSEMP4.label           "Enable MSE for MP4 video">
+<!ENTITY  videoMSEMP4.accesskey       "4">
+<!ENTITY  videoMSEWebM.label          "Enable MSE for WebM video">
+<!ENTITY  videoMSEWebM.accesskey      "W">
+
+

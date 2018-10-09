@@ -1,0 +1,104 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef mozilla_ipc_backgroundparentimpl_h__
+#define mozilla_ipc_backgroundparentimpl_h__
+
+#include "mozilla/Attributes.h"
+#include "mozilla/ipc/PBackgroundParent.h"
+
+namespace mozilla {
+
+namespace layout {
+class VsyncParent;
+}
+
+namespace ipc {
+
+// Instances of this class should never be created directly. This class is meant
+// to be inherited in BackgroundImpl.
+class BackgroundParentImpl : public PBackgroundParent
+{
+protected:
+  BackgroundParentImpl();
+  virtual ~BackgroundParentImpl();
+
+  virtual void
+  ActorDestroy(ActorDestroyReason aWhy) override;
+
+  virtual PBackgroundTestParent*
+  AllocPBackgroundTestParent(const nsCString& aTestArg) override;
+
+  virtual bool
+  RecvPBackgroundTestConstructor(PBackgroundTestParent* aActor,
+                                 const nsCString& aTestArg) override;
+
+  virtual bool
+  DeallocPBackgroundTestParent(PBackgroundTestParent* aActor) override;
+
+  virtual PBackgroundIDBFactoryParent*
+  AllocPBackgroundIDBFactoryParent(const LoggingInfo& aLoggingInfo)
+                                   override;
+
+  virtual bool
+  RecvPBackgroundIDBFactoryConstructor(PBackgroundIDBFactoryParent* aActor,
+                                       const LoggingInfo& aLoggingInfo)
+                                       override;
+
+  virtual bool
+  DeallocPBackgroundIDBFactoryParent(PBackgroundIDBFactoryParent* aActor)
+                                     override;
+
+  virtual PBlobParent*
+  AllocPBlobParent(const BlobConstructorParams& aParams) override;
+
+  virtual bool
+  DeallocPBlobParent(PBlobParent* aActor) override;
+
+  virtual PFileDescriptorSetParent*
+  AllocPFileDescriptorSetParent(const FileDescriptor& aFileDescriptor)
+                                override;
+
+  virtual bool
+  DeallocPFileDescriptorSetParent(PFileDescriptorSetParent* aActor)
+                                  override;
+
+  virtual PVsyncParent*
+  AllocPVsyncParent() override;
+
+  virtual bool
+  DeallocPVsyncParent(PVsyncParent* aActor) override;
+
+  virtual PBroadcastChannelParent*
+  AllocPBroadcastChannelParent(const PrincipalInfo& aPrincipalInfo,
+                               const nsString& aOrigin,
+                               const nsString& aChannel,
+                               const bool& aPrivateBrowsing) override;
+
+  virtual bool
+  RecvPBroadcastChannelConstructor(PBroadcastChannelParent* actor,
+                                   const PrincipalInfo& aPrincipalInfo,
+                                   const nsString& origin,
+                                   const nsString& channel,
+                                   const bool& aPrivateBrowsing) override;
+
+  virtual bool
+  DeallocPBroadcastChannelParent(PBroadcastChannelParent* aActor) override;
+
+  virtual bool
+  RecvRegisterServiceWorker(const ServiceWorkerRegistrationData& aData)
+                            override;
+
+  virtual bool
+  RecvUnregisterServiceWorker(const PrincipalInfo& aPrincipalInfo,
+                              const nsString& aScope) override;
+
+  virtual bool
+  RecvShutdownServiceWorkerRegistrar() override;
+};
+
+} // namespace ipc
+} // namespace mozilla
+
+#endif // mozilla_ipc_backgroundparentimpl_h__

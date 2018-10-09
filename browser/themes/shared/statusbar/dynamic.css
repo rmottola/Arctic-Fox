@@ -1,0 +1,25 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* Progress bar/line styles */
+
+#status4evar-progress-bar[s4estyle="true"] > .progress-bar
+{
+	-moz-appearance: none;
+	background: #333399;
+	border-radius: 3px;
+}
+
+#status4evar-download-progress-bar[pmType^="active"] > .progress-bar
+{
+	background-color: #333399;
+}
+
+#status4evar-download-progress-bar[pmType^="paused"] > .progress-bar
+{
+	background-color: gray;
+}
+

@@ -1,0 +1,136 @@
+diff --git a/ipc/chromium/src/third_party/libevent/README.mozilla b/ipc/chromium/src/third_party/libevent/README.mozilla
+index ab8b3c4..16a7e8b 100644
+--- a/ipc/chromium/src/third_party/libevent/README.mozilla
++++ b/ipc/chromium/src/third_party/libevent/README.mozilla
+@@ -12,8 +12,10 @@ These files are taken from libevent-2.0.21-stable built on the development envir
+ 
+ 3. Apply "add mac-arc4random-buf.patch", which removes some bad OS X compatibility code. This will allow libevent to compile on all supported versions of OS X.
+ 
+ 4. Apply "openbsd-no-arc4random_addrandom.patch", which fixes the build on OpenBSD (which doesnt provide arc4random_addrandom anymore, see #931354)
+ 
+ 5. Apply "libevent-use-non-deprecated-syscalls.patch", which fixes the build on AArch64 architecture (which does not provide deprecated syscalls)
+ 
+ 6. Apply "libevent-dont-use-issetugid-on-android.patch'. which fixes the build on Android L preview
++
++7. Apply "libevent-backport-upstream-fixes.patch", which incorporates some upstream fixes from 2.1.*
+diff --git a/ipc/chromium/src/third_party/libevent/buffer.c b/ipc/chromium/src/third_party/libevent/buffer.c
+index 8504502..146c6bf 100644
+--- a/ipc/chromium/src/third_party/libevent/buffer.c
++++ b/ipc/chromium/src/third_party/libevent/buffer.c
+@@ -1539,17 +1539,21 @@ evbuffer_add(struct evbuffer *buf, const void *data_in, size_t datlen)
+ 	int result = -1;
+ 
+ 	EVBUFFER_LOCK(buf);
+ 
+ 	if (buf->freeze_end) {
+ 		goto done;
+ 	}
+ 
+-	chain = buf->last;
++	if (*buf->last_with_datap == NULL) {
++		chain = buf->last;
++	} else {
++		chain = *buf->last_with_datap;
++	}
+ 
+ 	/* If there are no chains allocated for this buffer, allocate one
+ 	 * big enough to hold all the data. */
+ 	if (chain == NULL) {
+ 		chain = evbuffer_chain_new(datlen);
+ 		if (!chain)
+ 			goto done;
+ 		evbuffer_chain_insert(buf, chain);
+diff --git a/ipc/chromium/src/third_party/libevent/evdns.c b/ipc/chromium/src/third_party/libevent/evdns.c
+index 9e5a0f2..096eefb 100644
+--- a/ipc/chromium/src/third_party/libevent/evdns.c
++++ b/ipc/chromium/src/third_party/libevent/evdns.c
+@@ -947,17 +947,16 @@ name_parse(u8 *packet, int length, int *idx, char *name_out, int name_out_len) {
+ 	/* Normally, names are a series of length prefixed strings terminated */
+ 	/* with a length of 0 (the lengths are u8's < 63). */
+ 	/* However, the length can start with a pair of 1 bits and that */
+ 	/* means that the next 14 bits are a pointer within the current */
+ 	/* packet. */
+ 
+ 	for (;;) {
+ 		u8 label_len;
+-		if (j >= length) return -1;
+ 		GET8(label_len);
+ 		if (!label_len) break;
+ 		if (label_len & 0xc0) {
+ 			u8 ptr_low;
+ 			GET8(ptr_low);
+ 			if (name_end < 0) name_end = j;
+ 			j = (((int)label_len & 0x3f) << 8) + ptr_low;
+ 			/* Make sure that the target offset is in-bounds. */
+@@ -968,16 +967,17 @@ name_parse(u8 *packet, int length, int *idx, char *name_out, int name_out_len) {
+ 			continue;
+ 		}
+ 		if (label_len > 63) return -1;
+ 		if (cp != name_out) {
+ 			if (cp + 1 >= end) return -1;
+ 			*cp++ = '.';
+ 		}
+ 		if (cp + label_len >= end) return -1;
++		if (j + label_len > length) return -1;
+ 		memcpy(cp, packet + j, label_len);
+ 		cp += label_len;
+ 		j += label_len;
+ 	}
+ 	if (cp >= end) return -1;
+ 	*cp = '\0';
+ 	if (name_end < 0)
+ 		*idx = j;
+@@ -3102,19 +3102,22 @@ search_set_from_hostname(struct evdns_base *base) {
+ 	if (!domainname) return;
+ 	search_postfix_add(base, domainname);
+ }
+ 
+ /* warning: returns malloced string */
+ static char *
+ search_make_new(const struct search_state *const state, int n, const char *const base_name) {
+ 	const size_t base_len = strlen(base_name);
+-	const char need_to_append_dot = base_name[base_len - 1] == '.' ? 0 : 1;
++	char need_to_append_dot;
+ 	struct search_domain *dom;
+ 
++	if (!base_len) return NULL;
++	need_to_append_dot = base_name[base_len - 1] == '.' ? 0 : 1;
++
+ 	for (dom = state->head; dom; dom = dom->next) {
+ 		if (!n--) {
+ 			/* this is the postfix we want */
+ 			/* the actual postfix string is kept at the end of the structure */
+ 			const u8 *const postfix = ((u8 *) dom) + sizeof(struct search_domain);
+ 			const int postfix_len = dom->len;
+ 			char *const newname = (char *) mm_malloc(base_len + need_to_append_dot + postfix_len + 1);
+ 			if (!newname) return NULL;
+diff --git a/ipc/chromium/src/third_party/libevent/evutil.c b/ipc/chromium/src/third_party/libevent/evutil.c
+index e17e5b8..e5431e5 100644
+--- a/ipc/chromium/src/third_party/libevent/evutil.c
++++ b/ipc/chromium/src/third_party/libevent/evutil.c
+@@ -1803,22 +1803,22 @@ evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *
+ 	 * ipv6
+ 	 * [ipv6]
+ 	 * ipv4:port
+ 	 * ipv4
+ 	 */
+ 
+ 	cp = strchr(ip_as_string, ':');
+ 	if (*ip_as_string == '[') {
+-		int len;
++		size_t len;
+ 		if (!(cp = strchr(ip_as_string, ']'))) {
+ 			return -1;
+ 		}
+-		len = (int) ( cp-(ip_as_string + 1) );
+-		if (len > (int)sizeof(buf)-1) {
++		len = ( cp-(ip_as_string + 1) );
++		if (len > sizeof(buf)-1) {
+ 			return -1;
+ 		}
+ 		memcpy(buf, ip_as_string+1, len);
+ 		buf[len] = '\0';
+ 		addr_part = buf;
+ 		if (cp[1] == ':')
+ 			port_part = cp+2;
+ 		else

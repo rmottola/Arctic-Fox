@@ -1,0 +1,176 @@
+<?xml version="1.0"?>
+
+<!-- -*- Mode: Java; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- -->
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE overlay [
+  <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd">
+  <!ENTITY % contentDTD SYSTEM "chrome://browser/locale/preferences/content.dtd">
+  %brandDTD;
+  %contentDTD;
+]>
+
+<overlay id="ContentPaneOverlay"
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+  <prefpane id="paneContent" 
+            onpaneload="gContentPane.init();"
+            helpTopic="prefs-content">
+
+    <preferences id="contentPreferences">
+      <!--XXX buttons prefs -->
+
+      <!-- POPUPS, IMAGES -->
+      <preference id="dom.disable_open_during_load"   name="dom.disable_open_during_load"   type="bool"/>
+      <preference id="permissions.default.image"      name="permissions.default.image"      type="int"/>
+
+      <!-- FONTS -->
+      <preference id="font.language.group"
+                  name="font.language.group"
+                  type="wstring"
+                  onchange="gContentPane._rebuildFonts();"/>
+                  
+      <!-- VIDEO -->
+      <preference id="media.mediasource.enabled"       name="media.mediasource.enabled"       type="bool"
+        onchange="gContentPane.updateMSE();" />
+      <preference id="media.mediasource.format-reader" name="media.mediasource.format-reader" type="bool"
+        onchange="gContentPane.updateMSEWebM();" />
+      <preference id="media.mediasource.mp4.enabled"   name="media.mediasource.mp4.enabled"   type="bool"/>
+      <preference id="media.mediasource.webm.enabled"  name="media.mediasource.webm.enabled"  type="bool"/>
+      
+    </preferences>
+    
+    <script type="application/javascript" src="chrome://mozapps/content/preferences/fontbuilder.js"/>
+    <script type="application/javascript" src="chrome://browser/content/preferences/content.js"/>
+
+    <stringbundle id="bundlePreferences" src="chrome://browser/locale/preferences/preferences.properties"/>
+
+    <!-- various checkboxes, font-fu -->
+    <groupbox id="miscGroup">
+      <grid id="contentGrid">
+        <columns>
+          <column flex="1"/>
+          <column/>
+        </columns>
+        <rows id="contentRows-1">
+          <row id="popupPolicyRow">
+            <vbox align="start">
+              <checkbox id="popupPolicy" preference="dom.disable_open_during_load"
+                        label="&blockPopups.label;" accesskey="&blockPopups.accesskey;"
+                        onsyncfrompreference="return gContentPane.updateButtons('popupPolicyButton', 
+                                                                            'dom.disable_open_during_load');"/>
+            </vbox>
+            <button id="popupPolicyButton" label="&popupExceptions.label;"
+                    oncommand="gContentPane.showPopupExceptions();"
+                    accesskey="&popupExceptions.accesskey;"/>
+          </row>
+          <row id="enableImagesRow">
+            <hbox align="center">
+              	<label id="loadImages" control="loadImages-menu">&loadImages.label;</label>
+					<menulist id="loadImages-menu" preference="permissions.default.image" sizetopopup="always">
+						<menupopup>
+							<menuitem label="&loadImages.always;" value="1" />
+							<menuitem label="&loadImages.never;" value="2" />
+							<menuitem label="&loadImages.no3rdparty;" value="3" />
+						</menupopup>
+					</menulist>
+            </hbox>
+          </row>
+        </rows>
+      </grid>
+    </groupbox>
+
+    <!-- Fonts and Colors -->
+    <groupbox id="fontsGroup">
+      <caption label="&fontsAndColors.label;"/>
+
+      <grid id="fontsGrid">
+        <columns>
+          <column flex="1"/>
+          <column/>
+        </columns>
+        <rows id="fontsRows">
+          <row id="fontRow">
+            <hbox align="center">
+              <label control="defaultFont" accesskey="&defaultFont.accesskey;">&defaultFont.label;</label>
+              <menulist id="defaultFont" flex="1"/>
+              <label control="defaultFontSize" accesskey="&defaultSize.accesskey;">&defaultSize.label;</label>
+              <menulist id="defaultFontSize">
+                <menupopup>
+                  <menuitem value="9" label="9"/>
+                  <menuitem value="10" label="10"/>
+                  <menuitem value="11" label="11"/>
+                  <menuitem value="12" label="12"/>
+                  <menuitem value="13" label="13"/>
+                  <menuitem value="14" label="14"/>
+                  <menuitem value="15" label="15"/>
+                  <menuitem value="16" label="16"/>
+                  <menuitem value="17" label="17"/>
+                  <menuitem value="18" label="18"/>
+                  <menuitem value="20" label="20"/>
+                  <menuitem value="22" label="22"/>
+                  <menuitem value="24" label="24"/>
+                  <menuitem value="26" label="26"/>
+                  <menuitem value="28" label="28"/>
+                  <menuitem value="30" label="30"/>
+                  <menuitem value="32" label="32"/>
+                  <menuitem value="34" label="34"/>
+                  <menuitem value="36" label="36"/>
+                  <menuitem value="40" label="40"/>
+                  <menuitem value="44" label="44"/>
+                  <menuitem value="48" label="48"/>
+                  <menuitem value="56" label="56"/>
+                  <menuitem value="64" label="64"/>
+                  <menuitem value="72" label="72"/>
+                </menupopup>
+              </menulist>
+            </hbox>
+            <button id="advancedFonts" icon="select-font"
+                    label="&advancedFonts.label;"
+                    accesskey="&advancedFonts.accesskey;"
+                    oncommand="gContentPane.configureFonts();"/>
+          </row>
+          <row id="colorsRow">
+            <hbox/>
+            <button id="colors" icon="select-color"
+                    label="&colors.label;"
+                    accesskey="&colors.accesskey;"
+                    oncommand="gContentPane.configureColors();"/>
+          </row>
+        </rows>
+      </grid>
+    </groupbox>
+
+    <!-- Languages -->
+    <groupbox id="languagesGroup">
+      <caption label="&languages.label;"/>
+
+      <hbox id="languagesBox" align="center">
+        <description flex="1" control="chooseLanguage">&chooseLanguage.label;</description>
+        <button id="chooseLanguage"
+                label="&chooseButton.label;"
+                accesskey="&chooseButton.accesskey;"
+                oncommand="gContentPane.showLanguages();"/>
+      </hbox>
+    </groupbox>
+
+    <!-- Video -->
+     <groupbox id="videoGroup">
+       <caption label="&video.label;"/>
+ 
+       <checkbox id="videoMSE" preference="media.mediasource.enabled"
+                 label="&videoMSE.label;" accesskey="&videoMSE.accesskey;"
+                 onsyncfrompreference="gContentPane.updateMSE();"/>
+       <checkbox class="indent" id="videoMSENFR" preference="media.mediasource.format-reader"
+                 label="&videoMSENFR.label;" accesskey="&videoMSENFR.accesskey;"/>
+       <checkbox class="indent" id="videoMSEMP4" preference="media.mediasource.mp4.enabled"
+                 label="&videoMSEMP4.label;" accesskey="&videoMSEMP4.accesskey;"/>
+       <checkbox class="indent" id="videoMSEWebM" preference="media.mediasource.webm.enabled"
+                 label="&videoMSEWebM.label;" accesskey="&videoMSEWebM.accesskey;"/>
+     </groupbox>
+
+  </prefpane>
+
+</overlay>

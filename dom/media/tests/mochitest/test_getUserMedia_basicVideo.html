@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <script type="application/javascript" src="mediaStreamPlayback.js"></script>
+</head>
+<body>
+<pre id="test">
+<script type="application/javascript">
+  createHTML({
+    title: "getUserMedia Basic Video Test",
+    bug: "781534"
+  });
+  /**
+   * Run a test to verify that we can complete a start and stop media playback
+   * cycle for an video LocalMediaStream on a video HTMLMediaElement.
+   */
+  runTest(function () {
+    var testVideo = createMediaElement('video', 'testVideo');
+    var constraints = {video: true};
+
+    getUserMedia(constraints).then(aStream => {
+      checkMediaStreamTracks(constraints, aStream);
+
+      var playback = new LocalMediaStreamPlayback(testVideo, aStream);
+      return playback.playMedia(false);
+    }).then(() => SimpleTest.finish(), generateErrorCallback());
+  });
+
+</script>
+</pre>
+</body>
+</html>

@@ -1,0 +1,172 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS.mozilla += [
+    'GenericRefCounted.h',
+]
+
+EXPORTS.mozilla.gfx += [
+    '2D.h',
+    'BaseCoord.h',
+    'BaseMargin.h',
+    'BasePoint.h',
+    'BasePoint3D.h',
+    'BasePoint4D.h',
+    'BaseRect.h',
+    'BaseSize.h',
+    'Blur.h',
+    'BorrowedContext.h',
+    'Coord.h',
+    'DataSurfaceHelpers.h',
+    'DrawTargetTiled.h',
+    'Filters.h',
+    'Helpers.h',
+    'Logging.h',
+    'Matrix.h',
+    'PathHelpers.h',
+    'PatternHelpers.h',
+    'Point.h',
+    'Rect.h',
+    'Scale.h',
+    'ScaleFactor.h',
+    'SourceSurfaceCairo.h',
+    'Tools.h',
+    'Types.h',
+    'UserData.h',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    EXPORTS.mozilla.gfx += [
+        'MacIOSurface.h',
+        'QuartzSupport.h',
+    ]
+    UNIFIED_SOURCES += [
+        'DrawTargetCG.cpp',
+        'PathCG.cpp',
+        'ScaledFontMac.cpp',
+        'SourceSurfaceCG.cpp',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    SOURCES += [
+        'DrawTargetD2D.cpp',
+        'DrawTargetD2D1.cpp',
+        'ExtendInputEffectD2D1.cpp',
+        'FilterNodeD2D1.cpp',
+        'PathD2D.cpp',
+        'RadialGradientEffectD2D1.cpp',
+        'ScaledFontDWrite.cpp',
+        'ScaledFontWin.cpp',
+        'SourceSurfaceD2D.cpp',
+        'SourceSurfaceD2D1.cpp',
+        'SourceSurfaceD2DTarget.cpp',
+    ]
+    DEFINES['WIN32'] = True
+
+if CONFIG['MOZ_ENABLE_SKIA']:
+    UNIFIED_SOURCES += [
+        'convolver.cpp',
+        'DrawTargetSkia.cpp',
+        'PathSkia.cpp',
+        'SourceSurfaceSkia.cpp',
+    ]
+    SOURCES += [
+        'image_operations.cpp', # Uses _USE_MATH_DEFINES
+    ]
+    EXPORTS.mozilla.gfx += [
+        'HelpersSkia.h',
+    ]
+
+# Are we targeting x86 or x64?  If so, build SSE2 files.
+if CONFIG['INTEL_ARCHITECTURE']:
+    SOURCES += [
+        'BlurSSE2.cpp',
+        'FilterProcessingSSE2.cpp',
+        'ImageScalingSSE2.cpp',
+    ]
+    if CONFIG['MOZ_ENABLE_SKIA']:
+        SOURCES += [
+            'convolverSSE2.cpp',
+        ]
+    DEFINES['USE_SSE2'] = True
+    # The file uses SSE2 intrinsics, so it needs special compile flags on some
+    # compilers.
+    SOURCES['BlurSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+    SOURCES['FilterProcessingSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+    SOURCES['ImageScalingSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+    if CONFIG['MOZ_ENABLE_SKIA']:
+        SOURCES['convolverSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+
+UNIFIED_SOURCES += [
+    'Blur.cpp',
+    'DataSourceSurface.cpp',
+    'DataSurfaceHelpers.cpp',
+    'DrawEventRecorder.cpp',
+    'DrawTarget.cpp',
+    'DrawTargetCairo.cpp',
+    'DrawTargetCapture.cpp',
+    'DrawTargetDual.cpp',
+    'DrawTargetRecording.cpp',
+    'Factory.cpp',
+    'FilterNodeSoftware.cpp',
+    'FilterProcessing.cpp',
+    'FilterProcessingScalar.cpp',
+    'ImageScaling.cpp',
+    'Matrix.cpp',
+    'Path.cpp',
+    'PathCairo.cpp',
+    'PathHelpers.cpp',
+    'PathRecording.cpp',
+    'RecordedEvent.cpp',
+    'Scale.cpp',
+    'ScaledFontBase.cpp',
+    'ScaledFontCairo.cpp',
+    'SourceSurfaceCairo.cpp',
+    'SourceSurfaceRawData.cpp',
+]
+
+SOURCES += [
+    'DrawTargetTiled.cpp',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    SOURCES += [
+        'MacIOSurface.cpp',
+        'QuartzSupport.mm',
+    ]
+
+if CONFIG['CPU_ARCH'] == 'arm' and CONFIG['BUILD_ARM_NEON']:
+    SOURCES += ['BlurNEON.cpp']
+    SOURCES['BlurNEON.cpp'].flags += ['-mfpu=neon']
+
+FAIL_ON_WARNINGS = True
+
+MSVC_ENABLE_PGO = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+FINAL_LIBRARY = 'xul'
+
+for var in ('USE_CAIRO', 'MOZ2D_HAS_MOZ_CAIRO'):
+    DEFINES[var] = True
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+    DEFINES['MOZ_ENABLE_FREETYPE'] = True
+
+if CONFIG['MOZ_DEBUG']:
+    DEFINES['GFX_LOG_DEBUG'] = True
+    DEFINES['GFX_LOG_WARNING'] = True
+
+# Define the GFX_LOG_WARNING in release builds (available, but controlled by a
+# preference), though we may want to consider only doing it in the nightly
+# build, if the size of gfxWarning() code ends up making a difference.
+# See bug 1074952.
+# if CONFIG['NIGHTLY_BUILD']:
+DEFINES['GFX_LOG_WARNING'] = True
+
+CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+    CXXFLAGS += CONFIG['CAIRO_FT_CFLAGS']

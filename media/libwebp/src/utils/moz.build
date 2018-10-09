@@ -1,0 +1,36 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS.webp.utils += [ 
+    'bit_reader.h',
+    'bit_writer.h',
+    'color_cache.h',
+    'filters.h',
+    'huffman.h',
+    'huffman_encode.h',
+    'quant_levels.h',
+    'quant_levels_dec.h',
+    'rescaler.h',
+    'thread.h',
+    'utils.h'
+]
+
+SOURCES += [
+    'bit_reader.c',
+    'bit_writer.c',
+    'color_cache.c',
+    'filters.c',
+    'huffman.c',
+    'huffman_encode.c',
+    'quant_levels.c',
+    'quant_levels_dec.c',
+    'random.c',
+    'rescaler.c',
+    'thread.c',
+    'utils.c'
+]
+
+FINAL_LIBRARY = 'gkmedias'

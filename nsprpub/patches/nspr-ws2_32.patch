@@ -1,0 +1,27 @@
+diff --git a/nsprpub/pr/src/md/windows/w95sock.c b/nsprpub/pr/src/md/windows/w95sock.c
+index 0429c65..c3c4634 100644
+--- a/nsprpub/pr/src/md/windows/w95sock.c
++++ b/nsprpub/pr/src/md/windows/w95sock.c
+@@ -4,16 +4,22 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ /* Win95 Sockets module
+  *
+  */
+ 
+ #include "primpl.h"
+ 
++#if defined(_WIN64)
++#if defined(_MSC_VER)
++#pragma comment(lib, "ws2_32.lib")
++#endif
++#endif
++
+ #define READ_FD     1
+ #define WRITE_FD    2
+ #define CONNECT_FD  3
+ 
+ static PRInt32 socket_io_wait(
+     PROsfd osfd, 
+     PRInt32 fd_type,
+     PRIntervalTime timeout);

@@ -1,0 +1,169 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+@namespace html url("http://www.w3.org/1999/xhtml");
+
+/*
+ * General styles
+ */
+
+#status4evar-status-widget,
+#status4evar-progress-widget
+{
+	-moz-box-align: center;
+}
+
+[forcevisible="true"]
+{
+	visibility: visible !important;
+}
+
+#wrapper-status4evar-progress-widget progressmeter,
+#wrapper-status4evar-download-button toolbarbutton
+{
+	visibility: visible;
+}
+
+#wrapper-status4evar-status-widget toolbaritem label
+{
+	background-color: rgba(0,0,0,0.2);
+	padding: 2px 4px;
+}
+
+/*
+ * Options button
+ */
+
+#status4evar-options-button
+{
+	list-style-image: url("chrome://browser/skin/statusbar/pms24.png");
+}
+
+toolbar[iconsize="small"] #status4evar-options-button
+{
+	list-style-image: url("chrome://browser/skin/statusbar/pms16.png");
+}
+
+/*
+ * Download status
+ */
+
+toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"],
+toolbar[mode="text"] #status4evar-download-button
+{
+	-moz-box-orient: horizontal !important;
+}
+
+toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"] > label
+{
+	display: -moz-box !important;
+}
+
+#status4evar-download-progress-bar
+{
+	border: 1px solid gray;
+	-moz-appearance: none;
+	margin: 0px;
+	min-height: 0px;
+	min-width: 0px;
+}
+
+#status4evar-download-progress-bar > *
+{
+	-moz-appearance: none;
+	background: #FFFFFF;
+}
+
+#status4evar-download-progress-bar[pmType$="unknown"] > .progress-bar
+{
+	background-image: url("chrome://browser/skin/statusbar/pulse.png");
+}
+
+#status4evar-download-notification-container
+{
+	min-height: 1px;
+	min-width: 1px;
+	height: 1px;
+	margin-bottom: -1px;
+	position: relative;
+	z-index: 5;
+}
+
+#status4evar-download-notification-icon
+{
+	opacity: 0;
+	background-size: 16px;
+	background-position: center;
+	background-repeat: no-repeat;
+	width: 16px;
+	height: 16px;
+}
+
+@keyframes status4evar-download-notification-finish
+{
+	from { opacity: 0; transform: scale(1); }
+	20%  { opacity: .65; animation-timing-function: ease-in; }
+	to   { opacity: 0; transform: scale(8); }
+}
+
+#status4evar-download-notification-anchor[notification="finish"][forcevisible="true"] #status4evar-download-notification-icon
+{
+	background-image: url("chrome://browser/skin/downloads/download-notification-finish.png");
+	animation-name: status4evar-download-notification-finish;
+	animation-duration: 1s;
+}
+
+/*
+ * Splitter
+ */
+
+splitter.status4evar-status-splitter
+{
+	-moz-appearance: splitter;
+	border: none;
+	background: transparent;
+	position: relative;
+}
+
+splitter.status4evar-status-splitter:not(:hover)
+{
+	-moz-appearance: none;
+}
+
+/*
+ * General progress
+ */
+
+#status4evar-progress-bar[s4estyle="true"] > *
+{
+	border: none;
+}
+
+#status4evar-progress-bar > .progress-remainder
+{
+	background-image: none;
+	background-color: transparent;
+}
+
+#status4evar-progress-bar[s4estyle="true"] > .progress-bar
+{
+	border-right: 1px solid rgba(0,0,0,.2);
+}
+
+#status4evar-progress-bar[s4estyle="true"][value="0"] > .progress-bar,
+#status4evar-progress-bar[s4estyle="true"][value="100"] > .progress-bar
+{
+	border-right: none;
+}
+
+/*
+ * Status bar
+ */
+
+#status-bar > .statusbar-resizerpanel
+{
+	display: none !important;
+}
+

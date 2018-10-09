@@ -1,0 +1,99 @@
+/* - This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+%include ../../../shared/in-content/common.inc.css
+
+xul|caption {
+  background-color: transparent;
+}
+
+xul|button,
+html|button,
+xul|colorpicker[type="button"],
+xul|menulist {
+  margin: 2px 4px;
+}
+
+xul|menulist:not([editable="true"]) > xul|*.menulist-dropmarker {
+  margin-top: 1px;
+  margin-bottom: 1px;
+}
+
+xul|checkbox {
+  -moz-padding-start: 0;
+}
+
+@media not all and (-moz-windows-default-theme) {
+  xul|*.checkbox-check {
+    background-image: none !important;
+  }
+
+  xul|*.checkbox-check[checked] {
+    list-style-image: url("chrome://global/skin/in-content/check.svg#check-native");
+    background-color: -moz-dialog;
+  }
+}
+
+xul|radio {
+  -moz-binding: url("chrome://global/content/bindings/radio.xml#radio");
+  -moz-padding-start: 0;
+}
+
+@media not all and (-moz-windows-default-theme) {
+  xul|*.radio-check {
+    background-image: none;
+  }
+
+  xul|*.radio-check[selected] {
+    list-style-image: url("chrome://global/skin/in-content/radio.svg#radio-native");
+    background-color: -moz-dialog;
+  }
+}
+
+xul|*.radio-icon,
+xul|*.checkbox-icon {
+  -moz-margin-end: 0;
+}
+
+html|a:-moz-focusring,
+xul|*.text-link:-moz-focusring,
+xul|*.inline-link:-moz-focusring {
+  border: 1px dotted -moz-DialogText;
+}
+
+/* Don't draw a transparent border for the focusring because when page
+   colors are disabled, the border is drawn in -moz-DialogText */
+xul|*.text-link:not(:-moz-focusring),
+xul|button:not(:-moz-focusring) > xul|*.button-box,
+xul|menulist:not(:-moz-focusring) > xul|*.menulist-label-box,
+xul|radio:not([focused="true"]) > xul|*.radio-label-box,
+xul|checkbox:not(:-moz-focusring) > xul|*.checkbox-label-box {
+  border-width: 0;
+  margin: 1px;
+}
+
+xul|*.text-link:not(:-moz-focusring) {
+  margin-top: 2px;
+  margin-right: 1px !important;
+  margin-left: 1px !important;
+  margin-bottom: 3px;
+}
+
+xul|menulist:not(:-moz-focusring) > xul|*.menulist-label-box {
+  margin: 2px;
+}
+
+xul|radio:not([focused="true"]) > xul|*.radio-label-box,
+xul|checkbox:not(:-moz-focusring) > xul|*.checkbox-label-box {
+  -moz-margin-start: 0;
+}
+
+/* Use a 2px border so that selected row highlight is still visible behind
+    an existing high-contrast border that uses the background color */
+@media not all and (-moz-windows-default-theme) {
+  xul|treechildren::-moz-tree-row(selected),
+  xul|listbox xul|listitem[selected="true"] {
+     border: 2px dotted Highlight;
+  }
+}

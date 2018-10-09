@@ -1,0 +1,8 @@
+The source from this directory was copied from the kissfft github repository using
+the update.sh script.  The only changes made were those applied by update.sh
+and the addition of moz.build and Makefile.in build files for the Mozilla build
+system.
+
+The kissfft git repository is: https://github.com/MoonchildProductions/kissfft
+
+The git commit used was fa1bf9189dc84f960d4e56c0bed25d961c0ccb76.

@@ -1,0 +1,91 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+include('sources.mozbuild')
+
+EXPORTS.vpx += files['EXPORTS']
+
+SOURCES += files['SOURCES']
+
+if CONFIG['MOZ_VPX_ERROR_CONCEALMENT']:
+    SOURCES += files['ERROR_CONCEALMENT']
+
+if CONFIG['VPX_X86_ASM']:
+    SOURCES += files['X86_ASM']
+
+    if '64' in CONFIG['OS_TEST']:
+        SOURCES += files['X86-64_ASM']
+
+    # AVX2 only supported on
+    # Darwin and Windows toolchains right now
+    if CONFIG['OS_TARGET'] in ('Darwin', 'WINNT'):
+        SOURCES += files['AVX2']
+
+    #postproc is only enabled on x86 with asm
+    SOURCES += files['VP8_POSTPROC']
+
+arm_asm_files = []
+if CONFIG['VPX_ARM_ASM']:
+    arm_asm_files += files['ARM_ASM']
+
+    if CONFIG['VPX_AS_CONVERSION']:
+        SOURCES += sorted([
+            "!%s.%s" % (f, CONFIG['VPX_ASM_SUFFIX'])
+            if f.endswith('.asm') else f
+            for f in sorted(arm_asm_files)
+        ])
+    else:
+        SOURCES += sorted(arm_asm_files)
+
+    for f in SOURCES:
+        if f.endswith('.c') and 'neon' in f:
+            SOURCES[f].flags += ['-march=armv7-a', '-mthumb', '-mfloat-abi=softfp', '-mfpu=neon']
+
+# boolhuff_armv5te.asm defines the same functions as boolhuff.c instead of
+# using RTCD, so we have to make sure we only add one of the two.
+if 'vp8/encoder/arm/armv5te/boolhuff_armv5te.asm' not in arm_asm_files:
+    SOURCES += [
+        'vp8/encoder/boolhuff.c',
+    ]
+
+if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
+    NO_VISIBILITY_FLAGS = True
+
+FINAL_LIBRARY = 'gkmedias'
+
+DEFINES['HAVE_CONFIG_H'] = 'vpx_config.h'
+
+if CONFIG['OS_TARGET'] == 'Android':
+    # Older versions of the Android NDK don't pre-define anything to indicate
+    # the OS they're on, so do it for them.
+    DEFINES['__linux__'] = True
+
+    if not CONFIG['MOZ_WEBRTC']:
+        SOURCES += [
+            '%s/sources/android/cpufeatures/cpu-features.c' % CONFIG['ANDROID_NDK'],
+        ]
+
+if CONFIG['CLANG_CL'] or not CONFIG['_MSC_VER']:
+    for f in SOURCES:
+        if f.endswith('.c'):
+            if 'sse2' in f:
+                SOURCES[f].flags += CONFIG['SSE2_FLAGS']
+            if 'ssse3' in f:
+                SOURCES[f].flags += ['-mssse3']
+            if 'sse4' in f:
+                SOURCES[f].flags += ['-msse4.1']
+            if 'avx2' in f:
+                SOURCES[f].flags += ['-mavx2']
+
+# Suppress warnings in third-party code.
+if CONFIG['GNU_CC']:
+    CFLAGS += ['-Wno-sign-compare']
+
+if CONFIG['OS_TARGET'] == 'Android':
+    # For LIBVPX_RAND
+    ASFLAGS += [
+        '-D__ANDROID__'
+    ]

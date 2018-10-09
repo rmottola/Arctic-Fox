@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+
+# -*- Mode: Java; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+<!DOCTYPE overlay [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd">
+%brandDTD;
+<!ENTITY % tabsDTD SYSTEM "chrome://browser/locale/preferences/tabs.dtd">
+%tabsDTD;
+]>
+
+<overlay id="TabsPaneOverlay"
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+  <prefpane id="paneTabs"
+            onpaneload="gTabsPane.init();"
+            helpTopic="prefs-tabs">
+
+    <preferences id="tabsPreferences">
+      <preference id="browser.link.open_newwindow"     name="browser.link.open_newwindow"     type="int"/>
+      <preference id="browser.tabs.autoHide"           name="browser.tabs.autoHide"           type="bool" inverted="true"/>
+      <preference id="browser.tabs.loadInBackground"   name="browser.tabs.loadInBackground"   type="bool" inverted="true"/>
+      <preference id="browser.tabs.warnOnClose"        name="browser.tabs.warnOnClose"        type="bool"
+                  onchange="gTabsPane.syncWarnOnClose();"/>
+      <preference id="browser.tabs.warnOnCloseOtherTabs" name="browser.tabs.warnOnCloseOtherTabs" type="bool"/>
+      <preference id="browser.tabs.warnOnOpen"         name="browser.tabs.warnOnOpen"         type="bool"/>
+      <preference id="browser.sessionstore.restore_on_demand" name="browser.sessionstore.restore_on_demand" type="bool"/>
+#ifdef XP_WIN
+      <preference id="browser.taskbar.previews.enable" name="browser.taskbar.previews.enable" type="bool"/>
+#endif
+      <preference id="browser.tabs.insertRelatedAfterCurrent"  name="browser.tabs.insertRelatedAfterCurrent"  type="bool"/>
+      <preference id="browser.search.context.loadInBackground" name="browser.search.context.loadInBackground" type="bool" inverted="true"/>
+      <preference id="browser.tabs.closeWindowWithLastTab"     name="browser.tabs.closeWindowWithLastTab"     type="bool"/>
+      <preference id="browser.ctrlTab.previews"                name="browser.ctrlTab.previews"                type="bool"/>
+      
+      <preference id="browser.newtab.url"    name="browser.newtab.url"    type="string"/>
+      <preference id="browser.newtab.myhome" name="browser.newtab.myhome" type="string"/>
+      <preference id="browser.newtab.choice" name="browser.newtab.choice" type="int"/>
+    </preferences>
+    
+    <script type="application/javascript" src="chrome://browser/content/preferences/tabs.js"/>
+
+    <!-- XXX flex below is a hack because wrapping checkboxes don't reflow
+             properly; see bug 349098 -->
+    <vbox id="tabPrefsBox" align="start" flex="1">
+      <checkbox id="linkTargeting" label="&newWindowsAsTabs.label;"
+                accesskey="&newWindowsAsTabs.accesskey;"
+                preference="browser.link.open_newwindow"
+                onsyncfrompreference="return gTabsPane.readLinkTarget();"
+                onsynctopreference="return gTabsPane.writeLinkTarget();"/>
+      <checkbox id="warnCloseMultiple" label="&warnCloseMultipleTabs.label;"
+                accesskey="&warnCloseMultipleTabs.accesskey;"
+                preference="browser.tabs.warnOnClose"/>
+      <checkbox id="warnOpenMany" label="&warnOpenManyTabs.label;"
+                accesskey="&warnOpenManyTabs.accesskey;"
+                preference="browser.tabs.warnOnOpen"/>
+      <checkbox id="showTabBar" label="&showTabBar.label;"
+                accesskey="&showTabBar.accesskey;"
+                preference="browser.tabs.autoHide"/>
+      <checkbox id="restoreOnDemand" label="&restoreTabsOnDemand.label;"
+                accesskey="&restoreTabsOnDemand.accesskey;"
+                preference="browser.sessionstore.restore_on_demand"/>
+      <checkbox id="switchToNewTabs" label="&switchToNewTabs.label;"
+                accesskey="&switchToNewTabs.accesskey;"
+                preference="browser.tabs.loadInBackground"/>
+#ifdef XP_WIN
+      <checkbox id="showTabsInTaskbar" label="&showTabsInTaskbar.label;"
+                accesskey="&showTabsInTaskbar.accesskey;"
+                preference="browser.taskbar.previews.enable"/>
+#endif
+<!-- Pale Moon additions -->
+      <checkbox id="insertRelatedAfterCurrent" label="&insertRelatedAfterCurrent.label;"
+                preference="browser.tabs.insertRelatedAfterCurrent"/>
+      <checkbox id="contextLoadInBackground" label="&contextLoadInBackground.label;"
+                preference="browser.search.context.loadInBackground"/>
+      <checkbox id="closeWindowWithLastTab" label="&closeWindowWithLastTab.label;"
+                preference="browser.tabs.closeWindowWithLastTab"/>
+      <checkbox id="showTabPreviews" label="&showTabPreviews.label;"
+                preference="browser.ctrlTab.previews"/>
+      <hbox align="center">
+        <label value="&newtabPage.label;"/>
+        <menulist 
+          id="newtabPage"
+          preference="browser.newtab.choice"
+          oncommand="gTabsPane.writeNewtabUrl(event.target.value);">
+          <menupopup>
+            <menuitem label="&newtabPage.custom.label;"    value="0" id="newtabPageCustom" hidden="true" />
+            <menuitem label="&newtabPage.blank.label;"     value="1" />
+            <menuitem label="&newtabPage.home.label;"      value="2" />
+            <menuitem label="&newtabPage.myhome.label;"    value="3" />
+            <menuitem label="&newtabPage.quickdial.label;" value="4" />
+          </menupopup>
+        </menulist>
+      </hbox>
+    </vbox>
+
+  </prefpane>
+
+</overlay>

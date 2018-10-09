@@ -1,0 +1,15 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+browser.jar:
+% overlay chrome://browser/content/browser.xul                  chrome://browser/content/statusbar/overlay.xul
+% style chrome://global/content/customizeToolbar.xul            chrome://browser/skin/statusbar/overlay.css
+        content/browser/statusbar/overlay.js                    (content/overlay.js)
+        content/browser/statusbar/prefs.js                      (content/prefs.js)
+        content/browser/statusbar/prefs.xml                     (content/prefs.xml)
+        content/browser/statusbar/tabbrowser.xml                (content/tabbrowser.xml)
+        content/browser/statusbar/overlay.xul                   (content/overlay.xul)
+        content/browser/statusbar/prefs.xul                     (content/prefs.xul)
+        content/browser/statusbar/overlay.css                   (content/overlay.css)
+        content/browser/statusbar/prefs.css                     (content/prefs.css)

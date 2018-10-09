@@ -1,0 +1,6 @@
+{
+"runtests": {},
+"excludetests": {
+  "dom/canvas/test/webgl-conformance": "bug 865443 - separate suite -- mochitest-gl"
+  }
+}

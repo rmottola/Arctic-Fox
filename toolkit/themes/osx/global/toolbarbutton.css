@@ -1,0 +1,145 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+toolbarbutton {
+  -moz-box-align: center;
+  -moz-box-pack: center;
+  margin: 0px 2px 0px 2px;
+  padding: 3px 1px 3px 1px;
+  border-right: 1px solid transparent;
+  border-left: 1px solid transparent;
+  background-color: transparent;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+toolbarbutton[open="true"],
+toolbarbutton:not([disabled="true"]):active:hover {
+  text-shadow: none;
+}
+
+.toolbarbutton-text {
+  margin: 0 !important; /* !important for overriding global.css */
+  padding: 0px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+toolbarbutton[disabled="true"],
+toolbarbutton[disabled="true"]:hover,
+toolbarbutton[disabled="true"]:hover:active,
+toolbarbutton[disabled="true"][open="true"] {
+  color: -moz-mac-disabledtoolbartext !important;
+}
+
+/* ::::: toolbarbutton menu ::::: */
+
+.toolbarbutton-menu-dropmarker {
+  -moz-appearance: none !important;
+  border: none !important;
+  background-color: transparent !important;
+  list-style-image: url("chrome://global/skin/arrow/arrow-dn.png");
+  padding: 0;
+  -moz-padding-start: 2px;
+  width: auto;
+}
+
+.toolbarbutton-menu-dropmarker[disabled="true"] {
+  list-style-image: url("chrome://global/skin/arrow/arrow-dn-dis.png");
+  padding: 0;
+  -moz-padding-start: 2px;
+}
+
+/* ::::: toolbarbutton menu-button ::::: */
+
+toolbarbutton[type="menu-button"] {
+  -moz-box-align: stretch;
+  -moz-box-orient: horizontal !important;
+}
+
+toolbarbutton[type="menu-button"],
+toolbarbutton[type="menu-button"]:hover,
+toolbarbutton[type="menu-button"]:hover:active,
+toolbarbutton[type="menu-button"][open="true"],
+toolbarbutton[type="menu-button"][disabled="true"],
+toolbarbutton[type="menu-button"][disabled="true"]:hover,
+toolbarbutton[type="menu-button"][disabled="true"]:hover:active {
+  background-color: transparent;
+}
+
+.toolbarbutton-menubutton-button {
+  -moz-box-align: center;
+  -moz-box-pack: center;
+  -moz-box-orient: vertical;
+  text-shadow: inherit;
+}
+
+/* ::::: toolbarbutton badged ::::: */
+
+.toolbarbutton-badge {
+  background-color: #d90000;
+}
+
+.toolbarbutton-badge::after {
+  /* The |content| property is set in the content stylesheet. */
+  font-size: 9px;
+  padding: 1px 2px 2px;
+  color: #fff;
+  background-color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 1px 0 hsla(0, 100%, 100%, .2) inset,
+              0 -1px 0 hsla(0, 0%, 0%, .1) inset,
+              0 1px 0 hsla(206, 50%, 10%, .2);
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 1;
+  min-width: 10px;
+  line-height: 10px;
+  text-align: center;
+}
+
+.toolbarbutton-badge:-moz-window-inactive::after {
+  background-color: rgb(230,230,230);
+  box-shadow: none;
+  border: 1px solid rgb(206,206,206);
+  color: rgb(192,192,192);
+}
+
+.toolbarbutton-badge:-moz-locale-dir(rtl)::after {
+  left: -8px;
+  right: auto;
+}
+
+toolbar[mode="icons"] > *|* > .toolbarbutton-badge::after {
+  right: -10px;
+}
+
+toolbar[mode="icons"] > *|* > .toolbarbutton-badge:-moz-locale-dir(rtl)::after {
+  left: -10px;
+}
+
+.toolbarbutton-badge-container {
+  position: relative;
+}
+
+/* .......... dropmarker .......... */
+
+.toolbarbutton-menubutton-dropmarker {
+  -moz-appearance: none;
+  border: none;
+  background-color: transparent !important;
+  list-style-image: url("chrome://global/skin/arrow/arrow-dn.png");
+  width: auto;
+  padding: 0 5px;
+}
+
+.toolbarbutton-menubutton-dropmarker[disabled="true"] {
+  list-style-image: url("chrome://global/skin/arrow/arrow-dn-dis.png");
+}
+
+toolbarbutton.tabbable {
+  -moz-user-focus: normal !important;
+}

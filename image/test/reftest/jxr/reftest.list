@@ -1,0 +1,4 @@
+# JPEG-XR tests
+
+# Basic image decoding.
+pref(media.jxr.enabled,true) == pineapples-800.jxr   pineapples-800.jxr.png

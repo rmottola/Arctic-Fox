@@ -1,0 +1,103 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+TEST_DIRS += ['test']
+
+EXPORTS.mozilla += [
+    'ErrorResult.h',
+]
+
+EXPORTS.mozilla.dom += [
+    'AtomList.h',
+    'BindingDeclarations.h',
+    'BindingUtils.h',
+    'CallbackFunction.h',
+    'CallbackInterface.h',
+    'CallbackObject.h',
+    'Date.h',
+    'DOMJSClass.h',
+    'DOMJSProxyHandler.h',
+    'DOMString.h',
+    'Errors.msg',
+    'Exceptions.h',
+    'JSSlots.h',
+    'MozMap.h',
+    'NonRefcountedDOMObject.h',
+    'Nullable.h',
+    'OwningNonNull.h',
+    'PrimitiveConversions.h',
+    'RootedDictionary.h',
+    'StructuredClone.h',
+    'ToJSValue.h',
+    'TypedArray.h',
+    'UnionMember.h',
+]
+
+FAIL_ON_WARNINGS = True
+
+MSVC_ENABLE_PGO = True
+
+LOCAL_INCLUDES += [
+    '/dom/base',
+    '/dom/battery',
+    '/dom/bluetooth',
+    '/dom/camera',
+    '/dom/canvas',
+    '/dom/geolocation',
+    '/dom/html',
+    '/dom/indexedDB',
+    '/dom/media/webaudio',
+    '/dom/media/webspeech/recognition',
+    '/dom/svg',
+    '/dom/workers',
+    '/dom/xbl',
+    '/dom/xml',
+    '/dom/xslt/base',
+    '/dom/xslt/xpath',
+    '/dom/xul',
+    '/js/xpconnect/src',
+    '/js/xpconnect/wrappers',
+    '/layout/style',
+    '/layout/xul/tree',
+    '/media/mtransport',
+    '/media/webrtc/',
+    '/media/webrtc/signaling/src/common/time_profiling',
+    '/media/webrtc/signaling/src/peerconnection',
+]
+
+UNIFIED_SOURCES += [
+    'BindingUtils.cpp',
+    'CallbackInterface.cpp',
+    'CallbackObject.cpp',
+    'Date.cpp',
+    'DOMJSProxyHandler.cpp',
+    'Exceptions.cpp',
+    'ToJSValue.cpp',
+]
+
+SOURCES += [
+    'StructuredClone.cpp',
+]
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+    LOCAL_INCLUDES += [
+        '/dom/system/gonk',
+    ]
+
+FINAL_LIBRARY = 'xul'
+
+SPHINX_TREES['webidl'] = 'docs'
+SPHINX_PYTHON_PACKAGE_DIRS += ['mozwebidlcodegen']
+
+if CONFIG['MOZ_BUILD_APP'] in ['browser', 'mobile/android', 'xulrunner']:
+    # This is needed for Window.webidl
+    DEFINES['HAVE_SIDEBAR'] = True
+
+PYTHON_UNIT_TESTS += [
+    'mozwebidlcodegen/test/test_mozwebidlcodegen.py',
+]

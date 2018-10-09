@@ -1,0 +1,80 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+notification {
+  color: InfoText;
+  background-color: InfoBackground;
+  text-shadow: none;
+}
+
+notification[type="info"] {
+  color: -moz-DialogText;
+  background-color: -moz-Dialog;
+}
+
+notification[type="critical"] {
+  color: white;
+  background-image: linear-gradient(rgb(212,0,0), rgb(152,0,0));
+}
+
+.notification-inner {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.messageText {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.messageText > .text-link {
+  color: inherit !important;
+  text-decoration: underline;
+}
+
+.messageImage {
+  width: 16px;
+  height: 16px;
+  -moz-margin-start: 6px;
+  -moz-margin-end: 1px;
+}
+
+/* Default icons for notifications */
+
+notification[type="info"] .messageImage {
+  list-style-image: url("moz-icon://stock/gtk-dialog-info?size=menu");
+}
+
+notification[type="warning"] .messageImage {
+  list-style-image: url("moz-icon://stock/gtk-dialog-warning?size=menu");
+}
+
+notification[type="critical"] .messageImage {
+  list-style-image: url("moz-icon://stock/gtk-dialog-error?size=menu");
+}
+
+.messageCloseButton {
+  padding-left: 11px;
+  padding-right: 11px;
+}
+
+/* Popup notification */
+
+.popup-notification-description {
+  max-width: 24em;
+}
+
+.popup-notification-learnmore-link {
+  margin-top: 1em !important;
+}
+
+.popup-notification-learnmore-link:not([href]) {
+  display: none;
+}
+
+.popup-notification-button-container {
+  margin-top: 17px;
+}

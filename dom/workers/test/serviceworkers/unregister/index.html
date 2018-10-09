@@ -1,0 +1,41 @@
+<!--
+  Any copyright is dedicated to the Public Domain.
+  http://creativecommons.org/publicdomain/zero/1.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Bug 984048 - Test unregister</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<p id="display"></p>
+<div id="content" style="display: none"></div>
+<pre id="test"></pre>
+<script class="testbody" type="text/javascript">
+
+  if (!parent) {
+    info("unregister/index.html should not to be launched directly!");
+  }
+
+  SimpleTest.requestFlakyTimeout("Unfortunately we have no way to test for a page being uncontrolled except waiting for ready to not resolve");
+  var tId = setTimeout(function() {
+    parent.postMessage({ controlled: false }, "*");
+    tId = null;
+  }, 2000);
+
+  navigator.serviceWorker.ready.then(function() {
+    if (tId == null) {
+      parent.postMessage("FAIL!!!", "*");
+      return;
+    }
+
+    clearTimeout(tId);
+    parent.postMessage({ controlled: true }, "*");
+  });
+
+</script>
+</pre>
+</body>
+</html>

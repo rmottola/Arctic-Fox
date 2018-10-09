@@ -1,0 +1,150 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=940424
+-->
+<head>
+  <title>Bug 940424 - Test camera hardware init failure handling</title>
+  <script type="text/javascript" src="/MochiKit/MochiKit.js"></script>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <script type="text/javascript" src="camera_common.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+  <a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=940424">Mozilla Bug 940424</a>
+  <video id="viewfinder" width="200" height="200" autoplay></video>
+  <img src="#" alt="This image is going to load" id="testimage"/>
+
+<script class="testbody" type="text/javascript;version=1.7">
+
+SimpleTest.waitForExplicitFinish();
+
+var whichCamera = navigator.mozCameras.getListOfCameras()[0];
+var initialConfig = {
+  mode: 'picture',
+  recorderProfile: 'high',
+  previewSize: {
+    width: 352,
+    height: 288
+  }
+};
+
+var tests = [
+  {
+    name: "init-failure",
+    key: "init-failure",
+    func: function testInitFailure(test) {
+      function onSuccess(d) {
+        ok(false, "onSuccess called incorrectly");
+        d.camera.release();
+        test.next();
+      }
+      function onError(error) {
+        ok(true, "onError called correctly on init failure");
+        test.next();
+      }
+      info("Running test: init-failure");
+      navigator.mozCameras.getCamera(whichCamera, initialConfig).then(onSuccess, onError);
+    }
+  },
+  /* This test case (init-success) *must* follow the preceeding test case
+     (init-failure) in order for the desired condition to be verified */
+  {
+    name: "init-success",
+    key: "",
+    func: function(test) {
+      function onSuccess(d) {
+        ok(true, "onSuccess called correctly");
+        d.camera.release().then(test.next);
+      }
+      function onError(error) {
+        ok(false, "onError called incorrectly: " + error);
+        test.next();
+      }
+      info("Running test: init-success");
+      navigator.mozCameras.getCamera(whichCamera, initialConfig).then(onSuccess, onError)
+    }
+  },
+  /* Test for bug 1099390 to make sure events related to the underlying
+     platform failing are generated and handled properly. */
+  {
+    name: "post-init-system-failure",
+    key: "post-init-system-failure",
+    func: function(test) {
+      var gotReleasePromise = false;
+      var gotCloseEvent = false;
+
+      function gotAll() {
+        var all = gotReleasePromise && gotCloseEvent;
+        if (all) {
+          info("Got all expected notifications");
+        }
+        return all;
+      }
+
+      function onSuccess(d) {
+        var onClosedEvent = function(e) {
+          d.camera.removeEventListener('close', onClosedEvent);
+
+          ok(e.reason === "SystemFailure", "reason is: " + e.reason);
+          ok(!gotCloseEvent, "gotCloseEvent was " + gotCloseEvent);
+          gotCloseEvent = true;
+          if (gotAll()) {
+            test.next();
+          }
+
+          d.camera.release().then(
+            function resolve(e) {
+              ok(true, "release() promise resolved");
+              ok(!gotReleasePromise, "gotReleasePromise was " + gotReleasePromise);
+              gotReleasePromise = true;
+              if (gotAll()) {
+                test.next();
+              }
+            },
+            function reject(e) {
+              ok(false, "release() promise unexpected rejected: " + e);
+            }
+          );
+        };
+
+        d.camera.addEventListener('close', onClosedEvent);
+      }
+
+      function onError(error) {
+        ok(false, "onError called incorrectly: " + error);
+        test.next();
+      }
+
+      info("Running test: post-init-system-failure");
+      navigator.mozCameras.getCamera(whichCamera, initialConfig).then(onSuccess, onError)
+    }
+  },
+];
+
+var testGenerator = function() {
+  for (var i = 0; i < tests.length; ++i) {
+    yield tests[i];
+  }
+}();
+
+CameraTest.begin("hardware", function(test) {
+  CameraTest.next = function() {
+    try {
+      var t = testGenerator.next();
+      test.set(t.key, t.func.bind(undefined, CameraTest));
+    } catch(e) {
+      if (e instanceof StopIteration) {
+        CameraTest.end();
+      } else {
+        throw e;
+      }
+    }
+  };
+  CameraTest.next();
+});
+
+</script>
+</body>
+
+</html>

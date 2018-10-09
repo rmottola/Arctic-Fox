@@ -1,0 +1,51 @@
+/* -*- Mode: IDL; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsIChannel.idl"
+
+interface nsIFile;
+interface nsIZipEntry;
+
+[scriptable, builtinclass, uuid(6b438dc3-9ba0-4f5f-b83f-82e1d7b98604)]
+interface nsIJARChannel : nsIChannel
+{
+    /**
+     * Returns TRUE if the JAR file is not safe (if the content type reported
+     * by the server for a remote JAR is not of an expected type).  Scripting,
+     * redirects, and plugins should be disabled when loading from this
+     * channel.
+     */
+    [infallible] readonly attribute boolean isUnsafe;
+
+    /**
+     * Forces the uri to be a app:// uri.
+     */
+    void setAppURI(in nsIURI uri);
+
+    /**
+     * Returns the JAR file.
+     */
+    readonly attribute nsIFile jarFile;
+
+    /**
+     * Returns the zip entry if the file is synchronously accessible.
+     * This will work even without opening the channel.
+     */
+    readonly attribute nsIZipEntry zipEntry;
+
+    /**
+     * For child process, set this to make sure that a valid file descriptor of
+     * JAR file is always provided when calling NSPRFileDesc().
+     * Must be set before Open() or AsyncOpen() to be effective.
+     *
+     * Note that the file descriptor returned by NSPRFileDesc() is duplicated
+     * from the original, which shares its file offset with the original.  If
+     * the file offset is modified (ex: by lseek/read/write) on one of the
+     * shared descriptors, the offset is also changed for the other.
+     * It can be safely used only with operations that take absolute offsets,
+     * such as mmap/pread/pwrite.
+     */
+    void ensureChildFd();
+};

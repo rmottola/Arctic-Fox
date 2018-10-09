@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+
+<!--
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE prefwindow [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
+%brandDTD;
+<!ENTITY % safeModeDTD SYSTEM "chrome://browser/locale/safeMode.dtd" >
+%safeModeDTD;
+<!ENTITY % browserDTD SYSTEM "chrome://browser/locale/browser.dtd" >
+%browserDTD;
+]>
+
+<?xml-stylesheet href="chrome://global/skin/"?>
+
+<dialog id="safeModeDialog"
+            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+            title="&safeModeDialog.title;"
+            buttons="accept,cancel,extra1"
+            buttonlabelaccept="&changeAndRestartButton.label;"
+#ifdef XP_WIN
+            buttonlabelcancel="&quitApplicationCmdWin.label;"
+#else
+            buttonlabelcancel="&quitApplicationCmd.label;"
+#endif
+            buttonlabelextra1="&continueButton.label;"
+            width="&window.width;"
+            ondialogaccept="return onOK()"
+            ondialogcancel="onCancel()"
+            ondialogextra1="window.close()"
+            onload="onLoad();"
+            buttondisabledaccept="true">
+
+  <script type="application/javascript" src="chrome://browser/content/safeMode.js"/>
+
+  <stringbundle id="preferencesBundle" src="chrome://browser/locale/preferences/preferences.properties"/>
+
+  <description>&safeModeDescription.label;</description>
+
+  <separator class="thin"/>
+
+  <label value="&safeModeDescription2.label;"/>
+  <vbox id="tasks">
+    <checkbox id="disableAddons"  label="&disableAddons.label;"  accesskey="&disableAddons.accesskey;"/>
+    <checkbox id="resetToolbars"  label="&resetToolbars.label;"  accesskey="&resetToolbars.accesskey;"/>
+    <checkbox id="deleteBookmarks" label="&deleteBookmarks.label;" accesskey="&deleteBookmarks.accesskey;"/>
+    <checkbox id="resetUserPrefs" label="&resetUserPrefs.label;" accesskey="&resetUserPrefs.accesskey;"/>
+    <checkbox id="restoreSearch"  label="&restoreSearch.label;"  accesskey="&restoreSearch.accesskey;"/>
+  </vbox>
+     
+  <separator class="thin"/>
+</dialog>

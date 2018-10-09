@@ -1,0 +1,45 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!ENTITY  addons.label                  "Add-ons">
+
+<!ENTITY  warnAddonInstall.label        "Warn me when sites try to install add-ons">
+<!ENTITY  warnAddonInstall.accesskey    "W">
+
+<!ENTITY  addonExceptions.label         "Exceptions…">
+<!ENTITY  addonExceptions.accesskey     "E">
+
+<!ENTITY  addonSecuritylevel            "Add-on security level:">
+<!ENTITY  addonSecurityLevel_Off        "Off: No add-ons will be blocked (dangerous)">
+<!ENTITY  addonSecurityLevel_Low        "Low: Block only add-ons with severe security and stability issues">
+<!ENTITY  addonSecurityLevel_High       "Medium: Block all harmful add-ons (default, recommended)">
+<!ENTITY  addonSecurityLevel_Extreme    "High: Block all add-ons with known issues">
+
+<!ENTITY  passwords.label               "Passwords">
+
+<!ENTITY  rememberPasswords.label       "Remember passwords for sites">
+<!ENTITY  rememberPasswords.accesskey   "R">
+<!ENTITY  passwordExceptions.label      "Exceptions…">
+<!ENTITY  passwordExceptions.accesskey  "x">
+
+<!ENTITY  autofillPasswords.label       "Automatically fill in log-in details">
+<!ENTITY  autofillPasswords.accesskey   "A">
+
+<!ENTITY  useMasterPassword.label        "Use a master password">
+<!ENTITY  useMasterPassword.accesskey    "U">
+<!ENTITY  changeMasterPassword.label     "Change Master Password…">
+<!ENTITY  changeMasterPassword.accesskey "M">
+
+<!ENTITY  savedPasswords.label            "Saved Passwords…">
+<!ENTITY  savedPasswords.accesskey        "P">
+
+<!ENTITY  SecProto.label             "Security Protocols">
+<!ENTITY  enableHSTS.label           "Enable Strict Transport Security (HSTS)">
+<!ENTITY  enableHSTS.accesskey       "S">
+<!ENTITY  enableHPKP.label           "Enable Certificate Key Pinning (HPKP)">
+<!ENTITY  enableHPKP.accesskey       "C">
+
+<!ENTITY  XSSFilt.label              "XSS Filter">
+<!ENTITY  enableXSSFilt.label        "Enable XSS filter">
+<!ENTITY  enableXSSFilt.accesskey    "f">

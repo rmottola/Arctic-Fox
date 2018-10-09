@@ -1,0 +1,39 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS.webp.dsp += [ 
+    'dsp.h',
+    'lossless.h',
+    'yuv.h'
+]
+
+SOURCES += [
+    'alpha_processing.c',
+    'alpha_processing_sse2.c',
+    'cpu.c',
+    'dec.c',
+    'dec_clip_tables.c',
+    'dec_mips32.c',
+    'dec_neon.c',
+    'dec_sse2.c',
+    'enc.c',
+    'enc_avx2.c',
+    'enc_mips32.c',
+    'enc_neon.c',
+    'enc_sse2.c',
+    'lossless.c',
+    'lossless_mips32.c',
+    'lossless_neon.c',
+    'lossless_sse2.c',
+    'upsampling.c',
+    'upsampling_neon.c',
+    'upsampling_sse2.c',
+    'yuv.c',
+    'yuv_mips32.c',
+    'yuv_sse2.c' 
+]
+
+FINAL_LIBRARY = 'gkmedias'

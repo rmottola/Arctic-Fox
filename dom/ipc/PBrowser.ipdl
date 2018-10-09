@@ -1,0 +1,649 @@
+/* -*- Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 8 -*- */
+/* vim: set sw=4 ts=8 et tw=80 ft=cpp : */
+
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PBlob;
+include protocol PColorPicker;
+include protocol PContent;
+include protocol PContentBridge;
+include protocol PDocumentRenderer;
+include protocol PContentPermissionRequest;
+include protocol PFilePicker;
+include protocol PIndexedDBPermissionRequest;
+include protocol PRenderFrame;
+include protocol PPluginWidget;
+include DOMTypes;
+include JavaScriptTypes;
+include URIParams;
+include PContentPermission;
+include ServiceWorkerRegistrarTypes;
+
+
+using class IPC::Principal from "mozilla/dom/PermissionMessageUtils.h";
+using class mozilla::gfx::Matrix from "mozilla/gfx/Matrix.h";
+using struct gfxSize from "gfxPoint.h";
+using CSSRect from "Units.h";
+using LayoutDeviceIntRect from "Units.h";
+using struct mozilla::layers::FrameMetrics from "FrameMetrics.h";
+using struct mozilla::layers::ScrollableLayerGuid from "FrameMetrics.h";
+using struct mozilla::layers::ZoomConstraints from "FrameMetrics.h";
+using FrameMetrics::ViewID from "FrameMetrics.h";
+using mozilla::layout::ScrollingBehavior from "mozilla/layout/RenderFrameUtils.h";
+using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
+using mozilla::WindowsHandle from "ipc/IPCMessageUtils.h";
+using nscolor from "nsColor.h";
+using class mozilla::WidgetCompositionEvent from "ipc/nsGUIEventIPC.h";
+using struct mozilla::widget::IMENotification from "nsIWidget.h";
+using struct nsIMEUpdatePreference from "nsIWidget.h";
+using struct nsIntPoint from "nsPoint.h";
+using struct nsIntRect from "nsRect.h";
+using struct nsIntSize from "nsSize.h";
+using class mozilla::WidgetKeyboardEvent from "ipc/nsGUIEventIPC.h";
+using class mozilla::WidgetMouseEvent from "ipc/nsGUIEventIPC.h";
+using class mozilla::WidgetWheelEvent from "ipc/nsGUIEventIPC.h";
+using struct nsRect from "nsRect.h";
+using class mozilla::WidgetSelectionEvent from "ipc/nsGUIEventIPC.h";
+using class mozilla::WidgetTouchEvent from "ipc/nsGUIEventIPC.h";
+using struct mozilla::dom::RemoteDOMEvent from "mozilla/dom/TabMessageUtils.h";
+using mozilla::dom::ScreenOrientation from "mozilla/dom/ScreenOrientation.h";
+using struct mozilla::layers::TextureFactoryIdentifier from "mozilla/layers/CompositorTypes.h";
+using mozilla::CSSPoint from "Units.h";
+using mozilla::CSSToScreenScale from "Units.h";
+using mozilla::CommandInt from "mozilla/EventForwards.h";
+using mozilla::layers::GoannaContentController::APZStateChange from "mozilla/layers/GoannaContentController.h";
+using mozilla::WritingMode from "WritingModes.h";
+
+namespace mozilla {
+namespace dom {
+
+struct NativeKeyBinding
+{
+  CommandInt[] singleLineCommands;
+  CommandInt[] multiLineCommands;
+  CommandInt[] richTextCommands;
+};
+
+struct BrowserConfiguration
+{
+  ServiceWorkerRegistrationData[] serviceWorkerRegistrations;
+};
+
+union MaybeNativeKeyBinding
+{
+  NativeKeyBinding;
+  void_t;
+};
+
+struct ShowInfo
+{
+  nsString name;
+  bool fullscreenAllowed;
+  bool isPrivate;
+  float dpi;
+  double defaultScale;
+};
+
+struct FrameScriptInfo
+{
+    nsString url;
+    bool runInGlobalScope;
+};
+
+prio(normal upto urgent) sync protocol PBrowser
+{
+    manager PContent or PContentBridge;
+
+    manages PColorPicker;
+    manages PDocumentRenderer;
+    manages PContentPermissionRequest;
+    manages PFilePicker;
+    manages PIndexedDBPermissionRequest;
+    manages PRenderFrame;
+    manages PPluginWidget;
+
+both:
+    AsyncMessage(nsString aMessage, ClonedMessageData aData, CpowEntry[] aCpows,
+                 Principal aPrincipal);
+
+    /**
+     * Create a layout frame (encapsulating a remote layer tree) for
+     * the page that is currently loaded in the <browser>.
+     */
+    PRenderFrame();
+
+parent:
+    /*
+     * Creates a new remoted nsIWidget connection for windowed plugins
+     * in e10s mode. This is always initiated from the child in response
+     * to windowed plugin creation.
+     */
+    sync PPluginWidget();
+
+    /**
+     * Return native data of root widget
+     */
+    sync GetWidgetNativeData() returns (WindowsHandle value);
+
+parent:
+    /**
+     * When child sends this message, parent should move focus to
+     * the next or previous focusable element.
+     */
+    MoveFocus(bool forward);
+
+    Event(RemoteDOMEvent aEvent);
+
+    sync CreateWindow(PBrowser aNewTab,
+                      uint32_t aChromeFlags,
+                      bool aCalledFromJS,
+                      bool aPositionSpecified,
+                      bool aSizeSpecified,
+                      nsString aURI,
+                      nsString aName,
+                      nsString aFeatures,
+                      nsString aBaseURI)
+      returns (bool windowOpened, FrameScriptInfo[] frameScripts, nsCString urlToLoad);
+
+    sync SyncMessage(nsString aMessage, ClonedMessageData aData,
+                     CpowEntry[] aCpows, Principal aPrincipal)
+      returns (nsString[] retval);
+
+    prio(high) sync RpcMessage(nsString aMessage, ClonedMessageData aData,
+                               CpowEntry[] aCpows, Principal aPrincipal)
+      returns (nsString[] retval);
+
+    /**
+     * The IME sequence number (seqno) parameter is used to make sure
+     * that a notification is discarded if it arrives at the chrome process
+     * too late. If the notification is late and we accept it, we will have
+     * an out-of-date view of the content process, which means events that we
+     * dispatch based on this out-of-date view will be wrong also.
+     * (see Bug 599550 and Bug 591047 comments 44, 50, and 54)
+     *
+     * Chrome increments seqno and includes it in each IME event sent to
+     * content, and content sends its current seqno back to chrome with each
+     * notification. A notification is up-to-date only if the content
+     * seqno is the same as the current chrome seqno, meaning no additional
+     * event was sent to content before the notification was received
+     *
+     * On blur, chrome returns the current seqno to content, and content
+     * uses it to discard subsequent events until the content seqno and
+     * chrome seqno-on-blur match again. These events, meant for the blurred
+     * textfield, are discarded to prevent events going to the wrong target
+     */
+
+    /**
+     * Notifies chrome that there is a focus change involving an editable
+     * object (input, textarea, document, contentEditable. etc.)
+     *
+     *  focus        PR_TRUE if editable object is receiving focus
+     *               PR_FALSE if losing focus
+     *  preference   Native widget preference for IME updates
+     *  seqno        Current seqno value on the chrome side
+     */
+    prio(urgent) sync NotifyIMEFocus(bool focus)
+      returns (nsIMEUpdatePreference preference, uint32_t seqno);
+
+    /**
+     * Notifies chrome that there has been a change in text content
+     * One call can encompass both a delete and an insert operation
+     * Only called when NotifyIMEFocus returns PR_TRUE for mWantUpdates
+     *
+     *  offset       Starting offset of the change
+     *  end          Ending offset of the range deleted
+     *  newEnd       New ending offset after insertion
+     *  causedByComposition true if the change is caused by composition
+     *
+     *  for insertion, offset == end
+     *  for deletion, offset == newEnd
+     */
+    prio(urgent) async NotifyIMETextChange(uint32_t offset, uint32_t end,
+                                           uint32_t newEnd,
+                                           bool causedByComposition);
+
+    /**
+     * Notifies chrome that there is a IME compostion rect updated
+     *
+     *  offset       The starting offset of this rect
+     *  rect         The rect of first character of selected IME composition
+     *  caretOffset  The offset of caret position
+     *  caretRect    The rect of IME caret
+     */
+    prio(urgent) async NotifyIMESelectedCompositionRect(uint32_t offset,
+                                                        LayoutDeviceIntRect[] rect,
+                                                        uint32_t caretOffset,
+                                                        LayoutDeviceIntRect caretRect);
+
+    /**
+     * Notifies chrome that there has been a change in selection
+     * Only called when NotifyIMEFocus returns PR_TRUE for mWantUpdates
+     *
+     *  seqno        Current seqno value on the content side
+     *  anchor       Offset where the selection started
+     *  focus        Offset where the caret is
+     *  writingMode  CSS writing-mode in effect at the focus
+     *  causedByComposition true if the change is caused by composition
+     */
+    prio(urgent) async NotifyIMESelection(uint32_t seqno, uint32_t anchor,
+                                          uint32_t focus,
+                                          WritingMode writingMode,
+                                          bool causedByComposition);
+
+    /**
+     * Notifies chrome to refresh its text cache 
+     *
+     *  text         The entire content of the text field
+     */
+    prio(urgent) async NotifyIMETextHint(nsString text);
+
+    /**
+     * Notifies IME of mouse button event on a character in focused editor.
+     *
+     * Returns true if the mouse button event is consumd by IME.
+     */
+    prio(urgent) sync NotifyIMEMouseButtonEvent(IMENotification notification)
+      returns (bool consumedByIME);
+
+    /**
+     * Notifies chrome to currect editor rect
+     *
+     *  rect         Rect of current focused editor
+     */
+    prio(urgent) async NotifyIMEEditorRect(LayoutDeviceIntRect rect);
+
+    /**
+     * Notifies chrome to position change
+     *
+     *  editorRect   Rect of current focused editor
+     *  compositionRects     Rects of current composition string
+     */
+    prio(urgent) async NotifyIMEPositionChange(LayoutDeviceIntRect editorRect,
+                                               LayoutDeviceIntRect[] compositionRects,
+                                               LayoutDeviceIntRect caretRect);
+
+    /**
+     * Instructs chrome to end any pending composition
+     *
+     *  cancel       true if composition should be cancelled
+     *  noCompositionEvent   true if no composition event is fired by commit or
+     *                       cancel
+     *  composition  Text to commit before ending the composition
+     *
+     *  if cancel is true,
+     *    widget should return empty string for composition
+     *  if cancel is false,
+     *    widget should return the current composition text
+     */
+    prio(urgent) sync EndIMEComposition(bool cancel)
+                        returns (bool noCompositionEvent, nsString composition);
+
+    /**
+     * Tells chrome to start plugin IME.  If this results in a string getting
+     * committed, the result is in aCommitted (otherwise aCommitted is empty).
+     *
+     * aKeyboardEvent     The event with which plugin IME is to be started
+     * panelX and panelY  Location in screen coordinates of the IME input panel
+     *                    (should be just under the plugin)
+     * aCommitted         The string committed during IME -- otherwise empty
+     */
+    prio(urgent) sync StartPluginIME(WidgetKeyboardEvent aKeyboardEvent,
+                                     int32_t panelX, int32_t panelY)
+                                     returns (nsString aCommitted);
+
+    /**
+     * Tells chrome (and specifically the appropriate widget) whether or not
+     * a plugin (inside the widget) has the keyboard focus.  Should be sent
+     * when the keyboard focus changes too or from a plugin.
+     *
+     * aFocused  Whether or not a plugin is focused
+     */
+    prio(urgent) async SetPluginFocused(bool aFocused);
+
+    /**
+     * Request that the parent process move focus to the browser's frame. If
+     * canRaise is true, the window can be raised if it is inactive.
+     */
+    RequestFocus(bool canRaise);
+
+    /**
+     * Indicate, based on the current state, that some commands are enabled and
+     * some are disabled.
+     */
+    EnableDisableCommands(nsString action,
+                          nsCString[] enabledCommands,
+                          nsCString[] disabledCommands);
+
+    prio(urgent) sync GetInputContext() returns (int32_t IMEEnabled,
+                                                 int32_t IMEOpen,
+                                                 intptr_t NativeIMEContext);
+
+    prio(urgent) async SetInputContext(int32_t IMEEnabled,
+                                       int32_t IMEOpen,
+                                       nsString type,
+                                       nsString inputmode,
+                                       nsString actionHint,
+                                       int32_t cause,
+                                       int32_t focusChange);
+
+    sync IsParentWindowMainWidgetVisible() returns (bool visible);
+
+    /**
+     * Gets the DPI of the screen corresponding to this browser.
+     */
+    sync GetDPI() returns (float value);
+
+    /**
+     * Gets the default scaling factor of the screen corresponding to this browser.
+     */
+    sync GetDefaultScale() returns (double value);
+
+    /**
+     * Set the native cursor.
+     * @param value
+     *   The widget cursor to set.
+     * @param force
+     *   Invalidate any locally cached cursor settings and force an
+     *   update.
+     */
+    SetCursor(uint32_t value, bool force);
+
+    SetBackgroundColor(nscolor color);
+
+    /**
+     * Used to set the current text of the status tooltip.
+     * Nowadays this is mainly used for link locations on hover.
+     */
+    SetStatus(uint32_t type, nsString status);
+
+    /**
+     * Show/hide a tooltip when the mouse hovers over an element in the content
+     * document.
+     */
+    ShowTooltip(uint32_t x, uint32_t y, nsString tooltip);
+    HideTooltip();
+
+    /**
+     * Create an asynchronous color picker on the parent side,
+     * but don't open it yet.
+     */
+    PColorPicker(nsString title, nsString initialColor);
+
+    /**
+     * Initiates an asynchronous request for permission for the
+     * provided principal.
+     *
+     * @param aRequests
+     *   The array of permissions to request.
+     * @param aPrincipal
+     *   The principal of the request.
+     *
+     * NOTE: The principal is untrusted in the parent process. Only
+     *       principals that can live in the content process should
+     *       provided.
+     */
+    PContentPermissionRequest(PermissionRequest[] aRequests, Principal aPrincipal);
+
+    PFilePicker(nsString aTitle, int16_t aMode);
+
+    /**
+     * Initiates an asynchronous request for one of the special indexedDB
+     * permissions for the provided principal.
+     *
+     * @param principal
+     *   The principal of the request.
+     *
+     * NOTE: The principal is untrusted in the parent process. Only
+     *       principals that can live in the content process should
+     *       provided.
+     */
+    PIndexedDBPermissionRequest(Principal principal);
+
+    /**
+     * window.open from inside <iframe mozbrowser> is special.  When the child
+     * process calls window.open, it creates a new PBrowser (in its own
+     * process), then calls BrowserFrameOpenWindow on it.
+     *
+     * The parent process gets a chance to accept or reject the window.open
+     * call, and windowOpened is set to true if we ended up going through with
+     * the window.open.
+     *
+     * @param opener the PBrowser whose content called window.open.
+     */
+    sync BrowserFrameOpenWindow(PBrowser opener, nsString aURL,
+                                nsString aName, nsString aFeatures)
+      returns (bool windowOpened);
+
+    /**
+     * Instructs the TabParent to forward a request to zoom to a rect given in
+     * CSS pixels. This rect is relative to the document.
+     */
+    ZoomToRect(uint32_t aPresShellId, ViewID aViewId, CSSRect aRect);
+
+    /**
+     * We know for sure that content has either preventDefaulted or not
+     * preventDefaulted. This applies to an entire batch of touch events. It is
+     * expected that, if there are any DOM touch listeners, touch events will be
+     * batched and only processed for panning and zooming if content does not
+     * preventDefault.
+     */
+    ContentReceivedInputBlock(ScrollableLayerGuid aGuid, uint64_t aInputBlockId, bool aPreventDefault);
+
+    /**
+     * Notifies the APZ code of the results of the goanna hit-test for a
+     * particular input block. Each target corresponds to one touch point in the
+     * touch event.
+     */
+    SetTargetAPZC(uint64_t aInputBlockId, ScrollableLayerGuid[] aTargets);
+
+    /**
+     * Updates the zoom constraints for a scrollable frame in this tab.
+     * The zoom controller code lives on the parent side and so this allows it to
+     * have up-to-date zoom constraints.
+     */
+    UpdateZoomConstraints(uint32_t aPresShellId, ViewID aViewId, bool aIsRoot,
+                          ZoomConstraints aConstraints);
+
+    /**
+     * Brings up the auth prompt dialog.
+     * Called when this is the PBrowserParent for a nested remote iframe.
+     * aCallbackId corresponds to an nsIAuthPromptCallback that lives in the
+     * root process.  It will be passed back to the root process with either the
+     * OnAuthAvailable or OnAuthCancelled message.
+     */
+    AsyncAuthPrompt(nsCString uri, nsString realm, uint64_t aCallbackId);
+
+    __delete__();
+
+    ReplyKeyEvent(WidgetKeyboardEvent event);
+
+    DispatchAfterKeyboardEvent(WidgetKeyboardEvent event);
+
+    sync RequestNativeKeyBindings(WidgetKeyboardEvent event)
+        returns (MaybeNativeKeyBinding bindings);
+
+    /**
+     * Child informs the parent that the graphics objects are ready for
+     * compositing.  This is sent when all pending changes have been
+     * sent to the compositor and are ready to be shown on the next composite.
+     * @see PCompositor
+     * @see RequestNotifyAfterRemotePaint
+     */
+    async RemotePaintIsReady();
+
+    sync GetRenderFrameInfo(PRenderFrame aRenderFrame)
+        returns (ScrollingBehavior scrolling,
+                 TextureFactoryIdentifier textureFactoryIdentifier,
+                 uint64_t layersId);
+
+    /**
+     * Sent by the child to the parent to inform it that an update to the
+     * dimensions has been requested, likely through win.moveTo or resizeTo
+     */
+    async SetDimensions(uint32_t aFlags, int32_t aX, int32_t aY, int32_t aCx, int32_t aCy);
+
+child:
+    /**
+     * Notify the remote browser that it has been Show()n on this
+     * side, with the given |visibleRect|.  This message is expected
+     * to trigger creation of the remote browser's "widget".
+     *
+     * |Show()| and |Move()| take IntSizes rather than Rects because
+     * content processes always render to a virtual <0, 0> top-left
+     * point.
+     */
+    Show(nsIntSize size,
+         ShowInfo info,
+         ScrollingBehavior scrolling,
+         TextureFactoryIdentifier textureFactoryIdentifier,
+         uint64_t layersId,
+         nullable PRenderFrame renderFrame,
+         bool parentIsActive);
+
+    LoadURL(nsCString uri, BrowserConfiguration config);
+
+    CacheFileDescriptor(nsString path, FileDescriptor fd);
+
+    UpdateDimensions(nsIntRect rect, nsIntSize size, ScreenOrientation orientation,
+                     nsIntPoint chromeDisp) compress;
+
+    UpdateFrame(FrameMetrics frame);
+
+    // The following methods correspond to functions on the GoannaContentController
+    // interface in gfx/layers/apz/public/GoannaContentController.h. Refer to documentation
+    // in that file for these functions.
+    AcknowledgeScrollUpdate(ViewID aScrollId, uint32_t aScrollGeneration);
+    HandleDoubleTap(CSSPoint point, ScrollableLayerGuid aGuid);
+    HandleSingleTap(CSSPoint point, ScrollableLayerGuid aGuid);
+    HandleLongTap(CSSPoint point, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+    HandleLongTapUp(CSSPoint point, ScrollableLayerGuid aGuid);
+    NotifyAPZStateChange(ViewID aViewId, APZStateChange aChange, int aArg);
+
+
+    /**
+     * Sending an activate message moves focus to the child.
+     */
+    Activate();
+
+    Deactivate();
+
+    ParentActivated(bool aActivated);
+
+    /**
+     * @see nsIDOMWindowUtils sendMouseEvent.
+     */
+    MouseEvent(nsString aType,
+               float aX,
+               float aY,
+               int32_t aButton,
+               int32_t aClickCount,
+               int32_t aModifiers,
+               bool aIgnoreRootScrollFrame);
+
+    /**
+     * When two consecutive mouse move events would be added to the message queue,
+     * they are 'compressed' by dumping the oldest one.
+     */
+    RealMouseMoveEvent(WidgetMouseEvent event) compress;
+    RealMouseButtonEvent(WidgetMouseEvent event);
+    RealKeyEvent(WidgetKeyboardEvent event, MaybeNativeKeyBinding keyBinding);
+    MouseWheelEvent(WidgetWheelEvent event, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+    RealTouchEvent(WidgetTouchEvent aEvent, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+    RealTouchMoveEvent(WidgetTouchEvent aEvent, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+
+    /**
+     * @see nsIDOMWindowUtils sendKeyEvent.
+     */
+    KeyEvent(nsString aType,
+             int32_t aKeyCode,
+             int32_t aCharCode,
+             int32_t aModifiers,
+             bool aPreventDefault);
+
+    CompositionEvent(WidgetCompositionEvent event);
+
+    SelectionEvent(WidgetSelectionEvent event);
+
+    /**
+     * Activate event forwarding from client to parent.
+     */
+    ActivateFrameEvent(nsString aType, bool capture);
+
+    LoadRemoteScript(nsString aURL, bool aRunInGlobalScope);
+
+    /**
+     * Create a asynchronous request to render whatever document is
+     * loaded in the child when this message arrives.  When the
+     * request finishes, PDocumentRenderer:__delete__ is sent back to
+     * this side to notify completion.
+     *
+     * |documentRect| is the area of the remote document to draw,
+     * transformed by |transform|.  The rendered area will have the
+     * default background color |bgcolor|.  |renderFlags| are the
+     * nsIPresShell::RenderDocument() flags to use on the remote side,
+     * and if true, |flushLayout| will do just that before rendering
+     * the document.  The rendered image will be of size |renderSize|.
+     */
+    PDocumentRenderer(nsRect documentRect, Matrix transform,
+                      nsString bgcolor,
+                      uint32_t renderFlags, bool flushLayout,
+                      nsIntSize renderSize);
+
+    /**
+     * Sent by the chrome process when it no longer wants this remote
+     * <browser>.  The child side cleans up in response, then
+     * finalizing its death by sending back __delete__() to the
+     * parent.
+     */
+    Destroy();
+
+
+    /**
+     * Tell the child side if it has to update it's touchable region
+     * to the parent.
+     */
+    SetUpdateHitRegion(bool aEnabled);
+
+    /**
+     * Tell the child to update its docShell's active state.
+     */
+    SetIsDocShellActive(bool aIsActive);
+
+    /**
+     * The parent (chrome thread) requests that the child inform it when
+     * the graphics objects are ready to display.
+     * @see PCompositor
+     * @see RemotePaintIsReady
+     */
+    async RequestNotifyAfterRemotePaint();
+
+    /**
+     * Tell the child that the UI resolution changed for the containing
+     * window.
+     */
+    UIResolutionChanged();
+
+    /**
+     * Tell the child of an app's offline status
+     */
+    AppOfflineStatus(uint32_t id, bool offline);
+
+/*
+ * FIXME: write protocol!
+
+state LIVE:
+    send LoadURL goto LIVE;
+//etc.
+    send Destroy goto DYING;
+
+state DYING:
+    discard send blah;
+// etc.
+    recv __delete__;
+ */
+};
+
+}
+}

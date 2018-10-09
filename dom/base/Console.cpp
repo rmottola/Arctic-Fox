@@ -1,0 +1,1759 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "mozilla/dom/Console.h"
+#include "mozilla/dom/ConsoleBinding.h"
+
+#include "mozilla/dom/BlobBinding.h"
+#include "mozilla/dom/Exceptions.h"
+#include "mozilla/dom/File.h"
+#include "mozilla/dom/ToJSValue.h"
+#include "mozilla/Maybe.h"
+#include "nsCycleCollectionParticipant.h"
+#include "nsDocument.h"
+#include "nsDOMNavigationTiming.h"
+#include "nsGlobalWindow.h"
+#include "nsJSUtils.h"
+#include "nsPerformance.h"
+#include "ScriptSettings.h"
+#include "WorkerPrivate.h"
+#include "WorkerRunnable.h"
+#include "xpcprivate.h"
+#include "nsContentUtils.h"
+#include "nsDocShell.h"
+
+#include "nsIConsoleAPIStorage.h"
+#include "nsIDOMWindowUtils.h"
+#include "nsIInterfaceRequestorUtils.h"
+#include "nsILoadContext.h"
+#include "nsIServiceManager.h"
+#include "nsISupportsPrimitives.h"
+#include "nsIWebNavigation.h"
+#include "nsIXPConnect.h"
+
+// The maximum allowed number of concurrent timers per page.
+#define MAX_PAGE_TIMERS 10000
+
+// The maximum allowed number of concurrent counters per page.
+#define MAX_PAGE_COUNTERS 10000
+
+// The maximum stacktrace depth when populating the stacktrace array used for
+// console.trace().
+#define DEFAULT_MAX_STACKTRACE_DEPTH 200
+
+// This tags are used in the Structured Clone Algorithm to move js values from
+// worker thread to main thread
+#define CONSOLE_TAG_BLOB   JS_SCTAG_USER_MIN
+
+using namespace mozilla::dom::exceptions;
+using namespace mozilla::dom::workers;
+
+namespace mozilla {
+namespace dom {
+
+struct
+ConsoleStructuredCloneData
+{
+  nsCOMPtr<nsISupports> mParent;
+  nsTArray<nsRefPtr<FileImpl>> mFiles;
+};
+
+/**
+ * Console API in workers uses the Structured Clone Algorithm to move any value
+ * from the worker thread to the main-thread. Some object cannot be moved and,
+ * in these cases, we convert them to strings.
+ * It's not the best, but at least we are able to show something.
+ */
+
+// This method is called by the Structured Clone Algorithm when some data has
+// to be read.
+static JSObject*
+ConsoleStructuredCloneCallbacksRead(JSContext* aCx,
+                                    JSStructuredCloneReader* /* unused */,
+                                    uint32_t aTag, uint32_t aIndex,
+                                    void* aClosure)
+{
+  AssertIsOnMainThread();
+  ConsoleStructuredCloneData* data =
+    static_cast<ConsoleStructuredCloneData*>(aClosure);
+  MOZ_ASSERT(data);
+
+  if (aTag == CONSOLE_TAG_BLOB) {
+    MOZ_ASSERT(data->mFiles.Length() > aIndex);
+
+    JS::Rooted<JS::Value> val(aCx);
+    {
+      nsRefPtr<File> file =
+        new File(data->mParent, data->mFiles.ElementAt(aIndex));
+      if (!GetOrCreateDOMReflector(aCx, file, &val)) {
+        return nullptr;
+      }
+    }
+
+    return &val.toObject();
+  }
+
+  MOZ_CRASH("No other tags are supported.");
+  return nullptr;
+}
+
+// This method is called by the Structured Clone Algorithm when some data has
+// to be written.
+static bool
+ConsoleStructuredCloneCallbacksWrite(JSContext* aCx,
+                                     JSStructuredCloneWriter* aWriter,
+                                     JS::Handle<JSObject*> aObj,
+                                     void* aClosure)
+{
+  ConsoleStructuredCloneData* data =
+    static_cast<ConsoleStructuredCloneData*>(aClosure);
+  MOZ_ASSERT(data);
+
+  nsRefPtr<File> file;
+  if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, file)) &&
+      file->Impl()->MayBeClonedToOtherThreads()) {
+    if (!JS_WriteUint32Pair(aWriter, CONSOLE_TAG_BLOB, data->mFiles.Length())) {
+      return false;
+    }
+
+    data->mFiles.AppendElement(file->Impl());
+    return true;
+  }
+
+  JS::Rooted<JS::Value> value(aCx, JS::ObjectOrNullValue(aObj));
+  JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, value));
+  if (!jsString) {
+    return false;
+  }
+
+  if (!JS_WriteString(aWriter, jsString)) {
+    return false;
+  }
+
+  return true;
+}
+
+static void
+ConsoleStructuredCloneCallbacksError(JSContext* /* aCx */,
+                                     uint32_t /* aErrorId */)
+{
+  NS_WARNING("Failed to clone data for the Console API in workers.");
+}
+
+static const JSStructuredCloneCallbacks gConsoleCallbacks = {
+  ConsoleStructuredCloneCallbacksRead,
+  ConsoleStructuredCloneCallbacksWrite,
+  ConsoleStructuredCloneCallbacksError
+};
+
+class ConsoleCallData final
+{
+public:
+  ConsoleCallData()
+    : mMethodName(Console::MethodLog)
+    , mPrivate(false)
+    , mTimeStamp(JS_Now() / PR_USEC_PER_MSEC)
+    , mIDType(eUnknown)
+    , mOuterIDNumber(0)
+    , mInnerIDNumber(0)
+  { }
+
+  void
+  Initialize(JSContext* aCx, Console::MethodName aName,
+             const nsAString& aString, const Sequence<JS::Value>& aArguments)
+  {
+    mGlobal = JS::CurrentGlobalOrNull(aCx);
+    mMethodName = aName;
+    mMethodString = aString;
+
+    for (uint32_t i = 0; i < aArguments.Length(); ++i) {
+      mArguments.AppendElement(aArguments[i]);
+    }
+  }
+
+  void
+  SetIDs(uint64_t aOuterID, uint64_t aInnerID)
+  {
+    MOZ_ASSERT(mIDType == eUnknown);
+
+    mOuterIDNumber = aOuterID;
+    mInnerIDNumber = aInnerID;
+    mIDType = eNumber;
+  }
+
+  void
+  SetIDs(const nsAString& aOuterID, const nsAString& aInnerID)
+  {
+    MOZ_ASSERT(mIDType == eUnknown);
+
+    mOuterIDString = aOuterID;
+    mInnerIDString = aInnerID;
+    mIDType = eString;
+  }
+
+  void
+  CleanupJSObjects()
+  {
+    mArguments.Clear();
+    mGlobal = nullptr;
+  }
+
+  JS::Heap<JSObject*> mGlobal;
+
+  Console::MethodName mMethodName;
+  bool mPrivate;
+  int64_t mTimeStamp;
+  DOMHighResTimeStamp mMonotonicTimer;
+
+  // The concept of outerID and innerID is misleading because when a
+  // ConsoleCallData is created from a window, these are the window IDs, but
+  // when the object is created from a SharedWorker, a ServiceWorker or a
+  // subworker of a ChromeWorker these IDs are the type of worker and the
+  // filename of the callee.
+  // In Console.jsm the ID is 'jsm'.
+  enum {
+    eString,
+    eNumber,
+    eUnknown
+  } mIDType;
+
+  uint64_t mOuterIDNumber;
+  nsString mOuterIDString;
+
+  uint64_t mInnerIDNumber;
+  nsString mInnerIDString;
+
+  nsString mMethodString;
+  nsTArray<JS::Heap<JS::Value>> mArguments;
+
+  // Stack management is complicated, because we want to do it as
+  // lazily as possible.  Therefore, we have the following behavior:
+  // 1)  mTopStackFrame is initialized whenever we have any JS on the stack
+  // 2)  mReifiedStack is initialized if we're created in a worker.
+  // 3)  mStack is set (possibly to null if there is no JS on the stack) if
+  //     we're created on main thread.
+  Maybe<ConsoleStackEntry> mTopStackFrame;
+  Maybe<nsTArray<ConsoleStackEntry>> mReifiedStack;
+  nsCOMPtr<nsIStackFrame> mStack;
+};
+
+// This class is used to clear any exception at the end of this method.
+class ClearException
+{
+public:
+  explicit ClearException(JSContext* aCx)
+    : mCx(aCx)
+  {
+  }
+
+  ~ClearException()
+  {
+    JS_ClearPendingException(mCx);
+  }
+
+private:
+  JSContext* mCx;
+};
+
+class ConsoleRunnable : public nsRunnable
+{
+public:
+  explicit ConsoleRunnable(Console* aConsole)
+    : mWorkerPrivate(GetCurrentThreadWorkerPrivate())
+    , mConsole(aConsole)
+  {
+    MOZ_ASSERT(mWorkerPrivate);
+  }
+
+  virtual
+  ~ConsoleRunnable()
+  {
+  }
+
+  bool
+  Dispatch()
+  {
+    mWorkerPrivate->AssertIsOnWorkerThread();
+
+    JSContext* cx = mWorkerPrivate->GetJSContext();
+
+    if (!PreDispatch(cx)) {
+      return false;
+    }
+
+    AutoSyncLoopHolder syncLoop(mWorkerPrivate);
+    mSyncLoopTarget = syncLoop.EventTarget();
+
+    if (NS_FAILED(NS_DispatchToMainThread(this))) {
+      JS_ReportError(cx,
+                     "Failed to dispatch to main thread for the Console API!");
+      return false;
+    }
+
+    return syncLoop.Run();
+  }
+
+private:
+  NS_IMETHOD Run()
+  {
+    AssertIsOnMainThread();
+
+    // Walk up to our containing page
+    WorkerPrivate* wp = mWorkerPrivate;
+    while (wp->GetParent()) {
+      wp = wp->GetParent();
+    }
+
+    nsPIDOMWindow* window = wp->GetWindow();
+    if (!window) {
+      RunWindowless();
+    } else {
+      RunWithWindow(window);
+    }
+
+    nsRefPtr<MainThreadStopSyncLoopRunnable> response =
+      new MainThreadStopSyncLoopRunnable(mWorkerPrivate,
+                                         mSyncLoopTarget.forget(),
+                                         true);
+    if (!response->Dispatch(nullptr)) {
+      NS_WARNING("Failed to dispatch response!");
+    }
+
+    return NS_OK;
+  }
+
+  void
+  RunWithWindow(nsPIDOMWindow* aWindow)
+  {
+    AutoJSAPI jsapi;
+    MOZ_ASSERT(aWindow);
+
+    nsRefPtr<nsGlobalWindow> win = static_cast<nsGlobalWindow*>(aWindow);
+    if (NS_WARN_IF(!jsapi.Init(win))) {
+      return;
+    }
+
+    MOZ_ASSERT(aWindow->IsInnerWindow());
+    nsPIDOMWindow* outerWindow = aWindow->GetOuterWindow();
+    MOZ_ASSERT(outerWindow);
+
+    RunConsole(jsapi.cx(), outerWindow, aWindow);
+  }
+
+  void
+  RunWindowless()
+  {
+    WorkerPrivate* wp = mWorkerPrivate;
+    while (wp->GetParent()) {
+      wp = wp->GetParent();
+    }
+
+    MOZ_ASSERT(!wp->GetWindow());
+
+    AutoSafeJSContext cx;
+
+    nsCOMPtr<nsIXPConnectJSObjectHolder> sandbox =
+      mConsole->GetOrCreateSandbox(cx, wp->GetPrincipal());
+    if (NS_WARN_IF(!sandbox)) {
+       return;
+    }
+
+    JS::Rooted<JSObject*> global(cx, sandbox->GetJSObject());
+    if (NS_WARN_IF(!global)) {
+      return;
+    }
+
+    // The CreateSandbox call returns a proxy to the actual sandbox object. We
+    // don't need a proxy here.
+    global = js::UncheckedUnwrap(global);
+
+    JSAutoCompartment ac(cx, global);
+
+    RunConsole(cx, nullptr, nullptr);
+  }
+
+protected:
+  virtual bool
+  PreDispatch(JSContext* aCx) = 0;
+
+  virtual void
+  RunConsole(JSContext* aCx, nsPIDOMWindow* aOuterWindow,
+             nsPIDOMWindow* aInnerWindow) = 0;
+
+  WorkerPrivate* mWorkerPrivate;
+
+  // Raw pointer because this method is async and this object is kept alive by
+  // the caller.
+  Console* mConsole;
+
+private:
+  nsCOMPtr<nsIEventTarget> mSyncLoopTarget;
+};
+
+// This runnable appends a CallData object into the Console queue running on
+// the main-thread.
+class ConsoleCallDataRunnable final : public ConsoleRunnable
+{
+public:
+  ConsoleCallDataRunnable(Console* aConsole,
+                          ConsoleCallData* aCallData)
+    : ConsoleRunnable(aConsole)
+    , mCallData(aCallData)
+  { }
+
+private:
+  ~ConsoleCallDataRunnable()
+  { }
+
+  bool
+  PreDispatch(JSContext* aCx) override
+  {
+    mWorkerPrivate->AssertIsOnWorkerThread();
+
+    ClearException ce(aCx);
+    JSAutoCompartment ac(aCx, mCallData->mGlobal);
+
+    JS::Rooted<JSObject*> arguments(aCx,
+      JS_NewArrayObject(aCx, mCallData->mArguments.Length()));
+    if (!arguments) {
+      return false;
+    }
+
+    JS::Rooted<JS::Value> arg(aCx);
+    for (uint32_t i = 0; i < mCallData->mArguments.Length(); ++i) {
+      arg = mCallData->mArguments[i];
+      if (!JS_DefineElement(aCx, arguments, i, arg, JSPROP_ENUMERATE)) {
+        return false;
+      }
+    }
+
+    JS::Rooted<JS::Value> value(aCx, JS::ObjectValue(*arguments));
+
+    if (!mArguments.write(aCx, value, &gConsoleCallbacks, &mData)) {
+      return false;
+    }
+
+    mCallData->CleanupJSObjects();
+    return true;
+  }
+
+  void
+  RunConsole(JSContext* aCx, nsPIDOMWindow* aOuterWindow,
+             nsPIDOMWindow* aInnerWindow) override
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+
+    // The windows have to run in parallel.
+    MOZ_ASSERT(!!aOuterWindow == !!aInnerWindow);
+
+    if (aOuterWindow) {
+      mCallData->SetIDs(aOuterWindow->WindowID(), aInnerWindow->WindowID());
+    } else {
+      ConsoleStackEntry frame;
+      if (mCallData->mTopStackFrame) {
+        frame = *mCallData->mTopStackFrame;
+      }
+
+      nsString id;
+      if (mWorkerPrivate->IsSharedWorker()) {
+        id = NS_LITERAL_STRING("SharedWorker");
+      } else if (mWorkerPrivate->IsServiceWorker()) {
+        id = NS_LITERAL_STRING("ServiceWorker");
+      } else {
+        id = NS_LITERAL_STRING("Worker");
+      }
+
+      mCallData->SetIDs(id, frame.mFilename);
+    }
+
+    // Now we could have the correct window (if we are not window-less).
+    mData.mParent = aInnerWindow;
+
+    ProcessCallData(aCx);
+    mCallData->CleanupJSObjects();
+
+    mData.mParent = nullptr;
+  }
+
+private:
+  void
+  ProcessCallData(JSContext* aCx)
+  {
+    ClearException ce(aCx);
+
+    JS::Rooted<JS::Value> argumentsValue(aCx);
+    if (!mArguments.read(aCx, &argumentsValue, &gConsoleCallbacks, &mData)) {
+      return;
+    }
+
+    MOZ_ASSERT(argumentsValue.isObject());
+    JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
+    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
+
+    uint32_t length;
+    if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
+      return;
+    }
+
+    for (uint32_t i = 0; i < length; ++i) {
+      JS::Rooted<JS::Value> value(aCx);
+
+      if (!JS_GetElement(aCx, argumentsObj, i, &value)) {
+        return;
+      }
+
+      mCallData->mArguments.AppendElement(value);
+    }
+
+    MOZ_ASSERT(mCallData->mArguments.Length() == length);
+
+    mCallData->mGlobal = JS::CurrentGlobalOrNull(aCx);
+    mConsole->ProcessCallData(mCallData);
+  }
+
+  ConsoleCallData* mCallData;
+
+  JSAutoStructuredCloneBuffer mArguments;
+  ConsoleStructuredCloneData mData;
+};
+
+// This runnable calls ProfileMethod() on the console on the main-thread.
+class ConsoleProfileRunnable final : public ConsoleRunnable
+{
+public:
+  ConsoleProfileRunnable(Console* aConsole, const nsAString& aAction,
+                         const Sequence<JS::Value>& aArguments)
+    : ConsoleRunnable(aConsole)
+    , mAction(aAction)
+    , mArguments(aArguments)
+  {
+    MOZ_ASSERT(aConsole);
+  }
+
+private:
+  bool
+  PreDispatch(JSContext* aCx) override
+  {
+    ClearException ce(aCx);
+
+    JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
+    if (!global) {
+      return false;
+    }
+
+    JSAutoCompartment ac(aCx, global);
+
+    JS::Rooted<JSObject*> arguments(aCx,
+      JS_NewArrayObject(aCx, mArguments.Length()));
+    if (!arguments) {
+      return false;
+    }
+
+    JS::Rooted<JS::Value> arg(aCx);
+    for (uint32_t i = 0; i < mArguments.Length(); ++i) {
+      arg = mArguments[i];
+      if (!JS_DefineElement(aCx, arguments, i, arg, JSPROP_ENUMERATE)) {
+        return false;
+      }
+    }
+
+    JS::Rooted<JS::Value> value(aCx, JS::ObjectValue(*arguments));
+
+    if (!mBuffer.write(aCx, value, &gConsoleCallbacks, &mData)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void
+  RunConsole(JSContext* aCx, nsPIDOMWindow* aOuterWindow,
+             nsPIDOMWindow* aInnerWindow) override
+  {
+    ClearException ce(aCx);
+
+    // Now we could have the correct window (if we are not window-less).
+    mData.mParent = aInnerWindow;
+
+    JS::Rooted<JS::Value> argumentsValue(aCx);
+    bool ok = mBuffer.read(aCx, &argumentsValue, &gConsoleCallbacks, &mData);
+    mData.mParent = nullptr;
+
+    if (!ok) {
+      return;
+    }
+
+    MOZ_ASSERT(argumentsValue.isObject());
+    JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
+    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
+
+    uint32_t length;
+    if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
+      return;
+    }
+
+    Sequence<JS::Value> arguments;
+
+    for (uint32_t i = 0; i < length; ++i) {
+      JS::Rooted<JS::Value> value(aCx);
+
+      if (!JS_GetElement(aCx, argumentsObj, i, &value)) {
+        return;
+      }
+
+      arguments.AppendElement(value);
+    }
+
+    mConsole->ProfileMethod(aCx, mAction, arguments);
+  }
+
+  nsString mAction;
+  Sequence<JS::Value> mArguments;
+
+  JSAutoStructuredCloneBuffer mBuffer;
+  ConsoleStructuredCloneData mData;
+};
+
+NS_IMPL_CYCLE_COLLECTION_CLASS(Console)
+
+// We don't need to traverse/unlink mStorage and mSanbox because they are not
+// CCed objects and they are only used on the main thread, even when this
+// Console object is used on workers.
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Console)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mWindow)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Console)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
+NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(Console)
+  NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
+NS_IMPL_CYCLE_COLLECTION_TRACE_END
+
+NS_IMPL_CYCLE_COLLECTING_ADDREF(Console)
+NS_IMPL_CYCLE_COLLECTING_RELEASE(Console)
+
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Console)
+  NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
+  NS_INTERFACE_MAP_ENTRY(nsIObserver)
+  NS_INTERFACE_MAP_ENTRY(nsISupports)
+NS_INTERFACE_MAP_END
+
+Console::Console(nsPIDOMWindow* aWindow)
+  : mWindow(aWindow)
+  , mOuterID(0)
+  , mInnerID(0)
+{
+  if (mWindow) {
+    MOZ_ASSERT(mWindow->IsInnerWindow());
+    mInnerID = mWindow->WindowID();
+
+    nsPIDOMWindow* outerWindow = mWindow->GetOuterWindow();
+    MOZ_ASSERT(outerWindow);
+    mOuterID = outerWindow->WindowID();
+  }
+
+  if (NS_IsMainThread()) {
+    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+    if (obs) {
+      obs->AddObserver(this, "inner-window-destroyed", false);
+    }
+  }
+
+  mozilla::HoldJSObjects(this);
+}
+
+Console::~Console()
+{
+  if (!NS_IsMainThread()) {
+    nsCOMPtr<nsIThread> mainThread;
+    NS_GetMainThread(getter_AddRefs(mainThread));
+
+    if (mStorage) {
+      nsIConsoleAPIStorage* storage;
+      mStorage.forget(&storage);
+      NS_ProxyRelease(mainThread, storage, false);
+    }
+
+    if (mSandbox) {
+      nsIXPConnectJSObjectHolder* sandbox;
+      mSandbox.forget(&sandbox);
+      NS_ProxyRelease(mainThread, sandbox, false);
+    }
+  }
+
+  mozilla::DropJSObjects(this);
+}
+
+NS_IMETHODIMP
+Console::Observe(nsISupports* aSubject, const char* aTopic,
+                 const char16_t* aData)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (strcmp(aTopic, "inner-window-destroyed")) {
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsISupportsPRUint64> wrapper = do_QueryInterface(aSubject);
+  NS_ENSURE_TRUE(wrapper, NS_ERROR_FAILURE);
+
+  uint64_t innerID;
+  nsresult rv = wrapper->GetData(&innerID);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (innerID == mInnerID) {
+    nsCOMPtr<nsIObserverService> obs =
+      do_GetService("@mozilla.org/observer-service;1");
+    if (obs) {
+      obs->RemoveObserver(this, "inner-window-destroyed");
+    }
+
+    mTimerRegistry.Clear();
+  }
+
+  return NS_OK;
+}
+
+JSObject*
+Console::WrapObject(JSContext* aCx)
+{
+  return ConsoleBinding::Wrap(aCx, this);
+}
+
+#define METHOD(name, string)                                          \
+  void                                                                \
+  Console::name(JSContext* aCx, const Sequence<JS::Value>& aData)     \
+  {                                                                   \
+    Method(aCx, Method##name, NS_LITERAL_STRING(string), aData);      \
+  }
+
+METHOD(Log, "log")
+METHOD(Info, "info")
+METHOD(Warn, "warn")
+METHOD(Error, "error")
+METHOD(Exception, "exception")
+METHOD(Debug, "debug")
+METHOD(Table, "table")
+
+void
+Console::Trace(JSContext* aCx)
+{
+  const Sequence<JS::Value> data;
+  Method(aCx, MethodTrace, NS_LITERAL_STRING("trace"), data);
+}
+
+// Displays an interactive listing of all the properties of an object.
+METHOD(Dir, "dir");
+
+METHOD(Group, "group")
+METHOD(GroupCollapsed, "groupCollapsed")
+METHOD(GroupEnd, "groupEnd")
+
+void
+Console::Time(JSContext* aCx, const JS::Handle<JS::Value> aTime)
+{
+  Sequence<JS::Value> data;
+  SequenceRooter<JS::Value> rooter(aCx, &data);
+
+  if (!aTime.isUndefined()) {
+    data.AppendElement(aTime);
+  }
+
+  Method(aCx, MethodTime, NS_LITERAL_STRING("time"), data);
+}
+
+void
+Console::TimeEnd(JSContext* aCx, const JS::Handle<JS::Value> aTime)
+{
+  Sequence<JS::Value> data;
+  SequenceRooter<JS::Value> rooter(aCx, &data);
+
+  if (!aTime.isUndefined()) {
+    data.AppendElement(aTime);
+  }
+
+  Method(aCx, MethodTimeEnd, NS_LITERAL_STRING("timeEnd"), data);
+}
+
+void
+Console::Profile(JSContext* aCx, const Sequence<JS::Value>& aData)
+{
+  ProfileMethod(aCx, NS_LITERAL_STRING("profile"), aData);
+}
+
+void
+Console::ProfileEnd(JSContext* aCx, const Sequence<JS::Value>& aData)
+{
+  ProfileMethod(aCx, NS_LITERAL_STRING("profileEnd"), aData);
+}
+
+void
+Console::ProfileMethod(JSContext* aCx, const nsAString& aAction,
+                       const Sequence<JS::Value>& aData)
+{
+  if (!NS_IsMainThread()) {
+    // Here we are in a worker thread.
+    nsRefPtr<ConsoleProfileRunnable> runnable =
+      new ConsoleProfileRunnable(this, aAction, aData);
+    runnable->Dispatch();
+    return;
+  }
+
+  ClearException ce(aCx);
+
+  RootedDictionary<ConsoleProfileEvent> event(aCx);
+  event.mAction = aAction;
+
+  event.mArguments.Construct();
+  Sequence<JS::Value>& sequence = event.mArguments.Value();
+
+  for (uint32_t i = 0; i < aData.Length(); ++i) {
+    sequence.AppendElement(aData[i]);
+  }
+
+  JS::Rooted<JS::Value> eventValue(aCx);
+  if (!ToJSValue(aCx, event, &eventValue)) {
+    return;
+  }
+
+  JS::Rooted<JSObject*> eventObj(aCx, &eventValue.toObject());
+  MOZ_ASSERT(eventObj);
+
+  if (!JS_DefineProperty(aCx, eventObj, "wrappedJSObject", eventValue,
+      JSPROP_ENUMERATE)) {
+    return;
+  }
+
+  nsXPConnect*  xpc = nsXPConnect::XPConnect();
+  nsCOMPtr<nsISupports> wrapper;
+  const nsIID& iid = NS_GET_IID(nsISupports);
+
+  if (NS_FAILED(xpc->WrapJS(aCx, eventObj, iid, getter_AddRefs(wrapper)))) {
+    return;
+  }
+
+  nsCOMPtr<nsIObserverService> obs =
+    do_GetService("@mozilla.org/observer-service;1");
+  if (obs) {
+    obs->NotifyObservers(wrapper, "console-api-profiler", nullptr);
+  }
+}
+
+void
+Console::Assert(JSContext* aCx, bool aCondition,
+                const Sequence<JS::Value>& aData)
+{
+  if (!aCondition) {
+    Method(aCx, MethodAssert, NS_LITERAL_STRING("assert"), aData);
+  }
+}
+
+METHOD(Count, "count")
+
+void
+Console::NoopMethod()
+{
+  // Nothing to do.
+}
+
+static
+nsresult
+StackFrameToStackEntry(nsIStackFrame* aStackFrame,
+                       ConsoleStackEntry& aStackEntry,
+                       uint32_t aLanguage)
+{
+  MOZ_ASSERT(aStackFrame);
+
+  nsresult rv = aStackFrame->GetFilename(aStackEntry.mFilename);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  int32_t lineNumber;
+  rv = aStackFrame->GetLineNumber(&lineNumber);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  aStackEntry.mLineNumber = lineNumber;
+
+  int32_t columnNumber;
+  rv = aStackFrame->GetColumnNumber(&columnNumber);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  aStackEntry.mColumnNumber = columnNumber;
+
+  rv = aStackFrame->GetName(aStackEntry.mFunctionName);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  aStackEntry.mLanguage = aLanguage;
+  return NS_OK;
+}
+
+static
+nsresult
+ReifyStack(nsIStackFrame* aStack, nsTArray<ConsoleStackEntry>& aRefiedStack)
+{
+  nsCOMPtr<nsIStackFrame> stack(aStack);
+
+  while (stack) {
+    uint32_t language;
+    nsresult rv = stack->GetLanguage(&language);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    if (language == nsIProgrammingLanguage::JAVASCRIPT ||
+        language == nsIProgrammingLanguage::JAVASCRIPT2) {
+      ConsoleStackEntry& data = *aRefiedStack.AppendElement();
+      rv = StackFrameToStackEntry(stack, data, language);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    nsCOMPtr<nsIStackFrame> caller;
+    rv = stack->GetCaller(getter_AddRefs(caller));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    stack.swap(caller);
+  }
+
+  return NS_OK;
+}
+
+class ConsoleTimelineMarker : public TimelineMarker
+{
+public:
+  ConsoleTimelineMarker(nsDocShell* aDocShell,
+                        TracingMetadata aMetaData,
+                        const nsAString& aCause)
+    : TimelineMarker(aDocShell, "ConsoleTime", aMetaData, aCause)
+  {
+    if (aMetaData == TRACING_INTERVAL_END) {
+      CaptureStack();
+    }
+  }
+
+  virtual bool Equals(const TimelineMarker* aOther) override
+  {
+    if (!TimelineMarker::Equals(aOther)) {
+      return false;
+    }
+    // Console markers must have matching causes as well.
+    return GetCause() == aOther->GetCause();
+  }
+
+  virtual void AddDetails(mozilla::dom::ProfileTimelineMarker& aMarker) override
+  {
+    if (GetMetaData() == TRACING_INTERVAL_START) {
+      aMarker.mCauseName.Construct(GetCause());
+    } else {
+      aMarker.mEndStack = GetStack();
+    }
+  }
+};
+
+// Queue a call to a console method. See the CALL_DELAY constant.
+void
+Console::Method(JSContext* aCx, MethodName aMethodName,
+                const nsAString& aMethodString,
+                const Sequence<JS::Value>& aData)
+{
+  nsAutoPtr<ConsoleCallData> callData(new ConsoleCallData());
+
+  ClearException ce(aCx);
+
+  callData->Initialize(aCx, aMethodName, aMethodString, aData);
+
+  if (mWindow) {
+    nsCOMPtr<nsIWebNavigation> webNav = do_GetInterface(mWindow);
+    if (!webNav) {
+      return;
+    }
+
+    nsCOMPtr<nsILoadContext> loadContext = do_QueryInterface(webNav);
+    MOZ_ASSERT(loadContext);
+
+    loadContext->GetUsePrivateBrowsing(&callData->mPrivate);
+  }
+
+  uint32_t maxDepth = ShouldIncludeStackTrace(aMethodName) ?
+                      DEFAULT_MAX_STACKTRACE_DEPTH : 1;
+  nsCOMPtr<nsIStackFrame> stack = CreateStack(aCx, maxDepth);
+
+  if (!stack) {
+    return;
+  }
+
+  // Walk up to the first JS stack frame and save it if we find it.
+  do {
+    uint32_t language;
+    nsresult rv = stack->GetLanguage(&language);
+    if (NS_FAILED(rv)) {
+      return;
+    }
+
+    if (language == nsIProgrammingLanguage::JAVASCRIPT ||
+        language == nsIProgrammingLanguage::JAVASCRIPT2) {
+      callData->mTopStackFrame.emplace();
+      nsresult rv = StackFrameToStackEntry(stack,
+                                           *callData->mTopStackFrame,
+                                           language);
+      if (NS_FAILED(rv)) {
+        return;
+      }
+
+      break;
+    }
+
+    nsCOMPtr<nsIStackFrame> caller;
+    rv = stack->GetCaller(getter_AddRefs(caller));
+    if (NS_FAILED(rv)) {
+      return;
+    }
+
+    stack.swap(caller);
+  } while (stack);
+
+  if (NS_IsMainThread()) {
+    callData->mStack = stack;
+  } else {
+    // nsIStackFrame is not threadsafe, so we need to snapshot it now,
+    // before we post our runnable to the main thread.
+    callData->mReifiedStack.emplace();
+    nsresult rv = ReifyStack(stack, *callData->mReifiedStack);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return;
+    }
+  }
+
+  // Monotonic timer for 'time' and 'timeEnd'
+  if ((aMethodName == MethodTime || aMethodName == MethodTimeEnd)) {
+    if (mWindow) {
+      nsGlobalWindow *win = static_cast<nsGlobalWindow*>(mWindow.get());
+      MOZ_ASSERT(win);
+
+      nsRefPtr<nsPerformance> performance = win->GetPerformance();
+      if (!performance) {
+        return;
+      }
+
+      callData->mMonotonicTimer = performance->Now();
+
+      // 'time' and 'timeEnd' are displayed in the devtools timeline if active.
+      bool isTimelineRecording = false;
+      nsDocShell* docShell = static_cast<nsDocShell*>(mWindow->GetDocShell());
+      if (docShell) {
+        docShell->GetRecordProfileTimelineMarkers(&isTimelineRecording);
+      }
+
+      if (isTimelineRecording && aData.Length() == 1) {
+        JS::Rooted<JS::Value> value(aCx, aData[0]);
+        JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, value));
+        if (jsString) {
+          nsAutoJSString key;
+          if (key.init(aCx, jsString)) {
+            mozilla::UniquePtr<TimelineMarker> marker =
+              MakeUnique<ConsoleTimelineMarker>(docShell,
+                                                aMethodName == MethodTime ? TRACING_INTERVAL_START : TRACING_INTERVAL_END,
+                                                key);
+            docShell->AddProfileTimelineMarker(marker);
+          }
+        }
+      }
+
+    } else {
+      WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
+      MOZ_ASSERT(workerPrivate);
+
+      TimeDuration duration =
+        mozilla::TimeStamp::Now() - workerPrivate->CreationTimeStamp();
+
+      callData->mMonotonicTimer = duration.ToMilliseconds();
+    }
+  }
+
+  if (NS_IsMainThread()) {
+    callData->SetIDs(mOuterID, mInnerID);
+    ProcessCallData(callData);
+    return;
+  }
+
+  // Note: we can pass the reference of callData because this runnable calls
+  // ProcessCallData() synchronously.
+  nsRefPtr<ConsoleCallDataRunnable> runnable =
+    new ConsoleCallDataRunnable(this, callData);
+  runnable->Dispatch();
+}
+
+// We store information to lazily compute the stack in the reserved slots of
+// LazyStackGetter.  The first slot always stores a JS object: it's either the
+// JS wrapper of the nsIStackFrame or the actual reified stack representation.
+// The second slot is a PrivateValue() holding an nsIStackFrame* when we haven't
+// reified the stack yet, or an UndefinedValue() otherwise.
+enum {
+  SLOT_STACKOBJ,
+  SLOT_RAW_STACK
+};
+
+bool
+LazyStackGetter(JSContext* aCx, unsigned aArgc, JS::Value* aVp)
+{
+  JS::CallArgs args = CallArgsFromVp(aArgc, aVp);
+  JS::Rooted<JSObject*> callee(aCx, &args.callee());
+
+  JS::Value v = js::GetFunctionNativeReserved(&args.callee(), SLOT_RAW_STACK);
+  if (v.isUndefined()) {
+    // Already reified.
+    args.rval().set(js::GetFunctionNativeReserved(callee, SLOT_STACKOBJ));
+    return true;
+  }
+
+  nsIStackFrame* stack = reinterpret_cast<nsIStackFrame*>(v.toPrivate());
+  nsTArray<ConsoleStackEntry> reifiedStack;
+  nsresult rv = ReifyStack(stack, reifiedStack);
+  if (NS_FAILED(rv)) {
+    Throw(aCx, rv);
+    return false;
+  }
+
+  JS::Rooted<JS::Value> stackVal(aCx);
+  if (!ToJSValue(aCx, reifiedStack, &stackVal)) {
+    return false;
+  }
+
+  MOZ_ASSERT(stackVal.isObject());
+
+  js::SetFunctionNativeReserved(callee, SLOT_STACKOBJ, stackVal);
+  js::SetFunctionNativeReserved(callee, SLOT_RAW_STACK, JS::UndefinedValue());
+
+  args.rval().set(stackVal);
+  return true;
+}
+
+void
+Console::ProcessCallData(ConsoleCallData* aData)
+{
+  MOZ_ASSERT(aData);
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ConsoleStackEntry frame;
+  if (aData->mTopStackFrame) {
+    frame = *aData->mTopStackFrame;
+  }
+
+  AutoSafeJSContext cx;
+  ClearException ce(cx);
+  RootedDictionary<ConsoleEvent> event(cx);
+
+  JSAutoCompartment ac(cx, aData->mGlobal);
+
+  event.mID.Construct();
+  event.mInnerID.Construct();
+
+  MOZ_ASSERT(aData->mIDType != ConsoleCallData::eUnknown);
+  if (aData->mIDType == ConsoleCallData::eString) {
+    event.mID.Value().SetAsString() = aData->mOuterIDString;
+    event.mInnerID.Value().SetAsString() = aData->mInnerIDString;
+  } else {
+    MOZ_ASSERT(aData->mIDType == ConsoleCallData::eNumber);
+    event.mID.Value().SetAsUnsignedLongLong() = aData->mOuterIDNumber;
+    event.mInnerID.Value().SetAsUnsignedLongLong() = aData->mInnerIDNumber;
+  }
+
+  event.mLevel = aData->mMethodString;
+  event.mFilename = frame.mFilename;
+  event.mLineNumber = frame.mLineNumber;
+  event.mColumnNumber = frame.mColumnNumber;
+  event.mFunctionName = frame.mFunctionName;
+  event.mTimeStamp = aData->mTimeStamp;
+  event.mPrivate = aData->mPrivate;
+
+  switch (aData->mMethodName) {
+    case MethodLog:
+    case MethodInfo:
+    case MethodWarn:
+    case MethodError:
+    case MethodException:
+    case MethodDebug:
+    case MethodAssert:
+      event.mArguments.Construct();
+      event.mStyles.Construct();
+      ProcessArguments(cx, aData->mArguments, event.mArguments.Value(),
+                       event.mStyles.Value());
+      break;
+
+    default:
+      event.mArguments.Construct();
+      ArgumentsToValueList(aData->mArguments, event.mArguments.Value());
+  }
+
+  if (aData->mMethodName == MethodGroup ||
+      aData->mMethodName == MethodGroupCollapsed ||
+      aData->mMethodName == MethodGroupEnd) {
+    ComposeGroupName(cx, aData->mArguments, event.mGroupName);
+  }
+
+  else if (aData->mMethodName == MethodTime && !aData->mArguments.IsEmpty()) {
+    event.mTimer = StartTimer(cx, aData->mArguments[0], aData->mMonotonicTimer);
+  }
+
+  else if (aData->mMethodName == MethodTimeEnd && !aData->mArguments.IsEmpty()) {
+    event.mTimer = StopTimer(cx, aData->mArguments[0], aData->mMonotonicTimer);
+  }
+
+  else if (aData->mMethodName == MethodCount) {
+    event.mCounter = IncreaseCounter(cx, frame, aData->mArguments);
+  }
+
+  // We want to create a console event object and pass it to our
+  // nsIConsoleAPIStorage implementation.  We want to define some accessor
+  // properties on this object, and those will need to keep an nsIStackFrame
+  // alive.  But nsIStackFrame cannot be wrapped in an untrusted scope.  And
+  // further, passing untrusted objects to system code is likely to run afoul of
+  // Object Xrays.  So we want to wrap in a system-principal scope here.  But
+  // which one?  We could cheat and try to get the underlying JSObject* of
+  // mStorage, but that's a bit fragile.  Instead, we just use the junk scope,
+  // with explicit permission from the XPConnect module owner.  If you're
+  // tempted to do that anywhere else, talk to said module owner first.
+  JSAutoCompartment ac2(cx, xpc::PrivilegedJunkScope());
+
+  JS::Rooted<JS::Value> eventValue(cx);
+  if (!ToJSValue(cx, event, &eventValue)) {
+    return;
+  }
+
+  JS::Rooted<JSObject*> eventObj(cx, &eventValue.toObject());
+  MOZ_ASSERT(eventObj);
+
+  if (!JS_DefineProperty(cx, eventObj, "wrappedJSObject", eventValue, JSPROP_ENUMERATE)) {
+    return;
+  }
+
+  if (ShouldIncludeStackTrace(aData->mMethodName)) {
+    // Now define the "stacktrace" property on eventObj.  There are two cases
+    // here.  Either we came from a worker and have a reified stack, or we want
+    // to define a getter that will lazily reify the stack.
+    if (aData->mReifiedStack) {
+      JS::Rooted<JS::Value> stacktrace(cx);
+      if (!ToJSValue(cx, *aData->mReifiedStack, &stacktrace) ||
+          !JS_DefineProperty(cx, eventObj, "stacktrace", stacktrace,
+                             JSPROP_ENUMERATE)) {
+        return;
+      }
+    } else {
+      JSFunction* fun = js::NewFunctionWithReserved(cx, LazyStackGetter, 0, 0,
+                                                    eventObj, "stacktrace");
+      if (!fun) {
+        return;
+      }
+
+      JS::Rooted<JSObject*> funObj(cx, JS_GetFunctionObject(fun));
+
+      // We want to store our stack in the function and have it stay alive.  But
+      // we also need sane access to the C++ nsIStackFrame.  So store both a JS
+      // wrapper and the raw pointer: the former will keep the latter alive.
+      JS::Rooted<JS::Value> stackVal(cx);
+      nsresult rv = nsContentUtils::WrapNative(cx, aData->mStack,
+                                               &stackVal);
+      if (NS_FAILED(rv)) {
+        return;
+      }
+
+      js::SetFunctionNativeReserved(funObj, SLOT_STACKOBJ, stackVal);
+      js::SetFunctionNativeReserved(funObj, SLOT_RAW_STACK,
+                                    JS::PrivateValue(aData->mStack.get()));
+
+      if (!JS_DefineProperty(cx, eventObj, "stacktrace",
+                             JS::UndefinedHandleValue,
+                             JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_GETTER |
+                             JSPROP_SETTER,
+                             JS_DATA_TO_FUNC_PTR(JSNative, funObj.get()),
+                             nullptr)) {
+        return;
+      }
+    }
+  }
+
+  if (!mStorage) {
+    mStorage = do_GetService("@mozilla.org/consoleAPI-storage;1");
+  }
+
+  if (!mStorage) {
+    NS_WARNING("Failed to get the ConsoleAPIStorage service.");
+    return;
+  }
+
+  nsAutoString innerID, outerID;
+
+  MOZ_ASSERT(aData->mIDType != ConsoleCallData::eUnknown);
+  if (aData->mIDType == ConsoleCallData::eString) {
+    outerID = aData->mOuterIDString;
+    innerID = aData->mInnerIDString;
+  } else {
+    MOZ_ASSERT(aData->mIDType == ConsoleCallData::eNumber);
+    outerID.AppendInt(aData->mOuterIDNumber);
+    innerID.AppendInt(aData->mInnerIDNumber);
+  }
+
+  if (NS_FAILED(mStorage->RecordEvent(innerID, outerID, eventValue))) {
+    NS_WARNING("Failed to record a console event.");
+  }
+}
+
+void
+Console::ProcessArguments(JSContext* aCx,
+                          const nsTArray<JS::Heap<JS::Value>>& aData,
+                          Sequence<JS::Value>& aSequence,
+                          Sequence<JS::Value>& aStyles)
+{
+  if (aData.IsEmpty()) {
+    return;
+  }
+
+  if (aData.Length() == 1 || !aData[0].isString()) {
+    ArgumentsToValueList(aData, aSequence);
+    return;
+  }
+
+  JS::Rooted<JS::Value> format(aCx, aData[0]);
+  JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, format));
+  if (!jsString) {
+    return;
+  }
+
+  nsAutoJSString string;
+  if (!string.init(aCx, jsString)) {
+    return;
+  }
+
+  nsString::const_iterator start, end;
+  string.BeginReading(start);
+  string.EndReading(end);
+
+  nsString output;
+  uint32_t index = 1;
+
+  while (start != end) {
+    if (*start != '%') {
+      output.Append(*start);
+      ++start;
+      continue;
+    }
+
+    ++start;
+    if (start == end) {
+      output.Append('%');
+      break;
+    }
+
+    if (*start == '%') {
+      output.Append(*start);
+      ++start;
+      continue;
+    }
+
+    nsAutoString tmp;
+    tmp.Append('%');
+
+    int32_t integer = -1;
+    int32_t mantissa = -1;
+
+    // Let's parse %<number>.<number> for %d and %f
+    if (*start >= '0' && *start <= '9') {
+      integer = 0;
+
+      do {
+        integer = integer * 10 + *start - '0';
+        tmp.Append(*start);
+        ++start;
+      } while (*start >= '0' && *start <= '9' && start != end);
+    }
+
+    if (start == end) {
+      output.Append(tmp);
+      break;
+    }
+
+    if (*start == '.') {
+      tmp.Append(*start);
+      ++start;
+
+      if (start == end) {
+        output.Append(tmp);
+        break;
+      }
+
+      // '.' must be followed by a number.
+      if (*start < '0' || *start > '9') {
+        output.Append(tmp);
+        continue;
+      }
+
+      mantissa = 0;
+
+      do {
+        mantissa = mantissa * 10 + *start - '0';
+        tmp.Append(*start);
+        ++start;
+      } while (*start >= '0' && *start <= '9' && start != end);
+
+      if (start == end) {
+        output.Append(tmp);
+        break;
+      }
+    }
+
+    char ch = *start;
+    tmp.Append(ch);
+    ++start;
+
+    switch (ch) {
+      case 'o':
+      case 'O':
+      {
+        if (!output.IsEmpty()) {
+          JS::Rooted<JSString*> str(aCx, JS_NewUCStringCopyN(aCx,
+                                                             output.get(),
+                                                             output.Length()));
+          if (!str) {
+            return;
+          }
+
+          aSequence.AppendElement(JS::StringValue(str));
+          output.Truncate();
+        }
+
+        JS::Rooted<JS::Value> v(aCx);
+        if (index < aData.Length()) {
+          v = aData[index++];
+        }
+
+        aSequence.AppendElement(v);
+        break;
+      }
+
+      case 'c':
+      {
+        if (!output.IsEmpty()) {
+          JS::Rooted<JSString*> str(aCx, JS_NewUCStringCopyN(aCx,
+                                                             output.get(),
+                                                             output.Length()));
+          if (!str) {
+            return;
+          }
+
+          aSequence.AppendElement(JS::StringValue(str));
+          output.Truncate();
+        }
+
+        if (index < aData.Length()) {
+          JS::Rooted<JS::Value> v(aCx, aData[index++]);
+          JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, v));
+          if (!jsString) {
+            return;
+          }
+
+          int32_t diff = aSequence.Length() - aStyles.Length();
+          if (diff > 0) {
+            for (int32_t i = 0; i < diff; i++) {
+              aStyles.AppendElement(JS::NullValue());
+            }
+          }
+          aStyles.AppendElement(JS::StringValue(jsString));
+        }
+        break;
+      }
+
+      case 's':
+        if (index < aData.Length()) {
+          JS::Rooted<JS::Value> value(aCx, aData[index++]);
+          JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, value));
+          if (!jsString) {
+            return;
+          }
+
+          nsAutoJSString v;
+          if (!v.init(aCx, jsString)) {
+            return;
+          }
+
+          output.Append(v);
+        }
+        break;
+
+      case 'd':
+      case 'i':
+        if (index < aData.Length()) {
+          JS::Rooted<JS::Value> value(aCx, aData[index++]);
+
+          int32_t v;
+          if (!JS::ToInt32(aCx, value, &v)) {
+            return;
+          }
+
+          nsCString format;
+          MakeFormatString(format, integer, mantissa, 'd');
+          output.AppendPrintf(format.get(), v);
+        }
+        break;
+
+      case 'f':
+        if (index < aData.Length()) {
+          JS::Rooted<JS::Value> value(aCx, aData[index++]);
+
+          double v;
+          if (!JS::ToNumber(aCx, value, &v)) {
+            return;
+          }
+
+          nsCString format;
+          MakeFormatString(format, integer, mantissa, 'f');
+          output.AppendPrintf(format.get(), v);
+        }
+        break;
+
+      default:
+        output.Append(tmp);
+        break;
+    }
+  }
+
+  if (!output.IsEmpty()) {
+    JS::Rooted<JSString*> str(aCx, JS_NewUCStringCopyN(aCx, output.get(),
+                                                       output.Length()));
+    if (!str) {
+      return;
+    }
+
+    aSequence.AppendElement(JS::StringValue(str));
+  }
+
+  // The rest of the array, if unused by the format string.
+  for (; index < aData.Length(); ++index) {
+    aSequence.AppendElement(aData[index]);
+  }
+}
+
+void
+Console::MakeFormatString(nsCString& aFormat, int32_t aInteger,
+                          int32_t aMantissa, char aCh)
+{
+  aFormat.Append('%');
+  if (aInteger >= 0) {
+    aFormat.AppendInt(aInteger);
+  }
+
+  if (aMantissa >= 0) {
+    aFormat.Append('.');
+    aFormat.AppendInt(aMantissa);
+  }
+
+  aFormat.Append(aCh);
+}
+
+void
+Console::ComposeGroupName(JSContext* aCx,
+                          const nsTArray<JS::Heap<JS::Value>>& aData,
+                          nsAString& aName)
+{
+  for (uint32_t i = 0; i < aData.Length(); ++i) {
+    if (i != 0) {
+      aName.AppendASCII(" ");
+    }
+
+    JS::Rooted<JS::Value> value(aCx, aData[i]);
+    JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, value));
+    if (!jsString) {
+      return;
+    }
+
+    nsAutoJSString string;
+    if (!string.init(aCx, jsString)) {
+      return;
+    }
+
+    aName.Append(string);
+  }
+}
+
+JS::Value
+Console::StartTimer(JSContext* aCx, const JS::Value& aName,
+                    DOMHighResTimeStamp aTimestamp)
+{
+  if (mTimerRegistry.Count() >= MAX_PAGE_TIMERS) {
+    RootedDictionary<ConsoleTimerError> error(aCx);
+
+    JS::Rooted<JS::Value> value(aCx);
+    if (!ToJSValue(aCx, error, &value)) {
+      return JS::UndefinedValue();
+    }
+
+    return value;
+  }
+
+  RootedDictionary<ConsoleTimerStart> timer(aCx);
+
+  JS::Rooted<JS::Value> name(aCx, aName);
+  JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, name));
+  if (!jsString) {
+    return JS::UndefinedValue();
+  }
+
+  nsAutoJSString key;
+  if (!key.init(aCx, jsString)) {
+    return JS::UndefinedValue();
+  }
+
+  timer.mName = key;
+
+  DOMHighResTimeStamp entry;
+  if (!mTimerRegistry.Get(key, &entry)) {
+    mTimerRegistry.Put(key, aTimestamp);
+  } else {
+    aTimestamp = entry;
+  }
+
+  timer.mStarted = aTimestamp;
+
+  JS::Rooted<JS::Value> value(aCx);
+  if (!ToJSValue(aCx, timer, &value)) {
+    return JS::UndefinedValue();
+  }
+
+  return value;
+}
+
+JS::Value
+Console::StopTimer(JSContext* aCx, const JS::Value& aName,
+                   DOMHighResTimeStamp aTimestamp)
+{
+  JS::Rooted<JS::Value> name(aCx, aName);
+  JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, name));
+  if (!jsString) {
+    return JS::UndefinedValue();
+  }
+
+  nsAutoJSString key;
+  if (!key.init(aCx, jsString)) {
+    return JS::UndefinedValue();
+  }
+
+  DOMHighResTimeStamp entry;
+  if (!mTimerRegistry.Get(key, &entry)) {
+    return JS::UndefinedValue();
+  }
+
+  mTimerRegistry.Remove(key);
+
+  RootedDictionary<ConsoleTimerEnd> timer(aCx);
+  timer.mName = key;
+  timer.mDuration = aTimestamp - entry;
+
+  JS::Rooted<JS::Value> value(aCx);
+  if (!ToJSValue(aCx, timer, &value)) {
+    return JS::UndefinedValue();
+  }
+
+  return value;
+}
+
+void
+Console::ArgumentsToValueList(const nsTArray<JS::Heap<JS::Value>>& aData,
+                              Sequence<JS::Value>& aSequence)
+{
+  for (uint32_t i = 0; i < aData.Length(); ++i) {
+    aSequence.AppendElement(aData[i]);
+  }
+}
+
+JS::Value
+Console::IncreaseCounter(JSContext* aCx, const ConsoleStackEntry& aFrame,
+                          const nsTArray<JS::Heap<JS::Value>>& aArguments)
+{
+  ClearException ce(aCx);
+
+  nsAutoString key;
+  nsAutoString label;
+
+  if (!aArguments.IsEmpty()) {
+    JS::Rooted<JS::Value> labelValue(aCx, aArguments[0]);
+    JS::Rooted<JSString*> jsString(aCx, JS::ToString(aCx, labelValue));
+
+    nsAutoJSString string;
+    if (jsString && string.init(aCx, jsString)) {
+      label = string;
+      key = string;
+    }
+  }
+
+  if (key.IsEmpty()) {
+    key.Append(aFrame.mFilename);
+    key.Append(':');
+    key.AppendInt(aFrame.mLineNumber);
+  }
+
+  uint32_t count = 0;
+  if (!mCounterRegistry.Get(key, &count)) {
+    if (mCounterRegistry.Count() >= MAX_PAGE_COUNTERS) {
+      RootedDictionary<ConsoleCounterError> error(aCx);
+
+      JS::Rooted<JS::Value> value(aCx);
+      if (!ToJSValue(aCx, error, &value)) {
+        return JS::UndefinedValue();
+      }
+
+      return value;
+    }
+  }
+
+  ++count;
+  mCounterRegistry.Put(key, count);
+
+  RootedDictionary<ConsoleCounter> data(aCx);
+  data.mLabel = label;
+  data.mCount = count;
+
+  JS::Rooted<JS::Value> value(aCx);
+  if (!ToJSValue(aCx, data, &value)) {
+    return JS::UndefinedValue();
+  }
+
+  return value;
+}
+
+bool
+Console::ShouldIncludeStackTrace(MethodName aMethodName)
+{
+  switch (aMethodName) {
+    case MethodError:
+    case MethodException:
+    case MethodAssert:
+    case MethodTrace:
+      return true;
+    default:
+      return false;
+  }
+}
+
+nsIXPConnectJSObjectHolder*
+Console::GetOrCreateSandbox(JSContext* aCx, nsIPrincipal* aPrincipal)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (!mSandbox) {
+    nsIXPConnect* xpc = nsContentUtils::XPConnect();
+    MOZ_ASSERT(xpc, "This should never be null!");
+
+    nsresult rv = xpc->CreateSandbox(aCx, aPrincipal,
+                                     getter_AddRefs(mSandbox));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return nullptr;
+    }
+  }
+
+  return mSandbox;
+}
+
+} // namespace dom
+} // namespace mozilla

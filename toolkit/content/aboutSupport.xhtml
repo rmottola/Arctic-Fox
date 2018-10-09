@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+<!DOCTYPE html [
+  <!ENTITY % htmlDTD PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd"> %htmlDTD;
+  <!ENTITY % globalDTD SYSTEM "chrome://global/locale/global.dtd"> %globalDTD;
+  <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd"> %brandDTD;
+  <!ENTITY % aboutSupportDTD SYSTEM "chrome://global/locale/aboutSupport.dtd"> %aboutSupportDTD;
+  <!ENTITY % resetProfileDTD SYSTEM "chrome://global/locale/resetProfile.dtd"> %resetProfileDTD;
+]>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>&aboutSupport.pageTitle;</title>
+
+    <link rel="icon" type="image/png" id="favicon"
+          href="chrome://branding/content/icon32.png"/>
+    <link rel="stylesheet" href="chrome://global/skin/aboutSupport.css"
+          type="text/css"/>
+
+    <script type="application/javascript;version=1.7"
+            src="chrome://global/content/aboutSupport.js"/>
+    <script type="application/javascript;version=1.7"
+            src="chrome://global/content/resetProfile.js"/>
+  </head>
+
+  <body dir="&locale.dir;">
+
+    <div id="action-box">
+      <div id="reset-box">
+        <h3>&refreshProfile.title;</h3>
+        <button id="reset-box-button">
+          &refreshProfile.button.label;
+        </button>
+      </div>
+      <div id="safe-mode-box">
+        <h3>&aboutSupport.safeModeTitle;</h3>
+        <button id="restart-in-safe-mode-button">
+          &aboutSupport.restartInSafeMode.label;
+        </button>
+      </div>
+      <div id="restart-box">
+        <h3>&aboutSupport.restartTitle;</h3>
+        <button id="restart-button">
+          &aboutSupport.restartNormal.label;
+        </button>
+      </div>
+
+    </div>
+    <h1>
+      &aboutSupport.pageTitle;
+    </h1>
+
+    <div class="page-subtitle">
+        &aboutSupport.pageSubtitle;
+    </div>
+
+    <div>
+      <button id="copy-raw-data-to-clipboard">
+        &aboutSupport.copyRawDataToClipboard.label;
+      </button>
+      <button id="copy-to-clipboard">
+        &aboutSupport.copyTextToClipboard.label;
+      </button>
+    </div>
+
+    <div id="contents">
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.appBasicsTitle;
+      </h2>
+
+      <table>
+        <tbody>
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsName;
+            </th>
+
+            <td id="application-box">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsVersion;
+            </th>
+
+            <td id="version-box">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsBuildID;
+              </th>
+            <td id="buildid-box"></td>
+          </tr>
+
+#ifndef ANDROID
+#ifdef MOZ_UPDATER
+          <tr class="no-copy">
+            <th class="column">
+              &aboutSupport.appBasicsUpdateHistory;
+            </th>
+
+            <td>
+              <button id="show-update-history-button">
+                &aboutSupport.appBasicsShowUpdateHistory;
+              </button>
+            </td>
+          </tr>
+#endif
+#endif
+
+#ifdef MOZ_UPDATER
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsUpdateChannel;
+            </th>
+            <td id="updatechannel-box"></td>
+          </tr>
+#endif
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsUserAgent;
+            </th>
+
+            <td id="useragent-box">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsOS;
+           </th>
+
+           <td id="os-box">
+           </td>
+          </tr>
+
+          <tr id="profile-row" class="no-copy">
+            <th class="column">
+#ifdef XP_WIN
+              &aboutSupport.appBasicsProfileDirWinMac;
+#else
+#ifdef XP_MACOSX
+              &aboutSupport.appBasicsProfileDirWinMac;
+#else
+              &aboutSupport.appBasicsProfileDir;
+#endif
+#endif
+            </th>
+
+            <td>
+              <button id="profile-dir-button">
+#ifdef XP_WIN
+                &aboutSupport.showWin.label;
+#else
+#ifdef XP_MACOSX
+                &aboutSupport.showMac.label;
+#else
+                &aboutSupport.showDir.label;
+#endif
+#endif
+               </button>
+            </td>
+          </tr>
+
+          <tr class="no-copy">
+            <th class="column">
+              &aboutSupport.appBasicsEnabledPlugins;
+            </th>
+
+            <td>
+              <a href="about:plugins">about:plugins</a>
+            </td>
+          </tr>
+
+          <tr class="no-copy">
+            <th class="column">
+              &aboutSupport.appBasicsBuildConfig;
+            </th>
+
+            <td>
+              <a href="about:buildconfig">about:buildconfig</a>
+            </td>
+          </tr>
+
+          <tr class="no-copy">
+            <th class="column">
+              &aboutSupport.appBasicsMemoryUse;
+            </th>
+
+            <td>
+              <a href="about:memory">about:memory</a>
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsMultiProcessSupport;
+            </th>
+
+            <td id="multiprocess-box">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.appBasicsSafeMode;
+            </th>
+
+            <td id="safemode-box">
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.extensionsTitle;
+      </h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>
+              &aboutSupport.extensionName;
+            </th>
+            <th>
+              &aboutSupport.extensionVersion;
+            </th>
+            <th>
+              &aboutSupport.extensionEnabled;
+            </th>
+            <th>
+              &aboutSupport.extensionId;
+            </th>
+          </tr>
+        </thead>
+        <tbody id="extensions-tbody">
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.graphicsTitle;
+      </h2>
+
+      <table>
+        <tbody id="graphics-tbody">
+        </tbody>
+
+        <tbody id="graphics-info-properties">
+        </tbody>
+
+        <tbody id="graphics-failures-tbody">
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.modifiedKeyPrefsTitle;
+      </h2>
+
+      <table class="prefs-table">
+        <thead class="no-copy">
+          <th class="name">
+            &aboutSupport.modifiedPrefsName;
+          </th>
+
+          <th class="value">
+            &aboutSupport.modifiedPrefsValue;
+          </th>
+        </thead>
+
+        <tbody id="prefs-tbody">
+        </tbody>
+      </table>
+
+      <section id="prefs-user-js-section" class="hidden no-copy">
+        <h3>&aboutSupport.userJSTitle;</h3>
+        <p>&aboutSupport.userJSDescription;</p>
+      </section>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.lockedKeyPrefsTitle;
+      </h2>
+
+      <table class="prefs-table">
+        <thead class="no-copy">
+          <th class="name">
+            &aboutSupport.lockedPrefsName;
+          </th>
+
+          <th class="value">
+            &aboutSupport.lockedPrefsValue;
+          </th>
+        </thead>
+
+        <tbody id="locked-prefs-tbody">
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section">
+        &aboutSupport.placeDatabaseTitle;
+      </h2>
+
+      <table>
+        <tr id="verify-place-result-parent" class="no-copy">
+          <th class="column">
+            &aboutSupport.placeDatabaseIntegrity;
+          </th>
+
+          <td class="endline">
+            <button id="verify-place-integrity-button">
+              &aboutSupport.placeDatabaseVerifyIntegrity;
+            </button>
+            <pre id="verify-place-result" class="hidden"></pre>
+          </td>
+        </tr>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+      <h2 class="major-section">
+        &aboutSupport.jsTitle;
+      </h2>
+
+      <table>
+        <tbody>
+          <tr>
+            <th class="column">
+              &aboutSupport.jsIncrementalGC;
+            </th>
+
+            <td id="javascript-incremental-gc">
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+      <h2 class="major-section">
+        &aboutSupport.a11yTitle;
+      </h2>
+
+      <table>
+        <tbody>
+          <tr>
+            <th class="column">
+              &aboutSupport.a11yActivated;
+            </th>
+
+            <td id="a11y-activated">
+            </td>
+          </tr>
+          <tr>
+            <th class="column">
+              &aboutSupport.a11yForceDisabled;
+            </th>
+
+            <td id="a11y-force-disabled">
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+      <h2 class="major-section">
+        &aboutSupport.libraryVersionsTitle;
+      </h2>
+
+      <table>
+        <tbody id="libversions-tbody">
+        </tbody>
+      </table>
+
+
+      <h2 class="major-section">
+        &aboutSupport.experimentsTitle;
+      </h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>
+              &aboutSupport.experimentName;
+            </th>
+            <th>
+              &aboutSupport.experimentId;
+            </th>
+            <th>
+              &aboutSupport.experimentDescription;
+            </th>
+            <th>
+              &aboutSupport.experimentActive;
+            </th>
+            <th>
+              &aboutSupport.experimentEndDate;
+            </th>
+            <th>
+              &aboutSupport.experimentHomepage;
+            </th>
+          </tr>
+        </thead>
+        <tbody id="experiments-tbody">
+        </tbody>
+      </table>
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+#if defined(XP_LINUX) && defined(MOZ_SANDBOX)
+      <h2 class="major-section" id="sandbox">
+	&aboutSupport.sandboxTitle;
+      </h2>
+
+      <table>
+	<tbody id="sandbox-tbody">
+	</tbody>
+      </table>
+#endif
+
+    </div>
+
+  </body>
+
+</html>

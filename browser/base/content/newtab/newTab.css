@@ -1,0 +1,209 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+input[type=button] {
+  cursor: pointer;
+}
+
+/* SCROLLBOX */
+#newtab-scrollbox {
+  display: -moz-box;
+  position: relative;
+  -moz-box-flex: 1;
+  -moz-user-focus: normal;
+}
+
+#newtab-scrollbox:not([page-disabled]) {
+  overflow: auto;
+}
+
+/* UNDO */
+#newtab-undo-container {
+  transition: opacity 100ms ease-out;
+  display: -moz-box;
+  -moz-box-align: center;
+  -moz-box-pack: center;
+}
+
+#newtab-undo-container[undo-disabled] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* TOGGLE */
+#newtab-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+#newtab-toggle:-moz-locale-dir(rtl) {
+  left: 12px;
+  right: auto;
+}
+
+/* MARGINS */
+#newtab-vertical-margin {
+  display: -moz-box;
+  position: relative;
+  -moz-box-flex: 1;
+  -moz-box-orient: vertical;
+}
+
+#newtab-margin-top {
+  min-height: 50px;
+  max-height: 80px;
+  display: -moz-box;
+  -moz-box-flex: 1;
+  -moz-box-align: center;
+  -moz-box-pack: center;
+}
+
+#newtab-margin-bottom {
+  min-height: 40px;
+  max-height: 100px;
+  -moz-box-flex: 1;
+}
+
+#newtab-horizontal-margin {
+  display: -moz-box;
+  -moz-box-flex: 5;
+}
+
+.newtab-side-margin {
+  min-width: 40px;
+  max-width: 300px;
+  -moz-box-flex: 1;
+}
+
+/* GRID */
+#newtab-grid {
+  display: -moz-box;
+  -moz-box-flex: 5;
+  -moz-box-orient: vertical;
+  min-width: 600px;
+  min-height: 400px;
+  transition: 100ms ease-out;
+  transition-property: opacity;
+}
+
+#newtab-grid[page-disabled] {
+  opacity: 0;
+}
+
+#newtab-grid[locked],
+#newtab-grid[page-disabled] {
+  pointer-events: none;
+}
+
+/* ROWS */
+.newtab-row {
+  display: -moz-box;
+  -moz-box-orient: horizontal;
+  -moz-box-direction: normal;
+  -moz-box-flex: 1;
+}
+
+/* CELLS */
+.newtab-cell {
+  display: -moz-box;
+  -moz-box-flex: 1;
+}
+
+/* SITES */
+.newtab-site {
+  position: relative;
+  -moz-box-flex: 1;
+  transition: 100ms ease-out;
+  transition-property: top, left, opacity;
+}
+
+.newtab-site[frozen] {
+  position: absolute;
+  pointer-events: none;
+}
+
+.newtab-site[dragged] {
+  transition-property: none;
+  z-index: 10;
+}
+
+/* LINK + THUMBNAILS */
+.newtab-link,
+.newtab-thumbnail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.newtab-thumbnail {
+  opacity: .8;
+  transition: opacity 100ms ease-out;
+}
+
+.newtab-thumbnail[dragged],
+.newtab-link:-moz-focusring > .newtab-thumbnail,
+.newtab-site:hover > .newtab-link > .newtab-thumbnail {
+  opacity: 1;
+}
+
+/* TITLES */
+.newtab-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* CONTROLS */
+.newtab-control {
+  position: absolute;
+  top: 4px;
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+
+.newtab-control:-moz-focusring,
+.newtab-site:hover > .newtab-control {
+  opacity: 1;
+}
+
+.newtab-control[dragged] {
+  opacity: 0 !important;
+}
+
+@media (-moz-touch-enabled) {
+  .newtab-control {
+    opacity: 1;
+  }
+}
+
+.newtab-control-pin:-moz-locale-dir(ltr),
+.newtab-control-block:-moz-locale-dir(rtl) {
+  left: 4px;
+}
+
+.newtab-control-block:-moz-locale-dir(ltr),
+.newtab-control-pin:-moz-locale-dir(rtl) {
+  right: 4px;
+}
+
+/* DRAG & DROP */
+
+/*
+ * This is just a temporary drag element used for dataTransfer.setDragImage()
+ * so that we can use custom drag images and elements. It needs an opacity of
+ * 0.01 so that the core code detects that it's in fact a visible element.
+ */
+.newtab-drag {
+  width: 1px;
+  height: 1px;
+  background-color: #fff;
+  opacity: 0.01;
+}

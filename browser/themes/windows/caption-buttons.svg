@@ -1,0 +1,121 @@
+<svg width="12" height="12" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+  <style>
+    g {
+      stroke: -moz-win-accentcolortext;
+      stroke-width: 0.9px;
+      fill: none;
+    }
+
+    g:not(:target) {
+      display: none;
+    }
+
+    use:target > g {
+      display: initial;
+    }
+
+    .highlight > g {
+      stroke: HighlightText;
+    }
+
+    .inactive > g {
+      stroke: black;
+    }
+    
+    .bolder {
+      stroke-width: 1.6px;
+      stroke: black;
+    }
+    
+    .outline  {
+      stroke-width: 4px;
+      stroke: white;
+      opacity: 0.75;
+    }
+    
+    .inverted  {
+      stroke-width: 1.6px;
+      stroke: white;
+    }
+    
+    .outline-inverted  {
+      stroke-width: 4px;
+      stroke: black;
+      opacity: 0.75;
+    }
+    
+    .outline-thinner {
+      stroke-width: 3.6px;
+    }
+  
+  </style>
+  
+  <g id="close">
+    <line x1="1" y1="1" x2="11" y2="11" stroke-width="1px"/>
+    <line x1="11" y1="1" x2="1" y2="11" stroke-width="1px"/>
+  </g>
+  <g id="maximize">
+    <rect x="1.5" y="1.5" width="9" height="9"/>
+  </g>
+  <g id="minimize">
+    <line x1="1" y1="5.5" x2="11" y2="5.5"/>
+  </g>
+  <g id="restore">
+    <rect x="1.5" y="3.5" width="7" height="7"/>
+    <polyline points="3.5,3.5 3.5,1.5 10.5,1.5 10.5,8.5 8.5,8.5"/>
+  </g>
+  
+  <g id="close-outline">
+    <line x1="1" y1="1" x2="11" y2="11" stroke-linecap="round" class="outline"/>
+    <line x1="11" y1="1" x2="1" y2="11" stroke-linecap="round" class="outline"/>
+    <line x1="1" y1="1" x2="11" y2="11" class="bolder"/>
+    <line x1="11" y1="1" x2="1" y2="11" class="bolder"/>
+  </g>
+  <g id="maximize-outline">
+    <rect x="1.2" y="1.2" width="9.6" height="9.6" stroke-linecap="round" class="outline"/>
+    <rect x="1.5" y="1.5" width="9" height="9" class="bolder"/>
+  </g>
+  <g id="minimize-outline">
+    <line x1="1" y1="5.5" x2="11" y2="5.5" stroke-linecap="round" class="outline outline-thinner"/>
+    <line x1="1" y1="5.5" x2="11" y2="5.5" class="bolder"/>
+  </g>
+  <g id="restore-outline">
+    <rect x="1.5" y="3.5" width="7" height="7" stroke-linecap="round" class="outline"/>
+    <polyline points="3.5,3.5 3.5,1.5 10.5,1.5 10.5,8.5 8.5,8.5" stroke-linecap="round" class="outline"/>
+    <rect x="1.5" y="3.5" width="7" height="7" class="bolder"/>
+    <polyline points="3.5,3.5 3.5,1.5 10.5,1.5 10.5,8.5 8.5,8.5" class="bolder"/>
+  </g>
+  
+  <g id="close-outline-inverted">
+    <line x1="1" y1="1" x2="11" y2="11" stroke-linecap="round" class="outline-inverted"/>
+    <line x1="11" y1="1" x2="1" y2="11" stroke-linecap="round" class="outline-inverted"/>
+    <line x1="1" y1="1" x2="11" y2="11" class="inverted"/>
+    <line x1="11" y1="1" x2="1" y2="11" class="inverted"/>
+  </g>
+  <g id="maximize-outline-inverted">
+    <rect x="1.2" y="1.2" width="9.6" height="9.6" stroke-linecap="round" class="outline-inverted"/>
+    <rect x="1.5" y="1.5" width="9" height="9" class="inverted"/>
+  </g>
+  <g id="minimize-outline-inverted">
+    <line x1="1" y1="5.5" x2="11" y2="5.5" stroke-linecap="round" class="outline-inverted outline-thinner"/>
+    <line x1="1" y1="5.5" x2="11" y2="5.5" class="inverted"/>
+  </g>
+  <g id="restore-outline-inverted">
+    <rect x="1.5" y="3.5" width="7" height="7" stroke-linecap="round" class="outline-inverted"/>
+    <polyline points="3.5,3.5 3.5,1.5 10.5,1.5 10.5,8.5 8.5,8.5" stroke-linecap="round" class="outline-inverted"/>
+    <rect x="1.5" y="3.5" width="7" height="7" class="inverted"/>
+    <polyline points="3.5,3.5 3.5,1.5 10.5,1.5 10.5,8.5 8.5,8.5" class="inverted"/>
+  </g>
+  
+  <use id="close-highlight" class="highlight" xlink:href="#close"/>
+  <use id="maximize-highlight" class="highlight" xlink:href="#maximize"/>
+  <use id="minimize-highlight" class="highlight" xlink:href="#minimize"/>
+  <use id="restore-highlight" class="highlight" xlink:href="#restore"/>
+  <use id="close-inactive" class="inactive" xlink:href="#close"/>
+  <use id="maximize-inactive" class="inactive" xlink:href="#maximize"/>
+  <use id="minimize-inactive" class="inactive" xlink:href="#minimize"/>
+  <use id="restore-inactive" class="inactive" xlink:href="#restore"/>
+</svg>

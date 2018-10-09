@@ -1,0 +1,28 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+HOST_SOURCES += [
+    'bsdiff.c',
+]
+
+HostProgram('mbsdiff')
+
+if CONFIG['MOZ_NATIVE_BZ2']:
+    HOST_OS_LIBS += CONFIG['MOZ_BZ2_LIBS']
+else:
+    HOST_USE_LIBS += [
+        'hostbz2',
+    ]
+
+if CONFIG['HOST_OS_ARCH'] == 'WINNT':
+    HOST_OS_LIBS += [
+        'ws2_32',
+    ]
+
+LOCAL_INCLUDES += [
+    '/toolkit/mozapps/update/updater',
+]
+

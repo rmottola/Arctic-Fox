@@ -1,0 +1,24 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+JAR_MANIFESTS += [ 'jar.mn' ]
+
+XPIDL_SOURCES += [ 'status4evar.idl' ]
+
+XPIDL_MODULE = 'status4evar'
+
+EXTRA_COMPONENTS += [
+    'status4evar.js',
+    'status4evar.manifest',
+]
+
+EXTRA_JS_MODULES.statusbar = [
+    'Downloads.jsm',
+    'Progress.jsm',
+    'Status.jsm',
+    'Status4Evar.jsm',
+    'Toolbars.jsm',
+]

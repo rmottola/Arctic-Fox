@@ -1,0 +1,67 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+interface nsIDOMMozSmsMessage;
+interface nsIMobileMessageCallback;
+
+%{C++
+#define SMS_SERVICE_CID { 0xbada3cb8, 0xa568, 0x4dff, { 0xb5, 0x43, 0x52, 0xbb, 0xb3, 0x14, 0x31, 0x21 } }
+#define SMS_SERVICE_CONTRACTID "@mozilla.org/sms/smsservice;1"
+%}
+
+[scriptable, uuid(ae688bca-00c9-4d08-945d-e8a5272ad5b1)]
+interface nsISmsService : nsISupports
+{
+  /**
+   * Constant definitions of predefined GSM Message Class
+   * See 3GPP TS 23.038 clause 4 SMS Data Coding Scheme
+   */
+  const unsigned short MESSAGE_CLASS_TYPE_CLASS_0 = 0;
+  const unsigned short MESSAGE_CLASS_TYPE_CLASS_1 = 1;
+  const unsigned short MESSAGE_CLASS_TYPE_CLASS_2 = 2;
+  const unsigned short MESSAGE_CLASS_TYPE_CLASS_3 = 3;
+  const unsigned short MESSAGE_CLASS_TYPE_NORMAL  = 6;
+
+  /**
+   * Constant definitions of SMS Delivery
+   */
+  const unsigned short DELIVERY_TYPE_RECEIVED = 0;
+  const unsigned short DELIVERY_TYPE_SENDING  = 1;
+  const unsigned short DELIVERY_TYPE_SENT     = 2;
+  const unsigned short DELIVERY_TYPE_ERROR    = 3;
+
+  /**
+   * Constant definitions of SMS Delivery Status
+   */
+  const unsigned short DELIVERY_STATUS_TYPE_NOT_APPLICABLE = 0;
+  const unsigned short DELIVERY_STATUS_TYPE_SUCCESS        = 1;
+  const unsigned short DELIVERY_STATUS_TYPE_PENDING        = 2;
+  const unsigned short DELIVERY_STATUS_TYPE_ERROR          = 3;
+
+  readonly attribute unsigned long smsDefaultServiceId;
+
+  void getSegmentInfoForText(in DOMString text,
+                             in nsIMobileMessageCallback request);
+
+  void send(in unsigned long serviceId,
+            in DOMString number,
+            in DOMString message,
+            in boolean silent,
+            in nsIMobileMessageCallback request);
+
+  void addSilentNumber(in DOMString number);
+  void removeSilentNumber(in DOMString number);
+
+  void getSmscAddress(in unsigned long serviceId,
+                      in nsIMobileMessageCallback request);
+};
+
+%{C++
+template<typename T> struct already_AddRefed;
+
+already_AddRefed<nsISmsService>
+NS_CreateSmsService();
+%}

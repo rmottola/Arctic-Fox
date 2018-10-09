@@ -1,0 +1,113 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+XPIDL_SOURCES += [
+    'nsIHttpActivityObserver.idl',
+    'nsIHttpAuthenticableChannel.idl',
+    'nsIHttpAuthenticator.idl',
+    'nsIHttpAuthManager.idl',
+    'nsIHttpChannel.idl',
+    'nsIHttpChannelAuthProvider.idl',
+    'nsIHttpChannelChild.idl',
+    'nsIHttpChannelInternal.idl',
+    'nsIHttpEventSink.idl',
+    'nsIHttpHeaderVisitor.idl',
+    'nsIHttpProtocolHandler.idl',
+]
+
+XPIDL_MODULE = 'necko_http'
+
+EXPORTS += [
+    'nsHttp.h',
+    'nsHttpAtomList.h',
+    'nsHttpHeaderArray.h',
+    'nsHttpRequestHead.h',
+    'nsHttpResponseHead.h',
+]
+
+EXPORTS.mozilla.net += [
+    'HttpBaseChannel.h',
+    'HttpChannelChild.h',
+    'HttpChannelParent.h',
+    'HttpInfo.h',
+    'NullHttpChannel.h',
+    'PHttpChannelParams.h',
+    'PSpdyPush.h',
+    'TimingStruct.h',
+]
+
+# ASpdySession.cpp and nsHttpAuthCache cannot be built in unified mode because
+# they use plarena.h.
+SOURCES += [
+    'AlternateServices.cpp',
+    'ASpdySession.cpp',
+    'nsHttpAuthCache.cpp',
+    'nsHttpChannelAuthProvider.cpp', # redefines GetAuthType
+]
+
+UNIFIED_SOURCES += [
+    'ConnectionDiagnostics.cpp',
+    'Http2Compression.cpp',
+    'Http2Push.cpp',
+    'Http2Session.cpp',
+    'Http2Stream.cpp',
+    'HttpBaseChannel.cpp',
+    'HttpChannelChild.cpp',
+    'HttpChannelParent.cpp',
+    'HttpChannelParentListener.cpp',
+    'HttpInfo.cpp',
+    'InterceptedChannel.cpp',
+    'nsHttp.cpp',
+    'nsHttpActivityDistributor.cpp',
+    'nsHttpAuthManager.cpp',
+    'nsHttpBasicAuth.cpp',
+    'nsHttpChannel.cpp',
+    'nsHttpChunkedDecoder.cpp',
+    'nsHttpConnection.cpp',
+    'nsHttpConnectionInfo.cpp',
+    'nsHttpConnectionMgr.cpp',
+    'nsHttpDigestAuth.cpp',
+    'nsHttpHeaderArray.cpp',
+    'nsHttpNTLMAuth.cpp',
+    'nsHttpPipeline.cpp',
+    'nsHttpRequestHead.cpp',
+    'nsHttpResponseHead.cpp',
+    'nsHttpTransaction.cpp',
+    'NullHttpChannel.cpp',
+    'NullHttpTransaction.cpp',
+    'SpdyPush31.cpp',
+    'SpdySession31.cpp',
+    'SpdyStream31.cpp',
+    'SpdyZlibReporter.cpp',
+    'TunnelUtils.cpp',
+]
+
+# These files cannot be built in unified mode because of OS X headers.
+SOURCES += [
+    'nsHttpHandler.cpp',
+]
+
+IPDL_SOURCES += [
+    'PHttpChannel.ipdl',
+]
+
+EXTRA_JS_MODULES += [
+    'UserAgentOverrides.jsm',
+    'UserAgentUpdates.jsm',
+]
+
+FAIL_ON_WARNINGS = True
+
+MSVC_ENABLE_PGO = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+FINAL_LIBRARY = 'xul'
+
+LOCAL_INCLUDES += [
+    '/dom/base',
+    '/netwerk/base',
+]

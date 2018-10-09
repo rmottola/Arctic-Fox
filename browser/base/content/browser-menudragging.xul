@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+
+
+<overlay id="menuDraggingOverlay"
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+<window id="main-window">
+
+  <script type="application/x-javascript" src="chrome://browser/content/browser-menudragging.js" />
+
+</window>
+
+</overlay>

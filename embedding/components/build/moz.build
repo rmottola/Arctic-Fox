@@ -1,0 +1,40 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+SOURCES += [
+    'nsEmbeddingModule.cpp',
+]
+
+FAIL_ON_WARNINGS = True
+
+FINAL_LIBRARY = 'xul'
+LOCAL_INCLUDES += [
+    '../appstartup',
+    '../commandhandler',
+    '../find',
+    '../printingui/ipc',
+    '../webbrowserpersist',
+    '../windowwatcher',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    DEFINES['PROXY_PRINTING'] = 1
+    LOCAL_INCLUDES += [
+        '../printingui/win',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    LOCAL_INCLUDES += [
+        '../printingui/mac',
+    ]
+
+if CONFIG['MOZ_PDF_PRINTING']:
+    DEFINES['PROXY_PRINTING'] = 1
+    LOCAL_INCLUDES += [
+        '../printingui/unixshared',
+    ]
+
+include('/ipc/chromium/chromium-config.mozbuild')
+

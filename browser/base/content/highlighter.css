@@ -1,0 +1,105 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+.highlighter-container {
+  pointer-events: none;
+}
+
+.highlighter-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.highlighter-outline-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.highlighter-outline {
+  position: absolute;
+}
+
+.highlighter-outline[hidden] {
+  opacity: 0;
+  pointer-events: none;
+  display: -moz-box;
+}
+
+.highlighter-outline:not([disable-transitions]) {
+  transition-property: opacity, top, left, width, height;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+/*
+ * Node Infobar
+ */
+
+.highlighter-nodeinfobar-container {
+  position: absolute;
+  max-width: 95%;
+}
+
+.highlighter-nodeinfobar-container[hidden] {
+  opacity: 0;
+  pointer-events: none;
+  display: -moz-box;
+}
+
+.highlighter-nodeinfobar-container:not([disable-transitions]),
+.highlighter-nodeinfobar-container[disable-transitions][force-transitions] {
+  transition-property: transform, opacity, top, left;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+.highlighter-nodeinfobar-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: ltr;
+}
+
+.highlighter-nodeinfobar-button > .toolbarbutton-text {
+  display: none;
+}
+
+.highlighter-nodeinfobar-container:not([locked]):not(:hover) > .highlighter-nodeinfobar > .highlighter-nodeinfobar-button {
+  visibility: hidden;
+}
+
+.highlighter-nodeinfobar-container[locked] > .highlighter-nodeinfobar,
+.highlighter-nodeinfobar-container:not([locked]):hover > .highlighter-nodeinfobar {
+  pointer-events: auto;
+}
+
+html|*.highlighter-nodeinfobar-id,
+html|*.highlighter-nodeinfobar-classes,
+html|*.highlighter-nodeinfobar-pseudo-classes,
+html|*.highlighter-nodeinfobar-tagname {
+  -moz-user-select: text;
+  -moz-user-focus: normal;
+  cursor: text;
+}
+
+.highlighter-nodeinfobar-arrow {
+  display: none;
+}
+
+.highlighter-nodeinfobar-container[position="top"]:not([hide-arrow]) > .highlighter-nodeinfobar-arrow-bottom {
+  display: block;
+}
+
+.highlighter-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .highlighter-nodeinfobar-arrow-top {
+  display: block;
+}
+
+.highlighter-nodeinfobar-container[disabled] {
+  visibility: hidden;
+}
+
+html|*.highlighter-nodeinfobar-tagname {
+  text-transform: lowercase;
+}

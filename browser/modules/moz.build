@@ -1,0 +1,39 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+# XXX: Include this until we convert browser/ to use toolkit promises directly
+EXTRA_JS_MODULES += [ 'promise.js' ]
+
+EXTRA_JS_MODULES += [
+    'BrowserNewTabPreloader.jsm',
+    'CharsetMenu.jsm',
+    'FormSubmitObserver.jsm',
+    'FormValidationHandler.jsm',
+    'NetworkPrioritizer.jsm',
+    'offlineAppCache.jsm',
+    'openLocationLastURL.jsm',
+    'PageMenu.jsm',
+    'PopupNotifications.jsm',
+    'QuotaManager.jsm',
+    'SharedFrame.jsm',
+    'webrtcUI.jsm'
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    EXTRA_JS_MODULES += [
+        'Windows8WindowFrameColor.jsm',
+        'WindowsJumpLists.jsm',
+        'WindowsPreviewPerTab.jsm',
+    ]
+
+EXTRA_PP_JS_MODULES += [
+    'AboutHomeUtils.jsm',
+    'RecentWindow.jsm',
+]
+
+if CONFIG['MOZILLA_OFFICIAL']:
+    DEFINES['MOZILLA_OFFICIAL'] = 1

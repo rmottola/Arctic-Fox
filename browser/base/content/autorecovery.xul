@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<overlay
+  id="autorecovery"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+<script type="application/x-javascript" src="chrome://browser/content/autorecovery.js"/>
+
+<!-- This is an empty overlay to allow separation of the script into its
+     own context (needed for locale issues preventing browser start) -->
+
+</overlay>

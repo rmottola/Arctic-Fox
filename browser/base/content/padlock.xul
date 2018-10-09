@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://browser/content/padlock.css" type="text/css"?>
+
+<overlay
+  id="padlock"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+<script type="application/x-javascript" src="chrome://browser/content/padlock.js"/>
+
+  <hbox id="identity-box">
+    <image id="padlock-ib" insertafter="identity-icon-labels"
+           class="urlbar-icon"
+           style="-moz-user-focus: none;"
+           hidden="false"
+           tooltiptext=""
+           onclick="return padlock_PadLock.onButtonClick(event);"/>
+  </hbox>
+
+  <hbox id="identity-box">
+    <image id="padlock-ib-left" insertbefore="identity-icon-labels"
+           class="urlbar-icon"
+           style="-moz-user-focus: none;"
+           hidden="false"
+           tooltiptext=""
+           onclick="return padlock_PadLock.onButtonClick(event);"/>
+  </hbox>
+
+  <hbox id="urlbar-icons">
+    <image id="padlock-ub-right" insertbefore="star-button"
+           class="urlbar-icon"
+           style="-moz-user-focus: none;"
+           hidden="false"
+           tooltiptext=""
+           onclick="return padlock_PadLock.onButtonClick(event);"/>
+  </hbox>
+
+  <statusbar id="status-bar">
+    <statusbarpanel insertafter="security-button"
+      id="padlock-sb-panel" 
+      class="statusbar-iconic-text">
+      <image id="padlock-sb" insertbefore="star-button"
+             class="urlbar-icon"
+             style="-moz-user-focus: none;"
+             hidden="false"
+             tooltiptext=""
+             onclick="return padlock_PadLock.onButtonClick(event);"/>
+    </statusbarpanel>
+  </statusbar>
+
+  <toolbar id="TabsToolbar">
+    <toolbaritem insertafter="tabs-closebutton" id="tabs-padlock-tbitem"
+                  align="center" pack="center">
+      <image id="padlock-tab"
+             class="urlbar-icon"
+             style="-moz-user-focus: none;"
+             hidden="false"
+             tooltiptext=""
+             onclick="return padlock_PadLock.onButtonClick(event);"/>
+    </toolbaritem>
+  </toolbar>
+
+
+</overlay>

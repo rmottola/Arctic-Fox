@@ -1,0 +1,114 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+%include ../../shared/statusbar/overlay.css
+
+/*
+ * General
+ */
+
+#status4evar-status-text,
+#status4evar-progress-bar
+{
+	margin: 0px 4px;
+}
+
+/*
+ * Download status
+ */
+
+#status4evar-download-progress-bar
+{
+	height: 6px;
+}
+
+toolbar[iconsize="small"] #status4evar-download-progress-bar
+{
+	height: 4px;
+}
+
+#status4evar-download-button[attention] #status4evar-download-icon
+{
+	background-image: url("chrome://browser/skin/downloads/download-glow.png");
+}
+
+#status4evar-download-button #status4evar-download-icon
+{
+	background: -moz-image-rect(url("chrome://browser/skin/Toolbar.png"), 0, 24, 24, 0) center no-repeat;
+	min-width: 24px;
+	min-height: 24px;
+}
+
+toolbar[iconsize="small"] #status4evar-download-button #status4evar-download-icon
+{
+	background: -moz-image-rect(url("chrome://browser/skin/Toolbar-small.png"), 0, 16, 16, 0) center no-repeat;
+	min-width: 16px;
+	min-height: 16px;
+}
+
+toolbar[iconsize="small"] > #status4evar-download-button[attention] #status4evar-download-icon {
+	background-image: url("chrome://browser/skin/downloads/download-glow-small.png");
+}
+
+toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"] > label
+{
+	margin: 0px 2px !important;
+	margin-top: -1px !important;
+	-moz-margin-start: 4px !important;
+}
+
+/*
+ * Splitter
+ */
+
+splitter.status4evar-status-splitter
+{
+	width: 8px;
+	margin: 0px -4px;
+}
+
+/*
+ * Location bar
+ */
+
+#urlbar-progress-alt
+{
+	margin: -1px;
+}
+
+#notification-popup-box
+{
+	-moz-margin-start: -1px;
+}
+
+#urlbar .urlbar-over-link-box
+{
+	margin-top: -1px;
+	margin-bottom: -1px;
+}
+
+/*
+ * Add-on bar
+ */
+
+#browser-bottombox[s4eboarder="true"] :-moz-any(#status4evar-status-bar, #addon-bar)
+{
+	-moz-appearance: none;
+}
+
+#browser-bottombox[s4eboarder="true"] > *:not([hidden="true"]):not([collapsed="true"])
+{
+	box-shadow: none !important;
+	border: none !important;
+	border-top: 2px solid !important;
+	-moz-border-top-colors: ThreeDShadow ThreeDHighlight !important;
+}
+
+#browser-bottombox[s4eboarder="true"] > *:not([hidden="true"]):not([collapsed="true"]) ~ *
+{
+	border: none !important;
+}
+

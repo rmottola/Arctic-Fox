@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE overlay SYSTEM "chrome://browser/locale/statusbar/statusbar-overlay.dtd">
+
+<?xml-stylesheet href="chrome://browser/content/statusbar/overlay.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/statusbar/overlay.css" type="text/css" ?>
+<?xml-stylesheet href="chrome://browser/skin/statusbar/dynamic.css" type="text/css" ?>
+
+<overlay id="status4evar-overlay"
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+	<stringbundleset id="stringbundleset">
+		<stringbundle id="bundle_status4evar" src="chrome://browser/locale/statusbar/overlay.properties" />
+	</stringbundleset>
+
+	<script type="application/javascript" src="chrome://browser/content/statusbar/overlay.js" />
+
+	<commandset>
+		<command id="S4E:Options" oncommand="caligon.status4evar.launchOptions(window);"/>
+	</commandset>
+
+	<popupset id="mainPopupSet">
+		<hbox id="status4evar-download-notification-container" mousethrough="always">
+			<vbox id="status4evar-download-notification-anchor">
+				<vbox id="status4evar-download-notification-icon" />
+			</vbox>
+		</hbox>
+	</popupset>
+
+    <menupopup id="menu_ToolsPopup">
+      <menuitem id="statusbar-options-fx" command="S4E:Options"
+        label="&status4evar.menu.options.label;"/>
+    </menupopup>
+    
+    <menupopup id="appmenu_customizeMenu">
+          <menuitem id="statusbar-options-app" command="S4E:Options"
+        label="&status4evar.menu.options.label;"/>
+    </menupopup>
+    
+	<toolbarpalette id="BrowserToolbarPalette">
+		<toolbaritem id="status4evar-status-widget"
+		             title="&status4evar.status.widget.title;"
+		             removable="true" flex="1" persist="width" width="100">
+			<label id="status4evar-status-text" flex="1" crop="end" value="&status4evar.status.widget.title;" />
+		</toolbaritem>
+
+		<toolbarbutton id="status4evar-download-button"
+		               title="&status4evar.download.widget.title;"
+		               class="toolbarbutton-1 chromeclass-toolbar-additional"
+		               removable="true" collapsed="true" tooltip="_child"
+		               oncommand="caligon.status4evar.downloadStatus.openUI(event)">
+			<stack id="status4evar-download-anchor" class="toolbarbutton-icon">
+				<vbox id="status4evar-download-icon" />
+				<vbox pack="end">
+					<progressmeter id="status4evar-download-progress-bar" mode="normal" value="0" collapsed="true" min="0" max="100" />
+				</vbox>
+			</stack>
+			<tooltip id="status4evar-download-tooltip" />
+			<label id="status4evar-download-label" value="&status4evar.download.widget.title;" class="toolbarbutton-text" crop="right" flex="1" />
+		</toolbarbutton>
+
+		<toolbaritem id="status4evar-progress-widget"
+		             title="&status4evar.progress.widget.title;"
+		             removable="true">
+			<progressmeter id="status4evar-progress-bar" class="progressmeter-statusbar"
+			               mode="normal" value="0" collapsed="true" min="0" max="100" />
+		</toolbaritem>
+
+		<toolbarbutton id="status4evar-options-button"
+		               title="&status4evar.options.widget.title;"
+		               class="toolbarbutton-1 chromeclass-toolbar-additional"
+		               label="&status4evar.options.widget.label;"
+		               removable="true" command="S4E:Options" tooltiptext="&status4evar.options.widget.title;" />
+	</toolbarpalette>
+
+  <statusbar id="status-bar" ordinal="1" />
+</overlay>
+

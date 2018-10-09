@@ -1,0 +1,162 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+JAR_MANIFESTS += ['jar.mn']
+
+interfaces = [
+    'base',
+    'canvas',
+    'core',
+    'html',
+    'events',
+    'devicestorage',
+    'settings',
+    'stylesheets',
+    'sidebar',
+    'css',
+    'traversal',
+    'range',
+    'xbl',
+    'xpath',
+    'xul',
+    'security',
+    'storage',
+    'json',
+    'offline',
+    'geolocation',
+    'notification',
+    'permission',
+    'svg',
+    'smil',
+    'apps',
+    'gamepad',
+]
+
+DIRS += ['interfaces/' + i for i in interfaces]
+
+DIRS += [
+    'animation',
+    'apps',
+    'base',
+    'activities',
+    'archivereader',
+    'requestsync',
+    'bindings',
+    'battery',
+    'browser-element',
+    'canvas',
+    'cellbroadcast',
+    'contacts',
+    'crypto',
+    'phonenumberutils',
+    'alarm',
+    'datastore',
+    'devicestorage',
+    'encoding',
+    'events',
+    'fetch',
+    'filehandle',
+    'filesystem',
+    'fmradio',
+    'geolocation',
+    'html',
+    'json',
+    'jsurl',
+    'asmjscache',
+    'mathml',
+    'media',
+    'messages',
+    'mobileconnection',
+    'notification',
+    'offline',
+    'power',
+    'push',
+    'quota',
+    'security',
+    'settings',
+    'storage',
+    'svg',
+    'mobilemessage',
+    'time',
+    'locales',
+    'network',
+    'permission',
+    'plugins/base',
+    'plugins/ipc',
+    'indexedDB',
+    'system',
+    'ipc',
+    'identity',
+    'workers',
+    'camera',
+    'audiochannel',
+    'broadcastchannel',
+    'promise',
+    'smil',
+    'telephony',
+    'tv',
+    'voicemail',
+    'inputmethod',
+    'webidl',
+    'xbl',
+    'xml',
+    'xslt',
+    'xul',
+    'resourcestats',
+    'manifest',
+    'vr',
+]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    DIRS += ['plugins/ipc/hangui']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    DIRS += [
+        'speakermanager',
+        'tethering',
+        'wifi',
+    ]
+
+if CONFIG['MOZ_B2G_RIL']:
+    DIRS += [
+        'icc',
+        'wappush',
+    ]
+
+if CONFIG['MOZ_PAY']:
+    DIRS += ['payment']
+
+if CONFIG['MOZ_GAMEPAD']:
+    DIRS += ['gamepad']
+
+if CONFIG['MOZ_NFC']:
+    DIRS += ['nfc']
+
+if CONFIG['MOZ_SECUREELEMENT']:
+    DIRS += ['secureelement']
+
+if CONFIG['MOZ_B2G']:
+    DIRS += [
+        'downloads',
+        'mobileid',
+        'engineeringmode'
+    ]
+
+if CONFIG['MOZ_B2G_BT_API_V2']:
+    DIRS += ['bluetooth2']
+else:
+    DIRS += ['bluetooth']
+
+DIRS += ['presentation']
+
+TEST_DIRS += [
+    'tests',
+    'imptests',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'cocoa', 'windows', 'android', 'qt'):
+    TEST_DIRS += ['plugins/test']
+

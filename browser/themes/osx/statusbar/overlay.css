@@ -1,0 +1,108 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+%include ../../shared/statusbar/overlay.css
+
+/*
+ * General
+ */
+
+#status4evar-status-text,
+#status4evar-progress-bar
+{
+	margin: 0px 4px;
+}
+
+/*
+ * Download status
+ */
+
+#status4evar-download-progress-bar
+{
+	height: 5px;
+}
+
+#status4evar-download-button[attention] #status4evar-download-icon
+{
+	background-image: url("chrome://browser/skin/downloads/download-glow.png");
+}
+
+#status-bar
+{
+	padding-right: 0px;
+}
+
+#browser-bottombox > #addon-bar:last-child
+{
+	padding-right: 16px;
+}
+
+#status4evar-download-button #status4evar-download-icon
+{
+	background: -moz-image-rect(url("chrome://browser/skin/Toolbar.png"), 0, 108, 18, 90) center no-repeat;
+  min-width: 18px;
+  min-height: 18px;
+}
+
+#status4evar-download-button:-moz-lwtheme-brighttext #status4evar-download-icon
+{
+	background: -moz-image-rect(url("chrome://browser/skin/Toolbar-inverted.png"), 0, 108, 18, 90) center no-repeat;
+}
+
+#status4evar-download-button[attention] #status4evar-download-icon
+{
+	background-image: url("chrome://browser/skin/downloads/download-glow.png");
+}
+
+toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"] > label
+{
+	margin: 0px 2px !important;
+	-moz-margin-start: 3px !important;
+}
+
+/*
+ * Splitter
+ */
+
+splitter.status4evar-status-splitter
+{
+	width: 8px;
+	margin: 0px -4px;
+}
+
+/*
+ * Location bar
+ */
+
+#urlbar-progress-alt
+{
+       margin-right: -1px;
+}
+
+/*
+ * Toolbar progress
+ */
+
+#status4evar-progress-bar[s4estyle="true"]
+{
+	-moz-appearance: none;
+	border: 1px solid gray;
+}
+
+#status4evar-progress-bar[s4estyle="true"] > .progress-remainder
+{
+	background-color: white;
+}
+
+/*
+ * Gripper
+ */
+
+#status4evar-window-gripper
+{
+	display: none;
+}
+

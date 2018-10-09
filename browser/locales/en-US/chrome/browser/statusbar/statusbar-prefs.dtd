@@ -1,0 +1,99 @@
+<!ENTITY status4evar.window.title "Pale Moon status bar preferences">
+
+<!ENTITY status4evar.pane.status "Status">
+<!ENTITY status4evar.pane.progress "Progress">
+<!ENTITY status4evar.pane.download "Download">
+<!ENTITY status4evar.pane.statusbar "Status Bar">
+<!ENTITY status4evar.pane.advanced "Advanced">
+
+<!ENTITY status4evar.tab.general "General">
+<!ENTITY status4evar.tab.toolbar "Status Bar">
+<!ENTITY status4evar.tab.popup "Pop-up">
+<!ENTITY status4evar.tab.tabs "Tabs">
+
+<!ENTITY status4evar.option.none "None">
+<!ENTITY status4evar.option.nothing "Nothing">
+<!ENTITY status4evar.option.toolbar "Status Bar">
+<!ENTITY status4evar.option.popup "Pop-up">
+<!ENTITY status4evar.option.tooltip "Tooltip">
+<!ENTITY status4evar.option.bottom "Bottom">
+<!ENTITY status4evar.option.top "Top">
+<!ENTITY status4evar.option.dlcount "Download count">
+<!ENTITY status4evar.option.dltime "Time remaining">
+<!ENTITY status4evar.option.both "Both">
+<!ENTITY status4evar.option.right "Right">
+<!ENTITY status4evar.option.left "Left">
+<!ENTITY status4evar.option.simple "Simple">
+<!ENTITY status4evar.option.advanced "Advanced">
+<!ENTITY status4evar.option.browse "Browse">
+<!ENTITY status4evar.option.clear "Clear">
+<!ENTITY status4evar.option.center "Center">
+<!ENTITY status4evar.option.offset "Offset">
+<!ENTITY status4evar.option.repeat "Repeat">
+<!ENTITY status4evar.option.no-repeat "No Repeat">
+<!ENTITY status4evar.option.space "Space">
+<!ENTITY status4evar.option.round "Round">
+<!ENTITY status4evar.option.firefoxdefault "Pale Moon default">
+<!ENTITY status4evar.option.download.library "Library">
+<!ENTITY status4evar.option.download.tab "Tab">
+<!ENTITY status4evar.option.download.thirdparty "3rd Party">
+
+<!ENTITY status4evar.unit.milliseconds "milliseconds">
+<!ENTITY status4evar.unit.seconds "seconds">
+<!ENTITY status4evar.unit.px "px">
+
+<!ENTITY status4evar.status.general.status.caption "Status Text">
+<!ENTITY status4evar.status.label "Show status in:">
+<!ENTITY status4evar.status.timeout.label "Hide the status after:">
+<!ENTITY status4evar.status.default.label "Show default status">
+<!ENTITY status4evar.status.network.label "Show network status">
+<!ENTITY status4evar.status.network.xhr.label "Show background network status">
+<!ENTITY toolkit.dom.status.change.label "Allow web pages to change the status">
+
+<!ENTITY status4evar.status.general.linkOver.caption "Links">
+<!ENTITY status4evar.status.linkOver.label "Show links in:">
+<!ENTITY status4evar.status.linkOver.delay.show.label "Delay before showing links:">
+<!ENTITY status4evar.status.linkOver.delay.hide.label "Delay before hiding links:">
+
+<!ENTITY status4evar.status.toolbar.maxLength.label "Max status text length:">
+
+<!ENTITY status4evar.status.urlbar.firefox.builtin.caption "Firefox compatibility features">
+<!ENTITY browser.urlbar.formatting.enabled.label "Enable domain highlighting">
+<!ENTITY browser.urlbar.trimming.enabled.label "Enable protocol hiding (http:// and ftp://)">
+
+<!ENTITY status4evar.status.popup.invertMirror.label "Default to the right side">
+<!ENTITY status4evar.status.popup.mouseMirror.label "Swap sides when moused over">
+
+<!ENTITY status4evar.progress.style.label "Use a custom style">
+
+<!ENTITY status4evar.progress.toolbar.force.label "Always show the progress meter">
+
+<!ENTITY status4evar.editor.label "Editor:">
+<!ENTITY status4evar.editor.css.color.label "Color:">
+<!ENTITY status4evar.editor.css.image.label "Image:">
+<!ENTITY status4evar.editor.css.image.repeat "Repeat">
+<!ENTITY status4evar.editor.css.image.position "Position">
+<!ENTITY status4evar.editor.css.image.offset "Offset">
+
+
+
+<!ENTITY status4evar.download.button.action.label "Download status button action:">
+<!ENTITY status4evar.download.force.label "Always show the Download Status indicator">
+<!ENTITY status4evar.download.label.force.label "Always show the indicator text">
+<!ENTITY status4evar.download.label.label "Download status indicator text:">
+<!ENTITY status4evar.download.tooltip.label "Download status indicator tooltip:">
+<!ENTITY status4evar.download.progress.label "Show download progress on the button">
+<!ENTITY status4evar.download.progress.average.label "Show average download completion">
+<!ENTITY status4evar.download.progress.max.label "Show most complete download">
+<!ENTITY status4evar.download.progress.min.label "Show least complete download">
+<!ENTITY status4evar.download.color.active.label "Progress color for active downloads:">
+<!ENTITY status4evar.download.color.paused.label "Progress color for paused downloads:">
+<!ENTITY status4evar.download.notify.animate.label "Animate button when download completes">
+<!ENTITY status4evar.download.notify.timeout.label "Highlight button when download completes:">
+
+<!ENTITY status4evar.addonbar.borderStyle "Use alternate toolbar borders">
+<!ENTITY status4evar.addonbar.windowGripper "Show the window re-size gripper">
+<!ENTITY status4evar.addonbar.closeButton "Show the close button">
+
+<!ENTITY status4evar.advanced.status.detectFullScreen "Detect full-screen mode and show links/status appropriately.">
+<!ENTITY status4evar.advanced.status.detectVideo "Hide status popup in full-screen HTML5 video.">

@@ -1,0 +1,124 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'nsContentDLF.h',
+    'nsLayoutCID.h',
+    'nsLayoutStatics.h',
+]
+
+UNIFIED_SOURCES += [
+    'nsContentDLF.cpp',
+    'nsLayoutModule.cpp',
+    'nsLayoutStatics.cpp',
+]
+
+if CONFIG['MOZ_NFC']:
+    LOCAL_INCLUDES += [
+        '/dom/nfc'
+    ]
+
+FAIL_ON_WARNINGS = True
+
+MSVC_ENABLE_PGO = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+LOCAL_INCLUDES += [
+    '../base',
+    '../forms',
+    '../generic',
+    '../inspector',
+    '../mathml',
+    '../style',
+    '../tables',
+    '../xul',
+    '/caps',
+    '/docshell/base',
+    '/dom/audiochannel',
+    '/dom/base',
+    '/dom/camera',
+    '/dom/canvas',
+    '/dom/filesystem',
+    '/dom/geolocation',
+    '/dom/html',
+    '/dom/json',
+    '/dom/jsurl',
+    '/dom/media',
+    '/dom/offline',
+    '/dom/speakermanager',
+    '/dom/storage',
+    '/dom/svg',
+    '/dom/telephony',
+    '/dom/xbl',
+    '/dom/xslt/base',
+    '/dom/xslt/xml',
+    '/dom/xslt/xpath',
+    '/dom/xslt/xslt',
+    '/dom/xul',
+    '/dom/xul/templates',
+    '/editor/composer',
+    '/editor/libeditor',
+    '/editor/txmgr',
+    '/editor/txtsvc',
+    '/extensions/cookie',
+    '/js/xpconnect/loader',
+    '/js/xpconnect/src',
+    '/netwerk/base',
+    '/netwerk/cookie',
+    '/view',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    LOCAL_INCLUDES += [
+        '/dom/system/windows',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    LOCAL_INCLUDES += [
+        '/dom/system/mac',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
+    LOCAL_INCLUDES += [
+        '/dom/system',
+        '/dom/system/android',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    LOCAL_INCLUDES += [
+        '/dom/system/gonk',
+    ]
+    CXXFLAGS += [
+        '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
+            'dalvik/libnativehelper/include/nativehelper',
+            'frameworks/base/include',
+            'frameworks/base/include/binder',
+            'frameworks/base/include/utils',
+            'frameworks/base/include/media',
+            'frameworks/base/include/media/stagefright/openmax',
+            'frameworks/base/media/libstagefright/include',
+        ]
+    ]
+
+if CONFIG['MOZ_B2G_FM']:
+    LOCAL_INCLUDES += [
+        '/dom/fmradio',
+    ]
+
+if CONFIG['MOZ_B2G_BT']:
+    LOCAL_INCLUDES += [
+        '/dom/bluetooth',
+    ]
+
+if CONFIG['MOZ_WEBSPEECH']:
+    LOCAL_INCLUDES += [
+        '/dom/media/webspeech/synth',
+    ]
+
+if CONFIG['MOZ_SECUREELEMENT']:
+    LOCAL_INCLUDES += [
+        '/dom/secureelement',
+    ]
+
+FINAL_LIBRARY = 'xul'

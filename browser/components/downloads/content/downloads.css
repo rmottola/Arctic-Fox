@@ -1,0 +1,132 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/*** Download items ***/
+
+richlistitem[type="download"] {
+  -moz-binding: url('chrome://browser/content/downloads/download.xml#download');
+}
+
+richlistitem[type="download"]:-moz-any([state="-1"],/* Starting (initial) */
+                                       [state="0"], /* Downloading        */
+                                       [state="4"], /* Paused             */
+                                       [state="5"], /* Starting (queued)  */
+                                       [state="7"]) /* Scanning           */
+{
+  -moz-binding: url('chrome://browser/content/downloads/download.xml#download-in-progress');
+}
+
+richlistitem[type="download"]:not([selected]) button {
+  /* Only focus buttons in the selected item. */
+  -moz-user-focus: none;
+}
+
+/*** Visibility of controls inside download items ***/
+
+.download-state:-moz-any(     [state="6"], /* Blocked (parental) */
+                              [state="8"], /* Blocked (dirty)    */
+                              [state="9"]) /* Blocked (policy)   */
+                                           .downloadTypeIcon:not(.blockedIcon),
+
+.download-state:not(:-moz-any([state="6"], /* Blocked (parental) */
+                              [state="8"], /* Blocked (dirty)    */
+                              [state="9"]) /* Blocked (policy)   */)
+                                           .downloadTypeIcon.blockedIcon,
+
+.download-state:not(:-moz-any([state="-1"],/* Starting (initial) */
+                              [state="0"], /* Downloading        */
+                              [state="4"], /* Paused             */
+                              [state="5"], /* Starting (queued)  */
+                              [state="7"]) /* Scanning           */)
+                                           .downloadProgress,
+
+.download-state:not(          [state="0"]  /* Downloading        */)
+                                           .downloadPauseMenuItem,
+
+.download-state:not(          [state="4"]  /* Paused             */)
+                                           .downloadResumeMenuItem,
+
+.download-state:not(:-moz-any([state="2"], /* Failed             */
+                              [state="4"]) /* Paused             */)
+                                           .downloadCancelMenuItem,
+
+.download-state:not(:-moz-any([state="1"], /* Finished           */
+                              [state="2"], /* Failed             */
+                              [state="3"], /* Canceled           */
+                              [state="6"], /* Blocked (parental) */
+                              [state="8"], /* Blocked (dirty)    */
+                              [state="9"]) /* Blocked (policy)   */)
+                                           .downloadRemoveFromHistoryMenuItem,
+
+.download-state:not(:-moz-any([state="-1"],/* Starting (initial) */
+                              [state="0"], /* Downloading        */
+                              [state="1"], /* Finished           */
+                              [state="4"], /* Paused             */
+                              [state="5"]) /* Starting (queued)  */)
+                                           .downloadShowMenuItem,
+
+.download-state[state="7"] /* Scanning */  .downloadCommandsSeparator
+
+{
+  display: none;
+}
+
+/*** Visibility of download buttons and indicator controls. ***/
+
+.download-state:not(:-moz-any([state="-1"],/* Starting (initial) */
+                              [state="0"], /* Downloading        */
+                              [state="4"], /* Paused             */
+                              [state="5"]) /* Starting (queued)  */)
+                                           .downloadCancel,
+
+.download-state:not(:-moz-any([state="2"], /* Failed             */
+                              [state="3"]) /* Canceled           */)
+                                           .downloadRetry,
+
+.download-state:not(          [state="1"]  /* Finished           */)
+                                           .downloadShow,
+
+#downloads-indicator:-moz-any([progress],
+                              [counter],
+                              [paused])    #downloads-indicator-icon,
+
+#downloads-indicator:not(:-moz-any([progress],
+                                   [counter],
+                                   [paused]))
+                                           #downloads-indicator-progress-area
+
+{
+  visibility: hidden;
+}
+
+.download-state[state="1"]:not([exists]) .downloadShow
+{
+  display: none;
+}
+
+#downloadsSummary:not([inprogress]) > vbox > #downloadsSummaryProgress,
+#downloadsSummary:not([inprogress]) > vbox > #downloadsSummaryDetails,
+#downloadsFooter[showingsummary] > #downloadsHistory,
+#downloadsFooter:not([showingsummary]) > #downloadsSummary
+{
+  display: none;
+}
+
+/* Hacks for toolbar full and text modes, until bug 573329 removes them */
+
+toolbar[mode="text"] > #downloads-indicator {
+  display: -moz-box;
+  -moz-box-orient: vertical;
+  -moz-box-pack: center;
+}
+
+toolbar[mode="text"] > #downloads-indicator > .toolbarbutton-text {
+  -moz-box-ordinal-group: 1;
+}
+
+toolbar[mode="text"] > #downloads-indicator > .toolbarbutton-icon {
+  display: -moz-box;
+  -moz-box-ordinal-group: 2;
+  visibility: collapse;
+}

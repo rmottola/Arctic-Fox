@@ -1,0 +1,49 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <script type="application/javascript" src="mediaStreamPlayback.js"></script>
+  <script type="application/javascript" src="blacksilence.js"></script>
+</head>
+<body>
+<pre id="test">
+<script type="application/javascript">
+createHTML({ title: "Test getUserMedia peerIdentity Constraint", bug: "942367" });
+function theTest() {
+  function testPeerIdentityConstraint(withConstraint, done) {
+    var config = { audio: true, video: true, fake: true };
+    if (withConstraint) {
+      config.peerIdentity = 'user@example.com';
+    }
+    info('getting media with constraints: ' + JSON.stringify(config));
+    navigator.mediaDevices.getUserMedia(config).then(function(stream) {
+      var oneDone = false;
+      function checkDone() {
+        if (oneDone) {
+          done();
+        }
+        oneDone = true;
+      }
+      var cancelAudioCheck = audioIsSilence(withConstraint, stream, checkDone);
+      var cancelVideoCheck = videoIsBlack(withConstraint, stream, checkDone);
+      setTimeout(cancelAudioCheck, 3*60*1000);
+      setTimeout(cancelVideoCheck, 3*60*1000);
+    })
+    .catch(function(e) {
+      ok(false, 'gUM error: ' + e);
+    });
+  };
+
+  // without constraint
+  testPeerIdentityConstraint(false, function() {
+    // with the constraint
+    testPeerIdentityConstraint(true, SimpleTest.finish.bind(SimpleTest));
+  });
+}
+
+runTest(theTest);
+SimpleTest.waitForExplicitFinish();
+
+</script>
+</pre>
+</body>
+</html>

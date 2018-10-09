@@ -1,0 +1,5 @@
+2013-04-20  -- (by Mozilla) Removed directories from original package (swig, examples, man)
+2015-06-16  -- Renamed duplicate enc/vp8li.h to vp8encli.h to avoid build system errors
+               as a result of duplicate exports to pymake.
+2015-06-30  -- Upstream update to 0.4.3 with rename of encoder lib header as above.
+               Removed more unused files like m4, some docs, unused makefiles for other build systems.

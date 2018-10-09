@@ -1,0 +1,10 @@
+<!ENTITY status4evar.status.toolbar.accessKey "S">
+<!ENTITY status4evar.status.toolbar.title "Status Bar">
+<!ENTITY status4evar.status.widget.title "Status Text">
+<!ENTITY status4evar.progress.widget.title "Progress Meter">
+<!ENTITY status4evar.throbber.widget.title "Activity Indicator">
+<!ENTITY status4evar.download.widget.title "Download Status">
+<!ENTITY status4evar.options.widget.title "Status Bar Preferences">
+<!ENTITY status4evar.options.widget.label "Pale Moon status bar">
+<!ENTITY status4evar.menu.options.label "Status Bar Preferences">
+

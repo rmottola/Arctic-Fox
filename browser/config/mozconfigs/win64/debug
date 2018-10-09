@@ -1,0 +1,22 @@
+. "$topsrcdir/browser/config/mozconfigs/common"
+
+ac_add_options --target=x86_64-pc-mingw32
+ac_add_options --host=x86_64-pc-mingw32
+
+ac_add_options --enable-debug
+ac_add_options --enable-trace-malloc
+ac_add_options --enable-signmar
+
+# Needed to enable breakpad in application.ini
+export MOZILLA_OFFICIAL=1
+
+if test -z "${_PYMAKE}"; then
+  mk_add_options MOZ_MAKE_FLAGS=-j1
+fi
+
+# Package js shell.
+export MOZ_PACKAGE_JSSHELL=1
+
+. $topsrcdir/build/win64/mozconfig.vs2010
+
+. "$topsrcdir/build/mozconfig.common.override"

@@ -1,0 +1,397 @@
+<?xml version="1.0"?>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/content/preferences/aboutPermissions.css"?>
+<?xml-stylesheet href="chrome://browser/skin/preferences/aboutPermissions.css"?>
+
+<!DOCTYPE page [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
+%brandDTD;
+<!ENTITY % aboutPermissionsDTD SYSTEM "chrome://browser/locale/preferences/aboutPermissions.dtd" >
+%aboutPermissionsDTD;
+]>
+
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:xhtml="http://www.w3.org/1999/xhtml"
+      id="permissions-page" title="&permissionsManager.title;"
+      onload="AboutPermissions.init();"
+      onunload="AboutPermissions.cleanUp();"
+      disablefastfind="true"
+      role="application">
+
+  <script type="application/javascript"
+          src="chrome://browser/content/preferences/aboutPermissions.js"/>
+
+  <hbox flex="1" id="permissions-header">
+    <label id="permissions-pagetitle">&permissionsManager.title;</label>
+  </hbox>
+  <hbox flex="1" id="permissions-content" class="main-content">
+
+    <vbox id="sites-box">
+      <button id="sites-reload"
+              label="&permissions.sitesReload;"
+              oncommand="AboutPermissions.sitesReload();"/>
+      <textbox id="sites-filter"
+               emptytext="&sites.search;"
+               oncommand="AboutPermissions.filterSitesList();"
+               type="search"/>
+      <richlistbox id="sites-list"
+                   flex="1"
+                   class="list"
+                   onselect="AboutPermissions.onSitesListSelect(event);">
+        <richlistitem id="all-sites-item"
+                      class="site"
+                      value="&sites.allSites;"/>                
+      </richlistbox>
+    </vbox>
+
+    <vbox id="permissions-box" flex="1">
+
+      <deck id="header-deck">
+        <hbox id="site-header" class="pref-item" align="center">
+          <description id="site-description">
+            &header.site.start;<label id="site-label"/>&header.site.end;
+          </description>
+          <label id="site-visit-count"/>
+          <spacer flex="1"/>
+          <button id="forget-site-button"
+                  label="&permissions.forgetSite;"
+                  oncommand="AboutPermissions.forgetSite();"/>
+        </hbox>
+
+        <hbox id="defaults-header" class="pref-item" align="center">
+          <description id="defaults-description">
+            &header.defaults;
+          </description>
+        </hbox>
+      </deck>
+
+      <!-- Passwords -->
+      <hbox id="password-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="password"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&password.label;"/>
+            <label id="password-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox align="center">
+            <menulist id="password-menulist"
+                      class="pref-menulist"
+                      type="password"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="password-1" value="1" label="&permission.allow;"/>
+                <menuitem id="password-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="password-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="password"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+            <button id="passwords-manage-all-button"
+                    label="&password.manage;"
+                    oncommand="AboutPermissions.managePasswords();"/>
+          </hbox>
+          <hbox id="passwords-count" align="center">
+            <label id="passwords-label"/>
+            <button id="passwords-manage-button"
+                    label="&password.manage;"
+                    oncommand="AboutPermissions.managePasswords();"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Image Blocking -->
+      <hbox id="image-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="image"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&image.label;"/>
+            <label id="image-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="image-menulist"
+                      class="pref-menulist"
+                      type="image"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="image-1" value="1" label="&permission.allow;"/>
+                <menuitem id="image-2" value="2" label="&permission.block;"/>
+                <menuitem id="image-3" value="3" label="&permission.allowFirstPartyOnly;"/>
+              </menupopup>
+            </menulist>
+            <button id="image-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="image"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Pop-up Blocking -->
+      <hbox id="popup-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="popup"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&popup.label;"/>
+            <label id="popup-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="popup-menulist"
+                      class="pref-menulist"
+                      type="popup"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="popup-1" value="1" label="&permission.allow;"/>
+                <menuitem id="popup-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="popup-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="popup"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Cookies -->
+      <hbox id="cookie-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="cookie"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&cookie.label;"/>
+            <label id="cookie-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox align="center">
+            <menulist id="cookie-menulist"
+                      class="pref-menulist"
+                      type="cookie"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="cookie-1" value="1" label="&permission.allow;"/>
+                <menuitem id="cookie-8" value="8" label="&permission.allowForSession;"/>
+                <menuitem id="cookie-9" value="9" label="&permission.allowFirstPartyOnly;"/>
+                <menuitem id="cookie-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="cookie-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="cookie"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+            <button id="cookies-clear-all-button"
+                    label="&cookie.removeAll;"
+                    oncommand="Services.cookies.removeAll();"/>
+            <button id="cookies-manage-all-button"
+                    label="&cookie.manage;"
+                    oncommand="AboutPermissions.manageCookies();"/>
+          </hbox>
+          <hbox id="cookies-count" align="center">
+            <label id="cookies-label"/>
+            <button id="cookies-clear-button"
+                    label="&cookie.remove;"
+                    oncommand="AboutPermissions.clearCookies();"/>
+            <button id="cookies-manage-button"
+                    label="&cookie.manage;"
+                    oncommand="AboutPermissions.manageCookies();"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Desktop Notifications -->
+      <hbox id="desktop-notification-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="desktop-notification"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&desktop-notification.label;"/>
+            <label id="desktop-notification-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="desktop-notification-menulist"
+                      class="pref-menulist"
+                      type="desktop-notification"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="desktop-notification-0" value="0" label="&permission.alwaysAsk;"/>
+                <menuitem id="desktop-notification-1" value="1" label="&permission.allow;"/>
+                <menuitem id="desktop-notification-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="desktop-notification-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="desktop-notification"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Addons Blocking -->
+      <hbox id="install-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="install"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&install.label;"/>
+            <label id="install-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="install-menulist"
+                      class="pref-menulist"
+                      type="install"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="install-1" value="1" label="&permission.allow;"/>
+                <menuitem id="install-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="install-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="install"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Geolocation -->
+      <hbox id="geo-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="geo"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&geo.label;"/>
+            <label id="geo-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="geo-menulist"
+                      class="pref-menulist"
+                      type="geo"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="geo-0" value="0" label="&permission.alwaysAsk;"/>
+                <menuitem id="geo-1" value="1" label="&permission.allow;"/>
+                <menuitem id="geo-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="geo-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="geo"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- IndexedDB Storage -->  
+      <hbox id="indexedDB-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="indexedDB"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&indexedDB.label;"/>
+            <label id="indexedDB-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="indexedDB-menulist"
+                      class="pref-menulist"
+                      type="indexedDB"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="indexedDB-0" value="0" label="&permission.alwaysAsk;"/>
+                <menuitem id="indexedDB-1" value="1" label="&permission.allow;"/>
+                <menuitem id="indexedDB-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="indexedDB-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="indexedDB"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+      <!-- Opt-in activation of Plug-ins -->
+      <hbox id="plugins-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="plugins"/>
+        <vbox>
+          <label class="pref-title" value="&plugins.label;"/>
+          <vbox id="plugins-box"/>
+        </vbox>
+      </hbox>
+
+      <!-- Fullscreen -->
+      <hbox id="fullscreen-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="fullscreen"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&fullscreen.label;"/>
+            <label id="fullscreen-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox align="center">
+            <menulist id="fullscreen-menulist"
+                      class="pref-menulist"
+                      type="fullscreen"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="fullscreen-0" value="0" label="&permission.alwaysAsk;"/>
+                <menuitem id="fullscreen-1" value="1" label="&permission.allow;"/>
+                <menuitem id="fullscreen-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="fullscreen-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="fullscreen"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>      
+      
+      <!-- PointerLock -->
+      <hbox id="pointerLock-pref-item"
+            class="pref-item" align="top">
+        <image class="pref-icon" type="pointerLock"/>
+        <vbox>
+          <hbox>
+            <label class="pref-title" value="&pointerLock.label;"/>
+            <label id="pointerLock-default" class="pref-default" value="*"/>
+          </hbox>
+          <hbox>
+            <menulist id="pointerLock-menulist"
+                      class="pref-menulist"
+                      type="pointerLock"
+                      oncommand="AboutPermissions.onPermissionCommand(event, false);">
+              <menupopup>
+                <menuitem id="pointerLock-0" value="0" label="&permission.alwaysAsk;"/>
+                <menuitem id="pointerLock-1" value="1" label="&permission.allow;"/>
+                <menuitem id="pointerLock-2" value="2" label="&permission.block;"/>
+              </menupopup>
+            </menulist>
+            <button id="pointerLock-set-default"
+                    class="pref-set-default"
+                    label="&permission.default;"
+                    type="pointerLock"
+                    oncommand="AboutPermissions.onPermissionCommand(event, true);"/>
+          </hbox>
+        </vbox>
+      </hbox>
+
+    </vbox>
+  </hbox>
+
+</page>

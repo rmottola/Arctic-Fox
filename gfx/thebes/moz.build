@@ -1,0 +1,304 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'ContextStateTracker.h',
+    'DrawMode.h',
+    'gfx2DGlue.h',
+    'gfx3DMatrix.h',
+    'gfxAlphaRecovery.h',
+    'gfxASurface.h',
+    'gfxBaseSharedMemorySurface.h',
+    'gfxBlur.h',
+    'gfxColor.h',
+    'gfxContext.h',
+    'gfxDrawable.h',
+    'gfxFailure.h',
+    'gfxFont.h',
+    'gfxFontConstants.h',
+    'gfxFontEntry.h',
+    'gfxFontFamilyList.h',
+    'gfxFontFeatures.h',
+    'gfxFontInfoLoader.h',
+    'gfxFontTest.h',
+    'gfxFontUtils.h',
+    'gfxGradientCache.h',
+    'gfxImageSurface.h',
+    'gfxLineSegment.h',
+    'gfxMathTable.h',
+    'gfxMatrix.h',
+    'gfxPattern.h',
+    'gfxPlatform.h',
+    'gfxPoint.h',
+    'gfxPrefs.h',
+    'gfxQuad.h',
+    'gfxQuaternion.h',
+    'gfxRect.h',
+    'gfxReusableImageSurfaceWrapper.h',
+    'gfxReusableSharedImageSurfaceWrapper.h',
+    'gfxReusableSurfaceWrapper.h',
+    'gfxSharedImageSurface.h',
+    'gfxSharedQuartzSurface.h',
+    'gfxSkipChars.h',
+    'gfxSVGGlyphs.h',
+    'gfxTeeSurface.h',
+    'gfxTextRun.h',
+    'gfxTypes.h',
+    'gfxUserFontSet.h',
+    'gfxUtils.h',
+    'gfxVR.h',
+    'GraphicsFilter.h',
+    'RoundedRect.h',
+    'SoftwareVsyncSource.h',
+    'VsyncSource.h',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
+    EXPORTS += [
+        'gfxAndroidPlatform.h',
+        'gfxFT2FontBase.h',
+        'gfxFT2Fonts.h',
+        'gfxPDFSurface.h',
+    ]
+    SOURCES += [
+        'gfxAndroidPlatform.cpp',
+        'gfxFT2FontBase.cpp',
+        'gfxFT2FontList.cpp',
+        'gfxFT2Fonts.cpp',
+        'gfxFT2Utils.cpp',
+        'gfxPDFSurface.cpp',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    EXPORTS += [
+        'gfxAndroidPlatform.h',
+        'gfxFT2FontBase.h',
+        'gfxFT2Fonts.h',
+        'gfxPDFSurface.h',
+    ]
+    SOURCES += [
+        'gfxAndroidPlatform.cpp',
+        'gfxFT2FontBase.cpp',
+        'gfxFT2FontList.cpp',
+        'gfxFT2Fonts.cpp',
+        'gfxFT2Utils.cpp',
+        'gfxPDFSurface.cpp',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    EXPORTS += [
+        'gfxPlatformMac.h',
+        'gfxQuartzImageSurface.h',
+        'gfxQuartzNativeDrawing.h',
+        'gfxQuartzSurface.h',
+    ]
+    SOURCES += [
+        'gfxCoreTextShaper.cpp',
+        'gfxMacFont.cpp',
+        'gfxPlatformMac.cpp',
+        'gfxQuartzImageSurface.cpp',
+        'gfxQuartzNativeDrawing.cpp',
+        'gfxQuartzSurface.cpp',
+    ]
+elif CONFIG['MOZ_WIDGET_GTK']:
+    EXPORTS += [
+        'gfxFT2FontBase.h',
+        'gfxGdkNativeRenderer.h',
+        'gfxPangoFonts.h',
+        'gfxPDFSurface.h',
+        'gfxPlatformGtk.h',
+        'gfxPSSurface.h',
+    ]
+
+    SOURCES += [
+        'gfxFontconfigUtils.cpp',
+        'gfxFT2FontBase.cpp',
+        'gfxFT2Utils.cpp',
+        'gfxGdkNativeRenderer.cpp',
+        'gfxPangoFonts.cpp',
+        'gfxPDFSurface.cpp',
+        'gfxPlatformGtk.cpp',
+        'gfxPSSurface.cpp',
+    ]
+
+    if CONFIG['MOZ_X11']:
+        EXPORTS += [
+            'gfxXlibNativeRenderer.h',
+            'gfxXlibSurface.h',
+        ]
+        SOURCES += [
+            'gfxXlibNativeRenderer.cpp',
+            'gfxXlibSurface.cpp',
+        ]
+
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'qt':
+    EXPORTS += [
+        'gfxFT2FontBase.h',
+        'gfxPangoFonts.h',
+        'gfxPDFSurface.h',
+        'gfxQPainterSurface.h',
+        'gfxQtNativeRenderer.h',
+        'gfxQtPlatform.h',
+    ]
+    SOURCES += [
+        'gfxFontconfigUtils.cpp',
+        'gfxFT2FontBase.cpp',
+        'gfxFT2Utils.cpp',
+        'gfxPangoFonts.cpp',
+        'gfxPDFSurface.cpp',
+        'gfxQPainterSurface.cpp',
+        'gfxQtPlatform.cpp',
+    ]
+
+    if CONFIG['MOZ_X11']:
+        EXPORTS += [
+            'gfxXlibSurface.h',
+        ]
+        SOURCES += [
+            'gfxQtNativeRenderer.cpp',
+            'gfxXlibSurface.cpp',
+        ]
+
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    EXPORTS += [
+        'gfxD2DSurface.h',
+        'gfxDWriteFonts.h',
+        'gfxGDIFont.h',
+        'gfxGDIFontList.h',
+        'gfxPDFSurface.h',
+        'gfxPlatformFontList.h',
+        'gfxWindowsNativeDrawing.h',
+        'gfxWindowsPlatform.h',
+        'gfxWindowsSurface.h',
+    ]
+    SOURCES += [
+        'gfxGDIFont.cpp',
+        'gfxGDIFontList.cpp',
+        'gfxPDFSurface.cpp',
+        'gfxWindowsNativeDrawing.cpp',
+        'gfxWindowsPlatform.cpp',
+        'gfxWindowsSurface.cpp',
+    ]
+    if CONFIG['MOZ_ENABLE_DWRITE_FONT']:
+        UNIFIED_SOURCES += [
+            'gfxDWriteFontList.cpp',
+        ]
+        SOURCES += [
+            'gfxD2DSurface.cpp',
+            'gfxDWriteCommon.cpp',
+            'gfxDWriteFonts.cpp',
+        ]
+
+# Are we targeting x86 or x64?  If so, build gfxAlphaRecoverySSE2.cpp.
+if CONFIG['INTEL_ARCHITECTURE']:
+    SOURCES += ['gfxAlphaRecoverySSE2.cpp']
+    # The file uses SSE2 intrinsics, so it needs special compile flags on some
+    # compilers.
+    SOURCES['gfxAlphaRecoverySSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+
+SOURCES += [
+    'ContextStateTracker.cpp',
+    # Includes mac system header conflicting with point/size,
+    # and includes glxXlibSurface.h which drags in Xrender.h
+    'gfxASurface.cpp',
+    # on X11, gfxDrawable.cpp includes X headers for an old workaround which
+    # we could consider removing soon (affects Ubuntus older than 10.04 LTS)
+    # which currently prevent it from joining UNIFIED_SOURCES.
+    'gfxDrawable.cpp',
+    # gfxPlatform.cpp includes mac system header conflicting with point/size
+    'gfxPlatform.cpp',
+    'gfxPrefs.cpp',
+]
+
+UNIFIED_SOURCES += [
+    'CJKCompatSVS.cpp',
+    'gfx3DMatrix.cpp',
+    'gfxAlphaRecovery.cpp',
+    'gfxBaseSharedMemorySurface.cpp',
+    'gfxBlur.cpp',
+    'gfxContext.cpp',
+    'gfxFont.cpp',
+    'gfxFontEntry.cpp',
+    'gfxFontFeatures.cpp',
+    'gfxFontInfoLoader.cpp',
+    'gfxFontMissingGlyphs.cpp',
+    'gfxFontTest.cpp',
+    'gfxFontUtils.cpp',
+    'gfxGlyphExtents.cpp',
+    'gfxGradientCache.cpp',
+    'gfxGraphiteShaper.cpp',
+    'gfxHarfBuzzShaper.cpp',
+    'gfxImageSurface.cpp',
+    'gfxMathTable.cpp',
+    'gfxMatrix.cpp',
+    'gfxPattern.cpp',
+    'gfxPlatformFontList.cpp',
+    'gfxRect.cpp',
+    'gfxReusableImageSurfaceWrapper.cpp',
+    'gfxReusableSharedImageSurfaceWrapper.cpp',
+    'gfxScriptItemizer.cpp',
+    'gfxSkipChars.cpp',
+    'gfxSVGGlyphs.cpp',
+    'gfxTeeSurface.cpp',
+    'gfxTextRun.cpp',
+    'gfxUserFontSet.cpp',
+    'gfxUtils.cpp',
+    'gfxVR.cpp',
+    'nsUnicodeRange.cpp',
+    'SoftwareVsyncSource.cpp',
+    'VsyncSource.cpp',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    UNIFIED_SOURCES += [
+        'gfxMacPlatformFontList.mm',
+    ]
+
+FAIL_ON_WARNINGS = not CONFIG['_MSC_VER']
+
+MSVC_ENABLE_PGO = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+FINAL_LIBRARY = 'xul'
+
+GENERATED_FILES = [
+    'DeprecatedPremultiplyTables.h',
+]
+
+LOCAL_INCLUDES += [
+    '/dom/xml',
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+  LOCAL_INCLUDES += ['/widget/gonk']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+    DEFINES['MOZ_ENABLE_FREETYPE'] = True
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    for var in ('MOZ_ENABLE_D3D9_LAYER', 'MOZ_ENABLE_D3D10_LAYER'):
+        if CONFIG[var]:
+            DEFINES[var] = True
+
+CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
+CXXFLAGS += CONFIG['TK_CFLAGS']
+CFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
+CFLAGS += CONFIG['TK_CFLAGS']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gonk', 'qt'):
+    CXXFLAGS += CONFIG['CAIRO_FT_CFLAGS']
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
+    # This is set for "normal Android", that is, when Goanna is running on
+    # top of the android java runtime.
+    DEFINES['MOZ_USING_ANDROID_JAVA_WIDGETS'] = True
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'qt'):
+    CXXFLAGS += CONFIG['MOZ_PANGO_CFLAGS']
+
+DEFINES['GRAPHITE2_STATIC'] = True
+
+if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
+    DEFINES['OTS_DLL'] = True

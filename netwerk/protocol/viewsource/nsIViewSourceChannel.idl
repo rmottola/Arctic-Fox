@@ -1,0 +1,29 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsIChannel.idl"
+
+[uuid(72d9580a-b636-4392-b888-6c003c56f3d7)]
+interface nsIViewSourceChannel : nsIChannel
+{
+    /**
+     * The actual (MIME) content type of the data.
+     *
+     * nsIViewSourceChannel returns a content type of
+     * "application/x-view-source" if you ask it for the contentType
+     * attribute.
+     *
+     * However, callers interested in finding out or setting the
+     * actual content type can utilize this attribute.
+     */
+    attribute ACString originalContentType;
+
+    /**
+     * Whether the channel was created to view the source of a srcdoc document.
+     */
+    readonly attribute boolean isSrcdocChannel;
+};
+
+

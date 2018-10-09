@@ -1,0 +1,204 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#main-window::after {
+    content: attr(title);
+    line-height: 50px;
+    max-height: 50px;
+    overflow: -moz-hidden-unscrollable;
+    pointer-events: none;
+    position: fixed;
+    word-wrap: break-word;
+    -moz-hyphens: auto;
+    color: CaptionText;
+    font-weight: bold;
+    text-align: left;
+}
+
+#main-window:-moz-window-inactive::after {
+    color: InactiveCaptionText;
+}
+
+/* Win10 doesn't respond to inactive caption, so dim it instead */
+@media (-moz-os-version: windows-win10) {
+    #main-window:-moz-window-inactive::after {
+      opacity: 0.5;
+    }
+}
+
+/* Hide in fullscreen/TiT mode */
+#main-window[inFullscreen="true"]::after,
+#main-window[sizemode="maximized"][tabsintitlebar="true"]::after,
+#main-window:not([chromemargin])::after {
+    opacity: 0 !important;
+}
+
+
+#main-window::after {
+    padding: 0 132px; /* AppMenu button/wincontrols width offset */
+    left: 0;
+    right: 0;
+}
+
+#main-window[privatebrowsingmode=temporary]::after {
+    padding: 0px 132px 0px 152px; /* AppMenu button width offset for PB mode */
+}
+
+#main-window[sizemode="normal"]::after {
+    left: -12px;
+    right: -12px;
+}
+
+/* Lightweight Themes */
+
+#main-window:-moz-lwtheme::after {
+  color: inherit;
+  text-shadow: inherit;
+}
+
+/* Windows Classic theme */
+
+@media all and (-moz-windows-classic) {
+
+  #main-window::after {
+    top: -13px;
+    text-shadow: none !important;
+    background-position: 2px 18px;
+  }
+
+}
+
+
+/* Windows Aero (Vista, non-glass 7/8) */
+
+@media all and (-moz-windows-theme: aero) {
+
+  #main-window::after {
+    top: -11px;
+    font-weight: normal;
+    text-shadow: none;
+    background-position: 2px 17px;
+  }
+
+  #main-window[sizemode="maximized"]::after {
+    top: -7px;
+  }
+
+}
+
+
+/* Windows Aero Glass */
+
+@media (-moz-windows-glass) {
+
+  #main-window::after {
+    top: -13px;
+    color: black;
+    text-shadow: rgba(255,255,255,.6) 7px -1px 12px,
+                 rgba(255,255,255,.6) 6px -1px 13px,
+                 rgba(255,255,255,.9) 5px -1px 14px,
+                 rgba(255,255,255,.6) -7px -1px 12px,
+                 rgba(255,255,255,.6) -6px -1px 13px,
+                 rgba(255,255,255,.9) -5px -1px 14px;
+    z-index: -99999;
+    background-position: 2px 18px;
+    font-weight: bold;
+  }
+
+  #main-window[sizemode="maximized"]::after {
+    top: -7px;
+  }
+
+  #main-window:-moz-window-inactive::after {
+    opacity: .9;
+    color: black;
+    text-shadow: rgba(255,255,255,.7) 7px -1px 12px,
+                 rgba(255,255,255,.5) 6px -1px 13px,
+                 rgba(255,255,255,.5) 5px -1px 14px,
+                 rgba(255,255,255,.7) -7px -1px 12px,
+                 rgba(255,255,255,.5) -6px -1px 13px,
+                 rgba(255,255,255,.5) -5px -1px 14px;
+  }
+
+}
+
+
+/* Generic other themes */
+
+@media all and (-moz-windows-theme: generic) {
+
+  #main-window::after {
+    font-family: trebuchet MS;
+    font-size: 13px;
+    text-shadow: 1px 1px rgba(0, 0, 0, .2);
+    top: -9px;
+    background-position: 2px 16px;
+  }
+
+  #main-window:-moz-window-inactive::after {
+    text-shadow: none;
+  }
+
+}
+
+
+/* Compositor style for Win 8/10 */
+
+@media all and (-moz-windows-compositor) {
+  @media not all and (-moz-windows-glass) {
+
+    #main-window::after {
+      background-position: 4px 17px;
+      top: -13px;
+    }
+    
+    @media (-moz-os-version: windows-win8) {
+      #main-window::after {
+        font-size: 15px;
+        text-align: center;
+      }
+      
+      #main-window[darkwindowframe="true"]:not(:-moz-window-inactive):not(:-moz-lwtheme)::after {
+        /* Dark window frame/accent color on Win 8 */
+        color: white;
+      }
+    }
+    
+    @media (-moz-os-version: windows-win10) {    
+      #main-window::after {
+        text-align: left;
+      }
+      
+      @media (-moz-windows-accent-color-applies: 0) {
+        #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme)::after {
+          /* Default Windows 10 styling is white - apply black text styling */
+          color: black;
+        }
+      }
+      
+      @media (-moz-windows-accent-color-applies) {
+        #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme)::after {
+          /* Accent color is applied - use the associated text styling */
+          color: -moz-win-accentcolortext;
+        }
+      }
+    }
+
+    #main-window[sizemode="maximized"]::after {
+      top: -5px;
+    }
+  }
+  
+}
+
+
+/* Hide for small windows */
+
+@media not all and (min-width: 320px) {
+
+  #main-window::after {
+    opacity: 0 !important;
+  }
+  
+}

@@ -1,0 +1,9 @@
+# Holds MOZILLA_COMPATVERSION for User Agent Overrides.
+# Should be in the format of
+#
+#    x.x
+#
+# Referenced by nsHttpHandler.cpp, uaoverrides.inc.
+#--------------------------------------------------------
+
+52.9
