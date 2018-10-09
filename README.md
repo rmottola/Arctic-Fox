@@ -1,19 +1,9 @@
 # Arctic Fox web Browser
 
-This is a rebranded Pale Moon 27.9.4. It should be built with the 10.7 SDK to function properly on 10.6.
-The goal here is to implement specific security updates to keep this snow leopard supported browser as secure and up to date as possible. 
+This is a rebranded Pale Moon 27.9.4. It should be built with the 10.7 SDK to function properly on Mac OS X 10.6 Snow Leopard.
+The goal here is to implement specific security updates and bug fixes to keep this snow leopard supported browser as up to date as possible.
 
-# Pale Moon web browser
-
-This is the source code for the Pale Moon web browser, an independent
-browser derived from Firefox/Mozilla community code. The source tree is
-mostly laid out like Mozilla-based products.
-
-## Maintenance mode
-
-This repository and incarnation of Pale Moon is currently in maintenance mode and will only receive critical and security updates.
-The new home for Pale Moon (v28+) is in the UXP platform repo where it is one of the included applications with the platform.
-** Do NOT open new feature/bug issues on this repo, please, unless it is a sec or critical issue, and check if the Pale Moon unstable channel solves any issues you may have before opening new issues on the UXP repo.
+It will also build for windows vista and up, and x86 and powerpc linux (more than likely any other unix/bsd varient as well).
 
 ## Resources
 
