@@ -6,7 +6,7 @@
 pref("startup.homepage_override_url","");
 pref("app.releaseNotesURL", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
 
-// Enable Firefox compatmode by default.
+// Disable Firefox compatmode by default.
 // pref("general.useragent.compatMode", 2);
 
 // ========================= updates ========================
