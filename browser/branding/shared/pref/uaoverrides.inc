@@ -5,7 +5,7 @@
 #define GRE_VERSION @MOZILLA_UAVERSION_U@
 #define GRE_VERSION_SLICE Goanna/@GRE_VERSION@
 #define GRE_DATE_SLICE Goanna/20170101
-#define PM_SLICE PaleMoon/@MOZ_APP_VERSION@
+#define PM_SLICE Arcticfox/@MOZ_APP_VERSION@
 
 #define GK_VERSION @MOZILLA_COMPATVERSION_U@
 #define GK_SLICE Gecko/20100101
@@ -58,14 +58,14 @@ pref("@GUAO_PREF@.dailymotion.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) @GK_SLICE@ 
 pref("@GUAO_PREF@.deviantart.com","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
-// UA-Sniffing domains below have indicated no interest in supporting Pale Moon (BOO!)
+// UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.humblebundle.com","Mozilla/5.0 (@OS_SLICE@ rv:@GK_VERSION@) @GK_SLICE@ @FX_SLICE@ (Arctic Fox)");
 pref("@GUAO_PREF@.privat24.ua","Mozilla/5.0 (@OS_SLICE@ rv:38.0) @GK_SLICE@ Firefox/38.0");
 pref("@GUAO_PREF@.citi.com","Mozilla/5.0 (@OS_SLICE@ rv:57.0) @GK_SLICE@ Firefox/57.0 (Arctic Fox)");
 pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/45.9");
 pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/45.9");
 
-// UA-sniffing domains that are "app/vendor-specific" and do not like Pale Moon
+// UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
 pref("@GUAO_PREF@.web.whatsapp.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36");
 
 // The following domains do not like the Goanna slice
