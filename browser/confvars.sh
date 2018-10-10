@@ -30,7 +30,7 @@ MOZ_WEBM_ENCODER=1
 MOZ_PHOENIX_EXTENSIONS=1
 MOZ_BROWSER_STATUSBAR=1
 
-#disabled by default on desktop.
+#Disable devtools by default as they are currently broken.
 MOZ_DEVTOOLS=
 
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
