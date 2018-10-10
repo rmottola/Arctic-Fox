@@ -6,7 +6,6 @@
 pref("startup.homepage_welcome_url","about:");
 
 pref("app.vendorURL", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
-//pref("app.support.baseURL", "https://forums.macrumors.com/threads/arctic-fox-web-browser-for-10-6-64bit.2133051/");
 pref("browser.getdevtools.url","https://@APO_AM_URL@/external/devtools");
 
 // User Interface
@@ -64,7 +63,7 @@ pref("extensions.getAddons.getWithPerformance.url","https://@APO_AM_URL@/interna
 pref("extensions.update.background.url","https://@APO_AM_URL@/internal/update?@APO_AUS_ARGS@");
 pref("extensions.update.url","https://@APO_AM_URL@/internal/update?@APO_AUS_ARGS@");
 
-// Extensions Blocklist
+// Extensions Blocklist for extentions that cause issues.
 pref("extensions.blocklist.url","http://blocklist.palemoon.org/%VERSION%/blocklist.xml");
 pref("extensions.blocklist.itemURL", "http://blocklist.palemoon.org/info/?id=%blockID%");
 
