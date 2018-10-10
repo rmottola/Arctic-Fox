@@ -9,7 +9,6 @@
 # BrandFullNameInternal is used for some registry and file system values
 # instead of BrandFullName and typically should not be modified.
 !define BrandFullNameInternal "Arctic Fox"
-#!define CompanyName           "Moonchild Productions"
 !define URLInfoAbout          "about:buildconfig"
 !define URLUpdateInfo         "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb"
 
