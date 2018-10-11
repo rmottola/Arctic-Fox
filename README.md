@@ -26,6 +26,6 @@ Full Rebranding / Fixed google captchas & craiglist reply button not working / P
  * [Build Arctic Fox for Windows](https://forum.palemoon.org/viewtopic.php?f=19&t=13556)
  * [Build Arctic Fox for Linux](https://developer.palemoon.org/Developer_Guide:Build_Instructions/Pale_Moon/Linux)
  
- ## Downloads and Extentions
+ ## Downloads and Add-ons
   See the WIKI tab for download links.
 
