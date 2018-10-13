@@ -3,7 +3,7 @@
 This is a rebranded Pale Moon 27.9.4. It should be built with the 10.7 SDK to function properly on Mac OS X 10.6 Snow Leopard.
 The goal here is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.8, PowerPC's running Linux, Win7, etc.
 
-It will also build for windows 7 and up, x86/x64 and powerpc linux (and more than likely any other unix/bsd varient as well).
+Arctic Fox will build for Windows 7 and up, x86/x64/PowerPC Linux, and more than likely any other unix/bsd varient as well.
 
 * To build on MacOSX:
 * Requires 10.7 Lion and 10.7 SDK minimum to build. Will fail on 10.6 due to missing frameworks in the 10.6 SDK. 
