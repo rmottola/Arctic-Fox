@@ -16,7 +16,6 @@ ID
 
 # User files that may appear at the root
 /.mozconfig*
-/mozconfig
 /configure
 /config.cache
 /config.log
