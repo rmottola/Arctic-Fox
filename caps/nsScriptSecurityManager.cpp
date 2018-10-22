@@ -68,9 +68,6 @@
 #include "nsJSUtils.h"
 #include "nsILoadInfo.h"
 
-// This should be probably defined on some other place... but I couldn't find it
-#define WEBAPPS_PERM_NAME "webapps-manage"
-
 using namespace mozilla;
 using namespace mozilla::dom;
 
