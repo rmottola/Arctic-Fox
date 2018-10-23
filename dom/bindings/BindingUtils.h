@@ -365,7 +365,7 @@ class ProtoAndIfaceCache
   {
   public:
     PageTableCache() {
-      memset(mPages.begin(), 0, sizeof(mPages));
+      memset(&mPages, 0, sizeof(mPages));
     }
 
     ~PageTableCache() {
