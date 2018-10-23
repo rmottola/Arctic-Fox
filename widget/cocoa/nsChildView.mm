@@ -2189,6 +2189,7 @@ nsChildView::UpdateTitlebarCGContext()
 
     [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:ctx flipped:[view isFlipped]]];
 
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
     if ([window useBrightTitlebarForeground] && !nsCocoaFeatures::OnYosemiteOrLater() &&
         view == [window standardWindowButton:NSWindowFullScreenButton]) {
       // Make the fullscreen button visible on dark titlebar backgrounds by
@@ -2207,9 +2208,12 @@ nsChildView::UpdateTitlebarCGContext()
       CGContextSetBlendMode(ctx, kCGBlendModeNormal);
 
       CGContextEndTransparencyLayer(ctx);
-    } else {
+    } else
+#else
+    {
       [cell drawWithFrame:[button bounds] inView:button];
     }
+#endif
 
     [NSGraphicsContext setCurrentContext:context];
     CGContextRestoreGState(ctx);
@@ -2657,6 +2661,10 @@ RectTextureImage::BeginUpdate(const nsIntSize& aNewSize,
   RefPtr<gfx::DrawTarget> drawTarget = mUpdateDrawTarget;
   return drawTarget;
 }
+
+#ifndef NSFoundationVersionNumber10_6_3
+#define NSFoundationVersionNumber10_6_3 751.21
+#endif
 
 #define NSFoundationVersionWithProperStrideSupportForSubtextureUpload NSFoundationVersionNumber10_6_3
 
