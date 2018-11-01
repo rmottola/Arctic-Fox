@@ -2822,7 +2822,9 @@ static const NSString* kStateShowsToolbarButton = @"showsToolbarButton";
 - (void)setUseBrightTitlebarForeground:(BOOL)aBrightForeground
 {
   mBrightTitlebarForeground = aBrightForeground;
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
   [[self standardWindowButton:NSWindowFullScreenButton] setNeedsDisplay:YES];
+#endif
 }
 
 - (BOOL)useBrightTitlebarForeground
