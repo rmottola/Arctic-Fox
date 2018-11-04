@@ -1,4 +1,4 @@
-<!ENTITY status4evar.window.title "Pale Moon status bar preferences">
+<!ENTITY status4evar.window.title "Arctic Fox status bar preferences">
 
 <!ENTITY status4evar.pane.status "Status">
 <!ENTITY status4evar.pane.progress "Progress">
@@ -33,7 +33,7 @@
 <!ENTITY status4evar.option.no-repeat "No Repeat">
 <!ENTITY status4evar.option.space "Space">
 <!ENTITY status4evar.option.round "Round">
-<!ENTITY status4evar.option.firefoxdefault "Pale Moon default">
+<!ENTITY status4evar.option.firefoxdefault "Arctic Fox default">
 <!ENTITY status4evar.option.download.library "Library">
 <!ENTITY status4evar.option.download.tab "Tab">
 <!ENTITY status4evar.option.download.thirdparty "3rd Party">
