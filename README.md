@@ -1,13 +1,12 @@
 # Arctic Fox Web Browser
 
-This is a rebranded Pale Moon 27.9.4. It should be built with the 10.7 SDK to function properly on Mac OS X 10.6 Snow Leopard.
+Arctic Fox is a forked and rebranded Pale Moon 27.9.4.
 The goal here is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.8, PowerPC's running Linux, Win7, etc.
 
-Arctic Fox will build for Windows 7 and up, x86/x64/PowerPC Linux, and more than likely any other unix/bsd varient as well.
+Arctic Fox will build for Mac OS X 10.6 and up, Windows 7 and up, x86/x64/PowerPC Linux, and more than likely any other unix/bsd varient as well. Ideally, we'd like to get it working on 32-bit OS X and PPC 10.5 also.
 
 * To build on MacOSX:
-* Requires 10.7 Lion and 10.7 SDK minimum to build. Will fail on 10.6 due to missing frameworks in the 10.6 SDK. 
-* It will also build on 10.6 IF you use the 10.7 SDK.
+* Requires OS X 10.6 as a minimum build environment.
 * Install xcode, command line tools and macports. 
 * Install these via macports: 
 * sudo port -v install autoconf213 python27 libidl ccache yasm clang-3.7 (clang-3.7 is the minimum known to work). 
