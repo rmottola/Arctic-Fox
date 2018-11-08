@@ -1,7 +1,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-ff-dbg
 mk_add_options MOZ_UNIFY_BDATE=1
 
 DARWIN_VERSION=`uname -r`
@@ -13,8 +13,8 @@ ac_add_app_options x86_64 --with-unify-dist=../i386/dist
 ac_add_options --disable-crashreporter
 ac_add_options --disable-tests
 ac_add_options --disable-debug
-ac_add_options --enable-updater
-ac_add_options --disable-mozril-geoloc
+ac_add_options --disable-updater
+ac_add_options --disable-applemedia
 ac_add_options --disable-webrtc
 ac_add_options --disable-safe-browsing
 ac_add_options --disable-necko-wifi
@@ -23,10 +23,9 @@ ac_add_options --disable-gamepad
 ac_add_options --enable-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
-ac_add_options '--enable-optimize=-O2 -march=core2 -mtune=generic -w'
-ac_add_options --with-macos-sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
-
-. $topsrcdir/build/macosx/mozconfig.common
+ac_add_options --enable-optimize
+ac_add_options --with-macos-sdk=/Developer/SDKs/MacOSX10.7.sdk
+. $topsrcdir/build/macosx/universal/mozconfig
 
 # $MOZ_BUILD_APP is only defined when sourced by configure.  That's not a
 # problem, because the variables it affects only need to be set for
@@ -60,7 +59,7 @@ if test "$MOZ_BUILD_APP" = "i386" -o "$MOZ_BUILD_APP" = "x86_64"; then
   # universal binary will be produced.  The exception is packager.mk, which
   # needs to know to look for universal bits when building the .dmg.
   UNIVERSAL_BINARY=1
-
+  export MACOSX_DEPLOYMENT_TARGET=10.6
   export CC CXX HOST_CC HOST_CXX RANLIB AR AS LD STRIP OTOOL
 fi
 fi
