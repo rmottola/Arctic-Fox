@@ -93,7 +93,7 @@ pref("canvas.poisondata", true);  //Enable canvas anti-fingerprinting by default
 
 // ===| Plugins |==============================================================
 
-pref("plugin.default.state", 2); //Allow plugins to run by default
+pref("plugin.default.state", 0); //Disable plugins by default
 pref("plugin.expose_full_path", true); //Security: expose the full path to the plugin
 pref("dom.ipc.plugins.timeoutSecs", 20);
 
