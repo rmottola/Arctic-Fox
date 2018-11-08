@@ -1,0 +1,23 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+mk_add_options MOZ_UNIFY_BDATE=1
+
+ac_add_options --disable-crashreporter
+ac_add_options --disable-tests
+ac_add_options --disable-debug
+ac_add_options --disable-updater
+ac_add_options --disable-applemedia
+ac_add_options --disable-webrtc
+ac_add_options --disable-safe-browsing
+ac_add_options --disable-necko-wifi
+ac_add_options --disable-eme
+ac_add_options --disable-gamepad
+ac_add_options --enable-strip
+ac_add_options --enable-application=browser
+ac_add_options --with-branding=browser/branding/arcticfox
+ac_add_options --enable-optimize
+ac_add_options --with-macos-sdk=/Developer/SDKs/MacOSX10.6.sdk
+. $topsrcdir/build/macosx/mozconfig.common
+
