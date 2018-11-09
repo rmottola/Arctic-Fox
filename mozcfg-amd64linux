@@ -2,13 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-mk_add_options MOZ_UNIFY_BDATE=1
+export CC="gcc-6.5.0"
+export CXX="g++-6.5.0"
 
-DARWIN_VERSION=`uname -r`
-ac_add_app_options i386 --target=i386-apple-darwin$DARWIN_VERSION
-ac_add_app_options x86_64 --target=x86_64-apple-darwin$DARWIN_VERSION
-ac_add_app_options i386 --with-unify-dist=../x86_64/dist
-ac_add_app_options x86_64 --with-unify-dist=../i386/dist
+mk_add_options MOZ_UNIFY_BDATE=1
 
 ac_add_options --disable-crashreporter
 ac_add_options --disable-tests
@@ -20,11 +17,11 @@ ac_add_options --disable-safe-browsing
 ac_add_options --disable-necko-wifi
 ac_add_options --disable-eme
 ac_add_options --disable-gamepad
+ac_add_options --disable-pulseaudio
 ac_add_options --enable-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
 ac_add_options '--enable-optimize=-O2 -march=core2 -mtune=generic -w'
-ac_add_options --with-macos-sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
 
 . $topsrcdir/build/macosx/mozconfig.common
 

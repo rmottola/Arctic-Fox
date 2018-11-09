@@ -1,0 +1,33 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+export CC="gcc -flax-vector-conversions -O3 -mcpu=7450 -mtune=7450 -maltivec -mabi=altivec -falign-loops=16 -falign-functions=16 -falign-labels=16 -falign-jumps=16"
+export CXX="g++ -flax-vector-conversions -fpermissive -O3 -mcpu=7450 -mtune=7450 -maltivec -mabi=altivec -falign-loops=16 -falign-functions=16 -falign-labels=16 -falign-jumps=16"
+export LDFLAGS="-latomic"
+
+mk_add_options MOZ_MAKE_FLAGS="-s -j2"
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-ff-dbg
+
+ac_add_options --disable-crashreporter
+ac_add_options --disable-tests
+ac_add_options --disable-debug
+ac_add_options --disable-updater
+ac_add_options --disable-mozril-geoloc
+ac_add_options --disable-webrtc
+ac_add_options --disable-safe-browsing
+ac_add_options --disable-parental-controls
+ac_add_options --enable-release
+ac_add_options --disable-necko-wifi
+ac_add_options --disable-eme
+ac_add_options --disable-gamepad
+ac_add_options --disable-dbus
+ac_add_options --disable-gio
+ac_add_options --disable-pulseaudio
+ac_add_options --enable-strip
+ac_add_options --enable-install-strip
+ac_add_options --enable-application=browser
+ac_add_options --with-branding=browser/branding/arcticfox
+ac_add_options --enable-optimize
+
+
