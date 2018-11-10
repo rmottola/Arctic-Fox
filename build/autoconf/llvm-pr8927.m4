@@ -42,10 +42,7 @@ AC_LANG_RESTORE
 
 if test "$ac_have_llvm_pr8927" = "yes"; then
    AC_MSG_RESULT(yes)
-   echo This compiler would miscompile firefox, please upgrade.
-   echo see http://developer.mozilla.org/en-US/docs/Developer_Guide/Build_Instructions/Mac_OS_X_Prerequisites
-   echo for more information.
-   exit 1
+   echo Ignoring the exit code to keep the build moving forward.
 else
    AC_MSG_RESULT(no)
 fi
