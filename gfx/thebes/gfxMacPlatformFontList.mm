@@ -637,12 +637,16 @@ gfxMacPlatformFontList::gfxMacPlatformFontList() :
     ActivateBundledFonts();
 #endif
 
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     ::CFNotificationCenterAddObserver(::CFNotificationCenterGetLocalCenter(),
                                       this,
                                       RegisteredFontsChangedNotificationCallback,
                                       kCTFontManagerRegisteredFontsChangedNotification,
                                       0,
                                       CFNotificationSuspensionBehaviorDeliverImmediately);
+#else
+   // FIXME implement perhaps from ATS like in TFF?
+#endif
 
     // cache this in a static variable so that MacOSFontFamily objects
     // don't have to repeatedly look it up
@@ -669,8 +673,24 @@ gfxMacPlatformFontList::InitFontList()
     
     // iterate over available families
 
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     CFArrayRef familyNames = CTFontManagerCopyAvailableFontFamilyNames();
+#else
+   uint32_t count, fdCount;
+   CTFontCollectionRef collection = CTFontCollectionCreateFromAvailableFonts(NULL);
+   CFArrayRef fontDescriptors = CTFontCollectionCreateMatchingFontDescriptors(collection);
 
+   fdCount = CFArrayGetCount(fontDescriptors);
+   CFMutableArrayRef familyNames = CFArrayCreateMutable(NULL, fdCount, &kCFTypeArrayCallBacks);
+   for (count = 0; count < fdCount; count++) {
+     CTFontDescriptorRef fd = (CTFontDescriptorRef)CFArrayGetValueAtIndex(fontDescriptors, count);
+     CFStringRef familyName = (CFStringRef)CTFontDescriptorCopyAttribute(fd, kCTFontFamilyNameAttribute);
+     CFArrayAppendValue(familyNames, familyName);
+   }
+
+   CFRelease(fontDescriptors);
+   CFRelease(collection);
+#endif
     // iterate over families
     uint32_t i, numFamilies;
 
@@ -794,9 +814,11 @@ gfxMacPlatformFontList::RegisteredFontsChangedNotificationCallback(CFNotificatio
                                                                    const void *object,
                                                                    CFDictionaryRef userInfo)
 {
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     if (!::CFEqual(name, kCTFontManagerRegisteredFontsChangedNotification)) {
         return;
     }
+#endif
 
     gfxMacPlatformFontList* fl = static_cast<gfxMacPlatformFontList*>(observer);
 
