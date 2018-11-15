@@ -83,6 +83,7 @@ pref("extensions.getAddons.cache.enabled", false);
 
 pref("dom.disable_window_status_change", false); //Allow status feedback by default
 pref("dom.messageChannel.enabled", true); //Fix google captchas and craigslist reply button
+pref("dom.fetch.enabled", true); //Fix for github.com as it is now using fetch API
 // Set max script runtimes to sane values
 pref("dom.max_chrome_script_run_time", 90); //Some addons need ample time!
 pref("dom.max_script_run_time", 20); //Should be plenty for a page script to do what it needs
