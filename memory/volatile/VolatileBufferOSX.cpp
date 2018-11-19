@@ -47,7 +47,14 @@ VolatileBuffer::Init(size_t aSize, size_t aAlignment)
   }
 
 heap_alloc:
+#if defined(HAVE_POSIX_MEMALIGN)
   (void)moz_posix_memalign(&mBuf, aAlignment, aSize);
+#else
+  // Mac is 16 bytes aligned
+  if(MOZ_UNLIKELY(aAlignment > 16))
+    fprintf(stderr, "Warning: volatile alignment %i.\n", aAlignment);
+  mBuf = malloc(aSize);
+#endif
   mHeap = true;
   return !!mBuf;
 }

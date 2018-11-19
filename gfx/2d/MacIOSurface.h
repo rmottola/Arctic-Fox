@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include "mozilla/RefPtr.h"
 
+typedef uint32_t IOSurfaceID;
 typedef CFTypeRef IOSurfacePtr;
 typedef IOSurfacePtr (*IOSurfaceCreateFunc) (CFDictionaryRef properties);
 typedef IOSurfacePtr (*IOSurfaceLookupFunc) (uint32_t io_surface_id);
@@ -49,7 +50,6 @@ struct _CGLContextObject;
 typedef _CGLContextObject* CGLContextObj;
 typedef struct CGContext* CGContextRef;
 typedef struct CGImage* CGImageRef;
-typedef uint32_t IOSurfaceID;
 
 enum CGContextType {
   CG_CONTEXT_TYPE_UNKNOWN = 0,
