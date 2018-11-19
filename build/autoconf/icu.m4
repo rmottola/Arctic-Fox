@@ -179,7 +179,7 @@ if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
          export CXXFLAGS="$HOST_ICU_CXXFLAGS $HOST_OPTIMIZE_FLAGS"
          export LDFLAGS="$HOST_LDFLAGS"
          ac_configure_args="$HOST_ICU_BUILD_OPTS"
-         ac_configure_args="$ac_configure_args --enable-static --disable-shared --enable-extras=no --enable-icuio=no --enable-layout=no --enable-tests=no --enable-samples=no"
+         ac_configure_args="$ac_configure_args --enable-static --disable-shared --disable-extras --disable-icuio --disable-layout --disable-layoutex --disable-tests --disable-samples --disable-strict"
          AC_OUTPUT_SUBDIRS_NOW(intl/icu/source:intl/icu/host)
         ) || exit 1
     	# generate config/icucross.mk
@@ -286,7 +286,7 @@ if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
          export CXXFLAGS="$ICU_CXXFLAGS"
          export LDFLAGS="$ICU_LDFLAGS $LDFLAGS"
          ac_configure_args="$ICU_BUILD_OPTS $ICU_CROSS_BUILD_OPT $ICU_LINK_OPTS $ICU_TARGET_OPT"
-         ac_configure_args="$ac_configure_args --disable-extras --disable-icuio --disable-layout --disable-tests --disable-samples"
+         ac_configure_args="$ac_configure_args --disable-extras --disable-icuio --disable-layout --disable-layoutex --disable-tests --disable-samples"
          AC_OUTPUT_SUBDIRS(intl/icu/source:intl/icu/target)
         ) || exit 1
     fi
