@@ -1763,10 +1763,10 @@ GetCallbackFromCallbackObject(T& aObj)
 }
 
 static inline bool
-InternJSString(JSContext* cx, jsid& id, const char* chars)
+InternJSString(JSContext* cx, jsid& jid, const char* chars)
 {
   if (JSString *str = ::JS_InternString(cx, chars)) {
-    id = INTERNED_STRING_TO_JSID(cx, str);
+    jid = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
   return false;
@@ -3096,26 +3096,26 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
  */
 class InternedStringId
 {
-  jsid id;
+  jsid jid;
 
  public:
-  InternedStringId() : id(JSID_VOID) {}
+  InternedStringId() : jid(JSID_VOID) {}
 
   bool init(JSContext *cx, const char *string) {
     JSString* str = JS_InternString(cx, string);
     if (!str)
       return false;
-    id = INTERNED_STRING_TO_JSID(cx, str);
+    jid = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
 
   operator const jsid& () {
-    return id;
+    return jid;
   }
 
   operator JS::Handle<jsid> () {
     /* This is safe because we have interned the string. */
-    return JS::Handle<jsid>::fromMarkedLocation(&id);
+    return JS::Handle<jsid>::fromMarkedLocation(&jid);
   }
 };
 
