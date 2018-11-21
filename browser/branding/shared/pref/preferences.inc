@@ -5,7 +5,7 @@
 
 pref("startup.homepage_welcome_url","about:");
 
-pref("app.vendorURL", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
+pref("app.vendorURL", "https://github.com/wicknix/Arctic-Fox/wiki");
 pref("browser.getdevtools.url","https://@APO_AM_URL@/external/devtools");
 
 // User Interface
@@ -32,7 +32,7 @@ pref("browser.altClickSave", true); //SBaD,M! (#2)
 // ===| Application Update Service |===========================================
 
 pref("app.update.auto", false);
-pref("app.update.url", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
+pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki");
 
 // The time interval between the downloading of mar file chunks in the
 // background (in seconds)
