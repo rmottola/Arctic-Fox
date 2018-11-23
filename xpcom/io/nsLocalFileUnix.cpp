@@ -13,7 +13,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#if !defined(XP_MACOSX)
+#if !defined(XP_MACOSX) && !defined(__FreeBSD__)
 #include <sys/sysmacros.h> // No longer implicitly included in later glibc
 #endif
 #include <unistd.h>
