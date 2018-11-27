@@ -1812,11 +1812,7 @@ public:
   nsTArray() {}
   explicit nsTArray(size_type aCapacity) : base_type(aCapacity) {}
   explicit nsTArray(const nsTArray& aOther) : base_type(aOther) {}
-#if defined(__clang__)
   MOZ_IMPLICIT nsTArray(nsTArray&& aOther) : base_type(mozilla::Move(aOther)) {}
-#else
-  explicit nsTArray(nsTArray&& aOther) : base_type(mozilla::Move(aOther)) {}
-#endif
 
   template<class Allocator>
   explicit nsTArray(const nsTArray_Impl<E, Allocator>& aOther)

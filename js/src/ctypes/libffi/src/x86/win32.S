@@ -1142,7 +1142,6 @@ L_ffi_closure_SYSV_inner$stub:
 
 #if defined(X86_WIN32) && !defined(__OS2__)
 	.section	.eh_frame,"w"
-#endif
 .Lframe1:
 .LSCIE1:
 	.long	.LECIE1-.LASCIE1  /* Length of Common Information Entry */
@@ -1301,6 +1300,7 @@ L_ffi_closure_SYSV_inner$stub:
 	/* End of DW_CFA_xxx CFI instructions.  */
 	.align 4
 .LEFDE5:
+#endif /* defined(X86_WIN32) && !defined(__OS2__), for the eh_frame */
 
 #endif /* !_MSC_VER */
 

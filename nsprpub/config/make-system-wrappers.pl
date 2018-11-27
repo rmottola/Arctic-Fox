@@ -19,7 +19,9 @@ while (<STDIN>) {
     open OUT, ">$output_dir/$_";
     print OUT "#pragma GCC system_header\n";  # suppress include_next warning
     print OUT "#pragma GCC visibility push(default)\n";
+    print OUT "#define _GLIBCXX_INCLUDE_NEXT_C_HEADERS\n";
     print OUT "#include_next \<$_\>\n";
+    print OUT "#undef _GLIBCXX_INCLUDE_NEXT_C_HEADERS\n";
     print OUT "#pragma GCC visibility pop\n";
     close OUT;
 }
