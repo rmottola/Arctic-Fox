@@ -5,7 +5,7 @@
 
 pref("startup.homepage_welcome_url","about:");
 
-pref("app.vendorURL", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
+pref("app.vendorURL", "https://github.com/wicknix/Arctic-Fox/wiki");
 pref("browser.getdevtools.url","https://@APO_AM_URL@/external/devtools");
 
 // User Interface
@@ -32,7 +32,7 @@ pref("browser.altClickSave", true); //SBaD,M! (#2)
 // ===| Application Update Service |===========================================
 
 pref("app.update.auto", false);
-pref("app.update.url", "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb");
+pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki");
 
 // The time interval between the downloading of mar file chunks in the
 // background (in seconds)
@@ -83,6 +83,7 @@ pref("extensions.getAddons.cache.enabled", false);
 
 pref("dom.disable_window_status_change", false); //Allow status feedback by default
 pref("dom.messageChannel.enabled", true); //Fix google captchas and craigslist reply button
+pref("dom.fetch.enabled", true); //Fix for github.com as it is now using fetch API
 // Set max script runtimes to sane values
 pref("dom.max_chrome_script_run_time", 90); //Some addons need ample time!
 pref("dom.max_script_run_time", 20); //Should be plenty for a page script to do what it needs

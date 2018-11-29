@@ -10,14 +10,14 @@
 # instead of BrandFullName and typically should not be modified.
 !define BrandFullNameInternal "Arctic Fox"
 !define URLInfoAbout          "about:buildconfig"
-!define URLUpdateInfo         "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb"
+!define URLUpdateInfo         "https://github.com/wicknix/Arctic-Fox/wiki/Downloads"
 
 ; The OFFICIAL define is a workaround to support different urls for Release and
 ; Beta since they share the same branding when building with other branches that
 ; set the update channel to beta.
 !define OFFICIAL
 !define URLStubDownload ""
-!define URLManualDownload "https://drive.google.com/drive/folders/1O4I0v611mNdkXPMZs4xI4qWUhXqGzPJb"
+!define URLManualDownload "https://github.com/wicknix/Arctic-Fox/wiki/Downloads"
 !define Channel "unstable"
 
 
