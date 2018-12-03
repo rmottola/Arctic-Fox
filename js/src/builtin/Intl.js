@@ -1899,6 +1899,7 @@ var currencyDigits = {
     TND: 3,
     UGX: 0,
     UYI: 0,
+    UYW: 4,
     VND: 0,
     VUV: 0,
     XAF: 0,
