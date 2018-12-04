@@ -40,6 +40,8 @@ public:
            nsContentPolicyType aContentPolicyType,
            nsIURI* aBaseURI = nullptr);
 
+  void SetIsFromProcessingFrameAttributes();
+
 private:
   // private constructor that is only allowed to be called from within
   // HttpChannelParent and FTPChannelParent declared as friends undeneath.
@@ -63,6 +65,11 @@ private:
   nsContentPolicyType mContentPolicyType;
   nsCOMPtr<nsIURI> mBaseURI;
   uint32_t mInnerWindowID;
+
+  // Is true if this load was triggered by processing the attributes of the
+  // browsing context container.
+  // See nsILoadInfo.isFromProcessingFrameAttributes
+  bool                             mIsFromProcessingFrameAttributes;
 };
 
 } // namespace mozilla

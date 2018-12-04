@@ -30,6 +30,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mBaseURI(aBaseURI)
   , mInnerWindowID(aLoadingContext ?
                      aLoadingContext->OwnerDoc()->InnerWindowID() : 0)
+  , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
@@ -55,6 +56,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mSecurityFlags(aSecurityFlags)
   , mContentPolicyType(aContentPolicyType)
   , mInnerWindowID(aInnerWindowID)
+  , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
@@ -157,6 +159,20 @@ NS_IMETHODIMP
 LoadInfo::GetInnerWindowID(uint32_t* aResult)
 {
   *aResult = mInnerWindowID;
+  return NS_OK;
+}
+
+void
+LoadInfo::SetIsFromProcessingFrameAttributes()
+{
+  mIsFromProcessingFrameAttributes = true;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttributes)
+{
+  MOZ_ASSERT(aIsFromProcessingFrameAttributes);
+  *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
   return NS_OK;
 }
 
