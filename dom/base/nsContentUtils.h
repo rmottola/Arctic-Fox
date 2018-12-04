@@ -906,6 +906,66 @@ public:
    */
   static nsIContentPolicy *GetContentPolicy();
 
+/**
+   * Map internal content policy types to external ones.
+   */
+  static nsContentPolicyType InternalContentPolicyTypeToExternal(nsContentPolicyType aType);
+
+  /**
+   * Map internal content policy types to external ones or script types or preload types:
+   *   * TYPE_INTERNAL_SCRIPT
+   *   * TYPE_INTERNAL_WORKER
+   *   * TYPE_INTERNAL_SHARED_WORKER
+   *   * TYPE_INTERNAL_SERVICE_WORKER
+   *   * TYPE_INTERNAL_SCRIPT_PRELOAD
+   *   * TYPE_INTERNAL_IMAGE_PRELOAD
+   *   * TYPE_INTERNAL_STYLESHEET_PRELOAD
+   *
+   * Note: DO NOT call this function unless you know what you're doing!
+   */
+  static nsContentPolicyType InternalContentPolicyTypeToExternalOrMCBInternal(nsContentPolicyType aType);
+
+  /**
+   * Map internal content policy types to external ones or preload types:
+   *   * TYPE_INTERNAL_SCRIPT_PRELOAD
+   *   * TYPE_INTERNAL_IMAGE_PRELOAD
+   *   * TYPE_INTERNAL_STYLESHEET_PRELOAD
+   *
+   * Note: DO NOT call this function unless you know what you're doing!
+   */
+  static nsContentPolicyType InternalContentPolicyTypeToExternalOrPreload(nsContentPolicyType aType);
+
+  /**
+   * Map internal content policy types to external ones, worker, or preload types:
+   *   * TYPE_INTERNAL_WORKER
+   *   * TYPE_INTERNAL_SHARED_WORKER
+   *   * TYPE_INTERNAL_SERVICE_WORKER
+   *   * TYPE_INTERNAL_SCRIPT_PRELOAD
+   *   * TYPE_INTERNAL_IMAGE_PRELOAD
+   *   * TYPE_INTERNAL_STYLESHEET_PRELOAD
+   *
+   * Note: DO NOT call this function unless you know what you're doing!
+   */
+  static nsContentPolicyType InternalContentPolicyTypeToExternalOrCSPInternal(nsContentPolicyType aType);
+
+  /**
+   * Map internal content policy types to external ones, worker, or preload types:
+   *   * TYPE_INTERNAL_WORKER
+   *   * TYPE_INTERNAL_SHARED_WORKER
+   *   * TYPE_INTERNAL_SERVICE_WORKER
+   *
+   * Note: DO NOT call this function unless you know what you're doing!
+   */
+  static nsContentPolicyType InternalContentPolicyTypeToExternalOrWorker(nsContentPolicyType aType);
+
+  /**
+   * Returns true if the content policy type is any of:
+   *   * TYPE_INTERNAL_SCRIPT_PRELOAD
+   *   * TYPE_INTERNAL_IMAGE_PRELOAD
+   *   * TYPE_INTERNAL_STYLESHEET_PRELOAD
+   */
+  static bool IsPreloadType(nsContentPolicyType aType);
+
   /**
    * Quick helper to determine whether there are any mutation listeners
    * of a given type that apply to this content or any of its ancestors.

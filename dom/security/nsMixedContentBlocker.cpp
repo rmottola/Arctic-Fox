@@ -251,7 +251,7 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
     return NS_OK;
   }
 
-  uint32_t contentPolicyType = loadInfo->GetContentPolicyType();
+  uint32_t contentPolicyType = loadInfo->InternalContentPolicyType();
   nsCOMPtr<nsIPrincipal> requestingPrincipal = loadInfo->LoadingPrincipal();
 
   // Since we are calling shouldLoad() directly on redirects, we don't go through the code
@@ -270,7 +270,7 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   }
 
   int16_t decision = REJECT_REQUEST;
-  rv = ShouldLoad(contentPolicyType,
+  rv = ShouldLoad(nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(contentPolicyType),
                   newUri,
                   requestingLocation,
                   loadInfo->LoadingNode(),
@@ -304,6 +304,19 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
   // and unlock sBlockMixedScript and sBlockMixedDisplay before reading/writing
   // to them.
   MOZ_ASSERT(NS_IsMainThread());
+
+  MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(aContentType),
+             "We should only see external content policy types here.");
+
+  bool isPreload = nsContentUtils::IsPreloadType(aContentType);
+
+  // The content policy type that we receive may be an internal type for
+  // scripts.  Let's remember if we have seen a worker type, and reset it to the
+  // external type in all cases right now.
+  bool isWorkerType = aContentType == nsIContentPolicy::TYPE_INTERNAL_WORKER ||
+                      aContentType == nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER ||
+                      aContentType == nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER;
+  aContentType = nsContentUtils::InternalContentPolicyTypeToExternal(aContentType);
 
   // Assume active (high risk) content and blocked by default
   MixedContentTypes classification = eMixedScript;
@@ -738,6 +751,9 @@ nsMixedContentBlocker::ShouldProcess(uint32_t aContentType,
                                      nsIPrincipal* aRequestPrincipal,
                                      int16_t* aDecision)
 {
+  MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
+             "We should only see external content policy types here.");
+
   if (!aContentLocation) {
     // aContentLocation may be null when a plugin is loading without an associated URI resource
     if (aContentType == TYPE_OBJECT) {

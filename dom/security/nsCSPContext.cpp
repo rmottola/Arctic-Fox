@@ -113,6 +113,12 @@ nsCSPContext::ShouldLoad(nsContentPolicyType aContentType,
   }
 #endif
 
+  // Since we know whether we are dealing with a preload, we have to convert
+  // the internal policytype ot the external policy type before moving on.
+  // We still need to know if this is a worker so child-src can handle that
+  // case correctly.
+  aContentType = nsContentUtils::InternalContentPolicyTypeToExternalOrWorker(aContentType);
+
   nsresult rv = NS_OK;
 
   // This ShouldLoad function is called from nsCSPService::ShouldLoad,

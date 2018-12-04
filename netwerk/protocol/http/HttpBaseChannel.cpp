@@ -2639,6 +2639,14 @@ HttpBaseChannel::GetPerformance()
     if (!pDomWindow) {
         return nullptr;
     }
+
+    if (mLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_SUBDOCUMENT &&
+        !mLoadInfo->GetIsFromProcessingFrameAttributes()) {
+      // We only report loads caused by processing the attributes of the
+      // browsing context container.
+      return nullptr;
+    }
+
     if (!pDomWindow->IsInnerWindow()) {
         pDomWindow = pDomWindow->GetCurrentInnerWindow();
         if (!pDomWindow) {
