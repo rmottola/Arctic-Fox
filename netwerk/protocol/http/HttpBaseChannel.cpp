@@ -2640,9 +2640,7 @@ HttpBaseChannel::GetPerformance()
         return nullptr;
     }
 
-    // XXX  FIXME RM 2018-12-04 we do not implement internal/external policies yet
-    // if (mLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_SUBDOCUMENT &&
-    if (mLoadInfo->GetContentPolicyType() == nsIContentPolicy::TYPE_SUBDOCUMENT &&
+    if (mLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_SUBDOCUMENT &&
         !mLoadInfo->GetIsFromProcessingFrameAttributes()) {
       // We only report loads caused by processing the attributes of the
       // browsing context container.

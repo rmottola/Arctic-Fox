@@ -13,12 +13,15 @@
 #include "nsISupports.h"
 #include "nsXPCOM.h"
 #include "nsContentPolicyUtils.h"
+#include "mozilla/dom/nsCSPService.h"
 #include "nsContentPolicy.h"
 #include "nsIURI.h"
 #include "nsIDOMNode.h"
 #include "nsIDOMWindow.h"
 #include "nsIContent.h"
 #include "nsCOMArray.h"
+#include "mozilla/dom/nsMixedContentBlocker.h"
+
 
 NS_IMPL_ISUPPORTS(nsContentPolicy, nsIContentPolicy)
 
@@ -111,6 +114,21 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
             requestingLocation = doc->GetDocumentURI();
         }
     }
+
+    nsContentPolicyType externalType =
+        nsContentUtils::InternalContentPolicyTypeToExternal(contentType);
+
+    nsContentPolicyType externalTypeOrMCBInternal =
+        nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(contentType);
+
+    nsContentPolicyType externalTypeOrCSPInternal =
+       nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(contentType);
+
+    nsCOMPtr<nsIContentPolicy> mixedContentBlocker =
+        do_GetService(NS_MIXEDCONTENTBLOCKER_CONTRACTID);
+
+    nsCOMPtr<nsIContentPolicy> cspService =
+      do_GetService(CSPSERVICE_CONTRACTID);
 
     /* 
      * Enumerate mPolicies and ask each of them, taking the logical AND of

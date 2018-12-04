@@ -347,7 +347,7 @@ NS_NewChannelInternal(nsIChannel**           outChannel,
                                       aLoadInfo->LoadingPrincipal(),
                                       aLoadInfo->TriggeringPrincipal(),
                                       aLoadInfo->GetSecurityFlags(),
-                                      aLoadInfo->GetContentPolicyType(),
+                                      aLoadInfo->InternalContentPolicyType(), // XXX RM 2018/12/04 unsure if this is correct
                                       aLoadGroup,
                                       aCallbacks,
                                       aLoadFlags,

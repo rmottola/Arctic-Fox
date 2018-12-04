@@ -24,7 +24,7 @@ nsWebBrowserContentPolicy::~nsWebBrowserContentPolicy()
 NS_IMPL_ISUPPORTS(nsWebBrowserContentPolicy, nsIContentPolicy)
 
 NS_IMETHODIMP
-nsWebBrowserContentPolicy::ShouldLoad(uint32_t          contentType,
+nsWebBrowserContentPolicy::ShouldLoad(uint32_t          aContentType,
                                       nsIURI           *contentLocation,
                                       nsIURI           *requestingLocation,
                                       nsISupports      *requestingContext,
@@ -34,6 +34,9 @@ nsWebBrowserContentPolicy::ShouldLoad(uint32_t          contentType,
                                       int16_t          *shouldLoad)
 {
     NS_PRECONDITION(shouldLoad, "Null out param");
+
+    MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
+               "We should only see external content policy types here.");
 
     *shouldLoad = nsIContentPolicy::ACCEPT;
 
@@ -46,7 +49,7 @@ nsWebBrowserContentPolicy::ShouldLoad(uint32_t          contentType,
     nsresult rv;
     bool allowed = true;
 
-    switch (contentType) {
+    switch (aContentType) {
       case nsIContentPolicy::TYPE_SCRIPT:
         rv = shell->GetAllowJavascript(&allowed);
         break;
@@ -74,7 +77,7 @@ nsWebBrowserContentPolicy::ShouldLoad(uint32_t          contentType,
 }
 
 NS_IMETHODIMP
-nsWebBrowserContentPolicy::ShouldProcess(uint32_t          contentType,
+nsWebBrowserContentPolicy::ShouldProcess(uint32_t          aContentType,
                                          nsIURI           *contentLocation,
                                          nsIURI           *requestingLocation,
                                          nsISupports      *requestingContext,
@@ -85,12 +88,16 @@ nsWebBrowserContentPolicy::ShouldProcess(uint32_t          contentType,
 {
     NS_PRECONDITION(shouldProcess, "Null out param");
 
+
+    MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
+               "We should only see external content policy types here.");
+
     *shouldProcess = nsIContentPolicy::ACCEPT;
 
     // Object tags will always open channels with TYPE_OBJECT, but may end up
     // loading with TYPE_IMAGE or TYPE_DOCUMENT as their final type, so we block
     // actual-plugins at the process stage
-    if (contentType != nsIContentPolicy::TYPE_OBJECT) {
+    if (aContentType != nsIContentPolicy::TYPE_OBJECT) {
         return NS_OK;
     }
 

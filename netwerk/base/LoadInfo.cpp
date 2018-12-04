@@ -26,7 +26,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                            aTriggeringPrincipal : mLoadingPrincipal.get())
   , mLoadingContext(do_GetWeakReference(aLoadingContext))
   , mSecurityFlags(aSecurityFlags)
-  , mContentPolicyType(aContentPolicyType)
+  , mInternalContentPolicyType(aContentPolicyType)
   , mBaseURI(aBaseURI)
   , mInnerWindowID(aLoadingContext ?
                      aLoadingContext->OwnerDoc()->InnerWindowID() : 0)
@@ -54,7 +54,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   : mLoadingPrincipal(aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
-  , mContentPolicyType(aContentPolicyType)
+  , mInternalContentPolicyType(aContentPolicyType)
   , mInnerWindowID(aInnerWindowID)
   , mIsFromProcessingFrameAttributes(false)
 {
@@ -135,10 +135,16 @@ LoadInfo::GetLoadingSandboxed(bool* aLoadingSandboxed)
 }
 
 NS_IMETHODIMP
-LoadInfo::GetContentPolicyType(nsContentPolicyType* aResult)
+LoadInfo::GetExternalContentPolicyType(nsContentPolicyType* aResult)
 {
-  *aResult = mContentPolicyType;
+  *aResult = nsContentUtils::InternalContentPolicyTypeToExternal(mInternalContentPolicyType);
   return NS_OK;
+}
+
+nsContentPolicyType
+LoadInfo::InternalContentPolicyType()
+{
+  return mInternalContentPolicyType;
 }
 
 NS_IMETHODIMP

@@ -1377,14 +1377,14 @@ ProcessXCTO(nsHttpResponseHead* aResponseHead, nsILoadInfo* aLoadInfo)
     nsAFlatCString contentType = aResponseHead->ContentType();
 
     // 3) Compare the expected MIME type with the actual type
-    if (aLoadInfo->GetContentPolicyType() == nsIContentPolicy::TYPE_STYLESHEET) {
+    if (aLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_STYLESHEET) {
         if (contentType.EqualsLiteral(TEXT_CSS)) {
             return NS_OK;
         }
         return NS_ERROR_CORRUPTED_CONTENT;
     }
 
-    if (aLoadInfo->GetContentPolicyType() == nsIContentPolicy::TYPE_SCRIPT) {
+    if (aLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_SCRIPT) {
         if (nsContentUtils::IsJavascriptMIMEType(NS_ConvertUTF8toUTF16(contentType))) {
             return NS_OK;
         }

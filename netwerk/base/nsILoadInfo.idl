@@ -153,20 +153,37 @@ interface nsILoadInfo : nsISupports
   [infallible] readonly attribute boolean loadingSandboxed;
 
   /**
-   * The contentPolicyType of the channel, used for security checks
+   * The external contentPolicyType of the channel, used for security checks
    * like Mixed Content Blocking and Content Security Policy.
+   *
+   * Specifically, content policy types with _INTERNAL_ in their name will
+   * never get returned from this attribute.
    */
-  readonly attribute nsContentPolicyType contentPolicyType;
+  readonly attribute nsContentPolicyType externalContentPolicyType;
 
 %{ C++
-  inline nsContentPolicyType GetContentPolicyType()
+  inline nsContentPolicyType GetExternalContentPolicyType()
   {
     nsContentPolicyType result;
-    mozilla::DebugOnly<nsresult> rv = GetContentPolicyType(&result);
+    mozilla::DebugOnly<nsresult> rv = GetExternalContentPolicyType(&result);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     return result;
   }
 %}
+
+  /**
+   * The internal contentPolicyType of the channel, used for constructing
+   * RequestContext values when creating a fetch event for an intercepted
+   * channel.
+   *
+   * This should not be used for the purposes of security checks, since
+   * the content policy implementations cannot be expected to deal with
+   * _INTERNAL_ values.  Please use the contentPolicyType attribute above
+   * for that purpose.
+   */
+  [noscript, notxpcom]
+  nsContentPolicyType internalContentPolicyType();
+
 
   /**
    * A base URI for use in situations where it cannot otherwise be inferred.

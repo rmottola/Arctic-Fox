@@ -62,7 +62,7 @@ private:
   nsCOMPtr<nsIPrincipal> mTriggeringPrincipal;
   nsWeakPtr mLoadingContext;
   nsSecurityFlags mSecurityFlags;
-  nsContentPolicyType mContentPolicyType;
+  nsContentPolicyType mInternalContentPolicyType;
   nsCOMPtr<nsIURI> mBaseURI;
   uint32_t mInnerWindowID;
 
