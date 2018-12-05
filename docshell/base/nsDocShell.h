@@ -324,6 +324,7 @@ protected:
   nsresult DoURILoad(nsIURI* aURI,
                      nsIURI* aOriginalURI,
                      bool aLoadReplace,
+                     bool aIsFromProcessingFrameAttributes,
                      nsIURI* aReferrer,
                      bool aSendReferrer,
                      uint32_t aReferrerPolicy,

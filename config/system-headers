@@ -260,6 +260,7 @@ cairo-directfb.h
 cairo-qpainter.h
 cairo-qt.h
 #endif
+complex
 dfiff.h
 exception
 ffi.h

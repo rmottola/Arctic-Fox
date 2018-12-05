@@ -468,7 +468,7 @@ propagateLoadInfo(nsILoadInfo *aLoadInfo,
                                          &triggeringPrincipalInfo);
   wsArgs.triggeringPrincipalInfo() = triggeringPrincipalInfo;
   wsArgs.securityFlags() = aLoadInfo->GetSecurityFlags();
-  wsArgs.contentPolicyType() = aLoadInfo->GetContentPolicyType();
+  wsArgs.contentPolicyType() = aLoadInfo->InternalContentPolicyType();
   wsArgs.innerWindowID() = aLoadInfo->GetInnerWindowID();
 }
 

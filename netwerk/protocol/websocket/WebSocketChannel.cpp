@@ -3180,7 +3180,7 @@ WebSocketChannel::AsyncOpen(nsIURI *aURI,
               mLoadInfo->LoadingPrincipal(),
               mLoadInfo->TriggeringPrincipal(),
               mLoadInfo->GetSecurityFlags(),
-              mLoadInfo->GetContentPolicyType(),
+              mLoadInfo->InternalContentPolicyType(),
               getter_AddRefs(localChannel));
   NS_ENSURE_SUCCESS(rv, rv);
 

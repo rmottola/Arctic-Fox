@@ -1433,7 +1433,7 @@ propagateLoadInfo(nsILoadInfo *aLoadInfo,
     openArgs.triggeringPrincipalInfo() = triggeringPrincipalInfo;
 
     openArgs.securityFlags() = aLoadInfo->GetSecurityFlags();
-    openArgs.contentPolicyType() = aLoadInfo->GetContentPolicyType();
+    openArgs.contentPolicyType() = aLoadInfo->InternalContentPolicyType();
     openArgs.innerWindowID() = aLoadInfo->GetInnerWindowID();
     return;
   }
