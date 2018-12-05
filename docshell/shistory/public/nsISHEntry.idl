@@ -41,6 +41,18 @@ interface nsISHEntry : nsISupports
     readonly attribute nsIURI URI;
 
     /**
+     * A readonly property that returns the original URI of the current entry.
+     * If an entry is the result of a redirect this attribute holds original
+     * URI. The object returned is of type nsIURI
+     */
+    attribute nsIURI originalURI;
+
+    /**
+     *  This flag remembers whether channel has LOAD_REPLACE set.
+     */
+    attribute boolean loadReplace;
+
+    /**
      * A readonly property that returns the title
      * of the current entry.  The object returned
      * is a encoded string
@@ -323,19 +335,3 @@ interface nsISHEntryInternal : nsISupports
     "@mozilla.org/browser/session-history-entry;1"
 
 %}
-
-[scriptable, uuid(c93d6146-9cfa-4da9-b652-f64d958f3ce4)]
-interface nsISHEntry_ESR38 : nsISHEntry
-{
-    /**
-     * A readonly property that returns the original URI of the current entry.
-     * If an entry is the result of a redirect this attribute holds original
-     * URI. The object returned is of type nsIURI
-     */
-    attribute nsIURI originalURI;
-
-    /**
-     *  This flag remembers whether channel has LOAD_REPLACE set.
-     */
-    attribute boolean loadReplace;
-};

@@ -22,16 +22,15 @@ class nsSHEntryShared;
 class nsIInputStream;
 class nsIURI;
 
-class nsSHEntry final : public nsISHEntry_ESR38,
-                            public nsISHContainer,
-                            public nsISHEntryInternal
+class nsSHEntry final : public nsISHEntry,
+                        public nsISHContainer,
+                        public nsISHEntryInternal
 {
 public: 
   nsSHEntry();
   nsSHEntry(const nsSHEntry &other);
 
   NS_DECL_ISUPPORTS
-  NS_DECL_NSISHENTRY_ESR38
   NS_DECL_NSISHENTRY
   NS_DECL_NSISHENTRYINTERNAL
   NS_DECL_NSISHCONTAINER

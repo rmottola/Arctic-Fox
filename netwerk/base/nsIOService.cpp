@@ -321,7 +321,6 @@ NS_IMPL_ISUPPORTS(nsIOService,
                   nsIIOService,
                   nsIIOService2,
                   nsINetUtil,
-                  nsINetUtil_ESR_38,
                   nsISpeculativeConnect,
                   nsIObserver,
                   nsISupportsWeakReference)
