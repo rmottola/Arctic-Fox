@@ -32,6 +32,7 @@
 #include "InternalRequest.h"
 #include "InternalResponse.h"
 
+#include "nsFormData.h"
 #include "WorkerPrivate.h"
 #include "WorkerRunnable.h"
 #include "WorkerScope.h"
@@ -177,7 +178,7 @@ public:
     nsRefPtr<FetchDriver> fetch = new FetchDriver(mRequest, principal, loadGroup);
     nsIDocument* doc = mResolver->GetWorkerPrivate()->GetDocument();
     if (doc) {
-      fetch->SetReferrerPolicy(doc->GetReferrerPolicy());
+      fetch->SetDocument(doc);
     }
 
     nsresult rv = fetch->Fetch(mResolver);
@@ -234,7 +235,7 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
     nsCOMPtr<nsILoadGroup> loadGroup = doc->GetDocumentLoadGroup();
     nsRefPtr<FetchDriver> fetch =
       new FetchDriver(r, doc->NodePrincipal(), loadGroup);
-    fetch->SetReferrerPolicy(doc->GetReferrerPolicy());
+    fetch->SetDocument(doc);
     aRv = fetch->Fetch(resolver);
     if (NS_WARN_IF(aRv.Failed())) {
       return nullptr;
@@ -315,7 +316,6 @@ public:
       result.ThrowTypeError(MSG_FETCH_FAILED);
       promise->MaybeReject(result);
     }
-
     return true;
   }
 };
@@ -454,6 +454,16 @@ ExtractFromBlob(const File& aFile, nsIInputStream** aStream,
 }
 
 nsresult
+ExtractFromFormData(nsFormData& aFormData, nsIInputStream** aStream,
+                    nsCString& aContentType)
+{
+  uint64_t unusedContentLength;
+  nsAutoCString unusedCharset;
+  return aFormData.GetSendInfo(aStream, &unusedContentLength,
+                               aContentType, unusedCharset);
+}
+
+nsresult
 ExtractFromUSVString(const nsString& aStr,
                      nsIInputStream** aStream,
                      nsCString& aContentType)
@@ -503,7 +513,7 @@ ExtractFromURLSearchParams(const URLSearchParams& aParams,
 } // anonymous namespace
 
 nsresult
-ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrUSVStringOrURLSearchParams& aBodyInit,
+ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& aBodyInit,
                           nsIInputStream** aStream,
                           nsCString& aContentType)
 {
@@ -518,6 +528,9 @@ ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrUSVStr
   } else if (aBodyInit.IsBlob()) {
     const File& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
+  } else if (aBodyInit.IsFormData()) {
+    nsFormData& form = aBodyInit.GetAsFormData();
+    return ExtractFromFormData(form, aStream, aContentType);
   } else if (aBodyInit.IsUSVString()) {
     nsAutoString str;
     str.Assign(aBodyInit.GetAsUSVString());
@@ -532,7 +545,7 @@ ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrUSVStr
 }
 
 nsresult
-ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrUSVStringOrURLSearchParams& aBodyInit,
+ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& aBodyInit,
                           nsIInputStream** aStream,
                           nsCString& aContentType)
 {
@@ -547,6 +560,9 @@ ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrUSVStringOrU
   } else if (aBodyInit.IsBlob()) {
     const File& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
+  } else if (aBodyInit.IsFormData()) {
+    nsFormData& form = aBodyInit.GetAsFormData();
+    return ExtractFromFormData(form, aStream, aContentType);
   } else if (aBodyInit.IsUSVString()) {
     nsAutoString str;
     str.Assign(aBodyInit.GetAsUSVString());
