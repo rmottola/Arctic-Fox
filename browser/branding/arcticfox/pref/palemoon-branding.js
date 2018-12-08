@@ -7,7 +7,7 @@ pref("startup.homepage_override_url","");
 pref("app.releaseNotesURL", "https://github.com/wicknix/Arctic-Fox/wiki/Change-Log");
 
 // Disable Firefox compatmode by default.
-// pref("general.useragent.compatMode", 2);
+pref("general.useragent.compatMode", 2);
 
 // ========================= updates ========================
 #if defined(XP_WIN)
