@@ -15,7 +15,7 @@
 #ifndef XP_MACOSX
 #define OS_SLICE X11; Linux x86_64;
 #else
-#define OS_SLICE Macintosh; Intel Mac OS X 10.11;
+#define OS_SLICE Macintosh; Intel Mac OS X 10.12;
 #endif
 #else
 #define OS_SLICE Windows NT 6.1; WOW64;
@@ -47,18 +47,18 @@ pref("@GUAO_PREF@.deviantart.com","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GR
 pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
-pref("@GUAO_PREF@.privat24.ua","Mozilla/5.0 (@OS_SLICE@ rv:38.0) @GK_SLICE@ Firefox/38.0");
-pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/45.9");
-pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/45.9");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:63.0) @GK_SLICE@ Firefox/63.0");
+pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 
 // UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
-pref("@GUAO_PREF@.web.whatsapp.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36");
+pref("@GUAO_PREF@.web.whatsapp.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2049.0 Safari/537.36");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
-pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/63.0 Arcticfox/27.9.12");
-pref("general.appname.override", "Netscape");
-pref("general.appversion.override", "5.0 (Windows)");
-pref("general.buildID.override", "Gecko/20100101");
-pref("general.oscpu.override", "Windows NT 10.0");
-pref("general.platform.override", "Win64");
+// pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/63.0 Arcticfox/27.9.12");
+// pref("general.appname.override", "Netscape");
+// pref("general.appversion.override", "5.0 (Windows)");
+// pref("general.buildID.override", "Gecko/20100101");
+// pref("general.oscpu.override", "Windows NT 10.0");
+// pref("general.platform.override", "Win64");
