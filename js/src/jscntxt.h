@@ -646,6 +646,12 @@ js_ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumb
     ((void)js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,          \
                                     spindex, v, fallback, arg1, arg2))
 
+// TODO FIXME eventually migrate js_Report* to Report* as modern code
+
+#define ReportValueError(cx,errorNumber,spindex,v,fallback)                   \
+    ((void)js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,          \
+                                    spindex, v, fallback, nullptr, nullptr))
+
 extern const JSErrorFormatString js_ErrorFormatString[JSErr_Limit];
 
 namespace js {
