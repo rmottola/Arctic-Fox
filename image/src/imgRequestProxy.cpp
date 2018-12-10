@@ -7,7 +7,7 @@
 #include "ImageLogging.h"
 #include "imgRequestProxy.h"
 #include "imgIOnloadBlocker.h"
-
+#include "imgLoader.h"
 #include "Image.h"
 #include "ImageOps.h"
 #include "nsError.h"
@@ -331,10 +331,15 @@ NS_IMETHODIMP imgRequestProxy::CancelAndForgetObserver(nsresult aStatus)
   bool oldIsInLoadGroup = mIsInLoadGroup;
   mIsInLoadGroup = false;
 
-  if (GetOwner()) {
-    GetOwner()->RemoveProxy(this, aStatus);
-  }
+  imgRequest* owner = GetOwner();
+  if (owner) {
+    imgCacheValidator* validator = owner->GetValidator();
+    if (validator) {
+      validator->RemoveProxy(this);
+    }
 
+    owner->RemoveProxy(this, aStatus);
+  }
   mIsInLoadGroup = oldIsInLoadGroup;
 
   if (mIsInLoadGroup) {
@@ -628,6 +633,11 @@ nsresult imgRequestProxy::PerformClone(imgINotificationObserver* aObserver,
   nsresult rv = clone->Init(mBehaviour->GetOwner(), mLoadGroup, mURI, aObserver);
   if (NS_FAILED(rv))
     return rv;
+
+  if (GetOwner() && GetOwner()->GetValidator()) {
+    clone->SetNotificationsDeferred(true);
+    GetOwner()->GetValidator()->AddProxy(clone);
+  }
 
   // Assign to *aClone before calling Notify so that if the caller expects to
   // only be notified for requests it's already holding pointers to it won't be
