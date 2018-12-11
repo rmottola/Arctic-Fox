@@ -2,17 +2,21 @@ Yet unapplied Mozilla patches:
 
 - 1499861 - issues when backporting on other collections
 - 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
-- 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer
+- 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
 
 
 
 
-Further ToDo which would help portability
+Further ToDo which would help portability:
 
 - Update code from TemporaryRef to already_Refed
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - js/src/jscntxt.h  update ReportValueError to UniquePtr
+
+Further Further ToDo:
+- factor out dom/base/nsGlobalWindowInner.cpp
+
 
 JS Sputink checks:
 
