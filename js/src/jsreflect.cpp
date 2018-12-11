@@ -202,8 +202,8 @@ class NodeBuilder
             }
 
             if (!funv.isObject() || !funv.toObject().is<JSFunction>()) {
-                js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NOT_FUNCTION,
-                                         JSDVG_SEARCH_STACK, funv, js::NullPtr(), nullptr, nullptr);
+                ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NOT_FUNCTION,
+                                      JSDVG_SEARCH_STACK, funv, js::NullPtr(), nullptr, nullptr);
                 return false;
             }
 
@@ -3495,9 +3495,9 @@ reflect_parse(JSContext* cx, uint32_t argc, jsval* vp)
 
     if (!arg.isNullOrUndefined()) {
         if (!arg.isObject()) {
-            js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                     JSDVG_SEARCH_STACK, arg, js::NullPtr(),
-                                     "not an object", nullptr);
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                                  JSDVG_SEARCH_STACK, arg, js::NullPtr(),
+                                  "not an object", nullptr);
             return false;
         }
 
@@ -3547,9 +3547,9 @@ reflect_parse(JSContext* cx, uint32_t argc, jsval* vp)
 
         if (!prop.isNullOrUndefined()) {
             if (!prop.isObject()) {
-                js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                         JSDVG_SEARCH_STACK, prop, js::NullPtr(),
-                                         "not an object", nullptr);
+                ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                                      JSDVG_SEARCH_STACK, prop, js::NullPtr(),
+                                      "not an object", nullptr);
                 return false;
             }
             builder = &prop.toObject();

@@ -427,9 +427,9 @@ js::Throw(JSContext* cx, JSObject* obj, unsigned errorNumber)
 {
     if (js_ErrorFormatString[errorNumber].argCount == 1) {
         RootedValue val(cx, ObjectValue(*obj));
-        js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,
-                                 JSDVG_IGNORE_STACK, val, NullPtr(),
-                                 nullptr, nullptr);
+        ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,
+                              JSDVG_IGNORE_STACK, val, NullPtr(),
+                              nullptr, nullptr);
     } else {
         MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount == 0);
         JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, errorNumber);
@@ -3021,27 +3021,27 @@ bool
 JSObject::reportReadOnly(JSContext* cx, jsid id, unsigned report)
 {
     RootedValue val(cx, IdToValue(id));
-    return js_ReportValueErrorFlags(cx, report, JSMSG_READ_ONLY,
-                                    JSDVG_IGNORE_STACK, val, js::NullPtr(),
-                                    nullptr, nullptr);
+    return ReportValueErrorFlags(cx, report, JSMSG_READ_ONLY,
+                                 JSDVG_IGNORE_STACK, val, js::NullPtr(),
+                                 nullptr, nullptr);
 }
 
 bool
 JSObject::reportNotConfigurable(JSContext* cx, jsid id, unsigned report)
 {
     RootedValue val(cx, IdToValue(id));
-    return js_ReportValueErrorFlags(cx, report, JSMSG_CANT_DELETE,
-                                    JSDVG_IGNORE_STACK, val, js::NullPtr(),
-                                    nullptr, nullptr);
+    return ReportValueErrorFlags(cx, report, JSMSG_CANT_DELETE,
+                                 JSDVG_IGNORE_STACK, val, js::NullPtr(),
+                                 nullptr, nullptr);
 }
 
 bool
 JSObject::reportNotExtensible(JSContext* cx, unsigned report)
 {
     RootedValue val(cx, ObjectValue(*this));
-    return js_ReportValueErrorFlags(cx, report, JSMSG_OBJECT_NOT_EXTENSIBLE,
-                                    JSDVG_IGNORE_STACK, val, js::NullPtr(),
-                                    nullptr, nullptr);
+    return ReportValueErrorFlags(cx, report, JSMSG_OBJECT_NOT_EXTENSIBLE,
+                                 JSDVG_IGNORE_STACK, val, js::NullPtr(),
+                                 nullptr, nullptr);
 }
 
 
@@ -3477,7 +3477,7 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
             return true;
     }
 
-    /* Avoid recursive death when decompiling in js_ReportValueError. */
+    /* Avoid recursive death when decompiling in ReportValueError. */
     RootedString str(cx);
     if (hint == JSTYPE_STRING) {
         str = JS_InternString(cx, clasp->name);
@@ -3488,10 +3488,10 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
     }
 
     RootedValue val(cx, ObjectValue(*obj));
-    js_ReportValueError2(cx, JSMSG_CANT_CONVERT_TO, JSDVG_SEARCH_STACK, val, str,
-                         hint == JSTYPE_VOID
-                         ? "primitive type"
-                         : hint == JSTYPE_STRING ? "string" : "number");
+    ReportValueError2(cx, JSMSG_CANT_CONVERT_TO, JSDVG_SEARCH_STACK, val, str,
+                      hint == JSTYPE_VOID
+                      ? "primitive type"
+                      : hint == JSTYPE_STRING ? "string" : "number");
     return false;
 }
 

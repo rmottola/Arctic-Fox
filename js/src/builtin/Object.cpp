@@ -1051,7 +1051,7 @@ ProtoSetter(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     if (!success) {
-        js_ReportValueError(cx, JSMSG_SETPROTOTYPEOF_FAIL, JSDVG_IGNORE_STACK, thisv, js::NullPtr());
+        ReportValueError(cx, JSMSG_SETPROTOTYPEOF_FAIL, JSDVG_IGNORE_STACK, thisv, js::NullPtr());
         return false;
     }
 

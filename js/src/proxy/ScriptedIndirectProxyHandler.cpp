@@ -154,8 +154,8 @@ ReturnedValueMustNotBePrimitive(JSContext* cx, HandleObject proxy, JSAtom* atom,
         JSAutoByteString bytes;
         if (AtomToPrintableString(cx, atom, &bytes)) {
             RootedValue val(cx, ObjectOrNullValue(proxy));
-            js_ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
-                                 JSDVG_SEARCH_STACK, val, js::NullPtr(), bytes.ptr());
+            ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
+                              JSDVG_SEARCH_STACK, val, js::NullPtr(), bytes.ptr());
         }
         return false;
     }

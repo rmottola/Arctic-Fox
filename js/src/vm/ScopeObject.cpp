@@ -1802,8 +1802,8 @@ class DebugScopeProxy : public BaseProxyHandler
     bool delete_(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const override
     {
         RootedValue idval(cx, IdToValue(id));
-        return js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_CANT_DELETE,
-                                        JSDVG_IGNORE_STACK, idval, NullPtr(), nullptr, nullptr);
+        return ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_CANT_DELETE,
+                                     JSDVG_IGNORE_STACK, idval, NullPtr(), nullptr, nullptr);
     }
 };
 

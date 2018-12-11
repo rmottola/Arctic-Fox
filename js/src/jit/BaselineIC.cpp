@@ -5661,7 +5661,7 @@ DoInFallback(JSContext* cx, ICIn_Fallback* stub, HandleValue key, HandleValue ob
     FallbackICSpew(cx, stub, "In");
 
     if (!objValue.isObject()) {
-        js_ReportValueError(cx, JSMSG_IN_NOT_OBJECT, -1, objValue, NullPtr());
+        ReportValueError(cx, JSMSG_IN_NOT_OBJECT, -1, objValue, NullPtr());
         return false;
     }
 
@@ -11294,7 +11294,7 @@ DoInstanceOfFallback(JSContext* cx, BaselineFrame* frame, ICInstanceOf_Fallback*
     FallbackICSpew(cx, stub, "InstanceOf");
 
     if (!rhs.isObject()) {
-        js_ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS, -1, rhs, NullPtr());
+        ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS, -1, rhs, NullPtr());
         return false;
     }
 
