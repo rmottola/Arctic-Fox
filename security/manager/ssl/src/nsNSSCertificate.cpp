@@ -1588,6 +1588,10 @@ void nsNSSCertList::destructorSafeDestroyNSSReference()
 NS_IMETHODIMP
 nsNSSCertList::AddCert(nsIX509Cert* aCert)
 {
+  if (!aCert) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
   nsNSSShutDownPreventionLock locker;
   if (isAlreadyShutDown()) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -1733,13 +1737,16 @@ nsNSSCertList::Read(nsIObjectInputStream* aStream)
     nsCOMPtr<nsISupports> certSupports;
     rv = aStream->ReadObject(true, getter_AddRefs(certSupports));
     if (NS_FAILED(rv)) {
-      break;
+      return rv;
     }
 
     nsCOMPtr<nsIX509Cert> cert = do_QueryInterface(certSupports);
+    if (!cert) {
+      return NS_ERROR_UNEXPECTED;
+    }
     rv = AddCert(cert);
     if (NS_FAILED(rv)) {
-      break;
+      return rv;
     }
   }
 
