@@ -154,6 +154,17 @@ function GetIterator(obj, method) {
     return iterator;
 }
 
+var _builtinCtorsCache = {__proto__: null};
+function GetBuiltinConstructor(builtinName) {
+    var ctor = _builtinCtorsCache[builtinName] ||
+               (_builtinCtorsCache[builtinName] = GetBuiltinConstructorImpl(builtinName));
+    assert(ctor, `No builtin with name "${builtinName}" found`);
+    return ctor;
+}
+function GetBuiltinPrototype(builtinName) {
+    return (_builtinCtorsCache[builtinName] || GetBuiltinConstructor(builtinName)).prototype;
+}
+
 function SpeciesConstructor(obj, defaultConstructor) {
     var C = obj.constructor;
     if (C === undefined) {

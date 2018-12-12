@@ -121,6 +121,41 @@ intrinsic_IsConstructor(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+/**
+ * Self-hosting intrinsic returning the original constructor for a builtin
+ * the name of which is the first and only argument.
+ *
+ * The return value is guaranteed to be the original constructor even if
+ * content code changed the named binding on the global object.
+ *
+ * This intrinsic shouldn't be called directly. Instead, the
+ * `GetBuiltinConstructor` and `GetBuiltinPrototype` helper functions in
+ * Utilities.js should be used, as they cache results, improving performance.
+ */
+static bool
+intrinsic_GetBuiltinConstructor(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    RootedString str(cx, args[0].toString());
+    JSAtom* atom;
+    if (str->isAtom()) {
+        atom = &str->asAtom();
+    } else {
+        atom = AtomizeString(cx, str);
+        if (!atom)
+            return false;
+    }
+    RootedId id(cx, AtomToId(atom));
+    JSProtoKey key = JS_IdToProtoKey(cx, id);
+    MOZ_ASSERT(key != JSProto_Null);
+    RootedObject ctor(cx);
+    if (!GetBuiltinConstructor(cx, key, &ctor))
+        return false;
+    args.rval().setObject(*ctor);
+    return true;
+}
+
 bool
 js::intrinsic_SubstringKernel(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -882,6 +917,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("OwnPropertyKeys",         intrinsic_OwnPropertyKeys,         1,0),
     JS_FN("ThrowError",              intrinsic_ThrowError,              4,0),
     JS_FN("AssertionFailed",         intrinsic_AssertionFailed,         1,0),
+    JS_FN("GetBuiltinConstructorImpl", intrinsic_GetBuiltinConstructor, 1,0),
     JS_FN("MakeConstructible",       intrinsic_MakeConstructible,       2,0),
     JS_FN("_IsConstructing",         intrinsic_IsConstructing,          0,0),
     JS_FN("_ConstructorForTypedArray", intrinsic_ConstructorForTypedArray, 1,0),
