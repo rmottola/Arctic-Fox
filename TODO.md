@@ -4,6 +4,9 @@ Yet unapplied Mozilla patches:
 - 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
 
+- 1114580 - toStringTag - several diffs still to analyze
+- 1235656 - 3 parts to merge in
+
 
 
 
@@ -15,6 +18,7 @@ Further ToDo which would help portability:
 - js/src/jscntxt.h  update ReportValueError to UniquePtr
 
 Further Further ToDo:
+- flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 
 
