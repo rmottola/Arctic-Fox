@@ -5661,7 +5661,7 @@ DoInFallback(JSContext* cx, ICIn_Fallback* stub, HandleValue key, HandleValue ob
     FallbackICSpew(cx, stub, "In");
 
     if (!objValue.isObject()) {
-        js_ReportValueError(cx, JSMSG_IN_NOT_OBJECT, -1, objValue, NullPtr());
+        ReportValueError(cx, JSMSG_IN_NOT_OBJECT, -1, objValue, NullPtr());
         return false;
     }
 
@@ -11252,6 +11252,18 @@ TryAttachInstanceOfStub(JSContext* cx, BaselineFrame* frame, ICInstanceOf_Fallba
     if (fun->isBoundFunction())
         return true;
 
+    // If the user has supplied their own @@hasInstance method we shouldn't
+    // clobber it.
+    if (!js::FunctionHasDefaultHasInstance(fun, cx->wellKnownSymbols()))
+        return true;
+    // Refuse to optimize any function whose [[Prototype]] isn't
+    // Function.prototype.
+    if (fun->hasLazyPrototype() || fun->hasUncacheableProto())
+        return true;
+    Value funProto = cx->global()->getPrototype(JSProto_Function);
+    if (funProto.isObject() && fun->getProto() != &funProto.toObject())
+        return true;
+
     Shape* shape = fun->lookupPure(cx->names().prototype);
     if (!shape || !shape->hasSlot() || !shape->hasDefaultGetter())
         return true;
@@ -11282,7 +11294,7 @@ DoInstanceOfFallback(JSContext* cx, BaselineFrame* frame, ICInstanceOf_Fallback*
     FallbackICSpew(cx, stub, "InstanceOf");
 
     if (!rhs.isObject()) {
-        js_ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS, -1, rhs, NullPtr());
+        ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS, -1, rhs, NullPtr());
         return false;
     }
 

@@ -24,6 +24,16 @@ interface nsIDocShellLoadInfo : nsISupports
 {
     /** This is the referrer for the load. */
     attribute nsIURI referrer;
+ 
+    /**
+     * The originalURI to be passed to nsIDocShell.internalLoad. May be null.
+     */
+    attribute nsIURI originalURI;
+
+    /**
+     * loadReplace flag to be passed to nsIDocShell.internalLoad.
+     */
+    attribute boolean loadReplace;
 
     /** The owner of the load, that is, the entity responsible for 
      *  causing the load to occur. This should be a nsIPrincipal typically.
@@ -116,18 +126,4 @@ interface nsIDocShellLoadInfo : nsISupports
      * See nsILoadInfo.isFromProcessingFrameAttributes
      */
     attribute boolean isFromProcessingFrameAttributes;
-};
-
-[scriptable, uuid(009bf87b-3f6c-435f-9c92-b9ab8265ff4e)]
-interface nsIDocShellLoadInfo_ESR38 : nsIDocShellLoadInfo
-{
-    /**
-     * The originalURI to be passed to nsIDocShell.internalLoad. May be null.
-     */
-    attribute nsIURI originalURI;
-
-    /**
-     * loadReplace flag to be passed to nsIDocShell.internalLoad.
-     */
-    attribute boolean loadReplace;
 };

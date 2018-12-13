@@ -220,6 +220,8 @@ class JSFunction : public js::NativeObject
 
     void initAtom(JSAtom* atom) { atom_.init(atom); }
 
+    void setAtom(JSAtom* atom) { atom_ = atom; }
+
     JSAtom* displayAtom() const {
         return atom_;
     }
@@ -316,6 +318,19 @@ class JSFunction : public js::NativeObject
             initScript(script);
         }
         return nonLazyScript();
+    }
+
+    // If this is a scripted function, returns its canonical function (the
+    // original function allocated by the frontend). Note that lazy self-hosted
+    // builtins don't have a lazy script so in that case we also return nullptr.
+    JSFunction* maybeCanonicalFunction() const {
+        if (hasScript()) {
+            return nonLazyScript()->functionNonDelazifying();
+        }
+        if (isInterpretedLazy() && !isSelfHostedBuiltin()) {
+            return lazyScript()->functionNonDelazifying();
+        }
+        return nullptr;
     }
 
     // The state of a JSFunction whose script errored out during bytecode
@@ -550,6 +565,17 @@ fun_toString(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool
 fun_bind(JSContext* cx, unsigned argc, Value* vp);
+
+struct WellKnownSymbols;
+
+extern bool
+FunctionHasDefaultHasInstance(JSFunction* fun, const WellKnownSymbols& symbols);
+
+extern bool
+fun_symbolHasInstance(JSContext* cx, unsigned argc, Value* vp);
+
+extern bool
+OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp);
 
 /*
  * Function extended with reserved slots for use by various kinds of functions.

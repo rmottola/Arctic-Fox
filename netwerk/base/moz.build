@@ -59,7 +59,6 @@ XPIDL_SOURCES += [
     'nsINestedURI.idl',
     'nsINetAddr.idl',
     'nsINetUtil.idl',
-    'nsINetUtil_ESR_38.idl',
     'nsINetworkInterceptController.idl',
     'nsINetworkLinkService.idl',
     'nsINetworkPredictor.idl',

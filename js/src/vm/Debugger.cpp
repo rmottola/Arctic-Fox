@@ -134,9 +134,9 @@ ValueToIdentifier(JSContext* cx, HandleValue v, MutableHandleId id)
         return false;
     if (!JSID_IS_ATOM(id) || !IsIdentifier(JSID_TO_ATOM(id))) {
         RootedValue val(cx, v);
-        js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                 JSDVG_SEARCH_STACK, val, js::NullPtr(), "not an identifier",
-                                 nullptr);
+        ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                              JSDVG_SEARCH_STACK, val, js::NullPtr(), "not an identifier",
+                              nullptr);
         return false;
     }
     return true;
@@ -7029,13 +7029,13 @@ RequireGlobalObject(JSContext* cx, HandleValue dbgobj, HandleObject referent)
         }
 
         if (obj->is<GlobalObject>()) {
-            js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_DEBUG_WRAPPER_IN_WAY,
-                                     JSDVG_SEARCH_STACK, dbgobj, js::NullPtr(),
-                                     isWrapper, isWindowProxy);
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_DEBUG_WRAPPER_IN_WAY,
+                                  JSDVG_SEARCH_STACK, dbgobj, js::NullPtr(),
+                                  isWrapper, isWindowProxy);
         } else {
-            js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_DEBUG_BAD_REFERENT,
-                                     JSDVG_SEARCH_STACK, dbgobj, js::NullPtr(),
-                                     "a global object", nullptr);
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_DEBUG_BAD_REFERENT,
+                                  JSDVG_SEARCH_STACK, dbgobj, js::NullPtr(),
+                                  "a global object", nullptr);
         }
         return false;
     }

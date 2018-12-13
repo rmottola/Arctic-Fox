@@ -321,7 +321,6 @@ NS_IMPL_ISUPPORTS(nsIOService,
                   nsIIOService,
                   nsIIOService2,
                   nsINetUtil,
-                  nsINetUtil_ESR_38,
                   nsISpeculativeConnect,
                   nsIObserver,
                   nsISupportsWeakReference)
@@ -1265,10 +1264,10 @@ nsIOService::ParseRequestContentType(const nsACString &aTypeHeader,
 
 // nsINetUtil interface
 NS_IMETHODIMP
-nsIOService::ParseContentType(const nsACString &aTypeHeader,
-                              nsACString &aCharset,
-                              bool *aHadCharset,
-                              nsACString &aContentType)
+nsIOService::ParseResponseContentType(const nsACString &aTypeHeader,
+                                      nsACString &aCharset,
+                                      bool *aHadCharset,
+                                      nsACString &aContentType)
 {
     net_ParseContentType(aTypeHeader, aContentType, aCharset, aHadCharset);
     return NS_OK;

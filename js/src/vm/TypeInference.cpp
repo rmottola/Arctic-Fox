@@ -3243,6 +3243,10 @@ TypeNewScript::make(JSContext* cx, ObjectGroup* group, JSFunction* fun)
     MOZ_ASSERT(!group->newScript());
     MOZ_ASSERT(!group->maybeUnboxedLayout());
 
+    // rollbackPartiallyInitializedObjects expects function_ to be
+    // canonicalized.
+    MOZ_ASSERT(fun->maybeCanonicalFunction() == fun);
+
     if (group->unknownProperties())
         return;
 
@@ -3613,8 +3617,14 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
                 MOZ_CRASH("rollbackPartiallyInitializedObjects");
         }
 
-        if (!iter.isConstructing() || !iter.matchCallee(cx, function))
+        if (!iter.isConstructing()) {
             continue;
+	}
+
+	MOZ_ASSERT(iter.calleeTemplate()->maybeCanonicalFunction());
+        if (iter.calleeTemplate()->maybeCanonicalFunction() != function) {
+            continue;
+        }
 
         Value thisv = iter.thisv(cx);
         if (!thisv.isObject() ||

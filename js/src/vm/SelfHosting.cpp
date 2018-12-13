@@ -121,6 +121,41 @@ intrinsic_IsConstructor(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+/**
+ * Self-hosting intrinsic returning the original constructor for a builtin
+ * the name of which is the first and only argument.
+ *
+ * The return value is guaranteed to be the original constructor even if
+ * content code changed the named binding on the global object.
+ *
+ * This intrinsic shouldn't be called directly. Instead, the
+ * `GetBuiltinConstructor` and `GetBuiltinPrototype` helper functions in
+ * Utilities.js should be used, as they cache results, improving performance.
+ */
+static bool
+intrinsic_GetBuiltinConstructor(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    RootedString str(cx, args[0].toString());
+    JSAtom* atom;
+    if (str->isAtom()) {
+        atom = &str->asAtom();
+    } else {
+        atom = AtomizeString(cx, str);
+        if (!atom)
+            return false;
+    }
+    RootedId id(cx, AtomToId(atom));
+    JSProtoKey key = JS_IdToProtoKey(cx, id);
+    MOZ_ASSERT(key != JSProto_Null);
+    RootedObject ctor(cx);
+    if (!GetBuiltinConstructor(cx, key, &ctor))
+        return false;
+    args.rval().setObject(*ctor);
+    return true;
+}
+
 bool
 js::intrinsic_SubstringKernel(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -541,6 +576,26 @@ js::intrinsic_IsStringIterator(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+intrinsic_SetCanonicalName(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 2);
+
+    RootedFunction fun(cx, &args[0].toObject().as<JSFunction>());
+    MOZ_ASSERT(fun->isSelfHostedBuiltin());
+    RootedAtom atom(cx, AtomizeString(cx, args[1].toString()));
+    if (!atom)
+        return false;
+
+    fun->setAtom(atom);
+#ifdef DEBUG
+    fun->setExtendedSlot(HAS_SELFHOSTED_CANONICAL_NAME_SLOT, BooleanValue(true));
+#endif
+    args.rval().setUndefined();
+    return true;
+}
+
+static bool
 intrinsic_IsStarGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -862,6 +917,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("OwnPropertyKeys",         intrinsic_OwnPropertyKeys,         1,0),
     JS_FN("ThrowError",              intrinsic_ThrowError,              4,0),
     JS_FN("AssertionFailed",         intrinsic_AssertionFailed,         1,0),
+    JS_FN("GetBuiltinConstructorImpl", intrinsic_GetBuiltinConstructor, 1,0),
     JS_FN("MakeConstructible",       intrinsic_MakeConstructible,       2,0),
     JS_FN("_IsConstructing",         intrinsic_IsConstructing,          0,0),
     JS_FN("_ConstructorForTypedArray", intrinsic_ConstructorForTypedArray, 1,0),
@@ -886,6 +942,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("GetIteratorPrototype",    intrinsic_GetIteratorPrototype,    0,0),
 
     JS_FN("NewArrayIterator",        intrinsic_NewArrayIterator,        0,0),
+    JS_FN("_SetCanonicalName",       intrinsic_SetCanonicalName,        2,0),
     JS_FN("IsArrayIterator",         intrinsic_IsArrayIterator,         1,0),
     JS_FN("CallArrayIteratorMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<ArrayIteratorObject>>,      2,0),
@@ -1164,15 +1221,15 @@ GetUnclonedValue(JSContext* cx, HandleNativeObject selfHostedObject,
     if (JSID_IS_STRING(id) && !JSID_TO_STRING(id)->isPermanentAtom()) {
         MOZ_ASSERT(selfHostedObject->is<GlobalObject>());
         RootedValue value(cx, IdToValue(id));
-        return js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NO_SUCH_SELF_HOSTED_PROP,
-                                        JSDVG_IGNORE_STACK, value, NullPtr(), nullptr, nullptr);
+        return ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NO_SUCH_SELF_HOSTED_PROP,
+                                     JSDVG_IGNORE_STACK, value, NullPtr(), nullptr, nullptr);
     }
 
     RootedShape shape(cx, selfHostedObject->lookupPure(id));
     if (!shape) {
         RootedValue value(cx, IdToValue(id));
-        return js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NO_SUCH_SELF_HOSTED_PROP,
-                                        JSDVG_IGNORE_STACK, value, NullPtr(), nullptr, nullptr);
+        return ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_NO_SUCH_SELF_HOSTED_PROP,
+                                     JSDVG_IGNORE_STACK, value, NullPtr(), nullptr, nullptr);
     }
 
     MOZ_ASSERT(shape->hasSlot() && shape->hasDefaultGetter());

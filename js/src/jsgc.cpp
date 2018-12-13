@@ -5902,6 +5902,8 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         /* fall through */
 
       case SWEEP:
+        AutoGCRooter::traceAllWrappers(&marker);
+
         if (sweepPhase(budget) == NotFinished)
             break;
 

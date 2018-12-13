@@ -1119,7 +1119,7 @@ protected:
     }
   }
 
-  void FreeInnerObjects();
+  void FreeInnerObjects(bool aForDocumentOpen = false);
   nsGlobalWindow *CallerInnerWindow();
 
   // Only to be called on an inner window.

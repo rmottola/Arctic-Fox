@@ -56,7 +56,6 @@
 #include "nsISyncStreamListener.h"
 #include "nsInterfaceRequestorAgg.h"
 #include "nsINetUtil.h"
-#include "nsINetUtil_ESR_38.h"
 #include "nsIURIWithPrincipal.h"
 #include "nsIAuthPrompt.h"
 #include "nsIAuthPrompt2.h"
@@ -1237,12 +1236,10 @@ NS_ParseRequestContentType(const nsACString &rawContentType,
     nsresult rv;
     nsCOMPtr<nsINetUtil> util = do_GetNetUtil(&rv);
     NS_ENSURE_SUCCESS(rv, rv);
-    nsCOMPtr<nsINetUtil_ESR_38> utilESR38 = do_QueryInterface(util, &rv);
-    NS_ENSURE_SUCCESS(rv, rv);
     nsCString charset;
     bool hadCharset;
-    rv = utilESR38->ParseRequestContentType(rawContentType, charset, &hadCharset,
-                                            contentType);
+    rv = util->ParseRequestContentType(rawContentType, charset, &hadCharset,
+                                       contentType);
     if (NS_SUCCEEDED(rv) && hadCharset)
         contentCharset = charset;
     return rv;
@@ -1259,8 +1256,8 @@ NS_ParseContentType(const nsACString &rawContentType,
     NS_ENSURE_SUCCESS(rv, rv);
     nsCString charset;
     bool hadCharset;
-    rv = util->ParseContentType(rawContentType, charset, &hadCharset,
-                                contentType);
+    rv = util->ParseRequestContentType(rawContentType, charset, &hadCharset,
+                                       contentType);
     if (NS_SUCCEEDED(rv) && hadCharset)
         contentCharset = charset;
     return rv;

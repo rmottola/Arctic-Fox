@@ -496,8 +496,8 @@ GetCustomIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandle
         if (!AtomToPrintableString(cx, name, &bytes))
             return false;
         RootedValue val(cx, ObjectValue(*obj));
-        js_ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
-                             -1, val, js::NullPtr(), bytes.ptr());
+        ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
+                          -1, val, js::NullPtr(), bytes.ptr());
         return false;
     }
     objp.set(&rval.toObject());

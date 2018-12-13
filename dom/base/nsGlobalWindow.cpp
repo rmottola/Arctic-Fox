@@ -1568,7 +1568,7 @@ nsGlobalWindow::ClearControllers()
 }
 
 void
-nsGlobalWindow::FreeInnerObjects()
+nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
 {
   NS_ASSERTION(IsInnerWindow(), "Don't free inner objects on an outer window");
 
@@ -1617,8 +1617,10 @@ nsGlobalWindow::FreeInnerObjects()
     mDocumentURI = mDoc->GetDocumentURI();
     mDocBaseURI = mDoc->GetDocBaseURI();
 
-    while (mDoc->EventHandlingSuppressed()) {
-      mDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eEvents, false);
+    if (!aForDocumentOpen) {
+      while (mDoc->EventHandlingSuppressed()) {
+        mDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eEvents, false);
+      }
     }
 
     // Note: we don't have to worry about eAnimationsOnly suppressions because
@@ -2445,6 +2447,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
   nsCOMPtr<WindowStateHolder> wsh = do_QueryInterface(aState);
   NS_ASSERTION(!aState || wsh, "What kind of weird state are you giving me here?");
 
+  bool handleDocumentOpen = false;
+
   JS::Rooted<JSObject*> newInnerGlobal(cx);
   if (reUseInnerWindow) {
     // We're reusing the current inner window.
@@ -2535,6 +2539,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
 
     if (currentInner && currentInner->GetWrapperPreserveColor()) {
       if (oldDoc == aDocument) {
+        handleDocumentOpen = true;
         // Move the navigator from the old inner window to the new one since
         // this is a document.write. This is safe from a same-origin point of
         // view because document.write can only be used by the same origin.
@@ -2560,7 +2565,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
       // Don't free objects on our current inner window if it's going to be
       // held in the bfcache.
       if (!currentInner->IsFrozen()) {
-        currentInner->FreeInnerObjects();
+        currentInner->FreeInnerObjects(handleDocumentOpen);
       }
     }
 

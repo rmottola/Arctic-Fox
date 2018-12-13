@@ -158,8 +158,8 @@ ReportInvalidTrapResult(JSContext* cx, JSObject* proxy, JSAtom* atom)
     JSAutoByteString bytes;
     if (!AtomToPrintableString(cx, atom, &bytes))
         return;
-    js_ReportValueError2(cx, JSMSG_INVALID_TRAP_RESULT, JSDVG_IGNORE_STACK, v,
-                         js::NullPtr(), bytes.ptr());
+    ReportValueError2(cx, JSMSG_INVALID_TRAP_RESULT, JSDVG_IGNORE_STACK, v,
+                      js::NullPtr(), bytes.ptr());
 }
 
 // This function is shared between ownPropertyKeys, enumerate, and
@@ -735,7 +735,7 @@ ScriptedDirectProxyHandler::delete_(JSContext* cx, HandleObject proxy, HandleId 
         // step 14-15
         if (desc.object() && desc.isPermanent()) {
             RootedValue v(cx, IdToValue(id));
-            js_ReportValueError(cx, JSMSG_CANT_DELETE, JSDVG_IGNORE_STACK, v, js::NullPtr());
+            ReportValueError(cx, JSMSG_CANT_DELETE, JSDVG_IGNORE_STACK, v, js::NullPtr());
             return false;
         }
 

@@ -137,7 +137,7 @@ enum eCharsetReloadState
 
 class nsDocShell final
   : public nsDocLoader
-  , public nsIDocShell_ESR38_2
+  , public nsIDocShell
   , public nsIWebNavigation
   , public nsIBaseWindow
   , public nsIScrollable
@@ -169,8 +169,6 @@ public:
 
   NS_DECL_ISUPPORTS_INHERITED
 
-  NS_DECL_NSIDOCSHELL_ESR38_2
-  NS_DECL_NSIDOCSHELL_ESR38
   NS_DECL_NSIDOCSHELL
   NS_DECL_NSIDOCSHELLTREEITEM
   NS_DECL_NSIWEBNAVIGATION

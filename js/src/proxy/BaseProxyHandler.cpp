@@ -306,8 +306,8 @@ BaseProxyHandler::hasInstance(JSContext* cx, HandleObject proxy, MutableHandleVa
 {
     assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
     RootedValue val(cx, ObjectValue(*proxy.get()));
-    js_ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
-                        JSDVG_SEARCH_STACK, val, js::NullPtr());
+    ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
+                     JSDVG_SEARCH_STACK, val, js::NullPtr());
     return false;
 }
 

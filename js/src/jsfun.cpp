@@ -673,6 +673,94 @@ js::CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFun
     return clone;
 }
 
+/* ES6 (04-25-16) 19.2.3.6 Function.prototype [ @@hasInstance ] */
+bool
+js::fun_symbolHasInstance(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (args.length() < 1) {
+        args.rval().setBoolean(false);
+        return true;
+    }
+
+    /* Step 1. */
+    HandleValue func = args.thisv();
+
+    // Primitives are non-callable and will always return false from
+    // OrdinaryHasInstance.
+    if (!func.isObject()) {
+        args.rval().setBoolean(false);
+        return true;
+    }
+
+    RootedObject obj(cx, &func.toObject());
+    RootedValue v(cx, args[0]);
+
+    /* Step 2. */
+    bool result;
+    if (!OrdinaryHasInstance(cx, obj, &v, &result))
+        return false;
+
+    args.rval().setBoolean(result);
+    return true;
+}
+
+/*
+ * ES6 (4-25-16) 7.3.19 OrdinaryHasInstance
+ */
+
+bool
+js::OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp)
+{
+    RootedObject obj(cx, objArg);
+
+    /* Step 1. */
+    if (!obj->isCallable()) {
+        *bp = false;
+        return true;
+    }
+
+    /* Step 2. */
+    if (obj->is<JSFunction>() && obj->isBoundFunction()) {
+        /* Steps 2a-b. */
+        obj = obj->as<JSFunction>().getBoundFunctionTarget();
+        return InstanceOfOperator(cx, obj, v, bp);
+    }
+
+    /* Step 3. */
+    if (!v.isObject()) {
+        *bp = false;
+        return true;
+    }
+
+    /* Step 4. */
+    RootedValue pval(cx);
+    if (!GetProperty(cx, obj, obj, cx->names().prototype, &pval))
+        return false;
+
+    /* Step 5. */
+    if (pval.isPrimitive()) {
+        /*
+         * Throw a runtime error if instanceof is called on a function that
+         * has a non-object as its .prototype value.
+         */
+        RootedValue val(cx, ObjectValue(*obj));
+        ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, NullPtr());
+        return false;
+    }
+
+    /* Step 6. */
+    RootedObject pobj(cx, &pval.toObject());
+    bool isDelegate;
+    if (!IsDelegate(cx, pobj, v, &isDelegate))
+        return false;
+    *bp = isDelegate;
+    return true;
+}
+
+// XXX RM 2018-12-10 TODO perhaps this can be removed given the functions above
+
 /*
  * [[HasInstance]] internal method for Function objects: fetch the .prototype
  * property of its 'this' parameter, and walks the prototype chain of v (only
@@ -696,7 +784,7 @@ fun_hasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* 
          * has a non-object as its .prototype value.
          */
         RootedValue val(cx, ObjectValue(*obj));
-        js_ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, js::NullPtr());
+        ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, js::NullPtr());
         return false;
     }
 
@@ -1154,6 +1242,20 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool bodyOnly, bool lamb
         }
     }
     return out.finishString();
+}
+
+bool
+js::FunctionHasDefaultHasInstance(JSFunction* fun, const WellKnownSymbols& symbols)
+{
+    jsid id = SYMBOL_TO_JSID(symbols.hasInstance);
+    Shape* shape = fun->lookupPure(id);
+    if (shape) {
+        if (!shape->hasSlot() || !shape->hasDefaultGetter())
+            return false;
+        const Value hasInstance = fun->as<NativeObject>().getSlot(shape->slot());
+        return IsNativeFunction(hasInstance, js::fun_symbolHasInstance);
+    }
+    return true;
 }
 
 JSString*

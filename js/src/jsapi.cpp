@@ -1885,7 +1885,7 @@ JS_SetPrototype(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JSObject*> 
 
     if (!succeeded) {
         RootedValue val(cx, ObjectValue(*obj));
-        js_ReportValueError(cx, JSMSG_SETPROTOTYPEOF_FAIL, JSDVG_IGNORE_STACK, val, js::NullPtr());
+        ReportValueError(cx, JSMSG_SETPROTOTYPEOF_FAIL, JSDVG_IGNORE_STACK, val, js::NullPtr());
         return false;
     }
 

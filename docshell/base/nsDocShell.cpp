@@ -1028,8 +1028,6 @@ NS_IMPL_ADDREF_INHERITED(nsDocShell, nsDocLoader)
 NS_IMPL_RELEASE_INHERITED(nsDocShell, nsDocLoader)
 
 NS_INTERFACE_MAP_BEGIN(nsDocShell)
-  NS_INTERFACE_MAP_ENTRY(nsIDocShell_ESR38_2)
-  NS_INTERFACE_MAP_ENTRY(nsIDocShell_ESR38)
   NS_INTERFACE_MAP_ENTRY(nsIDocShell)
   NS_INTERFACE_MAP_ENTRY(nsIDocShellTreeItem)
   NS_INTERFACE_MAP_ENTRY(nsIWebNavigation)
@@ -1410,11 +1408,8 @@ nsDocShell::LoadURI(nsIURI* aURI,
   // Extract the info from the DocShellLoadInfo struct...
   if (aLoadInfo) {
     aLoadInfo->GetReferrer(getter_AddRefs(referrer));
-    nsCOMPtr<nsIDocShellLoadInfo_ESR38> liESR38 = do_QueryInterface(aLoadInfo);
-    if (liESR38) {
-      liESR38->GetOriginalURI(getter_AddRefs(originalURI));
-      liESR38->GetLoadReplace(&loadReplace);
-    }
+    aLoadInfo->GetOriginalURI(getter_AddRefs(originalURI));
+    aLoadInfo->GetLoadReplace(&loadReplace);
     aLoadInfo->GetIsFromProcessingFrameAttributes(&isFromProcessingFrameAttributes);
 
     nsDocShellInfoLoadType lt = nsIDocShellLoadInfo::loadNormal;
@@ -1670,27 +1665,27 @@ nsDocShell::LoadURI(nsIURI* aURI,
     flags |= INTERNAL_LOAD_FLAGS_IS_SRCDOC;
   }
 
-  return InternalLoad2(aURI,
-                       originalURI,
-                       loadReplace,
-                       isFromProcessingFrameAttributes,
-                       referrer,
-                       referrerPolicy,
-                       owner,
-                       flags,
-                       target.get(),
-                       nullptr,      // No type hint
-                       NullString(), // No forced download
-                       postStream,
-                       headersStream,
-                       loadType,
-                       nullptr, // No SHEntry
-                       aFirstParty,
-                       srcdoc,
-                       sourceDocShell,
-                       baseURI,
-                       nullptr,  // No nsIDocShell
-                       nullptr); // No nsIRequest
+  return InternalLoad(aURI,
+                      originalURI,
+                      loadReplace,
+                      isFromProcessingFrameAttributes,
+                      referrer,
+                      referrerPolicy,
+                      owner,
+                      flags,
+                      target.get(),
+                      nullptr,      // No type hint
+                      NullString(), // No forced download
+                      postStream,
+                      headersStream,
+                      loadType,
+                      nullptr, // No SHEntry
+                      aFirstParty,
+                      srcdoc,
+                      sourceDocShell,
+                      baseURI,
+                      nullptr,  // No nsIDocShell
+                      nullptr); // No nsIRequest
 }
 
 NS_IMETHODIMP
@@ -3480,7 +3475,7 @@ nsDocShell::SetDocLoaderParent(nsDocLoader* aParent)
   // If parent is another docshell, we inherit all their flags for
   // allowing plugins, scripting etc.
   bool value;
-  nsCOMPtr<nsIDocShell_ESR38> parentAsDocShell(do_QueryInterface(parent));
+  nsCOMPtr<nsIDocShell> parentAsDocShell(do_QueryInterface(parent));
   if (parentAsDocShell) {
     if (NS_SUCCEEDED(parentAsDocShell->GetAllowPlugins(&value))) {
       SetAllowPlugins(value);
@@ -5413,12 +5408,12 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   rv = NS_NewURI(getter_AddRefs(errorPageURI), errorPageUrl);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return InternalLoad2(errorPageURI, nullptr, false, false, nullptr,
-                       mozilla::net::RP_Default,
-                       nullptr, INTERNAL_LOAD_FLAGS_INHERIT_OWNER, nullptr,
-                       nullptr, NullString(), nullptr, nullptr, LOAD_ERROR_PAGE,
-                       nullptr, true, NullString(), this, nullptr, nullptr,
-                       nullptr);
+  return InternalLoad(errorPageURI, nullptr, false, false, nullptr,
+                      mozilla::net::RP_Default,
+                      nullptr, INTERNAL_LOAD_FLAGS_INHERIT_OWNER, nullptr,
+                      nullptr, NullString(), nullptr, nullptr, LOAD_ERROR_PAGE,
+                      nullptr, true, NullString(), this, nullptr, nullptr,
+                      nullptr);
 }
 
 NS_IMETHODIMP
@@ -5492,27 +5487,27 @@ nsDocShell::Reload(uint32_t aReloadFlags)
     nsCOMPtr<nsIURI> currentURI = mCurrentURI;
     nsCOMPtr<nsIURI> referrerURI = mReferrerURI;
     uint32_t referrerPolicy = mReferrerPolicy;
-    rv = InternalLoad2(currentURI,
-                       originalURI,
-                       loadReplace,
-                       false,           // IsFromProcessingFrameAttributes
-                       referrerURI,
-                       referrerPolicy,
-                       principal,
-                       flags,
-                       nullptr,         // No window target
-                       NS_LossyConvertUTF16toASCII(contentTypeHint).get(),
-                       NullString(),    // No forced download
-                       nullptr,         // No post data
-                       nullptr,         // No headers data
-                       loadType,        // Load type
-                       nullptr,         // No SHEntry
-                       true,
-                       srcdoc,          // srcdoc argument for iframe
-                       this,            // For reloads we are the source
-                       baseURI,
-                       nullptr,         // No nsIDocShell
-                       nullptr);        // No nsIRequest
+    rv = InternalLoad(currentURI,
+                      originalURI,
+                      loadReplace,
+                      false,           // IsFromProcessingFrameAttributes
+                      referrerURI,
+                      referrerPolicy,
+                      principal,
+                      flags,
+                      nullptr,         // No window target
+                      NS_LossyConvertUTF16toASCII(contentTypeHint).get(),
+                      NullString(),    // No forced download
+                      nullptr,         // No post data
+                      nullptr,         // No headers data
+                      loadType,        // Load type
+                      nullptr,         // No SHEntry
+                      true,
+                      srcdoc,          // srcdoc argument for iframe
+                      this,            // For reloads we are the source
+                      baseURI,
+                      nullptr,         // No nsIDocShell
+                      nullptr);        // No nsIRequest
   }
 
   return rv;
@@ -5683,10 +5678,7 @@ nsDocShell::LoadPage(nsISupports* aPageDescriptor, uint32_t aDisplayType)
       return rv;
     }
     shEntry->SetURI(newUri);
-    nsCOMPtr<nsISHEntry_ESR38> entryESR38 = do_QueryInterface(shEntry);
-    if (entryESR38) {
-      entryESR38->SetOriginalURI(nullptr);
-    }
+    shEntry->SetOriginalURI(nullptr);
   }
 
   rv = LoadHistoryEntry(shEntry, LOAD_HISTORY);
@@ -8791,7 +8783,7 @@ nsDocShell::RestoreFromHistory()
   // Now we simulate appending child docshells for subframes.
   for (i = 0; i < childShells.Count(); ++i) {
     nsIDocShellTreeItem* childItem = childShells.ObjectAt(i);
-    nsCOMPtr<nsIDocShell_ESR38> childShell = do_QueryInterface(childItem);
+    nsCOMPtr<nsIDocShell> childShell = do_QueryInterface(childItem);
 
     // Make sure to not clobber the state of the child.  Since AddChild
     // always clobbers it, save it off first.
@@ -9542,17 +9534,17 @@ public:
 
   NS_IMETHOD Run()
   {
-    return mDocShell->InternalLoad2(mURI, mOriginalURI,
-                                    mLoadReplace,
-                                    mIsFromProcessingFrameAttributes,
-                                    mReferrer,
-                                    mReferrerPolicy,
-                                    mOwner, mFlags,
-                                    nullptr, mTypeHint.get(),
-                                    NullString(), mPostData, mHeadersData,
-                                    mLoadType, mSHEntry, mFirstParty,
-                                    mSrcdoc, mSourceDocShell, mBaseURI,
-                                    nullptr, nullptr);
+    return mDocShell->InternalLoad(mURI, mOriginalURI,
+                                   mLoadReplace,
+                                   mIsFromProcessingFrameAttributes,
+                                   mReferrer,
+                                   mReferrerPolicy,
+                                   mOwner, mFlags,
+                                   nullptr, mTypeHint.get(),
+                                   NullString(), mPostData, mHeadersData,
+                                   mLoadType, mSHEntry, mFirstParty,
+                                   mSrcdoc, mSourceDocShell, mBaseURI,
+                                   nullptr, nullptr);
   }
 
 private:
@@ -9617,7 +9609,7 @@ nsDocShell::CreatePrincipalFromReferrer(nsIURI* aReferrer,
   NS_ENSURE_SUCCESS(rv, rv);
   return NS_OK;
 }
-
+/* XXX
 NS_IMETHODIMP
 nsDocShell::InternalLoad(nsIURI* aURI,
                          nsIURI* aReferrer,
@@ -9643,29 +9635,29 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                        aHeadersData, aLoadType, aSHEntry, aFirstParty, aSrcdoc,
                        aSourceDocShell, aBaseURI, aDocShell, aRequest);
 }
-
+*/
 NS_IMETHODIMP
-nsDocShell::InternalLoad2(nsIURI* aURI,
-                          nsIURI* aOriginalURI,
-                          bool aLoadReplace,
-                          bool aIsFromProcessingFrameAttributes,
-                          nsIURI* aReferrer,
-                          uint32_t aReferrerPolicy,
-                          nsISupports* aOwner,
-                          uint32_t aFlags,
-                          const char16_t* aWindowTarget,
-                          const char* aTypeHint,
-                          const nsAString& aFileName,
-                          nsIInputStream* aPostData,
-                          nsIInputStream* aHeadersData,
-                          uint32_t aLoadType,
-                          nsISHEntry* aSHEntry,
-                          bool aFirstParty,
-                          const nsAString& aSrcdoc,
-                          nsIDocShell* aSourceDocShell,
-                          nsIURI* aBaseURI,
-                          nsIDocShell** aDocShell,
-                          nsIRequest** aRequest)
+nsDocShell::InternalLoad(nsIURI* aURI,
+                         nsIURI* aOriginalURI,
+                         bool aLoadReplace,
+                         bool aIsFromProcessingFrameAttributes,
+                         nsIURI* aReferrer,
+                         uint32_t aReferrerPolicy,
+                         nsISupports* aOwner,
+                         uint32_t aFlags,
+                         const char16_t* aWindowTarget,
+                         const char* aTypeHint,
+                         const nsAString& aFileName,
+                         nsIInputStream* aPostData,
+                         nsIInputStream* aHeadersData,
+                         uint32_t aLoadType,
+                         nsISHEntry* aSHEntry,
+                         bool aFirstParty,
+                         const nsAString& aSrcdoc,
+                         nsIDocShell* aSourceDocShell,
+                         nsIURI* aBaseURI,
+                         nsIDocShell** aDocShell,
+                         nsIRequest** aRequest)
 {
   nsresult rv = NS_OK;
   mOriginalUriString.Truncate();
@@ -9916,49 +9908,27 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
     // window target name from to prevent recursive retargeting!
     //
     if (NS_SUCCEEDED(rv) && targetDocShell) {
-      nsCOMPtr<nsIDocShell_ESR38_2> dsESR38 = do_QueryInterface(targetDocShell);
-      if (dsESR38) {
-        rv = dsESR38->InternalLoad2(aURI,
-                                    aOriginalURI,
-                                    aLoadReplace,
-                                    aIsFromProcessingFrameAttributes,
-                                    aReferrer,
-                                    aReferrerPolicy,
-                                    owner,
-                                    aFlags,
-                                    nullptr,         // No window target
-                                    aTypeHint,
-                                    NullString(),    // No forced download
-                                    aPostData,
-                                    aHeadersData,
-                                    aLoadType,
-                                    aSHEntry,
-                                    aFirstParty,
-                                    aSrcdoc,
-                                    aSourceDocShell,
-                                    aBaseURI,
-                                    aDocShell,
-                                    aRequest);
-      } else {
-        rv = targetDocShell->InternalLoad(aURI,
-                                          aReferrer,
-                                          aReferrerPolicy,
-                                          owner,
-                                          aFlags,
-                                          nullptr,         // No window target
-                                          aTypeHint,
-                                          NullString(),    // No forced download
-                                          aPostData,
-                                          aHeadersData,
-                                          aLoadType,
-                                          aSHEntry,
-                                          aFirstParty,
-                                          aSrcdoc,
-                                          aSourceDocShell,
-                                          aBaseURI,
-                                          aDocShell,
-                                          aRequest);
-      }
+      rv = targetDocShell->InternalLoad(aURI,
+                                        aOriginalURI,
+                                        aLoadReplace,
+                                        aIsFromProcessingFrameAttributes,
+                                        aReferrer,
+                                        aReferrerPolicy,
+                                        owner,
+                                        aFlags,
+                                        nullptr,         // No window target
+                                        aTypeHint,
+                                        NullString(),    // No forced download
+                                        aPostData,
+                                        aHeadersData,
+                                        aLoadType,
+                                        aSHEntry,
+                                        aFirstParty,
+                                        aSrcdoc,
+                                        aSourceDocShell,
+                                        aBaseURI,
+                                        aDocShell,
+                                        aRequest);
 
       if (rv == NS_ERROR_NO_CONTENT) {
         // XXXbz except we never reach this code!
@@ -11781,11 +11751,8 @@ nsDocShell::AddState(JS::Handle<JS::Value> aData, const nsAString& aTitle,
   } else {
     newSHEntry = mOSHE;
     newSHEntry->SetURI(newURI);
-    nsCOMPtr<nsISHEntry_ESR38> entryESR38 = do_QueryInterface(newSHEntry);
-    if (entryESR38) {
-      entryESR38->SetOriginalURI(newURI);
-      entryESR38->SetLoadReplace(false);
-    }
+    newSHEntry->SetOriginalURI(newURI);
+    newSHEntry->SetLoadReplace(false);
   }
 
   // Step 4: Modify new/original session history entry and clear its POST
@@ -12044,11 +12011,8 @@ nsDocShell::AddToSessionHistory(nsIURI* aURI, nsIChannel* aChannel,
                 mHistoryID,
                 mDynamicallyCreated);
 
-  nsCOMPtr<nsISHEntry_ESR38> entryESR38 = do_QueryInterface(entry);
-  if (entryESR38) {
-    entryESR38->SetOriginalURI(originalURI);
-    entryESR38->SetLoadReplace(loadReplace);
-  }
+  entry->SetOriginalURI(originalURI);
+  entry->SetLoadReplace(loadReplace);
   entry->SetReferrerURI(referrerURI);
   entry->SetReferrerPolicy(referrerPolicy);
   nsCOMPtr<nsIInputStreamChannel> inStrmChan = do_QueryInterface(aChannel);
@@ -12162,13 +12126,10 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
 
   NS_ENSURE_SUCCESS(aEntry->GetURI(getter_AddRefs(uri)), NS_ERROR_FAILURE);
 
-  nsCOMPtr<nsISHEntry_ESR38> entryESR38 = do_QueryInterface(aEntry);
-  if (entryESR38) {
-    NS_ENSURE_SUCCESS(entryESR38->GetOriginalURI(getter_AddRefs(originalURI)),
+  NS_ENSURE_SUCCESS(aEntry->GetOriginalURI(getter_AddRefs(originalURI)),
+                    NS_ERROR_FAILURE);
+  NS_ENSURE_SUCCESS(aEntry->GetLoadReplace(&loadReplace),
                       NS_ERROR_FAILURE);
-    NS_ENSURE_SUCCESS(entryESR38->GetLoadReplace(&loadReplace),
-                      NS_ERROR_FAILURE);
-  }
   NS_ENSURE_SUCCESS(aEntry->GetReferrerURI(getter_AddRefs(referrerURI)),
                     NS_ERROR_FAILURE);
   NS_ENSURE_SUCCESS(aEntry->GetReferrerPolicy(&referrerPolicy),
@@ -12248,27 +12209,27 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
   // aSourceDocShell was introduced. According to spec we should be passing
   // the source browsing context that was used when the history entry was
   // first created. bug 947716 has been created to address this issue.
-  rv = InternalLoad2(uri,
-                     originalURI,
-                     loadReplace,
-                     false,              // IsFromProcessingFrameAttributes
-                     referrerURI,
-                     referrerPolicy,
-                     owner,
-                     flags,
-                     nullptr,            // No window target
-                     contentType.get(),  // Type hint
-                     NullString(),       // No forced file download
-                     postData,           // Post data stream
-                     nullptr,            // No headers stream
-                     aLoadType,          // Load type
-                     aEntry,             // SHEntry
-                     true,
-                     srcdoc,
-                     nullptr,            // Source docshell, see comment above
-                     baseURI,
-                     nullptr,            // No nsIDocShell
-                     nullptr);           // No nsIRequest
+  rv = InternalLoad(uri,
+                    originalURI,
+                    loadReplace,
+                    false,              // IsFromProcessingFrameAttributes
+                    referrerURI,
+                    referrerPolicy,
+                    owner,
+                    flags,
+                    nullptr,            // No window target
+                    contentType.get(),  // Type hint
+                    NullString(),       // No forced file download
+                    postData,           // Post data stream
+                    nullptr,            // No headers stream
+                    aLoadType,          // Load type
+                    aEntry,             // SHEntry
+                    true,
+                    srcdoc,
+                    nullptr,            // Source docshell, see comment above
+                    baseURI,
+                    nullptr,            // No nsIDocShell
+                    nullptr);           // No nsIRequest
   return rv;
 }
 
@@ -13719,28 +13680,28 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  nsresult rv = InternalLoad2(clonedURI,                 // New URI
-                              nullptr,                   // Original URI
-                              false,                     // LoadReplace
-                              false,                     // IsFromProcessingFrameAttributes
-                              referer,                   // Referer URI
-                              refererPolicy,             // Referer policy
-                              aContent->NodePrincipal(), // Owner is our node's
-                                                         // principal
-                              flags,
-                              target.get(),              // Window target
-                              NS_LossyConvertUTF16toASCII(typeHint).get(),
-                              aFileName,                 // Download as file
-                              aPostDataStream,           // Post data stream
-                              aHeadersDataStream,        // Headers stream
-                              LOAD_LINK,                 // Load type
-                              nullptr,                   // No SHEntry
-                              true,                      // first party site
-                              NullString(),              // No srcdoc
-                              this,                      // We are the source
-                              nullptr,                   // baseURI not needed
-                              aDocShell,                 // DocShell out-param
-                              aRequest);                 // Request out-param
+  nsresult rv = InternalLoad(clonedURI,                 // New URI
+                             nullptr,                   // Original URI
+                             false,                     // LoadReplace
+                             false,                     // IsFromProcessingFrameAttributes
+                             referer,                   // Referer URI
+                             refererPolicy,             // Referer policy
+                             aContent->NodePrincipal(), // Owner is our node's
+                                                        // principal
+                             flags,
+                             target.get(),              // Window target
+                             NS_LossyConvertUTF16toASCII(typeHint).get(),
+                             aFileName,                 // Download as file
+                             aPostDataStream,           // Post data stream
+                             aHeadersDataStream,        // Headers stream
+                             LOAD_LINK,                 // Load type
+                             nullptr,                   // No SHEntry
+                             true,                      // first party site
+                             NullString(),              // No srcdoc
+                             this,                      // We are the source
+                             nullptr,                   // baseURI not needed
+                             aDocShell,                 // DocShell out-param
+                             aRequest);                 // Request out-param
   if (NS_SUCCEEDED(rv)) {
     DispatchPings(aContent, aURI, referer, refererPolicy);
   }

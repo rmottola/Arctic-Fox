@@ -259,7 +259,7 @@ Http2Decompressor::DecodeHeaderBlock(const uint8_t *data, uint32_t datalen,
   mIsPush = isPush;
 
   nsresult rv = NS_OK;
-  while (NS_SUCCEEDED(rv) && (mOffset < datalen)) {
+  while (NS_SUCCEEDED(rv) && (mOffset < mDataLen)) {
     if (mData[mOffset] & 0x80) {
       rv = DoIndexed();
       LOG(("Decompressor state after indexed"));
@@ -473,6 +473,11 @@ nsresult
 Http2Decompressor::DecodeFinalHuffmanCharacter(HuffmanIncomingTable *table,
                                                uint8_t &c, uint8_t &bitsLeft)
 {
+  MOZ_ASSERT(mOffset <= mDataLen);
+  if (mOffset > mDataLen) {
+    NS_WARNING("DecodeFinalHuffmanCharacter would read beyond end of buffer");
+    return NS_ERROR_FAILURE;
+  }
   uint8_t mask = (1 << bitsLeft) - 1;
   uint8_t idx = mData[mOffset - 1] & mask;
   idx <<= (8 - bitsLeft);
@@ -513,6 +518,7 @@ Http2Decompressor::ExtractByte(uint8_t bitsLeft, uint32_t &bytesConsumed)
   uint8_t rv;
 
   if (bitsLeft) {
+    MOZ_DIAGNOSTIC_ASSERT(mOffset < mDataLen);
     // Need to extract bitsLeft bits from the previous byte, and 8 - bitsLeft
     // bits from the current byte
     uint8_t mask = (1 << bitsLeft) - 1;
@@ -540,8 +546,8 @@ Http2Decompressor::DecodeHuffmanCharacter(HuffmanIncomingTable *table,
   HuffmanIncomingEntry *entry = &(table->mEntries[idx]);
 
   if (entry->mPtr) {
-    if (bytesConsumed >= mDataLen) {
-      if (!bitsLeft || (bytesConsumed > mDataLen)) {
+    if (mOffset >= mDataLen) {
+      if (!bitsLeft || (mOffset > mDataLen)) {
         // TODO - does this get me into trouble in the new world?
         // No info left in input to try to consume, we're done
         LOG(("DecodeHuffmanCharacter all out of bits to consume, can't chain"));
@@ -679,6 +685,13 @@ Http2Decompressor::DoLiteralInternal(nsACString &name, nsACString &value,
   if (NS_FAILED(rv))
     return rv;
 
+  // sanity check
+  if (mOffset >= mDataLen) {
+    NS_WARNING("Http2 Decompressor ran out of data");
+    // This is session-fatal
+    return NS_ERROR_FAILURE;
+  }
+
   bool isHuffmanEncoded;
 
   if (!index) {
@@ -704,6 +717,13 @@ Http2Decompressor::DoLiteralInternal(nsACString &name, nsACString &value,
   }
   if (NS_FAILED(rv))
     return rv;
+
+  // sanity check
+  if (mOffset >= mDataLen) {
+    NS_WARNING("Http2 Decompressor ran out of data");
+    // This is session-fatal
+    return NS_ERROR_FAILURE;
+  }
 
   // now the value
   uint32_t valueLen;

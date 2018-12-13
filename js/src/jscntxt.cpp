@@ -865,11 +865,11 @@ js_ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
 }
 
 bool
-js_ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumber,
-                         int spindex, HandleValue v, HandleString fallback,
-                         const char* arg1, const char* arg2)
+js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumber,
+                          int spindex, HandleValue v, HandleString fallback,
+                          const char* arg1, const char* arg2)
 {
-    char* bytes;
+    char* bytes; // XXX FIXME  RM 2018-12-10 eventually migrate to UniquePtr<char[], JS::FreePolicy> bytes;
     bool ok;
 
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount >= 1);
@@ -881,6 +881,7 @@ js_ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumb
     ok = JS_ReportErrorFlagsAndNumber(cx, flags, js_GetErrorMessage,
                                       nullptr, errorNumber, bytes, arg1, arg2);
     js_free(bytes);
+
     return ok;
 }
 

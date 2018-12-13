@@ -171,6 +171,8 @@ private:
 
   nsresult GetSecurityInfo(nsISupports **aSecurityInfo);
 
+  imgCacheValidator* GetValidator() const { return mValidator; }
+
   inline const char *GetMimeType() const {
     return mContentType.get();
   }

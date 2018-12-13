@@ -624,27 +624,31 @@ js_ReportIsNullOrUndefined(JSContext* cx, int spindex, js::HandleValue v,
 extern void
 js_ReportMissingArg(JSContext* cx, js::HandleValue v, unsigned arg);
 
+namespace js {
+
 /*
  * Report error using js_DecompileValueGenerator(cx, spindex, v, fallback) as
  * the first argument for the error message. If the error message has less
  * then 3 arguments, use null for arg1 or arg2.
  */
 extern bool
-js_ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumber,
-                         int spindex, js::HandleValue v, js::HandleString fallback,
-                         const char* arg1, const char* arg2);
+ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNumber,
+                      int spindex, HandleValue v, HandleString fallback,
+                      const char* arg1, const char* arg2);
 
-#define js_ReportValueError(cx,errorNumber,spindex,v,fallback)                \
-    ((void)js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,          \
+#define ReportValueError(cx,errorNumber,spindex,v,fallback)                   \
+    ((void)ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,             \
                                     spindex, v, fallback, nullptr, nullptr))
 
-#define js_ReportValueError2(cx,errorNumber,spindex,v,fallback,arg1)          \
-    ((void)js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,          \
+#define ReportValueError2(cx,errorNumber,spindex,v,fallback,arg1)             \
+    ((void)ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,             \
                                     spindex, v, fallback, arg1, nullptr))
 
-#define js_ReportValueError3(cx,errorNumber,spindex,v,fallback,arg1,arg2)     \
-    ((void)js_ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,          \
+#define ReportValueError3(cx,errorNumber,spindex,v,fallback,arg1,arg2)        \
+    ((void)ReportValueErrorFlags(cx, JSREPORT_ERROR, errorNumber,             \
                                     spindex, v, fallback, arg1, arg2))
+
+} /* namespace js */
 
 extern const JSErrorFormatString js_ErrorFormatString[JSErr_Limit];
 
