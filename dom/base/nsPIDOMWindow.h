@@ -23,6 +23,7 @@
 class nsIArray;
 class nsIContent;
 class nsIDocShell;
+class nsIDocShellLoadInfo;
 class nsIDocument;
 class nsIIdleObserver;
 class nsIPrincipal;
@@ -761,6 +762,14 @@ public:
   // Sends an NS_AFTER_REMOTE_PAINT message if requested by
   // SetRequestNotifyAfterRemotePaint().
   void SendAfterRemotePaintIfRequested();
+
+  // aLoadInfo will be passed on through to the windowwatcher.
+  virtual nsresult Open(const nsAString& aUrl, const nsAString& aName,
+                        const nsAString& aOptions,
+                        nsPIDOMWindow **_retval) = 0;
+  virtual nsresult OpenDialog(const nsAString& aUrl, const nsAString& aName,
+                              const nsAString& aOptions,
+                              nsISupports* aExtraArgument, nsIDOMWindow** _retval) = 0;
 
 protected:
   // The nsPIDOMWindow constructor. The aOuterWindow argument should

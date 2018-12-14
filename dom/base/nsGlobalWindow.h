@@ -871,6 +871,8 @@ public:
                                       const nsAString& aName,
                                       const nsAString& aOptions,
                                       mozilla::ErrorResult& aError);
+  nsresult Open(const nsAString& aUrl, const nsAString& aName,
+                const nsAString& aOptions, nsPIDOMWindow **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
   nsIDOMOfflineResourceList* GetApplicationCache(mozilla::ErrorResult& aError);
 
@@ -1027,6 +1029,10 @@ public:
                                             const nsAString& aOptions,
                                             const mozilla::dom::Sequence<JS::Value>& aExtraArgument,
                                             mozilla::ErrorResult& aError);
+  nsresult
+  OpenDialog(const nsAString& aUrl, const nsAString& aName,
+             const nsAString& aOptions,
+             nsISupports* aExtraArgument, nsIDOMWindow** _retval) override;
   void GetContent(JSContext* aCx,
                   JS::MutableHandle<JSObject*> aRetval,
                   mozilla::ErrorResult& aError);

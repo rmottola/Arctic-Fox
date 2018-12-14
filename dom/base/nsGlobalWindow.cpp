@@ -7666,22 +7666,28 @@ nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
   return window.forget();
 }
 
-NS_IMETHODIMP
+
+nsresult
 nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
-                     const nsAString& aOptions, nsIDOMWindow **_retval)
+                     const nsAString& aOptions, nsPIDOMWindow **_retval)
 {
   FORWARD_TO_OUTER(Open, (aUrl, aName, aOptions, _retval),
                    NS_ERROR_NOT_INITIALIZED);
-  return OpenInternal(aUrl, aName, aOptions,
-                      false,          // aDialog
-                      false,          // aContentModal
-                      true,           // aCalledNoScript
-                      false,          // aDoJSFixups
-                      true,           // aNavigate
-                      nullptr, nullptr,  // No args
-                      GetPrincipal(),    // aCalleePrincipal
-                      nullptr,           // aJSCallerContext
-                      _retval);
+  nsCOMPtr<nsIDOMWindow> window;
+  nsresult rv = OpenInternal(aUrl, aName, aOptions,
+                             false,          // aDialog
+                             false,          // aContentModal
+                             true,           // aCalledNoScript
+                             false,          // aDoJSFixups
+                             true,           // aNavigate
+                             nullptr, nullptr,  // No args
+                             GetPrincipal(),    // aCalleePrincipal
+                             nullptr,           // aJSCallerContext
+                             getter_AddRefs(window));
+  if (NS_SUCCEEDED(rv) && window) {
+    return CallQueryInterface(window, _retval);
+  }
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -7704,7 +7710,7 @@ nsGlobalWindow::OpenJS(const nsAString& aUrl, const nsAString& aName,
 
 // like Open, but attaches to the new window any extra parameters past
 // [features] as a JS property named "arguments"
-NS_IMETHODIMP
+nsresult
 nsGlobalWindow::OpenDialog(const nsAString& aUrl, const nsAString& aName,
                            const nsAString& aOptions,
                            nsISupports* aExtraArgument, nsIDOMWindow** _retval)
