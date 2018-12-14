@@ -392,6 +392,8 @@ nsNumberControlFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
     nsContentUtils::AddScriptRunner(focusJob);
   }
 
+  SyncDisabledState(); // Sync disabled state of 'mTextField'.
+
   if (StyleDisplay()->mAppearance == NS_THEME_TEXTFIELD) {
     // The author has elected to hide the spinner by setting this
     // -moz-appearance. We will reframe if it changes.
@@ -422,8 +424,6 @@ nsNumberControlFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
                             nsGkAtoms::div,
                             nsCSSPseudoElements::ePseudo_mozNumberSpinDown,
                             spinBoxCI.mStyleContext);
-
-  SyncDisabledState();
 
   return rv;
 }
@@ -641,14 +641,16 @@ nsNumberControlFrame::HandleFocusEvent(WidgetEvent* aEvent)
 {
   if (aEvent->originalTarget != mTextField) {
     // Move focus to our text field
-    HTMLInputElement::FromContent(mTextField)->Focus();
+    nsRefPtr<HTMLInputElement> textField = HTMLInputElement::FromContent(mTextField);
+    textField->Focus();
   }
 }
 
 nsresult
 nsNumberControlFrame::HandleSelectCall()
 {
-  return HTMLInputElement::FromContent(mTextField)->Select();
+  nsRefPtr<HTMLInputElement> textField = HTMLInputElement::FromContent(mTextField);
+  return textField->Select();
 }
 
 #define STYLES_DISABLING_NATIVE_THEMING \
