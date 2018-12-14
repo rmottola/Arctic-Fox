@@ -3113,6 +3113,8 @@ namespace Telemetry {
 void
 Accumulate(ID aHistogram, uint32_t aSample)
 {
+return;
+/*
   if (!TelemetryImpl::CanRecord()) {
     return;
   }
@@ -3120,11 +3122,14 @@ Accumulate(ID aHistogram, uint32_t aSample)
   nsresult rv = GetHistogramByEnumId(aHistogram, &h);
   if (NS_SUCCEEDED(rv))
     h->Add(aSample);
+*/
 }
 
 void
 Accumulate(ID aID, const nsCString& aKey, uint32_t aSample)
 {
+return;
+/*
   if (!TelemetryImpl::CanRecord()) {
     return;
   }
@@ -3137,11 +3142,14 @@ Accumulate(ID aID, const nsCString& aKey, uint32_t aSample)
   if (histogram) {
     histogram->Add(aSample);
   }
+*/
 }
 
 void
 Accumulate(const char* name, uint32_t sample)
 {
+return;
+/*
   if (!TelemetryImpl::CanRecord()) {
     return;
   }
@@ -3156,19 +3164,23 @@ Accumulate(const char* name, uint32_t sample)
   if (NS_SUCCEEDED(rv)) {
     h->Add(sample);
   }
+*/
 }
 
 void
 AccumulateTimeDelta(ID aHistogram, TimeStamp start, TimeStamp end)
 {
+return;
+/*
   Accumulate(aHistogram,
              static_cast<uint32_t>((end - start).ToMilliseconds()));
+*/
 }
 
 bool
 CanRecord()
 {
-  return TelemetryImpl::CanRecord();
+  return false; // TelemetryImpl::CanRecord();
 }
 
 base::Histogram*
@@ -3184,7 +3196,9 @@ RecordSlowSQLStatement(const nsACString &statement,
                        const nsACString &dbName,
                        uint32_t delay)
 {
+/*
   TelemetryImpl::RecordSlowStatement(statement, dbName, delay);
+*/
 }
 
 void Init()
@@ -3362,7 +3376,7 @@ NSMODULE_DEFN(nsTelemetryModule) = &kTelemetryModule;
 void
 XRE_TelemetryAccumulate(int aID, uint32_t aSample)
 {
-  mozilla::Telemetry::Accumulate((mozilla::Telemetry::ID) aID, aSample);
+//  mozilla::Telemetry::Accumulate((mozilla::Telemetry::ID) aID, aSample);
 }
 
 KeyedHistogram::KeyedHistogram(const nsACString &name, const nsACString &expiration,
