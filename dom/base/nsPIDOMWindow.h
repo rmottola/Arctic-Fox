@@ -766,6 +766,7 @@ public:
   // aLoadInfo will be passed on through to the windowwatcher.
   virtual nsresult Open(const nsAString& aUrl, const nsAString& aName,
                         const nsAString& aOptions,
+			nsIDocShellLoadInfo* aLoadInfo,
                         nsPIDOMWindow **_retval) = 0;
   virtual nsresult OpenDialog(const nsAString& aUrl, const nsAString& aName,
                               const nsAString& aOptions,

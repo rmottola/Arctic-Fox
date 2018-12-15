@@ -22,7 +22,7 @@
 class  nsIURI;
 class  nsIDocShellTreeItem;
 class  nsIDocShellTreeOwner;
-class nsPIDOMWindow;
+class  nsPIDOMWindow;
 class  nsIWebBrowserChrome;
 class  nsString;
 class  nsWatcherWindowEnumerator;
@@ -86,6 +86,7 @@ protected:
                               bool aNavigate,
                               nsITabParent *aOpeningTab,
                               nsIArray *argv,
+			      nsIDocShellLoadInfo* aLoadInfo,
                               nsIDOMWindow **_retval);
 
   static nsresult   URIfromURL(const char *aURL,

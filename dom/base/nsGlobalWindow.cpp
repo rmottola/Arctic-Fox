@@ -7669,9 +7669,10 @@ nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
 
 nsresult
 nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
-                     const nsAString& aOptions, nsPIDOMWindow **_retval)
+                     const nsAString& aOptions, nsIDocShellLoadInfo* aLoadInfo,
+		     nsPIDOMWindow **_retval)
 {
-  FORWARD_TO_OUTER(Open, (aUrl, aName, aOptions, _retval),
+  FORWARD_TO_OUTER(Open, (aUrl, aName, aOptions, aLoadInfo, _retval),
                    NS_ERROR_NOT_INITIALIZED);
   nsCOMPtr<nsIDOMWindow> window;
   nsresult rv = OpenInternal(aUrl, aName, aOptions,
@@ -7681,6 +7682,7 @@ nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
                              false,          // aDoJSFixups
                              true,           // aNavigate
                              nullptr, nullptr,  // No args
+			     aLoadInfo,
                              GetPrincipal(),    // aCalleePrincipal
                              nullptr,           // aJSCallerContext
                              getter_AddRefs(window));
@@ -7703,6 +7705,7 @@ nsGlobalWindow::OpenJS(const nsAString& aUrl, const nsAString& aName,
                       true,           // aDoJSFixups
                       true,           // aNavigate
                       nullptr, nullptr,  // No args
+		      nullptr,        // aLoadInfo
                       GetPrincipal(),    // aCalleePrincipal
                       nsContentUtils::GetCurrentJSContext(), // aJSCallerContext
                       _retval);
@@ -7723,9 +7726,10 @@ nsGlobalWindow::OpenDialog(const nsAString& aUrl, const nsAString& aName,
                       true,                    // aCalledNoScript
                       false,                   // aDoJSFixups
                       true,                    // aNavigate
-                      nullptr, aExtraArgument,    // Arguments
-                      GetPrincipal(),             // aCalleePrincipal
-                      nullptr,                    // aJSCallerContext
+                      nullptr, aExtraArgument, // Arguments
+                      nullptr,                 // aLoadInfo
+                      GetPrincipal(),          // aCalleePrincipal
+                      nullptr,                 // aJSCallerContext
                       _retval);
 }
 
@@ -7744,6 +7748,7 @@ nsGlobalWindow::OpenNoNavigate(const nsAString& aUrl,
                       false,          // aDoJSFixups
                       false,          // aNavigate
                       nullptr, nullptr,  // No args
+                      nullptr,           // aLoadInfo
                       GetPrincipal(),    // aCalleePrincipal
                       nullptr,           // aJSCallerContext
                       _retval);
@@ -7776,6 +7781,7 @@ nsGlobalWindow::OpenDialog(JSContext* aCx, const nsAString& aUrl,
                         false,            // aDoJSFixups
                         true,                // aNavigate
                         argvArray, nullptr,  // Arguments
+                        nullptr  ,           // aLoadInfo
                         GetPrincipal(),      // aCalleePrincipal
                         aCx,                 // aJSCallerContext
                         getter_AddRefs(dialog));
@@ -7827,6 +7833,7 @@ nsGlobalWindow::OpenDialog(const nsAString& aUrl, const nsAString& aName,
                       false,            // aDoJSFixups
                       true,                // aNavigate
                       argvArray, nullptr,  // Arguments
+                      nullptr,             // aLoadInfo
                       GetPrincipal(),      // aCalleePrincipal
                       cx,                  // aJSCallerContext
                       _retval);
@@ -9370,6 +9377,7 @@ nsGlobalWindow::ShowModalDialog(const nsAString& aUrl, nsIVariant* aArgument,
                         true,           // aDoJSFixups
                         true,           // aNavigate
                         nullptr, argHolder, // args
+                        nullptr,            // aLoadInfo
                         GetPrincipal(),     // aCalleePrincipal
                         nullptr,            // aJSCallerContext
                         getter_AddRefs(dlgWin));
@@ -11875,6 +11883,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
                              bool aDoJSFixups, bool aNavigate,
                              nsIArray *argv,
                              nsISupports *aExtraArgument,
+			     nsIDocShellLoadInfo* aLoadInfo,
                              nsIPrincipal *aCalleePrincipal,
                              JSContext *aJSCallerContext,
                              nsIDOMWindow **aReturn)
@@ -11992,6 +12001,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
       rv = pwwatch->OpenWindow2(this, url.get(), name_ptr, options_ptr,
                                 /* aCalledFromScript = */ true,
                                 aDialog, aNavigate, nullptr, argv,
+				aLoadInfo,
                                 getter_AddRefs(domReturn));
     } else {
       // Force a system caller here so that the window watcher won't screw us
@@ -12012,6 +12022,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
       rv = pwwatch->OpenWindow2(this, url.get(), name_ptr, options_ptr,
                                 /* aCalledFromScript = */ false,
                                 aDialog, aNavigate, nullptr, aExtraArgument,
+				aLoadInfo,
                                 getter_AddRefs(domReturn));
 
     }

@@ -872,7 +872,9 @@ public:
                                       const nsAString& aOptions,
                                       mozilla::ErrorResult& aError);
   nsresult Open(const nsAString& aUrl, const nsAString& aName,
-                const nsAString& aOptions, nsPIDOMWindow **_retval) override;
+                const nsAString& aOptions,
+		nsIDocShellLoadInfo* aLoadInfo,
+		nsPIDOMWindow **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
   nsIDOMOfflineResourceList* GetApplicationCache(mozilla::ErrorResult& aError);
 
@@ -1203,10 +1205,10 @@ private:
    *        three args, if present, will be aUrl, aName, and aOptions.  So this
    *        param only matters if there are more than 3 arguments.
    *
-   * @param argc The number of arguments in argv.
-   *
    * @param aExtraArgument Another way to pass arguments in.  This is mutually
    *        exclusive with the argv/argc approach.
+   *
+   * @param aLoadInfo to be passed on along to the windowwatcher.
    *
    * @param aJSCallerContext The calling script's context. This must be null
    *        when aCalledNoScript is true.
@@ -1225,6 +1227,7 @@ private:
                                     bool aNavigate,
                                     nsIArray *argv,
                                     nsISupports *aExtraArgument,
+				    nsIDocShellLoadInfo* aLoadInfo,
                                     nsIPrincipal *aCalleePrincipal,
                                     JSContext *aJSCallerContext,
                                     nsIDOMWindow **aReturn);
