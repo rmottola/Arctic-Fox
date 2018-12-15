@@ -140,6 +140,7 @@ ImageAccessible::DoAction(uint8_t aIndex)
   nsCOMPtr<nsIDOMWindow> tmp;
   return NS_SUCCEEDED(win->Open(spec, EmptyString(), EmptyString(),
                                 /* aLoadInfo = */ nullptr,
+				/* aForceNoOpener = */ false,
                                 getter_AddRefs(tmp)));
 }
 

@@ -874,6 +874,7 @@ public:
   nsresult Open(const nsAString& aUrl, const nsAString& aName,
                 const nsAString& aOptions,
 		nsIDocShellLoadInfo* aLoadInfo,
+		bool aForceNoOpener,
 		nsPIDOMWindow **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
   nsIDOMOfflineResourceList* GetApplicationCache(mozilla::ErrorResult& aError);
@@ -1209,6 +1210,9 @@ private:
    *        exclusive with the argv/argc approach.
    *
    * @param aLoadInfo to be passed on along to the windowwatcher.
+   * @param aForceNoOpener if true, will act as if "noopener" were passed in
+   *                       aOptions, but without affecting any other window
+   *                       features.
    *
    * @param aJSCallerContext The calling script's context. This must be null
    *        when aCalledNoScript is true.
@@ -1228,6 +1232,7 @@ private:
                                     nsIArray *argv,
                                     nsISupports *aExtraArgument,
 				    nsIDocShellLoadInfo* aLoadInfo,
+				    bool aForceNoOpener,
                                     nsIPrincipal *aCalleePrincipal,
                                     JSContext *aJSCallerContext,
                                     nsIDOMWindow **aReturn);
