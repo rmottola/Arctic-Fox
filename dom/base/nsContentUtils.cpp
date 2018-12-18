@@ -6759,7 +6759,7 @@ nsContentUtils::GetFullscreenAncestor(nsIDocument* aDoc)
 
 /* static */
 bool
-nsContentUtils::IsInPointerLockContext(nsIDOMWindow* aWin)
+nsContentUtils::IsInPointerLockContext(nsPIDOMWindow* aWin)
 {
   if (!aWin) {
     return false;
@@ -6771,11 +6771,8 @@ nsContentUtils::IsInPointerLockContext(nsIDOMWindow* aWin)
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> lockTop;
-  pointerLockedDoc->GetWindow()->GetScriptableTop(getter_AddRefs(lockTop));
-
-  nsCOMPtr<nsIDOMWindow> top;
-  aWin->GetScriptableTop(getter_AddRefs(top));
+  nsCOMPtr<nsPIDOMWindow> lockTop = pointerLockedDoc->GetWindow()->GetScriptableTop();
+  nsCOMPtr<nsPIDOMWindow> top = aWin->GetScriptableTop();
 
   return top == lockTop;
 }

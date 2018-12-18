@@ -78,6 +78,23 @@ public:
   virtual void ActivateOrDeactivate(bool aActivate) = 0;
 
   // this is called GetTopWindowRoot to avoid conflicts with nsIDOMWindow::GetWindowRoot
+  /**
+   * |top| gets the root of the window hierarchy.
+   *
+   * This function does not cross chrome-content boundaries, so if this
+   * window's parent is of a different type, |top| will return this window.
+   *
+   * When script reads the top property, we run GetScriptableTop, which
+   * will not cross an <iframe mozbrowser> boundary.
+   *
+   * In contrast, C++ calls to GetTop are forwarded to GetRealTop, which
+   * ignores <iframe mozbrowser> boundaries.
+   */
+
+  virtual already_AddRefed<nsPIDOMWindow> GetTop() = 0; // Outer only
+  virtual already_AddRefed<nsPIDOMWindow> GetParent() = 0;
+  virtual nsPIDOMWindow* GetScriptableTop() = 0;
+  virtual nsPIDOMWindow* GetScriptableParent() = 0;
   virtual already_AddRefed<nsPIWindowRoot> GetTopWindowRoot() = 0;
 
   // Inner windows only.

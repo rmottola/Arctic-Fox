@@ -253,7 +253,7 @@ CollectWindowReports(nsGlobalWindow *aWindow,
   if (aWindow->GetOuterWindow()) {
     // Our window should have a null top iff it has a null docshell.
     MOZ_ASSERT(!!aWindow->GetTop() == !!aWindow->GetDocShell());
-    top = aWindow->GetTop();
+    top = aWindow->GetTopInternal();
     if (top) {
       location = GetWindowURI(top);
     }
@@ -763,7 +763,7 @@ CheckForGhostWindowsEnumerator(nsISupports *aKey, TimeStamp& aTimeStamp,
   // overflow.
   nsCOMPtr<nsIDOMWindow> top;
   if (window->GetOuterWindow()) {
-    window->GetTop(getter_AddRefs(top));
+    top = window->GetOuterWindow()->GetTop();
   }
 
   if (top) {
@@ -820,7 +820,7 @@ GetNonDetachedWindowDomainsEnumerator(const uint64_t& aId, nsGlobalWindow* aWind
 
   // Null outer window implies null top, but calling GetTop() when there's no
   // outer window causes us to spew debug warnings.
-  if (!aWindow->GetOuterWindow() || !aWindow->GetTop()) {
+  if (!aWindow->GetOuterWindow() || !aWindow->GetTopInternal()) {
     // This window is detached, so we don't care about its domain.
     return PL_DHASH_NEXT;
   }
