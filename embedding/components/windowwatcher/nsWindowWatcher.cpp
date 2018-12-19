@@ -776,7 +776,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow *aParent,
     }
   }
   
-  rv = ReadyOpenedDocShellItem(newDocShellItem, aParent, windowIsNew, _retval);
+  rv = ReadyOpenedDocShellItem(newDocShellItem, parentWindow, windowIsNew, _retval);
   if (NS_FAILED(rv))
     return rv;
 
@@ -1776,7 +1776,7 @@ nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
    is acceptable. */
 nsresult
 nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem *aOpenedItem,
-                                         nsIDOMWindow        *aParent,
+                                         nsPIDOMWindow        *aParent,
                                          bool                aWindowIsNew,
                                          nsIDOMWindow        **aOpenedWindow)
 {

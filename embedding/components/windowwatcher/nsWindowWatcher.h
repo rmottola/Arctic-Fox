@@ -105,7 +105,7 @@ protected:
   /* Compute the right SizeSpec based on aFeatures */
   static void       CalcSizeSpec(const char* aFeatures, SizeSpec& aResult);
   static nsresult   ReadyOpenedDocShellItem(nsIDocShellTreeItem *aOpenedItem,
-                                            nsIDOMWindow *aParent,
+                                            nsPIDOMWindow *aParent,
                                             bool aWindowIsNew,
                                             nsIDOMWindow **aOpenedWindow);
   static void       SizeOpenedDocShellItem(nsIDocShellTreeItem *aDocShellItem,

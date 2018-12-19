@@ -407,7 +407,7 @@ public:
    * SetOpenerWindow is called.  It might never be true, of course, if the
    * window does not have an opener when it's created.
    */
-  virtual void SetOpenerWindow(nsIDOMWindow* aOpener,
+  virtual void SetOpenerWindow(nsPIDOMWindow* aOpener,
                                bool aOriginalOpener) = 0;
 
   virtual void EnsureSizeUpToDate() = 0;
@@ -780,6 +780,7 @@ public:
   // SetRequestNotifyAfterRemotePaint().
   void SendAfterRemotePaintIfRequested();
 
+  virtual already_AddRefed<nsPIDOMWindow> GetOpener() = 0;
   // aLoadInfo will be passed on through to the windowwatcher.
   // aForceNoOpener will act just like a "noopener" feature in aOptions except
   //                will not affect any other window features.

@@ -2964,7 +2964,7 @@ nsGlobalWindow::DetachFromDocShell()
 }
 
 void
-nsGlobalWindow::SetOpenerWindow(nsIDOMWindow* aOpener,
+nsGlobalWindow::SetOpenerWindow(nsPIDOMWindow* aOpener,
                                 bool aOriginalOpener)
 {
   FORWARD_TO_OUTER_VOID(SetOpenerWindow, (aOpener, aOriginalOpener));
@@ -2975,10 +2975,6 @@ nsGlobalWindow::SetOpenerWindow(nsIDOMWindow* aOpener,
   NS_ASSERTION(aOpener || !aOriginalOpener,
                "Shouldn't set mHadOriginalOpener if aOpener is null");
 
-#ifdef DEBUG
-  nsCOMPtr<nsPIDOMWindow> opener = do_QueryInterface(aOpener);
-  MOZ_ASSERT(!opener || opener->IsOuterWindow());
-#endif
   mOpener = do_GetWeakReference(aOpener);
   NS_ASSERTION(mOpener || !aOpener, "Opener must support weak references!");
 
@@ -4557,13 +4553,16 @@ nsGlobalWindow::GetScriptableOpener(JSContext* aCx,
   return rv.ErrorCode();
 }
 
-NS_IMETHODIMP
-nsGlobalWindow::GetOpener(nsIDOMWindow** aOpener)
+
+already_AddRefed<nsPIDOMWindow>
+nsGlobalWindow::GetOpener()
 {
-  ErrorResult rv;
-  nsCOMPtr<nsIDOMWindow> opener = GetOpenerWindow(rv);
-  opener.forget(aOpener);
-  return rv.ErrorCode();
+  FORWARD_TO_INNER(GetOpener, (), nullptr);
+
+  ErrorResult dummy;
+  nsCOMPtr<nsPIDOMWindow> opener = GetOpenerWindow(dummy);
+  dummy.SuppressException();
+  return opener.forget();
 }
 
 void
@@ -4636,12 +4635,6 @@ nsGlobalWindow::SetScriptableOpener(JSContext* aCx,
   return rv.ErrorCode();
 }
 
-NS_IMETHODIMP
-nsGlobalWindow::SetOpener(nsIDOMWindow* aOpener)
-{
-  SetOpenerWindow(aOpener, false);
-  return NS_OK;
-}
 
 void
 nsGlobalWindow::GetStatus(nsAString& aStatus, ErrorResult& aError)
@@ -6583,8 +6576,7 @@ nsGlobalWindow::Focus(ErrorResult& aError)
 
   nsCOMPtr<nsPIDOMWindow> caller = do_QueryInterface(GetEntryGlobal());
   caller = caller ? caller->GetOuterWindow() : nullptr;
-  nsCOMPtr<nsIDOMWindow> opener;
-  GetOpener(getter_AddRefs(opener));
+  nsCOMPtr<nsIDOMWindow> opener = GetOpener();
 
   // Enforce dom.disable_window_flip (for non-chrome), but still allow the
   // window which opened us to raise us at times when popups are allowed

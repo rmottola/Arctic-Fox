@@ -96,9 +96,6 @@ interface nsIDOMWindow : nsISupports
   [implicit_jscontext, binaryname(ScriptableOpener)]
            attribute jsval                              opener;
 
-  [noscript, binaryname(Opener)]
-           attribute nsIDOMWindow                       openerWindow;
-
   /**
    * |frameElement| gets this window's <iframe> or <frame> element, if it has
    * one.
