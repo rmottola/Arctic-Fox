@@ -3,9 +3,9 @@ Yet unapplied Mozilla patches:
 - 1499861 - issues when backporting on other collections
 - 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
-
 - 1114580 - toStringTag - several diffs still to analyze
-- 1235656 - 3 parts to merge in
+- 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- 1222516 part 4. Implement support for rel=noopener on links. - apply part3 before
 
 
 
@@ -16,10 +16,16 @@ Further ToDo which would help portability:
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - js/src/jscntxt.h  update ReportValueError to UniquePtr
+- in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
+- inherit principal vs. inherit owner in DocShell see INTERNAL_LOAD_FLAGS_INHERIT_OWNER
+- update nsNullPrincipal (and nsDocShell Fixme's)
+- add PrincipalToInherit to LoadInfo
+- LoadFrame needs TriggerPrincipal & OriginalSrc
 
 Further Further ToDo:
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
+- NekcoOriginAttributes
 
 
 JS Sputink checks:
