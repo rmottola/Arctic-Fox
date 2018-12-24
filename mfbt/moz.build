@@ -60,6 +60,7 @@ EXPORTS.mozilla = [
     'Poison.h',
     'Range.h',
     'RangedPtr.h',
+    'RefCounted.h',
     'RefCountType.h',
     'ReentrancyGuard.h',
     'RefPtr.h',
