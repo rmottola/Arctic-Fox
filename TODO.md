@@ -6,6 +6,7 @@ Yet unapplied Mozilla patches:
 - 1114580 - toStringTag - several diffs still to analyze
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
 - 1222516 part 4. Implement support for rel=noopener on links. - apply part3 before
+- Bug 1184634 - Rename MediaTaskQueue to TaskQueue
 
 
 
@@ -21,6 +22,7 @@ Further ToDo which would help portability:
 - update nsNullPrincipal (and nsDocShell Fixme's)
 - add PrincipalToInherit to LoadInfo
 - LoadFrame needs TriggerPrincipal & OriginalSrc
+- move SharedThreadPool from domi/media to xpcom/threads
 
 Further Further ToDo:
 - flatten out security manager ssl
