@@ -13,7 +13,7 @@
 #include "TimeUnits.h"
 #include "mozilla/UniquePtr.h"
 #include "nsISupportsImpl.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 #include "nsTArray.h"
 
 namespace mozilla {

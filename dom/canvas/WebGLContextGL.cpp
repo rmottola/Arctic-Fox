@@ -48,6 +48,7 @@
 #include "mozilla/dom/ImageData.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/Endian.h"
+#include "mozilla/nsRefPtr.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
