@@ -4,8 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-DIRS += ['public', 'decoders', 'encoders']
-DIRS += ['build']
+DIRS += ['build', 'decoders', 'encoders']
 
 BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']
 
@@ -16,7 +15,25 @@ MOCHITEST_CHROME_MANIFESTS += ['test/mochitest/chrome.ini']
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
 
+XPIDL_SOURCES += [
+    'imgICache.idl',
+    'imgIContainer.idl',
+    'imgIContainerDebug.idl',
+    'imgIEncoder.idl',
+    'imgILoader.idl',
+    'imgINotificationObserver.idl',
+    'imgIOnloadBlocker.idl',
+    'imgIRequest.idl',
+    'imgIScriptedNotificationObserver.idl',
+    'imgITools.idl',
+    'nsIIconURI.idl',
+]
+
+XPIDL_MODULE = 'imglib2'
+
+
 EXPORTS += [
+    'ImageLogging.h',
     'ImageOps.h',
     'ImageRegion.h',
     'imgLoader.h',
