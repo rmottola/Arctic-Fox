@@ -21,7 +21,6 @@ Further ToDo which would help portability:
 - update nsNullPrincipal (and nsDocShell Fixme's)
 - add PrincipalToInherit to LoadInfo
 - LoadFrame needs TriggerPrincipal & OriginalSrc
-- in image, flatten out public/ImageLogging
 
 Further Further ToDo:
 - flatten out security manager ssl
