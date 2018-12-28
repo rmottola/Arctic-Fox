@@ -29,7 +29,7 @@ class SharedPluginTexture;
 
 #include "mozilla/TimeStamp.h"
 #include "mozilla/PluginLibrary.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 
 class nsPluginStreamListenerPeer; // browser-initiated stream class
 class nsNPAPIPluginStreamListener; // plugin-initiated stream class

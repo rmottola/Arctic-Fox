@@ -12,7 +12,7 @@
 #include <queue>
 
 #include "nsITimer.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 
 #include "mozilla/Monitor.h"
 #include "mozilla/TimeStamp.h"
