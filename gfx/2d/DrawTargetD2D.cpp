@@ -1199,7 +1199,8 @@ DrawTargetD2D::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
   if (aSurface->GetType() == SurfaceType::D2D1_BITMAP ||
       aSurface->GetType() == SurfaceType::D2D1_DRAWTARGET) {
-    return aSurface;
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   RefPtr<DataSourceSurface> data = aSurface->GetDataSurface();
@@ -1276,7 +1277,7 @@ DrawTargetD2D::CreatePathBuilder(FillRule aFillRule) const
     sink->SetFillMode(D2D1_FILL_MODE_WINDING);
   }
 
-  return new PathBuilderD2D(sink, path, aFillRule, BackendType::DIRECT2D);
+  return MakeAndAddRef<PathBuilderD2D>(sink, path, aFillRule, BackendType::DIRECT2D);
 }
 
 TemporaryRef<GradientStops>
@@ -1302,7 +1303,7 @@ DrawTargetD2D::CreateGradientStops(GradientStop *rawStops, uint32_t aNumStops, E
     return nullptr;
   }
 
-  return new GradientStopsD2D(stopCollection, Factory::GetDirect3D11Device());
+  return MakeAndAddRef<GradientStopsD2D>(stopCollection, Factory::GetDirect3D11Device());
 }
 
 TemporaryRef<FilterNode>

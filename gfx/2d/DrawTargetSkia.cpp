@@ -649,7 +649,8 @@ TemporaryRef<SourceSurface>
 DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
   if (aSurface->GetType() == SurfaceType::SKIA) {
-    return aSurface;
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   if (!UsingSkiaGPU()) {
@@ -686,7 +687,7 @@ DrawTargetSkia::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurfa
       return nullptr;
     }
     cairo_surface_t* surf = static_cast<cairo_surface_t*>(aSurface.mSurface);
-    return new SourceSurfaceCairo(surf, aSurface.mSize, aSurface.mFormat);
+    return MakeAndAddRef<SourceSurfaceCairo>(surf, aSurface.mSize, aSurface.mFormat);
 #if USE_SKIA_GPU
   } else if (aSurface.mType == NativeSurfaceType::OPENGL_TEXTURE) {
     RefPtr<SourceSurfaceSkia> newSurf = new SourceSurfaceSkia();
@@ -873,7 +874,7 @@ DrawTargetSkia::GetNativeSurface(NativeSurfaceType aType)
 TemporaryRef<PathBuilder>
 DrawTargetSkia::CreatePathBuilder(FillRule aFillRule) const
 {
-  return new PathBuilderSkia(aFillRule);
+  return MakeAndAddRef<PathBuilderSkia>(aFillRule);
 }
 
 void
@@ -926,7 +927,7 @@ DrawTargetSkia::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops, Ex
   }
   std::stable_sort(stops.begin(), stops.end());
 
-  return new GradientStopsSkia(stops, aNumStops, aExtendMode);
+  return MakeAndAddRef<GradientStopsSkia>(stops, aNumStops, aExtendMode);
 }
 
 TemporaryRef<FilterNode>

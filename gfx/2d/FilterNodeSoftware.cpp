@@ -1299,7 +1299,8 @@ static TemporaryRef<DataSourceSurface>
 Premultiply(DataSourceSurface* aSurface)
 {
   if (aSurface->GetFormat() == SurfaceFormat::A8) {
-    return aSurface;
+    RefPtr<DataSourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   IntSize size = aSurface->GetSize();
@@ -1324,7 +1325,8 @@ static TemporaryRef<DataSourceSurface>
 Unpremultiply(DataSourceSurface* aSurface)
 {
   if (aSurface->GetFormat() == SurfaceFormat::A8) {
-    return aSurface;
+    RefPtr<DataSourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   IntSize size = aSurface->GetSize();
