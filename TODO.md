@@ -44,6 +44,8 @@ Further Further ToDo:
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
 
+Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
+
 
 JS Sputink checks:
 
