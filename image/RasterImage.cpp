@@ -731,7 +731,7 @@ RasterImage::CopyFrame(uint32_t aWhichFrame, uint32_t aFlags)
   target->Flush();
   surf->Unmap();
 
-  return surf;
+  return surf.forget();
 }
 
 //******************************************************************************
@@ -781,7 +781,7 @@ RasterImage::GetFrameInternal(uint32_t aWhichFrame, uint32_t aFlags)
     frameSurf = CopyFrame(aWhichFrame, aFlags);
   }
 
-  return frameSurf;
+  return frameSurf.forget();
 }
 
 already_AddRefed<layers::Image>

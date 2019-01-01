@@ -335,7 +335,7 @@ MediaCodecReader::DispatchAudioTask()
     RefPtr<nsIRunnable> task =
       NS_NewRunnableMethod(this,
                            &MediaCodecReader::DecodeAudioDataTask);
-    mAudioTrack.mTaskQueue->Dispatch(task);
+    mAudioTrack.mTaskQueue->Dispatch(task.forget());
   }
 }
 
@@ -347,7 +347,7 @@ MediaCodecReader::DispatchVideoTask(int64_t aTimeThreshold)
       NS_NewRunnableMethodWithArg<int64_t>(this,
                                            &MediaCodecReader::DecodeVideoFrameTask,
                                            aTimeThreshold);
-    mVideoTrack.mTaskQueue->Dispatch(task);
+    mVideoTrack.mTaskQueue->Dispatch(task.forget());
   }
 }
 
@@ -807,7 +807,7 @@ MediaCodecReader::TextureClientRecycleCallback(TextureClient* aClient)
     RefPtr<nsIRunnable> task =
       NS_NewRunnableMethod(this,
                            &MediaCodecReader::WaitFenceAndReleaseOutputBuffer);
-    mVideoTrack.mReleaseBufferTaskQueue->Dispatch(task);
+    mVideoTrack.mReleaseBufferTaskQueue->Dispatch(task.forget());
   }
 }
 

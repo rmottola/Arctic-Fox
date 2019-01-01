@@ -223,7 +223,8 @@ DrawTargetD2D::Snapshot()
     Flush();
   }
 
-  return mSnapshot;
+  RefPtr<SourceSurface> snapshot(mSnapshot);
+  return snapshot.forget();
 }
 
 void
@@ -317,7 +318,7 @@ DrawTargetD2D::GetBitmapForSurface(SourceSurface *aSurface,
     break;
   }
 
-  return bitmap;
+  return bitmap.forget();
 }
 
 TemporaryRef<ID2D1Image>
@@ -328,7 +329,7 @@ DrawTargetD2D::GetImageForSurface(SourceSurface *aSurface)
   Rect r(Point(), Size(aSurface->GetSize()));
   image = GetBitmapForSurface(aSurface, r);
 
-  return image;
+  return image.forget();
 }
 
 void
@@ -1858,7 +1859,8 @@ DrawTargetD2D::GetClippedGeometry(IntRect *aClipBounds)
 {
   if (mCurrentClippedGeometry) {
     *aClipBounds = mCurrentClipBounds;
-    return mCurrentClippedGeometry;
+    RefPtr<ID2D1Geometry> clippedGeometry(mCurrentClippedGeometry);
+    return clippedGeometry.forget();
   }
 
   mCurrentClipBounds = IntRect(IntPoint(0, 0), mSize);
@@ -1937,7 +1939,8 @@ DrawTargetD2D::GetClippedGeometry(IntRect *aClipBounds)
   }
   mCurrentClippedGeometry = pathGeom.forget();
   *aClipBounds = mCurrentClipBounds;
-  return mCurrentClippedGeometry;
+  RefPtr<ID2D1Geometry> clippedGeometry(mCurrentClippedGeometry);
+  return clippedGeometry.forget();
 }
 
 TemporaryRef<ID2D1RenderTarget>

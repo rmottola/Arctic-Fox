@@ -454,7 +454,7 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
     mContext->ClearRenderTargetView(rt->mRTView, clear);
   }
 
-  return rt;
+  return rt.forget();
 }
 
 TemporaryRef<CompositingRenderTarget>
@@ -513,7 +513,7 @@ CompositorD3D11::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
     new CompositingRenderTargetD3D11(texture, aRect.TopLeft());
   rt->SetSize(aRect.Size());
 
-  return rt;
+  return rt.forget();
 }
 
 void

@@ -127,7 +127,7 @@ MediaOmxCommonDecoder::PauseStateMachine()
       GetStateMachine(),
       &MediaDecoderStateMachine::SetDormant,
       true);
-  GetStateMachine()->TaskQueue()->Dispatch(event);
+  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
 }
 
 void
@@ -158,7 +158,7 @@ MediaOmxCommonDecoder::ResumeStateMachine()
       GetStateMachine(),
       &MediaDecoderStateMachine::SetDormant,
       false);
-  GetStateMachine()->TaskQueue()->Dispatch(event);
+  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
   UpdateLogicalPosition();
 }
 

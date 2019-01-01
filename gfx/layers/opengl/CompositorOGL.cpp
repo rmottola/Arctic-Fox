@@ -1413,9 +1413,7 @@ CompositorOGL::Resume()
 TemporaryRef<DataTextureSource>
 CompositorOGL::CreateDataTextureSource(TextureFlags aFlags)
 {
-  RefPtr<DataTextureSource> result =
-    new TextureImageTextureSourceOGL(this, aFlags);
-  return result;
+  return MakeAndAddRef<TextureImageTextureSourceOGL>(this, aFlags);
 }
 
 bool

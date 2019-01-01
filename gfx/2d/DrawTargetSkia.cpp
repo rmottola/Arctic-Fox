@@ -692,7 +692,7 @@ DrawTargetSkia::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurfa
     RefPtr<SourceSurfaceSkia> newSurf = new SourceSurfaceSkia();
     unsigned int texture = (unsigned int)((uintptr_t)aSurface.mSurface);
     if (UsingSkiaGPU() && newSurf->InitFromTexture((DrawTargetSkia*)this, texture, aSurface.mSize, aSurface.mFormat)) {
-      return newSurf;
+      return newSurf.forget();
     }
     return nullptr;
 #endif

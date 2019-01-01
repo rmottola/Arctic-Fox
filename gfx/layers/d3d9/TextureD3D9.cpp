@@ -199,7 +199,7 @@ TextureSourceD3D9::InitTextures(DeviceManagerD3D9* aDeviceManager,
     return nullptr;
   }
 
-  return result;
+  return result.forget();
 }
 
 /**
@@ -247,7 +247,7 @@ TextureSourceD3D9::DataToTexture(DeviceManagerD3D9* aDeviceManager,
 
   FinishTextures(aDeviceManager, texture, surface);
 
-  return texture;
+  return texture.forget();
 }
 
 TemporaryRef<IDirect3DTexture9>
@@ -271,7 +271,7 @@ TextureSourceD3D9::TextureToTexture(DeviceManagerD3D9* aDeviceManager,
     return nullptr;
   }
 
-  return texture;
+  return texture.forget();
 }
 
 TemporaryRef<IDirect3DTexture9>
@@ -310,7 +310,7 @@ TextureSourceD3D9::SurfaceToTexture(DeviceManagerD3D9* aDeviceManager,
 
   FinishTextures(aDeviceManager, texture, surface);
 
-  return texture;
+  return texture.forget();
 }
 
 DataTextureSourceD3D9::DataTextureSourceD3D9(gfx::SurfaceFormat aFormat,
@@ -583,7 +583,7 @@ CairoTextureClientD3D9::CreateSimilar(TextureFlags aFlags, TextureAllocationFlag
     return nullptr;
   }
 
-  return tex;
+  return tex.forget();
 }
 
 bool
@@ -776,7 +776,7 @@ SharedTextureClientD3D9::Create(ISurfaceAllocator* aAllocator,
   if (texture->mTexture) {
     gfxWindowsPlatform::sD3D9SharedTextureUsed += texture->mDesc.Width * texture->mDesc.Height * 4;
   }
-  return texture;
+  return texture.forget();
 }
 
 bool

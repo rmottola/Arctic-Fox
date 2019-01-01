@@ -656,7 +656,8 @@ TemporaryRef<SourceSurface>
 DrawTargetCairo::Snapshot()
 {
   if (mSnapshot) {
-    return mSnapshot;
+    RefPtr<SourceSurface> snapshot(mSnapshot);
+    return snapshot.forget();
   }
 
   IntSize size = GetSize();
@@ -665,7 +666,8 @@ DrawTargetCairo::Snapshot()
                                      size,
                                      GfxFormatForCairoSurface(mSurface),
                                      this);
-  return mSnapshot;
+  RefPtr<SourceSurface> snapshot(mSnapshot);
+  return snapshot.forget();
 }
 
 bool

@@ -589,7 +589,7 @@ TrackBuffer::QueueInitializeDecoder(SourceBufferDecoder* aDecoder)
                                                       &TrackBuffer::InitializeDecoder,
                                                       aDecoder);
   // We need to initialize the reader on its own task queue
-  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task);
+  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task.forget());
   return true;
 }
 
@@ -1067,7 +1067,7 @@ TrackBuffer::RemoveDecoder(SourceBufferDecoder* aDecoder)
     mInitializedDecoders.RemoveElement(aDecoder);
     mDecoders.RemoveElement(aDecoder);
   }
-  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task);
+  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task.forget());
 }
 
 nsRefPtr<TrackBuffer::RangeRemovalPromise>

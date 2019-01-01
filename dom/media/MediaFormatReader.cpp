@@ -1139,7 +1139,7 @@ MediaFormatReader::Output(TrackType aTrack, MediaData* aSample)
   RefPtr<nsIRunnable> task =
     NS_NewRunnableMethodWithArgs<TrackType, MediaData*>(
       this, &MediaFormatReader::NotifyNewOutput, aTrack, aSample);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 void
@@ -1148,7 +1148,7 @@ MediaFormatReader::DrainComplete(TrackType aTrack)
   RefPtr<nsIRunnable> task =
     NS_NewRunnableMethodWithArg<TrackType>(
       this, &MediaFormatReader::NotifyDrainComplete, aTrack);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 void
@@ -1157,7 +1157,7 @@ MediaFormatReader::InputExhausted(TrackType aTrack)
   RefPtr<nsIRunnable> task =
     NS_NewRunnableMethodWithArg<TrackType>(
       this, &MediaFormatReader::NotifyInputExhausted, aTrack);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 void
@@ -1166,7 +1166,7 @@ MediaFormatReader::Error(TrackType aTrack)
   RefPtr<nsIRunnable> task =
     NS_NewRunnableMethodWithArg<TrackType>(
       this, &MediaFormatReader::NotifyError, aTrack);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 void
@@ -1538,7 +1538,7 @@ MediaFormatReader::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int6
     NS_NewRunnableMethodWithArgs<int32_t, uint64_t>(
       this, &MediaFormatReader::NotifyDemuxer,
       aLength, aOffset);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 void
@@ -1561,7 +1561,7 @@ MediaFormatReader::NotifyDataRemoved()
     NS_NewRunnableMethodWithArgs<int32_t, uint64_t>(
       this, &MediaFormatReader::NotifyDemuxer,
       0, 0);
-  GetTaskQueue()->Dispatch(task);
+  GetTaskQueue()->Dispatch(task.forget());
 }
 
 int64_t

@@ -2026,7 +2026,7 @@ gfxWindowsPlatform::CreateD3D11DecoderDevice()
 
   multi->SetMultithreadProtected(TRUE);
 
-  return device;
+  return device.forget();
 }
 
 static bool

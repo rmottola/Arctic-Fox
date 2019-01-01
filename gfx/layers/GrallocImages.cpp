@@ -406,7 +406,7 @@ GrallocImage::GetAsSourceSurface()
   rv = ConvertOmxYUVFormatToRGB565(graphicBuffer, surface, &mappedSurface, mData);
   if (rv == OK) {
     surface->Unmap();
-    return surface;
+    return surface.forget();
   }
 
   rv = ConvertVendorYUVFormatToRGB565(graphicBuffer, surface, &mappedSurface);
@@ -416,7 +416,7 @@ GrallocImage::GetAsSourceSurface()
     return nullptr;
   }
 
-  return surface;
+  return surface.forget();
 }
 
 android::sp<android::GraphicBuffer>
