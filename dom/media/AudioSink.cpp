@@ -47,7 +47,8 @@ AudioSink::OnAudioEndTimeUpdateTask::Dispatch(int64_t aEndTime) {
   MutexAutoLock lock(mMutex);
   if (mStateMachine) {
     mEndTime = aEndTime;
-    mStateMachine->TaskQueue()->Dispatch(this);
+    nsRefPtr<AudioSink::OnAudioEndTimeUpdateTask> runnable(this);
+    mStateMachine->TaskQueue()->Dispatch(runnable.forget());
   }
 }
 

@@ -161,11 +161,12 @@ GonkMediaDataDecoder::Shutdown()
 nsresult
 GonkMediaDataDecoder::Input(MediaRawData* aSample)
 {
-  mTaskQueue->Dispatch(
+  nsCOMPtr<nsIRunnable> runnable(
     NS_NewRunnableMethodWithArg<nsRefPtr<MediaRawData>>(
       this,
       &GonkMediaDataDecoder::ProcessDecode,
       nsRefPtr<MediaRawData>(aSample)));
+  mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
 }
 
@@ -258,7 +259,9 @@ GonkMediaDataDecoder::ProcessDrain()
 nsresult
 GonkMediaDataDecoder::Drain()
 {
-  mTaskQueue->Dispatch(NS_NewRunnableMethod(this, &GonkMediaDataDecoder::ProcessDrain));
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethod(this, &GonkMediaDataDecoder::ProcessDrain);
+  mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
 }
 
