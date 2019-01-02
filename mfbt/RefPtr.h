@@ -13,6 +13,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/Move.h"
 #include "mozilla/RefCounted.h"
 #include "mozilla/RefCountType.h"
 #include "mozilla/TypeTraits.h"
@@ -144,7 +145,12 @@ class TemporaryRef
   typedef typename RefPtr<T>::DontRef DontRef;
 
 public:
-  MOZ_IMPLICIT TemporaryRef(T* aVal) : mPtr(RefPtr<T>::ref(aVal)) {}
+  // Please see already_AddRefed for a description of what these constructors
+  // do.
+  TemporaryRef() : mPtr(nullptr) {}
+  typedef void (TemporaryRef::* MatchNullptr)(double, float);
+  MOZ_IMPLICIT TemporaryRef(MatchNullptr aRawPtr) : mPtr(nullptr) {}
+  explicit TemporaryRef(T* aVal) : mPtr(RefPtr<T>::ref(aVal)) {}
   TemporaryRef(const TemporaryRef& aOther) : mPtr(aOther.take()) {}
 
   template<typename U>
@@ -164,7 +170,6 @@ private:
 
   mutable T* MOZ_OWNING_REF mPtr;
 
-  TemporaryRef() = delete;
   void operator=(const TemporaryRef&) = delete;
 };
 
