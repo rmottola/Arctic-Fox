@@ -37,10 +37,6 @@ Yet unapplied Mozilla patches:
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
-- 1116905 - part 4 - remove implicit conversion from non-nullptr T* to TemporaryRef<T>
-- 1116905 - part 3 - remove dependence on implicit conversion from T* to TemporaryRef<T>, gfx changes;
-- 1116905 - part 2 - add MakeAndAddRef helper function to facilitate constructing TemporaryRef
-- 1116905 - part 1 - remove dependence on implicit conversion from T* to TemporaryRef<T>, non-gfx changes
 - 1114580 - toStringTag - several diffs still to analyze
 - 1041586 - Implement Symbol.isConcatSpreadable
 
