@@ -38,7 +38,11 @@ Yet unapplied Mozilla patches:
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1114580 - toStringTag - several diffs still to analyze
+- 1141862 - 6 parts
+- 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
+- 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
 - 1041586 - Implement Symbol.isConcatSpreadable
+- 1041586 - Autogenerate symbol names
 
 
 
