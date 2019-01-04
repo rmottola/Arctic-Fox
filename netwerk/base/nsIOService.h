@@ -14,14 +14,12 @@
 #include "nsIObserver.h"
 #include "nsWeakReference.h"
 #include "nsINetUtil.h"
+#include "nsINetUtil_ESR_38.h"
 #include "nsIChannelEventSink.h"
 #include "nsCategoryCache.h"
 #include "nsISpeculativeConnect.h"
 #include "nsDataHashtable.h"
-#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
-#include "prtime.h"
-#include "nsICaptivePortalService.h"
 
 #define NS_N(x) (sizeof(x)/sizeof(*x))
 
@@ -29,10 +27,9 @@
 // Intended internal use only for remoting offline/inline events.
 // See Bug 552829
 #define NS_IPC_IOSERVICE_SET_OFFLINE_TOPIC "ipc:network:set-offline"
-#define NS_IPC_IOSERVICE_SET_CONNECTIVITY_TOPIC "ipc:network:set-connectivity"
 
 static const char gScheme[][sizeof("resource")] =
-    {"chrome", "file", "http", "https", "jar", "data", "resource"};
+    {"chrome", "file", "http", "jar", "resource"};
 
 class nsAsyncRedirectVerifyHelper;
 class nsINetworkLinkService;
@@ -49,11 +46,11 @@ namespace net {
 } // namespace mozilla
 
 class nsIOService final : public nsIIOService2
-                        , public nsIObserver
-                        , public nsINetUtil
-                        , public nsISpeculativeConnect
-                        , public nsSupportsWeakReference
-                        , public nsIIOServiceInternal
+                            , public nsIObserver
+                            , public nsINetUtil
+                            , public nsINetUtil_ESR_38
+                            , public nsISpeculativeConnect
+                            , public nsSupportsWeakReference
 {
 public:
     NS_DECL_THREADSAFE_ISUPPORTS
@@ -61,8 +58,8 @@ public:
     NS_DECL_NSIIOSERVICE2
     NS_DECL_NSIOBSERVER
     NS_DECL_NSINETUTIL
+    NS_DECL_NSINETUTIL_ESR_38
     NS_DECL_NSISPECULATIVECONNECT
-    NS_DECL_NSIIOSERVICEINTERNAL
 
     // Gets the singleton instance of the IO Service, creating it as needed
     // Returns nullptr on out of memory or failure to initialize.
@@ -81,13 +78,11 @@ public:
                                     nsAsyncRedirectVerifyHelper *helper);
 
     bool IsOffline() { return mOffline; }
-    PRIntervalTime LastOfflineStateChange() { return mLastOfflineStateChange; }
-    PRIntervalTime LastConnectivityChange() { return mLastConnectivityChange; }
-    PRIntervalTime LastNetworkLinkChange() { return mLastNetworkLinkChange; }
-    bool IsShutdown() { return mShutdown; }
     bool IsLinkUp();
 
-    static bool IsDataURIUniqueOpaqueOrigin();
+    bool IsComingOnline() const {
+      return mOffline && mSettingOffline && !mSetOfflineValue;
+    }
 
     // Should only be called from NeckoChild. Use SetAppOffline instead.
     void SetAppOfflineInternal(uint32_t appId, int32_t status);
@@ -98,7 +93,6 @@ private:
     // - destroy using Release
     nsIOService();
     ~nsIOService();
-    nsresult SetConnectivityInternal(bool aConnectivity);
 
     nsresult OnNetworkLinkEvent(const char *data);
 
@@ -108,9 +102,6 @@ private:
                                                   uint32_t end=0);
     nsresult CacheProtocolHandler(const char *scheme,
                                               nsIProtocolHandler* hdlr);
-
-    nsresult InitializeCaptivePortalService();
-    nsresult RecheckCaptivePortalIfLocalRedirect(nsIChannel* newChan);
 
     // Prefs wrangling
     void PrefsChanged(nsIPrefBranch *prefs, const char *pref = nullptr);
@@ -127,25 +118,17 @@ private:
     // notify content processes of offline status
     // 'status' must be a nsIAppOfflineInfo mode constant.
     void NotifyAppOfflineStatus(uint32_t appId, int32_t status);
+    static PLDHashOperator EnumerateWifiAppsChangingState(const unsigned int &, int32_t, void*);
 
     nsresult NewChannelFromURIWithProxyFlagsInternal(nsIURI* aURI,
                                                      nsIURI* aProxyURI,
                                                      uint32_t aProxyFlags,
                                                      nsILoadInfo* aLoadInfo,
                                                      nsIChannel** result);
-
-    nsresult SpeculativeConnectInternal(nsIURI *aURI,
-                                        nsIInterfaceRequestor *aCallbacks,
-                                        bool aAnonymous);
-
 private:
     bool                                 mOffline;
     bool                                 mOfflineForProfileChange;
-    bool                                 mManageLinkStatus;
-    bool                                 mConnectivity;
-    // If true, the connectivity state will be mirrored by IOService.offline
-    // meaning if !mConnectivity, GetOffline() will return true
-    bool                                 mOfflineMirrorsConnectivity;
+    bool                                 mManageOfflineStatus;
 
     // Used to handle SetOffline() reentrancy.  See the comment in
     // SetOffline() for more details.
@@ -157,7 +140,6 @@ private:
     nsCOMPtr<nsPISocketTransportService> mSocketTransportService;
     nsCOMPtr<nsPIDNSService>             mDNSService;
     nsCOMPtr<nsIProtocolProxyService2>   mProxyService;
-    nsCOMPtr<nsICaptivePortalService>    mCaptivePortalService;
     nsCOMPtr<nsINetworkLinkService>      mNetworkLinkService;
     bool                                 mNetworkLinkServiceInitialized;
 
@@ -176,16 +158,7 @@ private:
     // that is used especially in IsAppOffline
     nsDataHashtable<nsUint32HashKey, int32_t> mAppsOfflineStatus;
 
-    //static bool                          sTelemetryEnabled;
-    static bool                          sIsDataURIUniqueOpaqueOrigin;
-
-    // These timestamps are needed for collecting telemetry on PR_Connect,
-    // PR_ConnectContinue and PR_Close blocking time.  If we spend very long
-    // time in any of these functions we want to know if and what network
-    // change has happened shortly before.
-    mozilla::Atomic<PRIntervalTime>  mLastOfflineStateChange;
-    mozilla::Atomic<PRIntervalTime>  mLastConnectivityChange;
-    mozilla::Atomic<PRIntervalTime>  mLastNetworkLinkChange;
+    static bool                          sTelemetryEnabled;
 public:
     // Used for all default buffer sizes that necko allocates.
     static uint32_t   gDefaultSegmentSize;
