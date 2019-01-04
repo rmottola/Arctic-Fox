@@ -25,4 +25,8 @@ Arctic Fox will build for Mac OS X 10.6 and up, i386/x86_64/PowerPC Linux, and m
  
  ## Downloads and Add-ons
   See the WIKI tab for prebuilt binary download links.
+  
+ ## Thanks to...
+  The Pale Moon team for making a great browser to base this off of.
+  The TenFourFox team. We borrow or backport a lot of their stuff.
 
