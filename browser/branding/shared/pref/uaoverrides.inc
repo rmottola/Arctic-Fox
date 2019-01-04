@@ -52,7 +52,7 @@ pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Fire
 pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 
 // UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
-pref("@GUAO_PREF@.web.whatsapp.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2049.0 Safari/537.36");
+pref("@GUAO_PREF@.maps.bing.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2049.0 Safari/537.36");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
