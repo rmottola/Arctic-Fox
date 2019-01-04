@@ -7,6 +7,11 @@
 #include "nsDataHandler.h"
 #include "nsNetCID.h"
 #include "nsError.h"
+#include "DataChannelChild.h"
+#include "plstr.h"
+
+#include "mozilla-config.h"
+#include "plvmx.h"
 
 static NS_DEFINE_CID(kSimpleURICID, NS_SIMPLEURI_CID);
 
@@ -18,7 +23,7 @@ nsDataHandler::nsDataHandler() {
 nsDataHandler::~nsDataHandler() {
 }
 
-NS_IMPL_ISUPPORTS(nsDataHandler, nsIProtocolHandler)
+NS_IMPL_ISUPPORTS(nsDataHandler, nsIProtocolHandler, nsISupportsWeakReference)
 
 nsresult
 nsDataHandler::Create(nsISupports* aOuter, const nsIID& aIID, void* *aResult) {
@@ -50,9 +55,16 @@ nsDataHandler::GetDefaultPort(int32_t *result) {
 
 NS_IMETHODIMP
 nsDataHandler::GetProtocolFlags(uint32_t *result) {
-    *result = URI_NORELATIVE | URI_NOAUTH | URI_INHERITS_SECURITY_CONTEXT |
+    *result = URI_NORELATIVE | URI_NOAUTH |
         URI_LOADABLE_BY_ANYONE | URI_NON_PERSISTABLE | URI_IS_LOCAL_RESOURCE |
         URI_SYNC_LOAD_IS_OK;
+
+    // From bug 1324406:
+    // data: URIs inherit the security context.
+    if (!nsIOService::IsDataURIUniqueOpaqueOrigin()) {
+        *result |= URI_INHERITS_SECURITY_CONTEXT;
+    }
+
     return NS_OK;
 }
 
@@ -62,7 +74,7 @@ nsDataHandler::NewURI(const nsACString &aSpec,
                       nsIURI *aBaseURI,
                       nsIURI **result) {
     nsresult rv;
-    nsRefPtr<nsIURI> uri;
+    RefPtr<nsIURI> uri;
 
     nsCString spec(aSpec);
 
@@ -108,9 +120,12 @@ nsDataHandler::NewChannel2(nsIURI* uri,
                            nsIChannel** result)
 {
     NS_ENSURE_ARG_POINTER(uri);
-    nsDataChannel* channel = new nsDataChannel(uri);
-    if (!channel)
-        return NS_ERROR_OUT_OF_MEMORY;
+    nsDataChannel* channel;
+    if (XRE_IsParentProcess()) {
+        channel = new nsDataChannel(uri);
+    } else {
+        channel = new mozilla::net::DataChannelChild(uri);
+    }
     NS_ADDREF(channel);
 
     nsresult rv = channel->Init();
@@ -163,8 +178,9 @@ nsDataHandler::ParseURI(nsCString& spec,
     buffer += 5;
 
     // First, find the start of the data
-    char *comma = strchr(buffer, ',');
-    if (!comma)
+    char *comma = VMX_STRCHR(buffer, ',');
+    char *hash = VMX_STRCHR(buffer, '#');
+    if (!comma || (hash && hash < comma))
         return NS_ERROR_MALFORMED_URI;
 
     *comma = '\0';
@@ -189,7 +205,7 @@ nsDataHandler::ParseURI(nsCString& spec,
         contentCharset.AssignLiteral("US-ASCII");
     } else {
         // everything else is content type
-        char *semiColon = (char *) strchr(buffer, ';');
+        char *semiColon = (char *) VMX_STRCHR(buffer, ';');
         if (semiColon)
             *semiColon = '\0';
         
@@ -219,7 +235,6 @@ nsDataHandler::ParseURI(nsCString& spec,
 
     // Split encoded data from terminal "#ref" (if present)
     char *data = comma + 1;
-    char *hash = strchr(data, '#');
     if (!hash) {
         dataBuffer.Assign(data);
         hashRef.Truncate();
