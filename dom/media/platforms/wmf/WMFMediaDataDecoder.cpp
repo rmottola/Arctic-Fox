@@ -49,15 +49,16 @@ WMFMediaDataDecoder::Init()
 nsresult
 WMFMediaDataDecoder::Shutdown()
 {
-  mTaskQueue->Dispatch(
-    NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessShutdown));
-#ifdef DEBUG
-  {
-    MonitorAutoLock mon(mMonitor);
-    // The MP4Reader should have flushed before calling Shutdown().
-    MOZ_ASSERT(!mIsDecodeTaskDispatched);
+  MOZ_DIAGNOSTIC_ASSERT(!mIsShutDown);
+
+  if (mTaskQueue) {
+    nsCOMPtr<nsIRunnable> runnable =
+      NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessShutdown);
+    mTaskQueue->Dispatch(runnable.forget());
+  } else {
+    ProcessShutdown();
   }
-#endif
+  mIsShutDown = true;
   return NS_OK;
 }
 
@@ -195,7 +196,9 @@ WMFMediaDataDecoder::ProcessDrain()
 nsresult
 WMFMediaDataDecoder::Drain()
 {
-  mTaskQueue->Dispatch(NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessDrain));
+  nsCOMPtr<nsIRunnable> runnable =
+  NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessDrain);
+  mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
 }
 

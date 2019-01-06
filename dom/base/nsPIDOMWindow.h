@@ -23,6 +23,7 @@
 class nsIArray;
 class nsIContent;
 class nsIDocShell;
+class nsIDocShellLoadInfo;
 class nsIDocument;
 class nsIIdleObserver;
 class nsIPrincipal;
@@ -77,6 +78,23 @@ public:
   virtual void ActivateOrDeactivate(bool aActivate) = 0;
 
   // this is called GetTopWindowRoot to avoid conflicts with nsIDOMWindow::GetWindowRoot
+  /**
+   * |top| gets the root of the window hierarchy.
+   *
+   * This function does not cross chrome-content boundaries, so if this
+   * window's parent is of a different type, |top| will return this window.
+   *
+   * When script reads the top property, we run GetScriptableTop, which
+   * will not cross an <iframe mozbrowser> boundary.
+   *
+   * In contrast, C++ calls to GetTop are forwarded to GetRealTop, which
+   * ignores <iframe mozbrowser> boundaries.
+   */
+
+  virtual already_AddRefed<nsPIDOMWindow> GetTop() = 0; // Outer only
+  virtual already_AddRefed<nsPIDOMWindow> GetParent() = 0;
+  virtual nsPIDOMWindow* GetScriptableTop() = 0;
+  virtual nsPIDOMWindow* GetScriptableParent() = 0;
   virtual already_AddRefed<nsPIWindowRoot> GetTopWindowRoot() = 0;
 
   // Inner windows only.
@@ -389,7 +407,7 @@ public:
    * SetOpenerWindow is called.  It might never be true, of course, if the
    * window does not have an opener when it's created.
    */
-  virtual void SetOpenerWindow(nsIDOMWindow* aOpener,
+  virtual void SetOpenerWindow(nsPIDOMWindow* aOpener,
                                bool aOriginalOpener) = 0;
 
   virtual void EnsureSizeUpToDate() = 0;
@@ -761,6 +779,19 @@ public:
   // Sends an NS_AFTER_REMOTE_PAINT message if requested by
   // SetRequestNotifyAfterRemotePaint().
   void SendAfterRemotePaintIfRequested();
+
+  virtual already_AddRefed<nsPIDOMWindow> GetOpener() = 0;
+  // aLoadInfo will be passed on through to the windowwatcher.
+  // aForceNoOpener will act just like a "noopener" feature in aOptions except
+  //                will not affect any other window features.
+  virtual nsresult Open(const nsAString& aUrl, const nsAString& aName,
+                        const nsAString& aOptions,
+			nsIDocShellLoadInfo* aLoadInfo,
+			bool aForceNoOpener,
+                        nsPIDOMWindow **_retval) = 0;
+  virtual nsresult OpenDialog(const nsAString& aUrl, const nsAString& aName,
+                              const nsAString& aOptions,
+                              nsISupports* aExtraArgument, nsIDOMWindow** _retval) = 0;
 
 protected:
   // The nsPIDOMWindow constructor. The aOuterWindow argument should

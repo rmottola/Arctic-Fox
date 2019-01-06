@@ -402,7 +402,7 @@ public:
                                 bool aUseCapture,
                                 const mozilla::dom::Nullable<bool>& aWantsUntrusted,
                                 mozilla::ErrorResult& aRv) override;
-  virtual nsIDOMWindow* GetOwnerGlobalForBindings() override
+  virtual nsPIDOMWindow* GetOwnerGlobalForBindings() override
   {
     if (IsOuterWindow()) {
       return this;
@@ -461,7 +461,7 @@ public:
   // Outer windows only.
   void DispatchDOMWindowCreated();
 
-  virtual void SetOpenerWindow(nsIDOMWindow* aOpener,
+  virtual void SetOpenerWindow(nsPIDOMWindow* aOpener,
                                bool aOriginalOpener) override;
 
   // Outer windows only.
@@ -525,30 +525,22 @@ public:
     return FromSupports(wrapper->Native());
   }
 
-  /**
-   * Wrap nsIDOMWindow::GetTop so we can overload the inline GetTop()
-   * implementation below.  (nsIDOMWindow::GetTop simply calls
-   * nsIDOMWindow::GetRealTop().)
-   */
-  nsresult GetTop(nsIDOMWindow **aWindow)
+  already_AddRefed<nsIDOMWindow> GetTopOuter();
+  already_AddRefed<nsPIDOMWindow> GetTop() override;
+  nsPIDOMWindow* GetScriptableTop() override;
+  inline nsGlobalWindow *GetTopInternal()
   {
-    return nsIDOMWindow::GetTop(aWindow);
-  }
-
-  inline nsGlobalWindow *GetTop()
-  {
-    nsCOMPtr<nsIDOMWindow> top;
-    GetTop(getter_AddRefs(top));
+    nsGlobalWindow* outer = IsOuterWindow() ? this : GetOuterWindowInternal();
+    nsCOMPtr<nsPIDOMWindow> top = outer ? outer->GetTop() : nullptr;
     if (top)
       return static_cast<nsGlobalWindow *>(top.get());
     return nullptr;
   }
 
-  inline nsGlobalWindow* GetScriptableTop()
+  inline nsGlobalWindow* GetScriptableTopInternal()
   {
-    nsCOMPtr<nsIDOMWindow> top;
-    GetScriptableTop(getter_AddRefs(top));
-    return static_cast<nsGlobalWindow *>(top.get());
+    nsPIDOMWindow* top = GetScriptableTop();
+    return static_cast<nsGlobalWindow*>(top);
   }
 
   nsPIDOMWindow* GetChildWindow(const nsAString& aName);
@@ -848,29 +840,32 @@ public:
   void Blur(mozilla::ErrorResult& aError);
   already_AddRefed<nsIDOMWindow> GetFrames(mozilla::ErrorResult& aError);
   uint32_t Length();
-  already_AddRefed<nsIDOMWindow> GetTop(mozilla::ErrorResult& aError)
-  {
-    nsCOMPtr<nsIDOMWindow> top;
-    aError = GetScriptableTop(getter_AddRefs(top));
-    return top.forget();
-  }
+  already_AddRefed<nsIDOMWindow> GetTop(mozilla::ErrorResult& aError);
 protected:
   explicit nsGlobalWindow(nsGlobalWindow *aOuterWindow);
-  nsIDOMWindow* GetOpenerWindow(mozilla::ErrorResult& aError);
+  nsPIDOMWindow* GetOpenerWindow(mozilla::ErrorResult& aError);
   // Initializes the mWasOffline member variable
   void InitWasOffline();
 public:
   void GetOpener(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
                  mozilla::ErrorResult& aError);
+  already_AddRefed<nsPIDOMWindow> GetOpener() override;
   void SetOpener(JSContext* aCx, JS::Handle<JS::Value> aOpener,
                  mozilla::ErrorResult& aError);
-  using nsIDOMWindow::GetParent;
+  already_AddRefed<nsIDOMWindow> GetParentOuter();
   already_AddRefed<nsIDOMWindow> GetParent(mozilla::ErrorResult& aError);
+  already_AddRefed<nsPIDOMWindow> GetParent() override;
+  nsPIDOMWindow* GetScriptableParent() override;
   mozilla::dom::Element* GetFrameElement(mozilla::ErrorResult& aError);
   already_AddRefed<nsIDOMWindow> Open(const nsAString& aUrl,
                                       const nsAString& aName,
                                       const nsAString& aOptions,
                                       mozilla::ErrorResult& aError);
+  nsresult Open(const nsAString& aUrl, const nsAString& aName,
+                const nsAString& aOptions,
+                nsIDocShellLoadInfo* aLoadInfo,
+     	          bool aForceNoOpener,
+                nsPIDOMWindow **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
   nsIDOMOfflineResourceList* GetApplicationCache(mozilla::ErrorResult& aError);
 
@@ -1027,6 +1022,10 @@ public:
                                             const nsAString& aOptions,
                                             const mozilla::dom::Sequence<JS::Value>& aExtraArgument,
                                             mozilla::ErrorResult& aError);
+  nsresult
+  OpenDialog(const nsAString& aUrl, const nsAString& aName,
+             const nsAString& aOptions,
+             nsISupports* aExtraArgument, nsIDOMWindow** _retval) override;
   void GetContent(JSContext* aCx,
                   JS::MutableHandle<JSObject*> aRetval,
                   mozilla::ErrorResult& aError);
@@ -1197,10 +1196,13 @@ private:
    *        three args, if present, will be aUrl, aName, and aOptions.  So this
    *        param only matters if there are more than 3 arguments.
    *
-   * @param argc The number of arguments in argv.
-   *
    * @param aExtraArgument Another way to pass arguments in.  This is mutually
    *        exclusive with the argv/argc approach.
+   *
+   * @param aLoadInfo to be passed on along to the windowwatcher.
+   * @param aForceNoOpener if true, will act as if "noopener" were passed in
+   *                       aOptions, but without affecting any other window
+   *                       features.
    *
    * @param aJSCallerContext The calling script's context. This must be null
    *        when aCalledNoScript is true.
@@ -1219,6 +1221,8 @@ private:
                                     bool aNavigate,
                                     nsIArray *argv,
                                     nsISupports *aExtraArgument,
+				                            nsIDocShellLoadInfo* aLoadInfo,
+				                            bool aForceNoOpener,
                                     nsIPrincipal *aCalleePrincipal,
                                     JSContext *aJSCallerContext,
                                     nsIDOMWindow **aReturn);
@@ -1273,8 +1277,7 @@ public:
 
   bool PopupWhitelisted();
   PopupControlState RevisePopupAbuseLevel(PopupControlState);
-  void     FireAbuseEvents(bool aBlocked, bool aWindow,
-                           const nsAString &aPopupURL,
+  void     FireAbuseEvents(const nsAString &aPopupURL,
                            const nsAString &aPopupWindowName,
                            const nsAString &aPopupWindowFeatures);
   void FireOfflineStatusEventIfChanged();

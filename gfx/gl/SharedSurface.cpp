@@ -343,7 +343,7 @@ SurfaceFactory::NewShSurfHandle(const gfx::IntSize& size)
     if (!surf)
         return nullptr;
 
-    return new ShSurfHandle(this, Move(surf));
+    return MakeAndAddRef<ShSurfHandle>(this, Move(surf));
 }
 
 // Auto-deletes surfs of the wrong type.

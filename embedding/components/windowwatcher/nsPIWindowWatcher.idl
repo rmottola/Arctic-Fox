@@ -16,8 +16,9 @@ interface nsIWebBrowserChrome;
 interface nsIDocShellTreeItem;
 interface nsIArray;
 interface nsITabParent;
+interface nsIDocShellLoadInfo;
 
-[uuid(0f2d9d75-c46b-4114-802e-83b4655e61d2)]
+[uuid(0f2d9d75-c46b-4114-802e-83b4655e61d3)]
 
 interface nsPIWindowWatcher : nsISupports
 {
@@ -55,6 +56,12 @@ interface nsPIWindowWatcher : nsISupports
       @param aOpeningTab the nsITabParent that is opening the new window. The
                          nsITabParent is a remote tab belonging to aParent. Can
                          be nullptr if this window is not being opened from a tab.
+      @param aLoadInfo if aNavigate is true, this allows the caller to pass in
+                       an nsIDocShellLoadInfo to use for the navigation.
+                       Callers can pass in null if they want the windowwatcher
+                       to just construct a loadinfo itself.  If aNavigate is
+                       false, this argument is ignored.
+
       @param aArgs Window argument
       @return the new window
 
@@ -70,7 +77,8 @@ interface nsPIWindowWatcher : nsISupports
                            in string aName, in string aFeatures,
                            in boolean aCalledFromScript, in boolean aDialog,
                            in boolean aNavigate, in nsITabParent aOpeningTab,
-                           in nsISupports aArgs);
+                           in nsISupports aArgs,
+			   in nsIDocShellLoadInfo aLoadInfo);
 
   /**
    * Find a named docshell tree item amongst all windows registered

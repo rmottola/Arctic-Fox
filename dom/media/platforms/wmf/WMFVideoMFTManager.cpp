@@ -19,6 +19,7 @@
 #include "gfx2DGlue.h"
 #include "gfxWindowsPlatform.h"
 #include "IMFYCbCrImage.h"
+#include "mozilla/WindowsVersion.h"
 
 #ifdef PR_LOGGING
 PRLogModuleInfo* GetDemuxerLog();
@@ -130,12 +131,22 @@ WMFVideoMFTManager::GetMediaSubtypeGUID()
 
 class CreateDXVAManagerEvent : public nsRunnable {
 public:
+  CreateDXVAManagerEvent(LayersBackend aBackend)
+    : mBackend(aBackend)
+  {}
+
   NS_IMETHOD Run() {
     NS_ASSERTION(NS_IsMainThread(), "Must be on main thread.");
-    mDXVA2Manager = DXVA2Manager::Create();
+    if (mBackend == LayersBackend::LAYERS_D3D11 &&
+        IsWin8OrLater()) {
+      mDXVA2Manager = DXVA2Manager::CreateD3D11DXVA();
+    } else {
+      mDXVA2Manager = DXVA2Manager::CreateD3D9DXVA();
+    }
     return NS_OK;
   }
   nsAutoPtr<DXVA2Manager> mDXVA2Manager;
+  LayersBackend mBackend;
 };
 
 bool
@@ -159,7 +170,7 @@ WMFVideoMFTManager::InitializeDXVA()
   }
 
   // The DXVA manager must be created on the main thread.
-  nsRefPtr<CreateDXVAManagerEvent> event(new CreateDXVAManagerEvent());
+  nsRefPtr<CreateDXVAManagerEvent> event(new CreateDXVAManagerEvent(mLayersBackend));
   NS_DispatchToMainThread(event, NS_DISPATCH_SYNC);
   mDXVA2Manager = event->mDXVA2Manager;
 
@@ -292,6 +303,11 @@ WMFVideoMFTManager::ConfigureVideoFrameGeometry()
   if (!IsValidVideoRegion(frameSize, pictureRegion, displaySize)) {
     // Video track's frame sizes will overflow. Ignore the video track.
     return E_FAIL;
+  }
+
+  if (mDXVA2Manager) {
+    hr = mDXVA2Manager->ConfigureForSize(width, height);
+    NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
   }
 
   // Success! Save state.

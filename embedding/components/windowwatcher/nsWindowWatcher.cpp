@@ -344,7 +344,9 @@ nsWindowWatcher::OpenWindow(nsIDOMWindow *aParent,
 
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             /* calledFromJS = */ false, dialog,
-                            /* navigate = */ true, nullptr, argv, _retval);
+                            /* navigate = */ true, nullptr, argv,
+			    /* aLoadInfo */ nullptr,
+			    _retval);
 }
 
 struct SizeSpec {
@@ -398,6 +400,7 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow *aParent,
                               bool aNavigate,
                               nsITabParent *aOpeningTab,
                               nsISupports *aArguments,
+			      nsIDocShellLoadInfo* aLoadInfo,
                               nsIDOMWindow **_retval)
 {
   nsCOMPtr<nsIArray> argv = ConvertArgsToArray(aArguments);
@@ -417,7 +420,9 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow *aParent,
 
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             aCalledFromScript, dialog,
-                            aNavigate, aOpeningTab, argv, _retval);
+                            aNavigate, aOpeningTab, argv,
+			    aLoadInfo,
+			    _retval);
 }
 
 nsresult
@@ -430,6 +435,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow *aParent,
                                     bool aNavigate,
                                     nsITabParent *aOpeningTab,
                                     nsIArray *argv,
+				    nsIDocShellLoadInfo* aLoadInfo,
                                     nsIDOMWindow **_retval)
 {
   nsresult                        rv = NS_OK;
@@ -770,7 +776,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow *aParent,
     }
   }
   
-  rv = ReadyOpenedDocShellItem(newDocShellItem, aParent, windowIsNew, _retval);
+  rv = ReadyOpenedDocShellItem(newDocShellItem, parentWindow, windowIsNew, _retval);
   if (NS_FAILED(rv))
     return rv;
 
@@ -883,8 +889,8 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow *aParent,
     }
   }
 
-  nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
-  if (uriToLoad && aNavigate) {
+  nsCOMPtr<nsIDocShellLoadInfo> loadInfo =aLoadInfo;
+  if (uriToLoad && aNavigate && !loadInfo) {
     newDocShell->CreateLoadInfo(getter_AddRefs(loadInfo));
     NS_ENSURE_TRUE(loadInfo, NS_ERROR_FAILURE);
 
@@ -1770,7 +1776,7 @@ nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
    is acceptable. */
 nsresult
 nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem *aOpenedItem,
-                                         nsIDOMWindow        *aParent,
+                                         nsPIDOMWindow        *aParent,
                                          bool                aWindowIsNew,
                                          nsIDOMWindow        **aOpenedWindow)
 {

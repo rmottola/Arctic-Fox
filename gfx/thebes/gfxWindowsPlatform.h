@@ -246,6 +246,10 @@ public:
 #endif
     ID3D11Device *GetD3D11Device();
     ID3D11Device *GetD3D11ContentDevice();
+    ID3D11Device *GetD3D11MediaDevice();
+
+    // Create a D3D11 device to be used for DXVA decoding.
+    mozilla::TemporaryRef<ID3D11Device> CreateD3D11DecoderDevice();
 
     mozilla::layers::ReadbackManagerD3D11* GetReadbackManager();
 
@@ -286,6 +290,7 @@ private:
     nsRefPtr<mozilla::layers::DeviceManagerD3D9> mDeviceManager;
     mozilla::RefPtr<ID3D11Device> mD3D11Device;
     mozilla::RefPtr<ID3D11Device> mD3D11ContentDevice;
+    mozilla::RefPtr<ID3D11Device> mD3D11MediaDevice;
     bool mD3D11DeviceInitialized;
     mozilla::RefPtr<mozilla::layers::ReadbackManagerD3D11> mD3D11ReadbackManager;
     bool mIsWARP;

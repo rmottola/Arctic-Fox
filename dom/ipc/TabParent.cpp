@@ -644,7 +644,7 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
   rv = pwwatch->OpenWindow2(parent, finalURIString.get(),
                             NS_ConvertUTF16toUTF8(aName).get(),
                             NS_ConvertUTF16toUTF8(aFeatures).get(), aCalledFromJS,
-                            false, false, this, nullptr, getter_AddRefs(window));
+                            false, false, this, nullptr, nullptr, getter_AddRefs(window));
   NS_ENSURE_SUCCESS(rv, false);
 
   nsCOMPtr<nsPIDOMWindow> pwindow = do_QueryInterface(window);
