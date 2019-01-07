@@ -10626,7 +10626,8 @@ class CGDOMJSProxyHandler_finalize(ClassMethod):
         self.descriptor = descriptor
 
     def getBody(self):
-        return ("%s* self = UnwrapProxy(proxy);\n\n" % self.descriptor.nativeType +
+        return (("%s* self = UnwrapPossiblyNotInitializedDOMObject<%s>(proxy);\n" %
+                 (self.descriptor.nativeType, self.descriptor.nativeType)) +
                 finalizeHook(self.descriptor, FINALIZE_HOOK_NAME, self.args[0].name).define())
 
 
