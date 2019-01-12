@@ -607,6 +607,7 @@ class IonBuilder
         return length;
     }
 
+    bool improveThisTypesForCall();
 
     MDefinition* getCallee();
     MDefinition* getAliasedVar(ScopeCoordinate sc);
