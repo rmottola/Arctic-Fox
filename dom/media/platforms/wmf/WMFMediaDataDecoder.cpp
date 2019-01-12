@@ -77,9 +77,9 @@ WMFMediaDataDecoder::EnsureDecodeTaskDispatched()
 {
   mMonitor.AssertCurrentThreadOwns();
   if (!mIsDecodeTaskDispatched) {
-    mTaskQueue->Dispatch(
-      NS_NewRunnableMethod(this,
-      &WMFMediaDataDecoder::Decode));
+    nsCOMPtr<nsIRunnable> runnable =
+      NS_NewRunnableMethod(this, &WMFMediaDataDecoder::Decode);
+    mTaskQueue->Dispatch(runnable.forget());
     mIsDecodeTaskDispatched = true;
   }
 }

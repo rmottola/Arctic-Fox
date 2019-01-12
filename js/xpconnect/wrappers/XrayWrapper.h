@@ -12,6 +12,7 @@
 #include "WrapperFactory.h"
 
 #include "jswrapper.h"
+#include "js/Proxy.h"
 
 // Xray wrappers re-resolve the original native properties on the native
 // object and always directly access to those properties.
@@ -386,8 +387,7 @@ public:
 
     virtual JSObject* createHolder(JSContext* cx, JSObject* wrapper) override
     {
-        JS::RootedObject global(cx, JS_GetGlobalForObject(cx, wrapper));
-        return JS_NewObjectWithGivenProto(cx, nullptr, JS::NullPtr(), global);
+        return JS_NewObjectWithGivenProto(cx, nullptr, JS::NullPtr());
     }
 
     static OpaqueXrayTraits singleton;
@@ -527,6 +527,13 @@ public:
 
     virtual bool call(JSContext* cx, JS::Handle<JSObject*> proxy,
                       const JS::CallArgs& args) const override;
+
+    static const size_t SandboxProxySlot = 0;
+
+    static inline JSObject *getSandboxProxy(JS::Handle<JSObject*> proxy)
+    {
+        return &js::GetProxyExtra(proxy, SandboxProxySlot).toObject();
+    }
 };
 
 extern const SandboxCallableProxyHandler sandboxCallableProxyHandler;

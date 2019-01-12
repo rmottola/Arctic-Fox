@@ -17,6 +17,7 @@ if CONFIG['MOZ_TASK_TRACER']:
     UNIFIED_SOURCES += [
         'GoannaTaskTracer.cpp',
         'TracedTaskCommon.cpp',
+	'ProfileEntry.cpp',
     ]
 
 XPCSHELL_TESTS_MANIFESTS += ['tests/xpcshell.ini']

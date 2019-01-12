@@ -37,13 +37,40 @@ Yet unapplied Mozilla patches:
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
-- 1114580 - toStringTag - several diffs still to analyze
+- 1142669 part 6 - Don't inline scripts that are known to inline a
 - 1141862 - 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
+- 1114580 - toStringTag - several diffs still to analyze
 - 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
 - 1041586 - Implement Symbol.isConcatSpreadable
 - 1041586 - Autogenerate symbol names
-
+- Bug 1242578
+- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
+- 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
+- 1227567 - Optimise module namespace imports in Ion where we have
+- 1214508: SharedStubs - Part 3: Enable the getprop stubs in ionmon
+- 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
+- 1199143 - Inline heavyweight functions.
+- 1030095 - Remove restriction on inlining recursive calls
+- 1180854 - Record and expose Ion IC stub optimization info to Jit
+- 1169731 - [[Call]] on a class constructor should throw.
+- 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
+- 1161584 - Add TrackedStrategy::SetProp_InlineCache. 
+- 1155788. Make the Ion inner-window optimizations work again. 
+- 1154997 - Deal with self-hosted builtins when stringifying tracke
+- 1150654 - Add CantInlineNoSpecialization to distinguish natives f
+- 1144366 (big pointer style refactor, see below.... ToDo)
+- 1142669 part 6 - Don't inline scripts that are known to inline a ¿
+- 1145440 - Ship constant names for tracked strategy and outcomes i
+- 1143860 - Deduplicate tracked optimizations when streaming the pr
+- 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- 1142669 part 4 - Fix some inlining issues and inline scripts with
+- 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
+- 1136837 part 1 - Don't inline calls with incomplete type informat
+- 1131429 - Add a shell function to dump all of a function's tracke¿ 
+- 1129780 - Report the youngest sampled frame's line number if it h
+- 1129769 - Handle more kinds when resolving tracked type names. 
+- 1129780 - Report the youngest sampled frame's line number if it h¿
 
 
 
@@ -60,6 +87,8 @@ Further ToDo which would help portability:
 - LoadFrame needs TriggerPrincipal & OriginalSrc
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
+
+- Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
 
 Further Further ToDo:
 - flatten out security manager ssl
