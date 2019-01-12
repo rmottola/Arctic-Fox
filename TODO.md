@@ -71,7 +71,6 @@ Yet unapplied Mozilla patches:
 - 1129780 - Report the youngest sampled frame's line number if it h
 - 1129769 - Handle more kinds when resolving tracked type names. 
 - 1129780 - Report the youngest sampled frame's line number if it h¿
-- Bug 1129769 - Followup: ignore indirect function calls from JSStreamW
 
 
 
