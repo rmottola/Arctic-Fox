@@ -48,7 +48,7 @@ Yet unapplied Mozilla patches:
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - 1227567 - Optimise module namespace imports in Ion where we have
-- 1214508: SharedStubs - Part 3: Enable the getprop stubs in ionmon
+- 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
 - 1199143 - Inline heavyweight functions.
 - 1030095 - Remove restriction on inlining recursive calls
@@ -56,7 +56,7 @@ Yet unapplied Mozilla patches:
 - 1169731 - [[Call]] on a class constructor should throw.
 - 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
 - 1161584 - Add TrackedStrategy::SetProp_InlineCache. 
-- 1155788. Make the Ion inner-window optimizations work again. 
+- 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
@@ -66,11 +66,6 @@ Yet unapplied Mozilla patches:
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
 - 1142669 part 4 - Fix some inlining issues and inline scripts with
 - 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
-- 1136837 part 1 - Don't inline calls with incomplete type informat
-- 1131429 - Add a shell function to dump all of a function's tracke¿ 
-- 1129780 - Report the youngest sampled frame's line number if it h
-- 1129769 - Handle more kinds when resolving tracked type names. 
-- 1129780 - Report the youngest sampled frame's line number if it h¿
 
 
 
