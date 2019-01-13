@@ -1097,6 +1097,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(ObjectPolicy<0>)                                                  \
     _(ObjectPolicy<1>)                                                  \
     _(ObjectPolicy<3>)                                                  \
+    _(SimdSameAsReturnedTypePolicy<0>)                                  \
     _(StringPolicy<0>)
 
 
