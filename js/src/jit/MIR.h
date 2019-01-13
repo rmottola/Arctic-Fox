@@ -1840,6 +1840,18 @@ class MSimdUnaryArith
         sqrt
     };
 
+    static const char* OperationName(Operation op) {
+        switch (op) {
+          case abs:            return "abs";
+          case neg:            return "neg";
+          case not_:           return "not";
+          case reciprocal:     return "reciprocal";
+          case reciprocalSqrt: return "reciprocalSqrt";
+          case sqrt:           return "sqrt";
+        }
+        MOZ_CRASH("unexpected operation");
+    }
+
   private:
     Operation operation_;
 
