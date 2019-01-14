@@ -740,12 +740,10 @@ template bool ObjectPolicy<2>::staticAdjustInputs(TempAllocator& alloc, MInstruc
 template bool ObjectPolicy<3>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
 
 template <unsigned Op>
-bool
-SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins)
+static bool
+MaybeSimdUnbox(TempAllocator &alloc, MInstruction *ins, MIRType type)
 {
-    MIRType type = ins->type();
     MOZ_ASSERT(IsSimdType(type));
-
     MDefinition* in = ins->getOperand(Op);
     if (in->type() == type)
         return true;
@@ -757,10 +755,28 @@ SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator& alloc, MInst
     return replace->typePolicy()->adjustInputs(alloc, replace);
 }
 
+
+template <unsigned Op>
+bool
+SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins)
+{
+    return MaybeSimdUnbox<Op>(alloc, ins, ins->type());
+}
+
 template bool
 SimdSameAsReturnedTypePolicy<0>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
 template bool
 SimdSameAsReturnedTypePolicy<1>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
+
+template <unsigned Op>
+bool
+SimdPolicy<Op>::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+{
+    return MaybeSimdUnbox<Op>(alloc, ins, ins->typePolicySpecialization());
+}
+
+template bool
+SimdPolicy<0>::adjustInputs(TempAllocator &alloc, MInstruction *ins);
 
 bool
 CallPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
@@ -1097,6 +1113,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(ObjectPolicy<0>)                                                  \
     _(ObjectPolicy<1>)                                                  \
     _(ObjectPolicy<3>)                                                  \
+    _(SimdPolicy<0>)                                                    \
     _(SimdSameAsReturnedTypePolicy<0>)                                  \
     _(StringPolicy<0>)
 
