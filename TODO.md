@@ -66,7 +66,10 @@ Yet unapplied Mozilla patches:
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
 - 1142669 part 4 - Fix some inlining issues and inline scripts with
 - 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
-
+- Bug 1130679: IonMonkey: Make it possible to guard on type changes
+- Bug 994016: IonMonkey: Add MTypeOf folding to MCompare
+- Bug 1135423 - Use unboxed objects for object literals where possible,
+- Bug 1047529 - Move caller field from MResumePoint to MBasicBlock
 
 
 Further ToDo which would help portability:
