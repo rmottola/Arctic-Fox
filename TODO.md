@@ -65,7 +65,10 @@ Yet unapplied Mozilla patches:
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
 - 1142669 part 4 - Fix some inlining issues and inline scripts with
+- Bug 805052 - four parts
 - 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
+- Bug 1136980 part 2. Remove JS_SetParent, even though we have a 
+- Bug 1136980 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
 - Bug 1130679: IonMonkey: Make it possible to guard on type changes
 - Bug 994016: IonMonkey: Add MTypeOf folding to MCompare
 - Bug 1135423 - Use unboxed objects for object literals where possible,
