@@ -246,7 +246,6 @@ class MNode : public TempObject
     MBasicBlock* block() const {
         return block_;
     }
-    MBasicBlock *caller() const;
 
     // Sets an already set operand, updating use information. If you're looking
     // for setOperand, this is probably what you want.
@@ -11753,10 +11752,11 @@ class MResumePoint final :
     MStoresToRecoverList stores_;
 
     jsbytecode* pc_;
+    MResumePoint* caller_;
     MInstruction* instruction_;
     Mode mode_;
 
-    MResumePoint(MBasicBlock* block, jsbytecode* pc, Mode mode);
+    MResumePoint(MBasicBlock* block, jsbytecode* pc, MResumePoint* parent, Mode mode);
     void inherit(MBasicBlock* state);
 
   protected:
@@ -11778,7 +11778,7 @@ class MResumePoint final :
 
   public:
     static MResumePoint* New(TempAllocator& alloc, MBasicBlock* block, jsbytecode* pc,
-                             Mode mode);
+                             MResumePoint* parent, Mode mode);
     static MResumePoint* New(TempAllocator& alloc, MBasicBlock* block, MResumePoint* model,
                              const MDefinitionVector& operands);
     static MResumePoint* Copy(TempAllocator& alloc, MResumePoint* src);
@@ -11818,10 +11818,15 @@ class MResumePoint final :
     jsbytecode* pc() const {
         return pc_;
     }
-    MResumePoint *caller() const;
+    MResumePoint* caller() const {
+        return caller_;
+    }
+    void setCaller(MResumePoint* caller) {
+        caller_ = caller;
+    }
     uint32_t frameCount() const {
         uint32_t count = 1;
-        for (MResumePoint* it = caller(); it; it = it->caller())
+        for (MResumePoint* it = caller_; it; it = it->caller_)
             count++;
         return count;
     }
