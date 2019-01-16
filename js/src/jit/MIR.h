@@ -246,6 +246,7 @@ class MNode : public TempObject
     MBasicBlock* block() const {
         return block_;
     }
+    MBasicBlock *caller() const;
 
     // Sets an already set operand, updating use information. If you're looking
     // for setOperand, this is probably what you want.
@@ -1497,20 +1498,27 @@ class MSimdConstant
 // Converts all lanes of a given vector into the type of another vector
 class MSimdConvert
   : public MUnaryInstruction,
-    public NoTypePolicy::Data
+    public SimdPolicy<0>::Data
 {
     MSimdConvert(MDefinition* obj, MIRType fromType, MIRType toType)
       : MUnaryInstruction(obj)
     {
-        MOZ_ASSERT(IsSimdType(obj->type()) && fromType == obj->type());
         MOZ_ASSERT(IsSimdType(toType));
         setResultType(toType);
+        specialization_ = fromType; // expects fromType as input
     }
 
   public:
     INSTRUCTION_HEADER(SimdConvert)
     static MSimdConvert* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType fromType,
                                   MIRType toType)
+    {
+        MOZ_ASSERT(IsSimdType(obj->type()) && fromType == obj->type());
+        return new(alloc) MSimdConvert(obj, fromType, toType);
+    }
+
+    static MSimdConvert *New(TempAllocator &alloc, MDefinition *obj, MIRType fromType,
+                             MIRType toType)
     {
         return new(alloc) MSimdConvert(obj, fromType, toType);
     }
@@ -1527,20 +1535,27 @@ class MSimdConvert
 // Casts bits of a vector input to another SIMD type (doesn't generate code).
 class MSimdReinterpretCast
   : public MUnaryInstruction,
-    public NoTypePolicy::Data
+    public SimdPolicy<0>::Data
 {
     MSimdReinterpretCast(MDefinition* obj, MIRType fromType, MIRType toType)
       : MUnaryInstruction(obj)
     {
-        MOZ_ASSERT(IsSimdType(obj->type()) && fromType == obj->type());
         MOZ_ASSERT(IsSimdType(toType));
         setResultType(toType);
+        specialization_ = fromType; // expects fromType as input
     }
 
   public:
     INSTRUCTION_HEADER(SimdReinterpretCast)
     static MSimdReinterpretCast* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType fromType,
                                           MIRType toType)
+    {
+        MOZ_ASSERT(IsSimdType(obj->type()) && fromType == obj->type());
+        return new(alloc) MSimdReinterpretCast(obj, fromType, toType);
+    }
+
+    static MSimdReinterpretCast* New(TempAllocator &alloc, MDefinition *obj, MIRType fromType,
+                                     MIRType toType)
     {
         return new(alloc) MSimdReinterpretCast(obj, fromType, toType);
     }
@@ -1828,7 +1843,7 @@ class MSimdShuffle
 
 class MSimdUnaryArith
   : public MUnaryInstruction,
-    public NoTypePolicy::Data
+    public SimdSameAsReturnedTypePolicy<0>::Data
 {
   public:
     enum Operation {
@@ -1840,14 +1855,24 @@ class MSimdUnaryArith
         sqrt
     };
 
+    static const char* OperationName(Operation op) {
+        switch (op) {
+          case abs:            return "abs";
+          case neg:            return "neg";
+          case not_:           return "not";
+          case reciprocal:     return "reciprocal";
+          case reciprocalSqrt: return "reciprocalSqrt";
+          case sqrt:           return "sqrt";
+        }
+        MOZ_CRASH("unexpected operation");
+    }
+
   private:
     Operation operation_;
 
     MSimdUnaryArith(MDefinition* def, Operation op, MIRType type)
       : MUnaryInstruction(def), operation_(op)
     {
-        MOZ_ASSERT(IsSimdType(type));
-        MOZ_ASSERT(def->type() == type);
         MOZ_ASSERT_IF(type == MIRType_Int32x4, op == neg || op == not_);
         setResultType(type);
         setMovable();
@@ -1855,9 +1880,17 @@ class MSimdUnaryArith
 
   public:
     INSTRUCTION_HEADER(SimdUnaryArith)
+
+    static MSimdUnaryArith *New(TempAllocator &alloc, MDefinition *def, Operation op, MIRType t)
+    {
+        return new(alloc) MSimdUnaryArith(def, op, t);
+    }
+
     static MSimdUnaryArith* NewAsmJS(TempAllocator& alloc, MDefinition* def,
                                      Operation op, MIRType t)
     {
+        MOZ_ASSERT(IsSimdType(t));
+        MOZ_ASSERT(def->type() == t);
         return new(alloc) MSimdUnaryArith(def, op, t);
     }
 
@@ -1870,6 +1903,8 @@ class MSimdUnaryArith
     bool congruentTo(const MDefinition* ins) const override {
         return congruentIfOperandsEqual(ins) && ins->toSimdUnaryArith()->operation() == operation();
     }
+
+    void printOpcode(FILE *fp) const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MSimdUnaryArith);
 };
@@ -2022,6 +2057,8 @@ class MSimdBinaryArith
         return operation_ == ins->toSimdBinaryArith()->operation();
     }
 
+    void printOpcode(FILE *fp) const MOZ_OVERRIDE;
+
     ALLOW_CLONE(MSimdBinaryArith)
 };
 
@@ -2035,6 +2072,15 @@ class MSimdBinaryBitwise
         or_,
         xor_
     };
+
+    static const char* OperationName(Operation op) {
+        switch (op) {
+          case and_: return "and";
+          case or_:  return "or";
+          case xor_: return "xor";
+        }
+        MOZ_CRASH("unexpected operation");
+    }
 
   private:
     Operation operation_;
@@ -2075,6 +2121,8 @@ class MSimdBinaryBitwise
             return false;
         return operation_ == ins->toSimdBinaryBitwise()->operation();
     }
+
+    void printOpcode(FILE *fp) const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MSimdBinaryBitwise)
 };
@@ -11705,11 +11753,10 @@ class MResumePoint final :
     MStoresToRecoverList stores_;
 
     jsbytecode* pc_;
-    MResumePoint* caller_;
     MInstruction* instruction_;
     Mode mode_;
 
-    MResumePoint(MBasicBlock* block, jsbytecode* pc, MResumePoint* parent, Mode mode);
+    MResumePoint(MBasicBlock* block, jsbytecode* pc, Mode mode);
     void inherit(MBasicBlock* state);
 
   protected:
@@ -11731,7 +11778,7 @@ class MResumePoint final :
 
   public:
     static MResumePoint* New(TempAllocator& alloc, MBasicBlock* block, jsbytecode* pc,
-                             MResumePoint* parent, Mode mode);
+                             Mode mode);
     static MResumePoint* New(TempAllocator& alloc, MBasicBlock* block, MResumePoint* model,
                              const MDefinitionVector& operands);
     static MResumePoint* Copy(TempAllocator& alloc, MResumePoint* src);
@@ -11771,15 +11818,10 @@ class MResumePoint final :
     jsbytecode* pc() const {
         return pc_;
     }
-    MResumePoint* caller() const {
-        return caller_;
-    }
-    void setCaller(MResumePoint* caller) {
-        caller_ = caller;
-    }
+    MResumePoint *caller() const;
     uint32_t frameCount() const {
         uint32_t count = 1;
-        for (MResumePoint* it = caller_; it; it = it->caller_)
+        for (MResumePoint* it = caller(); it; it = it->caller())
             count++;
         return count;
     }

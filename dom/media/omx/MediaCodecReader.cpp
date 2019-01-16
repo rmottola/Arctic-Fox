@@ -335,7 +335,7 @@ MediaCodecReader::DispatchAudioTask()
     RefPtr<nsIRunnable> task =
       NS_NewRunnableMethod(this,
                            &MediaCodecReader::DecodeAudioDataTask);
-    mAudioTrack.mTaskQueue->Dispatch(task);
+    mAudioTrack.mTaskQueue->Dispatch(task.forget());
   }
 }
 
@@ -347,7 +347,7 @@ MediaCodecReader::DispatchVideoTask(int64_t aTimeThreshold)
       NS_NewRunnableMethodWithArg<int64_t>(this,
                                            &MediaCodecReader::DecodeVideoFrameTask,
                                            aTimeThreshold);
-    mVideoTrack.mTaskQueue->Dispatch(task);
+    mVideoTrack.mTaskQueue->Dispatch(task.forget());
   }
 }
 
@@ -458,8 +458,13 @@ MediaCodecReader::DecodeAudioDataSync()
 void
 MediaCodecReader::DecodeAudioDataTask()
 {
-  DecodeAudioDataSync();
+  if (AudioQueue().GetSize() == 0 && !AudioQueue().IsFinished()) {
+    DecodeAudioDataSync();
+  }
   MonitorAutoLock al(mAudioTrack.mTrackMonitor);
+  if (mAudioTrack.mAudioPromise.IsEmpty()) {
+    return;
+  }
   if (AudioQueue().GetSize() > 0) {
     nsRefPtr<AudioData> a = AudioQueue().PopFront();
     if (a) {
@@ -802,7 +807,7 @@ MediaCodecReader::TextureClientRecycleCallback(TextureClient* aClient)
     RefPtr<nsIRunnable> task =
       NS_NewRunnableMethod(this,
                            &MediaCodecReader::WaitFenceAndReleaseOutputBuffer);
-    mVideoTrack.mReleaseBufferTaskQueue->Dispatch(task);
+    mVideoTrack.mReleaseBufferTaskQueue->Dispatch(task.forget());
   }
 }
 
@@ -1001,6 +1006,8 @@ MediaCodecReader::DecodeVideoFrameSync(int64_t aTimeThreshold)
     }
 
     if (v) {
+      // Notify mDecoder that we have decoded a video frame.
+      mDecoder->NotifyDecodedFrames(0, 1, 0);
       VideoQueue().Push(v);
     } else {
       NS_WARNING("Unable to create VideoData");
@@ -1814,6 +1821,10 @@ MediaCodecReader::GetCodecOutputData(Track& aTrack,
     }
 
     if (status == OK) {
+      // Notify mDecoder that we have parsed a video frame.
+      if (&aTrack == &mVideoTrack) {
+        mDecoder->NotifyDecodedFrames(1, 0, 0);
+      }
       if (!IsValidTimestampUs(aThreshold) || info.mTimeUs >= aThreshold) {
         // Get a valid output buffer.
         break;

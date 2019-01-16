@@ -204,7 +204,8 @@ gfxContext::ClosePath()
 TemporaryRef<Path> gfxContext::GetPath()
 {
   EnsurePath();
-  return mPath;
+  RefPtr<Path> path(mPath);
+  return path.forget();
 }
 
 void gfxContext::SetPath(Path* path)
@@ -932,7 +933,7 @@ gfxContext::PopGroupToSurface(Matrix* aTransform)
   deviceOffsetTranslation.PreTranslate(deviceOffset.x, deviceOffset.y);
 
   *aTransform = deviceOffsetTranslation * mat;
-  return src;
+  return src.forget();
 }
 
 void

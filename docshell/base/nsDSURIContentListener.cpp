@@ -307,7 +307,7 @@ nsDSURIContentListener::CheckOneFrameOptionsPolicy(nsIHttpChannel* aHttpChannel,
   // window, if we're not the top.  X-F-O: SAMEORIGIN requires that the
   // document must be same-origin with top window.  X-F-O: DENY requires that
   // the document must never be framed.
-  nsCOMPtr<nsIDOMWindow> thisWindow = mDocShell->GetWindow();
+  nsCOMPtr<nsPIDOMWindow> thisWindow = mDocShell->GetWindow();
   // If we don't have DOMWindow there is no risk of clickjacking
   if (!thisWindow) {
     return true;
@@ -315,8 +315,7 @@ nsDSURIContentListener::CheckOneFrameOptionsPolicy(nsIHttpChannel* aHttpChannel,
 
   // GetScriptableTop, not GetTop, because we want this to respect
   // <iframe mozbrowser> boundaries.
-  nsCOMPtr<nsIDOMWindow> topWindow;
-  thisWindow->GetScriptableTop(getter_AddRefs(topWindow));
+  nsCOMPtr<nsPIDOMWindow> topWindow = thisWindow->GetScriptableTop();
 
   // if the document is in the top window, it's not in a frame.
   if (thisWindow == topWindow) {

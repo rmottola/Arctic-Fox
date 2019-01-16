@@ -76,11 +76,12 @@ AppleATDecoder::Input(MediaRawData* aSample)
       (unsigned long long)aSample->Size());
 
   // Queue a task to perform the actual decoding on a separate thread.
-  mTaskQueue->Dispatch(
+  nsCOMPtr<nsIRunnable> runnable =
       NS_NewRunnableMethodWithArg<nsRefPtr<MediaRawData>>(
         this,
         &AppleATDecoder::SubmitSample,
-        nsRefPtr<MediaRawData>(aSample)));
+        nsRefPtr<MediaRawData>(aSample));
+  mTaskQueue->Dispatch(runnable.forget());
 
   return NS_OK;
 }

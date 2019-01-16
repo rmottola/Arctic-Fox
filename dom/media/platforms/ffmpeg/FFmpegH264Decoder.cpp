@@ -328,10 +328,11 @@ FFmpegH264Decoder<LIBAV_VER>::DecodeFrame(MediaRawData* aSample)
 nsresult
 FFmpegH264Decoder<LIBAV_VER>::Input(MediaRawData* aSample)
 {
-  mTaskQueue->Dispatch(
+  nsCOMPtr<nsIRunnable> runnable(
     NS_NewRunnableMethodWithArg<nsRefPtr<MediaRawData>>(
       this, &FFmpegH264Decoder<LIBAV_VER>::DecodeFrame,
       nsRefPtr<MediaRawData>(aSample)));
+  mTaskQueue->Dispatch(runnable.forget());
 
   return NS_OK;
 }
@@ -348,8 +349,9 @@ FFmpegH264Decoder<LIBAV_VER>::DoDrain()
 nsresult
 FFmpegH264Decoder<LIBAV_VER>::Drain()
 {
-  mTaskQueue->Dispatch(
+  nsCOMPtr<nsIRunnable> runnable(
     NS_NewRunnableMethod(this, &FFmpegH264Decoder<LIBAV_VER>::DoDrain));
+  mTaskQueue->Dispatch(runnable.forget());
 
   return NS_OK;
 }

@@ -116,7 +116,7 @@ WMFReader::InitializeDXVA()
     return false;
   }
 
-  mDXVA2Manager = DXVA2Manager::Create();
+  mDXVA2Manager = DXVA2Manager::CreateD3D9DXVA();
 
   return mDXVA2Manager != nullptr;
 }

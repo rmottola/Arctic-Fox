@@ -204,7 +204,7 @@ CompositableHost::Create(const TextureInfo& aTextureInfo)
   default:
     NS_ERROR("Unknown CompositableType");
   }
-  return result;
+  return result.forget();
 }
 
 void

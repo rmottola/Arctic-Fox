@@ -92,69 +92,9 @@ interface nsIDOMWindow : nsISupports
   /* [replaceable] length */
   readonly attribute unsigned long                      length;
 
-  /**
-   * |top| gets the root of the window hierarchy.
-   *
-   * This function does not cross chrome-content boundaries, so if this
-   * window's parent is of a different type, |top| will return this window.
-   *
-   * When script reads the top property, we run GetScriptableTop, which
-   * will not cross an <iframe mozbrowser> boundary.
-   *
-   * In contrast, C++ calls to GetTop are forwarded to GetRealTop, which
-   * ignores <iframe mozbrowser> boundaries.
-   *
-   * This property is "replaceable" in JavaScript.
-   */
-  [binaryname(ScriptableTop)]
-  readonly attribute nsIDOMWindow                       top;
-
-  /**
-   * You shouldn't need to call this function directly; call GetTop instead.
-   */
-  [noscript]
-  readonly attribute nsIDOMWindow                       realTop;
-
-  %{C++
-  nsresult GetTop(nsIDOMWindow **aWindow)
-  {
-    return GetRealTop(aWindow);
-  }
-  %}
-
-  /**
-   * |parent| gets this window's parent window.  If this window has no parent,
-   * we return the window itself.
-   *
-   * This property does not cross chrome-content boundaries, so if this
-   * window's parent is of a different type, we return the window itself as its
-   * parent.
-   *
-   * When script reads the property (or when C++ calls ScriptableTop), this
-   * property does not cross <iframe mozbrowser> boundaries.  In contrast, when
-   * C++ calls GetParent, we ignore the mozbrowser attribute.
-   */
-  [binaryname(ScriptableParent)]
-  readonly attribute nsIDOMWindow                       parent;
-
-  /**
-   * You shouldn't need to read this property directly; call GetParent instead.
-   */
-  [noscript]
-  readonly attribute nsIDOMWindow                       realParent;
-
-  %{C++
-  inline nsresult GetParent(nsIDOMWindow **aWindow)
-  {
-    return GetRealParent(aWindow);
-  }
-  %}
 
   [implicit_jscontext, binaryname(ScriptableOpener)]
            attribute jsval                              opener;
-
-  [noscript, binaryname(Opener)]
-           attribute nsIDOMWindow                       openerWindow;
 
   /**
    * |frameElement| gets this window's <iframe> or <frame> element, if it has
@@ -403,28 +343,6 @@ interface nsIDOMWindow : nsISupports
   void                      moveBy(in long xDif, in long yDif);
   void                      resizeTo(in long width, in long height);
   void                      resizeBy(in long widthDif, in long heightDif);
-
-  /**
-   * Open a new window with this one as the parent.  This method will
-   * NOT examine the JS stack for purposes of determining a caller.
-   * This window will be used for security checks during the search by
-   * name and the default character set on the newly opened window
-   * will just be the default character set of this window.
-   */
-  [noscript] nsIDOMWindow   open(in DOMString url, in DOMString name,
-                                 in DOMString options);
-
-  /**
-   * This method works like open except that aExtraArgument gets
-   * converted into the array window.arguments in JS, if
-   * aExtraArgument is a nsISupportsArray then the individual items in
-   * the array are inserted into window.arguments, and primitive
-   * nsISupports (nsISupportsPrimitives) types are converted to native
-   * JS types when possible.
-   */
-  [noscript] nsIDOMWindow   openDialog(in DOMString url, in DOMString name,
-                                       in DOMString options,
-                                       in nsISupports aExtraArgument);
 
   // XXX Should this be in nsIDOMChromeWindow?
   void                      updateCommands(in DOMString action,

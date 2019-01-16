@@ -143,7 +143,8 @@ BasicPlanarYCbCrImage::GetAsSourceSurface()
   NS_ASSERTION(NS_IsMainThread(), "Must be main thread");
 
   if (mSourceSurface) {
-    return mSourceSurface.get();
+    RefPtr<gfx::SourceSurface> surface(mSourceSurface);
+    return surface.forget();
   }
 
   if (!mDecodedBuffer) {
@@ -172,7 +173,7 @@ BasicPlanarYCbCrImage::GetAsSourceSurface()
   mRecycleBin->RecycleBuffer(mDecodedBuffer.forget(), mSize.height * mStride);
 
   mSourceSurface = surface;
-  return mSourceSurface.get();
+  return surface.forget();
 }
 
 

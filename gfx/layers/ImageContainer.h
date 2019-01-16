@@ -807,7 +807,8 @@ public:
 
   virtual TemporaryRef<gfx::SourceSurface> GetAsSourceSurface() override
   {
-    return mSourceSurface.get();
+    RefPtr<gfx::SourceSurface> surface(mSourceSurface);
+    return surface.forget();
   }
 
   virtual TextureClient* GetTextureClient(CompositableClient* aClient) override;

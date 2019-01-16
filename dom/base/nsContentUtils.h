@@ -2035,7 +2035,7 @@ public:
    * Returns true if aWin and the current pointer lock document
    * have common scriptable top window.
    */
-  static bool IsInPointerLockContext(nsIDOMWindow* aWin);
+  static bool IsInPointerLockContext(nsPIDOMWindow* aWin);
 
   /**
    * Returns the time limit on handling user input before

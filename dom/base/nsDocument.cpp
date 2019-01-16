@@ -6176,7 +6176,7 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     }
 
     if (!aOptions.mPrototype) {
-      protoObject = JS_NewObjectWithGivenProto(aCx, nullptr, htmlProto, JS::NullPtr());
+      protoObject = JS_NewObjectWithGivenProto(aCx, nullptr, htmlProto);
       if (!protoObject) {
         rv.Throw(NS_ERROR_UNEXPECTED);
         return;
@@ -12325,18 +12325,15 @@ nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> top;
-  ownerWindow->GetScriptableTop(getter_AddRefs(top));
-  nsCOMPtr<nsPIDOMWindow> piTop = do_QueryInterface(top);
-  if (!piTop || !piTop->GetExtantDoc() ||
-      piTop->GetExtantDoc()->Hidden()) {
+  nsCOMPtr<nsPIDOMWindow> top = ownerWindow->GetScriptableTop();
+  if (!top || !top->GetExtantDoc() || top->GetExtantDoc()->Hidden()) {
     NS_WARNING("ShouldLockPointer(): Top document isn't visible.");
     return false;
   }
 
   if (!aNoFocusCheck) {
     mozilla::ErrorResult rv;
-    if (!piTop->GetExtantDoc()->HasFocus(rv)) {
+    if (!top->GetExtantDoc()->HasFocus(rv)) {
       NS_WARNING("ShouldLockPointer(): Top document isn't focused.");
       return false;
     }
@@ -12899,10 +12896,7 @@ nsAutoSyncOperation::nsAutoSyncOperation(nsIDocument* aDoc)
   if (aDoc) {
     nsPIDOMWindow* win = aDoc->GetWindow();
     if (win) {
-      nsCOMPtr<nsIDOMWindow> topWindow;
-      win->GetTop(getter_AddRefs(topWindow));
-      nsCOMPtr<nsPIDOMWindow> top = do_QueryInterface(topWindow);
-      if (top) {
+      if (nsCOMPtr<nsPIDOMWindow> top = win->GetTop()) {
         nsCOMPtr<nsIDocument> doc = top->GetExtantDoc();
         MarkDocumentTreeToBeInSyncOperation(doc, &mDocuments);
       }
