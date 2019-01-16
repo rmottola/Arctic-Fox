@@ -2544,7 +2544,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
         }
         funbox->bufEnd = pos().begin + 1;
     } else {
-#if not JS_HAS_EXPR_CLOSURES
+#if !JS_HAS_EXPR_CLOSURES
         MOZ_ASSERT(kind == Arrow);
 #endif
         if (tokenStream.hadError())

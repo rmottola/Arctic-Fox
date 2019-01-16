@@ -6176,7 +6176,7 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     }
 
     if (!aOptions.mPrototype) {
-      protoObject = JS_NewObjectWithGivenProto(aCx, nullptr, htmlProto, JS::NullPtr());
+      protoObject = JS_NewObjectWithGivenProto(aCx, nullptr, htmlProto);
       if (!protoObject) {
         rv.Throw(NS_ERROR_UNEXPECTED);
         return;

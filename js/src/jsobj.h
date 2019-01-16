@@ -1140,7 +1140,7 @@ extern JSObject*
 CreateThis(JSContext* cx, const js::Class* clasp, js::HandleObject callee);
 
 extern JSObject*
-CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto, HandleObject parent);
+CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto);
 
 extern NativeObject*
 DeepCloneObjectLiteral(JSContext* cx, HandleNativeObject obj, NewObjectKind newKind = GenericObject);

@@ -5153,14 +5153,12 @@ fi;
 dnl ========================================================
 dnl = Apple platform decoder support
 dnl ========================================================
-if test -n "$MOZ_WIDGET_TOOLKIT" = "cocoa"; then
-   MOZ_ARG_DISABLE_BOOL(applemedia,
-     [  --disable-applemedia          Disable support for AppleMedia (Cocoa only)]
-     MOZ_APPLEMEDIA=,
-     MOZ_APPLEMEDIA=1)
-fi
+MOZ_ARG_DISABLE_BOOL(applemedia,
+[  --disable-applemedia    Disable support for AppleMedia (Cocoa only)],
+    MOZ_APPLEMEDIA=,
+    MOZ_APPLEMEDIA=1)
 
-if test -n "$MOZ_APPLEMEDIA"; then
+if test -n "$MOZ_WIDGET_TOOLKIT" = "cocoa" && test -n "$MOZ_APPLEMEDIA"; then
   AC_DEFINE(MOZ_APPLEMEDIA)
   # hack in frameworks for fmp4 - see bug 1029974
   # We load VideoToolbox and CoreMedia dynamically, so they don't appear here.
@@ -5171,7 +5169,7 @@ if test -n "$MOZ_APPLEMEDIA"; then
 fi
 
 dnl ========================================================
-dnl = DirectShow support
+dnl = DirectShow supporthttps://github.com/mozilla/gecko-dev/commit/7aa93ab05f68bd7e712a54d0c2d725e9a9f988c0
 dnl ========================================================
 if test "$OS_ARCH" = "WINNT"; then
     dnl Enable DirectShow support by default.
