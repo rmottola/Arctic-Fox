@@ -30,8 +30,8 @@ MOZ_WEBM_ENCODER=1
 MOZ_PHOENIX_EXTENSIONS=1
 MOZ_BROWSER_STATUSBAR=1
 
-#Disable devtools by default as they are currently broken.
-MOZ_DEVTOOLS=
+#Enable devtools by default.
+MOZ_DEVTOOLS=1
 
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
 # Changing MOZ_*BRANDING_DIRECTORY requires a clobber to ensure correct results,
