@@ -16,7 +16,7 @@ MOZ_CHROME_FILE_FORMAT=omni
 MOZ_SERVICES_COMMON=1
 MOZ_MEDIA_NAVIGATOR=1
 MOZ_SERVICES_CRYPTO=1
-MOZ_SERVICES_SYNC=1
+MOZ_SERVICES_SYNC=
 MOZ_APP_VERSION=`cat ${_topsrcdir}/$MOZ_BUILD_APP/config/version.txt`
 MOZ_EXTENSIONS_DEFAULT=" gio"
 
@@ -30,7 +30,7 @@ MOZ_WEBM_ENCODER=1
 MOZ_PHOENIX_EXTENSIONS=1
 MOZ_BROWSER_STATUSBAR=1
 
-#Enable devtools by default.
+#Enable devtools by default. Can be disabled with --disable-devtools in mozconfig.
 MOZ_DEVTOOLS=1
 
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
