@@ -5482,7 +5482,7 @@ class MSqrt
       : MUnaryInstruction(num)
     {
         setResultType(type);
-        setPolicyType(type);
+        specialization_ = type;
         setMovable();
     }
 
@@ -5763,7 +5763,7 @@ class MMathFunction
       : MUnaryInstruction(input), function_(function), cache_(cache)
     {
         setResultType(MIRType_Double);
-        setPolicyType(MIRType_Double);
+        specialization_ = MIRType_Double;
         setMovable();
     }
 
@@ -10906,7 +10906,7 @@ class MFloor
       : MUnaryInstruction(num)
     {
         setResultType(MIRType_Int32);
-        setPolicyType(MIRType_Double);
+        specialization_ = MIRType_Double;
         setMovable();
     }
 
@@ -10950,7 +10950,7 @@ class MCeil
       : MUnaryInstruction(num)
     {
         setResultType(MIRType_Int32);
-        setPolicyType(MIRType_Double);
+        specialization_ = MIRType_Double;
         setMovable();
     }
 
@@ -10994,7 +10994,7 @@ class MRound
       : MUnaryInstruction(num)
     {
         setResultType(MIRType_Int32);
-        setPolicyType(MIRType_Double);
+        specialization_ = MIRType_Double;
         setMovable();
     }
 

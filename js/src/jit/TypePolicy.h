@@ -221,24 +221,8 @@ class Float32Policy final : public TypePolicy
 template <unsigned Op>
 class FloatingPointPolicy final : public TypePolicy
 {
-
   public:
-    struct PolicyTypeData
-    {
-        MIRType policyType_;
-
-        void setPolicyType(MIRType type) {
-            policyType_ = type;
-        }
-
-      protected:
-        MIRType& thisTypeSpecialization() {
-            return policyType_;
-        }
-    };
-
-    INHERIT_DATA_(PolicyTypeData);
-
+    SPECIALIZATION_DATA_;
     virtual bool adjustInputs(TempAllocator& alloc, MInstruction* def) override;
 };
 
