@@ -7802,12 +7802,19 @@ Parser<ParseHandler>::computedPropertyName(Node literal)
 
 template <typename ParseHandler>
 typename ParseHandler::Node
-Parser<ParseHandler>::objectLiteral()
+Parser<ParseHandler>::newPropertyListNode(PropListType type)
+{
+    return handler.newObjectLiteral(pos().begin);
+}
+
+template <typename ParseHandler>
+typename ParseHandler::Node
+Parser<ParseHandler>::propertyList(PropListType type)
 {
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_LC));
 
-    Node literal = handler.newObjectLiteral(pos().begin);
-    if (!literal)
+    Node propList = newPropertyListNode(type);
+    if (!propList)
         return null();
 
     bool seenPrototypeMutation = false;
@@ -7841,7 +7848,7 @@ Parser<ParseHandler>::objectLiteral()
             break;
 
           case TOK_LB: {
-              propname = computedPropertyName(literal);
+              propname = computedPropertyName(propList);
               if (!propname)
                   return null();
               break;
@@ -7897,7 +7904,7 @@ Parser<ParseHandler>::objectLiteral()
                 if (!propname)
                     return null();
             } else if (tt == TOK_LB) {
-                propname = computedPropertyName(literal);
+                propname = computedPropertyName(propList);
                 if (!propname)
                     return null();
             } else {
@@ -7964,13 +7971,13 @@ Parser<ParseHandler>::objectLiteral()
                     // method/generator definitions, computed property name
                     // versions of all of these, and shorthands do not.
                     uint32_t begin = handler.getPosition(propname).begin;
-                    if (!handler.addPrototypeMutation(literal, begin, propexpr))
+                    if (!handler.addPrototypeMutation(propList, begin, propexpr))
                         return null();
                 } else {
                     if (!handler.isConstant(propexpr))
-                        handler.setListFlag(literal, PNX_NONCONST);
+                        handler.setListFlag(propList, PNX_NONCONST);
 
-                    if (!handler.addPropertyDefinition(literal, propname, propexpr))
+                    if (!handler.addPropertyDefinition(propList, propname, propexpr))
                         return null();
                 }
             } else if (ltok == TOK_NAME && (tt == TOK_COMMA || tt == TOK_RC)) {
@@ -7991,11 +7998,11 @@ Parser<ParseHandler>::objectLiteral()
                 if (!nameExpr)
                     return null();
 
-                if (!handler.addShorthand(literal, propname, nameExpr))
+                if (!handler.addShorthand(propList, propname, nameExpr))
                     return null();
             } else if (tt == TOK_LP) {
                 tokenStream.ungetToken();
-                if (!methodDefinition(literal, propname, Normal, Method,
+                if (!methodDefinition(type, propList, propname, Normal, Method,
                                       isGenerator ? StarGenerator : NotGenerator, op)) {
                     return null();
                 }
@@ -8005,7 +8012,7 @@ Parser<ParseHandler>::objectLiteral()
             }
         } else {
             /* NB: Getter function in { get x(){} } is unnamed. */
-            if (!methodDefinition(literal, propname, op == JSOP_INITPROP_GETTER ? Getter : Setter,
+            if (!methodDefinition(type, propList, propname, op == JSOP_INITPROP_GETTER ? Getter : Setter,
                                   Expression, NotGenerator, op)) {
                 return null();
             }
@@ -8022,13 +8029,13 @@ Parser<ParseHandler>::objectLiteral()
         }
     }
 
-    handler.setEndPosition(literal, pos().end);
-    return literal;
+    handler.setEndPosition(propList, pos().end);
+    return propList;
 }
 
 template <typename ParseHandler>
 bool
-Parser<ParseHandler>::methodDefinition(Node literal, Node propname, FunctionType type,
+Parser<ParseHandler>::methodDefinition(PropListType, Node propList, Node propname, FunctionType type,
                                        FunctionSyntaxKind kind, GeneratorKind generatorKind,
                                        JSOp op)
 {
@@ -8041,7 +8048,7 @@ Parser<ParseHandler>::methodDefinition(Node literal, Node propname, FunctionType
     Node fn = functionDef(funName, type, kind, generatorKind);
     if (!fn)
         return false;
-    if (!handler.addMethodDefinition(literal, propname, fn, op))
+    if (!handler.addMethodDefinition(propList, propname, fn, op))
         return false;
     return true;
 }
@@ -8061,7 +8068,7 @@ Parser<ParseHandler>::primaryExpr(TokenKind tt, InvokedPrediction invoked)
         return arrayInitializer();
 
       case TOK_LC:
-        return objectLiteral();
+        return propertyList(ObjectLiteral);
 
       case TOK_LP: {
         TokenKind next;
