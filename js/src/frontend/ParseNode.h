@@ -1555,7 +1555,7 @@ enum ParseReportKind
     ParseStrictError
 };
 
-enum FunctionSyntaxKind { Expression, Statement, Arrow, Method };
+enum FunctionSyntaxKind { Expression, Statement, Arrow, Method, Lazy };
 
 static inline ParseNode*
 FunctionArgsList(ParseNode* fn, unsigned* numFormals)
