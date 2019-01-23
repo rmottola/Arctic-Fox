@@ -1760,6 +1760,7 @@ IonBuilder::inspectOpcode(JSOp op)
 
       case JSOP_INITPROP:
       case JSOP_INITLOCKEDPROP:
+      case JSOP_INITHIDDENPROP:
       {
         PropertyName* name = info().getAtom(pc)->asPropertyName();
         return jsop_initprop(name);
@@ -6466,7 +6467,7 @@ IonBuilder::jsop_initprop(PropertyName* name)
 
     if (useSlowPath) {
         // JSOP_NEWINIT becomes an MNewObject without preconfigured properties.
-        MInitProp *init = MInitProp::New(alloc(), obj, name, value, *pc == JSOP_INITLOCKEDPROP);
+        MInitProp *init = MInitProp::New(alloc(), obj, name, value);
         current->add(init);
         return resumeAfter(init);
     }

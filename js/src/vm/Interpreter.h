@@ -376,6 +376,9 @@ bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandleId id,
                           HandleObject val);
 
+unsigned
+GetInitDataPropAttrs(JSOp op);
+
 bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandlePropertyName name,
                           HandleObject val);
