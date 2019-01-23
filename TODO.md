@@ -80,8 +80,6 @@ Yet unapplied Mozilla patches:
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 - Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare
 - 1134638 2015-02-26 : 10 to 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
-- Bug 1066229 5 Parts + Followup
-- Bug 1066227 4 Parts + Test
 
 
 Further ToDo which would help portability:
