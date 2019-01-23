@@ -3322,12 +3322,12 @@ class MInitProp
   : public MAryInstruction<2>,
     public MixPolicy<ObjectPolicy<0>, BoxPolicy<1> >::Data
 {
-  public:
     AlwaysTenuredPropertyName name_;
+    bool locked_;
 
   protected:
-    MInitProp(MDefinition* obj, PropertyName* name, MDefinition* value)
-      : name_(name)
+    MInitProp(MDefinition *obj, PropertyName *name, MDefinition *value, bool locked)
+      : name_(name), locked_(locked)
     {
         initOperand(0, obj);
         initOperand(1, value);
@@ -3337,23 +3337,26 @@ class MInitProp
   public:
     INSTRUCTION_HEADER(InitProp)
 
-    static MInitProp* New(TempAllocator& alloc, MDefinition* obj, PropertyName* name,
-                          MDefinition* value)
+    static MInitProp *New(TempAllocator &alloc, MDefinition *obj, PropertyName *name,
+                          MDefinition *value, bool locked)
     {
-        return new(alloc) MInitProp(obj, name, value);
+        return new(alloc) MInitProp(obj, name, value, locked);
     }
 
-    MDefinition* getObject() const {
+    MDefinition *getObject() const {
         return getOperand(0);
     }
-    MDefinition* getValue() const {
+    MDefinition *getValue() const {
         return getOperand(1);
     }
 
-    PropertyName* propertyName() const {
+    PropertyName *propertyName() const {
         return name_;
     }
-    bool possiblyCalls() const override {
+    bool locked() const {
+        return locked_;
+    }
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };

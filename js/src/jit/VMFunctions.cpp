@@ -191,16 +191,27 @@ MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value)
     return true;
 }
 
+template<bool Locked>
 bool
-InitProp(JSContext* cx, HandleNativeObject obj, HandlePropertyName name, HandleValue value)
+InitProp(JSContext *cx, HandleNativeObject obj, HandlePropertyName name, HandleValue value)
 {
     RootedId id(cx, NameToId(name));
-    return NativeDefineProperty(cx, obj, id, value, nullptr, nullptr, JSPROP_ENUMERATE);
+    unsigned propFlags;
+    if (Locked)
+        propFlags = JSPROP_READONLY | JSPROP_PERMANENT;
+    else
+        propFlags = JSPROP_ENUMERATE;
+    return NativeDefineProperty(cx, obj, id, value, nullptr, nullptr, propFlags);
 }
+
+template bool InitProp<true>(JSContext *cx, HandleNativeObject obj, HandlePropertyName name,
+                             HandleValue value);
+template bool InitProp<false>(JSContext *cx, HandleNativeObject obj, HandlePropertyName name,
+                              HandleValue value);
 
 template<bool Equal>
 bool
-LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
+LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
 {
     if (!js::LooselyEqual(cx, lhs, rhs, res))
         return false;

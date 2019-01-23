@@ -644,13 +644,15 @@ bool CheckOverRecursed(JSContext* cx);
 bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
-bool DefVarOrConst(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
-bool SetConst(JSContext* cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
-bool MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value);
-bool InitProp(JSContext* cx, HandleNativeObject obj, HandlePropertyName name, HandleValue value);
+bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
+bool SetConst(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
+bool MutatePrototype(JSContext *cx, HandlePlainObject obj, HandleValue value);
+
+template<bool Locked>
+bool InitProp(JSContext *cx, HandleNativeObject obj, HandlePropertyName name, HandleValue value);
 
 template<bool Equal>
-bool LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
+bool LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
 
 template<bool Equal>
 bool StrictlyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
