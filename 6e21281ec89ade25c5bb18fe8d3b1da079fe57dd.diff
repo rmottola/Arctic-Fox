@@ -1,0 +1,375 @@
+diff --git a/js/src/tests/ecma_6/Class/classPrototype.js b/js/src/tests/ecma_6/Class/classPrototype.js
+new file mode 100644
+index 0000000000000..17bbf21257c9a
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/classPrototype.js
+@@ -0,0 +1,27 @@
++var test = `
++
++// The prototype of a class is a non-writable, non-configurable, non-enumerable data property.
++class a { constructor() { } }
++var protoDesc = Object.getOwnPropertyDescriptor(a, "prototype");
++assertEq(protoDesc.writable, false);
++assertEq(protoDesc.configurable, false);
++assertEq(protoDesc.enumerable, false);
++
++var prototype = protoDesc.value;
++assertEq(typeof prototype, "object");
++assertEq(Object.getPrototypeOf(prototype), Object.prototype);
++assertEq(Object.isExtensible(prototype), true);
++
++var desiredPrototype = {};
++Object.defineProperty(desiredPrototype, "constructor", { writable: true,
++                                                         configurable: true,
++                                                         enumerable: false,
++                                                         value: a });
++assertDeepEq(prototype, desiredPrototype);
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/constructorCalled.js b/js/src/tests/ecma_6/Class/constructorCalled.js
+new file mode 100644
+index 0000000000000..bf77362e2dc1a
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/constructorCalled.js
+@@ -0,0 +1,31 @@
++// The constructor specified should get called, regardless of order, or
++// other distractions
++
++var test = `
++
++var called = false;
++class a { constructor(x) { assertEq(x, 4); called = true } }
++new a(4);
++assertEq(called, true);
++
++called = false;
++class b { constructor() { called = true } method() { } }
++new b();
++assertEq(called, true);
++
++called = false;
++class c { method() { } constructor() { called = true; } }
++new c();
++assertEq(called, true);
++
++called = false;
++class d { [\"constructor\"]() { throw new Error(\"NO\"); } constructor() { called = true; } }
++new d();
++assertEq(called, true);
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/innerBinding.js b/js/src/tests/ecma_6/Class/innerBinding.js
+new file mode 100644
+index 0000000000000..55d1ffca3fa39
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/innerBinding.js
+@@ -0,0 +1,78 @@
++// Class statements should create an immutable inner binding. Since all code in
++// classes is in strict mode, attempts to mutate it should throw.
++
++if (classesEnabled()) {
++
++// XXXefaust Because we currently try to do assignment to const as an early error,
++// this is a syntax error. It is specced to be a TypeError
++
++function syntaxWrapper() {
++    eval("class Foo { constructor() { } tryBreak() { Foo = 4; } }");
++}
++assertThrowsInstanceOf(syntaxWrapper, SyntaxError);
++/*
++var test = `
++class Foo { constructor() { }; tryBreak() { Foo = 4; } }
++assertThrowsInstanceOf(() => new Foo().tryBreak(), TypeError);
++
++{
++    class foo { constructor() { }; tryBreak() { foo = 4; } }
++    assertThrowsInstanceOf(() => new foo().tryBreak(), TypeError);
++}
++`;
++*/
++
++var test = `
++
++// TDZ applies to inner bindings
++assertThrowsInstanceOf(()=>eval(\`class Bar {
++                                    constructor() { };
++                                    [Bar] () { };
++                                 }\`), ReferenceError);
++
++// There's no magic "inner binding" global
++{
++    class Foo {
++        constructor() { };
++        test() {
++            class Bar {
++                constructor() { }
++                test() { return Foo === Bar }
++            }
++            return new Bar().test();
++        }
++    }
++    assertEq(new Foo().test(), false);
++}
++
++// Inner bindings are shadowable
++{
++    class Foo {
++        constructor() { }
++        test(Foo) { return Foo; }
++    }
++    assertEq(new Foo().test(4), 4);
++}
++
++// The outer binding is distinct from the inner one
++{
++    let orig_X;
++
++    class X {
++        constructor() { }
++        f() { assertEq(X, orig_X); }
++    }
++
++    orig_X = X;
++    X = 13;
++    assertEq(X, 13);
++    new orig_X().f();
++}
++`;
++
++eval(test);
++
++}
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/methodInstallation.js b/js/src/tests/ecma_6/Class/methodInstallation.js
+new file mode 100644
+index 0000000000000..56b293e98a5f9
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/methodInstallation.js
+@@ -0,0 +1,52 @@
++// Do the things we write in classes actually appear as they are supposed to?
++
++var test= `
++
++var methodCalled = false;
++var getterCalled = false;
++var setterCalled = false;
++var constructorCalled = false;
++class a {
++    constructor() { constructorCalled = true; }
++    __proto__() { methodCalled = true }
++    get getter() { getterCalled = true; }
++    set setter(x) { setterCalled = true; }
++    *[Symbol.iterator]() { yield "cow"; yield "pig"; }
++}
++var aConstDesc = Object.getOwnPropertyDescriptor(a.prototype, \"constructor\");
++assertEq(aConstDesc.writable, true);
++assertEq(aConstDesc.configurable, true);
++assertEq(aConstDesc.enumerable, false);
++aConstDesc.value();
++assertEq(constructorCalled, true);
++
++// __proto__ is just an identifier for classes. No prototype changes are made.
++assertEq(Object.getPrototypeOf(a.prototype), Object.prototype);
++var aMethDesc = Object.getOwnPropertyDescriptor(a.prototype, \"__proto__\");
++assertEq(aMethDesc.writable, true);
++assertEq(aMethDesc.configurable, true);
++assertEq(aMethDesc.enumerable, true);
++aMethDesc.value();
++assertEq(methodCalled, true);
++
++var aGetDesc = Object.getOwnPropertyDescriptor(a.prototype, \"getter\");
++assertEq(aGetDesc.configurable, true);
++assertEq(aGetDesc.enumerable, true);
++aGetDesc.get();
++assertEq(getterCalled, true);
++
++var aSetDesc = Object.getOwnPropertyDescriptor(a.prototype, \"setter\");
++assertEq(aSetDesc.configurable, true);
++assertEq(aSetDesc.enumerable, true);
++aSetDesc.set();
++assertEq(setterCalled, true);
++assertDeepEq(aSetDesc, Object.getOwnPropertyDescriptor(a.prototype, \"setter\"));
++
++assertEq([...new a()].join(), "cow,pig");
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/methodOverwrites.js b/js/src/tests/ecma_6/Class/methodOverwrites.js
+new file mode 100644
+index 0000000000000..9af84a212ce1b
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/methodOverwrites.js
+@@ -0,0 +1,45 @@
++// Ensure that we can overwrite methods when more tha one is present.
++
++var test = `
++var result = 0;
++// Regardless of order, the constructor is overridden by any CPN, because it's
++// processed seperately.
++class a { [\"constructor\"]() { result += 1; }; constructor() { result += 2; } }
++var aInst = new a();
++assertEq(result, 2);
++aInst.constructor();
++assertEq(result, 3);
++
++class b { constructor() { result += 2; } [\"constructor\"]() { result += 1; }; }
++var bInst = new b();
++assertEq(result, 5);
++bInst.constructor();
++assertEq(result, 6);
++
++class c { constructor() { } method() { result += 1 } get method() { result += 2 } }
++new c().method;
++assertEq(result, 8);
++
++class d { constructor() { } get method() { result += 1 } method() { result += 2 } }
++new d().method();
++assertEq(result, 10);
++
++// getters and setter should not overwrite each other, but merge cleanly.
++class e { constructor() { } get method() { result += 1 } set method(x) { } }
++new e().method;
++assertEq(result, 11);
++
++class f { constructor() { }
++          set method(x) { throw "NO"; }
++          method() { throw "NO" }
++          get method() { return new Function("result += 1"); }
++        }
++new f().method();
++assertEq(result, 12);
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/outerBinding.js b/js/src/tests/ecma_6/Class/outerBinding.js
+new file mode 100644
+index 0000000000000..66595bb5c733c
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/outerBinding.js
+@@ -0,0 +1,63 @@
++// A class creates a mutable lexical outer binding.
++
++var test = `
++class Foo { constructor() { } }
++assertEq(typeof Foo, \"function\");
++Foo = 5;
++assertEq(Foo, 5);
++
++{
++    class foo { constructor() { } }
++    assertEq(typeof foo, \"function\");
++    foo = 4;
++    assertEq(foo, 4);
++}
++
++var ieval = eval;
++
++{
++    class PermanentBinding { constructor() { } }
++    delete PermanentBinding;
++    // That...didn't actually work, right?
++    assertEq(typeof PermanentBinding, "function");
++}
++
++{
++    try {
++        ieval(\`class x { constructor () { } }
++                throw new Error("FAIL");
++                class y { constructor () { } }
++              \`);
++    } catch (e if e instanceof Error) { }
++    assertEq(typeof x, "function");
++    assertEq(y, undefined, "Congrats, you fixed top-level lexical scoping! " +
++                           "Please uncomment the tests below for the real test.");
++    // assertThrowsInstanceOf(() => y, ReferenceError);
++}
++
++/*
++===== UNCOMMENT ME WHEN ENABLING THE TEST ABOVE. =====
++const globalConstant = 0;
++var earlyError = true;
++try {
++    ieval("earlyError = false; class globalConstant { constructor() { } }");
++} catch (e if e instanceof TypeError) { }
++assertEq(earlyError, true);
++*/
++
++function strictEvalShadows() {
++    "use strict";
++    let x = 4;
++    eval(\`class x { constructor() { } }
++           assertEq(typeof x, "function");
++         \`);
++    assertEq(x, 4);
++}
++strictEvalShadows()
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
+diff --git a/js/src/tests/ecma_6/Class/shell.js b/js/src/tests/ecma_6/Class/shell.js
+index e69de29bb2d1d..5c4d61268e547 100644
+--- a/js/src/tests/ecma_6/Class/shell.js
++++ b/js/src/tests/ecma_6/Class/shell.js
+@@ -0,0 +1,12 @@
++// Enable "let" in shell builds. So silly.
++if (typeof version != 'undefined')
++  version(185);
++
++function classesEnabled() {
++    try {
++        new Function("class Foo { constructor() { } }");
++        return true;
++    } catch (e if e instanceof SyntaxError) {
++        return false;
++    }
++}
+diff --git a/js/src/tests/ecma_6/Class/strictExecution.js b/js/src/tests/ecma_6/Class/strictExecution.js
+new file mode 100644
+index 0000000000000..4d17dea4f89de
+--- /dev/null
++++ b/js/src/tests/ecma_6/Class/strictExecution.js
+@@ -0,0 +1,20 @@
++// Classes are always strict mode. Check computed property names as well.
++
++var test = `
++class a { constructor() { Object.preventExtensions({}).prop = 0; } }
++assertThrowsInstanceOf(() => new a(), TypeError);
++
++function shouldThrow() {
++    class b {
++        [Object.preventExtensions({}).prop = 4]() { }
++        constructor() { }
++    }
++}
++assertThrowsInstanceOf(shouldThrow, TypeError);
++`;
++
++if (classesEnabled())
++    eval(test);
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0, "OK");
