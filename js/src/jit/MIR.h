@@ -1090,7 +1090,7 @@ class MBinaryInstruction : public MAryInstruction<2>
 class MTernaryInstruction : public MAryInstruction<3>
 {
   protected:
-    MTernaryInstruction(MDefinition* first, MDefinition* second, MDefinition* third)
+    MTernaryInstruction(MDefinition *first, MDefinition *second, MDefinition *third)
     {
         initOperand(0, first);
         initOperand(1, second);
@@ -2214,31 +2214,38 @@ class MSimdShift
 
 class MSimdSelect
   : public MTernaryInstruction,
-    public NoTypePolicy::Data
+    public SimdSelectPolicy::Data
 {
     bool isElementWise_;
 
-    MSimdSelect(MDefinition* mask, MDefinition* lhs, MDefinition* rhs, MIRType type,
+    MSimdSelect(MDefinition *mask, MDefinition *lhs, MDefinition *rhs, MIRType type,
                 bool isElementWise)
       : MTernaryInstruction(mask, lhs, rhs), isElementWise_(isElementWise)
     {
         MOZ_ASSERT(IsSimdType(type));
-        MOZ_ASSERT(mask->type() == MIRType_Int32x4);
-        MOZ_ASSERT(lhs->type() == rhs->type());
-        MOZ_ASSERT(lhs->type() == type);
         setResultType(type);
+        specialization_ = type;
         setMovable();
     }
 
   public:
     INSTRUCTION_HEADER(SimdSelect)
-    static MSimdSelect* NewAsmJS(TempAllocator& alloc, MDefinition* mask, MDefinition* lhs,
-                                 MDefinition* rhs, MIRType t, bool isElementWise)
+    static MSimdSelect *NewAsmJS(TempAllocator &alloc, MDefinition *mask, MDefinition *lhs,
+                                 MDefinition *rhs, MIRType t, bool isElementWise)
+    {
+        MOZ_ASSERT(mask->type() == MIRType_Int32x4);
+        MOZ_ASSERT(lhs->type() == rhs->type());
+        MOZ_ASSERT(lhs->type() == t);
+        return new(alloc) MSimdSelect(mask, lhs, rhs, t, isElementWise);
+    }
+
+    static MSimdSelect *New(TempAllocator &alloc, MDefinition *mask, MDefinition *lhs,
+                            MDefinition *rhs, MIRType t, bool isElementWise)
     {
         return new(alloc) MSimdSelect(mask, lhs, rhs, t, isElementWise);
     }
 
-    MDefinition* mask() const {
+    MDefinition *mask() const {
         return getOperand(0);
     }
 

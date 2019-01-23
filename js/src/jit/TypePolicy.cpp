@@ -64,7 +64,7 @@ BoxInputsPolicy::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-ArithPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+ArithPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
     if (specialization == MIRType_None)
@@ -97,7 +97,7 @@ ArithPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-AllDoublePolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+AllDoublePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     for (size_t i = 0, e = ins->numOperands(); i < e; i++) {
         MDefinition* in = ins->getOperand(i);
@@ -117,7 +117,7 @@ AllDoublePolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-ComparePolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
+ComparePolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
 {
     MOZ_ASSERT(def->isCompare());
     MCompare* compare = def->toCompare();
@@ -262,7 +262,7 @@ ComparePolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 }
 
 bool
-TypeBarrierPolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
+TypeBarrierPolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
 {
     MTypeBarrier* ins = def->toTypeBarrier();
     MIRType inputType = ins->getOperand(0)->type();
@@ -317,7 +317,7 @@ TypeBarrierPolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 }
 
 bool
-TestPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+TestPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     MDefinition* op = ins->getOperand(0);
     switch (op->type()) {
@@ -763,9 +763,9 @@ SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator &alloc, MInst
 }
 
 template bool
-SimdSameAsReturnedTypePolicy<0>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
+SimdSameAsReturnedTypePolicy<0>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins);
 template bool
-SimdSameAsReturnedTypePolicy<1>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
+SimdSameAsReturnedTypePolicy<1>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins);
 
 bool
 SimdAllPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
@@ -789,7 +789,25 @@ template bool
 SimdPolicy<0>::adjustInputs(TempAllocator &alloc, MInstruction *ins);
 
 bool
-CallPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+SimdSelectPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+{
+    MIRType specialization = ins->typePolicySpecialization();
+
+    // First input is the mask, which has to be an int32x4 (for now).
+    if (!MaybeSimdUnbox(alloc, ins, MIRType_Int32x4, 0))
+        return false;
+
+    // Next inputs are the two vectors of a particular type.
+    for (unsigned i = 1; i < 3; i++) {
+        if (!MaybeSimdUnbox(alloc, ins, specialization, i))
+            return false;
+    }
+
+    return true;
+}
+
+bool
+CallPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     MCall* call = ins->toCall();
 
@@ -1069,6 +1087,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(InstanceOfPolicy)                         \
     _(PowPolicy)                                \
     _(SimdAllPolicy)                            \
+    _(SimdSelectPolicy)                         \
     _(StoreTypedArrayElementStaticPolicy)       \
     _(StoreTypedArrayHolePolicy)                \
     _(StoreTypedArrayPolicy)                    \
