@@ -428,12 +428,13 @@ class IonBuilder
                                 BarrierKind barrier, TemporaryTypeSet* types);
     bool getPropTryUnboxed(bool* emitted, MDefinition* obj, PropertyName* name,
                            BarrierKind barrier, TemporaryTypeSet* types);
-    bool getPropTryCommonGetter(bool* emitted, MDefinition* obj, PropertyName* name,
-                                TemporaryTypeSet* types);
-    bool getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName* name,
-                                BarrierKind barrier, TemporaryTypeSet* types);
-    bool getPropTryTypedObject(bool* emitted, MDefinition* obj, PropertyName* name);
-    bool getPropTryScalarPropOfTypedObject(bool* emitted, MDefinition* typedObj,
+    bool getPropTryCommonGetter(bool *emitted, MDefinition *obj, PropertyName *name,
+                                TemporaryTypeSet *types);
+    bool getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName *name,
+                                BarrierKind barrier, TemporaryTypeSet *types);
+    bool getPropTrySimdGetter(bool *emitted, MDefinition *obj, PropertyName *name);
+    bool getPropTryTypedObject(bool *emitted, MDefinition *obj, PropertyName *name);
+    bool getPropTryScalarPropOfTypedObject(bool *emitted, MDefinition *typedObj,
                                            int32_t fieldOffset,
                                            TypedObjectPrediction fieldTypeReprs);
     bool getPropTryReferencePropOfTypedObject(bool* emitted, MDefinition* typedObj,
@@ -805,9 +806,10 @@ class IonBuilder
     InliningStatus inlineConstructTypedObject(CallInfo& callInfo, TypeDescr* target);
 
     // SIMD intrinsics and natives.
-    InliningStatus inlineConstructSimdObject(CallInfo& callInfo, SimdTypeDescr* target);
+    InliningStatus inlineConstructSimdObject(CallInfo& callInfo, SimdTypeDescr *target);
 
     //  helpers
+    static MIRType SimdTypeDescrToMIRType(SimdTypeDescr::Type type);
     bool checkInlineSimd(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
                          unsigned numArgs, InlineTypedObject **templateObj);
     IonBuilder::InliningStatus boxSimd(CallInfo &callInfo, MInstruction *ins,
