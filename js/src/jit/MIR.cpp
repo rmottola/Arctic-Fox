@@ -974,6 +974,11 @@ MCompare::printOpcode(FILE* fp) const
     MDefinition::printOpcode(fp);
     fprintf(fp, " %s", js_CodeName[jsop()]);
 }
+void
+MSimdBinaryComp::printOpcode(FILE *fp) const
+{
+    PrintOpcodeOperation(this, fp);
+}
 
 void
 MConstantElements::printOpcode(FILE* fp) const

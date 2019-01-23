@@ -9181,9 +9181,12 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
 
     if (JitSupportsSimd()) {
 #define ADD_INT32X4_SIMD_OP_NAME_(OP) || native == js::simd_int32x4_##OP
+#define ADD_FLOAT32X4_SIMD_OP_NAME_(OP) || native == js::simd_float32x4_##OP
        if (false
            ARITH_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
            BITWISE_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
+           COMP_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
+           COMP_COMMONX4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
            || native == js::simd_int32x4_not || native == js::simd_int32x4_neg
            || native == js::simd_int32x4_fromFloat32x4 || native == js::simd_int32x4_fromFloat32x4Bits)
        {
@@ -9191,8 +9194,6 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
        }
-#undef ADD_INT32X4_SIMD_OP_NAME_
-#define ADD_FLOAT32X4_SIMD_OP_NAME_(OP) || native == js::simd_float32x4_##OP
        if (false
            ARITH_FLOAT32X4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
            BITWISE_COMMONX4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
@@ -9205,6 +9206,7 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
        }
+#undef ADD_INT32X4_SIMD_OP_NAME_
 #undef ADD_FLOAT32X4_SIMD_OP_NAME_
     }
 
