@@ -627,12 +627,14 @@ LIRGeneratorX86Shared::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins)
 }
 
 void
-LIRGeneratorX86Shared::visitSimdBinaryArith(MSimdBinaryArith* ins)
+LIRGeneratorX86Shared::visitSimdBinaryArith(MSimdBinaryArith *ins)
 {
+    MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
+    MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
     MOZ_ASSERT(IsSimdType(ins->type()));
 
-    MDefinition* lhs = ins->lhs();
-    MDefinition* rhs = ins->rhs();
+    MDefinition *lhs = ins->lhs();
+    MDefinition *rhs = ins->rhs();
 
     if (ins->isCommutative())
         ReorderCommutative(&lhs, &rhs, ins);
