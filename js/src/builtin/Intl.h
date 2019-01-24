@@ -20,7 +20,7 @@
  * Spec: ECMAScript Internationalization API Specification, 8.0, 8.1
  */
 extern JSObject*
-js_InitIntlClass(JSContext* cx, js::HandleObject obj);
+js_InitIntlClass(JSContext *cx, js::HandleObject obj);
 
 namespace js {
 
@@ -39,7 +39,7 @@ namespace js {
  * Usage: collator = intl_Collator(locales, options)
  */
 extern bool
-intl_Collator(JSContext* cx, unsigned argc, Value* vp);
+intl_Collator(JSContext *cx, unsigned argc, Value *vp);
 
 /**
  * Returns an object indicating the supported locales for collation
@@ -50,7 +50,7 @@ intl_Collator(JSContext* cx, unsigned argc, Value* vp);
  * Usage: availableLocales = intl_Collator_availableLocales()
  */
 extern bool
-intl_Collator_availableLocales(JSContext* cx, unsigned argc, Value* vp);
+intl_Collator_availableLocales(JSContext *cx, unsigned argc, Value* vp);
 
 /**
  * Returns an array with the collation type identifiers per Unicode

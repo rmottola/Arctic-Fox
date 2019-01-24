@@ -2032,7 +2032,7 @@ static const JSFunctionSpec intl_static_methods[] = {
  * Spec: ECMAScript Internationalization API Specification, 8.0, 8.1
  */
 JSObject*
-js_InitIntlClass(JSContext* cx, HandleObject obj)
+js_InitIntlClass(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->is<GlobalObject>());
     Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());
