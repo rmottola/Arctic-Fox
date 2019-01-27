@@ -78,7 +78,6 @@ Yet unapplied Mozilla patches:
 - Bug 1136980 2015-02-27 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 - Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare (6 patches)
-- Bug 1130166 - Use SizePrintfMacros.h when printing line numbers.
 
 
 Further ToDo which would help portability:
@@ -103,6 +102,7 @@ Further Further ToDo:
 - NekcoOriginAttributes
 - evaulate WebRTC : Bug 1093934 - Create a XPCOM library 
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
+- see if window.requestIdleCallback can be backported
 
 Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
 
