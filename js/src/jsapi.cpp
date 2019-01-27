@@ -121,7 +121,7 @@ JS::CallArgs::requireAtLeast(JSContext* cx, const char* fnname, unsigned require
     if (length() < required) {
         char numArgsStr[40];
         JS_snprintf(numArgsStr, sizeof numArgsStr, "%u", required - 1);
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              fnname, numArgsStr, required == 2 ? "" : "s");
         return false;
     }
@@ -269,7 +269,7 @@ JS_ConvertArgumentsVA(JSContext *cx, const CallArgs &args, const char *format, v
                     JS_snprintf(numBuf, sizeof numBuf, "%u", args.length());
                     JSAutoByteString funNameBytes;
                     if (const char *name = GetFunctionNameBytes(cx, fun, &funNameBytes)) {
-                        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+                        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                                              JSMSG_MORE_ARGS_NEEDED,
                                              name, numBuf, (args.length() == 1) ? "" : "s");
                     }
@@ -336,7 +336,7 @@ JS_ConvertArgumentsVA(JSContext *cx, const CallArgs &args, const char *format, v
           case '*':
             break;
           default:
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_CHAR, format);
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_CHAR, format);
             return false;
         }
     }
@@ -391,7 +391,7 @@ JS_ConvertValue(JSContext *cx, HandleValue value, JSType type, MutableHandleValu
       default: {
         char numBuf[12];
         JS_snprintf(numBuf, sizeof numBuf, "%d", (int)type);
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_TYPE, numBuf);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_TYPE, numBuf);
         ok = false;
         break;
       }
@@ -1801,8 +1801,8 @@ JS_InitClass(JSContext* cx, HandleObject obj, HandleObject parent_proto,
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, parent_proto);
-    return js_InitClass(cx, obj, parent_proto, Valueify(clasp), constructor,
-                        nargs, ps, fs, static_ps, static_fs);
+    return InitClass(cx, obj, parent_proto, Valueify(clasp), constructor,
+                     nargs, ps, fs, static_ps, static_fs);
 }
 
 JS_PUBLIC_API(bool)
@@ -1934,7 +1934,7 @@ JS_GetConstructor(JSContext* cx, HandleObject proto)
     if (!GetProperty(cx, proto, proto, cx->names().constructor, &cval))
         return nullptr;
     if (!IsFunctionObject(cval)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_NO_CONSTRUCTOR,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NO_CONSTRUCTOR,
                              proto->getClass()->name);
         return nullptr;
     }
@@ -3335,17 +3335,17 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject dynamicScop
     }
 
     if (!IsFunctionCloneable(fun, dynamicScope)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_CLONE_FUNOBJ_SCOPE);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_CLONE_FUNOBJ_SCOPE);
         return nullptr;
     }
 
     if (fun->isBoundFunction()) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
         return nullptr;
     }
 
     if (fun->isNative() && IsAsmJSModuleNative(fun->native())) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
         return nullptr;
     }
 
@@ -3438,7 +3438,7 @@ JS_PUBLIC_API(JSObject*)
 JS_BindCallable(JSContext* cx, HandleObject target, HandleObject newThis)
 {
     RootedValue thisArg(cx, ObjectValue(*newThis));
-    return js_fun_bind(cx, target, thisArg, nullptr, 0);
+    return fun_bind(cx, target, thisArg, nullptr, 0);
 }
 
 static bool
@@ -3451,7 +3451,7 @@ js_generic_native_method_dispatcher(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT((fs->flags & JSFUN_GENERIC_NATIVE) != 0);
 
     if (argc < 1) {
-        js_ReportMissingArg(cx, args.calleev(), 0);
+        ReportMissingArg(cx, args.calleev(), 0);
         return false;
     }
 
@@ -3612,7 +3612,7 @@ struct AutoLastFrameCheck
         if (cx->isExceptionPending() &&
             !JS_IsRunning(cx) &&
             (!cx->options().dontReportUncaught() && !cx->options().autoJSAPIOwnsErrorReporting())) {
-            js_ReportUncaughtException(cx);
+            ReportUncaughtException(cx);
         }
     }
 
@@ -3697,7 +3697,7 @@ AutoFile::open(JSContext* cx, const char* filename)
     } else {
         fp_ = fopen(filename, "r");
         if (!fp_) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_OPEN,
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_OPEN,
                                  filename, "No such file or directory");
             return false;
         }
@@ -4455,8 +4455,8 @@ JS_NewHelper(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& input
          * API is asking for an object, so we report an error.
          */
         JSAutoByteString bytes;
-        if (js_ValueToPrintable(cx, args.rval(), &bytes)) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_NEW_RESULT,
+        if (ValueToPrintable(cx, args.rval(), &bytes)) {
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_NEW_RESULT,
                                  bytes.ptr());
         }
         return nullptr;
@@ -4849,7 +4849,7 @@ JS_DecodeBytes(JSContext* cx, const char* src, size_t srclen, char16_t* dst, siz
         CopyAndInflateChars(dst, src, dstlen);
 
         AutoSuppressGC suppress(cx);
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
         return false;
     }
 
@@ -5031,7 +5031,7 @@ JS_Stringify(JSContext* cx, MutableHandleValue vp, HandleObject replacer,
     StringBuffer sb(cx);
     if (!sb.ensureTwoByteChars())
         return false;
-    if (!js_Stringify(cx, vp, replacer, space, sb))
+    if (!Stringify(cx, vp, replacer, space, sb))
         return false;
     if (sb.empty() && !sb.append(cx->names().null))
         return false;
@@ -5085,7 +5085,7 @@ JS_ReportError(JSContext* cx, const char* format, ...)
 
     AssertHeapIsIdle(cx);
     va_start(ap, format);
-    js_ReportErrorVA(cx, JSREPORT_ERROR, format, ap);
+    ReportErrorVA(cx, JSREPORT_ERROR, format, ap);
     va_end(ap);
 }
 
@@ -5105,8 +5105,8 @@ JS_ReportErrorNumberVA(JSContext* cx, JSErrorCallback errorCallback,
                        va_list ap)
 {
     AssertHeapIsIdle(cx);
-    js_ReportErrorNumberVA(cx, JSREPORT_ERROR, errorCallback, userRef,
-                           errorNumber, ArgumentsAreASCII, ap);
+    ReportErrorNumberVA(cx, JSREPORT_ERROR, errorCallback, userRef,
+                        errorNumber, ArgumentsAreASCII, ap);
 }
 
 JS_PUBLIC_API(void)
@@ -5117,8 +5117,8 @@ JS_ReportErrorNumberUC(JSContext* cx, JSErrorCallback errorCallback,
 
     AssertHeapIsIdle(cx);
     va_start(ap, errorNumber);
-    js_ReportErrorNumberVA(cx, JSREPORT_ERROR, errorCallback, userRef,
-                           errorNumber, ArgumentsAreUnicode, ap);
+    ReportErrorNumberVA(cx, JSREPORT_ERROR, errorCallback, userRef,
+                        errorNumber, ArgumentsAreUnicode, ap);
     va_end(ap);
 }
 
@@ -5128,8 +5128,8 @@ JS_ReportErrorNumberUCArray(JSContext* cx, JSErrorCallback errorCallback,
                             const char16_t** args)
 {
     AssertHeapIsIdle(cx);
-    js_ReportErrorNumberUCArray(cx, JSREPORT_ERROR, errorCallback, userRef,
-                                errorNumber, args);
+    ReportErrorNumberUCArray(cx, JSREPORT_ERROR, errorCallback, userRef,
+                             errorNumber, args);
 }
 
 JS_PUBLIC_API(bool)
@@ -5140,7 +5140,7 @@ JS_ReportWarning(JSContext* cx, const char* format, ...)
 
     AssertHeapIsIdle(cx);
     va_start(ap, format);
-    ok = js_ReportErrorVA(cx, JSREPORT_WARNING, format, ap);
+    ok = ReportErrorVA(cx, JSREPORT_WARNING, format, ap);
     va_end(ap);
     return ok;
 }
@@ -5155,8 +5155,8 @@ JS_ReportErrorFlagsAndNumber(JSContext* cx, unsigned flags,
 
     AssertHeapIsIdle(cx);
     va_start(ap, errorNumber);
-    ok = js_ReportErrorNumberVA(cx, flags, errorCallback, userRef,
-                                errorNumber, ArgumentsAreASCII, ap);
+    ok = ReportErrorNumberVA(cx, flags, errorCallback, userRef,
+                             errorNumber, ArgumentsAreASCII, ap);
     va_end(ap);
     return ok;
 }
@@ -5171,8 +5171,8 @@ JS_ReportErrorFlagsAndNumberUC(JSContext* cx, unsigned flags,
 
     AssertHeapIsIdle(cx);
     va_start(ap, errorNumber);
-    ok = js_ReportErrorNumberVA(cx, flags, errorCallback, userRef,
-                                errorNumber, ArgumentsAreUnicode, ap);
+    ok = ReportErrorNumberVA(cx, flags, errorCallback, userRef,
+                             errorNumber, ArgumentsAreUnicode, ap);
     va_end(ap);
     return ok;
 }
@@ -5180,13 +5180,13 @@ JS_ReportErrorFlagsAndNumberUC(JSContext* cx, unsigned flags,
 JS_PUBLIC_API(void)
 JS_ReportOutOfMemory(JSContext* cx)
 {
-    js_ReportOutOfMemory(cx);
+    ReportOutOfMemory(cx);
 }
 
 JS_PUBLIC_API(void)
 JS_ReportAllocationOverflow(JSContext* cx)
 {
-    js_ReportAllocationOverflow(cx);
+    ReportAllocationOverflow(cx);
 }
 
 JS_PUBLIC_API(JSErrorReporter)
@@ -5215,7 +5215,7 @@ JS_NewDateObject(JSContext* cx, int year, int mon, int mday, int hour, int min, 
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
-    return js_NewDateObject(cx, year, mon, mday, hour, min, sec);
+    return NewDateObject(cx, year, mon, mday, hour, min, sec);
 }
 
 JS_PUBLIC_API(JSObject*)
@@ -5223,7 +5223,7 @@ JS_NewDateObjectMsec(JSContext* cx, double msec)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
-    return js_NewDateObjectMsec(cx, msec);
+    return NewDateObjectMsec(cx, msec);
 }
 
 JS_PUBLIC_API(bool)
@@ -5467,7 +5467,7 @@ JS_ReportPendingException(JSContext* cx)
     CHECK_REQUEST(cx);
 
     // This can only fail due to oom.
-    bool ok = js_ReportUncaughtException(cx);
+    bool ok = ReportUncaughtException(cx);
     MOZ_ASSERT(!cx->isExceptionPending());
     return ok;
 }
@@ -5561,7 +5561,7 @@ JS_ErrorFromException(JSContext* cx, HandleObject obj)
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
-    return js_ErrorFromException(cx, obj);
+    return ErrorFromException(cx, obj);
 }
 
 JS_PUBLIC_API(bool)

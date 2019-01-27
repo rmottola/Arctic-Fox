@@ -5709,7 +5709,7 @@ IonBuilder::jsop_funcall(uint32_t argc)
     // If |Function.prototype.call| may be overridden, don't optimize callsite.
     TemporaryTypeSet* calleeTypes = current->peek(calleeDepth)->resultTypeSet();
     JSFunction* native = getSingleCallTarget(calleeTypes);
-    if (!native || !native->isNative() || native->native() != &js_fun_call) {
+    if (!native || !native->isNative() || native->native() != &fun_call) {
         CallInfo callInfo(alloc(), false);
         if (!callInfo.init(current, argc))
             return false;
@@ -5792,7 +5792,7 @@ IonBuilder::jsop_funapply(uint32_t argc)
     }
 
     if ((!native || !native->isNative() ||
-        native->native() != js_fun_apply) &&
+        native->native() != fun_apply) &&
         info().analysisMode() != Analysis_DefiniteProperties)
     {
         return abort("fun.apply speculation failed");

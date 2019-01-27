@@ -89,13 +89,13 @@ PerThreadData::PerThreadData(JSRuntime* runtime)
 PerThreadData::~PerThreadData()
 {
     if (dtoaState)
-        js_DestroyDtoaState(dtoaState);
+        DestroyDtoaState(dtoaState);
 }
 
 bool
 PerThreadData::init()
 {
-    dtoaState = js_NewDtoaState();
+    dtoaState = NewDtoaState();
     if (!dtoaState)
         return false;
 
@@ -575,7 +575,7 @@ InvokeInterruptCallback(JSContext* cx)
         chars = stableChars.twoByteRange().start().get();
     else
         chars = MOZ_UTF16("(stack not available)");
-    JS_ReportErrorFlagsAndNumberUC(cx, JSREPORT_WARNING, js_GetErrorMessage, nullptr,
+    JS_ReportErrorFlagsAndNumberUC(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
                                    JSMSG_TERMINATED, chars);
 
     return false;
@@ -640,7 +640,7 @@ JSRuntime::createMathCache(JSContext* cx)
 
     MathCache* newMathCache = js_new<MathCache>();
     if (!newMathCache) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 
@@ -754,7 +754,7 @@ JSRuntime::onOutOfMemory(void* p, size_t nbytes, JSContext* cx)
     if (p)
         return p;
     if (cx)
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
     return nullptr;
 }
 

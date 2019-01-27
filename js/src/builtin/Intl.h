@@ -10,6 +10,8 @@
 #include "NamespaceImports.h"
 #include "unicode/utypes.h"
 
+namespace js {
+
 /*
  * The Intl module specified by standard ECMA-402,
  * ECMAScript Internationalization API Specification.
@@ -20,9 +22,7 @@
  * Spec: ECMAScript Internationalization API Specification, 8.0, 8.1
  */
 extern JSObject*
-js_InitIntlClass(JSContext *cx, js::HandleObject obj);
-
-namespace js {
+InitIntlClass(JSContext *cx, HandleObject obj);
 
 /*
  * The following functions are for use by self-hosted code.

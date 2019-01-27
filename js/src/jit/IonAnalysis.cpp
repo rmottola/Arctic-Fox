@@ -3281,7 +3281,7 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
 
     CompilerConstraintList* constraints = NewCompilerConstraintList(temp);
     if (!constraints) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
 

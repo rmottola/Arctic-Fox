@@ -747,7 +747,7 @@ GeneratorKindFromBits(unsigned val) {
 /*
  * NB: after a successful XDR_DECODE, XDRScript callers must do any required
  * subsequent set-up of owning function or script object and then call
- * js_CallNewScriptHook.
+ * CallNewScriptHook.
  */
 template<XDRMode mode>
 bool
@@ -2127,16 +2127,16 @@ struct GSNCache;
 jssrcnote*
 GetSrcNote(GSNCache& cache, JSScript* script, jsbytecode* pc);
 
-} /* namespace js */
-
 extern jssrcnote*
-js_GetSrcNote(JSContext* cx, JSScript* script, jsbytecode* pc);
+GetSrcNote(JSContext* cx, JSScript* script, jsbytecode* pc);
 
 extern jsbytecode*
-js_LineNumberToPC(JSScript* script, unsigned lineno);
+LineNumberToPC(JSScript* script, unsigned lineno);
 
 extern JS_FRIEND_API(unsigned)
-js_GetScriptLineExtent(JSScript* script);
+GetScriptLineExtent(JSScript* script);
+
+} /* namespace js */
 
 namespace js {
 

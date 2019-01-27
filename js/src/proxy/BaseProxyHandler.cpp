@@ -147,7 +147,7 @@ BaseProxyHandler::set(JSContext* cx, HandleObject proxy, HandleObject receiver,
     if (ownDesc.hasSetterObject())
         setter = ownDesc.setterObject();
     if (!setter)
-        return js_ReportGetterOnlyAssignment(cx, strict);
+        return ReportGetterOnlyAssignment(cx, strict);
     RootedValue setterValue(cx, ObjectValue(*setter));
     return InvokeGetterOrSetter(cx, receiver, setterValue, 1, vp.address(), vp);
 }
@@ -350,7 +350,7 @@ BaseProxyHandler::setPrototypeOf(JSContext* cx, HandleObject, HandleObject, bool
     // Disallow sets of protos on proxies with lazy protos, but no hook.
     // This keeps us away from the footgun of having the first proto set opt
     // you out of having dynamic protos altogether.
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_SETPROTOTYPEOF_FAIL,
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SETPROTOTYPEOF_FAIL,
                          "incompatible Proxy");
     return false;
 }
@@ -365,7 +365,7 @@ BaseProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool*
 bool
 BaseProxyHandler::watch(JSContext* cx, HandleObject proxy, HandleId id, HandleObject callable) const
 {
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_WATCH,
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_WATCH,
                          proxy->getClass()->name);
     return false;
 }

@@ -219,14 +219,14 @@ ReportError(JSContext* cx, const char* message, JSErrorReport* reportp,
      * on the error report, and exception-aware hosts should ignore it.
      */
     MOZ_ASSERT(reportp);
-    if ((!callback || callback == js_GetErrorMessage) &&
+    if ((!callback || callback == GetErrorMessage) &&
         reportp->errorNumber == JSMSG_UNCAUGHT_EXCEPTION)
     {
         reportp->flags |= JSREPORT_EXCEPTION;
     }
 
     if (cx->options().autoJSAPIOwnsErrorReporting() || JS_IsRunning(cx)) {
-        if (js_ErrorToException(cx, message, reportp, callback, userRef)) {
+        if (ErrorToException(cx, message, reportp, callback, userRef)) {
             return;
         }
 
@@ -242,9 +242,8 @@ ReportError(JSContext* cx, const char* message, JSErrorReport* reportp,
     /*
      * Call the error reporter only if an exception wasn't raised.
      */
-    if (message) {
+    if (message)
         CallErrorReporter(cx, message, reportp);
-    }
 }
 
 /*
@@ -273,11 +272,11 @@ PopulateReportBlame(JSContext* cx, JSErrorReport* report)
  * throw the static atom "out of memory". If code is not running, call the
  * error reporter directly.
  *
- * Furthermore, callers of js_ReportOutOfMemory (viz., malloc) assume a GC does
+ * Furthermore, callers of ReportOutOfMemory (viz., malloc) assume a GC does
  * not occur, so GC must be avoided or suppressed.
  */
 void
-js_ReportOutOfMemory(ExclusiveContext* cxArg)
+js::ReportOutOfMemory(ExclusiveContext* cxArg)
 {
 #ifdef JS_MORE_DETERMINISTIC
     /*
@@ -285,7 +284,7 @@ js_ReportOutOfMemory(ExclusiveContext* cxArg)
      * (e.g. interpreter vs JIT). In more-deterministic builds, print to stderr
      * so that the fuzzers can detect this.
      */
-    fprintf(stderr, "js_ReportOutOfMemory called\n");
+    fprintf(stderr, "ReportOutOfMemory called\n");
 #endif
 
     if (!cxArg->isJSContext())
@@ -306,7 +305,7 @@ js_ReportOutOfMemory(ExclusiveContext* cxArg)
     }
 
     /* Get the message for this error, but we don't expand any arguments. */
-    const JSErrorFormatString* efs = js_GetErrorMessage(nullptr, JSMSG_OUT_OF_MEMORY);
+    const JSErrorFormatString* efs = GetErrorMessage(nullptr, JSMSG_OUT_OF_MEMORY);
     const char* msg = efs ? efs->format : "Out of memory";
 
     /* Fill out the report, but don't do anything that requires allocation. */
@@ -334,7 +333,7 @@ js_ReportOutOfMemory(ExclusiveContext* cxArg)
 }
 
 JS_FRIEND_API(void)
-js_ReportOverRecursed(JSContext* maybecx)
+js::ReportOverRecursed(JSContext* maybecx)
 {
 #ifdef JS_MORE_DETERMINISTIC
     /*
@@ -345,25 +344,25 @@ js_ReportOverRecursed(JSContext* maybecx)
      * stack depth which is useful for external testing programs
      * like fuzzers.
      */
-    fprintf(stderr, "js_ReportOverRecursed called\n");
+    fprintf(stderr, "ReportOverRecursed called\n");
 #endif
     if (maybecx) {
-        JS_ReportErrorNumber(maybecx, js_GetErrorMessage, nullptr, JSMSG_OVER_RECURSED);
+        JS_ReportErrorNumber(maybecx, GetErrorMessage, nullptr, JSMSG_OVER_RECURSED);
         maybecx->overRecursed_ = true;
     }
 }
 
 void
-js_ReportOverRecursed(ExclusiveContext* cx)
+js::ReportOverRecursed(ExclusiveContext* cx)
 {
     if (cx->isJSContext())
-        js_ReportOverRecursed(cx->asJSContext());
+        ReportOverRecursed(cx->asJSContext());
     else
         cx->addPendingOverRecursed();
 }
 
 void
-js_ReportAllocationOverflow(ExclusiveContext* cxArg)
+js::ReportAllocationOverflow(ExclusiveContext* cxArg)
 {
     if (!cxArg)
         return;
@@ -373,7 +372,7 @@ js_ReportAllocationOverflow(ExclusiveContext* cxArg)
     JSContext* cx = cxArg->asJSContext();
 
     AutoSuppressGC suppressGC(cx);
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_ALLOC_OVERFLOW);
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_ALLOC_OVERFLOW);
 }
 
 /*
@@ -413,7 +412,7 @@ checkReportFlags(JSContext* cx, unsigned* flags)
 }
 
 bool
-js_ReportErrorVA(JSContext* cx, unsigned flags, const char* format, va_list ap)
+js::ReportErrorVA(JSContext* cx, unsigned flags, const char* format, va_list ap)
 {
     char* message;
     char16_t* ucmessage;
@@ -556,10 +555,10 @@ js::PrintError(JSContext* cx, FILE* file, const char* message, JSErrorReport* re
  * Returns true if the expansion succeeds (can fail if out of memory).
  */
 bool
-js_ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
-                        void* userRef, const unsigned errorNumber,
-                        char** messagep, JSErrorReport* reportp,
-                        ErrorArgumentsType argumentsType, va_list ap)
+js::ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
+                         void* userRef, const unsigned errorNumber,
+                         char** messagep, JSErrorReport* reportp,
+                         ErrorArgumentsType argumentsType, va_list ap)
 {
     const JSErrorFormatString* efs;
     int i;
@@ -569,7 +568,7 @@ js_ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
     *messagep = nullptr;
 
     if (!callback)
-        callback = js_GetErrorMessage;
+        callback = GetErrorMessage;
 
     {
         AutoSuppressGC suppressGC(cx);
@@ -721,9 +720,9 @@ error:
 }
 
 bool
-js_ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
-                       void* userRef, const unsigned errorNumber,
-                       ErrorArgumentsType argumentsType, va_list ap)
+js::ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
+                        void* userRef, const unsigned errorNumber,
+                        ErrorArgumentsType argumentsType, va_list ap)
 {
     JSErrorReport report;
     char* message;
@@ -737,8 +736,8 @@ js_ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
     report.errorNumber = errorNumber;
     PopulateReportBlame(cx, &report);
 
-    if (!js_ExpandErrorArguments(cx, callback, userRef, errorNumber,
-                                 &message, &report, argumentsType, ap)) {
+    if (!ExpandErrorArguments(cx, callback, userRef, errorNumber,
+                              &message, &report, argumentsType, ap)) {
         return false;
     }
 
@@ -763,9 +762,9 @@ js_ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
 }
 
 bool
-js_ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callback,
-                            void* userRef, const unsigned errorNumber,
-                            const char16_t** args)
+js::ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callback,
+                             void* userRef, const unsigned errorNumber,
+                             const char16_t** args)
 {
     if (checkReportFlags(cx, &flags))
         return true;
@@ -779,8 +778,8 @@ js_ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callb
 
     char* message;
     va_list dummy;
-    if (!js_ExpandErrorArguments(cx, callback, userRef, errorNumber,
-                                 &message, &report, ArgumentsAreUnicode, dummy)) {
+    if (!ExpandErrorArguments(cx, callback, userRef, errorNumber,
+                              &message, &report, ArgumentsAreUnicode, dummy)) {
         return false;
     }
 
@@ -803,13 +802,13 @@ js::CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* reportp
 }
 
 void
-js_ReportIsNotDefined(JSContext* cx, const char* name)
+js::ReportIsNotDefined(JSContext* cx, const char* name)
 {
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_NOT_DEFINED, name);
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_DEFINED, name);
 }
 
 bool
-js_ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
+js::ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
                            HandleString fallback)
 {
     char* bytes;
@@ -822,18 +821,18 @@ js_ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
     if (strcmp(bytes, js_undefined_str) == 0 ||
         strcmp(bytes, js_null_str) == 0) {
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
-                                          js_GetErrorMessage, nullptr,
+                                          GetErrorMessage, nullptr,
                                           JSMSG_NO_PROPERTIES, bytes,
                                           nullptr, nullptr);
     } else if (v.isUndefined()) {
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
-                                          js_GetErrorMessage, nullptr,
+                                          GetErrorMessage, nullptr,
                                           JSMSG_UNEXPECTED_TYPE, bytes,
                                           js_undefined_str, nullptr);
     } else {
         MOZ_ASSERT(v.isNull());
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
-                                          js_GetErrorMessage, nullptr,
+                                          GetErrorMessage, nullptr,
                                           JSMSG_UNEXPECTED_TYPE, bytes,
                                           js_null_str, nullptr);
     }
@@ -843,7 +842,7 @@ js_ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
 }
 
 void
-js_ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
+js::ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
 {
     char argbuf[11];
     char* bytes;
@@ -858,7 +857,7 @@ js_ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
         if (!bytes)
             return;
     }
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                          JSMSG_MISSING_FUN_ARG, argbuf,
                          bytes ? bytes : "");
     js_free(bytes);
@@ -878,7 +877,7 @@ js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNum
     if (!bytes)
         return false;
 
-    ok = JS_ReportErrorFlagsAndNumber(cx, flags, js_GetErrorMessage,
+    ok = JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage,
                                       nullptr, errorNumber, bytes, arg1, arg2);
     js_free(bytes);
 
@@ -893,7 +892,7 @@ const JSErrorFormatString js_ErrorFormatString[JSErr_Limit] = {
 };
 
 JS_FRIEND_API(const JSErrorFormatString*)
-js_GetErrorMessage(void* userRef, const unsigned errorNumber)
+js::GetErrorMessage(void* userRef, const unsigned errorNumber)
 {
     if (errorNumber > 0 && errorNumber < JSErr_Limit)
         return &js_ErrorFormatString[errorNumber];

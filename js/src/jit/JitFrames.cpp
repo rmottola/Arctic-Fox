@@ -896,7 +896,7 @@ HandleException(ResumeFromException* rfe)
 
         if (overrecursed) {
             // We hit an overrecursion error during bailout. Report it now.
-            js_ReportOverRecursed(cx);
+            ReportOverRecursed(cx);
         }
     }
 
