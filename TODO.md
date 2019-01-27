@@ -79,7 +79,6 @@ Yet unapplied Mozilla patches:
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 - Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare (6 patches)
 - Bug 1130166 - Use SizePrintfMacros.h when printing line numbers.
-- Bug 1137523 - 2015-02-27 - Unprefix most js_* functions.
 
 
 Further ToDo which would help portability:
