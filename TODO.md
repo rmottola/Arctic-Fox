@@ -79,8 +79,6 @@ Yet unapplied Mozilla patches:
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 - Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare (6 patches)
 - Bug 1129510 - Trace references to JS heap from Profiler buffers.
-- Bug 1133369 - Use consistent allocation kinds for new objects after c
-- Bug 1116855 - Add default-disabled unboxed objects for use by interpr
 
 
 Further ToDo which would help portability:
