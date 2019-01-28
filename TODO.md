@@ -78,7 +78,6 @@ Yet unapplied Mozilla patches:
 - Bug 1136980 2015-02-27 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 - Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare (6 patches)
-- Bug 1129510 - Trace references to JS heap from Profiler buffers.
 
 
 Further ToDo which would help portability:
