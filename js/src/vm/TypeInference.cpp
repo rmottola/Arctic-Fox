@@ -716,22 +716,6 @@ TypeSet::clone(LifoAlloc* alloc) const
 }
 
 TemporaryTypeSet*
-TypeSet::filter(LifoAlloc* alloc, bool filterUndefined, bool filterNull) const
-{
-    TemporaryTypeSet* res = clone(alloc);
-    if (!res)
-        return nullptr;
-
-    if (filterUndefined)
-        res->flags = res->flags & ~TYPE_FLAG_UNDEFINED;
-
-    if (filterNull)
-        res->flags = res->flags & ~TYPE_FLAG_NULL;
-
-    return res;
-}
-
-TemporaryTypeSet*
 TypeSet::cloneObjectsOnly(LifoAlloc* alloc)
 {
     TemporaryTypeSet* res = clone(alloc);
@@ -776,6 +760,34 @@ TypeSet::unionSets(TypeSet* a, TypeSet* b, LifoAlloc* alloc)
 
     return res;
 }
+
+/* static */ TemporaryTypeSet *
+TypeSet::removeSet(TemporaryTypeSet *input, TemporaryTypeSet *removal, LifoAlloc *alloc)
+{
+    // Only allow removal of primitives and the "AnyObject" flag.
+    MOZ_ASSERT(!removal->unknown());
+    MOZ_ASSERT_IF(!removal->unknownObject(), removal->getObjectCount() == 0);
+
+    uint32_t flags = input->baseFlags() & ~removal->baseFlags();
+    TemporaryTypeSet *res =
+        alloc->new_<TemporaryTypeSet>(flags, static_cast<ObjectKey**>(nullptr));
+    if (!res)
+        return nullptr;
+
+    res->setBaseObjectCount(0);
+    if (removal->unknownObject() || input->unknownObject())
+        return res;
+
+    for (size_t i = 0; i < input->getObjectCount(); i++) {
+        if (!input->getObject(i))
+            continue;
+
+        res->addType(TypeSet::ObjectType(input->getObject(i)), alloc);
+    }
+
+    return res;
+}
+
 
 /* static */ TemporaryTypeSet*
 TypeSet::intersectSets(TemporaryTypeSet* a, TemporaryTypeSet* b, LifoAlloc* alloc)
