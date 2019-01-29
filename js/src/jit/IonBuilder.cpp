@@ -3354,6 +3354,9 @@ IonBuilder::replaceTypeSet(MDefinition* subject, TemporaryTypeSet* type, MTest* 
     if (type->unknown())
         return true;
 
+    if (type->equals(subject->resultTypeSet()))
+        return true;
+
     MInstruction* replace = nullptr;
     MDefinition* ins;
 
@@ -3502,11 +3505,6 @@ IonBuilder::improveTypesAtCompare(MCompare* ins, bool trueBranch, MTest* test)
     if (!subject->resultTypeSet() || subject->resultTypeSet()->unknown())
         return true;
 
-    if (!subject->mightBeType(MIRType_Undefined) &&
-        !subject->mightBeType(MIRType_Null))
-    {
-        return true;
-    }
 
     if (!altersUndefined && !altersNull)
         return true;
@@ -3515,7 +3513,7 @@ IonBuilder::improveTypesAtCompare(MCompare* ins, bool trueBranch, MTest* test)
 
     // Decide if we need to filter the type or set it.
     if ((op == JSOP_STRICTEQ || op == JSOP_EQ) ^ trueBranch) {
-        // Filter undefined/null
+        // Remover undefined/null
         TemporaryTypeSet remove;
         if (altersUndefined)
             remove.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
@@ -3584,7 +3582,8 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
             break;
         }
 
-        // Now we have detected the triangular structure and determined if it was an AND or an OR.
+        // Now we have detected the triangular structure and determined if it
+        // was an AND or an OR.
         if (branchIsAnd) {
             if (trueBranch) {
                 if (!improveTypesAtTest(ins->toPhi()->getOperand(0), true, test))
