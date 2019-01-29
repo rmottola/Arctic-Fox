@@ -4044,6 +4044,7 @@ class MCompare
 
   protected:
     bool tryFoldEqualOperands(bool* result);
+    bool tryFoldTypeOf(bool *result);
 
     bool congruentTo(const MDefinition* ins) const override {
         if (!binaryCongruentTo(ins))
