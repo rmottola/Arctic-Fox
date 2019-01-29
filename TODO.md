@@ -72,12 +72,15 @@ Yet unapplied Mozilla patches:
 - Bug 1133081 2015-02-15 1 of 5
 - Bug 1140586 - 2015-03-12
 - Bug 1113369 1 of 5
+- Bug 994016 - IonMonkey: Improve type information at branches with Typ
+- Bug 1139152: IonMonkey: Don't improve types at MTypeOf for unknown ty
+- Bug 1135816 - Handle unboxed object receivers when compiling getter/s
+- Bug 1136837 part 2 - Improve |this| types when inlining after a CALLP
 - Bug 1137523 - 2015-03-03 part 2 - Unprefix a few js_* functions I forgot in part 1
 - Bug 1135423 2015-03-01 - Use unboxed objects for object literals where possible,
 - Bug 1136980 2015-02-27 part 2. Remove JS_SetParent, even though we have a 
 - Bug 1136980 2015-02-27 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
 - Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
-- Bug 994016 2015-02-28: IonMonkey: Add MTypeOf folding to MCompare (6 patches)
 
 
 Further ToDo which would help portability:
