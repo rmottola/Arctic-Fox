@@ -3318,6 +3318,9 @@ MCompare::tryFoldEqualOperands(bool* result)
             return false;
     }
 
+    if (DeadIfUnused(lhs()))
+        lhs()->setGuardRangeBailouts();
+
     *result = (jsop() == JSOP_STRICTEQ);
     return true;
 }
