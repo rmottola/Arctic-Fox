@@ -2957,10 +2957,10 @@ class MNewObject
         initialHeap_(initialHeap),
         mode_(mode)
     {
-        PlainObject* obj = templateObject();
         MOZ_ASSERT_IF(mode != ObjectLiteral, !shouldUseVM());
         setResultType(MIRType_Object);
-        if (!obj->isSingleton())
+
+        if (JSObject *obj = templateObject())
             setResultTypeSet(MakeSingletonTypeSet(constraints, obj));
 
         // The constant is kept separated in a MConstant, this way we can safely
@@ -2968,7 +2968,8 @@ class MNewObject
         // making it emittedAtUses, we do not produce register allocations for
         // it and inline its content inside the code produced by the
         // CodeGenerator.
-        templateConst->setEmittedAtUses();
+        if (templateConst->toConstant()->value().isObject())
+            templateConst->setEmittedAtUses();
     }
 
   public:
@@ -2989,8 +2990,8 @@ class MNewObject
         return mode_;
     }
 
-    PlainObject* templateObject() const {
-        return &getOperand(0)->toConstant()->value().toObject().as<PlainObject>();
+    JSObject *templateObject() const {
+        return getOperand(0)->toConstant()->value().toObjectOrNull();
     }
 
     gc::InitialHeap initialHeap() const {
