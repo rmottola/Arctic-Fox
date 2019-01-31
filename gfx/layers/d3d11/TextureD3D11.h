@@ -370,45 +370,6 @@ protected:
   bool mIsLocked;
 };
 
-class DXGIYCbCrTextureHostD3D11 : public TextureHost
-{
-public:
-  DXGIYCbCrTextureHostD3D11(TextureFlags aFlags,
-                            const SurfaceDescriptorDXGIYCbCr& aDescriptor);
-
-  virtual TextureSource* GetTextureSources() MOZ_OVERRIDE;
-
-  virtual void DeallocateDeviceData() MOZ_OVERRIDE{}
-
-  virtual void SetCompositor(Compositor* aCompositor) MOZ_OVERRIDE;
-
-  virtual gfx::SurfaceFormat GetFormat() const MOZ_OVERRIDE{ return gfx::SurfaceFormat::YUV; }
-
-  virtual bool Lock() MOZ_OVERRIDE;
-
-  virtual void Unlock() MOZ_OVERRIDE;
-
-  virtual gfx::IntSize GetSize() const MOZ_OVERRIDE{ return mSize; }
-
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() MOZ_OVERRIDE
-  {
-    return nullptr;
-  }
-
-protected:
-  ID3D11Device* GetDevice();
-
-  bool OpenSharedHandle();
-
-  RefPtr<ID3D11Texture2D> mTextures[3];
-  RefPtr<DataTextureSourceD3D11> mTextureSources[3];
-
-  RefPtr<CompositorD3D11> mCompositor;
-  gfx::IntSize mSize;
-  WindowsHandle mHandles[3];
-  bool mIsLocked;
-};
-
 class CompositingRenderTargetD3D11 : public CompositingRenderTarget,
                                      public TextureSourceD3D11
 {

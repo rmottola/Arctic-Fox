@@ -140,8 +140,8 @@ static bool
 SortComparatorIntegerIds(jsid a, jsid b, bool* lessOrEqualp)
 {
     uint32_t indexA, indexB;
-    MOZ_ALWAYS_TRUE(js_IdIsIndex(a, &indexA));
-    MOZ_ALWAYS_TRUE(js_IdIsIndex(b, &indexB));
+    MOZ_ALWAYS_TRUE(IdIsIndex(a, &indexA));
+    MOZ_ALWAYS_TRUE(IdIsIndex(b, &indexB));
     *lessOrEqualp = (indexA <= indexB);
     return true;
 }
@@ -186,7 +186,7 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
                 Shape& shape = r.front();
                 jsid id = shape.propid();
                 uint32_t dummy;
-                if (js_IdIsIndex(id, &dummy)) {
+                if (IdIsIndex(id, &dummy)) {
                     if (!Enumerate(cx, pobj, id, shape.enumerable(), flags, ht, props))
                         return false;
                 }
@@ -223,7 +223,7 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
             }
 
             uint32_t dummy;
-            if (isIndexed && js_IdIsIndex(id, &dummy))
+            if (isIndexed && IdIsIndex(id, &dummy))
                 continue;
 
             if (!Enumerate(cx, pobj, id, shape.enumerable(), flags, ht, props))
@@ -928,7 +928,7 @@ js::IteratorConstructor(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() == 0) {
-        js_ReportMissingArg(cx, args.calleev(), 0);
+        ReportMissingArg(cx, args.calleev(), 0);
         return false;
     }
 
@@ -1498,7 +1498,7 @@ GlobalObject::initStringIteratorProto(JSContext* cx, Handle<GlobalObject*> globa
 }
 
 JSObject*
-js_InitLegacyIteratorClass(JSContext* cx, HandleObject obj)
+js::InitLegacyIteratorClass(JSContext* cx, HandleObject obj)
 {
     Handle<GlobalObject*> global = obj.as<GlobalObject>();
 
@@ -1536,7 +1536,7 @@ js_InitLegacyIteratorClass(JSContext* cx, HandleObject obj)
 }
 
 JSObject*
-js_InitStopIterationClass(JSContext* cx, HandleObject obj)
+js::InitStopIterationClass(JSContext* cx, HandleObject obj)
 {
     Handle<GlobalObject*> global = obj.as<GlobalObject>();
     if (!global->getPrototype(JSProto_StopIteration).isObject()) {

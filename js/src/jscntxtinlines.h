@@ -338,7 +338,7 @@ CallSetter(JSContext* cx, HandleObject obj, HandleId id, StrictPropertyOp op, un
     }
 
     if (attrs & JSPROP_GETTER)
-        return js_ReportGetterOnlyAssignment(cx, strict);
+        return ReportGetterOnlyAssignment(cx, strict);
 
     if (!op)
         return true;
@@ -373,7 +373,7 @@ inline void
 JSContext::setPendingException(js::Value v)
 {
     MOZ_ASSERT(!IsPoisonedValue(v));
-    // overRecursed_ is set after the fact by js_ReportOverRecursed.
+    // overRecursed_ is set after the fact by ReportOverRecursed.
     this->overRecursed_ = false;
     this->throwing = true;
     this->unwrappedException_ = v;

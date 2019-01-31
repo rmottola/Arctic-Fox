@@ -116,7 +116,7 @@ Shape::makeOwnBaseShape(ExclusiveContext* cx)
     MOZ_ASSERT(!base()->isOwned());
     assertSameCompartmentDebugOnly(cx, compartment());
 
-    BaseShape* nbase = js_NewGCBaseShape<NoGC>(cx);
+    BaseShape* nbase = NewGCBaseShape<NoGC>(cx);
     if (!nbase)
         return false;
 
@@ -308,7 +308,7 @@ ShapeTable::grow(ExclusiveContext* cx)
     MOZ_ASSERT(entryCount_ + removedCount_ <= size - 1);
 
     if (!change(delta, cx) && entryCount_ + removedCount_ == size - 1) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     return true;
@@ -442,7 +442,7 @@ js::NativeObject::toDictionaryMode(ExclusiveContext* cx)
 
         Shape* dprop = shape->isAccessorShape() ? NewGCAccessorShape(cx) : NewGCShape(cx);
         if (!dprop) {
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return false;
         }
 
@@ -459,7 +459,7 @@ js::NativeObject::toDictionaryMode(ExclusiveContext* cx)
     }
 
     if (!Shape::hashify(cx, root)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
 
@@ -564,7 +564,7 @@ NativeObject::addPropertyInternal(ExclusiveContext* cx,
         RootedShape last(cx, obj->lastProperty());
 
         uint32_t index;
-        bool indexed = js_IdIsIndex(id, &index);
+        bool indexed = IdIsIndex(id, &index);
 
         Rooted<UnownedBaseShape*> nbase(cx);
         if (!indexed) {
@@ -633,7 +633,7 @@ js::ReshapeForParentAndAllocKind(JSContext* cx, Shape* shape, TaggedProto proto,
         id = ids[i];
 
         uint32_t index;
-        bool indexed = js_IdIsIndex(id, &index);
+        bool indexed = IdIsIndex(id, &index);
 
         Rooted<UnownedBaseShape*> nbase(cx, newShape->base()->unowned());
         if (indexed) {
@@ -692,7 +692,7 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
     if (obj->is<ArrayObject>()) {
         ArrayObject* arr = &obj->as<ArrayObject>();
         uint32_t index;
-        if (js_IdIsIndex(id, &index))
+        if (IdIsIndex(id, &index))
             MOZ_ASSERT(index < arr->length() || arr->lengthIsWritable());
     }
 #endif
@@ -750,7 +750,7 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
     Rooted<UnownedBaseShape*> nbase(cx);
     {
         uint32_t index;
-        bool indexed = js_IdIsIndex(id, &index);
+        bool indexed = IdIsIndex(id, &index);
         StackBaseShape base(obj->lastProperty()->base());
         if (indexed)
             base.flags |= BaseShape::INDEXED;
@@ -1368,7 +1368,7 @@ BaseShape::getUnowned(ExclusiveContext* cx, StackBaseShape& base)
 
     RootedGeneric<StackBaseShape*> root(cx, &base);
 
-    BaseShape* nbase_ = js_NewGCBaseShape<CanGC>(cx);
+    BaseShape* nbase_ = NewGCBaseShape<CanGC>(cx);
     if (!nbase_)
         return nullptr;
 
@@ -1627,7 +1627,7 @@ EmptyShape::new_(ExclusiveContext* cx, Handle<UnownedBaseShape*> base, uint32_t 
 {
     Shape* shape = NewGCShape(cx);
     if (!shape) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 

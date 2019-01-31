@@ -24,10 +24,10 @@ Yet unapplied Mozilla patches:
 - 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1235656 - Set canonical name in self-hosted builtins
 - 1223690 - Remove implicit Rect conversions
+- 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
-- 1222516 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
-- 1207245 - part 6 - rename nsRefPtr<T> to RefPtr<T>
+- 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -36,9 +36,9 @@ Yet unapplied Mozilla patches:
 - 1184634 - Rename MediaTaskQueue to TaskQueue
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
-- 1160485 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
+- 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1142669 part 6 - Don't inline scripts that are known to inline a
-- 1141862 - 6 parts
+- 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
 - 1114580 - toStringTag - several diffs still to analyze
 - 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
@@ -60,19 +60,27 @@ Yet unapplied Mozilla patches:
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
-- 1142669 part 6 - Don't inline scripts that are known to inline a ¿
+- 1142669 part 6 - Don't inline scripts that are known to inline a 
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
-- 1142669 part 4 - Fix some inlining issues and inline scripts with
-- Bug 805052 - four parts
-- 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
-- Bug 1136980 part 2. Remove JS_SetParent, even though we have a 
-- Bug 1136980 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
-- Bug 1130679: IonMonkey: Make it possible to guard on type changes
-- Bug 994016: IonMonkey: Add MTypeOf folding to MCompare
-- Bug 1135423 - Use unboxed objects for object literals where possible,
-- Bug 1047529 - Move caller field from MResumePoint to MBasicBlock
+- 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
+- Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
+- Bug 805052 - 2015-03-14 four parts
+- Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
+- Bug 1140670 2015-03-09 all parts
+- Bug 1133081 2015-02-15 1 of 5
+- Bug 1140586 - 2015-03-12
+- Bug 1113369 1 of 5
+- Bug 994016 - IonMonkey: Improve type information at branches with Typ
+- Bug 1139152: IonMonkey: Don't improve types at MTypeOf for unknown ty
+- Bug 1135816 - Handle unboxed object receivers when compiling getter/s
+- Bug 1136837 part 2 - Improve |this| types when inlining after a CALLP
+- Bug 1137523 - 2015-03-03 part 2 - Unprefix a few js_* functions I forgot in part 1
+- Bug 1135423 2015-03-01 - Use unboxed objects for object literals where possible,
+- Bug 1136980 2015-02-27 part 2. Remove JS_SetParent, even though we have a 
+- Bug 1136980 2015-02-27 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
+- Bug 1130679 2015-02-28: IonMonkey: Make it possible to guard on type changes
 
 
 Further ToDo which would help portability:
@@ -97,6 +105,7 @@ Further Further ToDo:
 - NekcoOriginAttributes
 - evaulate WebRTC : Bug 1093934 - Create a XPCOM library 
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
+- see if window.requestIdleCallback can be backported
 
 Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
 

@@ -1482,7 +1482,7 @@ class MOZ_STACK_CLASS ModuleCompiler
                                            errorString_.get());
         }
         if (errorOverRecursed_)
-            js_ReportOverRecursed(cx_);
+            ReportOverRecursed(cx_);
     }
 
     bool init() {
@@ -1549,7 +1549,7 @@ class MOZ_STACK_CLASS ModuleCompiler
         // "use strict" should be added to the source if we are in an implicit
         // strict context, see also comment above addUseStrict in
         // js::FunctionToString.
-        bool strict = parser_.pc->sc->strict && !parser_.pc->sc->hasExplicitUseStrict();
+        bool strict = parser_.pc->sc->strict() && !parser_.pc->sc->hasExplicitUseStrict();
         module_ = cx_->new_<AsmJSModule>(parser_.ss, srcStart, srcBodyStart, strict,
                                          cx_->canUseSignalHandlers());
         if (!module_)
@@ -2791,7 +2791,7 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(type));
-        MSimdSplatX4* ins = MSimdSplatX4::New(alloc(), type, v);
+        MSimdSplatX4 *ins = MSimdSplatX4::NewAsmJS(alloc(), v, type);
         curBlock_->add(ins);
         return ins;
     }
@@ -5882,7 +5882,7 @@ CheckSimdOperationCall(FunctionCompiler& f, ParseNode* call, const ModuleCompile
       case AsmJSSimdOperation_##OP:                                                     \
         return CheckSimdBinary(f, call, opType, MSimdBinaryArith::Op_##OP, def, type);
       ARITH_COMMONX4_SIMD_OP(OP_CHECK_CASE_LIST_)
-      ARITH_FLOAT32X4_SIMD_OP(OP_CHECK_CASE_LIST_)
+      BINARY_ARITH_FLOAT32X4_SIMD_OP(OP_CHECK_CASE_LIST_)
 #undef OP_CHECK_CASE_LIST_
 
       case AsmJSSimdOperation_lessThan:

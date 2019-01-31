@@ -1176,7 +1176,7 @@ RNewObject::recover(JSContext* cx, SnapshotIterator& iter) const
 
     // See CodeGenerator::visitNewObjectVMCall
     if (mode_ == MNewObject::ObjectLiteral) {
-        resultObject = NewInitObject(cx, templateObject);
+        resultObject = NewObjectOperationWithTemplate(cx, templateObject);
     } else {
         MOZ_ASSERT(mode_ == MNewObject::ObjectCreate);
         resultObject = ObjectCreateWithTemplate(cx, templateObject);

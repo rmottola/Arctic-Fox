@@ -1194,7 +1194,7 @@ MapObject::set(JSContext* cx, HandleObject obj, HandleValue k, HandleValue v)
 
     RelocatableValue rval(v);
     if (!map->put(key, rval)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     WriteBarrierPost(cx->runtime(), map, key.get());
@@ -1211,7 +1211,7 @@ MapObject::create(JSContext* cx)
     ValueMap* map = cx->new_<ValueMap>(cx->runtime());
     if (!map || !map->init()) {
         js_delete(map);
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 
@@ -1266,7 +1266,7 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
             if (done)
                 break;
             if (!pairVal.isObject()) {
-                JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                                      JSMSG_INVALID_MAP_ITERABLE, "Map");
                 return false;
             }
@@ -1289,7 +1289,7 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
 
                 RelocatableValue rval(val);
                 if (!map->put(hkey, rval)) {
-                    js_ReportOutOfMemory(cx);
+                    ReportOutOfMemory(cx);
                     return false;
                 }
                 WriteBarrierPost(cx->runtime(), map, key);
@@ -1446,7 +1446,7 @@ MapObject::set_impl(JSContext* cx, const CallArgs& args)
     ARG0_KEY(cx, args, key);
     RelocatableValue rval(args.get(1));
     if (!map.put(key, rval)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     WriteBarrierPost(cx->runtime(), &map, key.get());
@@ -1479,7 +1479,7 @@ MapObject::delete_impl(JSContext* cx, const CallArgs& args)
     ARG0_KEY(cx, args, key);
     bool found;
     if (!map.remove(key, &found)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     args.rval().setBoolean(found);
@@ -1570,14 +1570,14 @@ MapObject::clear(JSContext* cx, HandleObject obj)
     MOZ_ASSERT(MapObject::is(obj));
     ValueMap& map = extract(obj);
     if (!map.clear()) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     return true;
 }
 
 JSObject*
-js_InitMapClass(JSContext* cx, HandleObject obj)
+js::InitMapClass(JSContext* cx, HandleObject obj)
 {
     return MapObject::initClass(cx, obj);
 }
@@ -1836,7 +1836,7 @@ SetObject::add(JSContext* cx, HandleObject obj, HandleValue k)
         return false;
 
     if (!set->put(key)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     WriteBarrierPost(cx->runtime(), set, key.get());
@@ -1853,7 +1853,7 @@ SetObject::create(JSContext* cx)
     ValueSet* set = cx->new_<ValueSet>(cx->runtime());
     if (!set || !set->init()) {
         js_delete(set);
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
     obj->setPrivate(set);
@@ -1921,7 +1921,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!key.setValue(cx, keyVal))
                     return false;
                 if (!set->put(key)) {
-                    js_ReportOutOfMemory(cx);
+                    ReportOutOfMemory(cx);
                     return false;
                 }
                 WriteBarrierPost(cx->runtime(), set, keyVal);
@@ -2002,7 +2002,7 @@ SetObject::add_impl(JSContext* cx, const CallArgs& args)
     ValueSet& set = extract(args);
     ARG0_KEY(cx, args, key);
     if (!set.put(key)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     WriteBarrierPost(cx->runtime(), &set, key.get());
@@ -2026,7 +2026,7 @@ SetObject::delete_impl(JSContext* cx, const CallArgs& args)
     ARG0_KEY(cx, args, key);
     bool found;
     if (!set.remove(key, &found)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     args.rval().setBoolean(found);
@@ -2083,7 +2083,7 @@ SetObject::clear_impl(JSContext* cx, const CallArgs& args)
 {
     Rooted<SetObject*> setobj(cx, &args.thisv().toObject().as<SetObject>());
     if (!setobj->getData()->clear()) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
     args.rval().setUndefined();
@@ -2098,7 +2098,7 @@ SetObject::clear(JSContext* cx, unsigned argc, Value* vp)
 }
 
 JSObject*
-js_InitSetClass(JSContext* cx, HandleObject obj)
+js::InitSetClass(JSContext* cx, HandleObject obj)
 {
     return SetObject::initClass(cx, obj);
 }

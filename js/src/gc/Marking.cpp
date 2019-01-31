@@ -799,11 +799,11 @@ TypeSet::MarkTypeRoot(JSTracer* trc, TypeSet::Type* v, const char* name)
 {
     JS_ROOT_MARKING_ASSERT(trc);
     trc->setTracingName(name);
-    if (v->isSingleton()) {
+    if (v->isSingletonUnchecked()) {
         JSObject* obj = v->singleton();
         MarkInternal(trc, &obj);
         *v = TypeSet::ObjectType(obj);
-    } else if (v->isGroup()) {
+    } else if (v->isGroupUnchecked()) {
         ObjectGroup* group = v->group();
         MarkInternal(trc, &group);
         *v = TypeSet::ObjectType(group);
@@ -924,7 +924,7 @@ gc::MarkObjectSlots(JSTracer* trc, NativeObject* obj, uint32_t start, uint32_t n
 {
     MOZ_ASSERT(obj->isNative());
     for (uint32_t i = start; i < (start + nslots); ++i) {
-        trc->setTracingDetails(js_GetObjectSlotName, obj, i);
+        trc->setTracingDetails(GetObjectSlotName, obj, i);
         MarkValueInternal(trc, obj->getSlotRef(i).unsafeGet());
     }
 }
@@ -1447,6 +1447,9 @@ ScanObjectGroup(GCMarker* gcmarker, ObjectGroup* group)
     if (group->newScript())
         group->newScript()->trace(gcmarker);
 
+    if (group->maybePreliminaryObjects())
+        group->maybePreliminaryObjects()->trace(gcmarker);
+
     if (group->maybeUnboxedLayout())
         group->unboxedLayout().trace(gcmarker);
 
@@ -1477,6 +1480,9 @@ gc::MarkChildren(JSTracer* trc, ObjectGroup* group)
 
     if (group->newScript())
         group->newScript()->trace(trc);
+
+    if (group->maybePreliminaryObjects())
+        group->maybePreliminaryObjects()->trace(trc);
 
     if (group->maybeUnboxedLayout())
         group->unboxedLayout().trace(trc);

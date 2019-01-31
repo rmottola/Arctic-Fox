@@ -538,7 +538,8 @@ jit::EliminateDeadResumePointOperands(MIRGenerator* mir, MIRGraph& graph)
 bool
 js::jit::DeadIfUnused(const MDefinition* def)
 {
-    return !def->isEffectful() && !def->isGuard() && !def->isControlInstruction() &&
+    return !def->isEffectful() && !def->isGuard() && !def->isGuardRangeBailouts() &&
+           !def->isControlInstruction() &&
            (!def->isInstruction() || !def->toInstruction()->resumePoint());
 }
 
@@ -1815,7 +1816,7 @@ CheckOperand(const MNode* consumer, const MUse* use, int32_t* usesBalance)
 #ifdef _DEBUG_CHECK_OPERANDS_USES_BALANCE
     fprintf(stderr, "==Check Operand\n");
     use->producer()->dump(stderr);
-    fprintf(stderr, "  index: %zu\n", use->consumer()->indexOf(use));
+    fprintf(stderr, "  index: %" PRIuSIZE "\n", use->consumer()->indexOf(use));
     use->consumer()->dump(stderr);
     fprintf(stderr, "==End\n");
 #endif
@@ -1833,7 +1834,7 @@ CheckUse(const MDefinition* producer, const MUse* use, int32_t* usesBalance)
 #ifdef _DEBUG_CHECK_OPERANDS_USES_BALANCE
     fprintf(stderr, "==Check Use\n");
     use->producer()->dump(stderr);
-    fprintf(stderr, "  index: %zu\n", use->consumer()->indexOf(use));
+    fprintf(stderr, "  index: %" PRIuSIZE "\n", use->consumer()->indexOf(use));
     use->consumer()->dump(stderr);
     fprintf(stderr, "==End\n");
 #endif
@@ -3281,7 +3282,7 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
 
     CompilerConstraintList* constraints = NewCompilerConstraintList(temp);
     if (!constraints) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return false;
     }
 

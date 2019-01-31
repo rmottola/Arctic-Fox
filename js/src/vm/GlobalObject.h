@@ -20,13 +20,15 @@
 #include "vm/ErrorObject.h"
 #include "vm/Runtime.h"
 
-extern JSObject*
-js_InitSharedArrayBufferClass(JSContext* cx, js::HandleObject obj);
 
-extern JSObject*
-js_InitStopIterationClass(JSContext* cx, js::HandleObject obj);
 
 namespace js {
+
+extern JSObject*
+InitSharedArrayBufferClass(JSContext *cx, HandleObject obj);
+
+extern JSObject*
+InitStopIterationClass(JSContext* cx, HandleObject obj);
 
 class Debugger;
 class TypedObjectModuleObject;

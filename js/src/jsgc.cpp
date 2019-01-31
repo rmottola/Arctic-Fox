@@ -219,6 +219,7 @@
 #include "gc/Memory.h"
 #include "jit/BaselineJIT.h"
 #include "jit/IonCode.h"
+#include "jit/JitcodeMap.h"
 #include "js/SliceBudget.h"
 #include "proxy/DeadObjectProxy.h"
 #include "vm/Debugger.h"
@@ -2986,7 +2987,7 @@ GCRuntime::refillFreeListFromMainThread(JSContext* cx, AllocKind thingKind)
 
     // We are really just totally out of memory.
     MOZ_ASSERT(allowGC, "A fallible allocation must not report OOM on failure.");
-    js_ReportOutOfMemory(cx);
+    ReportOutOfMemory(cx);
     return nullptr;
 }
 
@@ -3010,7 +3011,7 @@ GCRuntime::refillFreeListOffMainThread(ExclusiveContext* cx, AllocKind thingKind
     if (thing)
         return thing;
 
-    js_ReportOutOfMemory(cx);
+    ReportOutOfMemory(cx);
     return nullptr;
 }
 
@@ -5161,6 +5162,7 @@ GCRuntime::beginSweepPhase(bool destroyingRuntime)
 #endif
 
     DropStringWrappers(rt);
+
     findZoneGroups();
     endMarkingZoneGroup();
     beginSweepingZoneGroup();
@@ -6512,12 +6514,12 @@ js::NewCompartment(JSContext* cx, Zone* zone, JSPrincipals* principals,
     AutoLockGC lock(rt);
 
     if (!zone->compartments.append(compartment.get())) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 
     if (zoneHolder && !rt->gc.zones.append(zone)) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 

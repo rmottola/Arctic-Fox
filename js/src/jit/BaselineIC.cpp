@@ -8,6 +8,7 @@
 
 #include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/TemplateLib.h"
 
 #include "jslibmath.h"
@@ -58,13 +59,13 @@ FallbackICSpew(JSContext* cx, ICFallbackStub* stub, const char* fmt, ...)
         va_end(args);
 
         JitSpew(JitSpew_BaselineICFallback,
-                "Fallback hit for (%s:%d) (pc=%d,line=%d,uses=%d,stubs=%d): %s",
+                "Fallback hit for (%s:%" PRIuSIZE ") (pc=%" PRIuSIZE ",line=%d,uses=%d,stubs=%" PRIuSIZE "): %s",
                 script->filename(),
                 script->lineno(),
-                (int) script->pcToOffset(pc),
+                script->pcToOffset(pc),
                 PCToLineNumber(script, pc),
                 script->getWarmUpCount(),
-                (int) stub->numOptimizedStubs(),
+                stub->numOptimizedStubs(),
                 fmtbuf);
     }
 }
@@ -83,10 +84,10 @@ TypeFallbackICSpew(JSContext* cx, ICTypeMonitor_Fallback* stub, const char* fmt,
         va_end(args);
 
         JitSpew(JitSpew_BaselineICFallback,
-                "Type monitor fallback hit for (%s:%d) (pc=%d,line=%d,uses=%d,stubs=%d): %s",
+                "Type monitor fallback hit for (%s:%" PRIuSIZE ") (pc=%" PRIuSIZE ",line=%d,uses=%d,stubs=%d): %s",
                 script->filename(),
                 script->lineno(),
-                (int) script->pcToOffset(pc),
+                script->pcToOffset(pc),
                 PCToLineNumber(script, pc),
                 script->getWarmUpCount(),
                 (int) stub->numOptimizedMonitorStubs(),
@@ -489,7 +490,8 @@ ICStub::trace(JSTracer* trc)
       }
       case ICStub::NewObject_Fallback: {
         ICNewObject_Fallback* stub = toNewObject_Fallback();
-        MarkObject(trc, &stub->templateObject(), "baseline-newobject-template");
+        if (stub->templateObject())
+            MarkObject(trc, &stub->templateObject(), "baseline-newobject-template");
         break;
       }
       case ICStub::Rest_Fallback: {
@@ -939,7 +941,7 @@ DoWarmUpCounterFallback(JSContext* cx, ICWarmUpCounter_Fallback* stub, BaselineF
 
     // Ensure that Ion-compiled code is available.
     JitSpew(JitSpew_BaselineOSR,
-            "WarmUpCounter for %s:%d reached %d at pc %p, trying to switch to Ion!",
+            "WarmUpCounter for %s:%" PRIuSIZE " reached %d at pc %p, trying to switch to Ion!",
             script->filename(), script->lineno(), (int) script->getWarmUpCount(), (void*) pc);
     void* jitcode = nullptr;
     if (!EnsureCanEnterIon(cx, stub, frame, script, pc, &jitcode))
@@ -1093,7 +1095,7 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
         ICStub* stub = existingStub ? compiler.updateStub()
                                     : compiler.getStub(compiler.getStubSpace(script));
         if (!stub) {
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return false;
         }
 
@@ -1120,7 +1122,7 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
         ICTypeMonitor_SingleObject::Compiler compiler(cx, obj);
         ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
         if (!stub) {
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return false;
         }
 
@@ -1144,7 +1146,7 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
         ICTypeMonitor_ObjectGroup::Compiler compiler(cx, group);
         ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
         if (!stub) {
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return false;
         }
 
@@ -1664,13 +1666,80 @@ ICNewArray_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 // NewObject_Fallback
 //
 
+
+// Unlike typical baseline IC stubs, the code for NewObject_WithTemplate is
+// specialized for the template object being allocated.
+static JitCode *
+GenerateNewObjectWithTemplateCode(JSContext *cx, JSObject *templateObject)
+{
+    JitContext jctx(cx, nullptr);
+    MacroAssembler masm;
+#ifdef JS_CODEGEN_ARM
+    masm.setSecondScratchReg(BaselineSecondScratchReg);
+#endif
+
+    Label failure;
+    Register objReg = R0.scratchReg();
+    Register tempReg = R1.scratchReg();
+    masm.movePtr(ImmGCPtr(templateObject->group()), tempReg);
+    masm.branchTest32(Assembler::NonZero, Address(tempReg, ObjectGroup::offsetOfFlags()),
+                      Imm32(OBJECT_FLAG_PRE_TENURE), &failure);
+    masm.branchPtr(Assembler::NotEqual, AbsoluteAddress(cx->compartment()->addressOfMetadataCallback()),
+                   ImmWord(0), &failure);
+    masm.createGCObject(objReg, tempReg, templateObject, gc::DefaultHeap, &failure);
+    masm.tagValue(JSVAL_TYPE_OBJECT, objReg, R0);
+
+    EmitReturnFromIC(masm);
+    masm.bind(&failure);
+    EmitStubGuardFailure(masm);
+
+    Linker linker(masm);
+    AutoFlushICache afc("GenerateNewObjectWithTemplateCode");
+    return linker.newCode<CanGC>(cx, BASELINE_CODE);
+}
+
+
 static bool
-DoNewObject(JSContext* cx, ICNewObject_Fallback* stub, MutableHandleValue res)
+DoNewObject(JSContext *cx, BaselineFrame *frame, ICNewObject_Fallback *stub, MutableHandleValue res)
 {
     FallbackICSpew(cx, stub, "NewObject");
 
-    RootedPlainObject templateObject(cx, stub->templateObject());
-    JSObject* obj = NewInitObject(cx, templateObject);
+    RootedObject obj(cx);
+
+    RootedObject templateObject(cx, stub->templateObject());
+    if (templateObject) {
+        MOZ_ASSERT(!templateObject->group()->maybePreliminaryObjects());
+        obj = NewObjectOperationWithTemplate(cx, templateObject);
+    } else {
+        RootedScript script(cx, frame->script());
+        jsbytecode *pc = stub->icEntry()->pc(script);
+        obj = NewObjectOperation(cx, script, pc);
+
+        if (obj && !obj->isSingleton() && !obj->group()->maybePreliminaryObjects()) {
+            JSObject *templateObject = NewObjectOperation(cx, script, pc, TenuredObject);
+            if (!templateObject)
+                return false;
+
+            if (templateObject->is<UnboxedPlainObject>() ||
+                !templateObject->as<PlainObject>().hasDynamicSlots())
+            {
+                JitCode *code = GenerateNewObjectWithTemplateCode(cx, templateObject);
+                if (!code)
+                    return false;
+
+                ICStubSpace *space =
+                    ICStubCompiler::StubSpaceForKind(ICStub::NewObject_WithTemplate, script);
+                ICStub *templateStub = ICStub::New<ICNewObject_WithTemplate>(space, code);
+                if (!templateStub)
+                    return false;
+
+                stub->addNewStub(templateStub);
+            }
+
+            stub->setTemplateObject(templateObject);
+        }
+    }
+
     if (!obj)
         return false;
 
@@ -1678,7 +1747,7 @@ DoNewObject(JSContext* cx, ICNewObject_Fallback* stub, MutableHandleValue res)
     return true;
 }
 
-typedef bool(*DoNewObjectFn)(JSContext*, ICNewObject_Fallback*, MutableHandleValue);
+typedef bool(*DoNewObjectFn)(JSContext *, BaselineFrame *, ICNewObject_Fallback *, MutableHandleValue);
 static const VMFunction DoNewObjectInfo = FunctionInfo<DoNewObjectFn>(DoNewObject, TailCall);
 
 bool
@@ -1687,6 +1756,7 @@ ICNewObject_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(BaselineStubReg); // stub.
+    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
 
     return tailCallVM(DoNewObjectInfo, masm);
 }
@@ -3758,7 +3828,7 @@ TryAttachNativeGetElemStub(JSContext* cx, HandleScript script, jsbytecode* pc,
 
         if (getterIsScripted) {
             JitSpew(JitSpew_BaselineIC,
-                    "  Generating GetElem(Native %s%s call scripted %s:%d) stub "
+                    "  Generating GetElem(Native %s%s call scripted %s:%" PRIuSIZE ") stub "
                     "(obj=%p, shape=%p, holder=%p, holderShape=%p)",
                         (obj == holder) ? "direct" : "prototype",
                         needsAtomize ? " atomizing" : "",
@@ -6521,7 +6591,7 @@ TryAttachNativeGetPropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
             return true;
         }
 
-        JitSpew(JitSpew_BaselineIC, "  Generating GetProp(NativeObj/ScriptedGetter %s:%d) stub",
+        JitSpew(JitSpew_BaselineIC, "  Generating GetProp(NativeObj/ScriptedGetter %s:%" PRIuSIZE ") stub",
                     callee->nonLazyScript()->filename(), callee->nonLazyScript()->lineno());
 
         ICGetProp_CallScripted::Compiler compiler(cx, monitorStub, obj, holder, callee,
@@ -8127,7 +8197,7 @@ TryAttachSetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
             return true;
         }
 
-        JitSpew(JitSpew_BaselineIC, "  Generating SetProp(NativeObj/ScriptedSetter %s:%d) stub",
+        JitSpew(JitSpew_BaselineIC, "  Generating SetProp(NativeObj/ScriptedSetter %s:%" PRIuSIZE ") stub",
                     callee->nonLazyScript()->filename(), callee->nonLazyScript()->lineno());
 
         ICSetProp_CallScripted::Compiler compiler(cx, obj, holder, callee, script->pcToOffset(pc));
@@ -8263,6 +8333,8 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
                op == JSOP_SETGNAME ||
                op == JSOP_STRICTSETGNAME ||
                op == JSOP_INITPROP ||
+               op == JSOP_INITLOCKEDPROP ||
+               op == JSOP_INITHIDDENPROP ||
                op == JSOP_SETALIASEDVAR ||
                op == JSOP_INITALIASEDLEXICAL);
 
@@ -8296,13 +8368,12 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
         return false;
     }
 
-    if (op == JSOP_INITPROP) {
-        MOZ_ASSERT(obj->is<PlainObject>());
-        if (!NativeDefineProperty(cx, obj.as<PlainObject>(), id, rhs,
-                                  nullptr, nullptr, JSPROP_ENUMERATE))
-        {
+    if (op == JSOP_INITPROP ||
+        op == JSOP_INITLOCKEDPROP ||
+        op == JSOP_INITHIDDENPROP)
+    {
+        if (!InitPropertyOperation(cx, op, obj, id, rhs))
             return false;
-        }
     } else if (op == JSOP_SETNAME ||
                op == JSOP_STRICTSETNAME ||
                op == JSOP_SETGNAME ||
@@ -9104,7 +9175,7 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
     // Check for natives to which template objects can be attached. This is
     // done to provide templates to Ion for inlining these natives later on.
 
-    if (native == js_Array) {
+    if (native == ArrayConstructor) {
         // Note: the template array won't be used if its length is inaccurately
         // computed here.  (We allocate here because compilation may occur on a
         // separate thread where allocation is impossible.)
@@ -9161,7 +9232,7 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
         return true;
     }
 
-    if (native == js_String) {
+    if (native == StringConstructor) {
         RootedString emptyString(cx, cx->runtime()->emptyString);
         res.set(StringObject::create(cx, emptyString, TenuredObject));
         return !!res;
@@ -9175,30 +9246,26 @@ GetTemplateObjectForNative(JSContext* cx, HandleScript script, jsbytecode* pc,
 
     if (JitSupportsSimd()) {
 #define ADD_INT32X4_SIMD_OP_NAME_(OP) || native == js::simd_int32x4_##OP
+#define ADD_FLOAT32X4_SIMD_OP_NAME_(OP) || native == js::simd_float32x4_##OP
        if (false
-           ARITH_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
-           BITWISE_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
-           || native == js::simd_int32x4_not || native == js::simd_int32x4_neg
-           || native == js::simd_int32x4_fromFloat32x4 || native == js::simd_int32x4_fromFloat32x4Bits)
+           ION_COMMONX4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
+           COMP_COMMONX4_TO_INT32X4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
+           COMP_COMMONX4_TO_INT32X4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
+           CONVERSION_INT32X4_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_))
        {
             Rooted<SimdTypeDescr*> descr(cx, &cx->global()->int32x4TypeDescr().as<SimdTypeDescr>());
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
        }
-#undef ADD_INT32X4_SIMD_OP_NAME_
-#define ADD_FLOAT32X4_SIMD_OP_NAME_(OP) || native == js::simd_float32x4_##OP
        if (false
-           ARITH_FLOAT32X4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
-           BITWISE_COMMONX4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
-           || native == js::simd_float32x4_abs || native == js::simd_float32x4_sqrt
-           || native == js::simd_float32x4_reciprocal || native == js::simd_float32x4_reciprocalSqrt
-           || native == js::simd_float32x4_not || native == js::simd_float32x4_neg
-           || native == js::simd_float32x4_fromInt32x4 || native == js::simd_float32x4_fromInt32x4Bits)
+           FOREACH_FLOAT32X4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_)
+           ION_COMMONX4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_))
        {
             Rooted<SimdTypeDescr *> descr(cx, &cx->global()->float32x4TypeDescr().as<SimdTypeDescr>());
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
        }
+#undef ADD_INT32X4_SIMD_OP_NAME_
 #undef ADD_FLOAT32X4_SIMD_OP_NAME_
     }
 
@@ -9393,7 +9460,7 @@ TryAttachCallStub(JSContext* cx, ICCall_Fallback* stub, HandleScript script, jsb
         }
 
         JitSpew(JitSpew_BaselineIC,
-                "  Generating Call_Scripted stub (fun=%p, %s:%d, cons=%s, spread=%s)",
+                "  Generating Call_Scripted stub (fun=%p, %s:%" PRIuSIZE ", cons=%s, spread=%s)",
                 fun.get(), fun->nonLazyScript()->filename(), fun->nonLazyScript()->lineno(),
                 constructing ? "yes" : "no", isSpread ? "yes" : "no");
         ICCallScriptedCompiler compiler(cx, stub->fallbackMonitorStub()->firstMonitorStub(),
@@ -9414,7 +9481,7 @@ TryAttachCallStub(JSContext* cx, ICCall_Fallback* stub, HandleScript script, jsb
 
         // Check for JSOP_FUNAPPLY
         if (op == JSOP_FUNAPPLY) {
-            if (fun->native() == js_fun_apply)
+            if (fun->native() == fun_apply)
                 return TryAttachFunApplyStub(cx, stub, script, pc, thisv, argc, vp + 2, handled);
 
             // Don't try to attach a "regular" optimized call stubs for FUNAPPLY ops,
@@ -9422,7 +9489,7 @@ TryAttachCallStub(JSContext* cx, ICCall_Fallback* stub, HandleScript script, jsb
             return true;
         }
 
-        if (op == JSOP_FUNCALL && fun->native() == js_fun_call) {
+        if (op == JSOP_FUNCALL && fun->native() == fun_call) {
             if (!TryAttachFunCallStub(cx, stub, script, pc, thisv, handled))
                 return false;
             if (*handled)
@@ -9851,7 +9918,7 @@ ICCallStubCompiler::guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs,
     // Stack now confirmed to be like:
     //      [..., CalleeV, ThisV, Arg0V, MagicValue(Arguments), <MaybeReturnAddr>]
 
-    // Load the callee, ensure that it's js_fun_apply
+    // Load the callee, ensure that it's fun_apply
     ValueOperand val = regs.takeAnyValue();
     Address calleeSlot(BaselineStackReg, ICStackValueOffset + (3 * sizeof(Value)));
     masm.loadValue(calleeSlot, val);
@@ -9863,7 +9930,7 @@ ICCallStubCompiler::guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs,
                             failure);
     masm.loadPtr(Address(callee, JSFunction::offsetOfNativeOrScript()), callee);
 
-    masm.branchPtr(Assembler::NotEqual, callee, ImmPtr(js_fun_apply), failure);
+    masm.branchPtr(Assembler::NotEqual, callee, ImmPtr(fun_apply), failure);
 
     // Load the |thisv|, ensure that it's a scripted function with a valid baseline or ion
     // script, or a native function.
@@ -10691,7 +10758,7 @@ ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
     // Stack now looks like:
     //                                      BaselineFrameReg -------------------.
     //                                                                          v
-    //      [..., js_fun_apply, TargetV, TargetThisV, ArgsArrayV, StubFrameHeader]
+    //      [..., fun_apply, TargetV, TargetThisV, ArgsArrayV, StubFrameHeader]
 
     // Push all array elements onto the stack:
     Address arrayVal(BaselineFrameReg, STUB_FRAME_SIZE);
@@ -10700,7 +10767,7 @@ ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
     // Stack now looks like:
     //                                      BaselineFrameReg -------------------.
     //                                                                          v
-    //      [..., js_fun_apply, TargetV, TargetThisV, ArgsArrayV, StubFrameHeader,
+    //      [..., fun_apply, TargetV, TargetThisV, ArgsArrayV, StubFrameHeader,
     //       PushedArgN, ..., PushedArg0]
     // Can't fail after this, so it's ok to clobber argcReg.
 
@@ -10791,7 +10858,7 @@ ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler& masm)
     //
 
     // Stack now looks like:
-    //      [..., js_fun_apply, TargetV, TargetThisV, MagicArgsV, StubFrameHeader]
+    //      [..., fun_apply, TargetV, TargetThisV, MagicArgsV, StubFrameHeader]
 
     // Push all arguments supplied to caller function onto the stack.
     pushCallerArguments(masm, regs);
@@ -10799,7 +10866,7 @@ ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler& masm)
     // Stack now looks like:
     //                                      BaselineFrameReg -------------------.
     //                                                                          v
-    //      [..., js_fun_apply, TargetV, TargetThisV, MagicArgsV, StubFrameHeader,
+    //      [..., fun_apply, TargetV, TargetThisV, MagicArgsV, StubFrameHeader,
     //       PushedArgN, ..., PushedArg0]
     // Can't fail after this, so it's ok to clobber argcReg.
 
@@ -10872,14 +10939,14 @@ ICCall_ScriptedFunCall::Compiler::generateStubCode(MacroAssembler& masm)
     masm.loadValue(calleeSlot, R1);
     regs.take(R1);
 
-    // Ensure callee is js_fun_call.
+    // Ensure callee is fun_call.
     masm.branchTestObject(Assembler::NotEqual, R1, &failure);
 
     Register callee = masm.extractObject(R1, ExtractTemp0);
     masm.branchTestObjClass(Assembler::NotEqual, callee, regs.getAny(), &JSFunction::class_,
                             &failure);
     masm.loadPtr(Address(callee, JSFunction::offsetOfNativeOrScript()), callee);
-    masm.branchPtr(Assembler::NotEqual, callee, ImmPtr(js_fun_call), &failure);
+    masm.branchPtr(Assembler::NotEqual, callee, ImmPtr(fun_call), &failure);
 
     // Ensure |this| is a scripted function with JIT code.
     BaseIndex thisSlot(BaselineStackReg, argcReg, TimesEight, ICStackValueOffset);
