@@ -7901,7 +7901,7 @@ SrcNoteArity(jssrcnote* sn)
 }
 
 JS_FRIEND_API(unsigned)
-js_SrcNoteLength(jssrcnote* sn)
+js::SrcNoteLength(jssrcnote *sn)
 {
     unsigned arity;
     jssrcnote* base;
@@ -7915,7 +7915,7 @@ js_SrcNoteLength(jssrcnote* sn)
 }
 
 JS_FRIEND_API(ptrdiff_t)
-js_GetSrcNoteOffset(jssrcnote* sn, unsigned which)
+js::GetSrcNoteOffset(jssrcnote *sn, unsigned which)
 {
     /* Find the offset numbered which (i.e., skip exactly which offsets). */
     MOZ_ASSERT(SN_TYPE(sn) != SRC_XDELTA);
