@@ -1,4 +1,5 @@
-Yet unapplied Mozilla patches:
+# Backlog of Mozilla patches:
+(grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
@@ -6,6 +7,7 @@ Yet unapplied Mozilla patches:
 - 1470260 - part 2 - Make RefreshDriverTimer ref-counted and hold a s
 - 1470260 - part 1 - Ensure that 'this' stays alive for the duration
 - 1472018 - Limit the lock scope in WebCryptoThreadPool::Shutdown.
+- Bug 1464751 2018-05-28 If there is no JIT, there should be no JIT signal handlers
 - 1469309 - Remove an unused sensor type
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
@@ -69,15 +71,11 @@ Yet unapplied Mozilla patches:
 - Bug 805052 - 2015-03-14 four parts
 - Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
 - Bug 1140670 2015-03-09 all parts
-- Bug 1133081 2015-02-15 1 of 5
-- Bug 1140586 - 2015-03-12
-- Bug 1113369 1 of 5
-- Bug 994016 - IonMonkey: Improve type information at branches with Typ
-- Bug 1139152: IonMonkey: Don't improve types at MTypeOf for unknown ty
-- Bug 1135816 - Handle unboxed object receivers when compiling getter/s
+- Bug 1133081 2015-02-15 1 to 5
+- Bug 1140586 - 2015-03-12 1 to 5
+- Bug 1113369 1 to 5
 
-
-Further ToDo which would help portability:
+### Further ToDo which would help portability:
 
 - Update code from TemporaryRef to already_Refed
 - Update code to work with GCC 7 & GCC 8
@@ -90,10 +88,11 @@ Further ToDo which would help portability:
 - LoadFrame needs TriggerPrincipal & OriginalSrc
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
-
+- check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
 - Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
 
-Further Further ToDo:
+### Further Further ToDo:
+- import PPC JIT from TenFourFox
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
@@ -103,11 +102,13 @@ Further Further ToDo:
 
 Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
 
--- last checked TFF backport commit
+### last checked TFF backport commit
 #512: M1472018 M1469309 M1472925 M1470260 (part 1)
 
+-- consider non taken bugs for platforms we do support compared to TFF (and update list here)
+https://github.com/classilla/tenfourfox/issues/526
 
-JS Sputink checks:
+## JS Sputink checks:
 
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
