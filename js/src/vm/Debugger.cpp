@@ -3970,7 +3970,8 @@ Debugger::startTraceLogger(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-    TraceLoggerEnable(logger, cx);
+    if (!TraceLoggerEnable(logger, cx))
+        return false;
 
     args.rval().setUndefined();
 
