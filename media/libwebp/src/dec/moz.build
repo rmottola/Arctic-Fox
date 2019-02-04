@@ -4,24 +4,21 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-EXPORTS.webp.dec += [ 
-    'decode_vp8.h',
-    'vp8i.h',
-    'vp8li.h',
-    'webpi.h'
+SOURCES += [
+    'alpha_dec.c',
+    'buffer_dec.c',
+    'frame_dec.c',
+    'idec_dec.c',
+    'io_dec.c',
+    'quant_dec.c',
+    'tree_dec.c',
+    'vp8_dec.c',
+    'vp8l_dec.c',
+    'webp_dec.c',
 ]
 
-SOURCES += [
-    'alpha.c',
-    'buffer.c',
-    'frame.c',
-    'idec.c',
-    'io.c',
-    'quant.c',
-    'tree.c',
-    'vp8.c',
-    'vp8l.c',
-    'webp.c'
+LOCAL_INCLUDES += [
+    '/media/libwebp',
 ]
 
 FINAL_LIBRARY = 'gkmedias'

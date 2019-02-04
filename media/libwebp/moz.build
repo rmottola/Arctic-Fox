@@ -4,6 +4,19 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-FINAL_LIBRARY = 'gkmedias'
+EXPORTS.webp += [
+    'src/webp/decode.h',
+    'src/webp/demux.h',
+    'src/webp/mux_types.h',
+    'src/webp/types.h',
+]
 
-DIRS += [ 'src' ]
+DIRS += [
+    'src/dec',
+    'src/demux',
+    'src/dsp',
+    'src/moz',
+    'src/utils',
+]
+
+FINAL_LIBRARY = 'gkmedias'
