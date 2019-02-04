@@ -503,10 +503,11 @@ with_LookupProperty(JSContext* cx, HandleObject obj, HandleId id,
 
 static bool
 with_DefineProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue value,
-                    JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs)
+                    JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
+                    ObjectOpResult &result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
-    return DefineProperty(cx, actual, id, value, getter, setter, attrs);
+    return DefineProperty(cx, actual, id, value, getter, setter, attrs, result);
 }
 
 static bool
@@ -1695,7 +1696,8 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
-                        MutableHandle<PropertyDescriptor> desc) const override
+                        MutableHandle<PropertyDescriptor> desc,
+                        ObjectOpResult &result) const MOZ_OVERRIDE
     {
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
 
@@ -1705,13 +1707,7 @@ class DebugScopeProxy : public BaseProxyHandler
         if (found)
             return Throw(cx, id, JSMSG_CANT_REDEFINE_PROP);
 
-        return JS_DefinePropertyById(cx, scope, id, desc.value(),
-                                     // Descriptors never store JSNatives for
-                                     // accessors: they have either JSFunctions
-                                     // or JSPropertyOps.
-                                     desc.attributes() | JSPROP_PROPOP_ACCESSORS,
-                                     JS_PROPERTYOP_GETTER(desc.getter()),
-                                     JS_PROPERTYOP_SETTER(desc.setter()));
+        return JS_DefinePropertyById(cx, scope, id, desc, result);
     }
 
     bool ownPropertyKeys(JSContext* cx, HandleObject proxy, AutoIdVector& props) const override

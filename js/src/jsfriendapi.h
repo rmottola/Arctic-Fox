@@ -337,7 +337,8 @@ proxy_LookupProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::M
                     JS::MutableHandle<Shape*> propp);
 extern JS_FRIEND_API(bool)
 proxy_DefineProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
-                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs);
+                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
+                     JS::ObjectOpResult &result);
 extern JS_FRIEND_API(bool)
 proxy_HasProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 extern JS_FRIEND_API(bool)
@@ -2647,7 +2648,7 @@ ReportIsNotFunction(JSContext* cx, JS::HandleValue v);
 
 extern JS_FRIEND_API(bool)
 DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                  JS::Handle<JSPropertyDescriptor> descriptor, bool* bp);
+                  JS::Handle<JSPropertyDescriptor> descriptor, JS::ObjectOpResult &result);
 
 } /* namespace js */
 

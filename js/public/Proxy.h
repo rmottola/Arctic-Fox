@@ -26,6 +26,7 @@ using JS::MutableHandle;
 using JS::MutableHandleObject;
 using JS::MutableHandleValue;
 using JS::NativeImpl;
+using JS::ObjectOpResult;
 using JS::PrivateValue;
 using JS::Value;
 
@@ -251,7 +252,8 @@ class JS_FRIEND_API(BaseProxyHandler)
     virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const = 0;
     virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
-                                MutableHandle<JSPropertyDescriptor> desc) const = 0;
+                                MutableHandle<JSPropertyDescriptor> desc,
+                                ObjectOpResult &result) const = 0;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
                                  AutoIdVector& props) const = 0;
     virtual bool delete_(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const = 0;
@@ -368,7 +370,8 @@ class JS_PUBLIC_API(DirectProxyHandler) : public BaseProxyHandler
     virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
     virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
-                                MutableHandle<JSPropertyDescriptor> desc) const override;
+                                MutableHandle<JSPropertyDescriptor> desc,
+                                ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
                                  AutoIdVector& props) const override;
     virtual bool delete_(JSContext* cx, HandleObject proxy, HandleId id,

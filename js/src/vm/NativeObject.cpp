@@ -1135,7 +1135,7 @@ static inline bool
 DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                         PropertyOp getter, StrictPropertyOp setter,
                         unsigned attrs, HandleValue value,
-                        bool callSetterAfterwards, bool setterIsStrict)
+                        bool callSetterAfterwards, ObjectOpResult &result)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);
     MOZ_ASSERT(setter != JS_StrictPropertyStub);
@@ -1149,20 +1149,17 @@ DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId i
         !IsAnyTypedArray(obj))
     {
         uint32_t index = JSID_TO_INT(id);
-        bool definesPast;
-        if (!WouldDefinePastNonwritableLength(cx, obj, index, setterIsStrict, &definesPast))
-            return false;
-        if (definesPast)
-            return true;
+        if (WouldDefinePastNonwritableLength(obj, index))
+            return result.fail(JSMSG_CANT_DEFINE_PAST_ARRAY_LENGTH);
 
-        NativeObject::EnsureDenseResult result;
-        result = obj->ensureDenseElements(cx, index, 1);
-
-        if (result == NativeObject::ED_FAILED)
+        NativeObject::EnsureDenseResult edResult = obj->ensureDenseElements(cx, index, 1);
+        if (edResult == NativeObject::ED_FAILED)
             return false;
-        if (result == NativeObject::ED_OK) {
+        if (edResult == NativeObject::ED_OK) {
             obj->setDenseElementWithType(cx, index, value);
-            return CallAddPropertyHookDense(cx, obj, index, value);
+            if (!CallAddPropertyHookDense(cx, obj, index, value))
+                return false;
+            return result.succeed();
         }
     }
 
@@ -1171,24 +1168,13 @@ DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId i
         if (id == NameToId(cx->names().length)) {
             if (!cx->shouldBeJSContext())
                 return false;
-
-            ObjectOpResult success;
-            if (!ArraySetLength(cx->asJSContext(), arr, id, attrs, value, success))
-                return false;
-            if (setterIsStrict && !success) {
-                success.reportError(cx->asJSContext(), arr, id);
-                return false;
-            }
-            return true;
+            return ArraySetLength(cx->asJSContext(), arr, id, attrs, value, result);
         }
 
         uint32_t index;
         if (IdIsIndex(id, &index)) {
-            bool definesPast;
-            if (!WouldDefinePastNonwritableLength(cx, arr, index, setterIsStrict, &definesPast))
-                return false;
-            if (definesPast)
-                return true;
+            if (WouldDefinePastNonwritableLength(obj, index))
+                return result.fail(JSMSG_CANT_DEFINE_PAST_ARRAY_LENGTH);
         }
     }
 
@@ -1196,7 +1182,7 @@ DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId i
     if (IsAnyTypedArray(obj)) {
         uint64_t index;
         if (IsTypedArrayIndex(id, &index))
-            return true;
+            return result.succeed();
     }
 
     AutoRooterGetterSetter gsRoot(cx, attrs, &getter, &setter);
@@ -1218,12 +1204,14 @@ DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId i
 
         uint32_t index = JSID_TO_INT(id);
         NativeObject::removeDenseElementForSparseIndex(cx, obj, index);
-        NativeObject::EnsureDenseResult result = NativeObject::maybeDensifySparseElements(cx, obj);
-        if (result == NativeObject::ED_FAILED)
+        NativeObject::EnsureDenseResult edResult = NativeObject::maybeDensifySparseElements(cx, obj);
+        if (edResult == NativeObject::ED_FAILED)
             return false;
-        if (result == NativeObject::ED_OK) {
+        if (edResult == NativeObject::ED_OK) {
             MOZ_ASSERT(!setter);
-            return CallAddPropertyHookDense(cx, obj, index, value);
+            if (!CallAddPropertyHookDense(cx, obj, index, value))
+                return false;
+            return result.succeed();
         }
     }
 
@@ -1234,9 +1222,13 @@ DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId i
         if (!cx->shouldBeJSContext())
             return false;
         RootedValue nvalue(cx, value);
-        return NativeSet(cx->asJSContext(), obj, obj, shape, setterIsStrict, &nvalue);
+
+        // FIXME: result should be passed to NativeSet.
+        if (!NativeSet(cx->asJSContext(), obj, obj, shape, false, &nvalue))
+            return false;
     }
-    return true;
+
+    return result.succeed();
 }
 
 static unsigned
@@ -1349,7 +1341,8 @@ CheckAccessorRedefinition(ExclusiveContext* cx, HandleObject obj, HandleShape sh
 
 bool
 js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                         PropertyOp getter, StrictPropertyOp setter, unsigned attrs)
+                         PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                         ObjectOpResult &result)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);
     MOZ_ASSERT(setter != JS_StrictPropertyStub);
@@ -1377,7 +1370,7 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
             if (IsImplicitDenseOrTypedArrayElement(shape)) {
                 if (IsAnyTypedArray(obj)) {
                     /* Ignore getter/setter properties added to typed arrays. */
-                    return true;
+                    return result.succeed();
                 }
                 if (!NativeObject::sparsifyDenseElement(cx, obj, JSID_TO_INT(id)))
                     return false;
@@ -1442,11 +1435,11 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
             if (IsImplicitDenseOrTypedArrayElement(shape)) {
                 if (IsAnyTypedArray(obj)) {
                     /*
-                     * Silently ignore attempts to change individial index attributes.
+                     * Silently ignore attempts to change individual index attributes.
                      * FIXME: Uses the same broken behavior as for accessors. This should
-                     *        probably throw.
+                     *        fail.
                      */
-                    return true;
+                    return result.succeed();
                 }
                 if (!NativeObject::sparsifyDenseElement(cx, obj, JSID_TO_INT(id)))
                     return false;
@@ -1493,14 +1486,16 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
         // relevant, just clear it.
         attrs = ApplyOrDefaultAttributes(attrs) & ~JSPROP_IGNORE_VALUE;
         return DefinePropertyOrElement(cx, obj, id, getter, setter,
-                                       attrs, updateValue, false, false);
+                                       attrs, updateValue, false, result);
     }
 
     MOZ_ASSERT(shape);
 
     JS_ALWAYS_TRUE(UpdateShapeTypeAndValue(cx, obj, shape, updateValue));
 
-    return CallAddPropertyHook(cx, obj, shape, updateValue);
+    if (!CallAddPropertyHook(cx, obj, shape, updateValue))
+        return false;
+    return result.succeed();
 }
 
 template <AllowGC allowGC>
@@ -1554,13 +1549,23 @@ js::NativeLookupElement(JSContext* cx, HandleNativeObject obj, uint32_t index,
 }
 
 bool
-js::NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index, HandleValue value,
-                        PropertyOp getter, StrictPropertyOp setter, unsigned attrs)
+js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+                         HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                         unsigned attrs, ObjectOpResult &result)
+{
+    RootedId id(cx, NameToId(name));
+    return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs, result);
+}
+
+bool
+js::NativeDefineElement(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index,
+                        HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                        unsigned attrs, ObjectOpResult &result)
 {
     RootedId id(cx);
     if (index <= JSID_INT_MAX) {
         id = INT_TO_JSID(index);
-        return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs);
+        return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs, result);
     }
 
     AutoRooterGetterSetter gsRoot(cx, attrs, &getter, &setter);
@@ -1568,6 +1573,35 @@ js::NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t i
     if (!IndexToId(cx, index, &id))
         return false;
 
+    return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs, result);
+}
+
+bool
+js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+                         HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                         unsigned attrs)
+{
+    ObjectOpResult result;
+    if (!NativeDefineProperty(cx, obj, id, value, getter, setter, attrs, result))
+        return false;
+    if (!result) {
+        // Off-main-thread callers should not get here: they must call this
+        // function only with known-valid arguments. Populating a new
+        // PlainObject with configurable properties is fine.
+        if (!cx->shouldBeJSContext())
+            return false;
+        result.reportError(cx->asJSContext(), obj, id);
+        return false;
+    }
+    return true;
+}
+
+bool
+js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+                         HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                         unsigned attrs)
+{
+    RootedId id(cx, NameToId(name));
     return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs);
 }
 
@@ -2031,7 +2065,10 @@ js::SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleObject receiver
         return DefineProperty(cx, receiver, id, v, getter, setter, attrs);
 
     Rooted<NativeObject*> nativeReceiver(cx, &receiver->as<NativeObject>());
-    return DefinePropertyOrElement(cx, nativeReceiver, id, getter, setter, attrs, v, true, strict);
+    ObjectOpResult success;
+    if (!DefinePropertyOrElement(cx, nativeReceiver, id, getter, setter, attrs, v, true, success))
+        return false;
+    return success.checkStrictErrorOrWarning(cx, receiver, id, strict);
 }
 
 // When setting |id| for |receiver| and |obj| has no property for id, continue
@@ -2111,11 +2148,14 @@ SetDenseOrTypedArrayElement(JSContext* cx, HandleNativeObject obj, uint32_t inde
         return true;
     }
 
-    bool definesPast;
-    if (!WouldDefinePastNonwritableLength(cx, obj, index, strict, &definesPast))
-        return false;
-    if (definesPast)
+    if (WouldDefinePastNonwritableLength(obj, index)) {
+        if (strict) {
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
+                                 JSMSG_CANT_DEFINE_PAST_ARRAY_LENGTH);
+            return false;
+        }
         return true;
+    }
 
     if (!obj->maybeCopyElementsForWrite(cx))
         return false;

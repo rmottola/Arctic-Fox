@@ -22,7 +22,8 @@ class DeadObjectProxy : public BaseProxyHandler
     virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
     virtual bool defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
-                                MutableHandle<JSPropertyDescriptor> desc) const override;
+                                MutableHandle<JSPropertyDescriptor> desc,
+                                ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject wrapper,
                                  AutoIdVector& props) const override;
     virtual bool delete_(JSContext* cx, HandleObject wrapper, HandleId id, bool* bp) const override;

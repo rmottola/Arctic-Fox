@@ -806,6 +806,22 @@ StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id,
                        Handle<PropertyDescriptor> desc);
 
 extern bool
+DefineProperty(ExclusiveContext *cx, HandleObject obj, HandleId id, HandleValue value,
+               JSPropertyOp getter, JSStrictPropertyOp, unsigned attrs, ObjectOpResult &result);
+
+extern bool
+DefineProperty(ExclusiveContext *cx, HandleObject obj, PropertyName *name, HandleValue value,
+               JSPropertyOp getter, JSStrictPropertyOp, unsigned attrs, ObjectOpResult &result);
+
+extern bool
+DefineElement(ExclusiveContext *cx, HandleObject obj, uint32_t index, HandleValue value,
+              JSPropertyOp getter, JSStrictPropertyOp, unsigned attrs, ObjectOpResult &result);
+
+/*
+ * When the 'result' out-param is omitted, the behavior is the same as above, except
+ * that any failure results in a TypeError.
+ */
+extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
                JSPropertyOp getter = nullptr,
                JSStrictPropertyOp setter = nullptr,
