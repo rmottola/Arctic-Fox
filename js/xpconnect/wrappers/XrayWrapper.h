@@ -433,7 +433,8 @@ class XrayWrapper : public Base {
     virtual bool get(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
                      JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp) const override;
     virtual bool set(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
-                     JS::Handle<jsid> id, bool strict, JS::MutableHandle<JS::Value> vp) const override;
+                     JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp,
+                     JS::ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool call(JSContext* cx, JS::Handle<JSObject*> wrapper,
                       const JS::CallArgs& args) const override;
     virtual bool construct(JSContext* cx, JS::Handle<JSObject*> wrapper,
@@ -506,7 +507,8 @@ public:
     virtual bool get(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<JSObject*> receiver,
                      JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp) const override;
     virtual bool set(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<JSObject*> receiver,
-                     JS::Handle<jsid> id, bool strict, JS::MutableHandle<JS::Value> vp) const override;
+                     JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp,
+                     JS::ObjectOpResult &result) const MOZ_OVERRIDE;
 
     virtual bool getPropertyDescriptor(JSContext* cx, JS::Handle<JSObject*> proxy,
                                        JS::Handle<jsid> id,

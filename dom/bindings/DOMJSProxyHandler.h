@@ -115,16 +115,16 @@ public:
                               JS::MutableHandle<JSPropertyDescriptor> desc,
                               JS::ObjectOpResult &result, bool *defined) const;
   bool delete_(JSContext* cx, JS::Handle<JSObject*> proxy,
-               JS::Handle<jsid> id, bool* bp) const override;
+               JS::Handle<jsid> id, bool* bp) const MOZ_OVERRIDE;
   bool preventExtensions(JSContext *cx, JS::Handle<JSObject*> proxy,
-                         bool *succeeded) const override;
+                         bool *succeeded) const MOZ_OVERRIDE;
   bool isExtensible(JSContext *cx, JS::Handle<JSObject*> proxy, bool *extensible)
                     const override;
   bool has(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-           bool* bp) const override;
+           bool* bp) const MOZ_OVERRIDE;
   bool set(JSContext *cx, JS::Handle<JSObject*> proxy, JS::Handle<JSObject*> receiver,
-           JS::Handle<jsid> id, bool strict, JS::MutableHandle<JS::Value> vp)
-           const override;
+           JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp, JS::ObjectOpResult &result)
+           const MOZ_OVERRIDE;
 
   /*
    * If assigning to proxy[id] hits a named setter with OverrideBuiltins or

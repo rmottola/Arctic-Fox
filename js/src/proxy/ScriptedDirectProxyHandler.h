@@ -45,7 +45,7 @@ class ScriptedDirectProxyHandler : public DirectProxyHandler {
     virtual bool get(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
                      MutableHandleValue vp) const override;
     virtual bool set(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
-                     bool strict, MutableHandleValue vp) const override;
+                     MutableHandleValue vp, ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool call(JSContext* cx, HandleObject proxy, const CallArgs& args) const override;
     virtual bool construct(JSContext* cx, HandleObject proxy, const CallArgs& args) const override;
 

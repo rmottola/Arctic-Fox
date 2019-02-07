@@ -316,12 +316,12 @@ CallJSPropertyOp(JSContext* cx, PropertyOp op, HandleObject receiver, HandleId i
 
 MOZ_ALWAYS_INLINE bool
 CallJSPropertyOpSetter(JSContext* cx, StrictPropertyOp op, HandleObject obj, HandleId id,
-                       bool strict, MutableHandleValue vp)
+                       MutableHandleValue vp, ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
 
     assertSameCompartment(cx, obj, id, vp);
-    return op(cx, obj, id, strict, vp);
+    return op(cx, obj, id, vp, result);
 }
 
 static inline bool
@@ -339,20 +339,22 @@ CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiv
 
 inline bool
 CallSetter(JSContext* cx, HandleObject obj, HandleId id, StrictPropertyOp op, unsigned attrs,
-           bool strict, MutableHandleValue vp)
+           MutableHandleValue vp, ObjectOpResult &result)
 {
     if (attrs & JSPROP_SETTER) {
         RootedValue opv(cx, CastAsObjectJsval(op));
-        return InvokeGetterOrSetter(cx, obj, opv, 1, vp.address(), vp);
+        if (!InvokeGetterOrSetter(cx, obj, opv, 1, vp.address(), vp))
+            return false;
+        return result.succeed();
     }
 
     if (attrs & JSPROP_GETTER)
-        return ReportGetterOnlyAssignment(cx, strict);
+        return result.fail(JSMSG_GETTER_ONLY);
 
     if (!op)
-        return true;
+        return result.succeed();
 
-    return CallJSPropertyOpSetter(cx, op, obj, id, strict, vp);
+    return CallJSPropertyOpSetter(cx, op, obj, id, vp, result);
 }
 
 inline uintptr_t
