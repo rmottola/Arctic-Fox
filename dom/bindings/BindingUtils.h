@@ -2516,7 +2516,7 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
   return JS_WrapObject(cx, protop);
 }
 
-extern NativePropertyHooks sWorkerNativePropertyHooks;
+extern NativePropertyHooks sEmptyNativePropertyHooks;
 
 inline bool
 UseDOMXray(JSObject* obj)
