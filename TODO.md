@@ -75,8 +75,18 @@
 - Bug 1140586 - 2015-03-12 1 to 5
 - Bug 1132522, part 2 - Treat false return from proxyHandler.set()
 - Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
-- Bug 1113369 5 to 7
+- Bug 928336. Make defining unforgeable properties on objects faster by
+- Bug 1131805 1 to 3 parts
+- Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
 - Bug 1112164 1 to 19
+- Bug 1133746. Allow DOMProxyShadows to communicate to the JIT whether
+- Bug 963921 - Clients of the JS API should use JS_DefineElement where
+- Bug 1113369 5 to 7
+- Bug 1037687, load iframes in shadow DOM
+- Bug 1129223 - Remove local mozAfterRemotePaint events
+- Bug 940273 1 of 7
+- Bug 945584 1 of 9 Scroll snapping
+
 
 ### Further ToDo which would help portability:
 
