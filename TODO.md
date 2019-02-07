@@ -73,7 +73,10 @@
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
 - Bug 1140586 - 2015-03-12 1 to 5
-- Bug 1113369 1 to 5
+- Bug 1132522, part 2 - Treat false return from proxyHandler.set()
+- Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp¿
+- Bug 1113369 5 to 7
+- Bug 1112164 1 to 19
 
 ### Further ToDo which would help portability:
 
