@@ -46,6 +46,39 @@
 
 //#define HACK_COLORGLYPHS
 
+#if (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+
+extern const CFStringRef kCTFontFormatAttribute = CFSTR("kCTFontFormatAttribute");
+
+typedef enum CTFontFormat : uint32_t {
+  kCTFontFormatUnrecognized = 0,
+  kCTFontFormatOpenTypePostScript = 1,
+  kCTFontFormatOpenTypeTrueType = 2,
+  kCTFontFormatTrueType = 3,
+  kCTFontFormatPostScript = 4,
+  kCTFontFormatBitmap = 5
+} CTFontFormat;
+
+CFArrayRef CTFontManagerCopyAvailableFontFamilyNames(void) {
+  uint32_t count, fdCount;
+  CTFontCollectionRef collection = CTFontCollectionCreateFromAvailableFonts(NULL);
+  CFArrayRef fontDescriptors = CTFontCollectionCreateMatchingFontDescriptors(collection);
+
+  fdCount = CFArrayGetCount(fontDescriptors);
+  CFMutableArrayRef familyNames = CFArrayCreateMutable(NULL, fdCount, &kCFTypeArrayCallBacks);
+  for (count = 0; count < fdCount; count++) {
+    CTFontDescriptorRef fd = (CTFontDescriptorRef)CFArrayGetValueAtIndex(fontDescriptors, count);
+    CFStringRef familyName = (CFStringRef)CTFontDescriptorCopyAttribute(fd, kCTFontFamilyNameAttribute);
+    CFArrayAppendValue(familyNames, familyName);
+  }
+
+  CFRelease(fontDescriptors);
+  CFRelease(collection);
+
+  return familyNames;
+}
+#endif
+
 class SkScalerContext_Mac;
 
 // CTFontManagerCopyAvailableFontFamilyNames() is not always available, so we
