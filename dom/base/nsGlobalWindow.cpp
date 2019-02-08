@@ -609,7 +609,7 @@ class nsOuterWindowProxy : public js::Wrapper
 public:
   MOZ_CONSTEXPR nsOuterWindowProxy() : js::Wrapper(0) { }
 
-  virtual bool finalizeInBackground(JS::Value priv) const override {
+  virtual bool finalizeInBackground(JS::Value priv) const MOZ_OVERRIDE {
     return false;
   }
 
@@ -618,7 +618,7 @@ public:
                                         JS::Handle<JSObject*> proxy,
                                         JS::Handle<jsid> id,
                                         JS::MutableHandle<JSPropertyDescriptor> desc)
-                                        const override;
+                                        const MOZ_OVERRIDE;
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
@@ -626,23 +626,23 @@ public:
                               JS::ObjectOpResult &result) const MOZ_OVERRIDE;
   virtual bool ownPropertyKeys(JSContext *cx,
                                JS::Handle<JSObject*> proxy,
-                               JS::AutoIdVector &props) const override;
+                               JS::AutoIdVector &props) const MOZ_OVERRIDE;
   virtual bool delete_(JSContext *cx, JS::Handle<JSObject*> proxy,
                        JS::Handle<jsid> id,
-                       bool *bp) const override;
+                       bool *bp) const MOZ_OVERRIDE;
   virtual bool enumerate(JSContext *cx, JS::Handle<JSObject*> proxy,
-                         JS::MutableHandle<JSObject*> vp) const override;
+                         JS::MutableHandle<JSObject*> vp) const MOZ_OVERRIDE;
   virtual bool preventExtensions(JSContext *cx,
                                  JS::Handle<JSObject*> proxy,
-                                 bool *succeeded) const override;
+                                 bool *succeeded) const MOZ_OVERRIDE;
   virtual bool isExtensible(JSContext *cx, JS::Handle<JSObject*> proxy, bool *extensible)
-                            const override;
+                            const MOZ_OVERRIDE;
   virtual bool has(JSContext *cx, JS::Handle<JSObject*> proxy,
-                   JS::Handle<jsid> id, bool *bp) const override;
+                   JS::Handle<jsid> id, bool *bp) const MOZ_OVERRIDE;
   virtual bool get(JSContext *cx, JS::Handle<JSObject*> proxy,
                    JS::Handle<JSObject*> receiver,
                    JS::Handle<jsid> id,
-                   JS::MutableHandle<JS::Value> vp) const override;
+                   JS::MutableHandle<JS::Value> vp) const MOZ_OVERRIDE;
   virtual bool set(JSContext *cx, JS::Handle<JSObject*> proxy,
                    JS::Handle<JSObject*> receiver,
                    JS::Handle<jsid> id,
@@ -654,27 +654,27 @@ public:
                                      JS::Handle<JSObject*> proxy,
                                      JS::Handle<jsid> id,
                                      JS::MutableHandle<JSPropertyDescriptor> desc)
-                                     const override;
+                                     const MOZ_OVERRIDE;
   virtual bool hasOwn(JSContext *cx, JS::Handle<JSObject*> proxy,
-                      JS::Handle<jsid> id, bool *bp) const override;
+                      JS::Handle<jsid> id, bool *bp) const MOZ_OVERRIDE;
   virtual bool getOwnEnumerablePropertyKeys(JSContext *cx, JS::Handle<JSObject*> proxy,
-                                            JS::AutoIdVector &props) const override;
+                                            JS::AutoIdVector &props) const MOZ_OVERRIDE;
   virtual const char *className(JSContext *cx,
-                                JS::Handle<JSObject*> wrapper) const override;
+                                JS::Handle<JSObject*> wrapper) const MOZ_OVERRIDE;
 
-  virtual void finalize(JSFreeOp *fop, JSObject *proxy) const override;
+  virtual void finalize(JSFreeOp *fop, JSObject *proxy) const MOZ_OVERRIDE;
 
-  virtual bool isCallable(JSObject *obj) const override {
+  virtual bool isCallable(JSObject *obj) const MOZ_OVERRIDE {
     return false;
   }
-  virtual bool isConstructor(JSObject *obj) const override {
+  virtual bool isConstructor(JSObject *obj) const MOZ_OVERRIDE {
     return false;
   }
 
   virtual bool watch(JSContext *cx, JS::Handle<JSObject*> proxy,
-                     JS::Handle<jsid> id, JS::Handle<JSObject*> callable) const override;
+                     JS::Handle<jsid> id, JS::Handle<JSObject*> callable) const MOZ_OVERRIDE;
   virtual bool unwatch(JSContext *cx, JS::Handle<JSObject*> proxy,
-                       JS::Handle<jsid> id) const override;
+                       JS::Handle<jsid> id) const MOZ_OVERRIDE;
 
   static void ObjectMoved(JSObject *obj, const JSObject *old);
 
@@ -1039,7 +1039,7 @@ class nsChromeOuterWindowProxy : public nsOuterWindowProxy
 public:
   MOZ_CONSTEXPR nsChromeOuterWindowProxy() : nsOuterWindowProxy() { }
 
-  virtual const char *className(JSContext *cx, JS::Handle<JSObject*> wrapper) const override;
+  virtual const char *className(JSContext *cx, JS::Handle<JSObject*> wrapper) const MOZ_OVERRIDE;
 
   static const nsChromeOuterWindowProxy singleton;
 };
@@ -8885,7 +8885,7 @@ nsGlobalWindow::NotifyDOMWindowDestroyed(nsGlobalWindow* aWindow) {
 // with principals that are either the system principal or an expanded principal.
 // This may not return true for all non-web-content compartments.
 struct BrowserCompartmentMatcher : public js::CompartmentFilter {
-  virtual bool match(JSCompartment* c) const override
+  virtual bool match(JSCompartment* c) const MOZ_OVERRIDE
   {
     nsCOMPtr<nsIPrincipal> pc = nsJSPrincipals::get(JS_GetCompartmentPrincipals(c));
     return nsContentUtils::IsSystemOrExpandedPrincipal(pc);
@@ -8903,7 +8903,7 @@ class MultiCompartmentMatcher : public js::CompartmentFilter {
   }
   
 public: 
-  virtual bool match(JSCompartment* c) const override
+  virtual bool match(JSCompartment* c) const MOZ_OVERRIDE
   {
     return compartments.has(c);
   }

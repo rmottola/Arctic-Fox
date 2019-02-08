@@ -24,7 +24,7 @@ public:
                        JS::Handle<jsid> aId,
                        bool /* unused */,
                        JS::MutableHandle<JSPropertyDescriptor> aDesc)
-                       const override;
+                       const MOZ_OVERRIDE;
   virtual bool
   defineProperty(JSContext* aCx, JS::Handle<JSObject*> aProxy,
                  JS::Handle<jsid> aId,
@@ -32,26 +32,26 @@ public:
                  JS::ObjectOpResult &result) const MOZ_OVERRIDE;
   virtual bool
   ownPropNames(JSContext* aCx, JS::Handle<JSObject*> aProxy, unsigned flags,
-               JS::AutoIdVector& aProps) const override;
+               JS::AutoIdVector& aProps) const MOZ_OVERRIDE;
   virtual bool
   delete_(JSContext* aCx, JS::Handle<JSObject*> aProxy, JS::Handle<jsid> aId,
-          bool* aBp) const override;
+          bool* aBp) const MOZ_OVERRIDE;
   virtual bool
   preventExtensions(JSContext* aCx, JS::Handle<JSObject*> aProxy,
-                    bool *succeeded) const override
+                    bool *succeeded) const MOZ_OVERRIDE
   {
     *succeeded = false;
     return true;
   }
   virtual bool
   isExtensible(JSContext* aCx, JS::Handle<JSObject*> aProxy,
-               bool* aIsExtensible) const override
+               bool* aIsExtensible) const MOZ_OVERRIDE
   {
     *aIsExtensible = true;
     return true;
   }
   virtual const char*
-  className(JSContext *aCx, JS::Handle<JSObject*> aProxy) const override
+  className(JSContext *aCx, JS::Handle<JSObject*> aProxy) const MOZ_OVERRIDE
   {
     return "WindowProperties";
   }
