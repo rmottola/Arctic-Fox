@@ -1311,7 +1311,7 @@ NativeSetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, u
                  MutableHandleValue vp, ObjectOpResult &result);
 
 extern bool
-NativeDeleteProperty(JSContext* cx, HandleNativeObject obj, HandleId id, bool* succeeded);
+NativeDeleteProperty(JSContext *cx, HandleNativeObject obj, HandleId id, ObjectOpResult &result);
 
 
 /*** SpiderMonkey nonstandard internal methods ***************************************************/

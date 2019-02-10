@@ -27,7 +27,8 @@ class ScriptedIndirectProxyHandler : public BaseProxyHandler
                                 ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
                                  AutoIdVector& props) const override;
-    virtual bool delete_(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const override;
+    virtual bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
+                         ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool enumerate(JSContext* cx, HandleObject proxy,
                            MutableHandleObject objp) const override;
     virtual bool preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded) const override;

@@ -70,9 +70,9 @@ public:
                                     JS::HandleObject wrapper, JS::HandleObject holder,
                                     JS::HandleId id, JS::MutableHandle<JSPropertyDescriptor> desc);
 
-    bool delete_(JSContext* cx, JS::HandleObject wrapper, JS::HandleId id, bool* bp) {
-        *bp = true;
-        return true;
+    bool delete_(JSContext *cx, JS::HandleObject wrapper, JS::HandleId id,
+                 JS::ObjectOpResult &result) {
+        return result.succeed();
     }
 
     static const char* className(JSContext* cx, JS::HandleObject wrapper, const js::Wrapper& baseInstance) {
@@ -217,7 +217,7 @@ public:
                                     JS::HandleObject holder, JS::HandleId id,
                                     JS::MutableHandle<JSPropertyDescriptor> desc) override;
 
-    bool delete_(JSContext* cx, JS::HandleObject wrapper, JS::HandleId id, bool* bp);
+    bool delete_(JSContext *cx, JS::HandleObject wrapper, JS::HandleId id, JS::ObjectOpResult &result);
 
     bool defineProperty(JSContext* cx, JS::HandleObject wrapper, JS::HandleId id,
                         JS::MutableHandle<JSPropertyDescriptor> desc,
@@ -417,7 +417,7 @@ class XrayWrapper : public Base {
     virtual bool ownPropertyKeys(JSContext* cx, JS::Handle<JSObject*> wrapper,
                                  JS::AutoIdVector& props) const override;
     virtual bool delete_(JSContext* cx, JS::Handle<JSObject*> wrapper,
-                         JS::Handle<jsid> id, bool* bp) const override;
+                         JS::Handle<jsid> id, JS::ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool enumerate(JSContext* cx, JS::Handle<JSObject*> wrapper,
                            JS::MutableHandle<JSObject*> objp) const override;
     virtual bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,

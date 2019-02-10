@@ -121,7 +121,8 @@ class JS_FRIEND_API(CrossCompartmentWrapper) : public Wrapper
                                 ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject wrapper,
                                  AutoIdVector& props) const override;
-    virtual bool delete_(JSContext* cx, HandleObject wrapper, HandleId id, bool* bp) const override;
+    virtual bool delete_(JSContext *cx, HandleObject wrapper, HandleId id,
+                         ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool enumerate(JSContext* cx, HandleObject wrapper, MutableHandleObject objp) const override;
     virtual bool getPrototypeOf(JSContext* cx, HandleObject proxy,
                                 MutableHandleObject protop) const override;

@@ -2383,15 +2383,15 @@ CASE(JSOP_STRICTDELPROP)
     RootedObject& obj = rootObject0;
     FETCH_OBJECT(cx, -1, obj);
 
-    bool succeeded;
-    if (!DeleteProperty(cx, obj, id, &succeeded))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         goto error;
-    if (!succeeded && JSOp(*REGS.pc) == JSOP_STRICTDELPROP) {
-        obj->reportNotConfigurable(cx, id);
+    if (!result && JSOp(*REGS.pc) == JSOP_STRICTDELPROP) {
+        result.reportError(cx, obj, id);
         goto error;
     }
     MutableHandleValue res = REGS.stackHandleAt(-1);
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
 }
 END_CASE(JSOP_DELPROP)
 
@@ -2407,19 +2407,19 @@ CASE(JSOP_STRICTDELELEM)
     RootedValue& propval = rootValue0;
     propval = REGS.sp[-1];
 
-    bool succeeded;
+    ObjectOpResult result;
     RootedId& id = rootId0;
     if (!ValueToId<CanGC>(cx, propval, &id))
         goto error;
-    if (!DeleteProperty(cx, obj, id, &succeeded))
+    if (!DeleteProperty(cx, obj, id, result))
         goto error;
-    if (!succeeded && JSOp(*REGS.pc) == JSOP_STRICTDELELEM) {
-        obj->reportNotConfigurable(cx, id);
+    if (!result && JSOp(*REGS.pc) == JSOP_STRICTDELELEM) {
+        result.reportError(cx, obj, id);
         goto error;
     }
 
     MutableHandleValue res = REGS.stackHandleAt(-2);
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
     REGS.sp--;
 }
 END_CASE(JSOP_DELELEM)
@@ -3888,29 +3888,35 @@ js::GetAndClearException(JSContext* cx, MutableHandleValue res)
 
 template <bool strict>
 bool
-js::DeleteProperty(JSContext* cx, HandleValue v, HandlePropertyName name, bool* bp)
+js::DeletePropertyJit(JSContext* cx, HandleValue v, HandlePropertyName name, bool* bp)
 {
     RootedObject obj(cx, ToObjectFromStack(cx, v));
     if (!obj)
         return false;
 
     RootedId id(cx, NameToId(name));
-    if (!DeleteProperty(cx, obj, id, bp))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         return false;
 
-    if (strict && !*bp) {
-        obj->reportNotConfigurable(cx, NameToId(name));
-        return false;
+    if (strict) {
+        if (!result)
+            return result.reportError(cx, obj, id);
+        *bp = true;
+    } else {
+        *bp = result.ok();
     }
     return true;
 }
 
-template bool js::DeleteProperty<true> (JSContext* cx, HandleValue val, HandlePropertyName name, bool* bp);
-template bool js::DeleteProperty<false>(JSContext* cx, HandleValue val, HandlePropertyName name, bool* bp);
+template bool js::DeletePropertyJit<true> (JSContext *cx, HandleValue val, HandlePropertyName name,
+                                           bool *bp);
+template bool js::DeletePropertyJit<false>(JSContext *cx, HandleValue val, HandlePropertyName name,
+                                           bool *bp);
 
 template <bool strict>
 bool
-js::DeleteElement(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
+js::DeleteElementJit(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
 {
     RootedObject obj(cx, ToObjectFromStack(cx, val));
     if (!obj)
@@ -3919,18 +3925,22 @@ js::DeleteElement(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
     RootedId id(cx);
     if (!ValueToId<CanGC>(cx, index, &id))
         return false;
-    if (!DeleteProperty(cx, obj, id, bp))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         return false;
 
-    if (strict && !*bp) {
-        obj->reportNotConfigurable(cx, id);
-        return false;
+    if (strict) {
+        if (!result)
+            return result.reportError(cx, obj, id);
+        *bp = true;
+    } else {
+        *bp = result.ok();
     }
     return true;
 }
 
-template bool js::DeleteElement<true> (JSContext*, HandleValue, HandleValue, bool* succeeded);
-template bool js::DeleteElement<false>(JSContext*, HandleValue, HandleValue, bool* succeeded);
+template bool js::DeleteElementJit<true> (JSContext*, HandleValue, HandleValue, bool* succeeded);
+template bool js::DeleteElementJit<false>(JSContext*, HandleValue, HandleValue, bool* succeeded);
 
 bool
 js::GetElement(JSContext* cx, MutableHandleValue lref, HandleValue rref, MutableHandleValue vp)
@@ -4029,11 +4039,11 @@ js::DeleteNameOperation(JSContext* cx, HandlePropertyName name, HandleObject sco
         return false;
     }
 
-    bool succeeded;
+    ObjectOpResult result;
     RootedId id(cx, NameToId(name));
-    if (!DeleteProperty(cx, scope, id, &succeeded))
+    if (!DeleteProperty(cx, scope, id, result))
         return false;
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
     return true;
 }
 
