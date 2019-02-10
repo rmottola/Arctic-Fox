@@ -50,8 +50,8 @@ SecurityWrapper<Base>::setImmutablePrototype(JSContext* cx, HandleObject wrapper
 
 template <class Base>
 bool
-SecurityWrapper<Base>::preventExtensions(JSContext* cx, HandleObject wrapper,
-                                         bool* succeeded) const
+SecurityWrapper<Base>::preventExtensions(JSContext *cx, HandleObject wrapper,
+                                         bool *succeeded) const
 {
     // Just like BaseProxyHandler, SecurityWrappers claim by default to always
     // be extensible, so as not to leak information about the state of the

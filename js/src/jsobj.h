@@ -84,8 +84,8 @@ class SetObject;
 class StrictArgumentsObject;
 
 // Forward declarations, required for later friend declarations.
-bool PreventExtensions(JSContext* cx, JS::HandleObject obj, bool* succeeded);
-bool SetImmutablePrototype(js::ExclusiveContext* cx, JS::HandleObject obj, bool* succeeded);
+bool PreventExtensions(JSContext *cx, JS::HandleObject obj, bool *succeeded);
+bool SetImmutablePrototype(js::ExclusiveContext *cx, JS::HandleObject obj, bool *succeeded);
 
 }  /* namespace js */
 
@@ -113,9 +113,9 @@ class JSObject : public js::gc::Cell
     friend class js::NewObjectCache;
     friend class js::Nursery;
     friend class js::gc::RelocationOverlay;
-    friend bool js::PreventExtensions(JSContext* cx, JS::HandleObject obj, bool* succeeded);
-    friend bool js::SetImmutablePrototype(js::ExclusiveContext* cx, JS::HandleObject obj,
-                                          bool* succeeded);
+    friend bool js::PreventExtensions(JSContext *cx, JS::HandleObject obj, bool *succeeded);
+    friend bool js::SetImmutablePrototype(js::ExclusiveContext *cx, JS::HandleObject obj,
+                                          bool *succeeded);
 
     // Make a new group to use for a singleton object.
     static js::ObjectGroup* makeLazyGroup(JSContext* cx, js::HandleObject obj);
@@ -762,7 +762,7 @@ IsExtensible(ExclusiveContext* cx, HandleObject obj, bool* extensible);
  * actual error through the return value.
  */
 extern bool
-PreventExtensions(JSContext* cx, HandleObject obj, bool* succeeded);
+PreventExtensions(JSContext *cx, HandleObject obj, bool *succeeded);
 
 /*
  * ES6 [[GetOwnPropertyDescriptor]]. Get a description of one of obj's own

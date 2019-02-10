@@ -309,8 +309,8 @@ ScriptedDirectProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject pr
 
 // ES6 20141014 9.5.4 Proxy.[[PreventExtensions]]()
 bool
-ScriptedDirectProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy,
-                                              bool* succeeded) const
+ScriptedDirectProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy,
+                                              bool *succeeded) const
 {
     // Steps 1-3.
     RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));

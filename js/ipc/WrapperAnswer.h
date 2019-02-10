@@ -16,13 +16,13 @@ namespace jsipc {
 class WrapperAnswer : public virtual JavaScriptShared
 {
   public:
-    explicit WrapperAnswer(JSRuntime* rt) : JavaScriptShared(rt) {}
+    explicit WrapperAnswer(JSRuntime *rt) : JavaScriptShared(rt) {}
 
-    bool RecvPreventExtensions(const ObjectId& objId, ReturnStatus* rs,
-                               bool* succeeded);
-    bool RecvGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& id,
-                                   ReturnStatus* rs,
-                                   PPropertyDescriptor* out);
+    bool RecvPreventExtensions(const ObjectId &objId, ReturnStatus *rs,
+                               bool *succeeded);
+    bool RecvGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant &id,
+                                   ReturnStatus *rs,
+                                   PPropertyDescriptor *out);
     bool RecvGetOwnPropertyDescriptor(const ObjectId& objId,
                                       const JSIDVariant& id,
                                       ReturnStatus* rs,

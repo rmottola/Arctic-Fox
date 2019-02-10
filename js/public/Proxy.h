@@ -383,8 +383,8 @@ class JS_PUBLIC_API(DirectProxyHandler) : public BaseProxyHandler
                                 MutableHandleObject protop) const MOZ_OVERRIDE;
     virtual bool setPrototypeOf(JSContext *cx, HandleObject proxy, HandleObject proto,
                                 bool *bp) const MOZ_OVERRIDE;
-    virtual bool setImmutablePrototype(JSContext *cx, HandleObject proxy,
-                                       bool *succeeded) const MOZ_OVERRIDE;
+    virtual bool setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const MOZ_OVERRIDE;
+
     virtual bool preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded) const MOZ_OVERRIDE;
     virtual bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const MOZ_OVERRIDE;
     virtual bool has(JSContext *cx, HandleObject proxy, HandleId id,

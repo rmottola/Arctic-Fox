@@ -126,21 +126,21 @@ DirectProxyHandler::setPrototypeOf(JSContext* cx, HandleObject proxy, HandleObje
 }
 
 bool
-DirectProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded) const
+DirectProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return SetImmutablePrototype(cx, target, succeeded);
 }
 
 bool
-DirectProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded) const
+DirectProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return PreventExtensions(cx, target, succeeded);
 }
 
 bool
-DirectProxyHandler::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const
+DirectProxyHandler::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return IsExtensible(cx, target, extensible);

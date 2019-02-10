@@ -116,8 +116,8 @@ CrossCompartmentWrapper::setImmutablePrototype(JSContext* cx, HandleObject wrapp
 }
 
 bool
-CrossCompartmentWrapper::preventExtensions(JSContext* cx, HandleObject wrapper,
-                                           bool* succeeded) const
+CrossCompartmentWrapper::preventExtensions(JSContext *cx, HandleObject wrapper,
+                                           bool *succeeded) const
 {
     PIERCE(cx, wrapper,
            NOTHING,
@@ -126,7 +126,7 @@ CrossCompartmentWrapper::preventExtensions(JSContext* cx, HandleObject wrapper,
 }
 
 bool
-CrossCompartmentWrapper::isExtensible(JSContext* cx, HandleObject wrapper, bool* extensible) const
+CrossCompartmentWrapper::isExtensible(JSContext *cx, HandleObject wrapper, bool *extensible) const
 {
     PIERCE(cx, wrapper,
            NOTHING,

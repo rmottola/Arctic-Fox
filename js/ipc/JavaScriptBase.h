@@ -35,14 +35,14 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
 
     /*** IPC handlers ***/
 
-    bool RecvPreventExtensions(const uint64_t& objId, ReturnStatus* rs,
-                               bool* succeeded) {
+    bool RecvPreventExtensions(const uint64_t &objId, ReturnStatus *rs,
+                               bool *succeeded) {
         return Answer::RecvPreventExtensions(ObjectId::deserialize(objId), rs,
                                              succeeded);
     }
-    bool RecvGetPropertyDescriptor(const uint64_t& objId, const JSIDVariant& id,
-                                     ReturnStatus* rs,
-                                     PPropertyDescriptor* out) {
+    bool RecvGetPropertyDescriptor(const uint64_t &objId, const JSIDVariant &id,
+                                     ReturnStatus *rs,
+                                     PPropertyDescriptor *out) {
         return Answer::RecvGetPropertyDescriptor(ObjectId::deserialize(objId), id, rs, out);
     }
     bool RecvGetOwnPropertyDescriptor(const uint64_t& objId,
@@ -124,14 +124,14 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
 
     /*** Dummy call handlers ***/
 
-    bool SendDropObject(const ObjectId& objId) {
+    bool SendDropObject(const ObjectId &objId) {
         return Base::SendDropObject(objId.serialize());
     }
-    bool SendPreventExtensions(const ObjectId& objId, ReturnStatus* rs,
-                               bool* succeeded) {
+    bool SendPreventExtensions(const ObjectId &objId, ReturnStatus *rs,
+                               bool *succeeded) {
         return Base::SendPreventExtensions(objId.serialize(), rs, succeeded);
     }
-    bool SendGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& id,
+    bool SendGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant& id,
                                      ReturnStatus* rs,
                                      PPropertyDescriptor* out) {
         return Base::SendGetPropertyDescriptor(objId.serialize(), id, rs, out);

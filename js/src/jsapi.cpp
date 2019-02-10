@@ -1982,19 +1982,19 @@ JS_IsExtensible(JSContext* cx, HandleObject obj, bool* extensible)
 }
 
 JS_PUBLIC_API(bool)
-JS_PreventExtensions(JSContext* cx, JS::HandleObject obj, bool* succeeded)
+JS_PreventExtensions(JSContext *cx, JS::HandleObject obj, bool *succeeded)
 {
     return PreventExtensions(cx, obj, succeeded);
 }
 
-JS_PUBLIC_API(JSObject*)
-JS_GetParent(JSObject* obj)
+JS_PUBLIC_API(JSObject *)
+JS_GetParent(JSObject *obj)
 {
     MOZ_ASSERT(!obj->is<ScopeObject>());
     return obj->getParent();
 }
 
-JS_PUBLIC_API(JSObject*)
+JS_PUBLIC_API(JSObject *)
 JS_GetConstructor(JSContext* cx, HandleObject proto)
 {
     AssertHeapIsIdle(cx);

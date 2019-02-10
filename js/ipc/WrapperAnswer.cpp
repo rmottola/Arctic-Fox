@@ -74,8 +74,8 @@ WrapperAnswer::ok(ReturnStatus *rs, const JS::ObjectOpResult &result)
 }
 
 bool
-WrapperAnswer::RecvPreventExtensions(const ObjectId& objId, ReturnStatus* rs,
-                                     bool* succeeded)
+WrapperAnswer::RecvPreventExtensions(const ObjectId &objId, ReturnStatus *rs,
+                                     bool *succeeded)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))

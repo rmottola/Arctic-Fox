@@ -210,23 +210,23 @@ Proxy::setPrototypeOf(JSContext* cx, HandleObject proxy, HandleObject proto, boo
 }
 
 /* static */ bool
-Proxy::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded)
+Proxy::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
     return handler->setImmutablePrototype(cx, proxy, succeeded);
 }
 
 /* static */ bool
-Proxy::preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded)
+Proxy::preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
     return handler->preventExtensions(cx, proxy, succeeded);
 }
 
 /* static */ bool
-Proxy::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible)
+Proxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible)
 {
     JS_CHECK_RECURSION(cx, return false);
     return proxy->as<ProxyObject>().handler()->isExtensible(cx, proxy, extensible);

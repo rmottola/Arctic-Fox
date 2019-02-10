@@ -1746,7 +1746,7 @@ XrayToString(JSContext* cx, unsigned argc, Value* vp)
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::preventExtensions(JSContext* cx, HandleObject wrapper, bool* succeeded)
+XrayWrapper<Base, Traits>::preventExtensions(JSContext *cx, HandleObject wrapper, bool *succeeded)
                                              const
 {
     // Xray wrappers are supposed to provide a clean view of the target

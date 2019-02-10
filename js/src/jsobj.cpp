@@ -3111,7 +3111,7 @@ js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, bool* succ
 }
 
 bool
-js::PreventExtensions(JSContext* cx, HandleObject obj, bool* succeeded)
+js::PreventExtensions(JSContext *cx, HandleObject obj, bool *succeeded)
 {
     if (obj->is<ProxyObject>())
         return js::Proxy::preventExtensions(cx, obj, succeeded);
