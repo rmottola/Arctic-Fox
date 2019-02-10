@@ -92,15 +92,15 @@ class CPOWProxyHandler : public BaseProxyHandler
     virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                                 MutableHandle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const MOZ_OVERRIDE;
-    virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
-                                 AutoIdVector& props) const MOZ_OVERRIDE;
+    virtual bool ownPropertyKeys(JSContext *cx, HandleObject proxy,
+                                 AutoIdVector &props) const MOZ_OVERRIDE;
     virtual bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
                          ObjectOpResult &result) const MOZ_OVERRIDE;
-    virtual bool enumerate(JSContext* cx, HandleObject proxy, MutableHandleObject objp) const MOZ_OVERRIDE;
-    virtual bool preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded) const MOZ_OVERRIDE;
-    virtual bool isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const MOZ_OVERRIDE;
-    virtual bool has(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const MOZ_OVERRIDE;
-    virtual bool get(JSContext* cx, HandleObject proxy, HandleObject receiver,
+    virtual bool enumerate(JSContext *cx, HandleObject proxy, MutableHandleObject objp) const MOZ_OVERRIDE;
+    virtual bool preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded) const MOZ_OVERRIDE;
+    virtual bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const MOZ_OVERRIDE;
+    virtual bool has(JSContext *cx, HandleObject proxy, HandleId id, bool *bp) const MOZ_OVERRIDE;
+    virtual bool get(JSContext *cx, HandleObject proxy, HandleObject receiver,
                      HandleId id, MutableHandleValue vp) const MOZ_OVERRIDE;
     virtual bool set(JSContext* cx, JS::HandleObject proxy, JS::HandleObject receiver,
                      JS::HandleId id, JS::MutableHandleValue vp,
@@ -487,13 +487,13 @@ WrapperOwner::getOwnEnumerablePropertyKeys(JSContext* cx, HandleObject proxy, Au
 }
 
 bool
-CPOWProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded) const
+CPOWProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded) const
 {
     FORWARD(preventExtensions, (cx, proxy, succeeded));
 }
 
 bool
-WrapperOwner::preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded)
+WrapperOwner::preventExtensions(JSContext *cx, HandleObject proxy, bool *succeeded)
 {
     ObjectId objId = idOf(proxy);
 
