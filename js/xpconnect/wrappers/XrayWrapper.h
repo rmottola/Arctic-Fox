@@ -184,14 +184,14 @@ public:
                                 JS::AutoIdVector& props);
     static bool call(JSContext* cx, JS::HandleObject wrapper,
                      const JS::CallArgs& args, const js::Wrapper& baseInstance);
-    static bool construct(JSContext* cx, JS::HandleObject wrapper,
-                          const JS::CallArgs& args, const js::Wrapper& baseInstance);
+    static bool construct(JSContext *cx, JS::HandleObject wrapper,
+                          const JS::CallArgs &args, const js::Wrapper& baseInstance);
 
-    static bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+    static bool getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                                JS::HandleObject target,
                                JS::MutableHandleObject protop);
 
-    virtual void preserveWrapper(JSObject* target) override;
+    virtual void preserveWrapper(JSObject *target) override;
 
     virtual JSObject* createHolder(JSContext* cx, JSObject* wrapper) override;
 
@@ -253,7 +253,7 @@ public:
         return false;
     }
 
-    bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+    bool getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                         JS::HandleObject target,
                         JS::MutableHandleObject protop)
     {
@@ -368,7 +368,7 @@ public:
         return false;
     }
 
-    bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+    bool getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                         JS::HandleObject target,
                         JS::MutableHandleObject protop)
     {
@@ -418,11 +418,11 @@ class XrayWrapper : public Base {
                                  JS::AutoIdVector& props) const MOZ_OVERRIDE;
     virtual bool delete_(JSContext* cx, JS::Handle<JSObject*> wrapper,
                          JS::Handle<jsid> id, JS::ObjectOpResult &result) const MOZ_OVERRIDE;
-    virtual bool enumerate(JSContext* cx, JS::Handle<JSObject*> wrapper,
+    virtual bool enumerate(JSContext *cx, JS::Handle<JSObject*> wrapper,
                            JS::MutableHandle<JSObject*> objp) const MOZ_OVERRIDE;
-    virtual bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+    virtual bool getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                                 JS::MutableHandleObject protop) const MOZ_OVERRIDE;
-    virtual bool setPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+    virtual bool setPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                                 JS::HandleObject proto, bool *bp) const MOZ_OVERRIDE;
     virtual bool setImmutablePrototype(JSContext *cx, JS::HandleObject wrapper,
                                        bool *succeeded) const MOZ_OVERRIDE;
@@ -459,19 +459,19 @@ class XrayWrapper : public Base {
   private:
     template <bool HasPrototype>
     typename mozilla::EnableIf<HasPrototype, bool>::Type
-        getPrototypeOfHelper(JSContext* cx, JS::HandleObject wrapper,
+        getPrototypeOfHelper(JSContext *cx, JS::HandleObject wrapper,
                              JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return Traits::singleton.getPrototypeOf(cx, wrapper, target, protop);
     }
     template <bool HasPrototype>
     typename mozilla::EnableIf<!HasPrototype, bool>::Type
-        getPrototypeOfHelper(JSContext* cx, JS::HandleObject wrapper,
+        getPrototypeOfHelper(JSContext *cx, JS::HandleObject wrapper,
                              JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return Base::getPrototypeOf(cx, wrapper, protop);
     }
-    bool getPrototypeOfHelper(JSContext* cx, JS::HandleObject wrapper,
+    bool getPrototypeOfHelper(JSContext *cx, JS::HandleObject wrapper,
                               JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return getPrototypeOfHelper<Traits::HasPrototype>(cx, wrapper, target,

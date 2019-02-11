@@ -736,7 +736,7 @@ namespace js {
  * instead. See the comment on JSObject::getTaggedProto().
  */
 inline bool
-GetPrototype(JSContext* cx, HandleObject obj, MutableHandleObject protop);
+GetPrototype(JSContext *cx, HandleObject obj, MutableHandleObject protop);
 
 /*
  * ES6 [[SetPrototypeOf]]. Change obj's prototype to proto.
@@ -746,7 +746,7 @@ GetPrototype(JSContext* cx, HandleObject obj, MutableHandleObject protop);
  * true, because no exception is thrown for this; but *succeeded will be false.
  */
 extern bool
-SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, bool* succeeded);
+SetPrototype(JSContext *cx, HandleObject obj, HandleObject proto, bool *succeeded);
 
 /*
  * ES6 [[IsExtensible]]. Extensible objects can have new properties defined on

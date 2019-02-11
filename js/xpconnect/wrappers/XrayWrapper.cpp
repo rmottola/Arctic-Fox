@@ -1615,7 +1615,7 @@ DOMXrayTraits::construct(JSContext* cx, HandleObject wrapper,
 }
 
 bool
-DOMXrayTraits::getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+DOMXrayTraits::getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                               JS::HandleObject target,
                               JS::MutableHandleObject protop)
 {
@@ -2125,7 +2125,7 @@ XrayWrapper<Base, Traits>::defaultValue(JSContext* cx, HandleObject wrapper,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
+XrayWrapper<Base, Traits>::getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
                                           JS::MutableHandleObject protop) const
 {
     // We really only want this override for non-SecurityWrapper-inheriting
@@ -2158,8 +2158,8 @@ XrayWrapper<Base, Traits>::getPrototypeOf(JSContext* cx, JS::HandleObject wrappe
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::setPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
-                                          JS::HandleObject proto, bool* bp) const
+XrayWrapper<Base, Traits>::setPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
+                                          JS::HandleObject proto, bool *bp) const
 {
     // Do this only for non-SecurityWrapper-inheriting |Base|. See the comment
     // in getPrototypeOf().

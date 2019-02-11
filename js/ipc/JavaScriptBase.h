@@ -89,22 +89,22 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
     bool RecvHasInstance(const uint64_t& objId, const JSVariant& v, ReturnStatus* rs, bool* bp) {
         return Answer::RecvHasInstance(ObjectId::deserialize(objId), v, rs, bp);
     }
-    bool RecvObjectClassIs(const uint64_t& objId, const uint32_t& classValue,
-                             bool* result) {
+    bool RecvObjectClassIs(const uint64_t &objId, const uint32_t &classValue,
+                             bool *result) {
         return Answer::RecvObjectClassIs(ObjectId::deserialize(objId), classValue, result);
     }
-    bool RecvClassName(const uint64_t& objId, nsString* result) {
+    bool RecvClassName(const uint64_t &objId, nsString *result) {
         return Answer::RecvClassName(ObjectId::deserialize(objId), result);
     }
-    bool RecvGetPrototypeOf(const uint64_t& objId, ReturnStatus* rs, ObjectOrNullVariant* result) {
+    bool RecvGetPrototypeOf(const uint64_t &objId, ReturnStatus *rs, ObjectOrNullVariant *result) {
         return Answer::RecvGetPrototypeOf(ObjectId::deserialize(objId), rs, result);
     }
-    bool RecvRegExpToShared(const uint64_t& objId, ReturnStatus* rs, nsString* source, uint32_t* flags) {
+    bool RecvRegExpToShared(const uint64_t &objId, ReturnStatus *rs, nsString *source, uint32_t *flags) {
         return Answer::RecvRegExpToShared(ObjectId::deserialize(objId), rs, source, flags);
     }
 
-    bool RecvGetPropertyKeys(const uint64_t& objId, const uint32_t& flags,
-                             ReturnStatus* rs, nsTArray<JSIDVariant>* ids) {
+    bool RecvGetPropertyKeys(const uint64_t &objId, const uint32_t &flags,
+                             ReturnStatus *rs, nsTArray<JSIDVariant> *ids) {
         return Answer::RecvGetPropertyKeys(ObjectId::deserialize(objId), flags, rs, ids);
     }
     bool RecvInstanceOf(const uint64_t& objId, const JSIID& iid,
@@ -183,20 +183,20 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
                            bool* result) {
         return Base::SendObjectClassIs(objId.serialize(), classValue, result);
     }
-    bool SendClassName(const ObjectId& objId, nsString* result) {
+    bool SendClassName(const ObjectId &objId, nsString *result) {
         return Base::SendClassName(objId.serialize(), result);
     }
-    bool SendGetPrototypeOf(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result) {
+    bool SendGetPrototypeOf(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result) {
         return Base::SendGetPrototypeOf(objId.serialize(), rs, result);
      }
 
-    bool SendRegExpToShared(const ObjectId& objId, ReturnStatus* rs,
-                            nsString* source, uint32_t* flags) {
+    bool SendRegExpToShared(const ObjectId &objId, ReturnStatus *rs,
+                            nsString *source, uint32_t *flags) {
         return Base::SendRegExpToShared(objId.serialize(), rs, source, flags);
     }
 
-    bool SendGetPropertyKeys(const ObjectId& objId, const uint32_t& flags,
-                             ReturnStatus* rs, nsTArray<JSIDVariant>* ids) {
+    bool SendGetPropertyKeys(const ObjectId &objId, const uint32_t &flags,
+                             ReturnStatus *rs, nsTArray<JSIDVariant> *ids) {
         return Base::SendGetPropertyKeys(objId.serialize(), flags, rs, ids);
     }
     bool SendInstanceOf(const ObjectId& objId, const JSIID& iid,

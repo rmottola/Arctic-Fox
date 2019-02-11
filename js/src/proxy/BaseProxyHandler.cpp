@@ -338,13 +338,13 @@ BaseProxyHandler::weakmapKeyDelegate(JSObject* proxy) const
 }
 
 bool
-BaseProxyHandler::getPrototypeOf(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const
+BaseProxyHandler::getPrototypeOf(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const
 {
     MOZ_CRASH("Must override getPrototypeOf with lazy prototype.");
 }
 
 bool
-BaseProxyHandler::setPrototypeOf(JSContext* cx, HandleObject, HandleObject, bool*) const
+BaseProxyHandler::setPrototypeOf(JSContext *cx, HandleObject, HandleObject, bool *) const
 {
     // Disallow sets of protos on proxies with lazy protos, but no hook.
     // This keeps us away from the footgun of having the first proto set opt
@@ -355,7 +355,7 @@ BaseProxyHandler::setPrototypeOf(JSContext* cx, HandleObject, HandleObject, bool
 }
 
 bool
-BaseProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded) const
+BaseProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const
 {
     *succeeded = false;
     return true;

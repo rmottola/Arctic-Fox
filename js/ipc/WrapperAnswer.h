@@ -47,13 +47,13 @@ class WrapperAnswer : public virtual JavaScriptShared
                              const bool& construct, ReturnStatus* rs, JSVariant* result,
                              nsTArray<JSParam>* outparams);
     bool RecvHasInstance(const ObjectId& objId, const JSVariant& v, ReturnStatus* rs, bool* bp);
-    bool RecvObjectClassIs(const ObjectId& objId, const uint32_t& classValue,
-                           bool* result);
-    bool RecvClassName(const ObjectId& objId, nsString* result);
-    bool RecvGetPrototypeOf(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result);
-    bool RecvRegExpToShared(const ObjectId& objId, ReturnStatus* rs, nsString* source, uint32_t* flags);
+    bool RecvObjectClassIs(const ObjectId &objId, const uint32_t &classValue,
+                           bool *result);
+    bool RecvClassName(const ObjectId &objId, nsString *result);
+    bool RecvGetPrototypeOf(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result);
+    bool RecvRegExpToShared(const ObjectId &objId, ReturnStatus *rs, nsString *source, uint32_t *flags);
 
-    bool RecvGetPropertyKeys(const ObjectId& objId, const uint32_t& flags,
+    bool RecvGetPropertyKeys(const ObjectId &objId, const uint32_t &flags,
                              ReturnStatus* rs, nsTArray<JSIDVariant>* ids);
     bool RecvInstanceOf(const ObjectId& objId, const JSIID& iid,
                         ReturnStatus* rs, bool* instanceof);

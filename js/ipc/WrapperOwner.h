@@ -51,14 +51,14 @@ class WrapperOwner : public virtual JavaScriptShared
     bool getPropertyDescriptor(JSContext* cx, JS::HandleObject proxy, JS::HandleId id,
                                JS::MutableHandle<JSPropertyDescriptor> desc);
     bool hasOwn(JSContext* cx, JS::HandleObject proxy, JS::HandleId id, bool* bp);
-    bool getOwnEnumerablePropertyKeys(JSContext* cx, JS::HandleObject proxy,
-                                      JS::AutoIdVector& props);
-    bool hasInstance(JSContext* cx, JS::HandleObject proxy, JS::MutableHandleValue v, bool* bp);
-    bool objectClassIs(JSContext* cx, JS::HandleObject obj, js::ESClassValue classValue);
-    const char* className(JSContext* cx, JS::HandleObject proxy);
-    bool getPrototypeOf(JSContext* cx, JS::HandleObject proxy, JS::MutableHandleObject protop);
+    bool getOwnEnumerablePropertyKeys(JSContext *cx, JS::HandleObject proxy,
+                                      JS::AutoIdVector &props);
+    bool hasInstance(JSContext *cx, JS::HandleObject proxy, JS::MutableHandleValue v, bool *bp);
+    bool objectClassIs(JSContext *cx, JS::HandleObject obj, js::ESClassValue classValue);
+    const char* className(JSContext *cx, JS::HandleObject proxy);
+    bool getPrototypeOf(JSContext *cx, JS::HandleObject proxy, JS::MutableHandleObject protop);
 
-    bool regexp_toShared(JSContext* cx, JS::HandleObject proxy, js::RegExpGuard* g);
+    bool regexp_toShared(JSContext *cx, JS::HandleObject proxy, js::RegExpGuard *g);
 
     nsresult instanceOf(JSObject* obj, const nsID* id, bool* bp);
 
@@ -136,14 +136,14 @@ class WrapperOwner : public virtual JavaScriptShared
     virtual bool SendCallOrConstruct(const ObjectId& objId, const nsTArray<JSParam>& argv,
                                      const bool& construct, ReturnStatus* rs, JSVariant* result,
                                      nsTArray<JSParam>* outparams) = 0;
-    virtual bool SendHasInstance(const ObjectId& objId, const JSVariant& v,
-                                 ReturnStatus* rs, bool* bp) = 0;
-    virtual bool SendObjectClassIs(const ObjectId& objId, const uint32_t& classValue,
-                                   bool* result) = 0;
-    virtual bool SendClassName(const ObjectId& objId, nsString* result) = 0;
-    virtual bool SendGetPrototypeOf(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result) = 0;
-    virtual bool SendRegExpToShared(const ObjectId& objId, ReturnStatus* rs, nsString* source,
-                                    uint32_t* flags) = 0;
+    virtual bool SendHasInstance(const ObjectId &objId, const JSVariant &v,
+                                 ReturnStatus *rs, bool *bp) = 0;
+    virtual bool SendObjectClassIs(const ObjectId &objId, const uint32_t &classValue,
+                                   bool *result) = 0;
+    virtual bool SendClassName(const ObjectId &objId, nsString *result) = 0;
+    virtual bool SendGetPrototypeOf(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result) = 0;
+    virtual bool SendRegExpToShared(const ObjectId &objId, ReturnStatus *rs, nsString *source,
+                                    uint32_t *flags) = 0;
 
     virtual bool SendGetPropertyKeys(const ObjectId& objId, const uint32_t& flags,
                                      ReturnStatus* rs, nsTArray<JSIDVariant>* ids) = 0;

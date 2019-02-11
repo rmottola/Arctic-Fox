@@ -266,7 +266,7 @@ ArrayToIdVector(JSContext* cx, HandleObject proxy, HandleObject target, HandleVa
 // ES6 implements both getPrototypeOf and setPrototypeOf traps. We don't have them yet (see bug
 // 888969). For now, use these, to account for proxy revocation.
 bool
-ScriptedDirectProxyHandler::getPrototypeOf(JSContext* cx, HandleObject proxy,
+ScriptedDirectProxyHandler::getPrototypeOf(JSContext *cx, HandleObject proxy,
                                            MutableHandleObject protop) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -280,8 +280,8 @@ ScriptedDirectProxyHandler::getPrototypeOf(JSContext* cx, HandleObject proxy,
 }
 
 bool
-ScriptedDirectProxyHandler::setPrototypeOf(JSContext* cx, HandleObject proxy,
-                                           HandleObject proto, bool* bp) const
+ScriptedDirectProxyHandler::setPrototypeOf(JSContext *cx, HandleObject proxy,
+                                           HandleObject proto, bool *bp) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     if (!target) {
@@ -295,8 +295,8 @@ ScriptedDirectProxyHandler::setPrototypeOf(JSContext* cx, HandleObject proxy,
 // Not yet part of ES6, but hopefully to be standards-tracked -- and needed to
 // handle revoked proxies in any event.
 bool
-ScriptedDirectProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy,
-                                                  bool* succeeded) const
+ScriptedDirectProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy,
+                                                  bool *succeeded) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     if (!target) {
@@ -409,7 +409,7 @@ ScriptedDirectProxyHandler::isExtensible(JSContext* cx, HandleObject proxy, bool
 // Corresponds to the "standard" property descriptor getOwn getPrototypeOf dance. It's so explicit
 // here because ScriptedDirectProxyHandler allows script visibility for this operation.
 bool
-ScriptedDirectProxyHandler::getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+ScriptedDirectProxyHandler::getPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                                   MutableHandle<PropertyDescriptor> desc) const
 {
     JS_CHECK_RECURSION(cx, return false);

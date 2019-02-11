@@ -104,8 +104,8 @@ EmptyDesc(PPropertyDescriptor* desc)
 }
 
 bool
-WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& idVar,
-                                         ReturnStatus* rs, PPropertyDescriptor* out)
+WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant &idVar,
+                                         ReturnStatus *rs, PPropertyDescriptor *out)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -542,7 +542,7 @@ WrapperAnswer::RecvClassName(const ObjectId& objId, nsString* name)
 }
 
 bool
-WrapperAnswer::RecvGetPrototypeOf(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result)
+WrapperAnswer::RecvGetPrototypeOf(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result)
 {
     *result = NullVariant();
 

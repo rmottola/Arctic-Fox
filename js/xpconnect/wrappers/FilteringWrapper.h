@@ -50,11 +50,11 @@ class FilteringWrapper : public Base {
     virtual bool nativeCall(JSContext* cx, JS::IsAcceptableThis test, JS::NativeImpl impl,
                             const JS::CallArgs& args) const override;
 
-    virtual bool defaultValue(JSContext* cx, JS::Handle<JSObject*> obj, JSType hint,
-                              JS::MutableHandleValue vp) const override;
+    virtual bool defaultValue(JSContext *cx, JS::Handle<JSObject*> obj, JSType hint,
+                              JS::MutableHandleValue vp) const MOZ_OVERRIDE;
 
-    virtual bool getPrototypeOf(JSContext* cx, JS::HandleObject wrapper,
-                                JS::MutableHandleObject protop) const override;
+    virtual bool getPrototypeOf(JSContext *cx, JS::HandleObject wrapper,
+                                JS::MutableHandleObject protop) const MOZ_OVERRIDE;
 
     static const FilteringWrapper singleton;
 };

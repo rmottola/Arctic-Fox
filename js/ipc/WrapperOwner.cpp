@@ -119,12 +119,12 @@ class CPOWProxyHandler : public BaseProxyHandler
     virtual bool objectClassIs(HandleObject obj, js::ESClassValue classValue,
                                JSContext* cx) const MOZ_OVERRIDE;
     virtual const char* className(JSContext* cx, HandleObject proxy) const MOZ_OVERRIDE;
-    virtual bool regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const MOZ_OVERRIDE;
-    virtual void finalize(JSFreeOp* fop, JSObject* proxy) const MOZ_OVERRIDE;
-    virtual void objectMoved(JSObject* proxy, const JSObject* old) const MOZ_OVERRIDE;
-    virtual bool isCallable(JSObject* obj) const MOZ_OVERRIDE;
-    virtual bool isConstructor(JSObject* obj) const MOZ_OVERRIDE;
-    virtual bool getPrototypeOf(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const MOZ_OVERRIDE;
+    virtual bool regexp_toShared(JSContext *cx, HandleObject proxy, RegExpGuard *g) const MOZ_OVERRIDE;
+    virtual void finalize(JSFreeOp *fop, JSObject *proxy) const MOZ_OVERRIDE;
+    virtual void objectMoved(JSObject *proxy, const JSObject *old) const MOZ_OVERRIDE;
+    virtual bool isCallable(JSObject *obj) const MOZ_OVERRIDE;
+    virtual bool isConstructor(JSObject *obj) const MOZ_OVERRIDE;
+    virtual bool getPrototypeOf(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const MOZ_OVERRIDE;
 
     static const char family;
     static const CPOWProxyHandler singleton;
@@ -687,13 +687,13 @@ WrapperOwner::className(JSContext* cx, HandleObject proxy)
 }
 
 bool
-CPOWProxyHandler::getPrototypeOf(JSContext* cx, HandleObject proxy, MutableHandleObject objp) const
+CPOWProxyHandler::getPrototypeOf(JSContext *cx, HandleObject proxy, MutableHandleObject objp) const
 {
     FORWARD(getPrototypeOf, (cx, proxy, objp));
 }
 
 bool
-WrapperOwner::getPrototypeOf(JSContext* cx, HandleObject proxy, MutableHandleObject objp)
+WrapperOwner::getPrototypeOf(JSContext *cx, HandleObject proxy, MutableHandleObject objp)
 {
     ObjectId objId = idOf(proxy);
 

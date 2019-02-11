@@ -116,7 +116,7 @@ class JS_FRIEND_API(CrossCompartmentWrapper) : public Wrapper
     /* Standard internal methods. */
     virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const MOZ_OVERRIDE;
-    virtual bool defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+    virtual bool defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                                 MutableHandle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const MOZ_OVERRIDE;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject wrapper,
@@ -197,7 +197,7 @@ class JS_FRIEND_API(SecurityWrapper) : public Base
     virtual bool nativeCall(JSContext *cx, IsAcceptableThis test, NativeImpl impl,
                             const CallArgs &args) const MOZ_OVERRIDE;
     virtual bool objectClassIs(HandleObject obj, ESClassValue classValue,
-                               JSContext* cx) const MOZ_OVERRIDE;
+                               JSContext *cx) const MOZ_OVERRIDE;
     virtual bool regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const MOZ_OVERRIDE;
     virtual bool boxedValue_unbox(JSContext* cx, HandleObject proxy, MutableHandleValue vp) const MOZ_OVERRIDE;
     virtual bool defaultValue(JSContext* cx, HandleObject wrapper, JSType hint,

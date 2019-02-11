@@ -3030,7 +3030,7 @@ JSObject::reportNotExtensible(JSContext* cx, unsigned report)
 /*** ES6 standard internal methods ***************************************************************/
 
 bool
-js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, bool* succeeded)
+js::SetPrototype(JSContext *cx, HandleObject obj, HandleObject proto, bool *succeeded)
 {
     /*
      * If |obj| has a "lazy" [[Prototype]], it is 1) a proxy 2) whose handler's
