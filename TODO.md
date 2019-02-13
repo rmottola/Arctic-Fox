@@ -81,10 +81,9 @@
 - Bug 1112164 1 to 19
 - Bug 1133746. Allow DOMProxyShadows to communicate to the JIT whether
 - Bug 963921 - Clients of the JS API should use JS_DefineElement where
-- Bug 1113369 5 to 7
 - Bug 1037687, load iframes in shadow DOM
 - Bug 1129223 - Remove local mozAfterRemotePaint events
-- Bug 940273 1 of 7
+- Bug 940273 3 of 7
 - Bug 945584 1 of 9 Scroll snapping
 
 
