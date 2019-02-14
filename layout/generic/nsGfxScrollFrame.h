@@ -220,7 +220,8 @@ public:
    */
   void ScrollBy(nsIntPoint aDelta, nsIScrollableFrame::ScrollUnit aUnit,
                 nsIScrollableFrame::ScrollMode aMode, nsIntPoint* aOverflow,
-                nsIAtom* aOrigin = nullptr, bool aIsMomentum = false);
+                nsIAtom* aOrigin = nullptr,
+                nsIScrollableFrame::ScrollMomentum aMomentum = nsIScrollableFrame::NOT_MOMENTUM);
   /**
    * @note This method might destroy the frame, pres shell and other objects.
    */
@@ -462,6 +463,10 @@ public:
   // SetResolutionAndScaleTo or restored via RestoreState.
   bool mIsResolutionSet:1;
 
+  // True if the events synthesized by OSX to produce momentum scrolling should
+  // be ignored.  Reset when the next real, non-synthesized scroll event occurs.
+  bool mIgnoreMomentumScroll:1;
+
   // True if the frame's resolution has been set via SetResolutionAndScaleTo.
   // Only meaningful for root scroll frames.
   bool mScaleToResolution:1;
@@ -687,8 +692,9 @@ public:
    */
   virtual void ScrollBy(nsIntPoint aDelta, ScrollUnit aUnit, ScrollMode aMode,
                         nsIntPoint* aOverflow, nsIAtom* aOrigin = nullptr,
-                        bool aIsMomentum = false) override {
-    mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aIsMomentum);
+                        nsIScrollableFrame::ScrollMomentum aMomentum = nsIScrollableFrame::NOT_MOMENTUM)
+                        MOZ_OVERRIDE {
+    mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aMomentum);
   }
   /**
    * @note This method might destroy the frame, pres shell and other objects.
@@ -1048,8 +1054,9 @@ public:
    */
   virtual void ScrollBy(nsIntPoint aDelta, ScrollUnit aUnit, ScrollMode aMode,
                         nsIntPoint* aOverflow, nsIAtom* aOrigin = nullptr,
-                        bool aIsMomentum = false) override {
-    mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aIsMomentum);
+                        nsIScrollableFrame::ScrollMomentum aMomentum = nsIScrollableFrame::NOT_MOMENTUM)
+                        MOZ_OVERRIDE {
+    mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aMomentum);
   }
   /**
    * @note This method might destroy the frame, pres shell and other objects.

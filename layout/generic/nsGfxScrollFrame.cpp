@@ -1910,6 +1910,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mShouldBuildScrollableLayer(false)
   , mHasBeenScrolled(false)
   , mIsResolutionSet(false)
+  , mIgnoreMomentumScroll(false)
   , mScaleToResolution(false)
 {
   if (LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars) != 0) {
@@ -2104,6 +2105,7 @@ ScrollFrameHelper::ScrollToWithOrigin(nsPoint aScrollPosition,
 
   if (gfxPrefs::ScrollBehaviorEnabled()) {
     if (aMode == nsIScrollableFrame::SMOOTH_MSD) {
+      mIgnoreMomentumScroll = true;
       if (!mAsyncSmoothMSDScroll) {
         if (mAsyncScroll) {
           if (mAsyncScroll->mIsSmoothScroll) {
@@ -3345,18 +3347,25 @@ CalcRangeForScrollBy(int32_t aDelta, nscoord aPos,
 
 void
 ScrollFrameHelper::ScrollBy(nsIntPoint aDelta,
-                                nsIScrollableFrame::ScrollUnit aUnit,
-                                nsIScrollableFrame::ScrollMode aMode,
-                                nsIntPoint* aOverflow,
-                                nsIAtom *aOrigin,
-                                bool aIsMomentum)
+                            nsIScrollableFrame::ScrollUnit aUnit,
+                            nsIScrollableFrame::ScrollMode aMode,
+                            nsIntPoint* aOverflow,
+                            nsIAtom *aOrigin,
+                            nsIScrollableFrame::ScrollMomentum aMomentum)
 {
   // When a smooth scroll is being processed on a frame, mouse wheel and trackpad
   // momentum scroll event updates must notcancel the SMOOTH or SMOOTH_MSD
   // scroll animations, enabling Javascript that depends on them to be responsive
   // without forcing the user to wait for the fling animations to completely stop.
-  if (aIsMomentum && IsProcessingAsyncScroll()) {
-    return;
+  switch (aMomentum) {
+  case nsIScrollableFrame::NOT_MOMENTUM:
+    mIgnoreMomentumScroll = false;
+    break;
+  case nsIScrollableFrame::SYNTHESIZED_MOMENTUM_EVENT:
+    if (mIgnoreMomentumScroll) {
+      return;
+    }
+    break;
   }
 
   if (mAsyncSmoothMSDScroll != nullptr) {
