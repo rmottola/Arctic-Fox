@@ -40,51 +40,51 @@ protected:
   virtual ~BackgroundChildImpl();
 
   virtual void
-  ProcessingError(Result aCode, const char* aReason) override;
+  ProcessingError(Result aCode, const char* aReason) MOZ_OVERRIDE;
 
   virtual void
-  ActorDestroy(ActorDestroyReason aWhy) override;
+  ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
 
   virtual PBackgroundTestChild*
-  AllocPBackgroundTestChild(const nsCString& aTestArg) override;
+  AllocPBackgroundTestChild(const nsCString& aTestArg) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBackgroundTestChild(PBackgroundTestChild* aActor) override;
+  DeallocPBackgroundTestChild(PBackgroundTestChild* aActor) MOZ_OVERRIDE;
 
   virtual PBackgroundIDBFactoryChild*
-  AllocPBackgroundIDBFactoryChild(const LoggingInfo& aLoggingInfo) override;
+  AllocPBackgroundIDBFactoryChild(const LoggingInfo& aLoggingInfo) MOZ_OVERRIDE;
 
   virtual bool
   DeallocPBackgroundIDBFactoryChild(PBackgroundIDBFactoryChild* aActor)
-                                    override;
+                                    MOZ_OVERRIDE;
 
   virtual PBlobChild*
-  AllocPBlobChild(const BlobConstructorParams& aParams) override;
+  AllocPBlobChild(const BlobConstructorParams& aParams) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBlobChild(PBlobChild* aActor) override;
+  DeallocPBlobChild(PBlobChild* aActor) MOZ_OVERRIDE;
 
   virtual PFileDescriptorSetChild*
   AllocPFileDescriptorSetChild(const FileDescriptor& aFileDescriptor)
-                               override;
+                               MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPFileDescriptorSetChild(PFileDescriptorSetChild* aActor) override;
+  DeallocPFileDescriptorSetChild(PFileDescriptorSetChild* aActor) MOZ_OVERRIDE;
 
   virtual PVsyncChild*
-  AllocPVsyncChild() override;
+  AllocPVsyncChild() MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPVsyncChild(PVsyncChild* aActor) override;
+  DeallocPVsyncChild(PVsyncChild* aActor) MOZ_OVERRIDE;
 
   virtual PBroadcastChannelChild*
   AllocPBroadcastChannelChild(const PrincipalInfo& aPrincipalInfo,
                               const nsString& aOrigin,
                               const nsString& aChannel,
-                              const bool& aPrivateBrowsing) override;
+                              const bool& aPrivateBrowsing) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBroadcastChannelChild(PBroadcastChannelChild* aActor) override;
+  DeallocPBroadcastChannelChild(PBroadcastChannelChild* aActor) MOZ_OVERRIDE;
 };
 
 class BackgroundChildImpl::ThreadLocal final

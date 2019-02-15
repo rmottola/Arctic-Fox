@@ -25,77 +25,77 @@ protected:
   virtual ~BackgroundParentImpl();
 
   virtual void
-  ActorDestroy(ActorDestroyReason aWhy) override;
+  ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
 
   virtual PBackgroundTestParent*
-  AllocPBackgroundTestParent(const nsCString& aTestArg) override;
+  AllocPBackgroundTestParent(const nsCString& aTestArg) MOZ_OVERRIDE;
 
   virtual bool
   RecvPBackgroundTestConstructor(PBackgroundTestParent* aActor,
-                                 const nsCString& aTestArg) override;
+                                 const nsCString& aTestArg) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBackgroundTestParent(PBackgroundTestParent* aActor) override;
+  DeallocPBackgroundTestParent(PBackgroundTestParent* aActor) MOZ_OVERRIDE;
 
   virtual PBackgroundIDBFactoryParent*
   AllocPBackgroundIDBFactoryParent(const LoggingInfo& aLoggingInfo)
-                                   override;
+                                   MOZ_OVERRIDE;
 
   virtual bool
   RecvPBackgroundIDBFactoryConstructor(PBackgroundIDBFactoryParent* aActor,
                                        const LoggingInfo& aLoggingInfo)
-                                       override;
+                                       MOZ_OVERRIDE;
 
   virtual bool
   DeallocPBackgroundIDBFactoryParent(PBackgroundIDBFactoryParent* aActor)
-                                     override;
+                                     MOZ_OVERRIDE;
 
   virtual PBlobParent*
-  AllocPBlobParent(const BlobConstructorParams& aParams) override;
+  AllocPBlobParent(const BlobConstructorParams& aParams) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBlobParent(PBlobParent* aActor) override;
+  DeallocPBlobParent(PBlobParent* aActor) MOZ_OVERRIDE;
 
   virtual PFileDescriptorSetParent*
   AllocPFileDescriptorSetParent(const FileDescriptor& aFileDescriptor)
-                                override;
+                                MOZ_OVERRIDE;
 
   virtual bool
   DeallocPFileDescriptorSetParent(PFileDescriptorSetParent* aActor)
-                                  override;
+                                  MOZ_OVERRIDE;
 
   virtual PVsyncParent*
-  AllocPVsyncParent() override;
+  AllocPVsyncParent() MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPVsyncParent(PVsyncParent* aActor) override;
+  DeallocPVsyncParent(PVsyncParent* aActor) MOZ_OVERRIDE;
 
   virtual PBroadcastChannelParent*
   AllocPBroadcastChannelParent(const PrincipalInfo& aPrincipalInfo,
                                const nsString& aOrigin,
                                const nsString& aChannel,
-                               const bool& aPrivateBrowsing) override;
+                               const bool& aPrivateBrowsing) MOZ_OVERRIDE;
 
   virtual bool
   RecvPBroadcastChannelConstructor(PBroadcastChannelParent* actor,
                                    const PrincipalInfo& aPrincipalInfo,
                                    const nsString& origin,
                                    const nsString& channel,
-                                   const bool& aPrivateBrowsing) override;
+                                   const bool& aPrivateBrowsing) MOZ_OVERRIDE;
 
   virtual bool
-  DeallocPBroadcastChannelParent(PBroadcastChannelParent* aActor) override;
+  DeallocPBroadcastChannelParent(PBroadcastChannelParent* aActor) MOZ_OVERRIDE;
 
   virtual bool
   RecvRegisterServiceWorker(const ServiceWorkerRegistrationData& aData)
-                            override;
+                            MOZ_OVERRIDE;
 
   virtual bool
   RecvUnregisterServiceWorker(const PrincipalInfo& aPrincipalInfo,
-                              const nsString& aScope) override;
+                              const nsString& aScope) MOZ_OVERRIDE;
 
   virtual bool
-  RecvShutdownServiceWorkerRegistrar() override;
+  RecvShutdownServiceWorkerRegistrar() MOZ_OVERRIDE;
 };
 
 } // namespace ipc
