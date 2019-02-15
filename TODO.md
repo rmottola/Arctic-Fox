@@ -86,10 +86,11 @@
 - Bug 940273 3 of 7
 - Bug 1139153 - Rip out the unneeded layout.async-containerless-scrolli
 - Bug 1102427 - Ensure scroll parents of an active scrollframe are laye
+- Bug 1356843 - Fix -Wcomma warnings in dom/base/ and dom/xml/.
 - Bug 945584 6 of 9 Scroll snapping
 - Bug 1125750 - Check the overflow region direction to avoid unnecesary reflow for scrollable frame
-- all 21 patches of 1134280
-
+- all 20 patches of 1134280
+- Bug 1137714 - Make roleDescription nicer/correct/faster
 
 
 ### Further ToDo which would help portability:
