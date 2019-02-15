@@ -1912,6 +1912,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mIsResolutionSet(false)
   , mIgnoreMomentumScroll(false)
   , mScaleToResolution(false)
+  , mTransformingByAPZ(false)
 {
   if (LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars) != 0) {
     mScrollbarActivity = new ScrollbarActivity(do_QueryFrame(aOuter));
