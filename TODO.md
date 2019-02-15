@@ -84,7 +84,12 @@
 - Bug 1037687, load iframes in shadow DOM
 - Bug 1129223 - Remove local mozAfterRemotePaint events
 - Bug 940273 3 of 7
-- Bug 945584 1 of 9 Scroll snapping
+- Bug 1139153 - Rip out the unneeded layout.async-containerless-scrolli
+- Bug 1102427 - Ensure scroll parents of an active scrollframe are laye
+- Bug 945584 6 of 9 Scroll snapping
+- Bug 1125750 - Check the overflow region direction to avoid unnecesary reflow for scrollable frame
+- all 21 patches of 1134280
+
 
 
 ### Further ToDo which would help portability:
