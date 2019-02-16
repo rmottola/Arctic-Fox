@@ -818,7 +818,7 @@ static bool HasSourceChildren(nsIContent* aElement)
   for (nsIContent* child = aElement->GetFirstChild();
        child;
        child = child->GetNextSibling()) {
-    if (child->IsHTML(nsGkAtoms::source))
+    if (child->IsHTMLElement(nsGkAtoms::source))
     {
       return true;
     }
@@ -4151,7 +4151,7 @@ nsIContent* HTMLMediaElement::GetNextSource()
     nsIContent* child = GetChildAt(startOffset);
 
     // If child is a <source> element, it is the next candidate.
-    if (child && child->IsHTML(nsGkAtoms::source)) {
+    if (child && child->IsHTMLElement(nsGkAtoms::source)) {
       mSourceLoadCandidate = child;
       return child;
     }

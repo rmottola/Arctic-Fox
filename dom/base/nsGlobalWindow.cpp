@@ -10083,7 +10083,7 @@ nsGlobalWindow::SetChromeEventHandler(EventTarget* aChromeEventHandler)
 
 static bool IsLink(nsIContent* aContent)
 {
-  return aContent && (aContent->IsHTML(nsGkAtoms::a) ||
+  return aContent && (aContent->IsHTMLElement(nsGkAtoms::a) ||
                       aContent->AttrValueIs(kNameSpaceID_XLink, nsGkAtoms::type,
                                             nsGkAtoms::simple, eCaseMatters));
 }

@@ -594,7 +594,7 @@ nsSubDocumentFrame::GetIntrinsicISize()
     return 0;  // HTML <frame> has no useful intrinsic width
   }
 
-  if (mContent->IsXUL()) {
+  if (mContent->IsXULElement()) {
     return 0;  // XUL <iframe> and <browser> have no useful intrinsic width
   }
 
@@ -612,7 +612,7 @@ nsSubDocumentFrame::GetIntrinsicBSize()
   // <frame> processing does not use this routine, only <iframe>
   NS_ASSERTION(IsInline(), "Shouldn't have been called");
 
-  if (mContent->IsXUL()) {
+  if (mContent->IsXULElement()) {
     return 0;
   }
 

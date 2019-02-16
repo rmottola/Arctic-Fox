@@ -306,7 +306,7 @@ nsIContent::GetBaseURI(bool aTryUseXHRDocBaseURI) const
   const nsIContent *elem = this;
   do {
     // First check for SVG specialness (why is this SVG specific?)
-    if (elem->IsSVG()) {
+    if (elem->IsSVGElement()) {
       nsIContent* bindingParent = elem->GetBindingParent();
       if (bindingParent) {
         nsXBLBinding* binding = bindingParent->GetXBLBinding();
@@ -1343,7 +1343,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FragmentOrElement)
   // which is dispatched in UnbindFromTree.
 
   if (tmp->HasProperties()) {
-    if (tmp->IsHTML() || tmp->IsSVG()) {
+    if (tmp->IsHTMLElement() || tmp->IsSVGElement()) {
       nsIAtom*** props = Element::HTMLSVGPropertiesToTraverseAndUnlink();
       for (uint32_t i = 0; props[i]; ++i) {
         tmp->DeleteProperty(*props[i]);
@@ -1385,7 +1385,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FragmentOrElement)
   {
     nsDOMSlots *slots = tmp->GetExistingDOMSlots();
     if (slots) {
-      slots->Unlink(tmp->IsXUL());
+      slots->Unlink(tmp->IsXULElement());
     }
   }
 
@@ -1895,7 +1895,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(FragmentOrElement)
   tmp->OwnerDoc()->BindingManager()->Traverse(tmp, cb);
 
   if (tmp->HasProperties()) {
-    if (tmp->IsHTML() || tmp->IsSVG()) {
+    if (tmp->IsHTMLElement() || tmp->IsSVGElement()) {
       nsIAtom*** props = Element::HTMLSVGPropertiesToTraverseAndUnlink();
       for (uint32_t i = 0; props[i]; ++i) {
         nsISupports* property =
@@ -1930,7 +1930,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(FragmentOrElement)
   {
     nsDOMSlots *slots = tmp->GetExistingDOMSlots();
     if (slots) {
-      slots->Traverse(cb, tmp->IsXUL());
+      slots->Traverse(cb, tmp->IsXULElement());
     }
   }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
@@ -2429,7 +2429,8 @@ StartElement(Element* aContent, StringBuilder& aBuilder)
   int32_t tagNS = aContent->GetNameSpaceID();
 
   aBuilder.Append("<");
-  if (aContent->IsHTML() || aContent->IsSVG() || aContent->IsMathML()) {
+  if (aContent->IsHTMLElement() || aContent->IsSVGElement() ||
+      aContent->IsMathMLElement()) {
     aBuilder.Append(localName);
   } else {
     aBuilder.Append(aContent->NodeName());
@@ -2494,7 +2495,7 @@ StartElement(Element* aContent, StringBuilder& aBuilder)
   // pre/textarea/listing is a textnode and starts with a \n.
   // But because browsers haven't traditionally had that behavior,
   // we're not changing our behavior either - yet.
-  if (aContent->IsHTML()) {
+  if (aContent->IsHTMLElement()) {
     if (localName == nsGkAtoms::pre || localName == nsGkAtoms::textarea ||
         localName == nsGkAtoms::listing) {
       nsIContent* fc = aContent->GetFirstChild();
@@ -2513,7 +2514,7 @@ StartElement(Element* aContent, StringBuilder& aBuilder)
 static inline bool
 ShouldEscape(nsIContent* aParent)
 {
-  if (!aParent || !aParent->IsHTML()) {
+  if (!aParent || !aParent->IsHTMLElement()) {
     return true;
   }
 
@@ -2582,7 +2583,7 @@ IsVoidTag(nsIAtom* aTag)
 static inline bool
 IsVoidTag(Element* aElement)
 {
-  if (!aElement->IsHTML()) {
+  if (!aElement->IsHTMLElement()) {
     return false;
   }
   return IsVoidTag(aElement->Tag());
@@ -2662,7 +2663,8 @@ Serialize(FragmentOrElement* aRoot, bool aDescendentsOnly, nsAString& aOut)
       if (!isVoid && current->NodeType() == nsIDOMNode::ELEMENT_NODE) {
         builder.Append("</");
         nsIContent* elem = static_cast<nsIContent*>(current);
-        if (elem->IsHTML() || elem->IsSVG() || elem->IsMathML()) {
+        if (elem->IsHTMLElement() || elem->IsSVGElement() ||
+            elem->IsMathMLElement()) {
           builder.Append(elem->Tag());
         } else {
           builder.Append(current->NodeName());
@@ -2844,7 +2846,7 @@ FragmentOrElement::SetInnerHTMLInternal(const nsAString& aInnerHTML, ErrorResult
     contextNameSpaceID = shadowRoot->GetHost()->GetNameSpaceID();
   }
 
-  if (doc->IsHTML()) {
+  if (doc->IsHTMLDocument()) {
     int32_t oldChildCount = target->GetChildCount();
     aError = nsContentUtils::ParseFragmentHTML(aInnerHTML,
                                                target,

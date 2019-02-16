@@ -210,7 +210,7 @@ TrimOffsets(uint32_t& aStart, uint32_t& aLength,
 static nsIContent*
 GetFirstNonAAncestor(nsIContent* aContent)
 {
-  while (aContent && aContent->IsSVG(nsGkAtoms::a)) {
+  while (aContent && aContent->IsSVGElement(nsGkAtoms::a)) {
     aContent = aContent->GetParent();
   }
   return aContent;
@@ -240,7 +240,7 @@ GetFirstNonAAncestor(nsIContent* aContent)
 static bool
 IsTextContentElement(nsIContent* aContent)
 {
-  if (!aContent->IsSVG()) {
+  if (!aContent->IsSVGElement()) {
     return false;
   }
 
@@ -251,7 +251,7 @@ IsTextContentElement(nsIContent* aContent)
 
   if (aContent->Tag() == nsGkAtoms::textPath) {
     nsIContent* parent = GetFirstNonAAncestor(aContent->GetParent());
-    return parent && parent->IsSVG(nsGkAtoms::text);
+    return parent && parent->IsSVGElement(nsGkAtoms::text);
   }
 
   if (aContent->Tag() == nsGkAtoms::a ||
@@ -2993,7 +2993,7 @@ SVGTextDrawPathCallbacks::StrokeGeometry()
       GeneralPattern strokePattern;
       nsSVGUtils::MakeStrokePatternFor(mFrame, gfx, &strokePattern, /*aContextPaint*/ nullptr);
       if (strokePattern.GetPattern()) {
-        if (!mFrame->GetParent()->GetContent()->IsSVG()) {
+        if (!mFrame->GetParent()->GetContent()->IsSVGElement()) {
           // The cast that follows would be unsafe
           MOZ_ASSERT(false, "Our nsTextFrame's parent's content should be SVG");
           return;
@@ -3223,7 +3223,7 @@ SVGTextFrame::Init(nsIContent*       aContent,
                    nsContainerFrame* aParent,
                    nsIFrame*         aPrevInFlow)
 {
-  NS_ASSERTION(aContent->IsSVG(nsGkAtoms::text), "Content is not an SVG text");
+  NS_ASSERTION(aContent->IsSVGElement(nsGkAtoms::text), "Content is not an SVG text");
 
   SVGTextFrameBase::Init(aContent, aParent, aPrevInFlow);
   AddStateBits((aParent->GetStateBits() & NS_STATE_SVG_CLIPPATH_CHILD) |
@@ -3431,7 +3431,7 @@ SVGTextFrame::MutationObserver::AttributeChanged(
                                                 nsIAtom* aAttribute,
                                                 int32_t aModType)
 {
-  if (!aElement->IsSVG()) {
+  if (!aElement->IsSVGElement()) {
     return;
   }
 
@@ -4855,7 +4855,7 @@ SVGTextFrame::GetTextPathPathElement(nsIFrame* aTextPathFrame)
   }
 
   Element* element = property->GetReferencedElement();
-  return (element && element->IsSVG(nsGkAtoms::path)) ?
+  return (element && element->IsSVGElement(nsGkAtoms::path)) ?
     static_cast<SVGPathElement*>(element) : nullptr;
 }
 
