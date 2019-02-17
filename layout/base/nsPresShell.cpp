@@ -3223,7 +3223,7 @@ PresShell::GoToAnchor(const nsAString& aAnchorName, bool aScroll,
         // Ensure it's an anchor element
         content = do_QueryInterface(node);
         if (content) {
-          if (content->Tag() == nsGkAtoms::a && content->IsHTMLElement()) {
+          if (content->IsHTMLElement(nsGkAtoms::a)) {
             break;
           }
           content = nullptr;
@@ -7530,8 +7530,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
                        "Unexpected document");
           nsIFrame* captureFrame = capturingContent->GetPrimaryFrame();
           if (captureFrame) {
-            if (capturingContent->Tag() == nsGkAtoms::select &&
-                capturingContent->IsHTMLElement()) {
+            if (capturingContent->IsHTMLElement(nsGkAtoms::select)) {
               // a dropdown <select> has a child in its selectPopupList and we should
               // capture on that instead.
               nsIFrame* childFrame = captureFrame->GetChildList(nsIFrame::kSelectPopupList).FirstChild();

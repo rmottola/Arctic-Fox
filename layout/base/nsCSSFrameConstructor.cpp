@@ -2546,7 +2546,7 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
   else
 #endif
   if (aDocElement->IsSVGElement()) {
-    if (aDocElement->Tag() != nsGkAtoms::svg) {
+    if (!aDocElement->IsSVGElement(nsGkAtoms::svg)) {
       return nullptr;
     }
     // We're going to call the right function ourselves, so no need to give a
@@ -2561,8 +2561,9 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
     already_AddRefed<nsStyleContext> extraRef =
       nsRefPtr<nsStyleContext>(styleContext).forget();
     FrameConstructionItem item(&rootSVGData, aDocElement,
-                               aDocElement->Tag(), kNameSpaceID_SVG,
-                               nullptr, extraRef, true, nullptr);
+                               aDocElement->NodeInfo()->NameAtom(),
+                               kNameSpaceID_SVG, nullptr, extraRef, true,
+                               nullptr);
 
     nsFrameItems frameItems;
     contentFrame = static_cast<nsContainerFrame*>(
@@ -2596,8 +2597,9 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
     already_AddRefed<nsStyleContext> extraRef =
       nsRefPtr<nsStyleContext>(styleContext).forget();
     FrameConstructionItem item(&rootTableData, aDocElement,
-                               aDocElement->Tag(), kNameSpaceID_None,
-                               nullptr, extraRef, true, nullptr);
+                               aDocElement->NodeInfo()->NameAtom(),
+                               kNameSpaceID_None, nullptr, extraRef, true,
+                               nullptr);
 
     nsFrameItems frameItems;
     // if the document is a table then just populate it.
@@ -3726,8 +3728,8 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
                "Unexpected FCDATA_FORCED_NON_SCROLLABLE_BLOCK flag");
 
   // Don't create a subdocument frame for iframes if we're creating extra frames
-  if (aState.mCreatingExtraFrames && aItem.mContent->IsHTMLElement() &&
-      aItem.mContent->Tag() == nsGkAtoms::iframe)
+  if (aState.mCreatingExtraFrames &&
+      aItem.mContent->IsHTMLElement(nsGkAtoms::iframe))
   {
     return;
   }
@@ -5500,7 +5502,8 @@ nsCSSFrameConstructor::DoAddFrameConstructionItems(nsFrameConstructorState& aSta
     }
   }
   AddFrameConstructionItemsInternal(aState, aContent, aParentFrame,
-                                    aContent->Tag(), aContent->GetNameSpaceID(),
+                                    aContent->NodeInfo()->NameAtom(),
+                                    aContent->GetNameSpaceID(),
                                     aSuppressWhiteSpaceOptimizations,
                                     aStyleContext,
                                     flags, aAnonChildren,
@@ -5564,7 +5567,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
                   aContent->IsElement(),
                   "Shouldn't get anything else here!");
   MOZ_ASSERT(!aContent->GetPrimaryFrame() || aState.mCreatingExtraFrames ||
-             aContent->Tag() == nsGkAtoms::area);
+             aContent->NodeInfo()->NameAtom() == nsGkAtoms::area);
 
   // The following code allows the user to specify the base tag
   // of an element using XBL.  XUL and HTML objects (like boxes, menus, etc.)
@@ -5624,14 +5627,12 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
   nsIContent *parent = aContent->GetParent();
   if (parent) {
     // Check tag first, since that check will usually fail
-    nsIAtom* parentTag = parent->Tag();
-    if ((parentTag == nsGkAtoms::select || parentTag == nsGkAtoms::optgroup) &&
-        parent->IsHTMLElement() &&
+    if (parent->IsAnyOfHTMLElements(nsGkAtoms::select, nsGkAtoms::optgroup) &&
         // <option> is ok no matter what
         !aContent->IsHTMLElement(nsGkAtoms::option) &&
         // <optgroup> is OK in <select> but not in <optgroup>
         (!aContent->IsHTMLElement(nsGkAtoms::optgroup) ||
-         parentTag != nsGkAtoms::select) &&
+         !parent->IsHTMLElement(nsGkAtoms::select)) &&
         // Allow native anonymous content no matter what
         !aContent->IsRootOfNativeAnonymousSubtree()) {
       // No frame for aContent
@@ -6223,7 +6224,7 @@ AdjustAppendParentForAfterContent(nsFrameManager* aFrameManager,
         nsIContent* c = child->GetContent();
         if (child->IsGeneratedContentFrame()) {
           nsIContent* p = c->GetParent();
-          if (c->Tag() == nsGkAtoms::mozgeneratedcontentafter) {
+          if (c->NodeInfo()->NameAtom() == nsGkAtoms::mozgeneratedcontentafter) {
             if (!nsContentUtils::ContentIsDescendantOf(aChild, p) &&
                 p != aContainer &&
                 nsContentUtils::PositionIsBefore(p, aChild)) {
@@ -6799,9 +6800,7 @@ static bool
 IsSpecialFramesetChild(nsIContent* aContent)
 {
   // IMPORTANT: This must match the conditions in nsHTMLFramesetFrame::Init.
-  return aContent->IsHTMLElement() &&
-    (aContent->Tag() == nsGkAtoms::frameset ||
-     aContent->Tag() == nsGkAtoms::frame);
+  return aContent->IsAnyOfHTMLElements(nsGkAtoms::frameset, nsGkAtoms::frame);
 }
 
 static void
@@ -7729,7 +7728,7 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
   NS_ASSERTION(isSingleInsert || frameType != nsGkAtoms::fieldSetFrame,
                "Unexpected parent");
   if (IsFrameForFieldSet(insertion.mParentFrame, frameType) &&
-      aStartChild->Tag() == nsGkAtoms::legend) {
+      aStartChild->NodeInfo()->NameAtom() == nsGkAtoms::legend) {
     // Just reframe the parent, since figuring out whether this
     // should be the new legend and then handling it is too complex.
     // We could do a little better here --- check if the fieldset already
@@ -8451,8 +8450,7 @@ InvalidateCanvasIfNeeded(nsIPresShell* presShell, nsIContent* node)
     }
 
     // Check whether it's an HTML body
-    if (node->Tag() != nsGkAtoms::body ||
-        !node->IsHTMLElement()) {
+    if (!node->IsHTMLElement(nsGkAtoms::body)) {
       return;
     }
   }
@@ -9011,7 +9009,7 @@ nsCSSFrameConstructor::ReplicateFixedFrames(nsPageContentFrame* aParentFrame)
         nsLayoutUtils::GetStyleFrame(content)->StyleContext();
       FrameConstructionItemList items;
       AddFrameConstructionItemsInternal(state, content, canvasFrame,
-                                        content->Tag(),
+                                        content->NodeInfo()->NameAtom(),
                                         content->GetNameSpaceID(),
                                         true,
                                         styleContext,
@@ -10468,7 +10466,8 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
                      ITEM_IS_ANONYMOUSCONTENTCREATOR_CONTENT | aExtraFlags;
 
     AddFrameConstructionItemsInternal(aState, content, aFrame,
-                                      content->Tag(), content->GetNameSpaceID(),
+                                      content->NodeInfo()->NameAtom(),
+                                      content->GetNameSpaceID(),
                                       true, styleContext, flags,
                                       anonChildren, aItemsToConstruct);
   }
@@ -10644,7 +10643,8 @@ nsCSSFrameConstructor::ProcessChildren(nsFrameConstructorState& aState,
     if (!aFrame->IsGeneratedContentFrame() &&
         mPresShell->GetPresContext()->IsChrome()) {
       nsIContent *badKid = AnyKidsNeedBlockParent(aFrameItems.FirstChild());
-      nsDependentAtomString parentTag(aContent->Tag()), kidTag(badKid->Tag());
+      nsDependentAtomString parentTag(aContent->NodeInfo()->NameAtom()),
+                            kidTag(badKid->NodeInfo()->NameAtom());
       const char16_t* params[] = { parentTag.get(), kidTag.get() };
       const nsStyleDisplay *display = frameStyleContext->StyleDisplay();
       const char *message =
@@ -11529,7 +11529,8 @@ nsCSSFrameConstructor::CreateListBoxContent(nsPresContext*         aPresContext,
 
     FrameConstructionItemList items;
     AddFrameConstructionItemsInternal(state, aChild, aParentFrame,
-                                      aChild->Tag(), aChild->GetNameSpaceID(),
+                                      aChild->NodeInfo()->NameAtom(),
+                                      aChild->GetNameSpaceID(),
                                       true, styleContext,
                                       ITEM_ALLOW_XBL_BASE, nullptr, items);
     ConstructFramesFromItemList(state, items, aParentFrame, frameItems);
@@ -11924,7 +11925,8 @@ nsCSSFrameConstructor::BuildInlineChildItems(nsFrameConstructorState& aState,
       nsRefPtr<nsStyleContext> childContext =
         ResolveStyleContext(parentStyleContext, content, &aState);
 
-      AddFrameConstructionItemsInternal(aState, content, nullptr, content->Tag(),
+      AddFrameConstructionItemsInternal(aState, content, nullptr,
+                                        content->NodeInfo()->NameAtom(),
                                         content->GetNameSpaceID(),
                                         iter.XBLInvolved(), childContext,
                                         flags, nullptr,
