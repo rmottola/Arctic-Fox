@@ -1004,13 +1004,11 @@ NS_IMETHODIMP nsPluginInstanceOwner::GetTagType(nsPluginTagType *result)
   *result = nsPluginTagType_Unknown;
 
   nsCOMPtr<nsIContent> content = do_QueryReferent(mContent);
-  nsIAtom *atom = content->Tag();
-
-  if (atom == nsGkAtoms::applet)
+  if (content->IsHTMLElement(nsGkAtoms::applet))
     *result = nsPluginTagType_Applet;
-  else if (atom == nsGkAtoms::embed)
+  else if (content->IsHTMLElement(nsGkAtoms::embed))
     *result = nsPluginTagType_Embed;
-  else if (atom == nsGkAtoms::object)
+  else if (content->IsHTMLElement(nsGkAtoms::object))
     *result = nsPluginTagType_Object;
 
   return NS_OK;
