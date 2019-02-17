@@ -4093,12 +4093,11 @@ XULDocument::BroadcasterHookup::~BroadcasterHookup()
 #ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
         // Tell the world we failed
-        nsIAtom *tag = mObservesElement->Tag();
 
         nsAutoString broadcasterID;
         nsAutoString attribute;
 
-        if (tag == nsGkAtoms::observes) {
+        if (mObservesElement->IsXULElement(nsGkAtoms::observes)) {
             mObservesElement->GetAttr(kNameSpaceID_None, nsGkAtoms::element, broadcasterID);
             mObservesElement->GetAttr(kNameSpaceID_None, nsGkAtoms::attribute, attribute);
         }
@@ -4112,7 +4111,7 @@ XULDocument::BroadcasterHookup::~BroadcasterHookup()
         broadcasteridC.AssignWithConversion(broadcasterID);
         PR_LOG(gXULLog, PR_LOG_WARNING,
                ("xul: broadcaster hookup failed <%s attribute='%s'> to %s",
-                nsAtomCString(tag).get(),
+                nsAtomCString(mObservesElement->NodeInfo()->NameAtom()).get(),
                 attributeC.get(),
                 broadcasteridC.get()));
     }
@@ -4328,7 +4327,7 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
         broadcasteridC.AssignWithConversion(broadcasterID);
         PR_LOG(gXULLog, PR_LOG_NOTICE,
                ("xul: broadcaster hookup <%s attribute='%s'> to %s",
-                nsAtomCString(content->Tag()).get(),
+                nsAtomCString(content->NodeInfo()->NameAtom()).get(),
                 attributeC.get(),
                 broadcasteridC.get()));
     }
