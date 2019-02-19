@@ -323,6 +323,8 @@ public:
                                       const ScreenOrientation& orientation,
                                       const nsIntPoint& chromeDisp) MOZ_OVERRIDE;
     virtual bool RecvUpdateFrame(const mozilla::layers::FrameMetrics& aFrameMetrics) MOZ_OVERRIDE;
+    virtual bool RecvRequestFlingSnap(const ViewID& aScrollId,
+                                      const CSSPoint& aDestination) MOZ_OVERRIDE;
     virtual bool RecvAcknowledgeScrollUpdate(const ViewID& aScrollId,
                                              const uint32_t& aScrollGeneration) MOZ_OVERRIDE;
     virtual bool RecvHandleDoubleTap(const CSSPoint& aPoint,

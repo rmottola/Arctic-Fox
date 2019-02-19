@@ -514,6 +514,7 @@ child:
     // The following methods correspond to functions on the GoannaContentController
     // interface in gfx/layers/apz/public/GoannaContentController.h. Refer to documentation
     // in that file for these functions.
+    RequestFlingSnap(ViewID aScrollID, CSSPoint aDestination);
     AcknowledgeScrollUpdate(ViewID aScrollId, uint32_t aScrollGeneration);
     HandleDoubleTap(CSSPoint point, ScrollableLayerGuid aGuid);
     HandleSingleTap(CSSPoint point, ScrollableLayerGuid aGuid);
