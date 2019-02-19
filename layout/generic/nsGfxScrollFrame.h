@@ -533,7 +533,7 @@ public:
   NS_DECL_QUERYFRAME
   NS_DECL_FRAMEARENA_HELPERS
 
-  virtual mozilla::WritingMode GetWritingMode() const override
+  virtual mozilla::WritingMode GetWritingMode() const MOZ_OVERRIDE
   {
     if (mHelper.mScrolledFrame) {
       return mHelper.mScrolledFrame->GetWritingMode();
@@ -564,7 +564,7 @@ public:
   nscoord GetIntrinsicVScrollbarWidth(nsRenderingContext *aRenderingContext);
 
   virtual bool GetBorderRadii(const nsSize& aFrameSize, const nsSize& aBorderArea,
-                              Sides aSkipSides, nscoord aRadii[8]) const override {
+                              Sides aSkipSides, nscoord aRadii[8]) const MOZ_OVERRIDE {
     return mHelper.GetBorderRadii(aFrameSize, aBorderArea, aSkipSides, aRadii);
   }
 
@@ -605,7 +605,7 @@ public:
   }
 
   virtual bool DoesClipChildren() override { return true; }
-  virtual nsSplittableType GetSplittableType() const override;
+  virtual nsSplittableType GetSplittableType() const MOZ_OVERRIDE;
 
   virtual nsPoint GetPositionOfChildIgnoringScrolling(nsIFrame* aChild) override
   { nsPoint pt = aChild->GetPosition();
@@ -619,16 +619,16 @@ public:
                                         uint32_t aFilter) override;
 
   // nsIScrollableFrame
-  virtual nsIFrame* GetScrolledFrame() const override {
+  virtual nsIFrame* GetScrolledFrame() const MOZ_OVERRIDE {
     return mHelper.GetScrolledFrame();
   }
-  virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
+  virtual mozilla::ScrollbarStyles GetScrollbarStyles() const MOZ_OVERRIDE {
     return mHelper.GetScrollbarStylesFromFrame();
   }
-  virtual uint32_t GetScrollbarVisibility() const override {
+  virtual uint32_t GetScrollbarVisibility() const MOZ_OVERRIDE {
     return mHelper.GetScrollbarVisibility();
   }
-  virtual nsMargin GetActualScrollbarSizes() const override {
+  virtual nsMargin GetActualScrollbarSizes() const MOZ_OVERRIDE {
     return mHelper.GetActualScrollbarSizes();
   }
   virtual nsMargin GetDesiredScrollbarSizes(nsBoxLayoutState* aState) override {
@@ -644,25 +644,25 @@ public:
     nsBoxLayoutState bls(aPresContext, aRC, 0);
     return mHelper.GetNondisappearingScrollbarWidth(&bls);
   }
-  virtual nsRect GetScrolledRect() const override {
+  virtual nsRect GetScrolledRect() const MOZ_OVERRIDE {
     return mHelper.GetScrolledRect();
   }
-  virtual nsRect GetScrollPortRect() const override {
+  virtual nsRect GetScrollPortRect() const MOZ_OVERRIDE {
     return mHelper.GetScrollPortRect();
   }
-  virtual nsPoint GetScrollPosition() const override {
+  virtual nsPoint GetScrollPosition() const MOZ_OVERRIDE {
     return mHelper.GetScrollPosition();
   }
-  virtual nsPoint GetLogicalScrollPosition() const override {
+  virtual nsPoint GetLogicalScrollPosition() const MOZ_OVERRIDE {
     return mHelper.GetLogicalScrollPosition();
   }
-  virtual nsRect GetScrollRange() const override {
+  virtual nsRect GetScrollRange() const MOZ_OVERRIDE {
     return mHelper.GetScrollRange();
   }
-  virtual nsSize GetScrollPositionClampingScrollPortSize() const override {
+  virtual nsSize GetScrollPositionClampingScrollPortSize() const MOZ_OVERRIDE {
     return mHelper.GetScrollPositionClampingScrollPortSize();
   }
-  virtual gfxSize GetResolution() const override {
+  virtual gfxSize GetResolution() const MOZ_OVERRIDE {
     return mHelper.GetResolution();
   }
   virtual void SetResolution(const gfxSize& aResolution) override {
@@ -671,10 +671,10 @@ public:
   virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) override {
     return mHelper.SetResolutionAndScaleTo(aResolution);
   }
-  virtual nsSize GetLineScrollAmount() const override {
+  virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetLineScrollAmount();
   }
-  virtual nsSize GetPageScrollAmount() const override {
+  virtual nsSize GetPageScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetPageScrollAmount();
   }
   /**
@@ -742,10 +742,10 @@ public:
   virtual void ResetScrollPositionForLayerPixelAlignment() override {
     mHelper.ResetScrollPositionForLayerPixelAlignment();
   }
-  virtual bool IsResolutionSet() const override {
+  virtual bool IsResolutionSet() const MOZ_OVERRIDE {
     return mHelper.mIsResolutionSet;
   }
-  virtual bool DidHistoryRestore() const override {
+  virtual bool DidHistoryRestore() const MOZ_OVERRIDE {
     return mHelper.mDidHistoryRestore;
   }
   virtual void ClearDidHistoryRestore() override {
@@ -754,7 +754,7 @@ public:
   virtual bool IsRectNearlyVisible(const nsRect& aRect) override {
     return mHelper.IsRectNearlyVisible(aRect);
   }
-  virtual nsRect ExpandRectToNearlyVisible(const nsRect& aRect) const override {
+  virtual nsRect ExpandRectToNearlyVisible(const nsRect& aRect) const MOZ_OVERRIDE {
     return mHelper.ExpandRectToNearlyVisible(aRect);
   }
   virtual nsIAtom* LastScrollOrigin() override {
@@ -772,20 +772,20 @@ public:
   virtual void ResetScrollInfoIfGeneration(uint32_t aGeneration) override {
     mHelper.ResetScrollInfoIfGeneration(aGeneration);
   }
-  virtual bool WantAsyncScroll() const override {
+  virtual bool WantAsyncScroll() const MOZ_OVERRIDE {
     return mHelper.WantAsyncScroll();
   }
   virtual void ComputeFrameMetrics(Layer* aLayer, nsIFrame* aContainerReferenceFrame,
                                    const ContainerLayerParameters& aParameters,
                                    nsRect* aClipRect,
-                                   nsTArray<FrameMetrics>* aOutput) const override {
+                                   nsTArray<FrameMetrics>* aOutput) const MOZ_OVERRIDE {
     mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame,
                                 aParameters, aClipRect, aOutput);
   }
-  virtual bool IsIgnoringViewportClipping() const override {
+  virtual bool IsIgnoringViewportClipping() const MOZ_OVERRIDE {
     return mHelper.IsIgnoringViewportClipping();
   }
-  virtual void MarkScrollbarsDirtyForReflow() const override {
+  virtual void MarkScrollbarsDirtyForReflow() const MOZ_OVERRIDE {
     mHelper.MarkScrollbarsDirtyForReflow();
   }
 
@@ -806,7 +806,7 @@ public:
    *
    * @see nsGkAtoms::scrollFrame
    */
-  virtual nsIAtom* GetType() const override;
+  virtual nsIAtom* GetType() const MOZ_OVERRIDE;
 
   // nsIScrollbarMediator
   virtual void ScrollByPage(nsScrollbarFrame* aScrollbar, int32_t aDirection) override {
@@ -830,8 +830,8 @@ public:
   virtual nsIFrame* GetScrollbarBox(bool aVertical) override {
     return mHelper.GetScrollbarBox(aVertical);
   }
-  virtual void ScrollbarActivityStarted() const override;
-  virtual void ScrollbarActivityStopped() const override;
+  virtual void ScrollbarActivityStarted() const MOZ_OVERRIDE;
+  virtual void ScrollbarActivityStopped() const MOZ_OVERRIDE;
 
   virtual void SetTransformingByAPZ(bool aTransforming) MOZ_OVERRIDE {
     mHelper.SetTransformingByAPZ(aTransforming);
@@ -841,7 +841,7 @@ public:
   }
   
 #ifdef DEBUG_FRAME_DUMP
-  virtual nsresult GetFrameName(nsAString& aResult) const override;
+  virtual nsresult GetFrameName(nsAString& aResult) const MOZ_OVERRIDE;
 #endif
 
 #ifdef ACCESSIBILITY
@@ -940,7 +940,7 @@ public:
   }
 
   virtual bool DoesClipChildren() override { return true; }
-  virtual nsSplittableType GetSplittableType() const override;
+  virtual nsSplittableType GetSplittableType() const MOZ_OVERRIDE;
 
   virtual nsPoint GetPositionOfChildIgnoringScrolling(nsIFrame* aChild) override
   { nsPoint pt = aChild->GetPosition();
@@ -963,7 +963,7 @@ public:
   virtual nsresult GetPadding(nsMargin& aPadding) override;
 
   virtual bool GetBorderRadii(const nsSize& aFrameSize, const nsSize& aBorderArea,
-                              Sides aSkipSides, nscoord aRadii[8]) const override {
+                              Sides aSkipSides, nscoord aRadii[8]) const MOZ_OVERRIDE {
     return mHelper.GetBorderRadii(aFrameSize, aBorderArea, aSkipSides, aRadii);
   }
 
@@ -991,16 +991,16 @@ public:
   static void AdjustReflowStateBack(nsBoxLayoutState& aState, bool aSetBack);
 
   // nsIScrollableFrame
-  virtual nsIFrame* GetScrolledFrame() const override {
+  virtual nsIFrame* GetScrolledFrame() const MOZ_OVERRIDE {
     return mHelper.GetScrolledFrame();
   }
-  virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
+  virtual mozilla::ScrollbarStyles GetScrollbarStyles() const MOZ_OVERRIDE {
     return mHelper.GetScrollbarStylesFromFrame();
   }
-  virtual uint32_t GetScrollbarVisibility() const override {
+  virtual uint32_t GetScrollbarVisibility() const MOZ_OVERRIDE {
     return mHelper.GetScrollbarVisibility();
   }
-  virtual nsMargin GetActualScrollbarSizes() const override {
+  virtual nsMargin GetActualScrollbarSizes() const MOZ_OVERRIDE {
     return mHelper.GetActualScrollbarSizes();
   }
   virtual nsMargin GetDesiredScrollbarSizes(nsBoxLayoutState* aState) override {
@@ -1016,25 +1016,25 @@ public:
     nsBoxLayoutState bls(aPresContext, aRC, 0);
     return mHelper.GetNondisappearingScrollbarWidth(&bls);
   }
-  virtual nsRect GetScrolledRect() const override {
+  virtual nsRect GetScrolledRect() const MOZ_OVERRIDE {
     return mHelper.GetScrolledRect();
   }
-  virtual nsRect GetScrollPortRect() const override {
+  virtual nsRect GetScrollPortRect() const MOZ_OVERRIDE {
     return mHelper.GetScrollPortRect();
   }
-  virtual nsPoint GetScrollPosition() const override {
+  virtual nsPoint GetScrollPosition() const MOZ_OVERRIDE {
     return mHelper.GetScrollPosition();
   }
-  virtual nsPoint GetLogicalScrollPosition() const override {
+  virtual nsPoint GetLogicalScrollPosition() const MOZ_OVERRIDE {
     return mHelper.GetLogicalScrollPosition();
   }
-  virtual nsRect GetScrollRange() const override {
+  virtual nsRect GetScrollRange() const MOZ_OVERRIDE {
     return mHelper.GetScrollRange();
   }
-  virtual nsSize GetScrollPositionClampingScrollPortSize() const override {
+  virtual nsSize GetScrollPositionClampingScrollPortSize() const MOZ_OVERRIDE {
     return mHelper.GetScrollPositionClampingScrollPortSize();
   }
-  virtual gfxSize GetResolution() const override {
+  virtual gfxSize GetResolution() const MOZ_OVERRIDE {
     return mHelper.GetResolution();
   }
   virtual void SetResolution(const gfxSize& aResolution) override {
@@ -1043,10 +1043,10 @@ public:
   virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) override {
     return mHelper.SetResolutionAndScaleTo(aResolution);
   }
-  virtual nsSize GetLineScrollAmount() const override {
+  virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetLineScrollAmount();
   }
-  virtual nsSize GetPageScrollAmount() const override {
+  virtual nsSize GetPageScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetPageScrollAmount();
   }
   /**
@@ -1111,10 +1111,10 @@ public:
   virtual void ResetScrollPositionForLayerPixelAlignment() override {
     mHelper.ResetScrollPositionForLayerPixelAlignment();
   }
-  virtual bool IsResolutionSet() const override {
+  virtual bool IsResolutionSet() const MOZ_OVERRIDE {
     return mHelper.mIsResolutionSet;
   }
-  virtual bool DidHistoryRestore() const override {
+  virtual bool DidHistoryRestore() const MOZ_OVERRIDE {
     return mHelper.mDidHistoryRestore;
   }
   virtual void ClearDidHistoryRestore() override {
@@ -1123,7 +1123,7 @@ public:
   virtual bool IsRectNearlyVisible(const nsRect& aRect) override {
     return mHelper.IsRectNearlyVisible(aRect);
   }
-  virtual nsRect ExpandRectToNearlyVisible(const nsRect& aRect) const override {
+  virtual nsRect ExpandRectToNearlyVisible(const nsRect& aRect) const MOZ_OVERRIDE {
     return mHelper.ExpandRectToNearlyVisible(aRect);
   }
   virtual nsIAtom* LastScrollOrigin() override {
@@ -1141,20 +1141,20 @@ public:
   virtual void ResetScrollInfoIfGeneration(uint32_t aGeneration) override {
     mHelper.ResetScrollInfoIfGeneration(aGeneration);
   }
-  virtual bool WantAsyncScroll() const override {
+  virtual bool WantAsyncScroll() const MOZ_OVERRIDE {
     return mHelper.WantAsyncScroll();
   }
   virtual void ComputeFrameMetrics(Layer* aLayer, nsIFrame* aContainerReferenceFrame,
                                    const ContainerLayerParameters& aParameters,
                                    nsRect* aClipRect,
-                                   nsTArray<FrameMetrics>* aOutput) const override {
+                                   nsTArray<FrameMetrics>* aOutput) const MOZ_OVERRIDE {
     mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame,
                                 aParameters, aClipRect, aOutput);
   }
-  virtual bool IsIgnoringViewportClipping() const override {
+  virtual bool IsIgnoringViewportClipping() const MOZ_OVERRIDE {
     return mHelper.IsIgnoringViewportClipping();
   }
-  virtual void MarkScrollbarsDirtyForReflow() const override {
+  virtual void MarkScrollbarsDirtyForReflow() const MOZ_OVERRIDE {
     mHelper.MarkScrollbarsDirtyForReflow();
   }
 
@@ -1175,9 +1175,9 @@ public:
    *
    * @see nsGkAtoms::scrollFrame
    */
-  virtual nsIAtom* GetType() const override;
+  virtual nsIAtom* GetType() const MOZ_OVERRIDE;
   
-  virtual bool IsFrameOfType(uint32_t aFlags) const override
+  virtual bool IsFrameOfType(uint32_t aFlags) const MOZ_OVERRIDE
   {
     // Override bogus IsFrameOfType in nsBoxFrame.
     if (aFlags & (nsIFrame::eReplacedContainsBlock | nsIFrame::eReplaced))
@@ -1207,8 +1207,8 @@ public:
     return mHelper.GetScrollbarBox(aVertical);
   }
 
-  virtual void ScrollbarActivityStarted() const override;
-  virtual void ScrollbarActivityStopped() const override;
+  virtual void ScrollbarActivityStarted() const MOZ_OVERRIDE;
+  virtual void ScrollbarActivityStopped() const MOZ_OVERRIDE;
 
   virtual void SetTransformingByAPZ(bool aTransforming) MOZ_OVERRIDE {
     mHelper.SetTransformingByAPZ(aTransforming);
@@ -1218,7 +1218,7 @@ public:
   }
 
 #ifdef DEBUG_FRAME_DUMP
-  virtual nsresult GetFrameName(nsAString& aResult) const override;
+  virtual nsresult GetFrameName(nsAString& aResult) const MOZ_OVERRIDE;
 #endif
 
 protected:

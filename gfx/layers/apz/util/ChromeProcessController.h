@@ -33,28 +33,28 @@ class ChromeProcessController : public mozilla::layers::GoannaContentController
 
 public:
   explicit ChromeProcessController(nsIWidget* aWidget, APZEventState* aAPZEventState);
-  virtual void Destroy() override;
+  virtual void Destroy() MOZ_OVERRIDE;
 
   // GoannaContentController interface
-  virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) override;
-  virtual void PostDelayedTask(Task* aTask, int aDelayMs) override;
+  virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) MOZ_OVERRIDE;
+  virtual void PostDelayedTask(Task* aTask, int aDelayMs) MOZ_OVERRIDE;
   virtual void AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollId,
-                                       const uint32_t& aScrollGeneration) override;
+                                       const uint32_t& aScrollGeneration) MOZ_OVERRIDE;
 
   virtual void HandleDoubleTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
                                const ScrollableLayerGuid& aGuid) override {}
   virtual void HandleSingleTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
-                               const ScrollableLayerGuid& aGuid) override;
+                               const ScrollableLayerGuid& aGuid) MOZ_OVERRIDE;
   virtual void HandleLongTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
                                const ScrollableLayerGuid& aGuid,
-                               uint64_t aInputBlockId) override;
+                               uint64_t aInputBlockId) MOZ_OVERRIDE;
   virtual void HandleLongTapUp(const CSSPoint& aPoint, int32_t aModifiers,
-                               const ScrollableLayerGuid& aGuid) override;
+                               const ScrollableLayerGuid& aGuid) MOZ_OVERRIDE;
   virtual void SendAsyncScrollDOMEvent(bool aIsRoot, const mozilla::CSSRect &aContentRect,
                                        const mozilla::CSSSize &aScrollableSize) override {}
   virtual void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                     APZStateChange aChange,
-                                    int aArg) override;
+                                    int aArg) MOZ_OVERRIDE;
 private:
   nsCOMPtr<nsIWidget> mWidget;
   nsRefPtr<APZEventState> mAPZEventState;
