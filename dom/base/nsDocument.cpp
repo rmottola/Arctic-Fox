@@ -6333,6 +6333,7 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
         continue;
       }
 
+      MOZ_ASSERT(elem->IsHTMLElement(nameAtom));
       nsWrapperCache* cache;
       CallQueryInterface(elem, &cache);
       MOZ_ASSERT(cache, "Element doesn't support wrapper cache?");
