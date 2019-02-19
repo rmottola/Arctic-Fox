@@ -49,6 +49,10 @@ class TextOverflow {
   nsDisplayList& GetMarkers() { return mMarkerList; }
 
   /**
+   * @return true if aBlockFrmae has text-overflow:clip on both sides.
+   */
+  static bool HasClippedOverflow(nsIFrame* aBlockFrame);
+  /**
    * @return true if aBlockFrame needs analysis for text overflow.
    */
   static bool CanHaveTextOverflow(nsDisplayListBuilder* aBuilder,
