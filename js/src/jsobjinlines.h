@@ -453,7 +453,9 @@ inline bool
 IsInternalFunctionObject(JSObject* funobj)
 {
     JSFunction* fun = &funobj->as<JSFunction>();
-    return fun->isLambda() && !funobj->getParent();
+    MOZ_ASSERT_IF(fun->isLambda(),
+                  fun->isInterpreted() || fun->isAsmJSNative());
+    return fun->isLambda() && fun->isInterpreted() && !fun->environment();
 }
 
 class AutoPropDescVector : public AutoVectorRooter<PropDesc>
