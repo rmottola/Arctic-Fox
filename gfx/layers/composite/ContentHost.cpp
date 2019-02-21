@@ -849,7 +849,7 @@ ContentHostTexture::GetRenderState()
   return result;
 }
 
-TemporaryRef<TexturedEffect>
+already_AddRefed<TexturedEffect>
 ContentHostTexture::GenEffect(const gfx::Filter& aFilter)
 {
   if (!mTextureHost) {
@@ -869,7 +869,7 @@ ContentHostTexture::GenEffect(const gfx::Filter& aFilter)
                               aFilter, true);
 }
 
-TemporaryRef<TexturedEffect>
+already_AddRefed<TexturedEffect>
 ContentHostIncremental::GenEffect(const gfx::Filter& aFilter)
 {
   if (!mSource) {
@@ -878,7 +878,7 @@ ContentHostIncremental::GenEffect(const gfx::Filter& aFilter)
   return CreateTexturedEffect(mSource, mSourceOnWhite, aFilter, true);
 }
 
-TemporaryRef<gfx::DataSourceSurface>
+already_AddRefed<gfx::DataSourceSurface>
 ContentHostTexture::GetAsSurface()
 {
   if (!mTextureHost) {

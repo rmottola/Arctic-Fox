@@ -152,7 +152,7 @@ public:
   void MarkSent() { mSent = true; }
   bool IsSentToCompositor() { return mSent; }
 
-  virtual TemporaryRef<gfx::SourceSurface> GetAsSourceSurface() = 0;
+  virtual already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() = 0;
 
   virtual GrallocImage* AsGrallocImage()
   {
@@ -427,12 +427,12 @@ public:
    * the lock methods should be used to avoid the copy, however this should be
    * avoided if the surface is required for a long period of time.
    */
-  TemporaryRef<gfx::SourceSurface> GetCurrentAsSourceSurface(gfx::IntSize* aSizeResult);
+  already_AddRefed<gfx::SourceSurface> GetCurrentAsSourceSurface(gfx::IntSize* aSizeResult);
 
   /**
    * Same as LockCurrentAsSurface but for Moz2D
    */
-  TemporaryRef<gfx::SourceSurface> LockCurrentAsSourceSurface(gfx::IntSize* aSizeResult,
+  already_AddRefed<gfx::SourceSurface> LockCurrentAsSourceSurface(gfx::IntSize* aSizeResult,
                                                               Image** aCurrentImage = nullptr);
 
   /**
@@ -768,7 +768,7 @@ protected:
    */
   virtual uint8_t* AllocateBuffer(uint32_t aSize);
 
-  TemporaryRef<gfx::SourceSurface> GetAsSourceSurface();
+  already_AddRefed<gfx::SourceSurface> GetAsSourceSurface();
 
   void SetOffscreenFormat(gfxImageFormat aFormat) { mOffscreenFormat = aFormat; }
   gfxImageFormat GetOffscreenFormat();
@@ -805,7 +805,7 @@ public:
     mSourceSurface = aData.mSourceSurface;
   }
 
-  virtual TemporaryRef<gfx::SourceSurface> GetAsSourceSurface() override
+  virtual already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() override
   {
     RefPtr<gfx::SourceSurface> surface(mSourceSurface);
     return surface.forget();
@@ -846,7 +846,7 @@ public:
     mSize = aData.mSize;
   }
 
-  TemporaryRef<gfx::SourceSurface> GetAsSourceSurface() { return nullptr; } ;
+  already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() { return nullptr; } ;
   int32_t GetOverlayId() { return mOverlayId; }
 
   gfx::IntSize GetSize() { return mSize; }

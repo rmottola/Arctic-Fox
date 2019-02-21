@@ -136,7 +136,7 @@ LayerManager::GetScrollableLayers(nsTArray<Layer*>& aArray)
   }
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 LayerManager::CreateOptimalDrawTarget(const gfx::IntSize &aSize,
                                       SurfaceFormat aFormat)
 {
@@ -144,13 +144,13 @@ LayerManager::CreateOptimalDrawTarget(const gfx::IntSize &aSize,
                                                                       aFormat);
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 LayerManager::CreateOptimalMaskDrawTarget(const gfx::IntSize &aSize)
 {
   return CreateOptimalDrawTarget(aSize, SurfaceFormat::A8);
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 LayerManager::CreateDrawTarget(const IntSize &aSize,
                                SurfaceFormat aFormat)
 {

@@ -177,7 +177,7 @@ WMFVideoMFTManager::InitializeDXVA()
   return mDXVA2Manager != nullptr;
 }
 
-TemporaryRef<MFTDecoder>
+already_AddRefed<MFTDecoder>
 WMFVideoMFTManager::Init()
 {
   mUseHwAccel = false; // default value; changed if D3D setup succeeds.

@@ -115,7 +115,7 @@ DrawBlur(gfxContext* aDestinationCtx,
     }
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 gfxAlphaBoxBlur::DoBlur(DrawTarget* aDT, IntPoint* aTopLeft)
 {
     mBlur->Blur(mData);

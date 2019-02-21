@@ -133,7 +133,7 @@ DrawTargetSkia::~DrawTargetSkia()
 {
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::Snapshot()
 {
   RefPtr<SourceSurfaceSkia> snapshot = mSnapshot;
@@ -608,7 +608,7 @@ DrawTargetSkia::MaskSurface(const Pattern &aSource,
   }
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::CreateSourceSurfaceFromData(unsigned char *aData,
                                             const IntSize &aSize,
                                             int32_t aStride,
@@ -624,7 +624,7 @@ DrawTargetSkia::CreateSourceSurfaceFromData(unsigned char *aData,
   return newSurf.forget();
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 DrawTargetSkia::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFormat) const
 {
   RefPtr<DrawTargetSkia> target = new DrawTargetSkia();
@@ -644,7 +644,7 @@ DrawTargetSkia::UsingSkiaGPU() const
 #endif
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
   if (aSurface->GetType() == SurfaceType::SKIA) {
@@ -676,7 +676,7 @@ DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
   return result.forget();
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurface) const
 {
   if (aSurface.mType == NativeSurfaceType::CAIRO_SURFACE) {
@@ -870,7 +870,7 @@ DrawTargetSkia::GetNativeSurface(NativeSurfaceType aType)
 }
 
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 DrawTargetSkia::CreatePathBuilder(FillRule aFillRule) const
 {
   return MakeAndAddRef<PathBuilderSkia>(aFillRule);
@@ -916,7 +916,7 @@ DrawTargetSkia::PopClip()
   mCanvas->restore();
 }
 
-TemporaryRef<GradientStops>
+already_AddRefed<GradientStops>
 DrawTargetSkia::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops, ExtendMode aExtendMode) const
 {
   std::vector<GradientStop> stops;
@@ -929,7 +929,7 @@ DrawTargetSkia::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops, Ex
   return MakeAndAddRef<GradientStopsSkia>(stops, aNumStops, aExtendMode);
 }
 
-TemporaryRef<FilterNode>
+already_AddRefed<FilterNode>
 DrawTargetSkia::CreateFilter(FilterType aType)
 {
   return FilterNodeSoftware::Create(aType);

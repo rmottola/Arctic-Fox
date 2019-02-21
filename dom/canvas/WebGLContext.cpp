@@ -1696,7 +1696,7 @@ WebGLContext::MakeContextCurrent() const
     gl->MakeCurrent();
 }
 
-mozilla::TemporaryRef<mozilla::gfx::SourceSurface>
+already_AddRefed<mozilla::gfx::SourceSurface>
 WebGLContext::GetSurfaceSnapshot(bool* out_premultAlpha)
 {
     if (!gl)

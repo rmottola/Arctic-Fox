@@ -120,7 +120,7 @@ public:
       CreateOffscreenSurface(const IntSize& size,
                              gfxContentType contentType) override;
 
-    virtual mozilla::TemporaryRef<mozilla::gfx::ScaledFont>
+    virtual already_AddRefed<mozilla::gfx::ScaledFont>
       GetScaledFontForFont(mozilla::gfx::DrawTarget* aTarget, gfxFont *aFont);
 
     enum RenderMode {
@@ -249,7 +249,7 @@ public:
     ID3D11Device *GetD3D11MediaDevice();
 
     // Create a D3D11 device to be used for DXVA decoding.
-    mozilla::TemporaryRef<ID3D11Device> CreateD3D11DecoderDevice();
+    already_AddRefed<ID3D11Device> CreateD3D11DecoderDevice();
 
     mozilla::layers::ReadbackManagerD3D11* GetReadbackManager();
 

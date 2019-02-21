@@ -238,7 +238,7 @@ protected:
 
 public:
     UniquePtr<SharedSurface> NewSharedSurface(const gfx::IntSize& size);
-    TemporaryRef<ShSurfHandle> NewShSurfHandle(const gfx::IntSize& size);
+    already_AddRefed<ShSurfHandle> NewShSurfHandle(const gfx::IntSize& size);
 
     // Auto-deletes surfs of the wrong type.
     void Recycle(UniquePtr<SharedSurface> surf);

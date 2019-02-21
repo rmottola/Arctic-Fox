@@ -4855,7 +4855,7 @@ SVGTextFrame::GetTextPathPathElement(nsIFrame* aTextPathFrame)
     static_cast<SVGPathElement*>(element) : nullptr;
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 SVGTextFrame::GetTextPath(nsIFrame* aTextPathFrame)
 {
   SVGPathElement* element = GetTextPathPathElement(aTextPathFrame);

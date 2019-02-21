@@ -91,14 +91,14 @@ public:
                 const gfx::Point& aCP2,
                 const gfx::Point& aCP3);
 
-  TemporaryRef<gfx::Path> GetPath(const CanvasWindingRule& aWinding,
+  already_AddRefed<gfx::Path> GetPath(const CanvasWindingRule& aWinding,
                                   const gfx::DrawTarget* aTarget) const;
 
   explicit CanvasPath(nsISupports* aParent);
-  // TemporaryRef arg because the return value from Path::CopyToBuilder() is
-  // passed directly and we can't drop the only ref to have a raw pointer.
+  // already_AddRefed arg because the return value from Path::CopyToBuilder()
+  // is passed directly and we can't drop the only ref to have a raw pointer.
   CanvasPath(nsISupports* aParent,
-             TemporaryRef<gfx::PathBuilder> aPathBuilder);
+             already_AddRefed<gfx::PathBuilder> aPathBuilder);
 
   void AddPath(CanvasPath& aCanvasPath,
                const Optional<NonNull<SVGMatrix>>& aMatrix);
@@ -510,7 +510,7 @@ public:
                             const char16_t* aEncoderOptions,
                             nsIInputStream **aStream) override;
 
-  mozilla::TemporaryRef<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(bool* aPremultAlpha = nullptr) override
+  already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(bool* aPremultAlpha = nullptr) override
   {
     EnsureTarget();
     if (aPremultAlpha) {

@@ -1178,7 +1178,7 @@ CompositorChild* nsBaseWidget::GetRemoteRenderer()
   return mCompositorChild;
 }
 
-TemporaryRef<mozilla::gfx::DrawTarget> nsBaseWidget::StartRemoteDrawing()
+already_AddRefed<mozilla::gfx::DrawTarget> nsBaseWidget::StartRemoteDrawing()
 {
   return nullptr;
 }

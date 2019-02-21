@@ -79,7 +79,7 @@ SVGMotionSMILPathUtils::PathGenerator::
   return true;
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 SVGMotionSMILPathUtils::PathGenerator::GetResultingPath()
 {
   return mPathBuilder->Finish();
