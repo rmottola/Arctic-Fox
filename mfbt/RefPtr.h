@@ -58,6 +58,7 @@ public:
   RefPtr(const RefPtr& aOther) : mPtr(ref(aOther.mPtr)) {}
   MOZ_IMPLICIT RefPtr(const TemporaryRef<T>& aOther) : mPtr(aOther.take()) {}
   MOZ_IMPLICIT RefPtr(already_AddRefed<T>& aOther) : mPtr(aOther.take()) {}
+  MOZ_IMPLICIT RefPtr(already_AddRefed<T>&& aOther) : mPtr(aOther.take()) {}
   MOZ_IMPLICIT RefPtr(T* aVal) : mPtr(ref(aVal)) {}
 
   template<typename U>
@@ -76,6 +77,11 @@ public:
     return *this;
   }
   RefPtr& operator=(already_AddRefed<T>& aOther)
+  {
+    assign(aOther.take());
+    return *this;
+  }
+  RefPtr& operator=(already_AddRefed<T>&& aOther)
   {
     assign(aOther.take());
     return *this;
