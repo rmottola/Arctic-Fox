@@ -946,6 +946,7 @@ static const ShadowParams kWindowShadowParametersPostYosemite[] = {
 void
 nsCocoaWindow::AdjustWindowShadow()
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow || ![mWindow isVisible] || ![mWindow hasShadow] ||
@@ -962,6 +963,9 @@ nsCocoaWindow::AdjustWindowShadow()
                                      params.flags);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
+#else // not 10.6 or later
+  return;
+#endif
 }
 
 static const NSUInteger kWindowBackgroundBlurRadius = 4;
