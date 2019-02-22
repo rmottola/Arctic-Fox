@@ -654,6 +654,10 @@ class IonOOLPropertyOpExitFrameLayout
         return sizeof(IonOOLPropertyOpExitFrameLayout);
     }
 
+    static size_t offsetOfObject() {
+        return offsetof(IonOOLPropertyOpExitFrameLayout, obj_);
+    }
+
     static size_t offsetOfId() {
         return offsetof(IonOOLPropertyOpExitFrameLayout, id_);
     }
@@ -728,6 +732,10 @@ class IonOOLProxyExitFrameLayout
 
     static inline size_t Size() {
         return sizeof(IonOOLProxyExitFrameLayout);
+    }
+
+    static size_t offsetOfObject() {
+        return offsetof(IonOOLProxyExitFrameLayout, proxy_);
     }
 
     static size_t offsetOfResult() {
