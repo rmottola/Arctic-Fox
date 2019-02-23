@@ -769,17 +769,6 @@ public:
     return mMarkedCCGeneration;
   }
 
-  // Sets the condition that we send an NS_AFTER_REMOTE_PAINT message just before the next
-  // composite.  Used in non-e10s implementations.
-  void SetRequestNotifyAfterRemotePaint()
-  {
-    mSendAfterRemotePaint = true;
-  }
-
-  // Sends an NS_AFTER_REMOTE_PAINT message if requested by
-  // SetRequestNotifyAfterRemotePaint().
-  void SendAfterRemotePaintIfRequested();
-
   virtual already_AddRefed<nsPIDOMWindow> GetOpener() = 0;
   // aLoadInfo will be passed on through to the windowwatcher.
   // aForceNoOpener will act just like a "noopener" feature in aOptions except
@@ -885,10 +874,6 @@ protected:
   bool mHasNotifiedGlobalCreated;
 
   uint32_t mMarkedCCGeneration;
-
-  // If true, send an NS_AFTER_REMOTE_PAINT message before compositing in a
-  // non-e10s implementation.
-  bool mSendAfterRemotePaint;
 };
 
 
