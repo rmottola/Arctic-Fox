@@ -1711,9 +1711,10 @@ GetPropertyIC::tryAttachProxy(JSContext* cx, HandleScript outerScript, IonScript
         DOMProxyShadowsResult shadows = GetDOMProxyShadowsCheck()(cx, obj, id);
         if (shadows == ShadowCheckFailed)
             return false;
-        if (shadows == Shadows)
+        if (DOMProxyIsShadowing(shadows))
             return tryAttachDOMProxyShadowed(cx, outerScript, ion, obj, returnAddr, emitted);
 
+        MOZ_ASSERT(shadows == DoesntShadow || shadows == DoesntShadowUnique);
         return tryAttachDOMProxyUnshadowed(cx, outerScript, ion, obj, name,
                                            shadows == DoesntShadowUnique, returnAddr, emitted);
     }
@@ -3078,7 +3079,7 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
                 DOMProxyShadowsResult shadows = GetDOMProxyShadowsCheck()(cx, obj, id);
                 if (shadows == ShadowCheckFailed)
                     return false;
-                if (shadows == Shadows) {
+                if (DOMProxyIsShadowing(shadows)) {
                     if (!cache.attachDOMProxyShadowed(cx, outerScript, ion, obj, returnAddr))
                         return false;
                     addedSetterStub = true;
