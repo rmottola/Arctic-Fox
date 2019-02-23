@@ -83,12 +83,11 @@ class ArrayObject;
  *
  * |id| must be "length", |attrs| are the attributes to be used for the newly-
  * changed length property, |value| is the value for the new length, and
- * |setterIsStrict| indicates whether invalid changes will cause a TypeError
- * to be thrown.
+ * |result| receives an error code if the change is invalid.
  */
 extern bool
 ArraySetLength(JSContext* cx, Handle<ArrayObject*> obj, HandleId id,
-               unsigned attrs, HandleValue value, bool setterIsStrict);
+               unsigned attrs, HandleValue value, ObjectOpResult &result);
 
 /*
  * Elements header used for native objects. The elements component of such objects
@@ -189,7 +188,7 @@ class ObjectElements
 
     friend bool
     ArraySetLength(JSContext* cx, Handle<ArrayObject*> obj, HandleId id,
-                   unsigned attrs, HandleValue value, bool setterIsStrict);
+                   unsigned attrs, HandleValue value, ObjectOpResult &result);
 
     /* See Flags enum above. */
     uint32_t flags;
@@ -346,10 +345,6 @@ class NativeObject : public JSObject
 
     /* Slots for object dense elements. */
     js::HeapSlot* elements_;
-
-    friend bool
-    ArraySetLength(JSContext* cx, Handle<ArrayObject*> obj, HandleId id, unsigned attrs,
-                   HandleValue value, bool setterIsStrict);
 
     friend class ::JSObject;
 
@@ -1238,16 +1233,28 @@ IsObjectValueInCompartment(Value v, JSCompartment* comp)
 
 extern bool
 NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs);
+                     PropertyOp getter, StrictPropertyOp, unsigned attrs,
+                     ObjectOpResult &result);
 
-inline bool
+extern bool
 NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
                      HandleValue value, PropertyOp getter, StrictPropertyOp setter,
-                     unsigned attrs);
+                     unsigned attrs, ObjectOpResult &result);
 
 extern bool
 NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index, HandleValue value,
-                    JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs);
+                    PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                    ObjectOpResult &result);
+
+/* If the result out-param is omitted, throw on failure. */
+extern bool
+NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
+                     PropertyOp getter, StrictPropertyOp setter, unsigned attrs);
+
+extern bool
+NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+                     HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                     unsigned attrs);
 
 extern bool
 NativeHasProperty(JSContext* cx, HandleNativeObject obj, HandleId id, bool* foundp);
@@ -1276,16 +1283,12 @@ NativeGetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, MutableH
 }
 
 bool
-SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleObject receiver,
-                      HandleId id, HandleValue v, bool strict, bool objHasOwn);
+SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
+                      HandleValue v, bool objHasOwn, ObjectOpResult &result);
 
 bool
-SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleObject receiver,
-                   HandleId id, MutableHandleValue vp, bool strict);
-
-// Report any error or warning when writing to a non-writable property.
-bool
-SetNonWritableProperty(JSContext* cx, HandleId id, bool strict);
+SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
+                   MutableHandleValue vp, ObjectOpResult &result);
 
 /*
  * Indicates whether an assignment operation is qualified (`x.y = 0`) or
@@ -1301,14 +1304,14 @@ enum QualifiedBool {
 
 extern bool
 NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
-                  QualifiedBool qualified, MutableHandleValue vp, bool strict);
+                  QualifiedBool qualified, MutableHandleValue vp, ObjectOpResult &result);
 
 extern bool
 NativeSetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
-                 MutableHandleValue vp, bool strict);
+                 MutableHandleValue vp, ObjectOpResult &result);
 
 extern bool
-NativeDeleteProperty(JSContext* cx, HandleNativeObject obj, HandleId id, bool* succeeded);
+NativeDeleteProperty(JSContext *cx, HandleNativeObject obj, HandleId id, ObjectOpResult &result);
 
 
 /*** SpiderMonkey nonstandard internal methods ***************************************************/
@@ -1417,20 +1420,20 @@ js::GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, V
 
 inline bool
 js::SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
-                HandleId id, MutableHandleValue vp, bool strict)
+                HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     if (obj->getOps()->setProperty)
-        return JSObject::nonNativeSetProperty(cx, obj, receiver, id, vp, strict);
-    return NativeSetProperty(cx, obj.as<NativeObject>(), receiver, id, Qualified, vp, strict);
+        return JSObject::nonNativeSetProperty(cx, obj, receiver, id, vp, result);
+    return NativeSetProperty(cx, obj.as<NativeObject>(), receiver, id, Qualified, vp, result);
 }
 
 inline bool
 js::SetElement(JSContext* cx, HandleObject obj, HandleObject receiver, uint32_t index,
-               MutableHandleValue vp, bool strict)
+               MutableHandleValue vp, ObjectOpResult &result)
 {
     if (obj->getOps()->setProperty)
-        return JSObject::nonNativeSetElement(cx, obj, receiver, index, vp, strict);
-    return NativeSetElement(cx, obj.as<NativeObject>(), receiver, index, vp, strict);
+        return JSObject::nonNativeSetElement(cx, obj, receiver, index, vp, result);
+    return NativeSetElement(cx, obj.as<NativeObject>(), receiver, index, vp, result);
 }
 
 #endif /* vm_NativeObject_h */

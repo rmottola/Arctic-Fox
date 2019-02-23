@@ -380,7 +380,7 @@ ConvertOmxYUVFormatToRGB565(android::sp<GraphicBuffer>& aBuffer,
   return OK;
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 GrallocImage::GetAsSourceSurface()
 {
   if (!mTextureClient) {

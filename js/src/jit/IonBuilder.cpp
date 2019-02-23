@@ -2948,7 +2948,7 @@ IonBuilder::assertValidLoopHeadOp(jsbytecode* pc)
     // do-while loops have a source note.
     jssrcnote* sn = info().getNote(gsn, pc);
     if (sn) {
-        jsbytecode* ifne = pc + js_GetSrcNoteOffset(sn, 0);
+        jsbytecode* ifne = pc + GetSrcNoteOffset(sn, 0);
 
         jsbytecode* expected_ifne;
         switch (state.state) {
@@ -2981,11 +2981,11 @@ IonBuilder::doWhileLoop(JSOp op, jssrcnote* sn)
     //    COND        ; start of condition
     //    ...
     //    IFNE ->     ; goes to LOOPHEAD
-    int condition_offset = js_GetSrcNoteOffset(sn, 0);
+    int condition_offset = GetSrcNoteOffset(sn, 0);
     jsbytecode* conditionpc = pc + condition_offset;
 
     jssrcnote* sn2 = info().getNote(gsn, pc+1);
-    int offset = js_GetSrcNoteOffset(sn2, 0);
+    int offset = GetSrcNoteOffset(sn2, 0);
     jsbytecode* ifne = pc + offset + 1;
     MOZ_ASSERT(ifne > pc);
 
@@ -3051,7 +3051,7 @@ IonBuilder::whileOrForInLoop(jssrcnote* sn)
     //    IFNE        ; goes to LOOPHEAD
     // for (x in y) { } loops are similar; the cond will be a MOREITER.
     MOZ_ASSERT(SN_TYPE(sn) == SRC_FOR_OF || SN_TYPE(sn) == SRC_FOR_IN || SN_TYPE(sn) == SRC_WHILE);
-    int ifneOffset = js_GetSrcNoteOffset(sn, 0);
+    int ifneOffset = GetSrcNoteOffset(sn, 0);
     jsbytecode* ifne = pc + ifneOffset;
     MOZ_ASSERT(ifne > pc);
 
@@ -3115,9 +3115,9 @@ IonBuilder::forLoop(JSOp op, jssrcnote* sn)
     MOZ_ASSERT(op == JSOP_POP || op == JSOP_NOP);
     pc = GetNextPc(pc);
 
-    jsbytecode* condpc = pc + js_GetSrcNoteOffset(sn, 0);
-    jsbytecode* updatepc = pc + js_GetSrcNoteOffset(sn, 1);
-    jsbytecode* ifne = pc + js_GetSrcNoteOffset(sn, 2);
+    jsbytecode* condpc = pc + GetSrcNoteOffset(sn, 0);
+    jsbytecode* updatepc = pc + GetSrcNoteOffset(sn, 1);
+    jsbytecode* ifne = pc + GetSrcNoteOffset(sn, 2);
     jsbytecode* exitpc = GetNextPc(ifne);
 
     // for loops have the following structures:
@@ -3247,7 +3247,7 @@ IonBuilder::tableSwitch(JSOp op, jssrcnote* sn)
     MDefinition* ins = current->pop();
 
     // Get the default and exit pc
-    jsbytecode* exitpc = pc + js_GetSrcNoteOffset(sn, 0);
+    jsbytecode* exitpc = pc + GetSrcNoteOffset(sn, 0);
     jsbytecode* defaultpc = pc + GET_JUMP_OFFSET(pc);
 
     MOZ_ASSERT(defaultpc > pc && defaultpc <= exitpc);
@@ -3532,6 +3532,8 @@ IonBuilder::improveTypesAtTypeOfCompare(MCompare *ins, bool trueBranch, MTest *t
         filter.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
         if (typeOf->inputMaybeCallableOrEmulatesUndefined() && trueBranch)
             filter.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
+    } else if (constant->toString() == TypeName(JSTYPE_BOOLEAN, names)) {
+        filter.addType(TypeSet::BooleanType(), alloc_->lifoAlloc());
     } else if (constant->toString() == TypeName(JSTYPE_NUMBER, names)) {
         filter.addType(TypeSet::Int32Type(), alloc_->lifoAlloc());
         filter.addType(TypeSet::DoubleType(), alloc_->lifoAlloc());
@@ -3546,7 +3548,10 @@ IonBuilder::improveTypesAtTypeOfCompare(MCompare *ins, bool trueBranch, MTest *t
     } else if (constant->toString() == TypeName(JSTYPE_FUNCTION, names)) {
         if (typeOf->inputMaybeCallableOrEmulatesUndefined() && trueBranch)
             filter.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
+    } else {
+    	return true;
     }
+
 
     TemporaryTypeSet *type;
     if (trueBranch)
@@ -3821,8 +3826,8 @@ IonBuilder::jsop_condswitch()
     MOZ_ASSERT(SN_TYPE(sn) == SRC_CONDSWITCH);
 
     // Get the exit pc
-    jsbytecode* exitpc = pc + js_GetSrcNoteOffset(sn, 0);
-    jsbytecode* firstCase = pc + js_GetSrcNoteOffset(sn, 1);
+    jsbytecode* exitpc = pc + GetSrcNoteOffset(sn, 0);
+    jsbytecode* firstCase = pc + GetSrcNoteOffset(sn, 1);
 
     // Iterate all cases in the conditional switch.
     // - Stop at the default case. (always emitted after the last case)
@@ -3837,7 +3842,7 @@ IonBuilder::jsop_condswitch()
         // Fetch the next case.
         jssrcnote* caseSn = info().getNote(gsn, curCase);
         MOZ_ASSERT(caseSn && SN_TYPE(caseSn) == SRC_NEXTCASE);
-        ptrdiff_t off = js_GetSrcNoteOffset(caseSn, 0);
+        ptrdiff_t off = GetSrcNoteOffset(caseSn, 0);
         curCase = off ? curCase + off : GetNextPc(curCase);
         MOZ_ASSERT(pc < curCase && curCase <= exitpc);
 
@@ -3917,7 +3922,7 @@ IonBuilder::processCondSwitchCase(CFGState& state)
 
     // Fetch the following case in which we will continue.
     jssrcnote* sn = info().getNote(gsn, pc);
-    ptrdiff_t off = js_GetSrcNoteOffset(sn, 0);
+    ptrdiff_t off = GetSrcNoteOffset(sn, 0);
     jsbytecode* casePc = off ? pc + off : GetNextPc(pc);
     bool caseIsDefault = JSOp(*casePc) == JSOP_DEFAULT;
     MOZ_ASSERT(JSOp(*casePc) == JSOP_CASE || caseIsDefault);
@@ -4198,7 +4203,7 @@ IonBuilder::jsop_ifeq(JSOp op)
       {
         // Infer the join point from the JSOP_GOTO[X] sitting here, then
         // assert as we much we can that this is the right GOTO.
-        jsbytecode* trueEnd = pc + js_GetSrcNoteOffset(sn, 0);
+        jsbytecode* trueEnd = pc + GetSrcNoteOffset(sn, 0);
         MOZ_ASSERT(trueEnd > pc);
         MOZ_ASSERT(trueEnd < falseStart);
         MOZ_ASSERT(JSOp(*trueEnd) == JSOP_GOTO);
@@ -4253,7 +4258,7 @@ IonBuilder::jsop_try()
 
     // Get the pc of the last instruction in the try block. It's a JSOP_GOTO to
     // jump over the catch block.
-    jsbytecode* endpc = pc + js_GetSrcNoteOffset(sn, 0);
+    jsbytecode* endpc = pc + GetSrcNoteOffset(sn, 0);
     MOZ_ASSERT(JSOp(*endpc) == JSOP_GOTO);
     MOZ_ASSERT(GetJumpOffset(endpc) > 0);
 
@@ -10483,8 +10488,9 @@ IonBuilder::getPropTryUnboxed(bool* emitted, MDefinition* obj, PropertyName* nam
 
 MDefinition*
 IonBuilder::addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Shape* holderShape,
-                                          const BaselineInspector::ShapeVector& receiverShapes,
-                                          bool isOwnProperty)
+                const BaselineInspector::ShapeVector &receiverShapes,
+                const BaselineInspector::ObjectGroupVector &receiverUnboxedGroups,
+                bool isOwnProperty)
 {
     MOZ_ASSERT(holder);
     MOZ_ASSERT(holderShape);
@@ -10497,7 +10503,7 @@ IonBuilder::addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Sh
     MDefinition* holderDef = constantMaybeNursery(holder);
     addShapeGuard(holderDef, holderShape, Bailout_ShapeGuard);
 
-    return addShapeGuardPolymorphic(obj, receiverShapes);
+    return addShapeGuardPolymorphic(obj, receiverShapes, receiverUnboxedGroups);
 }
 
 bool
@@ -10512,8 +10518,10 @@ IonBuilder::getPropTryCommonGetter(bool* emitted, MDefinition* obj, PropertyName
     JSObject* foundProto = nullptr;
     bool isOwnProperty = false;
     BaselineInspector::ShapeVector receiverShapes(alloc());
+    BaselineInspector::ObjectGroupVector receiverUnboxedGroups(alloc());
     if (!inspector->commonGetPropFunction(pc, &foundProto, &lastProperty, &commonGetter,
-                                          &globalShape, &isOwnProperty, receiverShapes))
+                                          &globalShape, &isOwnProperty,
+                                          receiverShapes, receiverUnboxedGroups))
     {
         return true;
     }
@@ -10528,7 +10536,8 @@ IonBuilder::getPropTryCommonGetter(bool* emitted, MDefinition* obj, PropertyName
     if (!canUseTIForGetter) {
         // If type information is bad, we can still optimize the getter if we
         // shape guard.
-        obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty, receiverShapes,
+        obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty,
+                                            receiverShapes, receiverUnboxedGroups,
                                             isOwnProperty);
         if (!obj)
             return false;
@@ -10739,13 +10748,7 @@ IonBuilder::getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName
 
         ObjectGroup* group = unboxedGroups[0];
 
-        // Failures in this group guard should be treated the same as a shape guard failure.
-        obj = MGuardObjectGroup::New(alloc(), obj, group, /* bailOnEquality = */ false,
-                                     Bailout_ShapeGuard);
-        current->add(obj->toInstruction());
-
-        if (failedShapeGuard_)
-            obj->toGuardObjectGroup()->setNotMovable();
+        obj = addGroupGuard(obj, group, Bailout_ShapeGuard);
 
         const UnboxedLayout::Property* property = group->unboxedLayout().lookup(name);
         MInstruction* load = loadUnboxedProperty(obj, property->offset, property->type, barrier, types);
@@ -10767,7 +10770,7 @@ IonBuilder::getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName
         return false;
 
     if (sameSlot && unboxedGroups.empty()) {
-        obj = addShapeGuardPolymorphic(obj, nativeShapes);
+        obj = addShapeGuardPolymorphic(obj, nativeShapes, unboxedGroups);
         if (!obj)
             return false;
 
@@ -11033,8 +11036,10 @@ IonBuilder::setPropTryCommonSetter(bool* emitted, MDefinition* obj,
     JSObject* foundProto = nullptr;
     bool isOwnProperty;
     BaselineInspector::ShapeVector receiverShapes(alloc());
-    if (!inspector->commonSetPropFunction(pc, &foundProto, &lastProperty, &commonSetter, &isOwnProperty,
-                                          receiverShapes))
+    BaselineInspector::ObjectGroupVector receiverUnboxedGroups(alloc());
+    if (!inspector->commonSetPropFunction(pc, &foundProto, &lastProperty, &commonSetter,
+                                          &isOwnProperty,
+                                          receiverShapes, receiverUnboxedGroups))
     {
         trackOptimizationOutcome(TrackedOutcome::NoProtoFound);
         return true;
@@ -11048,7 +11053,8 @@ IonBuilder::setPropTryCommonSetter(bool* emitted, MDefinition* obj,
     if (!canUseTIForSetter) {
         // If type information is bad, we can still optimize the setter if we
         // shape guard.
-        obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty, receiverShapes,
+        obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty,
+                                            receiverShapes, receiverUnboxedGroups,
                                             isOwnProperty);
         if (!obj)
             return false;
@@ -11434,13 +11440,7 @@ IonBuilder::setPropTryInlineAccess(bool* emitted, MDefinition* obj,
 
         ObjectGroup* group = unboxedGroups[0];
 
-        // Failures in this group guard should be treated the same as a shape guard failure.
-        obj = MGuardObjectGroup::New(alloc(), obj, group, /* bailOnEquality = */ false,
-                                    Bailout_ShapeGuard);
-        current->add(obj->toInstruction());
-
-        if (failedShapeGuard_)
-            obj->toGuardObjectGroup()->setNotMovable();
+	obj = addGroupGuard(obj, group, Bailout_ShapeGuard);
 
         const UnboxedLayout::Property* property = group->unboxedLayout().lookup(name);
         storeUnboxedProperty(obj, property->offset, property->type, value);
@@ -11460,7 +11460,7 @@ IonBuilder::setPropTryInlineAccess(bool* emitted, MDefinition* obj,
         return false;
 
     if (sameSlot && unboxedGroups.empty()) {
-        obj = addShapeGuardPolymorphic(obj, nativeShapes);
+        obj = addShapeGuardPolymorphic(obj, nativeShapes, unboxedGroups);
         if (!obj)
             return false;
 
@@ -12395,21 +12395,50 @@ IonBuilder::addShapeGuard(MDefinition* obj, Shape* const shape, BailoutKind bail
 }
 
 MInstruction*
-IonBuilder::addShapeGuardPolymorphic(MDefinition* obj, const BaselineInspector::ShapeVector& shapes)
+IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind)
 {
-    if (shapes.length() == 1)
+    MGuardObjectGroup *guard = MGuardObjectGroup::New(alloc(), obj, group,
+                                                      /* bailOnEquality = */ false,
+                                                      bailoutKind);
+    current->add(guard);
+
+    // If a shape guard failed in the past, don't optimize group guards.
+    if (failedShapeGuard_)
+        guard->setNotMovable();
+
+    LifoAlloc *lifoAlloc = alloc().lifoAlloc();
+    guard->setResultTypeSet(lifoAlloc->new_<TemporaryTypeSet>(lifoAlloc,
+                                                            TypeSet::ObjectType(group)));
+
+    return guard;
+}
+
+MInstruction *
+IonBuilder::addShapeGuardPolymorphic(MDefinition *obj,
+                                     const BaselineInspector::ShapeVector &shapes,
+                                     const BaselineInspector::ObjectGroupVector &unboxedGroups)
+{
+    if (shapes.length() == 1 && unboxedGroups.empty())
         return addShapeGuard(obj, shapes[0], Bailout_ShapeGuard);
 
-    MOZ_ASSERT(shapes.length() > 1);
+    if (shapes.empty() && unboxedGroups.length() == 1)
+        return addGroupGuard(obj, unboxedGroups[0], Bailout_ShapeGuard);
 
-    MGuardShapePolymorphic* guard = MGuardShapePolymorphic::New(alloc(), obj);
+    MOZ_ASSERT(shapes.length() + unboxedGroups.length() > 1);
+
+    MGuardReceiverPolymorphic *guard = MGuardReceiverPolymorphic::New(alloc(), obj);
     current->add(guard);
 
     if (failedShapeGuard_)
         guard->setNotMovable();
 
-    for (size_t i = 0, len = shapes.length(); i < len; i++) {
+    for (size_t i = 0; i < shapes.length(); i++) {
         if (!guard->addShape(shapes[i]))
+            return nullptr;
+    }
+
+    for (size_t i = 0; i < unboxedGroups.length(); i++) {
+        if (!guard->addUnboxedGroup(unboxedGroups[i]))
             return nullptr;
     }
 

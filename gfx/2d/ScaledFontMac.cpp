@@ -6,9 +6,9 @@
 #include "ScaledFontMac.h"
 #ifdef USE_SKIA
 #include "PathSkia.h"
-#include "skia/SkPaint.h"
-#include "skia/SkPath.h"
-#include "skia/SkTypeface_mac.h"
+#include "skia/include/core/SkPaint.h"
+#include "skia/include/core/SkPath.h"
+#include "skia/include/ports/SkTypeface_mac.h"
 #endif
 #include "DrawTargetCG.h"
 #include <vector>
@@ -76,7 +76,7 @@ SkTypeface* ScaledFontMac::GetSkTypeface()
 // Note: cairo dlsyms it. We could do that but maybe it's
 // safe just to use?
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 ScaledFontMac::GetPathForGlyphs(const GlyphBuffer &aBuffer, const DrawTarget *aTarget)
 {
   if (aTarget->GetBackendType() == BackendType::COREGRAPHICS ||

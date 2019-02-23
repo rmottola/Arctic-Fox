@@ -979,7 +979,7 @@ HTMLCanvasElement::MarkContextClean()
   mCurrentContext->MarkContextClean();
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 HTMLCanvasElement::GetSurfaceSnapshot(bool* aPremultAlpha)
 {
   if (!mCurrentContext)

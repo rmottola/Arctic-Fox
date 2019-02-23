@@ -4,33 +4,22 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-EXPORTS.webp.utils += [ 
-    'bit_reader.h',
-    'bit_writer.h',
-    'color_cache.h',
-    'filters.h',
-    'huffman.h',
-    'huffman_encode.h',
-    'quant_levels.h',
-    'quant_levels_dec.h',
-    'rescaler.h',
-    'thread.h',
-    'utils.h'
+SOURCES += [
+    'bit_reader_utils.c',
+    'color_cache_utils.c',
+    'filters_utils.c',
+    'huffman_utils.c',
+    'quant_levels_dec_utils.c',
+    'quant_levels_utils.c',
+    'random_utils.c',
+    'rescaler_utils.c',
+    'thread_utils.c',
+    'utils.c',
 ]
 
-SOURCES += [
-    'bit_reader.c',
-    'bit_writer.c',
-    'color_cache.c',
-    'filters.c',
-    'huffman.c',
-    'huffman_encode.c',
-    'quant_levels.c',
-    'quant_levels_dec.c',
-    'random.c',
-    'rescaler.c',
-    'thread.c',
-    'utils.c'
+LOCAL_INCLUDES += [
+    '/media/libwebp',
 ]
+
 
 FINAL_LIBRARY = 'gkmedias'

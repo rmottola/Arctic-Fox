@@ -9,6 +9,11 @@
 #include "nsCocoaUtils.h"
 #include "nsThreadUtils.h"
 
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1060
+@protocol NSWindowDelegate
+@end
+#endif
+
 using namespace mozilla;
 
 static unsigned int

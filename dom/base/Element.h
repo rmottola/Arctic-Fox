@@ -351,7 +351,7 @@ public:
   // false
   inline bool HasDirAuto() const {
     return (!HasFixedDir() &&
-            (HasValidDir() || IsHTML(nsGkAtoms::bdi)));
+            (HasValidDir() || IsHTMLElement(nsGkAtoms::bdi)));
   }
 
   Directionality GetComputedDirectionality() const;
@@ -782,6 +782,7 @@ public:
   void SetScrollLeft(int32_t aScrollLeft);
   int32_t ScrollWidth();
   int32_t ScrollHeight();
+  void MozScrollSnap();
   int32_t ClientTop()
   {
     return nsPresContext::AppUnitsToIntCSSPixels(GetClientAreaRect().y);

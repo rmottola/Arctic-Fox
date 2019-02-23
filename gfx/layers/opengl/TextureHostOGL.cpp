@@ -41,7 +41,7 @@ namespace layers {
 
 class Compositor;
 
-TemporaryRef<TextureHost>
+already_AddRefed<TextureHost>
 CreateTextureHostOGL(const SurfaceDescriptor& aDesc,
                      ISurfaceAllocator* aDeallocator,
                      TextureFlags aFlags)

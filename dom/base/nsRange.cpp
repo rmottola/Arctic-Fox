@@ -1118,10 +1118,11 @@ nsRange::IsValidBoundary(nsINode* aNode)
   }
 
   if (aNode->IsNodeOfType(nsINode::eCONTENT)) {
-    nsIContent* content = static_cast<nsIContent*>(aNode);
-    if (content->Tag() == nsGkAtoms::documentTypeNodeName) {
+    if (aNode->NodeInfo()->NameAtom() == nsGkAtoms::documentTypeNodeName) {
       return nullptr;
     }
+
+    nsIContent* content = static_cast<nsIContent*>(aNode);
 
     if (!mMaySpanAnonymousSubtrees) {
       // If the node is in a shadow tree then the ShadowRoot is the root.
@@ -3244,7 +3245,7 @@ IsVisibleAndNotInReplacedElement(nsIFrame* aFrame)
   }
   for (nsIFrame* f = aFrame->GetParent(); f; f = f->GetParent()) {
     if (f->IsFrameOfType(nsIFrame::eReplaced) &&
-        !f->GetContent()->IsHTML(nsGkAtoms::button)) {
+        !f->GetContent()->IsHTMLElement(nsGkAtoms::button)) {
       return false;
     }
   }
@@ -3291,7 +3292,7 @@ enum TreeTraversalState {
 static int8_t
 GetRequiredInnerTextLineBreakCount(nsIFrame* aFrame)
 {
-  if (aFrame->GetContent()->IsHTML(nsGkAtoms::p)) {
+  if (aFrame->GetContent()->IsHTMLElement(nsGkAtoms::p)) {
     return 2;
   }
   const nsStyleDisplay* styleDisplay = aFrame->StyleDisplay();
@@ -3386,7 +3387,7 @@ nsRange::GetInnerTextNoFlush(DOMString& aValue, ErrorResult& aError,
     bool isVisibleAndNotReplaced = IsVisibleAndNotInReplacedElement(f);
     if (currentState == AT_NODE) {
       bool isText = currentNode->IsNodeOfType(nsINode::eTEXT);
-      if (isText && currentNode->GetParent()->IsHTML(nsGkAtoms::rp) &&
+      if (isText && currentNode->GetParent()->IsHTMLElement(nsGkAtoms::rp) &&
           ElementIsVisibleNoFlush(currentNode->GetParent()->AsElement())) {
         nsAutoString str;
         currentNode->GetTextContent(str, aError);
@@ -3409,7 +3410,7 @@ nsRange::GetInnerTextNoFlush(DOMString& aValue, ErrorResult& aError,
       break;
     }
     if (isVisibleAndNotReplaced) {
-      if (currentNode->IsHTML(nsGkAtoms::br)) {
+      if (currentNode->IsHTMLElement(nsGkAtoms::br)) {
         result.Append('\n');
       }
       switch (f->StyleDisplay()->mDisplay) {

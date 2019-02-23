@@ -14,8 +14,8 @@
 #endif
 
 #ifdef USE_SKIA
-#include "skia/SkPath.h"
-#include "skia/SkTypeface.h"
+#include "skia/include/core/SkPath.h"
+#include "skia/include/core/SkTypeface.h"
 #endif
 #ifdef USE_CAIRO_SCALED_FONT
 #include "cairo.h"
@@ -33,7 +33,7 @@ public:
   explicit ScaledFontBase(Float aSize);
   virtual ~ScaledFontBase();
 
-  virtual TemporaryRef<Path> GetPathForGlyphs(const GlyphBuffer &aBuffer, const DrawTarget *aTarget);
+  virtual already_AddRefed<Path> GetPathForGlyphs(const GlyphBuffer &aBuffer, const DrawTarget *aTarget);
 
   virtual void CopyGlyphsToBuilder(const GlyphBuffer &aBuffer, PathBuilder *aBuilder, BackendType aBackendType, const Matrix *aTransformHint);
 

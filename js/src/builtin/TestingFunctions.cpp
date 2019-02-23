@@ -1858,8 +1858,10 @@ EnableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-    args.rval().setBoolean(TraceLoggerEnable(logger, cx));
+    if (!TraceLoggerEnable(logger, cx))
+        return false;
 
+    args.rval().setUndefined();
     return true;
 }
 
@@ -1882,7 +1884,7 @@ DumpObject(JSContext* cx, unsigned argc, jsval* vp)
     if (!JS_ConvertArguments(cx, args, "o", obj.address()))
         return false;
 
-    js_DumpObject(obj);
+    DumpObject(obj);
 
     args.rval().setUndefined();
     return true;
@@ -1927,7 +1929,7 @@ static bool
 DumpBacktrace(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    js_DumpBacktrace(cx);
+    DumpBacktrace(cx);
     args.rval().setUndefined();
     return true;
 }

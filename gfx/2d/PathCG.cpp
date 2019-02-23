@@ -9,6 +9,10 @@
 #include "Logging.h"
 #include "PathHelpers.h"
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+CGPathRef CGContextCopyPath(CGContextRef c);
+#endif
+
 namespace mozilla {
 namespace gfx {
 
@@ -127,13 +131,13 @@ PathBuilderCG::EnsureActive(const Point &aPoint)
 {
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 PathBuilderCG::Finish()
 {
   return MakeAndAddRef<PathCG>(mCGPath, mFillRule);
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathCG::CopyToBuilder(FillRule aFillRule) const
 {
   CGMutablePathRef path = CGPathCreateMutableCopy(mPath);
@@ -142,7 +146,7 @@ PathCG::CopyToBuilder(FillRule aFillRule) const
 
 
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathCG::TransformedCopyToBuilder(const Matrix &aTransform, FillRule aFillRule) const
 {
   // 10.7 adds CGPathCreateMutableCopyByTransformingPath it might be faster than doing

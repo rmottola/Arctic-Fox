@@ -250,7 +250,7 @@ HTMLButtonAccessible::NativeName(nsString& aName)
   // type="submit"/"reset"/"image" elements.
 
   ENameValueFlag nameFlag = Accessible::NativeName(aName);
-  if (!aName.IsEmpty() || mContent->Tag() != nsGkAtoms::input ||
+  if (!aName.IsEmpty() || !mContent->IsHTMLElement(nsGkAtoms::input) ||
       !mContent->AttrValueIs(kNameSpaceID_None, nsGkAtoms::type,
                              nsGkAtoms::image, eCaseMatters))
     return nameFlag;
@@ -306,8 +306,13 @@ HTMLTextFieldAccessible::NativeAttributes()
   // Expose type for text input elements as it gives some useful context,
   // especially for mobile.
   nsAutoString type;
-  if (mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::type, type))
+  if (mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::type, type)) {
     nsAccUtils::SetAccAttr(attributes, nsGkAtoms::textInputType, type);
+    if (!mRoleMapEntry && type.EqualsLiteral("search")) {
+      nsAccUtils::SetAccAttr(attributes, nsGkAtoms::xmlroles,
+                             NS_LITERAL_STRING("searchbox"));
+    }
+  }
 
   return attributes.forget();
 }

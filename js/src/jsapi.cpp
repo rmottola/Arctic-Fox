@@ -129,6 +129,105 @@ JS::CallArgs::requireAtLeast(JSContext* cx, const char* fnname, unsigned require
     return true;
 }
 
+static bool
+ErrorTakesIdArgument(unsigned msg)
+{
+    MOZ_ASSERT(msg < JSErr_Limit);
+    unsigned argCount = js_ErrorFormatString[msg].argCount;
+    MOZ_ASSERT(argCount <= 1);
+    return argCount == 1;
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, HandleId id,
+                                               bool strict)
+{
+    static_assert(unsigned(OkCode) == unsigned(JSMSG_NOT_AN_ERROR),
+                  "unsigned value of OkCode must not be an error code");
+    MOZ_ASSERT(code_ != Uninitialized);
+    MOZ_ASSERT(!ok());
+
+    unsigned flags = strict ? JSREPORT_ERROR : (JSREPORT_WARNING | JSREPORT_STRICT);
+    if (code_ == JSMSG_OBJECT_NOT_EXTENSIBLE) {
+        RootedValue val(cx, ObjectValue(*obj));
+        return ReportValueErrorFlags(cx, flags, code_, JSDVG_IGNORE_STACK, val,
+                                     NullPtr(), nullptr, nullptr);
+    }
+    if (ErrorTakesIdArgument(code_)) {
+        RootedValue idv(cx, IdToValue(id));
+        RootedString str(cx, ValueToSource(cx, idv));
+        if (!str)
+            return false;
+
+        JSAutoByteString propName(cx, str);
+        if (!propName)
+            return false;
+
+        return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_,
+                                            propName.ptr());
+    }
+    return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, bool strict)
+{
+    MOZ_ASSERT(code_ != Uninitialized);
+    MOZ_ASSERT(!ok());
+    MOZ_ASSERT(!ErrorTakesIdArgument(code_));
+
+    unsigned flags = strict ? JSREPORT_ERROR : (JSREPORT_WARNING | JSREPORT_STRICT);
+    return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantRedefineProp()
+{
+    return fail(JSMSG_CANT_REDEFINE_PROP);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failReadOnly()
+{
+    return fail(JSMSG_READ_ONLY);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failGetterOnly()
+{
+    return fail(JSMSG_GETTER_ONLY);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantSetInterposed()
+{
+    return fail(JSMSG_CANT_SET_INTERPOSED);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantDelete()
+{
+    return fail(JSMSG_CANT_DELETE);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantDeleteWindowElement()
+{
+    return fail(JSMSG_CANT_DELETE_WINDOW_ELEMENT);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantDeleteWindowNamedProperty()
+{
+    return fail(JSMSG_CANT_DELETE_WINDOW_NAMED_PROPERTY);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failCantPreventExtensions()
+{
+    return fail(JSMSG_CANT_PREVENT_EXTENSIONS);
+}
+
 JS_PUBLIC_API(int64_t)
 JS_Now()
 {
@@ -1787,9 +1886,10 @@ JS_PropertyStub(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue
 }
 
 JS_PUBLIC_API(bool)
-JS_StrictPropertyStub(JSContext* cx, HandleObject obj, HandleId id, bool strict, MutableHandleValue vp)
+JS_StrictPropertyStub(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+                      ObjectOpResult &result)
 {
-    return true;
+    return result.succeed();
 }
 
 JS_PUBLIC_API(JSObject*)
@@ -1879,17 +1979,7 @@ JS_SetPrototype(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JSObject*> 
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, proto);
 
-    bool succeeded;
-    if (!SetPrototype(cx, obj, proto, &succeeded))
-        return false;
-
-    if (!succeeded) {
-        RootedValue val(cx, ObjectValue(*obj));
-        ReportValueError(cx, JSMSG_SETPROTOTYPEOF_FAIL, JSDVG_IGNORE_STACK, val, js::NullPtr());
-        return false;
-    }
-
-    return true;
+    return SetPrototype(cx, obj, proto);
 }
 
 JS_PUBLIC_API(bool)
@@ -1899,19 +1989,19 @@ JS_IsExtensible(JSContext* cx, HandleObject obj, bool* extensible)
 }
 
 JS_PUBLIC_API(bool)
-JS_PreventExtensions(JSContext* cx, JS::HandleObject obj, bool* succeeded)
+JS_PreventExtensions(JSContext *cx, JS::HandleObject obj, ObjectOpResult &result)
 {
-    return PreventExtensions(cx, obj, succeeded);
+    return PreventExtensions(cx, obj, result);
 }
 
-JS_PUBLIC_API(JSObject*)
-JS_GetParent(JSObject* obj)
+JS_PUBLIC_API(JSObject *)
+JS_GetParent(JSObject *obj)
 {
     MOZ_ASSERT(!obj->is<ScopeObject>());
     return obj->getParent();
 }
 
-JS_PUBLIC_API(JSObject*)
+JS_PUBLIC_API(JSObject *)
 JS_GetConstructor(JSContext* cx, HandleObject proto)
 {
     AssertHeapIsIdle(cx);
@@ -2387,6 +2477,33 @@ JS_DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, double value
 }
 
 static bool
+DefinePropertyByDescriptor(JSContext *cx, HandleObject obj, HandleId id,
+                           Handle<JSPropertyDescriptor> desc, ObjectOpResult &result)
+{
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, obj, id, desc);
+    return DefineProperty(cx, obj, id, desc.value(), desc.getter(), desc.setter(),
+                          desc.attributes(), result);
+}
+
+JS_PUBLIC_API(bool)
+JS_DefinePropertyById(JSContext *cx, HandleObject obj, HandleId id,
+                      Handle<JSPropertyDescriptor> desc, ObjectOpResult &result)
+{
+    return DefinePropertyByDescriptor(cx, obj, id, desc, result);
+}
+
+JS_PUBLIC_API(bool)
+JS_DefinePropertyById(JSContext *cx, HandleObject obj, HandleId id,
+                      Handle<JSPropertyDescriptor> desc)
+{
+    ObjectOpResult result;
+    return DefinePropertyByDescriptor(cx, obj, id, desc, result) &&
+           result.checkStrict(cx, obj, id);
+}
+
+static bool
 DefineElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue value,
               unsigned attrs, Native getter, Native setter)
 {
@@ -2642,6 +2759,31 @@ JS_DefineUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_
                             getter, setter, attrs, 0);
 }
 
+JS_PUBLIC_API(bool)
+JS_DefineUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
+                    Handle<JSPropertyDescriptor> desc,
+                    ObjectOpResult &result)
+{
+    JSAtom *atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
+    if (!atom)
+        return false;
+    RootedId id(cx, AtomToId(atom));
+    return DefinePropertyByDescriptor(cx, obj, id, desc, result);
+}
+
+JS_PUBLIC_API(bool)
+JS_DefineUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
+                    Handle<JSPropertyDescriptor> desc)
+{
+    JSAtom *atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
+    if (!atom)
+        return false;
+    RootedId id(cx, AtomToId(atom));
+    ObjectOpResult result;
+    return DefinePropertyByDescriptor(cx, obj, id, desc, result) &&
+           result.checkStrict(cx, obj, id);
+}
+
 JS_PUBLIC_API(JSObject*)
 JS_DefineObject(JSContext* cx, HandleObject obj, const char* name, const JSClass* jsclasp,
                 unsigned attrs)
@@ -2884,25 +3026,25 @@ JS_SetPropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue v)
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, id);
 
-    return SetProperty(cx, obj, obj, id, &value, false);
+    ObjectOpResult ignored;
+    return SetProperty(cx, obj, obj, id, &value, ignored);
 }
 
 JS_PUBLIC_API(bool)
-JS_ForwardSetPropertyTo(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue onBehalfOf,
-                        bool strict, JS::HandleValue v)
+JS_ForwardSetPropertyTo(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                        HandleValue receiver, ObjectOpResult &result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, obj, id);
-    assertSameCompartment(cx, onBehalfOf);
+    assertSameCompartment(cx, obj, id, receiver);
 
     // XXX Bug 603201 will eliminate this ToObject.
-    RootedObject receiver(cx, ToObject(cx, onBehalfOf));
-    if (!receiver)
+    RootedObject receiverObj(cx, ToObject(cx, receiver));
+    if (!receiverObj)
         return false;
 
     RootedValue value(cx, v);
-    return SetProperty(cx, obj, receiver, id, &value, strict);
+    return SetProperty(cx, obj, receiverObj, id, &value, result);
 }
 
 static bool
@@ -2912,7 +3054,8 @@ SetElement(JSContext* cx, HandleObject obj, uint32_t index, MutableHandleValue v
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, vp);
 
-    return SetElement(cx, obj, obj, index, vp, false);
+    ObjectOpResult ignored;
+    return SetElement(cx, obj, obj, index, vp, ignored);
 }
 
 JS_PUBLIC_API(bool)
@@ -2979,7 +3122,7 @@ JS_SetUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_t n
 }
 
 JS_PUBLIC_API(bool)
-JS_DeletePropertyById2(JSContext* cx, HandleObject obj, HandleId id, bool* result)
+JS_DeletePropertyById(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2989,7 +3132,7 @@ JS_DeletePropertyById2(JSContext* cx, HandleObject obj, HandleId id, bool* resul
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteElement2(JSContext* cx, HandleObject obj, uint32_t index, bool* result)
+JS_DeleteElement(JSContext *cx, HandleObject obj, uint32_t index, ObjectOpResult &result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2999,7 +3142,7 @@ JS_DeleteElement2(JSContext* cx, HandleObject obj, uint32_t index, bool* result)
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteProperty2(JSContext* cx, HandleObject obj, const char* name, bool* result)
+JS_DeleteProperty(JSContext *cx, HandleObject obj, const char *name, ObjectOpResult &result)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -3012,8 +3155,8 @@ JS_DeleteProperty2(JSContext* cx, HandleObject obj, const char* name, bool* resu
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteUCProperty2(JSContext* cx, HandleObject obj, const char16_t* name, size_t namelen,
-                     bool* result)
+JS_DeleteUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
+                    ObjectOpResult &result)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -3028,22 +3171,22 @@ JS_DeleteUCProperty2(JSContext* cx, HandleObject obj, const char16_t* name, size
 JS_PUBLIC_API(bool)
 JS_DeletePropertyById(JSContext* cx, HandleObject obj, HandleId id)
 {
-    bool junk;
-    return JS_DeletePropertyById2(cx, obj, id, &junk);
+    ObjectOpResult ignored;
+    return JS_DeletePropertyById(cx, obj, id, ignored);
 }
 
 JS_PUBLIC_API(bool)
 JS_DeleteElement(JSContext* cx, HandleObject obj, uint32_t index)
 {
-    bool junk;
-    return JS_DeleteElement2(cx, obj, index, &junk);
+    ObjectOpResult ignored;
+    return JS_DeleteElement(cx, obj, index, ignored);
 }
 
 JS_PUBLIC_API(bool)
 JS_DeleteProperty(JSContext* cx, HandleObject obj, const char* name)
 {
-    bool junk;
-    return JS_DeleteProperty2(cx, obj, name, &junk);
+    ObjectOpResult ignored;
+    return JS_DeleteProperty(cx, obj, name, ignored);
 }
 
 JS_PUBLIC_API(void)
@@ -3430,7 +3573,7 @@ JS_BindCallable(JSContext* cx, HandleObject target, HandleObject newThis)
 }
 
 static bool
-js_generic_native_method_dispatcher(JSContext* cx, unsigned argc, Value* vp)
+GenericNativeMethodDispatcher(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -3499,7 +3642,7 @@ JS_DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
 
             flags &= ~JSFUN_GENERIC_NATIVE;
             JSFunction* fun = DefineFunction(cx, ctor, id,
-                                             js_generic_native_method_dispatcher,
+					     GenericNativeMethodDispatcher,
                                              fs->nargs + 1, flags,
                                              JSFunction::ExtendedFinalizeKind);
             if (!fun)

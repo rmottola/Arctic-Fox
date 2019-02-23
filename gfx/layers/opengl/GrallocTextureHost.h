@@ -62,7 +62,7 @@ public:
   }
 #endif
 
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() override;
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override;
 
   bool IsValid() const;
 

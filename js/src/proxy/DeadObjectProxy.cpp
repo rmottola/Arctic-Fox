@@ -32,7 +32,8 @@ DeadObjectProxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, H
 
 bool
 DeadObjectProxy::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
-                                MutableHandle<PropertyDescriptor> desc) const
+                                MutableHandle<PropertyDescriptor> desc,
+                                ObjectOpResult &result) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
     return false;
@@ -47,35 +48,36 @@ DeadObjectProxy::ownPropertyKeys(JSContext* cx, HandleObject wrapper,
 }
 
 bool
-DeadObjectProxy::delete_(JSContext* cx, HandleObject wrapper, HandleId id, bool* bp) const
+DeadObjectProxy::delete_(JSContext *cx, HandleObject wrapper, HandleId id,
+                         ObjectOpResult &result) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
     return false;
 }
 
 bool
-DeadObjectProxy::enumerate(JSContext* cx, HandleObject wrapper, MutableHandleObject objp) const
+DeadObjectProxy::enumerate(JSContext *cx, HandleObject wrapper, MutableHandleObject objp) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
     return false;
 }
 
 bool
-DeadObjectProxy::getPrototypeOf(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const
+DeadObjectProxy::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const
 {
     protop.set(nullptr);
     return true;
 }
 
 bool
-DeadObjectProxy::preventExtensions(JSContext* cx, HandleObject proxy, bool* succeeded) const
+DeadObjectProxy::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
     return false;
 }
 
 bool
-DeadObjectProxy::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const
+DeadObjectProxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const
 {
     // This is kind of meaningless, but dead-object semantics aside,
     // [[Extensible]] always being true is consistent with other proxy types.
