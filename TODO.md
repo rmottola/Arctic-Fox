@@ -78,11 +78,14 @@
 - Bug 928336. Make defining unforgeable properties on objects faster by
 - Bug 1131805 1 to 3 parts
 - Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
-- Bug 1112164 1 to 19
-- Bug 1133746. Allow DOMProxyShadows to communicate to the JIT whether
-- Bug 963921 - Clients of the JS API should use JS_DefineElement where
-- Bug 1037687, load iframes in shadow DOM
-- Bug 1129223 - Remove local mozAfterRemotePaint events
+- Bug 1140801 - Don't invoke functions on non-ion platforms.
+- Bug 1138141 - x64: Add some padding after pushing an odd number of fl
+- Bug 1112164 5 to 19
+- Bug 1135903 - OdinMonkey: Check the siginfo si_code field before hand
+- Bug 986981 - OdinMonkey: Optimize addresses with constant offsets on 
+- Bug 1122856 - OdinMonkey: Split out the flag that says "bounds checks
+- Bug 1133565 (part): Factor SIMD templates within a compartment
+
 
 
 ### Further ToDo which would help portability:
