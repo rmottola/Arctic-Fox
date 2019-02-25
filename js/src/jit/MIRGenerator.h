@@ -38,7 +38,8 @@ class MIRGenerator
   public:
     MIRGenerator(CompileCompartment* compartment, const JitCompileOptions& options,
                  TempAllocator* alloc, MIRGraph* graph,
-                 CompileInfo* info, const OptimizationInfo* optimizationInfo);
+                 CompileInfo *info, const OptimizationInfo *optimizationInfo,
+                 Label *outOfBoundsLabel = nullptr, bool usesSignalHandlersForOOB = false);
 
     TempAllocator& alloc() {
         return *alloc_;
@@ -200,6 +201,9 @@ class MIRGenerator
     // CodeGenerator::link).
     ObjectVector nurseryObjects_;
 
+    Label *outOfBoundsLabel_;
+    bool usesSignalHandlersForOOB_;
+
     void addAbortedPreliminaryGroup(ObjectGroup *group);
 
     void setForceAbort() {
@@ -223,6 +227,13 @@ class MIRGenerator
 
     const ObjectVector& nurseryObjects() const {
         return nurseryObjects_;
+    }
+
+    bool usesSignalHandlersForOOB() const {
+        return usesSignalHandlersForOOB_;
+    }
+    Label *outOfBoundsLabel() const {
+        return outOfBoundsLabel_;
     }
 };
 
