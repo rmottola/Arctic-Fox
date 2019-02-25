@@ -166,6 +166,9 @@ EXPORTS.angle.KHR += [ 'include/KHR/khrplatform.h' ]
 
 LOCAL_INCLUDES += [ 'include', 'src' ]
 
+if CONFIG['MOZ_X11']:
+    CXXFLAGS += CONFIG['XCFLAGS']
+
 if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
     NO_VISIBILITY_FLAGS = True
 
