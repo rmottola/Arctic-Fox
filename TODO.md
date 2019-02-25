@@ -83,9 +83,6 @@
 - Bug 1112164 5 to 19
 - Bug 1135903 - OdinMonkey: Check the siginfo si_code field before hand
 - Bug 986981 - OdinMonkey: Optimize addresses with constant offsets on 
-- Bug 1122856 - OdinMonkey: Split out the flag that says "bounds checks
-- Bug 1133565 (part): Factor SIMD templates within a compartment
-
 
 
 ### Further ToDo which would help portability:
