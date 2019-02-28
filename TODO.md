@@ -82,7 +82,6 @@
 - Bug 1138141 - x64: Add some padding after pushing an odd number of fl
 - Bug 1112164 5 to 19
 - Bug 1135903 - OdinMonkey: Check the siginfo si_code field before hand
-- Bug 986981 - OdinMonkey: Optimize addresses with constant offsets on 
 
 
 ### Further ToDo which would help portability:
