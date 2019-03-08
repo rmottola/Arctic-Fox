@@ -66,6 +66,7 @@
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- Bug 1135903 - OdinMonkey: Make signal-handler OOB checking an indepen
 - 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
 - Bug 805052 - 2015-03-14 four parts
@@ -80,8 +81,9 @@
 - Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
 - Bug 1140801 - Don't invoke functions on non-ion platforms.
 - Bug 1138141 - x64: Add some padding after pushing an odd number of fl
-- Bug 1112164 5 to 19
-- Bug 1135903 - OdinMonkey: Check the siginfo si_code field before hand
+- Bug 1134425 - Part 2: templatize the GC's allocation routines
+- Bug 1134425 - Part 1: move the allocator interface code out of line
+- Bug 1112164 6 to 19
 
 
 ### Further ToDo which would help portability:
