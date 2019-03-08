@@ -84,6 +84,7 @@
 - Bug 1134425 - Part 2: templatize the GC's allocation routines
 - Bug 1134425 - Part 1: move the allocator interface code out of line
 - Bug 1112164 6 to 19
+- Bug 1152176 - xpcom: Define linux kernel BLOCK_SIZE if necessary.
 
 
 ### Further ToDo which would help portability:
