@@ -102,17 +102,17 @@ class RegisterDump
 // Information needed to recover machine register state.
 class MachineState
 {
-    mozilla::Array<uintptr_t*, Registers::Total> regs_;
-    mozilla::Array<double*, FloatRegisters::Total> fpregs_;
+    mozilla::Array<uintptr_t *, Registers::Total> regs_;
+    mozilla::Array<double *, FloatRegisters::Total> fpregs_;
 
   public:
-    static MachineState FromBailout(mozilla::Array<uintptr_t, Registers::Total>& regs,
-                                    mozilla::Array<double, FloatRegisters::TotalPhys>& fpregs);
+    static MachineState FromBailout(mozilla::Array<uintptr_t, Registers::Total> &regs,
+                                    mozilla::Array<double, FloatRegisters::TotalPhys> &fpregs);
 
-    void setRegisterLocation(Register reg, uintptr_t* up) {
+    void setRegisterLocation(Register reg, uintptr_t *up) {
         regs_[reg.code()] = up;
     }
-    void setRegisterLocation(FloatRegister reg, double* dp) {
+    void setRegisterLocation(FloatRegister reg, double *dp) {
         fpregs_[reg.code()] = dp;
     }
 

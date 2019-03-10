@@ -2504,8 +2504,8 @@ InlineFrameIterator::isFunctionFrame() const
 }
 
 MachineState
-MachineState::FromBailout(mozilla::Array<uintptr_t, Registers::Total>& regs,
-                          mozilla::Array<double, FloatRegisters::TotalPhys>& fpregs)
+MachineState::FromBailout(mozilla::Array<uintptr_t, Registers::Total> &regs,
+                          mozilla::Array<double, FloatRegisters::TotalPhys> &fpregs)
 {
     MachineState machine;
 

@@ -948,8 +948,8 @@ class InvalidationBailoutStack
 {
     mozilla::Array<double, FloatRegisters::TotalPhys> fpregs_;
     mozilla::Array<uintptr_t, Registers::Total> regs_;
-    IonScript*  ionScript_;
-    uint8_t*      osiPointReturnAddress_;
+    IonScript  *ionScript_;
+    uint8_t      *osiPointReturnAddress_;
 
   public:
     uint8_t* sp() const {
