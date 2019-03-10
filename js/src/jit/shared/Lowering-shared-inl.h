@@ -278,8 +278,8 @@ LIRGeneratorShared::useRegisterOrConstantAtStart(MDefinition* mir)
 LAllocation
 LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition *mir)
 {
-    if (mir->isConstant() && mir->toConstant()->value().toInt32() >= 0)
-        return LAllocation(mir->toConstant()->vp());
+    if (mir->isConstant() && mir->toConstant()->value().isInt32(0))
+        return LAllocation();
     return useRegisterAtStart(mir);
 }
 

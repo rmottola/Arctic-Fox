@@ -352,7 +352,7 @@ CodeGeneratorX86::loadSimd(Scalar::Type type, unsigned numElems, const Operand &
         switch (numElems) {
           // In memory-to-register mode, movss zeroes out the high lanes.
           case 1: masm.vmovssWithPatch(srcAddr, out); break;
-          // See comment above, which also applies to movsq.
+          // See comment above, which also applies to movsd.
           case 2: masm.vmovsdWithPatch(srcAddr, out); break;
           case 4: masm.vmovupsWithPatch(srcAddr, out); break;
           default: MOZ_CRASH("unexpected size for partial load");
@@ -403,6 +403,7 @@ CodeGeneratorX86::emitSimdLoad(LAsmJSLoadHeap *ins)
     unsigned numElems = mir->numSimdElems();
     if (numElems == 3) {
         MOZ_ASSERT(type == Scalar::Int32x4 || type == Scalar::Float32x4);
+
         Operand srcAddrZ =
             ptr->isBogus()
             ? Operand(PatchedAbsoluteAddress(2 * sizeof(float) + mir->offset()))

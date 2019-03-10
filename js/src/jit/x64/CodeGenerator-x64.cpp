@@ -396,7 +396,6 @@ CodeGeneratorX64::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
     verifyHeapAccessDisassembly(before, after, /*isLoad=*/true, accessType, 0, srcAddr, *out->output());
     if (ool) {
         cleanupAfterAsmJSBoundsCheckBranch(mir, ToRegister(ptr));
-        cleanupAfterAsmJSBoundsCheckBranch(mir, ToRegister(ptr));
         masm.bind(ool->rejoin());
     }
     memoryBarrier(mir->barrierAfter());
