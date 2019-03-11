@@ -129,7 +129,7 @@ class FloatRegisters {
     };
 
     typedef uint32_t SetType;
-    static const char* GetName(Encoding code) {
+    static const char *GetName(Encoding code) {
         return X86Encoding::XMMRegName(code);
     }
 
@@ -204,7 +204,7 @@ struct FloatRegister {
         MOZ_ASSERT(uint32_t(code_) < FloatRegisters::Total);
         return Encoding(code_);
     }
-    const char* name() const {
+    const char *name() const {
         return FloatRegisters::GetName(encoding());
     }
     bool volatile_() const {
@@ -224,7 +224,7 @@ struct FloatRegister {
     }
     // N.B. FloatRegister is an explicit outparam here because msvc-2010
     // miscompiled it on win64 when the value was simply returned
-    void aliased(uint32_t aliasIdx, FloatRegister* ret) {
+    void aliased(uint32_t aliasIdx, FloatRegister *ret) {
         MOZ_ASSERT(aliasIdx == 0);
         *ret = *this;
     }
@@ -242,13 +242,13 @@ struct FloatRegister {
     uint32_t numAlignedAliased() const {
         return 1;
     }
-    void alignedAliased(uint32_t aliasIdx, FloatRegister* ret) {
+    void alignedAliased(uint32_t aliasIdx, FloatRegister *ret) {
         MOZ_ASSERT(aliasIdx == 0);
         *ret = *this;
     }
-    static TypedRegisterSet<FloatRegister> ReduceSetForPush(const TypedRegisterSet<FloatRegister>& s);
-    static uint32_t GetSizeInBytes(const TypedRegisterSet<FloatRegister>& s);
-    static uint32_t GetPushSizeInBytes(const TypedRegisterSet<FloatRegister>& s);
+    static TypedRegisterSet<FloatRegister> ReduceSetForPush(const TypedRegisterSet<FloatRegister> &s);
+    static uint32_t GetSizeInBytes(const TypedRegisterSet<FloatRegister> &s);
+    static uint32_t GetPushSizeInBytes(const TypedRegisterSet<FloatRegister> &s);
     uint32_t getRegisterDumpOffsetInBytes();
 };
 
