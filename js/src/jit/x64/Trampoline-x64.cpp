@@ -539,11 +539,10 @@ GenerateBailoutThunk(JSContext* cx, MacroAssembler& masm, uint32_t frameClass)
     //     [bailoutFrame]
     //
     // Remove both the bailout frame and the topmost Ion frame's stack.
-    static const uint32_t BailoutDataSize = sizeof(void*) * Registers::Total +
-                                            sizeof(double) * FloatRegisters::Total;
+    static const uint32_t BailoutDataSize = sizeof(RegisterDump);
     masm.addq(Imm32(BailoutDataSize), rsp);
     masm.pop(rcx);
-    masm.lea(Operand(rsp, rcx, TimesOne, sizeof(void*)), rsp);
+    masm.lea(Operand(rsp, rcx, TimesOne, sizeof(void *)), rsp);
 
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in r9.
     JitCode* bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
