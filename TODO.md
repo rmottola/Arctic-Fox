@@ -88,14 +88,8 @@
 - Bug 1137978 - Access an object's compartment and zone via its group
 - Bug 1138538 - Display GC zeal help text in shell help message r
 - Bug 1138390 - Wait for GC to finish if necessary in runOffThreadScrip
-- Bug 1135141 - Make LAST_DITCH GC more robust;
-- Bug 1134667 - Add crashtest for this heap-buffer-overflow bug.
-- Bug 1131424 - Report error message when failing to open ctypes librar
-- Bug 1135745 - Disable the reserved-id-macro macro in security/pkix;
-- Bug 1123111 - Fix a typo
-- Bug 1134021 - Use composed document when getting nsDOMWindowUtils fro
-- Bug 1135319 - Fix several javascript warnings when for mochitest-chro
-- Bug 1127629 - Handle void in ExpressionDecompiler.
+- Bug 1135141 - Release relocated arenas immediately on last ditch GC 
+- Bug 1135141 - Fix jsapi-test framework to not overwrite original glob
 
 
 
