@@ -474,9 +474,9 @@ class ArenaList {
         return *this;
     }
 
-    ArenaHeader* removeRemainingArenas(ArenaHeader** arenap, const AutoLockGC& lock);
-    ArenaHeader* pickArenasToRelocate(JSRuntime* runtime);
-    ArenaHeader* relocateArenas(ArenaHeader* toRelocate, ArenaHeader* relocated,
+    ArenaHeader *removeRemainingArenas(ArenaHeader **arenap, const AutoLockGC &lock);
+    ArenaHeader *pickArenasToRelocate(JSRuntime *runtime);
+    ArenaHeader *relocateArenas(ArenaHeader *toRelocate, ArenaHeader *relocated,
                                 gcstats::Statistics& stats);
 };
 
@@ -804,10 +804,10 @@ class ArenaLists
         MOZ_ASSERT(freeLists[kind].isEmpty());
     }
 
-    ArenaHeader* relocateArenas(ArenaHeader* relocatedList, gcstats::Statistics& stats);
+    ArenaHeader *relocateArenas(ArenaHeader *relocatedList, gcstats::Statistics& stats);
 
-    void queueForegroundObjectsForSweep(FreeOp* fop);
-    void queueForegroundThingsForSweep(FreeOp* fop);
+    void queueForegroundObjectsForSweep(FreeOp *fop);
+    void queueForegroundThingsForSweep(FreeOp *fop);
 
     void mergeForegroundSweptObjectArenas();
 

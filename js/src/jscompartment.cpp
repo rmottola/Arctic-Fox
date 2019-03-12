@@ -492,14 +492,14 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropDesc> desc)
  * across compartments.
  */
 void
-JSCompartment::markCrossCompartmentWrappers(JSTracer* trc)
+JSCompartment::markCrossCompartmentWrappers(JSTracer *trc)
 {
     MOZ_ASSERT(!zone()->isCollecting());
 
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         Value v = e.front().value();
         if (e.front().key().kind == CrossCompartmentKey::ObjectWrapper) {
-            ProxyObject* wrapper = &v.toObject().as<ProxyObject>();
+            ProxyObject *wrapper = &v.toObject().as<ProxyObject>();
 
             /*
              * We have a cross-compartment wrapper. Its private pointer may

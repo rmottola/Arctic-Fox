@@ -1954,8 +1954,8 @@ size_t ArenaHeader::countUsedCells()
     return Arena::thingsPerArena(getThingSize()) - countFreeCells();
 }
 
-ArenaHeader*
-ArenaList::removeRemainingArenas(ArenaHeader** arenap, const AutoLockGC& lock)
+ArenaHeader *
+ArenaList::removeRemainingArenas(ArenaHeader **arenap, const AutoLockGC &lock)
 {
     // This is only ever called to remove arenas that are after the cursor, so
     // we don't need to update it.
@@ -1973,8 +1973,8 @@ ArenaList::removeRemainingArenas(ArenaHeader** arenap, const AutoLockGC& lock)
  * Choose which arenas to relocate all cells out of and remove them from the
  * arena list. Return the head of a list of arenas to relocate.
  */
-ArenaHeader*
-ArenaList::pickArenasToRelocate(JSRuntime* runtime)
+ArenaHeader *
+ArenaList::pickArenasToRelocate(JSRuntime *runtime)
 {
     AutoLockGC lock(runtime);
 
@@ -1990,7 +1990,7 @@ ArenaList::pickArenasToRelocate(JSRuntime* runtime)
     relocateAll = true;
 #endif
     if (relocateAll) {
-        ArenaHeader* allArenas = head();
+        ArenaHeader *allArenas = head();
         clear();
         return allArenas;
     }
@@ -2009,19 +2009,19 @@ ArenaList::pickArenasToRelocate(JSRuntime* runtime)
     if (isCursorAtEnd())
         return nullptr;
 
-    ArenaHeader** arenap = cursorp_;               // Next arena to consider
+    ArenaHeader **arenap = cursorp_;               // Next arena to consider
     size_t previousFreeCells = 0;                  // Count of free cells before
 
     // Count of used cells after arenap.
     size_t followingUsedCells = 0;
-    for (ArenaHeader* arena = *arenap; arena; arena = arena->next)
+    for (ArenaHeader *arena = *arenap; arena; arena = arena->next)
         followingUsedCells += arena->countUsedCells();
 
     mozilla::DebugOnly<size_t> lastFreeCells(0);
     size_t cellsPerArena = Arena::thingsPerArena((*arenap)->getThingSize());
 
     while (*arenap) {
-        ArenaHeader* arena = *arenap;
+        ArenaHeader *arena = *arenap;
         if (followingUsedCells <= previousFreeCells)
             return removeRemainingArenas(arenap, lock);
         size_t freeCells = arena->countFreeCells();
@@ -2105,7 +2105,7 @@ RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind, size_t thingSize
 }
 
 static void
-RelocateArena(ArenaHeader* aheader)
+RelocateArena(ArenaHeader *aheader)
 {
     MOZ_ASSERT(aheader->allocated());
     MOZ_ASSERT(!aheader->hasDelayedMarking);
@@ -2131,8 +2131,8 @@ RelocateArena(ArenaHeader* aheader)
  * Relocate all arenas identified by pickArenasToRelocate: for each arena,
  * relocate each cell within it, then add it to a list of relocated arenas.
  */
-ArenaHeader*
-ArenaList::relocateArenas(ArenaHeader* toRelocate, ArenaHeader* relocated,
+ArenaHeader *
+ArenaList::relocateArenas(ArenaHeader *toRelocate, ArenaHeader *relocated,
                           gcstats::Statistics& stats)
 {
     check();
@@ -2151,8 +2151,8 @@ ArenaList::relocateArenas(ArenaHeader* toRelocate, ArenaHeader* relocated,
     return relocated;
 }
 
-ArenaHeader*
-ArenaLists::relocateArenas(ArenaHeader* relocatedList, gcstats::Statistics& stats)
+ArenaHeader *
+ArenaLists::relocateArenas(ArenaHeader *relocatedList, gcstats::Statistics& stats)
 {
     // Flush all the freeLists back into the arena headers
     purge();
@@ -2160,8 +2160,8 @@ ArenaLists::relocateArenas(ArenaHeader* relocatedList, gcstats::Statistics& stat
 
     for (size_t i = 0; i < FINALIZE_LIMIT; i++) {
         if (CanRelocateAllocKind(AllocKind(i))) {
-            ArenaList& al = arenaLists[i];
-            ArenaHeader* toRelocate = al.pickArenasToRelocate(runtime_);
+            ArenaList &al = arenaLists[i];
+            ArenaHeader *toRelocate = al.pickArenasToRelocate(runtime_);
             if (toRelocate)
                 relocatedList = al.relocateArenas(toRelocate, relocatedList, stats);
         }
@@ -2179,12 +2179,12 @@ ArenaLists::relocateArenas(ArenaHeader* relocatedList, gcstats::Statistics& stat
     return relocatedList;
 }
 
-ArenaHeader*
+ArenaHeader *
 GCRuntime::relocateArenas()
 {
     gcstats::AutoPhase ap(stats, gcstats::PHASE_COMPACT_MOVE);
 
-    ArenaHeader* relocatedList = nullptr;
+    ArenaHeader *relocatedList = nullptr;
     for (GCZonesIter zone(rt); !zone.done(); zone.next()) {
         MOZ_ASSERT(zone->isGCFinished());
         MOZ_ASSERT(!zone->isPreservingCode());
@@ -5475,15 +5475,15 @@ GCRuntime::compactPhase(bool destroyingRuntime)
     MOZ_ASSERT(rt->gc.nursery.isEmpty());
     assertBackgroundSweepingFinished();
 
-    ArenaHeader* relocatedList = relocateArenas();
+    ArenaHeader *relocatedList = relocateArenas();
     updatePointersToRelocatedCells();
 
 #ifdef DEBUG
-    for (ArenaHeader* arena = relocatedList; arena; arena = arena->next) {
+    for (ArenaHeader *arena = relocatedList; arena; arena = arena->next) {
         for (ArenaCellIterUnderFinalize i(arena); !i.done(); i.next()) {
-            TenuredCell* src = i.getCell();
+            TenuredCell *src = i.getCell();
             MOZ_ASSERT(IsForwarded(src));
-            TenuredCell* dest = Forwarded(src);
+            TenuredCell *dest = Forwarded(src);
             MOZ_ASSERT(src->isMarked(BLACK) == dest->isMarked(BLACK));
             MOZ_ASSERT(src->isMarked(GRAY) == dest->isMarked(GRAY));
         }
