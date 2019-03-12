@@ -83,9 +83,27 @@
 - Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
 - Bug 1134425 - Part 2: templatize the GC's allocation routines
 - Bug 1134425 - Part 1: move the allocator interface code out of line
+- Bug 1138735 - Fallback to software vsync if CVDisplayLink fails to in
+- Bug 1137497 - Remove shape from unboxed objects,
+- Bug 1137978 - Access an object's compartment and zone via its group
+- Bug 1138538 - Display GC zeal help text in shell help message r
+- Bug 1138390 - Wait for GC to finish if necessary in runOffThreadScrip
+- Bug 1135141 - Make LAST_DITCH GC more robust;
+- Bug 1134667 - Add crashtest for this heap-buffer-overflow bug.
+- Bug 1131424 - Report error message when failing to open ctypes librar
+- Bug 1135745 - Disable the reserved-id-macro macro in security/pkix;
+- Bug 1123111 - Fix a typo
+- Bug 1134021 - Use composed document when getting nsDOMWindowUtils fro
+- Bug 1135319 - Fix several javascript warnings when for mochitest-chro
+- Bug 1127629 - Handle void in ExpressionDecompiler.
+
+
 
 ### FIXME / TODO
 - Bug 1112164 part 14 : seems to have introduced issues (timeouts/hangs in JetStream tests) on x86 only
+
+- Cannot be applied because file is missing - check
+Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
 ### Further ToDo which would help portability:
 
@@ -102,6 +120,10 @@
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
 - Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
+
+For Windows:
+Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
+
 
 ### Further Further ToDo:
 - import PPC JIT from TenFourFox
