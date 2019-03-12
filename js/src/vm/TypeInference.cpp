@@ -2283,8 +2283,8 @@ TemporaryTypeSet::propertyNeedsBarrier(CompilerConstraintList* constraints, jsid
     return false;
 }
 
-static inline bool
-ClassCanHaveExtraProperties(const Class *clasp)
+bool
+js::ClassCanHaveExtraProperties(const Class *clasp)
 {
     return clasp->resolve
         || clasp->ops.lookupProperty
