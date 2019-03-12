@@ -66,7 +66,9 @@
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
-- Bug 1135903 - OdinMonkey: Make signal-handler OOB checking an indepen
+- Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
+- Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
+- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
 - 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
 - Bug 805052 - 2015-03-14 four parts
@@ -79,13 +81,11 @@
 - Bug 928336. Make defining unforgeable properties on objects faster by
 - Bug 1131805 1 to 3 parts
 - Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
-- Bug 1140801 - Don't invoke functions on non-ion platforms.
-- Bug 1138141 - x64: Add some padding after pushing an odd number of fl
 - Bug 1134425 - Part 2: templatize the GC's allocation routines
 - Bug 1134425 - Part 1: move the allocator interface code out of line
-- Bug 1112164 6 to 19
-- Bug 1152176 - xpcom: Define linux kernel BLOCK_SIZE if necessary.
 
+### FIXME / TODO
+- Bug 1112164 part 14 : seems to have introduced issues (timeouts/hangs in JetStream tests) on x86 only
 
 ### Further ToDo which would help portability:
 
