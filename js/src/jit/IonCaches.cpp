@@ -3300,7 +3300,7 @@ GetElementIC::attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* 
 /* static */ bool
 GetElementIC::canAttachDenseElementHole(JSObject *obj, const Value &idval, TypedOrValueRegister output)
 {
-    if (!idval.isInt32())
+    if (!idval.isInt32() || idval.toInt32() < 0)
         return false;
 
     if (!output.hasValue())
@@ -3399,6 +3399,9 @@ GenerateDenseElementHole(JSContext *cx, MacroAssembler &masm, IonCache::StubAtta
 
         // Unbox the index.
         masm.unboxInt32(val, indexReg);
+
+        // Make sure index is nonnegative.
+        masm.branch32(Assembler::LessThan, indexReg, Imm32(0), &failures);
 
         // Save the object register.
         masm.push(object);
