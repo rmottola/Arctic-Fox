@@ -942,7 +942,7 @@ class TypeNewScript
 };
 
 /* Is this a reasonable PC to be doing inlining on? */
-inline bool isInlinableCall(jsbytecode* pc);
+inline bool isInlinableCall(jsbytecode *pc);
 
 /*
  * Whether Array.prototype, or an object on its proto chain, has an

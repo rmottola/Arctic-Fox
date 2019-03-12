@@ -1823,14 +1823,14 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
             return;
         }
 
-        ObjectGroup* group = obj->groupFromGC();
+        ObjectGroup *group = obj->groupFromGC();
         PushMarkStack(this, group);
 
-        Shape* shape = obj->lastProperty();
+        Shape *shape = obj->lastProperty();
         PushMarkStack(this, shape);
 
         /* Call the trace hook if necessary. */
-        const Class* clasp = group->clasp();
+        const Class *clasp = group->clasp();
         if (clasp->trace) {
             // Global objects all have the same trace hook. That hook is safe without barriers
             // if the global has no custom trace hook of its own, or has been moved to a different
@@ -1839,7 +1839,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
                             (!obj->compartment()->options().getTrace() || !obj->isOwnGlobal())),
                           clasp->flags & JSCLASS_IMPLEMENTS_BARRIERS);
             if (clasp->trace == InlineTypedObject::obj_trace) {
-                TypeDescr* descr = &obj->as<InlineOpaqueTypedObject>().typeDescr();
+                TypeDescr *descr = &obj->as<InlineOpaqueTypedObject>().typeDescr();
                 if (!descr->hasTraceList())
                     return;
                 unboxedTraceList = descr->traceList();
@@ -1860,7 +1860,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
         if (!shape->isNative())
             return;
 
-        NativeObject* nobj = &obj->as<NativeObject>();
+        NativeObject *nobj = &obj->as<NativeObject>();
         unsigned nslots = nobj->slotSpan();
 
         do {
@@ -1868,7 +1868,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
                 break;
 
             if (nobj->denseElementsAreCopyOnWrite()) {
-                JSObject* owner = nobj->getElementsHeader()->ownerObject();
+                JSObject *owner = nobj->getElementsHeader()->ownerObject();
                 if (owner != nobj) {
                     PushMarkStack(this, owner);
                     break;

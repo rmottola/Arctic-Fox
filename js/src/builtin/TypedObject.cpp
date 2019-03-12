@@ -1629,9 +1629,9 @@ ReportTypedObjTypeError(JSContext* cx,
 }
 
 /* static */ void
-OutlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
+OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 {
-    OutlineTypedObject& typedObj = object->as<OutlineTypedObject>();
+    OutlineTypedObject &typedObj = object->as<OutlineTypedObject>();
 
     if (!typedObj.owner_)
         return;
@@ -1640,15 +1640,15 @@ OutlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
     // may not have had their slots updated yet. Note that this does not apply
     // to generational GC because these objects (type descriptors and
     // prototypes) are never allocated in the nursery.
-    TypeDescr& descr = typedObj.maybeForwardedTypeDescr();
+    TypeDescr &descr = typedObj.maybeForwardedTypeDescr();
 
     // Mark the owner, watching in case it is moved by the tracer.
-    JSObject* oldOwner = typedObj.owner_;
+    JSObject *oldOwner = typedObj.owner_;
     gc::MarkObjectUnbarriered(trc, &typedObj.owner_, "typed object owner");
-    JSObject* owner = typedObj.owner_;
+    JSObject *owner = typedObj.owner_;
 
-    uint8_t* oldData = typedObj.outOfLineTypedMem();
-    uint8_t* newData = oldData;
+    uint8_t *oldData = typedObj.outOfLineTypedMem();
+    uint8_t *newData = oldData;
 
     // Update the data pointer if the owner moved and the owner's data is
     // inline with it. Note that an array buffer pointing to data in an inline
@@ -2155,9 +2155,9 @@ InlineTypedObject::createCopy(JSContext* cx, Handle<InlineTypedObject*> template
 }
 
 /* static */ void
-InlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
+InlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 {
-    InlineTypedObject& typedObj = object->as<InlineTypedObject>();
+    InlineTypedObject &typedObj = object->as<InlineTypedObject>();
 
     // Inline transparent objects do not have references and do not need to be
     // traced. If they have an entry in the compartment's LazyArrayBufferTable,
@@ -2166,13 +2166,13 @@ InlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
 
     // When this is called for compacting GC, the related objects we touch here
     // may not have had their slots updated yet.
-    TypeDescr& descr = typedObj.maybeForwardedTypeDescr();
+    TypeDescr &descr = typedObj.maybeForwardedTypeDescr();
 
     descr.traceInstances(trc, typedObj.inlineTypedMem(), 1);
 }
 
 /* static */ void
-InlineTypedObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject* src)
+InlineTypedObject::objectMovedDuringMinorGC(JSTracer *trc, JSObject *dst, JSObject *src)
 {
     // Inline typed object element arrays can be preserved on the stack by Ion
     // and need forwarding pointers created during a minor GC. We can't do this

@@ -2856,14 +2856,14 @@ EvalInWorker(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ShapeOf(JSContext* cx, unsigned argc, JS::Value* vp)
+ShapeOf(JSContext *cx, unsigned argc, JS::Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
         JS_ReportError(cx, "shapeOf: object expected");
         return false;
     }
-    JSObject* obj = &args[0].toObject();
+    JSObject *obj = &args[0].toObject();
     args.rval().set(JS_NumberValue(double(uintptr_t(obj->lastProperty()) >> 3)));
     return true;
 }
@@ -2880,7 +2880,7 @@ IsBefore(int64_t t1, int64_t t2)
 }
 
 static bool
-Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
+Sleep_fn(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     int64_t t_ticks;

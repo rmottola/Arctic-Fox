@@ -641,7 +641,7 @@ RegisterEnumerator(JSContext* cx, PropertyIteratorObject* iterobj, NativeIterato
 }
 
 static inline bool
-VectorToKeyIterator(JSContext* cx, HandleObject obj, unsigned flags, AutoIdVector& keys,
+VectorToKeyIterator(JSContext *cx, HandleObject obj, unsigned flags, AutoIdVector& keys,
                     uint32_t slength, uint32_t key, MutableHandleObject objp)
 {
     MOZ_ASSERT(!(flags & JSITER_FOREACH));
@@ -667,7 +667,7 @@ VectorToKeyIterator(JSContext* cx, HandleObject obj, unsigned flags, AutoIdVecto
          * the shape key; if such a GC *does* occur, we can only get hits through
          * the one-slot lastNativeIterator cache.
          */
-        JSObject* pobj = obj;
+        JSObject *pobj = obj;
         size_t ind = 0;
         do {
             ni->shapes_array[ind++] = pobj->lastProperty();
@@ -749,7 +749,7 @@ UpdateNativeIterator(NativeIterator* ni, JSObject* obj)
 }
 
 bool
-js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleObject objp)
+js::GetIterator(JSContext *cx, HandleObject obj, unsigned flags, MutableHandleObject objp)
 {
     if (obj->is<PropertyIteratorObject>() || obj->is<LegacyGeneratorObject>()) {
         objp.set(obj);
@@ -766,7 +766,7 @@ js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleOb
             return Proxy::enumerate(cx, obj, objp);
     }
 
-    Vector<Shape*, 8> shapes(cx);
+    Vector<Shape *, 8> shapes(cx);
     uint32_t key = 0;
     if (flags == JSITER_ENUMERATE) {
         /*
@@ -777,13 +777,13 @@ js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleOb
          */
         PropertyIteratorObject* last = cx->runtime()->nativeIterCache.last;
         if (last) {
-            NativeIterator* lastni = last->getNativeIterator();
+            NativeIterator *lastni = last->getNativeIterator();
             if (!(lastni->flags & (JSITER_ACTIVE|JSITER_UNREUSABLE)) &&
                 obj->isNative() &&
                 obj->as<NativeObject>().hasEmptyElements() &&
                 obj->lastProperty() == lastni->shapes_array[0])
             {
-                JSObject* proto = obj->getProto();
+                JSObject *proto = obj->getProto();
                 if (proto->isNative() &&
                     proto->as<NativeObject>().hasEmptyElements() &&
                     proto->lastProperty() == lastni->shapes_array[1] &&
@@ -804,7 +804,7 @@ js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleOb
          * currently active.
          */
         {
-            JSObject* pobj = obj;
+            JSObject *pobj = obj;
             do {
                 if (!pobj->isNative() ||
                     !pobj->as<NativeObject>().hasEmptyElements() ||
@@ -817,7 +817,7 @@ js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleOb
                     shapes.clear();
                     goto miss;
                 }
-                Shape* shape = pobj->lastProperty();
+                Shape *shape = pobj->lastProperty();
                 key = (key + (key << 16)) ^ (uintptr_t(shape) >> 3);
                 if (!shapes.append(shape))
                     return false;
@@ -825,7 +825,7 @@ js::GetIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandleOb
             } while (pobj);
         }
 
-        PropertyIteratorObject* iterobj = cx->runtime()->nativeIterCache.get(key);
+        PropertyIteratorObject *iterobj = cx->runtime()->nativeIterCache.get(key);
         if (iterobj) {
             NativeIterator* ni = iterobj->getNativeIterator();
             if (!(ni->flags & (JSITER_ACTIVE|JSITER_UNREUSABLE)) &&

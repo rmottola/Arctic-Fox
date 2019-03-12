@@ -3916,7 +3916,7 @@ JSObject::dump()
 
     if (obj->isNative()) {
         fprintf(stderr, "properties:\n");
-        Vector<Shape*, 8, SystemAllocPolicy> props;
+        Vector<Shape *, 8, SystemAllocPolicy> props;
         for (Shape::Range<NoGC> r(obj->lastProperty()); !r.empty(); r.popFront()) {
             if (!props.append(&r.front())) {
                 fprintf(stderr, "(OOM while appending properties)\n");
@@ -3930,7 +3930,7 @@ JSObject::dump()
 }
 
 static void
-MaybeDumpObject(const char* name, JSObject* obj)
+MaybeDumpObject(const char *name, JSObject *obj)
 {
     if (obj) {
         fprintf(stderr, "  %s: ", name);
@@ -4097,18 +4097,18 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
 }
 
 void
-JSObject::markChildren(JSTracer* trc)
+JSObject::markChildren(JSTracer *trc)
 {
     MarkObjectGroup(trc, &group_, "group");
 
     MarkShape(trc, &shape_, "shape");
 
-    const Class* clasp = group_->clasp();
+    const Class *clasp = group_->clasp();
     if (clasp->trace)
         clasp->trace(trc, this);
 
     if (shape_->isNative()) {
-        NativeObject* nobj = &as<NativeObject>();
+        NativeObject *nobj = &as<NativeObject>();
         MarkObjectSlots(trc, nobj, 0, nobj->slotSpan());
 
         do {

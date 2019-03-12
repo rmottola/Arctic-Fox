@@ -1191,7 +1191,7 @@ MacroAssembler::initGCSlots(Register obj, Register slots, NativeObject* template
 }
 
 void
-MacroAssembler::initGCThing(Register obj, Register slots, JSObject* templateObj,
+MacroAssembler::initGCThing(Register obj, Register slots, JSObject *templateObj,
                             bool initFixedSlots)
 {
     // Fast initialization of an empty object returned by allocateObject().
@@ -1200,7 +1200,7 @@ MacroAssembler::initGCThing(Register obj, Register slots, JSObject* templateObj,
     storePtr(ImmGCPtr(templateObj->group()), Address(obj, JSObject::offsetOfGroup()));
 
     if (templateObj->isNative()) {
-        NativeObject* ntemplate = &templateObj->as<NativeObject>();
+        NativeObject *ntemplate = &templateObj->as<NativeObject>();
         MOZ_ASSERT_IF(!ntemplate->denseElementsAreCopyOnWrite(), !ntemplate->hasDynamicElements());
 
         if (ntemplate->hasDynamicSlots())
@@ -1255,10 +1255,10 @@ MacroAssembler::initGCThing(Register obj, Register slots, JSObject* templateObj,
             offset += sizeof(uintptr_t);
         }
     } else if (templateObj->is<UnboxedPlainObject>()) {
-        const UnboxedLayout& layout = templateObj->as<UnboxedPlainObject>().layout();
+        const UnboxedLayout &layout = templateObj->as<UnboxedPlainObject>().layout();
 
         // Initialize reference fields of the object, per UnboxedPlainObject::create.
-        if (const int32_t* list = layout.traceList()) {
+        if (const int32_t *list = layout.traceList()) {
             while (*list != -1) {
                 storePtr(ImmGCPtr(GetJitContext()->runtime->names().empty),
                          Address(obj, UnboxedPlainObject::offsetOfData() + *list));

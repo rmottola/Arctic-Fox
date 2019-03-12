@@ -194,7 +194,7 @@ class JSObject : public js::gc::Cell
         GENERATE_SHAPE
     };
 
-    bool setFlags(js::ExclusiveContext* cx, /*BaseShape::Flag*/ uint32_t flags,
+    bool setFlags(js::ExclusiveContext *cx, /*BaseShape::Flag*/ uint32_t flags,
                   GenerateShape generateShape = GENERATE_NONE);
 
     /*
@@ -210,7 +210,7 @@ class JSObject : public js::gc::Cell
         return lastProperty()->hasObjectFlag(js::BaseShape::DELEGATE);
     }
 
-    bool setDelegate(js::ExclusiveContext* cx) {
+    bool setDelegate(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::DELEGATE, GENERATE_SHAPE);
     }
 
@@ -223,18 +223,18 @@ class JSObject : public js::gc::Cell
     bool watched() const {
         return lastProperty()->hasObjectFlag(js::BaseShape::WATCHED);
     }
-    bool setWatched(js::ExclusiveContext* cx) {
+    bool setWatched(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::WATCHED, GENERATE_SHAPE);
     }
 
     /* See InterpreterFrame::varObj. */
     inline bool isQualifiedVarObj();
-    bool setQualifiedVarObj(js::ExclusiveContext* cx) {
+    bool setQualifiedVarObj(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::QUALIFIED_VAROBJ);
     }
 
     inline bool isUnqualifiedVarObj();
-    bool setUnqualifiedVarObj(js::ExclusiveContext* cx) {
+    bool setUnqualifiedVarObj(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::UNQUALIFIED_VAROBJ);
     }
 
@@ -247,7 +247,7 @@ class JSObject : public js::gc::Cell
     bool hasUncacheableProto() const {
         return lastProperty()->hasObjectFlag(js::BaseShape::UNCACHEABLE_PROTO);
     }
-    bool setUncacheableProto(js::ExclusiveContext* cx) {
+    bool setUncacheableProto(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::UNCACHEABLE_PROTO, GENERATE_SHAPE);
     }
 
@@ -258,7 +258,7 @@ class JSObject : public js::gc::Cell
     bool hadElementsAccess() const {
         return lastProperty()->hasObjectFlag(js::BaseShape::HAD_ELEMENTS_ACCESS);
     }
-    bool setHadElementsAccess(js::ExclusiveContext* cx) {
+    bool setHadElementsAccess(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::HAD_ELEMENTS_ACCESS);
     }
 
@@ -280,7 +280,7 @@ class JSObject : public js::gc::Cell
 
     /* GC support. */
 
-    void markChildren(JSTracer* trc);
+    void markChildren(JSTracer *trc);
 
     void fixupAfterMovingGC();
 
@@ -288,23 +288,23 @@ class JSObject : public js::gc::Cell
     static const size_t MaxTagBits = 3;
     static bool isNullLike(const JSObject* obj) { return uintptr_t(obj) < (1 << MaxTagBits); }
 
-    MOZ_ALWAYS_INLINE JS::Zone* zone() const {
+    MOZ_ALWAYS_INLINE JS::Zone *zone() const {
         return shape_->zone();
     }
-    MOZ_ALWAYS_INLINE JS::shadow::Zone* shadowZone() const {
+    MOZ_ALWAYS_INLINE JS::shadow::Zone *shadowZone() const {
         return JS::shadow::Zone::asShadowZone(zone());
     }
-    MOZ_ALWAYS_INLINE JS::Zone* zoneFromAnyThread() const {
+    MOZ_ALWAYS_INLINE JS::Zone *zoneFromAnyThread() const {
         return shape_->zoneFromAnyThread();
     }
-    MOZ_ALWAYS_INLINE JS::shadow::Zone* shadowZoneFromAnyThread() const {
+    MOZ_ALWAYS_INLINE JS::shadow::Zone *shadowZoneFromAnyThread() const {
         return JS::shadow::Zone::asShadowZone(zoneFromAnyThread());
     }
-    static MOZ_ALWAYS_INLINE void readBarrier(JSObject* obj);
-    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSObject* obj);
-    static MOZ_ALWAYS_INLINE void writeBarrierPost(JSObject* obj, void* cellp);
-    static MOZ_ALWAYS_INLINE void writeBarrierPostRelocate(JSObject* obj, void* cellp);
-    static MOZ_ALWAYS_INLINE void writeBarrierPostRemove(JSObject* obj, void* cellp);
+    static MOZ_ALWAYS_INLINE void readBarrier(JSObject *obj);
+    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSObject *obj);
+    static MOZ_ALWAYS_INLINE void writeBarrierPost(JSObject *obj, void *cellp);
+    static MOZ_ALWAYS_INLINE void writeBarrierPostRelocate(JSObject* obj, void *cellp);
+    static MOZ_ALWAYS_INLINE void writeBarrierPostRemove(JSObject *obj, void *cellp);
 
     size_t tenuredSizeOfThis() const {
         MOZ_ASSERT(isTenured());
@@ -347,7 +347,7 @@ class JSObject : public js::gc::Cell
 
     bool uninlinedIsProxy() const;
 
-    JSObject* getProto() const {
+    JSObject *getProto() const {
         MOZ_ASSERT(!uninlinedIsProxy());
         return getTaggedProto().toObjectOrNull();
     }
@@ -382,7 +382,7 @@ class JSObject : public js::gc::Cell
         return lastProperty()->hasObjectFlag(js::BaseShape::IMMUTABLE_PROTOTYPE);
     }
 
-    inline void setGroup(js::ObjectGroup* group);
+    inline void setGroup(js::ObjectGroup *group);
 
     /*
      * Mark an object that has been iterated over and is a singleton. We need
@@ -392,7 +392,7 @@ class JSObject : public js::gc::Cell
     bool isIteratedSingleton() const {
         return lastProperty()->hasObjectFlag(js::BaseShape::ITERATED_SINGLETON);
     }
-    bool setIteratedSingleton(js::ExclusiveContext* cx) {
+    bool setIteratedSingleton(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::ITERATED_SINGLETON);
     }
 
@@ -409,18 +409,18 @@ class JSObject : public js::gc::Cell
     bool wasNewScriptCleared() const {
         return lastProperty()->hasObjectFlag(js::BaseShape::NEW_SCRIPT_CLEARED);
     }
-    bool setNewScriptCleared(js::ExclusiveContext* cx) {
+    bool setNewScriptCleared(js::ExclusiveContext *cx) {
         return setFlags(cx, js::BaseShape::NEW_SCRIPT_CLEARED);
     }
 
     /* Set a new prototype for an object with a singleton type. */
-    bool splicePrototype(JSContext* cx, const js::Class* clasp, js::Handle<js::TaggedProto> proto);
+    bool splicePrototype(JSContext *cx, const js::Class *clasp, js::Handle<js::TaggedProto> proto);
 
     /*
      * For bootstrapping, whether to splice a prototype for Function.prototype
      * or the global object.
      */
-    bool shouldSplicePrototype(JSContext* cx);
+    bool shouldSplicePrototype(JSContext *cx);
 
     /*
      * Parents and scope chains.
@@ -449,25 +449,25 @@ class JSObject : public js::gc::Cell
      */
 
     /* Access the parent link of an object. */
-    JSObject* getParent() const {
+    JSObject *getParent() const {
         return lastProperty()->getObjectParent();
     }
-    static bool setParent(JSContext* cx, js::HandleObject obj, js::HandleObject newParent);
+    static bool setParent(JSContext *cx, js::HandleObject obj, js::HandleObject newParent);
 
     /*
      * Get the enclosing scope of an object. When called on non-scope object,
      * this will just be the global (the name "enclosing scope" still applies
      * in this situation because non-scope objects can be on the scope chain).
      */
-    inline JSObject* enclosingScope();
+    inline JSObject *enclosingScope();
 
     /* Access the metadata on an object. */
-    inline JSObject* getMetadata() const {
+    inline JSObject *getMetadata() const {
         return lastProperty()->getObjectMetadata();
     }
-    static bool setMetadata(JSContext* cx, js::HandleObject obj, js::HandleObject newMetadata);
+    static bool setMetadata(JSContext *cx, js::HandleObject obj, js::HandleObject newMetadata);
 
-    inline js::GlobalObject& global() const;
+    inline js::GlobalObject &global() const;
     inline bool isOwnGlobal() const;
 
     /*
@@ -632,14 +632,14 @@ struct JSObject_Slots12 : JSObject { void* data[2]; js::Value fslots[12]; };
 struct JSObject_Slots16 : JSObject { void* data[2]; js::Value fslots[16]; };
 
 /* static */ MOZ_ALWAYS_INLINE void
-JSObject::readBarrier(JSObject* obj)
+JSObject::readBarrier(JSObject *obj)
 {
     if (!isNullLike(obj) && obj->isTenured())
         obj->asTenured().readBarrier(&obj->asTenured());
 }
 
 /* static */ MOZ_ALWAYS_INLINE void
-JSObject::writeBarrierPre(JSObject* obj)
+JSObject::writeBarrierPre(JSObject *obj)
 {
     if (!isNullLike(obj) && obj->isTenured())
         obj->asTenured().writeBarrierPre(&obj->asTenured());

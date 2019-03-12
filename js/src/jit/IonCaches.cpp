@@ -1099,10 +1099,10 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
 }
 
 static bool
-GenerateCallGetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
-                   IonCache::StubAttacher& attacher, JSObject* obj, PropertyName* name,
-                   JSObject* holder, HandleShape shape, RegisterSet& liveRegs, Register object,
-                   TypedOrValueRegister output, void* returnAddr, Label* failures = nullptr)
+GenerateCallGetter(JSContext *cx, IonScript *ion, MacroAssembler &masm,
+                   IonCache::StubAttacher &attacher, JSObject *obj, PropertyName *name,
+                   JSObject *holder, HandleShape shape, RegisterSet &liveRegs, Register object,
+                   TypedOrValueRegister output, void *returnAddr, Label *failures = nullptr)
 {
     MOZ_ASSERT(output.hasValue());
 
@@ -2699,8 +2699,8 @@ SetPropertyIC::attachCallSetter(JSContext* cx, HandleScript outerScript, IonScri
 }
 
 static void
-GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                NativeObject* obj, Shape* oldShape, ObjectGroup* oldGroup,
+GenerateAddSlot(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &attacher,
+                NativeObject *obj, Shape *oldShape, ObjectGroup *oldGroup,
                 Register object, ConstantOrRegister value,
                 bool checkTypeset)
 {
@@ -2725,10 +2725,10 @@ GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         masm.loadPtr(Address(StackPointer, 0), object);
     }
 
-    JSObject* proto = obj->getProto();
+    JSObject *proto = obj->getProto();
     Register protoReg = object;
     while (proto) {
-        Shape* protoShape = proto->lastProperty();
+        Shape *protoShape = proto->lastProperty();
 
         // load next prototype
         masm.loadObjProto(protoReg, protoReg);
@@ -2742,7 +2742,7 @@ GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
     masm.pop(object);     // restore object reg
 
     // Changing object shape.  Write the object's new shape.
-    Shape* newShape = obj->lastProperty();
+    Shape *newShape = obj->lastProperty();
     Address shapeAddr(object, JSObject::offsetOfShape());
     if (cx->zone()->needsIncrementalBarrier())
         masm.callPreBarrier(shapeAddr, MIRType_Shape);
@@ -3297,14 +3297,14 @@ GetElementIC::attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* 
 }
 
 /* static */ bool
-GetElementIC::canAttachDenseElement(JSObject* obj, const Value& idval)
+GetElementIC::canAttachDenseElement(JSObject *obj, const Value &idval)
 {
     return obj->isNative() && idval.isInt32();
 }
 
 static bool
-GenerateDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                     JSObject* obj, const Value& idval, Register object,
+GenerateDenseElement(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher& attacher,
+                     JSObject *obj, const Value &idval, Register object,
                      ConstantOrRegister index, TypedOrValueRegister output)
 {
     MOZ_ASSERT(GetElementIC::canAttachDenseElement(obj, idval));

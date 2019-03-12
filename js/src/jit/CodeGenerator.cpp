@@ -4538,15 +4538,15 @@ static const VMFunction NewSingletonCallObjectInfo =
     FunctionInfo<NewSingletonCallObjectFn>(NewSingletonCallObject);
 
 void
-CodeGenerator::visitNewSingletonCallObject(LNewSingletonCallObject* lir)
+CodeGenerator::visitNewSingletonCallObject(LNewSingletonCallObject *lir)
 {
     Register objReg = ToRegister(lir->output());
 
-    JSObject* templateObj = lir->mir()->templateObject();
+    JSObject *templateObj = lir->mir()->templateObject();
 
-    JSScript* script = lir->mir()->block()->info().script();
+    JSScript *script = lir->mir()->block()->info().script();
     uint32_t lexicalBegin = script->bindings.aliasedBodyLevelLexicalBegin();
-    OutOfLineCode* ool;
+    OutOfLineCode *ool;
     ool = oolCallVM(NewSingletonCallObjectInfo, lir,
                     (ArgList(), ImmGCPtr(templateObj->lastProperty()),
                                 Imm32(lexicalBegin)),

@@ -302,31 +302,31 @@ js::IsFunctionObject(JSObject* obj)
 }
 
 JS_FRIEND_API(bool)
-js::IsScopeObject(JSObject* obj)
+js::IsScopeObject(JSObject *obj)
 {
     return obj->is<ScopeObject>();
 }
 
 JS_FRIEND_API(bool)
-js::IsCallObject(JSObject* obj)
+js::IsCallObject(JSObject *obj)
 {
     return obj->is<CallObject>();
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetObjectParentMaybeScope(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetObjectParentMaybeScope(JSObject *obj)
 {
     return obj->enclosingScope();
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetGlobalForObjectCrossCompartment(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetGlobalForObjectCrossCompartment(JSObject *obj)
 {
     return &obj->global();
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetPrototypeNoProxy(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetPrototypeNoProxy(JSObject *obj)
 {
     MOZ_ASSERT(!obj->is<js::ProxyObject>());
     MOZ_ASSERT(!obj->getTaggedProto().isLazy());

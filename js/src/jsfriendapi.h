@@ -545,10 +545,10 @@ public:
 // This layout is shared by all objects except for Typed Objects (which still
 // have a shape and group).
 struct Object {
-    shadow::Shape*      shape;
-    shadow::ObjectGroup* group;
-    JS::Value*          slots;
-    void*               _1;
+    shadow::Shape       *shape;
+    shadow::ObjectGroup *group;
+    JS::Value           *slots;
+    void                *_1;
 
     size_t numFixedSlots() const { return shape->slotInfo >> Shape::FIXED_SLOTS_SHIFT; }
     JS::Value* fixedSlots() const {
@@ -654,16 +654,16 @@ IsOuterObject(JSObject* obj) {
 }
 
 JS_FRIEND_API(bool)
-IsFunctionObject(JSObject* obj);
+IsFunctionObject(JSObject *obj);
 
 JS_FRIEND_API(bool)
-IsScopeObject(JSObject* obj);
+IsScopeObject(JSObject *obj);
 
 JS_FRIEND_API(bool)
-IsCallObject(JSObject* obj);
+IsCallObject(JSObject *obj);
 
-inline JSObject*
-GetObjectParent(JSObject* obj)
+inline JSObject *
+GetObjectParent(JSObject *obj)
 {
     MOZ_ASSERT(!IsScopeObject(obj));
     return reinterpret_cast<shadow::Object*>(obj)->shape->base->parent;
@@ -676,10 +676,10 @@ GetObjectCompartment(JSObject* obj)
 }
 
 JS_FRIEND_API(JSObject*)
-GetObjectParentMaybeScope(JSObject* obj);
+GetObjectParentMaybeScope(JSObject *obj);
 
 JS_FRIEND_API(JSObject*)
-GetGlobalForObjectCrossCompartment(JSObject* obj);
+GetGlobalForObjectCrossCompartment(JSObject *obj);
 
 JS_FRIEND_API(JSObject*)
 GetPrototypeNoProxy(JSObject* obj);

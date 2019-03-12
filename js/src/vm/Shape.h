@@ -830,12 +830,12 @@ class Shape : public gc::TenuredCell
     JSObject* getObjectParent() const { return base()->parent; }
     JSObject* getObjectMetadata() const { return base()->metadata; }
 
-    static Shape* setObjectParent(ExclusiveContext* cx,
-                                  JSObject* obj, TaggedProto proto, Shape* last);
-    static Shape* setObjectMetadata(JSContext* cx,
-                                    JSObject* metadata, TaggedProto proto, Shape* last);
-    static Shape* setObjectFlags(ExclusiveContext* cx,
-                                 BaseShape::Flag flag, TaggedProto proto, Shape* last);
+    static Shape *setObjectParent(ExclusiveContext *cx,
+                                  JSObject *obj, TaggedProto proto, Shape *last);
+    static Shape *setObjectMetadata(JSContext* cx,
+                                    JSObject *metadata, TaggedProto proto, Shape *last);
+    static Shape *setObjectFlags(ExclusiveContext *cx,
+                                 BaseShape::Flag flag, TaggedProto proto, Shape *last);
 
     uint32_t getObjectFlags() const { return base()->getObjectFlags(); }
     bool hasObjectFlag(BaseShape::Flag flag) const {

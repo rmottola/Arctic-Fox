@@ -19,7 +19,7 @@ class Shape;
 namespace gc {
 
 static inline AllocKind
-GetGCObjectKind(const Class* clasp)
+GetGCObjectKind(const Class *clasp)
 {
     if (clasp == FunctionClassPtr)
         return JSFunction::FinalizeKind;
@@ -30,16 +30,16 @@ GetGCObjectKind(const Class* clasp)
 }
 
 inline bool
-ShouldNurseryAllocateObject(const Nursery& nursery, InitialHeap heap)
+ShouldNurseryAllocateObject(const Nursery &nursery, InitialHeap heap)
 {
     return nursery.isEnabled() && heap != TenuredHeap;
 }
 
 inline JSGCTraceKind
-GetGCThingTraceKind(const void* thing)
+GetGCThingTraceKind(const void *thing)
 {
     MOZ_ASSERT(thing);
-    const Cell* cell = static_cast<const Cell*>(thing);
+    const Cell *cell = static_cast<const Cell *>(thing);
     if (IsInsideNursery(cell))
         return JSTRACE_OBJECT;
     return MapAllocToTraceKind(cell->asTenured().getAllocKind());
@@ -59,9 +59,9 @@ GCRuntime::poke()
 
 class ArenaIter
 {
-    ArenaHeader* aheader;
-    ArenaHeader* unsweptHeader;
-    ArenaHeader* sweptHeader;
+    ArenaHeader *aheader;
+    ArenaHeader *unsweptHeader;
+    ArenaHeader *sweptHeader;
 
   public:
     ArenaIter() {
@@ -383,13 +383,13 @@ typedef CompartmentsIterT<GCZoneGroupIter> GCCompartmentGroupIter;
  * room in the nursery or there is an OOM, this method will return nullptr.
  */
 template <AllowGC allowGC>
-inline JSObject*
-TryNewNurseryObject(JSContext* cx, size_t thingSize, size_t nDynamicSlots, const js::Class* clasp)
+inline JSObject *
+TryNewNurseryObject(JSContext *cx, size_t thingSize, size_t nDynamicSlots, const js::Class *clasp)
 {
     MOZ_ASSERT(!IsAtomsCompartment(cx->compartment()));
-    JSRuntime* rt = cx->runtime();
-    Nursery& nursery = rt->gc.nursery;
-    JSObject* obj = nursery.allocateObject(cx, thingSize, nDynamicSlots, clasp);
+    JSRuntime *rt = cx->runtime();
+    Nursery &nursery = rt->gc.nursery;
+    JSObject *obj = nursery.allocateObject(cx, thingSize, nDynamicSlots, clasp);
     if (obj)
         return obj;
     if (allowGC && !rt->mainThread.suppressGC) {
@@ -579,8 +579,8 @@ AllocateNonObject(ExclusiveContext* cx)
  * fail the allocation, forcing the non-cached path.
  */
 template <AllowGC allowGC>
-inline JSObject*
-AllocateObjectForCacheHit(JSContext* cx, AllocKind kind, InitialHeap heap, const js::Class* clasp)
+inline JSObject *
+AllocateObjectForCacheHit(JSContext *cx, AllocKind kind, InitialHeap heap, const js::Class *clasp)
 {
     if (ShouldNurseryAllocateObject(cx->nursery(), heap)) {
         size_t thingSize = Arena::thingSize(kind);
@@ -589,7 +589,7 @@ AllocateObjectForCacheHit(JSContext* cx, AllocKind kind, InitialHeap heap, const
         if (!CheckAllocatorState<NoGC>(cx, kind))
             return nullptr;
 
-        JSObject* obj = TryNewNurseryObject<NoGC>(cx, thingSize, 0, clasp);
+        JSObject *obj = TryNewNurseryObject<NoGC>(cx, thingSize, 0, clasp);
         if (!obj && allowGC) {
             cx->minorGC(JS::gcreason::OUT_OF_NURSERY);
             return nullptr;
@@ -597,7 +597,7 @@ AllocateObjectForCacheHit(JSContext* cx, AllocKind kind, InitialHeap heap, const
         return obj;
     }
 
-    JSObject* obj = AllocateObject<NoGC>(cx, kind, 0, heap, clasp);
+    JSObject *obj = AllocateObject<NoGC>(cx, kind, 0, heap, clasp);
     if (!obj && allowGC) {
         cx->runtime()->gc.maybeGC(cx->zone());
         return nullptr;

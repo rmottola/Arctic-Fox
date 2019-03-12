@@ -2284,7 +2284,7 @@ TemporaryTypeSet::propertyNeedsBarrier(CompilerConstraintList* constraints, jsid
 }
 
 static inline bool
-ClassCanHaveExtraProperties(const Class* clasp)
+ClassCanHaveExtraProperties(const Class *clasp)
 {
     return clasp->resolve
         || clasp->ops.lookupProperty
@@ -2561,14 +2561,14 @@ ObjectGroup::matchDefiniteProperties(HandleObject obj)
 {
     unsigned count = getPropertyCount();
     for (unsigned i = 0; i < count; i++) {
-        Property* prop = getProperty(i);
+        Property *prop = getProperty(i);
         if (!prop)
             continue;
         if (prop->types.definiteProperty()) {
             unsigned slot = prop->types.definiteSlot();
 
             bool found = false;
-            Shape* shape = obj->lastProperty();
+            Shape *shape = obj->lastProperty();
             while (!shape->isEmptyShape()) {
                 if (shape->slot() == slot && shape->propid() == prop->id) {
                     found = true;
@@ -2585,7 +2585,7 @@ ObjectGroup::matchDefiniteProperties(HandleObject obj)
 }
 
 void
-js::AddTypePropertyId(ExclusiveContext* cx, ObjectGroup* group, jsid id, TypeSet::Type type)
+js::AddTypePropertyId(ExclusiveContext *cx, ObjectGroup *group, jsid id, TypeSet::Type type)
 {
     MOZ_ASSERT(id == IdToTypeId(id));
 
