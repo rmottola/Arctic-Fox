@@ -8220,6 +8220,8 @@ static const FloatRegisterSet NonVolatileSimdRegs = SupportsSimd ? NonVolatileRe
 static const unsigned FramePushedAfterSave = NonVolatileRegs.gprs().size() * sizeof(intptr_t) +
                                              NonVolatileRegs.fpus().getPushSizeInBytes() +
                                              sizeof(double);
+#elif defined(JS_CODEGEN_NONE)
+static const unsigned FramePushedAfterSave = 0;
 #else
 static const unsigned FramePushedAfterSave =
    SupportsSimd ? NonVolatileRegs.gprs().size() * sizeof(intptr_t) +
