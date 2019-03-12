@@ -1962,7 +1962,7 @@ class MOZ_STACK_CLASS ModuleCompiler
         // Protection works at page granularity, so we need to ensure that no
         // stub code gets into the function code pages.
         MOZ_ASSERT(!finishedFunctionBodies_);
-        masm_.align(AsmJSPageSize);
+        masm_.haltingAlign(AsmJSPageSize);
         module_->finishFunctionBodies(masm_.currentOffset());
         finishedFunctionBodies_ = true;
     }
@@ -8237,7 +8237,7 @@ GenerateEntry(ModuleCompiler& m, unsigned exportIndex)
     MacroAssembler& masm = m.masm();
 
     Label begin;
-    masm.align(CodeAlignment);
+    masm.haltingAlign(CodeAlignment);
     masm.bind(&begin);
 
     // Save the return address if it wasn't already saved by the call insn.
@@ -9016,10 +9016,10 @@ static const RegisterSet AllRegsExceptSP =
 // after restoring all registers. To hack around this, push the resumePC on the
 // stack so that it can be popped directly into PC.
 static bool
-GenerateAsyncInterruptExit(ModuleCompiler& m, Label* throwLabel)
+GenerateAsyncInterruptExit(ModuleCompiler& m, Label *throwLabel)
 {
     MacroAssembler& masm = m.masm();
-    masm.align(CodeAlignment);
+    masm.haltingAlign(CodeAlignment);
     masm.bind(&m.asyncInterruptLabel());
 
 #if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
@@ -9182,10 +9182,10 @@ GenerateSyncInterruptExit(ModuleCompiler& m, Label* throwLabel)
 //  2. PopRegsInMask to restore the caller's non-volatile registers.
 //  3. Return (to CallAsmJS).
 static bool
-GenerateThrowStub(ModuleCompiler& m, Label* throwLabel)
+GenerateThrowStub(ModuleCompiler& m, Label *throwLabel)
 {
     MacroAssembler& masm = m.masm();
-    masm.align(CodeAlignment);
+    masm.haltingAlign(CodeAlignment);
     masm.bind(throwLabel);
 
     // We are about to pop all frames in this AsmJSActivation. Set fp to null to
