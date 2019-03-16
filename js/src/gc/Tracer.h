@@ -127,7 +127,7 @@ class MarkStack
 class GCMarker : public JSTracer
 {
   public:
-    explicit GCMarker(JSRuntime* rt);
+    explicit GCMarker(JSRuntime *rt);
     bool init(JSGCMode gcMode);
 
     void setMaxCapacity(size_t maxCap) { stack.setMaxCapacity(maxCap); }
@@ -137,15 +137,15 @@ class GCMarker : public JSTracer
     void stop();
     void reset();
 
-    void pushObject(JSObject* obj) {
+    void pushObject(JSObject *obj) {
         pushTaggedPtr(ObjectTag, obj);
     }
 
-    void pushType(ObjectGroup* group) {
+    void pushType(ObjectGroup *group) {
         pushTaggedPtr(GroupTag, group);
     }
 
-    void pushJitCode(jit::JitCode* code) {
+    void pushJitCode(jit::JitCode *code) {
         pushTaggedPtr(JitCodeTag, code);
     }
 
@@ -172,10 +172,10 @@ class GCMarker : public JSTracer
         color = gc::BLACK;
     }
 
-    inline void delayMarkingArena(gc::ArenaHeader* aheader);
-    void delayMarkingChildren(const void* thing);
-    void markDelayedChildren(gc::ArenaHeader* aheader);
-    bool markDelayedChildren(SliceBudget& budget);
+    inline void delayMarkingArena(gc::ArenaHeader *aheader);
+    void delayMarkingChildren(const void *thing);
+    void markDelayedChildren(gc::ArenaHeader *aheader);
+    bool markDelayedChildren(SliceBudget &budget);
     bool hasDelayedChildren() const {
         return !!unmarkedArenaStackTop;
     }
@@ -240,7 +240,7 @@ class GCMarker : public JSTracer
     static_assert(StackTagMask >= uintptr_t(LastTag), "The tag mask must subsume the tags.");
     static_assert(StackTagMask <= gc::CellMask, "The tag mask must be embeddable in a Cell*.");
 
-    void pushTaggedPtr(StackTag tag, void* ptr) {
+    void pushTaggedPtr(StackTag tag, void *ptr) {
         checkZone(ptr);
         uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
         MOZ_ASSERT(!(addr & StackTagMask));
@@ -248,7 +248,7 @@ class GCMarker : public JSTracer
             delayMarkingChildren(ptr);
     }
 
-    void pushValueArray(JSObject* obj, void* start, void* end) {
+    void pushValueArray(JSObject *obj, void* start, void *end) {
         checkZone(obj);
 
         MOZ_ASSERT(start <= end);

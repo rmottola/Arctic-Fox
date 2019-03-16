@@ -229,7 +229,7 @@ UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
             return false;
     }
 
-    ObjectGroup* nativeGroup =
+    ObjectGroup *nativeGroup =
         ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, proto,
                                           group->flags() & OBJECT_FLAG_DYNAMIC_MASK);
     if (!nativeGroup)

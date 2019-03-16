@@ -2331,7 +2331,7 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
      * Normally write barriers happen before the write. However, that's not
      * necessary here because nothing is being destroyed. We're just swapping.
      */
-    JS::Zone* zone = a->zone();
+    JS::Zone *zone = a->zone();
     if (zone->needsIncrementalBarrier()) {
         MarkChildren(zone->barrierTracer(), a);
         MarkChildren(zone->barrierTracer(), b);

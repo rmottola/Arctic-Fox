@@ -134,14 +134,14 @@ JSRope::new_(js::ExclusiveContext* cx,
 }
 
 inline void
-JSRope::markChildren(JSTracer* trc)
+JSRope::markChildren(JSTracer *trc)
 {
     js::gc::MarkStringUnbarriered(trc, &d.s.u2.left, "left child");
     js::gc::MarkStringUnbarriered(trc, &d.s.u3.right, "right child");
 }
 
 MOZ_ALWAYS_INLINE void
-JSDependentString::init(js::ExclusiveContext* cx, JSLinearString* base, size_t start,
+JSDependentString::init(js::ExclusiveContext *cx, JSLinearString *base, size_t start,
                         size_t length)
 {
     MOZ_ASSERT(!js::IsPoisonedPtr(base));
@@ -205,14 +205,14 @@ JSDependentString::new_(js::ExclusiveContext* cx, JSLinearString* baseArg, size_
 }
 
 inline void
-JSString::markBase(JSTracer* trc)
+JSString::markBase(JSTracer *trc)
 {
     MOZ_ASSERT(hasBase());
     js::gc::MarkStringUnbarriered(trc, &d.s.u3.base, "base");
 }
 
 MOZ_ALWAYS_INLINE void
-JSFlatString::init(const char16_t* chars, size_t length)
+JSFlatString::init(const char16_t *chars, size_t length)
 {
     d.u1.length = length;
     d.u1.flags = FLAT_BIT;
