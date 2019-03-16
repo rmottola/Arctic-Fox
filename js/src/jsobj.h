@@ -168,7 +168,7 @@ class JSObject : public js::gc::Cell
         return group_->lazy();
     }
 
-    JSCompartment* compartment() const {
+    JSCompartment *compartment() const {
         return lastProperty()->base()->compartment();
     }
 
@@ -176,7 +176,7 @@ class JSObject : public js::gc::Cell
      * Make a non-array object with the specified initial state. This method
      * takes ownership of any extantSlots it is passed.
      */
-    static inline JSObject* create(js::ExclusiveContext* cx,
+    static inline JSObject *create(js::ExclusiveContext *cx,
                                    js::gc::AllocKind kind,
                                    js::gc::InitialHeap heap,
                                    js::HandleShape shape,

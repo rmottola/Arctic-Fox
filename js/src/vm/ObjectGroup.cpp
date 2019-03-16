@@ -25,7 +25,7 @@ using mozilla::PodZero;
 // ObjectGroup
 /////////////////////////////////////////////////////////////////////
 
-ObjectGroup::ObjectGroup(const Class* clasp, TaggedProto proto, ObjectGroupFlags initialFlags)
+ObjectGroup::ObjectGroup(const Class *clasp, TaggedProto proto, ObjectGroupFlags initialFlags)
 {
     PodZero(this);
 
@@ -290,8 +290,8 @@ JSObject::splicePrototype(JSContext* cx, const Class* clasp, Handle<TaggedProto>
     return true;
 }
 
-/* static */ ObjectGroup*
-JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
+/* static */ ObjectGroup *
+JSObject::makeLazyGroup(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->hasLazyGroup());
     MOZ_ASSERT(cx->compartment() == obj->compartment());
@@ -317,7 +317,7 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
         initialFlags |= OBJECT_FLAG_LENGTH_OVERFLOW;
 
     Rooted<TaggedProto> proto(cx, obj->getTaggedProto());
-    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
+    ObjectGroup *group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
                                                            initialFlags);
     if (!group)
         return nullptr;
@@ -594,7 +594,7 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
     AutoEnterAnalysis enter(cx);
 
     Rooted<TaggedProto> protoRoot(cx, proto);
-    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, clasp, protoRoot);
+    ObjectGroup *group = ObjectGroupCompartment::makeGroup(cx, clasp, protoRoot);
     if (!group)
         return nullptr;
 
@@ -603,7 +603,7 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
 
     ObjectGroupCompartment::newTablePostBarrier(cx, table, clasp, proto, nullptr);
 
-    group->initSingleton((JSObject*) ObjectGroup::LAZY_SINGLETON);
+    group->initSingleton((JSObject *) ObjectGroup::LAZY_SINGLETON);
     MOZ_ASSERT(group->singleton(), "created group must be a proper singleton");
 
     return group;
@@ -800,12 +800,12 @@ ObjectGroup::fixRestArgumentsGroup(ExclusiveContext* cx, ArrayObject* obj)
 }
 
 /* static */ void
-ObjectGroup::setGroupToHomogenousArray(ExclusiveContext* cx, JSObject* obj,
+ObjectGroup::setGroupToHomogenousArray(ExclusiveContext *cx, JSObject *obj,
                                        TypeSet::Type elementType)
 {
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
 
-    ObjectGroupCompartment::ArrayObjectTable*& table =
+    ObjectGroupCompartment::ArrayObjectTable *&table =
         cx->compartment()->objectGroups.arrayObjectTable;
 
     if (!table) {
@@ -1158,10 +1158,10 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
     return res;
 }
 
-/* static */ ObjectGroup*
-ObjectGroup::callingAllocationSiteGroup(JSContext* cx, JSProtoKey key)
+/* static */ ObjectGroup *
+ObjectGroup::callingAllocationSiteGroup(JSContext *cx, JSProtoKey key)
 {
-    jsbytecode* pc;
+    jsbytecode *pc;
     RootedScript script(cx, cx->currentScript(&pc));
     if (script)
         return allocationSiteGroup(cx, script, pc, key);
@@ -1196,8 +1196,8 @@ ObjectGroup::setAllocationSiteObjectGroup(JSContext* cx,
     return true;
 }
 
-/* static */ ArrayObject*
-ObjectGroup::getOrFixupCopyOnWriteObject(JSContext* cx, HandleScript script, jsbytecode* pc)
+/* static */ ArrayObject *
+ObjectGroup::getOrFixupCopyOnWriteObject(JSContext *cx, HandleScript script, jsbytecode *pc)
 {
     // Make sure that the template object for script/pc has a type indicating
     // that the object and its copies have copy on write elements.
@@ -1218,7 +1218,7 @@ ObjectGroup::getOrFixupCopyOnWriteObject(JSContext* cx, HandleScript script, jsb
     // Update type information in the initializer object group.
     MOZ_ASSERT(obj->slotSpan() == 0);
     for (size_t i = 0; i < obj->getDenseInitializedLength(); i++) {
-        const Value& v = obj->getDenseElement(i);
+        const Value &v = obj->getDenseElement(i);
         AddTypePropertyId(cx, group, JSID_VOID, v);
     }
 
@@ -1308,14 +1308,14 @@ ObjectGroupCompartment::replaceDefaultNewGroup(const Class* clasp, TaggedProto p
 }
 
 /* static */
-ObjectGroup*
-ObjectGroupCompartment::makeGroup(ExclusiveContext* cx, const Class* clasp,
+ObjectGroup *
+ObjectGroupCompartment::makeGroup(ExclusiveContext *cx, const Class *clasp,
                                   Handle<TaggedProto> proto,
                                   ObjectGroupFlags initialFlags /* = 0 */)
 {
     MOZ_ASSERT_IF(proto.isObject(), cx->isInsideCurrentCompartment(proto.toObject()));
 
-    ObjectGroup* group = NewObjectGroup(cx);
+    ObjectGroup *group = NewObjectGroup(cx);
     if (!group)
         return nullptr;
     new(group) ObjectGroup(clasp, proto, initialFlags);

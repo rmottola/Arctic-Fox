@@ -522,15 +522,15 @@ GetAnyCompartmentInZone(JS::Zone* zone);
 namespace shadow {
 
 struct ObjectGroup {
-    const Class* clasp;
-    JSObject*   proto;
+    const Class *clasp;
+    JSObject    *proto;
 };
 
 struct BaseShape {
-    const js::Class* clasp_;
-    JSObject* parent;
-    JSObject* _1;
-    JSCompartment* compartment;
+    const js::Class *clasp_;
+    JSObject *parent;
+    JSObject *_1;
+    JSCompartment *compartment;
 };
 
 class Shape {
@@ -669,20 +669,20 @@ GetObjectParent(JSObject *obj)
     return reinterpret_cast<shadow::Object*>(obj)->shape->base->parent;
 }
 
-static MOZ_ALWAYS_INLINE JSCompartment*
-GetObjectCompartment(JSObject* obj)
+static MOZ_ALWAYS_INLINE JSCompartment *
+GetObjectCompartment(JSObject *obj)
 {
     return reinterpret_cast<shadow::Object*>(obj)->shape->base->compartment;
 }
 
-JS_FRIEND_API(JSObject*)
+JS_FRIEND_API(JSObject *)
 GetObjectParentMaybeScope(JSObject *obj);
 
-JS_FRIEND_API(JSObject*)
+JS_FRIEND_API(JSObject *)
 GetGlobalForObjectCrossCompartment(JSObject *obj);
 
-JS_FRIEND_API(JSObject*)
-GetPrototypeNoProxy(JSObject* obj);
+JS_FRIEND_API(JSObject *)
+GetPrototypeNoProxy(JSObject *obj);
 
 // Sidestep the activeContext checking implicitly performed in
 // JS_SetPendingException.

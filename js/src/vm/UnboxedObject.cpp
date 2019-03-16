@@ -165,11 +165,11 @@ UnboxedPlainObject::trace(JSTracer* trc, JSObject* obj)
 }
 
 /* static */ bool
-UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
+UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
 {
     AutoEnterAnalysis enter(cx);
 
-    UnboxedLayout& layout = group->unboxedLayout();
+    UnboxedLayout &layout = group->unboxedLayout();
     Rooted<TaggedProto> proto(cx, group->proto());
 
     MOZ_ASSERT(!layout.nativeGroup());
@@ -243,7 +243,7 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
                 return false;
             for (size_t j = 0; j < types.length(); j++)
                 AddTypePropertyId(cx, nativeGroup, property->id, types[j]);
-            HeapTypeSet* nativeProperty = nativeGroup->maybeGetProperty(property->id);
+            HeapTypeSet *nativeProperty = nativeGroup->maybeGetProperty(property->id);
             if (nativeProperty->canSetDefinite(i))
                 nativeProperty->setDefinite(i);
         }
@@ -259,9 +259,9 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
 }
 
 /* static */ bool
-UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
+UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (!layout.nativeGroup()) {
         if (!UnboxedLayout::makeNativeGroup(cx, obj->group()))

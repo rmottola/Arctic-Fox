@@ -1430,11 +1430,11 @@ gc::MarkCycleCollectorChildren(JSTracer* trc, Shape* shape)
 }
 
 static void
-ScanObjectGroup(GCMarker* gcmarker, ObjectGroup* group)
+ScanObjectGroup(GCMarker *gcmarker, ObjectGroup *group)
 {
     unsigned count = group->getPropertyCount();
     for (unsigned i = 0; i < count; i++) {
-        if (ObjectGroup::Property* prop = group->getProperty(i))
+        if (ObjectGroup::Property *prop = group->getProperty(i))
             MarkId(gcmarker, &prop->id, "ObjectGroup property id");
     }
 
@@ -1453,22 +1453,22 @@ ScanObjectGroup(GCMarker* gcmarker, ObjectGroup* group)
     if (group->maybeUnboxedLayout())
         group->unboxedLayout().trace(gcmarker);
 
-    if (ObjectGroup* unboxedGroup = group->maybeOriginalUnboxedGroup())
+    if (ObjectGroup *unboxedGroup = group->maybeOriginalUnboxedGroup())
         PushMarkStack(gcmarker, unboxedGroup);
 
-    if (TypeDescr* descr = group->maybeTypeDescr())
+    if (TypeDescr *descr = group->maybeTypeDescr())
         PushMarkStack(gcmarker, descr);
 
-    if (JSFunction* fun = group->maybeInterpretedFunction())
+    if (JSFunction *fun = group->maybeInterpretedFunction())
         PushMarkStack(gcmarker, fun);
 }
 
 static void
-gc::MarkChildren(JSTracer* trc, ObjectGroup* group)
+gc::MarkChildren(JSTracer *trc, ObjectGroup *group)
 {
     unsigned count = group->getPropertyCount();
     for (unsigned i = 0; i < count; i++) {
-        if (ObjectGroup::Property* prop = group->getProperty(i))
+        if (ObjectGroup::Property *prop = group->getProperty(i))
             MarkId(trc, &prop->id, "group_property");
     }
 
@@ -1487,17 +1487,17 @@ gc::MarkChildren(JSTracer* trc, ObjectGroup* group)
     if (group->maybeUnboxedLayout())
         group->unboxedLayout().trace(trc);
 
-    if (ObjectGroup* unboxedGroup = group->maybeOriginalUnboxedGroup()) {
+    if (ObjectGroup *unboxedGroup = group->maybeOriginalUnboxedGroup()) {
         MarkObjectGroupUnbarriered(trc, &unboxedGroup, "group_original_unboxed_group");
         group->setOriginalUnboxedGroup(unboxedGroup);
     }
 
-    if (JSObject* descr = group->maybeTypeDescr()) {
+    if (JSObject *descr = group->maybeTypeDescr()) {
         MarkObjectUnbarriered(trc, &descr, "group_type_descr");
         group->setTypeDescr(&descr->as<TypeDescr>());
     }
 
-    if (JSObject* fun = group->maybeInterpretedFunction()) {
+    if (JSObject *fun = group->maybeInterpretedFunction()) {
         MarkObjectUnbarriered(trc, &fun, "group_function");
         group->setInterpretedFunction(&fun->as<JSFunction>());
     }

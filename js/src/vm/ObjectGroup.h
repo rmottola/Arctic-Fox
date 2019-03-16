@@ -151,7 +151,7 @@ AsTaggedProto(HandleObject obj)
 class ObjectGroup : public gc::TenuredCell
 {
     /* Class shared by objects in this group. */
-    const Class* clasp_;
+    const Class *clasp_;
 
     /* Prototype shared by objects in this group. */
     HeapPtrObject proto_;
@@ -165,11 +165,11 @@ class ObjectGroup : public gc::TenuredCell
 
   public:
 
-    const Class* clasp() const {
+    const Class *clasp() const {
         return clasp_;
     }
 
-    void setClasp(const Class* clasp) {
+    void setClasp(const Class *clasp) {
         clasp_ = clasp;
     }
 
@@ -177,18 +177,18 @@ class ObjectGroup : public gc::TenuredCell
         return TaggedProto(proto_);
     }
 
-    JSObject* singleton() const {
+    JSObject *singleton() const {
         return singleton_;
     }
 
     // For use during marking, don't call otherwise.
-    HeapPtrObject& protoRaw() { return proto_; }
-    HeapPtrObject& singletonRaw() { return singleton_; }
+    HeapPtrObject &protoRaw() { return proto_; }
+    HeapPtrObject &singletonRaw() { return singleton_; }
 
     void setProto(TaggedProto proto);
     void setProtoUnchecked(TaggedProto proto);
 
-    void initSingleton(JSObject* singleton) {
+    void initSingleton(JSObject *singleton) {
         singleton_ = singleton;
     }
 
@@ -197,7 +197,7 @@ class ObjectGroup : public gc::TenuredCell
      * object whose group has not been constructed yet.
      */
     static const size_t LAZY_SINGLETON = 1;
-    bool lazy() const { return singleton() == (JSObject*) LAZY_SINGLETON; }
+    bool lazy() const { return singleton() == (JSObject *) LAZY_SINGLETON; }
 
   private:
     /* Flags for this group. */
@@ -234,7 +234,7 @@ class ObjectGroup : public gc::TenuredCell
 
     // If non-null, holds additional information about this object, whose
     // format is indicated by the object's addendum kind.
-    void* addendum_;
+    void *addendum_;
 
     void setAddendum(AddendumKind kind, void* addendum, bool writeBarrier = true);
 
@@ -243,7 +243,7 @@ class ObjectGroup : public gc::TenuredCell
             ((flags_ & OBJECT_FLAG_ADDENDUM_MASK) >> OBJECT_FLAG_ADDENDUM_SHIFT);
     }
 
-    TypeNewScript* newScriptDontCheckGeneration() const {
+    TypeNewScript *newScriptDontCheckGeneration() const {
         if (addendumKind() == Addendum_NewScript)
             return reinterpret_cast<TypeNewScript*>(addendum_);
         return nullptr;
@@ -255,7 +255,7 @@ class ObjectGroup : public gc::TenuredCell
         return nullptr;
     }
 
-    TypeNewScript* anyNewScript();
+    TypeNewScript *anyNewScript();
     void detachNewScript(bool writeBarrier, ObjectGroup *replacement);
 
     ObjectGroupFlags flagsDontCheckGeneration() {
@@ -425,10 +425,10 @@ class ObjectGroup : public gc::TenuredCell
      * defineProperty which are on native properties, and on any jitcode which
      * might update the property with a new type.
      */
-    Property** propertySet;
+    Property **propertySet;
   public:
 
-    inline ObjectGroup(const Class* clasp, TaggedProto proto, ObjectGroupFlags initialFlags);
+    inline ObjectGroup(const Class *clasp, TaggedProto proto, ObjectGroupFlags initialFlags);
 
     inline bool hasAnyFlags(ObjectGroupFlags flags) {
         MOZ_ASSERT((flags & OBJECT_FLAG_DYNAMIC_MASK) == flags);
@@ -480,24 +480,24 @@ class ObjectGroup : public gc::TenuredCell
      * Get or create a property of this object. Only call this for properties which
      * a script accesses explicitly.
      */
-    inline HeapTypeSet* getProperty(ExclusiveContext* cx, jsid id);
+    inline HeapTypeSet *getProperty(ExclusiveContext *cx, jsid id);
 
     /* Get a property only if it already exists. */
-    inline HeapTypeSet* maybeGetProperty(jsid id);
+    inline HeapTypeSet *maybeGetProperty(jsid id);
 
     inline unsigned getPropertyCount();
-    inline Property* getProperty(unsigned i);
+    inline Property *getProperty(unsigned i);
 
     /* Helpers */
 
-    void updateNewPropertyTypes(ExclusiveContext* cx, jsid id, HeapTypeSet* types);
-    bool addDefiniteProperties(ExclusiveContext* cx, Shape* shape);
+    void updateNewPropertyTypes(ExclusiveContext *cx, jsid id, HeapTypeSet *types);
+    bool addDefiniteProperties(ExclusiveContext *cx, Shape *shape);
     bool matchDefiniteProperties(HandleObject obj);
-    void markPropertyNonData(ExclusiveContext* cx, jsid id);
-    void markPropertyNonWritable(ExclusiveContext* cx, jsid id);
-    void markStateChange(ExclusiveContext* cx);
-    void setFlags(ExclusiveContext* cx, ObjectGroupFlags flags);
-    void markUnknown(ExclusiveContext* cx);
+    void markPropertyNonData(ExclusiveContext *cx, jsid id);
+    void markPropertyNonWritable(ExclusiveContext *cx, jsid id);
+    void markStateChange(ExclusiveContext *cx);
+    void setFlags(ExclusiveContext *cx, ObjectGroupFlags flags);
+    void markUnknown(ExclusiveContext *cx);
     void maybeClearNewScriptOnOOM();
     void clearNewScript(ExclusiveContext *cx, ObjectGroup *replacement = nullptr);
     bool isPropertyNonData(jsid id);

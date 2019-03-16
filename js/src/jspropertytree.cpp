@@ -231,19 +231,19 @@ Shape::fixupDictionaryShapeAfterMovingGC()
     // It's possible that this shape is unreachable and that listp points to the
     // location of a dead object in the nursery, in which case we should never
     // touch it again.
-    if (IsInsideNursery(reinterpret_cast<Cell*>(listp))) {
+    if (IsInsideNursery(reinterpret_cast<Cell *>(listp))) {
         listp = nullptr;
         return;
     }
 
-    MOZ_ASSERT(!IsInsideNursery(reinterpret_cast<Cell*>(listp)));
+    MOZ_ASSERT(!IsInsideNursery(reinterpret_cast<Cell *>(listp)));
     AllocKind kind = TenuredCell::fromPointer(listp)->getAllocKind();
     MOZ_ASSERT(kind == FINALIZE_SHAPE ||
                kind == FINALIZE_ACCESSOR_SHAPE ||
                kind <= FINALIZE_OBJECT_LAST);
     if (kind == FINALIZE_SHAPE || kind == FINALIZE_ACCESSOR_SHAPE) {
         // listp points to the parent field of the next shape.
-        Shape* next = reinterpret_cast<Shape*>(uintptr_t(listp) -
+        Shape *next = reinterpret_cast<Shape *>(uintptr_t(listp) -
                                                 offsetof(Shape, parent));
         listp = &gc::MaybeForwarded(next)->parent;
     } else {

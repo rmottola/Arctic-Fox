@@ -6597,7 +6597,7 @@ js::NewCompartment(JSContext* cx, Zone* zone, JSPrincipals* principals,
 }
 
 void
-gc::MergeCompartments(JSCompartment* source, JSCompartment* target)
+gc::MergeCompartments(JSCompartment *source, JSCompartment *target)
 {
     // The source compartment must be specifically flagged as mergable.  This
     // also implies that the compartment is not visible to the debugger.
@@ -6605,7 +6605,7 @@ gc::MergeCompartments(JSCompartment* source, JSCompartment* target)
 
     MOZ_ASSERT(source->addonId == target->addonId);
 
-    JSRuntime* rt = source->runtimeFromMainThread();
+    JSRuntime *rt = source->runtimeFromMainThread();
 
     AutoPrepareForTracing prepare(rt, SkipAtoms);
 
@@ -6629,20 +6629,20 @@ gc::MergeCompartments(JSCompartment* source, JSCompartment* target)
     // type information generations are in sync.
 
     for (ZoneCellIter iter(source->zone(), FINALIZE_SCRIPT); !iter.done(); iter.next()) {
-        JSScript* script = iter.get<JSScript>();
+        JSScript *script = iter.get<JSScript>();
         MOZ_ASSERT(script->compartment() == source);
         script->compartment_ = target;
         script->setTypesGeneration(target->zone()->types.generation);
     }
 
     for (ZoneCellIter iter(source->zone(), FINALIZE_BASE_SHAPE); !iter.done(); iter.next()) {
-        BaseShape* base = iter.get<BaseShape>();
+        BaseShape *base = iter.get<BaseShape>();
         MOZ_ASSERT(base->compartment() == source);
         base->compartment_ = target;
     }
 
     for (ZoneCellIter iter(source->zone(), FINALIZE_OBJECT_GROUP); !iter.done(); iter.next()) {
-        ObjectGroup* group = iter.get<ObjectGroup>();
+        ObjectGroup *group = iter.get<ObjectGroup>();
         group->setGeneration(target->zone()->types.generation);
     }
 
@@ -6650,7 +6650,7 @@ gc::MergeCompartments(JSCompartment* source, JSCompartment* target)
 
     for (size_t thingKind = 0; thingKind != FINALIZE_LIMIT; thingKind++) {
         for (ArenaIter aiter(source->zone(), AllocKind(thingKind)); !aiter.done(); aiter.next()) {
-            ArenaHeader* aheader = aiter.get();
+            ArenaHeader *aheader = aiter.get();
             aheader->zone = target->zone();
         }
     }

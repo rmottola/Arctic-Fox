@@ -321,7 +321,7 @@ class UnownedBaseShape;
 struct StackBaseShape;
 
 namespace gc {
-void MergeCompartments(JSCompartment* source, JSCompartment* target);
+void MergeCompartments(JSCompartment *source, JSCompartment *target);
 }
 
 // This class is used to add a post barrier on the AccessorShape's getter/setter

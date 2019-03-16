@@ -1172,12 +1172,12 @@ js::array_join(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static inline bool
-InitArrayTypes(JSContext* cx, ObjectGroup* group, const Value* vector, unsigned count)
+InitArrayTypes(JSContext *cx, ObjectGroup *group, const Value *vector, unsigned count)
 {
     if (!group->unknownProperties()) {
         AutoEnterAnalysis enter(cx);
 
-        HeapTypeSet* types = group->getProperty(cx, JSID_VOID);
+        HeapTypeSet *types = group->getProperty(cx, JSID_VOID);
         if (!types)
             return false;
 
@@ -1198,14 +1198,14 @@ enum ShouldUpdateTypes
 
 /* vector must point to rooted memory. */
 static bool
-InitArrayElements(JSContext* cx, HandleObject obj, uint32_t start, uint32_t count, const Value* vector, ShouldUpdateTypes updateTypes)
+InitArrayElements(JSContext *cx, HandleObject obj, uint32_t start, uint32_t count, const Value *vector, ShouldUpdateTypes updateTypes)
 {
     MOZ_ASSERT(count <= MAX_ARRAY_INDEX);
 
     if (count == 0)
         return true;
 
-    ObjectGroup* group = obj->getGroup(cx);
+    ObjectGroup *group = obj->getGroup(cx);
     if (!group)
         return false;
     if (updateTypes && !InitArrayTypes(cx, group, vector, count))
@@ -1248,7 +1248,7 @@ InitArrayElements(JSContext* cx, HandleObject obj, uint32_t start, uint32_t coun
         return true;
     } while (false);
 
-    const Value* end = vector + count;
+    const Value *end = vector + count;
     while (vector < end && start <= MAX_ARRAY_INDEX) {
         if (!CheckForInterrupt(cx) ||
             !SetArrayElement(cx, obj, start++, HandleValue::fromMarkedLocation(vector++))) {
@@ -3025,11 +3025,11 @@ IsArrayConstructor(const Value& v)
 }
 
 static bool
-ArrayFromCallArgs(JSContext* cx, HandleObjectGroup group, CallArgs& args)
+ArrayFromCallArgs(JSContext *cx, HandleObjectGroup group, CallArgs &args)
 {
     if (!InitArrayTypes(cx, group, args.array(), args.length()))
         return false;
-    JSObject* obj = (args.length() == 0)
+    JSObject *obj = (args.length() == 0)
         ? NewDenseEmptyArray(cx)
         : NewDenseCopiedArray(cx, args.length(), args.array());
     if (!obj)
