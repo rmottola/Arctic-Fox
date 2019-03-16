@@ -7271,6 +7271,10 @@ IonBuilder::ensureDefiniteType(MDefinition* def, MIRType definiteType)
 
       default: {
         if (def->type() != MIRType_Value) {
+            if (def->type() == MIRType_Int32 && definiteType == MIRType_Double) {
+                replace = MToDouble::New(alloc(), def);
+                break;
+            }
             MOZ_ASSERT(def->type() == definiteType);
             return def;
         }
