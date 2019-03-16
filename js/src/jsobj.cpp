@@ -2333,8 +2333,8 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
      */
     JS::Zone *zone = a->zone();
     if (zone->needsIncrementalBarrier()) {
-        MarkChildren(zone->barrierTracer(), a);
-        MarkChildren(zone->barrierTracer(), b);
+        a->markChildren(zone->barrierTracer());
+        b->markChildren(zone->barrierTracer());
     }
 
     NotifyGCPostSwap(a, b, r);
