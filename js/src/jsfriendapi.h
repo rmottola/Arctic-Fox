@@ -524,13 +524,12 @@ namespace shadow {
 struct ObjectGroup {
     const Class *clasp;
     JSObject    *proto;
+    JSCompartment *compartment;
 };
 
 struct BaseShape {
     const js::Class *clasp_;
     JSObject *parent;
-    JSObject *_1;
-    JSCompartment *compartment;
 };
 
 class Shape {
@@ -545,8 +544,8 @@ public:
 // This layout is shared by all objects except for Typed Objects (which still
 // have a shape and group).
 struct Object {
-    shadow::Shape       *shape;
     shadow::ObjectGroup *group;
+    shadow::Shape       *shape;
     JS::Value           *slots;
     void                *_1;
 
@@ -672,7 +671,7 @@ GetObjectParent(JSObject *obj)
 static MOZ_ALWAYS_INLINE JSCompartment *
 GetObjectCompartment(JSObject *obj)
 {
-    return reinterpret_cast<shadow::Object*>(obj)->shape->base->compartment;
+    return reinterpret_cast<shadow::Object*>(obj)->group->compartment;
 }
 
 JS_FRIEND_API(JSObject *)
