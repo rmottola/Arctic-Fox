@@ -28,6 +28,7 @@
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
@@ -62,6 +63,7 @@
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
+- Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
 - 1142669 part 6 - Don't inline scripts that are known to inline a 
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
@@ -69,13 +71,28 @@
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
+- Bug 1137180 - Add baseline caches for extensible unboxed objects, and…
 - 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
+- Bug 1137180 - Add most functionality necessary for extensible unboxed…
+- Bug 1144331 - Assert that gray buffering does not depend on isMarking
+- Bug 1144369 - Add a GC phase to track time spent buffering gray roots
+- Bug 1144789 - Strongly type GrayBufferState enum and move to GCRuntim
+- Bug 1144794 - Move markBufferedGrayRoots to the GCRuntime
+- Bug 1144811 - Inline the start and end buffering gray roots methods o
+- Bug 1144817 - Move hasBufferedGrayRoots to GCRuntim
+- Bug 1144832 - Move grayBufferState manipulation out of GCMarker;
+- Bug 1144834 - Move resetBufferedGrayRoots to GCRuntime;
+- Bug 1144920 - Move gray buffer clearing out of GCMarker
+- Bug 1144925 - Buffer gray roots using a CallbackTracer instead of the
+- Bug 1144931 - Move gray buffering code to RootMarking.cpp
+- Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
 - Bug 805052 - 2015-03-14 four parts
 - Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
 - Bug 1140586 - 2015-03-12 1 to 5
+- Bug 1137180 - Only mark inner scripts as having failed a bounds check…
 - Bug 1132522, part 2 - Treat false return from proxyHandler.set()
 - Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
 - Bug 928336. Make defining unforgeable properties on objects faster by
@@ -84,12 +101,6 @@
 - Bug 1134425 - Part 2: templatize the GC's allocation routines
 - Bug 1134425 - Part 1: move the allocator interface code out of line
 - Bug 1138735 - Fallback to software vsync if CVDisplayLink fails to in
-- Bug 1137497 - Remove shape from unboxed objects,
-- Bug 1137978 - Access an object's compartment and zone via its group
-- Bug 1138538 - Display GC zeal help text in shell help message r
-- Bug 1138390 - Wait for GC to finish if necessary in runOffThreadScrip
-- Bug 1135141 - Release relocated arenas immediately on last ditch GC 
-- Bug 1135141 - Fix jsapi-test framework to not overwrite original glob
 
 
 
@@ -98,6 +109,9 @@
 
 - Cannot be applied because file is missing - check
 Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
+
+Analyze all:
+https://bugzilla.mozilla.org/show_bug.cgi?id=1106828
 
 ### Further ToDo which would help portability:
 
