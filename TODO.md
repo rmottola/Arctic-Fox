@@ -97,10 +97,6 @@
 - Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
 - Bug 928336. Make defining unforgeable properties on objects faster by
 - Bug 1131805 1 to 3 parts
-- Bug 1136896. Speed up fill() and dedent() by memoizing some of the wo
-- Bug 1134425 - Part 2: templatize the GC's allocation routines
-- Bug 1134425 - Part 1: move the allocator interface code out of line
-- Bug 1138735 - Fallback to software vsync if CVDisplayLink fails to in
 
 
 
