@@ -258,11 +258,11 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->numFixedSlots() == 0);
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->slotSpan() == 0);
 
-    const js::Class* clasp = group->clasp();
+    const js::Class *clasp = group->clasp();
     size_t nDynamicSlots =
         js::NativeObject::dynamicSlotsCount(shape->numFixedSlots(), shape->slotSpan(), clasp);
 
-    JSObject* obj = js::NewGCObject<js::CanGC>(cx, kind, nDynamicSlots, heap, clasp);
+    JSObject *obj = js::NewGCObject<js::CanGC>(cx, kind, nDynamicSlots, heap, clasp);
     if (!obj)
         return nullptr;
 

@@ -2376,9 +2376,9 @@ JSScript::initCompartment(ExclusiveContext* cx)
     compartment_ = cx->compartment_;
 }
 
-JSScript*
-JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCallerFun,
-                 const ReadOnlyCompileOptions& options, unsigned staticLevel,
+JSScript *
+JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCallerFun,
+                 const ReadOnlyCompileOptions &options, unsigned staticLevel,
                  HandleObject sourceObject, uint32_t bufStart, uint32_t bufEnd)
 {
     MOZ_ASSERT(bufStart <= bufEnd);
@@ -3761,7 +3761,7 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     if (bytes && !table)
         return nullptr;
 
-    LazyScript* res = NewGCLazyScript(cx);
+    LazyScript *res = NewGCLazyScript(cx);
     if (!res)
         return nullptr;
 
@@ -3770,8 +3770,8 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     return new (res) LazyScript(fun, table.forget(), packed, begin, end, lineno, column);
 }
 
-/* static */ LazyScript*
-LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
+/* static */ LazyScript *
+LazyScript::CreateRaw(ExclusiveContext *cx, HandleFunction fun,
                       uint32_t numFreeVariables, uint32_t numInnerFunctions, JSVersion version,
                       uint32_t begin, uint32_t end, uint32_t lineno, uint32_t column)
 {

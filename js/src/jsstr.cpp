@@ -3056,10 +3056,10 @@ struct StringRange
 
 template <typename CharT>
 static void
-CopySubstringsToFatInline(JSFatInlineString* dest, const CharT* src, const StringRange* ranges,
+CopySubstringsToFatInline(JSFatInlineString *dest, const CharT *src, const StringRange *ranges,
                           size_t rangesLen, size_t outputLen)
 {
-    CharT* buf = dest->init<CharT>(outputLen);
+    CharT *buf = dest->init<CharT>(outputLen);
     size_t pos = 0;
     for (size_t i = 0; i < rangesLen; i++) {
         PodCopy(buf + pos, src + ranges[i].start, ranges[i].length);
@@ -3070,11 +3070,11 @@ CopySubstringsToFatInline(JSFatInlineString* dest, const CharT* src, const Strin
     buf[outputLen] = 0;
 }
 
-static inline JSFatInlineString*
-FlattenSubstrings(JSContext* cx, HandleLinearString str, const StringRange* ranges,
+static inline JSFatInlineString *
+FlattenSubstrings(JSContext *cx, HandleLinearString str, const StringRange *ranges,
                   size_t rangesLen, size_t outputLen)
 {
-    JSFatInlineString* result = NewGCFatInlineString<CanGC>(cx);
+    JSFatInlineString *result = NewGCFatInlineString<CanGC>(cx);
     if (!result)
         return nullptr;
 

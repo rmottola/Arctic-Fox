@@ -580,11 +580,11 @@ JitRuntime::getVMWrapper(const VMFunction& f) const
 }
 
 template <AllowGC allowGC>
-JitCode*
-JitCode::New(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
-             ExecutablePool* pool, CodeKind kind)
+JitCode *
+JitCode::New(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
+             ExecutablePool *pool, CodeKind kind)
 {
-    JitCode* codeObj = js::NewJitCode<allowGC>(cx);
+    JitCode *codeObj = js::NewJitCode<allowGC>(cx);
     if (!codeObj) {
         pool->release(headerSize + bufferSize, kind);
         return nullptr;
@@ -595,14 +595,14 @@ JitCode::New(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerS
 }
 
 template
-JitCode*
-JitCode::New<CanGC>(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
-                    ExecutablePool* pool, CodeKind kind);
+JitCode *
+JitCode::New<CanGC>(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
+                    ExecutablePool *pool, CodeKind kind);
 
 template
-JitCode*
-JitCode::New<NoGC>(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
-                   ExecutablePool* pool, CodeKind kind);
+JitCode *
+JitCode::New<NoGC>(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
+                   ExecutablePool *pool, CodeKind kind);
 
 void
 JitCode::copyFrom(MacroAssembler& masm)

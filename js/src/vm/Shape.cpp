@@ -111,12 +111,12 @@ Shape::insertIntoDictionary(HeapPtrShape* dictp)
 }
 
 bool
-Shape::makeOwnBaseShape(ExclusiveContext* cx)
+Shape::makeOwnBaseShape(ExclusiveContext *cx)
 {
     MOZ_ASSERT(!base()->isOwned());
     assertSameCompartmentDebugOnly(cx, compartment());
 
-    BaseShape* nbase = NewGCBaseShape<NoGC>(cx);
+    BaseShape *nbase = NewGCBaseShape<NoGC>(cx);
     if (!nbase)
         return false;
 
@@ -129,7 +129,7 @@ Shape::makeOwnBaseShape(ExclusiveContext* cx)
 }
 
 void
-Shape::handoffTableTo(Shape* shape)
+Shape::handoffTableTo(Shape *shape)
 {
     MOZ_ASSERT(inDictionary() && shape->inDictionary());
 
@@ -138,7 +138,7 @@ Shape::handoffTableTo(Shape* shape)
 
     MOZ_ASSERT(base()->isOwned() && !shape->base()->isOwned());
 
-    BaseShape* nbase = base();
+    BaseShape *nbase = base();
 
     MOZ_ASSERT_IF(shape->hasSlot(), nbase->slotSpan() > shape->slot());
 
@@ -440,13 +440,13 @@ js::NativeObject::toDictionaryMode(ExclusiveContext* cx)
     while (shape) {
         MOZ_ASSERT(!shape->inDictionary());
 
-        Shape* dprop = shape->isAccessorShape() ? NewGCAccessorShape(cx) : NewGCShape(cx);
+        Shape *dprop = shape->isAccessorShape() ? NewGCAccessorShape(cx) : NewGCShape(cx);
         if (!dprop) {
             ReportOutOfMemory(cx);
             return false;
         }
 
-        HeapPtrShape* listp = dictionaryShape ? &dictionaryShape->parent : nullptr;
+        HeapPtrShape *listp = dictionaryShape ? &dictionaryShape->parent : nullptr;
         StackShape child(shape);
         dprop->initDictionaryShape(child, self->numFixedSlots(), listp);
 
@@ -1376,13 +1376,13 @@ BaseShape::getUnowned(ExclusiveContext* cx, StackBaseShape& base)
 
     RootedGeneric<StackBaseShape*> root(cx, &base);
 
-    BaseShape* nbase_ = NewGCBaseShape<CanGC>(cx);
+    BaseShape *nbase_ = NewGCBaseShape<CanGC>(cx);
     if (!nbase_)
         return nullptr;
 
     new (nbase_) BaseShape(base);
 
-    UnownedBaseShape* nbase = static_cast<UnownedBaseShape*>(nbase_);
+    UnownedBaseShape *nbase = static_cast<UnownedBaseShape*>(nbase_);
 
     if (!p.add(cx, table, base, nbase))
         return nullptr;
@@ -1630,10 +1630,10 @@ JSCompartment::checkInitialShapesTableAfterMovingGC()
 
 #endif // JSGC_HASH_TABLE_CHECKS
 
-Shape*
-EmptyShape::new_(ExclusiveContext* cx, Handle<UnownedBaseShape*> base, uint32_t nfixed)
+Shape *
+EmptyShape::new_(ExclusiveContext *cx, Handle<UnownedBaseShape *> base, uint32_t nfixed)
 {
-    Shape* shape = NewGCShape(cx);
+    Shape *shape = NewGCShape(cx);
     if (!shape) {
         ReportOutOfMemory(cx);
         return nullptr;
