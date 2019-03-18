@@ -2383,7 +2383,7 @@ JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCa
 {
     MOZ_ASSERT(bufStart <= bufEnd);
 
-    RootedScript script(cx, NewGCScript(cx));
+    RootedScript script(cx, Allocate<JSScript>(cx));
     if (!script)
         return nullptr;
 
@@ -3761,7 +3761,7 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     if (bytes && !table)
         return nullptr;
 
-    LazyScript *res = NewGCLazyScript(cx);
+    LazyScript *res = Allocate<LazyScript>(cx);
     if (!res)
         return nullptr;
 
