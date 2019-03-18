@@ -44,7 +44,6 @@
 #include "vm/TraceLogging.h"
 
 #include "jscompartmentinlines.h"
-#include "jsgcinlines.h"
 #include "jsobjinlines.h"
 
 using namespace js;
