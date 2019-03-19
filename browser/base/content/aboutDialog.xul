@@ -94,10 +94,10 @@
           Arctic Fox is a fork of Pale Moon 27.9.4 that was released by <label class="text-link" href="http://www.moonchildproductions.info">Moonchild Productions</label>.
         </description>
         <description class="text-pmcreds">
-          Our goal is to add security updates and bug fixes to keep this browser updated for as long as possible for Intel OSX and PowerPC Linux based systems.
+          The intent is to add security updates and bug fixes to keep this browser as up to date as possible for older Intel OSX and PowerPC Linux machines.
         </description>
         <description class="text-blurb">
-          Arctic Fox is not affiliated with Pale Moon.
+          Arctic Fox is not associated with Pale Moon.
 #endif
         </description>    
         </vbox>
