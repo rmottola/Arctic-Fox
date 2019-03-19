@@ -87,7 +87,7 @@
 - Bug 1144931 - Move gray buffering code to RootMarking.cpp
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
-- Bug 805052 - 2015-03-14 four parts
+- Bug 805052 - 2015-03-14 four parts (check all dependencies)
 - Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
@@ -101,8 +101,6 @@
 
 
 ### FIXME / TODO
-- Bug 1112164 part 14 : seems to have introduced issues (timeouts/hangs in JetStream tests) on x86 only
-
 - Cannot be applied because file is missing - check
 Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
