@@ -66,6 +66,13 @@ JS_DeprecatedNewObjectWithGivenProtoAndParent(JSContext *cx, const JSClass *clas
                                               JS::Handle<JSObject*> proto,
                                               JS::Handle<JSObject*> parent);
 
+// Allocate an object in exactly the same way as JS_NewObjectWithGivenProto, but
+// without invoking the metadata callback on it.  This allows creation of
+// internal bookkeeping objects that are guaranteed to not have metadata
+// attached to them.
+extern JS_FRIEND_API(JSObject *)
+JS_NewObjectWithoutMetadata(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto);
+
 extern JS_FRIEND_API(uint32_t)
 JS_ObjectCountDynamicSlots(JS::HandleObject obj);
 
