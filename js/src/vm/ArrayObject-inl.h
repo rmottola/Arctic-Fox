@@ -9,6 +9,7 @@
 
 #include "vm/ArrayObject.h"
 
+#include "gc/GCTrace.h"
 #include "vm/String.h"
 
 #include "vm/TypeInference-inl.h"
@@ -28,8 +29,8 @@ ArrayObject::setLength(ExclusiveContext* cx, uint32_t length)
     getElementsHeader()->length = length;
 }
 
-/* static */ inline ArrayObject*
-ArrayObject::createArrayInternal(ExclusiveContext* cx, gc::AllocKind kind, gc::InitialHeap heap,
+/* static */ inline ArrayObject *
+ArrayObject::createArrayInternal(ExclusiveContext *cx, gc::AllocKind kind, gc::InitialHeap heap,
                                  HandleShape shape, HandleObjectGroup group)
 {
     // Create a new array and initialize everything except for its elements.
@@ -43,12 +44,12 @@ ArrayObject::createArrayInternal(ExclusiveContext* cx, gc::AllocKind kind, gc::I
     MOZ_ASSERT(shape->numFixedSlots() == 0);
 
     size_t nDynamicSlots = dynamicSlotsCount(0, shape->slotSpan(), group->clasp());
-    JSObject* obj = NewGCObject<CanGC>(cx, kind, nDynamicSlots, heap, group->clasp());
+    JSObject *obj = Allocate<JSObject>(cx, kind, nDynamicSlots, heap, group->clasp());
     if (!obj)
         return nullptr;
 
-    static_cast<ArrayObject*>(obj)->shape_.init(shape);
-    static_cast<ArrayObject*>(obj)->group_.init(group);
+    static_cast<ArrayObject *>(obj)->shape_.init(shape);
+    static_cast<ArrayObject *>(obj)->group_.init(group);
 
     return &obj->as<ArrayObject>();
 }

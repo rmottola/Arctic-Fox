@@ -165,11 +165,11 @@ UnboxedPlainObject::trace(JSTracer* trc, JSObject* obj)
 }
 
 /* static */ bool
-UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
+UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
 {
     AutoEnterAnalysis enter(cx);
 
-    UnboxedLayout& layout = group->unboxedLayout();
+    UnboxedLayout &layout = group->unboxedLayout();
     Rooted<TaggedProto> proto(cx, group->proto());
 
     MOZ_ASSERT(!layout.nativeGroup());
@@ -229,24 +229,27 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
             return false;
     }
 
-    ObjectGroup* nativeGroup =
+    ObjectGroup *nativeGroup =
         ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, proto,
                                           group->flags() & OBJECT_FLAG_DYNAMIC_MASK);
     if (!nativeGroup)
         return false;
 
     // Propagate all property types from the old group to the new group.
-    for (size_t i = 0; i < group->getPropertyCount(); i++) {
-        if (ObjectGroup::Property* property = group->getProperty(i)) {
-            TypeSet::TypeList types;
-            if (!property->types.enumerateTypes(&types))
-                return false;
-            for (size_t j = 0; j < types.length(); j++)
-                AddTypePropertyId(cx, nativeGroup, property->id, types[j]);
-            HeapTypeSet* nativeProperty = nativeGroup->maybeGetProperty(property->id);
-            if (nativeProperty->canSetDefinite(i))
-                nativeProperty->setDefinite(i);
-        }
+    for (size_t i = 0; i < layout.properties().length(); i++) {
+        const UnboxedLayout::Property &property = layout.properties()[i];
+        jsid id = NameToId(property.name);
+
+        HeapTypeSet *typeProperty = group->maybeGetProperty(id);
+        TypeSet::TypeList types;
+        if (!typeProperty->enumerateTypes(&types))
+            return false;
+        MOZ_ASSERT(!types.empty());
+        for (size_t j = 0; j < types.length(); j++)
+            AddTypePropertyId(cx, nativeGroup, nullptr, id, types[j]);
+        HeapTypeSet *nativeProperty = nativeGroup->maybeGetProperty(id);
+        if (nativeProperty->canSetDefinite(i))
+            nativeProperty->setDefinite(i);
     }
 
     layout.nativeGroup_ = nativeGroup;
@@ -259,9 +262,9 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
 }
 
 /* static */ bool
-UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
+UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (!layout.nativeGroup()) {
         if (!UnboxedLayout::makeNativeGroup(cx, obj->group()))
@@ -278,28 +281,11 @@ UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
             return false;
     }
 
-    uint32_t objectFlags = obj->lastProperty()->getObjectFlags();
-    RootedObject metadata(cx, obj->getMetadata());
-
     obj->setGroup(layout.nativeGroup());
     obj->as<PlainObject>().setLastPropertyMakeNative(cx, layout.nativeShape());
 
     for (size_t i = 0; i < values.length(); i++)
         obj->as<PlainObject>().initSlotUnchecked(i, values[i]);
-
-    if (objectFlags) {
-        RootedObject objRoot(cx, obj);
-        if (!obj->setFlags(cx, objectFlags))
-            return false;
-        obj = objRoot;
-    }
-
-    if (metadata) {
-        RootedObject objRoot(cx, obj);
-        RootedObject metadataRoot(cx, metadata);
-        if (!setMetadata(cx, objRoot, metadataRoot))
-            return false;
-    }
 
     return true;
 }
@@ -315,6 +301,9 @@ UnboxedPlainObject::create(JSContext* cx, HandleObjectGroup group, NewObjectKind
                                                                      allocKind, newKind);
     if (!res)
         return nullptr;
+
+    // Avoid spurious shape guard hits.
+    res->dummy_ = nullptr;
 
     // Initialize reference fields of the object. All fields in the object will
     // be overwritten shortly, but references need to be safe for the GC.

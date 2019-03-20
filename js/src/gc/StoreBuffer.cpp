@@ -10,6 +10,7 @@
 
 #include "gc/Statistics.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/Runtime.h"
 
 #include "jsgcinlines.h"
 
@@ -20,9 +21,9 @@ using mozilla::ReentrancyGuard;
 /*** Edges ***/
 
 void
-StoreBuffer::SlotsEdge::mark(JSTracer* trc) const
+StoreBuffer::SlotsEdge::mark(JSTracer *trc) const
 {
-    NativeObject* obj = object();
+    NativeObject *obj = object();
 
     // Beware JSObject::swap exchanging a native object for a non-native one.
     if (!obj->isNative())
@@ -46,15 +47,15 @@ StoreBuffer::SlotsEdge::mark(JSTracer* trc) const
 }
 
 void
-StoreBuffer::WholeCellEdges::mark(JSTracer* trc) const
+StoreBuffer::WholeCellEdges::mark(JSTracer *trc) const
 {
     MOZ_ASSERT(edge->isTenured());
     JSGCTraceKind kind = GetGCThingTraceKind(edge);
     if (kind <= JSTRACE_OBJECT) {
-        JSObject* object = static_cast<JSObject*>(edge);
+        JSObject *object = static_cast<JSObject *>(edge);
         if (object->is<ArgumentsObject>())
             ArgumentsObject::trace(trc, object);
-        MarkChildren(trc, object);
+        object->markChildren(trc);
         return;
     }
     MOZ_ASSERT(kind == JSTRACE_JITCODE);
@@ -62,7 +63,7 @@ StoreBuffer::WholeCellEdges::mark(JSTracer* trc) const
 }
 
 void
-StoreBuffer::CellPtrEdge::mark(JSTracer* trc) const
+StoreBuffer::CellPtrEdge::mark(JSTracer *trc) const
 {
     if (!*edge)
         return;

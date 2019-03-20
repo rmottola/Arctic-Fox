@@ -474,9 +474,9 @@ class ArenaList {
         return *this;
     }
 
-    ArenaHeader* removeRemainingArenas(ArenaHeader** arenap, const AutoLockGC& lock);
-    ArenaHeader* pickArenasToRelocate(JSRuntime* runtime);
-    ArenaHeader* relocateArenas(ArenaHeader* toRelocate, ArenaHeader* relocated,
+    ArenaHeader *removeRemainingArenas(ArenaHeader **arenap);
+    ArenaHeader **pickArenasToRelocate(size_t &arenaTotalOut, size_t &relocTotalOut);
+    ArenaHeader *relocateArenas(ArenaHeader *toRelocate, ArenaHeader *relocated,
                                 gcstats::Statistics& stats);
 };
 
@@ -804,10 +804,11 @@ class ArenaLists
         MOZ_ASSERT(freeLists[kind].isEmpty());
     }
 
-    ArenaHeader* relocateArenas(ArenaHeader* relocatedList, gcstats::Statistics& stats);
+    bool relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason reason,
+                        gcstats::Statistics& stats);
 
-    void queueForegroundObjectsForSweep(FreeOp* fop);
-    void queueForegroundThingsForSweep(FreeOp* fop);
+    void queueForegroundObjectsForSweep(FreeOp *fop);
+    void queueForegroundThingsForSweep(FreeOp *fop);
 
     void mergeForegroundSweptObjectArenas();
 
@@ -1155,22 +1156,22 @@ class RelocationOverlay
         return magic_ == Relocated;
     }
 
-    Cell* forwardingAddress() const {
+    Cell *forwardingAddress() const {
         MOZ_ASSERT(isForwarded());
         return newLocation_;
     }
 
-    void forwardTo(Cell* cell) {
+    void forwardTo(Cell *cell) {
         MOZ_ASSERT(!isForwarded());
-        static_assert(offsetof(JSObject, shape_) == offsetof(RelocationOverlay, newLocation_),
-                      "forwarding pointer and shape should be at same location, "
+        static_assert(offsetof(JSObject, group_) == offsetof(RelocationOverlay, newLocation_),
+                      "forwarding pointer and group should be at same location, "
                       "so that obj->zone() works on forwarded objects");
         newLocation_ = cell;
         magic_ = Relocated;
         next_ = nullptr;
     }
 
-    RelocationOverlay* next() const {
+    RelocationOverlay *next() const {
         return next_;
     }
 };
@@ -1270,8 +1271,6 @@ const int ZealCheckHashTablesOnMinorGC = 13;
 const int ZealCompactValue = 14;
 const int ZealLimit = 14;
 
-extern const char* ZealModeHelpText;
-
 enum VerifierType {
     PreBarrierVerifier,
     PostBarrierVerifier
@@ -1279,9 +1278,11 @@ enum VerifierType {
 
 #ifdef JS_GC_ZEAL
 
+extern const char *ZealModeHelpText;
+
 /* Check that write barriers have been used correctly. See jsgc.cpp. */
 void
-VerifyBarriers(JSRuntime* rt, VerifierType type);
+VerifyBarriers(JSRuntime *rt, VerifierType type);
 
 void
 MaybeVerifyBarriers(JSContext* cx, bool always = false);

@@ -90,7 +90,7 @@ JSObject*
 NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
             const js::Class* clasp)
 {
-    return js::NewGCObject<CanGC>(cx, allocKind, 0, initialHeap, clasp);
+    return js::Allocate<JSObject>(cx, allocKind, 0, initialHeap, clasp);
 }
 
 bool
@@ -1131,8 +1131,8 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
     MOZ_ASSERT(obj->compartment() == cx->compartment());
     MOZ_ASSERT(obj->runtimeFromMainThread() == cx->runtime());
 
-    MOZ_ASSERT_IF(!obj->hasLazyGroup(),
-                  obj->group()->clasp() == obj->lastProperty()->getObjectClass());
+    MOZ_ASSERT_IF(!obj->hasLazyGroup() && obj->maybeShape(),
+                  obj->group()->clasp() == obj->maybeShape()->getObjectClass());
 
     if (obj->isTenured()) {
         MOZ_ASSERT(obj->isAligned());

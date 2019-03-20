@@ -245,17 +245,10 @@ MarkCrossCompartmentScriptUnbarriered(JSTracer* trc, JSObject* src, JSScript** d
  * being GC'd. (Although it won't be marked if it's in the wrong compartment.)
  */
 void
-MarkCrossCompartmentSlot(JSTracer* trc, JSObject* src, HeapValue* dst_slot, const char* name);
+MarkCrossCompartmentSlot(JSTracer *trc, JSObject *src, HeapValue *dst_slot, const char *name);
 
 
 /*** Special Cases ***/
-
-/*
- * MarkChildren<JSObject> is exposed solely for preWriteBarrier on
- * JSObject::swap. It should not be considered external interface.
- */
-void
-MarkChildren(JSTracer* trc, JSObject* obj);
 
 /*
  * Trace through the shape and any shapes it contains to mark
@@ -263,7 +256,7 @@ MarkChildren(JSTracer* trc, JSObject* obj);
  * JS_TraceShapeCycleCollectorChildren.
  */
 void
-MarkCycleCollectorChildren(JSTracer* trc, Shape* shape);
+MarkCycleCollectorChildren(JSTracer *trc, Shape *shape);
 
 void
 PushArena(GCMarker* gcmarker, ArenaHeader* aheader);

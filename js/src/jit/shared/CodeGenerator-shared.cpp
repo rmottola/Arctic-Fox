@@ -1075,15 +1075,18 @@ class StoreOp
         masm.storePtr(reg, dump);
     }
     void operator()(FloatRegister reg, Address dump) {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS)
-        if (reg.isDouble()) {
+        if (reg.isDouble())
             masm.storeDouble(reg, dump);
-        } else {
+        else if (reg.isSingle())
             masm.storeFloat32(reg, dump);
-        }
-#else
-        masm.storeDouble(reg, dump);
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+        else if (reg.isInt32x4())
+            masm.storeUnalignedInt32x4(reg, dump);
+        else if (reg.isFloat32x4())
+            masm.storeUnalignedFloat32x4(reg, dump);
 #endif
+        else
+            MOZ_CRASH("Unexpected register type.");
     }
 };
 
@@ -1124,21 +1127,17 @@ class VerifyOp
     }
     void operator()(FloatRegister reg, Address dump) {
         FloatRegister scratch;
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS)
         if (reg.isDouble()) {
             scratch = ScratchDoubleReg;
             masm.loadDouble(dump, scratch);
             masm.branchDouble(Assembler::DoubleNotEqual, scratch, reg, failure_);
-        } else {
+        } else if (reg.isSingle()) {
             scratch = ScratchFloat32Reg;
             masm.loadFloat32(dump, scratch);
             masm.branchFloat(Assembler::DoubleNotEqual, scratch, reg, failure_);
         }
-#else
-        scratch = ScratchFloat32Reg;
-        masm.loadDouble(dump, scratch);
-        masm.branchDouble(Assembler::DoubleNotEqual, scratch, reg, failure_);
-#endif
+
+        // :TODO: (Bug 1133745) Add support to verify SIMD registers.
     }
 };
 
@@ -1366,16 +1365,19 @@ CodeGeneratorShared::visitOutOfLineTruncateSlow(OutOfLineTruncateSlow* ool)
     Register dest = ool->dest();
 
     saveVolatile(dest);
-#ifdef JS_CODEGEN_ARM
+#if defined(JS_CODEGEN_ARM)
     if (ool->needFloat32Conversion()) {
         masm.convertFloat32ToDouble(src, ScratchDoubleReg);
         src = ScratchDoubleReg;
     }
 
 #else
+    FloatRegister srcSingle = src.asSingle();
     if (ool->needFloat32Conversion()) {
+        MOZ_ASSERT(src.isSingle());
         masm.push(src);
         masm.convertFloat32ToDouble(src, src);
+        src = src.asDouble();
     }
 #endif
     masm.setupUnalignedABICall(1, dest);
@@ -1386,9 +1388,9 @@ CodeGeneratorShared::visitOutOfLineTruncateSlow(OutOfLineTruncateSlow* ool)
         masm.callWithABI(BitwiseCast<void*, int32_t(*)(double)>(JS::ToInt32));
     masm.storeCallResult(dest);
 
-#ifndef JS_CODEGEN_ARM
+#if !defined(JS_CODEGEN_ARM)
     if (ool->needFloat32Conversion())
-        masm.pop(src);
+        masm.pop(srcSingle);
 #endif
     restoreVolatile(dest);
 

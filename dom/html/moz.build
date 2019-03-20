@@ -248,4 +248,7 @@ LOCAL_INCLUDES += [
     '/netwerk/base',
 ]
 
+if CONFIG['MOZ_X11']:
+    CXXFLAGS += CONFIG['XCFLAGS']
+
 FINAL_LIBRARY = 'xul'

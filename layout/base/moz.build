@@ -140,3 +140,7 @@ MOCHITEST_CHROME_MANIFESTS += ['tests/chrome/chrome.ini']
 BROWSER_CHROME_MANIFESTS += ['tests/browser.ini']
 
 CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
+
+if CONFIG['MOZ_X11']:
+    CXXFLAGS += CONFIG['XCFLAGS']
+

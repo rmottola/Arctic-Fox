@@ -14,7 +14,6 @@
 #include "vm/ArrayObject.h"
 #include "vm/UnboxedObject.h"
 
-#include "jsgcinlines.h"
 #include "jsobjinlines.h"
 
 using namespace js;
@@ -25,7 +24,8 @@ using mozilla::PodZero;
 // ObjectGroup
 /////////////////////////////////////////////////////////////////////
 
-ObjectGroup::ObjectGroup(const Class* clasp, TaggedProto proto, ObjectGroupFlags initialFlags)
+ObjectGroup::ObjectGroup(const Class *clasp, TaggedProto proto, JSCompartment *comp,
+                         ObjectGroupFlags initialFlags)
 {
     PodZero(this);
 
@@ -34,6 +34,7 @@ ObjectGroup::ObjectGroup(const Class* clasp, TaggedProto proto, ObjectGroupFlags
 
     this->clasp_ = clasp;
     this->proto_ = proto.raw();
+    this->compartment_ = comp;
     this->flags_ = initialFlags;
 
     setGeneration(zone()->types.generation);
@@ -290,8 +291,8 @@ JSObject::splicePrototype(JSContext* cx, const Class* clasp, Handle<TaggedProto>
     return true;
 }
 
-/* static */ ObjectGroup*
-JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
+/* static */ ObjectGroup *
+JSObject::makeLazyGroup(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->hasLazyGroup());
     MOZ_ASSERT(cx->compartment() == obj->compartment());
@@ -305,9 +306,9 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
 
     // Find flags which need to be specified immediately on the object.
     // Don't track whether singletons are packed.
-    ObjectGroupFlags initialFlags = OBJECT_FLAG_NON_PACKED;
+    ObjectGroupFlags initialFlags = OBJECT_FLAG_SINGLETON | OBJECT_FLAG_NON_PACKED;
 
-    if (obj->lastProperty()->hasObjectFlag(BaseShape::ITERATED_SINGLETON))
+    if (obj->isIteratedSingleton())
         initialFlags |= OBJECT_FLAG_ITERATED;
 
     if (obj->isIndexed())
@@ -317,7 +318,7 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
         initialFlags |= OBJECT_FLAG_LENGTH_OVERFLOW;
 
     Rooted<TaggedProto> proto(cx, obj->getTaggedProto());
-    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
+    ObjectGroup *group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
                                                            initialFlags);
     if (!group)
         return nullptr;
@@ -325,8 +326,6 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
     AutoEnterAnalysis enter(cx);
 
     /* Fill in the type according to the state of this object. */
-
-    group->initSingleton(obj);
 
     if (obj->is<JSFunction>() && obj->as<JSFunction>().isInterpreted())
         group->setInterpretedFunction(&obj->as<JSFunction>());
@@ -544,22 +543,22 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         const JSAtomState& names = cx->names();
 
         if (obj->is<RegExpObject>()) {
-            AddTypePropertyId(cx, group, NameToId(names.source), TypeSet::StringType());
-            AddTypePropertyId(cx, group, NameToId(names.global), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, NameToId(names.ignoreCase), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, NameToId(names.multiline), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, NameToId(names.sticky), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, NameToId(names.lastIndex), TypeSet::Int32Type());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.source), TypeSet::StringType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.global), TypeSet::BooleanType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.ignoreCase), TypeSet::BooleanType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.multiline), TypeSet::BooleanType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.sticky), TypeSet::BooleanType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.lastIndex), TypeSet::Int32Type());
         }
 
         if (obj->is<StringObject>())
-            AddTypePropertyId(cx, group, NameToId(names.length), TypeSet::Int32Type());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.length), TypeSet::Int32Type());
 
         if (obj->is<ErrorObject>()) {
-            AddTypePropertyId(cx, group, NameToId(names.fileName), TypeSet::StringType());
-            AddTypePropertyId(cx, group, NameToId(names.lineNumber), TypeSet::Int32Type());
-            AddTypePropertyId(cx, group, NameToId(names.columnNumber), TypeSet::Int32Type());
-            AddTypePropertyId(cx, group, NameToId(names.stack), TypeSet::StringType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.fileName), TypeSet::StringType());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.lineNumber), TypeSet::Int32Type());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.columnNumber), TypeSet::Int32Type());
+            AddTypePropertyId(cx, group, nullptr, NameToId(names.stack), TypeSet::StringType());
         }
     }
 
@@ -594,7 +593,9 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
     AutoEnterAnalysis enter(cx);
 
     Rooted<TaggedProto> protoRoot(cx, proto);
-    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, clasp, protoRoot);
+    ObjectGroup *group =
+        ObjectGroupCompartment::makeGroup(cx, clasp, protoRoot,
+                                          OBJECT_FLAG_SINGLETON | OBJECT_FLAG_LAZY_SINGLETON);
     if (!group)
         return nullptr;
 
@@ -602,9 +603,6 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
         return nullptr;
 
     ObjectGroupCompartment::newTablePostBarrier(cx, table, clasp, proto, nullptr);
-
-    group->initSingleton((JSObject*) ObjectGroup::LAZY_SINGLETON);
-    MOZ_ASSERT(group->singleton(), "created group must be a proper singleton");
 
     return group;
 }
@@ -800,12 +798,12 @@ ObjectGroup::fixRestArgumentsGroup(ExclusiveContext* cx, ArrayObject* obj)
 }
 
 /* static */ void
-ObjectGroup::setGroupToHomogenousArray(ExclusiveContext* cx, JSObject* obj,
+ObjectGroup::setGroupToHomogenousArray(ExclusiveContext *cx, JSObject *obj,
                                        TypeSet::Type elementType)
 {
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
 
-    ObjectGroupCompartment::ArrayObjectTable*& table =
+    ObjectGroupCompartment::ArrayObjectTable *&table =
         cx->compartment()->objectGroups.arrayObjectTable;
 
     if (!table) {
@@ -830,7 +828,7 @@ ObjectGroup::setGroupToHomogenousArray(ExclusiveContext* cx, JSObject* obj,
             return;
         obj->setGroup(group);
 
-        AddTypePropertyId(cx, group, JSID_VOID, elementType);
+        AddTypePropertyId(cx, group, nullptr, JSID_VOID, elementType);
 
         key.proto = objProto;
         (void) p.add(cx, *table, key, group);
@@ -909,7 +907,7 @@ ObjectGroupCompartment::updatePlainObjectEntryTypes(ExclusiveContext* cx, PlainO
                 /* Include 'double' in the property types to avoid the update below later. */
                 entry.types[i] = TypeSet::DoubleType();
             }
-            AddTypePropertyId(cx, entry.group, IdToTypeId(properties[i].id), ntype);
+            AddTypePropertyId(cx, entry.group, nullptr, IdToTypeId(properties[i].id), ntype);
         }
     }
 }
@@ -990,7 +988,7 @@ ObjectGroup::fixPlainObjectGroup(ExclusiveContext* cx, PlainObject* obj)
     for (size_t i = 0; i < properties.length(); i++) {
         ids[i] = properties[i].id;
         types[i] = GetValueTypeForTable(obj->getSlot(i));
-        AddTypePropertyId(cx, group, IdToTypeId(ids[i]), types[i]);
+        AddTypePropertyId(cx, group, nullptr, IdToTypeId(ids[i]), types[i]);
     }
 
     ObjectGroupCompartment::PlainObjectKey key;
@@ -1158,10 +1156,10 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
     return res;
 }
 
-/* static */ ObjectGroup*
-ObjectGroup::callingAllocationSiteGroup(JSContext* cx, JSProtoKey key)
+/* static */ ObjectGroup *
+ObjectGroup::callingAllocationSiteGroup(JSContext *cx, JSProtoKey key)
 {
-    jsbytecode* pc;
+    jsbytecode *pc;
     RootedScript script(cx, cx->currentScript(&pc));
     if (script)
         return allocationSiteGroup(cx, script, pc, key);
@@ -1196,8 +1194,8 @@ ObjectGroup::setAllocationSiteObjectGroup(JSContext* cx,
     return true;
 }
 
-/* static */ ArrayObject*
-ObjectGroup::getOrFixupCopyOnWriteObject(JSContext* cx, HandleScript script, jsbytecode* pc)
+/* static */ ArrayObject *
+ObjectGroup::getOrFixupCopyOnWriteObject(JSContext *cx, HandleScript script, jsbytecode *pc)
 {
     // Make sure that the template object for script/pc has a type indicating
     // that the object and its copies have copy on write elements.
@@ -1218,8 +1216,8 @@ ObjectGroup::getOrFixupCopyOnWriteObject(JSContext* cx, HandleScript script, jsb
     // Update type information in the initializer object group.
     MOZ_ASSERT(obj->slotSpan() == 0);
     for (size_t i = 0; i < obj->getDenseInitializedLength(); i++) {
-        const Value& v = obj->getDenseElement(i);
-        AddTypePropertyId(cx, group, JSID_VOID, v);
+        const Value &v = obj->getDenseElement(i);
+        AddTypePropertyId(cx, group, nullptr, JSID_VOID, v);
     }
 
     obj->setGroup(group);
@@ -1308,17 +1306,17 @@ ObjectGroupCompartment::replaceDefaultNewGroup(const Class* clasp, TaggedProto p
 }
 
 /* static */
-ObjectGroup*
-ObjectGroupCompartment::makeGroup(ExclusiveContext* cx, const Class* clasp,
+ObjectGroup *
+ObjectGroupCompartment::makeGroup(ExclusiveContext *cx, const Class *clasp,
                                   Handle<TaggedProto> proto,
                                   ObjectGroupFlags initialFlags /* = 0 */)
 {
     MOZ_ASSERT_IF(proto.isObject(), cx->isInsideCurrentCompartment(proto.toObject()));
 
-    ObjectGroup* group = NewObjectGroup(cx);
+    ObjectGroup *group = Allocate<ObjectGroup>(cx);
     if (!group)
         return nullptr;
-    new(group) ObjectGroup(clasp, proto, initialFlags);
+    new(group) ObjectGroup(clasp, proto, cx->compartment(), initialFlags);
 
     return group;
 }

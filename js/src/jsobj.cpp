@@ -1873,6 +1873,58 @@ js::DeepCloneObjectLiteral(JSContext* cx, HandleNativeObject obj, NewObjectKind 
     return clone;
 }
 
+static bool
+InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
+                                               HandleNativeObject dst,
+                                               HandleNativeObject src)
+{
+    assertSameCompartment(cx, src, dst);
+    MOZ_ASSERT(src->getClass() == dst->getClass());
+    MOZ_ASSERT(src->getParent() == dst->getParent());
+    MOZ_ASSERT(dst->getParent() == cx->global());
+    MOZ_ASSERT(src->getProto() == dst->getProto());
+    MOZ_ASSERT(dst->lastProperty()->getObjectFlags() == 0);
+    MOZ_ASSERT(!src->getMetadata());
+    MOZ_ASSERT(!src->isSingleton());
+
+    // Save the dst metadata, if any, before we start messing with its shape.
+    RootedObject dstMetadata(cx, dst->getMetadata());
+
+    if (!dst->ensureElements(cx, src->getDenseInitializedLength()))
+        return false;
+
+    uint32_t initialized = src->getDenseInitializedLength();
+    for (uint32_t i = 0; i < initialized; ++i) {
+        dst->setDenseInitializedLength(i + 1);
+        dst->initDenseElement(i, src->getDenseElement(i));
+    }
+
+    MOZ_ASSERT(!src->hasPrivate());
+    RootedShape shape(cx, src->lastProperty());
+    size_t span = shape->slotSpan();
+    if (!dst->setLastProperty(cx, shape))
+        return false;
+    for (size_t i = JSCLASS_RESERVED_SLOTS(src->getClass()); i < span; i++)
+        dst->setSlot(i, src->getSlot(i));
+
+    if (dstMetadata) {
+        if (!js::SetObjectMetadata(cx, dst, dstMetadata))
+            return false;
+    }
+
+    return true;
+}
+
+JS_FRIEND_API(bool)
+JS_InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
+                                                  HandleObject dst,
+                                                  HandleObject src)
+{
+    return InitializePropertiesFromCompatibleNativeObject(cx,
+                                                          dst.as<NativeObject>(),
+                                                          src.as<NativeObject>());
+}
+
 template<XDRMode mode>
 bool
 js::XDRObjectLiteral(XDRState<mode>* xdr, MutableHandleNativeObject obj)
@@ -2133,7 +2185,7 @@ js::CloneObjectLiteral(JSContext* cx, HandleObject parent, HandleObject srcObj)
         if (!res)
             return nullptr;
 
-        RootedShape newShape(cx, ReshapeForParentAndAllocKind(cx, srcObj->lastProperty(),
+        RootedShape newShape(cx, ReshapeForParentAndAllocKind(cx, srcObj->as<PlainObject>().lastProperty(),
                                                               TaggedProto(proto), parent, kind));
         if (!newShape || !res->setLastProperty(cx, newShape))
             return nullptr;
@@ -2214,7 +2266,7 @@ JSObject::fixDictionaryShapeAfterSwap()
     // Dictionary shapes can point back to their containing objects, so after
     // swapping the guts of those objects fix the pointers up.
     if (isNative() && as<NativeObject>().inDictionaryMode())
-        shape_->listp = &shape_;
+        as<NativeObject>().shape_->listp = &as<NativeObject>().shape_;
 }
 
 /* Use this method with extreme caution. It trades the guts of two objects. */
@@ -2331,10 +2383,10 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
      * Normally write barriers happen before the write. However, that's not
      * necessary here because nothing is being destroyed. We're just swapping.
      */
-    JS::Zone* zone = a->zone();
+    JS::Zone *zone = a->zone();
     if (zone->needsIncrementalBarrier()) {
-        MarkChildren(zone->barrierTracer(), a);
-        MarkChildren(zone->barrierTracer(), b);
+        a->markChildren(zone->barrierTracer());
+        b->markChildren(zone->barrierTracer());
     }
 
     NotifyGCPostSwap(a, b, r);
@@ -3640,7 +3692,7 @@ js::GetObjectSlotName(JSTracer *trc, char *buf, size_t bufsize)
 
     Shape* shape;
     if (obj->isNative()) {
-        shape = obj->lastProperty();
+        shape = obj->as<NativeObject>().lastProperty();
         while (shape && (!shape->hasSlot() || shape->slot() != slot))
             shape = shape->previous();
     } else {
@@ -3916,8 +3968,8 @@ JSObject::dump()
 
     if (obj->isNative()) {
         fprintf(stderr, "properties:\n");
-        Vector<Shape*, 8, SystemAllocPolicy> props;
-        for (Shape::Range<NoGC> r(obj->lastProperty()); !r.empty(); r.popFront()) {
+        Vector<Shape *, 8, SystemAllocPolicy> props;
+        for (Shape::Range<NoGC> r(obj->as<NativeObject>().lastProperty()); !r.empty(); r.popFront())
             if (!props.append(&r.front())) {
                 fprintf(stderr, "(OOM while appending properties)\n");
                 break;
@@ -3930,7 +3982,7 @@ JSObject::dump()
 }
 
 static void
-MaybeDumpObject(const char* name, JSObject* obj)
+MaybeDumpObject(const char *name, JSObject *obj)
 {
     if (obj) {
         fprintf(stderr, "  %s: ", name);
@@ -4097,18 +4149,19 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
 }
 
 void
-JSObject::markChildren(JSTracer* trc)
+JSObject::markChildren(JSTracer *trc)
 {
     MarkObjectGroup(trc, &group_, "group");
 
-    MarkShape(trc, &shape_, "shape");
-
-    const Class* clasp = group_->clasp();
+    const Class *clasp = group_->clasp();
     if (clasp->trace)
         clasp->trace(trc, this);
 
-    if (shape_->isNative()) {
-        NativeObject* nobj = &as<NativeObject>();
+    if (clasp->isNative()) {
+        NativeObject *nobj = &as<NativeObject>();
+
+        MarkShape(trc, &nobj->shape_, "shape");
+
         MarkObjectSlots(trc, nobj, 0, nobj->slotSpan());
 
         do {
@@ -4126,4 +4179,17 @@ JSObject::markChildren(JSTracer* trc)
                                "objectElements");
         } while (false);
     }
+}
+
+JSObject *
+JSObject::getParent() const
+{
+    if (Shape *shape = maybeShape())
+        return shape->getObjectParent();
+
+    // Avoid the parent-link checking in JSObject::global. Unboxed plain
+    // objects keep their compartment's global alive through their layout, and
+    // don't need a read barrier here.
+    MOZ_ASSERT(is<UnboxedPlainObject>());
+    return compartment()->unsafeUnbarrieredMaybeGlobal();
 }

@@ -11,6 +11,7 @@
 
 #include "builtin/MapObject.h"
 #include "builtin/TypedObject.h"
+#include "gc/Allocator.h"
 #include "vm/ArrayObject.h"
 #include "vm/DateObject.h"
 #include "vm/NumberObject.h"
@@ -24,6 +25,24 @@
 #include "jsgcinlines.h"
 
 #include "vm/TypeInference-inl.h"
+
+inline js::Shape *
+JSObject::maybeShape() const
+{
+    if (is<js::UnboxedPlainObject>())
+        return nullptr;
+    return *reinterpret_cast<js::Shape **>(uintptr_t(this) + offsetOfShape());
+}
+
+inline js::Shape *
+JSObject::ensureShape(js::ExclusiveContext *cx)
+{
+    if (is<js::UnboxedPlainObject>() && !js::UnboxedPlainObject::convertToNative(cx->asJSContext(), this))
+        return nullptr;
+    js::Shape *shape = maybeShape();
+    MOZ_ASSERT(shape);
+    return shape;
+}
 
 inline void
 JSObject::finalize(js::FreeOp* fop)
@@ -67,8 +86,8 @@ JSObject::finalize(js::FreeOp* fop)
     // unreachable shapes may be marked whose listp points into this object.
     // In case this happens, null out the shape's pointer here so that a moving
     // GC will not try to access the dead object.
-    if (shape_->listp == &shape_)
-        shape_->listp = nullptr;
+    if (nobj->shape_->listp == &nobj->shape_)
+        nobj->shape_->listp = nullptr;
 }
 
 /* static */ inline bool
@@ -188,7 +207,7 @@ JSObject::isQualifiedVarObj()
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isQualifiedVarObj();
-    return lastProperty()->hasObjectFlag(js::BaseShape::QUALIFIED_VAROBJ);
+    return hasAllFlags(js::BaseShape::QUALIFIED_VAROBJ);
 }
 
 inline bool
@@ -196,7 +215,7 @@ JSObject::isUnqualifiedVarObj()
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isUnqualifiedVarObj();
-    return lastProperty()->hasObjectFlag(js::BaseShape::UNQUALIFIED_VAROBJ);
+    return hasAllFlags(js::BaseShape::UNQUALIFIED_VAROBJ);
 }
 
 namespace js {
@@ -239,18 +258,19 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->numFixedSlots() == 0);
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->slotSpan() == 0);
 
-    const js::Class* clasp = group->clasp();
+    const js::Class *clasp = group->clasp();
     size_t nDynamicSlots =
         js::NativeObject::dynamicSlotsCount(shape->numFixedSlots(), shape->slotSpan(), clasp);
 
-    JSObject* obj = js::NewGCObject<js::CanGC>(cx, kind, nDynamicSlots, heap, clasp);
+    JSObject *obj = js::Allocate<JSObject>(cx, kind, nDynamicSlots, heap, clasp);
     if (!obj)
         return nullptr;
 
-    obj->shape_.init(shape);
     obj->group_.init(group);
 
-    // Note: slots are created and assigned internally by NewGCObject.
+    obj->setInitialShapeMaybeNonNative(shape);
+
+    // Note: slots are created and assigned internally by Allocate<JSObject>.
     obj->setInitialElementsMaybeNonNative(js::emptyObjectElements);
 
     if (clasp->hasPrivate())
@@ -269,18 +289,39 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
 }
 
 inline void
+JSObject::setInitialShapeMaybeNonNative(js::Shape *shape)
+{
+    static_cast<js::NativeObject *>(this)->shape_.init(shape);
+}
+
+inline void
+JSObject::setShapeMaybeNonNative(js::Shape *shape)
+{
+    MOZ_ASSERT(!is<js::UnboxedPlainObject>());
+    static_cast<js::NativeObject *>(this)->shape_ = shape;
+}
+
+inline void
 JSObject::setInitialSlotsMaybeNonNative(js::HeapSlot* slots)
 {
     static_cast<js::NativeObject*>(this)->slots_ = slots;
 }
 
 inline void
-JSObject::setInitialElementsMaybeNonNative(js::HeapSlot* elements)
+JSObject::setInitialElementsMaybeNonNative(js::HeapSlot *elements)
 {
-    static_cast<js::NativeObject*>(this)->elements_ = elements;
+    static_cast<js::NativeObject *>(this)->elements_ = elements;
 }
 
-inline js::GlobalObject&
+inline JSObject *
+JSObject::getMetadata() const
+{
+    if (js::Shape *shape = maybeShape())
+        return shape->getObjectMetadata();
+    return nullptr;
+}
+
+inline js::GlobalObject &
 JSObject::global() const
 {
 #ifdef DEBUG
@@ -301,6 +342,85 @@ inline bool
 JSObject::isOwnGlobal() const
 {
     return &global() == this;
+}
+
+inline bool
+JSObject::hasAllFlags(js::BaseShape::Flag flags) const
+{
+    MOZ_ASSERT(flags);
+    if (js::Shape *shape = maybeShape())
+        return shape->hasAllObjectFlags(flags);
+    return false;
+}
+
+inline bool
+JSObject::nonProxyIsExtensible() const
+{
+    MOZ_ASSERT(!uninlinedIsProxy());
+
+    // [[Extensible]] for ordinary non-proxy objects is an object flag.
+    return !hasAllFlags(js::BaseShape::NOT_EXTENSIBLE);
+}
+
+inline bool
+JSObject::isBoundFunction() const
+{
+    return hasAllFlags(js::BaseShape::BOUND_FUNCTION);
+}
+
+inline bool
+JSObject::watched() const
+{
+    return hasAllFlags(js::BaseShape::WATCHED);
+}
+
+inline bool
+JSObject::isDelegate() const
+{
+    return hasAllFlags(js::BaseShape::DELEGATE);
+}
+
+inline bool
+JSObject::hasUncacheableProto() const
+{
+    return hasAllFlags(js::BaseShape::UNCACHEABLE_PROTO);
+}
+
+inline bool
+JSObject::hadElementsAccess() const
+{
+    return hasAllFlags(js::BaseShape::HAD_ELEMENTS_ACCESS);
+}
+
+inline bool
+JSObject::isIndexed() const
+{
+    return hasAllFlags(js::BaseShape::INDEXED);
+}
+
+inline bool
+JSObject::nonLazyPrototypeIsImmutable() const
+{
+    MOZ_ASSERT(!hasLazyPrototype());
+    return hasAllFlags(js::BaseShape::IMMUTABLE_PROTOTYPE);
+}
+
+inline bool
+JSObject::isIteratedSingleton() const
+{
+    return hasAllFlags(js::BaseShape::ITERATED_SINGLETON);
+}
+
+inline bool
+JSObject::isNewGroupUnknown() const
+{
+    return hasAllFlags(js::BaseShape::NEW_GROUP_UNKNOWN);
+}
+
+inline bool
+JSObject::wasNewScriptCleared() const
+{
+    return hasAllFlags(js::BaseShape::NEW_SCRIPT_CLEARED);
 }
 
 namespace js {

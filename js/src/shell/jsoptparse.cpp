@@ -27,22 +27,22 @@ const char OptionParser::prognameMeta[] = "{progname}";
     Option::as##__cls##Option() \
     { \
         MOZ_ASSERT(is##__cls##Option()); \
-        return static_cast<__cls##Option*>(this); \
+        return static_cast<__cls##Option *>(this); \
     } \
     const __cls##Option * \
     Option::as##__cls##Option() const \
     { \
-        return const_cast<Option*>(this)->as##__cls##Option(); \
+        return const_cast<Option *>(this)->as##__cls##Option(); \
     }
 
-ValuedOption*
+ValuedOption *
 Option::asValued()
 {
     MOZ_ASSERT(isValued());
-    return static_cast<ValuedOption*>(this);
+    return static_cast<ValuedOption *>(this);
 }
 
-const ValuedOption*
+const ValuedOption *
 Option::asValued() const
 {
     return const_cast<Option*>(this)->asValued();
@@ -81,13 +81,18 @@ OptionParser::error(const char* fmt, ...)
 
 /* Quick and dirty paragraph printer. */
 static void
-PrintParagraph(const char* text, unsigned startColno, const unsigned limitColno, bool padFirstLine)
+PrintParagraph(const char *text, unsigned startColno, const unsigned limitColno, bool padFirstLine)
 {
     unsigned colno = startColno;
-    const char* it = text;
+    unsigned indent = 0;
+    const char *it = text;
 
     if (padFirstLine)
         printf("%*s", startColno, "");
+
+    /* Skip any leading spaces. */
+    while (*it != '\0' && isspace(*it))
+        ++it;
 
     while (*it != '\0') {
         MOZ_ASSERT(!isspace(*it));
@@ -105,7 +110,7 @@ PrintParagraph(const char* text, unsigned startColno, const unsigned limitColno,
         size_t tokLen = limit - it;
         MOZ_ASSERT(tokLen);
         if (tokLen + colno >= limitColno) {
-            printf("\n%*s%.*s", startColno, "", int(tokLen), it);
+            printf("\n%*s%.*s", startColno + indent, "", int(tokLen), it);
             colno = startColno + tokLen;
         } else {
             printf("%.*s", int(tokLen), it);
@@ -128,9 +133,11 @@ PrintParagraph(const char* text, unsigned startColno, const unsigned limitColno,
             colno = startColno;
             it = limit + 1;
             /* Could also have line-leading spaces. */
+            indent = 0;
             while (*it == ' ') {
                 putchar(' ');
                 ++colno;
+                ++indent;
                 ++it;
             }
             break;
@@ -140,8 +147,8 @@ PrintParagraph(const char* text, unsigned startColno, const unsigned limitColno,
     }
 }
 
-static const char*
-OptionFlagsToFormatInfo(char shortflag, bool isValued, size_t* length)
+static const char *
+OptionFlagsToFormatInfo(char shortflag, bool isValued, size_t *length)
 {
     static const char * const fmt[4] = { "  -%c --%s ",
                                          "  --%s ",
