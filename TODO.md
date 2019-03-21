@@ -96,7 +96,8 @@
 - Bug 1132522, part 2 - Treat false return from proxyHandler.set()
 - Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
 - Bug 928336. Make defining unforgeable properties on objects faster by
-- Bug 1131805 1 to 3 parts
+- Bug 1131805 2 to 3 parts
+- Bug 1131797 2 to 3 parts
 
 
 
