@@ -11,14 +11,15 @@
 #define GK_SLICE Gecko/20100101
 #define FX_SLICE Firefox/@GK_VERSION@
 
+// Lots of "heavy" sites in 2019, so lets set a less intrusive mobile user agent.
 #ifdef XP_UNIX
 #ifndef XP_MACOSX
-#define OS_SLICE X11; Linux x86_64;
+#define OS_SLICE X11; Linux x86_64; Mobile;
 #else
-#define OS_SLICE Macintosh; Intel Mac OS X 10.7;
+#define OS_SLICE Macintosh; Intel Mac OS X 10.6; Mobile;
 #endif
 #else
-#define OS_SLICE Windows NT 6.1; WOW64;
+#define OS_SLICE Windows NT 6.1; WOW64; Mobile;
 #endif
 
 // Required for domains that are evil and UA sniff. HARD.
@@ -47,12 +48,12 @@ pref("@GUAO_PREF@.deviantart.com","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GR
 pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 
 // UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
 pref("@GUAO_PREF@.maps.bing.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.2049.0 Safari/537.36 Edge/15.14931");
+pref("@GUAO_PREF@.polyfill.io" , "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.9) Gecko/20100101 Firefox/60.9");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
