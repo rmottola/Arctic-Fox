@@ -1900,8 +1900,7 @@ ResolvePrototype(nsIXPConnect *aXPConnect, nsGlobalWindow *aWin, JSContext *cx,
       }
       dot_prototype = ::JS_NewObjectWithUniqueType(cx,
                                                    &sDOMConstructorProtoClass,
-                                                   proto,
-                                                   winobj);
+                                                   proto);
       NS_ENSURE_TRUE(dot_prototype, NS_ERROR_OUT_OF_MEMORY);
     }
   }

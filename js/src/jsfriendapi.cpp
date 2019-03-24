@@ -126,9 +126,8 @@ JS_SplicePrototype(JSContext* cx, HandleObject obj, HandleObject proto)
     return obj->splicePrototype(cx, obj->getClass(), tagged);
 }
 
-JS_FRIEND_API(JSObject*)
-JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject proto,
-                           HandleObject parent)
+JS_FRIEND_API(JSObject *)
+JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject proto)
 {
     /*
      * Create our object with a null proto and then splice in the correct proto
@@ -136,8 +135,8 @@ JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject pro
      * ObjectGroup attached to our proto with information about our object, since
      * we're not going to be using that ObjectGroup anyway.
      */
-    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class*)clasp, NullPtr(),
-                                                 parent, SingletonObject));
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class *)clasp, NullPtr(),
+                                                 NullPtr(), SingletonObject));
     if (!obj)
         return nullptr;
     if (!JS_SplicePrototype(cx, obj, proto))
