@@ -19,6 +19,7 @@
 - 1342849 - Don't do any notifications for newly added background t
 - 1324406 - Treat 'data:' documents as unique, opaque origins
 - 1300118 P1 Make TaskQueue deliver runnables to nsIEventTarget
+- Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
@@ -68,6 +69,8 @@
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- Bug 1150253 - 2015-04-25 part 1 to 3
+- Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
@@ -86,18 +89,34 @@
 - Bug 1144925 - Buffer gray roots using a CallbackTracer instead of the
 - Bug 1144931 - Move gray buffering code to RootMarking.cpp
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
+- Bug 1144108 - Fix debugger tests that are confused by GC zea
+- Bug 1097987 - 2015-03-14 1 to 7
+- Bug 1142296 - 2015-03-14 Remove the parent argument from NewObjectWithGivenProto
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
 - Bug 805052 - 2015-03-14 four parts (check all dependencies)
-- Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
+- Bug 1143706 - Allow BaseShape's global to be null when tracing
+- Bug 1095290 - 2015-03-16 Make unlazified scripts same-compartment with their fun
+- Bug 1139456 - 2015-03-16 Do not let compaction set the alloc threshold to unreas
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
-- Bug 1140586 - 2015-03-12 1 to 5
-- Bug 1137180 - Only mark inner scripts as having failed a bounds check…
-- Bug 1132522, part 2 - Treat false return from proxyHandler.set()
-- Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
-- Bug 928336. Make defining unforgeable properties on objects faster by
-- Bug 1131805 2 to 3 parts
-- Bug 1131797 2 to 3 parts
+- Bug 1141905  1 to 4
+- Bug 1142304. Remove the parent argument from NewObjectWithGivenTagged
+- Bug 1142309. Remove the parent argument from NewObjectWithClassProto
+- Bug 1142859. Don't parent the object created by JS_DefineObject to th
+- Bug 1142864. Remove the parent argument from NewObject
+- Bug 1142865. Remove the parent argument from NewObjectWithGroup
+- Bug 1142310 part 1 to 2
+- Bug 1142311 part 1 to 2
+- Bug 1137844 2015-03-13 par 0 to 4
+- Bug 1142282 - 2014-03-12 1 to 3
+- Bug 1140586 - 2015-03-12 3 to 5
+- Bug 1142241 Stop using getParent() in js::GetObjectEnvironmentObject
+- Bug 1142266. Remove the parent argument from js::NewObjectWithProto.
+- Bug 1140573 - 1 to 4
+- Bug 1140582. Remove the parent argument from JS_NewObjectWithUniqueTy
+- Bug 1140670  - 1 to 3
+- Bug 1136906 - 1 to 3
+- Bug 1139993 -2015-03-06- Add VectorBase::ConstRange that gives out |const T&|
 
 
 
