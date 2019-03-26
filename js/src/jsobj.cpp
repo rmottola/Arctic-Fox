@@ -1502,21 +1502,20 @@ js::NewObjectScriptedCall(JSContext* cx, MutableHandleObject pobj)
     return true;
 }
 
-JSObject*
-js::CreateThis(JSContext* cx, const Class* newclasp, HandleObject callee)
+JSObject *
+js::CreateThis(JSContext *cx, const Class *newclasp, HandleObject callee)
 {
     RootedValue protov(cx);
     if (!GetProperty(cx, callee, callee, cx->names().prototype, &protov))
         return nullptr;
 
     RootedObject proto(cx, protov.isObjectOrNull() ? protov.toObjectOrNull() : nullptr);
-    RootedObject parent(cx, callee->getParent());
     gc::AllocKind kind = NewObjectGCKind(newclasp);
-    return NewObjectWithClassProto(cx, newclasp, proto, parent, kind);
+    return NewObjectWithClassProto(cx, newclasp, proto, NullPtr(), kind);
 }
 
-static inline JSObject*
-CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+static inline JSObject *
+CreateThisForFunctionWithGroup(JSContext *cx, HandleObjectGroup group,
                                NewObjectKind newKind)
 {
     if (group->maybeUnboxedLayout() && newKind != SingletonObject)
@@ -1553,7 +1552,7 @@ CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group, HandleObj
         // plain object and register it with the group. Use the maximum number
         // of fixed slots, as is also required by the TypeNewScript.
         gc::AllocKind allocKind = GuessObjectGCKind(NativeObject::MAX_FIXED_SLOTS);
-        PlainObject* res = NewObjectWithGroup<PlainObject>(cx, group, parent, allocKind, newKind);
+        PlainObject *res = NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind, newKind);
         if (!res)
             return nullptr;
 
@@ -1568,11 +1567,10 @@ CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group, HandleObj
 
     if (newKind == SingletonObject) {
         Rooted<TaggedProto> protoRoot(cx, group->proto());
-        RootedObject parentRoot(cx, parent);
-        return NewObjectWithGivenTaggedProto(cx, &PlainObject::class_, protoRoot, parentRoot,
+        return NewObjectWithGivenTaggedProto(cx, &PlainObject::class_, protoRoot, cx->global(),
                                              allocKind, newKind);
     }
-    return NewObjectWithGroup<PlainObject>(cx, group, parent, allocKind, newKind);
+    return NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind, newKind);
 }
 
 JSObject*
@@ -1600,12 +1598,11 @@ js::CreateThisForFunctionWithProto(JSContext* cx, HandleObject callee, HandleObj
             }
         }
 
-        RootedObject parent(cx, callee->getParent());
-        res = CreateThisForFunctionWithGroup(cx, group, parent, newKind);
+        res = CreateThisForFunctionWithGroup(cx, group, newKind);
     } else {
-        RootedObject parent(cx, callee->getParent());
         gc::AllocKind allocKind = NewObjectGCKind(&PlainObject::class_);
-        res = NewObjectWithProto<PlainObject>(cx, proto, parent, allocKind, newKind);
+        res = NewObjectWithProto<PlainObject>(cx, proto, cx->global(),
+                                              allocKind, newKind);
     }
 
     if (res) {
