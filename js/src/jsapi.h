@@ -3071,9 +3071,9 @@ JS_NewFunction(JSContext *cx, JSNative call, unsigned nargs, unsigned flags,
  * Create the function with the name given by the id. JSID_IS_STRING(id) must
  * be true.
  */
-extern JS_PUBLIC_API(JSFunction*)
-JS_NewFunctionById(JSContext* cx, JSNative call, unsigned nargs, unsigned flags,
-                   JS::Handle<JSObject*> parent, JS::Handle<jsid> id);
+extern JS_PUBLIC_API(JSFunction *)
+JS_NewFunctionById(JSContext *cx, JSNative call, unsigned nargs, unsigned flags,
+                   JS::Handle<jsid> id);
 
 namespace JS {
 

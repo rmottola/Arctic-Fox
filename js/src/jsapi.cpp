@@ -3170,21 +3170,20 @@ JS_NewFunction(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
 
 JS_PUBLIC_API(JSFunction *)
 JS_NewFunctionById(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
-                   HandleObject parent, HandleId id)
+                   HandleId id)
 {
     MOZ_ASSERT(JSID_IS_STRING(id));
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     MOZ_ASSERT(native);
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, parent);
 
     RootedAtom name(cx, JSID_TO_ATOM(id));
     JSFunction::Flags funFlags = JSAPIToJSFunctionFlags(flags);
-    return NewFunction(cx, NullPtr(), native, nargs, funFlags, parent, name);
+    return NewFunction(cx, NullPtr(), native, nargs, funFlags, NullPtr(), name);
 }
 
-JS_PUBLIC_API(JSFunction*)
+JS_PUBLIC_API(JSFunction *)
 JS::GetSelfHostedFunction(JSContext* cx, const char* selfHostedName, HandleId id, unsigned nargs)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
