@@ -30,8 +30,8 @@ pref("@GUAO_PREF@.reddit.com","Mozilla/5.0 (@OS_SLICE@ rv:38.9) @GK_SLICE@ @GRE_
 pref("@GUAO_PREF@.msn.com","Mozilla/5.0 (@OS_SLICE@) rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
 pref("@GUAO_PREF@.nytimes.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
 pref("@GUAO_PREF@.bbc.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
-pref("@GUAO_PREF@.facebook.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
-pref("@GUAO_PREF@.m.facebook.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
+pref("@GUAO_PREF@.soundcloud.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
+pref("@GUAO_PREF@.twitter.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
 
 // Force youtube to present the old style layout
 pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) @GK_SLICE@ Firefox/42.0 @PM_SLICE@");
