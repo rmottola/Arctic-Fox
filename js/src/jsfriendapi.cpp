@@ -437,19 +437,17 @@ js::NewFunctionWithReserved(JSContext* cx, JSNative native, unsigned nargs, unsi
                        JSFunction::ExtendedFinalizeKind);
 }
 
-JS_FRIEND_API(JSFunction*)
-js::NewFunctionByIdWithReserved(JSContext* cx, JSNative native, unsigned nargs, unsigned flags, JSObject* parentArg,
+JS_FRIEND_API(JSFunction *)
+js::NewFunctionByIdWithReserved(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
                                 jsid id)
 {
-    RootedObject parent(cx, parentArg);
     MOZ_ASSERT(JSID_IS_STRING(id));
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, parent);
 
     RootedAtom atom(cx, JSID_TO_ATOM(id));
     JSFunction::Flags funFlags = JSAPIToJSFunctionFlags(flags);
-    return NewFunction(cx, NullPtr(), native, nargs, funFlags, parent, atom,
+    return NewFunction(cx, NullPtr(), native, nargs, funFlags, NullPtr(), atom,
                        JSFunction::ExtendedFinalizeKind);
 }
 
