@@ -74,8 +74,17 @@
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
+- Bug 1153657 - Performance Monitoring is not ready to ride the trains
+- Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes�
+- Bug 1151466 - update talos to the latest version to include some pref
+- Bug 1153658 - browser_compartments.js logspam.
+- Bug 674779 - Deactivating subtest of test_measure for Windows XP
+- Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
+- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
+- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
 - Bug 1137180 - Add baseline caches for extensible unboxed objects, and…
 - 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
+- Bug 1150555 - about:performance should not confuse Jetpack addons.
 - Bug 1137180 - Add most functionality necessary for extensible unboxed…
 - Bug 1144331 - Assert that gray buffering does not depend on isMarking
 - Bug 1144369 - Add a GC phase to track time spent buffering gray roots
@@ -99,6 +108,7 @@
 - Bug 1139456 - 2015-03-16 Do not let compaction set the alloc threshold to unreas
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
+- Bug 1150259 - Deactivating subtest under old Windows/old Linux
 - Bug 1141905  1 to 4
 - Bug 1142304. Remove the parent argument from NewObjectWithGivenTagged
 - Bug 1142309. Remove the parent argument from NewObjectWithClassProto
@@ -112,12 +122,7 @@
 - Bug 1140586 - 2015-03-12 3 to 5
 - Bug 1142241 Stop using getParent() in js::GetObjectEnvironmentObject
 - Bug 1142266. Remove the parent argument from js::NewObjectWithProto.
-- Bug 1140573 - 1 to 4
-- Bug 1140582. Remove the parent argument from JS_NewObjectWithUniqueTy
-- Bug 1140670  - 1 to 3
-- Bug 1136906 - 1 to 3
-- Bug 1139993 -2015-03-06- Add VectorBase::ConstRange that gives out |const T&|
-
+- Bug 1140573 - 4 to 4
 
 
 ### FIXME / TODO
