@@ -771,7 +771,7 @@ StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id, const PropD
                        ObjectOpResult &result);
 
 extern bool
-StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id,
+StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id,
                        Handle<PropertyDescriptor> descriptor, ObjectOpResult &result);
 
 /*
@@ -782,7 +782,7 @@ extern bool
 StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id, const PropDesc &desc);
 
 extern bool
-StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id,
+StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id,
                        Handle<PropertyDescriptor> desc);
 
 extern bool
@@ -1188,8 +1188,8 @@ DefineProperties(JSContext* cx, HandleObject obj, HandleObject props);
  * ES5 15.2.3.7 steps 3-5.
  */
 extern bool
-ReadPropertyDescriptors(JSContext* cx, HandleObject props, bool checkAccessors,
-                        AutoIdVector* ids, AutoPropDescVector* descs);
+ReadPropertyDescriptors(JSContext *cx, HandleObject props, bool checkAccessors,
+                        AutoIdVector *ids, AutoPropDescVector *descs);
 
 /* Read the name using a dynamic lookup on the scopeChain. */
 extern bool

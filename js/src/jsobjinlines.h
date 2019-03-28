@@ -576,7 +576,7 @@ IsInternalFunctionObject(JSObject *funobj)
 class AutoPropDescVector : public AutoVectorRooter<PropDesc>
 {
   public:
-    explicit AutoPropDescVector(JSContext* cx
+    explicit AutoPropDescVector(JSContext *cx
                     MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
         : AutoVectorRooter<PropDesc>(cx, DESCVECTOR)
     {

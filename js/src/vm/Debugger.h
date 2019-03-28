@@ -693,8 +693,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * debugger compartment--mirror symmetry. But compartment wrapping always
      * happens in the target compartment--rotational symmetry.)
      */
-    bool unwrapDebuggeeValue(JSContext* cx, MutableHandleValue vp);
-    bool unwrapPropDescInto(JSContext* cx, HandleObject obj, Handle<PropDesc> wrapped,
+    bool unwrapDebuggeeValue(JSContext *cx, MutableHandleValue vp);
+    bool unwrapPropDescInto(JSContext *cx, HandleObject obj, Handle<PropDesc> wrapped,
                             MutableHandle<PropDesc> unwrapped);
 
     /*

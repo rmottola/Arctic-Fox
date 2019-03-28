@@ -869,17 +869,17 @@ Debugger::wrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
 }
 
 bool
-Debugger::unwrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
+Debugger::unwrapDebuggeeValue(JSContext *cx, MutableHandleValue vp)
 {
     assertSameCompartment(cx, object.get(), vp);
     if (vp.isObject()) {
-        JSObject* dobj = &vp.toObject();
+        JSObject *dobj = &vp.toObject();
         if (dobj->getClass() != &DebuggerObject_class) {
             JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
                                  "Debugger", "Debugger.Object", dobj->getClass()->name);
             return false;
         }
-        NativeObject* ndobj = &dobj->as<NativeObject>();
+        NativeObject *ndobj = &dobj->as<NativeObject>();
 
         Value owner = ndobj->getReservedSlot(JSSLOT_DEBUGOBJECT_OWNER);
         if (owner.isUndefined() || &owner.toObject() != object) {
@@ -900,8 +900,8 @@ Debugger::unwrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
  * Reject non-callable getters and setters.
  */
 static bool
-CheckArgCompartment(JSContext* cx, JSObject* obj, HandleValue v,
-                    const char* methodname, const char* propname)
+CheckArgCompartment(JSContext *cx, JSObject *obj, HandleValue v,
+                    const char *methodname, const char *propname)
 {
     if (v.isObject() && v.toObject().compartment() != obj->compartment()) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_COMPARTMENT_MISMATCH,
@@ -912,7 +912,7 @@ CheckArgCompartment(JSContext* cx, JSObject* obj, HandleValue v,
 }
 
 bool
-Debugger::unwrapPropDescInto(JSContext* cx, HandleObject obj, Handle<PropDesc> wrapped,
+Debugger::unwrapPropDescInto(JSContext *cx, HandleObject obj, Handle<PropDesc> wrapped,
                              MutableHandle<PropDesc> unwrapped)
 {
     MOZ_ASSERT(!wrapped.isUndefined());

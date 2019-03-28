@@ -860,7 +860,7 @@ DefinePropertyOnTypedArray(JSContext* cx, HandleObject obj, HandleId id, const P
 }
 
 bool
-js::StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id, const PropDesc& desc,
+js::StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id, const PropDesc &desc,
                            ObjectOpResult &result)
 {
     if (obj->is<ArrayObject>()) {
@@ -888,7 +888,7 @@ js::StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id, const P
 }
 
 bool
-js::StandardDefineProperty(JSContext* cx, HandleObject obj, HandleId id,
+js::StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id,
                            Handle<PropertyDescriptor> descriptor, ObjectOpResult &result)
 {
     Rooted<PropDesc> desc(cx);
@@ -914,8 +914,8 @@ js::StandardDefineProperty(JSContext *cx, HandleObject obj, HandleId id,
 }
 
 bool
-js::ReadPropertyDescriptors(JSContext* cx, HandleObject props, bool checkAccessors,
-                            AutoIdVector* ids, AutoPropDescVector* descs)
+js::ReadPropertyDescriptors(JSContext *cx, HandleObject props, bool checkAccessors,
+                            AutoIdVector *ids, AutoPropDescVector *descs)
 {
     if (!GetPropertyKeys(cx, props, JSITER_OWNONLY | JSITER_SYMBOLS, ids))
         return false;
@@ -936,7 +936,7 @@ js::ReadPropertyDescriptors(JSContext* cx, HandleObject props, bool checkAccesso
 }
 
 bool
-js::DefineProperties(JSContext* cx, HandleObject obj, HandleObject props)
+js::DefineProperties(JSContext *cx, HandleObject obj, HandleObject props)
 {
     AutoIdVector ids(cx);
     AutoPropDescVector descs(cx);

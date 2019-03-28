@@ -805,7 +805,7 @@ obj_getOwnPropertySymbols(JSContext* cx, unsigned argc, Value* vp)
 
 /* ES5 15.2.3.6: Object.defineProperty(O, P, Attributes) */
 bool
-js::obj_defineProperty(JSContext* cx, unsigned argc, Value* vp)
+js::obj_defineProperty(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject obj(cx);
