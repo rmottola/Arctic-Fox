@@ -93,8 +93,8 @@ class SavedFrame : public NativeObject {
     bool parentMoved();
     void updatePrivateParent();
 
-    static bool checkThis(JSContext* cx, CallArgs& args, const char* fnName,
-                          MutableHandleSavedFrame frame);
+    static bool checkThis(JSContext *cx, CallArgs &args, const char *fnName,
+                          MutableHandleObject frame);
 };
 
 struct SavedFrame::HashPolicy
