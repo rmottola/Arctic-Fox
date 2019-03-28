@@ -1275,13 +1275,13 @@ ToObjectFromStack(JSContext* cx, HandleValue vp)
 
 template<XDRMode mode>
 bool
-XDRObjectLiteral(XDRState<mode>* xdr, MutableHandleNativeObject obj);
+XDRObjectLiteral(XDRState<mode> *xdr, MutableHandleNativeObject obj);
 
-extern JSObject*
-CloneObjectLiteral(JSContext* cx, HandleObject parent, HandleObject srcObj);
+extern JSObject *
+CloneObjectLiteral(JSContext *cx, HandleObject parent, HandleObject srcObj);
 
 extern void
-GetObjectSlotName(JSTracer* trc, char* buf, size_t bufsize);
+GetObjectSlotName(JSTracer *trc, char *buf, size_t bufsize);
 
 extern bool
 ReportGetterOnlyAssignment(JSContext* cx, bool strict);

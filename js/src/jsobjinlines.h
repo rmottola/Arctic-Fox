@@ -736,24 +736,24 @@ NewBuiltinClassInstance(ExclusiveContext* cx, gc::AllocKind allocKind, NewObject
 
 // Used to optimize calls to (new Object())
 bool
-NewObjectScriptedCall(JSContext* cx, MutableHandleObject obj);
+NewObjectScriptedCall(JSContext *cx, MutableHandleObject obj);
 
-JSObject*
-NewObjectWithGroupCommon(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+JSObject *
+NewObjectWithGroupCommon(JSContext *cx, HandleObjectGroup group, HandleObject parent,
                          gc::AllocKind allocKind, NewObjectKind newKind);
 
 template <typename T>
-inline T*
-NewObjectWithGroup(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+inline T *
+NewObjectWithGroup(JSContext *cx, HandleObjectGroup group, HandleObject parent,
                    gc::AllocKind allocKind, NewObjectKind newKind = GenericObject)
 {
-    JSObject* obj = NewObjectWithGroupCommon(cx, group, parent, allocKind, newKind);
+    JSObject *obj = NewObjectWithGroupCommon(cx, group, parent, allocKind, newKind);
     return obj ? &obj->as<T>() : nullptr;
 }
 
 template <typename T>
-inline T*
-NewObjectWithGroup(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+inline T *
+NewObjectWithGroup(JSContext *cx, HandleObjectGroup group, HandleObject parent,
                    NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(group->clasp());

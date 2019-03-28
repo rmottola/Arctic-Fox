@@ -1428,7 +1428,7 @@ js::NewObjectWithClassProtoCommon(ExclusiveContext* cxArg, const Class* clasp,
 }
 
 static bool
-NewObjectWithGroupIsCachable(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+NewObjectWithGroupIsCachable(JSContext *cx, HandleObjectGroup group, HandleObject parent,
                              NewObjectKind newKind)
 {
     return group->proto().isObject() &&
@@ -1443,8 +1443,8 @@ NewObjectWithGroupIsCachable(JSContext* cx, HandleObjectGroup group, HandleObjec
  * Create a plain object with the specified group. This bypasses getNewGroup to
  * avoid losing creation site information for objects made by scripted 'new'.
  */
-JSObject*
-js::NewObjectWithGroupCommon(JSContext* cx, HandleObjectGroup group, HandleObject parent,
+JSObject *
+js::NewObjectWithGroupCommon(JSContext *cx, HandleObjectGroup group, HandleObject parent,
                              gc::AllocKind allocKind, NewObjectKind newKind)
 {
     MOZ_ASSERT(parent);
@@ -1455,17 +1455,17 @@ js::NewObjectWithGroupCommon(JSContext* cx, HandleObjectGroup group, HandleObjec
 
     bool isCachable = NewObjectWithGroupIsCachable(cx, group, parent, newKind);
     if (isCachable) {
-        NewObjectCache& cache = cx->runtime()->newObjectCache;
+        NewObjectCache &cache = cx->runtime()->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         if (cache.lookupGroup(group, allocKind, &entry)) {
-            JSObject* obj = cache.newObjectFromHit(cx, entry,
+            JSObject *obj = cache.newObjectFromHit(cx, entry,
                                                    GetInitialHeap(newKind, group->clasp()));
             if (obj)
                 return obj;
         }
     }
 
-    JSObject* obj = NewObject(cx, group, parent, allocKind, newKind);
+    JSObject *obj = NewObject(cx, group, parent, allocKind, newKind);
     if (!obj)
         return nullptr;
 
@@ -1573,8 +1573,8 @@ CreateThisForFunctionWithGroup(JSContext *cx, HandleObjectGroup group,
     return NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind, newKind);
 }
 
-JSObject*
-js::CreateThisForFunctionWithProto(JSContext* cx, HandleObject callee, HandleObject proto,
+JSObject *
+js::CreateThisForFunctionWithProto(JSContext *cx, HandleObject callee, HandleObject proto,
                                    NewObjectKind newKind /* = GenericObject */)
 {
     RootedObject res(cx);
@@ -2152,10 +2152,10 @@ template bool
 js::XDRObjectLiteral(XDRState<XDR_ENCODE>* xdr, MutableHandleNativeObject obj);
 
 template bool
-js::XDRObjectLiteral(XDRState<XDR_DECODE>* xdr, MutableHandleNativeObject obj);
+js::XDRObjectLiteral(XDRState<XDR_DECODE> *xdr, MutableHandleNativeObject obj);
 
-JSObject*
-js::CloneObjectLiteral(JSContext* cx, HandleObject parent, HandleObject srcObj)
+JSObject *
+js::CloneObjectLiteral(JSContext *cx, HandleObject parent, HandleObject srcObj)
 {
     if (srcObj->is<PlainObject>()) {
         AllocKind kind = GetBackgroundAllocKind(GuessObjectGCKind(srcObj->as<PlainObject>().numFixedSlots()));
