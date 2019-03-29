@@ -35,16 +35,19 @@ class SavedFrame : public NativeObject {
     static bool lineProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool columnProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool functionDisplayNameProperty(JSContext* cx, unsigned argc, Value* vp);
+    static bool asyncCauseProperty(JSContext *cx, unsigned argc, Value *vp);
+    static bool asyncParentProperty(JSContext *cx, unsigned argc, Value *vp);
     static bool parentProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool toStringMethod(JSContext* cx, unsigned argc, Value* vp);
 
     // Convenient getters for SavedFrame's reserved slots for use from C++.
-    JSAtom*      getSource();
+    JSAtom       *getSource();
     uint32_t     getLine();
     uint32_t     getColumn();
-    JSAtom*      getFunctionDisplayName();
-    SavedFrame*  getParent();
-    JSPrincipals* getPrincipals();
+    JSAtom       *getFunctionDisplayName();
+    JSAtom       *getAsyncCause();
+    SavedFrame   *getParent();
+    JSPrincipals *getPrincipals();
 
     bool         isSelfHosted();
 
@@ -74,6 +77,7 @@ class SavedFrame : public NativeObject {
         JSSLOT_LINE,
         JSSLOT_COLUMN,
         JSSLOT_FUNCTIONDISPLAYNAME,
+        JSSLOT_ASYNCCAUSE,
         JSSLOT_PARENT,
         JSSLOT_PRINCIPALS,
         JSSLOT_PRIVATE_PARENT,
