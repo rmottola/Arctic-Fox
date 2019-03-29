@@ -661,7 +661,7 @@ class NativeObject : public JSObject
   public:
     /* Add a property whose id is not yet in this scope. */
     static Shape *addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
-                              JSPropertyOp getter, JSStrictPropertyOp setter,
+                              JSGetterOp getter, JSSetterOp setter,
                               uint32_t slot, unsigned attrs, unsigned flags,
                               bool allowDictionary = true);
 
@@ -674,12 +674,12 @@ class NativeObject : public JSObject
     /* Add or overwrite a property for id in this scope. */
     static Shape *
     putProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
-                JSPropertyOp getter, JSStrictPropertyOp setter,
+                JSGetterOp getter, JSSetterOp setter,
                 uint32_t slot, unsigned attrs,
                 unsigned flags);
     static inline Shape *
     putProperty(ExclusiveContext *cx, HandleObject obj, PropertyName *name,
-                JSPropertyOp getter, JSStrictPropertyOp setter,
+                JSGetterOp getter, JSSetterOp setter,
                 uint32_t slot, unsigned attrs,
                 unsigned flags);
 
@@ -687,7 +687,7 @@ class NativeObject : public JSObject
     static Shape *
     changeProperty(ExclusiveContext *cx, HandleNativeObject obj,
                    HandleShape shape, unsigned attrs, unsigned mask,
-                   JSPropertyOp getter, JSStrictPropertyOp setter);
+                   JSGetterOp getter, JSSetterOp setter);
 
     static inline bool changePropertyAttributes(JSContext* cx, HandleNativeObject obj,
                                                 HandleShape shape, unsigned attrs);
@@ -708,7 +708,7 @@ class NativeObject : public JSObject
      */
     static Shape *
     addPropertyInternal(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
-                        JSPropertyOp getter, JSStrictPropertyOp setter,
+                        JSGetterOp getter, JSSetterOp setter,
                         uint32_t slot, unsigned attrs, unsigned flags, ShapeTable::Entry* entry,
                         bool allowDictionary);
 
@@ -1249,27 +1249,27 @@ IsObjectValueInCompartment(Value v, JSCompartment* comp)
 
 extern bool
 NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     PropertyOp getter, StrictPropertyOp, unsigned attrs,
+                     GetterOp getter, SetterOp, unsigned attrs,
                      ObjectOpResult &result);
 
 extern bool
 NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
-                     HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                     HandleValue value, GetterOp getter, SetterOp setter,
                      unsigned attrs, ObjectOpResult &result);
 
 extern bool
 NativeDefineElement(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index, HandleValue value,
-                    PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                    JSGetterOp getter, JSSetterOp setter, unsigned attrs,
                     ObjectOpResult &result);
 
 /* If the result out-param is omitted, throw on failure. */
 extern bool
 NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     PropertyOp getter, StrictPropertyOp setter, unsigned attrs);
+                     GetterOp getter, SetterOp setter, unsigned attrs);
 
 extern bool
 NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
-                     HandleValue value, PropertyOp getter, StrictPropertyOp setter,
+                     HandleValue value, GetterOp getter, SetterOp setter,
                      unsigned attrs);
 
 extern bool

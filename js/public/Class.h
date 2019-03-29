@@ -216,8 +216,10 @@ class ObjectOpResult
 // be a string (Unicode property identifier) or an int (element index).  The
 // *vp out parameter, on success, is the new property value after the action.
 typedef bool
-(* JSPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                 JS::MutableHandleValue vp);
+(* JSGetterOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+               JS::MutableHandleValue vp);
+
+typedef JSGetterOp JSAddPropertyOp;
 
 // Set a property named by id in obj, treating the assignment as strict
 // mode code if strict is true. Note the jsid id type -- id may be a string
@@ -225,8 +227,8 @@ typedef bool
 // parameter, on success, is the new property value after the
 // set.
 typedef bool
-(* JSStrictPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                       JS::MutableHandleValue vp, JS::ObjectOpResult &result);
+(* JSSetterOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+               JS::MutableHandleValue vp, JS::ObjectOpResult &result);
 
 // Delete a property named by id in obj.
 //
@@ -330,7 +332,7 @@ typedef bool
                      JS::MutableHandleObject objp, JS::MutableHandle<Shape*> propp);
 typedef bool
 (* DefinePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
-                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
+                     JSGetterOp getter, JSSetterOp setter, unsigned attrs,
                      JS::ObjectOpResult &result);
 typedef bool
 (* HasPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool *foundp);
@@ -409,10 +411,10 @@ typedef void
     uint32_t            flags;                                                \
                                                                               \
     /* Function pointer members (may be null). */                             \
-    JSPropertyOp        addProperty;                                          \
+    JSAddPropertyOp     addProperty;                                          \
     JSDeletePropertyOp  delProperty;                                          \
-    JSPropertyOp        getProperty;                                          \
-    JSStrictPropertyOp  setProperty;                                          \
+    JSGetterOp          getProperty;                                          \
+    JSSetterOp          setProperty;                                          \
     JSEnumerateOp       enumerate;                                            \
     JSResolveOp         resolve;                                              \
     JSConvertOp         convert;                                              \
