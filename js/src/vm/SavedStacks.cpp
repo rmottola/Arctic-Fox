@@ -51,7 +51,7 @@ struct SavedFrame::Lookup {
         MOZ_ASSERT(source);
     }
 
-    JSAtom*      source;
+    JSAtom       *source;
     uint32_t     line;
     uint32_t     column;
     JSAtom*      functionDisplayName;
@@ -802,7 +802,7 @@ SavedStacks::sweep(JSRuntime* rt)
                                                     frame->getAsyncCause(),
                                                     frame->getParent(),
                                                     frame->getPrincipals()),
-                                 ReadBarriered<SavedFrame*>(frame));
+                                 ReadBarriered<SavedFrame *>(frame));
                 }
             }
         }
@@ -917,8 +917,8 @@ SavedStacks::insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFram
     return true;
 }
 
-SavedFrame*
-SavedStacks::getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup)
+SavedFrame *
+SavedStacks::getOrCreateSavedFrame(JSContext *cx, SavedFrame::HandleLookup lookup)
 {
     const SavedFrame::Lookup& lookupInstance = *lookup;
     DependentAddPtr<SavedFrame::Set> p(cx, frames, lookupInstance);

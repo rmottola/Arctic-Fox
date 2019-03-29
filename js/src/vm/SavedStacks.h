@@ -146,11 +146,11 @@ class SavedStacks {
     uint32_t            allocationSkipCount;
     uint64_t            rngState;
 
-    bool       insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
+    bool       insertFrames(JSContext *cx, FrameIter &iter, MutableHandleSavedFrame frame,
                             unsigned maxFrameCount = 0);
-    SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
-    SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
-    void       chooseSamplingProbability(JSContext* cx);
+    SavedFrame *getOrCreateSavedFrame(JSContext *cx, SavedFrame::HandleLookup lookup);
+    SavedFrame *createFrameFromLookup(JSContext *cx, SavedFrame::HandleLookup lookup);
+    void       chooseSamplingProbability(JSContext *cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 

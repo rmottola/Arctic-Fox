@@ -670,7 +670,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     js::AsmJSActivation * volatile asmJSActivationStack_;
 
   public:
-    js::Activation* const* addressOfActivation() const {
+    js::Activation *const *addressOfActivation() const {
         return &activation_;
     }
     static unsigned offsetOfActivation() {
