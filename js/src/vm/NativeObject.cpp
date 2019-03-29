@@ -1044,7 +1044,7 @@ NativeObject::addDataProperty(ExclusiveContext* cx, HandlePropertyName name,
  * both while saving cycles for classes that stub their addProperty hook.
  */
 static inline bool
-CallAddPropertyHook(ExclusiveContext* cx, HandleNativeObject obj, HandleShape shape,
+CallAddPropertyHook(ExclusiveContext *cx, HandleNativeObject obj, HandleShape shape,
                     HandleValue nominal)
 {
     if (JSPropertyOp addProperty = obj->getClass()->addProperty) {
@@ -1070,12 +1070,12 @@ CallAddPropertyHook(ExclusiveContext* cx, HandleNativeObject obj, HandleShape sh
 }
 
 static inline bool
-CallAddPropertyHookDense(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index,
+CallAddPropertyHookDense(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index,
                          HandleValue nominal)
 {
     /* Inline addProperty for array objects. */
     if (obj->is<ArrayObject>()) {
-        ArrayObject* arr = &obj->as<ArrayObject>();
+        ArrayObject *arr = &obj->as<ArrayObject>();
         uint32_t length = arr->length();
         if (index >= length)
             arr->setLength(cx, index + 1);
@@ -1129,11 +1129,11 @@ UpdateShapeTypeAndValue(ExclusiveContext* cx, NativeObject* obj, Shape* shape, c
 }
 
 static bool
-NativeSet(JSContext* cx, HandleNativeObject obj, HandleObject receiver,
+NativeSet(JSContext *cx, HandleNativeObject obj, HandleObject receiver,
           HandleShape shape, MutableHandleValue vp, ObjectOpResult &result);
 
 static inline bool
-DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+DefinePropertyOrElement(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
                         PropertyOp getter, StrictPropertyOp setter,
                         unsigned attrs, HandleValue value,
                         bool callSetterAfterwards, ObjectOpResult &result)
@@ -1311,7 +1311,7 @@ PurgeScopeChain(ExclusiveContext* cx, HandleObject obj, HandleId id)
  * throw if so.
  */
 static inline bool
-CheckAccessorRedefinition(ExclusiveContext* cx, HandleObject obj, HandleShape shape,
+CheckAccessorRedefinition(ExclusiveContext *cx, HandleObject obj, HandleShape shape,
                           PropertyOp getter, StrictPropertyOp setter, HandleId id, unsigned attrs)
 {
     MOZ_ASSERT(shape->isAccessorDescriptor());
@@ -1338,7 +1338,7 @@ CheckAccessorRedefinition(ExclusiveContext* cx, HandleObject obj, HandleShape sh
 }
 
 bool
-js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
+js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
                          PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
                          ObjectOpResult &result)
 {

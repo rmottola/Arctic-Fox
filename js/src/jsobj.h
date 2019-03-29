@@ -44,16 +44,16 @@ namespace gc {
 class RelocationOverlay;
 }
 
-inline JSObject*
+inline JSObject *
 CastAsObject(PropertyOp op)
 {
-    return JS_FUNC_TO_DATA_PTR(JSObject*, op);
+    return JS_FUNC_TO_DATA_PTR(JSObject *, op);
 }
 
-inline JSObject*
+inline JSObject *
 CastAsObject(StrictPropertyOp op)
 {
-    return JS_FUNC_TO_DATA_PTR(JSObject*, op);
+    return JS_FUNC_TO_DATA_PTR(JSObject *, op);
 }
 
 inline Value
@@ -802,19 +802,19 @@ DefineElement(ExclusiveContext *cx, HandleObject obj, uint32_t index, HandleValu
  * that any failure results in a TypeError.
  */
 extern bool
-DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
+DefineProperty(ExclusiveContext *cx, HandleObject obj, HandleId id, HandleValue value,
                JSPropertyOp getter = nullptr,
                JSStrictPropertyOp setter = nullptr,
                unsigned attrs = JSPROP_ENUMERATE);
 
 extern bool
-DefineProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name, HandleValue value,
+DefineProperty(ExclusiveContext *cx, HandleObject obj, PropertyName *name, HandleValue value,
                JSPropertyOp getter = nullptr,
                JSStrictPropertyOp setter = nullptr,
                unsigned attrs = JSPROP_ENUMERATE);
 
 extern bool
-DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
+DefineElement(ExclusiveContext *cx, HandleObject obj, uint32_t index, HandleValue value,
               JSPropertyOp getter = nullptr,
               JSStrictPropertyOp setter = nullptr,
               unsigned attrs = JSPROP_ENUMERATE);

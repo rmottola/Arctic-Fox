@@ -3249,7 +3249,7 @@ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 bool
-js::DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
+js::DefineProperty(ExclusiveContext *cx, HandleObject obj, HandleId id, HandleValue value,
                    JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
                    ObjectOpResult &result)
 {
@@ -3315,7 +3315,7 @@ js::DefineProperty(ExclusiveContext *cx, HandleObject obj, PropertyName *name, H
 }
 
 bool
-js::DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
+js::DefineElement(ExclusiveContext *cx, HandleObject obj, uint32_t index, HandleValue value,
                    JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);

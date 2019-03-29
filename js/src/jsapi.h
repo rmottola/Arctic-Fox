@@ -2598,9 +2598,9 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
     JS::MutableHandleObject object() {
         return JS::MutableHandleObject::fromMarkedLocation(&desc()->obj);
     }
-    unsigned& attributesRef() { return desc()->attrs; }
-    JSPropertyOp& getter() { return desc()->getter; }
-    JSStrictPropertyOp& setter() { return desc()->setter; }
+    unsigned &attributesRef() { return desc()->attrs; }
+    JSPropertyOp &getter() { return desc()->getter; }
+    JSStrictPropertyOp &setter() { return desc()->setter; }
     JS::MutableHandleValue value() {
         return JS::MutableHandleValue::fromMarkedLocation(&desc()->value);
     }
@@ -2616,8 +2616,8 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         MOZ_ASSERT(op != JS_StrictPropertyStub);
         desc()->setter = op;
     }
-    void setGetterObject(JSObject* obj) { desc()->getter = reinterpret_cast<JSPropertyOp>(obj); }
-    void setSetterObject(JSObject* obj) { desc()->setter = reinterpret_cast<JSStrictPropertyOp>(obj); }
+    void setGetterObject(JSObject *obj) { desc()->getter = reinterpret_cast<JSPropertyOp>(obj); }
+    void setSetterObject(JSObject *obj) { desc()->setter = reinterpret_cast<JSStrictPropertyOp>(obj); }
 
     JS::MutableHandleObject getterObject() {
         MOZ_ASSERT(this->hasGetterObject());

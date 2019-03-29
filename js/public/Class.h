@@ -216,7 +216,7 @@ class ObjectOpResult
 // be a string (Unicode property identifier) or an int (element index).  The
 // *vp out parameter, on success, is the new property value after the action.
 typedef bool
-(* JSPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+(* JSPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                  JS::MutableHandleValue vp);
 
 // Set a property named by id in obj, treating the assignment as strict
@@ -225,7 +225,7 @@ typedef bool
 // parameter, on success, is the new property value after the
 // set.
 typedef bool
-(* JSStrictPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+(* JSStrictPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                        JS::MutableHandleValue vp, JS::ObjectOpResult &result);
 
 // Delete a property named by id in obj.
@@ -242,7 +242,7 @@ typedef bool
 // property, or an inherited property, is allowed -- it's just pointless),
 // call result.succeed() and return true.
 typedef bool
-(* JSDeletePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+(* JSDeletePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                        JS::ObjectOpResult &result);
 
 // The type of ObjectOps::enumerate. This callback overrides a portion of SpiderMonkey's default
@@ -257,7 +257,7 @@ typedef bool
 // The callback's job is to populate 'properties' with all property keys that the for-in loop
 // should visit.
 typedef bool
-(* JSNewEnumerateOp)(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& properties);
+(* JSNewEnumerateOp)(JSContext *cx, JS::HandleObject obj, JS::AutoIdVector &properties);
 
 // The old-style JSClass.enumerate op should define all lazy properties not
 // yet reflected in obj.
@@ -326,14 +326,14 @@ typedef void
 namespace js {
 
 typedef bool
-(* LookupPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+(* LookupPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                      JS::MutableHandleObject objp, JS::MutableHandle<Shape*> propp);
 typedef bool
-(* DefinePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
+(* DefinePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
                      JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
                      JS::ObjectOpResult &result);
 typedef bool
-(* HasPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
+(* HasPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool *foundp);
 typedef bool
 (* GetPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
                   JS::MutableHandleValue vp);

@@ -199,9 +199,9 @@
 **      size. Use them like this:
 **
 **      JSPropertyOp nativeGetter;
-**      JSObject* scriptedGetter;
+**      JSObject *scriptedGetter;
 **      ...
-**      scriptedGetter = JS_FUNC_TO_DATA_PTR(JSObject*, nativeGetter);
+**      scriptedGetter = JS_FUNC_TO_DATA_PTR(JSObject *, nativeGetter);
 **      ...
 **      nativeGetter = JS_DATA_TO_FUNC_PTR(JSPropertyOp, scriptedGetter);
 **

@@ -896,13 +896,13 @@ class Shape : public gc::TenuredCell
     inline PropertyOp getter() const;
     bool hasDefaultGetter() const { return !getter(); }
     PropertyOp getterOp() const { MOZ_ASSERT(!hasGetterValue()); return getter(); }
-    inline JSObject* getterObject() const;
+    inline JSObject *getterObject() const;
     bool hasGetterObject() const { return hasGetterValue() && getterObject(); }
 
     // Per ES5, decode null getterObj as the undefined value, which encodes as null.
     Value getterValue() const {
         MOZ_ASSERT(hasGetterValue());
-        if (JSObject* getterObj = getterObject())
+        if (JSObject *getterObj = getterObject())
             return ObjectValue(*getterObj);
         return UndefinedValue();
     }
@@ -914,13 +914,13 @@ class Shape : public gc::TenuredCell
     inline StrictPropertyOp setter() const;
     bool hasDefaultSetter() const { return !setter(); }
     StrictPropertyOp setterOp() const { MOZ_ASSERT(!hasSetterValue()); return setter(); }
-    inline JSObject* setterObject() const;
+    inline JSObject *setterObject() const;
     bool hasSetterObject() const { return hasSetterValue() && setterObject(); }
 
     // Per ES5, decode null setterObj as the undefined value, which encodes as null.
     Value setterValue() const {
         MOZ_ASSERT(hasSetterValue());
-        if (JSObject* setterObj = setterObject())
+        if (JSObject *setterObj = setterObject())
             return ObjectValue(*setterObj);
         return UndefinedValue();
     }
@@ -938,7 +938,7 @@ class Shape : public gc::TenuredCell
 
     void update(PropertyOp getter, StrictPropertyOp setter, uint8_t attrs);
 
-    bool matches(const Shape* other) const {
+    bool matches(const Shape *other) const {
         return propid_.get() == other->propid_.get() &&
                matchesParamsAfterId(other->base(), other->maybeSlot(), other->attrs, other->flags,
                                     other->getter(), other->setter());
@@ -946,7 +946,7 @@ class Shape : public gc::TenuredCell
 
     inline bool matches(const StackShape& other) const;
 
-    bool matchesParamsAfterId(BaseShape* base, uint32_t aslot, unsigned aattrs, unsigned aflags,
+    bool matchesParamsAfterId(BaseShape *base, uint32_t aslot, unsigned aattrs, unsigned aflags,
                               PropertyOp rawGetter, StrictPropertyOp rawSetter) const
     {
         return base->unowned() == this->base()->unowned() &&
@@ -1151,23 +1151,23 @@ class AutoRooterGetterSetter
     class Inner : private JS::CustomAutoRooter
     {
       public:
-        inline Inner(ExclusiveContext* cx, uint8_t attrs,
-                     PropertyOp* pgetter_, StrictPropertyOp* psetter_);
+        inline Inner(ExclusiveContext *cx, uint8_t attrs,
+                     PropertyOp *pgetter_, StrictPropertyOp *psetter_);
 
       private:
-        virtual void trace(JSTracer* trc);
+        virtual void trace(JSTracer *trc);
 
         uint8_t attrs;
-        PropertyOp* pgetter;
-        StrictPropertyOp* psetter;
+        PropertyOp *pgetter;
+        StrictPropertyOp *psetter;
     };
 
   public:
-    inline AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t attrs,
-                                  PropertyOp* pgetter, StrictPropertyOp* psetter
+    inline AutoRooterGetterSetter(ExclusiveContext *cx, uint8_t attrs,
+                                  PropertyOp *pgetter, StrictPropertyOp *psetter
                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
-    inline AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t attrs,
-                                  JSNative* pgetter, JSNative* psetter
+    inline AutoRooterGetterSetter(ExclusiveContext *cx, uint8_t attrs,
+                                  JSNative *pgetter, JSNative *psetter
                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
 
   private:
@@ -1177,7 +1177,7 @@ class AutoRooterGetterSetter
 
 struct EmptyShape : public js::Shape
 {
-    EmptyShape(UnownedBaseShape* base, uint32_t nfixed)
+    EmptyShape(UnownedBaseShape *base, uint32_t nfixed)
       : js::Shape(base, nfixed)
     {
         // Only empty shapes can be NON_NATIVE.
@@ -1290,7 +1290,7 @@ typedef HashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy> Initial
 struct StackShape
 {
     /* For performance, StackShape only roots when absolutely necessary. */
-    UnownedBaseShape* base;
+    UnownedBaseShape *base;
     jsid             propid;
     PropertyOp       rawGetter;
     StrictPropertyOp rawSetter;

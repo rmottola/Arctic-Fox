@@ -473,8 +473,8 @@ js::NativeObject::toDictionaryMode(ExclusiveContext* cx)
     return true;
 }
 
-/* static */ Shape*
-NativeObject::addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+/* static */ Shape *
+NativeObject::addProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
                           PropertyOp getter, StrictPropertyOp setter,
                           uint32_t slot, unsigned attrs,
                           unsigned flags, bool allowDictionary)
@@ -679,8 +679,8 @@ CheckCanChangeAttrs(ExclusiveContext* cx, JSObject* obj, Shape* shape, unsigned*
     return true;
 }
 
-/* static */ Shape*
-NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+/* static */ Shape *
+NativeObject::putProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
                           PropertyOp getter, StrictPropertyOp setter,
                           uint32_t slot, unsigned attrs, unsigned flags)
 {
@@ -690,7 +690,7 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
 
 #ifdef DEBUG
     if (obj->is<ArrayObject>()) {
-        ArrayObject* arr = &obj->as<ArrayObject>();
+        ArrayObject *arr = &obj->as<ArrayObject>();
         uint32_t index;
         if (IdIsIndex(id, &index))
             MOZ_ASSERT(index < arr->length() || arr->lengthIsWritable());
@@ -869,8 +869,8 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
     return shape;
 }
 
-/* static */ Shape*
-NativeObject::changeProperty(ExclusiveContext* cx, HandleNativeObject obj,
+/* static */ Shape *
+NativeObject::changeProperty(ExclusiveContext *cx, HandleNativeObject obj,
                              HandleShape shape, unsigned attrs,
                              unsigned mask, PropertyOp getter, StrictPropertyOp setter)
 {

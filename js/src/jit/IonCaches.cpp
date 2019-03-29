@@ -1011,7 +1011,7 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
         // Push stubCode for marking.
         attacher.pushStubCodePointer(masm);
 
-        // JSPropertyOp: bool fn(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp)
+        // JSPropertyOp: bool fn(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp)
 
         // Push args on stack first so we can take pointers to make handles.
         masm.Push(UndefinedValue());
@@ -2471,7 +2471,7 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 
         StrictPropertyOp target = shape->setterOp();
         MOZ_ASSERT(target);
-        // JSStrictPropertyOp: bool fn(JSContext* cx, HandleObject obj,
+        // JSStrictPropertyOp: bool fn(JSContext *cx, HandleObject obj,
         //                     HandleId id, MutableHandleValue vp, ObjectOpResult &result);
 
         // First, allocate an ObjectOpResult on the stack. We push this before

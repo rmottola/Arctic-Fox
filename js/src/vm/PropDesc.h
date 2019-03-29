@@ -13,13 +13,13 @@
 namespace js {
 
 static inline JSPropertyOp
-CastAsPropertyOp(JSObject* object)
+CastAsPropertyOp(JSObject *object)
 {
     return JS_DATA_TO_FUNC_PTR(JSPropertyOp, object);
 }
 
 static inline JSStrictPropertyOp
-CastAsStrictPropertyOp(JSObject* object)
+CastAsStrictPropertyOp(JSObject *object)
 {
     return JS_DATA_TO_FUNC_PTR(JSStrictPropertyOp, object);
 }
