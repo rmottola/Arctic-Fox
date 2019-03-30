@@ -462,7 +462,7 @@ js::Throw(JSContext* cx, JSObject* obj, unsigned errorNumber)
 /*** Standard-compliant property definition (used by Object.defineProperty) **********************/
 
 static bool
-DefinePropertyOnObject(JSContext* cx, HandleNativeObject obj, HandleId id, const PropDesc& desc,
+DefinePropertyOnObject(JSContext *cx, HandleNativeObject obj, HandleId id, const PropDesc &desc,
                        ObjectOpResult &result)
 {
     /* 8.12.9 step 1. */
@@ -761,7 +761,7 @@ DefinePropertyOnObject(JSContext* cx, HandleNativeObject obj, HandleId id, const
 
 /* ES6 20130308 draft 8.4.2.1 [[DefineOwnProperty]] */
 static bool
-DefinePropertyOnArray(JSContext* cx, Handle<ArrayObject*> arr, HandleId id, const PropDesc& desc,
+DefinePropertyOnArray(JSContext *cx, Handle<ArrayObject*> arr, HandleId id, const PropDesc &desc,
                       ObjectOpResult &result)
 {
     /* Step 2. */
@@ -823,7 +823,7 @@ DefinePropertyOnArray(JSContext* cx, Handle<ArrayObject*> arr, HandleId id, cons
 
 // ES6 draft rev31 9.4.5.3 [[DefineOwnProperty]]
 static bool
-DefinePropertyOnTypedArray(JSContext* cx, HandleObject obj, HandleId id, const PropDesc& desc,
+DefinePropertyOnTypedArray(JSContext *cx, HandleObject obj, HandleId id, const PropDesc &desc,
                            ObjectOpResult &result)
 {
     MOZ_ASSERT(IsAnyTypedArray(obj));
