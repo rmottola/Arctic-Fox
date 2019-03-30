@@ -415,7 +415,6 @@ SavedFrame::checkThis(JSContext *cx, CallArgs &args, const char *fnName,
 //   - unsigned   argc
 //   - Value*     vp
 //   - const char* fnName
-//   - Value      defaultVal
 // These parameters will be defined after calling this macro:
 //   - CallArgs args
 //   - Rooted<SavedFrame*> frame (will be non-null)
