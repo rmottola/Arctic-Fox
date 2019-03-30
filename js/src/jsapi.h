@@ -2533,6 +2533,13 @@ class PropertyDescriptorOperations
     const JSPropertyDescriptor * desc() const { return static_cast<const Outer*>(this)->extract(); }
 
   public:
+    // Descriptors with JSGetterOp/JSSetterOp are considered data
+    // descriptors. It's complicated.
+    bool isAccessorDescriptor() const { return hasGetterOrSetterObject(); }
+    bool isDataDescriptor() const { return !isAccessorDescriptor(); }
+
+    bool hasValue() const { return isDataDescriptor() && !hasAttributes(JSPROP_IGNORE_VALUE); }
+
     bool isEnumerable() const { return desc()->attrs & JSPROP_ENUMERATE; }
     bool isReadonly() const { return desc()->attrs & JSPROP_READONLY; }
     bool isPermanent() const { return desc()->attrs & JSPROP_PERMANENT; }
@@ -2543,11 +2550,6 @@ class PropertyDescriptorOperations
     bool isShared() const { return desc()->attrs & JSPROP_SHARED; }
     bool isIndex() const { return desc()->attrs & JSPROP_INDEX; }
     bool hasAttributes(unsigned attrs) const { return desc()->attrs & attrs; }
-
-    // Descriptors with JSGetterOp/JSSetterOp are considered data
-    // descriptors. It's complicated.
-    bool isAccessorDescriptor() const { return hasGetterOrSetterObject(); }
-    bool isDataDescriptor() const { return !isAccessorDescriptor(); }
 
     bool isWritable() const { MOZ_ASSERT(isDataDescriptor()); return !isReadonly(); }
 
@@ -2578,7 +2580,6 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
     JSPropertyDescriptor * desc() { return static_cast<Outer*>(this)->extractMutable(); }
 
   public:
-
     void clear() {
         object().set(nullptr);
         setAttributes(0);
@@ -2595,6 +2596,20 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         value().set(other.value);
     }
 
+    void setDataDescriptor(HandleValue v, unsigned attrs) {
+        MOZ_ASSERT((attrs & ~(JSPROP_ENUMERATE |
+                              JSPROP_PERMANENT |
+                              JSPROP_READONLY |
+                              JSPROP_IGNORE_ENUMERATE |
+                              JSPROP_IGNORE_PERMANENT |
+                              JSPROP_IGNORE_READONLY)) == 0);
+        object().set(nullptr);
+        setAttributes(attrs);
+        setGetter(nullptr);
+        setSetter(nullptr);
+        value().set(v);
+    }
+
     JS::MutableHandleObject object() {
         return JS::MutableHandleObject::fromMarkedLocation(&desc()->obj);
     }
@@ -2603,6 +2618,11 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
     JSSetterOp &setter() { return desc()->setter; }
     JS::MutableHandleValue value() {
         return JS::MutableHandleValue::fromMarkedLocation(&desc()->value);
+    }
+    void setValue(JS::HandleValue v) {
+        MOZ_ASSERT(!(desc()->attrs & (JSPROP_GETTER | JSPROP_SETTER)));
+        attributesRef() &= ~JSPROP_IGNORE_VALUE;
+        value().set(v);
     }
 
     void setEnumerable() { desc()->attrs |= JSPROP_ENUMERATE; }
