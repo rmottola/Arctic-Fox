@@ -1189,6 +1189,9 @@ ToPropertyDescriptor(JSContext *cx, HandleValue v, bool checkAccessors,
 bool
 CheckPropertyDescriptorAccessors(JSContext *cx, Handle<PropertyDescriptor> desc);
 
+void
+CompletePropertyDescriptor(MutableHandle<PropertyDescriptor> desc);
+
 /*
  * Read property descriptors from props, as for Object.defineProperties. See
  * ES5 15.2.3.7 steps 3-5.
