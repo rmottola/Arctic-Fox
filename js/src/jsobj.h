@@ -1174,7 +1174,7 @@ extern NativeObject*
 DeepCloneObjectLiteral(JSContext* cx, HandleNativeObject obj, NewObjectKind newKind = GenericObject);
 
 extern bool
-DefineProperties(JSContext* cx, HandleObject obj, HandleObject props);
+DefineProperties(JSContext *cx, HandleObject obj, HandleObject props);
 
 /* ES6 draft rev 32 (2015 Feb 2) 6.2.4.5 ToPropertyDescriptor(Obj) */
 bool
@@ -1237,33 +1237,33 @@ LookupNameUnqualified(JSContext* cx, HandlePropertyName name, HandleObject scope
 
 namespace js {
 
-extern JSObject*
+extern JSObject *
 FindVariableScope(JSContext* cx, JSFunction** funp);
 
 bool
-LookupPropertyPure(ExclusiveContext* cx, JSObject* obj, jsid id, JSObject** objp,
+LookupPropertyPure(ExclusiveContext* cx, JSObject *obj, jsid id, JSObject **objp,
                    Shape** propp);
 
 bool
-GetPropertyPure(ExclusiveContext* cx, JSObject* obj, jsid id, Value* vp);
+GetPropertyPure(ExclusiveContext *cx, JSObject *obj, jsid id, Value *vp);
 
 bool
-GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
+GetOwnPropertyDescriptor(JSContext *cx, HandleObject obj, HandleId id,
                          MutableHandle<PropertyDescriptor> desc);
 
 bool
-GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp);
+GetOwnPropertyDescriptor(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp);
 
 bool
-NewPropertyDescriptorObject(JSContext* cx, Handle<PropertyDescriptor> desc, MutableHandleValue vp);
+NewPropertyDescriptorObject(JSContext *cx, Handle<PropertyDescriptor> desc, MutableHandleValue vp);
 
 extern bool
-IsDelegate(JSContext* cx, HandleObject obj, const Value& v, bool* result);
+IsDelegate(JSContext *cx, HandleObject obj, const Value &v, bool *result);
 
 // obj is a JSObject*, but we root it immediately up front. We do it
 // that way because we need a Rooted temporary in this method anyway.
 extern bool
-IsDelegateOfObject(JSContext* cx, HandleObject protoObj, JSObject* obj, bool* result);
+IsDelegateOfObject(JSContext *cx, HandleObject protoObj, JSObject *obj, bool *result);
 
 /* Wrap boolean, number or string as Boolean, Number or String object. */
 extern JSObject*

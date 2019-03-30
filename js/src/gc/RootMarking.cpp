@@ -57,7 +57,7 @@ MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* 
 }
 
 void
-MarkPropDescRoot(JSTracer* trc, PropDesc* pd, const char* name)
+MarkPropDescRoot(JSTracer *trc, PropDesc *pd, const char *name)
 {
     pd->trace(trc);
 }

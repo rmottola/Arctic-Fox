@@ -420,7 +420,7 @@ JSObject::wasNewScriptCleared() const
 
 namespace js {
 
-PropDesc::PropDesc(const Value& getter, const Value& setter,
+PropDesc::PropDesc(const Value &getter, const Value &setter,
                    Enumerability enumerable, Configurability configurable)
   : value_(UndefinedValue()),
     get_(getter), set_(setter),
@@ -436,7 +436,7 @@ PropDesc::PropDesc(const Value& getter, const Value& setter,
 }
 
 static MOZ_ALWAYS_INLINE bool
-IsFunctionObject(const js::Value& v)
+IsFunctionObject(const js::Value &v)
 {
     return v.isObject() && v.toObject().is<JSFunction>();
 }

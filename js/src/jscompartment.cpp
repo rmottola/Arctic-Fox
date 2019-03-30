@@ -460,12 +460,12 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
 }
 
 bool
-JSCompartment::wrap(JSContext* cx, MutableHandle<PropDesc> desc)
+JSCompartment::wrap(JSContext *cx, MutableHandle<PropDesc> desc)
 {
     if (desc.isUndefined())
         return true;
 
-    JSCompartment* comp = cx->compartment();
+    JSCompartment *comp = cx->compartment();
 
     if (desc.hasValue()) {
         RootedValue value(cx, desc.value());

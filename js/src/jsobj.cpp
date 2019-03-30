@@ -124,7 +124,7 @@ js::InformalValueTypeName(const Value& v)
 }
 
 bool
-js::NewPropertyDescriptorObject(JSContext* cx, Handle<PropertyDescriptor> desc,
+js::NewPropertyDescriptorObject(JSContext *cx, Handle<PropertyDescriptor> desc,
                                 MutableHandleValue vp)
 {
     if (!desc.object()) {
@@ -204,7 +204,7 @@ PropDesc::populatePropertyDescriptor(HandleObject obj, MutableHandle<PropertyDes
 }
 
 bool
-PropDesc::makeObject(JSContext* cx, MutableHandleObject obj)
+PropDesc::makeObject(JSContext *cx, MutableHandleObject obj)
 {
     MOZ_ASSERT(!isUndefined());
 
@@ -275,7 +275,7 @@ GetPropertyIfPresent(JSContext* cx, HandleObject obj, HandleId id, MutableHandle
 }
 
 bool
-PropDesc::initialize(JSContext* cx, const Value& origval, bool checkAccessors)
+PropDesc::initialize(JSContext *cx, const Value& origval, bool checkAccessors)
 {
     MOZ_ASSERT(isUndefined());
 
@@ -421,7 +421,7 @@ PropDesc::complete()
 }
 
 bool
-js::Throw(JSContext* cx, jsid id, unsigned errorNumber)
+js::Throw(JSContext *cx, jsid id, unsigned errorNumber)
 {
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount == 1);
 
@@ -437,7 +437,7 @@ js::Throw(JSContext* cx, jsid id, unsigned errorNumber)
 }
 
 bool
-js::Throw(JSContext* cx, JSObject* obj, unsigned errorNumber)
+js::Throw(JSContext *cx, JSObject *obj, unsigned errorNumber)
 {
     if (js_ErrorFormatString[errorNumber].argCount == 1) {
         RootedValue val(cx, ObjectValue(*obj));

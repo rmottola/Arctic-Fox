@@ -49,7 +49,7 @@ PropDesc::setUndefined()
 }
 
 bool
-PropDesc::checkGetter(JSContext* cx)
+PropDesc::checkGetter(JSContext *cx)
 {
     if (hasGet_) {
         if (!IsCallable(get_) && !get_.isUndefined()) {
@@ -62,7 +62,7 @@ PropDesc::checkGetter(JSContext* cx)
 }
 
 bool
-PropDesc::checkSetter(JSContext* cx)
+PropDesc::checkSetter(JSContext *cx)
 {
     if (hasSet_) {
         if (!IsCallable(set_) && !set_.isUndefined()) {
@@ -289,7 +289,7 @@ js::NativeObject::dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class*
 }
 
 void
-PropDesc::trace(JSTracer* trc)
+PropDesc::trace(JSTracer *trc)
 {
     gc::MarkValueRoot(trc, &value_, "PropDesc value");
     gc::MarkValueRoot(trc, &get_, "PropDesc get");
@@ -297,7 +297,7 @@ PropDesc::trace(JSTracer* trc)
 }
 
 inline bool
-NativeObject::updateSlotsForSpan(ExclusiveContext* cx, size_t oldSpan, size_t newSpan)
+NativeObject::updateSlotsForSpan(ExclusiveContext *cx, size_t oldSpan, size_t newSpan)
 {
     MOZ_ASSERT(oldSpan != newSpan);
 
