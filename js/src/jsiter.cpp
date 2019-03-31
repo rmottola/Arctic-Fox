@@ -373,7 +373,7 @@ Snapshot(JSContext* cx, HandleObject pobj_, unsigned flags, AutoIdVector* props)
                     if (!(flags & JSITER_HIDDEN)) {
                         if (!Proxy::getOwnPropertyDescriptor(cx, pobj, proxyProps[n], &desc))
                             return false;
-                        enumerable = desc.isEnumerable();
+                        enumerable = desc.enumerable();
                     }
 
                     if (!Enumerate(cx, pobj, proxyProps[n], enumerable, flags, ht, props))
@@ -1243,7 +1243,7 @@ SuppressDeletedPropertyHelper(JSContext* cx, HandleObject obj, StringPredicate p
                             return false;
 
                         if (desc.object()) {
-                            if (desc.isEnumerable())
+                            if (desc.enumerable())
                                 continue;
                         }
                     }
