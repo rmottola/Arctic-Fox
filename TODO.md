@@ -122,10 +122,6 @@
 - Bug 1142282 - 2014-03-12 1 to 3
 - Bug 1140586 - 2015-03-12 3 to 5
 - Bug 1139552 - Convert js::gc::AllocKind to an enum class and eliminat
-- Bug 1142266
-- Bug 1133094 - Object.defineProperty() on scripted proxy incorrectly s
-- Bug 1133081
-- Bug 1133085 - PropDesc::initFromPropertyDescriptor should understand 
 
 
 ### FIXME / TODO
@@ -133,7 +129,8 @@
 Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
 Analyze all:
-https://bugzilla.mozilla.org/show_bug.cgi?id=1106828
+https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
+https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
 ### Further ToDo which would help portability:
 
