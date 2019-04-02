@@ -1111,14 +1111,14 @@ IonScript::unlinkFromRuntime(FreeOp* fop)
 }
 
 void
-jit::ToggleBarriers(JS::Zone* zone, bool needs)
+jit::ToggleBarriers(JS::Zone *zone, bool needs)
 {
-    JSRuntime* rt = zone->runtimeFromMainThread();
+    JSRuntime *rt = zone->runtimeFromMainThread();
     if (!rt->hasJitRuntime())
         return;
 
     for (gc::ZoneCellIterUnderGC i(zone, gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+        JSScript *script = i.get<JSScript>();
         if (script->hasIonScript())
             script->ionScript()->toggleBarriers(needs);
         if (script->hasBaselineScript())

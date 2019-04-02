@@ -636,12 +636,12 @@ class AutoDetectInvalidation
     }
 };
 
-bool InvokeFunction(JSContext* cx, HandleObject obj0, uint32_t argc, Value* argv, Value* rval);
-JSObject* NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-                      const js::Class* clasp);
+bool InvokeFunction(JSContext *cx, HandleObject obj0, uint32_t argc, Value *argv, Value* rval);
+JSObject *NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+                      const js::Class *clasp);
 
-bool CheckOverRecursed(JSContext* cx);
-bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
+bool CheckOverRecursed(JSContext *cx);
+bool CheckOverRecursedWithExtra(JSContext *cx, BaselineFrame *frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
 bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);

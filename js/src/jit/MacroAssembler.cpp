@@ -871,7 +871,7 @@ MacroAssembler::shouldNurseryAllocate(gc::AllocKind allocKind, gc::InitialHeap i
 // Inline version of Nursery::allocateObject.
 void
 MacroAssembler::nurseryAllocate(Register result, Register slots, gc::AllocKind allocKind,
-                                size_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail)
+                                size_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail)
 {
     MOZ_ASSERT(IsNurseryAllocable(allocKind));
     MOZ_ASSERT(initialHeap != gc::TenuredHeap);
@@ -886,7 +886,7 @@ MacroAssembler::nurseryAllocate(Register result, Register slots, gc::AllocKind a
 
     // No explicit check for nursery.isEnabled() is needed, as the comparison
     // with the nursery's end will always fail in such cases.
-    const Nursery& nursery = GetJitContext()->runtime->gcNursery();
+    const Nursery &nursery = GetJitContext()->runtime->gcNursery();
     Register temp = slots;
     int thingSize = int(gc::Arena::thingSize(allocKind));
     int totalSize = thingSize + nDynamicSlots * sizeof(HeapSlot);
@@ -901,7 +901,7 @@ MacroAssembler::nurseryAllocate(Register result, Register slots, gc::AllocKind a
 
 // Inlined version of FreeList::allocate.
 void
-MacroAssembler::freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label* fail)
+MacroAssembler::freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label *fail)
 {
     CompileZone* zone = GetJitContext()->compartment->zone();
     int thingSize = int(gc::Arena::thingSize(allocKind));
@@ -966,7 +966,7 @@ MacroAssembler::callFreeStub(Register slots)
 // Inlined equivalent of gc::AllocateObject, without failure case handling.
 void
 MacroAssembler::allocateObject(Register result, Register slots, gc::AllocKind allocKind,
-                               uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail)
+                               uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail)
 {
     MOZ_ASSERT(allocKind >= gc::FINALIZE_OBJECT0 && allocKind <= gc::FINALIZE_OBJECT_LAST);
 
@@ -997,8 +997,8 @@ MacroAssembler::allocateObject(Register result, Register slots, gc::AllocKind al
 }
 
 void
-MacroAssembler::newGCThing(Register result, Register temp, JSObject* templateObj,
-                           gc::InitialHeap initialHeap, Label* fail)
+MacroAssembler::newGCThing(Register result, Register temp, JSObject *templateObj,
+                           gc::InitialHeap initialHeap, Label *fail)
 {
     // This method does not initialize the object: if external slots get
     // allocated into |temp|, there is no easy way for us to ensure the caller
@@ -1045,13 +1045,13 @@ MacroAssembler::allocateNonObject(Register result, Register temp, gc::AllocKind 
 }
 
 void
-MacroAssembler::newGCString(Register result, Register temp, Label* fail)
+MacroAssembler::newGCString(Register result, Register temp, Label *fail)
 {
     allocateNonObject(result, temp, js::gc::FINALIZE_STRING, fail);
 }
 
 void
-MacroAssembler::newGCFatInlineString(Register result, Register temp, Label* fail)
+MacroAssembler::newGCFatInlineString(Register result, Register temp, Label *fail)
 {
     allocateNonObject(result, temp, js::gc::FINALIZE_FAT_INLINE_STRING, fail);
 }
@@ -1129,7 +1129,7 @@ FindStartOfUndefinedAndUninitializedSlots(NativeObject* templateObj, uint32_t ns
 }
 
 void
-MacroAssembler::initGCSlots(Register obj, Register slots, NativeObject* templateObj,
+MacroAssembler::initGCSlots(Register obj, Register slots, NativeObject *templateObj,
                             bool initFixedSlots)
 {
     // Slots of non-array objects are required to be initialized.
@@ -1210,7 +1210,7 @@ MacroAssembler::initGCThing(Register obj, Register slots, JSObject *templateObj,
             storePtr(ImmPtr(nullptr), Address(obj, NativeObject::offsetOfSlots()));
 
         if (ntemplate->denseElementsAreCopyOnWrite()) {
-            storePtr(ImmPtr((const Value*) ntemplate->getDenseElements()),
+            storePtr(ImmPtr((const Value *) ntemplate->getDenseElements()),
                      Address(obj, NativeObject::offsetOfElements()));
         } else if (ntemplate->is<ArrayObject>()) {
             Register temp = slots;

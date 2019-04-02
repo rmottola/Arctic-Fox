@@ -5574,9 +5574,9 @@ GCRuntime::compactPhase(JS::gcreason::Reason reason)
             for (size_t i = 0; i < FINALIZE_LIMIT; i++) {
                 size_t thingsPerArena = Arena::thingsPerArena(Arena::thingSize(AllocKind(i)));
                 if (CanRelocateAllocKind(AllocKind(i))) {
-                    ArenaList& al = zone->arenas.arenaLists[i];
+                    ArenaList &al = zone->arenas.arenaLists[i];
                     size_t freeCells = 0;
-                    for (ArenaHeader* arena = al.arenaAfterCursor(); arena; arena = arena->next)
+                    for (ArenaHeader *arena = al.arenaAfterCursor(); arena; arena = arena->next)
                         freeCells += arena->countFreeCells();
                     MOZ_ASSERT(freeCells < thingsPerArena);
                 }
@@ -6788,7 +6788,7 @@ js::ReleaseAllJITCode(FreeOp* fop)
 #ifdef DEBUG
         /* Assert no baseline scripts are marked as active. */
         for (ZoneCellIter i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-            JSScript* script = i.get<JSScript>();
+            JSScript *script = i.get<JSScript>();
             MOZ_ASSERT_IF(script->hasBaselineScript(), !script->baselineScript()->active());
         }
 #endif
@@ -6799,7 +6799,7 @@ js::ReleaseAllJITCode(FreeOp* fop)
         jit::InvalidateAll(fop, zone);
 
         for (ZoneCellIter i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-            JSScript* script = i.get<JSScript>();
+            JSScript *script = i.get<JSScript>();
             jit::FinishInvalidation(fop, script);
 
             /*
@@ -6814,10 +6814,10 @@ js::ReleaseAllJITCode(FreeOp* fop)
 }
 
 void
-js::PurgeJITCaches(Zone* zone)
+js::PurgeJITCaches(Zone *zone)
 {
     for (ZoneCellIterUnderGC i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+        JSScript *script = i.get<JSScript>();
 
         /* Discard Ion caches. */
         jit::PurgeCaches(script);

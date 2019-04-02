@@ -4715,7 +4715,7 @@ CodeGenerator::visitCreateThisWithProto(LCreateThisWithProto* lir)
     callVM(CreateThisWithProtoInfo, lir);
 }
 
-typedef JSObject* (*NewGCObjectFn)(JSContext* cx, gc::AllocKind allocKind,
+typedef JSObject *(*NewGCObjectFn)(JSContext *cx, gc::AllocKind allocKind,
                                    gc::InitialHeap initialHeap, const js::Class* clasp);
 static const VMFunction NewGCObjectInfo =
     FunctionInfo<NewGCObjectFn>(js::jit::NewGCObject);

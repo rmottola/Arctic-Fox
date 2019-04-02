@@ -86,9 +86,9 @@ InvokeFunction(JSContext* cx, HandleObject obj, uint32_t argc, Value* argv, Valu
     return true;
 }
 
-JSObject*
-NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-            const js::Class* clasp)
+JSObject *
+NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+            const js::Class *clasp)
 {
     return js::Allocate<JSObject>(cx, allocKind, 0, initialHeap, clasp);
 }

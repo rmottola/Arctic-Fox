@@ -813,18 +813,18 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     // Inline allocation.
   private:
-    void checkAllocatorState(Label* fail);
+    void checkAllocatorState(Label *fail);
     bool shouldNurseryAllocate(gc::AllocKind allocKind, gc::InitialHeap initialHeap);
     void nurseryAllocate(Register result, Register slots, gc::AllocKind allocKind,
-                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
-    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
+                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
+    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
     void allocateObject(Register result, Register slots, gc::AllocKind allocKind,
-                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
-    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
-    void copySlotsFromTemplate(Register obj, const NativeObject* templateObj,
+                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
+    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
+    void copySlotsFromTemplate(Register obj, const NativeObject *templateObj,
                                uint32_t start, uint32_t end);
     void fillSlotsWithConstantValue(Address addr, Register temp, uint32_t start, uint32_t end,
-                                    const Value& v);
+                                    const Value &v);
     void fillSlotsWithUndefined(Address addr, Register temp, uint32_t start, uint32_t end);
     void fillSlotsWithUninitialized(Address addr, Register temp, uint32_t start, uint32_t end);
     void initGCSlots(Register obj, Register temp, NativeObject* templateObj, bool initFixedSlots);

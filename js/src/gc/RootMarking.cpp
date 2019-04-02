@@ -478,7 +478,7 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
         /* Do not discard scripts with counts while profiling. */
         if (rt->profilingScripts && !isHeapMinorCollecting()) {
             for (ZoneCellIterUnderGC i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-                JSScript* script = i.get<JSScript>();
+                JSScript *script = i.get<JSScript>();
                 if (script->hasScriptCounts()) {
                     MarkScriptRoot(trc, &script, "profilingScripts");
                     MOZ_ASSERT(script == i.get<JSScript>());
