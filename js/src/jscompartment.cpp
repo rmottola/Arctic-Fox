@@ -698,7 +698,7 @@ CreateLazyScriptsForCompartment(JSContext* cx)
     // same LazyScript may create different JSScripts due to relazification of
     // clones. See bug 1105306.
     for (gc::ZoneCellIter i(cx->zone(), JSFunction::FinalizeKind); !i.done(); i.next()) {
-        JSObject* obj = i.get<JSObject>();
+        JSObject *obj = i.get<JSObject>();
 
         // Sweeping is incremental; take care to not delazify functions that
         // are about to be finalized. GC things referenced by objects that are
@@ -710,7 +710,7 @@ CreateLazyScriptsForCompartment(JSContext* cx)
             continue;
         }
 
-        JSFunction* fun = &obj->as<JSFunction>();
+        JSFunction *fun = &obj->as<JSFunction>();
         
         // This creates a new reference to an object that an ongoing incremental
         // GC may find to be unreachable. Treat as if we're reading a weak
@@ -719,7 +719,7 @@ CreateLazyScriptsForCompartment(JSContext* cx)
             fun->readBarrier(fun);
 
         if (fun->isInterpretedLazy()) {
-            LazyScript* lazy = fun->lazyScriptOrNull();
+            LazyScript *lazy = fun->lazyScriptOrNull();
             if (lazy && lazy->sourceObject() && !lazy->maybeScript() &&
                 !lazy->hasUncompiledEnclosingScript())
             {
@@ -733,17 +733,17 @@ CreateLazyScriptsForCompartment(JSContext* cx)
     // process with any newly exposed inner functions in created scripts.
     // A function cannot be delazified until its outer script exists.
     for (size_t i = 0; i < lazyFunctions.length(); i++) {
-        JSFunction* fun = &lazyFunctions[i]->as<JSFunction>();
+        JSFunction *fun = &lazyFunctions[i]->as<JSFunction>();
 
         // lazyFunctions may have been populated with multiple functions for
         // a lazy script.
         if (!fun->isInterpretedLazy())
             continue;
 
-        LazyScript* lazy = fun->lazyScript();
+        LazyScript *lazy = fun->lazyScript();
         bool lazyScriptHadNoScript = !lazy->maybeScript();
 
-        JSScript* script = fun->getOrCreateScript(cx);
+        JSScript *script = fun->getOrCreateScript(cx);
         if (!script)
             return false;
         if (lazyScriptHadNoScript && !AddInnerLazyFunctionsFromScript(script, lazyFunctions))
@@ -795,10 +795,10 @@ JSCompartment::unsetIsDebuggee()
 }
 
 void
-JSCompartment::clearBreakpointsIn(FreeOp* fop, js::Debugger* dbg, HandleObject handler)
+JSCompartment::clearBreakpointsIn(FreeOp *fop, js::Debugger *dbg, HandleObject handler)
 {
     for (gc::ZoneCellIter i(zone(), gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+        JSScript *script = i.get<JSScript>();
         if (script->compartment() == this && script->hasAnyBreakpointsOrStepMode())
             script->clearBreakpointsIn(fop, dbg, handler);
     }

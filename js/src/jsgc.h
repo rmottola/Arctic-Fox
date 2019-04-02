@@ -142,7 +142,7 @@ IsBackgroundFinalized(AllocKind kind)
 }
 
 static inline bool
-CanBeFinalizedInBackground(gc::AllocKind kind, const Class* clasp)
+CanBeFinalizedInBackground(gc::AllocKind kind, const Class *clasp)
 {
     MOZ_ASSERT(kind <= gc::FINALIZE_OBJECT_LAST);
     /* If the class has no finalizer or a finalizer that is safe to call on
@@ -594,7 +594,7 @@ class ArenaLists
 
   public:
     /* For each arena kind, a list of arenas remaining to be swept. */
-    ArenaHeader* arenaListsToSweep[FINALIZE_LIMIT];
+    ArenaHeader *arenaListsToSweep[FINALIZE_LIMIT];
 
     /* During incremental sweeping, a list of the arenas already swept. */
     unsigned incrementalSweptArenaKind;
@@ -602,20 +602,20 @@ class ArenaLists
 
     // Arena lists which have yet to be swept, but need additional foreground
     // processing before they are swept.
-    ArenaHeader* gcShapeArenasToUpdate;
-    ArenaHeader* gcAccessorShapeArenasToUpdate;
-    ArenaHeader* gcScriptArenasToUpdate;
-    ArenaHeader* gcObjectGroupArenasToUpdate;
+    ArenaHeader *gcShapeArenasToUpdate;
+    ArenaHeader *gcAccessorShapeArenasToUpdate;
+    ArenaHeader *gcScriptArenasToUpdate;
+    ArenaHeader *gcObjectGroupArenasToUpdate;
 
     // While sweeping type information, these lists save the arenas for the
     // objects which have already been finalized in the foreground (which must
     // happen at the beginning of the GC), so that type sweeping can determine
     // which of the object pointers are marked.
     ArenaList savedObjectArenas[FINALIZE_OBJECT_LIMIT];
-    ArenaHeader* savedEmptyObjectArenas;
+    ArenaHeader *savedEmptyObjectArenas;
 
   public:
-    explicit ArenaLists(JSRuntime* rt) : runtime_(rt) {
+    explicit ArenaLists(JSRuntime *rt) : runtime_(rt) {
         for (size_t i = 0; i != FINALIZE_LIMIT; ++i)
             freeLists[i].initAsEmpty();
         for (size_t i = 0; i != FINALIZE_LIMIT; ++i)
@@ -637,7 +637,7 @@ class ArenaLists
         return offset + thingKind * sizeof(FreeList);
     }
 
-    const FreeList* getFreeList(AllocKind thingKind) const {
+    const FreeList *getFreeList(AllocKind thingKind) const {
         return &freeLists[thingKind];
     }
 

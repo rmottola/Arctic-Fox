@@ -503,7 +503,7 @@ js::gc::GCRuntime::endVerifyPostBarriers()
     for (GCZoneGroupIter zone(rt); !zone.done(); zone.next()) {
         for (size_t kind = 0; kind < FINALIZE_LIMIT; ++kind) {
             for (ZoneCellIterUnderGC cells(zone, AllocKind(kind)); !cells.done(); cells.next()) {
-                Cell* src = cells.getCell();
+                Cell *src = cells.getCell();
                 JS_TraceChildren(trc, src, MapAllocToTraceKind(AllocKind(kind)));
             }
         }

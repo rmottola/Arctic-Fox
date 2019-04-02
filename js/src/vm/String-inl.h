@@ -348,7 +348,7 @@ js::StaticStrings::getLength2(char16_t c1, char16_t c2)
 }
 
 MOZ_ALWAYS_INLINE void
-JSString::finalize(js::FreeOp* fop)
+JSString::finalize(js::FreeOp *fop)
 {
     /* FatInline strings are in a different arena. */
     MOZ_ASSERT(getAllocKind() != js::gc::FINALIZE_FAT_INLINE_STRING);
@@ -360,7 +360,7 @@ JSString::finalize(js::FreeOp* fop)
 }
 
 inline void
-JSFlatString::finalize(js::FreeOp* fop)
+JSFlatString::finalize(js::FreeOp *fop)
 {
     MOZ_ASSERT(getAllocKind() != js::gc::FINALIZE_FAT_INLINE_STRING);
 
@@ -369,7 +369,7 @@ JSFlatString::finalize(js::FreeOp* fop)
 }
 
 inline void
-JSFatInlineString::finalize(js::FreeOp* fop)
+JSFatInlineString::finalize(js::FreeOp *fop)
 {
     MOZ_ASSERT(getAllocKind() == js::gc::FINALIZE_FAT_INLINE_STRING);
 
@@ -378,7 +378,7 @@ JSFatInlineString::finalize(js::FreeOp* fop)
 }
 
 inline void
-JSAtom::finalize(js::FreeOp* fop)
+JSAtom::finalize(js::FreeOp *fop)
 {
     MOZ_ASSERT(JSString::isAtom());
     MOZ_ASSERT(JSString::isFlat());
@@ -388,9 +388,9 @@ JSAtom::finalize(js::FreeOp* fop)
 }
 
 inline void
-JSExternalString::finalize(js::FreeOp* fop)
+JSExternalString::finalize(js::FreeOp *fop)
 {
-    const JSStringFinalizer* fin = externalFinalizer();
+    const JSStringFinalizer *fin = externalFinalizer();
     fin->finalize(fin, const_cast<char16_t*>(rawTwoByteChars()));
 }
 

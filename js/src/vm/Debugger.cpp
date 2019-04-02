@@ -1924,14 +1924,14 @@ UpdateExecutionObservabilityOfScriptsInZone(JSContext* cx, Zone* zone,
     // appending them to a vector for discarding their baseline scripts later.
     {
         AutoEnterAnalysis enter(fop, zone);
-        if (JSScript* script = obs.singleScriptForZoneInvalidation()) {
+        if (JSScript *script = obs.singleScriptForZoneInvalidation()) {
             if (obs.shouldRecompileOrInvalidate(script)) {
                 if (!AppendAndInvalidateScript(cx, zone, script, scripts))
                     return false;
             }
         } else {
             for (gc::ZoneCellIter iter(zone, gc::FINALIZE_SCRIPT); !iter.done(); iter.next()) {
-                JSScript* script = iter.get<JSScript>();
+                JSScript *script = iter.get<JSScript>();
                 if (obs.shouldRecompileOrInvalidate(script) &&
                     !gc::IsScriptAboutToBeFinalized(&script))
                 {

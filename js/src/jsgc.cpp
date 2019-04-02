@@ -1787,12 +1787,12 @@ GCMarker::delayMarkingChildren(const void* thing)
 }
 
 inline void
-ArenaLists::prepareForIncrementalGC(JSRuntime* rt)
+ArenaLists::prepareForIncrementalGC(JSRuntime *rt)
 {
     for (size_t i = 0; i != FINALIZE_LIMIT; ++i) {
-        FreeList* freeList = &freeLists[i];
+        FreeList *freeList = &freeLists[i];
         if (!freeList->isEmpty()) {
-            ArenaHeader* aheader = freeList->arenaHeader();
+            ArenaHeader *aheader = freeList->arenaHeader();
             aheader->allocatedDuringIncremental = true;
             rt->gc.marker.delayMarkingArena(aheader);
         }
@@ -2065,18 +2065,18 @@ RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind, size_t thingSize
         dstAlloc = GCRuntime::refillFreeListInGC(zone, thingKind);
     if (!dstAlloc)
         return false;
-    TenuredCell* dst = TenuredCell::fromPointer(dstAlloc);
+    TenuredCell *dst = TenuredCell::fromPointer(dstAlloc);
 
     // Copy source cell contents to destination.
     memcpy(dst, src, thingSize);
 
     if (thingKind <= FINALIZE_OBJECT_LAST) {
-        JSObject* srcObj = static_cast<JSObject*>(static_cast<Cell*>(src));
-        JSObject* dstObj = static_cast<JSObject*>(static_cast<Cell*>(dst));
+        JSObject *srcObj = static_cast<JSObject*>(static_cast<Cell*>(src));
+        JSObject *dstObj = static_cast<JSObject*>(static_cast<Cell*>(dst));
 
         if (srcObj->isNative()) {
-            NativeObject* srcNative = &srcObj->as<NativeObject>();
-            NativeObject* dstNative = &dstObj->as<NativeObject>();
+            NativeObject *srcNative = &srcObj->as<NativeObject>();
+            NativeObject *dstNative = &dstObj->as<NativeObject>();
 
             // Fixup the pointer to inline object elements if necessary.
             if (srcNative->hasFixedElements())
@@ -2249,36 +2249,36 @@ GCRuntime::relocateArenas(JS::gcreason::Reason reason)
 }
 
 void
-MovingTracer::Visit(JSTracer* jstrc, void** thingp, JSGCTraceKind kind)
+MovingTracer::Visit(JSTracer *jstrc, void **thingp, JSGCTraceKind kind)
 {
-    TenuredCell* thing = TenuredCell::fromPointer(*thingp);
-    Zone* zone = thing->zoneFromAnyThread();
+    TenuredCell *thing = TenuredCell::fromPointer(*thingp);
+    Zone *zone = thing->zoneFromAnyThread();
     if (!zone->isGCCompacting()) {
         MOZ_ASSERT(!IsForwarded(thing));
         return;
     }
 
     if (IsForwarded(thing)) {
-        Cell* dst = Forwarded(thing);
+        Cell *dst = Forwarded(thing);
         *thingp = dst;
     }
 }
 
 void
-GCRuntime::sweepTypesAfterCompacting(Zone* zone)
+GCRuntime::sweepTypesAfterCompacting(Zone *zone)
 {
-    FreeOp* fop = rt->defaultFreeOp();
+    FreeOp *fop = rt->defaultFreeOp();
     zone->beginSweepTypes(fop, rt->gc.releaseObservedTypes && !zone->isPreservingCode());
 
     AutoClearTypeInferenceStateOnOOM oom(zone);
 
     for (ZoneCellIterUnderGC i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+        JSScript *script = i.get<JSScript>();
         script->maybeSweepTypes(&oom);
     }
 
     for (ZoneCellIterUnderGC i(zone, FINALIZE_OBJECT_GROUP); !i.done(); i.next()) {
-        ObjectGroup* group = i.get<ObjectGroup>();
+        ObjectGroup *group = i.get<ObjectGroup>();
         group->maybeSweep(&oom);
     }
 
@@ -3325,7 +3325,7 @@ GCRuntime::decommitAllWithoutUnlocking(const AutoLockGC& lock)
 }
 
 void
-GCRuntime::decommitArenas(AutoLockGC& lock)
+GCRuntime::decommitArenas(AutoLockGC &lock)
 {
     // Verify that all entries in the empty chunks pool are decommitted.
     for (ChunkPool::Iter chunk(emptyChunks(lock)); !chunk.done(); chunk.next())
@@ -3347,13 +3347,13 @@ GCRuntime::decommitArenas(AutoLockGC& lock)
     // Start at the tail and stop before the first chunk: we allocate from the
     // head and don't want to thrash with the mutator.
     for (size_t i = toDecommit.length(); i > 1; --i) {
-        Chunk* chunk = toDecommit[i - 1];
+        Chunk *chunk = toDecommit[i - 1];
         MOZ_ASSERT(chunk);
 
         // The arena list is not doubly-linked, so we have to work in the free
         // list order and not in the natural order.
         while (chunk->info.numArenasFreeCommitted) {
-            ArenaHeader* aheader = chunk->allocateArena(rt, nullptr, FINALIZE_OBJECT0, lock);
+            ArenaHeader *aheader = chunk->allocateArena(rt, nullptr, FINALIZE_OBJECT0, lock);
             bool ok;
             {
                 AutoUnlockGC unlock(lock);
@@ -6838,7 +6838,7 @@ ArenaLists::normalizeBackgroundFinalizeState(AllocKind thingKind)
 }
 
 void
-ArenaLists::adoptArenas(JSRuntime* rt, ArenaLists* fromArenaLists)
+ArenaLists::adoptArenas(JSRuntime *rt, ArenaLists *fromArenaLists)
 {
     // GC should be inactive, but still take the lock as a kind of read fence.
     AutoLockGC lock(rt);
@@ -6852,12 +6852,12 @@ ArenaLists::adoptArenas(JSRuntime* rt, ArenaLists* fromArenaLists)
         normalizeBackgroundFinalizeState(AllocKind(thingKind));
         fromArenaLists->normalizeBackgroundFinalizeState(AllocKind(thingKind));
 
-        ArenaList* fromList = &fromArenaLists->arenaLists[thingKind];
-        ArenaList* toList = &arenaLists[thingKind];
+        ArenaList *fromList = &fromArenaLists->arenaLists[thingKind];
+        ArenaList *toList = &arenaLists[thingKind];
         fromList->check();
         toList->check();
-        ArenaHeader* next;
-        for (ArenaHeader* fromHeader = fromList->head(); fromHeader; fromHeader = next) {
+        ArenaHeader *next;
+        for (ArenaHeader *fromHeader = fromList->head(); fromHeader; fromHeader = next) {
             // Copy fromHeader->next before releasing/reinserting.
             next = fromHeader->next;
 
@@ -6870,11 +6870,11 @@ ArenaLists::adoptArenas(JSRuntime* rt, ArenaLists* fromArenaLists)
 }
 
 bool
-ArenaLists::containsArena(JSRuntime* rt, ArenaHeader* needle)
+ArenaLists::containsArena(JSRuntime *rt, ArenaHeader *needle)
 {
     AutoLockGC lock(rt);
     size_t allocKind = needle->getAllocKind();
-    for (ArenaHeader* aheader = arenaLists[allocKind].head(); aheader; aheader = aheader->next) {
+    for (ArenaHeader *aheader = arenaLists[allocKind].head(); aheader; aheader = aheader->next) {
         if (aheader == needle)
             return true;
     }

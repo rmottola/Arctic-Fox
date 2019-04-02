@@ -4721,16 +4721,16 @@ static const VMFunction NewGCObjectInfo =
     FunctionInfo<NewGCObjectFn>(js::jit::NewGCObject);
 
 void
-CodeGenerator::visitCreateThisWithTemplate(LCreateThisWithTemplate* lir)
+CodeGenerator::visitCreateThisWithTemplate(LCreateThisWithTemplate *lir)
 {
-    JSObject* templateObject = lir->mir()->templateObject();
+    JSObject *templateObject = lir->mir()->templateObject();
     gc::AllocKind allocKind = templateObject->asTenured().getAllocKind();
     gc::InitialHeap initialHeap = lir->mir()->initialHeap();
-    const js::Class* clasp = templateObject->getClass();
+    const js::Class *clasp = templateObject->getClass();
     Register objReg = ToRegister(lir->output());
     Register tempReg = ToRegister(lir->temp());
 
-    OutOfLineCode* ool = oolCallVM(NewGCObjectInfo, lir,
+    OutOfLineCode *ool = oolCallVM(NewGCObjectInfo, lir,
                                    (ArgList(), Imm32(allocKind), Imm32(initialHeap),
                                     ImmPtr(clasp)),
                                    StoreRegisterTo(objReg));

@@ -120,7 +120,7 @@ Zone::beginSweepTypes(FreeOp* fop, bool releaseTypes)
 }
 
 void
-Zone::sweepBreakpoints(FreeOp* fop)
+Zone::sweepBreakpoints(FreeOp *fop)
 {
     if (fop->runtime()->debuggerList.isEmpty())
         return;
@@ -132,7 +132,7 @@ Zone::sweepBreakpoints(FreeOp* fop)
 
     MOZ_ASSERT(isGCSweepingOrCompacting());
     for (ZoneCellIterUnderGC i(this, FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+        JSScript *script = i.get<JSScript>();
         MOZ_ASSERT_IF(isGCSweeping(), script->zone()->isGCSweeping());
         if (!script->hasAnyBreakpointsOrStepMode())
             continue;
@@ -140,12 +140,12 @@ Zone::sweepBreakpoints(FreeOp* fop)
         bool scriptGone = IsScriptAboutToBeFinalized(&script);
         MOZ_ASSERT(script == i.get<JSScript>());
         for (unsigned i = 0; i < script->length(); i++) {
-            BreakpointSite* site = script->getBreakpointSite(script->offsetToPC(i));
+            BreakpointSite *site = script->getBreakpointSite(script->offsetToPC(i));
             if (!site)
                 continue;
 
-            Breakpoint* nextbp;
-            for (Breakpoint* bp = site->firstBreakpoint(); bp; bp = nextbp) {
+            Breakpoint *nextbp;
+            for (Breakpoint *bp = site->firstBreakpoint(); bp; bp = nextbp) {
                 nextbp = bp->nextInSite();
                 HeapPtrNativeObject& dbgobj = bp->debugger->toJSObjectRef();
                 MOZ_ASSERT_IF(isGCSweeping() && dbgobj->zone()->isCollecting(),
@@ -160,7 +160,7 @@ Zone::sweepBreakpoints(FreeOp* fop)
 }
 
 void
-Zone::discardJitCode(FreeOp* fop)
+Zone::discardJitCode(FreeOp *fop)
 {
     if (!jitZone())
         return;
@@ -172,7 +172,7 @@ Zone::discardJitCode(FreeOp* fop)
 #ifdef DEBUG
         /* Assert no baseline scripts are marked as active. */
         for (ZoneCellIterUnderGC i(this, FINALIZE_SCRIPT); !i.done(); i.next()) {
-            JSScript* script = i.get<JSScript>();
+            JSScript *script = i.get<JSScript>();
             MOZ_ASSERT_IF(script->hasBaselineScript(), !script->baselineScript()->active());
         }
 #endif
@@ -184,7 +184,7 @@ Zone::discardJitCode(FreeOp* fop)
         jit::InvalidateAll(fop, this);
 
         for (ZoneCellIterUnderGC i(this, FINALIZE_SCRIPT); !i.done(); i.next()) {
-            JSScript* script = i.get<JSScript>();
+            JSScript *script = i.get<JSScript>();
             jit::FinishInvalidation(fop, script);
 
             /*

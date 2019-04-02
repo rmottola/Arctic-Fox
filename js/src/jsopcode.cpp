@@ -279,7 +279,7 @@ js::DumpPCCounts(JSContext* cx, HandleScript script, Sprinter* sp)
 }
 
 void
-js::DumpCompartmentPCCounts(JSContext* cx)
+js::DumpCompartmentPCCounts(JSContext *cx)
 {
     for (ZoneCellIter i(cx->zone(), gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
         RootedScript script(cx, i.get<JSScript>());

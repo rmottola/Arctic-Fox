@@ -2408,13 +2408,13 @@ TypeZone::addPendingRecompile(JSContext* cx, JSScript* script)
 }
 
 void
-js::PrintTypes(JSContext* cx, JSCompartment* comp, bool force)
+js::PrintTypes(JSContext *cx, JSCompartment *comp, bool force)
 {
 #ifdef DEBUG
     gc::AutoSuppressGC suppressGC(cx);
     JSAutoRequest request(cx);
 
-    Zone* zone = comp->zone();
+    Zone *zone = comp->zone();
     AutoEnterAnalysis enter(nullptr, zone);
 
     if (!force && !InferSpewActive(ISpewResult))
@@ -2427,7 +2427,7 @@ js::PrintTypes(JSContext* cx, JSCompartment* comp, bool force)
     }
 
     for (gc::ZoneCellIter i(zone, gc::FINALIZE_OBJECT_GROUP); !i.done(); i.next()) {
-        ObjectGroup* group = i.get<ObjectGroup>();
+        ObjectGroup *group = i.get<ObjectGroup>();
         group->print();
     }
 #endif
