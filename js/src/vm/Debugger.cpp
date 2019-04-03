@@ -2125,9 +2125,9 @@ Debugger::markCrossCompartmentEdges(JSTracer* trc)
  * all the edges being reported here are strong references.
  */
 /* static */ void
-Debugger::markAllCrossCompartmentEdges(JSTracer* trc)
+Debugger::markAllCrossCompartmentEdges(JSTracer *trc)
 {
-    JSRuntime* rt = trc->runtime();
+    JSRuntime *rt = trc->runtime();
 
     for (Debugger* dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext()) {
         if (!dbg->object->zone()->isCollecting())

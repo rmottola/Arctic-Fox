@@ -2381,7 +2381,7 @@ struct ArenasToUpdate
         BACKGROUND = 2,
         ALL = FOREGROUND | BACKGROUND
     };
-    ArenasToUpdate(JSRuntime* rt, KindsToUpdate kinds);
+    ArenasToUpdate(JSRuntime *rt, KindsToUpdate kinds);
     bool done() { return initialized && arena == nullptr; }
     ArenaHeader* next(AutoLockHelperThreadState& lock);
     ArenaHeader* getArenasToUpdate(AutoLockHelperThreadState& lock, unsigned max);
@@ -2391,7 +2391,7 @@ struct ArenasToUpdate
     KindsToUpdate kinds;
     GCZonesIter zone;    // Current zone to process, unless zone.done()
     unsigned kind;       // Current alloc kind to process
-    ArenaHeader* arena;  // Next arena to process
+    ArenaHeader *arena;  // Next arena to process
 
     bool shouldProcessKind(unsigned kind);
 };
@@ -2413,7 +2413,7 @@ bool ArenasToUpdate::shouldProcessKind(unsigned kind)
         return (kinds & FOREGROUND) != 0;
 }
 
-ArenasToUpdate::ArenasToUpdate(JSRuntime* rt, KindsToUpdate kinds)
+ArenasToUpdate::ArenasToUpdate(JSRuntime *rt, KindsToUpdate kinds)
   : initialized(false), kinds(kinds), zone(rt, SkipAtoms)
 {
     MOZ_ASSERT(kinds && !(kinds & ~ALL));
@@ -2457,14 +2457,14 @@ ArenasToUpdate::next(AutoLockHelperThreadState& lock)
     return nullptr;
 }
 
-ArenaHeader*
+ArenaHeader *
 ArenasToUpdate::getArenasToUpdate(AutoLockHelperThreadState& lock, unsigned count)
 {
     if (zone.done())
         return nullptr;
 
-    ArenaHeader* head = nullptr;
-    ArenaHeader* tail = nullptr;
+    ArenaHeader *head = nullptr;
+    ArenaHeader *tail = nullptr;
 
     for (unsigned i = 0; i < count; ++i) {
         ArenaHeader* arena = next(lock);
@@ -2546,7 +2546,7 @@ UpdateCellPointersTask::run()
 } // namespace js
 
 void
-GCRuntime::updateAllCellPointersParallel(MovingTracer* trc)
+GCRuntime::updateAllCellPointersParallel(MovingTracer *trc)
 {
     AutoDisableProxyCheck noProxyCheck(rt); // These checks assert when run in parallel.
 
@@ -2583,7 +2583,7 @@ GCRuntime::updateAllCellPointersParallel(MovingTracer* trc)
 }
 
 void
-GCRuntime::updateAllCellPointersSerial(MovingTracer* trc)
+GCRuntime::updateAllCellPointersSerial(MovingTracer *trc)
 {
     UpdateCellPointersTask task;
     {
@@ -2668,7 +2668,7 @@ GCRuntime::updatePointersToRelocatedCells()
 
 #ifdef DEBUG
 void
-GCRuntime::protectRelocatedArenas(ArenaHeader* relocatedList)
+GCRuntime::protectRelocatedArenas(ArenaHeader *relocatedList)
 {
     for (ArenaHeader* arena = relocatedList, *next; arena; arena = next) {
         next = arena->next;
@@ -2684,7 +2684,7 @@ GCRuntime::protectRelocatedArenas(ArenaHeader* relocatedList)
 }
 
 void
-GCRuntime::unprotectRelocatedArenas(ArenaHeader* relocatedList)
+GCRuntime::unprotectRelocatedArenas(ArenaHeader *relocatedList)
 {
     for (ArenaHeader* arena = relocatedList; arena; arena = arena->next) {
 #if defined(XP_WIN)
@@ -2700,7 +2700,7 @@ GCRuntime::unprotectRelocatedArenas(ArenaHeader* relocatedList)
 #endif
 
 void
-GCRuntime::releaseRelocatedArenas(ArenaHeader* relocatedList)
+GCRuntime::releaseRelocatedArenas(ArenaHeader *relocatedList)
 {
     AutoLockGC lock(rt);
     releaseRelocatedArenasWithoutUnlocking(relocatedList, lock);
@@ -2708,12 +2708,12 @@ GCRuntime::releaseRelocatedArenas(ArenaHeader* relocatedList)
 }
 
 void
-GCRuntime::releaseRelocatedArenasWithoutUnlocking(ArenaHeader* relocatedList, const AutoLockGC& lock)
+GCRuntime::releaseRelocatedArenasWithoutUnlocking(ArenaHeader *relocatedList, const AutoLockGC &lock)
 {
     // Release the relocated arenas, now containing only forwarding pointers
     unsigned count = 0;
     while (relocatedList) {
-        ArenaHeader* aheader = relocatedList;
+        ArenaHeader *aheader = relocatedList;
         relocatedList = relocatedList->next;
 
         // Clear the mark bits
