@@ -478,7 +478,7 @@ JitcodeGlobalTable::addEntry(const JitcodeGlobalEntry& entry, JSRuntime* rt)
 }
 
 void
-JitcodeGlobalTable::removeEntry(void* startAddr, JSRuntime* rt)
+JitcodeGlobalTable::removeEntry(void *startAddr, JSRuntime *rt)
 {
     JitcodeGlobalEntry query = JitcodeGlobalEntry::MakeQuery(startAddr);
     JitcodeGlobalEntry *searchTower[JitcodeSkiplistTower::MAX_HEIGHT];

@@ -886,13 +886,13 @@ class JitcodeGlobalTable
         return addEntry(JitcodeGlobalEntry(entry), rt);
     }
 
-    void removeEntry(void* startAddr, JSRuntime* rt);
+    void removeEntry(void *startAddr, JSRuntime *rt);
     void releaseEntry(void *startAddr, JSRuntime *rt);
 
     void mark(JSTracer *trc);
 
   private:
-    bool addEntry(const JitcodeGlobalEntry& entry, JSRuntime* rt);
+    bool addEntry(const JitcodeGlobalEntry &entry, JSRuntime *rt);
 
     JitcodeGlobalEntry *lookupInternal(void *ptr);
 

@@ -551,7 +551,7 @@ Mark##base##RootRange(JSTracer* trc, size_t len, type** vec, const char* name)  
 }                                                                                                 \
                                                                                                   \
 bool                                                                                              \
-Is##base##Marked(type** thingp)                                                                   \
+Is##base##Marked(type **thingp)                                                                   \
 {                                                                                                 \
     return IsMarked<type>(thingp);                                                                \
 }                                                                                                 \
@@ -800,7 +800,7 @@ gc::MarkValueRoot(JSTracer* trc, Value* v, const char* name)
 }
 
 void
-TypeSet::MarkTypeRoot(JSTracer* trc, TypeSet::Type* v, const char* name)
+TypeSet::MarkTypeRoot(JSTracer *trc, TypeSet::Type *v, const char *name)
 {
     JS_ROOT_MARKING_ASSERT(trc);
     trc->setTracingName(name);
@@ -816,7 +816,7 @@ TypeSet::MarkTypeRoot(JSTracer* trc, TypeSet::Type* v, const char* name)
 }
 
 void
-gc::MarkValueRange(JSTracer* trc, size_t len, BarrieredBase<Value>* vec, const char* name)
+gc::MarkValueRange(JSTracer *trc, size_t len, BarrieredBase<Value> *vec, const char *name)
 {
     for (size_t i = 0; i < len; ++i) {
         trc->setTracingIndex(name, i);

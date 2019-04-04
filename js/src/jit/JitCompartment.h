@@ -256,9 +256,9 @@ class JitRuntime
     uint8_t* allocateOsrTempData(size_t size);
     void freeOsrTempData();
 
-    static void Mark(JSTracer* trc);
+    static void Mark(JSTracer *trc);
 
-    ExecutableAllocator& execAlloc() {
+    ExecutableAllocator &execAlloc() {
         return execAlloc_;
     }
 

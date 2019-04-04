@@ -686,7 +686,7 @@ TypeSet::readBarrier(const TypeSet* types)
 }
 
 bool
-TypeSet::clone(LifoAlloc* alloc, TemporaryTypeSet* result) const
+TypeSet::clone(LifoAlloc *alloc, TemporaryTypeSet *result) const
 {
     MOZ_ASSERT(result->empty());
 
@@ -3099,7 +3099,7 @@ js::TypeMonitorCallSlow(JSContext* cx, JSObject* callee, const CallArgs& args, b
 }
 
 static inline bool
-IsAboutToBeFinalized(TypeSet::ObjectKey** keyp)
+IsAboutToBeFinalized(TypeSet::ObjectKey **keyp)
 {
     // Mask out the low bit indicating whether this is a group or JS object.
     uintptr_t flagBit = uintptr_t(*keyp) & 1;
@@ -3110,7 +3110,7 @@ IsAboutToBeFinalized(TypeSet::ObjectKey** keyp)
 }
 
 void
-js::FillBytecodeTypeMap(JSScript* script, uint32_t* bytecodeMap)
+js::FillBytecodeTypeMap(JSScript *script, uint32_t *bytecodeMap)
 {
     uint32_t added = 0;
     for (jsbytecode* pc = script->code(); pc < script->codeEnd(); pc += GetBytecodeLength(pc)) {
@@ -3875,11 +3875,11 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
         clearObjects();
         objectCount = 0;
         for (unsigned i = 0; i < oldCapacity; i++) {
-            ObjectKey* key = oldArray[i];
+            ObjectKey *key = oldArray[i];
             if (!key)
                 continue;
             if (!IsAboutToBeFinalized(&key)) {
-                ObjectKey** pentry =
+                ObjectKey **pentry =
                     TypeHashSet::Insert<ObjectKey*, ObjectKey, ObjectKey>
                         (zone->types.typeLifoAlloc, objectSet, objectCount, key);
                 if (pentry) {

@@ -657,9 +657,9 @@ JitCode::fixupNurseryObjects(JSContext* cx, const ObjectVector& nurseryObjects)
 }
 
 void
-JitCode::finalize(FreeOp* fop)
+JitCode::finalize(FreeOp *fop)
 {
-    JSRuntime* rt = fop->runtime();
+    JSRuntime *rt = fop->runtime();
 
     // If this jitcode has a bytecode map, de-register it.
     if (hasBytecodeMap_) {
