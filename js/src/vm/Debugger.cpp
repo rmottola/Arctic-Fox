@@ -2123,25 +2123,27 @@ Debugger::markCrossCompartmentEdges(JSTracer* trc)
  *
  * This happens during the initial mark phase, not iterative marking, because
  * all the edges being reported here are strong references.
+ *
+ * This method is also used during compacting GC to update cross compartment
+ * pointers in zones that are not currently being compacted.
  */
 /* static */ void
 Debugger::markIncomingCrossCompartmentEdges(JSTracer *trc)
 {
     JSRuntime *rt = trc->runtime();
+    gc::State state = rt->gc.state();
+    MOZ_ASSERT(state == gc::MARK_ROOTS || state == gc::COMPACT);
 
     for (Debugger* dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext()) {
-        if (!dbg->object->zone()->isCollecting())
+        Zone *zone = dbg->object->zone();
+        if ((state == gc::MARK_ROOTS && !zone->isCollecting()) ||
+            (state == gc::COMPACT && !zone->isGCCompacting()))
+        {
             dbg->markCrossCompartmentEdges(trc);
+	}
     }
 }
 
-/* static */ void
-Debugger::markAllCrossCompartmentEdges(JSTracer *trc)
-{
-    JSRuntime *rt = trc->runtime();
-    for (Debugger *dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext())
-        dbg->markCrossCompartmentEdges(trc);
-}
 
 /*
  * This method has two tasks:

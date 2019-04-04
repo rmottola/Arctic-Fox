@@ -549,7 +549,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * them and returns true. If not, it returns false.
      */
     static void markIncomingCrossCompartmentEdges(JSTracer *tracer);
-    static void markAllCrossCompartmentEdges(JSTracer *tracer);
     static bool markAllIteratively(GCMarker *trc);
     static void markAll(JSTracer *trc);
     static void sweepAll(FreeOp *fop);
