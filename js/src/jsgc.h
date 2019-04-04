@@ -1364,6 +1364,7 @@ class ZoneList
     void append(Zone* zone);
     void transferFrom(ZoneList& other);
     void removeFront();
+    void clear();
 
   private:
     explicit ZoneList(Zone* singleZone);
