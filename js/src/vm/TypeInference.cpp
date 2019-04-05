@@ -3918,9 +3918,9 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
         }
         setBaseObjectCount(objectCount);
     } else if (objectCount == 1) {
-        ObjectKey* key = (ObjectKey*) objectSet;
+        ObjectKey *key = (ObjectKey *) objectSet;
         if (!IsAboutToBeFinalized(&key)) {
-            objectSet = reinterpret_cast<ObjectKey**>(key);
+            objectSet = reinterpret_cast<ObjectKey **>(key);
         } else {
             // As above, mark type sets containing objects with unknown
             // properties as unknown.
