@@ -1236,7 +1236,7 @@ MaybeForwarded(T t)
 
 template <typename T>
 inline void
-CheckGCThingAfterMovingGC(T* t)
+CheckGCThingAfterMovingGC(T *t)
 {
     MOZ_ASSERT_IF(t, !IsInsideNursery(t));
     MOZ_ASSERT_IF(t, !IsForwarded(t));

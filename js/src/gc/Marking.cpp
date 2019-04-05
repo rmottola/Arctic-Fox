@@ -1010,19 +1010,19 @@ gc::MarkValueUnbarriered(JSTracer* trc, Value* v, const char* name)
 }
 
 bool
-gc::IsCellMarked(Cell** thingp)
+gc::IsCellMarked(Cell **thingp)
 {
     return IsMarked<Cell>(thingp);
 }
 
 bool
-gc::IsCellAboutToBeFinalized(Cell** thingp)
+gc::IsCellAboutToBeFinalized(Cell **thingp)
 {
     return IsAboutToBeFinalized<Cell>(thingp);
 }
 
 bool
-gc::IsCellAboutToBeFinalizedFromAnyThread(Cell** thingp)
+gc::IsCellAboutToBeFinalizedFromAnyThread(Cell **thingp)
 {
     return IsAboutToBeFinalizedFromAnyThread<Cell>(thingp);
 }

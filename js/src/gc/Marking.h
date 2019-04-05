@@ -314,16 +314,16 @@ Mark(JSTracer* trc, ScopeObject** obj, const char* name)
 }
 
 bool
-IsCellMarked(Cell** thingp);
+IsCellMarked(Cell **thingp);
 
 bool
-IsCellAboutToBeFinalized(Cell** thing);
+IsCellAboutToBeFinalized(Cell **thing);
 
 bool
-IsCellAboutToBeFinalizedFromAnyThread(Cell** thing);
+IsCellAboutToBeFinalizedFromAnyThread(Cell **thing);
 
 inline bool
-IsMarked(BarrieredBase<Value>* v)
+IsMarked(BarrieredBase<Value> *v)
 {
     if (!v->isMarkable())
         return true;
