@@ -1808,24 +1808,24 @@ class MSimdSwizzle
   public:
     INSTRUCTION_HEADER(SimdSwizzle)
 
-    static MSimdSwizzle* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType type,
+    static MSimdSwizzle *NewAsmJS(TempAllocator &alloc, MDefinition *obj, MIRType type,
                                   uint32_t laneX, uint32_t laneY, uint32_t laneZ, uint32_t laneW)
     {
         return new(alloc) MSimdSwizzle(obj, type, laneX, laneY, laneZ, laneW);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition *ins) const MOZ_OVERRIDE {
         if (!ins->isSimdSwizzle())
             return false;
-        const MSimdSwizzle* other = ins->toSimdSwizzle();
+        const MSimdSwizzle *other = ins->toSimdSwizzle();
         return sameLanes(other) && congruentIfOperandsEqual(other);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    MDefinition* foldsTo(TempAllocator& alloc) override;
+    MDefinition *foldsTo(TempAllocator& alloc) MOZ_OVERRIDE;
 
     ALLOW_CLONE(MSimdSwizzle)
 };
