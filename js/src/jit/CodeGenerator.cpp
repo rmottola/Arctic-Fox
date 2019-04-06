@@ -8662,7 +8662,7 @@ CodeGenerator::visitLoadTypedArrayElementHole(LLoadTypedArrayElementHole* lir)
 
 template <typename T>
 static inline void
-StoreToTypedArray(MacroAssembler& masm, Scalar::Type arrayType, const LAllocation* value, const T& dest)
+StoreToTypedArray(MacroAssembler &masm, Scalar::Type arrayType, const LAllocation *value, const T &dest)
 {
     if (arrayType == Scalar::Float32 || arrayType == Scalar::Float64) {
         masm.storeToTypedFloatArray(arrayType, ToFloatRegister(value), dest);
@@ -8675,10 +8675,10 @@ StoreToTypedArray(MacroAssembler& masm, Scalar::Type arrayType, const LAllocatio
 }
 
 void
-CodeGenerator::visitStoreTypedArrayElement(LStoreTypedArrayElement* lir)
+CodeGenerator::visitStoreTypedArrayElement(LStoreTypedArrayElement *lir)
 {
     Register elements = ToRegister(lir->elements());
-    const LAllocation* value = lir->value();
+    const LAllocation *value = lir->value();
 
     Scalar::Type arrayType = lir->mir()->arrayType();
     int width = Scalar::byteSize(arrayType);

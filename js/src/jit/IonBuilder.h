@@ -838,18 +838,18 @@ class IonBuilder
                                     SimdTypeDescr::Type type);
 
     // Utility intrinsics.
-    InliningStatus inlineIsCallable(CallInfo& callInfo);
-    InliningStatus inlineIsObject(CallInfo& callInfo);
-    InliningStatus inlineToObject(CallInfo& callInfo);
-    InliningStatus inlineToInteger(CallInfo& callInfo);
-    InliningStatus inlineToString(CallInfo& callInfo);
-    InliningStatus inlineDump(CallInfo& callInfo);
-    InliningStatus inlineHasClass(CallInfo& callInfo, const Class* clasp,
-                                  const Class* clasp2 = nullptr,
-                                  const Class* clasp3 = nullptr,
-                                  const Class* clasp4 = nullptr);
-    InliningStatus inlineIsConstructing(CallInfo& callInfo);
-    InliningStatus inlineSubstringKernel(CallInfo& callInfo);
+    InliningStatus inlineIsCallable(CallInfo &callInfo);
+    InliningStatus inlineIsObject(CallInfo &callInfo);
+    InliningStatus inlineToObject(CallInfo &callInfo);
+    InliningStatus inlineToInteger(CallInfo &callInfo);
+    InliningStatus inlineToString(CallInfo &callInfo);
+    InliningStatus inlineDump(CallInfo &callInfo);
+    InliningStatus inlineHasClass(CallInfo &callInfo, const Class *clasp,
+                                  const Class *clasp2 = nullptr,
+                                  const Class *clasp3 = nullptr,
+                                  const Class *clasp4 = nullptr);
+    InliningStatus inlineIsConstructing(CallInfo &callInfo);
+    InliningStatus inlineSubstringKernel(CallInfo &callInfo);
 
     // Testing functions.
     InliningStatus inlineBailout(CallInfo& callInfo);

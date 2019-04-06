@@ -933,22 +933,22 @@ class MacroAssemblerX86Shared : public Assembler
     void loadUnalignedInt32x4(const Operand& src, FloatRegister dest) {
         vmovdqu(src, dest);
     }
-    void storeUnalignedInt32x4(FloatRegister src, const Address& dest) {
+    void storeUnalignedInt32x4(FloatRegister src, const Address &dest) {
         vmovdqu(src, Operand(dest));
     }
-    void storeUnalignedInt32x4(FloatRegister src, const Operand& dest) {
+    void storeUnalignedInt32x4(FloatRegister src, const Operand &dest) {
         vmovdqu(src, dest);
     }
-    void packedEqualInt32x4(const Operand& src, FloatRegister dest) {
+    void packedEqualInt32x4(const Operand &src, FloatRegister dest) {
         vpcmpeqd(src, dest, dest);
     }
-    void packedGreaterThanInt32x4(const Operand& src, FloatRegister dest) {
+    void packedGreaterThanInt32x4(const Operand &src, FloatRegister dest) {
         vpcmpgtd(src, dest, dest);
     }
-    void packedAddInt32(const Operand& src, FloatRegister dest) {
+    void packedAddInt32(const Operand &src, FloatRegister dest) {
         vpaddd(src, dest, dest);
     }
-    void packedSubInt32(const Operand& src, FloatRegister dest) {
+    void packedSubInt32(const Operand &src, FloatRegister dest) {
         vpsubd(src, dest, dest);
     }
     void packedReciprocalFloat32x4(const Operand& src, FloatRegister dest) {
@@ -1008,28 +1008,28 @@ class MacroAssemblerX86Shared : public Assembler
         loadAlignedFloat32x4(src, dest);
         return dest;
     }
-    void loadUnalignedFloat32x4(const Address& src, FloatRegister dest) {
+    void loadUnalignedFloat32x4(const Address &src, FloatRegister dest) {
         vmovups(Operand(src), dest);
     }
-    void loadUnalignedFloat32x4(const Operand& src, FloatRegister dest) {
+    void loadUnalignedFloat32x4(const Operand &src, FloatRegister dest) {
         vmovups(src, dest);
     }
-    void storeUnalignedFloat32x4(FloatRegister src, const Address& dest) {
+    void storeUnalignedFloat32x4(FloatRegister src, const Address &dest) {
         vmovups(src, Operand(dest));
     }
-    void storeUnalignedFloat32x4(FloatRegister src, const Operand& dest) {
+    void storeUnalignedFloat32x4(FloatRegister src, const Operand &dest) {
         vmovups(src, dest);
     }
-    void packedAddFloat32(const Operand& src, FloatRegister dest) {
+    void packedAddFloat32(const Operand &src, FloatRegister dest) {
         vaddps(src, dest, dest);
     }
-    void packedSubFloat32(const Operand& src, FloatRegister dest) {
+    void packedSubFloat32(const Operand &src, FloatRegister dest) {
         vsubps(src, dest, dest);
     }
-    void packedMulFloat32(const Operand& src, FloatRegister dest) {
+    void packedMulFloat32(const Operand &src, FloatRegister dest) {
         vmulps(src, dest, dest);
     }
-    void packedDivFloat32(const Operand& src, FloatRegister dest) {
+    void packedDivFloat32(const Operand &src, FloatRegister dest) {
         vdivps(src, dest, dest);
     }
 
