@@ -3785,9 +3785,8 @@ LIRGenerator::visitSimdBox(MSimdBox* ins)
     MOZ_ASSERT(IsSimdType(ins->input()->type()));
     LUse in = useRegister(ins->input());
     LSimdBox* lir = new(alloc()) LSimdBox(in, temp());
-    // :TODO: Cannot spill SIMD registers (Bug 1112164)
-    assignSnapshot(lir, Bailout_Inevitable);
     define(lir, ins);
+    assignSafepoint(lir, ins);
 }
 
 void
