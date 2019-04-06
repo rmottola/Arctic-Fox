@@ -927,10 +927,13 @@ class MacroAssemblerX86Shared : public Assembler
         loadAlignedInt32x4(src, dest);
         return dest;
     }
-    void loadUnalignedInt32x4(const Address& src, FloatRegister dest) {
+    void loadUnalignedInt32x4(const Address &src, FloatRegister dest) {
         vmovdqu(Operand(src), dest);
     }
-    void loadUnalignedInt32x4(const Operand& src, FloatRegister dest) {
+    void loadUnalignedInt32x4(const BaseIndex &src, FloatRegister dest) {
+        vmovdqu(Operand(src), dest);
+    }
+    void loadUnalignedInt32x4(const Operand &src, FloatRegister dest) {
         vmovdqu(src, dest);
     }
     void storeUnalignedInt32x4(FloatRegister src, const Address &dest) {
@@ -1010,6 +1013,9 @@ class MacroAssemblerX86Shared : public Assembler
     }
     void loadUnalignedFloat32x4(const Address &src, FloatRegister dest) {
         vmovups(Operand(src), dest);
+    }
+    void loadUnalignedFloat32x4(const BaseIndex &src, FloatRegister dest) {
+        vmovdqu(Operand(src), dest);
     }
     void loadUnalignedFloat32x4(const Operand &src, FloatRegister dest) {
         vmovups(src, dest);
