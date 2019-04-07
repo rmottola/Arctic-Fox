@@ -99,6 +99,8 @@
 - Bug 1144931 - Move gray buffering code to RootMarking.cpp
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1144108 - Fix debugger tests that are confused by GC zea
+- Bug 1135042 2015-13-20 - Optimize SIMD.loadX/loadXY/loadXYZ in Ion; r=bhackett
+- Bug 1135042: Optimize SIMD.storeX/storeXY/storeXYZ in Ion; r=bhacket
 - Bug 1097987 - 2015-03-14 1 to 7
 - Bug 1142296 - 2015-03-14 Remove the parent argument from NewObjectWithGivenProto
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
@@ -119,9 +121,11 @@
 - Bug 1142311 part 1 to 2
 - Bug 1137844 2015-03-13 par 0 to 4
 - Bug 1135897 - Use unboxed objects for JSON objects and constant liter
-- Bug 1142282 - 2014-03-12 1 to 3
-- Bug 1140586 - 2015-03-12 3 to 5
-- Bug 1139552 - Convert js::gc::AllocKind to an enum class and eliminat
+- Bug 1142282 - 2015-03-12 1 to 3
+- Bug 1140586 - 2015-03-12 5 to 5
+- Bug 1140643 - JitcodeGlobalMap marking must participate in iterative 
+- Bug 1139832 - Restrict compacting GC zealousness to zeal collections
+- Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
 
 
 ### FIXME / TODO
