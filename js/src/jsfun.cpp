@@ -2091,8 +2091,8 @@ JSFunction::isBuiltinFunctionConstructor()
     return maybeNative() == Function || maybeNative() == Generator;
 }
 
-JSFunction*
-js::NewFunction(ExclusiveContext* cx, HandleObject funobjArg, Native native, unsigned nargs,
+JSFunction *
+js::NewFunction(ExclusiveContext *cx, HandleObject funobjArg, Native native, unsigned nargs,
                 JSFunction::Flags flags, HandleObject parent, HandleAtom atom,
                 gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
                 NewObjectKind newKind /* = GenericObject */)
@@ -2101,8 +2101,8 @@ js::NewFunction(ExclusiveContext* cx, HandleObject funobjArg, Native native, uns
                                 allocKind, newKind);
 }
 
-JSFunction*
-js::NewFunctionWithProto(ExclusiveContext* cx, HandleObject funobjArg, Native native,
+JSFunction *
+js::NewFunctionWithProto(ExclusiveContext *cx, HandleObject funobjArg, Native native,
                          unsigned nargs, JSFunction::Flags flags, HandleObject parent,
                          HandleAtom atom, HandleObject proto,
                          gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
