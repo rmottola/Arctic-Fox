@@ -233,7 +233,7 @@ class NewObjectCache
 
     static void staticAsserts() {
         JS_STATIC_ASSERT(NewObjectCache::MAX_OBJ_SIZE == sizeof(JSObject_Slots16));
-        JS_STATIC_ASSERT(gc::FINALIZE_OBJECT_LAST == gc::FINALIZE_OBJECT16_BACKGROUND);
+        JS_STATIC_ASSERT(gc::AllocKind::OBJECT_LAST == gc::AllocKind::OBJECT16_BACKGROUND);
     }
 
     struct Entry
@@ -319,7 +319,7 @@ class NewObjectCache
 
   private:
     EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
-        uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + kind;
+        uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + size_t(kind);
         return hash % mozilla::ArrayLength(entries);
     }
 
