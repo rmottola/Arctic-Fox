@@ -591,7 +591,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
         gc::AllocKind allocKind = JSFunction::FinalizeKind;
         if (uint16_t(flagsword) & JSFunction::EXTENDED)
             allocKind = JSFunction::ExtendedFinalizeKind;
-        fun = NewFunctionWithProto(cx, NullPtr(), nullptr, 0, JSFunction::INTERPRETED,
+        fun = NewFunctionWithProto(cx, nullptr, 0, JSFunction::INTERPRETED,
                                    /* parent = */ NullPtr(), NullPtr(), proto,
                                    allocKind, TenuredObject);
         if (!fun)
@@ -648,7 +648,7 @@ js::CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFun
     gc::AllocKind allocKind = JSFunction::FinalizeKind;
     if (srcFun->isExtended())
         allocKind = JSFunction::ExtendedFinalizeKind;
-    RootedFunction clone(cx, NewFunctionWithProto(cx, NullPtr(), nullptr, 0,
+    RootedFunction clone(cx, NewFunctionWithProto(cx, nullptr, 0,
                                                   JSFunction::INTERPRETED, NullPtr(), NullPtr(),
                                                   cloneProto, allocKind, TenuredObject));
     if (!clone)
@@ -861,7 +861,7 @@ CreateFunctionConstructor(JSContext *cx, JSProtoKey key)
     RootedObject functionProto(cx, &global->getPrototype(JSProto_Function).toObject());
 
     RootedObject functionCtor(cx,
-      NewFunctionWithProto(cx, NullPtr(), Function, 1, JSFunction::NATIVE_CTOR,
+      NewFunctionWithProto(cx, Function, 1, JSFunction::NATIVE_CTOR,
                            global, HandlePropertyName(cx->names().Function),
                            functionProto, JSFunction::FinalizeKind, SingletonObject));
     if (!functionCtor)
@@ -883,7 +883,7 @@ CreateFunctionPrototype(JSContext *cx, JSProtoKey key)
      * give it the guts to be one.
      */
     JSObject *functionProto_ =
-        NewFunctionWithProto(cx, NullPtr(), nullptr, 0, JSFunction::INTERPRETED,
+        NewFunctionWithProto(cx, nullptr, 0, JSFunction::INTERPRETED,
                              self, NullPtr(), objectProto, JSFunction::FinalizeKind,
                              SingletonObject);
     if (!functionProto_)
@@ -951,7 +951,7 @@ CreateFunctionPrototype(JSContext *cx, JSProtoKey key)
     // creating that as far as the world is concerned, so things will get all
     // confused.
     RootedFunction throwTypeError(cx,
-      NewFunctionWithProto(cx, NullPtr(), ThrowTypeError, 0, JSFunction::NATIVE_FUN,
+      NewFunctionWithProto(cx, ThrowTypeError, 0, JSFunction::NATIVE_FUN,
                            self, NullPtr(), functionProto, JSFunction::FinalizeKind,
                            SingletonObject));
     if (!throwTypeError || !PreventExtensions(cx, throwTypeError))
@@ -1795,7 +1795,7 @@ js::fun_bind(JSContext* cx, HandleObject target, HandleValue thisArg,
     //  Step 4.
     JSFunction::Flags flags = target->isConstructor() ? JSFunction::NATIVE_CTOR
                                                       : JSFunction::NATIVE_FUN;
-    RootedFunction fun(cx, NewFunction(cx, js::NullPtr(), CallOrConstructBoundFunction, length,
+    RootedFunction fun(cx, NewFunction(cx, CallOrConstructBoundFunction, length,
                                        flags, cx->global(), nameAtom));
     if (!fun)
         return nullptr;
@@ -2041,7 +2041,7 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
         if (!proto)
             return false;
     }
-    RootedFunction fun(cx, NewFunctionWithProto(cx, js::NullPtr(), nullptr, 0,
+    RootedFunction fun(cx, NewFunctionWithProto(cx, nullptr, 0,
                                                 JSFunction::INTERPRETED_LAMBDA, global,
                                                 anonymousAtom, proto,
                                                 JSFunction::FinalizeKind, TenuredObject));
@@ -2092,17 +2092,17 @@ JSFunction::isBuiltinFunctionConstructor()
 }
 
 JSFunction *
-js::NewFunction(ExclusiveContext *cx, HandleObject funobjArg, Native native, unsigned nargs,
+js::NewFunction(ExclusiveContext *cx, Native native, unsigned nargs,
                 JSFunction::Flags flags, HandleObject parent, HandleAtom atom,
                 gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
                 NewObjectKind newKind /* = GenericObject */)
 {
-    return NewFunctionWithProto(cx, funobjArg, native, nargs, flags, parent, atom, NullPtr(),
+    return NewFunctionWithProto(cx, native, nargs, flags, parent, atom, NullPtr(),
                                 allocKind, newKind);
 }
 
 JSFunction *
-js::NewFunctionWithProto(ExclusiveContext *cx, HandleObject funobjArg, Native native,
+js::NewFunctionWithProto(ExclusiveContext *cx, Native native,
                          unsigned nargs, JSFunction::Flags flags, HandleObject parent,
                          HandleAtom atom, HandleObject proto,
                          gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
@@ -2112,23 +2112,18 @@ js::NewFunctionWithProto(ExclusiveContext *cx, HandleObject funobjArg, Native na
     MOZ_ASSERT(sizeof(JSFunction) <= gc::Arena::thingSize(JSFunction::FinalizeKind));
     MOZ_ASSERT(sizeof(FunctionExtended) <= gc::Arena::thingSize(JSFunction::ExtendedFinalizeKind));
 
-    RootedObject funobj(cx, funobjArg);
-    if (funobj) {
-        MOZ_ASSERT(funobj->is<JSFunction>());
-        funobj->assertParentIs(parent);
-        MOZ_ASSERT_IF(native, funobj->isSingleton());
-    } else {
-        // Don't mark asm.js module functions as singleton since they are
-        // cloned (via CloneFunctionObjectIfNotSingleton) which assumes that
-        // isSingleton implies isInterpreted.
-        if (native && !IsAsmJSModuleNative(native))
-            newKind = SingletonObject;
-        RootedObject realParent(cx, SkipScopeParent(parent));
-        funobj = NewObjectWithClassProto(cx, &JSFunction::class_, proto, realParent, allocKind,
-                                         newKind);
-        if (!funobj)
-            return nullptr;
-    }
+    RootedObject funobj(cx);
+    // Don't mark asm.js module functions as singleton since they are
+    // cloned (via CloneFunctionObjectIfNotSingleton) which assumes that
+    // isSingleton implies isInterpreted.
+    if (native && !IsAsmJSModuleNative(native))
+        newKind = SingletonObject;
+    RootedObject realParent(cx, SkipScopeParent(parent));
+    funobj = NewObjectWithClassProto(cx, &JSFunction::class_, proto, realParent, allocKind,
+                                     newKind);
+    if (!funobj)
+        return nullptr;
+
     RootedFunction fun(cx, &funobj->as<JSFunction>());
 
     if (allocKind == JSFunction::ExtendedFinalizeKind)
@@ -2311,7 +2306,7 @@ js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
     if (!atom)
         return nullptr;
 
-    RootedFunction fun(cx, NewFunction(cx, NullPtr(), native, nargs, funFlags, obj, atom,
+    RootedFunction fun(cx, NewFunction(cx, native, nargs, funFlags, obj, atom,
                                        allocKind, newKind));
     if (!fun)
         return nullptr;

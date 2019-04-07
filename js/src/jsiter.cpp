@@ -564,7 +564,7 @@ NewPropertyIteratorObject(JSContext* cx, unsigned flags)
         // next method on the prototype doesn't break cross-global for .. in.
         // We don't have to do this for JSITER_ENUMERATE because that object always
         // takes an optimized path.
-        RootedFunction next(cx, NewFunctionWithProto(cx, NullPtr(), legacy_iterator_next, 0,
+        RootedFunction next(cx, NewFunctionWithProto(cx, legacy_iterator_next, 0,
                                                      JSFunction::NATIVE_FUN, NullPtr(),
                                                      HandlePropertyName(cx->names().next),
                                                      NullPtr()));
