@@ -358,24 +358,24 @@ NewNativeObjectWithGivenTaggedProto(ExclusiveContext* cx, const Class* clasp,
     return MaybeNativeObject(NewObjectWithGivenTaggedProto(cx, clasp, proto, parent, newKind));
 }
 
-inline NativeObject*
-NewNativeObjectWithGivenProto(ExclusiveContext* cx, const Class* clasp,
-                              HandleObject proto, HandleObject parent,
+inline NativeObject *
+NewNativeObjectWithGivenProto(ExclusiveContext *cx, const Class *clasp,
+                              HandleObject proto,
                               gc::AllocKind allocKind, NewObjectKind newKind)
 {
-    return MaybeNativeObject(NewObjectWithGivenProto(cx, clasp, proto, parent, allocKind, newKind));
+    return MaybeNativeObject(NewObjectWithGivenProto(cx, clasp, proto, NullPtr(), allocKind, newKind));
 }
 
-inline NativeObject*
-NewNativeObjectWithGivenProto(ExclusiveContext* cx, const Class* clasp,
-                              HandleObject proto, HandleObject parent,
+inline NativeObject *
+NewNativeObjectWithGivenProto(ExclusiveContext *cx, const Class *clasp,
+                              HandleObject proto,
                               NewObjectKind newKind = GenericObject)
 {
-    return MaybeNativeObject(NewObjectWithGivenProto(cx, clasp, proto, parent, newKind));
+    return MaybeNativeObject(NewObjectWithGivenProto(cx, clasp, proto, NullPtr(), newKind));
 }
 
-inline NativeObject*
-NewNativeObjectWithClassProto(ExclusiveContext* cx, const Class* clasp, HandleObject proto,
+inline NativeObject *
+NewNativeObjectWithClassProto(ExclusiveContext *cx, const Class *clasp, HandleObject proto,
                               HandleObject parent, gc::AllocKind allocKind,
                               NewObjectKind newKind = GenericObject)
 {

@@ -450,7 +450,7 @@ CreateBlankProto(JSContext *cx, const Class *clasp, HandleObject proto, HandleOb
 {
     MOZ_ASSERT(clasp != &JSFunction::class_);
 
-    RootedNativeObject blankProto(cx, NewNativeObjectWithGivenProto(cx, clasp, proto, global,
+    RootedNativeObject blankProto(cx, NewNativeObjectWithGivenProto(cx, clasp, proto,
                                                                     SingletonObject));
     if (!blankProto || !blankProto->setDelegate(cx))
         return nullptr;
@@ -532,8 +532,7 @@ GlobalObject::getOrCreateDebuggers(JSContext* cx, Handle<GlobalObject*> global)
     if (debuggers)
         return debuggers;
 
-    NativeObject* obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, NullPtr(),
-                                                      global);
+    NativeObject *obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, NullPtr());
     if (!obj)
         return nullptr;
     debuggers = cx->new_<DebuggerVector>();
