@@ -2128,7 +2128,7 @@ Debugger::markCrossCompartmentEdges(JSTracer* trc)
  * pointers in zones that are not currently being compacted.
  */
 /* static */ void
-Debugger::markIncomingCrossCompartmentEdges(JSTracer *trc)
+Debugger::markAllCrossCompartmentEdges(JSTracer *trc)
 {
     JSRuntime *rt = trc->runtime();
     gc::State state = rt->gc.state();
