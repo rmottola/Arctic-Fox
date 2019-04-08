@@ -121,9 +121,7 @@
 - Bug 1142311 part 1 to 2
 - Bug 1137844 2015-03-13 par 0 to 4
 - Bug 1135897 - Use unboxed objects for JSON objects and constant liter
-- Bug 1142282 - 2015-03-12 1 to 3
-- Bug 1140586 - 2015-03-12 5 to 5
-- Bug 1140643 - JitcodeGlobalMap marking must participate in iterative 
+- Bug 1142282 - 2015-03-12 2 to 3
 
 
 To verify:
