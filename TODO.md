@@ -124,7 +124,9 @@
 - Bug 1142282 - 2015-03-12 1 to 3
 - Bug 1140586 - 2015-03-12 5 to 5
 - Bug 1140643 - JitcodeGlobalMap marking must participate in iterative 
-- Bug 1139832 - Restrict compacting GC zealousness to zeal collections
+
+
+To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
 
 
