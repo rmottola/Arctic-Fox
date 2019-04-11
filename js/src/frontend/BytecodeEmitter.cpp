@@ -245,7 +245,7 @@ UpdateDepth(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t target)
 
 #ifdef DEBUG
 static bool
-CheckStrictOrSloppy(BytecodeEmitter* bce, JSOp op)
+CheckStrictOrSloppy(BytecodeEmitter *bce, JSOp op)
 {
     if (IsCheckStrictOp(op) && !bce->sc->strict())
         return false;
@@ -4329,7 +4329,7 @@ ParseNode::getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObje
             return false;
 
         RootedValue value(cx), idvalue(cx);
-        for (ParseNode* pn = pn_head; pn; pn = pn->pn_next) {
+        for (ParseNode *pn = pn_head; pn; pn = pn->pn_next) {
             if (!pn->pn_right->getConstantValue(cx, allowObjects, &value))
                 return false;
             if (value.isMagic(JS_GENERIC_MAGIC)) {
@@ -4337,7 +4337,7 @@ ParseNode::getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObje
                 return true;
             }
 
-            ParseNode* pnid = pn->pn_left;
+            ParseNode *pnid = pn->pn_left;
             if (pnid->isKind(PNK_NUMBER)) {
                 idvalue = NumberValue(pnid->pn_dval);
             } else {
@@ -4354,7 +4354,7 @@ ParseNode::getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObje
                 continue;
             }
 
-            JSAtom* name = ToAtom<CanGC>(cx, idvalue);
+            JSAtom *name = ToAtom<CanGC>(cx, idvalue);
             if (!name)
                 return false;
 
@@ -7768,13 +7768,13 @@ CGObjectList::indexOf(JSObject* obj)
 }
 
 void
-CGObjectList::finish(ObjectArray* array)
+CGObjectList::finish(ObjectArray *array)
 {
     MOZ_ASSERT(length <= INDEX_LIMIT);
     MOZ_ASSERT(length == array->length);
 
-    js::HeapPtrNativeObject* cursor = array->vector + array->length;
-    ObjectBox* objbox = lastbox;
+    js::HeapPtrNativeObject *cursor = array->vector + array->length;
+    ObjectBox *objbox = lastbox;
     do {
         --cursor;
         MOZ_ASSERT(!*cursor);

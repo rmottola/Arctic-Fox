@@ -1929,7 +1929,7 @@ CodeGenerator::visitTableSwitchV(LTableSwitchV* ins)
     emitTableSwitchDispatch(mir, index, ToRegisterOrInvalid(ins->tempPointer()));
 }
 
-typedef NativeObject* (*DeepCloneObjectLiteralFn)(JSContext*, HandleNativeObject, NewObjectKind);
+typedef NativeObject *(*DeepCloneObjectLiteralFn)(JSContext *, HandleNativeObject, NewObjectKind);
 static const VMFunction DeepCloneObjectLiteralInfo =
     FunctionInfo<DeepCloneObjectLiteralFn>(DeepCloneObjectLiteral);
 
@@ -4380,7 +4380,7 @@ CodeGenerator::visitSimdBox(LSimdBox* lir)
     FloatRegister in = ToFloatRegister(lir->input());
     Register object = ToRegister(lir->output());
     Register temp = ToRegister(lir->temp());
-    InlineTypedObject* templateObject = lir->mir()->templateObject();
+    InlineTypedObject *templateObject = lir->mir()->templateObject();
     gc::InitialHeap initialHeap = lir->mir()->initialHeap();
     MIRType type = lir->mir()->input()->type();
     registerSimdTemplate(templateObject);

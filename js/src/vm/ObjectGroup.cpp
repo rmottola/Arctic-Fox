@@ -847,27 +847,27 @@ ObjectGroup::setGroupToHomogenousArray(ExclusiveContext *cx, JSObject *obj,
  */
 struct ObjectGroupCompartment::PlainObjectKey
 {
-    jsid* properties;
+    jsid *properties;
     uint32_t nproperties;
     uint32_t nfixed;
 
     struct Lookup {
-        IdValuePair* properties;
+        IdValuePair *properties;
         uint32_t nproperties;
         uint32_t nfixed;
 
-        Lookup(IdValuePair* properties, uint32_t nproperties, uint32_t nfixed)
+        Lookup(IdValuePair *properties, uint32_t nproperties, uint32_t nfixed)
           : properties(properties), nproperties(nproperties), nfixed(nfixed)
         {}
     };
 
-    static inline HashNumber hash(const Lookup& lookup) {
+    static inline HashNumber hash(const Lookup &lookup) {
         return (HashNumber) (JSID_BITS(lookup.properties[lookup.nproperties - 1].id) ^
                              lookup.nproperties ^
                              lookup.nfixed);
     }
 
-    static inline bool match(const PlainObjectKey& v, const Lookup& lookup) {
+    static inline bool match(const PlainObjectKey &v, const Lookup &lookup) {
         if (lookup.nproperties != v.nproperties || lookup.nfixed != v.nfixed)
             return false;
         for (size_t i = 0; i < lookup.nproperties; i++) {
@@ -886,8 +886,8 @@ struct ObjectGroupCompartment::PlainObjectEntry
 };
 
 /* static */ void
-ObjectGroupCompartment::updatePlainObjectEntryTypes(ExclusiveContext* cx, PlainObjectEntry& entry,
-                                                    IdValuePair* properties, size_t nproperties)
+ObjectGroupCompartment::updatePlainObjectEntryTypes(ExclusiveContext *cx, PlainObjectEntry &entry,
+                                                    IdValuePair *properties, size_t nproperties)
 {
     if (entry.group->unknownProperties())
         return;
@@ -913,11 +913,11 @@ ObjectGroupCompartment::updatePlainObjectEntryTypes(ExclusiveContext* cx, PlainO
 }
 
 /* static */ void
-ObjectGroup::fixPlainObjectGroup(ExclusiveContext* cx, PlainObject* obj)
+ObjectGroup::fixPlainObjectGroup(ExclusiveContext *cx, PlainObject *obj)
 {
     AutoEnterAnalysis enter(cx);
 
-    ObjectGroupCompartment::PlainObjectTable*& table =
+    ObjectGroupCompartment::PlainObjectTable *&table =
         cx->compartment()->objectGroups.plainObjectTable;
 
     if (!table) {

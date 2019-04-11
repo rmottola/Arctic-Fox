@@ -1142,7 +1142,7 @@ enum NewObjectKind {
 };
 
 inline gc::InitialHeap
-GetInitialHeap(NewObjectKind newKind, const Class* clasp)
+GetInitialHeap(NewObjectKind newKind, const Class *clasp)
 {
     if (newKind != GenericObject)
         return gc::TenuredHeap;
@@ -1158,18 +1158,18 @@ CreateThisForFunctionWithProto(JSContext* cx, js::HandleObject callee, HandleObj
                                NewObjectKind newKind = GenericObject);
 
 // Specialized call for constructing |this| with a known function callee.
-extern JSObject*
+extern JSObject *
 CreateThisForFunction(JSContext* cx, js::HandleObject callee, NewObjectKind newKind);
 
 // Generic call for constructing |this|.
-extern JSObject*
-CreateThis(JSContext* cx, const js::Class* clasp, js::HandleObject callee);
+extern JSObject *
+CreateThis(JSContext *cx, const js::Class* clasp, js::HandleObject callee);
 
-extern JSObject*
-CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto);
+extern JSObject *
+CloneObject(JSContext *cx, HandleObject obj, Handle<js::TaggedProto> proto);
 
-extern NativeObject*
-DeepCloneObjectLiteral(JSContext* cx, HandleNativeObject obj, NewObjectKind newKind = GenericObject);
+extern NativeObject *
+DeepCloneObjectLiteral(JSContext *cx, HandleNativeObject obj, NewObjectKind newKind = GenericObject);
 
 extern bool
 DefineProperties(JSContext *cx, HandleObject obj, HandleObject props);

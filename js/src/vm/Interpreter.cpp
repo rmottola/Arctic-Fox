@@ -2777,7 +2777,7 @@ END_CASE(JSOP_GETNAME)
 
 CASE(JSOP_GETINTRINSIC)
 {
-    RootedValue& rval = rootValue0;
+    RootedValue &rval = rootValue0;
 
     if (!GetIntrinsicOperation(cx, REGS.pc, &rval))
         goto error;
@@ -2834,10 +2834,10 @@ END_CASE(JSOP_SYMBOL)
 
 CASE(JSOP_OBJECT)
 {
-    RootedNativeObject& ref = rootNativeObject0;
+    RootedNativeObject &ref = rootNativeObject0;
     ref = script->getObject(REGS.pc);
     if (JS::CompartmentOptionsRef(cx).cloneSingletons()) {
-        JSObject* obj = js::DeepCloneObjectLiteral(cx, ref, js::MaybeSingletonObject);
+        JSObject *obj = js::DeepCloneObjectLiteral(cx, ref, js::MaybeSingletonObject);
         if (!obj)
             goto error;
         PUSH_OBJECT(*obj);

@@ -829,26 +829,26 @@ class MacroAssembler : public MacroAssemblerSpecific
                                     const Value &v);
     void fillSlotsWithUndefined(Address addr, Register temp, uint32_t start, uint32_t end);
     void fillSlotsWithUninitialized(Address addr, Register temp, uint32_t start, uint32_t end);
-    void initGCSlots(Register obj, Register temp, NativeObject* templateObj, bool initFixedSlots);
+    void initGCSlots(Register obj, Register temp, NativeObject *templateObj, bool initFixedSlots);
 
   public:
-    void callMallocStub(size_t nbytes, Register result, Label* fail);
+    void callMallocStub(size_t nbytes, Register result, Label *fail);
     void callFreeStub(Register slots);
-    void createGCObject(Register result, Register temp, JSObject* templateObj,
-                        gc::InitialHeap initialHeap, Label* fail, bool initFixedSlots = true);
+    void createGCObject(Register result, Register temp, JSObject *templateObj,
+                        gc::InitialHeap initialHeap, Label *fail, bool initFixedSlots = true);
 
-    void newGCThing(Register result, Register temp, JSObject* templateObj,
-                     gc::InitialHeap initialHeap, Label* fail);
-    void initGCThing(Register obj, Register temp, JSObject* templateObj,
+    void newGCThing(Register result, Register temp, JSObject *templateObj,
+                     gc::InitialHeap initialHeap, Label *fail);
+    void initGCThing(Register obj, Register temp, JSObject *templateObj,
                      bool initFixedSlots = true);
 
-    void newGCString(Register result, Register temp, Label* fail);
-    void newGCFatInlineString(Register result, Register temp, Label* fail);
+    void newGCString(Register result, Register temp, Label *fail);
+    void newGCFatInlineString(Register result, Register temp, Label *fail);
 
     // Compares two strings for equality based on the JSOP.
     // This checks for identical pointers, atoms and length and fails for everything else.
     void compareStrings(JSOp op, Register left, Register right, Register result,
-                        Label* fail);
+                        Label *fail);
 
     // If the JitCode that created this assembler needs to transition into the VM,
     // we want to store the JitCode on the stack in order to mark it during a GC.

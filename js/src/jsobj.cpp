@@ -1731,8 +1731,8 @@ js::CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto)
     return clone;
 }
 
-NativeObject*
-js::DeepCloneObjectLiteral(JSContext* cx, HandleNativeObject obj, NewObjectKind newKind)
+NativeObject *
+js::DeepCloneObjectLiteral(JSContext *cx, HandleNativeObject obj, NewObjectKind newKind)
 {
     /* NB: Keep this in sync with XDRObjectLiteral. */
     MOZ_ASSERT_IF(obj->isSingleton(),
@@ -1870,11 +1870,11 @@ JS_InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
 
 template<XDRMode mode>
 bool
-js::XDRObjectLiteral(XDRState<mode>* xdr, MutableHandleNativeObject obj)
+js::XDRObjectLiteral(XDRState<mode> *xdr, MutableHandleNativeObject obj)
 {
     /* NB: Keep this in sync with DeepCloneObjectLiteral. */
 
-    JSContext* cx = xdr->cx();
+    JSContext *cx = xdr->cx();
     MOZ_ASSERT_IF(mode == XDR_ENCODE && obj->isSingleton(),
                   JS::CompartmentOptionsRef(cx).getSingletonsAsTemplates());
 
@@ -2103,7 +2103,7 @@ js::XDRObjectLiteral(XDRState<mode>* xdr, MutableHandleNativeObject obj)
 }
 
 template bool
-js::XDRObjectLiteral(XDRState<XDR_ENCODE>* xdr, MutableHandleNativeObject obj);
+js::XDRObjectLiteral(XDRState<XDR_ENCODE> *xdr, MutableHandleNativeObject obj);
 
 template bool
 js::XDRObjectLiteral(XDRState<XDR_DECODE> *xdr, MutableHandleNativeObject obj);

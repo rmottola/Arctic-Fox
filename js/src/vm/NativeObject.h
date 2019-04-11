@@ -693,10 +693,10 @@ class NativeObject : public JSObject
                                                 HandleShape shape, unsigned attrs);
 
     /* Remove the property named by id from this object. */
-    bool removeProperty(ExclusiveContext* cx, jsid id);
+    bool removeProperty(ExclusiveContext *cx, jsid id);
 
     /* Clear the scope, making it empty. */
-    static void clear(JSContext* cx, HandleNativeObject obj);
+    static void clear(JSContext *cx, HandleNativeObject obj);
 
   protected:
     /*

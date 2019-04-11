@@ -80,7 +80,7 @@ class UnboxedLayout : public mozilla::LinkedListElement<UnboxedLayout>
     HeapPtrObjectGroup replacementNewGroup_;
 
   public:
-    UnboxedLayout(const PropertyVector& properties, size_t size)
+    UnboxedLayout(const PropertyVector &properties, size_t size)
       : size_(size), newScript_(nullptr), traceList_(nullptr),
         nativeGroup_(nullptr), nativeShape_(nullptr), replacementNewGroup_(nullptr)
     {
@@ -138,11 +138,11 @@ class UnboxedLayout : public mozilla::LinkedListElement<UnboxedLayout>
 
     inline gc::AllocKind getAllocKind() const;
 
-    void trace(JSTracer* trc);
+    void trace(JSTracer *trc);
 
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
 
-    static bool makeNativeGroup(JSContext* cx, ObjectGroup* group);
+    static bool makeNativeGroup(JSContext *cx, ObjectGroup *group);
 };
 
 // Class for a plain object using an unboxed representation. The physical
@@ -193,13 +193,13 @@ class UnboxedPlainObject : public JSObject
         return &data_[0];
     }
 
-    bool setValue(JSContext* cx, const UnboxedLayout::Property& property, const Value& v);
-    Value getValue(const UnboxedLayout::Property& property);
+    bool setValue(JSContext *cx, const UnboxedLayout::Property &property, const Value &v);
+    Value getValue(const UnboxedLayout::Property &property);
 
-    static bool convertToNative(JSContext* cx, JSObject* obj);
-    static UnboxedPlainObject* create(JSContext* cx, HandleObjectGroup group, NewObjectKind newKind);
+    static bool convertToNative(JSContext *cx, JSObject *obj);
+    static UnboxedPlainObject* create(JSContext *cx, HandleObjectGroup group, NewObjectKind newKind);
 
-    static void trace(JSTracer* trc, JSObject* object);
+    static void trace(JSTracer *trc, JSObject *object);
 
     static size_t offsetOfData() {
         return offsetof(UnboxedPlainObject, data_[0]);
@@ -210,8 +210,8 @@ class UnboxedPlainObject : public JSObject
 // provided they all match the template shape. If successful, converts the
 // preliminary objects and their group to the new unboxed representation.
 bool
-TryConvertToUnboxedLayout(JSContext* cx, Shape* templateShape,
-                          ObjectGroup* group, PreliminaryObjectArray* objects);
+TryConvertToUnboxedLayout(JSContext *cx, Shape *templateShape,
+                          ObjectGroup *group, PreliminaryObjectArray *objects);
 
 inline gc::AllocKind
 UnboxedLayout::getAllocKind() const

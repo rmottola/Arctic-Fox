@@ -62,9 +62,9 @@ UnboxedLayout::setNewScript(TypeNewScript* newScript, bool writeBarrier /* = tru
 /////////////////////////////////////////////////////////////////////
 
 bool
-UnboxedPlainObject::setValue(JSContext* cx, const UnboxedLayout::Property& property, const Value& v)
+UnboxedPlainObject::setValue(JSContext *cx, const UnboxedLayout::Property &property, const Value &v)
 {
-    uint8_t* p = &data_[property.offset];
+    uint8_t *p = &data_[property.offset];
 
     switch (property.type) {
       case JSVAL_TYPE_BOOLEAN:
@@ -532,8 +532,8 @@ PropertiesAreSuperset(const UnboxedLayout::PropertyVector& properties, UnboxedLa
 }
 
 bool
-js::TryConvertToUnboxedLayout(JSContext* cx, Shape* templateShape,
-                              ObjectGroup* group, PreliminaryObjectArray* objects)
+js::TryConvertToUnboxedLayout(JSContext *cx, Shape *templateShape,
+                              ObjectGroup *group, PreliminaryObjectArray *objects)
 {
     if (!cx->runtime()->options().unboxedObjects())
         return true;

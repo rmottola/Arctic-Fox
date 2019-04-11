@@ -1038,8 +1038,8 @@ MacroAssembler::newGCThing(Register result, Register temp, JSObject *templateObj
 }
 
 void
-MacroAssembler::createGCObject(Register obj, Register temp, JSObject* templateObj,
-                               gc::InitialHeap initialHeap, Label* fail, bool initFixedSlots)
+MacroAssembler::createGCObject(Register obj, Register temp, JSObject *templateObj,
+                               gc::InitialHeap initialHeap, Label *fail, bool initFixedSlots)
 {
     gc::AllocKind allocKind = templateObj->asTenured().getAllocKind();
     MOZ_ASSERT(allocKind <= gc::AllocKind::OBJECT_LAST);

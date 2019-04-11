@@ -530,10 +530,10 @@ XDRRelazificationInfo(XDRState<mode>* xdr, HandleFunction fun, HandleScript scri
 }
 
 static inline uint32_t
-FindScopeObjectIndex(JSScript* script, NestedScopeObject& scope)
+FindScopeObjectIndex(JSScript *script, NestedScopeObject& scope)
 {
-    ObjectArray* objects = script->objects();
-    HeapPtrNativeObject* vector = objects->vector;
+    ObjectArray *objects = script->objects();
+    HeapPtrNativeObject *vector = objects->vector;
     unsigned length = objects->length;
     for (unsigned i = 0; i < length; ++i) {
         if (vector[i] == &scope)
@@ -905,11 +905,11 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
      * after the enclosing block has been XDR'd.
      */
     for (i = 0; i != nobjects; ++i) {
-        HeapPtrNativeObject* objp = &script->objects()->vector[i];
+        HeapPtrNativeObject *objp = &script->objects()->vector[i];
         XDRClassKind classk;
 
         if (mode == XDR_ENCODE) {
-            JSObject* obj = *objp;
+            JSObject *obj = *objp;
             if (obj->is<BlockObject>())
                 classk = CK_BlockObject;
             else if (obj->is<StaticWithObject>())
@@ -2480,25 +2480,25 @@ JSScript::partiallyInit(ExclusiveContext* cx, HandleScript script, uint32_t ncon
     if (nconsts != 0) {
         MOZ_ASSERT(reinterpret_cast<uintptr_t>(cursor) % sizeof(jsval) == 0);
         script->consts()->length = nconsts;
-        script->consts()->vector = (HeapValue*)cursor;
+        script->consts()->vector = (HeapValue *)cursor;
         cursor += nconsts * sizeof(script->consts()->vector[0]);
     }
 
     if (nobjects != 0) {
         script->objects()->length = nobjects;
-        script->objects()->vector = (HeapPtrNativeObject*)cursor;
+        script->objects()->vector = (HeapPtrNativeObject *)cursor;
         cursor += nobjects * sizeof(script->objects()->vector[0]);
     }
 
     if (nregexps != 0) {
         script->regexps()->length = nregexps;
-        script->regexps()->vector = (HeapPtrNativeObject*)cursor;
+        script->regexps()->vector = (HeapPtrNativeObject *)cursor;
         cursor += nregexps * sizeof(script->regexps()->vector[0]);
     }
 
     if (ntrynotes != 0) {
         script->trynotes()->length = ntrynotes;
-        script->trynotes()->vector = reinterpret_cast<JSTryNote*>(cursor);
+        script->trynotes()->vector = reinterpret_cast<JSTryNote *>(cursor);
         size_t vectorSize = ntrynotes * sizeof(script->trynotes()->vector[0]);
 #ifdef DEBUG
         memset(cursor, 0, vectorSize);
@@ -2988,7 +2988,7 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
 
     AutoObjectVector objects(cx);
     if (nobjects != 0) {
-        HeapPtrNativeObject* vector = src->objects()->vector;
+        HeapPtrNativeObject *vector = src->objects()->vector;
         for (unsigned i = 0; i < nobjects; i++) {
             RootedObject obj(cx, vector[i]);
             RootedObject clone(cx);
@@ -3043,9 +3043,9 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
 
     AutoObjectVector regexps(cx);
     for (unsigned i = 0; i < nregexps; i++) {
-        HeapPtrNativeObject* vector = src->regexps()->vector;
+        HeapPtrNativeObject *vector = src->regexps()->vector;
         for (unsigned i = 0; i < nregexps; i++) {
-            JSObject* clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
+            JSObject *clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
             if (!clone || !regexps.append(clone))
                 return nullptr;
         }
@@ -3133,13 +3133,13 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
             MOZ_ASSERT_IF(vector[i].isMarkable(), vector[i].toString()->isAtom());
     }
     if (nobjects != 0) {
-        HeapPtrNativeObject* vector = Rebase<HeapPtrNativeObject>(dst, src, src->objects()->vector);
+        HeapPtrNativeObject *vector = Rebase<HeapPtrNativeObject>(dst, src, src->objects()->vector);
         dst->objects()->vector = vector;
         for (unsigned i = 0; i < nobjects; ++i)
             vector[i].init(&objects[i]->as<NativeObject>());
     }
     if (nregexps != 0) {
-        HeapPtrNativeObject* vector = Rebase<HeapPtrNativeObject>(dst, src, src->regexps()->vector);
+        HeapPtrNativeObject *vector = Rebase<HeapPtrNativeObject>(dst, src, src->regexps()->vector);
         dst->regexps()->vector = vector;
         for (unsigned i = 0; i < nregexps; ++i)
             vector[i].init(&regexps[i]->as<NativeObject>());

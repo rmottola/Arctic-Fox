@@ -1361,7 +1361,7 @@ BaselineCompiler::emit_JSOP_SYMBOL()
     return true;
 }
 
-typedef NativeObject* (*DeepCloneObjectLiteralFn)(JSContext*, HandleNativeObject, NewObjectKind);
+typedef NativeObject *(*DeepCloneObjectLiteralFn)(JSContext *, HandleNativeObject, NewObjectKind);
 static const VMFunction DeepCloneObjectLiteralInfo =
     FunctionInfo<DeepCloneObjectLiteralFn>(DeepCloneObjectLiteral);
 

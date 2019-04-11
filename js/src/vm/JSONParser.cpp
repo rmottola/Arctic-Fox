@@ -577,15 +577,15 @@ JSONParser<CharT>::advanceAfterProperty()
     return token(Error);
 }
 
-JSObject*
-JSONParserBase::createFinishedObject(PropertyVector& properties)
+JSObject *
+JSONParserBase::createFinishedObject(PropertyVector &properties)
 {
     /*
      * Look for an existing cached group and shape for objects with this set of
      * properties.
      */
     {
-        JSObject* obj = ObjectGroup::newPlainObject(cx, properties.begin(),
+        JSObject *obj = ObjectGroup::newPlainObject(cx, properties.begin(),
                                                     properties.length());
         if (obj)
             return obj;
@@ -621,11 +621,11 @@ JSONParserBase::createFinishedObject(PropertyVector& properties)
 }
 
 inline bool
-JSONParserBase::finishObject(MutableHandleValue vp, PropertyVector& properties)
+JSONParserBase::finishObject(MutableHandleValue vp, PropertyVector &properties)
 {
     MOZ_ASSERT(&properties == &stack.back().properties());
 
-    JSObject* obj = createFinishedObject(properties);
+    JSObject *obj = createFinishedObject(properties);
     if (!obj)
         return false;
 

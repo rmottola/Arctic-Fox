@@ -593,13 +593,13 @@ class ObjectGroup : public gc::TenuredCell
 
     // Update the group of a freshly created array or plain object according to
     // the object's current contents.
-    static void fixArrayGroup(ExclusiveContext* cx, ArrayObject* obj);
-    static void fixPlainObjectGroup(ExclusiveContext* cx, PlainObject* obj);
+    static void fixArrayGroup(ExclusiveContext *cx, ArrayObject *obj);
+    static void fixPlainObjectGroup(ExclusiveContext *cx, PlainObject *obj);
 
     // Update the group of a freshly created 'rest' arguments object.
-    static void fixRestArgumentsGroup(ExclusiveContext* cx, ArrayObject* obj);
+    static void fixRestArgumentsGroup(ExclusiveContext *cx, ArrayObject *obj);
 
-    static PlainObject* newPlainObject(JSContext* cx, IdValuePair* properties, size_t nproperties);
+    static PlainObject *newPlainObject(JSContext *cx, IdValuePair *properties, size_t nproperties);
 
     // Static accessors for ObjectGroupCompartment AllocationSiteTable.
 
@@ -719,10 +719,10 @@ class ObjectGroupCompartment
     void sweepNewTable(NewTable* table);
     void fixupNewTableAfterMovingGC(NewTable* table);
 
-    static void newTablePostBarrier(ExclusiveContext* cx, NewTable* table,
-                                    const Class* clasp, TaggedProto proto, JSObject* associated);
-    static void updatePlainObjectEntryTypes(ExclusiveContext* cx, PlainObjectEntry& entry,
-                                            IdValuePair* properties, size_t nproperties);
+    static void newTablePostBarrier(ExclusiveContext *cx, NewTable *table,
+                                    const Class *clasp, TaggedProto proto, JSObject *associated);
+    static void updatePlainObjectEntryTypes(ExclusiveContext *cx, PlainObjectEntry &entry,
+                                            IdValuePair *properties, size_t nproperties);
 };
 
 } // namespace js
