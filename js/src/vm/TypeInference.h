@@ -810,7 +810,7 @@ class PreliminaryObjectArrayWithTemplate : public PreliminaryObjectArray
         return shape_;
     }
 
-    void maybeAnalyze(JSContext *cx, ObjectGroup *group, bool force = false);
+    void maybeAnalyze(ExclusiveContext *cx, ObjectGroup *group, bool force = false);
 
     void trace(JSTracer *trc);
 
