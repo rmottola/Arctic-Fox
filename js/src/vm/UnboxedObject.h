@@ -199,7 +199,7 @@ class UnboxedPlainObject : public JSObject
     Value getValue(const UnboxedLayout::Property &property);
 
     static bool convertToNative(JSContext *cx, JSObject *obj);
-    static UnboxedPlainObject* create(JSContext *cx, HandleObjectGroup group, NewObjectKind newKind);
+    static UnboxedPlainObject *create(JSContext *cx, HandleObjectGroup group, NewObjectKind newKind);
 
     static void trace(JSTracer *trc, JSObject *object);
 

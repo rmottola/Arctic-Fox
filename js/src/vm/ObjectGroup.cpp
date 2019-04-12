@@ -944,9 +944,9 @@ ObjectGroup::fixPlainObjectGroup(ExclusiveContext *cx, PlainObject *obj)
     if (!properties.resize(obj->slotSpan()))
         return;
 
-    Shape* shape = obj->lastProperty();
+    Shape *shape = obj->lastProperty();
     while (!shape->isEmptyShape()) {
-        IdValuePair& entry = properties[shape->slot()];
+        IdValuePair &entry = properties[shape->slot()];
         entry.id = shape->propid();
         entry.value = obj->getSlot(shape->slot());
         shape = shape->previous();
@@ -969,7 +969,7 @@ ObjectGroup::fixPlainObjectGroup(ExclusiveContext *cx, PlainObject *obj)
 
     /* Make a new type to use for the object and similar future ones. */
     Rooted<TaggedProto> objProto(cx, obj->getTaggedProto());
-    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, objProto);
+    ObjectGroup *group = ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, objProto);
     if (!group || !group->addDefiniteProperties(cx, obj->lastProperty()))
         return;
 
@@ -1011,12 +1011,12 @@ ObjectGroup::fixPlainObjectGroup(ExclusiveContext *cx, PlainObject *obj)
     }
 }
 
-/* static */ PlainObject*
-ObjectGroup::newPlainObject(JSContext* cx, IdValuePair* properties, size_t nproperties)
+/* static */ PlainObject *
+ObjectGroup::newPlainObject(JSContext *cx, IdValuePair *properties, size_t nproperties)
 {
     AutoEnterAnalysis enter(cx);
 
-    ObjectGroupCompartment::PlainObjectTable* table =
+    ObjectGroupCompartment::PlainObjectTable *table =
         cx->compartment()->objectGroups.plainObjectTable;
 
     if (!table)

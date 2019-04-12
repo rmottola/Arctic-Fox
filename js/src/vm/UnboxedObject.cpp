@@ -307,13 +307,13 @@ UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
 }
 
 /* static */
-UnboxedPlainObject*
-UnboxedPlainObject::create(JSContext* cx, HandleObjectGroup group, NewObjectKind newKind)
+UnboxedPlainObject *
+UnboxedPlainObject::create(JSContext *cx, HandleObjectGroup group, NewObjectKind newKind)
 {
     MOZ_ASSERT(group->clasp() == &class_);
     gc::AllocKind allocKind = group->unboxedLayout().getAllocKind();
 
-    UnboxedPlainObject* res = NewObjectWithGroup<UnboxedPlainObject>(cx, group, cx->global(),
+    UnboxedPlainObject *res = NewObjectWithGroup<UnboxedPlainObject>(cx, group, cx->global(),
                                                                      allocKind, newKind);
     if (!res)
         return nullptr;
@@ -345,7 +345,7 @@ UnboxedPlainObject::create(JSContext* cx, HandleObjectGroup group, NewObjectKind
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_lookupProperty(JSContext* cx, HandleObject obj,
+UnboxedPlainObject::obj_lookupProperty(JSContext *cx, HandleObject obj,
                                        HandleId id, MutableHandleObject objp,
                                        MutableHandleShape propp)
 {

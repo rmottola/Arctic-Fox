@@ -1569,7 +1569,7 @@ class JSScript : public js::gc::TenuredCell
         return savedCallerFun() ? 1 : 0;
     }
 
-    js::NativeObject *getObject(jsbytecode* pc) {
+    js::NativeObject *getObject(jsbytecode *pc) {
         MOZ_ASSERT(containsPC(pc) && containsPC(pc + sizeof(uint32_t)));
         return getObject(GET_UINT32_INDEX(pc));
     }
