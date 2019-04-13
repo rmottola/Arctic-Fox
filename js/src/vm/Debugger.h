@@ -195,6 +195,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         OnNewGlobalObject,
         OnNewPromise,
         OnPromiseSettled,
+        OnGarbageCollection,
         HookCount
     };
     enum {
