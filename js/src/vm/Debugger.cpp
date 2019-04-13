@@ -2466,7 +2466,7 @@ Debugger::setEnabled(JSContext* cx, unsigned argc, Value* vp)
 }
 
 /* static */ bool
-Debugger::getHookImpl(JSContext* cx, unsigned argc, Value* vp, Hook which)
+Debugger::getHookImpl(JSContext *cx, unsigned argc, Value *vp, Hook which)
 {
     MOZ_ASSERT(which >= 0 && which < HookCount);
     THIS_DEBUGGER(cx, argc, vp, "getHook", args, dbg);
@@ -2475,7 +2475,7 @@ Debugger::getHookImpl(JSContext* cx, unsigned argc, Value* vp, Hook which)
 }
 
 /* static */ bool
-Debugger::setHookImpl(JSContext* cx, unsigned argc, Value* vp, Hook which)
+Debugger::setHookImpl(JSContext *cx, unsigned argc, Value *vp, Hook which)
 {
     MOZ_ASSERT(which >= 0 && which < HookCount);
     THIS_DEBUGGER(cx, argc, vp, "setHook", args, dbg);
@@ -2498,85 +2498,85 @@ Debugger::setHookImpl(JSContext* cx, unsigned argc, Value* vp, Hook which)
 }
 
 /* static */ bool
-Debugger::getOnDebuggerStatement(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnDebuggerStatement(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnDebuggerStatement);
 }
 
 /* static */ bool
-Debugger::setOnDebuggerStatement(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnDebuggerStatement(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnDebuggerStatement);
 }
 
 /* static */ bool
-Debugger::getOnExceptionUnwind(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnExceptionUnwind(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnExceptionUnwind);
 }
 
 /* static */ bool
-Debugger::setOnExceptionUnwind(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnExceptionUnwind(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnExceptionUnwind);
 }
 
 /* static */ bool
-Debugger::getOnNewScript(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnNewScript(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnNewScript);
 }
 
 /* static */ bool
-Debugger::setOnNewScript(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnNewScript(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnNewScript);
 }
 
 /* static */ bool
-Debugger::getOnNewPromise(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnNewPromise(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnNewPromise);
 }
 
 /* static */ bool
-Debugger::setOnNewPromise(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnNewPromise(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnNewPromise);
 }
 
 /* static */ bool
-Debugger::getOnPromiseSettled(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnPromiseSettled(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnPromiseSettled);
 }
 
 /* static */ bool
-Debugger::setOnPromiseSettled(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnPromiseSettled(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnPromiseSettled);
 }
 
 /* static */ bool
-Debugger::getOnEnterFrame(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnEnterFrame(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnEnterFrame);
 }
 
 /* static */ bool
-Debugger::setOnEnterFrame(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnEnterFrame(JSContext *cx, unsigned argc, Value *vp)
 {
     return setHookImpl(cx, argc, vp, OnEnterFrame);
 }
 
 /* static */ bool
-Debugger::getOnNewGlobalObject(JSContext* cx, unsigned argc, Value* vp)
+Debugger::getOnNewGlobalObject(JSContext *cx, unsigned argc, Value *vp)
 {
     return getHookImpl(cx, argc, vp, OnNewGlobalObject);
 }
 
 /* static */ bool
-Debugger::setOnNewGlobalObject(JSContext* cx, unsigned argc, Value* vp)
+Debugger::setOnNewGlobalObject(JSContext *cx, unsigned argc, Value *vp)
 {
     THIS_DEBUGGER(cx, argc, vp, "setOnNewGlobalObject", args, dbg);
     RootedObject oldHook(cx, dbg->getHook(OnNewGlobalObject));

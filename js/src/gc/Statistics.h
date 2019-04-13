@@ -173,7 +173,7 @@ struct Statistics
         if (!aborted)
             slices.back().resetReason = reason;
     }
-    void nonincremental(const char* reason) { nonincrementalReason = reason; }
+    void nonincremental(const char *reason) { nonincrementalReason = reason; }
 
     void count(Stat s) {
         MOZ_ASSERT(s < STAT_LIMIT);
@@ -204,7 +204,7 @@ struct Statistics
     static const size_t MAX_NESTING = 20;
 
   private:
-    JSRuntime* runtime;
+    JSRuntime *runtime;
 
     int64_t startupTime;
 
@@ -221,7 +221,7 @@ struct Statistics
 
     JSGCInvocationKind gckind;
 
-    const char* nonincrementalReason;
+    const char *nonincrementalReason;
 
     struct SliceData {
         SliceData(JS::gcreason::Reason reason, int64_t start, size_t startFaults)
@@ -232,7 +232,7 @@ struct Statistics
         }
 
         JS::gcreason::Reason reason;
-        const char* resetReason;
+        const char *resetReason;
         int64_t start, end;
         size_t startFaults, endFaults;
         int64_t phaseTimes[MAX_MULTIPARENT_PHASES + 1][PHASE_LIMIT];
