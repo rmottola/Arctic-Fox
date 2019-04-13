@@ -824,7 +824,7 @@ HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& modul
         return false;
 
     RootedFunction fun(cx, NewScriptedFunction(cx, 0, JSFunction::INTERPRETED,
-                                               cx->global(), name, JSFunction::FinalizeKind,
+                                               name, JSFunction::FinalizeKind,
                                                TenuredObject));
     if (!fun)
         return false;
