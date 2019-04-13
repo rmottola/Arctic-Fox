@@ -1052,7 +1052,15 @@ JSObject::enclosingScope()
 
 namespace js {
 
-inline const Value&
+inline bool
+IsValidTerminatingScope(JSObject* scope)
+{
+    return !scope->is<ScopeObject>() ||
+           (scope->is<DynamicWithObject>() &&
+            !scope->as<DynamicWithObject>().isSyntactic());
+}
+
+inline const Value &
 ScopeObject::aliasedVar(ScopeCoordinate sc)
 {
     MOZ_ASSERT(is<CallObject>() || is<ClonedBlockObject>());
@@ -1093,7 +1101,7 @@ ScopeIter::enclosingScope() const
     // chain; every scope chain must start with zero or more ScopeObjects and
     // terminate with one or more non-ScopeObjects (viz., GlobalObject).
     MOZ_ASSERT(done());
-    MOZ_ASSERT(!scope_->is<ScopeObject>());
+    MOZ_ASSERT(IsValidTerminatingScope(scope_));
     return *scope_;
 }
 
