@@ -1099,17 +1099,17 @@ NewObjectGCKind(const js::Class *clasp)
 }
 
 static inline JSObject *
-NewObject(ExclusiveContext* cx, HandleObjectGroup group, HandleObject parent, gc::AllocKind kind,
+NewObject(ExclusiveContext *cx, HandleObjectGroup group, HandleObject parent, gc::AllocKind kind,
           NewObjectKind newKind)
 {
-    const Class* clasp = group->clasp();
+    const Class *clasp = group->clasp();
 
     MOZ_ASSERT(clasp != &ArrayObject::class_);
     MOZ_ASSERT_IF(clasp == &JSFunction::class_,
                   kind == JSFunction::FinalizeKind || kind == JSFunction::ExtendedFinalizeKind);
     MOZ_ASSERT_IF(parent, &parent->global() == cx->global());
 
-    JSObject* metadata = nullptr;
+    JSObject *metadata = nullptr;
     if (!NewObjectMetadata(cx, &metadata))
         return nullptr;
 
@@ -1367,7 +1367,7 @@ js::NewObjectWithClassProtoCommon(ExclusiveContext* cxArg, const Class* clasp,
     if (!group)
         return nullptr;
 
-    JSObject* obj = NewObject(cxArg, group, parent, allocKind, newKind);
+    JSObject *obj = NewObject(cxArg, group, parent, allocKind, newKind);
     if (!obj)
         return nullptr;
 
