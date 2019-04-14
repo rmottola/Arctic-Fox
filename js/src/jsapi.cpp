@@ -2611,7 +2611,7 @@ JS_DefineObject(JSContext* cx, HandleObject obj, const char* name, const JSClass
     if (!clasp)
         clasp = &PlainObject::class_;    /* default class is Object */
 
-    RootedObject nobj(cx, NewObjectWithClassProto(cx, clasp, NullPtr(), obj));
+    RootedObject nobj(cx, NewObjectWithClassProto(cx, clasp, NullPtr(), NullPtr()));
     if (!nobj)
         return nullptr;
 
