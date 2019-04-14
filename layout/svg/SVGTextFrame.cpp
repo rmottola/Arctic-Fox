@@ -2724,8 +2724,6 @@ public:
                                           DrawTarget& aDrawTarget) override;
   void NotifyBeforeText(nscolor aColor) override;
   void NotifyGlyphPathEmitted() override;
-  void NotifyBeforeSVGGlyphPainted() override;
-  void NotifyAfterSVGGlyphPainted() override;
   void NotifyAfterText() override;
   void NotifyBeforeDecorationLine(nscolor aColor) override;
   void NotifyDecorationLinePathEmitted() override;
@@ -2815,19 +2813,6 @@ void
 SVGTextDrawPathCallbacks::NotifyGlyphPathEmitted()
 {
   HandleTextGeometry();
-  gfx->NewPath();
-}
-
-void
-SVGTextDrawPathCallbacks::NotifyBeforeSVGGlyphPainted()
-{
-  gfx->Save();
-}
-
-void
-SVGTextDrawPathCallbacks::NotifyAfterSVGGlyphPainted()
-{
-  gfx->Restore();
   gfx->NewPath();
 }
 
