@@ -1268,7 +1268,7 @@ bool
 XDRObjectLiteral(XDRState<mode> *xdr, MutableHandleObject obj);
 
 extern JSObject *
-CloneObjectLiteral(JSContext *cx, HandleObject parent, HandleObject srcObj);
+CloneObjectLiteral(JSContext *cx, HandleObject srcObj);
 
 extern void
 GetObjectSlotName(JSTracer *trc, char *buf, size_t bufsize);

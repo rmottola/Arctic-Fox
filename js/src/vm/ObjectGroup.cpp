@@ -955,7 +955,7 @@ ObjectGroup::newPlainObject(ExclusiveContext *cx, IdValuePair *properties, size_
             return nullptr;
 
         gc::AllocKind allocKind = gc::GetGCObjectKind(nproperties);
-        RootedPlainObject obj(cx, NewObjectWithGroup<PlainObject>(cx, group, cx->global(),
+        RootedPlainObject obj(cx, NewObjectWithGroup<PlainObject>(cx, group,
                                                                   allocKind, TenuredObject));
         if (!obj || !AddPlainObjectProperties(cx, obj, properties, nproperties))
             return nullptr;
@@ -1057,7 +1057,7 @@ ObjectGroup::newPlainObject(ExclusiveContext *cx, IdValuePair *properties, size_
         newKind = TenuredObject;
 
     gc::AllocKind allocKind = gc::GetGCObjectKind(nproperties);
-    RootedPlainObject obj(cx, NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind,
+    RootedPlainObject obj(cx, NewObjectWithGroup<PlainObject>(cx, group, allocKind,
                                                               newKind));
 
     if (!obj->setLastProperty(cx, shape))

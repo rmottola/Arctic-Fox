@@ -1383,11 +1383,10 @@ js::NewObjectWithClassProtoCommon(ExclusiveContext* cxArg, const Class* clasp,
 }
 
 static bool
-NewObjectWithGroupIsCachable(ExclusiveContext *cx, HandleObjectGroup group, HandleObject parent,
+NewObjectWithGroupIsCachable(ExclusiveContext *cx, HandleObjectGroup group,
                              NewObjectKind newKind)
 {
     return group->proto().isObject() &&
-           parent == group->proto().toObject()->getParent() &&
            newKind == GenericObject &&
            group->clasp()->isNative() &&
            (!group->newScript() || group->newScript()->analyzed()) &&
@@ -1400,16 +1399,14 @@ NewObjectWithGroupIsCachable(ExclusiveContext *cx, HandleObjectGroup group, Hand
  * avoid losing creation site information for objects made by scripted 'new'.
  */
 JSObject *
-js::NewObjectWithGroupCommon(ExclusiveContext *cx, HandleObjectGroup group, HandleObject parent,
+js::NewObjectWithGroupCommon(ExclusiveContext *cx, HandleObjectGroup group,
                              gc::AllocKind allocKind, NewObjectKind newKind)
 {
-    MOZ_ASSERT(parent);
-
     MOZ_ASSERT(allocKind <= gc::AllocKind::OBJECT_LAST);
     if (CanBeFinalizedInBackground(allocKind, group->clasp()))
         allocKind = GetBackgroundAllocKind(allocKind);
 
-    bool isCachable = NewObjectWithGroupIsCachable(cx, group, parent, newKind);
+    bool isCachable = NewObjectWithGroupIsCachable(cx, group, newKind);
     if (isCachable) {
         NewObjectCache &cache = cx->asJSContext()->runtime()->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
@@ -1421,7 +1418,7 @@ js::NewObjectWithGroupCommon(ExclusiveContext *cx, HandleObjectGroup group, Hand
         }
     }
 
-    JSObject *obj = NewObject(cx, group, parent, allocKind, newKind);
+    JSObject *obj = NewObject(cx, group, cx->global(), allocKind, newKind);
     if (!obj)
         return nullptr;
 
@@ -1508,7 +1505,7 @@ CreateThisForFunctionWithGroup(JSContext *cx, HandleObjectGroup group,
         // plain object and register it with the group. Use the maximum number
         // of fixed slots, as is also required by the TypeNewScript.
         gc::AllocKind allocKind = GuessObjectGCKind(NativeObject::MAX_FIXED_SLOTS);
-        PlainObject *res = NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind, newKind);
+        PlainObject *res = NewObjectWithGroup<PlainObject>(cx, group, allocKind, newKind);
         if (!res)
             return nullptr;
 
@@ -1526,7 +1523,7 @@ CreateThisForFunctionWithGroup(JSContext *cx, HandleObjectGroup group,
         return NewObjectWithGivenTaggedProto(cx, &PlainObject::class_, protoRoot, cx->global(),
                                              allocKind, newKind);
     }
-    return NewObjectWithGroup<PlainObject>(cx, group, cx->global(), allocKind, newKind);
+    return NewObjectWithGroup<PlainObject>(cx, group, allocKind, newKind);
 }
 
 JSObject *
@@ -2091,7 +2088,7 @@ template bool
 js::XDRObjectLiteral(XDRState<XDR_DECODE> *xdr, MutableHandleObject obj);
 
 JSObject *
-js::CloneObjectLiteral(JSContext *cx, HandleObject parent, HandleObject srcObj)
+js::CloneObjectLiteral(JSContext *cx, HandleObject srcObj)
 {
     if (srcObj->is<PlainObject>()) {
         AllocKind kind = GetBackgroundAllocKind(GuessObjectGCKind(srcObj->as<PlainObject>().numFixedSlots()));
@@ -2105,13 +2102,13 @@ js::CloneObjectLiteral(JSContext *cx, HandleObject parent, HandleObject srcObj)
         if (!group)
             return nullptr;
 
-        RootedPlainObject res(cx, NewObjectWithGroup<PlainObject>(cx, group, parent, kind,
+        RootedPlainObject res(cx, NewObjectWithGroup<PlainObject>(cx, group, kind,
                                                                   MaybeSingletonObject));
         if (!res)
             return nullptr;
 
         RootedShape newShape(cx, ReshapeForParentAndAllocKind(cx, srcObj->as<PlainObject>().lastProperty(),
-                                                              TaggedProto(proto), parent, kind));
+                                                              TaggedProto(proto), cx->global(), kind));
         if (!newShape || !res->setLastProperty(cx, newShape))
             return nullptr;
 

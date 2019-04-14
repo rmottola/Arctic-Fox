@@ -392,7 +392,7 @@ UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
             return false;
 
         PlainObject *templateObject = NewObjectWithGroup<PlainObject>(cx, replacementNewGroup,
-                                                                      cx->global(), layout.getAllocKind(),
+                                                                      layout.getAllocKind(),
                                                                       MaybeSingletonObject);
         if (!templateObject)
             return false;
@@ -504,8 +504,8 @@ UnboxedPlainObject::create(ExclusiveContext *cx, HandleObjectGroup group, NewObj
     MOZ_ASSERT(group->clasp() == &class_);
     gc::AllocKind allocKind = group->unboxedLayout().getAllocKind();
 
-    UnboxedPlainObject *res = NewObjectWithGroup<UnboxedPlainObject>(cx, group, cx->global(),
-                                                                     allocKind, newKind);
+    UnboxedPlainObject *res =
+        NewObjectWithGroup<UnboxedPlainObject>(cx, group, allocKind, newKind);
     if (!res)
         return nullptr;
 
