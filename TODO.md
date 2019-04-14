@@ -111,15 +111,11 @@
 - Bug 1140670 2015-03-09 all parts
 - Bug 1133081 2015-02-15 1 to 5
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux
-- Bug 1142304. Remove the parent argument from NewObjectWithGivenTagged
-- Bug 1142309. Remove the parent argument from NewObjectWithClassProto
-- Bug 1141905  1 to 4
 - Bug 1142859. Don't parent the object created by JS_DefineObject to th
 - Bug 1142864. Remove the parent argument from NewObject
-- Bug 1142865. Remove the parent argument from NewObjectWithGroup
-- Bug 1142310 part 1 to 2
-- Bug 1142311 part 1 to 2
-- Bug 1137844 2015-03-13 par 0 to 4
+- Bug 1142304. Remove the parent argument from NewObjectWithGivenTagged
+- Bug 1142309. Remove the parent argument from NewObjectWithClassProto
+- Bug 1135731 - fix encoding inconsistency in NS_NewXBLProtoImpl
 
 
 To verify:
