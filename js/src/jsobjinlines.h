@@ -646,21 +646,21 @@ NewObjectWithGivenProto(ExclusiveContext* cx, HandleObject proto, HandleObject p
  * null, the context's active global will be used, and the resulting object's
  * parent will be that global.
  */
-JSObject*
-NewObjectWithClassProtoCommon(ExclusiveContext* cx, const Class* clasp, HandleObject proto,
+JSObject *
+NewObjectWithClassProtoCommon(ExclusiveContext *cx, const Class *clasp, HandleObject proto,
                               HandleObject parent, gc::AllocKind allocKind,
                               NewObjectKind newKind);
 
-inline JSObject*
-NewObjectWithClassProto(ExclusiveContext* cx, const Class* clasp, HandleObject proto,
+inline JSObject *
+NewObjectWithClassProto(ExclusiveContext *cx, const Class *clasp, HandleObject proto,
                         HandleObject parent, gc::AllocKind allocKind,
                         NewObjectKind newKind = GenericObject)
 {
     return NewObjectWithClassProtoCommon(cx, clasp, proto, parent, allocKind, newKind);
 }
 
-inline JSObject*
-NewObjectWithClassProto(ExclusiveContext* cx, const Class* clasp, HandleObject proto,
+inline JSObject *
+NewObjectWithClassProto(ExclusiveContext *cx, const Class *clasp, HandleObject proto,
                         HandleObject parent, NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(clasp);
@@ -689,15 +689,15 @@ NewObjectWithProto(ExclusiveContext *cx, HandleObject proto,
  * Create a native instance of the given class with parent and proto set
  * according to the context's active global.
  */
-inline JSObject*
-NewBuiltinClassInstance(ExclusiveContext* cx, const Class* clasp, gc::AllocKind allocKind,
+inline JSObject *
+NewBuiltinClassInstance(ExclusiveContext *cx, const Class *clasp, gc::AllocKind allocKind,
                         NewObjectKind newKind = GenericObject)
 {
     return NewObjectWithClassProto(cx, clasp, NullPtr(), NullPtr(), allocKind, newKind);
 }
 
-inline JSObject*
-NewBuiltinClassInstance(ExclusiveContext* cx, const Class* clasp, NewObjectKind newKind = GenericObject)
+inline JSObject *
+NewBuiltinClassInstance(ExclusiveContext *cx, const Class *clasp, NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(clasp);
     return NewBuiltinClassInstance(cx, clasp, allocKind, newKind);

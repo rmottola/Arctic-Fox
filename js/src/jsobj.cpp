@@ -1308,8 +1308,8 @@ FindProto(ExclusiveContext* cx, const js::Class* clasp, MutableHandleObject prot
 }
 
 static bool
-NewObjectWithClassProtoIsCachable(ExclusiveContext* cxArg, HandleObject parent,
-                                  JSProtoKey protoKey, NewObjectKind newKind, const Class* clasp)
+NewObjectWithClassProtoIsCachable(ExclusiveContext *cxArg, HandleObject parent,
+                                  JSProtoKey protoKey, NewObjectKind newKind, const Class *clasp)
 {
     return cxArg->isJSContext() &&
            parent->is<GlobalObject>() &&
@@ -1347,12 +1347,12 @@ js::NewObjectWithClassProtoCommon(ExclusiveContext* cxArg, const Class* clasp,
 
     bool isCachable = NewObjectWithClassProtoIsCachable(cxArg, parent, protoKey, newKind, clasp);
     if (isCachable) {
-        JSContext* cx = cxArg->asJSContext();
-        JSRuntime* rt = cx->runtime();
-        NewObjectCache& cache = rt->newObjectCache;
+        JSContext *cx = cxArg->asJSContext();
+        JSRuntime *rt = cx->runtime();
+        NewObjectCache &cache = rt->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         if (cache.lookupGlobal(clasp, &parent->as<GlobalObject>(), allocKind, &entry)) {
-            JSObject* obj = cache.newObjectFromHit(cx, entry, GetInitialHeap(newKind, clasp));
+            JSObject *obj = cache.newObjectFromHit(cx, entry, GetInitialHeap(newKind, clasp));
             if (obj)
                 return obj;
         }
@@ -1372,7 +1372,7 @@ js::NewObjectWithClassProtoCommon(ExclusiveContext* cxArg, const Class* clasp,
         return nullptr;
 
     if (isCachable && !obj->as<NativeObject>().hasDynamicSlots()) {
-        NewObjectCache& cache = cxArg->asJSContext()->runtime()->newObjectCache;
+        NewObjectCache &cache = cxArg->asJSContext()->runtime()->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         cache.lookupGlobal(clasp, &parent->as<GlobalObject>(), allocKind, &entry);
         cache.fillGlobal(entry, clasp, &parent->as<GlobalObject>(), allocKind,
