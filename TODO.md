@@ -114,8 +114,8 @@
 - Bug 1142859. Don't parent the object created by JS_DefineObject to th
 - Bug 1142864. Remove the parent argument from NewObject
 - Bug 1142304. Remove the parent argument from NewObjectWithGivenTagged
-- Bug 1142309. Remove the parent argument from NewObjectWithClassProto
-- Bug 1135731 - fix encoding inconsistency in NS_NewXBLProtoImpl
+- Bug 1142296. Remove the parent argument from NewObjectWithGivenProto
+- Bug 1066234 (even if it is backed out?)
 
 
 To verify:
