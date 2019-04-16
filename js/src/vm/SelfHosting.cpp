@@ -493,7 +493,7 @@ js::intrinsic_IsPackedArray(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args.length() == 1);
     MOZ_ASSERT(args[0].isObject());
 
-    JSObject* obj = &args[0].toObject();
+    JSObject *obj = &args[0].toObject();
     bool isPacked = obj->is<ArrayObject>() && !obj->hasLazyGroup() &&
                     !obj->group()->hasAllFlags(OBJECT_FLAG_NON_PACKED) &&
                     obj->as<ArrayObject>().getDenseInitializedLength() ==
@@ -527,7 +527,7 @@ intrinsic_NewArrayIterator(JSContext* cx, unsigned argc, Value* vp)
     if (!proto)
         return false;
 
-    JSObject* obj = NewObjectWithGivenProto(cx, &ArrayIteratorObject::class_, proto, cx->global());
+    JSObject *obj = NewObjectWithGivenProto(cx, &ArrayIteratorObject::class_, proto, cx->global());
     if (!obj)
         return false;
 
@@ -556,7 +556,7 @@ intrinsic_NewStringIterator(JSContext* cx, unsigned argc, Value* vp)
     if (!proto)
         return false;
 
-    JSObject* obj = NewObjectWithGivenProto(cx, &StringIteratorObject::class_, proto, cx->global());
+    JSObject *obj = NewObjectWithGivenProto(cx, &StringIteratorObject::class_, proto, cx->global());
     if (!obj)
         return false;
 

@@ -901,9 +901,9 @@ MapIteratorObject::kind() const
 }
 
 bool
-GlobalObject::initMapIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
+GlobalObject::initMapIteratorProto(JSContext *cx, Handle<GlobalObject *> global)
 {
-    Rooted<JSObject*> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
+    Rooted<JSObject *> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
     if (!base)
         return false;
     RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base, global));
@@ -915,20 +915,20 @@ GlobalObject::initMapIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
     return true;
 }
 
-MapIteratorObject*
-MapIteratorObject::create(JSContext* cx, HandleObject mapobj, ValueMap* data,
+MapIteratorObject *
+MapIteratorObject::create(JSContext *cx, HandleObject mapobj, ValueMap *data,
                           MapObject::IteratorKind kind)
 {
-    Rooted<GlobalObject*> global(cx, &mapobj->global());
+    Rooted<GlobalObject *> global(cx, &mapobj->global());
     Rooted<JSObject*> proto(cx, GlobalObject::getOrCreateMapIteratorPrototype(cx, global));
     if (!proto)
         return nullptr;
 
-    ValueMap::Range* range = cx->new_<ValueMap::Range>(data->all());
+    ValueMap::Range *range = cx->new_<ValueMap::Range>(data->all());
     if (!range)
         return nullptr;
 
-    MapIteratorObject* iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto, global);
+    MapIteratorObject *iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto, global);
     if (!iterobj) {
         js_delete(range);
         return nullptr;
@@ -1656,20 +1656,20 @@ GlobalObject::initSetIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
     return true;
 }
 
-SetIteratorObject*
-SetIteratorObject::create(JSContext* cx, HandleObject setobj, ValueSet* data,
+SetIteratorObject *
+SetIteratorObject::create(JSContext *cx, HandleObject setobj, ValueSet *data,
                           SetObject::IteratorKind kind)
 {
-    Rooted<GlobalObject*> global(cx, &setobj->global());
+    Rooted<GlobalObject *> global(cx, &setobj->global());
     Rooted<JSObject*> proto(cx, GlobalObject::getOrCreateSetIteratorPrototype(cx, global));
     if (!proto)
         return nullptr;
 
-    ValueSet::Range* range = cx->new_<ValueSet::Range>(data->all());
+    ValueSet::Range *range = cx->new_<ValueSet::Range>(data->all());
     if (!range)
         return nullptr;
 
-    SetIteratorObject* iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto, global);
+    SetIteratorObject *iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto, global);
     if (!iterobj) {
         js_delete(range);
         return nullptr;

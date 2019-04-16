@@ -3495,7 +3495,7 @@ CASE(JSOP_GENERATOR)
 {
     MOZ_ASSERT(!cx->isExceptionPending());
     MOZ_ASSERT(REGS.stackDepth() == 0);
-    JSObject* obj = GeneratorObject::create(cx, REGS.fp());
+    JSObject *obj = GeneratorObject::create(cx, REGS.fp());
     if (!obj)
         goto error;
     PUSH_OBJECT(*obj);

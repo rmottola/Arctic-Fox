@@ -4047,7 +4047,7 @@ Debugger::drainTraceLogger(JSContext* cx, unsigned argc, Value* vp)
 
     /* Add all events to the array. */
     uint32_t index = 0;
-    for (EventEntry* eventItem = events; eventItem < events + num; eventItem++, index++) {
+    for (EventEntry *eventItem = events; eventItem < events + num; eventItem++, index++) {
         RootedObject item(cx, NewObjectWithGivenProto(cx, &PlainObject::class_, NullPtr(),
                                                       GlobalObject::upcast(cx->global())));
         if (!item)
@@ -4147,7 +4147,7 @@ Debugger::drainTraceLoggerScriptCalls(JSContext* cx, unsigned argc, Value* vp)
 
     /* Add all events to the array. */
     uint32_t index = 0;
-    for (EventEntry* eventItem = events; eventItem < events + num; eventItem++) {
+    for (EventEntry *eventItem = events; eventItem < events + num; eventItem++) {
         RootedObject item(cx, NewObjectWithGivenProto(cx, &PlainObject::class_, NullPtr(),
                                                       cx->global()));
         if (!item)
