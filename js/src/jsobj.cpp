@@ -1148,7 +1148,7 @@ NewObject(ExclusiveContext *cx, HandleObjectGroup group, HandleObject parent, gc
 
 void
 NewObjectCache::fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto proto,
-                          gc::AllocKind kind, NativeObject* obj)
+                          gc::AllocKind kind, NativeObject *obj)
 {
     MOZ_ASSERT_IF(proto.isObject(), !proto.toObject()->is<GlobalObject>());
     MOZ_ASSERT(obj->getTaggedProto() == proto);
@@ -1156,8 +1156,8 @@ NewObjectCache::fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto 
 }
 
 static bool
-NewObjectWithTaggedProtoIsCachable(ExclusiveContext* cxArg, Handle<TaggedProto> proto,
-                                   NewObjectKind newKind, const Class* clasp,
+NewObjectWithTaggedProtoIsCachable(ExclusiveContext *cxArg, Handle<TaggedProto> proto,
+                                   NewObjectKind newKind, const Class *clasp,
                                    HandleObject parentArg)
 {
     return cxArg->isJSContext() &&
@@ -1169,8 +1169,8 @@ NewObjectWithTaggedProtoIsCachable(ExclusiveContext* cxArg, Handle<TaggedProto> 
            !proto.toObject()->is<GlobalObject>();
 }
 
-JSObject*
-js::NewObjectWithGivenTaggedProto(ExclusiveContext* cxArg, const Class* clasp,
+JSObject *
+js::NewObjectWithGivenTaggedProto(ExclusiveContext *cxArg, const Class *clasp,
                                   Handle<TaggedProto> proto, HandleObject parentArg,
                                   gc::AllocKind allocKind, NewObjectKind newKind)
 {
