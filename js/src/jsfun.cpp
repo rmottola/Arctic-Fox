@@ -2182,8 +2182,8 @@ js::CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction 
            !ObjectGroup::useSingletonForClone(fun);
 }
 
-JSFunction*
-js::CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
+JSFunction *
+js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
                         gc::AllocKind allocKind, NewObjectKind newKindArg /* = GenericObject */)
 {
     MOZ_ASSERT(parent);
