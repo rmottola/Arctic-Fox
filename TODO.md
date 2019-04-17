@@ -109,10 +109,6 @@
 - Bug 1095290 - 2015-03-16 Make unlazified scripts same-compartment with their fun
 - Bug 1139456 - 2015-03-16 Do not let compaction set the alloc threshold to unreas
 - Bug 1140670 2015-03-09 all parts
-- Bug 1133081 2015-02-15 1 to 5
-- Bug 1150259 - Deactivating subtest under old Windows/old Linux
-- Bug 1142859. Don't parent the object created by JS_DefineObject to th
-- Bug 1142864. Remove the parent argument from NewObject
 
 
 To verify:
