@@ -270,7 +270,7 @@ NewSingletonObjectWithObjectPrototype(JSContext* cx, Handle<GlobalObject*> globa
     RootedObject proto(cx, global->getOrCreateObjectPrototype(cx));
     if (!proto)
         return nullptr;
-    return NewObjectWithGivenProto<PlainObject>(cx, proto, global, SingletonObject);
+    return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
 }
 
 static JSObject*
@@ -279,7 +279,7 @@ NewSingletonObjectWithFunctionPrototype(JSContext* cx, Handle<GlobalObject*> glo
     RootedObject proto(cx, global->getOrCreateFunctionPrototype(cx));
     if (!proto)
         return nullptr;
-    return NewObjectWithGivenProto<PlainObject>(cx, proto, global, SingletonObject);
+    return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
 }
 
 /* static */ bool
@@ -308,7 +308,7 @@ GlobalObject::initStarGenerators(JSContext* cx, Handle<GlobalObject*> global)
     if (!iteratorProto)
         return false;
 
-    RootedPlainObject genObjectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, iteratorProto, global));
+    RootedPlainObject genObjectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, iteratorProto));
     if (!genObjectProto)
         return false;
     if (!DefinePropertiesAndFunctions(cx, genObjectProto, nullptr, star_generator_methods))

@@ -906,7 +906,7 @@ GlobalObject::initMapIteratorProto(JSContext *cx, Handle<GlobalObject *> global)
     Rooted<JSObject *> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
     if (!base)
         return false;
-    RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base, global));
+    RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base));
     if (!proto)
         return false;
     if (!JS_DefineFunctions(cx, proto, MapIteratorObject::methods))
@@ -928,7 +928,7 @@ MapIteratorObject::create(JSContext *cx, HandleObject mapobj, ValueMap *data,
     if (!range)
         return nullptr;
 
-    MapIteratorObject *iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto, global);
+    MapIteratorObject *iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto);
     if (!iterobj) {
         js_delete(range);
         return nullptr;
@@ -1647,7 +1647,7 @@ GlobalObject::initSetIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
     Rooted<JSObject*> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
     if (!base)
         return false;
-    RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base, global));
+    RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base));
     if (!proto)
         return false;
     if (!JS_DefineFunctions(cx, proto, SetIteratorObject::methods))
@@ -1669,7 +1669,7 @@ SetIteratorObject::create(JSContext *cx, HandleObject setobj, ValueSet *data,
     if (!range)
         return nullptr;
 
-    SetIteratorObject *iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto, global);
+    SetIteratorObject *iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto);
     if (!iterobj) {
         js_delete(range);
         return nullptr;

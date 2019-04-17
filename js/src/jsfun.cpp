@@ -385,7 +385,7 @@ ResolveInterpretedFunctionPrototype(JSContext* cx, HandleObject obj)
         return nullptr;
 
     RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, objProto,
-                                                                     NullPtr(), SingletonObject));
+                                                                     SingletonObject));
     if (!proto)
         return nullptr;
 
