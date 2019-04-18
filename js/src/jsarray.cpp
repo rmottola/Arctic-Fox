@@ -3224,7 +3224,6 @@ CreateArrayPrototype(JSContext* cx, JSProtoKey key)
     if (!NewObjectMetadata(cx, &metadata))
         return nullptr;
 
-    proto->assertParentIs(cx->global());
     RootedShape shape(cx, EmptyShape::getInitialShape(cx, &ArrayObject::class_, TaggedProto(proto),
                                                       cx->global(), metadata,
                                                       gc::AllocKind::OBJECT0));
