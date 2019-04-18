@@ -1710,7 +1710,7 @@ NewObjectCache::invalidateEntriesForShape(JSContext* cx, HandleShape shape, Hand
     if (CanBeFinalizedInBackground(kind, clasp))
         kind = GetBackgroundAllocKind(kind);
 
-    Rooted<GlobalObject*> global(cx, &shape->getObjectParent()->global());
+    Rooted<GlobalObject *> global(cx, shape->compartment()->unsafeUnbarrieredMaybeGlobal());
     RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, clasp, TaggedProto(proto)));
 
     EntryIndex entry;
