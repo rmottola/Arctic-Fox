@@ -406,11 +406,11 @@ class BaseShape : public gc::TenuredCell
     };
 
   private:
-    const Class*        clasp_;        /* Class of referring object. */
+    const Class         *clasp_;        /* Class of referring object. */
     HeapPtrObject       parent;         /* Parent of referring object. */
     HeapPtrObject       metadata;       /* Optional holder of metadata about
                                          * the referring object. */
-    JSCompartment*      compartment_;  /* Compartment shape belongs to. */
+    JSCompartment       *compartment_;  /* Compartment shape belongs to. */
     uint32_t            flags;          /* Vector of above flags. */
     uint32_t            slotSpan_;      /* Object slot span for BaseShapes at
                                          * dictionary last properties. */
@@ -419,14 +419,14 @@ class BaseShape : public gc::TenuredCell
     HeapPtrUnownedBaseShape unowned_;
 
     /* For owned BaseShapes, the shape's shape table. */
-    ShapeTable*      table_;
+    ShapeTable       *table_;
 
-    BaseShape(const BaseShape& base) = delete;
+    BaseShape(const BaseShape &base) = delete;
 
   public:
-    void finalize(FreeOp* fop);
+    void finalize(FreeOp *fop);
 
-    BaseShape(JSCompartment* comp, const Class* clasp, JSObject* parent, JSObject* metadata,
+    BaseShape(JSCompartment *comp, const Class *clasp, JSObject *parent, JSObject *metadata,
               uint32_t objectFlags)
     {
         MOZ_ASSERT(!(objectFlags & ~OBJECT_FLAG_MASK));
@@ -438,7 +438,7 @@ class BaseShape : public gc::TenuredCell
         this->compartment_ = comp;
     }
 
-    BaseShape(JSCompartment* comp, const Class* clasp, JSObject* parent, JSObject* metadata,
+    BaseShape(JSCompartment *comp, const Class *clasp, JSObject *parent, JSObject *metadata,
               uint32_t objectFlags, uint8_t attrs)
     {
         MOZ_ASSERT(!(objectFlags & ~OBJECT_FLAG_MASK));
@@ -450,12 +450,12 @@ class BaseShape : public gc::TenuredCell
         this->compartment_ = comp;
     }
 
-    explicit inline BaseShape(const StackBaseShape& base);
+    explicit inline BaseShape(const StackBaseShape &base);
 
     /* Not defined: BaseShapes must not be stack allocated. */
     ~BaseShape();
 
-    BaseShape& operator=(const BaseShape& other) {
+    BaseShape &operator=(const BaseShape &other) {
         clasp_ = other.clasp_;
         parent = other.parent;
         metadata = other.metadata;
@@ -476,8 +476,8 @@ class BaseShape : public gc::TenuredCell
         this->unowned_ = unowned;
     }
 
-    JSObject* getObjectParent() const { return parent; }
-    JSObject* getObjectMetadata() const { return metadata; }
+    JSObject *getObjectParent() const { return parent; }
+    JSObject *getObjectMetadata() const { return metadata; }
     uint32_t getObjectFlags() const { return flags & OBJECT_FLAG_MASK; }
 
     bool hasTable() const { MOZ_ASSERT_IF(table_, isOwned()); return table_ != nullptr; }
@@ -513,7 +513,7 @@ class BaseShape : public gc::TenuredCell
 
     static inline ThingRootKind rootKind() { return THING_ROOT_BASE_SHAPE; }
 
-    void markChildren(JSTracer* trc) {
+    void markChildren(JSTracer *trc) {
         if (isOwned())
             gc::MarkBaseShape(trc, &unowned_, "base");
 
@@ -575,12 +575,12 @@ BaseShape::baseUnowned()
 struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
 {
     uint32_t flags;
-    const Class* clasp;
-    JSObject* parent;
-    JSObject* metadata;
-    JSCompartment* compartment;
+    const Class *clasp;
+    JSObject *parent;
+    JSObject *metadata;
+    JSCompartment *compartment;
 
-    explicit StackBaseShape(BaseShape* base)
+    explicit StackBaseShape(BaseShape *base)
       : flags(base->flags & BaseShape::OBJECT_FLAG_MASK),
         clasp(base->clasp_),
         parent(base->parent),
@@ -588,20 +588,20 @@ struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
         compartment(base->compartment())
     {}
 
-    inline StackBaseShape(ExclusiveContext* cx, const Class* clasp,
-                          JSObject* parent, JSObject* metadata, uint32_t objectFlags);
-    explicit inline StackBaseShape(Shape* shape);
+    inline StackBaseShape(ExclusiveContext *cx, const Class *clasp,
+                          JSObject *parent, JSObject *metadata, uint32_t objectFlags);
+    explicit inline StackBaseShape(Shape *shape);
 
     struct Lookup
     {
         uint32_t flags;
-        const Class* clasp;
-        JSObject* hashParent;
-        JSObject* matchParent;
-        JSObject* hashMetadata;
-        JSObject* matchMetadata;
+        const Class *clasp;
+        JSObject *hashParent;
+        JSObject *matchParent;
+        JSObject *hashMetadata;
+        JSObject *matchMetadata;
 
-        MOZ_IMPLICIT Lookup(const StackBaseShape& base)
+        MOZ_IMPLICIT Lookup(const StackBaseShape &base)
           : flags(base.flags),
             clasp(base.clasp),
             hashParent(base.parent),
@@ -622,9 +622,9 @@ struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
         }
 
         // For use by generational GC post barriers.
-        Lookup(uint32_t flags, const Class* clasp,
-               JSObject* hashParent, JSObject* matchParent,
-               JSObject* hashMetadata, JSObject* matchMetadata)
+        Lookup(uint32_t flags, const Class *clasp,
+               JSObject *hashParent, JSObject *matchParent,
+               JSObject *hashMetadata, JSObject *matchMetadata)
           : flags(flags),
             clasp(clasp),
             hashParent(hashParent),
@@ -819,15 +819,15 @@ class Shape : public gc::TenuredCell
         }
     };
 
-    const Class* getObjectClass() const {
+    const Class *getObjectClass() const {
         return base()->clasp_;
     }
-    JSObject* getObjectParent() const { return base()->parent; }
-    JSObject* getObjectMetadata() const { return base()->metadata; }
+    JSObject *getObjectParent() const { return base()->parent; }
+    JSObject *getObjectMetadata() const { return base()->metadata; }
 
     static Shape *setObjectParent(ExclusiveContext *cx,
                                   JSObject *obj, TaggedProto proto, Shape *last);
-    static Shape *setObjectMetadata(JSContext* cx,
+    static Shape *setObjectMetadata(JSContext *cx,
                                     JSObject *metadata, TaggedProto proto, Shape *last);
     static Shape *setObjectFlags(ExclusiveContext *cx,
                                  BaseShape::Flag flag, TaggedProto proto, Shape *last);
@@ -1179,12 +1179,12 @@ struct EmptyShape : public js::Shape
      * Lookup an initial shape matching the given parameters, creating an empty
      * shape if none was found.
      */
-    static Shape* getInitialShape(ExclusiveContext* cx, const Class* clasp,
-                                  TaggedProto proto, JSObject* parent,
-                                  JSObject* metadata, size_t nfixed, uint32_t objectFlags = 0);
-    static Shape* getInitialShape(ExclusiveContext* cx, const Class* clasp,
-                                  TaggedProto proto, JSObject* parent,
-                                  JSObject* metadata, gc::AllocKind kind, uint32_t objectFlags = 0);
+    static Shape *getInitialShape(ExclusiveContext *cx, const Class *clasp,
+                                  TaggedProto proto, JSObject *parent,
+                                  JSObject *metadata, size_t nfixed, uint32_t objectFlags = 0);
+    static Shape *getInitialShape(ExclusiveContext *cx, const Class *clasp,
+                                  TaggedProto proto, JSObject *parent,
+                                  JSObject *metadata, gc::AllocKind kind, uint32_t objectFlags = 0);
 
     /*
      * Reinsert an alternate initial shape, to be returned by future
@@ -1228,16 +1228,16 @@ struct InitialShapeEntry
 
     /* State used to determine a match on an initial shape. */
     struct Lookup {
-        const Class* clasp;
+        const Class *clasp;
         TaggedProto hashProto;
         TaggedProto matchProto;
-        JSObject* hashParent;
-        JSObject* matchParent;
-        JSObject* hashMetadata;
-        JSObject* matchMetadata;
+        JSObject *hashParent;
+        JSObject *matchParent;
+        JSObject *hashMetadata;
+        JSObject *matchMetadata;
         uint32_t nfixed;
         uint32_t baseFlags;
-        Lookup(const Class* clasp, TaggedProto proto, JSObject* parent, JSObject* metadata,
+        Lookup(const Class *clasp, TaggedProto proto, JSObject *parent, JSObject *metadata,
                uint32_t nfixed, uint32_t baseFlags)
           : clasp(clasp),
             hashProto(proto), matchProto(proto),
@@ -1251,9 +1251,9 @@ struct InitialShapeEntry
          * parent and metadata fields may have been moved, but was hashed with
          * the original values.
          */
-        Lookup(const Class* clasp, TaggedProto proto,
-               JSObject* hashParent, JSObject* matchParent,
-               JSObject* hashMetadata, JSObject* matchMetadata,
+        Lookup(const Class *clasp, TaggedProto proto,
+               JSObject *hashParent, JSObject *matchParent,
+               JSObject *hashMetadata, JSObject *matchMetadata,
                uint32_t nfixed, uint32_t baseFlags)
           : clasp(clasp),
             hashProto(proto), matchProto(proto),
@@ -1538,8 +1538,8 @@ IsImplicitDenseOrTypedArrayElement(Shape* prop)
     return prop == reinterpret_cast<Shape*>(1);
 }
 
-Shape*
-ReshapeForParentAndAllocKind(JSContext* cx, Shape* shape, TaggedProto proto, JSObject* parent,
+Shape *
+ReshapeForParentAndAllocKind(JSContext *cx, Shape *shape, TaggedProto proto, JSObject *parent,
                              gc::AllocKind allocKind);
 
 } // namespace js

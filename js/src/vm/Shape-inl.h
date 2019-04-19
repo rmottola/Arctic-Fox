@@ -24,8 +24,8 @@
 namespace js {
 
 inline
-StackBaseShape::StackBaseShape(ExclusiveContext* cx, const Class* clasp,
-                               JSObject* parent, JSObject* metadata, uint32_t objectFlags)
+StackBaseShape::StackBaseShape(ExclusiveContext *cx, const Class *clasp,
+                               JSObject *parent, JSObject *metadata, uint32_t objectFlags)
   : flags(objectFlags),
     clasp(clasp),
     parent(parent),
