@@ -104,8 +104,6 @@
 - Bug 1097987 - 2015-03-14 1 to 7
 - Bug 1142296 - 2015-03-14 Remove the parent argument from NewObjectWithGivenProto
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
-- Bug 1143706 - Allow BaseShape's global to be null when tracing
-- Bug 805052 - 2015-03-14 2 of 3
 
 
 To verify:
