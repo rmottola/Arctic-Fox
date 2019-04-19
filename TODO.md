@@ -104,11 +104,8 @@
 - Bug 1097987 - 2015-03-14 1 to 7
 - Bug 1142296 - 2015-03-14 Remove the parent argument from NewObjectWithGivenProto
 - Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
-- Bug 805052 - 2015-03-14 four parts (check all dependencies)
 - Bug 1143706 - Allow BaseShape's global to be null when tracing
-- Bug 1095290 - 2015-03-16 Make unlazified scripts same-compartment with their fun
-- Bug 1139456 - 2015-03-16 Do not let compaction set the alloc threshold to unreas
-- Bug 1140670 2015-03-09 all parts
+- Bug 805052 - 2015-03-14 2 of 3
 
 
 To verify:
