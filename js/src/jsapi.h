@@ -3251,8 +3251,7 @@ JS_BufferIsCompilableUnit(JSContext* cx, JS::Handle<JSObject*> obj, const char* 
  * |script| will always be set. On failure, it will be set to nullptr.
  */
 extern JS_PUBLIC_API(bool)
-JS_CompileScript(JSContext* cx, JS::HandleObject obj,
-                 const char* ascii, size_t length,
+JS_CompileScript(JSContext *cx, const char *ascii, size_t length,
                  const JS::CompileOptions& options,
                  JS::MutableHandleScript script);
 
