@@ -100,10 +100,7 @@
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1144108 - Fix debugger tests that are confused by GC zea
 - Bug 1135042 2015-13-20 - Optimize SIMD.loadX/loadXY/loadXYZ in Ion; r=bhackett
-- Bug 1135042: Optimize SIMD.storeX/storeXY/storeXYZ in Ion; r=bhacket
-- Bug 1097987 - 2015-03-14 1 to 7
-- Bug 1142296 - 2015-03-14 Remove the parent argument from NewObjectWithGivenProto
-- Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
+- Bug 1143793 - 1 to 6
 
 
 To verify:
@@ -117,6 +114,7 @@ Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
+https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
 
 ### Further ToDo which would help portability:
 
