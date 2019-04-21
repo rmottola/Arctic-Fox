@@ -455,7 +455,7 @@ RunFile(JSContext *cx, const char *filename, FILE *file, bool compileOnly)
             AnalyzeEntrainedVariables(cx, script);
     #endif
     if (script && !compileOnly) {
-        if (!JS_ExecuteScript(cx, cx->global(), script)) {
+        if (!JS_ExecuteScript(cx, script)) {
             if (!gQuitting && gExitCode != EXITCODE_TIMEOUT)
                 gExitCode = EXITCODE_RUNTIME_ERROR;
         }
@@ -481,7 +481,7 @@ EvalAndPrint(JSContext *cx, const char *bytes, size_t length,
     if (compileOnly)
         return true;
     RootedValue result(cx);
-    if (!JS_ExecuteScript(cx, cx->global(), script, &result))
+    if (!JS_ExecuteScript(cx, script, &result))
         return false;
 
     if (!result.isUndefined()) {
@@ -1319,7 +1319,7 @@ Evaluate(JSContext* cx, unsigned argc, jsval* vp)
             if (!script->scriptSource()->setSourceMapURL(cx, smurl))
                 return false;
         }
-        if (!JS_ExecuteScript(cx, global, script, args.rval())) {
+        if (!JS_ExecuteScript(cx, script, args.rval())) {
             if (catchTermination && !JS_IsExceptionPending(cx)) {
                 JSAutoCompartment ac1(cx, callerGlobal);
                 JSString* str = JS_NewStringCopyZ(cx, "terminated");
@@ -1485,7 +1485,7 @@ Run(JSContext* cx, unsigned argc, jsval* vp)
             return false;
     }
 
-    if (!JS_ExecuteScript(cx, cx->global(), script))
+    if (!JS_ExecuteScript(cx, script))
         return false;
 
     int64_t endClock = PRMJ_Now();
@@ -2808,7 +2808,7 @@ WorkerMain(void* arg)
         if (!JS::Compile(cx, global, options, input->chars, input->length, &script))
             break;
         RootedValue result(cx);
-        JS_ExecuteScript(cx, global, script, &result);
+        JS_ExecuteScript(cx, script, &result);
     } while (0);
 
     JS::SetLargeAllocationFailureCallback(rt, nullptr, nullptr);
@@ -3538,7 +3538,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, jsval* vp)
     if (!script)
         return false;
 
-    return JS_ExecuteScript(cx, cx->global(), script, args.rval());
+    return JS_ExecuteScript(cx, script, args.rval());
 }
 
 struct FreeOnReturn
