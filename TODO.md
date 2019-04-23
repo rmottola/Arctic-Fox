@@ -100,7 +100,6 @@
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1144108 - Fix debugger tests that are confused by GC zea
 - Bug 1135042 2015-13-20 - Optimize SIMD.loadX/loadXY/loadXYZ in Ion; r=bhackett
-- Bug 1143793 - 1 to 6
 
 
 To verify:
