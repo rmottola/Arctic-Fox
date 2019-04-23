@@ -2274,7 +2274,7 @@ EvalReturningScope(JSContext* cx, unsigned argc, jsval* vp)
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
     RootedScript script(cx);
-    if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script))
+    if (!JS::Compile(cx, cx->global(), options, srcBuf, &script))
         return false;
 
     if (global) {
@@ -2345,7 +2345,7 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
     RootedScript script(cx);
-    if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script))
+    if (!JS::Compile(cx, cx->global(), options, srcBuf, &script))
         return false;
 
     global = CheckedUnwrap(global);
