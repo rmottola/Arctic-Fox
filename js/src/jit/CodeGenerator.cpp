@@ -8625,15 +8625,14 @@ CodeGenerator::visitUnboxObjectOrNull(LUnboxObjectOrNull* lir)
 }
 
 void
-CodeGenerator::visitLoadTypedArrayElement(LLoadTypedArrayElement *lir)
+CodeGenerator::visitLoadUnboxedScalar(LLoadUnboxedScalar *lir)
 {
     Register elements = ToRegister(lir->elements());
     Register temp = lir->temp()->isBogusTemp() ? InvalidReg : ToRegister(lir->temp());
     AnyRegister out = ToAnyRegister(lir->output());
 
-    Scalar::Type arrayType = lir->mir()->arrayType();
     Scalar::Type readType  = lir->mir()->readType();
-    int width = Scalar::byteSize(arrayType);
+    int width = Scalar::byteSize(lir->mir()->indexType());
 
     Label fail;
     if (lir->index()->isConstant()) {
@@ -8710,13 +8709,13 @@ StoreToTypedArray(MacroAssembler &masm, Scalar::Type writeType, const LAllocatio
 }
 
 void
-CodeGenerator::visitStoreTypedArrayElement(LStoreTypedArrayElement *lir)
+CodeGenerator::visitStoreUnboxedScalar(LStoreUnboxedScalar *lir)
 {
     Register elements = ToRegister(lir->elements());
     const LAllocation *value = lir->value();
 
     Scalar::Type writeType = lir->mir()->writeType();
-    int width = Scalar::byteSize(lir->mir()->arrayType());
+    int width = Scalar::byteSize(lir->mir()->indexType());
 
     if (lir->index()->isConstant()) {
         Address dest(elements, ToInt32(lir->index()) * width + lir->mir()->offsetAdjustment());
