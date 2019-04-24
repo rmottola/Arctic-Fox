@@ -8625,7 +8625,7 @@ CodeGenerator::visitUnboxObjectOrNull(LUnboxObjectOrNull* lir)
 }
 
 void
-CodeGenerator::visitLoadTypedArrayElement(LLoadTypedArrayElement* lir)
+CodeGenerator::visitLoadTypedArrayElement(LLoadTypedArrayElement *lir)
 {
     Register elements = ToRegister(lir->elements());
     Register temp = lir->temp()->isBogusTemp() ? InvalidReg : ToRegister(lir->temp());
@@ -8652,7 +8652,7 @@ CodeGenerator::visitLoadTypedArrayElement(LLoadTypedArrayElement* lir)
 }
 
 void
-CodeGenerator::visitLoadTypedArrayElementHole(LLoadTypedArrayElementHole* lir)
+CodeGenerator::visitLoadTypedArrayElementHole(LLoadTypedArrayElementHole *lir)
 {
     Register object = ToRegister(lir->object());
     const ValueOperand out = ToOutValue(lir);
@@ -8729,10 +8729,11 @@ CodeGenerator::visitStoreTypedArrayElement(LStoreTypedArrayElement *lir)
 }
 
 void
-CodeGenerator::visitStoreTypedArrayElementHole(LStoreTypedArrayElementHole* lir)
+CodeGenerator::visitStoreTypedArrayElementHole(LStoreTypedArrayElementHole *lir)
 {
     Register elements = ToRegister(lir->elements());
-    const LAllocation* value = lir->value();
+    const LAllocation *value = lir->value();
+    
 
     Scalar::Type arrayType = lir->mir()->arrayType();
     int width = Scalar::byteSize(arrayType);

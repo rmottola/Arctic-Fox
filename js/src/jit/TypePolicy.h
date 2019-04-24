@@ -457,21 +457,21 @@ class StoreTypedArrayHolePolicy final : public StoreTypedArrayPolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) MOZ_OVERRIDE;
+    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) MOZ_OVERRIDE;
 };
 
 class StoreTypedArrayElementStaticPolicy final : public StoreTypedArrayPolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) MOZ_OVERRIDE;
+    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) MOZ_OVERRIDE;
 };
 
 class StoreUnboxedObjectOrNullPolicy final : public TypePolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* def) MOZ_OVERRIDE;
+    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *def) MOZ_OVERRIDE;
 };
 
 // Accepts integers and doubles. Everything else is boxed.

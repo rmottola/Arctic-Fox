@@ -2862,7 +2862,7 @@ LIRGenerator::visitStringSplit(MStringSplit* ins)
 }
 
 void
-LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement* ins)
+LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement *ins)
 {
     MOZ_ASSERT(IsValidElementsType(ins->elements(), ins->offsetAdjustment()));
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
@@ -2879,15 +2879,15 @@ LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement* ins)
         tempDef = temp();
 
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
         add(fence, ins);
     }
-    LLoadTypedArrayElement* lir = new(alloc()) LLoadTypedArrayElement(elements, index, tempDef);
+    LLoadTypedArrayElement *lir = new(alloc()) LLoadTypedArrayElement(elements, index, tempDef);
     if (ins->fallible())
         assignSnapshot(lir, Bailout_Overflow);
     define(lir, ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
         add(fence, ins);
     }
 }
@@ -2958,7 +2958,7 @@ LIRGenerator::visitLoadTypedArrayElementStatic(MLoadTypedArrayElementStatic* ins
 }
 
 void
-LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement* ins)
+LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement *ins)
 {
     MOZ_ASSERT(IsValidElementsType(ins->elements(), ins->offsetAdjustment()));
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
@@ -2988,12 +2988,12 @@ LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement* ins)
     // barriers, and we could use that instead of separate barrier and
     // store instructions.  See bug #1077027.
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
         add(fence, ins);
     }
     add(new(alloc()) LStoreTypedArrayElement(elements, index, value), ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
         add(fence, ins);
     }
 }

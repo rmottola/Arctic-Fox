@@ -1010,7 +1010,7 @@ MConstantElements::printOpcode(FILE* fp) const
 }
 
 void
-MLoadTypedArrayElement::printOpcode(FILE* fp) const
+MLoadTypedArrayElement::printOpcode(FILE *fp) const
 {
     MDefinition::printOpcode(fp);
     fprintf(fp, " %s", ScalarTypeDescr::typeName(arrayType()));

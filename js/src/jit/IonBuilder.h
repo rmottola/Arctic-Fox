@@ -515,16 +515,16 @@ class IonBuilder
                                         ReferenceTypeDescr::Type type,
                                         MDefinition* value,
                                         PropertyName* name);
-    bool storeScalarTypedObjectValue(MDefinition* typedObj,
-                                     const LinearSum& byteOffset,
+    bool storeScalarTypedObjectValue(MDefinition *typedObj,
+                                     const LinearSum &byteOffset,
                                      ScalarTypeDescr::Type type,
                                      bool racy,
-                                     MDefinition* value);
+                                     MDefinition *value);
     bool checkTypedObjectIndexInBounds(int32_t elemSize,
-                                       MDefinition* obj,
-                                       MDefinition* index,
+                                       MDefinition *obj,
+                                       MDefinition *index,
                                        TypedObjectPrediction objTypeDescrs,
-                                       LinearSum* indexAsByteOffset);
+                                       LinearSum *indexAsByteOffset);
     bool pushDerivedTypedObject(bool* emitted,
                                 MDefinition* obj,
                                 const LinearSum& byteOffset,
@@ -662,13 +662,13 @@ class IonBuilder
     bool jsop_setelem();
     bool jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
                             SetElemSafety safety,
-                            MDefinition* object, MDefinition* index, MDefinition* value);
+                            MDefinition *object, MDefinition *index, MDefinition *value);
     bool jsop_setelem_typed(ScalarTypeDescr::Type arrayType,
                             SetElemSafety safety,
-                            MDefinition* object, MDefinition* index, MDefinition* value);
+                            MDefinition *object, MDefinition *index, MDefinition *value);
     bool jsop_setelem_typed_object(ScalarTypeDescr::Type arrayType,
                                    SetElemSafety safety, bool racy,
-                                   MDefinition* object, MDefinition* index, MDefinition* value);
+                                   MDefinition *object, MDefinition *index, MDefinition *value);
     bool jsop_length();
     bool jsop_length_fastPath();
     bool jsop_arguments();

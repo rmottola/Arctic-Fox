@@ -4843,22 +4843,22 @@ class LLoadTypedArrayElement : public LInstructionHelper<1, 2, 1>
   public:
     LIR_HEADER(LoadTypedArrayElement)
 
-    LLoadTypedArrayElement(const LAllocation& elements, const LAllocation& index,
-                           const LDefinition& temp) {
+    LLoadTypedArrayElement(const LAllocation &elements, const LAllocation &index,
+                           const LDefinition &temp) {
         setOperand(0, elements);
         setOperand(1, index);
         setTemp(0, temp);
     }
-    const MLoadTypedArrayElement* mir() const {
+    const MLoadTypedArrayElement *mir() const {
         return mir_->toLoadTypedArrayElement();
     }
-    const LAllocation* elements() {
+    const LAllocation *elements() {
         return getOperand(0);
     }
-    const LAllocation* index() {
+    const LAllocation *index() {
         return getOperand(1);
     }
-    const LDefinition* temp() {
+    const LDefinition *temp() {
         return getTemp(0);
     }
 };
@@ -4903,23 +4903,23 @@ class LStoreTypedArrayElement : public LInstructionHelper<0, 3, 0>
   public:
     LIR_HEADER(StoreTypedArrayElement)
 
-    LStoreTypedArrayElement(const LAllocation& elements, const LAllocation& index,
-                            const LAllocation& value) {
+    LStoreTypedArrayElement(const LAllocation &elements, const LAllocation &index,
+                            const LAllocation &value) {
         setOperand(0, elements);
         setOperand(1, index);
         setOperand(2, value);
     }
 
-    const MStoreTypedArrayElement* mir() const {
+    const MStoreTypedArrayElement *mir() const {
         return mir_->toStoreTypedArrayElement();
     }
-    const LAllocation* elements() {
+    const LAllocation *elements() {
         return getOperand(0);
     }
-    const LAllocation* index() {
+    const LAllocation *index() {
         return getOperand(1);
     }
-    const LAllocation* value() {
+    const LAllocation *value() {
         return getOperand(2);
     }
 };

@@ -1670,7 +1670,7 @@ GetTypedArrayRange(TempAllocator &alloc, Scalar::Type type)
 }
 
 void
-MLoadTypedArrayElement::computeRange(TempAllocator& alloc)
+MLoadTypedArrayElement::computeRange(TempAllocator &alloc)
 {
     // We have an Int32 type and if this is a UInt32 load it may produce a value
     // outside of our range, but we have a bailout to handle those cases.
@@ -1678,7 +1678,7 @@ MLoadTypedArrayElement::computeRange(TempAllocator& alloc)
 }
 
 void
-MLoadTypedArrayElementStatic::computeRange(TempAllocator& alloc)
+MLoadTypedArrayElementStatic::computeRange(TempAllocator &alloc)
 {
     // We don't currently use MLoadTypedArrayElementStatic for uint32, so we
     // don't have to worry about it returning a value outside our type.

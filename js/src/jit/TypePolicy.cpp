@@ -965,11 +965,11 @@ StoreTypedArrayPolicy::adjustValueInput(TempAllocator &alloc, MInstruction *ins,
 }
 
 bool
-StoreTypedArrayPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+StoreTypedArrayPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     SingleObjectPolicy::staticAdjustInputs(alloc, ins);
 
-    MStoreTypedArrayElement* store = ins->toStoreTypedArrayElement();
+    MStoreTypedArrayElement *store = ins->toStoreTypedArrayElement();
     MOZ_ASSERT(IsValidElementsType(store->elements(), store->offsetAdjustment()));
     MOZ_ASSERT(store->index()->type() == MIRType_Int32);
 

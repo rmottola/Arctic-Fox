@@ -7849,7 +7849,7 @@ IonBuilder::pushScalarLoadFromTypedObject(MDefinition* obj,
     loadTypedObjectElements(obj, byteOffset, size, &elements, &scaledOffset, &adjustment);
 
     // Load the element.
-    MLoadTypedArrayElement* load = MLoadTypedArrayElement::New(alloc(), elements, scaledOffset,
+    MLoadTypedArrayElement *load = MLoadTypedArrayElement::New(alloc(), elements, scaledOffset,
                                                                elemType,
                                                                DoesNotRequireMemoryBarrier,
                                                                adjustment);
@@ -8587,7 +8587,7 @@ IonBuilder::jsop_getelem_typed(MDefinition* obj, MDefinition* index,
         addTypedArrayLengthAndData(obj, DoBoundsCheck, &index, &length, &elements);
 
         // Load the element.
-        MLoadTypedArrayElement* load = MLoadTypedArrayElement::New(alloc(), elements, index, arrayType);
+        MLoadTypedArrayElement *load = MLoadTypedArrayElement::New(alloc(), elements, index, arrayType);
         current->add(load);
         current->push(load);
 
@@ -9071,7 +9071,7 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
             needsHoleCheck = false;
         }
 
-        MStoreElement* ins = MStoreElement::New(alloc(), elements, id, newValue, needsHoleCheck);
+        MStoreElement *ins = MStoreElement::New(alloc(), elements, id, newValue, needsHoleCheck);
         store = ins;
 
         if (safety == SetElem_Unsafe)
@@ -9137,7 +9137,7 @@ IonBuilder::jsop_setelem_typed(Scalar::Type arrayType, SetElemSafety safety,
     if (expectOOB) {
         ins = MStoreTypedArrayElementHole::New(alloc(), elements, length, id, toWrite, arrayType);
     } else {
-        MStoreTypedArrayElement* store =
+        MStoreTypedArrayElement *store =
             MStoreTypedArrayElement::New(alloc(), elements, id, toWrite, arrayType);
         if (safety == SetElem_Unsafe)
             store->setRacy();
@@ -9154,7 +9154,7 @@ IonBuilder::jsop_setelem_typed(Scalar::Type arrayType, SetElemSafety safety,
 
 bool
 IonBuilder::jsop_setelem_typed_object(Scalar::Type arrayType, SetElemSafety safety, bool racy,
-                                      MDefinition* object, MDefinition* index, MDefinition* value)
+                                      MDefinition *object, MDefinition *index, MDefinition *value)
 {
     MOZ_ASSERT(safety == SetElem_Unsafe); // Can be fixed, but there's been no reason to as of yet
 
@@ -10414,7 +10414,7 @@ IonBuilder::loadUnboxedProperty(MDefinition* obj, size_t offset, JSValueType unb
     MInstruction* scaledOffset = MConstant::New(alloc(), Int32Value(scaledOffsetConstant));
     current->add(scaledOffset);
 
-    MInstruction* load;
+    MInstruction *load;
     switch (unboxedType) {
       case JSVAL_TYPE_BOOLEAN:
         load = MLoadTypedArrayElement::New(alloc(), obj, scaledOffset, Scalar::Uint8,
@@ -11323,7 +11323,7 @@ IonBuilder::storeUnboxedProperty(MDefinition* obj, size_t offset, JSValueType un
     MInstruction* scaledOffset = MConstant::New(alloc(), Int32Value(scaledOffsetConstant));
     current->add(scaledOffset);
 
-    MInstruction* store;
+    MInstruction *store;
     switch (unboxedType) {
       case JSVAL_TYPE_BOOLEAN:
         store = MStoreTypedArrayElement::New(alloc(), obj, scaledOffset, value, Scalar::Uint8,
@@ -12674,26 +12674,26 @@ IonBuilder::typeObjectForFieldFromStructType(MDefinition* typeObj,
 }
 
 bool
-IonBuilder::storeScalarTypedObjectValue(MDefinition* typedObj,
-                                        const LinearSum& byteOffset,
+IonBuilder::storeScalarTypedObjectValue(MDefinition *typedObj,
+                                        const LinearSum &byteOffset,
                                         ScalarTypeDescr::Type type,
                                         bool racy,
-                                        MDefinition* value)
+                                        MDefinition *value)
 {
     // Find location within the owner object.
-    MDefinition* elements, *scaledOffset;
+    MDefinition *elements, *scaledOffset;
     int32_t adjustment;
     size_t alignment = ScalarTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
 
     // Clamp value to [0, 255] when type is Uint8Clamped
-    MDefinition* toWrite = value;
+    MDefinition *toWrite = value;
     if (type == Scalar::Uint8Clamped) {
         toWrite = MClampToUint8::New(alloc(), value);
         current->add(toWrite->toInstruction());
     }
 
-    MStoreTypedArrayElement* store =
+    MStoreTypedArrayElement *store =
         MStoreTypedArrayElement::New(alloc(), elements, scaledOffset, toWrite,
                                      type, DoesNotRequireMemoryBarrier, adjustment);
     if (racy)

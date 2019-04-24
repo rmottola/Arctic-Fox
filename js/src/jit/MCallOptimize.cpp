@@ -2119,9 +2119,9 @@ IonBuilder::inlineUnsafeSetTypedObjectArrayElement(CallInfo& callInfo,
     // - arr is a typed array
     // - idx < length
 
-    MDefinition* obj = callInfo.getArg(base + 0);
-    MDefinition* id = callInfo.getArg(base + 1);
-    MDefinition* elem = callInfo.getArg(base + 2);
+    MDefinition *obj = callInfo.getArg(base + 0);
+    MDefinition *id = callInfo.getArg(base + 1);
+    MDefinition *elem = callInfo.getArg(base + 2);
 
     if (!jsop_setelem_typed_object(arrayType, SetElem_Unsafe, true, obj, id, elem))
         return false;
@@ -2706,11 +2706,11 @@ IonBuilder::inlineAtomicsLoad(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* elements;
-    MDefinition* index;
+    MInstruction *elements;
+    MDefinition *index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MLoadTypedArrayElement* load =
+    MLoadTypedArrayElement *load =
         MLoadTypedArrayElement::New(alloc(), elements, index, arrayType,
                                     DoesRequireMemoryBarrier);
     load->setResultType(getInlineReturnType());
@@ -2721,7 +2721,7 @@ IonBuilder::inlineAtomicsLoad(CallInfo& callInfo)
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineAtomicsStore(CallInfo& callInfo)
+IonBuilder::inlineAtomicsStore(CallInfo &callInfo)
 {
     if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
@@ -2732,22 +2732,22 @@ IonBuilder::inlineAtomicsStore(CallInfo& callInfo)
     if (!atomicsMeetsPreconditions(callInfo, &arrayType))
         return InliningStatus_NotInlined;
 
-    MDefinition* value = callInfo.getArg(2);
+    MDefinition *value = callInfo.getArg(2);
     if (!(value->type() == MIRType_Int32 || value->type() == MIRType_Double))
         return InliningStatus_NotInlined;
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* elements;
-    MDefinition* index;
+    MInstruction *elements;
+    MDefinition *index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MDefinition* toWrite = value;
+    MDefinition *toWrite = value;
     if (value->type() == MIRType_Double) {
         toWrite = MTruncateToInt32::New(alloc(), value);
         current->add(toWrite->toInstruction());
     }
-    MStoreTypedArrayElement* store =
+    MStoreTypedArrayElement *store =
         MStoreTypedArrayElement::New(alloc(), elements, index, toWrite, arrayType,
                                      DoesRequireMemoryBarrier);
     current->add(store);
