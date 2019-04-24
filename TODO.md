@@ -99,8 +99,11 @@
 - Bug 1144931 - Move gray buffering code to RootMarking.cpp
 - Bug 1137180 - Allow unboxed objects to be extended with new propertie…
 - Bug 1144108 - Fix debugger tests that are confused by GC zea
+- Bug 1135042: Optimize SIMD.storeX/storeXY/storeXYZ
 - Bug 1135042 2015-13-20 - Optimize SIMD.loadX/loadXY/loadXYZ in Ion; r=bhackett
-
+- Bug 1135039: Generalize swizzle MIR node to SimdGeneralShuffle;
+- Bug 1139152 - IonMonkey: Add dynamic output type checks for LIRs that
+- Bug 1128076 - Clean up naming around unboxed scalar MIR accesses,
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
