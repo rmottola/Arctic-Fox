@@ -2726,24 +2726,24 @@ class FunctionCompiler
         return ins;
     }
 
-    MDefinition* swizzleSimd(MDefinition* vector, int32_t X, int32_t Y, int32_t Z, int32_t W,
+    MDefinition *swizzleSimd(MDefinition *vector, int32_t X, int32_t Y, int32_t Z, int32_t W,
                              MIRType type)
     {
         if (inDeadCode())
             return nullptr;
 
-        MSimdSwizzle* ins = MSimdSwizzle::NewAsmJS(alloc(), vector, type, X, Y, Z, W);
+        MSimdSwizzle *ins = MSimdSwizzle::NewAsmJS(alloc(), vector, type, X, Y, Z, W);
         curBlock_->add(ins);
         return ins;
     }
 
-    MDefinition* shuffleSimd(MDefinition* lhs, MDefinition* rhs, int32_t X, int32_t Y,
+    MDefinition *shuffleSimd(MDefinition *lhs, MDefinition* rhs, int32_t X, int32_t Y,
                              int32_t Z, int32_t W, MIRType type)
     {
         if (inDeadCode())
             return nullptr;
 
-        MInstruction* ins = MSimdShuffle::NewAsmJS(alloc(), lhs, rhs, type, X, Y, Z, W);
+        MInstruction *ins = MSimdShuffle::NewAsmJS(alloc(), lhs, rhs, type, X, Y, Z, W);
         curBlock_->add(ins);
         return ins;
     }

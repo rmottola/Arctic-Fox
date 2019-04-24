@@ -1912,7 +1912,7 @@ class MSimdShuffle
   public:
     INSTRUCTION_HEADER(SimdShuffle)
 
-    static MInstruction* NewAsmJS(TempAllocator& alloc, MDefinition* lhs, MDefinition* rhs,
+    static MInstruction *NewAsmJS(TempAllocator &alloc, MDefinition *lhs, MDefinition *rhs,
                                   MIRType type, uint32_t laneX, uint32_t laneY, uint32_t laneZ,
                                   uint32_t laneW)
     {
