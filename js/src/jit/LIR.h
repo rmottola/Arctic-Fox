@@ -1012,52 +1012,52 @@ class LInstructionHelper : public LInstruction
     mozilla::Array<LDefinition, Temps> temps_;
 
   public:
-    size_t numDefs() const final override {
+    size_t numDefs() const MOZ_FINAL MOZ_OVERRIDE {
         return Defs;
     }
-    LDefinition* getDef(size_t index) final override {
+    LDefinition *getDef(size_t index) MOZ_FINAL MOZ_OVERRIDE {
         return &defs_[index];
     }
-    size_t numOperands() const final override {
+    size_t numOperands() const MOZ_FINAL MOZ_OVERRIDE {
         return Operands;
     }
-    LAllocation* getOperand(size_t index) final override {
+    LAllocation *getOperand(size_t index) MOZ_FINAL MOZ_OVERRIDE {
         return &operands_[index];
     }
-    size_t numTemps() const final override {
+    size_t numTemps() const MOZ_FINAL MOZ_OVERRIDE {
         return Temps;
     }
-    LDefinition* getTemp(size_t index) final override {
+    LDefinition *getTemp(size_t index) MOZ_FINAL MOZ_OVERRIDE {
         return &temps_[index];
     }
 
-    void setDef(size_t index, const LDefinition& def) final override {
+    void setDef(size_t index, const LDefinition &def) MOZ_FINAL MOZ_OVERRIDE {
         defs_[index] = def;
     }
-    void setOperand(size_t index, const LAllocation& a) final override {
+    void setOperand(size_t index, const LAllocation &a) MOZ_FINAL MOZ_OVERRIDE {
         operands_[index] = a;
     }
-    void setTemp(size_t index, const LDefinition& a) final override {
+    void setTemp(size_t index, const LDefinition &a) MOZ_FINAL MOZ_OVERRIDE {
         temps_[index] = a;
     }
 
-    size_t numSuccessors() const override {
+    size_t numSuccessors() const MOZ_OVERRIDE {
         return 0;
     }
-    MBasicBlock* getSuccessor(size_t i) const override {
+    MBasicBlock *getSuccessor(size_t i) const MOZ_OVERRIDE {
         MOZ_ASSERT(false);
         return nullptr;
     }
-    void setSuccessor(size_t i, MBasicBlock* successor) override {
+    void setSuccessor(size_t i, MBasicBlock *successor) MOZ_OVERRIDE {
         MOZ_ASSERT(false);
     }
 
     // Default accessors, assuming a single input and output, respectively.
-    const LAllocation* input() {
+    const LAllocation *input() {
         MOZ_ASSERT(numOperands() == 1);
         return getOperand(0);
     }
-    const LDefinition* output() {
+    const LDefinition *output() {
         MOZ_ASSERT(numDefs() == 1);
         return getDef(0);
     }

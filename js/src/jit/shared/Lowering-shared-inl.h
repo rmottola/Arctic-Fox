@@ -60,7 +60,7 @@ LIRGeneratorShared::define(LVariadicInstruction<1, X> *lir, MDefinition *mir, LD
 }
 
 template <size_t X, size_t Y> void
-LIRGeneratorShared::define(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, const LDefinition& def)
+LIRGeneratorShared::define(LInstructionHelper<1, X, Y> *lir, MDefinition *mir, const LDefinition &def)
 {
     // Call instructions should use defineReturn.
     MOZ_ASSERT(!lir->isCall());
@@ -77,14 +77,14 @@ LIRGeneratorShared::define(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, c
 }
 
 template <size_t X, size_t Y> void
-LIRGeneratorShared::define(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, LDefinition::Policy policy)
+LIRGeneratorShared::define(LInstructionHelper<1, X, Y> *lir, MDefinition *mir, LDefinition::Policy policy)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
     define(lir, mir, LDefinition(type, policy));
 }
 
 template <size_t X, size_t Y> void
-LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, const LAllocation& output)
+LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y> *lir, MDefinition *mir, const LAllocation &output)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
 
