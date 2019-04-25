@@ -8825,6 +8825,7 @@ class MLoadUnboxedScalar
 {
     Scalar::Type indexType_;
     Scalar::Type readType_;
+    unsigned numElems_; // used only for SIMD
     bool requiresBarrier_;
     int32_t offsetAdjustment_;
     bool canonicalizeDoubles_;
@@ -8835,6 +8836,7 @@ class MLoadUnboxedScalar
       : MBinaryInstruction(elements, index),
         indexType_(indexType),
         readType_(indexType),
+        numElems_(1),
         requiresBarrier_(requiresBarrier == DoesRequireMemoryBarrier),
         offsetAdjustment_(offsetAdjustment),
         canonicalizeDoubles_(canonicalizeDoubles)
@@ -8864,8 +8866,12 @@ class MLoadUnboxedScalar
                                              canonicalizeDoubles);
     }
 
-    void setReadType(Scalar::Type type) {
+    void setSimdRead(Scalar::Type type, unsigned numElems) {
         readType_ = type;
+        numElems_ = numElems;
+    }
+    unsigned numElems() const {
+        return numElems_;
     }
     Scalar::Type readType() const {
         return readType_;
@@ -8910,6 +8916,8 @@ class MLoadUnboxedScalar
         if (indexType_ != other->indexType_)
             return false;
         if (readType_ != other->readType_)
+            return false;
+        if (numElems_ != other->numElems_)
             return false;
         if (offsetAdjustment() != other->offsetAdjustment())
             return false;
