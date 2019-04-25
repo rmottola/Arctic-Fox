@@ -319,8 +319,8 @@ MacroAssembler::storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister val
 
 template<typename T>
 void
-MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const T& src, AnyRegister dest, Register temp,
-                                   Label* fail, bool canonicalizeDoubles)
+MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const T &src, AnyRegister dest, Register temp,
+                                   Label *fail, bool canonicalizeDoubles)
 {
     switch (arrayType) {
       case Scalar::Int8:
@@ -372,10 +372,10 @@ MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const T& src, AnyRegi
     }
 }
 
-template void MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const Address& src, AnyRegister dest,
-                                                 Register temp, Label* fail, bool canonicalizeDoubles);
-template void MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const BaseIndex& src, AnyRegister dest,
-                                                 Register temp, Label* fail, bool canonicalizeDoubles);
+template void MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const Address &src, AnyRegister dest,
+                                                 Register temp, Label *fail, bool canonicalizeDoubles);
+template void MacroAssembler::loadFromTypedArray(Scalar::Type arrayType, const BaseIndex &src, AnyRegister dest,
+                                                 Register temp, Label *fail, bool canonicalizeDoubles);
 
 template<typename T>
 void

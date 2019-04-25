@@ -908,13 +908,13 @@ class MacroAssemblerX86Shared : public Assembler
     template <class T> inline void loadAlignedVector(const Address &src, FloatRegister dest);
     template <class T> inline void storeAlignedVector(FloatRegister src, const Address &dest);
 
-    void loadAlignedInt32x4(const Address& src, FloatRegister dest) {
+    void loadAlignedInt32x4(const Address &src, FloatRegister dest) {
         vmovdqa(Operand(src), dest);
     }
-    void loadAlignedInt32x4(const Operand& src, FloatRegister dest) {
+    void loadAlignedInt32x4(const Operand &src, FloatRegister dest) {
         vmovdqa(src, dest);
     }
-    void storeAlignedInt32x4(FloatRegister src, const Address& dest) {
+    void storeAlignedInt32x4(FloatRegister src, const Address &dest) {
         vmovdqa(src, Operand(dest));
     }
     void moveInt32x4(FloatRegister src, FloatRegister dest) {
@@ -995,13 +995,13 @@ class MacroAssemblerX86Shared : public Assembler
         vpsrld(count, dest, dest);
     }
 
-    void loadAlignedFloat32x4(const Address& src, FloatRegister dest) {
+    void loadAlignedFloat32x4(const Address &src, FloatRegister dest) {
         vmovaps(Operand(src), dest);
     }
-    void loadAlignedFloat32x4(const Operand& src, FloatRegister dest) {
+    void loadAlignedFloat32x4(const Operand &src, FloatRegister dest) {
         vmovaps(src, dest);
     }
-    void storeAlignedFloat32x4(FloatRegister src, const Address& dest) {
+    void storeAlignedFloat32x4(FloatRegister src, const Address &dest) {
         vmovaps(src, Operand(dest));
     }
     void moveFloat32x4(FloatRegister src, FloatRegister dest) {
