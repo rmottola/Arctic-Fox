@@ -1122,7 +1122,6 @@ AutoDetectInvalidation::setReturnOverride()
     cx_->runtime()->jitRuntime()->setIonReturnOverride(rval_.get());
 }
 
-#ifdef DEBUG
 void
 AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 {
@@ -1136,7 +1135,7 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 
     if (obj->isTenured()) {
         MOZ_ASSERT(obj->isAligned());
-        gc::AllocKind kind = obj->asTenured().getAllocKind();
+        mozilla::DebugOnly<gc::AllocKind> kind = obj->asTenured().getAllocKind();
         MOZ_ASSERT(kind <= js::gc::AllocKind::OBJECT_LAST);
         MOZ_ASSERT(obj->asTenured().zone() == cx->zone());
     }
@@ -1167,7 +1166,7 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
     MOZ_ASSERT(str->isAligned());
     MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
 
-    gc::AllocKind kind = str->getAllocKind();
+    mozilla::DebugOnly<gc::AllocKind> kind = str->getAllocKind();
     if (str->isFatInline())
         MOZ_ASSERT(kind == gc::AllocKind::FAT_INLINE_STRING);
     else if (str->isExternal())
@@ -1207,7 +1206,6 @@ AssertValidValue(JSContext* cx, Value* v)
     else if (v->isSymbol())
         AssertValidSymbolPtr(cx, v->toSymbol());
 }
-#endif
 
 bool
 ObjectIsCallable(JSObject* obj)
