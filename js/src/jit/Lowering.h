@@ -46,17 +46,17 @@ class LIRGenerator : public LIRGeneratorSpecific
 
   private:
 
-    void useBoxAtStart(LInstruction* lir, size_t n, MDefinition* mir,
+    void useBoxAtStart(LInstruction *lir, size_t n, MDefinition *mir,
                        LUse::Policy policy = LUse::REGISTER) {
         return useBox(lir, n, mir, policy, true);
     }
 
-    void lowerBitOp(JSOp op, MInstruction* ins);
-    void lowerShiftOp(JSOp op, MShiftInstruction* ins);
-    void lowerBinaryV(JSOp op, MBinaryInstruction* ins);
+    void lowerBitOp(JSOp op, MInstruction *ins);
+    void lowerShiftOp(JSOp op, MShiftInstruction *ins);
+    void lowerBinaryV(JSOp op, MBinaryInstruction *ins);
     void definePhis();
 
-    void lowerCallArguments(MCall* call);
+    void lowerCallArguments(MCall *call);
 
   public:
     bool visitInstruction(MInstruction* ins);

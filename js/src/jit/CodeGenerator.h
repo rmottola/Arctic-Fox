@@ -349,14 +349,14 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitBindNameIC(OutOfLineUpdateCache* ool, DataPtr<BindNameIC>& ic);
     void visitNameIC(OutOfLineUpdateCache* ool, DataPtr<NameIC>& ic);
 
-    void visitAssertRangeI(LAssertRangeI* ins);
-    void visitAssertRangeD(LAssertRangeD* ins);
-    void visitAssertRangeF(LAssertRangeF* ins);
-    void visitAssertRangeV(LAssertRangeV* ins);
+    void visitAssertRangeI(LAssertRangeI *ins);
+    void visitAssertRangeD(LAssertRangeD *ins);
+    void visitAssertRangeF(LAssertRangeF *ins);
+    void visitAssertRangeV(LAssertRangeV *ins);
 
-    void visitInterruptCheck(LInterruptCheck* lir);
-    void visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir);
-    void visitRecompileCheck(LRecompileCheck* ins);
+    void visitInterruptCheck(LInterruptCheck *lir);
+    void visitAsmJSInterruptCheck(LAsmJSInterruptCheck *lir);
+    void visitRecompileCheck(LRecompileCheck *ins);
 
     IonScriptCounts* extractScriptCounts() {
         IonScriptCounts* counts = scriptCounts_;
@@ -453,16 +453,16 @@ class CodeGenerator : public CodeGeneratorSpecific
     void emitStoreHoleCheck(Register elements, const LAllocation* index, int32_t offsetAdjustment,
                             LSnapshot* snapshot);
 
-    void emitAssertRangeI(const Range* r, Register input);
-    void emitAssertRangeD(const Range* r, FloatRegister input, FloatRegister temp);
+    void emitAssertRangeI(const Range *r, Register input);
+    void emitAssertRangeD(const Range *r, FloatRegister input, FloatRegister temp);
 
     Vector<CodeOffsetLabel, 0, JitAllocPolicy> ionScriptLabels_;
 #ifdef DEBUG
-    void branchIfInvalidated(Register temp, Label* invalidated);
+    void branchIfInvalidated(Register temp, Label *invalidated);
 
-    void emitDebugResultChecks(LInstruction* ins);
-    void emitObjectOrStringResultChecks(LInstruction* lir, MDefinition* mir);
-    void emitValueResultChecks(LInstruction* lir, MDefinition* mir);
+    void emitDebugResultChecks(LInstruction *ins);
+    void emitObjectOrStringResultChecks(LInstruction *lir, MDefinition *mir);
+    void emitValueResultChecks(LInstruction *lir, MDefinition *mir);
 #endif
 
     // Script counts created during code generation.

@@ -5828,7 +5828,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     if (op.getBoolOption("ion-check-range-analysis"))
         jit::js_JitOptions.checkRangeAnalysis = true;
 
-    if (const char* str = op.getStringOption("ion-inlining")) {
+    if (const char *str = op.getStringOption("ion-inlining")) {
         if (strcmp(str, "on") == 0)
             jit::js_JitOptions.disableInlining = false;
         else if (strcmp(str, "off") == 0)

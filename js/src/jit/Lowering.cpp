@@ -4051,9 +4051,9 @@ LIRGenerator::visitSimdShift(MSimdShift* ins)
 void
 LIRGenerator::visitLexicalCheck(MLexicalCheck* ins)
 {
-    MDefinition* input = ins->input();
+    MDefinition *input = ins->input();
     MOZ_ASSERT(input->type() == MIRType_Value);
-    LLexicalCheck* lir = new(alloc()) LLexicalCheck();
+    LLexicalCheck *lir = new(alloc()) LLexicalCheck();
     redefine(ins, input);
     useBox(lir, LLexicalCheck::Input, input);
     add(lir, ins);
@@ -4102,7 +4102,7 @@ SpewResumePoint(MBasicBlock* block, MInstruction* ins, MResumePoint* resumePoint
             int(resumePoint->block()->info().script()->pcToOffset(resumePoint->pc())));
 
     for (size_t i = 0, e = resumePoint->numOperands(); i < e; i++) {
-        MDefinition* in = resumePoint->getOperand(i);
+        MDefinition *in = resumePoint->getOperand(i);
         fprintf(JitSpewFile, "    slot%u: ", (unsigned)i);
         in->printName(JitSpewFile);
         fprintf(JitSpewFile, "\n");

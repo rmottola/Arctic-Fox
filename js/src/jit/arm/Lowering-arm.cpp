@@ -18,7 +18,7 @@ using namespace js::jit;
 using mozilla::FloorLog2;
 
 void
-LIRGeneratorARM::useBox(LInstruction* lir, size_t n, MDefinition* mir,
+LIRGeneratorARM::useBox(LInstruction *lir, size_t n, MDefinition *mir,
                         LUse::Policy policy, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);
@@ -28,7 +28,7 @@ LIRGeneratorARM::useBox(LInstruction* lir, size_t n, MDefinition* mir,
 }
 
 void
-LIRGeneratorARM::useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1,
+LIRGeneratorARM::useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1,
                              Register reg2)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);

@@ -15,7 +15,7 @@ using namespace js;
 using namespace js::jit;
 
 void
-LIRGeneratorX86::useBox(LInstruction* lir, size_t n, MDefinition* mir,
+LIRGeneratorX86::useBox(LInstruction *lir, size_t n, MDefinition *mir,
                         LUse::Policy policy, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);
@@ -26,7 +26,7 @@ LIRGeneratorX86::useBox(LInstruction* lir, size_t n, MDefinition* mir,
 }
 
 void
-LIRGeneratorX86::useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1,
+LIRGeneratorX86::useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1,
                              Register reg2)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);

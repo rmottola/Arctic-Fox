@@ -3698,7 +3698,7 @@ struct ScriptCountBlockState
 
 #ifdef DEBUG
 void
-CodeGenerator::branchIfInvalidated(Register temp, Label* invalidated)
+CodeGenerator::branchIfInvalidated(Register temp, Label *invalidated)
 {
     CodeOffsetLabel label = masm.movWithPatch(ImmWord(uintptr_t(-1)), temp);
     masm.propagateOOM(ionScriptLabels_.append(label));
@@ -3711,7 +3711,7 @@ CodeGenerator::branchIfInvalidated(Register temp, Label* invalidated)
 }
 
 void
-CodeGenerator::emitObjectOrStringResultChecks(LInstruction* lir, MDefinition* mir)
+CodeGenerator::emitObjectOrStringResultChecks(LInstruction *lir, MDefinition *mir)
 {
     if (lir->numDefs() == 0)
         return;
@@ -3759,13 +3759,13 @@ CodeGenerator::emitObjectOrStringResultChecks(LInstruction* lir, MDefinition* mi
     masm.passABIArg(temp);
     masm.passABIArg(output);
 
-    void* callee;
+    void *callee;
     switch (mir->type()) {
       case MIRType_Object:
-        callee = JS_FUNC_TO_DATA_PTR(void*, AssertValidObjectPtr);
+        callee = JS_FUNC_TO_DATA_PTR(void *, AssertValidObjectPtr);
         break;
       case MIRType_ObjectOrNull:
-        callee = JS_FUNC_TO_DATA_PTR(void*, AssertValidObjectOrNullPtr);
+        callee = JS_FUNC_TO_DATA_PTR(void *, AssertValidObjectOrNullPtr);
         break;
       case MIRType_String:
         callee = JS_FUNC_TO_DATA_PTR(void*, AssertValidStringPtr);
@@ -3785,7 +3785,7 @@ CodeGenerator::emitObjectOrStringResultChecks(LInstruction* lir, MDefinition* mi
 }
 
 void
-CodeGenerator::emitValueResultChecks(LInstruction* lir, MDefinition* mir)
+CodeGenerator::emitValueResultChecks(LInstruction *lir, MDefinition *mir)
 {
     if (lir->numDefs() == 0)
         return;
@@ -3840,7 +3840,7 @@ CodeGenerator::emitValueResultChecks(LInstruction* lir, MDefinition* mir)
     masm.loadJSContext(temp2);
     masm.passABIArg(temp2);
     masm.passABIArg(temp1);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, AssertValidValue));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, AssertValidValue));
     masm.popValue(output);
     restoreVolatile();
 
@@ -3850,7 +3850,7 @@ CodeGenerator::emitValueResultChecks(LInstruction* lir, MDefinition* mir)
 }
 
 void
-CodeGenerator::emitDebugResultChecks(LInstruction* ins)
+CodeGenerator::emitDebugResultChecks(LInstruction *ins)
 {
     // In debug builds, check that LIR instructions return valid values.
 
@@ -9477,7 +9477,7 @@ CodeGenerator::emitAssertRangeD(const Range* r, FloatRegister input, FloatRegist
 }
 
 void
-CodeGenerator::visitAssertRangeI(LAssertRangeI* ins)
+CodeGenerator::visitAssertRangeI(LAssertRangeI *ins)
 {
     Register input = ToRegister(ins->input());
     const Range* r = ins->range();
@@ -9486,7 +9486,7 @@ CodeGenerator::visitAssertRangeI(LAssertRangeI* ins)
 }
 
 void
-CodeGenerator::visitAssertRangeD(LAssertRangeD* ins)
+CodeGenerator::visitAssertRangeD(LAssertRangeD *ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
     FloatRegister temp = ToFloatRegister(ins->temp());

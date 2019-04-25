@@ -21,14 +21,14 @@ class LIRGeneratorNone : public LIRGeneratorShared
         MOZ_CRASH();
     }
 
-    void useBox(LInstruction*, size_t, MDefinition*,
+    void useBox(LInstruction *, size_t, MDefinition *,
                 LUse::Policy a = LUse::REGISTER, bool b = false) {
         MOZ_CRASH();
     }
-    void useBoxFixed(LInstruction*, size_t, MDefinition*, Register, Register) { MOZ_CRASH(); }
+    void useBoxFixed(LInstruction *, size_t, MDefinition *, Register, Register) { MOZ_CRASH(); }
 
-    LAllocation useByteOpRegister(MDefinition*) { MOZ_CRASH(); }
-    LAllocation useByteOpRegisterOrNonDoubleConstant(MDefinition*) { MOZ_CRASH(); }
+    LAllocation useByteOpRegister(MDefinition *) { MOZ_CRASH(); }
+    LAllocation useByteOpRegisterOrNonDoubleConstant(MDefinition *) { MOZ_CRASH(); }
     LDefinition tempByteOpRegister() { MOZ_CRASH(); }
     LDefinition tempToUnbox() { MOZ_CRASH(); }
     bool needTempForPostBarrier() { MOZ_CRASH(); }
