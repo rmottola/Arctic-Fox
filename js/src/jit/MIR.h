@@ -9112,6 +9112,7 @@ class MStoreUnboxedScalar
     Scalar::Type indexType_;
     bool requiresBarrier_;
     int32_t offsetAdjustment_;
+    unsigned numElems_; // used only for SIMD
 
     MStoreUnboxedScalar(MDefinition *elements, MDefinition *index, MDefinition *value,
                         Scalar::Type indexType, MemoryBarrierRequirement requiresBarrier,
@@ -9120,7 +9121,8 @@ class MStoreUnboxedScalar
         StoreUnboxedScalarBase(indexType),
         indexType_(indexType),
         requiresBarrier_(requiresBarrier == DoesRequireMemoryBarrier),
-        offsetAdjustment_(offsetAdjustment)
+        offsetAdjustment_(offsetAdjustment),
+        numElems_(1)
     {
         if (requiresBarrier_)
             setGuard();         // Not removable or movable
@@ -9145,6 +9147,14 @@ class MStoreUnboxedScalar
                                               requiresBarrier, offsetAdjustment);
     }
 
+    void setSimdWrite(Scalar::Type writeType, unsigned numElems) {
+        MOZ_ASSERT(Scalar::isSimdType(writeType));
+        setWriteType(writeType);
+        numElems_ = numElems;
+    }
+    unsigned numElems() const {
+        return numElems_;
+    }
     Scalar::Type indexType() const {
         return indexType_;
     }
