@@ -280,7 +280,7 @@ template void MacroAssembler::guardType(const ValueOperand& value, TypeSet::Type
 
 template<typename S, typename T>
 static void
-StoreToTypedFloatArray(MacroAssembler& masm, int arrayType, const S& value, const T& dest)
+StoreToTypedFloatArray(MacroAssembler &masm, int arrayType, const S &value, const T &dest)
 {
     switch (arrayType) {
       case Scalar::Float32:
@@ -306,13 +306,13 @@ StoreToTypedFloatArray(MacroAssembler& masm, int arrayType, const S& value, cons
 
 void
 MacroAssembler::storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value,
-                                       const BaseIndex& dest)
+                                       const BaseIndex &dest)
 {
     StoreToTypedFloatArray(*this, arrayType, value, dest);
 }
 void
 MacroAssembler::storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value,
-                                       const Address& dest)
+                                       const Address &dest)
 {
     StoreToTypedFloatArray(*this, arrayType, value, dest);
 }

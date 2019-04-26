@@ -745,15 +745,15 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     template<typename T>
-    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem, Register oldval, Register newval,
+    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T &mem, Register oldval, Register newval,
                                         Register temp, AnyRegister output);
 
     template<typename S, typename T>
-    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value,
-                                    const T& mem, Register temp1, Register temp2, AnyRegister output);
+    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S &value,
+                                    const T &mem, Register temp1, Register temp2, AnyRegister output);
 
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex& dest);
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address& dest);
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex &dest);
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address &dest);
 
     // Load a property from an UnboxedPlainObject.
     template <typename T>
