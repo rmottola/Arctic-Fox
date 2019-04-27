@@ -338,17 +338,17 @@ class ObjectGroup : public gc::TenuredCell
         setAddendum(Addendum_None, nullptr);
     }
 
-    UnboxedLayout* maybeUnboxedLayout() {
+    UnboxedLayout *maybeUnboxedLayout() {
         maybeSweep(nullptr);
         return maybeUnboxedLayoutDontCheckGeneration();
     }
 
-    UnboxedLayout& unboxedLayout() {
+    UnboxedLayout &unboxedLayout() {
         MOZ_ASSERT(addendumKind() == Addendum_UnboxedLayout);
         return *maybeUnboxedLayout();
     }
 
-    void setUnboxedLayout(UnboxedLayout* layout) {
+    void setUnboxedLayout(UnboxedLayout *layout) {
         setAddendum(Addendum_UnboxedLayout, layout);
     }
 

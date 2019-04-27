@@ -202,11 +202,11 @@ class UnboxedPlainObject : public JSObject
     static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties);
     static bool obj_watch(JSContext* cx, HandleObject obj, HandleId id, HandleObject callable);
 
-    const UnboxedLayout& layout() const {
+    const UnboxedLayout &layout() const {
         return group()->unboxedLayout();
     }
 
-    uint8_t* data() {
+    uint8_t *data() {
         return &data_[0];
     }
 

@@ -344,10 +344,10 @@ UnboxedPlainObject::getValue(const UnboxedLayout::Property& property)
 }
 
 void
-UnboxedPlainObject::trace(JSTracer* trc, JSObject* obj)
+UnboxedPlainObject::trace(JSTracer *trc, JSObject *obj)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
-    const int32_t* list = layout.traceList();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
+    const int32_t *list = layout.traceList();
     if (!list)
         return;
 

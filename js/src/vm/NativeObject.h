@@ -627,8 +627,8 @@ class NativeObject : public JSObject
     }
 
     /* Contextless; can be called from other pure code. */
-    Shape* lookupPure(jsid id);
-    Shape* lookupPure(PropertyName* name) {
+    Shape *lookupPure(jsid id);
+    Shape *lookupPure(PropertyName *name) {
         return lookupPure(NameToId(name));
     }
 
@@ -874,7 +874,7 @@ class NativeObject : public JSObject
      * capacity is not stored explicitly, and the allocated size of the slot
      * array is kept in sync with this count.
      */
-    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class* clasp);
+    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class *clasp);
 
     /* Elements accessors. */
 

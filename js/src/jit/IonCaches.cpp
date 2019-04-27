@@ -790,10 +790,10 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
 }
 
 static void
-GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
-                 IonCache::StubAttacher& attacher, JSObject* obj, NativeObject* holder,
-                 Shape* shape, Register object, TypedOrValueRegister output,
-                 Label* failures = nullptr)
+GenerateReadSlot(JSContext *cx, IonScript *ion, MacroAssembler &masm,
+                 IonCache::StubAttacher &attacher, JSObject *obj, NativeObject *holder,
+                 Shape *shape, Register object, TypedOrValueRegister output,
+                 Label *failures = nullptr)
 {
     // If there's a single jump to |failures|, we can patch the shape guard
     // jump directly. Otherwise, jump to the end of the stub, so there's a
@@ -1996,8 +1996,8 @@ CheckTypeSetForWrite(MacroAssembler& masm, JSObject* obj, jsid id,
 }
 
 static void
-GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                NativeObject* obj, Shape* shape, Register object, ConstantOrRegister value,
+GenerateSetSlot(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &attacher,
+                NativeObject *obj, Shape *shape, Register object, ConstantOrRegister value,
                 bool needsTypeBarrier, bool checkTypeset)
 {
     MOZ_ASSERT(obj->isNative());
@@ -2014,7 +2014,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         // just guard that it's already there.
 
         // Obtain and guard on the ObjectGroup of the object.
-        ObjectGroup* group = obj->group();
+        ObjectGroup *group = obj->group();
         masm.branchPtr(Assembler::NotEqual,
                        Address(object, JSObject::offsetOfGroup()),
                        ImmGCPtr(group), &failures);
@@ -2058,7 +2058,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
 }
 
 bool
-SetPropertyIC::attachSetSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
+SetPropertyIC::attachSetSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
                              HandleNativeObject obj, HandleShape shape, bool checkTypeset)
 {
     MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
