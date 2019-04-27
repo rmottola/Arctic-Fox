@@ -1705,7 +1705,7 @@ GCMarker::processMarkStackTop(SliceBudget &budget)
                 goto scan_unboxed;
             }
             if (clasp == &UnboxedPlainObject::class_) {
-                const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+                const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
                 unboxedTraceList = layout.traceList();
                 if (!unboxedTraceList)
                     return;
