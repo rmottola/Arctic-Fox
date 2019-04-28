@@ -241,6 +241,17 @@ Factory::HasSSE2()
 #endif
 }
 
+bool
+Factory::HasVMX()
+{
+#if (defined(__powerpc__) || defined(__POWERPC__)) \
+    && (defined(__ALTIVEC__) || defined(__APPLE_ALTIVEC__))
+  return true;
+#else
+  return false;
+#endif
+}
+
 // If the size is "reasonable", we want gfxCriticalError to assert, so
 // this is the option set up for it.
 inline int LoggerOptionsBasedOnSize(const IntSize& aSize)
