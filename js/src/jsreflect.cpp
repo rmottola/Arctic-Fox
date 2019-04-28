@@ -113,7 +113,7 @@ typedef AutoValueVector NodeVector;
     JS_BEGIN_MACRO                                                                        \
         MOZ_ASSERT(expr);                                                                 \
         if (!(expr)) {                                                                    \
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);  \
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);     \
             return false;                                                                 \
         }                                                                                 \
     JS_END_MACRO
@@ -121,7 +121,7 @@ typedef AutoValueVector NodeVector;
 #define LOCAL_NOT_REACHED(expr)                                                           \
     JS_BEGIN_MACRO                                                                        \
         MOZ_ASSERT(false);                                                                \
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);      \
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);         \
         return false;                                                                     \
     JS_END_MACRO
 
@@ -618,6 +618,10 @@ class NodeBuilder
 
     bool exportBatchSpecifier(TokenPos* pos, MutableHandleValue dst);
 
+    bool classStatement(HandleValue name, HandleValue heritage, HandleValue block, TokenPos *pos, MutableHandleValue dst);
+    bool classMethods(NodeVector &methods, MutableHandleValue dst);
+    bool classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic, TokenPos *pos, MutableHandleValue dst);
+
     /*
      * expressions
      */
@@ -722,7 +726,7 @@ NodeBuilder::newArray(NodeVector& elts, MutableHandleValue dst)
 {
     const size_t len = elts.length();
     if (len > UINT32_MAX) {
-        js_ReportAllocationOverflow(cx);
+        ReportAllocationOverflow(cx);
         return false;
     }
     RootedObject array(cx, NewDenseFullyAllocatedArray(cx, uint32_t(len)));
@@ -738,7 +742,7 @@ NodeBuilder::newArray(NodeVector& elts, MutableHandleValue dst)
         if (val.isMagic(JS_SERIALIZE_NO_NODE))
             continue;
 
-        if (!SetElement(cx, array, array, i, &val, false))
+        if (!DefineElement(cx, array, i, val))
             return false;
     }
 
@@ -1696,6 +1700,53 @@ NodeBuilder::function(ASTType type, TokenPos* pos,
                    dst);
 }
 
+bool
+NodeBuilder::classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic,
+                         TokenPos *pos, MutableHandleValue dst)
+{
+    RootedValue kindName(cx);
+    if (!atomValue(kind == PROP_INIT
+                   ? "method"
+                   : kind == PROP_GETTER
+                   ? "get"
+                   : "set", &kindName)) {
+        return false;
+    }
+
+    RootedValue isStaticVal(cx, BooleanValue(isStatic));
+    RootedValue cb(cx, callbacks[AST_CLASS_METHOD]);
+    if (!cb.isNull())
+        return callback(cb, kindName, name, body, isStaticVal, pos, dst);
+
+    return newNode(AST_CLASS_METHOD, pos,
+                   "name", name,
+                   "body", body,
+                   "kind", kindName,
+                   "static", isStaticVal,
+                   dst);
+}
+
+bool
+NodeBuilder::classMethods(NodeVector &methods, MutableHandleValue dst)
+{
+    return newArray(methods, dst);
+}
+
+bool
+NodeBuilder::classStatement(HandleValue name, HandleValue heritage, HandleValue block,
+                            TokenPos *pos, MutableHandleValue dst)
+{
+    RootedValue cb(cx, callbacks[AST_CLASS_STMT]);
+    if (!cb.isNull())
+        return callback(cb, name, heritage, block, pos, dst);
+
+    return newNode(AST_CLASS_STMT, pos,
+                   "name", name,
+                   "heritage", heritage,
+                   "body", block,
+                   dst);
+}
+
 namespace {
 
 /*
@@ -1768,6 +1819,8 @@ class ASTSerializer
 
     bool propertyName(ParseNode* pn, MutableHandleValue dst);
     bool property(ParseNode* pn, MutableHandleValue dst);
+
+    bool classMethod(ParseNode *pn, MutableHandleValue dst);
 
     bool optIdentifier(HandleAtom atom, TokenPos* pos, MutableHandleValue dst) {
         if (!atom) {
@@ -2549,12 +2602,69 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
       case PNK_DEBUGGER:
         return builder.debuggerStatement(&pn->pn_pos, dst);
 
+      case PNK_CLASS:
+      {
+         RootedValue className(cx);
+         RootedValue heritage(cx);
+         RootedValue classBody(cx);
+         return identifier(pn->pn_kid1->as<ClassNames>().innerBinding(), &className) &&
+                optExpression(pn->pn_kid2, &heritage) &&
+                statement(pn->pn_kid3, &classBody) &&
+                builder.classStatement(className, heritage, classBody, &pn->pn_pos, dst);
+      }
+
+      case PNK_CLASSMETHODLIST:
+      {
+        NodeVector methods(cx);
+        if (!methods.reserve(pn->pn_count))
+            return false;
+
+        for (ParseNode *next = pn->pn_head; next; next = next->pn_next) {
+            MOZ_ASSERT(pn->pn_pos.encloses(next->pn_pos));
+
+            RootedValue prop(cx);
+            if (!classMethod(next, &prop))
+                return false;
+            methods.infallibleAppend(prop);
+        }
+
+        return builder.classMethods(methods, dst);
+      }
+
       case PNK_NOP:
         return builder.emptyStatement(&pn->pn_pos, dst);
 
       default:
         LOCAL_NOT_REACHED("unexpected statement type");
     }
+}
+
+bool
+ASTSerializer::classMethod(ParseNode *pn, MutableHandleValue dst)
+{
+    PropKind kind;
+    switch (pn->getOp()) {
+      case JSOP_INITPROP:
+        kind = PROP_INIT;
+        break;
+
+      case JSOP_INITPROP_GETTER:
+        kind = PROP_GETTER;
+        break;
+
+      case JSOP_INITPROP_SETTER:
+        kind = PROP_SETTER;
+        break;
+
+      default:
+        LOCAL_NOT_REACHED("unexpected object-literal property");
+    }
+
+    RootedValue key(cx), val(cx);
+    bool isStatic = pn->as<ClassMethod>().isStatic();
+    return propertyName(pn->pn_left, &key) &&
+           expression(pn->pn_right, &val) &&
+           builder.classMethod(key, val, kind, isStatic, &pn->pn_pos, dst);
 }
 
 bool
@@ -3476,7 +3586,7 @@ reflect_parse(JSContext* cx, uint32_t argc, jsval* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              "Reflect.parse", "0", "s");
         return false;
     }

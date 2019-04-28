@@ -10,7 +10,7 @@
 
 namespace mozilla {
 
-MediaTaskQueue::MediaTaskQueue(TemporaryRef<SharedThreadPool> aPool,
+MediaTaskQueue::MediaTaskQueue(already_AddRefed<SharedThreadPool> aPool,
                                bool aRequireTailDispatch)
   : AbstractThread(aRequireTailDispatch)
   , mPool(aPool)
@@ -74,7 +74,7 @@ MediaTaskQueue::DispatchLocked(already_AddRefed<nsIRunnable> aRunnable,
 
 class MediaTaskQueueSyncRunnable : public nsRunnable {
 public:
-  explicit MediaTaskQueueSyncRunnable(TemporaryRef<nsIRunnable> aRunnable)
+  explicit MediaTaskQueueSyncRunnable(already_AddRefed<nsIRunnable> aRunnable)
     : mRunnable(aRunnable)
     , mMonitor("MediaTaskQueueSyncRunnable")
     , mDone(false)
@@ -104,9 +104,9 @@ private:
 };
 
 void
-MediaTaskQueue::SyncDispatch(TemporaryRef<nsIRunnable> aRunnable) {
+MediaTaskQueue::SyncDispatch(already_AddRefed<nsIRunnable> aRunnable) {
   NS_WARNING("MediaTaskQueue::SyncDispatch is deprecated and potentially dangerous. Don't use!");
-  nsRefPtr<MediaTaskQueueSyncRunnable> task(new MediaTaskQueueSyncRunnable(aRunnable));
+  nsRefPtr<MediaTaskQueueSyncRunnable> task(new MediaTaskQueueSyncRunnable(Move(aRunnable)));
 
   // Tail dispatchers don't interact nicely with sync dispatch. We require that
   // nothing is already in the tail dispatcher, and then sidestep it for this
@@ -185,7 +185,7 @@ FlushableMediaTaskQueue::Flush()
 }
 
 nsresult
-FlushableMediaTaskQueue::FlushAndDispatch(TemporaryRef<nsIRunnable> aRunnable)
+FlushableMediaTaskQueue::FlushAndDispatch(already_AddRefed<nsIRunnable> aRunnable)
 {
   MonitorAutoLock mon(mQueueMonitor);
   AutoSetFlushing autoFlush(this);

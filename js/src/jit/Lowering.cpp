@@ -3216,13 +3216,13 @@ LIRGenerator::visitPolyInlineGuard(MPolyInlineGuard* ins)
 }
 
 void
-LIRGenerator::visitGuardShapePolymorphic(MGuardShapePolymorphic* ins)
+LIRGenerator::visitGuardReceiverPolymorphic(MGuardReceiverPolymorphic *ins)
 {
     MOZ_ASSERT(ins->obj()->type() == MIRType_Object);
     MOZ_ASSERT(ins->type() == MIRType_Object);
 
-    LGuardShapePolymorphic* guard =
-        new(alloc()) LGuardShapePolymorphic(useRegister(ins->obj()), temp());
+    LGuardReceiverPolymorphic *guard =
+        new(alloc()) LGuardReceiverPolymorphic(useRegister(ins->obj()), temp());
     assignSnapshot(guard, Bailout_ShapeGuard);
     add(guard, ins);
     redefine(ins, ins->obj());
@@ -3644,8 +3644,10 @@ LIRGenerator::visitAsmJSReturn(MAsmJSReturn* ins)
         lir->setOperand(0, useFixed(rval, ReturnFloat32Reg));
     else if (rval->type() == MIRType_Double)
         lir->setOperand(0, useFixed(rval, ReturnDoubleReg));
-    else if (IsSimdType(rval->type()))
-        lir->setOperand(0, useFixed(rval, ReturnSimdReg));
+    else if (rval->type() == MIRType_Int32x4)
+        lir->setOperand(0, useFixed(rval, ReturnInt32x4Reg));
+    else if (rval->type() == MIRType_Float32x4)
+        lir->setOperand(0, useFixed(rval, ReturnFloat32x4Reg));
     else if (rval->type() == MIRType_Int32)
         lir->setOperand(0, useFixed(rval, ReturnReg));
     else
@@ -3847,7 +3849,12 @@ void
 LIRGenerator::visitSimdReinterpretCast(MSimdReinterpretCast* ins)
 {
     MOZ_ASSERT(IsSimdType(ins->type()) && IsSimdType(ins->input()->type()));
-    redefine(ins, ins->input());
+    MDefinition *input = ins->input();
+    LUse use = useRegisterAtStart(input);
+    // :TODO: (Bug 1132894) We have to allocate a different register as redefine
+    // and/or defineReuseInput are not yet capable of reusing the same register
+    // with a different register type.
+    define(new(alloc()) LSimdReinterpretCast(use), ins);
 }
 
 void
@@ -3943,18 +3950,19 @@ LIRGenerator::visitSimdShuffle(MSimdShuffle* ins)
 }
 
 void
-LIRGenerator::visitSimdUnaryArith(MSimdUnaryArith* ins)
+LIRGenerator::visitSimdUnaryArith(MSimdUnaryArith *ins)
 {
+    MOZ_ASSERT(IsSimdType(ins->input()->type()));
     MOZ_ASSERT(IsSimdType(ins->type()));
 
     // Cannot be at start, as the ouput is used as a temporary to store values.
     LUse in = use(ins->input());
 
     if (ins->type() == MIRType_Int32x4) {
-        LSimdUnaryArithIx4* lir = new(alloc()) LSimdUnaryArithIx4(in);
+        LSimdUnaryArithIx4 *lir = new(alloc()) LSimdUnaryArithIx4(in);
         define(lir, ins);
     } else if (ins->type() == MIRType_Float32x4) {
-        LSimdUnaryArithFx4* lir = new(alloc()) LSimdUnaryArithFx4(in);
+        LSimdUnaryArithFx4 *lir = new(alloc()) LSimdUnaryArithFx4(in);
         define(lir, ins);
     } else {
         MOZ_CRASH("Unknown SIMD kind for unary operation");
@@ -3962,18 +3970,20 @@ LIRGenerator::visitSimdUnaryArith(MSimdUnaryArith* ins)
 }
 
 void
-LIRGenerator::visitSimdBinaryComp(MSimdBinaryComp* ins)
+LIRGenerator::visitSimdBinaryComp(MSimdBinaryComp *ins)
 {
+    MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
+    MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
     MOZ_ASSERT(ins->type() == MIRType_Int32x4);
 
     if (ShouldReorderCommutative(ins->lhs(), ins->rhs(), ins))
         ins->reverse();
 
-    if (ins->compareType() == MSimdBinaryComp::CompareInt32x4) {
-        LSimdBinaryCompIx4* add = new(alloc()) LSimdBinaryCompIx4();
+    if (ins->specialization() == MIRType_Int32x4) {
+        LSimdBinaryCompIx4 *add = new(alloc()) LSimdBinaryCompIx4();
         lowerForCompIx4(add, ins, ins->lhs(), ins->rhs());
-    } else if (ins->compareType() == MSimdBinaryComp::CompareFloat32x4) {
-        LSimdBinaryCompFx4* add = new(alloc()) LSimdBinaryCompFx4();
+    } else if (ins->specialization() == MIRType_Float32x4) {
+        LSimdBinaryCompFx4 *add = new(alloc()) LSimdBinaryCompFx4();
         lowerForCompFx4(add, ins, ins->lhs(), ins->rhs());
     } else {
         MOZ_CRASH("Unknown compare type when comparing values");
@@ -3981,16 +3991,18 @@ LIRGenerator::visitSimdBinaryComp(MSimdBinaryComp* ins)
 }
 
 void
-LIRGenerator::visitSimdBinaryBitwise(MSimdBinaryBitwise* ins)
+LIRGenerator::visitSimdBinaryBitwise(MSimdBinaryBitwise *ins)
 {
+    MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
+    MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
     MOZ_ASSERT(IsSimdType(ins->type()));
 
-    MDefinition* lhs = ins->lhs();
-    MDefinition* rhs = ins->rhs();
+    MDefinition *lhs = ins->lhs();
+    MDefinition *rhs = ins->rhs();
     ReorderCommutative(&lhs, &rhs, ins);
 
     if (ins->type() == MIRType_Int32x4 || ins->type() == MIRType_Float32x4) {
-        LSimdBinaryBitwiseX4* lir = new(alloc()) LSimdBinaryBitwiseX4;
+        LSimdBinaryBitwiseX4 *lir = new(alloc()) LSimdBinaryBitwiseX4;
         lowerForFPU(lir, ins, lhs, rhs);
     } else {
         MOZ_CRASH("Unknown SIMD kind when doing bitwise operations");

@@ -1,4 +1,5 @@
-Yet unapplied Mozilla patches:
+# Backlog of Mozilla patches:
+(grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
@@ -6,6 +7,7 @@ Yet unapplied Mozilla patches:
 - 1470260 - part 2 - Make RefreshDriverTimer ref-counted and hold a s
 - 1470260 - part 1 - Ensure that 'this' stays alive for the duration
 - 1472018 - Limit the lock scope in WebCryptoThreadPool::Shutdown.
+- Bug 1464751 2018-05-28 If there is no JIT, there should be no JIT signal handlers
 - 1469309 - Remove an unused sensor type
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
@@ -24,10 +26,11 @@ Yet unapplied Mozilla patches:
 - 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1235656 - Set canonical name in self-hosted builtins
 - 1223690 - Remove implicit Rect conversions
+- 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
-- 1222516 part 4. Implement support for rel=noopener on links. - apply part3 before
+- Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
-- 1207245 - part 6 - rename nsRefPtr<T> to RefPtr<T>
+- 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -36,9 +39,9 @@ Yet unapplied Mozilla patches:
 - 1184634 - Rename MediaTaskQueue to TaskQueue
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
-- 1160485 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
+- 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1142669 part 6 - Don't inline scripts that are known to inline a
-- 1141862 - 6 parts
+- 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
 - 1114580 - toStringTag - several diffs still to analyze
 - 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
@@ -60,22 +63,51 @@ Yet unapplied Mozilla patches:
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
-- 1142669 part 6 - Don't inline scripts that are known to inline a �
+- Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
+- 1142669 part 6 - Don't inline scripts that are known to inline a 
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
-- 1142669 part 4 - Fix some inlining issues and inline scripts with
-- Bug 805052 - four parts
-- 1134638: 14. Inline SIMD getters (signMask, .x, .y, .z, .w) in Io
-- Bug 1136980 part 2. Remove JS_SetParent, even though we have a 
-- Bug 1136980 part 1. Get rid of JS_SetParent uses in DOM/XPConnect
-- Bug 1130679: IonMonkey: Make it possible to guard on type changes
-- Bug 994016: IonMonkey: Add MTypeOf folding to MCompare
-- Bug 1135423 - Use unboxed objects for object literals where possible,
-- Bug 1047529 - Move caller field from MResumePoint to MBasicBlock
+- Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
+- Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
+- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
+- Bug 1137180 - Add baseline caches for extensible unboxed objects, and…
+- 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
+- Bug 1137180 - Add most functionality necessary for extensible unboxed…
+- Bug 1144331 - Assert that gray buffering does not depend on isMarking
+- Bug 1144369 - Add a GC phase to track time spent buffering gray roots
+- Bug 1144789 - Strongly type GrayBufferState enum and move to GCRuntim
+- Bug 1144794 - Move markBufferedGrayRoots to the GCRuntime
+- Bug 1144811 - Inline the start and end buffering gray roots methods o
+- Bug 1144817 - Move hasBufferedGrayRoots to GCRuntim
+- Bug 1144832 - Move grayBufferState manipulation out of GCMarker;
+- Bug 1144834 - Move resetBufferedGrayRoots to GCRuntime;
+- Bug 1144920 - Move gray buffer clearing out of GCMarker
+- Bug 1144925 - Buffer gray roots using a CallbackTracer instead of the
+- Bug 1144931 - Move gray buffering code to RootMarking.cpp
+- Bug 1137180 - Allow unboxed objects to be extended with new propertie…
+- Bug 1135897 - 2015-03-13 - Use unboxed objects for JSON objects and constant liter
+- Bug 805052 - 2015-03-14 four parts (check all dependencies)
+- Bug 1142865 - 2015-03-14 . Remove the parent argument from NewObjectWithGroup.
+- Bug 1140670 2015-03-09 all parts
+- Bug 1133081 2015-02-15 1 to 5
+- Bug 1140586 - 2015-03-12 1 to 5
+- Bug 1137180 - Only mark inner scripts as having failed a bounds check…
+- Bug 1132522, part 2 - Treat false return from proxyHandler.set()
+- Bug 1132522, part 1 - Treat false return from proxyHandler.defineProp
+- Bug 928336. Make defining unforgeable properties on objects faster by
+- Bug 1131805 1 to 3 parts
 
 
-Further ToDo which would help portability:
+
+### FIXME / TODO
+- Cannot be applied because file is missing - check
+Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
+
+Analyze all:
+https://bugzilla.mozilla.org/show_bug.cgi?id=1106828
+
+### Further ToDo which would help portability:
 
 - Update code from TemporaryRef to already_Refed
 - Update code to work with GCC 7 & GCC 8
@@ -88,23 +120,31 @@ Further ToDo which would help portability:
 - LoadFrame needs TriggerPrincipal & OriginalSrc
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
-
+- check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
 - Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
 
-Further Further ToDo:
+For Windows:
+Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
+
+
+### Further Further ToDo:
+- import PPC JIT from TenFourFox
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
 - evaulate WebRTC : Bug 1093934 - Create a XPCOM library 
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
+- see if window.requestIdleCallback can be backported
 
 Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
 
--- last checked TFF backport commit
+### last checked TFF backport commit
 #512: M1472018 M1469309 M1472925 M1470260 (part 1)
 
+-- consider non taken bugs for platforms we do support compared to TFF (and update list here)
+https://github.com/classilla/tenfourfox/issues/526
 
-JS Sputink checks:
+## JS Sputink checks:
 
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"

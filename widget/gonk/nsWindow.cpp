@@ -683,7 +683,7 @@ HalFormatToSurfaceFormat(int aHalFormat, int* bytepp)
     }
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 nsWindow::StartRemoteDrawing()
 {
     GonkDisplay* display = GetGonkDisplay();

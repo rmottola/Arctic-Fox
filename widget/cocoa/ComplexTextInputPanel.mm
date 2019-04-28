@@ -44,6 +44,12 @@ extern "C" OSStatus TSMProcessRawKeyEvent(EventRef anEvent);
   NSTextView *mInputTextView;
 }
 
+
+#if defined(__APPLE__) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+// Not in 10.4 or 10.5.
+typedef NSObject NSTextInputContext;
+#endif
+
 + (ComplexTextInputPanelImpl*)sharedComplexTextInputPanelImpl;
 
 - (NSTextInputContext*)inputContext;
@@ -92,10 +98,12 @@ extern "C" OSStatus TSMProcessRawKeyEvent(EventRef anEvent);
 
   [self setFloatingPanel:YES];
 
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(keyboardInputSourceChanged:)
                                                name:NSTextInputContextKeyboardSelectionDidChangeNotification
                                              object:nil];
+#endif
 
   return self;
 }

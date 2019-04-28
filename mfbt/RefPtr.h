@@ -28,7 +28,6 @@
 
 namespace mozilla {
 
-template<typename T> class TemporaryRef;
 template<typename T> class OutParamRef;
 template<typename T> OutParamRef<T> byRef(RefPtr<T>&);
 
@@ -48,7 +47,6 @@ template<typename T>
 class RefPtr
 {
   // To allow them to use unref()
-  friend class TemporaryRef<T>;
   friend class OutParamRef<T>;
 
   struct DontRef {};
@@ -56,8 +54,8 @@ class RefPtr
 public:
   RefPtr() : mPtr(0) {}
   RefPtr(const RefPtr& aOther) : mPtr(ref(aOther.mPtr)) {}
-  MOZ_IMPLICIT RefPtr(const TemporaryRef<T>& aOther) : mPtr(aOther.take()) {}
   MOZ_IMPLICIT RefPtr(already_AddRefed<T>& aOther) : mPtr(aOther.take()) {}
+  MOZ_IMPLICIT RefPtr(already_AddRefed<T>&& aOther) : mPtr(aOther.take()) {}
   MOZ_IMPLICIT RefPtr(T* aVal) : mPtr(ref(aVal)) {}
 
   template<typename U>
@@ -70,12 +68,12 @@ public:
     assign(ref(aOther.mPtr));
     return *this;
   }
-  RefPtr& operator=(const TemporaryRef<T>& aOther)
+  RefPtr& operator=(already_AddRefed<T>& aOther)
   {
     assign(aOther.take());
     return *this;
   }
-  RefPtr& operator=(already_AddRefed<T>& aOther)
+  RefPtr& operator=(already_AddRefed<T>&& aOther)
   {
     assign(aOther.take());
     return *this;
@@ -93,11 +91,11 @@ public:
     return *this;
   }
 
-  TemporaryRef<T> forget()
+  already_AddRefed<T> forget()
   {
     T* tmp = mPtr;
     mPtr = nullptr;
-    return TemporaryRef<T>(tmp, DontRef());
+    return already_AddRefed<T>(tmp);
   }
 
   T* get() const { return mPtr; }
@@ -131,49 +129,6 @@ private:
 };
 
 /**
- * TemporaryRef<T> represents an object that holds a temporary
- * reference to a T.  TemporaryRef objects can't be manually ref'd or
- * unref'd (being temporaries, not lvalues), so can only relinquish
- * references to other objects, or unref on destruction.
- */
-template<typename T>
-class TemporaryRef
-{
-  // To allow it to construct TemporaryRef from a bare T*
-  friend class RefPtr<T>;
-
-  typedef typename RefPtr<T>::DontRef DontRef;
-
-public:
-  // Please see already_AddRefed for a description of what these constructors
-  // do.
-  TemporaryRef() : mPtr(nullptr) {}
-  typedef void (TemporaryRef::* MatchNullptr)(double, float);
-  MOZ_IMPLICIT TemporaryRef(MatchNullptr aRawPtr) : mPtr(nullptr) {}
-  explicit TemporaryRef(T* aVal) : mPtr(RefPtr<T>::ref(aVal)) {}
-  TemporaryRef(const TemporaryRef& aOther) : mPtr(aOther.take()) {}
-
-  template<typename U>
-  TemporaryRef(const TemporaryRef<U>& aOther) : mPtr(aOther.take()) {}
-
-  ~TemporaryRef() { RefPtr<T>::unref(mPtr); }
-
-  MOZ_WARN_UNUSED_RESULT T* take() const
-  {
-    T* tmp = mPtr;
-    mPtr = nullptr;
-    return tmp;
-  }
-
-private:
-  TemporaryRef(T* aVal, const DontRef&) : mPtr(aVal) {}
-
-  mutable T* MOZ_OWNING_REF mPtr;
-
-  void operator=(const TemporaryRef&) = delete;
-};
-
-/**
  * OutParamRef is a wrapper that tracks a refcounted pointer passed as
  * an outparam argument to a function.  OutParamRef implements COM T**
  * outparam semantics: this requires the callee to AddRef() the T*
@@ -183,7 +138,7 @@ private:
  * returns the same T* passed to it through the T** outparam, as long
  * as the callee obeys the COM discipline.
  *
- * Prefer returning TemporaryRef<T> from functions over creating T**
+ * Prefer returning already_AddRefed<T> from functions over creating T**
  * outparams and passing OutParamRef<T> to T**.  Prefer RefPtr<T>*
  * outparams over T** outparams.
  */
@@ -224,19 +179,14 @@ byRef(RefPtr<T>& aPtr)
 /**
  * Helper function to be able to conveniently write things like:
  *
- *   TemporaryRef<T>
+ *   already_AddRefed<T>
  *   f(...)
  *   {
  *     return MakeAndAddRef<T>(...);
  *   }
- *
- * since explicitly constructing TemporaryRef is unsightly.  Having an
- * explicit construction of TemporaryRef from T* also inhibits a future
- * auto-conversion from TemporaryRef to already_AddRefed, since the semantics
- * of TemporaryRef(T*) differ from already_AddRefed(T*).
  */
 template<typename T, typename... Args>
-TemporaryRef<T>
+already_AddRefed<T>
 MakeAndAddRef(Args&&... aArgs)
 {
   RefPtr<T> p(new T(Forward<Args>(aArgs)...));

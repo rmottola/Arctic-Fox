@@ -113,6 +113,9 @@ IsObjectEscaped(MInstruction* ins, JSObject* objDefault = nullptr)
     else
         obj = objDefault;
 
+    if (!obj)
+        return true;
+
     // Don't optimize unboxed objects, which aren't handled by MObjectState.
     if (obj->is<UnboxedPlainObject>())
         return true;
@@ -160,9 +163,9 @@ IsObjectEscaped(MInstruction* ins, JSObject* objDefault = nullptr)
           }
 
           case MDefinition::Op_GuardShape: {
-            MGuardShape* guard = def->toGuardShape();
+            MGuardShape *guard = def->toGuardShape();
             MOZ_ASSERT(!ins->isGuardShape());
-            if (obj->lastProperty() != guard->shape()) {
+            if (obj->as<NativeObject>().lastProperty() != guard->shape()) {
                 JitSpewDef(JitSpew_Escape, "Object ", ins);
                 JitSpewDef(JitSpew_Escape, "  has a non-matching guard shape\n", guard);
                 return true;

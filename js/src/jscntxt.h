@@ -177,7 +177,7 @@ class ExclusiveContext : public ContextFriendFields,
     }
 
     void reportAllocationOverflow() {
-        js_ReportAllocationOverflow(this);
+        js::ReportAllocationOverflow(this);
     }
 
     // Accessors for immutable runtime data.
@@ -298,7 +298,7 @@ struct JSContext : public js::ExclusiveContext,
     friend class js::ExclusiveContext;
     friend class JS::AutoSaveExceptionState;
     friend class js::jit::DebugModeOSRVolatileJitFrameIterator;
-    friend void js_ReportOverRecursed(JSContext*);
+    friend void js::ReportOverRecursed(JSContext*);
 
   private:
     /* Exception state -- the exception member is a GC root by definition. */
@@ -309,7 +309,7 @@ struct JSContext : public js::ExclusiveContext,
     JS::ContextOptions  options_;
 
     // True if the exception currently being thrown is by result of
-    // js_ReportOverRecursed. See Debugger::slowPathOnExceptionUnwind.
+    // ReportOverRecursed. See Debugger::slowPathOnExceptionUnwind.
     bool                overRecursed_;
 
     // True if propagating a forced return from an interrupt handler during
@@ -564,30 +564,26 @@ enum ErrorArgumentsType {
 JSFunction*
 SelfHostedFunction(JSContext* cx, HandlePropertyName propName);
 
-} /* namespace js */
-
 #ifdef va_start
 extern bool
-js_ReportErrorVA(JSContext* cx, unsigned flags, const char* format, va_list ap);
+ReportErrorVA(JSContext* cx, unsigned flags, const char* format, va_list ap);
 
 extern bool
-js_ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
-                       void* userRef, const unsigned errorNumber,
-                       js::ErrorArgumentsType argumentsType, va_list ap);
+ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
+                    void* userRef, const unsigned errorNumber,
+                    ErrorArgumentsType argumentsType, va_list ap);
 
 extern bool
-js_ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callback,
-                            void* userRef, const unsigned errorNumber,
-                            const char16_t** args);
+ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callback,
+                         void* userRef, const unsigned errorNumber,
+                         const char16_t** args);
 #endif
 
 extern bool
-js_ExpandErrorArguments(js::ExclusiveContext* cx, JSErrorCallback callback,
-                        void* userRef, const unsigned errorNumber,
-                        char** message, JSErrorReport* reportp,
-                        js::ErrorArgumentsType argumentsType, va_list ap);
-
-namespace js {
+ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
+                     void* userRef, const unsigned errorNumber,
+                     char** message, JSErrorReport* reportp,
+                     ErrorArgumentsType argumentsType, va_list ap);
 
 /* |callee| requires a usage string provided by JS_DefineFunctionsWithHelp. */
 extern void
@@ -609,22 +605,17 @@ PrintError(JSContext* cx, FILE* file, const char* message, JSErrorReport* report
 void
 CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* report);
 
-} /* namespace js */
-
 extern void
-js_ReportIsNotDefined(JSContext* cx, const char* name);
+ReportIsNotDefined(JSContext* cx, const char* name);
 
 /*
  * Report an attempt to access the property of a null or undefined value (v).
  */
 extern bool
-js_ReportIsNullOrUndefined(JSContext* cx, int spindex, js::HandleValue v,
-                           js::HandleString fallback);
+ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v, HandleString fallback);
 
 extern void
-js_ReportMissingArg(JSContext* cx, js::HandleValue v, unsigned arg);
-
-namespace js {
+ReportMissingArg(JSContext* cx, js::HandleValue v, unsigned arg);
 
 /*
  * Report error using js_DecompileValueGenerator(cx, spindex, v, fallback) as

@@ -840,21 +840,26 @@ class GetElementIC : public RepatchIonCache
         return monitoredResult();
     }
 
-    static bool canAttachGetProp(JSObject* obj, const Value& idval, jsid id);
-    static bool canAttachDenseElement(JSObject* obj, const Value& idval);
-    static bool canAttachTypedArrayElement(JSObject* obj, const Value& idval,
+    static bool canAttachGetProp(JSObject *obj, const Value &idval, jsid id);
+    static bool canAttachDenseElement(JSObject *obj, const Value &idval);
+    static bool canAttachDenseElementHole(JSObject *obj, const Value &idval,
+                                          TypedOrValueRegister output);
+    static bool canAttachTypedArrayElement(JSObject *obj, const Value &idval,
                                            TypedOrValueRegister output);
 
-    bool attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachGetProp(JSContext *cx, HandleScript outerScript, IonScript *ion,
                        HandleObject obj, const Value& idval, HandlePropertyName name);
 
-    bool attachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                            HandleObject obj, const Value& idval);
+    bool attachDenseElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                            HandleObject obj, const Value &idval);
 
-    bool attachTypedArrayElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                 HandleObject tarr, const Value& idval);
+    bool attachDenseElementHole(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                                HandleObject obj, const Value &idval);
 
-    bool attachArgumentsElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachTypedArrayElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                                 HandleObject tarr, const Value &idval);
+
+    bool attachArgumentsElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
                                 HandleObject obj);
 
     static bool

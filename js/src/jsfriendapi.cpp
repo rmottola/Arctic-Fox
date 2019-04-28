@@ -145,6 +145,14 @@ JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject pro
     return obj;
 }
 
+JS_FRIEND_API(JSObject *)
+JS_NewObjectWithoutMetadata(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto)
+{
+    // Use an AutoEnterAnalysis to suppress invocation of the metadata callback.
+    AutoEnterAnalysis enter(cx);
+    return JS_NewObjectWithGivenProto(cx, clasp, proto);
+}
+
 JS_FRIEND_API(JSPrincipals*)
 JS_GetCompartmentPrincipals(JSCompartment* compartment)
 {
@@ -252,13 +260,13 @@ JS_DefineFunctionsWithHelp(JSContext* cx, HandleObject obj, const JSFunctionSpec
 }
 
 JS_FRIEND_API(bool)
-js_ObjectClassIs(JSContext* cx, HandleObject obj, ESClassValue classValue)
+js::ObjectClassIs(JSContext* cx, HandleObject obj, ESClassValue classValue)
 {
     return ObjectClassIs(obj, classValue, cx);
 }
 
 JS_FRIEND_API(const char*)
-js_ObjectClassName(JSContext* cx, HandleObject obj)
+js::ObjectClassName(JSContext* cx, HandleObject obj)
 {
     return GetObjectClassName(cx, obj);
 }
@@ -302,31 +310,31 @@ js::IsFunctionObject(JSObject* obj)
 }
 
 JS_FRIEND_API(bool)
-js::IsScopeObject(JSObject* obj)
+js::IsScopeObject(JSObject *obj)
 {
     return obj->is<ScopeObject>();
 }
 
 JS_FRIEND_API(bool)
-js::IsCallObject(JSObject* obj)
+js::IsCallObject(JSObject *obj)
 {
     return obj->is<CallObject>();
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetObjectParentMaybeScope(JSObject* obj)
+JS_FRIEND_API(bool)
+js::CanAccessObjectShape(JSObject *obj)
 {
-    return obj->enclosingScope();
+    return obj->maybeShape() != nullptr;
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetGlobalForObjectCrossCompartment(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetGlobalForObjectCrossCompartment(JSObject *obj)
 {
     return &obj->global();
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetPrototypeNoProxy(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetPrototypeNoProxy(JSObject *obj)
 {
     MOZ_ASSERT(!obj->is<js::ProxyObject>());
     MOZ_ASSERT(!obj->getTaggedProto().isLazy());
@@ -620,19 +628,19 @@ JS_CloneObject(JSContext* cx, HandleObject obj, HandleObject protoArg)
 
 #ifdef DEBUG
 JS_FRIEND_API(void)
-js_DumpString(JSString* str)
+js::DumpString(JSString *str)
 {
     str->dump();
 }
 
 JS_FRIEND_API(void)
-js_DumpAtom(JSAtom* atom)
+js::DumpAtom(JSAtom *atom)
 {
     atom->dump();
 }
 
 JS_FRIEND_API(void)
-js_DumpChars(const char16_t* s, size_t n)
+js::DumpChars(const char16_t *s, size_t n)
 {
     fprintf(stderr, "char16_t * (%p) = ", (void*) s);
     JSString::dumpChars(s, n);
@@ -640,7 +648,7 @@ js_DumpChars(const char16_t* s, size_t n)
 }
 
 JS_FRIEND_API(void)
-js_DumpObject(JSObject* obj)
+js::DumpObject(JSObject *obj)
 {
     if (!obj) {
         fprintf(stderr, "NULL\n");
@@ -1174,12 +1182,12 @@ js::GetObjectMetadata(JSObject* obj)
 }
 
 JS_FRIEND_API(bool)
-js_DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                     JS::Handle<js::PropertyDescriptor> descriptor, bool* bp)
+js::DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
+                      JS::Handle<js::PropertyDescriptor> descriptor, ObjectOpResult &result)
 {
     RootedObject obj(cx, objArg);
     RootedId id(cx, idArg);
-    js::AssertHeapIsIdle(cx);
+    AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, id, descriptor.value());
     if (descriptor.hasGetterObject())
@@ -1187,13 +1195,13 @@ js_DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
     if (descriptor.hasSetterObject())
         assertSameCompartment(cx, descriptor.setterObject());
 
-    return StandardDefineProperty(cx, obj, id, descriptor, bp);
+    return StandardDefineProperty(cx, obj, id, descriptor, result);
 }
 
 JS_FRIEND_API(bool)
-js_ReportIsNotFunction(JSContext* cx, JS::HandleValue v)
+js::ReportIsNotFunction(JSContext* cx, HandleValue v)
 {
-    return ReportIsNotFunction(cx, v);
+    return ReportIsNotFunction(cx, v, -1);
 }
 
 JS_FRIEND_API(void)

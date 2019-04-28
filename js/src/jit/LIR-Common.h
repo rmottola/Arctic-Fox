@@ -221,6 +221,21 @@ class LSimdSplatX4 : public LInstructionHelper<1, 1, 0>
     }
 };
 
+// Reinterpret the bits of a SIMD value with a different type.
+class LSimdReinterpretCast : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(SimdReinterpretCast)
+    explicit LSimdReinterpretCast(const LAllocation &v)
+    {
+        setOperand(0, v);
+    }
+
+    MSimdReinterpretCast *mir() const {
+        return mir_->toSimdReinterpretCast();
+    }
+};
+
 class LSimdExtractElementBase : public LInstructionHelper<1, 1, 0>
 {
   protected:
@@ -285,13 +300,8 @@ class LSimdInsertElementBase : public LInstructionHelper<1, 2, 0>
         return mir_->toSimdInsertElement()->lane();
     }
     const char* extraName() const {
-        switch (lane()) {
-          case LaneX: return "lane x";
-          case LaneY: return "lane y";
-          case LaneZ: return "lane z";
-          case LaneW: return "lane w";
-        }
-        return "unknown lane";
+    return MSimdInsertElement::LaneName(lane());
+        return MSimdInsertElement::LaneName(lane());
     }
 };
 
@@ -409,16 +419,8 @@ public:
     MSimdBinaryComp::Operation operation() const {
         return mir_->toSimdBinaryComp()->operation();
     }
-    const char* extraName() const {
-        switch (operation()) {
-          case MSimdBinaryComp::greaterThan: return "greaterThan";
-          case MSimdBinaryComp::greaterThanOrEqual: return "greaterThanOrEqual";
-          case MSimdBinaryComp::lessThan: return "lessThan";
-          case MSimdBinaryComp::lessThanOrEqual: return "lessThanOrEqual";
-          case MSimdBinaryComp::equal: return "equal";
-          case MSimdBinaryComp::notEqual: return "notEqual";
-        }
-        MOZ_CRASH("unexpected operation");
+    const char *extraName() const {
+        return MSimdBinaryComp::OperationName(operation());
     }
 };
 
@@ -5991,12 +5993,12 @@ class LRest : public LCallInstructionHelper<1, 1, 3>
     }
 };
 
-class LGuardShapePolymorphic : public LInstructionHelper<0, 1, 1>
+class LGuardReceiverPolymorphic : public LInstructionHelper<0, 1, 1>
 {
   public:
-    LIR_HEADER(GuardShapePolymorphic)
+    LIR_HEADER(GuardReceiverPolymorphic)
 
-    LGuardShapePolymorphic(const LAllocation& in, const LDefinition& temp) {
+    LGuardReceiverPolymorphic(const LAllocation &in, const LDefinition &temp) {
         setOperand(0, in);
         setTemp(0, temp);
     }
@@ -6006,8 +6008,8 @@ class LGuardShapePolymorphic : public LInstructionHelper<0, 1, 1>
     const LDefinition* temp() {
         return getTemp(0);
     }
-    const MGuardShapePolymorphic* mir() const {
-        return mir_->toGuardShapePolymorphic();
+    const MGuardReceiverPolymorphic *mir() const {
+        return mir_->toGuardReceiverPolymorphic();
     }
 };
 

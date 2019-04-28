@@ -13,13 +13,13 @@
 
 #include "jsobj.h"
 
+#include "gc/Allocator.h"
 #include "vm/Interpreter.h"
 #include "vm/ScopeObject.h"
 #include "vm/TypedArrayCommon.h"
 
 #include "jsatominlines.h"
 #include "jscntxtinlines.h"
-#include "jsgcinlines.h"
 
 namespace js {
 
@@ -41,25 +41,27 @@ Shape::search(ExclusiveContext* cx, jsid id)
 }
 
 inline bool
-Shape::set(JSContext* cx, HandleNativeObject obj, HandleObject receiver, bool strict,
-           MutableHandleValue vp)
+Shape::set(JSContext* cx, HandleNativeObject obj, HandleObject receiver, MutableHandleValue vp,
+           ObjectOpResult &result)
 {
     MOZ_ASSERT_IF(hasDefaultSetter(), hasGetterValue());
     MOZ_ASSERT(!obj->is<DynamicWithObject>());  // See bug 1128681.
 
     if (attrs & JSPROP_SETTER) {
         Value fval = setterValue();
-        return InvokeGetterOrSetter(cx, receiver, fval, 1, vp.address(), vp);
+        if (!InvokeGetterOrSetter(cx, receiver, fval, 1, vp.address(), vp))
+            return false;
+        return result.succeed();
     }
 
     if (attrs & JSPROP_GETTER)
-        return js_ReportGetterOnlyAssignment(cx, strict);
+        return result.fail(JSMSG_GETTER_ONLY);
 
     if (!setterOp())
-        return true;
+        return result.succeed();
 
     RootedId id(cx, propid());
-    return CallJSPropertyOpSetter(cx, setterOp(), obj, id, strict, vp);
+    return CallJSPropertyOpSetter(cx, setterOp(), obj, id, vp, result);
 }
 
 /* static */ inline Shape*
@@ -103,13 +105,15 @@ Shape::search(ExclusiveContext* cx, Shape* start, jsid id, ShapeTable::Entry** p
     return nullptr;
 }
 
-inline Shape*
-Shape::new_(ExclusiveContext* cx, StackShape& unrootedOther, uint32_t nfixed)
+inline Shape *
+Shape::new_(ExclusiveContext *cx, StackShape& unrootedOther, uint32_t nfixed)
 {
     RootedGeneric<StackShape*> other(cx, &unrootedOther);
-    Shape* shape = other->isAccessorShape() ? NewGCAccessorShape(cx) : NewGCShape(cx);
+    Shape *shape = other->isAccessorShape()
+                   ? js::Allocate<AccessorShape>(cx)
+                   : js::Allocate<Shape>(cx);
     if (!shape) {
-        js_ReportOutOfMemory(cx);
+        ReportOutOfMemory(cx);
         return nullptr;
     }
 

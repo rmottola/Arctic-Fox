@@ -132,6 +132,15 @@ class CompartmentChecker
     void check(InterpreterFrame* fp);
     void check(AbstractFramePtr frame);
     void check(SavedStacks* stacks);
+
+    void check(Handle<JSPropertyDescriptor> desc) {
+        check(desc.object());
+        if (desc.hasGetterObject())
+            check(desc.getterObject());
+        if (desc.hasSetterObject())
+            check(desc.setterObject());
+        check(desc.value());
+    }
 };
 
 /*
@@ -307,43 +316,44 @@ CallJSPropertyOp(JSContext* cx, PropertyOp op, HandleObject receiver, HandleId i
 
 MOZ_ALWAYS_INLINE bool
 CallJSPropertyOpSetter(JSContext* cx, StrictPropertyOp op, HandleObject obj, HandleId id,
-                       bool strict, MutableHandleValue vp)
+                       MutableHandleValue vp, ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
 
     assertSameCompartment(cx, obj, id, vp);
-    return op(cx, obj, id, strict, vp);
+    return op(cx, obj, id, vp, result);
 }
 
-static inline bool
+inline bool
 CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiver, HandleId id,
-                       bool* succeeded)
+                       ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
 
     assertSameCompartment(cx, receiver, id);
     if (op)
-        return op(cx, receiver, id, succeeded);
-    *succeeded = true;
-    return true;
+        return op(cx, receiver, id, result);
+    return result.succeed();
 }
 
 inline bool
 CallSetter(JSContext* cx, HandleObject obj, HandleId id, StrictPropertyOp op, unsigned attrs,
-           bool strict, MutableHandleValue vp)
+           MutableHandleValue vp, ObjectOpResult &result)
 {
     if (attrs & JSPROP_SETTER) {
         RootedValue opv(cx, CastAsObjectJsval(op));
-        return InvokeGetterOrSetter(cx, obj, opv, 1, vp.address(), vp);
+        if (!InvokeGetterOrSetter(cx, obj, opv, 1, vp.address(), vp))
+            return false;
+        return result.succeed();
     }
 
     if (attrs & JSPROP_GETTER)
-        return js_ReportGetterOnlyAssignment(cx, strict);
+        return result.fail(JSMSG_GETTER_ONLY);
 
     if (!op)
-        return true;
+        return result.succeed();
 
-    return CallJSPropertyOpSetter(cx, op, obj, id, strict, vp);
+    return CallJSPropertyOpSetter(cx, op, obj, id, vp, result);
 }
 
 inline uintptr_t
@@ -373,7 +383,7 @@ inline void
 JSContext::setPendingException(js::Value v)
 {
     MOZ_ASSERT(!IsPoisonedValue(v));
-    // overRecursed_ is set after the fact by js_ReportOverRecursed.
+    // overRecursed_ is set after the fact by ReportOverRecursed.
     this->overRecursed_ = false;
     this->throwing = true;
     this->unwrappedException_ = v;

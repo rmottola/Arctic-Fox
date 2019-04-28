@@ -31,6 +31,8 @@
 #include "jstypes.h"
 #include "prmjtime.h"
 
+#include "js/Class.h"
+
 #include "jsobjinlines.h"
 
 using namespace js;
@@ -1607,7 +1609,7 @@ static const JSFunctionSpec math_static_methods[] = {
 };
 
 JSObject*
-js_InitMathClass(JSContext* cx, HandleObject obj)
+js::InitMathClass(JSContext* cx, HandleObject obj)
 {
     RootedObject proto(cx, obj->as<GlobalObject>().getOrCreateObjectPrototype(cx));
     if (!proto)

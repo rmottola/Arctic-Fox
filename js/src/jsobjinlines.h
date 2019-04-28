@@ -11,6 +11,7 @@
 
 #include "builtin/MapObject.h"
 #include "builtin/TypedObject.h"
+#include "gc/Allocator.h"
 #include "vm/ArrayObject.h"
 #include "vm/DateObject.h"
 #include "vm/NumberObject.h"
@@ -24,6 +25,24 @@
 #include "jsgcinlines.h"
 
 #include "vm/TypeInference-inl.h"
+
+inline js::Shape *
+JSObject::maybeShape() const
+{
+    if (is<js::UnboxedPlainObject>())
+        return nullptr;
+    return *reinterpret_cast<js::Shape **>(uintptr_t(this) + offsetOfShape());
+}
+
+inline js::Shape *
+JSObject::ensureShape(js::ExclusiveContext *cx)
+{
+    if (is<js::UnboxedPlainObject>() && !js::UnboxedPlainObject::convertToNative(cx->asJSContext(), this))
+        return nullptr;
+    js::Shape *shape = maybeShape();
+    MOZ_ASSERT(shape);
+    return shape;
+}
 
 inline void
 JSObject::finalize(js::FreeOp* fop)
@@ -67,8 +86,8 @@ JSObject::finalize(js::FreeOp* fop)
     // unreachable shapes may be marked whose listp points into this object.
     // In case this happens, null out the shape's pointer here so that a moving
     // GC will not try to access the dead object.
-    if (shape_->listp == &shape_)
-        shape_->listp = nullptr;
+    if (nobj->shape_->listp == &nobj->shape_)
+        nobj->shape_->listp = nullptr;
 }
 
 /* static */ inline bool
@@ -114,7 +133,7 @@ js::GetPrototype(JSContext* cx, js::HandleObject obj, js::MutableHandleObject pr
 {
     if (obj->getTaggedProto().isLazy()) {
         MOZ_ASSERT(obj->is<js::ProxyObject>());
-        return js::Proxy::getPrototypeOf(cx, obj, protop);
+        return js::Proxy::getPrototype(cx, obj, protop);
     } else {
         protop.set(obj->getTaggedProto().toObjectOrNull());
         return true;
@@ -163,21 +182,21 @@ js::GetElementNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, uint32_t in
 }
 
 inline bool
-js::DeleteProperty(JSContext* cx, HandleObject obj, HandleId id, bool* succeeded)
+js::DeleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
 {
     MarkTypePropertyNonData(cx, obj, id);
     if (DeletePropertyOp op = obj->getOps()->deleteProperty)
-        return op(cx, obj, id, succeeded);
-    return NativeDeleteProperty(cx, obj.as<NativeObject>(), id, succeeded);
+        return op(cx, obj, id, result);
+    return NativeDeleteProperty(cx, obj.as<NativeObject>(), id, result);
 }
 
 inline bool
-js::DeleteElement(JSContext* cx, HandleObject obj, uint32_t index, bool* succeeded)
+js::DeleteElement(JSContext *cx, HandleObject obj, uint32_t index, ObjectOpResult &result)
 {
     RootedId id(cx);
     if (!IndexToId(cx, index, &id))
         return false;
-    return DeleteProperty(cx, obj, id, succeeded);
+    return DeleteProperty(cx, obj, id, result);
 }
 
 
@@ -188,7 +207,7 @@ JSObject::isQualifiedVarObj()
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isQualifiedVarObj();
-    return lastProperty()->hasObjectFlag(js::BaseShape::QUALIFIED_VAROBJ);
+    return hasAllFlags(js::BaseShape::QUALIFIED_VAROBJ);
 }
 
 inline bool
@@ -196,7 +215,7 @@ JSObject::isUnqualifiedVarObj()
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isUnqualifiedVarObj();
-    return lastProperty()->hasObjectFlag(js::BaseShape::UNQUALIFIED_VAROBJ);
+    return hasAllFlags(js::BaseShape::UNQUALIFIED_VAROBJ);
 }
 
 namespace js {
@@ -239,18 +258,19 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->numFixedSlots() == 0);
     MOZ_ASSERT_IF(!group->clasp()->isNative(), shape->slotSpan() == 0);
 
-    const js::Class* clasp = group->clasp();
+    const js::Class *clasp = group->clasp();
     size_t nDynamicSlots =
         js::NativeObject::dynamicSlotsCount(shape->numFixedSlots(), shape->slotSpan(), clasp);
 
-    JSObject* obj = js::NewGCObject<js::CanGC>(cx, kind, nDynamicSlots, heap, clasp);
+    JSObject *obj = js::Allocate<JSObject>(cx, kind, nDynamicSlots, heap, clasp);
     if (!obj)
         return nullptr;
 
-    obj->shape_.init(shape);
     obj->group_.init(group);
 
-    // Note: slots are created and assigned internally by NewGCObject.
+    obj->setInitialShapeMaybeNonNative(shape);
+
+    // Note: slots are created and assigned internally by Allocate<JSObject>.
     obj->setInitialElementsMaybeNonNative(js::emptyObjectElements);
 
     if (clasp->hasPrivate())
@@ -269,18 +289,39 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
 }
 
 inline void
+JSObject::setInitialShapeMaybeNonNative(js::Shape *shape)
+{
+    static_cast<js::NativeObject *>(this)->shape_.init(shape);
+}
+
+inline void
+JSObject::setShapeMaybeNonNative(js::Shape *shape)
+{
+    MOZ_ASSERT(!is<js::UnboxedPlainObject>());
+    static_cast<js::NativeObject *>(this)->shape_ = shape;
+}
+
+inline void
 JSObject::setInitialSlotsMaybeNonNative(js::HeapSlot* slots)
 {
     static_cast<js::NativeObject*>(this)->slots_ = slots;
 }
 
 inline void
-JSObject::setInitialElementsMaybeNonNative(js::HeapSlot* elements)
+JSObject::setInitialElementsMaybeNonNative(js::HeapSlot *elements)
 {
-    static_cast<js::NativeObject*>(this)->elements_ = elements;
+    static_cast<js::NativeObject *>(this)->elements_ = elements;
 }
 
-inline js::GlobalObject&
+inline JSObject *
+JSObject::getMetadata() const
+{
+    if (js::Shape *shape = maybeShape())
+        return shape->getObjectMetadata();
+    return nullptr;
+}
+
+inline js::GlobalObject &
 JSObject::global() const
 {
 #ifdef DEBUG
@@ -301,6 +342,85 @@ inline bool
 JSObject::isOwnGlobal() const
 {
     return &global() == this;
+}
+
+inline bool
+JSObject::hasAllFlags(js::BaseShape::Flag flags) const
+{
+    MOZ_ASSERT(flags);
+    if (js::Shape *shape = maybeShape())
+        return shape->hasAllObjectFlags(flags);
+    return false;
+}
+
+inline bool
+JSObject::nonProxyIsExtensible() const
+{
+    MOZ_ASSERT(!uninlinedIsProxy());
+
+    // [[Extensible]] for ordinary non-proxy objects is an object flag.
+    return !hasAllFlags(js::BaseShape::NOT_EXTENSIBLE);
+}
+
+inline bool
+JSObject::isBoundFunction() const
+{
+    return hasAllFlags(js::BaseShape::BOUND_FUNCTION);
+}
+
+inline bool
+JSObject::watched() const
+{
+    return hasAllFlags(js::BaseShape::WATCHED);
+}
+
+inline bool
+JSObject::isDelegate() const
+{
+    return hasAllFlags(js::BaseShape::DELEGATE);
+}
+
+inline bool
+JSObject::hasUncacheableProto() const
+{
+    return hasAllFlags(js::BaseShape::UNCACHEABLE_PROTO);
+}
+
+inline bool
+JSObject::hadElementsAccess() const
+{
+    return hasAllFlags(js::BaseShape::HAD_ELEMENTS_ACCESS);
+}
+
+inline bool
+JSObject::isIndexed() const
+{
+    return hasAllFlags(js::BaseShape::INDEXED);
+}
+
+inline bool
+JSObject::nonLazyPrototypeIsImmutable() const
+{
+    MOZ_ASSERT(!hasLazyPrototype());
+    return hasAllFlags(js::BaseShape::IMMUTABLE_PROTOTYPE);
+}
+
+inline bool
+JSObject::isIteratedSingleton() const
+{
+    return hasAllFlags(js::BaseShape::ITERATED_SINGLETON);
+}
+
+inline bool
+JSObject::isNewGroupUnknown() const
+{
+    return hasAllFlags(js::BaseShape::NEW_GROUP_UNKNOWN);
+}
+
+inline bool
+JSObject::wasNewScriptCleared() const
+{
+    return hasAllFlags(js::BaseShape::NEW_SCRIPT_CLEARED);
 }
 
 namespace js {
@@ -413,7 +533,7 @@ ToPrimitive(JSContext* cx, MutableHandleValue vp)
     if (obj->is<StringObject>()) {
         jsid id = NameToId(cx->names().valueOf);
         StringObject* nobj = &obj->as<StringObject>();
-        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, js_str_toString)) {
+        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
             vp.setString(nobj->unbox());
             return true;
         }
@@ -423,7 +543,7 @@ ToPrimitive(JSContext* cx, MutableHandleValue vp)
     if (obj->is<NumberObject>()) {
         jsid id = NameToId(cx->names().valueOf);
         NumberObject* nobj = &obj->as<NumberObject>();
-        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, js_num_valueOf)) {
+        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, num_valueOf)) {
             vp.setNumber(nobj->unbox());
             return true;
         }
@@ -453,7 +573,9 @@ inline bool
 IsInternalFunctionObject(JSObject* funobj)
 {
     JSFunction* fun = &funobj->as<JSFunction>();
-    return fun->isLambda() && !funobj->getParent();
+    MOZ_ASSERT_IF(fun->isLambda(),
+                  fun->isInterpreted() || fun->isAsmJSNative());
+    return fun->isLambda() && fun->isInterpreted() && !fun->environment();
 }
 
 class AutoPropDescVector : public AutoVectorRooter<PropDesc>
@@ -785,14 +907,15 @@ ApplyAttributes(unsigned attrs, bool enumerable, bool writable, bool configurabl
     return attrs;
 }
 
-} /* namespace js */
 
 extern js::NativeObject*
-js_InitClass(JSContext* cx, js::HandleObject obj, js::HandleObject parent_proto,
-             const js::Class* clasp, JSNative constructor, unsigned nargs,
-             const JSPropertySpec* ps, const JSFunctionSpec* fs,
-             const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
-             js::NativeObject** ctorp = nullptr,
-             js::gc::AllocKind ctorKind = JSFunction::FinalizeKind);
+InitClass(JSContext* cx, js::HandleObject obj, HandleObject parent_proto,
+          const Class* clasp, JSNative constructor, unsigned nargs,
+          const JSPropertySpec* ps, const JSFunctionSpec* fs,
+          const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
+          NativeObject** ctorp = nullptr,
+          gc::AllocKind ctorKind = JSFunction::FinalizeKind);
+
+} /* namespace js */
 
 #endif /* jsobjinlines_h */

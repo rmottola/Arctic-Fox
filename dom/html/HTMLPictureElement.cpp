@@ -46,7 +46,7 @@ HTMLPictureElement::RemoveChildAt(uint32_t aIndex, bool aNotify)
   // Find all img siblings after this <source> to notify them of its demise
   nsCOMPtr<nsIContent> child = GetChildAt(aIndex);
   nsCOMPtr<nsIContent> nextSibling;
-  if (child && child->IsHTML(nsGkAtoms::source)) {
+  if (child && child->IsHTMLElement(nsGkAtoms::source)) {
     nextSibling = child->GetNextSibling();
   }
 

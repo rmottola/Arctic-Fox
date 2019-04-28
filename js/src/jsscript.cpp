@@ -2067,7 +2067,7 @@ ScriptSource::setDisplayURL(ExclusiveContext* cx, const char16_t* displayURL)
     if (hasDisplayURL()) {
         if (cx->isJSContext() &&
             !JS_ReportErrorFlagsAndNumber(cx->asJSContext(), JSREPORT_WARNING,
-                                          js_GetErrorMessage, nullptr,
+                                          GetErrorMessage, nullptr,
                                           JSMSG_ALREADY_HAS_PRAGMA, filename_.get(),
                                           "//# sourceURL"))
         {
@@ -2172,7 +2172,7 @@ SaveSharedScriptData(ExclusiveContext* cx, Handle<JSScript*> script, SharedScrip
             script->setCode(nullptr);
             script->atoms = nullptr;
             js_free(ssd);
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return false;
         }
     }
@@ -2376,14 +2376,14 @@ JSScript::initCompartment(ExclusiveContext* cx)
     compartment_ = cx->compartment_;
 }
 
-JSScript*
-JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCallerFun,
-                 const ReadOnlyCompileOptions& options, unsigned staticLevel,
+JSScript *
+JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCallerFun,
+                 const ReadOnlyCompileOptions &options, unsigned staticLevel,
                  HandleObject sourceObject, uint32_t bufStart, uint32_t bufEnd)
 {
     MOZ_ASSERT(bufStart <= bufEnd);
 
-    RootedScript script(cx, js_NewGCScript(cx));
+    RootedScript script(cx, Allocate<JSScript>(cx));
     if (!script)
         return nullptr;
 
@@ -2408,7 +2408,7 @@ JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCa
     if (staticLevel > UINT16_MAX) {
         if (cx->isJSContext()) {
             JS_ReportErrorNumber(cx->asJSContext(),
-                                 js_GetErrorMessage, nullptr, JSMSG_TOO_DEEP, js_function_str);
+                                 GetErrorMessage, nullptr, JSMSG_TOO_DEEP, js_function_str);
         }
         return nullptr;
     }
@@ -2606,7 +2606,7 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
         bce->tryNoteList.finish(script->trynotes());
     if (bce->blockScopeList.length() != 0)
         bce->blockScopeList.finish(script->blockScopes());
-    script->strict_ = bce->sc->strict;
+    script->strict_ = bce->sc->strict();
     script->explicitUseStrict_ = bce->sc->hasExplicitUseStrict();
     script->bindingsAccessedDynamically_ = bce->sc->bindingsAccessedDynamically();
     script->funHasExtensibleScope_ = funbox ? funbox->hasExtensibleScope() : false;
@@ -2782,7 +2782,7 @@ js::GetSrcNote(GSNCache& cache, JSScript* script, jsbytecode* pc)
 }
 
 jssrcnote*
-js_GetSrcNote(JSContext* cx, JSScript* script, jsbytecode* pc)
+js::GetSrcNote(JSContext* cx, JSScript* script, jsbytecode* pc)
 {
     return GetSrcNote(cx->runtime()->gsnCache, script, pc);
 }
@@ -2806,7 +2806,7 @@ js::PCToLineNumber(unsigned startLine, jssrcnote* notes, jsbytecode* code, jsbyt
         SrcNoteType type = (SrcNoteType) SN_TYPE(sn);
         if (type == SRC_SETLINE) {
             if (offset <= target)
-                lineno = (unsigned) js_GetSrcNoteOffset(sn, 0);
+                lineno = unsigned(GetSrcNoteOffset(sn, 0));
             column = 0;
         } else if (type == SRC_NEWLINE) {
             if (offset <= target)
@@ -2818,7 +2818,7 @@ js::PCToLineNumber(unsigned startLine, jssrcnote* notes, jsbytecode* code, jsbyt
             break;
 
         if (type == SRC_COLSPAN) {
-            ptrdiff_t colspan = SN_OFFSET_TO_COLSPAN(js_GetSrcNoteOffset(sn, 0));
+            ptrdiff_t colspan = SN_OFFSET_TO_COLSPAN(GetSrcNoteOffset(sn, 0));
             MOZ_ASSERT(ptrdiff_t(column) + colspan >= 0);
             column += colspan;
         }
@@ -2841,7 +2841,7 @@ js::PCToLineNumber(JSScript* script, jsbytecode* pc, unsigned* columnp)
 }
 
 jsbytecode*
-js_LineNumberToPC(JSScript* script, unsigned target)
+js::LineNumberToPC(JSScript* script, unsigned target)
 {
     ptrdiff_t offset = 0;
     ptrdiff_t best = -1;
@@ -2864,7 +2864,7 @@ js_LineNumberToPC(JSScript* script, unsigned target)
         offset += SN_DELTA(sn);
         SrcNoteType type = (SrcNoteType) SN_TYPE(sn);
         if (type == SRC_SETLINE) {
-            lineno = (unsigned) js_GetSrcNoteOffset(sn, 0);
+            lineno = unsigned(GetSrcNoteOffset(sn, 0));
         } else if (type == SRC_NEWLINE) {
             lineno++;
         }
@@ -2876,14 +2876,14 @@ out:
 }
 
 JS_FRIEND_API(unsigned)
-js_GetScriptLineExtent(JSScript* script)
+js::GetScriptLineExtent(JSScript* script)
 {
     unsigned lineno = script->lineno();
     unsigned maxLineNo = lineno;
     for (jssrcnote* sn = script->notes(); !SN_IS_TERMINATOR(sn); sn = SN_NEXT(sn)) {
         SrcNoteType type = (SrcNoteType) SN_TYPE(sn);
         if (type == SRC_SETLINE)
-            lineno = (unsigned) js_GetSrcNoteOffset(sn, 0);
+            lineno = unsigned(GetSrcNoteOffset(sn, 0));
         else if (type == SRC_NEWLINE)
             lineno++;
 
@@ -3325,7 +3325,7 @@ JSScript::getOrCreateBreakpointSite(JSContext* cx, jsbytecode* pc)
     if (!site) {
         site = cx->runtime()->new_<BreakpointSite>(this, pc);
         if (!site) {
-            js_ReportOutOfMemory(cx);
+            ReportOutOfMemory(cx);
             return nullptr;
         }
         debug->numSites++;
@@ -3761,7 +3761,7 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     if (bytes && !table)
         return nullptr;
 
-    LazyScript* res = js_NewGCLazyScript(cx);
+    LazyScript *res = Allocate<LazyScript>(cx);
     if (!res)
         return nullptr;
 
@@ -3770,8 +3770,8 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     return new (res) LazyScript(fun, table.forget(), packed, begin, end, lineno, column);
 }
 
-/* static */ LazyScript*
-LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
+/* static */ LazyScript *
+LazyScript::CreateRaw(ExclusiveContext *cx, HandleFunction fun,
                       uint32_t numFreeVariables, uint32_t numInnerFunctions, JSVersion version,
                       uint32_t begin, uint32_t end, uint32_t lineno, uint32_t column)
 {

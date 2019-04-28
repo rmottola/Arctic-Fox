@@ -662,7 +662,7 @@ AnimationPlayerCollection::LogAsyncAnimationFailure(nsCString& aMessage,
 {
   if (aContent) {
     aMessage.AppendLiteral(" [");
-    aMessage.Append(nsAtomCString(aContent->Tag()));
+    aMessage.Append(nsAtomCString(aContent->NodeInfo()->NameAtom()));
 
     nsIAtom* id = aContent->GetID();
     if (id) {

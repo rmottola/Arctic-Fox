@@ -143,6 +143,7 @@ let ClickEventHandler = {
 
   stopScroll: function() {
     if (this._scrollable) {
+      this._scrollable.mozScrollSnap();
       this._scrollable = null;
 
       Services.els.removeSystemEventListener(global, "mousemove", this, true);

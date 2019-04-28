@@ -644,13 +644,14 @@ bool CheckOverRecursed(JSContext* cx);
 bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
-bool DefVarOrConst(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
-bool SetConst(JSContext* cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
-bool MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value);
-bool InitProp(JSContext* cx, HandleNativeObject obj, HandlePropertyName name, HandleValue value);
+bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
+bool SetConst(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
+bool MutatePrototype(JSContext *cx, HandlePlainObject obj, HandleValue value);
+bool InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue value,
+              jsbytecode *pc);
 
 template<bool Equal>
-bool LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
+bool LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
 
 template<bool Equal>
 bool StrictlyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
@@ -662,8 +663,6 @@ bool GreaterThanOrEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValu
 
 template<bool Equal>
 bool StringsEqual(JSContext* cx, HandleString left, HandleString right, bool* res);
-
-JSObject* NewInitObject(JSContext* cx, HandlePlainObject templateObject);
 
 bool ArrayPopDense(JSContext* cx, HandleObject obj, MutableHandleValue rval);
 bool ArrayPushDense(JSContext* cx, HandleArrayObject obj, HandleValue v, uint32_t* length);

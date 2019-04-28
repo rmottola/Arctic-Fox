@@ -277,7 +277,7 @@ BaselineCompiler::compile()
             return Method_Error;
 
         JitcodeGlobalEntry::BaselineEntry entry;
-        entry.init(code->raw(), code->rawEnd(), script, str);
+        entry.init(code, code->raw(), code->rawEnd(), script, str);
 
         JitcodeGlobalTable* globalTable = cx->runtime()->jitRuntime()->getJitcodeGlobalTable();
         if (!globalTable->addEntry(entry, cx->runtime())) {
@@ -1813,47 +1813,10 @@ BaselineCompiler::emit_JSOP_NEWOBJECT()
 {
     frame.syncStack(0);
 
-    RootedObjectGroup group(cx);
-    if (!ObjectGroup::useSingletonForAllocationSite(script, pc, JSProto_Object)) {
-        group = ObjectGroup::allocationSiteGroup(cx, script, pc, JSProto_Object);
-        if (!group)
-            return false;
-    }
-
-    RootedPlainObject baseObject(cx, &script->getObject(pc)->as<PlainObject>());
-    RootedPlainObject templateObject(cx, CopyInitializerObject(cx, baseObject, TenuredObject));
-    if (!templateObject)
-        return false;
-
-    if (group) {
-        templateObject->setGroup(group);
-    } else {
-        if (!JSObject::setSingleton(cx, templateObject))
-            return false;
-    }
-
-    // Try to do the allocation inline.
-    Label done;
-    if (group && !group->shouldPreTenure() && !templateObject->hasDynamicSlots()) {
-        Label slowPath;
-        Register objReg = R0.scratchReg();
-        Register tempReg = R1.scratchReg();
-        masm.movePtr(ImmGCPtr(group), tempReg);
-        masm.branchTest32(Assembler::NonZero, Address(tempReg, ObjectGroup::offsetOfFlags()),
-                          Imm32(OBJECT_FLAG_PRE_TENURE), &slowPath);
-        masm.branchPtr(Assembler::NotEqual, AbsoluteAddress(cx->compartment()->addressOfMetadataCallback()),
-                      ImmWord(0), &slowPath);
-        masm.createGCObject(objReg, tempReg, templateObject, gc::DefaultHeap, &slowPath);
-        masm.tagValue(JSVAL_TYPE_OBJECT, objReg, R0);
-        masm.jump(&done);
-        masm.bind(&slowPath);
-    }
-
-    ICNewObject_Fallback::Compiler stubCompiler(cx, templateObject);
+    ICNewObject_Fallback::Compiler stubCompiler(cx);
     if (!emitOpIC(stubCompiler.getStub(&stubSpace_)))
         return false;
 
-    masm.bind(&done);
     frame.push(R0);
     return true;
 }
@@ -1887,19 +1850,7 @@ BaselineCompiler::emit_JSOP_NEWINIT()
     } else {
         MOZ_ASSERT(key == JSProto_Object);
 
-        RootedPlainObject templateObject(cx,
-            NewBuiltinClassInstance<PlainObject>(cx, TenuredObject));
-        if (!templateObject)
-            return false;
-
-        if (group) {
-            templateObject->setGroup(group);
-        } else {
-            if (!JSObject::setSingleton(cx, templateObject))
-                return false;
-        }
-
-        ICNewObject_Fallback::Compiler stubCompiler(cx, templateObject);
+        ICNewObject_Fallback::Compiler stubCompiler(cx);
         if (!emitOpIC(stubCompiler.getStub(&stubSpace_)))
             return false;
     }
@@ -1974,7 +1925,19 @@ BaselineCompiler::emit_JSOP_INITPROP()
     return emitOpIC(compiler.getStub(&stubSpace_));
 }
 
-typedef bool (*NewbornArrayPushFn)(JSContext*, HandleObject, const Value&);
+bool
+BaselineCompiler::emit_JSOP_INITLOCKEDPROP()
+{
+    return emit_JSOP_INITPROP();
+}
+
+bool
+BaselineCompiler::emit_JSOP_INITHIDDENPROP()
+{
+    return emit_JSOP_INITPROP();
+}
+
+typedef bool (*NewbornArrayPushFn)(JSContext *, HandleObject, const Value &);
 static const VMFunction NewbornArrayPushInfo = FunctionInfo<NewbornArrayPushFn>(NewbornArrayPush);
 
 bool
@@ -2042,8 +2005,10 @@ BaselineCompiler::emit_JSOP_STRICTSETELEM()
 }
 
 typedef bool (*DeleteElementFn)(JSContext*, HandleValue, HandleValue, bool*);
-static const VMFunction DeleteElementStrictInfo = FunctionInfo<DeleteElementFn>(DeleteElement<true>);
-static const VMFunction DeleteElementNonStrictInfo = FunctionInfo<DeleteElementFn>(DeleteElement<false>);
+static const VMFunction DeleteElementStrictInfo
+    = FunctionInfo<DeleteElementFn>(DeleteElementJit<true>);
+static const VMFunction DeleteElementNonStrictInfo
+    = FunctionInfo<DeleteElementFn>(DeleteElementJit<false>);
 
 bool
 BaselineCompiler::emit_JSOP_DELELEM()
@@ -2207,8 +2172,10 @@ BaselineCompiler::emit_JSOP_GETXPROP()
 }
 
 typedef bool (*DeletePropertyFn)(JSContext*, HandleValue, HandlePropertyName, bool*);
-static const VMFunction DeletePropertyStrictInfo = FunctionInfo<DeletePropertyFn>(DeleteProperty<true>);
-static const VMFunction DeletePropertyNonStrictInfo = FunctionInfo<DeletePropertyFn>(DeleteProperty<false>);
+static const VMFunction DeletePropertyStrictInfo =
+    FunctionInfo<DeletePropertyFn>(DeletePropertyJit<true>);
+static const VMFunction DeletePropertyNonStrictInfo =
+    FunctionInfo<DeletePropertyFn>(DeletePropertyJit<false>);
 
 bool
 BaselineCompiler::emit_JSOP_DELPROP()

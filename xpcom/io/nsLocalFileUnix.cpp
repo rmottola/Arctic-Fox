@@ -13,7 +13,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#if !defined(XP_MACOSX) && !defined(__FreeBSD__)
+#if !defined(XP_MACOSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 #include <sys/sysmacros.h> // No longer implicitly included in later glibc
 #endif
 #include <unistd.h>
@@ -31,6 +31,9 @@
 #define USE_LINUX_QUOTACTL
 #include <sys/mount.h>
 #include <sys/quota.h>
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 1024 /* kernel block size */
+#endif
 #endif
 
 #include "xpcom-private.h"

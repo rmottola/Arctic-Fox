@@ -47,15 +47,19 @@ struct ProtoTableEntry {
     ClassInitializerOp init;
 };
 
+namespace js {
+
 #define DECLARE_PROTOTYPE_CLASS_INIT(name,code,init,clasp) \
     extern JSObject* init(JSContext* cx, Handle<JSObject*> obj);
 JS_FOR_EACH_PROTOTYPE(DECLARE_PROTOTYPE_CLASS_INIT)
 #undef DECLARE_PROTOTYPE_CLASS_INIT
 
+} // namespace js
+
 JSObject*
-js_InitViaClassSpec(JSContext* cx, Handle<JSObject*> obj)
+js::InitViaClassSpec(JSContext* cx, Handle<JSObject*> obj)
 {
-    MOZ_CRASH("js_InitViaClassSpec() should not be called.");
+    MOZ_CRASH("InitViaClassSpec() should not be called.");
 }
 
 static const ProtoTableEntry protoTable[JSProto_LIMIT] = {
@@ -101,11 +105,11 @@ GlobalObject::resolveConstructor(JSContext* cx, Handle<GlobalObject*> global, JS
     MOZ_ASSERT(!global->isStandardClassResolved(key));
 
     // There are two different kinds of initialization hooks. One of them is
-    // the class js_InitFoo hook, defined in a JSProtoKey-keyed table at the
+    // the class js::InitFoo hook, defined in a JSProtoKey-keyed table at the
     // top of this file. The other lives in the ClassSpec for classes that
     // define it. Classes may use one or the other, but not both.
     ClassInitializerOp init = protoTable[key].init;
-    if (init == js_InitViaClassSpec)
+    if (init == InitViaClassSpec)
         init = nullptr;
 
     const Class* clasp = ProtoKeyToClass(key);
@@ -396,7 +400,7 @@ GlobalObject::initSelfHostingBuiltins(JSContext* cx, Handle<GlobalObject*> globa
            InitBareBuiltinCtor(cx, global, JSProto_Uint8Array) &&
            InitBareBuiltinCtor(cx, global, JSProto_Uint32Array) &&
            InitBareWeakMapCtor(cx, global) &&
-           js_InitStopIterationClass(cx, global) &&
+           InitStopIterationClass(cx, global) &&
            InitSelfHostingCollectionIteratorFunctions(cx, global) &&
            JS_DefineFunctions(cx, global, builtins);
 }
@@ -423,7 +427,7 @@ GlobalObject::warnOnceAbout(JSContext* cx, HandleObject obj, uint32_t slot, unsi
     Rooted<GlobalObject*> global(cx, &obj->global());
     HeapSlot& v = global->getSlotRef(slot);
     if (v.isUndefined()) {
-        if (!JS_ReportErrorFlagsAndNumber(cx, JSREPORT_WARNING, js_GetErrorMessage, nullptr,
+        if (!JS_ReportErrorFlagsAndNumber(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
                                           errorNumber))
         {
             return false;

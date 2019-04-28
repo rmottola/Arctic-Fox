@@ -35,6 +35,9 @@ UnboxedLayout::trace(JSTracer* trc)
 
     if (nativeShape_)
         MarkShape(trc, &nativeShape_, "unboxed_layout_nativeShape");
+
+    if (replacementNewGroup_)
+        MarkObjectGroup(trc, &replacementNewGroup_, "unboxed_layout_replacementNewGroup");
 }
 
 size_t
@@ -162,20 +165,52 @@ UnboxedPlainObject::trace(JSTracer* trc, JSObject* obj)
 }
 
 /* static */ bool
-UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
+UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
 {
-    UnboxedLayout& layout = group->unboxedLayout();
+    AutoEnterAnalysis enter(cx);
+
+    UnboxedLayout &layout = group->unboxedLayout();
+    Rooted<TaggedProto> proto(cx, group->proto());
 
     MOZ_ASSERT(!layout.nativeGroup());
 
-    // Immediately clear any new script on the group, as
-    // rollbackPartiallyInitializedObjects() will be confused by the type
-    // changes we make later on.
-    group->clearNewScript(cx);
+    // Immediately clear any new script on the group. This is done by replacing
+    // the existing new script with one for a replacement default new group.
+    // This is done so that the size of the replacment group's objects is the
+    // same as that for the unboxed group, so that we do not see polymorphic
+    // slot accesses later on for sites that see converted objects from this
+    // group and objects that were allocated using the replacement new group.
+    RootedObjectGroup replacementNewGroup(cx);
+    if (layout.newScript()) {
+        replacementNewGroup = ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, proto);
+        if (!replacementNewGroup)
+            return false;
 
-    AutoEnterAnalysis enter(cx);
+        PlainObject *templateObject = NewObjectWithGroup<PlainObject>(cx, replacementNewGroup,
+                                                                      cx->global(), layout.getAllocKind(),
+                                                                      MaybeSingletonObject);
+        if (!templateObject)
+            return false;
 
-    Rooted<TaggedProto> proto(cx, group->proto());
+        for (size_t i = 0; i < layout.properties().length(); i++) {
+            const UnboxedLayout::Property &property = layout.properties()[i];
+            if (!templateObject->addDataProperty(cx, NameToId(property.name), i, JSPROP_ENUMERATE))
+                return false;
+            MOZ_ASSERT(templateObject->slotSpan() == i + 1);
+            MOZ_ASSERT(!templateObject->inDictionaryMode());
+        }
+
+        TypeNewScript *replacementNewScript =
+            TypeNewScript::makeNativeVersion(cx, layout.newScript(), templateObject);
+        if (!replacementNewScript)
+            return false;
+
+        replacementNewGroup->setNewScript(replacementNewScript);
+        gc::TraceTypeNewScript(replacementNewGroup);
+
+        group->clearNewScript(cx, replacementNewGroup);
+    }
+
 
     size_t nfixed = gc::GetGCKindSlots(layout.getAllocKind());
     RootedShape shape(cx, EmptyShape::getInitialShape(cx, &PlainObject::class_, proto,
@@ -194,28 +229,32 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
             return false;
     }
 
-    ObjectGroup* nativeGroup =
+    ObjectGroup *nativeGroup =
         ObjectGroupCompartment::makeGroup(cx, &PlainObject::class_, proto,
                                           group->flags() & OBJECT_FLAG_DYNAMIC_MASK);
     if (!nativeGroup)
         return false;
 
     // Propagate all property types from the old group to the new group.
-    for (size_t i = 0; i < group->getPropertyCount(); i++) {
-        if (ObjectGroup::Property* property = group->getProperty(i)) {
-            TypeSet::TypeList types;
-            if (!property->types.enumerateTypes(&types))
-                return false;
-            for (size_t j = 0; j < types.length(); j++)
-                AddTypePropertyId(cx, nativeGroup, property->id, types[j]);
-            HeapTypeSet* nativeProperty = nativeGroup->maybeGetProperty(property->id);
-            if (nativeProperty->canSetDefinite(i))
-                nativeProperty->setDefinite(i);
-        }
+    for (size_t i = 0; i < layout.properties().length(); i++) {
+        const UnboxedLayout::Property &property = layout.properties()[i];
+        jsid id = NameToId(property.name);
+
+        HeapTypeSet *typeProperty = group->maybeGetProperty(id);
+        TypeSet::TypeList types;
+        if (!typeProperty->enumerateTypes(&types))
+            return false;
+        MOZ_ASSERT(!types.empty());
+        for (size_t j = 0; j < types.length(); j++)
+            AddTypePropertyId(cx, nativeGroup, nullptr, id, types[j]);
+        HeapTypeSet *nativeProperty = nativeGroup->maybeGetProperty(id);
+        if (nativeProperty->canSetDefinite(i))
+            nativeProperty->setDefinite(i);
     }
 
     layout.nativeGroup_ = nativeGroup;
     layout.nativeShape_ = shape;
+    layout.replacementNewGroup_ = replacementNewGroup;
 
     nativeGroup->setOriginalUnboxedGroup(group);
 
@@ -223,9 +262,9 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
 }
 
 /* static */ bool
-UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
+UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (!layout.nativeGroup()) {
         if (!UnboxedLayout::makeNativeGroup(cx, obj->group()))
@@ -242,28 +281,11 @@ UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
             return false;
     }
 
-    uint32_t objectFlags = obj->lastProperty()->getObjectFlags();
-    RootedObject metadata(cx, obj->getMetadata());
-
     obj->setGroup(layout.nativeGroup());
     obj->as<PlainObject>().setLastPropertyMakeNative(cx, layout.nativeShape());
 
     for (size_t i = 0; i < values.length(); i++)
         obj->as<PlainObject>().initSlotUnchecked(i, values[i]);
-
-    if (objectFlags) {
-        RootedObject objRoot(cx, obj);
-        if (!obj->setFlags(cx, objectFlags))
-            return false;
-        obj = objRoot;
-    }
-
-    if (metadata) {
-        RootedObject objRoot(cx, obj);
-        RootedObject metadataRoot(cx, metadata);
-        if (!setMetadata(cx, objRoot, metadataRoot))
-            return false;
-    }
 
     return true;
 }
@@ -279,6 +301,9 @@ UnboxedPlainObject::create(JSContext* cx, HandleObjectGroup group, NewObjectKind
                                                                      allocKind, newKind);
     if (!res)
         return nullptr;
+
+    // Avoid spurious shape guard hits.
+    res->dummy_ = nullptr;
 
     // Initialize reference fields of the object. All fields in the object will
     // be overwritten shortly, but references need to be safe for the GC.
@@ -326,12 +351,13 @@ UnboxedPlainObject::obj_lookupProperty(JSContext* cx, HandleObject obj,
 
 /* static */ bool
 UnboxedPlainObject::obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                                       PropertyOp getter, StrictPropertyOp setter, unsigned attrs)
+                                       PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                                       ObjectOpResult &result)
 {
     if (!convertToNative(cx, obj))
         return false;
 
-    return DefineProperty(cx, obj, id, v, getter, setter, attrs);
+    return DefineProperty(cx, obj, id, v, getter, setter, attrs, result);
 }
 
 /* static */ bool
@@ -373,24 +399,24 @@ UnboxedPlainObject::obj_getProperty(JSContext* cx, HandleObject obj, HandleObjec
 
 /* static */ bool
 UnboxedPlainObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
-                                    HandleId id, MutableHandleValue vp, bool strict)
+                                    HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
 
     if (const UnboxedLayout::Property* property = layout.lookup(id)) {
         if (obj == receiver) {
             if (obj->as<UnboxedPlainObject>().setValue(cx, *property, vp))
-                return true;
+                return result.succeed();
 
             if (!convertToNative(cx, obj))
                 return false;
-            return SetProperty(cx, obj, receiver, id, vp, strict);
+            return SetProperty(cx, obj, receiver, id, vp, result);
         }
 
-        return SetPropertyByDefining(cx, obj, receiver, id, vp, strict, false);
+        return SetPropertyByDefining(cx, obj, receiver, id, vp, false, result);
     }
 
-    return SetPropertyOnProto(cx, obj, receiver, id, vp, strict);
+    return SetPropertyOnProto(cx, obj, receiver, id, vp, result);
 }
 
 /* static */ bool
@@ -412,11 +438,11 @@ UnboxedPlainObject::obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj
 
 /* static */ bool
 UnboxedPlainObject::obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id,
-                                       bool* succeeded)
+                                       ObjectOpResult &result)
 {
     if (!convertToNative(cx, obj))
         return false;
-    return DeleteProperty(cx, obj, id, succeeded);
+    return DeleteProperty(cx, obj, id, result);
 }
 
 /* static */ bool
@@ -527,11 +553,14 @@ js::TryConvertToUnboxedLayout(JSContext* cx, Shape* templateShape,
 
         objectCount++;
 
-        // All preliminary objects must have been created with the largest
-        // allocation kind possible, which will allow their unboxed data to be
-        // filled in inline.
-        MOZ_ASSERT(gc::GetGCKindSlots(obj->asTenured().getAllocKind()) ==
-                   NativeObject::MAX_FIXED_SLOTS);
+        // All preliminary objects must have been created with enough space to
+        // fill in their unboxed data inline. This is ensured either by using
+        // the largest allocation kind (which limits the maximum size of an
+        // unboxed object), or by using an allocation kind that covers all
+        // properties in the template, as the space used by unboxed properties
+        // less than or equal to that used by boxed properties.
+        MOZ_ASSERT(gc::GetGCKindSlots(obj->asTenured().getAllocKind()) >=
+                   Min(NativeObject::MAX_FIXED_SLOTS, templateShape->slotSpan()));
 
         if (obj->as<PlainObject>().lastProperty() != templateShape ||
             obj->as<PlainObject>().hasDynamicElements())

@@ -64,7 +64,7 @@ public:
     // This TextureClient should not be used in a context where we use CreateSimilar
     // (ex. component alpha) because the underlying texture data is always created by
     // an external producer.
-    virtual TemporaryRef<TextureClient>
+    virtual already_AddRefed<TextureClient>
     CreateSimilar(TextureFlags, TextureAllocationFlags) const MOZ_OVERRIDE{ return nullptr; }
 
 private:
@@ -88,7 +88,7 @@ public:
   virtual ~TextureClientD3D11();
 
   // Creates a TextureClient and init width.
-  static TemporaryRef<TextureClientD3D11>
+  static already_AddRefed<TextureClientD3D11>
   Create(ISurfaceAllocator* aAllocator,
          gfx::SurfaceFormat aFormat,
          TextureFlags aFlags,
@@ -122,7 +122,7 @@ public:
   virtual bool AllocateForSurface(gfx::IntSize aSize,
                                   TextureAllocationFlags aFlags = ALLOC_DEFAULT) override;
 
-  virtual TemporaryRef<TextureClient>
+  virtual already_AddRefed<TextureClient>
   CreateSimilar(TextureFlags aFlags = TextureFlags::DEFAULT,
                 TextureAllocationFlags aAllocFlags = ALLOC_DEFAULT) const override;
 
@@ -148,7 +148,7 @@ public:
   virtual ~DXGIYCbCrTextureClient();
 
   // Creates a TextureClient and init width.
-  static TemporaryRef<DXGIYCbCrTextureClient>
+  static already_AddRefed<DXGIYCbCrTextureClient>
   Create(ISurfaceAllocator* aAllocator,
          TextureFlags aFlags,
          IUnknown* aTextureY,
@@ -183,7 +183,7 @@ public:
     // This TextureClient should not be used in a context where we use CreateSimilar
     // (ex. component alpha) because the underlying texture data is always created by
     // an external producer.
-    virtual TemporaryRef<TextureClient>
+    virtual already_AddRefed<TextureClient>
     CreateSimilar(TextureFlags, TextureAllocationFlags) const MOZ_OVERRIDE{ return nullptr; }
 
 private:
@@ -312,7 +312,7 @@ public:
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() override
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
   {
     return nullptr;
   }
@@ -351,46 +351,7 @@ public:
 
   virtual gfx::IntSize GetSize() const MOZ_OVERRIDE{ return mSize; }
 
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() MOZ_OVERRIDE
-  {
-    return nullptr;
-  }
-
-protected:
-  ID3D11Device* GetDevice();
-
-  bool OpenSharedHandle();
-
-  RefPtr<ID3D11Texture2D> mTextures[3];
-  RefPtr<DataTextureSourceD3D11> mTextureSources[3];
-
-  RefPtr<CompositorD3D11> mCompositor;
-  gfx::IntSize mSize;
-  WindowsHandle mHandles[3];
-  bool mIsLocked;
-};
-
-class DXGIYCbCrTextureHostD3D11 : public TextureHost
-{
-public:
-  DXGIYCbCrTextureHostD3D11(TextureFlags aFlags,
-                            const SurfaceDescriptorDXGIYCbCr& aDescriptor);
-
-  virtual TextureSource* GetTextureSources() MOZ_OVERRIDE;
-
-  virtual void DeallocateDeviceData() MOZ_OVERRIDE{}
-
-  virtual void SetCompositor(Compositor* aCompositor) MOZ_OVERRIDE;
-
-  virtual gfx::SurfaceFormat GetFormat() const MOZ_OVERRIDE{ return gfx::SurfaceFormat::YUV; }
-
-  virtual bool Lock() MOZ_OVERRIDE;
-
-  virtual void Unlock() MOZ_OVERRIDE;
-
-  virtual gfx::IntSize GetSize() const MOZ_OVERRIDE{ return mSize; }
-
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() MOZ_OVERRIDE
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() MOZ_OVERRIDE
   {
     return nullptr;
   }

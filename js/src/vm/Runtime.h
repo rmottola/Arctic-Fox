@@ -64,16 +64,17 @@ extern mozilla::ThreadLocal<PerThreadData*> TlsPerThreadData;
 
 struct DtoaState;
 
-extern MOZ_COLD void
-js_ReportOutOfMemory(js::ExclusiveContext* cx);
-
-extern MOZ_COLD void
-js_ReportAllocationOverflow(js::ExclusiveContext* maybecx);
-
-extern MOZ_COLD void
-js_ReportOverRecursed(js::ExclusiveContext* cx);
-
 namespace js {
+
+extern MOZ_COLD void
+ReportOutOfMemory(ExclusiveContext *cx);
+
+extern MOZ_COLD void
+ReportAllocationOverflow(ExclusiveContext *maybecx);
+
+extern MOZ_COLD void
+ReportOverRecursed(ExclusiveContext *cx);
+
 
 class Activation;
 class ActivationIterator;
@@ -297,27 +298,27 @@ class NewObjectCache
      * nullptr if returning the object could possibly trigger GC (does not
      * indicate failure).
      */
-    inline JSObject* newObjectFromHit(JSContext* cx, EntryIndex entry, js::gc::InitialHeap heap);
+    inline NativeObject *newObjectFromHit(JSContext *cx, EntryIndex entry, js::gc::InitialHeap heap);
 
     /* Fill an entry after a cache miss. */
-    void fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto proto,
-                   gc::AllocKind kind, NativeObject* obj);
+    void fillProto(EntryIndex entry, const Class *clasp, js::TaggedProto proto,
+                   gc::AllocKind kind, NativeObject *obj);
 
-    inline void fillGlobal(EntryIndex entry, const Class* clasp, js::GlobalObject* global,
-                           gc::AllocKind kind, NativeObject* obj);
+    inline void fillGlobal(EntryIndex entry, const Class *clasp, js::GlobalObject *global,
+                           gc::AllocKind kind, NativeObject *obj);
 
-    void fillGroup(EntryIndex entry, js::ObjectGroup* group, gc::AllocKind kind,
-                   NativeObject* obj)
+    void fillGroup(EntryIndex entry, js::ObjectGroup *group, gc::AllocKind kind,
+                   NativeObject *obj)
     {
         MOZ_ASSERT(obj->group() == group);
         return fill(entry, group->clasp(), group, kind, obj);
     }
 
     /* Invalidate any entries which might produce an object with shape/proto. */
-    void invalidateEntriesForShape(JSContext* cx, HandleShape shape, HandleObject proto);
+    void invalidateEntriesForShape(JSContext *cx, HandleShape shape, HandleObject proto);
 
   private:
-    EntryIndex makeIndex(const Class* clasp, gc::Cell* key, gc::AllocKind kind) {
+    EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
         uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + kind;
         return hash % mozilla::ArrayLength(entries);
     }
@@ -344,7 +345,7 @@ class NewObjectCache
         js_memcpy(&entry->templateObject, obj, entry->nbytes);
     }
 
-    static void copyCachedToObject(JSObject* dst, JSObject* src, gc::AllocKind kind) {
+    static void copyCachedToObject(NativeObject *dst, NativeObject *src, gc::AllocKind kind) {
         js_memcpy(dst, src, gc::Arena::thingSize(kind));
         Shape::writeBarrierPost(dst->shape_, &dst->shape_);
         ObjectGroup::writeBarrierPost(dst->group_, &dst->group_);
@@ -514,7 +515,7 @@ class PerThreadData : public PerThreadDataFriendFields
 
     /*
      * When this flag is non-zero, any attempt to GC will be skipped. It is used
-     * to suppress GC when reporting an OOM (see js_ReportOutOfMemory) and in
+     * to suppress GC when reporting an OOM (see ReportOutOfMemory) and in
      * debugging facilities that cannot tolerate a GC and would rather OOM
      * immediately, such as utilities exposed to GDB. Setting this flag is
      * extremely dangerous and should only be used when in an OOM situation or
@@ -650,6 +651,21 @@ struct JSRuntime : public JS::shadow::Runtime,
      */
     js::Activation * volatile profilingActivation_;
 
+    /*
+     * The profiler sampler generation after the latest sample.
+     *
+     * The lapCount indicates the number of largest number of 'laps'
+     * (wrapping from high to low) that occurred when writing entries
+     * into the sample buffer.  All JitcodeGlobalMap entries referenced
+     * from a given sample are assigned the generation of the sample buffer
+     * at the START of the run.  If multiple laps occur, then some entries
+     * (towards the end) will be written out with the "wrong" generation.
+     * The lapCount indicates the required fudge factor to use to compare
+     * entry generations with the sample buffer generation.
+     */
+    mozilla::Atomic<uint32_t, mozilla::ReleaseAcquire> profilerSampleBufferGen_;
+    mozilla::Atomic<uint32_t, mozilla::ReleaseAcquire> profilerSampleBufferLapCount_;
+
     /* See AsmJSActivation comment. */
     js::AsmJSActivation * volatile asmJSActivationStack_;
 
@@ -669,6 +685,31 @@ struct JSRuntime : public JS::shadow::Runtime,
     }
     static unsigned offsetOfProfilingActivation() {
         return offsetof(JSRuntime, profilingActivation_);
+    }
+
+    uint32_t profilerSampleBufferGen() {
+        return profilerSampleBufferGen_;
+    }
+    void setProfilerSampleBufferGen(uint32_t gen) {
+        profilerSampleBufferGen_ = gen;
+    }
+
+    uint32_t profilerSampleBufferLapCount() {
+        MOZ_ASSERT(profilerSampleBufferLapCount_ > 0);
+        return profilerSampleBufferLapCount_;
+    }
+    void updateProfilerSampleBufferLapCount(uint32_t lapCount) {
+        MOZ_ASSERT(profilerSampleBufferLapCount_ > 0);
+
+        // Use compareExchange to make sure we have monotonic increase.
+        for (;;) {
+            uint32_t curLapCount = profilerSampleBufferLapCount_;
+            if (curLapCount >= lapCount)
+                break;
+
+            if (profilerSampleBufferLapCount_.compareExchange(curLapCount, lapCount))
+                break;
+        }
     }
 
     js::AsmJSActivation* asmJSActivationStack() const {
@@ -1281,7 +1322,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     void updateMallocCounter(size_t nbytes);
     void updateMallocCounter(JS::Zone* zone, size_t nbytes);
 
-    void reportAllocationOverflow() { js_ReportAllocationOverflow(nullptr); }
+    void reportAllocationOverflow() { js::ReportAllocationOverflow(nullptr); }
 
     /*
      * The function must be called outside the GC lock.

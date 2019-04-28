@@ -270,7 +270,7 @@ CopyRect(DataSourceSurface* aSrc, DataSourceSurface* aDest,
   }
 }
 
-TemporaryRef<DataSourceSurface>
+already_AddRefed<DataSourceSurface>
 CreateDataSourceSurfaceByCloning(DataSourceSurface* aSource)
 {
   RefPtr<DataSourceSurface> copy =

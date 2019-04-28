@@ -32,7 +32,7 @@ using namespace mozilla::gl;
 namespace mozilla {
 namespace layers {
 
-/* static */ TemporaryRef<CanvasClient>
+/* static */ already_AddRefed<CanvasClient>
 CanvasClient::CreateCanvasClient(CanvasClientType aType,
                                  CompositableForwarder* aForwarder,
                                  TextureFlags aFlags)
@@ -118,7 +118,7 @@ CanvasClient2D::Update(gfx::IntSize aSize, ClientCanvasLayer* aLayer)
   }
 }
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 CanvasClient2D::CreateTextureClientForCanvas(gfx::SurfaceFormat aFormat,
                                              gfx::IntSize aSize,
                                              TextureFlags aFlags,
@@ -156,7 +156,7 @@ CanvasClientSharedSurface::CanvasClientSharedSurface(CompositableForwarder* aLay
 ////////////////////////////////////////
 // Accelerated backends
 
-static TemporaryRef<TextureClient>
+static already_AddRefed<TextureClient>
 TexClientFromShSurf(ISurfaceAllocator* aAllocator, SharedSurface* surf,
                     TextureFlags flags)
 {
@@ -206,20 +206,20 @@ public:
   }
 
 protected:
-  TemporaryRef<BufferTextureClient> Create(gfx::SurfaceFormat format) {
+  already_AddRefed<BufferTextureClient> Create(gfx::SurfaceFormat format) {
     return TextureClient::CreateForRawBufferAccess(mAllocator, format,
                                                    mSize, mBackendType,
                                                    mBaseTexFlags);
   }
 
 public:
-  TemporaryRef<BufferTextureClient> CreateB8G8R8AX8() {
+  already_AddRefed<BufferTextureClient> CreateB8G8R8AX8() {
     gfx::SurfaceFormat format = mHasAlpha ? gfx::SurfaceFormat::B8G8R8A8
                                           : gfx::SurfaceFormat::B8G8R8X8;
     return Create(format);
   }
 
-  TemporaryRef<BufferTextureClient> CreateR8G8B8AX8() {
+  already_AddRefed<BufferTextureClient> CreateR8G8B8AX8() {
     RefPtr<BufferTextureClient> ret;
 
     bool areRGBAFormatsBroken = mLayersBackend == LayersBackend::LAYERS_BASIC;
@@ -240,7 +240,7 @@ public:
   }
 };
 
-static TemporaryRef<TextureClient>
+static already_AddRefed<TextureClient>
 TexClientFromReadback(SharedSurface* src, ISurfaceAllocator* allocator,
                       TextureFlags baseFlags, LayersBackend layersBackend)
 {
@@ -331,7 +331,7 @@ TexClientFromReadback(SharedSurface* src, ISurfaceAllocator* allocator,
 
 ////////////////////////////////////////
 
-static TemporaryRef<gl::ShSurfHandle>
+static already_AddRefed<gl::ShSurfHandle>
 CloneSurface(gl::SharedSurface* src, gl::SurfaceFactory* factory)
 {
     RefPtr<gl::ShSurfHandle> dest = factory->NewShSurfHandle(src->mSize);

@@ -1739,8 +1739,8 @@ TelemetryImpl::ReflectSQL(const SlowSQLEntryType *entry,
   if (!arrayObj) {
     return false;
   }
-  return (JS_SetElement(cx, arrayObj, 0, stat->hitCount)
-          && JS_SetElement(cx, arrayObj, 1, stat->totalTime)
+  return (JS_DefineElement(cx, arrayObj, 0, stat->hitCount, JSPROP_ENUMERATE)
+          && JS_DefineElement(cx, arrayObj, 1, stat->totalTime, JSPROP_ENUMERATE)
           && JS_DefineProperty(cx, obj, sql.BeginReading(), arrayObj,
                                JSPROP_ENUMERATE));
 }
@@ -2328,13 +2328,16 @@ TelemetryImpl::GetChromeHangs(JSContext *cx, JS::MutableHandle<JS::Value> ret)
 
   const size_t length = stacks.GetStackCount();
   for (size_t i = 0; i < length; ++i) {
-    if (!JS_SetElement(cx, durationArray, i, mHangReports.GetDuration(i))) {
+    if (!JS_DefineElement(cx, durationArray, i, mHangReports.GetDuration(i),
+                          JSPROP_ENUMERATE)) {
       return NS_ERROR_FAILURE;
     }
-    if (!JS_SetElement(cx, systemUptimeArray, i, mHangReports.GetSystemUptime(i))) {
+    if (!JS_DefineElement(cx, systemUptimeArray, i, mHangReports.GetSystemUptime(i),
+                          JSPROP_ENUMERATE)) {
       return NS_ERROR_FAILURE;
     }
-    if (!JS_SetElement(cx, firefoxUptimeArray, i, mHangReports.GetFirefoxUptime(i))) {
+    if (!JS_DefineElement(cx, firefoxUptimeArray, i, mHangReports.GetFirefoxUptime(i),
+                          JSPROP_ENUMERATE)) {
       return NS_ERROR_FAILURE;
     }
     const nsTArray<HangReports::AnnotationInfo>& annotationInfo =
@@ -2347,7 +2350,7 @@ TelemetryImpl::GetChromeHangs(JSContext *cx, JS::MutableHandle<JS::Value> ret)
       }
       JS::RootedValue indexValue(cx);
       indexValue.setNumber(annotationInfo[iterIndex].mHangIndex);
-      if (!JS_SetElement(cx, keyValueArray, 0, indexValue)) {
+      if (!JS_DefineElement(cx, keyValueArray, 0, indexValue, JSPROP_ENUMERATE)) {
         return NS_ERROR_FAILURE;
       }
       JS::Rooted<JSObject*> jsAnnotation(cx, JS_NewPlainObject(cx));
@@ -2369,11 +2372,11 @@ TelemetryImpl::GetChromeHangs(JSContext *cx, JS::MutableHandle<JS::Value> ret)
           return NS_ERROR_FAILURE;
         }
       }
-      if (!JS_SetElement(cx, keyValueArray, 1, jsAnnotation)) {
+      if (!JS_DefineElement(cx, keyValueArray, 1, jsAnnotation, JSPROP_ENUMERATE)) {
         return NS_ERROR_FAILURE;
       }
-      if (!JS_SetElement(cx, annotationsArray, iterIndex,
-                         keyValueArray)) {
+      if (!JS_DefineElement(cx, annotationsArray, iterIndex,
+                         keyValueArray, JSPROP_ENUMERATE)) {
         return NS_ERROR_FAILURE;
       }
     }
@@ -2409,7 +2412,8 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
     if (!moduleInfoArray) {
       return nullptr;
     }
-    if (!JS_SetElement(cx, moduleArray, moduleIndex, moduleInfoArray)) {
+    if (!JS_DefineElement(cx, moduleArray, moduleIndex, moduleInfoArray,
+                          JSPROP_ENUMERATE)) {
       return nullptr;
     }
 
@@ -2420,7 +2424,7 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
     if (!str) {
       return nullptr;
     }
-    if (!JS_SetElement(cx, moduleInfoArray, index++, str)) {
+    if (!JS_DefineElement(cx, moduleInfoArray, index++, str, JSPROP_ENUMERATE)) {
       return nullptr;
     }
 
@@ -2429,7 +2433,7 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
     if (!id) {
       return nullptr;
     }
-    if (!JS_SetElement(cx, moduleInfoArray, index++, id)) {
+    if (!JS_DefineElement(cx, moduleInfoArray, index++, id, JSPROP_ENUMERATE)) {
       return nullptr;
     }
   }
@@ -2451,7 +2455,7 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
       return nullptr;
     }
 
-    if (!JS_SetElement(cx, reportArray, i, pcArray)) {
+    if (!JS_DefineElement(cx, reportArray, i, pcArray, JSPROP_ENUMERATE)) {
       return nullptr;
     }
 
@@ -2465,13 +2469,14 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
       }
       int modIndex = (std::numeric_limits<uint16_t>::max() == frame.mModIndex) ?
         -1 : frame.mModIndex;
-      if (!JS_SetElement(cx, framePair, 0, modIndex)) {
+      if (!JS_DefineElement(cx, framePair, 0, modIndex, JSPROP_ENUMERATE)) {
         return nullptr;
       }
-      if (!JS_SetElement(cx, framePair, 1, static_cast<double>(frame.mOffset))) {
+      if (!JS_DefineElement(cx, framePair, 1, static_cast<double>(frame.mOffset),
+                            JSPROP_ENUMERATE)) {
         return nullptr;
       }
-      if (!JS_SetElement(cx, pcArray, pcIndex, framePair)) {
+      if (!JS_DefineElement(cx, pcArray, pcIndex, framePair, JSPROP_ENUMERATE)) {
         return nullptr;
       }
     }

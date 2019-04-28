@@ -80,7 +80,7 @@ AddActiveInfo(WebGLContext* webgl, GLint elemCount, GLenum elemType, bool isArra
 
 //#define DUMP_SHADERVAR_MAPPINGS
 
-static TemporaryRef<const webgl::LinkedProgramInfo>
+static already_AddRefed<const webgl::LinkedProgramInfo>
 QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
 {
     RefPtr<webgl::LinkedProgramInfo> info(new webgl::LinkedProgramInfo(prog));

@@ -19,7 +19,8 @@ using mozilla::Swap;
 
 MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOptions& options,
                            TempAllocator* alloc, MIRGraph* graph, CompileInfo* info,
-                           const OptimizationInfo* optimizationInfo)
+                           const OptimizationInfo *optimizationInfo,
+                           Label *outOfBoundsLabel, bool usesSignalHandlersForAsmJSOOB)
   : compartment(compartment),
     info_(info),
     optimizationInfo_(optimizationInfo),
@@ -27,7 +28,7 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
     graph_(graph),
     abortReason_(AbortReason_NoAbort),
     shouldForceAbort_(false),
-    abortedNewScriptPropertiesGroups_(*alloc_),
+    abortedPreliminaryGroups_(*alloc_),
     error_(false),
     pauseBuild_(nullptr),
     cancelBuild_(false),
@@ -40,6 +41,8 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
     instrumentedProfiling_(false),
     instrumentedProfilingIsCached_(false),
     nurseryObjects_(*alloc),
+    outOfBoundsLabel_(outOfBoundsLabel),
+    usesSignalHandlersForAsmJSOOB_(usesSignalHandlersForAsmJSOOB),
     options(options)
 { }
 
@@ -93,14 +96,14 @@ MIRGenerator::abort(const char* message, ...)
 }
 
 void
-MIRGenerator::addAbortedNewScriptPropertiesGroup(ObjectGroup* group)
+MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup *group)
 {
-    for (size_t i = 0; i < abortedNewScriptPropertiesGroups_.length(); i++) {
-        if (group == abortedNewScriptPropertiesGroups_[i])
+    for (size_t i = 0; i < abortedPreliminaryGroups_.length(); i++) {
+        if (group == abortedPreliminaryGroups_[i])
             return;
     }
-    if (!abortedNewScriptPropertiesGroups_.append(group))
-        CrashAtUnhandlableOOM("addAbortedNewScriptPropertiesGroup");
+    if (!abortedPreliminaryGroups_.append(group))
+        CrashAtUnhandlableOOM("addAbortedPreliminaryGroup");
 }
 
 void

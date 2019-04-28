@@ -295,7 +295,7 @@ public:
 
   virtual ~RectTextureImage();
 
-  TemporaryRef<gfx::DrawTarget>
+  already_AddRefed<gfx::DrawTarget>
     BeginUpdate(const nsIntSize& aNewSize,
                 const nsIntRegion& aDirtyRegion = nsIntRegion());
   void EndUpdate(bool aKeepSurface = false);
@@ -2515,7 +2515,7 @@ nsChildView::EnsureVibrancyManager()
   return *mVibrancyManager;
 }
 
-TemporaryRef<gfx::DrawTarget>
+already_AddRefed<gfx::DrawTarget>
 nsChildView::StartRemoteDrawing()
 {
   if (!mGLPresenter) {
@@ -2632,7 +2632,7 @@ RectTextureImage::TextureSizeForSize(const nsIntSize& aSize)
                    gfx::NextPowerOfTwo(aSize.height));
 }
 
-TemporaryRef<gfx::DrawTarget>
+already_AddRefed<gfx::DrawTarget>
 RectTextureImage::BeginUpdate(const nsIntSize& aNewSize,
                               const nsIntRegion& aDirtyRegion)
 {

@@ -20,13 +20,15 @@
 #include "vm/ErrorObject.h"
 #include "vm/Runtime.h"
 
-extern JSObject*
-js_InitSharedArrayBufferClass(JSContext* cx, js::HandleObject obj);
 
-extern JSObject*
-js_InitStopIterationClass(JSContext* cx, js::HandleObject obj);
 
 namespace js {
+
+extern JSObject*
+InitSharedArrayBufferClass(JSContext *cx, HandleObject obj);
+
+extern JSObject*
+InitStopIterationClass(JSContext* cx, HandleObject obj);
 
 class Debugger;
 class TypedObjectModuleObject;
@@ -605,7 +607,10 @@ class GlobalObject : public NativeObject
 #endif
         RootedObject holder(cx, intrinsicsHolder());
         RootedValue valCopy(cx, value);
-        return SetProperty(cx, holder, holder, name, &valCopy, false);
+        ObjectOpResult result;
+        bool ok = SetProperty(cx, holder, holder, name, &valCopy, result);
+        MOZ_ASSERT_IF(ok, result);
+        return ok;
     }
 
     bool getSelfHostedFunction(JSContext* cx, HandleAtom selfHostedName, HandleAtom name,

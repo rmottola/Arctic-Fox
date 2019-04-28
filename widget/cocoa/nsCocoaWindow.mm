@@ -946,6 +946,7 @@ static const ShadowParams kWindowShadowParametersPostYosemite[] = {
 void
 nsCocoaWindow::AdjustWindowShadow()
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow || ![mWindow isVisible] || ![mWindow hasShadow] ||
@@ -962,6 +963,9 @@ nsCocoaWindow::AdjustWindowShadow()
                                      params.flags);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
+#else // not 10.6 or later
+  return;
+#endif
 }
 
 static const NSUInteger kWindowBackgroundBlurRadius = 4;
@@ -969,6 +973,7 @@ static const NSUInteger kWindowBackgroundBlurRadius = 4;
 void
 nsCocoaWindow::SetWindowBackgroundBlur()
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow || ![mWindow isVisible] || [mWindow windowNumber] == -1)
@@ -983,6 +988,9 @@ nsCocoaWindow::SetWindowBackgroundBlur()
   CGSSetWindowBackgroundBlurRadius(cid, [mWindow windowNumber], kWindowBackgroundBlurRadius);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
+#else // not 10.6 or later
+  return;
+#endif
 }
 
 nsresult
@@ -2605,8 +2613,9 @@ static NSMutableSet *gSwizzledFrameViewClasses = nil;
 
 #endif
 
-#if !defined(MAC_OS_X_VERSION_10_8) || \
-    MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_8
+#if (!defined(MAC_OS_X_VERSION_10_8) && defined(MAC_OS_X_VERSION_10_6)) \
+    || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_8 \
+    && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 
 @interface NSImage(ImageCreationWithDrawingHandler)
 + (NSImage *)imageWithSize:(NSSize)size
@@ -2631,6 +2640,9 @@ static NSMutableSet *gSwizzledFrameViewClasses = nil;
     return [super _cornerMask];
   }
 
+#if !defined(MAC_OS_X_VERSION_10_6)  &&  (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+  return [super _cornerMask];
+#else
   CGFloat radius = 4.0f;
   NSEdgeInsets insets = { 5, 5, 5, 5 };
   NSSize maskSize = { 12, 12 };
@@ -2642,6 +2654,7 @@ static NSMutableSet *gSwizzledFrameViewClasses = nil;
   }];
   [maskImage setCapInsets:insets];
   return maskImage;
+#endif
 }
 
 // The frame of a window is implemented using undocumented NSView subclasses.

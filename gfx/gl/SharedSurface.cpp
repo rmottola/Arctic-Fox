@@ -336,7 +336,7 @@ SurfaceFactory::NewSharedSurface(const gfx::IntSize& size)
     return CreateShared(size);
 }
 
-TemporaryRef<ShSurfHandle>
+already_AddRefed<ShSurfHandle>
 SurfaceFactory::NewShSurfHandle(const gfx::IntSize& size)
 {
     auto surf = NewSharedSurface(size);

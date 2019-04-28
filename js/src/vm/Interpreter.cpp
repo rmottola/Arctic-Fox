@@ -241,7 +241,7 @@ GetPropertyOperation(JSContext* cx, InterpreterFrame* fp, HandleScript script, j
         NativeObject* proto = GlobalObject::getOrCreateNumberPrototype(cx, global);
         if (!proto)
             return false;
-        if (ClassMethodIsNative(cx, proto, &NumberObject::class_, id, js_num_toString))
+        if (ClassMethodIsNative(cx, proto, &NumberObject::class_, id, num_toString))
             obj = proto;
     }
 
@@ -315,19 +315,19 @@ SetObjectProperty(JSContext* cx, JSOp op, HandleValue lval, HandleId id, Mutable
 
     RootedObject obj(cx, &lval.toObject());
 
-    bool strict = op == JSOP_STRICTSETPROP;
+    ObjectOpResult result;
     if (MOZ_LIKELY(!obj->getOps()->setProperty)) {
         if (!NativeSetProperty(cx, obj.as<NativeObject>(), obj.as<NativeObject>(), id,
-                               Qualified, rref, strict))
+                               Qualified, rref, result))
         {
             return false;
         }
     } else {
-        if (!SetProperty(cx, obj, obj, id, rref, strict))
+        if (!SetProperty(cx, obj, obj, id, rref, result))
             return false;
     }
 
-    return true;
+    return result.checkStrictErrorOrWarning(cx, obj, id, op == JSOP_STRICTSETPROP);
 }
 
 static bool
@@ -1430,7 +1430,7 @@ SetObjectElementOperation(JSContext* cx, Handle<JSObject*> obj, HandleId id, con
         return false;
 
     RootedValue tmp(cx, value);
-    return SetProperty(cx, obj, obj, id, &tmp, strict);
+    return PutProperty(cx, obj, id, &tmp, strict);
 }
 
 static MOZ_NEVER_INLINE bool
@@ -1700,8 +1700,6 @@ CASE(JSOP_UNUSED105)
 CASE(JSOP_UNUSED107)
 CASE(JSOP_UNUSED125)
 CASE(JSOP_UNUSED126)
-CASE(JSOP_UNUSED146)
-CASE(JSOP_UNUSED147)
 CASE(JSOP_UNUSED148)
 CASE(JSOP_BACKPATCH)
 CASE(JSOP_UNUSED157)
@@ -2385,15 +2383,15 @@ CASE(JSOP_STRICTDELPROP)
     RootedObject& obj = rootObject0;
     FETCH_OBJECT(cx, -1, obj);
 
-    bool succeeded;
-    if (!DeleteProperty(cx, obj, id, &succeeded))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         goto error;
-    if (!succeeded && JSOp(*REGS.pc) == JSOP_STRICTDELPROP) {
-        obj->reportNotConfigurable(cx, id);
+    if (!result && JSOp(*REGS.pc) == JSOP_STRICTDELPROP) {
+        result.reportError(cx, obj, id);
         goto error;
     }
     MutableHandleValue res = REGS.stackHandleAt(-1);
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
 }
 END_CASE(JSOP_DELPROP)
 
@@ -2409,19 +2407,19 @@ CASE(JSOP_STRICTDELELEM)
     RootedValue& propval = rootValue0;
     propval = REGS.sp[-1];
 
-    bool succeeded;
+    ObjectOpResult result;
     RootedId& id = rootId0;
     if (!ValueToId<CanGC>(cx, propval, &id))
         goto error;
-    if (!DeleteProperty(cx, obj, id, &succeeded))
+    if (!DeleteProperty(cx, obj, id, result))
         goto error;
-    if (!succeeded && JSOp(*REGS.pc) == JSOP_STRICTDELELEM) {
-        obj->reportNotConfigurable(cx, id);
+    if (!result && JSOp(*REGS.pc) == JSOP_STRICTDELELEM) {
+        result.reportError(cx, obj, id);
         goto error;
     }
 
     MutableHandleValue res = REGS.stackHandleAt(-2);
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
     REGS.sp--;
 }
 END_CASE(JSOP_DELELEM)
@@ -3130,7 +3128,6 @@ CASE(JSOP_LAMBDA_ARROW)
     REGS.sp[-1].setObject(*obj);
 }
 END_CASE(JSOP_LAMBDA_ARROW)
-
 CASE(JSOP_CALLEE)
     MOZ_ASSERT(REGS.fp()->isNonEvalFunctionFrame());
     PUSH_COPY(REGS.fp()->calleev());
@@ -3182,25 +3179,23 @@ CASE(JSOP_NEWINIT)
 {
     uint8_t i = GET_UINT8(REGS.pc);
     MOZ_ASSERT(i == JSProto_Array || i == JSProto_Object);
-
     RootedObject& obj = rootObject0;
-    NewObjectKind newKind = GenericObject;
+
     if (i == JSProto_Array) {
+    	NewObjectKind newKind = GenericObject;
         if (ObjectGroup::useSingletonForAllocationSite(script, REGS.pc, &ArrayObject::class_))
             newKind = SingletonObject;
         obj = NewDenseEmptyArray(cx, NullPtr(), newKind);
+        if (!obj || !ObjectGroup::setAllocationSiteObjectGroup(cx, script, REGS.pc, obj,
+                                                               newKind == SingletonObject))
+        {
+            goto error;
+        }
     } else {
-        gc::AllocKind allocKind = GuessObjectGCKind(0);
-        if (ObjectGroup::useSingletonForAllocationSite(script, REGS.pc, &PlainObject::class_))
-            newKind = SingletonObject;
-        obj = NewBuiltinClassInstance<PlainObject>(cx, allocKind, newKind);
+        obj = NewObjectOperation(cx, script, REGS.pc);
+        if (!obj)
+            goto error;
     }
-    if (!obj || !ObjectGroup::setAllocationSiteObjectGroup(cx, script, REGS.pc, obj,
-                                                           newKind == SingletonObject))
-    {
-        goto error;
-    }
-
     PUSH_OBJECT(*obj);
 }
 END_CASE(JSOP_NEWINIT)
@@ -3241,20 +3236,9 @@ END_CASE(JSOP_NEWARRAY_COPYONWRITE)
 
 CASE(JSOP_NEWOBJECT)
 {
-    RootedObject& baseobj = rootObject0;
-    baseobj = script->getObject(REGS.pc);
-
-    RootedObject& obj = rootObject1;
-    NewObjectKind newKind = GenericObject;
-    if (ObjectGroup::useSingletonForAllocationSite(script, REGS.pc, baseobj->getClass()))
-        newKind = SingletonObject;
-    obj = CopyInitializerObject(cx, baseobj.as<PlainObject>(), newKind);
-    if (!obj || !ObjectGroup::setAllocationSiteObjectGroup(cx, script, REGS.pc, obj,
-                                                           newKind == SingletonObject))
-    {
+    JSObject *obj = NewObjectOperation(cx, script, REGS.pc);
+    if (!obj)
         goto error;
-    }
-
     PUSH_OBJECT(*obj);
 }
 END_CASE(JSOP_NEWOBJECT)
@@ -3271,10 +3255,8 @@ CASE(JSOP_MUTATEPROTO)
         obj = &REGS.sp[-2].toObject();
         MOZ_ASSERT(obj->is<PlainObject>());
 
-        bool succeeded;
-        if (!SetPrototype(cx, obj, newProto, &succeeded))
+        if (!SetPrototype(cx, obj, newProto))
             goto error;
-        MOZ_ASSERT(succeeded);
     }
 
     REGS.sp--;
@@ -3282,22 +3264,28 @@ CASE(JSOP_MUTATEPROTO)
 END_CASE(JSOP_MUTATEPROTO)
 
 CASE(JSOP_INITPROP)
+CASE(JSOP_INITLOCKEDPROP)
+CASE(JSOP_INITHIDDENPROP)
 {
+    static_assert(JSOP_INITPROP_LENGTH == JSOP_INITLOCKEDPROP_LENGTH,
+                  "initprop and initlockedprop must be the same size");
+    static_assert(JSOP_INITPROP_LENGTH == JSOP_INITHIDDENPROP_LENGTH,
+                  "initprop and inithiddenprop must be the same size");
     /* Load the property's initial value into rval. */
     MOZ_ASSERT(REGS.stackDepth() >= 2);
     RootedValue& rval = rootValue0;
     rval = REGS.sp[-1];
 
     /* Load the object being initialized into lval/obj. */
-    RootedNativeObject& obj = rootNativeObject0;
-    obj = &REGS.sp[-2].toObject().as<PlainObject>();
+    RootedObject &obj = rootObject0;
+    obj = &REGS.sp[-2].toObject();
 
     PropertyName* name = script->getName(REGS.pc);
 
     RootedId& id = rootId0;
     id = NameToId(name);
 
-    if (!NativeDefineProperty(cx, obj, id, rval, nullptr, nullptr, JSPROP_ENUMERATE))
+    if (!InitPropertyOperation(cx, JSOp(*REGS.pc), obj, id, rval))
         goto error;
 
     REGS.sp--;
@@ -3598,7 +3586,7 @@ DEFAULT()
 {
     char numBuf[12];
     JS_snprintf(numBuf, sizeof numBuf, "%d", *REGS.pc);
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                          JSMSG_BAD_BYTECODE, numBuf);
     goto error;
 }
@@ -3722,7 +3710,7 @@ js::GetScopeName(JSContext* cx, HandleObject scopeChain, HandlePropertyName name
     if (!shape) {
         JSAutoByteString printable;
         if (AtomToPrintableString(cx, name, &printable))
-            js_ReportIsNotDefined(cx, printable.ptr());
+            ReportIsNotDefined(cx, printable.ptr());
         return false;
     }
 
@@ -3858,7 +3846,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
         if (shape->isAccessorDescriptor() || !shape->writable() || !shape->enumerable()) {
             JSAutoByteString bytes;
             if (AtomToPrintableString(cx, name, &bytes)) {
-                JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_REDEFINE_PROP,
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_REDEFINE_PROP,
                                      bytes.ptr());
             }
 
@@ -3874,13 +3862,13 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
      */
 
     /* Step 5f. */
-    return SetProperty(cx, parent, parent, name, &rval, script->strict());
+    return PutProperty(cx, parent, name, &rval, script->strict());
 }
 
 bool
 js::SetCallOperation(JSContext* cx)
 {
-    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_LEFTSIDE_OF_ASS);
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_LEFTSIDE_OF_ASS);
     return false;
 }
 
@@ -3898,29 +3886,35 @@ js::GetAndClearException(JSContext* cx, MutableHandleValue res)
 
 template <bool strict>
 bool
-js::DeleteProperty(JSContext* cx, HandleValue v, HandlePropertyName name, bool* bp)
+js::DeletePropertyJit(JSContext* cx, HandleValue v, HandlePropertyName name, bool* bp)
 {
     RootedObject obj(cx, ToObjectFromStack(cx, v));
     if (!obj)
         return false;
 
     RootedId id(cx, NameToId(name));
-    if (!DeleteProperty(cx, obj, id, bp))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         return false;
 
-    if (strict && !*bp) {
-        obj->reportNotConfigurable(cx, NameToId(name));
-        return false;
+    if (strict) {
+        if (!result)
+            return result.reportError(cx, obj, id);
+        *bp = true;
+    } else {
+        *bp = result.ok();
     }
     return true;
 }
 
-template bool js::DeleteProperty<true> (JSContext* cx, HandleValue val, HandlePropertyName name, bool* bp);
-template bool js::DeleteProperty<false>(JSContext* cx, HandleValue val, HandlePropertyName name, bool* bp);
+template bool js::DeletePropertyJit<true> (JSContext *cx, HandleValue val, HandlePropertyName name,
+                                           bool *bp);
+template bool js::DeletePropertyJit<false>(JSContext *cx, HandleValue val, HandlePropertyName name,
+                                           bool *bp);
 
 template <bool strict>
 bool
-js::DeleteElement(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
+js::DeleteElementJit(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
 {
     RootedObject obj(cx, ToObjectFromStack(cx, val));
     if (!obj)
@@ -3929,18 +3923,22 @@ js::DeleteElement(JSContext* cx, HandleValue val, HandleValue index, bool* bp)
     RootedId id(cx);
     if (!ValueToId<CanGC>(cx, index, &id))
         return false;
-    if (!DeleteProperty(cx, obj, id, bp))
+    ObjectOpResult result;
+    if (!DeleteProperty(cx, obj, id, result))
         return false;
 
-    if (strict && !*bp) {
-        obj->reportNotConfigurable(cx, id);
-        return false;
+    if (strict) {
+        if (!result)
+            return result.reportError(cx, obj, id);
+        *bp = true;
+    } else {
+        *bp = result.ok();
     }
     return true;
 }
 
-template bool js::DeleteElement<true> (JSContext*, HandleValue, HandleValue, bool* succeeded);
-template bool js::DeleteElement<false>(JSContext*, HandleValue, HandleValue, bool* succeeded);
+template bool js::DeleteElementJit<true> (JSContext*, HandleValue, HandleValue, bool* succeeded);
+template bool js::DeleteElementJit<false>(JSContext*, HandleValue, HandleValue, bool* succeeded);
 
 bool
 js::GetElement(JSContext* cx, MutableHandleValue lref, HandleValue rref, MutableHandleValue vp)
@@ -4039,11 +4037,11 @@ js::DeleteNameOperation(JSContext* cx, HandlePropertyName name, HandleObject sco
         return false;
     }
 
-    bool succeeded;
+    ObjectOpResult result;
     RootedId id(cx, NameToId(name));
-    if (!DeleteProperty(cx, scope, id, &succeeded))
+    if (!DeleteProperty(cx, scope, id, result))
         return false;
-    res.setBoolean(succeeded);
+    res.setBoolean(result.ok());
     return true;
 }
 
@@ -4075,6 +4073,22 @@ js::RunOnceScriptPrologue(JSContext* cx, HandleScript script)
 
     MarkObjectGroupFlags(cx, script->functionNonDelazifying(), OBJECT_FLAG_RUNONCE_INVALIDATED);
     return true;
+}
+
+unsigned
+js::GetInitDataPropAttrs(JSOp op)
+{
+    switch (op) {
+      case JSOP_INITPROP:
+        return JSPROP_ENUMERATE;
+      case JSOP_INITLOCKEDPROP:
+        return JSPROP_PERMANENT | JSPROP_READONLY;
+      case JSOP_INITHIDDENPROP:
+        // Non-enumerable, but writable and configurable
+        return 0;
+      default:;
+    }
+    MOZ_CRASH("Unknown data initprop");
 }
 
 bool
@@ -4131,7 +4145,7 @@ js::SpreadCallOperation(JSContext* cx, HandleScript script, jsbytecode* pc, Hand
     JSOp op = JSOp(*pc);
 
     if (length > ARGS_LENGTH_MAX) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                              op == JSOP_SPREADNEW ? JSMSG_TOO_MANY_CON_SPREADARGS
                                                   : JSMSG_TOO_MANY_FUN_SPREADARGS);
         return false;
@@ -4185,12 +4199,88 @@ js::SpreadCallOperation(JSContext* cx, HandleScript script, jsbytecode* pc, Hand
     return true;
 }
 
+JSObject *
+js::NewObjectOperation(JSContext *cx, HandleScript script, jsbytecode *pc,
+                       NewObjectKind newKind /* = GenericObject */)
+{
+    MOZ_ASSERT(newKind != SingletonObject);
+
+    RootedObjectGroup group(cx);
+    if (ObjectGroup::useSingletonForAllocationSite(script, pc, JSProto_Object)) {
+        newKind = SingletonObject;
+    } else {
+        group = ObjectGroup::allocationSiteGroup(cx, script, pc, JSProto_Object);
+        if (!group)
+            return nullptr;
+        if (group->maybePreliminaryObjects())
+            group->maybePreliminaryObjects()->maybeAnalyze(cx, group);
+
+        if (group->shouldPreTenure() || group->maybePreliminaryObjects())
+            newKind = TenuredObject;
+
+        if (group->maybeUnboxedLayout())
+            return UnboxedPlainObject::create(cx, group, newKind);
+    }
+
+    RootedObject obj(cx);
+
+    if (*pc == JSOP_NEWOBJECT) {
+        RootedPlainObject baseObject(cx, &script->getObject(pc)->as<PlainObject>());
+        obj = CopyInitializerObject(cx, baseObject, newKind);
+    } else {
+        MOZ_ASSERT(*pc == JSOP_NEWINIT);
+        MOZ_ASSERT(GET_UINT8(pc) == JSProto_Object);
+        obj = NewBuiltinClassInstance<PlainObject>(cx, newKind);
+    }
+
+    if (!obj)
+        return nullptr;
+
+    if (newKind == SingletonObject) {
+        if (!JSObject::setSingleton(cx, obj))
+            return nullptr;
+    } else {
+        obj->setGroup(group);
+
+        if (PreliminaryObjectArray *preliminaryObjects = group->maybePreliminaryObjects())
+            preliminaryObjects->registerNewObject(obj);
+    }
+
+    return obj;
+}
+
+JSObject*
+js::NewObjectOperationWithTemplate(JSContext *cx, HandleObject templateObject)
+{
+    // This is an optimized version of NewObjectOperation for use when the
+    // object is not a singleton and has had its preliminary objects analyzed,
+    // with the template object a copy of the object to create.
+    MOZ_ASSERT(!templateObject->isSingleton());
+
+    NewObjectKind newKind = templateObject->group()->shouldPreTenure() ? TenuredObject : GenericObject;
+
+    if (templateObject->group()->maybeUnboxedLayout()) {
+        RootedObjectGroup group(cx, templateObject->group());
+        JSObject *obj = UnboxedPlainObject::create(cx, group, newKind);
+        if (!obj)
+            return nullptr;
+        return obj;
+    }
+
+    JSObject *obj = CopyInitializerObject(cx, templateObject.as<PlainObject>(), newKind);
+    if (!obj)
+        return nullptr;
+
+    obj->setGroup(templateObject->group());
+    return obj;
+}
+
 void
 js::ReportUninitializedLexical(JSContext* cx, HandlePropertyName name)
 {
     JSAutoByteString printable;
     if (AtomToPrintableString(cx, name, &printable)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_UNINITIALIZED_LEXICAL,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNINITIALIZED_LEXICAL,
                              printable.ptr());
     }
 }

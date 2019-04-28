@@ -20,6 +20,8 @@ namespace JS {
       "getprop constant")                               \
     _(GetProp_StaticName,                               \
       "getprop static name")                            \
+    _(GetProp_SimdGetter,                               \
+      "getprop SIMD getter")                            \
     _(GetProp_TypedObject,                              \
       "getprop TypedObject")                            \
     _(GetProp_DefiniteSlot,                             \
@@ -146,8 +148,10 @@ namespace JS {
       "TypedObject array of unknown length")                            \
     _(AccessNotDense,                                                   \
       "access not on dense native (check receiver, index, and result types)") \
+    _(AccessNotSimdObject,                                              \
+      "access not on SIMD object (check receiver)")                     \
     _(AccessNotTypedObject,                                             \
-      "access not on typed array (check receiver and index types)")     \
+      "access not on typed object (check receiver and index types)")    \
     _(AccessNotTypedArray,                                              \
       "access not on typed array (check receiver, index, and result types)") \
     _(AccessNotString,                                                  \
@@ -166,6 +170,12 @@ namespace JS {
       "index type must be int32, string, or symbol")                    \
     _(SetElemNonDenseNonTANotCached,                                    \
       "setelem on non-dense non-TAs are not inline cached")             \
+    _(NoSimdJitSupport,                                                 \
+      "SIMD isn't optimized in Ion on this platform yet")               \
+    _(SimdTypeNotOptimized,                                             \
+      "given SIMD type isn't optimized in Ion yet")                     \
+    _(UnknownSimdProperty,                                              \
+      "getelem on an unknown SIMD property ")                           \
                                                                         \
     _(CantInlineGeneric,                                                \
       "can't inline")                                                   \

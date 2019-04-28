@@ -446,14 +446,14 @@ ThisToStringForStringProto(JSContext* cx, CallReceiver call)
         if (obj->is<StringObject>()) {
             StringObject* nobj = &obj->as<StringObject>();
             Rooted<jsid> id(cx, NameToId(cx->names().toString));
-            if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, js_str_toString)) {
+            if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
                 JSString* str = nobj->unbox();
                 call.setThis(StringValue(str));
                 return str;
             }
         }
     } else if (call.thisv().isNullOrUndefined()) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_CANT_CONVERT_TO,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_CONVERT_TO,
                              call.thisv().isNull() ? "null" : "undefined", "object");
         return nullptr;
     }
@@ -483,7 +483,7 @@ str_toSource_impl(JSContext* cx, const CallArgs& args)
     if (!str)
         return false;
 
-    str = js_QuoteString(cx, str, '"');
+    str = QuoteString(cx, str, '"');
     if (!str)
         return false;
 
@@ -519,7 +519,7 @@ str_toString_impl(JSContext* cx, const CallArgs& args)
 }
 
 bool
-js_str_toString(JSContext* cx, unsigned argc, Value* vp)
+js::str_toString(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<IsString, str_toString_impl>(cx, args);
@@ -901,7 +901,7 @@ str_normalize(JSContext* cx, unsigned argc, Value* vp)
         } else if (formStr == cx->names().NFKD) {
             form = UNORM_NFKD;
         } else {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                                  JSMSG_INVALID_NORMALIZE_FORM);
             return false;
         }
@@ -950,7 +950,7 @@ str_normalize(JSContext* cx, unsigned argc, Value* vp)
 #endif
 
 bool
-js_str_charAt(JSContext* cx, unsigned argc, Value* vp)
+js::str_charAt(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1016,7 +1016,7 @@ out_of_range:
 }
 
 bool
-js_str_charCodeAt(JSContext* cx, unsigned argc, Value* vp)
+js::str_charCodeAt(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedString str(cx);
@@ -1740,7 +1740,7 @@ js::str_startsWith(JSContext* cx, unsigned argc, Value* vp)
 
     // Step 4
     if (args.get(0).isObject() && IsObjectWithClass(args[0], ESClass_RegExp, cx)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_INVALID_ARG_TYPE,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INVALID_ARG_TYPE,
                              "first", "", "Regular Expression");
         return false;
     }
@@ -1801,7 +1801,7 @@ str_endsWith(JSContext* cx, unsigned argc, Value* vp)
 
     // Step 4
     if (args.get(0).isObject() && IsObjectWithClass(args[0], ESClass_RegExp, cx)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_INVALID_ARG_TYPE,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INVALID_ARG_TYPE,
                              "first", "", "Regular Expression");
         return false;
     }
@@ -2175,7 +2175,7 @@ class MOZ_STACK_CLASS StringRegExpGuard
 
         // Handle everything else generically (including throwing if .lastIndex is non-writable).
         RootedValue zero(cx, Int32Value(0));
-        return SetProperty(cx, obj_, obj_, cx->names().lastIndex, &zero, true);
+        return SetProperty(cx, obj_, obj_, cx->names().lastIndex, &zero);
     }
 
     RegExpShared& regExp() { return *re_; }
@@ -2659,7 +2659,7 @@ FindReplaceLengthString(JSContext* cx, RegExpStatics* res, ReplaceData& rdata, s
     }
 
     if (!replen.isValid()) {
-        js_ReportAllocationOverflow(cx);
+        ReportAllocationOverflow(cx);
         return false;
     }
 
@@ -2822,7 +2822,7 @@ ReplaceRegExp(JSContext* cx, RegExpStatics* res, ReplaceData& rdata)
     newlen += leftlen;
     newlen += replen;
     if (!newlen.isValid()) {
-        js_ReportAllocationOverflow(cx);
+        ReportAllocationOverflow(cx);
         return false;
     }
 
@@ -3056,10 +3056,10 @@ struct StringRange
 
 template <typename CharT>
 static void
-CopySubstringsToFatInline(JSFatInlineString* dest, const CharT* src, const StringRange* ranges,
+CopySubstringsToFatInline(JSFatInlineString *dest, const CharT *src, const StringRange *ranges,
                           size_t rangesLen, size_t outputLen)
 {
-    CharT* buf = dest->init<CharT>(outputLen);
+    CharT *buf = dest->init<CharT>(outputLen);
     size_t pos = 0;
     for (size_t i = 0; i < rangesLen; i++) {
         PodCopy(buf + pos, src + ranges[i].start, ranges[i].length);
@@ -3070,11 +3070,11 @@ CopySubstringsToFatInline(JSFatInlineString* dest, const CharT* src, const Strin
     buf[outputLen] = 0;
 }
 
-static inline JSFatInlineString*
-FlattenSubstrings(JSContext* cx, HandleLinearString str, const StringRange* ranges,
+static inline JSFatInlineString *
+FlattenSubstrings(JSContext *cx, HandleLinearString str, const StringRange *ranges,
                   size_t rangesLen, size_t outputLen)
 {
-    JSFatInlineString* result = NewGCFatInlineString<CanGC>(cx);
+    JSFatInlineString *result = Allocate<JSFatInlineString>(cx);
     if (!result)
         return nullptr;
 
@@ -3559,7 +3559,7 @@ class SplitMatchResult {
 
 template<class Matcher>
 static ArrayObject*
-SplitHelper(JSContext* cx, HandleLinearString str, uint32_t limit, const Matcher& splitMatch,
+SplitHelper(JSContext *cx, HandleLinearString str, uint32_t limit, const Matcher &splitMatch,
             HandleObjectGroup group)
 {
     size_t strLength = str->length();
@@ -3664,7 +3664,7 @@ SplitHelper(JSContext* cx, HandleLinearString str, uint32_t limit, const Matcher
                         return nullptr;
                 } else {
                     /* Only string entries have been accounted for so far. */
-                    AddTypePropertyId(cx, group, JSID_VOID, UndefinedValue());
+                    AddTypePropertyId(cx, group, nullptr, JSID_VOID, UndefinedValue());
                     if (!splits.append(UndefinedValue()))
                         return nullptr;
                 }
@@ -3795,7 +3795,7 @@ js::str_split(JSContext* cx, unsigned argc, Value* vp)
     RootedObjectGroup group(cx, ObjectGroup::callingAllocationSiteGroup(cx, JSProto_Array));
     if (!group)
         return false;
-    AddTypePropertyId(cx, group, JSID_VOID, TypeSet::StringType());
+    AddTypePropertyId(cx, group, nullptr, JSID_VOID, TypeSet::StringType());
 
     /* Step 5: Use the second argument as the split limit, if given. */
     uint32_t limit;
@@ -3943,12 +3943,12 @@ static const JSFunctionSpec string_methods[] = {
 #endif
 
     /* Java-like methods. */
-    JS_FN(js_toString_str,     js_str_toString,       0,0),
-    JS_FN(js_valueOf_str,      js_str_toString,       0,0),
+    JS_FN(js_toString_str,     str_toString,          0,0),
+    JS_FN(js_valueOf_str,      str_toString,          0,0),
     JS_FN("toLowerCase",       str_toLowerCase,       0,JSFUN_GENERIC_NATIVE),
     JS_FN("toUpperCase",       str_toUpperCase,       0,JSFUN_GENERIC_NATIVE),
-    JS_FN("charAt",            js_str_charAt,         1,JSFUN_GENERIC_NATIVE),
-    JS_FN("charCodeAt",        js_str_charCodeAt,     1,JSFUN_GENERIC_NATIVE),
+    JS_FN("charAt",            str_charAt,            1,JSFUN_GENERIC_NATIVE),
+    JS_FN("charCodeAt",        str_charCodeAt,        1,JSFUN_GENERIC_NATIVE),
     JS_SELF_HOSTED_FN("substring", "String_substring", 2,0),
     JS_SELF_HOSTED_FN("codePointAt", "String_codePointAt", 1,0),
     JS_FN("includes",          str_includes,          1,JSFUN_GENERIC_NATIVE),
@@ -4004,7 +4004,7 @@ static const JSFunctionSpec string_methods[] = {
 
 // ES6 rev 27 (2014 Aug 24) 21.1.1
 bool
-js_String(JSContext* cx, unsigned argc, Value* vp)
+js::StringConstructor(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -4112,7 +4112,7 @@ StringObject::assignInitialShape(ExclusiveContext* cx, Handle<StringObject*> obj
 }
 
 JSObject*
-js_InitStringClass(JSContext* cx, HandleObject obj)
+js::InitStringClass(JSContext* cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->isNative());
 
@@ -4125,7 +4125,7 @@ js_InitStringClass(JSContext* cx, HandleObject obj)
 
     /* Now create the String function. */
     RootedFunction ctor(cx);
-    ctor = global->createConstructor(cx, js_String, cx->names().String, 1);
+    ctor = global->createConstructor(cx, StringConstructor, cx->names().String, 1);
     if (!ctor)
         return nullptr;
 
@@ -4152,7 +4152,7 @@ js_InitStringClass(JSContext* cx, HandleObject obj)
 }
 
 const char*
-js_ValueToPrintable(JSContext* cx, const Value& vArg, JSAutoByteString* bytes, bool asSource)
+js::ValueToPrintable(JSContext* cx, const Value& vArg, JSAutoByteString* bytes, bool asSource)
 {
     RootedValue v(cx, vArg);
     JSString* str;
@@ -4162,7 +4162,7 @@ js_ValueToPrintable(JSContext* cx, const Value& vArg, JSAutoByteString* bytes, b
         str = ToString<CanGC>(cx, v);
     if (!str)
         return nullptr;
-    str = js_QuoteString(cx, str, 0);
+    str = QuoteString(cx, str, 0);
     if (!str)
         return nullptr;
     return bytes->encodeLatin1(cx, str);
@@ -4193,12 +4193,12 @@ js::ToStringSlow(ExclusiveContext* cx, typename MaybeRooted<Value, allowGC>::Han
     } else if (v.isDouble()) {
         str = NumberToString<allowGC>(cx, v.toDouble());
     } else if (v.isBoolean()) {
-        str = js_BooleanToString(cx, v.toBoolean());
+        str = BooleanToString(cx, v.toBoolean());
     } else if (v.isNull()) {
         str = cx->names().null;
     } else if (v.isSymbol()) {
         if (cx->shouldBeJSContext() && allowGC) {
-            JS_ReportErrorNumber(cx->asJSContext(), js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(cx->asJSContext(), GetErrorMessage, nullptr,
                                  JSMSG_SYMBOL_TO_STRING);
         }
         return nullptr;
@@ -4285,7 +4285,7 @@ js::ValueToSource(JSContext* cx, HandleValue v)
 JSString*
 js::StringToSource(JSContext* cx, JSString* str)
 {
-    return js_QuoteString(cx, str, '"');
+    return QuoteString(cx, str, '"');
 }
 
 bool
@@ -4521,7 +4521,7 @@ js::DeflateStringToBuffer(JSContext* maybecx, const CharT* src, size_t srclen,
             dst[i] = char(src[i]);
         if (maybecx) {
             AutoSuppressGC suppress(maybecx);
-            JS_ReportErrorNumber(maybecx, js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(maybecx, GetErrorMessage, nullptr,
                                  JSMSG_BUFFER_TOO_SMALL);
         }
         return false;
@@ -4730,7 +4730,7 @@ Encode(StringBuffer& sb, const CharT* chars, size_t length,
                 v = ((c - 0xD800) << 10) + (c2 - 0xDC00) + 0x10000;
             }
             uint8_t utf8buf[4];
-            size_t L = js_OneUcs4ToUtf8Char(utf8buf, v);
+            size_t L = OneUcs4ToUtf8Char(utf8buf, v);
             for (size_t j = 0; j < L; j++) {
                 hexBuf[1] = HexDigits[utf8buf[j] >> 4];
                 hexBuf[2] = HexDigits[utf8buf[j] & 0xf];
@@ -4770,7 +4770,7 @@ Encode(JSContext* cx, HandleLinearString str, const bool* unescapedSet,
         return false;
 
     if (res == Encode_BadUri) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_URI, nullptr);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_URI, nullptr);
         return false;
     }
 
@@ -4880,7 +4880,7 @@ Decode(JSContext* cx, HandleLinearString str, const bool* reservedSet, MutableHa
         return false;
 
     if (res == Decode_BadUri) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_URI);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_URI);
         return false;
     }
 
@@ -4937,7 +4937,7 @@ str_encodeURI_Component(JSContext* cx, unsigned argc, Value* vp)
  * least 4 bytes long.  Return the number of UTF-8 bytes of data written.
  */
 int
-js_OneUcs4ToUtf8Char(uint8_t* utf8Buffer, uint32_t ucs4Char)
+js::OneUcs4ToUtf8Char(uint8_t* utf8Buffer, uint32_t ucs4Char)
 {
     int utf8Length = 1;
 

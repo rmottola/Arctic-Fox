@@ -258,7 +258,7 @@ InterpreterStack::allocateFrame(JSContext* cx, size_t size)
         maxFrames = MAX_FRAMES;
 
     if (MOZ_UNLIKELY(frameCount_ >= maxFrames)) {
-        js_ReportOverRecursed(cx);
+        ReportOverRecursed(cx);
         return nullptr;
     }
 

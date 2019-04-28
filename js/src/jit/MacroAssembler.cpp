@@ -20,7 +20,6 @@
 #include "js/Conversions.h"
 #include "vm/TraceLogging.h"
 
-#include "jsgcinlines.h"
 #include "jsobjinlines.h"
 #include "vm/Interpreter-inl.h"
 
@@ -1191,16 +1190,18 @@ MacroAssembler::initGCSlots(Register obj, Register slots, NativeObject* template
 }
 
 void
-MacroAssembler::initGCThing(Register obj, Register slots, JSObject* templateObj,
+MacroAssembler::initGCThing(Register obj, Register slots, JSObject *templateObj,
                             bool initFixedSlots)
 {
     // Fast initialization of an empty object returned by allocateObject().
 
-    storePtr(ImmGCPtr(templateObj->lastProperty()), Address(obj, JSObject::offsetOfShape()));
     storePtr(ImmGCPtr(templateObj->group()), Address(obj, JSObject::offsetOfGroup()));
 
+    if (Shape *shape = templateObj->maybeShape())
+        storePtr(ImmGCPtr(shape), Address(obj, JSObject::offsetOfShape()));
+
     if (templateObj->isNative()) {
-        NativeObject* ntemplate = &templateObj->as<NativeObject>();
+        NativeObject *ntemplate = &templateObj->as<NativeObject>();
         MOZ_ASSERT_IF(!ntemplate->denseElementsAreCopyOnWrite(), !ntemplate->hasDynamicElements());
 
         if (ntemplate->hasDynamicSlots())
@@ -1255,10 +1256,12 @@ MacroAssembler::initGCThing(Register obj, Register slots, JSObject* templateObj,
             offset += sizeof(uintptr_t);
         }
     } else if (templateObj->is<UnboxedPlainObject>()) {
-        const UnboxedLayout& layout = templateObj->as<UnboxedPlainObject>().layout();
+        const UnboxedLayout &layout = templateObj->as<UnboxedPlainObject>().layout();
+
+        storePtr(ImmWord(0), Address(obj, JSObject::offsetOfShape()));
 
         // Initialize reference fields of the object, per UnboxedPlainObject::create.
-        if (const int32_t* list = layout.traceList()) {
+        if (const int32_t *list = layout.traceList()) {
             while (*list != -1) {
                 storePtr(ImmGCPtr(GetJitContext()->runtime->names().empty),
                          Address(obj, UnboxedPlainObject::offsetOfData() + *list));
@@ -1372,9 +1375,9 @@ MacroAssembler::linkExitFrame()
 }
 
 static void
-ReportOverRecursed(JSContext* cx)
+BailoutReportOverRecursed(JSContext* cx)
 {
-    js_ReportOverRecursed(cx);
+    ReportOverRecursed(cx);
 }
 
 void
@@ -1400,7 +1403,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
         loadJSContext(ReturnReg);
         setupUnalignedABICall(1, scratch);
         passABIArg(ReturnReg);
-        callWithABI(JS_FUNC_TO_DATA_PTR(void*, ReportOverRecursed));
+        callWithABI(JS_FUNC_TO_DATA_PTR(void*, BailoutReportOverRecursed));
         jump(exceptionLabel());
     }
 

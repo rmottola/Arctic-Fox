@@ -14,12 +14,13 @@
 
 #include <arm_neon.h>
 
-#include "./dsp.h"
+#include "src/dsp/dsp.h"
 
 // Right now, some intrinsics functions seem slower, so we disable them
-// everywhere except aarch64 where the inline assembly is incompatible.
-#if defined(__aarch64__)
-#define USE_INTRINSICS   // use intrinsics when possible
+// everywhere except newer clang/gcc or aarch64 where the inline assembly is
+// incompatible.
+#if LOCAL_CLANG_PREREQ(3,8) || LOCAL_GCC_PREREQ(4,9) || defined(__aarch64__)
+#define WEBP_USE_INTRINSICS   // use intrinsics when possible
 #endif
 
 #define INIT_VECTOR2(v, a, b) do {  \
@@ -43,11 +44,11 @@
 // if using intrinsics, this flag avoids some functions that make gcc-4.6.3
 // crash ("internal compiler error: in immed_double_const, at emit-rtl.").
 // (probably similar to gcc.gnu.org/bugzilla/show_bug.cgi?id=48183)
-#if !(LOCAL_GCC_PREREQ(4,8) || defined(__aarch64__))
+#if !(LOCAL_CLANG_PREREQ(3,8) || LOCAL_GCC_PREREQ(4,8) || defined(__aarch64__))
 #define WORK_AROUND_GCC
 #endif
 
-static WEBP_INLINE int32x4x4_t Transpose4x4(const int32x4x4_t rows) {
+static WEBP_INLINE int32x4x4_t Transpose4x4_NEON(const int32x4x4_t rows) {
   uint64x2x2_t row01, row23;
 
   row01.val[0] = vreinterpretq_u64_s32(rows.val[0]);
@@ -78,5 +79,23 @@ static WEBP_INLINE int32x4x4_t Transpose4x4(const int32x4x4_t rows) {
     return out;
   }
 }
+
+#if 0     // Useful debug macro.
+#include <stdio.h>
+#define PRINT_REG(REG, SIZE) do {                       \
+  int i;                                                \
+  printf("%s \t[%d]: 0x", #REG, SIZE);                  \
+  if (SIZE == 8) {                                      \
+    uint8_t _tmp[8];                                    \
+    vst1_u8(_tmp, (REG));                               \
+    for (i = 0; i < 8; ++i) printf("%.2x ", _tmp[i]);   \
+  } else if (SIZE == 16) {                              \
+    uint16_t _tmp[4];                                   \
+    vst1_u16(_tmp, (REG));                              \
+    for (i = 0; i < 4; ++i) printf("%.4x ", _tmp[i]);   \
+  }                                                     \
+  printf("\n");                                         \
+} while (0)
+#endif
 
 #endif  // WEBP_DSP_NEON_H_
