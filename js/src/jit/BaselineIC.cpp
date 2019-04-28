@@ -387,7 +387,7 @@ ICStub::trace(JSTracer* trc)
       }
       case ICStub::GetProp_CallDOMProxyNative:
       case ICStub::GetProp_CallDOMProxyWithGenerationNative: {
-        ICGetPropCallDOMProxyNativeStub* propStub;
+        ICGetPropCallDOMProxyNativeStub *propStub;
         if (kind() ==  ICStub::GetProp_CallDOMProxyNative)
             propStub = toGetProp_CallDOMProxyNative();
         else
@@ -409,7 +409,7 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_CallScripted: {
-        ICGetProp_CallScripted* callStub = toGetProp_CallScripted();
+        ICGetProp_CallScripted *callStub = toGetProp_CallScripted();
 	callStub->receiverGuard().trace(trc);
         MarkObject(trc, &callStub->holder(), "baseline-getpropcallscripted-stub-holder");
         MarkShape(trc, &callStub->holderShape(), "baseline-getpropcallscripted-stub-holdershape");
@@ -417,14 +417,14 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_CallNative: {
-        ICGetProp_CallNative* callStub = toGetProp_CallNative();
+        ICGetProp_CallNative *callStub = toGetProp_CallNative();
         MarkObject(trc, &callStub->holder(), "baseline-getpropcallnative-stub-holder");
         MarkShape(trc, &callStub->holderShape(), "baseline-getpropcallnative-stub-holdershape");
         MarkObject(trc, &callStub->getter(), "baseline-getpropcallnative-stub-getter");
         break;
       }
       case ICStub::GetProp_CallNativePrototype: {
-        ICGetProp_CallNativePrototype* callStub = toGetProp_CallNativePrototype();
+        ICGetProp_CallNativePrototype *callStub = toGetProp_CallNativePrototype();
 	callStub->receiverGuard().trace(trc);
         MarkObject(trc, &callStub->holder(), "baseline-getpropcallnativeproto-stub-holder");
         MarkShape(trc, &callStub->holderShape(), "baseline-getpropcallnativeproto-stub-holdershape");
@@ -5767,7 +5767,7 @@ static const VMFunction DoInFallbackInfo =
     FunctionInfo<DoInFallbackFn>(DoInFallback, TailCall, PopValues(2));
 
 bool
-ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
+ICIn_Fallback::Compiler::generateStubCode(MacroAssembler &masm)
 {
     EmitRestoreTailCallReg(masm);
 
@@ -5814,7 +5814,7 @@ UpdateExistingGetPropCallStubs(ICFallbackStub* fallbackStub,
                     cachedReceiverGuard = 0;
                 } else {
                     ICGetPropCallPrototypeGetter *stubWithReceiver =
-                        static_cast<ICGetPropCallPrototypeGetter *>(getPropStub);
+                        static_cast<ICGetPropCallPrototypeGetter*>(getPropStub);
                     cachedReceiverGuard = stubWithReceiver->receiverGuard().token();
                 }
                 // We would like to assert that either
@@ -7424,7 +7424,7 @@ ICGetPropNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     Label failureLeaveStubFrame;
@@ -7511,7 +7511,7 @@ ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICGetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_CallNative::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
 
@@ -7567,7 +7567,7 @@ ICGetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICGetProp_CallNativePrototype::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_CallNativePrototype::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
 
@@ -11964,8 +11964,8 @@ ICGetPropNativeDoesNotExistCompiler::ICGetPropNativeDoesNotExistCompiler(
     MOZ_ASSERT(protoChainDepth_ <= ICGetProp_NativeDoesNotExist::MAX_PROTO_CHAIN_DEPTH);
 }
 
-ICGetPropCallGetter::ICGetPropCallGetter(Kind kind, JitCode* stubCode, ICStub* firstMonitorStub,
-                                         JSObject* holder, Shape* holderShape, JSFunction* getter,
+ICGetPropCallGetter::ICGetPropCallGetter(Kind kind, JitCode *stubCode, ICStub *firstMonitorStub,
+                                         JSObject *holder, Shape *holderShape, JSFunction *getter,
                                          uint32_t pcOffset)
   : ICMonitoredStub(kind, stubCode, firstMonitorStub),
     holder_(holder),
@@ -12010,17 +12010,17 @@ ICGetProp_CallScripted::Clone(ICStubSpace* space, ICStub* firstMonitorStub,
                                        other.getter_, other.pcOffset_);
 }
 
-/* static */ ICGetProp_CallNative*
-ICGetProp_CallNative::Clone( ICStubSpace* space, ICStub* firstMonitorStub,
-                            ICGetProp_CallNative& other)
+/* static */ ICGetProp_CallNative *
+ICGetProp_CallNative::Clone( ICStubSpace *space, ICStub *firstMonitorStub,
+                            ICGetProp_CallNative &other)
 {
     return New<ICGetProp_CallNative>(space, other.jitCode(), firstMonitorStub, other.holder_,
                                      other.holderShape_, other.getter_, other.pcOffset_);
 }
 
-/* static */ ICGetProp_CallNativePrototype*
-ICGetProp_CallNativePrototype::Clone(ICStubSpace* space, ICStub* firstMonitorStub,
-                                     ICGetProp_CallNativePrototype& other)
+/* static */ ICGetProp_CallNativePrototype *
+ICGetProp_CallNativePrototype::Clone(ICStubSpace *space, ICStub *firstMonitorStub,
+                                     ICGetProp_CallNativePrototype &other)
 {
     return New<ICGetProp_CallNativePrototype>(space, other.jitCode(), firstMonitorStub,
                                               other.receiverGuard().token(), other.holder_,

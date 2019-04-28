@@ -569,10 +569,10 @@ BaselineInspector::templateCallObject()
     return &res->as<CallObject>();
 }
 
-static Shape* GlobalShapeForGetPropFunction(ICStub* stub)
+static Shape *GlobalShapeForGetPropFunction(ICStub *stub)
 {
     if (stub->isGetProp_CallNativePrototype()) {
-        ICGetProp_CallNativePrototype* nstub =
+        ICGetProp_CallNativePrototype *nstub =
             stub->toGetProp_CallNativePrototype();
         const ReceiverGuard &guard = nstub->receiverGuard();
         if (Shape *shape = guard.shape()) {
@@ -625,14 +625,14 @@ BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shap
     MOZ_ASSERT(unboxedGroups.empty());
 
     *holder = nullptr;
-    const ICEntry& entry = icEntryFromPC(pc);
+    const ICEntry &entry = icEntryFromPC(pc);
 
-    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
+    for (ICStub *stub = entry.firstStub(); stub; stub = stub->next()) {
         if (stub->isGetProp_CallScripted()  ||
             stub->isGetProp_CallNative()    ||
             stub->isGetProp_CallNativePrototype())
         {
-            ICGetPropCallGetter* nstub = static_cast<ICGetPropCallGetter*>(stub);
+            ICGetPropCallGetter *nstub = static_cast<ICGetPropCallGetter *>(stub);
             bool isOwn = stub->isGetProp_CallNative();
             if (!AddReceiverForGetPropFunction(nativeShapes, unboxedGroups, nstub))
                 return false;
