@@ -420,7 +420,7 @@ IntlInitialize(JSContext* cx, HandleObject obj, Handle<PropertyName*> initialize
 static bool
 CreateDefaultOptions(JSContext* cx, MutableHandleValue defaultOptions)
 {
-    RootedObject options(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(), cx->global()));
+    RootedObject options(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr()));
     if (!options)
         return false;
     defaultOptions.setObject(*options);
@@ -439,7 +439,7 @@ static bool
 intl_availableLocales(JSContext* cx, CountAvailable countAvailable,
                       GetAvailable getAvailable, MutableHandleValue result)
 {
-    RootedObject locales(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(), NullPtr()));
+    RootedObject locales(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr()));
     if (!locales)
         return false;
 
@@ -629,7 +629,7 @@ Collator(JSContext* cx, const CallArgs& args, bool construct)
         RootedObject proto(cx, cx->global()->getOrCreateCollatorPrototype(cx));
         if (!proto)
             return false;
-        obj = NewObjectWithGivenProto(cx, &CollatorClass, proto, cx->global());
+        obj = NewObjectWithGivenProto(cx, &CollatorClass, proto);
         if (!obj)
             return false;
 
@@ -710,7 +710,7 @@ InitCollatorClass(JSContext* cx, HandleObject Intl, Handle<GlobalObject*> global
     if (!GlobalObject::getIntrinsicValue(cx, cx->global(), cx->names().CollatorCompareGet, &getter))
         return nullptr;
     if (!DefineProperty(cx, proto, cx->names().compare, UndefinedHandleValue,
-                        JS_DATA_TO_FUNC_PTR(JSPropertyOp, &getter.toObject()),
+                        JS_DATA_TO_FUNC_PTR(JSGetterOp, &getter.toObject()),
                         nullptr, JSPROP_GETTER | JSPROP_SHARED))
     {
         return nullptr;
@@ -1121,7 +1121,7 @@ NumberFormat(JSContext* cx, const CallArgs& args, bool construct)
         RootedObject proto(cx, cx->global()->getOrCreateNumberFormatPrototype(cx));
         if (!proto)
             return false;
-        obj = NewObjectWithGivenProto(cx, &NumberFormatClass, proto, cx->global());
+        obj = NewObjectWithGivenProto(cx, &NumberFormatClass, proto);
         if (!obj)
             return false;
 
@@ -1203,7 +1203,7 @@ InitNumberFormatClass(JSContext* cx, HandleObject Intl, Handle<GlobalObject*> gl
     if (!GlobalObject::getIntrinsicValue(cx, cx->global(), cx->names().NumberFormatFormatGet, &getter))
         return nullptr;
     if (!DefineProperty(cx, proto, cx->names().format, UndefinedHandleValue,
-                        JS_DATA_TO_FUNC_PTR(JSPropertyOp, &getter.toObject()),
+                        JS_DATA_TO_FUNC_PTR(JSGetterOp, &getter.toObject()),
                         nullptr, JSPROP_GETTER | JSPROP_SHARED))
     {
         return nullptr;
@@ -1580,7 +1580,7 @@ DateTimeFormat(JSContext* cx, const CallArgs& args, bool construct)
         RootedObject proto(cx, cx->global()->getOrCreateDateTimeFormatPrototype(cx));
         if (!proto)
             return false;
-        obj = NewObjectWithGivenProto(cx, &DateTimeFormatClass, proto, cx->global());
+        obj = NewObjectWithGivenProto(cx, &DateTimeFormatClass, proto);
         if (!obj)
             return false;
 
@@ -1662,7 +1662,7 @@ InitDateTimeFormatClass(JSContext* cx, HandleObject Intl, Handle<GlobalObject*> 
     if (!GlobalObject::getIntrinsicValue(cx, cx->global(), cx->names().DateTimeFormatFormatGet, &getter))
         return nullptr;
     if (!DefineProperty(cx, proto, cx->names().format, UndefinedHandleValue,
-                        JS_DATA_TO_FUNC_PTR(JSPropertyOp, &getter.toObject()),
+                        JS_DATA_TO_FUNC_PTR(JSGetterOp, &getter.toObject()),
                         nullptr, JSPROP_GETTER | JSPROP_SHARED))
     {
         return nullptr;
@@ -2069,7 +2069,7 @@ GlobalObject::initIntlObject(JSContext* cx, Handle<GlobalObject*> global)
 {
     RootedObject Intl(cx);
     RootedObject proto(cx, global->getOrCreateObjectPrototype(cx));
-    Intl = NewObjectWithGivenProto(cx, &IntlClass, proto, global, SingletonObject);
+    Intl = NewObjectWithGivenProto(cx, &IntlClass, proto, SingletonObject);
     if (!Intl)
         return false;
 

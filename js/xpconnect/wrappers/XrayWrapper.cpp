@@ -116,13 +116,28 @@ GetXrayType(JSObject* obj)
 }
 
 JSObject*
-XrayAwareCalleeGlobal(JSObject* fun)
+XrayAwareCalleeGlobal(JSObject *fun)
 {
   MOZ_ASSERT(js::IsFunctionObject(fun));
-  JSObject* scope = js::GetObjectParent(fun);
-  if (IsXrayWrapper(scope))
-    scope = js::UncheckedUnwrap(scope);
-  return js::GetGlobalForObjectCrossCompartment(scope);
+
+  if (!js::FunctionHasNativeReserved(fun)) {
+      // Just a normal function, no Xrays involved.
+      return js::GetGlobalForObjectCrossCompartment(fun);
+  }
+
+  // The functions we expect here have the Xray wrapper they're associated with
+  // in their XRAY_DOM_FUNCTION_PARENT_WRAPPER_SLOT and, in a debug build, their
+  // JSNative in their XRAY_DOM_FUNCTION_NATIVE_SLOT_FOR_ASSERT.  Assert that
+  // last bit.
+  MOZ_ASSERT(js::GetFunctionNativeReserved(fun, XRAY_DOM_FUNCTION_NATIVE_SLOT_FOR_ASSERT).toPrivate() ==
+             js::GetFunctionObjectNative(fun));
+
+  Value v =
+      js::GetFunctionNativeReserved(fun, XRAY_DOM_FUNCTION_PARENT_WRAPPER_SLOT);
+  MOZ_ASSERT(IsXrayWrapper(&v.toObject()));
+
+  JSObject *xrayTarget = js::UncheckedUnwrap(&v.toObject());
+  return js::GetGlobalForObjectCrossCompartment(xrayTarget);
 }
 
 JSObject*
@@ -471,8 +486,7 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
         if (fsMatch->selfHostedName) {
             fun = JS::GetSelfHostedFunction(cx, fsMatch->selfHostedName, id, fsMatch->nargs);
         } else {
-            fun = JS_NewFunctionById(cx, fsMatch->call.op, fsMatch->nargs,
-                                     0, wrapper, id);
+            fun = JS_NewFunctionById(cx, fsMatch->call.op, fsMatch->nargs, 0, id);
         }
         if (!fun)
             return false;
@@ -513,9 +527,9 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
             }
         } else {
             desc.setGetter(JS_CAST_NATIVE_TO(psMatch->getter.native.op,
-                                             JSPropertyOp));
+                                             JSGetterOp));
             desc.setSetter(JS_CAST_NATIVE_TO(psMatch->setter.native.op,
-                                             JSStrictPropertyOp));
+                                             JSSetterOp));
         }
         desc.setAttributes(flags);
 
@@ -1190,7 +1204,7 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
         if (id != nsXPConnect::GetRuntimeInstance()->GetStringID(XPCJSRuntime::IDX_TO_STRING))
             return true;
 
-        JSFunction* toString = JS_NewFunction(cx, XrayToString, 0, 0, holder, "toString");
+        JSFunction *toString = JS_NewFunction(cx, XrayToString, 0, 0, "toString");
         if (!toString)
             return false;
 
@@ -1965,18 +1979,18 @@ XrayWrapper<Base, Traits>::defineProperty(JSContext* cx, HandleObject wrapper,
     // we often lie (sloppily) about where we found properties and set
     // desc.object() to |wrapper|. Once we fully fix our Xray prototype semantics,
     // this should work as intended.
-    if (existing_desc.object() == wrapper && existing_desc.isPermanent()) {
+    if (existing_desc.object() == wrapper && !existing_desc.configurable()) {
         // We have a non-configurable property. See if the caller is trying to
         // re-configure it in any way other than making it non-writable.
-        if (existing_desc.hasGetterOrSetterObject() || desc.hasGetterOrSetterObject() ||
-            existing_desc.isEnumerable() != desc.isEnumerable() ||
-            (existing_desc.isReadonly() && !desc.isReadonly()))
+        if (existing_desc.isAccessorDescriptor() || desc.isAccessorDescriptor() ||
+            (desc.hasEnumerable() && existing_desc.enumerable() != desc.enumerable()) ||
+            (desc.hasWritable() && !existing_desc.writable() && desc.writable()))
         {
             // We should technically report non-configurability in strict mode, but
             // doing that via JSAPI used to be a lot of trouble. See bug 1135997.
             return result.succeed();
         }
-        if (existing_desc.isReadonly()) {
+        if (!existing_desc.writable()) {
             // Same as the above for non-writability.
             return result.succeed();
         }

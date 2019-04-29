@@ -41,8 +41,7 @@ DebuggerMemory::create(JSContext* cx, Debugger* dbg)
 {
     Value memoryProtoValue = dbg->object->getReservedSlot(Debugger::JSSLOT_DEBUG_MEMORY_PROTO);
     RootedObject memoryProto(cx, &memoryProtoValue.toObject());
-    RootedNativeObject memory(cx, NewNativeObjectWithGivenProto(cx, &class_, memoryProto,
-                                                                NullPtr()));
+    RootedNativeObject memory(cx, NewNativeObjectWithGivenProto(cx, &class_, memoryProto));
     if (!memory)
         return nullptr;
 
@@ -300,6 +299,20 @@ DebuggerMemory::getAllocationsLogOverflowed(JSContext* cx, unsigned argc, Value*
     THIS_DEBUGGER_MEMORY(cx, argc, vp, "(get allocationsLogOverflowed)", args, memory);
     args.rval().setBoolean(memory->getDebugger()->allocationsLogOverflowed);
     return true;
+}
+
+/* static */ bool
+DebuggerMemory::getOnGarbageCollection(JSContext *cx, unsigned argc, Value *vp)
+{
+    THIS_DEBUGGER_MEMORY(cx, argc, vp, "(get onGarbageCollection)", args, memory);
+    return Debugger::getHookImpl(cx, args, *memory->getDebugger(), Debugger::OnGarbageCollection);
+}
+
+/* static */ bool
+DebuggerMemory::setOnGarbageCollection(JSContext *cx, unsigned argc, Value *vp)
+{
+    THIS_DEBUGGER_MEMORY(cx, argc, vp, "(set onGarbageCollection)", args, memory);
+    return Debugger::setHookImpl(cx, args, *memory->getDebugger(), Debugger::OnGarbageCollection);
 }
 
 
@@ -814,6 +827,7 @@ DebuggerMemory::takeCensus(JSContext* cx, unsigned argc, Value* vp)
     JS_PSGS("maxAllocationsLogLength", getMaxAllocationsLogLength, setMaxAllocationsLogLength, 0),
     JS_PSGS("allocationSamplingProbability", getAllocationSamplingProbability, setAllocationSamplingProbability, 0),
     JS_PSG("allocationsLogOverflowed", getAllocationsLogOverflowed, 0),
+    JS_PSGS("onGarbageCollection", getOnGarbageCollection, setOnGarbageCollection, 0),
     JS_PS_END
 };
 

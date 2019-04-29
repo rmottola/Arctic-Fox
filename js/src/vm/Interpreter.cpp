@@ -166,8 +166,7 @@ js::OnUnknownMethod(JSContext* cx, HandleObject obj, Value idval_, MutableHandle
         return false;
 
     if (value.isObject()) {
-        NativeObject* obj = NewNativeObjectWithClassProto(cx, &js_NoSuchMethodClass, NullPtr(),
-                                                          NullPtr());
+        NativeObject *obj = NewNativeObjectWithClassProto(cx, &js_NoSuchMethodClass, NullPtr());
         if (!obj)
             return false;
 
@@ -179,32 +178,37 @@ js::OnUnknownMethod(JSContext* cx, HandleObject obj, Value idval_, MutableHandle
 }
 
 static bool
-NoSuchMethod(JSContext* cx, unsigned argc, Value* vp)
+NoSuchMethod(JSContext *cx, unsigned argc, Value *vp)
 {
+    if (JSScript *script = cx->currentScript()) {
+        const char *filename = script->filename();
+        cx->compartment()->addTelemetry(filename, JSCompartment::DeprecatedNoSuchMethod);
+    }
+
+    if (!cx->compartment()->warnedAboutNoSuchMethod) {
+        if (!JS_ReportWarning(cx, "__noSuchMethod__ is deprecated"))
+            return false;
+        cx->compartment()->warnedAboutNoSuchMethod = true;
+    }
+
     InvokeArgs args(cx);
     if (!args.init(2))
         return false;
 
     MOZ_ASSERT(vp[0].isObject());
     MOZ_ASSERT(vp[1].isObject());
-    NativeObject* obj = &vp[0].toObject().as<NativeObject>();
+    NativeObject *obj = &vp[0].toObject().as<NativeObject>();
     MOZ_ASSERT(obj->getClass() == &js_NoSuchMethodClass);
 
     args.setCallee(obj->getReservedSlot(JSSLOT_FOUND_FUNCTION));
     args.setThis(vp[1]);
     args[0].set(obj->getReservedSlot(JSSLOT_SAVED_ID));
-    JSObject* argsobj = NewDenseCopiedArray(cx, argc, vp + 2);
+    JSObject *argsobj = NewDenseCopiedArray(cx, argc, vp + 2);
     if (!argsobj)
         return false;
     args[1].setObject(*argsobj);
     bool ok = Invoke(cx, args);
     vp[0] = args.rval();
-
-    if (JSScript* script = cx->currentScript()) {
-        const char* filename = script->filename();
-        cx->compartment()->addTelemetry(filename, JSCompartment::DeprecatedNoSuchMethod);
-    }
-
     return ok;
 }
 
@@ -629,10 +633,7 @@ js::ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChainArg, c
                   ExecuteType type, AbstractFramePtr evalInFrame, Value* result)
 {
     MOZ_ASSERT_IF(evalInFrame, type == EXECUTE_DEBUG);
-    MOZ_ASSERT_IF(type == EXECUTE_GLOBAL,
-                  !scopeChainArg.is<ScopeObject>() ||
-                  (scopeChainArg.is<DynamicWithObject>() &&
-                   !scopeChainArg.as<DynamicWithObject>().isSyntactic()));
+    MOZ_ASSERT_IF(type == EXECUTE_GLOBAL, IsValidTerminatingScope(&scopeChainArg));
 #ifdef DEBUG
     if (thisv.isObject()) {
         RootedObject thisObj(cx, &thisv.toObject());
@@ -660,11 +661,14 @@ js::ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChainArg, c
 bool
 js::Execute(JSContext* cx, HandleScript script, JSObject& scopeChainArg, Value* rval)
 {
-    /* The scope chain could be anything, so innerize just in case. */
+    /* The scope chain is something we control, so we know it can't
+       have any outer objects on it. */
     RootedObject scopeChain(cx, &scopeChainArg);
-    scopeChain = GetInnerObject(scopeChain);
-    if (!scopeChain)
-        return false;
+    MOZ_ASSERT(scopeChain == GetInnerObject(scopeChain));
+
+    MOZ_RELEASE_ASSERT(scopeChain->is<GlobalObject>() || !script->compileAndGo(),
+                       "Only non-compile-and-go scripts can be executed with "
+                       "interesting scopechains");
 
     /* Ensure the scope chain is all same-compartment and terminates in a global. */
 #ifdef DEBUG
@@ -1690,9 +1694,6 @@ CASE(EnableInterruptsPseudoOpcode)
 /* Various 1-byte no-ops. */
 CASE(JSOP_NOP)
 CASE(JSOP_UNUSED2)
-CASE(JSOP_UNUSED51)
-CASE(JSOP_UNUSED52)
-CASE(JSOP_UNUSED83)
 CASE(JSOP_UNUSED92)
 CASE(JSOP_UNUSED103)
 CASE(JSOP_UNUSED104)
@@ -2773,7 +2774,7 @@ END_CASE(JSOP_GETNAME)
 
 CASE(JSOP_GETINTRINSIC)
 {
-    RootedValue& rval = rootValue0;
+    RootedValue &rval = rootValue0;
 
     if (!GetIntrinsicOperation(cx, REGS.pc, &rval))
         goto error;
@@ -2830,10 +2831,10 @@ END_CASE(JSOP_SYMBOL)
 
 CASE(JSOP_OBJECT)
 {
-    RootedNativeObject& ref = rootNativeObject0;
+    RootedObject &ref = rootObject0;
     ref = script->getObject(REGS.pc);
     if (JS::CompartmentOptionsRef(cx).cloneSingletons()) {
-        JSObject* obj = js::DeepCloneObjectLiteral(cx, ref, js::MaybeSingletonObject);
+        JSObject *obj = DeepCloneObjectLiteral(cx, ref, js::MaybeSingletonObject);
         if (!obj)
             goto error;
         PUSH_OBJECT(*obj);
@@ -3494,7 +3495,7 @@ CASE(JSOP_GENERATOR)
 {
     MOZ_ASSERT(!cx->isExceptionPending());
     MOZ_ASSERT(REGS.stackDepth() == 0);
-    JSObject* obj = GeneratorObject::create(cx, REGS.fp());
+    JSObject *obj = GeneratorObject::create(cx, REGS.fp());
     if (!obj)
         goto error;
     PUSH_OBJECT(*obj);
@@ -3581,6 +3582,70 @@ CASE(JSOP_ARRAYPUSH)
     REGS.sp -= 2;
 }
 END_CASE(JSOP_ARRAYPUSH)
+
+CASE(JSOP_CLASSHERITAGE)
+{
+    RootedValue &val = rootValue0;
+    val = REGS.sp[-1];
+
+    RootedValue &objProto = rootValue1;
+    RootedObject &funcProto = rootObject0;
+    if (val.isNull()) {
+        objProto.setNull();
+        if (!GetBuiltinPrototype(cx, JSProto_Function, &funcProto))
+            goto error;
+    } else {
+        if (!val.isObject() || !val.toObject().isConstructor()) {
+            ReportIsNotFunction(cx, val, 0, CONSTRUCT);
+            goto error;
+        }
+
+        funcProto = &val.toObject();
+
+        if (!GetProperty(cx, funcProto, funcProto, cx->names().prototype, &objProto))
+            goto error;
+
+        if (!objProto.isObjectOrNull()) {
+            ReportValueError(cx, JSMSG_PROTO_NOT_OBJORNULL, -1, objProto, NullPtr());
+            goto error;
+        }
+    }
+
+    REGS.sp[-1] = objProto;
+    PUSH_OBJECT(*funcProto);
+}
+END_CASE(JSOP_CLASSHERITAGE)
+
+CASE(JSOP_FUNWITHPROTO)
+{
+    RootedObject &proto = rootObject1;
+    proto = &REGS.sp[-1].toObject();
+
+    /* Load the specified function object literal. */
+    RootedFunction &fun = rootFunction0;
+    fun = script->getFunction(GET_UINT32_INDEX(REGS.pc));
+
+    JSObject *obj = CloneFunctionObjectIfNotSingleton(cx, fun, REGS.fp()->scopeChain(),
+                                                      proto, GenericObject);
+    if (!obj)
+        goto error;
+
+    REGS.sp[-1].setObject(*obj);
+}
+END_CASE(JSOP_FUNWITHPROTO)
+
+CASE(JSOP_OBJWITHPROTO)
+{
+    RootedObject &proto = rootObject0;
+    proto = REGS.sp[-1].toObjectOrNull();
+
+    JSObject *obj = NewObjectWithGivenProto<PlainObject>(cx, proto);
+    if (!obj)
+        goto error;
+
+    REGS.sp[-1].setObject(*obj);
+}
+END_CASE(JSOP_OBJWITHPROTO)
 
 DEFAULT()
 {
@@ -3764,7 +3829,8 @@ js::LambdaArrow(JSContext* cx, HandleFunction fun, HandleObject parent, HandleVa
 {
     MOZ_ASSERT(fun->isArrow());
 
-    RootedObject clone(cx, CloneFunctionObjectIfNotSingleton(cx, fun, parent, TenuredObject));
+    RootedObject clone(cx, CloneFunctionObjectIfNotSingleton(cx, fun, parent, NullPtr(),
+                                                             TenuredObject));
     if (!clone)
         return nullptr;
 
@@ -3790,7 +3856,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
      */
     RootedFunction fun(cx, funArg);
     if (fun->isNative() || fun->environment() != scopeChain) {
-        fun = CloneFunctionObjectIfNotSingleton(cx, fun, scopeChain, TenuredObject);
+        fun = CloneFunctionObjectIfNotSingleton(cx, fun, scopeChain, NullPtr(), TenuredObject);
         if (!fun)
             return false;
     } else {
@@ -4096,20 +4162,20 @@ js::InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, H
                               HandleObject val)
 {
     MOZ_ASSERT(val->isCallable());
-    PropertyOp getter;
-    StrictPropertyOp setter;
+    GetterOp getter;
+    SetterOp setter;
     unsigned attrs = JSPROP_ENUMERATE | JSPROP_SHARED;
 
     JSOp op = JSOp(*pc);
 
     if (op == JSOP_INITPROP_GETTER || op == JSOP_INITELEM_GETTER) {
-        getter = CastAsPropertyOp(val);
+        getter = CastAsGetterOp(val);
         setter = nullptr;
         attrs |= JSPROP_GETTER;
     } else {
         MOZ_ASSERT(op == JSOP_INITPROP_SETTER || op == JSOP_INITELEM_SETTER);
         getter = nullptr;
-        setter = CastAsStrictPropertyOp(val);
+        setter = CastAsSetterOp(val);
         attrs |= JSPROP_SETTER;
     }
 

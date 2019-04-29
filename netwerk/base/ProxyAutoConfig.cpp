@@ -416,8 +416,11 @@ bool PACDnsResolve(JSContext *cx, unsigned int argc, JS::Value *vp)
     return false;
   }
 
-  JS::Rooted<JSString*> arg1(cx);
-  if (!JS_ConvertArguments(cx, args, "S", arg1.address()))
+  if (!args.requireAtLeast(cx, "dnsResolve", 1))
+    return false;
+
+  JS::Rooted<JSString*> arg1(cx, JS::ToString(cx, args[0]));
+  if (!arg1)
     return false;
 
   nsAutoJSString hostName;
@@ -465,8 +468,11 @@ bool PACProxyAlert(JSContext *cx, unsigned int argc, JS::Value *vp)
 {
   JS::CallArgs args = CallArgsFromVp(argc, vp);
 
-  JS::Rooted<JSString*> arg1(cx);
-  if (!JS_ConvertArguments(cx, args, "S", arg1.address()))
+  if (!args.requireAtLeast(cx, "alert", 1))
+    return false;
+
+  JS::Rooted<JSString*> arg1(cx, JS::ToString(cx, args[0]));
+  if (!arg1)
     return false;
 
   nsAutoJSString message;
@@ -660,9 +666,9 @@ ProxyAutoConfig::SetupJS()
   JS::CompileOptions options(cx);
   options.setFileAndLine(mPACURI.get(), 1);
   JS::Rooted<JSScript*> script(cx);
-  if (!JS_CompileScript(cx, global, mPACScript.get(),
-                        mPACScript.Length(), options, &script) ||
-      !JS_ExecuteScript(cx, global, script))
+  if (!JS_CompileScript(cx, mPACScript.get(), mPACScript.Length(), options,
+                        &script) ||
+      !JS_ExecuteScript(cx, script))
   {
     nsString alertMessage(NS_LITERAL_STRING("PAC file failed to install from "));
     if (isDataURI) {

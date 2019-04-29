@@ -233,7 +233,7 @@ class NewObjectCache
 
     static void staticAsserts() {
         JS_STATIC_ASSERT(NewObjectCache::MAX_OBJ_SIZE == sizeof(JSObject_Slots16));
-        JS_STATIC_ASSERT(gc::FINALIZE_OBJECT_LAST == gc::FINALIZE_OBJECT16_BACKGROUND);
+        JS_STATIC_ASSERT(gc::AllocKind::OBJECT_LAST == gc::AllocKind::OBJECT16_BACKGROUND);
     }
 
     struct Entry
@@ -319,7 +319,7 @@ class NewObjectCache
 
   private:
     EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
-        uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + kind;
+        uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + size_t(kind);
         return hash % mozilla::ArrayLength(entries);
     }
 
@@ -670,7 +670,23 @@ struct JSRuntime : public JS::shadow::Runtime,
     js::AsmJSActivation * volatile asmJSActivationStack_;
 
   public:
-    js::Activation* const* addressOfActivation() const {
+    /*
+     * Youngest frame of a saved stack that will be picked up as an async stack
+     * by any new Activation, and is nullptr when no async stack should be used.
+     *
+     * The JS::AutoSetAsyncStackForNewCalls class can be used to set this.
+     *
+     * New activations will reset this to nullptr on construction after getting
+     * the current value, and will restore the previous value on destruction.
+     */
+    js::SavedFrame *asyncStackForNewActivations;
+
+    /*
+     * Value of asyncCause to be attached to asyncStackForNewActivations.
+     */
+    JSString *asyncCauseForNewActivations;
+
+    js::Activation *const *addressOfActivation() const {
         return &activation_;
     }
     static unsigned offsetOfActivation() {

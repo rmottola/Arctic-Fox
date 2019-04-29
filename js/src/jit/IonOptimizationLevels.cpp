@@ -28,6 +28,7 @@ OptimizationInfo::initNormalOptimizationInfo()
     eliminateRedundantChecks_ = true;
     inlineInterpreted_ = true;
     inlineNative_ = true;
+    eagerSimdUnbox_ = true;
     gvn_ = true;
     licm_ = true;
     rangeAnalysis_ = true;
@@ -55,7 +56,9 @@ OptimizationInfo::initAsmjsOptimizationInfo()
     // Take normal option values for not specified values.
     initNormalOptimizationInfo();
 
+    ama_ = true;
     level_ = Optimization_AsmJS;
+    eagerSimdUnbox_ = false;           // AsmJS has no boxing / unboxing.
     edgeCaseAnalysis_ = false;
     eliminateRedundantChecks_ = false;
     autoTruncate_ = false;

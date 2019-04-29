@@ -45,6 +45,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     isSystem(false),
     isSelfHosting(false),
     marked(true),
+    warnedAboutNoSuchMethod(false),
     addonId(options.addonIdOrNull()),
 #ifdef DEBUG
     firedOnNewGlobalObject(false),
@@ -196,8 +197,15 @@ class WrapperMapRef : public BufferableRef
         CrossCompartmentKey prior = key;
         if (key.debugger)
             Mark(trc, &key.debugger, "CCW debugger");
-        if (key.kind != CrossCompartmentKey::StringWrapper)
+        if (key.kind == CrossCompartmentKey::ObjectWrapper ||
+            key.kind == CrossCompartmentKey::DebuggerObject ||
+            key.kind == CrossCompartmentKey::DebuggerEnvironment ||
+            key.kind == CrossCompartmentKey::DebuggerSource)
+        {
+            MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
+                       key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
             Mark(trc, reinterpret_cast<JSObject**>(&key.wrapped), "CCW wrapped object");
+        }
         if (key.debugger == prior.debugger && key.wrapped == prior.wrapped)
             return;
 
@@ -412,7 +420,6 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
     if (WrapperMap::Ptr p = crossCompartmentWrappers.lookup(CrossCompartmentKey(key))) {
         obj.set(&p->value().get().toObject());
         MOZ_ASSERT(obj->is<CrossCompartmentWrapperObject>());
-        MOZ_ASSERT(obj->getParent() == global);
         return true;
     }
 
@@ -422,7 +429,6 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
         if (!existing->getTaggedProto().isLazy() ||
             // Note: Class asserted above, so all that's left to check is callability
             existing->isCallable() ||
-            existing->getParent() != global ||
             obj->isCallable())
         {
             existing = nullptr;
@@ -456,35 +462,6 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
     }
 
     return wrap(cx, desc.value());
-}
-
-bool
-JSCompartment::wrap(JSContext* cx, MutableHandle<PropDesc> desc)
-{
-    if (desc.isUndefined())
-        return true;
-
-    JSCompartment* comp = cx->compartment();
-
-    if (desc.hasValue()) {
-        RootedValue value(cx, desc.value());
-        if (!comp->wrap(cx, &value))
-            return false;
-        desc.setValue(value);
-    }
-    if (desc.hasGet()) {
-        RootedValue get(cx, desc.getterValue());
-        if (!comp->wrap(cx, &get))
-            return false;
-        desc.setGetter(get);
-    }
-    if (desc.hasSet()) {
-        RootedValue set(cx, desc.setterValue());
-        if (!comp->wrap(cx, &set))
-            return false;
-        desc.setSetter(set);
-    }
-    return true;
 }
 
 /*
@@ -623,7 +600,30 @@ JSCompartment::sweepCrossCompartmentWrappers()
     /* Remove dead wrappers from the table. */
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         CrossCompartmentKey key = e.front().key();
-        bool keyDying = IsCellAboutToBeFinalizedFromAnyThread(&key.wrapped);
+        bool keyDying;
+        switch (key.kind) {
+          case CrossCompartmentKey::ObjectWrapper:
+          case CrossCompartmentKey::DebuggerObject:
+          case CrossCompartmentKey::DebuggerEnvironment:
+          case CrossCompartmentKey::DebuggerSource:
+              MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
+                         key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
+              keyDying = IsObjectAboutToBeFinalizedFromAnyThread(
+                  reinterpret_cast<JSObject**>(&key.wrapped));
+              break;
+          case CrossCompartmentKey::StringWrapper:
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_STRING);
+              keyDying = IsStringAboutToBeFinalizedFromAnyThread(
+                  reinterpret_cast<JSString**>(&key.wrapped));
+              break;
+          case CrossCompartmentKey::DebuggerScript:
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_SCRIPT);
+              keyDying = IsScriptAboutToBeFinalizedFromAnyThread(
+                  reinterpret_cast<JSScript**>(&key.wrapped));
+              break;
+          default:
+              MOZ_CRASH("Unknown key kind");
+        }
         bool valDying = IsValueAboutToBeFinalizedFromAnyThread(e.front().value().unsafeGet());
         bool dbgDying = key.debugger && IsObjectAboutToBeFinalizedFromAnyThread(&key.debugger);
         if (keyDying || valDying || dbgDying) {
@@ -714,46 +714,23 @@ CreateLazyScriptsForCompartment(JSContext* cx)
 {
     AutoObjectVector lazyFunctions(cx);
 
-    // Find all live root lazy functions in the compartment: those which
-    // have not been compiled, which have a source object, indicating that
-    // they have a parent, and which do not have an uncompiled enclosing
-    // script. The last condition is so that we don't compile lazy scripts
-    // whose enclosing scripts failed to compile, indicating that the lazy
-    // script did not escape the script.
-    //
-    // Note that while we ideally iterate over LazyScripts, LazyScripts do not
-    // currently stand in 1-1 relation with JSScripts; JSFunctions with the
-    // same LazyScript may create different JSScripts due to relazification of
-    // clones. See bug 1105306.
-    for (gc::ZoneCellIter i(cx->zone(), JSFunction::FinalizeKind); !i.done(); i.next()) {
-        JSObject* obj = i.get<JSObject>();
-
-        // Sweeping is incremental; take care to not delazify functions that
-        // are about to be finalized. GC things referenced by objects that are
-        // about to be finalized (e.g., in slots) may already be freed.
-        if (gc::IsObjectAboutToBeFinalized(&obj) ||
-            obj->compartment() != cx->compartment() ||
-            !obj->is<JSFunction>())
+    // Find all live lazy scripts in the compartment, and via them all root
+    // lazy functions in the compartment: those which have not been compiled,
+    // which have a source object, indicating that they have a parent, and
+    // which do not have an uncompiled enclosing script. The last condition is
+    // so that we don't compile lazy scripts whose enclosing scripts failed to
+    // compile, indicating that the lazy script did not escape the script.
+    for (gc::ZoneCellIter i(cx->zone(), gc::AllocKind::LAZY_SCRIPT); !i.done(); i.next()) {
+        LazyScript *lazy = i.get<LazyScript>();
+        JSFunction *fun = lazy->functionNonDelazifying();
+        if (fun->compartment() == cx->compartment() &&
+            lazy->sourceObject() && !lazy->maybeScript() &&
+            !lazy->hasUncompiledEnclosingScript())
         {
-            continue;
-        }
-
-        JSFunction* fun = &obj->as<JSFunction>();
-        
-        // This creates a new reference to an object that an ongoing incremental
-        // GC may find to be unreachable. Treat as if we're reading a weak
-        // reference and trigger the read barrier.
-        if (cx->zone()->needsIncrementalBarrier())
-            fun->readBarrier(fun);
-
-        if (fun->isInterpretedLazy()) {
-            LazyScript* lazy = fun->lazyScriptOrNull();
-            if (lazy && lazy->sourceObject() && !lazy->maybeScript() &&
-                !lazy->hasUncompiledEnclosingScript())
-            {
-                if (!lazyFunctions.append(fun))
-                    return false;
-            }
+            MOZ_ASSERT(fun->isInterpretedLazy());
+            MOZ_ASSERT(lazy == fun->lazyScriptOrNull());
+            if (!lazyFunctions.append(fun))
+                return false;
         }
     }
 
@@ -761,20 +738,17 @@ CreateLazyScriptsForCompartment(JSContext* cx)
     // process with any newly exposed inner functions in created scripts.
     // A function cannot be delazified until its outer script exists.
     for (size_t i = 0; i < lazyFunctions.length(); i++) {
-        JSFunction* fun = &lazyFunctions[i]->as<JSFunction>();
+        JSFunction *fun = &lazyFunctions[i]->as<JSFunction>();
 
         // lazyFunctions may have been populated with multiple functions for
         // a lazy script.
         if (!fun->isInterpretedLazy())
             continue;
 
-        LazyScript* lazy = fun->lazyScript();
-        bool lazyScriptHadNoScript = !lazy->maybeScript();
-
-        JSScript* script = fun->getOrCreateScript(cx);
+        JSScript *script = fun->getOrCreateScript(cx);
         if (!script)
             return false;
-        if (lazyScriptHadNoScript && !AddInnerLazyFunctionsFromScript(script, lazyFunctions))
+        if (!AddInnerLazyFunctionsFromScript(script, lazyFunctions))
             return false;
     }
 
@@ -823,10 +797,10 @@ JSCompartment::unsetIsDebuggee()
 }
 
 void
-JSCompartment::clearBreakpointsIn(FreeOp* fop, js::Debugger* dbg, HandleObject handler)
+JSCompartment::clearBreakpointsIn(FreeOp *fop, js::Debugger *dbg, HandleObject handler)
 {
-    for (gc::ZoneCellIter i(zone(), gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+    for (gc::ZoneCellIter i(zone(), gc::AllocKind::SCRIPT); !i.done(); i.next()) {
+        JSScript *script = i.get<JSScript>();
         if (script->compartment() == this && script->hasAnyBreakpointsOrStepMode())
             script->clearBreakpointsIn(fop, dbg, handler);
     }

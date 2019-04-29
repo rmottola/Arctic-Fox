@@ -3225,12 +3225,11 @@ CreateArrayPrototype(JSContext* cx, JSProtoKey key)
         return nullptr;
 
     RootedShape shape(cx, EmptyShape::getInitialShape(cx, &ArrayObject::class_, TaggedProto(proto),
-                                                      proto->getParent(), metadata,
-                                                      gc::FINALIZE_OBJECT0));
+                                                      metadata, gc::AllocKind::OBJECT0));
     if (!shape)
         return nullptr;
 
-    RootedArrayObject arrayProto(cx, ArrayObject::createArray(cx, gc::FINALIZE_OBJECT4,
+    RootedArrayObject arrayProto(cx, ArrayObject::createArray(cx, gc::AllocKind::OBJECT4,
                                                               gc::TenuredHeap, shape, group, 0));
     if (!arrayProto ||
         !JSObject::setSingleton(cx, arrayProto) ||
@@ -3256,7 +3255,7 @@ static bool
 array_proto_finish(JSContext* cx, JS::HandleObject ctor, JS::HandleObject proto)
 {
     // Add Array.prototype[@@unscopables]. ECMA-262 6.0 22.1.3.31.
-    RootedObject unscopables(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(), NullPtr(), TenuredObject));
+    RootedObject unscopables(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(), TenuredObject));
     if (!unscopables)
         return false;
 
@@ -3383,8 +3382,8 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
      * See JSObject::createArray.
      */
     RootedShape shape(cxArg, EmptyShape::getInitialShape(cxArg, &ArrayObject::class_,
-                                                         TaggedProto(proto), cxArg->global(),
-                                                         metadata, gc::FINALIZE_OBJECT0));
+                                                         TaggedProto(proto),
+                                                         metadata, gc::AllocKind::OBJECT0));
     if (!shape)
         return nullptr;
 

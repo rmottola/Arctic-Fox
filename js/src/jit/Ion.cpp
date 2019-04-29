@@ -15,11 +15,13 @@
 
 #include "gc/Marking.h"
 #include "jit/AliasAnalysis.h"
+#include "jit/AlignmentMaskAnalysis.h"
 #include "jit/BacktrackingAllocator.h"
 #include "jit/BaselineFrame.h"
 #include "jit/BaselineInspector.h"
 #include "jit/BaselineJIT.h"
 #include "jit/CodeGenerator.h"
+#include "jit/EagerSimdUnbox.h"
 #include "jit/EdgeCaseAnalysis.h"
 #include "jit/EffectiveAddressAnalysis.h"
 #include "jit/IonAnalysis.h"
@@ -483,22 +485,34 @@ jit::LazyLinkTopActivation(JSContext* cx)
 
     return script->baselineOrIonRawPointer();
 }
+
 /* static */ void
-JitRuntime::Mark(JSTracer* trc)
+JitRuntime::Mark(JSTracer *trc)
 {
     MOZ_ASSERT(!trc->runtime()->isHeapMinorCollecting());
-    Zone* zone = trc->runtime()->atomsCompartment()->zone();
-    for (gc::ZoneCellIterUnderGC i(zone, gc::FINALIZE_JITCODE); !i.done(); i.next()) {
-        JitCode* code = i.get<JitCode>();
+    Zone *zone = trc->runtime()->atomsCompartment()->zone();
+    for (gc::ZoneCellIterUnderGC i(zone, gc::AllocKind::JITCODE); !i.done(); i.next()) {
+        JitCode *code = i.get<JitCode>();
         MarkJitCodeRoot(trc, &code, "wrapper");
     }
+}
 
-    // Mark all heap the jitcode global table map.
+/* static */ bool
+JitRuntime::MarkJitcodeGlobalTableIteratively(JSTracer *trc)
+{
     if (trc->runtime()->hasJitRuntime() &&
         trc->runtime()->jitRuntime()->hasJitcodeGlobalTable())
     {
-        trc->runtime()->jitRuntime()->getJitcodeGlobalTable()->mark(trc);
+        return trc->runtime()->jitRuntime()->getJitcodeGlobalTable()->markIteratively(trc);
     }
+    return false;
+}
+
+/* static */ void
+JitRuntime::SweepJitcodeGlobalTable(JSRuntime *rt)
+{
+    if (rt->hasJitRuntime() && rt->jitRuntime()->hasJitcodeGlobalTable())
+        rt->jitRuntime()->getJitcodeGlobalTable()->sweep(rt);
 }
 
 void
@@ -657,15 +671,17 @@ JitCode::fixupNurseryObjects(JSContext* cx, const ObjectVector& nurseryObjects)
 }
 
 void
-JitCode::finalize(FreeOp* fop)
+JitCode::finalize(FreeOp *fop)
 {
-    JSRuntime* rt = fop->runtime();
-
-    // If this jitcode has a bytecode map, de-register it.
+    // If this jitcode had a bytecode map, it must have already been removed.
+#ifdef DEBUG
+    JSRuntime *rt = fop->runtime();
     if (hasBytecodeMap_) {
+        JitcodeGlobalEntry result;
         MOZ_ASSERT(rt->jitRuntime()->hasJitcodeGlobalTable());
-        rt->jitRuntime()->getJitcodeGlobalTable()->releaseEntry(raw(), rt);
+        MOZ_ASSERT(!rt->jitRuntime()->getJitcodeGlobalTable()->lookup(raw(), &result, rt));
     }
+#endif
 
     // Buffer can be freed at any time hereafter. Catch use-after-free bugs.
     // Don't do this if the Ion code is protected, as the signal handler will
@@ -1111,14 +1127,14 @@ IonScript::unlinkFromRuntime(FreeOp* fop)
 }
 
 void
-jit::ToggleBarriers(JS::Zone* zone, bool needs)
+jit::ToggleBarriers(JS::Zone *zone, bool needs)
 {
-    JSRuntime* rt = zone->runtimeFromMainThread();
+    JSRuntime *rt = zone->runtimeFromMainThread();
     if (!rt->hasJitRuntime())
         return;
 
-    for (gc::ZoneCellIterUnderGC i(zone, gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
-        JSScript* script = i.get<JSScript>();
+    for (gc::ZoneCellIterUnderGC i(zone, gc::AllocKind::SCRIPT); !i.done(); i.next()) {
+        JSScript *script = i.get<JSScript>();
         if (script->hasIonScript())
             script->ionScript()->toggleBarriers(needs);
         if (script->hasBaselineScript())
@@ -1242,6 +1258,29 @@ OptimizeMIR(MIRGenerator* mir)
         AssertExtendedGraphCoherency(graph);
 
         if (mir->shouldCancel("Apply types"))
+            return false;
+    }
+
+    if (mir->optimizationInfo().eagerSimdUnboxEnabled()) {
+        AutoTraceLog log(logger, TraceLogger_EagerSimdUnbox);
+        if (!EagerSimdUnbox(mir, graph))
+            return false;
+        IonSpewPass("Eager Simd Unbox");
+        AssertGraphCoherency(graph);
+
+        if (mir->shouldCancel("Eager Simd Unbox"))
+            return false;
+    }
+
+    if (mir->optimizationInfo().amaEnabled()) {
+        AutoTraceLog log(logger, TraceLogger_AlignmentMaskAnalysis);
+        AlignmentMaskAnalysis ama(graph);
+        if (!ama.analyze())
+            return false;
+        IonSpewPass("Alignment Mask Analysis");
+        AssertExtendedGraphCoherency(graph);
+
+        if (mir->shouldCancel("Alignment Mask Analysis"))
             return false;
     }
 

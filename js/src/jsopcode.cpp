@@ -279,9 +279,9 @@ js::DumpPCCounts(JSContext* cx, HandleScript script, Sprinter* sp)
 }
 
 void
-js::DumpCompartmentPCCounts(JSContext* cx)
+js::DumpCompartmentPCCounts(JSContext *cx)
 {
-    for (ZoneCellIter i(cx->zone(), gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
+    for (ZoneCellIter i(cx->zone(), gc::AllocKind::SCRIPT); !i.done(); i.next()) {
         RootedScript script(cx, i.get<JSScript>());
         if (script->compartment() != cx->compartment())
             continue;
@@ -298,14 +298,14 @@ js::DumpCompartmentPCCounts(JSContext* cx)
         }
     }
 
-    for (unsigned thingKind = FINALIZE_OBJECT0; thingKind < FINALIZE_OBJECT_LIMIT; thingKind++) {
-        for (ZoneCellIter i(cx->zone(), (AllocKind) thingKind); !i.done(); i.next()) {
-            JSObject* obj = i.get<JSObject>();
+    for (OBJECT_ALLOC_KINDS(thingKind)) {
+        for (ZoneCellIter i(cx->zone(), thingKind); !i.done(); i.next()) {
+            JSObject *obj = i.get<JSObject>();
             if (obj->compartment() != cx->compartment())
                 continue;
 
             if (obj->is<AsmJSModuleObject>()) {
-                AsmJSModule& module = obj->as<AsmJSModuleObject>().module();
+                AsmJSModule &module = obj->as<AsmJSModuleObject>().module();
 
                 Sprinter sprinter(cx);
                 if (!sprinter.init())
@@ -2061,8 +2061,8 @@ js::StopPCCountProfiling(JSContext* cx)
         return;
 
     for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
-        for (ZoneCellIter i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-            JSScript* script = i.get<JSScript>();
+        for (ZoneCellIter i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
+            JSScript *script = i.get<JSScript>();
             if (script->hasScriptCounts() && script->types()) {
                 ScriptAndCounts sac;
                 sac.script = script;

@@ -50,7 +50,7 @@ BEGIN_TEST(testXDR_bug506491)
     JS::CompileOptions options(cx);
     options.setFileAndLine(__FILE__, __LINE__);
     JS::RootedScript script(cx);
-    CHECK(JS_CompileScript(cx, global, s, strlen(s), options, &script));
+    CHECK(JS_CompileScript(cx, s, strlen(s), options, &script));
     CHECK(script);
 
     script = FreezeThaw(cx, script);
@@ -58,7 +58,7 @@ BEGIN_TEST(testXDR_bug506491)
 
     // execute
     JS::RootedValue v2(cx);
-    CHECK(JS_ExecuteScript(cx, global, script, &v2));
+    CHECK(JS_ExecuteScript(cx, script, &v2));
 
     // try to break the Block object that is the parent of f
     JS_GC(rt);
@@ -77,14 +77,14 @@ BEGIN_TEST(testXDR_bug516827)
     JS::CompileOptions options(cx);
     options.setFileAndLine(__FILE__, __LINE__);
     JS::RootedScript script(cx);
-    CHECK(JS_CompileScript(cx, global, "", 0, options, &script));
+    CHECK(JS_CompileScript(cx, "", 0, options, &script));
     CHECK(script);
 
     script = FreezeThaw(cx, script);
     CHECK(script);
 
     // execute with null result meaning no result wanted
-    CHECK(JS_ExecuteScript(cx, global, script));
+    CHECK(JS_ExecuteScript(cx, script));
     return true;
 }
 END_TEST(testXDR_bug516827)
@@ -101,7 +101,7 @@ BEGIN_TEST(testXDR_source)
         JS::CompileOptions options(cx);
         options.setFileAndLine(__FILE__, __LINE__);
         JS::RootedScript script(cx);
-        CHECK(JS_CompileScript(cx, global, *s, strlen(*s), options, &script));
+        CHECK(JS_CompileScript(cx, *s, strlen(*s), options, &script));
         CHECK(script);
         script = FreezeThaw(cx, script);
         CHECK(script);
@@ -126,7 +126,7 @@ BEGIN_TEST(testXDR_sourceMap)
     for (const char** sm = sourceMaps; *sm; sm++) {
         JS::CompileOptions options(cx);
         options.setFileAndLine(__FILE__, __LINE__);
-        CHECK(JS_CompileScript(cx, global, "", 0, options, &script));
+        CHECK(JS_CompileScript(cx, "", 0, options, &script));
         CHECK(script);
 
         size_t len = strlen(*sm);

@@ -78,8 +78,14 @@ JitOptions::JitOptions()
     // RangeAnalysis results.
     SET_DEFAULT(checkRangeAnalysis, false);
 
+    // Whether to enable extra code to perform dynamic validations.
+    SET_DEFAULT(runExtraChecks, false);
+
     // Toggle whether eager scalar replacement is globally disabled.
     SET_DEFAULT(disableScalarReplacement, false);
+
+    // Toggle whether eager simd unboxing is globally disabled.
+    SET_DEFAULT(disableEagerSimdUnbox, false);
 
     // Toggle whether global value numbering is globally disabled.
     SET_DEFAULT(disableGvn, false);
@@ -104,6 +110,9 @@ JitOptions::JitOptions()
 
     // Toggles whether Effective Address Analysis is globally disabled.
     SET_DEFAULT(disableEaa, false);
+
+    // Toggles whether Alignment Mask Analysis is globally disabled.
+    SET_DEFAULT(disableAma, false);
 
     // Whether functions are compiled immediately.
     SET_DEFAULT(eagerCompilation, false);

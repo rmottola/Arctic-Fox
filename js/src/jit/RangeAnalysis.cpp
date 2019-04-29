@@ -1640,7 +1640,8 @@ MLimitedTruncate::computeRange(TempAllocator& alloc)
     setRange(output);
 }
 
-static Range* GetTypedArrayRange(TempAllocator& alloc, int type)
+static Range *
+GetTypedArrayRange(TempAllocator &alloc, Scalar::Type type)
 {
     switch (type) {
       case Scalar::Uint8Clamped:
@@ -1660,22 +1661,24 @@ static Range* GetTypedArrayRange(TempAllocator& alloc, int type)
 
       case Scalar::Float32:
       case Scalar::Float64:
+      case Scalar::Float32x4:
+      case Scalar::Int32x4:
+      case Scalar::MaxTypedArrayViewType:
         break;
     }
-
-  return nullptr;
+    return nullptr;
 }
 
 void
-MLoadTypedArrayElement::computeRange(TempAllocator& alloc)
+MLoadUnboxedScalar::computeRange(TempAllocator &alloc)
 {
     // We have an Int32 type and if this is a UInt32 load it may produce a value
     // outside of our range, but we have a bailout to handle those cases.
-    setRange(GetTypedArrayRange(alloc, arrayType()));
+    setRange(GetTypedArrayRange(alloc, readType()));
 }
 
 void
-MLoadTypedArrayElementStatic::computeRange(TempAllocator& alloc)
+MLoadTypedArrayElementStatic::computeRange(TempAllocator &alloc)
 {
     // We don't currently use MLoadTypedArrayElementStatic for uint32, so we
     // don't have to worry about it returning a value outside our type.
@@ -2631,24 +2634,24 @@ MToDouble::operandTruncateKind(size_t index) const
 }
 
 MDefinition::TruncateKind
-MStoreTypedArrayElement::operandTruncateKind(size_t index) const
+MStoreUnboxedScalar::operandTruncateKind(size_t index) const
 {
     // An integer store truncates the stored value.
-    return index == 2 && !isFloatArray() ? Truncate : NoTruncate;
+    return index == 2 && isIntegerWrite() ? Truncate : NoTruncate;
 }
 
 MDefinition::TruncateKind
 MStoreTypedArrayElementHole::operandTruncateKind(size_t index) const
 {
     // An integer store truncates the stored value.
-    return index == 3 && !isFloatArray() ? Truncate : NoTruncate;
+    return index == 3 && isIntegerWrite() ? Truncate : NoTruncate;
 }
 
 MDefinition::TruncateKind
 MStoreTypedArrayElementStatic::operandTruncateKind(size_t index) const
 {
     // An integer store truncates the stored value.
-    return index == 1 && !isFloatArray() ? Truncate : NoTruncate;
+    return index == 1 && isIntegerWrite() ? Truncate : NoTruncate;
 }
 
 MDefinition::TruncateKind

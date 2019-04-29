@@ -790,10 +790,10 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
 }
 
 static void
-GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
-                 IonCache::StubAttacher& attacher, JSObject* obj, NativeObject* holder,
-                 Shape* shape, Register object, TypedOrValueRegister output,
-                 Label* failures = nullptr)
+GenerateReadSlot(JSContext *cx, IonScript *ion, MacroAssembler &masm,
+                 IonCache::StubAttacher &attacher, JSObject *obj, NativeObject *holder,
+                 Shape *shape, Register object, TypedOrValueRegister output,
+                 Label *failures = nullptr)
 {
     // If there's a single jump to |failures|, we can patch the shape guard
     // jump directly. Otherwise, jump to the end of the stub, so there's a
@@ -1005,13 +1005,13 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
         Register argObjReg       = argUintNReg;
         Register argIdReg        = regSet.takeGeneral();
 
-        PropertyOp target = shape->getterOp();
+        GetterOp target = shape->getterOp();
         MOZ_ASSERT(target);
 
         // Push stubCode for marking.
         attacher.pushStubCodePointer(masm);
 
-        // JSPropertyOp: bool fn(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp)
+        // JSGetterOp: bool fn(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp)
 
         // Push args on stack first so we can take pointers to make handles.
         masm.Push(UndefinedValue());
@@ -1996,8 +1996,8 @@ CheckTypeSetForWrite(MacroAssembler& masm, JSObject* obj, jsid id,
 }
 
 static void
-GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                NativeObject* obj, Shape* shape, Register object, ConstantOrRegister value,
+GenerateSetSlot(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &attacher,
+                NativeObject *obj, Shape *shape, Register object, ConstantOrRegister value,
                 bool needsTypeBarrier, bool checkTypeset)
 {
     MOZ_ASSERT(obj->isNative());
@@ -2014,7 +2014,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         // just guard that it's already there.
 
         // Obtain and guard on the ObjectGroup of the object.
-        ObjectGroup* group = obj->group();
+        ObjectGroup *group = obj->group();
         masm.branchPtr(Assembler::NotEqual,
                        Address(object, JSObject::offsetOfGroup()),
                        ImmGCPtr(group), &failures);
@@ -2058,7 +2058,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
 }
 
 bool
-SetPropertyIC::attachSetSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
+SetPropertyIC::attachSetSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
                              HandleNativeObject obj, HandleShape shape, bool checkTypeset)
 {
     MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
@@ -2122,10 +2122,9 @@ IsCacheableSetPropCallPropertyOp(HandleObject obj, HandleObject holder, HandleSh
     if (shape->hasSetterValue())
         return false;
 
-    // Despite the vehement claims of Shape.h that writable() is only
-    // relevant for data descriptors, some PropertyOp setters care
-    // desperately about its value. The flag should be always true, apart
-    // from these rare instances.
+    // Despite the vehement claims of Shape.h that writable() is only relevant
+    // for data descriptors, some SetterOps care desperately about its
+    // value. The flag should be always true, apart from these rare instances.
     if (!shape->writable())
         return false;
 
@@ -2469,10 +2468,10 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
         // before we push value and release its reg back into the set.
         Register argResultReg = regSet.takeGeneral();
 
-        StrictPropertyOp target = shape->setterOp();
+        SetterOp target = shape->setterOp();
         MOZ_ASSERT(target);
-        // JSStrictPropertyOp: bool fn(JSContext* cx, HandleObject obj,
-        //                     HandleId id, MutableHandleValue vp, ObjectOpResult &result);
+        // JSSetterOp: bool fn(JSContext *cx, HandleObject obj,
+        //                     HandleId id, bool strict, MutableHandleValue vp);
 
         // First, allocate an ObjectOpResult on the stack. We push this before
         // the stubCode pointer in order to match the layout of

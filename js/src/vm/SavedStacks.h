@@ -35,16 +35,19 @@ class SavedFrame : public NativeObject {
     static bool lineProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool columnProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool functionDisplayNameProperty(JSContext* cx, unsigned argc, Value* vp);
+    static bool asyncCauseProperty(JSContext *cx, unsigned argc, Value *vp);
+    static bool asyncParentProperty(JSContext *cx, unsigned argc, Value *vp);
     static bool parentProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool toStringMethod(JSContext* cx, unsigned argc, Value* vp);
 
     // Convenient getters for SavedFrame's reserved slots for use from C++.
-    JSAtom*      getSource();
+    JSAtom       *getSource();
     uint32_t     getLine();
     uint32_t     getColumn();
-    JSAtom*      getFunctionDisplayName();
-    SavedFrame*  getParent();
-    JSPrincipals* getPrincipals();
+    JSAtom       *getFunctionDisplayName();
+    JSAtom       *getAsyncCause();
+    SavedFrame   *getParent();
+    JSPrincipals *getPrincipals();
 
     bool         isSelfHosted();
 
@@ -60,9 +63,19 @@ class SavedFrame : public NativeObject {
                     HashPolicy,
                     SystemAllocPolicy> Set;
 
-    typedef RootedGeneric<Lookup*> AutoLookupRooter;
-    typedef AutoLookupRooter& HandleLookup;
     class AutoLookupVector;
+
+    class MOZ_STACK_CLASS HandleLookup {
+        friend class AutoLookupVector;
+
+        Lookup &lookup;
+
+        explicit HandleLookup(Lookup &lookup) : lookup(lookup) { }
+
+      public:
+        inline Lookup &get() { return lookup; }
+        inline Lookup *operator->() { return &lookup; }
+    };
 
   private:
     static bool finishSavedFrameInit(JSContext* cx, HandleObject ctor, HandleObject proto);
@@ -74,6 +87,7 @@ class SavedFrame : public NativeObject {
         JSSLOT_LINE,
         JSSLOT_COLUMN,
         JSSLOT_FUNCTIONDISPLAYNAME,
+        JSSLOT_ASYNCCAUSE,
         JSSLOT_PARENT,
         JSSLOT_PRINCIPALS,
         JSSLOT_PRIVATE_PARENT,
@@ -93,8 +107,8 @@ class SavedFrame : public NativeObject {
     bool parentMoved();
     void updatePrivateParent();
 
-    static bool checkThis(JSContext* cx, CallArgs& args, const char* fnName,
-                          MutableHandleSavedFrame frame);
+    static bool checkThis(JSContext *cx, CallArgs &args, const char *fnName,
+                          MutableHandleObject frame);
 };
 
 struct SavedFrame::HashPolicy
@@ -142,11 +156,15 @@ class SavedStacks {
     uint32_t            allocationSkipCount;
     uint64_t            rngState;
 
-    bool       insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
+    bool       insertFrames(JSContext *cx, FrameIter &iter, MutableHandleSavedFrame frame,
                             unsigned maxFrameCount = 0);
-    SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
-    SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
-    void       chooseSamplingProbability(JSContext* cx);
+    bool       adoptAsyncStack(JSContext *cx, HandleSavedFrame asyncStack,
+                               HandleString asyncCause,
+                               MutableHandleSavedFrame adoptedStack,
+                               unsigned maxFrameCount);
+    SavedFrame *getOrCreateSavedFrame(JSContext *cx, SavedFrame::HandleLookup lookup);
+    SavedFrame *createFrameFromLookup(JSContext *cx, SavedFrame::HandleLookup lookup);
+    void       chooseSamplingProbability(JSContext *cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 

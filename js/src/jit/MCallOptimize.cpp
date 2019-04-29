@@ -335,6 +335,11 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
     if (native == js::simd_float32x4_splat)
         return inlineSimdSplat(callInfo, native, SimdTypeDescr::TYPE_FLOAT32);
 
+    if (native == js::simd_int32x4_check)
+        return inlineSimdCheck(callInfo, native, SimdTypeDescr::TYPE_INT32);
+    if (native == js::simd_float32x4_check)
+        return inlineSimdCheck(callInfo, native, SimdTypeDescr::TYPE_FLOAT32);
+
     typedef bool IsElementWise;
     if (native == js::simd_int32x4_select)
         return inlineSimdSelect(callInfo, native, IsElementWise(true), SimdTypeDescr::TYPE_INT32);
@@ -344,6 +349,50 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
         return inlineSimdSelect(callInfo, native, IsElementWise(true), SimdTypeDescr::TYPE_FLOAT32);
     if (native == js::simd_float32x4_bitselect)
         return inlineSimdSelect(callInfo, native, IsElementWise(false), SimdTypeDescr::TYPE_FLOAT32);
+
+    if (native == js::simd_int32x4_swizzle)
+        return inlineSimdShuffle(callInfo, native, SimdTypeDescr::TYPE_INT32, 1, 4);
+    if (native == js::simd_float32x4_swizzle)
+        return inlineSimdShuffle(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 1, 4);
+    if (native == js::simd_int32x4_shuffle)
+        return inlineSimdShuffle(callInfo, native, SimdTypeDescr::TYPE_INT32, 2, 4);
+    if (native == js::simd_float32x4_shuffle)
+        return inlineSimdShuffle(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 2, 4);
+
+    if (native == js::simd_int32x4_load)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_INT32, 4);
+    if (native == js::simd_int32x4_loadX)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_INT32, 1);
+    if (native == js::simd_int32x4_loadXY)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_INT32, 2);
+    if (native == js::simd_int32x4_loadXYZ)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_INT32, 3);
+
+    if (native == js::simd_float32x4_load)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 4);
+    if (native == js::simd_float32x4_loadX)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 1);
+    if (native == js::simd_float32x4_loadXY)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 2);
+    if (native == js::simd_float32x4_loadXYZ)
+        return inlineSimdLoad(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 3);
+
+    if (native == js::simd_int32x4_store)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_INT32, 4);
+    if (native == js::simd_int32x4_storeX)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_INT32, 1);
+    if (native == js::simd_int32x4_storeXY)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_INT32, 2);
+    if (native == js::simd_int32x4_storeXYZ)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_INT32, 3);
+    if (native == js::simd_float32x4_store)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 4);
+    if (native == js::simd_float32x4_storeX)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 1);
+    if (native == js::simd_float32x4_storeXY)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 2);
+    if (native == js::simd_float32x4_storeXYZ)
+        return inlineSimdStore(callInfo, native, SimdTypeDescr::TYPE_FLOAT32, 3);
 
     return InliningStatus_NotInlined;
 }
@@ -2099,11 +2148,11 @@ IonBuilder::inlineUnsafeSetTypedObjectArrayElement(CallInfo& callInfo,
     // - arr is a typed array
     // - idx < length
 
-    MDefinition* obj = callInfo.getArg(base + 0);
-    MDefinition* id = callInfo.getArg(base + 1);
-    MDefinition* elem = callInfo.getArg(base + 2);
+    MDefinition *obj = callInfo.getArg(base + 0);
+    MDefinition *id = callInfo.getArg(base + 1);
+    MDefinition *elem = callInfo.getArg(base + 2);
 
-    if (!jsop_setelem_typed_object(arrayType, SetElem_Unsafe, true, obj, id, elem))
+    if (!jsop_setelem_typed_object(arrayType, SetElem_Unsafe, obj, id, elem))
         return false;
 
     return true;
@@ -2686,13 +2735,13 @@ IonBuilder::inlineAtomicsLoad(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* elements;
-    MDefinition* index;
+    MInstruction *elements;
+    MDefinition *index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MLoadTypedArrayElement* load =
-        MLoadTypedArrayElement::New(alloc(), elements, index, arrayType,
-                                    DoesRequireMemoryBarrier);
+    MLoadUnboxedScalar *load =
+        MLoadUnboxedScalar::New(alloc(), elements, index, arrayType,
+                                DoesRequireMemoryBarrier);
     load->setResultType(getInlineReturnType());
     current->add(load);
     current->push(load);
@@ -2701,7 +2750,7 @@ IonBuilder::inlineAtomicsLoad(CallInfo& callInfo)
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineAtomicsStore(CallInfo& callInfo)
+IonBuilder::inlineAtomicsStore(CallInfo &callInfo)
 {
     if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
@@ -2712,24 +2761,24 @@ IonBuilder::inlineAtomicsStore(CallInfo& callInfo)
     if (!atomicsMeetsPreconditions(callInfo, &arrayType))
         return InliningStatus_NotInlined;
 
-    MDefinition* value = callInfo.getArg(2);
+    MDefinition *value = callInfo.getArg(2);
     if (!(value->type() == MIRType_Int32 || value->type() == MIRType_Double))
         return InliningStatus_NotInlined;
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* elements;
-    MDefinition* index;
+    MInstruction *elements;
+    MDefinition *index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MDefinition* toWrite = value;
+    MDefinition *toWrite = value;
     if (value->type() == MIRType_Double) {
         toWrite = MTruncateToInt32::New(alloc(), value);
         current->add(toWrite->toInstruction());
     }
-    MStoreTypedArrayElement* store =
-        MStoreTypedArrayElement::New(alloc(), elements, index, toWrite, arrayType,
-                                     DoesRequireMemoryBarrier);
+    MStoreUnboxedScalar *store =
+        MStoreUnboxedScalar::New(alloc(), elements, index, toWrite, arrayType,
+                                 DoesRequireMemoryBarrier);
     current->add(store);
     current->push(value);
 
@@ -3094,6 +3143,157 @@ IonBuilder::inlineSimdSelect(CallInfo &callInfo, JSNative native, bool isElement
     MSimdSelect *ins = MSimdSelect::New(alloc(), callInfo.getArg(0), callInfo.getArg(1),
                                         callInfo.getArg(2), mirType, isElementWise);
     return boxSimd(callInfo, ins, templateObj);
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineSimdCheck(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type)
+{
+    InlineTypedObject *templateObj = nullptr;
+    if (!checkInlineSimd(callInfo, native, type, 1, &templateObj))
+        return InliningStatus_NotInlined;
+
+    MIRType mirType = SimdTypeDescrToMIRType(type);
+    MSimdUnbox *unbox = MSimdUnbox::New(alloc(), callInfo.getArg(0), mirType);
+    // Make sure not to remove this unbox!
+    unbox->setGuard();
+
+    current->add(unbox);
+    current->push(callInfo.getArg(0));
+
+    callInfo.setImplicitlyUsedUnchecked();
+    return InliningStatus_Inlined;
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineSimdShuffle(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+                              unsigned numVectors, unsigned numLanes)
+{
+    InlineTypedObject *templateObj = nullptr;
+    if (!checkInlineSimd(callInfo, native, type, numVectors + numLanes, &templateObj))
+        return InliningStatus_NotInlined;
+
+    MIRType mirType = SimdTypeDescrToMIRType(type);
+    MSimdGeneralShuffle *ins = MSimdGeneralShuffle::New(alloc(), numVectors, numLanes, mirType);
+
+    if (!ins->init(alloc()))
+        return InliningStatus_Error;
+
+    for (unsigned i = 0; i < numVectors; i++)
+        ins->setVector(i, callInfo.getArg(i));
+    for (size_t i = 0; i < numLanes; i++)
+        ins->setLane(i, callInfo.getArg(numVectors + i));
+
+    return boxSimd(callInfo, ins, templateObj);
+}
+
+static Scalar::Type
+SimdTypeToScalarType(SimdTypeDescr::Type type)
+{
+    switch (type) {
+      case SimdTypeDescr::TYPE_FLOAT32: return Scalar::Float32x4;
+      case SimdTypeDescr::TYPE_INT32:   return Scalar::Int32x4;
+      case SimdTypeDescr::TYPE_FLOAT64: break;
+    }
+    MOZ_CRASH("unexpected simd type");
+}
+
+bool
+IonBuilder::prepareForSimdLoadStore(CallInfo &callInfo, Scalar::Type simdType, MInstruction **elements,
+                                    MDefinition **index, Scalar::Type *arrayType)
+{
+    MDefinition *array = callInfo.getArg(0);
+    *index = callInfo.getArg(1);
+
+    if (!ElementAccessIsAnyTypedArray(constraints(), array, *index, arrayType))
+        return false;
+
+    MInstruction *indexAsInt32 = MToInt32::New(alloc(), *index);
+    current->add(indexAsInt32);
+    *index = indexAsInt32;
+
+    MDefinition *indexForBoundsCheck = *index;
+
+    // Artificially make sure the index is in bounds by adding the difference
+    // number of slots needed (e.g. reading from Float32Array we need to make
+    // sure to be in bounds for 4 slots, so add 3, etc.).
+    MOZ_ASSERT(Scalar::byteSize(simdType) % Scalar::byteSize(*arrayType) == 0);
+    int32_t suppSlotsNeeded = Scalar::byteSize(simdType) / Scalar::byteSize(*arrayType) - 1;
+    if (suppSlotsNeeded) {
+        MConstant *suppSlots = constant(Int32Value(suppSlotsNeeded));
+        MAdd *addedIndex = MAdd::New(alloc(), *index, suppSlots);
+        // We're fine even with the add overflows, as long as the generated code
+        // for the bounds check uses an unsigned comparison.
+        addedIndex->setInt32();
+        current->add(addedIndex);
+        indexForBoundsCheck = addedIndex;
+    }
+
+    MInstruction *length;
+    addTypedArrayLengthAndData(array, SkipBoundsCheck, index, &length, elements);
+
+    // It can be that the index is out of bounds, while the added index for the
+    // bounds check is in bounds, so we actually need two bounds checks here.
+    MInstruction *positiveCheck = MBoundsCheck::New(alloc(), *index, length);
+    current->add(positiveCheck);
+
+    MInstruction *fullCheck = MBoundsCheck::New(alloc(), indexForBoundsCheck, length);
+    current->add(fullCheck);
+    return true;
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineSimdLoad(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+                           unsigned numElems)
+{
+    InlineTypedObject *templateObj = nullptr;
+    if (!checkInlineSimd(callInfo, native, type, 2, &templateObj))
+        return InliningStatus_NotInlined;
+
+    Scalar::Type simdType = SimdTypeToScalarType(type);
+
+    MDefinition *index = nullptr;
+    MInstruction *elements = nullptr;
+    Scalar::Type arrayType;
+    if (!prepareForSimdLoadStore(callInfo, simdType, &elements, &index, &arrayType))
+        return InliningStatus_NotInlined;
+
+    MLoadUnboxedScalar *load = MLoadUnboxedScalar::New(alloc(), elements, index, arrayType);
+    load->setResultType(SimdTypeDescrToMIRType(type));
+    load->setSimdRead(simdType, numElems);
+
+    return boxSimd(callInfo, load, templateObj);
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineSimdStore(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+                            unsigned numElems)
+{
+    InlineTypedObject *templateObj = nullptr;
+    if (!checkInlineSimd(callInfo, native, type, 3, &templateObj))
+        return InliningStatus_NotInlined;
+
+    Scalar::Type simdType = SimdTypeToScalarType(type);
+
+    MDefinition *index = nullptr;
+    MInstruction *elements = nullptr;
+    Scalar::Type arrayType;
+    if (!prepareForSimdLoadStore(callInfo, simdType, &elements, &index, &arrayType))
+        return InliningStatus_NotInlined;
+
+    MDefinition *valueToWrite = callInfo.getArg(2);
+    MStoreUnboxedScalar *store = MStoreUnboxedScalar::New(alloc(), elements, index,
+                                                          valueToWrite, arrayType);
+    store->setSimdWrite(simdType, numElems);
+
+    current->add(store);
+    current->push(valueToWrite);
+
+    callInfo.setImplicitlyUsedUnchecked();
+
+    if (!resumeAfter(store))
+        return InliningStatus_Error;
+
+    return InliningStatus_Inlined;
 }
 
 } // namespace jit

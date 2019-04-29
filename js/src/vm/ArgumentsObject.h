@@ -129,10 +129,10 @@ class ArgumentsObject : public NativeObject
 
   public:
     static const uint32_t RESERVED_SLOTS = 3;
-    static const gc::AllocKind FINALIZE_KIND = gc::FINALIZE_OBJECT4_BACKGROUND;
+    static const gc::AllocKind FINALIZE_KIND = gc::AllocKind::OBJECT4_BACKGROUND;
 
     /* Create an arguments object for a frame that is expecting them. */
-    static ArgumentsObject* createExpected(JSContext* cx, AbstractFramePtr frame);
+    static ArgumentsObject *createExpected(JSContext *cx, AbstractFramePtr frame);
 
     /*
      * Purposefully disconnect the returned arguments object from the frame
@@ -140,9 +140,9 @@ class ArgumentsObject : public NativeObject
      * This allows function-local analysis to determine that formals are
      * not aliased and generally simplifies arguments objects.
      */
-    static ArgumentsObject* createUnexpected(JSContext* cx, ScriptFrameIter& iter);
-    static ArgumentsObject* createUnexpected(JSContext* cx, AbstractFramePtr frame);
-    static ArgumentsObject* createForIon(JSContext* cx, jit::JitFrameLayout* frame,
+    static ArgumentsObject *createUnexpected(JSContext *cx, ScriptFrameIter &iter);
+    static ArgumentsObject *createUnexpected(JSContext *cx, AbstractFramePtr frame);
+    static ArgumentsObject *createForIon(JSContext *cx, jit::JitFrameLayout *frame,
                                          HandleObject scopeChain);
 
     /*

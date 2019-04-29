@@ -108,22 +108,6 @@ ReportError(JSContext* cx, const char* origMsg, nsIURI* uri)
     return ReportError(cx, msg.get());
 }
 
-// There probably aren't actually any consumers that rely on having the full
-// scope chain up the parent chain of "obj" (instead of just having obj and then
-// the global), but we do this for now to preserve backwards compat.
-static bool
-BuildScopeChainForObject(JSContext* cx, HandleObject obj,
-                         AutoObjectVector& scopeChain)
-{
-    RootedObject cur(cx, obj);
-    for ( ; cur && !JS_IsGlobalObject(cur); cur = JS_GetParent(cur)) {
-        if (!scopeChain.append(cur)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 nsresult
 mozJSSubScriptLoader::ReadScript(nsIURI* uri, JSContext* cx, JSObject* targetObjArg,
                                  const nsAString& charset, const char* uriStr,
@@ -193,10 +177,11 @@ mozJSSubScriptLoader::ReadScript(nsIURI* uri, JSContext* cx, JSObject* targetObj
         }
 
         if (!reuseGlobal) {
-            JS::Compile(cx, target_obj, options, srcBuf, script);
+            JS::Compile(cx, options, srcBuf, script);
         } else {
             AutoObjectVector scopeChain(cx);
-            if (!BuildScopeChainForObject(cx, target_obj, scopeChain)) {
+            if (!JS_IsGlobalObject(target_obj) &&
+                !scopeChain.append(target_obj)) {
                 return NS_ERROR_OUT_OF_MEMORY;
             }
             // XXXbz do we really not care if the compile fails???
@@ -208,10 +193,11 @@ mozJSSubScriptLoader::ReadScript(nsIURI* uri, JSContext* cx, JSObject* targetObj
         // the lazy source loader doesn't know the encoding.
         if (!reuseGlobal) {
             options.setSourceIsLazy(true);
-            JS::Compile(cx, target_obj, options, buf.get(), len, script);
+            JS::Compile(cx, options, buf.get(), len, script);
         } else {
             AutoObjectVector scopeChain(cx);
-            if (!BuildScopeChainForObject(cx, target_obj, scopeChain)) {
+            if (!JS_IsGlobalObject(target_obj) &&
+                !scopeChain.append(target_obj)) {
                 return NS_ERROR_OUT_OF_MEMORY;
             }
             // XXXbz do we really not care if the compile fails???
@@ -392,7 +378,13 @@ mozJSSubScriptLoader::DoLoadSubScriptWithOptions(const nsAString& url,
         ok = JS_CallFunction(cx, targetObj, function, JS::HandleValueArray::empty(),
                              retval);
     } else {
-        ok = JS_ExecuteScript(cx, targetObj, script, retval);
+        if (JS_IsGlobalObject(targetObj)) {
+            ok = JS_ExecuteScript(cx, script, retval);
+        } else {
+            JS::AutoObjectVector scopeChain(cx);
+            ok = scopeChain.append(targetObj) &&
+                 JS_ExecuteScript(cx, scopeChain, script, retval);
+        }
     }
 
     if (ok) {

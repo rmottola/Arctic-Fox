@@ -327,8 +327,8 @@ NewFunctionForwarder(JSContext* cx, HandleId idArg, HandleObject callable,
     if (id == JSID_VOIDHANDLE)
         id = GetRTIdByIndex(cx, XPCJSRuntime::IDX_EMPTYSTRING);
 
-    JSFunction* fun = js::NewFunctionByIdWithReserved(cx, FunctionForwarder,
-                                                      0,0, JS::CurrentGlobalOrNull(cx), id);
+    JSFunction *fun = js::NewFunctionByIdWithReserved(cx, FunctionForwarder,
+                                                      0, 0, id);
     if (!fun)
         return false;
 
@@ -464,7 +464,7 @@ CreateObjectIn(JSContext* cx, HandleValue vobj, CreateObjectInOptions& options,
     RootedObject obj(cx);
     {
         JSAutoCompartment ac(cx, scope);
-        obj = JS_NewObject(cx, nullptr, scope);
+        obj = JS_NewPlainObject(cx);
         if (!obj)
             return false;
 

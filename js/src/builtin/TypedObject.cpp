@@ -487,10 +487,7 @@ CreatePrototypeObjectForComplexTypeInstance(JSContext* cx, HandleObject ctorProt
     if (!ctorPrototypePrototype)
         return nullptr;
 
-    return NewObjectWithProto<TypedProto>(cx,
-                                          ctorPrototypePrototype,
-                                          NullPtr(),
-                                          TenuredObject);
+    return NewObjectWithProto<TypedProto>(cx, ctorPrototypePrototype, TenuredObject);
 }
 
 const Class ArrayTypeDescr::class_ = {
@@ -586,7 +583,7 @@ ArrayMetaTypeDescr::create(JSContext* cx,
                            int32_t length)
 {
     Rooted<ArrayTypeDescr*> obj(cx);
-    obj = NewObjectWithProto<ArrayTypeDescr>(cx, arrayTypePrototype, NullPtr(), SingletonObject);
+    obj = NewObjectWithProto<ArrayTypeDescr>(cx, arrayTypePrototype, SingletonObject);
     if (!obj)
         return nullptr;
 
@@ -778,11 +775,11 @@ StructMetaTypeDescr::create(JSContext* cx,
     int32_t alignment = 1;             // Alignment of struct.
     bool opaque = false;               // Opacity of struct.
 
-    userFieldOffsets = NewObjectWithProto<PlainObject>(cx, NullPtr(), NullPtr(), TenuredObject);
+    userFieldOffsets = NewObjectWithProto<PlainObject>(cx, NullPtr(), TenuredObject);
     if (!userFieldOffsets)
         return nullptr;
 
-    userFieldTypes = NewObjectWithProto<PlainObject>(cx, NullPtr(), NullPtr(), TenuredObject);
+    userFieldTypes = NewObjectWithProto<PlainObject>(cx, NullPtr(), TenuredObject);
     if (!userFieldTypes)
         return nullptr;
 
@@ -912,7 +909,7 @@ StructMetaTypeDescr::create(JSContext* cx,
         return nullptr;
 
     Rooted<StructTypeDescr*> descr(cx);
-    descr = NewObjectWithProto<StructTypeDescr>(cx, structTypePrototype, NullPtr(),
+    descr = NewObjectWithProto<StructTypeDescr>(cx, structTypePrototype,
                                                 SingletonObject);
     if (!descr)
         return nullptr;
@@ -1154,7 +1151,7 @@ DefineSimpleTypeDescr(JSContext* cx,
         return false;
 
     Rooted<T*> descr(cx);
-    descr = NewObjectWithProto<T>(cx, funcProto, GlobalObject::upcast(global), SingletonObject);
+    descr = NewObjectWithProto<T>(cx, funcProto, SingletonObject);
     if (!descr)
         return false;
 
@@ -1174,7 +1171,7 @@ DefineSimpleTypeDescr(JSContext* cx,
     // Create the typed prototype for the scalar type. This winds up
     // not being user accessible, but we still create one for consistency.
     Rooted<TypedProto*> proto(cx);
-    proto = NewObjectWithProto<TypedProto>(cx, objProto, NullPtr(), TenuredObject);
+    proto = NewObjectWithProto<TypedProto>(cx, objProto, TenuredObject);
     if (!proto)
         return false;
     descr->initReservedSlot(JS_DESCR_SLOT_TYPROTO, ObjectValue(*proto));
@@ -1210,7 +1207,6 @@ DefineMetaTypeDescr(JSContext* cx,
     // Create ctor.prototype, which inherits from Function.__proto__
 
     RootedObject proto(cx, NewObjectWithProto<PlainObject>(cx, funcProto,
-                                                           GlobalObject::upcast(global),
                                                            SingletonObject));
     if (!proto)
         return nullptr;
@@ -1221,8 +1217,7 @@ DefineMetaTypeDescr(JSContext* cx,
     if (!objProto)
         return nullptr;
     RootedObject protoProto(cx);
-    protoProto = NewObjectWithProto<PlainObject>(cx, objProto,
-                                                 GlobalObject::upcast(global), SingletonObject);
+    protoProto = NewObjectWithProto<PlainObject>(cx, objProto, SingletonObject);
     if (!protoProto)
         return nullptr;
 
@@ -1269,8 +1264,7 @@ GlobalObject::initTypedObjectModule(JSContext* cx, Handle<GlobalObject*> global)
         return false;
 
     Rooted<TypedObjectModuleObject*> module(cx);
-    module = NewObjectWithProto<TypedObjectModuleObject>(cx, objProto,
-                                                         GlobalObject::upcast(global));
+    module = NewObjectWithProto<TypedObjectModuleObject>(cx, objProto);
     if (!module)
         return false;
 
@@ -1476,8 +1470,8 @@ OutlineTypedObject::setOwnerAndData(JSObject* owner, uint8_t* data)
 }
 
 /*static*/ OutlineTypedObject*
-OutlineTypedObject::createUnattachedWithClass(JSContext* cx,
-                                              const Class* clasp,
+OutlineTypedObject::createUnattachedWithClass(JSContext *cx,
+                                              const Class *clasp,
                                               HandleTypeDescr descr,
                                               int32_t length,
                                               gc::InitialHeap heap)
@@ -1492,8 +1486,9 @@ OutlineTypedObject::createUnattachedWithClass(JSContext* cx,
         return nullptr;
 
     NewObjectKind newKind = (heap == gc::TenuredHeap) ? MaybeSingletonObject : GenericObject;
-    OutlineTypedObject* obj = NewObjectWithGroup<OutlineTypedObject>(cx, group, cx->global(),
-                                                                     gc::FINALIZE_OBJECT0, newKind);
+    OutlineTypedObject *obj = NewObjectWithGroup<OutlineTypedObject>(cx, group,
+                                                                     gc::AllocKind::OBJECT0,
+                                                                     newKind);
     if (!obj)
         return nullptr;
 
@@ -1756,11 +1751,11 @@ ReportPropertyError(JSContext* cx,
 }
 
 bool
-TypedObject::obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                                PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+TypedObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                                GetterOp getter, SetterOp setter, unsigned attrs,
                                 ObjectOpResult &result)
 {
-    Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
+    Rooted<TypedObject *> typedObj(cx, &obj->as<TypedObject>());
     return ReportTypedObjTypeError(cx, JSMSG_OBJECT_NOT_EXTENSIBLE, typedObj);
 }
 
@@ -2140,7 +2135,7 @@ InlineTypedObject::create(JSContext* cx, HandleTypeDescr descr, gc::InitialHeap 
         return nullptr;
 
     NewObjectKind newKind = (heap == gc::TenuredHeap) ? MaybeSingletonObject : GenericObject;
-    return NewObjectWithGroup<InlineTypedObject>(cx, group, cx->global(), allocKind, newKind);
+    return NewObjectWithGroup<InlineTypedObject>(cx, group, allocKind, newKind);
 }
 
 /* static */ InlineTypedObject*

@@ -961,7 +961,7 @@ GlobalHelperThreadState::mergeParseTaskCompartment(JSRuntime* rt, ParseTask* par
     LeaveParseTaskZone(rt, parseTask);
 
     {
-        gc::ZoneCellIter iter(parseTask->cx->zone(), gc::FINALIZE_OBJECT_GROUP);
+        gc::ZoneCellIter iter(parseTask->cx->zone(), gc::AllocKind::OBJECT_GROUP);
 
         // Generator functions don't have Function.prototype as prototype but a
         // different function object, so the IdentifyStandardPrototype trick

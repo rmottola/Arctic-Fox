@@ -300,12 +300,13 @@ class AliasSet {
     enum Flag {
         None_             = 0,
         ObjectFields      = 1 << 0, // shape, class, slots, length etc.
-        Element           = 1 << 1, // A member of obj->elements, or reference
-                                    // typed object field.
-        DynamicSlot       = 1 << 2, // A member of obj->slots.
-        FixedSlot         = 1 << 3, // A member of obj->fixedSlots().
-        TypedArrayElement = 1 << 4, // A typed array element, or scalar typed
-                                    // object field.
+        Element           = 1 << 1, // A Value member of obj->elements or
+                                    // a typed object.
+        UnboxedElement    = 1 << 2, // An unboxed scalar or reference member of
+                                    // a typed array, typed object, or unboxed
+                                    // object.
+        DynamicSlot       = 1 << 3, // A Value member of obj->slots.
+        FixedSlot         = 1 << 4, // A Value member of obj->fixedSlots().
         DOMProperty       = 1 << 5, // A DOM property
         FrameArgument     = 1 << 6, // An argument kept on the stack frame
         AsmJSGlobalVar    = 1 << 7, // An asm.js global var
@@ -446,8 +447,8 @@ class MDefinition : public MNode
     void printName(FILE* fp) const;
     static void PrintOpcodeName(FILE* fp, Opcode op);
     virtual void printOpcode(FILE* fp) const;
-    void dump(FILE* fp) const override;
-    void dump() const override;
+    void dump(FILE* fp) const MOZ_OVERRIDE;
+    void dump() const MOZ_OVERRIDE;
     void dumpLocation(FILE* fp) const;
     void dumpLocation() const;
 
@@ -580,7 +581,7 @@ class MDefinition : public MNode
     virtual void collectRangeInfoPreTrunc() {
     }
 
-    MNode::Kind kind() const override {
+    MNode::Kind kind() const MOZ_OVERRIDE {
         return MNode::Definition;
     }
 
@@ -942,10 +943,10 @@ class MInstruction
 
 #define INSTRUCTION_HEADER_WITHOUT_TYPEPOLICY(opcode)                       \
     static const Opcode classOpcode = MDefinition::Op_##opcode;             \
-    Opcode op() const override {                                        \
+    Opcode op() const MOZ_OVERRIDE {                                        \
         return classOpcode;                                                 \
     }                                                                       \
-    const char* opName() const override {                               \
+    const char* opName() const MOZ_OVERRIDE {                               \
         return #opcode;                                                     \
     }                                                                       \
     void accept(MDefinitionVisitor* visitor) override {                 \
@@ -958,11 +959,11 @@ class MInstruction
     virtual MIRType typePolicySpecialization() override;
 
 #define ALLOW_CLONE(typename)                                               \
-    bool canClone() const override {                                    \
+    bool canClone() const MOZ_OVERRIDE {                                    \
         return true;                                                        \
     }                                                                       \
     MInstruction* clone(TempAllocator& alloc,                               \
-                        const MDefinitionVector& inputs) const override { \
+                        const MDefinitionVector& inputs) const MOZ_OVERRIDE { \
         MInstruction* res = new(alloc) typename(*this);                     \
         for (size_t i = 0; i < numOperands(); i++)                          \
             res->replaceOperand(i, inputs[i]);                              \
@@ -1243,7 +1244,7 @@ class MNop : public MNullaryInstruction
         return new(alloc) MNop();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -1277,13 +1278,13 @@ class MLimitedTruncate
         return new(alloc) MLimitedTruncate(input, kind);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
     TruncateKind truncateKind() const {
         return truncate_;
     }
@@ -1321,12 +1322,12 @@ class MConstant : public MNullaryInstruction
         return ToBoolean(HandleValue::fromMarkedLocation(&value_));
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -1345,7 +1346,7 @@ class MConstant : public MNullaryInstruction
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
 
-    bool canProduceFloat32() const override;
+    bool canProduceFloat32() const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MConstant)
 };
@@ -1363,14 +1364,14 @@ class MNurseryObject : public MNullaryInstruction
     static MNurseryObject* New(TempAllocator& alloc, JSObject* obj, uint32_t index,
                                CompilerConstraintList* constraints = nullptr);
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 
     uint32_t index() const {
         return index_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -1414,15 +1415,15 @@ class MSimdValueX4
         return MSimdValueX4::New(alloc, type, x, y, z, w);
     }
 
-    bool canConsumeFloat32(MUse* use) const override {
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE {
         return SimdTypeToScalarType(type()) == MIRType_Float32;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
@@ -1459,15 +1460,15 @@ class MSimdSplatX4
         return new(alloc) MSimdSplatX4(type, v);
     }
 
-    bool canConsumeFloat32(MUse* use) const override {
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE {
         return SimdTypeToScalarType(type()) == MIRType_Float32;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
@@ -1495,7 +1496,7 @@ class MSimdConstant
         return new(alloc) MSimdConstant(v, type);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isSimdConstant())
             return false;
         return value() == ins->toSimdConstant()->value();
@@ -1505,7 +1506,7 @@ class MSimdConstant
         return value_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -1540,10 +1541,10 @@ class MSimdConvert
         return new(alloc) MSimdConvert(obj, fromType, toType);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     ALLOW_CLONE(MSimdConvert)
@@ -1577,10 +1578,10 @@ class MSimdReinterpretCast
         return new(alloc) MSimdReinterpretCast(obj, fromType, toType);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     ALLOW_CLONE(MSimdReinterpretCast)
@@ -1625,10 +1626,10 @@ class MSimdExtractElement
         return lane_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isSimdExtractElement())
             return false;
         const MSimdExtractElement* other = ins->toSimdExtractElement();
@@ -1692,15 +1693,15 @@ class MSimdInsertElement
         MOZ_CRASH("unknown lane");
     }
 
-    bool canConsumeFloat32(MUse *use) const override {
+    bool canConsumeFloat32(MUse *use) const MOZ_OVERRIDE {
         return use == getUseFor(1) && SimdTypeToScalarType(type()) == MIRType_Float32;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return binaryCongruentTo(ins) && lane_ == ins->toSimdInsertElement()->lane();
     }
 
@@ -1737,10 +1738,10 @@ class MSimdSignMask
         return new(alloc) MSimdSignMask(obj, type);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isSimdSignMask())
             return false;
         return congruentIfOperandsEqual(ins);
@@ -1808,26 +1809,102 @@ class MSimdSwizzle
   public:
     INSTRUCTION_HEADER(SimdSwizzle)
 
-    static MSimdSwizzle* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType type,
-                                  uint32_t laneX, uint32_t laneY, uint32_t laneZ, uint32_t laneW)
+    static MSimdSwizzle *New(TempAllocator &alloc, MDefinition *obj, MIRType type,
+                             uint32_t laneX, uint32_t laneY, uint32_t laneZ, uint32_t laneW)
     {
         return new(alloc) MSimdSwizzle(obj, type, laneX, laneY, laneZ, laneW);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition *ins) const MOZ_OVERRIDE {
         if (!ins->isSimdSwizzle())
             return false;
-        const MSimdSwizzle* other = ins->toSimdSwizzle();
+        const MSimdSwizzle *other = ins->toSimdSwizzle();
         return sameLanes(other) && congruentIfOperandsEqual(other);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    MDefinition* foldsTo(TempAllocator& alloc) override;
+    MDefinition *foldsTo(TempAllocator& alloc) MOZ_OVERRIDE;
 
     ALLOW_CLONE(MSimdSwizzle)
+};
+
+// A "general swizzle" is a swizzle or a shuffle with non-constant lane
+// indices.  This is the one that Ion inlines and it can be folded into a
+// MSimdSwizzle/MSimdShuffle if lane indices are constant.  Performance of
+// general swizzle/shuffle does not really matter, as we expect to get
+// constant indices most of the time.
+class MSimdGeneralShuffle :
+    public MVariadicInstruction,
+    public SimdShufflePolicy::Data
+{
+    unsigned numVectors_;
+    unsigned numLanes_;
+
+  protected:
+    MSimdGeneralShuffle(unsigned numVectors, unsigned numLanes, MIRType type)
+      : numVectors_(numVectors), numLanes_(numLanes)
+    {
+        MOZ_ASSERT(IsSimdType(type));
+        MOZ_ASSERT(SimdTypeToLength(type) == numLanes_);
+
+        setResultType(type);
+        specialization_ = type;
+        setMovable();
+    }
+
+  public:
+    INSTRUCTION_HEADER(SimdGeneralShuffle);
+
+    static MSimdGeneralShuffle *New(TempAllocator &alloc, unsigned numVectors, unsigned numLanes,
+                                    MIRType type)
+    {
+        return new(alloc) MSimdGeneralShuffle(numVectors, numLanes, type);
+    }
+
+    bool init(TempAllocator &alloc) {
+        return MVariadicInstruction::init(alloc, numVectors_ + numLanes_);
+    }
+    void setVector(unsigned i, MDefinition* vec) {
+        MOZ_ASSERT(i < numVectors_);
+        initOperand(i, vec);
+    }
+    void setLane(unsigned i, MDefinition* laneIndex) {
+        MOZ_ASSERT(i < numLanes_);
+        initOperand(numVectors_ + i, laneIndex);
+    }
+
+    unsigned numVectors() const {
+        return numVectors_;
+    }
+    unsigned numLanes() const {
+        return numLanes_;
+    }
+    MDefinition *vector(unsigned i) const {
+        MOZ_ASSERT(i < numVectors_);
+        return getOperand(i);
+    }
+    MDefinition *lane(unsigned i) const {
+        MOZ_ASSERT(i < numLanes_);
+        return getOperand(numVectors_ + i);
+    }
+
+    bool congruentTo(const MDefinition *ins) const MOZ_OVERRIDE {
+        if (!ins->isSimdGeneralShuffle())
+            return false;
+        const MSimdGeneralShuffle *other = ins->toSimdGeneralShuffle();
+        return numVectors_ == other->numVectors() &&
+               numLanes_ == other->numLanes() &&
+               congruentIfOperandsEqual(other);
+    }
+
+    MDefinition *foldsTo(TempAllocator &alloc) MOZ_OVERRIDE;
+
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::None();
+    }
 };
 
 // Applies a shuffle operation to the inputs, selecting the 2 first lanes of the
@@ -1855,9 +1932,9 @@ class MSimdShuffle
   public:
     INSTRUCTION_HEADER(SimdShuffle)
 
-    static MInstruction* NewAsmJS(TempAllocator& alloc, MDefinition* lhs, MDefinition* rhs,
-                                  MIRType type, uint32_t laneX, uint32_t laneY, uint32_t laneZ,
-                                  uint32_t laneW)
+    static MInstruction *New(TempAllocator &alloc, MDefinition *lhs, MDefinition *rhs,
+                             MIRType type, uint32_t laneX, uint32_t laneY, uint32_t laneZ,
+                             uint32_t laneW)
     {
         // Swap operands so that new lanes come from LHS in majority.
         // In the balanced case, swap operands if needs be, in order to be able
@@ -1873,19 +1950,19 @@ class MSimdShuffle
 
         // If all lanes come from the same vector, just use swizzle instead.
         if (laneX < 4 && laneY < 4 && laneZ < 4 && laneW < 4)
-            return MSimdSwizzle::NewAsmJS(alloc, lhs, type, laneX, laneY, laneZ, laneW);
+            return MSimdSwizzle::New(alloc, lhs, type, laneX, laneY, laneZ, laneW);
 
         return new(alloc) MSimdShuffle(lhs, rhs, type, laneX, laneY, laneZ, laneW);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isSimdShuffle())
             return false;
         const MSimdShuffle* other = ins->toSimdShuffle();
         return sameLanes(other) && binaryCongruentTo(other);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -1946,11 +2023,11 @@ class MSimdUnaryArith
 
     Operation operation() const { return operation_; }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins) && ins->toSimdUnaryArith()->operation() == operation();
     }
 
@@ -2011,7 +2088,7 @@ class MSimdBinaryComp
         return new(alloc) MSimdBinaryComp(left, right, op, opType);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -2033,7 +2110,7 @@ class MSimdBinaryComp
         swapOperands();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!binaryCongruentTo(ins))
             return false;
         const MSimdBinaryComp *other = ins->toSimdBinaryComp();
@@ -2098,13 +2175,13 @@ class MSimdBinaryArith
         return New(alloc, left, right, op, t);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     Operation operation() const { return operation_; }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!binaryCongruentTo(ins))
             return false;
         return operation_ == ins->toSimdBinaryArith()->operation();
@@ -2163,13 +2240,13 @@ class MSimdBinaryBitwise
         return new(alloc) MSimdBinaryBitwise(left, right, op, t);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     Operation operation() const { return operation_; }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!binaryCongruentTo(ins))
             return false;
         return operation_ == ins->toSimdBinaryBitwise()->operation();
@@ -2210,13 +2287,13 @@ class MSimdShift
         return new(alloc) MSimdShift(left, right, op);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     Operation operation() const { return operation_; }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!binaryCongruentTo(ins))
             return false;
         return operation_ == ins->toSimdShift()->operation();
@@ -2262,7 +2339,7 @@ class MSimdSelect
         return getOperand(0);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -2270,7 +2347,7 @@ class MSimdSelect
         return isElementWise_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!congruentIfOperandsEqual(ins))
             return false;
         return isElementWise_ == ins->toSimdSelect()->isElementWise();
@@ -2317,10 +2394,10 @@ class MParameter : public MNullaryInstruction
     int32_t index() const {
         return index_;
     }
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 };
 
 class MCallee : public MNullaryInstruction
@@ -2335,14 +2412,14 @@ class MCallee : public MNullaryInstruction
   public:
     INSTRUCTION_HEADER(Callee)
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
     static MCallee* New(TempAllocator& alloc) {
         return new(alloc) MCallee();
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2358,13 +2435,13 @@ class MIsConstructing : public MNullaryInstruction
   public:
     INSTRUCTION_HEADER(IsConstructing)
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     static MIsConstructing* New(TempAllocator& alloc) {
         return new(alloc) MIsConstructing();
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2379,11 +2456,11 @@ class MControlInstruction : public MInstruction
     virtual MBasicBlock* getSuccessor(size_t i) const = 0;
     virtual void replaceSuccessor(size_t i, MBasicBlock* successor) = 0;
 
-    bool isControlInstruction() const override {
+    bool isControlInstruction() const MOZ_OVERRIDE {
         return true;
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 };
 
 class MTableSwitch final
@@ -2425,7 +2502,7 @@ class MTableSwitch final
         return &operand_;
     }
 
-    const MUse* getUseFor(size_t index) const override {
+    const MUse* getUseFor(size_t index) const MOZ_OVERRIDE {
         MOZ_ASSERT(index == 0);
         return &operand_;
     }
@@ -2434,7 +2511,7 @@ class MTableSwitch final
     INSTRUCTION_HEADER(TableSwitch)
     static MTableSwitch* New(TempAllocator& alloc, MDefinition* ins, int32_t low, int32_t high);
 
-    size_t numSuccessors() const override {
+    size_t numSuccessors() const MOZ_OVERRIDE {
         return successors_.length();
     }
 
@@ -2445,7 +2522,7 @@ class MTableSwitch final
         return successors_.append(successor);
     }
 
-    MBasicBlock* getSuccessor(size_t i) const override {
+    MBasicBlock* getSuccessor(size_t i) const MOZ_OVERRIDE {
         MOZ_ASSERT(i < numSuccessors());
         return successors_[i];
     }
@@ -2503,12 +2580,12 @@ class MTableSwitch final
         return blocks_.append(block);
     }
 
-    MDefinition* getOperand(size_t index) const override {
+    MDefinition* getOperand(size_t index) const MOZ_OVERRIDE {
         MOZ_ASSERT(index == 0);
         return operand_.producer();
     }
 
-    size_t numOperands() const override {
+    size_t numOperands() const MOZ_OVERRIDE {
         return 1;
     }
 
@@ -2588,7 +2665,7 @@ class MGoto
     MBasicBlock* target() {
         return getSuccessor(0);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2638,7 +2715,7 @@ class MTest
         return (dir == TRUE_BRANCH) ? ifTrue() : ifFalse();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -2659,7 +2736,7 @@ class MTest
         return operandMightEmulateUndefined_;
     }
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
@@ -2688,7 +2765,7 @@ class MGotoWithFake
         return getSuccessor(0);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2711,7 +2788,7 @@ class MReturn
     MDefinition* input() const {
         return getOperand(0);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2730,10 +2807,10 @@ class MThrow
         return new(alloc) MThrow(ins);
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -2845,12 +2922,12 @@ class MNewArray
     // notations.  So we might have to allocate the array twice if we bail
     // during the computation of the first element of the square braket
     // notation.
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         // The template object can safely be used in the recover instruction
         // because it can never be mutated by any other function execution.
         return true;
@@ -2891,7 +2968,7 @@ class MNewArrayCopyOnWrite : public MNullaryInstruction
         return initialHeap_;
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2935,7 +3012,7 @@ class MNewArrayDynamicLength
         return initialHeap_;
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -2998,8 +3075,8 @@ class MNewObject
         return initialHeap_;
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         // The template object can safely be used in the recover instruction
         // because it can never be mutated by any other function execution.
         return true;
@@ -3040,7 +3117,7 @@ class MNewTypedObject : public MNullaryInstruction
         return initialHeap_;
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -3067,10 +3144,10 @@ class MTypedObjectDescr
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -3097,7 +3174,8 @@ class MSimdBox
         MOZ_ASSERT(IsSimdType(op->type()));
         setMovable();
         setResultType(MIRType_Object);
-        setResultTypeSet(MakeSingletonTypeSet(constraints, templateObject));
+        if (constraints)
+            setResultTypeSet(MakeSingletonTypeSet(constraints, templateObject));
     }
 
   public:
@@ -3120,7 +3198,7 @@ class MSimdBox
         return initialHeap_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (congruentIfOperandsEqual(ins)) {
             MOZ_ASSERT(ins->toSimdBox()->initialHeap() == initialHeap());
             return true;
@@ -3129,7 +3207,7 @@ class MSimdBox
         return false;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -3156,7 +3234,7 @@ class MSimdUnbox
         return new(alloc) MSimdUnbox(op, type);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -3218,12 +3296,12 @@ class MNewDerivedTypedObject
         return getOperand(2);
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3286,8 +3364,8 @@ class MObjectState
         setSlot(slot + numFixedSlots(), def);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3339,8 +3417,8 @@ class MArrayState
         replaceOperand(index + 2, def);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3373,7 +3451,7 @@ class MMutateProto
         return getOperand(1);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3480,7 +3558,7 @@ class MInitElem
     MDefinition* getValue() const {
         return getOperand(2);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3605,7 +3683,7 @@ class MCall
         return numActualArgs_;
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -3646,11 +3724,11 @@ class MCallDOMNative : public MCall
 
     const JSJitInfo* getJitInfo() const;
   public:
-    virtual AliasSet getAliasSet() const override;
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE;
 
-    virtual bool congruentTo(const MDefinition* ins) const override;
+    virtual bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 
-    virtual bool isCallDOMNative() const override {
+    virtual bool isCallDOMNative() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -3688,7 +3766,7 @@ class MArraySplice
         return getOperand(2);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3731,7 +3809,7 @@ class MApplyArgs
     MDefinition* getThis() const {
         return getOperand(2);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3761,7 +3839,7 @@ class MBail : public MNullaryInstruction
         return new(alloc) MBail(Bailout_Inevitable);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -3781,7 +3859,7 @@ class MUnreachable
         return new(alloc) MUnreachable();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -3805,7 +3883,7 @@ class MAssertFloat32
         return new(alloc) MAssertFloat32(value, mustBeFloat32);
     }
 
-    bool canConsumeFloat32(MUse* use) const override { return true; }
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE { return true; }
 
     bool mustBeFloat32() const { return mustBeFloat32_; }
 };
@@ -3836,7 +3914,7 @@ class MGetDynamicName
     MDefinition* getName() const {
         return getOperand(1);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -3882,7 +3960,7 @@ class MCallDirectEval
         return pc_;
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -4029,7 +4107,7 @@ class MCompare
     bool operandsAreNeverNaN() const {
         return operandsAreNeverNaN_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // Strict equality is never effectful.
         if (jsop_ == JSOP_STRICTEQ || jsop_ == JSOP_STRICTNE)
             return AliasSet::None();
@@ -4039,17 +4117,17 @@ class MCompare
         return AliasSet::None();
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
     void collectRangeInfoPreTrunc() override;
 
     void trySpecializeFloat32(TempAllocator& alloc) override;
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
 # ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         // Both sides of the compare can be Float32
         return compareType_ == Compare_Float32;
     }
@@ -4061,7 +4139,7 @@ class MCompare
     bool tryFoldEqualOperands(bool* result);
     bool tryFoldTypeOf(bool *result);
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!binaryCongruentTo(ins))
             return false;
         return compareType() == ins->toCompare()->compareType() &&
@@ -4099,10 +4177,10 @@ class MBox
         return new(alloc) MBox(alloc, ins);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -4210,15 +4288,15 @@ class MUnbox final : public MUnaryInstruction, public BoxInputsPolicy::Data
     bool fallible() const {
         return mode() != Infallible;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isUnbox() || ins->toUnbox()->mode() != mode())
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
     void makeInfallible() {
         // Should only be called if we're already Infallible or TypeBarrier
         MOZ_ASSERT(mode() != Fallible);
@@ -4246,7 +4324,7 @@ class MGuardObject
     static MGuardObject* New(TempAllocator& alloc, MDefinition* ins) {
         return new(alloc) MGuardObject(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -4270,7 +4348,7 @@ class MGuardString
         return new(alloc) MGuardString(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -4292,7 +4370,7 @@ class MPolyInlineGuard
     static MPolyInlineGuard* New(TempAllocator& alloc, MDefinition* ins) {
         return new(alloc) MPolyInlineGuard(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -4324,11 +4402,11 @@ class MAssertRange
         return assertedRange_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 };
 
 // Caller-side allocation of |this| for |new|:
@@ -4366,12 +4444,12 @@ class MCreateThisWithTemplate
     }
 
     // Although creation of |this| modifies global state, it is safely repeatable.
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override;
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE;
 };
 
 // Caller-side allocation of |this| for |new|:
@@ -4402,10 +4480,10 @@ class MCreateThisWithProto
     }
 
     // Although creation of |this| modifies global state, it is safely repeatable.
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -4434,10 +4512,10 @@ class MCreateThis
     }
 
     // Although creation of |this| modifies global state, it is safely repeatable.
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -4464,11 +4542,11 @@ class MCreateArgumentsObject
         return getOperand(0);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -4501,7 +4579,7 @@ class MGetArgumentsObjectArg
         return argno_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::Any);
     }
 };
@@ -4538,7 +4616,7 @@ class MSetArgumentsObjectArg
         return getOperand(1);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::Any);
     }
 };
@@ -4558,7 +4636,7 @@ class MRunOncePrologue
     static MRunOncePrologue* New(TempAllocator& alloc) {
         return new(alloc) MRunOncePrologue();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -4591,7 +4669,7 @@ class MReturnFromCtor
         return getOperand(1);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -4654,22 +4732,22 @@ class MToDouble
     }
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isToDouble() || ins->toToDouble()->conversion() != conversion())
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override { return true; }
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE { return true; }
 #endif
 
     TruncateKind truncateKind() const {
@@ -4679,8 +4757,8 @@ class MToDouble
         implicitTruncate_ = Max(implicitTruncate_, kind);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         if (input()->type() == MIRType_Value)
             return false;
         if (input()->type() == MIRType_Symbol)
@@ -4722,22 +4800,22 @@ class MToFloat32
     }
 
     virtual MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isToFloat32() || ins->toToFloat32()->conversion() != conversion())
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     void computeRange(TempAllocator& alloc) override;
 
-    bool canConsumeFloat32(MUse* use) const override { return true; }
-    bool canProduceFloat32() const override { return true; }
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE { return true; }
+    bool canProduceFloat32() const MOZ_OVERRIDE { return true; }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -4763,10 +4841,10 @@ class MAsmJSUnsignedToDouble
     }
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -4790,14 +4868,14 @@ class MAsmJSUnsignedToFloat32
     }
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool canProduceFloat32() const override { return true; }
+    bool canProduceFloat32() const MOZ_OVERRIDE { return true; }
 };
 
 // Converts a primitive (either typed or untyped) to an int32. If the input is
@@ -4849,20 +4927,20 @@ class MToInt32
         return conversion_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isToInt32() || ins->toToInt32()->conversion() != conversion())
             return false;
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
     void collectRangeInfoPreTrunc() override;
 
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override { return true; }
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE { return true; }
 #endif
 
     ALLOW_CLONE(MToInt32)
@@ -4897,23 +4975,23 @@ class MTruncateToInt32
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
     void computeRange(TempAllocator& alloc) override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 # ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return input()->type() < MIRType_Symbol;
     }
 
@@ -4941,11 +5019,11 @@ class MToString :
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -4975,11 +5053,11 @@ class MToObjectOrNull :
         return new(alloc) MToObjectOrNull(def);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -5006,18 +5084,18 @@ class MBitNot
     MDefinition* foldsTo(TempAllocator& alloc) override;
     void infer();
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         if (specialization_ == MIRType_None)
             return AliasSet::Store(AliasSet::Any);
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ != MIRType_None;
     }
 
@@ -5060,11 +5138,11 @@ class MTypeOf
         inputMaybeCallableOrEmulatesUndefined_ = false;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isTypeOf())
             return false;
         if (inputType() != ins->toTypeOf()->inputType())
@@ -5077,8 +5155,8 @@ class MTypeOf
         return congruentIfOperandsEqual(ins);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -5123,16 +5201,16 @@ class MBinaryBitwiseInstruction
     virtual MDefinition* foldIfEqual()  = 0;
     virtual void infer(BaselineInspector* inspector, jsbytecode* pc);
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return binaryCongruentTo(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         if (specialization_ >= MIRType_Object)
             return AliasSet::Store(AliasSet::Any);
         return AliasSet::None();
     }
 
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 };
 
 class MBitAnd : public MBinaryBitwiseInstruction
@@ -5157,8 +5235,8 @@ class MBitAnd : public MBinaryBitwiseInstruction
     }
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ != MIRType_None;
     }
 
@@ -5186,8 +5264,8 @@ class MBitOr : public MBinaryBitwiseInstruction
         return getOperand(0); // x | x => x
     }
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ != MIRType_None;
     }
 
@@ -5216,8 +5294,8 @@ class MBitXor : public MBinaryBitwiseInstruction
     }
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -5260,8 +5338,8 @@ class MLsh : public MShiftInstruction
     }
 
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ != MIRType_None;
     }
 
@@ -5286,8 +5364,8 @@ class MRsh : public MShiftInstruction
     }
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -5327,8 +5405,8 @@ class MUrsh : public MShiftInstruction
     void computeRange(TempAllocator& alloc) override;
     void collectRangeInfoPreTrunc() override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -5372,10 +5450,10 @@ class MBinaryArithInstruction
 
     virtual void trySpecializeFloat32(TempAllocator& alloc) override;
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return binaryCongruentTo(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         if (specialization_ >= MIRType_Object)
             return AliasSet::Store(AliasSet::Any);
         return AliasSet::None();
@@ -5420,7 +5498,7 @@ class MMinMax
         return isMax_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isMinMax())
             return false;
         if (isMax() != ins->toMinMax()->isMax())
@@ -5428,17 +5506,17 @@ class MMinMax
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     MDefinition* foldsTo(TempAllocator& alloc) override;
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 
     ALLOW_CLONE(MMinMax)
@@ -5471,20 +5549,20 @@ class MAbs
             ins->implicitTruncate_ = true;
         return ins;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     bool fallible() const;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5518,11 +5596,11 @@ class MClz
     MDefinition* num() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -5557,20 +5635,20 @@ class MSqrt
         MOZ_ASSERT(IsFloatingPointType(type));
         return new(alloc) MSqrt(num, type);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5603,20 +5681,20 @@ class MAtan2
         return getOperand(1);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5638,29 +5716,29 @@ class MHypot
     INSTRUCTION_HEADER(Hypot)
     static MHypot* New(TempAllocator& alloc, const MDefinitionVector& vector);
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
-    bool canClone() const override {
+    bool canClone() const MOZ_OVERRIDE {
         return true;
     }
 
     MInstruction* clone(TempAllocator& alloc,
-                        const MDefinitionVector& inputs) const override {
+                        const MDefinitionVector& inputs) const MOZ_OVERRIDE {
        return MHypot::New(alloc, inputs);
     }
 };
@@ -5693,17 +5771,17 @@ class MPow
     MDefinition* power() const {
         return rhs();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5734,7 +5812,7 @@ class MPowHalf
     static MPowHalf* New(TempAllocator& alloc, MDefinition* input) {
         return new(alloc) MPowHalf(input);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     bool operandIsNeverNegativeInfinity() const {
@@ -5746,12 +5824,12 @@ class MPowHalf
     bool operandIsNeverNaN() const {
         return operandIsNeverNaN_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void collectRangeInfoPreTrunc() override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5772,11 +5850,11 @@ class MRandom : public MNullaryInstruction
         return new(alloc) MRandom;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -5844,7 +5922,7 @@ class MMathFunction
     const MathCache* cache() const {
         return cache_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isMathFunction())
             return false;
         if (ins->toMathFunction()->function() != function())
@@ -5852,27 +5930,27 @@ class MMathFunction
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 
     static const char* FunctionName(Function function);
 
-    bool isFloat32Commutative() const override {
+    bool isFloat32Commutative() const MOZ_OVERRIDE {
         return function_ == Floor || function_ == Ceil || function_ == Round;
     }
     void trySpecializeFloat32(TempAllocator& alloc) override;
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         switch(function_) {
           case Sin:
           case Log:
@@ -5914,7 +5992,7 @@ class MAdd : public MBinaryArithInstruction
         return add;
     }
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
 
     double getIdentity() override {
         return 0;
@@ -5924,10 +6002,10 @@ class MAdd : public MBinaryArithInstruction
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -5962,16 +6040,16 @@ class MSub : public MBinaryArithInstruction
         return 0;
     }
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
 
     bool fallible() const;
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -6032,7 +6110,7 @@ class MMul : public MBinaryArithInstruction
         return 1;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isMul())
             return false;
 
@@ -6065,17 +6143,17 @@ class MMul : public MBinaryArithInstruction
         specialization_ = type;
     }
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
 
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
     Mode mode() const { return mode_; }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -6169,17 +6247,17 @@ class MDiv : public MBinaryArithInstruction
         return isTruncated() || isTruncatedIndirectly();
     }
 
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
 
     void computeRange(TempAllocator& alloc) override;
     bool fallible() const;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
     void collectRangeInfoPreTrunc() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -6247,8 +6325,8 @@ class MMod : public MBinaryArithInstruction
         return unsigned_;
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return specialization_ < MIRType_Object;
     }
 
@@ -6258,7 +6336,7 @@ class MMod : public MBinaryArithInstruction
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
     void collectRangeInfoPreTrunc() override;
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MMod)
 };
@@ -6284,15 +6362,15 @@ class MConcat
     }
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -6317,19 +6395,19 @@ class MCharCodeAt
         return new(alloc) MCharCodeAt(str, index);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         // Strings are immutable, so there is no implicit dependency.
         return AliasSet::None();
     }
 
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -6354,15 +6432,15 @@ class MFromCharCode
         return new(alloc) MFromCharCode(code);
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -6402,16 +6480,16 @@ class MStringSplit
     ObjectGroup* group() const {
         return templateObject()->group();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         // Although this instruction returns a new array, we don't have to mark
         // it as store instruction, see also MNewArray.
         return AliasSet::None();
     }
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -6435,7 +6513,7 @@ class MComputeThis
         return new(alloc) MComputeThis(def);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -6464,10 +6542,10 @@ class MLoadArrowThis
     MDefinition* callee() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // An arrow function's lexical |this| value is immutable.
         return AliasSet::None();
     }
@@ -6500,7 +6578,7 @@ class MPhi final
         MOZ_ASSERT(index < numOperands());
         return &inputs_[index];
     }
-    const MUse* getUseFor(size_t index) const override {
+    const MUse* getUseFor(size_t index) const MOZ_OVERRIDE {
         return &inputs_[index];
     }
 
@@ -6531,10 +6609,10 @@ class MPhi final
     void removeOperand(size_t index);
     void removeAllOperands();
 
-    MDefinition* getOperand(size_t index) const override {
+    MDefinition* getOperand(size_t index) const MOZ_OVERRIDE {
         return inputs_[index].producer();
     }
-    size_t numOperands() const override {
+    size_t numOperands() const MOZ_OVERRIDE {
         return inputs_.length();
     }
     size_t indexOf(const MUse* u) const final override {
@@ -6622,7 +6700,7 @@ class MPhi final
     MDefinition* foldsTo(TempAllocator& alloc) override;
     MDefinition* foldsTernary();
 
-    bool congruentTo(const MDefinition* ins) const override;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 
     bool isIterator() const {
         return isIterator_;
@@ -6631,14 +6709,14 @@ class MPhi final
         isIterator_ = true;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
 
     MDefinition* operandIfRedundant();
 
-    bool canProduceFloat32() const override {
+    bool canProduceFloat32() const MOZ_OVERRIDE {
         return canProduceFloat32_;
     }
 
@@ -6646,7 +6724,7 @@ class MPhi final
         canProduceFloat32_ = can;
     }
 
-    bool canConsumeFloat32(MUse* use) const override {
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE {
         return canConsumeFloat32_;
     }
 
@@ -6654,7 +6732,7 @@ class MPhi final
         canConsumeFloat32_ = can;
     }
 
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
     bool needTruncation(TruncateKind kind) override;
     void truncate() override;
 };
@@ -6682,13 +6760,13 @@ class MBeta
 
   public:
     INSTRUCTION_HEADER(Beta)
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
     static MBeta* New(TempAllocator& alloc, MDefinition* val, const Range* comp)
     {
         return new(alloc) MBeta(val, comp);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -6725,7 +6803,7 @@ class MOsrValue
         return getOperand(0)->toOsrEntry();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -6827,7 +6905,7 @@ class MInterruptCheck : public MNullaryInstruction
     static MInterruptCheck* New(TempAllocator& alloc) {
         return new(alloc) MInterruptCheck();
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -6881,7 +6959,7 @@ class MLexicalCheck
         return new(alloc) MLexicalCheck(input);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -6905,7 +6983,7 @@ class MThrowUninitializedLexical : public MNullaryInstruction
         return new(alloc) MThrowUninitializedLexical();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -6944,7 +7022,7 @@ class MDefVar
     MDefinition* scopeChain() const {
         return getOperand(0);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -6974,7 +7052,7 @@ class MDefFun
     MDefinition* scopeChain() const {
         return getOperand(0);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7007,10 +7085,10 @@ class MRegExp : public MNullaryInstruction
     RegExpObject* source() const {
         return source_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7043,16 +7121,16 @@ class MRegExpExec
         return getOperand(1);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
 
-    bool canRecoverOnBailout() const override {
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         // XXX: always return false for now, to work around bug 1132128.
         if (false && regexp()->isRegExp())
             return !regexp()->toRegExp()->source()->needUpdateLastIndex();
         return false;
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7083,12 +7161,12 @@ class MRegExpTest
         return getOperand(1);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         // RegExpTest has a side-effect on the regexp object's lastIndex
         // when sticky or global flags are set.
         // Return false unless we are sure it's not the case.
@@ -7125,7 +7203,7 @@ class MStrReplace
         return getOperand(2);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7147,8 +7225,8 @@ class MRegExpReplace
         return new(alloc) MRegExpReplace(string, pattern, replacement);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         // RegExpReplace will zero the lastIndex field when global flag is set.
         // So we can only remove this if it's non-global.
         // XXX: always return false for now, to work around bug 1132128.
@@ -7175,16 +7253,16 @@ class MStringReplace
         return new(alloc) MStringReplace(string, pattern, replacement);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         if (pattern()->isRegExp())
             return !pattern()->toRegExp()->source()->global();
         return false;
@@ -7224,10 +7302,10 @@ class MSubstr
         return getOperand(2);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -7291,8 +7369,8 @@ class MLambda
     const LambdaFunctionInfo& info() const {
         return info_;
     }
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7354,10 +7432,10 @@ class MSlots
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -7386,10 +7464,10 @@ class MElements
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -7419,17 +7497,17 @@ class MConstantElements : public MNullaryInstruction
         return value_;
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
 
-    HashNumber valueHash() const override {
+    HashNumber valueHash() const MOZ_OVERRIDE {
         return (HashNumber)(size_t) value_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return ins->isConstantElements() && ins->toConstantElements()->value() == value();
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
@@ -7459,10 +7537,10 @@ class MConvertElementsToDoubles
     MDefinition* elements() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // This instruction can read and write to the elements' contents.
         // However, it is alright to hoist this from loops which explicitly
         // read or write to the elements: such reads and writes will use double
@@ -7503,10 +7581,10 @@ class MMaybeToDoubleElement
     MDefinition* value() const {
         return getOperand(1);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -7535,14 +7613,14 @@ class MMaybeCopyElementsForWrite
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::ObjectFields);
     }
 #ifdef DEBUG
-    bool needsResumePoint() const override {
+    bool needsResumePoint() const MOZ_OVERRIDE {
         // This instruction is idempotent and does not change observable
         // behavior, so does not need its own resume point.
         return false;
@@ -7573,10 +7651,10 @@ class MInitializedLength
     MDefinition* elements() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -7609,7 +7687,7 @@ class MSetInitializedLength
     MDefinition* index() const {
         return getOperand(1);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::ObjectFields);
     }
 
@@ -7638,10 +7716,10 @@ class MArrayLength
     MDefinition* elements() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -7674,7 +7752,7 @@ class MSetArrayLength
     MDefinition* index() const {
         return getOperand(1);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::ObjectFields);
     }
 };
@@ -7701,10 +7779,10 @@ class MTypedArrayLength
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::TypedArrayLength);
     }
 
@@ -7733,10 +7811,10 @@ class MTypedArrayElements
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -7775,7 +7853,7 @@ class MTypedObjectElements
     bool definitelyOutline() const {
         return definitelyOutline_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isTypedObjectElements())
             return false;
         const MTypedObjectElements* other = ins->toTypedObjectElements();
@@ -7783,7 +7861,7 @@ class MTypedObjectElements
             return false;
         return congruentIfOperandsEqual(other);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -7820,7 +7898,7 @@ class MSetTypedObjectOffset
         return getOperand(1);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // This affects the result of MTypedObjectElements,
         // which is described as a load of ObjectFields.
         return AliasSet::Store(AliasSet::ObjectFields);
@@ -7892,23 +7970,23 @@ class MNot
         return operandIsNeverNaN_;
     }
 
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void collectRangeInfoPreTrunc() override;
 
     void trySpecializeFloat32(TempAllocator& alloc) override;
-    bool isFloat32Commutative() const override { return true; }
+    bool isFloat32Commutative() const MOZ_OVERRIDE { return true; }
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -7961,7 +8039,7 @@ class MBoundsCheck
         maximum_ = n;
     }
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isBoundsCheck())
             return false;
         const MBoundsCheck* other = ins->toBoundsCheck();
@@ -7969,7 +8047,7 @@ class MBoundsCheck
             return false;
         return congruentIfOperandsEqual(other);
     }
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
@@ -8009,7 +8087,7 @@ class MBoundsCheckLower
     void setMinimum(int32_t n) {
         minimum_ = n;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     bool fallible() const {
@@ -8084,7 +8162,7 @@ class MLoadElement
     bool fallible() const {
         return needsHoleCheck();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadElement())
             return false;
         const MLoadElement* other = ins->toLoadElement();
@@ -8097,7 +8175,7 @@ class MLoadElement
         return congruentIfOperandsEqual(other);
     }
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::Element);
     }
 
@@ -8149,7 +8227,7 @@ class MLoadElementHole
     bool needsHoleCheck() const {
         return needsHoleCheck_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadElementHole())
             return false;
         const MLoadElementHole* other = ins->toLoadElementHole();
@@ -8159,7 +8237,7 @@ class MLoadElementHole
             return false;
         return congruentIfOperandsEqual(other);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::Element);
     }
     void collectRangeInfoPreTrunc() override;
@@ -8224,7 +8302,7 @@ class MLoadUnboxedObjectOrNull
     bool fallible() const {
         return nullBehavior() == BailOnNull;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadUnboxedObjectOrNull())
             return false;
         const MLoadUnboxedObjectOrNull* other = ins->toLoadUnboxedObjectOrNull();
@@ -8234,8 +8312,8 @@ class MLoadUnboxedObjectOrNull
             return false;
         return congruentIfOperandsEqual(other);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Load(AliasSet::Element);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Load(AliasSet::UnboxedElement);
     }
 
     ALLOW_CLONE(MLoadUnboxedObjectOrNull)
@@ -8275,7 +8353,7 @@ class MLoadUnboxedString
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadUnboxedString())
             return false;
         const MLoadUnboxedString* other = ins->toLoadUnboxedString();
@@ -8283,8 +8361,8 @@ class MLoadUnboxedString
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Load(AliasSet::Element);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Load(AliasSet::UnboxedElement);
     }
 
     ALLOW_CLONE(MLoadUnboxedString)
@@ -8294,13 +8372,11 @@ class MStoreElementCommon
 {
     MIRType elementType_;
     bool needsBarrier_;
-    bool racy_; // if true, exempted from normal data race req. during par. exec.
 
   protected:
     MStoreElementCommon()
       : elementType_(MIRType_Value),
-        needsBarrier_(false),
-        racy_(false)
+        needsBarrier_(false)
     { }
 
   public:
@@ -8316,12 +8392,6 @@ class MStoreElementCommon
     }
     void setNeedsBarrier() {
         needsBarrier_ = true;
-    }
-    bool racy() const {
-        return racy_;
-    }
-    void setRacy() {
-        racy_ = true;
     }
 };
 
@@ -8362,7 +8432,7 @@ class MStoreElement
     MDefinition* value() const {
         return getOperand(2);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::Element);
     }
     bool needsHoleCheck() const {
@@ -8417,7 +8487,7 @@ class MStoreElementHole
     MDefinition* value() const {
         return getOperand(3);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // StoreElementHole can update the initialized length, the array length
         // or reallocate obj->elements.
         return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
@@ -8472,9 +8542,8 @@ class MStoreUnboxedObjectOrNull
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
     }
-    AliasSet getAliasSet() const override {
-        // Use AliasSet::Element for reference typed object fields.
-        return AliasSet::Store(AliasSet::Element);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
 
     // For StoreUnboxedObjectOrNullPolicy.
@@ -8523,9 +8592,8 @@ class MStoreUnboxedString
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
     }
-    AliasSet getAliasSet() const override {
-        // Use AliasSet::Element for reference typed object fields.
-        return AliasSet::Store(AliasSet::Element);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
 
     ALLOW_CLONE(MStoreUnboxedString)
@@ -8562,12 +8630,12 @@ class MConvertUnboxedObjectToNative
     ObjectGroup* group() const {
         return group_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!congruentIfOperandsEqual(ins))
             return false;
         return ins->toConvertUnboxedObjectToNative()->group() == group();
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // This instruction can read and write to all parts of the object, but
         // is marked as non-effectful so it can be consolidated by LICM and GVN
         // and avoid inhibiting other optimizations.
@@ -8627,7 +8695,7 @@ class MArrayPopShift
     bool mode() const {
         return mode_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
     }
 
@@ -8658,7 +8726,7 @@ class MArrayPush
     MDefinition* value() const {
         return getOperand(1);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
     }
     void computeRange(TempAllocator& alloc) override;
@@ -8702,10 +8770,10 @@ class MArrayConcat
         return initialHeap_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -8731,10 +8799,10 @@ class MArrayJoin
     MDefinition* sep() const {
         return getOperand(1);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
-    virtual AliasSet getAliasSet() const override {
+    virtual AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::Element | AliasSet::ObjectFields);
     }
     MDefinition* foldsTo(TempAllocator& alloc) override;
@@ -8750,20 +8818,25 @@ enum MemoryBarrierRequirement
 
 // Also see comments above MMemoryBarrier, below.
 
-class MLoadTypedArrayElement
+// Load an unboxed scalar value from a typed array or other object.
+class MLoadUnboxedScalar
   : public MBinaryInstruction,
     public SingleObjectPolicy::Data
 {
-    Scalar::Type arrayType_;
+    Scalar::Type indexType_;
+    Scalar::Type readType_;
+    unsigned numElems_; // used only for SIMD
     bool requiresBarrier_;
     int32_t offsetAdjustment_;
     bool canonicalizeDoubles_;
 
-    MLoadTypedArrayElement(MDefinition* elements, MDefinition* index,
-                           Scalar::Type arrayType, MemoryBarrierRequirement requiresBarrier,
-                           int32_t offsetAdjustment, bool canonicalizeDoubles)
+    MLoadUnboxedScalar(MDefinition *elements, MDefinition *index,
+                       Scalar::Type indexType, MemoryBarrierRequirement requiresBarrier,
+                       int32_t offsetAdjustment, bool canonicalizeDoubles)
       : MBinaryInstruction(elements, index),
-        arrayType_(arrayType),
+        indexType_(indexType),
+        readType_(indexType),
+        numElems_(1),
         requiresBarrier_(requiresBarrier == DoesRequireMemoryBarrier),
         offsetAdjustment_(offsetAdjustment),
         canonicalizeDoubles_(canonicalizeDoubles)
@@ -8775,29 +8848,41 @@ class MLoadTypedArrayElement
             setMovable();
         MOZ_ASSERT(IsValidElementsType(elements, offsetAdjustment));
         MOZ_ASSERT(index->type() == MIRType_Int32);
-        MOZ_ASSERT(arrayType >= 0 && arrayType < Scalar::MaxTypedArrayViewType);
+        MOZ_ASSERT(indexType >= 0 && indexType < Scalar::MaxTypedArrayViewType);
     }
 
   public:
-    INSTRUCTION_HEADER(LoadTypedArrayElement)
+    INSTRUCTION_HEADER(LoadUnboxedScalar)
 
-    static MLoadTypedArrayElement* New(TempAllocator& alloc, MDefinition* elements, MDefinition* index,
-                                       Scalar::Type arrayType,
-                                       MemoryBarrierRequirement requiresBarrier=DoesNotRequireMemoryBarrier,
-                                       int32_t offsetAdjustment = 0,
-                                       bool canonicalizeDoubles = true)
+    static MLoadUnboxedScalar *New(TempAllocator &alloc, MDefinition *elements, MDefinition *index,
+                                   Scalar::Type indexType,
+                                   MemoryBarrierRequirement requiresBarrier
+                                       = DoesNotRequireMemoryBarrier,
+                                   int32_t offsetAdjustment = 0,
+                                   bool canonicalizeDoubles = true)
     {
-        return new(alloc) MLoadTypedArrayElement(elements, index, arrayType,
-                                                 requiresBarrier, offsetAdjustment,
-                                                 canonicalizeDoubles);
+        return new(alloc) MLoadUnboxedScalar(elements, index, indexType,
+                                             requiresBarrier, offsetAdjustment,
+                                             canonicalizeDoubles);
     }
 
-    Scalar::Type arrayType() const {
-        return arrayType_;
+    void setSimdRead(Scalar::Type type, unsigned numElems) {
+        readType_ = type;
+        numElems_ = numElems;
+    }
+    unsigned numElems() const {
+        return numElems_;
+    }
+    Scalar::Type readType() const {
+        return readType_;
+    }
+
+    Scalar::Type indexType() const {
+        return indexType_;
     }
     bool fallible() const {
         // Bailout if the result does not fit in an int32.
-        return arrayType_ == Scalar::Uint32 && type() == MIRType_Int32;
+        return readType_ == Scalar::Uint32 && type() == MIRType_Int32;
     }
     bool requiresMemoryBarrier() const {
         return requiresBarrier_;
@@ -8814,21 +8899,25 @@ class MLoadTypedArrayElement
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // When a barrier is needed make the instruction effectful by
         // giving it a "store" effect.
         if (requiresBarrier_)
-            return AliasSet::Store(AliasSet::TypedArrayElement);
-        return AliasSet::Load(AliasSet::TypedArrayElement);
+            return AliasSet::Store(AliasSet::UnboxedElement);
+        return AliasSet::Load(AliasSet::UnboxedElement);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition *ins) const MOZ_OVERRIDE {
         if (requiresBarrier_)
             return false;
-        if (!ins->isLoadTypedArrayElement())
+        if (!ins->isLoadUnboxedScalar())
             return false;
-        const MLoadTypedArrayElement* other = ins->toLoadTypedArrayElement();
-        if (arrayType_ != other->arrayType_)
+        const MLoadUnboxedScalar *other = ins->toLoadUnboxedScalar();
+        if (indexType_ != other->indexType_)
+            return false;
+        if (readType_ != other->readType_)
+            return false;
+        if (numElems_ != other->numElems_)
             return false;
         if (offsetAdjustment() != other->offsetAdjustment())
             return false;
@@ -8837,13 +8926,13 @@ class MLoadTypedArrayElement
         return congruentIfOperandsEqual(other);
     }
 
-    void printOpcode(FILE* fp) const override;
+    void printOpcode(FILE *fp) const MOZ_OVERRIDE;
 
-    void computeRange(TempAllocator& alloc) override;
+    void computeRange(TempAllocator &alloc) override;
 
-    bool canProduceFloat32() const override { return arrayType_ == Scalar::Float32; }
+    bool canProduceFloat32() const MOZ_OVERRIDE { return indexType_ == Scalar::Float32; }
 
-    ALLOW_CLONE(MLoadTypedArrayElement)
+    ALLOW_CLONE(MLoadUnboxedScalar)
 };
 
 // Load a value from a typed array. Out-of-bounds accesses are handled in-line.
@@ -8887,7 +8976,7 @@ class MLoadTypedArrayElementHole
     MDefinition* index() const {
         return getOperand(1);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadTypedArrayElementHole())
             return false;
         const MLoadTypedArrayElementHole* other = ins->toLoadTypedArrayElementHole();
@@ -8897,10 +8986,10 @@ class MLoadTypedArrayElementHole
             return false;
         return congruentIfOperandsEqual(other);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Load(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Load(AliasSet::UnboxedElement);
     }
-    bool canProduceFloat32() const override { return arrayType_ == Scalar::Float32; }
+    bool canProduceFloat32() const MOZ_OVERRIDE { return arrayType_ == Scalar::Float32; }
 
     ALLOW_CLONE(MLoadTypedArrayElementHole)
 };
@@ -8952,9 +9041,9 @@ class MLoadTypedArrayElementStatic
     MDefinition* ptr() const { return getOperand(0); }
     int32_t offset() const { return offset_; }
     void setOffset(int32_t offset) { offset_ = offset; }
-    bool congruentTo(const MDefinition* ins) const override;
-    AliasSet getAliasSet() const override {
-        return AliasSet::Load(AliasSet::TypedArrayElement);
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Load(AliasSet::UnboxedElement);
     }
 
     bool needsBoundsCheck() const { return needsBoundsCheck_; }
@@ -8970,29 +9059,70 @@ class MLoadTypedArrayElementStatic
 
     void computeRange(TempAllocator& alloc) override;
     bool needTruncation(TruncateKind kind) override;
-    bool canProduceFloat32() const override { return accessType() == Scalar::Float32; }
-    void collectRangeInfoPreTrunc() override;
+    bool canProduceFloat32() const MOZ_OVERRIDE { return accessType() == Scalar::Float32; }
+    void collectRangeInfoPreTrunc() MOZ_OVERRIDE;
 };
 
-class MStoreTypedArrayElement
-  : public MTernaryInstruction,
-    public StoreTypedArrayPolicy::Data
+// Base class for MIR ops that write unboxed scalar values.
+class StoreUnboxedScalarBase
 {
-    Scalar::Type arrayType_;
+    Scalar::Type writeType_;
+
+  protected:
+    explicit StoreUnboxedScalarBase(Scalar::Type writeType)
+      : writeType_(writeType)
+    {
+        MOZ_ASSERT(isIntegerWrite() || isFloatWrite() || isSimdWrite());
+    }
+
+  public:
+    void setWriteType(Scalar::Type type) {
+        writeType_ = type;
+    }
+    Scalar::Type writeType() const {
+        return writeType_;
+    }
+    bool isByteWrite() const {
+        return writeType_ == Scalar::Int8 ||
+               writeType_ == Scalar::Uint8 ||
+               writeType_ == Scalar::Uint8Clamped;
+    }
+    bool isIntegerWrite() const {
+        return isByteWrite () ||
+               writeType_ == Scalar::Int16 ||
+               writeType_ == Scalar::Uint16 ||
+               writeType_ == Scalar::Int32 ||
+               writeType_ == Scalar::Uint32;
+    }
+    bool isFloatWrite() const {
+        return writeType_ == Scalar::Float32 ||
+               writeType_ == Scalar::Float64;
+    }
+    bool isSimdWrite() const {
+        return Scalar::isSimdType(writeType());
+    }
+};
+
+// Store an unboxed scalar value to a typed array or other object.
+class MStoreUnboxedScalar
+  : public MTernaryInstruction,
+    public StoreUnboxedScalarBase,
+    public StoreUnboxedScalarPolicy::Data
+{
+    Scalar::Type indexType_;
     bool requiresBarrier_;
     int32_t offsetAdjustment_;
+    unsigned numElems_; // used only for SIMD
 
-    // See note in MStoreElementCommon.
-    bool racy_;
-
-    MStoreTypedArrayElement(MDefinition* elements, MDefinition* index, MDefinition* value,
-                            Scalar::Type arrayType, MemoryBarrierRequirement requiresBarrier,
-                            int32_t offsetAdjustment)
+    MStoreUnboxedScalar(MDefinition *elements, MDefinition *index, MDefinition *value,
+                        Scalar::Type indexType, MemoryBarrierRequirement requiresBarrier,
+                        int32_t offsetAdjustment)
       : MTernaryInstruction(elements, index, value),
-        arrayType_(arrayType),
+        StoreUnboxedScalarBase(indexType),
+        indexType_(indexType),
         requiresBarrier_(requiresBarrier == DoesRequireMemoryBarrier),
         offsetAdjustment_(offsetAdjustment),
-        racy_(false)
+        numElems_(1)
     {
         if (requiresBarrier_)
             setGuard();         // Not removable or movable
@@ -9000,44 +9130,45 @@ class MStoreTypedArrayElement
             setMovable();
         MOZ_ASSERT(IsValidElementsType(elements, offsetAdjustment));
         MOZ_ASSERT(index->type() == MIRType_Int32);
-        MOZ_ASSERT(arrayType >= 0 && arrayType < Scalar::MaxTypedArrayViewType);
+        MOZ_ASSERT(indexType >= 0 && indexType < Scalar::MaxTypedArrayViewType);
     }
 
   public:
-    INSTRUCTION_HEADER(StoreTypedArrayElement)
+    INSTRUCTION_HEADER(StoreUnboxedScalar)
 
-    static MStoreTypedArrayElement* New(TempAllocator& alloc, MDefinition* elements, MDefinition* index,
-                                        MDefinition* value, Scalar::Type arrayType,
-                                        MemoryBarrierRequirement requiresBarrier = DoesNotRequireMemoryBarrier,
-                                        int32_t offsetAdjustment = 0)
+    static MStoreUnboxedScalar *New(TempAllocator &alloc,
+                                    MDefinition *elements, MDefinition *index,
+                                    MDefinition *value, Scalar::Type indexType,
+                                    MemoryBarrierRequirement requiresBarrier =
+                                        DoesNotRequireMemoryBarrier,
+                                    int32_t offsetAdjustment = 0)
     {
-        return new(alloc) MStoreTypedArrayElement(elements, index, value, arrayType,
-                                                  requiresBarrier, offsetAdjustment);
+        return new(alloc) MStoreUnboxedScalar(elements, index, value, indexType,
+                                              requiresBarrier, offsetAdjustment);
     }
 
-    Scalar::Type arrayType() const {
-        return arrayType_;
+    void setSimdWrite(Scalar::Type writeType, unsigned numElems) {
+        MOZ_ASSERT(Scalar::isSimdType(writeType));
+        setWriteType(writeType);
+        numElems_ = numElems;
     }
-    bool isByteArray() const {
-        return arrayType_ == Scalar::Int8 ||
-               arrayType_ == Scalar::Uint8 ||
-               arrayType_ == Scalar::Uint8Clamped;
+    unsigned numElems() const {
+        return numElems_;
     }
-    bool isFloatArray() const {
-        return arrayType_ == Scalar::Float32 ||
-               arrayType_ == Scalar::Float64;
+    Scalar::Type indexType() const {
+        return indexType_;
     }
-    MDefinition* elements() const {
+    MDefinition *elements() const {
         return getOperand(0);
     }
-    MDefinition* index() const {
+    MDefinition *index() const {
         return getOperand(1);
     }
-    MDefinition* value() const {
+    MDefinition *value() const {
         return getOperand(2);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
     bool requiresMemoryBarrier() const {
         return requiresBarrier_;
@@ -9045,30 +9176,24 @@ class MStoreTypedArrayElement
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
     }
-    bool racy() const {
-        return racy_;
-    }
-    void setRacy() {
-        racy_ = true;
-    }
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool canConsumeFloat32(MUse* use) const override {
-        return use == getUseFor(2) && arrayType_ == Scalar::Float32;
+    bool canConsumeFloat32(MUse *use) const MOZ_OVERRIDE {
+        return use == getUseFor(2) && writeType() == Scalar::Float32;
     }
 
-    ALLOW_CLONE(MStoreTypedArrayElement)
+    ALLOW_CLONE(MStoreUnboxedScalar)
 };
 
 class MStoreTypedArrayElementHole
   : public MAryInstruction<4>,
+    public StoreUnboxedScalarBase,
     public StoreTypedArrayHolePolicy::Data
 {
-    Scalar::Type arrayType_;
-
     MStoreTypedArrayElementHole(MDefinition* elements, MDefinition* length, MDefinition* index,
                                 MDefinition* value, Scalar::Type arrayType)
-      : MAryInstruction<4>(), arrayType_(arrayType)
+      : MAryInstruction<4>(),
+        StoreUnboxedScalarBase(arrayType)
     {
         initOperand(0, elements);
         initOperand(1, length);
@@ -9092,36 +9217,29 @@ class MStoreTypedArrayElementHole
     }
 
     Scalar::Type arrayType() const {
-        return arrayType_;
+        MOZ_ASSERT(!Scalar::isSimdType(writeType()),
+                   "arrayType == writeType iff the write type isn't SIMD");
+        return writeType();
     }
-    bool isByteArray() const {
-        return arrayType_ == Scalar::Int8 ||
-               arrayType_ == Scalar::Uint8 ||
-               arrayType_ == Scalar::Uint8Clamped;
-    }
-    bool isFloatArray() const {
-        return arrayType_ == Scalar::Float32 ||
-               arrayType_ == Scalar::Float64;
-    }
-    MDefinition* elements() const {
+    MDefinition *elements() const {
         return getOperand(0);
     }
-    MDefinition* length() const {
+    MDefinition *length() const {
         return getOperand(1);
     }
-    MDefinition* index() const {
+    MDefinition *index() const {
         return getOperand(2);
     }
-    MDefinition* value() const {
+    MDefinition *value() const {
         return getOperand(3);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool canConsumeFloat32(MUse* use) const override {
-        return use == getUseFor(3) && arrayType_ == Scalar::Float32;
+    bool canConsumeFloat32(MUse *use) const MOZ_OVERRIDE {
+        return use == getUseFor(3) && arrayType() == Scalar::Float32;
     }
 
     ALLOW_CLONE(MStoreTypedArrayElementHole)
@@ -9129,16 +9247,20 @@ class MStoreTypedArrayElementHole
 
 // Store a value infallibly to a statically known typed array.
 class MStoreTypedArrayElementStatic :
-    public MBinaryInstruction
-  , public StoreTypedArrayElementStaticPolicy::Data
+    public MBinaryInstruction,
+    public StoreUnboxedScalarBase,
+    public StoreTypedArrayElementStaticPolicy::Data
 {
-    MStoreTypedArrayElementStatic(JSObject* someTypedArray, MDefinition* ptr, MDefinition* v,
+    MStoreTypedArrayElementStatic(JSObject *someTypedArray, MDefinition *ptr, MDefinition *v,
                                   int32_t offset, bool needsBoundsCheck)
-        : MBinaryInstruction(ptr, v), someTypedArray_(someTypedArray),
+        : MBinaryInstruction(ptr, v),
+          StoreUnboxedScalarBase(AnyTypedArrayType(someTypedArray)),
+          someTypedArray_(someTypedArray),
           offset_(offset), needsBoundsCheck_(needsBoundsCheck)
     {}
 
     AlwaysTenured<JSObject*> someTypedArray_;
+
     // An offset to be encoded in the store instruction - taking advantage of the
     // addressing modes. This is only non-zero when the access is proven to be
     // within bounds.
@@ -9158,11 +9280,7 @@ class MStoreTypedArrayElementStatic :
     }
 
     Scalar::Type accessType() const {
-        return AnyTypedArrayType(someTypedArray_);
-    }
-    bool isFloatArray() const {
-        return accessType() == Scalar::Float32 ||
-               accessType() == Scalar::Float64;
+        return writeType();
     }
 
     void* base() const;
@@ -9174,12 +9292,12 @@ class MStoreTypedArrayElementStatic :
     void setNeedsBoundsCheck(bool v) { needsBoundsCheck_ = v; }
     int32_t offset() const { return offset_; }
     void setOffset(int32_t offset) { offset_ = offset; }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
-    TruncateKind operandTruncateKind(size_t index) const override;
+    TruncateKind operandTruncateKind(size_t index) const MOZ_OVERRIDE;
 
-    bool canConsumeFloat32(MUse* use) const override {
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE {
         return use == getUseFor(1) && accessType() == Scalar::Float32;
     }
     void collectRangeInfoPreTrunc() override;
@@ -9248,10 +9366,10 @@ class MClampToUint8
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
     void computeRange(TempAllocator& alloc) override;
@@ -9286,7 +9404,7 @@ class MLoadFixedSlot
     size_t slot() const {
         return slot_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadFixedSlot())
             return false;
         if (slot() != ins->toLoadFixedSlot()->slot())
@@ -9296,11 +9414,11 @@ class MLoadFixedSlot
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::FixedSlot);
     }
 
-    bool mightAlias(const MDefinition* store) const override;
+    bool mightAlias(const MDefinition* store) const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MLoadFixedSlot)
 };
@@ -9342,7 +9460,7 @@ class MStoreFixedSlot
         return slot_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::FixedSlot);
     }
     bool needsBarrier() const {
@@ -9502,7 +9620,7 @@ class MGetPropertyCache
         return location_;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!idempotent_)
             return false;
         if (!ins->isGetPropertyCache())
@@ -9512,7 +9630,7 @@ class MGetPropertyCache
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         if (idempotent_) {
             return AliasSet::Load(AliasSet::ObjectFields |
                                   AliasSet::FixedSlot |
@@ -9561,7 +9679,7 @@ class MGetPropertyPolymorphic
         return new(alloc) MGetPropertyPolymorphic(alloc, obj, name);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGetPropertyPolymorphic())
             return false;
         if (name() != ins->toGetPropertyPolymorphic()->name())
@@ -9599,12 +9717,14 @@ class MGetPropertyPolymorphic
     MDefinition* obj() const {
         return getOperand(0);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Load(AliasSet::ObjectFields | AliasSet::FixedSlot | AliasSet::DynamicSlot |
-                              (unboxedGroups_.empty() ? 0 : (AliasSet::TypedArrayElement | AliasSet::Element)));
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Load(AliasSet::ObjectFields |
+                              AliasSet::FixedSlot |
+                              AliasSet::DynamicSlot |
+                              (!unboxedGroups_.empty() ? AliasSet::UnboxedElement : 0));
     }
 
-    bool mightAlias(const MDefinition* store) const override;
+    bool mightAlias(const MDefinition* store) const MOZ_OVERRIDE;
 };
 
 // Emit code to store a value to an object's slots if its shape/group matches
@@ -9683,9 +9803,11 @@ class MSetPropertyPolymorphic
     void setNeedsBarrier() {
         needsBarrier_ = true;
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::ObjectFields | AliasSet::FixedSlot | AliasSet::DynamicSlot |
-                               (unboxedGroups_.empty() ? 0 : (AliasSet::TypedArrayElement | AliasSet::Element)));
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::ObjectFields |
+                               AliasSet::FixedSlot |
+                               AliasSet::DynamicSlot |
+                               (!unboxedGroups_.empty() ? AliasSet::UnboxedElement : 0));
     }
 };
 
@@ -9961,7 +10083,7 @@ class MGuardShape
     BailoutKind bailoutKind() const {
         return bailoutKind_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGuardShape())
             return false;
         if (shape() != ins->toGuardShape()->shape())
@@ -9970,7 +10092,7 @@ class MGuardShape
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -10024,9 +10146,9 @@ class MGuardReceiverPolymorphic
         return unboxedGroups_[i];
     }
 
-    bool congruentTo(const MDefinition* ins) const override;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -10036,11 +10158,11 @@ class MGuardObjectGroup
   : public MUnaryInstruction,
     public SingleObjectPolicy::Data
 {
-    AlwaysTenured<ObjectGroup*> group_;
+    AlwaysTenured<ObjectGroup *> group_;
     bool bailOnEquality_;
     BailoutKind bailoutKind_;
 
-    MGuardObjectGroup(MDefinition* obj, ObjectGroup* group, bool bailOnEquality,
+    MGuardObjectGroup(MDefinition *obj, ObjectGroup *group, bool bailOnEquality,
                       BailoutKind bailoutKind)
       : MUnaryInstruction(obj),
         group_(group),
@@ -10059,15 +10181,15 @@ class MGuardObjectGroup
   public:
     INSTRUCTION_HEADER(GuardObjectGroup)
 
-    static MGuardObjectGroup* New(TempAllocator& alloc, MDefinition* obj, ObjectGroup* group,
+    static MGuardObjectGroup *New(TempAllocator &alloc, MDefinition *obj, ObjectGroup *group,
                                   bool bailOnEquality, BailoutKind bailoutKind) {
         return new(alloc) MGuardObjectGroup(obj, group, bailOnEquality, bailoutKind);
     }
 
-    MDefinition* obj() const {
+    MDefinition *obj() const {
         return getOperand(0);
     }
-    const ObjectGroup* group() const {
+    const ObjectGroup *group() const {
         return group_;
     }
     bool bailOnEquality() const {
@@ -10076,7 +10198,7 @@ class MGuardObjectGroup
     BailoutKind bailoutKind() const {
         return bailoutKind_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition *ins) const MOZ_OVERRIDE {
         if (!ins->isGuardObjectGroup())
             return false;
         if (group() != ins->toGuardObjectGroup()->group())
@@ -10087,7 +10209,7 @@ class MGuardObjectGroup
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -10125,14 +10247,14 @@ class MGuardObjectIdentity
     bool bailOnEquality() const {
         return bailOnEquality_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGuardObjectIdentity())
             return false;
         if (bailOnEquality() != ins->toGuardObjectIdentity()->bailOnEquality())
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 };
@@ -10165,14 +10287,14 @@ class MGuardClass
     const Class* getClass() const {
         return class_;
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGuardClass())
             return false;
         if (getClass() != ins->toGuardClass()->getClass())
             return false;
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
 
@@ -10209,8 +10331,8 @@ class MLoadSlot
         return slot_;
     }
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override {
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isLoadSlot())
             return false;
         if (slot() != ins->toLoadSlot()->slot())
@@ -10220,11 +10342,11 @@ class MLoadSlot
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         MOZ_ASSERT(slots()->type() == MIRType_Slots);
         return AliasSet::Load(AliasSet::DynamicSlot);
     }
-    bool mightAlias(const MDefinition* store) const override;
+    bool mightAlias(const MDefinition* store) const MOZ_OVERRIDE;
 
     ALLOW_CLONE(MLoadSlot)
 };
@@ -10255,7 +10377,7 @@ class MFunctionEnvironment
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
     // A function's environment is fixed.
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -10314,7 +10436,7 @@ class MStoreSlot
     void setNeedsBarrier() {
         needsBarrier_ = true;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::DynamicSlot);
     }
 
@@ -10381,10 +10503,10 @@ class MCallGetIntrinsicValue : public MNullaryInstruction
     PropertyName* name() const {
         return name_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10536,7 +10658,7 @@ class MCallSetProperty
         return new(alloc) MCallSetProperty(obj, value, name, strict);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10594,7 +10716,7 @@ class MSetElementCache
         return guardHoles_;
     }
 
-    bool canConsumeFloat32(MUse* use) const override { return use == getUseFor(2); }
+    bool canConsumeFloat32(MUse* use) const MOZ_OVERRIDE { return use == getUseFor(2); }
 };
 
 class MCallGetProperty
@@ -10637,12 +10759,12 @@ class MCallGetProperty
     void setIdempotent() {
         idempotent_ = true;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         if (!idempotent_)
             return AliasSet::Store(AliasSet::Any);
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10665,7 +10787,7 @@ class MCallGetElement
     static MCallGetElement* New(TempAllocator& alloc, MDefinition* lhs, MDefinition* rhs) {
         return new(alloc) MCallGetElement(lhs, rhs);
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10688,7 +10810,7 @@ class MCallSetElement
         return new(alloc) MCallSetElement(object, index, value, strict);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10727,7 +10849,7 @@ class MCallInitElementArray
         return getOperand(1);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10767,7 +10889,7 @@ class MSetDOMProperty
         return getOperand(1);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10864,7 +10986,7 @@ class MGetDOMProperty
         return getOperand(0);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGetDOMProperty())
             return false;
 
@@ -10882,7 +11004,7 @@ class MGetDOMProperty
         return congruentIfOperandsEqual(ins);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         JSJitInfo::AliasSet aliasSet = domAliasSet();
         if (aliasSet == JSJitInfo::AliasNone)
             return AliasSet::None();
@@ -10892,7 +11014,7 @@ class MGetDOMProperty
         return AliasSet::Store(AliasSet::Any);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -10919,11 +11041,11 @@ class MGetDOMMember : public MGetDOMProperty
         return res;
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return false;
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isGetDOMMember())
             return false;
 
@@ -10953,10 +11075,10 @@ class MStringLength
     MDefinition* string() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // The string |length| property is immutable, so there is no
         // implicit dependency.
         return AliasSet::None();
@@ -10964,8 +11086,8 @@ class MStringLength
 
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -10992,24 +11114,24 @@ class MFloor
         return new(alloc) MFloor(num);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool isFloat32Commutative() const override {
+    bool isFloat32Commutative() const MOZ_OVERRIDE {
         return true;
     }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -11036,24 +11158,24 @@ class MCeil
         return new(alloc) MCeil(num);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool isFloat32Commutative() const override {
+    bool isFloat32Commutative() const MOZ_OVERRIDE {
         return true;
     }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
     void computeRange(TempAllocator& alloc) override;
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -11080,25 +11202,25 @@ class MRound
         return new(alloc) MRound(num);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
-    bool isFloat32Commutative() const override {
+    bool isFloat32Commutative() const MOZ_OVERRIDE {
         return true;
     }
     void trySpecializeFloat32(TempAllocator& alloc) override;
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         return true;
     }
 #endif
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
-    bool canRecoverOnBailout() const override {
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 
@@ -11172,7 +11294,7 @@ class MIsNoIter
         return new(alloc) MIsNoIter(def);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -11215,7 +11337,7 @@ class MIn
         return new(alloc) MIn(key, obj);
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -11272,10 +11394,10 @@ class MInArray
         return needsNegativeIntCheck_;
     }
     void collectRangeInfoPreTrunc() override;
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::Element);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isInArray())
             return false;
         const MInArray* other = ins->toInArray();
@@ -11348,19 +11470,19 @@ class MArgumentsLength : public MNullaryInstruction
         return new(alloc) MArgumentsLength();
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // Arguments |length| cannot be mutated by Ion Code.
         return AliasSet::None();
    }
 
     void computeRange(TempAllocator& alloc) override;
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
 
-    bool canRecoverOnBailout() const override {
+    bool canRecoverOnBailout() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -11391,10 +11513,10 @@ class MGetFrameArgument
         return getOperand(0);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // If the script doesn't have any JSOP_SETARG ops, then this instruction is never
         // aliased.
         if (scriptHasSetArg_)
@@ -11432,10 +11554,10 @@ class MSetFrameArgument
         return getOperand(0);
     }
 
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return false;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::FrameArgument);
     }
 };
@@ -11488,10 +11610,10 @@ class MRest
         return getOperand(0);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };
@@ -11515,13 +11637,13 @@ class MFilterTypeSet
         return new(alloc) MFilterTypeSet(def, types);
     }
 
-    bool congruentTo(const MDefinition* def) const override {
+    bool congruentTo(const MDefinition* def) const MOZ_OVERRIDE {
         return false;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    virtual bool neverHoist() const override {
+    virtual bool neverHoist() const MOZ_OVERRIDE {
         return resultTypeSet()->empty();
     }
 };
@@ -11556,13 +11678,13 @@ class MTypeBarrier
         return new(alloc) MTypeBarrier(def, types, kind);
     }
 
-    void printOpcode(FILE* fp) const override;
-    bool congruentTo(const MDefinition* def) const override;
+    void printOpcode(FILE* fp) const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* def) const MOZ_OVERRIDE;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    virtual bool neverHoist() const override {
+    virtual bool neverHoist() const MOZ_OVERRIDE {
         return resultTypeSet()->empty();
     }
     BarrierKind barrierKind() const {
@@ -11619,7 +11741,7 @@ class MMonitorTypes
         return barrierKind_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -11649,12 +11771,12 @@ class MPostWriteBarrier : public MBinaryInstruction, public ObjectPolicy<0>::Dat
         return getOperand(1);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 
 #ifdef DEBUG
-    bool isConsistentFloat32Use(MUse* use) const override {
+    bool isConsistentFloat32Use(MUse* use) const MOZ_OVERRIDE {
         // During lowering, values that neither have object nor value MIR type
         // are ignored, thus Float32 can show up at this point without any issue.
         return use == getUseFor(1);
@@ -11685,7 +11807,7 @@ class MNewDeclEnvObject : public MNullaryInstruction
     DeclEnvObject* templateObj() {
         return templateObj_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -11706,7 +11828,7 @@ class MNewCallObjectBase : public MNullaryInstruction
     CallObject* templateObject() {
         return templateObj_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -11780,7 +11902,7 @@ class MEnclosingScope : public MLoadFixedSlot
         return new(alloc) MEnclosingScope(obj);
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         // ScopeObject reserved slots are immutable.
         return AliasSet::None();
     }
@@ -11847,7 +11969,7 @@ class MResumePoint final :
     MUse* getUseFor(size_t index) override {
         return &operands_[index];
     }
-    const MUse* getUseFor(size_t index) const override {
+    const MUse* getUseFor(size_t index) const MOZ_OVERRIDE {
         return &operands_[index];
     }
 
@@ -11858,7 +11980,7 @@ class MResumePoint final :
                              const MDefinitionVector& operands);
     static MResumePoint* Copy(TempAllocator& alloc, MResumePoint* src);
 
-    MNode::Kind kind() const override {
+    MNode::Kind kind() const MOZ_OVERRIDE {
         return MNode::ResumePoint;
     }
     size_t numAllocatedOperands() const {
@@ -11867,7 +11989,7 @@ class MResumePoint final :
     uint32_t stackDepth() const {
         return numAllocatedOperands();
     }
-    size_t numOperands() const override {
+    size_t numOperands() const MOZ_OVERRIDE {
         return numAllocatedOperands();
     }
     size_t indexOf(const MUse* u) const final override {
@@ -11887,7 +12009,7 @@ class MResumePoint final :
     bool isObservableOperand(size_t index) const;
     bool isRecoverableOperand(MUse* u) const;
 
-    MDefinition* getOperand(size_t index) const override {
+    MDefinition* getOperand(size_t index) const MOZ_OVERRIDE {
         return operands_[index].producer();
     }
     jsbytecode* pc() const {
@@ -11927,7 +12049,7 @@ class MResumePoint final :
         }
     }
 
-    bool writeRecoverData(CompactBufferWriter& writer) const override;
+    bool writeRecoverData(CompactBufferWriter& writer) const MOZ_OVERRIDE;
 
     // Register a store instruction on the current resume point. This
     // instruction would be recovered when we are bailing out. The |cache|
@@ -11942,8 +12064,8 @@ class MResumePoint final :
         return stores_.end();
     }
 
-    virtual void dump(FILE* fp) const override;
-    virtual void dump() const override;
+    virtual void dump(FILE* fp) const MOZ_OVERRIDE;
+    virtual void dump() const MOZ_OVERRIDE;
 };
 
 class MIsCallable
@@ -11966,7 +12088,7 @@ class MIsCallable
     MDefinition* object() const {
         return getOperand(0);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -11989,10 +12111,10 @@ class MIsObject
     MDefinition* object() const {
         return getOperand(0);
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         return congruentIfOperandsEqual(ins);
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
@@ -12025,10 +12147,10 @@ class MHasClass
     const Class* getClass() const {
         return class_;
     }
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
-    bool congruentTo(const MDefinition* ins) const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE {
         if (!ins->isHasClass())
             return false;
         if (getClass() != ins->toHasClass()->getClass())
@@ -12099,14 +12221,14 @@ class MRecompileCheck : public MNullaryInstruction
         return increaseWarmUpCounter_;
     }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::None();
     }
 };
 
 // All barriered operations - MMemoryBarrier, MCompareExchangeTypedArrayElement,
-// and MAtomicTypedArrayElementBinop, as well as MLoadTypedArrayElement and
-// MStoreTypedArrayElement when they are marked as requiring a memory barrer - have
+// and MAtomicTypedArrayElementBinop, as well as MLoadUnboxedScalar and
+// MStoreUnboxedSclaar when they are marked as requiring a memory barrer - have
 // the following attributes:
 //
 // - Not movable
@@ -12142,8 +12264,8 @@ class MMemoryBarrier
         return type_;
     }
 
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
 };
 
@@ -12197,8 +12319,8 @@ class MCompareExchangeTypedArrayElement
     Scalar::Type arrayType() const {
         return arrayType_;
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
 };
 
@@ -12252,8 +12374,8 @@ class MAtomicTypedArrayElementBinop
     MDefinition* value() {
         return getOperand(2);
     }
-    AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::TypedArrayElement);
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
+        return AliasSet::Store(AliasSet::UnboxedElement);
     }
 };
 
@@ -12405,11 +12527,11 @@ class MAsmJSLoadHeap
     MemoryBarrierBits barrierBefore() const { return barrierBefore_; }
     MemoryBarrierBits barrierAfter() const { return barrierAfter_; }
 
-    bool congruentTo(const MDefinition* ins) const override;
-    AliasSet getAliasSet() const override {
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Load(AliasSet::AsmJSHeap);
     }
-    bool mightAlias(const MDefinition* def) const override;
+    bool mightAlias(const MDefinition* def) const MOZ_OVERRIDE;
 };
 
 class MAsmJSStoreHeap
@@ -12450,7 +12572,7 @@ class MAsmJSStoreHeap
     MemoryBarrierBits barrierBefore() const { return barrierBefore_; }
     MemoryBarrierBits barrierAfter() const { return barrierAfter_; }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::AsmJSHeap);
     }
 };
@@ -12483,7 +12605,7 @@ class MAsmJSCompareExchangeHeap
     MDefinition* oldValue() const { return getOperand(1); }
     MDefinition* newValue() const { return getOperand(2); }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::AsmJSHeap);
     }
 };
@@ -12518,7 +12640,7 @@ class MAsmJSAtomicBinopHeap
     MDefinition* ptr() const { return getOperand(0); }
     MDefinition* value() const { return getOperand(1); }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::AsmJSHeap);
     }
 };
@@ -12547,15 +12669,15 @@ class MAsmJSLoadGlobalVar : public MNullaryInstruction
 
     unsigned globalDataOffset() const { return globalDataOffset_; }
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
     MDefinition* foldsTo(TempAllocator& alloc) override;
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return isConstant_ ? AliasSet::None() : AliasSet::Load(AliasSet::AsmJSGlobalVar);
     }
 
-    bool mightAlias(const MDefinition* def) const override;
+    bool mightAlias(const MDefinition* def) const MOZ_OVERRIDE;
 };
 
 class MAsmJSStoreGlobalVar
@@ -12578,7 +12700,7 @@ class MAsmJSStoreGlobalVar
     unsigned globalDataOffset() const { return globalDataOffset_; }
     MDefinition* value() const { return getOperand(0); }
 
-    AliasSet getAliasSet() const override {
+    AliasSet getAliasSet() const MOZ_OVERRIDE {
         return AliasSet::Store(AliasSet::AsmJSGlobalVar);
     }
 };
@@ -12607,8 +12729,8 @@ class MAsmJSLoadFuncPtr
     unsigned globalDataOffset() const { return globalDataOffset_; }
     MDefinition* index() const { return getOperand(0); }
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 };
 
 class MAsmJSLoadFFIFunc : public MNullaryInstruction
@@ -12631,8 +12753,8 @@ class MAsmJSLoadFFIFunc : public MNullaryInstruction
 
     unsigned globalDataOffset() const { return globalDataOffset_; }
 
-    HashNumber valueHash() const override;
-    bool congruentTo(const MDefinition* ins) const override;
+    HashNumber valueHash() const MOZ_OVERRIDE;
+    bool congruentTo(const MDefinition* ins) const MOZ_OVERRIDE;
 };
 
 class MAsmJSParameter : public MNullaryInstruction
@@ -12779,7 +12901,7 @@ class MAsmJSCall final
         return spIncrement_;
     }
 
-    bool possiblyCalls() const override {
+    bool possiblyCalls() const MOZ_OVERRIDE {
         return true;
     }
 };

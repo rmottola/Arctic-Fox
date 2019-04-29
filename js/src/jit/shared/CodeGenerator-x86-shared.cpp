@@ -2379,6 +2379,71 @@ CodeGeneratorX86Shared::visitSimdSignMaskX4(LSimdSignMaskX4* ins)
     masm.vmovmskps(input, output);
 }
 
+template <class T, class Reg> void
+CodeGeneratorX86Shared::visitSimdGeneralShuffle(LSimdGeneralShuffleBase *ins, Reg tempRegister)
+{
+    MSimdGeneralShuffle *mir = ins->mir();
+    unsigned numVectors = mir->numVectors();
+
+    Register laneTemp = ToRegister(ins->temp());
+
+    // This won't generate fast code, but it's fine because we expect users
+    // to have used constant indices (and thus MSimdGeneralShuffle to be fold
+    // into MSimdSwizzle/MSimdShuffle, which are fast).
+    masm.reserveStack(Simd128DataSize * numVectors);
+
+    for (unsigned i = 0; i < numVectors; i++) {
+        masm.storeAlignedVector<T>(ToFloatRegister(ins->vector(i)),
+                                   Address(StackPointer, Simd128DataSize * (1 + i)));
+    }
+
+    Label bail;
+
+    for (size_t i = 0; i < mir->numLanes(); i++) {
+        Operand lane = ToOperand(ins->lane(i));
+
+        masm.cmp32(lane, Imm32(mir->numVectors() * mir->numLanes() - 1));
+        masm.j(Assembler::Above, &bail);
+
+        if (lane.kind() == Operand::REG) {
+            masm.loadScalar<T>(Operand(StackPointer, ToRegister(ins->lane(i)), TimesFour, Simd128DataSize),
+                               tempRegister);
+        } else {
+            masm.load32(lane, laneTemp);
+            masm.loadScalar<T>(Operand(StackPointer, laneTemp, TimesFour, Simd128DataSize), tempRegister);
+        }
+
+        masm.storeScalar<T>(tempRegister, Address(StackPointer, i * sizeof(T)));
+    }
+
+    FloatRegister output = ToFloatRegister(ins->output());
+    masm.loadAlignedVector<T>(Address(StackPointer, 0), output);
+
+    Label join;
+    masm.jump(&join);
+
+    {
+        masm.bind(&bail);
+        masm.freeStack(Simd128DataSize * numVectors);
+        bailout(ins->snapshot());
+    }
+
+    masm.bind(&join);
+    masm.setFramePushed(masm.framePushed() + Simd128DataSize * numVectors);
+    masm.freeStack(Simd128DataSize * numVectors);
+}
+
+void
+CodeGeneratorX86Shared::visitSimdGeneralShuffleI(LSimdGeneralShuffleI *ins)
+{
+    visitSimdGeneralShuffle<int32_t, Register>(ins, ToRegister(ins->temp()));
+}
+void
+CodeGeneratorX86Shared::visitSimdGeneralShuffleF(LSimdGeneralShuffleF *ins)
+{
+    visitSimdGeneralShuffle<float, FloatRegister>(ins, ScratchFloat32Reg);
+}
+
 void
 CodeGeneratorX86Shared::visitSimdSwizzleI(LSimdSwizzleI* ins)
 {

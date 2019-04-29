@@ -789,6 +789,34 @@ template bool
 SimdPolicy<0>::adjustInputs(TempAllocator &alloc, MInstruction *ins);
 
 bool
+SimdShufflePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+{
+    MIRType specialization = ins->typePolicySpecialization();
+
+    MSimdGeneralShuffle *s = ins->toSimdGeneralShuffle();
+
+    for (unsigned i = 0; i < s->numVectors(); i++) {
+        if (!MaybeSimdUnbox(alloc, ins, specialization, i))
+            return false;
+    }
+
+    // Next inputs are the lanes, which need to be int32
+    for (unsigned i = 0; i < s->numLanes(); i++) {
+        MDefinition *in = ins->getOperand(s->numVectors() + i);
+        if (in->type() == MIRType_Int32)
+            continue;
+
+        MInstruction *replace = MToInt32::New(alloc, in, MacroAssembler::IntConversion_NumbersOnly);
+        ins->block()->insertBefore(ins, replace);
+        ins->replaceOperand(s->numVectors() + i, replace);
+        if (!replace->typePolicy()->adjustInputs(alloc, replace))
+            return false;
+    }
+
+    return true;
+}
+
+bool
 SimdSelectPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
@@ -854,10 +882,15 @@ InstanceOfPolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 }
 
 bool
-StoreTypedArrayPolicy::adjustValueInput(TempAllocator& alloc, MInstruction* ins, int arrayType,
-                                        MDefinition* value, int valueOperand)
+StoreUnboxedScalarPolicy::adjustValueInput(TempAllocator &alloc, MInstruction *ins,
+                                           Scalar::Type writeType, MDefinition *value,
+                                           int valueOperand)
 {
-    MDefinition* curValue = value;
+    // Storing a SIMD value just implies that we might need a SimdUnbox.
+    if (Scalar::isSimdType(writeType))
+        return MaybeSimdUnbox(alloc, ins, ScalarTypeToMIRType(writeType), valueOperand);
+
+    MDefinition *curValue = value;
     // First, ensure the value is int32, boolean, double or Value.
     // The conversion is based on TypedArrayObjectTemplate::setElementTail.
     switch (value->type()) {
@@ -897,7 +930,7 @@ StoreTypedArrayPolicy::adjustValueInput(TempAllocator& alloc, MInstruction* ins,
                value->type() == MIRType_Float32 ||
                value->type() == MIRType_Value);
 
-    switch (arrayType) {
+    switch (writeType) {
       case Scalar::Int8:
       case Scalar::Uint8:
       case Scalar::Int16:
@@ -936,15 +969,15 @@ StoreTypedArrayPolicy::adjustValueInput(TempAllocator& alloc, MInstruction* ins,
 }
 
 bool
-StoreTypedArrayPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
+StoreUnboxedScalarPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 {
     SingleObjectPolicy::staticAdjustInputs(alloc, ins);
 
-    MStoreTypedArrayElement* store = ins->toStoreTypedArrayElement();
+    MStoreUnboxedScalar *store = ins->toStoreUnboxedScalar();
     MOZ_ASSERT(IsValidElementsType(store->elements(), store->offsetAdjustment()));
     MOZ_ASSERT(store->index()->type() == MIRType_Int32);
 
-    return adjustValueInput(alloc, ins, store->arrayType(), store->value(), 2);
+    return adjustValueInput(alloc, store, store->writeType(), store->value(), 2);
 }
 
 bool
@@ -955,7 +988,7 @@ StoreTypedArrayHolePolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     MOZ_ASSERT(store->index()->type() == MIRType_Int32);
     MOZ_ASSERT(store->length()->type() == MIRType_Int32);
 
-    return StoreTypedArrayPolicy::adjustValueInput(alloc, ins, store->arrayType(), store->value(), 3);
+    return StoreUnboxedScalarPolicy::adjustValueInput(alloc, ins, store->arrayType(), store->value(), 3);
 }
 
 bool
@@ -964,7 +997,7 @@ StoreTypedArrayElementStaticPolicy::adjustInputs(TempAllocator& alloc, MInstruct
     MStoreTypedArrayElementStatic* store = ins->toStoreTypedArrayElementStatic();
 
     return ConvertToInt32Policy<0>::staticAdjustInputs(alloc, ins) &&
-        StoreTypedArrayPolicy::adjustValueInput(alloc, ins, store->accessType(), store->value(), 1);
+        StoreUnboxedScalarPolicy::adjustValueInput(alloc, ins, store->accessType(), store->value(), 1);
 }
 
 bool
@@ -1088,9 +1121,10 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(PowPolicy)                                \
     _(SimdAllPolicy)                            \
     _(SimdSelectPolicy)                         \
+    _(SimdShufflePolicy)                        \
     _(StoreTypedArrayElementStaticPolicy)       \
     _(StoreTypedArrayHolePolicy)                \
-    _(StoreTypedArrayPolicy)                    \
+    _(StoreUnboxedScalarPolicy)                 \
     _(StoreUnboxedObjectOrNullPolicy)           \
     _(TestPolicy)                               \
     _(AllDoublePolicy)                          \

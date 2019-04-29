@@ -290,8 +290,7 @@ CreateSimdClass(JSContext* cx, Handle<GlobalObject*> global, HandlePropertyName 
     // Create type constructor itself and initialize its reserved slots.
 
     Rooted<SimdTypeDescr*> typeDescr(cx);
-    typeDescr = NewObjectWithProto<SimdTypeDescr>(cx, funcProto, GlobalObject::upcast(global),
-                                                  SingletonObject);
+    typeDescr = NewObjectWithProto<SimdTypeDescr>(cx, funcProto, SingletonObject);
     if (!typeDescr)
         return nullptr;
 
@@ -312,7 +311,7 @@ CreateSimdClass(JSContext* cx, Handle<GlobalObject*> global, HandlePropertyName 
     if (!objProto)
         return nullptr;
     Rooted<TypedProto*> proto(cx);
-    proto = NewObjectWithProto<TypedProto>(cx, objProto, NullPtr(), SingletonObject);
+    proto = NewObjectWithProto<TypedProto>(cx, objProto, SingletonObject);
     if (!proto)
         return nullptr;
     typeDescr->initReservedSlot(JS_DESCR_SLOT_TYPROTO, ObjectValue(*proto));
@@ -417,7 +416,7 @@ SIMDObject::initClass(JSContext* cx, Handle<GlobalObject*> global)
     if (!objProto)
         return nullptr;
     RootedObject SIMD(cx, NewObjectWithGivenProto(cx, &SIMDObject::class_, objProto,
-                                                  global, SingletonObject));
+                                                  SingletonObject));
     if (!SIMD)
         return nullptr;
 
@@ -749,9 +748,9 @@ Swizzle(JSContext* cx, unsigned argc, Value* vp)
 
     uint32_t lanes[V::lanes];
     for (unsigned i = 0; i < V::lanes; i++) {
-        int32_t lane = -1;
-        if (!ToInt32(cx, args[i + 1], &lane))
-            return false;
+        if (!args[i + 1].isInt32())
+            return ErrorBadArgs(cx);
+        int32_t lane = args[i + 1].toInt32();
         if (lane < 0 || uint32_t(lane) >= V::lanes)
             return ErrorBadArgs(cx);
         lanes[i] = uint32_t(lane);
@@ -778,9 +777,9 @@ Shuffle(JSContext* cx, unsigned argc, Value* vp)
 
     uint32_t lanes[V::lanes];
     for (unsigned i = 0; i < V::lanes; i++) {
-        int32_t lane = -1;
-        if (!ToInt32(cx, args[i + 2], &lane))
-            return false;
+        if (!args[i + 2].isInt32())
+            return ErrorBadArgs(cx);
+        int32_t lane = args[i + 2].toInt32();
         if (lane < 0 || uint32_t(lane) >= (2 * V::lanes))
             return ErrorBadArgs(cx);
         lanes[i] = uint32_t(lane);

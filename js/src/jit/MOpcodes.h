@@ -24,6 +24,7 @@ namespace jit {
     _(SimdInsertElement)                                                    \
     _(SimdSignMask)                                                         \
     _(SimdSwizzle)                                                          \
+    _(SimdGeneralShuffle)                                                   \
     _(SimdShuffle)                                                          \
     _(SimdUnaryArith)                                                       \
     _(SimdBinaryComp)                                                       \
@@ -178,10 +179,12 @@ namespace jit {
     _(InArray)                                                              \
     _(LoadElement)                                                          \
     _(LoadElementHole)                                                      \
+    _(LoadUnboxedScalar)                                                    \
     _(LoadUnboxedObjectOrNull)                                              \
     _(LoadUnboxedString)                                                    \
     _(StoreElement)                                                         \
     _(StoreElementHole)                                                     \
+    _(StoreUnboxedScalar)                                                   \
     _(StoreUnboxedObjectOrNull)                                             \
     _(StoreUnboxedString)                                                   \
     _(ConvertUnboxedObjectToNative)                                         \
@@ -189,10 +192,8 @@ namespace jit {
     _(ArrayPush)                                                            \
     _(ArrayConcat)                                                          \
     _(ArrayJoin)                                                            \
-    _(LoadTypedArrayElement)                                                \
     _(LoadTypedArrayElementHole)                                            \
     _(LoadTypedArrayElementStatic)                                          \
-    _(StoreTypedArrayElement)                                               \
     _(StoreTypedArrayElementHole)                                           \
     _(StoreTypedArrayElementStatic)                                         \
     _(CompareExchangeTypedArrayElement)                                     \

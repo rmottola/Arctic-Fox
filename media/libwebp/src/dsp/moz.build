@@ -54,7 +54,9 @@ elif CONFIG['INTEL_ARCHITECTURE']:
         'lossless_sse2.c',
         'rescaler_sse2.c',
         'upsampling_sse2.c',
+        'upsampling_sse41.c',
         'yuv_sse2.c',
+        'yuv_sse41.c',
     ]
     DEFINES['WEBP_HAVE_SSE2'] = 1;
     DEFINES['WEBP_HAVE_SSE41'] = 1;

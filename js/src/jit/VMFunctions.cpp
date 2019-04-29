@@ -86,11 +86,11 @@ InvokeFunction(JSContext* cx, HandleObject obj, uint32_t argc, Value* argv, Valu
     return true;
 }
 
-JSObject*
-NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-            const js::Class* clasp)
+JSObject *
+NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+            size_t ndynamic, const js::Class *clasp)
 {
-    return js::Allocate<JSObject>(cx, allocKind, 0, initialHeap, clasp);
+    return js::Allocate<JSObject>(cx, allocKind, ndynamic, initialHeap, clasp);
 }
 
 bool
@@ -1122,7 +1122,6 @@ AutoDetectInvalidation::setReturnOverride()
     cx_->runtime()->jitRuntime()->setIonReturnOverride(rval_.get());
 }
 
-#ifdef DEBUG
 void
 AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 {
@@ -1136,8 +1135,8 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 
     if (obj->isTenured()) {
         MOZ_ASSERT(obj->isAligned());
-        gc::AllocKind kind = obj->asTenured().getAllocKind();
-        MOZ_ASSERT(kind >= js::gc::FINALIZE_OBJECT0 && kind <= js::gc::FINALIZE_OBJECT_LAST);
+        mozilla::DebugOnly<gc::AllocKind> kind = obj->asTenured().getAllocKind();
+        MOZ_ASSERT(kind <= js::gc::AllocKind::OBJECT_LAST);
         MOZ_ASSERT(obj->asTenured().zone() == cx->zone());
     }
 }
@@ -1167,15 +1166,15 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
     MOZ_ASSERT(str->isAligned());
     MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
 
-    gc::AllocKind kind = str->getAllocKind();
+    mozilla::DebugOnly<gc::AllocKind> kind = str->getAllocKind();
     if (str->isFatInline())
-        MOZ_ASSERT(kind == gc::FINALIZE_FAT_INLINE_STRING);
+        MOZ_ASSERT(kind == gc::AllocKind::FAT_INLINE_STRING);
     else if (str->isExternal())
-        MOZ_ASSERT(kind == gc::FINALIZE_EXTERNAL_STRING);
+        MOZ_ASSERT(kind == gc::AllocKind::EXTERNAL_STRING);
     else if (str->isAtom() || str->isFlat())
-        MOZ_ASSERT(kind == gc::FINALIZE_STRING || kind == gc::FINALIZE_FAT_INLINE_STRING);
+        MOZ_ASSERT(kind == gc::AllocKind::STRING || kind == gc::AllocKind::FAT_INLINE_STRING);
     else
-        MOZ_ASSERT(kind == gc::FINALIZE_STRING);
+        MOZ_ASSERT(kind == gc::AllocKind::STRING);
 }
 
 void
@@ -1194,7 +1193,7 @@ AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
         AssertValidStringPtr(cx, desc);
     }
 
-    MOZ_ASSERT(sym->getAllocKind() == gc::FINALIZE_SYMBOL);
+    MOZ_ASSERT(sym->getAllocKind() == gc::AllocKind::SYMBOL);
 }
 
 void
@@ -1207,7 +1206,6 @@ AssertValidValue(JSContext* cx, Value* v)
     else if (v->isSymbol())
         AssertValidSymbolPtr(cx, v->toSymbol());
 }
-#endif
 
 bool
 ObjectIsCallable(JSObject* obj)

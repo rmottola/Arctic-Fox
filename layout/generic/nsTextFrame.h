@@ -313,11 +313,10 @@ public:
    *
    * Callbacks are invoked in the following order:
    *
-   *   (NotifySelectionBackgroundNeedsFill)?
+   *   NotifySelectionBackgroundNeedsFill?
    *   (NotifyBeforeDecorationLine NotifyDecorationLinePathEmitted)*
    *   NotifyBeforeText
-   *   (NotifyGlyphPathEmitted |
-   *    (NotifyBeforeSVGGlyphPainted NotifyAfterSVGGlyphPainted))*
+   *   NotifyGlyphPathEmitted*
    *   NotifyAfterText
    *   (NotifyBeforeDecorationLine NotifyDecorationLinePathEmitted)*
    *   (NotifyBeforeSelectionDecorationLine NotifySelectionDecorationLinePathEmitted)*

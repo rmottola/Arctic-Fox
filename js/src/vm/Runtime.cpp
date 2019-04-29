@@ -124,6 +124,8 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     profilerSampleBufferGen_(0),
     profilerSampleBufferLapCount_(1),
     asmJSActivationStack_(nullptr),
+    asyncStackForNewActivations(nullptr),
+    asyncCauseForNewActivations(nullptr),
     parentRuntime(parentRuntime),
     interrupt_(false),
     telemetryCallback(nullptr),

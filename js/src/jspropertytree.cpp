@@ -240,10 +240,10 @@ Shape::fixupDictionaryShapeAfterMovingGC()
     }
 
     AllocKind kind = TenuredCell::fromPointer(cell)->getAllocKind();
-    MOZ_ASSERT(kind == FINALIZE_SHAPE ||
-               kind == FINALIZE_ACCESSOR_SHAPE ||
-               kind <= FINALIZE_OBJECT_LAST);
-    if (kind == FINALIZE_SHAPE || kind == FINALIZE_ACCESSOR_SHAPE) {
+    MOZ_ASSERT(kind == AllocKind::SHAPE ||
+               kind == AllocKind::ACCESSOR_SHAPE ||
+               kind <= AllocKind::OBJECT_LAST);
+    if (kind == AllocKind::SHAPE || kind == AllocKind::ACCESSOR_SHAPE) {
         // listp points to the parent field of the next shape.
         Shape *next = reinterpret_cast<Shape *>(uintptr_t(listp) -
                                                 offsetof(Shape, parent));
@@ -282,13 +282,13 @@ Shape::fixupShapeTreeAfterMovingGC()
         if (IsForwarded(unowned))
             unowned = Forwarded(unowned);
 
-        PropertyOp getter = key->getter();
+        GetterOp getter = key->getter();
         if (key->hasGetterObject())
-            getter = PropertyOp(MaybeForwarded(key->getterObject()));
+            getter = GetterOp(MaybeForwarded(key->getterObject()));
 
-        StrictPropertyOp setter = key->setter();
+        SetterOp setter = key->setter();
         if (key->hasSetterObject())
-            setter = StrictPropertyOp(MaybeForwarded(key->setterObject()));
+            setter = SetterOp(MaybeForwarded(key->setterObject()));
 
         StackShape lookup(unowned,
                           const_cast<Shape*>(key)->propidRef(),
