@@ -345,13 +345,13 @@ js::InitSharedArrayBufferClass(JSContext *cx, HandleObject obj)
 
     RootedId byteLengthId(cx, NameToId(cx->names().byteLength));
     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER | JSPROP_PERMANENT;
-    JSObject* getter = NewFunction(cx, NullPtr(), SharedArrayBufferObject::byteLengthGetter, 0,
-                                   JSFunction::NATIVE_FUN, global, NullPtr());
+    JSObject *getter =
+        NewNativeFunction(cx, SharedArrayBufferObject::byteLengthGetter, 0, NullPtr());
     if (!getter)
         return nullptr;
 
     if (!NativeDefineProperty(cx, proto, byteLengthId, UndefinedHandleValue,
-                              JS_DATA_TO_FUNC_PTR(PropertyOp, getter), nullptr, attrs))
+                              JS_DATA_TO_FUNC_PTR(GetterOp, getter), nullptr, attrs))
         return nullptr;
 
     if (!JS_DefineFunctions(cx, ctor, SharedArrayBufferObject::jsstaticfuncs))

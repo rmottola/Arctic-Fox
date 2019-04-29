@@ -683,11 +683,11 @@ BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shap
     MOZ_ASSERT(unboxedGroups.empty());
 
     *holder = nullptr;
-    const ICEntry& entry = icEntryFromPC(pc);
+    const ICEntry &entry = icEntryFromPC(pc);
 
-    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
+    for (ICStub *stub = entry.firstStub(); stub; stub = stub->next()) {
         if (stub->isSetProp_CallScripted() || stub->isSetProp_CallNative()) {
-            ICSetPropCallSetter* nstub = static_cast<ICSetPropCallSetter*>(stub);
+            ICSetPropCallSetter *nstub = static_cast<ICSetPropCallSetter*>(stub);
 	    if (!AddReceiver(nativeShapes, unboxedGroups, nstub->guard().token()))
                 return false;
 

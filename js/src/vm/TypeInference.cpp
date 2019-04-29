@@ -257,7 +257,8 @@ js::ObjectGroupHasProperty(JSContext* cx, ObjectGroup* group, jsid id, const Val
         // properties become unknown.
         if (value.isObject() &&
             !value.toObject().hasLazyGroup() &&
-            value.toObject().group()->flags() & OBJECT_FLAG_UNKNOWN_PROPERTIES)
+            ((value.toObject().group()->flags() & OBJECT_FLAG_UNKNOWN_PROPERTIES) ||
+             value.toObject().group()->maybeOriginalUnboxedGroup()))
         {
             return true;
         }
@@ -686,7 +687,60 @@ TypeSet::readBarrier(const TypeSet* types)
 }
 
 bool
-TypeSet::clone(LifoAlloc* alloc, TemporaryTypeSet* result) const
+TypeSet::IsTypeMarkedFromAnyThread(TypeSet::Type *v)
+{
+    bool rv;
+    if (v->isSingletonUnchecked()) {
+        JSObject *obj = v->singleton();
+        rv = IsObjectMarkedFromAnyThread(&obj);
+        *v = TypeSet::ObjectType(obj);
+    } else if (v->isGroupUnchecked()) {
+        ObjectGroup *group = v->group();
+        rv = IsObjectGroupMarkedFromAnyThread(&group);
+        *v = TypeSet::ObjectType(group);
+    } else {
+        rv = true;
+    }
+    return rv;
+}
+
+static inline bool
+IsObjectKeyAboutToBeFinalized(TypeSet::ObjectKey **keyp)
+{
+    TypeSet::ObjectKey *key = *keyp;
+    bool isAboutToBeFinalized;
+    if (key->isGroup()) {
+        ObjectGroup *group = key->groupNoBarrier();
+        isAboutToBeFinalized = IsObjectGroupAboutToBeFinalized(&group);
+        if (!isAboutToBeFinalized)
+            *keyp = TypeSet::ObjectKey::get(group);
+    } else {
+        MOZ_ASSERT(key->isSingleton());
+        JSObject *singleton = key->singletonNoBarrier();
+        isAboutToBeFinalized = IsObjectAboutToBeFinalized(&singleton);
+        if (!isAboutToBeFinalized)
+            *keyp = TypeSet::ObjectKey::get(singleton);
+    }
+    return isAboutToBeFinalized;
+}
+
+bool
+TypeSet::IsTypeAboutToBeFinalized(TypeSet::Type *v)
+{
+    bool isAboutToBeFinalized;
+    if (v->isObjectUnchecked()) {
+        TypeSet::ObjectKey *key = v->objectKey();
+        isAboutToBeFinalized = IsObjectKeyAboutToBeFinalized(&key);
+        if (!isAboutToBeFinalized)
+            *v = TypeSet::ObjectType(key);
+    } else {
+        isAboutToBeFinalized = false;
+    }
+    return isAboutToBeFinalized;
+}
+
+bool
+TypeSet::clone(LifoAlloc *alloc, TemporaryTypeSet *result) const
 {
     MOZ_ASSERT(result->empty());
 
@@ -2408,26 +2462,26 @@ TypeZone::addPendingRecompile(JSContext* cx, JSScript* script)
 }
 
 void
-js::PrintTypes(JSContext* cx, JSCompartment* comp, bool force)
+js::PrintTypes(JSContext *cx, JSCompartment *comp, bool force)
 {
 #ifdef DEBUG
     gc::AutoSuppressGC suppressGC(cx);
     JSAutoRequest request(cx);
 
-    Zone* zone = comp->zone();
+    Zone *zone = comp->zone();
     AutoEnterAnalysis enter(nullptr, zone);
 
     if (!force && !InferSpewActive(ISpewResult))
         return;
 
-    for (gc::ZoneCellIter i(zone, gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
+    for (gc::ZoneCellIter i(zone, gc::AllocKind::SCRIPT); !i.done(); i.next()) {
         RootedScript script(cx, i.get<JSScript>());
         if (script->types())
             script->types()->printTypes(cx, script);
     }
 
-    for (gc::ZoneCellIter i(zone, gc::FINALIZE_OBJECT_GROUP); !i.done(); i.next()) {
-        ObjectGroup* group = i.get<ObjectGroup>();
+    for (gc::ZoneCellIter i(zone, gc::AllocKind::OBJECT_GROUP); !i.done(); i.next()) {
+        ObjectGroup *group = i.get<ObjectGroup>();
         group->print();
     }
 #endif
@@ -3098,19 +3152,8 @@ js::TypeMonitorCallSlow(JSContext* cx, JSObject* callee, const CallArgs& args, b
         TypeScript::SetArgument(cx, script, arg, UndefinedValue());
 }
 
-static inline bool
-IsAboutToBeFinalized(TypeSet::ObjectKey** keyp)
-{
-    // Mask out the low bit indicating whether this is a group or JS object.
-    uintptr_t flagBit = uintptr_t(*keyp) & 1;
-    gc::Cell* tmp = reinterpret_cast<gc::Cell*>(uintptr_t(*keyp) & ~1);
-    bool isAboutToBeFinalized = IsCellAboutToBeFinalized(&tmp);
-    *keyp = reinterpret_cast<TypeSet::ObjectKey*>(uintptr_t(tmp) | flagBit);
-    return isAboutToBeFinalized;
-}
-
 void
-js::FillBytecodeTypeMap(JSScript* script, uint32_t* bytecodeMap)
+js::FillBytecodeTypeMap(JSScript *script, uint32_t *bytecodeMap)
 {
     uint32_t added = 0;
     for (jsbytecode* pc = script->code(); pc < script->codeEnd(); pc += GetBytecodeLength(pc)) {
@@ -3316,7 +3359,7 @@ CommonPrefix(Shape *first, Shape *second)
 }
 
 void
-PreliminaryObjectArrayWithTemplate::maybeAnalyze(JSContext *cx, ObjectGroup *group, bool force)
+PreliminaryObjectArrayWithTemplate::maybeAnalyze(ExclusiveContext *cx, ObjectGroup *group, bool force)
 {
     // Don't perform the analyses until sufficient preliminary objects have
     // been allocated.
@@ -3446,9 +3489,9 @@ ChangeObjectFixedSlotCount(JSContext* cx, PlainObject* obj, gc::AllocKind allocK
 {
     MOZ_ASSERT(OnlyHasDataProperties(obj->lastProperty()));
 
-    Shape* newShape = ReshapeForParentAndAllocKind(cx, obj->lastProperty(),
-                                                   obj->getTaggedProto(), obj->getParent(),
-                                                   allocKind);
+    Shape *newShape = ReshapeForAllocKind(cx, obj->lastProperty(),
+                                          obj->getTaggedProto(),
+                                          allocKind);
     if (!newShape)
         return false;
 
@@ -3574,7 +3617,7 @@ TypeNewScript::maybeAnalyze(JSContext* cx, ObjectGroup* group, bool* regenerate,
     }
 
     RootedObjectGroup groupRoot(cx, group);
-    templateObject_ = NewObjectWithGroup<PlainObject>(cx, groupRoot, cx->global(), kind,
+    templateObject_ = NewObjectWithGroup<PlainObject>(cx, groupRoot, kind,
                                                       MaybeSingletonObject);
     if (!templateObject_)
         return false;
@@ -3873,11 +3916,11 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
         clearObjects();
         objectCount = 0;
         for (unsigned i = 0; i < oldCapacity; i++) {
-            ObjectKey* key = oldArray[i];
+            ObjectKey *key = oldArray[i];
             if (!key)
                 continue;
-            if (!IsAboutToBeFinalized(&key)) {
-                ObjectKey** pentry =
+            if (!IsObjectKeyAboutToBeFinalized(&key)) {
+                ObjectKey **pentry =
                     TypeHashSet::Insert<ObjectKey*, ObjectKey, ObjectKey>
                         (zone->types.typeLifoAlloc, objectSet, objectCount, key);
                 if (pentry) {
@@ -3907,9 +3950,9 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
         }
         setBaseObjectCount(objectCount);
     } else if (objectCount == 1) {
-        ObjectKey* key = (ObjectKey*) objectSet;
-        if (!IsAboutToBeFinalized(&key)) {
-            objectSet = reinterpret_cast<ObjectKey**>(key);
+        ObjectKey *key = (ObjectKey *) objectSet;
+        if (!IsObjectKeyAboutToBeFinalized(&key)) {
+            objectSet = reinterpret_cast<ObjectKey **>(key);
         } else {
             // As above, mark type sets containing objects with unknown
             // properties as unknown.
@@ -3994,8 +4037,16 @@ ObjectGroup::maybeSweep(AutoClearTypeInferenceStateOnOOM* oom)
     Maybe<AutoClearTypeInferenceStateOnOOM> fallbackOOM;
     EnsureHasAutoClearTypeInferenceStateOnOOM(oom, zone(), fallbackOOM);
 
-    if (maybeUnboxedLayout() && unboxedLayout().newScript())
-        unboxedLayout().newScript()->sweep();
+    if (maybeUnboxedLayout()) {
+        // Remove unboxed layouts that are about to be finalized from the
+        // compartment wide list while we are still on the main thread.
+        ObjectGroup *group = this;
+        if (IsObjectGroupAboutToBeFinalized(&group))
+            unboxedLayout().detachFromCompartment();
+
+        if (unboxedLayout().newScript())
+            unboxedLayout().newScript()->sweep();
+    }
 
     if (maybePreliminaryObjects())
         maybePreliminaryObjects()->sweep();
@@ -4217,7 +4268,7 @@ TypeZone::endSweep(JSRuntime* rt)
 void
 TypeZone::clearAllNewScriptsOnOOM()
 {
-    for (gc::ZoneCellIterUnderGC iter(zone(), gc::FINALIZE_OBJECT_GROUP);
+    for (gc::ZoneCellIterUnderGC iter(zone(), gc::AllocKind::OBJECT_GROUP);
          !iter.done(); iter.next())
     {
         ObjectGroup* group = iter.get<ObjectGroup>();

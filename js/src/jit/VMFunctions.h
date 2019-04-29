@@ -636,12 +636,12 @@ class AutoDetectInvalidation
     }
 };
 
-bool InvokeFunction(JSContext* cx, HandleObject obj0, uint32_t argc, Value* argv, Value* rval);
-JSObject* NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-                      const js::Class* clasp);
+bool InvokeFunction(JSContext *cx, HandleObject obj0, uint32_t argc, Value *argv, Value* rval);
+JSObject *NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+                      size_t ndynamic, const js::Class *clasp);
 
-bool CheckOverRecursed(JSContext* cx);
-bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
+bool CheckOverRecursed(JSContext *cx);
+bool CheckOverRecursedWithExtra(JSContext *cx, BaselineFrame *frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
 bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
@@ -749,22 +749,20 @@ JSString* RegExpReplace(JSContext* cx, HandleString string, HandleObject regexp,
 JSString* StringReplace(JSContext* cx, HandleString string, HandleString pattern,
                         HandleString repl);
 
-bool SetDenseElement(JSContext* cx, HandleNativeObject obj, int32_t index, HandleValue value,
+bool SetDenseElement(JSContext *cx, HandleNativeObject obj, int32_t index, HandleValue value,
                      bool strict);
 
-#ifdef DEBUG
-void AssertValidObjectPtr(JSContext* cx, JSObject* obj);
-void AssertValidObjectOrNullPtr(JSContext* cx, JSObject* obj);
-void AssertValidStringPtr(JSContext* cx, JSString* str);
-void AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym);
-void AssertValidValue(JSContext* cx, Value* v);
-#endif
+void AssertValidObjectPtr(JSContext *cx, JSObject *obj);
+void AssertValidObjectOrNullPtr(JSContext *cx, JSObject *obj);
+void AssertValidStringPtr(JSContext *cx, JSString *str);
+void AssertValidSymbolPtr(JSContext *cx, JS::Symbol *sym);
+void AssertValidValue(JSContext *cx, Value *v);
 
-void MarkValueFromIon(JSRuntime* rt, Value* vp);
-void MarkStringFromIon(JSRuntime* rt, JSString** stringp);
-void MarkObjectFromIon(JSRuntime* rt, JSObject** objp);
-void MarkShapeFromIon(JSRuntime* rt, Shape** shapep);
-void MarkObjectGroupFromIon(JSRuntime* rt, ObjectGroup** groupp);
+void MarkValueFromIon(JSRuntime *rt, Value *vp);
+void MarkStringFromIon(JSRuntime *rt, JSString **stringp);
+void MarkObjectFromIon(JSRuntime *rt, JSObject **objp);
+void MarkShapeFromIon(JSRuntime *rt, Shape **shapep);
+void MarkObjectGroupFromIon(JSRuntime *rt, ObjectGroup **groupp);
 
 // Helper for generatePreBarrier.
 inline void*

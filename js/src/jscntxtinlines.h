@@ -303,7 +303,8 @@ CallJSNativeConstructor(JSContext* cx, Native native, const CallArgs& args)
 }
 
 MOZ_ALWAYS_INLINE bool
-CallJSPropertyOp(JSContext* cx, PropertyOp op, HandleObject receiver, HandleId id, MutableHandleValue vp)
+CallJSGetterOp(JSContext *cx, GetterOp op, HandleObject receiver, HandleId id,
+               MutableHandleValue vp)
 {
     JS_CHECK_RECURSION(cx, return false);
 
@@ -315,7 +316,7 @@ CallJSPropertyOp(JSContext* cx, PropertyOp op, HandleObject receiver, HandleId i
 }
 
 MOZ_ALWAYS_INLINE bool
-CallJSPropertyOpSetter(JSContext* cx, StrictPropertyOp op, HandleObject obj, HandleId id,
+CallJSSetterOp(JSContext *cx, SetterOp op, HandleObject obj, HandleId id,
                        MutableHandleValue vp, ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
@@ -325,7 +326,7 @@ CallJSPropertyOpSetter(JSContext* cx, StrictPropertyOp op, HandleObject obj, Han
 }
 
 inline bool
-CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiver, HandleId id,
+CallJSDeletePropertyOp(JSContext *cx, JSDeletePropertyOp op, HandleObject receiver, HandleId id,
                        ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
@@ -337,7 +338,7 @@ CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiv
 }
 
 inline bool
-CallSetter(JSContext* cx, HandleObject obj, HandleId id, StrictPropertyOp op, unsigned attrs,
+CallSetter(JSContext *cx, HandleObject obj, HandleId id, SetterOp op, unsigned attrs,
            MutableHandleValue vp, ObjectOpResult &result)
 {
     if (attrs & JSPROP_SETTER) {
@@ -353,7 +354,7 @@ CallSetter(JSContext* cx, HandleObject obj, HandleId id, StrictPropertyOp op, un
     if (!op)
         return result.succeed();
 
-    return CallJSPropertyOpSetter(cx, op, obj, id, vp, result);
+    return CallJSSetterOp(cx, op, obj, id, vp, result);
 }
 
 inline uintptr_t

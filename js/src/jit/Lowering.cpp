@@ -25,6 +25,12 @@ using mozilla::DebugOnly;
 using JS::GenericNaN;
 
 void
+LIRGenerator::useBoxAtStart(LInstruction *lir, size_t n, MDefinition *mir, LUse::Policy policy)
+{
+    return useBox(lir, n, mir, policy, true);
+}
+
+void
 LIRGenerator::visitCloneLiteral(MCloneLiteral* ins)
 {
     MOZ_ASSERT(ins->type() == MIRType_Object);
@@ -2302,8 +2308,8 @@ LIRGenerator::visitTypeBarrier(MTypeBarrier* ins)
     if (ins->alwaysBails()) {
         LBail* bail = new(alloc()) LBail();
         assignSnapshot(bail, Bailout_Inevitable);
-        redefine(ins, ins->input());
         add(bail, ins);
+        redefine(ins, ins->input());
         return;
     }
 
@@ -2313,8 +2319,8 @@ LIRGenerator::visitTypeBarrier(MTypeBarrier* ins)
         LTypeBarrierV* barrier = new(alloc()) LTypeBarrierV(tmp);
         useBox(barrier, LTypeBarrierV::Input, ins->input());
         assignSnapshot(barrier, Bailout_TypeBarrierV);
-        redefine(ins, ins->input());
         add(barrier, ins);
+        redefine(ins, ins->input());
         return;
     }
 
@@ -2333,8 +2339,8 @@ LIRGenerator::visitTypeBarrier(MTypeBarrier* ins)
         LDefinition tmp = needTemp ? temp() : LDefinition::BogusTemp();
         LTypeBarrierO* barrier = new(alloc()) LTypeBarrierO(useRegister(ins->getOperand(0)), tmp);
         assignSnapshot(barrier, Bailout_TypeBarrierO);
-        redefine(ins, ins->getOperand(0));
         add(barrier, ins);
+        redefine(ins, ins->getOperand(0));
         return;
     }
 
@@ -2862,7 +2868,7 @@ LIRGenerator::visitStringSplit(MStringSplit* ins)
 }
 
 void
-LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement* ins)
+LIRGenerator::visitLoadUnboxedScalar(MLoadUnboxedScalar *ins)
 {
     MOZ_ASSERT(IsValidElementsType(ins->elements(), ins->offsetAdjustment()));
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
@@ -2870,23 +2876,24 @@ LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement* ins)
     const LUse elements = useRegister(ins->elements());
     const LAllocation index = useRegisterOrConstant(ins->index());
 
-    MOZ_ASSERT(IsNumberType(ins->type()) || ins->type() == MIRType_Boolean);
+    MOZ_ASSERT(IsNumberType(ins->type()) || IsSimdType(ins->type()) ||
+               ins->type() == MIRType_Boolean);
 
     // We need a temp register for Uint32Array with known double result.
     LDefinition tempDef = LDefinition::BogusTemp();
-    if (ins->arrayType() == Scalar::Uint32 && IsFloatingPointType(ins->type()))
+    if (ins->readType() == Scalar::Uint32 && IsFloatingPointType(ins->type()))
         tempDef = temp();
 
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
         add(fence, ins);
     }
-    LLoadTypedArrayElement* lir = new(alloc()) LLoadTypedArrayElement(elements, index, tempDef);
+    LLoadUnboxedScalar *lir = new(alloc()) LLoadUnboxedScalar(elements, index, tempDef);
     if (ins->fallible())
         assignSnapshot(lir, Bailout_Overflow);
     define(lir, ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
         add(fence, ins);
     }
 }
@@ -2957,14 +2964,17 @@ LIRGenerator::visitLoadTypedArrayElementStatic(MLoadTypedArrayElementStatic* ins
 }
 
 void
-LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement* ins)
+LIRGenerator::visitStoreUnboxedScalar(MStoreUnboxedScalar *ins)
 {
     MOZ_ASSERT(IsValidElementsType(ins->elements(), ins->offsetAdjustment()));
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
 
-    if (ins->isFloatArray()) {
-        MOZ_ASSERT_IF(ins->arrayType() == Scalar::Float32, ins->value()->type() == MIRType_Float32);
-        MOZ_ASSERT_IF(ins->arrayType() == Scalar::Float64, ins->value()->type() == MIRType_Double);
+    if (ins->isSimdWrite()) {
+        MOZ_ASSERT_IF(ins->writeType() == Scalar::Float32x4, ins->value()->type() == MIRType_Float32x4);
+        MOZ_ASSERT_IF(ins->writeType() == Scalar::Int32x4, ins->value()->type() == MIRType_Int32x4);
+    } else if (ins->isFloatWrite()) {
+        MOZ_ASSERT_IF(ins->writeType() == Scalar::Float32, ins->value()->type() == MIRType_Float32);
+        MOZ_ASSERT_IF(ins->writeType() == Scalar::Float64, ins->value()->type() == MIRType_Double);
     } else {
         MOZ_ASSERT(ins->value()->type() == MIRType_Int32);
     }
@@ -2974,7 +2984,7 @@ LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement* ins)
     LAllocation value;
 
     // For byte arrays, the value has to be in a byte register on x86.
-    if (ins->isByteArray())
+    if (ins->isByteWrite())
         value = useByteOpRegisterOrNonDoubleConstant(ins->value());
     else
         value = useRegisterOrNonDoubleConstant(ins->value());
@@ -2984,12 +2994,12 @@ LIRGenerator::visitStoreTypedArrayElement(MStoreTypedArrayElement* ins)
     // barriers, and we could use that instead of separate barrier and
     // store instructions.  See bug #1077027.
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
         add(fence, ins);
     }
-    add(new(alloc()) LStoreTypedArrayElement(elements, index, value), ins);
+    add(new(alloc()) LStoreUnboxedScalar(elements, index, value), ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
+        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
         add(fence, ins);
     }
 }
@@ -3001,7 +3011,7 @@ LIRGenerator::visitStoreTypedArrayElementHole(MStoreTypedArrayElementHole* ins)
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
     MOZ_ASSERT(ins->length()->type() == MIRType_Int32);
 
-    if (ins->isFloatArray()) {
+    if (ins->isFloatWrite()) {
         MOZ_ASSERT_IF(ins->arrayType() == Scalar::Float32, ins->value()->type() == MIRType_Float32);
         MOZ_ASSERT_IF(ins->arrayType() == Scalar::Float64, ins->value()->type() == MIRType_Double);
     } else {
@@ -3014,7 +3024,7 @@ LIRGenerator::visitStoreTypedArrayElementHole(MStoreTypedArrayElementHole* ins)
     LAllocation value;
 
     // For byte arrays, the value has to be in a byte register on x86.
-    if (ins->isByteArray())
+    if (ins->isByteWrite())
         value = useByteOpRegisterOrNonDoubleConstant(ins->value());
     else
         value = useRegisterOrNonDoubleConstant(ins->value());
@@ -3785,9 +3795,8 @@ LIRGenerator::visitSimdBox(MSimdBox* ins)
     MOZ_ASSERT(IsSimdType(ins->input()->type()));
     LUse in = useRegister(ins->input());
     LSimdBox* lir = new(alloc()) LSimdBox(in, temp());
-    // :TODO: Cannot spill SIMD registers (Bug 1112164)
-    assignSnapshot(lir, Bailout_Inevitable);
     define(lir, ins);
+    assignSafepoint(lir, ins);
 }
 
 void
@@ -3950,6 +3959,36 @@ LIRGenerator::visitSimdShuffle(MSimdShuffle* ins)
 }
 
 void
+LIRGenerator::visitSimdGeneralShuffle(MSimdGeneralShuffle*ins)
+{
+    MOZ_ASSERT(IsSimdType(ins->type()));
+
+    LSimdGeneralShuffleBase *lir;
+    if (ins->type() == MIRType_Int32x4)
+        lir = new (alloc()) LSimdGeneralShuffleI(temp());
+    else if (ins->type() == MIRType_Float32x4)
+        lir = new (alloc()) LSimdGeneralShuffleF(temp());
+    else
+        MOZ_CRASH("Unknown SIMD kind when doing a shuffle");
+
+    if (!lir->init(alloc(), ins->numVectors() + ins->numLanes()))
+        return;
+
+    for (unsigned i = 0; i < ins->numVectors(); i++) {
+        MOZ_ASSERT(IsSimdType(ins->vector(i)->type()));
+        lir->setOperand(i, useRegister(ins->vector(i)));
+    }
+
+    for (unsigned i = 0; i < ins->numLanes(); i++) {
+        MOZ_ASSERT(ins->lane(i)->type() == MIRType_Int32);
+        lir->setOperand(i + ins->numVectors(), useRegister(ins->lane(i)));
+    }
+
+    assignSnapshot(lir, Bailout_BoundsCheck);
+    define(lir, ins);
+}
+
+void
 LIRGenerator::visitSimdUnaryArith(MSimdUnaryArith *ins)
 {
     MOZ_ASSERT(IsSimdType(ins->input()->type()));
@@ -4023,13 +4062,13 @@ LIRGenerator::visitSimdShift(MSimdShift* ins)
 void
 LIRGenerator::visitLexicalCheck(MLexicalCheck* ins)
 {
-    MDefinition* input = ins->input();
+    MDefinition *input = ins->input();
     MOZ_ASSERT(input->type() == MIRType_Value);
-    LLexicalCheck* lir = new(alloc()) LLexicalCheck();
-    redefine(ins, input);
+    LLexicalCheck *lir = new(alloc()) LLexicalCheck();
     useBox(lir, LLexicalCheck::Input, input);
     add(lir, ins);
     assignSafepoint(lir, ins);
+    redefine(ins, input);
 }
 
 void
@@ -4074,7 +4113,7 @@ SpewResumePoint(MBasicBlock* block, MInstruction* ins, MResumePoint* resumePoint
             int(resumePoint->block()->info().script()->pcToOffset(resumePoint->pc())));
 
     for (size_t i = 0, e = resumePoint->numOperands(); i < e; i++) {
-        MDefinition* in = resumePoint->getOperand(i);
+        MDefinition *in = resumePoint->getOperand(i);
         fprintf(JitSpewFile, "    slot%u: ", (unsigned)i);
         in->printName(JitSpewFile);
         fprintf(JitSpewFile, "\n");

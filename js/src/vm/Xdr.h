@@ -29,11 +29,11 @@ namespace js {
  *
  *  https://developer.mozilla.org/en-US/docs/SpiderMonkey/Internals/Bytecode
  */
-static const uint32_t XDR_BYTECODE_VERSION_SUBTRAHEND = 244;
+static const uint32_t XDR_BYTECODE_VERSION_SUBTRAHEND = 249;
 static const uint32_t XDR_BYTECODE_VERSION =
     uint32_t(0xb973c0de - XDR_BYTECODE_VERSION_SUBTRAHEND);
 
-static_assert(JSErr_Limit == 380,
+static_assert(JSErr_Limit == 383,
               "GREETINGS, POTENTIAL SUBTRAHEND INCREMENTER! If you added or "
               "removed MSG_DEFs from js.msg, you should increment "
               "XDR_BYTECODE_VERSION_SUBTRAHEND and update this assertion's "
@@ -178,7 +178,7 @@ class XDRState {
     {
         uint32_t tmp;
         if (mode == XDR_ENCODE)
-            tmp = *val;
+            tmp = uint32_t(*val);
         if (!codeUint32(&tmp))
             return false;
         if (mode == XDR_DECODE)

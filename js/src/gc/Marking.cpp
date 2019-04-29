@@ -551,7 +551,13 @@ Mark##base##RootRange(JSTracer* trc, size_t len, type** vec, const char* name)  
 }                                                                                                 \
                                                                                                   \
 bool                                                                                              \
-Is##base##Marked(type** thingp)                                                                   \
+Is##base##MarkedFromAnyThread(type **thingp)                                                      \
+{                                                                                                 \
+    return IsMarkedFromAnyThread<type>(thingp);                                                   \
+}                                                                                                 \
+                                                                                                  \
+bool                                                                                              \
+Is##base##Marked(type **thingp)                                                                   \
 {                                                                                                 \
     return IsMarked<type>(thingp);                                                                \
 }                                                                                                 \
@@ -800,23 +806,7 @@ gc::MarkValueRoot(JSTracer* trc, Value* v, const char* name)
 }
 
 void
-TypeSet::MarkTypeRoot(JSTracer* trc, TypeSet::Type* v, const char* name)
-{
-    JS_ROOT_MARKING_ASSERT(trc);
-    trc->setTracingName(name);
-    if (v->isSingletonUnchecked()) {
-        JSObject* obj = v->singleton();
-        MarkInternal(trc, &obj);
-        *v = TypeSet::ObjectType(obj);
-    } else if (v->isGroupUnchecked()) {
-        ObjectGroup* group = v->group();
-        MarkInternal(trc, &group);
-        *v = TypeSet::ObjectType(group);
-    }
-}
-
-void
-gc::MarkValueRange(JSTracer* trc, size_t len, BarrieredBase<Value>* vec, const char* name)
+gc::MarkValueRange(JSTracer *trc, size_t len, BarrieredBase<Value> *vec, const char *name)
 {
     for (size_t i = 0; i < len; ++i) {
         trc->setTracingIndex(name, i);
@@ -898,6 +888,30 @@ gc::IsValueAboutToBeFinalizedFromAnyThread(Value* v)
         v->setSymbol(sym);
     }
     return rv;
+}
+
+/*** Type Marking ***/
+
+void
+TypeSet::MarkTypeRoot(JSTracer *trc, TypeSet::Type *v, const char *name)
+{
+    JS_ROOT_MARKING_ASSERT(trc);
+    MarkTypeUnbarriered(trc, v, name);
+}
+
+void
+TypeSet::MarkTypeUnbarriered(JSTracer *trc, TypeSet::Type *v, const char *name)
+{
+    trc->setTracingName(name);
+    if (v->isSingletonUnchecked()) {
+        JSObject *obj = v->singleton();
+        MarkInternal(trc, &obj);
+        *v = TypeSet::ObjectType(obj);
+    } else if (v->isGroupUnchecked()) {
+        ObjectGroup *group = v->group();
+        MarkInternal(trc, &group);
+        *v = TypeSet::ObjectType(group);
+    }
 }
 
 /*** Slot Marking ***/
@@ -1009,24 +1023,6 @@ gc::MarkValueUnbarriered(JSTracer* trc, Value* v, const char* name)
     MarkValueInternal(trc, v);
 }
 
-bool
-gc::IsCellMarked(Cell** thingp)
-{
-    return IsMarked<Cell>(thingp);
-}
-
-bool
-gc::IsCellAboutToBeFinalized(Cell** thingp)
-{
-    return IsAboutToBeFinalized<Cell>(thingp);
-}
-
-bool
-gc::IsCellAboutToBeFinalizedFromAnyThread(Cell** thingp)
-{
-    return IsAboutToBeFinalizedFromAnyThread<Cell>(thingp);
-}
-
 /*** Push Mark Stack ***/
 
 /*
@@ -1061,6 +1057,20 @@ PushMarkStack(GCMarker *gcmarker, Shape *thing)
 
 static inline void
 ScanBaseShape(GCMarker *gcmarker, BaseShape *base);
+
+void
+BaseShape::markChildren(JSTracer *trc)
+{
+    if (isOwned())
+        gc::MarkBaseShape(trc, &unowned_, "base");
+
+    JSObject* global = compartment()->unsafeUnbarrieredMaybeGlobal();
+    if (global)
+        MarkObjectUnbarriered(trc, &global, "global");
+
+    if (metadata)
+        gc::MarkObject(trc, &metadata, "metadata");
+}
 
 static void
 PushMarkStack(GCMarker *gcmarker, BaseShape *thing)
@@ -1103,11 +1113,8 @@ ScanBaseShape(GCMarker *gcmarker, BaseShape* base)
 
     base->compartment()->mark();
 
-    if (JSObject *parent = base->getObjectParent()) {
-        MaybePushMarkStackBetweenSlices(gcmarker, parent);
-    } else if (GlobalObject *global = base->compartment()->unsafeUnbarrieredMaybeGlobal()) {
+    if (GlobalObject *global = base->compartment()->unsafeUnbarrieredMaybeGlobal())
         gcmarker->traverse(global);
-    }
 
     if (JSObject *metadata = base->getObjectMetadata())
         MaybePushMarkStackBetweenSlices(gcmarker, metadata);
@@ -1250,45 +1257,30 @@ PushMarkStack(GCMarker *gcmarker, JS::Symbol *sym)
 }
 
 /*
- * This function is used by the cycle collector to trace through the
- * children of a BaseShape (and its baseUnowned(), if any). The cycle
- * collector does not directly care about BaseShapes, so only the
- * parent is marked. Furthermore, the parent is marked only if it isn't the
- * same as prevParent, which will be updated to the current shape's parent.
- */
-static inline void
-MarkCycleCollectorChildren(JSTracer *trc, BaseShape *base, JSObject **prevParent)
-{
-    MOZ_ASSERT(base);
-
-    /*
-     * The cycle collector does not need to trace unowned base shapes,
-     * as they have the same parent as the original base shape.
-     */
-    base->assertConsistency();
-
-    JSObject *parent = base->getObjectParent();
-    if (parent && parent != *prevParent) {
-        MarkObjectUnbarriered(trc, &parent, "parent");
-        MOZ_ASSERT(parent == base->getObjectParent());
-        *prevParent = parent;
-    }
-}
-
-/*
  * This function is used by the cycle collector to trace through a
  * shape. The cycle collector does not care about shapes or base
  * shapes, so those are not marked. Instead, any shapes or base shapes
  * that are encountered have their children marked. Stack space is
- * bounded. If two shapes in a row have the same parent pointer, the
- * parent pointer will only be marked once.
+ * bounded.
  */
 void
 gc::MarkCycleCollectorChildren(JSTracer *trc, Shape *shape)
 {
-    JSObject *prevParent = nullptr;
+    /*
+     * We need to mark the global, but it's OK to only do this once instead of
+     * doing it for every Shape in our lineage, since it's always the same
+     * global.
+     */
+    JSObject *global = shape->compartment()->unsafeUnbarrieredMaybeGlobal();
+    MOZ_ASSERT(global);
+    MarkObjectUnbarriered(trc, &global, "global");
+
     do {
-        MarkCycleCollectorChildren(trc, shape->base(), &prevParent);
+        MOZ_ASSERT(global == shape->compartment()->unsafeUnbarrieredMaybeGlobal());
+
+        MOZ_ASSERT(shape->base());
+        shape->base()->assertConsistency();
+
         MarkId(trc, &shape->propidRef(), "propid");
 
         if (shape->hasGetterObject()) {
@@ -1713,7 +1705,7 @@ GCMarker::processMarkStackTop(SliceBudget &budget)
                 goto scan_unboxed;
             }
             if (clasp == &UnboxedPlainObject::class_) {
-                const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+                const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
                 unboxedTraceList = layout.traceList();
                 if (!unboxedTraceList)
                     return;

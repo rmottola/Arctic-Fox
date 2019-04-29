@@ -402,26 +402,26 @@ js::intrinsic_DefineDataProperty(JSContext* cx, unsigned argc, Value* vp)
     RootedValue value(cx, args[2]);
     unsigned attributes = args[3].toInt32();
 
-    Rooted<PropDesc> desc(cx);
+    Rooted<PropertyDescriptor> desc(cx);
+    unsigned attrs = 0;
 
     MOZ_ASSERT(bool(attributes & ATTR_ENUMERABLE) != bool(attributes & ATTR_NONENUMERABLE),
                "_DefineDataProperty must receive either ATTR_ENUMERABLE xor ATTR_NONENUMERABLE");
-    PropDesc::Enumerability enumerable =
-        PropDesc::Enumerability(bool(attributes & ATTR_ENUMERABLE));
+    if (attributes & ATTR_ENUMERABLE)
+        attrs |= JSPROP_ENUMERATE;
 
     MOZ_ASSERT(bool(attributes & ATTR_CONFIGURABLE) != bool(attributes & ATTR_NONCONFIGURABLE),
                "_DefineDataProperty must receive either ATTR_CONFIGURABLE xor "
                "ATTR_NONCONFIGURABLE");
-    PropDesc::Configurability configurable =
-        PropDesc::Configurability(bool(attributes & ATTR_CONFIGURABLE));
+    if (attributes & ATTR_NONCONFIGURABLE)
+        attrs |= JSPROP_PERMANENT;
 
     MOZ_ASSERT(bool(attributes & ATTR_WRITABLE) != bool(attributes & ATTR_NONWRITABLE),
                "_DefineDataProperty must receive either ATTR_WRITABLE xor ATTR_NONWRITABLE");
-    PropDesc::Writability writable =
-        PropDesc::Writability(bool(attributes & ATTR_WRITABLE));
+    if (attributes & ATTR_NONWRITABLE)
+        attrs |= JSPROP_READONLY;
 
-    desc = PropDesc(value, writable, enumerable, configurable);
-
+    desc.setDataDescriptor(value, attrs);
     return StandardDefineProperty(cx, obj, id, desc);
 }
 
@@ -493,7 +493,7 @@ js::intrinsic_IsPackedArray(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args.length() == 1);
     MOZ_ASSERT(args[0].isObject());
 
-    JSObject* obj = &args[0].toObject();
+    JSObject *obj = &args[0].toObject();
     bool isPacked = obj->is<ArrayObject>() && !obj->hasLazyGroup() &&
                     !obj->group()->hasAllFlags(OBJECT_FLAG_NON_PACKED) &&
                     obj->as<ArrayObject>().getDenseInitializedLength() ==
@@ -527,7 +527,7 @@ intrinsic_NewArrayIterator(JSContext* cx, unsigned argc, Value* vp)
     if (!proto)
         return false;
 
-    JSObject* obj = NewObjectWithGivenProto(cx, &ArrayIteratorObject::class_, proto, cx->global());
+    JSObject *obj = NewObjectWithGivenProto(cx, &ArrayIteratorObject::class_, proto);
     if (!obj)
         return false;
 
@@ -556,7 +556,7 @@ intrinsic_NewStringIterator(JSContext* cx, unsigned argc, Value* vp)
     if (!proto)
         return false;
 
-    JSObject* obj = NewObjectWithGivenProto(cx, &StringIteratorObject::class_, proto, cx->global());
+    JSObject *obj = NewObjectWithGivenProto(cx, &StringIteratorObject::class_, proto);
     if (!obj)
         return false;
 
@@ -1147,7 +1147,7 @@ JSRuntime::initSelfHosting(JSContext* cx)
     char* filename = getenv("MOZ_SELFHOSTEDJS");
     if (filename) {
         RootedScript script(cx);
-        if (Compile(cx, shg, options, filename, &script))
+        if (Compile(cx, options, filename, &script))
             ok = Execute(cx, script, *shg.get(), rv.address());
     } else {
         uint32_t srcLen = GetRawScriptsSize();
@@ -1161,7 +1161,7 @@ JSRuntime::initSelfHosting(JSContext* cx)
             ok = false;
         }
 
-        ok = ok && Evaluate(cx, shg, options, src, srcLen, &rv);
+        ok = ok && Evaluate(cx, options, src, srcLen, &rv);
     }
     JS_SetErrorReporter(cx->runtime(), oldReporter);
     return ok;
@@ -1344,7 +1344,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
         clone = NewDenseEmptyArray(cx, NullPtr(), TenuredObject);
     } else {
         MOZ_ASSERT(selfHostedObject->isNative());
-        clone = NewObjectWithGivenProto(cx, selfHostedObject->getClass(), NullPtr(), cx->global(),
+        clone = NewObjectWithGivenProto(cx, selfHostedObject->getClass(), NullPtr(),
                                         selfHostedObject->asTenured().getAllocKind(),
                                         SingletonObject);
     }

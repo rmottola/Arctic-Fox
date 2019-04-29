@@ -931,6 +931,29 @@ MSimdSwizzle::foldsTo(TempAllocator& alloc)
 }
 
 
+MDefinition *
+MSimdGeneralShuffle::foldsTo(TempAllocator &alloc)
+{
+    FixedList<uint32_t> lanes;
+    if (!lanes.init(alloc, numLanes()))
+        return this;
+
+    for (size_t i = 0; i < numLanes(); i++) {
+        if (!lane(i)->isConstant() || lane(i)->type() != MIRType_Int32)
+            return this;
+        int32_t temp = lane(i)->toConstant()->value().toInt32();
+        if (temp < 0 || uint32_t(temp) >= numLanes() * numVectors())
+            return this;
+        lanes[i] = uint32_t(temp);
+    }
+
+    if (numVectors() == 1)
+        return MSimdSwizzle::New(alloc, vector(0), type(), lanes[0], lanes[1], lanes[2], lanes[3]);
+
+    MOZ_ASSERT(numVectors() == 2);
+    return MSimdShuffle::New(alloc, vector(0), vector(1), type(), lanes[0], lanes[1], lanes[2], lanes[3]);
+}
+
 template <typename T>
 static void
 PrintOpcodeOperation(T *mir, FILE *fp)
@@ -996,10 +1019,10 @@ MConstantElements::printOpcode(FILE* fp) const
 }
 
 void
-MLoadTypedArrayElement::printOpcode(FILE* fp) const
+MLoadUnboxedScalar::printOpcode(FILE *fp) const
 {
     MDefinition::printOpcode(fp);
-    fprintf(fp, " %s", ScalarTypeDescr::typeName(arrayType()));
+    fprintf(fp, " %s", ScalarTypeDescr::typeName(indexType()));
 }
 
 void
@@ -2025,7 +2048,7 @@ NeedNegativeZeroCheck(MDefinition* def)
           case MDefinition::Op_StoreElementHole:
           case MDefinition::Op_LoadElement:
           case MDefinition::Op_LoadElementHole:
-          case MDefinition::Op_LoadTypedArrayElement:
+          case MDefinition::Op_LoadUnboxedScalar:
           case MDefinition::Op_LoadTypedArrayElementHole:
           case MDefinition::Op_CharCodeAt:
           case MDefinition::Op_Mod:

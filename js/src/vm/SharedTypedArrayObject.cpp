@@ -350,13 +350,12 @@ class SharedTypedArrayObjectTemplate : public SharedTypedArrayObject
         unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
 
         Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
-        JSObject* getter = NewFunction(cx, NullPtr(), native, 0,
-                                       JSFunction::NATIVE_FUN, global, NullPtr());
+        JSObject *getter = NewNativeFunction(cx, native, 0, NullPtr());
         if (!getter)
             return false;
 
         return NativeDefineProperty(cx, proto, id, UndefinedHandleValue,
-                                    JS_DATA_TO_FUNC_PTR(PropertyOp, getter), nullptr,
+                                    JS_DATA_TO_FUNC_PTR(GetterOp, getter), nullptr,
                                     attrs);
     }
 
@@ -591,7 +590,7 @@ const JSFunctionSpec Shared##_typedArray##Object::jsfuncs[] = {                 
    B2G ICS. Older GCC versions have a bug in which they fail to compile            \
    reinterpret_casts of templated functions with the message: "insufficient        \
    contextual information to determine type". JS_PSG needs to                      \
-   reinterpret_cast<JSPropertyOp>, so this causes problems for us here.            \
+   reinterpret_cast<JSGetterOp>, so this causes problems for us here.              \
                                                                                    \
    We could restructure all this code to make this nicer, but since ICS isn't      \
    going to be around forever (and since this bug is fixed with the newer GCC      \

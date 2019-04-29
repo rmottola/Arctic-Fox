@@ -117,7 +117,6 @@ class JitcodeSkiplistTower
     }
 };
 
-
 class JitcodeGlobalEntry
 {
     friend class JitcodeGlobalTable;
@@ -208,7 +207,9 @@ class JitcodeGlobalEntry
             return startsBelowPointer(ptr) && endsAbovePointer(ptr);
         }
 
-        void markJitcode(JSTracer *trc);
+        bool markJitcodeIfUnmarked(JSTracer *trc);
+        bool isJitcodeMarkedFromAnyThread();
+        bool isJitcodeAboutToBeFinalized();
     };
 
     struct IonEntry : public BaseEntry
@@ -357,7 +358,9 @@ class JitcodeGlobalEntry
 
         mozilla::Maybe<uint8_t> trackedOptimizationIndexAtAddr(void* ptr);
 
-        void mark(JSTracer *trc);
+        bool markIfUnmarked(JSTracer *trc);
+        void sweep();
+        bool isMarkedFromAnyThread();
     };
 
     struct BaselineEntry : public BaseEntry
@@ -410,6 +413,10 @@ class JitcodeGlobalEntry
 
         void youngestFrameLocationAtAddr(JSRuntime *rt, void *ptr,
                                          JSScript **script, jsbytecode **pc) const;
+
+        bool markIfUnmarked(JSTracer *trc);
+        void sweep();
+        bool isMarkedFromAnyThread();
     };
 
     struct IonCacheEntry : public BaseEntry
@@ -438,6 +445,8 @@ class JitcodeGlobalEntry
 
         void youngestFrameLocationAtAddr(JSRuntime *rt, void *ptr,
                                          JSScript **script, jsbytecode **pc) const;
+
+        bool isMarkedFromAnyThread(JSRuntime *rt);
     };
 
     // Dummy entries are created for jitcode generated when profiling is not turned on,
@@ -803,6 +812,62 @@ class JitcodeGlobalEntry
         return ionEntry().allTrackedTypes();
     }
 
+    Zone *zone() {
+        return baseEntry().jitcode()->zone();
+    }
+
+    bool markIfUnmarked(JSTracer *trc) {
+        bool markedAny = baseEntry().markJitcodeIfUnmarked(trc);
+        switch (kind()) {
+          case Ion:
+            markedAny |= ionEntry().markIfUnmarked(trc);
+            break;
+          case Baseline:
+            markedAny |= baselineEntry().markIfUnmarked(trc);
+            break;
+          case IonCache:
+          case Dummy:
+            break;
+          default:
+            MOZ_CRASH("Invalid JitcodeGlobalEntry kind.");
+        }
+        return markedAny;
+    }
+
+    void sweep() {
+        switch (kind()) {
+          case Ion:
+            ionEntry().sweep();
+            break;
+          case Baseline:
+            baselineEntry().sweep();
+            break;
+          case IonCache:
+          case Dummy:
+            break;
+          default:
+            MOZ_CRASH("Invalid JitcodeGlobalEntry kind.");
+        }
+    }
+
+    bool isMarkedFromAnyThread(JSRuntime *rt) {
+        if (!baseEntry().isJitcodeMarkedFromAnyThread())
+            return false;
+        switch (kind()) {
+          case Ion:
+            return ionEntry().isMarkedFromAnyThread();
+          case Baseline:
+            return baselineEntry().isMarkedFromAnyThread();
+          case IonCache:
+            return ionCacheEntry().isMarkedFromAnyThread(rt);
+          case Dummy:
+            break;
+          default:
+            MOZ_CRASH("Invalid JitcodeGlobalEntry kind.");
+        }
+        return true;
+    }
+
     //
     // When stored in a free-list, entries use 'tower_' to store a
     // pointer to the next entry.  In this context only, 'tower_'
@@ -886,13 +951,14 @@ class JitcodeGlobalTable
         return addEntry(JitcodeGlobalEntry(entry), rt);
     }
 
-    void removeEntry(void* startAddr, JSRuntime* rt);
-    void releaseEntry(void *startAddr, JSRuntime *rt);
+    void removeEntry(JitcodeGlobalEntry &entry, JitcodeGlobalEntry **prevTower, JSRuntime *rt);
+    void releaseEntry(JitcodeGlobalEntry &entry, JitcodeGlobalEntry **prevTower, JSRuntime *rt);
 
-    void mark(JSTracer *trc);
+    bool markIteratively(JSTracer *trc);
+    void sweep(JSRuntime *rt);
 
   private:
-    bool addEntry(const JitcodeGlobalEntry& entry, JSRuntime* rt);
+    bool addEntry(const JitcodeGlobalEntry &entry, JSRuntime *rt);
 
     JitcodeGlobalEntry *lookupInternal(void *ptr);
 
@@ -918,6 +984,49 @@ class JitcodeGlobalTable
 #else
     void verifySkiplist() {}
 #endif
+
+  public:
+    class Range
+    {
+      protected:
+        JitcodeGlobalTable &table_;
+        JitcodeGlobalEntry *cur_;
+
+      public:
+        explicit Range(JitcodeGlobalTable &table)
+          : table_(table),
+            cur_(table.startTower_[0])
+        { }
+
+        JitcodeGlobalEntry *front() const {
+            MOZ_ASSERT(!empty());
+            return cur_;
+        }
+
+        bool empty() const {
+            return !cur_;
+        }
+
+        void popFront() {
+            MOZ_ASSERT(!empty());
+            cur_ = cur_->tower_->next(0);
+        }
+    };
+
+    // An enumerator class that can remove entries as it enumerates. If this
+    // functionality is not needed, use Range instead.
+    class Enum : public Range
+    {
+        JSRuntime *rt_;
+        JitcodeGlobalEntry *next_;
+        JitcodeGlobalEntry *prevTower_[JitcodeSkiplistTower::MAX_HEIGHT];
+
+      public:
+        Enum(JitcodeGlobalTable &table, JSRuntime *rt);
+
+        void popFront();
+        void removeFront();
+    };
 };
 
 

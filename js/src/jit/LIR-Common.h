@@ -375,6 +375,46 @@ class LSimdSwizzleF : public LSimdSwizzleBase
     {}
 };
 
+class LSimdGeneralShuffleBase : public LVariadicInstruction<1, 1>
+{
+  public:
+    explicit LSimdGeneralShuffleBase(const LDefinition &temp) {
+        setTemp(0, temp);
+    }
+    const LAllocation *vector(unsigned i) {
+        MOZ_ASSERT(i < mir()->numVectors());
+        return getOperand(i);
+    }
+    const LAllocation *lane(unsigned i) {
+        MOZ_ASSERT(i < mir()->numLanes());
+        return getOperand(mir()->numVectors() + i);
+    }
+    const LDefinition *temp() {
+        return getTemp(0);
+    }
+    MSimdGeneralShuffle *mir() const {
+        return mir_->toSimdGeneralShuffle();
+    }
+};
+
+class LSimdGeneralShuffleI : public LSimdGeneralShuffleBase
+{
+  public:
+    LIR_HEADER(SimdGeneralShuffleI);
+    explicit LSimdGeneralShuffleI(const LDefinition &temp)
+      : LSimdGeneralShuffleBase(temp)
+    {}
+};
+
+class LSimdGeneralShuffleF : public LSimdGeneralShuffleBase
+{
+  public:
+    LIR_HEADER(SimdGeneralShuffleF);
+    explicit LSimdGeneralShuffleF(const LDefinition &temp)
+      : LSimdGeneralShuffleBase(temp)
+    {}
+};
+
 // Base class for both int32x4 and float32x4 shuffle instructions.
 class LSimdShuffle : public LInstructionHelper<1, 2, 1>
 {
@@ -4794,28 +4834,27 @@ class LArrayJoin : public LCallInstructionHelper<1, 2, 0>
     }
 };
 
-// Load a typed value from a typed array's elements vector.
-class LLoadTypedArrayElement : public LInstructionHelper<1, 2, 1>
+class LLoadUnboxedScalar : public LInstructionHelper<1, 2, 1>
 {
   public:
-    LIR_HEADER(LoadTypedArrayElement)
+    LIR_HEADER(LoadUnboxedScalar)
 
-    LLoadTypedArrayElement(const LAllocation& elements, const LAllocation& index,
-                           const LDefinition& temp) {
+    LLoadUnboxedScalar(const LAllocation &elements, const LAllocation &index,
+                       const LDefinition &temp) {
         setOperand(0, elements);
         setOperand(1, index);
         setTemp(0, temp);
     }
-    const MLoadTypedArrayElement* mir() const {
-        return mir_->toLoadTypedArrayElement();
+    const MLoadUnboxedScalar *mir() const {
+        return mir_->toLoadUnboxedScalar();
     }
-    const LAllocation* elements() {
+    const LAllocation *elements() {
         return getOperand(0);
     }
-    const LAllocation* index() {
+    const LAllocation *index() {
         return getOperand(1);
     }
-    const LDefinition* temp() {
+    const LDefinition *temp() {
         return getTemp(0);
     }
 };
@@ -4855,28 +4894,28 @@ class LLoadTypedArrayElementStatic : public LInstructionHelper<1, 1, 0>
     }
 };
 
-class LStoreTypedArrayElement : public LInstructionHelper<0, 3, 0>
+class LStoreUnboxedScalar : public LInstructionHelper<0, 3, 0>
 {
   public:
-    LIR_HEADER(StoreTypedArrayElement)
+    LIR_HEADER(StoreUnboxedScalar)
 
-    LStoreTypedArrayElement(const LAllocation& elements, const LAllocation& index,
-                            const LAllocation& value) {
+    LStoreUnboxedScalar(const LAllocation &elements, const LAllocation &index,
+                        const LAllocation &value) {
         setOperand(0, elements);
         setOperand(1, index);
         setOperand(2, value);
     }
 
-    const MStoreTypedArrayElement* mir() const {
-        return mir_->toStoreTypedArrayElement();
+    const MStoreUnboxedScalar *mir() const {
+        return mir_->toStoreUnboxedScalar();
     }
-    const LAllocation* elements() {
+    const LAllocation *elements() {
         return getOperand(0);
     }
-    const LAllocation* index() {
+    const LAllocation *index() {
         return getOperand(1);
     }
-    const LAllocation* value() {
+    const LAllocation *value() {
         return getOperand(2);
     }
 };
@@ -6630,6 +6669,28 @@ class LAssertRangeV : public LInstructionHelper<0, BOX_PIECES, 3>
     const Range* range() {
         return mir()->assertedRange();
     }
+};
+
+class LAssertResultT : public LInstructionHelper<0, 1, 0>
+{
+  public:
+    LIR_HEADER(AssertResultT)
+
+    explicit LAssertResultT(const LAllocation &input) {
+        setOperand(0, input);
+    }
+
+    const LAllocation *input() {
+        return getOperand(0);
+    }
+};
+
+class LAssertResultV : public LInstructionHelper<0, BOX_PIECES, 0>
+{
+  public:
+    LIR_HEADER(AssertResultV)
+
+    static const size_t Input = 0;
 };
 
 class LRecompileCheck : public LInstructionHelper<0, 0, 1>

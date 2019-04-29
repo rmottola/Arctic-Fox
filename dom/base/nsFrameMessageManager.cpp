@@ -1603,13 +1603,13 @@ nsMessageManagerScriptExecutor::TryCacheLoadAndCompileScript(
     JS::Rooted<JSScript*> script(cx);
 
     if (aRunInGlobalScope) {
-      if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script)) {
+      if (!JS::Compile(cx, options, srcBuf, &script)) {
         return;
       }
     } else {
       // We can't clone compile-and-go scripts.
       options.setCompileAndGo(false);
-      if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script)) {
+      if (!JS::Compile(cx, options, srcBuf, &script)) {
         return;
       }
     }

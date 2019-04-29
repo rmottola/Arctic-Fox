@@ -612,10 +612,14 @@ CycleCollectedJSRuntime::NoteGCThingXPCOMChildren(const js::Class* aClasp,
     const DOMJSClass* domClass = GetDOMClass(aObj);
     if (domClass) {
       NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(aCb, "UnwrapDOMObject(obj)");
+      // It's possible that our object is an unforgeable holder object, in
+      // which case it doesn't actually have a C++ DOM object associated with
+      // it.  Use UnwrapPossiblyNotInitializedDOMObject, which produces null in
+      // that case, since NoteXPCOMChild/NoteNativeChild are null-safe.
       if (domClass->mDOMObjectIsISupports) {
-        aCb.NoteXPCOMChild(UnwrapDOMObject<nsISupports>(aObj));
+        aCb.NoteXPCOMChild(UnwrapPossiblyNotInitializedDOMObject<nsISupports>(aObj));
       } else if (domClass->mParticipant) {
-        aCb.NoteNativeChild(UnwrapDOMObject<void>(aObj),
+        aCb.NoteNativeChild(UnwrapPossiblyNotInitializedDOMObject<void>(aObj),
                             domClass->mParticipant);
       }
     }
@@ -983,7 +987,7 @@ CycleCollectedJSRuntime::UsefulToMergeZones() const
     MOZ_ASSERT(js::IsOuterObject(obj));
     // Grab the inner from the outer.
     obj = JS_ObjectToInnerObject(cx, obj);
-    MOZ_ASSERT(!js::GetObjectParent(obj));
+    MOZ_ASSERT(JS_IsGlobalObject(obj));
     if (JS::ObjectIsMarkedGray(obj) &&
         !js::IsSystemCompartment(js::GetObjectCompartment(obj))) {
       return true;

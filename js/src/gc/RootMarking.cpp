@@ -24,7 +24,6 @@
 #include "js/HashTable.h"
 #include "vm/Debugger.h"
 #include "vm/JSONParser.h"
-#include "vm/PropDesc.h"
 
 #include "jsgcinlines.h"
 #include "jsobjinlines.h"
@@ -52,12 +51,6 @@ MarkBindingsRoot(JSTracer* trc, Bindings* bindings, const char* name)
 
 void
 MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* name)
-{
-    pd->trace(trc);
-}
-
-void
-MarkPropDescRoot(JSTracer* trc, PropDesc* pd, const char* name)
 {
     pd->trace(trc);
 }
@@ -116,7 +109,6 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<Bindings, MarkBindingsRoot>(trc, context, "Bindings");
     MarkExactStackRootList<JSPropertyDescriptor, MarkPropertyDescriptorRoot>(
         trc, context, "JSPropertyDescriptor");
-    MarkExactStackRootList<PropDesc, MarkPropDescRoot>(trc, context, "PropDesc");
 }
 
 static void
@@ -149,8 +141,8 @@ AutoGCRooter::trace(JSTracer* trc)
       }
 
       case DESCVECTOR: {
-        AutoPropDescVector::VectorImpl& descriptors =
-            static_cast<AutoPropDescVector*>(this)->vector;
+        AutoPropertyDescriptorVector::VectorImpl &descriptors =
+            static_cast<AutoPropertyDescriptorVector *>(this)->vector;
         for (size_t i = 0, len = descriptors.length(); i < len; i++)
             descriptors[i].trace(trc);
         return;
@@ -165,6 +157,15 @@ AutoGCRooter::trace(JSTracer* trc)
       case IDVECTOR: {
         AutoIdVector::VectorImpl& vector = static_cast<AutoIdVector*>(this)->vector;
         MarkIdRootRange(trc, vector.length(), vector.begin(), "js::AutoIdVector.vector");
+        return;
+      }
+
+      case IDVALVECTOR: {
+        AutoIdValueVector::VectorImpl &vector = static_cast<AutoIdValueVector *>(this)->vector;
+        for (size_t i = 0; i < vector.length(); i++) {
+            MarkIdRoot(trc, &vector[i].id, "js::AutoIdValueVector id");
+            MarkValueRoot(trc, &vector[i].value, "js::AutoIdValueVector value");
+        }
         return;
       }
 
@@ -346,14 +347,14 @@ JSPropertyDescriptor::trace(JSTracer* trc)
         MarkObjectRoot(trc, &obj, "Descriptor::obj");
     MarkValueRoot(trc, &value, "Descriptor::value");
     if ((attrs & JSPROP_GETTER) && getter) {
-        JSObject* tmp = JS_FUNC_TO_DATA_PTR(JSObject*, getter);
+        JSObject *tmp = JS_FUNC_TO_DATA_PTR(JSObject *, getter);
         MarkObjectRoot(trc, &tmp, "Descriptor::get");
-        getter = JS_DATA_TO_FUNC_PTR(JSPropertyOp, tmp);
+        getter = JS_DATA_TO_FUNC_PTR(JSGetterOp, tmp);
     }
     if ((attrs & JSPROP_SETTER) && setter) {
-        JSObject* tmp = JS_FUNC_TO_DATA_PTR(JSObject*, setter);
+        JSObject *tmp = JS_FUNC_TO_DATA_PTR(JSObject *, setter);
         MarkObjectRoot(trc, &tmp, "Descriptor::set");
-        setter = JS_DATA_TO_FUNC_PTR(JSStrictPropertyOp, tmp);
+        setter = JS_DATA_TO_FUNC_PTR(JSSetterOp, tmp);
     }
 }
 
@@ -451,6 +452,14 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
         MarkPersistentRootedChains(trc);
     }
 
+    if (rt->asyncStackForNewActivations)
+        MarkObjectRoot(trc, &rt->asyncStackForNewActivations,
+                       "asyncStackForNewActivations");
+
+    if (rt->asyncCauseForNewActivations)
+        MarkStringRoot(trc, &rt->asyncCauseForNewActivations,
+                       "asyncCauseForNewActivations");
+
     if (rt->scriptAndCountsVector) {
         ScriptAndCountsVector& vec = *rt->scriptAndCountsVector;
         for (size_t i = 0; i < vec.length(); i++)
@@ -477,8 +486,8 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
         /* Do not discard scripts with counts while profiling. */
         if (rt->profilingScripts && !isHeapMinorCollecting()) {
-            for (ZoneCellIterUnderGC i(zone, FINALIZE_SCRIPT); !i.done(); i.next()) {
-                JSScript* script = i.get<JSScript>();
+            for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
+                JSScript *script = i.get<JSScript>();
                 if (script->hasScriptCounts()) {
                     MarkScriptRoot(trc, &script, "profilingScripts");
                     MOZ_ASSERT(script == i.get<JSScript>());

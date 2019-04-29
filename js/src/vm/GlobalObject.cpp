@@ -232,13 +232,13 @@ GlobalObject::initBuiltinConstructor(JSContext* cx, Handle<GlobalObject*> global
     return true;
 }
 
-GlobalObject*
-GlobalObject::createInternal(JSContext* cx, const Class* clasp)
+GlobalObject *
+GlobalObject::createInternal(JSContext *cx, const Class *clasp)
 {
     MOZ_ASSERT(clasp->flags & JSCLASS_IS_GLOBAL);
     MOZ_ASSERT(clasp->trace == JS_GlobalObjectTraceHook);
 
-    JSObject* obj = NewObjectWithGivenProto(cx, clasp, NullPtr(), NullPtr(), SingletonObject);
+    JSObject *obj = NewObjectWithGivenProto(cx, clasp, NullPtr(), SingletonObject);
     if (!obj)
         return nullptr;
 
@@ -437,21 +437,20 @@ GlobalObject::warnOnceAbout(JSContext* cx, HandleObject obj, uint32_t slot, unsi
     return true;
 }
 
-JSFunction*
-GlobalObject::createConstructor(JSContext* cx, Native ctor, JSAtom* nameArg, unsigned length,
+JSFunction *
+GlobalObject::createConstructor(JSContext *cx, Native ctor, JSAtom *nameArg, unsigned length,
                                 gc::AllocKind kind)
 {
     RootedAtom name(cx, nameArg);
-    RootedObject self(cx, this);
-    return NewFunction(cx, NullPtr(), ctor, length, JSFunction::NATIVE_CTOR, self, name, kind);
+    return NewNativeConstructor(cx, ctor, length, name, kind);
 }
 
-static NativeObject*
-CreateBlankProto(JSContext* cx, const Class* clasp, HandleObject proto, HandleObject global)
+static NativeObject *
+CreateBlankProto(JSContext *cx, const Class *clasp, HandleObject proto, HandleObject global)
 {
     MOZ_ASSERT(clasp != &JSFunction::class_);
 
-    RootedNativeObject blankProto(cx, NewNativeObjectWithGivenProto(cx, clasp, proto, global,
+    RootedNativeObject blankProto(cx, NewNativeObjectWithGivenProto(cx, clasp, proto,
                                                                     SingletonObject));
     if (!blankProto || !blankProto->setDelegate(cx))
         return nullptr;
@@ -533,8 +532,7 @@ GlobalObject::getOrCreateDebuggers(JSContext* cx, Handle<GlobalObject*> global)
     if (debuggers)
         return debuggers;
 
-    NativeObject* obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, NullPtr(),
-                                                      global);
+    NativeObject *obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, NullPtr());
     if (!obj)
         return nullptr;
     debuggers = cx->new_<DebuggerVector>();
@@ -605,8 +603,9 @@ GlobalObject::getSelfHostedFunction(JSContext* cx, HandleAtom selfHostedName, Ha
     if (cx->global()->maybeGetIntrinsicValue(shId, funVal.address()))
         return true;
 
-    JSFunction* fun = NewFunction(cx, NullPtr(), nullptr, nargs, JSFunction::INTERPRETED_LAZY,
-                                  holder, name, JSFunction::ExtendedFinalizeKind, SingletonObject);
+    JSFunction *fun =
+        NewScriptedFunction(cx, nargs, JSFunction::INTERPRETED_LAZY,
+                            name, JSFunction::ExtendedFinalizeKind, SingletonObject);
     if (!fun)
         return false;
     fun->setIsSelfHostedBuiltin();

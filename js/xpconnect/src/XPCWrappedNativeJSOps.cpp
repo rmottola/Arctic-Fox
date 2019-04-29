@@ -242,7 +242,7 @@ DefinePropertyIfFound(XPCCallContext& ccx,
                 call = nullptr;
 
             if (call) {
-                RootedFunction fun(ccx, JS_NewFunction(ccx, call, 0, 0, obj, name));
+                RootedFunction fun(ccx, JS_NewFunction(ccx, call, 0, 0, name));
                 if (!fun) {
                     JS_ReportOutOfMemory(ccx);
                     return false;
@@ -299,7 +299,7 @@ DefinePropertyIfFound(XPCCallContext& ccx,
             name = rt->GetStringName(XPCJSRuntime::IDX_WRAPPED_JSOBJECT);
 
             fun = JS_NewFunction(ccx, XPC_WN_DoubleWrappedGetter,
-                                 0, 0, obj, name);
+                                 0, 0, name);
 
             if (!fun)
                 return false;
@@ -999,7 +999,7 @@ XPCNativeScriptableShared::PopulateJSClass()
     if (mFlags.IsGlobalObject())
         mJSClass.base.flags |= XPCONNECT_GLOBAL_FLAGS;
 
-    JSPropertyOp addProperty;
+    JSAddPropertyOp addProperty;
     if (mFlags.WantAddProperty())
         addProperty = XPC_WN_Helper_AddProperty;
     else if (mFlags.UseJSStubForAddProperty())
@@ -1024,7 +1024,7 @@ XPCNativeScriptableShared::PopulateJSClass()
     else
         mJSClass.base.getProperty = nullptr;
 
-    JSStrictPropertyOp setProperty;
+    JSSetterOp setProperty;
     if (mFlags.WantSetProperty())
         setProperty = XPC_WN_Helper_SetProperty;
     else if (mFlags.UseJSStubForSetProperty())
@@ -1109,11 +1109,14 @@ MOZ_ALWAYS_INLINE JSObject*
 FixUpThisIfBroken(JSObject* obj, JSObject* funobj)
 {
     if (funobj) {
-        const js::Class* parentClass = js::GetObjectClass(js::GetObjectParent(funobj));
+        JSObject* parentObj =
+            &js::GetFunctionNativeReserved(funobj,
+                                           XPC_FUNCTION_PARENT_OBJECT_SLOT).toObject();
+        const js::Class *parentClass = js::GetObjectClass(parentObj);
         if (MOZ_UNLIKELY((IS_NOHELPER_CLASS(parentClass) || IS_CU_CLASS(parentClass)) &&
                          (js::GetObjectClass(obj) != parentClass)))
         {
-            return js::GetObjectParent(funobj);
+            return parentObj;
         }
     }
     return obj;

@@ -232,13 +232,11 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         if (!ctorProto)
             return nullptr;
 
-        RootedObject ctorObj(cx, NewObjectWithGivenProto(cx, &JSFunction::class_,
-                                                         ctorProto, global, SingletonObject));
-        if (!ctorObj)
-            return nullptr;
-
-        return NewFunction(cx, ctorObj, class_constructor, 3, JSFunction::NATIVE_CTOR, global,
-                           ClassName(key, cx), JSFunction::FinalizeKind);
+        return NewFunctionWithProto(cx, class_constructor, 3,
+                                    JSFunction::NATIVE_CTOR, NullPtr(),
+                                    ClassName(key, cx),
+                                    ctorProto, JSFunction::FinalizeKind,
+                                    SingletonObject);
     }
 
     static bool
@@ -254,8 +252,8 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         }
 
         RootedFunction fun(cx);
-        fun = NewFunction(cx, NullPtr(), ArrayBufferObject::createTypedArrayFromBuffer<NativeType>,
-                          0, JSFunction::NATIVE_FUN, cx->global(), NullPtr());
+        fun = NewNativeFunction(cx, ArrayBufferObject::createTypedArrayFromBuffer<NativeType>,
+                                0, NullPtr());
         if (!fun)
             return false;
 
@@ -722,7 +720,7 @@ FinishTypedArrayInit(JSContext* cx, HandleObject ctor, HandleObject proto)
  * B2G ICS. Older GCC versions have a bug in which they fail to compile
  * reinterpret_casts of templated functions with the message: "insufficient
  * contextual information to determine type". JS_PSG needs to
- * reinterpret_cast<JSPropertyOp>, so this causes problems for us here.
+ * reinterpret_cast<JSGetterOp>, so this causes problems for us here.
  *
  * We could restructure all this code to make this nicer, but since ICS isn't
  * going to be around forever (and since this bug is fixed with the newer GCC
@@ -1970,13 +1968,13 @@ DataViewObject::defineGetter(JSContext* cx, PropertyName* name, HandleNativeObje
     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
 
     Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
-    JSObject* getter = NewFunction(cx, NullPtr(), DataViewObject::getter<ValueGetter>, 0,
-                                   JSFunction::NATIVE_FUN, global, NullPtr());
+    JSObject *getter =
+        NewNativeFunction(cx, DataViewObject::getter<ValueGetter>, 0, NullPtr());
     if (!getter)
         return false;
 
     return NativeDefineProperty(cx, proto, id, UndefinedHandleValue,
-                                JS_DATA_TO_FUNC_PTR(PropertyOp, getter), nullptr, attrs);
+                                JS_DATA_TO_FUNC_PTR(GetterOp, getter), nullptr, attrs);
 }
 
 /* static */ bool
@@ -2015,8 +2013,8 @@ DataViewObject::initClass(JSContext* cx)
      * |new DataView(new otherWindow.ArrayBuffer())|, and install it in the
      * global for use by the DataViewObject constructor.
      */
-    RootedFunction fun(cx, NewFunction(cx, NullPtr(), ArrayBufferObject::createDataViewForThis,
-                                       0, JSFunction::NATIVE_FUN, global, NullPtr()));
+    RootedFunction fun(cx, NewNativeFunction(cx, ArrayBufferObject::createDataViewForThis,
+                                             0, NullPtr()));
     if (!fun)
         return false;
 

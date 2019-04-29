@@ -906,13 +906,13 @@ class GCRuntime
     void beginSweepingZoneGroup();
     bool shouldReleaseObservedTypes();
     void endSweepingZoneGroup();
-    IncrementalProgress sweepPhase(SliceBudget& sliceBudget);
+    IncrementalProgress sweepPhase(SliceBudget &sliceBudget);
     void endSweepPhase(bool lastGC);
     void sweepZones(FreeOp* fop, bool lastGC);
     void decommitAllWithoutUnlocking(const AutoLockGC& lock);
-    void decommitArenas(AutoLockGC& lock);
-    void expireChunksAndArenas(bool shouldShrink, AutoLockGC& lock);
-    void queueZonesForBackgroundSweep(ZoneList& zones);
+    void decommitArenas(AutoLockGC &lock);
+    void expireChunksAndArenas(bool shouldShrink, AutoLockGC &lock);
+    void queueZonesForBackgroundSweep(ZoneList &zones);
     void sweepBackgroundThings(ZoneList &zones, LifoAlloc &freeBlocks, ThreadType threadType);
     void assertBackgroundSweepingFinished();
     bool shouldCompact();
@@ -923,11 +923,11 @@ class GCRuntime
     void updateAllCellPointersParallel(MovingTracer *trc);
     void updateAllCellPointersSerial(MovingTracer *trc);
     void updatePointersToRelocatedCells();
-    void releaseRelocatedArenas(ArenaHeader* relocatedList);
-    void releaseRelocatedArenasWithoutUnlocking(ArenaHeader* relocatedList, const AutoLockGC& lock);
+    void releaseRelocatedArenas(ArenaHeader *relocatedList);
+    void releaseRelocatedArenasWithoutUnlocking(ArenaHeader *relocatedList, const AutoLockGC& lock);
 #ifdef DEBUG
-    void protectRelocatedArenas(ArenaHeader* relocatedList);
-    void unprotectRelocatedArenas(ArenaHeader* relocatedList);
+    void protectRelocatedArenas(ArenaHeader *relocatedList);
+    void unprotectRelocatedArenas(ArenaHeader *relocatedList);
 #endif
     void finishCollection(JS::gcreason::Reason reason);
 

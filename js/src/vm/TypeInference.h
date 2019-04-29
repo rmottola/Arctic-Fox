@@ -524,9 +524,12 @@ class TypeSet
     // Get the type of a possibly optimized out or uninitialized let value.
     // This generally only happens on unconditional type monitors on bailing
     // out of Ion, such as for argument and local types.
-    static inline Type GetMaybeUntrackedValueType(const Value& val);
+    static inline Type GetMaybeUntrackedValueType(const Value &val);
 
-    static void MarkTypeRoot(JSTracer* trc, Type* v, const char* name);
+    static void MarkTypeRoot(JSTracer *trc, Type *v, const char *name);
+    static void MarkTypeUnbarriered(JSTracer *trc, Type *v, const char *name);
+    static bool IsTypeMarkedFromAnyThread(Type *v);
+    static bool IsTypeAboutToBeFinalized(Type *v);
 };
 
 /*
@@ -807,7 +810,7 @@ class PreliminaryObjectArrayWithTemplate : public PreliminaryObjectArray
         return shape_;
     }
 
-    void maybeAnalyze(JSContext *cx, ObjectGroup *group, bool force = false);
+    void maybeAnalyze(ExclusiveContext *cx, ObjectGroup *group, bool force = false);
 
     void trace(JSTracer *trc);
 

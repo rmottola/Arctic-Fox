@@ -144,7 +144,7 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, InternalBindingsHandle 
 
     // Start with the empty shape and then append one shape per aliased binding.
     RootedShape shape(cx,
-        EmptyShape::getInitialShape(cx, &CallObject::class_, TaggedProto(nullptr), nullptr, nullptr,
+        EmptyShape::getInitialShape(cx, &CallObject::class_, TaggedProto(nullptr), nullptr,
                                     nfixed, BaseShape::QUALIFIED_VAROBJ | BaseShape::DELEGATE));
     if (!shape)
         return false;
@@ -167,7 +167,7 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, InternalBindingsHandle 
             return false;
 #endif
 
-        StackBaseShape stackBase(cx, &CallObject::class_, nullptr, nullptr,
+        StackBaseShape stackBase(cx, &CallObject::class_, nullptr,
                                  BaseShape::QUALIFIED_VAROBJ | BaseShape::DELEGATE);
 
         UnownedBaseShape* base = BaseShape::getUnowned(cx, stackBase);
@@ -423,9 +423,9 @@ js::XDRScriptConst(XDRState<mode>* xdr, MutableHandleValue vp)
             vp.set(NullValue());
         break;
       case SCRIPT_OBJECT: {
-        RootedNativeObject obj(cx);
+        RootedObject obj(cx);
         if (mode == XDR_ENCODE)
-            obj = &vp.toObject().as<NativeObject>();
+            obj = &vp.toObject();
 
         if (!XDRObjectLiteral(xdr, &obj))
             return false;
@@ -530,10 +530,10 @@ XDRRelazificationInfo(XDRState<mode>* xdr, HandleFunction fun, HandleScript scri
 }
 
 static inline uint32_t
-FindScopeObjectIndex(JSScript* script, NestedScopeObject& scope)
+FindScopeObjectIndex(JSScript *script, NestedScopeObject& scope)
 {
-    ObjectArray* objects = script->objects();
-    HeapPtrNativeObject* vector = objects->vector;
+    ObjectArray *objects = script->objects();
+    HeapPtrObject *vector = objects->vector;
     unsigned length = objects->length;
     for (unsigned i = 0; i < length; ++i) {
         if (vector[i] == &scope)
@@ -905,11 +905,11 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
      * after the enclosing block has been XDR'd.
      */
     for (i = 0; i != nobjects; ++i) {
-        HeapPtrNativeObject* objp = &script->objects()->vector[i];
+        HeapPtrObject *objp = &script->objects()->vector[i];
         XDRClassKind classk;
 
         if (mode == XDR_ENCODE) {
-            JSObject* obj = *objp;
+            JSObject *obj = *objp;
             if (obj->is<BlockObject>())
                 classk = CK_BlockObject;
             else if (obj->is<StaticWithObject>())
@@ -1018,7 +1018,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
 
           case CK_JSObject: {
             /* Code object literal. */
-            RootedNativeObject tmp(cx, *objp);
+            RootedObject tmp(cx, *objp);
             if (!XDRObjectLiteral(xdr, &tmp))
                 return false;
             *objp = tmp;
@@ -1359,7 +1359,7 @@ const Class ScriptSourceObject::class_ = {
 ScriptSourceObject*
 ScriptSourceObject::create(ExclusiveContext* cx, ScriptSource* source)
 {
-    RootedObject object(cx, NewObjectWithGivenProto(cx, &class_, NullPtr(), cx->global()));
+    RootedObject object(cx, NewObjectWithGivenProto(cx, &class_, NullPtr()));
     if (!object)
         return nullptr;
     RootedScriptSource sourceObject(cx, &object->as<ScriptSourceObject>());
@@ -2480,25 +2480,25 @@ JSScript::partiallyInit(ExclusiveContext* cx, HandleScript script, uint32_t ncon
     if (nconsts != 0) {
         MOZ_ASSERT(reinterpret_cast<uintptr_t>(cursor) % sizeof(jsval) == 0);
         script->consts()->length = nconsts;
-        script->consts()->vector = (HeapValue*)cursor;
+        script->consts()->vector = (HeapValue *)cursor;
         cursor += nconsts * sizeof(script->consts()->vector[0]);
     }
 
     if (nobjects != 0) {
         script->objects()->length = nobjects;
-        script->objects()->vector = (HeapPtrNativeObject*)cursor;
+        script->objects()->vector = (HeapPtrObject *)cursor;
         cursor += nobjects * sizeof(script->objects()->vector[0]);
     }
 
     if (nregexps != 0) {
         script->regexps()->length = nregexps;
-        script->regexps()->vector = (HeapPtrNativeObject*)cursor;
+        script->regexps()->vector = (HeapPtrObject *)cursor;
         cursor += nregexps * sizeof(script->regexps()->vector[0]);
     }
 
     if (ntrynotes != 0) {
         script->trynotes()->length = ntrynotes;
-        script->trynotes()->vector = reinterpret_cast<JSTryNote*>(cursor);
+        script->trynotes()->vector = reinterpret_cast<JSTryNote *>(cursor);
         size_t vectorSize = ntrynotes * sizeof(script->trynotes()->vector[0]);
 #ifdef DEBUG
         memset(cursor, 0, vectorSize);
@@ -2988,7 +2988,7 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
 
     AutoObjectVector objects(cx);
     if (nobjects != 0) {
-        HeapPtrNativeObject* vector = src->objects()->vector;
+        HeapPtrObject *vector = src->objects()->vector;
         for (unsigned i = 0; i < nobjects; i++) {
             RootedObject obj(cx, vector[i]);
             RootedObject clone(cx);
@@ -3032,7 +3032,7 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
                  * with JSOPTION_COMPILE_N_GO set. As we don't clone the latter type of code, this
                  * case should only ever be hit when cloning objects from self-hosted code.
                  */
-                clone = CloneObjectLiteral(cx, cx->global(), obj);
+                clone = CloneObjectLiteral(cx, obj);
             }
             if (!clone || !objects.append(clone))
                 return nullptr;
@@ -3043,9 +3043,9 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
 
     AutoObjectVector regexps(cx);
     for (unsigned i = 0; i < nregexps; i++) {
-        HeapPtrNativeObject* vector = src->regexps()->vector;
+        HeapPtrObject *vector = src->regexps()->vector;
         for (unsigned i = 0; i < nregexps; i++) {
-            JSObject* clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
+            JSObject *clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
             if (!clone || !regexps.append(clone))
                 return nullptr;
         }
@@ -3133,13 +3133,13 @@ js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, 
             MOZ_ASSERT_IF(vector[i].isMarkable(), vector[i].toString()->isAtom());
     }
     if (nobjects != 0) {
-        HeapPtrNativeObject* vector = Rebase<HeapPtrNativeObject>(dst, src, src->objects()->vector);
+        HeapPtrObject *vector = Rebase<HeapPtrObject>(dst, src, src->objects()->vector);
         dst->objects()->vector = vector;
         for (unsigned i = 0; i < nobjects; ++i)
             vector[i].init(&objects[i]->as<NativeObject>());
     }
     if (nregexps != 0) {
-        HeapPtrNativeObject* vector = Rebase<HeapPtrNativeObject>(dst, src, src->regexps()->vector);
+        HeapPtrObject *vector = Rebase<HeapPtrObject>(dst, src, src->regexps()->vector);
         dst->regexps()->vector = vector;
         for (unsigned i = 0; i < nregexps; ++i)
             vector[i].init(&regexps[i]->as<NativeObject>());

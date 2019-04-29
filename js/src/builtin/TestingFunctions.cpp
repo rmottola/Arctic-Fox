@@ -1008,6 +1008,37 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
+CallFunctionWithAsyncStack(JSContext *cx, unsigned argc, jsval *vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (args.length() != 3) {
+        JS_ReportError(cx, "The function takes exactly three arguments.");
+        return false;
+    }
+    if (!args[0].isObject() || !IsCallable(args[0])) {
+        JS_ReportError(cx, "The first argument should be a function.");
+        return false;
+    }
+    if (!args[1].isObject() || !args[1].toObject().is<SavedFrame>()) {
+        JS_ReportError(cx, "The second argument should be a SavedFrame.");
+        return false;
+    }
+    if (!args[2].isString() || args[2].toString()->empty()) {
+        JS_ReportError(cx, "The third argument should be a non-empty string.");
+        return false;
+    }
+
+    RootedObject function(cx, &args[0].toObject());
+    RootedObject stack(cx, &args[1].toObject());
+    RootedString asyncCause(cx, args[2].toString());
+
+    JS::AutoSetAsyncStackForNewCalls sas(cx, stack, asyncCause);
+    return Call(cx, UndefinedHandleValue, function,
+                JS::HandleValueArray::empty(), args.rval());
+}
+
+static bool
 EnableTrackAllocations(JSContext* cx, unsigned argc, jsval* vp)
 {
     SetObjectMetadataCallback(cx, SavedStacksMetadataCallback);
@@ -1048,11 +1079,8 @@ static bool
 MakeFakePromise(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    RootedObject scope(cx, cx->global());
-    if (!scope)
-        return false;
 
-    RootedObject obj(cx, NewObjectWithGivenProto(cx, &FakePromiseClass, NullPtr(), scope));
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, &FakePromiseClass, NullPtr()));
     if (!obj)
         return false;
 
@@ -1877,8 +1905,8 @@ static bool
 DumpObject(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    RootedObject obj(cx);
-    if (!JS_ConvertArguments(cx, args, "o", obj.address()))
+    RootedObject obj(cx, ToObject(cx, args.get(0)));
+    if (!obj)
         return false;
 
     DumpObject(obj);
@@ -2212,11 +2240,19 @@ static bool
 EvalReturningScope(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-
-    RootedString str(cx);
-    RootedObject global(cx);
-    if (!JS_ConvertArguments(cx, args, "S/o", str.address(), global.address()))
+    if (!args.requireAtLeast(cx, "evalReturningScope", 1))
         return false;
+
+    RootedString str(cx, ToString(cx, args[0]));
+    if (!str)
+        return false;
+
+    RootedObject global(cx);
+    if (args.hasDefined(1)) {
+        global = ToObject(cx, args[1]);
+        if (!global)
+            return false;
+    }
 
     AutoStableStringChars strChars(cx);
     if (!strChars.initTwoByte(cx, str))
@@ -2238,7 +2274,7 @@ EvalReturningScope(JSContext* cx, unsigned argc, jsval* vp)
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
     RootedScript script(cx);
-    if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script))
+    if (!JS::Compile(cx, options, srcBuf, &script))
         return false;
 
     if (global) {
@@ -2278,10 +2314,15 @@ static bool
 ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "cloneAndExecuteScript", 2))
+        return false;
 
-    RootedString str(cx);
-    RootedObject global(cx);
-    if (!JS_ConvertArguments(cx, args, "So", str.address(), global.address()))
+    RootedString str(cx, ToString(cx, args[0]));
+    if (!str)
+        return false;
+
+    RootedObject global(cx, ToObject(cx, args[1]));
+    if (!global)
         return false;
 
     AutoStableStringChars strChars(cx);
@@ -2304,7 +2345,7 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
     RootedScript script(cx);
-    if (!JS::Compile(cx, JS::NullPtr(), options, srcBuf, &script))
+    if (!JS::Compile(cx, options, srcBuf, &script))
         return false;
 
     global = CheckedUnwrap(global);
@@ -2422,6 +2463,13 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  Capture a stack. If 'maxDepth' is given, capture at most 'maxDepth' number\n"
 "  of frames. If 'compartment' is given, allocate the js::SavedFrame instances\n"
 "  with the given object's compartment."),
+
+    JS_FN_HELP("callFunctionWithAsyncStack", CallFunctionWithAsyncStack, 0, 0,
+"callFunctionWithAsyncStack(function, stack, asyncCause)",
+"  Call 'function', using the provided stack as the async stack responsible\n"
+"  for the call, and propagate its return value or the exception it throws.\n"
+"  The function is called with no arguments, and 'this' is 'undefined'. The\n"
+"  specified |asyncCause| is attached to the provided stack frame."),
 
     JS_FN_HELP("enableTrackAllocations", EnableTrackAllocations, 0, 0,
 "enableTrackAllocations()",

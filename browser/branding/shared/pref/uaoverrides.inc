@@ -26,7 +26,6 @@ pref("@GUAO_PREF@.calendar.yahoo.com","Mozilla/5.0 (Macintosh; Intel Mac OS X 10
 pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:38.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/38.9 @PM_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:31.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/31.9 @PM_SLICE@");
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; rv:52.9) Gecko/20100101 Mobile Arcticfox/27.9.16");
 pref("@GUAO_PREF@.yahoo.com","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8");
 
 // Force youtube to present the old style layout
@@ -48,18 +47,19 @@ pref("@GUAO_PREF@.deviantart.com","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GR
 pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
-pref("@GUAO_PREF@.privat24.ua","Mozilla/5.0 (@OS_SLICE@ rv:38.0) @GK_SLICE@ Firefox/38.0");
-pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:45.9) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 
 // UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
-//pref("@GUAO_PREF@.web.whatsapp.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36");
+pref("@GUAO_PREF@.web.skype.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.2049.0 Safari/537.36 Edge/15.14931");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
-//pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/63.0 Arcticfox/27.9.12");
-//pref("general.appname.override", "Netscape");
-//pref("general.appversion.override", "5.0 (Windows)");
-//pref("general.buildID.override", "Gecko/20100101");
-//pref("general.oscpu.override", "Windows NT 10.0");
-//pref("general.platform.override", "Win64");
+// pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/63.0 Arcticfox/27.9.12");
+// pref("general.appname.override", "Netscape");
+// pref("general.appversion.override", "5.0 (Windows)");
+// pref("general.buildID.override", "Gecko/20100101");
+// pref("general.oscpu.override", "Windows NT 10.0");
+// pref("general.platform.override", "Win64");

@@ -30,6 +30,7 @@
 #include "jit/VMFunctions.h"
 #include "vm/ProxyObject.h"
 #include "vm/Shape.h"
+#include "vm/UnboxedObject.h"
 
 #ifdef IS_LITTLE_ENDIAN
 #define IMM32_16ADJ(X) X << 16
@@ -279,6 +280,8 @@ class MacroAssembler : public MacroAssemblerSpecific
     void guardObjectType(Register obj, const TypeSet* types, Register scratch, Label* miss);
     template <typename Source>
     void guardType(const Source& address, TypeSet::Type type, Register scratch, Label* miss);
+
+    void guardTypeSetMightBeIncomplete(Register obj, Register scratch, Label *label);
 
     void loadObjShape(Register objReg, Register dest) {
         loadPtr(Address(objReg, JSObject::offsetOfShape()), dest);
@@ -713,12 +716,12 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     template<typename T>
-    void loadFromTypedArray(Scalar::Type arrayType, const T& src, AnyRegister dest, Register temp, Label* fail,
-                            bool canonicalizeDoubles = true);
+    void loadFromTypedArray(Scalar::Type arrayType, const T &src, AnyRegister dest, Register temp, Label *fail,
+                            bool canonicalizeDoubles = true, unsigned numElems = 0);
 
     template<typename T>
-    void loadFromTypedArray(Scalar::Type arrayType, const T& src, const ValueOperand& dest, bool allowDouble,
-                            Register temp, Label* fail);
+    void loadFromTypedArray(Scalar::Type arrayType, const T &src, const ValueOperand &dest, bool allowDouble,
+                            Register temp, Label *fail);
 
     template<typename S, typename T>
     void storeToTypedIntArray(Scalar::Type arrayType, const S& value, const T& dest) {
@@ -742,15 +745,17 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     template<typename T>
-    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem, Register oldval, Register newval,
+    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T &mem, Register oldval, Register newval,
                                         Register temp, AnyRegister output);
 
     template<typename S, typename T>
-    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value,
-                                    const T& mem, Register temp1, Register temp2, AnyRegister output);
+    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S &value,
+                                    const T &mem, Register temp1, Register temp2, AnyRegister output);
 
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex& dest);
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address& dest);
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex &dest,
+                                unsigned numElems = 0);
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address &dest,
+                                unsigned numElems = 0);
 
     // Load a property from an UnboxedPlainObject.
     template <typename T>
@@ -813,40 +818,42 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     // Inline allocation.
   private:
-    void checkAllocatorState(Label* fail);
+    void checkAllocatorState(Label *fail);
     bool shouldNurseryAllocate(gc::AllocKind allocKind, gc::InitialHeap initialHeap);
-    void nurseryAllocate(Register result, Register slots, gc::AllocKind allocKind,
-                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
-    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
-    void allocateObject(Register result, Register slots, gc::AllocKind allocKind,
-                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
-    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
-    void copySlotsFromTemplate(Register obj, const NativeObject* templateObj,
+    void nurseryAllocate(Register result, Register temp, gc::AllocKind allocKind,
+                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
+    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
+    void allocateObject(Register result, Register temp, gc::AllocKind allocKind,
+                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
+    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
+    void copySlotsFromTemplate(Register obj, const NativeObject *templateObj,
                                uint32_t start, uint32_t end);
     void fillSlotsWithConstantValue(Address addr, Register temp, uint32_t start, uint32_t end,
-                                    const Value& v);
+                                    const Value &v);
     void fillSlotsWithUndefined(Address addr, Register temp, uint32_t start, uint32_t end);
     void fillSlotsWithUninitialized(Address addr, Register temp, uint32_t start, uint32_t end);
-    void initGCSlots(Register obj, Register temp, NativeObject* templateObj, bool initFixedSlots);
+    void initGCSlots(Register obj, Register temp, NativeObject *templateObj, bool initContents);
 
   public:
-    void callMallocStub(size_t nbytes, Register result, Label* fail);
+    void callMallocStub(size_t nbytes, Register result, Label *fail);
     void callFreeStub(Register slots);
-    void createGCObject(Register result, Register temp, JSObject* templateObj,
-                        gc::InitialHeap initialHeap, Label* fail, bool initFixedSlots = true);
+    void createGCObject(Register result, Register temp, JSObject *templateObj,
+                        gc::InitialHeap initialHeap, Label *fail, bool initContents = true);
 
-    void newGCThing(Register result, Register temp, JSObject* templateObj,
-                     gc::InitialHeap initialHeap, Label* fail);
-    void initGCThing(Register obj, Register temp, JSObject* templateObj,
-                     bool initFixedSlots = true);
+    void newGCThing(Register result, Register temp, JSObject *templateObj,
+                     gc::InitialHeap initialHeap, Label *fail);
+    void initGCThing(Register obj, Register temp, JSObject *templateObj,
+                     bool initContents = true);
 
-    void newGCString(Register result, Register temp, Label* fail);
-    void newGCFatInlineString(Register result, Register temp, Label* fail);
+    void initUnboxedObjectContents(Register object, UnboxedPlainObject *templateObject);
+
+    void newGCString(Register result, Register temp, Label *fail);
+    void newGCFatInlineString(Register result, Register temp, Label *fail);
 
     // Compares two strings for equality based on the JSOP.
     // This checks for identical pointers, atoms and length and fails for everything else.
     void compareStrings(JSOp op, Register left, Register right, Register result,
-                        Label* fail);
+                        Label *fail);
 
     // If the JitCode that created this assembler needs to transition into the VM,
     // we want to store the JitCode on the stack in order to mark it during a GC.

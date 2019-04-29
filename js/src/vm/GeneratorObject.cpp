@@ -35,13 +35,13 @@ GeneratorObject::create(JSContext* cx, AbstractFramePtr frame)
             if (!proto)
                 return nullptr;
         }
-        obj = NewNativeObjectWithGivenProto(cx, &StarGeneratorObject::class_, proto, global);
+        obj = NewNativeObjectWithGivenProto(cx, &StarGeneratorObject::class_, proto);
     } else {
         MOZ_ASSERT(frame.script()->isLegacyGenerator());
         RootedObject proto(cx, GlobalObject::getOrCreateLegacyGeneratorObjectPrototype(cx, global));
         if (!proto)
             return nullptr;
-        obj = NewNativeObjectWithGivenProto(cx, &LegacyGeneratorObject::class_, proto, global);
+        obj = NewNativeObjectWithGivenProto(cx, &LegacyGeneratorObject::class_, proto);
     }
     if (!obj)
         return nullptr;
@@ -270,7 +270,7 @@ NewSingletonObjectWithObjectPrototype(JSContext* cx, Handle<GlobalObject*> globa
     RootedObject proto(cx, global->getOrCreateObjectPrototype(cx));
     if (!proto)
         return nullptr;
-    return NewObjectWithGivenProto<PlainObject>(cx, proto, global, SingletonObject);
+    return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
 }
 
 static JSObject*
@@ -279,7 +279,7 @@ NewSingletonObjectWithFunctionPrototype(JSContext* cx, Handle<GlobalObject*> glo
     RootedObject proto(cx, global->getOrCreateFunctionPrototype(cx));
     if (!proto)
         return nullptr;
-    return NewObjectWithGivenProto<PlainObject>(cx, proto, global, SingletonObject);
+    return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
 }
 
 /* static */ bool
@@ -308,7 +308,7 @@ GlobalObject::initStarGenerators(JSContext* cx, Handle<GlobalObject*> global)
     if (!iteratorProto)
         return false;
 
-    RootedPlainObject genObjectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, iteratorProto, global));
+    RootedPlainObject genObjectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, iteratorProto));
     if (!genObjectProto)
         return false;
     if (!DefinePropertiesAndFunctions(cx, genObjectProto, nullptr, star_generator_methods))
@@ -325,8 +325,8 @@ GlobalObject::initStarGenerators(JSContext* cx, Handle<GlobalObject*> global)
         return false;
     RootedObject proto(cx, &function.toObject());
     RootedAtom name(cx, cx->names().GeneratorFunction);
-    RootedObject genFunction(cx, NewFunctionWithProto(cx, NullPtr(), Generator, 1,
-                                                      JSFunction::NATIVE_CTOR, global, name,
+    RootedObject genFunction(cx, NewFunctionWithProto(cx, Generator, 1,
+                                                      JSFunction::NATIVE_CTOR, NullPtr(), name,
                                                       proto));
     if (!genFunction)
         return false;

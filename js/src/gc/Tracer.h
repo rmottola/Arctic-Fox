@@ -318,11 +318,11 @@ class GCMarker : public JSTracer
     inline void processMarkStackTop(SliceBudget& budget);
     void processMarkStackOther(uintptr_t tag, uintptr_t addr);
 
-    void markAndScanString(JSObject* source, JSString* str);
-    void markAndScanSymbol(JSObject* source, JS::Symbol* sym);
-    bool markObject(JSObject* source, JSObject* obj);
+    void markAndScanString(JSObject *source, JSString *str);
+    void markAndScanSymbol(JSObject *source, JS::Symbol *sym);
+    bool markObject(JSObject *source, JSObject *obj);
 
-    void appendGrayRoot(void* thing, JSGCTraceKind kind);
+    void appendGrayRoot(void *thing, JSGCTraceKind kind);
 
     /* The color is only applied to objects and functions. */
     uint32_t color;
