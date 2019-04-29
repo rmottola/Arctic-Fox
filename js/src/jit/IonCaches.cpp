@@ -2797,7 +2797,7 @@ GenerateAddSlot(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &att
 }
 
 bool
-SetPropertyIC::attachAddSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
+SetPropertyIC::attachAddSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
                              HandleNativeObject obj, HandleShape oldShape, HandleObjectGroup oldGroup,
                              bool checkTypeset)
 {
@@ -2874,8 +2874,8 @@ IsPropertySetInlineable(NativeObject* obj, HandleId id, MutableHandleShape pshap
 }
 
 static bool
-IsPropertyAddInlineable(NativeObject* obj, HandleId id, ConstantOrRegister val, uint32_t oldSlots,
-                        HandleShape oldShape, bool needsTypeBarrier, bool* checkTypeset)
+IsPropertyAddInlineable(NativeObject *obj, HandleId id, ConstantOrRegister val, uint32_t oldSlots,
+                        HandleShape oldShape, bool needsTypeBarrier, bool *checkTypeset)
 {
     // If the shape of the object did not change, then this was not an add.
     if (obj->lastProperty() == oldShape)
@@ -2903,13 +2903,13 @@ IsPropertyAddInlineable(NativeObject* obj, HandleId id, ConstantOrRegister val, 
     // Walk up the object prototype chain and ensure that all prototypes
     // are native, and that all prototypes have no getter or setter
     // defined on the property
-    for (JSObject* proto = obj->getProto(); proto; proto = proto->getProto()) {
+    for (JSObject *proto = obj->getProto(); proto; proto = proto->getProto()) {
         // If prototype is non-native, don't optimize
         if (!proto->isNative())
             return false;
 
         // If prototype defines this property in a non-plain way, don't optimize
-        Shape* protoShape = proto->as<NativeObject>().lookupPure(id);
+        Shape *protoShape = proto->as<NativeObject>().lookupPure(id);
         if (protoShape && !protoShape->hasDefaultSetter())
             return false;
 
@@ -3053,11 +3053,11 @@ CanAttachSetUnboxed(JSContext* cx, HandleObject obj, HandleId id, ConstantOrRegi
 }
 
 bool
-SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex, HandleObject obj,
+SetPropertyIC::update(JSContext *cx, HandleScript outerScript, size_t cacheIndex, HandleObject obj,
                       HandleValue value)
 {
-    IonScript* ion = outerScript->ionScript();
-    SetPropertyIC& cache = ion->getCache(cacheIndex).toSetProperty();
+    IonScript *ion = outerScript->ionScript();
+    SetPropertyIC &cache = ion->getCache(cacheIndex).toSetProperty();
     RootedPropertyName name(cx, cache.name());
     RootedId id(cx, AtomToId(name));
 

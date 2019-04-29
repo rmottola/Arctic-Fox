@@ -336,7 +336,7 @@ ICStub::trace(JSTracer* trc)
         static_cast<ICGetName_Scope<6>*>(this)->traceScopes(trc);
         break;
       case ICStub::GetIntrinsic_Constant: {
-        ICGetIntrinsic_Constant* constantStub = toGetIntrinsic_Constant();
+        ICGetIntrinsic_Constant *constantStub = toGetIntrinsic_Constant();
         gc::MarkValue(trc, &constantStub->value(), "baseline-getintrinsic-constant-value");
         break;
       }
@@ -376,12 +376,12 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_Unboxed: {
-        ICGetProp_Unboxed* propStub = toGetProp_Unboxed();
+        ICGetProp_Unboxed *propStub = toGetProp_Unboxed();
         MarkObjectGroup(trc, &propStub->group(), "baseline-getprop-unboxed-stub-group");
         break;
       }
       case ICStub::GetProp_TypedObject: {
-        ICGetProp_TypedObject* propStub = toGetProp_TypedObject();
+        ICGetProp_TypedObject *propStub = toGetProp_TypedObject();
         MarkShape(trc, &propStub->shape(), "baseline-getprop-typedobject-stub-shape");
         break;
       }

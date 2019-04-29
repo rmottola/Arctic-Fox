@@ -668,15 +668,15 @@ class GetPropertyIC : public RepatchIonCache
 
     bool tryAttachUnboxed(JSContext* cx, HandleScript outerScript, IonScript* ion,
                           HandleObject obj, HandlePropertyName name,
-                          void* returnAddr, bool* emitted);
+                          void *returnAddr, bool *emitted);
 
-    bool tryAttachTypedArrayLength(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                   HandleObject obj, HandlePropertyName name, bool* emitted);
+    bool tryAttachTypedArrayLength(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                                   HandleObject obj, HandlePropertyName name, bool *emitted);
 
-    bool tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                  HandleObject obj, HandlePropertyName name, bool* emitted);
+    bool tryAttachArgumentsLength(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                                  HandleObject obj, HandlePropertyName name, bool *emitted);
 
-    static bool update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
+    static bool update(JSContext *cx, HandleScript outerScript, size_t cacheIndex,
                        HandleObject obj, MutableHandleValue vp);
 };
 
@@ -738,24 +738,24 @@ class SetPropertyIC : public RepatchIonCache
         CanAttachCallSetter
     };
 
-    bool attachSetSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachSetSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
                        HandleNativeObject obj, HandleShape shape, bool checkTypeset);
 
-    bool attachCallSetter(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachCallSetter(JSContext *cx, HandleScript outerScript, IonScript *ion,
                           HandleObject obj, HandleObject holder, HandleShape shape,
-                          void* returnAddr);
+                          void *returnAddr);
 
-    bool attachAddSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachAddSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
                        HandleNativeObject obj, HandleShape oldShape, HandleObjectGroup oldGroup,
                        bool checkTypeset);
 
-    bool attachSetUnboxed(JSContext* cx, HandleScript outerScript, IonScript* ion,
+    bool attachSetUnboxed(JSContext *cx, HandleScript outerScript, IonScript *ion,
                           HandleObject obj, HandleId id,
                           uint32_t unboxedOffset, JSValueType unboxedType,
                           bool checkTypeset);
 
-    bool attachGenericProxy(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                            void* returnAddr);
+    bool attachGenericProxy(JSContext *cx, HandleScript outerScript, IonScript *ion,
+                            void *returnAddr);
 
     bool attachDOMProxyShadowed(JSContext* cx, HandleScript outerScript, IonScript* ion,
                                 HandleObject obj, void* returnAddr);

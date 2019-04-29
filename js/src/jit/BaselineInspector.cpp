@@ -615,8 +615,8 @@ AddReceiverForGetPropFunction(BaselineInspector::ShapeVector &nativeShapes,
 }
 
 bool
-BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
-                                         JSFunction** commonGetter, Shape** globalShape,
+BaselineInspector::commonGetPropFunction(jsbytecode *pc, JSObject **holder, Shape **holderShape,
+                                         JSFunction **commonGetter, Shape **globalShape,
                                          bool *isOwnProperty,
                                          ShapeVector &nativeShapes,
                                          ObjectGroupVector &unboxedGroups)
@@ -673,8 +673,8 @@ BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shap
 }
 
 bool
-BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
-                                         JSFunction** commonSetter, bool* isOwnProperty,
+BaselineInspector::commonSetPropFunction(jsbytecode *pc, JSObject **holder, Shape **holderShape,
+                                         JSFunction **commonSetter, bool *isOwnProperty,
                                          ShapeVector &nativeShapes,
                                          ObjectGroupVector &unboxedGroups)
 {
@@ -689,7 +689,7 @@ BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shap
 
     for (ICStub *stub = entry.firstStub(); stub; stub = stub->next()) {
         if (stub->isSetProp_CallScripted() || stub->isSetProp_CallNative()) {
-            ICSetPropCallSetter *nstub = static_cast<ICSetPropCallSetter*>(stub);
+            ICSetPropCallSetter *nstub = static_cast<ICSetPropCallSetter *>(stub);
 	    if (!AddReceiver(nativeShapes, unboxedGroups, nstub->guard().token()))
                 return false;
 

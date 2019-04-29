@@ -614,7 +614,7 @@ UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_hasProperty(JSContext *cx, HandleObject obj, HandleId id, bool* foundp)
+UnboxedPlainObject::obj_hasProperty(JSContext *cx, HandleObject obj, HandleId id, bool *foundp)
 {
     if (obj->as<UnboxedPlainObject>().layout().lookup(id)) {
         *foundp = true;
@@ -631,10 +631,10 @@ UnboxedPlainObject::obj_hasProperty(JSContext *cx, HandleObject obj, HandleId id
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_getProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
+UnboxedPlainObject::obj_getProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
                                     HandleId id, MutableHandleValue vp)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (const UnboxedLayout::Property* property = layout.lookup(id)) {
         vp.set(obj->as<UnboxedPlainObject>().getValue(*property));
@@ -651,12 +651,12 @@ UnboxedPlainObject::obj_getProperty(JSContext* cx, HandleObject obj, HandleObjec
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
+UnboxedPlainObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
                                     HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
 
-    if (const UnboxedLayout::Property* property = layout.lookup(id)) {
+    if (const UnboxedLayout::Property *property = layout.lookup(id)) {
         if (obj == receiver) {
             if (obj->as<UnboxedPlainObject>().setValue(cx, *property, vp))
                 return result.succeed();
@@ -699,7 +699,7 @@ UnboxedPlainObject::obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_watch(JSContext* cx, HandleObject obj, HandleId id, HandleObject callable)
+UnboxedPlainObject::obj_watch(JSContext *cx, HandleObject obj, HandleId id, HandleObject callable)
 {
     if (!convertToNative(cx, obj))
         return false;
@@ -707,9 +707,9 @@ UnboxedPlainObject::obj_watch(JSContext* cx, HandleObject obj, HandleId id, Hand
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties)
+UnboxedPlainObject::obj_enumerate(JSContext *cx, HandleObject obj, AutoIdVector &properties)
 {
-    const UnboxedLayout::PropertyVector& unboxed = obj->as<UnboxedPlainObject>().layout().properties();
+    const UnboxedLayout::PropertyVector &unboxed = obj->as<UnboxedPlainObject>().layout().properties();
     for (size_t i = 0; i < unboxed.length(); i++) {
         if (!properties.append(NameToId(unboxed[i].name)))
             return false;
@@ -1000,7 +1000,7 @@ js::TryConvertToUnboxedLayout(ExclusiveContext *cx, Shape *templateShape,
     for (size_t i = 0; i < PreliminaryObjectArray::COUNT; i++) {
         if (!objects->get(i))
             continue;
-        UnboxedPlainObject* obj = &objects->get(i)->as<UnboxedPlainObject>();
+        UnboxedPlainObject *obj = &objects->get(i)->as<UnboxedPlainObject>();
         memset(obj->data(), 0, layout->size());
         for (size_t j = 0; j < templateShape->slotSpan(); j++) {
             Value v = values[valueCursor++];
