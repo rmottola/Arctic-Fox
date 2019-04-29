@@ -10502,7 +10502,7 @@ IonBuilder::addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Sh
     MDefinition* holderDef = constantMaybeNursery(holder);
     addShapeGuard(holderDef, holderShape, Bailout_ShapeGuard);
 
-    return addShapeGuardPolymorphic(obj, receiverShapes, receiverUnboxedGroups);
+    return addGuardReceiverPolymorphic(obj, receiverShapes, receiverUnboxedGroups);
 }
 
 bool
@@ -10769,7 +10769,7 @@ IonBuilder::getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName
         return false;
 
     if (sameSlot && unboxedGroups.empty()) {
-        obj = addShapeGuardPolymorphic(obj, nativeShapes, unboxedGroups);
+        obj = addGuardReceiverPolymorphic(obj, nativeShapes, unboxedGroups);
         if (!obj)
             return false;
 
@@ -11459,7 +11459,7 @@ IonBuilder::setPropTryInlineAccess(bool* emitted, MDefinition* obj,
         return false;
 
     if (sameSlot && unboxedGroups.empty()) {
-        obj = addShapeGuardPolymorphic(obj, nativeShapes, unboxedGroups);
+        obj = addGuardReceiverPolymorphic(obj, nativeShapes, unboxedGroups);
         if (!obj)
             return false;
 
@@ -12394,11 +12394,12 @@ IonBuilder::addShapeGuard(MDefinition* obj, Shape* const shape, BailoutKind bail
 }
 
 MInstruction *
-IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind)
+IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind,
+                          bool checkUnboxedExpando)
 {
     MGuardObjectGroup *guard = MGuardObjectGroup::New(alloc(), obj, group,
                                                       /* bailOnEquality = */ false,
-                                                      bailoutKind);
+                                                      bailoutKind, checkUnboxedExpando);
     current->add(guard);
 
     // If a shape guard failed in the past, don't optimize group guards.
@@ -12413,15 +12414,19 @@ IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bail
 }
 
 MInstruction *
-IonBuilder::addShapeGuardPolymorphic(MDefinition *obj,
-                                     const BaselineInspector::ShapeVector &shapes,
-                                     const BaselineInspector::ObjectGroupVector &unboxedGroups)
+IonBuilder::addGuardReceiverPolymorphic(MDefinition *obj,
+                                        const BaselineInspector::ShapeVector &shapes,
+                                        const BaselineInspector::ObjectGroupVector &unboxedGroups)
 {
     if (shapes.length() == 1 && unboxedGroups.empty())
         return addShapeGuard(obj, shapes[0], Bailout_ShapeGuard);
 
-    if (shapes.empty() && unboxedGroups.length() == 1)
-        return addGroupGuard(obj, unboxedGroups[0], Bailout_ShapeGuard);
+    if (shapes.empty() && unboxedGroups.length() == 1) {
+        // The guard requires that unboxed objects not have expando objects.
+        // An inline cache will be used in these cases.
+        return addGroupGuard(obj, unboxedGroups[0], Bailout_ShapeGuard,
+                             /* checkUnboxedExpando = */ true);
+    }
 
     MOZ_ASSERT(shapes.length() + unboxedGroups.length() > 1);
 
