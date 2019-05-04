@@ -1086,6 +1086,7 @@ GCRuntime::GCRuntime(JSRuntime* rt) :
     numActiveZoneIters(0),
     decommitThreshold(32 * 1024 * 1024),
     cleanUpEverything(false),
+    grayBufferState(GCRuntime::GrayBufferState::Unused),
     grayBitsValid(false),
     majorGCTriggerReason(JS::gcreason::NO_REASON),
     minorGCTriggerReason(JS::gcreason::NO_REASON),
