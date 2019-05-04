@@ -639,12 +639,6 @@ GCMarker::checkZone(void* p)
 }
 #endif
 
-bool
-GCMarker::hasBufferedGrayRoots() const
-{
-    return runtime()->gc.grayBufferState == GCRuntime::GrayBufferState::Okay;
-}
-
 void
 GCMarker::resetBufferedGrayRoots()
 {
