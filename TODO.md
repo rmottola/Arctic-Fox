@@ -88,18 +88,7 @@
 - Bug 1137180 - Add most functionality necessary for extensible unboxed…
 - Bug 1144331 - Assert that gray buffering does not depend on isMarking
 - Bug 1144369 - Add a GC phase to track time spent buffering gray roots
-- Bug 1144789 - Strongly type GrayBufferState enum and move to GCRuntim
 - Bug 1144794 - Move markBufferedGrayRoots to the GCRuntime
-- Bug 1144811 - Inline the start and end buffering gray roots methods o
-- Bug 1144817 - Move hasBufferedGrayRoots to GCRuntim
-- Bug 1144832 - Move grayBufferState manipulation out of GCMarker;
-- Bug 1144834 - Move resetBufferedGrayRoots to GCRuntime;
-- Bug 1144920 - Move gray buffer clearing out of GCMarker
-- Bug 1144925 - Buffer gray roots using a CallbackTracer instead of the
-- Bug 1144931 - Move gray buffering code to RootMarking.cpp
-- Bug 1137180 - Allow unboxed objects to be extended with new propertie…
-- Bug 1144108 - Fix debugger tests that are confused by GC zea
-- Bug 1135042: Optimize SIMD.storeX/storeXY/storeXYZ
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
