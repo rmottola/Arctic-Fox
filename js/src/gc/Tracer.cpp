@@ -506,7 +506,6 @@ MarkStack::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const
  */
 GCMarker::GCMarker(JSRuntime* rt)
   : JSTracer(rt, nullptr, DoNotTraceWeakMaps),
-    bufferingGrayRootsFailed(false),
     stack(size_t(-1)),
     color(BLACK),
     unmarkedArenaStackTop(nullptr),
@@ -661,9 +660,9 @@ GCRuntime::markBufferedGrayRoots(JS::Zone *zone)
 }
 
 void
-GCMarker::appendGrayRoot(void *thing, JSGCTraceKind kind)
+BufferGrayRootsTracer::appendGrayRoot(void *thing, JSGCTraceKind kind)
 {
-    MOZ_ASSERT(started);
+    MOZ_ASSERT(runtime()->isHeapBusy());
 
     if (bufferingGrayRootsFailed)
         return;
@@ -694,15 +693,6 @@ GCMarker::appendGrayRoot(void *thing, JSGCTraceKind kind)
         if (!zone->gcGrayRoots.append(root))
             bufferingGrayRootsFailed = true;
     }
-}
-
-void
-GCMarker::GrayCallback(JSTracer *trc, void **thingp, JSGCTraceKind kind)
-{
-    MOZ_ASSERT(thingp);
-    MOZ_ASSERT(*thingp);
-    GCMarker* gcmarker = static_cast<GCMarker *>(trc);
-    gcmarker->appendGrayRoot(*thingp, kind);
 }
 
 size_t
