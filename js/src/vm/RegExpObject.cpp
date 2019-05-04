@@ -572,7 +572,7 @@ RegExpShared::~RegExpShared()
 }
 
 void
-RegExpShared::trace(JSTracer* trc)
+RegExpShared::trace(JSTracer *trc)
 {
     if (IS_GC_MARKING_TRACER(trc))
         marked_ = true;

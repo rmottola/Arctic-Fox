@@ -3386,7 +3386,7 @@ JSScript::markChildren(JSTracer* trc)
     // fullyInitFromEmitter() or fullyInitTrivial().
 
     MOZ_ASSERT_IF(IS_GC_MARKING_TRACER(trc) &&
-                  static_cast<GCMarker*>(trc)->shouldCheckCompartments(),
+                  static_cast<GCMarker *>(trc)->shouldCheckCompartments(),
                   zone()->isCollecting());
 
     for (uint32_t i = 0; i < natoms(); ++i) {

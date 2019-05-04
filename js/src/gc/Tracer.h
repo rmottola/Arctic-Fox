@@ -350,7 +350,7 @@ class GCMarker : public JSTracer
 };
 
 void
-SetMarkStackLimit(JSRuntime* rt, size_t limit);
+SetMarkStackLimit(JSRuntime *rt, size_t limit);
 
 } /* namespace js */
 

@@ -140,11 +140,11 @@ IsThingPoisoned(T *thing)
 }
 #endif
 
-static GCMarker*
-AsGCMarker(JSTracer* trc)
+static GCMarker *
+AsGCMarker(JSTracer *trc)
 {
     MOZ_ASSERT(IS_GC_MARKING_TRACER(trc));
-    return static_cast<GCMarker*>(trc);
+    return static_cast<GCMarker *>(trc);
 }
 
 template <typename T> bool ThingIsPermanentAtom(T* thing) { return false; }
@@ -211,7 +211,7 @@ CheckMarkedThing(JSTracer* trc, T** thingp)
     MOZ_ASSERT(MapTypeToTraceKind<T>::kind == GetGCThingTraceKind(thing));
 
     if (isGcMarkingTracer) {
-        GCMarker* gcMarker = static_cast<GCMarker*>(trc);
+        GCMarker *gcMarker = static_cast<GCMarker *>(trc);
         MOZ_ASSERT_IF(gcMarker->shouldCheckCompartments(),
                       zone->isCollecting() || rt->isAtomsZone(zone));
 
@@ -949,7 +949,7 @@ gc::MarkObjectSlots(JSTracer* trc, NativeObject* obj, uint32_t start, uint32_t n
 }
 
 static bool
-ShouldMarkCrossCompartment(JSTracer* trc, JSObject* src, Cell* cell)
+ShouldMarkCrossCompartment(JSTracer *trc, JSObject *src, Cell *cell)
 {
     if (!IS_GC_MARKING_TRACER(trc))
         return true;
@@ -961,9 +961,9 @@ ShouldMarkCrossCompartment(JSTracer* trc, JSObject* src, Cell* cell)
         MOZ_ASSERT(color == BLACK);
         return false;
     }
-    TenuredCell& tenured = cell->asTenured();
+    TenuredCell &tenured = cell->asTenured();
 
-    JS::Zone* zone = tenured.zone();
+    JS::Zone *zone = tenured.zone();
     if (color == BLACK) {
         /*
          * Having black->gray edges violates our promise to the cycle
