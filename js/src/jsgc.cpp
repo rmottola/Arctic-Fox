@@ -5592,6 +5592,7 @@ GCRuntime::finishCollection(JS::gcreason::Reason reason)
 {
     MOZ_ASSERT(marker.isDrained());
     marker.stop();
+    clearBufferedGrayRoots();
 
     uint64_t currentTime = PRMJ_Now();
     schedulingState.updateHighFrequencyMode(lastGCTime, currentTime, tunables);
@@ -5712,6 +5713,7 @@ GCRuntime::resetIncrementalGC(const char* reason)
 
         marker.reset();
         marker.stop();
+        clearBufferedGrayRoots();
 
         for (GCCompartmentsIter c(rt); !c.done(); c.next())
             ResetGrayList(c);
