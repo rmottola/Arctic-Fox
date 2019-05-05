@@ -1781,7 +1781,7 @@ MarkOffThreadNurseryObjects::mark(JSTracer* trc)
 }
 
 static inline bool
-OffThreadCompilationAvailable(JSContext* cx)
+OffThreadCompilationAvailable(JSContext *cx)
 {
     // Even if off thread compilation is enabled, compilation must still occur
     // on the main thread in some cases.
