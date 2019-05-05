@@ -3351,6 +3351,7 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
         lineno(1),
         column(0),
         compileAndGo(false),
+        hasPollutedGlobalScope(false),
         forEval(false),
         noScriptRval(false),
         selfHostingMode(false),
@@ -3390,6 +3391,7 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
     unsigned lineno;
     unsigned column;
     bool compileAndGo;
+    bool hasPollutedGlobalScope;
     bool forEval;
     bool noScriptRval;
     bool selfHostingMode;
@@ -3481,6 +3483,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     OwningCompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     OwningCompileOptions& setColumn(unsigned c) { column = c; return *this; }
     OwningCompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
+    OwningCompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
     OwningCompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     OwningCompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     OwningCompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
@@ -3564,6 +3567,7 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
     CompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     CompileOptions& setColumn(unsigned c) { column = c; return *this; }
     CompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
+    CompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
     CompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     CompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     CompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
