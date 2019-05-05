@@ -87,7 +87,6 @@
 - Bug 1145440 - Ship constant names for tracked strategy and outcomes i
 - Bug 1143860 - Deduplicate tracked optimizations when streaming the pr
 - Bug 1144802 - 2015.03.20 - 1 to 8 parts
-- Bug 1144743 - 2015-03-20 - 1 to 6 parts
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
