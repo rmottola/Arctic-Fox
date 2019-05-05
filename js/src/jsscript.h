@@ -924,6 +924,11 @@ class JSScript : public js::gc::TenuredCell
     // See Parser::compileAndGo.
     bool compileAndGo_:1;
 
+    // True if the script has a non-syntactic scope on its dynamic scope chain.
+    // That is, there are objects about which we know nothing between the
+    // outermost syntactic scope and the global.
+    bool hasPollutedGlobalScope_:1;
+
     // see Parser::selfHostingMode.
     bool selfHosted_:1;
 
@@ -1147,6 +1152,10 @@ class JSScript : public js::gc::TenuredCell
 
     bool compileAndGo() const {
         return compileAndGo_;
+    }
+
+    bool hasPollutedGlobalScope() const {
+        return hasPollutedGlobalScope_;
     }
 
     bool selfHosted() const { return selfHosted_; }

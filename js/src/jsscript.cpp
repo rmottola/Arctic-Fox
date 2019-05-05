@@ -579,7 +579,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
         IsCompileAndGo,
         HasSingleton,
         TreatAsRunOnce,
-        HasLazyScript
+        HasLazyScript,
+        HasPollutedGlobalScope,
     };
 
     uint32_t length, lineno, column, nslots, staticLevel;
@@ -697,6 +698,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
             scriptBits |= (1 << TreatAsRunOnce);
         if (script->isRelazifiable())
             scriptBits |= (1 << HasLazyScript);
+        if (script->hasPollutedGlobalScope())
+            scriptBits |= (1 << HasPollutedGlobalScope);
     }
 
     if (!xdr->codeUint32(&prologLength))
@@ -814,6 +817,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
             script->hasSingletons_ = true;
         if (scriptBits & (1 << TreatAsRunOnce))
             script->treatAsRunOnce_ = true;
+        if (scriptBits & (1 << HasPollutedGlobalScope))
+            script->hasPollutedGlobalScope_ = true;
 
         if (scriptBits & (1 << IsLegacyGenerator)) {
             MOZ_ASSERT(!(scriptBits & (1 << IsStarGenerator)));
