@@ -869,7 +869,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         exitCodePatch_ = PushWithPatch(ImmWord(-1));
     }
 
-    void enterExitFrame(const VMFunction* f = nullptr) {
+    void enterExitFrame(const VMFunction *f = nullptr) {
         linkExitFrame();
         // Push the ioncode. (Bailout or VM wrapper)
         PushStubCode();

@@ -438,17 +438,17 @@ FinishAllOffThreadCompilations(JSCompartment* comp)
 }
 
 uint8_t*
-jit::LazyLinkTopActivation(JSContext* cx)
+jit::LazyLinkTopActivation(JSContext *cx)
 {
     JitActivationIterator iter(cx->runtime());
 
     // First frame should be an exit frame.
     JitFrameIterator it(iter);
-    LazyLinkExitFrameLayout* ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
-    JSScript* calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
+    LazyLinkExitFrameLayout *ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
+    JSScript *calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
 
     // Get the pending builder from the Ion frame.
-    IonBuilder* builder = calleeScript->ionScript()->pendingBuilder();
+    IonBuilder *builder = calleeScript->ionScript()->pendingBuilder();
     calleeScript->setPendingIonBuilder(cx, nullptr);
 
     AutoEnterAnalysis enterTypes(cx);

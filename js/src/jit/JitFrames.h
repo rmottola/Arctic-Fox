@@ -880,21 +880,21 @@ struct IonDOMMethodExitFrameLayoutTraits {
 class LazyLinkExitFrameLayout
 {
   protected: // silence clang warning about unused private fields
-    JitCode* stubCode_;
+    JitCode *stubCode_;
     ExitFooterFrame footer_;
     JitFrameLayout exit_;
 
   public:
-    static JitCode* Token() { return (JitCode*) LazyLinkExitFrameLayoutToken; }
+    static JitCode *Token() { return (JitCode *) LazyLinkExitFrameLayoutToken; }
 
     static inline size_t Size() {
         return sizeof(LazyLinkExitFrameLayout);
     }
 
-    inline JitCode** stubCode() {
+    inline JitCode **stubCode() {
         return &stubCode_;
     }
-    inline JitFrameLayout* jsFrame() {
+    inline JitFrameLayout *jsFrame() {
         return &exit_;
     }
     static size_t offsetOfExitFrame() {
@@ -903,13 +903,13 @@ class LazyLinkExitFrameLayout
 };
 
 template <>
-inline LazyLinkExitFrameLayout*
+inline LazyLinkExitFrameLayout *
 ExitFrameLayout::as<LazyLinkExitFrameLayout>()
 {
     MOZ_ASSERT(is<LazyLinkExitFrameLayout>());
-    uint8_t* sp = reinterpret_cast<uint8_t*>(this);
+    uint8_t *sp = reinterpret_cast<uint8_t *>(this);
     sp -= LazyLinkExitFrameLayout::offsetOfExitFrame();
-    return reinterpret_cast<LazyLinkExitFrameLayout*>(sp);
+    return reinterpret_cast<LazyLinkExitFrameLayout *>(sp);
 }
 
 class ICStub;
