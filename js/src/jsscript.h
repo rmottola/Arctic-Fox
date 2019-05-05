@@ -754,8 +754,14 @@ bool
 XDRScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
           HandleFunction fun, MutableHandleScript scriptp);
 
+enum PollutedGlobalScopeOption {
+    HasPollutedGlobalScope,
+    HasCleanGlobalScope
+};
+
 JSScript *
 CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
+            PollutedGlobalScopeOption polluted = HasCleanGlobalScope,
             NewObjectKind newKind = GenericObject);
 
 template<XDRMode mode>
@@ -780,8 +786,9 @@ class JSScript : public js::gc::TenuredCell
     js::XDRScript(js::XDRState<mode>* xdr, js::HandleObject enclosingScope, js::HandleScript enclosingScript,
                   js::HandleFunction fun, js::MutableHandleScript scriptp);
 
-    friend JSScript*
-    js::CloneScript(JSContext* cx, js::HandleObject enclosingScope, js::HandleFunction fun, js::HandleScript src,
+    friend JSScript *
+    js::CloneScript(JSContext *cx, js::HandleObject enclosingScope, js::HandleFunction fun,
+                    js::HandleScript src, js::PollutedGlobalScopeOption polluted,
                     js::NewObjectKind newKind);
 
   public:
@@ -2178,7 +2185,7 @@ DescribeScriptedCallerForCompilation(JSContext *cx, MutableHandleScript maybeScr
 
 bool
 CloneFunctionScript(JSContext *cx, HandleFunction original, HandleFunction clone,
-                    NewObjectKind newKind = GenericObject);
+                    PollutedGlobalScopeOption polluted, NewObjectKind newKind);
 
 } /* namespace js */
 
