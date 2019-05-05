@@ -398,12 +398,13 @@ class IonBuilder
     MDefinition *addMaybeCopyElementsForWrite(MDefinition *object);
     MInstruction *addBoundsCheck(MDefinition *index, MDefinition *length);
     MInstruction *addShapeGuard(MDefinition *obj, Shape *const shape, BailoutKind bailoutKind);
-    MInstruction *addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind);
+    MInstruction *addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind,
+                                bool checkUnboxedExpando = false);
 
     MInstruction *
-    addShapeGuardPolymorphic(MDefinition *obj,
-                             const BaselineInspector::ShapeVector &shapes,
-                             const BaselineInspector::ObjectGroupVector &unboxedGroups);
+    addGuardReceiverPolymorphic(MDefinition *obj,
+                                const BaselineInspector::ShapeVector &shapes,
+                                const BaselineInspector::ObjectGroupVector &unboxedGroups);
 
     MDefinition *convertShiftToMaskForStaticTypedArray(MDefinition *id,
                                                        Scalar::Type viewType);
@@ -1096,6 +1097,10 @@ class IonBuilder
     BaselineInspector* inspector;
 
     size_t inliningDepth_;
+
+    // Total bytecode length of all inlined scripts. Only tracked for the
+    // outermost builder.
+    size_t inlinedBytecodeLength_;
 
     // Cutoff to disable compilation if excessive time is spent reanalyzing
     // loop bodies to compute a fixpoint of the types for loop variables.

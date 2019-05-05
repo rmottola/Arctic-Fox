@@ -759,15 +759,13 @@ js::OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v
     return true;
 }
 
-// XXX RM 2018-12-10 TODO perhaps this can be removed given the functions above
-
 /*
  * [[HasInstance]] internal method for Function objects: fetch the .prototype
  * property of its 'this' parameter, and walks the prototype chain of v (only
  * if v is an object) returning true if .prototype is found.
  */
 static bool
-fun_hasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp)
+fun_hasInstance(JSContext *cx, HandleObject objArg, MutableHandleValue v, bool *bp)
 {
     RootedObject obj(cx, objArg);
 
@@ -823,8 +821,8 @@ JSFunction::trace(JSTracer* trc)
             // This information can either be a LazyScript, or the name of a
             // self-hosted function which can be cloned over again. The latter
             // is stored in the first extended slot.
-            JSRuntime* rt = trc->runtime();
-            if (IS_GC_MARKING_TRACER(trc) &&
+            JSRuntime *rt = trc->runtime();
+            if (IsMarkingTracer(trc) &&
                 (rt->allowRelazificationForTesting || !compartment()->hasBeenEntered()) &&
                 !compartment()->isDebuggee() && !compartment()->isSelfHosting &&
                 u.i.s.script_->isRelazifiable() && (!isSelfHostedBuiltin() || isExtended()))

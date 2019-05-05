@@ -37,8 +37,10 @@ OptimizationInfo::initNormalOptimizationInfo()
     sink_ = true;
     registerAllocator_ = RegisterAllocator_LSRA;
 
-    inlineMaxTotalBytecodeLength_ = 1000;
-    inliningMaxCallerBytecodeLength_ = 10000;
+    inlineMaxBytecodePerCallSiteMainThread_ = 500;
+    inlineMaxBytecodePerCallSiteOffThread_ = 1000;
+    inlineMaxTotalBytecodeLength_ = 80000;
+    inliningMaxCallerBytecodeLength_ = 1500;
     maxInlineDepth_ = 3;
     scalarReplacement_ = true;
     smallFunctionMaxInlineDepth_ = 10;

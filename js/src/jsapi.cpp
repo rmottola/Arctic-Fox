@@ -1411,22 +1411,13 @@ JS_RemoveExtraGCRootsTracer(JSRuntime* rt, JSTraceDataOp traceOp, void* data)
 }
 
 extern JS_PUBLIC_API(bool)
-JS_IsGCMarkingTracer(JSTracer* trc)
+JS_IsGCMarkingTracer(JSTracer *trc)
 {
-    return IS_GC_MARKING_TRACER(trc);
+    return js::IsMarkingTracer(trc);
 }
-
-#ifdef DEBUG
-extern JS_PUBLIC_API(bool)
-JS_IsMarkingGray(JSTracer* trc)
-{
-    MOZ_ASSERT(JS_IsGCMarkingTracer(trc));
-    return trc->callback == GCMarker::GrayCallback;
-}
-#endif
 
 JS_PUBLIC_API(void)
-JS_GC(JSRuntime* rt)
+JS_GC(JSRuntime *rt)
 {
     AssertHeapIsIdle(rt);
     JS::PrepareForFullGC(rt);

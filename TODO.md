@@ -80,26 +80,14 @@
 - Bug 1153658 - browser_compartments.js logspam.
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
 - Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
+- Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1137180 - Add baseline caches for extensible unboxed objects, and…
-- 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
-- Bug 1150555 - about:performance should not confuse Jetpack addons.
-- Bug 1137180 - Add most functionality necessary for extensible unboxed…
-- Bug 1144331 - Assert that gray buffering does not depend on isMarking
-- Bug 1144369 - Add a GC phase to track time spent buffering gray roots
-- Bug 1144789 - Strongly type GrayBufferState enum and move to GCRuntim
-- Bug 1144794 - Move markBufferedGrayRoots to the GCRuntime
-- Bug 1144811 - Inline the start and end buffering gray roots methods o
-- Bug 1144817 - Move hasBufferedGrayRoots to GCRuntim
-- Bug 1144832 - Move grayBufferState manipulation out of GCMarker;
-- Bug 1144834 - Move resetBufferedGrayRoots to GCRuntime;
-- Bug 1144920 - Move gray buffer clearing out of GCMarker
-- Bug 1144925 - Buffer gray roots using a CallbackTracer instead of the
-- Bug 1144931 - Move gray buffering code to RootMarking.cpp
-- Bug 1137180 - Allow unboxed objects to be extended with new propertie…
-- Bug 1144108 - Fix debugger tests that are confused by GC zea
-- Bug 1135042: Optimize SIMD.storeX/storeXY/storeXYZ
+- Bug 1142669 part 6 - Don't inline scripts that are known to inline a
+- Bug 1145440 - Ship constant names for tracked strategy and outcomes i
+- Bug 1143860 - Deduplicate tracked optimizations when streaming the pr
+- Bug 1144802 - 2015.03.20 - 1 to 8 parts
+- Bug 1144743 - 2015-03-20 - 1 to 6 parts
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;

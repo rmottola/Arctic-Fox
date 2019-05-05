@@ -998,7 +998,7 @@ ReadAllocation(const JitFrameIterator& frame, const LAllocation* a)
 #endif
 
 static void
-MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
+MarkThisAndArguments(JSTracer *trc, JitFrameLayout *layout)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
@@ -1008,7 +1008,7 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
     size_t nargs = layout->numActualArgs();
     size_t nformals = 0;
     if (CalleeTokenIsFunction(layout->calleeToken())) {
-        JSFunction* fun = CalleeTokenToFunction(layout->calleeToken());
+        JSFunction *fun = CalleeTokenToFunction(layout->calleeToken());
         nformals = fun->nonLazyScript()->mayReadFrameArgsDirectly() ? 0 : fun->nargs();
     }
 
@@ -1023,15 +1023,15 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
 }
 
 static void
-MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
+MarkThisAndArguments(JSTracer *trc, const JitFrameIterator &frame)
 {
-    JitFrameLayout* layout = frame.jsFrame();
+    JitFrameLayout *layout = frame.jsFrame();
     MarkThisAndArguments(trc, layout);
 }
 
 #ifdef JS_NUNBOX32
 static inline void
-WriteAllocation(const JitFrameIterator& frame, const LAllocation* a, uintptr_t value)
+WriteAllocation(const JitFrameIterator &frame, const LAllocation *a, uintptr_t value)
 {
     if (a->isGeneralReg()) {
         Register reg = a->toGeneralReg()->reg();
@@ -1289,7 +1289,7 @@ MarkJitExitFrameCopiedArguments(JSTracer* trc, const VMFunction* f, ExitFooterFr
 #endif
 
 static void
-MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
+MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
 {
     // Ignore fake exit frames created by EnsureExitFrame.
     if (frame.isFakeExitFrame())
@@ -1308,9 +1308,9 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
     // CodeGenerator.cpp which handle the case of a native function call. We
     // need to mark the argument vector of the function call.
     if (frame.isExitFrameLayout<NativeExitFrameLayout>()) {
-        NativeExitFrameLayout* native = frame.exitFrame()->as<NativeExitFrameLayout>();
+        NativeExitFrameLayout *native = frame.exitFrame()->as<NativeExitFrameLayout>();
         size_t len = native->argc() + 2;
-        Value* vp = native->vp();
+        Value *vp = native->vp();
         gc::MarkValueRootRange(trc, len, vp, "ion-native-args");
         return;
     }
@@ -1369,8 +1369,8 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
     }
 
     if (frame.isExitFrameLayout<LazyLinkExitFrameLayout>()) {
-        LazyLinkExitFrameLayout* ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
-        JitFrameLayout* layout = ll->jsFrame();
+        LazyLinkExitFrameLayout *ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
+        JitFrameLayout *layout = ll->jsFrame();
 
         gc::MarkJitCodeRoot(trc, ll->stubCode(), "lazy-link-code");
         layout->replaceCalleeToken(MarkCalleeToken(trc, layout->calleeToken()));

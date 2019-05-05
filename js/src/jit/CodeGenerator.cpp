@@ -2557,6 +2557,10 @@ CodeGenerator::visitGuardReceiverPolymorphic(LGuardReceiverPolymorphic *lir)
     }
 
     if (mir->numUnboxedGroups()) {
+        // The guard requires that unboxed objects not have expandos.
+        bailoutCmpPtr(Assembler::NotEqual, Address(obj, JSObject::offsetOfShape()),
+                      ImmWord(0), lir->snapshot());
+
         masm.loadObjGroup(obj, temp);
 
         for (size_t i = 0; i < mir->numUnboxedGroups(); i++) {
@@ -6108,7 +6112,7 @@ JitRuntime::generateFreeStub(JSContext* cx)
 }
 
 
-JitCode*
+JitCode *
 JitRuntime::generateLazyLinkStub(JSContext* cx)
 {
     MacroAssembler masm(cx);
@@ -6132,7 +6136,7 @@ JitRuntime::generateLazyLinkStub(JSContext* cx)
     masm.setupUnalignedABICall(1, temp0);
     masm.loadJSContext(temp0);
     masm.passABIArg(temp0);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, LazyLinkTopActivation));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, LazyLinkTopActivation));
 
     masm.leaveExitFrame(/* stub code */ sizeof(JitCode*));
 
