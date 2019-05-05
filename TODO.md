@@ -80,15 +80,14 @@
 - Bug 1153658 - browser_compartments.js logspam.
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
 - Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
+- Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1137180 - Add baseline caches for extensible unboxed objects, and…
-- 1142669 - 2015-03-19 part 4 - Fix some inlining issues and inline scripts with
-- Bug 1150555 - about:performance should not confuse Jetpack addons.
-- Bug 1137180 - Add most functionality necessary for extensible unboxed…
-- Bug 1144331 - Assert that gray buffering does not depend on isMarking
-- Bug 1144369 - Add a GC phase to track time spent buffering gray roots
-- Bug 1144794 - Move markBufferedGrayRoots to the GCRuntime
+- Bug 1142669 part 6 - Don't inline scripts that are known to inline a
+- Bug 1145440 - Ship constant names for tracked strategy and outcomes i
+- Bug 1143860 - Deduplicate tracked optimizations when streaming the pr
+- Bug 1144802 - 2015.03.20 - 1 to 8 parts
+- Bug 1144743 - 2015-03-20 - 1 to 6 parts
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
