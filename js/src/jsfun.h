@@ -617,10 +617,10 @@ class FunctionExtended : public JSFunction
 };
 
 extern bool
-CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction fun);
+CloneFunctionObjectUseSameScript(JSCompartment *compartment, HandleFunction fun);
 
-extern JSFunction*
-CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
+extern JSFunction *
+CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
                     gc::AllocKind kind = JSFunction::FinalizeKind,
                     NewObjectKind newKindArg = GenericObject,
                     HandleObject proto = NullPtr());

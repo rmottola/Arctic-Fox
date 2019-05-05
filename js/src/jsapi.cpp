@@ -3962,9 +3962,9 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
  * enclosingDynamicScope is a dynamic scope to use, if it's not the global.
  */
 static bool
-CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& options,
-                const char* name, unsigned nargs, const char* const* argnames,
-                SourceBufferHolder& srcBuf,
+CompileFunction(JSContext *cx, const ReadOnlyCompileOptions &options,
+                const char *name, unsigned nargs, const char *const *argnames,
+                SourceBufferHolder &srcBuf,
                 HandleObject enclosingDynamicScope,
                 HandleObject enclosingStaticScope,
                 MutableHandleFunction fun)

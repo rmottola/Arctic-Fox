@@ -2954,8 +2954,8 @@ Rebase(JSScript* dst, JSScript* src, T* srcp)
     return reinterpret_cast<T*>(dst->data + off);
 }
 
-JSScript*
-js::CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, HandleScript src,
+JSScript *
+js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript src,
                 NewObjectKind newKind /* = GenericObject */)
 {
     /* NB: Keep this in sync with XDRScript. */
@@ -3176,7 +3176,7 @@ js::CloneFunctionScript(JSContext* cx, HandleFunction original, HandleFunction c
 
     clone->mutableScript().init(nullptr);
 
-    JSScript* cscript = CloneScript(cx, scope, clone, script, newKind);
+    JSScript *cscript = CloneScript(cx, scope, clone, script, newKind);
     if (!cscript)
         return false;
 

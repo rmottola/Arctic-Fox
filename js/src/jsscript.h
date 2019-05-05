@@ -751,17 +751,17 @@ GeneratorKindFromBits(unsigned val) {
  */
 template<XDRMode mode>
 bool
-XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+XDRScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
           HandleFunction fun, MutableHandleScript scriptp);
 
-JSScript*
-CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
+JSScript *
+CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
             NewObjectKind newKind = GenericObject);
 
 template<XDRMode mode>
 bool
-XDRLazyScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
-              HandleFunction fun, MutableHandle<LazyScript*> lazy);
+XDRLazyScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+              HandleFunction fun, MutableHandle<LazyScript *> lazy);
 
 /*
  * Code any constant value.
@@ -2162,13 +2162,13 @@ enum LineOption {
 };
 
 extern void
-DescribeScriptedCallerForCompilation(JSContext* cx, MutableHandleScript maybeScript,
-                                     const char** file, unsigned* linenop,
-                                     uint32_t* pcOffset, bool* mutedErrors,
+DescribeScriptedCallerForCompilation(JSContext *cx, MutableHandleScript maybeScript,
+                                     const char **file, unsigned *linenop,
+                                     uint32_t *pcOffset, bool *mutedErrors,
                                      LineOption opt = NOT_CALLED_FROM_JSOP_EVAL);
 
 bool
-CloneFunctionScript(JSContext* cx, HandleFunction original, HandleFunction clone,
+CloneFunctionScript(JSContext *cx, HandleFunction original, HandleFunction clone,
                     NewObjectKind newKind = GenericObject);
 
 } /* namespace js */

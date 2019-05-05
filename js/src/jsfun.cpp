@@ -2173,7 +2173,7 @@ js::NewFunctionWithProto(ExclusiveContext *cx, Native native,
 }
 
 bool
-js::CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction fun)
+js::CloneFunctionObjectUseSameScript(JSCompartment *compartment, HandleFunction fun)
 {
     return compartment == fun->compartment() &&
            !fun->isSingleton() &&
