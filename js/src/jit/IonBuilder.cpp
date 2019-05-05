@@ -4907,7 +4907,8 @@ IonBuilder::makeInliningDecision(JSObject* targetArg, CallInfo& callInfo)
 
     // Callee must not be excessively large.
     // This heuristic also applies to the callsite as a whole.
-    if (targetScript->length() > optimizationInfo().inlineMaxTotalBytecodeLength()) {
+    bool offThread = options.offThreadCompilationAvailable();
+    if (targetScript->length() > optimizationInfo().inlineMaxBytecodePerCallSite(offThread)) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineBigCallee);
         return DontInline(targetScript, "Vetoed: callee excessively large");
     }
@@ -4974,7 +4975,8 @@ IonBuilder::selectInliningTargets(const ObjectVector& targets, CallInfo& callInf
             // Enforce a maximum inlined bytecode limit at the callsite.
             if (inlineable && target->as<JSFunction>().isInterpreted()) {
                 totalSize += target->as<JSFunction>().nonLazyScript()->length();
-                if (totalSize > optimizationInfo().inlineMaxTotalBytecodeLength())
+                bool offThread = options.offThreadCompilationAvailable();
+                if (totalSize > optimizationInfo().inlineMaxBytecodePerCallSite(offThread))
                     inlineable = false;
             }
         } else {

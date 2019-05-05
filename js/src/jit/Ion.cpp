@@ -1780,7 +1780,7 @@ MarkOffThreadNurseryObjects::mark(JSTracer* trc)
     }
 }
 
-static inline bool
+bool
 OffThreadCompilationAvailable(JSContext *cx)
 {
     // Even if off thread compilation is enabled, compilation must still occur
@@ -1974,7 +1974,7 @@ IonCompile(JSContext* cx, JSScript* script,
     }
 
     // If possible, compile the script off thread.
-    if (OffThreadCompilationAvailable(cx)) {
+    if (options.offThreadCompilationAvailable()) {
         if (!recompile)
             builderScript->setIonScript(cx, ION_COMPILING_SCRIPT);
 
