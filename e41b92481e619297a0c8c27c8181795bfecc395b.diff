@@ -1,0 +1,70 @@
+diff --git a/js/src/frontend/BytecodeCompiler.cpp b/js/src/frontend/BytecodeCompiler.cpp
+index 2aade16f9162..b1be2c877ae2 100644
+--- a/js/src/frontend/BytecodeCompiler.cpp
++++ b/js/src/frontend/BytecodeCompiler.cpp
+@@ -283,7 +283,7 @@ frontend::CompileScript(ExclusiveContext *cx, LifoAlloc *alloc, HandleObject sco
+         return nullptr;
+ 
+     Directives directives(options.strictOption);
+-    GlobalSharedContext globalsc(cx, scopeChain, directives, options.extraWarningsOption);
++    GlobalSharedContext globalsc(cx, directives, options.extraWarningsOption);
+ 
+     bool savedCallerFun = evalCaller && evalCaller->functionOrCallerFunction();
+     Rooted<JSScript*> script(cx, JSScript::Create(cx, evalStaticScope, savedCallerFun,
+diff --git a/js/src/frontend/Parser.cpp b/js/src/frontend/Parser.cpp
+index 254c48cc813b..971c1854d414 100644
+--- a/js/src/frontend/Parser.cpp
++++ b/js/src/frontend/Parser.cpp
+@@ -699,7 +699,7 @@ Parser<ParseHandler>::parse(JSObject *chain)
+      *   protected from the GC by a root or a stack frame reference.
+      */
+     Directives directives(options().strictOption);
+-    GlobalSharedContext globalsc(context, chain, directives, options().extraWarningsOption);
++    GlobalSharedContext globalsc(context, directives, options().extraWarningsOption);
+     ParseContext<ParseHandler> globalpc(this, /* parent = */ nullptr, ParseHandler::null(),
+                                         &globalsc, /* newDirectives = */ nullptr,
+                                         /* staticLevel = */ 0, /* bodyid = */ 0,
+diff --git a/js/src/frontend/SharedContext.h b/js/src/frontend/SharedContext.h
+index 3857e14c5998..f0101bb0d8cf 100644
+--- a/js/src/frontend/SharedContext.h
++++ b/js/src/frontend/SharedContext.h
+@@ -193,9 +193,7 @@ class SharedContext
+     {}
+ 
+     virtual ObjectBox *toObjectBox() = 0;
+-    inline bool isGlobalSharedContext() { return toObjectBox() == nullptr; }
+     inline bool isFunctionBox() { return toObjectBox() && toObjectBox()->isFunctionBox(); }
+-    inline GlobalSharedContext *asGlobalSharedContext();
+     inline FunctionBox *asFunctionBox();
+ 
+     bool hasExplicitUseStrict()        const { return anyCxFlags.hasExplicitUseStrict; }
+@@ -231,27 +229,15 @@ class SharedContext
+ 
+ class GlobalSharedContext : public SharedContext
+ {
+-  private:
+-    const RootedObject scopeChain_; /* scope chain object for the script */
+-
+   public:
+-    GlobalSharedContext(ExclusiveContext *cx, JSObject *scopeChain,
++    GlobalSharedContext(ExclusiveContext *cx,
+                         Directives directives, bool extraWarnings)
+-      : SharedContext(cx, directives, extraWarnings),
+-        scopeChain_(cx, scopeChain)
++      : SharedContext(cx, directives, extraWarnings)
+     {}
+ 
+     ObjectBox *toObjectBox() { return nullptr; }
+-    JSObject *scopeChain() const { return scopeChain_; }
+ };
+ 
+-inline GlobalSharedContext *
+-SharedContext::asGlobalSharedContext()
+-{
+-    MOZ_ASSERT(isGlobalSharedContext());
+-    return static_cast<GlobalSharedContext*>(this);
+-}
+-
+ class FunctionBox : public ObjectBox, public SharedContext
+ {
+   public:
