@@ -6544,13 +6544,13 @@ IonBuilder::jsop_initelem_array()
     current->add(id);
 
     // Get the elements vector.
-    MElements* elements = MElements::New(alloc(), obj);
+    MElements *elements = MElements::New(alloc(), obj);
     current->add(elements);
 
-    NativeObject* templateObject = obj->toNewArray()->templateObject();
+    NativeObject *templateObject = obj->toNewArray()->templateObject();
 
     if (templateObject->shouldConvertDoubleElements()) {
-        MInstruction* valueDouble = MToDouble::New(alloc(), value);
+        MInstruction *valueDouble = MToDouble::New(alloc(), value);
         current->add(valueDouble);
         value = valueDouble;
     }

@@ -492,7 +492,7 @@ IonBuilder::inlineMathFunction(CallInfo& callInfo, MMathFunction::Function funct
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineArray(CallInfo& callInfo)
+IonBuilder::inlineArray(CallInfo &callInfo)
 {
     uint32_t initLength = 0;
     AllocatingBehaviour allocating = NewArray_Unallocating;
@@ -592,9 +592,9 @@ IonBuilder::inlineArray(CallInfo& callInfo)
             id = MConstant::New(alloc(), Int32Value(i));
             current->add(id);
 
-            MDefinition* value = callInfo.getArg(i);
+            MDefinition *value = callInfo.getArg(i);
             if (conversion == TemporaryTypeSet::AlwaysConvertToDoubles) {
-                MInstruction* valueDouble = MToDouble::New(alloc(), value);
+                MInstruction *valueDouble = MToDouble::New(alloc(), value);
                 current->add(valueDouble);
                 value = valueDouble;
             }

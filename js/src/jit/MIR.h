@@ -2873,14 +2873,14 @@ class MNewArray
     // Allocate space at initialization or not
     AllocatingBehaviour allocating_;
 
-    MNewArray(CompilerConstraintList* constraints, uint32_t count, MConstant* templateConst,
+    MNewArray(CompilerConstraintList *constraints, uint32_t count, MConstant *templateConst,
               gc::InitialHeap initialHeap, AllocatingBehaviour allocating)
       : MUnaryInstruction(templateConst),
         count_(count),
         initialHeap_(initialHeap),
         allocating_(allocating)
     {
-        ArrayObject* obj = templateObject();
+        ArrayObject *obj = templateObject();
         setResultType(MIRType_Object);
         if (!obj->isSingleton())
             setResultTypeSet(MakeSingletonTypeSet(constraints, obj));
