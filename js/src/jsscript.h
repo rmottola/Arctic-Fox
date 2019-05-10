@@ -751,17 +751,23 @@ GeneratorKindFromBits(unsigned val) {
  */
 template<XDRMode mode>
 bool
-XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+XDRScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
           HandleFunction fun, MutableHandleScript scriptp);
 
-JSScript*
-CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
+enum PollutedGlobalScopeOption {
+    HasPollutedGlobalScope,
+    HasCleanGlobalScope
+};
+
+JSScript *
+CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
+            PollutedGlobalScopeOption polluted = HasCleanGlobalScope,
             NewObjectKind newKind = GenericObject);
 
 template<XDRMode mode>
 bool
-XDRLazyScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
-              HandleFunction fun, MutableHandle<LazyScript*> lazy);
+XDRLazyScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+              HandleFunction fun, MutableHandle<LazyScript *> lazy);
 
 /*
  * Code any constant value.
@@ -780,8 +786,9 @@ class JSScript : public js::gc::TenuredCell
     js::XDRScript(js::XDRState<mode>* xdr, js::HandleObject enclosingScope, js::HandleScript enclosingScript,
                   js::HandleFunction fun, js::MutableHandleScript scriptp);
 
-    friend JSScript*
-    js::CloneScript(JSContext* cx, js::HandleObject enclosingScope, js::HandleFunction fun, js::HandleScript src,
+    friend JSScript *
+    js::CloneScript(JSContext *cx, js::HandleObject enclosingScope, js::HandleFunction fun,
+                    js::HandleScript src, js::PollutedGlobalScopeOption polluted,
                     js::NewObjectKind newKind);
 
   public:
@@ -923,6 +930,11 @@ class JSScript : public js::gc::TenuredCell
 
     // See Parser::compileAndGo.
     bool compileAndGo_:1;
+
+    // True if the script has a non-syntactic scope on its dynamic scope chain.
+    // That is, there are objects about which we know nothing between the
+    // outermost syntactic scope and the global.
+    bool hasPollutedGlobalScope_:1;
 
     // see Parser::selfHostingMode.
     bool selfHosted_:1;
@@ -1147,6 +1159,10 @@ class JSScript : public js::gc::TenuredCell
 
     bool compileAndGo() const {
         return compileAndGo_;
+    }
+
+    bool hasPollutedGlobalScope() const {
+        return hasPollutedGlobalScope_;
     }
 
     bool selfHosted() const { return selfHosted_; }
@@ -2162,14 +2178,14 @@ enum LineOption {
 };
 
 extern void
-DescribeScriptedCallerForCompilation(JSContext* cx, MutableHandleScript maybeScript,
-                                     const char** file, unsigned* linenop,
-                                     uint32_t* pcOffset, bool* mutedErrors,
+DescribeScriptedCallerForCompilation(JSContext *cx, MutableHandleScript maybeScript,
+                                     const char **file, unsigned *linenop,
+                                     uint32_t *pcOffset, bool *mutedErrors,
                                      LineOption opt = NOT_CALLED_FROM_JSOP_EVAL);
 
 bool
-CloneFunctionScript(JSContext* cx, HandleFunction original, HandleFunction clone,
-                    NewObjectKind newKind = GenericObject);
+CloneFunctionScript(JSContext *cx, HandleFunction original, HandleFunction clone,
+                    PollutedGlobalScopeOption polluted, NewObjectKind newKind);
 
 } /* namespace js */
 
