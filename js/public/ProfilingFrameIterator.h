@@ -124,7 +124,7 @@ class JS_PUBLIC_API(ProfilingFrameIterator)
 };
 
 JS_FRIEND_API(bool)
-IsProfilingEnabledForRuntime(JSRuntime* runtime);
+IsProfilingEnabledForRuntime(JSRuntime *runtime);
 
 /**
  * After each sample run, this method should be called with the latest sample

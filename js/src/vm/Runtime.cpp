@@ -856,7 +856,7 @@ JS::UpdateJSRuntimeProfilerSampleBufferGen(JSRuntime *runtime, uint32_t generati
 }
 
 JS_FRIEND_API(bool)
-JS::IsProfilingEnabledForRuntime(JSRuntime* runtime)
+JS::IsProfilingEnabledForRuntime(JSRuntime *runtime)
 {
     MOZ_ASSERT(runtime);
     return runtime->spsProfiler.enabled();

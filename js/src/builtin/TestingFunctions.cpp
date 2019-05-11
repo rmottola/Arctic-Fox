@@ -1277,7 +1277,7 @@ DisableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ReadSPSProfilingStack(JSContext* cx, unsigned argc, jsval* vp)
+ReadSPSProfilingStack(JSContext *cx, unsigned argc, jsval *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
