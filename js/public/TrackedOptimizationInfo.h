@@ -277,13 +277,13 @@ enum class TrackedTypeSite : uint32_t {
     Count
 };
 
-extern JS_PUBLIC_API(const char*)
+extern JS_PUBLIC_API(const char *)
 TrackedStrategyString(TrackedStrategy strategy);
 
-extern JS_PUBLIC_API(const char*)
+extern JS_PUBLIC_API(const char *)
 TrackedOutcomeString(TrackedOutcome outcome);
 
-extern JS_PUBLIC_API(const char*)
+extern JS_PUBLIC_API(const char *)
 TrackedTypeSiteString(TrackedTypeSite site);
 
 struct ForEachTrackedOptimizationAttemptOp
@@ -292,7 +292,7 @@ struct ForEachTrackedOptimizationAttemptOp
 };
 
 JS_PUBLIC_API(void)
-ForEachTrackedOptimizationAttempt(JSRuntime* rt, void* addr,
+ForEachTrackedOptimizationAttempt(JSRuntime *rt, void *addr,
                                   ForEachTrackedOptimizationAttemptOp &op,
                                   JSScript **scriptOut, jsbytecode **pcOut);
 
@@ -338,8 +338,8 @@ struct ForEachTrackedOptimizationTypeInfoOp
 };
 
 extern JS_PUBLIC_API(void)
-ForEachTrackedOptimizationTypeInfo(JSRuntime* rt, void* addr,
-                                   ForEachTrackedOptimizationTypeInfoOp& op);
+ForEachTrackedOptimizationTypeInfo(JSRuntime *rt, void *addr,
+                                   ForEachTrackedOptimizationTypeInfoOp &op);
 
 } // namespace JS
 

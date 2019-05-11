@@ -445,11 +445,11 @@ IonTrackedOptimizationsRegion::RangeIterator::readNext(uint32_t* startOffset, ui
 }
 
 Maybe<uint8_t>
-JitcodeGlobalEntry::IonEntry::trackedOptimizationIndexAtAddr(void* ptr)
+JitcodeGlobalEntry::IonEntry::trackedOptimizationIndexAtAddr(void *ptr)
 {
     MOZ_ASSERT(hasTrackedOptimizations());
     MOZ_ASSERT(containsPointer(ptr));
-    uint32_t ptrOffset = ((uint8_t*) ptr) - ((uint8_t*) nativeStartAddr());
+    uint32_t ptrOffset = ((uint8_t *) ptr) - ((uint8_t *) nativeStartAddr());
     Maybe<IonTrackedOptimizationsRegion> region = optsRegionTable_->findRegion(ptrOffset);
     if (region.isNothing())
         return Nothing();
@@ -1126,11 +1126,11 @@ IonBuilder::trackInlineSuccessUnchecked(InliningStatus status)
 }
 
 JS_PUBLIC_API(void)
-JS::ForEachTrackedOptimizationAttempt(JSRuntime* rt, void* addr,
+JS::ForEachTrackedOptimizationAttempt(JSRuntime *rt, void *addr,
                                       ForEachTrackedOptimizationAttemptOp &op,
                                       JSScript **scriptOut, jsbytecode **pcOut)
 {
-    JitcodeGlobalTable* table = rt->jitRuntime()->getJitcodeGlobalTable();
+    JitcodeGlobalTable *table = rt->jitRuntime()->getJitcodeGlobalTable();
     JitcodeGlobalEntry entry;
     table->lookupInfallible(addr, &entry, rt);
     entry.youngestFrameLocationAtAddr(rt, addr, scriptOut, pcOut);
@@ -1242,10 +1242,10 @@ IonTrackedOptimizationsTypeInfo::ForEachOpAdapter::operator()(JS::TrackedTypeSit
 }
 
 JS_PUBLIC_API(void)
-JS::ForEachTrackedOptimizationTypeInfo(JSRuntime* rt, void* addr,
-                                       ForEachTrackedOptimizationTypeInfoOp& op)
+JS::ForEachTrackedOptimizationTypeInfo(JSRuntime *rt, void *addr,
+                                       ForEachTrackedOptimizationTypeInfoOp &op)
 {
-    JitcodeGlobalTable* table = rt->jitRuntime()->getJitcodeGlobalTable();
+    JitcodeGlobalTable *table = rt->jitRuntime()->getJitcodeGlobalTable();
     JitcodeGlobalEntry entry;
     table->lookupInfallible(addr, &entry, rt);
     IonTrackedOptimizationsTypeInfo::ForEachOpAdapter adapter(op);
