@@ -85,8 +85,6 @@
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
 - Bug 1142669 part 6 - Don't inline scripts that are known to inline a
 - Bug 1145440 - Ship constant names for tracked strategy and outcomes i
-- Bug 1143860 - Deduplicate tracked optimizations when streaming the pr
-- Bug 974418 - Fix a TSan race involving the double-elements flag on te
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
