@@ -568,7 +568,7 @@ template <typename ParseHandler>
 ObjectBox*
 Parser<ParseHandler>::newObjectBox(NativeObject* obj)
 {
-    MOZ_ASSERT(obj && !IsPoisonedPtr(obj));
+    MOZ_ASSERT(obj);
 
     /*
      * We use JSContext.tempLifoAlloc to allocate parsed objects and place them
@@ -646,7 +646,7 @@ FunctionBox*
 Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun, ParseContext<ParseHandler>* outerpc,
                                      Directives inheritedDirectives, GeneratorKind generatorKind)
 {
-    MOZ_ASSERT(fun && !IsPoisonedPtr(fun));
+    MOZ_ASSERT(fun);
 
     /*
      * We use JSContext.tempLifoAlloc to allocate parsed objects and place them
