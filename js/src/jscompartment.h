@@ -547,6 +547,7 @@ struct JSCompartment
         DeprecatedLetBlock = 4,             // Added in JS 1.7
         // No longer using 5 (was: let expressions)
         DeprecatedNoSuchMethod = 6,         // JS 1.7+
+        DeprecatedFlagsArgument = 7,        // JS 1.3 or older
         DeprecatedLanguageExtensionCount
     };
 
