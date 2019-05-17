@@ -83,8 +83,36 @@
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1142669 part 6 - Don't inline scripts that are known to inline a
-- Bug 1145440 - Ship constant names for tracked strategy and outcomes i
+- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
+- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+- Bug 1150555 - about:performance should not confuse Jetpack addons. 
+- Bug 1125848 - 2015-03-09 Consolidate PCompositor's creation-destruction logic
+- Bug 1147491, part 2 - Disable use of BaseTimeDuration::operator/ w
+- Bug 1147491, part 1 - Fix playbackRate crash due to integer rounding 
+- Bug 1072037, part 3 - Tests for the effect of setting CSS transition
+- Bug 1054755 - Part 3: Use IsRegExp in String.prototype.
+- Bug 1054755 - Part 2: Implement IsRegExp.
+- Bug 1054755 - Part 1: Add Symbol.match
+- Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
+- Bug 1005110 - Warn about unreachable expression after semicolon-less
+- Bug 1148899 - Rename isExprClosure/setIsExprClosure/EXPR_CLOSURE
+- Bug 1149015 - Part 3: Remove some use of expression closure from jit
+- Bug 1149015 - Part 2: Remove some use of expression closure from jste
+- Bug 1149015 - Part 1: Remove some use of expression closure from jste
+- Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
+- Bug 1146696 - Don't assume there are no arenas available after last d
+- Bug 1145997 - Suppress GC in debugger GC callback 
+- Bug 1092102 - Rename Suspend/Resume to Freeze
+- Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
+- Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
+- Bug 1148903 - Allow control characters to be rendered by user fonts.
+- Bug 1125698 - Add ExpandErrorArguments() varargs helper function and
+- Bug 1120308 - tcp control channel for presentation api.
+- Bug 1134920 - Remove nsMemory::Alloc/Realloc/Free
+- Bug 1134920 - Use moz_xmalloc/moz_xrealloc/free instead of nsMemory:
+- Bug 1149854: Use range-based "for" loops when iterating over child fr
+- Bug 1147670 - Remove duplicate IsMarked/IsAboutToBeFinalized 
+- Bug 1143256 - Store object metadata using a weak map
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
