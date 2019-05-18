@@ -44,7 +44,11 @@ nsWEBPDecoder::~nsWEBPDecoder()
 void
 nsWEBPDecoder::InitInternal()
 {
+#if MOZ_BIG_ENDIAN
+  mDecoder = WebPINewRGB(MODE_Argb, nullptr, 0, 0);
+#else
   mDecoder = WebPINewRGB(MODE_rgbA, nullptr, 0, 0);
+#endif
 
   if (!mDecoder) {
     PostDecoderError(NS_ERROR_FAILURE);
