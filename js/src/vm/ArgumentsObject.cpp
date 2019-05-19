@@ -169,7 +169,7 @@ ArgumentsObject::create(JSContext* cx, HandleScript script, HandleFunction calle
     if (!group)
         return nullptr;
 
-    JSObject* metadata = nullptr;
+    JSObject *metadata = nullptr;
     if (!NewObjectMetadata(cx, &metadata))
         return nullptr;
 

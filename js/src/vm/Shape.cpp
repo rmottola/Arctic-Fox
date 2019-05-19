@@ -1159,7 +1159,7 @@ JSObject::setMetadata(JSContext *cx, HandleObject obj, HandleObject metadata)
 }
 
 /* static */ Shape *
-Shape::setObjectMetadata(JSContext *cx, JSObject *metadata, TaggedProto proto, Shape* last)
+Shape::setObjectMetadata(JSContext *cx, JSObject *metadata, TaggedProto proto, Shape *last)
 {
     if (last->getObjectMetadata() == metadata)
         return last;
@@ -1245,7 +1245,7 @@ StackBaseShape::hash(const Lookup& lookup)
 }
 
 /* static */ inline bool
-StackBaseShape::match(UnownedBaseShape* key, const Lookup& lookup)
+StackBaseShape::match(UnownedBaseShape *key, const Lookup& lookup)
 {
     return key->flags == lookup.flags
         && key->clasp_ == lookup.clasp
@@ -1371,7 +1371,7 @@ JSCompartment::fixupBaseShapeTable()
     for (BaseShapeSet::Enum e(baseShapes); !e.empty(); e.popFront()) {
         UnownedBaseShape *base = e.front().unbarrieredGet();
         if (base->fixupBaseShapeTableEntry()) {
-            ReadBarriered<UnownedBaseShape*> b(base);
+            ReadBarriered<UnownedBaseShape *> b(base);
             e.rekeyFront(base, b);
         }
     }

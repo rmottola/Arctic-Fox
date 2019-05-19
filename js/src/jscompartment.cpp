@@ -692,7 +692,7 @@ JSCompartment::setObjectMetadataCallback(js::ObjectMetadataCallback callback)
 }
 
 static bool
-AddInnerLazyFunctionsFromScript(JSScript* script, AutoObjectVector& lazyFunctions)
+AddInnerLazyFunctionsFromScript(JSScript *script, AutoObjectVector& lazyFunctions)
 {
     if (!script->hasObjects())
         return true;
@@ -806,16 +806,16 @@ JSCompartment::clearBreakpointsIn(FreeOp *fop, js::Debugger *dbg, HandleObject h
 
 void
 JSCompartment::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
-                                      size_t* tiAllocationSiteTables,
-                                      size_t* tiArrayTypeTables,
-                                      size_t* tiObjectTypeTables,
-                                      size_t* compartmentObject,
-                                      size_t* compartmentTables,
-                                      size_t* innerViewsArg,
-                                      size_t* lazyArrayBuffersArg,
-                                      size_t* crossCompartmentWrappersArg,
-                                      size_t* regexpCompartment,
-                                      size_t* savedStacksSet)
+                                      size_t *tiAllocationSiteTables,
+                                      size_t *tiArrayTypeTables,
+                                      size_t *tiObjectTypeTables,
+                                      size_t *compartmentObject,
+                                      size_t *compartmentTables,
+                                      size_t *innerViewsArg,
+                                      size_t *lazyArrayBuffersArg,
+                                      size_t *crossCompartmentWrappersArg,
+                                      size_t *regexpCompartment,
+                                      size_t *savedStacksSet)
 {
     *compartmentObject += mallocSizeOf(this);
     objectGroups.addSizeOfExcludingThis(mallocSizeOf, tiAllocationSiteTables,

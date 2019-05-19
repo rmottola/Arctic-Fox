@@ -250,16 +250,16 @@ struct JSCompartment
 
   public:
     void addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
-                                size_t* tiAllocationSiteTables,
-                                size_t* tiArrayTypeTables,
-                                size_t* tiObjectTypeTables,
-                                size_t* compartmentObject,
-                                size_t* compartmentTables,
-                                size_t* innerViews,
-                                size_t* lazyArrayBuffers,
-                                size_t* crossCompartmentWrappers,
-                                size_t* regexpCompartment,
-                                size_t* savedStacksSet);
+                                size_t *tiAllocationSiteTables,
+                                size_t *tiArrayTypeTables,
+                                size_t *tiObjectTypeTables,
+                                size_t *compartmentObject,
+                                size_t *compartmentTables,
+                                size_t *innerViews,
+                                size_t *lazyArrayBuffers,
+                                size_t *crossCompartmentWrappers,
+                                size_t *regexpCompartment,
+                                size_t *savedStacksSet);
 
     /*
      * Shared scope property tree, and arena-pool for allocating its nodes.
@@ -293,7 +293,7 @@ struct JSCompartment
     js::InnerViewTable innerViews;
 
     // Map from typed objects to array buffers lazily created for them.
-    js::LazyArrayBufferTable* lazyArrayBuffers;
+    js::LazyArrayBufferTable *lazyArrayBuffers;
 
     // All unboxed layouts in the compartment.
     mozilla::LinkedList<js::UnboxedLayout> unboxedLayouts;
@@ -399,10 +399,10 @@ struct JSCompartment
     void forgetObjectMetadataCallback() {
         objectMetadataCallback = nullptr;
     }
-    bool callObjectMetadataCallback(JSContext* cx, JSObject** obj) const {
+    bool callObjectMetadataCallback(JSContext *cx, JSObject **obj) const {
         return objectMetadataCallback(cx, obj);
     }
-    const void* addressOfMetadataCallback() const {
+    const void *addressOfMetadataCallback() const {
         return &objectMetadataCallback;
     }
 

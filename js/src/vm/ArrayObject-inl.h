@@ -102,8 +102,8 @@ ArrayObject::createArray(ExclusiveContext* cx, gc::InitialHeap heap,
     return finishCreateArray(obj, shape);
 }
 
-/* static */ inline ArrayObject*
-ArrayObject::createCopyOnWriteArray(ExclusiveContext* cx, gc::InitialHeap heap,
+/* static */ inline ArrayObject *
+ArrayObject::createCopyOnWriteArray(ExclusiveContext *cx, gc::InitialHeap heap,
                                     HandleShape shape,
                                     HandleArrayObject sharedElementsOwner)
 {
@@ -116,7 +116,7 @@ ArrayObject::createCopyOnWriteArray(ExclusiveContext* cx, gc::InitialHeap heap,
     gc::AllocKind kind = gc::AllocKind::OBJECT0_BACKGROUND;
 
     RootedObjectGroup group(cx, sharedElementsOwner->group());
-    ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, group);
+    ArrayObject *obj = createArrayInternal(cx, kind, heap, shape, group);
     if (!obj)
         return nullptr;
 

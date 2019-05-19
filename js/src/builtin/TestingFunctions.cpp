@@ -1390,7 +1390,7 @@ DisplayName(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ShellObjectMetadataCallback(JSContext* cx, JSObject** pmetadata)
+ShellObjectMetadataCallback(JSContext *cx, JSObject **pmetadata)
 {
     RootedObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!obj)
@@ -1448,7 +1448,7 @@ SetObjectMetadataCallback(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
+SetObjectMetadata(JSContext *cx, unsigned argc, jsval *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2 || !args[0].isObject() || !args[1].isObject()) {
@@ -1464,7 +1464,7 @@ SetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
+GetObjectMetadata(JSContext *cx, unsigned argc, jsval *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1 || !args[0].isObject()) {

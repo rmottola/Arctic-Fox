@@ -1149,9 +1149,9 @@ SavedStacks::chooseSamplingProbability(JSContext* cx)
 }
 
 bool
-SavedStacksMetadataCallback(JSContext* cx, JSObject** pmetadata)
+SavedStacksMetadataCallback(JSContext *cx, JSObject **pmetadata)
 {
-    SavedStacks& stacks = cx->compartment()->savedStacks();
+    SavedStacks &stacks = cx->compartment()->savedStacks();
     if (stacks.allocationSkipCount > 0) {
         stacks.allocationSkipCount--;
         return true;
@@ -1194,7 +1194,7 @@ SavedStacksMetadataCallback(JSContext* cx, JSObject** pmetadata)
     return Debugger::onLogAllocationSite(cx, frame, PRMJ_Now());
 }
 
-JS_FRIEND_API(JSPrincipals*)
+JS_FRIEND_API(JSPrincipals *)
 GetSavedFramePrincipals(HandleObject savedFrame)
 {
     MOZ_ASSERT(savedFrame);

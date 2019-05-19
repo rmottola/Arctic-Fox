@@ -1378,10 +1378,10 @@ bool
 TypedObject::isAttached() const
 {
     if (is<InlineTransparentTypedObject>()) {
-        LazyArrayBufferTable* table = compartment()->lazyArrayBuffers;
+        LazyArrayBufferTable *table = compartment()->lazyArrayBuffers;
         if (table) {
-            ArrayBufferObject* buffer =
-                table->maybeBuffer(&const_cast<TypedObject*>(this)->as<InlineTransparentTypedObject>());
+            ArrayBufferObject *buffer =
+                table->maybeBuffer(&const_cast<TypedObject *>(this)->as<InlineTransparentTypedObject>());
             if (buffer)
                 return !buffer->isNeutered();
         }
@@ -2190,17 +2190,17 @@ InlineTypedObject::objectMovedDuringMinorGC(JSTracer *trc, JSObject *dst, JSObje
     }
 }
 
-ArrayBufferObject*
-InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
+ArrayBufferObject *
+InlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
 {
-    LazyArrayBufferTable*& table = cx->compartment()->lazyArrayBuffers;
+    LazyArrayBufferTable *&table = cx->compartment()->lazyArrayBuffers;
     if (!table) {
         table = cx->new_<LazyArrayBufferTable>(cx);
         if (!table)
             return nullptr;
     }
 
-    ArrayBufferObject* buffer = table->maybeBuffer(this);
+    ArrayBufferObject *buffer = table->maybeBuffer(this);
     if (buffer)
         return buffer;
 
@@ -2232,15 +2232,15 @@ InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
     return buffer;
 }
 
-ArrayBufferObject*
-OutlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
+ArrayBufferObject *
+OutlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
 {
     if (owner().is<ArrayBufferObject>())
         return &owner().as<ArrayBufferObject>();
     return owner().as<InlineTransparentTypedObject>().getOrCreateBuffer(cx);
 }
 
-LazyArrayBufferTable::LazyArrayBufferTable(JSContext* cx)
+LazyArrayBufferTable::LazyArrayBufferTable(JSContext *cx)
  : map(cx)
 {
     if (!map.init())
@@ -2252,8 +2252,8 @@ LazyArrayBufferTable::~LazyArrayBufferTable()
     WeakMapBase::removeWeakMapFromList(&map);
 }
 
-ArrayBufferObject*
-LazyArrayBufferTable::maybeBuffer(InlineTransparentTypedObject* obj)
+ArrayBufferObject *
+LazyArrayBufferTable::maybeBuffer(InlineTransparentTypedObject *obj)
 {
     if (Map::Ptr p = map.lookup(obj))
         return &p->value()->as<ArrayBufferObject>();
@@ -2261,7 +2261,7 @@ LazyArrayBufferTable::maybeBuffer(InlineTransparentTypedObject* obj)
 }
 
 bool
-LazyArrayBufferTable::addBuffer(JSContext* cx, InlineTransparentTypedObject* obj, ArrayBufferObject* buffer)
+LazyArrayBufferTable::addBuffer(JSContext *cx, InlineTransparentTypedObject *obj, ArrayBufferObject *buffer)
 {
     MOZ_ASSERT(!map.has(obj));
     if (!map.put(obj, buffer)) {
@@ -2273,12 +2273,12 @@ LazyArrayBufferTable::addBuffer(JSContext* cx, InlineTransparentTypedObject* obj
     if (IsInsideNursery(obj)) {
         // Strip the barriers from the type before inserting into the store
         // buffer, as is done for DebugScopes::proxiedScopes.
-        Map::Base* baseHashMap = static_cast<Map::Base*>(&map);
+        Map::Base *baseHashMap = static_cast<Map::Base *>(&map);
 
-        typedef HashMap<JSObject*, JSObject*> UnbarrieredMap;
-        UnbarrieredMap* unbarrieredMap = reinterpret_cast<UnbarrieredMap*>(baseHashMap);
+        typedef HashMap<JSObject *, JSObject *> UnbarrieredMap;
+        UnbarrieredMap *unbarrieredMap = reinterpret_cast<UnbarrieredMap *>(baseHashMap);
 
-        typedef gc::HashKeyRef<UnbarrieredMap, JSObject*> Ref;
+        typedef gc::HashKeyRef<UnbarrieredMap, JSObject *> Ref;
         cx->runtime()->gc.storeBuffer.putGeneric(Ref(unbarrieredMap, obj));
 
         // Also make sure the buffer is traced, so that its data pointer is
@@ -2290,7 +2290,7 @@ LazyArrayBufferTable::addBuffer(JSContext* cx, InlineTransparentTypedObject* obj
 }
 
 void
-LazyArrayBufferTable::trace(JSTracer* trc)
+LazyArrayBufferTable::trace(JSTracer *trc)
 {
     map.trace(trc);
 }

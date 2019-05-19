@@ -235,8 +235,8 @@ ClassCanHaveFixedData(const Class* clasp)
 
 } // namespace js
 
-/* static */ inline JSObject*
-JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::InitialHeap heap,
+/* static */ inline JSObject *
+JSObject::create(js::ExclusiveContext *cx, js::gc::AllocKind kind, js::gc::InitialHeap heap,
                  js::HandleShape shape, js::HandleObjectGroup group)
 {
     MOZ_ASSERT(shape && group);
@@ -829,13 +829,13 @@ Unbox(JSContext* cx, HandleObject obj, MutableHandleValue vp)
 }
 
 static MOZ_ALWAYS_INLINE bool
-NewObjectMetadata(ExclusiveContext* cxArg, JSObject** pmetadata)
+NewObjectMetadata(ExclusiveContext *cxArg, JSObject **pmetadata)
 {
     // The metadata callback is invoked before each created object, except when
     // analysis/compilation is active, to avoid recursion. It is also skipped
     // when we allocate objects during a bailout, to prevent stack iterations.
     MOZ_ASSERT(!*pmetadata);
-    if (JSContext* cx = cxArg->maybeJSContext()) {
+    if (JSContext *cx = cxArg->maybeJSContext()) {
         if (MOZ_UNLIKELY((size_t)cx->compartment()->hasObjectMetadataCallback()) &&
             !cx->zone()->types.activeAnalysis &&
             !cx->zone()->usedByExclusiveThread)

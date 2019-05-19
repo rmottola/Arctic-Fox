@@ -1174,13 +1174,13 @@ js::SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback)
 }
 
 JS_FRIEND_API(bool)
-js::SetObjectMetadata(JSContext* cx, HandleObject obj, HandleObject metadata)
+js::SetObjectMetadata(JSContext *cx, HandleObject obj, HandleObject metadata)
 {
     return JSObject::setMetadata(cx, obj, metadata);
 }
 
-JS_FRIEND_API(JSObject*)
-js::GetObjectMetadata(JSObject* obj)
+JS_FRIEND_API(JSObject *)
+js::GetObjectMetadata(JSObject *obj)
 {
     return obj->getMetadata();
 }

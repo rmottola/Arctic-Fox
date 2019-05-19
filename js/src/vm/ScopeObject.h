@@ -921,8 +921,8 @@ class DebugScopes
     /* The map from (non-debug) scopes to debug scopes. */
     typedef WeakMap<PreBarrieredObject, RelocatablePtrObject> ObjectWeakMap;
     ObjectWeakMap proxiedScopes;
-    static MOZ_ALWAYS_INLINE void proxiedScopesPostWriteBarrier(JSRuntime* rt, ObjectWeakMap* map,
-                                                               const PreBarrieredObject& key);
+    static MOZ_ALWAYS_INLINE void proxiedScopesPostWriteBarrier(JSRuntime *rt, ObjectWeakMap *map,
+                                                               const PreBarrieredObject &key);
 
     /*
      * The map from live frames which have optimized-away scopes to the

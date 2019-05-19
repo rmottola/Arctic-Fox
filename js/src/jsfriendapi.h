@@ -2589,7 +2589,7 @@ class JS_FRIEND_API(AutoCTypesActivityCallback) {
 };
 
 typedef bool
-(* ObjectMetadataCallback)(JSContext* cx, JSObject** pmetadata);
+(* ObjectMetadataCallback)(JSContext *cx, JSObject **pmetadata);
 
 /*
  * Specify a callback to invoke when creating each JS object in the current
@@ -2598,15 +2598,15 @@ typedef bool
  * so for efficiency, objects should generally try to share metadata objects.
  */
 JS_FRIEND_API(void)
-SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback);
+SetObjectMetadataCallback(JSContext *cx, ObjectMetadataCallback callback);
 
 /* Manipulate the metadata associated with an object. */
 
 JS_FRIEND_API(bool)
-SetObjectMetadata(JSContext* cx, JS::HandleObject obj, JS::HandleObject metadata);
+SetObjectMetadata(JSContext *cx, JS::HandleObject obj, JS::HandleObject metadata);
 
-JS_FRIEND_API(JSObject*)
-GetObjectMetadata(JSObject* obj);
+JS_FRIEND_API(JSObject *)
+GetObjectMetadata(JSObject *obj);
 
 JS_FRIEND_API(bool)
 GetElementsWithAdder(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver,

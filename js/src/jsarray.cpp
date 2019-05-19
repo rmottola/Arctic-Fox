@@ -3220,7 +3220,7 @@ CreateArrayPrototype(JSContext* cx, JSProtoKey key)
     if (!group)
         return nullptr;
 
-    JSObject* metadata = nullptr;
+    JSObject *metadata = nullptr;
     if (!NewObjectMetadata(cx, &metadata))
         return nullptr;
 
@@ -3324,7 +3324,7 @@ EnsureNewArrayElements(ExclusiveContext* cx, ArrayObject* obj, uint32_t length)
 }
 
 static bool
-NewArrayIsCachable(ExclusiveContext* cxArg, NewObjectKind newKind)
+NewArrayIsCachable(ExclusiveContext *cxArg, NewObjectKind newKind)
 {
     return cxArg->isJSContext() &&
            newKind == GenericObject &&
@@ -3373,7 +3373,7 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
     if (!group)
         return nullptr;
 
-    JSObject* metadata = nullptr;
+    JSObject *metadata = nullptr;
     if (!NewObjectMetadata(cxArg, &metadata))
         return nullptr;
 
@@ -3547,14 +3547,14 @@ js::NewDenseFullyAllocatedArrayWithTemplate(JSContext* cx, uint32_t length, JSOb
     return arr;
 }
 
-JSObject*
-js::NewDenseCopyOnWriteArray(JSContext* cx, HandleArrayObject templateObject, gc::InitialHeap heap)
+JSObject *
+js::NewDenseCopyOnWriteArray(JSContext *cx, HandleArrayObject templateObject, gc::InitialHeap heap)
 {
     RootedShape shape(cx, templateObject->lastProperty());
 
     MOZ_ASSERT(!gc::IsInsideNursery(templateObject));
 
-    JSObject* metadata = nullptr;
+    JSObject *metadata = nullptr;
     if (!NewObjectMetadata(cx, &metadata))
         return nullptr;
     if (metadata) {
@@ -3563,7 +3563,7 @@ js::NewDenseCopyOnWriteArray(JSContext* cx, HandleArrayObject templateObject, gc
             return nullptr;
     }
 
-    ArrayObject* arr = ArrayObject::createCopyOnWriteArray(cx, heap, shape, templateObject);
+    ArrayObject *arr = ArrayObject::createCopyOnWriteArray(cx, heap, shape, templateObject);
     if (!arr)
         return nullptr;
 

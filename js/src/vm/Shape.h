@@ -470,11 +470,11 @@ class BaseShape : public gc::TenuredCell
         return *this;
     }
 
-    const Class* clasp() const { return clasp_; }
+    const Class *clasp() const { return clasp_; }
 
     bool isOwned() const { return !!(flags & OWNED_SHAPE); }
 
-    inline void adoptUnowned(UnownedBaseShape* other);
+    inline void adoptUnowned(UnownedBaseShape *other);
 
     void setOwned(UnownedBaseShape* unowned) {
         flags |= OWNED_SHAPE;
@@ -485,13 +485,13 @@ class BaseShape : public gc::TenuredCell
     uint32_t getObjectFlags() const { return flags & OBJECT_FLAG_MASK; }
 
     bool hasTable() const { MOZ_ASSERT_IF(table_, isOwned()); return table_ != nullptr; }
-    ShapeTable& table() const { MOZ_ASSERT(table_ && isOwned()); return *table_; }
-    void setTable(ShapeTable* table) { MOZ_ASSERT(isOwned()); table_ = table; }
+    ShapeTable &table() const { MOZ_ASSERT(table_ && isOwned()); return *table_; }
+    void setTable(ShapeTable *table) { MOZ_ASSERT(isOwned()); table_ = table; }
 
     uint32_t slotSpan() const { MOZ_ASSERT(isOwned()); return slotSpan_; }
     void setSlotSpan(uint32_t slotSpan) { MOZ_ASSERT(isOwned()); slotSpan_ = slotSpan; }
 
-    JSCompartment* compartment() const { return compartment_; }
+    JSCompartment *compartment() const { return compartment_; }
 
     /*
      * Lookup base shapes from the compartment's baseShapes table, adding if
@@ -601,7 +601,7 @@ struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
             matchMetadata(base.metadata)
         {}
 
-        MOZ_IMPLICIT Lookup(UnownedBaseShape* base)
+        MOZ_IMPLICIT Lookup(UnownedBaseShape *base)
           : flags(base->getObjectFlags()),
             clasp(base->clasp()),
             hashMetadata(base->getObjectMetadata()),
@@ -621,14 +621,14 @@ struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
     };
 
     static inline HashNumber hash(const Lookup& lookup);
-    static inline bool match(UnownedBaseShape* key, const Lookup& lookup);
+    static inline bool match(UnownedBaseShape *key, const Lookup& lookup);
 
     // For RootedGeneric<StackBaseShape*>
-    void trace(JSTracer* trc);
+    void trace(JSTracer *trc);
 };
 
 inline
-BaseShape::BaseShape(const StackBaseShape& base)
+BaseShape::BaseShape(const StackBaseShape &base)
 {
     mozilla::PodZero(this);
     this->clasp_ = base.clasp;
