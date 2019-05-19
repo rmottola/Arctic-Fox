@@ -6991,7 +6991,6 @@ EmitClass(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
     if (Emit1(cx, bce, JSOP_POP) < 0)
         return false;
 
-    bool shouldPopResult = false;
     if (names) {
         // That DEFCONST is never gonna be used, but use it here for logical consistency.
         ParseNode *innerName = names->innerBinding();
@@ -7005,13 +7004,11 @@ EmitClass(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
         if (outerName) {
             if (!EmitLexicalInitialization(cx, bce, outerName, JSOP_DEFVAR))
                 return false;
-            shouldPopResult = true;
+            // Only class statements make outer bindings, and they do not leave
+            // themselves on the stack.
+            if (Emit1(cx, bce, JSOP_POP) < 0)
+                return false;
         }
-    }
-
-    if (shouldPopResult) {
-        if (Emit1(cx, bce, JSOP_POP) < 0)
-            return false;
     }
 
     MOZ_ALWAYS_TRUE(bce->sc->setLocalStrictMode(savedStrictness));
