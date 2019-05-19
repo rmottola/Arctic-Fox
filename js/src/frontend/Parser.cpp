@@ -564,8 +564,8 @@ Parser<ParseHandler>::~Parser()
 }
 
 template <typename ParseHandler>
-ObjectBox*
-Parser<ParseHandler>::newObjectBox(NativeObject* obj)
+ObjectBox *
+Parser<ParseHandler>::newObjectBox(JSObject *obj)
 {
     MOZ_ASSERT(obj);
 

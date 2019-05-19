@@ -1103,7 +1103,7 @@ NameNode::dump(int indent)
 }
 #endif
 
-ObjectBox::ObjectBox(NativeObject* object, ObjectBox* traceLink)
+ObjectBox::ObjectBox(JSObject *object, ObjectBox* traceLink)
   : object(object),
     traceLink(traceLink),
     emitLink(nullptr)
@@ -1111,7 +1111,7 @@ ObjectBox::ObjectBox(NativeObject* object, ObjectBox* traceLink)
     MOZ_ASSERT(!object->is<JSFunction>());
 }
 
-ObjectBox::ObjectBox(JSFunction* function, ObjectBox* traceLink)
+ObjectBox::ObjectBox(JSFunction *function, ObjectBox* traceLink)
   : object(function),
     traceLink(traceLink),
     emitLink(nullptr)
