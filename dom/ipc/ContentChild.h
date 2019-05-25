@@ -378,6 +378,7 @@ public:
                                    nsTArray<nsCString>&& aThreadNameFilters) override;
     virtual bool RecvStopProfiler() override;
     virtual bool RecvGetProfile(nsCString* aProfile) override;
+    virtual bool RecvShutdown() override;
 
 #ifdef ANDROID
     gfxIntSize GetScreenSize() { return mScreenSize; }
