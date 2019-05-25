@@ -746,7 +746,7 @@ private:
     RecvBackUpXResources(const FileDescriptor& aXSocketFd) override;
 
     virtual bool
-    RecvOpenAnonymousTemporaryFile(FileDescriptor* aFD) override;
+    RecvOpenAnonymousTemporaryFile(FileDescOrError* aFD) override;
 
     virtual bool
     RecvKeygenProcessValue(const nsString& oldValue, const nsString& challenge,
