@@ -7,7 +7,6 @@
 if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
     GoannaSharedLibrary('gkmedias', linkage=None)
     USE_LIBS += [
-        'mozalloc',
         'nspr',
     ]
 else:
