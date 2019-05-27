@@ -72,7 +72,6 @@ EXPORTS.mozilla += [
     'EnumeratedArrayCycleCollection.h',
     'FileUtils.h',
     'GenericFactory.h',
-    'HoldDropJSObjects.h',
     'IntentionalCrash.h',
     'Monitor.h',
     'Mutex.h',
