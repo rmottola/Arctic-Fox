@@ -127,6 +127,11 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
 
+Check ApplicationReputation.cpp which is missing, possibly from here:
+Bug 837199 - Write interface to query application reputation 
+
+no components/url-classifier ?
+
 ### Further ToDo which would help portability:
 
 - Update code from TemporaryRef to already_Refed
