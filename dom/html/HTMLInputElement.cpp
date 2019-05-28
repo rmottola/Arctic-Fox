@@ -1178,7 +1178,7 @@ void
 HTMLInputElement::FreeData()
 {
   if (!IsSingleLineTextControl(false)) {
-    nsMemory::Free(mInputData.mValue);
+    free(mInputData.mValue);
     mInputData.mValue = nullptr;
   } else {
     UnbindFromFrame(nullptr);
@@ -2875,7 +2875,7 @@ HTMLInputElement::SetValueInternal(const nsAString& aValue,
           UpdateAllValidityStates(mParserCreating);
         }
       } else {
-        nsMemory::Free(mInputData.mValue);
+        free(mInputData.mValue);
         mInputData.mValue = ToNewUnicode(value);
         if (aSetValueChanged) {
           SetValueChanged(true);

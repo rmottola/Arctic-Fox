@@ -449,7 +449,7 @@ MobileConnection::GetSupportedNetworkTypes(nsTArray<MobileNetworkType>& aTypes) 
     aTypes.AppendElement(static_cast<MobileNetworkType>(type));
   }
 
-  nsMemory::Free(types);
+  free(types);
 }
 
 already_AddRefed<DOMRequest>

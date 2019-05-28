@@ -158,7 +158,7 @@ TestPref(nsIURI *uri, const char *pref)
         start = end + 1;
     }
 
-    nsMemory::Free(hostList);
+    free(hostList);
     return false;
 }
 
@@ -451,12 +451,12 @@ nsHttpNTLMAuth::GenerateCredentials(nsIHttpAuthenticableChannel *authChannel,
         }
         // decode into the input secbuffer
         inBufLen = (len * 3)/4;      // sufficient size (see plbase64.h)
-        inBuf = nsMemory::Alloc(inBufLen);
+        inBuf = moz_xmalloc(inBufLen);
         if (!inBuf)
             return NS_ERROR_OUT_OF_MEMORY;
 
         if (PL_Base64Decode(challenge, len, (char *) inBuf) == nullptr) {
-            nsMemory::Free(inBuf);
+            free(inBuf);
             return NS_ERROR_UNEXPECTED; // improper base64 encoding
         }
     }
@@ -478,11 +478,11 @@ nsHttpNTLMAuth::GenerateCredentials(nsIHttpAuthenticableChannel *authChannel,
         }
 
         // OK, we are done with |outBuf|
-        nsMemory::Free(outBuf);
+        free(outBuf);
     }
 
     if (inBuf)
-        nsMemory::Free(inBuf);
+        free(inBuf);
 
     return rv;
 }
