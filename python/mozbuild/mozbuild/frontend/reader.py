@@ -792,7 +792,7 @@ class BuildReader(object):
         read, a new Context is created and emitted.
         """
         path = mozpath.join(self.config.topsrcdir, 'moz.build')
-        return self.read_mozbuild(path, self.config, read_tiers=True)
+        return self.read_mozbuild(path, self.config)
 
     def all_mozbuild_paths(self):
         """Iterator over all available moz.build files.
@@ -928,8 +928,7 @@ class BuildReader(object):
             for name, key, value in assignments:
                 yield p, name, key, value
 
-    def read_mozbuild(self, path, config, read_tiers=False, descend=True,
-            metadata={}):
+    def read_mozbuild(self, path, config, descend=True, metadata={}):
         """Read and process a mozbuild file, descending into children.
 
         This starts with a single mozbuild file, executes it, and descends into
@@ -939,10 +938,6 @@ class BuildReader(object):
         each element as a relative directory path. For each encountered
         directory, we will open the moz.build file located in that
         directory in a new Sandbox and process it.
-
-        If read_tiers is True (it should only be True for the top-level
-        mozbuild file in a project), the TIERS variable will be used for
-        traversal as well.
 
         If descend is True (the default), we will descend into child
         directories and files per variable values.
@@ -956,8 +951,8 @@ class BuildReader(object):
         """
         self._execution_stack.append(path)
         try:
-            for s in self._read_mozbuild(path, config, read_tiers=read_tiers,
-                descend=descend, metadata=metadata):
+            for s in self._read_mozbuild(path, config, descend=descend,
+                                         metadata=metadata):
                 yield s
 
         except BuildReaderError as bre:
@@ -983,7 +978,7 @@ class BuildReader(object):
             raise BuildReaderError(list(self._execution_stack),
                 sys.exc_info()[2], other_error=e)
 
-    def _read_mozbuild(self, path, config, read_tiers, descend, metadata):
+    def _read_mozbuild(self, path, config, descend, metadata):
         path = mozpath.normpath(path)
         log(self._log, logging.DEBUG, 'read_mozbuild', {'path': path},
             'Reading file: {path}')
@@ -1108,7 +1103,7 @@ class BuildReader(object):
                 continue
 
             for res in self.read_mozbuild(child_path, context.config,
-                read_tiers=False, metadata=child_metadata):
+                                          metadata=child_metadata):
                 yield res
 
         self._execution_stack.pop()
