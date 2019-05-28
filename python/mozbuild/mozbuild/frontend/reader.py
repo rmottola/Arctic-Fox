@@ -1022,7 +1022,7 @@ class BuildReader(object):
         curdir = mozpath.dirname(path)
 
         gyp_contexts = []
-        for target_dir in context['GYP_DIRS']:
+        for target_dir in context.get('GYP_DIRS', []):
             gyp_dir = context['GYP_DIRS'][target_dir]
             for v in ('input', 'variables'):
                 if not getattr(gyp_dir, v):
