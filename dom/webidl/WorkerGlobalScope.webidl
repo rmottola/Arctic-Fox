@@ -12,7 +12,7 @@
  * this document.
  */
 
-[Exposed=Worker]
+[Exposed=(Worker)]
 interface WorkerGlobalScope : EventTarget {
   [Constant, Cached]
   readonly attribute WorkerGlobalScope self;
