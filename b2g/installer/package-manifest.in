@@ -411,6 +411,9 @@
 @BINPATH@/components/htmlMenuBuilder.manifest
 @BINPATH@/components/PresentationDeviceInfoManager.manifest
 @BINPATH@/components/PresentationDeviceInfoManager.js
+@RESPATH@/components/BuiltinProviders.manifest
+@RESPATH@/components/TCPPresentationServer.js
+
 #ifdef MOZ_SECUREELEMENT
 @BINPATH@/components/SecureElement.js
 @BINPATH@/components/SecureElement.manifest
