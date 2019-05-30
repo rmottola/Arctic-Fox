@@ -233,6 +233,7 @@ public:
                                                const bool& aPreventDefault) override;
     virtual bool RecvSetTargetAPZC(const uint64_t& aInputBlockId,
                                    nsTArray<ScrollableLayerGuid>&& aTargets) override;
+    virtual bool RecvSynthesizedMouseWheelEvent(const mozilla::WidgetWheelEvent& aEvent) override;
 
     virtual PColorPickerParent*
     AllocPColorPickerParent(const nsString& aTitle, const nsString& aInitialColor) override;
