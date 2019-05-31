@@ -2894,7 +2894,9 @@ nsRootPresContext::ComputePluginGeometryUpdates(nsIFrame* aFrame,
   // This is not happening during a paint event.
   ApplyPluginGeometryUpdates();
 #else
-  InitApplyPluginGeometryTimer();
+  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+    InitApplyPluginGeometryTimer();
+  }
 #endif
 }
 

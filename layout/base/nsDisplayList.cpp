@@ -1640,6 +1640,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
   nsIFrame* frame = aBuilder->RootReferenceFrame();
   nsPresContext* presContext = frame->PresContext();
   nsIPresShell* presShell = presContext->GetPresShell();
+  nsRootPresContext* rootPresContext = presContext->GetRootPresContext();
 
   NotifySubDocInvalidationFunc computeInvalidFunc =
     presContext->MayHavePaintEventListenerInSubDocument() ? nsPresContext::NotifySubDocInvalidation : 0;
@@ -1748,6 +1749,15 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
     if (aBuilder->WillComputePluginGeometry()) {
       flags = LayerManager::END_NO_REMOTE_COMPOSITE;
     }
+  }
+
+  // If this is the content process, we ship plugin geometry updates over with layer
+  // updates, so calculate that now before we call EndTransaction.
+  if (rootPresContext &&
+      aBuilder->WillComputePluginGeometry() &&
+      XRE_GetProcessType() == GoannaProcessType_Content) {
+    rootPresContext->ComputePluginGeometryUpdates(aBuilder->RootReferenceFrame(), aBuilder, this);
+    rootPresContext->CollectPluginGeometryUpdates(layerManager);
   }
 
   MaybeSetupTransactionIdAllocator(layerManager, view);
