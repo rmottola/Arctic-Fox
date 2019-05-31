@@ -105,7 +105,14 @@
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
+- Bug 1137267 
+- Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
+- Bug 1139675 - Simplify the APIs for getting and setting the pres shel
+- Bug 1036967 - Use ScaleFactors2D instead of ScaleFactor where appropr
+- Bug 1139283 - Move some properties from nsStyleDisplay to nsStylePosi
+
+- Bug 1138527 part 1 - Make ruby annotations have the same font inflati
 
 https://github.com/mozilla/gecko-dev/commit/f800285f024067cae4498a8017dcb5630ec8ebfa
 
