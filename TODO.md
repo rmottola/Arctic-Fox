@@ -105,14 +105,9 @@
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
-- Bug 1148903 - Allow control characters to be rendered by user fonts.
-- Bug 1125698 - Add ExpandErrorArguments() varargs helper function and
-- Bug 1120308 - tcp control channel for presentation api.
-- Bug 1134920 - Remove nsMemory::Alloc/Realloc/Free
-- Bug 1134920 - Use moz_xmalloc/moz_xrealloc/free instead of nsMemory:
-- Bug 1149854: Use range-based "for" loops when iterating over child fr
-- Bug 1147670 - Remove duplicate IsMarked/IsAboutToBeFinalized 
-- Bug 1143256 - Store object metadata using a weak map
+- Bug 1126014 - DomainPolicy support for e10s.
+
+https://github.com/mozilla/gecko-dev/commit/f800285f024067cae4498a8017dcb5630ec8ebfa
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
