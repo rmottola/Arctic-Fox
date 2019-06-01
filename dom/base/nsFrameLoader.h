@@ -21,9 +21,9 @@
 #include "nsFrameMessageManager.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/Attributes.h"
-#include "FrameMetrics.h"
 #include "nsStubMutationObserver.h"
 #include "nsIFrame.h"
+#include "Units.h"
 
 class nsIURI;
 class nsSubDocumentFrame;
@@ -297,7 +297,7 @@ private:
   bool TryRemoteBrowser();
 
   // Tell the remote browser that it's now "virtually visible"
-  bool ShowRemoteFrame(const nsIntSize& size,
+  bool ShowRemoteFrame(const mozilla::ScreenIntSize& size,
                        nsSubDocumentFrame *aFrame = nullptr);
 
   bool AddTreeItemToTreeOwner(nsIDocShellTreeItem* aItem,

@@ -242,8 +242,8 @@ public:
     // XXX/cjones: it's not clear what we gain by hiding these
     // message-sending functions under a layer of indirection and
     // eating the return values
-    void Show(const nsIntSize& size, bool aParentIsActive);
-    void UpdateDimensions(const nsIntRect& rect, const nsIntSize& size,
+    void Show(const ScreenIntSize& size, bool aParentIsActive);
+    void UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
                           const nsIntPoint& chromeDisp);
     void UpdateFrame(const layers::FrameMetrics& aFrameMetrics);
     void UIResolutionChanged();
@@ -445,7 +445,7 @@ protected:
     int32_t mEventCaptureDepth;
 
     nsIntRect mRect;
-    nsIntSize mDimensions;
+    ScreenIntSize mDimensions;
     ScreenOrientation mOrientation;
     float mDPI;
     CSSToLayoutDeviceScale mDefaultScale;
