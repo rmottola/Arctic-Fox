@@ -942,7 +942,7 @@ TabParent::AcknowledgeScrollUpdate(const ViewID& aScrollId, const uint32_t& aScr
 }
 
 void TabParent::HandleDoubleTap(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
   if (!mIsDestroyed) {
@@ -951,7 +951,7 @@ void TabParent::HandleDoubleTap(const CSSPoint& aPoint,
 }
 
 void TabParent::HandleSingleTap(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
   // TODO Send the modifier data to TabChild for use in mouse events.
@@ -961,7 +961,7 @@ void TabParent::HandleSingleTap(const CSSPoint& aPoint,
 }
 
 void TabParent::HandleLongTap(const CSSPoint& aPoint,
-                              int32_t aModifiers,
+                              Modifiers aModifiers,
                               const ScrollableLayerGuid &aGuid,
                               uint64_t aInputBlockId)
 {
@@ -971,7 +971,7 @@ void TabParent::HandleLongTap(const CSSPoint& aPoint,
 }
 
 void TabParent::HandleLongTapUp(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
   if (!mIsDestroyed) {

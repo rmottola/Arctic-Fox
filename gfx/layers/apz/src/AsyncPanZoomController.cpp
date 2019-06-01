@@ -84,57 +84,6 @@
 #  define APZC_LOG_FM(fm, prefix, ...)
 #endif
 
-// Static helper functions
-namespace {
-
-int32_t
-WidgetModifiersToDOMModifiers(mozilla::Modifiers aModifiers)
-{
-  int32_t result = 0;
-  if (aModifiers & mozilla::MODIFIER_SHIFT) {
-    result |= nsIDOMWindowUtils::MODIFIER_SHIFT;
-  }
-  if (aModifiers & mozilla::MODIFIER_CONTROL) {
-    result |= nsIDOMWindowUtils::MODIFIER_CONTROL;
-  }
-  if (aModifiers & mozilla::MODIFIER_ALT) {
-    result |= nsIDOMWindowUtils::MODIFIER_ALT;
-  }
-  if (aModifiers & mozilla::MODIFIER_META) {
-    result |= nsIDOMWindowUtils::MODIFIER_META;
-  }
-  if (aModifiers & mozilla::MODIFIER_ALTGRAPH) {
-    result |= nsIDOMWindowUtils::MODIFIER_ALTGRAPH;
-  }
-  if (aModifiers & mozilla::MODIFIER_CAPSLOCK) {
-    result |= nsIDOMWindowUtils::MODIFIER_CAPSLOCK;
-  }
-  if (aModifiers & mozilla::MODIFIER_FN) {
-    result |= nsIDOMWindowUtils::MODIFIER_FN;
-  }
-  if (aModifiers & mozilla::MODIFIER_FNLOCK) {
-    result |= nsIDOMWindowUtils::MODIFIER_FNLOCK;
-  }
-  if (aModifiers & mozilla::MODIFIER_NUMLOCK) {
-    result |= nsIDOMWindowUtils::MODIFIER_NUMLOCK;
-  }
-  if (aModifiers & mozilla::MODIFIER_SCROLLLOCK) {
-    result |= nsIDOMWindowUtils::MODIFIER_SCROLLLOCK;
-  }
-  if (aModifiers & mozilla::MODIFIER_SYMBOL) {
-    result |= nsIDOMWindowUtils::MODIFIER_SYMBOL;
-  }
-  if (aModifiers & mozilla::MODIFIER_SYMBOLLOCK) {
-    result |= nsIDOMWindowUtils::MODIFIER_SYMBOLLOCK;
-  }
-  if (aModifiers & mozilla::MODIFIER_OS) {
-    result |= nsIDOMWindowUtils::MODIFIER_OS;
-  }
-  return result;
-}
-
-}
-
 namespace mozilla {
 namespace layers {
 
@@ -1662,7 +1611,6 @@ nsEventStatus AsyncPanZoomController::OnLongPress(const TapGestureInput& aEvent)
   APZC_LOG("%p got a long-press in state %d\n", this, mState);
   nsRefPtr<GoannaContentController> controller = GetGoannaContentController();
   if (controller) {
-    int32_t modifiers = WidgetModifiersToDOMModifiers(aEvent.modifiers);
     CSSPoint goannaScreenPoint;
     if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
       if (CurrentTouchBlock()->IsDuringFastMotion()) {
@@ -1670,7 +1618,7 @@ nsEventStatus AsyncPanZoomController::OnLongPress(const TapGestureInput& aEvent)
         return nsEventStatus_eIgnore;
       }
       uint64_t blockId = GetInputQueue()->InjectNewTouchBlock(this);
-      controller->HandleLongTap(goannaScreenPoint, modifiers, GetGuid(), blockId);
+      controller->HandleLongTap(goannaScreenPoint, aEvent.modifiers, GetGuid(), blockId);
       return nsEventStatus_eConsumeNoDefault;
     }
   }
@@ -1681,10 +1629,9 @@ nsEventStatus AsyncPanZoomController::OnLongPressUp(const TapGestureInput& aEven
   APZC_LOG("%p got a long-tap-up in state %d\n", this, mState);
   nsRefPtr<GoannaContentController> controller = GetGoannaContentController();
   if (controller) {
-    int32_t modifiers = WidgetModifiersToDOMModifiers(aEvent.modifiers);
     CSSPoint goannaScreenPoint;
     if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
-      controller->HandleLongTapUp(goannaScreenPoint, modifiers, GetGuid());
+      controller->HandleLongTapUp(goannaScreenPoint, aEvent.modifiers, GetGuid());
       return nsEventStatus_eConsumeNoDefault;
     }
   }
@@ -1706,7 +1653,7 @@ nsEventStatus AsyncPanZoomController::GenerateSingleTap(const ParentLayerPoint& 
       // See bug 965381 for the issue this was causing.
       controller->PostDelayedTask(
         NewRunnableMethod(controller.get(), &GoannaContentController::HandleSingleTap,
-                          goannaScreenPoint, WidgetModifiersToDOMModifiers(aModifiers),
+                          goannaScreenPoint, aModifiers,
                           GetGuid()),
         0);
       return nsEventStatus_eConsumeNoDefault;
@@ -1742,10 +1689,9 @@ nsEventStatus AsyncPanZoomController::OnDoubleTap(const TapGestureInput& aEvent)
   nsRefPtr<GoannaContentController> controller = GetGoannaContentController();
   if (controller) {
     if (mZoomConstraints.mAllowDoubleTapZoom && CurrentTouchBlock()->TouchActionAllowsDoubleTapZoom()) {
-      int32_t modifiers = WidgetModifiersToDOMModifiers(aEvent.modifiers);
       CSSPoint goannaScreenPoint;
       if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
-        controller->HandleDoubleTap(goannaScreenPoint, modifiers, GetGuid());
+        controller->HandleDoubleTap(goannaScreenPoint, aEvent.modifiers, GetGuid());
       }
     }
     return nsEventStatus_eConsumeNoDefault;
