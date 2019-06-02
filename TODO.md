@@ -109,12 +109,10 @@
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Bug 1036967 - Use ScaleFactors2D instead of ScaleFactor where appropr
-- Bug 1139283 - Move some properties from nsStyleDisplay to nsStylePosi
+- Fix APZ using incorrect scroll wheel deltas. (bug 1141728, r=kats) 
+- Bug 1130982 - Ensure the clip rect on a multi-metrics layer belongs t
 
-- Bug 1138527 part 1 - Make ruby annotations have the same font inflati
 
-https://github.com/mozilla/gecko-dev/commit/f800285f024067cae4498a8017dcb5630ec8ebfa
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -149,6 +147,8 @@ no components/url-classifier ?
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
 - Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
+
+- what do do with EME ?
 
 For Windows:
 Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
