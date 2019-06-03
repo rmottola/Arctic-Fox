@@ -109,8 +109,6 @@
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Fix APZ using incorrect scroll wheel deltas. (bug 1141728, r=kats) 
-- Bug 1130982 - Ensure the clip rect on a multi-metrics layer belongs t
 
 
 
