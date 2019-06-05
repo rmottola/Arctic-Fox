@@ -751,8 +751,8 @@ public:
   // using this state.
   nsFrameState              mAdditionalStateBits;
 
-  // When working with the -moz-transform property, we want to hook
-  // the abs-pos and fixed-pos lists together, since transformed
+  // When working with the transform and filter properties, we want to hook
+  // the abs-pos and fixed-pos lists together, since such
   // elements are fixed-pos containing blocks.  This flag determines
   // whether or not we want to wire the fixed-pos and abs-pos lists
   // together.
@@ -1062,8 +1062,7 @@ nsFrameConstructorState::PushAbsoluteContainingBlock(nsContainerFrame* aNewAbsol
    * we're a transformed element.
    */
   mFixedPosIsAbsPos = aPositionedFrame &&
-    (aPositionedFrame->StylePosition()->HasTransform(aPositionedFrame) ||
-     aPositionedFrame->StylePosition()->HasPerspectiveStyle());
+      aPositionedFrame->StylePosition()->IsFixedPosContainingBlock(aPositionedFrame);
 
   if (aNewAbsoluteContainingBlock) {
     aNewAbsoluteContainingBlock->MarkAsAbsoluteContainingBlock();
@@ -2036,7 +2035,7 @@ nsCSSFrameConstructor::ConstructTable(nsFrameConstructorState& aState,
 
   // Mark the table frame as an absolute container if needed
   newFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
-  if (display->IsPositioned(newFrame)) {
+  if (display->IsAbsPosContainingBlock(newFrame)) {
     aState.PushAbsoluteContainingBlock(newFrame, newFrame, absoluteSaveState);
   }
   NS_ASSERTION(aItem.mAnonChildren.IsEmpty(),
@@ -2079,7 +2078,7 @@ MakeTablePartAbsoluteContainingBlockIfNeeded(nsFrameConstructorState&     aState
   // However, in this case flag serves the additional purpose of indicating that
   // the frame was registered with its table frame. This allows us to avoid the
   // overhead of unregistering the frame in most cases.
-  if (aDisplay->IsPositioned(aFrame)) {
+  if (aDisplay->IsAbsPosContainingBlock(aFrame)) {
     aFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
     aState.PushAbsoluteContainingBlock(aFrame, aFrame, aAbsSaveState);
     nsTableFrame::RegisterPositionedTablePart(aFrame);
@@ -2621,7 +2620,7 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
                                             mDocElementContainingBlock),
                    mDocElementContainingBlock, styleContext,
                    &contentFrame, frameItems,
-                   display->IsPositioned(contentFrame) ? contentFrame : nullptr,
+                   display->IsAbsPosContainingBlock(contentFrame) ? contentFrame : nullptr,
                    nullptr);
     newFrame = frameItems.FirstChild();
     NS_ASSERTION(frameItems.OnlyChild(), "multiple root element frames");
@@ -3106,7 +3105,7 @@ nsCSSFrameConstructor::ConstructSelectFrame(nsFrameConstructorState& aState,
     // Notify combobox that it should use the listbox as it's popup
     comboBox->SetDropDown(listFrame);
 
-    NS_ASSERTION(!listFrame->IsPositioned(),
+    NS_ASSERTION(!listFrame->IsAbsPosContaininingBlock(),
                  "Ended up with positioned dropdown list somehow.");
     NS_ASSERTION(!listFrame->IsFloating(),
                  "Ended up with floating dropdown list somehow.");
@@ -3261,7 +3260,7 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
   nsFrameItems                childItems;
 
   blockFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
-  if (fieldsetFrame->IsPositioned()) {
+  if (fieldsetFrame->IsAbsPosContaininingBlock()) {
     aState.PushAbsoluteContainingBlock(blockFrame, fieldsetFrame, absoluteSaveState);
   }
 
@@ -3892,7 +3891,7 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
       // Now figure out whether newFrame or outerFrame should be the
       // absolute container.
       auto outerDisplay = outerSC->StyleDisplay();
-      if (outerDisplay->IsPositioned(outerFrame)) {
+      if (outerDisplay->IsAbsPosContainingBlock(outerFrame)) {
         maybeAbsoluteContainingBlockDisplay = outerDisplay;
         maybeAbsoluteContainingBlock = outerFrame;
         innerFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
@@ -3935,9 +3934,7 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
         // make the inner the containing block.
         if ((maybeAbsoluteContainingBlockDisplay->IsAbsolutelyPositionedStyle() ||
              maybeAbsoluteContainingBlockDisplay->IsRelativelyPositionedStyle() ||
-             (maybeAbsoluteContainingBlockPosition->HasTransformStyle() &&
-              cb->IsFrameOfType(nsIFrame::eSupportsCSSTransforms)) ||
-             maybeAbsoluteContainingBlockPosition->HasPerspectiveStyle()) &&
+             maybeAbsoluteContainingBlockPosition->IsFixedPosContainingBlock(cb)) &&
             !cb->IsSVGText()) {
           nsContainerFrame* cf = static_cast<nsContainerFrame*>(cb);
           aState.PushAbsoluteContainingBlock(cf, cf, absoluteSaveState);
@@ -4791,7 +4788,7 @@ nsCSSFrameConstructor::ConstructScrollableBlockWithConstructor(
   ConstructBlock(aState, scrolledContentStyle->StyleDisplay(), content,
                  newFrame, newFrame, scrolledContentStyle,
                  &scrolledFrame, blockItem,
-                 aDisplay->IsPositioned(newFrame) ? newFrame : nullptr,
+                 aDisplay->IsAbsPosContainingBlock(newFrame) ? newFrame : nullptr,
                  aItem.mPendingBinding);
 
   MOZ_ASSERT(blockItem.OnlyChild() == scrolledFrame,
@@ -4848,7 +4845,7 @@ nsCSSFrameConstructor::ConstructNonScrollableBlockWithConstructor(
                  aState.GetGeometricParent(aDisplay, aParentFrame),
                  aParentFrame, styleContext, &newFrame,
                  aFrameItems,
-                 aDisplay->IsPositioned(newFrame) ? newFrame : nullptr,
+                 aDisplay->IsAbsPosContainingBlock(newFrame) ? newFrame : nullptr,
                  aItem.mPendingBinding);
   return newFrame;
 }
@@ -6109,10 +6106,9 @@ nsCSSFrameConstructor::GetAbsoluteContainingBlock(nsIFrame* aFrame,
     // the correct containing block (the scrolledframe) in that case.
     // If we're looking for a fixed-pos containing block and the frame is
     // not transformed, skip it.
-    if (!frame->IsPositioned() ||
+    if (!frame->IsAbsPosContaininingBlock() ||
         (aType == FIXED_POS &&
-         !frame->StylePosition()->HasTransform(frame) &&
-         !frame->StylePosition()->HasPerspectiveStyle())) {
+         !frame->StylePosition()->IsFixedPosContainingBlock(frame))) {
       continue;
     }
     nsIFrame* absPosCBCandidate = frame;
