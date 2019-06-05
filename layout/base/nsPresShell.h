@@ -83,196 +83,196 @@ public:
   void Init(nsIDocument* aDocument, nsPresContext* aPresContext,
             nsViewManager* aViewManager, nsStyleSet* aStyleSet,
             nsCompatibility aCompatMode);
-  virtual void Destroy() override;
-  virtual void MakeZombie() override;
+  virtual void Destroy() MOZ_OVERRIDE;
+  virtual void MakeZombie() MOZ_OVERRIDE;
 
-  virtual nsresult SetPreferenceStyleRules(bool aForceReflow) override;
+  virtual nsresult SetPreferenceStyleRules(bool aForceReflow) MOZ_OVERRIDE;
 
-  NS_IMETHOD GetSelection(SelectionType aType, nsISelection** aSelection) override;
-  virtual mozilla::dom::Selection* GetCurrentSelection(SelectionType aType) override;
+  NS_IMETHOD GetSelection(SelectionType aType, nsISelection** aSelection) MOZ_OVERRIDE;
+  virtual mozilla::dom::Selection* GetCurrentSelection(SelectionType aType) MOZ_OVERRIDE;
 
-  NS_IMETHOD SetDisplaySelection(int16_t aToggle) override;
-  NS_IMETHOD GetDisplaySelection(int16_t *aToggle) override;
+  NS_IMETHOD SetDisplaySelection(int16_t aToggle) MOZ_OVERRIDE;
+  NS_IMETHOD GetDisplaySelection(int16_t *aToggle) MOZ_OVERRIDE;
   NS_IMETHOD ScrollSelectionIntoView(SelectionType aType, SelectionRegion aRegion,
-                                     int16_t aFlags) override;
-  NS_IMETHOD RepaintSelection(SelectionType aType) override;
+                                     int16_t aFlags) MOZ_OVERRIDE;
+  NS_IMETHOD RepaintSelection(SelectionType aType) MOZ_OVERRIDE;
 
-  virtual void BeginObservingDocument() override;
-  virtual void EndObservingDocument() override;
-  virtual nsresult Initialize(nscoord aWidth, nscoord aHeight) override;
-  virtual nsresult ResizeReflow(nscoord aWidth, nscoord aHeight) override;
-  virtual nsresult ResizeReflowOverride(nscoord aWidth, nscoord aHeight) override;
-  virtual nsIPageSequenceFrame* GetPageSequenceFrame() const override;
-  virtual nsCanvasFrame* GetCanvasFrame() const override;
-  virtual nsIFrame* GetRealPrimaryFrameFor(nsIContent* aContent) const override;
+  virtual void BeginObservingDocument() MOZ_OVERRIDE;
+  virtual void EndObservingDocument() MOZ_OVERRIDE;
+  virtual nsresult Initialize(nscoord aWidth, nscoord aHeight) MOZ_OVERRIDE;
+  virtual nsresult ResizeReflow(nscoord aWidth, nscoord aHeight) MOZ_OVERRIDE;
+  virtual nsresult ResizeReflowOverride(nscoord aWidth, nscoord aHeight) MOZ_OVERRIDE;
+  virtual nsIPageSequenceFrame* GetPageSequenceFrame() const MOZ_OVERRIDE;
+  virtual nsCanvasFrame* GetCanvasFrame() const MOZ_OVERRIDE;
+  virtual nsIFrame* GetRealPrimaryFrameFor(nsIContent* aContent) const MOZ_OVERRIDE;
 
-  virtual nsIFrame* GetPlaceholderFrameFor(nsIFrame* aFrame) const override;
+  virtual nsIFrame* GetPlaceholderFrameFor(nsIFrame* aFrame) const MOZ_OVERRIDE;
   virtual void FrameNeedsReflow(nsIFrame *aFrame, IntrinsicDirty aIntrinsicDirty,
-                                            nsFrameState aBitToAdd) override;
-  virtual void FrameNeedsToContinueReflow(nsIFrame *aFrame) override;
-  virtual void CancelAllPendingReflows() override;
-  virtual bool IsSafeToFlush() const override;
-  virtual void FlushPendingNotifications(mozFlushType aType) override;
-  virtual void FlushPendingNotifications(mozilla::ChangesToFlush aType) override;
+                                            nsFrameState aBitToAdd) MOZ_OVERRIDE;
+  virtual void FrameNeedsToContinueReflow(nsIFrame *aFrame) MOZ_OVERRIDE;
+  virtual void CancelAllPendingReflows() MOZ_OVERRIDE;
+  virtual bool IsSafeToFlush() const MOZ_OVERRIDE;
+  virtual void FlushPendingNotifications(mozFlushType aType) MOZ_OVERRIDE;
+  virtual void FlushPendingNotifications(mozilla::ChangesToFlush aType) MOZ_OVERRIDE;
   virtual void DestroyFramesFor(nsIContent*  aContent,
-                                nsIContent** aDestroyedFramesFor) override;
-  virtual void CreateFramesFor(nsIContent* aContent) override;
+                                nsIContent** aDestroyedFramesFor) MOZ_OVERRIDE;
+  virtual void CreateFramesFor(nsIContent* aContent) MOZ_OVERRIDE;
 
   /**
    * Recreates the frames for a node
    */
-  virtual nsresult RecreateFramesFor(nsIContent* aContent) override;
+  virtual nsresult RecreateFramesFor(nsIContent* aContent) MOZ_OVERRIDE;
 
   /**
    * Post a callback that should be handled after reflow has finished.
    */
-  virtual nsresult PostReflowCallback(nsIReflowCallback* aCallback) override;
-  virtual void CancelReflowCallback(nsIReflowCallback* aCallback) override;
+  virtual nsresult PostReflowCallback(nsIReflowCallback* aCallback) MOZ_OVERRIDE;
+  virtual void CancelReflowCallback(nsIReflowCallback* aCallback) MOZ_OVERRIDE;
 
-  virtual void ClearFrameRefs(nsIFrame* aFrame) override;
-  virtual already_AddRefed<gfxContext> CreateReferenceRenderingContext() override;
+  virtual void ClearFrameRefs(nsIFrame* aFrame) MOZ_OVERRIDE;
+  virtual already_AddRefed<gfxContext> CreateReferenceRenderingContext() MOZ_OVERRIDE;
   virtual nsresult GoToAnchor(const nsAString& aAnchorName, bool aScroll,
-                              uint32_t aAdditionalScrollFlags = 0) override;
-  virtual nsresult ScrollToAnchor() override;
+                              uint32_t aAdditionalScrollFlags = 0) MOZ_OVERRIDE;
+  virtual nsresult ScrollToAnchor() MOZ_OVERRIDE;
 
   virtual nsresult ScrollContentIntoView(nsIContent* aContent,
                                                      ScrollAxis  aVertical,
                                                      ScrollAxis  aHorizontal,
-                                                     uint32_t    aFlags) override;
+                                                     uint32_t    aFlags) MOZ_OVERRIDE;
   virtual bool ScrollFrameRectIntoView(nsIFrame*     aFrame,
                                        const nsRect& aRect,
                                        ScrollAxis    aVertical,
                                        ScrollAxis    aHorizontal,
-                                       uint32_t      aFlags) override;
+                                       uint32_t      aFlags) MOZ_OVERRIDE;
   virtual nsRectVisibility GetRectVisibility(nsIFrame *aFrame,
                                              const nsRect &aRect,
-                                             nscoord aMinTwips) const override;
+                                             nscoord aMinTwips) const MOZ_OVERRIDE;
 
-  virtual void SetIgnoreFrameDestruction(bool aIgnore) override;
-  virtual void NotifyDestroyingFrame(nsIFrame* aFrame) override;
+  virtual void SetIgnoreFrameDestruction(bool aIgnore) MOZ_OVERRIDE;
+  virtual void NotifyDestroyingFrame(nsIFrame* aFrame) MOZ_OVERRIDE;
 
-  virtual nsresult CaptureHistoryState(nsILayoutHistoryState** aLayoutHistoryState) override;
+  virtual nsresult CaptureHistoryState(nsILayoutHistoryState** aLayoutHistoryState) MOZ_OVERRIDE;
 
-  virtual void UnsuppressPainting() override;
+  virtual void UnsuppressPainting() MOZ_OVERRIDE;
 
-  virtual nsresult GetAgentStyleSheets(nsCOMArray<nsIStyleSheet>& aSheets) override;
-  virtual nsresult SetAgentStyleSheets(const nsCOMArray<nsIStyleSheet>& aSheets) override;
+  virtual nsresult GetAgentStyleSheets(nsCOMArray<nsIStyleSheet>& aSheets) MOZ_OVERRIDE;
+  virtual nsresult SetAgentStyleSheets(const nsCOMArray<nsIStyleSheet>& aSheets) MOZ_OVERRIDE;
 
-  virtual nsresult AddOverrideStyleSheet(nsIStyleSheet *aSheet) override;
-  virtual nsresult RemoveOverrideStyleSheet(nsIStyleSheet *aSheet) override;
+  virtual nsresult AddOverrideStyleSheet(nsIStyleSheet *aSheet) MOZ_OVERRIDE;
+  virtual nsresult RemoveOverrideStyleSheet(nsIStyleSheet *aSheet) MOZ_OVERRIDE;
 
   virtual nsresult HandleEventWithTarget(
                                  mozilla::WidgetEvent* aEvent,
                                  nsIFrame* aFrame,
                                  nsIContent* aContent,
-                                 nsEventStatus* aStatus) override;
-  virtual nsIFrame* GetEventTargetFrame() override;
+                                 nsEventStatus* aStatus) MOZ_OVERRIDE;
+  virtual nsIFrame* GetEventTargetFrame() MOZ_OVERRIDE;
   virtual already_AddRefed<nsIContent> GetEventTargetContent(
-                                                     mozilla::WidgetEvent* aEvent) override;
+                                                     mozilla::WidgetEvent* aEvent) MOZ_OVERRIDE;
 
-  virtual void NotifyCounterStylesAreDirty() override;
+  virtual void NotifyCounterStylesAreDirty() MOZ_OVERRIDE;
 
-  virtual nsresult ReconstructFrames(void) override;
-  virtual void Freeze() override;
-  virtual void Thaw() override;
-  virtual void FireOrClearDelayedEvents(bool aFireEvents) override;
+  virtual nsresult ReconstructFrames(void) MOZ_OVERRIDE;
+  virtual void Freeze() MOZ_OVERRIDE;
+  virtual void Thaw() MOZ_OVERRIDE;
+  virtual void FireOrClearDelayedEvents(bool aFireEvents) MOZ_OVERRIDE;
 
   virtual nsresult RenderDocument(const nsRect& aRect, uint32_t aFlags,
                                               nscolor aBackgroundColor,
-                                              gfxContext* aThebesContext) override;
+                                              gfxContext* aThebesContext) MOZ_OVERRIDE;
 
   virtual already_AddRefed<SourceSurface>
   RenderNode(nsIDOMNode* aNode,
              nsIntRegion* aRegion,
              nsIntPoint& aPoint,
-             nsIntRect* aScreenRect) override;
+             nsIntRect* aScreenRect) MOZ_OVERRIDE;
 
   virtual already_AddRefed<SourceSurface>
   RenderSelection(nsISelection* aSelection,
                   nsIntPoint& aPoint,
-                  nsIntRect* aScreenRect) override;
+                  nsIntRect* aScreenRect) MOZ_OVERRIDE;
 
-  virtual already_AddRefed<nsPIDOMWindow> GetRootWindow() override;
+  virtual already_AddRefed<nsPIDOMWindow> GetRootWindow() MOZ_OVERRIDE;
 
-  virtual LayerManager* GetLayerManager() override;
+  virtual LayerManager* GetLayerManager() MOZ_OVERRIDE;
 
-  virtual void SetIgnoreViewportScrolling(bool aIgnore) override;
+  virtual void SetIgnoreViewportScrolling(bool aIgnore) MOZ_OVERRIDE;
 
-  virtual nsresult SetResolution(float aXResolution, float aYResolution) override {
+  virtual nsresult SetResolution(float aXResolution, float aYResolution) MOZ_OVERRIDE {
     return SetResolutionImpl(aXResolution, aYResolution, /* aScaleToResolution = */ false);
   }
-  virtual nsresult SetResolutionAndScaleTo(float aXResolution, float aYResolution) override {
+  virtual nsresult SetResolutionAndScaleTo(float aXResolution, float aYResolution) MOZ_OVERRIDE {
     return SetResolutionImpl(aXResolution, aYResolution, /* aScaleToResolution = */ true);
   }
-  virtual bool ScaleToResolution() const override;
-  virtual gfxSize GetCumulativeResolution() override;
+  virtual bool ScaleToResolution() const MOZ_OVERRIDE;
+  virtual gfxSize GetCumulativeResolution() MOZ_OVERRIDE;
 
   //nsIViewObserver interface
 
   virtual void Paint(nsView* aViewToPaint, const nsRegion& aDirtyRegion,
-                     uint32_t aFlags) override;
+                     uint32_t aFlags) MOZ_OVERRIDE;
   virtual nsresult HandleEvent(nsIFrame* aFrame,
                                mozilla::WidgetGUIEvent* aEvent,
                                bool aDontRetargetEvents,
                                nsEventStatus* aEventStatus,
-                               nsIContent** aTargetContent) override;
+                               nsIContent** aTargetContent) MOZ_OVERRIDE;
   virtual nsresult HandleDOMEventWithTarget(
                                  nsIContent* aTargetContent,
                                  mozilla::WidgetEvent* aEvent,
-                                 nsEventStatus* aStatus) override;
+                                 nsEventStatus* aStatus) MOZ_OVERRIDE;
   virtual nsresult HandleDOMEventWithTarget(nsIContent* aTargetContent,
                                                         nsIDOMEvent* aEvent,
-                                                        nsEventStatus* aStatus) override;
-  virtual bool ShouldIgnoreInvalidation() override;
-  virtual void WillPaint() override;
-  virtual void WillPaintWindow() override;
-  virtual void DidPaintWindow() override;
-  virtual void ScheduleViewManagerFlush(PaintType aType = PAINT_DEFAULT) override;
+                                                        nsEventStatus* aStatus) MOZ_OVERRIDE;
+  virtual bool ShouldIgnoreInvalidation() MOZ_OVERRIDE;
+  virtual void WillPaint() MOZ_OVERRIDE;
+  virtual void WillPaintWindow() MOZ_OVERRIDE;
+  virtual void DidPaintWindow() MOZ_OVERRIDE;
+  virtual void ScheduleViewManagerFlush(PaintType aType = PAINT_DEFAULT) MOZ_OVERRIDE;
   virtual void DispatchSynthMouseMove(mozilla::WidgetGUIEvent* aEvent,
-                                      bool aFlushOnHoverChange) override;
-  virtual void ClearMouseCaptureOnView(nsView* aView) override;
-  virtual bool IsVisible() override;
+                                      bool aFlushOnHoverChange) MOZ_OVERRIDE;
+  virtual void ClearMouseCaptureOnView(nsView* aView) MOZ_OVERRIDE;
+  virtual bool IsVisible() MOZ_OVERRIDE;
 
   // touch caret
-  virtual already_AddRefed<mozilla::TouchCaret> GetTouchCaret() const override;
-  virtual mozilla::dom::Element* GetTouchCaretElement() const override;
+  virtual already_AddRefed<mozilla::TouchCaret> GetTouchCaret() const MOZ_OVERRIDE;
+  virtual mozilla::dom::Element* GetTouchCaretElement() const MOZ_OVERRIDE;
   // selection caret
-  virtual already_AddRefed<mozilla::SelectionCarets> GetSelectionCarets() const override;
-  virtual mozilla::dom::Element* GetSelectionCaretsStartElement() const override;
-  virtual mozilla::dom::Element* GetSelectionCaretsEndElement() const override;
+  virtual already_AddRefed<mozilla::SelectionCarets> GetSelectionCarets() const MOZ_OVERRIDE;
+  virtual mozilla::dom::Element* GetSelectionCaretsStartElement() const MOZ_OVERRIDE;
+  virtual mozilla::dom::Element* GetSelectionCaretsEndElement() const MOZ_OVERRIDE;
   // caret handling
-  virtual already_AddRefed<nsCaret> GetCaret() const override;
-  NS_IMETHOD SetCaretEnabled(bool aInEnable) override;
-  NS_IMETHOD SetCaretReadOnly(bool aReadOnly) override;
-  NS_IMETHOD GetCaretEnabled(bool *aOutEnabled) override;
-  NS_IMETHOD SetCaretVisibilityDuringSelection(bool aVisibility) override;
-  NS_IMETHOD GetCaretVisible(bool *_retval) override;
-  virtual void SetCaret(nsCaret *aNewCaret) override;
-  virtual void RestoreCaret() override;
+  virtual already_AddRefed<nsCaret> GetCaret() const MOZ_OVERRIDE;
+  NS_IMETHOD SetCaretEnabled(bool aInEnable) MOZ_OVERRIDE;
+  NS_IMETHOD SetCaretReadOnly(bool aReadOnly) MOZ_OVERRIDE;
+  NS_IMETHOD GetCaretEnabled(bool *aOutEnabled) MOZ_OVERRIDE;
+  NS_IMETHOD SetCaretVisibilityDuringSelection(bool aVisibility) MOZ_OVERRIDE;
+  NS_IMETHOD GetCaretVisible(bool *_retval) MOZ_OVERRIDE;
+  virtual void SetCaret(nsCaret *aNewCaret) MOZ_OVERRIDE;
+  virtual void RestoreCaret() MOZ_OVERRIDE;
 
-  NS_IMETHOD SetSelectionFlags(int16_t aInEnable) override;
-  NS_IMETHOD GetSelectionFlags(int16_t *aOutEnable) override;
+  NS_IMETHOD SetSelectionFlags(int16_t aInEnable) MOZ_OVERRIDE;
+  NS_IMETHOD GetSelectionFlags(int16_t *aOutEnable) MOZ_OVERRIDE;
 
   // nsISelectionController
 
-  NS_IMETHOD PhysicalMove(int16_t aDirection, int16_t aAmount, bool aExtend) override;
-  NS_IMETHOD CharacterMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD CharacterExtendForDelete() override;
-  NS_IMETHOD CharacterExtendForBackspace() override;
-  NS_IMETHOD WordMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD WordExtendForDelete(bool aForward) override;
-  NS_IMETHOD LineMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD IntraLineMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD PageMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD ScrollPage(bool aForward) override;
-  NS_IMETHOD ScrollLine(bool aForward) override;
-  NS_IMETHOD ScrollCharacter(bool aRight) override;
-  NS_IMETHOD CompleteScroll(bool aForward) override;
-  NS_IMETHOD CompleteMove(bool aForward, bool aExtend) override;
-  NS_IMETHOD SelectAll() override;
-  NS_IMETHOD CheckVisibility(nsIDOMNode *node, int16_t startOffset, int16_t EndOffset, bool *_retval) override;
+  NS_IMETHOD PhysicalMove(int16_t aDirection, int16_t aAmount, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD CharacterMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD CharacterExtendForDelete() MOZ_OVERRIDE;
+  NS_IMETHOD CharacterExtendForBackspace() MOZ_OVERRIDE;
+  NS_IMETHOD WordMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD WordExtendForDelete(bool aForward) MOZ_OVERRIDE;
+  NS_IMETHOD LineMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD IntraLineMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD PageMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD ScrollPage(bool aForward) MOZ_OVERRIDE;
+  NS_IMETHOD ScrollLine(bool aForward) MOZ_OVERRIDE;
+  NS_IMETHOD ScrollCharacter(bool aRight) MOZ_OVERRIDE;
+  NS_IMETHOD CompleteScroll(bool aForward) MOZ_OVERRIDE;
+  NS_IMETHOD CompleteMove(bool aForward, bool aExtend) MOZ_OVERRIDE;
+  NS_IMETHOD SelectAll() MOZ_OVERRIDE;
+  NS_IMETHOD CheckVisibility(nsIDOMNode *node, int16_t startOffset, int16_t EndOffset, bool *_retval) MOZ_OVERRIDE;
   virtual nsresult CheckVisibilityContent(nsIContent* aNode, int16_t aStartOffset,
-                                          int16_t aEndOffset, bool* aRetval) override;
+                                          int16_t aEndOffset, bool* aRetval) MOZ_OVERRIDE;
 
   // nsIDocumentObserver
   NS_DECL_NSIDOCUMENTOBSERVER_BEGINUPDATE
@@ -299,24 +299,24 @@ public:
   NS_DECL_NSIOBSERVER
 
 #ifdef MOZ_REFLOW_PERF
-  virtual void DumpReflows() override;
-  virtual void CountReflows(const char * aName, nsIFrame * aFrame) override;
+  virtual void DumpReflows() MOZ_OVERRIDE;
+  virtual void CountReflows(const char * aName, nsIFrame * aFrame) MOZ_OVERRIDE;
   virtual void PaintCount(const char * aName,
                                       nsRenderingContext* aRenderingContext,
                                       nsPresContext* aPresContext,
                                       nsIFrame * aFrame,
                                       const nsPoint& aOffset,
-                                      uint32_t aColor) override;
-  virtual void SetPaintFrameCount(bool aOn) override;
-  virtual bool IsPaintingFrameCounts() override;
+                                      uint32_t aColor) MOZ_OVERRIDE;
+  virtual void SetPaintFrameCount(bool aOn) MOZ_OVERRIDE;
+  virtual bool IsPaintingFrameCounts() MOZ_OVERRIDE;
 #endif
 
 #ifdef DEBUG
   virtual void ListStyleContexts(nsIFrame *aRootFrame, FILE *out,
-                                 int32_t aIndent = 0) override;
+                                 int32_t aIndent = 0) MOZ_OVERRIDE;
 
-  virtual void ListStyleSheets(FILE *out, int32_t aIndent = 0) override;
-  virtual void VerifyStyleTree() override;
+  virtual void ListStyleSheets(FILE *out, int32_t aIndent = 0) MOZ_OVERRIDE;
+  virtual void VerifyStyleTree() MOZ_OVERRIDE;
 #endif
 
 #ifdef PR_LOGGING

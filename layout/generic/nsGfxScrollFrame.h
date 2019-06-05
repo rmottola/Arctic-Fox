@@ -692,10 +692,10 @@ public:
   virtual gfxSize GetResolution() const MOZ_OVERRIDE {
     return mHelper.GetResolution();
   }
-  virtual void SetResolution(const gfxSize& aResolution) override {
+  virtual void SetResolution(const gfxSize& aResolution) MOZ_OVERRIDE {
     return mHelper.SetResolution(aResolution);
   }
-  virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) override {
+  virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) MOZ_OVERRIDE {
     return mHelper.SetResolutionAndScaleTo(aResolution);
   }
   virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
@@ -1073,10 +1073,10 @@ public:
   virtual gfxSize GetResolution() const MOZ_OVERRIDE {
     return mHelper.GetResolution();
   }
-  virtual void SetResolution(const gfxSize& aResolution) override {
+  virtual void SetResolution(const gfxSize& aResolution) MOZ_OVERRIDE {
     return mHelper.SetResolution(aResolution);
   }
-  virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) override {
+  virtual void SetResolutionAndScaleTo(const gfxSize& aResolution) MOZ_OVERRIDE {
     return mHelper.SetResolutionAndScaleTo(aResolution);
   }
   virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
