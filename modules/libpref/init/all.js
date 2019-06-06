@@ -2721,7 +2721,7 @@ pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 // Defaults to 1 minute.
 pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
-pref("dom.ipc.plugins.asyncInit", false);
+pref("dom.ipc.plugins.asyncInit", true);
 
 pref("dom.ipc.processCount", 1);
 
