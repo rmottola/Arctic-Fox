@@ -2514,7 +2514,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
     if (!body)
         return false;
 
-    if (kind != Method && kind != Lazy && 
+    if (kind != Method && kind != Lazy &&
         fun->name() && !checkStrictBinding(fun->name(), pn))
     {
         return false;
@@ -6235,6 +6235,15 @@ Parser<ParseHandler>::assignExpr(InvokedPrediction invoked)
       case TOK_POWASSIGN:    kind = PNK_POWASSIGN;    op = JSOP_POW;    break;
 
       case TOK_ARROW: {
+        // A line terminator between ArrowParameters and the => should trigger a SyntaxError.
+        tokenStream.ungetToken();
+        TokenKind next;
+        if (!tokenStream.peekTokenSameLine(&next) || next != TOK_ARROW) {
+            report(ParseError, false, null(), JSMSG_UNEXPECTED_TOKEN,
+                   "expression", TokenKindToDesc(TOK_ARROW));
+            return null();
+        }
+
         tokenStream.seek(start);
         if (!abortIfSyntaxParser())
             return null();
@@ -8252,7 +8261,7 @@ Parser<ParseHandler>::primaryExpr(TokenKind tt, InvokedPrediction invoked)
             return null();
         }
 
-        if (!tokenStream.peekToken(&next))
+        if (!tokenStream.peekTokenSameLine(&next))
             return null();
         if (next != TOK_ARROW) {
             report(ParseError, false, null(), JSMSG_UNEXPECTED_TOKEN,
