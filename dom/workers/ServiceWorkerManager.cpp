@@ -1113,7 +1113,6 @@ ServiceWorkerRegistrationInfo::Activate()
   nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
   swm->InvalidateServiceWorkerRegistrationWorker(this, WhichServiceWorker::WAITING_WORKER | WhichServiceWorker::ACTIVE_WORKER);
   if (!activatingWorker) {
-    NS_WARNING("No activatingWorker!");
     return;
   }
 
