@@ -671,6 +671,21 @@ public:
             mCleanedUp);
   }
 
+  bool
+  HadOriginalOpener() const
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    return mHadOriginalOpener;
+  }
+
+  bool
+  IsTopLevelWindow()
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    nsPIDOMWindow* parentWindow = GetScriptableTop();
+    return parentWindow == static_cast<nsPIDOMWindow*>(this);
+  }
+
   virtual void
   FirePopupBlockedEvent(nsIDocument* aDoc,
                         nsIURI* aPopupURI,
