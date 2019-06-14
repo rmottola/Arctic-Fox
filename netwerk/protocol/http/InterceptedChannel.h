@@ -75,6 +75,7 @@ public:
   NS_IMETHOD GetChannel(nsIChannel** aChannel) override;
   NS_IMETHOD SynthesizeHeader(const nsACString& aName, const nsACString& aValue) override;
   NS_IMETHOD Cancel() override;
+  NS_IMETHOD SetSecurityInfo(nsISupports* aSecurityInfo) override;
 
   virtual void NotifyController() override;
 };
@@ -103,6 +104,7 @@ public:
   NS_IMETHOD GetChannel(nsIChannel** aChannel) override;
   NS_IMETHOD SynthesizeHeader(const nsACString& aName, const nsACString& aValue) override;
   NS_IMETHOD Cancel() override;
+  NS_IMETHOD SetSecurityInfo(nsISupports* aSecurityInfo) override;
 
   virtual void NotifyController() override;
 };
