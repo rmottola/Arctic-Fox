@@ -123,6 +123,18 @@ public:
     mBody = aBody;
   }
 
+  const nsCString&
+  GetSecurityInfo() const
+  {
+    return mSecurityInfo;
+  }
+
+  void
+  SetSecurityInfo(nsISupports* aSecurityInfo);
+
+  void
+  SetSecurityInfo(const nsCString& aSecurityInfo);
+
 private:
   ~InternalResponse()
   { }
@@ -140,6 +152,7 @@ private:
   nsRefPtr<InternalHeaders> mHeaders;
   nsCOMPtr<nsIInputStream> mBody;
   nsCString mContentType;
+  nsCString mSecurityInfo;
 };
 
 } // namespace dom
