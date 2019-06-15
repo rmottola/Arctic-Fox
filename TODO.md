@@ -32,6 +32,7 @@
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+- Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -109,16 +110,25 @@
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
+- Bug 1151974
 - Bug 1110487 all
+- Bug 1110814
+- Bug Bug 931249 2015-03-20
+- Bug 1110815
+- Bug 1137844
+- Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/30333a7a7d73dcb73367bc2c71a19091a78d8a34
+https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
+https://github.com/mozilla/newtab-dev/commit/7d68b9894ab35849f960afd305c57271bb99e166
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
 
 
 ### FIXME / TODO
+- fix devtools structure, from browser/themes/osx/devtools to browser/devtools
+
 - Cannot be applied because file is missing - check
 Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
