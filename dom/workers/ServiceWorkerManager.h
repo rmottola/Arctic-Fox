@@ -264,6 +264,13 @@ public:
   void
   UpdateState(ServiceWorkerState aState);
 
+  // Only used to set initial state when loading from disk!
+  void
+  SetActivateStateUncheckedWithoutEvent(ServiceWorkerState aState)
+  {
+    mState = aState;
+  }
+
   void
   AppendWorker(ServiceWorker* aWorker);
 
