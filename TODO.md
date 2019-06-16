@@ -114,8 +114,10 @@
 - Bug 1110487 all
 - Bug 1110814
 - Bug Bug 931249 2015-03-20
+- Bug 1144876 - Stop spamming stderr with a warning every time t
+- Bug 1134324 - Set CORS mode and credentials on Fetch event Re
+- Bug 1142841
 - Bug 1110815
-- Bug 1137844
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 
 Parents of:
