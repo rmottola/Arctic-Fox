@@ -1432,6 +1432,13 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     NS_ASSERTION(!sharedWorkerScriptSpec.IsEmpty(), "Empty spec!");
   }
 
+  bool exemptFromPerDomainMax = false;
+  if (aWorkerPrivate->IsServiceWorker()) {
+    AssertIsOnMainThread();
+    exemptFromPerDomainMax = Preferences::GetBool("dom.serviceWorkers.exemptFromPerDomainMax",
+                                                  false);
+  }
+
   const nsCString& domain = aWorkerPrivate->Domain();
 
   WorkerDomainInfo* domainInfo;
@@ -1449,7 +1456,8 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
 
     queued = gMaxWorkersPerDomain &&
              domainInfo->ActiveWorkerCount() >= gMaxWorkersPerDomain &&
-             !domain.IsEmpty();
+             !domain.IsEmpty() &&
+             !exemptFromPerDomainMax;
 
     if (queued) {
       domainInfo->mQueuedWorkers.AppendElement(aWorkerPrivate);
