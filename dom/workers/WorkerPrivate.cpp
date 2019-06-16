@@ -1143,6 +1143,9 @@ class MessageEventRunnable final : public WorkerRunnable
   uint64_t mMessagePortSerial;
   bool mToMessagePort;
 
+  // This is only used for messages dispatched to a service worker.
+  nsAutoPtr<ServiceWorkerClientInfo> mEventSource;
+
 public:
   MessageEventRunnable(WorkerPrivate* aWorkerPrivate,
                        TargetAndBusyBehavior aBehavior,
@@ -1155,6 +1158,12 @@ public:
   , mToMessagePort(aToMessagePort)
   {
     mClonedObjects.SwapElements(aClonedObjects);
+  }
+
+  void
+  SetMessageSource(ServiceWorkerClientInfo* aSource)
+  {
+    mEventSource = aSource;
   }
 
   bool
@@ -1182,6 +1191,12 @@ public:
                               EmptyString(),
                               EmptyString(),
                               nullptr);
+    if (mEventSource) {
+      nsRefPtr<ServiceWorkerClient> client =
+        new ServiceWorkerWindowClient(aTarget, *mEventSource);
+      event->SetSource(client);
+    }
+
     if (NS_FAILED(rv)) {
       xpc::Throw(aCx, rv);
       return false;
@@ -3216,9 +3231,10 @@ void
 WorkerPrivateParent<Derived>::PostMessageInternal(
                                             JSContext* aCx,
                                             JS::Handle<JS::Value> aMessage,
-                                            const Optional<Sequence<JS::Value> >& aTransferable,
+                                            const Optional<Sequence<JS::Value>>& aTransferable,
                                             bool aToMessagePort,
                                             uint64_t aMessagePortSerial,
+                                            ServiceWorkerClientInfo* aClientInfo,
                                             ErrorResult& aRv)
 {
   AssertIsOnParentThread();
@@ -3282,9 +3298,24 @@ WorkerPrivateParent<Derived>::PostMessageInternal(
                              WorkerRunnable::WorkerThreadModifyBusyCount,
                              Move(buffer), clonedObjects, aToMessagePort,
                              aMessagePortSerial);
+  runnable->SetMessageSource(aClientInfo);
+
   if (!runnable->Dispatch(aCx)) {
     aRv.Throw(NS_ERROR_FAILURE);
   }
+}
+
+template <class Derived>
+void
+WorkerPrivateParent<Derived>::PostMessageToServiceWorker(
+                             JSContext* aCx, JS::Handle<JS::Value> aMessage,
+                             const Optional<Sequence<JS::Value>>& aTransferable,
+                             nsAutoPtr<ServiceWorkerClientInfo>& aClientInfo,
+                             ErrorResult& aRv)
+{
+  AssertIsOnMainThread();
+  PostMessageInternal(aCx, aMessage, aTransferable, false, 0,
+                      aClientInfo.forget(), aRv);
 }
 
 template <class Derived>
@@ -3299,7 +3330,7 @@ WorkerPrivateParent<Derived>::PostMessageToMessagePort(
   AssertIsOnMainThread();
 
   PostMessageInternal(aCx, aMessage, aTransferable, true, aMessagePortSerial,
-                      aRv);
+                      nullptr, aRv);
 }
 
 template <class Derived>
