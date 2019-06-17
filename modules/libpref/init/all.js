@@ -4768,8 +4768,6 @@ pref("beacon.enabled", true);
 // Camera prefs
 pref("camera.control.face_detection.enabled", true);
 
-// Fetch API.
-pref("dom.fetch.enabled", false);
 
 // SW Cache API
 pref("dom.caches.enabled", false);
