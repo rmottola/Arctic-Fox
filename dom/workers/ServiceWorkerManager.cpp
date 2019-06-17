@@ -2132,11 +2132,13 @@ public:
   FetchEventRunnable(WorkerPrivate* aWorkerPrivate,
                      nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
                      nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker,
-                     nsAutoPtr<ServiceWorkerClientInfo>& aClientInfo)
+                     nsAutoPtr<ServiceWorkerClientInfo>& aClientInfo,
+                     bool aIsReload)
     : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
     , mInterceptedChannel(aChannel)
     , mServiceWorker(aServiceWorker)
     , mClientInfo(aClientInfo)
+    , mIsReload(aIsReload)
   {
     MOZ_ASSERT(aWorkerPrivate);
   }
@@ -2174,9 +2176,6 @@ public:
     uint32_t loadFlags;
     rv = channel->GetLoadFlags(&loadFlags);
     NS_ENSURE_SUCCESS(rv, rv);
-
-    //TODO(jdm): we should probably include reload-ness in the loadinfo or as a separate load flag
-    mIsReload = false;
 
     rv = httpChannel->VisitRequestHeaders(this);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -2277,7 +2276,8 @@ private:
 NS_IMPL_ISUPPORTS_INHERITED(FetchEventRunnable, WorkerRunnable, nsIHttpHeaderVisitor)
 
 NS_IMETHODIMP
-ServiceWorkerManager::DispatchFetchEvent(nsIDocument* aDoc, nsIInterceptedChannel* aChannel)
+ServiceWorkerManager::DispatchFetchEvent(nsIDocument* aDoc, nsIInterceptedChannel* aChannel,
+                                         bool aIsReload)
 {
   MOZ_ASSERT(aChannel);
   nsCOMPtr<nsISupports> serviceWorker;
@@ -2327,7 +2327,7 @@ ServiceWorkerManager::DispatchFetchEvent(nsIDocument* aDoc, nsIInterceptedChanne
 
   // clientInfo is null if we don't have a controlled document
   nsRefPtr<FetchEventRunnable> event =
-    new FetchEventRunnable(sw->GetWorkerPrivate(), handle, serviceWorkerHandle, clientInfo);
+    new FetchEventRunnable(sw->GetWorkerPrivate(), handle, serviceWorkerHandle, clientInfo, aIsReload);
   rv = event->Init();
   NS_ENSURE_SUCCESS(rv, rv);
 
