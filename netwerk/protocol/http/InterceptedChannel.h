@@ -80,7 +80,7 @@ public:
   NS_IMETHOD ResetInterception() override;
   NS_IMETHOD FinishSynthesizedResponse() override;
   NS_IMETHOD GetChannel(nsIChannel** aChannel) override;
-  NS_IMETHOD SynthesizeStatus(uint16_t aStatus, const nsACString& aReason);
+  NS_IMETHOD SynthesizeStatus(uint16_t aStatus, const nsACString& aReason) override;
   NS_IMETHOD SynthesizeHeader(const nsACString& aName, const nsACString& aValue) override;
   NS_IMETHOD Cancel() override;
   NS_IMETHOD SetSecurityInfo(nsISupports* aSecurityInfo) override;
@@ -110,7 +110,7 @@ public:
   NS_IMETHOD ResetInterception() override;
   NS_IMETHOD FinishSynthesizedResponse() override;
   NS_IMETHOD GetChannel(nsIChannel** aChannel) override;
-  NS_IMETHOD SynthesizeStatus(uint16_t aStatus, const nsACString& aReason);
+  NS_IMETHOD SynthesizeStatus(uint16_t aStatus, const nsACString& aReason) override;
   NS_IMETHOD SynthesizeHeader(const nsACString& aName, const nsACString& aValue) override;
   NS_IMETHOD Cancel() override;
   NS_IMETHOD SetSecurityInfo(nsISupports* aSecurityInfo) override;
