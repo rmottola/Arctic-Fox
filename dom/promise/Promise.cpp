@@ -385,7 +385,7 @@ bool
 Promise::PerformMicroTaskCheckpoint()
 {
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsRefPtr<nsIRunnable>>& microtaskQueue =
+  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
   if (microtaskQueue.IsEmpty()) {
@@ -393,7 +393,7 @@ Promise::PerformMicroTaskCheckpoint()
   }
 
   do {
-    nsRefPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
+    nsCOMPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
     MOZ_ASSERT(runnable);
 
     // This function can re-enter, so we remove the element before calling.
@@ -1038,7 +1038,7 @@ Promise::DispatchToMicroTask(nsIRunnable* aRunnable)
   MOZ_ASSERT(aRunnable);
 
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsRefPtr<nsIRunnable>>& microtaskQueue =
+  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
   microtaskQueue.AppendElement(aRunnable);

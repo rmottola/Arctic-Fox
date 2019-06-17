@@ -1742,7 +1742,7 @@ public:
                                   JS::Handle<JSObject *> aCpows,
                                   nsIPrincipal* aPrincipal) override
   {
-    nsRefPtr<nsIRunnable> ev =
+    nsCOMPtr<nsIRunnable> ev =
       new nsAsyncMessageToSameProcessChild(aCx, aMessage, aData, aCpows,
                                            aPrincipal);
     NS_DispatchToCurrentThread(ev);
