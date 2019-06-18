@@ -1,0 +1,12 @@
+diff --git a/security/sandbox/linux/SandboxFilter.cpp b/security/sandbox/linux/SandboxFilter.cpp
+index 8fc504a2c5a78..1dfc6b1f79bac 100644
+--- a/security/sandbox/linux/SandboxFilter.cpp
++++ b/security/sandbox/linux/SandboxFilter.cpp
+@@ -369,6 +369,7 @@ void SandboxFilterImplGMP::Build() {
+   Allow(SOCKETCALL(recvmsg, RECVMSG));
+   Allow(SOCKETCALL(sendmsg, SENDMSG));
+   Allow(SYSCALL(time));
++  Allow(SYSCALL(sched_yield));
+ 
+   // Nothing after this line is performance-critical.
+ 
