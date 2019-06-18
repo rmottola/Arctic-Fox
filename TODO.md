@@ -113,20 +113,14 @@
 - Bug 1151974
 - Bug 1110487 all
 - Bug 1110814
+- Bug 1145631 - Part 1: Replace MOZ_OVERRIDE and MOZ_FINAL with overrid
 - Bug Bug 931249 2015-03-20
+- Bug 1143504 - Disconnect the Cache object from its actor when it gets
+- Bug 1117172 3 parts + Bug 1146293 fix
 - Bug 1144876 - Stop spamming stderr with a warning every time t
-- Bug 1134324 - Set CORS mode and credentials on Fetch event Re
 - Bug 1144249 - fix fetch no-cors mode.
 - Bug 1136200 - Verify request type is not no-cors if response is opaqu
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
-- Bug 1146059 - Remove Response.finalURL. 
-- Bug 1144931 - Move gray buffering code to RootMarking.cpp
-- Bug 1144925 - Buffer gray roots using a CallbackTracer instead of th
-- Bug 1145812 - Fix assertion with dom.url.encode_decode_hash pref set
-- Bug 1145787 - Put a misplaced assertion into its proper place.
-- Bug 1145345 - Account for a greater variety of rounding errors when c
-- Bug 1XXXXXX - Whitelist sched_yield syscall in GMP sandbox on Linux
-- Bug 1142761 - Move CallSetter into ScriptedIndirectProxyHandler so it
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
