@@ -60,6 +60,15 @@ using namespace mozilla::ipc;
 
 BEGIN_WORKERS_NAMESPACE
 
+static_assert(nsIHttpChannelInternal::CORS_MODE_SAME_ORIGIN == static_cast<uint32_t>(RequestMode::Same_origin),
+              "RequestMode enumeration value should match Necko CORS mode value.");
+static_assert(nsIHttpChannelInternal::CORS_MODE_NO_CORS == static_cast<uint32_t>(RequestMode::No_cors),
+              "RequestMode enumeration value should match Necko CORS mode value.");
+static_assert(nsIHttpChannelInternal::CORS_MODE_CORS == static_cast<uint32_t>(RequestMode::Cors),
+              "RequestMode enumeration value should match Necko CORS mode value.");
+static_assert(nsIHttpChannelInternal::CORS_MODE_CORS_WITH_FORCED_PREFLIGHT == static_cast<uint32_t>(RequestMode::Cors_with_forced_preflight),
+              "RequestMode enumeration value should match Necko CORS mode value.");
+
 struct ServiceWorkerManager::PendingOperation
 {
   nsCOMPtr<nsIRunnable> mRunnable;
@@ -2128,6 +2137,8 @@ class FetchEventRunnable : public WorkerRunnable
   nsCString mSpec;
   nsCString mMethod;
   bool mIsReload;
+  RequestMode mRequestMode;
+  RequestCredentials mRequestCredentials;
 public:
   FetchEventRunnable(WorkerPrivate* aWorkerPrivate,
                      nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
@@ -2139,6 +2150,10 @@ public:
     , mServiceWorker(aServiceWorker)
     , mClientInfo(aClientInfo)
     , mIsReload(aIsReload)
+    , mRequestMode(RequestMode::No_cors)
+    // By default we set it to same-origin since normal HTTP fetches always
+    // send credentials to same-origin websites unless explicitly forbidden.
+    , mRequestCredentials(RequestCredentials::Same_origin)
   {
     MOZ_ASSERT(aWorkerPrivate);
   }
@@ -2156,6 +2171,7 @@ public:
   nsresult
   Init()
   {
+    AssertIsOnMainThread();
     nsCOMPtr<nsIChannel> channel;
     nsresult rv = mInterceptedChannel->GetChannel(getter_AddRefs(channel));
     NS_ENSURE_SUCCESS(rv, rv);
@@ -2176,6 +2192,36 @@ public:
     uint32_t loadFlags;
     rv = channel->GetLoadFlags(&loadFlags);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsIHttpChannelInternal> internalChannel = do_QueryInterface(httpChannel);
+    NS_ENSURE_TRUE(internalChannel, NS_ERROR_NOT_AVAILABLE);
+
+    uint32_t mode;
+    internalChannel->GetCorsMode(&mode);
+    switch (mode) {
+      case nsIHttpChannelInternal::CORS_MODE_SAME_ORIGIN:
+        mRequestMode = RequestMode::Same_origin;
+        break;
+      case nsIHttpChannelInternal::CORS_MODE_NO_CORS:
+        mRequestMode = RequestMode::No_cors;
+        break;
+      case nsIHttpChannelInternal::CORS_MODE_CORS:
+      case nsIHttpChannelInternal::CORS_MODE_CORS_WITH_FORCED_PREFLIGHT:
+        mRequestMode = RequestMode::Cors;
+        break;
+      default:
+        MOZ_CRASH("Unexpected CORS mode");
+    }
+
+    if (loadFlags & nsIRequest::LOAD_ANONYMOUS) {
+      mRequestCredentials = RequestCredentials::Omit;
+    } else {
+      bool includeCrossOrigin;
+      internalChannel->GetCorsIncludeCredentials(&includeCrossOrigin);
+      if (includeCrossOrigin) {
+        mRequestCredentials = RequestCredentials::Include;
+      }
+    }
 
     rv = httpChannel->VisitRequestHeaders(this);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -2240,7 +2286,9 @@ private:
     reqInit.mHeaders.Value().SetAsHeaders() = headers;
 
     //TODO(jdm): set request body
-    //TODO(jdm): set request same-origin mode and credentials
+
+    reqInit.mMode.Construct(mRequestMode);
+    reqInit.mCredentials.Construct(mRequestCredentials);
 
     ErrorResult rv;
     nsRefPtr<Request> request = Request::Constructor(globalObj, requestInfo, reqInit, rv);
