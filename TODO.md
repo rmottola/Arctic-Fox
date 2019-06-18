@@ -119,7 +119,6 @@
 - Bug 1117172 3 parts + Bug 1146293 fix
 - Bug 1144876 - Stop spamming stderr with a warning every time t
 - Bug 1144249 - fix fetch no-cors mode.
-- Bug 1136200 - Verify request type is not no-cors if response is opaqu
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 
 Parents of:
