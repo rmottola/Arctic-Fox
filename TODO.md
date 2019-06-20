@@ -115,10 +115,6 @@
 - Bug 1110814
 - Bug 1145631 - Part 1: Replace MOZ_OVERRIDE and MOZ_FINAL with overrid
 - Bug Bug 931249 2015-03-20
-- Bug 1143504 - Disconnect the Cache object from its actor when it gets
-- Bug 1117172 3 parts + Bug 1146293 fix
-- Bug 1144876 - Stop spamming stderr with a warning every time t
-- Bug 1144249 - fix fetch no-cors mode.
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 
 Parents of:
