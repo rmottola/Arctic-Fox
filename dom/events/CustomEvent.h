@@ -38,7 +38,7 @@ public:
               ErrorResult& aRv);
 
   virtual JSObject*
-  WrapObjectInternal(JSContext* aCx) override;
+  WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void
   GetDetail(JSContext* aCx,

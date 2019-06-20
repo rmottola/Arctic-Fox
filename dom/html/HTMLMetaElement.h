@@ -59,7 +59,7 @@ public:
     SetHTMLAttr(nsGkAtoms::scheme, aScheme, aRv);
   }
 
-  virtual JSObject* WrapNode(JSContext* aCx) override;
+  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 protected:
   virtual ~HTMLMetaElement();

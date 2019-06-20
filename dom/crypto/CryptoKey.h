@@ -98,7 +98,7 @@ public:
     return mGlobal;
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL methods
   void GetType(nsString& aRetVal) const;

@@ -63,7 +63,7 @@ public:
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(AnimationPlayer)
 
   AnimationTimeline* GetParentObject() const { return mTimeline; }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   virtual CSSAnimationPlayer* AsCSSAnimationPlayer() { return nullptr; }
   virtual CSSTransitionPlayer* AsCSSTransitionPlayer() { return nullptr; }

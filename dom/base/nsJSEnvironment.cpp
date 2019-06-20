@@ -2472,7 +2472,7 @@ NS_DOMReadStructuredClone(JSContext* cx,
       if (!key->ReadStructuredClone(reader)) {
         result = nullptr;
       } else {
-        result = key->WrapObject(cx);
+        result = key->WrapObject(cx, JS::NullPtr());
       }
     }
     return result;

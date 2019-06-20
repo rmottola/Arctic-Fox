@@ -44,9 +44,9 @@ public:
     return mOwner;
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return mozilla::dom::MutationRecordBinding::Wrap(aCx, this);
+    return mozilla::dom::MutationRecordBinding::Wrap(aCx, this, aGivenProto);
   }
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -356,9 +356,9 @@ public:
               mozilla::dom::MutationCallback& aCb,
               mozilla::ErrorResult& aRv);
 
-  virtual JSObject* WrapObject(JSContext* aCx) override
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return mozilla::dom::MutationObserverBinding::Wrap(aCx, this);
+    return mozilla::dom::MutationObserverBinding::Wrap(aCx, this, aGivenProto);
   }
 
   nsISupports* GetParentObject() const

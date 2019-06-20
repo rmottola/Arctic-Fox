@@ -42,7 +42,7 @@ public:
 protected:
   virtual ~HTMLHeadingElement();
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   static void MapAttributesIntoRule(const nsMappedAttributes* aAttributes,

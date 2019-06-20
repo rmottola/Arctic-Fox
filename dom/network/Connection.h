@@ -41,7 +41,7 @@ public:
 
   // WebIDL
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   ConnectionType Type() const { return mType; }
 

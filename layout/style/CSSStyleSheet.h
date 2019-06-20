@@ -310,7 +310,7 @@ public:
 
     return dom::ParentObject(static_cast<nsIStyleSheet*>(mParent), mParent);
   }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   CSSStyleSheet(const CSSStyleSheet& aCopy,

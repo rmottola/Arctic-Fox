@@ -321,7 +321,7 @@ public:
     return GetWindow();
   }
 
-  virtual JSObject* WrapObject(JSContext* cx) override;
+  virtual JSObject* WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) override;
 
   // GetWindowFromGlobal returns the inner window for this global, if
   // any, else null.

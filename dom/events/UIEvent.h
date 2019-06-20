@@ -101,9 +101,9 @@ public:
                                                const UIEventInit& aParam,
                                                ErrorResult& aRv);
 
-  virtual JSObject* WrapObjectInternal(JSContext* aCx) override
+  virtual JSObject* WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return UIEventBinding::Wrap(aCx, this);
+    return UIEventBinding::Wrap(aCx, this, aGivenProto);
   }
 
   nsIDOMWindow* GetView() const

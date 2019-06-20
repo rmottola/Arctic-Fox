@@ -100,7 +100,7 @@ public:
   DOMPoint* GetAngularAcceleration();
 
   nsISupports* GetParentObject() const { return mParent; }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 protected:
   nsCOMPtr<nsISupports> mParent;
@@ -186,7 +186,7 @@ public:
   virtual VRFieldOfView* GetMaximumEyeFieldOfView(VREye aEye) = 0;
   virtual already_AddRefed<DOMRect> GetRecommendedEyeRenderRect(VREye aEye) = 0;
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void XxxToggleElementVR(Element& aElement);
 
@@ -210,7 +210,7 @@ public:
 
   virtual void ZeroSensor() = 0;
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 protected:
   explicit PositionSensorVRDevice(nsISupports* aParent)

@@ -58,7 +58,7 @@ public:
   NS_DECL_NSIINTERFACEREQUESTOR
 
   // nsWrapperCache
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL
   nsPIDOMWindow*

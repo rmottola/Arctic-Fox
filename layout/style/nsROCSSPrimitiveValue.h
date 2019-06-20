@@ -104,7 +104,7 @@ public:
     return nullptr;
   }
 
-  virtual JSObject *WrapObject(JSContext *cx) override;
+  virtual JSObject *WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   ~nsROCSSPrimitiveValue();

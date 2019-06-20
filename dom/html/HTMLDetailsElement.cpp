@@ -69,9 +69,9 @@ HTMLDetailsElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
 }
 
 JSObject*
-HTMLDetailsElement::WrapNode(JSContext* aCx)
+HTMLDetailsElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return HTMLDetailsElementBinding::Wrap(aCx, this);
+  return HTMLDetailsElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
 } // namespace dom

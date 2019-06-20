@@ -56,7 +56,7 @@ public:
   {
     return mElement;
   }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   uint32_t NumberOfItems() const;
   uint32_t Length() const;

@@ -44,7 +44,7 @@ public:
   }
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void
   Log(JSContext* aCx, const Sequence<JS::Value>& aData);

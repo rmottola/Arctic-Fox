@@ -1084,9 +1084,9 @@ nsLocation::CallerSubsumes()
 }
 
 JSObject*
-nsLocation::WrapObject(JSContext* aCx)
+nsLocation::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return LocationBinding::Wrap(aCx, this);
+  return LocationBinding::Wrap(aCx, this, aGivenProto);
 }
 
 URLSearchParams*

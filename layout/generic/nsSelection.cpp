@@ -6223,9 +6223,9 @@ Selection::SetSelectionDirection(nsDirection aDirection) {
 }
 
 JSObject*
-Selection::WrapObject(JSContext* aCx)
+Selection::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return mozilla::dom::SelectionBinding::Wrap(aCx, this);
+  return mozilla::dom::SelectionBinding::Wrap(aCx, this, aGivenProto);
 }
 
 // AutoHideSelectionChanges

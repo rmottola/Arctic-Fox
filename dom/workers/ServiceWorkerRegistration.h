@@ -35,7 +35,7 @@ public:
                             const nsAString& aScope);
 
   JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   already_AddRefed<workers::ServiceWorker>
   GetInstalling();

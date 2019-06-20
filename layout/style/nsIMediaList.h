@@ -197,7 +197,7 @@ public:
   nsMediaList();
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
   nsISupports* GetParentObject() const
   {
     return nullptr;

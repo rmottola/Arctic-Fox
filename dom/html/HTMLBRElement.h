@@ -43,7 +43,7 @@ public:
     return SetHTMLAttr(nsGkAtoms::clear, aClear, aError);
   }
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   virtual ~HTMLBRElement();

@@ -58,7 +58,7 @@ public:
 
   void RemoveAllListeners();
 
-  JSObject* WrapObject(JSContext* aCx) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL methods
   void GetMedia(nsAString& aMedia);

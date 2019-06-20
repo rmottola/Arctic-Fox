@@ -37,9 +37,9 @@ public:
   Request(nsIGlobalObject* aOwner, InternalRequest* aRequest);
 
   JSObject*
-  WrapObject(JSContext* aCx) override
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return RequestBinding::Wrap(aCx, this);
+    return RequestBinding::Wrap(aCx, this, aGivenProto);
   }
 
   void

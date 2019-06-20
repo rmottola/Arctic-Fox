@@ -286,7 +286,7 @@ protected:
   // get rid of the compiler warning
   using nsGenericHTMLFormElementWithState::IsSingleLineTextControl;
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   nsCOMPtr<nsIControllers> mControllers;
   /** Whether or not the value has changed since its default value was given. */

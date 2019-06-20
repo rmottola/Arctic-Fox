@@ -723,7 +723,7 @@ protected:
                !HasAttr(kNameSpaceID_None, nsGkAtoms::readonly);
     }
 
-    virtual JSObject* WrapNode(JSContext *aCx) override;
+    virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
     void MaybeUpdatePrivateLifetime();
 };

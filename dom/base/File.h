@@ -189,7 +189,7 @@ public:
               const ChromeFilePropertyBag& aBag,
               ErrorResult& aRv);
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   uint64_t GetSize(ErrorResult& aRv);
 
@@ -828,7 +828,7 @@ public:
 
   NS_DECL_NSIDOMFILELIST
 
-  virtual JSObject* WrapObject(JSContext *cx) override;
+  virtual JSObject* WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto) override;
 
   nsISupports* GetParentObject()
   {

@@ -149,7 +149,7 @@ public:
 
   nsresult     StopAutoScrollTimer();
 
-  JSObject* WrapObject(JSContext* aCx) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL methods
   nsINode*     GetAnchorNode();

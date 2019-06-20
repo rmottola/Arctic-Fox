@@ -94,7 +94,7 @@ public:
     NS_DECL_NSIMUTATIONOBSERVER_NODEWILLBEDESTROYED
 
     // nsWrapperCache
-    virtual JSObject* WrapObject(JSContext* aCx) override;
+    virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
     // WebIDL
     nsISupports*

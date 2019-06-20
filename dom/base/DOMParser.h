@@ -75,9 +75,9 @@ public:
     return mOwner;
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return mozilla::dom::DOMParserBinding::Wrap(aCx, this);
+    return mozilla::dom::DOMParserBinding::Wrap(aCx, this, aGivenProto);
   }
 
 private:

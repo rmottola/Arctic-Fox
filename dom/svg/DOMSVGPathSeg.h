@@ -60,9 +60,9 @@ namespace mozilla {
   }                                                                           \
                                                                               \
   virtual JSObject*                                                           \
-  WrapObject(JSContext* aCx) override                                     \
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override                                     \
   {                                                                           \
-    return dom::SVGPathSeg##segName##Binding::Wrap(aCx, this);        \
+    return dom::SVGPathSeg##segName##Binding::Wrap(aCx, this, aGivenProto);        \
   }
 
 
@@ -167,7 +167,7 @@ public:
   uint16_t PathSegType() const { return Type(); }
   void GetPathSegTypeAsLetter(nsAString &aPathSegTypeAsLetter)
     { aPathSegTypeAsLetter = SVGPathSegUtils::GetPathSegTypeAsLetter(Type()); }
-  virtual JSObject* WrapObject(JSContext* aCx) override = 0;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override = 0;
 
 protected:
 

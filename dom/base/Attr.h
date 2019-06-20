@@ -82,7 +82,7 @@ public:
   virtual nsIDOMNode* AsDOMNode() override { return this; }
 
   // WebIDL
-  virtual JSObject* WrapNode(JSContext* aCx) override;
+  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // XPCOM GetName() is OK
   // XPCOM GetValue() is OK

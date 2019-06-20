@@ -69,7 +69,7 @@ public:
   {
     return mOwnerWindow;
   }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   BluetoothClassOfDevice(nsPIDOMWindow* aOwner);

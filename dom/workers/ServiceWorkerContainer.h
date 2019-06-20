@@ -36,7 +36,7 @@ public:
   explicit ServiceWorkerContainer(nsPIDOMWindow* aWindow);
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   already_AddRefed<Promise>
   Register(const nsAString& aScriptURL,

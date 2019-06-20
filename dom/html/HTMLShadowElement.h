@@ -71,7 +71,7 @@ public:
 protected:
   virtual ~HTMLShadowElement();
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // The ShadowRoot that will be rendered in place of this shadow insertion point.
   nsRefPtr<ShadowRoot> mProjectedShadow;

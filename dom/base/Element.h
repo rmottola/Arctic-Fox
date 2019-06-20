@@ -992,7 +992,7 @@ public:
                            nsIDOMHTMLCollection** aResult);
   void GetClassList(nsISupports** aClassList);
 
-  virtual JSObject* WrapObject(JSContext *aCx) final override;
+  virtual JSObject* WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) final override;
 
   nsINode* GetScopeChainParent() const override;
 
@@ -1347,7 +1347,7 @@ public:
   virtual int32_t IndexOf(nsIContent* aContent) override;
   virtual nsINode* GetParentObject() override { return mParent; }
   virtual uint32_t Length() const;
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 protected:
   virtual ~DestinationInsertionPointList();
 

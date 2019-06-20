@@ -37,7 +37,7 @@ public:
   GetParentObject() const;
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void
   NotifyResult(JS::Handle<JS::Value> aResult);

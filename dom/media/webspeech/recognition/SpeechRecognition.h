@@ -69,7 +69,7 @@ public:
 
   nsISupports* GetParentObject() const;
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   static already_AddRefed<SpeechRecognition>
   Constructor(const GlobalObject& aGlobal, ErrorResult& aRv);

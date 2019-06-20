@@ -95,7 +95,7 @@ public:
 
   FontFaceSet(nsPIDOMWindow* aWindow, nsPresContext* aPresContext);
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   UserFontSet* EnsureUserFontSet(nsPresContext* aPresContext);
   UserFontSet* GetUserFontSet() { return mUserFontSet; }

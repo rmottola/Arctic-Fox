@@ -118,7 +118,7 @@ public:
 protected:
   virtual ~HTMLOptionElement();
 
-  virtual JSObject* WrapNode(JSContext* aCx) override;
+  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   /**
    * Get the select content element that contains this option, this

@@ -139,7 +139,7 @@ public:
 protected:
   virtual ~HTMLFrameSetElement();
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
   nsresult ParseRowCol(const nsAString& aValue,

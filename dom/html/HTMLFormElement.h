@@ -410,7 +410,7 @@ public:
   void RequestAutocomplete();
 
 protected:
-  virtual JSObject* WrapNode(JSContext* aCx) override;
+  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void PostPasswordEvent();
   void EventHandled() { mFormPasswordEventDispatcher = nullptr; }

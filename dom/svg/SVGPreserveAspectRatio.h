@@ -128,7 +128,7 @@ public:
 
   // WebIDL
   nsSVGElement* GetParentObject() const { return mSVGElement; }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   uint16_t Align();
   void SetAlign(uint16_t aAlign, ErrorResult& rv);

@@ -65,7 +65,7 @@ public:
     return GetOwner();
   }
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   uint16_t GetStatus(ErrorResult& aRv)
   {

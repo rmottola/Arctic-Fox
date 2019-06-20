@@ -80,7 +80,7 @@ public:
               const Optional<Sequence<JS::Value>>& aTransferable,
               ErrorResult& aRv);
 
-  JSObject* WrapObject(JSContext* aCx) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
 private:
 protected:
