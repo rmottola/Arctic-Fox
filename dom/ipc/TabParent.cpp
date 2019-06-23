@@ -2579,7 +2579,7 @@ TabParent::GetTabId(uint64_t* aId)
   return NS_OK;
 }
 
-class LayerTreeUpdateRunnable MOZ_FINAL
+class LayerTreeUpdateRunnable final
   : public nsRunnable
 {
   uint64_t mLayersId;

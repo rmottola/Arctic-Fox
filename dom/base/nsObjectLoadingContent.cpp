@@ -377,10 +377,10 @@ public:
   }
 
   // nsRunnable
-  NS_IMETHOD Run() MOZ_OVERRIDE;
+  NS_IMETHOD Run() override;
 
   // nsITimerCallback
-  NS_IMETHOD Notify(nsITimer* timer) MOZ_OVERRIDE;
+  NS_IMETHOD Notify(nsITimer* timer) override;
 
 protected:
   virtual ~nsStopPluginRunnable() {}

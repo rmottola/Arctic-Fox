@@ -5335,14 +5335,14 @@ public:
   CalcSnapPoints(nsIScrollableFrame::ScrollUnit aUnit,
                  const nsPoint& aDestination,
                  const nsPoint& aStartPos);
-  virtual void AddHorizontalEdge(nscoord aEdge) MOZ_OVERRIDE;
-  virtual void AddVerticalEdge(nscoord aEdge) MOZ_OVERRIDE;
+  virtual void AddHorizontalEdge(nscoord aEdge) override;
+  virtual void AddVerticalEdge(nscoord aEdge) override;
   virtual void AddHorizontalEdgeInterval(const nsRect &aScrollRange,
                                          nscoord aInterval, nscoord aOffset)
-                                         MOZ_OVERRIDE;
+                                         override;
   virtual void AddVerticalEdgeInterval(const nsRect &aScrollRange,
                                        nscoord aInterval, nscoord aOffset)
-                                       MOZ_OVERRIDE;
+                                       override;
   void AddEdge(nscoord aEdge,
                nscoord aDestination,
                nscoord aStartPos,

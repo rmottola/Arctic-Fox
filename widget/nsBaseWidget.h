@@ -232,7 +232,7 @@ public:
   NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() override final;
 
   // Dispatch an event that must be first be routed through APZ.
-  nsEventStatus DispatchAPZAwareEvent(mozilla::WidgetInputEvent* aEvent) MOZ_OVERRIDE;
+  nsEventStatus DispatchAPZAwareEvent(mozilla::WidgetInputEvent* aEvent) override;
 
   void NotifyWindowDestroyed();
   void NotifySizeMoveDone();

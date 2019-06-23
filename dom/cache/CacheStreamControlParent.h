@@ -32,8 +32,8 @@ public:
   void Shutdown();
 
   // PCacheStreamControlParent methods
-  virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvNoteClosed(const nsID& aId) MOZ_OVERRIDE;
+  virtual void ActorDestroy(ActorDestroyReason aReason) override;
+  virtual bool RecvNoteClosed(const nsID& aId) override;
 
 private:
   void NotifyClose(const nsID& aId);

@@ -339,7 +339,7 @@ public:
 
     virtual bool RecvSetOfflinePermission(const IPC::Principal& principal) override;
 
-    virtual bool RecvFinishShutdown() MOZ_OVERRIDE;
+    virtual bool RecvFinishShutdown() override;
 
 protected:
     void OnChannelConnected(int32_t pid) override;

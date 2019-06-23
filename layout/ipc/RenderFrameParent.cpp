@@ -102,7 +102,7 @@ public:
   }
 
   virtual void RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                                const mozilla::CSSPoint& aDestination) MOZ_OVERRIDE
+                                const mozilla::CSSPoint& aDestination) override
   {
     if (MessageLoop::current() != mUILoop) {
       // We have to send this message from the "UI thread" (main

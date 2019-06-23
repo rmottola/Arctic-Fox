@@ -22,7 +22,7 @@ class ServiceWorkerWindowClient;
 
 // Used as a container object for information needed to create
 // client objects.
-class ServiceWorkerClientInfo MOZ_FINAL
+class ServiceWorkerClientInfo final
 {
   friend class ServiceWorkerClient;
   friend class ServiceWorkerWindowClient;

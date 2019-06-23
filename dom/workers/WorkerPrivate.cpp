@@ -2171,7 +2171,7 @@ WorkerLoadInfo::StealFrom(WorkerLoadInfo& aOther)
 }
 
 template <class Derived>
-class WorkerPrivateParent<Derived>::EventTarget MOZ_FINAL
+class WorkerPrivateParent<Derived>::EventTarget final
   : public nsIEventTarget
 {
   // This mutex protects mWorkerPrivate and must be acquired *before* the

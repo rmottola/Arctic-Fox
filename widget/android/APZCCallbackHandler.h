@@ -44,7 +44,7 @@ public:
 public: // GoannaContentController methods
     void RequestContentRepaint(const mozilla::layers::FrameMetrics& aFrameMetrics) override;
     void RequestFlingSnap(const mozilla::layers::FrameMetrics::ViewID& aScrollId,
-                          const mozilla::CSSPoint& aDestination) MOZ_OVERRIDE;
+                          const mozilla::CSSPoint& aDestination) override;
     void AcknowledgeScrollUpdate(const mozilla::layers::FrameMetrics::ViewID& aScrollId,
                                  const uint32_t& aScrollGeneration) override;
     void HandleDoubleTap(const mozilla::CSSPoint& aPoint, Modifiers aModifiers,

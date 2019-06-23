@@ -217,7 +217,7 @@ public:
   { }
 
   void readType(const char *keyedBy, const char *name,
-                const char *location, unsigned lineno) MOZ_OVERRIDE {
+                const char *location, unsigned lineno) override {
     if (!mStartedTypeList) {
       mStartedTypeList = true;
       mWriter.BeginObject();
@@ -239,7 +239,7 @@ public:
     mWriter.EndObject();
   }
 
-  void operator()(JS::TrackedTypeSite site, const char *mirType) MOZ_OVERRIDE {
+  void operator()(JS::TrackedTypeSite site, const char *mirType) override {
     if (mStartedTypeList) {
       mWriter.EndArray();
       mStartedTypeList = false;
@@ -262,7 +262,7 @@ public:
     : mWriter(b)
   { }
 
-  void operator()(JS::TrackedStrategy strategy, JS::TrackedOutcome outcome) MOZ_OVERRIDE {
+  void operator()(JS::TrackedStrategy strategy, JS::TrackedOutcome outcome) override {
     mWriter.BeginObject();
     {
       // Stringify the reasons for now; could stream enum values in the future

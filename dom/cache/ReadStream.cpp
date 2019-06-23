@@ -47,7 +47,7 @@ using mozilla::ipc::PFileDescriptorSetParent;
 
 // ----------------------------------------------------------------------------
 
-class ReadStreamChild MOZ_FINAL : public ReadStream
+class ReadStreamChild final : public ReadStream
 {
 public:
   ReadStreamChild(PCacheStreamControlChild* aControl, const nsID& aId,
@@ -66,7 +66,7 @@ public:
     NoteClosed();
   }
 
-  virtual void NoteClosedOnOwningThread() MOZ_OVERRIDE
+  virtual void NoteClosedOnOwningThread() override
   {
     NS_ASSERT_OWNINGTHREAD(ReadStream);
 
@@ -79,7 +79,7 @@ public:
     mControl->NoteClosed(mId);
   }
 
-  virtual void ForgetOnOwningThread() MOZ_OVERRIDE
+  virtual void ForgetOnOwningThread() override
   {
     NS_ASSERT_OWNINGTHREAD(ReadStream);
 
@@ -91,7 +91,7 @@ public:
     mControl->RemoveListener(this);
   }
 
-  virtual void SerializeControl(PCacheReadStream* aReadStreamOut) MOZ_OVERRIDE
+  virtual void SerializeControl(PCacheReadStream* aReadStreamOut) override
   {
     MOZ_ASSERT(aReadStreamOut);
     MOZ_ASSERT(!mClosed);
@@ -101,7 +101,7 @@ public:
 
   virtual void
   SerializeFds(PCacheReadStream* aReadStreamOut,
-               const nsTArray<FileDescriptor>& fds) MOZ_OVERRIDE
+               const nsTArray<FileDescriptor>& fds) override
   {
     MOZ_ASSERT(!mClosed);
     PFileDescriptorSetChild* fdSet = nullptr;
@@ -125,7 +125,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class ReadStreamParent MOZ_FINAL : public ReadStream
+class ReadStreamParent final : public ReadStream
 {
 public:
   ReadStreamParent(PCacheStreamControlParent* aControl, const nsID& aId,
@@ -144,7 +144,7 @@ public:
     NoteClosed();
   }
 
-  virtual void NoteClosedOnOwningThread() MOZ_OVERRIDE
+  virtual void NoteClosedOnOwningThread() override
   {
     NS_ASSERT_OWNINGTHREAD(ReadStream);
 
@@ -159,7 +159,7 @@ public:
     mControl = nullptr;
   }
 
-  virtual void ForgetOnOwningThread() MOZ_OVERRIDE
+  virtual void ForgetOnOwningThread() override
   {
     NS_ASSERT_OWNINGTHREAD(ReadStream);
 
@@ -173,7 +173,7 @@ public:
     mControl = nullptr;
   }
 
-  virtual void SerializeControl(PCacheReadStream* aReadStreamOut) MOZ_OVERRIDE
+  virtual void SerializeControl(PCacheReadStream* aReadStreamOut) override
   {
     MOZ_ASSERT(aReadStreamOut);
     MOZ_ASSERT(!mClosed);
@@ -184,7 +184,7 @@ public:
 
   virtual void
   SerializeFds(PCacheReadStream* aReadStreamOut,
-               const nsTArray<FileDescriptor>& fds) MOZ_OVERRIDE
+               const nsTArray<FileDescriptor>& fds) override
   {
     MOZ_ASSERT(!mClosed);
     MOZ_ASSERT(mControl);
@@ -227,7 +227,7 @@ using mozilla::ipc::PFileDescriptorSetChild;
 // be done on the thread associated with the PBackground actor.  Must be
 // cancelable to execute on Worker threads (which can occur when the
 // ReadStream is constructed on a child process Worker thread).
-class ReadStream::NoteClosedRunnable MOZ_FINAL : public nsCancelableRunnable
+class ReadStream::NoteClosedRunnable final : public nsCancelableRunnable
 {
 public:
   explicit NoteClosedRunnable(ReadStream* aStream)
@@ -259,7 +259,7 @@ private:
 // it on the thread associated with the PBackground actor.  Must be
 // cancelable to execute on Worker threads (which can occur when the
 // ReadStream is constructed on a child process Worker thread).
-class ReadStream::ForgetRunnable MOZ_FINAL : public nsCancelableRunnable
+class ReadStream::ForgetRunnable final : public nsCancelableRunnable
 {
 public:
   explicit ForgetRunnable(ReadStream* aStream)

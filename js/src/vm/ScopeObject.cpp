@@ -1500,14 +1500,14 @@ class DebugScopeProxy : public BaseProxyHandler
     MOZ_CONSTEXPR DebugScopeProxy() : BaseProxyHandler(&family) {}
 
     bool preventExtensions(JSContext *cx, HandleObject proxy,
-                           ObjectOpResult &result) const MOZ_OVERRIDE
+                           ObjectOpResult &result) const override
     {
         // always [[Extensible]], can't be made non-[[Extensible]], like most
         // proxies
         return result.fail(JSMSG_CANT_CHANGE_EXTENSIBILITY);
     }
 
-    bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const MOZ_OVERRIDE
+    bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const override
     {
         // See above.
         *extensible = true;
@@ -1515,7 +1515,7 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
-                               MutableHandle<PropertyDescriptor> desc) const MOZ_OVERRIDE
+                               MutableHandle<PropertyDescriptor> desc) const override
     {
         return getOwnPropertyDescriptor(cx, proxy, id, desc);
     }
@@ -1544,7 +1544,7 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
-                                  MutableHandle<PropertyDescriptor> desc) const MOZ_OVERRIDE
+                                  MutableHandle<PropertyDescriptor> desc) const override
     {
         Rooted<DebugScopeObject*> debugScope(cx, &proxy->as<DebugScopeObject>());
         Rooted<ScopeObject*> scope(cx, &debugScope->scope());
@@ -1594,7 +1594,7 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool get(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
-             MutableHandleValue vp) const MOZ_OVERRIDE
+             MutableHandleValue vp) const override
     {
         Rooted<DebugScopeObject*> debugScope(cx, &proxy->as<DebugScopeObject>());
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
@@ -1663,7 +1663,7 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
-             MutableHandleValue vp, ObjectOpResult &result) const MOZ_OVERRIDE
+             MutableHandleValue vp, ObjectOpResult &result) const override
     {
         Rooted<DebugScopeObject*> debugScope(cx, &proxy->as<DebugScopeObject>());
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
@@ -1687,7 +1687,7 @@ class DebugScopeProxy : public BaseProxyHandler
 
     bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                         MutableHandle<PropertyDescriptor> desc,
-                        ObjectOpResult &result) const MOZ_OVERRIDE
+                        ObjectOpResult &result) const override
     {
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
 
@@ -1700,7 +1700,7 @@ class DebugScopeProxy : public BaseProxyHandler
         return JS_DefinePropertyById(cx, scope, id, desc, result);
     }
 
-    bool ownPropertyKeys(JSContext* cx, HandleObject proxy, AutoIdVector& props) const MOZ_OVERRIDE
+    bool ownPropertyKeys(JSContext* cx, HandleObject proxy, AutoIdVector& props) const override
     {
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
 
@@ -1748,12 +1748,12 @@ class DebugScopeProxy : public BaseProxyHandler
         return true;
     }
 
-    bool enumerate(JSContext* cx, HandleObject proxy, MutableHandleObject objp) const MOZ_OVERRIDE
+    bool enumerate(JSContext* cx, HandleObject proxy, MutableHandleObject objp) const override
     {
         return BaseProxyHandler::enumerate(cx, proxy, objp);
     }
 
-    bool has(JSContext* cx, HandleObject proxy, HandleId id_, bool* bp) const MOZ_OVERRIDE
+    bool has(JSContext* cx, HandleObject proxy, HandleId id_, bool* bp) const override
     {
         RootedId id(cx, id_);
         ScopeObject& scopeObj = proxy->as<DebugScopeObject>().scope();
@@ -1787,7 +1787,7 @@ class DebugScopeProxy : public BaseProxyHandler
     }
 
     bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
-                 ObjectOpResult &result) const MOZ_OVERRIDE
+                 ObjectOpResult &result) const override
     {
         return result.fail(JSMSG_CANT_DELETE);
     }

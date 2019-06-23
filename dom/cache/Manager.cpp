@@ -42,7 +42,7 @@ using mozilla::dom::cache::SyncDBAction;
 // An Action that is executed when a Context is first created.  It ensures that
 // the directory and database are setup properly.  This lets other actions
 // not worry about these details.
-class SetupAction MOZ_FINAL : public SyncDBAction
+class SetupAction final : public SyncDBAction
 {
 public:
   SetupAction()
@@ -51,7 +51,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     // TODO: init maintainance marker (bug 1110446)
     // TODO: perform maintainance if necessary (bug 1110446)
@@ -79,7 +79,7 @@ public:
 
 // Action that is executed when we determine that content has stopped using
 // a body file that has been orphaned.
-class DeleteOrphanedBodyAction MOZ_FINAL : public Action
+class DeleteOrphanedBodyAction final : public Action
 {
 public:
   explicit DeleteOrphanedBodyAction(const nsTArray<nsID>& aDeletedBodyIdList)
@@ -92,7 +92,7 @@ public:
   }
 
   virtual void
-  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) MOZ_OVERRIDE
+  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) override
   {
     MOZ_ASSERT(aResolver);
     MOZ_ASSERT(aQuotaInfo.mDir);
@@ -346,11 +346,11 @@ private:
     MaybeDestroyInstance();
   }
 
-  class ShutdownAllRunnable MOZ_FINAL : public nsRunnable
+  class ShutdownAllRunnable final : public nsRunnable
   {
   public:
     NS_IMETHOD
-    Run() MOZ_OVERRIDE
+    Run() override
     {
       mozilla::ipc::AssertIsOnBackgroundThread();
       ShutdownAllOnBackgroundThread();
@@ -421,7 +421,7 @@ protected:
   Complete(Listener* aListener, nsresult aRv) = 0;
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     NS_ASSERT_OWNINGTHREAD(Manager::BaseAction);
     Listener* listener = mManager->GetListener(mListenerId);
@@ -442,7 +442,7 @@ protected:
 
 // Action that is executed when we determine that content has stopped using
 // a Cache object that has been orphaned.
-class Manager::DeleteOrphanedCacheAction MOZ_FINAL : public SyncDBAction
+class Manager::DeleteOrphanedCacheAction final : public SyncDBAction
 {
 public:
   DeleteOrphanedCacheAction(Manager* aManager, CacheId aCacheId)
@@ -453,7 +453,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
@@ -468,7 +468,7 @@ public:
   }
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     mManager->NoteOrphanedBodyIdList(mDeletedBodyIdList);
 
@@ -484,7 +484,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheMatchAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheMatchAction final : public Manager::BaseAction
 {
 public:
   CacheMatchAction(Manager* aManager, ListenerId aListenerId,
@@ -502,7 +502,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     nsresult rv = DBSchema::CacheMatch(aConn, mCacheId, mRequest, mParams,
                                        &mFoundResponse, &mResponse);
@@ -524,7 +524,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     if (!mFoundResponse) {
       aListener->OnCacheMatch(mRequestId, aRv, nullptr, nullptr);
@@ -535,7 +535,7 @@ public:
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
@@ -551,7 +551,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheMatchAllAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheMatchAllAction final : public Manager::BaseAction
 {
 public:
   CacheMatchAllAction(Manager* aManager, ListenerId aListenerId,
@@ -568,7 +568,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     nsresult rv = DBSchema::CacheMatchAll(aConn, mCacheId, mRequestOrVoid,
                                           mParams, mSavedResponses);
@@ -593,14 +593,14 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     mStreamList->Activate(mCacheId);
     aListener->OnCacheMatchAll(mRequestId, aRv, mSavedResponses, mStreamList);
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
@@ -618,7 +618,7 @@ private:
 // This is the most complex Action.  It puts a request/response pair into the
 // Cache.  It does not complete until all of the body data has been saved to
 // disk.  This means its an asynchronous Action.
-class Manager::CachePutAllAction MOZ_FINAL : public DBAction
+class Manager::CachePutAllAction final : public DBAction
 {
 public:
   CachePutAllAction(Manager* aManager, ListenerId aListenerId,
@@ -654,7 +654,7 @@ private:
 
   virtual void
   RunWithDBOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo,
-                    nsIFile* aDBDir, mozIStorageConnection* aConn) MOZ_OVERRIDE
+                    nsIFile* aDBDir, mozIStorageConnection* aConn) override
   {
     MOZ_ASSERT(aResolver);
     MOZ_ASSERT(aDBDir);
@@ -800,7 +800,7 @@ private:
   }
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
 
@@ -819,14 +819,14 @@ private:
   }
 
   virtual void
-  CancelOnInitiatingThread() MOZ_OVERRIDE
+  CancelOnInitiatingThread() override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
     Action::CancelOnInitiatingThread();
     CancelAllStreamCopying();
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
     return aCacheId == mCacheId;
@@ -990,7 +990,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheDeleteAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheDeleteAction final : public Manager::BaseAction
 {
 public:
   CacheDeleteAction(Manager* aManager, ListenerId aListenerId,
@@ -1006,7 +1006,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
@@ -1025,13 +1025,13 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     mManager->NoteOrphanedBodyIdList(mDeletedBodyIdList);
     aListener->OnCacheDelete(mRequestId, aRv, mSuccess);
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
@@ -1046,7 +1046,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheKeysAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheKeysAction final : public Manager::BaseAction
 {
 public:
   CacheKeysAction(Manager* aManager, ListenerId aListenerId,
@@ -1063,7 +1063,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     nsresult rv = DBSchema::CacheKeys(aConn, mCacheId, mRequestOrVoid, mParams,
                                       mSavedRequests);
@@ -1088,14 +1088,14 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     mStreamList->Activate(mCacheId);
     aListener->OnCacheKeys(mRequestId, aRv, mSavedRequests, mStreamList);
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
@@ -1110,7 +1110,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageMatchAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageMatchAction final : public Manager::BaseAction
 {
 public:
   StorageMatchAction(Manager* aManager, ListenerId aListenerId,
@@ -1128,7 +1128,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     nsresult rv = DBSchema::StorageMatch(aConn, mNamespace, mRequest, mParams,
                                          &mFoundResponse, &mSavedResponse);
@@ -1150,7 +1150,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     if (!mFoundResponse) {
       aListener->OnStorageMatch(mRequestId, aRv, nullptr, nullptr);
@@ -1172,7 +1172,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageHasAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageHasAction final : public Manager::BaseAction
 {
 public:
   StorageHasAction(Manager* aManager, ListenerId aListenerId,
@@ -1186,7 +1186,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     CacheId cacheId;
     return DBSchema::StorageGetCacheId(aConn, mNamespace, mKey,
@@ -1194,7 +1194,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     aListener->OnStorageHas(mRequestId, aRv, mCacheFound);
   }
@@ -1207,7 +1207,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageOpenAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageOpenAction final : public Manager::BaseAction
 {
 public:
   StorageOpenAction(Manager* aManager, ListenerId aListenerId,
@@ -1221,7 +1221,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     // Cache does not exist, create it instead
     mozStorageTransaction trans(aConn, false,
@@ -1249,7 +1249,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     aListener->OnStorageOpen(mRequestId, aRv, mCacheId);
   }
@@ -1262,7 +1262,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageDeleteAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageDeleteAction final : public Manager::BaseAction
 {
 public:
   StorageDeleteAction(Manager* aManager, ListenerId aListenerId,
@@ -1277,7 +1277,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
@@ -1303,7 +1303,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     if (mCacheDeleted) {
       // If content is referencing this cache, mark it orphaned to be
@@ -1331,7 +1331,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageKeysAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageKeysAction final : public Manager::BaseAction
 {
 public:
   StorageKeysAction(Manager* aManager, ListenerId aListenerId,
@@ -1342,13 +1342,13 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     return DBSchema::StorageGetKeys(aConn, mNamespace, mKeys);
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, nsresult aRv) override
   {
     if (NS_FAILED(aRv)) {
       mKeys.Clear();

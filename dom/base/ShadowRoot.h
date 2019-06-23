@@ -134,7 +134,7 @@ public:
     mIsComposedDocParticipant = aIsComposedDocParticipant;
   }
 
-  virtual void DestroyContent() MOZ_OVERRIDE;
+  virtual void DestroyContent() override;
 protected:
   virtual ~ShadowRoot();
 
