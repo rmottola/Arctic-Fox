@@ -45,10 +45,10 @@ xpcAccessibleApplication* XPCApplicationAcc();
 } // namespace mozilla
 
 class nsAccessibilityService final : public mozilla::a11y::DocManager,
-                                         public mozilla::a11y::FocusManager,
-                                         public mozilla::a11y::SelectionManager,
-                                         public nsIAccessibilityService,
-                                         public nsIObserver
+                                     public mozilla::a11y::FocusManager,
+                                     public mozilla::a11y::SelectionManager,
+                                     public nsIAccessibilityService,
+                                     public nsIObserver
 {
 public:
   typedef mozilla::a11y::Accessible Accessible;

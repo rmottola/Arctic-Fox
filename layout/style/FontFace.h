@@ -33,7 +33,7 @@ namespace mozilla {
 namespace dom {
 
 class FontFace final : public nsISupports,
-                           public nsWrapperCache
+                       public nsWrapperCache
 {
   friend class mozilla::dom::FontFaceBufferSource;
   friend class mozilla::dom::FontFaceInitializer;

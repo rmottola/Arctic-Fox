@@ -36,9 +36,9 @@ enum class DataURIHandling
 };
 
 class nsCORSListenerProxy final : public nsIStreamListener,
-                                      public nsIInterfaceRequestor,
-                                      public nsIChannelEventSink,
-                                      public nsIAsyncVerifyRedirectCallback
+                                  public nsIInterfaceRequestor,
+                                  public nsIChannelEventSink,
+                                  public nsIAsyncVerifyRedirectCallback
 {
 public:
   nsCORSListenerProxy(nsIStreamListener* aOuter,

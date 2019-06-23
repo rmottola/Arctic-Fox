@@ -486,7 +486,7 @@ GetRequiredScopeStringPrefix(const nsACString& aScriptSpec, nsACString& aPrefix)
 
 
 class ServiceWorkerRegisterJob final : public ServiceWorkerJob,
-                                           public nsIStreamLoaderObserver
+                                       public nsIStreamLoaderObserver
 {
   friend class ContinueInstallTask;
 

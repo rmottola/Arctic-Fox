@@ -584,8 +584,8 @@ private:
 };
 
 class WorkerScopeUnregisterRunnable final : public nsRunnable
-                                              , public nsIServiceWorkerUnregisterCallback
-                                              , public WorkerFeature
+                                          , public nsIServiceWorkerUnregisterCallback
+                                          , public WorkerFeature
 {
   WorkerPrivate* mWorkerPrivate;
   nsString mScope;

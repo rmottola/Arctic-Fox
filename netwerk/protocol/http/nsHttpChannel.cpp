@@ -6139,7 +6139,7 @@ nsHttpChannel::SetOfflineCacheToken(nsISupports *token)
 }
 
 class nsHttpChannelCacheKey final : public nsISupportsPRUint32,
-                                        public nsISupportsCString
+                                    public nsISupportsCString
 {
     NS_DECL_ISUPPORTS
 
