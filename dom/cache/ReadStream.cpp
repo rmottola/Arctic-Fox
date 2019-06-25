@@ -209,6 +209,11 @@ ReadStream::Inner::Serialize(PCacheReadStream* aReadStreamOut)
   MOZ_ASSERT(mState == Open);
   MOZ_ASSERT(mControl);
 
+  // If we are sending a ReadStream, then we never want to set the
+  // pushStream actors at the same time.
+  aReadStreamOut->pushStreamChild() = nullptr;
+  aReadStreamOut->pushStreamParent() = nullptr;
+
   aReadStreamOut->id() = mId;
   mControl->SerializeControl(aReadStreamOut);
 
@@ -404,6 +409,9 @@ ReadStream::Create(const PCacheReadStream& aReadStream)
   if (!aReadStream.controlChild() && !aReadStream.controlParent()) {
     return nullptr;
   }
+
+  MOZ_ASSERT(!aReadStream.pushStreamChild());
+  MOZ_ASSERT(!aReadStream.pushStreamParent());
 
   // Control is guaranteed to survive this method as ActorDestroy() cannot
   // run on this thread until we complete.
