@@ -33,6 +33,7 @@ class DBSchema final
 {
 public:
   static nsresult CreateSchema(mozIStorageConnection* aConn);
+  static nsresult InitializeConnection(mozIStorageConnection* aConn);
 
   static nsresult CreateCache(mozIStorageConnection* aConn,
                               CacheId* aCacheIdOut);
