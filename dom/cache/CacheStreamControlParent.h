@@ -8,6 +8,7 @@
 #define mozilla_dom_cache_CacheStreamControlParent_h
 
 #include "mozilla/dom/cache/PCacheStreamControlParent.h"
+#include "mozilla/dom/cache/StreamControl.h"
 #include "nsTObserverArray.h"
 
 namespace mozilla {
@@ -18,24 +19,42 @@ class ReadStream;
 class StreamList;
 
 class CacheStreamControlParent : public PCacheStreamControlParent
+                               , public StreamControl
 {
 public:
   CacheStreamControlParent();
   ~CacheStreamControlParent();
-
-  void AddListener(ReadStream* aListener);
-  void RemoveListener(ReadStream* aListener);
 
   void SetStreamList(StreamList* aStreamList);
   void Close(const nsID& aId);
   void CloseAll();
   void Shutdown();
 
+  // StreamControl methods
+  virtual void
+  SerializeControl(PCacheReadStream* aReadStreamOut) override;
+
+  virtual void
+  SerializeFds(PCacheReadStream* aReadStreamOut,
+               const nsTArray<mozilla::ipc::FileDescriptor>& aFds) override;
+
+  virtual void
+  DeserializeFds(const PCacheReadStream& aReadStream,
+                 nsTArray<mozilla::ipc::FileDescriptor>& aFdsOut) override;
+
+private:
+  virtual void
+  NoteClosedAfterForget(const nsID& aId) override;
+
+#ifdef DEBUG
+  virtual void
+  AssertOwningThread() override;
+#endif
+
   // PCacheStreamControlParent methods
   virtual void ActorDestroy(ActorDestroyReason aReason) override;
   virtual bool RecvNoteClosed(const nsID& aId) override;
 
-private:
   void NotifyClose(const nsID& aId);
   void NotifyCloseAll();
 
@@ -43,9 +62,6 @@ private:
   // is deleted by the PBackground manager.  ActorDestroy() then calls
   // StreamList::RemoveStreamControl() to clear the weak ref.
   nsRefPtr<StreamList> mStreamList;
-
-  typedef nsTObserverArray<ReadStream*> ReadStreamList;
-  ReadStreamList mListeners;
 
   NS_DECL_OWNINGTHREAD
 };
