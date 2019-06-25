@@ -810,8 +810,6 @@ DBSchema::MatchByVaryHeader(mozIStorageConnection* aConn,
 
   nsRefPtr<InternalHeaders> cachedHeaders = new InternalHeaders(HeadersGuardEnum::None);
 
-  ErrorResult errorResult;
-
   while (NS_SUCCEEDED(state->ExecuteStep(&hasMoreData)) && hasMoreData) {
     nsAutoCString name;
     nsAutoCString value;
@@ -819,6 +817,8 @@ DBSchema::MatchByVaryHeader(mozIStorageConnection* aConn,
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
     rv = state->GetUTF8String(1, value);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
+
+    ErrorResult errorResult;
 
     cachedHeaders->Append(name, value, errorResult);
     if (errorResult.Failed()) { return errorResult.ErrorCode(); };
@@ -843,18 +843,19 @@ DBSchema::MatchByVaryHeader(mozIStorageConnection* aConn,
         continue;
       }
 
+      ErrorResult errorResult;
       nsAutoCString queryValue;
       queryHeaders->Get(header, queryValue, errorResult);
       if (errorResult.Failed()) {
         errorResult.ClearMessage();
-        return errorResult.ErrorCode();
+        MOZ_ASSERT(queryValue.IsEmpty());
       }
 
       nsAutoCString cachedValue;
       cachedHeaders->Get(header, cachedValue, errorResult);
       if (errorResult.Failed()) {
         errorResult.ClearMessage();
-        return errorResult.ErrorCode();
+        MOZ_ASSERT(cachedValue.IsEmpty());
       }
 
       if (queryValue != cachedValue) {
