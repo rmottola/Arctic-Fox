@@ -111,9 +111,6 @@
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
 - Bug 1151974
-- Bug 1110487 all
-- Bug 1110814
-- Bug 1145631 - Part 1: Replace MOZ_OVERRIDE and MOZ_FINAL with overrid
 - Bug Bug 931249 2015-03-20
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 
