@@ -112,6 +112,9 @@ private:
                const mozilla::ipc::PrincipalInfo& aPrincipalInfo, Feature* aFeature);
   ~CacheStorage();
 
+  // Called when we're destroyed or CCed.
+  void DisconnectFromActor();
+
   void MaybeRunPendingRequests();
 
   RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
