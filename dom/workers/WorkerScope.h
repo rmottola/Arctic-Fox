@@ -64,7 +64,7 @@ protected:
 
 public:
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   virtual bool
   WrapGlobalObject(JSContext* aCx, JS::MutableHandle<JSObject*> aReflector) = 0;
@@ -98,7 +98,7 @@ public:
   GetExistingNavigator() const;
 
   void
-  Close(JSContext* aCx);
+  Close(JSContext* aCx, ErrorResult& aRv);
 
   OnErrorEventHandlerNonNull*
   GetOnerror();
@@ -219,12 +219,6 @@ public:
   }
 
   void
-  Close() const
-  {
-    // no-op close.
-  }
-
-  void
   Update();
 
   already_AddRefed<Promise>
@@ -241,8 +235,41 @@ public:
   IMPL_EVENT_HANDLER(message)
 };
 
-JSObject*
-CreateGlobalScope(JSContext* aCx);
+class WorkerDebuggerGlobalScope final : public DOMEventTargetHelper,
+                                        public nsIGlobalObject
+{
+  WorkerPrivate* mWorkerPrivate;
+
+public:
+  explicit WorkerDebuggerGlobalScope(WorkerPrivate* aWorkerPrivate);
+
+  NS_DECL_ISUPPORTS_INHERITED
+
+  virtual JSObject*
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
+  {
+    MOZ_CRASH("Shouldn't get here!");
+  }
+
+  virtual bool
+  WrapGlobalObject(JSContext* aCx,
+                   JS::MutableHandle<JSObject*> aReflector);
+
+  virtual JSObject*
+  GetGlobalJSObject(void) override
+  {
+    return GetWrapper();
+  }
+
+  void
+  GetGlobal(JSContext* aCx, JS::MutableHandle<JSObject*> aGlobal);
+
+  void
+  Dump(JSContext* aCx, const Optional<nsAString>& aString) const;
+
+private:
+  virtual ~WorkerDebuggerGlobalScope();
+};
 
 END_WORKERS_NAMESPACE
 

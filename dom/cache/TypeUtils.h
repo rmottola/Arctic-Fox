@@ -9,10 +9,10 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/BindingUtils.h"
-#include "nsCOMPtr.h"
 #include "nsError.h"
 
 class nsIGlobalObject;
+class nsIAsyncInputStream;
 class nsIInputStream;
 
 namespace mozilla {
@@ -25,17 +25,15 @@ class OwningRequestOrUSVString;
 class Request;
 class RequestOrUSVString;
 class Response;
-template<typename T> class Optional;
 
 namespace cache {
 
+class CachePushStreamChild;
 class PCacheQueryParams;
 class PCacheReadStream;
 class PCacheReadStreamOrVoid;
 class PCacheRequest;
-class PCacheRequestOrVoid;
 class PCacheResponse;
-class PCacheStreamControlChild;
 
 class TypeUtils
 {
@@ -66,6 +64,9 @@ public:
 #else
   inline void AssertOwningThread() const { }
 #endif
+
+  virtual CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream) = 0;
 
   already_AddRefed<InternalRequest>
   ToInternalRequest(const RequestOrUSVString& aIn, BodyAction aBodyAction,
@@ -111,9 +112,9 @@ private:
   SerializeCacheStream(nsIInputStream* aStream, PCacheReadStreamOrVoid* aStreamOut,
                        ErrorResult& aRv);
 
-  nsIThread* GetStreamThread();
-
-  nsCOMPtr<nsIThread> mStreamThread;
+  void
+  SerializePushStream(nsIInputStream* aStream, PCacheReadStream& aReadStreamOut,
+                      ErrorResult& aRv);
 };
 
 } // namespace cache

@@ -236,8 +236,6 @@ private:
 namespace mozilla {
 namespace dom {
 
-TabParent* sEventCapturer;
-
 TabParent *TabParent::mIMETabParent = nullptr;
 TabParent::LayerToTabParentTable* TabParent::sLayerToTabParentTable = nullptr;
 
@@ -262,7 +260,6 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mIMECompositionStart(0)
   , mIMESeqno(0)
   , mIMECompositionRectOffset(0)
-  , mEventCaptureDepth(0)
   , mRect(0, 0, 0, 0)
   , mDimensions(0, 0)
   , mOrientation(0)
@@ -401,9 +398,6 @@ TabParent::Recv__delete__()
 void
 TabParent::ActorDestroy(ActorDestroyReason why)
 {
-  if (sEventCapturer == this) {
-    sEventCapturer = nullptr;
-  }
   if (mIMETabParent == this) {
     mIMETabParent = nullptr;
   }
@@ -796,7 +790,7 @@ TabParent::LoadURL(nsIURI* aURI)
 }
 
 void
-TabParent::Show(const nsIntSize& size, bool aParentIsActive)
+TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
 {
     // sigh
     mShown = true;
@@ -805,7 +799,6 @@ TabParent::Show(const nsIntSize& size, bool aParentIsActive)
         return;
     }
 
-    ScrollingBehavior scrolling = UseAsyncPanZoom() ? ASYNC_PAN_ZOOM : DEFAULT_SCROLLING;
     TextureFactoryIdentifier textureFactoryIdentifier;
     uint64_t layersId = 0;
     bool success = false;
@@ -819,7 +812,6 @@ TabParent::Show(const nsIntSize& size, bool aParentIsActive)
         if (frameLoader) {
           renderFrame =
               new RenderFrameParent(frameLoader,
-                                    scrolling,
                                     &textureFactoryIdentifier,
                                     &layersId,
                                     &success);
@@ -842,7 +834,7 @@ TabParent::Show(const nsIntSize& size, bool aParentIsActive)
       info = ShowInfo(name, allowFullscreen, isPrivate, mDPI, mDefaultScale.scale);
     }
 
-    unused << SendShow(size, info, scrolling, textureFactoryIdentifier,
+    unused << SendShow(size, info, textureFactoryIdentifier,
                        layersId, renderFrame, aParentIsActive);
 }
 
@@ -884,7 +876,7 @@ TabParent::RecvSetDimensions(const uint32_t& aFlags,
 }
 
 void
-TabParent::UpdateDimensions(const nsIntRect& rect, const nsIntSize& size,
+TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
                             const nsIntPoint& aChromeDisp)
 {
   if (mIsDestroyed) {
@@ -942,40 +934,39 @@ TabParent::AcknowledgeScrollUpdate(const ViewID& aScrollId, const uint32_t& aScr
 }
 
 void TabParent::HandleDoubleTap(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
   if (!mIsDestroyed) {
-    unused << SendHandleDoubleTap(aPoint, aGuid);
+    unused << SendHandleDoubleTap(aPoint, aModifiers, aGuid);
   }
 }
 
 void TabParent::HandleSingleTap(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
-  // TODO Send the modifier data to TabChild for use in mouse events.
   if (!mIsDestroyed) {
-    unused << SendHandleSingleTap(aPoint, aGuid);
+    unused << SendHandleSingleTap(aPoint, aModifiers, aGuid);
   }
 }
 
 void TabParent::HandleLongTap(const CSSPoint& aPoint,
-                              int32_t aModifiers,
+                              Modifiers aModifiers,
                               const ScrollableLayerGuid &aGuid,
                               uint64_t aInputBlockId)
 {
   if (!mIsDestroyed) {
-    unused << SendHandleLongTap(aPoint, aGuid, aInputBlockId);
+    unused << SendHandleLongTap(aPoint, aModifiers, aGuid, aInputBlockId);
   }
 }
 
 void TabParent::HandleLongTapUp(const CSSPoint& aPoint,
-                                int32_t aModifiers,
+                                Modifiers aModifiers,
                                 const ScrollableLayerGuid &aGuid)
 {
   if (!mIsDestroyed) {
-    unused << SendHandleLongTapUp(aPoint, aGuid);
+    unused << SendHandleLongTapUp(aPoint, aModifiers, aGuid);
   }
 }
 
@@ -1186,40 +1177,40 @@ CSSPoint TabParent::AdjustTapToChildWidget(const CSSPoint& aPoint)
   return aPoint + (LayoutDevicePoint(mChildProcessOffsetAtTouchStart) * GetLayoutDeviceToCSSScale());
 }
 
-bool TabParent::SendHandleSingleTap(const CSSPoint& aPoint, const ScrollableLayerGuid& aGuid)
+bool TabParent::SendHandleSingleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid)
 {
   if (mIsDestroyed) {
     return false;
   }
 
-  return PBrowserParent::SendHandleSingleTap(AdjustTapToChildWidget(aPoint), aGuid);
+  return PBrowserParent::SendHandleSingleTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid);
 }
 
-bool TabParent::SendHandleLongTap(const CSSPoint& aPoint, const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId)
+bool TabParent::SendHandleLongTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId)
 {
   if (mIsDestroyed) {
     return false;
   }
 
-  return PBrowserParent::SendHandleLongTap(AdjustTapToChildWidget(aPoint), aGuid, aInputBlockId);
+  return PBrowserParent::SendHandleLongTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid, aInputBlockId);
 }
 
-bool TabParent::SendHandleLongTapUp(const CSSPoint& aPoint, const ScrollableLayerGuid& aGuid)
+bool TabParent::SendHandleLongTapUp(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid)
 {
   if (mIsDestroyed) {
     return false;
   }
 
-  return PBrowserParent::SendHandleLongTapUp(AdjustTapToChildWidget(aPoint), aGuid);
+  return PBrowserParent::SendHandleLongTapUp(AdjustTapToChildWidget(aPoint), aModifiers, aGuid);
 }
 
-bool TabParent::SendHandleDoubleTap(const CSSPoint& aPoint, const ScrollableLayerGuid& aGuid)
+bool TabParent::SendHandleDoubleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid)
 {
   if (mIsDestroyed) {
     return false;
   }
 
-  return PBrowserParent::SendHandleDoubleTap(AdjustTapToChildWidget(aPoint), aGuid);
+  return PBrowserParent::SendHandleDoubleTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid);
 }
 
 bool TabParent::SendMouseWheelEvent(WidgetWheelEvent& event)
@@ -1233,6 +1224,21 @@ bool TabParent::SendMouseWheelEvent(WidgetWheelEvent& event)
   ApzAwareEventRoutingToChild(&guid, &blockId);
   event.refPoint += GetChildProcessOffset();
   return PBrowserParent::SendMouseWheelEvent(event, guid, blockId);
+}
+
+bool TabParent::RecvSynthesizedMouseWheelEvent(const mozilla::WidgetWheelEvent& aEvent)
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  WidgetWheelEvent localEvent(aEvent);
+  localEvent.widget = widget;
+  localEvent.refPoint -= GetChildProcessOffset();
+
+  widget->DispatchAPZAwareEvent(&localEvent);
+  return true;
 }
 
 static void
@@ -1313,22 +1319,7 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
     return false;
   }
   if (event.message == NS_TOUCH_START) {
-    // Adjust the widget coordinates to be relative to our frame.
-    nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
-    if (!frameLoader) {
-      // No frame anymore?
-      sEventCapturer = nullptr;
-      return false;
-    }
-
     mChildProcessOffsetAtTouchStart = GetChildProcessOffset();
-
-    MOZ_ASSERT((!sEventCapturer && mEventCaptureDepth == 0) ||
-               (sEventCapturer == this && mEventCaptureDepth > 0));
-    // We want to capture all remaining touch events in this series
-    // for fast-path dispatch.
-    sEventCapturer = this;
-    ++mEventCaptureDepth;
   }
 
   // PresShell::HandleEventInternal adds touches on touch end/cancel.  This
@@ -1359,41 +1350,6 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
   return (event.message == NS_TOUCH_MOVE) ?
     PBrowserParent::SendRealTouchMoveEvent(event, guid, blockId) :
     PBrowserParent::SendRealTouchEvent(event, guid, blockId);
-}
-
-/*static*/ TabParent*
-TabParent::GetEventCapturer()
-{
-  return sEventCapturer;
-}
-
-bool
-TabParent::TryCapture(const WidgetGUIEvent& aEvent)
-{
-  MOZ_ASSERT(sEventCapturer == this && mEventCaptureDepth > 0);
-
-  if (aEvent.mClass != eTouchEventClass) {
-    // Only capture of touch events is implemented, for now.
-    return false;
-  }
-
-  WidgetTouchEvent event(*aEvent.AsTouchEvent());
-
-  bool isTouchPointUp = (event.message == NS_TOUCH_END ||
-                         event.message == NS_TOUCH_CANCEL);
-  if (event.message == NS_TOUCH_START || isTouchPointUp) {
-    // Let the DOM see touch start/end events so that its touch-point
-    // state stays consistent.
-    if (isTouchPointUp && 0 == --mEventCaptureDepth) {
-      // All event series are un-captured, don't try to catch any
-      // more.
-      sEventCapturer = nullptr;
-    }
-    return false;
-  }
-
-  SendRealTouchEvent(event);
-  return true;
 }
 
 bool
@@ -2343,14 +2299,12 @@ TabParent::AllocPRenderFrameParent()
 {
   MOZ_ASSERT(ManagedPRenderFrameParent().IsEmpty());
   nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
-  ScrollingBehavior scrolling = UseAsyncPanZoom() ? ASYNC_PAN_ZOOM : DEFAULT_SCROLLING;
   TextureFactoryIdentifier textureFactoryIdentifier;
   uint64_t layersId = 0;
   bool success = false;
   if(frameLoader) {
     PRenderFrameParent* renderFrame = 
       new RenderFrameParent(frameLoader,
-                            scrolling,
                             &textureFactoryIdentifier,
                             &layersId,
                             &success);
@@ -2371,12 +2325,10 @@ TabParent::DeallocPRenderFrameParent(PRenderFrameParent* aFrame)
 
 bool
 TabParent::RecvGetRenderFrameInfo(PRenderFrameParent* aRenderFrame,
-                                  ScrollingBehavior* aScrolling,
                                   TextureFactoryIdentifier* aTextureFactoryIdentifier,
                                   uint64_t* aLayersId)
 {
   RenderFrameParent* renderFrame = static_cast<RenderFrameParent*>(aRenderFrame);
-  *aScrolling = renderFrame->UseAsyncPanZoom() ? ASYNC_PAN_ZOOM : DEFAULT_SCROLLING;
   renderFrame->GetTextureFactoryIdentifier(aTextureFactoryIdentifier);
   *aLayersId = renderFrame->GetLayersId();
   return true;
@@ -2436,14 +2388,6 @@ TabParent::GetWidget() const
 
   nsCOMPtr<nsIWidget> widget = frame->GetNearestWidget();
   return widget.forget();
-}
-
-bool
-TabParent::UseAsyncPanZoom()
-{
-  bool usingOffMainThreadCompositing = !!CompositorParent::CompositorLoop();
-  return (usingOffMainThreadCompositing && gfxPrefs::AsyncPanZoomEnabled() &&
-          GetScrollingBehavior() == ASYNC_PAN_ZOOM);
 }
 
 void
@@ -2551,11 +2495,6 @@ TabParent::GetLoadContext()
   return loadContext.forget();
 }
 
-/* Be careful if you call this method while proceding a real touch event. For
- * example sending a touchstart during a real touchend may results into
- * a busted mEventCaptureDepth and following touch events may not do what you
- * expect.
- */
 NS_IMETHODIMP
 TabParent::InjectTouchEvent(const nsAString& aType,
                             uint32_t* aIdentifiers,
@@ -2615,11 +2554,6 @@ TabParent::InjectTouchEvent(const nsAString& aType,
     event.touches.AppendElement(t);
   }
 
-  if ((msg == NS_TOUCH_END || msg == NS_TOUCH_CANCEL) && sEventCapturer) {
-    WidgetGUIEvent* guiEvent = event.AsGUIEvent();
-    TryCapture(*guiEvent);
-  }
-
   SendRealTouchEvent(event);
   return NS_OK;
 }
@@ -2627,7 +2561,7 @@ TabParent::InjectTouchEvent(const nsAString& aType,
 NS_IMETHODIMP
 TabParent::GetUseAsyncPanZoom(bool* useAsyncPanZoom)
 {
-  *useAsyncPanZoom = UseAsyncPanZoom();
+  *useAsyncPanZoom = gfxPrefs::AsyncPanZoomEnabled();
   return NS_OK;
 }
 
@@ -2645,7 +2579,7 @@ TabParent::GetTabId(uint64_t* aId)
   return NS_OK;
 }
 
-class LayerTreeUpdateRunnable MOZ_FINAL
+class LayerTreeUpdateRunnable final
   : public nsRunnable
 {
   uint64_t mLayersId;
@@ -2758,9 +2692,9 @@ TabParent::DeallocPPluginWidgetParent(mozilla::plugins::PPluginWidgetParent* aAc
 }
 
 class FakeChannel final : public nsIChannel,
-                              public nsIAuthPromptCallback,
-                              public nsIInterfaceRequestor,
-                              public nsILoadContext
+                          public nsIAuthPromptCallback,
+                          public nsIInterfaceRequestor,
+                          public nsILoadContext
 {
 public:
   FakeChannel(const nsCString& aUri, uint64_t aCallbackId, Element* aElement)

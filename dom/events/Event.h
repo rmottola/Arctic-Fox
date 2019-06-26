@@ -98,9 +98,9 @@ public:
     return mOwner;
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override final;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override final;
 
-  virtual JSObject* WrapObjectInternal(JSContext* aCx);
+  virtual JSObject* WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto);
 
 #define GENERATED_EVENT(EventClass_) \
   virtual EventClass_* As##EventClass_()  \

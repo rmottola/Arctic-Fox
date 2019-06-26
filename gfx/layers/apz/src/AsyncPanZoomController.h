@@ -75,7 +75,6 @@ class AsyncPanZoomController {
 
   typedef mozilla::MonitorAutoLock MonitorAutoLock;
   typedef mozilla::gfx::Matrix4x4 Matrix4x4;
-  typedef uint32_t TouchBehaviorFlags;
 
 public:
   enum GestureBehavior {
@@ -303,17 +302,6 @@ public:
   void ClearOverscroll();
 
   /**
-   * Returns allowed touch behavior for the given point on the scrollable layer.
-   * Internally performs a kind of hit testing based on the regions constructed
-   * on the main thread and attached to the current scrollable layer. Each of such regions
-   * contains info about allowed touch behavior. If regions info isn't enough it returns
-   * UNKNOWN value and we should switch to the fallback approach - asking content.
-   * TODO: for now it's only a stub and returns hardcoded magic value. As soon as bug 928833
-   * is done we should integrate its logic here.
-   */
-  TouchBehaviorFlags GetAllowedTouchBehavior(ScreenIntPoint& aPoint);
-
-  /**
    * Returns whether this APZC is for an element marked with the 'scrollgrab'
    * attribute.
    */
@@ -419,7 +407,7 @@ protected:
   nsEventStatus OnPanMayBegin(const PanGestureInput& aEvent);
   nsEventStatus OnPanCancelled(const PanGestureInput& aEvent);
   nsEventStatus OnPanBegin(const PanGestureInput& aEvent);
-  nsEventStatus OnPan(const PanGestureInput& aEvent, bool aFingersOnTouchpad);
+  nsEventStatus OnPan(const PanGestureInput& aEvent, ScrollSource aSource, bool aFingersOnTouchpad);
   nsEventStatus OnPanEnd(const PanGestureInput& aEvent);
   nsEventStatus OnPanMomentumStart(const PanGestureInput& aEvent);
   nsEventStatus OnPanMomentumEnd(const PanGestureInput& aEvent);
@@ -788,12 +776,6 @@ public:
   bool ArePointerEventsConsumable(TouchBlockState* aBlock, uint32_t aTouchPoints);
 
   /**
-   * Return true if there are are touch listeners registered on content
-   * scrolled by this APZC.
-   */
-  bool NeedToWaitForContent() const;
-
-  /**
    * Clear internal state relating to input handling.
    */
   void ResetInputState();
@@ -859,7 +841,7 @@ private:
   // Start an overscroll animation with the given initial velocity.
   void StartOverscrollAnimation(const ParentLayerPoint& aVelocity);
 
-  void StartSmoothScroll();
+  void StartSmoothScroll(ScrollSource aSource);
 
   /* ===================================================================
    * The functions and members in this section are used to make ancestor chains
@@ -922,7 +904,8 @@ public:
    * state). If this returns false, the caller APZC knows that it should enter
    * an overscrolled state itself if it can.
    */
-  bool AttemptScroll(const ParentLayerPoint& aStartPoint, const ParentLayerPoint& aEndPoint,
+  bool AttemptScroll(const ParentLayerPoint& aStartPoint,
+                     const ParentLayerPoint& aEndPoint,
                      OverscrollHandoffState& aOverscrollHandoffState);
 
   void FlushRepaintForOverscrollHandoff();

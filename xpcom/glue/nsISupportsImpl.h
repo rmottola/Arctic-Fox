@@ -376,9 +376,9 @@ private:
 #define NS_DECL_ISUPPORTS                                                     \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
 protected:                                                                    \
   nsAutoRefCnt mRefCnt;                                                       \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -387,9 +387,9 @@ public:
 #define NS_DECL_THREADSAFE_ISUPPORTS                                          \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
 protected:                                                                    \
   ::mozilla::ThreadSafeAutoRefCnt mRefCnt;                                    \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -398,9 +398,9 @@ public:
 #define NS_DECL_CYCLE_COLLECTING_ISUPPORTS                                    \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
   NS_IMETHOD_(void) DeleteCycleCollectable(void);                             \
 protected:                                                                    \
   nsCycleCollectingAutoRefCnt mRefCnt;                                        \

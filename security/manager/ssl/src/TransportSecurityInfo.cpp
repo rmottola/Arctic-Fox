@@ -471,7 +471,7 @@ TransportSecurityInfo::GetClassDescription(char * *aClassDescription)
 NS_IMETHODIMP
 TransportSecurityInfo::GetClassID(nsCID * *aClassID)
 {
-  *aClassID = (nsCID*) nsMemory::Alloc(sizeof(nsCID));
+  *aClassID = (nsCID*) moz_xmalloc(sizeof(nsCID));
   if (!*aClassID)
     return NS_ERROR_OUT_OF_MEMORY;
   return GetClassIDNoAlloc(*aClassID);
@@ -1088,15 +1088,16 @@ RememberCertErrorsTable::LookupCertErrorBits(TransportSecurityInfo* infoObject,
 }
 
 void
-TransportSecurityInfo::SetStatusErrorBits(nsIX509Cert & cert,
+TransportSecurityInfo::SetStatusErrorBits(nsNSSCertificate* cert,
                                           uint32_t collected_errors)
 {
   MutexAutoLock lock(mMutex);
 
-  if (!mSSLStatus)
+  if (!mSSLStatus) {
     mSSLStatus = new nsSSLStatus();
+  }
 
-  mSSLStatus->SetServerCert(&cert, nsNSSCertificate::ev_status_invalid);
+  mSSLStatus->SetServerCert(cert, nsNSSCertificate::ev_status_invalid);
 
   mSSLStatus->mHaveCertErrorBits = true;
   mSSLStatus->mIsDomainMismatch = 

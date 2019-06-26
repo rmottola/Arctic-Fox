@@ -25,15 +25,15 @@ class PCacheQueryParams;
 class PCacheRequest;
 class PCacheRequestOrVoid;
 class PCacheResponse;
-class PCacheResponseOrVoid;
 struct SavedRequest;
 struct SavedResponse;
 
 // TODO: remove static class and use functions in cache namespace (bug 1110485)
-class DBSchema MOZ_FINAL
+class DBSchema final
 {
 public:
   static nsresult CreateSchema(mozIStorageConnection* aConn);
+  static nsresult InitializeConnection(mozIStorageConnection* aConn);
 
   static nsresult CreateCache(mozIStorageConnection* aConn,
                               CacheId* aCacheIdOut);
@@ -88,6 +88,9 @@ public:
   static nsresult StorageGetKeys(mozIStorageConnection* aConn,
                                  Namespace aNamespace,
                                  nsTArray<nsString>& aKeysOut);
+
+  // We will wipe out databases with a schema versions less than this.
+  static const int32_t kMaxWipeSchemaVersion;
 
 private:
   typedef int32_t EntryId;

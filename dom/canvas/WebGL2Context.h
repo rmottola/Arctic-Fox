@@ -37,7 +37,7 @@ public:
     // -------------------------------------------------------------------------
     // IMPLEMENT nsWrapperCache
 
-    virtual JSObject* WrapObject(JSContext* cx) override;
+    virtual JSObject* WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) override;
 
     // -------------------------------------------------------------------------
     // Buffer objects - WebGL2ContextBuffers.cpp

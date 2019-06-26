@@ -379,9 +379,9 @@ nsWindowRoot::GetParentObject()
 }
 
 JSObject*
-nsWindowRoot::WrapObject(JSContext* aCx)
+nsWindowRoot::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return mozilla::dom::WindowRootBinding::Wrap(aCx, this);
+  return mozilla::dom::WindowRootBinding::Wrap(aCx, this, aGivenProto);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

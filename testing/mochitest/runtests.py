@@ -2016,6 +2016,9 @@ class Mochitest(MochitestUtilsMixin):
             # Dump the logging buffer
             self.message_logger.dump_buffered()
 
+            if result == -1:
+                break
+
         # printing total number of tests
         if options.browserChrome:
             print "TEST-INFO | checking window state"

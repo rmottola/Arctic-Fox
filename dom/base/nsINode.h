@@ -372,7 +372,7 @@ public:
    */
   virtual bool IsNodeOfType(uint32_t aFlags) const = 0;
 
-  virtual JSObject* WrapObject(JSContext *aCx) override;
+  virtual JSObject* WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   /**
    * returns true if we are in priviliged code or
@@ -386,7 +386,7 @@ protected:
    * does some additional checks and fix-up that's common to all nodes. WrapNode
    * should just call the DOM binding's Wrap function.
    */
-  virtual JSObject* WrapNode(JSContext *aCx) = 0;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) = 0;
 
 public:
   mozilla::dom::ParentObject GetParentObject() const; // Implemented in nsIDocument.h

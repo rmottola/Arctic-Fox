@@ -15,7 +15,6 @@
 #include "nsTArray.h"
 
 class nsIEventTarget;
-class nsIFile;
 
 namespace mozilla {
 namespace dom {
@@ -42,7 +41,7 @@ class Manager;
 // As an invariant, all Context objects must be destroyed before permitting
 // the "profile-before-change" shutdown event to complete.  This is ensured
 // via the code in ShutdownObserver.cpp.
-class Context MOZ_FINAL
+class Context final
 {
 public:
   static already_AddRefed<Context>

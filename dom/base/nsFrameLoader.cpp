@@ -369,7 +369,7 @@ nsFrameLoader::ReallyStartLoadingInternal()
       }
     }
 
-    if (mRemoteBrowserShown || ShowRemoteFrame(nsIntSize(0, 0))) {
+    if (mRemoteBrowserShown || ShowRemoteFrame(ScreenIntSize(0, 0))) {
       // FIXME get error codes from child
       mRemoteBrowser->LoadURL(mURIToLoad);
     } else {
@@ -764,7 +764,7 @@ nsFrameLoader::Show(int32_t marginWidth, int32_t marginHeight,
     }
   }
 
-  nsIntSize size = frame->GetSubdocumentSize();
+  ScreenIntSize size = frame->GetSubdocumentSize();
   if (mRemoteFrame) {
     return ShowRemoteFrame(size, frame);
   }
@@ -857,7 +857,7 @@ nsFrameLoader::MarginsChanged(uint32_t aMarginWidth,
 }
 
 bool
-nsFrameLoader::ShowRemoteFrame(const nsIntSize& size,
+nsFrameLoader::ShowRemoteFrame(const ScreenIntSize& size,
                                nsSubDocumentFrame *aFrame)
 {
   NS_ASSERTION(mRemoteFrame, "ShowRemote only makes sense on remote frames.");
@@ -1957,7 +1957,7 @@ nsFrameLoader::UpdatePositionAndSize(nsSubDocumentFrame *aIFrame)
 {
   if (mRemoteFrame) {
     if (mRemoteBrowser) {
-      nsIntSize size = aIFrame->GetSubdocumentSize();
+      ScreenIntSize size = aIFrame->GetSubdocumentSize();
       nsIntRect dimensions;
       NS_ENSURE_SUCCESS(GetWindowDimensions(dimensions), NS_ERROR_FAILURE);
       nsIntPoint chromeDisp = aIFrame->GetChromeDisplacement();
@@ -1990,7 +1990,7 @@ nsFrameLoader::UpdateBaseWindowPositionAndSize(nsSubDocumentFrame *aIFrame)
       return;
     }
 
-    nsIntSize size = aIFrame->GetSubdocumentSize();
+    ScreenIntSize size = aIFrame->GetSubdocumentSize();
 
     baseWindow->SetPositionAndSize(x, y, size.width, size.height, false);
   }
@@ -2146,24 +2146,15 @@ nsFrameLoader::TryRemoteBrowser()
   MutableTabContext context;
   nsCOMPtr<mozIApplication> ownApp = GetOwnApp();
   nsCOMPtr<mozIApplication> containingApp = GetContainingApp();
-  ScrollingBehavior scrollingBehavior = DEFAULT_SCROLLING;
-
-  if (Preferences::GetBool("layers.async-pan-zoom.enabled", false) ||
-      mOwnerContent->AttrValueIs(kNameSpaceID_None,
-                                 nsGkAtoms::mozasyncpanzoom,
-                                 nsGkAtoms::_true,
-                                 eCaseMatters)) {
-    scrollingBehavior = ASYNC_PAN_ZOOM;
-  }
 
   bool rv = true;
   if (ownApp) {
-    rv = context.SetTabContextForAppFrame(ownApp, containingApp, scrollingBehavior);
+    rv = context.SetTabContextForAppFrame(ownApp, containingApp);
   } else if (OwnerIsBrowserFrame()) {
     // The |else| above is unnecessary; OwnerIsBrowserFrame() implies !ownApp.
-    rv = context.SetTabContextForBrowserFrame(containingApp, scrollingBehavior);
+    rv = context.SetTabContextForBrowserFrame(containingApp);
   } else {
-    rv = context.SetTabContextForNormalFrame(scrollingBehavior);
+    rv = context.SetTabContextForNormalFrame();
   }
   NS_ENSURE_TRUE(rv, false);
 
@@ -2369,7 +2360,7 @@ nsFrameLoader::DoSendAsyncMessage(JSContext* aCx,
   }
 
   if (mChildMessageManager) {
-    nsRefPtr<nsIRunnable> ev = new nsAsyncMessageToChild(aCx, this, aMessage,
+    nsCOMPtr<nsIRunnable> ev = new nsAsyncMessageToChild(aCx, this, aMessage,
                                                          aData, aCpows,
                                                          aPrincipal);
     NS_DispatchToCurrentThread(ev);
@@ -2503,7 +2494,7 @@ nsFrameLoader::SetRemoteBrowser(nsITabParent* aTabParent)
   mRemoteFrame = true;
   mRemoteBrowser = TabParent::GetFrom(aTabParent);
   mChildID = mRemoteBrowser ? mRemoteBrowser->Manager()->ChildID() : 0;
-  ShowRemoteFrame(nsIntSize(0, 0));
+  ShowRemoteFrame(ScreenIntSize(0, 0));
 }
 
 void

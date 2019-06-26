@@ -314,9 +314,9 @@ CacheStorage::GetParentObject() const
 }
 
 JSObject*
-CacheStorage::WrapObject(JSContext* aContext)
+CacheStorage::WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto)
 {
-  return mozilla::dom::CacheStorageBinding::Wrap(aContext, this);
+  return mozilla::dom::CacheStorageBinding::Wrap(aContext, this, aGivenProto);
 }
 
 void
@@ -506,6 +506,13 @@ CacheStorage::AssertOwningThread() const
   NS_ASSERT_OWNINGTHREAD(CacheStorage);
 }
 #endif
+
+CachePushStreamChild*
+CacheStorage::CreatePushStream(nsIAsyncInputStream* aStream)
+{
+  // This is true because CacheStorage always uses IgnoreBody for requests.
+  MOZ_CRASH("CacheStorage should never create a push stream.");
+}
 
 void
 CacheStorage::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue)

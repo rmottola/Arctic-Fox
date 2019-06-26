@@ -188,6 +188,10 @@ public:
   NS_IMETHOD ForcePending(bool aForcePending) override;
   NS_IMETHOD GetLastModifiedTime(PRTime* lastModifiedTime) override;
   NS_IMETHOD ForceNoIntercept() override;
+  NS_IMETHOD GetCorsIncludeCredentials(bool* aInclude) override;
+  NS_IMETHOD SetCorsIncludeCredentials(bool aInclude) override;
+  NS_IMETHOD GetCorsMode(uint32_t* aCorsMode) override;
+  NS_IMETHOD SetCorsMode(uint32_t aCorsMode) override;
   NS_IMETHOD GetTopWindowURI(nsIURI **aTopWindowURI) override;
   NS_IMETHOD GetProxyURI(nsIURI **proxyURI) override;
 
@@ -238,6 +242,8 @@ public:
 
     const NetAddr& GetSelfAddr() { return mSelfAddr; }
     const NetAddr& GetPeerAddr() { return mPeerAddr; }
+
+    nsresult OverrideSecurityInfo(nsISupports* aSecurityInfo);
 
 public: /* Necko internal use only... */
     bool IsNavigation();
@@ -316,6 +322,7 @@ protected:
   nsAutoPtr<nsHttpResponseHead>     mResponseHead;
   nsRefPtr<nsHttpConnectionInfo>    mConnectionInfo;
   nsCOMPtr<nsIProxyInfo>            mProxyInfo;
+  nsCOMPtr<nsISupports>             mSecurityInfo;
 
   nsCString                         mSpec; // ASCII encoded URL spec
   nsCString                         mContentTypeHint;
@@ -418,6 +425,9 @@ protected:
 
   bool                              mForcePending;
   nsCOMPtr<nsIURI>                  mTopWindowURI;
+
+  bool mCorsIncludeCredentials;
+  uint32_t mCorsMode;
 };
 
 // Share some code while working around C++'s absurd inability to handle casting

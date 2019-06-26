@@ -31,15 +31,15 @@ public:
 
   // TextureClient
 
-  virtual bool IsAllocated() const MOZ_OVERRIDE{ return !!mTextures[0]; }
+  virtual bool IsAllocated() const override{ return !!mTextures[0]; }
 
-  virtual bool Lock(OpenMode aOpenMode) MOZ_OVERRIDE;
+  virtual bool Lock(OpenMode aOpenMode) override;
 
-  virtual void Unlock() MOZ_OVERRIDE;
+  virtual void Unlock() override;
 
-  virtual bool IsLocked() const MOZ_OVERRIDE{ return mIsLocked; }
+  virtual bool IsLocked() const override{ return mIsLocked; }
 
-  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) MOZ_OVERRIDE;
+  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) override;
 
   void InitWith(ID3D11Texture2D* aTextureY,
                 ID3D11Texture2D* aTextureCb,
@@ -59,13 +59,13 @@ public:
     return mSize;
   }
 
-  virtual bool HasInternalBuffer() const MOZ_OVERRIDE{ return true; }
+  virtual bool HasInternalBuffer() const override{ return true; }
 
     // This TextureClient should not be used in a context where we use CreateSimilar
     // (ex. component alpha) because the underlying texture data is always created by
     // an external producer.
     virtual already_AddRefed<TextureClient>
-    CreateSimilar(TextureFlags, TextureAllocationFlags) const MOZ_OVERRIDE{ return nullptr; }
+    CreateSimilar(TextureFlags, TextureAllocationFlags) const override{ return nullptr; }
 
 private:
   RefPtr<ID3D11Texture2D> mTextures[3];
@@ -163,28 +163,28 @@ public:
 
   // TextureClient
 
-  virtual bool IsAllocated() const MOZ_OVERRIDE{ return !!mHoldRefs[0]; }
+  virtual bool IsAllocated() const override{ return !!mHoldRefs[0]; }
 
-  virtual bool Lock(OpenMode aOpenMode) MOZ_OVERRIDE;
+  virtual bool Lock(OpenMode aOpenMode) override;
 
-  virtual void Unlock() MOZ_OVERRIDE;
+  virtual void Unlock() override;
 
-  virtual bool IsLocked() const MOZ_OVERRIDE{ return mIsLocked; }
+  virtual bool IsLocked() const override{ return mIsLocked; }
 
-  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) MOZ_OVERRIDE;
+  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) override;
 
   virtual gfx::IntSize GetSize() const
   {
     return mSize;
   }
 
-  virtual bool HasInternalBuffer() const MOZ_OVERRIDE{ return true; }
+  virtual bool HasInternalBuffer() const override{ return true; }
 
     // This TextureClient should not be used in a context where we use CreateSimilar
     // (ex. component alpha) because the underlying texture data is always created by
     // an external producer.
     virtual already_AddRefed<TextureClient>
-    CreateSimilar(TextureFlags, TextureAllocationFlags) const MOZ_OVERRIDE{ return nullptr; }
+    CreateSimilar(TextureFlags, TextureAllocationFlags) const override{ return nullptr; }
 
 private:
   RefPtr<IUnknown> mHoldRefs[3];
@@ -337,21 +337,21 @@ public:
   DXGIYCbCrTextureHostD3D11(TextureFlags aFlags,
                             const SurfaceDescriptorDXGIYCbCr& aDescriptor);
 
-  virtual TextureSource* GetTextureSources() MOZ_OVERRIDE;
+  virtual TextureSource* GetTextureSources() override;
 
-  virtual void DeallocateDeviceData() MOZ_OVERRIDE{}
+  virtual void DeallocateDeviceData() override{}
 
-  virtual void SetCompositor(Compositor* aCompositor) MOZ_OVERRIDE;
+  virtual void SetCompositor(Compositor* aCompositor) override;
 
-  virtual gfx::SurfaceFormat GetFormat() const MOZ_OVERRIDE{ return gfx::SurfaceFormat::YUV; }
+  virtual gfx::SurfaceFormat GetFormat() const override{ return gfx::SurfaceFormat::YUV; }
 
-  virtual bool Lock() MOZ_OVERRIDE;
+  virtual bool Lock() override;
 
-  virtual void Unlock() MOZ_OVERRIDE;
+  virtual void Unlock() override;
 
-  virtual gfx::IntSize GetSize() const MOZ_OVERRIDE{ return mSize; }
+  virtual gfx::IntSize GetSize() const override{ return mSize; }
 
-  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() MOZ_OVERRIDE
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
   {
     return nullptr;
   }

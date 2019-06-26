@@ -4373,7 +4373,7 @@ XULDocument::InsertElement(nsINode* aParent, nsIContent* aChild,
 
             token = nsCRT::strtok(rest, ", ", &rest);
         }
-        nsMemory::Free(str);
+        free(str);
 
         if (content) {
             int32_t pos = aParent->IndexOf(content);
@@ -4666,9 +4666,9 @@ XULDocument::GetBoxObjectFor(nsIDOMElement* aElement, nsIBoxObject** aResult)
 }
 
 JSObject*
-XULDocument::WrapNode(JSContext *aCx)
+XULDocument::WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return XULDocumentBinding::Wrap(aCx, this);
+  return XULDocumentBinding::Wrap(aCx, this, aGivenProto);
 }
 
 } // namespace dom

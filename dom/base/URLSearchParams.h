@@ -27,7 +27,7 @@ public:
 };
 
 class URLSearchParams final : public nsISupports,
-                                  public nsWrapperCache
+                              public nsWrapperCache
 {
   ~URLSearchParams();
 
@@ -44,7 +44,7 @@ public:
   }
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   static already_AddRefed<URLSearchParams>
   Constructor(const GlobalObject& aGlobal, const nsAString& aInit,

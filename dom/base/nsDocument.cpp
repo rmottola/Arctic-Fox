@@ -4403,7 +4403,7 @@ nsDocument::SetStyleSheetApplicableState(nsIStyleSheet* aSheet,
   }
 
   if (!mSSApplicableStateNotificationPending) {
-    nsRefPtr<nsIRunnable> notification = NS_NewRunnableMethod(this,
+    nsCOMPtr<nsIRunnable> notification = NS_NewRunnableMethod(this,
       &nsDocument::NotifyStyleSheetApplicableStateChanged);
     mSSApplicableStateNotificationPending =
       NS_SUCCEEDED(NS_DispatchToCurrentThread(notification));
@@ -5206,7 +5206,7 @@ nsDocument::UnblockDOMContentLoaded()
 
   MOZ_ASSERT(mReadyState == READYSTATE_INTERACTIVE);
   if (!mSynchronousDOMContentLoaded) {
-    nsRefPtr<nsIRunnable> ev =
+    nsCOMPtr<nsIRunnable> ev =
       NS_NewRunnableMethod(this, &nsDocument::DispatchContentLoadedEvents);
     NS_DispatchToCurrentThread(ev);
   } else {
@@ -10035,7 +10035,7 @@ nsDocument::ScrollToRef()
   nsUnescape(tmpstr);
   nsAutoCString unescapedRef;
   unescapedRef.Assign(tmpstr);
-  nsMemory::Free(tmpstr);
+  free(tmpstr);
 
   nsresult rv = NS_ERROR_FAILURE;
   // We assume that the bytes are in UTF-8, as it says in the spec:
@@ -12870,6 +12870,35 @@ nsIDocument::CreateHTMLElement(nsIAtom* aTag)
 
   MOZ_ASSERT(NS_SUCCEEDED(rv), "NS_NewHTMLElement should never fail");
   return element.forget();
+}
+
+nsresult
+nsIDocument::GetId(nsAString& aId)
+{
+  if (mId.IsEmpty()) {
+    nsresult rv;
+    nsCOMPtr<nsIUUIDGenerator> uuidgen = do_GetService("@mozilla.org/uuid-generator;1", &rv);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    nsID id;
+    rv = uuidgen->GenerateUUIDInPlace(&id);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    // Build a string in {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} format
+    char buffer[NSID_LENGTH];
+    id.ToProvidedString(buffer);
+    NS_ConvertASCIItoUTF16 uuid(buffer);
+
+    // Remove {} and the null terminator
+    mId.Assign(Substring(uuid, 1, NSID_LENGTH - 3));
+  }
+
+  aId = mId;
+  return NS_OK;
 }
 
 bool

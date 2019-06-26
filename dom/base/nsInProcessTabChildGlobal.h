@@ -146,7 +146,7 @@ public:
 
     return mGlobal->GetJSObject();
   }
-  virtual JSObject* WrapObject(JSContext* cx) override
+  virtual JSObject* WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) override
   {
     MOZ_CRASH("nsInProcessTabChildGlobal doesn't use DOM bindings!");
   }

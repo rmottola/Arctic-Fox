@@ -1071,6 +1071,7 @@ ScrollFrameHelper::HandleScrollbarStyleSwitching()
   }
 }
 
+#if defined(MOZ_B2G) || defined(MOZ_WIDGET_ANDROID)
 static bool IsFocused(nsIContent* aContent)
 {
   // Some content elements, like the GetContent() of a scroll frame
@@ -1083,22 +1084,29 @@ static bool IsFocused(nsIContent* aContent)
 
   return aContent ? nsContentUtils::IsFocusedContent(aContent) : false;
 }
+#endif
 
 bool
 ScrollFrameHelper::WantAsyncScroll() const
 {
-  nsRect scrollRange = GetScrollRange();
   ScrollbarStyles styles = GetScrollbarStylesFromFrame();
-  bool isFocused = IsFocused(mOuter->GetContent());
-  bool isVScrollable = (scrollRange.height > 0)
-                    && (styles.mVertical != NS_STYLE_OVERFLOW_HIDDEN);
-  bool isHScrollable = (scrollRange.width > 0)
-                    && (styles.mHorizontal != NS_STYLE_OVERFLOW_HIDDEN);
+  uint32_t directions = mOuter->GetScrollTargetFrame()->GetPerceivedScrollingDirections();
+  bool isVScrollable = !!(directions & nsIScrollableFrame::VERTICAL) &&
+                       (styles.mVertical != NS_STYLE_OVERFLOW_HIDDEN);
+  bool isHScrollable = !!(directions & nsIScrollableFrame::HORIZONTAL) &&
+                       (styles.mHorizontal != NS_STYLE_OVERFLOW_HIDDEN);
+
+#if defined(MOZ_B2G) || defined(MOZ_WIDGET_ANDROID)
+  // Mobile platforms need focus to scroll.
+  bool canScrollWithoutScrollbars = IsFocused(mOuter->GetContent());
+#else
+  bool canScrollWithoutScrollbars = true;
+#endif
+
   // The check for scroll bars was added in bug 825692 to prevent layerization
-  // of text inputs for performance reasons. However, if a text input is
-  // focused we want to layerize it so we can async scroll it (bug 946408).
-  bool isVAsyncScrollable = isVScrollable && (mVScrollbarBox || isFocused);
-  bool isHAsyncScrollable = isHScrollable && (mHScrollbarBox || isFocused);
+  // of text inputs for performance reasons.
+  bool isVAsyncScrollable = isVScrollable && (mVScrollbarBox || canScrollWithoutScrollbars);
+  bool isHAsyncScrollable = isHScrollable && (mHScrollbarBox || canScrollWithoutScrollbars);
   return isVAsyncScrollable || isHAsyncScrollable;
 }
 
@@ -2640,7 +2648,7 @@ ScrollFrameHelper::AppendScrollPartsTo(nsDisplayListBuilder*   aBuilder,
   nsAutoTArray<nsIFrame*, 3> scrollParts;
   for (nsIFrame* kid = mOuter->GetFirstPrincipalChild(); kid; kid = kid->GetNextSibling()) {
     if (kid == mScrolledFrame ||
-        (kid->IsPositioned() || overlayScrollbars) != aPositioned)
+        (kid->IsAbsPosContaininingBlock() || overlayScrollbars) != aPositioned)
       continue;
 
     scrollParts.AppendElement(kid);
@@ -3018,8 +3026,8 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     dirtyRect = ExpandRectToNearlyVisible(dirtyRect);
   }
 
-  const nsStyleDisplay* disp = mOuter->StyleDisplay();
-  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
+  const nsStylePosition* pos = mOuter->StylePosition();
+  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
     aBuilder->AddToWillChangeBudget(mOuter, GetScrollPositionClampingScrollPortSize());
   }
 
@@ -3182,7 +3190,12 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
 {
   nsPoint toReferenceFrame = mOuter->GetOffsetToCrossDoc(aContainerReferenceFrame);
   nsRect scrollport = mScrollPort + toReferenceFrame;
-  if (!gfxPrefs::LayoutUseContainersForRootFrames() || mAddClipRectToLayer) {
+  // If APZ is enabled, do not apply clips to the scroll ports of metrics
+  // above the first one on a given layer. They will be applied by the
+  // compositor instead, with async transforms for the scrollframes interspersed
+  // between them.
+  bool omitClip = gfxPrefs::AsyncPanZoomEnabled() && aOutput->Length() > 0;
+  if (!omitClip && (!gfxPrefs::LayoutUseContainersForRootFrames() || mAddClipRectToLayer)) {
     // When using containers, the container layer contains the clip. Otherwise
     // we always include the clip.
     *aClipRect = scrollport;
@@ -4367,8 +4380,8 @@ ScrollFrameHelper::IsScrollbarOnRight() const
 bool
 ScrollFrameHelper::IsMaybeScrollingActive() const
 {
-  const nsStyleDisplay* disp = mOuter->StyleDisplay();
-  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
+  const nsStylePosition* pos = mOuter->StylePosition();
+  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
     return true;
   }
 
@@ -4380,9 +4393,9 @@ ScrollFrameHelper::IsMaybeScrollingActive() const
 bool
 ScrollFrameHelper::IsScrollingActive(nsDisplayListBuilder* aBuilder) const
 {
-  const nsStyleDisplay* disp = mOuter->StyleDisplay();
-  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL) &&
-    aBuilder->IsInWillChangeBudget(mOuter)) {
+  const nsStylePosition* pos = mOuter->StylePosition();
+  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL) &&
+      aBuilder->IsInWillChangeBudget(mOuter)) {
     return true;
   }
 
@@ -5322,14 +5335,14 @@ public:
   CalcSnapPoints(nsIScrollableFrame::ScrollUnit aUnit,
                  const nsPoint& aDestination,
                  const nsPoint& aStartPos);
-  virtual void AddHorizontalEdge(nscoord aEdge) MOZ_OVERRIDE;
-  virtual void AddVerticalEdge(nscoord aEdge) MOZ_OVERRIDE;
+  virtual void AddHorizontalEdge(nscoord aEdge) override;
+  virtual void AddVerticalEdge(nscoord aEdge) override;
   virtual void AddHorizontalEdgeInterval(const nsRect &aScrollRange,
                                          nscoord aInterval, nscoord aOffset)
-                                         MOZ_OVERRIDE;
+                                         override;
   virtual void AddVerticalEdgeInterval(const nsRect &aScrollRange,
                                        nscoord aInterval, nscoord aOffset)
-                                       MOZ_OVERRIDE;
+                                       override;
   void AddEdge(nscoord aEdge,
                nscoord aDestination,
                nscoord aStartPos,

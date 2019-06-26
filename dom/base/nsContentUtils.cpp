@@ -401,7 +401,7 @@ EventListenerManagerHashClearEntry(PLDHashTable *table, PLDHashEntryHdr *entry)
 }
 
 class SameOriginCheckerImpl final : public nsIChannelEventSink,
-                                        public nsIInterfaceRequestor
+                                    public nsIInterfaceRequestor
 {
   ~SameOriginCheckerImpl() {}
 
@@ -6517,6 +6517,11 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
   AutoJSAPI jsapi;
   jsapi.Init();
   JSContext* cx = jsapi.cx();
+
+  // Failure to create or run the regexp results in the invalid pattern
+  // matching, but we can still report the error to the console.
+  jsapi.TakeOwnershipOfErrorReporting();
+
   // We can use the junk scope here, because we're just using it for
   // regexp evaluation, not actual script execution.
   JSAutoCompartment ac(cx, xpc::UnprivilegedJunkScope());
@@ -6530,7 +6535,6 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
                                   static_cast<char16_t*>(aPattern.BeginWriting()),
                                   aPattern.Length(), 0));
   if (!re) {
-    JS_ClearPendingException(cx);
     return true;
   }
 
@@ -6539,7 +6543,6 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
   if (!JS_ExecuteRegExpNoStatics(cx, re,
                                  static_cast<char16_t*>(aValue.BeginWriting()),
                                  aValue.Length(), &idx, true, &rval)) {
-    JS_ClearPendingException(cx);
     return true;
   }
 

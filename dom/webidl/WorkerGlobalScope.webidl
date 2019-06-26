@@ -12,7 +12,7 @@
  * this document.
  */
 
-[Exposed=Worker]
+[Exposed=(Worker)]
 interface WorkerGlobalScope : EventTarget {
   [Constant, Cached]
   readonly attribute WorkerGlobalScope self;
@@ -22,6 +22,7 @@ interface WorkerGlobalScope : EventTarget {
 
   readonly attribute WorkerLocation location;
 
+  [Throws]
   void close();
   attribute OnErrorEventHandler onerror;
 

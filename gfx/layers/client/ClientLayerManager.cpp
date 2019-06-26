@@ -212,10 +212,8 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
   // Desktop does not support async zoom yet, so we ignore this for those
   // platforms.
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
-  if (mWidget) {
-    if (dom::TabChild* window = mWidget->GetOwningTabChild()) {
-      mCompositorMightResample = window->IsAsyncPanZoomEnabled();
-    }
+  if (mWidget && mWidget->GetOwningTabChild()) {
+    mCompositorMightResample = gfxPrefs::AsyncPanZoomEnabled();
   }
 #endif
 
@@ -789,7 +787,7 @@ ClientLayerManager::ProgressiveUpdateCallback(bool aHasPendingNewThebesContent,
   MOZ_ASSERT(aMetrics.IsScrollable());
   // This is derived from the code in
   // gfx/layers/ipc/CompositorParent.cpp::TransformShadowTree.
-  CSSToLayerScale paintScale = aMetrics.LayersPixelsPerCSSPixel();
+  CSSToLayerScale paintScale = aMetrics.LayersPixelsPerCSSPixel().ToScaleFactor();
   const CSSRect& metricsDisplayPort =
     (aDrawingCritical && !aMetrics.GetCriticalDisplayPort().IsEmpty()) ?
       aMetrics.GetCriticalDisplayPort() : aMetrics.GetDisplayPort();
@@ -801,7 +799,7 @@ ClientLayerManager::ProgressiveUpdateCallback(bool aHasPendingNewThebesContent,
     aHasPendingNewThebesContent, displayPort, paintScale.scale, aDrawingCritical,
     scrollOffset, zoom);
   aMetrics.SetScrollOffset(scrollOffset / zoom);
-  aMetrics.SetZoom(zoom);
+  aMetrics.SetZoom(CSSToParentLayerScale2D(zoom));
   return ret;
 #else
   return false;

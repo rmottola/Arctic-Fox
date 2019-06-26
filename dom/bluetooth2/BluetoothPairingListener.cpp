@@ -117,9 +117,10 @@ BluetoothPairingListener::Notify(const BluetoothSignal& aData)
 }
 
 JSObject*
-BluetoothPairingListener::WrapObject(JSContext* aCx)
+BluetoothPairingListener::WrapObject(JSContext* aCx,
+                                     JS::Handle<JSObject*> aGivenProto)
 {
-  return BluetoothPairingListenerBinding::Wrap(aCx, this);
+  return BluetoothPairingListenerBinding::Wrap(aCx, this, aGivenProto);
 }
 
 void

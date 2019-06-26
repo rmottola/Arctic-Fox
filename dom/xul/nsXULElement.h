@@ -368,7 +368,7 @@ ASSERT_NODE_FLAGS_SPACE(ELEMENT_TYPE_SPECIFIC_BITS_OFFSET + 3);
 class nsScriptEventHandlerOwnerTearoff;
 
 class nsXULElement final : public nsStyledElement,
-                               public nsIDOMXULElement
+                           public nsIDOMXULElement
 {
 public:
     explicit nsXULElement(already_AddRefed<mozilla::dom::NodeInfo> aNodeInfo);
@@ -723,7 +723,7 @@ protected:
                !HasAttr(kNameSpaceID_None, nsGkAtoms::readonly);
     }
 
-    virtual JSObject* WrapNode(JSContext *aCx) override;
+    virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
     void MaybeUpdatePrivateLifetime();
 };

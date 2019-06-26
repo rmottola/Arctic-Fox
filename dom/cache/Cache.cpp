@@ -14,6 +14,7 @@
 #include "mozilla/dom/CacheBinding.h"
 #include "mozilla/dom/cache/AutoUtils.h"
 #include "mozilla/dom/cache/CacheChild.h"
+#include "mozilla/dom/cache/CachePushStreamChild.h"
 #include "mozilla/dom/cache/ReadStream.h"
 #include "mozilla/dom/cache/TypeUtils.h"
 #include "mozilla/ErrorResult.h"
@@ -78,7 +79,17 @@ using mozilla::dom::workers::WorkerPrivate;
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(mozilla::dom::cache::Cache);
 NS_IMPL_CYCLE_COLLECTING_RELEASE(mozilla::dom::cache::Cache);
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(Cache, mGlobal, mRequestPromises)
+NS_IMPL_CYCLE_COLLECTION_CLASS(mozilla::dom::cache::Cache)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(mozilla::dom::cache::Cache)
+  tmp->DisconnectFromActor();
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mGlobal, mRequestPromises)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(mozilla::dom::cache::Cache)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGlobal, mRequestPromises)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(mozilla::dom::cache::Cache)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Cache)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
@@ -375,9 +386,9 @@ Cache::GetParentObject() const
 }
 
 JSObject*
-Cache::WrapObject(JSContext* aContext)
+Cache::WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto)
 {
-  return CacheBinding::Wrap(aContext, this);
+  return CacheBinding::Wrap(aContext, this, aGivenProto);
 }
 
 void
@@ -516,6 +527,18 @@ Cache::AssertOwningThread() const
 }
 #endif
 
+CachePushStreamChild*
+Cache::CreatePushStream(nsIAsyncInputStream* aStream)
+{
+  NS_ASSERT_OWNINGTHREAD(Cache);
+  MOZ_ASSERT(mActor);
+  MOZ_ASSERT(aStream);
+  auto actor = mActor->SendPCachePushStreamConstructor(
+    new CachePushStreamChild(mActor->GetFeature(), aStream));
+  MOZ_ASSERT(actor);
+  return static_cast<CachePushStreamChild*>(actor);
+}
+
 void
 Cache::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue)
 {
@@ -533,6 +556,12 @@ Cache::RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue)
 }
 
 Cache::~Cache()
+{
+  DisconnectFromActor();
+}
+
+void
+Cache::DisconnectFromActor()
 {
   if (mActor) {
     mActor->StartDestroy();

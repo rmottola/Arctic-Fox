@@ -7,7 +7,6 @@
 #include "nsSSLStatus.h"
 #include "plstr.h"
 #include "nsIClassInfoImpl.h"
-#include "nsIIdentityInfo.h"
 #include "nsIProgrammingLanguage.h"
 #include "nsIObjectOutputStream.h"
 #include "nsIObjectInputStream.h"
@@ -255,7 +254,7 @@ nsSSLStatus::GetClassDescription(char** aClassDescription)
 NS_IMETHODIMP
 nsSSLStatus::GetClassID(nsCID** aClassID)
 {
-  *aClassID = (nsCID*) nsMemory::Alloc(sizeof(nsCID));
+  *aClassID = (nsCID*) moz_xmalloc(sizeof(nsCID));
   if (!*aClassID) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -305,7 +304,8 @@ nsSSLStatus::~nsSSLStatus()
 }
 
 void
-nsSSLStatus::SetServerCert(nsIX509Cert* aServerCert, nsNSSCertificate::EVStatus aEVStatus)
+nsSSLStatus::SetServerCert(nsNSSCertificate* aServerCert,
+                           nsNSSCertificate::EVStatus aEVStatus)
 {
   mServerCert = aServerCert;
 
@@ -316,10 +316,9 @@ nsSSLStatus::SetServerCert(nsIX509Cert* aServerCert, nsNSSCertificate::EVStatus 
   }
 
 #ifndef MOZ_NO_EV_CERTS
-  nsCOMPtr<nsIIdentityInfo> idinfo = do_QueryInterface(mServerCert);
-  if (idinfo) {
-    nsresult rv = idinfo->GetIsExtendedValidation(&mIsEV);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+  if (aServerCert) {
+    nsresult rv = aServerCert->GetIsExtendedValidation(&mIsEV);
+    if (NS_FAILED(rv)) {
       return;
     }
     mHasIsEVStatus = true;

@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+include protocol PCachePushStream;
 include protocol PCacheStreamControl;
 include PHeaders;
 include InputStreamParams;
@@ -33,6 +34,7 @@ struct PCacheReadStream
   OptionalInputStreamParams params;
   OptionalFileDescriptorSet fds;
   nullable PCacheStreamControl control;
+  nullable PCachePushStream pushStream;
 };
 
 union PCacheReadStreamOrVoid
@@ -70,6 +72,7 @@ struct PCacheResponse
   PHeadersEntry[] headers;
   HeadersGuardEnum headersGuard;
   PCacheReadStreamOrVoid body;
+  nsCString securityInfo;
 };
 
 union PCacheResponseOrVoid

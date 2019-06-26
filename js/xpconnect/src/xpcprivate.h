@@ -1700,7 +1700,7 @@ public:
          MOZ_COUNT_CTOR(XPCNativeScriptableShared);}
 
     ~XPCNativeScriptableShared()
-        {if (mJSClass.base.name)nsMemory::Free((void*)mJSClass.base.name);
+        {if (mJSClass.base.name)free((void*)mJSClass.base.name);
          MOZ_COUNT_DTOR(XPCNativeScriptableShared);}
 
     char* TransferNameOwnership()
@@ -2414,10 +2414,10 @@ private:
 // interface on the single underlying (possibly aggregate) JSObject.
 
 class nsXPCWrappedJS final : protected nsAutoXPTCStub,
-                                 public nsIXPConnectWrappedJS,
-                                 public nsSupportsWeakReference,
-                                 public nsIPropertyBag,
-                                 public XPCRootSetElem
+                             public nsIXPConnectWrappedJS,
+                             public nsSupportsWeakReference,
+                             public nsIPropertyBag,
+                             public XPCRootSetElem
 {
 public:
     NS_DECL_CYCLE_COLLECTING_ISUPPORTS

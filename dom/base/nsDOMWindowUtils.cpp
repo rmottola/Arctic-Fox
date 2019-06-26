@@ -1030,9 +1030,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX,
 
   wheelEvent.refPoint = ToWidgetPoint(CSSPoint(aX, aY), offset, presContext);
 
-  nsEventStatus status;
-  nsresult rv = widget->DispatchEvent(&wheelEvent, status);
-  NS_ENSURE_SUCCESS(rv, rv);
+  widget->DispatchAPZAwareEvent(&wheelEvent);
 
   bool failedX = false;
   if ((aOptions & WHEEL_EVENT_EXPECTED_OVERFLOW_DELTA_X_ZERO) &&
@@ -2516,7 +2514,7 @@ nsDOMWindowUtils::StopFrameTimeRecording(uint32_t   startIndex,
   mgr->StopFrameTimeRecording(startIndex, tmpFrameIntervals);
   *frameCount = tmpFrameIntervals.Length();
 
-  *frameIntervals = (float*)nsMemory::Alloc(*frameCount * sizeof(float));
+  *frameIntervals = (float*)moz_xmalloc(*frameCount * sizeof(float));
 
   /* copy over the frame intervals and paint times into the arrays we just allocated */
   for (uint32_t i = 0; i < *frameCount; i++) {

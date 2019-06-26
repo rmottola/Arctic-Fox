@@ -4014,22 +4014,23 @@ class OutOfLineNewArray : public OutOfLineCodeBase<CodeGenerator>
     }
 };
 
-typedef ArrayObject* (*NewDenseArrayFn)(ExclusiveContext*, uint32_t, HandleObjectGroup,
-                                        AllocatingBehaviour);
+typedef ArrayObject *(*NewDenseArrayFn)(ExclusiveContext *, uint32_t, HandleObjectGroup,
+                                        AllocatingBehaviour, bool);
 static const VMFunction NewDenseArrayInfo = FunctionInfo<NewDenseArrayFn>(NewDenseArray);
 
 void
-CodeGenerator::visitNewArrayCallVM(LNewArray* lir)
+CodeGenerator::visitNewArrayCallVM(LNewArray *lir)
 {
     Register objReg = ToRegister(lir->output());
 
     MOZ_ASSERT(!lir->isCall());
     saveLive(lir);
 
-    JSObject* templateObject = lir->mir()->templateObject();
-    ObjectGroup* group =
+    JSObject *templateObject = lir->mir()->templateObject();
+    ObjectGroup *group =
         templateObject->isSingleton() ? nullptr : templateObject->group();
 
+    pushArg(Imm32(lir->mir()->convertDoubleElements()));
     pushArg(Imm32(lir->mir()->allocatingBehaviour()));
     pushArg(ImmGCPtr(group));
     pushArg(Imm32(lir->mir()->count()));
@@ -4100,7 +4101,7 @@ CodeGenerator::visitHypot(LHypot* lir)
 }
 
 void
-CodeGenerator::visitNewArray(LNewArray* lir)
+CodeGenerator::visitNewArray(LNewArray *lir)
 {
     Register objReg = ToRegister(lir->output());
     Register tempReg = ToRegister(lir->temp());
@@ -4114,10 +4115,12 @@ CodeGenerator::visitNewArray(LNewArray* lir)
         return;
     }
 
-    OutOfLineNewArray* ool = new(alloc()) OutOfLineNewArray(lir);
+    OutOfLineNewArray *ool = new(alloc()) OutOfLineNewArray(lir);
     addOutOfLineCode(ool, lir->mir());
 
-    masm.createGCObject(objReg, tempReg, templateObject, lir->mir()->initialHeap(), ool->entry());
+    masm.createGCObject(objReg, tempReg, templateObject, lir->mir()->initialHeap(),
+                        ool->entry(), /* initContents = */ true,
+                        lir->mir()->convertDoubleElements());
 
     masm.bind(ool->rejoin());
 }

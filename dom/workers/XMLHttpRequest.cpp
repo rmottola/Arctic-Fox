@@ -318,7 +318,7 @@ private:
 };
 
 class LoadStartDetectionRunnable final : public nsRunnable,
-                                             public nsIDOMEventListener
+                                         public nsIDOMEventListener
 {
   WorkerPrivate* mWorkerPrivate;
   nsRefPtr<Proxy> mProxy;
@@ -1636,9 +1636,9 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(XMLHttpRequest,
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 JSObject*
-XMLHttpRequest::WrapObject(JSContext* aCx)
+XMLHttpRequest::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return XMLHttpRequestBinding_workers::Wrap(aCx, this);
+  return XMLHttpRequestBinding_workers::Wrap(aCx, this, aGivenProto);
 }
 
 // static

@@ -44,17 +44,17 @@ public:
 public: // GoannaContentController methods
     void RequestContentRepaint(const mozilla::layers::FrameMetrics& aFrameMetrics) override;
     void RequestFlingSnap(const mozilla::layers::FrameMetrics::ViewID& aScrollId,
-                          const mozilla::CSSPoint& aDestination) MOZ_OVERRIDE;
+                          const mozilla::CSSPoint& aDestination) override;
     void AcknowledgeScrollUpdate(const mozilla::layers::FrameMetrics::ViewID& aScrollId,
                                  const uint32_t& aScrollGeneration) override;
-    void HandleDoubleTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
+    void HandleDoubleTap(const mozilla::CSSPoint& aPoint, Modifiers aModifiers,
                          const mozilla::layers::ScrollableLayerGuid& aGuid) override;
-    void HandleSingleTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
+    void HandleSingleTap(const mozilla::CSSPoint& aPoint, Modifiers aModifiers,
                          const mozilla::layers::ScrollableLayerGuid& aGuid) override;
-    void HandleLongTap(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
+    void HandleLongTap(const mozilla::CSSPoint& aPoint, Modifiers aModifiers,
                        const mozilla::layers::ScrollableLayerGuid& aGuid,
                        uint64_t aInputBlockId) override;
-    void HandleLongTapUp(const mozilla::CSSPoint& aPoint, int32_t aModifiers,
+    void HandleLongTapUp(const mozilla::CSSPoint& aPoint, Modifiers aModifiers,
                          const mozilla::layers::ScrollableLayerGuid& aGuid) override;
     void SendAsyncScrollDOMEvent(bool aIsRoot, const mozilla::CSSRect& aContentRect,
                                  const mozilla::CSSSize& aScrollableSize) override;

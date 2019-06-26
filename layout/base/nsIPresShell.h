@@ -795,17 +795,6 @@ public:
   virtual mozilla::dom::Element* GetTouchCaretElement() const = 0;
 
   /**
-   * Will be called when touch caret visibility has changed.
-   * Set the mMayHaveTouchCaret flag to aSet.
-   */
-  virtual void SetMayHaveTouchCaret(bool aSet) = 0;
-
-  /**
-   * Get the mMayHaveTouchCaret flag.
-   */
-  virtual bool MayHaveTouchCaret() = 0;
-
-  /**
    * Get the selection caret, if it exists. AddRefs it.
    */
   virtual already_AddRefed<mozilla::SelectionCarets> GetSelectionCarets() const = 0;
@@ -1242,11 +1231,7 @@ public:
   }
 
   // mouse capturing
-
   static CapturingContentInfo gCaptureInfo;
-
-  static nsRefPtrHashtable<nsUint32HashKey, mozilla::dom::Touch>* gCaptureTouchList;
-  static bool gPreventMouseEvents;
 
   struct PointerCaptureInfo
   {

@@ -319,9 +319,9 @@
 #ifdef __cplusplus
 
 /*
- * MOZ_OVERRIDE explicitly indicates that a virtual member function in a class
+ * override explicitly indicates that a virtual member function in a class
  * overrides a member function of a base class, rather than potentially being a
- * new member function.  MOZ_OVERRIDE should be placed immediately before the
+ * new member function.  override should be placed immediately before the
  * ';' terminating the member function's declaration, or before '= 0;' if the
  * member function is pure.  If the member function is defined in the class
  * definition, it should appear before the opening brace of the function body.
@@ -334,43 +334,43 @@
  *   class Derived1 : public Base
  *   {
  *   public:
- *     virtual void f() MOZ_OVERRIDE;
+ *     virtual void f() override;
  *   };
  *   class Derived2 : public Base
  *   {
  *   public:
- *     virtual void f() MOZ_OVERRIDE = 0;
+ *     virtual void f() override = 0;
  *   };
  *   class Derived3 : public Base
  *   {
  *   public:
- *     virtual void f() MOZ_OVERRIDE { }
+ *     virtual void f() override { }
  *   };
  *
- * In compilers supporting C++11 override controls, MOZ_OVERRIDE *requires* that
+ * In compilers supporting C++11 override controls, override *requires* that
  * the function marked with it override a member function of a base class: it
- * is a compile error if it does not.  Otherwise MOZ_OVERRIDE does not affect
+ * is a compile error if it does not.  Otherwise override does not affect
  * semantics and merely documents the override relationship to the reader (but
  * of course must still be used correctly to not break C++11 compilers).
  */
 #if defined(MOZ_HAVE_CXX11_OVERRIDE)
-#  define MOZ_OVERRIDE          override
+#  define override          override
 #else
-#  define MOZ_OVERRIDE          /* no support */
+#  define override          /* no support */
 #endif
 
 /*
- * MOZ_FINAL indicates that some functionality cannot be overridden through
+ * final indicates that some functionality cannot be overridden through
  * inheritance.  It can be used to annotate either classes/structs or virtual
  * member functions.
  *
- * To annotate a class/struct with MOZ_FINAL, place MOZ_FINAL immediately after
+ * To annotate a class/struct with final, place final immediately after
  * the name of the class, before the list of classes from which it derives (if
- * any) and before its opening brace.  MOZ_FINAL must not be used to annotate
+ * any) and before its opening brace.  final must not be used to annotate
  * unnamed classes or structs.  (With some compilers, and with C++11 proper, the
  * underlying expansion is ambiguous with specifying a class name.)
  *
- *   class Base MOZ_FINAL
+ *   class Base final
  *   {
  *   public:
  *     Base();
@@ -384,32 +384,32 @@
  *     ~Derived() { }
  *   };
  *
- * One particularly common reason to specify MOZ_FINAL upon a class is to tell
+ * One particularly common reason to specify final upon a class is to tell
  * the compiler that it's not dangerous for it to have a non-virtual destructor
  * yet have one or more virtual functions, silencing the warning it might emit
- * in this case.  Suppose Base above weren't annotated with MOZ_FINAL.  Because
+ * in this case.  Suppose Base above weren't annotated with final.  Because
  * ~Base() is non-virtual, an attempt to delete a Derived* through a Base*
  * wouldn't call ~Derived(), so any cleanup ~Derived() might do wouldn't happen.
  * (Formally C++ says behavior is undefined, but compilers will likely just call
- * ~Base() and not ~Derived().)  Specifying MOZ_FINAL tells the compiler that
+ * ~Base() and not ~Derived().)  Specifying final tells the compiler that
  * it's safe for the destructor to be non-virtual.
  *
  * In compilers implementing final controls, it is an error to inherit from a
- * class annotated with MOZ_FINAL.  In other compilers it serves only as
+ * class annotated with final.  In other compilers it serves only as
  * documentation.
  *
- * To annotate a virtual member function with MOZ_FINAL, place MOZ_FINAL
+ * To annotate a virtual member function with final, place final
  * immediately before the ';' terminating the member function's declaration, or
  * before '= 0;' if the member function is pure.  If the member function is
  * defined in the class definition, it should appear before the opening brace of
- * the function body.  (This placement is identical to that for MOZ_OVERRIDE.
- * If both are used, they should appear in the order 'MOZ_FINAL MOZ_OVERRIDE'
+ * the function body.  (This placement is identical to that for override.
+ * If both are used, they should appear in the order 'final override'
  * for consistency.)
  *
  *   class Base
  *   {
  *   public:
- *     virtual void f() MOZ_FINAL;
+ *     virtual void f() final;
  *   };
  *   class Derived
  *   {
@@ -419,13 +419,13 @@
  *   };
  *
  * In compilers implementing final controls, it is an error for a derived class
- * to override a method annotated with MOZ_FINAL.  In other compilers it serves
+ * to override a method annotated with final.  In other compilers it serves
  * only as documentation.
  */
 #if defined(MOZ_HAVE_CXX11_FINAL)
-#  define MOZ_FINAL             MOZ_HAVE_CXX11_FINAL
+#  define final             MOZ_HAVE_CXX11_FINAL
 #else
-#  define MOZ_FINAL             /* no support */
+#  define final             /* no support */
 #endif
 
 /**

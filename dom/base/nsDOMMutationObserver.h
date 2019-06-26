@@ -29,7 +29,7 @@ class nsDOMMutationObserver;
 using mozilla::dom::MutationObservingInfo;
 
 class nsDOMMutationRecord final : public nsISupports,
-                                      public nsWrapperCache
+                                  public nsWrapperCache
 {
   virtual ~nsDOMMutationRecord() {}
 
@@ -44,9 +44,9 @@ public:
     return mOwner;
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return mozilla::dom::MutationRecordBinding::Wrap(aCx, this);
+    return mozilla::dom::MutationRecordBinding::Wrap(aCx, this, aGivenProto);
   }
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -338,7 +338,7 @@ public:
   { 0x9e, 0xab, 0x07, 0x47, 0xa9, 0xe4, 0x65, 0xb4 } }
 
 class nsDOMMutationObserver final : public nsISupports,
-                                        public nsWrapperCache
+                                    public nsWrapperCache
 {
 public:
   nsDOMMutationObserver(already_AddRefed<nsPIDOMWindow>&& aOwner,
@@ -356,9 +356,9 @@ public:
               mozilla::dom::MutationCallback& aCb,
               mozilla::ErrorResult& aRv);
 
-  virtual JSObject* WrapObject(JSContext* aCx) override
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
   {
-    return mozilla::dom::MutationObserverBinding::Wrap(aCx, this);
+    return mozilla::dom::MutationObserverBinding::Wrap(aCx, this, aGivenProto);
   }
 
   nsISupports* GetParentObject() const

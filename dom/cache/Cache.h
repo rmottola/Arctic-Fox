@@ -21,10 +21,6 @@ namespace mozilla {
 
 class ErrorResult;
 
-namespace ipc {
-  class IProtocol;
-}
-
 namespace dom {
 
 class OwningRequestOrUSVString;
@@ -39,14 +35,12 @@ namespace cache {
 
 class CacheChild;
 class PCacheRequest;
-class PCacheRequestOrVoid;
 class PCacheResponse;
 class PCacheResponseOrVoid;
-class PCacheStreamControlChild;
 
-class Cache MOZ_FINAL : public PromiseNativeHandler
-                      , public nsWrapperCache
-                      , public TypeUtils
+class Cache final : public PromiseNativeHandler
+                  , public nsWrapperCache
+                  , public TypeUtils
 {
 public:
   Cache(nsIGlobalObject* aGlobal, CacheChild* aActor);
@@ -77,7 +71,7 @@ public:
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
 
   nsISupports* GetParentObject() const;
-  virtual JSObject* WrapObject(JSContext* aContext) MOZ_OVERRIDE;
+  virtual JSObject* WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto) override;
 
   // Called when CacheChild actor is being destroyed
   void DestroyInternal(CacheChild* aActor);
@@ -97,21 +91,27 @@ public:
 
   // TypeUtils methods
   virtual nsIGlobalObject*
-  GetGlobalObject() const MOZ_OVERRIDE;
+  GetGlobalObject() const override;
 
 #ifdef DEBUG
-  virtual void AssertOwningThread() const MOZ_OVERRIDE;
+  virtual void AssertOwningThread() const override;
 #endif
+
+  virtual CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream) override;
 
   // PromiseNativeHandler methods
   virtual void
-  ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
+  ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) override;
 
   virtual void
-  RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
+  RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) override;
 
 private:
   ~Cache();
+
+  // Called when we're destroyed or CCed.
+  void DisconnectFromActor();
 
   // TODO: Replace with actor-per-request model during refactor (bug 1110485)
   RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);

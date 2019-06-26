@@ -44,7 +44,11 @@ nsWEBPDecoder::~nsWEBPDecoder()
 void
 nsWEBPDecoder::InitInternal()
 {
+#if MOZ_BIG_ENDIAN
+  mDecoder = WebPINewRGB(MODE_Argb, nullptr, 0, 0);
+#else
   mDecoder = WebPINewRGB(MODE_rgbA, nullptr, 0, 0);
+#endif
 
   if (!mDecoder) {
     PostDecoderError(NS_ERROR_FAILURE);
@@ -131,12 +135,20 @@ nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
   if (lastLineRead > mPreviousLastLine) {
     for (int line = mPreviousLastLine; line < lastLineRead; line++) {
       for (int pix = 0; pix < width; pix++) {
-        // RGBA -> BGRA
         uint32_t DataOffset = 4 * (line * width + pix);
+#if MOZ_BIG_ENDIAN
+        // ARGB -> ARGB // even if Doc says it should be put in BGRA
+        mImageData[DataOffset+0] = mData[DataOffset+0];
+        mImageData[DataOffset+1] = mData[DataOffset+1];
+        mImageData[DataOffset+2] = mData[DataOffset+2];
+        mImageData[DataOffset+3] = mData[DataOffset+3];
+#else
+        // RGBA -> BGRA
         mImageData[DataOffset+0] = mData[DataOffset+2];
         mImageData[DataOffset+1] = mData[DataOffset+1];
         mImageData[DataOffset+2] = mData[DataOffset+0];
         mImageData[DataOffset+3] = mData[DataOffset+3];
+#endif
       }
     }
 

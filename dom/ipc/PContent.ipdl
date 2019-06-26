@@ -334,6 +334,11 @@ union MaybeFileDesc {
     void_t;
 };
 
+union FileDescOrError {
+    FileDescriptor;
+    nsresult;
+};
+
 union OptionalContentId
 {
   ContentParentId;
@@ -544,6 +549,12 @@ child:
       returns (nsCString aProfile);
 
     NuwaFreeze();
+
+    /**
+     * Notify the child to shutdown. The child will in turn call FinishShutdown
+     * and let the parent close the channel.
+     */
+    async Shutdown();
 
     async LoadProcessScript(nsString url);
 
@@ -817,7 +828,7 @@ parent:
      */
     BackUpXResources(FileDescriptor aXSocketFd);
 
-    sync OpenAnonymousTemporaryFile() returns (FileDescriptor aFD);
+    sync OpenAnonymousTemporaryFile() returns (FileDescOrError aFD);
 
     /**
      * Keygen requires us to call it after a <keygen> element is parsed and
@@ -885,6 +896,12 @@ parent:
      * offline-apps.allow_by_default is set to true.
      */
     SetOfflinePermission(Principal principal);
+
+    /**
+     * Notifies the parent to continue shutting down after the child performs
+     * its shutdown tasks.
+     */
+    async FinishShutdown();
 
 both:
      AsyncMessage(nsString aMessage, ClonedMessageData aData,

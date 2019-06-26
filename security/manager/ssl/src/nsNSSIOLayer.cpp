@@ -27,13 +27,6 @@
 #include "SSLServerCertVerification.h"
 #include "nsNSSCertHelper.h"
 
-#ifndef MOZ_NO_EV_CERTS
-#include "nsIDocShell.h"
-#include "nsIDocShellTreeItem.h"
-#include "nsISecureBrowserUI.h"
-#include "nsIInterfaceRequestorUtils.h"
-#endif
-
 #include "nsCharSeparatedTokenizer.h"
 #include "nsIConsoleService.h"
 #include "PSMRunnable.h"
@@ -276,39 +269,6 @@ nsNSSSocketInfo::SetNotificationCallbacks(nsIInterfaceRequestor* aCallbacks)
 
   return NS_OK;
 }
-
-#ifndef MOZ_NO_EV_CERTS
-static void
-getSecureBrowserUI(nsIInterfaceRequestor* callbacks,
-                   nsISecureBrowserUI** result)
-{
-  NS_ASSERTION(result, "result parameter to getSecureBrowserUI is null");
-  *result = nullptr;
-
-  NS_ASSERTION(NS_IsMainThread(),
-               "getSecureBrowserUI called off the main thread");
-
-  if (!callbacks)
-    return;
-
-  nsCOMPtr<nsISecureBrowserUI> secureUI = do_GetInterface(callbacks);
-  if (secureUI) {
-    secureUI.forget(result);
-    return;
-  }
-
-  nsCOMPtr<nsIDocShellTreeItem> item = do_GetInterface(callbacks);
-  if (item) {
-    nsCOMPtr<nsIDocShellTreeItem> rootItem;
-    (void) item->GetSameTypeRootTreeItem(getter_AddRefs(rootItem));
-
-    nsCOMPtr<nsIDocShell> docShell = do_QueryInterface(rootItem);
-    if (docShell) {
-      (void) docShell->GetSecurityUI(result);
-    }
-  }
-}
-#endif
 
 void
 nsNSSSocketInfo::NoteTimeUntilReady()
@@ -646,49 +606,6 @@ nsNSSSocketInfo::SetFileDescPtr(PRFileDesc* aFilePtr)
 {
   mFd = aFilePtr;
   return NS_OK;
-}
-
-#ifndef MOZ_NO_EV_CERTS
-class PreviousCertRunnable : public SyncRunnableBase
-{
-public:
-  explicit PreviousCertRunnable(nsIInterfaceRequestor* callbacks)
-    : mCallbacks(callbacks)
-  {
-  }
-
-  virtual void RunOnTargetThread()
-  {
-    nsCOMPtr<nsISecureBrowserUI> secureUI;
-    getSecureBrowserUI(mCallbacks, getter_AddRefs(secureUI));
-    nsCOMPtr<nsISSLStatusProvider> statusProvider = do_QueryInterface(secureUI);
-    if (statusProvider) {
-      nsCOMPtr<nsISSLStatus> status;
-      (void) statusProvider->GetSSLStatus(getter_AddRefs(status));
-      if (status) {
-        (void) status->GetServerCert(getter_AddRefs(mPreviousCert));
-      }
-    }
-  }
-
-  nsCOMPtr<nsIX509Cert> mPreviousCert; // out
-private:
-  nsCOMPtr<nsIInterfaceRequestor> mCallbacks; // in
-};
-#endif
-
-void
-nsNSSSocketInfo::GetPreviousCert(nsIX509Cert** _result)
-{
-  NS_ASSERTION(_result, "_result parameter to GetPreviousCert is null");
-  *_result = nullptr;
-
-#ifndef MOZ_NO_EV_CERTS
-  RefPtr<PreviousCertRunnable> runnable(new PreviousCertRunnable(mCallbacks));
-  DebugOnly<nsresult> rv = runnable->DispatchToMainThreadAndWait();
-  NS_ASSERTION(NS_SUCCEEDED(rv), "runnable->DispatchToMainThreadAndWait() failed");
-  runnable->mPreviousCert.forget(_result);
-#endif
 }
 
 void
@@ -2122,7 +2039,7 @@ nsGetUserCertChoice(SSM_UserCertChoice* certChoice)
 
 loser:
   if (mode) {
-    nsMemory::Free(mode);
+    free(mode);
   }
   return ret;
 }
@@ -2493,13 +2410,13 @@ ClientAuthDataRunnable::RunOnTargetThread()
       if (cissuer) PORT_Free(cissuer);
 
       certNicknameList =
-        (char16_t**)nsMemory::Alloc(sizeof(char16_t*)* nicknames->numnicknames);
+        (char16_t**)moz_xmalloc(sizeof(char16_t*)* nicknames->numnicknames);
       if (!certNicknameList)
         goto loser;
       certDetailsList =
-        (char16_t**)nsMemory::Alloc(sizeof(char16_t*)* nicknames->numnicknames);
+        (char16_t**)moz_xmalloc(sizeof(char16_t*)* nicknames->numnicknames);
       if (!certDetailsList) {
-        nsMemory::Free(certNicknameList);
+        free(certNicknameList);
         goto loser;
       }
 
@@ -2524,7 +2441,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
           continue;
         certDetailsList[CertsToUse] = ToNewUnicode(details);
         if (!certDetailsList[CertsToUse]) {
-          nsMemory::Free(certNicknameList[CertsToUse]);
+          free(certNicknameList[CertsToUse]);
           continue;
         }
 

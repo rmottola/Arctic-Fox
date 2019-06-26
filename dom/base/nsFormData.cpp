@@ -240,7 +240,7 @@ nsFormData::Append(const nsAString& aName, nsIVariant* aValue)
     rv = aValue->GetAsInterface(&iid, getter_AddRefs(supports));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsMemory::Free(iid);
+    free(iid);
 
     nsCOMPtr<nsIDOMBlob> domBlob = do_QueryInterface(supports);
     nsRefPtr<File> blob = static_cast<File*>(domBlob.get());
@@ -264,9 +264,9 @@ nsFormData::Append(const nsAString& aName, nsIVariant* aValue)
 }
 
 /* virtual */ JSObject*
-nsFormData::WrapObject(JSContext* aCx)
+nsFormData::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return FormDataBinding::Wrap(aCx, this);
+  return FormDataBinding::Wrap(aCx, this, aGivenProto);
 }
 
 /* static */ already_AddRefed<nsFormData>

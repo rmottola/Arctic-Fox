@@ -32,8 +32,8 @@ class Selection;
 }
 
 class nsRange final : public nsIDOMRange,
-                          public nsStubMutationObserver,
-                          public nsWrapperCache
+                      public nsStubMutationObserver,
+                      public nsWrapperCache
 {
   typedef mozilla::ErrorResult ErrorResult;
   typedef mozilla::dom::DOMRect DOMRect;
@@ -219,7 +219,7 @@ public:
                                   uint32_t aEndOffset);
 
   nsINode* GetParentObject() const { return mOwner; }
-  virtual JSObject* WrapObject(JSContext* cx) override final;
+  virtual JSObject* WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) override final;
 
 private:
   // no copy's or assigns

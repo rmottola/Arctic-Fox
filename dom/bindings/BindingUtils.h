@@ -234,6 +234,10 @@ IsDOMObject(JSObject* obj)
   mozilla::dom::UnwrapObject<mozilla::dom::prototypes::id::Interface,        \
     mozilla::dom::Interface##Binding::NativeType>(obj, value)
 
+#define UNWRAP_WORKER_OBJECT(Interface, obj, value)                           \
+  UnwrapObject<prototypes::id::Interface##_workers,                           \
+    mozilla::dom::Interface##Binding_workers::NativeType>(obj, value)
+
 // Some callers don't want to set an exception when unwrapping fails
 // (for example, overload resolution uses unwrapping to tell what sort
 // of thing it's looking at).
@@ -919,7 +923,7 @@ DoGetOrCreateDOMReflector(JSContext* cx, T* value,
       return false;
     }
 
-    obj = value->WrapObject(cx);
+    obj = value->WrapObject(cx, JS::NullPtr());
     if (!obj) {
       // At this point, obj is null, so just return false.
       // Callers seem to be testing JS_IsExceptionPending(cx) to
@@ -1027,7 +1031,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     }
 
     MOZ_ASSERT(js::IsObjectInContextCompartment(scope, cx));
-    if (!value->WrapObject(cx, &obj)) {
+    if (!value->WrapObject(cx, JS::NullPtr(), &obj)) {
       return false;
     }
   }
@@ -1073,7 +1077,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     }
 
     MOZ_ASSERT(js::IsObjectInContextCompartment(scope, cx));
-    if (!value->WrapObject(cx, &obj)) {
+    if (!value->WrapObject(cx, JS::NullPtr(), &obj)) {
       return false;
     }
 
@@ -1509,7 +1513,7 @@ struct WrapNativeParentHelper
     if (!CouldBeDOMBinding(parent)) {
       obj = WrapNativeParentFallback<T>::Wrap(cx, parent, cache);
     } else {
-      obj = parent->WrapObject(cx);
+      obj = parent->WrapObject(cx, JS::NullPtr());
     }
 
     return obj;
@@ -1931,15 +1935,15 @@ struct FakeString {
     return reinterpret_cast<const nsString*>(this);
   }
 
-  nsAString* ToAStringPtr() {
-    return reinterpret_cast<nsString*>(this);
-  }
-
-  operator const nsAString& () const {
+operator const nsAString& () const {
     return *reinterpret_cast<const nsString*>(this);
   }
 
 private:
+  nsAString* ToAStringPtr() {
+    return reinterpret_cast<nsString*>(this);
+  }
+
   nsString::char_type* mData;
   nsString::size_type mLength;
   uint32_t mFlags;
@@ -1954,6 +1958,8 @@ private:
     MOZ_ASSERT(mFlags == nsString::F_TERMINATED);
     mData = const_cast<nsString::char_type*>(aData);
   }
+
+  friend class NonNull<nsAString>;
 
   // A class to use for our static asserts to ensure our object layout
   // matches that of nsString.

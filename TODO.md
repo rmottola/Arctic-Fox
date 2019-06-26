@@ -32,6 +32,7 @@
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+- Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -83,16 +84,50 @@
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1142669 part 6 - Don't inline scripts that are known to inline a
-- Bug 1145440 - Ship constant names for tracked strategy and outcomes i
-- Bug 1143860 - Deduplicate tracked optimizations when streaming the pr
-- Bug 1144802 - 2015.03.20 - 1 to 8 parts
+- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
+- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+- Bug 1150555 - about:performance should not confuse Jetpack addons. 
+- Bug 1125848 - 2015-03-09 Consolidate PCompositor's creation-destruction logic
+- Bug 1147491, part 2 - Disable use of BaseTimeDuration::operator/ w
+- Bug 1147491, part 1 - Fix playbackRate crash due to integer rounding 
+- Bug 1072037, part 3 - Tests for the effect of setting CSS transition
+- Bug 1054755 - Part 3: Use IsRegExp in String.prototype.
+- Bug 1054755 - Part 2: Implement IsRegExp.
+- Bug 1054755 - Part 1: Add Symbol.match
+- Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
+- Bug 1005110 - Warn about unreachable expression after semicolon-less
+- Bug 1148899 - Rename isExprClosure/setIsExprClosure/EXPR_CLOSURE
+- Bug 1149015 - Part 3: Remove some use of expression closure from jit
+- Bug 1149015 - Part 2: Remove some use of expression closure from jste
+- Bug 1149015 - Part 1: Remove some use of expression closure from jste
+- Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
+- Bug 1146696 - Don't assume there are no arenas available after last d
+- Bug 1145997 - Suppress GC in debugger GC callback 
+- Bug 1092102 - Rename Suspend/Resume to Freeze
+- Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
+- Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
+- Bug 1137267 
+- Bug 1141563 - Don't update Shapes in parallel after compacting GC
+- Bug 1126014 - DomainPolicy support for e10s.
+- Bug 1139675 - Simplify the APIs for getting and setting the pres shel
+- Bug 1151974
+- Bug 1110487 all
+- Bug 1110814
+- Bug 1145631 - Part 1: Replace MOZ_OVERRIDE and MOZ_FINAL with overrid
+- Bug Bug 931249 2015-03-20
+- Bug 1083344 - Tighten rules for Mac OS content process sandbox on
+
+Parents of:
+https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
+https://github.com/mozilla/newtab-dev/commit/7d68b9894ab35849f960afd305c57271bb99e166
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
 
 
 ### FIXME / TODO
+- fix devtools structure, from browser/themes/osx/devtools to browser/devtools
+
 - Cannot be applied because file is missing - check
 Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
@@ -100,6 +135,11 @@ Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
+
+Check ApplicationReputation.cpp which is missing, possibly from here:
+Bug 837199 - Write interface to query application reputation 
+
+no components/url-classifier ?
 
 ### Further ToDo which would help portability:
 
@@ -116,6 +156,11 @@ https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
 - Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
+
+- Bug 1172609 - 8 part ICU update
+
+
+- what do do with EME ?
 
 For Windows:
 Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma

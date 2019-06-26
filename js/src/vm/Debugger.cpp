@@ -3230,6 +3230,9 @@ Debugger::removeDebuggeeGlobal(FreeOp* fop, GlobalObject* global, GlobalObjectSe
     if (trackingAllocationSites)
         global->compartment()->forgetObjectMetadataCallback();
 
+    // Clear out all object metadata in the compartment.
+    global->compartment()->clearObjectMetadata();
+
     if (global->getDebuggers()->empty()) {
         global->compartment()->unsetIsDebuggee();
     } else {
@@ -6122,8 +6125,6 @@ EvaluateInEnv(JSContext* cx, Handle<Env*> env, HandleValue thisv, AbstractFrameP
     MOZ_ASSERT_IF(frame, thisv.get() == frame.thisValue());
     MOZ_ASSERT_IF(frame, pc);
 
-    MOZ_ASSERT(!IsPoisonedPtr(chars.start().get()));
-
     /*
      * NB: This function breaks the assumption that the compiler can see all
      * calls and properly compute a static level. In practice, any non-zero
@@ -6744,7 +6745,7 @@ DebuggerObject_getAllocationSite(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_REFERENT(cx, argc, vp, "get allocationSite", args, obj);
 
-    RootedObject metadata(cx, obj->getMetadata());
+    RootedObject metadata(cx, GetObjectMetadata(obj));
     if (!cx->compartment()->wrap(cx, &metadata))
         return false;
     args.rval().setObjectOrNull(metadata);

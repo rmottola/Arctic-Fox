@@ -68,6 +68,6 @@ GoannaStart(void *data, const nsXREAppData *appData)
     mozilla::widget::GoannaAppShell::NotifyXreExit();
 
     free(targs[0]);
-    nsMemory::Free(data);
+    free(data);
     return;
 }

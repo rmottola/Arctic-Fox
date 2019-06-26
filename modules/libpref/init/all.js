@@ -1386,6 +1386,7 @@ pref("javascript.options.mem.gc_compacting", true);
 pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
 pref("javascript.options.gc_on_memory_pressure", true);
+pref("javascript.options.compact_on_user_inactive", true);
 
 pref("javascript.options.mem.gc_high_frequency_time_limit_ms", 1000);
 pref("javascript.options.mem.gc_high_frequency_low_limit_mb", 100);
@@ -2720,7 +2721,7 @@ pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 // Defaults to 1 minute.
 pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
-pref("dom.ipc.plugins.asyncInit", false);
+pref("dom.ipc.plugins.asyncInit", true);
 
 pref("dom.ipc.processCount", 1);
 
@@ -4767,8 +4768,6 @@ pref("beacon.enabled", true);
 // Camera prefs
 pref("camera.control.face_detection.enabled", true);
 
-// Fetch API.
-pref("dom.fetch.enabled", false);
 
 // SW Cache API
 pref("dom.caches.enabled", false);

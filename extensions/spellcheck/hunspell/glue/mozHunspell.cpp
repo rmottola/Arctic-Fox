@@ -567,7 +567,7 @@ NS_IMETHODIMP mozHunspell::Suggest(const char16_t *aWord, char16_t ***aSuggestio
   *aSuggestionCount = static_cast<uint32_t>(suggestions.size());
 
   if (*aSuggestionCount) {
-    *aSuggestions  = (char16_t **)nsMemory::Alloc(*aSuggestionCount * sizeof(char16_t *));
+    *aSuggestions  = (char16_t **)moz_xmalloc(*aSuggestionCount * sizeof(char16_t *));
     if (*aSuggestions) {
       uint32_t index = 0;
       for (index = 0; index < *aSuggestionCount && NS_SUCCEEDED(rv); ++index) {
@@ -577,7 +577,7 @@ NS_IMETHODIMP mozHunspell::Suggest(const char16_t *aWord, char16_t ***aSuggestio
         rv = mDecoder->GetMaxLength(suggestions[index].c_str(), inLength, &outLength);
         if (NS_SUCCEEDED(rv))
         {
-          (*aSuggestions)[index] = (char16_t *) nsMemory::Alloc(sizeof(char16_t) * (outLength+1));
+          (*aSuggestions)[index] = (char16_t *) moz_xmalloc(sizeof(char16_t) * (outLength+1));
           if ((*aSuggestions)[index])
           {
             rv = mDecoder->Convert(suggestions[index].c_str(), &inLength, (*aSuggestions)[index], &outLength);

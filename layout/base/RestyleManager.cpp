@@ -332,12 +332,12 @@ ApplyRenderingChangeToTree(nsPresContext* aPresContext,
                            nsIFrame* aFrame,
                            nsChangeHint aChange)
 {
-  // We check StyleDisplay()->HasTransformStyle() in addition to checking
+  // We check StylePosition()->HasTransformStyle() in addition to checking
   // IsTransformed() since we can get here for some frames that don't support
   // CSS transforms.
   NS_ASSERTION(!(aChange & nsChangeHint_UpdateTransformLayer) ||
                aFrame->IsTransformed() ||
-               aFrame->StyleDisplay()->HasTransformStyle(),
+               aFrame->StylePosition()->HasTransformStyle(),
                "Unexpected UpdateTransformLayer hint");
 
   nsIPresShell *shell = aPresContext->PresShell();
@@ -742,7 +742,7 @@ RestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
           // It's because we need to set this state on each affected frame
           // that we can't coalesce nsChangeHint_AddOrRemoveTransform hints up
           // to ancestors (i.e. it can't be an inherited change hint).
-          if (cont->IsPositioned()) {
+          if (cont->IsAbsPosContaininingBlock()) {
             // If a transform has been added, we'll be taking this path,
             // but we may be taking this path even if a transform has been
             // removed. It's OK to add the bit even if it's not needed.
@@ -2600,7 +2600,7 @@ ElementRestyler::AddLayerChangesForAnimation()
       // nsChangeHint_UpdateTransformLayer, ApplyRenderingChangeToTree would
       // complain that we're updating a transform layer without a transform).
       if (layerInfo[i].mLayerType == nsDisplayItem::TYPE_TRANSFORM &&
-          !mFrame->StyleDisplay()->HasTransformStyle()) {
+          !mFrame->StylePosition()->HasTransformStyle()) {
         continue;
       }
       NS_UpdateHint(hint, layerInfo[i].mChangeHint);

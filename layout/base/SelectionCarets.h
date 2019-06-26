@@ -56,9 +56,9 @@ class Selection;
  *          caret becomes tilt.
  */
 class SelectionCarets final : public nsIReflowObserver,
-                                  public nsISelectionListener,
-                                  public nsIScrollObserver,
-                                  public nsSupportsWeakReference
+                              public nsISelectionListener,
+                              public nsIScrollObserver,
+                              public nsSupportsWeakReference
 {
 public:
   /**

@@ -2231,9 +2231,9 @@ Navigator::GetOwnPropertyNames(JSContext* aCx, nsTArray<nsString>& aNames,
 }
 
 JSObject*
-Navigator::WrapObject(JSContext* cx)
+Navigator::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto)
 {
-  return NavigatorBinding::Wrap(cx, this);
+  return NavigatorBinding::Wrap(cx, this, aGivenProto);
 }
 
 /* static */

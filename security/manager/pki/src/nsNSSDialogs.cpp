@@ -367,7 +367,7 @@ nsNSSDialogs::SetPKCS12FilePassword(nsIInterfaceRequestor *ctx,
     rv = block->GetString(2, &pw);
     if (NS_SUCCEEDED(rv)) {
       _password = pw;
-      nsMemory::Free(pw);
+      free(pw);
     }
   }
   return rv;
@@ -405,7 +405,7 @@ nsNSSDialogs::GetPKCS12FilePassword(nsIInterfaceRequestor* ctx,
 
   if (*_retval) {
     _password.Assign(pwTemp);
-    nsMemory::Free(pwTemp);
+    free(pwTemp);
   }
 
   return NS_OK;

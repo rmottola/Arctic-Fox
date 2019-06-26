@@ -642,6 +642,10 @@ IonBuilder::analyzeNewLoopTypes(MBasicBlock* entry, jsbytecode* start, jsbytecod
               case JSOP_UNDEFINED:
                 type = MIRType_Undefined;
                 break;
+              case JSOP_GIMPLICITTHIS:
+                if (!script()->hasPollutedGlobalScope())
+                    type = MIRType_Undefined;
+                break;
               case JSOP_NULL:
                 type = MIRType_Null;
                 break;
@@ -882,6 +886,12 @@ IonBuilder::build()
 
     // Discard unreferenced & pre-allocated resume points.
     replaceMaybeFallbackFunctionGetter(nullptr);
+
+    if (script_->hasBaselineScript() &&
+        inlinedBytecodeLength_ > script_->baselineScript()->inlinedBytecodeLength())
+    {
+        script_->baselineScript()->setInlinedBytecodeLength(inlinedBytecodeLength_);
+    }
 
     if (!maybeAddOsrTypeBarriers())
         return false;
@@ -1585,6 +1595,7 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_label();
 
       case JSOP_UNDEFINED:
+        // If this ever changes, change what JSOP_GIMPLICITTHIS does too.
         return pushConstant(UndefinedValue());
 
       case JSOP_IFEQ:
@@ -1978,6 +1989,13 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_DEBUGGER:
         return jsop_debugger();
 
+      case JSOP_GIMPLICITTHIS:
+        if (!script()->hasPollutedGlobalScope())
+            return pushConstant(UndefinedValue());
+
+        // Just fall through to the unsupported bytecode case.
+        break;
+
 #ifdef DEBUG
       case JSOP_PUSHBLOCKSCOPE:
       case JSOP_FRESHENBLOCKSCOPE:
@@ -1990,16 +2008,18 @@ IonBuilder::inspectOpcode(JSOp op)
         // encountered.
 #endif
       default:
-        // Track a simpler message, since the actionable abort message is a
-        // static string, and the internal opcode name isn't an actionable
-        // thing anyways.
-        trackActionableAbort("Unsupported bytecode");
-#ifdef DEBUG
-        return abort("Unsupported opcode: %s", js_CodeName[op]);
-#else
-        return abort("Unsupported opcode: %d", op);
-#endif
+        break;
     }
+
+    // Track a simpler message, since the actionable abort message is a
+    // static string, and the internal opcode name isn't an actionable
+    // thing anyways.
+    trackActionableAbort("Unsupported bytecode");
+#ifdef DEBUG
+    return abort("Unsupported opcode: %s", js_CodeName[op]);
+#else
+    return abort("Unsupported opcode: %d", op);
+#endif
 }
 
 // Given that the current control flow structure has ended forcefully,
@@ -4880,6 +4900,14 @@ IonBuilder::makeInliningDecision(JSObject* targetArg, CallInfo& callInfo)
         return InliningDecision_WarmUpCountTooLow;
     }
 
+    // Don't inline if the callee is known to inline a lot of code, to avoid
+    // huge MIR graphs.
+    uint32_t inlinedBytecodeLength = targetScript->baselineScript()->inlinedBytecodeLength();
+    if (inlinedBytecodeLength > optimizationInfo().inlineMaxCalleeInlinedBytecodeLength()) {
+        trackOptimizationOutcome(TrackedOutcome::CantInlineBigCalleeInlinedBytecodeLength);
+        return DontInline(targetScript, "Vetoed: callee inlinedBytecodeLength is too big");
+    }
+
     IonBuilder *outerBuilder = outermostBuilder();
 
     // Cap the total bytecode length we inline under a single script, to avoid
@@ -6420,14 +6448,6 @@ IonBuilder::jsop_newarray(uint32_t count)
                                     NewArray_FullyAllocating);
     current->add(ins);
     current->push(ins);
-
-    TemporaryTypeSet::DoubleConversion conversion =
-        ins->resultTypeSet()->convertDoubleElements(constraints());
-
-    if (conversion == TemporaryTypeSet::AlwaysConvertToDoubles)
-        templateObject->as<ArrayObject>().setShouldConvertDoubleElements();
-    else
-        templateObject->as<ArrayObject>().clearShouldConvertDoubleElements();
     return true;
 }
 
@@ -6530,13 +6550,11 @@ IonBuilder::jsop_initelem_array()
     current->add(id);
 
     // Get the elements vector.
-    MElements* elements = MElements::New(alloc(), obj);
+    MElements *elements = MElements::New(alloc(), obj);
     current->add(elements);
 
-    NativeObject* templateObject = obj->toNewArray()->templateObject();
-
-    if (templateObject->shouldConvertDoubleElements()) {
-        MInstruction* valueDouble = MToDouble::New(alloc(), value);
+    if (obj->toNewArray()->convertDoubleElements()) {
+        MInstruction *valueDouble = MToDouble::New(alloc(), value);
         current->add(valueDouble);
         value = valueDouble;
     }

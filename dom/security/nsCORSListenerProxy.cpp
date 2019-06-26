@@ -9,6 +9,7 @@
 #include "nsCORSListenerProxy.h"
 #include "nsIChannel.h"
 #include "nsIHttpChannel.h"
+#include "nsIHttpChannelInternal.h"
 #include "nsError.h"
 #include "nsContentUtils.h"
 #include "nsIScriptSecurityManager.h"
@@ -819,6 +820,22 @@ nsCORSListenerProxy::UpdateChannel(nsIChannel* aChannel,
     }
   }
 
+  // Set CORS attributes on channel so that intercepted requests get correct
+  // values. We have to do this here because the CheckMayLoad checks may lead
+  // to early return. We can't be sure this is an http channel though, so we
+  // can't return early on failure.
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aChannel);
+  if (internal) {
+    if (mIsPreflight) {
+      rv = internal->SetCorsMode(nsIHttpChannelInternal::CORS_MODE_CORS_WITH_FORCED_PREFLIGHT);
+    } else {
+      rv = internal->SetCorsMode(nsIHttpChannelInternal::CORS_MODE_CORS);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = internal->SetCorsIncludeCredentials(mWithCredentials);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
   // Check that the uri is ok to load
   rv = nsContentUtils::GetSecurityManager()->
     CheckLoadURIWithPrincipal(mRequestingPrincipal, uri,
@@ -900,8 +917,8 @@ nsCORSListenerProxy::UpdateChannel(nsIChannel* aChannel,
 // Class used as streamlistener and notification callback when
 // doing the initial OPTIONS request for a CORS check
 class nsCORSPreflightListener final : public nsIStreamListener,
-                                          public nsIInterfaceRequestor,
-                                          public nsIChannelEventSink
+                                      public nsIInterfaceRequestor,
+                                      public nsIChannelEventSink
 {
 public:
   nsCORSPreflightListener(nsIChannel* aOuterChannel,

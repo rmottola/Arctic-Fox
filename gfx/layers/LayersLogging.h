@@ -161,6 +161,22 @@ AppendToString(std::stringstream& aStream, const mozilla::gfx::IntSizeTyped<T>& 
   aStream << sfx;
 }
 
+template<class src, class dst>
+void
+AppendToString(std::stringstream& aStream, const mozilla::gfx::ScaleFactors2D<src, dst>& scale,
+               const char* pfx="", const char* sfx="")
+{
+  aStream << pfx;
+  std::streamsize oldPrecision = aStream.precision(3);
+  if (scale.AreScalesSame()) {
+    aStream << scale.xScale;
+  } else {
+    aStream << '(' << scale.xScale << ',' << scale.yScale << ')';
+  }
+  aStream.precision(oldPrecision);
+  aStream << sfx;
+}
+
 void
 AppendToString(std::stringstream& aStream, const mozilla::gfx::Matrix4x4& m,
                const char* pfx="", const char* sfx="");

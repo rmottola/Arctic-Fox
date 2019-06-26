@@ -13,6 +13,7 @@
 # include "LayerManagerD3D9.h"
 #endif //MOZ_ENABLE_D3D9_LAYER
 #include "mozilla/BrowserElementParent.h"
+#include "mozilla/EventForwards.h"  // for Modifiers
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/layers/APZCTreeManager.h"
@@ -101,7 +102,7 @@ public:
   }
 
   virtual void RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                                const mozilla::CSSPoint& aDestination) MOZ_OVERRIDE
+                                const mozilla::CSSPoint& aDestination) override
   {
     if (MessageLoop::current() != mUILoop) {
       // We have to send this message from the "UI thread" (main
@@ -137,7 +138,7 @@ public:
   }
 
   virtual void HandleDoubleTap(const CSSPoint& aPoint,
-                               int32_t aModifiers,
+                               Modifiers aModifiers,
                                const ScrollableLayerGuid& aGuid) override
   {
     if (MessageLoop::current() != mUILoop) {
@@ -156,7 +157,7 @@ public:
   }
 
   virtual void HandleSingleTap(const CSSPoint& aPoint,
-                               int32_t aModifiers,
+                               Modifiers aModifiers,
                                const ScrollableLayerGuid& aGuid) override
   {
     if (MessageLoop::current() != mUILoop) {
@@ -176,7 +177,7 @@ public:
   }
 
   virtual void HandleLongTap(const CSSPoint& aPoint,
-                             int32_t aModifiers,
+                             Modifiers aModifiers,
                              const ScrollableLayerGuid& aGuid,
                              uint64_t aInputBlockId) override
   {
@@ -196,7 +197,7 @@ public:
   }
 
   virtual void HandleLongTapUp(const CSSPoint& aPoint,
-                               int32_t aModifiers,
+                               Modifiers aModifiers,
                                const ScrollableLayerGuid& aGuid) override
   {
     if (MessageLoop::current() != mUILoop) {
@@ -296,7 +297,6 @@ private:
 };
 
 RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
-                                     ScrollingBehavior aScrollingBehavior,
                                      TextureFactoryIdentifier* aTextureFactoryIdentifier,
                                      uint64_t* aId,
                                      bool* aSuccess)
@@ -330,7 +330,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
         static_cast<ClientLayerManager*>(lm.get());
       clientManager->GetRemoteRenderer()->SendNotifyChildCreated(mLayersId);
     }
-    if (aScrollingBehavior == ASYNC_PAN_ZOOM) {
+    if (gfxPrefs::AsyncPanZoomEnabled()) {
       mContentController = new RemoteContentController(this);
       CompositorParent::SetControllerForLayerTree(mLayersId, mContentController);
     }

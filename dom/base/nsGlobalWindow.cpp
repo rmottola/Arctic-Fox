@@ -479,7 +479,7 @@ static const char sPopStatePrefStr[] = "browser.history.allowPopState";
  * on nsGlobalWindow, where any script could see it.
  */
 class nsGlobalWindowObserver final : public nsIObserver,
-                                         public nsIInterfaceRequestor
+                                     public nsIInterfaceRequestor
 {
 public:
   explicit nsGlobalWindowObserver(nsGlobalWindow* aWindow) : mWindow(aWindow) {}
@@ -577,8 +577,6 @@ nsPIDOMWindow::nsPIDOMWindow(nsPIDOMWindow *aOuterWindow)
   mRunningTimeout(nullptr), mMutationBits(0), mIsDocumentLoaded(false),
   mIsHandlingResizeEvent(false), mIsInnerWindow(aOuterWindow != nullptr),
   mMayHavePaintEventListener(false), mMayHaveTouchEventListener(false),
-  mMayHaveTouchCaret(false),
-  mMayHaveScrollWheelEventListener(false),
   mMayHaveMouseEnterLeaveEventListener(false),
   mMayHavePointerEnterLeaveEventListener(false),
   mIsModalContentWindow(false),
@@ -611,7 +609,7 @@ class nsOuterWindowProxy : public js::Wrapper
 public:
   MOZ_CONSTEXPR nsOuterWindowProxy() : js::Wrapper(0) { }
 
-  virtual bool finalizeInBackground(JS::Value priv) const MOZ_OVERRIDE {
+  virtual bool finalizeInBackground(JS::Value priv) const override {
     return false;
   }
 
@@ -620,63 +618,63 @@ public:
                                         JS::Handle<JSObject*> proxy,
                                         JS::Handle<jsid> id,
                                         JS::MutableHandle<JSPropertyDescriptor> desc)
-                                        const MOZ_OVERRIDE;
+                                        const override;
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
                               JS::MutableHandle<JSPropertyDescriptor> desc,
-                              JS::ObjectOpResult &result) const MOZ_OVERRIDE;
+                              JS::ObjectOpResult &result) const override;
   virtual bool ownPropertyKeys(JSContext *cx,
                                JS::Handle<JSObject*> proxy,
-                               JS::AutoIdVector &props) const MOZ_OVERRIDE;
+                               JS::AutoIdVector &props) const override;
   virtual bool delete_(JSContext *cx, JS::Handle<JSObject*> proxy,
                        JS::Handle<jsid> id,
-                       JS::ObjectOpResult &result) const MOZ_OVERRIDE;
+                       JS::ObjectOpResult &result) const override;
   virtual bool enumerate(JSContext *cx, JS::Handle<JSObject*> proxy,
-                         JS::MutableHandle<JSObject*> vp) const MOZ_OVERRIDE;
+                         JS::MutableHandle<JSObject*> vp) const override;
   virtual bool preventExtensions(JSContext* cx,
                                  JS::Handle<JSObject*> proxy,
-                                 JS::ObjectOpResult& result) const MOZ_OVERRIDE;
+                                 JS::ObjectOpResult& result) const override;
   virtual bool isExtensible(JSContext *cx, JS::Handle<JSObject*> proxy, bool *extensible)
-                            const MOZ_OVERRIDE;
+                            const override;
   virtual bool has(JSContext *cx, JS::Handle<JSObject*> proxy,
-                   JS::Handle<jsid> id, bool *bp) const MOZ_OVERRIDE;
+                   JS::Handle<jsid> id, bool *bp) const override;
   virtual bool get(JSContext *cx, JS::Handle<JSObject*> proxy,
                    JS::Handle<JSObject*> receiver,
                    JS::Handle<jsid> id,
-                   JS::MutableHandle<JS::Value> vp) const MOZ_OVERRIDE;
+                   JS::MutableHandle<JS::Value> vp) const override;
   virtual bool set(JSContext *cx, JS::Handle<JSObject*> proxy,
                    JS::Handle<JSObject*> receiver,
                    JS::Handle<jsid> id,
                    JS::MutableHandle<JS::Value> vp,
-                   JS::ObjectOpResult &result) const MOZ_OVERRIDE;
+                   JS::ObjectOpResult &result) const override;
 
   // SpiderMonkey extensions
   virtual bool getPropertyDescriptor(JSContext* cx,
                                      JS::Handle<JSObject*> proxy,
                                      JS::Handle<jsid> id,
                                      JS::MutableHandle<JSPropertyDescriptor> desc)
-                                     const MOZ_OVERRIDE;
+                                     const override;
   virtual bool hasOwn(JSContext *cx, JS::Handle<JSObject*> proxy,
-                      JS::Handle<jsid> id, bool *bp) const MOZ_OVERRIDE;
+                      JS::Handle<jsid> id, bool *bp) const override;
   virtual bool getOwnEnumerablePropertyKeys(JSContext *cx, JS::Handle<JSObject*> proxy,
-                                            JS::AutoIdVector &props) const MOZ_OVERRIDE;
+                                            JS::AutoIdVector &props) const override;
   virtual const char *className(JSContext *cx,
-                                JS::Handle<JSObject*> wrapper) const MOZ_OVERRIDE;
+                                JS::Handle<JSObject*> wrapper) const override;
 
-  virtual void finalize(JSFreeOp *fop, JSObject *proxy) const MOZ_OVERRIDE;
+  virtual void finalize(JSFreeOp *fop, JSObject *proxy) const override;
 
-  virtual bool isCallable(JSObject *obj) const MOZ_OVERRIDE {
+  virtual bool isCallable(JSObject *obj) const override {
     return false;
   }
-  virtual bool isConstructor(JSObject *obj) const MOZ_OVERRIDE {
+  virtual bool isConstructor(JSObject *obj) const override {
     return false;
   }
 
   virtual bool watch(JSContext *cx, JS::Handle<JSObject*> proxy,
-                     JS::Handle<jsid> id, JS::Handle<JSObject*> callable) const MOZ_OVERRIDE;
+                     JS::Handle<jsid> id, JS::Handle<JSObject*> callable) const override;
   virtual bool unwatch(JSContext *cx, JS::Handle<JSObject*> proxy,
-                       JS::Handle<jsid> id) const MOZ_OVERRIDE;
+                       JS::Handle<jsid> id) const override;
 
   static void ObjectMoved(JSObject *obj, const JSObject *old);
 
@@ -1037,7 +1035,7 @@ class nsChromeOuterWindowProxy : public nsOuterWindowProxy
 public:
   MOZ_CONSTEXPR nsChromeOuterWindowProxy() : nsOuterWindowProxy() { }
 
-  virtual const char *className(JSContext *cx, JS::Handle<JSObject*> wrapper) const MOZ_OVERRIDE;
+  virtual const char *className(JSContext *cx, JS::Handle<JSObject*> wrapper) const override;
 
   static const nsChromeOuterWindowProxy singleton;
 };
@@ -6137,7 +6135,7 @@ nsGlobalWindow::Dump(const nsAString& aStr)
     FILE *fp = gDumpFile ? gDumpFile : stdout;
     fputs(cstr, fp);
     fflush(fp);
-    nsMemory::Free(cstr);
+    free(cstr);
   }
 
   return NS_OK;
@@ -8060,7 +8058,7 @@ PostMessageReadTransferStructuredClone(JSContext* aCx,
     port->BindToOwner(scInfo->window);
     scInfo->ports.Put(port, nullptr);
 
-    JS::Rooted<JSObject*> obj(aCx, port->WrapObject(aCx));
+    JS::Rooted<JSObject*> obj(aCx, port->WrapObject(aCx, JS::NullPtr()));
     if (JS_WrapObject(aCx, &obj)) {
       MOZ_ASSERT(port->GetOwner() == scInfo->window);
       returnObject.set(obj);
@@ -8882,7 +8880,7 @@ nsGlobalWindow::NotifyDOMWindowDestroyed(nsGlobalWindow* aWindow) {
 // with principals that are either the system principal or an expanded principal.
 // This may not return true for all non-web-content compartments.
 struct BrowserCompartmentMatcher : public js::CompartmentFilter {
-  virtual bool match(JSCompartment* c) const MOZ_OVERRIDE
+  virtual bool match(JSCompartment* c) const override
   {
     nsCOMPtr<nsIPrincipal> pc = nsJSPrincipals::get(JS_GetCompartmentPrincipals(c));
     return nsContentUtils::IsSystemOrExpandedPrincipal(pc);
@@ -8900,7 +8898,7 @@ class MultiCompartmentMatcher : public js::CompartmentFilter {
   }
   
 public: 
-  virtual bool match(JSCompartment* c) const MOZ_OVERRIDE
+  virtual bool match(JSCompartment* c) const override
   {
     return compartments.has(c);
   }
@@ -9048,7 +9046,7 @@ private:
 void
 nsGlobalWindow::NotifyWindowIDDestroyed(const char* aTopic)
 {
-  nsRefPtr<nsIRunnable> runnable = new WindowDestroyedEvent(this, mWindowID, aTopic);
+  nsCOMPtr<nsIRunnable> runnable = new WindowDestroyedEvent(this, mWindowID, aTopic);
   nsresult rv = NS_DispatchToCurrentThread(runnable);
   if (NS_SUCCEEDED(rv)) {
     mNotifiedIDDestroyed = true;

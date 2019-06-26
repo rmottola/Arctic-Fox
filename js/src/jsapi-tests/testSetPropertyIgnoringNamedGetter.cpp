@@ -28,7 +28,7 @@ class CustomProxyHandler : public DirectProxyHandler {
     }
 
     bool set(JSContext* cx, HandleObject proxy, HandleObject receiver,
-             HandleId id, MutableHandleValue vp, ObjectOpResult &result) const MOZ_OVERRIDE
+             HandleId id, MutableHandleValue vp, ObjectOpResult &result) const override
     {
         Rooted<JSPropertyDescriptor> desc(cx);
         if (!DirectProxyHandler::getPropertyDescriptor(cx, proxy, id, &desc))

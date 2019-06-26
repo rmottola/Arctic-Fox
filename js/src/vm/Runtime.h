@@ -1443,6 +1443,9 @@ struct JSRuntime : public JS::shadow::Runtime,
      * function to assess the size of malloc'd blocks of memory.
      */
     mozilla::MallocSizeOf debuggerMallocSizeOf;
+
+    /* Last time at which an animation was played for this runtime. */
+    int64_t lastAnimationTime;
 };
 
 namespace js {

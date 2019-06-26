@@ -42,9 +42,9 @@ using namespace mozilla;
 using namespace mozilla::dom;
 
 JSObject*
-nsRange::WrapObject(JSContext* aCx)
+nsRange::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return RangeBinding::Wrap(aCx, this);
+  return RangeBinding::Wrap(aCx, this, aGivenProto);
 }
 
 /******************************************************

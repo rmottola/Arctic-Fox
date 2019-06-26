@@ -19,7 +19,7 @@ namespace dom {
 class TableRowsCollection;
 
 class HTMLTableElement final : public nsGenericHTMLElement,
-                                   public nsIDOMHTMLTableElement
+                               public nsIDOMHTMLTableElement
 {
 public:
   explicit HTMLTableElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
@@ -207,7 +207,7 @@ public:
 protected:
   virtual ~HTMLTableElement();
 
-  virtual JSObject* WrapNode(JSContext *aCx) override;
+  virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   nsIContent* GetChild(nsIAtom *aTag) const
   {

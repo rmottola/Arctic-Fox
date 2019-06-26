@@ -22,22 +22,15 @@ class nsIRunnable;
 class nsIThread;
 
 namespace mozilla {
-
-class ErrorResult;
-
 namespace dom {
 
-class OwningRequestOrScalarValueString;
-class Promise;
 class Request;
-class RequestOrScalarValueString;
 class Response;
-template<typename T> class Sequence;
 
 namespace cache {
 
-class FetchPut MOZ_FINAL : public Manager::Listener
-                         , public TypeUtils
+class FetchPut final : public Manager::Listener
+                     , public TypeUtils
 {
 public:
   typedef std::pair<nsRefPtr<Request>, nsRefPtr<Response>> PutPair;
@@ -90,16 +83,19 @@ private:
   void DoPutOnWorkerThread();
   static bool MatchInPutList(const PCacheRequest& aRequest,
                              const nsTArray<CacheRequestResponse>& aPutList);
-  virtual void OnCachePutAll(RequestId aRequestId, nsresult aRv) MOZ_OVERRIDE;
+  virtual void OnCachePutAll(RequestId aRequestId, nsresult aRv) override;
 
   void MaybeSetError(nsresult aRv);
   void MaybeNotifyListener();
 
   // TypeUtils methods
-  virtual nsIGlobalObject* GetGlobalObject() const MOZ_OVERRIDE;
+  virtual nsIGlobalObject* GetGlobalObject() const override;
 #ifdef DEBUG
-  virtual void AssertOwningThread() const MOZ_OVERRIDE;
+  virtual void AssertOwningThread() const override;
 #endif
+
+  virtual CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream) override;
 
   Listener* mListener;
   nsRefPtr<Manager> mManager;
