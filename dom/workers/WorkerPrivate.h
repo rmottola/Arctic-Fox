@@ -261,6 +261,9 @@ public:
   nsresult
   DispatchControlRunnable(WorkerControlRunnable* aWorkerControlRunnable);
 
+  nsresult
+  DispatchDebuggerRunnable(WorkerRunnable* aDebuggerRunnable);
+
   already_AddRefed<WorkerRunnable>
   MaybeWrapAsWorkerRunnable(nsIRunnable* aRunnable);
 
@@ -771,6 +774,7 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   nsRefPtr<WorkerDebugger> mDebugger;
 
   Queue<WorkerControlRunnable*, 4> mControlQueue;
+  Queue<WorkerRunnable*, 4> mDebuggerQueue;
 
   // Touched on multiple threads, protected with mMutex.
   JSContext* mJSContext;
