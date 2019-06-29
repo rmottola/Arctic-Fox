@@ -55,6 +55,7 @@ public:
 private:
   class Runnable;
   class FetchObserver;
+  friend class FetchObserver;
   struct State
   {
     PCacheRequest mPCacheRequest;
