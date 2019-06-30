@@ -14120,6 +14120,11 @@ NS_IMETHODIMP
 nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate, bool* aShouldIntercept)
 {
   *aShouldIntercept = false;
+  if (mSandboxFlags) {
+    // If we're sandboxed, don't intercept.
+    return NS_OK;
+  }
+
   nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
   if (!swm) {
     return NS_OK;
