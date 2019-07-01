@@ -1143,7 +1143,6 @@ CacheCreator::Load(nsIPrincipal* aPrincipal)
     return rv;
   }
 
-  // We use the ServiceWorker scope as key for the cacheStorage.
   ErrorResult error;
   MOZ_ASSERT(!mCacheName.IsEmpty());
   nsRefPtr<Promise> promise = mCacheStorage->Open(mCacheName, error);
