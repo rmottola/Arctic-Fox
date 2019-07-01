@@ -7,6 +7,7 @@ function testDefaultCtor() {
   is(req.referrer, "about:client", "Default referrer is `client` which serializes to about:client.");
   is(req.mode, "cors", "Request mode for string input is cors");
   is(req.credentials, "omit", "Default Request credentials is omit");
+  is(req.cache, "default", "Default Request cache is default");
 
   var req = new Request(req);
   is(req.method, "GET", "Default Request method is GET");
@@ -16,6 +17,7 @@ function testDefaultCtor() {
   is(req.referrer, "about:client", "Default referrer is `client` which serializes to about:client.");
   is(req.mode, "cors", "Request mode string input is cors");
   is(req.credentials, "omit", "Default Request credentials is omit");
+  is(req.cache, "default", "Default Request cache is default");
 }
 
 function testClone() {
@@ -25,6 +27,7 @@ function testClone() {
               body: "Sample body",
               mode: "same-origin",
               credentials: "same-origin",
+              cache: "no-store",
             });
   var clone = orig.clone();
   ok(clone.method === "POST", "Request method is POST");
@@ -39,6 +42,7 @@ function testClone() {
   ok(clone.referrer === "about:client", "Default referrer is `client` which serializes to about:client.");
   ok(clone.mode === "same-origin", "Request mode is same-origin");
   ok(clone.credentials === "same-origin", "Default credentials is same-origin");
+  ok(clone.cache === "no-store", "Default cache is no-store");
 
   ok(!orig.bodyUsed, "Original body is not consumed.");
   ok(!clone.bodyUsed, "Clone body is not consumed.");
@@ -216,8 +220,8 @@ function testBodyUsed() {
   });
 }
 
+var text = "κόσμε";
 function testBodyCreation() {
-  var text = "κόσμε";
   var req1 = new Request("", { method: 'post', body: text });
   var p1 = req1.text().then(function(v) {
     ok(typeof v === "string", "Should resolve to string");
@@ -239,6 +243,8 @@ function testBodyCreation() {
     is(v, text, "Extracted string should match");
   });
 
+  // FormData has its own function since it has blobs and files.
+
   var params = new URLSearchParams();
   params.append("item", "Goannas");
   params.append("feature", "stickyfeet");
@@ -252,6 +258,39 @@ function testBodyCreation() {
   });
 
   return Promise.all([p1, p2, p2b, pblob, p3]);
+}
+
+function testFormDataBodyCreation() {
+  var f1 = new FormData();
+  f1.append("key", "value");
+  f1.append("foo", "bar");
+
+  var r1 = new Request("", { method: 'post', body: f1 })
+  // Since f1 is serialized immediately, later additions should not show up.
+  f1.append("more", "stuff");
+  var p1 = r1.formData().then(function(fd) {
+    ok(fd instanceof FormData, "Valid FormData extracted.");
+    ok(fd.has("key"), "key should exist.");
+    ok(fd.has("foo"), "foo should exist.");
+    ok(!fd.has("more"), "more should not exist.");
+  });
+
+  f1.append("blob", new Blob([text]));
+  var r2 = new Request("", { method: 'post', body: f1 });
+  f1.delete("key");
+  var p2 = r2.formData().then(function(fd) {
+    ok(fd instanceof FormData, "Valid FormData extracted.");
+    ok(fd.has("more"), "more should exist.");
+
+    var b = fd.get("blob");
+    ok(b instanceof Blob, "blob entry should be a Blob.");
+
+    return readAsText(b).then(function(output) {
+      is(output, text, "Blob contents should match.");
+    });
+  });
+
+  return Promise.all([p1, p2]);
 }
 
 function testBodyExtraction() {
@@ -279,7 +318,69 @@ function testBodyExtraction() {
       var dec = new TextDecoder();
       is(dec.decode(new Uint8Array(v)), text, "UTF-8 decoded ArrayBuffer should match original");
     });
-  })
+  }).then(function() {
+    return newReq().formData().then(function(v) {
+      ok(false, "invalid FormData read should fail.");
+    }, function(e) {
+      ok(e.name == "TypeError", "invalid FormData read should fail.");
+    });
+  });
+}
+
+function testFormDataBodyExtraction() {
+  // URLSearchParams translates to application/x-www-form-urlencoded.
+  var params = new URLSearchParams();
+  params.append("item", "Geckos");
+  params.append("feature", "stickyfeet");
+  params.append("quantity", "700");
+  params.append("quantity", "800");
+
+  var req = new Request("", { method: 'POST', body: params });
+  var p1 = req.formData().then(function(fd) {
+    ok(fd.has("item"));
+    ok(fd.has("feature"));
+    var entries = fd.getAll("quantity");
+    is(entries.length, 2, "Entries with same name are correctly handled.");
+    is(entries[0], "700", "Entries with same name are correctly handled.");
+    is(entries[1], "800", "Entries with same name are correctly handled.");
+  });
+
+  var f1 = new FormData();
+  f1.append("key", "value");
+  f1.append("foo", "bar");
+  f1.append("blob", new Blob([text]));
+  var r2 = new Request("", { method: 'post', body: f1 });
+  var p2 = r2.formData().then(function(fd) {
+    ok(fd.has("key"));
+    ok(fd.has("foo"));
+    ok(fd.has("blob"));
+    var entries = fd.getAll("blob");
+    is(entries.length, 1, "getAll returns all items.");
+    is(entries[0].name, "blob", "Filename should be blob.");
+  });
+
+  var ws = "\r\n\r\n\r\n\r\n";
+  f1.set("key", new File([ws], 'file name has spaces.txt', { type: 'new/lines' }));
+  var r3 = new Request("", { method: 'post', body: f1 });
+  var p3 = r3.formData().then(function(fd) {
+    ok(fd.has("foo"));
+    ok(fd.has("blob"));
+    var entries = fd.getAll("blob");
+    is(entries.length, 1, "getAll returns all items.");
+    is(entries[0].name, "blob", "Filename should be blob.");
+
+    ok(fd.has("key"));
+    var f = fd.get("key");
+    ok(f instanceof File, "entry should be a File.");
+    is(f.name, "file name has spaces.txt", "File name should match.");
+    is(f.type, "new/lines", "File type should match.");
+    is(f.size, ws.length, "File size should match.");
+    return readAsText(f).then(function(text) {
+      is(text, ws, "File contents should match.");
+    });
+  });
+
+  return Promise.all([p1, p2, p3]);
 }
 
 // mode cannot be set to "CORS-with-forced-preflight" from javascript.
@@ -316,6 +417,8 @@ function runTest() {
     .then(testBodyCreation)
     .then(testBodyUsed)
     .then(testBodyExtraction)
+    .then(testFormDataBodyCreation)
+    .then(testFormDataBodyExtraction)
     .then(testUsedRequest)
     .then(testClone())
     // Put more promise based tests here.

@@ -110,9 +110,13 @@
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Bug 1151974
-- Bug Bug 931249 2015-03-20
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
+Bug 1094764 - Implement AudioContext.suspend and friends. r=roc,ehsan 
+- Bug 1151974
+- Bug 1151892 Refactor Cache Manager Context usage to be more sane and 
+- Bug 1110485 P1 Refactor Cache IPC requests to use a separate actor
+- Bug 1150608 Do not reuse CacheId values within an origin.
+- Bug 1147699 from 2 to 18 parts
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
