@@ -601,6 +601,7 @@ public:
 
     if (aInCacheAndEqual) {
       Succeed();
+      Done(NS_OK);
       return;
     }
 
