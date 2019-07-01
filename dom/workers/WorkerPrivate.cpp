@@ -2293,6 +2293,7 @@ WorkerLoadInfo::StealFrom(WorkerLoadInfo& aOther)
   mPrincipalInfo = aOther.mPrincipalInfo.forget();
 
   mDomain = aOther.mDomain;
+  mServiceWorkerCacheName = aOther.mServiceWorkerCacheName;
   mWindowID = aOther.mWindowID;
   mFromWindow = aOther.mFromWindow;
   mEvalAllowed = aOther.mEvalAllowed;
@@ -2672,7 +2673,8 @@ WorkerPrivateParent<Derived>::WorkerPrivateParent(
   mCondVar(mMutex, "WorkerPrivateParent CondVar"),
   mMemoryReportCondVar(mMutex, "WorkerPrivateParent Memory Report CondVar"),
   mParent(aParent), mScriptURL(aScriptURL),
-  mSharedWorkerName(aSharedWorkerName), mBusyCount(0), mMessagePortSerial(0),
+  mSharedWorkerName(aSharedWorkerName), mLoadingWorkerScript(false),
+  mBusyCount(0), mMessagePortSerial(0),
   mParentStatus(Pending), mParentFrozen(false),
   mIsChromeWorker(aIsChromeWorker), mMainThreadObjectsForgotten(false),
   mWorkerType(aWorkerType),
