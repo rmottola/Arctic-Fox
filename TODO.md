@@ -110,7 +110,6 @@
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
 - Bug 1126014 - DomainPolicy support for e10s.
 - Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Bug Bug 931249 2015-03-20
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 Bug 1094764 - Implement AudioContext.suspend and friends. r=roc,ehsan 
 - Bug 1151974
