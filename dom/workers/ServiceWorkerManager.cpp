@@ -2174,6 +2174,7 @@ class FetchEventRunnable : public WorkerRunnable
   bool mIsReload;
   RequestMode mRequestMode;
   RequestCredentials mRequestCredentials;
+  nsContentPolicyType mContentPolicyType;
 public:
   FetchEventRunnable(WorkerPrivate* aWorkerPrivate,
                      nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
@@ -2189,6 +2190,7 @@ public:
     // By default we set it to same-origin since normal HTTP fetches always
     // send credentials to same-origin websites unless explicitly forbidden.
     , mRequestCredentials(RequestCredentials::Same_origin)
+    , mContentPolicyType(nsIContentPolicy::TYPE_INVALID)
   {
     MOZ_ASSERT(aWorkerPrivate);
   }
@@ -2261,6 +2263,12 @@ public:
     rv = httpChannel->VisitRequestHeaders(this);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    nsCOMPtr<nsILoadInfo> loadInfo;
+    rv = channel->GetLoadInfo(getter_AddRefs(loadInfo));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    mContentPolicyType = loadInfo->InternalContentPolicyType();
+
     return NS_OK;
   }
 
@@ -2330,6 +2338,8 @@ private:
     if (NS_WARN_IF(rv.Failed())) {
       return false;
     }
+
+    request->SetContentPolicyType(mContentPolicyType);
 
     RootedDictionary<FetchEventInit> init(aCx);
     init.mRequest.Construct();
