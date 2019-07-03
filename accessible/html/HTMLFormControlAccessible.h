@@ -243,7 +243,6 @@ public:
   HTMLLegendAccessible(nsIContent* aContent, DocAccessible* aDoc);
 
   // Accessible
-  virtual mozilla::a11y::role NativeRole() override;
   virtual Relation RelationByType(RelationType aType) override;
 };
 
@@ -257,7 +256,6 @@ public:
 
   // Accessible
   virtual already_AddRefed<nsIPersistentProperties> NativeAttributes() override;
-  virtual mozilla::a11y::role NativeRole() override;
   virtual Relation RelationByType(RelationType aType) override;
 
 protected:
@@ -278,7 +276,6 @@ public:
   HTMLFigcaptionAccessible(nsIContent* aContent, DocAccessible* aDoc);
 
   // Accessible
-  virtual mozilla::a11y::role NativeRole() override;
   virtual Relation RelationByType(RelationType aType) override;
 };
 
