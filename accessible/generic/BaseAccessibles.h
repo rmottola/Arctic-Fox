@@ -94,10 +94,10 @@ protected:
  * A simple accessible that gets its enumerated role passed into constructor.
  */
 template<a11y::role R>
-class RoleTAccessible : public AccessibleWrap
+class EnumRoleAccessible : public AccessibleWrap
 {
 public:
-  RoleTAccessible(nsIContent* aContent, DocAccessible* aDoc) :
+  EnumRoleAccessible(nsIContent* aContent, DocAccessible* aDoc) :
     AccessibleWrap(aContent, aDoc) { }
 
   NS_IMETHOD QueryInterface(REFNSIID aIID, void** aPtr) override
@@ -107,7 +107,7 @@ public:
   virtual a11y::role NativeRole() override { return R; }
 
 protected:
-  virtual ~RoleTAccessible() { }
+  virtual ~EnumRoleAccessible() { }
 };
 
 
