@@ -255,7 +255,6 @@ public:
   HTMLFigureAccessible(nsIContent* aContent, DocAccessible* aDoc);
 
   // Accessible
-  virtual already_AddRefed<nsIPersistentProperties> NativeAttributes() override;
   virtual Relation RelationByType(RelationType aType) override;
 
 protected:
