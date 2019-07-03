@@ -114,7 +114,6 @@
 - Bug 1135491: Part 1 - Add functions to notify plugin when a plugin de
 - Bug 1139576 - New_ functions should be static
 - Bug 1001634 - Add basic MathML accessibility implementation, r=surkov
-- Bug 1140500 - add object attributes declaration into markup map,
 
 
 Parents of:
