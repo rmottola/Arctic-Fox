@@ -216,13 +216,8 @@ New_HTMLTableHeaderCellIfScope(nsIContent* aContent, Accessible* aContext)
 ////////////////////////////////////////////////////////////////////////////////
 // Markup maps array.
 
-struct MarkupMapInfo {
-  nsIAtom** tag;
-  New_Accessible* new_func;
-};
-
-#define MARKUPMAP(atom, new_func) \
-  { &nsGkAtoms::atom, new_func },
+#define MARKUPMAP(atom, new_func, r) \
+  { &nsGkAtoms::atom, new_func, static_cast<a11y::role>(r) },
 
 static const MarkupMapInfo sMarkupMapList[] = {
   #include "MarkupMap.h"
@@ -240,7 +235,7 @@ xpcAccessibleApplication* nsAccessibilityService::gXPCApplicationAccessible = nu
 bool nsAccessibilityService::gIsShutdown = true;
 
 nsAccessibilityService::nsAccessibilityService() :
-  DocManager(), FocusManager(), mMarkupMap(ArrayLength(sMarkupMapList))
+  DocManager(), FocusManager(), mMarkupMaps(ArrayLength(sMarkupMapList))
 {
 }
 
@@ -1074,9 +1069,10 @@ nsAccessibilityService::GetOrCreateAccessible(nsINode* aNode,
         frame->AccessibleType() == eHTMLTableCellType ||
         frame->AccessibleType() == eHTMLTableType) {
       // Prefer to use markup to decide if and what kind of accessible to create,
-      New_Accessible* new_func = mMarkupMap.Get(content->NodeInfo()->NameAtom());
-      if (new_func)
-        newAcc = new_func(content, aContext);
+      const MarkupMapInfo* markupMap =
+        mMarkupMaps.Get(content->NodeInfo()->NameAtom());
+      if (markupMap && markupMap->new_func)
+        newAcc = markupMap->new_func(content, aContext);
 
       if (!newAcc) // try by frame accessible type.
         newAcc = CreateAccessibleByFrameType(frame, content, aContext);
@@ -1215,7 +1211,7 @@ nsAccessibilityService::Init()
   observerService->NotifyObservers(nullptr, "a11y-init-or-shutdown", kInitIndicator);
 
   for (uint32_t i = 0; i < ArrayLength(sMarkupMapList); i++)
-    mMarkupMap.Put(*sMarkupMapList[i].tag, sMarkupMapList[i].new_func);
+    mMarkupMaps.Put(*sMarkupMapList[i].tag, &sMarkupMapList[i]);
 
 #ifdef A11Y_LOG
   logging::CheckEnv();
