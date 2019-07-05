@@ -112,13 +112,11 @@
 - Bug 927995 - Handle antialias+preserveDrawingBuffer properly.
 - Bug 1135491: Part 2 - Changes to nsJSNPRuntime to ensure that JS exce
 - Bug 1135491: Part 1 - Add functions to notify plugin when a plugin de
-- Bug 1139576 - New_ functions should be static
-- Bug 1001634 - Add basic MathML accessibility implementation, r=surkov
 
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/1d9af5b5eaa1be6cd11bde96c8d04bd3040ad2a3
+https://github.com/mozilla/newtab-dev/commit/2af8c2b3fefa5c7898879efd3dd44b9070e9033c
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
