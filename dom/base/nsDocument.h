@@ -1034,9 +1034,8 @@ public:
   virtual void FlushSkinBindings() override;
 
   virtual nsresult InitializeFrameLoader(nsFrameLoader* aLoader) override;
-  virtual nsresult FinalizeFrameLoader(nsFrameLoader* aLoader) override;
+  virtual nsresult FinalizeFrameLoader(nsFrameLoader* aLoader, nsIRunnable* aFinalizer) override;
   virtual void TryCancelFrameLoaderInitialization(nsIDocShell* aShell) override;
-  virtual bool FrameLoaderScheduledToBeFinalized(nsIDocShell* aShell) override;
   virtual nsIDocument*
     RequestExternalResource(nsIURI* aURI,
                             nsINode* aRequestingNode,
@@ -1765,7 +1764,7 @@ private:
   nsString mLastStyleSheetSet;
 
   nsTArray<nsRefPtr<nsFrameLoader> > mInitializableFrameLoaders;
-  nsTArray<nsRefPtr<nsFrameLoader> > mFinalizableFrameLoaders;
+  nsTArray<nsCOMPtr<nsIRunnable> > mFrameLoaderFinalizers;
   nsRefPtr<nsRunnableMethod<nsDocument> > mFrameLoaderRunner;
 
   nsRevocableEventPtr<nsRunnableMethod<nsDocument, void, false> >
