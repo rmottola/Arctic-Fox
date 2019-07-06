@@ -1,0 +1,91 @@
+diff --git a/dom/media/webrtc/MediaEngineCameraVideoSource.cpp b/dom/media/webrtc/MediaEngineCameraVideoSource.cpp
+index 9c318c6ef978..b82e96774dca 100644
+--- a/dom/media/webrtc/MediaEngineCameraVideoSource.cpp
++++ b/dom/media/webrtc/MediaEngineCameraVideoSource.cpp
+@@ -116,10 +116,16 @@ MediaEngineCameraVideoSource::FitnessDistance(double n,
+ MediaEngineCameraVideoSource::GetFitnessDistance(const webrtc::CaptureCapability& aCandidate,
+                                                  const MediaTrackConstraintSet &aConstraints)
+ {
++  // Treat width|height|frameRate == 0 on capability as "can do any".
++  // This allows for orthogonal capabilities that are not in discrete steps.
++
+   uint64_t distance =
+-    uint64_t(FitnessDistance(int32_t(aCandidate.width), aConstraints.mWidth)) +
+-    uint64_t(FitnessDistance(int32_t(aCandidate.height), aConstraints.mHeight)) +
+-    uint64_t(FitnessDistance(double(aCandidate.maxFPS), aConstraints.mFrameRate));
++    uint64_t(aCandidate.width? FitnessDistance(int32_t(aCandidate.width),
++                                               aConstraints.mWidth) : 0) +
++    uint64_t(aCandidate.height? FitnessDistance(int32_t(aCandidate.height),
++                                                aConstraints.mHeight) : 0) +
++    uint64_t(aCandidate.maxFPS? FitnessDistance(double(aCandidate.maxFPS),
++                                                aConstraints.mFrameRate) : 0);
+   return uint32_t(std::min(distance, uint64_t(UINT32_MAX)));
+ }
+ 
+diff --git a/dom/media/webrtc/MediaEngineWebRTCVideo.cpp b/dom/media/webrtc/MediaEngineWebRTCVideo.cpp
+index 150b215255d9..6e291e1080fa 100644
+--- a/dom/media/webrtc/MediaEngineWebRTCVideo.cpp
++++ b/dom/media/webrtc/MediaEngineWebRTCVideo.cpp
+@@ -162,27 +162,43 @@ MediaEngineWebRTCVideoSource::NumCapabilities()
+   if (num > 0) {
+     return num;
+   }
+-  // Mac doesn't support capabilities.
+-  //
+-  // Hardcode generic desktop capabilities modeled on OSX camera.
+-  // Note: Values are empirically picked to be OSX friendly, as on OSX, values
+-  // other than these cause the source to not produce.
+-
+-  if (mHardcodedCapabilities.IsEmpty()) {
+-    for (int i = 0; i < 9; i++) {
+-      webrtc::CaptureCapability c;
+-      c.width = 1920 - i*128;
+-      c.height = 1080 - i*72;
+-      c.maxFPS = 30;
+-      mHardcodedCapabilities.AppendElement(c);
+-    }
+-    for (int i = 0; i < 16; i++) {
++
++  switch (mMediaSource) {
++#ifdef XP_MACOSX
++    case dom::MediaSourceEnum::Camera:
++      // Mac doesn't support capabilities.
++      //
++      // Hardcode generic desktop capabilities modeled on OSX camera.
++      // Note: Values are empirically picked to be OSX friendly, as on OSX,
++      // values other than these cause the source to not produce.
++
++      if (mHardcodedCapabilities.IsEmpty()) {
++        for (int i = 0; i < 9; i++) {
++          webrtc::CaptureCapability c;
++          c.width = 1920 - i*128;
++          c.height = 1080 - i*72;
++          c.maxFPS = 30;
++          mHardcodedCapabilities.AppendElement(c);
++        }
++        for (int i = 0; i < 16; i++) {
++          webrtc::CaptureCapability c;
++          c.width = 640 - i*40;
++          c.height = 480 - i*30;
++          c.maxFPS = 30;
++          mHardcodedCapabilities.AppendElement(c);
++        }
++      }
++      break;
++#endif
++    default:
++      // The default for devices that don't return discrete capabilities: treat
++      // them as supporting all capabilities orthogonally. E.g. screensharing.
+       webrtc::CaptureCapability c;
+-      c.width = 640 - i*40;
+-      c.height = 480 - i*30;
+-      c.maxFPS = 30;
++      c.width = 0; // 0 = accept any value
++      c.height = 0;
++      c.maxFPS = 0;
+       mHardcodedCapabilities.AppendElement(c);
+-    }
++      break;
+   }
+   return mHardcodedCapabilities.Length();
+ }
