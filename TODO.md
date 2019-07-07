@@ -112,11 +112,13 @@
 - Bug 927995 - Handle antialias+preserveDrawingBuffer properly.
 - Bug 1135491: Part 2 - Changes to nsJSNPRuntime to ensure that JS exce
 - Bug 1135491: Part 1 - Add functions to notify plugin when a plugin de
+- Bug 1142403 - Enable jemalloc debug on debug builds.
+
 
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/2af8c2b3fefa5c7898879efd3dd44b9070e9033c
+https://github.com/mozilla/newtab-dev/commit/f5ae8deae6ed76c4af3ec5cad21831c335c37862
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
