@@ -1049,6 +1049,8 @@ PluginModuleParent::DeallocPPluginInstanceParent(PPluginInstanceParent* aActor)
 void
 PluginModuleParent::SetPluginFuncs(NPPluginFuncs* aFuncs)
 {
+    MOZ_ASSERT(aFuncs);
+
     aFuncs->version = (NP_VERSION_MAJOR << 8) | NP_VERSION_MINOR;
     aFuncs->javaClass = nullptr;
 
@@ -1684,7 +1686,7 @@ PluginModuleParent::RecvNP_InitializeResult(const NPError& aError)
         return true;
     }
 
-    if (mIsStartingAsync) {
+    if (mIsStartingAsync && mNPPIface) {
         SetPluginFuncs(mNPPIface);
         InitAsyncSurrogates();
     }
@@ -1803,8 +1805,17 @@ PluginModuleParent::NP_GetEntryPoints(NPPluginFuncs* pFuncs, NPError* error)
 
     *error = NPERR_NO_ERROR;
     if (mIsStartingAsync && !IsChrome()) {
-        PluginAsyncSurrogate::NP_GetEntryPoints(pFuncs);
         mNPPIface = pFuncs;
+#if defined(XP_MACOSX)
+        if (mNPInitialized) {
+            SetPluginFuncs(pFuncs);
+            InitAsyncSurrogates();
+        } else {
+            PluginAsyncSurrogate::NP_GetEntryPoints(pFuncs);
+        }
+#else
+        PluginAsyncSurrogate::NP_GetEntryPoints(pFuncs);
+#endif
     } else {
         SetPluginFuncs(pFuncs);
     }
