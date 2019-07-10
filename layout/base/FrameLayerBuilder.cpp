@@ -4285,8 +4285,9 @@ FrameLayerBuilder::GetPaintedLayerScaleForFrame(nsIFrame* aFrame)
     }
   }
 
+  float presShellResolution = last->PresContext()->PresShell()->GetResolution();
   return PredictScaleForContent(aFrame, last,
-      last->PresContext()->PresShell()->GetResolution());
+      gfxSize(presShellResolution, presShellResolution));
 }
 
 #ifdef MOZ_DUMP_PAINTING
