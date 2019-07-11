@@ -106,13 +106,6 @@
 - Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
 - Bug 1141563 - Don't update Shapes in parallel after compacting GC
-- Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Bug 1128019 - Init SCISSOR_BOX with initial width and height. 
-- Bug 1136507 - L8, LA8, and A8 should not be renderable
-- Bug 927995 - Handle antialias+preserveDrawingBuffer properly.
-- Bug 1135491: Part 2 - Changes to nsJSNPRuntime to ensure that JS exce
-- Bug 1135491: Part 1 - Add functions to notify plugin when a plugin de
-- Bug 1142403 - Enable jemalloc debug on debug builds.
 
 
 
