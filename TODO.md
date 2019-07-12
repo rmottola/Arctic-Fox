@@ -105,7 +105,6 @@
 - Bug 1145997 - Suppress GC in debugger GC callback 
 - Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
-- Bug 1141563 - Don't update Shapes in parallel after compacting GC
 
 
 
@@ -135,7 +134,6 @@ no components/url-classifier ?
 
 ### Further ToDo which would help portability:
 
-- Update code from TemporaryRef to already_Refed
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - js/src/jscntxt.h  update ReportValueError to UniquePtr
