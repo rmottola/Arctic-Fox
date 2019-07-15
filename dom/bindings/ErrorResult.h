@@ -48,6 +48,7 @@ public:
 
 #ifdef DEBUG
     mMightHaveUnreportedJSException = false;
+    mHasMessage = false;
 #endif
   }
 
@@ -55,6 +56,7 @@ public:
   ~ErrorResult() {
     MOZ_ASSERT_IF(IsErrorWithMessage(), !mMessage);
     MOZ_ASSERT(!mMightHaveUnreportedJSException);
+    MOZ_ASSERT(!mHasMessage);
   }
 #endif
 
@@ -192,6 +194,10 @@ private:
   // Used to keep track of codepaths that might throw JS exceptions,
   // for assertion purposes.
   bool mMightHaveUnreportedJSException;
+  // Used to keep track of whether mMessage has ever been assigned to.
+  // We need to check this in order to ensure that not attempting to
+  // delete mMessage in DeserializeMessage doesn't leak memory.
+  bool mHasMessage;
 #endif
 
   // Not to be implemented, to make sure people always pass this by
