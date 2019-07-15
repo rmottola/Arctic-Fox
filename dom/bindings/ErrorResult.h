@@ -17,6 +17,7 @@
 #include "nscore.h"
 #include "nsStringGlue.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Move.h"
 
 namespace IPC {
 class Message;
@@ -56,6 +57,12 @@ public:
     MOZ_ASSERT(!mMightHaveUnreportedJSException);
   }
 #endif
+
+  ErrorResult(ErrorResult&& aRHS)
+  {
+    *this = Move(aRHS);
+  }
+  ErrorResult& operator=(ErrorResult&& aRHS);
 
   void Throw(nsresult rv) {
     MOZ_ASSERT(NS_FAILED(rv), "Please don't try throwing success");
