@@ -108,6 +108,14 @@ this.TelemetryPing = Object.freeze({
     Impl._clientID = null;
     return this.setup();
   },
+
+
+  /**
+   * Used only for testing purposes.
+   */
+  shutdown: function() {
+    return Impl.shutdown(true);
+  },
   /**
    * Used only for testing purposes.
    */
@@ -411,5 +419,17 @@ let Impl = {
 
   get clientID() {
     return this._clientID;
+  },
+
+  /**
+   * This tells TelemetryPing to uninitialize and save any pending pings.
+   * @param testing Optional. If true, always saves the ping whether Telemetry
+   *                can send pings or not, which is used for testing.
+   */
+  shutdown: function(testing = false) {
+    this.uninstall();
+    if (Telemetry.canSend || testing) {
+      return this.savePendingPings();
+    }
   },
 };

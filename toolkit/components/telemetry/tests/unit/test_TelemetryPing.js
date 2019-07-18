@@ -800,6 +800,20 @@ add_task(function* test_savedSessionClientID() {
   Assert.equal(ping.value.payload.clientID, gDataReportingClientID);
 });
 
+add_task(function* test_savedSessionClientID() {
+  // Assure that we store the ping properly when saving sessions on shutdown.
+  // We make the TelemetryPings shutdown to trigger a session save.
+  const dir = TelemetryFile.pingDirectoryPath;
+  yield OS.File.removeDir(dir, {ignoreAbsent: true});
+  yield OS.File.makeDir(dir);
+  yield TelemetryPing.shutdown();
+
+  yield TelemetryFile.loadSavedPings();
+  Assert.equal(TelemetryFile.pingsLoaded, 1);
+  let ping = TelemetryFile.popPendingPings().next();
+  Assert.equal(ping.value.payload.clientID, gDataReportingClientID);
+});
+
 add_task(function* stopServer(){
   gHttpServer.stop(do_test_finished);
 });
