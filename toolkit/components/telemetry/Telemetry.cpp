@@ -1763,7 +1763,8 @@ TelemetryImpl::AsyncFetchTelemetryData(nsIFetchTelemetryDataCallback *aCallback)
 
 TelemetryImpl::TelemetryImpl():
 mHistogramMap(Telemetry::HistogramCount),
-mCanRecord(XRE_GetProcessType() == GoannaProcessType_Default),
+mCanRecord(XRE_GetProcessType() == GoannaProcessType_Default ||
+           XRE_GetProcessType() == GoannaProcessType_Content),
 mHashMutex("Telemetry::mHashMutex"),
 mHangReportsMutex("Telemetry::mHangReportsMutex"),
 mCachedTelemetryData(false),
