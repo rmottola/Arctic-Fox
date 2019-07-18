@@ -28,8 +28,19 @@ const IS_CONTENT_PROCESS = (function() {
 
 // When modifying the payload in incompatible ways, please bump this version number
 const PAYLOAD_VERSION = 1;
-const PING_TYPE = "main";
+const PING_TYPE_MAIN = "main";
 const RETENTION_DAYS = 14;
+
+const REASON_DAILY = "daily";
+const REASON_SAVED_SESSION = "saved-session";
+const REASON_IDLE_DAILY = "idle-daily";
+const REASON_GATHER_PAYLOAD = "gather-payload";
+const REASON_TEST_PING = "test-ping";
+
+const SEC_IN_ONE_DAY  = 24 * 60 * 60;
+const MS_IN_ONE_DAY   = SEC_IN_ONE_DAY * 1000;
+
+const MIN_SUBSESSION_LENGTH_MS = 10 * 60 * 1000;
 
 // This is the HG changeset of the Histogram.json file, used to associate
 // submitted ping data with its histogram definition (bug 832007)
@@ -115,6 +126,8 @@ function generateUUID() {
  */
 let Policy = {
   now: () => new Date(),
+  setDailyTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+  clearDailyTimeout: (id) => clearTimeout(id),
 };
 
 /**
@@ -125,6 +138,34 @@ function truncateToDays(date) {
                   date.getMonth(),
                   date.getDate(),
                   0, 0, 0, 0);
+}
+
+/**
+ * Date.toISOString() gives us UTC times, this gives us local times in the ISO date format.
+ * http://www.w3.org/TR/NOTE-datetime
+ */
+function toLocalTimeISOString(date) {
+  function padNumber(number, places) {
+    number = number.toString();
+    while (number.length < places) {
+      number = "0" + number;
+    }
+    return number;
+  }
+
+  let sign = (n) => n >= 0 ? "+" : "-";
+  let tzOffset = date.getTimezoneOffset();
+
+  // YYYY-MM-DDThh:mm:ss.sTZD (eg 1997-07-16T19:20:30.45+01:00)
+  return    padNumber(date.getFullYear(), 4)
+    + "-" + padNumber(date.getMonth() + 1, 2)
+    + "-" + padNumber(date.getDate(), 2)
+    + "T" + padNumber(date.getHours(), 2)
+    + ":" + padNumber(date.getMinutes(), 2)
+    + ":" + padNumber(date.getSeconds(), 2);
+    + "." + date.getMilliseconds()
+    + sign(tzOffset) + Math.abs(Math.floor(tzOffset / 60))
+    + ":" + Math.abs(tzOffset % 60);
 }
 
 /**
@@ -304,6 +345,8 @@ let Impl = {
   _childTelemetry: [],
   // Date of the last session split
   _subsessionStartDate: null,
+  // The timer used for daily collections.
+  _dailyTimerId: null,
 
   /**
    * Gets a series of simple measurements (counters). At the moment, this
@@ -550,6 +593,8 @@ let Impl = {
   getMetadata: function getMetadata(reason) {
     this._log.trace("getMetadata - Reason " + reason);
 
+    let subsessionStartDate = toLocalTimeISOString(truncateToDays(this._subsessionStartDate));
+
     let ai = Services.appinfo;
     let ret = {
       reason: reason,
@@ -564,7 +609,7 @@ let Impl = {
       locale: getLocale(),
       asyncPluginInit: Preferences.get(PREF_ASYNC_PLUGIN_INIT, false)
 
-      subsessionStartDate: truncateToDays(this._subsessionStartDate).toISOString(),
+      subsessionStartDate: subsessionStartDate,
     };
 
     // In order to share profile data, the appName used for Metro Firefox is "Firefox",
@@ -856,11 +901,14 @@ let Impl = {
   getSessionPayload: function getSessionPayload(reason, clearSubsession) {
     this._log.trace("getSessionPayload - reason: " + reason + ", clearSubsession: " + clearSubsession);
 
-    let measurements = this.getSimpleMeasurements(reason == "saved-session");
+    let measurements = this.getSimpleMeasurements(reason == REASON_SAVED_SESSION);
     let info = !IS_CONTENT_PROCESS ? this.getMetadata(reason) : null;
     let payload = this.assemblePayloadWithMeasurements(measurements, info, reason, clearSubsession);
 
-    this._subsessionStartDate = Policy.now();
+    if (clearSubsession) {
+      this._subsessionStartDate = Policy.now();
+      this._rescheduleDailyTimer();
+    }
 
     return payload;
   },
@@ -880,7 +928,7 @@ let Impl = {
       addClientId: true,
       addEnvironment: true,
     };
-    return TelemetryPing.send(PING_TYPE, payload, options);
+    return TelemetryPing.send(PING_TYPE_MAIN, payload, options);
   },
 
   attachObservers: function attachObservers() {
@@ -964,13 +1012,7 @@ let Impl = {
     }
 
     AsyncShutdown.sendTelemetry.addBlocker(
-      "TelemetrySession: shutting down",
-      function condition(){
-        this.uninstall();
-        if (Telemetry.canSend) {
-          return this.savePendingPings();
-        }
-      }.bind(this));
+      "TelemetrySession: shutting down", () => this.shutdown());
 
     Services.obs.addObserver(this, "sessionstore-windows-restored", false);
 #ifdef MOZ_WIDGET_ANDROID
@@ -993,6 +1035,8 @@ let Impl = {
       this.gatherMemory();
 
       Telemetry.asyncFetchTelemetryData(function () {});
+      this._rescheduleDailyTimer();
+
       deferred.resolve();
 
     }.bind(this), testing ? TELEMETRY_TEST_DELAY : TELEMETRY_DELAY);
@@ -1072,18 +1116,18 @@ let Impl = {
 
   savePendingPings: function savePendingPings() {
     this._log.trace("savePendingPings");
-    let payload = this.getSessionPayload("saved-session", false);
+    let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
     let options = {
       retentionDays: RETENTION_DAYS,
       addClientId: true,
       addEnvironment: true,
     };
-    return TelemetryPing.savePendingPings(PING_TYPE, payload, options);
+    return TelemetryPing.savePendingPings(PING_TYPE_MAIN, payload, options);
   },
 
   testSaveHistograms: function testSaveHistograms(file) {
     this._log.trace("testSaveHistograms - Path: " + file.path);
-    let payload = this.getSessionPayload("saved-session", false);
+    let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
     let options = {
       retentionDays: RETENTION_DAYS,
       addClientId: true,
@@ -1091,7 +1135,7 @@ let Impl = {
       overwrite: true,
       filePath: file.path,
     };
-    return TelemetryPing.testSavePingToFile(PING_TYPE, payload, options);
+    return TelemetryPing.testSavePingToFile(PING_TYPE_MAIN, payload, options);
   },
 
   /**
@@ -1114,7 +1158,7 @@ let Impl = {
 
   getPayload: function getPayload(reason, clearSubsession) {
     this._log.trace("getPayload - clearSubsession: " + clearSubsession);
-    reason = reason || "gather-payload";
+    reason = reason || REASON_GATHER_PAYLOAD;
     // This function returns the current Telemetry payload to the caller.
     // We only gather startup info once.
     if (Object.keys(this._slowSQLStartup).length == 0) {
@@ -1147,9 +1191,9 @@ let Impl = {
       this._isIdleObserver = false;
     }
     if (aTest) {
-      return this.send("test-ping");
+      return this.send(REASON_TEST_PING);
     } else if (Telemetry.canSend) {
-      return this.send("idle-daily");
+      return this.send(REASON_IDLE_DAILY);
     }
   },
 
@@ -1180,7 +1224,7 @@ let Impl = {
       this.uninstall();
 
       if (Telemetry.canSend) {
-        this.sendContentProcessPing("saved-session");
+        this.sendContentProcessPing(REASON_SAVED_SESSION);
       }
       break;
     case "cycle-collector-begin":
@@ -1208,7 +1252,7 @@ let Impl = {
       gWasDebuggerAttached = debugService.isDebuggerAttached;
       this.gatherStartup();
       break;
-    case "idle-daily":
+    case REASON_IDLE_DAILY:
       // Enqueue to main-thread, otherwise components may be inited by the
       // idle-daily category and miss the gather-telemetry notification.
       Services.tm.mainThread.dispatch((function() {
@@ -1241,14 +1285,14 @@ let Impl = {
     //    it on the next backgrounding). Not deleting it is faster, so that's what we do.
     case "application-background":
       if (Telemetry.canSend) {
-        let payload = this.getSessionPayload("saved-session", false);
+        let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
         let options = {
           retentionDays: RETENTION_DAYS,
           addClientId: true,
           addEnvironment: true,
           overwrite: true,
         };
-        TelemetryPing.savePing(PING_TYPE, payload, options);
+        TelemetryPing.savePing(PING_TYPE_MAIN, payload, options);
       }
       break;
 #endif
@@ -1261,6 +1305,10 @@ let Impl = {
    *                can send pings or not, which is used for testing.
    */
   shutdown: function(testing = false) {
+    if (this._dailyTimerId) {
+      Policy.clearDailyTimeout(this._dailyTimerId);
+      this._dailyTimerId = null;
+    }
     this.uninstall();
     if (Telemetry.canSend || testing) {
       return this.savePendingPings();
@@ -1268,12 +1316,55 @@ let Impl = {
     return Promise.resolve();
   },
 
+  _rescheduleDailyTimer: function() {
+    if (this._dailyTimerId) {
+      this._log.trace("_rescheduleDailyTimer - clearing existing timeout");
+      Policy.clearDailyTimeout(this._dailyTimerId);
+    }
+
+    let now = Policy.now();
+    let midnight = truncateToDays(now).getTime() + MS_IN_ONE_DAY;
+    let msUntilCollection = midnight - now.getTime();
+    if (msUntilCollection < MIN_SUBSESSION_LENGTH_MS) {
+      msUntilCollection += MS_IN_ONE_DAY;
+    }
+
+    this._log.trace("_rescheduleDailyTimer - now: " + now
+                    + ", scheduled: " + new Date(now.getTime() + msUntilCollection));
+    this._dailyTimerId = Policy.setDailyTimeout(() => this._onDailyTimer(), msUntilCollection);
+  },
+
+  _onDailyTimer: function() {
+    if (!this._initialized) {
+      if (this._log) {
+        this._log.warn("_onDailyTimer - not initialized");
+      } else {
+        Cu.reportError("TelemetrySession._onDailyTimer - not initialized");
+      }
+      return;
+    }
+
+    this._log.trace("_onDailyTimer");
+    let payload = this.getSessionPayload(REASON_DAILY, true);
+
+    let options = {
+      retentionDays: RETENTION_DAYS,
+      addClientId: true,
+      addEnvironment: true,
+    };
+    let promise = TelemetryPing.send(PING_TYPE_MAIN, payload, options);
+
+    this._rescheduleDailyTimer();
+    // Return the promise so tests can wait on the ping submission.
+    return promise;
+  },
+
   _isClassicReason: function(reason) {
     const classicReasons = [
-      "saved-session",
-      "idle-daily",
-      "gather-payload",
-      "test-ping",
+      REASON_SAVED_SESSION,
+      REASON_IDLE_DAILY,
+      REASON_GATHER_PAYLOAD,
+      REASON_TEST_PING,
     ];
     return classicReasons.indexOf(reason) != -1;
   },
