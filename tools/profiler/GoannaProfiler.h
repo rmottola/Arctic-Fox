@@ -50,6 +50,7 @@
 #define SAMPLER_H
 
 #include "js/TypeDecls.h"
+#include "mozilla/UniquePtr.h"
 
 namespace mozilla {
 class TimeStamp;
@@ -229,5 +230,7 @@ public:
     profiler_sleep_end();
   }
 };
+
+
 
 #endif // ifndef SAMPLER_H
