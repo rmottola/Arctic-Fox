@@ -9,7 +9,7 @@
 
 #include "base/process.h"
 #include "mozilla/FileUtils.h"
-#include "mozilla/HangMonitor.h"
+#include "mozilla/HangAnnotations.h"
 #include "mozilla/PluginLibrary.h"
 #include "mozilla/plugins/ScopedMethodFactory.h"
 #include "mozilla/plugins/PluginProcessParent.h"

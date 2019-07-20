@@ -54,6 +54,7 @@
 #include "nsReadableUtils.h"
 #include "plstr.h"
 #include "nsAppDirectoryServiceDefs.h"
+#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/ProcessedStack.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/FileUtils.h"
@@ -236,7 +237,7 @@ public:
    */
   struct AnnotationInfo {
     AnnotationInfo(uint32_t aHangIndex,
-                   UniquePtr<HangAnnotations> aAnnotations)
+                   HangAnnotationsPtr aAnnotations)
       : mHangIndex(aHangIndex)
       , mAnnotations(Move(aAnnotations))
     {}
@@ -252,7 +253,7 @@ public:
       return *this;
     }
     uint32_t mHangIndex;
-    UniquePtr<HangAnnotations> mAnnotations;
+    HangAnnotationsPtr mAnnotations;
 
   private:
     // Force move constructor
@@ -262,7 +263,7 @@ public:
   size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
   void AddHang(const Telemetry::ProcessedStack& aStack, uint32_t aDuration,
                int32_t aSystemUptime, int32_t aFirefoxUptime,
-               UniquePtr<HangAnnotations> aAnnotations);
+               HangAnnotationsPtr aAnnotations);
   uint32_t GetDuration(unsigned aIndex) const;
   int32_t GetSystemUptime(unsigned aIndex) const;
   int32_t GetFirefoxUptime(unsigned aIndex) const;
@@ -291,7 +292,7 @@ HangReports::AddHang(const Telemetry::ProcessedStack& aStack,
                      uint32_t aDuration,
                      int32_t aSystemUptime,
                      int32_t aFirefoxUptime,
-                     UniquePtr<HangAnnotations> aAnnotations) {
+                     HangAnnotationsPtr aAnnotations) {
   HangInfo info = { aDuration, aSystemUptime, aFirefoxUptime };
   mHangInfo.push_back(info);
   if (aAnnotations) {
@@ -2521,9 +2522,9 @@ TelemetryImpl::GetChromeHangs(JSContext *cx, JS::MutableHandle<JS::Value> ret)
       if (!jsAnnotation) {
         return NS_ERROR_FAILURE;
       }
-      nsAutoPtr<HangAnnotations::Enumerator> annotationsEnum;
-      if (!annotationInfo[iterIndex].mAnnotations->GetEnumerator(
-            annotationsEnum.StartAssignment())) {
+      UniquePtr<HangAnnotations::Enumerator> annotationsEnum =
+        annotationInfo[iterIndex].mAnnotations->GetEnumerator();
+      if (!annotationsEnum) {
         return NS_ERROR_FAILURE;
       }
       nsAutoString  key;

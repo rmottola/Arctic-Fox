@@ -6,8 +6,6 @@
 
 #include "mozilla/HangMonitor.h"
 
-#include <set>
-
 #include "mozilla/Atomics.h"
 #include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/Monitor.h"
@@ -66,9 +64,6 @@ static const int32_t DEFAULT_CHROME_HANG_INTERVAL = 5;
 
 // Maximum number of PCs to gather from the stack
 static const int32_t MAX_CALL_STACK_PCS = 400;
-
-// Chrome hang annotators
-static StaticAutoPtr<std::set<Annotator*>> gAnnotators;
 #endif
 
 // PrefChangedFunc
@@ -316,21 +311,6 @@ GetChromeHangReport(Telemetry::ProcessedStack& aStack,
   }
 }
 
-static void
-ChromeHangAnnotatorCallout(ChromeHangAnnotations& aAnnotations)
-{
-  gMonitor->AssertCurrentThreadOwns();
-  MOZ_ASSERT(gAnnotators);
-  if (!gAnnotators) {
-    return;
-  }
-  for (std::set<Annotator*>::iterator i = gAnnotators->begin(),
-                                      e = gAnnotators->end();
-       i != e; ++i) {
-    (*i)->AnnotateHang(aAnnotations);
-  }
-}
-
 #endif
 
 void
@@ -350,7 +330,7 @@ ThreadMain(void*)
   Telemetry::ProcessedStack stack;
   int32_t systemUptime = -1;
   int32_t firefoxUptime = -1;
-  auto annotations = MakeUnique<ChromeHangAnnotations>();
+  UniquePtr<HangAnnotations> annotations;
 #endif
 
   while (true) {
@@ -378,7 +358,7 @@ ThreadMain(void*)
       // the minimum hang duration has been reached (not when the hang ends)
       if (waitCount == 2) {
         GetChromeHangReport(stack, systemUptime, firefoxUptime);
-        ChromeHangAnnotatorCallout(*annotations);
+        annotations = ChromeHangAnnotatorCallout();
       }
 #else
       // This is the crash-on-hang feature.
@@ -399,7 +379,6 @@ ThreadMain(void*)
         Telemetry::RecordChromeHang(hangDuration, stack, systemUptime,
                                     firefoxUptime, Move(annotations));
         stack.Clear();
-        annotations = MakeUnique<ChromeHangAnnotations>();
       }
 #endif
       lastTimestamp = timestamp;
@@ -439,7 +418,6 @@ Startup()
   if (!winMainThreadHandle) {
     return;
   }
-  gAnnotators = new std::set<Annotator*>();
 #endif
 
   // Don't actually start measuring hangs until we hit the main event loop.
@@ -478,11 +456,6 @@ Shutdown()
 
   delete gMonitor;
   gMonitor = nullptr;
-
-#ifdef REPORT_CHROME_HANGS
-  // gAnnotators is a StaticAutoPtr, so we just need to null it out.
-  gAnnotators = nullptr;
-#endif
 }
 
 static bool
@@ -569,32 +542,6 @@ Suspend()
   if (gThread && !gShutdown) {
     mozilla::BackgroundHangMonitor().NotifyWait();
   }
-}
-
-void
-RegisterAnnotator(Annotator& aAnnotator)
-{
-#ifdef REPORT_CHROME_HANGS
-  if (GoannaProcessType_Default != XRE_GetProcessType()) {
-    return;
-  }
-  MonitorAutoLock lock(*gMonitor);
-  MOZ_ASSERT(gAnnotators);
-  gAnnotators->insert(&aAnnotator);
-#endif
-}
-
-void
-UnregisterAnnotator(Annotator& aAnnotator)
-{
-#ifdef REPORT_CHROME_HANGS
-  if (GoannaProcessType_Default != XRE_GetProcessType()) {
-    return;
-  }
-  MonitorAutoLock lock(*gMonitor);
-  MOZ_ASSERT(gAnnotators);
-  gAnnotators->erase(&aAnnotator);
-#endif
 }
 
 } // namespace HangMonitor
