@@ -49,6 +49,9 @@ public:
   virtual bool
   MatchId(const nsID& aId) const override;
 
+  virtual bool
+  HasEverBeenRead() const override;
+
   // Simulate nsIInputStream methods, but we don't actually inherit from it
   NS_METHOD
   Close();
@@ -102,6 +105,7 @@ private:
     NumStates
   };
   Atomic<State> mState;
+  Atomic<bool> mHasEverBeenRead;
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(cache::ReadStream::Inner)
 };
@@ -248,6 +252,13 @@ ReadStream::Inner::MatchId(const nsID& aId) const
   return mId.Equals(aId);
 }
 
+bool
+ReadStream::Inner::HasEverBeenRead() const
+{
+  MOZ_ASSERT(NS_GetCurrentThread() == mOwningThread);
+  return mHasEverBeenRead;
+}
+
 NS_IMETHODIMP
 ReadStream::Inner::Close()
 {
@@ -283,6 +294,8 @@ ReadStream::Inner::Read(char* aBuf, uint32_t aCount, uint32_t* aNumReadOut)
     Close();
   }
 
+  mHasEverBeenRead = true;
+
   return rv;
 }
 
@@ -293,12 +306,24 @@ ReadStream::Inner::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
   // stream ops can happen on any thread
   MOZ_ASSERT(aNumReadOut);
 
+  if (aCount) {
+    mHasEverBeenRead = true;
+  }
+
   nsresult rv = mSnappyStream->ReadSegments(aWriter, aClosure, aCount,
                                             aNumReadOut);
 
   if ((NS_FAILED(rv) && rv != NS_BASE_STREAM_WOULD_BLOCK &&
                         rv != NS_ERROR_NOT_IMPLEMENTED) || *aNumReadOut == 0) {
     Close();
+  }
+
+  // Verify bytes were actually read before marking as being ever read.  For
+  // example, code can test if the stream supports ReadSegments() by calling
+  // this method with a dummy callback which doesn't read anything.  We don't
+  // want to trigger on that.
+  if (*aNumReadOut) {
+    mHasEverBeenRead = true;
   }
 
   return rv;
