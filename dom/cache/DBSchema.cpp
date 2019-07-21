@@ -10,6 +10,8 @@
 #include "mozilla/dom/InternalHeaders.h"
 #include "mozilla/dom/cache/CacheTypes.h"
 #include "mozilla/dom/cache/SavedTypes.h"
+#include "mozilla/dom/cache/Types.h"
+#include "mozilla/dom/cache/TypeUtils.h"
 #include "mozIStorageConnection.h"
 #include "mozIStorageStatement.h"
 #include "nsCOMPtr.h"
@@ -19,7 +21,6 @@
 #include "mozilla/dom/HeadersBinding.h"
 #include "mozilla/dom/RequestBinding.h"
 #include "mozilla/dom/ResponseBinding.h"
-#include "Types.h"
 #include "nsIContentPolicy.h"
 
 namespace mozilla {
@@ -927,7 +928,8 @@ DBSchema::MatchByVaryHeader(mozIStorageConnection* aConn,
   rv = state->BindInt32Parameter(0, entryId);
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-  nsRefPtr<InternalHeaders> cachedHeaders = new InternalHeaders(HeadersGuardEnum::None);
+  nsRefPtr<InternalHeaders> cachedHeaders =
+    new InternalHeaders(HeadersGuardEnum::None);
 
   while (NS_SUCCEEDED(state->ExecuteStep(&hasMoreData)) && hasMoreData) {
     nsAutoCString name;
@@ -944,7 +946,8 @@ DBSchema::MatchByVaryHeader(mozIStorageConnection* aConn,
   }
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-  nsRefPtr<InternalHeaders> queryHeaders = new InternalHeaders(aRequest.headers());
+  nsRefPtr<InternalHeaders> queryHeaders =
+    TypeUtils::ToInternalHeaders(aRequest.headers());
 
   // Assume the vary headers match until we find a conflict
   bool varyHeadersMatch = true;
@@ -1209,7 +1212,7 @@ DBSchema::InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
   ), getter_AddRefs(state));
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-  const nsTArray<PHeadersEntry>& requestHeaders = aRequest.headers();
+  const nsTArray<HeadersEntry>& requestHeaders = aRequest.headers();
   for (uint32_t i = 0; i < requestHeaders.Length(); ++i) {
     rv = state->BindUTF8StringParameter(0, requestHeaders[i].name());
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
@@ -1233,7 +1236,7 @@ DBSchema::InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
   ), getter_AddRefs(state));
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-  const nsTArray<PHeadersEntry>& responseHeaders = aResponse.headers();
+  const nsTArray<HeadersEntry>& responseHeaders = aResponse.headers();
   for (uint32_t i = 0; i < responseHeaders.Length(); ++i) {
     rv = state->BindUTF8StringParameter(0, responseHeaders[i].name());
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
@@ -1334,7 +1337,7 @@ DBSchema::ReadResponse(mozIStorageConnection* aConn, EntryId aEntryId,
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
   while (NS_SUCCEEDED(state->ExecuteStep(&hasMoreData)) && hasMoreData) {
-    PHeadersEntry header;
+    HeadersEntry header;
 
     rv = state->GetUTF8String(0, header.name());
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
@@ -1453,7 +1456,7 @@ DBSchema::ReadRequest(mozIStorageConnection* aConn, EntryId aEntryId,
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
   while (NS_SUCCEEDED(state->ExecuteStep(&hasMoreData)) && hasMoreData) {
-    PHeadersEntry header;
+    HeadersEntry header;
 
     rv = state->GetUTF8String(0, header.name());
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
