@@ -46,6 +46,7 @@ static bool sIsProfiling = false; // is raced on
 static bool sIsGPUProfiling = false; // is raced on
 static bool sIsLayersDump = false; // is raced on
 static bool sIsDisplayListDump = false; // is raced on
+static bool sIsRestyleProfiling = false; // is raced on
 
 // env variables to control the profiler
 const char* PROFILER_MODE = "MOZ_PROFILER_MODE";
@@ -748,6 +749,7 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
   sIsGPUProfiling = t->ProfileGPU();
   sIsLayersDump = t->LayersDump();
   sIsDisplayListDump = t->DisplayListDump();
+  sIsRestyleProfiling = t->ProfileRestyle();
 
   if (Sampler::CanNotifyObservers()) {
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
@@ -815,6 +817,7 @@ void mozilla_sampler_stop()
   sIsGPUProfiling = false;
   sIsLayersDump = false;
   sIsDisplayListDump = false;
+  sIsRestyleProfiling = false;
 
   if (Sampler::CanNotifyObservers()) {
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
@@ -860,6 +863,10 @@ bool mozilla_sampler_feature_active(const char* aName)
 
   if (strcmp(aName, "displaylistdump") == 0) {
     return sIsDisplayListDump;
+  }
+
+  if (strcmp(aName, "restyle") == 0) {
+    return sIsRestyleProfiling;
   }
 
   return false;

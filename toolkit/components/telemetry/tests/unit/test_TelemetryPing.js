@@ -1,3 +1,4 @@
+
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ 
 */
@@ -168,7 +169,6 @@ function checkPayloadInfo(payload, reason) {
   // get rid of the non-deterministic field
   const expected_info = {
     OS: "XPCShell", 
-    appID: "xpcshell@tests.mozilla.org", 
     appVersion: "1", 
     appName: "XPCShell", 
     appBuildID: "2007010101",
@@ -182,7 +182,6 @@ function checkPayloadInfo(payload, reason) {
 
   do_check_eq(payload.info.reason, reason);
   do_check_true("appUpdateChannel" in payload.info);
-  do_check_true("locale" in payload.info);
   do_check_true("revision" in payload.info);
   if (Services.appinfo.isOfficial) {
     do_check_true(payload.info.revision.startsWith("http"));
@@ -193,24 +192,6 @@ function checkPayloadInfo(payload, reason) {
     do_check_true("clientID" in payload);
     do_check_neq(payload.clientID, null);
     do_check_eq(payload.clientID, gDataReportingClientID);
-  }
-
-  try {
-    // If we've not got nsIGfxInfoDebug, then this will throw and stop us doing
-    // this test.
-    let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfoDebug);
-    let isWindows = ("@mozilla.org/windows-registry-key;1" in Components.classes);
-    let isOSX = ("nsILocalFileMac" in Components.interfaces);
-
-    if (isWindows || isOSX) {
-      do_check_true("adapterVendorID" in payload.info);
-      do_check_true("adapterDeviceID" in payload.info);
-      if (isWindows) {
-        do_check_true("adapterSubsysID" in payload.info);
-      }
-    }
-  }
-  catch (x) {
   }
 }
 
@@ -362,17 +343,6 @@ function checkPayload(request, payload, reason, successfulPings) {
   Assert.deepEqual(expected_keyed_count, keyedHistograms[TELEMETRY_TEST_KEYED_COUNT]);
 }
 
-function dummyTheme(id) {
-  return {
-    id: id,
-    name: Math.random().toString(),
-    headerURL: "http://lwttest.invalid/a.png",
-    footerURL: "http://lwttest.invalid/b.png",
-    textcolor: Math.random().toString(),
-    accentcolor: Math.random().toString()
-  };
-}
-
 // A fake plugin host for testing flash version telemetry
 let PluginHost = {
   getPluginTags: function(countRef) {
@@ -435,13 +405,6 @@ function write_fake_failedprofilelocks_file() {
 
 function run_test() {
   do_test_pending();
-  try {
-    let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfoDebug);
-    gfxInfo.spoofVendorID("0xabcd");
-    gfxInfo.spoofDeviceID("0x1234");
-  } catch (x) {
-    // If we can't test gfxInfo, that's fine, we'll note it later.
-  }
 
   // Addon manager needs a profile directory
   do_get_profile();
@@ -495,7 +458,6 @@ function actualTest() {
                          .QueryInterface(Ci.nsITimerCallback);
 
   gInternalManager.observe(null, "addons-startup", null);
-  LightweightThemeManager.currentTheme = dummyTheme("1234");
 
   // fake plugin host for consistent flash version data
   registerFakePluginHost();
@@ -604,6 +566,173 @@ add_task(function* test_saveLoadPing() {
     checkPayload(request1, payload1, "saved-session", 1);
     checkPayload(request2, payload2, "test-ping", 1);
   }
+});
+
+add_task(function* test_checkSubsession() {
+  const COUNT_ID = "TELEMETRY_TEST_COUNT";
+  const KEYED_ID = "TELEMETRY_TEST_KEYED_COUNT";
+  const count = Telemetry.getHistogramById(COUNT_ID);
+  const keyed = Telemetry.getKeyedHistogramById(KEYED_ID);
+  const registeredIds =
+    new Set(Telemetry.registeredHistograms(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, []));
+
+  const stableHistograms = new Set([
+    "TELEMETRY_TEST_FLAG",
+    "TELEMETRY_TEST_COUNT",
+    "TELEMETRY_TEST_RELEASE_OPTOUT",
+    "TELEMETRY_TEST_RELEASE_OPTIN",
+    "STARTUP_CRASH_DETECTED",
+  ]);
+
+  const stableKeyedHistograms = new Set([
+    "TELEMETRY_TEST_KEYED_FLAG",
+    "TELEMETRY_TEST_KEYED_COUNT",
+    "TELEMETRY_TEST_KEYED_RELEASE_OPTIN",
+    "TELEMETRY_TEST_KEYED_RELEASE_OPTOUT",
+  ]);
+
+  // Compare the two sets of histograms.
+  // The "subsession" histograms should match the registered
+  // "classic" histograms. However, histograms can change
+  // between us collecting the different payloads, so we only
+  // check for deep equality on known stable histograms.
+  checkHistograms = (classic, subsession) => {
+    for (let id of Object.keys(classic)) {
+      if (!registeredIds.has(id)) {
+        continue;
+      }
+
+      Assert.ok(id in subsession);
+      if (stableHistograms.has(id)) {
+        Assert.deepEqual(classic[id],
+                         subsession[id]);
+      } else {
+        Assert.equal(classic[id].histogram_type,
+                     subsession[id].histogram_type);
+      }
+    }
+  };
+
+  // Same as above, except for keyed histograms.
+  checkKeyedHistograms = (classic, subsession) => {
+    for (let id of Object.keys(classic)) {
+      if (!registeredIds.has(id)) {
+        continue;
+      }
+
+      Assert.ok(id in subsession);
+      if (stableKeyedHistograms.has(id)) {
+        Assert.deepEqual(classic[id],
+                         subsession[id]);
+      }
+    }
+  };
+
+  // Both classic and subsession payload histograms should start the same.
+  // The payloads should be identical for now except for the reason.
+  count.clear();
+  keyed.clear();
+  let classic = TelemetrySession.getPayload();
+  let subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.equal(classic.info.reason, "gather-payload");
+  Assert.equal(subsession.info.reason, "environment-change");
+  Assert.ok(!(COUNT_ID in classic.histograms));
+  Assert.ok(!(COUNT_ID in subsession.histograms));
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.deepEqual(classic.keyedHistograms[KEYED_ID], {});
+  Assert.deepEqual(subsession.keyedHistograms[KEYED_ID], {});
+
+  checkHistograms(classic.histograms, subsession.histograms);
+  checkKeyedHistograms(classic.keyedHistograms, subsession.keyedHistograms);
+
+  // Adding values should get picked up in both.
+  count.add(1);
+  keyed.add("a", 1);
+  keyed.add("b", 1);
+  classic = TelemetrySession.getPayload();
+  subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.ok(COUNT_ID in classic.histograms);
+  Assert.ok(COUNT_ID in subsession.histograms);
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.equal(classic.histograms[COUNT_ID].sum, 1);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["a"].sum, 1);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["b"].sum, 1);
+
+  checkHistograms(classic.histograms, subsession.histograms);
+  checkKeyedHistograms(classic.keyedHistograms, subsession.keyedHistograms);
+
+  // Values should still reset properly.
+  count.clear();
+  keyed.clear();
+  classic = TelemetrySession.getPayload();
+  subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.ok(!(COUNT_ID in classic.histograms));
+  Assert.ok(!(COUNT_ID in subsession.histograms));
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.deepEqual(classic.keyedHistograms[KEYED_ID], {});
+
+  checkHistograms(classic.histograms, subsession.histograms);
+  checkKeyedHistograms(classic.keyedHistograms, subsession.keyedHistograms);
+
+  // Adding values should get picked up in both.
+  count.add(1);
+  keyed.add("a", 1);
+  keyed.add("b", 1);
+  classic = TelemetrySession.getPayload();
+  subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.ok(COUNT_ID in classic.histograms);
+  Assert.ok(COUNT_ID in subsession.histograms);
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.equal(classic.histograms[COUNT_ID].sum, 1);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["a"].sum, 1);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["b"].sum, 1);
+
+  checkHistograms(classic.histograms, subsession.histograms);
+  checkKeyedHistograms(classic.keyedHistograms, subsession.keyedHistograms);
+
+  // We should be able to reset only the subsession histograms.
+  count.clear(true);
+  keyed.clear(true);
+  classic = TelemetrySession.getPayload();
+  subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.ok(COUNT_ID in classic.histograms);
+  Assert.ok(COUNT_ID in subsession.histograms);
+  Assert.equal(classic.histograms[COUNT_ID].sum, 1);
+  Assert.equal(subsession.histograms[COUNT_ID].sum, 0);
+
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["a"].sum, 1);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["b"].sum, 1);
+  Assert.deepEqual(subsession.keyedHistograms[KEYED_ID], {});
+
+  // Adding values should get picked up in both again.
+  count.add(1);
+  keyed.add("a", 1);
+  keyed.add("b", 1);
+  classic = TelemetrySession.getPayload();
+  subsession = TelemetrySession.getPayload("environment-change");
+
+  Assert.ok(COUNT_ID in classic.histograms);
+  Assert.ok(COUNT_ID in subsession.histograms);
+  Assert.equal(classic.histograms[COUNT_ID].sum, 2);
+  Assert.equal(subsession.histograms[COUNT_ID].sum, 1);
+
+  Assert.ok(KEYED_ID in classic.keyedHistograms);
+  Assert.ok(KEYED_ID in subsession.keyedHistograms);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["a"].sum, 2);
+  Assert.equal(classic.keyedHistograms[KEYED_ID]["b"].sum, 2);
+  Assert.equal(subsession.keyedHistograms[KEYED_ID]["a"].sum, 1);
+  Assert.equal(subsession.keyedHistograms[KEYED_ID]["b"].sum, 1);
 });
 
 // Checks that an expired histogram file is deleted when loaded.

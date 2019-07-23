@@ -17,6 +17,12 @@
 #include "nscore.h"
 #include "nsStringGlue.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Move.h"
+
+namespace IPC {
+class Message;
+template <typename> struct ParamTraits;
+}
 
 namespace mozilla {
 
@@ -42,6 +48,7 @@ public:
 
 #ifdef DEBUG
     mMightHaveUnreportedJSException = false;
+    mHasMessage = false;
 #endif
   }
 
@@ -49,19 +56,25 @@ public:
   ~ErrorResult() {
     MOZ_ASSERT_IF(IsErrorWithMessage(), !mMessage);
     MOZ_ASSERT(!mMightHaveUnreportedJSException);
+    MOZ_ASSERT(!mHasMessage);
   }
 #endif
 
+  ErrorResult(ErrorResult&& aRHS)
+  {
+    *this = Move(aRHS);
+  }
+  ErrorResult& operator=(ErrorResult&& aRHS);
+
+  explicit ErrorResult(nsresult aRv)
+    : ErrorResult()
+  {
+    AssignErrorCode(aRv);
+  }
+
   void Throw(nsresult rv) {
     MOZ_ASSERT(NS_FAILED(rv), "Please don't try throwing success");
-    MOZ_ASSERT(rv != NS_ERROR_TYPE_ERR, "Use ThrowTypeError()");
-    MOZ_ASSERT(rv != NS_ERROR_RANGE_ERR, "Use ThrowRangeError()");
-    MOZ_ASSERT(!IsErrorWithMessage(), "Don't overwrite errors with message");
-    MOZ_ASSERT(rv != NS_ERROR_DOM_JS_EXCEPTION, "Use ThrowJSException()");
-    MOZ_ASSERT(!IsJSException(), "Don't overwrite JS exceptions");
-    MOZ_ASSERT(rv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "Use ThrowNotEnoughArgsError()");
-    MOZ_ASSERT(!IsNotEnoughArgsError(), "Don't overwrite not enough args error");
-    mResult = rv;
+    AssignErrorCode(rv);
   }
 
   // Use SuppressException when you want to suppress any exception that might be
@@ -142,14 +155,7 @@ public:
   // Throw() here because people can easily pass success codes to
   // this.
   void operator=(nsresult rv) {
-    MOZ_ASSERT(rv != NS_ERROR_TYPE_ERR, "Use ThrowTypeError()");
-    MOZ_ASSERT(rv != NS_ERROR_RANGE_ERR, "Use ThrowRangeError()");
-    MOZ_ASSERT(!IsErrorWithMessage(), "Don't overwrite errors with message");
-    MOZ_ASSERT(rv != NS_ERROR_DOM_JS_EXCEPTION, "Use ThrowJSException()");
-    MOZ_ASSERT(!IsJSException(), "Don't overwrite JS exceptions");
-    MOZ_ASSERT(rv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "Use ThrowNotEnoughArgsError()");
-    MOZ_ASSERT(!IsNotEnoughArgsError(), "Don't overwrite not enough args error");
-    mResult = rv;
+    AssignErrorCode(rv);
   }
 
   bool Failed() const {
@@ -161,6 +167,24 @@ public:
   }
 
 private:
+  friend struct IPC::ParamTraits<ErrorResult>;
+  void SerializeMessage(IPC::Message* aMsg) const;
+  bool DeserializeMessage(const IPC::Message* aMsg, void** aIter);
+
+  void ThrowErrorWithMessage(va_list ap, const dom::ErrNum errorNumber,
+                             nsresult errorType);
+
+  void AssignErrorCode(nsresult aRv) {
+    MOZ_ASSERT(aRv != NS_ERROR_TYPE_ERR, "Use ThrowTypeError()");
+    MOZ_ASSERT(aRv != NS_ERROR_RANGE_ERR, "Use ThrowRangeError()");
+    MOZ_ASSERT(!IsErrorWithMessage(), "Don't overwrite errors with message");
+    MOZ_ASSERT(aRv != NS_ERROR_DOM_JS_EXCEPTION, "Use ThrowJSException()");
+    MOZ_ASSERT(!IsJSException(), "Don't overwrite JS exceptions");
+    MOZ_ASSERT(aRv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "Use ThrowNotEnoughArgsError()");
+    MOZ_ASSERT(!IsNotEnoughArgsError(), "Don't overwrite not enough args error");
+    mResult = aRv;
+  }
+
   nsresult mResult;
   struct Message;
   // mMessage is set by ThrowErrorWithMessage and cleared (and deallocated) by
@@ -176,13 +200,16 @@ private:
   // Used to keep track of codepaths that might throw JS exceptions,
   // for assertion purposes.
   bool mMightHaveUnreportedJSException;
+  // Used to keep track of whether mMessage has ever been assigned to.
+  // We need to check this in order to ensure that not attempting to
+  // delete mMessage in DeserializeMessage doesn't leak memory.
+  bool mHasMessage;
 #endif
 
   // Not to be implemented, to make sure people always pass this by
   // reference, not by value.
   ErrorResult(const ErrorResult&) = delete;
-  void ThrowErrorWithMessage(va_list ap, const dom::ErrNum errorNumber,
-                             nsresult errorType);
+  void operator=(const ErrorResult&) = delete;
 };
 
 /******************************************************************************

@@ -582,7 +582,8 @@ nsPIDOMWindow::nsPIDOMWindow(nsPIDOMWindow *aOuterWindow)
   mIsModalContentWindow(false),
   mIsActive(false), mIsBackground(false),
   mAudioMuted(false), mAudioVolume(1.0),
-  mInnerWindow(nullptr), mOuterWindow(aOuterWindow),
+  mDesktopModeViewport(false), mInnerWindow(nullptr),
+  mOuterWindow(aOuterWindow),
   // Make sure no actual window ends up with mWindowID == 0
   mWindowID(NextWindowID()), mHasNotifiedGlobalCreated(false),
   mMarkedCCGeneration(0)
@@ -13152,8 +13153,8 @@ nsGlobalWindow::SuspendTimeouts(uint32_t aIncrease,
     }
     DisableGamepadUpdates();
 
-    // Suspend all of the workers for this window.
-    mozilla::dom::workers::SuspendWorkersForWindow(this);
+    // Freeze all of the workers for this window.
+    mozilla::dom::workers::FreezeWorkersForWindow(this);
 
     TimeStamp now = TimeStamp::Now();
     for (nsTimeout *t = mTimeouts.getFirst(); t; t = t->getNext()) {
@@ -13178,7 +13179,8 @@ nsGlobalWindow::SuspendTimeouts(uint32_t aIncrease,
 
     // Suspend all of the AudioContexts for this window
     for (uint32_t i = 0; i < mAudioContexts.Length(); ++i) {
-      mAudioContexts[i]->Suspend();
+      ErrorResult dummy;
+      unused << mAudioContexts[i]->Suspend(dummy);
     }
   }
 
@@ -13238,11 +13240,12 @@ nsGlobalWindow::ResumeTimeouts(bool aThawChildren)
 
     // Resume all of the AudioContexts for this window
     for (uint32_t i = 0; i < mAudioContexts.Length(); ++i) {
-      mAudioContexts[i]->Resume();
+      ErrorResult dummy;
+      unused << mAudioContexts[i]->Resume(dummy);
     }
 
-    // Resume all of the workers for this window.
-    mozilla::dom::workers::ResumeWorkersForWindow(this);
+    // Thaw all of the workers for this window.
+    mozilla::dom::workers::ThawWorkersForWindow(this);
 
     // Restore all of the timeouts, using the stored time remaining
     // (stored in timeout->mTimeRemaining).

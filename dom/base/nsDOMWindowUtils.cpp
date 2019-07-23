@@ -490,7 +490,7 @@ nsDOMWindowUtils::SetDisplayPortBaseForElement(int32_t aX,
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::SetResolution(float aXResolution, float aYResolution)
+nsDOMWindowUtils::SetResolution(float aResolution)
 {
   if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
@@ -503,15 +503,15 @@ nsDOMWindowUtils::SetResolution(float aXResolution, float aYResolution)
 
   nsIScrollableFrame* sf = presShell->GetRootScrollFrameAsScrollable();
   if (sf) {
-    sf->SetResolution(gfxSize(aXResolution, aYResolution));
-    presShell->SetResolution(aXResolution, aYResolution);
+    sf->SetResolution(aResolution);
+    presShell->SetResolution(aResolution);
   }
 
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::SetResolutionAndScaleTo(float aXResolution, float aYResolution)
+nsDOMWindowUtils::SetResolutionAndScaleTo(float aResolution)
 {
   if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
@@ -524,15 +524,15 @@ nsDOMWindowUtils::SetResolutionAndScaleTo(float aXResolution, float aYResolution
 
   nsIScrollableFrame* sf = presShell->GetRootScrollFrameAsScrollable();
   if (sf) {
-    sf->SetResolutionAndScaleTo(gfxSize(aXResolution, aYResolution));
-    presShell->SetResolutionAndScaleTo(aXResolution, aYResolution);
+    sf->SetResolutionAndScaleTo(aResolution);
+    presShell->SetResolutionAndScaleTo(aResolution);
   }
 
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::GetResolution(float* aXResolution, float* aYResolution)
+nsDOMWindowUtils::GetResolution(float* aResolution)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -543,12 +543,9 @@ nsDOMWindowUtils::GetResolution(float* aXResolution, float* aYResolution)
 
   nsIScrollableFrame* sf = presShell->GetRootScrollFrameAsScrollable();
   if (sf) {
-    const gfxSize& res = sf->GetResolution();
-    *aXResolution = res.width;
-    *aYResolution = res.height;
+    *aResolution = sf->GetResolution();
   } else {
-    *aXResolution = presShell->GetXResolution();
-    *aYResolution = presShell->GetYResolution();
+    *aResolution = presShell->GetResolution();
   }
 
   return NS_OK;
@@ -2376,6 +2373,18 @@ nsDOMWindowUtils::IsInModalState(bool *retval)
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::SetDesktopModeViewport(bool aDesktopMode)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(mWindow);
+  NS_ENSURE_STATE(window);
+
+  static_cast<nsGlobalWindow*>(window.get())->SetDesktopModeViewport(aDesktopMode);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::GetOuterWindowID(uint64_t *aWindowID)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
@@ -2925,6 +2934,67 @@ nsDOMWindowUtils::CheckAndClearPaintedState(nsIDOMElement* aElement, bool* aResu
   }
 
   *aResult = frame->CheckAndClearPaintedState();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::IsPartOfOpaqueLayer(nsIDOMElement* aElement, bool* aResult)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  if (!aElement) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsresult rv;
+  nsCOMPtr<nsIContent> content = do_QueryInterface(aElement, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsIFrame* frame = content->GetPrimaryFrame();
+  if (!frame) {
+    return NS_ERROR_FAILURE;
+  }
+
+  Layer* layer = FrameLayerBuilder::GetDebugSingleOldLayerForFrame(frame);
+  if (!layer || !layer->AsPaintedLayer()) {
+    return NS_ERROR_FAILURE;
+  }
+
+  *aResult = (layer->GetContentFlags() & Layer::CONTENT_OPAQUE);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::NumberOfAssignedPaintedLayers(nsIDOMElement** aElements,
+                                                uint32_t aCount,
+                                                uint32_t* aResult)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  if (!aElements) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsTHashtable<nsPtrHashKey<PaintedLayer>> layers;
+  nsresult rv;
+  for (uint32_t i = 0; i < aCount; i++) {
+    nsCOMPtr<nsIContent> content = do_QueryInterface(aElements[i], &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsIFrame* frame = content->GetPrimaryFrame();
+    if (!frame) {
+      return NS_ERROR_FAILURE;
+    }
+
+    Layer* layer = FrameLayerBuilder::GetDebugSingleOldLayerForFrame(frame);
+    if (!layer || !layer->AsPaintedLayer()) {
+      return NS_ERROR_FAILURE;
+    }
+
+    layers.PutEntry(layer->AsPaintedLayer());
+  }
+
+  *aResult = layers.Count();
   return NS_OK;
 }
 

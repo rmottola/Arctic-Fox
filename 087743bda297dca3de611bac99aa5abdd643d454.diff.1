@@ -1,0 +1,15 @@
+diff --git a/dom/bindings/ErrorResult.h b/dom/bindings/ErrorResult.h
+index 0fd98d8b7072..a469b8de1f0d 100644
+--- a/dom/bindings/ErrorResult.h
++++ b/dom/bindings/ErrorResult.h
+@@ -47,10 +47,6 @@ class ErrorResult {
+     mResult = NS_OK;
+ 
+ #ifdef DEBUG
+-    // ErrorResult is extremely performance-sensitive code, where literally
+-    // every machine instruction matters. Initialize mMessage only to suppress
+-    // a debug-only warning from gcc 4.6.
+-    mMessage = nullptr;
+     mMightHaveUnreportedJSException = false;
+     mHasMessage = false;
+ #endif

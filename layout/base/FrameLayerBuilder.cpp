@@ -1523,6 +1523,27 @@ FrameLayerBuilder::GetDebugOldLayerFor(nsIFrame* aFrame, uint32_t aDisplayItemKe
   return nullptr;
 }
 
+/* static */ Layer*
+FrameLayerBuilder::GetDebugSingleOldLayerForFrame(nsIFrame* aFrame)
+{
+  nsTArray<DisplayItemData*>* array =
+    reinterpret_cast<nsTArray<DisplayItemData*>*>(aFrame->Properties().Get(LayerManagerDataProperty()));
+
+  if (!array) {
+    return nullptr;
+  }
+
+  Layer* layer = nullptr;
+  for (DisplayItemData* data : *array) {
+    if (layer && layer != data->mLayer) {
+      // More than one layer assigned, bail.
+      return nullptr;
+    }
+    layer = data->mLayer;
+  }
+  return layer;
+}
+
 already_AddRefed<ColorLayer>
 ContainerState::CreateOrRecycleColorLayer(PaintedLayer *aPainted)
 {
@@ -4264,8 +4285,9 @@ FrameLayerBuilder::GetPaintedLayerScaleForFrame(nsIFrame* aFrame)
     }
   }
 
+  float presShellResolution = last->PresContext()->PresShell()->GetResolution();
   return PredictScaleForContent(aFrame, last,
-      last->PresContext()->PresShell()->GetResolution());
+      gfxSize(presShellResolution, presShellResolution));
 }
 
 #ifdef MOZ_DUMP_PAINTING

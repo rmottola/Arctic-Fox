@@ -10,12 +10,14 @@
 
 #include "mozilla/a11y/DocManager.h"
 #include "mozilla/a11y/FocusManager.h"
+#include "mozilla/a11y/Role.h"
 #include "mozilla/a11y/SelectionManager.h"
 #include "mozilla/Preferences.h"
 
 #include "nsIObserver.h"
 
 class nsImageFrame;
+class nsIPersistentProperties;
 class nsPluginFrame;
 class nsITreeView;
 
@@ -40,6 +42,23 @@ SelectionManager* SelectionMgr();
  */
 ApplicationAccessible* ApplicationAcc();
 xpcAccessibleApplication* XPCApplicationAcc();
+
+typedef Accessible* (New_Accessible)(nsIContent* aContent, Accessible* aContext);
+
+struct MarkupAttrInfo {
+  nsIAtom** name;
+  nsIAtom** value;
+
+  nsIAtom** DOMAttrName;
+  nsIAtom** DOMAttrValue;
+};
+
+struct MarkupMapInfo {
+  nsIAtom** tag;
+  New_Accessible* new_func;
+  a11y::role role;
+  MarkupAttrInfo attrs[4];
+};
 
 } // namespace a11y
 } // namespace mozilla
@@ -166,6 +185,19 @@ public:
   Accessible* GetOrCreateAccessible(nsINode* aNode, Accessible* aContext,
                                     bool* aIsSubtreeHidden = nullptr);
 
+  mozilla::a11y::role MarkupRole(const nsIContent* aContent) const
+  {
+    const mozilla::a11y::MarkupMapInfo* markupMap =
+      mMarkupMaps.Get(aContent->NodeInfo()->NameAtom());
+    return markupMap ? markupMap->role : mozilla::a11y::roles::NOTHING;
+  }
+
+  /**
+   * Set the object attribute defined by markup for the given element.
+   */
+  void MarkupAttributes(const nsIContent* aContent,
+                        nsIPersistentProperties* aAttributes) const;
+
 private:
   // nsAccessibilityService creation is controlled by friend
   // NS_GetAccessibilityService, keep constructors private.
@@ -189,13 +221,6 @@ private:
    */
   already_AddRefed<Accessible>
     CreateAccessibleByType(nsIContent* aContent, DocAccessible* aDoc);
-
-  /**
-   * Create accessible for HTML node by tag name.
-   */
-  already_AddRefed<Accessible>
-    CreateHTMLAccessibleByMarkup(nsIFrame* aFrame, nsIContent* aContent,
-                                 Accessible* aContext);
 
   /**
    * Create an accessible whose type depends on the given frame.
@@ -227,6 +252,8 @@ private:
    * Indicates whether accessibility service was shutdown.
    */
   static bool gIsShutdown;
+
+  nsDataHashtable<nsPtrHashKey<const nsIAtom>, const mozilla::a11y::MarkupMapInfo*> mMarkupMaps;
 
   friend nsAccessibilityService* GetAccService();
   friend mozilla::a11y::FocusManager* mozilla::a11y::FocusMgr();

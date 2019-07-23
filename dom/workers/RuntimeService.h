@@ -129,10 +129,10 @@ public:
   CancelWorkersForWindow(nsPIDOMWindow* aWindow);
 
   void
-  SuspendWorkersForWindow(nsPIDOMWindow* aWindow);
+  FreezeWorkersForWindow(nsPIDOMWindow* aWindow);
 
   void
-  ResumeWorkersForWindow(nsPIDOMWindow* aWindow);
+  ThawWorkersForWindow(nsPIDOMWindow* aWindow);
 
   nsresult
   CreateSharedWorker(const GlobalObject& aGlobal,
@@ -142,16 +142,6 @@ public:
   {
     return CreateSharedWorkerInternal(aGlobal, aScriptURL, aName,
                                       WorkerTypeShared, aSharedWorker);
-  }
-
-  nsresult
-  CreateSharedWorkerForServiceWorker(const GlobalObject& aGlobal,
-                                     const nsAString& aScriptURL,
-                                     const nsACString& aScope,
-                                     SharedWorker** aSharedWorker)
-  {
-    return CreateSharedWorkerInternal(aGlobal, aScriptURL, aScope,
-                                      WorkerTypeService, aSharedWorker);
   }
 
   nsresult

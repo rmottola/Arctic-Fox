@@ -1042,9 +1042,13 @@ private:
 
 class CompileScriptRunnable final : public WorkerRunnable
 {
+  nsString mScriptURL;
+
 public:
-  explicit CompileScriptRunnable(WorkerPrivate* aWorkerPrivate)
-  : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
+  explicit CompileScriptRunnable(WorkerPrivate* aWorkerPrivate,
+                                 const nsAString& aScriptURL)
+  : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount),
+    mScriptURL(aScriptURL)
   { }
 
 private:
@@ -1059,12 +1063,42 @@ private:
     }
 
     JS::Rooted<JSObject*> global(aCx, globalScope->GetWrapper());
+
     JSAutoCompartment ac(aCx, global);
-    bool result = scriptloader::LoadWorkerScript(aCx);
+    bool result = scriptloader::LoadMainScript(aCx, mScriptURL, WorkerScript);
     if (result) {
       aWorkerPrivate->SetWorkerScriptExecutedSuccessfully();
     }
     return result;
+  }
+};
+
+class CompileDebuggerScriptRunnable final : public WorkerDebuggerRunnable
+{
+  nsString mScriptURL;
+
+public:
+  CompileDebuggerScriptRunnable(WorkerPrivate* aWorkerPrivate,
+                                const nsAString& aScriptURL)
+  : WorkerDebuggerRunnable(aWorkerPrivate),
+    mScriptURL(aScriptURL)
+  { }
+
+private:
+  virtual bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    WorkerDebuggerGlobalScope* globalScope =
+      aWorkerPrivate->CreateDebuggerGlobalScope(aCx);
+    if (!globalScope) {
+      NS_WARNING("Failed to make global!");
+      return false;
+    }
+
+    JS::Rooted<JSObject*> global(aCx, globalScope->GetWrapper());
+
+    JSAutoCompartment ac(aCx, global);
+    return scriptloader::LoadMainScript(aCx, mScriptURL, DebuggerScript);
   }
 };
 
@@ -1232,7 +1266,7 @@ private:
                                                             mClonedObjects);
       }
 
-      if (aWorkerPrivate->IsSuspended()) {
+      if (aWorkerPrivate->IsFrozen()) {
         aWorkerPrivate->QueueRunnable(this);
         return true;
       }
@@ -1257,6 +1291,54 @@ private:
 
     return DispatchDOMEvent(aCx, aWorkerPrivate, aWorkerPrivate->GlobalScope(),
                             false);
+  }
+};
+
+class DebuggerMessageEventRunnable : public WorkerDebuggerRunnable {
+  nsString mMessage;
+
+public:
+  DebuggerMessageEventRunnable(WorkerPrivate* aWorkerPrivate,
+                               const nsAString& aMessage)
+  : WorkerDebuggerRunnable(aWorkerPrivate),
+    mMessage(aMessage)
+  {
+  }
+
+private:
+  virtual bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    WorkerDebuggerGlobalScope* globalScope = aWorkerPrivate->DebuggerGlobalScope();
+    MOZ_ASSERT(globalScope);
+
+    JS::Rooted<JSString*> message(aCx, JS_NewUCStringCopyN(aCx, mMessage.get(),
+                                                           mMessage.Length()));
+    if (!message) {
+      return false;
+    }
+    JS::Rooted<JS::Value> data(aCx, JS::StringValue(message));
+
+    nsRefPtr<MessageEvent> event = new MessageEvent(globalScope, nullptr,
+                                                    nullptr);
+    nsresult rv =
+      event->InitMessageEvent(NS_LITERAL_STRING("message"),
+                              false, // canBubble
+                              true, // cancelable
+                              data,
+                              EmptyString(),
+                              EmptyString(),
+                              nullptr);
+    if (NS_FAILED(rv)) {
+      xpc::Throw(aCx, rv);
+      return false;
+    }
+    event->SetTrusted(true);
+
+    nsCOMPtr<nsIDOMEvent> domEvent = do_QueryObject(event);
+    nsEventStatus status = nsEventStatus_eIgnore;
+    globalScope->DispatchDOMEvent(nullptr, domEvent, nullptr, &status);
+    return true;
   }
 };
 
@@ -1317,10 +1399,10 @@ private:
   }
 };
 
-class SuspendRunnable final : public WorkerControlRunnable
+class FreezeRunnable final : public WorkerControlRunnable
 {
 public:
-  explicit SuspendRunnable(WorkerPrivate* aWorkerPrivate)
+  explicit FreezeRunnable(WorkerPrivate* aWorkerPrivate)
   : WorkerControlRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
   { }
 
@@ -1328,14 +1410,14 @@ private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
-    return aWorkerPrivate->SuspendInternal(aCx);
+    return aWorkerPrivate->FreezeInternal(aCx);
   }
 };
 
-class ResumeRunnable final : public WorkerControlRunnable
+class ThawRunnable final : public WorkerControlRunnable
 {
 public:
-  explicit ResumeRunnable(WorkerPrivate* aWorkerPrivate)
+  explicit ThawRunnable(WorkerPrivate* aWorkerPrivate)
   : WorkerControlRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
   { }
 
@@ -1343,7 +1425,7 @@ private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
-    return aWorkerPrivate->ResumeInternal(aCx);
+    return aWorkerPrivate->ThawInternal(aCx);
   }
 };
 
@@ -1422,19 +1504,23 @@ public:
         nsIScriptGlobalObject* sgo;
 
         if (aWorkerPrivate) {
-          nsIDOMEventTarget* target = nullptr;
           WorkerGlobalScope* globalScope = nullptr;
           UNWRAP_WORKER_OBJECT(WorkerGlobalScope, global, globalScope);
-          if (globalScope) {
-            MOZ_ASSERT(global == globalScope->GetWrapperPreserveColor());
-            target = static_cast<nsIDOMEventTarget*>(globalScope);
-          } else {
+
+          if (!globalScope) {
             WorkerDebuggerGlobalScope* globalScope = nullptr;
             UNWRAP_OBJECT(WorkerDebuggerGlobalScope, global, globalScope);
-            MOZ_ASSERT(globalScope);
-            MOZ_ASSERT(global == globalScope->GetWrapperPreserveColor());
-            target = static_cast<nsIDOMEventTarget*>(globalScope);
+
+            MOZ_ASSERT_IF(globalScope, globalScope->GetWrapperPreserveColor() == global);
+            MOZ_ASSERT_IF(!globalScope, IsDebuggerSandbox(global));
+
+            aWorkerPrivate->ReportErrorToDebugger(aFilename, aLineNumber,
+                                                  aMessage);
+            return true;
           }
+
+          MOZ_ASSERT(globalScope->GetWrapperPreserveColor() == global);
+          nsIDOMEventTarget* target = static_cast<nsIDOMEventTarget*>(globalScope);
 
           nsRefPtr<ErrorEvent> event =
             ErrorEvent::Constructor(aTarget, NS_LITERAL_STRING("error"), init);
@@ -1516,7 +1602,7 @@ private:
     else {
       AssertIsOnMainThread();
 
-      if (aWorkerPrivate->IsSuspended()) {
+      if (aWorkerPrivate->IsFrozen()) {
         aWorkerPrivate->QueueRunnable(this);
         return true;
       }
@@ -1588,6 +1674,54 @@ private:
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
     return aWorkerPrivate->RunExpiredTimeouts(aCx);
+  }
+};
+
+class DebuggerImmediateRunnable : public WorkerRunnable
+{
+  nsRefPtr<Function> mHandler;
+
+public:
+  explicit DebuggerImmediateRunnable(WorkerPrivate* aWorkerPrivate,
+                                     Function& aHandler)
+  : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount),
+    mHandler(&aHandler)
+  { }
+
+private:
+  virtual bool
+  IsDebuggerRunnable() const override
+  {
+    return true;
+  }
+
+  virtual bool
+  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    // Silence bad assertions.
+    return true;
+  }
+
+  virtual void
+  PostDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
+               bool aDispatchResult) override
+  {
+    // Silence bad assertions.
+  }
+
+  virtual bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
+    JS::Rooted<JS::Value> callable(aCx, JS::ObjectValue(*mHandler->Callable()));
+    JS::HandleValueArray args = JS::HandleValueArray::empty();
+    JS::Rooted<JS::Value> rval(aCx);
+    if (!JS_CallFunctionValue(aCx, global, callable, args, &rval) &&
+        !JS_ReportPendingException(aCx)) {
+      return false;
+    }
+
+    return true;
   }
 };
 
@@ -2159,6 +2293,7 @@ WorkerLoadInfo::StealFrom(WorkerLoadInfo& aOther)
   mPrincipalInfo = aOther.mPrincipalInfo.forget();
 
   mDomain = aOther.mDomain;
+  mServiceWorkerCacheName = aOther.mServiceWorkerCacheName;
   mWindowID = aOther.mWindowID;
   mFromWindow = aOther.mFromWindow;
   mEvalAllowed = aOther.mEvalAllowed;
@@ -2224,62 +2359,6 @@ public:
 private:
   ~EventTarget()
   { }
-};
-
-template <class Derived>
-class WorkerPrivateParent<Derived>::SynchronizeAndResumeRunnable final
-  : public nsRunnable
-{
-  friend class nsRevocableEventPtr<SynchronizeAndResumeRunnable>;
-
-  WorkerPrivate* mWorkerPrivate;
-  nsCOMPtr<nsPIDOMWindow> mWindow;
-
-public:
-  SynchronizeAndResumeRunnable(WorkerPrivate* aWorkerPrivate,
-                               nsPIDOMWindow* aWindow)
-  : mWorkerPrivate(aWorkerPrivate), mWindow(aWindow)
-  {
-    AssertIsOnMainThread();
-    MOZ_ASSERT(aWorkerPrivate);
-    MOZ_ASSERT(aWindow);
-    MOZ_ASSERT(!aWorkerPrivate->GetParent());
-  }
-
-private:
-  ~SynchronizeAndResumeRunnable()
-  { }
-
-  NS_IMETHOD
-  Run() override
-  {
-    AssertIsOnMainThread();
-
-    if (mWorkerPrivate) {
-      AutoJSAPI jsapi;
-      if (NS_WARN_IF(!jsapi.InitWithLegacyErrorReporting(mWindow))) {
-        return NS_OK;
-      }
-      JSContext* cx = jsapi.cx();
-
-      if (!mWorkerPrivate->Resume(cx, mWindow)) {
-        JS_ReportPendingException(cx);
-      }
-    }
-
-    return NS_OK;
-  }
-
-  void
-  Revoke()
-  {
-    AssertIsOnMainThread();
-    MOZ_ASSERT(mWorkerPrivate);
-    MOZ_ASSERT(mWindow);
-
-    mWorkerPrivate = nullptr;
-    mWindow = nullptr;
-  }
 };
 
 WorkerLoadInfo::
@@ -2594,8 +2673,9 @@ WorkerPrivateParent<Derived>::WorkerPrivateParent(
   mCondVar(mMutex, "WorkerPrivateParent CondVar"),
   mMemoryReportCondVar(mMutex, "WorkerPrivateParent Memory Report CondVar"),
   mParent(aParent), mScriptURL(aScriptURL),
-  mSharedWorkerName(aSharedWorkerName), mBusyCount(0), mMessagePortSerial(0),
-  mParentStatus(Pending), mParentSuspended(false),
+  mSharedWorkerName(aSharedWorkerName), mLoadingWorkerScript(false),
+  mBusyCount(0), mMessagePortSerial(0),
+  mParentStatus(Pending), mParentFrozen(false),
   mIsChromeWorker(aIsChromeWorker), mMainThreadObjectsForgotten(false),
   mWorkerType(aWorkerType),
   mCreationTimeStamp(TimeStamp::Now())
@@ -2786,6 +2866,37 @@ WorkerPrivateParent<Derived>::DispatchControlRunnable(
 }
 
 template <class Derived>
+nsresult
+WorkerPrivateParent<Derived>::DispatchDebuggerRunnable(
+                                              WorkerRunnable *aDebuggerRunnable)
+{
+  // May be called on any thread!
+
+  MOZ_ASSERT(aDebuggerRunnable);
+
+  nsRefPtr<WorkerRunnable> runnable = aDebuggerRunnable;
+
+  WorkerPrivate* self = ParentAsWorkerPrivate();
+
+  {
+    MutexAutoLock lock(mMutex);
+
+    if (self->mStatus == Dead) {
+      NS_WARNING("A debugger runnable was posted to a worker that is already "
+                 "shutting down!");
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    // Transfer ownership to the debugger queue.
+    self->mDebuggerQueue.Push(runnable.forget().take());
+
+    mCondVar.Notify();
+  }
+
+  return NS_OK;
+}
+
+template <class Derived>
 already_AddRefed<WorkerRunnable>
 WorkerPrivateParent<Derived>::MaybeWrapAsWorkerRunnable(nsIRunnable* aRunnable)
 {
@@ -2902,10 +3013,6 @@ WorkerPrivateParent<Derived>::NotifyPrivate(JSContext* aCx, Status aStatus)
     return true;
   }
 
-  // Only top-level workers should have a synchronize runnable.
-  MOZ_ASSERT_IF(mSynchronizeRunnable.get(), !GetParent());
-  mSynchronizeRunnable.Revoke();
-
   NS_ASSERTION(aStatus != Terminating || mQueuedRunnables.IsEmpty(),
                "Shouldn't have anything queued!");
 
@@ -2919,13 +3026,13 @@ WorkerPrivateParent<Derived>::NotifyPrivate(JSContext* aCx, Status aStatus)
 
 template <class Derived>
 bool
-WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
+WorkerPrivateParent<Derived>::Freeze(JSContext* aCx, nsPIDOMWindow* aWindow)
 {
   AssertIsOnParentThread();
   MOZ_ASSERT(aCx);
 
-  // Shared workers are only suspended if all of their owning documents are
-  // suspended. It can happen that mSharedWorkers is empty but this thread has
+  // Shared workers are only frozen if all of their owning documents are
+  // frozen. It can happen that mSharedWorkers is empty but this thread has
   // not been unregistered yet.
   if ((IsSharedWorker() || IsServiceWorker()) && mSharedWorkers.Count()) {
     AssertIsOnMainThread();
@@ -2933,17 +3040,17 @@ WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
     struct Closure
     {
       nsPIDOMWindow* mWindow;
-      bool mAllSuspended;
+      bool mAllFrozen;
 
       explicit Closure(nsPIDOMWindow* aWindow)
-      : mWindow(aWindow), mAllSuspended(true)
+      : mWindow(aWindow), mAllFrozen(true)
       {
         AssertIsOnMainThread();
         // aWindow may be null here.
       }
 
       static PLDHashOperator
-      Suspend(const uint64_t& aKey,
+      Freeze(const uint64_t& aKey,
               SharedWorker* aSharedWorker,
               void* aClosure)
       {
@@ -2954,17 +3061,17 @@ WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
         auto closure = static_cast<Closure*>(aClosure);
 
         if (closure->mWindow && aSharedWorker->GetOwner() == closure->mWindow) {
-          // Calling Suspend() may change the refcount, ensure that the worker
+          // Calling Freeze() may change the refcount, ensure that the worker
           // outlives this call.
           nsRefPtr<SharedWorker> kungFuDeathGrip = aSharedWorker;
 
-          aSharedWorker->Suspend();
+          aSharedWorker->Freeze();
         } else {
           MOZ_ASSERT_IF(aSharedWorker->GetOwner() && closure->mWindow,
                         !SameCOMIdentity(aSharedWorker->GetOwner(),
                                          closure->mWindow));
-          if (!aSharedWorker->IsSuspended()) {
-            closure->mAllSuspended = false;
+          if (!aSharedWorker->IsFrozen()) {
+            closure->mAllFrozen = false;
           }
         }
         return PL_DHASH_NEXT;
@@ -2973,14 +3080,14 @@ WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
 
     Closure closure(aWindow);
 
-    mSharedWorkers.EnumerateRead(Closure::Suspend, &closure);
+    mSharedWorkers.EnumerateRead(Closure::Freeze, &closure);
 
-    if (!closure.mAllSuspended || mParentSuspended) {
+    if (!closure.mAllFrozen || mParentFrozen) {
       return true;
     }
   }
 
-  mParentSuspended = true;
+  mParentFrozen = true;
 
   {
     MutexAutoLock lock(mMutex);
@@ -2990,8 +3097,8 @@ WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
     }
   }
 
-  nsRefPtr<SuspendRunnable> runnable =
-    new SuspendRunnable(ParentAsWorkerPrivate());
+  nsRefPtr<FreezeRunnable> runnable =
+    new FreezeRunnable(ParentAsWorkerPrivate());
   if (!runnable->Dispatch(aCx)) {
     return false;
   }
@@ -3001,13 +3108,19 @@ WorkerPrivateParent<Derived>::Suspend(JSContext* aCx, nsPIDOMWindow* aWindow)
 
 template <class Derived>
 bool
-WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
+WorkerPrivateParent<Derived>::Thaw(JSContext* aCx, nsPIDOMWindow* aWindow)
 {
   AssertIsOnParentThread();
   MOZ_ASSERT(aCx);
-  MOZ_ASSERT_IF(IsDedicatedWorker(), mParentSuspended);
 
-  // Shared workers are resumed if any of their owning documents are resumed.
+  if (IsDedicatedWorker() && !mParentFrozen) {
+    // If we are in here, it means that this worker has been created when the
+    // parent was actually suspended (maybe during a sync XHR), and in this case
+    // we don't need to thaw.
+    return true;
+  }
+
+  // Shared workers are resumed if any of their owning documents are thawed.
   // It can happen that mSharedWorkers is empty but this thread has not been
   // unregistered yet.
   if ((IsSharedWorker() || IsServiceWorker()) && mSharedWorkers.Count()) {
@@ -3026,7 +3139,7 @@ WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
       }
 
       static PLDHashOperator
-      Resume(const uint64_t& aKey,
+      Thaw(const uint64_t& aKey,
               SharedWorker* aSharedWorker,
               void* aClosure)
       {
@@ -3037,17 +3150,17 @@ WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
         auto closure = static_cast<Closure*>(aClosure);
 
         if (closure->mWindow && aSharedWorker->GetOwner() == closure->mWindow) {
-          // Calling Resume() may change the refcount, ensure that the worker
+          // Calling Thaw() may change the refcount, ensure that the worker
           // outlives this call.
           nsRefPtr<SharedWorker> kungFuDeathGrip = aSharedWorker;
 
-          aSharedWorker->Resume();
+          aSharedWorker->Thaw();
           closure->mAnyRunning = true;
         } else {
           MOZ_ASSERT_IF(aSharedWorker->GetOwner() && closure->mWindow,
                         !SameCOMIdentity(aSharedWorker->GetOwner(),
                                          closure->mWindow));
-          if (!aSharedWorker->IsSuspended()) {
+          if (!aSharedWorker->IsFrozen()) {
             closure->mAnyRunning = true;
           }
         }
@@ -3057,16 +3170,16 @@ WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
 
     Closure closure(aWindow);
 
-    mSharedWorkers.EnumerateRead(Closure::Resume, &closure);
+    mSharedWorkers.EnumerateRead(Closure::Thaw, &closure);
 
-    if (!closure.mAnyRunning || !mParentSuspended) {
+    if (!closure.mAnyRunning || !mParentFrozen) {
       return true;
     }
   }
 
-  MOZ_ASSERT(mParentSuspended);
+  MOZ_ASSERT(mParentFrozen);
 
-  mParentSuspended = false;
+  mParentFrozen = false;
 
   {
     MutexAutoLock lock(mMutex);
@@ -3075,10 +3188,6 @@ WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
       return true;
     }
   }
-
-  // Only top-level workers should have a synchronize runnable.
-  MOZ_ASSERT_IF(mSynchronizeRunnable.get(), !GetParent());
-  mSynchronizeRunnable.Revoke();
 
   // Execute queued runnables before waking up the worker, otherwise the worker
   // could post new messages before we run those that have been queued.
@@ -3094,45 +3203,12 @@ WorkerPrivateParent<Derived>::Resume(JSContext* aCx, nsPIDOMWindow* aWindow)
     }
   }
 
-  nsRefPtr<ResumeRunnable> runnable =
-    new ResumeRunnable(ParentAsWorkerPrivate());
+  nsRefPtr<ThawRunnable> runnable =
+    new ThawRunnable(ParentAsWorkerPrivate());
   if (!runnable->Dispatch(aCx)) {
     return false;
   }
 
-  return true;
-}
-
-template <class Derived>
-bool
-WorkerPrivateParent<Derived>::SynchronizeAndResume(
-                                               JSContext* aCx,
-                                               nsPIDOMWindow* aWindow)
-{
-  AssertIsOnMainThread();
-  MOZ_ASSERT(!GetParent());
-
-  if (IsDedicatedWorker() && !mParentSuspended) {
-    // If we are in here, it means that this worker has been created when the
-    // parent was actually suspended (maybe during a sync XHR), and in this case
-    // don't need to dispatch a SynchronizeAndResumeRunnable.
-    return true;
-  }
-
-  // NB: There may be pending unqueued messages.  If we resume here we will
-  // execute those messages out of order.  Instead we post an event to the
-  // end of the event queue, allowing all of the outstanding messages to be
-  // queued up in order on the worker.  Then and only then we execute all of
-  // the messages.
-
-  nsRefPtr<SynchronizeAndResumeRunnable> runnable =
-    new SynchronizeAndResumeRunnable(ParentAsWorkerPrivate(), aWindow);
-  if (NS_FAILED(NS_DispatchToCurrentThread(runnable))) {
-    JS_ReportError(aCx, "Failed to dispatch to current thread!");
-    return false;
-  }
-
-  mSynchronizeRunnable = runnable;
   return true;
 }
 
@@ -3611,8 +3687,8 @@ WorkerPrivateParent<Derived>::RegisterSharedWorker(JSContext* aCx,
   mSharedWorkers.Put(aSharedWorker->Serial(), aSharedWorker);
 
   // If there were other SharedWorker objects attached to this worker then they
-  // may all have been suspended and this worker would need to be resumed.
-  if (mSharedWorkers.Count() > 1 && !Resume(aCx, nullptr)) {
+  // may all have been frozen and this worker would need to be thawed.
+  if (mSharedWorkers.Count() > 1 && !Thaw(aCx, nullptr)) {
     return false;
   }
 
@@ -3640,10 +3716,10 @@ WorkerPrivateParent<Derived>::UnregisterSharedWorker(
   mSharedWorkers.Remove(aSharedWorker->Serial());
 
   // If there are still SharedWorker objects attached to this worker then they
-  // may all be suspended and this worker would need to be suspended. Otherwise,
+  // may all be frozen and this worker would need to be frozen. Otherwise,
   // if that was the last SharedWorker then it's time to cancel this worker.
   if (mSharedWorkers.Count()) {
-    if (!Suspend(aCx, nullptr)) {
+    if (!Freeze(aCx, nullptr)) {
       JS_ReportPendingException(aCx);
     }
   } else if (!Cancel(aCx)) {
@@ -4100,11 +4176,48 @@ WorkerPrivateParent<Derived>::AssertInnerWindowIsCorrect() const
 
 #endif
 
+class ReportDebuggerErrorRunnable final : public nsIRunnable
+{
+  nsRefPtr<WorkerDebugger> mDebugger;
+  nsString mFilename;
+  uint32_t mLineno;
+  nsString mMessage;
+
+public:
+  ReportDebuggerErrorRunnable(WorkerDebugger* aDebugger,
+                                const nsAString& aFilename, uint32_t aLineno,
+                                const nsAString& aMessage)
+  : mDebugger(aDebugger),
+    mFilename(aFilename),
+    mLineno(aLineno),
+    mMessage(aMessage)
+  {
+  }
+
+  NS_DECL_THREADSAFE_ISUPPORTS
+
+private:
+  ~ReportDebuggerErrorRunnable()
+  { }
+
+  NS_IMETHOD
+  Run() override
+  {
+    mDebugger->ReportErrorToDebuggerOnMainThread(mFilename, mLineno, mMessage);
+
+    return NS_OK;
+  }
+};
+
+NS_IMPL_ISUPPORTS(ReportDebuggerErrorRunnable, nsIRunnable)
+
 WorkerDebugger::WorkerDebugger(WorkerPrivate* aWorkerPrivate)
 : mMutex("WorkerDebugger::mMutex"),
   mCondVar(mMutex, "WorkerDebugger::mCondVar"),
   mWorkerPrivate(aWorkerPrivate),
-  mIsEnabled(false)
+  mIsEnabled(false),
+  mIsInitialized(false),
+  mIsFrozen(false)
 {
   mWorkerPrivate->AssertIsOnParentThread();
 }
@@ -4155,6 +4268,21 @@ WorkerDebugger::GetIsChrome(bool* aResult)
   }
 
   *aResult = mWorkerPrivate->IsChromeWorker();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+WorkerDebugger::GetIsFrozen(bool* aResult)
+{
+  AssertIsOnMainThread();
+
+  MutexAutoLock lock(mMutex);
+
+  if (!mWorkerPrivate) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  *aResult = mIsFrozen;
   return NS_OK;
 }
 
@@ -4230,6 +4358,48 @@ WorkerDebugger::GetWindow(nsIDOMWindow** aResult)
 
   nsCOMPtr<nsPIDOMWindow> window = mWorkerPrivate->GetWindow();
   window.forget(aResult);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+WorkerDebugger::Initialize(const nsAString& aURL, JSContext* aCx)
+{
+  AssertIsOnMainThread();
+
+  MutexAutoLock lock(mMutex);
+
+  if (!mWorkerPrivate || mIsInitialized) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsRefPtr<CompileDebuggerScriptRunnable> runnable =
+    new CompileDebuggerScriptRunnable(mWorkerPrivate, aURL);
+  if (!runnable->Dispatch(aCx)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  mIsInitialized = true;
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+WorkerDebugger::PostMessageMoz(const nsAString& aMessage, JSContext* aCx)
+{
+  AssertIsOnMainThread();
+
+  MutexAutoLock lock(mMutex);
+
+  if (!mWorkerPrivate || !mIsInitialized) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsRefPtr<DebuggerMessageEventRunnable> runnable =
+    new DebuggerMessageEventRunnable(mWorkerPrivate, aMessage);
+  if (!runnable->Dispatch(aCx)) {
+    return NS_ERROR_FAILURE;
+  }
+
   return NS_OK;
 }
 
@@ -4313,6 +4483,116 @@ WorkerDebugger::Disable()
   NotifyIsEnabled(false);
 }
 
+void
+WorkerDebugger::Freeze()
+{
+  mWorkerPrivate->AssertIsOnWorkerThread();
+
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethod(this, &WorkerDebugger::FreezeOnMainThread);
+  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+    NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
+}
+
+void
+WorkerDebugger::FreezeOnMainThread()
+{
+  AssertIsOnMainThread();
+
+  mIsFrozen = true;
+
+  for (size_t index = 0; index < mListeners.Length(); ++index) {
+    mListeners[index]->OnFreeze();
+  }
+}
+
+void
+WorkerDebugger::Thaw()
+{
+  mWorkerPrivate->AssertIsOnWorkerThread();
+
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethod(this, &WorkerDebugger::ThawOnMainThread);
+  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+    NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
+}
+
+void
+WorkerDebugger::ThawOnMainThread()
+{
+  AssertIsOnMainThread();
+
+  mIsFrozen = false;
+
+  for (size_t index = 0; index < mListeners.Length(); ++index) {
+    mListeners[index]->OnThaw();
+  }
+}
+
+void
+WorkerDebugger::PostMessageToDebugger(const nsAString& aMessage)
+{
+  mWorkerPrivate->AssertIsOnWorkerThread();
+
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethodWithArg<nsString>(this,
+      &WorkerDebugger::PostMessageToDebuggerOnMainThread, nsString(aMessage));
+  NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL);
+}
+
+void
+WorkerDebugger::PostMessageToDebuggerOnMainThread(const nsAString& aMessage)
+{
+  AssertIsOnMainThread();
+
+  nsTArray<nsCOMPtr<nsIWorkerDebuggerListener>> listeners;
+
+  {
+    MutexAutoLock lock(mMutex);
+
+    listeners.AppendElements(mListeners);
+  }
+
+  for (size_t index = 0; index < listeners.Length(); ++index) {
+    listeners[index]->OnMessage(aMessage);
+  }
+}
+
+void
+WorkerDebugger::ReportErrorToDebugger(const nsAString& aFilename,
+                                      uint32_t aLineno,
+                                      const nsAString& aMessage)
+{
+  mWorkerPrivate->AssertIsOnWorkerThread();
+
+  nsCOMPtr<nsIRunnable> runnable =
+    new ReportDebuggerErrorRunnable(this, aFilename, aLineno, aMessage);
+  if (NS_FAILED(NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL))) {
+    NS_WARNING("Failed to report error to debugger on main thread!");
+  }
+}
+
+void
+WorkerDebugger::ReportErrorToDebuggerOnMainThread(const nsAString& aFilename,
+                                                  uint32_t aLineno,
+                                                  const nsAString& aMessage)
+{
+  AssertIsOnMainThread();
+
+  nsTArray<nsCOMPtr<nsIWorkerDebuggerListener>> listeners;
+  {
+    MutexAutoLock lock(mMutex);
+
+    listeners.AppendElements(mListeners);
+  }
+
+  for (size_t index = 0; index < listeners.Length(); ++index) {
+    listeners[index]->OnError(aFilename, aLineno, aMessage);
+  }
+
+  LogErrorToConsole(aMessage, aFilename, nsString(), aLineno, 0, 0, 0);
+}
+
 WorkerPrivate::WorkerPrivate(JSContext* aCx,
                              WorkerPrivate* aParent,
                              const nsAString& aScriptURL,
@@ -4324,10 +4604,11 @@ WorkerPrivate::WorkerPrivate(JSContext* aCx,
                                        aSharedWorkerName, aLoadInfo)
   , mJSContext(nullptr)
   , mPRThread(nullptr)
+  , mDebuggerEventLoopLevel(0)
   , mErrorHandlerRecursionCount(0)
   , mNextTimeoutId(1)
   , mStatus(Pending)
-  , mSuspended(false)
+  , mFrozen(false)
   , mTimerRunning(false)
   , mRunningExpiredTimeouts(false)
   , mCloseHandlerStarted(false)
@@ -4495,7 +4776,8 @@ WorkerPrivate::Constructor(JSContext* aCx,
 
   worker->EnableDebugger();
 
-  nsRefPtr<CompileScriptRunnable> compiler = new CompileScriptRunnable(worker);
+  nsRefPtr<CompileScriptRunnable> compiler =
+    new CompileScriptRunnable(worker, aScriptURL);
   if (!compiler->Dispatch(aCx)) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
@@ -4808,19 +5090,15 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
   Maybe<JSAutoCompartment> workerCompartment;
 
   for (;;) {
-    // Workers lazily create a global object in CompileScriptRunnable. We need
-    // to enter the global's compartment as soon as it has been created.
-    if (!workerCompartment && GlobalScope()) {
-      workerCompartment.emplace(aCx, GlobalScope()->GetGlobalJSObject());
-    }
-
     Status currentStatus;
+    bool debuggerRunnablesPending = false;
     bool normalRunnablesPending = false;
 
     {
       MutexAutoLock lock(mMutex);
 
       while (mControlQueue.IsEmpty() &&
+             !(debuggerRunnablesPending = !mDebuggerQueue.IsEmpty()) &&
              !(normalRunnablesPending = NS_HasPendingEvents(mThread))) {
         WaitForWorkerEvents();
       }
@@ -4884,33 +5162,54 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
       }
     }
 
-    // Nothing to do here if we don't have any runnables in the main queue.
-    if (!normalRunnablesPending) {
-      SetGCTimerMode(IdleTimer);
-      continue;
+    if (debuggerRunnablesPending || normalRunnablesPending) {
+      // Start the periodic GC timer if it is not already running.
+      SetGCTimerMode(PeriodicTimer);
     }
 
-    MOZ_ASSERT(NS_HasPendingEvents(mThread));
+    if (debuggerRunnablesPending) {
+      WorkerRunnable* runnable;
 
-    // Start the periodic GC timer if it is not already running.
-    SetGCTimerMode(PeriodicTimer);
+      {
+        MutexAutoLock lock(mMutex);
 
-    // Process a single runnable from the main queue.
-    MOZ_ALWAYS_TRUE(NS_ProcessNextEvent(mThread, false));
+        mDebuggerQueue.Pop(runnable);
+        debuggerRunnablesPending = !mDebuggerQueue.IsEmpty();
+      }
 
-    // Only perform the Promise microtask checkpoint on the outermost event
-    // loop.  Don't run it, for example, during sync XHR or importScripts.
-    (void)Promise::PerformMicroTaskCheckpoint();
+      MOZ_ASSERT(runnable);
+      static_cast<nsIRunnable*>(runnable)->Run();
+      runnable->Release();
 
-    if (NS_HasPendingEvents(mThread)) {
-      // Now *might* be a good time to GC. Let the JS engine make the decision.
-      if (workerCompartment) {
+      if (debuggerRunnablesPending) {
+        WorkerDebuggerGlobalScope* globalScope = DebuggerGlobalScope();
+        MOZ_ASSERT(globalScope);
+
+        // Now *might* be a good time to GC. Let the JS engine make the decision.
+        JSAutoCompartment ac(aCx, globalScope->GetGlobalJSObject());
+        JS_MaybeGC(aCx);
+      }
+    } else if (normalRunnablesPending) {
+      MOZ_ASSERT(NS_HasPendingEvents(mThread));
+
+      // Process a single runnable from the main queue.
+      MOZ_ALWAYS_TRUE(NS_ProcessNextEvent(mThread, false));
+
+      // Only perform the Promise microtask checkpoint on the outermost event
+      // loop.  Don't run it, for example, during sync XHR or importScripts.
+      (void)Promise::PerformMicroTaskCheckpoint();
+
+      normalRunnablesPending = NS_HasPendingEvents(mThread);
+      if (normalRunnablesPending && GlobalScope()) {
+        // Now *might* be a good time to GC. Let the JS engine make the decision.
+        JSAutoCompartment ac(aCx, GlobalScope()->GetGlobalJSObject());
         JS_MaybeGC(aCx);
       }
     }
-    else {
-      // The normal event queue has been exhausted, cancel the periodic GC timer
-      // and schedule the idle GC timer.
+
+    if (!debuggerRunnablesPending && !normalRunnablesPending) {
+      // Both the debugger event queue and the normal event queue has been
+      // exhausted, cancel the periodic GC timer and schedule the idle GC timer.
       SetGCTimerMode(IdleTimer);
     }
   }
@@ -5114,17 +5413,17 @@ WorkerPrivate::InterruptCallback(JSContext* aCx)
     // Run all control events now.
     mayContinue = ProcessAllControlRunnables();
 
-    bool maySuspend = mSuspended;
-    if (maySuspend) {
+    bool mayFreeze = mFrozen;
+    if (mayFreeze) {
       MutexAutoLock lock(mMutex);
-      maySuspend = mStatus <= Running;
+      mayFreeze = mStatus <= Running;
     }
 
-    if (!mayContinue || !maySuspend) {
+    if (!mayContinue || !mayFreeze) {
       break;
     }
 
-    // Cancel the periodic GC timer here before suspending. The idle GC timer
+    // Cancel the periodic GC timer here before freezing. The idle GC timer
     // will clean everything up once it runs.
     if (!scheduledIdleGC) {
       SetGCTimerMode(IdleTimer);
@@ -5444,24 +5743,26 @@ WorkerPrivate::RemainingRunTimeMS() const
 }
 
 bool
-WorkerPrivate::SuspendInternal(JSContext* aCx)
+WorkerPrivate::FreezeInternal(JSContext* aCx)
 {
   AssertIsOnWorkerThread();
 
-  NS_ASSERTION(!mSuspended, "Already suspended!");
+  NS_ASSERTION(!mFrozen, "Already frozen!");
 
-  mSuspended = true;
+  mFrozen = true;
+  mDebugger->Freeze();
   return true;
 }
 
 bool
-WorkerPrivate::ResumeInternal(JSContext* aCx)
+WorkerPrivate::ThawInternal(JSContext* aCx)
 {
   AssertIsOnWorkerThread();
 
-  NS_ASSERTION(mSuspended, "Not yet suspended!");
+  NS_ASSERTION(mFrozen, "Not yet frozen!");
 
-  mSuspended = false;
+  mFrozen = false;
+  mDebugger->Thaw();
   return true;
 }
 
@@ -5909,6 +6210,103 @@ WorkerPrivate::PostMessageToParentMessagePort(
 
   PostMessageToParentInternal(aCx, aMessage, aTransferable, true,
                               aMessagePortSerial, aRv);
+}
+
+void
+WorkerPrivate::EnterDebuggerEventLoop()
+{
+  AssertIsOnWorkerThread();
+
+  JSContext* cx = GetJSContext();
+  MOZ_ASSERT(cx);
+
+  uint32_t currentEventLoopLevel = ++mDebuggerEventLoopLevel;
+
+  while (currentEventLoopLevel <= mDebuggerEventLoopLevel) {
+    bool debuggerRunnablesPending = false;
+
+    {
+      MutexAutoLock lock(mMutex);
+
+      debuggerRunnablesPending = !mDebuggerQueue.IsEmpty();
+    }
+
+    // Don't block with the periodic GC timer running.
+    if (!debuggerRunnablesPending) {
+      SetGCTimerMode(IdleTimer);
+    }
+
+    // Wait for something to do
+    {
+      MutexAutoLock lock(mMutex);
+
+      while (mControlQueue.IsEmpty() &&
+             !(debuggerRunnablesPending = !mDebuggerQueue.IsEmpty())) {
+        WaitForWorkerEvents();
+      }
+
+      ProcessAllControlRunnablesLocked();
+    }
+
+    if (debuggerRunnablesPending) {
+      // Start the periodic GC timer if it is not already running.
+      SetGCTimerMode(PeriodicTimer);
+
+      WorkerRunnable* runnable;
+
+      {
+        MutexAutoLock lock(mMutex);
+
+        mDebuggerQueue.Pop(runnable);
+      }
+
+      MOZ_ASSERT(runnable);
+      static_cast<nsIRunnable*>(runnable)->Run();
+      runnable->Release();
+
+      // Now *might* be a good time to GC. Let the JS engine make the decision.
+      JS_MaybeGC(cx);
+    }
+  }
+}
+
+void
+WorkerPrivate::LeaveDebuggerEventLoop()
+{
+  AssertIsOnWorkerThread();
+
+  MutexAutoLock lock(mMutex);
+
+  if (mDebuggerEventLoopLevel > 0) {
+    --mDebuggerEventLoopLevel;
+  }
+}
+
+void
+WorkerPrivate::PostMessageToDebugger(const nsAString& aMessage)
+{
+  mDebugger->PostMessageToDebugger(aMessage);
+}
+
+void
+WorkerPrivate::SetDebuggerImmediate(JSContext* aCx, Function& aHandler,
+                                    ErrorResult& aRv)
+{
+  AssertIsOnWorkerThread();
+
+  nsRefPtr<DebuggerImmediateRunnable> runnable =
+    new DebuggerImmediateRunnable(this, aHandler);
+  if (!runnable->Dispatch(aCx)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+  }
+}
+
+void
+WorkerPrivate::ReportErrorToDebugger(const nsAString& aFilename,
+                                     uint32_t aLineno,
+                                     const nsAString& aMessage)
+{
+  mDebugger->ReportErrorToDebugger(aFilename, aLineno, aMessage);
 }
 
 bool

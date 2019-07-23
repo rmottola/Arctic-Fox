@@ -76,7 +76,7 @@
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
-- Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes¿
+- Bug 1150563 - Intermittent test_compartments.js | test_measure - [tesÂ¿
 - Bug 1151466 - update talos to the latest version to include some pref
 - Bug 1153658 - browser_compartments.js logspam.
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
@@ -103,23 +103,18 @@
 - Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
 - Bug 1146696 - Don't assume there are no arenas available after last d
 - Bug 1145997 - Suppress GC in debugger GC callback 
-- Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
-- Bug 1137267 
-- Bug 1141563 - Don't update Shapes in parallel after compacting GC
-- Bug 1126014 - DomainPolicy support for e10s.
-- Bug 1139675 - Simplify the APIs for getting and setting the pres shel
-- Bug 1151974
-- Bug 1110487 all
-- Bug 1110814
-- Bug 1145631 - Part 1: Replace MOZ_OVERRIDE and MOZ_FINAL with overrid
-- Bug Bug 931249 2015-03-20
+- Bug 1092102 - Rename Suspend/Resume to Freeze
+- Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
+- Bug 1151974
+- Bug 1151892 Refactor Cache Manager Context usage to be more sane and 
+- Bug 1110485 P1 Refactor Cache IPC requests to use a separate actor
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/7d68b9894ab35849f960afd305c57271bb99e166
+https://github.com/mozilla/newtab-dev/commit/f5ae8deae6ed76c4af3ec5cad21831c335c37862
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -143,7 +138,6 @@ no components/url-classifier ?
 
 ### Further ToDo which would help portability:
 
-- Update code from TemporaryRef to already_Refed
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - js/src/jscntxt.h  update ReportValueError to UniquePtr

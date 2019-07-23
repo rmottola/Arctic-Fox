@@ -31,6 +31,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/Base64.h"
+#include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/dom/DocumentFragment.h"
@@ -994,19 +995,29 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   }
 
   bool foundValue = false;
-  int32_t value = 0;
-  int32_t pValue = 0; // Previous value, used to check integer overflow
+  CheckedInt32 value = 0;
+
+  // Check for leading zeros first.
+  uint64_t leadingZeros = 0;
+  while (iter != end) {
+    if (*iter != char16_t('0')) {
+      break;
+    }
+
+    ++leadingZeros;
+    foundValue = true;
+    ++iter;
+  }
+
   while (iter != end) {
     if (*iter >= char16_t('0') && *iter <= char16_t('9')) {
       value = (value * 10) + (*iter - char16_t('0'));
       ++iter;
-      // Checking for integer overflow.
-      if (pValue > value) {
+      if (!value.isValid()) {
         result |= eParseHTMLInteger_Error | eParseHTMLInteger_ErrorOverflow;
         break;
       } else {
         foundValue = true;
-        pValue = value;
       }
     } else if (*iter == char16_t('%')) {
       ++iter;
@@ -1024,9 +1035,13 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   if (negate) {
     value = -value;
     // Checking the special case of -0.
-    if (!value) {
+    if (value == 0) {
       result |= eParseHTMLInteger_NonStandard;
     }
+  }
+
+  if (leadingZeros > 1 || (leadingZeros == 1 && !(value == 0))) {
+    result |= eParseHTMLInteger_NonStandard;
   }
 
   if (iter != end) {
@@ -1034,7 +1049,7 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   }
 
   *aResult = (ParseHTMLIntegerResultFlags)result;
-  return value;
+  return value.value();
 }
 
 #define SKIP_WHITESPACE(iter, end_iter, end_res)                 \
@@ -5753,7 +5768,7 @@ SameOriginCheckerImpl::GetInterface(const nsIID& aIID, void** aResult)
 
 /* static */
 nsresult
-nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsCString& aOrigin)
+nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsACString& aOrigin)
 {
   NS_PRECONDITION(aPrincipal, "missing principal");
 
@@ -5774,7 +5789,7 @@ nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsCString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsCString& aOrigin)
+nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsACString& aOrigin)
 {
   NS_PRECONDITION(aURI, "missing uri");
 
@@ -5828,7 +5843,7 @@ nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsCString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin)
+nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsAString& aOrigin)
 {
   NS_PRECONDITION(aPrincipal, "missing principal");
 
@@ -5849,7 +5864,7 @@ nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetUTFOrigin(nsIURI* aURI, nsString& aOrigin)
+nsContentUtils::GetUTFOrigin(nsIURI* aURI, nsAString& aOrigin)
 {
   NS_PRECONDITION(aURI, "missing uri");
 

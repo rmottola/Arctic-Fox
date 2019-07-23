@@ -1320,9 +1320,14 @@ static StaticRefPtr<nsScriptSecurityManager> gScriptSecMan;
 nsScriptSecurityManager::~nsScriptSecurityManager(void)
 {
     Preferences::RemoveObservers(this, kObservedPrefs);
-    if (mDomainPolicy)
+    if (mDomainPolicy) {
         mDomainPolicy->Deactivate();
-    MOZ_ASSERT(!mDomainPolicy);
+    }
+    // ContentChild might hold a reference to the domain policy,
+    // and it might release it only after the security manager is
+    // gone. But we can still assert this for the main process.
+    MOZ_ASSERT_IF(XRE_GetProcessType() == GoannaProcessType_Default,
+                  !mDomainPolicy);
 }
 
 void
@@ -1538,6 +1543,16 @@ nsScriptSecurityManager::GetDomainPolicyActive(bool *aRv)
 NS_IMETHODIMP
 nsScriptSecurityManager::ActivateDomainPolicy(nsIDomainPolicy** aRv)
 {
+    if (XRE_GetProcessType() != GoannaProcessType_Default) {
+        return NS_ERROR_SERVICE_NOT_AVAILABLE;
+    }
+
+    return ActivateDomainPolicyInternal(aRv);
+}
+
+NS_IMETHODIMP
+nsScriptSecurityManager::ActivateDomainPolicyInternal(nsIDomainPolicy** aRv)
+{
     // We only allow one domain policy at a time. The holder of the previous
     // policy must explicitly deactivate it first.
     if (mDomainPolicy) {
@@ -1556,6 +1571,17 @@ void
 nsScriptSecurityManager::DeactivateDomainPolicy()
 {
     mDomainPolicy = nullptr;
+}
+
+void
+nsScriptSecurityManager::CloneDomainPolicy(DomainPolicyClone* aClone)
+{
+    MOZ_ASSERT(aClone);
+    if (mDomainPolicy) {
+        mDomainPolicy->CloneDomainPolicy(aClone);
+    } else {
+        aClone->active() = false;
+    }
 }
 
 NS_IMETHODIMP

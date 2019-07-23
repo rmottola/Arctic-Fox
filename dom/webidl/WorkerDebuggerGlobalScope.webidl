@@ -6,6 +6,24 @@
 [Global=(WorkerDebugger), Exposed=WorkerDebugger]
 interface WorkerDebuggerGlobalScope : EventTarget {
   readonly attribute object global;
+
+  object createSandbox(DOMString name, object prototype);
+
+  [Throws]
+  void loadSubScript(DOMString url, optional object sandbox);
+
+  void enterEventLoop();
+
+  void leaveEventLoop();
+
+  void postMessage(DOMString message);
+
+  attribute EventHandler onmessage;
+
+  [Throws]
+  void setImmediate(Function handler);
+
+  void reportError(DOMString message);
 };
 
 // So you can debug while you debug

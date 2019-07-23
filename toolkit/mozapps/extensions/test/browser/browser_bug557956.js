@@ -194,6 +194,11 @@ function check_telemetry({disabled, metaenabled, metadisabled, upgraded, failed,
 }
 
 add_test(function test_setup() {
+  let oldCanRecord = Services.telemetry.canRecordExtended;
+  Services.telemetry.canRecordExtended = true;
+  registerCleanupFunction(function () {
+    Services.telemetry.canRecordExtended = oldCanRecord;
+  });
   TelemetrySession.setup().then(run_next_test);
 });
 
@@ -514,5 +519,5 @@ add_test(function overrides_retrieved() {
 });
 
 add_test(function test_shutdown() {
-  TelemetrySession.shutdown().then(run_next_test);
+  TelemetrySession.shutdown(false).then(run_next_test);
 });

@@ -1707,7 +1707,7 @@ AndroidBridge::GetFrameNameJavaProfiling(uint32_t aThreadId, uint32_t aSampleId,
 static float
 GetScaleFactor(nsPresContext* aPresContext) {
     nsIPresShell* presShell = aPresContext->PresShell();
-    LayoutDeviceToLayerScale cumulativeResolution(presShell->GetCumulativeResolution().width);
+    LayoutDeviceToLayerScale cumulativeResolution(presShell->GetCumulativeResolution());
     return cumulativeResolution.scale;
 }
 

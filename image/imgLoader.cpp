@@ -701,7 +701,7 @@ static nsresult NewImageChannel(nsIChannel **aResult,
                                               requestingNode,
                                               triggeringPrincipal,
                                               securityFlags,
-                                              nsIContentPolicy::TYPE_IMAGE,
+                                              aPolicyType,
                                               nullptr,   // loadGroup
                                               callbacks,
                                               aLoadFlags);
@@ -716,7 +716,7 @@ static nsresult NewImageChannel(nsIChannel **aResult,
                        aURI,
                        triggeringPrincipal,
                        securityFlags,
-                       nsIContentPolicy::TYPE_IMAGE,
+                       aPolicyType,
                        nullptr,   // loadGroup
                        callbacks,
                        aLoadFlags);
