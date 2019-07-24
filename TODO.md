@@ -109,12 +109,12 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 - Bug 1151974
-- Bug 1151892 Refactor Cache Manager Context usage to be more sane and 
-- Bug 1110485 P1 Refactor Cache IPC requests to use a separate actor
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/f5ae8deae6ed76c4af3ec5cad21831c335c37862
+https://github.com/mozilla/newtab-dev/commit/a15008f587d1920abf725565770c5c2ceeb082ba
+
+https://github.com/mozilla/newtab-dev/commit/2649263bed76b3ff8d843732127478f2cd46ceaf
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -123,8 +123,6 @@ To verify:
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
 
-- Cannot be applied because file is missing - check
-Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
