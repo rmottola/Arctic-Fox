@@ -17,7 +17,7 @@
      deliberate for formatting around the embedded links. -->
 <!ENTITY rights.intro-point1a "&brandShortName; is made available to you under the terms of the ">
 <!ENTITY rights.intro-point1b "Mozilla Public License">
-<!ENTITY rights.intro-point1c ". This means you may use, copy and distribute &brandShortName; to others in its source form. Binaries are subject to the Pale Moon redistribution license found on the Pale Moon website. You are also welcome to modify the source code of &brandShortName; as you want to meet your needs. The Mozilla Public License also gives you the right to distribute your modified versions.">
+<!ENTITY rights.intro-point1c ". This means you may use, copy and distribute &brandShortName; to others in its source form. You are also welcome to modify the source code of &brandShortName; as you want to meet your needs. The Mozilla Public License also gives you the right to distribute your modified versions.">
 
 <!-- point 2.5 text for official branded builds -->
 <!ENTITY rights.intro-point2.5 "Some features in &brandShortName; may give you the option to provide feedback to &vendorShortName;. By choosing to submit feedback, you give &vendorShortName; permission to use the feedback to improve its products, to publish the feedback on its websites, and to distribute the feedback.">
