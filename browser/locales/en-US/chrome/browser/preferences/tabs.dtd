@@ -31,6 +31,6 @@
 <!ENTITY newtabPage.label                   "When opening a new tab, show:">
 <!ENTITY newtabPage.custom.label            "A custom URL">
 <!ENTITY newtabPage.blank.label             "A blank page">
-<!ENTITY newtabPage.home.label              "The Pale Moon start page">
+<!ENTITY newtabPage.home.label              "The Arctic Fox start page">
 <!ENTITY newtabPage.myhome.label            "My home page">
 <!ENTITY newtabPage.quickdial.label         "The Quickdial page">
