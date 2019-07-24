@@ -3593,7 +3593,7 @@ XREMain::XRE_mainRun()
           // Automatically migrate from the current application if we just
           // reset the profile.
           // Hard-code MOZ_APP_NAME to firefox because of hard-coded type in migrator.
-          aKey = (strcmp(MOZ_APP_NAME, "palemoon") == 0) ? "firefox" : MOZ_APP_NAME;
+          aKey = (strcmp(MOZ_APP_NAME, "arcticfox") == 0) ? "firefox" : MOZ_APP_NAME;
         }
         pm->Migrate(&mDirProvider, aKey, gResetOldProfileName);
       }
