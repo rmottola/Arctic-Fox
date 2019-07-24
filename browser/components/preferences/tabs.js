@@ -89,7 +89,7 @@ var gTabsPane = {
       case "about:logopage": 
         newtabUrlChoice.value = 1;
         break;
-      case "http://start.palemoon.org/":
+      case "https://duckduckgo.com/":
         newtabUrlChoice.value = 2;
         break;
       case newtabUrlSanitizedPref.value:
