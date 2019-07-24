@@ -133,7 +133,7 @@ var gTabsPane = {
           newtabUrlPref = "about:logopage";
           break;
         case 2:
-          newtabUrlPref = "http://start.palemoon.org/";
+          newtabUrlPref = "https://duckduckgo.com/";
           break;
         case 3:
           // If url is a pipe-delimited set of pages, just take the first one.
