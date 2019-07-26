@@ -109,12 +109,12 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 - Bug 1151974
+- Bug 958147 - Choose one of run-if or skip-if 
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/a15008f587d1920abf725565770c5c2ceeb082ba
+https://github.com/mozilla/newtab-dev/commit/3893eed7e53448081f6072c31169a27d719249fa
 
-https://github.com/mozilla/newtab-dev/commit/2649263bed76b3ff8d843732127478f2cd46ceaf
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -152,7 +152,6 @@ no components/url-classifier ?
 - Bug 1172609 - 8 part ICU update
 
 
-- what do do with EME ?
 
 For Windows:
 Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
@@ -163,7 +162,6 @@ Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
-- evaulate WebRTC : Bug 1093934 - Create a XPCOM library 
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
 - see if window.requestIdleCallback can be backported
 
