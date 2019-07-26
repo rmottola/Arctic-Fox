@@ -113,7 +113,7 @@
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/3893eed7e53448081f6072c31169a27d719249fa
+https://github.com/mozilla/newtab-dev/commit/841639e989014b4131e4022b0d3ff33036cf3a62
 
 
 To verify:
