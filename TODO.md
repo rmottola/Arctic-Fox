@@ -112,9 +112,8 @@
 - Bug 958147 - Choose one of run-if or skip-if 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/841639e989014b4131e4022b0d3ff33036cf3a62
-
+https://github.com/mozilla/newtab-dev/commit/394a2dd441482a2c66055b3dba742a820add0620
+https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
