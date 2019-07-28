@@ -21,5 +21,8 @@ EXTRA_JS_MODULES.reader = [
   'ReaderWorker.jsm'
 ]
 
+with Files('**'):
+    BUG_COMPONENT = ('Toolkit', 'Reader Mode')
+
 if CONFIG['MOZ_BUILD_APP'] == 'mobile/android':
     DEFINES['MOZ_FENNEC'] = True
