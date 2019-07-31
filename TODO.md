@@ -107,7 +107,6 @@
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 1: Change SandboxTarg
-- Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 - Bug 1151974
 - Bug 958147 - Choose one of run-if or skip-if 
 
