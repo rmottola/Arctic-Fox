@@ -74,7 +74,6 @@ DIRS += [
     'notification',
     'offline',
     'power',
-    'push',
     'quota',
     'security',
     'settings',
@@ -135,6 +134,11 @@ if CONFIG['MOZ_GAMEPAD']:
 
 if CONFIG['MOZ_NFC']:
     DIRS += ['nfc']
+
+if CONFIG['MOZ_SIMPLEPUSH']:
+    DIRS += ['simplepush']
+else:
+    DIRS += ['push']
 
 if CONFIG['MOZ_SECUREELEMENT']:
     DIRS += ['secureelement']

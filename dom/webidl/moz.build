@@ -346,7 +346,6 @@ WEBIDL_FILES = [
     'ProfileTimelineMarker.webidl',
     'Promise.webidl',
     'PromiseDebugging.webidl',
-    'PushManager.webidl',
     'RadioNodeList.webidl',
     'Range.webidl',
     'Rect.webidl',
@@ -657,6 +656,12 @@ if CONFIG['MOZ_B2G_RIL']:
         'MozIcc.webidl',
         'MozIccInfo.webidl',
         'MozIccManager.webidl',
+    ]
+
+if CONFIG['MOZ_SIMPLEPUSH']:
+    WEBIDL_FILES += SimplePushManager.webidl
+else:
+    WEBIDL_FILES += [
     ]
 
 if CONFIG['MOZ_NFC']:
