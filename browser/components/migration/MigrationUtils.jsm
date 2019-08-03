@@ -48,7 +48,7 @@ function getMigratorKeyForDefaultBrowser() {
   const APP_DESC_TO_KEY = {
     "Internet Explorer":     "ie",
     "Safari":                "safari",
-    "Pale Moon web browser": "firefox",
+    "Arctic Fox":            "firefox",
     "Google Chrome":         "chrome",  // Windows, Linux
     "Chrome":                "chrome",  // OS X
   };

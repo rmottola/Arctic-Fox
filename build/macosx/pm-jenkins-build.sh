@@ -15,5 +15,5 @@ rm -rf obj-*darwin*/dist
 ./mach package
 
 pushd obj-*darwin*/dist
-scp -P ${PORT} palemoon-*.dmg ${DIST}/$(ls palemoon-*.dmg | sed "s/\.en-US/-${BUILD_NUMBER}-${FLAVOR}.en-US/")
+scp -P ${PORT} arcticfox-*.dmg ${DIST}/$(ls arcticfox-*.dmg | sed "s/\.en-US/-${BUILD_NUMBER}-${FLAVOR}.en-US/")
 popd
