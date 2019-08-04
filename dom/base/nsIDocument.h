@@ -2252,6 +2252,16 @@ public:
     mMayHaveDOMMutationObservers = true;
   }
 
+  bool MayHaveAnimationObservers()
+  {
+    return mMayHaveAnimationObservers;
+  }
+
+  void SetMayHaveAnimationObservers()
+  {
+    mMayHaveAnimationObservers = true;
+  }
+
   bool IsInSyncOperation()
   {
     return mInSyncOperationCount != 0;
@@ -2763,6 +2773,9 @@ protected:
 
   // True if a DOMMutationObserver is perhaps attached to a node in the document.
   bool mMayHaveDOMMutationObservers;
+
+  // True if an nsIAnimationObserver is perhaps attached to a node in the document.
+  bool mMayHaveAnimationObservers;
 
   // True if a document has loaded Mixed Active Script (see nsMixedContentBlocker.cpp)
   bool mHasMixedActiveContentLoaded;
