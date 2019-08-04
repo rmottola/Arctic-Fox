@@ -128,6 +128,7 @@ AnimationPlayer::SetSource(Animation* aSource)
   if (mSource) {
     mSource->SetParentTime(GetCurrentTime());
   }
+  UpdateRelevance();
 }
 
 void
@@ -213,6 +214,8 @@ AnimationPlayer::Cancel()
 
   mHoldTime.SetNull();
   mStartTime.SetNull();
+
+  UpdateSourceContent();
 }
 
 bool
@@ -224,6 +227,12 @@ AnimationPlayer::IsRunning() const
 
   ComputedTiming computedTiming = GetSource()->GetComputedTiming();
   return computedTiming.mPhase == ComputedTiming::AnimationPhase_Active;
+}
+
+void
+AnimationPlayer::UpdateRelevance()
+{
+  mIsRelevant = HasCurrentSource() || HasInEffectSource();
 }
 
 bool
@@ -356,6 +365,7 @@ AnimationPlayer::UpdateSourceContent()
 {
   if (mSource) {
     mSource->SetParentTime(GetCurrentTime());
+    UpdateRelevance();
   }
 }
 
