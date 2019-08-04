@@ -109,9 +109,10 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 958147 - Choose one of run-if or skip-if 
+- Bug 1038811 2015-04-11 Complete remaining
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/394a2dd441482a2c66055b3dba742a820add0620
+https://github.com/mozilla/newtab-dev/commit/26b0645b4a2759e47a7aaf57416ea8dec8cb4f90
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
