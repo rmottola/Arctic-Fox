@@ -30,6 +30,7 @@
 #include "nsGkAtoms.h"
 #include "nsImageFrame.h"
 #include "nsLayoutStylesheetCache.h"
+#include "nsPrincipal.h"
 #include "nsRange.h"
 #include "nsRegion.h"
 #include "nsRepeatService.h"
@@ -267,6 +268,7 @@ nsLayoutStatics::Initialize()
   nsIPresShell::InitializeStatics();
   TouchManager::InitializeStatics();
   nsRefreshDriver::InitializeStatics();
+  nsPrincipal::InitializeStatics();
 
   nsCORSListenerProxy::Startup();
 
