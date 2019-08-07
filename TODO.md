@@ -112,7 +112,8 @@
 - Bug 1038811 2015-04-11 Complete remaining
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/3410e2545774029b7a9ede74d9f8a30a56da18f2
+
+https://github.com/mozilla/newtab-dev/commit/21fb986d253bcd035547835c32932a7f1cfa6b54
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
