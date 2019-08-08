@@ -598,7 +598,8 @@ public:
                  const nsRect& aContainerBounds,
                  ContainerLayer* aContainerLayer,
                  const ContainerLayerParameters& aParameters,
-                 bool aFlattenToSingleLayer) :
+                 bool aFlattenToSingleLayer,
+                 nscolor aBackgroundColor) :
     mBuilder(aBuilder), mManager(aManager),
     mLayerBuilder(aLayerBuilder),
     mContainerFrame(aContainerFrame),
@@ -606,6 +607,7 @@ public:
     mContainerBounds(aContainerBounds),
     mParameters(aParameters),
     mNextFreeRecycledPaintedLayer(0),
+    mContainerUniformBackgroundColor(aBackgroundColor),
     mFlattenToSingleLayer(aFlattenToSingleLayer)
   {
     nsPresContext* presContext = aContainerFrame->PresContext();
@@ -938,8 +940,20 @@ protected:
   nsTArray<nsRefPtr<PaintedLayer> > mRecycledPaintedLayers;
   nsDataHashtable<nsPtrHashKey<Layer>, nsRefPtr<ImageLayer> >
     mRecycledMaskImageLayers;
+  /**
+   * The visible region of all visible content in this container layer under
+   * first PaintedLayerData layer in the PaintedLayerDataStack.
+   */
+  PossiblyInfiniteRegion           mVisibleAboveBackgroundRegion;
   uint32_t                         mNextFreeRecycledPaintedLayer;
   nscoord                          mAppUnitsPerDevPixel;
+  /**
+   * The uniform opaque color from behind this container layer, or
+   * NS_RGBA(0,0,0,0) if the background behind this container layer is not
+   * uniform and opaque. This color can be pulled into ThebesLayers that are
+   * directly above the background.
+   */
+  nscolor                          mContainerUniformBackgroundColor;
   bool                             mSnappingEnabled;
   bool                             mFlattenToSingleLayer;
   /**
@@ -1970,7 +1984,7 @@ ContainerState::FindOpaqueBackgroundColorFor(const nsIntRegion& aTargetVisibleRe
                                                mParameters.mXScale,
                                                mParameters.mYScale,
                                                mAppUnitsPerDevPixel)) {
-        break;
+        return NS_RGBA(0,0,0,0);
       }
 
       nscolor color;
@@ -1980,7 +1994,11 @@ ContainerState::FindOpaqueBackgroundColorFor(const nsIntRegion& aTargetVisibleRe
       return NS_RGBA(0,0,0,0);
     }
   }
-  return NS_RGBA(0,0,0,0);
+  if (mVisibleAboveBackgroundRegion.Intersects(aTargetVisibleRegion)) {
+    // Some non-Thebes content is between container background and target.
+    return NS_RGBA(0,0,0,0);
+  }
+  return mContainerUniformBackgroundColor;
 }
 
 void
@@ -2352,12 +2370,13 @@ ContainerState::PopPaintedLayerData()
     layer->SetEventRegions(regions);
   }
 
-  if (lastIndex > 0) {
-    // Since we're going to pop off the last PaintedLayerData, the
-    // mVisibleAboveRegion of the second-to-last item will need to include
-    // the regions of the last item.
-    UpdateVisibleAboveRegionOnPop(data, mPaintedLayerDataStack[lastIndex - 1]);
-  }
+  // Since we're going to pop off the last PaintedLayerData, the
+  // mVisibleAboveRegion of the second-to-last item will need to include
+  // the regions of the last item. If we're emptying the PaintedLayerDataStack,
+  // we instead need to accumulate the regions into the container's
+  // mVisibleAboveBackgroundRegion.
+  UpdateVisibleAboveRegionOnPop(data,
+    lastIndex > 0 ? mPaintedLayerDataStack[lastIndex - 1].get() : nullptr);
 
   mPaintedLayerDataStack.RemoveElementAt(lastIndex);
 }
@@ -2813,11 +2832,8 @@ ContainerState::UpdateVisibleAboveRegionForNewItem(const nsIntRect& aVisibleRect
                                                    const nsIntRect* aClipRectIfAny)
 {
   PaintedLayerData* data = GetTopPaintedLayerData();
-  if (!data) {
-    return;
-  }
-
-  PossiblyInfiniteRegion& visibleAboveRegion = data->mVisibleAboveRegion;
+  PossiblyInfiniteRegion& visibleAboveRegion = data
+    ? data->mVisibleAboveRegion : mVisibleAboveBackgroundRegion;
 
   if (aCanMoveFreely) {
     // Prerendered transform items can be updated without layer building
@@ -2838,8 +2854,8 @@ void
 ContainerState::UpdateVisibleAboveRegionOnPop(PaintedLayerData* aData,
                                               PaintedLayerData* aNextPaintedLayerData)
 {
-  PossiblyInfiniteRegion& visibleAboveRegion =
-    aNextPaintedLayerData->mVisibleAboveRegion;
+  PossiblyInfiniteRegion& visibleAboveRegion = aNextPaintedLayerData ?
+    aNextPaintedLayerData->mVisibleAboveRegion : mVisibleAboveBackgroundRegion;
 
   // If aData has a draw region and is subject to async transforms then the
   // layer can potentially be moved arbitrarily on the compositor. So we
@@ -3045,6 +3061,16 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         continue;
       }
 
+      // 3D-transformed layers don't necessarily draw in the order in which
+      // they're added to their parent container layer.
+      bool mayDrawOutOfOrder = itemType == nsDisplayItem::TYPE_TRANSFORM &&
+        (item->Frame()->Preserves3D() || item->Frame()->Preserves3DChildren());
+
+      // Pull up a uniform background color into the layer if possible.
+      mParameters.mBackgroundColor = (prerenderedTransform || mayDrawOutOfOrder)
+        ? NS_RGBA(0,0,0,0)
+        : FindOpaqueBackgroundColorFor(itemVisibleRect, mPaintedLayerDataStack.Length());
+
       // Just use its layer.
       // Set layerContentsVisibleRect.width/height to -1 to indicate we
       // currently don't know. If BuildContainerLayerFor gets called by
@@ -3090,8 +3116,9 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       }
 
       // Update the "visible above region" of the topmost PaintedLayerData item
-      // so that FindPaintedLayerFor and FindOpaqueBackgroundColorFor are aware
-      // of this item, even though it's not in the PaintedLayerDataStack.
+      // (or of the container's background) so that FindPaintedLayerFor and
+      // FindOpaqueBackgroundColorFor are aware of this item, even though it's
+      // not in the PaintedLayerDataStack.
       UpdateVisibleAboveRegionForNewItem(itemVisibleRect, prerenderedTransform,
                                          itemClip.HasClip() ? &clipRect : nullptr);
 
@@ -4143,11 +4170,18 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
   {
     flattenToSingleLayer = true;
   }
+
+  nscolor backgroundColor = NS_RGBA(0,0,0,0);
+  if (aFlags & CONTAINER_ALLOW_PULL_BACKGROUND_COLOR) {
+    backgroundColor = aParameters.mBackgroundColor;
+  }
+
   uint32_t flags;
   while (true) {
     ContainerState state(aBuilder, aManager, aManager->GetLayerBuilder(),
                          aContainerFrame, aContainerItem, bounds,
-                         containerLayer, scaleParameters, flattenToSingleLayer);
+                         containerLayer, scaleParameters, flattenToSingleLayer,
+                         backgroundColor);
 
     state.ProcessDisplayItems(aChildren);
 

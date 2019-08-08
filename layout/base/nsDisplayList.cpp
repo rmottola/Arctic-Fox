@@ -3844,7 +3844,8 @@ nsDisplayOpacity::BuildLayer(nsDisplayListBuilder* aBuilder,
                              const ContainerLayerParameters& aContainerParameters) {
   nsRefPtr<Layer> container = aManager->GetLayerBuilder()->
     BuildContainerLayerFor(aBuilder, aManager, mFrame, this, &mList,
-                           aContainerParameters, nullptr);
+                           aContainerParameters, nullptr,
+                           FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR);
   if (!container)
     return nullptr;
 
@@ -4153,7 +4154,8 @@ nsDisplayOwnLayer::BuildLayer(nsDisplayListBuilder* aBuilder,
                               const ContainerLayerParameters& aContainerParameters) {
   nsRefPtr<ContainerLayer> layer = aManager->GetLayerBuilder()->
     BuildContainerLayerFor(aBuilder, aManager, mFrame, this, &mList,
-                           aContainerParameters, nullptr);
+                           aContainerParameters, nullptr,
+                           FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR);
   if (mFlags & VERTICAL_SCROLLBAR) {
     layer->SetScrollbarData(mScrollTarget, Layer::ScrollDirection::VERTICAL);
   }
@@ -4553,7 +4555,8 @@ nsDisplayScrollLayer::BuildLayer(nsDisplayListBuilder* aBuilder,
 
   return aManager->GetLayerBuilder()->
     BuildContainerLayerFor(aBuilder, aManager, mFrame, this, &mList,
-                           params, nullptr);
+                           params, nullptr,
+                           FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR);
 }
 
 UniquePtr<FrameMetrics>
@@ -5556,6 +5559,7 @@ already_AddRefed<Layer> nsDisplayTransform::BuildLayer(nsDisplayListBuilder *aBu
 
   uint32_t flags = ShouldPrerender(aBuilder) ?
     FrameLayerBuilder::CONTAINER_NOT_CLIPPED_BY_ANCESTORS : 0;
+  flags |= FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR;
   nsRefPtr<ContainerLayer> container = aManager->GetLayerBuilder()->
     BuildContainerLayerFor(aBuilder, aManager, mFrame, this, mStoredList.GetChildren(),
                            aContainerParameters, &newTransformMatrix, flags);
@@ -6012,7 +6016,8 @@ nsDisplayVR::BuildLayer(nsDisplayListBuilder* aBuilder,
                         const ContainerLayerParameters& aContainerParameters)
 {
   ContainerLayerParameters newContainerParameters = aContainerParameters;
-  uint32_t flags = FrameLayerBuilder::CONTAINER_NOT_CLIPPED_BY_ANCESTORS;
+  uint32_t flags = FrameLayerBuilder::CONTAINER_NOT_CLIPPED_BY_ANCESTORS |
+                   FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR;
   nsRefPtr<ContainerLayer> container = aManager->GetLayerBuilder()->
     BuildContainerLayerFor(aBuilder, aManager, mFrame, this, &mList,
                            newContainerParameters, nullptr, flags);
