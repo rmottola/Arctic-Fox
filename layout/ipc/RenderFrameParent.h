@@ -162,7 +162,7 @@ class nsDisplayRemote : public nsDisplayItem
   typedef mozilla::layout::RenderFrameParent RenderFrameParent;
 
 public:
-  nsDisplayRemote(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
+  nsDisplayRemote(nsDisplayListBuilder* aBuilder, nsSubDocumentFrame* aFrame,
                   RenderFrameParent* aRemoteFrame);
 
   virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
