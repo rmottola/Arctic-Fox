@@ -5393,6 +5393,36 @@
     "n_values": "7",
     "description": "Final status of the CacheFileInputStream (0=ok, 1=other error, 2=out of memory, 3=disk full, 4=file corrupted, 5=file not found, 6=binding aborted)"
   },
+  "NETWORK_CACHE_METADATA_FIRST_READ_TIME_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Time spent to read the first part of the metadata from the cache entry file."
+  },
+  "NETWORK_CACHE_METADATA_SECOND_READ_TIME_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Time spent to read the missing part of the metadata from the cache entry file."
+  },
+  "NETWORK_CACHE_METADATA_FIRST_READ_SIZE": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "5119",
+    "n_buckets": 256,
+    "description": "Guessed size of the metadata that we read from the cache file as the first part."
+  },
+  "NETWORK_CACHE_METADATA_SIZE": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "5119",
+    "n_buckets": 256,
+    "description": "Actual size of the metadata parsed from the disk."
+  },
   "DATABASE_LOCKED_EXCEPTION": {
     "expires_in_version": "42",
     "kind": "enumerated",
