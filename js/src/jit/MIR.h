@@ -8001,7 +8001,7 @@ class MBoundsCheck
     int32_t minimum_;
     int32_t maximum_;
 
-    MBoundsCheck(MDefinition* index, MDefinition* length)
+    MBoundsCheck(MDefinition *index, MDefinition *length)
       : MBinaryInstruction(index, length), minimum_(0), maximum_(0)
     {
         setGuard();
@@ -8049,7 +8049,7 @@ class MBoundsCheck
     virtual AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
-    void computeRange(TempAllocator& alloc) override;
+    void computeRange(TempAllocator &alloc) override;
 
     ALLOW_CLONE(MBoundsCheck)
 };
