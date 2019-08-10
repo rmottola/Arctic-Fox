@@ -2537,6 +2537,9 @@ LIRGenerator::visitNot(MNot* ins)
 void
 LIRGenerator::visitBoundsCheck(MBoundsCheck *ins)
 {
+     if (!ins->fallible())
+         return;
+
     LInstruction *check;
     if (ins->minimum() || ins->maximum()) {
         check = new(alloc()) LBoundsCheckRange(useRegisterOrConstant(ins->index()),

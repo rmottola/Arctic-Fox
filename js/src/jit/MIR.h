@@ -8000,9 +8000,10 @@ class MBoundsCheck
     // Range over which to perform the bounds check, may be modified by GVN.
     int32_t minimum_;
     int32_t maximum_;
+    bool fallible_;
 
     MBoundsCheck(MDefinition *index, MDefinition *length)
-      : MBinaryInstruction(index, length), minimum_(0), maximum_(0)
+      : MBinaryInstruction(index, length), minimum_(0), maximum_(0), fallible_(true)
     {
         setGuard();
         setMovable();
@@ -8050,6 +8051,10 @@ class MBoundsCheck
         return AliasSet::None();
     }
     void computeRange(TempAllocator &alloc) override;
+    bool fallible() const {
+        return fallible_;
+    }
+    void collectRangeInfoPreTrunc() override;
 
     ALLOW_CLONE(MBoundsCheck)
 };
