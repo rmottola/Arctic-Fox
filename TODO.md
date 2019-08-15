@@ -29,6 +29,8 @@
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
@@ -113,7 +115,7 @@
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/511a39c19ddc10666b1f7386d89dc318c2b0dc2c
+https://github.com/mozilla/newtab-dev/commit/a6c55eb584f218e924083ad4c3b2092d1114009b
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
