@@ -1897,6 +1897,9 @@ pref("network.dnsCacheExpirationGracePeriod", 300);
 // This preference can be used to turn off DNS prefetch.
 pref("network.dns.disablePrefetch", true);
 
+// Contols whether or not "localhost" should resolve when offline
+pref("network.dns.offline-localhost", true);
+
 // This preference controls whether or not URLs with UTF-8 characters are
 // escaped.  Set this preference to TRUE for strict RFC2396 conformance.
 pref("network.standard-url.escape-utf8", true);
