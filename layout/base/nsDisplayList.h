@@ -3703,6 +3703,12 @@ public:
   explicit nsCharClipDisplayItem(nsIFrame* aFrame)
     : nsDisplayItem(aFrame) {}
 
+  virtual nsDisplayItemGeometry* AllocateGeometry(nsDisplayListBuilder* aBuilder) override;
+
+  virtual void ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
+                                         const nsDisplayItemGeometry* aGeometry,
+                                         nsRegion* aInvalidRegion) override;
+
   struct ClipEdges {
     ClipEdges(const nsDisplayItem& aItem,
               nscoord aLeftEdge, nscoord aRightEdge) {

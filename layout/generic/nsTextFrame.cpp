@@ -4531,11 +4531,11 @@ nsTextFrame::CharacterDataChanged(CharacterDataChangeInfo* aInfo)
   return NS_OK;
 }
 
-class nsDisplayTextGeometry : public nsDisplayItemGenericGeometry
+class nsDisplayTextGeometry : public nsCharClipGeometry
 {
 public:
-  nsDisplayTextGeometry(nsDisplayItem* aItem, nsDisplayListBuilder* aBuilder)
-    : nsDisplayItemGenericGeometry(aItem, aBuilder)
+  nsDisplayTextGeometry(nsCharClipDisplayItem* aItem, nsDisplayListBuilder* aBuilder)
+    : nsCharClipGeometry(aItem, aBuilder)
   {
     nsTextFrame* f = static_cast<nsTextFrame*>(aItem->Frame());
     f->GetTextDecorations(f->PresContext(), nsTextFrame::eResolvedColors, mDecorations);
@@ -4606,6 +4606,8 @@ public:
     nsRect newRect = geometry->mBounds;
     nsRect oldRect = GetBounds(aBuilder, &snap);
     if (decorations != geometry->mDecorations ||
+        mLeftEdge != geometry->mLeftEdge ||
+        mRightEdge != geometry->mRightEdge ||
         !oldRect.IsEqualInterior(newRect) ||
         !geometry->mBorderRect.IsEqualInterior(GetBorderRect())) {
       aInvalidRegion->Or(oldRect, newRect);
