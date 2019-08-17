@@ -73,6 +73,7 @@ public:
   Animation* GetSource() const { return mSource; }
   AnimationTimeline* Timeline() const { return mTimeline; }
   Nullable<TimeDuration> GetStartTime() const { return mStartTime; }
+  void SetStartTime(const Nullable<TimeDuration>& aNewStartTime);
   Nullable<TimeDuration> GetCurrentTime() const;
   AnimationPlayState PlayState() const;
   virtual Promise* GetReady(ErrorResult& aRv);
@@ -85,6 +86,7 @@ public:
   // script but when called from script we (or one of our subclasses) perform
   // extra steps such as flushing style or converting the return type.
   Nullable<double> GetStartTimeAsDouble() const;
+  void SetStartTimeAsDouble(const Nullable<double>& aStartTime);
   Nullable<double> GetCurrentTimeAsDouble() const;
   virtual AnimationPlayState PlayStateFromJS() const { return PlayState(); }
   virtual void PlayFromJS() { Play(); }
