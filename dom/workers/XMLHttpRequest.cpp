@@ -2284,14 +2284,6 @@ XMLHttpRequest::Send(const ArrayBufferView& aBody, ErrorResult& aRv)
 }
 
 void
-XMLHttpRequest::SendAsBinary(const nsAString& aBody, ErrorResult& aRv)
-{
-  NS_NOTYETIMPLEMENTED("Implement me!");
-  aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  return;
-}
-
-void
 XMLHttpRequest::Abort(ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
