@@ -112,10 +112,13 @@
 - Bug 1151974
 - Bug 958147 - Choose one of run-if or skip-if 
 - Bug 1038811 2015-04-11 Complete remaining
+- Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
+- Bug 1141710 - 2015-03-04 all parts
+- Bug 1130616 - 2015-02-24 Support EXT_color_buffer_half_float on ANGLE. 
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/ed036ca142c34b4c807c675f86070fef8a54889c
+https://github.com/mozilla/newtab-dev/commit/6134ad7194e9c19c8b61702d20182c8b8049c7a3
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
