@@ -1254,7 +1254,7 @@
           <![CDATA[
             var aFromExternal;
             var aRelatedToCurrent;
-            var aDisableMCB;
+            var aAllowMixedContent;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1266,7 +1266,7 @@
               aAllowThirdPartyFixup = params.allowThirdPartyFixup;
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
-              aDisableMCB           = params.disableMCB;
+              aAllowMixedContent    = params.allowMixedContent;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1280,7 +1280,7 @@
                                   allowThirdPartyFixup: aAllowThirdPartyFixup,
                                   fromExternal: aFromExternal,
                                   relatedToCurrent: aRelatedToCurrent,
-                                  disableMCB: aDisableMCB});
+                                  allowMixedContent: aAllowMixedContent});
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1354,7 +1354,7 @@
             var aFromExternal;
             var aRelatedToCurrent;
             var aSkipAnimation;
-            var aDisableMCB;
+            var aAllowMixedContent;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1367,7 +1367,7 @@
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
               aSkipAnimation        = params.skipAnimation;
-              aDisableMCB           = params.disableMCB;
+              aAllowMixedContent    = params.allowMixedContent;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -1527,7 +1527,7 @@
               }
               if (aFromExternal)
                 flags |= Ci.nsIWebNavigation.LOAD_FLAGS_FROM_EXTERNAL;
-              if (aDisableMCB)
+              if (aAllowMixedContent)
                 flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_MIXED_CONTENT;
               try {
                 b.loadURIWithFlags(aURI, flags, aReferrerURI, aCharset, aPostData);

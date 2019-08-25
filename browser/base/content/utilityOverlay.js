@@ -215,7 +215,7 @@ function openLinkIn(url, where, params) {
   var aCharset              = params.charset;
   var aReferrerURI          = params.referrerURI;
   var aRelatedToCurrent     = params.relatedToCurrent;
-  var aDisableMCB           = params.disableMCB;
+  var aAllowMixedContent    = params.allowMixedContent;
   var aInBackground         = params.inBackground;
   var aDisallowInheritPrincipal = params.disallowInheritPrincipal;
   var aInitiatingDoc        = params.initiatingDoc;
@@ -330,7 +330,7 @@ function openLinkIn(url, where, params) {
                        inBackground: loadInBackground,
                        allowThirdPartyFixup: aAllowThirdPartyFixup,
                        relatedToCurrent: aRelatedToCurrent,
-                       disableMCB: aDisableMCB});
+                       allowMixedContent: aAllowMixedContent});
     break;
   }
 
