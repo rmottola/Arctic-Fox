@@ -1254,6 +1254,7 @@
           <![CDATA[
             var aFromExternal;
             var aRelatedToCurrent;
+            var aDisableMCB;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1265,6 +1266,7 @@
               aAllowThirdPartyFixup = params.allowThirdPartyFixup;
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
+              aDisableMCB           = params.disableMCB;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1277,7 +1279,8 @@
                                   ownerTab: owner,
                                   allowThirdPartyFixup: aAllowThirdPartyFixup,
                                   fromExternal: aFromExternal,
-                                  relatedToCurrent: aRelatedToCurrent});
+                                  relatedToCurrent: aRelatedToCurrent,
+                                  disableMCB: aDisableMCB});
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1351,6 +1354,7 @@
             var aFromExternal;
             var aRelatedToCurrent;
             var aSkipAnimation;
+            var aDisableMCB;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1363,6 +1367,7 @@
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
               aSkipAnimation        = params.skipAnimation;
+              aDisableMCB           = params.disableMCB;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -1522,6 +1527,8 @@
               }
               if (aFromExternal)
                 flags |= Ci.nsIWebNavigation.LOAD_FLAGS_FROM_EXTERNAL;
+              if (aDisableMCB)
+                flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_MIXED_CONTENT;
               try {
                 b.loadURIWithFlags(aURI, flags, aReferrerURI, aCharset, aPostData);
               } catch (ex) {
