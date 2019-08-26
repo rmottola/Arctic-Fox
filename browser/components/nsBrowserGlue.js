@@ -19,6 +19,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ContentClick",
+                                  "resource:///modules/ContentClick.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
 
@@ -513,6 +516,9 @@ BrowserGlue.prototype = {
     if (Services.prefs.getBoolPref('media.mediasource.format-reader', true)) {
       Services.prefs.setBoolPref('media.mediasource.webm.enabled', false);
     }
+
+    if (Services.prefs.getBoolPref("browser.tabs.remote"))
+      ContentClick.init();
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
