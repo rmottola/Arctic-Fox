@@ -13,6 +13,9 @@ const XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
+                                  "resource:///modules/AboutHome.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 
@@ -501,6 +504,7 @@ BrowserGlue.prototype = {
     NewTabUtils.init();
     BrowserNewTabPreloader.init();
     webrtcUI.init();
+    AboutHome.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();
