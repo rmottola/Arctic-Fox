@@ -923,6 +923,8 @@ pref("browser.tabs.remote", false);
 pref("security.sandbox.macos.content.level", 1);
 #endif
 
+pref("browser.tabs.remote", false);
+
 // This pref governs whether we attempt to work around problems caused by
 // plugins using OS calls to manipulate the cursor while running out-of-
 // process.  These workarounds all involve intercepting (hooking) certain
