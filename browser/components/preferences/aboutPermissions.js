@@ -534,6 +534,7 @@ let AboutPermissions = {
     Services.prefs.addObserver("dom.webnotifications.enabled", this, false);
     Services.prefs.addObserver("xpinstall.whitelist.required", this, false);
     Services.prefs.addObserver("geo.enabled", this, false);
+    Services.prefs.addObserver("dom.push.enabled", this, false);
     Services.prefs.addObserver("dom.indexedDB.enabled", this, false);
     Services.prefs.addObserver("plugins.click_to_play", this, false);
     Services.prefs.addObserver("full-screen-api.enabled", this, false);
@@ -687,6 +688,7 @@ let AboutPermissions = {
       Services.prefs.removeObserver("dom.webnotifications.enabled", this, false);
       Services.prefs.removeObserver("xpinstall.whitelist.required", this, false);
       Services.prefs.removeObserver("geo.enabled", this, false);
+      Services.prefs.removeObserver("dom.push.enabled", this, false);
       Services.prefs.removeObserver("dom.indexedDB.enabled", this, false);
       Services.prefs.removeObserver("plugins.click_to_play", this, false);
       Services.prefs.removeObserver("full-screen-api.enabled", this, false);
