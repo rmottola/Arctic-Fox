@@ -1458,6 +1458,10 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
     min-width: 102px;
 }
 
+.tabbrowser-tab[remote] {
+  text-decoration: underline;
+}
+
 /* When the tabs are on top and the window is maximized or in full-
    screen mode, unhide the transparent top border of the tabs so we
    have a 1px gap between the tabs and the top edge of the screen */
