@@ -5,21 +5,35 @@
 
 #include "domstubs.idl"
 
+interface nsIArray;
 interface nsIDocument;
 interface nsIInterceptedChannel;
 interface nsIPrincipal;
 interface nsIURI;
 
-[builtinclass, uuid(d4367ffe-e435-4195-95f8-0a51b1bbfdfb)]
+[scriptable, uuid(52ee2c9d-ee87-4caf-9588-23ae77ff8798)]
 interface nsIServiceWorkerUnregisterCallback : nsISupports
 {
   // aState is true if the unregistration succeded.
   // It's false if this ServiceWorkerRegistration doesn't exist.
-  [noscript] void UnregisterSucceeded(in bool aState);
-  [noscript] void UnregisterFailed();
+  void unregisterSucceeded(in bool aState);
+  void unregisterFailed();
 };
 
-[builtinclass, uuid(e4c8baa5-237a-4bf6-82d4-ea06eb4b76ba)]
+[scriptable, builtinclass, uuid(8ce0d197-5740-4ddf-aa4a-e5a63e611d03)]
+interface nsIServiceWorkerInfo : nsISupports
+{
+  readonly attribute nsIPrincipal principal;
+
+  readonly attribute DOMString scope;
+  readonly attribute DOMString scriptSpec;
+  readonly attribute DOMString currentWorkerURL;
+
+  readonly attribute DOMString activeCacheName;
+  readonly attribute DOMString waitingCacheName;
+};
+
+[scriptable, builtinclass, uuid(3cd3acce-8c80-4fcc-9265-067ebe8cab92)]
 interface nsIServiceWorkerManager : nsISupports
 {
   /**
@@ -103,6 +117,13 @@ interface nsIServiceWorkerManager : nsISupports
 
   // Testing
   DOMString getScopeForUrl(in DOMString path);
+
+  // This is meant to be used only by about:serviceworkers. It returns an array
+  // of nsIServiceWorkerInfo.
+  nsIArray getAllRegistrations();
+
+  void sendPushEvent(in ACString scope, in DOMString data);
+  void sendPushSubscriptionChangedEvent(in ACString scope);
 };
 
 %{ C++

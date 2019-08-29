@@ -16,12 +16,15 @@ browser.jar:
 #ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/aboutSyncTabs.css
 #endif
+  skin/classic/browser/aboutTabCrashed.css
   skin/classic/browser/actionicon-tab.png
 * skin/classic/browser/browser.css
   skin/classic/browser/click-to-play-warning-stripes.png
 * skin/classic/browser/engineManager.css
   skin/classic/browser/Geolocation-16.png
   skin/classic/browser/Geolocation-64.png
+  skin/classic/browser/Push-16.png
+  skin/classic/browser/Push-64.png
   skin/classic/browser/Go-arrow.png
   skin/classic/browser/identity.png
   skin/classic/browser/imagedocument.png 

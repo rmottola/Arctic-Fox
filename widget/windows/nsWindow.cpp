@@ -6594,6 +6594,15 @@ nsWindow::IsPopup()
   return mWindowType == eWindowType_popup;
 }
 
+void
+nsWindow::ClearCompositor(nsWindow* aWindow)
+{
+  if (aWindow->mLayerManager) {
+    aWindow->mLayerManager = nullptr;
+    aWindow->DestroyCompositor();
+  }
+}
+
 bool
 nsWindow::ShouldUseOffMainThreadCompositing()
 {

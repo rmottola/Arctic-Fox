@@ -29,6 +29,8 @@
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
@@ -107,14 +109,28 @@
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 1: Change SandboxTarg
-- Bug 1083344 - Tighten rules for Mac OS content process sandbox on
 - Bug 1151974
-- Bug 1151892 Refactor Cache Manager Context usage to be more sane and 
-- Bug 1110485 P1 Refactor Cache IPC requests to use a separate actor
+- Bug 958147 - Choose one of run-if or skip-if 
+- Bug 1038811 2015-04-11 Complete remaining
+- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
+- Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
+- Bug 1141710 - 2015-03-04 all parts
+- Bug 1130616 - 2015-02-24 Support EXT_color_buffer_half_float on ANGLE. 
+
+Require check of JS browser components:
+
+- Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
+- Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
+- Bug 1118502 - part 1 - fixup grabbing of documentURIObject; 
+- Bug 1031264 - make opening links in new {tabs,windows} honor rel
+
+- Bug 897062 - 2013 -  Handle special clicks in e10s. r=felipe,smaug 
+- Bug 899222 - 2013 - Make about:home work via message passing (r=felipe)
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/dc7696193f8e5478bc44cb74402bf7965f560357
-https://github.com/mozilla/newtab-dev/commit/f5ae8deae6ed76c4af3ec5cad21831c335c37862
+
+https://github.com/mozilla/newtab-dev/commit/ed1b0adc6c08d6ac9aae2e41f9e35d9066614943
+https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -123,8 +139,6 @@ To verify:
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
 
-- Cannot be applied because file is missing - check
-Bug 1135825: Add missing MOZ_OVERRIDE annotation in RTCIdentityProvid
 
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
@@ -154,7 +168,6 @@ no components/url-classifier ?
 - Bug 1172609 - 8 part ICU update
 
 
-- what do do with EME ?
 
 For Windows:
 Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
@@ -165,7 +178,6 @@ Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
-- evaulate WebRTC : Bug 1093934 - Create a XPCOM library 
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
 - see if window.requestIdleCallback can be backported
 

@@ -13,6 +13,7 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkInterceptController.h"
+#include "nsIMutableArray.h"
 #include "nsPIDOMWindow.h"
 #include "nsScriptLoader.h"
 #include "nsDebug.h"
@@ -1466,6 +1467,139 @@ public:
   }
 };
 
+#ifndef MOZ_SIMPLEPUSH
+
+class SendPushEventRunnable final : public WorkerRunnable
+{
+  nsString mData;
+  nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
+
+public:
+  SendPushEventRunnable(
+    WorkerPrivate* aWorkerPrivate,
+    const nsAString& aData,
+    nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker)
+      : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
+      , mData(aData)
+      , mServiceWorker(aServiceWorker)
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(aWorkerPrivate);
+    MOZ_ASSERT(aWorkerPrivate->IsServiceWorker());
+  }
+
+  bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    MOZ_ASSERT(aWorkerPrivate);
+    GlobalObject globalObj(aCx, aWorkerPrivate->GlobalScope()->GetWrapper());
+
+    PushEventInit pei;
+    pei.mData.Construct(mData);
+    pei.mBubbles = false;
+    pei.mCancelable = true;
+
+    ErrorResult result;
+    nsRefPtr<PushEvent> event =
+      PushEvent::Constructor(globalObj, NS_LITERAL_STRING("push"), pei, result);
+    if (NS_WARN_IF(result.Failed())) {
+      return false;
+    }
+
+    event->SetTrusted(true);
+    event->PostInit(mServiceWorker);
+
+    nsRefPtr<EventTarget> target = do_QueryObject(aWorkerPrivate->GlobalScope());
+    target->DispatchDOMEvent(nullptr, event, nullptr, nullptr);
+    return true;
+  }
+};
+
+class SendPushSubscriptionChangeEventRunnable final : public WorkerRunnable
+{
+  nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
+
+public:
+  SendPushSubscriptionChangeEventRunnable(
+    WorkerPrivate* aWorkerPrivate,
+    nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker)
+      : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
+      , mServiceWorker(aServiceWorker)
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(aWorkerPrivate);
+    MOZ_ASSERT(aWorkerPrivate->IsServiceWorker());
+  }
+
+  bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    MOZ_ASSERT(aWorkerPrivate);
+
+    nsRefPtr<EventTarget> target = do_QueryObject(aWorkerPrivate->GlobalScope());
+
+    nsContentUtils::DispatchTrustedEvent(nullptr, target,
+                                         NS_LITERAL_STRING("pushsubscriptionchange"),
+                                         true, true);
+    return true;
+  }
+};
+
+#endif /* ! MOZ_SIMPLEPUSH */
+
+NS_IMETHODIMP
+ServiceWorkerManager::SendPushEvent(const nsACString& aScope, const nsAString& aData)
+{
+#ifdef MOZ_SIMPLEPUSH
+  return NS_ERROR_NOT_AVAILABLE;
+#else
+  nsRefPtr<ServiceWorker> serviceWorker = CreateServiceWorkerForScope(aScope);
+  if (!serviceWorker) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsMainThreadPtrHandle<ServiceWorker> serviceWorkerHandle(
+    new nsMainThreadPtrHolder<ServiceWorker>(serviceWorker));
+
+  nsRefPtr<SendPushEventRunnable> r =
+    new SendPushEventRunnable(serviceWorker->GetWorkerPrivate(), aData, serviceWorkerHandle);
+
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  if (NS_WARN_IF(!r->Dispatch(jsapi.cx()))) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
+#endif
+}
+
+NS_IMETHODIMP
+ServiceWorkerManager::SendPushSubscriptionChangedEvent(const nsACString& aScope)
+{
+#ifdef MOZ_SIMPLEPUSH
+  return NS_ERROR_NOT_AVAILABLE;
+#else
+  nsRefPtr<ServiceWorker> serviceWorker = CreateServiceWorkerForScope(aScope);
+  if (!serviceWorker) {
+    return NS_ERROR_FAILURE;
+  }
+  nsMainThreadPtrHandle<ServiceWorker> serviceWorkerHandle(
+    new nsMainThreadPtrHolder<ServiceWorker>(serviceWorker));
+
+  nsRefPtr<SendPushSubscriptionChangeEventRunnable> r =
+    new SendPushSubscriptionChangeEventRunnable(serviceWorker->GetWorkerPrivate(), serviceWorkerHandle);
+
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  if (NS_WARN_IF(!r->Dispatch(jsapi.cx()))) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
+#endif
+}
+
 NS_IMETHODIMP
 ServiceWorkerManager::GetReadyPromise(nsIDOMWindow* aWindow,
                                       nsISupports** aPromise)
@@ -1567,6 +1701,37 @@ ServiceWorkerManager::CheckReadyPromise(nsPIDOMWindow* aWindow,
   return false;
 }
 
+already_AddRefed<ServiceWorker>
+ServiceWorkerManager::CreateServiceWorkerForScope(const nsACString& aScope)
+{
+  AssertIsOnMainThread();
+
+  nsCOMPtr<nsIURI> scopeURI;
+  nsresult rv = NS_NewURI(getter_AddRefs(scopeURI), aScope, nullptr, nullptr);
+  if (NS_FAILED(rv)) {
+    return nullptr;
+  }
+  nsRefPtr<ServiceWorkerRegistrationInfo> registration = GetServiceWorkerRegistrationInfo(scopeURI);
+  if (!registration) {
+    return nullptr;
+  }
+
+  if (!registration->mActiveWorker) {
+    return nullptr;
+  }
+
+  nsRefPtr<ServiceWorker> sw;
+  rv = CreateServiceWorker(registration->mPrincipal,
+                           registration->mActiveWorker,
+                           getter_AddRefs(sw));
+
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return nullptr;
+  }
+
+  return sw.forget();
+}
+
 class ServiceWorkerUnregisterJob final : public ServiceWorkerJob
 {
   nsRefPtr<ServiceWorkerRegistrationInfo> mRegistration;
@@ -1613,7 +1778,7 @@ private:
     nsRefPtr<ServiceWorkerRegistrationInfo> registration;
     if (!swm->mServiceWorkerRegistrationInfos.Get(mScope, getter_AddRefs(registration))) {
       // "If registration is null, then, resolve promise with false."
-      return mCallback->UnregisterSucceeded(false);
+      return mCallback ? mCallback->UnregisterSucceeded(false) : NS_OK;
     }
 
     MOZ_ASSERT(registration);
@@ -1621,7 +1786,7 @@ private:
     // "Set registration's uninstalling flag."
     registration->mPendingUninstall = true;
     // "Resolve promise with true"
-    nsresult rv = mCallback->UnregisterSucceeded(true);
+    nsresult rv = mCallback ? mCallback->UnregisterSucceeded(true) : NS_OK;
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -1659,8 +1824,10 @@ ServiceWorkerManager::Unregister(nsIPrincipal* aPrincipal,
                                  const nsAString& aScope)
 {
   AssertIsOnMainThread();
-  MOZ_ASSERT(aPrincipal);
-  MOZ_ASSERT(aCallback);
+
+  if (!aPrincipal) {
+    return NS_ERROR_FAILURE;
+  }
 
 // This is not accessible by content, and callers should always ensure scope is
 // a correct URI, so this is wrapped in DEBUG
@@ -2317,9 +2484,9 @@ private:
     nsRefPtr<InternalHeaders> internalHeaders = new InternalHeaders(HeadersGuardEnum::Request);
     MOZ_ASSERT(mHeaderNames.Length() == mHeaderValues.Length());
     for (uint32_t i = 0; i < mHeaderNames.Length(); i++) {
-      ErrorResult rv;
-      internalHeaders->Set(mHeaderNames[i], mHeaderValues[i], rv);
-      if (NS_WARN_IF(rv.Failed())) {
+      ErrorResult result;
+      internalHeaders->Set(mHeaderNames[i], mHeaderValues[i], result);
+      if (NS_WARN_IF(result.Failed())) {
         return false;
       }
     }
@@ -2333,9 +2500,9 @@ private:
     reqInit.mMode.Construct(mRequestMode);
     reqInit.mCredentials.Construct(mRequestCredentials);
 
-    ErrorResult rv;
-    nsRefPtr<Request> request = Request::Constructor(globalObj, requestInfo, reqInit, rv);
-    if (NS_WARN_IF(rv.Failed())) {
+    ErrorResult result;
+    nsRefPtr<Request> request = Request::Constructor(globalObj, requestInfo, reqInit, result);
+    if (NS_WARN_IF(result.Failed())) {
       return false;
     }
 
@@ -2348,8 +2515,8 @@ private:
     init.mCancelable = true;
     init.mIsReload.Construct(mIsReload);
     nsRefPtr<FetchEvent> event =
-      FetchEvent::Constructor(globalObj, NS_LITERAL_STRING("fetch"), init, rv);
-    if (NS_WARN_IF(rv.Failed())) {
+      FetchEvent::Constructor(globalObj, NS_LITERAL_STRING("fetch"), init, result);
+    if (NS_WARN_IF(result.Failed())) {
       return false;
     }
 
@@ -2810,6 +2977,130 @@ ServiceWorkerManager::RemoveRegistration(ServiceWorkerRegistrationInfo* aRegistr
     return;
   }
   mActor->SendUnregisterServiceWorker(principalInfo, NS_ConvertUTF8toUTF16(reg->mScope));
+}
+
+class ServiceWorkerDataInfo final : public nsIServiceWorkerInfo
+{
+public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSISERVICEWORKERINFO
+
+  static already_AddRefed<ServiceWorkerDataInfo>
+  Create(const ServiceWorkerRegistrationData& aData);
+
+private:
+  ServiceWorkerDataInfo()
+  {}
+
+  ~ServiceWorkerDataInfo()
+  {}
+
+  nsCOMPtr<nsIPrincipal> mPrincipal;
+  nsString mScope;
+  nsString mScriptSpec;
+  nsString mCurrentWorkerURL;
+  nsString mActiveCacheName;
+  nsString mWaitingCacheName;
+};
+
+NS_IMPL_ISUPPORTS(ServiceWorkerDataInfo, nsIServiceWorkerInfo)
+
+/* static */ already_AddRefed<ServiceWorkerDataInfo>
+ServiceWorkerDataInfo::Create(const ServiceWorkerRegistrationData& aData)
+{
+  AssertIsOnMainThread();
+
+  nsRefPtr<ServiceWorkerDataInfo> info = new ServiceWorkerDataInfo();
+
+  info->mPrincipal = PrincipalInfoToPrincipal(aData.principal());
+  if (!info->mPrincipal) {
+    return nullptr;
+  }
+
+  CopyUTF8toUTF16(aData.scope(), info->mScope);
+  CopyUTF8toUTF16(aData.scriptSpec(), info->mScriptSpec);
+  CopyUTF8toUTF16(aData.currentWorkerURL(), info->mCurrentWorkerURL);
+  info->mActiveCacheName = aData.activeCacheName();
+  info->mWaitingCacheName = aData.waitingCacheName();
+
+  return info.forget();
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetPrincipal(nsIPrincipal** aPrincipal)
+{
+  AssertIsOnMainThread();
+  NS_ADDREF(*aPrincipal = mPrincipal);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetScope(nsAString& aScope)
+{
+  AssertIsOnMainThread();
+  aScope = mScope;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetScriptSpec(nsAString& aScriptSpec)
+{
+  AssertIsOnMainThread();
+  aScriptSpec = mScriptSpec;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetCurrentWorkerURL(nsAString& aCurrentWorkerURL)
+{
+  AssertIsOnMainThread();
+  aCurrentWorkerURL = mCurrentWorkerURL;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetActiveCacheName(nsAString& aActiveCacheName)
+{
+  AssertIsOnMainThread();
+  aActiveCacheName = mActiveCacheName;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerDataInfo::GetWaitingCacheName(nsAString& aWaitingCacheName)
+{
+  AssertIsOnMainThread();
+  aWaitingCacheName = mWaitingCacheName;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerManager::GetAllRegistrations(nsIArray** aResult)
+{
+  AssertIsOnMainThread();
+
+  nsRefPtr<ServiceWorkerRegistrar> swr = ServiceWorkerRegistrar::Get();
+  MOZ_ASSERT(swr);
+
+  nsTArray<ServiceWorkerRegistrationData> data;
+  swr->GetRegistrations(data);
+
+  nsCOMPtr<nsIMutableArray> array(do_CreateInstance(NS_ARRAY_CONTRACTID));
+  if (!array) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  for (uint32_t i = 0, len = data.Length(); i < len; ++i) {
+    nsCOMPtr<nsIServiceWorkerInfo> info = ServiceWorkerDataInfo::Create(data[i]);
+    if (!info) {
+      return NS_ERROR_FAILURE;
+    }
+
+    array->AppendElement(info, false);
+  }
+
+  array.forget(aResult);
+  return NS_OK;
 }
 
 void

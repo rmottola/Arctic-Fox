@@ -6887,6 +6887,9 @@ class MCheckOverRecursed
     static MCheckOverRecursed* New(TempAllocator& alloc) {
         return new(alloc) MCheckOverRecursed();
     }
+    AliasSet getAliasSet() const override {
+        return AliasSet::None();
+    }
 };
 
 // Check whether we need to fire the interrupt handler.
@@ -7467,6 +7470,7 @@ class MElements
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
+    bool mightAlias(const MDefinition *store) const;
 
     ALLOW_CLONE(MElements)
 };
@@ -7654,6 +7658,7 @@ class MInitializedLength
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
+    bool mightAlias(const MDefinition *store) const;
 
     void computeRange(TempAllocator& alloc) override;
 
@@ -7998,9 +8003,10 @@ class MBoundsCheck
     // Range over which to perform the bounds check, may be modified by GVN.
     int32_t minimum_;
     int32_t maximum_;
+    bool fallible_;
 
-    MBoundsCheck(MDefinition* index, MDefinition* length)
-      : MBinaryInstruction(index, length), minimum_(0), maximum_(0)
+    MBoundsCheck(MDefinition *index, MDefinition *length)
+      : MBinaryInstruction(index, length), minimum_(0), maximum_(0), fallible_(true)
     {
         setGuard();
         setMovable();
@@ -8047,7 +8053,11 @@ class MBoundsCheck
     virtual AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
-    void computeRange(TempAllocator& alloc) override;
+    void computeRange(TempAllocator &alloc) override;
+    bool fallible() const {
+        return fallible_;
+    }
+    void collectRangeInfoPreTrunc() override;
 
     ALLOW_CLONE(MBoundsCheck)
 };
@@ -8175,6 +8185,7 @@ class MLoadElement
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::Element);
     }
+    bool mightAlias(const MDefinition *store) const;
 
     ALLOW_CLONE(MLoadElement)
 };

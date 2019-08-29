@@ -11,6 +11,7 @@ GENERATED_WEBIDL_FILES = [
 PREPROCESSED_WEBIDL_FILES = [
     'HTMLMediaElement.webidl',
     'Navigator.webidl',
+    'ServiceWorkerRegistration.webidl',
     'Window.webidl',
 ]
 
@@ -245,7 +246,6 @@ WEBIDL_FILES = [
     'IDBRequest.webidl',
     'IDBTransaction.webidl',
     'IDBVersionChangeEvent.webidl',
-    'Identity.webidl',
     'ImageCapture.webidl',
     'ImageData.webidl',
     'ImageDocument.webidl',
@@ -346,7 +346,6 @@ WEBIDL_FILES = [
     'ProfileTimelineMarker.webidl',
     'Promise.webidl',
     'PromiseDebugging.webidl',
-    'PushManager.webidl',
     'RadioNodeList.webidl',
     'Range.webidl',
     'Rect.webidl',
@@ -366,7 +365,6 @@ WEBIDL_FILES = [
     'ServiceWorker.webidl',
     'ServiceWorkerContainer.webidl',
     'ServiceWorkerGlobalScope.webidl',
-    'ServiceWorkerRegistration.webidl',
     'SettingChangeNotification.webidl',
     'SettingsManager.webidl',
     'ShadowRoot.webidl',
@@ -659,6 +657,19 @@ if CONFIG['MOZ_B2G_RIL']:
         'MozIccManager.webidl',
     ]
 
+if CONFIG['MOZ_SIMPLEPUSH']:
+    WEBIDL_FILES += [
+        'SimplePushManager.webidl'
+    ]
+else:
+    WEBIDL_FILES += [
+        'PushEvent.webidl',
+        'PushManager.webidl',
+        'PushManager.webidl',
+        'PushMessageData.webidl',
+        'PushSubscription.webidl',
+    ]
+
 if CONFIG['MOZ_NFC']:
     WEBIDL_FILES += [
          'MozIsoDepTech.webidl',
@@ -820,4 +831,9 @@ if CONFIG['MOZ_BUILD_APP'] in ['browser', 'mobile/android', 'xulrunner']:
 if CONFIG['MOZ_PAY']:
     WEBIDL_FILES += [
         'MozPaymentProvider.webidl'
+    ]
+
+if CONFIG['MOZ_B2G']:
+    WEBIDL_FILES += [
+        'Identity.webidl'
     ]

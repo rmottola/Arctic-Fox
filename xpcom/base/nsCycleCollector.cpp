@@ -926,7 +926,7 @@ CCGraph::RemoveNodeFromMap(void* aPtr)
 static nsISupports*
 CanonicalizeXPCOMParticipant(nsISupports* aIn)
 {
-  nsISupports* out;
+  nsISupports* out = nullptr;
   aIn->QueryInterface(NS_GET_IID(nsCycleCollectionISupports),
                       reinterpret_cast<void**>(&out));
   return out;
@@ -1423,6 +1423,7 @@ ToParticipant(nsISupports* aPtr, nsXPCOMCycleCollectionParticipant** aCp)
   // nsXPCOMCycleCollectionParticipant, which is a per-class singleton helper
   // object that implements traversal and unlinking logic for the nsISupports
   // in question.
+  *aCp = nullptr;
   CallQueryInterface(aPtr, aCp);
 }
 

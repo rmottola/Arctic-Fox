@@ -53,4 +53,6 @@
 
 <!ENTITY fullscreen.label                "Fullscreen">
 
+<!ENTITY push.label                      "Receive Push Notifications">
+
 <!ENTITY pointerLock.label               "Hide the Mouse Pointer">

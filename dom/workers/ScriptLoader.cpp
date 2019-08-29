@@ -883,7 +883,12 @@ private:
       return rv;
     }
 
-    if (!aLoadInfo.mScriptTextBuf || !aLoadInfo.mScriptTextLength) {
+    if (!aLoadInfo.mScriptTextLength && !aLoadInfo.mScriptTextBuf) {
+      nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                      NS_LITERAL_CSTRING("DOM"), parentDoc,
+                                      nsContentUtils::eDOM_PROPERTIES,
+                                      "EmptyWorkerSourceWarning");
+    } else if (!aLoadInfo.mScriptTextBuf) {
       return NS_ERROR_FAILURE;
     }
 
@@ -1002,6 +1007,14 @@ private:
       if (NS_SUCCEEDED(rv)) {
         mWorkerPrivate->SetBaseURI(finalURI);
       }
+
+      nsIPrincipal* principal = mWorkerPrivate->GetPrincipal();
+      MOZ_ASSERT(principal);
+      nsILoadGroup* loadGroup = mWorkerPrivate->GetLoadGroup();
+      MOZ_ASSERT(loadGroup);
+      // Needed to initialize the principal info. This is fine because
+      // the cache principal cannot change, unlike the channel principal.
+      mWorkerPrivate->SetPrincipal(principal, loadGroup);
     }
 
     if (NS_SUCCEEDED(rv)) {

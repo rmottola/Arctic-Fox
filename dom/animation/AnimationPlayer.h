@@ -48,7 +48,7 @@ class AnimationPlayer : public nsISupports,
                         public nsWrapperCache
 {
 protected:
-  virtual ~AnimationPlayer() { }
+  virtual ~AnimationPlayer() {}
 
 public:
   explicit AnimationPlayer(AnimationTimeline* aTimeline)
@@ -56,6 +56,7 @@ public:
     , mIsPending(false)
     , mIsRunningOnCompositor(false)
     , mIsPreviousStateFinished(false)
+    , mIsRelevant(false)
   {
   }
 
@@ -72,6 +73,7 @@ public:
   Animation* GetSource() const { return mSource; }
   AnimationTimeline* Timeline() const { return mTimeline; }
   Nullable<TimeDuration> GetStartTime() const { return mStartTime; }
+  void SetStartTime(const Nullable<TimeDuration>& aNewStartTime);
   Nullable<TimeDuration> GetCurrentTime() const;
   AnimationPlayState PlayState() const;
   virtual Promise* GetReady(ErrorResult& aRv);
@@ -84,6 +86,7 @@ public:
   // script but when called from script we (or one of our subclasses) perform
   // extra steps such as flushing style or converting the return type.
   Nullable<double> GetStartTimeAsDouble() const;
+  void SetStartTimeAsDouble(const Nullable<double>& aStartTime);
   Nullable<double> GetCurrentTimeAsDouble() const;
   virtual AnimationPlayState PlayStateFromJS() const { return PlayState(); }
   virtual void PlayFromJS() { Play(); }
@@ -185,6 +188,9 @@ public:
     return GetSource() && GetSource()->IsInEffect();
   }
 
+  bool IsRelevant() const { return mIsRelevant; }
+  void UpdateRelevance();
+
   void SetIsRunningOnCompositor() { mIsRunningOnCompositor = true; }
   void ClearIsRunningOnCompositor() { mIsRunningOnCompositor = false; }
 
@@ -250,6 +256,9 @@ protected:
   // probably remove this and check if the promise has been settled yet
   // or not instead.
   bool mIsPreviousStateFinished; // Spec calls this "previous finished state"
+  // Indicates that the player should be exposed in an element's
+  // getAnimationPlayers() list.
+  bool mIsRelevant;
 };
 
 } // namespace dom

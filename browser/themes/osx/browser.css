@@ -1872,27 +1872,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     -moz-margin-end: 0;
 }
 
-.popup-notification-icon {
-    width: 64px;
-    height: 64px;
-    -moz-margin-end: 10px;
-}
-
-.popup-notification-icon[popupid="geolocation"] {
-    list-style-image: url(chrome://browser/skin/Geolocation-64.png);
-}
-
-.popup-notification-icon[popupid="xpinstall-disabled"],
-.popup-notification-icon[popupid="addon-progress"],
-.popup-notification-icon[popupid="addon-install-cancelled"],
-.popup-notification-icon[popupid="addon-install-blocked"],
-.popup-notification-icon[popupid="addon-install-origin-blocked"],
-.popup-notification-icon[popupid="addon-install-failed"],
-.popup-notification-icon[popupid="addon-install-complete"] {
-    list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric.png);
-    width: 32px;
-    height: 32px;
-}
 
 .popup-notification-icon[popupid="click-to-play-plugins"] {
     list-style-image: url(chrome://mozapps/skin/plugins/pluginBlocked-64.png);
@@ -1935,61 +1914,11 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     -moz-image-region: rect(32px, 32px, 48px, 16px);
 }
 
-.popup-notification-icon[popupid="indexedDB-permissions-prompt"],
-.popup-notification-icon[popupid="indexedDB-quota-prompt"],
-.popup-notification-icon[popupid*="offline-app-requested"],
-.popup-notification-icon[popupid="offline-app-usage"] {
-    list-style-image: url(chrome://global/skin/icons/question-64.png);
-}
-
-.popup-notification-icon[popupid="password-save"],
-.popup-notification-icon[popupid="password-change"] {
-    list-style-image: url(chrome://mozapps/skin/passwordmgr/key-64.png);
-}
-
-.popup-notification-icon[popupid="webapps-install"] {
-    list-style-image: url(chrome://browser/skin/webapps-64.png);
-}
-
-.popup-notification-icon[popupid="mixed-content-blocked"] {
-    list-style-image: url(chrome://browser/skin/mixed-content-blocked-64.png);
-}
-
-.popup-notification-icon[popupid="webRTC-sharingDevices"],
-.popup-notification-icon[popupid="webRTC-shareDevices"] {
-    list-style-image: url(chrome://browser/skin/webRTC-shareDevice-64.png);
-}
-
-.popup-notification-icon[popupid="pointerLock"] {
-    list-style-image: url(chrome://browser/skin/pointerLock-64.png);
-}
+%include ../shared/notification-icons.inc.css
 
 /* Notification icon box */
 #notification-popup-box {
-    position: relative;
-    background-color: #fff;
-    background-clip: padding-box;
-    padding-left: 3px;
     border-radius: 2.5px 0 0 2.5px;
-    border-width: 0 8px 0 0;
-    border-style: solid;
-    border-image: url("chrome://browser/skin/urlbar-arrow.png") 0 8 0 0 fill;
-    -moz-margin-end: -8px;
-}
-
-@conditionalForwardWithUrlbar@[forwarddisabled] + #urlbar-container > #urlbar > #notification-popup-box {
-    padding-left: 5px;
-}
-
-#notification-popup-box:-moz-locale-dir(rtl),
-.notification-anchor-icon:-moz-locale-dir(rtl) {
-    transform: scaleX(-1);
-}
-
-.notification-anchor-icon {
-    width: 16px;
-    height: 16px;
-    margin: 0 2px;
 }
 
 .notification-anchor-icon:-moz-focusring {
@@ -1997,44 +1926,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     outline-offset: -3px;
 }
 
-.default-notification-icon,
-#default-notification-icon {
-    list-style-image: url(chrome://global/skin/icons/information-16.png);
-}
 
-.geo-notification-icon,
-#geo-notification-icon {
-    list-style-image: url(chrome://browser/skin/Geolocation-16.png);
-}
-
-#addons-notification-icon {
-    list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric-16.png);
-}
-
-.indexedDB-notification-icon,
-#indexedDB-notification-icon {
-    list-style-image: url(chrome://global/skin/icons/question-16.png);
-}
-
-#password-notification-icon {
-    list-style-image: url(chrome://mozapps/skin/passwordmgr/key-16.png);
-}
-
-#webapps-notification-icon {
-    list-style-image: url(chrome://browser/skin/webapps-16.png);
-}
-
-#plugins-notification-icon {
-    list-style-image: url(chrome://browser/skin/notification-pluginNormal.png);
-}
-
-#alert-plugins-notification-icon {
-    list-style-image: url(chrome://browser/skin/notification-pluginAlert.png);
-}
-
-#blocked-plugins-notification-icon {
-    list-style-image: url(chrome://browser/skin/notification-pluginBlocked.png);
-}
 
 #plugins-notification-icon,
 #alert-plugins-notification-icon,
@@ -2054,45 +1946,11 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     -moz-image-region: rect(0, 48px, 16px, 32px);
 }
 
-#notification-popup-box[hidden] {
-    /* Override display:none to make the pluginBlockedNotification animation work
-       when showing the notification repeatedly. */
-    display: -moz-box;
-    visibility: collapse;
-}
-
-#blocked-plugins-notification-icon[showing] {
-    animation: pluginBlockedNotification 500ms ease 0s 5 alternate both;
-}
-
-@keyframes pluginBlockedNotification {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
 .mixed-content-blocked-notification-icon,
 #mixed-content-blocked-notification-icon {
     list-style-image: url(chrome://browser/skin/mixed-content-blocked-16.png);
 }
 
-.webRTC-shareDevices-notification-icon,
-#webRTC-shareDevices-notification-icon {
-    list-style-image: url(chrome://browser/skin/webRTC-shareDevice-16.png);
-}
-
-.webRTC-sharingDevices-notification-icon,
-#webRTC-sharingDevices-notification-icon {
-    list-style-image: url(chrome://browser/skin/webRTC-sharingDevice-16.png);
-}
-
-.web-notifications-notification-icon,
-#web-notifications-notification-icon {
-    list-style-image: url(chrome://browser/skin/notification-16.png);
-}
 
 #pointerLock-notification-icon {
     list-style-image: url(chrome://browser/skin/pointerLock-16.png);

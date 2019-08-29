@@ -490,6 +490,8 @@
 @RESPATH@/components/formautofill.manifest
 @RESPATH@/components/FormAutofillContentService.js
 @RESPATH@/components/FormAutofillStartup.js
+@RESPATH@/components/CSSUnprefixingService.js
+@RESPATH@/components/CSSUnprefixingService.manifest
 @RESPATH@/components/contentAreaDropListener.manifest
 @RESPATH@/components/contentAreaDropListener.js
 @RESPATH@/browser/components/BrowserProfileMigrators.manifest
@@ -554,9 +556,6 @@
 @RESPATH@/components/Webapps.manifest
 @RESPATH@/components/AppsService.js
 @RESPATH@/components/AppsService.manifest
-@RESPATH@/components/nsDOMIdentity.js
-@RESPATH@/components/nsIDService.js
-@RESPATH@/components/Identity.manifest
 @RESPATH@/components/recording-cmdline.js
 @RESPATH@/components/recording-cmdline.manifest
 @RESPATH@/components/htmlMenuBuilder.js
@@ -690,7 +689,7 @@
 
 ; [Default Preferences]
 ; All the pref files must be part of base to prevent migration bugs
-@RESPATH@/browser/@PREF_DIR@/palemoon.js
+@RESPATH@/browser/@PREF_DIR@/arcticfox.js
 @RESPATH@/browser/@PREF_DIR@/palemoon-branding.js
 @RESPATH@/goanna.js
 @RESPATH@/defaults/autoconfig/platform.js

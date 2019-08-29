@@ -1061,7 +1061,6 @@ static const JSFunctionSpec object_static_methods[] = {
     JS_FN("getPrototypeOf",            obj_getPrototypeOf,          1,0),
     JS_FN("setPrototypeOf",            obj_setPrototypeOf,          2,0),
     JS_FN("getOwnPropertyDescriptor",  obj_getOwnPropertyDescriptor,2,0),
-    JS_SELF_HOSTED_FN("getOwnPropertyDescriptors", "ObjectGetOwnPropertyDescriptors", 1,JSPROP_DEFINE_LATE),
     JS_FN("keys",                      obj_keys,                    1,0),
     JS_SELF_HOSTED_FN("values",        "ObjectValues",              1,JSPROP_DEFINE_LATE),
     JS_SELF_HOSTED_FN("entries",       "ObjectEntries",             1,JSPROP_DEFINE_LATE),

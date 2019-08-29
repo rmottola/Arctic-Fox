@@ -11,6 +11,7 @@ EXTRA_JS_MODULES += [ 'promise.js' ]
 EXTRA_JS_MODULES += [
     'BrowserNewTabPreloader.jsm',
     'CharsetMenu.jsm',
+    'ContentClick.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
@@ -31,7 +32,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     ]
 
 EXTRA_PP_JS_MODULES += [
-    'AboutHomeUtils.jsm',
+    'AboutHome.jsm',
     'RecentWindow.jsm',
 ]
 
