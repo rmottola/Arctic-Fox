@@ -1,0 +1,116 @@
+diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
+index 408b1a86e1cc..456debdda93d 100644
+--- a/browser/base/content/tabbrowser.xml
++++ b/browser/base/content/tabbrowser.xml
+@@ -3229,8 +3229,7 @@
+                                           addonInfo: aMessage.data.addonInfo };
+               let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
+               let event = gContextMenuContentData.event;
+-              let pos = browser.mapScreenCoordinatesFromContent(event.screenX, event.screenY);
+-              popup.openPopupAtScreen(pos.x, pos.y, true);
++              popup.openPopupAtScreen(event.screenX, event.screenY, true);
+               break;
+             }
+             case "DOMWebNotificationClicked": {
+diff --git a/toolkit/components/satchel/AutoCompleteE10S.jsm b/toolkit/components/satchel/AutoCompleteE10S.jsm
+index 3928b273dec2..1e506fd97b27 100644
+--- a/toolkit/components/satchel/AutoCompleteE10S.jsm
++++ b/toolkit/components/satchel/AutoCompleteE10S.jsm
+@@ -81,9 +81,8 @@ this.AutoCompleteE10S = {
+     this.popup.hidden = false;
+     this.popup.setAttribute("width", rect.width);
+ 
+-    let {x, y} = this.browser.mapScreenCoordinatesFromContent(rect.left, rect.top + rect.height);
+-    this.x = x;
+-    this.y = y;
++    this.x = rect.left;
++    this.y = rect.top + rect.height;
+   },
+ 
+   _showPopup: function(results) {
+diff --git a/toolkit/content/widgets/browser.xml b/toolkit/content/widgets/browser.xml
+index 8178a1d95ee3..fbc330049030 100644
+--- a/toolkit/content/widgets/browser.xml
++++ b/toolkit/content/widgets/browser.xml
+@@ -877,8 +877,7 @@
+               if (!this.autoscrollEnabled) {
+                 return false;
+               }
+-              let pos = this.mapScreenCoordinatesFromContent(data.screenX, data.screenY);
+-              this.startScroll(data.scrolldir, pos.x, pos.y);
++              this.startScroll(data.scrolldir, data.screenX, data.screenY);
+               return true;
+             }
+             case "Autoscroll:Cancel":
+@@ -1059,25 +1058,6 @@
+         </body>
+       </method>
+ 
+-      <!--
+-        For out-of-process code, event.screen[XY] is relative to the
+-        left/top of the content view. For in-process code,
+-        event.screen[XY] is relative to the left/top of the screen. We
+-        use this method to map screen coordinates received from a
+-        (possibly out-of-process) <browser> element to coordinates
+-        that are relative to the screen. This code handles the
+-        in-process case, where we return the coordinates unchanged.
+-      -->
+-      <method name="mapScreenCoordinatesFromContent">
+-        <parameter name="aScreenX"/>
+-        <parameter name="aScreenY"/>
+-        <body>
+-        <![CDATA[
+-          return { x: aScreenX, y: aScreenY };
+-        ]]>
+-        </body>
+-      </method>
+-
+       <method name="swapDocShells">
+         <parameter name="aOtherBrowser"/>
+         <body>
+diff --git a/toolkit/content/widgets/remote-browser.xml b/toolkit/content/widgets/remote-browser.xml
+index 3f778febb842..6ba947c86140 100644
+--- a/toolkit/content/widgets/remote-browser.xml
++++ b/toolkit/content/widgets/remote-browser.xml
+@@ -391,27 +391,6 @@
+         ]]></body>
+       </method>
+ 
+-      <!--
+-        For out-of-process code, event.screen[XY] is relative to the
+-        left/top of the content view. For in-process code,
+-        event.screen[XY] is relative to the left/top of the screen. We
+-        use this method to map screen coordinates received from a
+-        (possibly out-of-process) <browser> element to coordinates
+-        that are relative to the screen. This code handles the
+-        out-of-process case, where we need to translate by the screen
+-        position of the <browser> element.
+-      -->
+-      <method name="mapScreenCoordinatesFromContent">
+-        <parameter name="aScreenX"/>
+-        <parameter name="aScreenY"/>
+-        <body>
+-        <![CDATA[
+-          return { x: aScreenX + this.boxObject.screenX,
+-                   y: aScreenY + this.boxObject.screenY };
+-        ]]>
+-        </body>
+-      </method>
+-
+       <method name="enableDisableCommands">
+         <parameter name="aAction"/>
+         <parameter name="aEnabledLength"/>
+diff --git a/toolkit/modules/SelectParentHelper.jsm b/toolkit/modules/SelectParentHelper.jsm
+index 5d6b87425080..60a179fa0239 100644
+--- a/toolkit/modules/SelectParentHelper.jsm
++++ b/toolkit/modules/SelectParentHelper.jsm
+@@ -28,8 +28,7 @@ this.SelectParentHelper = {
+     currentBrowser = browser;
+     this._registerListeners(menulist.menupopup);
+ 
+-    let {x, y} = browser.mapScreenCoordinatesFromContent(rect.left, rect.top + rect.height);
+-    menulist.menupopup.openPopupAtScreen(x, y);
++    menulist.menupopup.openPopupAtScreen(rect.left, rect.top + rect.height);
+     menulist.selectedItem.scrollIntoView();
+   },
+ 
