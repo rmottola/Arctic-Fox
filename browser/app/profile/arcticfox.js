@@ -25,7 +25,7 @@ pref("browser.chromeURL","chrome://browser/content/");
 pref("browser.hiddenWindowChromeURL", "chrome://browser/content/hiddenWindow.xul");
 
 // Display the "Get Add-ons" pane in the Add-on Manager
-pref("extensions.getAddons.showPane", true);
+pref("extensions.getAddons.showPane", false);
 
 // Enables some extra Extension System Logging (can reduce performance)
 pref("extensions.logging.enabled", false);
