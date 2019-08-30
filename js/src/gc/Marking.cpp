@@ -710,16 +710,16 @@ gc::MarkGCThingUnbarriered(JSTracer* trc, void** thingp, const char* name)
 /*** ID Marking ***/
 
 static inline void
-MarkIdInternal(JSTracer* trc, jsid* id)
+MarkIdInternal(JSTracer *trc, jsid *id)
 {
     if (JSID_IS_STRING(*id)) {
-        JSString* str = JSID_TO_STRING(*id);
-        trc->setTracingLocation((void*)id);
+        JSString *str = JSID_TO_STRING(*id);
+        trc->setTracingLocation((void *)id);
         MarkInternal(trc, &str);
-        *id = NON_INTEGER_ATOM_TO_JSID(reinterpret_cast<JSAtom*>(str));
+        *id = NON_INTEGER_ATOM_TO_JSID(reinterpret_cast<JSAtom *>(str));
     } else if (JSID_IS_SYMBOL(*id)) {
-        JS::Symbol* sym = JSID_TO_SYMBOL(*id);
-        trc->setTracingLocation((void*)id);
+        JS::Symbol *sym = JSID_TO_SYMBOL(*id);
+        trc->setTracingLocation((void *)id);
         MarkInternal(trc, &sym);
         *id = SYMBOL_TO_JSID(sym);
     } else {
@@ -772,20 +772,20 @@ gc::MarkIdRootRange(JSTracer* trc, size_t len, jsid* vec, const char* name)
 /*** Value Marking ***/
 
 static inline void
-MarkValueInternal(JSTracer* trc, Value* v)
+MarkValueInternal(JSTracer *trc, Value *v)
 {
     if (v->isMarkable()) {
         MOZ_ASSERT(v->toGCThing());
-        void* thing = v->toGCThing();
-        trc->setTracingLocation((void*)v);
+        void *thing = v->toGCThing();
+        trc->setTracingLocation((void *)v);
         MarkKind(trc, &thing, v->gcKind());
         if (v->isString()) {
-            v->setString((JSString*)thing);
+            v->setString((JSString *)thing);
         } else if (v->isObject()) {
-            v->setObjectOrNull((JSObject*)thing);
+            v->setObjectOrNull((JSObject *)thing);
         } else {
             MOZ_ASSERT(v->isSymbol());
-            v->setSymbol((JS::Symbol*)thing);
+            v->setSymbol((JS::Symbol *)thing);
         }
     } else {
         /* Unset realLocation manually if we do not call MarkInternal. */
