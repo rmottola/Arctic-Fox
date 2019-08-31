@@ -83,7 +83,7 @@ class Context(KeyedDefaultDict):
         # a list to be a problem.
         self._all_paths = []
         self.config = config
-        self.executed_time = 0
+        self.execution_time = 0
         self._sandbox = None
         KeyedDefaultDict.__init__(self, self._factory)
 
