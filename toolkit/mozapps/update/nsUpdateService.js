@@ -1365,8 +1365,9 @@ function readStringFromInputStream(inputStream) {
   sis.init(inputStream);
   var text = sis.read(sis.available());
   sis.close();
-  if (text[text.length - 1] == "\n")
+  if (text && text[text.length - 1] == "\n") {
     text = text.slice(0, -1);
+  }
   return text;
 }
 
