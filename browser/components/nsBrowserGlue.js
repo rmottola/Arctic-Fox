@@ -326,6 +326,9 @@ BrowserGlue.prototype = {
         Services.obs.removeObserver(this, "browser-search-service");
         this._syncSearchEngines();
         break;
+      case "flash-plugin-hang":
+        this._handleFlashHang();
+        break;
     }
   },
 
@@ -369,6 +372,9 @@ BrowserGlue.prototype = {
     os.addObserver(this, "profile-before-change", false);
     os.addObserver(this, "browser-search-engine-modified", false);
     os.addObserver(this, "browser-search-service", false);
+    os.addObserver(this, "flash-plugin-hang", false);
+
+    this._flashHangCount = 0;
   },
 
   // cleanup (called on application shutdown)
@@ -404,6 +410,7 @@ BrowserGlue.prototype = {
       os.removeObserver(this, "browser-search-service");
       // may have already been removed by the observer
     } catch (ex) {}
+    os.removeObserver(this, "flash-plugin-hang");
   },
 
   _onAppDefaults: function BG__onAppDefaults() {
@@ -1722,6 +1729,92 @@ BrowserGlue.prototype = {
     }
   },
 #endif
+
+  _handleFlashHang: function() {
+    ++this._flashHangCount;
+    if (this._flashHangCount < 2) {
+      return;
+    }
+    // protected mode only applies to win32
+    if (Services.appinfo.XPCOMABI != "x86-msvc") {
+      return;
+    }
+
+    if (Services.prefs.getBoolPref("dom.ipc.plugins.flash.disable-protected-mode")) {
+      return;
+    }
+    if (!Services.prefs.getBoolPref("browser.flash-protected-mode-flip.enable")) {
+      return;
+    }
+    if (Services.prefs.getBoolPref("browser.flash-protected-mode-flip.done")) {
+      return;
+    }
+    Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
+    Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
+
+    let win = this.getMostRecentBrowserWindow();
+    if (!win) {
+      return;
+    }
+    let productName = Services.strings
+      .createBundle("chrome://branding/locale/brand.properties")
+      .GetStringFromName("brandShortName");
+    let message = win.gNavigatorBundle.
+      getFormattedString("flashHang.message", [productName]);
+    let buttons = [{
+      label: win.gNavigatorBundle.getString("flashHang.helpButton.label"),
+      accessKey: win.gNavigatorBundle.getString("flashHang.helpButton.accesskey"),
+      callback: function() {
+        win.openUILinkIn("https://support.mozilla.org/kb/flash-protected-mode-autodisabled", "tab");
+      }
+    }];
+    let nb = win.document.getElementById("global-notificationbox");
+    nb.appendNotification(message, "flash-hang", null,
+                          nb.PRIORITY_INFO_MEDIUM, buttons);
+  },
+
+  _handleFlashHang: function() {
+    ++this._flashHangCount;
+    if (this._flashHangCount < 2) {
+      return;
+    }
+    // protected mode only applies to win32
+    if (Services.appinfo.XPCOMABI != "x86-msvc") {
+      return;
+    }
+
+    if (Services.prefs.getBoolPref("dom.ipc.plugins.flash.disable-protected-mode")) {
+      return;
+    }
+    if (!Services.prefs.getBoolPref("browser.flash-protected-mode-flip.enable")) {
+      return;
+    }
+    if (Services.prefs.getBoolPref("browser.flash-protected-mode-flip.done")) {
+      return;
+    }
+    Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
+    Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
+
+    let win = this.getMostRecentBrowserWindow();
+    if (!win) {
+      return;
+    }
+    let productName = Services.strings
+      .createBundle("chrome://branding/locale/brand.properties")
+      .GetStringFromName("brandShortName");
+    let message = win.gNavigatorBundle.
+      getFormattedString("flashHang.message", [productName]);
+    let buttons = [{
+      label: win.gNavigatorBundle.getString("flashHang.helpButton.label"),
+      accessKey: win.gNavigatorBundle.getString("flashHang.helpButton.accesskey"),
+      callback: function() {
+        win.openUILinkIn("https://support.mozilla.org/kb/flash-protected-mode-autodisabled", "tab");
+      }
+    }];
+    let nb = win.document.getElementById("global-notificationbox");
+    nb.appendNotification(message, "flash-hang", null,
+                          nb.PRIORITY_INFO_MEDIUM, buttons);
+  },
 
   // for XPCOM
   classID:          Components.ID("{eab9012e-5f74-4cbc-b2b5-a590235513cc}"),

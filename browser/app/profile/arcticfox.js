@@ -901,6 +901,15 @@ pref("toolbar.customization.usesheet", true);
 pref("toolbar.customization.usesheet", false);
 #endif
 
+// Disable Flash protected mode to reduce hang/crash rates.
+pref("dom.ipc.plugins.flash.disable-protected-mode", true);
+
+// Feature-disable the protected-mode auto-flip
+pref("browser.flash-protected-mode-flip.enable", true);
+
+// Whether we've already flipped protected mode automatically
+pref("browser.flash-protected-mode-flip.done", false);
+
 #ifdef XP_MACOSX
 // On mac, the default pref is per-architecture
 pref("dom.ipc.plugins.enabled.i386", true);
