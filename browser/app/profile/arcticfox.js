@@ -905,7 +905,7 @@ pref("toolbar.customization.usesheet", false);
 pref("dom.ipc.plugins.flash.disable-protected-mode", true);
 
 // Feature-disable the protected-mode auto-flip
-pref("browser.flash-protected-mode-flip.enable", true);
+pref("browser.flash-protected-mode-flip.enable", false);
 
 // Whether we've already flipped protected mode automatically
 pref("browser.flash-protected-mode-flip.done", false);
