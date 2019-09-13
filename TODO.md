@@ -129,7 +129,7 @@ Require check of JS browser components:
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/6b5ad1ac1f03077b3b72b705617b37e594c7e51e
+https://github.com/mozilla/newtab-dev/commit/393b29be58aba2e99325f31cff09a4ee18a6e166
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
