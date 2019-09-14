@@ -49,16 +49,18 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
   }
 });
 
-addEventListener("DOMFormHasPassword", function(event) {
-  InsecurePasswordUtils.checkForInsecurePasswords(event.target);
-  LoginManagerContent.onFormPassword(event);
-});
-addEventListener("DOMAutoComplete", function(event) {
-  LoginManagerContent.onUsernameInput(event);
-});
-addEventListener("blur", function(event) {
-  LoginManagerContent.onUsernameInput(event);
-});
+if (!Services.prefs.getBoolPref("browser.tabs.remote")) {
+  addEventListener("DOMFormHasPassword", function(event) {
+    InsecurePasswordUtils.checkForInsecurePasswords(event.target);
+    LoginManagerContent.onFormPassword(event);
+  });
+  addEventListener("DOMAutoComplete", function(event) {
+    LoginManagerContent.onUsernameInput(event);
+  });
+  addEventListener("blur", function(event) {
+    LoginManagerContent.onUsernameInput(event);
+  });
+}
 
 let AboutHomeListener = {
   init: function(chromeGlobal) {
