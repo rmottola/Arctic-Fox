@@ -3069,6 +3069,16 @@
                 tab.setAttribute("titlechanged", "true");
               break;
             }
+            case "contextmenu": {
+              gContextMenuContentData = { event: aMessage.objects.event,
+                                          browser: browser };
+              let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
+              popup.openPopup(browser, "overlap",
+                              gContextMenuContentData.event.clientX,
+                              gContextMenuContentData.event.clientY,
+                              true, false, null);
+              break;
+            }
             case "DOMWebNotificationClicked": {
               let tab = this.getTabForBrowser(browser);
               if (!tab)
@@ -3139,6 +3149,7 @@
 
           if (Services.prefs.getBoolPref("browser.tabs.remote")) {
             messageManager.addMessageListener("DOMTitleChanged", this);
+            messageManager.addMessageListener("contextmenu", this);
           } else {
             this._outerWindowIDBrowserMap.set(this.mCurrentBrowser.outerWindowID,
                                               this.mCurrentBrowser);
@@ -3189,8 +3200,10 @@
           document.removeEventListener("keypress", this, false);
           window.removeEventListener("sizemodechange", this, false);
 
-          if (Services.prefs.getBoolPref("browser.tabs.remote"))
+          if (Services.prefs.getBoolPref("browser.tabs.remote")) {
             messageManager.removeMessageListener("DOMTitleChanged", this);
+            messageManager.removeMessageListener("contextmenu", this);
+          }
         ]]>
       </destructor>
 

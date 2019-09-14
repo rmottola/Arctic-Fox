@@ -4,6 +4,8 @@
 
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 
+var gContextMenuContentData = null;
+
 function nsContextMenu(aXulMenu, aIsShift) {
   this.shouldDisplay = true;
   this.initMenu(aXulMenu, aIsShift);
@@ -39,6 +41,7 @@ nsContextMenu.prototype = {
   },
 
   hiding: function CM_hiding() {
+    gContextMenuContentData = null;
     InlineSpellCheckerUI.clearSuggestionsFromMenu();
     InlineSpellCheckerUI.clearDictionaryListFromMenu();
     InlineSpellCheckerUI.uninit();
@@ -433,6 +436,15 @@ nsContextMenu.prototype = {
 
   // Set various context menu attributes based on the state of the world.
   setTarget: function (aNode, aRangeParent, aRangeOffset) {
+    // If gContextMenuContentData is not null, this event was forwarded from a
+    // child process, so use that information instead.
+    if (gContextMenuContentData) {
+      this.isRemote = true;
+      aNode = gContextMenuContentData.event.target;
+    } else {
+      this.isRemote = false;
+    }
+
     const xulNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
     if (aNode.namespaceURI == xulNS ||
         aNode.nodeType == Node.DOCUMENT_NODE ||
@@ -475,11 +487,17 @@ nsContextMenu.prototype = {
     // Remember the node that was clicked.
     this.target = aNode;
 
-    this.browser = this.target.ownerDocument.defaultView
-                                .QueryInterface(Ci.nsIInterfaceRequestor)
-                                .getInterface(Ci.nsIWebNavigation)
-                                .QueryInterface(Ci.nsIDocShell)
-                                .chromeEventHandler;
+    // If this is a remote context menu event, use the information from
+    // gContextMenuContentData instead.
+    if (this.isRemote) {
+      this.browser = gContextMenuContentData.browser;
+    } else {
+      this.browser = this.target.ownerDocument.defaultView
+                                  .QueryInterface(Ci.nsIInterfaceRequestor)
+                                  .getInterface(Ci.nsIWebNavigation)
+                                  .QueryInterface(Ci.nsIDocShell)
+                                  .chromeEventHandler;
+    }
 
     // Check if we are in a synthetic document (stand alone image, video, etc.).
     this.inSyntheticDoc =  this.target.ownerDocument.mozSyntheticDocument;
@@ -739,10 +757,22 @@ nsContextMenu.prototype = {
     return aNode.spellcheck;
   },
 
+  _unremotePrincipal: function(aRemotePrincipal) {
+    if (this.isRemote) {
+      return Cc["@mozilla.org/scriptsecuritymanager;1"]
+               .getService(Ci.nsIScriptSecurityManager)
+               .getAppCodebasePrincipal(aRemotePrincipal.URI,
+                                        aRemotePrincipal.appId,
+                                        aRemotePrincipal.isInBrowserElement);
+    }
+
+    return aRemotePrincipal;
+  },
+
   // Open linked-to URL in a new window.
   openLink : function () {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
     openLinkIn(this.linkURL, "window",
                { charset: doc.characterSet,
                  referrerURI: doc.documentURIObject });
@@ -751,7 +781,7 @@ nsContextMenu.prototype = {
   // Open linked-to URL in a new private window.
   openLinkInPrivateWindow : function () {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
     openLinkIn(this.linkURL, "window",
                { charset: doc.characterSet,
                  referrerURI: doc.documentURIObject,
@@ -761,7 +791,7 @@ nsContextMenu.prototype = {
   // Open linked-to URL in a new tab.
   openLinkInTab: function() {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
     var referrerURI = doc.documentURIObject;
 
     // if the mixedContentChannel is present and the referring URI passes
@@ -788,7 +818,7 @@ nsContextMenu.prototype = {
   // open URL in current tab
   openLinkInCurrent: function() {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
     openLinkIn(this.linkURL, "current",
                { charset: doc.characterSet,
                  referrerURI: doc.documentURIObject });
@@ -824,7 +854,8 @@ nsContextMenu.prototype = {
     var doc = this.target.ownerDocument;
     var frameURL = doc.location.href;
 
-    urlSecurityCheck(frameURL, this.browser.contentPrincipal,
+    urlSecurityCheck(frameURL,
+                     this._unremotePrincipal(this.browser.contentPrincipal),
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     var referrer = doc.referrer;
     openUILinkIn(frameURL, "current", { disallowInheritPrincipal: true,
@@ -872,6 +903,16 @@ nsContextMenu.prototype = {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document);
   },
 
+
+  viewImageDesc: function(e) {
+    var doc = this.target.ownerDocument;
+    urlSecurityCheck(this.imageDescURL,
+                     this._unremotePrincipal(this.browser.contentPrincipal),
+                     Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
+    openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
+                             referrerURI: doc.documentURIObject });
+  },
+
   viewImageInfo: function() {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document,
                     "mediaTab", this.target);
@@ -883,7 +924,7 @@ nsContextMenu.prototype = {
 
   reloadImage: function(e) {
     urlSecurityCheck(this.mediaURL,
-                     this.browser.contentPrincipal,
+                     this._unremotePrincipal(this.browser.contentPrincipal),
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
 
     if (this.target instanceof Ci.nsIImageLoadingContent)
@@ -915,7 +956,7 @@ nsContextMenu.prototype = {
     } else {
       viewURL = this.mediaURL;
       urlSecurityCheck(viewURL,
-                       this.browser.contentPrincipal,
+                       this._unremotePrincipal(this.browser.contentPrincipal),
                        Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
       let doc = this.target.ownerDocument;
       openUILink(viewURL, e, { disallowInheritPrincipal: true,
@@ -924,7 +965,8 @@ nsContextMenu.prototype = {
   },
 
   saveVideoFrameAsImage: function () {
-    urlSecurityCheck(this.mediaURL, this.browser.contentPrincipal,
+    urlSecurityCheck(this.mediaURL,
+                     this._unremotePrincipal(this.browser.contentPrincipal),
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     let name = "";
     try {
@@ -957,7 +999,7 @@ nsContextMenu.prototype = {
   // Change current window to the URL of the background image.
   viewBGImage: function(e) {
     urlSecurityCheck(this.bgImageURL,
-                     this.browser.contentPrincipal,
+                     this._unremotePrincipal(this.browser.contentPrincipal),
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     var doc = this.target.ownerDocument;
     openUILink(this.bgImageURL, e, { disallowInheritPrincipal: true,
@@ -991,8 +1033,9 @@ nsContextMenu.prototype = {
     if (this.disableSetDesktopBackground())
       return;
 
+    var doc = this.target.ownerDocument;
     urlSecurityCheck(this.target.currentURI.spec,
-                     this.target.ownerDocument.nodePrincipal);
+                     this._unremotePrincipal(doc.nodePrincipal));
 
     // Confirm since it's annoying if you hit this accidentally.
     const kDesktopBackgroundURL = 
@@ -1172,7 +1215,7 @@ nsContextMenu.prototype = {
       linkText = document.commandDispatcher.focusedWindow.getSelection().toString().trim();
     else
       linkText = this.linkText();
-    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
 
     this.saveHelper(this.linkURL, linkText, null, true, doc,
                     this.linkDownload);
@@ -1212,11 +1255,13 @@ nsContextMenu.prototype = {
         }, Components.utils.reportError);
       }
     } else if (this.onImage) {
-      urlSecurityCheck(this.mediaURL, doc.nodePrincipal);
+      urlSecurityCheck(this.mediaURL,
+                       this._unremotePrincipal(doc.nodePrincipal));
       saveImageURL(this.mediaURL, null, "SaveImageTitle", false,
                    false, doc.documentURIObject, doc);
     } else if (this.onVideo || this.onAudio) {
-      urlSecurityCheck(this.mediaURL, doc.nodePrincipal);
+      urlSecurityCheck(this.mediaURL,
+                       this._unremotePrincipal(doc.nodePrincipal));
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";
       this.saveHelper(this.mediaURL, null, dialogTitle, false, doc, "");
     }
