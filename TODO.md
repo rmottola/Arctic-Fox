@@ -152,6 +152,8 @@ no components/url-classifier ?
 
 ### Further ToDo which would help portability:
 
+- from nsContextMenu.js : remove unremotePrincipal again
+
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - js/src/jscntxt.h  update ReportValueError to UniquePtr
