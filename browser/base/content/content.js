@@ -51,7 +51,23 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
 
 if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
   addEventListener("contextmenu", function (event) {
-    sendAsyncMessage("contextmenu", {}, { event: event });
+    let defaultPrevented = event.defaultPrevented;
+    if (!Services.prefs.getBoolPref("dom.event.contextmenu.enabled")) {
+      let plugin = null;
+      try {
+        plugin = event.target.QueryInterface(Ci.nsIObjectLoadingContent);
+      } catch (e) {}
+      if (plugin && plugin.displayedType == Ci.nsIObjectLoadingContent.TYPE_PLUGIN) {
+        // Don't open a context menu for plugins.
+        return;
+      }
+
+      defaultPrevented = false;
+    }
+
+    if (!defaultPrevented) {
+      sendSyncMessage("contextmenu", {}, { event: event });
+    }
   }, false);
 } else {
   addEventListener("DOMFormHasPassword", function(event) {
