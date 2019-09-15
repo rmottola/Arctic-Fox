@@ -3147,7 +3147,11 @@
               "-moz-default-background-color" :
               Services.prefs.getCharPref("browser.display.background_color");
 
-          if (Services.prefs.getBoolPref("browser.tabs.remote")) {
+          let remote = window.QueryInterface(Ci.nsIInterfaceRequestor)
+            .getInterface(Ci.nsIWebNavigation)
+            .QueryInterface(Ci.nsILoadContext)
+            .useRemoteTabs;
+          if (remote) {
             messageManager.addMessageListener("DOMTitleChanged", this);
             messageManager.addMessageListener("contextmenu", this);
           } else {
@@ -3200,7 +3204,7 @@
           document.removeEventListener("keypress", this, false);
           window.removeEventListener("sizemodechange", this, false);
 
-          if (Services.prefs.getBoolPref("browser.tabs.remote")) {
+          if (gMultiProcessBrowser) {
             messageManager.removeMessageListener("DOMTitleChanged", this);
             messageManager.removeMessageListener("contextmenu", this);
           }

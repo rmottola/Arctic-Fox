@@ -703,7 +703,11 @@ const gXSSObserver = {
 
 var gBrowserInit = {
   onLoad: function() {
-    gMultiProcessBrowser = gPrefService.getBoolPref("browser.tabs.remote");
+    gMultiProcessBrowser =
+      window.QueryInterface(Ci.nsIInterfaceRequestor)
+      .getInterface(Ci.nsIWebNavigation)
+      .QueryInterface(Ci.nsILoadContext)
+      .useRemoteTabs;
 
     var mustLoadSidebar = false;
 
@@ -1020,6 +1024,7 @@ var gBrowserInit = {
     IndexedDBPromptHelper.init();
     AddonManager.addAddonListener(AddonsMgrListener);
     WebrtcIndicator.init();
+    gRemoteTabsUI.init();
 
     // Ensure login manager is up and running.
     Services.logins;
@@ -3147,6 +3152,12 @@ function OpenBrowserWindow(options)
     }
   } else {
     extraFeatures = ",non-private";
+  }
+
+  if (options && options.remote) {
+    extraFeatures += ",remote";
+  } else if (options && options.remote === false) {
+    extraFeatures += ",non-remote";
   }
 
   // if and only if the current window is a browser window and it has a document with a character
@@ -6701,6 +6712,28 @@ let gPrivateBrowsingUI = {
   }
 };
 
+let gRemoteTabsUI = {
+  init: function() {
+    if (window.location.href != getBrowserURL()) {
+      return;
+    }
+
+    let remoteTabs = gPrefService.getBoolPref("browser.tabs.remote");
+    let autostart = gPrefService.getBoolPref("browser.tabs.remote.autostart");
+
+    let newRemoteWindow = document.getElementById("menu_newRemoteWindow");
+    let newNonRemoteWindow = document.getElementById("menu_newNonRemoteWindow");
+
+    if (!remoteTabs) {
+      newRemoteWindow.hidden = true;
+      newNonRemoteWindow.hidden = true;
+      return;
+    }
+
+    newRemoteWindow.hidden = autostart;
+    newNonRemoteWindow.hidden = !autostart;
+  }
+};
 
 /**
  * Switch to a tab that has a given URI, and focusses its browser window.
