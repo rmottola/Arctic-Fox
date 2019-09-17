@@ -114,22 +114,20 @@
 - Bug 1038811 2015-04-11 Complete remaining
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
+- Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
 - Bug 1141710 - 2015-03-04 all parts
-- Bug 1130616 - 2015-02-24 Support EXT_color_buffer_half_float on ANGLE. 
-- Bug 1133201 - part 2 - don't send referrer information when opening n
 
 Require check of JS browser components:
 
 - Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
 - Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
-- Bug 1118502 - part 1 - fixup grabbing of documentURIObject; 
 - Bug 1031264 - make opening links in new {tabs,windows} honor rel
 - Bug 1135913 - 4 parts
 - Bug 1135537 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/393b29be58aba2e99325f31cff09a4ee18a6e166
+https://github.com/mozilla/newtab-dev/commit/ef1854ac4e344616b35262d227fc141d53bc84c0
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
