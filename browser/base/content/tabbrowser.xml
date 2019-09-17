@@ -1259,6 +1259,7 @@
             var aFromExternal;
             var aRelatedToCurrent;
             var aAllowMixedContent;
+            var aSkipAnimation;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1271,6 +1272,7 @@
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
               aAllowMixedContent    = params.allowMixedContent;
+              aSkipAnimation        = params.skipAnimation;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1284,6 +1286,7 @@
                                   allowThirdPartyFixup: aAllowThirdPartyFixup,
                                   fromExternal: aFromExternal,
                                   relatedToCurrent: aRelatedToCurrent,
+                                  skipAnimation: aSkipAnimation,
                                   allowMixedContent: aAllowMixedContent});
             if (!bgLoad)
               this.selectedTab = tab;
