@@ -248,6 +248,7 @@ let ClickEventHandler = {
           if (json.bookmark)
             event.preventDefault(); // Need to prevent the pageload.
         }
+        json.noReferrer = BrowserUtils.linkHasNoReferrer(node)
       }
 
       sendAsyncMessage("Content:Click", json);
