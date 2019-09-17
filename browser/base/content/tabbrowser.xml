@@ -3070,8 +3070,13 @@
               break;
             }
             case "contextmenu": {
+              let spellInfo = aMessage.data.spellInfo;
+              if (spellInfo)
+                spellInfo.target = aMessage.target.messageManager;
               gContextMenuContentData = { event: aMessage.objects.event,
-                                          browser: browser };
+                                          browser: browser,
+                                          editFlags: aMessage.data.editFlags,
+                                          spellInfo: spellInfo };
               let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
               popup.openPopup(browser, "overlap",
                               gContextMenuContentData.event.clientX,

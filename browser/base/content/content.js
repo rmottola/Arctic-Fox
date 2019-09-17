@@ -9,6 +9,8 @@ let Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/InlineSpellChecker.jsm");
+Cu.import("resource://gre/modules/InlineSpellCheckerContent.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
   "resource://gre/modules/BrowserUtils.jsm");
@@ -66,7 +68,15 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
     }
 
     if (!defaultPrevented) {
-      sendSyncMessage("contextmenu", {}, { event: event });
+      let editFlags = SpellCheckHelper.isEditable(event.target, content);
+      let spellInfo;
+      if (editFlags &
+          (SpellCheckHelper.EDITABLE | SpellCheckHelper.CONTENTEDITABLE)) {
+        spellInfo =
+          InlineSpellCheckerContent.initContextMenu(event, editFlags, this);
+      }
+
+      sendSyncMessage("contextmenu", { editFlags, spellInfo }, { event });
     }
   }, false);
 } else {
