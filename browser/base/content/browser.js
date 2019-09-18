@@ -642,65 +642,6 @@ var gPopupBlockerObserver = {
   }
 };
 
-const gXSSObserver = {
-
-  observe: function (aSubject, aTopic, aData)
-  {
-
-    // Don't do anything if the notification is disabled.
-    if (!gPrefService.getBoolPref("security.xssfilter.displayWarning"))
-      return;
-
-    // Parse incoming XSS array
-    aSubject.QueryInterface(Ci.nsIArray);
-    var policy = aSubject.queryElementAt(0, Ci.nsISupportsString).data;
-    var content = aSubject.queryElementAt(1, Ci.nsISupportsString).data;
-    var domain = aSubject.queryElementAt(2, Ci.nsISupportsString).data;
-    var url = aSubject.queryElementAt(3, Ci.nsISupportsCString).data;
-    var blockMode = aSubject.queryElementAt(4, Ci.nsISupportsPRBool).data;
-
-    // If it is a block mode event, do not display the infobar
-    if (blockMode)
-      return;
-
-    var nb = gBrowser.getNotificationBox();
-    const priority = nb.PRIORITY_WARNING_MEDIUM;
-
-    var buttons = [{
-      label: 'View Unsafe Content',
-      accessKey: 'V',
-      popup: null,
-      callback: function () {
-        alert(content);
-      }
-    }];
-
-    if (domain !== "")
-      buttons.push({
-        label: 'Add Domain Exception',
-        accessKey: 'A',
-        popup: null,
-        callback: function () {
-          let whitelist = gPrefService.getCharPref("security.xssfilter.whitelist");
-          if (whitelist != "") {
-            whitelist = whitelist + "," + domain;
-          } else {
-            whitelist = domain;
-          }
-          // Write the updated whitelist. Since this is observed by the XSS filter,
-          // it will automatically sync to the back-end and update immediately.
-          gPrefService.setCharPref("security.xssfilter.whitelist", whitelist);
-          // After setting this, we automatically reload the page.
-          BrowserReloadSkipCache();
-        }
-      });
-    
-    nb.appendNotification("The XSS Filter has detected a potential XSS attack. Type: " +
-                          policy, 'popup-blocked', 'chrome://browser/skin/Info.png',
-                          priority, buttons);
-  }
-};
-
 var gBrowserInit = {
   onLoad: function() {
     gMultiProcessBrowser =
@@ -1012,7 +953,6 @@ var gBrowserInit = {
     Services.obs.addObserver(gXPInstallObserver, "addon-install-origin-blocked", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-failed", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-complete", false);
-    Services.obs.addObserver(gXSSObserver, "xss-on-violate-policy", false);
 
     gPrefService.addObserver(gURLBarSettings.prefSuggest, gURLBarSettings, false);
     gPrefService.addObserver(gURLBarSettings.prefKeyword, gURLBarSettings, false);
@@ -1363,7 +1303,6 @@ var gBrowserInit = {
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-origin-blocked");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-failed");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-complete");
-      Services.obs.removeObserver(gXSSObserver, "xss-on-violate-policy");
 
       try {
         gPrefService.removeObserver(gURLBarSettings.prefSuggest, gURLBarSettings);
