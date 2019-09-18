@@ -94,8 +94,7 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
 
 let AboutHomeListener = {
   init: function(chromeGlobal) {
-    let self = this;
-    chromeGlobal.addEventListener('AboutHomeLoad', function(e) { self.onPageLoad(); }, false, true);
+    chromeGlobal.addEventListener('AboutHomeLoad', () => this.onPageLoad(), false, true);
   },
 
   handleEvent: function(aEvent) {
