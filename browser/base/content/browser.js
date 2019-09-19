@@ -147,6 +147,7 @@ let gInitialPages = [
 ];
 
 #include browser-addons.js
+#include browser-devedition.js
 #include browser-feeds.js
 #include browser-fullScreen.js
 #include browser-fullZoom.js
@@ -677,6 +678,12 @@ var gBrowserInit = {
 
     window.addEventListener("AppCommand", HandleAppCommandEvent, true);
 
+    // These routines add message listeners. They must run before
+    // loading the frame script to ensure that we don't miss any
+    // message sent between when the frame script is loaded and when
+    // the listener is registered.
+    DevEdition.init();
+    
     messageManager.loadFrameScript("chrome://browser/content/content.js", true);
     messageManager.loadFrameScript("chrome://browser/content/content-sessionStore.js", true);
 
@@ -1279,6 +1286,8 @@ var gBrowserInit = {
     TabsInTitlebar.uninit();
     
     ToolbarIconColor.uninit();
+
+    DevEdition.uninit();
 
     var enumerator = Services.wm.getEnumerator(null);
     enumerator.getNext();
