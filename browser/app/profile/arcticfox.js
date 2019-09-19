@@ -298,7 +298,7 @@ pref("browser.urlbar.suggest.openpage",             true);
 pref("browser.urlbar.suggest.history.onlyTyped",    false);
 
 pref("browser.urlbar.formatting.enabled", true);
-pref("browser.urlbar.trimURLs", true);
+pref("browser.urlbar.trimURLs", false);
 
 // Display punycode in identity panel:
 // 0 = Display IDN name
@@ -343,7 +343,7 @@ pref("browser.download.panel.shown", false);
 pref("browser.download.panel.firstSessionCompleted", false);
 
 // search engines URL
-pref("browser.search.searchEnginesURL",      "https://addons.mozilla.org/%LOCALE%/firefox/search-engines/");
+pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
@@ -425,7 +425,7 @@ pref("browser.tabs.loadBookmarksInBackground", false);
 pref("browser.tabs.noWindowActivationOnExternal", false);
 pref("browser.tabs.tabClipWidth", 140);
 pref("browser.tabs.animate", true);
-pref("browser.tabs.onTop", true);
+pref("browser.tabs.onTop", false);
 #ifdef XP_WIN
 pref("browser.tabs.drawInTitlebar", true);
 #else
