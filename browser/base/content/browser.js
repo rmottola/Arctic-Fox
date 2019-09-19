@@ -21,7 +21,11 @@ var gProxyFavIcon = null;
 var gLastValidURLStr = "";
 var gInPrintPreviewMode = false;
 var gContextMenu = null; // nsContextMenu instance
-var gMultiProcessBrowser = false;
+var gMultiProcessBrowser =
+  window.QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIWebNavigation)
+        .QueryInterface(Ci.nsILoadContext)
+        .useRemoteTabs;
 
 #ifndef XP_MACOSX
 var gEditUIVisible = true;
@@ -650,12 +654,6 @@ var gPopupBlockerObserver = {
 
 var gBrowserInit = {
   onLoad: function() {
-    gMultiProcessBrowser =
-      window.QueryInterface(Ci.nsIInterfaceRequestor)
-      .getInterface(Ci.nsIWebNavigation)
-      .QueryInterface(Ci.nsILoadContext)
-      .useRemoteTabs;
-
     var mustLoadSidebar = false;
 
     if (!gMultiProcessBrowser) {
