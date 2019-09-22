@@ -124,6 +124,8 @@ Require check of JS browser components:
 - Bug 1031264 - make opening links in new {tabs,windows} honor rel
 - Bug 1135913 - 4 parts
 - Bug 1135537 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
+- Bug 897253 - Remove support for calling nsISessionStore.init() with a
+- Bug 887394 - Don't collect state right after startup when restoring t
 
 Parents of:
 
