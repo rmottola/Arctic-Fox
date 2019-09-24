@@ -6,6 +6,8 @@ function debug(msg) {
   Services.console.logStringMessage("SessionStoreContent: " + msg);
 }
 
+let Cu = Components.utils;
+
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 
 /**
