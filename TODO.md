@@ -115,21 +115,24 @@
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
-- Bug 1141710 - 2015-03-04 all parts
 
 Require check of JS browser components:
 
 - Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
 - Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
-- Bug 1031264 - make opening links in new {tabs,windows} honor rel
 - Bug 1135913 - 4 parts
-- Bug 1135537 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
-- Bug 897253 - Remove support for calling nsISessionStore.init() with a
-- Bug 887394 - Don't collect state right after startup when restoring t
+- Bug 1135537 - 2015-02-24 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
+- Bug 1031264 - 2014-12-10 - make opening links in new {tabs,windows} honor rel
+- Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
+- Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
+- Bug 897253 - 2013-07-24 - Remove support for calling nsISessionStore.init() with a
+- Bug 867143 - 2013-07-23 - Cache Session Restore state aggressively.
+- Bug 891360 - 2013-07-12 - Move SessionStore I/O logic to a dedicated worker
+- Bug 887394 - 2013-06-27 - Don't collect state right after startup when restoring t
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/ef1854ac4e344616b35262d227fc141d53bc84c0
+https://github.com/mozilla/newtab-dev/commit/096d14988376a6f4e2bf70ba5888d94a1d1a649b
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
