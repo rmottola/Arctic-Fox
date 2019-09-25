@@ -2027,59 +2027,44 @@ let SessionStoreInternal = {
     }
     catch (ex) { } // this could happen if we catch a tab during (de)initialization
 
-    // Limit number of back/forward button history entries to save
-    let oldest, newest;
-    let maxSerializeBack = this._prefBranch.getIntPref("sessionstore.max_serialize_back");
-    if (maxSerializeBack >= 0) {
-      oldest = Math.max(0, history.index - maxSerializeBack);
-    } else { // History.getEntryAtIndex(0, ...) is the oldest.
-      oldest = 0;
-    }
-    let maxSerializeFwd = this._prefBranch.getIntPref("sessionstore.max_serialize_forward");
-    if (maxSerializeFwd >= 0) {
-      newest = Math.min(history.count - 1, history.index + maxSerializeFwd);
-    } else { // History.getEntryAtIndex(history.count - 1, ...) is the newest.
-      newest = history.count - 1;
-    }
-
     // XXXzeniko anchor navigation doesn't reset __SS_data, so we could reuse
     //           data even when we shouldn't (e.g. Back, different anchor)
-    // Warning: this is required to save form data and scrolling position!
     if (history && browser.__SS_data &&
         browser.__SS_data.entries[history.index] &&
         browser.__SS_data.entries[history.index].url == browser.currentURI.spec &&
         history.index < this._sessionhistory_max_entries - 1 && !includePrivateData) {
-      try {
-        tabData.entries = browser.__SS_data.entries.slice(oldest, newest + 1);
-      }
-      catch (ex) {
-        // No errors are expected above, but we use try-catch to keep sessionstore.js safe
-        NS_ASSERT(false, "SessionStore failed to slice history from browser.__SS_data");
-      }
-
-      // Set the one-based index of the currently active tab, ensuring it isn't out of bounds
-      tabData.index = Math.min(history.index - oldest + 1, tabData.entries.length);
+      tabData = browser.__SS_data;
+      tabData.index = history.index + 1;
     }
     else if (history && history.count > 0) {
       browser.__SS_hostSchemeData = [];
       try {
-        for (var j = oldest; j <= newest; j++) {
+        for (var j = 0; j < history.count; j++) {
           let entry = this._serializeHistoryEntry(history.getEntryAtIndex(j, false),
                                                   includePrivateData, aTab.pinned, browser.__SS_hostSchemeData);
           tabData.entries.push(entry);
         }
+        // If we make it through the for loop, then we're ok and we should clear
+        // any indicator of brokenness.
+        delete aTab.__SS_broken_history;
       }
       catch (ex) {
         // In some cases, getEntryAtIndex will throw. This seems to be due to
         // history.count being higher than it should be. By doing this in a
         // try-catch, we'll update history to where it breaks, assert for
-        // non-release builds, and still save sessionstore.js.
-        NS_ASSERT(false, "SessionStore failed gathering complete history " +
-                         "for the focused window/tab. See bug 669196.");
+        // non-release builds, and still save sessionstore.js. We'll track if
+        // we've shown the assert for this tab so we only show it once.
+        // cf. bug 669196.
+        if (!aTab.__SS_broken_history) {
+          // First Focus the window & tab we're having trouble with.
+          aTab.ownerDocument.defaultView.focus();
+          aTab.ownerDocument.defaultView.gBrowser.selectedTab = aTab;
+          NS_ASSERT(false, "SessionStore failed gathering complete history " +
+                           "for the focused window/tab. See bug 669196.");
+          aTab.__SS_broken_history = true;
+        }
       }
-
-      // Set the one-based index of the currently active tab, ensuring it isn't out of bounds
-      tabData.index = Math.min(history.index - oldest + 1, tabData.entries.length);
+      tabData.index = history.index + 1;
 
       // make sure not to cache privacy sensitive data which shouldn't get out
       if (!includePrivateData)
