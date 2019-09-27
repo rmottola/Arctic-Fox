@@ -29,5 +29,6 @@ EXTRA_JS_MODULES.sessionstore = [
 ]
 
 EXTRA_PP_JS_MODULES.sessionstore += [
+    'SessionSaver.jsm',
     'SessionStore.jsm',
 ]
