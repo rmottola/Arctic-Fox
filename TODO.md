@@ -131,11 +131,10 @@ Require check of JS browser components:
 - Bug 897253 - 2013-07-24 - Remove support for calling nsISessionStore.init() with a
 - Bug 867143 - 2013-07-23 - Cache Session Restore state aggressively.
 - Bug 891360 - 2013-07-12 - Move SessionStore I/O logic to a dedicated worker
-- Bug 887394 - 2013-06-27 - Don't collect state right after startup when restoring t
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/096d14988376a6f4e2bf70ba5888d94a1d1a649b
+https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
 https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
 
 To verify:
@@ -147,7 +146,6 @@ To verify:
 
 
 Analyze all:
-https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
 
