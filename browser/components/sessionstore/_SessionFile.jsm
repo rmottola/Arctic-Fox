@@ -66,8 +66,8 @@ this._SessionFile = {
   /**
    * Write the contents of the session file, asynchronously.
    */
-  write: function (aData, aOptions = {}) {
-    return SessionFileInternal.write(aData, aOptions);
+  write: function (aData) {
+    return SessionFileInternal.write(aData);
   },
   /**
    * Writes the initial state to disk again only to change the session's load
@@ -204,11 +204,11 @@ let SessionFileInternal = {
     });
   },
 
-  write: function (aData, aOption) {
+  write: function (aData) {
     let refObj = {};
     return TaskUtils.spawn(function task() {
       try {
-        let promise = SessionWorker.post("write", [aData, aOptions]);
+        let promise = SessionWorker.post("write", [aData]);
         yield promise;
       } catch (ex) {
         console.error("Could not write session state file: " + this.path, ex);

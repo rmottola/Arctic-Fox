@@ -540,13 +540,6 @@ let SessionStoreInternal = {
       gDebuggingEnabled = this._prefBranch.getBoolPref("sessionstore.debug");
     }, false);
 
-    // when crash recovery is disabled, session data is not written to disk
-    XPCOMUtils.defineLazyGetter(this, "_resume_from_crash", function () {
-      // get crash recovery state from prefs and allow for proper reaction to state changes
-      this._prefBranch.addObserver("sessionstore.resume_from_crash", this, true);
-      return this._prefBranch.getBoolPref("sessionstore.resume_from_crash");
-    });
-
     this._max_tabs_undo = this._prefBranch.getIntPref("sessionstore.max_tabs_undo");
     this._prefBranch.addObserver("sessionstore.max_tabs_undo", this, true);
     
@@ -1210,20 +1203,6 @@ let SessionStoreInternal = {
       case "sessionstore.max_windows_undo":
         this._max_windows_undo = this._prefBranch.getIntPref("sessionstore.max_windows_undo");
         this._capClosedWindows();
-        break;
-      case "sessionstore.resume_from_crash":
-        this._resume_from_crash = this._prefBranch.getBoolPref("sessionstore.resume_from_crash");
-        // restore original resume_session_once preference if set in saveState
-        if (this._resume_session_once_on_shutdown != null) {
-          this._prefBranch.setBoolPref("sessionstore.resume_session_once",
-                                       this._resume_session_once_on_shutdown);
-          this._resume_session_once_on_shutdown = null;
-        }
-        // either create the file with crash recovery information or remove it
-        // (when _loadState is not STATE_RUNNING, that file is used for session resuming instead)
-        if (!this._resume_from_crash)
-          _SessionFile.wipe();
-        this.saveState(true);
         break;
     }
   },
@@ -2542,8 +2521,6 @@ let SessionStoreInternal = {
    * gather session data as object
    * @param aUpdateAll
    *        Bool update all windows
-   * @param aPinnedOnly
-   *        Bool collect pinned tabs only
    * @returns object
    */
   getCurrentState: function (aUpdateAll) {
