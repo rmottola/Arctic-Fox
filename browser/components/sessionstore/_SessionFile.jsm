@@ -245,7 +245,7 @@ let SessionFileInternal = {
     SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]).then(msg => {
       this._recordTelemetry(msg.telemetry);
       return msg;
-    });
+    }, Cu.reportError);
   },
 
   createBackupCopy: function (ext) {
