@@ -481,15 +481,6 @@ let SessionStoreInternal = {
       catch (ex) { debug("The session file is invalid: " + ex); }
     }
 
-    // A Lazy getter for the sessionstore.js backup promise.
-    XPCOMUtils.defineLazyGetter(this, "_backupSessionFileOnce", function () {
-      // We're creating a backup of sessionstore.js by moving it to .bak
-      // because that's a lot faster than creating a copy. sessionstore.js
-      // would be overwritten shortly afterwards anyway so we can save time
-      // and just move instead of copy.
-      return _SessionFile.moveToBackupPath();
-    });
-
     // at this point, we've as good as resumed the session, so we can
     // clear the resume_session_once flag, if it's set
     if (this._loadState != STATE_QUITTING &&
@@ -500,17 +491,6 @@ let SessionStoreInternal = {
 
     this._performUpgradeBackup();
 
-    // The service is ready. Backup-on-upgrade might still be in progress,
-    // but we do not have a race condition:
-    //
-    // - if the file to backup is named sessionstore.js, secondary
-    // backup will be started in this tick, so any further I/O will be
-    // scheduled to start after the secondary backup is complete;
-    //
-    // - if the file is named sessionstore.bak, it will only be erased
-    // by the getter to |_backupSessionFileOnce|, which specifically
-    // waits until the secondary backup has been completed or deemed
-    // useless before causing any side-effects.
     this._sessionInitialized = true;
     this._promiseInitialization.resolve();
   },

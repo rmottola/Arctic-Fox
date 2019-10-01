@@ -66,8 +66,8 @@ this._SessionFile = {
   /**
    * Write the contents of the session file, asynchronously.
    */
-  write: function (aData) {
-    return SessionFileInternal.write(aData);
+  write: function (aData, aOptions = {}) {
+    return SessionFileInternal.write(aData, aOptions);
   },
   /**
    * Writes the initial state to disk again only to change the session's load
@@ -75,12 +75,6 @@ this._SessionFile = {
    */
   writeLoadStateOnceAfterStartup: function (aLoadState) {
     return SessionFileInternal.writeLoadStateOnceAfterStartup(aLoadState);
-  },
-  /**
-   * Create a backup copy, asynchronously.
-   */
-  moveToBackupPath: function () {
-    return SessionFileInternal.moveToBackupPath();
   },
   /**
    * Create a backup copy, asynchronously.
@@ -207,11 +201,11 @@ let SessionFileInternal = {
     return SessionWorker.post("read").then(msg => msg.ok);
   },
 
-  write: function (aData) {
+  write: function (aData, aOption) {
     let refObj = {};
     return TaskUtils.spawn(function task() {
       try {
-        let promise = SessionWorker.post("write", [aData]);
+        let promise = SessionWorker.post("write", [aData, aOptions]);
         yield promise;
       } catch (ex) {
         console.error("Could not write session state file: " + this.path, ex);
@@ -221,10 +215,6 @@ let SessionFileInternal = {
 
   writeLoadStateOnceAfterStartup: function (aLoadState) {
     return SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]);
-  },
-
-  moveToBackupPath: function () {
-    return SessionWorker.post("moveToBackupPath");
   },
 
   createBackupCopy: function (ext) {
