@@ -34,6 +34,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/PromiseWorker.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
+Cu.import("resource://gre/modules/AsyncShutdown.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
@@ -148,6 +149,18 @@ let SessionFileInternal = {
   backupPath: OS.Path.join(OS.Constants.Path.profileDir, "sessionstore.bak"),
 
   /**
+   * The promise returned by the latest call to |write|.
+   * We use it to ensure that AsyncShutdown.profileBeforeChange cannot
+   * interrupt a call to |write|.
+   */
+  _latestWrite: null,
+
+  /**
+   * |true| once we have decided to stop receiving write instructiosn
+   */
+  _isClosed: false,
+
+  /**
    * Utility function to safely read a file synchronously.
    * @param aPath
    *        A path to read the file from.
@@ -205,14 +218,26 @@ let SessionFileInternal = {
   },
 
   write: function (aData) {
+    if (this._isClosed) {
+      return Promise.reject(new Error("_SessionFile is closed"));
+    }
     let refObj = {};
-    return TaskUtils.spawn(function task() {
+    return this._latestWrite = TaskUtils.spawn(function task() {
       try {
         let promise = SessionWorker.post("write", [aData]);
         yield promise;
       } catch (ex) {
         console.error("Could not write session state file: " + this.path, ex);
       }
+      // At this stage, we are done writing. If shutdown has started,
+      // we will want to stop receiving write instructions.
+      if (Services.startup.shuttingDown) {
+        this._isClosed = true;
+      }
+      // In rare cases, we may already have other writes pending,
+      // which we need to flush before shutdown proceeds. AsyncShutdown
+      // uses _latestWrite to determine what needs to be flushed during
+      // shutdown.
     }.bind(this));
   },
 
@@ -263,3 +288,11 @@ let SessionWorker = (function () {
     }
   };
 })();
+
+// Ensure that we can write sessionstore.js cleanly before the profile
+// becomes unaccessible.
+AsyncShutdown.profileBeforeChange.addBlocker(
+  "SessionFile: Finish writing the latest sessionstore.js",
+  function() {
+    return _SessionFile._latestWrite;
+  });
