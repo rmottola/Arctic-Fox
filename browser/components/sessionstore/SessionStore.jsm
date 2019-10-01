@@ -133,8 +133,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
   "resource:///modules/sessionstore/SessionSaver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
   "resource:///modules/sessionstore/SessionStorage.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "_SessionFile",
-  "resource:///modules/sessionstore/_SessionFile.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SessionFile",
+  "resource:///modules/sessionstore/SessionFile.jsm");
 
 /**
  * |true| if we are in debug mode, |false| otherwise.
@@ -511,12 +511,12 @@ let SessionStoreInternal = {
     return Task.spawn(function task() {
       try {
         // Perform background backup
-        yield _SessionFile.createBackupCopy("-" + buildID);
+        yield SessionFile.createBackupCopy("-" + buildID);
 
         this._prefBranch.setCharPref(PREF_UPGRADE, buildID);
 
         // In case of success, remove previous backup.
-        yield _SessionFile.removeBackupCopy("-" + latestBackup);
+        yield SessionFile.removeBackupCopy("-" + latestBackup);
       } catch (ex) {
         debug("Could not perform upgrade backup " + ex);
         debug(ex.stack);
@@ -791,7 +791,7 @@ let SessionStoreInternal = {
           // _loadState changed from "stopped" to "running". Save the session's
           // load state immediately so that crashes happening during startup
           // are correctly counted.
-          _SessionFile.writeLoadStateOnceAfterStartup(STATE_RUNNING_STR);
+          SessionFile.writeLoadStateOnceAfterStartup(STATE_RUNNING_STR);
         }
       }
       else {
@@ -1082,7 +1082,7 @@ let SessionStoreInternal = {
    * On purge of session history
    */
   onPurgeSessionHistory: function ssi_onPurgeSessionHistory() {
-    _SessionFile.wipe();
+    SessionFile.wipe();
     // If the browser is shutting down, simply return after clearing the
     // session data on disk as this notification fires after the
     // quit-application notification so the browser is about to exit.
