@@ -36,7 +36,8 @@ const OBSERVING = [
   "quit-application-requested", "quit-application-granted",
   "browser-lastwindow-close-granted",
   "quit-application", "browser:purge-session-history",
-  "browser:purge-domain-data"
+  "browser:purge-domain-data",
+  "gather-telemetry",
 ];
 
 // XUL Window properties to (re)store
@@ -643,6 +644,9 @@ let SessionStoreInternal = {
         break;
       case "timer-callback": // timer call back for delayed saving
         this.onTimerCallback();
+        break;
+      case "gather-telemetry":
+        this.onGatherTelemetry();
         break;
     }
   },
@@ -1401,6 +1405,16 @@ let SessionStoreInternal = {
     // Default delay of 2 seconds gives enough time to catch multiple TabHide
     // events due to changing groups in Panorama.
     this.saveStateDelayed(aWindow);
+  },
+
+  onGatherTelemetry: function() {
+    // On the first gather-telemetry notification of the session,
+    // gather telemetry data.
+    Services.obs.removeObserver(this, "gather-telemetry");
+    this.fillTabCachesAsynchronously().then(function() {
+      let stateString = SessionStore.getBrowserState();
+      return SessionFile.gatherTelemetry(stateString);
+    });
   },
 
   /* ........ nsISessionStore API .............. */
