@@ -198,7 +198,10 @@ let SessionFileInternal = {
   },
 
   read: function () {
-    return SessionWorker.post("read").then(msg => msg.ok);
+    return SessionWorker.post("read").then(msg => {
+      this._recordTelemetry(msg.telemetry);
+      return msg.ok;
+    });
   },
 
   write: function (aData, aOption) {
@@ -214,7 +217,10 @@ let SessionFileInternal = {
   },
 
   writeLoadStateOnceAfterStartup: function (aLoadState) {
-    return SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]);
+    return SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]).then(msg => {
+      this._recordTelemetry(msg.telemetry);
+      return msg;
+    });
   },
 
   createBackupCopy: function (ext) {
@@ -227,6 +233,12 @@ let SessionFileInternal = {
 
   wipe: function () {
     return SessionWorker.post("wipe");
+  },
+
+  _recordTelemetry: function(telemetry) {
+    for (let histogramId in telemetry){
+      Telemetry.getHistogramById(histogramId).add(telemetry[histogramId]);
+    }
   }
 };
 
