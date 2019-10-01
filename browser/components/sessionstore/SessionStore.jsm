@@ -488,40 +488,9 @@ let SessionStoreInternal = {
 
     this._initEncoding();
 
-    this._performUpgradeBackup();
-
     this._sessionInitialized = true;
     this._promiseInitialization.resolve();
     return state;
-  },
-
-  /**
-   * If this is the first time we launc this build of Firefox,
-   * backup sessionstore.js.
-   */
-  _performUpgradeBackup: function ssi_performUpgradeBackup() {
-    // Perform upgrade backup, if necessary
-    const PREF_UPGRADE = "sessionstore.upgradeBackup.latestBuildID";
-
-    let buildID = Services.appinfo.platformBuildID;
-    let latestBackup = this._prefBranch.getCharPref(PREF_UPGRADE);
-    if (latestBackup == buildID) {
-      return Promise.resolve();
-    }
-    return Task.spawn(function task() {
-      try {
-        // Perform background backup
-        yield SessionFile.createBackupCopy("-" + buildID);
-
-        this._prefBranch.setCharPref(PREF_UPGRADE, buildID);
-
-        // In case of success, remove previous backup.
-        yield SessionFile.removeBackupCopy("-" + latestBackup);
-      } catch (ex) {
-        debug("Could not perform upgrade backup " + ex);
-        debug(ex.stack);
-      }
-    }.bind(this));
   },
 
   _initEncoding : function ssi_initEncoding() {
