@@ -71,13 +71,6 @@ this.SessionFile = {
     return SessionFileInternal.gatherTelemetry(aData);
   },
   /**
-   * Writes the initial state to disk again only to change the session's load
-   * state. This must only be called once, it will throw an error otherwise.
-   */
-  writeLoadStateOnceAfterStartup: function (aLoadState) {
-    SessionFileInternal.writeLoadStateOnceAfterStartup(aLoadState);
-  },
-  /**
    * Create a backup copy, asynchronously.
    * This is designed to perform backup on upgrade.
    */
@@ -167,13 +160,6 @@ let SessionFileInternal = {
         Services.obs.notifyObservers(null, "sessionstore-final-state-write-complete", "");
       }
     }.bind(this));
-  },
-
-  writeLoadStateOnceAfterStartup: function (aLoadState) {
-    SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]).then(msg => {
-      this._recordTelemetry(msg.telemetry);
-      return msg;
-    }, console.error);
   },
 
   createBackupCopy: function (ext) {
