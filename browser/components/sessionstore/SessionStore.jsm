@@ -92,6 +92,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "gSessionStartup",
   "@mozilla.org/browser/sessionstartup;1", "nsISessionStartup");
 XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
   "@mozilla.org/gfx/screenmanager;1", "nsIScreenManager");
+XPCOMUtils.defineLazyModuleGetter(this, "console",
+  "resource://gre/modules/devtools/Console.jsm");
 
 // List of docShell capabilities to (re)store. These are automatically
 // retrieved from a given docShell if not already collected before.
@@ -3711,7 +3713,7 @@ let SessionStoreInternal = {
                              cookie.value, !!cookie.secure, !!cookie.httponly, true,
                              "expiry" in cookie ? cookie.expiry : MAX_EXPIRY);
       }
-      catch (ex) { Cu.reportError(ex); } // don't let a single cookie stop recovering
+      catch (ex) { console.error(ex); } // don't let a single cookie stop recovering
     }
   },
 

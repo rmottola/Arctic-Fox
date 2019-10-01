@@ -9,6 +9,8 @@ const Cu = Components.utils;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "console",
+  "resource://gre/modules/devtools/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
   "resource:///modules/sessionstore/SessionStore.jsm");
 
@@ -95,7 +97,7 @@ let DomStorage = {
       try {
         let storage = storageManager.createStorage(window, principal, "", aDocShell.usePrivateBrowsing);
       } catch(e) {
-        Cu.reportError(e);
+        console.error(e);
       }
 
       for (let [key, value] in Iterator(data)) {
@@ -103,7 +105,7 @@ let DomStorage = {
           storage.setItem(key, value);
         } catch (e) {
           // throws e.g. for URIs that can't have sessionStorage
-          Cu.reportError(e);
+          console.error(e);
         }
       }
     }

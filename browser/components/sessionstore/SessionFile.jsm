@@ -100,7 +100,7 @@ const TaskUtils = {
     return promise.then(
       null,
       function onError(reason) {
-        console.error("Uncaught asynchronous error:", reason);
+        console.error("Uncaught asynchronous error", reason, "at", reason.stack);
         throw reason;
       }
     );
@@ -169,7 +169,7 @@ let SessionFileInternal = {
         let promise = SessionWorker.post("write", [aData]);
         yield promise;
       } catch (ex) {
-        console.error("Could not write session state file: " + this.path, ex);
+        console.error("Could not write session state file ", this.path, ex);
       }
 
       if (isFinalWrite) {
@@ -182,7 +182,7 @@ let SessionFileInternal = {
     SessionWorker.post("writeLoadStateOnceAfterStartup", [aLoadState]).then(msg => {
       this._recordTelemetry(msg.telemetry);
       return msg;
-    }, Cu.reportError);
+    }, console.error);
   },
 
   createBackupCopy: function (ext) {
