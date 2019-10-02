@@ -29,11 +29,6 @@ interface nsIDOMNode;
 interface nsISessionStore : nsISupports
 {
   /**
-   * Initialize the service
-   */
-  jsval init(in nsIDOMWindow aWindow);
-
-  /**
    * Is it possible to restore the previous session. Will always be false when
    * in Private Browsing mode.
    */

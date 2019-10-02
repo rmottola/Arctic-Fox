@@ -67,6 +67,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+                                  "resource:///modules/sessionstore/SessionStore.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
@@ -181,7 +184,7 @@ BrowserGlue.prototype = {
         this._finalUIStartup();
         break;
       case "browser-delayed-startup-finished":
-        this._onFirstWindowLoaded();
+        this._onFirstWindowLoaded(subject);
         Services.obs.removeObserver(this, "browser-delayed-startup-finished");
         break;
       case "sessionstore-windows-restored":
@@ -608,7 +611,7 @@ BrowserGlue.prototype = {
   },
 
   // the first browser window has finished initializing
-  _onFirstWindowLoaded: function BG__onFirstWindowLoaded() {
+  _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
 #ifdef XP_WIN
     // For windows seven, initialize the jump list module.
     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
@@ -620,6 +623,7 @@ BrowserGlue.prototype = {
     }
 #endif
 
+    SessionStore.init(aWindow);
     this._trackSlowStartup();
   },
 

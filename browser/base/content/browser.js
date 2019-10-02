@@ -144,6 +144,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
   "resource:///modules/TabCrashReporter.jsm");
 #endif
 
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm");
+
 let gInitialPages = [
   "about:blank",
   "about:newtab",
@@ -1040,10 +1043,6 @@ var gBrowserInit = {
       NP.trackBrowserWindow(window);
     }
 
-    // initialize the session-restore service (in case it's not already running)
-    let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-    let ssPromise = ss.init(window);
-
     PlacesToolbarHelper.init();
 
     ctrlTab.readPref();
@@ -1204,14 +1203,14 @@ var gBrowserInit = {
       Cu.reportError("Could not end startup crash tracking: " + ex);
     }
 
-    ssPromise.then(() =>{
+    SessionStore.promiseInitialized.then(() => {
       // Bail out if the window has been closed in the meantime.
       if (window.closed) {
         return;
       }
 
       // Enable the Restore Last Session command if needed
-      if (ss.canRestoreLastSession &&
+      if (SessionStore.canRestoreLastSession &&
           !PrivateBrowsingUtils.isWindowPrivate(window))
         goSetCommandEnabled("Browser:RestoreLastSession", true);
 
