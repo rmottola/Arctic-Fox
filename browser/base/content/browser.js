@@ -1209,10 +1209,16 @@ var gBrowserInit = {
       if (window.closed) {
         return;
       }
+
+      // Enable the Restore Last Session command if needed
+      if (ss.canRestoreLastSession &&
+          !PrivateBrowsingUtils.isWindowPrivate(window))
+        goSetCommandEnabled("Browser:RestoreLastSession", true);
+
       if ("TabView" in window) {
         TabView.init();
       }
-      // XXX: do we still need this?...
+
       setTimeout(function () { BrowserChromeTest.markAsReady(); }, 0);
     });
 
