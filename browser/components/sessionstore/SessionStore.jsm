@@ -93,6 +93,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
   "@mozilla.org/gfx/screenmanager;1", "nsIScreenManager");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
   "resource://gre/modules/devtools/Console.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "GlobalState",
+  "resource:///modules/sessionstore/GlobalState.jsm");
 
 // List of docShell capabilities to (re)store. These are automatically
 // retrieved from a given docShell if not already collected before.
@@ -302,6 +304,8 @@ let SessionStoreInternal = {
 
   // set default load state
   _loadState: STATE_STOPPED,
+
+  _globalState: new GlobalState(),
 
   // During the initial restore and setBrowserState calls tracks the number of
   // windows yet to be restored
@@ -768,7 +772,7 @@ let SessionStoreInternal = {
 
           // global data must be restored before restoreWindow is called so that
           // it happens before observers are notified
-          GlobalState.setFromState(aInitialState);
+          this._globalState.setFromState(aInitialState);
 
 	  let overwrite = this._isCmdLineEmpty(aWindow, aInitialState);
           let options = {firstWindow: true, overwriteTabs: overwrite};
@@ -797,7 +801,7 @@ let SessionStoreInternal = {
 
       // global data must be restored before restoreWindow is called so that
       // it happens before observers are notified
-      GlobalState.setFromState(this._deferredInitialState);
+      this._globalState.setFromState(this._deferredInitialState);
 
       this._restoreCount = this._deferredInitialState.windows ?
         this._deferredInitialState.windows.length : 0;
@@ -1446,7 +1450,7 @@ let SessionStoreInternal = {
 
     // global data must be restored before restoreWindow is called so that
     // it happens before observers are notified
-    GlobalState.setFromState(state);
+    this._globalState.setFromState(state);
 
     // restore to the given state
     this.restoreWindow(window, state, {overwriteTabs: true});
@@ -1723,16 +1727,16 @@ let SessionStoreInternal = {
   },
 
   getGlobalValue: function ssi_getGlobalValue(aKey) {
-    return GlobalState.get(aKey);
+    return this._globalState.get(aKey);
   },
 
   setGlobalValue: function ssi_setGlobalValue(aKey, aStringValue) {
-    GlobalState.set(aKey, aStringValue);
+    this._globalState.set(aKey, aStringValue);
     this.saveStateDelayed();
   },
 
   deleteGlobalValue: function ssi_deleteGlobalValue(aKey) {
-    GlobalState.delete(aKey);
+    this._globalState.delete(aKey);
     this.saveStateDelayed();
   },
 
@@ -1783,7 +1787,7 @@ let SessionStoreInternal = {
 
     // global data must be restored before restoreWindow is called so that
     // it happens before observers are notified
-    GlobalState.setFromState(lastSessionState);
+    this._globalState.setFromState(lastSessionState);
 
     // Restore into windows or open new ones as needed.
     for (let i = 0; i < lastSessionState.windows.length; i++) {
@@ -2642,7 +2646,7 @@ let SessionStoreInternal = {
 #else
       session: session,
 #endif
-      global: GlobalState.state
+      global: this._globalState.getState()
     };
 
     // Persist the last session if we deferred restoring it
@@ -4858,62 +4862,3 @@ let LastSession = {
     }
   }
 };
-
-/**
- * Module that contains global session data.
- */
-let GlobalState = {
-
-  // Storage for global state.
-  state: {},
-
-  /**
-   * Clear all currently stored global state.
-   */
-  clear: function() {
-    this.state = {};
-  },
-
-  /**
-   * Retrieve a value from the global state.
-   *
-   * @param aKey
-   *        A key the value is stored under.
-   * @return The value stored at aKey, or an empty string if no value is set.
-   */
-  get: function(aKey) {
-    return this.state[aKey] || "";
-  },
-
-  /**
-   * Set a global value.
-   *
-   * @param aKey
-   *        A key to store the value under.
-   */
-  set: function(aKey, aStringValue) {
-    this.state[aKey] = aStringValue;
-  },
-
-  /**
-   * Delete a global value.
-   *
-   * @param aKey
-   *        A key to delete the value for.
-   */
-  delete: function(aKey) {
-    delete this.state[aKey];
-  },
-
-  /**
-   * Set the current global state from a state object. Any previous global
-   * state will be removed, even if the new state does not contain a matching
-   * key.
-   *
-   * @param aState
-   *        A state object to extract global state from to be set.
-   */
-  setFromState: function (aState) {
-    this.state = (aState && aState.global) || {};
-  }
-}
