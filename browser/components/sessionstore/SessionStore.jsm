@@ -22,6 +22,7 @@ const PRIVACY_FULL = 2;
 
 const NOTIFY_WINDOWS_RESTORED = "sessionstore-windows-restored";
 const NOTIFY_BROWSER_STATE_RESTORED = "sessionstore-browser-state-restored";
+const NOTIFY_LAST_SESSION_CLEARED = "sessionstore-last-session-cleared";
 
 // Default maximum number of tabs to restore simultaneously. Controlled by
 // the browser.sessionstore.max_concurrent_tabs pref.
@@ -329,12 +330,6 @@ let SessionStoreInternal = {
   // whether restored tabs load cached versions or force a reload
   _cacheBehavior: 0,
   
-  // The state from the previous session (after restoring pinned tabs). This
-  // state is persisted and passed through to the next session during an app
-  // restart to make the third party add-on warning not trash the deferred
-  // session
-  _lastSessionState: null,
-
   // When starting Firefox with a single private window, this is the place
   // where we keep the session we actually wanted to restore in case the user
   // decides to later open a non-private window as well.
@@ -367,13 +362,14 @@ let SessionStoreInternal = {
     return this._deferredInitialized.promise;
   },
 
-  /* ........ Public Getters .............. */
   get canRestoreLastSession() {
-    return this._lastSessionState;
+    return LastSession.canRestore;
   },
 
   set canRestoreLastSession(val) {
-    this._lastSessionState = null;
+    if (!val) {
+      LastSession.clear();
+    }
   },
 
   /**
@@ -441,13 +437,15 @@ let SessionStoreInternal = {
             state = iniState;
           else
             state = null;
-          if (remainingState.windows.length)
-            this._lastSessionState = remainingState;
+
+          if (remainingState.windows.length) {
+            LastSession.setState(remainingState);
+          }
         }
         else {
           // Get the last deferred session in case the user still wants to
           // restore it
-          this._lastSessionState = state.lastSessionState;
+          LastSession.setState(state.lastSessionState);
 
           if (ss.previousSessionCrashed) {
             this._recentCrashes = (state.session &&
@@ -1039,7 +1037,7 @@ let SessionStoreInternal = {
 
     if (aData != "restart") {
       // Throw away the previous session on shutdown
-      this._lastSessionState = null;
+      LastSession.clear();
     }
 
     this._loadState = STATE_QUITTING; // just to be sure
@@ -1056,7 +1054,7 @@ let SessionStoreInternal = {
     // quit-application notification so the browser is about to exit.
     if (this._loadState == STATE_QUITTING)
       return;
-    this._lastSessionState = null;
+    LastSession.clear();
     let openWindows = {};
     this._forEachBrowserWindow(function(aWindow) {
       Array.forEach(aWindow.gBrowser.tabs, function(aTab) {
@@ -1708,7 +1706,7 @@ let SessionStoreInternal = {
   },
 
   /**
-   * Restores the session state stored in _lastSessionState. This will attempt
+   * Restores the session state stored in LastSession. This will attempt
    * to merge data into the current session. If a window was opened at startup
    * with pinned tab(s), then the remaining data from the previous session for
    * that window will be opened into that winddow. Otherwise new windows will
@@ -1726,7 +1724,7 @@ let SessionStoreInternal = {
         windows[aWindow.__SS_lastSessionWindowID] = aWindow;
     });
 
-    let lastSessionState = this._lastSessionState;
+    let lastSessionState = LastSession.getState();
 
     // This shouldn't ever be the case...
     if (!lastSessionState.windows.length)
@@ -1813,7 +1811,7 @@ let SessionStoreInternal = {
                              lastSessionState.session.startTime ||
                              this._sessionStartTime;
 
-    this._lastSessionState = null;
+    LastSession.clear();
   },
 
   /**
@@ -2605,8 +2603,8 @@ let SessionStoreInternal = {
     };
 
     // Persist the last session if we deferred restoring it
-    if (this._lastSessionState) {
-      state.lastSessionState = this._lastSessionState;
+    if (LastSession.canRestore) {
+      state.lastSessionState = LastSession.getState();
     }
 
     return state;
@@ -4018,8 +4016,8 @@ let SessionStoreInternal = {
    * from state. It will contain the cookies that go along with the history
    * entries in those tabs. It will also contain window position information.
    *
-   * defaultState will be restored at startup. state will be placed into
-   * this._lastSessionState and will be kept in case the user explicitly wants
+   * defaultState will be restored at startup. state will be passed into
+   * LastSession and will be kept in case the user explicitly wants
    * to restore the previous session (publicly exposed as restoreLastSession).
    *
    * @param state
@@ -4788,5 +4786,32 @@ let TabStateCache = {
       return aKey;
     }
     throw new TypeError("Key is neither a tab nor a browser: " + nodeName);
+  }
+};
+
+// The state from the previous session (after restoring pinned tabs). This
+// state is persisted and passed through to the next session during an app
+// restart to make the third party add-on warning not trash the deferred
+// session
+let LastSession = {
+  _state: null,
+
+  get canRestore() {
+    return !!this._state;
+  },
+
+  getState: function () {
+    return this._state;
+  },
+
+  setState: function (state) {
+    this._state = state;
+  },
+
+  clear: function () {
+    if (this._state) {
+      this._state = null;
+      Services.obs.notifyObservers(null, NOTIFY_LAST_SESSION_CLEARED, null);
+    }
   }
 };
