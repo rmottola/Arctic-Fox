@@ -194,6 +194,25 @@ interface nsISessionStore : nsISupports
    */
   void deleteTabValue(in nsIDOMNode aTab, in AString aKey);
 
+   /**
+   * @param aKey is the value's name.
+   *
+   * @returns A string value or an empty string if none is set.
+   */
+  AString getGlobalValue(in AString aKey);
+
+  /**
+   * @param aKey         is the value's name.
+   * @param aStringValue is the value itself (use JSON.stringify/parse before setting JS objects).
+   */
+  void setGlobalValue(in AString aKey, in AString aStringValue);
+
+  /**
+   * @param aTab is the browser tab to get the value for.
+   * @param aKey is the value's name.
+   */
+  void deleteGlobalValue(in AString aKey);
+
   /**
    * @param aName is the name of the attribute to save/restore for all tabbrowser tabs.
    */
