@@ -1278,7 +1278,7 @@ let SessionStoreInternal = {
     }
 
     // Get the latest data for this tab (generally, from the cache)
-    let tabState = this._collectTabData(aTab);
+    let tabState = TabState.collect(aTab);
 
     // store closed-tab data for undo
     if (this._shouldSaveTabState(tabState)) {
