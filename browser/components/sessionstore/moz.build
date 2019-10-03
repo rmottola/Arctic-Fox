@@ -22,6 +22,7 @@ EXTRA_COMPONENTS += [
 EXTRA_JS_MODULES.sessionstore = [
     'ContentRestore.jsm',
     'DocumentUtils.jsm',
+    'Messenger.jsm',
     'GlobalState.jsm',
     'SessionFile.jsm',
     'SessionMigration.jsm',

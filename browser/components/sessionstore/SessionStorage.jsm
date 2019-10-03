@@ -5,6 +5,7 @@
 this.EXPORTED_SYMBOLS = ["SessionStorage"];
 
 const Cu = Components.utils;
+const Ci = Components.interfaces;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -51,9 +52,10 @@ let DomStorage = {
   read: function DomStorage_read(aDocShell, aFullData) {
     let data = {};
     let isPinned = aDocShell.isAppTab;
-    let shistory = aDocShell.sessionHistory;
+    let webNavigation = aDocShell.QueryInterface(Ci.nsIWebNavigation);
+    let shistory = webNavigation.sessionHistory;
 
-    for (let i = 0; i < shistory.count; i++) {
+    for (let i = 0; shistory && i < shistory.count; i++) {
       let principal = History.getPrincipalForEntry(shistory, i, aDocShell);
       if (!principal)
         continue;
