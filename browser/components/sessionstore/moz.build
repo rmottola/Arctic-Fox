@@ -30,6 +30,7 @@ EXTRA_JS_MODULES.sessionstore = [
     'SessionWorker.jsm',
     'TabState.jsm',
     'TabStateCache.jsm',
+    'Utils.jsm',
     'XPathGenerator.jsm',
 ]
 
