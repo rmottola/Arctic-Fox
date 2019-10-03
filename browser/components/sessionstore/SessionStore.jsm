@@ -138,6 +138,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
   "resource:///modules/sessionstore/SessionStorage.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionFile",
   "resource:///modules/sessionstore/SessionFile.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TabState",
+  "resource:///modules/sessionstore/TabState.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
+  "resource:///modules/sessionstore/TabStateCache.jsm");
 
 /**
  * |true| if we are in debug mode, |false| otherwise.
@@ -4746,95 +4750,6 @@ function TabData(obj = null) {
   }
   return this;
 }
-
-/**
- * A cache for tabs data.
- *
- * This cache implements a weak map from tabs (as XUL elements)
- * to tab data (as instances of TabData).
- *
- * Note that we should never cache private data, as:
- * - that data is used very seldom by SessionStore;
- * - caching private data in addition to public data is memory consuming.
- */
-let TabStateCache = {
-  _data: new WeakMap(),
-
-  /**
-   * Add or replace an entry in the cache.
-   *
-   * @param {XULElement} aTab The key, which may be either a tab
-   * or the corresponding browser. The binding will disappear
-   * if the tab/browser is destroyed.
-   * @param {TabData} aValue The data associated to |aTab|.
-   */
-  set: function(aTab, aValue) {
-    let key = this._normalizeToBrowser(aTab);
-    if (!(aValue instanceof TabData)) {
-      throw new TypeError("Attempting to cache a non TabData");
-    }
-    this._data.set(key, aValue);
-  },
-
-  /**
-   * Return the tab data associated with a tab.
-   *
-   * @param {XULElement} aKey The tab or the associated browser.
-   *
-   * @return {TabData|undefined} The data if available, |undefined|
-   * otherwise.
-   */
-  get: function(aKey) {
-    let key = this._normalizeToBrowser(aKey);
-    return this._data.get(key);
-  },
-
-  /**
-   * Delete the tab data associated with a tab.
-   *
-   * @param {XULElement} aKey The tab or the associated browser.
-   *
-   * Noop of there is no tab data associated with the tab.
-   */
-  delete: function(aKey) {
-    let key = this._normalizeToBrowser(aKey);
-    this._data.delete(key);
-  },
-
-  /**
-   * Delete all tab data.
-   */
-  clear: function() {
-    this._data.clear();
-  },
-
-  /**
-   * Update in place a piece of data.
-   *
-   * @param {XULElement} aKey The tab or the associated browser.
-   * If the tab/browser is not present, do nothing.
-   * @param {string} aField The field to update.
-   * @param {*} aValue The new value to place in the field.
-   */
-  update: function(aKey, aField, aValue) {
-    let key = this._normalizeToBrowser(aKey);
-    let data = this._data.get(key);
-    if (data) {
-      data[aField] = aValue;
-    }
-  },
-
-  _normalizeToBrowser: function(aKey) {
-    let nodeName = aKey.localName;
-    if (nodeName == "tab") {
-      return aKey.linkedBrowser;
-    }
-    if (nodeName == "browser") {
-      return aKey;
-    }
-    throw new TypeError("Key is neither a tab nor a browser: " + nodeName);
-  }
-};
 
 // The state from the previous session (after restoring pinned tabs). This
 // state is persisted and passed through to the next session during an app
