@@ -17,6 +17,8 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 
 XPCOMUtils.defineLazyModuleGetter(this, "DocShellCapabilities",
   "resource:///modules/sessionstore/DocShellCapabilities.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PageStyle",
+  "resource:///modules/sessionstore/PageStyle.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
   "resource:///modules/sessionstore/SessionHistory.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
@@ -78,7 +80,8 @@ let MessageListener = {
   MESSAGES: [
     "SessionStore:collectSessionHistory",
     "SessionStore:collectSessionStorage",
-    "SessionStore:collectDocShellCapabilities"
+    "SessionStore:collectDocShellCapabilities",
+    "SessionStore:collectPageStyle"
   ],
 
   init: function () {
@@ -98,6 +101,10 @@ let MessageListener = {
       case "SessionStore:collectDocShellCapabilities":
         let disallow = DocShellCapabilities.collect(docShell);
         sendAsyncMessage(name, {id: id, data: disallow});
+        break;
+      case "SessionStore:collectPageStyle":
+        let pageStyle = PageStyle.collect(docShell);
+        sendAsyncMessage(name, {id: id, data: pageStyle});
         break;
       default:
         debug("received unknown message '" + name + "'");
