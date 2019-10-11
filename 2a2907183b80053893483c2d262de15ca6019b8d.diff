@@ -1,0 +1,1113 @@
+diff --git a/browser/components/sessionstore/content/content-sessionStore.js b/browser/components/sessionstore/content/content-sessionStore.js
+index c56f6429b485..74da0a69bcb4 100644
+--- a/browser/components/sessionstore/content/content-sessionStore.js
++++ b/browser/components/sessionstore/content/content-sessionStore.js
+@@ -14,7 +14,10 @@ let Ci = Components.interfaces;
+ let Cr = Components.results;
+ 
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
++Cu.import("resource://gre/modules/Timer.jsm", this);
+ 
++XPCOMUtils.defineLazyModuleGetter(this, "Utils",
++  "resource:///modules/sessionstore/Utils.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "DocShellCapabilities",
+   "resource:///modules/sessionstore/DocShellCapabilities.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "PageStyle",
+@@ -26,6 +29,38 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
+ XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
+   "resource:///modules/sessionstore/TextAndScrollData.jsm");
+ 
++/**
++ * Returns a lazy function that will evaluate the given
++ * function |fn| only once and cache its return value.
++ */
++function createLazy(fn) {
++  let cached = false;
++  let cachedValue = null;
++
++  return function lazy() {
++    if (!cached) {
++      cachedValue = fn();
++      cached = true;
++    }
++
++    return cachedValue;
++  };
++}
++
++/**
++ * Determines whether the given storage event was triggered by changes
++ * to the sessionStorage object and not the local or globalStorage.
++ */
++function isSessionStorageEvent(event) {
++  try {
++    return event.storageArea == content.sessionStorage;
++  } catch (ex if ex instanceof Ci.nsIException && ex.result == Cr.NS_ERROR_NOT_AVAILABLE) {
++    // This page does not have a DOMSessionStorage
++    // (this is typically the case for about: pages)
++    return false;
++  }
++}
++
+ /**
+  * Listens for and handles content events that we need for the
+  * session store service to be notified of state changes in content.
+@@ -33,7 +68,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
+ let EventListener = {
+ 
+   DOM_EVENTS: [
+-    "pageshow", "change", "input", "MozStorageChanged"
++    "pageshow", "change", "input"
+   ],
+ 
+   init: function () {
+@@ -50,23 +85,6 @@ let EventListener = {
+       case "change":
+         sendAsyncMessage("SessionStore:input");
+         break;
+-      case "MozStorageChanged": {
+-        let isSessionStorage = true;
+-        // We are only interested in sessionStorage events
+-        try {
+-          if (event.storageArea != content.sessionStorage) {
+-            isSessionStorage = false;
+-          }
+-        } catch (ex) {
+-          // This page does not even have sessionStorage
+-          // (this is typically the case of about: pages)
+-          isSessionStorage = false;
+-        }
+-        if (isSessionStorage) {
+-          sendAsyncMessage("SessionStore:MozStorageChanged");
+-        }
+-        break;
+-      }
+       default:
+         debug("received unknown event '" + event.type + "'");
+         break;
+@@ -80,10 +98,7 @@ let EventListener = {
+ let MessageListener = {
+ 
+   MESSAGES: [
+-    "SessionStore:collectSessionHistory",
+-    "SessionStore:collectSessionStorage",
+-    "SessionStore:collectDocShellCapabilities",
+-    "SessionStore:collectPageStyle"
++    "SessionStore:collectSessionHistory"
+   ],
+ 
+   init: function () {
+@@ -104,18 +119,6 @@ let MessageListener = {
+         }
+         sendAsyncMessage(name, {id: id, data: history});
+         break;
+-      case "SessionStore:collectSessionStorage":
+-        let storage = SessionStorage.serialize(docShell);
+-        sendAsyncMessage(name, {id: id, data: storage});
+-        break;
+-      case "SessionStore:collectDocShellCapabilities":
+-        let disallow = DocShellCapabilities.collect(docShell);
+-        sendAsyncMessage(name, {id: id, data: disallow});
+-        break;
+-      case "SessionStore:collectPageStyle":
+-        let pageStyle = PageStyle.collect(docShell);
+-        sendAsyncMessage(name, {id: id, data: pageStyle});
+-        break;
+       default:
+         debug("received unknown message '" + name + "'");
+         break;
+@@ -152,17 +155,29 @@ let SyncHandler = {
+     return history;
+   },
+ 
+-  collectSessionStorage: function () {
+-    return SessionStorage.serialize(docShell);
++  /**
++   * This function is used to make the tab process flush all data that
++   * hasn't been sent to the parent process, yet.
++   *
++   * @param id (int)
++   *        A unique id that represents the last message received by the chrome
++   *        process before flushing. We will use this to determine data that
++   *        would be lost when data has been sent asynchronously shortly
++   *        before flushing synchronously.
++   */
++  flush: function (id) {
++    MessageQueue.flush(id);
+   },
+ 
+-  collectDocShellCapabilities: function () {
+-    return DocShellCapabilities.collect(docShell);
+-  },
+-
+-  collectPageStyle: function () {
+-    return PageStyle.collect(docShell);
+-  },
++  /**
++   * DO NOT USE - DEBUGGING / TESTING ONLY
++   *
++   * This function is used to simulate certain situations where race conditions
++   * can occur by sending data shortly before flushing synchronously.
++   */
++  flushAsync: function () {
++    MessageQueue.flushAsync();
++  }
+ };
+ 
+ let ProgressListener = {
+@@ -183,7 +198,266 @@ let ProgressListener = {
+                                          Ci.nsISupportsWeakReference])
+ };
+ 
++/**
++ * Listens for changes to the page style. Whenever a different page style is
++ * selected or author styles are enabled/disabled we send a message with the
++ * currently applied style to the chrome process.
++ *
++ * Causes a SessionStore:update message to be sent that contains the currently
++ * selected pageStyle, if any. The pageStyle is represented by a string.
++ */
++let PageStyleListener = {
++  init: function () {
++    Services.obs.addObserver(this, "author-style-disabled-changed", true);
++    Services.obs.addObserver(this, "style-sheet-applicable-state-changed", true);
++  },
++
++  observe: function (subject, topic) {
++    if (subject.defaultView && subject.defaultView.top == content) {
++      MessageQueue.push("pageStyle", () => PageStyle.collect(docShell) || null);
++    }
++  },
++
++  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
++                                         Ci.nsISupportsWeakReference])
++};
++
++/**
++ * Listens for changes to docShell capabilities. Whenever a new load is started
++ * we need to re-check the list of capabilities and send message when it has
++ * changed.
++ *
++ * Causes a SessionStore:update message to be sent that contains the currently
++ * disabled docShell capabilities (all nsIDocShell.allow* properties set to
++ * false) as a string - i.e. capability names separate by commas.
++ */
++let DocShellCapabilitiesListener = {
++  /**
++   * This field is used to compare the last docShell capabilities to the ones
++   * that have just been collected. If nothing changed we won't send a message.
++   */
++  _latestCapabilities: "",
++
++  init: function () {
++    let webProgress = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
++                              .getInterface(Ci.nsIWebProgress);
++
++    webProgress.addProgressListener(this, Ci.nsIWebProgress.NOTIFY_LOCATION);
++  },
++
++  /**
++   * onLocationChange() is called as soon as we start loading a page after
++   * we are certain that there's nothing blocking the load (e.g. a content
++   * policy added by AdBlock or the like).
++   */
++  onLocationChange: function() {
++    // The order of docShell capabilities cannot change while we're running
++    // so calling join() without sorting before is totally sufficient.
++    let caps = DocShellCapabilities.collect(docShell).join(",");
++
++    // Send new data only when the capability list changes.
++    if (caps != this._latestCapabilities) {
++      this._latestCapabilities = caps;
++      MessageQueue.push("disallow", () => caps || null);
++    }
++  },
++
++  onStateChange: function () {},
++  onProgressChange: function () {},
++  onStatusChange: function () {},
++  onSecurityChange: function () {},
++
++  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
++                                         Ci.nsISupportsWeakReference])
++};
++
++/**
++ * Listens for changes to the DOMSessionStorage. Whenever new keys are added,
++ * existing ones removed or changed, or the storage is cleared we will send a
++ * message to the parent process containing up-to-date sessionStorage data.
++ *
++ * Causes a SessionStore:update message to be sent that contains the current
++ * DOMSessionStorage contents. The data is a nested object using host names
++ * as keys and per-host DOMSessionStorage data as values.
++ */
++let SessionStorageListener = {
++  init: function () {
++    addEventListener("MozStorageChanged", this);
++    Services.obs.addObserver(this, "browser:purge-domain-data", true);
++    Services.obs.addObserver(this, "browser:purge-session-history", true);
++  },
++
++  handleEvent: function (event) {
++    // Ignore events triggered by localStorage or globalStorage changes.
++    if (isSessionStorageEvent(event)) {
++      this.collect();
++    }
++  },
++
++  observe: function () {
++    // Collect data on the next tick so that any other observer
++    // that needs to purge data can do its work first.
++    setTimeout(() => this.collect(), 0);
++  },
++
++  collect: function () {
++    MessageQueue.push("storage", () => SessionStorage.collect(docShell));
++  },
++
++  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
++                                         Ci.nsISupportsWeakReference])
++};
++
++/**
++ * A message queue that takes collected data and will take care of sending it
++ * to the chrome process. It allows flushing using synchronous messages and
++ * takes care of any race conditions that might occur because of that. Changes
++ * will be batched if they're pushed in quick succession to avoid a message
++ * flood.
++ */
++let MessageQueue = {
++  /**
++   * A unique, monotonically increasing ID used for outgoing messages. This is
++   * important to make it possible to reuse tabs and allow sync flushes before
++   * data could be destroyed.
++   */
++  _id: 1,
++
++  /**
++   * A map (string -> lazy fn) holding lazy closures of all queued data
++   * collection routines. These functions will return data collected from the
++   * docShell.
++   */
++  _data: new Map(),
++
++  /**
++   * A map holding the |this._id| value for every type of data back when it
++   * was pushed onto the queue. We will use those IDs to find the data to send
++   * and flush.
++   */
++  _lastUpdated: new Map(),
++
++  /**
++   * The delay (in ms) used to delay sending changes after data has been
++   * invalidated.
++   */
++  BATCH_DELAY_MS: 1000,
++
++  /**
++   * The current timeout ID, null if there is no queue data. We use timeouts
++   * to damp a flood of data changes and send lots of changes as one batch.
++   */
++  _timeout: null,
++
++  /**
++   * Pushes a given |value| onto the queue. The given |key| represents the type
++   * of data that is stored and can override data that has been queued before
++   * but has not been sent to the parent process, yet.
++   *
++   * @param key (string)
++   *        A unique identifier specific to the type of data this is passed.
++   * @param fn (function)
++   *        A function that returns the value that will be sent to the parent
++   *        process.
++   */
++  push: function (key, fn) {
++    this._data.set(key, createLazy(fn));
++    this._lastUpdated.set(key, this._id);
++
++    if (!this._timeout) {
++      // Wait a little before sending the message to batch multiple changes.
++      this._timeout = setTimeout(() => this.send(), this.BATCH_DELAY_MS);
++    }
++  },
++
++  /**
++   * Sends queued data to the chrome process.
++   *
++   * @param options (object)
++   *        {id: 123} to override the update ID used to accumulate data to send.
++   *        {sync: true} to send data to the parent process synchronously.
++   */
++  send: function (options = {}) {
++    // Looks like we have been called off a timeout after the tab has been
++    // closed. The docShell is gone now and we can just return here as there
++    // is nothing to do.
++    if (!docShell) {
++      return;
++    }
++
++    if (this._timeout) {
++      clearTimeout(this._timeout);
++      this._timeout = null;
++    }
++
++    let sync = options && options.sync;
++    let startID = (options && options.id) || this._id;
++    let sendMessage = sync ? sendSyncMessage : sendAsyncMessage;
++
++    let data = {};
++    for (let [key, id] of this._lastUpdated) {
++      // There is no data for the given key anymore because
++      // the parent process already marked it as received.
++      if (!this._data.has(key)) {
++        continue;
++      }
++
++      if (startID > id) {
++        // If the |id| passed by the parent process is higher than the one
++        // stored in |_lastUpdated| for the given key we know that the parent
++        // received all necessary data and we can remove it from the map.
++        this._data.delete(key);
++        continue;
++      }
++
++      data[key] = this._data.get(key)();
++    }
++
++    // Send all data to the parent process.
++    sendMessage("SessionStore:update", {id: this._id, data: data});
++
++    // Increase our unique message ID.
++    this._id++;
++  },
++
++  /**
++   * This function is used to make the message queue flush all queue data that
++   * hasn't been sent to the parent process, yet.
++   *
++   * @param id (int)
++   *        A unique id that represents the latest message received by the
++   *        chrome process. We can use this to determine which messages have not
++   *        yet been received because they are still stuck in the event queue.
++   */
++  flush: function (id) {
++    // It's important to always send data, even if there is nothing to flush.
++    // The update message will be received by the parent process that can then
++    // update its last received update ID to ignore stale messages.
++    this.send({id: id + 1, sync: true});
++
++    this._data.clear();
++    this._lastUpdated.clear();
++  },
++
++  /**
++   * DO NOT USE - DEBUGGING / TESTING ONLY
++   *
++   * This function is used to simulate certain situations where race conditions
++   * can occur by sending data shortly before flushing synchronously.
++   */
++  flushAsync: function () {
++    if (!Services.prefs.getBoolPref("browser.sessionstore.debug")) {
++      throw new Error("flushAsync() must be used for testing, only.");
++    }
++
++    this.send();
++  }
++};
++
+ EventListener.init();
+ MessageListener.init();
+ SyncHandler.init();
+ ProgressListener.init();
++PageStyleListener.init();
++SessionStorageListener.init();
++DocShellCapabilitiesListener.init();
+diff --git a/browser/components/sessionstore/src/SessionStorage.jsm b/browser/components/sessionstore/src/SessionStorage.jsm
+index 119b4a1003f6..000c4cb17d94 100644
+--- a/browser/components/sessionstore/src/SessionStorage.jsm
++++ b/browser/components/sessionstore/src/SessionStorage.jsm
+@@ -15,16 +15,17 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
+   "resource:///modules/sessionstore/PrivacyLevel.jsm");
+ 
+-this.SessionStorage = {
++this.SessionStorage = Object.freeze({
+   /**
+    * Updates all sessionStorage "super cookies"
+    * @param aDocShell
+    *        That tab's docshell (containing the sessionStorage)
+-   * @param aFullData
+-   *        always return privacy sensitive data (use with care)
++   * @return Returns a nested object that will have hosts as keys and per-host
++   *         session storage data as values. For example:
++   *         {"example.com": {"key": "value", "my_number": 123}}
+    */
+-  serialize: function ssto_serialize(aDocShell, aFullData) {
+-    return DomStorage.read(aDocShell, aFullData);
++  collect: function (aDocShell) {
++    return SessionStorageInternal.collect(aDocShell);
+   },
+ 
+   /**
+@@ -32,50 +33,50 @@ this.SessionStorage = {
+    * @param aDocShell
+    *        A tab's docshell (containing the sessionStorage)
+    * @param aStorageData
+-   *        Storage data to be restored
++   *        A nested object with storage data to be restored that has hosts as
++   *        keys and per-host session storage data as values. For example:
++   *        {"example.com": {"key": "value", "my_number": 123}}
+    */
+-  deserialize: function ssto_deserialize(aDocShell, aStorageData) {
+-    DomStorage.write(aDocShell, aStorageData);
++  restore: function (aDocShell, aStorageData) {
++    SessionStorageInternal.restore(aDocShell, aStorageData);
+   }
+-};
+-
+-Object.freeze(SessionStorage);
++});
+ 
+-let DomStorage = {
++let SessionStorageInternal = {
+   /**
+    * Reads all session storage data from the given docShell.
+    * @param aDocShell
+    *        A tab's docshell (containing the sessionStorage)
+-   * @param aFullData
+-   *        Always return privacy sensitive data (use with care)
++   * @return Returns a nested object that will have hosts as keys and per-host
++   *         session storage data as values. For example:
++   *         {"example.com": {"key": "value", "my_number": 123}}
+    */
+-  read: function DomStorage_read(aDocShell, aFullData) {
++  collect: function (aDocShell) {
+     let data = {};
+-    let isPinned = aDocShell.isAppTab;
+     let webNavigation = aDocShell.QueryInterface(Ci.nsIWebNavigation);
+     let shistory = webNavigation.sessionHistory;
+ 
+     for (let i = 0; shistory && i < shistory.count; i++) {
+       let principal = History.getPrincipalForEntry(shistory, i, aDocShell);
+-      if (!principal)
++      if (!principal) {
+         continue;
++      }
+ 
+-      // Check if we're allowed to store sessionStorage data.
+-      let isHttps = principal.URI && principal.URI.schemeIs("https");
+-      if (aFullData || PrivacyLevel.canSave({isHttps: isHttps, isPinned: isPinned})) {
+-        let origin = principal.jarPrefix + principal.origin;
+-
++      // Get the root domain of the current history entry
++      // and use that as a key for the per-host storage data.
++      let origin = principal.jarPrefix + principal.origin;
++      if (data.hasOwnProperty(origin)) {
+         // Don't read a host twice.
+-        if (!(origin in data)) {
+-          let originData = this._readEntry(principal, aDocShell);
+-          if (Object.keys(originData).length) {
+-            data[origin] = originData;
+-          }
+-        }
++        continue;
++      }
++
++      let originData = this._readEntry(principal, aDocShell);
++      if (Object.keys(originData).length) {
++        data[origin] = originData;
+       }
+     }
+ 
+-    return data;
++    return Object.keys(data).length ? data : null;
+   },
+ 
+   /**
+@@ -83,9 +84,11 @@ let DomStorage = {
+    * @param aDocShell
+    *        A tab's docshell (containing the sessionStorage)
+    * @param aStorageData
+-   *        Storage data to be restored
++   *        A nested object with storage data to be restored that has hosts as
++   *        keys and per-host session storage data as values. For example:
++   *        {"example.com": {"key": "value", "my_number": 123}}
+    */
+-  write: function DomStorage_write(aDocShell, aStorageData) {
++  restore: function (aDocShell, aStorageData) {
+     for (let [host, data] in Iterator(aStorageData)) {
+       let uri = Services.io.newURI(host, null, null);
+       let principal = Services.scriptSecurityManager.getDocShellCodebasePrincipal(uri, aDocShell);
+@@ -114,7 +117,7 @@ let DomStorage = {
+    * @param aDocShell
+    *        A tab's docshell (containing the sessionStorage)
+    */
+-  _readEntry: function DomStorage_readEntry(aPrincipal, aDocShell) {
++  _readEntry: function (aPrincipal, aDocShell) {
+     let hostData = {};
+     let storage;
+ 
+diff --git a/browser/components/sessionstore/src/SessionStore.jsm b/browser/components/sessionstore/src/SessionStore.jsm
+index b41bfb4bd465..05ebab18bd15 100644
+--- a/browser/components/sessionstore/src/SessionStore.jsm
++++ b/browser/components/sessionstore/src/SessionStore.jsm
+@@ -59,17 +59,17 @@ const MESSAGES = [
+   // clicking the back or forward button.
+   "SessionStore:pageshow",
+ 
+-  // The content script has received a MozStorageChanged event dealing
+-  // with a change in the contents of the sessionStorage.
+-  "SessionStore:MozStorageChanged",
+-
+   // The content script tells us that a new page just started loading in a
+   // browser.
+   "SessionStore:loadStart",
+ 
+   // The content script gives us a reference to an object that performs
+   // synchronous collection of session data.
+-  "SessionStore:setupSyncHandler"
++  "SessionStore:setupSyncHandler",
++
++  // The content script sends us data that has been invalidated and needs to
++  // be saved to disk.
++  "SessionStore:update",
+ ];
+ 
+ // These are tab events that we listen to.
+@@ -604,16 +604,16 @@ let SessionStoreInternal = {
+       case "SessionStore:input":
+         this.onTabInput(win, browser);
+         break;
+-      case "SessionStore:MozStorageChanged":
+-        TabStateCache.delete(browser);
+-        this.saveStateDelayed(win);
+-        break;
+       case "SessionStore:loadStart":
+         TabStateCache.delete(browser);
+         break;
+       case "SessionStore:setupSyncHandler":
+         TabState.setSyncHandler(browser, aMessage.objects.handler);
+         break;
++      case "SessionStore:update":
++        TabState.update(browser, aMessage.data);
++        this.saveStateDelayed(win);
++        break;
+       default:
+         debug("received unknown message '" + aMessage.name + "'");
+         break;
+@@ -647,8 +647,8 @@ let SessionStoreInternal = {
+       case "SwapDocShells":
+         browser = aEvent.currentTarget;
+         let otherBrowser = aEvent.detail;
+-        TabState.onSwapDocShells(browser, otherBrowser);
+-        TabStateCache.onSwapDocShells(browser, otherBrowser);
++        TabState.onBrowserContentsSwapped(browser, otherBrowser);
++        TabStateCache.onBrowserContentsSwapped(browser, otherBrowser);
+         break;
+       case "TabOpen":
+         this.onTabAdd(win, aEvent.originalTarget);
+@@ -986,7 +986,12 @@ let SessionStoreInternal = {
+     tabbrowser.removeTabsProgressListener(gRestoreTabsProgressListener);
+ 
+     let winData = this._windows[aWindow.__SSi];
+-    if (this._loadState == STATE_RUNNING) { // window not closed during a regular shut-down
++
++    // Collect window data only when *not* closed during shutdown.
++    if (this._loadState == STATE_RUNNING) {
++      // Flush all data queued in the content script before the window is gone.
++      TabState.flushWindow(aWindow);
++
+       // update all window data for a last time
+       this._collectWindowData(aWindow);
+ 
+@@ -1037,6 +1042,9 @@ let SessionStoreInternal = {
+   onQuitApplicationRequested: function ssi_onQuitApplicationRequested() {
+     // get a current snapshot of all windows
+     this._forEachBrowserWindow(function(aWindow) {
++      // Flush all data queued in the content script to not lose it when
++      // shutting down.
++      TabState.flushWindow(aWindow);
+       this._collectWindowData(aWindow);
+     });
+     // we must cache this because _getMostRecentBrowserWindow will always
+@@ -1296,6 +1304,9 @@ let SessionStoreInternal = {
+       return;
+     }
+ 
++    // Flush all data queued in the content script before the tab is gone.
++    TabState.flush(aTab.linkedBrowser);
++
+     // Get the latest data for this tab (generally, from the cache)
+     let tabState = TabState.collectSync(aTab);
+ 
+@@ -1543,6 +1554,10 @@ let SessionStoreInternal = {
+         !aWindow.getBrowser)
+       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+ 
++    // Flush all data queued in the content script because we will need that
++    // state to properly duplicate the given tab.
++    TabState.flush(aTab.linkedBrowser);
++
+     // Duplicate the tab state
+     let tabState = TabState.clone(aTab);
+ 
+@@ -2372,11 +2387,9 @@ let SessionStoreInternal = {
+     // we're overwriting those tabs, they should no longer be restoring. The
+     // tabs will be rebuilt and marked if they need to be restored after loading
+     // state (in restoreTabs).
+-    // We also want to invalidate any cached information on the tab state.
+     if (overwriteTabs) {
+       for (let i = 0; i < tabbrowser.tabs.length; i++) {
+         let tab = tabbrowser.tabs[i];
+-        TabStateCache.delete(tab);
+         if (tabbrowser.browsers[i].__SS_restoreState)
+           this._resetTabRestoringState(tab);
+       }
+@@ -2609,6 +2622,11 @@ let SessionStoreInternal = {
+         delete tab.__SS_extdata;
+       }
+ 
++      // Flush all data from the content script synchronously. This is done so
++      // that all async messages that are still on their way to chrome will
++      // be ignored and don't override any tab data set by restoreHistory().
++      TabState.flush(tab.linkedBrowser);
++
+       browser.__SS_tabStillLoading = true;
+ 
+       // keep the data around to prevent dataloss in case
+@@ -2618,6 +2636,13 @@ let SessionStoreInternal = {
+       browser.setAttribute("pending", "true");
+       tab.setAttribute("pending", "true");
+ 
++      // Update the persistent tab state cache with |tabData| information.
++      TabStateCache.updatePersistent(browser, {
++        storage: tabData.storage || null,
++        disallow: tabData.disallow || null,
++        pageStyle: tabData.pageStyle || null
++      });
++
+       if (tabData.entries.length == 0) {
+         // make sure to blank out this tab's content
+         // (just purging the tab's history won't be enough)
+@@ -2719,7 +2744,7 @@ let SessionStoreInternal = {
+     DocShellCapabilities.restore(browser.docShell, disallow);
+ 
+     if (tabData.storage && browser.docShell instanceof Ci.nsIDocShell)
+-      SessionStorage.deserialize(browser.docShell, tabData.storage);
++      SessionStorage.restore(browser.docShell, tabData.storage);
+ 
+     // notify the tabbrowser that the tab chrome has been restored
+     var event = window.document.createEvent("Events");
+diff --git a/browser/components/sessionstore/src/TabState.jsm b/browser/components/sessionstore/src/TabState.jsm
+index 9e92dc29358c..6fb0ba03f213 100644
+--- a/browser/components/sessionstore/src/TabState.jsm
++++ b/browser/components/sessionstore/src/TabState.jsm
+@@ -14,10 +14,14 @@ Cu.import("resource://gre/modules/Task.jsm", this);
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "Messenger",
+   "resource:///modules/sessionstore/Messenger.jsm");
++XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
++  "resource:///modules/sessionstore/PrivacyLevel.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
+   "resource:///modules/sessionstore/TabStateCache.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "TabAttributes",
+   "resource:///modules/sessionstore/TabAttributes.jsm");
++XPCOMUtils.defineLazyModuleGetter(this, "Utils",
++  "resource:///modules/sessionstore/Utils.jsm");
+ 
+ /**
+  * Module that contains tab state collection methods.
+@@ -27,8 +31,20 @@ this.TabState = Object.freeze({
+     TabStateInternal.setSyncHandler(browser, handler);
+   },
+ 
+-  onSwapDocShells: function (browser, otherBrowser) {
+-    TabStateInternal.onSwapDocShells(browser, otherBrowser);
++  onBrowserContentsSwapped: function (browser, otherBrowser) {
++    TabStateInternal.onBrowserContentsSwapped(browser, otherBrowser);
++  },
++
++  update: function (browser, data) {
++    TabStateInternal.update(browser, data);
++  },
++
++  flush: function (browser) {
++    TabStateInternal.flush(browser);
++  },
++
++  flushWindow: function (window) {
++    TabStateInternal.flushWindow(window);
+   },
+ 
+   collect: function (tab) {
+@@ -58,11 +74,48 @@ let TabStateInternal = {
+   // See SyncHandler in content-sessionStore.js.
+   _syncHandlers: new WeakMap(),
+ 
++  // A map (xul:browser -> int) that maps a browser to the
++  // last "SessionStore:update" message ID we received for it.
++  _latestMessageID: new WeakMap(),
++
+   /**
+    * Install the sync handler object from a given tab.
+    */
+   setSyncHandler: function (browser, handler) {
+     this._syncHandlers.set(browser, handler);
++    this._latestMessageID.set(browser, 0);
++  },
++
++  /**
++   * Processes a data update sent by the content script.
++   */
++  update: function (browser, {id, data}) {
++    // Only ever process messages that have an ID higher than the last one we
++    // saw. This ensures we don't use stale data that has already been received
++    // synchronously.
++    if (id > this._latestMessageID.get(browser)) {
++      this._latestMessageID.set(browser, id);
++      TabStateCache.updatePersistent(browser, data);
++    }
++  },
++
++  /**
++   * Flushes all data currently queued in the given browser's content script.
++   */
++  flush: function (browser) {
++    if (this._syncHandlers.has(browser)) {
++      let lastID = this._latestMessageID.get(browser);
++      this._syncHandlers.get(browser).flush(lastID);
++    }
++  },
++
++  /**
++   * Flushes queued content script data for all browsers of a given window.
++   */
++  flushWindow: function (window) {
++    for (let browser of window.gBrowser.browsers) {
++      this.flush(browser);
++    }
+   },
+ 
+   /**
+@@ -71,33 +124,16 @@ let TabStateInternal = {
+    * global. In this case, the sync handler for the element needs to
+    * be swapped just like the docshell.
+    */
+-  onSwapDocShells: function (browser, otherBrowser) {
++  onBrowserContentsSwapped: function (browser, otherBrowser) {
+     // Data collected while docShells have been swapped should not go into
+     // the TabStateCache. Collections will most probably time out but we want
+     // to make sure.
+     this.dropPendingCollections(browser);
+     this.dropPendingCollections(otherBrowser);
+ 
+-    // Make sure that one or the other of these has a sync handler,
+-    // and let it be |browser|.
+-    if (!this._syncHandlers.has(browser)) {
+-      [browser, otherBrowser] = [otherBrowser, browser];
+-      if (!this._syncHandlers.has(browser)) {
+-        return;
+-      }
+-    }
+-
+-    // At this point, browser is guaranteed to have a sync handler,
+-    // although otherBrowser may not. Perform the swap.
+-    let handler = this._syncHandlers.get(browser);
+-    if (this._syncHandlers.has(otherBrowser)) {
+-      let otherHandler = this._syncHandlers.get(otherBrowser);
+-      this._syncHandlers.set(browser, otherHandler);
+-      this._syncHandlers.set(otherBrowser, handler);
+-    } else {
+-      this._syncHandlers.set(otherBrowser, handler);
+-      this._syncHandlers.delete(browser);
+-    }
++    // Swap data stored per-browser.
++    [this._syncHandlers, this._latestMessageID]
++      .forEach(map => Utils.swapMapEntries(map, browser, otherBrowser));
+   },
+ 
+   /**
+@@ -132,14 +168,6 @@ let TabStateInternal = {
+       // text and scroll data.
+       let history = yield Messenger.send(tab, "SessionStore:collectSessionHistory");
+ 
+-      // Collected session storage data asynchronously.
+-      let storage = yield Messenger.send(tab, "SessionStore:collectSessionStorage");
+-
+-      // Collect docShell capabilities asynchronously.
+-      let disallow = yield Messenger.send(tab, "SessionStore:collectDocShellCapabilities");
+-
+-      let pageStyle = yield Messenger.send(tab, "SessionStore:collectPageStyle");
+-
+       // Collect basic tab data, without session history and storage.
+       let tabData = this._collectBaseTabData(tab);
+ 
+@@ -149,17 +177,8 @@ let TabStateInternal = {
+         tabData.index = history.index;
+       }
+ 
+-      if (Object.keys(storage).length) {
+-        tabData.storage = storage;
+-      }
+-
+-      if (disallow.length > 0) {
+-        tabData.disallow = disallow.join(",");
+-      }
+-
+-      if (pageStyle) {
+-        tabData.pageStyle = pageStyle;
+-      }
++      // Copy data from the persistent cache.
++      this._copyFromPersistentCache(tab, tabData);
+ 
+       // If we're still the latest async collection for the given tab and
+       // the cache hasn't been filled by collect() in the meantime, let's
+@@ -267,12 +286,9 @@ let TabStateInternal = {
+ 
+     let includePrivateData = options && options.includePrivateData;
+ 
+-    let history, storage, disallow, pageStyle;
++    let history;
+     try {
+       history = syncHandler.collectSessionHistory(includePrivateData);
+-      storage = syncHandler.collectSessionStorage();
+-      disallow = syncHandler.collectDocShellCapabilities();
+-      pageStyle = syncHandler.collectPageStyle();
+     } catch (e) {
+       // This may happen if the tab has crashed.
+       Cu.reportError(e);
+@@ -284,19 +300,49 @@ let TabStateInternal = {
+       tabData.index = history.index;
+     }
+ 
+-    if (Object.keys(storage).length) {
+-      tabData.storage = storage;
+-    }
++    // Copy data from the persistent cache.
++    this._copyFromPersistentCache(tab, tabData, options);
+ 
+-    if (disallow.length > 0) {
+-      tabData.disallow = disallow.join(",");
+-    }
++    return tabData;
++  },
++
++  /**
++   * Copy tab data for the given |tab| from the persistent cache to |tabData|.
++   *
++   * @param tab (xul:tab)
++   *        The tab belonging to the given |tabData| object.
++   * @param tabData (object)
++   *        The tab data belonging to the given |tab|.
++   * @param options (object)
++   *        {includePrivateData: true} to always include private data
++   */
++  _copyFromPersistentCache: function (tab, tabData, options = {}) {
++    let data = TabStateCache.getPersistent(tab.linkedBrowser);
+ 
+-    if (pageStyle) {
+-      tabData.pageStyle = pageStyle;
++    // Nothing to do without any cached data.
++    if (!data) {
++      return;
+     }
+ 
+-    return tabData;
++    let includePrivateData = options && options.includePrivateData;
++
++    for (let key of Object.keys(data)) {
++      if (key != "storage" || includePrivateData) {
++        tabData[key] = data[key];
++      } else {
++        tabData.storage = {};
++        let isPinned = tab.pinned;
++
++        // If we're not allowed to include private data, let's filter out hosts
++        // based on the given tab's pinned state and the privacy level.
++        for (let host of Object.keys(data.storage)) {
++          let isHttps = host.startsWith("https:");
++          if (PrivacyLevel.canSave({isHttps: isHttps, isPinned: isPinned})) {
++            tabData.storage[host] = data.storage[host];
++          }
++        }
++      }
++    }
+   },
+ 
+   /*
+diff --git a/browser/components/sessionstore/src/TabStateCache.jsm b/browser/components/sessionstore/src/TabStateCache.jsm
+index 5f932055bae5..4d8f6929ea4f 100644
+--- a/browser/components/sessionstore/src/TabStateCache.jsm
++++ b/browser/components/sessionstore/src/TabStateCache.jsm
+@@ -8,7 +8,10 @@ this.EXPORTED_SYMBOLS = ["TabStateCache"];
+ 
+ const Cu = Components.utils;
+ Cu.import("resource://gre/modules/Services.jsm", this);
++Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
+ 
++XPCOMUtils.defineLazyModuleGetter(this, "Utils",
++  "resource:///modules/sessionstore/Utils.jsm");
+ 
+ /**
+  * A cache for tabs data.
+@@ -104,8 +107,34 @@ this.TabStateCache = Object.freeze({
+    * @param {xul:browser} otherBrowser
+    *        The second of the two browsers that swapped docShells.
+    */
+-  onSwapDocShells: function(browser, otherBrowser) {
+-    TabStateCacheInternal.onSwapDocShells(browser, otherBrowser);
++  onBrowserContentsSwapped: function(browser, otherBrowser) {
++    TabStateCacheInternal.onBrowserContentsSwapped(browser, otherBrowser);
++  },
++
++  /**
++   * Retrieves persistently cached data for a given |browser|.
++   *
++   * @param browser (xul:browser)
++   *        The browser to retrieve cached data for.
++   * @return (object)
++   *         The persistently cached data stored for the given |browser|.
++   */
++  getPersistent: function (browser) {
++    return TabStateCacheInternal.getPersistent(browser);
++  },
++
++  /**
++   * Updates persistently cached data for a given |browser|. This data is
++   * persistently in the sense that we never clear it, it will always be
++   * overwritten.
++   *
++   * @param browser (xul:browser)
++   *        The browser belonging to the given tab data.
++   * @param newData (object)
++   *        The new data to be stored for the given |browser|.
++   */
++  updatePersistent: function (browser, newData) {
++    TabStateCacheInternal.updatePersistent(browser, newData);
+   },
+ 
+   /**
+@@ -132,6 +161,7 @@ this.TabStateCache = Object.freeze({
+ 
+ let TabStateCacheInternal = {
+   _data: new WeakMap(),
++  _persistentData: new WeakMap(),
+ 
+   /**
+    * Tells whether an entry is in the cache.
+@@ -233,27 +263,51 @@ let TabStateCacheInternal = {
+    * @param {xul:browser} otherBrowser
+    *        The second of the two browsers that swapped docShells.
+    */
+-  onSwapDocShells: function(browser, otherBrowser) {
+-    // Make sure that one or the other of these has cached data,
+-    // and let it be |browser|.
+-    if (!this._data.has(browser)) {
+-      [browser, otherBrowser] = [otherBrowser, browser];
+-      if (!this._data.has(browser)) {
+-        return;
++  onBrowserContentsSwapped: function(browser, otherBrowser) {
++    // Swap data stored per-browser.
++    [this._data, this._persistentData]
++      .forEach(map => Utils.swapMapEntries(map, browser, otherBrowser));
++  },
++
++  /**
++   * Retrieves persistently cached data for a given |browser|.
++   *
++   * @param browser (xul:browser)
++   *        The browser to retrieve cached data for.
++   * @return (object)
++   *         The persistently cached data stored for the given |browser|.
++   */
++  getPersistent: function (browser) {
++    return this._persistentData.get(browser);
++  },
++
++  /**
++   * Updates persistently cached data for a given |browser|. This data is
++   * persistent in the sense that we never clear it, it will always be
++   * overwritten.
++   *
++   * @param browser (xul:browser)
++   *        The browser belonging to the given tab data.
++   * @param newData (object)
++   *        The new data to be stored for the given |browser|.
++   */
++  updatePersistent: function (browser, newData) {
++    let data = this._persistentData.get(browser) || {};
++
++    for (let key of Object.keys(newData)) {
++      let value = newData[key];
++      if (value === null) {
++        // Remove the field if the value is null.
++        this.removeField(browser, key);
++        delete data[key];
++      } else {
++        // Update the field otherwise.
++        this.updateField(browser, key, value);
++        data[key] = value;
+       }
+     }
+ 
+-    // At this point, |browser| is guaranteed to have cached data,
+-    // although |otherBrowser| may not. Perform the swap.
+-    let data = this._data.get(browser);
+-    if (this._data.has(otherBrowser)) {
+-      let otherData = this._data.get(otherBrowser);
+-      this._data.set(browser, otherData);
+-      this._data.set(otherBrowser, data);
+-    } else {
+-      this._data.set(otherBrowser, data);
+-      this._data.delete(browser);
+-    }
++    this._persistentData.set(browser, data);
+   },
+ 
+   _normalizeToBrowser: function(aKey) {
+diff --git a/browser/components/sessionstore/src/Utils.jsm b/browser/components/sessionstore/src/Utils.jsm
+index 7cc2f0990b5c..e061cd35b86a 100644
+--- a/browser/components/sessionstore/src/Utils.jsm
++++ b/browser/components/sessionstore/src/Utils.jsm
+@@ -15,6 +15,12 @@ this.Utils = Object.freeze({
+     return Services.io.newURI(url, null, null);
+   },
+ 
++  /**
++   * Returns true if the |url| passed in is part of the given root |domain|.
++   * For example, if |url| is "www.mozilla.org", and we pass in |domain| as
++   * "mozilla.org", this will return true. It would return false the other way
++   * around.
++   */
+   hasRootDomain: function (url, domain) {
+     let host;
+ 
+@@ -35,5 +41,28 @@ this.Utils = Object.freeze({
+     let prevChar = host[index - 1];
+     return (index == (host.length - domain.length)) &&
+            (prevChar == "." || prevChar == "/");
++  },
++
++  swapMapEntries: function (map, key, otherKey) {
++    // Make sure that one or the other of these has an entry in the map,
++    // and let it be |key|.
++    if (!map.has(key)) {
++      [key, otherKey] = [otherKey, key];
++      if (!map.has(key)) {
++        return;
++      }
++    }
++
++    // At this point, |key| is guaranteed to have an entry,
++    // although |otherKey| may not. Perform the swap.
++    let value = map.get(key);
++    if (map.has(otherKey)) {
++      let otherValue = map.get(otherKey);
++      map.set(key, otherValue);
++      map.set(otherKey, value);
++    } else {
++      map.set(otherKey, value);
++      map.delete(key);
++    }
+   }
+ });

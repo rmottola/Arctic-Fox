@@ -68,7 +68,11 @@ const MESSAGES = [
 
   // The content script tells us that a new page just started loading in a
   // browser.
-  "SessionStore:loadStart"
+  "SessionStore:loadStart",
+
+  // The content script gives us a reference to an object that performs
+  // synchronous collection of session data.
+  "SessionStore:setupSyncHandler"
 ];
 
 // These are tab events that we listen to.
@@ -648,6 +652,9 @@ let SessionStoreInternal = {
       case "SessionStore:loadStart":
         TabStateCache.delete(browser);
         break;
+      case "SessionStore:setupSyncHandler":
+        TabState.setSyncHandler(browser, aMessage.objects.handler);
+        break;
       default:
         debug("received unknown message '" + aMessage.name + "'");
         break;
@@ -666,16 +673,22 @@ let SessionStoreInternal = {
       return;
 
     var win = aEvent.currentTarget.ownerDocument.defaultView;
+    let browser;
     switch (aEvent.type) {
       case "load":
         // If __SS_restore_data is set, then we need to restore the document
         // (form data, scrolling, etc.). This will only happen when a tab is
         // first restored.
-        let browser = aEvent.currentTarget;
+        browser = aEvent.currentTarget;
         TabStateCache.delete(browser);
         if (browser.__SS_restore_data)
           this.restoreDocument(win, browser, aEvent);
         this.onTabLoad(win, browser);
+        break;
+      case "SwapDocShells":
+        browser = aEvent.currentTarget;
+        let otherBrowser = aEvent.detail;
+        TabState.onSwapDocShells(browser, otherBrowser);
         break;
       case "TabOpen":
         this.onTabAdd(win, aEvent.originalTarget);
@@ -1193,9 +1206,13 @@ let SessionStoreInternal = {
   onTabAdd: function ssi_onTabAdd(aWindow, aTab, aNoNotification) {
     let browser = aTab.linkedBrowser;
     browser.addEventListener("load", this, true);
+    browser.addEventListener("SwapDocShells", this, true);
 
     let mm = browser.messageManager;
     MESSAGES.forEach(msg => mm.addMessageListener(msg, this));
+
+    // Load the frame script after registering listeners.
+    mm.loadFrameScript("chrome://browser/content/content-sessionStore.js", false);
 
     if (!aNoNotification) {
       this.saveStateDelayed(aWindow);
@@ -1214,6 +1231,7 @@ let SessionStoreInternal = {
   onTabRemove: function ssi_onTabRemove(aWindow, aTab, aNoNotification) {
     let browser = aTab.linkedBrowser;
     browser.removeEventListener("load", this, true);
+    browser.removeEventListener("SwapDocShells", this, true);
 
     let mm = browser.messageManager;
     MESSAGES.forEach(msg => mm.removeMessageListener(msg, this));
@@ -3759,6 +3777,47 @@ let SessionStoreInternal = {
     // we can safely remove the progress listener from this window.
     if (!aWindow.__SS_tabsToRestore)
       aWindow.gBrowser.removeTabsProgressListener(gRestoreTabsProgressListener);
+  },
+
+  // A map (xul:browser -> handler) that maps a tab to the
+  // synchronous collection handler object for that tab.
+  // See SyncHandler in content-sessionStore.js.
+  _syncHandlers: new WeakMap(),
+
+  /**
+   * Install the sync handler object from a given tab.
+   */
+  setSyncHandler: function (browser, handler) {
+    this._syncHandlers.set(browser, handler);
+  },
+
+  /**
+   * When a docshell swap happens, a xul:browser element will be
+   * associated with a different content-sessionStore.js script
+   * global. In this case, the sync handler for the element needs to
+   * be swapped just like the docshell.
+   */
+  onSwapDocShells: function (browser, otherBrowser) {
+    // Make sure that one or the other of these has a sync handler,
+    // and let it be |browser|.
+    if (!this._syncHandlers.has(browser)) {
+      [browser, otherBrowser] = [otherBrowser, browser];
+      if (!this._syncHandlers.has(browser)) {
+        return;
+      }
+    }
+
+    // At this point, browser is guaranteed to have a sync handler,
+    // although otherBrowser may not. Perform the swap.
+    let handler = this._syncHandlers.get(browser);
+    if (this._syncHandlers.has(otherBrowser)) {
+      let otherHandler = this._syncHandlers.get(otherBrowser);
+      this._syncHandlers.set(browser, otherHandler);
+      this._syncHandlers.set(otherHandler, handler);
+    } else {
+      this._syncHandlers.set(otherBrowser, handler);
+      this._syncHandlers.delete(browser);
+    }
   },
 
   /**
