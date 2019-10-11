@@ -2476,6 +2476,17 @@ let SessionStoreInternal = {
         Object.keys(tabData.attributes).forEach(a => TabAttributes.persist(a));
       }
 
+      if (!tabData.entries) {
+        tabData.entries = [];
+      }
+      if (tabData.extData) {
+        tab.__SS_extdata = {};
+        for (let key in tabData.extData)
+         tab.__SS_extdata[key] = tabData.extData[key];
+      } else {
+        delete tab.__SS_extdata;
+      }
+
       browser.__SS_tabStillLoading = true;
 
       // keep the data around to prevent dataloss in case
@@ -2485,11 +2496,7 @@ let SessionStoreInternal = {
       browser.setAttribute("pending", "true");
       tab.setAttribute("pending", "true");
 
-      // Make sure that set/getTabValue will set/read the correct data by
-      // wiping out any current value in tab.__SS_extdata.
-      delete tab.__SS_extdata;
-
-      if (!tabData.entries || tabData.entries.length == 0) {
+      if (tabData.entries.length == 0) {
         // make sure to blank out this tab's content
         // (just purging the tab's history won't be enough)
         browser.contentDocument.location = "about:blank";
@@ -2521,6 +2528,16 @@ let SessionStoreInternal = {
           tab.label = activePageData.url;
           tab.crop = "center";
         }
+      }
+
+      // Restore tab attributes.
+      if ("attributes" in tabData) {
+        TabAttributes.set(tab, tabData.attributes);
+      }
+
+      // Restore the tab icon.
+      if ("image" in tabData) {
+        tabbrowser.setIcon(tab, tabData.image);
       }
     }
 
@@ -2575,17 +2592,6 @@ let SessionStoreInternal = {
     browser.__SS_shistoryListener = new SessionStoreSHistoryListener(tab);
     history.addSHistoryListener(browser.__SS_shistoryListener);
 
-    if (!tabData.entries) {
-      tabData.entries = [];
-    }
-    if (tabData.extData) {
-      tab.__SS_extdata = {};
-      for (let key in tabData.extData)
-        tab.__SS_extdata[key] = tabData.extData[key];
-    }
-    else
-      delete tab.__SS_extdata;
-
     for (var i = 0; i < tabData.entries.length; i++) {
       //XXXzpao Wallpaper patch for bug 514751
       if (!tabData.entries[i].url)
@@ -2598,16 +2604,6 @@ let SessionStoreInternal = {
     let disallow = new Set(tabData.disallow && tabData.disallow.split(","));
     for (let cap of gDocShellCapabilities(browser.docShell))
       browser.docShell["allow" + cap] = !disallow.has(cap);
-
-    // Restore tab attributes.
-    if ("attributes" in tabData) {
-      TabAttributes.set(tab, tabData.attributes);
-    }
-
-    // Restore the tab icon.
-    if ("image" in tabData) {
-      aWindow.gBrowser.setIcon(tab, tabData.image);
-    }
 
     if (tabData.storage && browser.docShell instanceof Ci.nsIDocShell)
       SessionStorage.deserialize(browser.docShell, tabData.storage);
