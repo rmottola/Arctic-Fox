@@ -24,6 +24,7 @@ EXTRA_JS_MODULES.sessionstore = [
     'DocumentUtils.jsm',
     'Messenger.jsm',
     'GlobalState.jsm',
+    'PrivacyLevel.jsm',
     'SessionCookies.jsm',
     'SessionFile.jsm',
     'SessionMigration.jsm',

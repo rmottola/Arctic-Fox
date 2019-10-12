@@ -19,10 +19,6 @@ const STATE_RUNNING_STR = "running";
 const TAB_STATE_NEEDS_RESTORE = 1;
 const TAB_STATE_RESTORING = 2;
 
-const PRIVACY_NONE = 0;
-const PRIVACY_ENCRYPTED = 1;
-const PRIVACY_FULL = 2;
-
 const NOTIFY_WINDOWS_RESTORED = "sessionstore-windows-restored";
 const NOTIFY_BROWSER_STATE_RESTORED = "sessionstore-browser-state-restored";
 const NOTIFY_LAST_SESSION_CLEARED = "sessionstore-last-session-cleared";
@@ -140,6 +136,8 @@ Object.defineProperty(this, "HUDService", {
   
 XPCOMUtils.defineLazyModuleGetter(this, "DocumentUtils",
   "resource:///modules/sessionstore/DocumentUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
+  "resource:///modules/sessionstore/PrivacyLevel.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
   "resource:///modules/sessionstore/SessionSaver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
@@ -286,10 +284,6 @@ this.SessionStore = {
 
   restoreLastSession: function ss_restoreLastSession() {
     SessionStoreInternal.restoreLastSession();
-  },
-
-  checkPrivacyLevel: function ss_checkPrivacyLevel(aIsHTTPS, aUseDefaultPref) {
-    return SessionStoreInternal.checkPrivacyLevel(aIsHTTPS, aUseDefaultPref);
   },
 
   getCurrentState: function (aUpdateAll) {
@@ -3281,25 +3275,6 @@ let SessionStoreInternal = {
     }
 
     return !hasFirstArgument;
-  },
-
-  /**
-   * don't save sensitive data if the user doesn't want to
-   * (distinguishes between encrypted and non-encrypted sites)
-   * @param aIsHTTPS
-   *        Bool is encrypted
-   * @param aUseDefaultPref
-   *        don't do normal check for deferred
-   * @returns bool
-   */
-  checkPrivacyLevel: function ssi_checkPrivacyLevel(aIsHTTPS, aUseDefaultPref) {
-    let pref = "sessionstore.privacy_level";
-    // If we're in the process of quitting and we're not autoresuming the session
-    // then we should treat it as a deferred session. We have a different privacy
-    // pref for that case.
-    if (!aUseDefaultPref && this._loadState == STATE_QUITTING && !this._doResumeSession())
-      pref = "sessionstore.privacy_level_deferred";
-    return this._prefBranch.getIntPref(pref) < (aIsHTTPS ? PRIVACY_ENCRYPTED : PRIVACY_FULL);
   },
 
   /**
