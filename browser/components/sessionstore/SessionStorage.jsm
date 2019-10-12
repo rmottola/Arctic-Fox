@@ -63,7 +63,7 @@ let DomStorage = {
       // Check if we're allowed to store sessionStorage data.
       let isHttps = principal.URI && principal.URI.schemeIs("https");
       if (aFullData || PrivacyLevel.canSave({isHttps: isHttps, isPinned: isPinned})) {
-        let origin = principal.extendedOrigin;
+        let origin = principal.jarPrefix + principal.origin;
 
         // Don't read a host twice.
         if (!(origin in data)) {
