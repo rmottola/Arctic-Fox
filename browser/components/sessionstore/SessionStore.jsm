@@ -682,6 +682,7 @@ let SessionStoreInternal = {
         browser = aEvent.currentTarget;
         let otherBrowser = aEvent.detail;
         TabState.onSwapDocShells(browser, otherBrowser);
+	TabStateCache.onSwapDocShells(browser, otherBrowser);
         break;
       case "TabOpen":
         this.onTabAdd(win, aEvent.originalTarget);
