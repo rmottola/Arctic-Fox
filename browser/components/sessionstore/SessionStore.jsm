@@ -615,9 +615,6 @@ let SessionStoreInternal = {
       case "nsPref:changed": // catch pref changes
         this.onPrefChange(aData);
         break;
-      case "timer-callback": // timer call back for delayed saving
-        this.onTimerCallback();
-        break;
       case "gather-telemetry":
         this.onGatherTelemetry();
         break;
