@@ -136,6 +136,8 @@ Object.defineProperty(this, "HUDService", {
   
 XPCOMUtils.defineLazyModuleGetter(this, "DocumentUtils",
   "resource:///modules/sessionstore/DocumentUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PageStyle",
+  "resource:///modules/sessionstore/PageStyle.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
   "resource:///modules/sessionstore/PrivacyLevel.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
@@ -2752,7 +2754,6 @@ let SessionStoreInternal = {
     function hasExpectedURL(aDocument, aURL)
       !aURL || aURL.replace(/#.*/, "") == aDocument.location.href.replace(/#.*/, "");
 
-    let selectedPageStyle = aBrowser.__SS_restore_pageStyle;
     function restoreTextDataAndScrolling(aContent, aData, aPrefix) {
       if (aData.formdata && hasExpectedURL(aContent.document, aData.url)) {
         let formdata = aData.formdata;
@@ -2800,9 +2801,6 @@ let SessionStoreInternal = {
       if (aData.scroll && (match = /(\d+),(\d+)/.exec(aData.scroll)) != null) {
         aContent.scrollTo(match[1], match[2]);
       }
-      Array.forEach(aContent.document.styleSheets, function(aSS) {
-        aSS.disabled = aSS.title && aSS.title != selectedPageStyle;
-      });
       for (var i = 0; i < aContent.frames.length; i++) {
         if (aData.children && aData.children[i] &&
           hasExpectedURL(aContent.document, aData.url)) {
@@ -2816,8 +2814,10 @@ let SessionStoreInternal = {
     if (hasExpectedURL(aEvent.originalTarget, aBrowser.__SS_restore_data.url)) {
       var content = aEvent.originalTarget.defaultView;
       restoreTextDataAndScrolling(content, aBrowser.__SS_restore_data, "");
-      aBrowser.markupDocumentViewer.authorStyleDisabled = selectedPageStyle == "_nostyle";
     }
+
+    let frameList = this.getFramesToRestore(aBrowser);
+    PageStyle.restore(aBrowser.docShell, frameList, aBrowser.__SS_restore_pageStyle);
 
     // notify the tabbrowser that this document has been completely restored
     this._sendTabRestoredNotification(aBrowser.__SS_restore_tab);
