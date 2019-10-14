@@ -1276,6 +1276,11 @@ let SessionStoreInternal = {
     // Get the latest data for this tab (generally, from the cache)
     let tabState = TabState.collect(aTab);
 
+    // Don't save private tabs
+    if (tabState.isPrivate || false) {
+      return;
+    }
+
     // store closed-tab data for undo
     if (this._shouldSaveTabState(tabState)) {
       let tabTitle = aTab.label;
