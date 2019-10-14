@@ -15,6 +15,12 @@ this.Utils = Object.freeze({
     return Services.io.newURI(url, null, null);
   },
 
+  /**
+   * Returns true if the |url| passed in is part of the given root |domain|.
+   * For example, if |url| is "www.mozilla.org", and we pass in |domain| as
+   * "mozilla.org", this will return true. It would return false the other way
+   * around.
+   */
   hasRootDomain: function (url, domain) {
     let host;
 
