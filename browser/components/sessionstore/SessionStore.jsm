@@ -135,6 +135,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionFile",
   "resource:///modules/sessionstore/SessionFile.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
   "resource:///modules/sessionstore/SessionHistory.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
+  "resource:///modules/sessionstore/TextAndScrollData.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabState",
   "resource:///modules/sessionstore/TabState.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
@@ -2759,74 +2761,9 @@ let SessionStoreInternal = {
       return;
     }
 
-    // always call this before injecting content into a document!
-    function hasExpectedURL(aDocument, aURL)
-      !aURL || aURL.replace(/#.*/, "") == aDocument.location.href.replace(/#.*/, "");
-
-    function restoreTextDataAndScrolling(aContent, aData, aPrefix) {
-      if (aData.formdata && hasExpectedURL(aContent.document, aData.url)) {
-        let formdata = aData.formdata;
-
-        // handle backwards compatibility
-        // this is a migration from pre-firefox 15. cf. bug 742051
-        if (!("xpath" in formdata || "id" in formdata)) {
-          formdata = { xpath: {}, id: {} };
-
-          for each (let [key, value] in Iterator(aData.formdata)) {
-            if (key.charAt(0) == "#") {
-              formdata.id[key.slice(1)] = value;
-            } else {
-              formdata.xpath[key] = value;
-            }
-          }
-        }
-
-        // for about:sessionrestore we saved the field as JSON to avoid
-        // nested instances causing humongous sessionstore.js files.
-        // cf. bug 467409
-        if ((aData.url == "about:sessionrestore" || aData.url == "about:welcomeback") &&
-            "sessionData" in formdata.id &&
-            typeof formdata.id["sessionData"] == "object") {
-          formdata.id["sessionData"] =
-            JSON.stringify(formdata.id["sessionData"]);
-        }
-
-        // update the formdata
-        aData.formdata = formdata;
-        // merge the formdata
-        DocumentUtils.mergeFormData(aContent.document, formdata);
-      }
-
-      if (aData.innerHTML) {
-        aWindow.setTimeout(function() {
-          if (aContent.document.designMode == "on" &&
-              hasExpectedURL(aContent.document, aData.url) &&
-              aContent.document.body) {
-            aContent.document.body.innerHTML = aData.innerHTML;
-          }
-        }, 0);
-      }
-      var match;
-      if (aData.scroll && (match = /(\d+),(\d+)/.exec(aData.scroll)) != null) {
-        aContent.scrollTo(match[1], match[2]);
-      }
-      for (var i = 0; i < aContent.frames.length; i++) {
-        if (aData.children && aData.children[i] &&
-          hasExpectedURL(aContent.document, aData.url)) {
-          restoreTextDataAndScrolling(aContent.frames[i], aData.children[i], aPrefix + i + "|");
-        }
-      }
-    }
-
-    // don't restore text data and scrolling state if the user has navigated
-    // away before the loading completed (except for in-page navigation)
-    if (hasExpectedURL(aEvent.originalTarget, aBrowser.__SS_restore_data.url)) {
-      var content = aEvent.originalTarget.defaultView;
-      restoreTextDataAndScrolling(content, aBrowser.__SS_restore_data, "");
-    }
-
     let frameList = this.getFramesToRestore(aBrowser);
     PageStyle.restore(aBrowser.docShell, frameList, aBrowser.__SS_restore_pageStyle);
+    TextAndScrollData.restore(frameList);
 
     // notify the tabbrowser that this document has been completely restored
     this._sendTabRestoredNotification(aBrowser.__SS_restore_tab);
