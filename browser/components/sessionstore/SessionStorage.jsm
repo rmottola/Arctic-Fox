@@ -106,8 +106,8 @@ let SessionStorageInternal = {
       let uri = Services.io.newURI(host, null, null);
       let principal = Services.scriptSecurityManager.getDocShellCodebasePrincipal(uri, aDocShell);
       let storageManager = aDocShell.QueryInterface(Ci.nsIDOMStorageManager);
-      let window = aDocShell.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                            .getInterface(Components.interfaces.nsIDOMWindow);
+      let window = aDocShell.QueryInterface(Ci.nsIInterfaceRequestor)
+                            .getInterface(Ci.nsIDOMWindow);
 
       // There is no need to pass documentURI, it's only used to fill documentURI property of
       // domstorage event, which in this case has no consumer.  Prevention of events in case
