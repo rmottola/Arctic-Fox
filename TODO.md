@@ -129,8 +129,26 @@ Require check of JS browser components:
 - Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
 - Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
 - Bug 897253 - 2013-07-24 - Remove support for calling nsISessionStore.init() with a
-- Bug 867143 - 2013-07-23 - Cache Session Restore state aggressively.
-- Bug 891360 - 2013-07-12 - Move SessionStore I/O logic to a dedicated worker
+
+2014-09
+Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
+Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
+
+https://github.com/mozilla/newtab-dev/commit/a0a0c45963092657a7eb7d8fee359786378cefbe#diff-0c6e8f7d648e858c3fe08a2b4802c3a0
+
+TabState.dropPendingCollections ?
+And check for PrivacyFilter.jsm !!!
+
+https://github.com/mozilla/newtab-dev/commits/c8c41d6efeff05c6a0a31030abd9baa0defccde2/browser/components/sessionstore/src/SessionStore.jsm
+(from 938248)
+
+https://github.com/mozilla/newtab-dev/commits/2a2907183b80053893483c2d262de15ca6019b8d/browser/components/sessionstore/content/content-sessionStore.js
+https://github.com/mozilla/newtab-dev/commit/2a2907183b80053893483c2d262de15ca6019b8d
+
+Bug 930967 - Add broadcasting for sessionstore data r=yoric,billm,sma
+Bug 910646 - Collect docShell capabilities from content script (r=tta
+Bug 910668 - Collect pagestyle from a content script (r=ttaubert)
+https://github.com/mozilla/newtab-dev/commit/3419f01f9badeadbdac458a49cf44c69d03fd77b
 
 Parents of:
 
