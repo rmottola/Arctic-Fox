@@ -2318,7 +2318,7 @@ let SessionStoreInternal = {
     }
 
     this.restoreTabs(aWindow, tabs, winData.tabs,
-      (overwriteTabs ? (parseInt(winData.selected) || 1) : 0), 0, 0);
+      (overwriteTabs ? (parseInt(winData.selected) || 1) : 0));
 
 #ifdef MOZ_DEVTOOLS
     if (aState.scratchpads) {
