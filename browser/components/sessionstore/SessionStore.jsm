@@ -2812,10 +2812,10 @@ let SessionStoreInternal = {
     if (typeof(pageStyle) === "string") {
       PageStyle.restore(aBrowser.docShell, frameList, pageStyle);
     } else {
-      ScrollPosition.restoreTree(aBrowser.contentWindow, scrollPositions);
+      PageStyle.restoreTree(aBrowser.docShell, pageStyle);
     }
 
-    PageStyle.restoreTree(aBrowser.docShell, pageStyle);
+    ScrollPosition.restoreTree(aBrowser.contentWindow, scrollPositions);
     TextAndScrollData.restore(frameList);
 
     // notify the tabbrowser that this document has been completely restored
