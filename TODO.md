@@ -119,6 +119,7 @@
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
 - Bug 943339 - 2014-02-07 - Part 1: Only store a subset of session history entries t
 
+
 Require check of JS browser components:
 
 - Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
@@ -129,6 +130,7 @@ Require check of JS browser components:
 - Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
 - Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
 - Bug 897253 - 2013-07-24 - Remove support for calling nsISessionStore.init() with a
+- Bug 963042 - Added event listener for SwapDocShells to ensure we save
 
 2014-09
 Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
@@ -142,13 +144,8 @@ And check for PrivacyFilter.jsm !!!
 https://github.com/mozilla/newtab-dev/commits/c8c41d6efeff05c6a0a31030abd9baa0defccde2/browser/components/sessionstore/src/SessionStore.jsm
 (from 938248)
 
-https://github.com/mozilla/newtab-dev/commits/2a2907183b80053893483c2d262de15ca6019b8d/browser/components/sessionstore/content/content-sessionStore.js
-https://github.com/mozilla/newtab-dev/commit/2a2907183b80053893483c2d262de15ca6019b8d
-
-Bug 930967 - Add broadcasting for sessionstore data r=yoric,billm,sma
-Bug 910646 - Collect docShell capabilities from content script (r=tta
-Bug 910668 - Collect pagestyle from a content script (r=ttaubert)
-https://github.com/mozilla/newtab-dev/commit/3419f01f9badeadbdac458a49cf44c69d03fd77b
+Check here:
+https://github.com/mozilla/newtab-dev/tree/dfb8d4ea04fc32bf71d5d175899c345907e6793c/browser/components/sessionstore/src
 
 Parents of:
 
