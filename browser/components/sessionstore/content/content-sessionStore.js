@@ -629,6 +629,9 @@ addEventListener("unload", () => {
   PageStyleListener.uninit();
   SessionStorageListener.uninit();
 
+  // Remove progress listeners.
+  gContentRestore.resetRestore();
+
   // We don't need to take care of any gFrameTree observers as the gFrameTree
   // will die with the content script. The same goes for the privacy transition
   // observer that will die with the docShell when the tab is closed.
