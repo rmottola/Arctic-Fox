@@ -28,7 +28,6 @@ EXTRA_JS_MODULES.sessionstore = [
     'GlobalState.jsm',
     'PageStyle.jsm',
     'PrivacyLevel.jsm',
-    'ScrollPosition.jsm',
     'SessionCookies.jsm',
     'SessionFile.jsm',
     'SessionMigration.jsm',
@@ -40,7 +39,6 @@ EXTRA_JS_MODULES.sessionstore = [
     'TabStateCache.jsm',
     'TextAndScrollData.jsm',
     'Utils.jsm',
-    'XPathGenerator.jsm',
 ]
 
 EXTRA_PP_JS_MODULES.sessionstore += [
