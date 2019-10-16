@@ -117,9 +117,9 @@ let SessionStorageInternal = {
         console.error(e);
       }
 
-      for (let [key, value] in Iterator(data)) {
+      for (let key of Object.keys(data)) {
         try {
-          storage.setItem(key, value);
+          storage.setItem(key, data[key]);
         } catch (e) {
           // throws e.g. for URIs that can't have sessionStorage
           console.error(e);
