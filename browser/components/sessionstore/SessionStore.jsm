@@ -125,6 +125,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "console",
   "resource://gre/modules/devtools/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "GlobalState",
   "resource:///modules/sessionstore/GlobalState.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
+  "resource:///modules/sessionstore/PrivacyFilter.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
@@ -1086,13 +1088,20 @@ let SessionStoreInternal = {
 
       // Save the window if it has multiple tabs or a single saveable tab and
       // it's not private.
-      if (!winData.isPrivate && (winData.tabs.length > 1 ||
-          (winData.tabs.length == 1 && this._shouldSaveTabState(winData.tabs[0])))) {
-        // we don't want to save the busy state
-        delete winData.busy;
+      if (!winData.isPrivate) {
+        // Remove any open private tabs the window may contain.
+        PrivacyFilter.filterPrivateTabs(winData);
 
-        this._closedWindows.unshift(winData);
-        this._capClosedWindows();
+        let hasSingleTabToSave =
+          winData.tabs.length == 1 && this._shouldSaveTabState(winData.tabs[0]);
+
+        if (hasSingleTabToSave || winData.tabs.length > 1) {
+          // we don't want to save the busy state
+          delete winData.busy;
+
+          this._closedWindows.unshift(winData);
+          this._capClosedWindows();
+        }
       }
 
       // clear this window from the list
@@ -1398,7 +1407,8 @@ let SessionStoreInternal = {
     let tabState = TabState.collect(aTab);
 
     // Don't save private tabs
-    if (tabState.isPrivate || false) {
+    let isPrivateWindow = PrivateBrowsingUtils.isWindowPrivate(aWindow);
+    if (!isPrivateWindow && tabState.isPrivate) {
       return;
     }
 
