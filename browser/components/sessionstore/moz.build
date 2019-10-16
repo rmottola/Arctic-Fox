@@ -31,6 +31,7 @@ EXTRA_JS_MODULES.sessionstore = [
     'PrivacyLevel.jsm',
     'SessionCookies.jsm',
     'SessionFile.jsm',
+    'SessionHistory.jsm',
     'SessionMigration.jsm',
     'SessionStorage.jsm',
     'SessionWorker.js',
