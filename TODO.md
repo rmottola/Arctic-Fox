@@ -117,7 +117,6 @@
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
-- Bug 943339 - 2014-02-07 - Part 1: Only store a subset of session history entries t
 
 
 Require check of JS browser components:
@@ -129,7 +128,6 @@ Require check of JS browser components:
 - Bug 1031264 - 2014-12-10 - make opening links in new {tabs,windows} honor rel
 - Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
 - Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
-- Bug 897253 - 2013-07-24 - Remove support for calling nsISessionStore.init() with a
 - Bug 963042 - Added event listener for SwapDocShells to ensure we save
 
 2014-09
