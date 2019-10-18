@@ -1735,7 +1735,6 @@ let SessionStoreInternal = {
   },
 
   setTabValue: function ssi_setTabValue(aTab, aKey, aStringValue) {
-    TabStateCache.delete(aTab);
     // If the tab hasn't been restored, then set the data there, otherwise we
     // could lose newly added data.
     let saveTo;
@@ -1749,12 +1748,13 @@ let SessionStoreInternal = {
       aTab.__SS_extdata = {};
       saveTo = aTab.__SS_extdata;
     }
+
     saveTo[aKey] = aStringValue;
+    TabStateCache.updateField(aTab, "extData", saveTo);
     this.saveStateDelayed(aTab.ownerDocument.defaultView);
   },
 
   deleteTabValue: function ssi_deleteTabValue(aTab, aKey) {
-    TabStateCache.delete(aTab);
     // We want to make sure that if data is accessed early, we attempt to delete
     // that data from __SS_data as well. Otherwise we'll throw in cases where
     // data can be set or read.
@@ -1766,9 +1766,19 @@ let SessionStoreInternal = {
       deleteFrom = aTab.linkedBrowser.__SS_data.extData;
     }
 
-    if (deleteFrom && deleteFrom[aKey])
+    if (deleteFrom && aKey in deleteFrom) {
       delete deleteFrom[aKey];
-    this.saveStateDelayed(aTab.ownerDocument.defaultView);
+
+      // Keep the extData object only if it is not empty, to save
+      // a little disk space when serializing the tab state later.
+      if (Object.keys(deleteFrom).length) {
+        TabStateCache.updateField(aTab, "extData", deleteFrom);
+      } else {
+        TabStateCache.removeField(aTab, "extData");
+      }
+
+      this.saveStateDelayed(aTab.ownerDocument.defaultView);
+    }
   },
 
   getGlobalValue: function ssi_getGlobalValue(aKey) {
@@ -2017,7 +2027,7 @@ let SessionStoreInternal = {
       });
       DirtyWindows.clear();
     }
-    TelemetryStopwatch.stop("FX_SESSION_RESTORE_COLLECT_ALL_WINDOWS_DATA_MS");
+    TelemetryStopwatch.finish("FX_SESSION_RESTORE_COLLECT_ALL_WINDOWS_DATA_MS");
 
     // An array that at the end will hold all current window data.
     var total = [];
@@ -2039,7 +2049,7 @@ let SessionStoreInternal = {
 
     TelemetryStopwatch.start("FX_SESSION_RESTORE_COLLECT_COOKIES_MS");
     SessionCookies.update(total);
-    TelemetryStopwatch.stop("FX_SESSION_RESTORE_COLLECT_COOKIES_MS");
+    TelemetryStopwatch.finish("FX_SESSION_RESTORE_COLLECT_COOKIES_MS");
 
     // collect the data for all windows yet to be restored
     for (ix in this._statesToRestore) {
@@ -2156,7 +2166,7 @@ let SessionStoreInternal = {
         aWindow.__SS_lastSessionWindowID;
 
     DirtyWindows.remove(aWindow);
-    TelemetryStopwatch.stop("FX_SESSION_RESTORE_COLLECT_SINGLE_WINDOW_DATA_MS");
+    TelemetryStopwatch.finish("FX_SESSION_RESTORE_COLLECT_SINGLE_WINDOW_DATA_MS");
   },
 
   /* ........ Restoring Functionality .............. */
