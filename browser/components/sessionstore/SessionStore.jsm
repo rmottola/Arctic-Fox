@@ -1167,7 +1167,6 @@ let SessionStoreInternal = {
       Array.forEach(aWindow.gBrowser.tabs, function(aTab) {
         delete aTab.linkedBrowser.__SS_data;
         delete aTab.linkedBrowser.__SS_tabStillLoading;
-        delete aTab.linkedBrowser.__SS_formDataSaved;
         if (aTab.linkedBrowser.__SS_restoreState)
           this._resetTabRestoringState(aTab);
       }, this);
@@ -1302,7 +1301,6 @@ let SessionStoreInternal = {
     let browser = aTab.linkedBrowser;
     delete browser.__SS_data;
     delete browser.__SS_tabStillLoading;
-    delete browser.__SS_formDataSaved;
 
     // If this tab was in the middle of restoring or still needs to be restored,
     // we need to reset that state. If the tab was restoring, we will attempt to
@@ -1376,11 +1374,7 @@ let SessionStoreInternal = {
    *        Browser reference
    */
   onTabInput: function ssi_onTabInput(aWindow, aBrowser) {
-    // deleting __SS_formDataSaved will cause us to recollect form data
-    delete aBrowser.__SS_formDataSaved;
-
     TabStateCache.delete(aBrowser);
-
     this.saveStateDelayed(aWindow);
   },
 
