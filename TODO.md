@@ -140,7 +140,7 @@ TabState.dropPendingCollections ?
 And check for PrivacyFilter.jsm !!!
 
 https://github.com/mozilla/newtab-dev/commits/c8c41d6efeff05c6a0a31030abd9baa0defccde2/browser/components/sessionstore/src/SessionStore.jsm
-(from 938248)
+(from 495123)
 
 Check here:
 https://github.com/mozilla/newtab-dev/tree/dfb8d4ea04fc32bf71d5d175899c345907e6793c/browser/components/sessionstore/src
