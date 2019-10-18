@@ -1550,6 +1550,10 @@ let SessionStoreInternal = {
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
     }
 
+    if (aTab.linkedBrowser.__SS_restoreState) {
+      this._resetTabRestoringState(aTab);
+    }
+
     this._setWindowStateBusy(window);
     this.restoreTabs(window, [aTab], [tabState], 0);
   },
