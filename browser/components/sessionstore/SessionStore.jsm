@@ -1565,8 +1565,9 @@ let SessionStoreInternal = {
   },
 
   getTabState: function ssi_getTabState(aTab) {
-    if (!aTab.ownerDocument || !aTab.ownerDocument.defaultView.__SSi)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!aTab.ownerDocument.defaultView.__SSi) {
+      throw Components.Exception("Default view is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     let tabState = TabState.collect(aTab);
 
@@ -1591,10 +1592,6 @@ let SessionStoreInternal = {
       debug("State argument must contain field 'entries'");
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
     }
-    if (!aTab.ownerDocument) {
-      debug("Tab argument must have an owner document");
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
-    }
 
     let window = aTab.ownerDocument.defaultView;
     if (!("__SSi" in window)) {
@@ -1611,9 +1608,12 @@ let SessionStoreInternal = {
   },
 
   duplicateTab: function ssi_duplicateTab(aWindow, aTab, aDelta) {
-    if (!aTab.ownerDocument || !aTab.ownerDocument.defaultView.__SSi ||
-        !aWindow.getBrowser)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!aTab.ownerDocument.defaultView.__SSi) {
+      throw Components.Exception("Default view is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    }
+    if (!aWindow.gBrowser) {
+      throw Components.Exception("Invalid window object: no gBrowser", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     // Flush all data queued in the content script because we will need that
     // state to properly duplicate the given tab.
