@@ -2571,6 +2571,12 @@ let SessionStoreInternal = {
 
       browser.__SS_tabStillLoading = true;
 
+      // In electrolysis, we may need to change the browser's remote
+      // attribute so that it runs in a content process.
+      let activePageData = tabData.entries[activeIndex] || null;
+      let uri = activePageData ? activePageData.url || null : null;
+      tabbrowser.updateBrowserRemoteness(browser, uri);
+
       // Start a new epoch and include the epoch in the restoreHistory
       // message. If a message is received that relates to a previous epoch, we
       // discard it.
@@ -2599,12 +2605,6 @@ let SessionStoreInternal = {
         browser.contentDocument.location = "about:blank";
         continue;
       }
-
-      // In electrolysis, we may need to change the browser's remote
-      // attribute so that it runs in a content process.
-      let activePageData = tabData.entries[activeIndex] || null;
-      let uri = activePageData ? activePageData.url || null : null;
-      tabbrowser.updateBrowserRemoteness(browser, uri);
 
       browser.messageManager.sendAsyncMessage("SessionStore:restoreHistory",
                                               {tabData: tabData, epoch: epoch});
