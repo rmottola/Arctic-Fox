@@ -808,6 +808,8 @@ pref("browser.sessionstore.restore_pinned_tabs_on_demand", false);
 pref("browser.sessionstore.upgradeBackup.latestBuildID", "");
 // End-users should not run sessionstore in debug mode
 pref("browser.sessionstore.debug", false);
+// Forget closed windows/tabs after two weeks
+pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // Pale Moon: Allow the user to bypass cached versions of pages when restoring
 // tabs from a previous session
 // 0 = standard behavior: pull fully from cache
