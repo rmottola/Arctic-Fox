@@ -808,7 +808,7 @@ let SessionStoreInternal = {
     // assign it a unique identifier (timestamp)
     aWindow.__SSi = "window" + Date.now();
 
-    let mm = aWindow.messageManager;
+    let mm = aWindow.getGroupMessageManager("browsers");
     MESSAGES.forEach(msg => mm.addMessageListener(msg, this));
 
     // Load the frame script after registering listeners.
@@ -1128,7 +1128,7 @@ let SessionStoreInternal = {
     // Cache the window state until it is completely gone.
     DyingWindowCache.set(aWindow, winData);
 
-    let mm = aWindow.messageManager;
+    let mm = aWindow.getGroupMessageManager("browsers");
     MESSAGES.forEach(msg => mm.removeMessageListener(msg, this));
 
     delete aWindow.__SSi;
