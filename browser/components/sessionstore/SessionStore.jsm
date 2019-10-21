@@ -2164,7 +2164,8 @@ let SessionStoreInternal = {
       selectedWindow: ix + 1,
       _closedWindows: lastClosedWindowsCopy,
       session: session,
-      scratchpads: scratchpads
+      scratchpads: scratchpads,
+      global: this._globalState.getState()
     };
 
     // Persist the last session if we deferred restoring it
