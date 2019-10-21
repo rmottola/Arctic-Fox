@@ -3454,7 +3454,7 @@ let SessionStoreInternal = {
    * with respect to |browser|.
    */
   isCurrentEpoch: function (browser, epoch) {
-    return this._browserEpochs.get(browser.permanentKey, 0) == epoch;
+    return (this._browserEpochs.get(browser.permanentKey) || 0) == epoch;
   },
 
   // A map (xul:browser -> handler) that maps a tab to the
