@@ -1224,7 +1224,6 @@ let SessionStoreInternal = {
     this._forEachBrowserWindow(function(aWindow) {
       Array.forEach(aWindow.gBrowser.tabs, function(aTab) {
         delete aTab.linkedBrowser.__SS_data;
-        delete aTab.linkedBrowser.__SS_tabStillLoading;
         if (aTab.linkedBrowser.__SS_restoreState)
           this._resetTabRestoringState(aTab);
       }, this);
@@ -1358,7 +1357,6 @@ let SessionStoreInternal = {
   onTabRemove: function ssi_onTabRemove(aWindow, aTab, aNoNotification) {
     let browser = aTab.linkedBrowser;
     delete browser.__SS_data;
-    delete browser.__SS_tabStillLoading;
 
     // If this tab was in the middle of restoring or still needs to be restored,
     // we need to reset that state. If the tab was restoring, we will attempt to
@@ -2582,8 +2580,6 @@ let SessionStoreInternal = {
 
       // Save the index in case we updated it above.
       tabData.index = activeIndex + 1;
-
-      browser.__SS_tabStillLoading = true;
 
       // In electrolysis, we may need to change the browser's remote
       // attribute so that it runs in a content process.
