@@ -274,7 +274,7 @@ GetPropertyOperation(JSContext* cx, InterpreterFrame* fp, HandleScript script, j
 }
 
 static inline bool
-NameOperation(JSContext* cx, InterpreterFrame* fp, jsbytecode* pc, MutableHandleValue vp)
+GetNameOperation(JSContext *cx, InterpreterFrame *fp, jsbytecode *pc, MutableHandleValue vp)
 {
     JSObject* obj = fp->scopeChain();
     PropertyName* name = fp->script()->getName(pc);
@@ -2779,7 +2779,7 @@ CASE(JSOP_GETNAME)
 {
     RootedValue& rval = rootValue0;
 
-    if (!NameOperation(cx, REGS.fp(), REGS.pc, &rval))
+    if (!GetNameOperation(cx, REGS.fp(), REGS.pc, &rval))
         goto error;
 
     PUSH_COPY(rval);
@@ -3787,12 +3787,8 @@ js::GetScopeName(JSContext* cx, HandleObject scopeChain, HandlePropertyName name
     if (!LookupName(cx, name, scopeChain, &obj, &pobj, &shape))
         return false;
 
-    if (!shape) {
-        JSAutoByteString printable;
-        if (AtomToPrintableString(cx, name, &printable))
-            ReportIsNotDefined(cx, printable.ptr());
-        return false;
-    }
+    if (!shape)
+        return ReportIsNotDefined(cx, name);
 
     if (!GetProperty(cx, obj, obj, name, vp))
         return false;
