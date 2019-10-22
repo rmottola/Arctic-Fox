@@ -115,6 +115,7 @@
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
 - Bug 1038811 2015-04-11 Complete remaining
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
+- Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
 
@@ -137,18 +138,11 @@ Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
 https://github.com/mozilla/newtab-dev/commit/a0a0c45963092657a7eb7d8fee359786378cefbe#diff-0c6e8f7d648e858c3fe08a2b4802c3a0
 
 TabState.dropPendingCollections ?
-And check for PrivacyFilter.jsm !!!
-
-https://github.com/mozilla/newtab-dev/commits/c8c41d6efeff05c6a0a31030abd9baa0defccde2/browser/components/sessionstore/src/SessionStore.jsm
-(from 495123)
-
-Check here:
-https://github.com/mozilla/newtab-dev/tree/dfb8d4ea04fc32bf71d5d175899c345907e6793c/browser/components/sessionstore/src
 
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/5ee3e2e6f9368b74d80263fb490fed29ad0a1ea9
+https://github.com/mozilla/newtab-dev/commit/4609707f8eb257b2bf0192b4124844a8b14bae8b
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
