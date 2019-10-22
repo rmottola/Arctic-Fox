@@ -97,7 +97,8 @@ SessionStartup.prototype = {
       this._ensureInitialized();
     } else {
       SessionFile.read().then(
-        this._onSessionFileRead.bind(this)
+        this._onSessionFileRead.bind(this),
+	console.error
       );
     }
   },
