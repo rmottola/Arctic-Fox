@@ -154,8 +154,9 @@ SessionStartup.prototype = {
           Services.prefs.getIntPref("browser.startup.page") == BROWSER_STARTUP_RESUME_SESSION;
 
     // If this is a normal restore then throw away any previous session
-    if (!shouldResumeSessionOnce)
+    if (!shouldResumeSessionOnce && this._initialState) {
       delete this._initialState.lastSessionState;
+    }
 
     let resumeFromCrash = Services.prefs.getBoolPref("browser.sessionstore.resume_from_crash");
 
