@@ -4,6 +4,8 @@
 
 this.EXPORTED_SYMBOLS = ["SessionMigration"];
 
+"use strict";
+
 const Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
