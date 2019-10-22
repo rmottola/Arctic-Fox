@@ -780,6 +780,7 @@ let SessionStoreInternal = {
         break;
       case "TabPinned":
       case "TabUnpinned":
+      case "SwapDocShells":
         this.saveStateDelayed(win);
         break;
     }
@@ -1340,6 +1341,8 @@ let SessionStoreInternal = {
    *        bool Do not save state if we're updating an existing tab
    */
   onTabAdd: function ssi_onTabAdd(aWindow, aTab, aNoNotification) {
+    let browser = aTab.linkedBrowser;
+    browser.addEventListener("SwapDocShells", this);
     if (!aNoNotification) {
       this.saveStateDelayed(aWindow);
     }
@@ -1357,6 +1360,7 @@ let SessionStoreInternal = {
   onTabRemove: function ssi_onTabRemove(aWindow, aTab, aNoNotification) {
     let browser = aTab.linkedBrowser;
     delete browser.__SS_data;
+    browser.removeEventListener("SwapDocShells", this);
 
     // If this tab was in the middle of restoring or still needs to be restored,
     // we need to reset that state. If the tab was restoring, we will attempt to
