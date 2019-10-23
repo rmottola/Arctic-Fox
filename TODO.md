@@ -140,7 +140,7 @@ https://github.com/mozilla/newtab-dev/tree/8932974653ba03522b4f6fefdc4081bdb0356
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/0ab8467895d943ebaf3466caefe31e7f8b89af29
+https://github.com/mozilla/newtab-dev/commit/2050f9e190cfcb415d0fbf77cb559fe596a4cfa2
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -165,7 +165,6 @@ no components/url-classifier ?
 
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
-- js/src/jscntxt.h  update ReportValueError to UniquePtr
 - in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
 - inherit principal vs. inherit owner in DocShell see INTERNAL_LOAD_FLAGS_INHERIT_OWNER
 - update nsNullPrincipal (and nsDocShell Fixme's)
