@@ -281,6 +281,8 @@ TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
         segment->AppendNullData(ticks);
         STREAM_LOG(PR_LOG_DEBUG+1, ("TrackUnionStream %p appending %lld ticks of null data to track %d",
                    this, (long long)ticks, outputTrack->GetID()));
+      } else if (InMutedCycle()) {
+        segment->AppendNullData(ticks);
       } else {
         if (GraphImpl()->StreamSuspended(source)) {
           segment->AppendNullData(aTo - aFrom);
