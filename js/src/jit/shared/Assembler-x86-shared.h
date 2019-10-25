@@ -1107,7 +1107,7 @@ class AssemblerX86Shared : public AssemblerShared
     }
     // Note, lock_addl() is used for a memory barrier on non-SSE2 systems.
     // Do not optimize, replace by XADDL, or similar.
-    void lock_addl(Imm32 imm, const Operand& op) {
+    void lock_addl(Imm32 imm, const Operand &op) {
         masm.prefix_lock();
         addl(imm, op);
     }
@@ -1362,7 +1362,7 @@ class AssemblerX86Shared : public AssemblerShared
         decl(op);
     }
 
-    void lock_cmpxchg8(Register src, const Operand& mem) {
+    void lock_cmpxchg8(Register src, const Operand &mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1375,7 +1375,7 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_cmpxchg16(Register src, const Operand& mem) {
+    void lock_cmpxchg16(Register src, const Operand &mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1388,7 +1388,7 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_cmpxchg32(Register src, const Operand& mem) {
+    void lock_cmpxchg32(Register src, const Operand &mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1402,7 +1402,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void lock_xaddb(Register srcdest, const Operand& mem) {
+    void lock_xaddb(Register srcdest, const Operand &mem) {
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
             masm.lock_xaddb_rm(srcdest.code(), mem.disp(), mem.base());
@@ -1414,11 +1414,11 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_xaddw(Register srcdest, const Operand& mem) {
+    void lock_xaddw(Register srcdest, const Operand &mem) {
         masm.prefix_16_for_32();
         lock_xaddl(srcdest, mem);
     }
-    void lock_xaddl(Register srcdest, const Operand& mem) {
+    void lock_xaddl(Register srcdest, const Operand &mem) {
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
             masm.lock_xaddl_rm(srcdest.code(), mem.disp(), mem.base());
