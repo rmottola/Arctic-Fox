@@ -141,7 +141,7 @@ https://github.com/mozilla/newtab-dev/tree/8932974653ba03522b4f6fefdc4081bdb0356
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/421713c14a10c7d284f7efaada99feef763f2333
+https://github.com/mozilla/newtab-dev/commit/3dd206c7b88dcda78fbcff6349119f8915587116
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
