@@ -6375,7 +6375,7 @@ class LAsmJSStoreHeap : public LInstructionHelper<0, 2, 0>
     }
 };
 
-class LAsmJSCompareExchangeHeap : public LInstructionHelper<1, 3, 0>
+class LAsmJSCompareExchangeHeap : public LInstructionHelper<1, 3, 1>
 {
   public:
     LIR_HEADER(AsmJSCompareExchangeHeap);
@@ -6386,6 +6386,7 @@ class LAsmJSCompareExchangeHeap : public LInstructionHelper<1, 3, 0>
         setOperand(0, ptr);
         setOperand(1, oldValue);
         setOperand(2, newValue);
+        setTemp(0, LDefinition::BogusTemp());
     }
 
     const LAllocation* ptr() {
@@ -6397,13 +6398,20 @@ class LAsmJSCompareExchangeHeap : public LInstructionHelper<1, 3, 0>
     const LAllocation* newValue() {
         return getOperand(2);
     }
+    const LDefinition *addrTemp() {
+        return getTemp(0);
+    }
+
+    void setAddrTemp(const LDefinition &addrTemp) {
+        setTemp(0, addrTemp);
+    }
 
     MAsmJSCompareExchangeHeap* mir() const {
         return mir_->toAsmJSCompareExchangeHeap();
     }
 };
 
-class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 1>
+class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 2>
 {
   public:
     LIR_HEADER(AsmJSAtomicBinopHeap);
@@ -6413,6 +6421,7 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 1>
         setOperand(0, ptr);
         setOperand(1, value);
         setTemp(0, temp);
+        setTemp(1, LDefinition::BogusTemp());
     }
     const LAllocation* ptr() {
         return getOperand(0);
@@ -6422,6 +6431,13 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 1>
     }
     const LDefinition* temp() {
         return getTemp(0);
+    }
+    const LDefinition *addrTemp() {
+        return getTemp(1);
+    }
+
+    void setAddrTemp(const LDefinition &addrTemp) {
+        setTemp(1, addrTemp);
     }
 
     MAsmJSAtomicBinopHeap* mir() const {
