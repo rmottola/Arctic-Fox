@@ -672,11 +672,7 @@ NS_METHOD nsWindow::Destroy()
    * On windows the LayerManagerOGL destructor wants the widget to be around for
    * cleanup. It also would like to have the HWND intact, so we nullptr it here.
    */
-  if (mLayerManager) {
-    mLayerManager->Destroy();
-  }
-  mLayerManager = nullptr;
-  DestroyCompositor();
+  DestroyLayerManager();
 
   /* We should clear our cached resources now and not wait for the GC to
    * delete the nsWindow. */
@@ -6595,10 +6591,7 @@ nsWindow::IsPopup()
 void
 nsWindow::ClearCompositor(nsWindow* aWindow)
 {
-  if (aWindow->mLayerManager) {
-    aWindow->mLayerManager = nullptr;
-    aWindow->DestroyCompositor();
-  }
+  aWindow->DestroyLayerManager();
 }
 
 bool
