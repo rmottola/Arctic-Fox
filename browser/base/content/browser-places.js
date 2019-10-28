@@ -462,7 +462,7 @@ var PlacesCommandHook = {
                  "", "chrome,toolbar=yes,dialog=no,resizable", aLeftPaneRoot);
     }
     else {
-      organizer.PlacesOrganizer.selectLeftPaneQuery(aLeftPaneRoot);
+      organizer.PlacesOrganizer.selectLeftPaneContainerByHierarchy(aLeftPaneRoot);
       organizer.focus();
     }
   }
