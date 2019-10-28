@@ -486,16 +486,6 @@ function HistoryMenu(aPopupShowingEvent) {
 }
 
 HistoryMenu.prototype = {
-  toggleRestoreLastSession: function HM_toggleRestoreLastSession() {
-    let restoreItem = this._rootElt.ownerDocument.getElementById("Browser:RestoreLastSession");
-    
-    if (this._ss.canRestoreLastSession &&
-        !PrivateBrowsingUtils.isWindowPrivate(window))
-      restoreItem.removeAttribute("disabled");
-    else
-      restoreItem.setAttribute("disabled", true);
-  },
- 
   toggleRecentlyClosedTabs: function HM_toggleRecentlyClosedTabs() {
     // enable/disable the Recently Closed Tabs sub menu
     var undoMenu = this._rootElt.getElementsByClassName("recentlyClosedTabsMenu")[0];
@@ -618,7 +608,6 @@ HistoryMenu.prototype = {
     if (aEvent.target != aEvent.currentTarget)
       return;
 
-    this.toggleRestoreLastSession();
     this.toggleRecentlyClosedTabs();
     this.toggleRecentlyClosedWindows();
     this.toggleTabsFromOtherComputers();
