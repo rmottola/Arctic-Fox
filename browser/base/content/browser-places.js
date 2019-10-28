@@ -1293,7 +1293,6 @@ let BookmarkingUI = {
 
   onBeginUpdateBatch: function () {},
   onEndUpdateBatch: function () {},
-  onBeforeItemRemoved: function () {},
   onItemVisited: function () {},
   onItemMoved: function () {},
 
