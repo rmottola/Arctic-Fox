@@ -28,6 +28,7 @@ EXTRA_JS_MODULES.sessionstore = [
     'PageStyle.jsm',
     'PrivacyFilter.jsm',
     'PrivacyLevel.jsm',
+    'RecentlyClosedTabsAndWindowsMenuUtils.jsm',
     'SessionCookies.jsm',
     'SessionFile.jsm',
     'SessionHistory.jsm',
