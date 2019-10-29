@@ -141,9 +141,11 @@ let SessionStorageInternal = {
     let hostData = {};
     let storage;
 
+    let window = aDocShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
+
     try {
       let storageManager = aDocShell.QueryInterface(Ci.nsIDOMStorageManager);
-      storage = storageManager.getStorage(aPrincipal);
+      storage = storageManager.getStorage(window, aPrincipal);
     } catch (e) {
       // sessionStorage might throw if it's turned off, see bug 458954
     }
