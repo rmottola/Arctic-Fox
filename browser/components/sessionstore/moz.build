@@ -20,12 +20,30 @@ EXTRA_COMPONENTS += [
 ]
 
 EXTRA_JS_MODULES.sessionstore = [
-    '_SessionFile.jsm',
+    'ContentRestore.jsm',
+    'DocShellCapabilities.jsm',
     'DocumentUtils.jsm',
+    'FrameTree.jsm',
+    'GlobalState.jsm',
+    'PageStyle.jsm',
+    'PrivacyFilter.jsm',
+    'PrivacyLevel.jsm',
+    'RecentlyClosedTabsAndWindowsMenuUtils.jsm',
+    'SessionCookies.jsm',
+    'SessionFile.jsm',
+    'SessionHistory.jsm',
+    'SessionMigration.jsm',
     'SessionStorage.jsm',
-    'XPathGenerator.jsm',
+    'SessionWorker.js',
+    'SessionWorker.jsm',
+    'TabAttributes.jsm',
+    'TabState.jsm',
+    'TabStateCache.jsm',
+    'TextAndScrollData.jsm',
+    'Utils.jsm',
 ]
 
 EXTRA_PP_JS_MODULES.sessionstore += [
+    'SessionSaver.jsm',
     'SessionStore.jsm',
 ]

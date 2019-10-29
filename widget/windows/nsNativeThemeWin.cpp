@@ -956,7 +956,6 @@ nsNativeThemeWin::GetThemePartAndState(nsIFrame* aFrame, uint8_t aWidgetType,
     case NS_THEME_PROGRESSBAR_CHUNK:
     case NS_THEME_PROGRESSBAR_CHUNK_VERTICAL: {
       nsIFrame* parentFrame = aFrame->GetParent();
-      EventStates eventStates = GetContentState(parentFrame, aWidgetType);
       if (aWidgetType == NS_THEME_PROGRESSBAR_CHUNK_VERTICAL ||
           IsVerticalProgress(parentFrame)) {
         aPart = PP_FILLVERT;
@@ -1381,11 +1380,7 @@ nsNativeThemeWin::GetThemePartAndState(nsIFrame* aFrame, uint8_t aWidgetType,
     case NS_THEME_MENUCHECKBOX:
     case NS_THEME_MENURADIO:
       {
-        bool isChecked;
         EventStates eventState = GetContentState(aFrame, aWidgetType);
-
-        // NOTE: we can probably use NS_EVENT_STATE_CHECKED
-        isChecked = CheckBooleanAttr(aFrame, nsGkAtoms::checked);
 
         aPart = MENU_POPUPCHECK;
         aState = MC_CHECKMARKNORMAL;
@@ -3069,7 +3064,6 @@ nsresult nsNativeThemeWin::ClassicGetThemePartAndState(nsIFrame* aFrame, uint8_t
     case NS_THEME_RADIOMENUITEM: {
       bool isTopLevel = false;
       bool isOpen = false;
-      bool isContainer = false;
       nsMenuFrame *menuFrame = do_QueryFrame(aFrame);
       EventStates eventState = GetContentState(aFrame, aWidgetType);
 
@@ -3085,7 +3079,6 @@ nsresult nsNativeThemeWin::ClassicGetThemePartAndState(nsIFrame* aFrame, uint8_t
         // rendering.
         isTopLevel = menuFrame->IsOnMenuBar();
         isOpen = menuFrame->IsOpen();
-        isContainer = menuFrame->IsMenu();
       }
 
       if (IsDisabled(aFrame, eventState))
@@ -3368,6 +3361,8 @@ static void DrawTab(HDC hdc, const RECT& R, int32_t aPosition, bool aSelected,
       ::SetRect(&lightRect, R.left, R.bottom-3, R.left+2, R.bottom-1);
       ::SetRect(&shadeRect, R.right-2, R.bottom-3, R.right, R.bottom-1);
       break;
+    default:
+      MOZ_CRASH();
   }
 
   // Background
@@ -3703,7 +3698,6 @@ RENDER_AGAIN:
       bool indeterminate = IsIndeterminateProgress(stateFrame, eventStates);
       bool vertical = IsVerticalProgress(stateFrame) ||
                       aWidgetType == NS_THEME_PROGRESSBAR_CHUNK_VERTICAL;
-      int32_t overlayPart = GetProgressOverlayStyle(vertical);
 
       nsIContent* content = aFrame->GetContent();
       if (!indeterminate || !content) {

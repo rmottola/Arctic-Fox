@@ -33,6 +33,7 @@
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
+- Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
@@ -110,27 +111,37 @@
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
-- Bug 958147 - Choose one of run-if or skip-if 
+- Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
 - Bug 1038811 2015-04-11 Complete remaining
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
+- Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
-- Bug 1141710 - 2015-03-04 all parts
-- Bug 1130616 - 2015-02-24 Support EXT_color_buffer_half_float on ANGLE. 
+- Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
+
 
 Require check of JS browser components:
 
 - Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
 - Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
-- Bug 1118502 - part 1 - fixup grabbing of documentURIObject; 
-- Bug 1031264 - make opening links in new {tabs,windows} honor rel
+- Bug 1135913 - 4 parts
+- Bug 1135537 - 2015-02-24 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
+- Bug 1031264 - 2014-12-10 - make opening links in new {tabs,windows} honor rel
+- Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
+- Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
 
-- Bug 897062 - 2013 -  Handle special clicks in e10s. r=felipe,smaug 
-- Bug 899222 - 2013 - Make about:home work via message passing (r=felipe)
+2014-09
+Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
+Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
+
+https://github.com/mozilla/newtab-dev/commit/a0a0c45963092657a7eb7d8fee359786378cefbe#diff-0c6e8f7d648e858c3fe08a2b4802c3a0
+
+https://github.com/mozilla/newtab-dev/tree/8932974653ba03522b4f6fefdc4081bdb0356da1/browser/components/sessionstore/src
+
 
 Parents of:
 
-https://github.com/mozilla/newtab-dev/commit/ed1b0adc6c08d6ac9aae2e41f9e35d9066614943
-https://github.com/mozilla/newtab-dev/commit/59ccb9a8108d73cf3a2766568b0b4f6441e763e0
+https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
+https://github.com/mozilla/newtab-dev/commit/3dd206c7b88dcda78fbcff6349119f8915587116
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -141,7 +152,6 @@ To verify:
 
 
 Analyze all:
-https://bugzilla.mozilla.org/show_bug.cgi?id=1106829
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
 
@@ -152,9 +162,10 @@ no components/url-classifier ?
 
 ### Further ToDo which would help portability:
 
+- from nsContextMenu.js : remove unremotePrincipal again
+
 - Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
-- js/src/jscntxt.h  update ReportValueError to UniquePtr
 - in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
 - inherit principal vs. inherit owner in DocShell see INTERNAL_LOAD_FLAGS_INHERIT_OWNER
 - update nsNullPrincipal (and nsDocShell Fixme's)

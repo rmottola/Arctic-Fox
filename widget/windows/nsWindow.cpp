@@ -672,11 +672,7 @@ NS_METHOD nsWindow::Destroy()
    * On windows the LayerManagerOGL destructor wants the widget to be around for
    * cleanup. It also would like to have the HWND intact, so we nullptr it here.
    */
-  if (mLayerManager) {
-    mLayerManager->Destroy();
-  }
-  mLayerManager = nullptr;
-  DestroyCompositor();
+  DestroyLayerManager();
 
   /* We should clear our cached resources now and not wait for the GC to
    * delete the nsWindow. */
@@ -1704,8 +1700,6 @@ NS_METHOD nsWindow::ConstrainPosition(bool aAllowSlop,
   int32_t logWidth = std::max<int32_t>(NSToIntRound(mBounds.width / dpiScale), 1);
   int32_t logHeight = std::max<int32_t>(NSToIntRound(mBounds.height / dpiScale), 1);
 
-  bool doConstrain = false; // whether we have enough info to do anything
-
   /* get our playing field. use the current screen, or failing that
     for any reason, use device caps for the default screen. */
   RECT screenRect;
@@ -1729,7 +1723,6 @@ NS_METHOD nsWindow::ConstrainPosition(bool aAllowSlop,
       screenRect.right = left + width;
       screenRect.top = top;
       screenRect.bottom = top + height;
-      doConstrain = true;
     }
   } else {
     if (mWnd) {
@@ -1743,7 +1736,6 @@ NS_METHOD nsWindow::ConstrainPosition(bool aAllowSlop,
             screenRect.right = GetSystemMetrics(SM_CXFULLSCREEN);
             screenRect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
           }
-          doConstrain = true;
         }
         ::ReleaseDC(mWnd, dc);
       }
@@ -2703,6 +2695,8 @@ void nsWindow::UpdateGlass()
     // Fall through
   case eTransparencyGlass:
     policy = DWMNCRP_ENABLED;
+    break;
+  default:
     break;
   }
 
@@ -5244,7 +5238,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       *aRetValue = 0;
       // Do explicit casting to make it working on 64bit systems (see bug 649236
       // for details).
-      DWORD objId = static_cast<DWORD>(lParam);
+      int32_t objId = static_cast<DWORD>(lParam);
       if (objId == OBJID_CLIENT) { // oleacc.dll will be loaded dynamically
         a11y::Accessible* rootAccessible = GetAccessible(); // Held by a11y cache
         if (rootAccessible) {
@@ -6597,10 +6591,7 @@ nsWindow::IsPopup()
 void
 nsWindow::ClearCompositor(nsWindow* aWindow)
 {
-  if (aWindow->mLayerManager) {
-    aWindow->mLayerManager = nullptr;
-    aWindow->DestroyCompositor();
-  }
+  aWindow->DestroyLayerManager();
 }
 
 bool
@@ -6634,8 +6625,6 @@ nsWindow::GetPreferredCompositorBackends(nsTArray<LayersBackend>& aHints)
     if (prefs.mPreferOpenGL) {
       aHints.AppendElement(LayersBackend::LAYERS_OPENGL);
     }
-
-    ID3D11Device* device = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
 
     if (!prefs.mPreferD3D9) {
       aHints.AppendElement(LayersBackend::LAYERS_D3D11);

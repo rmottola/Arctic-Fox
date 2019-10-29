@@ -53,8 +53,6 @@ public:
                       nsIntRegion* aDestRegion = nullptr,
                       gfx::IntPoint* aSrcOffset = nullptr) override
   {
-    // XXX - For this to work with IncrementalContentHost we will need to support
-    // the aDestRegion and aSrcOffset parameters properly;
     mSurface = aSurface;
     return true;
   }

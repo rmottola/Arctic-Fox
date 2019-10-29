@@ -2290,6 +2290,7 @@ XMLHttpRequest::Abort(ErrorResult& aRv)
 
   if (mCanceled) {
     aRv.ThrowUncatchableException();
+    return;
   }
 
   if (!mProxy) {

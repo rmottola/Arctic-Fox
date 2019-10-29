@@ -15,6 +15,8 @@
   <!ENTITY % browserDTD
     SYSTEM "chrome://browser/locale/browser.dtd">
   %browserDTD;
+  <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
+  %brandDTD;
 
 ]>
 
@@ -30,27 +32,15 @@
       <p id="helper-error-msg">&tabCrashed.message;</p>
     </div>
 
+    <div id="report-box">
+      <input type="checkbox" id="checkSendReport" checked="checked"/>
+      <label for="checkSendReport">&tabCrashed.checkSendReport;</label>
+    </div>
+
     <div id="button-box">
       <button id="tryAgain">&tabCrashed.tryAgain;</button>
     </div>
   </body>
 
-  <script type="text/javascript;version=1.8"><![CDATA[
-    function parseQueryString() {
-      let url = document.documentURI;
-      let queryString = url.replace(/^about:tabcrashed?e=tabcrashed/, "");
-
-      let urlMatch = queryString.match(/u=([^&]+)/);
-      let url = urlMatch && urlMatch[1] ? decodeURIComponent(urlMatch[1]) : "";
-
-      let titleMatch = queryString.match(/d=([^&]*)/);
-      title = titleMatch && titleMatch[1] ? decodeURIComponent(titleMatch[1]) : "";
-
-      return [url, title];
-    }
-
-    let [url, title] = parseQueryString();
-    document.title = title;
-    document.getElementById("tryAgain").setAttribute("url", url);
-  ]]></script>
+  <script type="text/javascript;version=1.8" src="chrome://browser/content/aboutTabCrashed.js"/>
 </html>
