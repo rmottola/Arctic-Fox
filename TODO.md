@@ -133,15 +133,11 @@ Require check of JS browser components:
 Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
 Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
 
-https://github.com/mozilla/newtab-dev/commit/a0a0c45963092657a7eb7d8fee359786378cefbe#diff-0c6e8f7d648e858c3fe08a2b4802c3a0
-
-https://github.com/mozilla/newtab-dev/tree/8932974653ba03522b4f6fefdc4081bdb0356da1/browser/components/sessionstore/src
-
 
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/3dd206c7b88dcda78fbcff6349119f8915587116
+https://github.com/mozilla/newtab-dev/commit/46dba701ace4db37c287ddbd467f363124eaf618
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
