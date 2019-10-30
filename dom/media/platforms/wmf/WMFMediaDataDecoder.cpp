@@ -88,6 +88,8 @@ WMFMediaDataDecoder::EnsureDecodeTaskDispatched()
 nsresult
 WMFMediaDataDecoder::Input(MediaRawData* aSample)
 {
+  MOZ_ASSERT(mCallback->OnReaderTaskQueue());
+
   MonitorAutoLock mon(mMonitor);
   mInput.push(aSample);
   EnsureDecodeTaskDispatched();
@@ -169,6 +171,8 @@ WMFMediaDataDecoder::PurgeInputQueue()
 nsresult
 WMFMediaDataDecoder::Flush()
 {
+  MOZ_ASSERT(mCallback->OnReaderTaskQueue());
+
   MonitorAutoLock mon(mMonitor);
   PurgeInputQueue();
   mIsFlushing = true;
@@ -196,6 +200,8 @@ WMFMediaDataDecoder::ProcessDrain()
 nsresult
 WMFMediaDataDecoder::Drain()
 {
+  MOZ_ASSERT(mCallback->OnReaderTaskQueue());
+
   nsCOMPtr<nsIRunnable> runnable =
   NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessDrain);
   mTaskQueue->Dispatch(runnable.forget());
