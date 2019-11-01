@@ -115,12 +115,12 @@ namespace image {
 // These functions may be used if we decide to provide mamroy allocation/deallocation routines to JXRLib
 //static void * MyAlloc(size_t cBytes)
 //{
-//    return moz_malloc(cBytes);
+//    return malloc(cBytes);
 //}
 //
 //static void MyFree(void *ptr)
 //{
-//    moz_free(ptr);
+//    free(ptr);
 //}
 
 // It looks like hasBeenDecoded is never true if the image is not cached, but is SOMETIMES true for a cached image.
@@ -169,8 +169,8 @@ nsJXRDecoder::nsJXRDecoder(RasterImage* aImage, bool hasBeenDecoded) : Decoder(a
 nsJXRDecoder::~nsJXRDecoder()
 {
     DestroyJXRStuff();
-    moz_free(m_tileRowBandInfos);
-    moz_free(m_tileRowInfos);
+    free(m_tileRowBandInfos);
+    free(m_tileRowInfos);
 
     if (m_transform)
         qcms_transform_release(m_transform);
@@ -178,7 +178,7 @@ nsJXRDecoder::~nsJXRDecoder()
     if (m_inProfile)
         qcms_profile_release(m_inProfile);
 
-    moz_free(m_xfBuf);
+    free(m_xfBuf);
 }
 
 bool nsJXRDecoder::CreateJXRStuff()
@@ -498,7 +498,7 @@ void nsJXRDecoder::AllocateMBRowBuffer(size_t width, bool decodeAlpha)
         // Allocate a buffer for color transformation
         uint32_t xf_bpp = GetPixFmtBitsPP(m_xfPixelFormat);
         m_xfBufRowStride = ((xf_bpp + 7) >> 3) * width;
-        m_xfBuf = (uint8_t *)moz_malloc(m_xfBufRowStride * cLinesPerMBRow);
+        m_xfBuf = (uint8_t *)malloc(m_xfBufRowStride * cLinesPerMBRow);
 
         if (nullptr == m_xfBuf)
             return;
@@ -644,7 +644,7 @@ bool nsJXRDecoder::FillTileRowBandInfo()
     if (nullptr == indexTable)
         return false;
 
-    m_tileRowBandInfos = (TileRowBandInfo *)moz_malloc(sizeof(TileRowBandInfo) * cTileRows);
+    m_tileRowBandInfos = (TileRowBandInfo *)malloc(sizeof(TileRowBandInfo) * cTileRows);
 
     if (nullptr == m_tileRowBandInfos)
     {
@@ -826,7 +826,7 @@ bool nsJXRDecoder::FillTileRowInfo()
     if (nullptr == indexTable)
         return false;
 
-    m_tileRowInfos = (TileRowInfo *)moz_malloc(sizeof(TileRowInfo) * cTileRows);
+    m_tileRowInfos = (TileRowInfo *)malloc(sizeof(TileRowInfo) * cTileRows);
 
     if (nullptr == m_tileRowInfos)
     {
@@ -2123,7 +2123,7 @@ void nsJXRDecoder::FreeMBRowBuffers()
 
     if (nullptr != m_xfBuf)
     {
-        moz_free(m_xfBuf);
+        free(m_xfBuf);
         m_xfBuf = nullptr;
     }
 }
@@ -2135,7 +2135,7 @@ void nsJXRDecoder::CreateColorTransform()
     if (0 == cb)
         return;
 
-    void *buf = moz_malloc(cb);
+    void *buf = malloc(cb);
 
     if (nullptr != buf)
     {
@@ -2145,7 +2145,7 @@ void nsJXRDecoder::CreateColorTransform()
         if (WMP_errSuccess == err)
             m_inProfile = qcms_profile_from_memory(buf, cb);
 
-        moz_free(buf);
+        free(buf);
 
         if (m_inProfile != nullptr)
         {

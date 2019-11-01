@@ -161,7 +161,7 @@ imgFrame::~imgFrame()
   MOZ_ASSERT(mAborted || IsImageCompleteInternal());
 #endif
 
-  moz_free(mPalettedImageData);
+  free(mPalettedImageData);
   mPalettedImageData = nullptr;
 }
 
@@ -213,7 +213,7 @@ imgFrame::ReinitForDecoder(const nsIntSize& aImageSize,
   mOptSurface = nullptr;
   mVBuf = nullptr;
   mVBufPtr = nullptr;
-  moz_free(mPalettedImageData);
+  free(mPalettedImageData);
   mPalettedImageData = nullptr;
 
   // Reinitialize.
@@ -274,9 +274,9 @@ imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     // Use the fallible allocator here. Paletted images always use 1 byte per
     // pixel, so calculating the amount of memory we need is straightforward.
     size_t dataSize = PaletteDataLength() + (mSize.width * mSize.height);
-    mPalettedImageData = static_cast<uint8_t*>(moz_calloc(dataSize, sizeof(uint8_t)));
+    mPalettedImageData = static_cast<uint8_t*>(calloc(dataSize, sizeof(uint8_t)));
     if (!mPalettedImageData)
-      NS_WARNING("Call to moz_calloc for paletted image data should succeed");
+      NS_WARNING("Call to calloc for paletted image data should succeed");
     NS_ENSURE_TRUE(mPalettedImageData, NS_ERROR_OUT_OF_MEMORY);
   } else {
     MOZ_ASSERT(!mImageSurface, "Called imgFrame::InitForDecoder() twice?");
