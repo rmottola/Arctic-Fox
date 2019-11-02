@@ -228,7 +228,10 @@ FetchName(JSContext* cx, HandleObject obj, HandleObject obj2, HandlePropertyName
             vp.setUndefined();
             return true;
         }
-        return ReportIsNotDefined(cx, name);
+        JSAutoByteString printable;
+        if (AtomToPrintableString(cx, name, &printable))
+            ReportIsNotDefined(cx, printable.ptr());
+        return false;
     }
 
     /* Take the slow path if shape was not found in a native object. */

@@ -34,8 +34,8 @@
             <xul:hbox flex="1" class="browserSidebarContainer">
               <xul:vbox flex="1" class="browserContainer">
                 <xul:stack flex="1" class="browserStack" anonid="browserStack">
-                  <xul:browser anonid="initialBrowser" type="content-primary" message="true" messagemanagergroup="browsers"
-                               xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup,selectpopup"/>
+                  <xul:browser anonid="initialBrowser" type="content-primary" message="true" disablehistory="true"
+                               xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
                 </xul:stack>
               </xul:vbox>
             </xul:hbox>
@@ -728,10 +728,8 @@
                                              aFlags]);
               }
 
-              if (topLevel) {
+              if (topLevel)
                 this.mBrowser.lastURI = aLocation;
-                this.mBrowser.lastLocationChange = Date.now();
-              }
             },
 
             onStatusChange: function (aWebProgress, aRequest, aStatus, aMessage) {
@@ -1261,7 +1259,6 @@
             var aFromExternal;
             var aRelatedToCurrent;
             var aAllowMixedContent;
-            var aSkipAnimation;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1274,7 +1271,6 @@
               aFromExternal         = params.fromExternal;
               aRelatedToCurrent     = params.relatedToCurrent;
               aAllowMixedContent    = params.allowMixedContent;
-              aSkipAnimation        = params.skipAnimation;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1288,7 +1284,6 @@
                                   allowThirdPartyFixup: aAllowThirdPartyFixup,
                                   fromExternal: aFromExternal,
                                   relatedToCurrent: aRelatedToCurrent,
-                                  skipAnimation: aSkipAnimation,
                                   allowMixedContent: aAllowMixedContent});
             if (!bgLoad)
               this.selectedTab = tab;
@@ -1350,14 +1345,15 @@
         ]]></body>
       </method>
 
-      <method name="updateBrowserRemoteness">
+#ifdef MAKE_E10S_WORK
+      <method name="_updateBrowserRemoteness">
         <parameter name="aBrowser"/>
-        <parameter name="aShouldBeRemote"/>
+        <parameter name="aRemote"/>
         <body>
           <![CDATA[
             let isRemote = aBrowser.getAttribute("remote") == "true";
-            if (isRemote == aShouldBeRemote)
-              return false;
+            if (isRemote == aRemote)
+              return;
 
             // Unhook our progress listener.
             let tab = this._getTabForBrowser(aBrowser);
@@ -1368,30 +1364,11 @@
             // Change the "remote" attribute.
             let parent = aBrowser.parentNode;
             parent.removeChild(aBrowser);
-            aBrowser.setAttribute("remote", aShouldBeRemote ? "true" : "false");
+            aBrowser.setAttribute("remote", aRemote ? "true" : "false");
             parent.appendChild(aBrowser);
 
             // Restore the progress listener.
             aBrowser.webProgress.addProgressListener(filter, Ci.nsIWebProgress.NOTIFY_ALL);
-
-            if (aShouldBeRemote)
-              tab.setAttribute("remote", "true");
-            else
-              tab.removeAttribute("remote");
-
-            return true;
-          ]]>
-        </body>
-      </method>
-
-#ifdef MAKE_E10S_WORK
-      <method name="updateBrowserRemotenessByURL">
-        <parameter name="aBrowser"/>
-        <parameter name="aURL"/>
-        <body>
-          <![CDATA[
-            let shouldBeRemote = this._shouldBrowserBeRemote(aURL);
-            return this.updateBrowserRemoteness(aBrowser, shouldBeRemote);
           ]]>
         </body>
       </method>
@@ -1476,13 +1453,6 @@
             t.setAttribute("validate", "never"); //PMed
             t.setAttribute("onerror", "this.removeAttribute('image');");
             t.className = "tabbrowser-tab";
-#ifdef MAKE_E10S_WORK
-            let remote = this._shouldBrowserBeRemote(aURI);
-#else
-            let remote = gMultiProcessBrowser;
-#endif
-            if (remote)
-              t.setAttribute("remote", "true");
 
             this.tabContainer._unlockTabSizing();
 
@@ -1514,10 +1484,14 @@
                                              "browser");
             b.setAttribute("type", "content-targetable");
             b.setAttribute("message", "true");
-            b.setAttribute("messagemanagergroup", "browsers");
             b.setAttribute("contextmenu", this.getAttribute("contentcontextmenu"));
             b.setAttribute("tooltip", this.getAttribute("contenttooltip"));
 
+#ifdef MAKE_E10S_WORK
+            let remote = this._shouldBrowserBeRemote(aURI);
+#else
+            let remote = gMultiProcessBrowser;
+#endif
             if (remote)
               b.setAttribute("remote", "true");
 
@@ -1528,10 +1502,6 @@
 
             if (this.hasAttribute("autocompletepopup"))
               b.setAttribute("autocompletepopup", this.getAttribute("autocompletepopup"));
-
-            if (this.hasAttribute("selectpopup"))
-              b.setAttribute("selectpopup", this.getAttribute("selectpopup"));
-
             b.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
 
             // Create the browserStack container
@@ -2230,7 +2200,9 @@
             // then do not switch docShells but retrieve the other tab's state
             // and apply it to our tab.
             if (isPending) {
-              SessionStore.setTabState(aOurTab, SessionStore.getTabState(aOtherTab));
+              let ss = Cc["@mozilla.org/browser/sessionstore;1"]
+                         .getService(Ci.nsISessionStore)
+              ss.setTabState(aOurTab, ss.getTabState(aOtherTab));
 
               // Make sure to unregister any open URIs.
               this._swapRegisteredOpenURIs(ourBrowser, otherBrowser);
@@ -2659,7 +2631,9 @@
         <parameter name="aTab"/><!-- can be from a different window as well -->
         <body>
           <![CDATA[
-            return SessionStore.duplicateTab(window, aTab);
+            return Cc["@mozilla.org/browser/sessionstore;1"]
+                     .getService(Ci.nsISessionStore)
+                     .duplicateTab(window, aTab);
           ]]>
         </body>
       </method>
@@ -2723,14 +2697,14 @@
         <body>
           <![CDATA[
 #ifdef MAKE_E10S_WORK
-            this.updateBrowserRemotenessByURL(this.mCurrentBrowser, aURI);
+            this._updateBrowserRemoteness(this.mCurrentBrowser, this._shouldBrowserBeRemote(aURI));
             try {
 #endif
             return this.mCurrentBrowser.loadURI(aURI, aReferrerURI, aCharset);
 #ifdef MAKE_E10S_WORK
             } catch (e) {
               let url = this.mCurrentBrowser.currentURI.spec;
-              this.updateBrowserRemotenessByURL(this.mCurrentBrowser, url);
+              this._updateBrowserRemoteness(this.mCurrentBrowser, this._shouldBrowserBeRemote(url));
             }
 #endif
           ]]>
@@ -2747,15 +2721,14 @@
         <body>
           <![CDATA[
 #ifdef MAKE_E10S_WORK
-            this.updateBrowserRemotenessByURL(this.mCurrentBrowser, aURI);
+            this._updateBrowserRemoteness(this.mCurrentBrowser, this._shouldBrowserBeRemote(aURI));
             try {
 #endif
             return this.mCurrentBrowser.loadURIWithFlags(aURI, aFlags, aReferrerURI, aCharset, aPostData);
 #ifdef MAKE_E10S_WORK
             } catch (e) {
               let url = this.mCurrentBrowser.currentURI.spec;
-              this.updateBrowserRemotenessByURL(this.mCurrentBrowser, url);
-	      throw e
+              this._updateBrowserRemoteness(this.mCurrentBrowser, this._shouldBrowserBeRemote(url));
             }
 #endif
           ]]>
@@ -3076,26 +3049,11 @@
           switch (aMessage.name) {
             case "DOMTitleChanged": {
               let tab = this.getTabForBrowser(browser);
-              if (!tab || tab.hasAttribute("pending"))
+              if (!tab)
                 return;
               let titleChanged = this.setTabTitle(tab);
               if (titleChanged && !tab.selected && !tab.hasAttribute("busy"))
                 tab.setAttribute("titlechanged", "true");
-              break;
-            }
-            case "contextmenu": {
-              let spellInfo = aMessage.data.spellInfo;
-              if (spellInfo)
-                spellInfo.target = aMessage.target.messageManager;
-              gContextMenuContentData = { event: aMessage.objects.event,
-                                          browser: browser,
-                                          editFlags: aMessage.data.editFlags,
-                                          spellInfo: spellInfo };
-              let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
-              popup.openPopup(browser, "overlap",
-                              gContextMenuContentData.event.clientX,
-                              gContextMenuContentData.event.clientY,
-                              true, false, null);
               break;
             }
             case "DOMWebNotificationClicked": {
@@ -3118,7 +3076,6 @@
             browserStack.removeChild(this.mCurrentBrowser);
             this.mCurrentBrowser.setAttribute("remote", true);
             browserStack.appendChild(this.mCurrentBrowser);
-            this.tabContainer.firstChild.setAttribute("remote", "true");
           }
 
           this.mCurrentTab = this.tabContainer.firstChild;
@@ -3166,13 +3123,8 @@
               "-moz-default-background-color" :
               Services.prefs.getCharPref("browser.display.background_color");
 
-          let remote = window.QueryInterface(Ci.nsIInterfaceRequestor)
-            .getInterface(Ci.nsIWebNavigation)
-            .QueryInterface(Ci.nsILoadContext)
-            .useRemoteTabs;
-          if (remote) {
+          if (Services.prefs.getBoolPref("browser.tabs.remote")) {
             messageManager.addMessageListener("DOMTitleChanged", this);
-            messageManager.addMessageListener("contextmenu", this);
           } else {
             this._outerWindowIDBrowserMap.set(this.mCurrentBrowser.outerWindowID,
                                               this.mCurrentBrowser);
@@ -3223,10 +3175,8 @@
           document.removeEventListener("keypress", this, false);
           window.removeEventListener("sizemodechange", this, false);
 
-          if (gMultiProcessBrowser) {
+          if (Services.prefs.getBoolPref("browser.tabs.remote"))
             messageManager.removeMessageListener("DOMTitleChanged", this);
-            messageManager.removeMessageListener("contextmenu", this);
-          }
         ]]>
       </destructor>
 
@@ -3320,8 +3270,9 @@
             return;
 
           var tab = this._getTabForContentWindow(contentWin);
-          if (!tab || tab.hasAttribute("pending"))
+          if (!tab) {
             return;
+          }
 
           var titleChanged = this.setTabTitle(tab);
           if (titleChanged && !tab.selected && !tab.hasAttribute("busy"))
@@ -3337,7 +3288,7 @@
           let title = browser.contentTitle;
           let uri = browser.currentURI;
 
-          this.updateBrowserRemotenessByURL(browser, "about:tabcrashed");
+          this._updateBrowserRemoteness(browser, false);
 
           browser.setAttribute("crashedPageTitle", title);
           browser.docShell.displayLoadError(Cr.NS_ERROR_CONTENT_CRASHED, uri, null);

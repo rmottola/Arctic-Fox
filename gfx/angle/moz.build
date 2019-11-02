@@ -150,6 +150,9 @@ DEFINES['GL_APICALL'] = ""
 DEFINES['GL_GLEXT_PROTOTYPES'] = ""
 DEFINES['EGLAPI'] = ""
 
+# ANGLE uses the STL, so we can't use Mozilla's derpy STL wrappers.
+DISABLE_STL_WRAPPING = True
+
 
 # Only build libEGL/libGLESv2 on Windows
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':

@@ -1,13 +1,8 @@
-/* vim: set ts=2 sw=2 sts=2 et tw=80: */
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
-Components.utils.import("resource://gre/modules/InlineSpellChecker.jsm");
-Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
-
-var gContextMenuContentData = null;
 
 function nsContextMenu(aXulMenu, aIsShift) {
   this.shouldDisplay = true;
@@ -44,7 +39,6 @@ nsContextMenu.prototype = {
   },
 
   hiding: function CM_hiding() {
-    gContextMenuContentData = null;
     InlineSpellCheckerUI.clearSuggestionsFromMenu();
     InlineSpellCheckerUI.clearDictionaryListFromMenu();
     InlineSpellCheckerUI.uninit();
@@ -439,19 +433,6 @@ nsContextMenu.prototype = {
 
   // Set various context menu attributes based on the state of the world.
   setTarget: function (aNode, aRangeParent, aRangeOffset) {
-    // If gContextMenuContentData is not null, this event was forwarded from a
-    // child process, so use that information instead.
-    let editFlags;
-    if (gContextMenuContentData) {
-      this.isRemote = true;
-      aNode = gContextMenuContentData.event.target;
-      aRangeParent = gContextMenuContentData.event.rangeParent;
-      aRangeOffset = gContextMenuContentData.event.rangeOffset;
-      editFlags = gContextMenuContentData.editFlags;
-    } else {
-      this.isRemote = false;
-    }
-
     const xulNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
     if (aNode.namespaceURI == xulNS ||
         aNode.nodeType == Node.DOCUMENT_NODE ||
@@ -494,18 +475,11 @@ nsContextMenu.prototype = {
     // Remember the node that was clicked.
     this.target = aNode;
 
-    // If this is a remote context menu event, use the information from
-    // gContextMenuContentData instead.
-    if (this.isRemote) {
-      this.browser = gContextMenuContentData.browser;
-    } else {
-      editFlags = SpellCheckHelper.isEditable(this.target, window);
-      this.browser = this.target.ownerDocument.defaultView
-                                  .QueryInterface(Ci.nsIInterfaceRequestor)
-                                  .getInterface(Ci.nsIWebNavigation)
-                                  .QueryInterface(Ci.nsIDocShell)
-                                  .chromeEventHandler;
-    }
+    this.browser = this.target.ownerDocument.defaultView
+                                .QueryInterface(Ci.nsIInterfaceRequestor)
+                                .getInterface(Ci.nsIWebNavigation)
+                                .QueryInterface(Ci.nsIDocShell)
+                                .chromeEventHandler;
 
     // Check if we are in a synthetic document (stand alone image, video, etc.).
     this.inSyntheticDoc =  this.target.ownerDocument.mozSyntheticDocument;
@@ -544,19 +518,24 @@ nsContextMenu.prototype = {
         this.onAudio = true;
         this.mediaURL = this.target.currentSrc || this.target.src;
       }
-      else if (editFlags & (SpellCheckHelper.INPUT | SpellCheckHelper.TEXTAREA)) {
-        this.onTextInput = (editFlags & SpellCheckHelper.TEXTINPUT) !== 0;
-        this.onEditableArea = (editFlags & SpellCheckHelper.EDITABLE) !== 0;
-        if (this.onEditableArea) {
-          if (gContextMenuContentData) {
-            InlineSpellCheckerUI.initFromRemote(gContextMenuContentData.spellInfo);
-          }
-          else {
-            InlineSpellCheckerUI.init(this.target.QueryInterface(Ci.nsIDOMNSEditableElement).editor);
-            InlineSpellCheckerUI.initFromEvent(aRangeParent, aRangeOffset);
-          }
+      else if (this.target instanceof HTMLInputElement ) {
+        this.onTextInput = this.isTargetATextBox(this.target);
+        // Allow spellchecking UI on all text and search inputs.
+        if (this.onTextInput && ! this.target.readOnly &&
+            (this.target.type == "text" || this.target.type == "search")) {
+          this.onEditableArea = true;
+          InlineSpellCheckerUI.init(this.target.QueryInterface(Ci.nsIDOMNSEditableElement).editor);
+          InlineSpellCheckerUI.initFromEvent(aRangeParent, aRangeOffset);
         }
-        this.onKeywordField = (editFlags & SpellCheckHelper.KEYWORD);
+        this.onKeywordField = this.isTargetAKeywordField(this.target);
+      }
+      else if (this.target instanceof HTMLTextAreaElement) {
+        this.onTextInput = true;
+        if (!this.target.readOnly) {
+          this.onEditableArea = true;
+          InlineSpellCheckerUI.init(this.target.QueryInterface(Ci.nsIDOMNSEditableElement).editor);
+          InlineSpellCheckerUI.initFromEvent(aRangeParent, aRangeOffset);
+        }
       }
       else if (this.target instanceof HTMLHtmlElement) {
         var bodyElt = this.target.ownerDocument.body;
@@ -672,35 +651,41 @@ nsContextMenu.prototype = {
 
     // if the document is editable, show context menu like in text inputs
     if (!this.onEditableArea) {
-      if (editFlags & SpellCheckHelper.CONTENTEDITABLE) {
-        // If this.onEditableArea is false but editFlags is CONTENTEDITABLE, then
-        // the document itself must be editable.
-        this.onTextInput       = true;
-        this.onKeywordField    = false;
-        this.onImage           = false;
-        this.onLoadedImage     = false;
-        this.onCompletedImage  = false;
-        this.onMathML          = false;
-        this.inFrame           = false;
-        this.inSrcdocFrame     = false;
-        this.hasBGImage        = false;
-        this.isDesignMode      = true;
-        this.onEditableArea = true;
-        if (gContextMenuContentData) {
-          InlineSpellCheckerUI.initFromRemote(gContextMenuContentData.spellInfo);
+      var win = this.target.ownerDocument.defaultView;
+      if (win) {
+        var isEditable = false;
+        try {
+          var editingSession = win.QueryInterface(Ci.nsIInterfaceRequestor)
+                                  .getInterface(Ci.nsIWebNavigation)
+                                  .QueryInterface(Ci.nsIInterfaceRequestor)
+                                  .getInterface(Ci.nsIEditingSession);
+          if (editingSession.windowIsEditable(win) &&
+              this.getComputedStyle(this.target, "-moz-user-modify") == "read-write") {
+            isEditable = true;
+          }
         }
-        else {
-          var targetWin = this.target.ownerDocument.defaultView;
-          var editingSession = targetWin.QueryInterface(Ci.nsIInterfaceRequestor)
-                                        .getInterface(Ci.nsIWebNavigation)
-                                        .QueryInterface(Ci.nsIInterfaceRequestor)
-                                        .getInterface(Ci.nsIEditingSession);
-          InlineSpellCheckerUI.init(editingSession.getEditorForWindow(targetWin));
+        catch(ex) {
+          // If someone built with composer disabled, we can't get an editing session.
+        }
+
+        if (isEditable) {
+          this.onTextInput       = true;
+          this.onKeywordField    = false;
+          this.onImage           = false;
+          this.onLoadedImage     = false;
+          this.onCompletedImage  = false;
+          this.onMathML          = false;
+          this.inFrame           = false;
+          this.inSrcdocFrame     = false;
+          this.hasBGImage        = false;
+          this.isDesignMode      = true;
+          this.onEditableArea = true;
+          InlineSpellCheckerUI.init(editingSession.getEditorForWindow(win));
+          var canSpell = InlineSpellCheckerUI.canSpellCheck && this.canSpellCheck;
           InlineSpellCheckerUI.initFromEvent(aRangeParent, aRangeOffset);
+          this.showItem("spell-check-enabled", canSpell);
+          this.showItem("spell-separator", canSpell);
         }
-        var canSpell = InlineSpellCheckerUI.canSpellCheck && this.canSpellCheck;
-        this.showItem("spell-check-enabled", canSpell);
-        this.showItem("spell-separator", canSpell);
       }
     }
   },
@@ -754,46 +739,29 @@ nsContextMenu.prototype = {
     return aNode.spellcheck;
   },
 
-  _unremotePrincipal: function(aRemotePrincipal) {
-    if (this.isRemote) {
-      return Cc["@mozilla.org/scriptsecuritymanager;1"]
-               .getService(Ci.nsIScriptSecurityManager)
-               .getAppCodebasePrincipal(aRemotePrincipal.URI,
-                                        aRemotePrincipal.appId,
-                                        aRemotePrincipal.isInBrowserElement);
-    }
-
-    return aRemotePrincipal;
-  },
-
-  _openLinkInParameters : function (doc, extra) {
-    let params = { charset: doc.characterSet };
-    if (!BrowserUtils.linkHasNoReferrer(this.link))
-      params.referrerURI = doc.documentURIObject;
-    for (let p in extra)
-      params[p] = extra[p];
-    return params;
-  },
-
   // Open linked-to URL in a new window.
   openLink : function () {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
-    openLinkIn(this.linkURL, "window", this._openLinkInParameters(doc));
+    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    openLinkIn(this.linkURL, "window",
+               { charset: doc.characterSet,
+                 referrerURI: doc.documentURIObject });
   },
 
   // Open linked-to URL in a new private window.
   openLinkInPrivateWindow : function () {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
+    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
     openLinkIn(this.linkURL, "window",
-               this._openLinkInParameters(doc, { private: true }));
+               { charset: doc.characterSet,
+                 referrerURI: doc.documentURIObject,
+                 private: true });
   },
 
   // Open linked-to URL in a new tab.
   openLinkInTab: function() {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
+    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
     var referrerURI = doc.documentURIObject;
 
     // if the mixedContentChannel is present and the referring URI passes
@@ -811,17 +779,19 @@ nsContextMenu.prototype = {
       catch (e) { }
     }
 
-    let params = this._openLinkInParameters(doc, {
-      allowMixedContent: persistAllowMixedContentInChildTab,
-    });
-    openLinkIn(this.linkURL, "tab", params);
+    openLinkIn(this.linkURL, "tab",
+               { charset: doc.characterSet,
+                 referrerURI: referrerURI,
+                 allowMixedContent: persistAllowMixedContentInChildTab });
   },
 
   // open URL in current tab
   openLinkInCurrent: function() {
     var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
-    openLinkIn(this.linkURL, "current", this._openLinkInParameters(doc));
+    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
+    openLinkIn(this.linkURL, "current",
+               { charset: doc.characterSet,
+                 referrerURI: doc.documentURIObject });
   },
 
   // Open frame in a new tab.
@@ -854,8 +824,7 @@ nsContextMenu.prototype = {
     var doc = this.target.ownerDocument;
     var frameURL = doc.location.href;
 
-    urlSecurityCheck(frameURL,
-                     this._unremotePrincipal(this.browser.contentPrincipal),
+    urlSecurityCheck(frameURL, this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     var referrer = doc.referrer;
     openUILinkIn(frameURL, "current", { disallowInheritPrincipal: true,
@@ -903,16 +872,6 @@ nsContextMenu.prototype = {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document);
   },
 
-
-  viewImageDesc: function(e) {
-    var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.imageDescURL,
-                     this._unremotePrincipal(this.browser.contentPrincipal),
-                     Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
-    openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
-                             referrerURI: doc.documentURIObject });
-  },
-
   viewImageInfo: function() {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document,
                     "mediaTab", this.target);
@@ -924,7 +883,7 @@ nsContextMenu.prototype = {
 
   reloadImage: function(e) {
     urlSecurityCheck(this.mediaURL,
-                     this._unremotePrincipal(this.browser.contentPrincipal),
+                     this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
 
     if (this.target instanceof Ci.nsIImageLoadingContent)
@@ -956,7 +915,7 @@ nsContextMenu.prototype = {
     } else {
       viewURL = this.mediaURL;
       urlSecurityCheck(viewURL,
-                       this._unremotePrincipal(this.browser.contentPrincipal),
+                       this.browser.contentPrincipal,
                        Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
       let doc = this.target.ownerDocument;
       openUILink(viewURL, e, { disallowInheritPrincipal: true,
@@ -965,8 +924,7 @@ nsContextMenu.prototype = {
   },
 
   saveVideoFrameAsImage: function () {
-    urlSecurityCheck(this.mediaURL,
-                     this._unremotePrincipal(this.browser.contentPrincipal),
+    urlSecurityCheck(this.mediaURL, this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     let name = "";
     try {
@@ -999,7 +957,7 @@ nsContextMenu.prototype = {
   // Change current window to the URL of the background image.
   viewBGImage: function(e) {
     urlSecurityCheck(this.bgImageURL,
-                     this._unremotePrincipal(this.browser.contentPrincipal),
+                     this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     var doc = this.target.ownerDocument;
     openUILink(this.bgImageURL, e, { disallowInheritPrincipal: true,
@@ -1033,9 +991,8 @@ nsContextMenu.prototype = {
     if (this.disableSetDesktopBackground())
       return;
 
-    var doc = this.target.ownerDocument;
     urlSecurityCheck(this.target.currentURI.spec,
-                     this._unremotePrincipal(doc.nodePrincipal));
+                     this.target.ownerDocument.nodePrincipal);
 
     // Confirm since it's annoying if you hit this accidentally.
     const kDesktopBackgroundURL = 
@@ -1215,7 +1172,7 @@ nsContextMenu.prototype = {
       linkText = document.commandDispatcher.focusedWindow.getSelection().toString().trim();
     else
       linkText = this.linkText();
-    urlSecurityCheck(this.linkURL, this._unremotePrincipal(doc.nodePrincipal));
+    urlSecurityCheck(this.linkURL, doc.nodePrincipal);
 
     this.saveHelper(this.linkURL, linkText, null, true, doc,
                     this.linkDownload);
@@ -1255,13 +1212,11 @@ nsContextMenu.prototype = {
         }, Components.utils.reportError);
       }
     } else if (this.onImage) {
-      urlSecurityCheck(this.mediaURL,
-                       this._unremotePrincipal(doc.nodePrincipal));
+      urlSecurityCheck(this.mediaURL, doc.nodePrincipal);
       saveImageURL(this.mediaURL, null, "SaveImageTitle", false,
                    false, doc.documentURIObject, doc);
     } else if (this.onVideo || this.onAudio) {
-      urlSecurityCheck(this.mediaURL,
-                       this._unremotePrincipal(doc.nodePrincipal));
+      urlSecurityCheck(this.mediaURL, doc.nodePrincipal);
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";
       this.saveHelper(this.mediaURL, null, dialogTitle, false, doc, "");
     }
@@ -1449,6 +1404,30 @@ nsContextMenu.prototype = {
       return node.mozIsTextField(false);
 
     return (node instanceof HTMLTextAreaElement);
+  },
+
+  isTargetAKeywordField: function(aNode) {
+    if (!(aNode instanceof HTMLInputElement))
+      return false;
+
+    var form = aNode.form;
+    if (!form || aNode.type == "password")
+      return false;
+
+    var method = form.method.toUpperCase();
+
+    // These are the following types of forms we can create keywords for:
+    //
+    // method   encoding type       can create keyword
+    // GET      *                                 YES
+    //          *                                 YES
+    // POST                                       YES
+    // POST     application/x-www-form-urlencoded YES
+    // POST     text/plain                        NO (a little tricky to do)
+    // POST     multipart/form-data               NO
+    // POST     everything else                   YES
+    return (method == "GET" || method == "") ||
+           (form.enctype != "text/plain") && (form.enctype != "multipart/form-data");
   },
 
   // Determines whether or not the separator with the specified ID should be

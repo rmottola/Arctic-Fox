@@ -1,4 +1,3 @@
-/* -*- mode: js; indent-tabs-mode: nil; js-indent-level: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -68,10 +67,8 @@ let ContentClick = {
 
     // Todo(903022): code for where == save
 
-    let params = { charset: browser.characterSet };
-    if (!json.noReferrer)
-      params.referrerURI = browser.documentURI;
-    window.openLinkIn(json.href, where, params);
+    window.openLinkIn(json.href, where, { referrerURI: browser.documentURI,
+                                          charset: browser.characterSet });
 
     // Mark the page as a user followed link.  This is done so that history can
     // distinguish automatic embed visits from user activated ones.  For example

@@ -8,9 +8,6 @@ let Ci = Components.interfaces;
 let Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/InlineSpellChecker.jsm");
-Cu.import("resource://gre/modules/InlineSpellCheckerContent.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
   "resource://gre/modules/BrowserUtils.jsm");
@@ -51,50 +48,21 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
   }
 });
 
-if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
-  addEventListener("contextmenu", function (event) {
-    let defaultPrevented = event.defaultPrevented;
-    if (!Services.prefs.getBoolPref("dom.event.contextmenu.enabled")) {
-      let plugin = null;
-      try {
-        plugin = event.target.QueryInterface(Ci.nsIObjectLoadingContent);
-      } catch (e) {}
-      if (plugin && plugin.displayedType == Ci.nsIObjectLoadingContent.TYPE_PLUGIN) {
-        // Don't open a context menu for plugins.
-        return;
-      }
-
-      defaultPrevented = false;
-    }
-
-    if (!defaultPrevented) {
-      let editFlags = SpellCheckHelper.isEditable(event.target, content);
-      let spellInfo;
-      if (editFlags &
-          (SpellCheckHelper.EDITABLE | SpellCheckHelper.CONTENTEDITABLE)) {
-        spellInfo =
-          InlineSpellCheckerContent.initContextMenu(event, editFlags, this);
-      }
-
-      sendSyncMessage("contextmenu", { editFlags, spellInfo }, { event });
-    }
-  }, false);
-} else {
-  addEventListener("DOMFormHasPassword", function(event) {
-    InsecurePasswordUtils.checkForInsecurePasswords(event.target);
-    LoginManagerContent.onFormPassword(event);
-  });
-  addEventListener("DOMAutoComplete", function(event) {
-    LoginManagerContent.onUsernameInput(event);
-  });
-  addEventListener("blur", function(event) {
-    LoginManagerContent.onUsernameInput(event);
-  });
-}
+addEventListener("DOMFormHasPassword", function(event) {
+  InsecurePasswordUtils.checkForInsecurePasswords(event.target);
+  LoginManagerContent.onFormPassword(event);
+});
+addEventListener("DOMAutoComplete", function(event) {
+  LoginManagerContent.onUsernameInput(event);
+});
+addEventListener("blur", function(event) {
+  LoginManagerContent.onUsernameInput(event);
+});
 
 let AboutHomeListener = {
   init: function(chromeGlobal) {
-    chromeGlobal.addEventListener('AboutHomeLoad', () => this.onPageLoad(), false, true);
+    let self = this;
+    chromeGlobal.addEventListener('AboutHomeLoad', function(e) { self.onPageLoad(); }, false, true);
   },
 
   handleEvent: function(aEvent) {
@@ -247,7 +215,6 @@ let ClickEventHandler = {
           if (json.bookmark)
             event.preventDefault(); // Need to prevent the pageload.
         }
-        json.noReferrer = BrowserUtils.linkHasNoReferrer(node)
       }
 
       sendAsyncMessage("Content:Click", json);

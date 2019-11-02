@@ -13,7 +13,7 @@
 #include "mozilla/ipc/SharedMemory.h"   // for SharedMemory, etc
 #include "mozilla/layers/AsyncTransactionTracker.h" // for AsyncTransactionTrackerHolder
 #include "mozilla/layers/CompositableForwarder.h"
-#include "mozilla/layers/CompositorTypes.h"
+#include "mozilla/layers/CompositorTypes.h"  // for TextureIdentifier, etc
 #include "mozilla/layers/PImageBridgeChild.h"
 #include "nsDebug.h"                    // for NS_RUNTIMEABORT
 #include "nsRegion.h"                   // for nsIntRegion
@@ -248,6 +248,16 @@ public:
     NS_RUNTIMEABORT("should not be called");
   }
 
+  virtual void UpdateTextureIncremental(CompositableClient* aCompositable,
+                                        TextureIdentifier aTextureId,
+                                        SurfaceDescriptor& aDescriptor,
+                                        const nsIntRegion& aUpdatedRegion,
+                                        const nsIntRect& aBufferRect,
+                                        const nsIntPoint& aBufferRotation) override
+  {
+    NS_RUNTIMEABORT("should not be called");
+  }
+
   /**
    * Communicate the picture rect of a YUV image in aLayer to the compositor
    */
@@ -255,6 +265,12 @@ public:
                                  const nsIntRect& aRect) override;
 
 
+  virtual void CreatedIncrementalBuffer(CompositableClient* aCompositable,
+                                        const TextureInfo& aTextureInfo,
+                                        const nsIntRect& aBufferRect) override
+  {
+    NS_RUNTIMEABORT("should not be called");
+  }
   virtual void UpdateTextureRegion(CompositableClient* aCompositable,
                                    const ThebesBufferData& aThebesBufferData,
                                    const nsIntRegion& aUpdatedRegion) override {

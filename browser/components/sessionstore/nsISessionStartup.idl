@@ -6,11 +6,11 @@
 
 /**
  * nsISessionStore keeps track of the current browsing state - i.e.
- * tab history, cookies, scroll state, form data, and window features
+ * tab history, cookies, scroll state, form data, POSTDATA and window features
  * - and allows to restore everything into one window.
  */
 
-[scriptable, uuid(934697e4-3807-47f8-b6c9-6caa8d83ccd1)]
+[scriptable, uuid(51f4b9f0-f3d2-11e2-bb62-2c24dd830245)]
 interface nsISessionStartup: nsISupports
 {
   /**
@@ -23,17 +23,11 @@ interface nsISessionStartup: nsISupports
   readonly attribute jsval state;
 
   /**
-   * Determines whether there is a pending session restore. Should only be
-   * called after initialization has completed.
+   * Determines whether there is a pending session restore and makes sure that
+   * we're initialized before returning. If we're not yet this will read the
+   * session file synchronously.
    */
   boolean doRestore();
-
-  /**
-   * Determines whether automatic session restoration is enabled for this
-   * launch of the browser. This does not include crash restoration, and will
-   * return false if restoration will only be caused by a crash.
-   */
-  boolean isAutomaticRestoreEnabled();
 
   /**
    * Returns whether we will restore a session that ends up replacing the
@@ -62,5 +56,4 @@ interface nsISessionStartup: nsISupports
   const unsigned long DEFER_SESSION = 3;
 
   readonly attribute unsigned long sessionType;
-  readonly attribute bool previousSessionCrashed;
 };

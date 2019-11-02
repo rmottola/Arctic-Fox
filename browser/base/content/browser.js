@@ -12,9 +12,6 @@ Cu.import("resource:///modules/RecentWindow.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
                                   "resource:///modules/CharsetMenu.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "Task",
-                                  "resource://gre/modules/Task.jsm");
-
 const nsIWebNavigation = Ci.nsIWebNavigation;
 const gToolbarInfoSeparators = ["|", "-"];
 
@@ -24,11 +21,7 @@ var gProxyFavIcon = null;
 var gLastValidURLStr = "";
 var gInPrintPreviewMode = false;
 var gContextMenu = null; // nsContextMenu instance
-var gMultiProcessBrowser =
-  window.QueryInterface(Ci.nsIInterfaceRequestor)
-        .getInterface(Ci.nsIWebNavigation)
-        .QueryInterface(Ci.nsILoadContext)
-        .useRemoteTabs;
+var gMultiProcessBrowser = false;
 
 #ifndef XP_MACOSX
 var gEditUIVisible = true;
@@ -139,26 +132,16 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
   "resource:///modules/FormValidationHandler.jsm");
 
-#ifdef MOZ_CRASHREPORTER
-XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
-  "resource:///modules/TabCrashReporter.jsm");
-#endif
-
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
-  "resource:///modules/sessionstore/SessionStore.jsm");
-
 let gInitialPages = [
   "about:blank",
   "about:newtab",
   "about:home",
   "about:privatebrowsing",
-  "about:welcomeback",
   "about:sessionrestore",
   "about:logopage"
 ];
 
 #include browser-addons.js
-#include browser-devedition.js
 #include browser-feeds.js
 #include browser-fullScreen.js
 #include browser-fullZoom.js
@@ -659,9 +642,77 @@ var gPopupBlockerObserver = {
   }
 };
 
+const gXSSObserver = {
+
+  observe: function (aSubject, aTopic, aData)
+  {
+
+    // Don't do anything if the notification is disabled.
+    if (!gPrefService.getBoolPref("security.xssfilter.displayWarning"))
+      return;
+
+    // Parse incoming XSS array
+    aSubject.QueryInterface(Ci.nsIArray);
+    var policy = aSubject.queryElementAt(0, Ci.nsISupportsString).data;
+    var content = aSubject.queryElementAt(1, Ci.nsISupportsString).data;
+    var domain = aSubject.queryElementAt(2, Ci.nsISupportsString).data;
+    var url = aSubject.queryElementAt(3, Ci.nsISupportsCString).data;
+    var blockMode = aSubject.queryElementAt(4, Ci.nsISupportsPRBool).data;
+
+    // If it is a block mode event, do not display the infobar
+    if (blockMode)
+      return;
+
+    var nb = gBrowser.getNotificationBox();
+    const priority = nb.PRIORITY_WARNING_MEDIUM;
+
+    var buttons = [{
+      label: 'View Unsafe Content',
+      accessKey: 'V',
+      popup: null,
+      callback: function () {
+        alert(content);
+      }
+    }];
+
+    if (domain !== "")
+      buttons.push({
+        label: 'Add Domain Exception',
+        accessKey: 'A',
+        popup: null,
+        callback: function () {
+          let whitelist = gPrefService.getCharPref("security.xssfilter.whitelist");
+          if (whitelist != "") {
+            whitelist = whitelist + "," + domain;
+          } else {
+            whitelist = domain;
+          }
+          // Write the updated whitelist. Since this is observed by the XSS filter,
+          // it will automatically sync to the back-end and update immediately.
+          gPrefService.setCharPref("security.xssfilter.whitelist", whitelist);
+          // After setting this, we automatically reload the page.
+          BrowserReloadSkipCache();
+        }
+      });
+    
+    nb.appendNotification("The XSS Filter has detected a potential XSS attack. Type: " +
+                          policy, 'popup-blocked', 'chrome://browser/skin/Info.png',
+                          priority, buttons);
+  }
+};
+
 var gBrowserInit = {
   onLoad: function() {
+    gMultiProcessBrowser = gPrefService.getBoolPref("browser.tabs.remote");
+
     var mustLoadSidebar = false;
+
+    if (!gMultiProcessBrowser) {
+      // There is a Content:Click message manually sent from content.
+      Cc["@mozilla.org/eventlistenerservice;1"]
+        .getService(Ci.nsIEventListenerService)
+        .addSystemEventListener(gBrowser, "click", contentAreaClick, true);
+    }
 
     gBrowser.addEventListener("DOMUpdatePageReport", gPopupBlockerObserver, false);
 
@@ -676,14 +727,8 @@ var gBrowserInit = {
 
     window.addEventListener("AppCommand", HandleAppCommandEvent, true);
 
-    // These routines add message listeners. They must run before
-    // loading the frame script to ensure that we don't miss any
-    // message sent between when the frame script is loaded and when
-    // the listener is registered.
-    DevEdition.init();
-    
-    let mm = window.getGroupMessageManager("browsers");
-    mm.loadFrameScript("chrome://browser/content/content.js", true);
+    messageManager.loadFrameScript("chrome://browser/content/content.js", true);
+    messageManager.loadFrameScript("chrome://browser/content/content-sessionStore.js", true);
 
     // initialize observers and listeners
     // and give C++ access to gBrowser
@@ -729,15 +774,6 @@ var gBrowserInit = {
       gBrowser.docShell.useGlobalHistory = true;
     } catch(ex) {
       Cu.reportError("Places database may be locked: " + ex);
-    }
-
-    if (!gMultiProcessBrowser) {
-      // There is a Content:Click message manually sent from content.
-      Cc["@mozilla.org/eventlistenerservice;1"]
-        .getService(Ci.nsIEventListenerService)
-        .addSystemEventListener(gBrowser, "click", contentAreaClick, true);
-    } else {
-      gBrowser.updateBrowserRemoteness(gBrowser.mCurrentBrowser, true);
     }
 
     // hook up UI through progress listener
@@ -811,11 +847,9 @@ var gBrowserInit = {
       }
     }
 
-    // Certain kinds of automigration rely on this notification to complete
-    // their tasks BEFORE the browser window is shown. SessionStore uses it to
-    // restore tabs into windows AFTER important parts like gMultiProcessBrowser
-    // have been initialized.
-    Services.obs.notifyObservers(window, "browser-window-before-show", "");
+    // Certain kinds of automigration rely on this notification to complete their
+    // tasks BEFORE the browser window is shown.
+    Services.obs.notifyObservers(null, "browser-window-before-show", "");
 
     // Set a sane starting width/height for all resolutions on new profiles.
     if (!document.documentElement.hasAttribute("width")) {
@@ -974,6 +1008,7 @@ var gBrowserInit = {
     Services.obs.addObserver(gXPInstallObserver, "addon-install-origin-blocked", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-failed", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-complete", false);
+    Services.obs.addObserver(gXSSObserver, "xss-on-violate-policy", false);
 
     gPrefService.addObserver(gURLBarSettings.prefSuggest, gURLBarSettings, false);
     gPrefService.addObserver(gURLBarSettings.prefKeyword, gURLBarSettings, false);
@@ -985,15 +1020,9 @@ var gBrowserInit = {
     IndexedDBPromptHelper.init();
     AddonManager.addAddonListener(AddonsMgrListener);
     WebrtcIndicator.init();
-    gRemoteTabsUI.init();
 
     // Ensure login manager is up and running.
     Services.logins;
-
-#ifdef MOZ_CRASHREPORTER
-    if (gMultiProcessBrowser)
-      TabCrashReporter.init();
-#endif
 
     if (mustLoadSidebar) {
       let sidebar = document.getElementById("sidebar");
@@ -1046,6 +1075,10 @@ var gBrowserInit = {
       Cu.import("resource:///modules/NetworkPrioritizer.jsm", NP);
       NP.trackBrowserWindow(window);
     }
+
+    // initialize the session-restore service (in case it's not already running)
+    let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
+    let ssPromise = ss.init(window);
 
     PlacesToolbarHelper.init();
 
@@ -1207,19 +1240,15 @@ var gBrowserInit = {
       Cu.reportError("Could not end startup crash tracking: " + ex);
     }
 
-    SessionStore.promiseInitialized.then(() => {
+    ssPromise.then(() =>{
       // Bail out if the window has been closed in the meantime.
       if (window.closed) {
         return;
       }
-
-      // Enable the Restore Last Session command if needed
-      RestoreLastSessionObserver.init();
-
       if ("TabView" in window) {
         TabView.init();
       }
-
+      // XXX: do we still need this?...
       setTimeout(function () { BrowserChromeTest.markAsReady(); }, 0);
     });
 
@@ -1296,8 +1325,6 @@ var gBrowserInit = {
     
     ToolbarIconColor.uninit();
 
-    DevEdition.uninit();
-
     var enumerator = Services.wm.getEnumerator(null);
     enumerator.getNext();
     if (!enumerator.hasMoreElements()) {
@@ -1331,6 +1358,7 @@ var gBrowserInit = {
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-origin-blocked");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-failed");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-complete");
+      Services.obs.removeObserver(gXSSObserver, "xss-on-violate-policy");
 
       try {
         gPrefService.removeObserver(gURLBarSettings.prefSuggest, gURLBarSettings);
@@ -1900,89 +1928,88 @@ function loadURI(uri, referrer, postData, allowThirdPartyFixup) {
   } catch (e) {}
 }
 
-function getShortcutOrURIAndPostData(aURL) {
-  return Task.spawn(function() {
-    let mayInheritPrincipal = false;
-    let postData = null;
-    let shortcutURL = null;
-    let keyword = aURL;
-    let param = "";
+function getShortcutOrURI(aURL, aPostDataRef, aMayInheritPrincipal) {
+  // Initialize outparam to false
+  if (aMayInheritPrincipal)
+    aMayInheritPrincipal.value = false;
 
-    let offset = aURL.indexOf(" ");
-    if (offset > 0) {
-      keyword = aURL.substr(0, offset);
-      param = aURL.substr(offset + 1);
+  var shortcutURL = null;
+  var keyword = aURL;
+  var param = "";
+
+  var offset = aURL.indexOf(" ");
+  if (offset > 0) {
+    keyword = aURL.substr(0, offset);
+    param = aURL.substr(offset + 1);
+  }
+
+  if (!aPostDataRef)
+    aPostDataRef = {};
+
+  var engine = Services.search.getEngineByAlias(keyword);
+  if (engine) {
+    var submission = engine.getSubmission(param);
+    aPostDataRef.value = submission.postData;
+    return submission.uri.spec;
+  }
+
+  [shortcutURL, aPostDataRef.value] =
+    PlacesUtils.getURLAndPostDataForKeyword(keyword);
+
+  if (!shortcutURL)
+    return aURL;
+
+  var postData = "";
+  if (aPostDataRef.value)
+    postData = unescape(aPostDataRef.value);
+
+  if (/%s/i.test(shortcutURL) || /%s/i.test(postData)) {
+    var charset = "";
+    const re = /^(.*)\&mozcharset=([a-zA-Z][_\-a-zA-Z0-9]+)\s*$/;
+    var matches = shortcutURL.match(re);
+    if (matches)
+      [, shortcutURL, charset] = matches;
+    else {
+      // Try to get the saved character-set.
+      try {
+        // makeURI throws if URI is invalid.
+        // Will return an empty string if character-set is not found.
+        charset = PlacesUtils.history.getCharsetForURI(makeURI(shortcutURL));
+      } catch (e) {}
     }
 
-    let engine = Services.search.getEngineByAlias(keyword);
-    if (engine) {
-      let submission = engine.getSubmission(param);
-      postData = submission.postData;
-      throw new Task.Result({ postData: submission.postData,
-                              url: submission.uri.spec,
-                              mayInheritPrincipal: mayInheritPrincipal });
-    }
+    // encodeURIComponent produces UTF-8, and cannot be used for other charsets.
+    // escape() works in those cases, but it doesn't uri-encode +, @, and /.
+    // Therefore we need to manually replace these ASCII characters by their
+    // encodeURIComponent result, to match the behavior of nsEscape() with
+    // url_XPAlphas
+    var encodedParam = "";
+    if (charset && charset != "UTF-8")
+      encodedParam = escape(convertFromUnicode(charset, param)).
+                     replace(/[+@\/]+/g, encodeURIComponent);
+    else // Default charset is UTF-8
+      encodedParam = encodeURIComponent(param);
 
-    [shortcutURL, postData] =
-      PlacesUtils.getURLAndPostDataForKeyword(keyword);
+    shortcutURL = shortcutURL.replace(/%s/g, encodedParam).replace(/%S/g, param);
 
-    if (!shortcutURL)
-      throw new Task.Result({ postData: postData, url: aURL,
-                              mayInheritPrincipal: mayInheritPrincipal });
+    if (/%s/i.test(postData)) // POST keyword
+      aPostDataRef.value = getPostDataStream(postData, param, encodedParam,
+                                             "application/x-www-form-urlencoded");
+  }
+  else if (param) {
+    // This keyword doesn't take a parameter, but one was provided. Just return
+    // the original URL.
+    aPostDataRef.value = null;
 
-    let escapedPostData = "";
-    if (postData)
-      escapedPostData = unescape(postData);
+    return aURL;
+  }
 
-    if (/%s/i.test(shortcutURL) || /%s/i.test(escapedPostData)) {
-      let charset = "";
-      const re = /^(.*)\&mozcharset=([a-zA-Z][_\-a-zA-Z0-9]+)\s*$/;
-      let matches = shortcutURL.match(re);
-      if (matches)
-        [, shortcutURL, charset] = matches;
-      else {
-        // Try to get the saved character-set.
-        try {
-          // makeURI throws if URI is invalid.
-          // Will return an empty string if character-set is not found.
-          charset = yield PlacesUtils.getCharsetForURI(makeURI(shortcutURL));
-        } catch (e) {}
-      }
+  // This URL came from a bookmark, so it's safe to let it inherit the current
+  // document's principal.
+  if (aMayInheritPrincipal)
+    aMayInheritPrincipal.value = true;
 
-      // encodeURIComponent produces UTF-8, and cannot be used for other charsets.
-      // escape() works in those cases, but it doesn't uri-encode +, @, and /.
-      // Therefore we need to manually replace these ASCII characters by their
-      // encodeURIComponent result, to match the behavior of nsEscape() with
-      // url_XPAlphas
-      let encodedParam = "";
-      if (charset && charset != "UTF-8")
-        encodedParam = escape(convertFromUnicode(charset, param)).
-                       replace(/[+@\/]+/g, encodeURIComponent);
-      else // Default charset is UTF-8
-        encodedParam = encodeURIComponent(param);
-
-      shortcutURL = shortcutURL.replace(/%s/g, encodedParam).replace(/%S/g, param);
-
-      if (/%s/i.test(escapedPostData)) // POST keyword
-        postData = getPostDataStream(escapedPostData, param, encodedParam,
-                                               "application/x-www-form-urlencoded");
-    }
-    else if (param) {
-      // This keyword doesn't take a parameter, but one was provided. Just return
-      // the original URL.
-      postData = null;
-
-      throw new Task.Result({ postData: postData, url: aURL,
-                              mayInheritPrincipal: mayInheritPrincipal });
-    }
-
-    // This URL came from a bookmark, so it's safe to let it inherit the current
-    // document's principal.
-    mayInheritPrincipal = true;
-
-    throw new Task.Result({ postData: postData, url: shortcutURL,
-                            mayInheritPrincipal: mayInheritPrincipal });
-  });
+  return shortcutURL;
 }
 
 function getPostDataStream(aStringData, aKeyword, aEncKeyword, aType) {
@@ -2316,9 +2343,6 @@ let BrowserOnClick = {
     else if (ownerDoc.documentURI.startsWith("about:neterror")) {
       this.onAboutNetError(originalTarget, ownerDoc);
     }
-    else if (ownerDoc.documentURI.startsWith("about:tabcrashed")) {
-      this.onAboutTabCrashed(aEvent, ownerDoc);
-    }
   },
 
   onAboutCertError: function BrowserOnClick_onAboutCertError(aTargetElm, aOwnerDoc) {
@@ -2359,29 +2383,6 @@ let BrowserOnClick = {
       case "expertContent":
         break;
 
-    }
-  },
-
-  /**
-   * The about:tabcrashed can't do window.reload() because that
-   * would reload the page but not use a remote browser.
-   */
-  onAboutTabCrashed: function(aEvent, aOwnerDoc) {
-    let isTopFrame = (aOwnerDoc.defaultView.parent === aOwnerDoc.defaultView);
-    if (!isTopFrame) {
-      return;
-    }
-
-    let button = aEvent.originalTarget;
-    if (button.id == "tryAgain") {
-#ifdef MOZ_CRASHREPORTER
-      if (aOwnerDoc.getElementById("checkSendReport").checked) {
-        let browser = gBrowser.getBrowserForDocument(aOwnerDoc);
-        TabCrashReporter.submitCrashReport(browser);
-      }
-#endif
-
-      TabCrashReporter.reloadCrashedTabs();
     }
   },
 
@@ -2444,15 +2445,6 @@ function getWebNavigation()
 }
 
 function BrowserReloadWithFlags(reloadFlags) {
-  let url = gBrowser.currentURI.spec;
-  if (gBrowser.updateBrowserRemotenessByURL(gBrowser.selectedBrowser, url)) {
-    // If the remoteness has changed, the new browser doesn't have any
-    // information of what was loaded before, so we need to load the previous
-    // URL again.
-    gBrowser.loadURIWithFlags(url, reloadFlags);
-    return;
-  }
-
   /* First, we'll try to use the session history object to reload so
    * that framesets are handled properly. If we're in a special
    * window (such as view-source) that has no session history, fall
@@ -2684,13 +2676,12 @@ var newTabButtonObserver = {
   onDrop: function (aEvent)
   {
     let url = browserDragAndDrop.drop(aEvent, { });
-    Task.spawn(function() {
-      let data = yield getShortcutOrURIAndPostData(url);
-      if (data.url) {
-        // allow third-party services to fixup this URL
-        openNewTabWith(data.url, null, data.postData, aEvent, true);
-      }
-    });
+    var postData = {};
+    url = getShortcutOrURI(url, postData);
+    if (url) {
+      // allow third-party services to fixup this URL
+      openNewTabWith(url, null, postData.value, aEvent, true);
+    }
   }
 }
 
@@ -2705,13 +2696,12 @@ var newWindowButtonObserver = {
   onDrop: function (aEvent)
   {
     let url = browserDragAndDrop.drop(aEvent, { });
-    Task.spawn(function() {
-      let data = yield getShortcutOrURIAndPostData(url);
-      if (data.url) {
-        // allow third-party services to fixup this URL
-        openNewWindowWith(data.url, null, data.postData, true);
-      }
-    });
+    var postData = {};
+    url = getShortcutOrURI(url, postData);
+    if (url) {
+      // allow third-party services to fixup this URL
+      openNewWindowWith(url, null, postData.value, true);
+    }
   }
 }
 
@@ -3128,12 +3118,6 @@ function OpenBrowserWindow(options)
     }
   } else {
     extraFeatures = ",non-private";
-  }
-
-  if (options && options.remote) {
-    extraFeatures += ",remote";
-  } else if (options && options.remote === false) {
-    extraFeatures += ",non-remote";
   }
 
   // if and only if the current window is a browser window and it has a document with a character
@@ -3733,7 +3717,8 @@ var XULBrowserWindow = {
       if (this.hideChromeForLocation(location)) {
         document.documentElement.setAttribute("disablechrome", "true");
       } else {
-        if (SessionStore.getTabValue(gBrowser.selectedTab, "appOrigin"))
+        let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
+        if (ss.getTabValue(gBrowser.selectedTab, "appOrigin"))
           document.documentElement.setAttribute("disablechrome", "true");
         else
           document.documentElement.removeAttribute("disablechrome");
@@ -4098,11 +4083,6 @@ var TabsProgressListener = {
         if (event.target.documentElement)
           event.target.documentElement.removeAttribute("hasBrowserHandlers");
       }, true);
-
-#ifdef MOZ_CRASHREPORTER
-      if (doc.documentURI.startsWith("about:tabcrashed"))
-        TabCrashReporter.onAboutTabCrashedLoad(aBrowser);
-#endif
     }
   },
 
@@ -5004,11 +4984,9 @@ function handleLinkClick(event, href, linkNode) {
   }
 
   urlSecurityCheck(href, doc.nodePrincipal);
-  let params = { charset: doc.characterSet,
-                 allowMixedContent: persistAllowMixedContentInChildTab };
-  if (!BrowserUtils.linkHasNoReferrer(linkNode))
-    params.referrerURI = referrerURI;
-  openLinkIn(href, where, params);
+  openLinkIn(href, where, { referrerURI: referrerURI,
+                            charset: doc.characterSet,
+                            allowMixedContent: persistAllowMixedContentInChildTab });
   event.preventDefault();
   return true;
 }
@@ -5022,52 +5000,36 @@ function middleMousePaste(event) {
   // bar's behavior (stripsurroundingwhitespace)
   clipboard = clipboard.replace(/\s*\n\s*/g, "");
 
-  // if it's not the current tab, we don't need to do anything because the 
-  // browser doesn't exist.
-  let where = whereToOpenLink(event, true, false);
-  let lastLocationChange;
-  if (where == "current") {
-    lastLocationChange = gBrowser.selectedBrowser.lastLocationChange;
+  let mayInheritPrincipal = { value: false };
+  let url = getShortcutOrURI(clipboard, mayInheritPrincipal);
+  try {
+    makeURI(url);
+  } catch (ex) {
+    // Not a valid URI.
+    return;
   }
 
-  Task.spawn(function() {
-    let data = yield getShortcutOrURIAndPostData(clipboard);
-    try {
-      makeURI(data.url);
-    } catch (ex) {
-      // Not a valid URI.
-      return;
-    }
+  try {
+    addToUrlbarHistory(url);
+  } catch (ex) {
+    // Things may go wrong when adding url to session history,
+    // but don't let that interfere with the loading of the url.
+    Cu.reportError(ex);
+  }
 
-    try {
-      addToUrlbarHistory(data.url);
-    } catch (ex) {
-      // Things may go wrong when adding url to session history,
-      // but don't let that interfere with the loading of the url.
-      Cu.reportError(ex);
-    }
-
-    if (where != "current" ||
-        lastLocationChange == gBrowser.selectedBrowser.lastLocationChange) {
-      openUILink(data.url, event,
-                 { ignoreButton: true,
-                   disallowInheritPrincipal: !data.mayInheritPrincipal });
-    }
-  });
+  openUILink(url, event,
+             { ignoreButton: true,
+               disallowInheritPrincipal: !mayInheritPrincipal.value });
 
   event.stopPropagation();
 }
 
 function handleDroppedLink(event, url, name)
 {
-  let lastLocationChange = gBrowser.selectedBrowser.lastLocationChange;
-
-  Task.spawn(function() {
-    let data = yield getShortcutOrURIAndPostData(url);
-    if (data.url &&
-        lastLocationChange == gBrowser.selectedBrowser.lastLocationChange)
-      loadURI(data.url, null, data.postData, false);
-  });
+  let postData = { };
+  let uri = getShortcutOrURI(url, postData);
+  if (uri)
+    loadURI(uri, null, postData.value, false);
 
   // Keep the event from being handled by the dragDrop listeners
   // built-in to goanna if they happen to be above us.
@@ -5181,6 +5143,7 @@ function charsetLoadListener() {
     gLastBrowserCharset = charset;
   }
 }
+
 
 var gPageStyleMenu = {
 
@@ -5963,15 +5926,17 @@ function BrowserOpenPermissionsMgr() {
   switchToTabHavingURI("about:permissions", true);
 }
 
-function GetSearchFieldBookmarkData(node) {
+function AddKeywordForSearchField() {
+  var node = document.popupNode;
+
   var charset = node.ownerDocument.characterSet;
 
-  var formBaseURI = makeURI(node.form.baseURI,
-                            charset);
+  var docURI = makeURI(node.ownerDocument.URL,
+                       charset);
 
   var formURI = makeURI(node.form.getAttribute("action"),
                         charset,
-                        formBaseURI);
+                        docURI);
 
   var spec = formURI.spec;
 
@@ -6026,27 +5991,14 @@ function GetSearchFieldBookmarkData(node) {
   else
     spec += "?" + formData.join("&");
 
-  return {
-    spec: spec,
-    title: title,
-    description: description,
-    postData: postData,
-    charSet: charset
-  };
-}
-
-
-function AddKeywordForSearchField() {
-  bookmarkData = GetSearchFieldBookmarkData(document.popupNode);
-
   PlacesUIUtils.showBookmarkDialog({ action: "add"
                                    , type: "bookmark"
-                                   , uri: makeURI(bookmarkData.spec)
-                                   , title: bookmarkData.title
-                                   , description: bookmarkData.description
+                                   , uri: makeURI(spec)
+                                   , title: title
+                                   , description: description
                                    , keyword: ""
-                                   , postData: bookmarkData.postData
-                                   , charSet: bookmarkData.charset
+                                   , postData: postData
+                                   , charSet: charset
                                    , hiddenRows: [ "location"
                                                  , "description"
                                                  , "tags"
@@ -6082,7 +6034,7 @@ function convertFromUnicode(charset, str)
 /**
  * Re-open a closed tab.
  * @param aIndex
- *        The index of the tab (via SessionStore.getClosedTabData)
+ *        The index of the tab (via nsSessionStore.getClosedTabData)
  * @returns a reference to the reopened tab.
  */
 function undoCloseTab(aIndex) {
@@ -6094,8 +6046,10 @@ function undoCloseTab(aIndex) {
     blankTabToRemove = gBrowser.selectedTab;
 
   var tab = null;
-  if (SessionStore.getClosedTabCount(window) > (aIndex || 0)) {
-    tab = SessionStore.undoCloseTab(window, aIndex || 0);
+  var ss = Cc["@mozilla.org/browser/sessionstore;1"].
+           getService(Ci.nsISessionStore);
+  if (ss.getClosedTabCount(window) > (aIndex || 0)) {
+    tab = ss.undoCloseTab(window, aIndex || 0);
 
     if (blankTabToRemove)
       gBrowser.removeTab(blankTabToRemove);
@@ -6107,13 +6061,15 @@ function undoCloseTab(aIndex) {
 /**
  * Re-open a closed window.
  * @param aIndex
- *        The index of the window (via SessionStore.getClosedWindowData)
+ *        The index of the window (via nsSessionStore.getClosedWindowData)
  * @returns a reference to the reopened window.
  */
 function undoCloseWindow(aIndex) {
+  let ss = Cc["@mozilla.org/browser/sessionstore;1"].
+           getService(Ci.nsISessionStore);
   let window = null;
-  if (SessionStore.getClosedWindowCount() > (aIndex || 0))
-    window = SessionStore.undoCloseWindow(aIndex || 0);
+  if (ss.getClosedWindowCount() > (aIndex || 0))
+    window = ss.undoCloseWindow(aIndex || 0);
 
   return window;
 }
@@ -6716,28 +6672,6 @@ let gPrivateBrowsingUI = {
   }
 };
 
-let gRemoteTabsUI = {
-  init: function() {
-    if (window.location.href != getBrowserURL()) {
-      return;
-    }
-
-    let remoteTabs = gPrefService.getBoolPref("browser.tabs.remote");
-    let autostart = gPrefService.getBoolPref("browser.tabs.remote.autostart");
-
-    let newRemoteWindow = document.getElementById("menu_newRemoteWindow");
-    let newNonRemoteWindow = document.getElementById("menu_newNonRemoteWindow");
-
-    if (!remoteTabs) {
-      newRemoteWindow.hidden = true;
-      newNonRemoteWindow.hidden = true;
-      return;
-    }
-
-    newRemoteWindow.hidden = autostart;
-    newNonRemoteWindow.hidden = !autostart;
-  }
-};
 
 /**
  * Switch to a tab that has a given URI, and focusses its browser window.
@@ -6749,14 +6683,9 @@ let gRemoteTabsUI = {
  * @param aOpenNew
  *        True to open a new tab and switch to it, if no existing tab is found.
  *        If no suitable window is found, a new one will be opened.
- * @param aOpenParams
- *        If switching to this URI results in us opening a tab, aOpenParams
- *        will be the parameter object that gets passed to openUILinkIn. Please
- *        see the documentation for openUILinkIn to see what parameters can be
- *        passed via this object.
  * @return True if an existing tab was found, false otherwise
  */
-function switchToTabHavingURI(aURI, aOpenNew, aOpenParams) {
+function switchToTabHavingURI(aURI, aOpenNew) {
   // This will switch to the tab in aWindow having aURI, if present.
   function switchIfURIInWindow(aWindow) {
     // Only switch to the tab if neither the source and desination window are
@@ -6804,36 +6733,18 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams) {
   // No opened tab has that url.
   if (aOpenNew) {
     if (isBrowserWindow && isTabEmpty(gBrowser.selectedTab))
-      openUILinkIn(aURI.spec, "current", aOpenParams);
+      gBrowser.selectedBrowser.loadURI(aURI.spec);
     else
-      openUILinkIn(aURI.spec, "tab", aOpenParams);
+      openUILinkIn(aURI.spec, "tab");
   }
 
   return false;
 }
 
-let RestoreLastSessionObserver = {
-  init: function () {
-    if (SessionStore.canRestoreLastSession &&
-        !PrivateBrowsingUtils.isWindowPrivate(window)) {
-      Services.obs.addObserver(this, "sessionstore-last-session-cleared", true);
-      goSetCommandEnabled("Browser:RestoreLastSession", true);
-    }
-  },
-
-  observe: function () {
-    // The last session can only be restored once so there's
-    // no way we need to re-enable our menu item.
-    Services.obs.removeObserver(this, "sessionstore-last-session-cleared");
-    goSetCommandEnabled("Browser:RestoreLastSession", false);
-  },
-
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
-                                         Ci.nsISupportsWeakReference])
-};
-
 function restoreLastSession() {
-  SessionStore.restoreLastSession();
+  let ss = Cc["@mozilla.org/browser/sessionstore;1"].
+           getService(Ci.nsISessionStore);
+  ss.restoreLastSession();
 }
 
 var TabContextMenu = {
@@ -6858,7 +6769,9 @@ var TabContextMenu = {
 
     // Session store
     document.getElementById("context_undoCloseTab").disabled =
-      SessionStore.getClosedTabCount(window) == 0;
+      Cc["@mozilla.org/browser/sessionstore;1"].
+      getService(Ci.nsISessionStore).
+      getClosedTabCount(window) == 0;
 
     // Only one of pin/unpin should be visible
     document.getElementById("context_pinTab").hidden = this.contextTab.pinned;
@@ -6967,7 +6880,9 @@ function restart(safeMode)
  * delta is the offset to the history entry that you want to load.
  */
 function duplicateTabIn(aTab, where, delta) {
-  let newTab = SessionStore.duplicateTab(window, aTab, delta);
+  let newTab = Cc['@mozilla.org/browser/sessionstore;1']
+                 .getService(Ci.nsISessionStore)
+                 .duplicateTab(window, aTab, delta);
 
   switch (where) {
     case "window":

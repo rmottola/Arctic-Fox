@@ -1855,12 +1855,6 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
     return ok;
 }
 
-size_t mozilla::RoundUpToMultipleOf(size_t value, size_t multiple)
-{
-    size_t overshoot = value + multiple - 1;
-    return overshoot - (overshoot % multiple);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 WebGLContext::ScopedMaskWorkaround::ScopedMaskWorkaround(WebGLContext& webgl)
@@ -1891,7 +1885,6 @@ WebGLContext::ScopedMaskWorkaround::~ScopedMaskWorkaround()
         mWebGL.gl->fEnable(LOCAL_GL_STENCIL_TEST);
     }
 }
-
 ////////////////////////////////////////////////////////////////////////////////
 // XPCOM goop
 

@@ -5,7 +5,6 @@
 
 #include "nsWSRunObject.h"
 
-#include "mozilla/dom/OwningNonNull.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Casting.h"
 #include "mozilla/mozalloc.h"
@@ -606,13 +605,13 @@ already_AddRefed<nsINode>
 nsWSRunObject::GetWSBoundingParent()
 {
   NS_ENSURE_TRUE(mNode, nullptr);
-  OwningNonNull<nsINode> wsBoundingParent = *mNode;
+  nsCOMPtr<nsINode> wsBoundingParent = mNode;
   while (!IsBlockNode(wsBoundingParent)) {
     nsCOMPtr<nsINode> parent = wsBoundingParent->GetParentNode();
     if (!parent || !mHTMLEditor->IsEditable(parent)) {
       break;
     }
-    wsBoundingParent = parent;
+    wsBoundingParent.swap(parent);
   }
   return wsBoundingParent.forget();
 }
@@ -1014,7 +1013,7 @@ nsWSRunObject::GetPreviousWSNodeInner(nsINode* aStartNode,
   MOZ_ASSERT(aStartNode && aBlockParent);
 
   nsCOMPtr<nsIContent> priorNode = aStartNode->GetPreviousSibling();
-  OwningNonNull<nsINode> curNode = *aStartNode;
+  nsCOMPtr<nsINode> curNode = aStartNode;
   while (!priorNode) {
     // We have exhausted nodes in parent of aStartNode.
     nsCOMPtr<nsINode> curParent = curNode->GetParentNode();

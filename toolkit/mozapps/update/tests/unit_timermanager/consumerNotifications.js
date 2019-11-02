@@ -5,8 +5,6 @@
 
 /* General Update Timer Manager Tests */
 
-'use strict';
-
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 const Cm = Components.manager;
@@ -105,8 +103,8 @@ const TESTS = [ {
   lastUpdateTime  : 0
 } ];
 
-let gUTM;
-let gNextFunc;
+var gUTM;
+var gNextFunc;
 
 XPCOMUtils.defineLazyServiceGetter(this, "gPref",
                                    "@mozilla.org/preferences-service;1",
@@ -129,7 +127,7 @@ function run_test() {
   gPref.setBoolPref(PREF_APP_UPDATE_LOG_ALL, true);
 
   // Remove existing update timers to prevent them from being notified
-  let entries = gCatMan.enumerateCategory(CATEGORY_UPDATE_TIMER);
+  var entries = gCatMan.enumerateCategory(CATEGORY_UPDATE_TIMER);
   while (entries.hasMoreElements()) {
     let entry = entries.getNext().QueryInterface(Ci.nsISupportsCString).data;
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, entry, false);
@@ -167,7 +165,7 @@ function run_test1thru7() {
                             TESTS[1].defaultInterval].join(","), false, true);
 
   // has a last update time of now - 43200 which is half of its interval
-  let lastUpdateTime = Math.round(Date.now() / 1000) - 43200;
+  var lastUpdateTime = Math.round(Date.now() / 1000) - 43200;
   gPref.setIntPref(PREF_BRANCH_LAST_UPDATE_TIME + TESTS[2].timerID, lastUpdateTime);
   gCompReg.registerFactory(TESTS[2].classID, TESTS[2].desc,
                            TESTS[2].contractID, gTest3Factory);
@@ -203,7 +201,7 @@ function run_test1thru7() {
                             TESTS[5].defaultInterval].join(","), false, true);
 
   // has a next update time 24 hours from now
-  let nextUpdateTime = Math.round(Date.now() / 1000) + 86400;
+  var nextUpdateTime = Math.round(Date.now() / 1000) + 86400;
   gPref.setIntPref(PREF_BRANCH_LAST_UPDATE_TIME + TESTS[6].timerID, nextUpdateTime);
   gCompReg.registerFactory(TESTS[6].classID, TESTS[6].desc,
                            TESTS[6].contractID, gTest7Factory);
@@ -214,41 +212,40 @@ function run_test1thru7() {
 }
 
 function finished_test1thru7() {
-  if (TESTS[4].notified && TESTS[5].notified && TESTS[6].notified) {
+  if (TESTS[4].notified && TESTS[5].notified && TESTS[6].notified)
     do_timeout(0, gNextFunc);
-  }
 }
 
 function check_test1thru7() {
-  do_print("Testing: a category registered timer didn't fire due to an " +
-           "invalid default interval");
+  dump("Testing: a category registered timer didn't fire due to an invalid " +
+       "default interval\n");
   do_check_false(TESTS[0].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to not " +
-           "implementing nsITimerCallback");
+  dump("Testing: a category registered timer didn't fire due to not " +
+       "implementing nsITimerCallback\n");
   do_check_false(TESTS[1].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to the next " +
-           "update time being in the future");
+  dump("Testing: a category registered timer didn't fire due to the next " +
+       "update time being in the future\n");
   do_check_false(TESTS[2].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to not " +
-           "having a notify method");
+  dump("Testing: a category registered timer didn't fire due to not " +
+       "having a notify method\n");
   do_check_false(TESTS[3].notified);
 
-  do_print("Testing: a category registered timer has fired");
+  dump("Testing: a category registered timer has fired\n");
   do_check_true(TESTS[4].notified);
 
-  do_print("Testing: a category registered timer fired that has an interval " +
-           "preference that overrides a default that wouldn't have fired yet");
+  dump("Testing: a category registered timer fired that has an interval " +
+       "preference that overrides a default that wouldn't have fired yet\n");
   do_check_true(TESTS[5].notified);
 
-  do_print("Testing: a category registered timer has fired due to the next " +
-           "update time being reset due to a future last update time");
+  dump("Testing: a category registered timer has fired due to the next " +
+       "update time being reset due to a future last update time\n");
   do_check_true(TESTS[6].notified);
 
-  do_print("Testing: two category registered timers last update time has " +
-           "user values");
+  dump("Testing: two category registered timers last update time has " +
+       "user values\n");
   do_check_true(gPref.prefHasUserValue(PREF_BRANCH_LAST_UPDATE_TIME +
                 TESTS[4].timerID));
   do_check_true(gPref.prefHasUserValue(PREF_BRANCH_LAST_UPDATE_TIME +
@@ -259,22 +256,23 @@ function check_test1thru7() {
   gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[1].desc, true);
   gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[2].desc, true);
   gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[3].desc, true);
-  let count = 0;
-  let entries = gCatMan.enumerateCategory(CATEGORY_UPDATE_TIMER);
+  var count = 0;
+  var entries = gCatMan.enumerateCategory(CATEGORY_UPDATE_TIMER);
   while (entries.hasMoreElements()) {
     let entry = entries.getNext().QueryInterface(Ci.nsISupportsCString).data;
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, entry, false);
     count++;
   }
-  do_print("Testing: no " + CATEGORY_UPDATE_TIMER + " categories are still " +
-           "registered");
+  dump("Testing: no " + CATEGORY_UPDATE_TIMER + " categories are still " +
+       "registered\n");
   do_check_eq(count, 0);
 
   do_timeout(0, run_test8);
 }
 
 function run_test8() {
-  for (let i = 0; i < 2; i++) {
+  gNextFunc = check_test8;
+  for (var i = 0; i < 2; i++) {
     gPref.setIntPref(PREF_BRANCH_LAST_UPDATE_TIME + TESTS[7 + i].timerID, 1);
     gCompReg.registerFactory(TESTS[7 + i].classID, TESTS[7 + i].desc,
                              TESTS[7 + i].contractID, eval("gTest" + (8 + i) + "Factory"));
@@ -283,16 +281,15 @@ function run_test8() {
   }
 }
 
-function check_test8(aTestTimerCallback) {
-  aTestTimerCallback.timesCalled = (aTestTimerCallback.timesCalled || 0) + 1;
-  if (aTestTimerCallback.timesCalled < 2) {
+function check_test8() {
+  var self = arguments.callee;
+  self.timesCalled = (self.timesCalled || 0) + 1;
+  if (self.timesCalled < 2)
     return;
-  }
 
-  do_print("Testing: two registerTimer registered timers have fired");
-  for (let i = 0; i < 2; i++) {
+  dump("Testing: two registerTimer registered timers have fired\n");
+  for (var i = 0; i < 2; i++)
     do_check_true(TESTS[7 + i].notified);
-  }
 
   // Check that 'staggering' has happened: even though the two events wanted to fire at
   // the same time, we waited a full MAIN_TIMER_INTERVAL between them.
@@ -300,76 +297,71 @@ function check_test8(aTestTimerCallback) {
   do_check_true(Math.abs(TESTS[7].notifyTime - TESTS[8].notifyTime) >=
                 MAIN_TIMER_INTERVAL * 0.5);
 
-  do_print("Testing: two registerTimer registered timers last update time have " +
-           "been updated");
-  for (let i = 0; i < 2; i++) {
+  dump("Testing: two registerTimer registered timers last update time have " +
+       "been updated\n");
+  for (var i = 0; i < 2; i++)
     do_check_neq(gPref.getIntPref(PREF_BRANCH_LAST_UPDATE_TIME + TESTS[7 + i].timerID), 1);
-  }
   end_test();
 }
 
-const gTest1TimerCallback = {
+var gTest1TimerCallback = {
   notify: function T1CB_notify(aTimer) {
     do_throw("gTest1TimerCallback notify method should not have been called");
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest1Factory = {
+var gTest1Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest1TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest2TimerCallback = {
+var gTest2TimerCallback = {
   notify: function T2CB_notify(aTimer) {
     do_throw("gTest2TimerCallback notify method should not have been called");
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimer])
 };
 
-const gTest2Factory = {
+var gTest2Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest2TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest3TimerCallback = {
+var gTest3TimerCallback = {
   notify: function T3CB_notify(aTimer) {
     do_throw("gTest3TimerCallback notify method should not have been called");
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest3Factory = {
+var gTest3Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest3TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest4TimerCallback = {
+var gTest4TimerCallback = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest4Factory = {
+var gTest4Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest4TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest5TimerCallback = {
+var gTest5TimerCallback = {
   notify: function T5CB_notify(aTimer) {
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[4].desc, true);
     TESTS[4].notified = true;
@@ -378,16 +370,15 @@ const gTest5TimerCallback = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest5Factory = {
+var gTest5Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest5TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest6TimerCallback = {
+var gTest6TimerCallback = {
   notify: function T6CB_notify(aTimer) {
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[5].desc, true);
     TESTS[5].notified = true;
@@ -396,16 +387,15 @@ const gTest6TimerCallback = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest6Factory = {
+var gTest6Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest6TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest7TimerCallback = {
+var gTest7TimerCallback = {
   notify: function T7CB_notify(aTimer) {
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, TESTS[6].desc, true);
     TESTS[6].notified = true;
@@ -414,51 +404,44 @@ const gTest7TimerCallback = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest7Factory = {
+var gTest7Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest7TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest8TimerCallback = {
+var gTest8TimerCallback = {
   notify: function T8CB_notify(aTimer) {
     TESTS[7].notified = true;
     TESTS[7].notifyTime = Date.now();
-    do_timeout(0, function() {
-      check_test8(gTest8TimerCallback);
-    });
+    do_timeout(0, check_test8);
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest8Factory = {
+var gTest8Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest8TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
 
-const gTest9TimerCallback = {
+var gTest9TimerCallback = {
   notify: function T9CB_notify(aTimer) {
     TESTS[8].notified = true;
     TESTS[8].notifyTime = Date.now();
-    do_timeout(0, function() {
-      check_test8(gTest9TimerCallback);
-    });
+    do_timeout(0, check_test8);
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback])
 };
 
-const gTest9Factory = {
+var gTest9Factory = {
   createInstance: function (outer, iid) {
-    if (outer == null) {
+    if (outer == null)
       return gTest9TimerCallback.QueryInterface(iid);
-    }
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };

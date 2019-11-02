@@ -275,7 +275,7 @@ HTMLLinkElement::UpdateImport()
     return;
   }
 
-  if (!nsStyleLinkElement::IsImportEnabled()) {
+  if (!nsStyleLinkElement::IsImportEnabled(NodePrincipal())) {
     // For now imports are hidden behind a pref...
     return;
   }

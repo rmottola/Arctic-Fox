@@ -414,11 +414,14 @@ NS_IMETHODIMP CacheEntry::OnFileReady(nsresult aResult, bool aIsNew)
 
   if (NS_SUCCEEDED(aResult)) {
     if (aIsNew) {
-      CacheFileUtils::DetailedCacheHitTelemetry::AddRecord(
-        CacheFileUtils::DetailedCacheHitTelemetry::MISS, mLoadStart);
-    } else {
-      CacheFileUtils::DetailedCacheHitTelemetry::AddRecord(
-        CacheFileUtils::DetailedCacheHitTelemetry::HIT, mLoadStart);
+      mozilla::Telemetry::AccumulateTimeDelta(
+        mozilla::Telemetry::NETWORK_CACHE_V2_MISS_TIME_MS,
+        mLoadStart);
+    }
+    else {
+      mozilla::Telemetry::AccumulateTimeDelta(
+        mozilla::Telemetry::NETWORK_CACHE_V2_HIT_TIME_MS,
+        mLoadStart);
     }
   }
 

@@ -408,20 +408,25 @@ class DeviceManagerADB(DeviceManager):
 
     def pullFile(self, remoteFile, offset=None, length=None):
         # TODO: add debug flags and allow for printing stdout
-        with mozfile.NamedTemporaryFile() as tf:
-            self._runPull(remoteFile, tf.name)
-            # we need to reopen the file to get the written contents
-            with open(tf.name) as tf2:
-                # ADB pull does not support offset and length, but we can
-                # instead read only the requested portion of the local file
-                if offset is not None and length is not None:
-                    tf2.seek(offset)
-                    return tf2.read(length)
-                elif offset is not None:
-                    tf2.seek(offset)
-                    return tf2.read()
-                else:
-                    return tf2.read()
+        localFile = tempfile.mkstemp()[1]
+        self._runPull(remoteFile, localFile)
+
+        f = open(localFile, 'r')
+
+        # ADB pull does not support offset and length, but we can instead
+        # read only the requested portion of the local file
+        if offset is not None and length is not None:
+            f.seek(offset)
+            ret = f.read(length)
+        elif offset is not None:
+            f.seek(offset)
+            ret = f.read()
+        else:
+            ret = f.read()
+
+        f.close()
+        mozfile.remove(localFile)
+        return ret
 
     def getFile(self, remoteFile, localFile):
         self._runPull(remoteFile, localFile)
@@ -440,10 +445,16 @@ class DeviceManagerADB(DeviceManager):
         """
         Return the md5 sum of a file on the device
         """
-        with tempfile.NamedTemporaryFile() as f:
-            self._runPull(remoteFile, f.name)
+        localFile = tempfile.mkstemp()[1]
+        localFile = self._runPull(remoteFile, localFile)
 
-            return self._getLocalHash(f.name)
+        if localFile is None:
+            return None
+
+        md5 = self._getLocalHash(localFile)
+        mozfile.remove(localFile)
+
+        return md5
 
     def _setupDeviceRoot(self, deviceRoot):
         # user-specified device root, create it and return it
