@@ -70,9 +70,6 @@ public:
                               /*out*/ mozilla::pkix::TrustLevel& trustLevel)
                               override;
 
-  virtual Result CheckSignatureDigestAlgorithm(
-                   mozilla::pkix::DigestAlgorithm digestAlg) override;
-
   virtual Result CheckRSAPublicKeyModulusSizeInBits(
                    mozilla::pkix::EndEntityOrCA endEntityOrCA,
                    unsigned int modulusSizeInBits) override;

@@ -21,7 +21,6 @@ EXTRA_JS_MODULES += [
     'PopupNotifications.jsm',
     'QuotaManager.jsm',
     'SharedFrame.jsm',
-    'TabCrashReporter.jsm',
     'webrtcUI.jsm'
 ]
 

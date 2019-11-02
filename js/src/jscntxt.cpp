@@ -55,7 +55,6 @@ using namespace js::gc;
 using mozilla::DebugOnly;
 using mozilla::PodArrayZero;
 using mozilla::PointerRangeSize;
-using mozilla::UniquePtr;
 
 bool
 js::AutoCycleDetector::init()
@@ -815,52 +814,43 @@ js::CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* reportp
         onError(cx, message, reportp);
 }
 
-bool
-js::ReportIsNotDefined(JSContext *cx, HandleId id)
+void
+js::ReportIsNotDefined(JSContext* cx, const char* name)
 {
-    JSAutoByteString printable;
-    if (ValueToPrintable(cx, IdToValue(id), &printable))
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_DEFINED, printable.ptr());
-    return false;
-}
-
-bool
-js::ReportIsNotDefined(JSContext *cx, HandlePropertyName name)
-{
-    RootedId id(cx, NameToId(name));
-    return ReportIsNotDefined(cx, id);
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_DEFINED, name);
 }
 
 bool
 js::ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
                            HandleString fallback)
 {
+    char* bytes;
     bool ok;
 
-    UniquePtr<char[], JS::FreePolicy> bytes =
-        DecompileValueGenerator(cx, spindex, v, fallback);
+    bytes = DecompileValueGenerator(cx, spindex, v, fallback);
     if (!bytes)
         return false;
 
-    if (strcmp(bytes.get(), js_undefined_str) == 0 ||
-        strcmp(bytes.get(), js_null_str) == 0) {
+    if (strcmp(bytes, js_undefined_str) == 0 ||
+        strcmp(bytes, js_null_str) == 0) {
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
                                           GetErrorMessage, nullptr,
-                                          JSMSG_NO_PROPERTIES, bytes.get(),
+                                          JSMSG_NO_PROPERTIES, bytes,
                                           nullptr, nullptr);
     } else if (v.isUndefined()) {
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
                                           GetErrorMessage, nullptr,
-                                          JSMSG_UNEXPECTED_TYPE, bytes.get(),
+                                          JSMSG_UNEXPECTED_TYPE, bytes,
                                           js_undefined_str, nullptr);
     } else {
         MOZ_ASSERT(v.isNull());
         ok = JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR,
                                           GetErrorMessage, nullptr,
-                                          JSMSG_UNEXPECTED_TYPE, bytes.get(),
+                                          JSMSG_UNEXPECTED_TYPE, bytes,
                                           js_null_str, nullptr);
     }
 
+    js_free(bytes);
     return ok;
 }
 
@@ -868,19 +858,22 @@ void
 js::ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
 {
     char argbuf[11];
-    UniquePtr<char[], JS::FreePolicy> bytes;
+    char* bytes;
     RootedAtom atom(cx);
 
     JS_snprintf(argbuf, sizeof argbuf, "%u", arg);
+    bytes = nullptr;
     if (IsFunctionObject(v)) {
         atom = v.toObject().as<JSFunction>().atom();
-        bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, atom);
+        bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK,
+                                        v, atom);
         if (!bytes)
             return;
     }
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                          JSMSG_MISSING_FUN_ARG, argbuf,
-                         bytes ? bytes.get() : "");
+                         bytes ? bytes : "");
+    js_free(bytes);
 }
 
 bool
@@ -888,8 +881,9 @@ js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNum
                           int spindex, HandleValue v, HandleString fallback,
                           const char* arg1, const char* arg2)
 {
+    char* bytes; // XXX FIXME  RM 2018-12-10 eventually migrate to UniquePtr<char[], JS::FreePolicy> bytes;
     bool ok;
-    UniquePtr<char[], JS::FreePolicy> bytes;
+
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount >= 1);
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount <= 3);
     bytes = DecompileValueGenerator(cx, spindex, v, fallback);
@@ -897,7 +891,8 @@ js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNum
         return false;
 
     ok = JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage,
-                                      nullptr, errorNumber, bytes.get(), arg1, arg2);
+                                      nullptr, errorNumber, bytes, arg1, arg2);
+    js_free(bytes);
 
     return ok;
 }

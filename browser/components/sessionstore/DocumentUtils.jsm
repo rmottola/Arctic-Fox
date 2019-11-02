@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-"use strict";
-
 this.EXPORTED_SYMBOLS = [ "DocumentUtils" ];
 
 const Cu = Components.utils;
@@ -55,8 +53,7 @@ this.DocumentUtils = {
       }
 
       if (node instanceof Ci.nsIDOMHTMLInputElement ||
-          node instanceof Ci.nsIDOMHTMLTextAreaElement ||
-          node instanceof Ci.nsIDOMXULTextBoxElement) {
+          node instanceof Ci.nsIDOMHTMLTextAreaElement) {
         switch (node.type) {
           case "checkbox":
           case "radio":

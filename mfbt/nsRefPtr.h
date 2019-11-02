@@ -17,12 +17,6 @@
 
 class nsCOMPtr_helper;
 
-namespace mozilla {
-namespace dom {
-template<class T> class OwningNonNull;
-} // namespace dom
-} // namespace mozilla
-
 template <class T>
 class nsRefPtr
 {
@@ -122,10 +116,6 @@ public:
 
   MOZ_IMPLICIT nsRefPtr(const nsCOMPtr_helper& aHelper);
 
-  // Defined in OwningNonNull.h
-  template<class U>
-  MOZ_IMPLICIT nsRefPtr(const mozilla::dom::OwningNonNull<U>& aOther);
-
   // Assignment operators
 
   nsRefPtr<T>&
@@ -171,11 +161,6 @@ public:
     aRefPtr.mRawPtr = nullptr;
     return *this;
   }
-
-  // Defined in OwningNonNull.h
-  template<class U>
-  nsRefPtr<T>&
-  operator=(const mozilla::dom::OwningNonNull<U>& aOther);
 
   // Other pointer operators
 

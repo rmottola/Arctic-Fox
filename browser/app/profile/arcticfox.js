@@ -772,6 +772,9 @@ pref("browser.sessionstore.resume_session_once", false);
 
 // minimal interval between two save operations in milliseconds
 pref("browser.sessionstore.interval", 15000);
+// maximum amount of POSTDATA to be saved in bytes per history entry (-1 = all of it)
+// (NB: POSTDATA will be saved either entirely or not at all)
+pref("browser.sessionstore.postdata", 0);
 // on which sites to save text data, POSTDATA and cookies
 // 0 = everywhere, 1 = unencrypted sites, 2 = nowhere
 pref("browser.sessionstore.privacy_level", 0);
@@ -785,9 +788,9 @@ pref("browser.sessionstore.max_windows_undo", 3);
 // number of crashes that can occur before the about:sessionrestore page is displayed
 // (this pref has no effect if more than 6 hours have passed since the last crash)
 pref("browser.sessionstore.max_resumed_crashes", 1);
-// number of back button session history entries to restore (-1 = all of them)
+// number of back button session history entries to save (-1 = all of them)
 pref("browser.sessionstore.max_serialize_back", 10);
-// number of forward button session history entries to restore (-1 = all of them)
+// number of forward button session history entries to save (-1 = all of them)
 pref("browser.sessionstore.max_serialize_forward", -1);
 // restore_on_demand overrides browser.sessionstore.max_concurrent_tabs
 // and restore_hidden_tabs. When true, tabs will not be restored until they are
@@ -804,12 +807,6 @@ pref("browser.sessionstore.restore_hidden_tabs", false);
 // When set to true, this pref overrides that behavior, and pinned tabs will only
 // be restored when they are focused.
 pref("browser.sessionstore.restore_pinned_tabs_on_demand", false);
-// The version at which we performed the latest upgrade backup
-pref("browser.sessionstore.upgradeBackup.latestBuildID", "");
-// End-users should not run sessionstore in debug mode
-pref("browser.sessionstore.debug", false);
-// Forget closed windows/tabs after two weeks
-pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // Pale Moon: Allow the user to bypass cached versions of pages when restoring
 // tabs from a previous session
 // 0 = standard behavior: pull fully from cache
@@ -904,15 +901,6 @@ pref("toolbar.customization.usesheet", true);
 pref("toolbar.customization.usesheet", false);
 #endif
 
-// Disable Flash protected mode to reduce hang/crash rates.
-pref("dom.ipc.plugins.flash.disable-protected-mode", true);
-
-// Feature-disable the protected-mode auto-flip
-pref("browser.flash-protected-mode-flip.enable", false);
-
-// Whether we've already flipped protected mode automatically
-pref("browser.flash-protected-mode-flip.done", false);
-
 #ifdef XP_MACOSX
 // On mac, the default pref is per-architecture
 pref("dom.ipc.plugins.enabled.i386", true);
@@ -935,16 +923,7 @@ pref("browser.tabs.remote", false);
 pref("security.sandbox.macos.content.level", 1);
 #endif
 
-#if defined(NIGHTLY_BUILD) && defined(XP_MACOSX)
-// In Nightly, browser.tabs.remote is enabled on platforms that
-// support OMTC. However, users won't actually get remote tabs unless
-// they enable browser.tabs.remote.autostart or they use the "New OOP
-// Window" menu option.
-pref("browser.tabs.remote", true);
-#else
 pref("browser.tabs.remote", false);
-#endif
-pref("browser.tabs.remote.autostart", false);
 
 // This pref governs whether we attempt to work around problems caused by
 // plugins using OS calls to manipulate the cursor while running out-of-
@@ -1047,8 +1026,7 @@ pref("services.sync.prefs.sync.spellchecker.dictionary", true);
 pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
-// Developer edition preferences
-pref("browser.devedition.theme.enabled", false);
+
 
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);

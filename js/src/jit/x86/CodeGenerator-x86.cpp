@@ -650,7 +650,6 @@ CodeGeneratorX86::visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins)
     const LAllocation* ptr = ins->ptr();
     Register oldval = ToRegister(ins->oldValue());
     Register newval = ToRegister(ins->newValue());
-    Register addrTemp = ToRegister(ins->addrTemp());
 
     MOZ_ASSERT(ptr->isRegister());
     // Set up the offset within the heap in the pointer reg.
@@ -672,13 +671,12 @@ CodeGeneratorX86::visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins)
 
     // Add in the actual heap pointer explicitly, to avoid opening up
     // the abstraction that is compareExchangeToTypedIntArray at this time.
-    masm.movl(ptrReg, addrTemp);
     uint32_t before = masm.size();
-    masm.addlWithPatch(Imm32(mir->offset()), addrTemp);
+    masm.addlWithPatch(Imm32(mir->offset()), ptrReg);
     uint32_t after = masm.size();
     masm.append(AsmJSHeapAccess(before, after, maybeCmpOffset));
 
-    Address memAddr(addrTemp, mir->offset());
+    Address memAddr(ToRegister(ptr), mir->offset());
     masm.compareExchangeToTypedIntArray(accessType == Scalar::Uint32 ? Scalar::Int32 : accessType,
                                         memAddr,
                                         oldval,
@@ -696,7 +694,6 @@ CodeGeneratorX86::visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins)
     Scalar::Type accessType = mir->accessType();
     const LAllocation* ptr = ins->ptr();
     Register temp = ins->temp()->isBogusTemp() ? InvalidReg : ToRegister(ins->temp());
-    Register addrTemp = ToRegister(ins->addrTemp());
     const LAllocation* value = ins->value();
     AtomicOp op = mir->operation();
 
@@ -720,13 +717,12 @@ CodeGeneratorX86::visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins)
 
     // Add in the actual heap pointer explicitly, to avoid opening up
     // the abstraction that is atomicBinopToTypedIntArray at this time.
-    masm.movl(ptrReg, addrTemp);
     uint32_t before = masm.size();
-    masm.addlWithPatch(Imm32(mir->offset()), addrTemp);
+    masm.addlWithPatch(Imm32(mir->offset()), ptrReg);
     uint32_t after = masm.size();
     masm.append(AsmJSHeapAccess(before, after, maybeCmpOffset));
 
-    Address memAddr(addrTemp, mir->offset());
+    Address memAddr(ptrReg, mir->offset());
     if (value->isConstant()) {
         masm.atomicBinopToTypedIntArray(op, accessType == Scalar::Uint32 ? Scalar::Int32 : accessType,
                                         Imm32(ToInt32(value)),

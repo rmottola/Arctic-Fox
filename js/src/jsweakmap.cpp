@@ -26,8 +26,6 @@
 using namespace js;
 using namespace js::gc;
 
-using mozilla::UniquePtr;
-
 WeakMapBase::WeakMapBase(JSObject* memOf, JSCompartment* c)
   : memberOf(memOf),
     compartment(c),
@@ -390,11 +388,10 @@ WeakMap_set_impl(JSContext* cx, const CallArgs& args)
     MOZ_ASSERT(IsWeakMap(args.thisv()));
 
     if (!args.get(0).isObject()) {
-        UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, args.get(0), NullPtr());
+        char *bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, args.get(0), NullPtr());
         if (!bytes)
             return false;
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes.get());
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes);
         return false;
     }
 
@@ -575,11 +572,10 @@ WeakMap_construct(JSContext* cx, unsigned argc, Value* vp)
             // Steps 12k-l.
             if (isOriginalAdder) {
                 if (keyVal.isPrimitive()) {
-                    UniquePtr<char[], JS::FreePolicy> bytes =
-                        DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, keyVal, NullPtr());
+                    char *bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, keyVal, NullPtr());
                     if (!bytes)
                         return false;
-                    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes.get());
+                    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes);
                     return false;
                 }
 

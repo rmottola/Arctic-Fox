@@ -90,8 +90,6 @@ public:
   virtual nsWindowBase* GetParentWindowBase(bool aIncludeOwner) override;
   virtual bool IsTopLevelWidget() override { return mIsTopWidgetWindow; }
 
-  using nsWindowBase::DispatchPluginEvent;
-
   // nsIWidget interface
   NS_IMETHOD              Create(nsIWidget *aParent,
                                  nsNativeWidget aNativeParent,

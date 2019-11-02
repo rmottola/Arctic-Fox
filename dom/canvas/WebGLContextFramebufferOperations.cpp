@@ -49,8 +49,8 @@ WebGLContext::Clear(GLbitfield mask)
     mShouldPresent = true;
 }
 
-static GLfloat
-GLClampFloat(GLfloat val)
+static GLclampf
+GLClampFloat(GLclampf val)
 {
     if (val < 0.0)
         return 0.0;
@@ -62,28 +62,18 @@ GLClampFloat(GLfloat val)
 }
 
 void
-WebGLContext::ClearColor(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
+WebGLContext::ClearColor(GLclampf r, GLclampf g,
+                             GLclampf b, GLclampf a)
 {
     if (IsContextLost())
         return;
 
     MakeContextCurrent();
-
-    const bool supportsFloatColorBuffers = (IsExtensionEnabled(WebGLExtensionID::EXT_color_buffer_half_float) ||
-                                            IsExtensionEnabled(WebGLExtensionID::WEBGL_color_buffer_float));
-    if (!supportsFloatColorBuffers) {
-        r = GLClampFloat(r);
-        g = GLClampFloat(g);
-        b = GLClampFloat(b);
-        a = GLClampFloat(a);
-    }
-
+    mColorClearValue[0] = GLClampFloat(r);
+    mColorClearValue[1] = GLClampFloat(g);
+    mColorClearValue[2] = GLClampFloat(b);
+    mColorClearValue[3] = GLClampFloat(a);
     gl->fClearColor(r, g, b, a);
-
-    mColorClearValue[0] = r;
-    mColorClearValue[1] = g;
-    mColorClearValue[2] = b;
-    mColorClearValue[3] = a;
 }
 
 void

@@ -477,11 +477,12 @@ WinUtils::LogW(const wchar_t *fmt, ...)
   OutputDebugStringW(buffer);
   OutputDebugStringW(L"\n");
 
-  int len = WideCharToMultiByte(CP_ACP, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+  int len = wcslen(buffer);
   if (len) {
-    char* utf8 = new char[len];
+    char* utf8 = new char[len+1];
+    memset(utf8, 0, sizeof(utf8));
     if (WideCharToMultiByte(CP_ACP, 0, buffer,
-                            -1, utf8, len, nullptr,
+                            -1, utf8, len+1, nullptr,
                             nullptr) > 0) {
       // desktop console
       printf("%s\n", utf8);
@@ -1066,11 +1067,11 @@ WinUtils::InvalidatePluginAsWorkaround(nsIWidget *aWidget, const nsIntRect &aRec
 }
 
 #ifdef MOZ_PLACES
-/************************************************************************
- * Constructs as AsyncFaviconDataReady Object
- * @param aIOThread : the thread which performs the action
- * @param aURLShortcut : Differentiates between (false)Jumplistcache and (true)Shortcutcache
- ************************************************************************/
+/************************************************************************/
+/* Constructs as AsyncFaviconDataReady Object
+/* @param aIOThread : the thread which performs the action
+/* @param aURLShortcut : Differentiates between (false)Jumplistcache and (true)Shortcutcache
+/************************************************************************/
 
 AsyncFaviconDataReady::AsyncFaviconDataReady(nsIURI *aNewURI, 
                                              nsCOMPtr<nsIThread> &aIOThread, 

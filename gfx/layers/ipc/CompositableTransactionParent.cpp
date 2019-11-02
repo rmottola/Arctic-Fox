@@ -73,6 +73,20 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
                                                      EditReplyVector& replyv)
 {
   switch (aEdit.type()) {
+    case CompositableOperation::TOpCreatedIncrementalTexture: {
+      MOZ_LAYERS_LOG(("[ParentSide] Created texture"));
+      const OpCreatedIncrementalTexture& op = aEdit.get_OpCreatedIncrementalTexture();
+      CompositableHost* compositable = AsCompositable(op);
+
+      bool success =
+        compositable->CreatedIncrementalTexture(this,
+                                                op.textureInfo(),
+                                                op.bufferRect());
+      if (!success) {
+        return false;
+      }
+      break;
+    }
     case CompositableOperation::TOpPaintTextureRegion: {
       MOZ_LAYERS_LOG(("[ParentSide] Paint PaintedLayer"));
 
@@ -100,6 +114,22 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
         OpContentBufferSwap(op.compositableParent(), nullptr, frontUpdatedRegion));
 
       RenderTraceInvalidateEnd(thebes, "FF00FF");
+      break;
+    }
+    case CompositableOperation::TOpPaintTextureIncremental: {
+      MOZ_LAYERS_LOG(("[ParentSide] Paint PaintedLayer"));
+
+      const OpPaintTextureIncremental& op = aEdit.get_OpPaintTextureIncremental();
+
+      CompositableHost* compositable = AsCompositable(op);
+
+      SurfaceDescriptor desc = op.image();
+
+      compositable->UpdateIncremental(op.textureId(),
+                                      desc,
+                                      op.updatedRegion(),
+                                      op.bufferRect(),
+                                      op.bufferRotation());
       break;
     }
     case CompositableOperation::TOpUpdatePictureRect: {
@@ -143,7 +173,7 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       MOZ_ASSERT(tex.get());
       compositable->RemoveTextureHost(tex);
 
-      if (!IsAsync() && ImageBridgeParent::GetInstance(GetChildProcessId())) {
+      if (!IsAsync() && GetChildProcessId()) {
         // send FenceHandle if present via ImageBridge.
         ImageBridgeParent::SendFenceHandleToTrackerIfPresent(
                              GetChildProcessId(),

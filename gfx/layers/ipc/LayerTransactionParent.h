@@ -101,8 +101,6 @@ public:
     return mChildProcessId;
   }
 
-  virtual void ReplyRemoveTexture(const OpReplyRemoveTexture& aReply) override;
-
 protected:
   virtual bool RecvShutdown() override;
 

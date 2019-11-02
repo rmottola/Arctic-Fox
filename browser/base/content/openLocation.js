@@ -16,7 +16,6 @@ try {
 }
 
 Components.utils.import("resource:///modules/openLocationLastURL.jsm", openLocationModule);
-Components.utils.import("resource://gre/modules/Task.jsm");
 let gOpenLocationLastURL = new openLocationModule.OpenLocationLastURL(window.opener);
 
 function onLoad()
@@ -62,53 +61,45 @@ function doEnabling()
 
 function open()
 {
-  Task.spawn(function() {
-    let url;
-    let postData = null;
-    let mayInheritPrincipal = false;
+  var url;
+  var postData = {};
+  var mayInheritPrincipal = {value: false};
+  if (browser)
+    url = browser.getShortcutOrURI(dialog.input.value, postData, mayInheritPrincipal);
+  else
+    url = dialog.input.value;
 
-    if (browser) {
-      let data = yield browser.getShortcutOrURIAndPostData(dialog.input.value);
-      url = data.url;
-      postData = data.postData;
-      mayInheritPrincipal = data.mayInheritPrincipal;
-    } else {
-      url = dialog.input.value;
+  try {
+    // Whichever target we use for the load, we allow third-party services to
+    // fixup the URI
+    switch (dialog.openWhereList.value) {
+      case "0":
+        var webNav = Components.interfaces.nsIWebNavigation;
+        var flags = webNav.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |
+                    webNav.LOAD_FLAGS_FIXUP_SCHEME_TYPOS;
+        if (!mayInheritPrincipal.value)
+          flags |= webNav.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
+        browser.gBrowser.loadURIWithFlags(url, flags, null, null, postData.value);
+        break;
+      case "1":
+        window.opener.delayedOpenWindow(getBrowserURL(), "all,dialog=no",
+                                        url, postData.value, null, null, true);
+        break;
+      case "3":
+        browser.delayedOpenTab(url, null, null, postData.value, true);
+        break;
     }
+  }
+  catch(exception) {
+  }
 
-    try {
-      // Whichever target we use for the load, we allow third-party services to
-      // fixup the URI
-      switch (dialog.openWhereList.value) {
-        case "0":
-          var webNav = Components.interfaces.nsIWebNavigation;
-          var flags = webNav.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |;
-                      webNav.LOAD_FLAGS_FIXUP_SCHEME_TYPOS;
-          if (!mayInheritPrincipal)
-            flags |= webNav.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
-          browser.gBrowser.loadURIWithFlags(url, flags, null, null, postData);
-          break;
-        case "1":
-          window.opener.delayedOpenWindow(getBrowserURL(), "all,dialog=no",
-                                          url, postData, null, null, true);
-          break;
-        case "3":
-          browser.delayedOpenTab(url, null, null, postData, true);
-          break;
-      }
-    }
-    catch(exception) {
-    }
+  if (pref) {
+    gOpenLocationLastURL.value = dialog.input.value;
+    pref.setIntPref("general.open_location.last_window_choice", dialog.openWhereList.value);
+  }
 
-    if (pref) {
-      gOpenLocationLastURL.value = dialog.input.value;
-      pref.setIntPref("general.open_location.last_window_choice", dialog.openWhereList.value);
-    }
-
-    // Delay closing slightly to avoid timing bug on Linux.
-    window.close();
-  });
-
+  // Delay closing slightly to avoid timing bug on Linux.
+  window.close();
   return false;
 }
 
