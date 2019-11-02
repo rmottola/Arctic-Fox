@@ -1624,9 +1624,10 @@ public:
   // @param aIndex the place to insert the new elements. This must be no
   //               greater than the current length of the array.
   // @param aCount the number of elements to insert
+  template<typename ActualAlloc = Alloc>
   elem_type* InsertElementsAt(index_type aIndex, size_type aCount)
   {
-    if (!Alloc::Successful(this->template InsertSlotsAt<Alloc>(
+    if (!ActualAlloc::Successful(this->template InsertSlotsAt<ActualAlloc>(
           aIndex, aCount, sizeof(elem_type), MOZ_ALIGNOF(elem_type)))) {
       return nullptr;
     }
@@ -1641,6 +1642,13 @@ public:
     return Elements() + aIndex;
   }
 
+  /* MOZ_WARN_UNUSED_RESULT */
+  elem_type* InsertElementsAt(index_type aIndex, size_type aCount,
+                              const mozilla::fallible_t&)
+  {
+    return InsertElementsAt<FallibleAlloc>(aIndex, aCount);
+  }
+
   // This method inserts elements into the array, constructing them
   // elem_type's copy constructor (or whatever one-arg constructor
   // happens to match the Item type).
@@ -1648,11 +1656,11 @@ public:
   //               greater than the current length of the array.
   // @param aCount the number of elements to insert.
   // @param aItem the value to use when constructing the new elements.
-  template<class Item>
+  template<class Item, typename ActualAlloc = Alloc>
   elem_type* InsertElementsAt(index_type aIndex, size_type aCount,
                               const Item& aItem)
   {
-    if (!Alloc::Successful(this->template InsertSlotsAt<Alloc>(
+    if (!ActualAlloc::Successful(this->template InsertSlotsAt<ActualAlloc>(
         aIndex, aCount, sizeof(elem_type), MOZ_ALIGNOF(elem_type)))) {
       return nullptr;
     }
@@ -1665,6 +1673,14 @@ public:
     }
 
     return Elements() + aIndex;
+  }
+
+  template<class Item>
+  /* MOZ_WARN_UNUSED_RESULT */
+  elem_type* InsertElementsAt(index_type aIndex, size_type aCount,
+                              const Item& aItem, const mozilla::fallible_t&)
+  {
+    return InsertElementsAt<Item, FallibleAlloc>(aIndex, aCount, aItem);
   }
 
   // This method may be called to minimize the memory used by this array.
