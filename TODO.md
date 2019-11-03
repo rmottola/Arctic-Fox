@@ -73,6 +73,7 @@
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
@@ -142,6 +143,7 @@ https://github.com/mozilla/newtab-dev/commit/bd4d2c42d2b4c5a952231e7495298556af0
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
 
+- Verify requirements of 968520
 
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
