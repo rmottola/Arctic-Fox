@@ -1430,10 +1430,10 @@ public:
   // @param aArrayLen The number of elements to append to this array.
   // @return          A pointer to the new elements in the array, or null if
   //                  the operation failed due to insufficient memory.
-  template<class Item>
+  template<class Item, typename ActualAlloc = Alloc>
   elem_type* AppendElements(const Item* aArray, size_type aArrayLen)
   {
-    if (!Alloc::Successful(this->template ExtendCapacity<Alloc>(
+    if (!ActualAlloc::Successful(this->template ExtendCapacity<ActualAlloc>(
       Length(), aArrayLen, sizeof(elem_type)))) {
       return nullptr;
     }
@@ -1443,11 +1443,27 @@ public:
     return Elements() + len;
   }
 
+  template<class Item>
+  /* MOZ_WARN_UNUSED_RESULT */
+  elem_type* AppendElements(const Item* aArray, size_type aArrayLen,
+                            const mozilla::fallible_t&)
+  {
+    return AppendElements<Item, FallibleAlloc>(aArray, aArrayLen);
+  }
+
   // A variation on the AppendElements method defined above.
-  template<class Item, class Allocator>
+  template<class Item, class Allocator, typename ActualAlloc = Alloc>
   elem_type* AppendElements(const nsTArray_Impl<Item, Allocator>& aArray)
   {
-    return AppendElements(aArray.Elements(), aArray.Length());
+    return AppendElements<Item, ActualAlloc>(aArray.Elements(), aArray.Length());
+  }
+
+  template<class Item, class Allocator>
+  /* MOZ_WARN_UNUSED_RESULT */
+  elem_type* AppendElements(const nsTArray_Impl<Item, Allocator>& aArray,
+                            const mozilla::fallible_t&)
+  {
+    return AppendElements<Item, Allocator, FallibleAlloc>(aArray);
   }
 
   // Append a new element, move constructing if possible.
@@ -1468,9 +1484,9 @@ public:
   // Append new elements without copy-constructing. This is useful to avoid
   // temporaries.
   // @return A pointer to the newly appended elements, or null on OOM.
-  elem_type* AppendElements(size_type aCount)
-  {
-    if (!Alloc::Successful(this->template ExtendCapacity<Alloc>(
+  template<typename ActualAlloc = Alloc>
+  elem_type* AppendElements(size_type aCount) {
+    if (!ActualAlloc::Successful(this->template ExtendCapacity<ActualAlloc>(
        Length(), aCount, sizeof(elem_type)))) {
       return nullptr;
     }
@@ -1481,6 +1497,13 @@ public:
     }
     this->IncrementLength(aCount);
     return elems;
+  }
+
+  /* MOZ_WARN_UNUSED_RESULT */
+  elem_type* AppendElements(size_type aCount,
+                            const mozilla::fallible_t&)
+  {
+    return AppendElements<FallibleAlloc>(aCount);
   }
 
   // Append a new element without copy-constructing. This is useful to avoid
