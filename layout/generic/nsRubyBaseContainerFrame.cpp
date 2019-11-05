@@ -684,7 +684,7 @@ nsRubyBaseContainerFrame::ReflowOneColumn(const ReflowState& aReflowState,
     nscoord deltaISize = icoord - lineLayout->GetCurrentICoord();
     if (deltaISize > 0) {
       lineLayout->AdvanceICoord(deltaISize);
-      if (textFrame) {
+      if (textFrame && !textFrame->IsAutoHidden()) {
         RubyUtils::SetReservedISize(textFrame, deltaISize);
       }
     }
