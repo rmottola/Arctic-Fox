@@ -86,6 +86,9 @@ public:
                                  const nsIntRegion& aVisibleRegion,
                                  nsTArray<PluginWindowData>&& aPlugins) override;
 
+  virtual bool
+  RecvUpdatePluginVisibility(nsTArray<uintptr_t>&& aWindowList) override;
+
   /**
    * Request that the parent tell us when graphics are ready on GPU.
    * When we get that message, we bounce it to the TabParent via
