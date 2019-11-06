@@ -307,30 +307,25 @@ PluginModuleContentParent::LoadModule(uint32_t aPluginId)
 
 /* static */ void
 PluginModuleContentParent::AssociatePluginId(uint32_t aPluginId,
-                                             base::ProcessId aProcessId)
+                                             base::ProcessId aOtherPid)
 {
     DebugOnly<PluginModuleMapping*> mapping =
-        PluginModuleMapping::AssociateWithProcessId(aPluginId, aProcessId);
+        PluginModuleMapping::AssociateWithProcessId(aPluginId, aOtherPid);
     MOZ_ASSERT(mapping);
 }
 
 /* static */ PluginModuleContentParent*
 PluginModuleContentParent::Initialize(mozilla::ipc::Transport* aTransport,
-                                      base::ProcessId aOtherProcess)
+                                      base::ProcessId aOtherPid)
 {
     nsAutoPtr<PluginModuleMapping> moduleMapping(
-        PluginModuleMapping::Resolve(aOtherProcess));
+        PluginModuleMapping::Resolve(aOtherPid));
     MOZ_ASSERT(moduleMapping);
     PluginModuleContentParent* parent = moduleMapping->GetModule();
     MOZ_ASSERT(parent);
 
-    ProcessHandle handle;
-    if (!base::OpenProcessHandle(aOtherProcess, &handle)) {
-        // Bug 1090578 - need to kill |aOtherProcess|, it's boned.
-        return nullptr;
-    }
-
-    DebugOnly<bool> ok = parent->Open(aTransport, handle, XRE_GetIOMessageLoop(),
+    DebugOnly<bool> ok = parent->Open(aTransport, aOtherPid,
+                                      XRE_GetIOMessageLoop(),
                                       mozilla::ipc::ParentSide);
     MOZ_ASSERT(ok);
 
@@ -374,7 +369,7 @@ bool
 PluginModuleChromeParent::SendAssociatePluginId()
 {
     MOZ_ASSERT(mContentParent);
-    return mContentParent->SendAssociatePluginId(mPluginId, OtherSidePID());
+    return mContentParent->SendAssociatePluginId(mPluginId, OtherPid());
 }
 
 // static
@@ -433,7 +428,9 @@ PluginModuleChromeParent::OnProcessLaunched(const bool aSucceeded)
     if (mAsyncInitRv != NS_ERROR_NOT_INITIALIZED || mShutdown) {
         return;
     }
-    Open(mSubprocess->GetChannel(), mSubprocess->GetChildProcessHandle());
+
+    Open(mSubprocess->GetChannel(),
+         base::GetProcId(mSubprocess->GetChildProcessHandle()));
 
     // Request Windows message deferral behavior on our channel. This
     // applies to the top level and all sub plugin protocols since they
@@ -962,12 +959,18 @@ PluginModuleContentParent::OnExitedSyncSend()
 void
 PluginModuleChromeParent::TerminateChildProcess(MessageLoop* aMsgLoop)
 {
+    mozilla::ipc::ScopedProcessHandle geckoChildProcess;
+    bool childOpened = base::OpenProcessHandle(OtherPid(),
+                                               &geckoChildProcess.rwget());
+
 #ifdef XP_WIN
     // collect cpu usage for plugin processes
 
     InfallibleTArray<base::ProcessHandle> processHandles;
 
-    processHandles.AppendElement(OtherProcess());
+    if (childOpened) {
+        processHandles.AppendElement(geckoChildProcess);
+    }
 
     if (!GetProcessCpuUsage(processHandles, mPluginCpuUsageOnHang)) {
       mPluginCpuUsageOnHang.Clear();
@@ -982,8 +985,9 @@ PluginModuleChromeParent::TerminateChildProcess(MessageLoop* aMsgLoop)
         mChromeTaskFactory.NewRunnableMethod(
             &PluginModuleChromeParent::CleanupFromTimeout, isFromHangUI));
 
-    if (!KillProcess(OtherProcess(), 1, false))
+    if (!childOpened || !KillProcess(geckoChildProcess, 1, false)) {
         NS_WARNING("failed to kill subprocess!");
+    }
 }
 
 bool
@@ -2299,7 +2303,7 @@ PluginModuleParent::RecvPluginHideWindow(const uint32_t& aWindowId)
 {
     PLUGIN_LOG_DEBUG(("%s", FULLFUNCTION));
 #if defined(XP_MACOSX)
-    mac_plugin_interposing::parent::OnPluginHideWindow(aWindowId, OtherSidePID());
+    mac_plugin_interposing::parent::OnPluginHideWindow(aWindowId, OtherPid());
     return true;
 #else
     NS_NOTREACHED(
@@ -2392,3 +2396,4 @@ PluginModuleChromeParent::RecvNotifyContentModuleDestroyed()
     }
     return true;
 }
+

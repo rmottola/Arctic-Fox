@@ -375,7 +375,7 @@ ${CHILD_DELETE_CASES}
 
 void
 IPDLUnitTestChildInit(IPC::Channel* transport,
-                      base::ProcessHandle parent,
+                      base::ProcessId parentPid,
                       MessageLoop* worker)
 {
     // Some tests require this, and we don't care what thread we're on if we're

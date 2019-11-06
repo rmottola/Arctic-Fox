@@ -142,7 +142,8 @@ GMPParent::LoadProcess()
       return NS_ERROR_FAILURE;
     }
 
-    bool opened = Open(mProcess->GetChannel(), mProcess->GetChildProcessHandle());
+    bool opened = Open(mProcess->GetChannel(),
+                       base::GetProcId(mProcess->GetChildProcessHandle()));
     if (!opened) {
       LOGD(("%s::%s: Failed to create new child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
       mProcess->Delete();

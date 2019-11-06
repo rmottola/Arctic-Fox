@@ -160,8 +160,10 @@ for var in ('MOZ_CHILD_PROCESS_NAME', 'MOZ_CHILD_PROCESS_BUNDLE',
             'DLL_PREFIX', 'DLL_SUFFIX'):
     DEFINES[var] = '"%s"' % CONFIG[var]
 
-if CONFIG['OS_ARCH'] == 'WINNT':
+if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_ARCH'] == 'WINNT':
     LOCAL_INCLUDES += [
+        '/security/sandbox/chromium',
+        '/security/sandbox/chromium-shim',
         '/security/sandbox/win/src/sandboxbroker',
     ]
 
