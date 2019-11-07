@@ -131,8 +131,8 @@ using namespace mozilla::system;
 #include "nsDocument.h"
 #include "mozilla/dom/HTMLVideoElement.h"
 #include "CameraPreferences.h"
-#include "MediaDecoder.h"
 #include "TouchManager.h"
+#include "MediaDecoder.h"
 
 using namespace mozilla;
 using namespace mozilla::net;
