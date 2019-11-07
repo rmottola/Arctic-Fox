@@ -1062,3 +1062,7 @@ pref("gfx.vsync.hw-vsync.enabled", false);
 pref("gfx.vsync.compositor", false);
 pref("gfx.touch.resample", false);
 #endif
+
+// mulet apparently loads firefox.js as well as b2g.js, so we have to explicitly
+// disable serviceworkers here to get them disabled in mulet.
+pref("dom.serviceWorkers.enabled", false);
