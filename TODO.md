@@ -138,7 +138,7 @@ Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/bd4d2c42d2b4c5a952231e7495298556af090a07
+https://github.com/mozilla/newtab-dev/commit/4380a42bbc26d571b40a87c3a0cfb9e2281f5423
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
