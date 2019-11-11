@@ -153,6 +153,28 @@ public:
                                           const int32_t& aX,
                                           const int32_t& aY) override;
 
+  virtual bool RecvReplaceText(const uint64_t& aID,
+                               const nsString& aText);
+
+  virtual bool RecvInsertText(const uint64_t& aID,
+                              const nsString& aText,
+                              const int32_t& aPosition);
+
+  virtual bool RecvCopyText(const uint64_t& aID,
+                            const int32_t& aStartPos,
+                            const int32_t& aEndPos);
+
+  virtual bool RecvCutText(const uint64_t& aID,
+                           const int32_t& aStartPos,
+                           const int32_t& aEndPos);
+
+  virtual bool RecvDeleteText(const uint64_t& aID,
+                              const int32_t& aStartPos,
+                              const int32_t& aEndPos);
+
+  virtual bool RecvPasteText(const uint64_t& aID,
+                             const int32_t& aPosition);
+
 private:
   bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
                                    nsTArray<Attribute>* aAttributes);
