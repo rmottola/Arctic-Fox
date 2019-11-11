@@ -326,21 +326,32 @@ getCharacterExtentsCB(AtkText *aText, gint aOffset,
                       gint *aWidth, gint *aHeight,
                       AtkCoordType aCoords)
 {
+  if(!aX || !aY || !aWidth || !aHeight) {
+    return;
+  }
+
+  nsIntRect rect;
+  uint32_t geckoCoordType;
+  if (aCoords == ATK_XY_SCREEN) {
+    goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
+  } else {
+    giabbaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
+  }
+
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
-  if(!accWrap || !aX || !aY || !aWidth || !aHeight)
+  if (accWrap) {
+    HyperTextAccessible* text = accWrap->AsHyperText();
+    if (!text || !text->IsTextRole()) {
+      return;
+    }
+
+    rect = text->CharBounds(aOffset, goannaCoordType);
+  } else if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
+    rect = proxy->CharBounds(aOffset, goannaCoordType);
+  } else {
     return;
+  }
 
-  HyperTextAccessible* text = accWrap->AsHyperText();
-  if (!text || !text->IsTextRole())
-    return;
-
-    uint32_t goannaCoordType;
-    if (aCoords == ATK_XY_SCREEN)
-        goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
-    else
-        goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
-
-  nsIntRect rect = text->CharBounds(aOffset, goannaCoordType);
   *aX = rect.x;
   *aY = rect.y;
   *aWidth = rect.width;
@@ -351,21 +362,32 @@ static void
 getRangeExtentsCB(AtkText *aText, gint aStartOffset, gint aEndOffset,
                   AtkCoordType aCoords, AtkTextRectangle *aRect)
 {
+  if (!aRect) {
+    return;
+  }
+
+  nsIntRect rect;
+  uint32_t goannaCoordType;
+  if (aCoords == ATK_XY_SCREEN) {
+      goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
+  } else {
+      goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
+  }
+
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
-  if(!accWrap || !aRect)
+  if(accWrap) {
+    HyperTextAccessible* text = accWrap->AsHyperText();
+    if (!text || !text->IsTextRole()) {
+      return;
+    }
+
+    rect = text->TextBounds(aStartOffset, aEndOffset, geckoCoordType);
+  } else if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
+    rect = proxy->TextBounds(aStartOffset, aEndOffset, geckoCoordType);
+  } else {
     return;
+  }
 
-  HyperTextAccessible* text = accWrap->AsHyperText();
-  if (!text || !text->IsTextRole())
-    return;
-
-    uint32_t goannaCoordType;
-    if (aCoords == ATK_XY_SCREEN)
-        goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
-    else
-        goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
-
-  nsIntRect rect = text->TextBounds(aStartOffset, aEndOffset, goannaCoordType);
   aRect->x = rect.x;
   aRect->y = rect.y;
   aRect->width = rect.width;
