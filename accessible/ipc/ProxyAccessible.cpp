@@ -202,5 +202,22 @@ ProxyAccessible::GetTextBeforeOffset(int32_t aOffset,
                                           &aText, aStartOffset, aEndOffset);
 }
 
+void
+ProxyAccessible::TextAttributes(bool aIncludeDefAttrs,
+                                int32_t aOffset,
+                                nsTArray<Attribute>* aAttributes,
+                                int32_t* aStartOffset,
+                                int32_t* aEndOffset)
+{
+  unused << mDoc->SendTextAttributes(mID, aIncludeDefAttrs, aOffset,
+                                     aAttributes, aStartOffset, aEndOffset);
+}
+
+void
+ProxyAccessible::DefaultTextAttributes(nsTArray<Attribute>* aAttrs)
+{
+  unused << mDoc->SendDefaultTextAttributes(mID, aAttrs);
+}
+
 }
 }

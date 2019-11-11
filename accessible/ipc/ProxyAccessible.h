@@ -120,6 +120,13 @@ public:
                            nsString& aText, int32_t* aStartOffset,
                            int32_t* aEndOffset);
 
+  void TextAttributes(bool aIncludeDefAttrs,
+                      const int32_t aOffset,
+                      nsTArray<Attribute>* aAttributes,
+                      int32_t* aStartOffset,
+                      int32_t* aEndOffset);
+  void DefaultTextAttributes(nsTArray<Attribute>* aAttrs);
+
   /**
    * Allow the platform to store a pointers worth of data on us.
    */

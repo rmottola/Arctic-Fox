@@ -90,7 +90,22 @@ public:
                                        nsString* aText, int32_t* aStartOffset,
                                        int32_t* aEndOffset) override;
 
+  virtual bool RecvTextAttributes(const uint64_t& aID,
+                                  const bool& aIncludeDefAttrs,
+                                  const int32_t& aOffset,
+                                  nsTArray<Attribute>* aAttributes,
+                                  int32_t* aStartOffset,
+                                  int32_t* aEndOffset)
+    override;
+
+  virtual bool RecvDefaultTextAttributes(const uint64_t& aID,
+                                         nsTArray<Attribute>* aAttributes)
+    override;
+
 private:
+  bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
+                                   nsTArray<Attribute>* aAttributes);
+
   DocAccessible* mDoc;
 };
 
