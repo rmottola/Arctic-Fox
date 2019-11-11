@@ -106,12 +106,18 @@ public:
                               const int32_t& aStartOffset,
                               const int32_t& aEndOffset,
                               const uint32_t& aCoordType,
-                              nsIntRect* aRetVal) MOZ_OVERRIDE;
+                              nsIntRect* aRetVal) override;
 
   virtual bool RecvCharBounds(const uint64_t& aID,
                               const int32_t& aOffset,
                               const uint32_t& aCoordType,
-                              nsIntRect* aRetVal) MOZ_OVERRIDE;
+                              nsIntRect* aRetVal) override;
+
+  virtual bool RecvOffsetAtPoint(const uint64_t& aID,
+                                 const int32_t& aX,
+                                 const int32_t& aY,
+                                 const uint32_t& aCoordType,
+                                 int32_t* aRetVal) override;
 private:
   bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
                                    nsTArray<Attribute>* aAttributes);
