@@ -118,6 +118,29 @@ public:
                                  const int32_t& aY,
                                  const uint32_t& aCoordType,
                                  int32_t* aRetVal) override;
+
+  virtual bool RecvSelectionBoundsAt(const uint64_t& aID,
+                                     const int32_t& aSelectionNum,
+                                     bool* aSucceeded,
+                                     nsString* aData,
+                                     int32_t* aStartOffset,
+                                     int32_t* aEndOffset) override;
+
+  virtual bool RecvSetSelectionBoundsAt(const uint64_t& aID,
+                                        const int32_t& aSelectionNum,
+                                        const int32_t& aStartOffset,
+                                        const int32_t& aEndOffset,
+                                        bool* aSucceeded) override;
+
+  virtual bool RecvAddToSelection(const uint64_t& aID,
+                                  const int32_t& aStartOffset,
+                                  const int32_t& aEndOffset,
+                                  bool* aSucceeded) override;
+
+  virtual bool RecvRemoveFromSelection(const uint64_t& aID,
+                                       const int32_t& aSelectionNum,
+                                       bool* aSucceeded) override;
+
 private:
   bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
                                    nsTArray<Attribute>* aAttributes);
