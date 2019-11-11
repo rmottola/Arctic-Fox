@@ -141,6 +141,18 @@ public:
                                        const int32_t& aSelectionNum,
                                        bool* aSucceeded) override;
 
+  virtual bool RecvScrollSubstringTo(const uint64_t& aID,
+                                     const int32_t& aStartOffset,
+                                     const int32_t& aEndOffset,
+                                     const uint32_t& aScrollType) override;
+
+  virtual bool RecvScrollSubstringToPoint(const uint64_t& aID,
+                                          const int32_t& aStartOffset,
+                                          const int32_t& aEndOffset,
+                                          const uint32_t& aCoordinateType,
+                                          const int32_t& aX,
+                                          const int32_t& aY) override;
+
 private:
   bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
                                    nsTArray<Attribute>* aAttributes);
