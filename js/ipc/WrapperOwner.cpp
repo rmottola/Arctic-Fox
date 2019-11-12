@@ -31,7 +31,7 @@ struct AuxCPOWData
     // however they see fit.
     nsCString objectTag;
 
-    AuxCPOWData(ObjectId id, bool isCallable, bool isConstructor, const nsACString& objectTag)
+    AuxCPOWData(ObjectId id, bool isCallable, bool isConstructor, const nsACString &objectTag)
       : id(id),
         isCallable(isCallable),
         isConstructor(isConstructor),
@@ -152,7 +152,7 @@ CPOWProxyHandler::getPropertyDescriptor(JSContext* cx, HandleObject proxy, Handl
 }
 
 bool
-WrapperOwner::getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+WrapperOwner::getPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
 				    MutableHandle<JSPropertyDescriptor> desc)
 {
     ObjectId objId = idOf(proxy);
@@ -175,14 +175,14 @@ WrapperOwner::getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId 
 }
 
 bool
-CPOWProxyHandler::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+CPOWProxyHandler::getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                            MutableHandle<JSPropertyDescriptor> desc) const
 {
     FORWARD(getOwnPropertyDescriptor, (cx, proxy, id, desc));
 }
 
 bool
-WrapperOwner::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+WrapperOwner::getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
 				       MutableHandle<JSPropertyDescriptor> desc)
 {
     ObjectId objId = idOf(proxy);
@@ -339,7 +339,7 @@ CPOWProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
 }
 
 static bool
-CPOWToString(JSContext* cx, unsigned argc, Value* vp)
+CPOWToString(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject callee(cx, &args.callee());
