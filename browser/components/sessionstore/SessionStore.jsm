@@ -79,10 +79,6 @@ const TAB_EVENTS = [
   "TabUnpinned"
 ];
 
-#ifndef XP_WIN
-#define BROKEN_WM_Z_ORDER
-#endif
-
 Cu.import("resource://gre/modules/Services.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", this);
@@ -114,8 +110,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
 
 #ifdef MOZ_DEVTOOLS
-XPCOMUtils.defineLazyModuleGetter(this, "ScratchpadManager",
-  "resource://gre/modules/devtools/scratchpad-manager.jsm");
 
 Object.defineProperty(this, "HUDService", {
   get: function HUDService_getter() {
@@ -131,6 +125,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "DocumentUtils",
   "resource:///modules/sessionstore/DocumentUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
   "resource:///modules/sessionstore/PrivacyLevel.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ScratchpadManager",
+  "resource://gre/modules/devtools/scratchpad-manager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
   "resource:///modules/sessionstore/SessionSaver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionCookies",
@@ -2921,32 +2917,7 @@ let SessionStoreInternal = {
    * @returns Window reference
    */
   _getMostRecentBrowserWindow: function ssi_getMostRecentBrowserWindow() {
-    var win = Services.wm.getMostRecentWindow("navigator:browser");
-    if (!win)
-      return null;
-    if (!win.closed)
-      return win;
-
-#ifdef BROKEN_WM_Z_ORDER
-    win = null;
-    var windowsEnum = Services.wm.getEnumerator("navigator:browser");
-    // this is oldest to newest, so this gets a bit ugly
-    while (windowsEnum.hasMoreElements()) {
-      let nextWin = windowsEnum.getNext();
-      if (!nextWin.closed)
-        win = nextWin;
-    }
-    return win;
-#else
-    var windowsEnum =
-      Services.wm.getZOrderDOMWindowEnumerator("navigator:browser", true);
-    while (windowsEnum.hasMoreElements()) {
-      win = windowsEnum.getNext();
-      if (!win.closed)
-        return win;
-    }
-    return null;
-#endif
+    return RecentWindow.getMostRecentBrowserWindow({ allowPopups: true });
   },
 
   /**
