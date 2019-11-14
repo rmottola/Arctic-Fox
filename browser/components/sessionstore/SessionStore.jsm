@@ -15,9 +15,6 @@ const STATE_STOPPED = 0;
 const STATE_RUNNING = 1;
 const STATE_QUITTING = -1;
 
-const STATE_STOPPED_STR = "stopped";
-const STATE_RUNNING_STR = "running";
-
 const TAB_STATE_NEEDS_RESTORE = 1;
 const TAB_STATE_RESTORING = 2;
 
@@ -2241,7 +2238,6 @@ let SessionStoreInternal = {
       ix = -1;
 
     let session = {
-      state: this._loadState == STATE_RUNNING ? STATE_RUNNING_STR : STATE_STOPPED_STR,
       lastUpdate: Date.now(),
       startTime: this._sessionStartTime,
       recentCrashes: this._recentCrashes
