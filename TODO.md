@@ -131,9 +131,6 @@ Require check of JS browser components:
 - Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
 - Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
 
-2014-09
-Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
-
 
 Parents of:
 
