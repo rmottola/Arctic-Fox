@@ -122,6 +122,7 @@
 
 Require check of JS browser components:
 
+- Bug 1169892 - Avoid extra round-trip when a pending tab is reloaded r
 - Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
 - Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
 - Bug 1135913 - 4 parts
@@ -132,7 +133,6 @@ Require check of JS browser components:
 
 2014-09
 Bug 1020831 - Make SessionStore.jsm and SessionFile.jsm share the sam
-Bug 1072814 - Fix SessionFile.jsm to use new Promise() API r=yoric
 
 
 Parents of:
