@@ -135,7 +135,7 @@ Require check of JS browser components:
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/c4009158f999c6b5c79d3a144853af07c0819194
+https://github.com/mozilla/newtab-dev/commit/a4099ba4c5867b9735dbacfbc5c9fe0629e0a145
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
