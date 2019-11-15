@@ -65,7 +65,7 @@ public:
                 nsIRequest *aRequest,
                 nsIChannel *aChannel,
                 imgCacheEntry *aCacheEntry,
-                void *aLoadId,
+                nsISupports* aCX,
                 nsIPrincipal* aLoadingPrincipal,
                 int32_t aCORSMode,
                 ReferrerPolicy aReferrerPolicy);
@@ -94,10 +94,6 @@ public:
   nsresult UnlockImage();
   nsresult StartDecoding();
   nsresult RequestDecode();
-
-  inline void SetInnerWindowID(uint64_t aInnerWindowId) {
-    mInnerWindowId = aInnerWindowId;
-  }
 
   inline uint64_t InnerWindowID() const {
     return mInnerWindowId;
