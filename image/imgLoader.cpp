@@ -402,7 +402,7 @@ private:
                                       nsTArray<ImageMemoryCounter>* aArray,
                                       bool aIsUsed)
   {
-    nsRefPtr<Image> image = aRequest->GetImage();
+    auto image = static_cast<Image*>(aRequest->mImage.get());
     if (!image) {
       return;
     }
@@ -432,7 +432,7 @@ private:
     }
 
     nsRefPtr<imgRequest> req = aEntry->GetRequest();
-    nsRefPtr<Image> image = req->GetImage();
+    auto image = static_cast<Image*>(req->mImage.get());
     if (!image) {
       return PL_DHASH_NEXT;
     }
