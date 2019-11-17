@@ -11797,7 +11797,8 @@ nsDocShell::AddState(JS::Handle<JS::Value> aData, const nsAString& aTitle,
   GetRootSessionHistory(getter_AddRefs(rootSH));
   NS_ENSURE_TRUE(rootSH, NS_ERROR_UNEXPECTED);
 
-  nsCOMPtr<nsISHistoryInternal> internalSH = do_QueryInterface(rootSH);
+  nsCOMPtr<nsISHistoryInternal> internalSH =
+      do_QueryInterface(rootSH);
   NS_ENSURE_TRUE(internalSH, NS_ERROR_UNEXPECTED);
 
   if (!aReplace) {
