@@ -167,8 +167,8 @@ this.SessionStore = {
     SessionStoreInternal.canRestoreLastSession = val;
   },
 
-  init: function ss_init(aWindow) {
-    SessionStoreInternal.init(aWindow);
+  init: function ss_init() {
+    SessionStoreInternal.init();
   },
 
   getBrowserState: function ss_getBrowserState() {
@@ -402,13 +402,9 @@ let SessionStoreInternal = {
   /**
    * Initialize the sessionstore service.
    */
-  init: function (aWindow) {
+  init: function () {
     if (this._initialized) {
       throw new Error("SessionStore.init() must only be called once!");
-    }
-
-    if (!aWindow) {
-      throw new Error("SessionStore.init() must be called with a valid window.");
     }
 
     OBSERVING.forEach(function(aTopic) {
@@ -422,20 +418,6 @@ let SessionStoreInternal = {
     // this pref is only read at startup, so no need to observe it
     this._sessionhistory_max_entries =
       this._prefBranch.getIntPref("sessionhistory.max_entries");
-
-    // Wait until nsISessionStartup has finished reading the session data.
-    gSessionStartup.onceInitialized.then(() => {
-      // Parse session data and start restoring.
-      this.initSession();
-
-      // Start tracking the given (initial) browser window.
-      if (!aWindow.closed) {
-        this.onLoad(aWindow);
-      }
-
-      // Let everyone know we're done.
-      this._deferredInitialized.resolve();
-    });
   },
 
   /**
