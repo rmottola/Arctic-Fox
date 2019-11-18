@@ -230,7 +230,7 @@ function openLinkIn(url, where, params) {
         "where == 'save' but without initiatingDoc.  See bug 814264.");
       return;
     }
-    saveURL(url, null, null, true, null, aReferrerURI, aInitiatingDoc);
+    saveURL(url, null, null, true, null, aNoReferrer ? null : aReferrerURI, aInitiatingDoc);
     return;
   }
   const Cc = Components.classes;
@@ -270,8 +270,7 @@ function openLinkIn(url, where, params) {
 
     sa.AppendElement(wuri);
     sa.AppendElement(charset);
-    if (sendReferrerURI)
-      sa.AppendElement(aReferrerURI);
+    sa.AppendElement(aNoReferrer ? null : aReferrerURI);
     sa.AppendElement(aPostData);
     sa.AppendElement(allowThirdPartyFixupSupports);
 
@@ -318,7 +317,7 @@ function openLinkIn(url, where, params) {
     }
     if (aDisallowInheritPrincipal)
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
-    w.gBrowser.loadURIWithFlags(url, flags, aReferrerURI, null, aPostData);
+    w.gBrowser.loadURIWithFlags(url, flags, aNoReferrer ? null : aReferrerURI, null, aPostData);
     break;
   case "tabshifted":
     loadInBackground = !loadInBackground;
