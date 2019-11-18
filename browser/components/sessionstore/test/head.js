@@ -31,6 +31,7 @@ Cu.import("resource:///modules/sessionstore/SessionStore.jsm", tmp);
 Cu.import("resource:///modules/sessionstore/SessionSaver.jsm", tmp);
 Cu.import("resource:///modules/sessionstore/SessionFile.jsm", tmp);
 Cu.import("resource:///modules/sessionstore/TabState.jsm", tmp);
+Cu.import("resource:///modules/sessionstore/TabState.jsm", tmp);
 let {Promise, Task, SessionStore, SessionSaver, SessionFile, TabState} = tmp;
 
 let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
