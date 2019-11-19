@@ -222,6 +222,7 @@ function openLinkIn(url, where, params) {
   var aInitiatingDoc        = params.initiatingDoc;
   var aIsPrivate            = params.private;
   var aSkipTabAnimation     = params.skipTabAnimation;
+  var aNoReferrer           = params.noReferrer;
   var sendReferrerURI       = true;
 
   if (where == "save") {
@@ -332,7 +333,9 @@ function openLinkIn(url, where, params) {
                        allowThirdPartyFixup: aAllowThirdPartyFixup,
                        relatedToCurrent: aRelatedToCurrent,
                        skipAnimation: aSkipTabAnimation,
-                       allowMixedContent: aAllowMixedContent});
+                       allowMixedContent: aAllowMixedContent,
+	               noReferrer: aNoReferrer
+    });
     break;
   }
 
