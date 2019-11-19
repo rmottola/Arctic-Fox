@@ -223,7 +223,7 @@
           this.tabContainer._positionPinnedTabs();
           this.tabContainer.adjustTabstrip();
 
-          this.getBrowserForTab(aTab).docShell.isAppTab = true;
+          this.getBrowserForTab(aTab).messageManager.sendAsyncMessage("Browser:AppTab", { isAppTab: true })
 
           if (aTab.selected)
             this._setCloseKeyState(false);
@@ -248,7 +248,7 @@
           this.tabContainer._positionPinnedTabs();
           this.tabContainer.adjustTabstrip();
 
-          this.getBrowserForTab(aTab).docShell.isAppTab = false;
+          this.getBrowserForTab(aTab).messageManager.sendAsyncMessage("Browser:AppTab", { isAppTab: true })
 
           if (aTab.selected)
             this._setCloseKeyState(true);
