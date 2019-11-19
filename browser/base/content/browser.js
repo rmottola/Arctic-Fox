@@ -9,6 +9,9 @@ let Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
+                                  "resource:///modules/E10SUtils.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
                                   "resource:///modules/CharsetMenu.jsm");
 
@@ -150,6 +153,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
 
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
   "resource:///modules/sessionstore/SessionStore.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "TabState",
+  "resource:///modules/sessionstore/TabState.jsm");
 
 let gInitialPages = [
   "about:blank",
@@ -758,6 +764,36 @@ function gKeywordURIFixup(fixupInfo, topic, data) {
   gDNSService.asyncResolve(hostName, 0, onLookupComplete, Services.tm.mainThread);
 }
 
+// Called when a docshell has attempted to load a page in an incorrect process.
+// This function is responsible for loading the page in the correct process.
+function RedirectLoad({ target: browser, data }) {
+  let tab = gBrowser._getTabForBrowser(browser);
+  // Flush the tab state before getting it
+  TabState.flush(browser);
+  let tabState = JSON.parse(SessionStore.getTabState(tab));
+
+  if (data.historyIndex < 0) {
+    // Add a pseudo-history state for the new url to load
+    let newEntry = {
+      url: data.uri,
+      referrer: data.referrer,
+    };
+
+    tabState.entries = tabState.entries.slice(0, tabState.index);
+    tabState.entries.push(newEntry);
+    tabState.index++;
+    tabState.userTypedValue = null;
+  }
+  else {
+    // Update the history state to point to the requested index
+    tabState.index = data.historyIndex + 1;
+  }
+
+  // SessionStore takes care of setting the browser remoteness before restoring
+  // history into it.
+  SessionStore.setTabState(tab, JSON.stringify(tabState));
+}
+
 var gBrowserInit = {
   onLoad: function() {
     var mustLoadSidebar = false;
@@ -1074,6 +1110,7 @@ var gBrowserInit = {
     Services.obs.addObserver(gXPInstallObserver, "addon-install-failed", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-complete", false);
     Services.obs.addObserver(gKeywordURIFixup, "keyword-uri-fixup", false);
+    window.messageManager.addMessageListener("Browser:LoadURI", RedirectLoad);
 
     gPrefService.addObserver(gURLBarSettings.prefSuggest, gURLBarSettings, false);
     gPrefService.addObserver(gURLBarSettings.prefKeyword, gURLBarSettings, false);
@@ -1430,6 +1467,7 @@ var gBrowserInit = {
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-failed");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-complete");
       Services.obs.removeObserver(gKeywordURIFixup, "keyword-uri-fixup");
+      window.messageManager.removeMessageListener("Browser:LoadURI", RedirectLoad);
 
       try {
         gPrefService.removeObserver(gURLBarSettings.prefSuggest, gURLBarSettings);
@@ -3647,6 +3685,28 @@ var XULBrowserWindow = {
     if (gProxyFavIcon && gBrowser.userTypedValue === null) {
       PageProxySetIcon(aIconURL); // update the favicon in the URL bar
     }
+  },
+
+  // Check whether this URI should load in the current process
+  shouldLoadURI: function(aDocShell, aURI, aReferrer) {
+    if (!gMultiProcessBrowser)
+      return true;
+
+    let browser = aDocShell.QueryInterface(Ci.nsIDocShellTreeItem)
+                           .sameTypeRootTreeItem
+                           .QueryInterface(Ci.nsIDocShell)
+                           .chromeEventHandler;
+
+    // Ignore loads that aren't in the main tabbrowser
+    if (browser.localName != "browser" || browser.getTabBrowser() != gBrowser)
+      return true;
+
+    if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
+      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer);
+      return false;
+    }
+
+    return true;
   },
 
   onProgressChange: function (aWebProgress, aRequest,

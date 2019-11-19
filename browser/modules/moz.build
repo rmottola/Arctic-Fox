@@ -12,6 +12,7 @@ EXTRA_JS_MODULES += [
     'BrowserNewTabPreloader.jsm',
     'CharsetMenu.jsm',
     'ContentClick.jsm',
+    'E10SUtils.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
