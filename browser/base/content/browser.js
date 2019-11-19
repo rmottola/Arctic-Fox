@@ -1319,8 +1319,6 @@ var gBrowserInit = {
       if ("TabView" in window) {
         TabView.init();
       }
-
-      setTimeout(function () { BrowserChromeTest.markAsReady(); }, 0);
     });
 
     Services.obs.notifyObservers(window, "browser-delayed-startup-finished", "");
@@ -7216,23 +7214,6 @@ function focusNextFrame(event) {
   if (element.ownerDocument == document)
     focusAndSelectUrlBar();
 }
-let BrowserChromeTest = {
-  _cb: null,
-  _ready: false,
-  markAsReady: function () {
-    this._ready = true;
-    if (this._cb) {
-      this._cb();
-      this._cb = null;
-    }
-  },
-  runWhenReady: function (cb) {
-    if (this._ready)
-      cb();
-    else
-      this._cb = cb;
-  }
-};
 
 let ToolbarIconColor = {
   init: function () {
