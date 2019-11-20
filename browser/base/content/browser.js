@@ -4404,8 +4404,8 @@ nsBrowserAccess.prototype = {
         break;
       case Ci.nsIBrowserDOMWindow.OPEN_NEWTAB :
         let browser = this._openURIInNewTab(aURI, aOpener, isExternal);
-
-        newWindow = browser.contentWindow;
+        if (browser)
+          newWindow = browser.contentWindow;
         break;
       default : // OPEN_CURRENTWINDOW or an illegal value
         newWindow = content;
@@ -4430,7 +4430,10 @@ nsBrowserAccess.prototype = {
 
     var isExternal = (aContext == Ci.nsIBrowserDOMWindow.OPEN_EXTERNAL);
     let browser = this._openURIInNewTab(aURI, aOpener, isExternal);
-    return browser.QueryInterface(Ci.nsIFrameLoaderOwner);
+    if (browser)
+      return browser.QueryInterface(Ci.nsIFrameLoaderOwner);
+
+    return null;
   },
 
   isTabContentWindow: function (aWindow) {
