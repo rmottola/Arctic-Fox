@@ -118,6 +118,7 @@
 - Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
+- Bug 1083281: Use flags to determine which chrome and about URIs are 
 
 
 Require check of JS browser components:
@@ -127,9 +128,6 @@ Require check of JS browser components:
 - Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
 - Bug 1135913 - 4 parts
 - Bug 1135537 - 2015-02-24 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
-- Bug 1031264 - 2014-12-10 - make opening links in new {tabs,windows} honor rel
-- Bug 1059007 - 2014-11-24 - Don't skip MozStorageChanged event for frames in s
-- Bug 1087356 - 2014-10-22 -  make e10s/non-e10s window options appear when no windows
 
 
 Parents of:
