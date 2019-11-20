@@ -1257,6 +1257,7 @@
             var aRelatedToCurrent;
             var aAllowMixedContent;
             var aSkipAnimation;
+            var aForceNotRemote;
             var aNoReferrer;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
@@ -1271,6 +1272,7 @@
               aRelatedToCurrent     = params.relatedToCurrent;
               aAllowMixedContent    = params.allowMixedContent;
               aSkipAnimation        = params.skipAnimation;
+	      aForceNotRemote       = params.forceNotRemote;
               aNoReferrer           = params.noReferrer;
             }
 
@@ -1287,6 +1289,7 @@
                                   relatedToCurrent: aRelatedToCurrent,
                                   skipAnimation: aSkipAnimation,
                                   allowMixedContent: aAllowMixedContent,
+				  forceNotRemote: aForceNotRemote,
                                   noReferrer: aNoReferrer });
             if (!bgLoad)
               this.selectedTab = tab;
@@ -1408,6 +1411,7 @@
             var aRelatedToCurrent;
             var aSkipAnimation;
             var aAllowMixedContent;
+	    var aForceNotRemote;
             var aNoReferrer;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
@@ -1422,6 +1426,7 @@
               aRelatedToCurrent     = params.relatedToCurrent;
               aSkipAnimation        = params.skipAnimation;
               aAllowMixedContent    = params.allowMixedContent;
+	      aForceNotRemote       = params.forceNotRemote;
               aNoReferrer           = params.noReferrer;
             }
 
@@ -1442,7 +1447,9 @@
             t.setAttribute("validate", "never"); //PMed
             t.setAttribute("onerror", "this.removeAttribute('image');");
             t.className = "tabbrowser-tab";
-	    let remote = gMultiProcessBrowser && E10SUtils.shouldBrowserBeRemote(aURI);
+	    let remote = gMultiProcessBrowser &&
+                         !aForceNotRemote &&
+                         E10SUtils.canLoadURIInProcess(aURI, Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT);
             if (remote)
               t.setAttribute("remote", "true");
 

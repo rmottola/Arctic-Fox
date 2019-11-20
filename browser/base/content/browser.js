@@ -819,7 +819,22 @@ function LoadInOtherProcess(browser, loadOptions, historyIndex = -1) {
 // Called when a docshell has attempted to load a page in an incorrect process.
 // This function is responsible for loading the page in the correct process.
 function RedirectLoad({ target: browser, data }) {
-  LoadInOtherProcess(browser, data.loadOptions, data.historyIndex);
+  // We should only start the redirection if the browser window has finished
+  // starting up. Otherwise, we should wait until the startup is done.
+  if (gBrowserInit.delayedStartupFinished) {
+    LoadInOtherProcess(browser, data.loadOptions, data.historyIndex);
+  } else {
+    let delayedStartupFinished = (subject, topic) => {
+      if (topic == "browser-delayed-startup-finished" &&
+          subject == window) {
+        Services.obs.removeObserver(delayedStartupFinished, topic);
+        LoadInOtherProcess(browser, data.loadOptions, data.historyIndex);
+      }
+    };
+    Services.obs.addObserver(delayedStartupFinished,
+                             "browser-delayed-startup-finished",
+                             false);
+  }
 }
 
 var gBrowserInit = {
@@ -847,6 +862,8 @@ var gBrowserInit = {
     
     let mm = window.getGroupMessageManager("browsers");
     mm.loadFrameScript("chrome://browser/content/content.js", true);
+
+    window.messageManager.addMessageListener("Browser:LoadURI", RedirectLoad);
 
     // initialize observers and listeners
     // and give C++ access to gBrowser
@@ -1138,7 +1155,6 @@ var gBrowserInit = {
     Services.obs.addObserver(gXPInstallObserver, "addon-install-failed", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-complete", false);
     Services.obs.addObserver(gKeywordURIFixup, "keyword-uri-fixup", false);
-    window.messageManager.addMessageListener("Browser:LoadURI", RedirectLoad);
 
     gPrefService.addObserver(gURLBarSettings.prefSuggest, gURLBarSettings, false);
     gPrefService.addObserver(gURLBarSettings.prefKeyword, gURLBarSettings, false);
@@ -4339,7 +4355,7 @@ function nsBrowserAccess() { }
 nsBrowserAccess.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIBrowserDOMWindow, Ci.nsISupports]),
 
-  _openURIInNewTab: function(aURI, aReferrer, aIsPrivate, aIsExternal) {
+  _openURIInNewTab: function(aURI, aReferrer, aIsPrivate, aIsExternal, aForceNotRemote=false) {
     let win, needToFocusWin;
 
     // try the current window.  if we're in a popup, fall back on the most recent browser window
@@ -4366,7 +4382,8 @@ nsBrowserAccess.prototype = {
     let tab = win.gBrowser.loadOneTab(aURI ? aURI.spec : "about:blank", {
                                       referrerURI: aReferrer,
                                       fromExternal: aIsExternal,
-                                      inBackground: loadInBackground});
+                                      inBackground: loadInBackground,
+                                      forceNotRemote: aForceNotRemote});
     let browser = win.gBrowser.getBrowserForTab(tab);
 
     if (needToFocusWin || (!loadInBackground && aIsExternal))
@@ -4376,8 +4393,22 @@ nsBrowserAccess.prototype = {
   },
 
   openURI: function (aURI, aOpener, aWhere, aContext) {
+    // This function should only ever be called if we're opening a URI
+    // from a non-remote browser window (via nsContentTreeOwner).
+    if (aOpener && Cu.isCrossProcessWrapper(aOpener)) {
+      Cu.reportError("nsBrowserAccess.openURI was passed a CPOW for aOpener. " +
+                     "openURI should only ever be called from non-remote browsers.");
+      throw Cr.NS_ERROR_FAILURE;
+    }
+
     var newWindow = null;
     var isExternal = (aContext == Ci.nsIBrowserDOMWindow.OPEN_EXTERNAL);
+
+    if (aOpener && isExternal) {
+      Cu.reportError("nsBrowserAccess.openURI did not expect an opener to be " +
+                     "passed if the context is OPEN_EXTERNAL.");
+      throw Cr.NS_ERROR_FAILURE;
+    }
 
     if (isExternal && aURI && aURI.schemeIs("chrome")) {
       dump("use -chrome command-line option to load external chrome urls\n");
@@ -4403,7 +4434,14 @@ nsBrowserAccess.prototype = {
       case Ci.nsIBrowserDOMWindow.OPEN_NEWTAB :
         let referrer = aOpener ? makeURI(aOpener.location.href) : null;
         let isPrivate = PrivateBrowsingUtils.isWindowPrivate(aOpener || window);
-        let browser = this._openURIInNewTab(aURI, referrer, isPrivate, isExternal);
+        // If we have an opener, that means that the caller is expecting access
+        // to the nsIDOMWindow of the opened tab right away. For e10s windows,
+        // this means forcing the newly opened browser to be non-remote so that
+        // we can hand back the nsIDOMWindow. The XULBrowserWindow.shouldLoadURI
+        // will do the job of shuttling off the newly opened browser to run in
+        // the right process once it starts loading a URI.
+        let forceNotRemote = !!aOpener;
+        let browser = this._openURIInNewTab(aURI, referrer, isPrivate, isExternal, forceNotRemote);
         if (browser)
           newWindow = browser.contentWindow;
         break;
