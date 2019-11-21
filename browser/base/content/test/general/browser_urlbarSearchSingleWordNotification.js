@@ -3,16 +3,32 @@
 
 "use strict";
 
+let notificationObserver;
 registerCleanupFunction(function() {
   Services.prefs.clearUserPref("browser.fixup.domainwhitelist.localhost");
+  if (notificationObserver) {
+    notificationObserver.disconnect();
+  }
 });
 
 function promiseNotificationForTab(aBrowser, value, expected, tab=aBrowser.selectedTab) {
   let deferred = Promise.defer();
   let notificationBox = aBrowser.getNotificationBox(tab.linkedBrowser);
   if (expected) {
-    waitForCondition(() => notificationBox.getNotificationWithValue(value) !== null,
-                     deferred.resolve, "Were expecting to get a notification");
+    info("Waiting for " + value + " notification");
+    let checkForNotification = function() {
+      if (notificationBox.getNotificationWithValue(value)) {
+        info("Saw the notification");
+        notificationObserver.disconnect();
+        notificationObserver = null;
+        deferred.resolve();
+      }
+    }
+    if (notificationObserver) {
+      notificationObserver.disconnect();
+    }
+    notificationObserver = new MutationObserver(checkForNotification);
+    notificationObserver.observe(notificationBox, {childList: true});
   } else {
     setTimeout(() => {
       is(notificationBox.getNotificationWithValue(value), null, "We are expecting to not get a notification");
@@ -34,12 +50,13 @@ function* runURLBarSearchTest(valueToOpen, expectSearch, expectNotification, aWi
     expectedURI = Services.search.defaultEngine.getSubmission(valueToOpen, null, "keyword").uri.spec;
   }
   aWindow.gURLBar.focus();
-  let docLoadPromise = waitForDocLoadAndStopIt(expectedURI, aWindow.gBrowser);
+  let docLoadPromise = waitForDocLoadAndStopIt(expectedURI, aWindow.gBrowser.selectedBrowser);
   EventUtils.synthesizeKey("VK_RETURN", {}, aWindow);
 
-  yield docLoadPromise;
-
-  yield promiseNotificationForTab(aWindow.gBrowser, "keyword-uri-fixup", expectNotification);
+  yield Promise.all([
+    docLoadPromise,
+    promiseNotificationForTab(aWindow.gBrowser, "keyword-uri-fixup", expectNotification)
+  ]);
 }
 
 add_task(function* test_navigate_full_domain() {
@@ -60,7 +77,7 @@ function get_test_function_for_localhost_with_hostname(hostName, isPrivate) {
 
     let notificationBox = browser.getNotificationBox(tab.linkedBrowser);
     let notification = notificationBox.getNotificationWithValue("keyword-uri-fixup");
-    let docLoadPromise = waitForDocLoadAndStopIt("http://" + hostName + "/", browser);
+    let docLoadPromise = waitForDocLoadAndStopIt("http://" + hostName + "/", tab.linkedBrowser);
     notification.querySelector(".notification-button-default").click();
 
     // check pref value

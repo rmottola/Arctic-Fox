@@ -669,32 +669,16 @@ var gPopupBlockerObserver = {
   }
 };
 
-function gKeywordURIFixup(fixupInfo, topic, data) {
-  fixupInfo.QueryInterface(Ci.nsIURIFixupInfo);
+function gKeywordURIFixup({ target: browser, data: fixupInfo }) {
+  let deserializeURI = (spec) => spec ? makeURI(spec) : null;
 
   // We get called irrespective of whether we did a keyword search, or
   // whether the original input would be vaguely interpretable as a URL,
   // so figure that out first.
-  let alternativeURI = fixupInfo.fixedURI;
+  let alternativeURI = deserializeURI(fixupInfo.fixedURI);
   if (!fixupInfo.fixupUsedKeyword || !alternativeURI) {
     return;
   }
-
-  // We should have a document loader...
-  let docshellRef = fixupInfo.consumer;
-  try {
-    docshellRef.QueryInterface(Ci.nsIDocumentLoader);
-  } catch (ex) {
-    return;
-  }
-
-  if (!docshellRef.document)
-    return;
-
-  // ... from which we can deduce the browser
-  let browser = gBrowser.getBrowserForDocument(docshellRef.document);
-  if (!browser)
-    return;
 
   // At this point we're still only just about to load this URI.
   // When the async DNS lookup comes back, we may be in any of these states:
@@ -705,6 +689,7 @@ function gKeywordURIFixup(fixupInfo, topic, data) {
   // We keep track of the currentURI to detect case (1) in the DNS lookup
   // callback.
   let previousURI = browser.currentURI;
+  let preferredURI = deserializeURI(fixupInfo.preferredURI);
 
   // now swap for a weak ref so we don't hang on to browser needlessly
   // even if the DNS query takes forever
@@ -724,7 +709,7 @@ function gKeywordURIFixup(fixupInfo, topic, data) {
     let currentURI = browser.currentURI;
     // If we're in case (3) (see above), don't show an info bar.
     if (!currentURI.equals(previousURI) &&
-        !currentURI.equals(fixupInfo.preferredURI)) {
+        !currentURI.equals(preferredURI)) {
       return;
     }
 
@@ -1167,7 +1152,7 @@ var gBrowserInit = {
     Services.obs.addObserver(gXPInstallObserver, "addon-install-origin-blocked", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-failed", false);
     Services.obs.addObserver(gXPInstallObserver, "addon-install-complete", false);
-    Services.obs.addObserver(gKeywordURIFixup, "keyword-uri-fixup", false);
+    window.messageManager.addMessageListener("Browser:URIFixup", gKeywordURIFixup);
 
     gPrefService.addObserver(gURLBarSettings.prefSuggest, gURLBarSettings, false);
     gPrefService.addObserver(gURLBarSettings.prefKeyword, gURLBarSettings, false);
@@ -1523,7 +1508,7 @@ var gBrowserInit = {
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-origin-blocked");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-failed");
       Services.obs.removeObserver(gXPInstallObserver, "addon-install-complete");
-      Services.obs.removeObserver(gKeywordURIFixup, "keyword-uri-fixup");
+      window.messageManager.removeMessageListener("Browser:URIFixup", gKeywordURIFixup);
       window.messageManager.removeMessageListener("Browser:LoadURI", RedirectLoad);
 
       try {
