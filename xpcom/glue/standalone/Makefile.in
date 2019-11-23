@@ -4,8 +4,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 DIST_INSTALL	= 1
-# Force to build a static library only
-NO_EXPAND_LIBS = 1
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3'):
     CXXFLAGS += CONFIG['GLIB_CFLAGS']
