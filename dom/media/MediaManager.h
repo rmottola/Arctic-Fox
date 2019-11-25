@@ -602,6 +602,7 @@ public:
 
   nsresult EnumerateDevices(nsPIDOMWindow* aWindow, dom::Promise& aPromise);
   void OnNavigation(uint64_t aWindowID);
+  bool IsWindowActivelyCapturing(uint64_t aWindowId);
 
   MediaEnginePrefs mPrefs;
 
