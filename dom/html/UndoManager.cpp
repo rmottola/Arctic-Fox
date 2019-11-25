@@ -1030,7 +1030,7 @@ UndoManager::ItemInternal(uint32_t aIndex,
     aItems.AppendElement(static_cast<DOMTransaction*>(listData[i]));
     NS_RELEASE(listData[i]);
   }
-  NS_Free(listData);
+  free(listData);
 }
 
 void

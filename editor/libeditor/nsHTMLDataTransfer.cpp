@@ -1662,7 +1662,7 @@ NS_IMETHODIMP nsHTMLEditor::PasteAsPlaintextQuotation(int32_t aSelectionType)
       rv = InsertAsPlaintextQuotation(stuffToPaste, true, 0);
     }
   }
-  NS_Free(flav);
+  free(flav);
 
   return rv;
 }
