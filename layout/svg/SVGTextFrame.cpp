@@ -2722,11 +2722,10 @@ public:
   void NotifySelectionBackgroundNeedsFill(const Rect& aBackgroundRect,
                                           nscolor aColor,
                                           DrawTarget& aDrawTarget) override;
+  void PaintDecorationLine(Rect aPath, nscolor aColor) override;
   void NotifyBeforeText(nscolor aColor) override;
   void NotifyGlyphPathEmitted() override;
   void NotifyAfterText() override;
-  void NotifyBeforeDecorationLine(nscolor aColor) override;
-  void NotifyDecorationLinePathEmitted() override;
   void NotifyBeforeSelectionDecorationLine(nscolor aColor) override;
   void NotifySelectionDecorationLinePathEmitted() override;
 
@@ -2823,15 +2822,16 @@ SVGTextDrawPathCallbacks::NotifyAfterText()
 }
 
 void
-SVGTextDrawPathCallbacks::NotifyBeforeDecorationLine(nscolor aColor)
+SVGTextDrawPathCallbacks::PaintDecorationLine(Rect aPath, nscolor aColor)
 {
   mColor = aColor;
-  SetupContext();
-}
+  AntialiasMode aaMode =
+    nsSVGUtils::ToAntialiasMode(mFrame->StyleSVG()->mTextRendering);
 
-void
-SVGTextDrawPathCallbacks::NotifyDecorationLinePathEmitted()
-{
+  gfx->Save();
+  gfx->NewPath();
+  gfx->SetAntialiasMode(aaMode);
+  gfx->Rectangle(ThebesRect(aPath));
   HandleTextGeometry();
   gfx->NewPath();
   gfx->Restore();
