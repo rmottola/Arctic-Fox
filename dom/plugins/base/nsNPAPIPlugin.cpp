@@ -1858,7 +1858,7 @@ _releasevariantvalue(NPVariant* variant)
           }
         }
 #else
-        NS_Free((void *)s->UTF8Characters);
+        free((void *)s->UTF8Characters);
 #endif
       }
       break;

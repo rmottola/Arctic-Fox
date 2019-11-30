@@ -10414,7 +10414,7 @@ int ReflowCountMgr::RemoveItems(PLHashEntry *he, int i, void *arg)
   char *str = (char *)he->key;
   ReflowCounter * counter = (ReflowCounter *)he->value;
   delete counter;
-  NS_Free(str);
+  free(str);
 
   return HT_ENUMERATE_REMOVE;
 }
@@ -10425,7 +10425,7 @@ int ReflowCountMgr::RemoveIndiItems(PLHashEntry *he, int i, void *arg)
   char *str = (char *)he->key;
   IndiReflowCounter * counter = (IndiReflowCounter *)he->value;
   delete counter;
-  NS_Free(str);
+  free(str);
 
   return HT_ENUMERATE_REMOVE;
 }

@@ -69,6 +69,77 @@ from ..util import (
 )
 from ..makeutil import Makefile
 
+MOZBUILD_VARIABLES = [
+    'ANDROID_GENERATED_RESFILES',
+    'ANDROID_RES_DIRS',
+    'ASFLAGS',
+    'CMSRCS',
+    'CMMSRCS',
+    'CPP_UNIT_TESTS',
+    'DIRS',
+    'DIST_INSTALL',
+    'EXTRA_DSO_LDOPTS',
+    'EXTRA_JS_MODULES',
+    'EXTRA_PP_COMPONENTS',
+    'EXTRA_PP_JS_MODULES',
+    'FORCE_SHARED_LIB',
+    'FORCE_STATIC_LIB',
+    'FINAL_LIBRARY',
+    'HOST_CSRCS',
+    'HOST_CMMSRCS',
+    'HOST_EXTRA_LIBS',
+    'HOST_LIBRARY_NAME',
+    'HOST_PROGRAM',
+    'HOST_SIMPLE_PROGRAMS',
+    'IS_COMPONENT',
+    'JAR_MANIFEST',
+    'JAVA_JAR_TARGETS',
+    'LD_VERSION_SCRIPT',
+    'LIBRARY_NAME',
+    'LIBS',
+    'MAKE_FRAMEWORK',
+    'MODULE',
+    'MSVC_ENABLE_PGO',
+    'NO_DIST_INSTALL',
+    'NO_EXPAND_LIBS',
+    'OS_LIBS',
+    'PARALLEL_DIRS',
+    'PREF_JS_EXPORTS',
+    'PROGRAM',
+    'PYTHON_UNIT_TESTS',
+    'RESOURCE_FILES',
+    'SDK_HEADERS',
+    'SDK_LIBRARY',
+    'SHARED_LIBRARY_LIBS',
+    'SHARED_LIBRARY_NAME',
+    'SIMPLE_PROGRAMS',
+    'SONAME',
+    'STATIC_LIBRARY_NAME',
+    'TEST_DIRS',
+    'TOOL_DIRS',
+    'XPCSHELL_TESTS',
+    'XPIDL_MODULE',
+]
+
+DEPRECATED_VARIABLES = [
+    'ANDROID_RESFILES',
+    'EXPORT_LIBRARY',
+    'EXTRA_LIBS',
+    'HOST_LIBS',
+    'LIBXUL_LIBRARY',
+    'MOCHITEST_A11Y_FILES',
+    'MOCHITEST_BROWSER_FILES',
+    'MOCHITEST_BROWSER_FILES_PARTS',
+    'MOCHITEST_CHROME_FILES',
+    'MOCHITEST_FILES',
+    'MOCHITEST_FILES_PARTS',
+    'MOCHITEST_METRO_FILES',
+    'MOCHITEST_ROBOCOP_FILES',
+    'SHORT_LIBNAME',
+    'TESTING_JS_MODULES',
+    'TESTING_JS_MODULE_DIR',
+]
+
 class BackendMakeFile(object):
     """Represents a generated backend.mk file.
 
@@ -628,6 +699,18 @@ class RecursiveMakeBackend(CommonBackend):
             rule = makefile.create_rule(['$(all_absolute_unified_files)'])
             rule.add_dependencies(['$(CURDIR)/%: %'])
 
+    def _check_blacklisted_variables(self, makefile_in, makefile_content):
+        for x in MOZBUILD_VARIABLES:
+            if re.search(r'[^#]\b%s\s*[:?+]?=' % x, makefile_content, re.M):
+                raise Exception('Variable %s is defined in %s. It should '
+                    'only be defined in moz.build files.' % (x, makefile_in))
+
+        for x in DEPRECATED_VARIABLES:
+            if re.search(r'[^#]\b%s\s*[:?+]?=' % x, makefile_content, re.M):
+                raise Exception('Variable %s is defined in %s. This variable '
+                    'has been deprecated. It does nothing. It must be removed '
+                    'in order to build.' % (x, makefile_in))
+
     def consume_finished(self):
         CommonBackend.consume_finished(self)
 
@@ -674,6 +757,10 @@ class RecursiveMakeBackend(CommonBackend):
                             continue
                         self._no_skip['tools'].add(mozpath.relpath(objdir,
                             self.environment.topobjdir))
+
+                    # Detect any Makefile.ins that contain variables on the
+                    # moz.build-only list
+                    self._check_blacklisted_variables(makefile_in, content)
 
         self._fill_root_mk()
 
@@ -1115,6 +1202,8 @@ INSTALL_TARGETS += %(prefix)s
         backend_file.write('REAL_LIBRARY := %s\n' % libdef.lib_name)
         if libdef.is_sdk:
             backend_file.write('SDK_LIBRARY := %s\n' % libdef.import_name)
+        if libdef.no_expand_lib:
+            backend_file.write('NO_EXPAND_LIBS := 1\n')
 
     def _process_host_library(self, libdef, backend_file):
         backend_file.write('HOST_LIBRARY_NAME = %s\n' % libdef.basename)

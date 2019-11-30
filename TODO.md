@@ -118,7 +118,11 @@
 - Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
 - Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
 - Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
-- Bug 1083281: Use flags to determine which chrome and about URIs are 
+
+- Bug 1204403 - Fix -Wshadow warnings in xpcom. r=mccr8
+- 931571 parts 9 to 15
+
+- Bug 1139036 - Bind all symbols from libmozglue.dylib when it is loade
 
 
 Require check of JS browser components:

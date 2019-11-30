@@ -29,7 +29,7 @@ TEST(Encoding, GoodSurrogatePair)
   nsDependentCString expected((const char*)expected8);
   EXPECT_EQ(0, CompareUTF8toUTF16(expected, goodPair16));
 
-  NS_Free(goodPair8);
+  free(goodPair8);
 }
 
 TEST(Encoding, BackwardsSurrogatePair)
@@ -54,7 +54,7 @@ TEST(Encoding, BackwardsSurrogatePair)
   nsDependentCString expected((const char*)expected8);
   EXPECT_EQ(0, CompareUTF8toUTF16(expected, backwardsPair16));
 
-  NS_Free(backwardsPair8);
+  free(backwardsPair8);
 }
 
 TEST(Encoding, MalformedUTF16OrphanHighSurrogate)
@@ -79,7 +79,7 @@ TEST(Encoding, MalformedUTF16OrphanHighSurrogate)
   nsDependentCString expected((const char*)expected8);
   EXPECT_EQ(0, CompareUTF8toUTF16(expected, highSurrogate16));
 
-  NS_Free(highSurrogate8);
+  free(highSurrogate8);
 }
 
 TEST(Encoding, MalformedUTF16OrphanLowSurrogate)
@@ -104,5 +104,5 @@ TEST(Encoding, MalformedUTF16OrphanLowSurrogate)
   nsDependentCString expected((const char*)expected8);
   EXPECT_EQ(0, CompareUTF8toUTF16(expected, lowSurrogate16));
 
-  NS_Free(lowSurrogate8);
+  free(lowSurrogate8);
 }
