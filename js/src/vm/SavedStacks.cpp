@@ -7,6 +7,7 @@
 #include "vm/SavedStacks.h"
 
 #include "mozilla/Attributes.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Maybe.h"
 
 #include <math.h>
