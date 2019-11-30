@@ -31,6 +31,7 @@
 #include "vm/NativeObject-inl.h"
 
 using mozilla::AddToHash;
+using mozilla::DebugOnly;
 using mozilla::HashString;
 using mozilla::Maybe;
 
