@@ -116,7 +116,16 @@
 - Bug 1038811 2015-04-11 Complete remaining
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
 - Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
+- Bug 1129650 - Touching navigator.mozId causes an error NS_ERROR_FACTO (Check MacOS-X failres and dependencies)
 
+- Bug 1136956 - Set CoreLocation provider to non-release only in firefo
+- Bug 1125411 - OSX: turn CoreLocation provider o 
+
+
+Check with Roy Tam:
+- Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
+- Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
+- bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
 Require check of JS browser components:
 
@@ -128,7 +137,7 @@ Require check of JS browser components:
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/a4099ba4c5867b9735dbacfbc5c9fe0629e0a145
+https://github.com/mozilla/newtab-dev/commit/ea49fe57ecbb1cd6a694458cac110c71de267f84
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
