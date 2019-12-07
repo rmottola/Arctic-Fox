@@ -1122,6 +1122,10 @@ pref("dom.debug.propagate_gesture_events_through_content", false);
 // The request URL of the GeoLocation backend.
 pref("geo.wifi.uri", "http://ip-api.com/json/?fields=lat,lon,status,message");
 
+// Necko IPC security checks only needed for app isolation for cookies/cache/etc:
+// currently irrelevant for desktop e10s
+pref("network.disable.ipc.security", true);
+
 //Pale Moon padlock overlay preferences
 pref("browser.padlock.shown", true);
 /* Where to show the padlock
