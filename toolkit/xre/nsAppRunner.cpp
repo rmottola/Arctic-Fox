@@ -56,6 +56,7 @@
 #include "nsICommandLineRunner.h"
 #include "nsIComponentManager.h"
 #include "nsIComponentRegistrar.h"
+#include "nsIConsoleService.h"
 #include "nsIContentHandler.h"
 #include "nsIDialogParamBlock.h"
 #include "nsIDOMWindow.h"
@@ -1475,7 +1476,15 @@ RemoteCommandLine(const char* aDesktopStartupID)
                               gArgc, gArgv, aDesktopStartupID,
                               getter_Copies(response), &success);
   // did the command fail?
-  if (NS_FAILED(rv) || !success)
+  if (!success)
+    return REMOTE_NOT_FOUND;
+
+  // The "command not parseable" error is returned when the
+  // nsICommandLineHandler throws a NS_ERROR_ABORT.
+  if (response.EqualsLiteral("500 command not parseable"))
+    return REMOTE_ARG_BAD;
+
+  if (NS_FAILED(rv))
     return REMOTE_NOT_FOUND;
 
   return REMOTE_FOUND;
@@ -3592,7 +3601,7 @@ XREMain::XRE_mainRun()
           // Automatically migrate from the current application if we just
           // reset the profile.
           // Hard-code MOZ_APP_NAME to firefox because of hard-coded type in migrator.
-          aKey = (strcmp(MOZ_APP_NAME, "palemoon") == 0) ? "firefox" : MOZ_APP_NAME;
+          aKey = (strcmp(MOZ_APP_NAME, "arcticfox") == 0) ? "firefox" : MOZ_APP_NAME;
         }
         pm->Migrate(&mDirProvider, aKey, gResetOldProfileName);
       }

@@ -125,7 +125,7 @@ var WifiManager = (function() {
 
   let capabilities = {
     security: ["OPEN", "WEP", "WPA-PSK", "WPA-EAP"],
-    eapMethod: ["PEAP", "TTLS"],
+    eapMethod: ["PEAP", "TTLS", "TLS"],
     eapPhase2: ["MSCHAPV2"],
     certificate: ["SERVER"],
     mode: [MODE_ESS]
@@ -1207,6 +1207,11 @@ var WifiManager = (function() {
     {name: "pcsc",          type: "string"},
     {name: "ca_cert",       type: "string"},
     {name: "subject_match", type: "string"},
+    {name: "client_cert",   type: "string"},
+    {name: "private_key",   type: "stirng"},
+    {name: "engine",        type: "integer"},
+    {name: "engine_id",     type: "string"},
+    {name: "key_id",        type: "string"},
     {name: "frequency",     type: "integer"},
     {name: "mode",          type: "integer"}
   ];
@@ -1531,6 +1536,10 @@ var WifiManager = (function() {
     wifiCertService.deleteCert(id, caInfo.certNickname);
   }
 
+  manager.sdkVersion = function() {
+    return sdkVersion;
+  }
+
   return manager;
 })();
 
@@ -1687,7 +1696,8 @@ Network.api = {
   pin: "rw",
   phase1: "rw",
   phase2: "rw",
-  serverCertificate: "rw"
+  serverCertificate: "rw",
+  userCertificate: "rw"
 };
 
 // Note: We never use ScanResult.prototype, so the fact that it's unrelated to
@@ -1932,6 +1942,10 @@ function WifiWorker() {
     if(net.subject_match) {
       pub.subjectMatch = net.subject_match;
     }
+    if ("client_cert" in net && net.client_cert &&
+        net.client_cert.indexOf("keystore://WIFI_USERCERT_" === 0)) {
+      pub.userCertificate = net.client_cert.substr(25);
+    }
     return pub;
   };
 
@@ -2021,6 +2035,24 @@ function WifiWorker() {
 
       if (hasValidProperty("subjectMatch"))
         net.subject_match = quote(net.subjectMatch);
+
+      if (hasValidProperty("userCertificate")) {
+        let userCertName = "WIFI_USERCERT_" + net.userCertificate;
+        net.client_cert = quote("keystore://" + userCertName);
+
+        let wifiCertService = Cc["@mozilla.org/wifi/certservice;1"].
+                                getService(Ci.nsIWifiCertService);
+        if (wifiCertService.hasPrivateKey(userCertName)) {
+          if (WifiManager.sdkVersion() >= 19) {
+            // Use openssol engine instead of keystore protocol after Kitkat.
+            net.engine = 1;
+            net.engine_id = quote("keystore");
+            net.key_id = quote("WIFI_USERKEY_" + net.userCertificate);
+          } else {
+            net.private_key = quote("keystore://WIFI_USERKEY_" + net.userCertificate);
+          }
+        }
+      }
     }
 
     return net;

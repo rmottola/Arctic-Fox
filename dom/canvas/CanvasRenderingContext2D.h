@@ -58,7 +58,7 @@ public:
 
   nsCOMPtr<nsISupports> GetParentObject() { return mParent; }
 
-  JSObject* WrapObject(JSContext* aCx);
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto);
 
   static already_AddRefed<CanvasPath> Constructor(const GlobalObject& aGlobal,
                                                   ErrorResult& rv);
@@ -134,7 +134,7 @@ typedef HTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement
 public:
   CanvasRenderingContext2D();
 
-  virtual JSObject* WrapObject(JSContext *cx) override;
+  virtual JSObject* WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto) override;
 
   HTMLCanvasElement* GetCanvas() const
   {

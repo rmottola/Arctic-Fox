@@ -48,7 +48,7 @@ function getMigratorKeyForDefaultBrowser() {
   const APP_DESC_TO_KEY = {
     "Internet Explorer":     "ie",
     "Safari":                "safari",
-    "Pale Moon web browser": "firefox",
+    "Arctic Fox":            "firefox",
     "Google Chrome":         "chrome",  // Windows, Linux
     "Chrome":                "chrome",  // OS X
   };
@@ -333,7 +333,8 @@ this.MigrationUtils = Object.freeze({
     FORMDATA:   Ci.nsIBrowserProfileMigrator.FORMDATA,
     PASSWORDS:  Ci.nsIBrowserProfileMigrator.PASSWORDS,
     BOOKMARKS:  Ci.nsIBrowserProfileMigrator.BOOKMARKS,
-    OTHERDATA:  Ci.nsIBrowserProfileMigrator.OTHERDATA
+    OTHERDATA:  Ci.nsIBrowserProfileMigrator.OTHERDATA,
+    SESSION:    Ci.nsIBrowserProfileMigrator.SESSION,
   },
 
   /**

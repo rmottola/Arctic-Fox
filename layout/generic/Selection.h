@@ -51,8 +51,8 @@ namespace mozilla {
 namespace dom {
 
 class Selection final : public nsISelectionPrivate,
-                            public nsWrapperCache,
-                            public nsSupportsWeakReference
+                        public nsWrapperCache,
+                        public nsSupportsWeakReference
 {
 protected:
   virtual ~Selection();
@@ -122,7 +122,6 @@ public:
   nsresult      Collapse(nsINode* aParentNode, int32_t aOffset);
   nsresult      Extend(nsINode* aParentNode, int32_t aOffset);
   nsRange*      GetRangeAt(int32_t aIndex);
-  int32_t GetRangeCount() { return mRanges.Length(); }
 
   // Get the anchor-to-focus range if we don't care which end is
   // anchor and which end is focus.
@@ -149,7 +148,7 @@ public:
 
   nsresult     StopAutoScrollTimer();
 
-  JSObject* WrapObject(JSContext* aCx) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL methods
   nsINode*     GetAnchorNode();

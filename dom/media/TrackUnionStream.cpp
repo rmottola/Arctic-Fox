@@ -24,10 +24,10 @@
 #include "AudioNodeEngine.h"
 #include "AudioNodeStream.h"
 #include "AudioNodeExternalInputStream.h"
+#include "webaudio/MediaStreamAudioDestinationNode.h"
 #include <algorithm>
 #include "DOMMediaStream.h"
 #include "GoannaProfiler.h"
-#include "mozilla/unused.h"
 #ifdef MOZ_WEBRTC
 #include "AudioOutputObserver.h"
 #endif
@@ -50,8 +50,7 @@ PRLogModuleInfo* gTrackUnionStreamLog;
 #endif
 
 TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
-  ProcessedMediaStream(aWrapper),
-  mFilterCallback(nullptr)
+  ProcessedMediaStream(aWrapper)
 {
 #ifdef PR_LOGGING
   if (!gTrackUnionStreamLog) {
@@ -114,7 +113,7 @@ TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
             break;
           }
         }
-        if (!found && (!mFilterCallback || mFilterCallback(tracks.get()))) {
+        if (!found) {
           bool trackFinished = false;
           trackAdded = true;
           uint32_t mapIndex = AddTrack(mInputs[i], tracks.get(), aFrom);
@@ -151,14 +150,6 @@ TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
       // We can make progress if we're not blocked
       mHasCurrentData = true;
     }
-  }
-
-  // Consumers may specify a filtering callback to apply to every input track.
-  // Returns true to allow the track to act as an input; false to reject it entirely.
-
-  void TrackUnionStream::SetTrackIDFilter(TrackIDFilterCallback aCallback)
-  {
-    mFilterCallback = aCallback;
   }
 
   // Forward SetTrackEnabled(output_track_id, enabled) to the Source MediaStream,
@@ -281,13 +272,19 @@ TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
         segment->AppendNullData(ticks);
         STREAM_LOG(PR_LOG_DEBUG+1, ("TrackUnionStream %p appending %lld ticks of null data to track %d",
                    this, (long long)ticks, outputTrack->GetID()));
+      } else if (InMutedCycle()) {
+        segment->AppendNullData(ticks);
       } else {
-        MOZ_ASSERT(outputTrack->GetEnd() == GraphTimeToStreamTime(interval.mStart),
-                   "Samples missing");
-        StreamTime inputStart = source->GraphTimeToStreamTime(interval.mStart);
-        segment->AppendSlice(*aInputTrack->GetSegment(),
-                             std::min(inputTrackEndPoint, inputStart),
-                             std::min(inputTrackEndPoint, inputEnd));
+        if (GraphImpl()->StreamSuspended(source)) {
+          segment->AppendNullData(aTo - aFrom);
+        } else {
+          MOZ_ASSERT(outputTrack->GetEnd() == GraphTimeToStreamTime(interval.mStart),
+                     "Samples missing");
+          StreamTime inputStart = source->GraphTimeToStreamTime(interval.mStart);
+          segment->AppendSlice(*aInputTrack->GetSegment(),
+                               std::min(inputTrackEndPoint, inputStart),
+                               std::min(inputTrackEndPoint, inputEnd));
+        }
       }
       ApplyTrackDisabling(outputTrack->GetID(), segment);
       for (uint32_t j = 0; j < mListeners.Length(); ++j) {

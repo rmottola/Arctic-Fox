@@ -152,6 +152,15 @@ AppendToString(std::stringstream& aStream, const EventRegions& e,
   if (!e.mDispatchToContentHitRegion.IsEmpty()) {
     AppendToString(aStream, e.mDispatchToContentHitRegion, " dispatchtocontentregion=", "");
   }
+  if (!e.mNoActionRegion.IsEmpty()) {
+    AppendToString(aStream, e.mNoActionRegion, " NoActionRegion=","");
+  }
+  if (!e.mHorizontalPanRegion.IsEmpty()) {
+    AppendToString(aStream, e.mHorizontalPanRegion, " HorizontalPanRegion=", "");
+  }
+  if (!e.mVerticalPanRegion.IsEmpty()) {
+    AppendToString(aStream, e.mVerticalPanRegion, " VerticalPanRegion=", "");
+  }
   aStream << "}" << sfx;
 }
 
@@ -183,17 +192,19 @@ AppendToString(std::stringstream& aStream, const FrameMetrics& m,
     if (m.GetScrollParentId() != FrameMetrics::NULL_SCROLL_ID) {
       AppendToString(aStream, m.GetScrollParentId(), "] [scrollParent=");
     }
-    aStream << nsPrintfCString("] [z=%.3f] }", m.GetZoom().scale).get();
+    AppendToString(aStream, m.GetZoom(), "] [z=", "] }");
   } else {
     AppendToString(aStream, m.GetDisplayPortMargins(), " [dpm=");
     aStream << nsPrintfCString("] um=%d", m.GetUseDisplayPortMargins()).get();
     AppendToString(aStream, m.GetRootCompositionSize(), "] [rcs=");
     AppendToString(aStream, m.GetViewport(), "] [v=");
-    aStream << nsPrintfCString("] [z=(ld=%.3f r=%.3f cr=%.3f z=%.3f er=%.3f)",
-            m.GetDevPixelsPerCSSPixel().scale, m.GetPresShellResolution(),
-            m.GetCumulativeResolution().scale, m.GetZoom().scale,
-            m.GetExtraResolution().scale).get();
-    aStream << nsPrintfCString("] [u=(%d %d %lu)",
+    aStream << nsPrintfCString("] [z=(ld=%.3f r=%.3f",
+            m.GetDevPixelsPerCSSPixel().scale,
+            m.GetPresShellResolution()).get();
+    AppendToString(aStream, m.GetCumulativeResolution(), " cr=");
+    AppendToString(aStream, m.GetZoom(), " z=");
+    AppendToString(aStream, m.GetExtraResolution(), " er=");
+    aStream << nsPrintfCString(")] [u=(%d %d %lu)",
             m.GetScrollOffsetUpdated(), m.GetDoSmoothScroll(),
             m.GetScrollGeneration()).get();
     AppendToString(aStream, m.GetScrollParentId(), "] [p=");

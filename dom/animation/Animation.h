@@ -51,6 +51,16 @@ struct AnimationTiming
     return mFillMode == NS_STYLE_ANIMATION_FILL_MODE_BOTH ||
            mFillMode == NS_STYLE_ANIMATION_FILL_MODE_BACKWARDS;
   }
+  bool operator==(const AnimationTiming& aOther) const {
+    return mIterationDuration == aOther.mIterationDuration &&
+           mDelay == aOther.mDelay &&
+           mIterationCount == aOther.mIterationCount &&
+           mDirection == aOther.mDirection &&
+           mFillMode == aOther.mFillMode;
+  }
+  bool operator!=(const AnimationTiming& aOther) const {
+    return !(*this == aOther);
+  }
 };
 
 /**
@@ -104,6 +114,14 @@ public:
   }
   Type GetType() const { return mType; }
   uint32_t GetSteps() const { return mSteps; }
+  bool operator==(const ComputedTimingFunction& aOther) const {
+    return mType == aOther.mType &&
+           mTimingFunction == aOther.mTimingFunction &&
+           mSteps == aOther.mSteps;
+  }
+  bool operator!=(const ComputedTimingFunction& aOther) const {
+    return !(*this == aOther);
+  }
 
 private:
   Type mType;
@@ -116,12 +134,31 @@ struct AnimationPropertySegment
   float mFromKey, mToKey;
   StyleAnimationValue mFromValue, mToValue;
   ComputedTimingFunction mTimingFunction;
+
+  bool operator==(const AnimationPropertySegment& aOther) const {
+    return mFromKey == aOther.mFromKey &&
+           mToKey == aOther.mToKey &&
+           mFromValue == aOther.mFromValue &&
+           mToValue == aOther.mToValue &&
+           mTimingFunction == aOther.mTimingFunction;
+  }
+  bool operator!=(const AnimationPropertySegment& aOther) const {
+    return !(*this == aOther);
+  }
 };
 
 struct AnimationProperty
 {
   nsCSSProperty mProperty;
   InfallibleTArray<AnimationPropertySegment> mSegments;
+
+  bool operator==(const AnimationProperty& aOther) const {
+    return mProperty == aOther.mProperty &&
+           mSegments == aOther.mSegments;
+  }
+  bool operator!=(const AnimationProperty& aOther) const {
+    return !(*this == aOther);
+  }
 };
 
 struct ElementPropertyTransition;
@@ -152,7 +189,7 @@ public:
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_NATIVE_CLASS(Animation)
 
   nsIDocument* GetParentObject() const { return mDocument; }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // FIXME: If we succeed in moving transition-specific code to a type of
   // AnimationEffect (as per the Web Animations API) we should remove these

@@ -16,9 +16,9 @@
 namespace mozilla {
 
 JSObject*
-WebGLFramebuffer::WrapObject(JSContext* cx)
+WebGLFramebuffer::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto)
 {
-    return dom::WebGLFramebufferBinding::Wrap(cx, this);
+    return dom::WebGLFramebufferBinding::Wrap(cx, this, aGivenProto);
 }
 
 WebGLFramebuffer::WebGLFramebuffer(WebGLContext* webgl, GLuint fbo)
@@ -129,6 +129,7 @@ WebGLFramebuffer::Attachment::IsReadableFloat() const
     MOZ_ASSERT(internalformat != LOCAL_GL_NONE);
     TexType type = TypeFromInternalFormat(internalformat);
     return type == LOCAL_GL_FLOAT ||
+           type == LOCAL_GL_HALF_FLOAT_OES ||
            type == LOCAL_GL_HALF_FLOAT;
 }
 
@@ -263,9 +264,6 @@ bool
 WebGLContext::IsFormatValidForFB(GLenum sizedFormat) const
 {
     switch (sizedFormat) {
-    case LOCAL_GL_ALPHA8:
-    case LOCAL_GL_LUMINANCE8:
-    case LOCAL_GL_LUMINANCE8_ALPHA8:
     case LOCAL_GL_RGB8:
     case LOCAL_GL_RGBA8:
     case LOCAL_GL_RGB565:
@@ -803,6 +801,7 @@ WebGLFramebuffer::CheckFramebufferStatus() const
     // Ok, attach our chosen flavor of {DEPTH, STENCIL, DEPTH_STENCIL}.
     FinalizeAttachments();
 
+    // TODO: This should not be unconditionally GL_FRAMEBUFFER.
     mStatus = mContext->gl->fCheckFramebufferStatus(LOCAL_GL_FRAMEBUFFER);
     return mStatus;
 }

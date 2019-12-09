@@ -318,7 +318,7 @@ private:
 };
 
 class LoadStartDetectionRunnable final : public nsRunnable,
-                                             public nsIDOMEventListener
+                                         public nsIDOMEventListener
 {
   WorkerPrivate* mWorkerPrivate;
   nsRefPtr<Proxy> mProxy;
@@ -1636,9 +1636,9 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(XMLHttpRequest,
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 JSObject*
-XMLHttpRequest::WrapObject(JSContext* aCx)
+XMLHttpRequest::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return XMLHttpRequestBinding_workers::Wrap(aCx, this);
+  return XMLHttpRequestBinding_workers::Wrap(aCx, this, aGivenProto);
 }
 
 // static
@@ -2284,20 +2284,13 @@ XMLHttpRequest::Send(const ArrayBufferView& aBody, ErrorResult& aRv)
 }
 
 void
-XMLHttpRequest::SendAsBinary(const nsAString& aBody, ErrorResult& aRv)
-{
-  NS_NOTYETIMPLEMENTED("Implement me!");
-  aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  return;
-}
-
-void
 XMLHttpRequest::Abort(ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
 
   if (mCanceled) {
     aRv.ThrowUncatchableException();
+    return;
   }
 
   if (!mProxy) {

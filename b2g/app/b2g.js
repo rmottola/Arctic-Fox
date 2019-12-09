@@ -34,6 +34,9 @@ pref("browser.tabs.remote.autostart.1", false);
 // Bug 945235: Prevent all bars to be considered visible:
 pref("toolkit.defaultChromeFeatures", "chrome,dialog=no,close,resizable,scrollbars,extrachrome");
 
+// Disable focus rings
+pref("browser.display.focus_ring_width", 0);
+
 // Device pixel to CSS px ratio, in percent. Set to -1 to calculate based on display density.
 pref("browser.viewport.scaleRatio", -1);
 
@@ -625,6 +628,9 @@ pref("ui.scrollbarFadeDuration", 200);
 // Scrollbar position follows the document `dir` attribute
 pref("layout.scrollbar.side", 1);
 
+// CSS Scroll Snapping
+pref("layout.css.scroll-snap.enabled", true);
+
 // Enable the ProcessPriorityManager, and give processes with no visible
 // documents a 1s grace period before they're eligible to be marked as
 // background. Background processes that are perceivable due to playing
@@ -1056,3 +1062,11 @@ pref("gfx.vsync.hw-vsync.enabled", false);
 pref("gfx.vsync.compositor", false);
 pref("gfx.touch.resample", false);
 #endif
+
+// Comma separated list of activity names that can only be provided by
+// the system app in dev mode.
+pref("dom.activities.developer_mode_only", "import-app");
+
+// mulet apparently loads firefox.js as well as b2g.js, so we have to explicitly
+// disable serviceworkers here to get them disabled in mulet.
+pref("dom.serviceWorkers.enabled", false);

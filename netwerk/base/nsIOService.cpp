@@ -1425,12 +1425,14 @@ nsIOService::OnNetworkLinkEvent(const char *data)
     }
 
     bool isUp;
-    if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {
+    if (!strcmp(data, NS_NETWORK_LINK_DATA_CHANGED)) {
+        // CHANGED means UP/DOWN didn't change
+        return NS_OK;
+    } else if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {
         isUp = false;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UP)) {
         isUp = true;
-    } else if (!strcmp(data, NS_NETWORK_LINK_DATA_CHANGED) ||
-               !strcmp(data, NS_NETWORK_LINK_DATA_UNKNOWN)) {
+    } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UNKNOWN)) {
         nsresult rv = mNetworkLinkService->GetIsLinkUp(&isUp);
         NS_ENSURE_SUCCESS(rv, rv);
     } else {
@@ -1579,6 +1581,10 @@ nsIOService::SpeculativeConnect(nsIURI *aURI,
     nsCOMPtr<nsICancelable> cancelable;
     nsRefPtr<IOServiceProxyCallback> callback =
         new IOServiceProxyCallback(aCallbacks, this);
+    nsCOMPtr<nsIProtocolProxyService2> pps2 = do_QueryInterface(pps);
+    if (pps2) {
+        return pps2->AsyncResolve2(channel, 0, callback, getter_AddRefs(cancelable));
+    }
     return pps->AsyncResolve(channel, 0, callback, getter_AddRefs(cancelable));
 }
 

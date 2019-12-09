@@ -651,9 +651,8 @@ nsStringBundleService::CreateExtensibleBundle(const char* aCategory,
     return res;
   }
 
-  res = bundle->QueryInterface(NS_GET_IID(nsIStringBundle), (void**) aResult);
-
-  return res;
+  bundle.forget(aResult);
+  return NS_OK;
 }
 
 #define GLOBAL_PROPERTIES "chrome://global/locale/global-strres.properties"
@@ -752,7 +751,7 @@ done:
   if (argCount > 1) {
     for (i = 0; i < argCount; i++) {
       if (argArray[i])
-        nsMemory::Free(argArray[i]);
+        free(argArray[i]);
     }
   }
   return rv;

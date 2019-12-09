@@ -261,11 +261,11 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(MessagePort,
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 JSObject*
-MessagePort::WrapObject(JSContext* aCx)
+MessagePort::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   AssertCorrectThread();
 
-  return MessagePortBinding::Wrap(aCx, this);
+  return MessagePortBinding::Wrap(aCx, this, aGivenProto);
 }
 
 nsresult
@@ -280,7 +280,7 @@ MessagePort::PreHandleEvent(EventChainPreVisitor& aVisitor)
 
     if (IsClosed()) {
       preventDispatch = true;
-    } else if (NS_IsMainThread() && mSharedWorker->IsSuspended()) {
+    } else if (NS_IsMainThread() && mSharedWorker->IsFrozen()) {
       mSharedWorker->QueueEvent(event);
       preventDispatch = true;
     } else if (!mStarted) {

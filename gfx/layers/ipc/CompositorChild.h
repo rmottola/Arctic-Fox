@@ -60,6 +60,12 @@ public:
   static PCompositorChild*
   Create(Transport* aTransport, ProcessId aOtherProcess);
 
+  /**
+   * Initialize the CompositorChild and open the connection in the non-multi-process
+   * case.
+   */
+  bool OpenSameProcess(CompositorParent* aParent);
+
   static CompositorChild* Get();
 
   static bool ChildProcessHasCompositor() { return sCompositor != nullptr; }
@@ -79,6 +85,9 @@ public:
   RecvUpdatePluginConfigurations(const nsIntPoint& aContentOffset,
                                  const nsIntRegion& aVisibleRegion,
                                  nsTArray<PluginWindowData>&& aPlugins) override;
+
+  virtual bool
+  RecvUpdatePluginVisibility(nsTArray<uintptr_t>&& aWindowList) override;
 
   /**
    * Request that the parent tell us when graphics are ready on GPU.
@@ -125,6 +134,7 @@ private:
 
   virtual bool RecvSharedCompositorFrameMetrics(const mozilla::ipc::SharedMemoryBasic::Handle& metrics,
                                                 const CrossProcessMutexHandle& handle,
+                                                const uint64_t& aLayersId,
                                                 const uint32_t& aAPZCId) override;
 
   virtual bool RecvReleaseSharedCompositorFrameMetrics(const ViewID& aId,
@@ -139,12 +149,14 @@ private:
     SharedFrameMetricsData(
         const mozilla::ipc::SharedMemoryBasic::Handle& metrics,
         const CrossProcessMutexHandle& handle,
+        const uint64_t& aLayersId,
         const uint32_t& aAPZCId);
 
     ~SharedFrameMetricsData();
 
     void CopyFrameMetrics(FrameMetrics* aFrame);
     FrameMetrics::ViewID GetViewID();
+    uint64_t GetLayersId() const;
     uint32_t GetAPZCId();
 
   private:
@@ -152,11 +164,19 @@ private:
     // the shared FrameMetrics
     nsRefPtr<mozilla::ipc::SharedMemoryBasic> mBuffer;
     CrossProcessMutex* mMutex;
+    uint64_t mLayersId;
     // Unique ID of the APZC that is sharing the FrameMetrics
     uint32_t mAPZCId;
   };
 
+  static PLDHashOperator RemoveSharedMetricsForLayersId(const uint64_t& aKey,
+                                                        nsAutoPtr<SharedFrameMetricsData>& aData,
+                                                        void* aLayerTransactionChild);
+
   nsRefPtr<ClientLayerManager> mLayerManager;
+  // When not multi-process, hold a reference to the CompositorParent to keep it
+  // alive. This reference should be null in multi-process.
+  nsRefPtr<CompositorParent> mCompositorParent;
 
   // The ViewID of the FrameMetrics is used as the key for this hash table.
   // While this should be safe to use since the ViewID is unique

@@ -17,6 +17,8 @@
 #include "nsINode.h"                     // for base class
 #include "nsIPrincipal.h"
 #include "nsIScriptGlobalObject.h"       // for member (in nsCOMPtr)
+#include "nsIServiceManager.h"
+#include "nsIUUIDGenerator.h"
 #include "nsIURI.h"
 #include "nsPIDOMWindow.h"               // for use in inline functions
 #include "nsPropertyTable.h"             // for member
@@ -63,6 +65,7 @@ class nsIObserver;
 class nsIPresShell;
 class nsIPrincipal;
 class nsIRequest;
+class nsIRunnable;
 class nsIStreamListener;
 class nsIStructuredCloneContainer;
 class nsIStyleRule;
@@ -769,6 +772,8 @@ public:
   nsTArray<nsRefPtr<mozilla::dom::AnonymousContent>>& GetAnonymousContents() {
     return mAnonymousContents;
   }
+
+  nsresult GetId(nsAString& aId);
 
 protected:
   virtual Element *GetRootElementInternal() const = 0;
@@ -1703,11 +1708,9 @@ public:
   virtual nsresult InitializeFrameLoader(nsFrameLoader* aLoader) = 0;
   // In case of failure, the caller must handle the error, for example by
   // finalizing frame loader asynchronously.
-  virtual nsresult FinalizeFrameLoader(nsFrameLoader* aLoader) = 0;
+  virtual nsresult FinalizeFrameLoader(nsFrameLoader* aLoader, nsIRunnable* aFinalizer) = 0;
   // Removes the frame loader of aShell from the initialization list.
   virtual void TryCancelFrameLoaderInitialization(nsIDocShell* aShell) = 0;
-  //  Returns true if the frame loader of aShell is in the finalization list.
-  virtual bool FrameLoaderScheduledToBeFinalized(nsIDocShell* aShell) = 0;
 
   /**
    * Check whether this document is a root document that is not an
@@ -2249,6 +2252,16 @@ public:
     mMayHaveDOMMutationObservers = true;
   }
 
+  bool MayHaveAnimationObservers()
+  {
+    return mMayHaveAnimationObservers;
+  }
+
+  void SetMayHaveAnimationObservers()
+  {
+    mMayHaveAnimationObservers = true;
+  }
+
   bool IsInSyncOperation()
   {
     return mInSyncOperationCount != 0;
@@ -2761,6 +2774,9 @@ protected:
   // True if a DOMMutationObserver is perhaps attached to a node in the document.
   bool mMayHaveDOMMutationObservers;
 
+  // True if an nsIAnimationObserver is perhaps attached to a node in the document.
+  bool mMayHaveAnimationObservers;
+
   // True if a document has loaded Mixed Active Script (see nsMixedContentBlocker.cpp)
   bool mHasMixedActiveContentLoaded;
 
@@ -2852,6 +2868,7 @@ protected:
   nsCOMPtr<nsIChannel> mChannel;
 private:
   nsCString mContentType;
+  nsString mId;
 protected:
 
   // The document's security info

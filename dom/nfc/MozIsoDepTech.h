@@ -32,7 +32,7 @@ public:
 
   nsPIDOMWindow* GetParentObject() const { return mWindow; }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   static already_AddRefed<MozIsoDepTech>
   Constructor(const GlobalObject& aGlobal, MozNFCTag& aNFCTag,

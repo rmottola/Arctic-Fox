@@ -633,6 +633,11 @@ pref("gfx.color_management.enablev4", false);
 
 pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
+
+// disable downloadable font cache so that behavior is consistently
+// the uncached load behavior across pages (useful for testing reflow problems)
+pref("gfx.downloadable_fonts.disable_cache", false);
+
 pref("gfx.downloadable_fonts.woff2.enabled", true);
 
 #ifdef ANDROID
@@ -1386,6 +1391,7 @@ pref("javascript.options.mem.gc_compacting", true);
 pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
 pref("javascript.options.gc_on_memory_pressure", true);
+pref("javascript.options.compact_on_user_inactive", true);
 
 pref("javascript.options.mem.gc_high_frequency_time_limit_ms", 1000);
 pref("javascript.options.mem.gc_high_frequency_low_limit_mb", 100);
@@ -1670,7 +1676,8 @@ pref("network.http.tcp_keepalive.short_lived_idle_time", 10);
 pref("network.http.tcp_keepalive.long_lived_connections", true);
 pref("network.http.tcp_keepalive.long_lived_idle_time", 600);
 
-pref("network.http.enforce-framing.http1", false);
+pref("network.http.enforce-framing.http1", false); // should be named "strict"
+pref("network.http.enforce-framing.soft", true);
 
 // default values for FTP
 // in a DSCP environment this should be 40 (0x28, or AF11), per RFC-4594,
@@ -1896,6 +1903,9 @@ pref("network.dnsCacheExpirationGracePeriod", 300);
 // This preference can be used to turn off DNS prefetch.
 pref("network.dns.disablePrefetch", true);
 
+// Contols whether or not "localhost" should resolve when offline
+pref("network.dns.offline-localhost", true);
+
 // This preference controls whether or not URLs with UTF-8 characters are
 // escaped.  Set this preference to TRUE for strict RFC2396 conformance.
 pref("network.standard-url.escape-utf8", true);
@@ -1903,6 +1913,9 @@ pref("network.standard-url.escape-utf8", true);
 // This preference controls whether or not URLs are always encoded and sent as
 // UTF-8.
 pref("network.standard-url.encode-utf8", true);
+
+// The maximum allowed length for a URL - 1MB default
+pref("network.standard-url.max-length", 1048576);
 
 // Idle timeout for ftp control connections - 5 minute default
 pref("network.ftp.idleConnectionTimeout", 300);
@@ -2482,6 +2495,10 @@ pref("layout.css.prefixes.animations", true);
 pref("layout.css.prefixes.box-sizing", true);
 pref("layout.css.prefixes.font-features", true);
 
+// Is the CSS Unprefixing Service enabled? (This service emulates support
+// for certain vendor-prefixed properties & values, for sites on a "fixlist".)
+pref("layout.css.unprefixing-service.enabled", false);
+
 // Is support for the :scope selector enabled?
 pref("layout.css.scope-pseudo.enabled", true);
 
@@ -2720,7 +2737,7 @@ pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 // Defaults to 1 minute.
 pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
-pref("dom.ipc.plugins.asyncInit", false);
+pref("dom.ipc.plugins.asyncInit", true);
 
 pref("dom.ipc.processCount", 1);
 
@@ -3322,6 +3339,14 @@ pref("intl.tsf.hack.atok.create_native_caret", true);
 pref("intl.tsf.hack.free_chang_jie.do_not_return_no_layout_error", true);
 // For Easy Changjei
 pref("intl.tsf.hack.easy_changjei.do_not_return_no_layout_error", true);
+// Whether use previous character rect for the result of
+// ITfContextView::GetTextExt() if the specified range is the first character
+// of selected clause of composition string.
+pref("intl.tsf.hack.google_ja_input.do_not_return_no_layout_error_at_first_char", true);
+// Whether use previous character rect for the result of
+// ITfContextView::GetTextExt() if the specified range is the caret of
+// composition string.
+pref("intl.tsf.hack.google_ja_input.do_not_return_no_layout_error_at_caret", true);
 #endif
 
 // See bug 448927, on topmost panel, some IMEs are not usable on Windows.
@@ -4111,10 +4136,11 @@ pref("image.cache.size", 5242880);
 pref("image.cache.timeweight", 500);
 
 // Whether we attempt to downscale images during decoding.
-pref("image.downscale-during-decode.enabled", false);
+pref("image.downscale-during-decode.enabled", true);
 
 // The default Accept header sent for images loaded over HTTP(S)
-pref("image.http.accept", "image/webp,image/png,image/*;q=0.8,*/*;q=0.5");
+// pref("image.http.accept", "image/webp,image/png,image/*;q=0.8,*/*;q=0.5");
+pref("image.http.accept", "image/png,image/*;q=0.8,*/*;q=0.5");
 
 pref("image.high_quality_downscaling.enabled", true);
 
@@ -4462,8 +4488,44 @@ pref("dom.mozContacts.enabled", false);
 // WebAlarms
 pref("dom.mozAlarms.enabled", false);
 
-// SimplePush
-pref("services.push.enabled", false);
+// Push
+pref("dom.push.enabled", false);
+
+pref("dom.push.debug", false);
+pref("dom.push.serverURL", "wss://push.services.mozilla.com/");
+pref("dom.push.userAgentID", "");
+
+// Is the network connection allowed to be up?
+// This preference should be used in UX to enable/disable push.
+pref("dom.push.connection.enabled", true);
+
+// Exponential back-off start is 5 seconds like in HTTP/1.1.
+// Maximum back-off is pingInterval.
+pref("dom.push.retryBaseInterval", 5000);
+
+// Interval at which to ping PushServer to check connection status. In
+// milliseconds. If no reply is received within requestTimeout, the connection
+// is considered closed.
+pref("dom.push.pingInterval", 1800000); // 30 minutes
+
+// How long before we timeout
+pref("dom.push.requestTimeout", 10000);
+pref("dom.push.pingInterval.default", 180000);// 3 min
+pref("dom.push.pingInterval.mobile", 180000); // 3 min
+pref("dom.push.pingInterval.wifi", 180000);  // 3 min
+
+// Adaptive ping
+pref("dom.push.adaptive.enabled", false);
+pref("dom.push.adaptive.lastGoodPingInterval", 180000);// 3 min
+pref("dom.push.adaptive.lastGoodPingInterval.mobile", 180000);// 3 min
+pref("dom.push.adaptive.lastGoodPingInterval.wifi", 180000);// 3 min
+// Valid gap between the biggest good ping and the bad ping
+pref("dom.push.adaptive.gap", 60000); // 1 minute
+// We limit the ping to this maximum value
+pref("dom.push.adaptive.upperLimit", 1740000); // 29 min
+
+// enable udp wakeup support
+pref("dom.push.udp.wakeupEnabled", false);
 
 // WebNetworkStats
 pref("dom.mozNetworkStats.enabled", false);
@@ -4766,11 +4828,13 @@ pref("beacon.enabled", true);
 // Camera prefs
 pref("camera.control.face_detection.enabled", true);
 
-// Fetch API.
-pref("dom.fetch.enabled", false);
 
 // SW Cache API
+#ifdef RELEASE_BUILD
 pref("dom.caches.enabled", false);
+#else
+pref("dom.caches.enabled", true);
+#endif // RELEASE_BUILD
 
 #ifdef MOZ_WIDGET_GONK
 // Empirically, this is the value returned by hal::GetTotalSystemMemory()
@@ -4814,6 +4878,16 @@ pref("dom.mozSettings.SettingsService.verbose.enabled", false);
 // IndexedDB transactions to be opened as readonly or keep everything as
 // readwrite.
 pref("dom.mozSettings.allowForceReadOnly", false);
+
+// The interval at which to check for slow running addons
+#ifdef NIGHTLY_BUILD
+pref("browser.addon-watch.interval", 15000);
+#else
+pref("browser.addon-watch.interval", -1);
+#endif
+pref("browser.addon-watch.ignore", "[\"mochikit@mozilla.org\",\"special-powers@mozilla.org\"]");
+// the percentage of time addons are allowed to use without being labeled slow
+pref("browser.addon-watch.percentage-limit", 5);
 
 // RequestSync API is disabled by default.
 pref("dom.requestSync.enabled", false);

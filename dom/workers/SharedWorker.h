@@ -35,9 +35,9 @@ class SharedWorker final : public DOMEventTargetHelper
 
   nsRefPtr<WorkerPrivate> mWorkerPrivate;
   nsRefPtr<MessagePort> mMessagePort;
-  nsTArray<nsCOMPtr<nsIDOMEvent>> mSuspendedEvents;
+  nsTArray<nsCOMPtr<nsIDOMEvent>> mFrozenEvents;
   uint64_t mSerial;
-  bool mSuspended;
+  bool mFrozen;
 
 public:
   static already_AddRefed<SharedWorker>
@@ -55,16 +55,16 @@ public:
   }
 
   bool
-  IsSuspended() const
+  IsFrozen() const
   {
-    return mSuspended;
+    return mFrozen;
   }
 
   void
-  Suspend();
+  Freeze();
 
   void
-  Resume();
+  Thaw();
 
   void
   QueueEvent(nsIDOMEvent* aEvent);
@@ -78,7 +78,7 @@ public:
   IMPL_EVENT_HANDLER(error)
 
   virtual JSObject*
-  WrapObject(JSContext* aCx) override;
+  WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   virtual nsresult
   PreHandleEvent(EventChainPreVisitor& aVisitor) override;

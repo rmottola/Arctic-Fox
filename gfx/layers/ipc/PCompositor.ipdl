@@ -66,6 +66,12 @@ child:
                                    nsIntRegion aVisibleRegion,
                                    PluginWindowData[] aPlugins);
 
+  /**
+   * Sets the list of currently visible plugin windows based on a
+   * list of plugin window ids.
+   */
+  async UpdatePluginVisibility(uintptr_t[] aVisibleIdList);
+
 parent:
   // Child sends the parent a request for fill ratio numbers.
   async RequestOverfill();
@@ -127,7 +133,7 @@ parent:
 child:
   // Send back Compositor Frame Metrics from APZCs so tiled layers can
   // update progressively.
-  async SharedCompositorFrameMetrics(Handle metrics, CrossProcessMutexHandle mutex, uint32_t aAPZCId);
+  async SharedCompositorFrameMetrics(Handle metrics, CrossProcessMutexHandle mutex, uint64_t aLayersId, uint32_t aAPZCId);
   async ReleaseSharedCompositorFrameMetrics(ViewID aId, uint32_t aAPZCId);
 };
 

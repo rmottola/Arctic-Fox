@@ -34,7 +34,7 @@ class OwningHeadersOrByteStringSequenceSequenceOrByteStringMozMap;
  * InternalHeaders object.
  */
 class Headers final : public nsISupports
-                        , public nsWrapperCache
+                    , public nsWrapperCache
 {
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Headers)
@@ -66,6 +66,11 @@ public:
   Constructor(const GlobalObject& aGlobal,
               const OwningHeadersOrByteStringSequenceSequenceOrByteStringMozMap& aInit,
               ErrorResult& aRv);
+
+  static already_AddRefed<Headers>
+  Create(nsIGlobalObject* aGlobalObject,
+         const OwningHeadersOrByteStringSequenceSequenceOrByteStringMozMap& aInit,
+         ErrorResult& aRv);
 
   void Append(const nsACString& aName, const nsACString& aValue,
               ErrorResult& aRv)
@@ -110,7 +115,7 @@ public:
     mInternalHeaders->SetGuard(aGuard, aRv);
   }
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
   nsISupports* GetParentObject() const { return mOwner; }
 
 private:

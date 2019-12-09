@@ -293,6 +293,8 @@ if test -n "$gonkdir" ; then
         GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include"
         MOZ_AUDIO_OFFLOAD=1
         MOZ_OMX_DECODER=1
+        MOZ_OMX_ENCODER=1
+        AC_DEFINE(MOZ_OMX_ENCODER)
         AC_SUBST(MOZ_AUDIO_OFFLOAD)
         AC_DEFINE(MOZ_AUDIO_OFFLOAD)
         MOZ_FMP4=
@@ -417,6 +419,30 @@ fi
 MOZ_TOOL_VARIABLES
 
 MOZ_CHECK_COMPILER_WRAPPER
+
+dnl ========================================================
+dnl Check for MacOS deployment target version
+dnl ========================================================
+
+MOZ_ARG_ENABLE_STRING(macos-target,
+                      [  --enable-macos-target=VER (default=10.6)
+                          Set the minimum MacOS version needed at runtime],
+                      [_MACOSX_DEPLOYMENT_TARGET=$enableval])
+
+case "$target" in
+*-darwin*)
+    if test -n "$_MACOSX_DEPLOYMENT_TARGET" ; then
+        dnl Use the specified value
+        export MACOSX_DEPLOYMENT_TARGET=$_MACOSX_DEPLOYMENT_TARGET
+    else
+        dnl No value specified on the command line or in the environment,
+        dnl use architecture minimum.
+        export MACOSX_DEPLOYMENT_TARGET=10.6
+    fi
+    ;;
+esac
+
+AC_SUBST(MACOSX_DEPLOYMENT_TARGET)
 
 dnl ========================================================
 dnl Special win32 checks
@@ -838,30 +864,6 @@ if test -n "$UNIVERSAL_BINARY"; then
     esac
 fi
 AC_SUBST(UNIFY_DIST)
-
-dnl ========================================================
-dnl Check for MacOS deployment target version
-dnl ========================================================
-
-MOZ_ARG_ENABLE_STRING(macos-target,
-                      [  --enable-macos-target=VER (default=10.6)
-                          Set the minimum MacOS version needed at runtime],
-                      [_MACOSX_DEPLOYMENT_TARGET=$enableval])
-
-case "$target" in
-*-darwin*)
-    if test -n "$_MACOSX_DEPLOYMENT_TARGET" ; then
-        dnl Use the specified value
-        export MACOSX_DEPLOYMENT_TARGET=$_MACOSX_DEPLOYMENT_TARGET
-    else
-        dnl No value specified on the command line or in the environment,
-        dnl use architecture minimum.
-        export MACOSX_DEPLOYMENT_TARGET=10.6
-    fi
-    ;;
-esac
-
-AC_SUBST(MACOSX_DEPLOYMENT_TARGET)
 
 dnl ========================================================
 dnl = Mac OS X SDK support
@@ -3898,6 +3900,7 @@ MOZ_ANDROID_MLS_STUMBLER=
 MOZ_ANDROID_SHARE_OVERLAY=
 ACCESSIBILITY=
 MOZ_TIME_MANAGER=
+MOZ_SIMPLEPUSH=
 MOZ_PAY=
 MOZ_AUDIO_CHANNEL_MANAGER=
 NSS_NO_LIBPKIX=
@@ -7175,6 +7178,15 @@ fi
 AC_SUBST(MOZ_B2G_CAMERA)
 
 dnl ========================================================
+dnl = Enable Support for SimplePush (Gonk usually)
+dnl   This will disable the Push API.
+dnl ========================================================
+if test -n "$MOZ_SIMPLEPUSH"; then
+    AC_DEFINE(MOZ_SIMPLEPUSH)
+fi
+AC_SUBST(MOZ_SIMPLEPUSH)
+
+dnl ========================================================
 dnl = Enable Support for Payment API
 dnl ========================================================
 if test -n "$MOZ_PAY"; then
@@ -8720,9 +8732,11 @@ esac
 
 if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -o -n "$MOZ_REPLACE_MALLOC"; then
   ac_configure_args="--build=$build --host=$target --enable-stats --with-jemalloc-prefix=je_ --disable-valgrind"
+  # We're using memalign for _aligned_malloc in memory/build/mozmemory_wrap.c
+  # on Windows, so just export memalign on all platforms.
+  ac_configure_args="$ac_configure_args ac_cv_func_memalign=yes"
   if test -n "$MOZ_REPLACE_MALLOC"; then
-    # When using replace_malloc, we always want memalign and valloc exported from jemalloc.
-    ac_configure_args="$ac_configure_args ac_cv_func_memalign=yes"
+    # When using replace_malloc, we always want valloc exported from jemalloc.
     ac_configure_args="$ac_configure_args ac_cv_func_valloc=yes"
   fi
   if test -n "$MOZ_JEMALLOC3"; then

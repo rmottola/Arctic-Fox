@@ -48,7 +48,7 @@ pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GR
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 

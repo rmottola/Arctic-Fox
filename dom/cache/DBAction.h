@@ -8,7 +8,6 @@
 #define mozilla_dom_cache_DBAction_h
 
 #include "mozilla/dom/cache/Action.h"
-#include "mozilla/dom/cache/CacheInitData.h"
 #include "mozilla/nsRefPtr.h"
 #include "nsString.h"
 
@@ -44,10 +43,12 @@ protected:
 
 private:
   virtual void
-  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) MOZ_OVERRIDE;
+  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) override;
 
   nsresult OpenConnection(const QuotaInfo& aQuotaInfo, nsIFile* aQuotaDir,
                           mozIStorageConnection** aConnOut);
+
+  nsresult WipeDatabase(nsIFile* aDBFile, nsIFile* aDBDir);
 
   const Mode mMode;
 };
@@ -67,7 +68,7 @@ protected:
 private:
   virtual void
   RunWithDBOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo,
-                    nsIFile* aDBDir, mozIStorageConnection* aConn) MOZ_OVERRIDE;
+                    nsIFile* aDBDir, mozIStorageConnection* aConn) override;
 };
 
 } // namespace cache

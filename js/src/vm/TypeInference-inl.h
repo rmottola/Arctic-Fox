@@ -611,8 +611,8 @@ TypeScript::MonitorAssign(JSContext* cx, HandleObject obj, jsid id)
         // But if we don't have too many properties yet, don't do anything.  The
         // idea here is that normal object initialization should not trigger
         // deoptimization in most cases, while actual usage as a hashmap should.
-        ObjectGroup* group = obj->group();
-        if (group->getPropertyCount() < 128)
+        ObjectGroup *group = obj->group();
+        if (group->basePropertyCount() < 128)
             return;
         MarkObjectGroupUnknownProperties(cx, group);
     }
@@ -1098,20 +1098,12 @@ template <>
 struct GCMethods<const TypeSet::Type>
 {
     static TypeSet::Type initial() { return TypeSet::UnknownType(); }
-    static bool poisoned(TypeSet::Type v) {
-        return (v.isGroup() && IsPoisonedPtr(v.group()))
-            || (v.isSingleton() && IsPoisonedPtr(v.singleton()));
-    }
 };
 
 template <>
 struct GCMethods<TypeSet::Type>
 {
     static TypeSet::Type initial() { return TypeSet::UnknownType(); }
-    static bool poisoned(TypeSet::Type v) {
-        return (v.isGroup() && IsPoisonedPtr(v.group()))
-            || (v.isSingleton() && IsPoisonedPtr(v.singleton()));
-    }
 };
 
 } // namespace js

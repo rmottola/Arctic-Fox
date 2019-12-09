@@ -446,6 +446,11 @@ public:
 
   nsresult StartTimeout();
 
+  void SetInterceptController(nsINetworkInterceptController* aInterceptController)
+  {
+    mInterceptController = aInterceptController;
+  }
+
 private:
   ~nsPingListener();
 
@@ -453,6 +458,7 @@ private:
   nsCOMPtr<nsIContent> mContent;
   nsCOMPtr<nsILoadGroup> mLoadGroup;
   nsCOMPtr<nsITimer> mTimer;
+  nsCOMPtr<nsINetworkInterceptController> mInterceptController;
 };
 
 NS_IMPL_ISUPPORTS(nsPingListener, nsIStreamListener, nsIRequestObserver,
@@ -517,8 +523,15 @@ NS_IMETHODIMP
 nsPingListener::GetInterface(const nsIID& aIID, void** aResult)
 {
   if (aIID.Equals(NS_GET_IID(nsIChannelEventSink))) {
-    NS_ADDREF_THIS();
-    *aResult = (nsIChannelEventSink*)this;
+    nsCOMPtr<nsIChannelEventSink> copy(this);
+    *aResult = copy.forget().take();
+    return NS_OK;
+  }
+
+  if (aIID.Equals(NS_GET_IID(nsINetworkInterceptController)) &&
+      mInterceptController) {
+    nsCOMPtr<nsINetworkInterceptController> copy(mInterceptController);
+    *aResult = copy.forget().take();
     return NS_OK;
   }
 
@@ -557,13 +570,14 @@ nsPingListener::AsyncOnChannelRedirect(nsIChannel* aOldChan,
   return NS_OK;
 }
 
-struct SendPingInfo
+struct MOZ_STACK_CLASS SendPingInfo
 {
   int32_t numPings;
   int32_t maxPings;
   bool requireSameHost;
   nsIURI* target;
   nsIURI* referrer;
+  nsIDocShell* docShell;
   uint32_t referrerPolicy;
 };
 
@@ -697,6 +711,8 @@ SendPing(void* aClosure, nsIContent* aContent, nsIURI* aURI,
   nsPingListener* pingListener =
     new nsPingListener(info->requireSameHost, aContent, loadGroup);
 
+  nsCOMPtr<nsINetworkInterceptController> interceptController = do_QueryInterface(info->docShell);
+  pingListener->SetInterceptController(interceptController);
   nsCOMPtr<nsIStreamListener> listener(pingListener);
 
   // Observe redirects as well:
@@ -721,7 +737,8 @@ SendPing(void* aClosure, nsIContent* aContent, nsIURI* aURI,
 
 // Spec: http://whatwg.org/specs/web-apps/current-work/#ping
 static void
-DispatchPings(nsIContent* aContent,
+DispatchPings(nsIDocShell* aDocShell,
+              nsIContent* aContent,
               nsIURI* aTarget,
               nsIURI* aReferrer,
               uint32_t aReferrerPolicy)
@@ -739,6 +756,7 @@ DispatchPings(nsIContent* aContent,
   info.target = aTarget;
   info.referrer = aReferrer;
   info.referrerPolicy = aReferrerPolicy;
+  info.docShell = aDocShell;
 
   ForEachPing(aContent, SendPing, &info);
 }
@@ -2401,6 +2419,12 @@ nsDocShell::GetUseRemoteTabs(bool* aUseRemoteTabs)
 NS_IMETHODIMP
 nsDocShell::SetRemoteTabs(bool aUseRemoteTabs)
 {
+#ifdef MOZ_CRASHREPORTER
+    if (aUseRemoteTabs) {
+        CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("DOMIPCEnabled"),
+                                           NS_LITERAL_CSTRING("1"));
+    }
+#endif
 
   mUseRemoteTabs = aUseRemoteTabs;
   return NS_OK;
@@ -11162,7 +11186,7 @@ nsDocShell::ScrollToAnchor(nsACString& aCurHash, nsACString& aNewHash,
       rv = shell->GoToAnchor(NS_ConvertUTF8toUTF16(str), scroll,
                              nsIPresShell::SCROLL_SMOOTH_AUTO);
     }
-    nsMemory::Free(str);
+    free(str);
 
     // Above will fail if the anchor name is not UTF-8.  Need to
     // convert from document charset to unicode.
@@ -11773,7 +11797,8 @@ nsDocShell::AddState(JS::Handle<JS::Value> aData, const nsAString& aTitle,
   GetRootSessionHistory(getter_AddRefs(rootSH));
   NS_ENSURE_TRUE(rootSH, NS_ERROR_UNEXPECTED);
 
-  nsCOMPtr<nsISHistoryInternal> internalSH = do_QueryInterface(rootSH);
+  nsCOMPtr<nsISHistoryInternal> internalSH =
+      do_QueryInterface(rootSH);
   NS_ENSURE_TRUE(internalSH, NS_ERROR_UNEXPECTED);
 
   if (!aReplace) {
@@ -13696,7 +13721,7 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
                              aDocShell,                 // DocShell out-param
                              aRequest);                 // Request out-param
   if (NS_SUCCEEDED(rv)) {
-    DispatchPings(aContent, aURI, referer, refererPolicy);
+    DispatchPings(this, aContent, aURI, referer, refererPolicy);
   }
   return rv;
 }
@@ -14008,10 +14033,6 @@ nsDocShell::GetAppManifestURL(nsAString& aAppManifestURL)
 NS_IMETHODIMP
 nsDocShell::GetAsyncPanZoomEnabled(bool* aOut)
 {
-  if (TabChild* tabChild = TabChild::GetFrom(this)) {
-    *aOut = tabChild->IsAsyncPanZoomEnabled();
-    return NS_OK;
-  }
   *aOut = Preferences::GetBool("layers.async-pan-zoom.enabled", false);
   return NS_OK;
 }
@@ -14124,6 +14145,11 @@ NS_IMETHODIMP
 nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate, bool* aShouldIntercept)
 {
   *aShouldIntercept = false;
+  if (mSandboxFlags) {
+    // If we're sandboxed, don't intercept.
+    return NS_OK;
+  }
+
   nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
   if (!swm) {
     return NS_OK;
@@ -14163,7 +14189,8 @@ nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel)
     }
   }
 
-  return swm->DispatchFetchEvent(doc, aChannel);
+  bool isReload = mLoadType & LOAD_CMD_RELOAD;
+  return swm->DispatchFetchEvent(doc, aChannel, isReload);
 }
 
 NS_IMETHODIMP

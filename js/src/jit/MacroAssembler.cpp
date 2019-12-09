@@ -1098,7 +1098,8 @@ MacroAssembler::newGCThing(Register result, Register temp, JSObject *templateObj
 
 void
 MacroAssembler::createGCObject(Register obj, Register temp, JSObject *templateObj,
-                               gc::InitialHeap initialHeap, Label *fail, bool initContents)
+                               gc::InitialHeap initialHeap, Label *fail, bool initContents,
+                               bool convertDoubleElements)
 {
     gc::AllocKind allocKind = templateObj->asTenured().getAllocKind();
     MOZ_ASSERT(allocKind <= gc::AllocKind::OBJECT_LAST);
@@ -1115,7 +1116,7 @@ MacroAssembler::createGCObject(Register obj, Register temp, JSObject *templateOb
     }
 
     allocateObject(obj, temp, allocKind, nDynamicSlots, initialHeap, fail);
-    initGCThing(obj, temp, templateObj, initContents);
+    initGCThing(obj, temp, templateObj, initContents, convertDoubleElements);
 }
 
 
@@ -1276,7 +1277,7 @@ MacroAssembler::initGCSlots(Register obj, Register temp, NativeObject *templateO
 
 void
 MacroAssembler::initGCThing(Register obj, Register temp, JSObject *templateObj,
-                            bool initContents)
+                            bool initContents, bool convertDoubleElements)
 {
     // Fast initialization of an empty object returned by allocateObject().
 
@@ -1284,6 +1285,8 @@ MacroAssembler::initGCThing(Register obj, Register temp, JSObject *templateObj,
 
     if (Shape *shape = templateObj->maybeShape())
         storePtr(ImmGCPtr(shape), Address(obj, JSObject::offsetOfShape()));
+
+    MOZ_ASSERT_IF(convertDoubleElements, templateObj->is<ArrayObject>());
 
     if (templateObj->isNative()) {
         NativeObject *ntemplate = &templateObj->as<NativeObject>();
@@ -1310,7 +1313,7 @@ MacroAssembler::initGCThing(Register obj, Register temp, JSObject *templateObj,
                     Address(obj, elementsOffset + ObjectElements::offsetOfInitializedLength()));
             store32(Imm32(ntemplate->as<ArrayObject>().length()),
                     Address(obj, elementsOffset + ObjectElements::offsetOfLength()));
-            store32(Imm32(ntemplate->shouldConvertDoubleElements()
+            store32(Imm32(convertDoubleElements
                           ? ObjectElements::CONVERT_DOUBLE_ELEMENTS
                           : 0),
                     Address(obj, elementsOffset + ObjectElements::offsetOfFlags()));
@@ -1340,8 +1343,7 @@ MacroAssembler::initGCThing(Register obj, Register temp, JSObject *templateObj,
             offset += sizeof(uintptr_t);
         }
     } else if (templateObj->is<UnboxedPlainObject>()) {
-        storePtr(ImmWord(0), Address(obj, JSObject::offsetOfShape()));
-
+        storePtr(ImmWord(0), Address(obj, UnboxedPlainObject::offsetOfExpando()));
         if (initContents)
             initUnboxedObjectContents(obj, &templateObj->as<UnboxedPlainObject>());
     } else {

@@ -407,7 +407,7 @@ DestroyUserData(void* aUserData)
 {
   TextRunUserData* userData = static_cast<TextRunUserData*>(aUserData);
   if (userData) {
-    nsMemory::Free(userData);
+    free(userData);
   }
 }
 
@@ -1881,7 +1881,7 @@ BuildTextRunsScanner::BuildTextRunForFrames(void* aTextBuffer)
     dummyData.mMappedFlows = &dummyMappedFlow;
   } else {
     userData = static_cast<TextRunUserData*>
-      (nsMemory::Alloc(sizeof(TextRunUserData) + mMappedFlows.Length()*sizeof(TextRunMappedFlow)));
+      (moz_xmalloc(sizeof(TextRunUserData) + mMappedFlows.Length()*sizeof(TextRunMappedFlow)));
     userDataToDestroy = userData;
     userData->mMappedFlows = reinterpret_cast<TextRunMappedFlow*>(userData + 1);
   }
@@ -1927,7 +1927,7 @@ BuildTextRunsScanner::BuildTextRunForFrames(void* aTextBuffer)
     textFlags |= GetSpacingFlags(WordSpacing(f));
     nsTextFrameUtils::CompressionMode compression =
       CSSWhitespaceToCompressionMode[textStyle->mWhiteSpace];
-    if ((enabledJustification || f->StyleContext()->IsInlineDescendantOfRuby()) &&
+    if ((enabledJustification || f->StyleContext()->ShouldSuppressLineBreak()) &&
         !textStyle->WhiteSpaceIsSignificant() && !isSVG) {
       textFlags |= gfxTextRunFactory::TEXT_ENABLE_SPACING;
     }
@@ -2275,7 +2275,7 @@ BuildTextRunsScanner::SetupLineBreakerContext(gfxTextRun *aTextRun)
     dummyData.mMappedFlows = &dummyMappedFlow;
   } else {
     userData = static_cast<TextRunUserData*>
-      (nsMemory::Alloc(sizeof(TextRunUserData) + mMappedFlows.Length()*sizeof(TextRunMappedFlow)));
+      (moz_xmalloc(sizeof(TextRunUserData) + mMappedFlows.Length()*sizeof(TextRunMappedFlow)));
     userDataToDestroy = userData;
     userData->mMappedFlows = reinterpret_cast<TextRunMappedFlow*>(userData + 1);
   }
@@ -2803,7 +2803,7 @@ static int32_t FindChar(const nsTextFragment* frag,
 
 static bool IsChineseOrJapanese(nsIFrame* aFrame)
 {
-  if (aFrame->StyleContext()->IsInlineDescendantOfRuby()) {
+  if (aFrame->StyleContext()->ShouldSuppressLineBreak()) {
     // Always treat ruby as CJ language so that those characters can
     // be expanded properly even when surrounded by other language.
     return true;
@@ -4531,26 +4531,11 @@ nsTextFrame::CharacterDataChanged(CharacterDataChangeInfo* aInfo)
   return NS_OK;
 }
 
-/* virtual */ void
-nsTextFrame::DidSetStyleContext(nsStyleContext* aOldStyleContext)
-{
-  // A belt-and-braces check just in case we never get the
-  // MarkIntrinsicISizesDirty call from the style system.
-  if (StyleText()->mTextTransform == NS_STYLE_TEXT_TRANSFORM_CAPITALIZE &&
-      mTextRun &&
-      !(mTextRun->GetFlags() & nsTextFrameUtils::TEXT_IS_TRANSFORMED)) {
-    NS_ERROR("the current textrun doesn't match the style");
-    // The current textrun is now of the wrong type.
-    ClearTextRuns();
-  }
-  nsFrame::DidSetStyleContext(aOldStyleContext);
-}
-
-class nsDisplayTextGeometry : public nsDisplayItemGenericGeometry
+class nsDisplayTextGeometry : public nsCharClipGeometry
 {
 public:
-  nsDisplayTextGeometry(nsDisplayItem* aItem, nsDisplayListBuilder* aBuilder)
-    : nsDisplayItemGenericGeometry(aItem, aBuilder)
+  nsDisplayTextGeometry(nsCharClipDisplayItem* aItem, nsDisplayListBuilder* aBuilder)
+    : nsCharClipGeometry(aItem, aBuilder)
   {
     nsTextFrame* f = static_cast<nsTextFrame*>(aItem->Frame());
     f->GetTextDecorations(f->PresContext(), nsTextFrame::eResolvedColors, mDecorations);
@@ -4621,6 +4606,8 @@ public:
     nsRect newRect = geometry->mBounds;
     nsRect oldRect = GetBounds(aBuilder, &snap);
     if (decorations != geometry->mDecorations ||
+        mLeftEdge != geometry->mLeftEdge ||
+        mRightEdge != geometry->mRightEdge ||
         !oldRect.IsEqualInterior(newRect) ||
         !geometry->mBorderRect.IsEqualInterior(GetBorderRect())) {
       aInvalidRegion->Or(oldRect, newRect);
@@ -8328,11 +8315,9 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   gfxFloat availWidth = aAvailableWidth;
   bool canTrimTrailingWhitespace = !textStyle->WhiteSpaceIsSignificant() ||
                                    (GetStateBits() & TEXT_IS_IN_TOKEN_MATHML);
-  int32_t unusedOffset;
-  gfxBreakPriority breakPriority;
-  aLineLayout.GetLastOptionalBreakPosition(&unusedOffset, &breakPriority);
+  gfxBreakPriority breakPriority = aLineLayout.LastOptionalBreakPriority();
   gfxTextRun::SuppressBreak suppressBreak = gfxTextRun::eNoSuppressBreak;
-  if (StyleContext()->IsInlineDescendantOfRuby()) {
+  if (StyleContext()->ShouldSuppressLineBreak()) {
     suppressBreak = gfxTextRun::eSuppressAllBreaks;
   } else if (!aLineLayout.LineIsBreakable()) {
     suppressBreak = gfxTextRun::eSuppressInitialBreak;
@@ -8543,7 +8528,7 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   bool emptyTextAtStartOfLine = atStartOfLine && length == 0;
   if (!breakAfter && charsFit == length && !emptyTextAtStartOfLine &&
       transformedOffset + transformedLength == mTextRun->GetLength() &&
-      !StyleContext()->IsInlineDescendantOfRuby() &&
+      !StyleContext()->ShouldSuppressLineBreak() &&
       (mTextRun->GetFlags() & nsTextFrameUtils::TEXT_HAS_TRAILING_BREAK)) {
     // We placed all the text in the textrun and we have a break opportunity at
     // the end of the textrun. We need to record it because the following
@@ -8605,7 +8590,7 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   if (!textStyle->WhiteSpaceIsSignificant() &&
       (lineContainer->StyleText()->mTextAlign == NS_STYLE_TEXT_ALIGN_JUSTIFY ||
        lineContainer->StyleText()->mTextAlignLast == NS_STYLE_TEXT_ALIGN_JUSTIFY ||
-       StyleContext()->IsInlineDescendantOfRuby()) &&
+       StyleContext()->ShouldSuppressLineBreak()) &&
       !lineContainer->IsSVGText()) {
     AddStateBits(TEXT_JUSTIFICATION_ENABLED);
     provider.ComputeJustification(offset, charsFit);

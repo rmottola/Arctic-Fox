@@ -245,10 +245,10 @@ RegExpObject::trace(JSTracer* trc, JSObject* obj)
     // conditions, since:
     //   1. During TraceRuntime, isHeapBusy() is true, but the tracer might not
     //      be a marking tracer.
-    //   2. When a write barrier executes, IS_GC_MARKING_TRACER is true, but
+    //   2. When a write barrier executes, IsMarkingTracer is true, but
     //      isHeapBusy() will be false.
     if (trc->runtime()->isHeapBusy() &&
-        IS_GC_MARKING_TRACER(trc) &&
+        IsMarkingTracer(trc) &&
         !obj->asTenured().zone()->isPreservingCode())
     {
         obj->as<RegExpObject>().NativeObject::setPrivate(nullptr);
@@ -572,9 +572,9 @@ RegExpShared::~RegExpShared()
 }
 
 void
-RegExpShared::trace(JSTracer* trc)
+RegExpShared::trace(JSTracer *trc)
 {
-    if (IS_GC_MARKING_TRACER(trc))
+    if (IsMarkingTracer(trc))
         marked_ = true;
 
     if (source)

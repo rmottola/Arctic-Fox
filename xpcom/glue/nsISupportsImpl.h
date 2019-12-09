@@ -143,7 +143,7 @@ private:
 
 // Macros for reference-count and constructor logging
 
-#ifdef NS_BUILD_REFCNT_LOGGING
+#if defined(NS_BUILD_REFCNT_LOGGING) && !defined(MOZILLA_XPCOMRT_API)
 
 #define NS_LOG_ADDREF(_p, _rc, _type, _size) \
   NS_LogAddRef((_p), (_rc), (_type), (uint32_t) (_size))
@@ -172,6 +172,11 @@ do {                                                              \
   NS_LogCtor((void*)this, #_type, sizeof(*this) - sizeof(_base)); \
 } while (0)
 
+#define MOZ_LOG_CTOR(_ptr, _name, _size) \
+do {                                     \
+  NS_LogCtor((void*)_ptr, _name, _size); \
+} while (0)
+
 #define MOZ_COUNT_DTOR(_type)                                 \
 do {                                                          \
   MOZ_ASSERT_CLASSNAME(_type);                                \
@@ -183,6 +188,11 @@ do {                                                              \
   MOZ_ASSERT_CLASSNAME(_type);                                    \
   MOZ_ASSERT_CLASSNAME(_base);                                    \
   NS_LogDtor((void*)this, #_type, sizeof(*this) - sizeof(_base)); \
+} while (0)
+
+#define MOZ_LOG_DTOR(_ptr, _name, _size) \
+do {                                     \
+  NS_LogDtor((void*)_ptr, _name, _size); \
 } while (0)
 
 /* nsCOMPtr.h allows these macros to be defined by clients
@@ -202,8 +212,10 @@ do {                                                              \
 #define NS_LOG_RELEASE(_p, _rc, _type)
 #define MOZ_COUNT_CTOR(_type)
 #define MOZ_COUNT_CTOR_INHERITED(_type, _base)
+#define MOZ_LOG_CTOR(_ptr, _name, _size)
 #define MOZ_COUNT_DTOR(_type)
 #define MOZ_COUNT_DTOR_INHERITED(_type, _base)
+#define MOZ_LOG_DTOR(_ptr, _name, _size)
 
 #endif /* NS_BUILD_REFCNT_LOGGING */
 
@@ -376,9 +388,9 @@ private:
 #define NS_DECL_ISUPPORTS                                                     \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
 protected:                                                                    \
   nsAutoRefCnt mRefCnt;                                                       \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -387,9 +399,9 @@ public:
 #define NS_DECL_THREADSAFE_ISUPPORTS                                          \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
 protected:                                                                    \
   ::mozilla::ThreadSafeAutoRefCnt mRefCnt;                                    \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -398,9 +410,9 @@ public:
 #define NS_DECL_CYCLE_COLLECTING_ISUPPORTS                                    \
 public:                                                                       \
   NS_IMETHOD QueryInterface(REFNSIID aIID,                                    \
-                            void** aInstancePtr) override;                \
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;             \
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;            \
+                            void** aInstancePtr) override;                    \
+  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
+  NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
   NS_IMETHOD_(void) DeleteCycleCollectable(void);                             \
 protected:                                                                    \
   nsCycleCollectingAutoRefCnt mRefCnt;                                        \

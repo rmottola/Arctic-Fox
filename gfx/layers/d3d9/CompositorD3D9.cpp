@@ -16,6 +16,7 @@
 #include "mozilla/layers/PCompositorParent.h"
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "gfxPrefs.h"
+#include "gfxCrashReporterUtils.h"
 
 namespace mozilla {
 namespace layers {
@@ -41,6 +42,8 @@ CompositorD3D9::Initialize()
 {
   bool force = gfxPrefs::LayersAccelerationForceEnabled();
 
+  ScopedGfxFeatureReporter reporter("D3D9 Layers", force);
+
   if (!gfxPlatform::CanUseDirect3D9()) {
     NS_WARNING("Direct3D 9-accelerated layers are not supported on this system.");
     return false;
@@ -58,6 +61,11 @@ CompositorD3D9::Initialize()
     return false;
   }
 
+  if (!mWidget->InitCompositor(this)) {
+    return false;
+  }
+
+  reporter.SetSuccessful();
   return true;
 }
 

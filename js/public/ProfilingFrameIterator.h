@@ -123,8 +123,11 @@ class JS_PUBLIC_API(ProfilingFrameIterator)
     bool isJit() const;
 };
 
+extern JS_PUBLIC_API(ProfilingFrameIterator::FrameKind)
+GetProfilingFrameKindFromNativeAddr(JSRuntime *runtime, void *pc);
+
 JS_FRIEND_API(bool)
-IsProfilingEnabledForRuntime(JSRuntime* runtime);
+IsProfilingEnabledForRuntime(JSRuntime *runtime);
 
 /**
  * After each sample run, this method should be called with the latest sample

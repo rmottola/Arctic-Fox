@@ -104,6 +104,7 @@
 #include "nsGlobalWindow.h"
 #include "nsDOMMutationObserver.h"
 #include "GeometryUtils.h"
+#include "nsIAnimationObserver.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -2896,7 +2897,7 @@ nsINode::GetElementById(const nsAString& aId)
 }
 
 JSObject*
-nsINode::WrapObject(JSContext *aCx)
+nsINode::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 {
   // Make sure one of these is true
   // (1) our owner document has a script handling object,
@@ -2915,7 +2916,7 @@ nsINode::WrapObject(JSContext *aCx)
     return nullptr;
   }
 
-  JS::Rooted<JSObject*> obj(aCx, WrapNode(aCx));
+  JS::Rooted<JSObject*> obj(aCx, WrapNode(aCx, aGivenProto));
   MOZ_ASSERT_IF(ChromeOnlyAccess(),
                 xpc::IsInContentXBLScope(obj) || !xpc::UseContentXBLScope(js::GetObjectCompartment(obj)));
   return obj;
@@ -2980,4 +2981,19 @@ nsINode*
 nsINode::GetScopeChainParent() const
 {
   return nullptr;
+}
+
+void
+nsINode::AddAnimationObserver(nsIAnimationObserver* aAnimationObserver)
+{
+  AddMutationObserver(aAnimationObserver);
+  OwnerDoc()->SetMayHaveAnimationObservers();
+}
+
+void
+nsINode::AddAnimationObserverUnlessExists(
+                               nsIAnimationObserver* aAnimationObserver)
+{
+  AddMutationObserverUnlessExists(aAnimationObserver);
+  OwnerDoc()->SetMayHaveAnimationObservers();
 }

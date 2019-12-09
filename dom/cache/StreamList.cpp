@@ -18,12 +18,12 @@ namespace cache {
 StreamList::StreamList(Manager* aManager, Context* aContext)
   : mManager(aManager)
   , mContext(aContext)
-  , mCacheId(0)
+  , mCacheId(INVALID_CACHE_ID)
   , mStreamControl(nullptr)
   , mActivated(false)
 {
   MOZ_ASSERT(mManager);
-  MOZ_ASSERT(mContext);
+  mContext->AddActivity(this);
 }
 
 void
@@ -58,7 +58,7 @@ StreamList::Activate(CacheId aCacheId)
 {
   NS_ASSERT_OWNINGTHREAD(StreamList);
   MOZ_ASSERT(!mActivated);
-  MOZ_ASSERT(!mCacheId);
+  MOZ_ASSERT(mCacheId == INVALID_CACHE_ID);
   mActivated = true;
   mCacheId = aCacheId;
   mManager->AddRefCacheId(mCacheId);
@@ -142,6 +142,20 @@ StreamList::CloseAll()
   }
 }
 
+void
+StreamList::Cancel()
+{
+  NS_ASSERT_OWNINGTHREAD(StreamList);
+  CloseAll();
+}
+
+bool
+StreamList::MatchesCacheId(CacheId aCacheId) const
+{
+  NS_ASSERT_OWNINGTHREAD(StreamList);
+  return aCacheId == mCacheId;
+}
+
 StreamList::~StreamList()
 {
   NS_ASSERT_OWNINGTHREAD(StreamList);
@@ -153,6 +167,7 @@ StreamList::~StreamList()
     }
     mManager->ReleaseCacheId(mCacheId);
   }
+  mContext->RemoveActivity(this);
 }
 
 } // namespace cache

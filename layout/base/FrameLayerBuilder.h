@@ -57,6 +57,7 @@ struct ContainerLayerParameters {
     : mXScale(1)
     , mYScale(1)
     , mLayerContentsVisibleRect(nullptr)
+    , mBackgroundColor(NS_RGBA(0,0,0,0))
     , mInTransformedSubtree(false)
     , mInActiveTransformedSubtree(false)
     , mDisableSubpixelAntialiasingInDescendants(false)
@@ -66,6 +67,7 @@ struct ContainerLayerParameters {
     : mXScale(aXScale)
     , mYScale(aYScale)
     , mLayerContentsVisibleRect(nullptr)
+    , mBackgroundColor(NS_RGBA(0,0,0,0))
     , mInTransformedSubtree(false)
     , mInActiveTransformedSubtree(false)
     , mDisableSubpixelAntialiasingInDescendants(false)
@@ -78,6 +80,7 @@ struct ContainerLayerParameters {
     , mYScale(aYScale)
     , mLayerContentsVisibleRect(nullptr)
     , mOffset(aOffset)
+    , mBackgroundColor(aParent.mBackgroundColor)
     , mInTransformedSubtree(aParent.mInTransformedSubtree)
     , mInActiveTransformedSubtree(aParent.mInActiveTransformedSubtree)
     , mDisableSubpixelAntialiasingInDescendants(aParent.mDisableSubpixelAntialiasingInDescendants)
@@ -94,6 +97,7 @@ struct ContainerLayerParameters {
    */
   nsIntPoint mOffset;
 
+  nscolor mBackgroundColor;
   bool mInTransformedSubtree;
   bool mInActiveTransformedSubtree;
   bool mDisableSubpixelAntialiasingInDescendants;
@@ -197,7 +201,16 @@ public:
   void DidEndTransaction();
 
   enum {
-    CONTAINER_NOT_CLIPPED_BY_ANCESTORS = 0x01
+    CONTAINER_NOT_CLIPPED_BY_ANCESTORS = 0x01,
+
+    /**
+     * Set this when pulling an opaque background color from behind the
+     * container layer into the container doesn't change the visual results,
+     * given the effects you're going to apply to the container layer.
+     * For example, this is compatible with opacity or clipping/masking, but
+     * not with non-OVER blend modes or filters.
+     */
+    CONTAINER_ALLOW_PULL_BACKGROUND_COLOR = 0x02
   };
   /**
    * Build a container layer for a display item that contains a child
@@ -334,6 +347,14 @@ public:
   void ClearCachedGeometry(nsDisplayItem* aItem);
 
   static Layer* GetDebugOldLayerFor(nsIFrame* aFrame, uint32_t aDisplayItemKey);
+
+  /**
+   * Return the layer that all display items of aFrame were assigned to in the
+   * last paint, or nullptr if there was no single layer assigned to all of the
+   * frame's display items (i.e. zero, or more than one).
+   * This function is for testing purposes and not performance sensitive.
+   */
+  static Layer* GetDebugSingleOldLayerForFrame(nsIFrame* aFrame);
 
   /**
    * Destroy any stored LayerManagerDataProperty and the associated data for

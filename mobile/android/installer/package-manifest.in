@@ -42,7 +42,6 @@
 @BINPATH@/@DLL_PREFIX@plds4@DLL_SUFFIX@
 @BINPATH@/@DLL_PREFIX@nspr4@DLL_SUFFIX@
 #endif
-@BINPATH@/@DLL_PREFIX@mozalloc@DLL_SUFFIX@
 @BINPATH@/@DLL_PREFIX@omxplugin@DLL_SUFFIX@
 @BINPATH@/@DLL_PREFIX@omxplugingb@DLL_SUFFIX@
 @BINPATH@/@DLL_PREFIX@omxplugingb235@DLL_SUFFIX@
@@ -386,6 +385,8 @@
 @BINPATH@/components/formautofill.manifest
 @BINPATH@/components/FormAutofillContentService.js
 @BINPATH@/components/FormAutofillStartup.js
+@BINPATH@/components/CSSUnprefixingService.js
+@BINPATH@/components/CSSUnprefixingService.manifest
 @BINPATH@/components/contentAreaDropListener.manifest
 @BINPATH@/components/contentAreaDropListener.js
 @BINPATH@/components/messageWakeupService.js
@@ -453,6 +454,8 @@
 
 @BINPATH@/components/PresentationDeviceInfoManager.manifest
 @BINPATH@/components/PresentationDeviceInfoManager.js
+@BINPATH@/components/BuiltinProviders.manifest
+@BINPATH@/components/TCPPresentationServer.js
 
 ; Modules
 @BINPATH@/modules/*

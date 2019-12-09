@@ -231,7 +231,7 @@ using namespace mozilla::widget;
 #ifdef ENABLE_TESTS
 
 class BackgroundTester final : public nsIIPCBackgroundChildCreateCallback,
-                                   public nsIObserver
+                               public nsIObserver
 {
     static uint32_t sCallbackCount;
 
@@ -1532,8 +1532,22 @@ ContentParent::TransformPreallocatedIntoBrowser(ContentParent* aOpener)
 }
 
 void
-ContentParent::ShutDownProcess(bool aCloseWithError)
+ContentParent::ShutDownProcess(ShutDownMethod aMethod)
 {
+    // Shutting down by sending a shutdown message works differently than the
+    // other methods. We first call Shutdown() in the child. After the child is
+    // ready, it calls FinishShutdown() on us. Then we close the channel.
+    if (aMethod == SEND_SHUTDOWN_MESSAGE) {
+
+        if (SendShutdown()) {
+            mShutdownPending = true;
+        }
+
+        // If call was not successful, the channel must have been broken
+        // somehow, and we will clean up the error in ActorDestroy.
+        return;
+    }
+
     using mozilla::dom::quota::QuotaManager;
 
     if (QuotaManager* quotaManager = QuotaManager::Get()) {
@@ -1541,10 +1555,10 @@ ContentParent::ShutDownProcess(bool aCloseWithError)
     }
 
     // If Close() fails with an error, we'll end up back in this function, but
-    // with aCloseWithError = true.  It's important that we call
+    // with aMethod = CLOSE_CHANNEL_WITH_ERROR.  It's important that we call
     // CloseWithError() in this case; see bug 895204.
 
-    if (!aCloseWithError && !mCalledClose) {
+    if (aMethod == CLOSE_CHANNEL && !mCalledClose) {
         // Close() can only be called once: It kicks off the destruction
         // sequence.
         mCalledClose = true;
@@ -1558,7 +1572,7 @@ ContentParent::ShutDownProcess(bool aCloseWithError)
 #endif
     }
 
-    if (aCloseWithError && !mCalledCloseWithError) {
+    if (aMethod == CLOSE_CHANNEL_WITH_ERROR && !mCalledCloseWithError) {
         MessageChannel* channel = GetIPCChannel();
         if (channel) {
             mCalledCloseWithError = true;
@@ -1583,6 +1597,17 @@ ContentParent::ShutDownProcess(bool aCloseWithError)
     // CC'ed objects, so we need to null them out here, while we still can.  See
     // bug 899761.
     ShutDownMessageManager();
+}
+
+bool
+ContentParent::RecvFinishShutdown()
+{
+    // At this point, we already called ShutDownProcess once with
+    // SEND_SHUTDOWN_MESSAGE. To actually close the channel, we call
+    // ShutDownProcess again with CLOSE_CHANNEL.
+    MOZ_ASSERT(mShutdownPending);
+    ShutDownProcess(CLOSE_CHANNEL);
+    return true;
 }
 
 void
@@ -1664,39 +1689,31 @@ ContentParent::OnBeginSyncTransaction() {
 void
 ContentParent::OnChannelConnected(int32_t pid)
 {
-    ProcessHandle handle;
-    if (!base::OpenPrivilegedProcessHandle(pid, &handle)) {
-        NS_WARNING("Can't open handle to child process.");
-    }
-    else {
-        // we need to close the existing handle before setting a new one.
-        base::CloseProcessHandle(OtherProcess());
-        SetOtherProcess(handle);
+    SetOtherProcessId(pid);
 
 #if defined(ANDROID) || defined(LINUX)
-        // Check nice preference
-        int32_t nice = Preferences::GetInt("dom.ipc.content.nice", 0);
+    // Check nice preference
+    int32_t nice = Preferences::GetInt("dom.ipc.content.nice", 0);
 
-        // Environment variable overrides preference
-        char* relativeNicenessStr = getenv("MOZ_CHILD_PROCESS_RELATIVE_NICENESS");
-        if (relativeNicenessStr) {
-            nice = atoi(relativeNicenessStr);
-        }
-
-        /* make the GUI thread have higher priority on single-cpu devices */
-        nsCOMPtr<nsIPropertyBag2> infoService = do_GetService(NS_SYSTEMINFO_CONTRACTID);
-        if (infoService) {
-            int32_t cpus;
-            nsresult rv = infoService->GetPropertyAsInt32(NS_LITERAL_STRING("cpucount"), &cpus);
-            if (NS_FAILED(rv)) {
-                cpus = 1;
-            }
-            if (nice != 0 && cpus == 1) {
-                setpriority(PRIO_PROCESS, pid, getpriority(PRIO_PROCESS, pid) + nice);
-            }
-        }
-#endif
+    // Environment variable overrides preference
+    char* relativeNicenessStr = getenv("MOZ_CHILD_PROCESS_RELATIVE_NICENESS");
+    if (relativeNicenessStr) {
+        nice = atoi(relativeNicenessStr);
     }
+
+    /* make the GUI thread have higher priority on single-cpu devices */
+    nsCOMPtr<nsIPropertyBag2> infoService = do_GetService(NS_SYSTEMINFO_CONTRACTID);
+    if (infoService) {
+        int32_t cpus;
+        nsresult rv = infoService->GetPropertyAsInt32(NS_LITERAL_STRING("cpucount"), &cpus);
+        if (NS_FAILED(rv)) {
+            cpus = 1;
+        }
+        if (nice != 0 && cpus == 1) {
+            setpriority(PRIO_PROCESS, pid, getpriority(PRIO_PROCESS, pid) + nice);
+        }
+    }
+#endif
 }
 
 void
@@ -1784,7 +1801,20 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
         mForceKillTask = nullptr;
     }
 
-    ShutDownMessageManager();
+    // Signal shutdown completion regardless of error state,
+    // so we can finish waiting in the xpcom-shutdown observer.
+    mShutdownComplete = true;
+
+    if (why == NormalShutdown && !mCalledClose) {
+        // If we shut down normally but haven't called Close, assume somebody
+        // else called Close on us. In that case, we still need to call
+        // ShutDownProcess below to perform other necessary clean up.
+        mCalledClose = true;
+    }
+
+    // Make sure we always clean up.
+    ShutDownProcess(why == NormalShutdown ? CLOSE_CHANNEL
+                                          : CLOSE_CHANNEL_WITH_ERROR);
 
     if (mHangMonitorActor) {
         ProcessHangMonitor::RemoveProcess(mHangMonitorActor);
@@ -1828,8 +1858,6 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
     mConsoleService = nullptr;
 
-    MarkAsDead();
-
     if (obs) {
         nsRefPtr<nsHashPropertyBag> props = new nsHashPropertyBag();
 
@@ -1846,11 +1874,6 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
     }
 
     mIdleListeners.Clear();
-
-    // If the child process was terminated due to a SIGKIL, ShutDownProcess
-    // might not have been called yet.  We must call it to ensure that our
-    // channel is closed, etc.
-    ShutDownProcess(/* closeWithError */ true);
 
     MessageLoop::current()->
         PostTask(FROM_HERE,
@@ -1875,7 +1898,7 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
         MessageLoop::current()->PostTask(
             FROM_HERE,
             NewRunnableMethod(cp, &ContentParent::ShutDownProcess,
-                              /* closeWithError */ false));
+                              CLOSE_CHANNEL));
     }
     cpm->RemoveContentProcess(this->ChildID());
 }
@@ -1921,10 +1944,12 @@ ContentParent::NotifyTabDestroyed(PBrowserParent* aTab,
     // because of popup windows.  When the last one closes, shut
     // us down.
     if (ManagedPBrowserParent().Length() == 1) {
+        // In the case of normal shutdown, send a shutdown message to child to
+        // allow it to perform shutdown tasks.
         MessageLoop::current()->PostTask(
             FROM_HERE,
             NewRunnableMethod(this, &ContentParent::ShutDownProcess,
-                              /* force */ false));
+                              SEND_SHUTDOWN_MESSAGE));
     }
 }
 
@@ -1973,6 +1998,8 @@ ContentParent::InitializeMembers()
     mCalledCloseWithError = false;
     mCalledKillHard = false;
     mCreatedPairedMinidumps = false;
+    mShutdownPending = false;
+    mShutdownComplete = false;
     mHangMonitorActor = nullptr;
 }
 
@@ -2049,7 +2076,8 @@ ContentParent::ContentParent(mozIApplication* aApp,
     }
     mSubprocess->LaunchAndWaitForProcessHandle(extraArgs);
 
-    Open(mSubprocess->GetChannel(), mSubprocess->GetOwnedChildProcessHandle());
+    Open(mSubprocess->GetChannel(),
+         base::GetProcId(mSubprocess->GetChildProcessHandle()));
 
     InitInternal(aInitialPriority,
                  true, /* Setup off-main thread compositing */
@@ -2123,7 +2151,7 @@ ContentParent::ContentParent(ContentParent* aTemplate,
     CloneOpenedToplevels(aTemplate, aFds, aPid, &cloneContext);
 
     Open(mSubprocess->GetChannel(),
-         mSubprocess->GetChildProcessHandle());
+         base::GetProcId(mSubprocess->GetChildProcessHandle()));
 
     // Set the subprocess's priority (bg if we're a preallocated process, fg
     // otherwise).  We do this first because we're likely /lowering/ its CPU and
@@ -2150,9 +2178,6 @@ ContentParent::~ContentParent()
     if (mForceKillTask) {
         mForceKillTask->Cancel();
     }
-
-    if (OtherProcess())
-        base::CloseProcessHandle(OtherProcess());
 
     NS_ASSERTION(NS_IsMainThread(), "Wrong thread!");
 
@@ -2675,8 +2700,9 @@ ContentParent::RecvAddNewProcess(const uint32_t& aPid,
     bool isOffline;
     InfallibleTArray<nsString> unusedDictionaries;
     ClipboardCapabilities clipboardCaps;
+    DomainPolicyClone domainPolicy;
     RecvGetXPCOMProcessAttributes(&isOffline, &unusedDictionaries,
-                                  &clipboardCaps);
+                                  &clipboardCaps, &domainPolicy);
     mozilla::unused << content->SendSetOffline(isOffline);
     MOZ_ASSERT(!clipboardCaps.supportsSelectionClipboard() &&
                !clipboardCaps.supportsFindClipboard(),
@@ -2711,7 +2737,16 @@ ContentParent::Observe(nsISupports* aSubject,
                        const char16_t* aData)
 {
     if (!strcmp(aTopic, "xpcom-shutdown") && mSubprocess) {
-        ShutDownProcess(/* closeWithError */ false);
+        if (mShutdownPending) {
+            // Wait for shutdown to complete, so that we receive any shutdown
+            // data (e.g. telemetry) from the child before we quit.
+            while (!mShutdownComplete) {
+                NS_ProcessNextEvent(nullptr, true);
+            }
+        } else {
+            // Just close the channel if we never tried shutting down.
+            ShutDownProcess(CLOSE_CHANNEL);
+        }
         NS_ASSERTION(!mSubprocess, "Close should have nulled mSubprocess");
     }
 
@@ -2978,7 +3013,8 @@ ContentParent::RecvGetProcessAttributes(ContentParentId* aCpId,
 bool
 ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
                                              InfallibleTArray<nsString>* dictionaries,
-                                             ClipboardCapabilities* clipboardCaps)
+                                             ClipboardCapabilities* clipboardCaps,
+                                             DomainPolicyClone* domainPolicy)
 {
     nsCOMPtr<nsIIOService> io(do_GetIOService());
     MOZ_ASSERT(io, "No IO service?");
@@ -2998,6 +3034,11 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
 
     rv = clipboard->SupportsFindClipboard(&clipboardCaps->supportsFindClipboard());
     MOZ_ASSERT(NS_SUCCEEDED(rv));
+
+    // Let's copy the domain policy from the parent to the child (if it's active).
+    nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
+    NS_ENSURE_TRUE(ssm, false);
+    ssm->CloneDomainPolicy(domainPolicy);
 
     return true;
 }
@@ -3112,19 +3153,26 @@ ContentParent::KillHard(const char* aReason)
     mCalledKillHard = true;
     mForceKillTask = nullptr;
 
-    if (!KillProcess(OtherProcess(), 1, false)) {
+    ProcessHandle otherProcessHandle;
+    if (!base::OpenProcessHandle(OtherPid(), &otherProcessHandle)) {
+        NS_ERROR("Failed to open child process when attempting kill.");
+        return;
+    }
+
+    if (!KillProcess(otherProcessHandle, base::PROCESS_END_KILLED_BY_USER,
+                     false)) {
         NS_WARNING("failed to kill subprocess!");
     }
+
     if (mSubprocess) {
         mSubprocess->SetAlreadyDead();
     }
+
+    // EnsureProcessTerminated has responsibilty for closing otherProcessHandle.
     XRE_GetIOMessageLoop()->PostTask(
         FROM_HERE,
         NewRunnableFunction(&ProcessWatcher::EnsureProcessTerminated,
-                            OtherProcess(), /*force=*/true));
-    // We've now closed the OtherProcess() handle, so must set it to null to
-    // prevent our dtor closing it twice.
-    SetOtherProcess(0);
+                            otherProcessHandle, /*force=*/true));
 }
 
 bool
@@ -4250,12 +4298,15 @@ ContentParent::RecvBackUpXResources(const FileDescriptor& aXSocketFd)
 }
 
 bool
-ContentParent::RecvOpenAnonymousTemporaryFile(FileDescriptor *aFD)
+ContentParent::RecvOpenAnonymousTemporaryFile(FileDescOrError *aFD)
 {
     PRFileDesc *prfd;
     nsresult rv = NS_OpenAnonymousTemporaryFile(&prfd);
     if (NS_WARN_IF(NS_FAILED(rv))) {
-        return false;
+        // Returning false will kill the child process; instead
+        // propagate the error and let the child handle it.
+        *aFD = rv;
+        return true;
     }
     *aFD = FileDescriptor(FileDescriptor::PlatformHandleType(PR_FileDesc2NativeHandle(prfd)));
     // The FileDescriptor object owns a duplicate of the file handle; we

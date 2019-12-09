@@ -24,6 +24,7 @@
 #include "js/Proxy.h"
 #include "proxy/DeadObjectProxy.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/WeakMapObject.h"
 #include "vm/WrapperObject.h"
 
 #include "jsobjinlines.h"
@@ -363,7 +364,9 @@ js::AssertSameCompartment(JSObject* objA, JSObject* objB)
 JS_FRIEND_API(void)
 js::NotifyAnimationActivity(JSObject* obj)
 {
-    obj->compartment()->lastAnimationTime = PRMJ_Now();
+    int64_t timeNow = PRMJ_Now();
+    obj->compartment()->lastAnimationTime = timeNow;
+    obj->runtimeFromMainThread()->lastAnimationTime = timeNow;
 }
 
 JS_FRIEND_API(uint32_t)
@@ -547,9 +550,9 @@ JS_GetCustomIteratorCount(JSContext* cx)
 }
 
 JS_FRIEND_API(unsigned)
-JS_PCToLineNumber(JSScript* script, jsbytecode* pc)
+JS_PCToLineNumber(JSScript *script, jsbytecode *pc, unsigned *columnp)
 {
-    return PCToLineNumber(script, pc);
+    return PCToLineNumber(script, pc, columnp);
 }
 
 JS_FRIEND_API(bool)
@@ -1171,16 +1174,13 @@ js::SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback)
     cx->compartment()->setObjectMetadataCallback(callback);
 }
 
-JS_FRIEND_API(bool)
-js::SetObjectMetadata(JSContext* cx, HandleObject obj, HandleObject metadata)
+JS_FRIEND_API(JSObject *)
+js::GetObjectMetadata(JSObject *obj)
 {
-    return JSObject::setMetadata(cx, obj, metadata);
-}
-
-JS_FRIEND_API(JSObject*)
-js::GetObjectMetadata(JSObject* obj)
-{
-    return obj->getMetadata();
+    ObjectWeakMap *map = obj->compartment()->objectMetadataTable;
+    if (map)
+        return map->lookup(obj);
+    return nullptr;
 }
 
 JS_FRIEND_API(bool)

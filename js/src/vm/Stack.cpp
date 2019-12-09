@@ -324,7 +324,7 @@ InterpreterFrame::popWith(JSContext* cx)
 }
 
 void
-InterpreterFrame::mark(JSTracer* trc)
+InterpreterFrame::mark(JSTracer *trc)
 {
     /*
      * Normally we would use MarkRoot here, except that generators also take
@@ -342,7 +342,7 @@ InterpreterFrame::mark(JSTracer* trc)
     } else {
         gc::MarkScriptUnbarriered(trc, &exec.script, "script");
     }
-    if (IS_GC_MARKING_TRACER(trc))
+    if (IsMarkingTracer(trc))
         script()->compartment()->zone()->active = true;
     if (hasReturnValue())
         gc::MarkValueUnbarriered(trc, &rval_, "rval");
@@ -1131,7 +1131,8 @@ FrameIter::matchCallee(JSContext* cx, HandleFunction fun) const
     // Use the same condition as |js::CloneFunctionObject|, to know if we should
     // expect both functions to have the same JSScript. If so, and if they are
     // different, then they cannot be equal.
-    bool useSameScript = CloneFunctionObjectUseSameScript(fun->compartment(), currentCallee);
+    RootedObject global(cx, &fun->global());
+    bool useSameScript = CloneFunctionObjectUseSameScript(fun->compartment(), currentCallee, global);
     if (useSameScript &&
         (currentCallee->hasScript() != fun->hasScript() ||
          currentCallee->nonLazyScript() != fun->nonLazyScript()))
@@ -1928,7 +1929,8 @@ JS::ProfilingFrameIterator::extractStack(Frame* frames, uint32_t offset, uint32_
     // FIXMEshu: disabled until we can ensure the optimization info is live
     // when we write out the JSON stream of the profile.
     if (false && entry.hasTrackedOptimizations()) {
-        mozilla::Maybe<uint8_t> index = entry.trackedOptimizationIndexAtAddr(returnAddr);
+        uint32_t dummy;
+        mozilla::Maybe<uint8_t> index = entry.trackedOptimizationIndexAtAddr(returnAddr, &dummy);
         frames[offset].hasTrackedOptimizations = index.isSome();
     }
 

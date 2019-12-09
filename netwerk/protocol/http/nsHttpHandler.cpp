@@ -50,6 +50,7 @@
 #include "nsINetworkLinkService.h"
 
 #include "mozilla/net/NeckoChild.h"
+#include "mozilla/ipc/URIUtils.h"
 #include "mozilla/Telemetry.h"
 
 #if defined(XP_UNIX)
@@ -208,7 +209,7 @@ nsHttpHandler::nsHttpHandler()
     , mTCPKeepaliveShortLivedIdleTimeS(10)
     , mTCPKeepaliveLongLivedEnabled(false)
     , mTCPKeepaliveLongLivedIdleTimeS(600)
-    , mEnforceH1Framing(false)
+    , mEnforceH1Framing(FRAMECHECK_BARELY)
 {
 #if defined(PR_LOGGING)
     gHttpLog = PR_NewLogModule("nsHttp");
@@ -1594,10 +1595,18 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
                                                       1, kMaxTCPKeepIdle);
     }
 
-    if (PREF_CHANGED(HTTP_PREF("enforce-framing.http1"))) {
+    if (PREF_CHANGED(HTTP_PREF("enforce-framing.http1")) ||
+        PREF_CHANGED(HTTP_PREF("enforce-framing.soft")) ) {
         rv = prefs->GetBoolPref(HTTP_PREF("enforce-framing.http1"), &cVar);
-        if (NS_SUCCEEDED(rv)) {
-            mEnforceH1Framing = cVar;
+        if (NS_SUCCEEDED(rv) && cVar) {
+            mEnforceH1Framing = FRAMECHECK_STRICT;
+        } else {
+            rv = prefs->GetBoolPref(HTTP_PREF("enforce-framing.soft"), &cVar);
+            if (NS_SUCCEEDED(rv) && cVar) {
+                mEnforceH1Framing = FRAMECHECK_BARELY;
+            } else {
+                mEnforceH1Framing = FRAMECHECK_LAX;
+            }
         }
     }
 
@@ -2059,6 +2068,13 @@ NS_IMETHODIMP
 nsHttpHandler::SpeculativeConnect(nsIURI *aURI,
                                   nsIInterfaceRequestor *aCallbacks)
 {
+    if (IsNeckoChild()) {
+        ipc::URIParams params;
+        SerializeURI(aURI, params);
+        gNeckoChild->SendSpeculativeConnect(params);
+        return NS_OK;
+    }
+
     if (!mHandlerActive)
         return NS_OK;
 

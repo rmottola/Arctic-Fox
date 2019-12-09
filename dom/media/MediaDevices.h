@@ -30,7 +30,7 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECLARE_STATIC_IID_ACCESSOR(MOZILLA_DOM_MEDIADEVICES_IMPLEMENTATION_IID)
 
-  JSObject* WrapObject(JSContext* cx) override;
+  JSObject* WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) override;
 
   already_AddRefed<Promise>
   GetUserMedia(const MediaStreamConstraints& aConstraints, ErrorResult &aRv);

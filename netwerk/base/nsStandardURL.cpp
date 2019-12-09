@@ -843,6 +843,10 @@ nsStandardURL::ParseURL(const char *spec, int32_t specLen)
 {
     nsresult rv;
 
+    if (specLen > net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     //
     // parse given URL string
     //
@@ -886,6 +890,10 @@ nsresult
 nsStandardURL::ParsePath(const char *spec, uint32_t pathPos, int32_t pathLen)
 {
     LOG(("ParsePath: %s pathpos %d len %d\n",spec,pathPos,pathLen));
+
+    if (pathLen > net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
 
     nsresult rv = mParser->ParsePath(spec + pathPos, pathLen,
                                      &mFilepath.mPos, &mFilepath.mLen,
@@ -1248,6 +1256,10 @@ nsStandardURL::SetSpec(const nsACString &input)
         if (NS_FAILED(rv)) {
             return rv;
         }
+    }
+
+    if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
     }
 
     // Make a backup of the curent URL
@@ -2850,6 +2862,10 @@ nsStandardURL::Init(uint32_t urlType,
 {
     ENSURE_MUTABLE();
 
+    if (spec.Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
 
     switch (urlType) {
@@ -3274,7 +3290,7 @@ nsStandardURL::GetClassDescription(char * *aClassDescription)
 NS_IMETHODIMP 
 nsStandardURL::GetClassID(nsCID * *aClassID)
 {
-    *aClassID = (nsCID*) nsMemory::Alloc(sizeof(nsCID));
+    *aClassID = (nsCID*) moz_xmalloc(sizeof(nsCID));
     if (!*aClassID)
         return NS_ERROR_OUT_OF_MEMORY;
     return GetClassIDNoAlloc(*aClassID);

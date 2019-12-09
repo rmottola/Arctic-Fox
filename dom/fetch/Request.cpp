@@ -33,7 +33,6 @@ Request::Request(nsIGlobalObject* aOwner, InternalRequest* aRequest)
   : FetchBody<Request>()
   , mOwner(aOwner)
   , mRequest(aRequest)
-  , mContext(RequestContext::Fetch)
 {
 }
 
@@ -47,6 +46,82 @@ Request::GetInternalRequest()
   nsRefPtr<InternalRequest> r = mRequest;
   return r.forget();
 }
+
+namespace {
+void
+GetRequestURLFromWindow(const GlobalObject& aGlobal, nsPIDOMWindow* aWindow,
+                        const nsAString& aInput, nsAString& aRequestURL,
+                        ErrorResult& aRv)
+{
+  MOZ_ASSERT(aWindow);
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsCOMPtr<nsIURI> docURI = aWindow->GetDocumentURI();
+  nsAutoCString spec;
+  aRv = docURI->GetSpec(spec);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  nsRefPtr<dom::URL> url =
+    dom::URL::Constructor(aGlobal, aInput, NS_ConvertUTF8toUTF16(spec), aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  url->Stringify(aRequestURL, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+}
+
+void
+GetRequestURLFromChrome(const nsAString& aInput, nsAString& aRequestURL,
+                        ErrorResult& aRv)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+#ifdef DEBUG
+  nsCOMPtr<nsIURI> uri;
+  aRv = NS_NewURI(getter_AddRefs(uri), aInput, nullptr, nullptr);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  nsAutoCString spec;
+  aRv = uri->GetSpec(spec);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  CopyUTF8toUTF16(spec, aRequestURL);
+#else
+  aRequestURL = aInput;
+#endif
+}
+
+void
+GetRequestURLFromWorker(const GlobalObject& aGlobal, const nsAString& aInput,
+                        nsAString& aRequestURL, ErrorResult& aRv)
+{
+  workers::WorkerPrivate* worker = workers::GetCurrentThreadWorkerPrivate();
+  MOZ_ASSERT(worker);
+  worker->AssertIsOnWorkerThread();
+
+  NS_ConvertUTF8toUTF16 baseURL(worker->GetLocationInfo().mHref);
+  nsRefPtr<workers::URL> url =
+    workers::URL::Constructor(aGlobal, aInput, baseURL, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  url->Stringify(aRequestURL, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+}
+
+} // anonymous namespace
 
 /*static*/ already_AddRefed<Request>
 Request::Constructor(const GlobalObject& aGlobal,
@@ -82,51 +157,32 @@ Request::Constructor(const GlobalObject& aGlobal,
 
   RequestMode fallbackMode = RequestMode::EndGuard_;
   RequestCredentials fallbackCredentials = RequestCredentials::EndGuard_;
+  RequestCache fallbackCache = RequestCache::EndGuard_;
   if (aInput.IsUSVString()) {
-    nsString input;
+    nsAutoString input;
     input.Assign(aInput.GetAsUSVString());
 
-    nsString requestURL;
+    nsAutoString requestURL;
     if (NS_IsMainThread()) {
       nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global);
-      MOZ_ASSERT(window);
-      nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
-      nsCString spec;
-      aRv = docURI->GetSpec(spec);
-      if (NS_WARN_IF(aRv.Failed())) {
-        return nullptr;
-      }
-
-      nsRefPtr<mozilla::dom::URL> url =
-        dom::URL::Constructor(aGlobal, input, NS_ConvertUTF8toUTF16(spec), aRv);
-      if (aRv.Failed()) {
-        return nullptr;
-      }
-
-      url->Stringify(requestURL, aRv);
-      if (aRv.Failed()) {
-        return nullptr;
+      if (window) {
+        GetRequestURLFromWindow(aGlobal, window, input, requestURL, aRv);
+      } else {
+        // If we don't have a window, we must assume that this is a full URL.
+        GetRequestURLFromChrome(input, requestURL, aRv);
       }
     } else {
-      workers::WorkerPrivate* worker = workers::GetCurrentThreadWorkerPrivate();
-      MOZ_ASSERT(worker);
-      worker->AssertIsOnWorkerThread();
-
-      nsString baseURL = NS_ConvertUTF8toUTF16(worker->GetLocationInfo().mHref);
-      nsRefPtr<workers::URL> url =
-        workers::URL::Constructor(aGlobal, input, baseURL, aRv);
-      if (aRv.Failed()) {
-        return nullptr;
-      }
-
-      url->Stringify(requestURL, aRv);
-      if (aRv.Failed()) {
-        return nullptr;
-      }
+      GetRequestURLFromWorker(aGlobal, input, requestURL, aRv);
     }
+
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+
     request->SetURL(NS_ConvertUTF16toUTF8(requestURL));
     fallbackMode = RequestMode::Cors;
     fallbackCredentials = RequestCredentials::Omit;
+    fallbackCache = RequestCache::Default;
   }
 
   // CORS-with-forced-preflight is not publicly exposed and should not be
@@ -150,6 +206,12 @@ Request::Constructor(const GlobalObject& aGlobal,
 
   if (credentials != RequestCredentials::EndGuard_) {
     request->SetCredentialsMode(credentials);
+  }
+
+  RequestCache cache = aInit.mCache.WasPassed() ?
+                       aInit.mCache.Value() : fallbackCache;
+  if (cache != RequestCache::EndGuard_) {
+    request->SetCacheMode(cache);
   }
 
   // Request constructor step 14.
@@ -230,7 +292,7 @@ Request::Constructor(const GlobalObject& aGlobal,
 
     const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& bodyInit = aInit.mBody.Value();
     nsCOMPtr<nsIInputStream> stream;
-    nsCString contentType;
+    nsAutoCString contentType;
     aRv = ExtractByteStreamFromBody(bodyInit,
                                     getter_AddRefs(stream), contentType);
     if (NS_WARN_IF(aRv.Failed())) {

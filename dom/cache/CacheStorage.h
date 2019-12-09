@@ -8,7 +8,6 @@
 #define mozilla_dom_cache_CacheStorage_h
 
 #include "mozilla/dom/CacheBinding.h"
-#include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/cache/Types.h"
 #include "mozilla/dom/cache/TypeUtils.h"
 #include "nsAutoPtr.h"
@@ -25,7 +24,6 @@ namespace mozilla {
 class ErrorResult;
 
 namespace ipc {
-  class IProtocol;
   class PrincipalInfo;
 }
 
@@ -39,16 +37,12 @@ namespace workers {
 
 namespace cache {
 
-class CacheChild;
 class CacheStorageChild;
 class Feature;
-class PCacheRequest;
-class PCacheResponseOrVoid;
 
-class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback
-                             , public nsWrapperCache
-                             , public TypeUtils
-                             , public PromiseNativeHandler
+class CacheStorage final : public nsIIPCBackgroundChildCreateCallback
+                         , public nsWrapperCache
+                         , public TypeUtils
 {
   typedef mozilla::ipc::PBackgroundChild PBackgroundChild;
 
@@ -74,37 +68,23 @@ public:
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
 
   nsISupports* GetParentObject() const;
-  virtual JSObject* WrapObject(JSContext* aContext) MOZ_OVERRIDE;
+  virtual JSObject* WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto) override;
 
   // nsIIPCbackgroundChildCreateCallback methods
-  virtual void ActorCreated(PBackgroundChild* aActor) MOZ_OVERRIDE;
-  virtual void ActorFailed() MOZ_OVERRIDE;
+  virtual void ActorCreated(PBackgroundChild* aActor) override;
+  virtual void ActorFailed() override;
 
   // Called when CacheStorageChild actor is being destroyed
   void DestroyInternal(CacheStorageChild* aActor);
 
-  // Methods forwarded from CacheStorageChild
-  void RecvMatchResponse(RequestId aRequestId, nsresult aRv,
-                         const PCacheResponseOrVoid& aResponse);
-  void RecvHasResponse(RequestId aRequestId, nsresult aRv, bool aSuccess);
-  void RecvOpenResponse(RequestId aRequestId, nsresult aRv,
-                        CacheChild* aActor);
-  void RecvDeleteResponse(RequestId aRequestId, nsresult aRv, bool aSuccess);
-  void RecvKeysResponse(RequestId aRequestId, nsresult aRv,
-                        const nsTArray<nsString>& aKeys);
-
   // TypeUtils methods
-  virtual nsIGlobalObject* GetGlobalObject() const MOZ_OVERRIDE;
+  virtual nsIGlobalObject* GetGlobalObject() const override;
 #ifdef DEBUG
-  virtual void AssertOwningThread() const MOZ_OVERRIDE;
+  virtual void AssertOwningThread() const override;
 #endif
 
-  // PromiseNativeHandler methods
-  virtual void
-  ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
-
-  virtual void
-  RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
+  virtual CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream) override;
 
 private:
   CacheStorage(Namespace aNamespace, nsIGlobalObject* aGlobal,
@@ -113,43 +93,17 @@ private:
 
   void MaybeRunPendingRequests();
 
-  RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
-  already_AddRefed<Promise> RemoveRequestPromise(RequestId aRequestId);
-
-  // Would like to use CacheInitData here, but we cannot because
-  // its an IPC struct which breaks webidl by including windows.h.
   const Namespace mNamespace;
   nsCOMPtr<nsIGlobalObject> mGlobal;
   UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
   nsRefPtr<Feature> mFeature;
+
+  // weak ref cleared in DestroyInternal
   CacheStorageChild* mActor;
-  nsTArray<nsRefPtr<Promise>> mRequestPromises;
 
-  enum Op
-  {
-    OP_MATCH,
-    OP_HAS,
-    OP_OPEN,
-    OP_DELETE,
-    OP_KEYS
-  };
+  struct Entry;
+  nsTArray<nsAutoPtr<Entry>> mPendingRequests;
 
-  struct Entry
-  {
-    RequestId mRequestId;
-    Op mOp;
-    // Would prefer to use PCacheRequest/PCacheCacheQueryOptions, but can't
-    // because they introduce a header dependency on windows.h which
-    // breaks the bindings build.
-    nsRefPtr<InternalRequest> mRequest;
-    CacheQueryOptions mOptions;
-    // It would also be nice to union the key with the match args above,
-    // but VS2013 doesn't like these types in unions because of copy
-    // constructors.
-    nsString mKey;
-  };
-
-  nsTArray<Entry> mPendingRequests;
   bool mFailedActor;
 
 public:

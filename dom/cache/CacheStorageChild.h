@@ -11,56 +11,62 @@
 #include "mozilla/dom/cache/Types.h"
 #include "mozilla/dom/cache/PCacheStorageChild.h"
 
+class nsIGlobalObject;
+
 namespace mozilla {
 namespace dom {
+
+class Promise;
+
 namespace cache {
 
+class CacheOpArgs;
 class CacheStorage;
 class PCacheChild;
 class Feature;
 
-class CacheStorageChild MOZ_FINAL : public PCacheStorageChild
-                                  , public ActorChild
+class CacheStorageChild final : public PCacheStorageChild
+                              , public ActorChild
 {
 public:
   CacheStorageChild(CacheStorage* aListener, Feature* aFeature);
   ~CacheStorageChild();
 
   // Must be called by the associated CacheStorage listener in its
-  // ActorDestroy() method.  Also, CacheStorage must Send__delete__() the
+  // ActorDestroy() method.  Also, CacheStorage must call SendDestroy() on the
   // actor in its destructor to trigger ActorDestroy() if it has not been
   // called yet.
   void ClearListener();
+
+  void
+  ExecuteOp(nsIGlobalObject* aGlobal, Promise* aPromise,
+            const CacheOpArgs& aArgs);
 
   // ActorChild methods
 
   // Synchronously call ActorDestroy on our CacheStorage listener and then start
   // the actor destruction asynchronously from the parent-side.
-  virtual void StartDestroy() MOZ_OVERRIDE;
+  virtual void StartDestroy() override;
 
 private:
   // PCacheStorageChild methods
-  virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvMatchResponse(const RequestId& aRequestId,
-                                 const nsresult& aRv,
-                                 const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
-  virtual bool RecvHasResponse(const cache::RequestId& aRequestId,
-                               const nsresult& aRv,
-                               const bool& aSuccess) MOZ_OVERRIDE;
-  virtual bool RecvOpenResponse(const cache::RequestId& aRequestId,
-                                const nsresult& aRv,
-                                PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual bool RecvDeleteResponse(const cache::RequestId& aRequestId,
-                                  const nsresult& aRv,
-                                  const bool& aResult) MOZ_OVERRIDE;
-  virtual bool RecvKeysResponse(const cache::RequestId& aRequestId,
-                                const nsresult& aRv,
-                                nsTArray<nsString>&& aKeys) MOZ_OVERRIDE;
+  virtual void ActorDestroy(ActorDestroyReason aReason) override;
+
+  virtual PCacheOpChild*
+  AllocPCacheOpChild(const CacheOpArgs& aOpArgs) override;
+
+  virtual bool
+  DeallocPCacheOpChild(PCacheOpChild* aActor) override;
+
+  // utility methods
+  void
+  NoteDeletedActor();
 
   // Use a weak ref so actor does not hold DOM object alive past content use.
   // The CacheStorage object must call ClearListener() to null this before its
   // destroyed.
   CacheStorage* MOZ_NON_OWNING_REF mListener;
+  uint32_t mNumChildActors;
 
   NS_DECL_OWNINGTHREAD
 };

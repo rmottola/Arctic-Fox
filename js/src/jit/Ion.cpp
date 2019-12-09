@@ -438,17 +438,17 @@ FinishAllOffThreadCompilations(JSCompartment* comp)
 }
 
 uint8_t*
-jit::LazyLinkTopActivation(JSContext* cx)
+jit::LazyLinkTopActivation(JSContext *cx)
 {
     JitActivationIterator iter(cx->runtime());
 
     // First frame should be an exit frame.
     JitFrameIterator it(iter);
-    LazyLinkExitFrameLayout* ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
-    JSScript* calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
+    LazyLinkExitFrameLayout *ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
+    JSScript *calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
 
     // Get the pending builder from the Ion frame.
-    IonBuilder* builder = calleeScript->ionScript()->pendingBuilder();
+    IonBuilder *builder = calleeScript->ionScript()->pendingBuilder();
     calleeScript->setPendingIonBuilder(cx, nullptr);
 
     AutoEnterAnalysis enterTypes(cx);
@@ -1737,8 +1737,12 @@ MarkOffThreadNurseryObjects::mark(JSTracer* trc)
 {
     JSRuntime* rt = trc->runtime();
 
-    MOZ_ASSERT(rt->jitRuntime()->hasIonNurseryObjects());
-    rt->jitRuntime()->setHasIonNurseryObjects(false);
+    if (trc->runtime()->isHeapMinorCollecting()) {
+        // Only reset hasIonNurseryObjects if we're doing an actual minor GC,
+        // not if we're, for instance, verifying post barriers.
+        MOZ_ASSERT(rt->jitRuntime()->hasIonNurseryObjects());
+        rt->jitRuntime()->setHasIonNurseryObjects(false);
+    }
 
     AutoLockHelperThreadState lock;
     if (!HelperThreadState().threads)
@@ -1774,19 +1778,6 @@ MarkOffThreadNurseryObjects::mark(JSTracer* trc)
             builder->traceNurseryObjects(trc);
         builder = builder->getNext();
     }
-}
-
-static inline bool
-OffThreadCompilationAvailable(JSContext* cx)
-{
-    // Even if off thread compilation is enabled, compilation must still occur
-    // on the main thread in some cases.
-    //
-    // Require cpuCount > 1 so that Ion compilation jobs and main-thread
-    // execution are not competing for the same resources.
-    return cx->runtime()->canUseOffthreadIonCompilation()
-        && HelperThreadState().cpuCount > 1
-        && CanUseExtraThreads();
 }
 
 static void
@@ -1970,7 +1961,7 @@ IonCompile(JSContext* cx, JSScript* script,
     }
 
     // If possible, compile the script off thread.
-    if (OffThreadCompilationAvailable(cx)) {
+    if (options.offThreadCompilationAvailable()) {
         if (!recompile)
             builderScript->setIonScript(cx, ION_COMPILING_SCRIPT);
 
@@ -2179,6 +2170,19 @@ Compile(JSContext* cx, HandleScript script, BaselineFrame* osrFrame, jsbytecode*
 
 } // namespace jit
 } // namespace js
+
+bool
+jit::OffThreadCompilationAvailable(JSContext *cx)
+{
+    // Even if off thread compilation is enabled, compilation must still occur
+    // on the main thread in some cases.
+    //
+    // Require cpuCount > 1 so that Ion compilation jobs and main-thread
+    // execution are not competing for the same resources.
+    return cx->runtime()->canUseOffthreadIonCompilation()
+        && HelperThreadState().cpuCount > 1
+        && CanUseExtraThreads();
+}
 
 // Decide if a transition from interpreter execution to Ion code should occur.
 // May compile or recompile the target JSScript.

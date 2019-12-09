@@ -419,6 +419,23 @@ TypeSet::isSubset(const TypeSet* other) const
 }
 
 bool
+TypeSet::objectsIntersect(const TypeSet *other) const
+{
+    if (unknownObject() || other->unknownObject())
+        return true;
+
+    for (unsigned i = 0; i < getObjectCount(); i++) {
+        ObjectKey *key = getObject(i);
+        if (!key)
+            continue;
+        if (other->hasType(ObjectType(key)))
+            return true;
+    }
+
+    return false;
+}
+
+bool
 TypeSet::enumerateTypes(TypeList* list) const
 {
     /* If any type is possible, there's no need to worry about specifics. */
@@ -686,7 +703,7 @@ TypeSet::readBarrier(const TypeSet* types)
     }
 }
 
-bool
+/* static */ bool
 TypeSet::IsTypeMarkedFromAnyThread(TypeSet::Type *v)
 {
     bool rv;
@@ -700,6 +717,22 @@ TypeSet::IsTypeMarkedFromAnyThread(TypeSet::Type *v)
         *v = TypeSet::ObjectType(group);
     } else {
         rv = true;
+    }
+    return rv;
+}
+
+/* static */ bool
+TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
+{
+    bool rv;
+    if (v.isSingletonUnchecked()) {
+        JSObject *obj = v.singletonNoBarrier();
+        rv = obj->isTenured() && obj->asTenured().arenaHeader()->allocatedDuringIncremental;
+    } else if (v.isGroupUnchecked()) {
+        ObjectGroup *group = v.groupNoBarrier();
+        rv = group->arenaHeader()->allocatedDuringIncremental;
+    } else {
+        rv = false;
     }
     return rv;
 }
@@ -3564,8 +3597,7 @@ TypeNewScript::maybeAnalyze(JSContext* cx, ObjectGroup* group, bool* regenerate,
         Shape* shape = obj->lastProperty();
         if (shape->inDictionary() ||
             !OnlyHasDataProperties(shape) ||
-            shape->getObjectFlags() != 0 ||
-            shape->getObjectMetadata() != nullptr)
+            shape->getObjectFlags() != 0)
         {
             return true;
         }

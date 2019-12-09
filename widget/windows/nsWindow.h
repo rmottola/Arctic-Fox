@@ -90,6 +90,8 @@ public:
   virtual nsWindowBase* GetParentWindowBase(bool aIncludeOwner) override;
   virtual bool IsTopLevelWidget() override { return mIsTopWidgetWindow; }
 
+  using nsWindowBase::DispatchPluginEvent;
+
   // nsIWidget interface
   NS_IMETHOD              Create(nsIWidget *aParent,
                                  nsNativeWidget aNativeParent,
@@ -235,6 +237,8 @@ public:
    * Misc.
    */
   virtual bool            AutoErase(HDC dc);
+
+  static void             ClearCompositor(nsWindow* aWindow);
 
   /**
    * AssociateDefaultIMC() associates or disassociates the default IMC for

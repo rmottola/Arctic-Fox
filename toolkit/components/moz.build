@@ -30,6 +30,7 @@ DIRS += [
     'formautofill',
     'find',
     'jsdownloads',
+    'lz4',
     'mediasniffer',
     'microformats',
     'osfile',
@@ -53,7 +54,6 @@ DIRS += [
     'viewconfig',
     'viewsource',
     'workerloader',
-    'workerlz4',
     'xulstore'
 ]
 

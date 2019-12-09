@@ -68,7 +68,6 @@
 #include "js/StructuredClone.h"
 #include "js/TrackedOptimizationInfo.h"
 #include "perf/jsperf.h"
-#include "shell/jsheaptools.h"
 #include "shell/jsoptparse.h"
 #include "shell/OSObject.h"
 #include "vm/ArgumentsObject.h"
@@ -137,6 +136,13 @@ static volatile bool gServiceInterrupt = false;
 static JS::PersistentRootedValue gInterruptFunc;
 
 static bool enableDisassemblyDumps = false;
+static bool offthreadCompilation = false;
+static bool enableBaseline = false;
+static bool enableIon = false;
+static bool enableAsmJS = false;
+static bool enableNativeRegExp = false;
+static bool enableUnboxedObjects = false;
+static char gZealStr[128];
 
 static bool printTiming = false;
 static const char* jsCacheDir = nullptr;
@@ -2761,6 +2767,8 @@ struct WorkerInput
     }
 };
 
+static void SetWorkerRuntimeOptions(JSRuntime *rt);
+
 static void
 WorkerMain(void* arg)
 {
@@ -2772,6 +2780,7 @@ WorkerMain(void* arg)
         return;
     }
     JS_SetErrorReporter(rt, my_ErrorReporter);
+    SetWorkerRuntimeOptions(rt);
 
     JSContext* cx = NewContext(rt);
     if (!cx) {
@@ -4318,7 +4327,7 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
     { }
 
     void readType(const char *keyedBy, const char *name,
-                  const char *location, unsigned lineno) MOZ_OVERRIDE
+                  const char *location, unsigned lineno) override
     {
         if (!startedTypes_) {
             startedTypes_ = true;
@@ -4337,7 +4346,7 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
         Sprint(sp, "},");
     }
 
-    void operator()(TrackedTypeSite site, const char *mirType) MOZ_OVERRIDE {
+    void operator()(TrackedTypeSite site, const char *mirType) override {
         if (startedTypes_) {
             // Clear trailing ,
             if ((*sp)[sp->getOffset() - 1] == ',')
@@ -4362,7 +4371,7 @@ class SprintOptimizationAttemptsOp : public ForEachTrackedOptimizationAttemptOp
       : sp(sp)
     { }
 
-    void operator()(TrackedStrategy strategy, TrackedOutcome outcome) MOZ_OVERRIDE {
+    void operator()(TrackedStrategy strategy, TrackedOutcome outcome) override {
         Sprint(sp, "{\"strategy\":\"%s\",\"outcome\":\"%s\"},",
                TrackedStrategyString(strategy), TrackedOutcomeString(outcome));
     }
@@ -4617,31 +4626,6 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "stackDump(showArgs, showLocals, showThisProps)",
 "  Tries to print a lot of information about the current stack. \n"
 "  Similar to the DumpJSStack() function in the browser."),
-
-    JS_FN_HELP("findReferences", FindReferences, 1, 0,
-"findReferences(target)",
-"  Walk the entire heap, looking for references to |target|, and return a\n"
-"  \"references object\" describing what we found.\n"
-"\n"
-"  Each property of the references object describes one kind of reference. The\n"
-"  property's name is the label supplied to MarkObject, JS_CALL_TRACER, or what\n"
-"  have you, prefixed with \"edge: \" to avoid collisions with system properties\n"
-"  (like \"toString\" and \"__proto__\"). The property's value is an array of things\n"
-"  that refer to |thing| via that kind of reference. Ordinary references from\n"
-"  one object to another are named after the property name (with the \"edge: \"\n"
-"  prefix).\n"
-"\n"
-"  Garbage collection roots appear as references from 'null'. We use the name\n"
-"  given to the root (with the \"edge: \" prefix) as the name of the reference.\n"
-"\n"
-"  Note that the references object does record references from objects that are\n"
-"  only reachable via |thing| itself, not just the references reachable\n"
-"  themselves from roots that keep |thing| from being collected. (We could make\n"
-"  this distinction if it is useful.)\n"
-"\n"
-"  If there are any references on the native stack, the references\n"
-"  object will have properties named like \"edge: exact-value \"; the referrers\n"
-"  will be 'null', because they are roots."),
 
 #endif
     JS_FN_HELP("build", BuildDate, 0, 0,
@@ -5746,11 +5730,11 @@ ProcessArgs(JSContext *cx, OptionParser *op)
 static bool
 SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 {
-    bool enableBaseline = !op.getBoolOption("no-baseline");
-    bool enableIon = !op.getBoolOption("no-ion");
-    bool enableAsmJS = !op.getBoolOption("no-asmjs");
-    bool enableNativeRegExp = !op.getBoolOption("no-native-regexp");
-    bool enableUnboxedObjects = op.getBoolOption("unboxed-objects");
+    enableBaseline = !op.getBoolOption("no-baseline");
+    enableIon = !op.getBoolOption("no-ion");
+    enableAsmJS = !op.getBoolOption("no-asmjs");
+    enableNativeRegExp = !op.getBoolOption("no-native-regexp");
+    enableUnboxedObjects = op.getBoolOption("unboxed-objects");
 
     JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
                              .setIon(enableIon)
@@ -5878,7 +5862,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     if (op.getBoolOption("ion-eager"))
         jit::js_JitOptions.setEagerCompilation();
 
-    bool offthreadCompilation = true;
+    offthreadCompilation = true;
     if (const char* str = op.getStringOption("ion-offthread-compile")) {
         if (strcmp(str, "off") == 0)
             offthreadCompilation = false;
@@ -5940,12 +5924,35 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 #endif
 
 #ifdef JS_GC_ZEAL
-    const char* zealStr = op.getStringOption("gc-zeal");
-    if (zealStr && !rt->gc.parseAndSetZeal(zealStr))
-        return false;
+    const char *zealStr = op.getStringOption("gc-zeal");
+    gZealStr[0] = 0;
+    if (zealStr) {
+        if (!rt->gc.parseAndSetZeal(zealStr))
+            return false;
+        strncpy(gZealStr, zealStr, sizeof(gZealStr));
+        gZealStr[sizeof(gZealStr)-1] = 0;
+    }
 #endif
 
     return true;
+}
+
+static void
+SetWorkerRuntimeOptions(JSRuntime *rt)
+{
+    // Copy option values from the main thread.
+    JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
+                             .setIon(enableIon)
+                             .setAsmJS(enableAsmJS)
+                             .setNativeRegExp(enableNativeRegExp)
+                             .setUnboxedObjects(enableUnboxedObjects);
+    rt->setOffthreadIonCompilationEnabled(offthreadCompilation);
+    rt->profilingScripts = enableDisassemblyDumps;
+
+#ifdef JS_GC_ZEAL
+    if (*gZealStr)
+        rt->gc.parseAndSetZeal(gZealStr);
+#endif
 }
 
 static int

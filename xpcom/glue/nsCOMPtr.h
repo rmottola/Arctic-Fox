@@ -113,6 +113,9 @@ namespace mozilla {
 
 struct unused_t;
 
+namespace dom {
+template<class T> class OwningNonNull;
+} // namespace dom
 } // namespace mozilla
 
 template<class T>
@@ -533,6 +536,10 @@ public:
     NSCAP_ASSERT_NO_QUERY_NEEDED();
   }
 
+  // Defined in OwningNonNull.h
+  template<class U>
+  MOZ_IMPLICIT nsCOMPtr(const mozilla::dom::OwningNonNull<U>& aOther);
+
 
   // Assignment operators
 
@@ -623,6 +630,10 @@ public:
     NSCAP_ASSERT_NO_QUERY_NEEDED();
     return *this;
   }
+
+  // Defined in OwningNonNull.h
+  template<class U>
+  nsCOMPtr<T>& operator=(const mozilla::dom::OwningNonNull<U>& aOther);
 
   // Exchange ownership with |aRhs|; can save a pair of refcount operations.
   void swap(nsCOMPtr<T>& aRhs)

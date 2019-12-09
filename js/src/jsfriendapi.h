@@ -80,7 +80,7 @@ JS_NondeterministicGetWeakMapKeys(JSContext* cx, JS::HandleObject obj, JS::Mutab
 
 // Raw JSScript* because this needs to be callable from a signal handler.
 extern JS_FRIEND_API(unsigned)
-JS_PCToLineNumber(JSScript* script, jsbytecode* pc);
+JS_PCToLineNumber(JSScript *script, jsbytecode *pc, unsigned *columnp = nullptr);
 
 /*
  * Determine whether the given object is backed by a DeadObjectProxy.
@@ -136,7 +136,6 @@ JS_GetScriptPrincipals(JSScript* script);
 
 extern JS_FRIEND_API(bool)
 JS_ScriptHasMutedErrors(JSScript* script);
-
 
 /* Safe to call with input obj == nullptr. Returns non-nullptr iff obj != nullptr. */
 extern JS_FRIEND_API(JSObject*)
@@ -1379,9 +1378,9 @@ struct MOZ_STACK_CLASS JS_FRIEND_API(ErrorReport)
     }
 
   private:
-    // More or less an equivalent of JS_ReportErrorNumber/js_ReportErrorNumberVA
+    // More or less an equivalent of JS_ReportErrorNumber/js::ReportErrorNumberVA
     // but fills in an ErrorReport instead of reporting it.  Uses varargs to
-    // make it simpler to call js_ExpandErrorArguments.
+    // make it simpler to call js::ExpandErrorArgumentsVA.
     //
     // Returns false if we fail to actually populate the ErrorReport
     // for some reason (probably out of memory).
@@ -2548,7 +2547,6 @@ inline void
 Debug_SetActiveJSContext(JSRuntime* rt, JSContext* cx) {}
 #endif
 
-
 enum CTypesActivityType {
     CTYPES_CALL_BEGIN,
     CTYPES_CALL_END,
@@ -2588,25 +2586,20 @@ class JS_FRIEND_API(AutoCTypesActivityCallback) {
     }
 };
 
-typedef bool
-(* ObjectMetadataCallback)(JSContext* cx, JSObject** pmetadata);
+typedef JSObject *
+(* ObjectMetadataCallback)(JSContext *cx);
 
 /*
  * Specify a callback to invoke when creating each JS object in the current
  * compartment, which may return a metadata object to associate with the
- * object. Objects with different metadata have different shape hierarchies,
- * so for efficiency, objects should generally try to share metadata objects.
+ * object.
  */
 JS_FRIEND_API(void)
-SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback);
+SetObjectMetadataCallback(JSContext *cx, ObjectMetadataCallback callback);
 
-/* Manipulate the metadata associated with an object. */
-
-JS_FRIEND_API(bool)
-SetObjectMetadata(JSContext* cx, JS::HandleObject obj, JS::HandleObject metadata);
-
-JS_FRIEND_API(JSObject*)
-GetObjectMetadata(JSObject* obj);
+/* Get the metadata associated with an object. */
+JS_FRIEND_API(JSObject *)
+GetObjectMetadata(JSObject *obj);
 
 JS_FRIEND_API(bool)
 GetElementsWithAdder(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver,

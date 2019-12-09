@@ -110,7 +110,6 @@ struct CrossCompartmentKey
 struct WrapperHasher : public DefaultHasher<CrossCompartmentKey>
 {
     static HashNumber hash(const CrossCompartmentKey& key) {
-        MOZ_ASSERT(!IsPoisonedPtr(key.wrapped));
         static_assert(sizeof(HashNumber) == sizeof(uint32_t),
                       "subsequent code assumes a four-byte hash");
         return uint32_t(uintptr_t(key.wrapped)) | uint32_t(key.kind);
@@ -132,7 +131,7 @@ struct TypeInferenceSizes;
 
 namespace js {
 class DebugScopes;
-class LazyArrayBufferTable;
+class ObjectWeakMap;
 class WeakMapBase;
 }
 
@@ -150,6 +149,7 @@ struct JSCompartment
     bool                         isSelfHosting;
     bool                         marked;
     bool                         warnedAboutNoSuchMethod;
+    bool                         warnedAboutFlagsArgument;
 
     // A null add-on ID means that the compartment is not associated with an
     // add-on.
@@ -250,16 +250,17 @@ struct JSCompartment
 
   public:
     void addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
-                                size_t* tiAllocationSiteTables,
-                                size_t* tiArrayTypeTables,
-                                size_t* tiObjectTypeTables,
-                                size_t* compartmentObject,
-                                size_t* compartmentTables,
-                                size_t* innerViews,
-                                size_t* lazyArrayBuffers,
-                                size_t* crossCompartmentWrappers,
-                                size_t* regexpCompartment,
-                                size_t* savedStacksSet);
+                                size_t *tiAllocationSiteTables,
+                                size_t *tiArrayTypeTables,
+                                size_t *tiObjectTypeTables,
+                                size_t *compartmentObject,
+                                size_t *compartmentTables,
+                                size_t *innerViews,
+                                size_t *lazyArrayBuffers,
+                                size_t *objectMetadataTables,
+                                size_t *crossCompartmentWrappers,
+                                size_t *regexpCompartment,
+                                size_t *savedStacksSet);
 
     /*
      * Shared scope property tree, and arena-pool for allocating its nodes.
@@ -289,11 +290,17 @@ struct JSCompartment
      */
     js::ReadBarrieredScriptSourceObject selfHostingScriptSource;
 
+    // Keep track of the metadata objects which can be associated with each
+    // JS object.
+    js::ObjectWeakMap *objectMetadataTable;
+
     // Map from array buffers to views sharing that storage.
     js::InnerViewTable innerViews;
 
-    // Map from typed objects to array buffers lazily created for them.
-    js::LazyArrayBufferTable* lazyArrayBuffers;
+    // Inline transparent typed objects do not initially have an array buffer,
+    // but can have that buffer created lazily if it is accessed later. This
+    // table manages references from such typed objects to their buffers.
+    js::ObjectWeakMap *lazyArrayBuffers;
 
     // All unboxed layouts in the compartment.
     mozilla::LinkedList<js::UnboxedLayout> unboxedLayouts;
@@ -392,17 +399,15 @@ struct JSCompartment
     void fixupInitialShapeTable();
     void fixupAfterMovingGC();
     void fixupGlobal();
-    void fixupBaseShapeTable();
 
     bool hasObjectMetadataCallback() const { return objectMetadataCallback; }
     void setObjectMetadataCallback(js::ObjectMetadataCallback callback);
     void forgetObjectMetadataCallback() {
         objectMetadataCallback = nullptr;
     }
-    bool callObjectMetadataCallback(JSContext* cx, JSObject** obj) const {
-        return objectMetadataCallback(cx, obj);
-    }
-    const void* addressOfMetadataCallback() const {
+    void setNewObjectMetadata(JSContext *cx, JSObject *obj);
+    void clearObjectMetadata();
+    const void *addressOfMetadataCallback() const {
         return &objectMetadataCallback;
     }
 
@@ -542,12 +547,13 @@ struct JSCompartment
 
     enum DeprecatedLanguageExtension {
         DeprecatedForEach = 0,              // JS 1.6+
-        DeprecatedDestructuringForIn = 1,   // JS 1.7 only
+        // NO LONGER USING 1
         DeprecatedLegacyGenerator = 2,      // JS 1.7+
         DeprecatedExpressionClosure = 3,    // Added in JS 1.8
         DeprecatedLetBlock = 4,             // Added in JS 1.7
         // No longer using 5 (was: let expressions)
         DeprecatedNoSuchMethod = 6,         // JS 1.7+
+        DeprecatedFlagsArgument = 7,        // JS 1.3 or older
         DeprecatedLanguageExtensionCount
     };
 

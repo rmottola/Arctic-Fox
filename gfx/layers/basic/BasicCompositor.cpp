@@ -53,8 +53,6 @@ public:
                       nsIntRegion* aDestRegion = nullptr,
                       gfx::IntPoint* aSrcOffset = nullptr) override
   {
-    // XXX - For this to work with IncrementalContentHost we will need to support
-    // the aDestRegion and aSrcOffset parameters properly;
     mSurface = aSurface;
     return true;
   }
@@ -83,6 +81,12 @@ BasicCompositor::~BasicCompositor()
 {
   MOZ_COUNT_DTOR(BasicCompositor);
 }
+
+bool
+BasicCompositor::Initialize()
+{
+  return mWidget ? mWidget->InitCompositor(this) : false;
+};
 
 int32_t
 BasicCompositor::GetMaxTextureSize() const

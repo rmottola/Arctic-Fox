@@ -194,21 +194,26 @@ class Base {
     //
     // If wantNames is true, compute names for edges. Doing so can be expensive
     // in time and memory.
-    virtual EdgeRange* edges(JSContext* cx, bool wantNames) const = 0;
+    virtual EdgeRange *edges(JSContext* cx, bool wantNames) const = 0;
 
     // Return the Zone to which this node's referent belongs, or nullptr if the
     // referent is not of a type allocated in SpiderMonkey Zones.
-    virtual JS::Zone* zone() const { return nullptr; }
+    virtual JS::Zone *zone() const { return nullptr; }
 
     // Return the compartment for this node. Some ubi::Node referents are not
     // associated with JSCompartments, such as JSStrings (which are associated
     // with Zones). When the referent is not associated with a compartment,
     // nullptr is returned.
-    virtual JSCompartment* compartment() const { return nullptr; }
+    virtual JSCompartment *compartment() const { return nullptr; }
+
+    // If this node references a JSObject in the live heap, or represents a
+    // previously existing JSObject from some deserialized heap snapshot, return
+    // the object's [[Class]]'s name. Otherwise, return nullptr.
+    virtual const char *jsObjectClassName() const { return nullptr; }
 
   private:
-    Base(const Base& rhs) = delete;
-    Base& operator=(const Base& rhs) = delete;
+    Base(const Base &rhs) = delete;
+    Base &operator=(const Base &rhs) = delete;
 };
 
 // A traits template with a specialization for each referent type that
@@ -327,9 +332,10 @@ class Node {
     // not all!) JSObjects can be exposed.
     JS::Value exposeToJS() const;
 
-    const char16_t* typeName()      const { return base()->typeName(); }
-    JS::Zone* zone()                const { return base()->zone(); }
-    JSCompartment* compartment()    const { return base()->compartment(); }
+    const char16_t *typeName()      const { return base()->typeName(); }
+    JS::Zone *zone()                const { return base()->zone(); }
+    JSCompartment *compartment()    const { return base()->compartment(); }
+    const char *jsObjectClassName() const { return base()->jsObjectClassName(); }
 
     size_t size(mozilla::MallocSizeOf mallocSizeof) const {
         return base()->size(mallocSizeof);
@@ -548,9 +554,10 @@ class TracerConcrete : public Base {
 template<typename Referent>
 class TracerConcreteWithCompartment : public TracerConcrete<Referent> {
     typedef TracerConcrete<Referent> TracerBase;
-    JSCompartment* compartment() const override;
+    JSCompartment *compartment() const override;
 
-    explicit TracerConcreteWithCompartment(Referent* ptr) : TracerBase(ptr) { }
+  protected:
+    explicit TracerConcreteWithCompartment(Referent *ptr) : TracerBase(ptr) { }
 
   public:
     static void construct(void* storage, Referent* ptr) {
@@ -558,11 +565,26 @@ class TracerConcreteWithCompartment : public TracerConcrete<Referent> {
     }
 };
 
+// For JS_TraceChildren-based types that have both a 'compartment' method and a
+// JSObject's [[Class]] name.
+template<typename Referent>
+class TracerConcreteWithCompartmentAndClassName : public TracerConcreteWithCompartment<Referent> {
+    typedef TracerConcreteWithCompartment<Referent> TracerBase;
+    const char *jsObjectClassName() const override;
+
+    explicit TracerConcreteWithCompartmentAndClassName(Referent *ptr) : TracerBase(ptr) { }
+
+  public:
+    static void construct(void *storage, Referent *ptr) {
+        new (storage) TracerConcreteWithCompartmentAndClassName(ptr);
+    }
+};
+
 // Define specializations for some commonly-used public JSAPI types.
-template<> struct Concrete<JSObject> : TracerConcreteWithCompartment<JSObject> { };
 template<> struct Concrete<JSString> : TracerConcrete<JSString> { };
 template<> struct Concrete<JS::Symbol> : TracerConcrete<JS::Symbol> { };
 template<> struct Concrete<JSScript> : TracerConcreteWithCompartment<JSScript> { };
+template<> struct Concrete<JSObject> : TracerConcreteWithCompartmentAndClassName<JSObject> { };
 
 // The ubi::Node null pointer. Any attempt to operate on a null ubi::Node asserts.
 template<>

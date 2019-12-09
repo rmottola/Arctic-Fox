@@ -7,78 +7,46 @@
 #ifndef mozilla_dom_cache_CacheParent_h
 #define mozilla_dom_cache_CacheParent_h
 
-#include "mozilla/dom/cache/FetchPut.h"
-#include "mozilla/dom/cache/Manager.h"
 #include "mozilla/dom/cache/PCacheParent.h"
 #include "mozilla/dom/cache/Types.h"
-
-struct nsID;
-template <class T> class nsRefPtr;
 
 namespace mozilla {
 namespace dom {
 namespace cache {
 
-class CacheDBConnection;
-class CacheStreamControlParent;
-struct SavedResponse;
-struct StreamHolder;
+class Manager;
 
-class CacheParent MOZ_FINAL : public PCacheParent
-                            , public Manager::Listener
-                            , public FetchPut::Listener
+class CacheParent final : public PCacheParent
 {
 public:
   CacheParent(cache::Manager* aManager, CacheId aCacheId);
   virtual ~CacheParent();
 
 private:
-  // PCacheParent method
-  virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvTeardown() MOZ_OVERRIDE;
-  virtual bool
-  RecvMatch(const RequestId& aRequestId, const PCacheRequest& aRequest,
-            const PCacheQueryParams& aParams) MOZ_OVERRIDE;
-  virtual bool
-  RecvMatchAll(const RequestId& aRequestId, const PCacheRequestOrVoid& aRequest,
-               const PCacheQueryParams& aParams) MOZ_OVERRIDE;
-  virtual bool
-  RecvAddAll(const RequestId& aRequestId,
-             nsTArray<PCacheRequest>&& aRequests) MOZ_OVERRIDE;
-  virtual bool
-  RecvPut(const RequestId& aRequestId,
-          const CacheRequestResponse& aPut) MOZ_OVERRIDE;
-  virtual bool
-  RecvDelete(const RequestId& aRequestId, const PCacheRequest& aRequest,
-             const PCacheQueryParams& aParams) MOZ_OVERRIDE;
-  virtual bool
-  RecvKeys(const RequestId& aRequestId, const PCacheRequestOrVoid& aRequest,
-           const PCacheQueryParams& aParams) MOZ_OVERRIDE;
+  // PCacheParent methods
+  virtual void ActorDestroy(ActorDestroyReason aReason) override;
 
-  // Manager::Listener methods
-  virtual void OnCacheMatch(RequestId aRequestId, nsresult aRv,
-                            const SavedResponse* aSavedResponse,
-                            StreamList* aStreamList) MOZ_OVERRIDE;
-  virtual void OnCacheMatchAll(RequestId aRequestId, nsresult aRv,
-                               const nsTArray<SavedResponse>& aSavedResponses,
-                               StreamList* aStreamList) MOZ_OVERRIDE;
-  virtual void OnCachePutAll(RequestId aRequestId, nsresult aRv) MOZ_OVERRIDE;
-  virtual void OnCacheDelete(RequestId aRequestId, nsresult aRv,
-                             bool aSuccess) MOZ_OVERRIDE;
-  virtual void OnCacheKeys(RequestId aRequestId, nsresult aRv,
-                           const nsTArray<SavedRequest>& aSavedRequests,
-                           StreamList* aStreamList) MOZ_OVERRIDE;
+  virtual PCacheOpParent*
+  AllocPCacheOpParent(const CacheOpArgs& aOpArgs) override;
 
-  // FetchPut::Listener methods
-  virtual void OnFetchPut(FetchPut* aFetchPut, RequestId aRequestId,
-                          nsresult aRv) MOZ_OVERRIDE;
+  virtual bool
+  DeallocPCacheOpParent(PCacheOpParent* aActor) override;
 
-  already_AddRefed<nsIInputStream>
-  DeserializeCacheStream(const PCacheReadStreamOrVoid& aStreamOrVoid);
+  virtual bool
+  RecvPCacheOpConstructor(PCacheOpParent* actor,
+                          const CacheOpArgs& aOpArgs) override;
+
+  virtual PCachePushStreamParent*
+  AllocPCachePushStreamParent() override;
+
+  virtual bool
+  DeallocPCachePushStreamParent(PCachePushStreamParent* aActor) override;
+
+  virtual bool
+  RecvTeardown() override;
 
   nsRefPtr<cache::Manager> mManager;
   const CacheId mCacheId;
-  nsTArray<nsRefPtr<FetchPut>> mFetchPutList;
 };
 
 } // namespace cache

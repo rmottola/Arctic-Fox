@@ -21,9 +21,9 @@
 #include "nsFrameMessageManager.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/Attributes.h"
-#include "FrameMetrics.h"
 #include "nsStubMutationObserver.h"
 #include "nsIFrame.h"
+#include "Units.h"
 
 class nsIURI;
 class nsSubDocumentFrame;
@@ -56,8 +56,8 @@ class QX11EmbedContainer;
 #endif
 
 class nsFrameLoader final : public nsIFrameLoader,
-                                public nsStubMutationObserver,
-                                public mozilla::dom::ipc::MessageManagerCallback
+                            public nsStubMutationObserver,
+                            public mozilla::dom::ipc::MessageManagerCallback
 {
   friend class AutoResetInShow;
   typedef mozilla::dom::PBrowserParent PBrowserParent;
@@ -79,7 +79,9 @@ public:
   NS_DECL_NSIMUTATIONOBSERVER_ATTRIBUTECHANGED
   nsresult CheckForRecursiveLoad(nsIURI* aURI);
   nsresult ReallyStartLoading();
-  void Finalize();
+  void StartDestroy();
+  void DestroyDocShell();
+  void DestroyComplete();
   nsIDocShell* GetExistingDocShell() { return mDocShell; }
   mozilla::dom::EventTarget* GetTabChildGlobalAsEventTarget();
   nsresult CreateStaticClone(nsIFrameLoader* aDest);
@@ -297,7 +299,7 @@ private:
   bool TryRemoteBrowser();
 
   // Tell the remote browser that it's now "virtually visible"
-  bool ShowRemoteFrame(const nsIntSize& size,
+  bool ShowRemoteFrame(const mozilla::ScreenIntSize& size,
                        nsSubDocumentFrame *aFrame = nullptr);
 
   bool AddTreeItemToTreeOwner(nsIDocShellTreeItem* aItem,
@@ -319,6 +321,11 @@ private:
   nsCOMPtr<nsIDocShell> mDocShell;
   nsCOMPtr<nsIURI> mURIToLoad;
   mozilla::dom::Element* mOwnerContent; // WEAK
+
+  // After the frameloader has been removed from the DOM but before all of the
+  // messages from the frame have been received, we keep a strong reference to
+  // our <browser> element.
+  nsRefPtr<mozilla::dom::Element> mOwnerContentStrong;
 
   // Note: this variable must be modified only by ResetPermissionManagerStatus()
   uint32_t mAppIdSentToPermissionManager;

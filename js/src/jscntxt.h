@@ -183,7 +183,8 @@ class ExclusiveContext : public ContextFriendFields,
     // Accessors for immutable runtime data.
     JSAtomState& names() { return *runtime_->commonNames; }
     StaticStrings& staticStrings() { return *runtime_->staticStrings; }
-    AtomSet& permanentAtoms() { return *runtime_->permanentAtoms; }
+    bool isPermanentAtomsInitialized() { return !!runtime_->permanentAtoms; }
+    FrozenAtomSet &permanentAtoms() { return *runtime_->permanentAtoms; }
     WellKnownSymbols& wellKnownSymbols() { return *runtime_->wellKnownSymbols; }
     const JS::AsmJSCacheOps& asmJSCacheOps() { return runtime_->asmJSCacheOps; }
     PropertyName* emptyString() { return runtime_->emptyString; }
@@ -554,7 +555,6 @@ enum ErrorArgumentsType {
     ArgumentsAreASCII
 };
 
-
 /*
  * Loads and returns a self-hosted function by name. For performance, define
  * the property name in vm/CommonPropertyNames.h.
@@ -580,10 +580,10 @@ ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback callback
 #endif
 
 extern bool
-ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
-                     void* userRef, const unsigned errorNumber,
-                     char** message, JSErrorReport* reportp,
-                     ErrorArgumentsType argumentsType, va_list ap);
+ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
+                       void* userRef, const unsigned errorNumber,
+                       char** message, JSErrorReport* reportp,
+                       ErrorArgumentsType argumentsType, va_list ap);
 
 /* |callee| requires a usage string provided by JS_DefineFunctionsWithHelp. */
 extern void
@@ -605,8 +605,11 @@ PrintError(JSContext* cx, FILE* file, const char* message, JSErrorReport* report
 void
 CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* report);
 
-extern void
-ReportIsNotDefined(JSContext* cx, const char* name);
+extern bool
+ReportIsNotDefined(JSContext *cx, HandlePropertyName name);
+
+extern bool
+ReportIsNotDefined(JSContext *cx, HandleId id);
 
 /*
  * Report an attempt to access the property of a null or undefined value (v).

@@ -411,6 +411,9 @@ package-tests: \
   stage-web-platform-tests \
   test-packages-manifest \
   $(NULL)
+ifdef MOZ_WEBRTC
+package-tests: stage-steeplechase
+endif
 else
 # This staging area has been built for us by universal/flight.mk
 PKG_STAGE = $(DIST)/universal/test-stage

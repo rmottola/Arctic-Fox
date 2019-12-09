@@ -186,6 +186,7 @@ function whereToOpenLink( e, ignoreButton, ignoreAlt )
  *   postData             (nsIInputStream)
  *   referrerURI          (nsIURI)
  *   relatedToCurrent     (boolean)
+ *   skipTabAnimation     (boolean)
  */
 function openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData, aReferrerURI) {
   var params;
@@ -215,10 +216,13 @@ function openLinkIn(url, where, params) {
   var aCharset              = params.charset;
   var aReferrerURI          = params.referrerURI;
   var aRelatedToCurrent     = params.relatedToCurrent;
+  var aAllowMixedContent    = params.allowMixedContent;
   var aInBackground         = params.inBackground;
   var aDisallowInheritPrincipal = params.disallowInheritPrincipal;
   var aInitiatingDoc        = params.initiatingDoc;
   var aIsPrivate            = params.private;
+  var aSkipTabAnimation     = params.skipTabAnimation;
+  var aNoReferrer           = params.noReferrer;
   var sendReferrerURI       = true;
 
   if (where == "save") {
@@ -227,7 +231,7 @@ function openLinkIn(url, where, params) {
         "where == 'save' but without initiatingDoc.  See bug 814264.");
       return;
     }
-    saveURL(url, null, null, true, null, aReferrerURI, aInitiatingDoc);
+    saveURL(url, null, null, true, null, aNoReferrer ? null : aReferrerURI, aInitiatingDoc);
     return;
   }
   const Cc = Components.classes;
@@ -267,8 +271,7 @@ function openLinkIn(url, where, params) {
 
     sa.AppendElement(wuri);
     sa.AppendElement(charset);
-    if (sendReferrerURI)
-      sa.AppendElement(aReferrerURI);
+    sa.AppendElement(aNoReferrer ? null : aReferrerURI);
     sa.AppendElement(aPostData);
     sa.AppendElement(allowThirdPartyFixupSupports);
 
@@ -315,7 +318,7 @@ function openLinkIn(url, where, params) {
     }
     if (aDisallowInheritPrincipal)
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
-    w.gBrowser.loadURIWithFlags(url, flags, aReferrerURI, null, aPostData);
+    w.gBrowser.loadURIWithFlags(url, flags, aNoReferrer ? null : aReferrerURI, null, aPostData);
     break;
   case "tabshifted":
     loadInBackground = !loadInBackground;
@@ -328,7 +331,11 @@ function openLinkIn(url, where, params) {
                        postData: aPostData,
                        inBackground: loadInBackground,
                        allowThirdPartyFixup: aAllowThirdPartyFixup,
-                       relatedToCurrent: aRelatedToCurrent});
+                       relatedToCurrent: aRelatedToCurrent,
+                       skipAnimation: aSkipTabAnimation,
+                       allowMixedContent: aAllowMixedContent,
+	               noReferrer: aNoReferrer
+    });
     break;
   }
 

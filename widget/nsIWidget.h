@@ -46,6 +46,7 @@ class PluginWidgetChild;
 }
 namespace layers {
 class Composer2D;
+class Compositor;
 class CompositorChild;
 class LayerManager;
 class LayerManagerComposite;
@@ -1688,6 +1689,13 @@ class nsIWidget : public nsISupports {
                              nsEventStatus & aStatus) = 0;
 
     /**
+     * Dispatches an event that must be handled by APZ first, when APZ is
+     * enabled. If invoked in the child process, it is forwarded to the
+     * parent process synchronously.
+     */
+    virtual nsEventStatus DispatchAPZAwareEvent(mozilla::WidgetInputEvent* aEvent) = 0;
+
+    /**
      * Enables the dropping of files to a widget (XXX this is temporary)
      *
      */
@@ -1853,6 +1861,16 @@ class nsIWidget : public nsISupports {
     virtual nsresult SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                 uint32_t aNativeMessage,
                                                 uint32_t aModifierFlags) = 0;
+
+    /**
+     * A hook for the widget to prepare a Compositor, during the latter's initialization.
+     *
+     * If this method returns true, it means that the widget will be able to
+     * present frames from the compoositor.
+     * Returning false will cause the compositor's initialization to fail, and
+     * a different compositor backend will be used (if any).
+     */
+    virtual bool InitCompositor(mozilla::layers::Compositor*) { return true; }
 
     /**
      * A shortcut to SynthesizeNativeMouseEvent, abstracting away the native message.

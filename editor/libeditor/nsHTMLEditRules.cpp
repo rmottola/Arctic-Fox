@@ -315,7 +315,7 @@ nsHTMLEditRules::BeforeEdit(EditAction action,
     nsRefPtr<Selection> selection = mHTMLEditor->GetSelection();
 
     // get the selection location
-    NS_ENSURE_STATE(selection->GetRangeCount());
+    NS_ENSURE_STATE(selection->RangeCount());
     mRangeItem->startNode = selection->GetRangeAt(0)->GetStartParent();
     mRangeItem->startOffset = selection->GetRangeAt(0)->StartOffset();
     mRangeItem->endNode = selection->GetRangeAt(0)->GetEndParent();
@@ -582,7 +582,7 @@ nsHTMLEditRules::WillDoAction(Selection* aSelection,
   if (!aSelection) {
     return NS_OK;
   }
-  NS_ENSURE_TRUE(aSelection->GetRangeCount(), NS_OK);
+  NS_ENSURE_TRUE(aSelection->RangeCount(), NS_OK);
 
   nsRefPtr<nsRange> range = aSelection->GetRangeAt(0);
   nsCOMPtr<nsINode> selStartNode = range->GetStartParent();
@@ -958,9 +958,8 @@ nsHTMLEditRules::GetIndentState(bool *aCanIndent, bool *aCanOutdent)
   *aCanOutdent = false;
 
   // get selection
-  NS_ENSURE_STATE(mHTMLEditor);
-  nsRefPtr<Selection> selection = mHTMLEditor->GetSelection();
-  NS_ENSURE_STATE(selection);
+  NS_ENSURE_STATE(mHTMLEditor && mHTMLEditor->GetSelection());
+  OwningNonNull<Selection> selection = *mHTMLEditor->GetSelection();
 
   // contruct a list of nodes to act on.
   nsCOMArray<nsIDOMNode> arrayOfNodes;
@@ -2006,7 +2005,7 @@ nsHTMLEditRules::WillDeleteSelection(Selection* aSelection,
     
     if (wsType == WSType::text) {
       // Found normal text to delete.
-      nsRefPtr<Text> nodeAsText = visNode->GetAsText();
+      OwningNonNull<Text> nodeAsText = *visNode->GetAsText();
       int32_t so = visOffset;
       int32_t eo = visOffset + 1;
       if (aAction == nsIEditor::ePrevious) {
@@ -2040,7 +2039,7 @@ nsHTMLEditRules::WillDeleteSelection(Selection* aSelection,
           address_of(visNode), &so, address_of(visNode), &eo);
       NS_ENSURE_SUCCESS(res, res);
       NS_ENSURE_STATE(mHTMLEditor);
-      res = mHTMLEditor->DeleteText(*nodeAsText, std::min(so, eo),
+      res = mHTMLEditor->DeleteText(nodeAsText, std::min(so, eo),
                                     DeprecatedAbs(eo - so));
       *aHandled = true;
       NS_ENSURE_SUCCESS(res, res);
@@ -2427,9 +2426,9 @@ nsHTMLEditRules::WillDeleteSelection(Selection* aSelection,
         // except table elements.
         join = true;
 
-        uint32_t rangeCount = aSelection->GetRangeCount();
+        uint32_t rangeCount = aSelection->RangeCount();
         for (uint32_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
-          nsRefPtr<nsRange> range = aSelection->GetRangeAt(rangeIdx);
+          OwningNonNull<nsRange> range = *aSelection->GetRangeAt(rangeIdx);
 
           // Build a list of nodes in the range
           nsTArray<nsCOMPtr<nsINode>> arrayOfNodes;
@@ -2474,19 +2473,19 @@ nsHTMLEditRules::WillDeleteSelection(Selection* aSelection,
         if (startNode->GetAsText() &&
             startNode->Length() > uint32_t(startOffset)) {
           // Delete to last character
-          nsRefPtr<nsGenericDOMDataNode> dataNode =
-            static_cast<nsGenericDOMDataNode*>(startNode.get());
+          OwningNonNull<nsGenericDOMDataNode> dataNode =
+            *static_cast<nsGenericDOMDataNode*>(startNode.get());
           NS_ENSURE_STATE(mHTMLEditor);
-          res = mHTMLEditor->DeleteText(*dataNode, startOffset,
+          res = mHTMLEditor->DeleteText(dataNode, startOffset,
               startNode->Length() - startOffset);
           NS_ENSURE_SUCCESS(res, res);
         }
         if (endNode->GetAsText() && endOffset) {
           // Delete to first character
           NS_ENSURE_STATE(mHTMLEditor);
-          nsRefPtr<nsGenericDOMDataNode> dataNode =
-            static_cast<nsGenericDOMDataNode*>(endNode.get());
-          res = mHTMLEditor->DeleteText(*dataNode, 0, endOffset);
+          OwningNonNull<nsGenericDOMDataNode> dataNode =
+            *static_cast<nsGenericDOMDataNode*>(endNode.get());
+          res = mHTMLEditor->DeleteText(dataNode, 0, endOffset);
           NS_ENSURE_SUCCESS(res, res);
         }
 
@@ -3056,7 +3055,7 @@ nsHTMLEditRules::WillMakeList(Selection* aSelection,
   if (!aSelection || !aListType || !aCancel || !aHandled) {
     return NS_ERROR_NULL_POINTER;
   }
-  nsCOMPtr<nsIAtom> listType = do_GetAtom(*aListType);
+  OwningNonNull<nsIAtom> listType = do_GetAtom(*aListType);
 
   nsresult res = WillInsert(aSelection, aCancel);
   NS_ENSURE_SUCCESS(res, res);
@@ -3126,11 +3125,11 @@ nsHTMLEditRules::WillMakeList(Selection* aSelection,
 
     // make sure we can put a list here
     NS_ENSURE_STATE(mHTMLEditor);
-    if (!mHTMLEditor->CanContainTag(*parent, *listType)) {
+    if (!mHTMLEditor->CanContainTag(*parent, listType)) {
       *aCancel = true;
       return NS_OK;
     }
-    res = SplitAsNeeded(*listType, parent, offset);
+    res = SplitAsNeeded(listType, parent, offset);
     NS_ENSURE_SUCCESS(res, res);
     NS_ENSURE_STATE(mHTMLEditor);
     nsCOMPtr<Element> theList =
@@ -3300,7 +3299,7 @@ nsHTMLEditRules::WillMakeList(Selection* aSelection,
 
     // need to make a list to put things in if we haven't already,
     if (!curList) {
-      res = SplitAsNeeded(*listType, curParent, offset);
+      res = SplitAsNeeded(listType, curParent, offset);
       NS_ENSURE_SUCCESS(res, res);
       NS_ENSURE_STATE(mHTMLEditor);
       curList = mHTMLEditor->CreateNode(listType, curParent, offset);
@@ -3442,7 +3441,7 @@ nsHTMLEditRules::WillMakeBasicBlock(Selection* aSelection,
                                     bool *aCancel,
                                     bool *aHandled)
 {
-  nsCOMPtr<nsIAtom> blockType = do_GetAtom(*aBlockType);
+  OwningNonNull<nsIAtom> blockType = do_GetAtom(*aBlockType);
   if (!aSelection || !aCancel || !aHandled) { return NS_ERROR_NULL_POINTER; }
   // initialize out param
   *aCancel = false;
@@ -3553,7 +3552,7 @@ nsHTMLEditRules::WillMakeBasicBlock(Selection* aSelection,
         arrayOfNodes.RemoveObject(brNode);
       }
       // make sure we can put a block here
-      res = SplitAsNeeded(*blockType, parent, offset);
+      res = SplitAsNeeded(blockType, parent, offset);
       NS_ENSURE_SUCCESS(res, res);
       NS_ENSURE_STATE(mHTMLEditor);
       theBlock = dont_AddRef(GetAsDOMNode(
@@ -6087,7 +6086,7 @@ nsHTMLEditRules::GetListActionNodes(nsCOMArray<nsIDOMNode> &outArrayOfNodes,
   // is only in part of it.  used by list item dialog.
   if (aEntireList)
   {       
-    uint32_t rangeCount = selection->GetRangeCount();
+    uint32_t rangeCount = selection->RangeCount();
     for (uint32_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
       nsRefPtr<nsRange> range = selection->GetRangeAt(rangeIdx);
       nsCOMPtr<nsIDOMNode> commonParent, parent, tmp;
@@ -7565,7 +7564,7 @@ nsHTMLEditRules::ReapplyCachedStyles()
   NS_ENSURE_STATE(mHTMLEditor);
   nsRefPtr<Selection> selection = mHTMLEditor->GetSelection();
   MOZ_ASSERT(selection);
-  if (!selection->GetRangeCount()) {
+  if (!selection->RangeCount()) {
     // Nothing to do
     return NS_OK;
   }
@@ -8225,7 +8224,7 @@ nsHTMLEditRules::SelectionEndpointInNode(nsINode* aNode, bool* aResult)
   nsRefPtr<Selection> selection = mHTMLEditor->GetSelection();
   NS_ENSURE_STATE(selection);
   
-  uint32_t rangeCount = selection->GetRangeCount();
+  uint32_t rangeCount = selection->RangeCount();
   for (uint32_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
     nsRefPtr<nsRange> range = selection->GetRangeAt(rangeIdx);
     nsCOMPtr<nsIDOMNode> startParent, endParent;

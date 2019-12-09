@@ -204,6 +204,7 @@ WebGLContext::WebGLContext()
     , mBypassShaderValidation(false)
     , mGLMaxSamples(1)
     , mNeedsFakeNoAlpha(false)
+    , mNeedsFakeNoStencil(false)
 {
     mGeneration = 0;
     mInvalidated = false;
@@ -235,9 +236,10 @@ WebGLContext::WebGLContext()
     mViewportWidth = 0;
     mViewportHeight = 0;
 
-    mScissorTestEnabled = 0;
     mDitherEnabled = 1;
     mRasterizerDiscardEnabled = 0; // OpenGL ES 3.0 spec p244
+    mScissorTestEnabled = 0;
+    mStencilTestEnabled = 0;
 
     // initialize some GL values: we're going to get them from the GL and use them as the sizes of arrays,
     // so in case glGetIntegerv leaves them uninitialized because of a GL bug, we would have very weird crashes.
@@ -895,9 +897,13 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
     ++mGeneration;
 
     // Update our internal stuff:
-    if (gl->WorkAroundDriverBugs()) {
+    if (gl->WorkAroundDriverBugs() && gl->IsANGLE()) {
         if (!mOptions.alpha && gl->Caps().alpha)
             mNeedsFakeNoAlpha = true;
+
+        // ANGLE doesn't quite handle this properly.
+        if (gl->Caps().depth && !gl->Caps().stencil)
+            mNeedsFakeNoStencil = true;
     }
 
     // Update mOptions.
@@ -910,6 +916,8 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
     gl->fViewport(0, 0, mWidth, mHeight);
     mViewportWidth = mWidth;
     mViewportHeight = mHeight;
+
+    gl->fScissor(0, 0, mWidth, mHeight);
 
     // Make sure that we clear this out, otherwise
     // we'll end up displaying random memory
@@ -1847,29 +1855,43 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
     return ok;
 }
 
+size_t mozilla::RoundUpToMultipleOf(size_t value, size_t multiple)
+{
+    size_t overshoot = value + multiple - 1;
+    return overshoot - (overshoot % multiple);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 WebGLContext::ScopedMaskWorkaround::ScopedMaskWorkaround(WebGLContext& webgl)
     : mWebGL(webgl)
-    , mNeedsChange(NeedsChange(webgl))
+    , mFakeNoAlpha(ShouldFakeNoAlpha(webgl))
+    , mFakeNoStencil(ShouldFakeNoStencil(webgl))
 {
-    if (mNeedsChange) {
+    if (mFakeNoAlpha) {
         mWebGL.gl->fColorMask(mWebGL.mColorWriteMask[0],
                               mWebGL.mColorWriteMask[1],
                               mWebGL.mColorWriteMask[2],
                               false);
     }
+    if (mFakeNoStencil) {
+        mWebGL.gl->fDisable(LOCAL_GL_STENCIL_TEST);
+    }
 }
 
 WebGLContext::ScopedMaskWorkaround::~ScopedMaskWorkaround()
 {
-    if (mNeedsChange) {
+    if (mFakeNoAlpha) {
         mWebGL.gl->fColorMask(mWebGL.mColorWriteMask[0],
                               mWebGL.mColorWriteMask[1],
                               mWebGL.mColorWriteMask[2],
                               mWebGL.mColorWriteMask[3]);
     }
+    if (mFakeNoStencil) {
+        mWebGL.gl->fEnable(LOCAL_GL_STENCIL_TEST);
+    }
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 // XPCOM goop
 

@@ -63,7 +63,7 @@ PSMContentDownloader::PSMContentDownloader(uint32_t type)
 PSMContentDownloader::~PSMContentDownloader()
 {
   if (mByteData)
-    nsMemory::Free(mByteData);
+    free(mByteData);
 }
 
 NS_IMPL_ISUPPORTS(PSMContentDownloader, nsIStreamListener, nsIRequestObserver)
@@ -90,7 +90,7 @@ PSMContentDownloader::OnStartRequest(nsIRequest* request, nsISupports* context)
   
   mBufferOffset = 0;
   mBufferSize = 0;
-  mByteData = (char*)nsMemory::Alloc(AssertedCast<size_t>(contentLength));
+  mByteData = (char*)moz_xmalloc(AssertedCast<size_t>(contentLength));
   if (!mByteData)
     return NS_ERROR_OUT_OF_MEMORY;
   
@@ -114,7 +114,7 @@ PSMContentDownloader::OnDataAvailable(nsIRequest* request,
   if ((mBufferOffset + (int32_t)aLength) > mBufferSize) {
       size_t newSize = (mBufferOffset + aLength) *2; // grow some more than needed
       char *newBuffer;
-      newBuffer = (char*)nsMemory::Realloc(mByteData, newSize);
+      newBuffer = (char*)moz_xrealloc(mByteData, newSize);
       if (!newBuffer) {
         return NS_ERROR_OUT_OF_MEMORY;
       }
@@ -270,17 +270,13 @@ PSMContentListener::DoContent(const nsACString & aContentType,
                                nsIStreamListener ** aContentHandler,
                                bool * aAbortProcess)
 {
-  PSMContentDownloader *downLoader;
   uint32_t type;
   type = getPSMContentType(PromiseFlatCString(aContentType).get());
   PR_LOG(gPIPNSSLog, PR_LOG_DEBUG, ("PSMContentListener::DoContent\n"));
   if (type != PSMContentDownloader::UNKNOWN_TYPE) {
-    downLoader = new PSMContentDownloader(type);
-    if (downLoader) {
-      downLoader->QueryInterface(NS_GET_IID(nsIStreamListener), 
-                                            (void **)aContentHandler);
-      return NS_OK;
-    }
+    nsRefPtr<PSMContentDownloader> downLoader = new PSMContentDownloader(type);
+    downLoader.forget(aContentHandler);
+    return NS_OK;
   }
   return NS_ERROR_FAILURE;
 }

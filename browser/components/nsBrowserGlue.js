@@ -13,8 +13,14 @@ const XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
+                                  "resource:///modules/AboutHome.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ContentClick",
+                                  "resource:///modules/ContentClick.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
@@ -61,11 +67,17 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+                                  "resource:///modules/sessionstore/SessionStore.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
                                   "resource:///modules/FormValidationHandler.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
+                                  "resource://gre/modules/AddonWatcher.jsm");
 
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
@@ -172,7 +184,7 @@ BrowserGlue.prototype = {
         this._finalUIStartup();
         break;
       case "browser-delayed-startup-finished":
-        this._onFirstWindowLoaded();
+        this._onFirstWindowLoaded(subject);
         Services.obs.removeObserver(this, "browser-delayed-startup-finished");
         break;
       case "sessionstore-windows-restored":
@@ -317,6 +329,9 @@ BrowserGlue.prototype = {
         Services.obs.removeObserver(this, "browser-search-service");
         this._syncSearchEngines();
         break;
+      case "flash-plugin-hang":
+        this._handleFlashHang();
+        break;
     }
   },
 
@@ -360,6 +375,9 @@ BrowserGlue.prototype = {
     os.addObserver(this, "profile-before-change", false);
     os.addObserver(this, "browser-search-engine-modified", false);
     os.addObserver(this, "browser-search-service", false);
+    os.addObserver(this, "flash-plugin-hang", false);
+
+    this._flashHangCount = 0;
   },
 
   // cleanup (called on application shutdown)
@@ -395,12 +413,83 @@ BrowserGlue.prototype = {
       os.removeObserver(this, "browser-search-service");
       // may have already been removed by the observer
     } catch (ex) {}
+    os.removeObserver(this, "flash-plugin-hang");
   },
 
   _onAppDefaults: function BG__onAppDefaults() {
     // apply distribution customizations (prefs)
     // other customizations are applied in _finalUIStartup()
     this._distributionCustomizer.applyPrefDefaults();
+  },
+
+  _notifySlowAddon: function BG_notifySlowAddon(addonId) {
+    let addonCallback = function(addon) {
+      if (!addon) {
+        Cu.reportError("couldn't look up addon: " + addonId);
+        return;
+      }
+      let win = RecentWindow.getMostRecentBrowserWindow();
+
+      if (!win) {
+        return;
+      }
+
+      let brandBundle = win.document.getElementById("bundle_brand");
+      let brandShortName = brandBundle.getString("brandShortName");
+      let message = win.gNavigatorBundle.getFormattedString("addonwatch.slow", [addon.name, brandShortName]);
+      let notificationBox = win.document.getElementById("global-notificationbox");
+      let notificationId = 'addon-slow:' + addonId;
+      let notification = notificationBox.getNotificationWithValue(notificationId);
+      if(notification) {
+        notification.label = message;
+      } else {
+        let buttons = [
+          {
+            label: win.gNavigatorBundle.getFormattedString("addonwatch.disable.label", [addon.name]),
+            accessKey: win.gNavigatorBundle.getString("addonwatch.disable.accesskey"),
+            callback: function() {
+              addon.userDisabled = true;
+              if (addon.pendingOperations != addon.PENDING_NONE) {
+                let restartMessage = win.gNavigatorBundle.getFormattedString("addonwatch.restart.message", [addon.name, brandShortName]);
+                let restartButton = [
+                  {
+                    label: win.gNavigatorBundle.getFormattedString("addonwatch.restart.label", [brandShortName]),
+                    accessKey: win.gNavigatorBundle.getString("addonwatch.restart.accesskey"),
+                    callback: function() {
+                      let appStartup = Cc["@mozilla.org/toolkit/app-startup;1"]
+                        .getService(Ci.nsIAppStartup);
+                      appStartup.quit(appStartup.eForceQuit | appStartup.eRestart);
+                    }
+                  }
+                ];
+                const priority = notificationBox.PRIORITY_WARNING_MEDIUM;
+                notificationBox.appendNotification(restartMessage, "restart-" + addonId, "",
+                                                   priority, restartButton);
+              }
+            }
+          },
+          {
+            label: win.gNavigatorBundle.getString("addonwatch.ignoreSession.label"),
+            accessKey: win.gNavigatorBundle.getString("addonwatch.ignoreSession.accesskey"),
+            callback: function() {
+              AddonWatcher.ignoreAddonForSession(addonId);
+            }
+          },
+          {
+            label: win.gNavigatorBundle.getString("addonwatch.ignorePerm.label"),
+            accessKey: win.gNavigatorBundle.getString("addonwatch.ignorePerm.accesskey"),
+            callback: function() {
+              AddonWatcher.ignoreAddonPermanently(addonId);
+            }
+          },
+        ];
+
+        const priority = notificationBox.PRIORITY_WARNING_MEDIUM;
+        notificationBox.appendNotification(message, notificationId, "",
+                                             priority, buttons);
+      }
+    };
+    AddonManager.getAddonByID(addonId, addonCallback);
   },
 
   // runs on startup, before the first command line handler is invoked
@@ -428,6 +517,8 @@ BrowserGlue.prototype = {
     NewTabUtils.init();
     BrowserNewTabPreloader.init();
     webrtcUI.init();
+    AboutHome.init();
+    SessionStore.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();
@@ -437,7 +528,12 @@ BrowserGlue.prototype = {
       Services.prefs.setBoolPref('media.mediasource.webm.enabled', false);
     }
 
+    if (Services.prefs.getBoolPref("browser.tabs.remote"))
+      ContentClick.init();
+
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
+
+    AddonWatcher.init(this._notifySlowAddon);
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
@@ -516,7 +612,7 @@ BrowserGlue.prototype = {
   },
 
   // the first browser window has finished initializing
-  _onFirstWindowLoaded: function BG__onFirstWindowLoaded() {
+  _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
 #ifdef XP_WIN
     // For windows seven, initialize the jump list module.
     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
@@ -541,6 +637,7 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
+    AddonWatcher.uninit();
     this._dispose();
   },
 
@@ -1637,6 +1734,92 @@ BrowserGlue.prototype = {
   },
 #endif
 
+  _handleFlashHang: function() {
+    ++this._flashHangCount;
+    if (this._flashHangCount < 2) {
+      return;
+    }
+    // protected mode only applies to win32
+    if (Services.appinfo.XPCOMABI != "x86-msvc") {
+      return;
+    }
+
+    if (Services.prefs.getBoolPref("dom.ipc.plugins.flash.disable-protected-mode")) {
+      return;
+    }
+    if (!Services.prefs.getBoolPref("browser.flash-protected-mode-flip.enable")) {
+      return;
+    }
+    if (Services.prefs.getBoolPref("browser.flash-protected-mode-flip.done")) {
+      return;
+    }
+    Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
+    Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
+
+    let win = this.getMostRecentBrowserWindow();
+    if (!win) {
+      return;
+    }
+    let productName = Services.strings
+      .createBundle("chrome://branding/locale/brand.properties")
+      .GetStringFromName("brandShortName");
+    let message = win.gNavigatorBundle.
+      getFormattedString("flashHang.message", [productName]);
+    let buttons = [{
+      label: win.gNavigatorBundle.getString("flashHang.helpButton.label"),
+      accessKey: win.gNavigatorBundle.getString("flashHang.helpButton.accesskey"),
+      callback: function() {
+        win.openUILinkIn("https://support.mozilla.org/kb/flash-protected-mode-autodisabled", "tab");
+      }
+    }];
+    let nb = win.document.getElementById("global-notificationbox");
+    nb.appendNotification(message, "flash-hang", null,
+                          nb.PRIORITY_INFO_MEDIUM, buttons);
+  },
+
+  _handleFlashHang: function() {
+    ++this._flashHangCount;
+    if (this._flashHangCount < 2) {
+      return;
+    }
+    // protected mode only applies to win32
+    if (Services.appinfo.XPCOMABI != "x86-msvc") {
+      return;
+    }
+
+    if (Services.prefs.getBoolPref("dom.ipc.plugins.flash.disable-protected-mode")) {
+      return;
+    }
+    if (!Services.prefs.getBoolPref("browser.flash-protected-mode-flip.enable")) {
+      return;
+    }
+    if (Services.prefs.getBoolPref("browser.flash-protected-mode-flip.done")) {
+      return;
+    }
+    Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
+    Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
+
+    let win = this.getMostRecentBrowserWindow();
+    if (!win) {
+      return;
+    }
+    let productName = Services.strings
+      .createBundle("chrome://branding/locale/brand.properties")
+      .GetStringFromName("brandShortName");
+    let message = win.gNavigatorBundle.
+      getFormattedString("flashHang.message", [productName]);
+    let buttons = [{
+      label: win.gNavigatorBundle.getString("flashHang.helpButton.label"),
+      accessKey: win.gNavigatorBundle.getString("flashHang.helpButton.accesskey"),
+      callback: function() {
+        win.openUILinkIn("https://support.mozilla.org/kb/flash-protected-mode-autodisabled", "tab");
+      }
+    }];
+    let nb = win.document.getElementById("global-notificationbox");
+    nb.appendNotification(message, "flash-hang", null,
+                          nb.PRIORITY_INFO_MEDIUM, buttons);
+  },
+
   // for XPCOM
   classID:          Components.ID("{eab9012e-5f74-4cbc-b2b5-a590235513cc}"),
 
@@ -1773,6 +1956,42 @@ ContentPermissionPrompt.prototype = {
     }
   },
 
+  _promptPush : function(aRequest) {
+    var browserBundle = Services.strings.createBundle("chrome://browser/locale/browser.properties");
+    var requestingURI = aRequest.principal.URI;
+
+    var message = browserBundle.formatStringFromName("push.enablePush",
+                                                 [requestingURI.host], 1);
+
+    var actions = [
+    {
+      stringId: "push.alwaysAllow",
+      action: Ci.nsIPermissionManager.ALLOW_ACTION,
+      expireType: null,
+      callback: function() {}
+    },
+    {
+      stringId: "push.allowForSession",
+      action: Ci.nsIPermissionManager.ALLOW_ACTION,
+      expireType: Ci.nsIPermissionManager.EXPIRE_SESSION,
+      callback: function() {}
+    },
+    {
+      stringId: "push.alwaysBlock",
+      action: Ci.nsIPermissionManager.DENY_ACTION,
+      expireType: null,
+      callback: function() {}
+    }]
+
+    var options = {
+                    learnMoreURL: Services.urlFormatter.formatURLPref("browser.push.warning.infoURL"),
+                  };
+
+    this._showPrompt(aRequest, message, "push", actions, "push",
+                     "push-notification-icon", options);
+
+  },
+
   _promptGeo : function(aRequest) {
     var browserBundle = Services.strings.createBundle("chrome://browser/locale/browser.properties");
     var requestingURI = aRequest.principal.URI;
@@ -1897,7 +2116,6 @@ ContentPermissionPrompt.prototype = {
   },
 
   prompt: function CPP_prompt(request) {
-
     // Only allow exactly one permission rquest here.
     let types = request.types.QueryInterface(Ci.nsIArray);
     if (types.length != 1) {
@@ -1909,6 +2127,7 @@ ContentPermissionPrompt.prototype = {
     const kFeatureKeys = { "geolocation" : "geo",
                            "desktop-notification" : "desktop-notification",
                            "pointerLock" : "pointerLock",
+                           "push" : "push"
                          };
 
     // Make sure that we support the request.
@@ -1951,6 +2170,9 @@ ContentPermissionPrompt.prototype = {
       break;
     case "pointerLock":
       this._promptPointerLock(request, autoAllow);
+      break;
+    case "push":
+      this._promptPush(request);
       break;
     }
   },

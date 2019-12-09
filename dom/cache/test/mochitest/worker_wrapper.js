@@ -1,17 +1,19 @@
 // Any copyright is dedicated to the Public Domain.
 // http://creativecommons.org/publicdomain/zero/1.0/
 //
-// Worker-side wrapper script for the worker_driver.js helper code.  See
-// the comments at the top of worker_driver.js for more information.
+// ServiceWorker equivalent of worker_wrapper.js.
+
+var client;
+var context;
 
 function ok(a, msg) {
-  dump("OK: " + !!a + "  =>  " + a + ": " + msg + "\n");
-  postMessage({type: 'status', status: !!a, msg: a + ": " + msg });
+  client.postMessage({type: 'status', status: !!a,
+                      msg: a + ": " + msg, context: context});
 }
 
 function is(a, b, msg) {
-  dump("IS: " + (a===b) + "  =>  " + a + " | " + b + ": " + msg + "\n");
-  postMessage({type: 'status', status: a === b, msg: a + " === " + b + ": " + msg });
+  client.postMessage({type: 'status', status: a === b,
+                      msg: a + " === " + b + ": " + msg, context: context });
 }
 
 function workerTestArrayEquals(a, b) {
@@ -26,8 +28,8 @@ function workerTestArrayEquals(a, b) {
   return true;
 }
 
-function workerTestDone() {
-  postMessage({ type: 'finish' });
+function testDone() {
+  client.postMessage({ type: 'finish', context: context });
 }
 
 function workerTestGetPrefs(prefs, cb) {
@@ -39,8 +41,9 @@ function workerTestGetPrefs(prefs, cb) {
     removeEventListener('message', workerTestGetPrefsCB);
     cb(e.data.result);
   });
-  postMessage({
+  client.postMessage({
     type: 'getPrefs',
+    context: context,
     prefs: prefs
   });
 }
@@ -54,8 +57,9 @@ function workerTestGetPermissions(permissions, cb) {
     removeEventListener('message', workerTestGetPermissionsCB);
     cb(e.data.result);
   });
-  postMessage({
+  client.postMessage({
     type: 'getPermissions',
+    context: context,
     permissions: permissions
   });
 }
@@ -68,7 +72,8 @@ function workerTestGetVersion(cb) {
     removeEventListener('message', workerTestGetVersionCB);
     cb(e.data.result);
   });
-  postMessage({
+  client.postMessage({
+    context: context,
     type: 'getVersion'
   });
 }
@@ -81,7 +86,8 @@ function workerTestGetUserAgent(cb) {
     removeEventListener('message', workerTestGetUserAgentCB);
     cb(e.data.result);
   });
-  postMessage({
+  client.postMessage({
+    context: context,
     type: 'getUserAgent'
   });
 }
@@ -89,13 +95,35 @@ function workerTestGetUserAgent(cb) {
 addEventListener('message', function workerWrapperOnMessage(e) {
   removeEventListener('message', workerWrapperOnMessage);
   var data = e.data;
-  try {
-    importScripts(data.script);
-  } catch(e) {
-    postMessage({
-      type: 'status',
-      status: false,
-      msg: 'worker failed to import ' + data.script + "; error: " + e.message
+  function runScript() {
+    try {
+      importScripts(data.script);
+    } catch(e) {
+      client.postMessage({
+        type: 'status',
+        status: false,
+        context: context,
+        msg: 'worker failed to import ' + data.script + "; error: " + e.message
+      });
+    }
+  }
+  if ("ServiceWorker" in self) {
+    self.clients.matchAll().then(function(clients) {
+      for (var i = 0; i < clients.length; ++i) {
+        if (clients[i].url.indexOf("message_receiver.html") > -1) {
+          client = clients[i];
+          break;
+        }
+      }
+      if (!client) {
+        dump("We couldn't find the message_receiver window, the test will fail\n");
+      }
+      context = "ServiceWorker";
+      runScript();
     });
+  } else {
+    client = self;
+    context = "Worker";
+    runScript();
   }
 });

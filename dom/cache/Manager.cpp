@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/cache/Manager.h"
 
+#include "mozilla/AutoRestore.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
@@ -15,7 +16,7 @@
 #include "mozilla/dom/cache/DBSchema.h"
 #include "mozilla/dom/cache/FileUtils.h"
 #include "mozilla/dom/cache/ManagerId.h"
-#include "mozilla/dom/cache/PCacheTypes.h"
+#include "mozilla/dom/cache/CacheTypes.h"
 #include "mozilla/dom/cache/SavedTypes.h"
 #include "mozilla/dom/cache/StreamList.h"
 #include "mozilla/dom/cache/Types.h"
@@ -33,15 +34,16 @@ namespace {
 
 using mozilla::unused;
 using mozilla::dom::cache::Action;
-using mozilla::dom::cache::DBSchema;
-using mozilla::dom::cache::FileUtils;
+using mozilla::dom::cache::BodyCreateDir;
+using mozilla::dom::cache::BodyDeleteFiles;
 using mozilla::dom::cache::QuotaInfo;
 using mozilla::dom::cache::SyncDBAction;
+using mozilla::dom::cache::db::CreateSchema;
 
 // An Action that is executed when a Context is first created.  It ensures that
 // the directory and database are setup properly.  This lets other actions
 // not worry about these details.
-class SetupAction MOZ_FINAL : public SyncDBAction
+class SetupAction final : public SyncDBAction
 {
 public:
   SetupAction()
@@ -50,7 +52,7 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     // TODO: init maintainance marker (bug 1110446)
     // TODO: perform maintainance if necessary (bug 1110446)
@@ -58,13 +60,13 @@ public:
     // TODO: have Context create/delete marker files in constructor/destructor
     //       and only do expensive maintenance if that marker is present (bug 1110446)
 
-    nsresult rv = FileUtils::BodyCreateDir(aDBDir);
+    nsresult rv = BodyCreateDir(aDBDir);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
-    rv = DBSchema::CreateSchema(aConn);
+    rv = CreateSchema(aConn);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     rv = trans.Commit();
@@ -78,7 +80,7 @@ public:
 
 // Action that is executed when we determine that content has stopped using
 // a body file that has been orphaned.
-class DeleteOrphanedBodyAction MOZ_FINAL : public Action
+class DeleteOrphanedBodyAction final : public Action
 {
 public:
   explicit DeleteOrphanedBodyAction(const nsTArray<nsID>& aDeletedBodyIdList)
@@ -91,7 +93,7 @@ public:
   }
 
   virtual void
-  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) MOZ_OVERRIDE
+  RunOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo) override
   {
     MOZ_ASSERT(aResolver);
     MOZ_ASSERT(aQuotaInfo.mDir);
@@ -115,7 +117,7 @@ public:
       return;
     }
 
-    rv = FileUtils::BodyDeleteFiles(dbDir, mDeletedBodyIdList);
+    rv = BodyDeleteFiles(dbDir, mDeletedBodyIdList);
     unused << NS_WARN_IF(NS_FAILED(rv));
 
     aResolver->Resolve(rv);
@@ -159,6 +161,12 @@ public:
 
       ref = new Manager(aManagerId, ioThread);
 
+      // There may be an old manager for this origin in the process of
+      // cleaning up.  We need to tell the new manager about this so
+      // that it won't actually start until the old manager is done.
+      nsRefPtr<Manager> oldManager = Get(aManagerId, Closing);
+      ref->Init(oldManager);
+
       MOZ_ASSERT(!sFactory->mManagerList.Contains(ref));
       sFactory->mManagerList.AppendElement(ref);
     }
@@ -169,17 +177,20 @@ public:
   }
 
   static already_AddRefed<Manager>
-  Get(ManagerId* aManagerId)
+  Get(ManagerId* aManagerId, State aState = Open)
   {
     mozilla::ipc::AssertIsOnBackgroundThread();
 
     nsresult rv = MaybeCreateInstance();
     if (NS_WARN_IF(NS_FAILED(rv))) { return nullptr; }
 
-    ManagerList::ForwardIterator iter(sFactory->mManagerList);
+    // Iterate in reverse to find the most recent, matching Manager.  This
+    // is important when looking for a Closing Manager.  If a new Manager
+    // chains to an old Manager we want it to be the most recent one.
+    ManagerList::BackwardIterator iter(sFactory->mManagerList);
     while (iter.HasMore()) {
       nsRefPtr<Manager> manager = iter.GetNext();
-      if (*manager->mManagerId == *aManagerId) {
+      if (aState == manager->GetState() && *manager->mManagerId == *aManagerId) {
         return manager.forget();
       }
     }
@@ -197,9 +208,7 @@ public:
     MOZ_ALWAYS_TRUE(sFactory->mManagerList.RemoveElement(aManager));
 
     // clean up the factory singleton if there are no more managers
-    if (sFactory->mManagerList.IsEmpty()) {
-      DestroyInstance();
-    }
+    MaybeDestroyInstance();
   }
 
   static void
@@ -236,6 +245,7 @@ public:
 
 private:
   Factory()
+    : mInSyncShutdown(false)
   {
     MOZ_COUNT_CTOR(cache::Manager::Factory);
   }
@@ -244,6 +254,7 @@ private:
   {
     MOZ_COUNT_DTOR(cache::Manager::Factory);
     MOZ_ASSERT(mManagerList.IsEmpty());
+    MOZ_ASSERT(!mInSyncShutdown);
   }
 
   static nsresult
@@ -264,7 +275,7 @@ private:
 
         // Cannot use ClearOnShutdown() because we're on the background thread.
         // This is automatically cleared when Factory::Remove() calls
-        // DestroyInstance().
+        // MaybeDestroyInstance().
         MOZ_ASSERT(!sBackgroundThread);
         sBackgroundThread = NS_GetCurrentThread();
       }
@@ -285,10 +296,18 @@ private:
   }
 
   static void
-  DestroyInstance()
+  MaybeDestroyInstance()
   {
     mozilla::ipc::AssertIsOnBackgroundThread();
     MOZ_ASSERT(sFactory);
+
+    // If the factory is is still in use then we cannot delete yet.  This
+    // could be due to managers still existing or because we are in the
+    // middle of shutting down.  We need to be careful not to delete ourself
+    // synchronously during shutdown.
+    if (!sFactory->mManagerList.IsEmpty() || sFactory->mInSyncShutdown) {
+      return;
+    }
 
     // Be clear about what we are locking.  sFactory is bg thread only, so
     // we don't need to lock it here.  Just protect sBackgroundThread.
@@ -320,18 +339,28 @@ private:
 
     MOZ_ASSERT(!sFactory->mManagerList.IsEmpty());
 
-    ManagerList::ForwardIterator iter(sFactory->mManagerList);
-    while (iter.HasMore()) {
-      nsRefPtr<Manager> manager = iter.GetNext();
-      manager->Shutdown();
+    {
+      // Note that we are synchronously calling shutdown code here.  If any
+      // of the shutdown code synchronously decides to delete the Factory
+      // we need to delay that delete until the end of this method.
+      AutoRestore<bool> restore(sFactory->mInSyncShutdown);
+      sFactory->mInSyncShutdown = true;
+
+      ManagerList::ForwardIterator iter(sFactory->mManagerList);
+      while (iter.HasMore()) {
+        nsRefPtr<Manager> manager = iter.GetNext();
+        manager->Shutdown();
+      }
     }
+
+    MaybeDestroyInstance();
   }
 
-  class ShutdownAllRunnable MOZ_FINAL : public nsRunnable
+  class ShutdownAllRunnable final : public nsRunnable
   {
   public:
     NS_IMETHOD
-    Run() MOZ_OVERRIDE
+    Run() override
     {
       mozilla::ipc::AssertIsOnBackgroundThread();
       ShutdownAllOnBackgroundThread();
@@ -363,6 +392,11 @@ private:
   // PBackground thread only.
   typedef nsTObserverArray<Manager*> ManagerList;
   ManagerList mManagerList;
+
+  // This flag is set when we are looping through the list and calling
+  // Shutdown() on each Manager.  We need to be careful not to synchronously
+  // trigger the deletion of the factory while still executing this loop.
+  bool mInSyncShutdown;
 };
 
 // static
@@ -385,24 +419,23 @@ StaticRefPtr<nsIThread> Manager::Factory::sBackgroundThread;
 class Manager::BaseAction : public SyncDBAction
 {
 protected:
-  BaseAction(Manager* aManager, ListenerId aListenerId, RequestId aRequestId)
+  BaseAction(Manager* aManager, ListenerId aListenerId)
     : SyncDBAction(DBAction::Existing)
     , mManager(aManager)
     , mListenerId(aListenerId)
-    , mRequestId (aRequestId)
   {
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) = 0;
+  Complete(Listener* aListener, ErrorResult&& aRv) = 0;
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     NS_ASSERT_OWNINGTHREAD(Manager::BaseAction);
     Listener* listener = mManager->GetListener(mListenerId);
     if (listener) {
-      Complete(listener, aRv);
+      Complete(listener, ErrorResult(aRv));
     }
 
     // ensure we release the manager on the initiating thread
@@ -411,14 +444,13 @@ protected:
 
   nsRefPtr<Manager> mManager;
   const ListenerId mListenerId;
-  const RequestId mRequestId;
 };
 
 // ----------------------------------------------------------------------------
 
 // Action that is executed when we determine that content has stopped using
 // a Cache object that has been orphaned.
-class Manager::DeleteOrphanedCacheAction MOZ_FINAL : public SyncDBAction
+class Manager::DeleteOrphanedCacheAction final : public SyncDBAction
 {
 public:
   DeleteOrphanedCacheAction(Manager* aManager, CacheId aCacheId)
@@ -429,12 +461,12 @@ public:
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
-    nsresult rv = DBSchema::DeleteCache(aConn, mCacheId, mDeletedBodyIdList);
+    nsresult rv = db::DeleteCacheId(aConn, mCacheId, mDeletedBodyIdList);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     rv = trans.Commit();
@@ -444,7 +476,7 @@ public:
   }
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     mManager->NoteOrphanedBodyIdList(mDeletedBodyIdList);
 
@@ -460,28 +492,25 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheMatchAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheMatchAction final : public Manager::BaseAction
 {
 public:
   CacheMatchAction(Manager* aManager, ListenerId aListenerId,
-                   RequestId aRequestId, CacheId aCacheId,
-                   const PCacheRequest& aRequest,
-                   const PCacheQueryParams& aParams,
+                   CacheId aCacheId, const CacheMatchArgs& aArgs,
                    StreamList* aStreamList)
-    : BaseAction(aManager, aListenerId, aRequestId)
+    : BaseAction(aManager, aListenerId)
     , mCacheId(aCacheId)
-    , mRequest(aRequest)
-    , mParams(aParams)
+    , mArgs(aArgs)
     , mStreamList(aStreamList)
     , mFoundResponse(false)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
-    nsresult rv = DBSchema::CacheMatch(aConn, mCacheId, mRequest, mParams,
-                                       &mFoundResponse, &mResponse);
+    nsresult rv = db::CacheMatch(aConn, mCacheId, mArgs.request(),
+                                 mArgs.params(), &mFoundResponse, &mResponse);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     if (!mFoundResponse || !mResponse.mHasBodyId) {
@@ -489,8 +518,7 @@ public:
     }
 
     nsCOMPtr<nsIInputStream> stream;
-    rv = FileUtils::BodyOpen(aQuotaInfo, aDBDir, mResponse.mBodyId,
-                             getter_AddRefs(stream));
+    rv = BodyOpen(aQuotaInfo, aDBDir, mResponse.mBodyId, getter_AddRefs(stream));
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
     if (NS_WARN_IF(!stream)) { return NS_ERROR_FILE_NOT_FOUND; }
 
@@ -500,26 +528,26 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     if (!mFoundResponse) {
-      aListener->OnCacheMatch(mRequestId, aRv, nullptr, nullptr);
+      aListener->OnOpComplete(Move(aRv), CacheMatchResult(void_t()));
     } else {
       mStreamList->Activate(mCacheId);
-      aListener->OnCacheMatch(mRequestId, aRv, &mResponse, mStreamList);
+      aListener->OnOpComplete(Move(aRv), CacheMatchResult(void_t()), mResponse,
+                              mStreamList);
     }
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
 
 private:
   const CacheId mCacheId;
-  const PCacheRequest mRequest;
-  const PCacheQueryParams mParams;
+  const CacheMatchArgs mArgs;
   nsRefPtr<StreamList> mStreamList;
   bool mFoundResponse;
   SavedResponse mResponse;
@@ -527,27 +555,24 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheMatchAllAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheMatchAllAction final : public Manager::BaseAction
 {
 public:
   CacheMatchAllAction(Manager* aManager, ListenerId aListenerId,
-                      RequestId aRequestId, CacheId aCacheId,
-                      const PCacheRequestOrVoid& aRequestOrVoid,
-                      const PCacheQueryParams& aParams,
+                      CacheId aCacheId, const CacheMatchAllArgs& aArgs,
                       StreamList* aStreamList)
-    : BaseAction(aManager, aListenerId, aRequestId)
+    : BaseAction(aManager, aListenerId)
     , mCacheId(aCacheId)
-    , mRequestOrVoid(aRequestOrVoid)
-    , mParams(aParams)
+    , mArgs(aArgs)
     , mStreamList(aStreamList)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
-    nsresult rv = DBSchema::CacheMatchAll(aConn, mCacheId, mRequestOrVoid,
-                                          mParams, mSavedResponses);
+    nsresult rv = db::CacheMatchAll(aConn, mCacheId, mArgs.requestOrVoid(),
+                                    mArgs.params(), mSavedResponses);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     for (uint32_t i = 0; i < mSavedResponses.Length(); ++i) {
@@ -556,9 +581,8 @@ public:
       }
 
       nsCOMPtr<nsIInputStream> stream;
-      rv = FileUtils::BodyOpen(aQuotaInfo, aDBDir,
-                               mSavedResponses[i].mBodyId,
-                               getter_AddRefs(stream));
+      rv = BodyOpen(aQuotaInfo, aDBDir, mSavedResponses[i].mBodyId,
+                    getter_AddRefs(stream));
       if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
       if (NS_WARN_IF(!stream)) { return NS_ERROR_FILE_NOT_FOUND; }
 
@@ -569,22 +593,22 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     mStreamList->Activate(mCacheId);
-    aListener->OnCacheMatchAll(mRequestId, aRv, mSavedResponses, mStreamList);
+    aListener->OnOpComplete(Move(aRv), CacheMatchAllResult(), mSavedResponses,
+                            mStreamList);
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
 
 private:
   const CacheId mCacheId;
-  const PCacheRequestOrVoid mRequestOrVoid;
-  const PCacheQueryParams mParams;
+  const CacheMatchAllArgs mArgs;
   nsRefPtr<StreamList> mStreamList;
   nsTArray<SavedResponse> mSavedResponses;
 };
@@ -594,18 +618,17 @@ private:
 // This is the most complex Action.  It puts a request/response pair into the
 // Cache.  It does not complete until all of the body data has been saved to
 // disk.  This means its an asynchronous Action.
-class Manager::CachePutAllAction MOZ_FINAL : public DBAction
+class Manager::CachePutAllAction final : public DBAction
 {
 public:
   CachePutAllAction(Manager* aManager, ListenerId aListenerId,
-                    RequestId aRequestId, CacheId aCacheId,
+                    CacheId aCacheId,
                     const nsTArray<CacheRequestResponse>& aPutList,
                     const nsTArray<nsCOMPtr<nsIInputStream>>& aRequestStreamList,
                     const nsTArray<nsCOMPtr<nsIInputStream>>& aResponseStreamList)
     : DBAction(DBAction::Existing)
     , mManager(aManager)
     , mListenerId(aListenerId)
-    , mRequestId(aRequestId)
     , mCacheId(aCacheId)
     , mList(aPutList.Length())
     , mExpectedAsyncCopyCompletions(1)
@@ -630,7 +653,7 @@ private:
 
   virtual void
   RunWithDBOnTarget(Resolver* aResolver, const QuotaInfo& aQuotaInfo,
-                    nsIFile* aDBDir, mozIStorageConnection* aConn) MOZ_OVERRIDE
+                    nsIFile* aDBDir, mozIStorageConnection* aConn) override
   {
     MOZ_ASSERT(aResolver);
     MOZ_ASSERT(aDBDir);
@@ -744,25 +767,25 @@ private:
     for (uint32_t i = 0; i < mList.Length(); ++i) {
       Entry& e = mList[i];
       if (e.mRequestStream) {
-        rv = FileUtils::BodyFinalizeWrite(mDBDir, e.mRequestBodyId);
+        rv = BodyFinalizeWrite(mDBDir, e.mRequestBodyId);
         if (NS_WARN_IF(NS_FAILED(rv))) {
           DoResolve(rv);
           return;
         }
       }
       if (e.mResponseStream) {
-        rv = FileUtils::BodyFinalizeWrite(mDBDir, e.mResponseBodyId);
+        rv = BodyFinalizeWrite(mDBDir, e.mResponseBodyId);
         if (NS_WARN_IF(NS_FAILED(rv))) {
           DoResolve(rv);
           return;
         }
       }
 
-      rv = DBSchema::CachePut(mConn, mCacheId, e.mRequest,
-                              e.mRequestStream ? &e.mRequestBodyId : nullptr,
-                              e.mResponse,
-                              e.mResponseStream ? &e.mResponseBodyId : nullptr,
-                              mDeletedBodyIdList);
+      rv = db::CachePut(mConn, mCacheId, e.mRequest,
+                        e.mRequestStream ? &e.mRequestBodyId : nullptr,
+                        e.mResponse,
+                        e.mResponseStream ? &e.mResponseBodyId : nullptr,
+                        mDeletedBodyIdList);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         DoResolve(rv);
         return;
@@ -776,7 +799,7 @@ private:
   }
 
   virtual void
-  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  CompleteOnInitiatingThread(nsresult aRv) override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
 
@@ -790,19 +813,19 @@ private:
     Listener* listener = mManager->GetListener(mListenerId);
     mManager = nullptr;
     if (listener) {
-      listener->OnCachePutAll(mRequestId, aRv);
+      listener->OnOpComplete(ErrorResult(aRv), CachePutAllResult());
     }
   }
 
   virtual void
-  CancelOnInitiatingThread() MOZ_OVERRIDE
+  CancelOnInitiatingThread() override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
     Action::CancelOnInitiatingThread();
     CancelAllStreamCopying();
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     NS_ASSERT_OWNINGTHREAD(Action);
     return aCacheId == mCacheId;
@@ -810,12 +833,12 @@ private:
 
   struct Entry
   {
-    PCacheRequest mRequest;
+    CacheRequest mRequest;
     nsCOMPtr<nsIInputStream> mRequestStream;
     nsID mRequestBodyId;
     nsCOMPtr<nsISupports> mRequestCopyContext;
 
-    PCacheResponse mResponse;
+    CacheResponse mResponse;
     nsCOMPtr<nsIInputStream> mResponseStream;
     nsID mResponseBodyId;
     nsCOMPtr<nsISupports> mResponseCopyContext;
@@ -856,10 +879,9 @@ private:
 
     nsCOMPtr<nsISupports> copyContext;
 
-    nsresult rv = FileUtils::BodyStartWriteStream(aQuotaInfo, mDBDir, source,
-                                                  this, AsyncCopyCompleteFunc,
-                                                  bodyId,
-                                                  getter_AddRefs(copyContext));
+    nsresult rv = BodyStartWriteStream(aQuotaInfo, mDBDir, source, this,
+                                       AsyncCopyCompleteFunc, bodyId,
+                                       getter_AddRefs(copyContext));
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     mBodyIdWrittenList.AppendElement(*bodyId);
@@ -880,7 +902,7 @@ private:
     // May occur on either owning thread or target thread
     MutexAutoLock lock(mMutex);
     for (uint32_t i = 0; i < mCopyContextList.Length(); ++i) {
-      FileUtils::BodyCancelWrite(mDBDir, mCopyContextList[i]);
+      BodyCancelWrite(mDBDir, mCopyContextList[i]);
     }
     mCopyContextList.Clear();
   }
@@ -919,7 +941,7 @@ private:
 
     // Clean up any files we might have written before hitting the error.
     if (NS_FAILED(aRv)) {
-      FileUtils::BodyDeleteFiles(mDBDir, mBodyIdWrittenList);
+      BodyDeleteFiles(mDBDir, mBodyIdWrittenList);
     }
 
     // Must be released on the target thread where it was opened.
@@ -939,7 +961,6 @@ private:
   // initiating thread only
   nsRefPtr<Manager> mManager;
   const ListenerId mListenerId;
-  const RequestId mRequestId;
 
   // Set on initiating thread, read on target thread.  State machine guarantees
   // these are not modified while being read by the target thread.
@@ -966,29 +987,27 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheDeleteAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheDeleteAction final : public Manager::BaseAction
 {
 public:
   CacheDeleteAction(Manager* aManager, ListenerId aListenerId,
-                    RequestId aRequestId, CacheId aCacheId,
-                    const PCacheRequest& aRequest,
-                    const PCacheQueryParams& aParams)
-    : BaseAction(aManager, aListenerId, aRequestId)
+                    CacheId aCacheId, const CacheDeleteArgs& aArgs)
+    : BaseAction(aManager, aListenerId)
     , mCacheId(aCacheId)
-    , mRequest(aRequest)
-    , mParams(aParams)
+    , mArgs(aArgs)
     , mSuccess(false)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
-    nsresult rv = DBSchema::CacheDelete(aConn, mCacheId, mRequest, mParams,
-                                        mDeletedBodyIdList, &mSuccess);
+    nsresult rv = db::CacheDelete(aConn, mCacheId, mArgs.request(),
+                                  mArgs.params(), mDeletedBodyIdList,
+                                  &mSuccess);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     rv = trans.Commit();
@@ -1001,48 +1020,44 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     mManager->NoteOrphanedBodyIdList(mDeletedBodyIdList);
-    aListener->OnCacheDelete(mRequestId, aRv, mSuccess);
+    aListener->OnOpComplete(Move(aRv), CacheDeleteResult(mSuccess));
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
 
 private:
   const CacheId mCacheId;
-  const PCacheRequest mRequest;
-  const PCacheQueryParams mParams;
+  const CacheDeleteArgs mArgs;
   bool mSuccess;
   nsTArray<nsID> mDeletedBodyIdList;
 };
 
 // ----------------------------------------------------------------------------
 
-class Manager::CacheKeysAction MOZ_FINAL : public Manager::BaseAction
+class Manager::CacheKeysAction final : public Manager::BaseAction
 {
 public:
   CacheKeysAction(Manager* aManager, ListenerId aListenerId,
-                  RequestId aRequestId, CacheId aCacheId,
-                  const PCacheRequestOrVoid& aRequestOrVoid,
-                  const PCacheQueryParams& aParams,
+                  CacheId aCacheId, const CacheKeysArgs& aArgs,
                   StreamList* aStreamList)
-    : BaseAction(aManager, aListenerId, aRequestId)
+    : BaseAction(aManager, aListenerId)
     , mCacheId(aCacheId)
-    , mRequestOrVoid(aRequestOrVoid)
-    , mParams(aParams)
+    , mArgs(aArgs)
     , mStreamList(aStreamList)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
-    nsresult rv = DBSchema::CacheKeys(aConn, mCacheId, mRequestOrVoid, mParams,
-                                      mSavedRequests);
+    nsresult rv = db::CacheKeys(aConn, mCacheId, mArgs.requestOrVoid(),
+                                mArgs.params(), mSavedRequests);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     for (uint32_t i = 0; i < mSavedRequests.Length(); ++i) {
@@ -1051,9 +1066,8 @@ public:
       }
 
       nsCOMPtr<nsIInputStream> stream;
-      rv = FileUtils::BodyOpen(aQuotaInfo, aDBDir,
-                               mSavedRequests[i].mBodyId,
-                               getter_AddRefs(stream));
+      rv = BodyOpen(aQuotaInfo, aDBDir, mSavedRequests[i].mBodyId,
+                    getter_AddRefs(stream));
       if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
       if (NS_WARN_IF(!stream)) { return NS_ERROR_FILE_NOT_FOUND; }
 
@@ -1064,50 +1078,49 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     mStreamList->Activate(mCacheId);
-    aListener->OnCacheKeys(mRequestId, aRv, mSavedRequests, mStreamList);
+    aListener->OnOpComplete(Move(aRv), CacheKeysResult(), mSavedRequests,
+                            mStreamList);
     mStreamList = nullptr;
   }
 
-  virtual bool MatchesCacheId(CacheId aCacheId) const MOZ_OVERRIDE
+  virtual bool MatchesCacheId(CacheId aCacheId) const override
   {
     return aCacheId == mCacheId;
   }
 
 private:
   const CacheId mCacheId;
-  const PCacheRequestOrVoid mRequestOrVoid;
-  const PCacheQueryParams mParams;
+  const CacheKeysArgs mArgs;
   nsRefPtr<StreamList> mStreamList;
   nsTArray<SavedRequest> mSavedRequests;
 };
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageMatchAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageMatchAction final : public Manager::BaseAction
 {
 public:
   StorageMatchAction(Manager* aManager, ListenerId aListenerId,
-                     RequestId aRequestId, Namespace aNamespace,
-                     const PCacheRequest& aRequest,
-                     const PCacheQueryParams& aParams,
+                     Namespace aNamespace,
+                     const StorageMatchArgs& aArgs,
                      StreamList* aStreamList)
-    : BaseAction(aManager, aListenerId, aRequestId)
+    : BaseAction(aManager, aListenerId)
     , mNamespace(aNamespace)
-    , mRequest(aRequest)
-    , mParams(aParams)
+    , mArgs(aArgs)
     , mStreamList(aStreamList)
     , mFoundResponse(false)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
-    nsresult rv = DBSchema::StorageMatch(aConn, mNamespace, mRequest, mParams,
-                                         &mFoundResponse, &mSavedResponse);
+    nsresult rv = db::StorageMatch(aConn, mNamespace, mArgs.request(),
+                                   mArgs.params(), &mFoundResponse,
+                                   &mSavedResponse);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     if (!mFoundResponse || !mSavedResponse.mHasBodyId) {
@@ -1115,8 +1128,8 @@ public:
     }
 
     nsCOMPtr<nsIInputStream> stream;
-    rv = FileUtils::BodyOpen(aQuotaInfo, aDBDir, mSavedResponse.mBodyId,
-                             getter_AddRefs(stream));
+    rv = BodyOpen(aQuotaInfo, aDBDir, mSavedResponse.mBodyId,
+                  getter_AddRefs(stream));
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
     if (NS_WARN_IF(!stream)) { return NS_ERROR_FILE_NOT_FOUND; }
 
@@ -1126,21 +1139,21 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     if (!mFoundResponse) {
-      aListener->OnStorageMatch(mRequestId, aRv, nullptr, nullptr);
+      aListener->OnOpComplete(Move(aRv), StorageMatchResult(void_t()));
     } else {
       mStreamList->Activate(mSavedResponse.mCacheId);
-      aListener->OnStorageMatch(mRequestId, aRv, &mSavedResponse, mStreamList);
+      aListener->OnOpComplete(Move(aRv), StorageMatchResult(void_t()), mSavedResponse,
+                              mStreamList);
     }
     mStreamList = nullptr;
   }
 
 private:
   const Namespace mNamespace;
-  const PCacheRequest mRequest;
-  const PCacheQueryParams mParams;
+  const StorageMatchArgs mArgs;
   nsRefPtr<StreamList> mStreamList;
   bool mFoundResponse;
   SavedResponse mSavedResponse;
@@ -1148,56 +1161,54 @@ private:
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageHasAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageHasAction final : public Manager::BaseAction
 {
 public:
   StorageHasAction(Manager* aManager, ListenerId aListenerId,
-                   RequestId aRequestId, Namespace aNamespace,
-                   const nsAString& aKey)
-    : BaseAction(aManager, aListenerId, aRequestId)
+                   Namespace aNamespace, const StorageHasArgs& aArgs)
+    : BaseAction(aManager, aListenerId)
     , mNamespace(aNamespace)
-    , mKey(aKey)
+    , mArgs(aArgs)
     , mCacheFound(false)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     CacheId cacheId;
-    return DBSchema::StorageGetCacheId(aConn, mNamespace, mKey,
-                                       &mCacheFound, &cacheId);
+    return db::StorageGetCacheId(aConn, mNamespace, mArgs.key(),
+                                 &mCacheFound, &cacheId);
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
-    aListener->OnStorageHas(mRequestId, aRv, mCacheFound);
+    aListener->OnOpComplete(Move(aRv), StorageHasResult(mCacheFound));
   }
 
 private:
   const Namespace mNamespace;
-  const nsString mKey;
+  const StorageHasArgs mArgs;
   bool mCacheFound;
 };
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageOpenAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageOpenAction final : public Manager::BaseAction
 {
 public:
   StorageOpenAction(Manager* aManager, ListenerId aListenerId,
-                    RequestId aRequestId, Namespace aNamespace,
-                    const nsAString& aKey)
-    : BaseAction(aManager, aListenerId, aRequestId)
+                    Namespace aNamespace, const StorageOpenArgs& aArgs)
+    : BaseAction(aManager, aListenerId)
     , mNamespace(aNamespace)
-    , mKey(aKey)
-    , mCacheId(0)
+    , mArgs(aArgs)
+    , mCacheId(INVALID_CACHE_ID)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     // Cache does not exist, create it instead
     mozStorageTransaction trans(aConn, false,
@@ -1205,17 +1216,17 @@ public:
 
     // Look for existing cache
     bool cacheFound;
-    nsresult rv = DBSchema::StorageGetCacheId(aConn, mNamespace, mKey,
-                                              &cacheFound, &mCacheId);
+    nsresult rv = db::StorageGetCacheId(aConn, mNamespace, mArgs.key(),
+                                        &cacheFound, &mCacheId);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
     if (cacheFound) {
       return rv;
     }
 
-    rv = DBSchema::CreateCache(aConn, &mCacheId);
+    rv = db::CreateCacheId(aConn, &mCacheId);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-    rv = DBSchema::StoragePutCache(aConn, mNamespace, mKey, mCacheId);
+    rv = db::StoragePutCache(aConn, mNamespace, mArgs.key(), mCacheId);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     rv = trans.Commit();
@@ -1225,42 +1236,41 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
-    aListener->OnStorageOpen(mRequestId, aRv, mCacheId);
+    aListener->OnOpComplete(Move(aRv), StorageOpenResult(), mCacheId);
   }
 
 private:
   const Namespace mNamespace;
-  const nsString mKey;
+  const StorageOpenArgs mArgs;
   CacheId mCacheId;
 };
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageDeleteAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageDeleteAction final : public Manager::BaseAction
 {
 public:
   StorageDeleteAction(Manager* aManager, ListenerId aListenerId,
-                      RequestId aRequestId, Namespace aNamespace,
-                      const nsAString& aKey)
-    : BaseAction(aManager, aListenerId, aRequestId)
+                      Namespace aNamespace, const StorageDeleteArgs& aArgs)
+    : BaseAction(aManager, aListenerId)
     , mNamespace(aNamespace)
-    , mKey(aKey)
+    , mArgs(aArgs)
     , mCacheDeleted(false)
-    , mCacheId(0)
+    , mCacheId(INVALID_CACHE_ID)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
     mozStorageTransaction trans(aConn, false,
                                 mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
     bool exists;
-    nsresult rv = DBSchema::StorageGetCacheId(aConn, mNamespace, mKey, &exists,
-                                              &mCacheId);
+    nsresult rv = db::StorageGetCacheId(aConn, mNamespace, mArgs.key(),
+                                        &exists, &mCacheId);
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     if (!exists) {
@@ -1268,7 +1278,7 @@ public:
       return NS_OK;
     }
 
-    rv = DBSchema::StorageForgetCache(aConn, mNamespace, mKey);
+    rv = db::StorageForgetCache(aConn, mNamespace, mArgs.key());
     if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
     rv = trans.Commit();
@@ -1279,7 +1289,7 @@ public:
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
     if (mCacheDeleted) {
       // If content is referencing this cache, mark it orphaned to be
@@ -1287,49 +1297,53 @@ public:
       if (!mManager->SetCacheIdOrphanedIfRefed(mCacheId)) {
 
         // no outstanding references, delete immediately
-        nsRefPtr<Context> context = mManager->CurrentContext();
-        context->CancelForCacheId(mCacheId);
-        nsRefPtr<Action> action =
-          new DeleteOrphanedCacheAction(mManager, mCacheId);
-        context->Dispatch(mManager->mIOThread, action);
+        nsRefPtr<Context> context = mManager->mContext;
+
+        // TODO: note that we need to check this cache for staleness on startup (bug 1110446)
+        if (!context->IsCanceled()) {
+          context->CancelForCacheId(mCacheId);
+          nsRefPtr<Action> action =
+            new DeleteOrphanedCacheAction(mManager, mCacheId);
+          context->Dispatch(mManager->mIOThread, action);
+        }
       }
     }
 
-    aListener->OnStorageDelete(mRequestId, aRv, mCacheDeleted);
+    aListener->OnOpComplete(Move(aRv), StorageDeleteResult(mCacheDeleted));
   }
 
 private:
   const Namespace mNamespace;
-  const nsString mKey;
+  const StorageDeleteArgs mArgs;
   bool mCacheDeleted;
   CacheId mCacheId;
 };
 
 // ----------------------------------------------------------------------------
 
-class Manager::StorageKeysAction MOZ_FINAL : public Manager::BaseAction
+class Manager::StorageKeysAction final : public Manager::BaseAction
 {
 public:
   StorageKeysAction(Manager* aManager, ListenerId aListenerId,
-                    RequestId aRequestId, Namespace aNamespace)
-    : BaseAction(aManager, aListenerId, aRequestId)
+                    Namespace aNamespace)
+    : BaseAction(aManager, aListenerId)
     , mNamespace(aNamespace)
   { }
 
   virtual nsresult
   RunSyncWithDBOnTarget(const QuotaInfo& aQuotaInfo, nsIFile* aDBDir,
-                        mozIStorageConnection* aConn) MOZ_OVERRIDE
+                        mozIStorageConnection* aConn) override
   {
-    return DBSchema::StorageGetKeys(aConn, mNamespace, mKeys);
+    return db::StorageGetKeys(aConn, mNamespace, mKeys);
   }
 
   virtual void
-  Complete(Listener* aListener, nsresult aRv) MOZ_OVERRIDE
+  Complete(Listener* aListener, ErrorResult&& aRv) override
   {
-    if (NS_FAILED(aRv)) {
+    if (aRv.Failed()) {
       mKeys.Clear();
     }
-    aListener->OnStorageKeys(mRequestId, aRv, mKeys);
+    aListener->OnOpComplete(Move(aRv), StorageKeysResult(mKeys));
   }
 
 private:
@@ -1341,6 +1355,50 @@ private:
 
 //static
 Manager::ListenerId Manager::sNextListenerId = 0;
+
+void
+Manager::Listener::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult)
+{
+  OnOpComplete(Move(aRv), aResult, INVALID_CACHE_ID, nsTArray<SavedResponse>(),
+               nsTArray<SavedRequest>(), nullptr);
+}
+
+void
+Manager::Listener::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
+                                CacheId aOpenedCacheId)
+{
+  OnOpComplete(Move(aRv), aResult, aOpenedCacheId, nsTArray<SavedResponse>(),
+               nsTArray<SavedRequest>(), nullptr);
+}
+
+void
+Manager::Listener::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
+                                const SavedResponse& aSavedResponse,
+                                StreamList* aStreamList)
+{
+  nsAutoTArray<SavedResponse, 1> responseList;
+  responseList.AppendElement(aSavedResponse);
+  OnOpComplete(Move(aRv), aResult, INVALID_CACHE_ID, responseList,
+               nsTArray<SavedRequest>(), aStreamList);
+}
+
+void
+Manager::Listener::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
+                                const nsTArray<SavedResponse>& aSavedResponseList,
+                                StreamList* aStreamList)
+{
+  OnOpComplete(Move(aRv), aResult, INVALID_CACHE_ID, aSavedResponseList,
+               nsTArray<SavedRequest>(), aStreamList);
+}
+
+void
+Manager::Listener::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
+                                const nsTArray<SavedRequest>& aSavedRequestList,
+                                StreamList* aStreamList)
+{
+  OnOpComplete(Move(aRv), aResult, INVALID_CACHE_ID, nsTArray<SavedResponse>(),
+               aSavedRequestList, aStreamList);
+}
 
 // static
 nsresult
@@ -1383,6 +1441,7 @@ Manager::RemoveListener(Listener* aListener)
   mListeners.RemoveElement(aListener, ListenerEntryListenerComparator());
   MOZ_ASSERT(!mListeners.Contains(aListener,
                                   ListenerEntryListenerComparator()));
+  MaybeAllowContextToClose();
 }
 
 void
@@ -1391,13 +1450,33 @@ Manager::RemoveContext(Context* aContext)
   NS_ASSERT_OWNINGTHREAD(Manager);
   MOZ_ASSERT(mContext);
   MOZ_ASSERT(mContext == aContext);
+
+  // Whether the Context destruction was triggered from the Manager going
+  // idle or the underlying storage being invalidated, we should know we
+  // are closing before the Conext is destroyed.
+  MOZ_ASSERT(mState == Closing);
+
   mContext = nullptr;
 
-  // If we're trying to shutdown, then note that we're done.  This is the
-  // delayed case from Manager::Shutdown().
-  if (mShuttingDown) {
-    Factory::Remove(this);
-  }
+  // Once the context is gone, we can immediately remove ourself from the
+  // Factory list.  We don't need to block shutdown by staying in the list
+  // any more.
+  Factory::Remove(this);
+}
+
+void
+Manager::NoteClosing()
+{
+  NS_ASSERT_OWNINGTHREAD(Manager);
+  // This can be called more than once legitimately through different paths.
+  mState = Closing;
+}
+
+Manager::State
+Manager::GetState() const
+{
+  NS_ASSERT_OWNINGTHREAD(Manager);
+  return mState;
 }
 
 void
@@ -1429,14 +1508,15 @@ Manager::ReleaseCacheId(CacheId aCacheId)
         bool orphaned = mCacheIdRefs[i].mOrphaned;
         mCacheIdRefs.RemoveElementAt(i);
         // TODO: note that we need to check this cache for staleness on startup (bug 1110446)
-        if (orphaned && !mShuttingDown) {
-          nsRefPtr<Context> context = CurrentContext();
+        nsRefPtr<Context> context = mContext;
+        if (orphaned && context && !context->IsCanceled()) {
           context->CancelForCacheId(aCacheId);
           nsRefPtr<Action> action = new DeleteOrphanedCacheAction(this,
                                                                   aCacheId);
           context->Dispatch(mIOThread, action);
         }
       }
+      MaybeAllowContextToClose();
       return;
     }
   }
@@ -1472,12 +1552,13 @@ Manager::ReleaseBodyId(const nsID& aBodyId)
         bool orphaned = mBodyIdRefs[i].mOrphaned;
         mBodyIdRefs.RemoveElementAt(i);
         // TODO: note that we need to check this body for staleness on startup (bug 1110446)
-        if (orphaned && !mShuttingDown) {
+        nsRefPtr<Context> context = mContext;
+        if (orphaned && context && !context->IsCanceled()) {
           nsRefPtr<Action> action = new DeleteOrphanedBodyAction(aBodyId);
-          nsRefPtr<Context> context = CurrentContext();
           context->Dispatch(mIOThread, action);
         }
       }
+      MaybeAllowContextToClose();
       return;
     }
   }
@@ -1508,196 +1589,121 @@ Manager::RemoveStreamList(StreamList* aStreamList)
 }
 
 void
-Manager::CacheMatch(Listener* aListener, RequestId aRequestId, CacheId aCacheId,
-                    const PCacheRequest& aRequest,
-                    const PCacheQueryParams& aParams)
+Manager::ExecuteCacheOp(Listener* aListener, CacheId aCacheId,
+                        const CacheOpArgs& aOpArgs)
 {
   NS_ASSERT_OWNINGTHREAD(Manager);
   MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnCacheMatch(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                            nullptr, nullptr);
+  MOZ_ASSERT(aOpArgs.type() != CacheOpArgs::TCacheAddAllArgs);
+  MOZ_ASSERT(aOpArgs.type() != CacheOpArgs::TCachePutAllArgs);
+
+  if (mState == Closing) {
+    aListener->OnOpComplete(ErrorResult(NS_ERROR_FAILURE), void_t());
     return;
   }
-  nsRefPtr<Context> context = CurrentContext();
+
+  nsRefPtr<Context> context = mContext;
+  MOZ_ASSERT(!context->IsCanceled());
+
   nsRefPtr<StreamList> streamList = new StreamList(this, context);
   ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new CacheMatchAction(this, listenerId, aRequestId,
-                                                 aCacheId, aRequest, aParams,
-                                                 streamList);
+
+  nsRefPtr<Action> action;
+  switch(aOpArgs.type()) {
+    case CacheOpArgs::TCacheMatchArgs:
+      action = new CacheMatchAction(this, listenerId, aCacheId,
+                                    aOpArgs.get_CacheMatchArgs(), streamList);
+      break;
+    case CacheOpArgs::TCacheMatchAllArgs:
+      action = new CacheMatchAllAction(this, listenerId, aCacheId,
+                                       aOpArgs.get_CacheMatchAllArgs(),
+                                       streamList);
+      break;
+    case CacheOpArgs::TCacheDeleteArgs:
+      action = new CacheDeleteAction(this, listenerId, aCacheId,
+                                     aOpArgs.get_CacheDeleteArgs());
+      break;
+    case CacheOpArgs::TCacheKeysArgs:
+      action = new CacheKeysAction(this, listenerId, aCacheId,
+                                   aOpArgs.get_CacheKeysArgs(), streamList);
+      break;
+    default:
+      MOZ_CRASH("Unknown Cache operation!");
+  }
+
   context->Dispatch(mIOThread, action);
 }
 
 void
-Manager::CacheMatchAll(Listener* aListener, RequestId aRequestId,
-                       CacheId aCacheId, const PCacheRequestOrVoid& aRequest,
-                       const PCacheQueryParams& aParams)
+Manager::ExecuteStorageOp(Listener* aListener, Namespace aNamespace,
+                          const CacheOpArgs& aOpArgs)
 {
   NS_ASSERT_OWNINGTHREAD(Manager);
   MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnCacheMatchAll(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                               nsTArray<SavedResponse>(), nullptr);
+
+  if (mState == Closing) {
+    aListener->OnOpComplete(ErrorResult(NS_ERROR_FAILURE), void_t());
     return;
   }
-  nsRefPtr<Context> context = CurrentContext();
+
+  nsRefPtr<Context> context = mContext;
+  MOZ_ASSERT(!context->IsCanceled());
+
   nsRefPtr<StreamList> streamList = new StreamList(this, context);
   ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new CacheMatchAllAction(this, listenerId, aRequestId,
-                                                    aCacheId, aRequest, aParams,
-                                                    streamList);
+
+  nsRefPtr<Action> action;
+  switch(aOpArgs.type()) {
+    case CacheOpArgs::TStorageMatchArgs:
+      action = new StorageMatchAction(this, listenerId, aNamespace,
+                                      aOpArgs.get_StorageMatchArgs(),
+                                      streamList);
+      break;
+    case CacheOpArgs::TStorageHasArgs:
+      action = new StorageHasAction(this, listenerId, aNamespace,
+                                    aOpArgs.get_StorageHasArgs());
+      break;
+    case CacheOpArgs::TStorageOpenArgs:
+      action = new StorageOpenAction(this, listenerId, aNamespace,
+                                     aOpArgs.get_StorageOpenArgs());
+      break;
+    case CacheOpArgs::TStorageDeleteArgs:
+      action = new StorageDeleteAction(this, listenerId, aNamespace,
+                                       aOpArgs.get_StorageDeleteArgs());
+      break;
+    case CacheOpArgs::TStorageKeysArgs:
+      action = new StorageKeysAction(this, listenerId, aNamespace);
+      break;
+    default:
+      MOZ_CRASH("Unknown CacheStorage operation!");
+  }
+
   context->Dispatch(mIOThread, action);
 }
 
 void
-Manager::CachePutAll(Listener* aListener, RequestId aRequestId, CacheId aCacheId,
-                     const nsTArray<CacheRequestResponse>& aPutList,
-                     const nsTArray<nsCOMPtr<nsIInputStream>>& aRequestStreamList,
-                     const nsTArray<nsCOMPtr<nsIInputStream>>& aResponseStreamList)
+Manager::ExecutePutAll(Listener* aListener, CacheId aCacheId,
+                       const nsTArray<CacheRequestResponse>& aPutList,
+                       const nsTArray<nsCOMPtr<nsIInputStream>>& aRequestStreamList,
+                       const nsTArray<nsCOMPtr<nsIInputStream>>& aResponseStreamList)
 {
   NS_ASSERT_OWNINGTHREAD(Manager);
   MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnCachePutAll(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN);
+
+  if (mState == Closing) {
+    aListener->OnOpComplete(ErrorResult(NS_ERROR_FAILURE), CachePutAllResult());
     return;
   }
+
+  nsRefPtr<Context> context = mContext;
+  MOZ_ASSERT(!context->IsCanceled());
+
   ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new CachePutAllAction(this, listenerId, aRequestId,
-                                                  aCacheId, aPutList,
-                                                  aRequestStreamList,
+
+  nsRefPtr<Action> action = new CachePutAllAction(this, listenerId, aCacheId,
+                                                  aPutList, aRequestStreamList,
                                                   aResponseStreamList);
-  nsRefPtr<Context> context = CurrentContext();
-  context->Dispatch(mIOThread, action);
-}
 
-void
-Manager::CacheDelete(Listener* aListener, RequestId aRequestId,
-                     CacheId aCacheId, const PCacheRequest& aRequest,
-                     const PCacheQueryParams& aParams)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnCacheDelete(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN, false);
-    return;
-  }
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new CacheDeleteAction(this, listenerId, aRequestId,
-                                                  aCacheId, aRequest, aParams);
-  nsRefPtr<Context> context = CurrentContext();
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::CacheKeys(Listener* aListener, RequestId aRequestId,
-                   CacheId aCacheId, const PCacheRequestOrVoid& aRequestOrVoid,
-                   const PCacheQueryParams& aParams)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnCacheKeys(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                           nsTArray<SavedRequest>(), nullptr);
-    return;
-  }
-  nsRefPtr<Context> context = CurrentContext();
-  nsRefPtr<StreamList> streamList = new StreamList(this, context);
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new CacheKeysAction(this, listenerId, aRequestId,
-                                                aCacheId, aRequestOrVoid,
-                                                aParams, streamList);
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::StorageMatch(Listener* aListener, RequestId aRequestId,
-                      Namespace aNamespace, const PCacheRequest& aRequest,
-                      const PCacheQueryParams& aParams)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnStorageMatch(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                              nullptr, nullptr);
-    return;
-  }
-  nsRefPtr<Context> context = CurrentContext();
-  nsRefPtr<StreamList> streamList = new StreamList(this, context);
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new StorageMatchAction(this, listenerId, aRequestId,
-                                                   aNamespace, aRequest,
-                                                   aParams, streamList);
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::StorageHas(Listener* aListener, RequestId aRequestId,
-                    Namespace aNamespace, const nsAString& aKey)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnStorageHas(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                            false);
-    return;
-  }
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new StorageHasAction(this, listenerId, aRequestId,
-                                                 aNamespace, aKey);
-  nsRefPtr<Context> context = CurrentContext();
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::StorageOpen(Listener* aListener, RequestId aRequestId,
-                     Namespace aNamespace, const nsAString& aKey)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnStorageOpen(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN, 0);
-    return;
-  }
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new StorageOpenAction(this, listenerId, aRequestId,
-                                                  aNamespace, aKey);
-  nsRefPtr<Context> context = CurrentContext();
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::StorageDelete(Listener* aListener, RequestId aRequestId,
-                       Namespace aNamespace, const nsAString& aKey)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnStorageDelete(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                               false);
-    return;
-  }
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new StorageDeleteAction(this, listenerId, aRequestId,
-                                                    aNamespace, aKey);
-  nsRefPtr<Context> context = CurrentContext();
-  context->Dispatch(mIOThread, action);
-}
-
-void
-Manager::StorageKeys(Listener* aListener, RequestId aRequestId,
-                     Namespace aNamespace)
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  MOZ_ASSERT(aListener);
-  if (mShuttingDown) {
-    aListener->OnStorageKeys(aRequestId, NS_ERROR_ILLEGAL_DURING_SHUTDOWN,
-                             nsTArray<nsString>());
-    return;
-  }
-  ListenerId listenerId = SaveListener(aListener);
-  nsRefPtr<Action> action = new StorageKeysAction(this, listenerId, aRequestId,
-                                                  aNamespace);
-  nsRefPtr<Context> context = CurrentContext();
   context->Dispatch(mIOThread, action);
 }
 
@@ -1706,6 +1712,7 @@ Manager::Manager(ManagerId* aManagerId, nsIThread* aIOThread)
   , mIOThread(aIOThread)
   , mContext(nullptr)
   , mShuttingDown(false)
+  , mState(Open)
 {
   MOZ_ASSERT(mManagerId);
   MOZ_ASSERT(mIOThread);
@@ -1714,8 +1721,8 @@ Manager::Manager(ManagerId* aManagerId, nsIThread* aIOThread)
 Manager::~Manager()
 {
   NS_ASSERT_OWNINGTHREAD(Manager);
+  MOZ_ASSERT(mState == Closing);
   MOZ_ASSERT(!mContext);
-  Shutdown();
 
   nsCOMPtr<nsIThread> ioThread;
   mIOThread.swap(ioThread);
@@ -1725,6 +1732,24 @@ Manager::~Manager()
   nsCOMPtr<nsIRunnable> runnable =
     NS_NewRunnableMethod(ioThread, &nsIThread::Shutdown);
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable)));
+}
+
+void
+Manager::Init(Manager* aOldManager)
+{
+  NS_ASSERT_OWNINGTHREAD(Manager);
+
+  nsRefPtr<Context> oldContext;
+  if (aOldManager) {
+    oldContext = aOldManager->mContext;
+  }
+
+  // Create the context immediately.  Since there can at most be one Context
+  // per Manager now, this lets us cleanly call Factory::Remove() once the
+  // Context goes away.
+  nsRefPtr<Action> setupAction = new SetupAction();
+  nsRefPtr<Context> ref = Context::Create(this, setupAction, oldContext);
+  mContext = ref;
 }
 
 void
@@ -1739,40 +1764,20 @@ Manager::Shutdown()
     return;
   }
 
-  // Set a flag to prevent any new requests from coming in and creating
-  // a new Context.  We must ensure all Contexts and IO operations are
-  // complete before shutdown proceeds.
   mShuttingDown = true;
 
-  for (uint32_t i = 0; i < mStreamLists.Length(); ++i) {
-    nsRefPtr<StreamList> streamList = mStreamLists[i];
-    streamList->CloseAll();
-  }
+  // Note that we are closing to prevent any new requests from coming in and
+  // creating a new Context.  We must ensure all Contexts and IO operations are
+  // complete before shutdown proceeds.
+  NoteClosing();
 
-  // If there is a context, then we must wait for it to complete.  Cancel and
-  // only note that we are done after its cleaned up.
+  // If there is a context, then cancel and only note that we are done after
+  // its cleaned up.
   if (mContext) {
     nsRefPtr<Context> context = mContext;
     context->CancelAll();
     return;
   }
-
-  // Otherwise, note that we are complete immediately
-  Factory::Remove(this);
-}
-
-already_AddRefed<Context>
-Manager::CurrentContext()
-{
-  NS_ASSERT_OWNINGTHREAD(Manager);
-  nsRefPtr<Context> ref = mContext;
-  if (!ref) {
-    MOZ_ASSERT(!mShuttingDown);
-    nsRefPtr<Action> setupAction = new SetupAction();
-    ref = Context::Create(this, setupAction);
-    mContext = ref;
-  }
-  return ref.forget();
 }
 
 Manager::ListenerId
@@ -1857,10 +1862,35 @@ Manager::NoteOrphanedBodyIdList(const nsTArray<nsID>& aDeletedBodyIdList)
     }
   }
 
-  if (!deleteNowList.IsEmpty()) {
+  // TODO: note that we need to check these bodies for staleness on startup (bug 1110446)
+  nsRefPtr<Context> context = mContext;
+  if (!deleteNowList.IsEmpty() && context && !context->IsCanceled()) {
     nsRefPtr<Action> action = new DeleteOrphanedBodyAction(deleteNowList);
-    nsRefPtr<Context> context = CurrentContext();
     context->Dispatch(mIOThread, action);
+  }
+}
+
+void
+Manager::MaybeAllowContextToClose()
+{
+  NS_ASSERT_OWNINGTHREAD(Manager);
+
+  // If we have an active context, but we have no more users of the Manager,
+  // then let it shut itself down.  We must wait for all possible users of
+  // Cache state information to complete before doing this.  Once we allow
+  // the Context to close we may not reliably get notified of storage
+  // invalidation.
+  nsRefPtr<Context> context = mContext;
+  if (context && mListeners.IsEmpty()
+              && mCacheIdRefs.IsEmpty()
+              && mBodyIdRefs.IsEmpty()) {
+
+    // Mark this Manager as invalid so that it won't get used again.  We don't
+    // want to start any new operations once we allow the Context to close since
+    // it may race with the underlying storage getting invalidated.
+    NoteClosing();
+
+    context->AllowToClose();
   }
 }
 

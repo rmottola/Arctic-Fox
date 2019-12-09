@@ -283,6 +283,32 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(Promise)
   NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(Promise)
+  if (tmp->IsBlack()) {
+    if (tmp->mResult.isObject()) {
+      JS::ExposeObjectToActiveJS(&(tmp->mResult.toObject()));
+    }
+    if (tmp->mAllocationStack) {
+      JS::ExposeObjectToActiveJS(tmp->mAllocationStack);
+    }
+    if (tmp->mRejectionStack) {
+      JS::ExposeObjectToActiveJS(tmp->mRejectionStack);
+    }
+    if (tmp->mFullfillmentStack) {
+      JS::ExposeObjectToActiveJS(tmp->mFullfillmentStack);
+    }
+    return true;
+  }
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
+
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(Promise)
+  return tmp->IsBlackAndDoesNotNeedTracing(tmp);
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
+
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(Promise)
+  return tmp->IsBlack();
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
+
 NS_IMPL_CYCLE_COLLECTING_ADDREF(Promise)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(Promise)
 
@@ -316,9 +342,9 @@ Promise::~Promise()
 }
 
 JSObject*
-Promise::WrapObject(JSContext* aCx)
+Promise::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return PromiseBinding::Wrap(aCx, this);
+  return PromiseBinding::Wrap(aCx, this, aGivenProto);
 }
 
 already_AddRefed<Promise>
@@ -385,7 +411,7 @@ bool
 Promise::PerformMicroTaskCheckpoint()
 {
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsRefPtr<nsIRunnable>>& microtaskQueue =
+  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
   if (microtaskQueue.IsEmpty()) {
@@ -393,7 +419,7 @@ Promise::PerformMicroTaskCheckpoint()
   }
 
   do {
-    nsRefPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
+    nsCOMPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
     MOZ_ASSERT(runnable);
 
     // This function can re-enter, so we remove the element before calling.
@@ -1038,7 +1064,7 @@ Promise::DispatchToMicroTask(nsIRunnable* aRunnable)
   MOZ_ASSERT(aRunnable);
 
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsRefPtr<nsIRunnable>>& microtaskQueue =
+  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
   microtaskQueue.AppendElement(aRunnable);

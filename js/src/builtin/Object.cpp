@@ -660,12 +660,12 @@ js::obj_create(JSContext* cx, unsigned argc, Value* vp)
 
     if (!args[0].isObjectOrNull()) {
         RootedValue v(cx, args[0]);
-        char* bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NullPtr());
+        UniquePtr<char[], JS::FreePolicy> bytes =
+            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NullPtr());
         if (!bytes)
             return false;
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
-                             bytes, "not an object or null");
-        js_free(bytes);
+                             bytes.get(), "not an object or null");
         return false;
     }
 
@@ -1061,7 +1061,6 @@ static const JSFunctionSpec object_static_methods[] = {
     JS_FN("getPrototypeOf",            obj_getPrototypeOf,          1,0),
     JS_FN("setPrototypeOf",            obj_setPrototypeOf,          2,0),
     JS_FN("getOwnPropertyDescriptor",  obj_getOwnPropertyDescriptor,2,0),
-    JS_SELF_HOSTED_FN("getOwnPropertyDescriptors", "ObjectGetOwnPropertyDescriptors", 1,JSPROP_DEFINE_LATE),
     JS_FN("keys",                      obj_keys,                    1,0),
     JS_SELF_HOSTED_FN("values",        "ObjectValues",              1,JSPROP_DEFINE_LATE),
     JS_SELF_HOSTED_FN("entries",       "ObjectEntries",             1,JSPROP_DEFINE_LATE),

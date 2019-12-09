@@ -13,7 +13,7 @@ else:
     GoannaProgram(CONFIG['MOZ_APP_NAME'], msvcrt='static')
 
 JS_PREFERENCE_FILES += [
-    'profile/palemoon.js',
+    'profile/arcticfox.js',
 ]
 
 if CONFIG['LIBXUL_SDK']:

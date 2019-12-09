@@ -389,7 +389,7 @@ void
 nsTerminator::StartWriter()
 {
 
-  if (!Telemetry::CanRecord()) {
+  if (!Telemetry::CanRecordExtended()) {
     return;
   }
   nsCOMPtr<nsIFile> profLD;
@@ -473,7 +473,7 @@ nsTerminator::UpdateHeartbeat(const char* aTopic)
 void
 nsTerminator::UpdateTelemetry()
 {
-  if (!Telemetry::CanRecord() || !gWriteReady) {
+  if (!Telemetry::CanRecordExtended() || !gWriteReady) {
     return;
   }
 

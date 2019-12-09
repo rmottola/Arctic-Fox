@@ -4403,7 +4403,7 @@ nsDocument::SetStyleSheetApplicableState(nsIStyleSheet* aSheet,
   }
 
   if (!mSSApplicableStateNotificationPending) {
-    nsRefPtr<nsIRunnable> notification = NS_NewRunnableMethod(this,
+    nsCOMPtr<nsIRunnable> notification = NS_NewRunnableMethod(this,
       &nsDocument::NotifyStyleSheetApplicableStateChanged);
     mSSApplicableStateNotificationPending =
       NS_SUCCEEDED(NS_DispatchToCurrentThread(notification));
@@ -4767,7 +4767,6 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
     nsLoadFlags loadFlags = 0;
     channel->GetLoadFlags(&loadFlags);
     // If we are shift-reloaded, don't associate with a ServiceWorker.
-    // FIXME(nsm): Bug 1041339.
     if (loadFlags & nsIRequest::LOAD_BYPASS_CACHE) {
       NS_WARNING("Page was shift reloaded, skipping ServiceWorker control");
       return;
@@ -5206,7 +5205,7 @@ nsDocument::UnblockDOMContentLoaded()
 
   MOZ_ASSERT(mReadyState == READYSTATE_INTERACTIVE);
   if (!mSynchronousDOMContentLoaded) {
-    nsRefPtr<nsIRunnable> ev =
+    nsCOMPtr<nsIRunnable> ev =
       NS_NewRunnableMethod(this, &nsDocument::DispatchContentLoadedEvents);
     NS_DispatchToCurrentThread(ev);
   } else {
@@ -7311,14 +7310,14 @@ nsDocument::InitializeFrameLoader(nsFrameLoader* aLoader)
 }
 
 nsresult
-nsDocument::FinalizeFrameLoader(nsFrameLoader* aLoader)
+nsDocument::FinalizeFrameLoader(nsFrameLoader* aLoader, nsIRunnable* aFinalizer)
 {
   mInitializableFrameLoaders.RemoveElement(aLoader);
   if (mInDestructor) {
     return NS_ERROR_FAILURE;
   }
 
-  mFinalizableFrameLoaders.AppendElement(aLoader);
+  mFrameLoaderFinalizers.AppendElement(aFinalizer);
   if (!mFrameLoaderRunner) {
     mFrameLoaderRunner =
       NS_NewRunnableMethod(this, &nsDocument::MaybeInitializeFinalizeFrameLoaders);
@@ -7343,7 +7342,7 @@ nsDocument::MaybeInitializeFinalizeFrameLoaders()
   if (!nsContentUtils::IsSafeToRunScript()) {
     if (!mInDestructor && !mFrameLoaderRunner &&
         (mInitializableFrameLoaders.Length() ||
-         mFinalizableFrameLoaders.Length())) {
+         mFrameLoaderFinalizers.Length())) {
       mFrameLoaderRunner =
         NS_NewRunnableMethod(this, &nsDocument::MaybeInitializeFinalizeFrameLoaders);
       nsContentUtils::AddScriptRunner(mFrameLoaderRunner);
@@ -7362,12 +7361,12 @@ nsDocument::MaybeInitializeFinalizeFrameLoaders()
     loader->ReallyStartLoading();
   }
 
-  uint32_t length = mFinalizableFrameLoaders.Length();
+  uint32_t length = mFrameLoaderFinalizers.Length();
   if (length > 0) {
-    nsTArray<nsRefPtr<nsFrameLoader> > loaders;
-    mFinalizableFrameLoaders.SwapElements(loaders);
+    nsTArray<nsCOMPtr<nsIRunnable> > finalizers;
+    mFrameLoaderFinalizers.SwapElements(finalizers);
     for (uint32_t i = 0; i < length; ++i) {
-      loaders[i]->Finalize();
+      finalizers[i]->Run();
     }
   }
 }
@@ -7382,20 +7381,6 @@ nsDocument::TryCancelFrameLoaderInitialization(nsIDocShell* aShell)
       return;
     }
   }
-}
-
-bool
-nsDocument::FrameLoaderScheduledToBeFinalized(nsIDocShell* aShell)
-{
-  if (aShell) {
-    uint32_t length = mFinalizableFrameLoaders.Length();
-    for (uint32_t i = 0; i < length; ++i) {
-      if (mFinalizableFrameLoaders[i]->GetExistingDocShell() == aShell) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 nsIDocument*
@@ -7871,6 +7856,15 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
 
   CSSToScreenScale defaultScale = layoutDeviceScale
                                 * LayoutDeviceToScreenScale(1.0);
+  // Get requested Desktopmode
+  nsPIDOMWindow* win = GetWindow();
+  if (win && win->IsDesktopModeViewport())
+  {
+    return nsViewportInfo(aDisplaySize,
+                          defaultScale,
+                          /*allowZoom*/false,
+                          /*allowDoubleTapZoom*/ true);
+  }
 
   if (!Preferences::GetBool("dom.meta-viewport.enabled", false)) {
     return nsViewportInfo(aDisplaySize,
@@ -10035,7 +10029,7 @@ nsDocument::ScrollToRef()
   nsUnescape(tmpstr);
   nsAutoCString unescapedRef;
   unescapedRef.Assign(tmpstr);
-  nsMemory::Free(tmpstr);
+  free(tmpstr);
 
   nsresult rv = NS_ERROR_FAILURE;
   // We assume that the bytes are in UTF-8, as it says in the spec:
@@ -12870,6 +12864,35 @@ nsIDocument::CreateHTMLElement(nsIAtom* aTag)
 
   MOZ_ASSERT(NS_SUCCEEDED(rv), "NS_NewHTMLElement should never fail");
   return element.forget();
+}
+
+nsresult
+nsIDocument::GetId(nsAString& aId)
+{
+  if (mId.IsEmpty()) {
+    nsresult rv;
+    nsCOMPtr<nsIUUIDGenerator> uuidgen = do_GetService("@mozilla.org/uuid-generator;1", &rv);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    nsID id;
+    rv = uuidgen->GenerateUUIDInPlace(&id);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    // Build a string in {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} format
+    char buffer[NSID_LENGTH];
+    id.ToProvidedString(buffer);
+    NS_ConvertASCIItoUTF16 uuid(buffer);
+
+    // Remove {} and the null terminator
+    mId.Assign(Substring(uuid, 1, NSID_LENGTH - 3));
+  }
+
+  aId = mId;
+  return NS_OK;
 }
 
 bool

@@ -9,12 +9,21 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/unused.h"
 #include "mozilla/dom/cache/ActorUtils.h"
+#include "mozilla/dom/cache/CacheTypes.h"
 #include "mozilla/dom/cache/ReadStream.h"
+#include "mozilla/ipc/FileDescriptorSetChild.h"
+#include "mozilla/ipc/PBackgroundChild.h"
+#include "mozilla/ipc/PFileDescriptorSetChild.h"
 #include "nsISupportsImpl.h"
 
 namespace mozilla {
 namespace dom {
 namespace cache {
+
+using mozilla::ipc::FileDescriptor;
+using mozilla::ipc::FileDescriptorSetChild;
+using mozilla::ipc::OptionalFileDescriptorSet;
+using mozilla::ipc::PFileDescriptorSetChild;
 
 // declared in ActorUtils.h
 PCacheStreamControlChild*
@@ -32,6 +41,7 @@ DeallocPCacheStreamControlChild(PCacheStreamControlChild* aActor)
 
 CacheStreamControlChild::CacheStreamControlChild()
   : mDestroyStarted(false)
+  , mDestroyDelayed(false)
 {
   MOZ_COUNT_CTOR(cache::CacheStreamControlChild);
 }
@@ -40,30 +50,6 @@ CacheStreamControlChild::~CacheStreamControlChild()
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
   MOZ_COUNT_DTOR(cache::CacheStreamControlChild);
-}
-
-void
-CacheStreamControlChild::AddListener(ReadStream* aListener)
-{
-  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  MOZ_ASSERT(aListener);
-  MOZ_ASSERT(!mListeners.Contains(aListener));
-  mListeners.AppendElement(aListener);
-}
-
-void
-CacheStreamControlChild::RemoveListener(ReadStream* aListener)
-{
-  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  MOZ_ASSERT(aListener);
-  MOZ_ALWAYS_TRUE(mListeners.RemoveElement(aListener));
-}
-
-void
-CacheStreamControlChild::NoteClosed(const nsID& aId)
-{
-  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  unused << SendNoteClosed(aId);
 }
 
 void
@@ -78,24 +64,102 @@ CacheStreamControlChild::StartDestroy()
   }
   mDestroyStarted = true;
 
+  // If any of the streams have started to be read, then wait for them to close
+  // naturally.
+  if (HasEverBeenRead()) {
+    // Note that we are delaying so that we can re-check for active streams
+    // in NoteClosedAfterForget().
+    mDestroyDelayed = true;
+    return;
+  }
+
+  // Otherwise, if the streams have not been touched then just pre-emptively
+  // close them now.  This handles the case where someone retrieves a Response
+  // from the Cache, but never accesses the body.  We should not keep the
+  // Worker alive until that Response is GC'd just because of its ignored
+  // body stream.
+
   // Begin shutting down all streams.  This is the same as if the parent had
   // asked us to shutdown.  So simulate the CloseAll IPC message.
   RecvCloseAll();
 }
 
 void
+CacheStreamControlChild::SerializeControl(CacheReadStream* aReadStreamOut)
+{
+  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
+  aReadStreamOut->controlParent() = nullptr;
+  aReadStreamOut->controlChild() = this;
+}
+
+void
+CacheStreamControlChild::SerializeFds(CacheReadStream* aReadStreamOut,
+                                      const nsTArray<FileDescriptor>& aFds)
+{
+  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
+  PFileDescriptorSetChild* fdSet = nullptr;
+  if (!aFds.IsEmpty()) {
+    fdSet = Manager()->SendPFileDescriptorSetConstructor(aFds[0]);
+    for (uint32_t i = 1; i < aFds.Length(); ++i) {
+      unused << fdSet->SendAddFileDescriptor(aFds[i]);
+    }
+  }
+
+  if (fdSet) {
+    aReadStreamOut->fds() = fdSet;
+  } else {
+    aReadStreamOut->fds() = void_t();
+  }
+}
+
+void
+CacheStreamControlChild::DeserializeFds(const CacheReadStream& aReadStream,
+                                        nsTArray<FileDescriptor>& aFdsOut)
+{
+  if (aReadStream.fds().type() !=
+      OptionalFileDescriptorSet::TPFileDescriptorSetChild) {
+    return;
+  }
+
+  auto fdSetActor = static_cast<FileDescriptorSetChild*>(
+    aReadStream.fds().get_PFileDescriptorSetChild());
+  MOZ_ASSERT(fdSetActor);
+
+  fdSetActor->ForgetFileDescriptors(aFdsOut);
+  MOZ_ASSERT(!aFdsOut.IsEmpty());
+
+  unused << fdSetActor->Send__delete__(fdSetActor);
+}
+
+void
+CacheStreamControlChild::NoteClosedAfterForget(const nsID& aId)
+{
+  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
+  unused << SendNoteClosed(aId);
+
+  // A stream has closed.  If we delayed StartDestry() due to this stream
+  // being read, then we should check to see if any of the remaining streams
+  // are active.  If none of our other streams have been read, then we can
+  // proceed with the shutdown now.
+  if (mDestroyDelayed && !HasEverBeenRead()) {
+    mDestroyDelayed = false;
+    RecvCloseAll();
+  }
+}
+
+#ifdef DEBUG
+void
+CacheStreamControlChild::AssertOwningThread()
+{
+  NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
+}
+#endif
+
+void
 CacheStreamControlChild::ActorDestroy(ActorDestroyReason aReason)
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  // Note, we cannot trigger IPC traffic here.  So use
-  // CloseStreamWithoutReporting().
-  ReadStreamList::ForwardIterator iter(mListeners);
-  while (iter.HasMore()) {
-    nsRefPtr<ReadStream> stream = iter.GetNext();
-    stream->CloseStreamWithoutReporting();
-  }
-  mListeners.Clear();
-
+  CloseAllReadStreamsWithoutReporting();
   RemoveFeature();
 }
 
@@ -103,20 +167,7 @@ bool
 CacheStreamControlChild::RecvClose(const nsID& aId)
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  DebugOnly<uint32_t> closedCount = 0;
-
-  ReadStreamList::ForwardIterator iter(mListeners);
-  while (iter.HasMore()) {
-    nsRefPtr<ReadStream> stream = iter.GetNext();
-    // note, multiple streams may exist for same ID
-    if (stream->MatchId(aId)) {
-      stream->CloseStream();
-      closedCount += 1;
-    }
-  }
-
-  MOZ_ASSERT(closedCount > 0);
-
+  CloseReadStreams(aId);
   return true;
 }
 
@@ -124,11 +175,7 @@ bool
 CacheStreamControlChild::RecvCloseAll()
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  ReadStreamList::ForwardIterator iter(mListeners);
-  while (iter.HasMore()) {
-    nsRefPtr<ReadStream> stream = iter.GetNext();
-    stream->CloseStream();
-  }
+  CloseAllReadStreams();
   return true;
 }
 

@@ -19,7 +19,7 @@
 #include "nsStringGlue.h"
 #include "nsError.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
-#include "mozilla/Mutex.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/net/ReferrerPolicy.h"
 
 class imgCacheValidator;
@@ -65,7 +65,7 @@ public:
                 nsIRequest *aRequest,
                 nsIChannel *aChannel,
                 imgCacheEntry *aCacheEntry,
-                void *aLoadId,
+                nsISupports* aCX,
                 nsIPrincipal* aLoadingPrincipal,
                 int32_t aCORSMode,
                 ReferrerPolicy aReferrerPolicy);
@@ -88,16 +88,8 @@ public:
   // Called or dispatched by EvictFromCache for main thread only execution.
   void ContinueEvict();
 
-  // Methods that get forwarded to the Image, or deferred until it's
-  // instantiated.
-  nsresult LockImage();
-  nsresult UnlockImage();
-  nsresult StartDecoding();
-  nsresult RequestDecode();
-
-  inline void SetInnerWindowID(uint64_t aInnerWindowId) {
-    mInnerWindowId = aInnerWindowId;
-  }
+  // Request that we start decoding the image as soon as data becomes available.
+  void RequestDecode() { mDecodeRequested = true; }
 
   inline uint64_t InnerWindowID() const {
     return mInnerWindowId;
@@ -131,8 +123,6 @@ public:
     return principal.forget();
   }
 
-  already_AddRefed<Image> GetImage();
-
   // Return the ProgressTracker associated with this imgRequest. It may live
   // in |mProgressTracker| or in |mImage.mProgressTracker|, depending on whether
   // mImage has been instantiated yet.
@@ -158,9 +148,6 @@ private:
   friend class imgCacheExpirationTracker;
   friend class imgRequestNotifyRunnable;
   friend class mozilla::image::ProgressTracker;
-
-  void SetImage(Image* aImage);
-  void SetProgressTracker(ProgressTracker* aProgressTracker);
 
   inline void SetLoadId(void *aLoadId) {
     mLoadId = aLoadId;
@@ -260,8 +247,6 @@ private:
   nsCOMPtr<nsIAsyncVerifyRedirectCallback> mRedirectCallback;
   nsCOMPtr<nsIChannel> mNewRedirectChannel;
 
-  mozilla::Mutex mMutex;
-
   // The ID of the inner window origin, used for error reporting.
   uint64_t mInnerWindowId;
 
@@ -274,9 +259,7 @@ private:
 
   nsresult mImageErrorCode;
 
-  // Sometimes consumers want to do things before the image is ready. Let them,
-  // and apply the action when the image becomes available.
-  bool mDecodeRequested : 1;
+  mozilla::Atomic<bool> mDecodeRequested;
 
   bool mIsMultiPartChannel : 1;
   bool mGotData : 1;

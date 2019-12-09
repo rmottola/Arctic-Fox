@@ -26,9 +26,9 @@ class GlobalObject;
 } // namespace mozilla
 
 class nsFormData final : public nsIDOMFormData,
-                             public nsIXHRSendable,
-                             public nsFormSubmission,
-                             public nsWrapperCache
+                         public nsIXHRSendable,
+                         public nsFormSubmission,
+                         public nsWrapperCache
 {
 private:
   ~nsFormData() {}
@@ -80,7 +80,7 @@ public:
   NS_DECL_NSIXHRSENDABLE
 
   // nsWrapperCache
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL
   nsISupports*

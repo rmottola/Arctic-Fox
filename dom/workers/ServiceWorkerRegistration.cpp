@@ -19,6 +19,10 @@
 #include "nsISupportsPrimitives.h"
 #include "nsPIDOMWindow.h"
 
+#ifndef MOZ_SIMPLEPUSH
+#include "mozilla/dom/PushManagerBinding.h"
+#endif
+
 using namespace mozilla::dom::workers;
 
 namespace mozilla {
@@ -30,11 +34,23 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 NS_IMPL_ADDREF_INHERITED(ServiceWorkerRegistration, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(ServiceWorkerRegistration, DOMEventTargetHelper)
 
+#ifdef MOZ_SIMPLEPUSH
+
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ServiceWorkerRegistration,
                                    DOMEventTargetHelper,
                                    mInstallingWorker,
                                    mWaitingWorker,
                                    mActiveWorker)
+
+#else
+
+NS_IMPL_CYCLE_COLLECTION_INHERITED(ServiceWorkerRegistration,
+                                   DOMEventTargetHelper,
+                                   mInstallingWorker,
+                                   mWaitingWorker,
+                                   mActiveWorker,
+                                   mPushManager)
+#endif
 
 ServiceWorkerRegistration::ServiceWorkerRegistration(nsPIDOMWindow* aWindow,
                                                      const nsAString& aScope)
@@ -61,9 +77,9 @@ ServiceWorkerRegistration::DisconnectFromOwner()
 }
 
 JSObject*
-ServiceWorkerRegistration::WrapObject(JSContext* aCx)
+ServiceWorkerRegistration::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return ServiceWorkerRegistrationBinding::Wrap(aCx, this);
+  return ServiceWorkerRegistrationBinding::Wrap(aCx, this, aGivenProto);
 }
 
 already_AddRefed<workers::ServiceWorker>
@@ -265,28 +281,6 @@ ServiceWorkerRegistration::InvalidateWorkerReference(WhichServiceWorker aWhichOn
   }
 }
 
-void
-ServiceWorkerRegistration::QueueStateChangeEvent(WhichServiceWorker aWhichOne,
-                                                 ServiceWorkerState aState) const
-{
-  nsRefPtr<ServiceWorker> worker;
-  if (aWhichOne == WhichServiceWorker::INSTALLING_WORKER) {
-    worker = mInstallingWorker;
-  } else if (aWhichOne == WhichServiceWorker::WAITING_WORKER) {
-    worker = mWaitingWorker;
-  } else if (aWhichOne == WhichServiceWorker::ACTIVE_WORKER) {
-    worker = mActiveWorker;
-  } else {
-    MOZ_CRASH("Invalid case");
-  }
-
-  if (worker) {
-    worker->SetState(aState);
-    nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(worker, &ServiceWorker::DispatchStateChange);
-    NS_DispatchToMainThread(r);
-  }
-}
-
 // XXXnsm, maybe this can be optimized to only add when a event handler is
 // registered.
 void
@@ -311,6 +305,56 @@ ServiceWorkerRegistration::StopListeningForEvents()
     swm->RemoveRegistrationEventListener(mScope, this);
     mListeningForEvents = false;
   }
+}
+
+already_AddRefed<PushManager>
+ServiceWorkerRegistration::GetPushManager(ErrorResult& aRv)
+{
+  AssertIsOnMainThread();
+
+#ifdef MOZ_SIMPLEPUSH
+  return nullptr;
+#else
+
+  if (!mPushManager) {
+    nsCOMPtr<nsIGlobalObject> globalObject = do_QueryInterface(GetOwner());
+
+    if (!globalObject) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+
+    AutoJSAPI jsapi;
+    if (NS_WARN_IF(!jsapi.Init(globalObject))) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+
+    JSContext* cx = jsapi.cx();
+
+    JS::RootedObject globalJs(cx, globalObject->GetGlobalJSObject());
+    GlobalObject global(cx, globalJs);
+
+    // TODO: bug 1148117.  This will fail when swr is exposed on workers
+    JS::Rooted<JSObject*> jsImplObj(cx);
+    nsCOMPtr<nsIGlobalObject> unused = ConstructJSImplementation(cx, "@mozilla.org/push/PushManager;1",
+                              global, &jsImplObj, aRv);
+    if (aRv.Failed()) {
+      return nullptr;
+    }
+    mPushManager = new PushManager(jsImplObj, globalObject);
+
+    mPushManager->SetScope(mScope, aRv);
+    if (aRv.Failed()) {
+      mPushManager = nullptr;
+      return nullptr;
+    }
+  }
+
+  nsRefPtr<PushManager> ret = mPushManager;
+  return ret.forget();
+
+  #endif /* ! MOZ_SIMPLEPUSH */
 }
 
 } // dom namespace

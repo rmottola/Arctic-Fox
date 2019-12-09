@@ -301,7 +301,8 @@ SameProcessCpowHolder::ToObject(JSContext* aCx,
 
 NS_IMETHODIMP
 nsFrameMessageManager::AddMessageListener(const nsAString& aMessage,
-                                          nsIMessageListener* aListener)
+                                          nsIMessageListener* aListener,
+                                          bool aListenWhenClosed)
 {
   nsAutoTObserverArray<nsMessageListenerInfo, 1>* listeners =
     mListeners.Get(aMessage);
@@ -320,6 +321,7 @@ nsFrameMessageManager::AddMessageListener(const nsAString& aMessage,
   nsMessageListenerInfo* entry = listeners->AppendElement();
   NS_ENSURE_TRUE(entry, NS_ERROR_OUT_OF_MEMORY);
   entry->mStrongListener = aListener;
+  entry->mListenWhenClosed = aListenWhenClosed;
   return NS_OK;
 }
 
@@ -407,6 +409,7 @@ nsFrameMessageManager::AddWeakMessageListener(const nsAString& aMessage,
 
   nsMessageListenerInfo* entry = listeners->AppendElement();
   entry->mWeakListener = weak;
+  entry->mListenWhenClosed = false;
   return NS_OK;
 }
 
@@ -984,6 +987,20 @@ nsFrameMessageManager::ReceiveMessage(nsISupports* aTarget,
                                       nsIPrincipal* aPrincipal,
                                       InfallibleTArray<nsString>* aJSONRetVal)
 {
+  return ReceiveMessage(aTarget, mClosed, aMessage, aIsSync,
+                        aCloneData, aCpows, aPrincipal, aJSONRetVal);
+}
+
+nsresult
+nsFrameMessageManager::ReceiveMessage(nsISupports* aTarget,
+                                      bool aTargetClosed,
+                                      const nsAString& aMessage,
+                                      bool aIsSync,
+                                      const StructuredCloneData* aCloneData,
+                                      mozilla::jsipc::CpowHolder* aCpows,
+                                      nsIPrincipal* aPrincipal,
+                                      InfallibleTArray<nsString>* aJSONRetVal)
+{
   nsAutoTObserverArray<nsMessageListenerInfo, 1>* listeners =
     mListeners.Get(aMessage);
   if (listeners) {
@@ -1002,6 +1019,10 @@ nsFrameMessageManager::ReceiveMessage(nsISupports* aTarget,
           listeners->RemoveElement(listener);
           continue;
         }
+      }
+
+      if (!listener.mListenWhenClosed && aTargetClosed) {
+        continue;
       }
 
       nsCOMPtr<nsIXPConnectWrappedJS> wrappedJS;
@@ -1154,7 +1175,7 @@ nsFrameMessageManager::ReceiveMessage(nsISupports* aTarget,
     }
   }
   nsRefPtr<nsFrameMessageManager> kungfuDeathGrip = mParentManager;
-  return mParentManager ? mParentManager->ReceiveMessage(aTarget, aMessage,
+  return mParentManager ? mParentManager->ReceiveMessage(aTarget, aTargetClosed, aMessage,
                                                          aIsSync, aCloneData,
                                                          aCpows, aPrincipal,
                                                          aJSONRetVal) : NS_OK;
@@ -1235,8 +1256,26 @@ nsFrameMessageManager::RemoveFromParent()
 }
 
 void
+nsFrameMessageManager::Close()
+{
+  if (!mClosed) {
+    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+    if (obs) {
+      obs->NotifyObservers(NS_ISUPPORTS_CAST(nsIContentFrameMessageManager*, this),
+                            "message-manager-close", nullptr);
+    }
+  }
+  mClosed = true;
+  mCallback = nullptr;
+  mOwnedCallback = nullptr;
+}
+
+void
 nsFrameMessageManager::Disconnect(bool aRemoveFromParent)
 {
+  // Notify message-manager-close if we haven't already.
+  Close();
+
   if (!mDisconnected) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
@@ -1249,8 +1288,6 @@ nsFrameMessageManager::Disconnect(bool aRemoveFromParent)
   }
   mDisconnected = true;
   mParentManager = nullptr;
-  mCallback = nullptr;
-  mOwnedCallback = nullptr;
   if (!mHandlingMessage) {
     mListeners.Clear();
   }
@@ -1607,8 +1644,9 @@ nsMessageManagerScriptExecutor::TryCacheLoadAndCompileScript(
         return;
       }
     } else {
-      // We can't clone compile-and-go scripts.
-      options.setCompileAndGo(false);
+      // We're going to run these against some non-global scope.
+      options.setCompileAndGo(false)
+             .setHasPollutedScope(true);
       if (!JS::Compile(cx, options, srcBuf, &script)) {
         return;
       }
@@ -1682,6 +1720,17 @@ nsMessageManagerScriptExecutor::InitChildGlobalInternal(
   return true;
 }
 
+void
+nsMessageManagerScriptExecutor::MarkScopesForCC()
+{
+  for (uint32_t i = 0; i < mAnonymousGlobalScopes.Length(); ++i) {
+    JSObject* obj = mAnonymousGlobalScopes[i];
+    if (obj) {
+      JS::ExposeObjectToActiveJS(obj);
+    }
+  }
+}
+
 NS_IMPL_ISUPPORTS(nsScriptCacheCleaner, nsIObserver)
 
 nsFrameMessageManager* nsFrameMessageManager::sChildProcessManager = nullptr;
@@ -1741,7 +1790,7 @@ public:
                                   JS::Handle<JSObject *> aCpows,
                                   nsIPrincipal* aPrincipal) override
   {
-    nsRefPtr<nsIRunnable> ev =
+    nsCOMPtr<nsIRunnable> ev =
       new nsAsyncMessageToSameProcessChild(aCx, aMessage, aData, aCpows,
                                            aPrincipal);
     NS_DispatchToCurrentThread(ev);

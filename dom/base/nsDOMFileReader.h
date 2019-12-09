@@ -62,7 +62,7 @@ public:
   {
     return GetOwner();
   }
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL
   static already_AddRefed<nsDOMFileReader>
@@ -131,7 +131,7 @@ protected:
   nsresult GetAsDataURL(nsIDOMBlob *aFile, const char *aFileData, uint32_t aDataLen, nsAString &aResult);
 
   void FreeFileData() {
-    moz_free(mFileData);
+    free(mFileData);
     mFileData = nullptr;
     mDataLen = 0;
   }

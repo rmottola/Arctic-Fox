@@ -22,6 +22,8 @@ ${INCLUDES}
 
 using namespace std;
 
+using base::Thread;
+
 namespace mozilla {
 namespace _ipdltest {
 
@@ -183,7 +185,7 @@ ${PARENT_ENABLED_CASES_PROC}
     if (!transport)
         fail("no transport");
 
-    base::ProcessHandle child = gSubprocess->GetChildProcessHandle();
+    base::ProcessId child = base::GetProcId(gSubprocess->GetChildProcessHandle());
 
     switch (test) {
 //-----------------------------------------------------------------------------
@@ -373,7 +375,7 @@ ${CHILD_DELETE_CASES}
 
 void
 IPDLUnitTestChildInit(IPC::Channel* transport,
-                      base::ProcessHandle parent,
+                      base::ProcessId parentPid,
                       MessageLoop* worker)
 {
     // Some tests require this, and we don't care what thread we're on if we're

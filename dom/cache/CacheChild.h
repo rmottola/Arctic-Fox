@@ -10,14 +10,22 @@
 #include "mozilla/dom/cache/ActorChild.h"
 #include "mozilla/dom/cache/PCacheChild.h"
 
+class nsIAsyncInputStream;
+class nsIGlobalObject;
+
 namespace mozilla {
 namespace dom {
+
+class Promise;
+
 namespace cache {
 
 class Cache;
+class CacheOpArgs;
+class CachePushStreamChild;
 
-class CacheChild MOZ_FINAL : public PCacheChild
-                           , public ActorChild
+class CacheChild final : public PCacheChild
+                       , public ActorChild
 {
 public:
   CacheChild();
@@ -30,40 +38,45 @@ public:
   // trigger ActorDestroy() if it has not been called yet.
   void ClearListener();
 
+  void
+  ExecuteOp(nsIGlobalObject* aGlobal, Promise* aPromise,
+            const CacheOpArgs& aArgs);
+
+  CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream);
+
   // ActorChild methods
 
   // Synchronously call ActorDestroy on our Cache listener and then start the
   // actor destruction asynchronously from the parent-side.
-  virtual void StartDestroy() MOZ_OVERRIDE;
+  virtual void StartDestroy() override;
 
 private:
   // PCacheChild methods
   virtual void
-  ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
+  ActorDestroy(ActorDestroyReason aReason) override;
+
+  virtual PCacheOpChild*
+  AllocPCacheOpChild(const CacheOpArgs& aOpArgs) override;
 
   virtual bool
-  RecvMatchResponse(const RequestId& requestId, const nsresult& aRv,
-                    const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
+  DeallocPCacheOpChild(PCacheOpChild* aActor) override;
+
+  virtual PCachePushStreamChild*
+  AllocPCachePushStreamChild() override;
+
   virtual bool
-  RecvMatchAllResponse(const RequestId& requestId, const nsresult& aRv,
-                       nsTArray<PCacheResponse>&& responses) MOZ_OVERRIDE;
-  virtual bool
-  RecvAddAllResponse(const RequestId& requestId,
-                     const nsresult& aRv) MOZ_OVERRIDE;
-  virtual bool
-  RecvPutResponse(const RequestId& aRequestId,
-                  const nsresult& aRv) MOZ_OVERRIDE;
-  virtual bool
-  RecvDeleteResponse(const RequestId& requestId, const nsresult& aRv,
-                     const bool& result) MOZ_OVERRIDE;
-  virtual bool
-  RecvKeysResponse(const RequestId& requestId, const nsresult& aRv,
-                   nsTArray<PCacheRequest>&& requests) MOZ_OVERRIDE;
+  DeallocPCachePushStreamChild(PCachePushStreamChild* aActor) override;
+
+  // utility methods
+  void
+  NoteDeletedActor();
 
   // Use a weak ref so actor does not hold DOM object alive past content use.
   // The Cache object must call ClearListener() to null this before its
   // destroyed.
   Cache* MOZ_NON_OWNING_REF mListener;
+  uint32_t mNumChildActors;
 
   NS_DECL_OWNINGTHREAD
 };

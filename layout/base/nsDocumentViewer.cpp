@@ -219,12 +219,12 @@ private:
 
 //-------------------------------------------------------------
 class nsDocumentViewer final : public nsIContentViewer,
-                                   public nsIContentViewerEdit,
-                                   public nsIContentViewerFile,
-                                   public nsIDocumentViewerPrint
+                               public nsIContentViewerEdit,
+                               public nsIContentViewerFile,
+                               public nsIDocumentViewerPrint
 
 #ifdef NS_PRINTING
-                                 , public nsIWebBrowserPrint
+                             , public nsIWebBrowserPrint
 #endif
 
 {
@@ -2315,7 +2315,7 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument,
           styleSet->PrependStyleSheet(nsStyleSet::eAgentSheet, csssheet);
           shouldOverride = true;
         }
-        nsMemory::Free(str);
+        free(str);
       }
     }
   }

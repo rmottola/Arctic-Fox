@@ -458,7 +458,7 @@ nsLineLayout::BeginSpan(nsIFrame* aFrame,
   nsIFrame* frame = aSpanReflowState->frame;
   psd->mNoWrap = !frame->StyleText()->WhiteSpaceCanWrap(frame) ||
                  mSuppressLineWrap ||
-                 frame->StyleContext()->IsInlineDescendantOfRuby();
+                 frame->StyleContext()->ShouldSuppressLineBreak();
   psd->mWritingMode = aSpanReflowState->GetWritingMode();
 
   // Switch to new span
@@ -1021,8 +1021,6 @@ nsLineLayout::ReflowFrame(nsIFrame* aFrame,
     } else {
       if (nsGkAtoms::letterFrame==frameType) {
         pfd->mIsLetterFrame = true;
-      } else if (nsGkAtoms::rubyFrame == frameType) {
-        SyncAnnotationBounds(pfd);
       }
       if (pfd->mSpan) {
         isEmpty = !pfd->mSpan->mHasNonemptyContent && pfd->mFrame->IsSelfEmpty();
@@ -1129,6 +1127,7 @@ nsLineLayout::ReflowFrame(nsIFrame* aFrame,
         }
         if (nsGkAtoms::rubyFrame == frameType) {
           mHasRuby = true;
+          SyncAnnotationBounds(pfd);
         }
       }
 
@@ -2786,8 +2785,13 @@ nsLineLayout::AdvanceAnnotationInlineBounds(PerFrameData* aPFD,
       // This ruby text container is a span.
       (psd->mFirstFrame == psd->mLastFrame && psd->mFirstFrame &&
        !psd->mFirstFrame->mIsLinkedToBase)) {
-    nscoord reservedISize = RubyUtils::GetReservedISize(frame);
-    RubyUtils::SetReservedISize(frame, reservedISize + aDeltaISize);
+    // For ruby text frames, only increase frames
+    // which are not auto-hidden.
+    if (frameType != nsGkAtoms::rubyTextFrame ||
+        !static_cast<nsRubyTextFrame*>(frame)->IsAutoHidden()) {
+      nscoord reservedISize = RubyUtils::GetReservedISize(frame);
+      RubyUtils::SetReservedISize(frame, reservedISize + aDeltaISize);
+    }
   } else {
     // It is a normal ruby text container. Its children will expand
     // themselves properly. We only need to expand its own size here.
@@ -2799,17 +2803,15 @@ nsLineLayout::AdvanceAnnotationInlineBounds(PerFrameData* aPFD,
 /**
  * This function applies the changes of icoord and isize caused by
  * justification to annotations of the given frame.
- * aPFD must be one of the frames in aContainingSpan.
  */
 void
 nsLineLayout::ApplyLineJustificationToAnnotations(PerFrameData* aPFD,
-                                                  PerSpanData* aContainingSpan,
                                                   nscoord aDeltaICoord,
                                                   nscoord aDeltaISize)
 {
   PerFrameData* pfd = aPFD->mNextAnnotation;
-  nscoord containerWidth = ContainerWidthForSpan(aContainingSpan);
   while (pfd) {
+    nscoord containerWidth = pfd->mFrame->GetParent()->GetRect().Width();
     AdvanceAnnotationInlineBounds(pfd, containerWidth,
                                   aDeltaICoord, aDeltaISize);
 
@@ -2878,8 +2880,7 @@ nsLineLayout::ApplyFrameJustification(PerSpanData* aPSD,
 
       // The gaps added to the end of the frame should also be
       // excluded from the isize added to the annotation.
-      ApplyLineJustificationToAnnotations(pfd, aPSD,
-                                          deltaICoord, dw - gapsAtEnd);
+      ApplyLineJustificationToAnnotations(pfd, deltaICoord, dw - gapsAtEnd);
       deltaICoord += dw;
       pfd->mFrame->SetRect(lineWM, pfd->mBounds, ContainerWidthForSpan(aPSD));
     }
@@ -2890,7 +2891,7 @@ nsLineLayout::ApplyFrameJustification(PerSpanData* aPSD,
 static nsIFrame*
 FindNearestRubyBaseAncestor(nsIFrame* aFrame)
 {
-  MOZ_ASSERT(aFrame->StyleContext()->IsInlineDescendantOfRuby());
+  MOZ_ASSERT(aFrame->StyleContext()->ShouldSuppressLineBreak());
   while (aFrame && aFrame->GetType() != nsGkAtoms::rubyBaseFrame) {
     aFrame = aFrame->GetParent();
   }
@@ -3081,7 +3082,7 @@ nsLineLayout::TextAlignLine(nsLineBox* aLine,
     ComputeFrameJustification(psd, computeState);
     if (mHasRuby && computeState.mFirstParticipant) {
       PerFrameData* firstFrame = computeState.mFirstParticipant;
-      if (firstFrame->mFrame->StyleContext()->IsInlineDescendantOfRuby()) {
+      if (firstFrame->mFrame->StyleContext()->ShouldSuppressLineBreak()) {
         MOZ_ASSERT(!firstFrame->mJustificationAssignment.mGapsAtStart);
         nsIFrame* rubyBase = FindNearestRubyBaseAncestor(firstFrame->mFrame);
         if (rubyBase && IsRubyAlignSpaceAround(rubyBase)) {
@@ -3090,7 +3091,7 @@ nsLineLayout::TextAlignLine(nsLineBox* aLine,
         }
       }
       PerFrameData* lastFrame = computeState.mLastParticipant;
-      if (lastFrame->mFrame->StyleContext()->IsInlineDescendantOfRuby()) {
+      if (lastFrame->mFrame->StyleContext()->ShouldSuppressLineBreak()) {
         MOZ_ASSERT(!lastFrame->mJustificationAssignment.mGapsAtEnd);
         nsIFrame* rubyBase = FindNearestRubyBaseAncestor(lastFrame->mFrame);
         if (rubyBase && IsRubyAlignSpaceAround(rubyBase)) {

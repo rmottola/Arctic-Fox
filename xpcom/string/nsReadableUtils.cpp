@@ -281,7 +281,7 @@ AppendUTF8toUTF16(const char* aSource, nsAString& aDest)
  * A helper function that allocates a buffer of the desired character type big enough to hold a copy of the supplied string (plus a zero terminator).
  *
  * @param aSource an string you will eventually be making a copy of
- * @return a new buffer (of the type specified by the second parameter) which you must free with |nsMemory::Free|.
+ * @return a new buffer (of the type specified by the second parameter) which you must free with |free|.
  *
  */
 template <class FromStringT, class ToCharT>
@@ -289,7 +289,7 @@ inline
 ToCharT*
 AllocateStringCopy(const FromStringT& aSource, ToCharT*)
 {
-  return static_cast<ToCharT*>(nsMemory::Alloc(
+  return static_cast<ToCharT*>(moz_xmalloc(
     (aSource.Length() + 1) * sizeof(ToCharT)));
 }
 
@@ -322,7 +322,7 @@ ToNewUTF8String(const nsAString& aSource, uint32_t* aUTF8Count)
   }
 
   char* result = static_cast<char*>
-                 (nsMemory::Alloc(calculator.Size() + 1));
+                 (moz_xmalloc(calculator.Size() + 1));
   if (!result) {
     return nullptr;
   }
@@ -414,7 +414,7 @@ UTF8ToNewUnicode(const nsACString& aSource, uint32_t* aUTF16Count)
 {
   const uint32_t length = CalcUTF8ToUnicodeLength(aSource);
   const size_t buffer_size = (length + 1) * sizeof(char16_t);
-  char16_t* buffer = static_cast<char16_t*>(nsMemory::Alloc(buffer_size));
+  char16_t* buffer = static_cast<char16_t*>(moz_xmalloc(buffer_size));
   if (!buffer) {
     return nullptr;
   }

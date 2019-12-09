@@ -1009,7 +1009,7 @@ DataChannelConnection::SendOpenRequestMessage(const nsACString& label,
     break;
   default:
     // FIX! need to set errno!  Or make all these SendXxxx() funcs return 0 or errno!
-    moz_free(req);
+    free(req);
     return (0);
   }
   if (unordered) {
@@ -1026,7 +1026,7 @@ DataChannelConnection::SendOpenRequestMessage(const nsACString& label,
 
   int32_t result = SendControlMessage(req, req_size, stream);
 
-  moz_free(req);
+  free(req);
   return result;
 }
 
@@ -1732,7 +1732,7 @@ DataChannelConnection::SendOutgoingStreamReset()
   } else {
     mStreamsResetting.Clear();
   }
-  moz_free(srs);
+  free(srs);
 }
 
 void

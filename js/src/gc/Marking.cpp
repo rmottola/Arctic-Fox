@@ -140,11 +140,11 @@ IsThingPoisoned(T *thing)
 }
 #endif
 
-static GCMarker*
-AsGCMarker(JSTracer* trc)
+static GCMarker *
+AsGCMarker(JSTracer *trc)
 {
-    MOZ_ASSERT(IS_GC_MARKING_TRACER(trc));
-    return static_cast<GCMarker*>(trc);
+    MOZ_ASSERT(IsMarkingTracer(trc));
+    return static_cast<GCMarker *>(trc);
 }
 
 template <typename T> bool ThingIsPermanentAtom(T* thing) { return false; }
@@ -202,16 +202,19 @@ CheckMarkedThing(JSTracer* trc, T** thingp)
     MOZ_ASSERT(zone->runtimeFromAnyThread() == trc->runtime());
     MOZ_ASSERT(trc->hasTracingDetails());
 
-    bool isGcMarkingTracer = IS_GC_MARKING_TRACER(trc);
-
-    MOZ_ASSERT_IF(zone->requireGCTracer(), isGcMarkingTracer);
-
     MOZ_ASSERT(thing->isAligned());
-
     MOZ_ASSERT(MapTypeToTraceKind<T>::kind == GetGCThingTraceKind(thing));
 
+    /*
+     * Do not check IsMarkingTracer directly -- it should only be used in paths
+     * where we cannot be the gray buffering tracer.
+     */
+    bool isGcMarkingTracer = (trc->callback == nullptr);
+
+    MOZ_ASSERT_IF(zone->requireGCTracer(), isGcMarkingTracer || IsBufferingGrayRoots(trc));
+
     if (isGcMarkingTracer) {
-        GCMarker* gcMarker = static_cast<GCMarker*>(trc);
+        GCMarker *gcMarker = static_cast<GCMarker *>(trc);
         MOZ_ASSERT_IF(gcMarker->shouldCheckCompartments(),
                       zone->isCollecting() || rt->isAtomsZone(zone));
 
@@ -310,9 +313,9 @@ MarkInternal(JSTracer* trc, T** thingp)
     trc->clearTracingDetails();
 }
 
-#define JS_ROOT_MARKING_ASSERT(trc)                                     \
-    MOZ_ASSERT_IF(IS_GC_MARKING_TRACER(trc),                            \
-                  trc->runtime()->gc.state() == NO_INCREMENTAL ||       \
+#define JS_ROOT_MARKING_ASSERT(trc) \
+    MOZ_ASSERT_IF(IsMarkingTracer(trc), \
+                  trc->runtime()->gc.state() == NO_INCREMENTAL || \
                   trc->runtime()->gc.state() == MARK_ROOTS);
 
 namespace js {
@@ -707,18 +710,22 @@ gc::MarkGCThingUnbarriered(JSTracer* trc, void** thingp, const char* name)
 /*** ID Marking ***/
 
 static inline void
-MarkIdInternal(JSTracer* trc, jsid* id)
+MarkIdInternal(JSTracer *trc, jsid *id)
 {
     if (JSID_IS_STRING(*id)) {
-        JSString* str = JSID_TO_STRING(*id);
-        trc->setTracingLocation((void*)id);
+        JSString *str = JSID_TO_STRING(*id);
+        JSString *prior = str;
+        trc->setTracingLocation((void *)id);
         MarkInternal(trc, &str);
-        *id = NON_INTEGER_ATOM_TO_JSID(reinterpret_cast<JSAtom*>(str));
+        if (str != prior)
+            *id = NON_INTEGER_ATOM_TO_JSID(reinterpret_cast<JSAtom *>(str));
     } else if (JSID_IS_SYMBOL(*id)) {
-        JS::Symbol* sym = JSID_TO_SYMBOL(*id);
-        trc->setTracingLocation((void*)id);
+        JS::Symbol *sym = JSID_TO_SYMBOL(*id);
+        JS::Symbol *prior = sym;
+        trc->setTracingLocation((void *)id);
         MarkInternal(trc, &sym);
-        *id = SYMBOL_TO_JSID(sym);
+        if (sym != prior)
+            *id = SYMBOL_TO_JSID(sym);
     } else {
         /* Unset realLocation manually if we do not call MarkInternal. */
         trc->unsetTracingLocation();
@@ -769,20 +776,28 @@ gc::MarkIdRootRange(JSTracer* trc, size_t len, jsid* vec, const char* name)
 /*** Value Marking ***/
 
 static inline void
-MarkValueInternal(JSTracer* trc, Value* v)
+MarkValueInternal(JSTracer *trc, Value *v)
 {
     if (v->isMarkable()) {
         MOZ_ASSERT(v->toGCThing());
-        void* thing = v->toGCThing();
-        trc->setTracingLocation((void*)v);
-        MarkKind(trc, &thing, v->gcKind());
+        void *thing = v->toGCThing();
+        trc->setTracingLocation((void *)v);
         if (v->isString()) {
-            v->setString((JSString*)thing);
+            JSString *str = static_cast<JSString*>(thing);
+            MarkInternal(trc, &str);
+            if (str != thing)
+                v->setString(str);
         } else if (v->isObject()) {
-            v->setObjectOrNull((JSObject*)thing);
+            JSObject *obj = static_cast<JSObject*>(thing);
+            MarkInternal(trc, &obj);
+            if (obj != thing)
+                v->setObjectOrNull(obj);
         } else {
             MOZ_ASSERT(v->isSymbol());
-            v->setSymbol((JS::Symbol*)thing);
+            JS::Symbol *sym = static_cast<JS::Symbol*>(thing);
+            MarkInternal(trc, &sym);
+            if (sym != thing)
+                v->setSymbol(sym);
         }
     } else {
         /* Unset realLocation manually if we do not call MarkInternal. */
@@ -949,9 +964,9 @@ gc::MarkObjectSlots(JSTracer* trc, NativeObject* obj, uint32_t start, uint32_t n
 }
 
 static bool
-ShouldMarkCrossCompartment(JSTracer* trc, JSObject* src, Cell* cell)
+ShouldMarkCrossCompartment(JSTracer *trc, JSObject *src, Cell *cell)
 {
-    if (!IS_GC_MARKING_TRACER(trc))
+    if (!IsMarkingTracer(trc))
         return true;
 
     uint32_t color = AsGCMarker(trc)->markColor();
@@ -961,9 +976,9 @@ ShouldMarkCrossCompartment(JSTracer* trc, JSObject* src, Cell* cell)
         MOZ_ASSERT(color == BLACK);
         return false;
     }
-    TenuredCell& tenured = cell->asTenured();
+    TenuredCell &tenured = cell->asTenured();
 
-    JS::Zone* zone = tenured.zone();
+    JS::Zone *zone = tenured.zone();
     if (color == BLACK) {
         /*
          * Having black->gray edges violates our promise to the cycle
@@ -1067,9 +1082,6 @@ BaseShape::markChildren(JSTracer *trc)
     JSObject* global = compartment()->unsafeUnbarrieredMaybeGlobal();
     if (global)
         MarkObjectUnbarriered(trc, &global, "global");
-
-    if (metadata)
-        gc::MarkObject(trc, &metadata, "metadata");
 }
 
 static void
@@ -1115,9 +1127,6 @@ ScanBaseShape(GCMarker *gcmarker, BaseShape* base)
 
     if (GlobalObject *global = base->compartment()->unsafeUnbarrieredMaybeGlobal())
         gcmarker->traverse(global);
-
-    if (JSObject *metadata = base->getObjectMetadata())
-        MaybePushMarkStackBetweenSlices(gcmarker, metadata);
 
     /*
      * All children of the owned base shape are consistent with its
@@ -1705,6 +1714,9 @@ GCMarker::processMarkStackTop(SliceBudget &budget)
                 goto scan_unboxed;
             }
             if (clasp == &UnboxedPlainObject::class_) {
+                JSObject *expando = obj->as<UnboxedPlainObject>().maybeExpando();
+                if (expando && mark(expando))
+                    repush(expando);
                 const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
                 unboxedTraceList = layout.traceList();
                 if (!unboxedTraceList)

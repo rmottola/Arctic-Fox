@@ -24,6 +24,7 @@ class nsIDOMBlob;
 class nsIObserver;
 struct ResourceMapping;
 struct OverrideMapping;
+class nsIDomainPolicy;
 
 namespace mozilla {
 class RemoteSpellcheckEngineChild;
@@ -77,7 +78,7 @@ public:
     };
 
     bool Init(MessageLoop* aIOLoop,
-              base::ProcessHandle aParentHandle,
+              base::ProcessId aParentPid,
               IPC::Channel* aChannel);
     void InitProcessAttributes();
     void InitXPCOM();
@@ -378,6 +379,9 @@ public:
                                    nsTArray<nsCString>&& aThreadNameFilters) override;
     virtual bool RecvStopProfiler() override;
     virtual bool RecvGetProfile(nsCString* aProfile) override;
+    virtual bool RecvDomainSetChanged(const uint32_t& aSetType, const uint32_t& aChangeType,
+                                      const OptionalURIParams& aDomain) override;
+    virtual bool RecvShutdown() override;
 
 #ifdef ANDROID
     gfxIntSize GetScreenSize() { return mScreenSize; }
@@ -473,6 +477,8 @@ private:
     nsString mProcessName;
 
     static ContentChild* sSingleton;
+
+    nsCOMPtr<nsIDomainPolicy> mPolicy;
 
     DISALLOW_EVIL_CONSTRUCTORS(ContentChild);
 };

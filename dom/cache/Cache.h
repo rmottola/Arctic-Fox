@@ -7,7 +7,6 @@
 #ifndef mozilla_dom_cache_Cache_h
 #define mozilla_dom_cache_Cache_h
 
-#include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/cache/Types.h"
 #include "mozilla/dom/cache/TypeUtils.h"
 #include "nsCOMPtr.h"
@@ -21,10 +20,6 @@ namespace mozilla {
 
 class ErrorResult;
 
-namespace ipc {
-  class IProtocol;
-}
-
 namespace dom {
 
 class OwningRequestOrUSVString;
@@ -37,16 +32,12 @@ template<typename T> class Sequence;
 
 namespace cache {
 
+class AutoChildOpArgs;
 class CacheChild;
-class PCacheRequest;
-class PCacheRequestOrVoid;
-class PCacheResponse;
-class PCacheResponseOrVoid;
-class PCacheStreamControlChild;
 
-class Cache MOZ_FINAL : public PromiseNativeHandler
-                      , public nsWrapperCache
-                      , public TypeUtils
+class Cache final : public nsISupports
+                  , public nsWrapperCache
+                  , public TypeUtils
 {
 public:
   Cache(nsIGlobalObject* aGlobal, CacheChild* aActor);
@@ -77,49 +68,33 @@ public:
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
 
   nsISupports* GetParentObject() const;
-  virtual JSObject* WrapObject(JSContext* aContext) MOZ_OVERRIDE;
+  virtual JSObject* WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto) override;
 
   // Called when CacheChild actor is being destroyed
   void DestroyInternal(CacheChild* aActor);
 
-  // methods forwarded from CacheChild
-  void RecvMatchResponse(RequestId aRequestId, nsresult aRv,
-                         const PCacheResponseOrVoid& aResponse);
-  void RecvMatchAllResponse(RequestId aRequestId, nsresult aRv,
-                            const nsTArray<PCacheResponse>& aResponses);
-  void RecvAddAllResponse(RequestId aRequestId, nsresult aRv);
-  void RecvPutResponse(RequestId aRequestId, nsresult aRv);
-
-  void RecvDeleteResponse(RequestId aRequestId, nsresult aRv,
-                          bool aSuccess);
-  void RecvKeysResponse(RequestId aRequestId, nsresult aRv,
-                        const nsTArray<PCacheRequest>& aRequests);
-
   // TypeUtils methods
   virtual nsIGlobalObject*
-  GetGlobalObject() const MOZ_OVERRIDE;
+  GetGlobalObject() const override;
 
 #ifdef DEBUG
-  virtual void AssertOwningThread() const MOZ_OVERRIDE;
+  virtual void AssertOwningThread() const override;
 #endif
 
-  // PromiseNativeHandler methods
-  virtual void
-  ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
-
-  virtual void
-  RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) MOZ_OVERRIDE;
+  virtual CachePushStreamChild*
+  CreatePushStream(nsIAsyncInputStream* aStream) override;
 
 private:
   ~Cache();
 
-  // TODO: Replace with actor-per-request model during refactor (bug 1110485)
-  RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
-  already_AddRefed<Promise> RemoveRequestPromise(RequestId aRequestId);
+  // Called when we're destroyed or CCed.
+  void DisconnectFromActor();
+
+  already_AddRefed<Promise>
+  ExecuteOp(AutoChildOpArgs& aOpArgs, ErrorResult& aRv);
 
   nsCOMPtr<nsIGlobalObject> mGlobal;
   CacheChild* mActor;
-  nsTArray<nsRefPtr<Promise>> mRequestPromises;
 
 public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS

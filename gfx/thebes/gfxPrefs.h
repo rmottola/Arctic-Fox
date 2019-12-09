@@ -236,7 +236,7 @@ private:
 
   DECL_GFX_PREF(Once, "image.cache.timeweight",                ImageCacheTimeWeight, int32_t, 500);
   DECL_GFX_PREF(Once, "image.cache.size",                      ImageCacheSize, int32_t, 5*1024*1024);
-  DECL_GFX_PREF(Live, "image.downscale-during-decode.enabled", ImageDownscaleDuringDecodeEnabled, bool, false);
+  DECL_GFX_PREF(Live, "image.downscale-during-decode.enabled", ImageDownscaleDuringDecodeEnabled, bool, true);
   DECL_GFX_PREF(Live, "image.high_quality_downscaling.enabled", ImageHQDownscalingEnabled, bool, false);
   DECL_GFX_PREF(Live, "image.high_quality_downscaling.min_factor", ImageHQDownscalingMinFactor, uint32_t, 1000);
   DECL_GFX_PREF(Live, "image.high_quality_upscaling.max_size", ImageHQUpscalingMaxSize, uint32_t, 20971520);
@@ -350,6 +350,10 @@ private:
 
   // This and code dependent on it should be removed once containerless scrolling looks stable.
   DECL_GFX_PREF(Once, "layout.scroll.root-frame-containers",   LayoutUseContainersForRootFrames, bool, true);
+
+  // This affects whether events will be routed through APZ or not.
+  DECL_GFX_PREF(Once, "mousewheel.system_scroll_override_on_root_content.enabled",
+                                                               MouseWheelHasScrollDeltaOverride, bool, false);
 public:
   // Manage the singleton:
   static gfxPrefs& GetSingleton()

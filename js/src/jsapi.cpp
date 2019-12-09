@@ -1411,22 +1411,13 @@ JS_RemoveExtraGCRootsTracer(JSRuntime* rt, JSTraceDataOp traceOp, void* data)
 }
 
 extern JS_PUBLIC_API(bool)
-JS_IsGCMarkingTracer(JSTracer* trc)
+JS_IsGCMarkingTracer(JSTracer *trc)
 {
-    return IS_GC_MARKING_TRACER(trc);
+    return js::IsMarkingTracer(trc);
 }
-
-#ifdef DEBUG
-extern JS_PUBLIC_API(bool)
-JS_IsMarkingGray(JSTracer* trc)
-{
-    MOZ_ASSERT(JS_IsGCMarkingTracer(trc));
-    return trc->callback == GCMarker::GrayCallback;
-}
-#endif
 
 JS_PUBLIC_API(void)
-JS_GC(JSRuntime* rt)
+JS_GC(JSRuntime *rt)
 {
     AssertHeapIsIdle(rt);
     JS::PrepareForFullGC(rt);
@@ -2221,10 +2212,12 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
     // it's just a plain old data property. However the JS_Define* APIs use
     // null getter and setter to mean "default to the Class getProperty and
     // setProperty ops".
-    if (!getter)
-        getter = obj->getClass()->getProperty;
-    if (!setter)
-        setter = obj->getClass()->setProperty;
+    if (!(attrs & (JSPROP_GETTER | JSPROP_SETTER))) {
+        if (!getter)
+            getter = obj->getClass()->getProperty;
+        if (!setter)
+            setter = obj->getClass()->setProperty;
+    }
     if (getter == JS_PropertyStub)
         getter = nullptr;
     if (setter == JS_StrictPropertyStub)
@@ -3971,9 +3964,9 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
  * enclosingDynamicScope is a dynamic scope to use, if it's not the global.
  */
 static bool
-CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& options,
-                const char* name, unsigned nargs, const char* const* argnames,
-                SourceBufferHolder& srcBuf,
+CompileFunction(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+                const char *name, unsigned nargs, const char *const *argnames,
+                SourceBufferHolder &srcBuf,
                 HandleObject enclosingDynamicScope,
                 HandleObject enclosingStaticScope,
                 MutableHandleFunction fun)
@@ -4004,6 +3997,13 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& options,
                                 enclosingDynamicScope));
     if (!fun)
         return false;
+
+    // Make sure to handle cases when we have a polluted scopechain.
+    OwningCompileOptions options(cx);
+    if (!options.copy(cx, optionsArg))
+        return false;
+    if (!enclosingDynamicScope->is<GlobalObject>())
+        options.setHasPollutedScope(true);
 
     if (!frontend::CompileFunctionBody(cx, fun, options, formals, srcBuf,
                                        enclosingStaticScope))
@@ -4102,6 +4102,13 @@ ExecuteScript(JSContext* cx, HandleObject obj, HandleScript scriptArg, jsval* rv
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, scriptArg);
+
+    if (!script->hasPollutedGlobalScope() && !obj->is<GlobalObject>()) {
+        script = CloneScript(cx, NullPtr(), NullPtr(), script, HasPollutedGlobalScope);
+        if (!script)
+            return false;
+        js::Debugger::onNewScript(cx, script);
+    }
     AutoLastFrameCheck lfc(cx);
     return Execute(cx, script, *obj, rval);
 }
@@ -4148,7 +4155,9 @@ JS::CloneAndExecuteScript(JSContext* cx, HandleObject obj, HandleScript scriptAr
     assertSameCompartment(cx, obj);
     RootedScript script(cx, scriptArg);
     if (script->compartment() != cx->compartment()) {
-        script = CloneScript(cx, NullPtr(), NullPtr(), script);
+        PollutedGlobalScopeOption globalScopeOption = obj->is<GlobalObject>() ?
+            HasCleanGlobalScope : HasPollutedGlobalScope;
+        script = CloneScript(cx, NullPtr(), NullPtr(), script, globalScopeOption);
         if (!script)
             return false;
 
@@ -4172,6 +4181,7 @@ Evaluate(JSContext *cx, HandleObject scope, const ReadOnlyCompileOptions &option
     AutoLastFrameCheck lfc(cx);
 
     options.setCompileAndGo(scope->is<GlobalObject>());
+    options.setHasPollutedScope(!scope->is<GlobalObject>());
     SourceCompressionTask sct(cx);
     RootedScript script(cx, frontend::CompileScript(cx, &cx->tempLifoAlloc(),
                                                     scope, NullPtr(), NullPtr(), options,

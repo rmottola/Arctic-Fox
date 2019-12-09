@@ -71,13 +71,11 @@ struct RootKind<TaggedProto>
 template <> struct GCMethods<const TaggedProto>
 {
     static TaggedProto initial() { return TaggedProto(); }
-    static bool poisoned(const TaggedProto& v) { return IsPoisonedPtr(v.raw()); }
 };
 
 template <> struct GCMethods<TaggedProto>
 {
     static TaggedProto initial() { return TaggedProto(); }
-    static bool poisoned(const TaggedProto& v) { return IsPoisonedPtr(v.raw()); }
 };
 
 template<class Outer>
@@ -428,7 +426,8 @@ class ObjectGroup : public gc::TenuredCell
      * objects, property types account for plain data properties (those with a
      * slot and no getter or setter hook) and dense elements. In typed objects
      * and unboxed objects, property types account for object and value
-     * properties and elements in the object.
+     * properties and elements in the object, and expando properties in unboxed
+     * objects.
      *
      * For accesses on these properties, the correspondence is as follows:
      *
@@ -521,6 +520,11 @@ class ObjectGroup : public gc::TenuredCell
     /* Get a property only if it already exists. */
     inline HeapTypeSet *maybeGetProperty(jsid id);
 
+    /*
+     * Iterate through the group's properties. getPropertyCount overapproximates
+     * in the hash case (see SET_ARRAY_SIZE in TypeInference-inl.h), and
+     * getProperty may return nullptr.
+     */
     inline unsigned getPropertyCount();
     inline Property *getProperty(unsigned i);
 
@@ -593,8 +597,9 @@ class ObjectGroup : public gc::TenuredCell
         return Addendum_OriginalUnboxedGroup << OBJECT_FLAG_ADDENDUM_SHIFT;
     }
 
-  private:
     inline uint32_t basePropertyCount();
+
+  private:
     inline void setBasePropertyCount(uint32_t count);
 
     static void staticAsserts() {

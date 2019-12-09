@@ -156,6 +156,10 @@ public:
   bool mHanging;
   // Is the thread in a waiting state
   bool mWaiting;
+  // Annotations for the current hang
+  UniquePtr<HangMonitor::HangAnnotations> mAnnotations;
+  // Annotators registered for this thread
+  HangMonitor::Observer::Annotators mAnnotators;
 
   BackgroundHangThread(const char* aName,
                        uint32_t aTimeoutMs,
@@ -290,6 +294,8 @@ BackgroundHangManager::RunMonitorThread()
           // A hang started
           currentThread->mHangStart = interval;
           currentThread->mHanging = true;
+          currentThread->mAnnotations =
+            currentThread->mAnnotators.GatherAnnotations();
         }
       } else {
         if (MOZ_LIKELY(interval != currentThread->mHangStart)) {
@@ -323,6 +329,33 @@ BackgroundHangManager::RunMonitorThread()
   }
 }
 
+bool
+BackgroundHangMonitor::RegisterAnnotator(HangMonitor::Annotator& aAnnotator)
+{
+#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
+  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
+  if (!thisThread) {
+    return false;
+  }
+  return thisThread->mAnnotators.Register(aAnnotator);
+#else
+  return false;
+#endif
+}
+
+bool
+BackgroundHangMonitor::UnregisterAnnotator(HangMonitor::Annotator& aAnnotator)
+{
+#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
+  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
+  if (!thisThread) {
+    return false;
+  }
+  return thisThread->mAnnotators.Unregister(aAnnotator);
+#else
+  return false;
+#endif
+}
 
 BackgroundHangThread::BackgroundHangThread(const char* aName,
                                            uint32_t aTimeoutMs,

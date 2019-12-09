@@ -3208,7 +3208,7 @@ nsFrameSelection::DeleteFromDocument()
   }
 
   nsRefPtr<Selection> selection = mDomSelections[index];
-  for (int32_t rangeIdx = 0; rangeIdx < selection->GetRangeCount(); ++rangeIdx) {
+  for (uint32_t rangeIdx = 0; rangeIdx < selection->RangeCount(); ++rangeIdx) {
     nsRefPtr<nsRange> range = selection->GetRangeAt(rangeIdx);
     res = range->DeleteContents();
     if (NS_FAILED(res))
@@ -3998,7 +3998,7 @@ Selection::GetRangesForInterval(nsIDOMNode* aBeginNode, int32_t aBeginOffset,
   }
 
   *aResults = static_cast<nsIDOMRange**>
-                         (nsMemory::Alloc(sizeof(nsIDOMRange*) * *aResultCount));
+                         (moz_xmalloc(sizeof(nsIDOMRange*) * *aResultCount));
   NS_ENSURE_TRUE(*aResults, NS_ERROR_OUT_OF_MEMORY);
 
   for (uint32_t i = 0; i < *aResultCount; i++) {
@@ -6223,9 +6223,9 @@ Selection::SetSelectionDirection(nsDirection aDirection) {
 }
 
 JSObject*
-Selection::WrapObject(JSContext* aCx)
+Selection::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return mozilla::dom::SelectionBinding::Wrap(aCx, this);
+  return mozilla::dom::SelectionBinding::Wrap(aCx, this, aGivenProto);
 }
 
 // AutoHideSelectionChanges

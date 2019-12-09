@@ -25,11 +25,9 @@
 #include "GMPLoader.h"
 
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
-#include "sandbox/chromium/base/basictypes.h"
-#include "sandbox/win/src/sandbox.h"
-#include "sandbox/win/src/sandbox_factory.h"
 #include "mozilla/sandboxTarget.h"
 #include "mozilla/sandboxing/loggingCallbacks.h"
+#include "sandbox/win/src/sandbox_factory.h"
 #endif
 
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
@@ -54,7 +52,11 @@
        "Goanna:MozillaRntimeMain", __VA_ARGS__)) \
      : (void)0 )
 
-#endif
+# ifdef MOZ_CONTENT_SANDBOX
+# include "mozilla/Sandbox.h"
+# endif
+
+#endif // MOZ_WIDGET_GONK
 
 #ifdef MOZ_NUWA_PROCESS
 #include <binder/ProcessState.h>
@@ -79,19 +81,13 @@ InitializeBinder(void *aDummy) {
 
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
 static bool gIsSandboxEnabled = false;
-void StartSandboxCallback()
-{
-    if (gIsSandboxEnabled) {
-        sandbox::TargetServices* target_service =
-            sandbox::SandboxFactory::GetTargetServices();
-        target_service->LowerToken();
-    }
-}
 
 class WinSandboxStarter : public mozilla::gmp::SandboxStarter {
 public:
     virtual void Start(const char *aLibPath) override {
-        StartSandboxCallback();
+        if (gIsSandboxEnabled) {
+            sandbox::SandboxFactory::GetTargetServices()->LowerToken();
+        }
     }
 };
 #endif
@@ -155,6 +151,16 @@ content_process_main(int argc, char* argv[])
     }
 #endif
 
+#if defined(XP_LINUX) && defined(MOZ_SANDBOX)
+    // This has to happen while we're still single-threaded, and on
+    // B2G that means before the Android Binder library is
+    // initialized.  Additional special handling is needed for Nuwa:
+    // the Nuwa process itself needs to be unsandboxed, and the same
+    // single-threadedness condition applies to its children; see also
+    // AfterNuwaFork().
+    mozilla::SandboxEarlyInit(XRE_GetProcessType(), isNuwa);
+#endif
+
 #ifdef MOZ_WIDGET_GONK
     // This creates a ThreadPool for binder ipc. A ThreadPool is necessary to
     // receive binder calls, though not necessary to send binder calls.
@@ -189,11 +195,11 @@ content_process_main(int argc, char* argv[])
             return 1;
         }
 
-        sandbox::ResultCode result = target_service->Init();
+        sandbox::ResultCode result =
+            mozilla::SandboxTarget::Instance()->InitTargetServices(target_service);
         if (result != sandbox::SBOX_ALL_OK) {
            return 2;
         }
-        mozilla::SandboxTarget::Instance()->SetStartSandboxCallback(StartSandboxCallback);
 
         mozilla::sandboxing::PrepareForLogging();
     }

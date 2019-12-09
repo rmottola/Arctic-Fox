@@ -103,7 +103,7 @@ public:
   nsIContent* GetPoolHost() { return mPoolHost; }
   nsTArray<HTMLShadowElement*>& ShadowDescendants() { return mShadowDescendants; }
 
-  JSObject* WrapObject(JSContext* aCx) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   static bool IsPooledNode(nsIContent* aChild, nsIContent* aContainer,
                            nsIContent* aHost);
@@ -134,7 +134,7 @@ public:
     mIsComposedDocParticipant = aIsComposedDocParticipant;
   }
 
-  virtual void DestroyContent() MOZ_OVERRIDE;
+  virtual void DestroyContent() override;
 protected:
   virtual ~ShadowRoot();
 

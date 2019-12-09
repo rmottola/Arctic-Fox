@@ -239,27 +239,6 @@ static uint32_t gNumberOfWidgetsNeedingEventThread = 0;
 
 #pragma mark -
 
-/* Convenience routine to go from a Goanna rect to Cocoa NSRect.
- *
- * Goanna rects (nsRect) contain an origin (x,y) in a coordinate
- * system with (0,0) in the top-left of the screen. Cocoa rects
- * (NSRect) contain an origin (x,y) in a coordinate system with
- * (0,0) in the bottom-left of the screen. Both nsRect and NSRect
- * contain width/height info, with no difference in their use.
- * If a Cocoa rect is from a flipped view, there is no need to
- * convert coordinate systems.
- */
-#ifndef __LP64__
-static inline void
-ConvertGoannaRectToMacRect(const nsIntRect& aRect, Rect& outMacRect)
-{
-  outMacRect.left = aRect.x;
-  outMacRect.top = aRect.y;
-  outMacRect.right = aRect.x + aRect.width;
-  outMacRect.bottom = aRect.y + aRect.height;
-}
-#endif
-
 // Flips a screen coordinate from a point in the cocoa coordinate system (bottom-left rect) to a point
 // that is a "flipped" cocoa coordinate system (starts in the top-left).
 static inline void
@@ -2518,6 +2497,8 @@ nsChildView::EnsureVibrancyManager()
 already_AddRefed<gfx::DrawTarget>
 nsChildView::StartRemoteDrawing()
 {
+  // should have created the GLPresenter in InitCompositor.
+  MOZ_ASSERT(mGLPresenter);
   if (!mGLPresenter) {
     mGLPresenter = GLPresenter::CreateForWindow(this);
 
@@ -2560,6 +2541,19 @@ nsChildView::CleanupRemoteDrawing()
   mResizerImage = nullptr;
   mTitlebarImage = nullptr;
   mGLPresenter = nullptr;
+}
+
+bool
+nsChildView::InitCompositor(Compositor* aCompositor)
+{
+  if (aCompositor->GetBackendType() == LayersBackend::LAYERS_BASIC) {
+    if (!mGLPresenter) {
+      mGLPresenter = GLPresenter::CreateForWindow(this);
+    }
+
+    return !!mGLPresenter;
+  }
+  return true;
 }
 
 void

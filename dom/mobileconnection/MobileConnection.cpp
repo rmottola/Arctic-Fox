@@ -50,7 +50,7 @@ using namespace mozilla::dom::mobileconnection;
 
 class MobileConnection::Listener final : public nsIMobileConnectionListener
 #ifdef MOZ_B2G_RIL
-                                           , public nsIIccListener
+                                       , public nsIIccListener
 #endif // MOZ_B2G_RIL
 {
   MobileConnection* mMobileConnection;
@@ -202,9 +202,9 @@ MobileConnection::DisconnectFromOwner()
 }
 
 JSObject*
-MobileConnection::WrapObject(JSContext* aCx)
+MobileConnection::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return MozMobileConnectionBinding::Wrap(aCx, this);
+  return MozMobileConnectionBinding::Wrap(aCx, this, aGivenProto);
 }
 
 bool
@@ -449,7 +449,7 @@ MobileConnection::GetSupportedNetworkTypes(nsTArray<MobileNetworkType>& aTypes) 
     aTypes.AppendElement(static_cast<MobileNetworkType>(type));
   }
 
-  nsMemory::Free(types);
+  free(types);
 }
 
 already_AddRefed<DOMRequest>

@@ -112,6 +112,8 @@ Response::Redirect(const GlobalObject& aGlobal, const nsAString& aUrl,
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
+  r->GetInternalHeaders()->SetGuard(HeadersGuardEnum::Immutable, aRv);
+  MOZ_ASSERT(!aRv.Failed());
 
   return r.forget();
 }
@@ -121,6 +123,8 @@ Response::Constructor(const GlobalObject& aGlobal,
                       const Optional<ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams>& aBody,
                       const ResponseInit& aInit, ErrorResult& aRv)
 {
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+
   if (aInit.mStatus < 200 || aInit.mStatus > 599) {
     aRv.ThrowRangeError(MSG_INVALID_RESPONSE_STATUSCODE_ERROR);
     return nullptr;
@@ -150,7 +154,6 @@ Response::Constructor(const GlobalObject& aGlobal,
   nsRefPtr<InternalResponse> internalResponse =
     new InternalResponse(aInit.mStatus, statusText);
 
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
   nsRefPtr<Response> r = new Response(global, internalResponse);
 
   if (aInit.mHeaders.WasPassed()) {
@@ -159,7 +162,7 @@ Response::Constructor(const GlobalObject& aGlobal,
     // Instead of using Fill, create an object to allow the constructor to
     // unwrap the HeadersInit.
     nsRefPtr<Headers> headers =
-      Headers::Constructor(aGlobal, aInit.mHeaders.Value(), aRv);
+      Headers::Create(global, aInit.mHeaders.Value(), aRv);
     if (aRv.Failed()) {
       return nullptr;
     }
@@ -225,19 +228,6 @@ Response::Headers_()
   }
 
   return mHeaders;
-}
-
-void
-Response::SetFinalURL(bool aFinalURL, ErrorResult& aRv)
-{
-  nsCString url;
-  mInternalResponse->GetUrl(url);
-  if (url.IsEmpty()) {
-    aRv.ThrowTypeError(MSG_RESPONSE_URL_IS_NULL);
-    return;
-  }
-
-  mInternalResponse->SetFinalURL(aFinalURL);
 }
 } // namespace dom
 } // namespace mozilla

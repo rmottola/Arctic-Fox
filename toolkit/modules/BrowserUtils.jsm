@@ -185,6 +185,37 @@ this.BrowserUtils = {
     return "_blank";
   },
 
+  onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
+    // Don't modify non-default targets or targets that aren't in top-level app
+    // tab docshells (isAppTab will be false for app tab subframes).
+    if (originalTarget != "" || !isAppTab)
+      return originalTarget;
+
+    // External links from within app tabs should always open in new tabs
+    // instead of replacing the app tab's page (Bug 575561)
+    let linkHost;
+    let docHost;
+    try {
+      linkHost = linkURI.host;
+      docHost = linkNode.ownerDocument.documentURIObject.host;
+    } catch(e) {
+      // nsIURI.host can throw for non-nsStandardURL nsIURIs.
+      // If we fail to get either host, just return originalTarget.
+      return originalTarget;
+    }
+
+    if (docHost == linkHost)
+      return originalTarget;
+
+    // Special case: ignore "www" prefix if it is part of host string
+    let [longHost, shortHost] =
+      linkHost.length > docHost.length ? [linkHost, docHost] : [docHost, linkHost];
+    if (longHost == "www." + shortHost)
+      return originalTarget;
+
+    return "_blank";
+  },
+
   /**
    * Map the plugin's name to a filtered version more suitable for UI.
    *
@@ -217,8 +248,11 @@ this.BrowserUtils = {
    * @return a boolean indicating if linkNode has a rel="noreferrer" attribute.
    */
   linkHasNoReferrer: function (linkNode) {
+    // A null linkNode typically means that we're checking a link that wasn't
+    // provided via an <a> link, like a text-selected URL.  Don't leak
+    // referrer information in this case.
     if (!linkNode)
-      return false;
+      return true;
 
     let rel = linkNode.getAttribute("rel");
     if (!rel)

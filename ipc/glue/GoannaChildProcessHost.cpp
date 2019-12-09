@@ -27,6 +27,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/ipc/BrowserProcessSubThread.h"
 #include "mozilla/Omnijar.h"
+#include "ProtocolUtils.h"
 #include <sys/stat.h>
 
 #ifdef XP_WIN
@@ -426,6 +427,11 @@ GoannaChildProcessHost::Join()
 void
 GoannaChildProcessHost::SetAlreadyDead()
 {
+  if (mChildProcessHandle &&
+      mChildProcessHandle != kInvalidProcessHandle) {
+    base::CloseProcessHandle(mChildProcessHandle);
+  }
+
   mChildProcessHandle = 0;
 }
 

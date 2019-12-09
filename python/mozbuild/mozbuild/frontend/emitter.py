@@ -75,7 +75,10 @@ from .data import (
 
 from .reader import SandboxValidationError
 
-from .context import Context
+from .context import (
+    Context,
+    SubContext,
+)
 
 
 class TreeMetadataEmitter(LoggingMixin):
@@ -136,6 +139,11 @@ class TreeMetadataEmitter(LoggingMixin):
                     raise Exception('Unhandled object of type %s' % type(o))
 
         for out in output:
+            # Nothing in sub-contexts is currently of interest to us. Filter
+            # them all out.
+            if isinstance(out, SubContext):
+                continue
+
             if isinstance(out, Context):
                 # Keep all contexts around, we will need them later.
                 contexts[out.objdir] = out
@@ -154,11 +162,14 @@ class TreeMetadataEmitter(LoggingMixin):
             else:
                 raise Exception('Unhandled output type: %s' % type(out))
 
-        start = time.time()
-        objs = list(self._emit_libs_derived(contexts))
-        emitter_time += time.time() - start
+        # Don't emit Linkable objects when COMPILE_ENVIRONMENT is explicitely
+        # set to a value meaning false (usually '').
+        if self.config.substs.get('COMPILE_ENVIRONMENT', True):
+            start = time.time()
+            objs = list(self._emit_libs_derived(contexts))
+            emitter_time += time.time() - start
 
-        for o in emit_objs(objs): yield o
+            for o in emit_objs(objs): yield o
 
         yield ReaderSummary(file_count, sandbox_execution_time, emitter_time)
 
@@ -525,7 +536,12 @@ class TreeMetadataEmitter(LoggingMixin):
                 flags = generated_files[f]
                 output = f
                 if flags.script:
-                    script = mozpath.join(context.srcdir, flags.script)
+                    method = "main"
+                    if ':' in flags.script:
+                        script, method = flags.script.split(':')
+                    else:
+                        script = flags.script
+                    script = mozpath.join(context.srcdir, script)
                     inputs = [mozpath.join(context.srcdir, i) for i in flags.inputs]
 
                     if not os.path.exists(script):
@@ -543,8 +559,9 @@ class TreeMetadataEmitter(LoggingMixin):
                                 % (f, i), context)
                 else:
                     script = None
+                    method = None
                     inputs = []
-                yield GeneratedFile(context, script, output, inputs)
+                yield GeneratedFile(context, script, method, output, inputs)
 
         test_harness_files = context.get('TEST_HARNESS_FILES')
         if test_harness_files:
@@ -566,7 +583,14 @@ class TreeMetadataEmitter(LoggingMixin):
                     else:
                         resolved = context.resolve_path(s)
                         if '*' in s:
-                            srcdir_pattern_files[path].append(s);
+                            if s[0] == '/':
+                                pattern_start = resolved.index('*')
+                                base_path = mozpath.dirname(resolved[:pattern_start])
+                                pattern = resolved[len(base_path)+1:]
+                            else:
+                                base_path = context.srcdir
+                                pattern = s
+                            srcdir_pattern_files[path].append((base_path, pattern));
                         elif not os.path.exists(resolved):
                             raise SandboxValidationError(
                                 'File listed in TEST_HARNESS_FILES does not exist: %s' % s, context)

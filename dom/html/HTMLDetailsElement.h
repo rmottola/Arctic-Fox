@@ -62,7 +62,7 @@ public:
 protected:
   virtual ~HTMLDetailsElement();
 
-  virtual JSObject* WrapNode(JSContext* aCx) override;
+  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   class ToggleEventDispatcher final : public AsyncEventDispatcher
   {

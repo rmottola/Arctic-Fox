@@ -3919,6 +3919,24 @@ MArrayState::Copy(TempAllocator& alloc, MArrayState* state)
     return res;
 }
 
+MNewArray::MNewArray(CompilerConstraintList *constraints, uint32_t count, MConstant *templateConst,
+                     gc::InitialHeap initialHeap, AllocatingBehaviour allocating)
+  : MUnaryInstruction(templateConst),
+    count_(count),
+    initialHeap_(initialHeap),
+    allocating_(allocating),
+    convertDoubleElements_(false)
+{
+    ArrayObject *obj = templateObject();
+    setResultType(MIRType_Object);
+    if (!obj->isSingleton()) {
+        TemporaryTypeSet *types = MakeSingletonTypeSet(constraints, obj);
+        setResultTypeSet(types);
+        if (types->convertDoubleElements(constraints) == TemporaryTypeSet::AlwaysConvertToDoubles)
+            convertDoubleElements_ = true;
+    }
+}
+
 bool
 MNewArray::shouldUseVM() const
 {
@@ -4126,6 +4144,57 @@ MLoadElement::foldsTo(TempAllocator& alloc)
         return this;
 
     return foldsToStoredValue(alloc, store->value());
+}
+
+static inline const MDefinition *
+GetStoreObject(const MDefinition *store)
+{
+    switch (store->op()) {
+      case MDefinition::Op_StoreElement:
+        return store->toStoreElement()->elements()->toElements()->input();
+
+      case MDefinition::Op_StoreElementHole:
+        return store->toStoreElementHole()->object();
+
+      default:
+        return nullptr;
+    }
+}
+
+static inline const MElements *
+MaybeUnwrapElements(const MDefinition *elements)
+{
+    if (elements->isConvertElementsToDoubles())
+        return elements->toConvertElementsToDoubles()->elements()->toElements();
+
+    return elements->toElements();
+}
+
+bool
+MElements::mightAlias(const MDefinition *store) const
+{
+    if (!input()->resultTypeSet())
+        return true;
+
+    const MDefinition *storeObj = GetStoreObject(store);
+    if (!storeObj)
+        return true;
+    if (!storeObj->resultTypeSet())
+        return true;
+
+    return input()->resultTypeSet()->objectsIntersect(storeObj->resultTypeSet());
+}
+
+bool
+MLoadElement::mightAlias(const MDefinition *store) const
+{
+    return MaybeUnwrapElements(elements())->mightAlias(store);
+}
+
+bool
+MInitializedLength::mightAlias(const MDefinition *store) const
+{
+    return MaybeUnwrapElements(elements())->mightAlias(store);
 }
 
 bool
@@ -4911,7 +4980,8 @@ AddGroupGuard(TempAllocator& alloc, MBasicBlock* current, MDefinition* obj,
 
     if (key->isGroup()) {
         guard = MGuardObjectGroup::New(alloc, obj, key->group(), bailOnEquality,
-                                       Bailout_ObjectIdentityOrTypeGuard);
+                                       Bailout_ObjectIdentityOrTypeGuard,
+                                       /* checkUnboxedExpando = */ false);
     } else {
         MConstant* singletonConst = MConstant::NewConstraintlessObject(alloc, key->singleton());
         current->add(singletonConst);

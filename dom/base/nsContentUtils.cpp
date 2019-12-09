@@ -31,6 +31,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/Base64.h"
+#include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/dom/DocumentFragment.h"
@@ -401,7 +402,7 @@ EventListenerManagerHashClearEntry(PLDHashTable *table, PLDHashEntryHdr *entry)
 }
 
 class SameOriginCheckerImpl final : public nsIChannelEventSink,
-                                        public nsIInterfaceRequestor
+                                    public nsIInterfaceRequestor
 {
   ~SameOriginCheckerImpl() {}
 
@@ -994,19 +995,29 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   }
 
   bool foundValue = false;
-  int32_t value = 0;
-  int32_t pValue = 0; // Previous value, used to check integer overflow
+  CheckedInt32 value = 0;
+
+  // Check for leading zeros first.
+  uint64_t leadingZeros = 0;
+  while (iter != end) {
+    if (*iter != char16_t('0')) {
+      break;
+    }
+
+    ++leadingZeros;
+    foundValue = true;
+    ++iter;
+  }
+
   while (iter != end) {
     if (*iter >= char16_t('0') && *iter <= char16_t('9')) {
       value = (value * 10) + (*iter - char16_t('0'));
       ++iter;
-      // Checking for integer overflow.
-      if (pValue > value) {
+      if (!value.isValid()) {
         result |= eParseHTMLInteger_Error | eParseHTMLInteger_ErrorOverflow;
         break;
       } else {
         foundValue = true;
-        pValue = value;
       }
     } else if (*iter == char16_t('%')) {
       ++iter;
@@ -1024,9 +1035,13 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   if (negate) {
     value = -value;
     // Checking the special case of -0.
-    if (!value) {
+    if (value == 0) {
       result |= eParseHTMLInteger_NonStandard;
     }
+  }
+
+  if (leadingZeros > 1 || (leadingZeros == 1 && !(value == 0))) {
+    result |= eParseHTMLInteger_NonStandard;
   }
 
   if (iter != end) {
@@ -1034,7 +1049,7 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   }
 
   *aResult = (ParseHTMLIntegerResultFlags)result;
-  return value;
+  return value.value();
 }
 
 #define SKIP_WHITESPACE(iter, end_iter, end_res)                 \
@@ -5753,7 +5768,7 @@ SameOriginCheckerImpl::GetInterface(const nsIID& aIID, void** aResult)
 
 /* static */
 nsresult
-nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsCString& aOrigin)
+nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsACString& aOrigin)
 {
   NS_PRECONDITION(aPrincipal, "missing principal");
 
@@ -5774,7 +5789,7 @@ nsContentUtils::GetASCIIOrigin(nsIPrincipal* aPrincipal, nsCString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsCString& aOrigin)
+nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsACString& aOrigin)
 {
   NS_PRECONDITION(aURI, "missing uri");
 
@@ -5828,7 +5843,7 @@ nsContentUtils::GetASCIIOrigin(nsIURI* aURI, nsCString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin)
+nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsAString& aOrigin)
 {
   NS_PRECONDITION(aPrincipal, "missing principal");
 
@@ -5849,7 +5864,7 @@ nsContentUtils::GetUTFOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin)
 
 /* static */
 nsresult
-nsContentUtils::GetUTFOrigin(nsIURI* aURI, nsString& aOrigin)
+nsContentUtils::GetUTFOrigin(nsIURI* aURI, nsAString& aOrigin)
 {
   NS_PRECONDITION(aURI, "missing uri");
 
@@ -6078,7 +6093,7 @@ nsContentUtils::CreateBlobBuffer(JSContext* aCx,
                                  JS::MutableHandle<JS::Value> aBlob)
 {
   uint32_t blobLen = aData.Length();
-  void* blobData = moz_malloc(blobLen);
+  void* blobData = malloc(blobLen);
   nsRefPtr<File> blob;
   if (blobData) {
     memcpy(blobData, aData.BeginReading(), blobLen);
@@ -6517,6 +6532,11 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
   AutoJSAPI jsapi;
   jsapi.Init();
   JSContext* cx = jsapi.cx();
+
+  // Failure to create or run the regexp results in the invalid pattern
+  // matching, but we can still report the error to the console.
+  jsapi.TakeOwnershipOfErrorReporting();
+
   // We can use the junk scope here, because we're just using it for
   // regexp evaluation, not actual script execution.
   JSAutoCompartment ac(cx, xpc::UnprivilegedJunkScope());
@@ -6530,7 +6550,6 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
                                   static_cast<char16_t*>(aPattern.BeginWriting()),
                                   aPattern.Length(), 0));
   if (!re) {
-    JS_ClearPendingException(cx);
     return true;
   }
 
@@ -6539,7 +6558,6 @@ nsContentUtils::IsPatternMatching(nsAString& aValue, nsAString& aPattern,
   if (!JS_ExecuteRegExpNoStatics(cx, re,
                                  static_cast<char16_t*>(aValue.BeginWriting()),
                                  aValue.Length(), &idx, true, &rval)) {
-    JS_ClearPendingException(cx);
     return true;
   }
 
@@ -6821,7 +6839,7 @@ nsContentUtils::GetSelectionInTextControl(Selection* aSelection,
 {
   MOZ_ASSERT(aSelection && aRoot);
 
-  if (!aSelection->GetRangeCount()) {
+  if (!aSelection->RangeCount()) {
     // Nothing selected
     aOutStartOffset = aOutEndOffset = 0;
     return;
@@ -6882,7 +6900,7 @@ nsContentUtils::GetSelectionBoundingRect(Selection* aSel)
       res = nsLayoutUtils::TransformFrameRectToAncestor(frame, res, relativeTo);
     }
   } else {
-    int32_t rangeCount = aSel->GetRangeCount();
+    int32_t rangeCount = aSel->RangeCount();
     nsLayoutUtils::RectAccumulator accumulator;
     for (int32_t idx = 0; idx < rangeCount; ++idx) {
       nsRange* range = aSel->GetRangeAt(idx);

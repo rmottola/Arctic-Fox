@@ -15,6 +15,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/SizePrintfMacros.h"
 #include "mozilla/TemplateLib.h"
+#include "mozilla/UniquePtr.h"
 
 #include <string.h>
 
@@ -71,6 +72,7 @@ using namespace js::gc;
 
 using mozilla::DebugOnly;
 using mozilla::Maybe;
+using mozilla::UniquePtr;
 
 JS_FRIEND_API(JSObject*)
 JS_ObjectToInnerObject(JSContext* cx, HandleObject obj)
@@ -94,10 +96,11 @@ js::NonNullObject(JSContext* cx, const Value& v)
 {
     if (v.isPrimitive()) {
         RootedValue value(cx, v);
-        char *bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, value, NullPtr());
+        UniquePtr<char[], JS::FreePolicy> bytes =
+            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, value, NullPtr());
         if (!bytes)
             return nullptr;
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes.get());
         return nullptr;
     }
     return &v.toObject();
@@ -189,12 +192,12 @@ js::GetFirstArgumentAsObject(JSContext* cx, const CallArgs& args, const char* me
 
     HandleValue v = args[0];
     if (!v.isObject()) {
-        char* bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NullPtr());
+        UniquePtr<char[], JS::FreePolicy> bytes =
+            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NullPtr());
         if (!bytes)
             return false;
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
-                             bytes, "not an object");
-        js_free(bytes);
+                             bytes.get(), "not an object");
         return false;
     }
 
@@ -947,7 +950,6 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
         // dictionary mode.
         RootedShape last(cx, EmptyShape::getInitialShape(cx, nobj->getClass(),
                                                          nobj->getTaggedProto(),
-                                                         nobj->getMetadata(),
                                                          nobj->numFixedSlots(),
                                                          nobj->lastProperty()->getObjectFlags()));
         if (!last)
@@ -1107,10 +1109,6 @@ NewObject(ExclusiveContext *cx, HandleObjectGroup group, gc::AllocKind kind,
     MOZ_ASSERT_IF(clasp == &JSFunction::class_,
                   kind == JSFunction::FinalizeKind || kind == JSFunction::ExtendedFinalizeKind);
 
-    JSObject *metadata = nullptr;
-    if (!NewObjectMetadata(cx, &metadata))
-        return nullptr;
-
     // For objects which can have fixed data following the object, only use
     // enough fixed slots to cover the number of reserved slots in the object,
     // regardless of the allocation kind specified.
@@ -1118,8 +1116,7 @@ NewObject(ExclusiveContext *cx, HandleObjectGroup group, gc::AllocKind kind,
                     ? GetGCKindSlots(gc::GetGCObjectKind(clasp), clasp)
                     : GetGCKindSlots(kind, clasp);
 
-    RootedShape shape(cx, EmptyShape::getInitialShape(cx, clasp, group->proto(),
-                                                      metadata, nfixed));
+    RootedShape shape(cx, EmptyShape::getInitialShape(cx, clasp, group->proto(), nfixed));
     if (!shape)
         return nullptr;
 
@@ -1161,7 +1158,6 @@ NewObjectWithTaggedProtoIsCachable(ExclusiveContext *cxArg, Handle<TaggedProto> 
            proto.isObject() &&
            newKind == GenericObject &&
            clasp->isNative() &&
-           !cxArg->asJSContext()->compartment()->hasObjectMetadataCallback() &&
            !proto.toObject()->is<GlobalObject>();
 }
 
@@ -1305,8 +1301,7 @@ NewObjectWithClassProtoIsCachable(ExclusiveContext *cxArg,
     return cxArg->isJSContext() &&
            protoKey != JSProto_Null &&
            newKind == GenericObject &&
-           clasp->isNative() &&
-           !cxArg->asJSContext()->compartment()->hasObjectMetadataCallback();
+           clasp->isNative();
 }
 
 JSObject *
@@ -1380,7 +1375,6 @@ NewObjectWithGroupIsCachable(ExclusiveContext *cx, HandleObjectGroup group,
            newKind == GenericObject &&
            group->clasp()->isNative() &&
            (!group->newScript() || group->newScript()->analyzed()) &&
-           !cx->compartment()->hasObjectMetadataCallback() &&
            cx->isJSContext();
 }
 
@@ -1883,13 +1877,9 @@ InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
 {
     assertSameCompartment(cx, src, dst);
     MOZ_ASSERT(src->getClass() == dst->getClass());
-    MOZ_ASSERT(src->getProto() == dst->getProto());
     MOZ_ASSERT(dst->lastProperty()->getObjectFlags() == 0);
-    MOZ_ASSERT(!src->getMetadata());
     MOZ_ASSERT(!src->isSingleton());
-
-    // Save the dst metadata, if any, before we start messing with its shape.
-    RootedObject dstMetadata(cx, dst->getMetadata());
+    MOZ_ASSERT(src->numFixedSlots() == dst->numFixedSlots());
 
     if (!dst->ensureElements(cx, src->getDenseInitializedLength()))
         return false;
@@ -1901,17 +1891,39 @@ InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
     }
 
     MOZ_ASSERT(!src->hasPrivate());
-    RootedShape shape(cx, src->lastProperty());
+    RootedShape shape(cx);
+    if (src->getProto() == dst->getProto()) {
+        shape = src->lastProperty();
+    } else {
+        // We need to generate a new shape for dst that has dst's proto but all
+        // the property information from src.  Note that we asserted above that
+        // dst's object flags are 0.
+        shape = EmptyShape::getInitialShape(cx, dst->getClass(), dst->getTaggedProto(),
+                                            dst->numFixedSlots(), 0);
+        if (!shape)
+            return false;
+
+        // Get an in-order list of the shapes in the src object.
+        AutoShapeVector shapes(cx);
+        for (Shape::Range<NoGC> r(src->lastProperty()); !r.empty(); r.popFront()) {
+            if (!shapes.append(&r.front()))
+                return false;
+        }
+        Reverse(shapes.begin(), shapes.end());
+
+        for (size_t i = 0; i < shapes.length(); i++) {
+            StackShape unrootedChild(shapes[i]);
+            RootedGeneric<StackShape*> child(cx, &unrootedChild);
+            shape = cx->compartment()->propertyTree.getChild(cx, shape, *child);
+            if (!shape)
+                return false;
+        }
+    }
     size_t span = shape->slotSpan();
     if (!dst->setLastProperty(cx, shape))
         return false;
     for (size_t i = JSCLASS_RESERVED_SLOTS(src->getClass()); i < span; i++)
         dst->setSlot(i, src->getSlot(i));
-
-    if (dstMetadata) {
-        if (!js::SetObjectMetadata(cx, dst, dstMetadata))
-            return false;
-    }
 
     return true;
 }
@@ -2122,7 +2134,7 @@ js::CloneObjectLiteral(JSContext *cx, HandleObject srcObj)
         value = srcArray->getDenseElement(i);
         MOZ_ASSERT_IF(value.isMarkable(),
                       value.toGCThing()->isTenured() &&
-                      cx->runtime()->isAtomsZone(value.toGCThing()->asTenured().zone()));
+                      cx->runtime()->isAtomsZone(value.toGCThing()->asTenured().zoneFromAnyThread()));
 
         id = INT_TO_JSID(i);
         if (!DefineProperty(cx, res, id, value, nullptr, nullptr, JSPROP_ENUMERATE))
@@ -2930,7 +2942,7 @@ js::LookupPropertyPure(ExclusiveContext* cx, JSObject* obj, jsid id, JSObject** 
             // are not handled here.
             if (!obj->is<UnboxedPlainObject>())
                 return false;
-            if (obj->as<UnboxedPlainObject>().layout().lookup(id)) {
+            if (obj->as<UnboxedPlainObject>().containsUnboxedOrExpandoProperty(cx, id)) {
                 *objp = obj;
                 MarkNonNativePropertyFound<NoGC>(propp);
                 return true;
@@ -3050,6 +3062,11 @@ js::SetPrototype(JSContext *cx, HandleObject obj, HandleObject proto, JS::Object
         if (!GetPrototype(cx, obj2, &obj2))
             return false;
     }
+
+    // Convert unboxed objects to their native representations before changing
+    // their prototype/group, as they depend on the group for their layout.
+    if (obj->is<UnboxedPlainObject>() && !UnboxedPlainObject::convertToNative(cx, obj))
+        return false;
 
     Rooted<TaggedProto> taggedProto(cx, TaggedProto(proto));
     if (!SetClassAndProto(cx, obj, obj->getClass(), taggedProto))

@@ -347,7 +347,9 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
   if (sMultiprocessDescription) {
     PrintToBuffer("%s ", sMultiprocessDescription);
   }
+#if !defined(MOZILLA_XPCOMRT_API)
   PrintToBuffer("%d] ", base::GetCurrentProcId());
+#endif // !defined(MOZILLA_XPCOMRT_API)
 
   PrintToBuffer("%s: ", sevString);
 
@@ -400,7 +402,7 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
 #if defined(DEBUG) && defined(_WIN32)
       RealBreak();
 #endif
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZILLA_XPCOMRT_API)
       nsTraceRefcnt::WalkTheStack(stderr);
 #endif
       Abort(buf.buffer);
@@ -425,11 +427,15 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
       return;
 
     case NS_ASSERT_STACK:
+#if !defined(MOZILLA_XPCOMRT_API)
       nsTraceRefcnt::WalkTheStack(stderr);
+#endif // !defined(MOZILLA_XPCOMRT_API)
       return;
 
     case NS_ASSERT_STACK_AND_ABORT:
+#if !defined(MOZILLA_XPCOMRT_API)
       nsTraceRefcnt::WalkTheStack(stderr);
+#endif // !defined(MOZILLA_XPCOMRT_API)
       // Fall through to abort
 
     case NS_ASSERT_ABORT:

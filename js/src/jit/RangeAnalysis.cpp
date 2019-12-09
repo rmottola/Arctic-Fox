@@ -3053,8 +3053,10 @@ void
 MLoadElementHole::collectRangeInfoPreTrunc()
 {
     Range indexRange(index());
-    if (indexRange.isFiniteNonNegative())
+    if (indexRange.isFiniteNonNegative()) {
         needsNegativeIntCheck_ = false;
+        setNotGuard();
+    }
 }
 
 void
@@ -3170,6 +3172,26 @@ MToInt32::collectRangeInfoPreTrunc()
     Range inputRange(input());
     if (!inputRange.canBeNegativeZero())
         canBeNegativeZero_ = false;
+}
+
+void
+MBoundsCheck::collectRangeInfoPreTrunc()
+{
+    Range indexRange(index());
+    Range lengthRange(length());
+    if (!indexRange.hasInt32LowerBound() || !indexRange.hasInt32UpperBound())
+        return;
+    if (!lengthRange.hasInt32LowerBound() || lengthRange.canBeNaN())
+        return;
+
+    int64_t indexLower = indexRange.lower();
+    int64_t indexUpper = indexRange.upper();
+    int64_t lengthLower = lengthRange.lower();
+    int64_t min = minimum();
+    int64_t max = maximum();
+
+    if (indexLower + min >= 0 && indexUpper + max < lengthLower)
+        fallible_ = false;
 }
 
 void

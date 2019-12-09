@@ -406,9 +406,9 @@ Element::GetBindingURL(nsIDocument *aDocument, css::URLValue **aResult)
 }
 
 JSObject*
-Element::WrapObject(JSContext *aCx)
+Element::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  JS::Rooted<JSObject*> obj(aCx, nsINode::WrapObject(aCx));
+  JS::Rooted<JSObject*> obj(aCx, nsINode::WrapObject(aCx, aGivenProto));
   if (!obj) {
     return nullptr;
   }
@@ -1104,9 +1104,9 @@ DestinationInsertionPointList::IndexOf(nsIContent* aContent)
 }
 
 JSObject*
-DestinationInsertionPointList::WrapObject(JSContext* aCx)
+DestinationInsertionPointList::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return NodeListBinding::Wrap(aCx, this);
+  return NodeListBinding::Wrap(aCx, this, aGivenProto);
 }
 
 already_AddRefed<DestinationInsertionPointList>
@@ -3249,7 +3249,7 @@ Element::GetAnimationPlayers(nsTArray<nsRefPtr<AnimationPlayer> >& aPlayers)
          playerIdx < collection->mPlayers.Length();
          playerIdx++) {
       AnimationPlayer* player = collection->mPlayers[playerIdx];
-      if (player->HasCurrentSource() || player->HasInEffectSource()) {
+      if (player->IsRelevant()) {
         aPlayers.AppendElement(player);
       }
     }

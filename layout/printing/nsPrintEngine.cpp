@@ -899,7 +899,7 @@ nsPrintEngine::EnumerateDocumentNames(uint32_t* aCount,
   *aResult = nullptr;
 
   int32_t     numDocs = mPrt->mPrintDocList.Length();
-  char16_t** array   = (char16_t**) nsMemory::Alloc(numDocs * sizeof(char16_t*));
+  char16_t** array   = (char16_t**) moz_xmalloc(numDocs * sizeof(char16_t*));
   if (!array)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -1105,7 +1105,7 @@ nsPrintEngine::IsThereARangeSelection(nsIDOMWindow* aDOMWin)
     return false;
   }
 
-  int32_t rangeCount = selection->GetRangeCount();
+  int32_t rangeCount = selection->RangeCount();
   if (!rangeCount) {
     return false;
   }
@@ -1453,8 +1453,8 @@ nsPrintEngine::GetDisplayTitleAndURL(nsPrintObject*   aPO,
       aURLStr = docURLStrPS;
     }
 
-    nsMemory::Free(docTitleStrPS);
-    nsMemory::Free(docURLStrPS);
+    free(docTitleStrPS);
+    free(docURLStrPS);
   }
 
   nsAutoString docTitle;
@@ -2014,7 +2014,7 @@ nsPrintEngine::UpdateSelectionAndShrinkPrintObject(nsPrintObject* aPO,
     selectionPS->RemoveAllRanges();
   }
   if (selection && selectionPS) {
-    int32_t cnt = selection->GetRangeCount();
+    int32_t cnt = selection->RangeCount();
     int32_t inx;
     for (inx = 0; inx < cnt; ++inx) {
         selectionPS->AddRange(selection->GetRangeAt(inx));
@@ -2428,7 +2428,7 @@ static nsresult CloneSelection(nsIDocument* aOrigDoc, nsIDocument* aDoc)
     shell->GetCurrentSelection(nsISelectionController::SELECTION_NORMAL);
   NS_ENSURE_STATE(origSelection && selection);
 
-  int32_t rangeCount = origSelection->GetRangeCount();
+  int32_t rangeCount = origSelection->RangeCount();
   for (int32_t i = 0; i < rangeCount; ++i) {
       CloneRangeToSelection(origSelection->GetRangeAt(i), aDoc, selection);
   }
@@ -3022,9 +3022,9 @@ void
 nsPrintEngine::CleanupDocTitleArray(char16_t**& aArray, int32_t& aCount)
 {
   for (int32_t i = aCount - 1; i >= 0; i--) {
-    nsMemory::Free(aArray[i]);
+    free(aArray[i]);
   }
-  nsMemory::Free(aArray);
+  free(aArray);
   aArray = nullptr;
   aCount = 0;
 }

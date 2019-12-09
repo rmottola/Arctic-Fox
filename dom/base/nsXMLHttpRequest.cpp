@@ -277,9 +277,9 @@ NS_IMPL_ADDREF_INHERITED(nsXMLHttpRequestUpload, nsXHREventTarget)
 NS_IMPL_RELEASE_INHERITED(nsXMLHttpRequestUpload, nsXHREventTarget)
 
 /* virtual */ JSObject*
-nsXMLHttpRequestUpload::WrapObject(JSContext* aCx)
+nsXMLHttpRequestUpload::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return XMLHttpRequestUploadBinding::Wrap(aCx, this);
+  return XMLHttpRequestUploadBinding::Wrap(aCx, this, aGivenProto);
 }
 
 /////////////////////////////////////////////
@@ -2053,11 +2053,15 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
           }
           nsCOMPtr<nsIFile> jarFile;
           jarChannel->GetJarFile(getter_AddRefs(jarFile));
-          rv = mArrayBufferBuilder.mapToFileInPackage(file, jarFile);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
+          if (!jarFile) {
             mIsMappedArrayBuffer = false;
           } else {
-            channel->SetContentType(NS_LITERAL_CSTRING("application/mem-mapped"));
+            rv = mArrayBufferBuilder.mapToFileInPackage(file, jarFile);
+            if (NS_WARN_IF(NS_FAILED(rv))) {
+              mIsMappedArrayBuffer = false;
+            } else {
+              channel->SetContentType(NS_LITERAL_CSTRING("application/mem-mapped"));
+            }
           }
         }
       }
@@ -2394,60 +2398,6 @@ nsXMLHttpRequest::ChangeStateToDone()
   }
 }
 
-NS_IMETHODIMP
-nsXMLHttpRequest::SendAsBinary(const nsAString &aBody)
-{
-  ErrorResult rv;
-  SendAsBinary(aBody, rv);
-  return rv.ErrorCode();
-}
-
-void
-nsXMLHttpRequest::SendAsBinary(const nsAString &aBody,
-                               ErrorResult& aRv)
-{
-  char *data = static_cast<char*>(NS_Alloc(aBody.Length() + 1));
-  if (!data) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-
-  if (GetOwner() && GetOwner()->GetExtantDoc()) {
-    GetOwner()->GetExtantDoc()->WarnOnceAbout(nsIDocument::eSendAsBinary);
-  }
-
-  nsAString::const_iterator iter, end;
-  aBody.BeginReading(iter);
-  aBody.EndReading(end);
-  char *p = data;
-  while (iter != end) {
-    if (*iter & 0xFF00) {
-      NS_Free(data);
-      aRv.Throw(NS_ERROR_DOM_INVALID_CHARACTER_ERR);
-      return;
-    }
-    *p++ = static_cast<char>(*iter++);
-  }
-  *p = '\0';
-
-  nsCOMPtr<nsIInputStream> stream;
-  aRv = NS_NewByteInputStream(getter_AddRefs(stream), data, aBody.Length(),
-                              NS_ASSIGNMENT_ADOPT);
-  if (aRv.Failed()) {
-    NS_Free(data);
-    return;
-  }
-
-  nsCOMPtr<nsIWritableVariant> variant = new nsVariant();
-
-  aRv = variant->SetAsISupports(stream);
-  if (aRv.Failed()) {
-    return;
-  }
-
-  aRv = Send(variant);
-}
-
 static nsresult
 GetRequestBody(nsIDOMDocument* aDoc, nsIInputStream** aResult,
                uint64_t* aContentLength, nsACString& aContentType,
@@ -2560,7 +2510,7 @@ GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLe
     rv = aBody->GetAsInterface(&iid, getter_AddRefs(supports));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsMemory::Free(iid);
+    free(iid);
 
     // document?
     nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(supports);
@@ -3019,13 +2969,18 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
   if (method.EqualsLiteral("POST")) {
     AddLoadFlags(mChannel,
         nsIRequest::LOAD_BYPASS_CACHE | nsIRequest::INHIBIT_CACHING);
-  }
-  // When we are sync loading, we need to bypass the local cache when it would
-  // otherwise block us waiting for exclusive access to the cache.  If we don't
-  // do this, then we could dead lock in some cases (see bug 309424).
-  else if (!(mState & XML_HTTP_REQUEST_ASYNC)) {
+  } else {
+    // When we are sync loading, we need to bypass the local cache when it would
+    // otherwise block us waiting for exclusive access to the cache.  If we don't
+    // do this, then we could dead lock in some cases (see bug 309424).
+    //
+    // Also don't block on the cache entry on async if it is busy - favoring parallelism
+    // over cache hit rate for xhr. This does not disable the cache everywhere -
+    // only in cases where more than one channel for the same URI is accessed
+    // simultanously.
+
     AddLoadFlags(mChannel,
-        nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY);
+                 nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY);
   }
 
   // Since we expect XML data, set the type hint accordingly

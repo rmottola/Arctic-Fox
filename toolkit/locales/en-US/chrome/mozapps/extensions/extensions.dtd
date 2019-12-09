@@ -210,7 +210,7 @@
 <!ENTITY addon.loadingReleaseNotes.label      "Loading…">
 <!ENTITY addon.errorLoadingReleaseNotes.label "Sorry, but there was an error loading the release notes.">
 
-<!ENTITY addon.nativeAddon                    "This add-on directly targets Pale Moon">
+<!ENTITY addon.nativeAddon                    "This add-on directly targets Arctic Fox">
 <!ENTITY addon.compatAddon                    "This add-on targets Mozilla Firefox and runs in compatibility mode">
 
 <!ENTITY addon.createdBy.label                "By ">

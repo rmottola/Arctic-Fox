@@ -124,7 +124,7 @@ uint32_t             nsXULPrototypeAttribute::gNumCacheFills;
 #endif
 
 class nsXULElementTearoff final : public nsIDOMElementCSSInlineStyle,
-                                      public nsIFrameLoaderOwner
+                                  public nsIFrameLoaderOwner
 {
   ~nsXULElementTearoff() {}
 
@@ -2118,9 +2118,9 @@ nsXULElement::IsEventAttributeName(nsIAtom *aName)
 }
 
 JSObject*
-nsXULElement::WrapNode(JSContext *aCx)
+nsXULElement::WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 {
-    return dom::XULElementBinding::Wrap(aCx, this);
+    return dom::XULElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(nsXULPrototypeNode)

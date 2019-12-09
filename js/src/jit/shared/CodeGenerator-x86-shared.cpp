@@ -2070,6 +2070,12 @@ void
 CodeGeneratorX86Shared::visitGuardObjectGroup(LGuardObjectGroup* guard)
 {
     Register obj = ToRegister(guard->input());
+
+    if (guard->mir()->checkUnboxedExpando()) {
+        masm.cmpPtr(Address(obj, UnboxedPlainObject::offsetOfExpando()), ImmWord(0));
+        bailoutIf(Assembler::NotEqual, guard->snapshot());
+    }
+
     masm.cmpPtr(Operand(obj, JSObject::offsetOfGroup()), ImmGCPtr(guard->mir()->group()));
 
     Assembler::Condition cond =
@@ -3008,8 +3014,8 @@ CodeGeneratorX86Shared::visitSimdUnaryArithIx4(LSimdUnaryArithIx4* ins)
         masm.bitwiseXorX4(in, out);
         return;
       case MSimdUnaryArith::abs:
-      case MSimdUnaryArith::reciprocal:
-      case MSimdUnaryArith::reciprocalSqrt:
+      case MSimdUnaryArith::reciprocalApproximation:
+      case MSimdUnaryArith::reciprocalSqrtApproximation:
       case MSimdUnaryArith::sqrt:
         break;
     }
@@ -3046,11 +3052,11 @@ CodeGeneratorX86Shared::visitSimdUnaryArithFx4(LSimdUnaryArithFx4* ins)
         masm.loadConstantFloat32x4(allOnes, out);
         masm.bitwiseXorX4(in, out);
         return;
-      case MSimdUnaryArith::reciprocal:
-        masm.packedReciprocalFloat32x4(in, out);
+      case MSimdUnaryArith::reciprocalApproximation:
+        masm.packedRcpApproximationFloat32x4(in, out);
         return;
-      case MSimdUnaryArith::reciprocalSqrt:
-        masm.packedReciprocalSqrtFloat32x4(in, out);
+      case MSimdUnaryArith::reciprocalSqrtApproximation:
+        masm.packedRcpSqrtApproximationFloat32x4(in, out);
         return;
       case MSimdUnaryArith::sqrt:
         masm.packedSqrtFloat32x4(in, out);

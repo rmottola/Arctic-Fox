@@ -332,12 +332,12 @@ ApplyRenderingChangeToTree(nsPresContext* aPresContext,
                            nsIFrame* aFrame,
                            nsChangeHint aChange)
 {
-  // We check StyleDisplay()->HasTransformStyle() in addition to checking
+  // We check StylePosition()->HasTransformStyle() in addition to checking
   // IsTransformed() since we can get here for some frames that don't support
   // CSS transforms.
   NS_ASSERTION(!(aChange & nsChangeHint_UpdateTransformLayer) ||
                aFrame->IsTransformed() ||
-               aFrame->StyleDisplay()->HasTransformStyle(),
+               aFrame->StylePosition()->HasTransformStyle(),
                "Unexpected UpdateTransformLayer hint");
 
   nsIPresShell *shell = aPresContext->PresShell();
@@ -742,7 +742,7 @@ RestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
           // It's because we need to set this state on each affected frame
           // that we can't coalesce nsChangeHint_AddOrRemoveTransform hints up
           // to ancestors (i.e. it can't be an inherited change hint).
-          if (cont->IsPositioned()) {
+          if (cont->IsAbsPosContaininingBlock()) {
             // If a transform has been added, we'll be taking this path,
             // but we may be taking this path even if a transform has been
             // removed. It's OK to add the bit even if it's not needed.
@@ -2600,7 +2600,7 @@ ElementRestyler::AddLayerChangesForAnimation()
       // nsChangeHint_UpdateTransformLayer, ApplyRenderingChangeToTree would
       // complain that we're updating a transform layer without a transform).
       if (layerInfo[i].mLayerType == nsDisplayItem::TYPE_TRANSFORM &&
-          !mFrame->StyleDisplay()->HasTransformStyle()) {
+          !mFrame->StylePosition()->HasTransformStyle()) {
         continue;
       }
       NS_UpdateHint(hint, layerInfo[i].mChangeHint);
@@ -3018,9 +3018,9 @@ ElementRestyler::ComputeRestyleResultFromNewContext(nsIFrame* aSelf,
     return eRestyleResult_Continue;
   }
 
-  if (oldContext->IsInlineDescendantOfRuby() !=
-        aNewContext->IsInlineDescendantOfRuby()) {
-    LOG_RESTYLE_CONTINUE("NS_STYLE_IS_INLINE_DESCENDANT_OF_RUBY differs"
+  if (oldContext->ShouldSuppressLineBreak() !=
+        aNewContext->ShouldSuppressLineBreak()) {
+    LOG_RESTYLE_CONTINUE("NS_STYLE_SUPPRESS_LINEBREAK differes"
                          "between old and new style contexts");
     return eRestyleResult_Continue;
   }
@@ -3600,10 +3600,21 @@ ElementRestyler::ComputeStyleChangeFor(nsIFrame*          aFrame,
                                        nsTArray<nsRefPtr<nsStyleContext>>&
                                          aSwappedStructOwners)
 {
-  PROFILER_LABEL("ElementRestyler", "ComputeStyleChangeFor",
-    js::ProfileEntry::Category::CSS);
-
   nsIContent* content = aFrame->GetContent();
+  nsAutoCString idStr;
+  if (profiler_is_active() && content) {
+    nsIAtom* id = content->GetID();
+    if (id) {
+      id->ToUTF8String(idStr);
+    } else {
+      idStr.AssignLiteral("?");
+    }
+  }
+
+  PROFILER_LABEL_PRINTF("ElementRestyler", "ComputeStyleChangeFor",
+                        js::ProfileEntry::Category::CSS,
+                        content ? "Element: %s" : "%s",
+                        content ? idStr.get() : "");
   if (aMinChange) {
     aChangeList->AppendChange(aFrame, content, aMinChange);
   }

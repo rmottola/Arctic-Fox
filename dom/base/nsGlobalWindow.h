@@ -355,7 +355,7 @@ public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
 
   // nsWrapperCache
-  virtual JSObject *WrapObject(JSContext *cx) override
+  virtual JSObject *WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto) override
   {
     return IsInnerWindow() || EnsureInnerWindow() ? GetWrapper() : nullptr;
   }
@@ -669,6 +669,21 @@ public:
             mInClose ||
             mHavePendingClose ||
             mCleanedUp);
+  }
+
+  bool
+  HadOriginalOpener() const
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    return mHadOriginalOpener;
+  }
+
+  bool
+  IsTopLevelWindow()
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    nsPIDOMWindow* parentWindow = GetScriptableTop();
+    return parentWindow == static_cast<nsPIDOMWindow*>(this);
   }
 
   virtual void

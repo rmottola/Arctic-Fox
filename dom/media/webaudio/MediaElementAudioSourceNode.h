@@ -18,7 +18,7 @@ public:
   static already_AddRefed<MediaElementAudioSourceNode>
   Create(AudioContext* aContext, DOMMediaStream* aStream, ErrorResult& aRv);
 
-  virtual JSObject* WrapObject(JSContext* aCx) override;
+  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   virtual const char* NodeType() const override
   {

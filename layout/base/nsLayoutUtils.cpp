@@ -8,6 +8,7 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/BasicEvents.h"
+#include "mozilla/EventDispatcher.h"
 #include "mozilla/gfx/PathHelpers.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Maybe.h"
@@ -95,6 +96,7 @@
 #include "FrameLayerBuilder.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/EventDispatcher.h"
 
 #ifdef MOZ_XUL
 #include "nsXULPopupManager.h"
@@ -882,16 +884,17 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
   nsPresContext* presContext = frame->PresContext();
   int32_t auPerDevPixel = presContext->AppUnitsPerDevPixel();
 
-  LayoutDeviceToScreenScale res(presContext->PresShell()->GetCumulativeResolution().width
-                              * nsLayoutUtils::GetTransformToAncestorScale(frame).width);
+  LayoutDeviceToScreenScale2D res(presContext->PresShell()->GetCumulativeResolution()
+                                * nsLayoutUtils::GetTransformToAncestorScale(frame));
 
   // First convert the base rect to screen pixels
-  LayoutDeviceToScreenScale parentRes = res;
+  LayoutDeviceToScreenScale2D parentRes = res;
   if (isRoot) {
     // the base rect for root scroll frames is specified in the parent document
     // coordinate space, so it doesn't include the local resolution.
-    gfxSize localRes = presContext->PresShell()->GetResolution();
-    parentRes.scale /= localRes.width;
+    float localRes = presContext->PresShell()->GetResolution();
+    parentRes.xScale /= localRes;
+    parentRes.yScale /= localRes;
   }
   ScreenRect screenRect = LayoutDeviceRect::FromAppUnits(base, auPerDevPixel)
                         * parentRes;
@@ -1829,9 +1832,10 @@ nsLayoutUtils::GetNearestScrollableFrame(nsIFrame* aFrame, uint32_t aFlags)
         return scrollableFrame;
     }
     if (aFlags & SCROLLABLE_ALWAYS_MATCH_ROOT) {
-      nsPresContext* pc = f->PresContext();
-      if (pc->IsRootContentDocument() && pc->PresShell()->GetRootFrame() == f) {
-        return pc->PresShell()->GetRootScrollFrameAsScrollable();
+      nsIPresShell* ps = f->PresContext()->PresShell();
+      if (ps->GetDocument() && ps->GetDocument()->IsRootDisplayDocument() &&
+          ps->GetRootFrame() == f) {
+        return ps->GetRootScrollFrameAsScrollable();
       }
     }
   }
@@ -2810,7 +2814,7 @@ CalculateFrameMetricsForDisplayPort(nsIScrollableFrame* aScrollFrame) {
   if (frame == presShell->GetRootScrollFrame()) {
     // Only the root scrollable frame for a given presShell should pick up
     // the presShell's resolution. All the other frames are 1.0.
-    resolution = presShell->GetXResolution();
+    resolution = presShell->GetResolution();
   }
   // Note: unlike in ComputeFrameMetrics(), we don't know the full cumulative
   // resolution including FrameMetrics::mExtraResolution, because layout hasn't
@@ -2818,9 +2822,9 @@ CalculateFrameMetricsForDisplayPort(nsIScrollableFrame* aScrollFrame) {
   // divides out mExtraResolution anyways, so we get the correct result by
   // setting the mCumulativeResolution to everything except the extra resolution
   // and leaving mExtraResolution at 1.
-  LayoutDeviceToLayerScale cumulativeResolution(
-      presShell->GetCumulativeResolution().width
-    * nsLayoutUtils::GetTransformToAncestorScale(frame).width);
+  LayoutDeviceToLayerScale2D cumulativeResolution(
+      presShell->GetCumulativeResolution()
+    * nsLayoutUtils::GetTransformToAncestorScale(frame));
 
   LayerToParentLayerScale layerToParentLayerScale(1.0f);
   metrics.SetDevPixelsPerCSSPixel(deviceScale);
@@ -2831,11 +2835,12 @@ CalculateFrameMetricsForDisplayPort(nsIScrollableFrame* aScrollFrame) {
   // Only the size of the composition bounds is relevant to the
   // displayport calculation, not its origin.
   nsSize compositionSize = nsLayoutUtils::CalculateCompositionSizeForFrame(frame);
-  LayoutDeviceToParentLayerScale compBoundsScale(1.0f);
+  LayoutDeviceToParentLayerScale2D compBoundsScale;
   if (frame == presShell->GetRootScrollFrame() && presContext->IsRootContentDocument()) {
     if (presContext->GetParentPresContext()) {
-      gfxSize res = presContext->GetParentPresContext()->PresShell()->GetCumulativeResolution();
-      compBoundsScale = LayoutDeviceToParentLayerScale(res.width, res.height);
+      float res = presContext->GetParentPresContext()->PresShell()->GetCumulativeResolution();
+      compBoundsScale = LayoutDeviceToParentLayerScale2D(
+          LayoutDeviceToParentLayerScale(res));
     }
   } else {
     compBoundsScale = cumulativeResolution * layerToParentLayerScale;
@@ -2990,15 +2995,17 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
   if (aFlags & PAINT_IGNORE_SUPPRESSION) {
     builder.IgnorePaintSuppression();
   }
-  // Windowed plugins aren't allowed in popups
+
+  // If the root has embedded plugins, flag the builder so we know we'll need
+  // to update plugin geometry after painting.
   if ((aFlags & PAINT_WIDGET_LAYERS) &&
       !willFlushRetainedLayers &&
       !(aFlags & PAINT_DOCUMENT_RELATIVE) &&
       rootPresContext->NeedToComputePluginGeometryUpdates()) {
     builder.SetWillComputePluginGeometry(true);
   }
-  nsRect canvasArea(nsPoint(0, 0), aFrame->GetSize());
 
+  nsRect canvasArea(nsPoint(0, 0), aFrame->GetSize());
   bool ignoreViewportScrolling =
     aFrame->GetParent() ? false : presShell->IgnoringViewportScrolling();
   if (ignoreViewportScrolling && rootScrollFrame) {
@@ -3237,7 +3244,7 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
   if (gfxPrefs::DumpClientLayers()) {
     std::stringstream ss;
     FrameLayerBuilder::DumpRetainedLayerTree(layerManager, ss, false);
-    printf_stderr("%s", ss.str().c_str());
+    print_stderr(ss);
   }
 #endif
 
@@ -3260,28 +3267,25 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
   }
 
   if (builder.WillComputePluginGeometry()) {
-    rootPresContext->ComputePluginGeometryUpdates(aFrame, &builder, &list);
-
-    // We're not going to get a WillPaintWindow event here if we didn't do
-    // widget invalidation, so just apply the plugin geometry update here instead.
-    // We could instead have the compositor send back an equivalent to WillPaintWindow,
-    // but it should be close enough to now not to matter.
-    if (layerManager && !layerManager->NeedsWidgetInvalidation()) {
-#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
-      if (XRE_GetProcessType() == GoannaProcessType_Content) {
-        // If this is a remotely managed widget (PluginWidgetProxy in content)
-        // store this information in the compositor, which ships this
-        // over to chrome for application when we paint.
-        rootPresContext->CollectPluginGeometryUpdates(layerManager);
-      } else
-#endif
-      {
+    // For single process compute and apply plugin geometry updates to plugin
+    // windows, then request composition. For content processes skip eveything
+    // except requesting composition. Geometry updates were calculated and
+    // shipped to the chrome process in nsDisplayList when the layer
+    // transaction completed.
+    if (XRE_GetProcessType() == GoannaProcessType_Default) {
+      rootPresContext->ComputePluginGeometryUpdates(aFrame, &builder, &list);
+      // We're not going to get a WillPaintWindow event here if we didn't do
+      // widget invalidation, so just apply the plugin geometry update here
+      // instead. We could instead have the compositor send back an equivalent
+      // to WillPaintWindow, but it should be close enough to now not to matter.
+      if (layerManager && !layerManager->NeedsWidgetInvalidation()) {
         rootPresContext->ApplyPluginGeometryUpdates();
       }
     }
 
-    // We told the compositor thread not to composite when it received the transaction because
-    // we wanted to update plugins first. Schedule the composite now.
+    // We told the compositor thread not to composite when it received the
+    // transaction because we wanted to update plugins first. Schedule the
+    // composite now.
     if (layerManager) {
       layerManager->Composite();
     }
@@ -5634,7 +5638,7 @@ nsLayoutUtils::GetClosestLayer(nsIFrame* aFrame)
 {
   nsIFrame* layer;
   for (layer = aFrame; layer; layer = layer->GetParent()) {
-    if (layer->IsPositioned() ||
+    if (layer->IsAbsPosContaininingBlock() ||
         (layer->GetParent() &&
           layer->GetParent()->GetType() == nsGkAtoms::scrollFrame))
       break;
@@ -5902,6 +5906,20 @@ ComputeSnappedImageDrawingParameters(gfxContext*     aCtx,
 
     gfxRect anchoredDestRect(anchorPoint, scaledDest);
     gfxRect anchoredImageRect(imageSpaceAnchorPoint, imageSize);
+
+    // Calculate anchoredDestRect with snapped fill rect when the devPixelFill rect
+    // corresponds to just a single tile in that direction
+    if (fill.Width() != devPixelFill.Width() &&
+        devPixelDest.x == devPixelFill.x &&
+        devPixelDest.XMost() == devPixelFill.XMost()) {
+      anchoredDestRect.width = fill.width;
+    }
+    if (fill.Height() != devPixelFill.Height() &&
+        devPixelDest.y == devPixelFill.y &&
+        devPixelDest.YMost() == devPixelFill.YMost()) {
+      anchoredDestRect.height = fill.height;
+    }
+
     transform = TransformBetweenRects(anchoredImageRect, anchoredDestRect);
     invTransform = TransformBetweenRects(anchoredDestRect, anchoredImageRect);
   }
@@ -7282,14 +7300,25 @@ nsLayoutUtils::FontSizeInflationInner(const nsIFrame *aFrame,
        f = f->GetParent()) {
     nsIContent* content = f->GetContent();
     nsIAtom* fType = f->GetType();
+    nsIFrame* parent = f->GetParent();
     // Also, if there is more than one frame corresponding to a single
     // content node, we want the outermost one.
-    if (!(f->GetParent() && f->GetParent()->GetContent() == content) &&
+    if (!(parent && parent->GetContent() == content) &&
         // ignore width/height on inlines since they don't apply
         fType != nsGkAtoms::inlineFrame &&
         // ignore width on radios and checkboxes since we enlarge them and
         // they have width/height in ua.css
         fType != nsGkAtoms::formControlFrame) {
+      // ruby annotations should have the same inflation as its
+      // grandparent, which is the ruby frame contains the annotation.
+      if (fType == nsGkAtoms::rubyTextFrame) {
+        MOZ_ASSERT(parent &&
+                   parent->GetType() == nsGkAtoms::rubyTextContainerFrame);
+        nsIFrame* grandparent = parent->GetParent();
+        MOZ_ASSERT(grandparent &&
+                   grandparent->GetType() == nsGkAtoms::rubyFrame);
+        return FontSizeInflationFor(grandparent);
+      }
       nsStyleCoord stylePosWidth = f->StylePosition()->mWidth;
       nsStyleCoord stylePosHeight = f->StylePosition()->mHeight;
       if (stylePosWidth.GetUnit() != eStyleUnit_Auto ||
@@ -7551,7 +7580,11 @@ nsLayoutUtils::GetContentViewerSize(nsPresContext* aPresContext,
 /* static */ nsSize
 nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
 {
-  nsSize size(aFrame->GetSize());
+  // If we have a scrollable frame, restrict the composition bounds to its
+  // scroll port. The scroll port excludes the frame borders and the scroll
+  // bars, which we don't want to be part of the composition bounds.
+  nsIScrollableFrame* scrollableFrame = aFrame->GetScrollTargetFrame();
+  nsSize size = scrollableFrame ? scrollableFrame->GetScrollPortRect().Size() : aFrame->GetSize();
 
   nsPresContext* presContext = aFrame->PresContext();
   nsIPresShell* presShell = presContext->PresShell();
@@ -7577,12 +7610,12 @@ nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
                       widgetBounds.height * auPerDevPixel);
 #ifdef MOZ_WIDGET_ANDROID
         nsRect frameRect = aFrame->GetRect();
-        gfxSize cumulativeResolution = presShell->GetCumulativeResolution();
+        float cumulativeResolution = presShell->GetCumulativeResolution();
         LayoutDeviceToParentLayerScale layoutToParentLayerScale =
           // The ScreenToParentLayerScale should be mTransformScale which is
           // not calculated yet, but we don't yet handle CSS transforms, so we
           // assume it's 1 here.
-          LayoutDeviceToLayerScale(cumulativeResolution.width, cumulativeResolution.height) *
+          LayoutDeviceToLayerScale(cumulativeResolution) *
           LayerToScreenScale(1.0) * ScreenToParentLayerScale(1.0);
         ParentLayerRect frameRectPixels =
           LayoutDeviceRect::FromAppUnits(frameRect, auPerDevPixel)
@@ -7591,7 +7624,7 @@ nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
           // Our return value is in appunits of the parent, so we need to
           // include the resolution.
           size.height =
-            NSToCoordRound(frameRect.height * cumulativeResolution.height);
+            NSToCoordRound(frameRect.height * cumulativeResolution);
         }
 #endif
       } else {
@@ -7600,15 +7633,13 @@ nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
           size = LayoutDevicePixel::ToAppUnits(contentSize, auPerDevPixel);
         }
       }
-    }
-  }
 
-  // Adjust composition bounds for the size of scroll bars.
-  nsIScrollableFrame* scrollableFrame = aFrame->GetScrollTargetFrame();
-  if (scrollableFrame && !LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars)) {
-    nsMargin margins = scrollableFrame->GetActualScrollbarSizes();
-    size.width -= margins.LeftRight();
-    size.height -= margins.TopBottom();
+      if (scrollableFrame && !LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars)) {
+        nsMargin margins = scrollableFrame->GetActualScrollbarSizes();
+        size.width -= margins.LeftRight();
+        size.height -= margins.TopBottom();
+      }
+    }
   }
 
   return size;
@@ -7640,9 +7671,9 @@ nsLayoutUtils::CalculateRootCompositionSize(nsIFrame* aFrame,
     // TODO: Reuse that code here.
     nsIPresShell* rootPresShell = rootPresContext->PresShell();
     if (nsIFrame* rootFrame = rootPresShell->GetRootFrame()) {
-      LayoutDeviceToLayerScale cumulativeResolution(
-        rootPresShell->GetCumulativeResolution().width
-      * nsLayoutUtils::GetTransformToAncestorScale(rootFrame).width);
+      LayoutDeviceToLayerScale2D cumulativeResolution(
+        rootPresShell->GetCumulativeResolution()
+      * nsLayoutUtils::GetTransformToAncestorScale(rootFrame));
       int32_t rootAUPerDevPixel = rootPresContext->AppUnitsPerDevPixel();
       LayerSize frameSize =
         (LayoutDeviceRect::FromAppUnits(rootFrame->GetRect(), rootAUPerDevPixel)
@@ -7666,10 +7697,10 @@ nsLayoutUtils::CalculateRootCompositionSize(nsIFrame* aFrame,
       } else {
         LayoutDeviceIntSize contentSize;
         if (nsLayoutUtils::GetContentViewerSize(rootPresContext, contentSize)) {
-          LayoutDeviceToLayerScale scale(1.0f);
+          LayoutDeviceToLayerScale scale;
           if (rootPresContext->GetParentPresContext()) {
-            gfxSize res = rootPresContext->GetParentPresContext()->PresShell()->GetCumulativeResolution();
-            scale = LayoutDeviceToLayerScale(res.width, res.height);
+            float res = rootPresContext->GetParentPresContext()->PresShell()->GetCumulativeResolution();
+            scale = LayoutDeviceToLayerScale(res);
           }
           rootCompositionSize = contentSize * scale * LayerToScreenScale(1.0f);
         }
@@ -7741,9 +7772,9 @@ nsLayoutUtils::CalculateExpandedScrollableRect(nsIFrame* aFrame)
   if (aFrame == aFrame->PresContext()->PresShell()->GetRootScrollFrame()) {
     // the composition size for the root scroll frame does not include the
     // local resolution, so we adjust.
-    gfxSize res = aFrame->PresContext()->PresShell()->GetResolution();
-    compSize.width = NSToCoordRound(compSize.width / ((float) res.width));
-    compSize.height = NSToCoordRound(compSize.height / ((float) res.height));
+    float res = aFrame->PresContext()->PresShell()->GetResolution();
+    compSize.width = NSToCoordRound(compSize.width / res);
+    compSize.height = NSToCoordRound(compSize.height / res);
   }
 
   if (scrollableRect.width < compSize.width) {
@@ -7984,4 +8015,51 @@ nsLayoutUtils::HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell)
     }
   }
   return false;
+}
+
+/* static */ uint32_t
+nsLayoutUtils::GetTouchActionFromFrame(nsIFrame* aFrame)
+{
+  // If aFrame is null then return default value
+  if (!aFrame) {
+    return NS_STYLE_TOUCH_ACTION_AUTO;
+  }
+
+  // The touch-action CSS property applies to: all elements except:
+  // non-replaced inline elements, table rows, row groups, table columns, and column groups
+  bool isNonReplacedInlineElement = aFrame->IsFrameOfType(nsIFrame::eLineParticipant);
+  if (isNonReplacedInlineElement) {
+    return NS_STYLE_TOUCH_ACTION_AUTO;
+  }
+
+  const nsStyleDisplay* disp = aFrame->StyleDisplay();
+  bool isTableElement = disp->IsInnerTableStyle() &&
+    disp->mDisplay != NS_STYLE_DISPLAY_TABLE_CELL &&
+    disp->mDisplay != NS_STYLE_DISPLAY_TABLE_CAPTION;
+  if (isTableElement) {
+    return NS_STYLE_TOUCH_ACTION_AUTO;
+  }
+
+  return disp->mTouchAction;
+}
+
+/* static */  void
+nsLayoutUtils::TransformToAncestorAndCombineRegions(
+  const nsRect& aBounds,
+  nsIFrame* aFrame,
+  const nsIFrame* aAncestorFrame,
+  nsRegion* aPreciseTargetDest,
+  nsRegion* aImpreciseTargetDest)
+{
+  if (aBounds.IsEmpty()) {
+    return;
+  }
+  Matrix4x4 matrix = GetTransformToAncestor(aFrame, aAncestorFrame);
+  Matrix matrix2D;
+  bool isPrecise = (matrix.Is2D(&matrix2D)
+    && !matrix2D.HasNonAxisAlignedTransform());
+  nsRect transformed = TransformFrameRectToAncestor(
+    aFrame, aBounds, aAncestorFrame);
+  nsRegion* dest = isPrecise ? aPreciseTargetDest : aImpreciseTargetDest;
+  dest->OrWith(transformed);
 }

@@ -1277,7 +1277,7 @@ bool CacheIndex::IsForcedValidEntry(const SHA1Sum::Hash *aHash)
   nsRefPtr<CacheFileHandle> handle;
 
   CacheFileIOManager::gInstance->mHandles.GetHandle(
-    aHash, false, getter_AddRefs(handle));
+    aHash, getter_AddRefs(handle));
 
   if (!handle)
     return false;
@@ -1306,6 +1306,29 @@ CacheIndex::GetCacheSize(uint32_t *_retval)
 
   *_retval = index->mIndexStats.Size();
   LOG(("CacheIndex::GetCacheSize() - returning %u", *_retval));
+  return NS_OK;
+}
+
+// static
+nsresult
+CacheIndex::GetEntryFileCount(uint32_t *_retval)
+{
+  LOG(("CacheIndex::GetEntryFileCount()"));
+
+  nsRefPtr<CacheIndex> index = gInstance;
+
+  if (!index) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+
+  CacheIndexAutoLock lock(index);
+
+  if (!index->IsIndexUsable()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  *_retval = index->mIndexStats.ActiveEntriesCount();
+  LOG(("CacheIndex::GetEntryFileCount() - returning %u", *_retval));
   return NS_OK;
 }
 
@@ -2752,7 +2775,7 @@ CacheIndex::BuildIndex()
 
 #ifdef DEBUG
     nsRefPtr<CacheFileHandle> handle;
-    CacheFileIOManager::gInstance->mHandles.GetHandle(&hash, false,
+    CacheFileIOManager::gInstance->mHandles.GetHandle(&hash,
                                                       getter_AddRefs(handle));
 #endif
 
@@ -2965,7 +2988,7 @@ CacheIndex::UpdateIndex()
 
 #ifdef DEBUG
     nsRefPtr<CacheFileHandle> handle;
-    CacheFileIOManager::gInstance->mHandles.GetHandle(&hash, false,
+    CacheFileIOManager::gInstance->mHandles.GetHandle(&hash,
                                                       getter_AddRefs(handle));
 #endif
 

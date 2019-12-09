@@ -147,13 +147,11 @@ ShadowChild(const OpRaiseToTopChild& op)
 // LayerTransactionParent
 LayerTransactionParent::LayerTransactionParent(LayerManagerComposite* aManager,
                                                ShadowLayersManager* aLayersManager,
-                                               uint64_t aId,
-                                               ProcessId aOtherProcess)
+                                               uint64_t aId)
   : mLayerManager(aManager)
   , mShadowLayersManager(aLayersManager)
   , mId(aId)
   , mPendingTransaction(0)
-  , mChildProcessId(aOtherProcess)
   , mDestroyed(false)
   , mIPCOpen(false)
 {
@@ -629,7 +627,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       mLayerManager->VisualFrameWarning(severity);
 #ifdef PR_LOGGING
       PR_LogPrint("LayerTransactionParent::RecvUpdate transaction from process %d took %f ms",
-                  mChildProcessId,
+                  OtherPid(),
                   latency.ToMilliseconds());
 #endif
     }
@@ -937,20 +935,24 @@ LayerTransactionParent::RecvChildAsyncMessages(InfallibleTArray<AsyncChildMessag
         MOZ_ASSERT(tex.get());
         compositable->RemoveTextureHost(tex);
 
-        // send FenceHandle if present via ImageBridge.
-        ImageBridgeParent::SendFenceHandleToTrackerIfPresent(
-                             GetChildProcessId(),
-                             op.holderId(),
-                             op.transactionId(),
-                             op.textureParent(),
-                             compositable);
-
-        // Send message back via PImageBridge.
-        ImageBridgeParent::ReplyRemoveTexture(
-                             GetChildProcessId(),
-                             OpReplyRemoveTexture(true, // isMain
-                                                  op.holderId(),
-                                                  op.transactionId()));
+        MOZ_ASSERT(ImageBridgeParent::GetInstance(GetChildProcessId()));
+        if (ImageBridgeParent::GetInstance(GetChildProcessId())) {
+          // send FenceHandle if present via ImageBridge.
+          ImageBridgeParent::SendFenceHandleToTrackerIfPresent(
+            GetChildProcessId(),
+            op.holderId(),
+            op.transactionId(),
+            op.textureParent(),
+            compositable);
+          // Send message back via PImageBridge.
+          ImageBridgeParent::ReplyRemoveTexture(
+            GetChildProcessId(),
+            OpReplyRemoveTexture(true, // isMain
+            op.holderId(),
+            op.transactionId()));
+        } else {
+          NS_ERROR("ImageBridgeParent should exist");
+        }
         break;
       }
       default:
@@ -969,7 +971,7 @@ LayerTransactionParent::ActorDestroy(ActorDestroyReason why)
 
 bool LayerTransactionParent::IsSameProcess() const
 {
-  return OtherProcess() == ipc::kInvalidProcessHandle;
+  return OtherPid() == ipc::kCurrentProcessId;
 }
 
 void
@@ -1021,6 +1023,14 @@ void
 LayerTransactionParent::SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage)
 {
   mozilla::unused << SendParentAsyncMessages(aMessage);
+}
+
+void
+LayerTransactionParent::ReplyRemoveTexture(const OpReplyRemoveTexture& aReply)
+{
+  InfallibleTArray<AsyncParentMessageData> messages;
+  messages.AppendElement(aReply);
+  mozilla::unused << SendParentAsyncMessages(messages);
 }
 
 } // namespace layers

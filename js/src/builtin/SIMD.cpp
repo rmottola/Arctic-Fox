@@ -532,11 +532,11 @@ struct Not {
     static inline T apply(T x) { return ~x; }
 };
 template<typename T>
-struct Rec {
+struct RecApprox {
     static inline T apply(T x) { return 1 / x; }
 };
 template<typename T>
-struct RecSqrt {
+struct RecSqrtApprox {
     static inline T apply(T x) { return 1 / sqrt(x); }
 };
 template<typename T>
@@ -918,16 +918,10 @@ static bool
 Int32x4Bool(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    if (args.length() != 4 ||
-        !args[0].isBoolean() || !args[1].isBoolean() ||
-        !args[2].isBoolean() || !args[3].isBoolean())
-    {
-        return ErrorBadArgs(cx);
-    }
 
     int32_t result[Int32x4::lanes];
     for (unsigned i = 0; i < Int32x4::lanes; i++)
-        result[i] = args[i].toBoolean() ? 0xFFFFFFFF : 0x0;
+        result[i] = ToBoolean(args.get(i)) ? -1 : 0;
     return StoreResult<Int32x4>(cx, args, result);
 }
 

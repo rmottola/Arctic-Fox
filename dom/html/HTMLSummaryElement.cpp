@@ -158,9 +158,9 @@ HTMLSummaryElement::GetDetails() const
 }
 
 JSObject*
-HTMLSummaryElement::WrapNode(JSContext* aCx)
+HTMLSummaryElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return HTMLSummaryElementBinding::Wrap(aCx, this);
+  return HTMLSummaryElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
 } // namespace dom

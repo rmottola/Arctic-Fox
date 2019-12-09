@@ -15,7 +15,13 @@ namespace mozilla {
 namespace dom {
 
 struct MessageEventInit;
-class OwningWindowProxyOrMessagePort;
+class OwningWindowProxyOrMessagePortOrClient;
+
+namespace workers {
+
+class ServiceWorkerClient;
+
+}
 
 /**
  * Implements the MessageEvent event, used for cross-document messaging and
@@ -25,7 +31,7 @@ class OwningWindowProxyOrMessagePort;
  * further details.
  */
 class MessageEvent final : public Event,
-                               public nsIDOMMessageEvent
+                           public nsIDOMMessageEvent
 {
 public:
   MessageEvent(EventTarget* aOwner,
@@ -40,12 +46,12 @@ public:
   // Forward to base class
   NS_FORWARD_TO_EVENT
 
-  virtual JSObject* WrapObjectInternal(JSContext* aCx) override;
+  virtual JSObject* WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   void GetData(JSContext* aCx, JS::MutableHandle<JS::Value> aData,
                ErrorResult& aRv);
 
-  void GetSource(Nullable<OwningWindowProxyOrMessagePort>& aValue) const;
+  void GetSource(Nullable<OwningWindowProxyOrMessagePortOrClient>& aValue) const;
 
   MessagePortList* GetPorts()
   {
@@ -56,6 +62,8 @@ public:
 
   // Non WebIDL methods
   void SetSource(mozilla::dom::MessagePort* aPort);
+
+  void SetSource(workers::ServiceWorkerClient* aClient);
 
   void SetSource(nsPIDOMWindow* aWindow)
   {
@@ -83,6 +91,7 @@ private:
   nsString mLastEventId;
   nsCOMPtr<nsIDOMWindow> mWindowSource;
   nsRefPtr<MessagePortBase> mPortSource;
+  nsRefPtr<workers::ServiceWorkerClient> mClientSource;
   nsRefPtr<MessagePortList> mPorts;
 };
 

@@ -42,7 +42,7 @@ nsPNGEncoder::nsPNGEncoder() : mPNG(nullptr), mPNGinfo(nullptr),
 nsPNGEncoder::~nsPNGEncoder()
 {
   if (mImageBuffer) {
-    moz_free(mImageBuffer);
+    free(mImageBuffer);
     mImageBuffer = nullptr;
   }
   // don't leak if EndImageEncode wasn't called
@@ -155,7 +155,7 @@ nsPNGEncoder::StartImageEncode(uint32_t aWidth,
   // estimated size. Note: we don't have to worry about freeing this data
   // in this function. It will be freed on object destruction.
   mImageBufferSize = 8192;
-  mImageBuffer = (uint8_t*)moz_malloc(mImageBufferSize);
+  mImageBuffer = (uint8_t*)malloc(mImageBufferSize);
   if (!mImageBuffer) {
     png_destroy_write_struct(&mPNG, &mPNGinfo);
     return NS_ERROR_OUT_OF_MEMORY;
@@ -532,7 +532,7 @@ NS_IMETHODIMP
 nsPNGEncoder::Close()
 {
   if (mImageBuffer != nullptr) {
-    moz_free(mImageBuffer);
+    free(mImageBuffer);
     mImageBuffer = nullptr;
     mImageBufferSize = 0;
     mImageBufferUsed = 0;
@@ -660,14 +660,17 @@ nsPNGEncoder::ConvertHostARGBRow(const uint8_t* aSrc, uint8_t* aDest,
     uint8_t* pixelOut = &aDest[x * pixelStride];
 
     uint8_t alpha = (pixelIn & 0xff000000) >> 24;
-    if (alpha == 0) {
-      pixelOut[0] = pixelOut[1] = pixelOut[2] = pixelOut[3] = 0;
+    pixelOut[pixelStride - 1] = alpha; // overwritten below if pixelStride == 3
+    if (alpha == 255) {
+      pixelOut[0] = (pixelIn & 0xff0000) >> 16;
+      pixelOut[1] = (pixelIn & 0x00ff00) >>  8;
+      pixelOut[2] = (pixelIn & 0x0000ff)      ;
+    } else if (alpha == 0) {
+      pixelOut[0] = pixelOut[1] = pixelOut[2] = 0;
     } else {
       pixelOut[0] = (((pixelIn & 0xff0000) >> 16) * 255 + alpha / 2) / alpha;
       pixelOut[1] = (((pixelIn & 0x00ff00) >>  8) * 255 + alpha / 2) / alpha;
-      pixelOut[2] = (((pixelIn & 0x0000ff) >>  0) * 255 + alpha / 2) / alpha;
-      if (aUseTransparency)
-        pixelOut[3] = alpha;
+      pixelOut[2] = (((pixelIn & 0x0000ff)      ) * 255 + alpha / 2) / alpha;
     }
   }
 }
@@ -730,11 +733,11 @@ nsPNGEncoder::WriteCallback(png_structp png, png_bytep data,
 
     // expand buffer, just double each time
     that->mImageBufferSize *= 2;
-    uint8_t* newBuf = (uint8_t*)moz_realloc(that->mImageBuffer,
-                                            that->mImageBufferSize);
+    uint8_t* newBuf = (uint8_t*)realloc(that->mImageBuffer,
+                                        that->mImageBufferSize);
     if (!newBuf) {
       // can't resize, just zero (this will keep us from writing more)
-      moz_free(that->mImageBuffer);
+      free(that->mImageBuffer);
       that->mImageBuffer = nullptr;
       that->mImageBufferSize = 0;
       that->mImageBufferUsed = 0;

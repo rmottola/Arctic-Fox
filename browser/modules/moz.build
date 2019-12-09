@@ -11,6 +11,8 @@ EXTRA_JS_MODULES += [ 'promise.js' ]
 EXTRA_JS_MODULES += [
     'BrowserNewTabPreloader.jsm',
     'CharsetMenu.jsm',
+    'ContentClick.jsm',
+    'E10SUtils.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
@@ -20,6 +22,7 @@ EXTRA_JS_MODULES += [
     'PopupNotifications.jsm',
     'QuotaManager.jsm',
     'SharedFrame.jsm',
+    'TabCrashReporter.jsm',
     'webrtcUI.jsm'
 ]
 
@@ -31,7 +34,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     ]
 
 EXTRA_PP_JS_MODULES += [
-    'AboutHomeUtils.jsm',
+    'AboutHome.jsm',
     'RecentWindow.jsm',
 ]
 

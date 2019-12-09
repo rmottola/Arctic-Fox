@@ -59,35 +59,9 @@ NS_IMPL_ISUPPORTS_INHERITED0(HyperTextAccessible, Accessible)
 role
 HyperTextAccessible::NativeRole()
 {
-  if (mContent->IsHTMLElement(nsGkAtoms::dd))
-    return roles::DEFINITION;
-
-  if (mContent->IsHTMLElement(nsGkAtoms::form))
-    return roles::FORM;
-
-  if (mContent->IsAnyOfHTMLElements(nsGkAtoms::blockquote,
-                                    nsGkAtoms::div,
-                                    nsGkAtoms::section,
-                                    nsGkAtoms::nav))
-    return roles::SECTION;
-
-  if (mContent->IsAnyOfHTMLElements(nsGkAtoms::h1, nsGkAtoms::h2,
-                                    nsGkAtoms::h3, nsGkAtoms::h4,
-                                    nsGkAtoms::h5, nsGkAtoms::h6))
-    return roles::HEADING;
-
-  if (mContent->IsHTMLElement(nsGkAtoms::article))
-    return roles::DOCUMENT;
-
-  // Deal with html landmark elements
-  if (mContent->IsHTMLElement(nsGkAtoms::header))
-    return roles::HEADER;
-
-  if (mContent->IsHTMLElement(nsGkAtoms::footer))
-    return roles::FOOTER;
-
-  if (mContent->IsHTMLElement(nsGkAtoms::aside))
-    return roles::NOTE;
+  a11y::role r = GetAccService()->MarkupRole(mContent);
+  if (r != roles::NOTHING)
+    return r;
 
   // Treat block frames as paragraphs
   nsIFrame *frame = GetFrame();
@@ -940,25 +914,8 @@ HyperTextAccessible::NativeAttributes()
     }
   }
 
-  if (!HasOwnContent())
-    return attributes.forget();
-
-  if (mContent->IsHTMLElement(nsGkAtoms::section)) {
-    nsAccUtils::SetAccAttr(attributes, nsGkAtoms::xmlroles,
-                           NS_LITERAL_STRING("region"));
-  } else if (mContent->IsHTMLElement(nsGkAtoms::article)) {
-    nsAccUtils::SetAccAttr(attributes, nsGkAtoms::xmlroles,
-                           NS_LITERAL_STRING("article"));
-  } else if (mContent->IsHTMLElement(nsGkAtoms::time)) {
-    nsAccUtils::SetAccAttr(attributes, nsGkAtoms::xmlroles,
-                           NS_LITERAL_STRING("time"));
-
-    if (mContent->HasAttr(kNameSpaceID_None, nsGkAtoms::datetime)) {
-      nsAutoString datetime;
-      mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::datetime, datetime);
-      nsAccUtils::SetAccAttr(attributes, nsGkAtoms::datetime, datetime);
-    }
-  }
+  if (HasOwnContent())
+    GetAccService()->MarkupAttributes(mContent, attributes);
 
   return attributes.forget();
 }
@@ -1180,7 +1137,7 @@ HyperTextAccessible::SetSelectionRange(int32_t aStartPos, int32_t aEndPos)
   NS_ENSURE_STATE(domSel);
 
   // Set up the selection.
-  for (int32_t idx = domSel->GetRangeCount() - 1; idx > 0; idx--)
+  for (int32_t idx = domSel->RangeCount() - 1; idx > 0; idx--)
     domSel->RemoveRange(domSel->GetRangeAt(idx));
   SetSelectionBoundsAt(0, aStartPos, aEndPos);
 
@@ -1485,7 +1442,7 @@ HyperTextAccessible::SetSelectionBoundsAt(int32_t aSelectionNum,
     return false;
 
   nsRefPtr<nsRange> range;
-  uint32_t rangeCount = domSel->GetRangeCount();
+  uint32_t rangeCount = domSel->RangeCount();
   if (aSelectionNum == static_cast<int32_t>(rangeCount))
     range = new nsRange(mContent);
   else
@@ -1513,7 +1470,7 @@ HyperTextAccessible::RemoveFromSelection(int32_t aSelectionNum)
   if (!domSel)
     return false;
 
-  if (aSelectionNum < 0 || aSelectionNum >= domSel->GetRangeCount())
+  if (aSelectionNum < 0 || aSelectionNum >= static_cast<int32_t>(domSel->RangeCount()))
     return false;
 
   domSel->RemoveRange(domSel->GetRangeAt(aSelectionNum));
@@ -1944,7 +1901,7 @@ HyperTextAccessible::GetSpellTextAttr(nsINode* aNode,
   if (!domSel)
     return;
 
-  int32_t rangeCount = domSel->GetRangeCount();
+  int32_t rangeCount = domSel->RangeCount();
   if (rangeCount <= 0)
     return;
 

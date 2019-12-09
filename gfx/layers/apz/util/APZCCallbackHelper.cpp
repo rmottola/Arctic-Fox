@@ -208,7 +208,7 @@ APZCCallbackHelper::UpdateRootFrame(nsIDOMWindowUtils* aUtils,
   // last paint.
   float presShellResolution = aMetrics.GetPresShellResolution()
                             * aMetrics.GetAsyncZoom().scale;
-  aUtils->SetResolutionAndScaleTo(presShellResolution, presShellResolution);
+  aUtils->SetResolutionAndScaleTo(presShellResolution);
 
   SetDisplayPortMargins(aUtils, content, aMetrics);
 }
@@ -415,23 +415,10 @@ APZCCallbackHelper::ApplyCallbackTransform(WidgetTouchEvent& aEvent,
 nsEventStatus
 APZCCallbackHelper::DispatchWidgetEvent(WidgetGUIEvent& aEvent)
 {
-  if (!aEvent.widget)
-    return nsEventStatus_eConsumeNoDefault;
-
-  // A nested process may be capturing events.
-  if (TabParent* capturer = TabParent::GetEventCapturer()) {
-    if (capturer->TryCapture(aEvent)) {
-      // Only touch events should be captured, and touch events from a parent
-      // process should not make it here. Capture for those is done elsewhere
-      // (for gonk, in nsWindow::DispatchTouchInputViaAPZ).
-      MOZ_ASSERT(!XRE_IsParentProcess());
-
-      return nsEventStatus_eConsumeNoDefault;
-    }
+  nsEventStatus status = nsEventStatus_eConsumeNoDefault;
+  if (aEvent.widget) {
+    aEvent.widget->DispatchEvent(&aEvent, status);
   }
-  nsEventStatus status;
-  NS_ENSURE_SUCCESS(aEvent.widget->DispatchEvent(&aEvent, status),
-                    nsEventStatus_eConsumeNoDefault);
   return status;
 }
 
@@ -439,6 +426,7 @@ nsEventStatus
 APZCCallbackHelper::DispatchSynthesizedMouseEvent(uint32_t aMsg,
                                                   uint64_t aTime,
                                                   const LayoutDevicePoint& aRefPoint,
+                                                  Modifiers aModifiers,
                                                   nsIWidget* aWidget)
 {
   MOZ_ASSERT(aMsg == NS_MOUSE_MOVE || aMsg == NS_MOUSE_BUTTON_DOWN ||
@@ -454,6 +442,7 @@ APZCCallbackHelper::DispatchSynthesizedMouseEvent(uint32_t aMsg,
   if (aMsg != NS_MOUSE_MOVE) {
     event.clickCount = 1;
   }
+  event.modifiers = aModifiers;
   event.widget = aWidget;
 
   return DispatchWidgetEvent(event);
@@ -480,6 +469,7 @@ APZCCallbackHelper::DispatchMouseEvent(const nsCOMPtr<nsIDOMWindowUtils>& aUtils
 
 void
 APZCCallbackHelper::FireSingleTapEvent(const LayoutDevicePoint& aPoint,
+                                       Modifiers aModifiers,
                                        nsIWidget* aWidget)
 {
   if (aWidget->Destroyed()) {
@@ -488,9 +478,9 @@ APZCCallbackHelper::FireSingleTapEvent(const LayoutDevicePoint& aPoint,
   APZCCH_LOG("Dispatching single-tap component events to %s\n",
     Stringify(aPoint).c_str());
   int time = 0;
-  DispatchSynthesizedMouseEvent(NS_MOUSE_MOVE, time, aPoint, aWidget);
-  DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_DOWN, time, aPoint, aWidget);
-  DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_UP, time, aPoint, aWidget);
+  DispatchSynthesizedMouseEvent(NS_MOUSE_MOVE, time, aPoint, aModifiers, aWidget);
+  DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_DOWN, time, aPoint, aModifiers, aWidget);
+  DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_UP, time, aPoint, aModifiers, aWidget);
 }
 
 static nsIScrollableFrame*

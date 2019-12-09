@@ -263,8 +263,8 @@ private:
 // thread. When on the main thread the runnable will call the callback and then
 // notify the QuotaManager that the job has been completed.
 class AsyncUsageRunnable final : public UsageInfo,
-                                     public nsRunnable,
-                                     public nsIQuotaRequest
+                                 public nsRunnable,
+                                 public nsIQuotaRequest
 {
   enum CallbackState {
     // Not yet run.
@@ -752,16 +752,6 @@ public:
     Append(':');
     Append(aOrigin);
   }
-};
-
-struct MOZ_STACK_CLASS RemoveQuotaInfo
-{
-  RemoveQuotaInfo(PersistenceType aPersistenceType, const nsACString& aPattern)
-  : persistenceType(aPersistenceType), pattern(aPattern)
-  { }
-
-  PersistenceType persistenceType;
-  nsCString pattern;
 };
 
 struct MOZ_STACK_CLASS InactiveOriginsInfo
@@ -3536,7 +3526,6 @@ QuotaManager::CollectOriginsForEviction(uint64_t aMinSizeToBeFreed,
   // Add origins that have live persistent storages.
   mDefaultLiveStorageTable.EnumerateRead(AddLiveStorageOrigins,
                                          &defaultOriginCollection);
-
 
   // Enumerate inactive origins. This must be protected by the mutex.
   nsTArray<OriginInfo*> inactiveOrigins;

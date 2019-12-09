@@ -2646,8 +2646,7 @@ NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
    * rect, with coordinates relative to this frame's origin. aRect must not be
    * null!
    */
-  bool GetClipPropClipRect(const nsStyleDisplay* aDisp, nsRect* aRect,
-                           const nsSize& aSize) const;
+  bool GetClipPropClipRect(nsRect* aRect, const nsSize& aSize) const;
 
   /**
    * Check if this frame is focusable and in the current tab order.
@@ -2918,7 +2917,7 @@ NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
   inline bool IsInlineOutside() const;
   inline uint8_t GetDisplay() const;
   inline bool IsFloating() const;
-  inline bool IsPositioned() const;
+  inline bool IsAbsPosContaininingBlock() const;
   inline bool IsRelativelyPositioned() const;
   inline bool IsAbsolutelyPositioned() const;
 
@@ -3363,6 +3362,27 @@ nsFrameList::FrameLinkEnumerator::Next()
 {
   mPrev = mFrame;
   Enumerator::Next();
+}
+
+// Operators of nsFrameList::Iterator
+// ---------------------------------------------------
+
+inline nsFrameList::Iterator&
+nsFrameList::Iterator::operator++()
+{
+  mCurrent = mCurrent->GetNextSibling();
+  return *this;
+}
+
+inline nsFrameList::Iterator&
+nsFrameList::Iterator::operator--()
+{
+  if (!mCurrent) {
+    mCurrent = mList.LastChild();
+  } else {
+    mCurrent = mCurrent->GetPrevSibling();
+  }
+  return *this;
 }
 
 // Helper-functions for nsIFrame::SortFrameList()

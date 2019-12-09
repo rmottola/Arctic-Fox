@@ -442,7 +442,6 @@ class BarrieredBase : public BarrieredBaseMixins<T>
 
   public:
     void init(T v) {
-        MOZ_ASSERT(!GCMethods<T>::poisoned(v));
         this->value = v;
     }
 
@@ -507,7 +506,6 @@ class PreBarriered : public BarrieredBase<T>
   private:
     void set(const T& v) {
         this->pre();
-        MOZ_ASSERT(!GCMethods<T>::poisoned(v));
         this->value = v;
     }
 };
@@ -540,7 +538,6 @@ class HeapPtr : public BarrieredBase<T>
 #endif
 
     void init(T v) {
-        MOZ_ASSERT(!GCMethods<T>::poisoned(v));
         this->value = v;
         post();
     }
@@ -553,7 +550,6 @@ class HeapPtr : public BarrieredBase<T>
   private:
     void set(const T& v) {
         this->pre();
-        MOZ_ASSERT(!GCMethods<T>::poisoned(v));
         this->value = v;
         post();
     }
@@ -651,7 +647,6 @@ class RelocatablePtr : public BarrieredBase<T>
     }
 
     void postBarrieredSet(const T& v) {
-        MOZ_ASSERT(!GCMethods<T>::poisoned(v));
         if (GCMethods<T>::needsPostBarrier(v)) {
             this->value = v;
             post();
@@ -857,14 +852,12 @@ class HeapSlot : public BarrieredBase<Value>
     explicit HeapSlot(NativeObject* obj, Kind kind, uint32_t slot, const Value& v)
       : BarrieredBase<Value>(v)
     {
-        MOZ_ASSERT(!IsPoisonedValue(v));
         post(obj, kind, slot, v);
     }
 
     explicit HeapSlot(NativeObject* obj, Kind kind, uint32_t slot, const HeapSlot& s)
       : BarrieredBase<Value>(s.value)
     {
-        MOZ_ASSERT(!IsPoisonedValue(s.value));
         post(obj, kind, slot, s);
     }
 
@@ -885,7 +878,6 @@ class HeapSlot : public BarrieredBase<Value>
 
     void set(NativeObject* owner, Kind kind, uint32_t slot, const Value& v) {
         MOZ_ASSERT(preconditionForSet(owner, kind, slot));
-        MOZ_ASSERT(!IsPoisonedValue(v));
         pre();
         value = v;
         post(owner, kind, slot, v);
@@ -893,7 +885,6 @@ class HeapSlot : public BarrieredBase<Value>
 
     void set(Zone* zone, NativeObject* owner, Kind kind, uint32_t slot, const Value& v) {
         MOZ_ASSERT(preconditionForSet(zone, owner, kind, slot));
-        MOZ_ASSERT(!IsPoisonedValue(v));
         pre(zone);
         value = v;
         post(owner, kind, slot, v);

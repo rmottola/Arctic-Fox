@@ -435,7 +435,7 @@ class ShutdownLeaks(object):
     self.leakedWindows = {}
     self.leakedDocShells = set()
     self.currentTest = None
-    self.seenShutdown = False
+    self.seenShutdown = set()
 
   def log(self, message):
     if message['action'] == 'log':
@@ -444,8 +444,9 @@ class ShutdownLeaks(object):
           self._logWindow(line)
         elif line[2:10] == "DOCSHELL":
           self._logDocShell(line)
-        elif line.startswith("TEST-START | Shutdown"):
-          self.seenShutdown = True
+        elif line.startswith("Completed ShutdownLeaks collections in process"):
+          pid = int(line.split()[-1])
+          self.seenShutdown.add(pid)
     elif message['action'] == 'test_start':
       fileName = message['test'].replace("chrome://mochitests/content/browser/", "")
       self.currentTest = {"fileName": fileName, "windows": set(), "docShells": set()}
@@ -489,7 +490,7 @@ class ShutdownLeaks(object):
         windows.add(key)
       else:
         windows.discard(key)
-    elif self.seenShutdown and not created:
+    elif int(pid) in self.seenShutdown and not created:
       self.leakedWindows[key] = self._parseValue(line, "url")
 
   def _logDocShell(self, line):
@@ -510,7 +511,7 @@ class ShutdownLeaks(object):
         docShells.add(key)
       else:
         docShells.discard(key)
-    elif self.seenShutdown and not created:
+    elif int(pid) in self.seenShutdown and not created:
       self.leakedDocShells.add(key)
 
   def _parseValue(self, line, name):
@@ -563,9 +564,9 @@ class LSANLeaks(object):
     # Don't various allocation-related stack frames, as they do not help much to
     # distinguish different leaks.
     unescapedSkipList = [
-      "malloc", "js_malloc", "malloc_", "__interceptor_malloc", "moz_malloc", "moz_xmalloc",
-      "calloc", "js_calloc", "calloc_", "__interceptor_calloc", "moz_calloc", "moz_xcalloc",
-      "realloc","js_realloc", "realloc_", "__interceptor_realloc", "moz_realloc", "moz_xrealloc",
+      "malloc", "js_malloc", "malloc_", "__interceptor_malloc", "moz_xmalloc",
+      "calloc", "js_calloc", "calloc_", "__interceptor_calloc", "moz_xcalloc",
+      "realloc","js_realloc", "realloc_", "__interceptor_realloc", "moz_xrealloc",
       "new",
       "js::MallocProvider",
     ]

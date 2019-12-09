@@ -838,12 +838,13 @@ class MacroAssembler : public MacroAssemblerSpecific
     void callMallocStub(size_t nbytes, Register result, Label *fail);
     void callFreeStub(Register slots);
     void createGCObject(Register result, Register temp, JSObject *templateObj,
-                        gc::InitialHeap initialHeap, Label *fail, bool initContents = true);
+                        gc::InitialHeap initialHeap, Label *fail, bool initContents = true,
+                        bool convertDoubleElements = false);
 
     void newGCThing(Register result, Register temp, JSObject *templateObj,
                      gc::InitialHeap initialHeap, Label *fail);
     void initGCThing(Register obj, Register temp, JSObject *templateObj,
-                     bool initContents = true);
+                     bool initContents = true, bool convertDoubleElements = false);
 
     void initUnboxedObjectContents(Register object, UnboxedPlainObject *templateObject);
 
@@ -869,7 +870,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         exitCodePatch_ = PushWithPatch(ImmWord(-1));
     }
 
-    void enterExitFrame(const VMFunction* f = nullptr) {
+    void enterExitFrame(const VMFunction *f = nullptr) {
         linkExitFrame();
         // Push the ioncode. (Bailout or VM wrapper)
         PushStubCode();

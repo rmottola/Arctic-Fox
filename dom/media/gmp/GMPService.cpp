@@ -625,7 +625,7 @@ GoannaMediaPluginService::AsyncShutdownComplete(GMPParent* aParent)
   if (mAsyncShutdownPlugins.IsEmpty() && mShuttingDownOnGMPThread) {
     // The main thread may be waiting for async shutdown of plugins,
     // which has completed. Break the main thread out of its waiting loop.
-    nsRefPtr<nsIRunnable> task(NS_NewRunnableMethod(
+    nsCOMPtr<nsIRunnable> task(NS_NewRunnableMethod(
       this, &GoannaMediaPluginService::SetAsyncShutdownComplete));
     NS_DispatchToMainThread(task);
   }
@@ -659,7 +659,7 @@ GoannaMediaPluginService::UnloadPlugins()
   }
 
   if (mAsyncShutdownPlugins.IsEmpty()) {
-    nsRefPtr<nsIRunnable> task(NS_NewRunnableMethod(
+    nsCOMPtr<nsIRunnable> task(NS_NewRunnableMethod(
       this, &GoannaMediaPluginService::SetAsyncShutdownComplete));
     NS_DispatchToMainThread(task);
   }

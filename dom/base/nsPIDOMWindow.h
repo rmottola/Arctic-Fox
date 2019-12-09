@@ -114,6 +114,17 @@ public:
   }
 
   // Outer windows only.
+  void SetDesktopModeViewport(bool aDesktopModeViewport)
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    mDesktopModeViewport = aDesktopModeViewport;
+  }
+  bool IsDesktopModeViewport() const
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    return mDesktopModeViewport;
+  }
+
   virtual void SetIsBackground(bool aIsBackground)
   {
     MOZ_ASSERT(IsOuterWindow());
@@ -462,44 +473,6 @@ public:
   }
 
   /**
-   * Call this to indicate that some node (this window, its document,
-   * or content in that document) has a scroll wheel event listener.
-   */
-  void SetHasScrollWheelEventListeners()
-  {
-    mMayHaveScrollWheelEventListener = true;
-  }
-
-  bool HasScrollWheelEventListeners()
-  {
-    return mMayHaveScrollWheelEventListener;
-  }
-
-  /**
-   * Returns whether or not any event listeners are present that APZ must be
-   * aware of.
-   */
-  bool HasApzAwareEventListeners()
-  {
-    return HasTouchEventListeners() || HasScrollWheelEventListeners();
-  }
-
-   /**
-   * Will be called when touch caret visibility has changed. mMayHaveTouchCaret
-   * is set if that some node (this window, its document, or content in that
-   * document) has a visible touch caret.
-   */
-  void SetMayHaveTouchCaret(bool aSetValue)
-  {
-    mMayHaveTouchCaret = aSetValue;
-  }
-
-  bool MayHaveTouchCaret()
-  {
-    return mMayHaveTouchCaret;
-  }
-
-  /**
    * Moves the top-level window into fullscreen mode if aIsFullScreen is true,
    * otherwise exits fullscreen. If aRequireTrust is true, this method only
    * changes window state in a context trusted for write.
@@ -833,8 +806,6 @@ protected:
   bool                   mIsInnerWindow;
   bool                   mMayHavePaintEventListener;
   bool                   mMayHaveTouchEventListener;
-  bool                   mMayHaveTouchCaret;
-  bool                   mMayHaveScrollWheelEventListener;
   bool                   mMayHaveMouseEnterLeaveEventListener;
   bool                   mMayHavePointerEnterLeaveEventListener;
 
@@ -853,6 +824,9 @@ protected:
 
   bool                   mAudioMuted;
   float                  mAudioVolume;
+
+  // current desktop mode flag.
+  bool                   mDesktopModeViewport;
 
   // And these are the references between inner and outer windows.
   nsPIDOMWindow* MOZ_NON_OWNING_REF mInnerWindow;
