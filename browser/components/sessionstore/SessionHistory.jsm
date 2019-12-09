@@ -288,6 +288,12 @@ let SessionHistoryInternal = {
       history.addEntry(this.deserializeEntry(tabData.entries[i],
                                              idMap, docIdentMap), true);
     }
+
+    // Select the right history entry.
+    let index = tabData.index - 1;
+    if (index < history.count && history.index != index) {
+      history.getEntryAtIndex(index, true);
+    }
   },
 
   /**
