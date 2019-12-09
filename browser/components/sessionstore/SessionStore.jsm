@@ -44,7 +44,8 @@ const WINDOW_HIDEABLE_FEATURES = [
   "menubar", "toolbar", "locationbar", "personalbar", "statusbar", "scrollbars"
 ];
 
-const MESSAGES = [
+// Messages that will be received via the Frame Message Manager.
+const FMM_MESSAGES = [
   // The content script gives us a reference to an object that performs
   // synchronous collection of session data.
   "SessionStore:setupSyncHandler",
@@ -73,6 +74,16 @@ const MESSAGES = [
   "SessionStore:reloadPendingTab",
 ];
 
+// Messages that will be received via the Parent Process Message Manager.
+const PPMM_MESSAGES = [
+  // A tab is being revived from the crashed state. The sender of this
+  // message should actually be running in the parent process, since this
+  // will be the crashed tab interface. We use the Child and Parent Process
+  // Message Managers because the message is sent during framescript unload
+  // when the Frame Message Manager is not available.
+  "SessionStore:RemoteTabRevived",
+];
+
 // These are tab events that we listen to.
 const TAB_EVENTS = [
   "TabOpen", "TabClose", "TabSelect", "TabShow", "TabHide", "TabPinned",
@@ -84,7 +95,9 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", this);
 Cu.import("resource://gre/modules/TelemetryStopwatch.jsm", this);
 Cu.import("resource://gre/modules/debug.js", this);
-Cu.import("resource://gre/modules/osfile.jsm", this);
+XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
+  "@mozilla.org/parentprocessmessagemanager;1",
+  "nsIMessageListenerManager");Cu.import("resource://gre/modules/osfile.jsm", this);
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
@@ -95,6 +108,9 @@ XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
   "@mozilla.org/gfx/screenmanager;1", "nsIScreenManager");
 XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
   "@mozilla.org/base/telemetry;1", "nsITelemetry");
+XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
+  "@mozilla.org/parentprocessmessagemanager;1",
+  "nsIMessageListenerManager");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
   "resource://gre/modules/devtools/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
@@ -327,6 +343,11 @@ let SessionStoreInternal = {
   // For each <browser> element being restored, records the current epoch.
   _browserEpochs: new WeakMap(),
 
+  // Any browsers that fires the oop-browser-crashed event gets stored in
+  // here - that way we know which browsers to ignore messages from (until
+  // they get restored).
+  _crashedBrowsers: new WeakSet(),
+
   // whether a setBrowserState call is in progress
   _browserSetState: false,
 
@@ -423,6 +444,8 @@ let SessionStoreInternal = {
     OBSERVING.forEach(function(aTopic) {
       Services.obs.addObserver(this, aTopic, true);
     }, this);
+
+    PPMM_MESSAGES.forEach(msg => ppmm.addMessageListener(msg, this));
 
     this._initPrefs();
     this._initialized = true;
@@ -578,6 +601,8 @@ let SessionStoreInternal = {
 
     // Make sure to cancel pending saves.
     SessionSaver.cancel();
+
+    PPMM_MESSAGES.forEach(msg => ppmm.removeMessageListener(msg, this));
   },
 
   /**
@@ -623,9 +648,18 @@ let SessionStoreInternal = {
 
   /**
    * This method handles incoming messages sent by the session store content
-   * script and thus enables communication with OOP tabs.
+   * script via the Frame Message Manager or Parent Process Message Manager,
+   * and thus enables communication with OOP tabs.
    */
-  receiveMessage: function ssi_receiveMessage(aMessage) {
+  receiveMessage(aMessage) {
+    // We'll deal with any Parent Process Message Manager messages first...
+    if (aMessage.name == "SessionStore:RemoteTabRevived") {
+      this._crashedBrowsers.delete(aMessage.objects.browser.permanentKey);
+      return;
+    }
+
+    // If we got here, that means we're dealing with a frame message
+    // manager message, so the target will be a <xul:browser>.
     var browser = aMessage.target;
     var win = browser.ownerDocument.defaultView;
     let tab = win ? win.gBrowser.getTabForBrowser(browser) : null;
@@ -639,6 +673,11 @@ let SessionStoreInternal = {
         TabState.setSyncHandler(browser, aMessage.objects.handler);
         break;
       case "SessionStore:update":
+        if (this._crashedBrowsers.has(browser.permanentKey)) {
+          // Ignore messages from <browser> elements that have crashed
+          // and not yet been revived.
+          return;
+        }
         this.recordTelemetry(aMessage.data.telemetry);
         TabState.update(browser, aMessage.data);
         this.saveStateDelayed(win);
@@ -723,7 +762,7 @@ let SessionStoreInternal = {
         }
         break;
       default:
-        debug("received unknown message '" + aMessage.name + "'");
+        debug(`received unknown message '${aMessage.name}'`);
         break;
     }
   },
@@ -750,7 +789,6 @@ let SessionStoreInternal = {
       return;
 
     var win = aEvent.currentTarget.ownerDocument.defaultView;
-    let browser;
     switch (aEvent.type) {
       case "TabOpen":
         this.onTabAdd(win, aEvent.originalTarget);
@@ -774,6 +812,9 @@ let SessionStoreInternal = {
       case "TabUnpinned":
       case "SwapDocShells":
         this.saveStateDelayed(win);
+        break;
+      case "oop-browser-crashed":
+        this._crashedBrowsers.add(aEvent.originalTarget.permanentKey);
         break;
     }
     this._clearRestoringWindows();
@@ -803,7 +844,7 @@ let SessionStoreInternal = {
     aWindow.__SSi = "window" + Date.now();
 
     let mm = aWindow.getGroupMessageManager("browsers");
-    MESSAGES.forEach(msg => mm.addMessageListener(msg, this));
+    FMM_MESSAGES.forEach(msg => mm.addMessageListener(msg, this));
 
     // Load the frame script after registering listeners.
     mm.loadFrameScript("chrome://browser/content/content-sessionStore.js", true);
@@ -1130,7 +1171,7 @@ let SessionStoreInternal = {
     DyingWindowCache.set(aWindow, winData);
 
     let mm = aWindow.getGroupMessageManager("browsers");
-    MESSAGES.forEach(msg => mm.removeMessageListener(msg, this));
+    FMM_MESSAGES.forEach(msg => mm.removeMessageListener(msg, this));
 
     delete aWindow.__SSi;
   },
@@ -1332,6 +1373,7 @@ let SessionStoreInternal = {
   onTabAdd: function ssi_onTabAdd(aWindow, aTab, aNoNotification) {
     let browser = aTab.linkedBrowser;
     browser.addEventListener("SwapDocShells", this);
+    browser.addEventListener("oop-browser-crashed", this);
     if (!aNoNotification) {
       this.saveStateDelayed(aWindow);
     }
@@ -1350,6 +1392,7 @@ let SessionStoreInternal = {
     let browser = aTab.linkedBrowser;
     delete browser.__SS_data;
     browser.removeEventListener("SwapDocShells", this);
+    browser.removeEventListener("oop-browser-crashed", this);
 
     // If this tab was in the middle of restoring or still needs to be restored,
     // we need to reset that state. If the tab was restoring, we will attempt to
