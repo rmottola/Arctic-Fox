@@ -17,7 +17,7 @@ var FullScreen = {
       enterFS = !enterFS;
 
     // Toggle the View:FullScreen command, which controls elements like the
-    // fullscreen menuitem, and menubars.
+    // fullscreen menuitem, menubars, and the appmenu.
     let fullscreenCommand = document.getElementById("View:FullScreen");
     if (enterFS) {
       fullscreenCommand.setAttribute("checked", enterFS);

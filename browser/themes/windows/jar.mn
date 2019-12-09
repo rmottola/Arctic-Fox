@@ -19,6 +19,8 @@ browser.jar:
         skin/classic/browser/aboutTabCrashed.css
         skin/classic/browser/aboutTabCrashed.css
         skin/classic/browser/actionicon-tab.png
+        skin/classic/browser/appmenu-icons.png
+        skin/classic/browser/appmenu-dropmarker.png
 *       skin/classic/browser/browser.css
 *       skin/classic/browser/devedition.css
         skin/classic/browser/caption-buttons.svg
