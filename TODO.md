@@ -45,6 +45,7 @@
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
+- 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
 - 1142669 part 6 - Don't inline scripts that are known to inline a
 - 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
@@ -128,10 +129,6 @@ Check with Roy Tam:
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
 Require check of JS browser components:
-
-- Bug 1169892 - Avoid extra round-trip when a pending tab is reloaded r
-- Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
-- Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
 
 
 Parents of:
