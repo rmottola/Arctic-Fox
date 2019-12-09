@@ -157,8 +157,6 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY bookmarksItem.title          "Bookmarks">
 
 <!-- Toolbar items --> 
-<!ENTITY appMenuButton.label          "Menu">
-<!ENTITY appMenuButton.tooltip        "Open &brandShortName; menu">
 <!ENTITY homeButton.label             "Home">
 
 <!ENTITY feedButton.label             "Subscribe">
@@ -326,15 +324,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY showAllHistoryCmd2.label "Show All History">
 <!ENTITY showAllHistoryCmd.commandkey "H">
 
-<!ENTITY appMenuEdit.label "Edit">
 <!ENTITY appMenuCustomize.label "Customize">
-<!ENTITY appMenuToolbarLayout.label "Toolbar Layout">
-<!ENTITY appMenuSidebars.label "Sidebars">
-<!ENTITY appMenuFind.label "Find…">
-<!ENTITY appMenuUnsorted.label "Unsorted Bookmarks">
-<!ENTITY appMenuWebDeveloper.label "Web Developer">
-<!ENTITY appMenuGettingStarted.label "Getting Started">
-<!ENTITY appMenuSafeMode.label "Restart in Safe Mode…">
 
 <!ENTITY openCmd.commandkey           "l">
 <!ENTITY urlbar.accesskey             "d">
