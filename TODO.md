@@ -130,6 +130,12 @@ Check with Roy Tam:
 
 Require check of JS browser components:
 
+- Bug 863753 - Retire the Firefox appmenu button. r=MattN
+- Bug 625989 - Always draw in the titlebar on OSX. r=josh,dao f=mstange 
+
+What with LightweightThemeConsumer.jsm 
+
+
 
 Parents of:
 
