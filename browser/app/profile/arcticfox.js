@@ -137,12 +137,12 @@ pref("app.update.certs.1.issuerName", "CN=COMODO RSA Domain Validation Secure Se
 pref("app.update.certs.1.commonName", "*.palemoon.org");
 
 // Whether or not app updates are enabled
-pref("app.update.enabled", true);
+pref("app.update.enabled", false);
 
 // This preference turns on app.update.mode and allows automatic download and
 // install to take place. We use a separate boolean toggle for this to make
 // the UI easier to construct.
-pref("app.update.auto", true);
+pref("app.update.auto", false);
 
 // See chart in nsUpdateService.js source for more details
 pref("app.update.mode", 1);
@@ -152,10 +152,10 @@ pref("app.update.silent", false);
 
 // If set to true, the Update Service will apply updates in the background
 // when it finishes downloading them.
-pref("app.update.staging.enabled", true);
+pref("app.update.staging.enabled", false);
 
 // Update service URL:
-pref("app.update.url", "https://aus3.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
 // app.update.url.manual is in branding section
 // app.update.url.details is in branding section
 
@@ -254,7 +254,7 @@ pref("browser.chrome.favicons", true);
 pref("browser.warnOnQuit", true);
 // browser.showQuitWarning specifically controls the quit warning dialog. We
 // might still show the window closing dialog with showQuitWarning == false.
-pref("browser.showQuitWarning", false);
+pref("browser.showQuitWarning", true);
 pref("browser.fullscreen.autohide", true);
 pref("browser.fullscreen.animateUp", 0);
 pref("browser.overlink-delay", 80);
@@ -635,7 +635,7 @@ pref("accessibility.typeaheadfind.flashBar", 1);
 pref("plugins.hide_infobar_for_blocked_plugin", false);
 pref("plugins.hide_infobar_for_outdated_plugin", false);
 
-// Pale Moon:pref to always show the plugin indicator or not (default=false)
+// Arctic Fox:pref to always show the plugin indicator or not (default=false)
 pref("plugins.always_show_indicator", false);
 
 pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
@@ -883,7 +883,7 @@ pref("browser.zoom.siteSpecific", true);
 pref("browser.zoom.updateBackgroundTabs", true);
 
 // base URL for web-based support pages
-pref("app.support.baseURL", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/");
+pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki");
 
 // Name of alternate about: page for certificate errors (when undefined, defaults to about:neterror)
 pref("security.alternate_certificate_error_page", "certerror");
@@ -1100,7 +1100,7 @@ pref("dom.debug.propagate_gesture_events_through_content", false);
 // The request URL of the GeoLocation backend.
 pref("geo.wifi.uri", "http://ip-api.com/json/?fields=lat,lon,status,message");
 
-//Pale Moon padlock overlay preferences
+//Arctic Fox padlock overlay preferences
 pref("browser.padlock.shown", true);
 /* Where to show the padlock
    1 = inside identity button, right side
@@ -1113,7 +1113,7 @@ pref("browser.padlock.style", 1);
 // address bar border, 0 = no border, 1 = border, 2 = border only on secure sites
 pref("browser.padlock.urlbar_background", 2);
 
-//Pale Moon standalone image background color
+//Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 // ****************** domain-specific UAs ******************
