@@ -164,11 +164,11 @@ pref("dom.enable_user_timing", true);
 pref("dom.performance.enable_user_timing_logging", false);
 
 // Whether the Gamepad API is enabled
-pref("dom.gamepad.enabled", true);
+pref("dom.gamepad.enabled", false);
 #ifdef RELEASE_BUILD
 pref("dom.gamepad.non_standard_events.enabled", false);
 #else
-pref("dom.gamepad.non_standard_events.enabled", true);
+pref("dom.gamepad.non_standard_events.enabled", false);
 #endif
 
 // Whether the KeyboardEvent.code is enabled
