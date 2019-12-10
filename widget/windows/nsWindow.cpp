@@ -3329,12 +3329,9 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
   }
 
   if (!mLayerManager) {
+    MOZ_ASSERT(!mCompositorParent && !mCompositorChild);
     mLayerManager = CreateBasicLayerManager();
   }
-
-  // If we don't have a layer manager at this point we shouldn't have a
-  // PCompositor actor pair either.
-  MOZ_ASSERT(mLayerManager || (!mCompositorParent && !mCompositorChild));
 
   NS_ASSERTION(mLayerManager, "Couldn't provide a valid layer manager.");
 

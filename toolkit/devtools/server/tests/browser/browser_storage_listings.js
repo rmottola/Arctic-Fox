@@ -7,6 +7,8 @@
 const {StorageFront} = require("devtools/server/actors/storage");
 let gWindow = null;
 
+const domStorageProperties = ['length', 'key', 'getItem','setItem', 'removeItem', 'clear'];
+
 const storeMap = {
   cookies: {
     "test1.example.org": [
@@ -416,9 +418,13 @@ function testLocalStorage(localStorageActor) {
 let testLocalStorageObjects = Task.async(function*(index, hosts, localStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
-    is(data.total, storeMap.localStorage[host].length,
+    is(data.total - domStorageProperties.length, storeMap.localStorage[host].length,
        "Number of local storage items in host " + host + " matches");
     for (let item of data.data) {
+      if (domStorageProperties.indexOf(item.name) != -1) {
+        continue;
+      }
+
       let found = false;
       for (let toMatch of storeMap.localStorage[host]) {
         if (item.name == toMatch.name) {
@@ -453,9 +459,13 @@ function testSessionStorage(sessionStorageActor) {
 let testSessionStorageObjects = Task.async(function*(index, hosts, sessionStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
-    is(data.total, storeMap.sessionStorage[host].length,
+    is(data.total - domStorageProperties.length, storeMap.sessionStorage[host].length,
        "Number of session storage items in host " + host + " matches");
     for (let item of data.data) {
+      if (domStorageProperties.indexOf(item.name) != -1) {
+        continue;
+      }
+
       let found = false;
       for (let toMatch of storeMap.sessionStorage[host]) {
         if (item.name == toMatch.name) {

@@ -158,6 +158,8 @@ static uint32_t ToLinkMask(const nsAString& aLink, nsIPrincipal* aPrincipal)
   else if (aLink.EqualsLiteral("import") && aPrincipal &&
            nsStyleLinkElement::IsImportEnabled(aPrincipal))
     return nsStyleLinkElement::eHTMLIMPORT;
+  else if (aLink.EqualsLiteral("preconnect"))
+    return nsStyleLinkElement::ePRECONNECT;
   else 
     return 0;
 }

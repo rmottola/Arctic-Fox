@@ -508,6 +508,7 @@ BrowserGlue.prototype = {
     BrowserNewTabPreloader.init();
     webrtcUI.init();
     AboutHome.init();
+    SessionStore.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();

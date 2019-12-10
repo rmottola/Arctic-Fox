@@ -406,14 +406,6 @@ XRE_InitChildProcess(int aArgc,
   base::ProcessId parentPID = strtol(parentPIDString, &end, 10);
   MOZ_ASSERT(!*end, "invalid parent PID");
 
-  // Retrieve the parent process handle. We need this for shared memory use and
-  // for creating new transports in the child.
-  base::ProcessHandle parentHandle = 0;
-  if (XRE_GetProcessType() != GoannaProcessType_GMPlugin) {
-    mozilla::DebugOnly<bool> ok = base::OpenProcessHandle(parentPID, &parentHandle);
-    MOZ_ASSERT(ok, "can't open handle to parent");
-  }
-
 #if defined(XP_WIN)
   // On Win7+, register the application user model id passed in by
   // parent. This insures windows created by the container properly
@@ -479,11 +471,11 @@ XRE_InitChildProcess(int aArgc,
         break;
 
       case GoannaProcessType_Plugin:
-        process = new PluginProcessChild(parentHandle);
+        process = new PluginProcessChild(parentPID);
         break;
 
       case GoannaProcessType_Content: {
-          process = new ContentProcess(parentHandle);
+          process = new ContentProcess(parentPID);
           // If passed in grab the application path for xpcom init
           nsCString appDir;
           for (int idx = aArgc; idx > 0; idx--) {
@@ -498,14 +490,14 @@ XRE_InitChildProcess(int aArgc,
 
       case GoannaProcessType_IPDLUnitTest:
 #ifdef MOZ_IPDL_TESTS
-        process = new IPDLUnitTestProcessChild(parentHandle);
+        process = new IPDLUnitTestProcessChild(parentPID);
 #else
         NS_RUNTIMEABORT("rebuild with --enable-ipdl-tests");
 #endif
         break;
 
       case GoannaProcessType_GMPlugin:
-        process = new gmp::GMPProcessChild(parentHandle);
+        process = new gmp::GMPProcessChild(parentPID);
         break;
 
       default:

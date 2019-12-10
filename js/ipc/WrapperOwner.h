@@ -60,15 +60,16 @@ class WrapperOwner : public virtual JavaScriptShared
 
     bool regexp_toShared(JSContext *cx, JS::HandleObject proxy, js::RegExpGuard *g);
 
-    nsresult instanceOf(JSObject* obj, const nsID* id, bool* bp);
+    nsresult instanceOf(JSObject *obj, const nsID *id, bool *bp);
 
-    bool toString(JSContext* cx, JS::HandleObject callee, JS::CallArgs& args);
+    bool toString(JSContext *cx, JS::HandleObject callee, JS::CallArgs &args);
+    bool DOMQI(JSContext *cx, JS::HandleObject callee, JS::CallArgs &args);
 
     /*
      * Check that |obj| is a DOM wrapper whose prototype chain contains
      * |prototypeID| at depth |depth|.
      */
-    bool domInstanceOf(JSContext* cx, JSObject* obj, int prototypeID, int depth, bool* bp);
+    bool domInstanceOf(JSContext *cx, JSObject *obj, int prototypeID, int depth, bool *bp);
 
     bool active() { return !inactive_; }
 

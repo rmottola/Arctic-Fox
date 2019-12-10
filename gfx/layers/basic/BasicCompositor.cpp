@@ -84,6 +84,12 @@ BasicCompositor::~BasicCompositor()
   MOZ_COUNT_DTOR(BasicCompositor);
 }
 
+bool
+BasicCompositor::Initialize()
+{
+  return mWidget ? mWidget->InitCompositor(this) : false;
+};
+
 int32_t
 BasicCompositor::GetMaxTextureSize() const
 {

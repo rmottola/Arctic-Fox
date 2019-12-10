@@ -835,7 +835,7 @@ CreateBlobImpl(const nsTArray<uint8_t>& aMemoryData,
       return nullptr;
     }
 
-    void* buffer = moz_malloc(length * elementSizeMultiplier);
+    void* buffer = malloc(length * elementSizeMultiplier);
     if (NS_WARN_IF(!buffer)) {
       return nullptr;
     }

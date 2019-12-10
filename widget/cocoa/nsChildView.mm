@@ -2497,6 +2497,8 @@ nsChildView::EnsureVibrancyManager()
 already_AddRefed<gfx::DrawTarget>
 nsChildView::StartRemoteDrawing()
 {
+  // should have created the GLPresenter in InitCompositor.
+  MOZ_ASSERT(mGLPresenter);
   if (!mGLPresenter) {
     mGLPresenter = GLPresenter::CreateForWindow(this);
 
@@ -2539,6 +2541,19 @@ nsChildView::CleanupRemoteDrawing()
   mResizerImage = nullptr;
   mTitlebarImage = nullptr;
   mGLPresenter = nullptr;
+}
+
+bool
+nsChildView::InitCompositor(Compositor* aCompositor)
+{
+  if (aCompositor->GetBackendType() == LayersBackend::LAYERS_BASIC) {
+    if (!mGLPresenter) {
+      mGLPresenter = GLPresenter::CreateForWindow(this);
+    }
+
+    return !!mGLPresenter;
+  }
+  return true;
 }
 
 void

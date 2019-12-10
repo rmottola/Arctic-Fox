@@ -3053,8 +3053,10 @@ void
 MLoadElementHole::collectRangeInfoPreTrunc()
 {
     Range indexRange(index());
-    if (indexRange.isFiniteNonNegative())
+    if (indexRange.isFiniteNonNegative()) {
         needsNegativeIntCheck_ = false;
+        setNotGuard();
+    }
 }
 
 void

@@ -17,7 +17,11 @@
 // mozalloc.cpp is part of the same library as mozmemory, thus MOZ_MEMORY_IMPL
 // is needed.
 #define MOZ_MEMORY_IMPL
-#include "mozmemory.h"
+#include "mozmemory_wrap.h"
+
+#if defined(XP_MACOSX)
+#include <malloc/malloc.h> // for malloc_size
+#endif
 
 // See mozmemory_wrap.h for more details. This file is part of libmozglue, so
 // it needs to use _impl suffixes. However, with libmozglue growing, this is
@@ -73,12 +77,6 @@ extern "C" MOZ_MEMORY_API char *strndup_impl(const char *, size_t);
 #define UNLIKELY(x)  (x)
 #endif
 
-void
-moz_free(void* ptr)
-{
-    free_impl(ptr);
-}
-
 void*
 moz_xmalloc(size_t size)
 {
@@ -88,11 +86,6 @@ moz_xmalloc(size_t size)
         return moz_xmalloc(size);
     }
     return ptr;
-}
-void*
-moz_malloc(size_t size)
-{
-    return malloc_impl(size);
 }
 
 void*
@@ -105,11 +98,6 @@ moz_xcalloc(size_t nmemb, size_t size)
     }
     return ptr;
 }
-void*
-moz_calloc(size_t nmemb, size_t size)
-{
-    return calloc_impl(nmemb, size);
-}
 
 void*
 moz_xrealloc(void* ptr, size_t size)
@@ -120,11 +108,6 @@ moz_xrealloc(void* ptr, size_t size)
         return moz_xrealloc(ptr, size);
     }
     return newptr;
-}
-void*
-moz_realloc(void* ptr, size_t size)
-{
-    return realloc_impl(ptr, size);
 }
 
 char*

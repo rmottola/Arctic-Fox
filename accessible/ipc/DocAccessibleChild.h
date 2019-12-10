@@ -90,7 +90,95 @@ public:
                                        nsString* aText, int32_t* aStartOffset,
                                        int32_t* aEndOffset) override;
 
+  virtual bool RecvTextAttributes(const uint64_t& aID,
+                                  const bool& aIncludeDefAttrs,
+                                  const int32_t& aOffset,
+                                  nsTArray<Attribute>* aAttributes,
+                                  int32_t* aStartOffset,
+                                  int32_t* aEndOffset)
+    override;
+
+  virtual bool RecvDefaultTextAttributes(const uint64_t& aID,
+                                         nsTArray<Attribute>* aAttributes)
+    override;
+
+  virtual bool RecvTextBounds(const uint64_t& aID,
+                              const int32_t& aStartOffset,
+                              const int32_t& aEndOffset,
+                              const uint32_t& aCoordType,
+                              nsIntRect* aRetVal) override;
+
+  virtual bool RecvCharBounds(const uint64_t& aID,
+                              const int32_t& aOffset,
+                              const uint32_t& aCoordType,
+                              nsIntRect* aRetVal) override;
+
+  virtual bool RecvOffsetAtPoint(const uint64_t& aID,
+                                 const int32_t& aX,
+                                 const int32_t& aY,
+                                 const uint32_t& aCoordType,
+                                 int32_t* aRetVal) override;
+
+  virtual bool RecvSelectionBoundsAt(const uint64_t& aID,
+                                     const int32_t& aSelectionNum,
+                                     bool* aSucceeded,
+                                     nsString* aData,
+                                     int32_t* aStartOffset,
+                                     int32_t* aEndOffset) override;
+
+  virtual bool RecvSetSelectionBoundsAt(const uint64_t& aID,
+                                        const int32_t& aSelectionNum,
+                                        const int32_t& aStartOffset,
+                                        const int32_t& aEndOffset,
+                                        bool* aSucceeded) override;
+
+  virtual bool RecvAddToSelection(const uint64_t& aID,
+                                  const int32_t& aStartOffset,
+                                  const int32_t& aEndOffset,
+                                  bool* aSucceeded) override;
+
+  virtual bool RecvRemoveFromSelection(const uint64_t& aID,
+                                       const int32_t& aSelectionNum,
+                                       bool* aSucceeded) override;
+
+  virtual bool RecvScrollSubstringTo(const uint64_t& aID,
+                                     const int32_t& aStartOffset,
+                                     const int32_t& aEndOffset,
+                                     const uint32_t& aScrollType) override;
+
+  virtual bool RecvScrollSubstringToPoint(const uint64_t& aID,
+                                          const int32_t& aStartOffset,
+                                          const int32_t& aEndOffset,
+                                          const uint32_t& aCoordinateType,
+                                          const int32_t& aX,
+                                          const int32_t& aY) override;
+
+  virtual bool RecvReplaceText(const uint64_t& aID,
+                               const nsString& aText) override;
+
+  virtual bool RecvInsertText(const uint64_t& aID,
+                              const nsString& aText,
+                              const int32_t& aPosition) override;
+
+  virtual bool RecvCopyText(const uint64_t& aID,
+                            const int32_t& aStartPos,
+                            const int32_t& aEndPos) override;
+
+  virtual bool RecvCutText(const uint64_t& aID,
+                           const int32_t& aStartPos,
+                           const int32_t& aEndPos) override;
+
+  virtual bool RecvDeleteText(const uint64_t& aID,
+                              const int32_t& aStartPos,
+                              const int32_t& aEndPos) override;
+
+  virtual bool RecvPasteText(const uint64_t& aID,
+                             const int32_t& aPosition) override;
+
 private:
+  bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
+                                   nsTArray<Attribute>* aAttributes);
+
   DocAccessible* mDoc;
 };
 

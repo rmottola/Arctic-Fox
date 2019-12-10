@@ -529,6 +529,7 @@ public:
   already_AddRefed<mozilla::gfx::DrawTarget> StartRemoteDrawing() override;
   void EndRemoteDrawing() override;
   void CleanupRemoteDrawing() override;
+  bool InitCompositor(mozilla::layers::Compositor* aCompositor) override;
 
   APZCTreeManager* APZCTM() { return mAPZC ; }
 
