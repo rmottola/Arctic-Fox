@@ -40,6 +40,8 @@ pref("@GUAO_PREF@.players.brightcove.net","Mozilla/5.0 (Windows NT 6.1; Trident/
 // Google Fonts forces unicode ranges unless it is being told the browser is Firefox 43 or below.
 // They do NOT test for unicode-ranges CSS support.
 pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) @GK_SLICE@ Firefox/43.0");
+// Force Google Drive to use lightweight mobile layout, as desktop layout grinds to a halt on PPC.
+pref("@GUAO_PREF@drive.google.com","Mozilla/5.0 (Mozilla/5.0 (Linux; U; Android 4.0.3; ko-kr; LG-L160L Build/IML74K) AppleWebkit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30L");
 #endif
 
 // The following requires native mode. Or it blocks.. "too old firefox", breakage, etc.
@@ -49,11 +51,6 @@ pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GR
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Mozilla/5.0 (Linux; U; Android 4.0.3; ko-kr; LG-L160L Build/IML74K) AppleWebkit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30L");
-pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-
-// UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
-pref("@GUAO_PREF@.web.skype.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.2049.0 Safari/537.36 Edge/15.14931");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
