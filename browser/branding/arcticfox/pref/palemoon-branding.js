@@ -15,8 +15,8 @@ pref("general.useragent.compatMode", 2);
 pref("app.update.auto", false);
 
 // Updates enabled
-pref("app.update.enabled", true);
 pref("app.update.cert.checkAttributes", false);
+pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
 
 // Interval: Time between checks for a new version (in seconds) -- 6 hours for unstable
 pref("app.update.interval", 21600);
@@ -32,5 +32,4 @@ pref("app.update.url.details", "about:");
 #else
 // Updates disabled (Linux, etc.)
 pref("app.update.enabled", false);
-pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
 #endif
