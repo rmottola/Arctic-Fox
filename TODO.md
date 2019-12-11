@@ -116,8 +116,6 @@
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
 - Bug 1038811 2015-04-11 Complete remaining
 - Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
-- Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
-- Bug 1129650 - Touching navigator.mozId causes an error NS_ERROR_FACTO (Check MacOS-X failres and dependencies)
 
 - Bug 1136956 - Set CoreLocation provider to non-release only in firefo
 - Bug 1125411 - OSX: turn CoreLocation provider o 
@@ -128,10 +126,6 @@ Check with Roy Tam:
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
-Require check of JS browser components:
-
-- Bug 863753 - Retire the Firefox appmenu button. r=MattN
-- Bug 625989 - Always draw in the titlebar on OSX. r=josh,dao f=mstange 
 
 What with LightweightThemeConsumer.jsm 
 
