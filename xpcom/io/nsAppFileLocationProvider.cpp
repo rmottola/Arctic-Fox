@@ -581,8 +581,8 @@ nsAppFileLocationProvider::GetFiles(const char* aProp,
     }
     *aResult = new nsPathsDirectoryEnumerator(this, keys);
 #endif
-    NS_IF_ADDREF(*aResult);
-    rv = *aResult ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+    NS_ADDREF(*aResult);
+    rv = NS_OK;
   }
   if (!nsCRT::strcmp(aProp, NS_APP_SEARCH_DIR_LIST)) {
     static const char* keys[] = { nullptr, NS_APP_SEARCH_DIR, NS_APP_USER_SEARCH_DIR, nullptr };
@@ -591,8 +591,8 @@ nsAppFileLocationProvider::GetFiles(const char* aProp,
       keys[0] = &nullstr;
     }
     *aResult = new nsPathsDirectoryEnumerator(this, keys);
-    NS_IF_ADDREF(*aResult);
-    rv = *aResult ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+    NS_ADDREF(*aResult);
+    rv = NS_OK;
   }
   return rv;
 }
