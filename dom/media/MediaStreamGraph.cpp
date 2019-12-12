@@ -589,18 +589,22 @@ MediaStreamGraphImpl::UpdateStreamOrder()
     // If this is a AudioNodeStream, force a AudioCallbackDriver.
     if (stream->AsAudioNodeStream()) {
       audioTrackPresent = true;
-    } else {
-      for (StreamBuffer::TrackIter tracks(stream->GetStreamBuffer(), MediaSegment::AUDIO);
-           !tracks.IsEnded(); tracks.Next()) {
-        audioTrackPresent = true;
-      }
+    }
+    for (StreamBuffer::TrackIter tracks(stream->GetStreamBuffer(), MediaSegment::AUDIO);
+         !tracks.IsEnded(); tracks.Next()) {
+      audioTrackPresent = true;
     }
   }
 
   if (!audioTrackPresent &&
       CurrentDriver()->AsAudioCallbackDriver()) {
-    MonitorAutoLock mon(mMonitor);
-    if (CurrentDriver()->AsAudioCallbackDriver()->IsStarted()) {
+    bool started;
+    {
+      MonitorAutoLock mon(mMonitor);
+      started = CurrentDriver()->AsAudioCallbackDriver()->IsStarted();
+    }
+    if (started) {
+      MonitorAutoLock mon(mMonitor);
       if (mLifecycleState == LIFECYCLE_RUNNING) {
         SystemClockDriver* driver = new SystemClockDriver(this);
         CurrentDriver()->SwitchAtNextIteration(driver);
@@ -619,12 +623,6 @@ MediaStreamGraphImpl::UpdateStreamOrder()
     }
   }
 #endif
-
-  if (!mStreamOrderDirty) {
-    return;
-  }
-
-  mStreamOrderDirty = false;
 
   // The algorithm for finding cycles is based on Tim Leslie's iterative
   // implementation [1][2] of Pearce's variant [3] of Tarjan's strongly
@@ -1356,7 +1354,9 @@ MediaStreamGraphImpl::UpdateGraph(GraphTime aEndBlockingDecision)
   }
   mFrontMessageQueue.Clear();
 
-  UpdateStreamOrder();
+  if (mStreamOrderDirty) {
+    UpdateStreamOrder();
+  }
 
   bool ensureNextIteration = false;
 

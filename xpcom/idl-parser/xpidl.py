@@ -994,6 +994,7 @@ class IDLParser(object):
         'readonly': 'READONLY',
         'native': 'NATIVE',
         'typedef': 'TYPEDEF',
+        'Infinity': 'INFINITY'
         }
 
     tokens = [

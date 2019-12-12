@@ -22,8 +22,6 @@ ${INCLUDES}
 
 using namespace std;
 
-using base::Thread;
-
 namespace mozilla {
 namespace _ipdltest {
 

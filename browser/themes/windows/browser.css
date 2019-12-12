@@ -1929,10 +1929,6 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   }
 }
 
-.tabbrowser-tab[remote] {
-  text-decoration: underline;
-}
-
 .tabbrowser-tab:hover,
 .tabs-newtab-button:hover {
   background-image: @toolbarShadowOnTab@, var(--tab-background-hover),

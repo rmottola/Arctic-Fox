@@ -272,6 +272,7 @@ public:
 
   struct DrawIterator {
     friend class RotatedContentBuffer;
+    friend class ContentClientIncremental;
     DrawIterator()
       : mCount(0)
     {}

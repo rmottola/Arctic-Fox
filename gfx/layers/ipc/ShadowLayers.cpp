@@ -353,6 +353,26 @@ ShadowLayerForwarder::UpdateTextureRegion(CompositableClient* aCompositable,
 }
 
 void
+ShadowLayerForwarder::UpdateTextureIncremental(CompositableClient* aCompositable,
+                                               TextureIdentifier aTextureId,
+                                               SurfaceDescriptor& aDescriptor,
+                                               const nsIntRegion& aUpdatedRegion,
+                                               const nsIntRect& aBufferRect,
+                                               const nsIntPoint& aBufferRotation)
+{
+  CheckSurfaceDescriptor(&aDescriptor);
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  mTxn->AddNoSwapPaint(OpPaintTextureIncremental(nullptr, aCompositable->GetIPDLActor(),
+                                                 aTextureId,
+                                                 aDescriptor,
+                                                 aUpdatedRegion,
+                                                 aBufferRect,
+                                                 aBufferRotation));
+}
+
+
+void
 ShadowLayerForwarder::UpdatePictureRect(CompositableClient* aCompositable,
                                         const nsIntRect& aRect)
 {
@@ -470,14 +490,10 @@ ShadowLayerForwarder::RemoveTextureFromCompositableAsync(AsyncTransactionTracker
   } else {
     // If the function is called outside of transaction,
     // OpRemoveTextureAsync message is stored as pending message.
-#ifdef MOZ_WIDGET_GONK
     mPendingAsyncMessages.push_back(OpRemoveTextureAsync(CompositableClient::GetTrackersHolderId(aCompositable->GetIPDLActor()),
                                     aAsyncTransactionTracker->GetId(),
                                     nullptr, aCompositable->GetIPDLActor(),
                                     nullptr, aTexture->GetIPDLActor()));
-#else
-    NS_RUNTIMEABORT("not reached");
-#endif
   }
   CompositableClient::HoldUntilComplete(aCompositable->GetIPDLActor(),
                                         aAsyncTransactionTracker);
@@ -797,6 +813,16 @@ ShadowLayerForwarder::Connect(CompositableClient* aCompositable)
     mShadowManager->SendPCompositableConstructor(aCompositable->GetTextureInfo());
   MOZ_ASSERT(actor);
   aCompositable->InitIPDLActor(actor);
+}
+
+void
+ShadowLayerForwarder::CreatedIncrementalBuffer(CompositableClient* aCompositable,
+                                               const TextureInfo& aTextureInfo,
+                                               const nsIntRect& aBufferRect)
+{
+  MOZ_ASSERT(aCompositable);
+  mTxn->AddNoSwapPaint(OpCreatedIncrementalTexture(nullptr, aCompositable->GetIPDLActor(),
+                                                   aTextureInfo, aBufferRect));
 }
 
 void ShadowLayerForwarder::Attach(CompositableClient* aCompositable,

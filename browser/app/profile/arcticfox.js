@@ -137,12 +137,12 @@ pref("app.update.certs.1.issuerName", "CN=COMODO RSA Domain Validation Secure Se
 pref("app.update.certs.1.commonName", "*.palemoon.org");
 
 // Whether or not app updates are enabled
-pref("app.update.enabled", true);
+pref("app.update.enabled", false);
 
 // This preference turns on app.update.mode and allows automatic download and
 // install to take place. We use a separate boolean toggle for this to make
 // the UI easier to construct.
-pref("app.update.auto", true);
+pref("app.update.auto", false);
 
 // See chart in nsUpdateService.js source for more details
 pref("app.update.mode", 1);
@@ -152,10 +152,10 @@ pref("app.update.silent", false);
 
 // If set to true, the Update Service will apply updates in the background
 // when it finishes downloading them.
-pref("app.update.staging.enabled", true);
+pref("app.update.staging.enabled", false);
 
 // Update service URL:
-pref("app.update.url", "https://aus3.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
 // app.update.url.manual is in branding section
 // app.update.url.details is in branding section
 
@@ -254,7 +254,7 @@ pref("browser.chrome.favicons", true);
 pref("browser.warnOnQuit", true);
 // browser.showQuitWarning specifically controls the quit warning dialog. We
 // might still show the window closing dialog with showQuitWarning == false.
-pref("browser.showQuitWarning", false);
+pref("browser.showQuitWarning", true);
 pref("browser.fullscreen.autohide", true);
 pref("browser.fullscreen.animateUp", 0);
 pref("browser.overlink-delay", 80);
@@ -299,7 +299,7 @@ pref("browser.urlbar.suggest.openpage",             true);
 pref("browser.urlbar.suggest.history.onlyTyped",    false);
 
 pref("browser.urlbar.formatting.enabled", true);
-pref("browser.urlbar.trimURLs", true);
+pref("browser.urlbar.trimURLs", false);
 
 // Display punycode in identity panel:
 // 0 = Display IDN name
@@ -344,7 +344,7 @@ pref("browser.download.panel.shown", false);
 pref("browser.download.panel.firstSessionCompleted", false);
 
 // search engines URL
-pref("browser.search.searchEnginesURL",      "https://addons.mozilla.org/%LOCALE%/firefox/search-engines/");
+pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
@@ -426,7 +426,7 @@ pref("browser.tabs.loadBookmarksInBackground", false);
 pref("browser.tabs.noWindowActivationOnExternal", false);
 pref("browser.tabs.tabClipWidth", 140);
 pref("browser.tabs.animate", true);
-pref("browser.tabs.onTop", true);
+pref("browser.tabs.onTop", false);
 #ifdef XP_WIN
 pref("browser.tabs.drawInTitlebar", true);
 #else
@@ -635,7 +635,7 @@ pref("accessibility.typeaheadfind.flashBar", 1);
 pref("plugins.hide_infobar_for_blocked_plugin", false);
 pref("plugins.hide_infobar_for_outdated_plugin", false);
 
-// Pale Moon:pref to always show the plugin indicator or not (default=false)
+// Arctic Fox:pref to always show the plugin indicator or not (default=false)
 pref("plugins.always_show_indicator", false);
 
 pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
@@ -773,6 +773,9 @@ pref("browser.sessionstore.resume_session_once", false);
 
 // minimal interval between two save operations in milliseconds
 pref("browser.sessionstore.interval", 15000);
+// maximum amount of POSTDATA to be saved in bytes per history entry (-1 = all of it)
+// (NB: POSTDATA will be saved either entirely or not at all)
+pref("browser.sessionstore.postdata", 0);
 // on which sites to save text data, POSTDATA and cookies
 // 0 = everywhere, 1 = unencrypted sites, 2 = nowhere
 pref("browser.sessionstore.privacy_level", 0);
@@ -786,9 +789,9 @@ pref("browser.sessionstore.max_windows_undo", 3);
 // number of crashes that can occur before the about:sessionrestore page is displayed
 // (this pref has no effect if more than 6 hours have passed since the last crash)
 pref("browser.sessionstore.max_resumed_crashes", 1);
-// number of back button session history entries to restore (-1 = all of them)
+// number of back button session history entries to save (-1 = all of them)
 pref("browser.sessionstore.max_serialize_back", 10);
-// number of forward button session history entries to restore (-1 = all of them)
+// number of forward button session history entries to save (-1 = all of them)
 pref("browser.sessionstore.max_serialize_forward", -1);
 // restore_on_demand overrides browser.sessionstore.max_concurrent_tabs
 // and restore_hidden_tabs. When true, tabs will not be restored until they are
@@ -805,12 +808,6 @@ pref("browser.sessionstore.restore_hidden_tabs", false);
 // When set to true, this pref overrides that behavior, and pinned tabs will only
 // be restored when they are focused.
 pref("browser.sessionstore.restore_pinned_tabs_on_demand", false);
-// The version at which we performed the latest upgrade backup
-pref("browser.sessionstore.upgradeBackup.latestBuildID", "");
-// End-users should not run sessionstore in debug mode
-pref("browser.sessionstore.debug", false);
-// Forget closed windows/tabs after two weeks
-pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // Pale Moon: Allow the user to bypass cached versions of pages when restoring
 // tabs from a previous session
 // 0 = standard behavior: pull fully from cache
@@ -886,7 +883,7 @@ pref("browser.zoom.siteSpecific", true);
 pref("browser.zoom.updateBackgroundTabs", true);
 
 // base URL for web-based support pages
-pref("app.support.baseURL", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/");
+pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki");
 
 // Name of alternate about: page for certificate errors (when undefined, defaults to about:neterror)
 pref("security.alternate_certificate_error_page", "certerror");
@@ -904,15 +901,6 @@ pref("toolbar.customization.usesheet", true);
 #else
 pref("toolbar.customization.usesheet", false);
 #endif
-
-// Disable Flash protected mode to reduce hang/crash rates.
-pref("dom.ipc.plugins.flash.disable-protected-mode", true);
-
-// Feature-disable the protected-mode auto-flip
-pref("browser.flash-protected-mode-flip.enable", false);
-
-// Whether we've already flipped protected mode automatically
-pref("browser.flash-protected-mode-flip.done", false);
 
 #ifdef XP_MACOSX
 // On mac, the default pref is per-architecture
@@ -936,16 +924,7 @@ pref("browser.tabs.remote", false);
 pref("security.sandbox.macos.content.level", 1);
 #endif
 
-#if defined(NIGHTLY_BUILD) && defined(XP_MACOSX)
-// In Nightly, browser.tabs.remote is enabled on platforms that
-// support OMTC. However, users won't actually get remote tabs unless
-// they enable browser.tabs.remote.autostart or they use the "New OOP
-// Window" menu option.
-pref("browser.tabs.remote", true);
-#else
 pref("browser.tabs.remote", false);
-#endif
-pref("browser.tabs.remote.autostart", false);
 
 // This pref governs whether we attempt to work around problems caused by
 // plugins using OS calls to manipulate the cursor while running out-of-
@@ -1048,8 +1027,7 @@ pref("services.sync.prefs.sync.spellchecker.dictionary", true);
 pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
-// Developer edition preferences
-pref("browser.devedition.theme.enabled", false);
+
 
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
@@ -1122,7 +1100,7 @@ pref("dom.debug.propagate_gesture_events_through_content", false);
 // The request URL of the GeoLocation backend.
 pref("geo.wifi.uri", "http://ip-api.com/json/?fields=lat,lon,status,message");
 
-//Pale Moon padlock overlay preferences
+//Arctic Fox padlock overlay preferences
 pref("browser.padlock.shown", true);
 /* Where to show the padlock
    1 = inside identity button, right side
@@ -1135,7 +1113,7 @@ pref("browser.padlock.style", 1);
 // address bar border, 0 = no border, 1 = border, 2 = border only on secure sites
 pref("browser.padlock.urlbar_background", 2);
 
-//Pale Moon standalone image background color
+//Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 // ****************** domain-specific UAs ******************

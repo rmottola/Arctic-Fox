@@ -244,13 +244,6 @@ AppTrustDomain::IsChainValid(const DERArray& certChain, Time time)
 }
 
 Result
-AppTrustDomain::CheckSignatureDigestAlgorithm(DigestAlgorithm)
-{
-  // TODO: We should restrict signatures to SHA-256 or better.
-  return Success;
-}
-
-Result
 AppTrustDomain::CheckRSAPublicKeyModulusSizeInBits(
   EndEntityOrCA /*endEntityOrCA*/, unsigned int modulusSizeInBits)
 {
@@ -264,7 +257,6 @@ Result
 AppTrustDomain::VerifyRSAPKCS1SignedDigest(const SignedDigest& signedDigest,
                                            Input subjectPublicKeyInfo)
 {
-  // TODO: We should restrict signatures to SHA-256 or better.
   return VerifyRSAPKCS1SignedDigestNSS(signedDigest, subjectPublicKeyInfo,
                                        mPinArg);
 }

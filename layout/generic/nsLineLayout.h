@@ -691,6 +691,7 @@ protected:
                                      nscoord aDeltaISize);
 
   void ApplyLineJustificationToAnnotations(PerFrameData* aPFD,
+                                           PerSpanData* aContainingSpan,
                                            nscoord aDeltaICoord,
                                            nscoord aDeltaISize);
 

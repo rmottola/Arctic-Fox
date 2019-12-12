@@ -120,19 +120,27 @@ nsStyleLinkElement::SetLineNumber(uint32_t aLineNumber)
 }
 
 /* static */ bool
-nsStyleLinkElement::IsImportEnabled()
+nsStyleLinkElement::IsImportEnabled(nsIPrincipal* aPrincipal)
 {
   static bool sAdded = false;
-  static bool sImportsEnabled;
+  static bool sWebComponentsEnabled;
   if (!sAdded) {
     // This part runs only once because of the static flag.
-    Preferences::AddBoolVarCache(&sImportsEnabled,
-                                 "dom.htmlimports.enabled",
+    Preferences::AddBoolVarCache(&sWebComponentsEnabled,
+                                 "dom.webcomponents.enabled",
                                  false);
     sAdded = true;
   }
 
-  return sImportsEnabled;
+  if (sWebComponentsEnabled) {
+    return true;
+  }
+
+  // If the web components pref is not enabled, check
+  // if we are in a certified app because imports is enabled
+  // for certified apps.
+  return aPrincipal &&
+    aPrincipal->GetAppStatus() == nsIPrincipal::APP_STATUS_CERTIFIED;
 }
 
 static uint32_t ToLinkMask(const nsAString& aLink, nsIPrincipal* aPrincipal)
@@ -147,8 +155,8 @@ static uint32_t ToLinkMask(const nsAString& aLink, nsIPrincipal* aPrincipal)
     return nsStyleLinkElement::eNEXT;
   else if (aLink.EqualsLiteral("alternate"))
     return nsStyleLinkElement::eALTERNATE;
-  else if (aLink.EqualsLiteral("import") &&
-           nsStyleLinkElement::IsImportEnabled())
+  else if (aLink.EqualsLiteral("import") && aPrincipal &&
+           nsStyleLinkElement::IsImportEnabled(aPrincipal))
     return nsStyleLinkElement::eHTMLIMPORT;
   else if (aLink.EqualsLiteral("preconnect"))
     return nsStyleLinkElement::ePRECONNECT;

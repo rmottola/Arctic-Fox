@@ -11,8 +11,6 @@
  * JS bytecode definitions.
  */
 
-#include "mozilla/UniquePtr.h"
-
 #include "jsbytecode.h"
 #include "jstypes.h"
 #include "NamespaceImports.h"
@@ -562,7 +560,7 @@ GetVariableBytecodeLength(jsbytecode* pc);
  *
  * The caller must call JS_free on the result after a successful call.
  */
-mozilla::UniquePtr<char[], JS::FreePolicy>
+char*
 DecompileValueGenerator(JSContext* cx, int spindex, HandleValue v,
                         HandleString fallback, int skipStackHits = 0);
 

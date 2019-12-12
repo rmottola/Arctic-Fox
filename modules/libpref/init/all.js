@@ -164,11 +164,11 @@ pref("dom.enable_user_timing", true);
 pref("dom.performance.enable_user_timing_logging", false);
 
 // Whether the Gamepad API is enabled
-pref("dom.gamepad.enabled", true);
+pref("dom.gamepad.enabled", false);
 #ifdef RELEASE_BUILD
 pref("dom.gamepad.non_standard_events.enabled", false);
 #else
-pref("dom.gamepad.non_standard_events.enabled", true);
+pref("dom.gamepad.non_standard_events.enabled", false);
 #endif
 
 // Whether the KeyboardEvent.code is enabled
@@ -633,11 +633,6 @@ pref("gfx.color_management.enablev4", false);
 
 pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
-
-// disable downloadable font cache so that behavior is consistently
-// the uncached load behavior across pages (useful for testing reflow problems)
-pref("gfx.downloadable_fonts.disable_cache", false);
-
 pref("gfx.downloadable_fonts.woff2.enabled", true);
 
 #ifdef ANDROID
