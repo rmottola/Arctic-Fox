@@ -8,7 +8,8 @@
 #define PM_SLICE Arcticfox/@MOZ_APP_VERSION@
 
 #define GK_VERSION @MOZILLA_COMPATVERSION_U@
-#define GK_SLICE Gecko/20100101
+// Changed Gecko compat to display "Mobile" page layouts for testing purposes. Possibly add proper mobile compat mode in the future.
+#define GK_SLICE Mobile/2010.01.01
 #define FX_SLICE Firefox/@GK_VERSION@
 
 #ifdef XP_UNIX
@@ -21,16 +22,14 @@
 #define OS_SLICE Windows NT 6.1; WOW64;
 #endif
 
-// Required for domains that are evil and UA sniff. HARD.
-pref("@GUAO_PREF@.calendar.yahoo.com","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8");
-pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
-pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:38.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/38.9 @PM_SLICE@");
-pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:31.9) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/31.9 @PM_SLICE@");
-pref("@GUAO_PREF@.yahoo.com","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8");
+// Required for google to play nice with Arctic Fox
+pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
+pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:38.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/38.9 @PM_SLICE@");
+pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:31.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/31.9 @PM_SLICE@");
 
 // Force youtube to present the old style layout
-pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) @GK_SLICE@ Firefox/42.0 @PM_SLICE@");
-pref("@GUAO_PREF@.gaming.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) @GK_SLICE@ Firefox/42.0");
+pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) Gecko/20010101 Firefox/42.0 @PM_SLICE@");
+pref("@GUAO_PREF@.gaming.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) Gecko/20010101 Firefox/42.0");
 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
@@ -39,25 +38,16 @@ pref("@GUAO_PREF@.players.brightcove.net","Mozilla/5.0 (Windows NT 6.1; Trident/
 #ifdef XP_UNIX
 // Google Fonts forces unicode ranges unless it is being told the browser is Firefox 43 or below.
 // They do NOT test for unicode-ranges CSS support.
-pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) @GK_SLICE@ Firefox/43.0");
+pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) Gecko/20010101 Firefox/43.0");
 #endif
-
-// The following requires native mode. Or it blocks.. "too old firefox", breakage, etc.
-pref("@GUAO_PREF@.deviantart.com","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
-pref("@GUAO_PREF@.deviantart.net","Mozilla/5.0 (@OS_SLICE@ rv:@GRE_VERSION@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.netflix.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.netflximg.net","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-
-// UA-sniffing domains that are "app/vendor-specific" and do not like Arctic Fox
-pref("@GUAO_PREF@.web.skype.com","Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.2049.0 Safari/537.36 Edge/15.14931");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; Mobile) @GK_SLICE@ Firefox/48.0");
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
-// pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/63.0 Arcticfox/27.9.12");
+// pref("general.useragent.override", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:52.9) Gecko/20100101 Firefox/52.9 Arcticfox/27.9.19");
 // pref("general.appname.override", "Netscape");
 // pref("general.appversion.override", "5.0 (Windows)");
 // pref("general.buildID.override", "Gecko/20100101");
