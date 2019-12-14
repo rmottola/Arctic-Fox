@@ -114,8 +114,6 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
-- Bug 1038811 2015-04-11 Complete remaining
-- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
 
 - Bug 1136956 - Set CoreLocation provider to non-release only in firefo
 - Bug 1125411 - OSX: turn CoreLocation provider o 
@@ -134,7 +132,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/ea49fe57ecbb1cd6a694458cac110c71de267f84
+https://github.com/mozilla/newtab-dev/commit/0dad1fee4b8acc1840bc272da9c14069902f00ad
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
