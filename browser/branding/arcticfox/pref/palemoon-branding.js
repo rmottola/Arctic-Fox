@@ -4,7 +4,7 @@
 #include ../../shared/pref/uaoverrides.inc
 
 pref("startup.homepage_override_url","");
-pref("app.releaseNotesURL", "https://github.com/wicknix/Arctic-Fox/wiki/Change-Log");
+pref("app.releaseNotesURL", "https://github.com/wicknix/Arctic-Fox/releases");
 
 // Disable Firefox compatmode by default.
 pref("general.useragent.compatMode", 2);
@@ -15,7 +15,7 @@ pref("general.useragent.compatMode", 2);
 pref("app.update.auto", false);
 
 // Updates enabled
-pref("app.update.enabled", true);
+pref("app.update.enabled", false);
 pref("app.update.cert.checkAttributes", false);
 
 // Interval: Time between checks for a new version (in seconds) -- 6 hours for unstable
