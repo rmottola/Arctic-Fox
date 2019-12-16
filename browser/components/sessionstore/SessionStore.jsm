@@ -30,7 +30,6 @@ const OBSERVING = [
   "quit-application-requested", "browser-lastwindow-close-granted",
   "quit-application", "browser:purge-session-history",
   "browser:purge-domain-data",
-  "gather-telemetry",
   "idle-daily",
 ];
 
@@ -647,9 +646,6 @@ let SessionStoreInternal = {
         break;
       case "nsPref:changed": // catch pref changes
         this.onPrefChange(aData);
-        break;
-      case "gather-telemetry":
-        this.onGatherTelemetry();
         break;
       case "idle-daily":
         this.onIdleDaily();
@@ -1545,14 +1541,6 @@ let SessionStoreInternal = {
     this._resetLocalTabRestoringState(tab);
   },
 
-  onGatherTelemetry: function() {
-    // On the first gather-telemetry notification of the session,
-    // gather telemetry data.
-    Services.obs.removeObserver(this, "gather-telemetry");
-    let stateString = SessionStore.getBrowserState();
-    return SessionFile.gatherTelemetry(stateString);
-  },
-
   // Clean up data that has been closed a long time ago.
   // Do not reschedule a save. This will wait for the next regular
   // save.
@@ -2337,7 +2325,6 @@ let SessionStoreInternal = {
   _collectWindowData: function ssi_collectWindowData(aWindow) {
     if (!this._isWindowLoaded(aWindow))
       return;
-    TelemetryStopwatch.start("FX_SESSION_RESTORE_COLLECT_SINGLE_WINDOW_DATA_MS");
 
     let tabbrowser = aWindow.gBrowser;
     let tabs = tabbrowser.tabs;
@@ -2359,7 +2346,6 @@ let SessionStoreInternal = {
         aWindow.__SS_lastSessionWindowID;
 
     DirtyWindows.remove(aWindow);
-    TelemetryStopwatch.finish("FX_SESSION_RESTORE_COLLECT_SINGLE_WINDOW_DATA_MS");
   },
 
   /* ........ Restoring Functionality .............. */
