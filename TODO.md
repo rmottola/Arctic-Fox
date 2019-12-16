@@ -118,6 +118,9 @@
 - Bug 1136956 - Set CoreLocation provider to non-release only in firefo
 - Bug 1125411 - OSX: turn CoreLocation provider o 
 
+Check on Mac:
+- Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
+- Bug 1142542 - Use AppConstants in browser/modules (r=gavin)
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
