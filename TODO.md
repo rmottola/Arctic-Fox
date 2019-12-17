@@ -118,9 +118,23 @@
 - Bug 1136956 - Set CoreLocation provider to non-release only in firefo
 - Bug 1125411 - OSX: turn CoreLocation provider o 
 
+MOre session store stuff to check:
+
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1243549 - Add missing bits. r=post-facto
+- Bug 1243549 - Make sure that startup sanitization doesn't throw becau
+- Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+
+- Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
+- Bug 1148505, remove cpow usage from back-forward menu by using sessio
+
 Check on Mac:
 - Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
 - Bug 1142542 - Use AppConstants in browser/modules (r=gavin)
+
+Verify for pre-Australis:
+- Bug 1123517 - Refactor sidebar code. r=florian
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
