@@ -2769,7 +2769,7 @@ let SessionStoreInternal = {
     let activeIndex = tabData.index - 1;
 
     // Attach data that will be restored on "load" event, after tab is restored.
-    if (activeIndex > -1) {
+    if (tabData.entries.length) {
       // restore those aspects of the currently active documents which are not
       // preserved in the plain history entries (mainly scroll state and text data)
       browser.__SS_restore_data = tabData.entries[activeIndex] || {};
