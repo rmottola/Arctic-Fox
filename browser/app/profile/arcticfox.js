@@ -254,7 +254,7 @@ pref("browser.chrome.favicons", true);
 pref("browser.warnOnQuit", true);
 // browser.showQuitWarning specifically controls the quit warning dialog. We
 // might still show the window closing dialog with showQuitWarning == false.
-pref("browser.showQuitWarning", true);
+pref("browser.showQuitWarning", false);
 pref("browser.fullscreen.autohide", true);
 pref("browser.fullscreen.animateUp", 0);
 pref("browser.overlink-delay", 80);
