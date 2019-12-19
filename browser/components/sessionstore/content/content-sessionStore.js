@@ -652,7 +652,8 @@ let MessageQueue = {
     // Send all data to the parent process.
     sendMessage("SessionStore:update", {
       id: this._id, data, telemetry,
-      isFinal: options.isFinal || false
+      isFinal: options.isFinal || false,
+      epoch: gCurrentEpoch
     });
 
     // Increase our unique message ID.
