@@ -133,8 +133,8 @@ let MessageListener = {
     }
   },
 
-  restoreHistory({epoch, tabData}) {
-    gContentRestore.restoreHistory(epoch, tabData, {
+  restoreHistory({epoch, tabData, loadArguments}) {
+    gContentRestore.restoreHistory(epoch, tabData, loadArguments, {
       onReload() {
         // Inform SessionStore.jsm about the reload. It will send
         // restoreTabContent in response.
