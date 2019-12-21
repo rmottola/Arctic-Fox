@@ -1,4 +1,4 @@
-/* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
  * vim: sw=2 ts=2 sts=2 et */
  /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -52,6 +52,16 @@ Object.defineProperty(FirefoxProfileMigrator.prototype, "sourceProfiles", {
     return [{id: x, name: x} for (x of this._getAllProfiles().keys())].sort(sorter);
   }
 });
+
+FirefoxProfileMigrator.prototype._getFileObject = function(dir, fileName) {
+  let file = dir.clone();
+  file.append(fileName);
+
+  // File resources are monolithic.  We don't make partial copies since
+  // they are not expected to work alone. Return null to avoid trying to
+  // copy non-existing files.
+  return file.exists() ? file : null;
+}
 
 FirefoxProfileMigrator.prototype.getResources = function(aProfile) {
   let sourceProfileDir = aProfile ? this._getAllProfiles().get(aProfile.id) :
