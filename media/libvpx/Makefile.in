@@ -5,18 +5,11 @@
 # Set up the libvpx assembler config.
 
 AS=$(VPX_AS)
-ASFLAGS=$(VPX_ASFLAGS) -I. -I$(topsrcdir)/media/libvpx/ -I$(topsrcdir)/media/libvpx/vpx_ports/
-AS_DASH_C_FLAG=$(VPX_DASH_C_FLAG)
 ASM_SUFFIX=$(VPX_ASM_SUFFIX)
 
 ifdef VPX_ARM_ASM
 # Building on an ARM platform with a supported assembler, include
 # the optimized assembly in the build.
-
-ifeq ($(OS_TARGET),Android)
-# For cpu-features.h
-LOCAL_INCLUDES += -I$(ANDROID_NDK)/sources/android/cpufeatures
-endif
 
 ifdef VPX_AS_CONVERSION
 # The ARM asm is written in ARM RVCT syntax, but we actually build it with

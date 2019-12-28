@@ -3257,7 +3257,7 @@ nsDOMWindowUtils::GetPlugins(JSContext* cx, JS::MutableHandle<JS::Value> aPlugin
 }
 
 static void
-MaybeReflowForInflationScreenWidthChange(nsPresContext *aPresContext)
+MaybeReflowForInflationScreenSizeChange(nsPresContext *aPresContext)
 {
   if (aPresContext) {
     nsIPresShell* presShell = aPresContext->GetPresShell();
@@ -3266,7 +3266,7 @@ MaybeReflowForInflationScreenWidthChange(nsPresContext *aPresContext)
     bool changed = false;
     if (presShell && presShell->FontSizeInflationEnabled() &&
         presShell->FontSizeInflationMinTwips() != 0) {
-      aPresContext->ScreenWidthInchesForFontInflation(&changed);
+      aPresContext->ScreenSizeInchesForFontInflation(&changed);
     }
 
     changed = changed ||
@@ -3324,7 +3324,7 @@ nsDOMWindowUtils::SetScrollPositionClampingScrollPortSize(float aWidth, float aH
   // size also changes, we hook in the needed updates here rather
   // than adding a separate notification just for this change.
   nsPresContext* presContext = GetPresContext();
-  MaybeReflowForInflationScreenWidthChange(presContext);
+  MaybeReflowForInflationScreenSizeChange(presContext);
 
   return NS_OK;
 }

@@ -3,13 +3,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-const kPrefSessionPersistMinutes = "plugin.sessionPermissionNow.intervalInMinutes";
-const kPrefPersistentDays = "plugin.persistentPermissionAlways.intervalInDays";
-
 var gPluginHandler = {
-  PLUGIN_SCRIPTED_STATE_NONE: 0,
-  PLUGIN_SCRIPTED_STATE_FIRED: 1,
-  PLUGIN_SCRIPTED_STATE_DONE: 2,
+  PREF_SESSION_PERSIST_MINUTES: "plugin.sessionPermissionNow.intervalInMinutes",
+  PREF_PERSISTENT_DAYS: "plugin.persistentPermissionAlways.intervalInDays",
 
   getPluginUI: function (plugin, anonid) {
     return plugin.ownerDocument.
@@ -558,14 +554,14 @@ var gPluginHandler = {
       case "allownow":
         permission = Ci.nsIPermissionManager.ALLOW_ACTION;
         expireType = Ci.nsIPermissionManager.EXPIRE_SESSION;
-        expireTime = Date.now() + Services.prefs.getIntPref(kPrefSessionPersistMinutes) * 60 * 1000;
+        expireTime = Date.now() + Services.prefs.getIntPref(this.PREF_SESSION_PERSIST_MINUTES) * 60 * 1000;
         break;
 
       case "allowalways":
         permission = Ci.nsIPermissionManager.ALLOW_ACTION;
         expireType = Ci.nsIPermissionManager.EXPIRE_TIME;
         expireTime = Date.now() +
-          Services.prefs.getIntPref(kPrefPersistentDays) * 24 * 60 * 60 * 1000;
+          Services.prefs.getIntPref(this.PREF_PERSISTENT_DAYS) * 24 * 60 * 60 * 1000;
         break;
 
       case "block":

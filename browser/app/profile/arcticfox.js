@@ -807,6 +807,8 @@ pref("browser.sessionstore.restore_hidden_tabs", false);
 pref("browser.sessionstore.restore_pinned_tabs_on_demand", false);
 // The version at which we performed the latest upgrade backup
 pref("browser.sessionstore.upgradeBackup.latestBuildID", "");
+// How many upgrade backups should be kept
+pref("browser.sessionstore.upgradeBackup.maxUpgradeBackups", 3);
 // End-users should not run sessionstore in debug mode
 pref("browser.sessionstore.debug", false);
 // Forget closed windows/tabs after two weeks
@@ -1122,7 +1124,19 @@ pref("dom.debug.propagate_gesture_events_through_content", false);
 // The request URL of the GeoLocation backend.
 pref("geo.wifi.uri", "http://ip-api.com/json/?fields=lat,lon,status,message");
 
-//Pale Moon padlock overlay preferences
+#ifdef XP_MACOSX
+#ifdef RELEASE_BUILD
+pref("geo.provider.use_corelocation", false);
+#else
+pref("geo.provider.use_corelocation", true);
+#endif
+#endif
+
+// Necko IPC security checks only needed for app isolation for cookies/cache/etc:
+// currently irrelevant for desktop e10s
+pref("network.disable.ipc.security", true);
+
+//Arctic Fox padlock overlay preferences
 pref("browser.padlock.shown", true);
 /* Where to show the padlock
    1 = inside identity button, right side
@@ -1135,7 +1149,7 @@ pref("browser.padlock.style", 1);
 // address bar border, 0 = no border, 1 = border, 2 = border only on secure sites
 pref("browser.padlock.urlbar_background", 2);
 
-//Pale Moon standalone image background color
+//Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 // ****************** domain-specific UAs ******************

@@ -694,7 +694,7 @@ nsCategoryManager::AddCategoryEntry(const char* aCategoryName,
     if (aOldValue) {
       *aOldValue = oldEntry;
     } else {
-      NS_Free(oldEntry);
+      free(oldEntry);
     }
   }
 }

@@ -184,12 +184,6 @@ IsWin10OrLater()
 }
 
 MOZ_ALWAYS_INLINE bool
-IsWin10OrLater()
-{
-  return IsWindowsVersionOrLater(0x0a000000ul);
-}
-
-MOZ_ALWAYS_INLINE bool
 IsNotWin7PreRTM()
 {
   return IsWin7SP1OrLater() || !IsWin7OrLater() ||

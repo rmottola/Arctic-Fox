@@ -981,7 +981,7 @@ Preferences::WritePrefFile(nsIFile* aFile)
     if (*walker) {
       outStream->Write(*walker, strlen(*walker), &writeAmount);
       outStream->Write(NS_LINEBREAK, NS_LINEBREAK_LEN, &writeAmount);
-      NS_Free(*walker);
+      free(*walker);
     }
   }
 

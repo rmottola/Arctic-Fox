@@ -45,6 +45,7 @@
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
+- 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
 - 1142669 part 6 - Don't inline scripts that are known to inline a
 - 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
@@ -113,27 +114,41 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
-- Bug 1038811 2015-04-11 Complete remaining
-- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen…
-- Bug 1140317 2015-03-10 Make sure chars created by DecompileValueGenerator won't
-- Bug 1073379, 2015-03-06 part 7 - Tests for the effect of setting a CSS transitio
-- Bug 1113431 - Propagate referrer policy throughout the UI: command-cl
-- Bug 1083281: Use flags to determine which chrome and about URIs are 
+
+More session store stuff to check:
+
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1243549 - Add missing bits. r=post-facto
+- Bug 1243549 - Make sure that startup sanitization doesn't throw becau
+- Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+
+- Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
+- Bug 1148505, remove cpow usage from back-forward menu by using sessio
+
+- Bug 785487 - Have AboutHomeUtils use the asynchronous search service
+
+Check on Mac:
+- Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
+- Bug 1142542 - Use AppConstants in browser/modules (r=gavin)
+
+Verify for pre-Australis:
+- Bug 1123517 - Refactor sidebar code. r=florian
+
+Check with Roy Tam:
+- Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
+- Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
+- bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
 
-Require check of JS browser components:
+What with LightweightThemeConsumer.jsm 
 
-- Bug 1169892 - Avoid extra round-trip when a pending tab is reloaded r
-- Bug 1133201 - part 2 - don't send referrer information when opening new windows via context menu; r=Gijs,mconley
-- Bug 1118502 - part 2 - ensure addOneTab sees a referrer URI if it was
-- Bug 1135913 - 4 parts
-- Bug 1135537 - 2015-02-24 - DebugOnly.h needed for DebugOnly uses in SavedStacks.
 
 
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/a4099ba4c5867b9735dbacfbc5c9fe0629e0a145
+https://github.com/mozilla/newtab-dev/commit/0dad1fee4b8acc1840bc272da9c14069902f00ad
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
