@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef GOANNA_TOUCH_INPUT_DISPATCHER_h
-#define GOANNA_TOUCH_INPUT_DISPATCHER_h
+#ifndef GECKO_TOUCH_INPUT_DISPATCHER_h
+#define GECKO_TOUCH_INPUT_DISPATCHER_h
 
 #include "InputData.h"
 #include "Units.h"
@@ -41,12 +41,12 @@ class CompositorVsyncObserver;
 // this sample time, we extrapolate the last two touch events to the sample
 // time. The magic numbers defined as constants are taken from android
 // InputTransport.cpp.
-class GoannaTouchDispatcher
+class GeckoTouchDispatcher
 {
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GoannaTouchDispatcher)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GeckoTouchDispatcher)
 
 public:
-  GoannaTouchDispatcher();
+  GeckoTouchDispatcher();
   void NotifyTouch(MultiTouchInput& aTouch, TimeStamp aEventTime);
   void DispatchTouchEvent(MultiTouchInput aMultiTouch);
   void DispatchTouchMoveEvents(TimeStamp aVsyncTime);
@@ -86,4 +86,4 @@ private:
 };
 
 } // namespace mozilla
-#endif // GOANNA_TOUCH_INPUT_DISPATCHER_h
+#endif // GECKO_TOUCH_INPUT_DISPATCHER_h

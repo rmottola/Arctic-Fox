@@ -27,7 +27,7 @@ class GMPVideoHost;
 [ptr] native GMPAudioDecoderProxy(GMPAudioDecoderProxy);
 
 [scriptable, uuid(46c7cd80-a19d-49e7-a147-ca314ad8d8b0)]
-interface mozIGoannaMediaPluginService : nsISupports
+interface mozIGeckoMediaPluginService : nsISupports
 {
 
   /**
@@ -92,7 +92,7 @@ interface mozIGoannaMediaPluginService : nsISupports
   void addPluginDirectory(in AString directory);
 
   /**
-   * Remove a directory for goanna media plugins.
+   * Remove a directory for gecko media plugins.
    * @note Main-thread API.
    */
   void removePluginDirectory(in AString directory);

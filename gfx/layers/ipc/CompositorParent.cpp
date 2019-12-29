@@ -64,7 +64,7 @@
 #include "mozilla/VsyncDispatcher.h"
 
 #ifdef MOZ_WIDGET_GONK
-#include "GoannaTouchDispatcher.h"
+#include "GeckoTouchDispatcher.h"
 #endif
 
 namespace mozilla {
@@ -228,7 +228,7 @@ CompositorVsyncObserver::CompositorVsyncObserver(CompositorParent* aCompositorPa
   MOZ_ASSERT(aWidget != nullptr);
   mCompositorVsyncDispatcher = aWidget->GetCompositorVsyncDispatcher();
 #ifdef MOZ_WIDGET_GONK
-  GoannaTouchDispatcher::SetCompositorVsyncObserver(this);
+  GeckoTouchDispatcher::SetCompositorVsyncObserver(this);
 #endif
 }
 
@@ -366,7 +366,7 @@ void
 CompositorVsyncObserver::DispatchTouchEvents(TimeStamp aVsyncTimestamp)
 {
 #ifdef MOZ_WIDGET_GONK
-  GoannaTouchDispatcher::NotifyVsync(aVsyncTimestamp);
+  GeckoTouchDispatcher::NotifyVsync(aVsyncTimestamp);
 #endif
 }
 
