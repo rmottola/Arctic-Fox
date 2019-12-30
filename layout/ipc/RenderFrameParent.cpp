@@ -84,7 +84,7 @@ GetFrom(nsFrameLoader* aFrameLoader)
   return nsContentUtils::LayerManagerForDocument(doc);
 }
 
-class RemoteContentController : public GoannaContentController {
+class RemoteContentController : public GeckoContentController {
 public:
   explicit RemoteContentController(RenderFrameParent* aRenderFrame)
     : mUILoop(MessageLoop::current())

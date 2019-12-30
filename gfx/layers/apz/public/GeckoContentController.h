@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef mozilla_layers_GoannaContentController_h
-#define mozilla_layers_GoannaContentController_h
+#ifndef mozilla_layers_GeckoContentController_h
+#define mozilla_layers_GeckoContentController_h
 
 #include "FrameMetrics.h"               // for FrameMetrics, etc
 #include "Units.h"                      // for CSSPoint, CSSRect, etc
@@ -18,10 +18,10 @@ class Task;
 namespace mozilla {
 namespace layers {
 
-class GoannaContentController
+class GeckoContentController
 {
 public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GoannaContentController)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GeckoContentController)
 
   /**
    * Requests a paint of the given FrameMetrics |aFrameMetrics| from Goanna.
@@ -165,15 +165,15 @@ public:
                                     APZStateChange aChange,
                                     int aArg = 0) {}
 
-  GoannaContentController() {}
+  GeckoContentController() {}
   virtual void Destroy() {}
 
 protected:
   // Protected destructor, to discourage deletion outside of Release():
-  virtual ~GoannaContentController() {}
+  virtual ~GeckoContentController() {}
 };
 
 }
 }
 
-#endif // mozilla_layers_GoannaContentController_h
+#endif // mozilla_layers_GeckoContentController_h

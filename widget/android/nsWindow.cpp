@@ -2483,7 +2483,7 @@ nsWindow::ConfigureAPZCTreeManager()
     }
 }
 
-already_AddRefed<GoannaContentController>
+already_AddRefed<GeckoContentController>
 nsWindow::CreateRootContentController()
 {
     nsRefPtr<widget::android::APZCCallbackHandler> controller =

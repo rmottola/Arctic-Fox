@@ -1350,17 +1350,17 @@ CompositorParent::DeallocateLayerTreeId(uint64_t aId)
 
 static void
 UpdateControllerForLayersId(uint64_t aLayersId,
-                            GoannaContentController* aController)
+                            GeckoContentController* aController)
 {
   // Adopt ref given to us by SetControllerForLayerTree()
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   sIndirectLayerTrees[aLayersId].mController =
-    already_AddRefed<GoannaContentController>(aController);
+    already_AddRefed<GeckoContentController>(aController);
 }
 
 ScopedLayerTreeRegistration::ScopedLayerTreeRegistration(uint64_t aLayersId,
                                                          Layer* aRoot,
-                                                         GoannaContentController* aController)
+                                                         GeckoContentController* aController)
     : mLayersId(aLayersId)
 {
   EnsureLayerTreeMapReady();
@@ -1377,7 +1377,7 @@ ScopedLayerTreeRegistration::~ScopedLayerTreeRegistration()
 
 /*static*/ void
 CompositorParent::SetControllerForLayerTree(uint64_t aLayersId,
-                                            GoannaContentController* aController)
+                                            GeckoContentController* aController)
 {
   // This ref is adopted by UpdateControllerForLayersId().
   aController->AddRef();
