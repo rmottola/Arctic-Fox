@@ -2140,7 +2140,7 @@ public:
     static bool
     UsePuppetWidgets()
     {
-      return XRE_GetProcessType() == GoannaProcessType_Content;
+      return XRE_GetProcessType() == GeckoProcessType_Content;
     }
 
     /**

@@ -407,7 +407,7 @@ Java_org_mozilla_goanna_mozglue_GoannaLoader_nativeRun(JNIEnv *jenv, jclass jc, 
   free(args);
 }
 
-typedef int GoannaProcessType;
+typedef int GeckoProcessType;
 
 extern "C" NS_EXPORT mozglueresult
 ChildProcessInit(int argc, char* argv[])

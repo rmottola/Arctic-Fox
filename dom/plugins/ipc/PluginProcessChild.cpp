@@ -58,7 +58,7 @@ PluginProcessChild::Init()
 
 #if defined(XP_MACOSX)
     // Remove the trigger for "dyld interposing" that we added in
-    // GoannaChildProcessHost::PerformAsyncLaunchInternal(), in the host
+    // GeckoChildProcessHost::PerformAsyncLaunchInternal(), in the host
     // process just before we were launched.  Dyld interposing will still
     // happen in our process (the plugin child process).  But we don't want
     // it to happen in any processes that the plugin might launch from our

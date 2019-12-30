@@ -581,7 +581,7 @@ nsGenericHTMLFrameElement::GetAppManifestURL(nsAString& aOut)
     return NS_OK;
   }
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     NS_WARNING("Can't embed-apps. Embed-apps is restricted to in-proc apps, see bug 1059662");
     return NS_OK;
   }

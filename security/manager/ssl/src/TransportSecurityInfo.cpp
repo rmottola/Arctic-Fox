@@ -240,7 +240,7 @@ TransportSecurityInfo::formatErrorMessage(MutexAutoLock const & proofOfLock,
     return NS_OK;
   }
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return NS_ERROR_UNEXPECTED;
   }
 

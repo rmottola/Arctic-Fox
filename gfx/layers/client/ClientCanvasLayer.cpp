@@ -87,7 +87,7 @@ ClientCanvasLayer::Initialize(const Data& aData)
                                                        flags,
                                                        ClientManager()->AsShadowForwarder());
 #else
-          bool isCrossProcess = !(XRE_GetProcessType() == GoannaProcessType_Default);
+          bool isCrossProcess = !(XRE_GetProcessType() == GeckoProcessType_Default);
           if (!isCrossProcess) {
             // [Basic/OGL Layers, OMTC] WebGL layer init.
             factory = SurfaceFactory_EGLImage::Create(mGLContext, caps);

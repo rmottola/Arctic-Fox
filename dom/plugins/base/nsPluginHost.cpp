@@ -245,7 +245,7 @@ nsPluginHost::nsPluginHost()
   // good plugin list the first time it requests it. Normally we'd just
   // init this to 1, but due to the unique nature of our ctor we need to do
   // this manually.
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     IncrementChromeEpoch();
   }
 
@@ -1256,7 +1256,7 @@ nsresult nsPluginHost::EnsurePluginLoaded(nsPluginTag* aPluginTag)
 nsresult
 nsPluginHost::GetPluginForContentProcess(uint32_t aPluginId, nsNPAPIPlugin** aPlugin)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   // If plugins haven't been scanned yet, do so now
   LoadPlugins();
@@ -1314,7 +1314,7 @@ protected:
 void
 nsPluginHost::NotifyContentModuleDestroyed(uint32_t aPluginId)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   // This is called in response to a message from the plugin. Don't unload the
   // plugin until the message handler is off the stack.
@@ -1820,7 +1820,7 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
                                             bool aCreatePluginList,
                                             bool *aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   NS_ENSURE_ARG_POINTER(aPluginsChanged);
   nsresult rv;
@@ -2027,7 +2027,7 @@ nsresult nsPluginHost::ScanPluginsDirectoryList(nsISimpleEnumerator *dirEnum,
                                                 bool aCreatePluginList,
                                                 bool *aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     bool hasMore;
     while (NS_SUCCEEDED(dirEnum->HasMoreElements(&hasMore)) && hasMore) {
@@ -2056,28 +2056,28 @@ nsresult nsPluginHost::ScanPluginsDirectoryList(nsISimpleEnumerator *dirEnum,
 void
 nsPluginHost::IncrementChromeEpoch()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   mPluginEpoch++;
 }
 
 uint32_t
 nsPluginHost::ChromeEpoch()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   return mPluginEpoch;
 }
 
 uint32_t
 nsPluginHost::ChromeEpochForContent()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Content);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
   return mPluginEpoch;
 }
 
 void
 nsPluginHost::SetChromeEpochForContent(uint32_t aEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Content);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
   mPluginEpoch = aEpoch;
 }
 
@@ -2107,7 +2107,7 @@ WatchRegKey(uint32_t aRoot, nsCOMPtr<nsIWindowsRegKey>& aKey)
 nsresult nsPluginHost::LoadPlugins()
 {
 #ifdef ANDROID
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return NS_OK;
   }
 #endif
@@ -2131,7 +2131,7 @@ nsresult nsPluginHost::LoadPlugins()
 
   // only if plugins have changed will we notify plugin-change observers
   if (pluginschanged) {
-    if (XRE_GetProcessType() == GoannaProcessType_Default) {
+    if (XRE_GetProcessType() == GeckoProcessType_Default) {
       IncrementChromeEpoch();
     }
 
@@ -2147,7 +2147,7 @@ nsresult nsPluginHost::LoadPlugins()
 nsresult
 nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Content);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
 
   dom::ContentChild* cp = dom::ContentChild::GetSingleton();
   nsTArray<PluginTag> plugins;
@@ -2203,7 +2203,7 @@ nsresult nsPluginHost::FindPlugins(bool aCreatePluginList, bool * aPluginsChange
 
   *aPluginsChanged = false;
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return FindPluginsInContent(aCreatePluginList, aPluginsChanged);
   }
 
@@ -2370,7 +2370,7 @@ mozilla::plugins::FindPluginsForContent(uint32_t aPluginEpoch,
                                         nsTArray<PluginTag>* aPlugins,
                                         uint32_t* aNewPluginEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   nsRefPtr<nsPluginHost> host = nsPluginHost::GetInst();
   host->FindPluginsForContent(aPluginEpoch, aPlugins, aNewPluginEpoch);
@@ -2382,7 +2382,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                     nsTArray<PluginTag>* aPlugins,
                                     uint32_t* aNewPluginEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   // Load plugins so that the epoch is correct.
   LoadPlugins();
@@ -2422,7 +2422,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
 void
 nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   ReadPluginInfo();
   WritePluginInfo();
@@ -2508,7 +2508,7 @@ nsPluginHost::RegisterWithCategoryManager(nsCString &aMimeType,
 nsresult
 nsPluginHost::WritePluginInfo()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   nsresult rv = NS_OK;
   nsCOMPtr<nsIProperties> directoryService(do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID,&rv));
@@ -2653,7 +2653,7 @@ nsPluginHost::WritePluginInfo()
 nsresult
 nsPluginHost::ReadPluginInfo()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   const long PLUGIN_REG_MIMETYPES_ARRAY_SIZE = 12;
   const long PLUGIN_REG_MAX_MIMETYPES = 1000;

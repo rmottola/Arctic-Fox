@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "GoannaChildProcessHost.h"
+#include "GeckoChildProcessHost.h"
 
 #include "base/command_line.h"
 #include "base/string_util.h"
@@ -46,7 +46,7 @@
 #include "nsNativeCharsetUtils.h"
 
 using mozilla::MonitorAutoLock;
-using mozilla::ipc::GoannaChildProcessHost;
+using mozilla::ipc::GeckoChildProcessHost;
 
 #ifdef ANDROID
 // This is the magic number of a file descriptor
@@ -67,25 +67,25 @@ static const bool kLowRightsSubprocesses =
 static bool
 ShouldHaveDirectoryService()
 {
-  return GoannaProcessType_Default == XRE_GetProcessType();
+  return GeckoProcessType_Default == XRE_GetProcessType();
 }
 
 template<>
-struct RunnableMethodTraits<GoannaChildProcessHost>
+struct RunnableMethodTraits<GeckoChildProcessHost>
 {
-    static void RetainCallee(GoannaChildProcessHost* obj) { }
-    static void ReleaseCallee(GoannaChildProcessHost* obj) { }
+    static void RetainCallee(GeckoChildProcessHost* obj) { }
+    static void ReleaseCallee(GeckoChildProcessHost* obj) { }
 };
 
 /*static*/
 base::ChildPrivileges
-GoannaChildProcessHost::DefaultChildPrivileges()
+GeckoChildProcessHost::DefaultChildPrivileges()
 {
   return (kLowRightsSubprocesses ?
           base::PRIVILEGES_UNPRIVILEGED : base::PRIVILEGES_INHERIT);
 }
 
-GoannaChildProcessHost::GoannaChildProcessHost(GoannaProcessType aProcessType,
+GeckoChildProcessHost::GeckoChildProcessHost(GeckoProcessType aProcessType,
                                              ChildPrivileges aPrivileges)
   : ChildProcessHost(RENDER_PROCESS), // FIXME/cjones: we should own this enum
     mProcessType(aProcessType),
@@ -103,15 +103,15 @@ GoannaChildProcessHost::GoannaChildProcessHost(GoannaProcessType aProcessType,
   , mChildTask(MACH_PORT_NULL)
 #endif
 {
-    MOZ_COUNT_CTOR(GoannaChildProcessHost);
+    MOZ_COUNT_CTOR(GeckoChildProcessHost);
 }
 
-GoannaChildProcessHost::~GoannaChildProcessHost()
+GeckoChildProcessHost::~GeckoChildProcessHost()
 
 {
   AssertIOThread();
 
-  MOZ_COUNT_DTOR(GoannaChildProcessHost);
+  MOZ_COUNT_DTOR(GeckoChildProcessHost);
 
   if (mChildProcessHandle > 0)
     ProcessWatcher::EnsureProcessTerminated(mChildProcessHandle
@@ -128,7 +128,7 @@ GoannaChildProcessHost::~GoannaChildProcessHost()
 
 //static
 void
-GoannaChildProcessHost::GetPathToBinary(FilePath& exePath)
+GeckoChildProcessHost::GetPathToBinary(FilePath& exePath)
 {
   if (ShouldHaveDirectoryService()) {
     MOZ_ASSERT(gGREBinPath);
@@ -185,7 +185,7 @@ private:
 };
 #endif
 
-nsresult GoannaChildProcessHost::GetArchitecturesForBinary(const char *path, uint32_t *result)
+nsresult GeckoChildProcessHost::GetArchitecturesForBinary(const char *path, uint32_t *result)
 {
   *result = 0;
 
@@ -233,10 +233,10 @@ nsresult GoannaChildProcessHost::GetArchitecturesForBinary(const char *path, uin
 #endif
 }
 
-uint32_t GoannaChildProcessHost::GetSupportedArchitecturesForProcessType(GoannaProcessType type)
+uint32_t GeckoChildProcessHost::GetSupportedArchitecturesForProcessType(GeckoProcessType type)
 {
 #ifdef MOZ_WIDGET_COCOA
-  if (type == GoannaProcessType_Plugin) {
+  if (type == GeckoProcessType_Plugin) {
 
     // Cache this, it shouldn't ever change.
     static uint32_t pluginContainerArchs = 0;
@@ -257,17 +257,17 @@ uint32_t GoannaChildProcessHost::GetSupportedArchitecturesForProcessType(GoannaP
 }
 
 void
-GoannaChildProcessHost::PrepareLaunch()
+GeckoChildProcessHost::PrepareLaunch()
 {
 
 #ifdef XP_WIN
-  if (mProcessType == GoannaProcessType_Plugin) {
+  if (mProcessType == GeckoProcessType_Plugin) {
     InitWindowsGroupID();
   }
 
 #if defined(MOZ_CONTENT_SANDBOX)
   // We need to get the pref here as the process is launched off main thread.
-  if (mProcessType == GoannaProcessType_Content) {
+  if (mProcessType == GeckoProcessType_Content) {
     mMoreStrictSandbox =
       Preferences::GetBool("security.sandbox.windows.content.moreStrict");
     mEnableSandboxLogging =
@@ -286,7 +286,7 @@ GoannaChildProcessHost::PrepareLaunch()
 }
 
 #ifdef XP_WIN
-void GoannaChildProcessHost::InitWindowsGroupID()
+void GeckoChildProcessHost::InitWindowsGroupID()
 {
   // On Win7+, pass the application user model to the child, so it can
   // register with it. This insures windows created by the container
@@ -307,7 +307,7 @@ void GoannaChildProcessHost::InitWindowsGroupID()
 #endif
 
 bool
-GoannaChildProcessHost::SyncLaunch(std::vector<std::string> aExtraOpts, int aTimeoutMs, base::ProcessArchitecture arch)
+GeckoChildProcessHost::SyncLaunch(std::vector<std::string> aExtraOpts, int aTimeoutMs, base::ProcessArchitecture arch)
 {
   PrepareLaunch();
 
@@ -316,14 +316,14 @@ GoannaChildProcessHost::SyncLaunch(std::vector<std::string> aExtraOpts, int aTim
 
   ioLoop->PostTask(FROM_HERE,
                    NewRunnableMethod(this,
-                                     &GoannaChildProcessHost::RunPerformAsyncLaunch,
+                                     &GeckoChildProcessHost::RunPerformAsyncLaunch,
                                      aExtraOpts, arch));
 
   return WaitUntilConnected(aTimeoutMs);
 }
 
 bool
-GoannaChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts,
+GeckoChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts,
                                    base::ProcessArchitecture arch)
 {
   PrepareLaunch();
@@ -331,7 +331,7 @@ GoannaChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts,
   MessageLoop* ioLoop = XRE_GetIOMessageLoop();
   ioLoop->PostTask(FROM_HERE,
                    NewRunnableMethod(this,
-                                     &GoannaChildProcessHost::RunPerformAsyncLaunch,
+                                     &GeckoChildProcessHost::RunPerformAsyncLaunch,
                                      aExtraOpts, arch));
 
   // This may look like the sync launch wait, but we only delay as
@@ -345,7 +345,7 @@ GoannaChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts,
 }
 
 bool
-GoannaChildProcessHost::WaitUntilConnected(int32_t aTimeoutMs)
+GeckoChildProcessHost::WaitUntilConnected(int32_t aTimeoutMs)
 {
   // NB: this uses a different mechanism than the chromium parent
   // class.
@@ -381,14 +381,14 @@ GoannaChildProcessHost::WaitUntilConnected(int32_t aTimeoutMs)
 }
 
 bool
-GoannaChildProcessHost::LaunchAndWaitForProcessHandle(StringVector aExtraOpts)
+GeckoChildProcessHost::LaunchAndWaitForProcessHandle(StringVector aExtraOpts)
 {
   PrepareLaunch();
 
   MessageLoop* ioLoop = XRE_GetIOMessageLoop();
   ioLoop->PostTask(FROM_HERE,
                    NewRunnableMethod(this,
-                                     &GoannaChildProcessHost::RunPerformAsyncLaunch,
+                                     &GeckoChildProcessHost::RunPerformAsyncLaunch,
                                      aExtraOpts, base::GetCurrentProcessArchitecture()));
 
   MonitorAutoLock lock(mMonitor);
@@ -401,7 +401,7 @@ GoannaChildProcessHost::LaunchAndWaitForProcessHandle(StringVector aExtraOpts)
 }
 
 void
-GoannaChildProcessHost::InitializeChannel()
+GeckoChildProcessHost::InitializeChannel()
 {
   CreateChannel();
 
@@ -411,7 +411,7 @@ GoannaChildProcessHost::InitializeChannel()
 }
 
 void
-GoannaChildProcessHost::Join()
+GeckoChildProcessHost::Join()
 {
   AssertIOThread();
 
@@ -425,7 +425,7 @@ GoannaChildProcessHost::Join()
 }
 
 void
-GoannaChildProcessHost::SetAlreadyDead()
+GeckoChildProcessHost::SetAlreadyDead()
 {
   if (mChildProcessHandle &&
       mChildProcessHandle != kInvalidProcessHandle) {
@@ -435,13 +435,13 @@ GoannaChildProcessHost::SetAlreadyDead()
   mChildProcessHandle = 0;
 }
 
-int32_t GoannaChildProcessHost::mChildCounter = 0;
+int32_t GeckoChildProcessHost::mChildCounter = 0;
 
 //
 // Wrapper function for handling GECKO_SEPARATE_NSPR_LOGS
 //
 bool
-GoannaChildProcessHost::PerformAsyncLaunch(std::vector<std::string> aExtraOpts, base::ProcessArchitecture arch)
+GeckoChildProcessHost::PerformAsyncLaunch(std::vector<std::string> aExtraOpts, base::ProcessArchitecture arch)
 {
   // If NSPR log files are not requested, we're done.
   const char* origLogName = PR_GetEnv("NSPR_LOG_FILE");
@@ -480,7 +480,7 @@ GoannaChildProcessHost::PerformAsyncLaunch(std::vector<std::string> aExtraOpts, 
 }
 
 bool
-GoannaChildProcessHost::RunPerformAsyncLaunch(std::vector<std::string> aExtraOpts,
+GeckoChildProcessHost::RunPerformAsyncLaunch(std::vector<std::string> aExtraOpts,
                                              base::ProcessArchitecture aArch)
 {
   InitializeChannel();
@@ -522,7 +522,7 @@ AddAppDirToCommandLine(std::vector<std::string>& aCmdLine)
 }
 
 bool
-GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExtraOpts, base::ProcessArchitecture arch)
+GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExtraOpts, base::ProcessArchitecture arch)
 {
   // We rely on the fact that InitializeChannel() has already been processed
   // on the IO thread before this point is reached.
@@ -579,7 +579,7 @@ GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aEx
     }
 
 #  if (MOZ_WIDGET_GTK == 3)
-    if (mProcessType == GoannaProcessType_Plugin) {
+    if (mProcessType == GeckoProcessType_Plugin) {
       const char *ld_preload = PR_GetEnv("LD_PRELOAD");
       nsCString new_ld_preload;
 
@@ -788,7 +788,7 @@ GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aEx
   // sandboxing in this class at some point. Unfortunately it will take a bit
   // of reorganizing so I don't think this patch is the right time.
   switch (mProcessType) {
-    case GoannaProcessType_Content:
+    case GeckoProcessType_Content:
 #if defined(MOZ_CONTENT_SANDBOX)
       if (!PR_GetEnv("MOZ_DISABLE_CONTENT_SANDBOX")) {
         mSandboxBroker.SetSecurityLevelForContentProcess(mMoreStrictSandbox);
@@ -797,7 +797,7 @@ GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aEx
       }
 #endif // MOZ_CONTENT_SANDBOX
       break;
-    case GoannaProcessType_Plugin:
+    case GeckoProcessType_Plugin:
       if (mSandboxLevel > 0 &&
           !PR_GetEnv("MOZ_DISABLE_NPAPI_SANDBOX")) {
         mSandboxBroker.SetSecurityLevelForPluginProcess(mSandboxLevel);
@@ -805,22 +805,22 @@ GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aEx
         shouldSandboxCurrentProcess = true;
       }
       break;
-    case GoannaProcessType_IPDLUnitTest:
+    case GeckoProcessType_IPDLUnitTest:
       // XXX: We don't sandbox this process type yet
       // mSandboxBroker.SetSecurityLevelForIPDLUnitTestProcess();
       // cmdLine.AppendLooseValue(UTF8ToWide("-sandbox"));
       // shouldSandboxCurrentProcess = true;
       break;
-    case GoannaProcessType_GMPlugin:
+    case GeckoProcessType_GMPlugin:
       if (!PR_GetEnv("MOZ_DISABLE_GMP_SANDBOX")) {
         mSandboxBroker.SetSecurityLevelForGMPlugin();
         cmdLine.AppendLooseValue(UTF8ToWide("-sandbox"));
         shouldSandboxCurrentProcess = true;
       }
       break;
-    case GoannaProcessType_Default:
+    case GeckoProcessType_Default:
     default:
-      MOZ_CRASH("Bad process type in GoannaChildProcessHost");
+      MOZ_CRASH("Bad process type in GeckoChildProcessHost");
       break;
   };
 
@@ -896,7 +896,7 @@ GoannaChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aEx
 }
 
 void
-GoannaChildProcessHost::OpenPrivilegedHandle(base::ProcessId aPid)
+GeckoChildProcessHost::OpenPrivilegedHandle(base::ProcessId aPid)
 {
   if (mChildProcessHandle) {
     MOZ_ASSERT(aPid == base::GetProcId(mChildProcessHandle));
@@ -908,7 +908,7 @@ GoannaChildProcessHost::OpenPrivilegedHandle(base::ProcessId aPid)
 }
 
 void
-GoannaChildProcessHost::OnChannelConnected(int32_t peer_pid)
+GeckoChildProcessHost::OnChannelConnected(int32_t peer_pid)
 {
   OpenPrivilegedHandle(peer_pid);
   {
@@ -919,7 +919,7 @@ GoannaChildProcessHost::OnChannelConnected(int32_t peer_pid)
 }
 
 void
-GoannaChildProcessHost::OnMessageReceived(const IPC::Message& aMsg)
+GeckoChildProcessHost::OnMessageReceived(const IPC::Message& aMsg)
 {
   // We never process messages ourself, just save them up for the next
   // listener.
@@ -927,7 +927,7 @@ GoannaChildProcessHost::OnMessageReceived(const IPC::Message& aMsg)
 }
 
 void
-GoannaChildProcessHost::OnChannelError()
+GeckoChildProcessHost::OnChannelError()
 {
   // Update the process state to an error state if we have a channel
   // error before we're connected. This fixes certain failures,
@@ -942,7 +942,7 @@ GoannaChildProcessHost::OnChannelError()
 }
 
 void
-GoannaChildProcessHost::GetQueuedMessages(std::queue<IPC::Message>& queue)
+GeckoChildProcessHost::GetQueuedMessages(std::queue<IPC::Message>& queue)
 {
   // If this is called off the IO thread, bad things will happen.
   DCHECK(MessageLoopForIO::current());
@@ -951,7 +951,7 @@ GoannaChildProcessHost::GetQueuedMessages(std::queue<IPC::Message>& queue)
 }
 
 void
-GoannaChildProcessHost::OnWaitableEventSignaled(base::WaitableEvent *event)
+GeckoChildProcessHost::OnWaitableEventSignaled(base::WaitableEvent *event)
 {
   if (mDelegate) {
     mDelegate->OnWaitableEventSignaled(event);
@@ -961,15 +961,15 @@ GoannaChildProcessHost::OnWaitableEventSignaled(base::WaitableEvent *event)
 
 #ifdef MOZ_NUWA_PROCESS
 
-using mozilla::ipc::GoannaExistingProcessHost;
+using mozilla::ipc::GeckoExistingProcessHost;
 using mozilla::ipc::FileDescriptor;
 
-GoannaExistingProcessHost::
-GoannaExistingProcessHost(GoannaProcessType aProcessType,
+GeckoExistingProcessHost::
+GeckoExistingProcessHost(GeckoProcessType aProcessType,
                          base::ProcessHandle aProcess,
                          const FileDescriptor& aFileDescriptor,
                          ChildPrivileges aPrivileges)
-  : GoannaChildProcessHost(aProcessType, aPrivileges)
+  : GeckoChildProcessHost(aProcessType, aPrivileges)
   , mExistingProcessHandle(aProcess)
   , mExistingFileDescriptor(aFileDescriptor)
 {
@@ -977,16 +977,16 @@ GoannaExistingProcessHost(GoannaProcessType aProcessType,
                "Expected file descriptor to be valid");
 }
 
-GoannaExistingProcessHost::~GoannaExistingProcessHost()
+GeckoExistingProcessHost::~GeckoExistingProcessHost()
 {
-  // Bug 943174: If we don't do this, ~GoannaChildProcessHost will try
+  // Bug 943174: If we don't do this, ~GeckoChildProcessHost will try
   // to wait on a process that isn't a direct child, and bad things
   // will happen.
   SetAlreadyDead();
 }
 
 bool
-GoannaExistingProcessHost::PerformAsyncLaunch(StringVector aExtraOpts,
+GeckoExistingProcessHost::PerformAsyncLaunch(StringVector aExtraOpts,
                                              base::ProcessArchitecture aArch)
 {
   SetHandle(mExistingProcessHandle);
@@ -1001,7 +1001,7 @@ GoannaExistingProcessHost::PerformAsyncLaunch(StringVector aExtraOpts,
 }
 
 void
-GoannaExistingProcessHost::InitializeChannel()
+GeckoExistingProcessHost::InitializeChannel()
 {
   CreateChannel(mExistingFileDescriptor);
 

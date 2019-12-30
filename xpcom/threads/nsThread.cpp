@@ -703,7 +703,7 @@ public:
 
   static bool EventLatencyIsImportant()
   {
-    return NS_IsMainThread() && XRE_GetProcessType() == GoannaProcessType_Default;
+    return NS_IsMainThread() && XRE_GetProcessType() == GeckoProcessType_Default;
   }
 };
 

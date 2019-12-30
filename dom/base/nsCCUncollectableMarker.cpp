@@ -139,7 +139,7 @@ static void
 MarkMessageManagers()
 {
   // The global message manager only exists in the root process.
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return;
   }
   nsCOMPtr<nsIMessageBroadcaster> strongGlobalMM =

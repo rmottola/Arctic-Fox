@@ -69,7 +69,7 @@ FileSystemUtils::IsDescendantPath(const nsAString& aPath,
 bool
 FileSystemUtils::IsParentProcess()
 {
-  return XRE_GetProcessType() == GoannaProcessType_Default;
+  return XRE_GetProcessType() == GeckoProcessType_Default;
 }
 
 } // namespace dom

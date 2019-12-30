@@ -17,7 +17,7 @@ main(int argc, char* argv[])
 
     void *mozloader_handle = dlopen("libmozglue.so", RTLD_LAZY);
     if (!mozloader_handle) {
-      __android_log_print(ANDROID_LOG_ERROR, "GoannaChildLoad",
+      __android_log_print(ANDROID_LOG_ERROR, "GeckoChildLoad",
                           "Couldn't load mozloader because %s", dlerror());
         return 1;
     }
@@ -26,7 +26,7 @@ main(int argc, char* argv[])
     ChildProcessInit_t fChildProcessInit =
         (ChildProcessInit_t)dlsym(mozloader_handle, "ChildProcessInit");
     if (!fChildProcessInit) {
-        __android_log_print(ANDROID_LOG_ERROR, "GoannaChildLoad",
+        __android_log_print(ANDROID_LOG_ERROR, "GeckoChildLoad",
                             "Couldn't load cpi_t because %s", dlerror());
         return 1;
     }

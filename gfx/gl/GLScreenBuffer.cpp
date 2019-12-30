@@ -46,7 +46,7 @@ GLScreenBuffer::Create(GLContext* gl,
     layers::ISurfaceAllocator* allocator = caps.surfaceAllocator;
     if (!factory &&
         allocator &&
-        XRE_GetProcessType() != GoannaProcessType_Default)
+        XRE_GetProcessType() != GeckoProcessType_Default)
     {
         layers::TextureFlags flags = layers::TextureFlags::DEALLOCATE_CLIENT |
                                      layers::TextureFlags::ORIGIN_BOTTOM_LEFT;

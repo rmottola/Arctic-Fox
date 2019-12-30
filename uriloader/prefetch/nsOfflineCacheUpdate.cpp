@@ -2314,7 +2314,7 @@ nsOfflineCacheUpdate::AddURI(nsIURI *aURI, uint32_t aType)
 NS_IMETHODIMP
 nsOfflineCacheUpdate::AddDynamicURI(nsIURI *aURI)
 {
-    if (GoannaProcessType_Default != XRE_GetProcessType())
+    if (GeckoProcessType_Default != XRE_GetProcessType())
         return NS_ERROR_NOT_IMPLEMENTED;
 
     // If this is a partial update and the resource is already in the

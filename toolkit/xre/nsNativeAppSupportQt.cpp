@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 #include <QTimer>
-#include "mozilla/ipc/GoannaChildProcessHost.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "nsNativeAppSupportQt.h"
 #include "nsCOMPtr.h"
 #include "nsIObserverService.h"

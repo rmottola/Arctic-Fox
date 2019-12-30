@@ -104,7 +104,7 @@ NS_IMPL_ISUPPORTS(nsSynthVoiceRegistry, nsISynthVoiceRegistry)
 nsSynthVoiceRegistry::nsSynthVoiceRegistry()
   : mSpeechSynthChild(nullptr)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
 
     mSpeechSynthChild = new SpeechSynthesisChild();
     ContentChild::GetSingleton()->SendPSpeechSynthesisConstructor(mSpeechSynthChild);
@@ -161,7 +161,7 @@ void
 nsSynthVoiceRegistry::Shutdown()
 {
   LOG(PR_LOG_DEBUG, ("[%s] nsSynthVoiceRegistry::Shutdown()",
-                     (XRE_GetProcessType() == GoannaProcessType_Content) ? "Content" : "Default"));
+                     (XRE_GetProcessType() == GeckoProcessType_Content) ? "Content" : "Default"));
   gSynthVoiceRegistry = nullptr;
 }
 
@@ -232,7 +232,7 @@ nsSynthVoiceRegistry::AddVoice(nsISpeechService* aService,
        NS_ConvertUTF16toUTF8(aLang).get(),
        aLocalService ? "true" : "false"));
 
-  NS_ENSURE_FALSE(XRE_GetProcessType() == GoannaProcessType_Content,
+  NS_ENSURE_FALSE(XRE_GetProcessType() == GeckoProcessType_Content,
                   NS_ERROR_NOT_AVAILABLE);
 
   return AddVoiceImpl(aService, aUri, aName, aLang,
@@ -246,7 +246,7 @@ nsSynthVoiceRegistry::RemoveVoice(nsISpeechService* aService,
   LOG(PR_LOG_DEBUG,
       ("nsSynthVoiceRegistry::RemoveVoice uri='%s' (%s)",
        NS_ConvertUTF16toUTF8(aUri).get(),
-       (XRE_GetProcessType() == GoannaProcessType_Content) ? "child" : "parent"));
+       (XRE_GetProcessType() == GeckoProcessType_Content) ? "child" : "parent"));
 
   bool found = false;
   VoiceData* retval = mUriVoiceMap.GetWeak(aUri, &found);
@@ -285,7 +285,7 @@ nsSynthVoiceRegistry::SetDefaultVoice(const nsAString& aUri,
     mDefaultVoices.AppendElement(retval);
   }
 
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     nsTArray<SpeechSynthesisParent*> ssplist;
     GetAllSpeechSynthActors(ssplist);
 
@@ -517,7 +517,7 @@ nsSynthVoiceRegistry::SpeakUtterance(SpeechSynthesisUtterance& aUtterance,
   }
 
   nsRefPtr<nsSpeechTask> task;
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     task = new SpeechTaskChild(&aUtterance);
     SpeechSynthesisRequestChild* actor =
       new SpeechSynthesisRequestChild(static_cast<SpeechTaskChild*>(task.get()));

@@ -91,7 +91,7 @@ ParamTraits<FenceHandle>::Read(const Message* aMsg,
     // SCM_RIGHTS doesn't dup the fd.  That's surprising, but we just
     // deal with it here.  NB: only the "default" (master) process can
     // alloc gralloc buffers.
-    bool sameProcess = (XRE_GetProcessType() == GoannaProcessType_Default);
+    bool sameProcess = (XRE_GetProcessType() == GeckoProcessType_Default);
     int dupFd = sameProcess ? dup(fd.fd) : fd.fd;
     fds[n] = dupFd;
   }
@@ -154,7 +154,7 @@ ParamTraits<FenceHandleFromChild>::Write(Message* aMsg,
     // SCM_RIGHTS doesn't dup the fd.  That's surprising, but we just
     // deal with it here.  NB: only the "default" (master) process can
     // alloc gralloc buffers.
-    bool sameProcess = (XRE_GetProcessType() == GoannaProcessType_Default);
+    bool sameProcess = (XRE_GetProcessType() == GeckoProcessType_Default);
     int dupFd = sameProcess ? dup(fds[n]) : fds[n];
     //int dupFd = fds[n];
 

@@ -9,7 +9,7 @@
 #include "GMPParent.h"
 #include "GMPVideoDecoderParent.h"
 #include "nsIObserverService.h"
-#include "GoannaChildProcessHost.h"
+#include "GeckoChildProcessHost.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/SyncRunnable.h"
@@ -374,7 +374,7 @@ GeckoMediaPluginService::Observe(nsISupports* aSubject,
       // XXX The content process never gets profile-change-teardown, so mShuttingDown
       // will always be false here. GMPService needs to be proxied to the parent.
       // See bug 1057908.
-      MOZ_ASSERT(XRE_GetProcessType() != GoannaProcessType_Default || mShuttingDown);
+      MOZ_ASSERT(XRE_GetProcessType() != GeckoProcessType_Default || mShuttingDown);
       mGMPThread.swap(gmpThread);
     }
 

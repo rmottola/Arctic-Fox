@@ -122,7 +122,7 @@ void TableTicker::StreamTaskTracer(JSStreamWriter& b)
         // Thread meta data
         ThreadInfo* info = sRegisteredThreads->at(i);
         b.BeginObject();
-        if (XRE_GetProcessType() == GoannaProcessType_Plugin) {
+        if (XRE_GetProcessType() == GeckoProcessType_Plugin) {
           // TODO Add the proper plugin name
           b.NameValue("name", "Plugin");
         } else {

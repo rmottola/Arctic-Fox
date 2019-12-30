@@ -273,7 +273,7 @@ WifiCertService::~WifiCertService()
 already_AddRefed<WifiCertService>
 WifiCertService::FactoryCreate()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return nullptr;
   }
 
