@@ -27,7 +27,7 @@
 #include "mozilla/dom/AudioContextBinding.h"
 #include <algorithm>
 #include "DOMMediaStream.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/unused.h"
 #ifdef MOZ_WEBRTC
 #include "AudioOutputObserver.h"

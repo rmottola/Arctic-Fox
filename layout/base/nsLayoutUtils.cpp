@@ -102,7 +102,7 @@
 #include "nsXULPopupManager.h"
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsAnimationManager.h"
 #include "nsTransitionManager.h"
 #include "RestyleManager.h"

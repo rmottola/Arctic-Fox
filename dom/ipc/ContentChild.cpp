@@ -15,7 +15,7 @@
 #include "ContentChild.h"
 
 #include "BlobChild.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "TabChild.h"
 
 #include "mozilla/Attributes.h"

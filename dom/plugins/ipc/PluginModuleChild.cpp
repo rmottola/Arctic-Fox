@@ -50,7 +50,7 @@
 #include "PluginUtilsOSX.h"
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 using namespace mozilla;
 using namespace mozilla::plugins;

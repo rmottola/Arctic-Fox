@@ -2,7 +2,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-// IWYU pragma: private, include "GoannaProfiler.h"
+// IWYU pragma: private, include "GeckoProfiler.h"
 
 #include <stdlib.h>
 #include <signal.h>
@@ -12,13 +12,13 @@
 #include "mozilla/GuardObjects.h"
 #include "mozilla/UniquePtr.h"
 #include "nscore.h"
-#include "GoannaProfilerFunc.h"
+#include "GeckoProfilerFunc.h"
 #include "PseudoStack.h"
 #include "nsISupports.h"
 #include "ProfilerBacktrace.h"
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 #endif
 
 /* QT has a #define for the word "slots" and jsfriendapi.h has a struct with
@@ -363,9 +363,9 @@ namespace mozilla {
 
 class ProfilerBacktrace;
 
-class MOZ_STACK_CLASS GoannaProfilerTracingRAII {
+class MOZ_STACK_CLASS GeckoProfilerTracingRAII {
 public:
-  GoannaProfilerTracingRAII(const char* aCategory, const char* aInfo,
+  GeckoProfilerTracingRAII(const char* aCategory, const char* aInfo,
                            mozilla::UniquePtr<ProfilerBacktrace> aBacktrace
                            MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
     : mCategory(aCategory)
@@ -375,7 +375,7 @@ public:
     profiler_tracing(mCategory, mInfo, aBacktrace.release(), TRACING_INTERVAL_START);
   }
 
-  ~GoannaProfilerTracingRAII() {
+  ~GeckoProfilerTracingRAII() {
     profiler_tracing(mCategory, mInfo, TRACING_INTERVAL_END);
   }
 

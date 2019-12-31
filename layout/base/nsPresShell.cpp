@@ -157,7 +157,7 @@
 
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "gfxPlatform.h"
 #include "Layers.h"
 #include "LayerTreeInvalidation.h"

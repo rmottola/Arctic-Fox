@@ -7,7 +7,7 @@
 #include "nsIInputStream.h"
 #include "nsIChannel.h"
 #include "nsError.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include <limits>
 

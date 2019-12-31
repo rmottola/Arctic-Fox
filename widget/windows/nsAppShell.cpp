@@ -21,7 +21,7 @@
 #include "mozilla/StaticPtr.h"
 #include "nsTHashtable.h"
 #include "nsHashKeys.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 using namespace mozilla;
 using namespace mozilla::widget;
@@ -285,7 +285,7 @@ nsAppShell::ProcessNextNativeEvent(bool mayWait)
       // Block and wait for any posted application message
       mozilla::HangMonitor::Suspend();
       {
-        GoannaProfilerSleepRAII profiler_sleep;
+        GeckoProfilerSleepRAII profiler_sleep;
         WinUtils::WaitForMessage();
       }
     }

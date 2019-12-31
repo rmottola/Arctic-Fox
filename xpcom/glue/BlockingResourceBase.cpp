@@ -24,7 +24,7 @@
 #include "mozilla/Mutex.h"
 
 #if defined(MOZILLA_INTERNAL_API) && !defined(MOZILLA_XPCOMRT_API)
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #endif //MOZILLA_INTERNAL_API
 
 #endif // ifdef DEBUG
@@ -463,7 +463,7 @@ ReentrantMonitor::Wait(PRIntervalTime aInterval)
   nsresult rv;
 #if defined(MOZILLA_INTERNAL_API) && !defined(MOZILLA_XPCOMRT_API)
   {
-    GoannaProfilerSleepRAII profiler_sleep;
+    GeckoProfilerSleepRAII profiler_sleep;
 #endif //MOZILLA_INTERNAL_API
 
     // give up the monitor until we're back from Wait()

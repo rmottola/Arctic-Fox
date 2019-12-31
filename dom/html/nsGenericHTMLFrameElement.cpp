@@ -10,7 +10,7 @@
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ErrorResult.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozIApplication.h"
 #include "nsAttrValueInlines.h"
 #include "nsContentUtils.h"

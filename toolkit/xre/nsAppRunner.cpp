@@ -2692,7 +2692,7 @@ static DWORD WINAPI InitDwriteBG(LPVOID lpdwThreadParam)
 bool fire_glxtest_process();
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // Encapsulates startup and shutdown state for XRE_main
 class XREMain
@@ -3789,7 +3789,7 @@ int
 XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
 {
   char aLocal;
-  GoannaProfilerInitRAII profilerGuard(&aLocal);
+  GeckoProfilerInitRAII profilerGuard(&aLocal);
 
   PROFILER_LABEL("Startup", "XRE_Main",
     js::ProfileEntry::Category::OTHER);

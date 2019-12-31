@@ -21,7 +21,7 @@
 #include "nsHashKeys.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/Maybe.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/layers/TransactionIdAllocator.h"
 
 class nsPresContext;

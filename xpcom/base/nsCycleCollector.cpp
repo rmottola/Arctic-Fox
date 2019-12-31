@@ -178,7 +178,7 @@
 #include "nsIFile.h"
 #include "nsDumpUtils.h"
 #include "xpcpublic.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include <stdint.h>
 #include <stdio.h>
 

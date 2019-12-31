@@ -10,7 +10,7 @@
 
 #include "RestyleTracker.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsFrameManager.h"
 #include "nsIDocument.h"
 #include "nsStyleChangeList.h"
@@ -311,7 +311,7 @@ RestyleTracker::DoProcessRestyles()
         }
 
 #if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
-        Maybe<GoannaProfilerTracingRAII> profilerRAII;
+        Maybe<GeckoProfilerTracingRAII> profilerRAII;
         if (profiler_feature_active("restyle")) {
           profilerRAII.emplace("Paint", "Styles", Move(data->mBacktrace));
         }
@@ -353,7 +353,7 @@ RestyleTracker::DoProcessRestyles()
           LOG_RESTYLE_INDENT();
 
 #if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
-          Maybe<GoannaProfilerTracingRAII> profilerRAII;
+          Maybe<GeckoProfilerTracingRAII> profilerRAII;
           if (profiler_feature_active("restyle")) {
             profilerRAII.emplace("Paint", "Styles", Move(currentRestyle->mBacktrace));
           }

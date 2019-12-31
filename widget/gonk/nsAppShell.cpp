@@ -69,7 +69,7 @@
 #endif
 
 #include "mozilla/Preferences.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // Defines kKeyMapping and GetKeyNameIndex()
 #include "GonkKeyMapping.h"

@@ -16,7 +16,7 @@
 #include "prenv.h"
 #include "mozilla/HangMonitor.h"
 #include "mozilla/unused.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsIPowerManagerService.h"
 #ifdef MOZ_ENABLE_DBUS
 #include "WakeLockListener.h"

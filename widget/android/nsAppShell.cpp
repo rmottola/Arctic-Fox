@@ -44,7 +44,7 @@
 #include "mozilla/dom/GamepadService.h"
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #ifdef MOZ_ANDROID_HISTORY
 #include "nsNetUtil.h"
 #include "IHistory.h"

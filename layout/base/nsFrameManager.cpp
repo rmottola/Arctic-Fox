@@ -34,7 +34,7 @@
 #include "ChildIterator.h"
 
 #include "nsFrameManager.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsIStatefulFrame.h"
 #include "nsContainerFrame.h"
 

@@ -79,7 +79,7 @@
 
 #include <ApplicationServices/ApplicationServices.h>
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "nsIDOMWheelEvent.h"
 #include "mozilla/layers/ChromeProcessController.h"

@@ -7,7 +7,7 @@
 #include <math.h>                       // for ceil, ceilf, floor
 #include <algorithm>
 #include "ClientTiledPaintedLayer.h"     // for ClientTiledPaintedLayer
-#include "GoannaProfiler.h"              // for PROFILER_LABEL
+#include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "ClientLayerManager.h"         // for ClientLayerManager
 #include "gfxContext.h"                 // for gfxContext, etc
 #include "gfxPlatform.h"                // for gfxPlatform

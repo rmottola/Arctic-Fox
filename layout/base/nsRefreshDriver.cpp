@@ -41,7 +41,7 @@
 #include "mozilla/PendingPlayerTracker.h"
 #include "mozilla/Preferences.h"
 #include "nsViewManager.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsNPAPIPluginInstance.h"
 #include "nsPerformance.h"
 #include "mozilla/dom/WindowBinding.h"

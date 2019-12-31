@@ -6,7 +6,7 @@
 #include "ClientPaintedLayer.h"
 #include "ClientTiledPaintedLayer.h"     // for ClientTiledPaintedLayer
 #include <stdint.h>                     // for uint32_t
-#include "GoannaProfiler.h"              // for PROFILER_LABEL
+#include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "client/ClientLayerManager.h"  // for ClientLayerManager, etc
 #include "gfxContext.h"                 // for gfxContext
 #include "gfxRect.h"                    // for gfxRect

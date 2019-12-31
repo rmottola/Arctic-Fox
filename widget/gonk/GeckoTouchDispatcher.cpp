@@ -16,7 +16,7 @@
  */
 
 #include "FrameMetrics.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "GoannaTouchDispatcher.h"
 #include "InputData.h"
 #include "ProfilerMarkers.h"

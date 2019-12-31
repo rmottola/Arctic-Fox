@@ -11,7 +11,7 @@
 #include "prsystem.h"
 #include "WebMWriter.h"
 #include "libyuv.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 namespace mozilla {
 

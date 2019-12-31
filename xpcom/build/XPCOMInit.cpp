@@ -143,7 +143,7 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 
 #include "ogg/ogg.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "jsapi.h"
 

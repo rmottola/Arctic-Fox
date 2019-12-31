@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "GoannaTaskTracer.h"
-#include "GoannaTaskTracerImpl.h"
+#include "GeckoTaskTracer.h"
+#include "GeckoTaskTracerImpl.h"
 
 #include "mozilla/StaticMutex.h"
 #include "mozilla/ThreadLocal.h"
@@ -388,7 +388,7 @@ void AddLabel(const char* aFormat, ...)
   }
 }
 
-// Functions used by GoannaProfiler.
+// Functions used by GeckoProfiler.
 
 void
 StartLogging()

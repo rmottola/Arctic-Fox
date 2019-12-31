@@ -46,7 +46,7 @@
 #include "nsGlobalWindow.h"
 #include "nsAboutProtocolUtils.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsIXULRuntime.h"
 #include "nsJSPrincipals.h"
 

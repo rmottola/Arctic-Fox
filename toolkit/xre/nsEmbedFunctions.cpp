@@ -73,7 +73,7 @@
 #include "GMPProcessChild.h"
 #include "GMPLoader.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
 #define TARGET_SANDBOX_EXPORTS

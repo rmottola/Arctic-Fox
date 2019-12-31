@@ -26,7 +26,7 @@
 #include "gfx2DGlue.h"
 #include "GLContext.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "cutils/properties.h"
 

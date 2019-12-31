@@ -9,7 +9,7 @@
 #include "BackgroundParentImpl.h"
 #include "base/process_util.h"
 #include "FileDescriptor.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "InputStreamUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"

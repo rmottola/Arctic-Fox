@@ -58,7 +58,7 @@ using mozilla::unused;
 #include "imgIEncoder.h"
 
 #include "nsString.h"
-#include "GoannaProfiler.h" // For PROFILER_LABEL
+#include "GeckoProfiler.h" // For PROFILER_LABEL
 #include "nsIXULRuntime.h"
 
 using namespace mozilla;

@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "SaveProfileTask.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 nsresult
 SaveProfileTask::Run() {

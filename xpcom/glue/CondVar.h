@@ -13,7 +13,7 @@
 #include "mozilla/Mutex.h"
 
 #ifdef MOZILLA_INTERNAL_API
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #endif //MOZILLA_INTERNAL_API
 
 namespace mozilla {
@@ -73,7 +73,7 @@ public:
   {
 
 #ifdef MOZILLA_INTERNAL_API
-    GoannaProfilerSleepRAII profiler_sleep;
+    GeckoProfilerSleepRAII profiler_sleep;
 #endif //MOZILLA_INTERNAL_API
     // NSPR checks for lock ownership
     return PR_WaitCondVar(mCvar, aInterval) == PR_SUCCESS ? NS_OK :

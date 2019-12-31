@@ -88,7 +88,7 @@
 #include "nsDocShellEnumerator.h"
 #include "nsSHistory.h"
 #include "nsDocShellEditorData.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // Helper Classes
 #include "nsError.h"

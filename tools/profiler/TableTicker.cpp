@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <sstream>
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "SaveProfileTask.h"
 #include "SyncProfile.h"
 #include "platform.h"

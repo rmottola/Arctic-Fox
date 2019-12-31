@@ -35,7 +35,7 @@
 #include "nsTArray.h"                   // for nsAutoTArray
 #include "TextRenderer.h"               // for TextRenderer
 #include <vector>
-#include "GoannaProfiler.h"              // for GoannaProfiler
+#include "GeckoProfiler.h"              // for GeckoProfiler
 
 #define CULLING_LOG(...)
 // #define CULLING_LOG(...) printf_stderr("CULLING: " __VA_ARGS__)

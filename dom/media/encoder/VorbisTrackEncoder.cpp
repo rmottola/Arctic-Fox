@@ -6,7 +6,7 @@
 #include <ogg/ogg.h>
 #include <vorbis/vorbisenc.h>
 #include "WebMWriter.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // One actually used: Encoding using a VBR quality mode. The usable range is -.1
 // (lowest quality, smallest file) to 1. (highest quality, largest file).

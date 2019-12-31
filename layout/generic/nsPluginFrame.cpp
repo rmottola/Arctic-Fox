@@ -38,7 +38,7 @@
 #include "nsLayoutUtils.h"
 #include "nsFrameManager.h"
 #include "nsIObserverService.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include <algorithm>
 
 #include "nsIObjectFrame.h"
