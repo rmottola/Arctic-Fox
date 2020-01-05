@@ -27,7 +27,7 @@
 #include "nsSize.h"                     // for nsIntSize
 #include "nsString.h"                   // for nsAutoCString
 #include "TextRenderer.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 namespace mozilla {
 namespace layers {

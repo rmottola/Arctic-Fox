@@ -11,7 +11,7 @@
 #include "nsThreadUtils.h"
 #include "plarena.h"
 #include "pratom.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/Atomics.h"
 #ifdef MOZ_NUWA_PROCESS
 #include "ipc/Nuwa.h"

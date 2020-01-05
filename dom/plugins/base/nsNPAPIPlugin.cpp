@@ -247,7 +247,7 @@ nsNPAPIPlugin::PluginCrashed(const nsAString& pluginDumpID,
 bool
 nsNPAPIPlugin::RunPluginOOP(const nsPluginTag *aPluginTag)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return true;
   }
 
@@ -403,7 +403,7 @@ GetNewPluginLibrary(nsPluginTag *aPluginTag)
     return nullptr;
   }
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return PluginModuleContentParent::LoadModule(aPluginTag->mId);
   }
 

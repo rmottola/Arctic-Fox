@@ -51,7 +51,7 @@ public:
 
   GMPParent();
 
-  nsresult Init(GoannaMediaPluginService *aService, nsIFile* aPluginDir);
+  nsresult Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir);
   nsresult CloneFrom(const GMPParent* aOther);
 
   void Crash();
@@ -134,7 +134,7 @@ public:
 
 private:
   ~GMPParent();
-  nsRefPtr<GoannaMediaPluginService> mService;
+  nsRefPtr<GeckoMediaPluginService> mService;
   bool EnsureProcessLoaded();
   nsresult ReadGMPMetaData();
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;

@@ -585,7 +585,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
   }
 #endif
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     process = kContent;
   } else {
     process = kMain;
@@ -769,7 +769,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
     } else
 #endif /* MOZ_B2G_LOADER */
     if (directive->regfunc) {
-      if (GoannaProcessType_Default != XRE_GetProcessType()) {
+      if (GeckoProcessType_Default != XRE_GetProcessType()) {
         continue;
       }
 

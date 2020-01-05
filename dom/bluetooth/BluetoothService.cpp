@@ -98,7 +98,7 @@ bool sToggleInProgress = false;
 bool
 IsMainProcess()
 {
-  return XRE_GetProcessType() == GoannaProcessType_Default;
+  return XRE_GetProcessType() == GeckoProcessType_Default;
 }
 
 void

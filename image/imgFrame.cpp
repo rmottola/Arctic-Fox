@@ -17,7 +17,7 @@
 
 static bool gDisableOptimize = false;
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/Likely.h"
 #include "MainThreadUtils.h"
 #include "mozilla/MemoryReporting.h"

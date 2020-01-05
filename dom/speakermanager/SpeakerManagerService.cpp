@@ -30,7 +30,7 @@ SpeakerManagerService::GetOrCreateSpeakerManagerService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return SpeakerManagerServiceChild::GetOrCreateSpeakerManagerService();
   }
 
@@ -52,7 +52,7 @@ SpeakerManagerService::GetSpeakerManagerService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return SpeakerManagerServiceChild::GetSpeakerManagerService();
   }
 
@@ -62,7 +62,7 @@ SpeakerManagerService::GetSpeakerManagerService()
 void
 SpeakerManagerService::Shutdown()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return SpeakerManagerServiceChild::Shutdown();
   }
 
@@ -182,7 +182,7 @@ SpeakerManagerService::SpeakerManagerService()
     mVisible(false)
 {
   MOZ_COUNT_CTOR(SpeakerManagerService);
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
       obs->AddObserver(this, "ipc:content-shutdown", false);

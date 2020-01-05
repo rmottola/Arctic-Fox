@@ -44,7 +44,7 @@
 #include "mozilla/dom/GamepadService.h"
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #ifdef MOZ_ANDROID_HISTORY
 #include "nsNetUtil.h"
 #include "IHistory.h"
@@ -134,7 +134,7 @@ nsAppShell::nsAppShell()
 {
     gAppShell = this;
 
-    if (XRE_GetProcessType() != GoannaProcessType_Default) {
+    if (XRE_GetProcessType() != GeckoProcessType_Default) {
         return;
     }
 

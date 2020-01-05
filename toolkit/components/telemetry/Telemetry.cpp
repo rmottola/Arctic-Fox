@@ -1767,10 +1767,10 @@ TelemetryImpl::AsyncFetchTelemetryData(nsIFetchTelemetryDataCallback *aCallback)
 
 TelemetryImpl::TelemetryImpl():
 mHistogramMap(Telemetry::HistogramCount),
-mCanRecordBase(XRE_GetProcessType() == GoannaProcessType_Default ||
-               XRE_GetProcessType() == GoannaProcessType_Content),
-mCanRecordExtended(XRE_GetProcessType() == GoannaProcessType_Default ||
-                   XRE_GetProcessType() == GoannaProcessType_Content),
+mCanRecordBase(XRE_GetProcessType() == GeckoProcessType_Default ||
+               XRE_GetProcessType() == GeckoProcessType_Content),
+mCanRecordExtended(XRE_GetProcessType() == GeckoProcessType_Default ||
+                   XRE_GetProcessType() == GeckoProcessType_Content),
 mHashMutex("Telemetry::mHashMutex"),
 mHangReportsMutex("Telemetry::mHangReportsMutex"),
 mCachedTelemetryData(false),

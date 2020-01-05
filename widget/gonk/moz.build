@@ -15,7 +15,7 @@
 # limitations under the License.
 
 EXPORTS += [
-    'GoannaTouchDispatcher.h',
+    'GeckoTouchDispatcher.h',
     'GonkPermission.h',
     'OrientationObserver.h',
 ]
@@ -46,7 +46,7 @@ SOURCES += ['libui/' + src for src in [
 ]]
 
 SOURCES += [
-    'GoannaTouchDispatcher.cpp',
+    'GeckoTouchDispatcher.cpp',
     'GfxInfo.cpp',
     'GonkMemoryPressureMonitoring.cpp',
     'GonkPermission.cpp',

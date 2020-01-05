@@ -82,7 +82,7 @@ FileImplSnapshot::~FileImplSnapshot()
 void
 FileImplSnapshot::AssertSanity()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   MOZ_ASSERT(NS_IsMainThread());
 }
 

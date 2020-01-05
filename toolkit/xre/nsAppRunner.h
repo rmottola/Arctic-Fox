@@ -111,7 +111,7 @@ WinLaunchChild(const wchar_t *exePath, int argc,
 
 namespace mozilla {
 namespace startup {
-extern GoannaProcessType sChildProcessType;
+extern GeckoProcessType sChildProcessType;
 }
 }
 

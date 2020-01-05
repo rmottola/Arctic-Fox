@@ -9,7 +9,7 @@
 
 #include "mozilla/dom/PContentParent.h"
 #include "mozilla/dom/nsIContentParent.h"
-#include "mozilla/ipc/GoannaChildProcessHost.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/HalTypes.h"
@@ -72,7 +72,7 @@ class ContentParent final : public PContentParent
                           , public nsIDOMGeoPositionErrorCallback
                           , public mozilla::LinkedListElement<ContentParent>
 {
-    typedef mozilla::ipc::GoannaChildProcessHost GoannaChildProcessHost;
+    typedef mozilla::ipc::GeckoChildProcessHost GeckoChildProcessHost;
     typedef mozilla::ipc::OptionalURIParams OptionalURIParams;
     typedef mozilla::ipc::PFileDescriptorSetParent PFileDescriptorSetParent;
     typedef mozilla::ipc::TestShellParent TestShellParent;
@@ -212,7 +212,7 @@ public:
     bool IsNuwaProcess() const;
 #endif
 
-    GoannaChildProcessHost* Process() {
+    GeckoChildProcessHost* Process() {
         return mSubprocess;
     }
 
@@ -783,7 +783,7 @@ private:
     // release these objects in ShutDownProcess.  See the comment there for more
     // details.
 
-    GoannaChildProcessHost* mSubprocess;
+    GeckoChildProcessHost* mSubprocess;
     ContentParent* mOpener;
 
     ContentParentId mChildID;

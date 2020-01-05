@@ -2604,7 +2604,7 @@ private:
 
     mAlreadyMappedToAddon = true;
 
-    if (XRE_GetProcessType() != GoannaProcessType_Default) {
+    if (XRE_GetProcessType() != GeckoProcessType_Default) {
       // Only try to access the service from the main process.
       return;
     }

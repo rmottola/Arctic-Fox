@@ -13,7 +13,7 @@
 #include "nsThreadUtils.h"
 #include "nsCOMPtr.h"
 #include "prlog.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsIStreamListener.h"
 #include "nsILoadGroup.h"
 #include "nsNetCID.h"

@@ -64,7 +64,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include "platform.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/LinuxSignal.h"

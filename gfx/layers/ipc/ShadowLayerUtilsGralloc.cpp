@@ -26,7 +26,7 @@
 #include "gfx2DGlue.h"
 #include "GLContext.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "cutils/properties.h"
 
@@ -126,7 +126,7 @@ ParamTraits<MagicGrallocBufferHandle>::Read(const Message* aMsg,
 
   size_t nfds = aMsg->num_fds();
   int fds[nfds];
-  bool sameProcess = (XRE_GetProcessType() == GoannaProcessType_Default);
+  bool sameProcess = (XRE_GetProcessType() == GeckoProcessType_Default);
   for (size_t n = 0; n < nfds; ++n) {
     FileDescriptor fd;
     if (!aMsg->ReadFileDescriptor(aIter, &fd)) {
@@ -214,7 +214,7 @@ GetGraphicBufferFrom(MaybeMagicGrallocBufferHandle aHandle)
 {
   if (aHandle.type() != MaybeMagicGrallocBufferHandle::TMagicGrallocBufferHandle) {
     if (aHandle.type() == MaybeMagicGrallocBufferHandle::TGrallocBufferRef) {
-      if (XRE_GetProcessType() == GoannaProcessType_Default) {
+      if (XRE_GetProcessType() == GeckoProcessType_Default) {
         return SharedBufferManagerParent::GetGraphicBuffer(aHandle.get_GrallocBufferRef());
       }
       return SharedBufferManagerChild::GetSingleton()->GetGraphicBuffer(aHandle.get_GrallocBufferRef().mKey);

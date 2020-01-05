@@ -26,7 +26,7 @@
 #include "nsServiceManagerUtils.h"
 #include "yuv_convert.h"
 #include "ycbcr_to_rgb565.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "ImageContainer.h"
 #include "ImageRegion.h"
 #include "gfx2DGlue.h"

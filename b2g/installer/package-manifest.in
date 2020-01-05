@@ -700,7 +700,7 @@
 @BINPATH@/@PREF_DIR@/b2g.js
 #endif
 @BINPATH@/@PREF_DIR@/channel-prefs.js
-@BINPATH@/goanna.js
+@BINPATH@/gecko.js
 @BINPATH@/defaults/autoconfig/platform.js
 @BINPATH@/defaults/autoconfig/prefcalls.js
 @BINPATH@/defaults/profile/prefs.js

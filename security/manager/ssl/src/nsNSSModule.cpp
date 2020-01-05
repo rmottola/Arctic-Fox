@@ -45,7 +45,7 @@
 #include "PSMContentListener.h"
 
 #define NS_IS_PROCESS_DEFAULT                                                 \
-    (GoannaProcessType_Default == XRE_GetProcessType())
+    (GeckoProcessType_Default == XRE_GetProcessType())
 
 #define NS_NSS_INSTANTIATE(ensureOperator, _InstanceClass)                    \
     PR_BEGIN_MACRO                                                            \

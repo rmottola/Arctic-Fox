@@ -84,7 +84,7 @@ GetFrom(nsFrameLoader* aFrameLoader)
   return nsContentUtils::LayerManagerForDocument(doc);
 }
 
-class RemoteContentController : public GoannaContentController {
+class RemoteContentController : public GeckoContentController {
 public:
   explicit RemoteContentController(RenderFrameParent* aRenderFrame)
     : mUILoop(MessageLoop::current())
@@ -321,7 +321,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
     *aTextureFactoryIdentifier = TextureFactoryIdentifier();
   }
 
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     // Our remote frame will push layers updates to the compositor,
     // and we'll keep an indirect reference to that tree.
     *aId = mLayersId = CompositorParent::AllocateLayerTreeId();
@@ -334,7 +334,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
       mContentController = new RemoteContentController(this);
       CompositorParent::SetControllerForLayerTree(mLayersId, mContentController);
     }
-  } else if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  } else if (XRE_GetProcessType() == GeckoProcessType_Content) {
     ContentChild::GetSingleton()->SendAllocateLayerTreeId(aId);
     mLayersId = *aId;
     CompositorChild::Get()->SendNotifyChildCreated(mLayersId);
@@ -442,7 +442,7 @@ void
 RenderFrameParent::ActorDestroy(ActorDestroyReason why)
 {
   if (mLayersId != 0) {
-    if (XRE_GetProcessType() == GoannaProcessType_Content) {
+    if (XRE_GetProcessType() == GeckoProcessType_Content) {
       ContentChild::GetSingleton()->SendDeallocateLayerTreeId(mLayersId);
     } else {
       CompositorParent::DeallocateLayerTreeId(mLayersId);

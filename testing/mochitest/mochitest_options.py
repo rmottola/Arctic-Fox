@@ -700,12 +700,12 @@ class MochitestOptions(optparse.OptionParser):
             "default": options.defaultLeakThreshold,
             "tab": 25000,  # See dependencies of bug 1051230.
             # GMP rarely gets a log, but when it does, it leaks a little.
-            "goannamediaplugin": 20000,
+            "geckomediaplugin": 20000,
         }
 
-        # Bug 1065098 - The goannamediaplugin process fails to produce a leak
+        # Bug 1065098 - The geckomediaplugin process fails to produce a leak
         # log for some reason.
-        options.ignoreMissingLeaks = ["goannamediaplugin", "tab"]
+        options.ignoreMissingLeaks = ["geckomediaplugin", "tab"]
 
         # Bug 1121539 - OSX-only intermittent tab process leak in test_ipc.html
         if mozinfo.isMac:

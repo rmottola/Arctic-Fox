@@ -522,12 +522,12 @@ ProcessSelectorMatches(Module::ProcessSelector aSelector)
     return true;
   }
 
-  GoannaProcessType type = XRE_GetProcessType();
+  GeckoProcessType type = XRE_GetProcessType();
   switch (aSelector) {
     case Module::MAIN_PROCESS_ONLY:
-      return type == GoannaProcessType_Default;
+      return type == GeckoProcessType_Default;
     case Module::CONTENT_PROCESS_ONLY:
-      return type == GoannaProcessType_Content;
+      return type == GeckoProcessType_Content;
     default:
       MOZ_CRASH("invalid process aSelector");
   }

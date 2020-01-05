@@ -31,7 +31,7 @@
 #include "SharedSurfaceIO.h"
 #include "mozilla/layers/MacIOSurfaceTextureHostOGL.h"
 #endif
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 using namespace mozilla::gl;
 using namespace mozilla::gfx;

@@ -13,7 +13,7 @@
 #include "ContainerLayerComposite.h"    // for ContainerLayerComposite, etc
 #include "FPSCounter.h"                 // for FPSState, FPSCounter
 #include "FrameMetrics.h"               // for FrameMetrics
-#include "GoannaProfiler.h"              // for profiler_set_frame_number, etc
+#include "GeckoProfiler.h"              // for profiler_set_frame_number, etc
 #include "ImageLayerComposite.h"        // for ImageLayerComposite
 #include "Layers.h"                     // for Layer, ContainerLayer, etc
 #include "LayerScope.h"                 // for LayerScope Tool
@@ -55,7 +55,7 @@
 #ifdef MOZ_WIDGET_ANDROID
 #include <android/log.h>
 #endif
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "TextRenderer.h"               // for TextRenderer
 
 class gfxContext;

@@ -13,7 +13,7 @@
 #include "nsIScrollableFrame.h"
 #include "nsSubDocumentFrame.h"
 #include "nsAbsoluteContainingBlock.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 using namespace mozilla;
 

@@ -12,7 +12,7 @@
 #include "GLLibraryLoader.h"
 #include "mozilla/ThreadLocal.h"
 #include "nsIFile.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include <bitset>
 #include <vector>

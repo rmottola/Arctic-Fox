@@ -18,7 +18,7 @@
 #include "nsVariant.h"
 #include "mozilla/storage.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "nsNetCID.h"
 

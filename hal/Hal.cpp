@@ -81,13 +81,13 @@ AssertMainThread()
 bool
 InSandbox()
 {
-  return GoannaProcessType_Content == XRE_GetProcessType();
+  return GeckoProcessType_Content == XRE_GetProcessType();
 }
 
 void
 AssertMainProcess()
 {
-  MOZ_ASSERT(GoannaProcessType_Default == XRE_GetProcessType());
+  MOZ_ASSERT(GeckoProcessType_Default == XRE_GetProcessType());
 }
 
 bool

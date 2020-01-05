@@ -905,7 +905,7 @@ bool
 PuppetWidget::NeedsPaint()
 {
   // e10s popups are handled by the parent process, so never should be painted here
-  if (XRE_GetProcessType() == GoannaProcessType_Content &&
+  if (XRE_GetProcessType() == GeckoProcessType_Content &&
       Preferences::GetBool("browser.tabs.remote.desktopbehavior", false) &&
       mWindowType == eWindowType_popup) {
     NS_WARNING("Trying to paint an e10s popup in the child process!");

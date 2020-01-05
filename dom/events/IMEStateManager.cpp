@@ -857,7 +857,7 @@ IMEStateManager::SetIMEState(const IMEState& aState,
   // XXX I think that we should use nsContentUtils::IsCallerChrome() instead
   //     of the process type.
   if (aAction.mCause == InputContextAction::CAUSE_UNKNOWN &&
-      XRE_GetProcessType() != GoannaProcessType_Content) {
+      XRE_GetProcessType() != GeckoProcessType_Content) {
     aAction.mCause = InputContextAction::CAUSE_UNKNOWN_CHROME;
   }
 

@@ -14,7 +14,7 @@
 #include "nsLayoutUtils.h"
 #include "AnimationCommon.h" // For GetLayerAnimationInfo
 #include "FrameLayerBuilder.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsStyleChangeList.h"
 #include "nsRuleProcessorData.h"
 #include "nsStyleUtil.h"

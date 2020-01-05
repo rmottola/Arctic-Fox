@@ -241,7 +241,7 @@ void InstallSignalHandlers(const char *ProgramName)
 #if defined(CRAWL_STACK_ON_SIGSEGV)
   if (!getenv("XRE_NO_WINDOWS_CRASH_DIALOG")) {
     void (*crap_handler)(int) =
-      GoannaProcessType_Default != XRE_GetProcessType() ?
+      GeckoProcessType_Default != XRE_GetProcessType() ?
           child_ah_crap_handler :
           ah_crap_handler;
     signal(SIGSEGV, crap_handler);
@@ -259,7 +259,7 @@ void InstallSignalHandlers(const char *ProgramName)
   sigaction(SIGFPE, &sa, &osa);
 #endif
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     /*
      * If the user is debugging a Goanna parent process in gdb and hits ^C to
      * suspend, a SIGINT signal will be sent to the child. We ignore this signal

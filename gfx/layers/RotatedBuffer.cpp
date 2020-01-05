@@ -9,7 +9,7 @@
 #include "BasicImplData.h"              // for BasicImplData
 #include "BasicLayersImpl.h"            // for ToData
 #include "BufferUnrotate.h"             // for BufferUnrotate
-#include "GoannaProfiler.h"              // for PROFILER_LABEL
+#include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "Layers.h"                     // for PaintedLayer, Layer, etc
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "gfxPrefs.h"                   // for gfxPrefs

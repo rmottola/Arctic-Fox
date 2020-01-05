@@ -441,7 +441,7 @@ AppProtocolHandler::NewChannel2(nsIURI* aUri,
   }
 
   bool noRemote = (appInfo->mIsCoreApp ||
-                   XRE_GetProcessType() == GoannaProcessType_Default);
+                   XRE_GetProcessType() == GeckoProcessType_Default);
 
   // In-parent and CoreApps can directly access files, so use jar:file://
   nsAutoCString jarSpec(noRemote ? "jar:file://"

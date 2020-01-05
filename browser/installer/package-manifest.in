@@ -196,7 +196,7 @@
 @RESPATH@/components/composer.xpt
 @RESPATH@/components/content_events.xpt
 @RESPATH@/components/content_html.xpt
-@RESPATH@/components/content_goannamediaplugins.xpt
+@RESPATH@/components/content_geckomediaplugins.xpt
 #ifdef MOZ_WEBRTC
 @RESPATH@/components/content_webrtc.xpt
 #endif
@@ -688,7 +688,7 @@
 ; All the pref files must be part of base to prevent migration bugs
 @RESPATH@/browser/@PREF_DIR@/arcticfox.js
 @RESPATH@/browser/@PREF_DIR@/palemoon-branding.js
-@RESPATH@/goanna.js
+@RESPATH@/gecko.js
 @RESPATH@/defaults/autoconfig/platform.js
 @RESPATH@/defaults/autoconfig/prefcalls.js
 @RESPATH@/browser/defaults/profile/prefs.js

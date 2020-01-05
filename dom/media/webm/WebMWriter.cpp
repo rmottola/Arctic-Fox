@@ -5,7 +5,7 @@
 
 #include "WebMWriter.h"
 #include "EbmlComposer.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 namespace mozilla {
 

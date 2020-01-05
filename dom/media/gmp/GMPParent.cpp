@@ -13,7 +13,7 @@
 #include "nsCharSeparatedTokenizer.h"
 #include "nsThreadUtils.h"
 #include "nsIRunnable.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 #include "mozilla/unused.h"
 #include "nsIObserverService.h"
 #include "GMPTimerParent.h"
@@ -83,7 +83,7 @@ GMPParent::CloneFrom(const GMPParent* aOther)
 }
 
 nsresult
-GMPParent::Init(GoannaMediaPluginService *aService, nsIFile* aPluginDir)
+GMPParent::Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir)
 {
   MOZ_ASSERT(aPluginDir);
   MOZ_ASSERT(aService);
@@ -181,8 +181,8 @@ AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
   if (service) {
     service->AsyncShutdownComplete(parent);
   }
@@ -209,8 +209,8 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   }
 
   int32_t timeout = GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT;
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
   if (service) {
     timeout = service->AsyncShutdownTimeoutMs();
   }
@@ -398,7 +398,7 @@ GMPParent::ChildTerminated()
   nsRefPtr<GMPParent> self(this);
   GMPThread()->Dispatch(NS_NewRunnableMethodWithArg<nsRefPtr<GMPParent>>(
                           mService,
-                          &GoannaMediaPluginService::PluginTerminated,
+                          &GeckoMediaPluginService::PluginTerminated,
                           self),
                         NS_DISPATCH_NORMAL);
 }
@@ -508,7 +508,7 @@ nsIThread*
 GMPParent::GMPThread()
 {
   if (!mGMPThread) {
-    nsCOMPtr<mozIGoannaMediaPluginService> mps = do_GetService("@mozilla.org/goanna-media-plugin-service;1");
+    nsCOMPtr<mozIGeckoMediaPluginService> mps = do_GetService("@mozilla.org/gecko-media-plugin-service;1");
     MOZ_ASSERT(mps);
     if (!mps) {
       return nullptr;

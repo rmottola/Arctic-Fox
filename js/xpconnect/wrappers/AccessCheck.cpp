@@ -231,7 +231,7 @@ AccessCheck::checkPassToPrivilegedCode(JSContext* cx, HandleObject wrapper, Hand
     // pass any objects at all to CPOWs.
     if (mozilla::jsipc::IsWrappedCPOW(obj) &&
         js::GetObjectCompartment(wrapper) == js::GetObjectCompartment(xpc::UnprivilegedJunkScope()) &&
-        XRE_GetProcessType() == GoannaProcessType_Default)
+        XRE_GetProcessType() == GeckoProcessType_Default)
     {
         return true;
     }

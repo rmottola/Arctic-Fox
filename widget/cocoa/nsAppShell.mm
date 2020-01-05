@@ -32,7 +32,7 @@
 #include "nsToolkit.h"
 #include "TextInputHandler.h"
 #include "mozilla/HangMonitor.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "pratom.h"
 
 #include <IOKit/pwr_mgt/IOPMLib.h>

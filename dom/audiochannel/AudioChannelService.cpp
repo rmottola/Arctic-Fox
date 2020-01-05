@@ -57,7 +57,7 @@ AudioChannelService::GetAudioChannelService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return AudioChannelServiceChild::GetAudioChannelService();
   }
 
@@ -71,7 +71,7 @@ AudioChannelService::GetOrCreateAudioChannelService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return AudioChannelServiceChild::GetOrCreateAudioChannelService();
   }
 
@@ -91,7 +91,7 @@ AudioChannelService::GetOrCreateAudioChannelService()
 void
 AudioChannelService::Shutdown()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return AudioChannelServiceChild::Shutdown();
   }
 
@@ -109,7 +109,7 @@ AudioChannelService::AudioChannelService()
 , mDisabled(false)
 , mDefChannelChildID(CONTENT_PROCESS_ID_UNKNOWN)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
       obs->AddObserver(this, "ipc:content-shutdown", false);
@@ -167,7 +167,7 @@ AudioChannelService::RegisterType(AudioChannel aChannel, uint64_t aChildID,
   AudioChannelInternalType type = GetInternalType(aChannel, true);
   mChannelCounters[type].AppendElement(aChildID);
 
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
 
     // We must keep the childIds in order to decide which app is allowed to play
     // with then telephony channel.
@@ -259,7 +259,7 @@ AudioChannelService::UnregisterType(AudioChannel aChannel,
   // There are two reasons to defer the decrease of telephony channel.
   // 1. User can have time to remove device from his ear before music resuming.
   // 2. Give BT SCO to be disconnected before starting to connect A2DP.
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
 
     if (aChannel == AudioChannel::Telephony) {
       UnregisterTelephonyChild(aChildID);
@@ -293,7 +293,7 @@ AudioChannelService::UnregisterTypeInternal(AudioChannel aChannel,
 
   // In order to avoid race conditions, it's safer to notify any existing
   // agent any time a new one is registered.
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     // No hidden content channel is playable if the original playable hidden
     // process does not need to play audio from background anymore.
     if (aChannel == AudioChannel::Content &&
@@ -518,7 +518,7 @@ AudioChannelService::SetDefaultVolumeControlChannelInternal(int32_t aChannel,
                                                             bool aVisible,
                                                             uint64_t aChildID)
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return;
   }
 
@@ -561,7 +561,7 @@ AudioChannelService::SetDefaultVolumeControlChannelInternal(int32_t aChannel,
 void
 AudioChannelService::SendAudioChannelChangedNotification(uint64_t aChildID)
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return;
   }
 

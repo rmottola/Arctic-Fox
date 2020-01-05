@@ -5,7 +5,7 @@
 
 #include "BasicPaintedLayer.h"
 #include <stdint.h>                     // for uint32_t
-#include "GoannaProfiler.h"              // for PROFILER_LABEL
+#include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "ReadbackLayer.h"              // for ReadbackLayer, ReadbackSink
 #include "ReadbackProcessor.h"          // for ReadbackProcessor::Update, etc
 #include "RenderTrace.h"                // for RenderTraceInvalidateEnd, etc

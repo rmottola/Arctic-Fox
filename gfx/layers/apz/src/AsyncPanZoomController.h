@@ -8,7 +8,7 @@
 #define mozilla_layers_AsyncPanZoomController_h
 
 #include "CrossProcessMutex.h"
-#include "mozilla/layers/GoannaContentController.h"
+#include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
@@ -99,7 +99,7 @@ public:
   AsyncPanZoomController(uint64_t aLayersId,
                          APZCTreeManager* aTreeManager,
                          const nsRefPtr<InputQueue>& aInputQueue,
-                         GoannaContentController* aController,
+                         GeckoContentController* aController,
                          GestureBehavior aGestures = DEFAULT_GESTURES);
 
   // --------------------------------------------------------------------------
@@ -534,7 +534,7 @@ protected:
 
   /**
    * Utility function to send updated FrameMetrics to Goanna so that it can paint
-   * the displayport area. Calls into GoannaContentController to do the actual
+   * the displayport area. Calls into GeckoContentController to do the actual
    * work. Note that only one paint request can be active at a time. If a paint
    * request is made while a paint is currently happening, it gets queued up. If
    * a new paint request arrives before a paint is completed, the old request
@@ -546,7 +546,7 @@ protected:
    * Tell the paint throttler to request a content repaint with the given
    * metrics.  (Helper function used by RequestContentRepaint.) If aThrottled
    * is set to false, the repaint request is sent directly without going through
-   * the paint throttler. In particular, the GoannaContentController::RequestContentRepaint
+   * the paint throttler. In particular, the GeckoContentController::RequestContentRepaint
    * function will be invoked before this function returns.
    */
   void RequestContentRepaint(FrameMetrics& aFrameMetrics, bool aThrottled = true);
@@ -611,12 +611,12 @@ protected:
   /* Access to the following two fields is protected by the mRefPtrMonitor,
      since they are accessed on the UI thread but can be cleared on the
      compositor thread. */
-  nsRefPtr<GoannaContentController> mGoannaContentController;
+  nsRefPtr<GeckoContentController> mGeckoContentController;
   nsRefPtr<GestureEventListener> mGestureEventListener;
   mutable Monitor mRefPtrMonitor;
 
   /* Utility functions that return a addrefed pointer to the corresponding fields. */
-  already_AddRefed<GoannaContentController> GetGoannaContentController() const;
+  already_AddRefed<GeckoContentController> GetGeckoContentController() const;
   already_AddRefed<GestureEventListener> GetGestureEventListener() const;
 
   // If we are sharing our frame metrics with content across processes

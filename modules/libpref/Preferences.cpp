@@ -50,7 +50,7 @@
 
 #ifdef DEBUG
 #define ENSURE_MAIN_PROCESS(message, pref) do {                                \
-  if (MOZ_UNLIKELY(XRE_GetProcessType() != GoannaProcessType_Default)) {        \
+  if (MOZ_UNLIKELY(XRE_GetProcessType() != GeckoProcessType_Default)) {        \
     nsPrintfCString msg("ENSURE_MAIN_PROCESS failed. %s %s", message, pref);   \
     NS_WARNING(msg.get());                                                     \
     return NS_ERROR_NOT_AVAILABLE;                                             \
@@ -58,7 +58,7 @@
 } while (0);
 #else
 #define ENSURE_MAIN_PROCESS(message, pref)                                     \
-  if (MOZ_UNLIKELY(XRE_GetProcessType() != GoannaProcessType_Default)) {        \
+  if (MOZ_UNLIKELY(XRE_GetProcessType() != GeckoProcessType_Default)) {        \
     return NS_ERROR_NOT_AVAILABLE;                                             \
   }
 #endif
@@ -530,7 +530,7 @@ Preferences::Init()
   NS_ENSURE_SUCCESS(rv, rv);
 
   using mozilla::dom::ContentChild;
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     InfallibleTArray<PrefSetting> prefs;
     ContentChild::GetSingleton()->SendReadPrefsArray(&prefs);
 
@@ -581,7 +581,7 @@ NS_IMETHODIMP
 Preferences::Observe(nsISupports *aSubject, const char *aTopic,
                      const char16_t *someData)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content)
+  if (XRE_GetProcessType() == GeckoProcessType_Content)
     return NS_ERROR_NOT_AVAILABLE;
 
   nsresult rv = NS_OK;
@@ -606,7 +606,7 @@ Preferences::Observe(nsISupports *aSubject, const char *aTopic,
 NS_IMETHODIMP
 Preferences::ReadUserPrefs(nsIFile *aFile)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     NS_ERROR("cannot load prefs from content process");
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -636,7 +636,7 @@ Preferences::ReadUserPrefs(nsIFile *aFile)
 NS_IMETHODIMP
 Preferences::ResetPrefs()
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     NS_ERROR("cannot reset prefs from content process");
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -653,7 +653,7 @@ Preferences::ResetPrefs()
 NS_IMETHODIMP
 Preferences::ResetUserPrefs()
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     NS_ERROR("cannot reset user prefs from content process");
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -665,7 +665,7 @@ Preferences::ResetUserPrefs()
 NS_IMETHODIMP
 Preferences::SavePrefFile(nsIFile *aFile)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     NS_ERROR("cannot save pref file from content process");
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1214,10 +1214,10 @@ static nsresult pref_InitInitialObjects()
   nsresult rv;
 
   // In omni.jar case, we load the following prefs:
-  // - jar:$gre/omni.jar!/goanna.js
+  // - jar:$gre/omni.jar!/gecko.js
   // - jar:$gre/omni.jar!/defaults/pref/*.js
   // In non omni.jar case, we load:
-  // - $gre/goanna.js
+  // - $gre/gecko.js
   //
   // In both cases, we also load:
   // - $gre/defaults/pref/*.js
@@ -1244,8 +1244,8 @@ static nsresult pref_InitInitialObjects()
 
   nsRefPtr<nsZipArchive> jarReader = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
   if (jarReader) {
-    // Load jar:$gre/omni.jar!/goanna.js
-    rv = pref_ReadPrefFromJar(jarReader, "goanna.js");
+    // Load jar:$gre/omni.jar!/gecko.js
+    rv = pref_ReadPrefFromJar(jarReader, "gecko.js");
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Load jar:$gre/omni.jar!/defaults/pref/*.js
@@ -1264,12 +1264,12 @@ static nsresult pref_InitInitialObjects()
         NS_WARNING("Error parsing preferences.");
     }
   } else {
-    // Load $gre/goanna.js
+    // Load $gre/gecko.js
     nsCOMPtr<nsIFile> greprefsFile;
     rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(greprefsFile));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = greprefsFile->AppendNative(NS_LITERAL_CSTRING("goanna.js"));
+    rv = greprefsFile->AppendNative(NS_LITERAL_CSTRING("gecko.js"));
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = openPrefFile(greprefsFile);

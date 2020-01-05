@@ -273,9 +273,9 @@ GetClosestInterestingAccessible(id anObject)
   if (!mGoannaAccessible)
     return nil;
   
-  Accessible* focusedGoannaChild = mGoannaAccessible->FocusedChild();
-  if (focusedGoannaChild) {
-    mozAccessible *focusedChild = GetNativeFromGoannaAccessible(focusedGoannaChild);
+  Accessible* focusedGeckoChild = mGoannaAccessible->FocusedChild();
+  if (focusedGeckoChild) {
+    mozAccessible *focusedChild = GetNativeFromGoannaAccessible(focusedGeckoChild);
     if (focusedChild)
       return GetClosestInterestingAccessible(focusedChild);
   }

@@ -26,7 +26,7 @@
 #include "mozilla/RefPtr.h"             // for RefPtr
 #include "mozilla/TimeStamp.h"          // for TimeStamp
 #include "mozilla/ipc/ProtocolUtils.h"
-#include "mozilla/layers/GoannaContentController.h"
+#include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/layers/LayersMessages.h"  // for TargetConfig
 #include "mozilla/layers/PCompositorParent.h"
 #include "mozilla/layers/ShadowLayersManager.h" // for ShadowLayersManager
@@ -60,7 +60,7 @@ struct ScopedLayerTreeRegistration
 {
   ScopedLayerTreeRegistration(uint64_t aLayersId,
                               Layer* aRoot,
-                              GoannaContentController* aController);
+                              GeckoContentController* aController);
   ~ScopedLayerTreeRegistration();
 
 private:
@@ -285,7 +285,7 @@ public:
    * Must run on content main thread.
    */
   static void SetControllerForLayerTree(uint64_t aLayersId,
-                                        GoannaContentController* aController);
+                                        GeckoContentController* aController);
 
   /**
    * This returns a reference to the APZCTreeManager to which
@@ -304,7 +304,7 @@ public:
     LayerTreeState();
     ~LayerTreeState();
     nsRefPtr<Layer> mRoot;
-    nsRefPtr<GoannaContentController> mController;
+    nsRefPtr<GeckoContentController> mController;
     CompositorParent* mParent;
     LayerManagerComposite* mLayerManager;
     // Pointer to the CrossProcessCompositorParent. Used by APZCs to share

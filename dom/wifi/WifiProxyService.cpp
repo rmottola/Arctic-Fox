@@ -151,7 +151,7 @@ WifiProxyService::~WifiProxyService()
 already_AddRefed<WifiProxyService>
 WifiProxyService::FactoryCreate()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return nullptr;
   }
 

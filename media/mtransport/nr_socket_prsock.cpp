@@ -1166,7 +1166,7 @@ int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp) {
   RefPtr<NrSocketBase> sock;
 
   // create IPC bridge for content process
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     sock = new NrSocket();
   } else {
     nsCOMPtr<nsIThread> main_thread;

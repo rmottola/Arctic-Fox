@@ -69,7 +69,7 @@
 #endif
 
 #include "mozilla/Preferences.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // Defines kKeyMapping and GetKeyNameIndex()
 #include "GonkKeyMapping.h"
@@ -875,7 +875,7 @@ nsAppShell::Init()
 
     InitGonkMemoryPressureMonitoring();
 
-    if (XRE_GetProcessType() == GoannaProcessType_Default) {
+    if (XRE_GetProcessType() == GeckoProcessType_Default) {
         printf("*****************************************************************\n");
         printf("***\n");
         printf("*** This is stdout. Most of the useful output will be in logcat.\n");

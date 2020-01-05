@@ -173,7 +173,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsHTMLEditor)
 
 class nsIDocumentLoaderFactory;
 
-#define PRODUCT_NAME "Goanna"
+#define PRODUCT_NAME "Gecko"
 
 /* 0ddf4df8-4dbb-4133-8b79-9afb966514f5 */
 #define NS_PLUGINDOCLOADERFACTORY_CID \
@@ -266,7 +266,7 @@ using mozilla::dom::TCPServerSocketChild;
 using mozilla::dom::UDPSocketChild;
 using mozilla::dom::time::TimeService;
 using mozilla::net::StreamingProtocolControllerService;
-using mozilla::gmp::GoannaMediaPluginService;
+using mozilla::gmp::GeckoMediaPluginService;
 
 // Transformiix
 /* 5d5d92cd-6bf8-11d9-bf4a-000a95dc234c */
@@ -638,7 +638,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(TCPSocketParent)
 NS_GENERIC_FACTORY_CONSTRUCTOR(TCPServerSocketChild)
 NS_GENERIC_FACTORY_CONSTRUCTOR(UDPSocketChild)
 
-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(GoannaMediaPluginService, GoannaMediaPluginService::GetGoannaMediaPluginService)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(GeckoMediaPluginService, GeckoMediaPluginService::GetGeckoMediaPluginService)
 
 #ifdef ACCESSIBILITY
 #include "nsAccessibilityService.h"
@@ -1099,7 +1099,7 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kTCPSOCKETPARENT_CID, false, nullptr, TCPSocketParentConstructor },
   { &kTCPSERVERSOCKETCHILD_CID, false, nullptr, TCPServerSocketChildConstructor },
   { &kUDPSOCKETCHILD_CID, false, nullptr, UDPSocketChildConstructor },
-  { &kGECKO_MEDIA_PLUGIN_SERVICE_CID, true, nullptr, GoannaMediaPluginServiceConstructor },
+  { &kGECKO_MEDIA_PLUGIN_SERVICE_CID, true, nullptr, GeckoMediaPluginServiceConstructor },
   { &kNS_TIMESERVICE_CID, false, nullptr, nsITimeServiceConstructor },
   { &kNS_MEDIASTREAMCONTROLLERSERVICE_CID, false, nullptr, nsIStreamingProtocolControllerServiceConstructor },
 #ifdef MOZ_WIDGET_GONK
@@ -1277,7 +1277,7 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
   { TV_TUNER_DATA_CONTRACTID, &kTV_TUNER_DATA_CID },
   { TV_CHANNEL_DATA_CONTRACTID, &kTV_CHANNEL_DATA_CID },
   { TV_PROGRAM_DATA_CONTRACTID, &kTV_PROGRAM_DATA_CID },
-  { "@mozilla.org/goanna-media-plugin-service;1",  &kGECKO_MEDIA_PLUGIN_SERVICE_CID },
+  { "@mozilla.org/gecko-media-plugin-service;1",  &kGECKO_MEDIA_PLUGIN_SERVICE_CID },
   { NS_MOBILE_CONNECTION_SERVICE_CONTRACTID, &kNS_MOBILE_CONNECTION_SERVICE_CID },
   { NS_VOICEMAIL_SERVICE_CONTRACTID, &kNS_VOICEMAIL_SERVICE_CID },
   { PRESENTATION_DEVICE_MANAGER_CONTRACTID, &kPRESENTATION_DEVICE_MANAGER_CID },

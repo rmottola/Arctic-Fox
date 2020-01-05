@@ -247,7 +247,7 @@ DispatchStatusChangedEvent(const nsAString& aType,
 bool
 IsMainProcess()
 {
-  return XRE_GetProcessType() == GoannaProcessType_Default;
+  return XRE_GetProcessType() == GeckoProcessType_Default;
 }
 
 END_BLUETOOTH_NAMESPACE

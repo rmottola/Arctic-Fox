@@ -699,7 +699,7 @@ NS_IMETHODIMP nsExternalHelperAppService::DoContent(const nsACString& aMimeConte
                                                     nsIInterfaceRequestor *aWindowContext,
                                                     nsIStreamListener ** aStreamListener)
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return DoContentContentProcessHelper(aMimeContentType, aRequest, aContentContext,
                                          aForceSave, aWindowContext, aStreamListener);
   }
@@ -955,7 +955,7 @@ nsExternalHelperAppService::LoadURI(nsIURI *aURI,
 {
   NS_ENSURE_ARG_POINTER(aURI);
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     URIParams uri;
     SerializeURI(aURI, uri);
 
@@ -1259,7 +1259,7 @@ nsExternalAppHandler::~nsExternalAppHandler()
 void
 nsExternalAppHandler::DidDivertRequest(nsIRequest *request)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Content, "in child process");
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content, "in child process");
   // Remove our request from the child loadGroup
   RetargetLoadNotifications(request);
   MaybeCloseWindow();
@@ -1613,7 +1613,7 @@ NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest *request, nsISuppo
 
   // At this point, the child process has done everything it can usefully do
   // for OnStartRequest.
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return NS_OK;
   }
 
@@ -1854,7 +1854,7 @@ void nsExternalAppHandler::SendStatusChange(ErrorType type, nsresult rv, nsIRequ
                 mDialogProgressListener->OnStatusChange(nullptr, (type == kReadError) ? aRequest : nullptr, rv, msgText);
               } else if (mTransfer) {
                 mTransfer->OnStatusChange(nullptr, (type == kReadError) ? aRequest : nullptr, rv, msgText);
-              } else if (XRE_GetProcessType() == GoannaProcessType_Default) {
+              } else if (XRE_GetProcessType() == GeckoProcessType_Default) {
                 // We don't have a listener.  Simply show the alert ourselves.
                 nsresult qiRv;
                 nsCOMPtr<nsIPrompt> prompter(do_GetInterface(GetDialogParent(), &qiRv));

@@ -12,7 +12,7 @@
 #include "nsIDocument.h"
 #include "nsINode.h"
 #include "nsPIDOMWindow.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/ContentEvents.h"
 #include "mozilla/dom/CloseEvent.h"
 #include "mozilla/dom/DeviceOrientationEvent.h"

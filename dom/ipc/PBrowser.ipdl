@@ -54,7 +54,7 @@ using mozilla::CSSPoint from "Units.h";
 using mozilla::CSSToScreenScale from "Units.h";
 using mozilla::CommandInt from "mozilla/EventForwards.h";
 using mozilla::Modifiers from "mozilla/EventForwards.h";
-using mozilla::layers::GoannaContentController::APZStateChange from "mozilla/layers/GoannaContentController.h";
+using mozilla::layers::GeckoContentController::APZStateChange from "mozilla/layers/GeckoContentController.h";
 using mozilla::WritingMode from "WritingModes.h";
 
 namespace mozilla {
@@ -512,8 +512,8 @@ child:
 
     UpdateFrame(FrameMetrics frame);
 
-    // The following methods correspond to functions on the GoannaContentController
-    // interface in gfx/layers/apz/public/GoannaContentController.h. Refer to documentation
+    // The following methods correspond to functions on the GeckoContentController
+    // interface in gfx/layers/apz/public/GeckoContentController.h. Refer to documentation
     // in that file for these functions.
     RequestFlingSnap(ViewID aScrollID, CSSPoint aDestination);
     AcknowledgeScrollUpdate(ViewID aScrollId, uint32_t aScrollGeneration);

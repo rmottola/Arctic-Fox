@@ -4,10 +4,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-XPIDL_MODULE = 'content_goannamediaplugins'
+XPIDL_MODULE = 'content_geckomediaplugins'
 
 XPIDL_SOURCES += [
-    'mozIGoannaMediaPluginService.idl',
+    'mozIGeckoMediaPluginService.idl',
 ]
 
 EXPORTS += [

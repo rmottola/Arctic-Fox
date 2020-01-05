@@ -29,7 +29,7 @@ EGLImageTextureClient::EGLImageTextureClient(ISurfaceAllocator* aAllocator,
   , mSize(aSize)
   , mIsLocked(false)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default,
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default,
              "Can't pass an `EGLImage` between processes.");
 
   AddFlags(TextureFlags::DEALLOCATE_CLIENT);
@@ -83,7 +83,7 @@ SurfaceTextureClient::SurfaceTextureClient(ISurfaceAllocator* aAllocator,
   , mSize(aSize)
   , mIsLocked(false)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default,
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default,
              "Can't pass pointers between processes.");
 
   // Our data is always owned externally.

@@ -270,7 +270,7 @@ NfcService::~NfcService()
 already_AddRefed<NfcService>
 NfcService::FactoryCreate()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return nullptr;
   }
 

@@ -85,7 +85,7 @@
 
 #include "mozilla/Preferences.h"
 #include "mozilla/LookAndFeel.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "Units.h"
 #include "mozilla/layers/APZCTreeManager.h"
 
@@ -601,7 +601,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     // window edge) wont update the cursor if the cached value and the current
     // cursor match. So when the mouse exits a remote frame, clear the cached
     // widget cursor so a proper update will occur when the mouse re-enters.
-    if (XRE_GetProcessType() == GoannaProcessType_Content) {
+    if (XRE_GetProcessType() == GeckoProcessType_Content) {
       ClearCachedWidgetCursor(mCurrentTarget);
     }
 

@@ -37,7 +37,7 @@ DiskSpaceWatcher::~DiskSpaceWatcher()
 already_AddRefed<DiskSpaceWatcher>
 DiskSpaceWatcher::FactoryCreate()
 {
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return nullptr;
   }
 

@@ -529,7 +529,7 @@ nsWindowMemoryReporter::CollectReports(nsIMemoryReporterCallback* aCb,
   // Collect window memory usage.
   nsWindowSizes windowTotalSizes(nullptr);
   nsCOMPtr<amIAddonManager> addonManager;
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     // Only try to access the service from the main process.
     addonManager = do_GetService("@mozilla.org/addons/integration;1");
   }
