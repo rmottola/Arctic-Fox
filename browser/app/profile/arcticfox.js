@@ -645,8 +645,6 @@ pref("plugins.update.notifyUser", false);
 pref("plugins.click_to_play", true);
 
 
-pref("plugins.clickToActivateInfo.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/clicktoplay");
-
 #ifdef XP_WIN
 pref("browser.preferences.instantApply", false);
 #else
