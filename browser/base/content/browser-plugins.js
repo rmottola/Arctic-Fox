@@ -783,12 +783,12 @@ var gPluginHandler = {
       if (this.isTooSmall(plugin, overlay)) {
         // Hide the overlay's contents. Use visibility style, so that it doesn't
         // collapse down to 0x0.
-        overlay.style.visibility = "hidden";
         isShowing = false;
       }
     }
 
     if (isShowing) {
+      overlay.style.visibility = "visible";
       // If a previous plugin on the page was too small and resulted in adding a
       // notification bar, then remove it because this plugin instance it big
       // enough to serve as in-content notification.
