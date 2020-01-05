@@ -525,6 +525,7 @@ var gPluginHandler = {
     let plugins = cwu.plugins;
     let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
 
+    let pluginFound = false;
     for (let plugin of plugins) {
       plugin.QueryInterface(Ci.nsIObjectLoadingContent);
       // canActivatePlugin will return false if this isn't a known plugin type,
@@ -536,7 +537,14 @@ var gPluginHandler = {
           overlay.removeEventListener("click", gPluginHandler._overlayClickListener, true);
         }
         plugin.playPlugin();
+        pluginFound = true;
       }
+    }
+
+    // If there are no instances of the plugin on the page any more, what the
+    // user probably needs is for us to allow and then refresh.
+    if (!pluginFound) {
+      browser.reload();
     }
   },
 
