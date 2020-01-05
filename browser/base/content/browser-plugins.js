@@ -530,7 +530,7 @@ var gPluginHandler = {
         url = Services.blocklist.getPluginBlocklistURL(pluginInfo.pluginTag);
       }
       else {
-        url = Services.urlFormatter.formatURLPref("plugins.clickToActivateInfo.url");
+        url = Services.urlFormatter.formatURLPref("app.support.baseURL") + "clicktoplay";
       }
       pluginInfo.detailsLink = url;
 
