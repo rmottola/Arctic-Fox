@@ -526,11 +526,15 @@ var gPluginHandler = {
     let expireType;
     let expireTime;
 
+    // Update the permission manager.
+    // Also update the current state of pluginInfo.fallbackType so that
+    // subsequent opening of the notification shows the current state.
     switch (aNewState) {
       case "allownow":
         permission = Ci.nsIPermissionManager.ALLOW_ACTION;
         expireType = Ci.nsIPermissionManager.EXPIRE_SESSION;
         expireTime = Date.now() + Services.prefs.getIntPref(this.PREF_SESSION_PERSIST_MINUTES) * 60 * 1000;
+        aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_ACTIVE;
         break;
 
       case "allowalways":
@@ -538,17 +542,29 @@ var gPluginHandler = {
         expireType = Ci.nsIPermissionManager.EXPIRE_TIME;
         expireTime = Date.now() +
           Services.prefs.getIntPref(this.PREF_PERSISTENT_DAYS) * 24 * 60 * 60 * 1000;
+        aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_ACTIVE;
         break;
 
       case "block":
         permission = Ci.nsIPermissionManager.PROMPT_ACTION;
         expireType = Ci.nsIPermissionManager.EXPIRE_NEVER;
         expireTime = 0;
+        switch (aPluginInfo.blocklistState) {
+          case Ci.nsIBlocklistService.STATE_VULNERABLE_UPDATE_AVAILABLE:
+            aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_VULNERABLE_UPDATABLE;
+            break;
+          case Ci.nsIBlocklistService.STATE_VULNERABLE_NO_UPDATE:
+            aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_VULNERABLE_NO_UPDATE;
+            break;
+          default:
+            aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_CLICK_TO_PLAY;
+        }
         break;
 
       // In case a plugin has already been allowed in another tab, the "continue allowing" button
       // shouldn't change any permissions but should run the plugin-enablement code below.
       case "continue":
+        aPluginInfo.fallbackType = Ci.nsIObjectLoadingContent.PLUGIN_ACTIVE;
         break;
 
       default:
