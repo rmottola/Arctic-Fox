@@ -2134,7 +2134,7 @@ HttpBaseChannel::AddCookiesToRequest()
   }
 
   bool useCookieService =
-    (XRE_GetProcessType() == GoannaProcessType_Default);
+    (XRE_GetProcessType() == GeckoProcessType_Default);
   nsXPIDLCString cookie;
   if (useCookieService) {
     nsICookieService *cs = gHttpHandler->GetCookieService();

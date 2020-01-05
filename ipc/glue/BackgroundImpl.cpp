@@ -9,7 +9,7 @@
 #include "BackgroundParentImpl.h"
 #include "base/process_util.h"
 #include "FileDescriptor.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "InputStreamUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
@@ -73,7 +73,7 @@ bool
 IsMainProcess()
 {
   static const bool isMainProcess =
-    XRE_GetProcessType() == GoannaProcessType_Default;
+    XRE_GetProcessType() == GeckoProcessType_Default;
   return isMainProcess;
 }
 

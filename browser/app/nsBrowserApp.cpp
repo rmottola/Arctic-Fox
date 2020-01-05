@@ -413,15 +413,6 @@ int main(int argc, char* argv[])
   TriggerQuirks();
 #endif
 
-  int gotCounters;
-#if defined(XP_UNIX)
-  struct rusage initialRUsage;
-  gotCounters = !getrusage(RUSAGE_SELF, &initialRUsage);
-#elif defined(XP_WIN)
-  IO_COUNTERS ioCounters;
-  gotCounters = GetProcessIoCounters(GetCurrentProcess(), &ioCounters);
-#endif
-
   nsIFile *xreDirectory;
 
   nsresult rv = InitXPCOMGlue(argv[0], &xreDirectory);

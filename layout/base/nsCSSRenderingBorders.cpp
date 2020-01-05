@@ -14,7 +14,7 @@
 #include "nsLayoutUtils.h"
 #include "nsStyleConsts.h"
 #include "nsCSSColorUtils.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsExpirationTracker.h"
 #include "RoundedRect.h"
 #include "nsClassHashtable.h"

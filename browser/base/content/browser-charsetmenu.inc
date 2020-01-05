@@ -2,61 +2,18 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#filter substitution
-
-#expand <menu id="__ID_PREFIX__charsetMenu"
+<menu id="charsetMenu"
     label="&charsetMenu.label;"
 #ifndef OMIT_ACCESSKEYS
     accesskey="&charsetMenu.accesskey;"
 #endif
-    oncommand="MultiplexHandler(event)"
+    oncommand="BrowserSetForcedCharacterSet(event.target.getAttribute('charset'));"
 #ifdef OMIT_ACCESSKEYS
-#expand    onpopupshowing="CharsetMenu.build(event, '__ID_PREFIX__');"
+    onpopupshowing="CharsetMenu.build(event.target, false);"
 #else
-#expand    onpopupshowing="CharsetMenu.build(event, '__ID_PREFIX__', true);"
+    onpopupshowing="CharsetMenu.build(event.target);"
 #endif
-    onpopupshown="UpdateMenus(event);">
+    onpopupshown="UpdateCurrentCharset(this);">
   <menupopup>
-    <menu label="&charsetMenuAutodet.label;"
-#ifndef OMIT_ACCESSKEYS
-          accesskey="&charsetMenuAutodet.accesskey;"
-#endif
-        >
-      <menupopup>
-        <menuitem type="radio"
-                  name="detectorGroup"
-#expand           id="__ID_PREFIX__chardet.off"
-                  label="&charsetMenuAutodet.off.label;"
-#ifndef OMIT_ACCESSKEYS
-                  accesskey="&charsetMenuAutodet.off.accesskey;"
-#endif
-                  />
-        <menuitem type="radio"
-                  name="detectorGroup"
-#expand           id="__ID_PREFIX__chardet.ja_parallel_state_machine"
-                  label="&charsetMenuAutodet.ja.label;"
-#ifndef OMIT_ACCESSKEYS
-                  accesskey="&charsetMenuAutodet.ja.accesskey;"
-#endif
-                  />
-        <menuitem type="radio"
-                  name="detectorGroup"
-#expand           id="__ID_PREFIX__chardet.ruprob"
-                  label="&charsetMenuAutodet.ru.label;"
-#ifndef OMIT_ACCESSKEYS
-                  accesskey="&charsetMenuAutodet.ru.accesskey;"
-#endif
-                  />
-        <menuitem type="radio"
-                  name="detectorGroup"
-#expand           id="__ID_PREFIX__chardet.ukprob"
-                  label="&charsetMenuAutodet.uk.label;"
-#ifndef OMIT_ACCESSKEYS
-                  accesskey="&charsetMenuAutodet.uk.accesskey;"
-#endif
-                  />
-      </menupopup>
-    </menu>
-    <menuseparator/>
   </menupopup>
 </menu>

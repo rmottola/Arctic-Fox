@@ -10,7 +10,7 @@
 #include "GMPAudioDecoderProxy.h"
 #include "MediaDataDecoderProxy.h"
 #include "PlatformDecoderModule.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 
 namespace mozilla {
 
@@ -82,7 +82,7 @@ protected:
 private:
   const AudioInfo& mConfig;
   MediaDataDecoderCallbackProxy* mCallback;
-  nsCOMPtr<mozIGoannaMediaPluginService> mMPS;
+  nsCOMPtr<mozIGeckoMediaPluginService> mMPS;
   GMPAudioDecoderProxy* mGMP;
   nsAutoPtr<AudioCallbackAdapter> mAdapter;
 };

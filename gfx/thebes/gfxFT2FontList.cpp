@@ -266,12 +266,12 @@ FT2FontEntry::CreateFontEntry(const nsAString& aFontName,
         FT_New_Memory_Face(gfxToolkitPlatform::GetPlatform()->GetFTLibrary(),
                            aFontData, aLength, 0, &face);
     if (error != FT_Err_Ok) {
-        NS_Free((void*)aFontData);
+        free((void*)aFontData);
         return nullptr;
     }
     if (FT_Err_Ok != FT_Select_Charmap(face, FT_ENCODING_UNICODE)) {
         FT_Done_Face(face);
-        NS_Free((void*)aFontData);
+        free((void*)aFontData);
         return nullptr;
     }
     // Create our FT2FontEntry, which inherits the name of the userfont entry
@@ -299,7 +299,7 @@ public:
     {
         FT_Done_Face(mFace);
         if (mFontData) {
-            NS_Free((void*)mFontData);
+            free((void*)mFontData);
         }
     }
 
@@ -631,7 +631,7 @@ public:
 
         PL_DHashTableInit(&mMap, &mOps, sizeof(FNCMapEntry), 0);
 
-        MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default,
+        MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default,
                    "StartupCacheFontNameCache should only be used in chrome "
                    "process");
         mCache = mozilla::scache::StartupCache::GetSingleton();
@@ -1165,7 +1165,7 @@ gfxFT2FontList::FindFonts()
     mCodepointsWithNoFonts.SetRange(0,0x1f);     // C0 controls
     mCodepointsWithNoFonts.SetRange(0x7f,0x9f);  // C1 controls
 
-    if (XRE_GetProcessType() != GoannaProcessType_Default) {
+    if (XRE_GetProcessType() != GeckoProcessType_Default) {
         // Content process: ask the Chrome process to give us the list
         InfallibleTArray<FontListEntry> fonts;
         mozilla::dom::ContentChild::GetSingleton()->SendReadFontList(&fonts);

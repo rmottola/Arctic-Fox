@@ -31,7 +31,7 @@
 #include "nsNPAPIPlugin.h"
 #include "nsPrintfCString.h"
 #include "prsystem.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsPluginTags.h"
 #include "nsUnicharUtils.h"
 
@@ -255,7 +255,7 @@ bool PluginModuleMapping::sIsLoadModuleOnStack = false;
 void
 mozilla::plugins::TerminatePlugin(uint32_t aPluginId)
 {
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     nsRefPtr<nsPluginHost> host = nsPluginHost::GetInst();
     nsPluginTag* pluginTag = host->PluginWithId(aPluginId);
@@ -274,7 +274,7 @@ PluginModuleContentParent::LoadModule(uint32_t aPluginId)
     PluginModuleMapping::NotifyLoadingModule loadingModule;
     nsAutoPtr<PluginModuleMapping> mapping(new PluginModuleMapping(aPluginId));
 
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Content);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
 
     /*
      * We send a LoadPlugin message to the chrome process using an intr

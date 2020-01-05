@@ -24,7 +24,7 @@
 
 #include "nsXULAppAPI.h"
 #define IS_CHILD_PROCESS() \
-    (GoannaProcessType_Default != XRE_GetProcessType())
+    (GeckoProcessType_Default != XRE_GetProcessType())
 
 using namespace mozilla;
 using namespace mozilla::dom;

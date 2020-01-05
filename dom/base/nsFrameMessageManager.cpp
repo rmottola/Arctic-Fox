@@ -827,7 +827,7 @@ nsFrameMessageManager::Dump(const nsAString& aStr)
 NS_IMETHODIMP
 nsFrameMessageManager::PrivateNoteIntentionalCrash()
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     mozilla::NoteIntentionalCrash("tab");
     return NS_OK;
   } else {
@@ -1439,7 +1439,7 @@ MessageManagerReporter::CollectReports(nsIMemoryReporterCallback* aCb,
 {
   nsresult rv;
 
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     nsCOMPtr<nsIMessageBroadcaster> globalmm =
       do_GetService("@mozilla.org/globalmessagemanager;1");
     if (globalmm) {
@@ -1475,7 +1475,7 @@ MessageManagerReporter::CollectReports(nsIMemoryReporterCallback* aCb,
 nsresult
 NS_NewGlobalMessageManager(nsIMessageBroadcaster** aResult)
 {
-  NS_ENSURE_TRUE(XRE_GetProcessType() == GoannaProcessType_Default,
+  NS_ENSURE_TRUE(XRE_GetProcessType() == GeckoProcessType_Default,
                  NS_ERROR_NOT_AVAILABLE);
   nsFrameMessageManager* mm = new nsFrameMessageManager(nullptr,
                                                         nullptr,
@@ -1994,13 +1994,13 @@ NS_NewParentProcessMessageManager(nsIMessageBroadcaster** aResult)
                                                                  nullptr,
                                                                  MM_CHROME | MM_PROCESSMANAGER | MM_BROADCASTER);
   nsFrameMessageManager::sParentProcessManager = mm;
-  nsFrameMessageManager::NewProcessMessageManager(nullptr); // Create same process message manager.
+  nsFrameMessageManager::NewProcessMessageManager(false); // Create same process message manager.
   return CallQueryInterface(mm, aResult);
 }
 
 
 nsFrameMessageManager*
-nsFrameMessageManager::NewProcessMessageManager(mozilla::dom::nsIContentParent* aProcess)
+nsFrameMessageManager::NewProcessMessageManager(bool aIsRemote)
 {
   if (!nsFrameMessageManager::sParentProcessManager) {
      nsCOMPtr<nsIMessageBroadcaster> dummy =
@@ -2010,8 +2010,10 @@ nsFrameMessageManager::NewProcessMessageManager(mozilla::dom::nsIContentParent* 
   MOZ_ASSERT(nsFrameMessageManager::sParentProcessManager,
              "parent process manager not created");
   nsFrameMessageManager* mm;
-  if (aProcess) {
-    mm = new nsFrameMessageManager(aProcess,
+  if (aIsRemote) {
+    // Callback is set in ContentParent::InitInternal so that the process has
+    // already started when we send pending scripts.
+    mm = new nsFrameMessageManager(nullptr,
                                    nsFrameMessageManager::sParentProcessManager,
                                    MM_CHROME | MM_PROCESSMANAGER);
   } else {
@@ -2030,7 +2032,7 @@ NS_NewChildProcessMessageManager(nsISyncMessageSender** aResult)
                "Re-creating sChildProcessManager");
 
   MessageManagerCallback* cb;
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     cb = new SameChildProcessMessageManagerCallback();
   } else {
     cb = new ChildProcessMessageManagerCallback();

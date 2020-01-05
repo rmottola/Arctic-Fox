@@ -276,7 +276,7 @@ nsIOService::InitializeNetworkLinkService()
     }
 
     // go into managed mode if we can, and chrome process
-    if (XRE_GetProcessType() == GoannaProcessType_Default)
+    if (XRE_GetProcessType() == GeckoProcessType_Default)
     {
         mNetworkLinkService = do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID, &rv);
     }
@@ -869,7 +869,7 @@ nsIOService::SetOffline(bool offline)
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
-    if (XRE_GetProcessType() == GoannaProcessType_Default) {
+    if (XRE_GetProcessType() == GeckoProcessType_Default) {
         if (observerService) {
             (void)observerService->NotifyObservers(nullptr,
                 NS_IPC_IOSERVICE_SET_OFFLINE_TOPIC, offline ? 

@@ -60,7 +60,7 @@
 #include "nsIFileChannel.h"
 #include "mozilla/Telemetry.h"
 #include "jsfriendapi.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/dom/EncodingUtils.h"
 #include "nsIUnicodeDecoder.h"
 #include "mozilla/dom/XMLHttpRequestBinding.h"
@@ -3022,7 +3022,7 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
         if (scheme.LowerCaseEqualsLiteral("app") ||
             scheme.LowerCaseEqualsLiteral("jar")) {
           mIsMappedArrayBuffer = true;
-          if (XRE_GetProcessType() != GoannaProcessType_Default) {
+          if (XRE_GetProcessType() != GeckoProcessType_Default) {
             nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(mChannel);
             // For memory mapping from child process, we need to get file
             // descriptor of the JAR file opened remotely on the parent proess.

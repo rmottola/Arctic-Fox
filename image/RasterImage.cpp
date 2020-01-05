@@ -50,7 +50,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/gfx/Scale.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "gfx2DGlue.h"
 #include "gfxPrefs.h"
 #include <algorithm>

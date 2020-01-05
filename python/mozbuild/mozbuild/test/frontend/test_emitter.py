@@ -213,6 +213,19 @@ class TestEmitterBasic(unittest.TestCase):
             self.assertEqual(o.method, expected_method)
             self.assertEqual(o.inputs, [])
 
+    def test_generated_files_absolute_script(self):
+        reader = self.reader('generated-files-absolute-script')
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+
+        o = objs[0]
+        self.assertIsInstance(o, GeneratedFile)
+        self.assertEqual(o.output, 'bar.c')
+        self.assertRegexpMatches(o.script, 'script.py$')
+        self.assertEqual(o.method, 'make_bar')
+        self.assertEqual(o.inputs, [])
+
     def test_generated_files_no_script(self):
         reader = self.reader('generated-files-no-script')
         with self.assertRaisesRegexp(SandboxValidationError,

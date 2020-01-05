@@ -19,7 +19,7 @@
 #include "nsIPresShell.h"
 #include "nsPresContext.h"
 #include "mozilla/StartupTimeline.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsRefreshDriver.h"
 #include "mozilla/Preferences.h"
 #include "nsContentUtils.h" // for nsAutoScriptBlocker

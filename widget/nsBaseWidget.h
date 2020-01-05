@@ -36,7 +36,7 @@ class BasicLayerManager;
 class CompositorChild;
 class CompositorParent;
 class APZCTreeManager;
-class GoannaContentController;
+class GeckoContentController;
 class APZEventState;
 struct ScrollableLayerGuid;
 struct SetTargetAPZCCallback;
@@ -91,7 +91,7 @@ protected:
   typedef mozilla::layers::CompositorChild CompositorChild;
   typedef mozilla::layers::CompositorParent CompositorParent;
   typedef mozilla::layers::APZCTreeManager APZCTreeManager;
-  typedef mozilla::layers::GoannaContentController GoannaContentController;
+  typedef mozilla::layers::GeckoContentController GeckoContentController;
   typedef mozilla::layers::ScrollableLayerGuid ScrollableLayerGuid;
   typedef mozilla::layers::APZEventState APZEventState;
   typedef mozilla::layers::SetTargetAPZCCallback SetTargetAPZCCallback;
@@ -327,7 +327,7 @@ protected:
                              nsWidgetInitData *aInitData);
 
   virtual void ConfigureAPZCTreeManager();
-  virtual already_AddRefed<GoannaContentController> CreateRootContentController();
+  virtual already_AddRefed<GeckoContentController> CreateRootContentController();
 
   // Dispatch an event that has already been routed through APZ.
   nsEventStatus ProcessUntransformedAPZEvent(mozilla::WidgetInputEvent* aEvent,

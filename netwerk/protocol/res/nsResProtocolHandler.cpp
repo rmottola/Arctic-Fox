@@ -324,7 +324,7 @@ nsResProtocolHandler::AllowPort(int32_t port, const char *scheme, bool *_retval)
 static void
 SendResourceSubstitution(const nsACString& root, nsIURI* baseURI)
 {
-    if (GoannaProcessType_Content == XRE_GetProcessType()) {
+    if (GeckoProcessType_Content == XRE_GetProcessType()) {
         return;
     }
 

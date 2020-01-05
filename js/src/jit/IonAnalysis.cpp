@@ -358,6 +358,9 @@ MaybeFoldAndOrBlock(MIRGraph& graph, MBasicBlock* initialBlock)
     if (branchResult != branchBlock->peek(-1) || initialResult != initialBlock->peek(-1))
         return;
 
+    if (initialResult != initialTest->input())
+        return;
+
     // OK, we found the desired pattern, now transform the graph.
 
     // Remove the phi and its inputs from testBlock.

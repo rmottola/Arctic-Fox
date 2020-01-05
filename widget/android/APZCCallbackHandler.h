@@ -6,7 +6,7 @@
 #ifndef APZCCallbackHandler_h__
 #define APZCCallbackHandler_h__
 
-#include "mozilla/layers/GoannaContentController.h"
+#include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/TimeStamp.h"
 #include "GeneratedJNIWrappers.h"
@@ -17,7 +17,7 @@ namespace mozilla {
 namespace widget {
 namespace android {
 
-class APZCCallbackHandler final : public mozilla::layers::GoannaContentController
+class APZCCallbackHandler final : public mozilla::layers::GeckoContentController
 {
 private:
     static StaticRefPtr<APZCCallbackHandler> sInstance;
@@ -41,7 +41,7 @@ public:
     NativePanZoomController::LocalRef SetNativePanZoomController(NativePanZoomController::Param obj);
     void NotifyDefaultPrevented(uint64_t aInputBlockId, bool aDefaultPrevented);
 
-public: // GoannaContentController methods
+public: // GeckoContentController methods
     void RequestContentRepaint(const mozilla::layers::FrameMetrics& aFrameMetrics) override;
     void RequestFlingSnap(const mozilla::layers::FrameMetrics::ViewID& aScrollId,
                           const mozilla::CSSPoint& aDestination) override;

@@ -46,7 +46,7 @@ ServiceWorkerRegistrar::Initialize()
 {
   MOZ_ASSERT(!gServiceWorkerRegistrar);
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     return;
   }
 
@@ -68,7 +68,7 @@ ServiceWorkerRegistrar::Initialize()
 /* static */ already_AddRefed<ServiceWorkerRegistrar>
 ServiceWorkerRegistrar::Get()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   MOZ_ASSERT(gServiceWorkerRegistrar);
   nsRefPtr<ServiceWorkerRegistrar> service = gServiceWorkerRegistrar.get();

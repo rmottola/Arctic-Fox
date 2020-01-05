@@ -49,7 +49,7 @@ static bool test_basic_1()
         NS_ERROR("unexpected result");
         return false;
       }
-    NS_Free(clone);
+    free(clone);
 
     nsCStringContainer temp;
     NS_CStringContainerInit(temp);
@@ -108,7 +108,7 @@ static bool test_basic_2()
         NS_ERROR("unexpected result");
         return false;
       }
-    NS_Free(clone);
+    free(clone);
 
     nsStringContainer temp;
     NS_StringContainerInit(temp);

@@ -16,7 +16,7 @@
 #include "nsContainerFrame.h"
 #include "mozilla/SplayTree.h"
 #include "mozilla/RestyleLogging.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #if defined(MOZ_ENABLE_PROFILER_SPS)
 #include "ProfilerBacktrace.h"

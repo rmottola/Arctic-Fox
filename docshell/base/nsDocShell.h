@@ -21,7 +21,7 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/TimeStamp.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 #include "jsapi.h"
 

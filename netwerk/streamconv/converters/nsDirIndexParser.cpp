@@ -249,7 +249,7 @@ nsDirIndexParser::ParseData(nsIDirIndex *aIdx, char* aDataStr, int32_t aLineLen)
               aIdx->SetDescription(result);
             success = true;
           }
-          NS_Free(result);
+          free(result);
         } else {
           NS_WARNING("UnEscapeAndConvert error");
         }

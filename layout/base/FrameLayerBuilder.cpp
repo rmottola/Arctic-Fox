@@ -28,7 +28,7 @@
 #include "nsImageFrame.h"
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/gfx/Tools.h"
 #include "mozilla/gfx/2D.h"
 #include "gfxPrefs.h"

@@ -52,7 +52,7 @@
 #include "nsCocoaFeatures.h"
 #endif
 
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
 #include "libdisplay/GonkDisplay.h"     // for GonkDisplay

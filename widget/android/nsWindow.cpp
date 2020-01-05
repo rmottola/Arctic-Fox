@@ -58,7 +58,7 @@ using mozilla::unused;
 #include "imgIEncoder.h"
 
 #include "nsString.h"
-#include "GoannaProfiler.h" // For PROFILER_LABEL
+#include "GeckoProfiler.h" // For PROFILER_LABEL
 #include "nsIXULRuntime.h"
 
 using namespace mozilla;
@@ -808,7 +808,7 @@ nsWindow::OnGlobalAndroidEvent(AndroidGoannaEvent *ae)
             gAndroidScreenBounds.width = newScreenWidth;
             gAndroidScreenBounds.height = newScreenHeight;
 
-            if (XRE_GetProcessType() != GoannaProcessType_Default &&
+            if (XRE_GetProcessType() != GeckoProcessType_Default &&
                 !Preferences::GetBool("browser.tabs.remote.desktopbehavior", false)) {
                 break;
             }
@@ -991,7 +991,7 @@ nsWindow::InitEvent(WidgetGUIEvent& event, nsIntPoint* aPoint)
 gfxIntSize
 nsWindow::GetAndroidScreenBounds()
 {
-    if (XRE_GetProcessType() == GoannaProcessType_Content) {
+    if (XRE_GetProcessType() == GeckoProcessType_Content) {
         return ContentChild::GetSingleton()->GetScreenSize();
     }
     return gAndroidScreenBounds;
@@ -2483,7 +2483,7 @@ nsWindow::ConfigureAPZCTreeManager()
     }
 }
 
-already_AddRefed<GoannaContentController>
+already_AddRefed<GeckoContentController>
 nsWindow::CreateRootContentController()
 {
     nsRefPtr<widget::android::APZCCallbackHandler> controller =

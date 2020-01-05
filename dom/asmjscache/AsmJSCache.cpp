@@ -62,7 +62,7 @@ namespace {
 bool
 IsMainProcess()
 {
-  return XRE_GetProcessType() == GoannaProcessType_Default;
+  return XRE_GetProcessType() == GeckoProcessType_Default;
 }
 
 // Anything smaller should compile fast enough that caching will just add

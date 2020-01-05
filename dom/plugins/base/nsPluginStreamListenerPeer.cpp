@@ -29,7 +29,7 @@
 #include "nsContentUtils.h"
 #include "nsNetUtil.h"
 #include "nsPluginNativeWindow.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsPluginInstanceOwner.h"
 #include "nsDataHashtable.h"
 

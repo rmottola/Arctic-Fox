@@ -36,7 +36,7 @@
 #include "nsIMobileMessageDatabaseService.h"
 #include "nsPluginInstanceOwner.h"
 #include "AndroidSurfaceTexture.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsMemoryPressure.h"
 
 using namespace mozilla;

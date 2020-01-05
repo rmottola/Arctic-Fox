@@ -8,7 +8,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/layers/AsyncCompositionManager.h" // for ViewTransform
-#include "mozilla/layers/GoannaContentController.h"
+#include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/layers/CompositorParent.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/LayerMetricsWrapper.h"
@@ -58,7 +58,7 @@ private:
     &(gfxPrefs::Set##prefBase), \
     prefValue)
 
-class MockContentController : public GoannaContentController {
+class MockContentController : public GeckoContentController {
 public:
   MOCK_METHOD1(RequestContentRepaint, void(const FrameMetrics&));
   MOCK_METHOD2(RequestFlingSnap, void(const FrameMetrics::ViewID& aScrollId, const mozilla::CSSPoint& aDestination));
@@ -129,12 +129,12 @@ public:
   }
 
 protected:
-  AsyncPanZoomController* MakeAPZCInstance(uint64_t aLayersId, GoannaContentController* aController) override;
+  AsyncPanZoomController* MakeAPZCInstance(uint64_t aLayersId, GeckoContentController* aController) override;
 };
 
 class TestAsyncPanZoomController : public AsyncPanZoomController {
 public:
-  TestAsyncPanZoomController(uint64_t aLayersId, GoannaContentController* aMcc,
+  TestAsyncPanZoomController(uint64_t aLayersId, GeckoContentController* aMcc,
                              TestAPZCTreeManager* aTreeManager,
                              GestureBehavior aBehavior = DEFAULT_GESTURES)
     : AsyncPanZoomController(aLayersId, aTreeManager, aTreeManager->GetInputQueue(), aMcc, aBehavior)
@@ -216,7 +216,7 @@ private:
 };
 
 AsyncPanZoomController*
-TestAPZCTreeManager::MakeAPZCInstance(uint64_t aLayersId, GoannaContentController* aController)
+TestAPZCTreeManager::MakeAPZCInstance(uint64_t aLayersId, GeckoContentController* aController)
 {
   return new TestAsyncPanZoomController(aLayersId, aController, this, AsyncPanZoomController::USE_GESTURE_DETECTOR);
 }
@@ -1068,17 +1068,17 @@ TEST_F(APZCBasicTester, PanningTransformNotifications) {
   {
     InSequence s;
     EXPECT_CALL(check, Call("Simple pan"));
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::StartTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::TransformBegin,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::StartPanning,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::EndTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::TransformEnd,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformBegin,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartPanning,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::EndTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformEnd,_)).Times(1);
     EXPECT_CALL(check, Call("Complex pan"));
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::StartTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::TransformBegin,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::StartPanning,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::EndTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GoannaContentController::APZStateChange::TransformEnd,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformBegin,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartPanning,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::EndTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformEnd,_)).Times(1);
     EXPECT_CALL(check, Call("Done"));
   }
 

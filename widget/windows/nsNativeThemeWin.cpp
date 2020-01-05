@@ -919,7 +919,7 @@ nsNativeThemeWin::GetThemePartAndState(nsIFrame* aFrame, uint8_t aWidgetType,
         /* XUL textboxes don't get focused themselves, because they have child
          * html:input.. but we can check the XUL focused attributes on them
          */
-        if (content && content->IsXUL() && IsFocused(aFrame))
+        if (content && content->IsXULElement() && IsFocused(aFrame))
           aState = TFS_EDITBORDER_FOCUSED;
         else if (eventState.HasAtLeastOneOfStates(NS_EVENT_STATE_ACTIVE | NS_EVENT_STATE_FOCUS))
           aState = TFS_EDITBORDER_FOCUSED;

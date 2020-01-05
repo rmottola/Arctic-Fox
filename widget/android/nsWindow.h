@@ -173,7 +173,7 @@ protected:
     void FlushIMEChanges();
 
     void ConfigureAPZCTreeManager() override;
-    already_AddRefed<GoannaContentController> CreateRootContentController() override;
+    already_AddRefed<GeckoContentController> CreateRootContentController() override;
 
     // Call this function when the users activity is the direct cause of an
     // event (like a keypress or mouse click).

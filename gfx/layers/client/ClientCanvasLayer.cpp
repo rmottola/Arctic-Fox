@@ -6,7 +6,7 @@
 #include "ClientCanvasLayer.h"
 #include "GLContext.h"                  // for GLContext
 #include "GLScreenBuffer.h"             // for GLScreenBuffer
-#include "GoannaProfiler.h"              // for PROFILER_LABEL
+#include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
 #include "SharedSurfaceGL.h"            // for SurfaceFactory_GLTexture, etc
 #include "ClientLayerManager.h"         // for ClientLayerManager, etc
@@ -87,7 +87,7 @@ ClientCanvasLayer::Initialize(const Data& aData)
                                                        flags,
                                                        ClientManager()->AsShadowForwarder());
 #else
-          bool isCrossProcess = !(XRE_GetProcessType() == GoannaProcessType_Default);
+          bool isCrossProcess = !(XRE_GetProcessType() == GeckoProcessType_Default);
           if (!isCrossProcess) {
             // [Basic/OGL Layers, OMTC] WebGL layer init.
             factory = SurfaceFactory_EGLImage::Create(mGLContext, caps);

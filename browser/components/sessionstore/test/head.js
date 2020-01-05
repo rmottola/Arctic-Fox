@@ -6,6 +6,7 @@ const TAB_STATE_NEEDS_RESTORE = 1;
 const TAB_STATE_RESTORING = 2;
 
 const ROOT = getRootDirectory(gTestPath);
+const HTTPROOT = ROOT.replace("chrome://mochitests/content/", "http://example.com/");
 const FRAME_SCRIPTS = [
   ROOT + "content.js",
   ROOT + "content-forms.js"
@@ -194,6 +195,10 @@ function waitForTabState(aTab, aState, aCallback) {
   ss.setTabState(aTab, JSON.stringify(aState));
 }
 
+function promiseTabState(tab, state) {
+  return new Promise(resolve => waitForTabState(tab, state, resolve));
+}
+
 /**
  * Wait for a content -> chrome message.
  */
@@ -250,7 +255,7 @@ function waitForTopic(aTopic, aTimeout, aCallback) {
  * Wait until session restore has finished collecting its data and is
  * has written that data ("sessionstore-state-write-complete").
  *
- * @param {function} aCallback If sessionstore-state-write is sent
+ * @param {function} aCallback If sessionstore-state-write-complete is sent
  * within buffering interval + 100 ms, the callback is passed |true|,
  * otherwise, it is passed |false|.
  */

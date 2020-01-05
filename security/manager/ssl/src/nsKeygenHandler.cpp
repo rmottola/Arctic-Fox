@@ -270,7 +270,7 @@ nsKeygenFormProcessor::~nsKeygenFormProcessor()
 nsresult
 nsKeygenFormProcessor::Create(nsISupports* aOuter, const nsIID& aIID, void* *aResult)
 {
-  if (GoannaProcessType_Content == XRE_GetProcessType()) {
+  if (GeckoProcessType_Content == XRE_GetProcessType()) {
     nsCOMPtr<nsISupports> contentProcessor = new nsKeygenFormProcessorContent();
     return contentProcessor->QueryInterface(aIID, aResult);
   }

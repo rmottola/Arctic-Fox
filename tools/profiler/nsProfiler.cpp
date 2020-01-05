@@ -5,7 +5,7 @@
 
 #include <string>
 #include <sstream>
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "nsProfiler.h"
 #include "nsMemory.h"
 #include "nsString.h"

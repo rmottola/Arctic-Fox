@@ -7,6 +7,7 @@
 #include "vm/SavedStacks.h"
 
 #include "mozilla/Attributes.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Maybe.h"
 
 #include <math.h>
@@ -31,6 +32,7 @@
 #include "vm/NativeObject-inl.h"
 
 using mozilla::AddToHash;
+using mozilla::DebugOnly;
 using mozilla::HashString;
 using mozilla::Maybe;
 

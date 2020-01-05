@@ -203,7 +203,9 @@ class MIRGenerator
     ObjectVector nurseryObjects_;
 
     Label *outOfBoundsLabel_;
+#if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
     bool usesSignalHandlersForAsmJSOOB_;
+#endif
 
     void addAbortedPreliminaryGroup(ObjectGroup *group);
 
@@ -238,7 +240,7 @@ class MIRGenerator
         // handlers to catch errors, and if it's not proven to be within bounds.
         // We use signal-handlers on x64, but on x86 there isn't enough address
         // space for a guard region.
-#ifdef JS_CODEGEN_X64
+#if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
         if (usesSignalHandlersForAsmJSOOB_)
             return false;
 #endif

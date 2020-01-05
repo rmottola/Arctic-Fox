@@ -8,7 +8,7 @@
 #define TimelineMarker_h__
 
 #include "nsString.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 #include "nsContentUtils.h"
 #include "jsapi.h"

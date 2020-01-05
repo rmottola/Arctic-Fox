@@ -88,7 +88,7 @@
 #include "nsDocShellEnumerator.h"
 #include "nsSHistory.h"
 #include "nsDocShellEditorData.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 // Helper Classes
 #include "nsError.h"
@@ -817,7 +817,7 @@ IncreasePrivateDocShellCount()
 {
   gNumberOfPrivateDocShells++;
   if (gNumberOfPrivateDocShells > 1 ||
-      XRE_GetProcessType() != GoannaProcessType_Content) {
+      XRE_GetProcessType() != GeckoProcessType_Content) {
     return;
   }
 
@@ -831,7 +831,7 @@ DecreasePrivateDocShellCount()
   MOZ_ASSERT(gNumberOfPrivateDocShells > 0);
   gNumberOfPrivateDocShells--;
   if (!gNumberOfPrivateDocShells) {
-    if (XRE_GetProcessType() == GoannaProcessType_Content) {
+    if (XRE_GetProcessType() == GeckoProcessType_Content) {
       dom::ContentChild* cc = dom::ContentChild::GetSingleton();
       cc->SendPrivateDocShellsExist(false);
       return;
@@ -5054,7 +5054,7 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
           mInPrivateBrowsing ? nsISocketProvider::NO_PERMANENT_STORAGE : 0;
         bool isStsHost = false;
         bool isPinnedHost = false;
-        if (XRE_GetProcessType() == GoannaProcessType_Default) {
+        if (XRE_GetProcessType() == GeckoProcessType_Default) {
           nsCOMPtr<nsISiteSecurityService> sss =
             do_GetService(NS_SSSERVICE_CONTRACTID, &rv);
           NS_ENSURE_SUCCESS(rv, rv);
@@ -7499,7 +7499,7 @@ nsDocShell::OnRedirectStateChange(nsIChannel* aOldChannel,
   nsCOMPtr<nsIApplicationCacheChannel> appCacheChannel =
     do_QueryInterface(aNewChannel);
   if (appCacheChannel) {
-    if (GoannaProcessType_Default != XRE_GetProcessType()) {
+    if (GeckoProcessType_Default != XRE_GetProcessType()) {
       // Permission will be checked in the parent process.
       appCacheChannel->SetChooseApplicationCache(true);
     } else {
@@ -10743,7 +10743,7 @@ nsDocShell::DoURILoad(nsIURI* aURI,
 
     // Loads with the correct permissions should check for a matching
     // application cache.
-    if (GoannaProcessType_Default != XRE_GetProcessType()) {
+    if (GeckoProcessType_Default != XRE_GetProcessType()) {
       // Permission will be checked in the parent process
       appCacheChannel->SetChooseApplicationCache(true);
     } else {
@@ -14115,7 +14115,7 @@ nsDocShell::MaybeNotifyKeywordSearchLoading(const nsString& aProvider,
     return;
   }
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     dom::ContentChild* contentChild = dom::ContentChild::GetSingleton();
     if (contentChild) {
       contentChild->SendNotifyKeywordSearchLoading(aProvider, aKeyword);

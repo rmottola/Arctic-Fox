@@ -11,7 +11,7 @@
 #include "FrameMetrics.h"     // for ScrollableLayerGuid
 #include "Units.h"
 #include "mozilla/EventForwards.h"
-#include "mozilla/layers/GoannaContentController.h"  // for APZStateChange
+#include "mozilla/layers/GeckoContentController.h"  // for APZStateChange
 #include "nsCOMPtr.h"
 #include "nsISupportsImpl.h"  // for NS_INLINE_DECL_REFCOUNTING
 #include "nsIWeakReferenceUtils.h"  // for nsWeakPtr
@@ -41,7 +41,7 @@ protected:
  * gestures and sending APZ notifications.
  */
 class APZEventState {
-  typedef GoannaContentController::APZStateChange APZStateChange;
+  typedef GeckoContentController::APZStateChange APZStateChange;
   typedef FrameMetrics::ViewID ViewID;
 public:
   APZEventState(nsIWidget* aWidget,

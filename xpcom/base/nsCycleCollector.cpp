@@ -178,7 +178,7 @@
 #include "nsIFile.h"
 #include "nsDumpUtils.h"
 #include "xpcpublic.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -260,13 +260,13 @@ struct nsCycleCollectorParams
     bool processLogging = true;
     if (logProcessEnv && !!strcmp(logProcessEnv, "all")) {
       switch (XRE_GetProcessType()) {
-        case GoannaProcessType_Default:
+        case GeckoProcessType_Default:
           processLogging = !strcmp(logProcessEnv, "main");
           break;
-        case GoannaProcessType_Plugin:
+        case GeckoProcessType_Plugin:
           processLogging = !strcmp(logProcessEnv, "plugins");
           break;
-        case GoannaProcessType_Content:
+        case GeckoProcessType_Content:
           processLogging = !strcmp(logProcessEnv, "content");
           break;
         default:
@@ -633,7 +633,7 @@ private:
 
   struct Block
   {
-    // We create and destroy Block using NS_Alloc/NS_Free rather
+    // We create and destroy Block using moz_xmalloc/free rather
     // than new and delete to avoid calling its constructor and
     // destructor.
     Block()
@@ -673,7 +673,7 @@ public:
     Block* b = mBlocks;
     while (b) {
       Block* n = b->mNext;
-      NS_Free(b);
+      free(b);
       b = n;
     }
 
@@ -703,7 +703,7 @@ public:
     PtrInfo* Add(void* aPointer, nsCycleCollectionParticipant* aParticipant)
     {
       if (mNext == mBlockEnd) {
-        Block* block = static_cast<Block*>(NS_Alloc(sizeof(Block)));
+        Block* block = static_cast<Block*>(moz_xmalloc(sizeof(Block)));
         *mNextBlock = block;
         mNext = block->mEntries;
         mBlockEnd = block->mEntries + BlockSize;

@@ -401,7 +401,7 @@ Startup()
   // The hang detector only runs in chrome processes. If you change this,
   // you must also deal with the threadsafety of AnnotateCrashReport in
   // non-chrome processes!
-  if (GoannaProcessType_Default != XRE_GetProcessType()) {
+  if (GeckoProcessType_Default != XRE_GetProcessType()) {
     return;
   }
 
@@ -435,7 +435,7 @@ Startup()
 void
 Shutdown()
 {
-  if (GoannaProcessType_Default != XRE_GetProcessType()) {
+  if (GeckoProcessType_Default != XRE_GetProcessType()) {
     return;
   }
 

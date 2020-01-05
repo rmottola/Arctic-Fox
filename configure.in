@@ -3851,7 +3851,6 @@ MOZ_WEBSPEECH=1
 MOZ_JXR=1
 VPX_AS=
 VPX_ASFLAGS=
-VPX_AS_DASH_C_FLAG=
 VPX_AS_CONVERSION=
 VPX_ASM_SUFFIX=
 VPX_X86_ASM=
@@ -4038,30 +4037,6 @@ fi
 AC_SUBST(MOZ_BING_API_CLIENTID)
 AC_SUBST(MOZ_BING_API_KEY)
 
-# Whether to include optional-but-large font files in the final APK.
-# We want this in mobile/android/confvars.sh, so it goes early.
-MOZ_ARG_DISABLE_BOOL(android-include-fonts,
-[  --disable-android-include-fonts
-                          Disable the inclusion of fonts into the final APK],
-    MOZ_ANDROID_EXCLUDE_FONTS=1)
-
-if test -n "$MOZ_ANDROID_EXCLUDE_FONTS"; then
-    AC_DEFINE(MOZ_ANDROID_EXCLUDE_FONTS)
-fi
-AC_SUBST(MOZ_ANDROID_EXCLUDE_FONTS)
-
-# Whether this APK is destined for resource constrained devices.
-# We want this in mobile/android/confvars.sh, so it goes early.
-MOZ_ARG_ENABLE_BOOL(android-resource-constrained,
-[  --enable-android-resource-constrained
-                          Exclude hi-res images and similar from the final APK],
-    MOZ_ANDROID_RESOURCE_CONSTRAINED=1)
-
-if test -n "$MOZ_ANDROID_RESOURCE_CONSTRAINED"; then
-    AC_DEFINE(MOZ_ANDROID_RESOURCE_CONSTRAINED)
-fi
-AC_SUBST(MOZ_ANDROID_RESOURCE_CONSTRAINED)
-
 # Allow the application to influence configure with a confvars.sh script.
 AC_MSG_CHECKING([if app-specific confvars.sh exists])
 if test -f "${srcdir}/${MOZ_BUILD_APP}/confvars.sh" ; then
@@ -4150,28 +4125,6 @@ WINNT|Darwin|Android)
   ;;
 esac
 
-dnl ========================================================
-dnl Check Android SDK version depending on mobile target.
-dnl ========================================================
-
-if test -z "$gonkdir" ; then
-    # Minimum Android SDK API Level we require.
-    case "$MOZ_BUILD_APP" in
-    mobile/android)
-        android_min_api_level=20
-        case "$target" in
-        *-android*|*-linuxandroid*)
-            :
-            ;;
-        *)
-            AC_MSG_ERROR([You must specify --target=arm-linux-androideabi (or some other valid android target) when building with --enable-application=mobile/android. See https://wiki.mozilla.org/Mobile/Fennec/Android#Setup_Fennec_mozconfig for more information about the necessary options])
-            ;;
-        esac
-        ;;
-    esac
-
-    MOZ_ANDROID_SDK($android_min_api_level)
-fi
 
 dnl ========================================================
 dnl =
@@ -4202,7 +4155,6 @@ MOZ_ARG_HEADER(Toolkit Options)
         -o "$_DEFAULT_TOOLKIT" = "cairo-qt" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-cocoa" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-uikit" \
-        -o "$_DEFAULT_TOOLKIT" = "cairo-android" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-gonk"
     then
         dnl nglayout only supports building with one toolkit,
@@ -5402,7 +5354,6 @@ if test -n "$MOZ_VPX" -a -z "$MOZ_NATIVE_LIBVPX"; then
         dnl These flags are a lie; they're just used to enable the requisite
         dnl opcodes; actual arch detection is done at runtime.
         VPX_ASFLAGS="-march=armv7-a -mfpu=neon"
-        VPX_DASH_C_FLAG="-c"
         VPX_AS_CONVERSION='$(PERL) $(topsrcdir)/media/libvpx/build/make/ads2gas.pl'
         VPX_ASM_SUFFIX="$ASM_SUFFIX"
         VPX_ARM_ASM=1
@@ -8495,8 +8446,7 @@ AC_SUBST(MOZ_OMX_PLUGIN)
 AC_SUBST(MOZ_VPX_ERROR_CONCEALMENT)
 AC_SUBST(MOZ_VPX)
 AC_SUBST(VPX_AS)
-AC_SUBST(VPX_ASFLAGS)
-AC_SUBST(VPX_DASH_C_FLAG)
+AC_SUBST_LIST(VPX_ASFLAGS)
 AC_SUBST(VPX_AS_CONVERSION)
 AC_SUBST(VPX_ASM_SUFFIX)
 AC_SUBST(VPX_X86_ASM)
@@ -8505,7 +8455,7 @@ AC_SUBST(VPX_NEED_OBJ_INT_EXTRACT)
 AC_SUBST(MOZ_INSTRUMENT_EVENT_LOOP)
 AC_SUBST(MOZ_CODE_COVERAGE)
 AC_SUBST(LIBJPEG_TURBO_AS)
-AC_SUBST(LIBJPEG_TURBO_ASFLAGS)
+AC_SUBST_LIST(LIBJPEG_TURBO_ASFLAGS)
 AC_SUBST(LIBJPEG_TURBO_X86_ASM)
 AC_SUBST(LIBJPEG_TURBO_X64_ASM)
 AC_SUBST(LIBJPEG_TURBO_ARM_ASM)

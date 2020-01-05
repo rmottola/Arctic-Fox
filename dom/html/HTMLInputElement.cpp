@@ -1034,7 +1034,7 @@ UploadLastDir::FetchDirectoryAndDisplayPicker(nsIDocument* aDoc,
     new UploadLastDir::ContentPrefCallback(aFilePicker, aFpCallback);
 
 #ifdef MOZ_B2G
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     prefCallback->HandleCompletion(nsIContentPrefCallback2::COMPLETE_ERROR);
     return NS_OK;
   }
@@ -1065,7 +1065,7 @@ UploadLastDir::StoreLastUsedDirectory(nsIDocument* aDoc, nsIFile* aDir)
   }
 
 #ifdef MOZ_B2G
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return NS_OK;
   }
 #endif
@@ -2315,7 +2315,7 @@ HTMLInputElement::MozGetFileNameArray(uint32_t* aLength, char16_t*** aFileNames)
 
   *aLength = array.Length();
   char16_t** ret =
-    static_cast<char16_t**>(NS_Alloc(*aLength * sizeof(char16_t*)));
+    static_cast<char16_t**>(moz_xmalloc(*aLength * sizeof(char16_t*)));
   if (!ret) {
     return NS_ERROR_OUT_OF_MEMORY;
   }

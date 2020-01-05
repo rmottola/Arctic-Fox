@@ -55,7 +55,7 @@
 #include "mozilla/layers/CompositorD3D11.h"
 #include "mozilla/layers/CompositorD3D9.h"
 #endif
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "mozilla/ipc/ProtocolTypes.h"
 #include "mozilla/unused.h"
 #include "mozilla/Hal.h"
@@ -64,7 +64,7 @@
 #include "mozilla/VsyncDispatcher.h"
 
 #ifdef MOZ_WIDGET_GONK
-#include "GoannaTouchDispatcher.h"
+#include "GeckoTouchDispatcher.h"
 #endif
 
 namespace mozilla {
@@ -228,7 +228,7 @@ CompositorVsyncObserver::CompositorVsyncObserver(CompositorParent* aCompositorPa
   MOZ_ASSERT(aWidget != nullptr);
   mCompositorVsyncDispatcher = aWidget->GetCompositorVsyncDispatcher();
 #ifdef MOZ_WIDGET_GONK
-  GoannaTouchDispatcher::SetCompositorVsyncObserver(this);
+  GeckoTouchDispatcher::SetCompositorVsyncObserver(this);
 #endif
 }
 
@@ -366,7 +366,7 @@ void
 CompositorVsyncObserver::DispatchTouchEvents(TimeStamp aVsyncTimestamp)
 {
 #ifdef MOZ_WIDGET_GONK
-  GoannaTouchDispatcher::NotifyVsync(aVsyncTimestamp);
+  GeckoTouchDispatcher::NotifyVsync(aVsyncTimestamp);
 #endif
 }
 
@@ -1350,17 +1350,17 @@ CompositorParent::DeallocateLayerTreeId(uint64_t aId)
 
 static void
 UpdateControllerForLayersId(uint64_t aLayersId,
-                            GoannaContentController* aController)
+                            GeckoContentController* aController)
 {
   // Adopt ref given to us by SetControllerForLayerTree()
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   sIndirectLayerTrees[aLayersId].mController =
-    already_AddRefed<GoannaContentController>(aController);
+    already_AddRefed<GeckoContentController>(aController);
 }
 
 ScopedLayerTreeRegistration::ScopedLayerTreeRegistration(uint64_t aLayersId,
                                                          Layer* aRoot,
-                                                         GoannaContentController* aController)
+                                                         GeckoContentController* aController)
     : mLayersId(aLayersId)
 {
   EnsureLayerTreeMapReady();
@@ -1377,7 +1377,7 @@ ScopedLayerTreeRegistration::~ScopedLayerTreeRegistration()
 
 /*static*/ void
 CompositorParent::SetControllerForLayerTree(uint64_t aLayersId,
-                                            GoannaContentController* aController)
+                                            GeckoContentController* aController)
 {
   // This ref is adopted by UpdateControllerForLayersId().
   aController->AddRef();

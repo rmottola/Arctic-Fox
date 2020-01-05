@@ -10,7 +10,6 @@ EXTRA_JS_MODULES += [ 'promise.js' ]
 
 EXTRA_JS_MODULES += [
     'BrowserNewTabPreloader.jsm',
-    'CharsetMenu.jsm',
     'ContentClick.jsm',
     'E10SUtils.jsm',
     'FormSubmitObserver.jsm',

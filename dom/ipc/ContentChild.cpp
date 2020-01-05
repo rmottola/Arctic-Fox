@@ -15,7 +15,7 @@
 #include "ContentChild.h"
 
 #include "BlobChild.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "TabChild.h"
 
 #include "mozilla/Attributes.h"
@@ -39,7 +39,7 @@
 #include "mozilla/ipc/BackgroundChild.h"
 #include "mozilla/ipc/FileDescriptorSetChild.h"
 #include "mozilla/ipc/FileDescriptorUtils.h"
-#include "mozilla/ipc/GoannaChildProcessHost.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/ipc/TestShellChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/CompositorChild.h"
@@ -2662,7 +2662,7 @@ uint64_t
 NextWindowID()
 {
   uint64_t processID = 0;
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     ContentChild* cc = ContentChild::GetSingleton();
     processID = cc->GetID();
   }

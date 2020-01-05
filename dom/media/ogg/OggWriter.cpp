@@ -4,7 +4,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "OggWriter.h"
 #include "prtime.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #undef LOG
 #ifdef MOZ_WIDGET_GONK

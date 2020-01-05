@@ -46,7 +46,7 @@ nsClipboard::SetData(nsITransferable *aTransferable,
   nsAutoString buffer;
   supportsString->GetData(buffer);
 
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     mClipboard = buffer;
   } else {
     bool isPrivateData = false;
@@ -66,7 +66,7 @@ nsClipboard::GetData(nsITransferable *aTransferable, int32_t aWhichClipboard)
   }
 
   nsAutoString buffer;
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     buffer = mClipboard;
   } else {
     ContentChild::GetSingleton()->SendGetClipboardText(aWhichClipboard, &buffer);
@@ -104,7 +104,7 @@ nsClipboard::EmptyClipboard(int32_t aWhichClipboard)
   if (aWhichClipboard != kGlobalClipboard) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     mClipboard.Truncate(0);
   } else {
     ContentChild::GetSingleton()->SendEmptyClipboard(aWhichClipboard);
@@ -122,7 +122,7 @@ nsClipboard::HasDataMatchingFlavors(const char **aFlavorList,
   if (aWhichClipboard != kGlobalClipboard) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     *aHasText = !mClipboard.IsEmpty();
   } else {
     ContentChild::GetSingleton()->SendClipboardHasText(aWhichClipboard, aHasText);

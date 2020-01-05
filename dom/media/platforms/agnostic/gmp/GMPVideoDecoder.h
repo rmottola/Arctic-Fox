@@ -11,7 +11,7 @@
 #include "ImageContainer.h"
 #include "MediaDataDecoderProxy.h"
 #include "PlatformDecoderModule.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 #include "MediaInfo.h"
 
 namespace mozilla {
@@ -98,7 +98,7 @@ protected:
 private:
   const VideoInfo& mConfig;
   MediaDataDecoderCallbackProxy* mCallback;
-  nsCOMPtr<mozIGoannaMediaPluginService> mMPS;
+  nsCOMPtr<mozIGeckoMediaPluginService> mMPS;
   GMPVideoDecoderProxy* mGMP;
   GMPVideoHost* mHost;
   nsAutoPtr<VideoCallbackAdapter> mAdapter;

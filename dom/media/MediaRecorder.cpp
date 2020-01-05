@@ -25,7 +25,7 @@
 #include "nsMimeTypes.h"
 #include "nsProxyRelease.h"
 #include "nsTArray.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #ifdef LOG
 #undef LOG

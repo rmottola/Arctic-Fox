@@ -20,7 +20,7 @@ EXPORTS.mozilla.ipc += [
     'FileDescriptorSetChild.h',
     'FileDescriptorSetParent.h',
     'FileDescriptorUtils.h',
-    'GoannaChildProcessHost.h',
+    'GeckoChildProcessHost.h',
     'InputStreamUtils.h',
     'IOThreadChild.h',
     'MessageChannel.h',
@@ -118,14 +118,14 @@ UNIFIED_SOURCES += [
     'StringUtil.cpp',
 ]
 
-# GoannaChildProcessHost.cpp cannot be built in unified mode because it uses plarena.h.
+# GeckoChildProcessHost.cpp cannot be built in unified mode because it uses plarena.h.
 # URIUtils.cpp cannot be built in unified mode because of name clashes on strdup.
 SOURCES += [
     'BackgroundChildImpl.cpp',
     'BackgroundParentImpl.cpp',
     'FileDescriptorSetChild.cpp',
     'FileDescriptorSetParent.cpp',
-    'GoannaChildProcessHost.cpp',
+    'GeckoChildProcessHost.cpp',
     'URIUtils.cpp',
 ]
 

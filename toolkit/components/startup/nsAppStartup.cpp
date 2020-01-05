@@ -25,7 +25,7 @@
 #include "nsAutoPtr.h"
 #include "nsString.h"
 #include "mozilla/Preferences.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "prprf.h"
 #include "nsIInterfaceRequestorUtils.h"

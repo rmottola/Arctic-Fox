@@ -15,7 +15,7 @@
 #include "nsTHashtable.h"
 #include "nsDataHashtable.h"
 #include "prio.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 #include "nsContentCID.h"
 #include "nsServiceManagerUtils.h"
 #include "nsISimpleEnumerator.h"
@@ -52,8 +52,8 @@ GetGMPStorageDir(nsIFile** aTempDir, const nsCString& aNodeId)
     return NS_ERROR_INVALID_ARG;
   }
 
-  nsCOMPtr<mozIGoannaMediaPluginService> mps =
-    do_GetService("@mozilla.org/goanna-media-plugin-service;1");
+  nsCOMPtr<mozIGeckoMediaPluginService> mps =
+    do_GetService("@mozilla.org/gecko-media-plugin-service;1");
   if (NS_WARN_IF(!mps)) {
     return NS_ERROR_FAILURE;
   }
@@ -468,8 +468,8 @@ GMPStorageParent::Init()
   if (NS_WARN_IF(mNodeId.IsEmpty())) {
     return NS_ERROR_FAILURE;
   }
-  nsCOMPtr<mozIGoannaMediaPluginService> mps =
-    do_GetService("@mozilla.org/goanna-media-plugin-service;1");
+  nsCOMPtr<mozIGeckoMediaPluginService> mps =
+    do_GetService("@mozilla.org/gecko-media-plugin-service;1");
   if (NS_WARN_IF(!mps)) {
     return NS_ERROR_FAILURE;
   }

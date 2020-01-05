@@ -8,7 +8,7 @@
 
 #include "mozilla/gfx/2D.h"
 #include "DecodePool.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #include "imgIContainer.h"
 #include "nsIConsoleService.h"
 #include "nsIScriptError.h"

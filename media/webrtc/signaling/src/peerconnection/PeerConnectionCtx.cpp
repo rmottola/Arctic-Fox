@@ -341,10 +341,10 @@ static void GMPReady() {
 
 void PeerConnectionCtx::initGMP()
 {
-  mGMPService = do_GetService("@mozilla.org/goanna-media-plugin-service;1");
+  mGMPService = do_GetService("@mozilla.org/gecko-media-plugin-service;1");
 
   if (!mGMPService) {
-    CSFLogError(logTag, "%s failed to get the goanna-media-plugin-service",
+    CSFLogError(logTag, "%s failed to get the gecko-media-plugin-service",
                 __FUNCTION__);
     return;
   }
@@ -355,7 +355,7 @@ void PeerConnectionCtx::initGMP()
   if (NS_FAILED(rv)) {
     mGMPService = nullptr;
     CSFLogError(logTag,
-                "%s failed to get the goanna-media-plugin thread, err=%u",
+                "%s failed to get the gecko-media-plugin thread, err=%u",
                 __FUNCTION__,
                 static_cast<unsigned>(rv));
     return;

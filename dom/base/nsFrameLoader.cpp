@@ -86,7 +86,7 @@
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "nsIAppsService.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #include "jsapi.h"
 #include "mozilla/dom/HTMLIFrameElement.h"
@@ -1661,12 +1661,12 @@ nsFrameLoader::ShouldUseRemoteProcess()
 
   // Don't try to launch nested children if we don't have OMTC.
   // They won't render!
-  if (XRE_GetProcessType() == GoannaProcessType_Content &&
+  if (XRE_GetProcessType() == GeckoProcessType_Content &&
       !CompositorChild::ChildProcessHasCompositor()) {
     return false;
   }
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content &&
+  if (XRE_GetProcessType() == GeckoProcessType_Content &&
       !(PR_GetEnv("MOZ_NESTED_OOP_TABS") ||
         Preferences::GetBool("dom.ipc.tabs.nested.enabled", false))) {
     return false;
@@ -2698,7 +2698,7 @@ nsFrameLoader::ResetPermissionManagerStatus()
 {
   // The resetting of the permissions status can run only
   // in the main process.
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     return;
   }
 

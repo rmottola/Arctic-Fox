@@ -30,6 +30,7 @@ struct RedirEntry
 static RedirEntry kRedirMap[] = {
   {
     "", "chrome://global/content/about.xhtml",
+    nsIAboutModule::URI_CAN_LOAD_IN_CHILD |
     nsIAboutModule::ALLOW_SCRIPT
   },
   { "about", "chrome://global/content/aboutAbout.xhtml", 0 },

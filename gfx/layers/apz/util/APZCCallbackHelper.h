@@ -30,7 +30,7 @@ protected:
 };
 
 /* This class contains some helper methods that facilitate implementing the
-   GoannaContentController callback interface required by the AsyncPanZoomController.
+   GeckoContentController callback interface required by the AsyncPanZoomController.
    Since different platforms need to implement this interface in similar-but-
    not-quite-the-same ways, this utility class provides some helpful methods
    to hold code that can be shared across the different platform implementations.

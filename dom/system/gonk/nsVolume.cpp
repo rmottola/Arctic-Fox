@@ -229,7 +229,7 @@ NS_IMETHODIMP nsVolume::GetIsHotSwappable(bool *aIsHotSwappable)
 
 NS_IMETHODIMP nsVolume::Format()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   XRE_GetIOMessageLoop()->PostTask(
       FROM_HERE,
@@ -241,7 +241,7 @@ NS_IMETHODIMP nsVolume::Format()
 /* static */
 void nsVolume::FormatVolumeIOThread(const nsCString& aVolume)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   MOZ_ASSERT(MessageLoop::current() == XRE_GetIOMessageLoop());
   if (VolumeManager::State() != VolumeManager::VOLUMES_READY) {
@@ -253,7 +253,7 @@ void nsVolume::FormatVolumeIOThread(const nsCString& aVolume)
 
 NS_IMETHODIMP nsVolume::Mount()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   XRE_GetIOMessageLoop()->PostTask(
       FROM_HERE,
@@ -265,7 +265,7 @@ NS_IMETHODIMP nsVolume::Mount()
 /* static */
 void nsVolume::MountVolumeIOThread(const nsCString& aVolume)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   MOZ_ASSERT(MessageLoop::current() == XRE_GetIOMessageLoop());
   if (VolumeManager::State() != VolumeManager::VOLUMES_READY) {
@@ -277,7 +277,7 @@ void nsVolume::MountVolumeIOThread(const nsCString& aVolume)
 
 NS_IMETHODIMP nsVolume::Unmount()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   XRE_GetIOMessageLoop()->PostTask(
       FROM_HERE,
@@ -289,7 +289,7 @@ NS_IMETHODIMP nsVolume::Unmount()
 /* static */
 void nsVolume::UnmountVolumeIOThread(const nsCString& aVolume)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
   MOZ_ASSERT(MessageLoop::current() == XRE_GetIOMessageLoop());
   if (VolumeManager::State() != VolumeManager::VOLUMES_READY) {
@@ -347,7 +347,7 @@ void nsVolume::Set(nsIVolume* aVolume)
 
   mMountGeneration = volMountGeneration;
 
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     // Child processes just track the state, not maintain it.
     aVolume->GetIsMountLocked(&mMountLocked);
     return;
@@ -369,7 +369,7 @@ void nsVolume::Set(nsIVolume* aVolume)
 void
 nsVolume::UpdateMountLock(const nsAString& aMountLockState)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   MOZ_ASSERT(NS_IsMainThread());
 
   // There are 3 states, unlocked, locked-background, and locked-foreground
@@ -380,7 +380,7 @@ nsVolume::UpdateMountLock(const nsAString& aMountLockState)
 void
 nsVolume::UpdateMountLock(bool aMountLocked)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   MOZ_ASSERT(NS_IsMainThread());
 
   if (aMountLocked == mMountLocked) {
@@ -430,7 +430,7 @@ nsVolume::SetState(int32_t aState)
 {
   static int32_t sMountGeneration = 0;
 
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(IsFake());
 

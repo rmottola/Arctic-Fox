@@ -17,7 +17,7 @@
 #include "nsIPropertyBag2.h"
 #include "mozilla/dom/Element.h"
 #include "nsObjectLoadingContent.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 namespace mozilla {
 namespace dom {

@@ -48,7 +48,7 @@ class OverscrollHandoffChain;
 struct OverscrollHandoffState;
 class LayerMetricsWrapper;
 class InputQueue;
-class GoannaContentController;
+class GeckoContentController;
 class HitTestingTreeNode;
 
 /**
@@ -397,7 +397,7 @@ protected:
 
   // Hook for gtests subclass
   virtual AsyncPanZoomController* MakeAPZCInstance(uint64_t aLayersId,
-                                                   GoannaContentController* aController);
+                                                   GeckoContentController* aController);
 
 public:
   /* Some helper functions to find an APZC given some identifying input. These functions

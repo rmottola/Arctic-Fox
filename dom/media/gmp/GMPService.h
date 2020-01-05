@@ -7,7 +7,7 @@
 #define GMPService_h_
 
 #include "nsString.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 #include "nsIObserver.h"
 #include "nsTArray.h"
 #include "mozilla/Attributes.h"
@@ -30,17 +30,17 @@ class GMPParent;
 
 #define GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT 3000
 
-class GoannaMediaPluginService final : public mozIGoannaMediaPluginService
-                                        , public nsIObserver
+class GeckoMediaPluginService final : public mozIGeckoMediaPluginService
+                                    , public nsIObserver
 {
 public:
-  static already_AddRefed<GoannaMediaPluginService> GetGoannaMediaPluginService();
+  static already_AddRefed<GeckoMediaPluginService> GetGeckoMediaPluginService();
 
-  GoannaMediaPluginService();
+  GeckoMediaPluginService();
   nsresult Init();
 
   NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_MOZIGOANNAMEDIAPLUGINSERVICE
+  NS_DECL_MOZIGECKOMEDIAPLUGINSERVICE
   NS_DECL_NSIOBSERVER
 
   void AsyncShutdownNeeded(GMPParent* aParent);
@@ -78,7 +78,7 @@ public:
                                const nsAString& aPluginDumpId);
 
 private:
-  ~GoannaMediaPluginService();
+  ~GeckoMediaPluginService();
 
   nsresult GMPDispatch(nsIRunnable* event, uint32_t flags = NS_DISPATCH_NORMAL);
 
@@ -132,7 +132,7 @@ private:
       REMOVE_AND_DELETE_FROM_DISK,
     };
 
-    PathRunnable(GoannaMediaPluginService* aService, const nsAString& aPath,
+    PathRunnable(GeckoMediaPluginService* aService, const nsAString& aPath,
                  EOperation aOperation, bool aDefer = false)
       : mService(aService)
       , mPath(aPath)
@@ -143,7 +143,7 @@ private:
     NS_DECL_NSIRUNNABLE
 
   private:
-    nsRefPtr<GoannaMediaPluginService> mService;
+    nsRefPtr<GeckoMediaPluginService> mService;
     nsString mPath;
     EOperation mOperation;
     bool mDefer;

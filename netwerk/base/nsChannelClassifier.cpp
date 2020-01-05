@@ -63,7 +63,7 @@ nsChannelClassifier::ShouldEnableTrackingProtection(nsIChannel *aChannel,
                                                     bool *result)
 {
     // Should only be called in the parent process.
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     NS_ENSURE_ARG(result);
     *result = false;
@@ -237,7 +237,7 @@ nsresult
 nsChannelClassifier::StartInternal()
 {
     // Should only be called in the parent process.
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     // Don't bother to run the classifier on a load that has already failed.
     // (this might happen after a redirect)
@@ -350,7 +350,7 @@ void
 nsChannelClassifier::MarkEntryClassified(nsresult status)
 {
     // Should only be called in the parent process.
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     // Don't cache tracking classifications because we support allowlisting.
     if (status == NS_ERROR_TRACKING_URI || mIsAllowListed) {
@@ -382,7 +382,7 @@ bool
 nsChannelClassifier::HasBeenClassified(nsIChannel *aChannel)
 {
     // Should only be called in the parent process.
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     nsCOMPtr<nsICachingChannel> cachingChannel =
         do_QueryInterface(aChannel);
@@ -480,7 +480,7 @@ NS_IMETHODIMP
 nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode)
 {
     // Should only be called in the parent process.
-    MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
     LOG(("nsChannelClassifier[%p]:OnClassifyComplete %d", this, aErrorCode));
     if (mSuspendedChannel) {

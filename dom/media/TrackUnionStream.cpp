@@ -27,7 +27,7 @@
 #include "webaudio/MediaStreamAudioDestinationNode.h"
 #include <algorithm>
 #include "DOMMediaStream.h"
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 #ifdef MOZ_WEBRTC
 #include "AudioOutputObserver.h"
 #endif

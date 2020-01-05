@@ -13,7 +13,7 @@
 #include "gfxColor.h"
 #include "gfxPrefs.h"
 #include <math.h>
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "mozilla/layers/GrallocTextureHost.h"

@@ -450,7 +450,7 @@ nsDefaultURIFixup::KeywordToURI(const nsACString& aKeyword,
   }
   keyword.Trim(" ");
 
-  if (XRE_GetProcessType() == GoannaProcessType_Content) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
     dom::ContentChild* contentChild = dom::ContentChild::GetSingleton();
     if (!contentChild) {
       return NS_ERROR_NOT_AVAILABLE;

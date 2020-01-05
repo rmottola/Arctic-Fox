@@ -107,7 +107,7 @@ APZCTreeManager::~APZCTreeManager()
 
 AsyncPanZoomController*
 APZCTreeManager::MakeAPZCInstance(uint64_t aLayersId,
-                                  GoannaContentController* aController)
+                                  GeckoContentController* aController)
 {
   return new AsyncPanZoomController(aLayersId, this, mInputQueue,
     aController, AsyncPanZoomController::USE_GESTURE_DETECTOR);
@@ -197,7 +197,7 @@ APZCTreeManager::UpdateHitTestingTree(CompositorParent* aCompositor,
 // Compute the clip region to be used for a layer with an APZC. This function
 // is only called for layers which actually have scrollable metrics and an APZC.
 static nsIntRegion
-ComputeClipRegion(GoannaContentController* aController,
+ComputeClipRegion(GeckoContentController* aController,
                   const LayerMetricsWrapper& aLayer)
 {
   nsIntRegion clipRegion;
@@ -212,7 +212,7 @@ ComputeClipRegion(GoannaContentController* aController,
         RoundedToInt(aLayer.Metrics().mCompositionBounds)));
   }
 
-  // Optionally, the GoannaContentController can provide a touch-sensitive
+  // Optionally, the GeckoContentController can provide a touch-sensitive
   // region that constrains all frames associated with the controller.
   // In this case we intersect the composition bounds with that region.
   CSSRect touchSensitiveRegion;
@@ -342,7 +342,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
 
   AsyncPanZoomController* apzc = nullptr;
   // If we get here, aLayer is a scrollable layer and somebody
-  // has registered a GoannaContentController for it, so we need to ensure
+  // has registered a GeckoContentController for it, so we need to ensure
   // it has an APZC instance to manage its scrolling.
 
   // aState.mApzcMap allows reusing the exact same APZC instance for different layers

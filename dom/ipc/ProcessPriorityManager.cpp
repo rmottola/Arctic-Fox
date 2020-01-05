@@ -381,7 +381,7 @@ ProcessPriorityManagerImpl::StaticInit()
   }
 
   // The process priority manager is main-process only.
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     sInitialized = true;
     return;
   }
@@ -422,7 +422,7 @@ ProcessPriorityManagerImpl::GetSingleton()
 ProcessPriorityManagerImpl::ProcessPriorityManagerImpl()
     : mHighPriority(false)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   RegisterWakeLockObserver(this);
 }
 
@@ -657,7 +657,7 @@ ParticularProcessPriorityManager::ParticularProcessPriorityManager(
   , mHoldsCPUWakeLock(false)
   , mHoldsHighPriorityWakeLock(false)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   LOGP("Creating ParticularProcessPriorityManager.");
 }
 
@@ -817,7 +817,7 @@ ParticularProcessPriorityManager::OnRemoteBrowserFrameShown(nsISupports* aSubjec
   TabParent* tp = TabParent::GetFrom(fl);
   NS_ENSURE_TRUE_VOID(tp);
 
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   if (tp->Manager() != mContentParent) {
     return;
   }
@@ -841,7 +841,7 @@ ParticularProcessPriorityManager::OnTabParentDestroyed(nsISupports* aSubject)
   nsCOMPtr<nsITabParent> tp = do_QueryInterface(aSubject);
   NS_ENSURE_TRUE_VOID(tp);
 
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   if (TabParent::GetFrom(tp)->Manager() != mContentParent) {
     return;
   }
@@ -860,7 +860,7 @@ ParticularProcessPriorityManager::OnFrameloaderVisibleChanged(nsISupports* aSubj
     return;
   }
 
-  MOZ_ASSERT(XRE_GetProcessType() == GoannaProcessType_Default);
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
   if (tp->Manager() != mContentParent) {
     return;
   }
@@ -1224,7 +1224,7 @@ NS_IMPL_ISUPPORTS(ProcessPriorityManagerChild,
 
 ProcessPriorityManagerChild::ProcessPriorityManagerChild()
 {
-  if (XRE_GetProcessType() == GoannaProcessType_Default) {
+  if (XRE_GetProcessType() == GeckoProcessType_Default) {
     mCachedPriority = PROCESS_PRIORITY_MASTER;
   } else {
     mCachedPriority = PROCESS_PRIORITY_UNKNOWN;
@@ -1236,7 +1236,7 @@ ProcessPriorityManagerChild::Init()
 {
   // The process priority should only be changed in child processes; don't even
   // bother listening for changes if we're in the main process.
-  if (XRE_GetProcessType() != GoannaProcessType_Default) {
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
     NS_ENSURE_TRUE_VOID(os);
     os->AddObserver(this, "ipc:process-priority-changed", /* weak = */ false);

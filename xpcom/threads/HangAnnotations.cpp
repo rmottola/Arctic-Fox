@@ -228,7 +228,7 @@ RegisterAnnotator(Annotator& aAnnotator)
   BackgroundHangMonitor::RegisterAnnotator(aAnnotator);
   // We still register annotators for ChromeHangs
   if (NS_IsMainThread() &&
-      GoannaProcessType_Default == XRE_GetProcessType()) {
+      GeckoProcessType_Default == XRE_GetProcessType()) {
     if (!gChromehangAnnotators) {
       gChromehangAnnotators = new Observer::Annotators();
     }
@@ -242,7 +242,7 @@ UnregisterAnnotator(Annotator& aAnnotator)
   BackgroundHangMonitor::UnregisterAnnotator(aAnnotator);
   // We still register annotators for ChromeHangs
   if (NS_IsMainThread() &&
-      GoannaProcessType_Default == XRE_GetProcessType()) {
+      GeckoProcessType_Default == XRE_GetProcessType()) {
     if (gChromehangAnnotators->Unregister(aAnnotator)) {
       gChromehangAnnotators = nullptr;
     }

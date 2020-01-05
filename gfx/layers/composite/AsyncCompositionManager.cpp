@@ -36,7 +36,7 @@
 # include <android/log.h>
 # include "AndroidBridge.h"
 #endif
-#include "GoannaProfiler.h"
+#include "GeckoProfiler.h"
 
 struct nsCSSValueSharedList;
 

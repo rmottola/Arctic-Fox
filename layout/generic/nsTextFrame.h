@@ -312,12 +312,12 @@ public:
    * Callbacks are invoked in the following order:
    *
    *   NotifySelectionBackgroundNeedsFill?
-   *   (NotifyBeforeDecorationLine NotifyDecorationLinePathEmitted)*
+   *   PaintDecorationLine*
    *   NotifyBeforeText
    *   NotifyGlyphPathEmitted*
    *   NotifyAfterText
-   *   (NotifyBeforeDecorationLine NotifyDecorationLinePathEmitted)*
-   *   (NotifyBeforeSelectionDecorationLine NotifySelectionDecorationLinePathEmitted)*
+   *   PaintDecorationLine*
+   *   PaintSelectionDecorationLine*
    *
    * The color of each part of the frame's text rendering is passed as an argument
    * to the NotifyBefore* callback for that part.  The nscolor can take on one of
@@ -344,6 +344,19 @@ public:
                                                     DrawTarget& aDrawTarget) { }
 
     /**
+     * Called before (for under/over-line) or after (for line-through) the text
+     * is drawn to have a text decoration line drawn.
+     */
+    virtual void PaintDecorationLine(Rect aPath, nscolor aColor) { }
+
+    /**
+     * Called after selected text is drawn to have a decoration line drawn over
+     * the text. (All types of text decoration are drawn after the text when
+     * text is selected.)
+     */
+    virtual void PaintSelectionDecorationLine(Rect aPath, nscolor aColor) { }
+
+    /**
      * Called just before any paths have been emitted to the gfxContext
      * for the glyphs of the frame's text.
      */
@@ -354,18 +367,6 @@ public:
      * for the glyphs of the frame's text.
      */
     virtual void NotifyAfterText() { }
-
-    /**
-     * Called just before a path corresponding to a text decoration line
-     * has been emitted to the gfxContext.
-     */
-    virtual void NotifyBeforeDecorationLine(nscolor aColor) { }
-
-    /**
-     * Called just after a path corresponding to a text decoration line
-     * has been emitted to the gfxContext.
-     */
-    virtual void NotifyDecorationLinePathEmitted() { }
 
     /**
      * Called just before a path corresponding to a selection decoration line
