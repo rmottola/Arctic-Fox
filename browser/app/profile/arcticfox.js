@@ -644,6 +644,9 @@ pref("plugins.update.notifyUser", false);
 //Enable tri-state option (Always/Never/Ask)
 pref("plugins.click_to_play", true);
 
+
+pref("plugins.clickToActivateInfo.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/clicktoplay");
+
 #ifdef XP_WIN
 pref("browser.preferences.instantApply", false);
 #else
