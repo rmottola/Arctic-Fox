@@ -228,11 +228,6 @@ var gPluginHandler = {
         break;
 
       case "PluginInstantiated":
-        //Pale Moon: don't show the indicator when plugins are enabled/allowed
-        if (gPrefService.getBoolPref("plugins.always_show_indicator")) {
-          shouldShowNotification = true;
-        }
-        break;
       case "PluginRemoved":
         shouldShowNotification = true;
         break;
