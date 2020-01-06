@@ -649,12 +649,12 @@ var gPluginHandler = {
       plugins = [aPlugin];
     }
 
-    // If this is a new notification, create a centerActions map, otherwise append
-    let centerActions;
+    // If this is a new notification, create a pluginData map, otherwise append
+    let pluginData;
     if (notification) {
-      centerActions = notification.options.centerActions;
+      pluginData = notification.options.pluginData;
     } else {
-      centerActions = new Map();
+      pluginData = new Map();
     }
 
     let principal = aBrowser.contentDocument.nodePrincipal;
@@ -666,7 +666,7 @@ var gPluginHandler = {
         Cu.reportError("No permission string for active plugin.");
         continue;
       }
-      if (centerActions.has(pluginInfo.permissionString)) {
+      if (pluginData.has(pluginInfo.permissionString)) {
         continue;
       }
 
@@ -694,7 +694,7 @@ var gPluginHandler = {
       }
       pluginInfo.detailsLink = url;
 
-      centerActions.set(pluginInfo.permissionString, pluginInfo);
+      pluginData.set(pluginInfo.permissionString, pluginInfo);
     }
 
     let primaryPluginPermission = null;
@@ -717,7 +717,7 @@ var gPluginHandler = {
       dismissed: !aShowNow,
       eventCallback: this._clickToPlayNotificationEventCallback,
       primaryPlugin: primaryPluginPermission,
-      centerActions: centerActions
+      pluginData: pluginData
     };
     PopupNotifications.show(aBrowser, "click-to-play-plugins",
                             "", "plugins-notification-icon",
@@ -739,7 +739,7 @@ var gPluginHandler = {
     // outdated plugins.
     let haveInsecure = false;
     let actions = new Map();
-    for (let action of notification.options.centerActions.values()) {
+    for (let action of notification.options.pluginData.values()) {
       switch (action.fallbackType) {
         // haveInsecure will trigger the red flashing icon and the infobar
         // styling below
