@@ -198,7 +198,8 @@ var gPluginHandler = {
     if (eventType == "PluginRemoved") {
       let doc = event.target;
       let browser = gBrowser.getBrowserForDocument(doc.defaultView.top.document);
-      this._setPluginNotificationIcon(browser);
+      if (browser)
+        this._setPluginNotificationIcon(browser);
       return;
     }
 
@@ -943,6 +944,8 @@ var gPluginHandler = {
     crashText.textContent = messageString;
 
     let browser = gBrowser.getBrowserForDocument(doc.defaultView.top.document);
+    if (!browser)
+      return;
 
     let link = doc.getAnonymousElementByAttribute(plugin, "class", "reloadLink");
     this.addLinkClickCallback(link, "reloadPage", browser);
