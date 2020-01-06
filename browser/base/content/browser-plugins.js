@@ -493,10 +493,9 @@ var gPluginHandler = {
     let contentWindow = browser.contentWindow;
     let cwu = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils);
-    let doc = contentWindow.document;
     let plugins = cwu.plugins;
     for (let plugin of plugins) {
-      let overlay = doc.getAnonymousElementByAttribute(plugin, "anonid", "main");
+      let overlay = this.getPluginUI(plugin, "main");
       if (overlay)
         overlay.removeEventListener("click", gPluginHandler._overlayClickListener, true);
       let objLoadingContent = plugin.QueryInterface(Ci.nsIObjectLoadingContent);
@@ -947,18 +946,18 @@ var gPluginHandler = {
 
     // Force a layout flush so the binding is attached.
     plugin.clientTop;
+    let overlay = this.getPluginUI(plugin, "main");
+    let statusDiv = this.getPluginUI(plugin, "submitStatus");
     let doc = plugin.ownerDocument;
-    let overlay = doc.getAnonymousElementByAttribute(plugin, "class", "mainBox");
-    let statusDiv = doc.getAnonymousElementByAttribute(plugin, "class", "submitStatus");
 
-    let crashText = doc.getAnonymousElementByAttribute(plugin, "class", "msgCrashedText");
+    let crashText = this.getPluginUI(plugin, "crashedText");
     crashText.textContent = messageString;
 
     let browser = gBrowser.getBrowserForDocument(doc.defaultView.top.document);
     if (!browser)
       return;
 
-    let link = doc.getAnonymousElementByAttribute(plugin, "class", "reloadLink");
+    let link = this.getPluginUI(plugin, "reloadLink");
     this.addLinkClickCallback(link, "reloadPage", browser);
 
     let notificationBox = gBrowser.getNotificationBox(browser);
