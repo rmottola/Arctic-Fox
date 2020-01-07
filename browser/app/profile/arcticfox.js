@@ -641,6 +641,7 @@ pref("plugins.update.notifyUser", false);
 //Enable tri-state option (Always/Never/Ask)
 pref("plugins.click_to_play", true);
 
+pref("plugins.hideMissingPluginsNotification", false);
 
 #ifdef XP_WIN
 pref("browser.preferences.instantApply", false);
