@@ -789,15 +789,12 @@ pref("browser.sessionstore.max_resumed_crashes", 1);
 pref("browser.sessionstore.max_serialize_back", 10);
 // number of forward button session history entries to restore (-1 = all of them)
 pref("browser.sessionstore.max_serialize_forward", -1);
-// restore_on_demand overrides browser.sessionstore.max_concurrent_tabs
+// restore_on_demand overrides MAX_CONCURRENT_TAB_RESTORES (sessionstore constant)
 // and restore_hidden_tabs. When true, tabs will not be restored until they are
 // focused (also applies to tabs that aren't visible). When false, the values
-// for browser.sessionstore.max_concurrent_tabs and restore_hidden_tabs are 
-// respected. Selected tabs are always restored regardless of this pref.
+// for MAX_CONCURRENT_TAB_RESTORES and restore_hidden_tabs are respected.
+// Selected tabs are always restored regardless of this pref.
 pref("browser.sessionstore.restore_on_demand", true);
-// The number of tabs that can restore concurrently.
-// Sane values are 1..10, default 3.
-pref("browser.sessionstore.max_concurrent_tabs", 3);
 // Whether to automatically restore hidden tabs (i.e., tabs in other tab groups) or not
 pref("browser.sessionstore.restore_hidden_tabs", false);
 // If restore_on_demand is set, pinned tabs are restored on startup by default.
