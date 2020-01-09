@@ -20,9 +20,9 @@ const NOTIFY_LAST_SESSION_CLEARED = "sessionstore-last-session-cleared";
 
 const NOTIFY_TAB_RESTORED = "sessionstore-debug-tab-restored"; // WARNING: debug-only
 
-// Default maximum number of tabs to restore simultaneously. Controlled by
+// Maximum number of tabs to restore simultaneously. Previously controlled by
 // the browser.sessionstore.max_concurrent_tabs pref.
-const DEFAULT_MAX_CONCURRENT_TAB_RESTORES = 3;
+const MAX_CONCURRENT_TAB_RESTORES = 3;
 
 // global notifications observed
 const OBSERVING = [
@@ -386,9 +386,6 @@ let SessionStoreInternal = {
   // number of tabs currently restoring
   _tabsRestoringCount: 0,
   
-  // max number of tabs to restore concurrently
-  _maxConcurrentTabRestores: DEFAULT_MAX_CONCURRENT_TAB_RESTORES,
-  
   // whether restored tabs load cached versions or force a reload
   _cacheBehavior: 0,
   
@@ -580,17 +577,6 @@ let SessionStoreInternal = {
     
     this._max_windows_undo = this._prefBranch.getIntPref("sessionstore.max_windows_undo");
     this._prefBranch.addObserver("sessionstore.max_windows_undo", this, true);
-    
-    // Straight-up collect the following one-time prefs
-    this._maxConcurrentTabRestores = 
-         Services.prefs.getIntPref("browser.sessionstore.max_concurrent_tabs");
-    // ensure a sane value for concurrency, ignore and set default otherwise
-    if (this._maxConcurrentTabRestores < 1 || this._maxConcurrentTabRestores > 10) {
-      this._maxConcurrentTabRestores = DEFAULT_MAX_CONCURRENT_TAB_RESTORES;
-    }
-    this._cacheBehavior =
-         Services.prefs.getIntPref("browser.sessionstore.cache_behavior");
-    
   },
 
   /**
@@ -2793,7 +2779,7 @@ let SessionStoreInternal = {
       return;
 
     // Don't exceed the maximum number of concurrent tab restores.
-    if (this._tabsRestoringCount >= this._maxConcurrentTabRestores)
+    if (this._tabsRestoringCount >= MAX_CONCURRENT_TAB_RESTORES)
       return;
 
     let tab = TabRestoreQueue.shift();
