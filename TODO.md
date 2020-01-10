@@ -126,6 +126,9 @@ More session store stuff to check:
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 - Bug 1148505, remove cpow usage from back-forward menu by using sessio
 
+- Bug 1109875 - Don't flush state when closing tabs r=billm
+- Bug 1109875 - Ignore SessionStore:update messages that do not target (Attention: applies, but breaks restore!
+
 - Bug 785487 - Have AboutHomeUtils use the asynchronous search service
 
 Check on Mac:
