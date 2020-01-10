@@ -1110,6 +1110,11 @@ let SessionStoreInternal = {
       winData._shouldRestore = true;
 #endif
 
+      // Store the window's close date to figure out when each individual tab
+      // was closed. This timestamp should allow re-arranging data based on how
+      // recently something was closed.
+      winData.closedAt = Date.now();
+
       // Save non-private windows if they have at
       // least one saveable tab or are the last window.
       if (!winData.isPrivate) {
@@ -1432,7 +1437,8 @@ let SessionStoreInternal = {
         state: tabState,
         title: tabTitle,
         image: tabbrowser.getIcon(aTab),
-        pos: aTab._tPos
+        pos: aTab._tPos,
+        closedAt: Date.now()
       });
       var length = this._windows[aWindow.__SSi]._closedTabs.length;
       if (length > this._max_tabs_undo)
