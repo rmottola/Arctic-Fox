@@ -9,6 +9,7 @@
 EXTRA_JS_MODULES += [ 'promise.js' ]
 
 EXTRA_JS_MODULES += [
+    'AboutHome.jsm',
     'BrowserNewTabPreloader.jsm',
     'ContentClick.jsm',
     'E10SUtils.jsm',
@@ -18,8 +19,10 @@ EXTRA_JS_MODULES += [
     'offlineAppCache.jsm',
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
+    'PluginContent.jsm',
     'PopupNotifications.jsm',
     'QuotaManager.jsm',
+    'RecentWindow.jsm',
     'SharedFrame.jsm',
     'TabCrashReporter.jsm',
     'webrtcUI.jsm'
@@ -31,12 +34,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
         'WindowsJumpLists.jsm',
         'WindowsPreviewPerTab.jsm',
     ]
-
-EXTRA_PP_JS_MODULES += [
-    'AboutHome.jsm',
-    'PluginContent.jsm',
-    'RecentWindow.jsm',
-]
 
 if CONFIG['MOZILLA_OFFICIAL']:
     DEFINES['MOZILLA_OFFICIAL'] = 1
