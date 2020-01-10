@@ -409,10 +409,6 @@ let SessionStoreInternal = {
   // Whether session has been initialized
   _sessionInitialized: false,
 
-  // True if session store is disabled by multi-process browsing.
-  // See bug 516755.
-  _disabledForMultiProcess: false,
-
   // The original "sessionstore.resume_session_once" preference value before it
   // was modified by saveState.  saveState will set the
   // "sessionstore.resume_session_once" to true when the
@@ -457,7 +453,6 @@ let SessionStoreInternal = {
 
     this._initPrefs();
     this._initialized = true;
-    this._disabledForMultiProcess = false;
 
     // this pref is only read at startup, so no need to observe it
     this._sessionhistory_max_entries =
@@ -607,9 +602,6 @@ let SessionStoreInternal = {
    * Handle notifications
    */
   observe: function ssi_observe(aSubject, aTopic, aData) {
-    if (this._disabledForMultiProcess)
-      return;
-
     switch (aTopic) {
       case "browser-window-before-show": // catch new windows
         this.onBeforeBrowserWindowShown(aSubject);
@@ -775,9 +767,6 @@ let SessionStoreInternal = {
    * Implement nsIDOMEventListener for handling various window and tab events
    */
   handleEvent: function ssi_handleEvent(aEvent) {
-    if (this._disabledForMultiProcess)
-      return;
-
     var win = aEvent.currentTarget.ownerDocument.defaultView;
     switch (aEvent.type) {
       case "TabOpen":
