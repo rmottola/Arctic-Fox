@@ -1538,8 +1538,7 @@ ContentParent::ShutDownProcess(ShutDownMethod aMethod)
     // other methods. We first call Shutdown() in the child. After the child is
     // ready, it calls FinishShutdown() on us. Then we close the channel.
     if (aMethod == SEND_SHUTDOWN_MESSAGE) {
-
-        if (SendShutdown()) {
+        if (mIPCOpen && SendShutdown()) {
             mShutdownPending = true;
         }
 
@@ -1803,7 +1802,7 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
     // Signal shutdown completion regardless of error state,
     // so we can finish waiting in the xpcom-shutdown observer.
-    mShutdownComplete = true;
+    mIPCOpen = false;
 
     if (why == NormalShutdown && !mCalledClose) {
         // If we shut down normally but haven't called Close, assume somebody
@@ -1999,7 +1998,7 @@ ContentParent::InitializeMembers()
     mCalledKillHard = false;
     mCreatedPairedMinidumps = false;
     mShutdownPending = false;
-    mShutdownComplete = false;
+    mIPCOpen = true;
     mHangMonitorActor = nullptr;
 }
 
@@ -2741,15 +2740,15 @@ ContentParent::Observe(nsISupports* aSubject,
                        const char16_t* aData)
 {
     if (!strcmp(aTopic, "xpcom-shutdown") && mSubprocess) {
-        if (mShutdownPending) {
-            // Wait for shutdown to complete, so that we receive any shutdown
-            // data (e.g. telemetry) from the child before we quit.
-            while (!mShutdownComplete) {
-                NS_ProcessNextEvent(nullptr, true);
-            }
-        } else {
-            // Just close the channel if we never tried shutting down.
-            ShutDownProcess(CLOSE_CHANNEL);
+        if (!mShutdownPending && mIPCOpen) {
+            ShutDownProcess(SEND_SHUTDOWN_MESSAGE);
+        }
+
+        // Wait for shutdown to complete, so that we receive any shutdown
+        // data (e.g. telemetry) from the child before we quit.
+        // This loop terminate prematurely based on mForceKillTimer.
+        while (mIPCOpen) {
+            NS_ProcessNextEvent(nullptr, true);
         }
         NS_ASSERTION(!mSubprocess, "Close should have nulled mSubprocess");
     }
