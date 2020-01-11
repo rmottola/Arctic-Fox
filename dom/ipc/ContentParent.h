@@ -34,6 +34,7 @@ class nsIDOMBlob;
 class nsIDumpGCAndCCLogsCallback;
 class nsIMemoryReporter;
 class ParentIdleListener;
+class nsIWidget;
 
 namespace mozilla {
 class PRemoteSpellcheckEngineParent;
@@ -142,6 +143,20 @@ public:
     static bool IgnoreIPCPrincipal();
 
     static void NotifyUpdatedDictionaries();
+
+#if defined(XP_WIN)
+    /**
+     * Windows helper for firing off an update window request to a plugin
+     * instance.
+     *
+     * aWidget - the eWindowType_plugin_ipc_chrome widget associated with
+     *           this plugin window.
+     */
+    static void SendAsyncUpdate(nsIWidget* aWidget);
+#endif
+
+    // Let managees query if it is safe to send messages.
+    bool IsDestroyed() { return !mIPCOpen; }
 
     virtual bool RecvCreateChildProcess(const IPCTabContext& aContext,
                                         const hal::ProcessPriority& aPriority,
