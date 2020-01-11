@@ -831,7 +831,7 @@ private:
     bool mCalledKillHard;
     bool mCreatedPairedMinidumps;
     bool mShutdownPending;
-    bool mShutdownComplete;
+    bool mIPCOpen;
 
     nsRefPtr<nsConsoleService>  mConsoleService;
     nsConsoleService* GetConsoleService();
