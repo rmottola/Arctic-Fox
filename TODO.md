@@ -114,6 +114,8 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
+- Bug 1137267 - Remove unneeded flags to track touch listeners and touc
+- Bug 1137267 - Enable event-regions automatically when APZ is enabled,
 
 More session store stuff to check:
 
@@ -133,7 +135,6 @@ More session store stuff to check:
 
 Check on Mac:
 - Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
-- Bug 1142542 - Use AppConstants in browser/modules (r=gavin)
 
 Verify for pre-Australis:
 - Bug 1123517 - Refactor sidebar code. r=florian
@@ -151,7 +152,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/0dad1fee4b8acc1840bc272da9c14069902f00ad
+https://github.com/mozilla/newtab-dev/commit/472d2ebba168df5766c8859143792ccfd19af9bc
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
