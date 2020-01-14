@@ -2243,6 +2243,7 @@ toolbar[brighttext] #addonbar-closebutton {
 %include ../../../toolkit/themes/shared/devtools/commandline.inc.css
 %endif
 %include ../shared/plugin-doorhanger.inc.css
+%include ../shared/badcontent-doorhanger.inc.css
 
 %ifdef MOZ_DEVTOOLS
 /* Error counter */
