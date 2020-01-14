@@ -36,8 +36,8 @@ browser.jar:
   skin/classic/browser/identity-icons-https-mixed-active.png
   skin/classic/browser/Info.png
   skin/classic/browser/KUI-close.png
-  skin/classic/browser/mixed-content-blocked-16.png
-  skin/classic/browser/mixed-content-blocked-64.png
+  skin/classic/browser/bad-content-blocked-16.png
+  skin/classic/browser/bad-content-blocked-64.png
   skin/classic/browser/monitor.png
   skin/classic/browser/monitor_16-10.png
   skin/classic/browser/notification-16.png
