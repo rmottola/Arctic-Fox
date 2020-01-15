@@ -406,16 +406,6 @@ let SessionStoreInternal = {
   // Whether session has been initialized
   _sessionInitialized: false,
 
-  // The original "sessionstore.resume_session_once" preference value before it
-  // was modified by saveState.  saveState will set the
-  // "sessionstore.resume_session_once" to true when the
-  // the "sessionstore.resume_from_crash" preference is false (crash recovery
-  // is disabled) so that pinned tabs will be restored in the case of a
-  // crash.  This variable is used to restore the original value so the
-  // previous session is not always restored when
-  // "sessionstore.resume_from_crash" is true.
-  _resume_session_once_on_shutdown: null,
-
   // Keep busy state counters per window.
   _windowBusyStates: new WeakMap(),
 
@@ -1200,15 +1190,6 @@ let SessionStoreInternal = {
       // perform any other sanitization processing on a restart as the
       // browser is about to exit anyway.
       Services.obs.removeObserver(this, "browser:purge-session-history");
-    }
-    else if (this._resume_session_once_on_shutdown != null) {
-      // if the sessionstore.resume_session_once preference was changed by
-      // saveState because crash recovery is disabled then restore the
-      // preference back to the value it was prior to that.  This will prevent
-      // SessionStore from always restoring the session when crash recovery is
-      // disabled.
-      this._prefBranch.setBoolPref("sessionstore.resume_session_once",
-                                   this._resume_session_once_on_shutdown);
     }
 
     if (aData != "restart") {
