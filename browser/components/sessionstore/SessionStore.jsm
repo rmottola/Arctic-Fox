@@ -834,7 +834,7 @@ let SessionStoreInternal = {
           // it happens before observers are notified
           this._globalState.setFromState(aInitialState);
 
-	  let overwrite = this._isCmdLineEmpty(aWindow, aInitialState);
+          let overwrite = this._isCmdLineEmpty(aWindow, aInitialState);
           let options = {firstWindow: true, overwriteTabs: overwrite};
           this.restoreWindow(aWindow, aInitialState, options);
         }
