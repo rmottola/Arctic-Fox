@@ -526,18 +526,9 @@ let SessionStoreInternal = {
         this._prefBranch.getBoolPref("sessionstore.resume_session_once"))
       this._prefBranch.setBoolPref("sessionstore.resume_session_once", false);
 
-    this._initEncoding();
-
     this._sessionInitialized = true;
     TelemetryStopwatch.finish("FX_SESSION_RESTORE_STARTUP_INIT_SESSION_MS");
     return state;
-  },
-
-  _initEncoding : function ssi_initEncoding() {
-    // The (UTF-8) encoder used to write to files.
-    XPCOMUtils.defineLazyGetter(this, "_writeFileEncoder", function () {
-      return new TextEncoder();
-    });
   },
 
   _initPrefs : function() {
