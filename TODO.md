@@ -84,6 +84,7 @@
 - Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes¿
 - Bug 1151466 - update talos to the latest version to include some pref
 - Bug 1153658 - browser_compartments.js logspam.
+- remaining parts of Bug 968923 (2015-06)
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
 - Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
