@@ -115,8 +115,7 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
-- Bug 1137267 - Remove unneeded flags to track touch listeners and touc
-- Bug 1137267 - Enable event-regions automatically when APZ is enabled,
+- Bug 749804 - part 0: remove the add-on bar, r=jaws
 
 More session store stuff to check:
 
