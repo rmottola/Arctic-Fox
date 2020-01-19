@@ -147,9 +147,10 @@ What with LightweightThemeConsumer.jsm
 
 
 Parents of:
+https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/76dd5cd892530ca4555736bf773fbc8066483241
+https://github.com/mozilla/newtab-dev/commit/2a1c08cab780da24753b84a88ca34739f6f41550
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
