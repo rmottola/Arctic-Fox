@@ -133,9 +133,6 @@ More session store stuff to check:
 
 - Bug 785487 - Have AboutHomeUtils use the asynchronous search service
 
-Check on Mac:
-- Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
-
 Verify for pre-Australis:
 - Bug 1123517 - Refactor sidebar code. r=florian
 
@@ -152,7 +149,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/472d2ebba168df5766c8859143792ccfd19af9bc
+https://github.com/mozilla/newtab-dev/commit/76dd5cd892530ca4555736bf773fbc8066483241
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
