@@ -187,6 +187,11 @@ public:
         Factory::CreateDrawTargetForData(BackendType::CAIRO, mappedSurf.mData,
         GetSize(), mappedSurf.mStride, GetFormat());
 
+      if (!dt) {
+        gfxWarning() << "DrawTargetTiled::GetDataSurface failed in CreateDrawTargetForData";
+        surf->Unmap();
+        return nullptr;
+      }
       for (size_t i = 0; i < mSnapshots.size(); i++) {
         RefPtr<DataSourceSurface> dataSurf = mSnapshots[i]->GetDataSurface();
         dt->CopySurface(dataSurf, IntRect(IntPoint(0, 0), mSnapshots[i]->GetSize()), mOrigins[i]);

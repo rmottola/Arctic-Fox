@@ -994,6 +994,11 @@ FilterNodeBlendSoftware::Render(const IntRect& aRect)
 	                                     target->Stride(),
 	                                     target->GetFormat());
 
+  if (!dt) {
+    gfxWarning() << "FilterNodeBlendSoftware::Render failed in CreateDrawTargetForData";
+    return nullptr;
+  }
+
   Rect r(0, 0, size.width, size.height);
   dt->DrawSurface(input2, r, r, DrawSurfaceOptions(), DrawOptions(1.0f, ToBlendOp(mBlendMode)));
   dt->Flush();
@@ -1102,6 +1107,7 @@ FilterNodeTransformSoftware::Render(const IntRect& aRect)
                                      mapping.mStride,
                                      surf->GetFormat());
   if (!dt) {
+    gfxWarning() << "FilterNodeTransformSoftware::Render failed in CreateDrawTargetForData";
     return nullptr;
   }
 

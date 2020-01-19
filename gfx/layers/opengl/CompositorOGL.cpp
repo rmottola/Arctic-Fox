@@ -1228,9 +1228,10 @@ CompositorOGL::EndFrame()
       mWidget->GetBounds(rect);
     }
     RefPtr<DrawTarget> target = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(IntSize(rect.width, rect.height), SurfaceFormat::B8G8R8A8);
-    CopyToTarget(target, nsIntPoint(), Matrix());
-
-    WriteSnapshotToDumpFile(this, target);
+    if (target) {
+      CopyToTarget(target, nsIntPoint(), Matrix());
+      WriteSnapshotToDumpFile(this, target);
+    }
   }
 #endif
 
@@ -1342,6 +1343,7 @@ CompositorOGL::SetDestinationSurfaceSize(const gfx::IntSize& aSize)
 void
 CompositorOGL::CopyToTarget(DrawTarget* aTarget, const nsIntPoint& aTopLeft, const gfx::Matrix& aTransform)
 {
+  MOZ_ASSERT(aTarget);
   IntRect rect;
   if (mUseExternalSurfaceSize) {
     rect = IntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
