@@ -140,10 +140,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
   "resource:///modules/sessionstore/PrivacyFilter.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RunState",
   "resource:///modules/sessionstore/RunState.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DocumentUtils",
-  "resource:///modules/sessionstore/DocumentUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "PrivacyLevel",
-  "resource:///modules/sessionstore/PrivacyLevel.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ScratchpadManager",
   "resource://gre/modules/devtools/scratchpad-manager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
@@ -152,8 +148,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionCookies",
   "resource:///modules/sessionstore/SessionCookies.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionFile",
   "resource:///modules/sessionstore/SessionFile.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
-  "resource:///modules/sessionstore/SessionHistory.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TabAttributes",
+  "resource:///modules/sessionstore/TabAttributes.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabState",
   "resource:///modules/sessionstore/TabState.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
@@ -3730,67 +3726,6 @@ let DirtyWindows = {
   clear: function (window) {
     this._data.clear();
   }
-};
-
-// A set of tab attributes to persist. We will read a given list of tab
-// attributes when collecting tab data and will re-set those attributes when
-// the given tab data is restored to a new tab.
-let TabAttributes = {
-  _attrs: new Set(),
-
-  // We never want to directly read or write those attributes.
-  // 'image' should not be accessed directly but handled by using the
-  //         gBrowser.getIcon()/setIcon() methods.
-  // 'pending' is used internal by sessionstore and managed accordingly.
-  _skipAttrs: new Set(["image", "pending"]),
-
-  persist: function (name) {
-    if (this._attrs.has(name) || this._skipAttrs.has(name)) {
-      return false;
-    }
-
-    this._attrs.add(name);
-    return true;
-  },
-
-  get: function (tab) {
-    let data = {};
-
-    for (let name of this._attrs) {
-      if (tab.hasAttribute(name)) {
-        data[name] = tab.getAttribute(name);
-      }
-    }
-
-    return data;
-  },
-
-  set: function (tab, data = {}) {
-    // Clear attributes.
-    for (let name of this._attrs) {
-      tab.removeAttribute(name);
-    }
-
-    // Set attributes.
-    for (let name in data) {
-      tab.setAttribute(name, data[name]);
-    }
-  }
-};
-
-
-// see nsPrivateBrowsingService.js
-String.prototype.hasRootDomain = function hasRootDomain(aDomain) {
-  let index = this.indexOf(aDomain);
-  if (index == -1)
-    return false;
-
-  if (this == aDomain)
-    return true;
-
-  let prevChar = this[index - 1];
-  return (index == (this.length - aDomain.length)) &&
-         (prevChar == "." || prevChar == "/");
 };
 
 function TabData(obj = null) {
