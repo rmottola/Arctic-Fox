@@ -3748,11 +3748,6 @@ let DirtyWindows = {
   }
 };
 
-// A map storing the number of tabs last closed per windoow. This only
-// stores the most recent tab-close operation, and is used to undo
-// batch tab-closing operations.
-let NumberOfTabsClosedLastPerWindow = new WeakMap();
-
 // A set of tab attributes to persist. We will read a given list of tab
 // attributes when collecting tab data and will re-set those attributes when
 // the given tab data is restored to a new tab.
