@@ -922,6 +922,37 @@ pref("dom.ipc.plugins.enabled", true);
 
 pref("browser.tabs.remote", false);
 
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+// When this pref is true the Windows process sandbox will set up dummy
+// interceptions and log to the browser console when calls fail in the sandboxed
+// process and also if they are subsequently allowed by the broker process.
+// This will require a restart.
+pref("security.sandbox.windows.log", false);
+
+#if defined(MOZ_CONTENT_SANDBOX)
+// This controls the strength of the Windows content process sandbox for testing
+// purposes. This will require a restart.
+// On windows these levels are:
+// 0 - sandbox with USER_NON_ADMIN access token level
+// 1 - a more strict sandbox, which causes problems in specific areas
+// 2 - a policy that we can reasonably call an effective sandbox
+// 3 - an equivalent basic policy to the Chromium renderer processes
+pref("security.sandbox.content.level", 0);
+
+// ID (a UUID when set by gecko) that is used as a per profile suffix to a low
+// integrity temp directory.
+pref("security.sandbox.content.tempDirSuffix", "");
+
+#if defined(MOZ_STACKWALKING)
+// This controls the depth of stack trace that is logged when Windows sandbox
+// logging is turned on.  This is only currently available for the content
+// process because the only other sandbox (for GMP) has too strict a policy to
+// allow stack tracing.  This does not require a restart to take effect.
+pref("security.sandbox.windows.log.stackTraceDepth", 0);
+#endif
+#endif
+#endif
+
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
 // This pref is discussed in bug 1083344, the naming is inspired from its Windows
 // counterpart, but on Mac it's an integer which means:
@@ -931,7 +962,7 @@ pref("browser.tabs.remote", false);
 // This setting is read when the content process is started. On Mac the content
 // process is killed when all windows are closed, so a change will take effect
 // when the 1st window is opened. It was decided to default this setting to 1.
-pref("security.sandbox.macos.content.level", 1);
+pref("security.sandbox.content.level", 1);
 #endif
 
 #if defined(NIGHTLY_BUILD) && defined(XP_MACOSX)

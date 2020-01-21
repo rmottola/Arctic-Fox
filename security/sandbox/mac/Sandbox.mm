@@ -313,7 +313,7 @@ bool StartMacSandbox(MacSandboxInfo aInfo, nsCString &aErrorMessage)
   }
   else if (aInfo.type == MacSandboxType_Content) {
     profile.AppendPrintf(contentSandboxRules,
-                         Preferences::GetInt("security.sandbox.macos.content.level"),
+                         Preferences::GetInt("security.sandbox.content.level"),
                          nsCocoaFeatures::OSXVersionMajor(),
                          nsCocoaFeatures::OSXVersionMinor(),
                          aInfo.appPath.get(),
