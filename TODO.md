@@ -116,6 +116,8 @@
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
 - Bug 749804 - part 0: remove the add-on bar, r=jaws
+- Bug 1128768: Part 3 - Update BHR to allow for hang annotations; r=vladan
+- Bug 932865 - Add way for telemetry to iterate over active threads;
 
 More session store stuff to check:
 
@@ -150,7 +152,7 @@ Parents of:
 https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/0994edf17b14b8d89058dca972beec57a7e0fd7c
+https://github.com/mozilla/newtab-dev/commit/56efb9658fc1f85f5f99e403aeed1c3159cb834e
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
