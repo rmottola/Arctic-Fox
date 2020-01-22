@@ -64,7 +64,7 @@ caches.open(name).then(function(openCache) {
     is(v, "Hello world", "Response body should match original");
   });
 }).then(function() {
-  // FIXME(nsm): Can't use a Request object for now since the operations
+  testDone();
   // consume it's 'body'. See
   // https://github.com/slightlyoff/ServiceWorker/issues/510.
   return caches.open(foobar);
