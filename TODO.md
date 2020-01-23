@@ -37,6 +37,7 @@
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
+- Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
