@@ -84,4 +84,4 @@ MaskLayerImageCache::MaskLayerImageKey::~MaskLayerImageKey()
   MOZ_COUNT_DTOR(MaskLayerImageKey);
 }
 
-}
+} // namespace mozilla

@@ -573,5 +573,5 @@ const char* AxisY::Name() const
   return "Y";
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

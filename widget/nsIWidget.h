@@ -40,10 +40,10 @@ namespace mozilla {
 class CompositorVsyncDispatcher;
 namespace dom {
 class TabChild;
-}
+} // namespace dom
 namespace plugins {
 class PluginWidgetChild;
-}
+} // namespace plugins
 namespace layers {
 class Composer2D;
 class Compositor;

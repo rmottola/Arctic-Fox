@@ -24,7 +24,7 @@ class IDBFactory;
 class IDBObjectStore;
 class IDBOpenDBRequest;
 class IDBTransaction;
-}
+} // namespace indexedDB
 
 class DataStoreDBCallback;
 

@@ -277,5 +277,5 @@ GLBlitTextureImageHelper::UseBlitProgram()
     gl->fUniform1i(gl->fGetUniformLocation(mBlitProgram, "uSrcTexture"), 0);
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

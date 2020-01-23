@@ -1511,7 +1511,8 @@ struct CompareIntRects
     return a.height < b.height;
   }
 };
-}
+
+} // namespace
 
 already_AddRefed<DataSourceSurface>
 FilterNodeTileSoftware::Render(const IntRect& aRect)

@@ -638,7 +638,8 @@ struct ShiftRight {
 struct ShiftRightLogical {
     static inline int32_t apply(int32_t v, int32_t bits) { return uint32_t(v) >> (bits & 31); }
 };
-}
+
+} // namespace js
 
 static inline bool
 ErrorBadArgs(JSContext* cx)

@@ -597,6 +597,7 @@ public:
     nsresult Init();
 };
 
-}} // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
 
 #endif // nsHttpHandler_h__

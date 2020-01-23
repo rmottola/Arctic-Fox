@@ -46,7 +46,7 @@ private:
   bool mPrivateBrowsing;
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_BroadcastChannelParent_h

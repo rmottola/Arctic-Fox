@@ -207,7 +207,7 @@ private:
   friend class ConsoleProfileRunnable;
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif /* mozilla_dom_Console_h */

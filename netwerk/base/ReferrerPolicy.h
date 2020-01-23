@@ -71,6 +71,7 @@ IsValidReferrerPolicy(const nsAString& content)
       || content.LowerCaseEqualsLiteral("unsafe-url");
 }
 
-} } //namespace mozilla::net
+} // namespace net
+} // namespace mozilla
 
 #endif

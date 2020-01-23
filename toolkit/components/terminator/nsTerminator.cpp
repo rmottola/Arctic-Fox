@@ -313,7 +313,7 @@ static ShutdownStep sShutdownSteps[] = {
   ShutdownStep("xpcom-shutdown"),
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_ISUPPORTS(nsTerminator, nsIObserver)
 

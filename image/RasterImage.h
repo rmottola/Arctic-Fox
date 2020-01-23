@@ -125,7 +125,7 @@ namespace layers {
 class LayerManager;
 class ImageContainer;
 class Image;
-}
+} // namespace layers
 
 namespace image {
 

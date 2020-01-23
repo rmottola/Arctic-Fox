@@ -25,8 +25,8 @@ class nsISimpleEnumerator;
 namespace mozilla {
 namespace dom {
 class DataTransfer;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 //
 // class nsContentAreaDragDrop, used to generate the dragdata

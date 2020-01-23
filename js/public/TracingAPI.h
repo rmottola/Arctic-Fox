@@ -255,7 +255,7 @@ JS_TraceChildren(JSTracer* trc, void* thing, JSGCTraceKind kind);
 
 namespace JS {
 typedef js::HashSet<Zone*, js::DefaultHasher<Zone*>, js::SystemAllocPolicy> ZoneSet;
-}
+} // namespace JS
 
 // Trace every value within |zones| that is wrapped by a cross-compartment
 // wrapper from a zone that is not an element of |zones|.

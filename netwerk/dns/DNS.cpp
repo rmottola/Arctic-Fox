@@ -328,5 +328,5 @@ AddrInfo::SizeOfIncludingThis(MallocSizeOf mallocSizeOf) const
   return n;
 }
 
-} // namespace dns
+} // namespace net
 } // namespace mozilla

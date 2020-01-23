@@ -2281,5 +2281,5 @@ nsHttpTransaction::Finish0RTT(bool aRestart)
     return NS_OK;
 }
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla

@@ -1452,7 +1452,7 @@ BackgroundProcessLRUPool::AddIntoBackgroundLRUPool(
   LOG("Add ChildID(%llu) into LRU pool", aContentParent->ChildID());
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 

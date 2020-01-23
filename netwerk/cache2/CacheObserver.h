@@ -101,7 +101,7 @@ private:
   nsCOMPtr<nsIFile> mCacheParentDirectoryOverride;
 };
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla
 
 #endif

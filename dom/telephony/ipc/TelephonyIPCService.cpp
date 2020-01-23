@@ -36,7 +36,7 @@ getDefaultServiceId()
   return id;
 }
 
-} // Anonymous namespace
+} // namespace
 
 NS_IMPL_ISUPPORTS(TelephonyIPCService,
                   nsITelephonyService,

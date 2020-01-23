@@ -31,7 +31,7 @@ struct nsIntSize;
 namespace mozilla {
 namespace dom {
 class SVGSVGElement;
-}
+} // namespace dom
 
 namespace image {
 

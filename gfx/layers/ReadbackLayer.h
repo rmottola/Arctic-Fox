@@ -28,7 +28,7 @@ class ReadbackProcessor;
 
 namespace layerscope {
 class LayersPacket;
-}
+} // namespace layerscope
 
 /**
  * A ReadbackSink receives a stream of updates to a rectangle of pixels.
@@ -200,6 +200,7 @@ protected:
   gfxRGBA      mBackgroundColor;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
+
 #endif /* GFX_READBACKLAYER_H */

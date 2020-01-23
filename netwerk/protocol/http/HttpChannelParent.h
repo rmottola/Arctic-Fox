@@ -29,7 +29,7 @@ namespace mozilla {
 namespace dom{
 class TabParent;
 class PBrowserOrId;
-}
+} // namespace dom
 
 namespace net {
 

@@ -13,7 +13,7 @@ class VideoFrameContainer;
 
 namespace dom {
 class HTMLMediaElement;
-}
+} // namespace dom
 
 class MediaDecoderOwner
 {
@@ -131,7 +131,7 @@ public:
   virtual void ResetConnectionState() = 0;
 };
 
-}
+} // namespace mozilla
 
 #endif
 

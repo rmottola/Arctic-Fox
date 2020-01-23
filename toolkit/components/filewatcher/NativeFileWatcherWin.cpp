@@ -1230,7 +1230,7 @@ NativeFileWatcherIOTask::MakeResourcePath(
   return NS_OK;
 }
 
-} // anonymous namespace
+} // namespace
 
 // The NativeFileWatcherService component
 

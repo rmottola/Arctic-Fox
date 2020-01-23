@@ -73,7 +73,7 @@ public:
   static bool IsMP4Type(const nsACString& aType);
 };
 
-}
+} // namespace mozilla
 
 #endif
 

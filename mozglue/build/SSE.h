@@ -215,7 +215,7 @@ namespace mozilla {
 
 
 #endif
-  }
+  } // namespace sse_private
 
 #if defined(MOZILLA_PRESUME_MMX)
 #define MOZILLA_MAY_SUPPORT_MMX 1
@@ -322,6 +322,6 @@ namespace mozilla {
 #endif
 
 
-}
+} // namespace mozilla
 
 #endif /* !defined(mozilla_SSE_h_) */

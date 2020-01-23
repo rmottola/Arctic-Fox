@@ -19,8 +19,8 @@ class nsITimer;
 namespace mozilla {
 namespace dom {
 class MemoryReport;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsMemoryReporterManager final : public nsIMemoryReporterManager
 {

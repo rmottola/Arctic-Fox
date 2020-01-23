@@ -98,7 +98,7 @@ private:
   DebugOnly<bool> mInsideLoop;
 };
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla
 
 #endif

@@ -380,7 +380,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 WorkerNavigator::GetUserAgent(nsString& aUserAgent) const

@@ -26,8 +26,8 @@ class FontFaceInitializer;
 class FontFaceStatusSetter;
 class Promise;
 class StringOrArrayBufferOrArrayBufferView;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 namespace mozilla {
 namespace dom {

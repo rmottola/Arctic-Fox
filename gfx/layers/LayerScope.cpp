@@ -1376,5 +1376,5 @@ LayerScopeAutoFrame::EndFrame()
     WebSocketHelper::GetSocketManager()->DispatchDebugData();
 }
 
-} /* layers */
-} /* mozilla */
+} // namespace layers
+} // namespace mozilla

@@ -431,7 +431,7 @@ private:
   nsCString mCharset;
 };
 
-} // anonymous namespace
+} // namespace
 
 /* static */
 TimeDuration
@@ -1982,9 +1982,9 @@ namespace dom {
 namespace workers {
 extern bool IsCurrentThreadRunningChromeWorker();
 extern JSContext* GetCurrentThreadJSContext();
-}
-}
-}
+} // namespace workers
+} // namespace dom
+} // namespace mozilla
 
 bool
 nsContentUtils::ThreadsafeIsCallerChrome()

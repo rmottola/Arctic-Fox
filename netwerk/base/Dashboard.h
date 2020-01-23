@@ -101,5 +101,7 @@ private:
     nsCOMPtr<nsIDNSService> mDnsService;
 };
 
-} } // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
+
 #endif // nsDashboard_h__

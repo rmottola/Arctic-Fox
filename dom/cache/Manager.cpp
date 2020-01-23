@@ -127,7 +127,7 @@ private:
   nsTArray<nsID> mDeletedBodyIdList;
 };
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

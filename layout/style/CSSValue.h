@@ -16,7 +16,7 @@ class nsIDOMCSSValue;
 class nsROCSSPrimitiveValue;
 namespace mozilla {
 class ErrorResult;
-}
+} // namespace mozilla
 
 namespace mozilla {
 namespace dom {
@@ -42,7 +42,7 @@ public:
   nsROCSSPrimitiveValue *AsPrimitiveValue();
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

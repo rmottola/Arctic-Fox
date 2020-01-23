@@ -307,7 +307,7 @@ protected:
 #endif
 };
 
-}
+} // namespace mozilla
 
 #endif /* MOZILLA_STREAMBUFFER_H_ */
 

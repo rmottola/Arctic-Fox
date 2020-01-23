@@ -1794,7 +1794,7 @@ struct CompareFilesByTime
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 nsPluginHost::AddPluginTag(nsPluginTag* aPluginTag)

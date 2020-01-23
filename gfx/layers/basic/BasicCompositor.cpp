@@ -596,5 +596,5 @@ BasicCompositor::EndFrame()
   mRenderTarget = nullptr;
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

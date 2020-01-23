@@ -34,7 +34,7 @@ DECL_CLASS(nsIDebug);
 #ifdef __cplusplus
 namespace mozilla {
 struct Module;
-}
+} // namespace mozilla
 #endif
 
 /**

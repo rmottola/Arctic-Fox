@@ -70,7 +70,7 @@ public:
   ActorDestroy(ActorDestroyReason aWhy) override;
 };
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace ipc {
@@ -321,7 +321,7 @@ private:
   nsCOMPtr<nsIThread> mBackgroundThread;
 };
 
-} // anonymous namespace
+} // namespace
 
 bool
 BackgroundParentImpl::RecvPBroadcastChannelConstructor(

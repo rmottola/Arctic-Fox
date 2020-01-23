@@ -48,7 +48,7 @@ namespace jit {
 
 namespace gcstats {
 struct Statistics;
-}
+} // namespace gcstats
 
 namespace gc {
 

@@ -251,7 +251,7 @@ class ThreadUtilsRefCountedDerived
 class ThreadUtilsNonRefCounted
 {};
 
-} // namespace TestThreadUtils;
+} // namespace TestThreadUtils
 
 TEST(ThreadUtils, main)
 {

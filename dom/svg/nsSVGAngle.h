@@ -29,8 +29,8 @@ class nsSVGOrientType;
 class SVGAngle;
 class SVGAnimatedAngle;
 class SVGAnimationElement;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsSVGAngle
 {

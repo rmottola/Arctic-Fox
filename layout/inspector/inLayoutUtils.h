@@ -17,7 +17,7 @@ class nsISupports;
 
 namespace mozilla {
 class EventStateManager;
-}
+} // namespace mozilla
 
 class inLayoutUtils
 {

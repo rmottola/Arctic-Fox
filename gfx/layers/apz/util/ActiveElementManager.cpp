@@ -222,5 +222,5 @@ ActiveElementManager::CancelTask()
   }
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

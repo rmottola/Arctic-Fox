@@ -215,6 +215,7 @@ WrapperFor(ProxyAccessible* aProxy)
 {
   return reinterpret_cast<AccessibleWrap*>(aProxy->GetWrapper());
 }
+
 } // namespace a11y
 } // namespace mozilla
 

@@ -163,5 +163,5 @@ GainNode::SendGainToStream(AudioNode* aNode)
   SendTimelineParameterToStream(This, GainNodeEngine::GAIN, *This->mGain);
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

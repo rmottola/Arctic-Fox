@@ -17,7 +17,7 @@ namespace mozilla {
 namespace gl {
     class GLContext;
     class TextureImage;
-}
+} // namespace gl
 namespace layers {
 
 class CompositorOGL;
@@ -66,7 +66,7 @@ public:
                           gl::TextureImage *aDst, const nsIntRect& aDstRect);
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // GLBLITTEXTUREIMAGEHELPER_H_

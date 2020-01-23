@@ -42,5 +42,6 @@ DirectEvalValueFromIon(JSContext* cx,
 extern bool
 IsAnyBuiltinEval(JSFunction* fun);
 
-}  // namespace js
+} // namespace js
+
 #endif /* builtin_Eval_h */

@@ -116,7 +116,7 @@ public:
   nsSMILTimedElement   mTimedElement;
 };
 
-} // namespace mozilla
 } // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_SVGAnimationElement_h

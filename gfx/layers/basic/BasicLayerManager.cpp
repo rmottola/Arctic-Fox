@@ -1005,5 +1005,5 @@ BasicLayerManager::CreateReadbackLayer()
   return layer.forget();
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

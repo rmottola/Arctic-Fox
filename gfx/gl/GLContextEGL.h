@@ -124,7 +124,7 @@ protected:
                                                            gfxIntSize& pbsize);
 };
 
-}
-}
+} // namespace gl
+} // namespace mozilla
 
 #endif // GLCONTEXTEGL_H_

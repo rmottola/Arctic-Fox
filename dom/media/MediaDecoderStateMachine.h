@@ -1288,5 +1288,6 @@ protected:
   DecodedStream mDecodedStream;
 };
 
-} // namespace mozilla;
+} // namespace mozilla
+
 #endif

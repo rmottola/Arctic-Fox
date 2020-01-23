@@ -20,8 +20,8 @@ namespace mozilla {
 namespace gfx {
 class DrawTarget;
 class Path;
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 namespace mozilla {
 
@@ -187,6 +187,6 @@ private:
   bool mHaveClipRect;
 };
 
-}
+} // namespace mozilla
 
 #endif /* DISPLAYITEMCLIP_H_ */

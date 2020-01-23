@@ -131,7 +131,7 @@ protected:
   gfx::CompositionOp mOperator;
 };
 
-} // layers
-} // mozilla
+} // namespace layers
+} // namespace mozilla
 
 #endif

@@ -121,7 +121,7 @@ protected:
 
 #endif // MOZ_WIDGET_ANDROID
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

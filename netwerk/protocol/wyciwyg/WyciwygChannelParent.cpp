@@ -352,4 +352,5 @@ WyciwygChannelParent::GetInterface(const nsIID& uuid, void** result)
 }
 
 
-}} // mozilla::net
+} // namespace net
+} // namespace mozilla

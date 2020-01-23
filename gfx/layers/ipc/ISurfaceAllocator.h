@@ -39,10 +39,10 @@ class Thread;
 namespace mozilla {
 namespace ipc {
 class Shmem;
-}
+} // namespace ipc
 namespace gfx {
 class DataSourceSurface;
-}
+} // namespace gfx
 
 namespace layers {
 
@@ -236,7 +236,7 @@ private:
   static mozilla::Atomic<size_t> sAmount;
 };
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

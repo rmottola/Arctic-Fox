@@ -302,7 +302,7 @@ RilConnector::GetSocketAddr(const sockaddr_any& aAddr, nsAString& aAddrStr)
   MOZ_CRASH("This should never be called!");
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace ipc {

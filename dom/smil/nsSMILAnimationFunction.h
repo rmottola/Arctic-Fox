@@ -21,8 +21,8 @@
 namespace mozilla {
 namespace dom {
 class SVGAnimationElement;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 //----------------------------------------------------------------------
 // nsSMILAnimationFunction

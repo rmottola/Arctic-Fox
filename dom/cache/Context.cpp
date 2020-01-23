@@ -54,7 +54,7 @@ private:
   const QuotaInfo mQuotaInfo;
 };
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

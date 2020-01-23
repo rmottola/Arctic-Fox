@@ -17,7 +17,7 @@ namespace mozilla {
 
 namespace dom {
 class HTMLMediaElement;
-}
+} // namespace dom
 
 namespace layers {
 class Image;
@@ -99,6 +99,6 @@ protected:
   bool mImageSizeChanged;
 };
 
-}
+} // namespace mozilla
 
 #endif /* VIDEOFRAMECONTAINER_H_ */

@@ -8472,7 +8472,8 @@ private:
     mRestorePresentationEvent;
   nsRefPtr<nsDocShell::RestorePresentationEvent> mEvent;
 };
-}
+
+} // namespace
 
 nsresult
 nsDocShell::RestoreFromHistory()
@@ -9512,7 +9513,7 @@ CopyFavicon(nsIURI* aOldURI, nsIURI* aNewURI, bool aInPrivateBrowsing)
 #endif
 }
 
-} // anonymous namespace
+} // namespace
 
 class InternalLoadEvent : public nsRunnable
 {

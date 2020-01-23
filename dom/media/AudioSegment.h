@@ -307,6 +307,6 @@ public:
   }
 };
 
-}
+} // namespace mozilla
 
 #endif /* MOZILLA_AUDIOSEGMENT_H_ */

@@ -119,7 +119,8 @@ DiscardExecutableRegion(void* start, size_t size);
 void DTraceEnterJSFun(JSContext* cx, JSFunction* fun, JSScript* script);
 void DTraceExitJSFun(JSContext* cx, JSFunction* fun, JSScript* script);
 
-} /* namespace Probes */
+} // namespace probes
+
 
 #ifdef INCLUDE_MOZILLA_DTRACE
 static const char* ObjectClassname(JSObject* obj) {

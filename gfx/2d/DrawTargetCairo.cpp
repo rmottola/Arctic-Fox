@@ -1715,5 +1715,5 @@ BorrowedCairoContext::ReturnCairoContextToDrawTarget(DrawTarget* aDT,
   cairoDT->mContext = aCairo;
 }
 
-}
-}
+} // namespace gfx
+} // namespace mozilla

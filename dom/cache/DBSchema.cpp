@@ -35,7 +35,7 @@ namespace {
 const int32_t kLatestSchemaVersion = 6;
 const int32_t kMaxEntriesPerStatement = 255;
 
-} // anonymous namespace
+} // namespace
 
 // If any of the static_asserts below fail, it means that you have changed
 // the corresponding WebIDL enum in a way that may be incompatible with the
@@ -1562,7 +1562,7 @@ ExtractId(mozIStorageStatement* aState, uint32_t aPos, nsID* aIdOut)
   return rv;
 }
 
-} // anonymouns namespace
+} // namespace
 
 } // namespace db
 } // namespace cache

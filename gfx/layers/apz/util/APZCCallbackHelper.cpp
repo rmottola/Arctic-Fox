@@ -651,6 +651,6 @@ APZCCallbackHelper::SendSetTargetAPZCNotification(nsIWidget* aWidget,
   }
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 

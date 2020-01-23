@@ -112,5 +112,5 @@ CompositingRenderTargetOGL::InitializeImpl()
 
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

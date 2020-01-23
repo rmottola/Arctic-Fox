@@ -34,7 +34,7 @@ namespace ipc {
 
 class SharedMemoryBasic;
 
-}
+} // namespace ipc
 
 namespace layers {
 
@@ -1104,7 +1104,7 @@ protected:
   Vector<Task*> mDeferredTasks;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_PanZoomController_h

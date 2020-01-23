@@ -325,7 +325,7 @@ CreateRoot(nsCOMPtr<mozIStorageConnection>& aDBConn,
 }
 
 
-} // Anonymous namespace
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Database

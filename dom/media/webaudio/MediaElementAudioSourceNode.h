@@ -33,7 +33,7 @@ private:
   explicit MediaElementAudioSourceNode(AudioContext* aContext);
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

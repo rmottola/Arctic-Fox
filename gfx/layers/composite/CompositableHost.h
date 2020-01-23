@@ -35,7 +35,7 @@ namespace mozilla {
 namespace gfx {
 class Matrix4x4;
 class DataSourceSurface;
-}
+} // namespace gfx
 
 namespace layers {
 
@@ -292,10 +292,10 @@ namespace CompositableMap {
   void Set(uint64_t aID, PCompositableParent* aParent);
   void Erase(uint64_t aID);
   void Clear();
-} // CompositableMap
+} // namespace CompositableMap
 
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

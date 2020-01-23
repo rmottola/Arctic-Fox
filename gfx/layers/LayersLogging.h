@@ -25,7 +25,7 @@ namespace mozilla {
 namespace gfx {
 class Matrix4x4;
 template <class units> struct RectTyped;
-}
+} // namespace gfx
 
 namespace layers {
 
@@ -207,8 +207,8 @@ Stringify(const T& obj)
   return ss.str();
 }
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 // versions of printf_stderr and fprintf_stderr that deal with line
 // truncation on android by printing individual lines out of the

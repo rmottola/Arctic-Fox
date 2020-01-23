@@ -21,7 +21,7 @@ class Matrix;
 
 namespace dom {
 class HTMLCanvasElement;
-}
+} // namespace dom
 
 namespace CanvasUtils {
 
@@ -168,7 +168,7 @@ DashArrayToJSVal(FallibleTArray<T>& dashes,
     }
 }
 
-}
-}
+} // namespace CanvasUtils
+} // namespace mozilla
 
 #endif /* _CANVASUTILS_H_ */

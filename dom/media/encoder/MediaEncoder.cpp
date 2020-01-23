@@ -367,4 +367,4 @@ MediaEncoder::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   return amount;
 }
 
-}
+} // namespace mozilla

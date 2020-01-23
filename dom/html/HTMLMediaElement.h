@@ -51,8 +51,8 @@ class TextTrack;
 class TimeRanges;
 class WakeLock;
 class MediaTrack;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsITimer;
 class nsRange;

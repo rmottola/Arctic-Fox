@@ -101,4 +101,4 @@ CacheParent::RecvTeardown()
 
 } // namespace cache
 } // namespace dom
-} // namesapce mozilla
+} // namespace mozilla

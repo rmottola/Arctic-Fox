@@ -523,5 +523,5 @@ AltSvcOverride::GetAllow1918(bool *allow)
 
 NS_IMPL_ISUPPORTS(AltSvcOverride, nsIInterfaceRequestor, nsISpeculativeConnectionOverrider)
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla

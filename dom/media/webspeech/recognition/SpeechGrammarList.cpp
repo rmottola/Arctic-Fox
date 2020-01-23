@@ -99,5 +99,6 @@ SpeechGrammarList::IndexedGetter(uint32_t aIndex, bool& aPresent,
   aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
   return nullptr;
 }
+
 } // namespace dom
 } // namespace mozilla

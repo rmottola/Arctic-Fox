@@ -30,8 +30,8 @@ class nsICanvasElementExternal;
 namespace mozilla {
 namespace gfx {
 class SourceSurface;
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 /**
  * XP DragService wrapper base class

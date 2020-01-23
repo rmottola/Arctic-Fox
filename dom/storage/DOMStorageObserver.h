@@ -56,7 +56,7 @@ private:
   nsCOMPtr<nsITimer> mDBThreadStartDelayTimer;
 };
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif

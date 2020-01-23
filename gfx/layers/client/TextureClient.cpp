@@ -944,5 +944,5 @@ SyncObject::CreateSyncObject(SyncHandle aHandle)
 #endif
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

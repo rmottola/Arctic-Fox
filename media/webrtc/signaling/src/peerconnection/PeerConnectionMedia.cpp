@@ -1223,4 +1223,4 @@ LocalSourceStreamInfo::ForgetPipelineByTrackId_m(const std::string& trackId)
   return nullptr;
 }
 
-}  // namespace mozilla
+} // namespace mozilla

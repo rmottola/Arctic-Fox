@@ -41,6 +41,7 @@ public:
 
   DataType mData;
 };
+
 } // namespace binding_detail
 
 template<typename DataType>

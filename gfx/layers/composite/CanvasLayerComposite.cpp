@@ -165,5 +165,5 @@ CanvasLayerComposite::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   }
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

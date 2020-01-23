@@ -52,15 +52,15 @@ class EventChainPreVisitor;
 class EventListenerManager;
 namespace css {
 class StyleRule;
-}
+} // namespace css
 namespace dom {
 class BoxObject;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 namespace JS {
 class SourceBufferHolder;
-}
+} // namespace JS
 
 ////////////////////////////////////////////////////////////////////////
 

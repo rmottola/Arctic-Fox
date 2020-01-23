@@ -53,6 +53,6 @@ private:
   ~OSFileConstantsService();
 };
 
-}
+} // namespace mozilla
 
 #endif // mozilla_osfileconstants_h__

@@ -111,5 +111,5 @@ GetLoadContextInfo(bool const aIsPrivate,
                              aIsAnonymous);
 }
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla

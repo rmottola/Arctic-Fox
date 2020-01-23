@@ -236,7 +236,7 @@ private:
 
 NS_IMPL_ISUPPORTS(AppCacheClearDataObserver, nsIObserver)
 
-} // anonymous namespace
+} // namespace
 
 // Instantiates and registers AppCacheClearDataObserver for notifications
 void

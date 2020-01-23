@@ -78,8 +78,8 @@ class FontFaceSet;
 namespace layers {
 class ContainerLayer;
 class LayerManager;
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 // supported values for cached bool types
 enum nsPresContext_CachedBoolPrefType {

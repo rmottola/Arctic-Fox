@@ -39,4 +39,4 @@ ChromeObjectWrapper::set(JSContext* cx, HandleObject wrapper,
     return ChromeObjectWrapperBase::set(cx, wrapper, receiver, id, vp, result);
 }
 
-}
+} // namespace xpc

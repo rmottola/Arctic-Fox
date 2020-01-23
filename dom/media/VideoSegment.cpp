@@ -109,4 +109,4 @@ VideoSegment::VideoSegment()
 VideoSegment::~VideoSegment()
 {}
 
-}
+} // namespace mozilla

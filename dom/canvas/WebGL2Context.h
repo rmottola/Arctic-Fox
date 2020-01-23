@@ -17,7 +17,7 @@ class WebGLVertexArrayObject;
 namespace dom {
 class OwningUnsignedLongOrUint32ArrayOrBoolean;
 class OwningWebGLBufferOrLongLong;
-}
+} // namespace dom
 
 class WebGL2Context
     : public WebGLContext

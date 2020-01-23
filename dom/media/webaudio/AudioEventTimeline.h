@@ -575,8 +575,8 @@ private:
   float mLastComputedValue;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

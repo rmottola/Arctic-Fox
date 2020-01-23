@@ -30,7 +30,7 @@ struct objectURLOptions;
 
 namespace workers {
 class URLProxy;
-}
+} // namespace workers
 
 class URL final : public URLSearchParamsObserver
 {
@@ -158,7 +158,7 @@ private:
 
 bool IsChromeURI(nsIURI* aURI);
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif /* URL_h___ */

@@ -21,7 +21,7 @@ namespace workers {
 
 class ServiceWorkerClient;
 
-}
+} // namespace workers
 
 /**
  * Implements the MessageEvent event, used for cross-document messaging and

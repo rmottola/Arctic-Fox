@@ -500,7 +500,7 @@ DOMFileToLocalFile(nsIDOMFile* aDomFile)
   return localFile.forget();
 }
 
-} // anonymous namespace
+} // namespace
 
 class DirPickerFileListBuilderTask final
   : public nsRunnable

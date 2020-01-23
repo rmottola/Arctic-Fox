@@ -68,7 +68,7 @@ frameBufferWatcher(void *)
     return nullptr;
 }
 
-} // anonymous namespace
+} // namespace
 
 
 namespace mozilla {

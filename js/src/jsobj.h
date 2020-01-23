@@ -29,7 +29,7 @@
 
 namespace JS {
 struct ClassInfo;
-}
+} // namespace JS
 
 namespace js {
 
@@ -42,7 +42,7 @@ struct StackShape;
 
 namespace gc {
 class RelocationOverlay;
-}
+} // namespace gc
 
 inline JSObject *
 CastAsObject(GetterOp op)
@@ -1200,7 +1200,7 @@ extern bool
 LookupNameUnqualified(JSContext* cx, HandlePropertyName name, HandleObject scopeChain,
                       MutableHandleObject objp);
 
-}
+} // namespace js
 
 
 namespace js {

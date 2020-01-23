@@ -507,7 +507,7 @@ class NuwaMarkPredictorThreadRunner : public nsRunnable
     return NS_OK;
   }
 };
-} // anon namespace
+} // namespace
 #endif
 
 // Predictor::nsICacheEntryMetaDataVisitor
@@ -680,7 +680,8 @@ private:
   nsCOMPtr<nsIThread> mIOThread;
   nsCOMPtr<nsIFile> mDBFile;
 };
-} // anon namespace
+
+} // namespace
 
 void
 Predictor::MaybeCleanupOldDBFiles()
@@ -1907,5 +1908,5 @@ PredictorLearnRedirect(nsIURI *targetURI, nsIChannel *channel,
                           loadContext);
 }
 
-} // ::mozilla::net
-} // ::mozilla
+} // namespace net
+} // namespace mozilla

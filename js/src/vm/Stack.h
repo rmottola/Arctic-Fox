@@ -76,7 +76,7 @@ enum MaybeCheckLexical { CheckLexical = true, DontCheckLexical = false };
 namespace jit {
     class BaselineFrame;
     class RematerializedFrame;
-}
+} // namespace jit
 
 /*
  * Pointer to either a ScriptFrameIter::Data, an InterpreterFrame, or a Baseline
@@ -1050,7 +1050,7 @@ class AsmJSActivation;
 
 namespace jit {
     class JitActivation;
-};
+} // namespace jit
 
 class Activation
 {

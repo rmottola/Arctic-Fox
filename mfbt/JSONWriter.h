@@ -116,7 +116,7 @@ public:
 // on Linux that caused link errors, whereas this formulation didn't.
 namespace detail {
 extern MFBT_DATA const char gTwoCharEscapes[256];
-}
+} // namespace detail
 
 class JSONWriter
 {

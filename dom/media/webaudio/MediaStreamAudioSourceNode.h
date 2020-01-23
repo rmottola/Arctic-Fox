@@ -76,7 +76,7 @@ private:
   nsRefPtr<DOMMediaStream> mInputStream;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

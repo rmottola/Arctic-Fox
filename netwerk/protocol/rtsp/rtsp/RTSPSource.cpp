@@ -772,4 +772,5 @@ bool RTSPSource::isLiveStream() {
     getDuration(&duration);
     return duration == 0;
 }
+
 }  // namespace android

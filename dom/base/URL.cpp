@@ -546,5 +546,5 @@ URL::CreateSearchParamsIfNeeded()
   }
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

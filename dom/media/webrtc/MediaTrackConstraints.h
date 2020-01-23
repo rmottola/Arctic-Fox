@@ -82,6 +82,6 @@ struct FlattenedConstraints : public NormalizedConstraintSet
   explicit FlattenedConstraints(const dom::MediaTrackConstraints& aOther);
 };
 
-}
+} // namespace mozilla
 
 #endif /* MEDIATRACKCONSTRAINTS_H_ */

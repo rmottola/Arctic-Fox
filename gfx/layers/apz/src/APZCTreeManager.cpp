@@ -1599,5 +1599,5 @@ APZCTreeManager::RootAPZCForLayersId(AsyncPanZoomController* aApzc) const
   return apzc.forget();
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

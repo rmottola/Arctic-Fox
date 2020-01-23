@@ -1623,5 +1623,5 @@ PerFrameTexturePoolOGL::EndFrame()
   mCreatedTextures.Clear();
 }
 
-} /* layers */
-} /* mozilla */
+} // namespace layers
+} // namespace mozilla

@@ -650,6 +650,5 @@ RefLayerComposite::CleanupResources()
   mLastIntermediateSurface = nullptr;
 }
 
-} /* layers */
-} /* mozilla */
-
+} // namespace layers
+} // namespace mozilla

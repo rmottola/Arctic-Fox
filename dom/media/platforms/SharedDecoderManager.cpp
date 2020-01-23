@@ -263,4 +263,4 @@ SharedDecoderProxy::IsHardwareAccelerated() const
   return mManager->mDecoder->IsHardwareAccelerated();
 }
 
-}
+} // namespace mozilla

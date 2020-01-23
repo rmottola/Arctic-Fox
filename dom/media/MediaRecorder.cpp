@@ -1206,5 +1206,5 @@ MediaRecorderReporter::~MediaRecorderReporter()
   UnregisterWeakMemoryReporter(this);
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

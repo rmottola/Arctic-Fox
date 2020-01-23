@@ -1003,5 +1003,5 @@ SharedSurfaceTextureHost::Unlock()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla

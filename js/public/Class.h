@@ -208,7 +208,7 @@ class ObjectOpResult
     }
 };
 
-}
+} // namespace JS
 
 // JSClass operation signatures.
 

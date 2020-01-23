@@ -43,7 +43,7 @@ struct nsIntRect;
 namespace mozilla {
 namespace ipc {
 class Shmem;
-}
+} // namespace ipc
 
 namespace layers {
 
@@ -978,5 +978,5 @@ void ImageBridgeChild::SendPendingAsyncMessges()
   SendChildAsyncMessages(replies);
 }
 
-} // layers
-} // mozilla
+} // namespace layers
+} // namespace mozilla

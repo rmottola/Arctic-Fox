@@ -1364,7 +1364,7 @@ EvictionNotifierRunnable::Run()
     return NS_OK;
 }
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 nsCacheService::EvictEntriesForClient(const char *          clientID,

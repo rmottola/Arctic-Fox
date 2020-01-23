@@ -26,7 +26,7 @@ namespace {
 FileService* gInstance = nullptr;
 bool gShutdown = false;
 
-} // anonymous namespace
+} // namespace
 
 FileService::FileService()
 {

@@ -218,7 +218,7 @@ TimeZoneSettingObserver::Observe(nsISupports *aSubject,
   return SetTimeZone(setting.mValue, cx);
 }
 
-} // anonymous namespace
+} // namespace
 
 static mozilla::StaticRefPtr<TimeZoneSettingObserver> sTimeZoneSettingObserver;
 namespace mozilla {

@@ -543,5 +543,5 @@ ClientTiledPaintedLayer::PrintInfo(std::stringstream& aStream, const char* aPref
   }
 }
 
-} // mozilla
-} // layers
+} // namespace layers
+} // namespace mozilla

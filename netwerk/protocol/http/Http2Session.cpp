@@ -3769,5 +3769,5 @@ Http2Session::SendPing()
   ResumeRecv();
 }
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla
