@@ -330,34 +330,6 @@ BackgroundHangManager::RunMonitorThread()
   }
 }
 
-bool
-BackgroundHangMonitor::RegisterAnnotator(HangMonitor::Annotator& aAnnotator)
-{
-#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
-  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
-  if (!thisThread) {
-    return false;
-  }
-  return thisThread->mAnnotators.Register(aAnnotator);
-#else
-  return false;
-#endif
-}
-
-bool
-BackgroundHangMonitor::UnregisterAnnotator(HangMonitor::Annotator& aAnnotator)
-{
-#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
-  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
-  if (!thisThread) {
-    return false;
-  }
-  return thisThread->mAnnotators.Unregister(aAnnotator);
-#else
-  return false;
-#endif
-}
-
 BackgroundHangThread::BackgroundHangThread(const char* aName,
                                            uint32_t aTimeoutMs,
                                            uint32_t aMaxTimeoutMs)
@@ -632,6 +604,33 @@ BackgroundHangMonitor::Allow()
 #endif
 }
 
+bool
+BackgroundHangMonitor::RegisterAnnotator(HangMonitor::Annotator& aAnnotator)
+{
+#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
+  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
+  if (!thisThread) {
+    return false;
+  }
+  return thisThread->mAnnotators.Register(aAnnotator);
+#else
+  return false;
+#endif
+}
+
+bool
+BackgroundHangMonitor::UnregisterAnnotator(HangMonitor::Annotator& aAnnotator)
+{
+#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
+  BackgroundHangThread* thisThread = BackgroundHangThread::FindThread();
+  if (!thisThread) {
+    return false;
+  }
+  return thisThread->mAnnotators.Unregister(aAnnotator);
+#else
+  return false;
+#endif
+}
 
 /* Because we are iterating through the BackgroundHangThread linked list,
    we need to take a lock. Using MonitorAutoLock as a base class makes
