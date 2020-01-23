@@ -57,6 +57,8 @@ MSVC_ENABLE_PGO = True
 LOCAL_INCLUDES += [
     '../build',
     '/caps',
+    '/toolkit/crashreporter/google-breakpad/src',
+    '/tools/profiler',
 ]
 
 # BHR disabled for Release builds because of bug 965392.
