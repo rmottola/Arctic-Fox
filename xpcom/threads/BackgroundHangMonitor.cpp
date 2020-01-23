@@ -8,6 +8,7 @@
 #include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/Monitor.h"
+#include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ThreadHangStats.h"
@@ -18,6 +19,7 @@
 
 #include "prinrval.h"
 #include "prthread.h"
+#include "ThreadStackHelper.h"
 #include "nsIObserverService.h"
 #include "nsIObserver.h"
 #include "mozilla/Services.h"
@@ -155,6 +157,10 @@ public:
   bool mHanging;
   // Is the thread in a waiting state
   bool mWaiting;
+  // Platform-specific helper to get hang stacks
+  ThreadStackHelper mStackHelper;
+  // Stack of current hang
+  Telemetry::HangStack mHangStack;
   // Statistics for telemetry
   Telemetry::ThreadHangStats mStats;
   // Annotations for the current hang
@@ -167,7 +173,7 @@ public:
                        uint32_t aMaxTimeoutMs);
 
   // Report a hang; aManager->mLock IS locked
-  void ReportHang(PRIntervalTime aHangTime) const;
+  void ReportHang(PRIntervalTime aHangTime);
   // Report a permanent hang; aManager->mLock IS locked
   void ReportPermaHang();
   // Called by BackgroundHangMonitor::NotifyActivity
@@ -293,6 +299,7 @@ BackgroundHangManager::RunMonitorThread()
       if (MOZ_LIKELY(!currentThread->mHanging)) {
         if (MOZ_UNLIKELY(hangTime >= currentThread->mTimeout)) {
           // A hang started
+          currentThread->mStackHelper.GetStack(currentThread->mHangStack);
           currentThread->mHangStart = interval;
           currentThread->mHanging = true;
           currentThread->mAnnotations =
@@ -374,7 +381,7 @@ BackgroundHangThread::~BackgroundHangThread()
 }
 
 void
-BackgroundHangThread::ReportHang(PRIntervalTime aHangTime) const
+BackgroundHangThread::ReportHang(PRIntervalTime aHangTime)
 {
   // Recovered from a hang; called on the monitor thread
   // mManager->mLock IS locked
@@ -385,6 +392,19 @@ BackgroundHangThread::ReportHang(PRIntervalTime aHangTime) const
       mHangStack.erase(f);
     }
   }
+
+  Telemetry::HangHistogram newHistogram(Move(mHangStack));
+  for (Telemetry::HangHistogram* oldHistogram = mStats.mHangs.begin();
+       oldHistogram != mStats.mHangs.end(); oldHistogram++) {
+    if (newHistogram == *oldHistogram) {
+      // New histogram matches old one
+      oldHistogram->Add(aHangTime, Move(mAnnotations));
+      return;
+    }
+  }
+  // Add new histogram
+  newHistogram.Add(aHangTime, Move(mAnnotations));
+  mStats.mHangs.append(Move(newHistogram));
 }
 
 void
@@ -409,6 +429,7 @@ BackgroundHangThread::NotifyActivity()
     mManager->Wakeup();
   } else {
     PRIntervalTime duration = intervalNow - mInterval;
+    mStats.mActivity.Add(duration);
     if (MOZ_UNLIKELY(duration >= mTimeout)) {
       /* Wake up the manager thread to tell it that a hang ended */
       mManager->Wakeup();
@@ -493,6 +514,7 @@ BackgroundHangMonitor::Startup()
 
   if (!strcmp(NS_STRINGIFY(MOZ_UPDATE_CHANNEL), "beta")) {
     if (XRE_IsParentProcess()) { // cached ClientID hasn't been read yet
+      ThreadStackHelper::Startup();
       BackgroundHangThread::Startup();
       BackgroundHangManager::sInstance = new BackgroundHangManager();
 
@@ -528,6 +550,7 @@ BackgroundHangMonitor::Shutdown()
   BackgroundHangManager::sInstance->Shutdown();
   BackgroundHangManager::sInstance = nullptr;
   BackgroundHangManager::sDisabled = true;
+  ThreadStackHelper::Shutdown();
 #endif
 }
 
