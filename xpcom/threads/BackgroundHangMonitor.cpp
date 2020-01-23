@@ -10,6 +10,7 @@
 #include "mozilla/Monitor.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/ThreadHangStats.h"
 #include "mozilla/ThreadLocal.h"
 #ifdef MOZ_NUWA_PROCESS
 #include "ipc/Nuwa.h"
@@ -142,8 +143,6 @@ public:
     (void)!sTlsKey.init();
   }
 
-  // Name of the thread
-  const nsAutoCString mThreadName;
   // Hang timeout in ticks
   const PRIntervalTime mTimeout;
   // PermaHang timeout in ticks
@@ -156,6 +155,8 @@ public:
   bool mHanging;
   // Is the thread in a waiting state
   bool mWaiting;
+  // Statistics for telemetry
+  Telemetry::ThreadHangStats mStats;
   // Annotations for the current hang
   UniquePtr<HangMonitor::HangAnnotations> mAnnotations;
   // Annotators registered for this thread
@@ -362,7 +363,6 @@ BackgroundHangThread::BackgroundHangThread(const char* aName,
                                            uint32_t aMaxTimeoutMs)
   : mManager(BackgroundHangManager::sInstance)
   , mThreadID(PR_GetCurrentThread())
-  , mThreadName(aName)
   , mTimeout(aTimeoutMs == BackgroundHangMonitor::kNoTimeout
              ? PR_INTERVAL_NO_TIMEOUT
              : PR_MillisecondsToInterval(aTimeoutMs))
@@ -373,6 +373,7 @@ BackgroundHangThread::BackgroundHangThread(const char* aName,
   , mHangStart(mInterval)
   , mHanging(false)
   , mWaiting(true)
+  , mStats(aName)
 {
   if (sTlsKey.initialized()) {
     sTlsKey.set(this);
@@ -629,6 +630,27 @@ BackgroundHangMonitor::Allow()
              "The background hang monitor is already initialized");
   BackgroundHangManager::sProhibited = false;
 #endif
+}
+
+
+/* Because we are iterating through the BackgroundHangThread linked list,
+   we need to take a lock. Using MonitorAutoLock as a base class makes
+   sure all of that is taken care of for us. */
+BackgroundHangMonitor::ThreadHangStatsIterator::ThreadHangStatsIterator()
+  : MonitorAutoLock(BackgroundHangManager::sInstance->mLock)
+  , mThread(BackgroundHangManager::sInstance->mHangThreads.getFirst())
+{
+}
+
+Telemetry::ThreadHangStats*
+BackgroundHangMonitor::ThreadHangStatsIterator::GetNext()
+{
+  if (!mThread) {
+    return nullptr;
+  }
+  Telemetry::ThreadHangStats* stats = &mThread->mStats;
+  mThread = mThread->getNext();
+  return stats;
 }
 
 } // namespace mozilla
