@@ -1,4 +1,4 @@
 ;!@Install@!UTF-8!
-Title="Pale Moon"
+Title="Arctic Fox"
 RunProgram="setup.exe"
 ;!@InstallEnd@!
