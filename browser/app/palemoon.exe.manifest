@@ -3,10 +3,10 @@
 <assemblyIdentity
         version="1.0.0.0"
         processorArchitecture="*"
-        name="Pale Moon"
+        name="Arctic Fox"
         type="win32"
 />
-<description>Pale Moon</description>
+<description>Arctic Fox</description>
 <dependency>
         <dependentAssembly>
                 <assemblyIdentity
