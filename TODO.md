@@ -119,6 +119,7 @@
 - Bug 749804 - part 0: remove the add-on bar, r=jaws
 - Bug 1128768: Part 3 - Update BHR to allow for hang annotations; r=vladan
 - Bug 932865 - Add way for telemetry to iterate over active threads;
+- Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
 
@@ -128,8 +129,11 @@ More session store stuff to check:
 - Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 
+
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 - Bug 1148505, remove cpow usage from back-forward menu by using sessio
+
+- Bug 1167508 - Reset epoch when receiving XULFrameLoaderCreated r=billm
 
 - Bug 1109875 - Don't flush state when closing tabs r=billm
 - Bug 1109875 - Ignore SessionStore:update messages that do not target (Attention: applies, but breaks restore!
@@ -153,7 +157,6 @@ Parents of:
 https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/a1a8fae426727d15bbed32b8fa437f1b865122b6
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
