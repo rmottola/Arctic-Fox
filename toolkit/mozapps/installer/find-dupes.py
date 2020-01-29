@@ -4,6 +4,7 @@
 
 import sys
 import hashlib
+import re
 from mozpack.packager.unpack import UnpackFinder
 from mozpack.files import DeflatedFile
 from collections import OrderedDict
@@ -308,6 +309,28 @@ def normalize_osx_path(p):
     return p
 
 
+def normalize_l10n_path(p):
+    '''
+    Normalizes localized paths to en-US
+
+    >>> normalize_l10n_path('chrome/es-ES/locale/branding/brand.properties')
+    'chrome/en-US/locale/branding/brand.properties'
+    >>> normalize_l10n_path('chrome/fr/locale/fr/browser/aboutHome.dtd')
+    'chrome/en-US/locale/en-US/browser/aboutHome.dtd'
+    '''
+    p = re.sub(r'chrome/(\S+)/locale/\1',
+               'chrome/en-US/locale/en-US',
+               p)
+    p = re.sub(r'chrome/(\S+)/locale',
+               'chrome/en-US/locale',
+               p)
+    return p
+
+
+def normalize_path(p):
+    return normalize_osx_path(normalize_l10n_path(p))
+
+
 def find_dupes(source):
     md5s = OrderedDict()
     for p, f in UnpackFinder(source):
@@ -335,7 +358,7 @@ def find_dupes(source):
             total_compressed += (len(paths) - 1) * compressed
             num_dupes += 1
 
-            unexpected_dupes.extend([p for p in paths if normalize_osx_path(p) not in ALLOWED_DUPES])
+            unexpected_dupes.extend([p for p in paths if normalize_path(p) not in ALLOWED_DUPES])
 
     if num_dupes:
         print "WARNING: Found %d duplicated files taking %d bytes (%s)" % \
