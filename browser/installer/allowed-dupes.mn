@@ -278,3 +278,10 @@ modules/devtools/framework/toolbox-options.js
 chrome/toolkit/content/global/devtools/framework/toolbox-options.js
 modules/devtools/shared/d3.js
 chrome/toolkit/content/global/devtools/d3.js
+#MacOS ArcticFox exceptions
+browser/chrome/browser/skin/classic/browser/Push-16@2x.png
+browser/chrome/browser/skin/classic/browser/Push-64@2x.png
+chrome/toolkit/skin/classic/global/dirListing/folder.png
+chrome/toolkit/skin/classic/global/dirListing/local.png
+browser/chrome/browser/skin/classic/browser/aboutSessionRestore-window-icon.png
+browser/chrome/browser/skin/classic/browser/preferences/application.png
