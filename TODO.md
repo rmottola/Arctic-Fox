@@ -128,10 +128,11 @@ More session store stuff to check:
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
-
-
+- Bug 1209689 - Tabs that haven't yet been restored should not crash.
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 - Bug 1148505, remove cpow usage from back-forward menu by using sessio
+
+- Bug 1177310 - TabStateFlusher Promises should always resolve.
 
 - Bug 1167508 - Reset epoch when receiving XULFrameLoaderCreated r=billm
 
