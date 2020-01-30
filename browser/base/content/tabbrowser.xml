@@ -1477,6 +1477,7 @@
             let isPreloadBrowser = aParams && aParams.isPreloadBrowser;
 
             let b = document.createElementNS(NS_XUL, "browser");
+	    b.permanentKey = {};
             b.setAttribute("type", "content-targetable");
             b.setAttribute("message", "true");
             b.setAttribute("messagemanagergroup", "browsers");
@@ -2366,6 +2367,12 @@
             if (remoteBrowser) {
               remoteBrowser._outerWindowIDBrowserMap.set(aOtherBrowser.outerWindowID, aOtherBrowser);
             }
+
+            // Swap permanentKey properties.
+            let ourPermanentKey = ourBrowser.permanentKey;
+            ourBrowser.permanentKey = aOtherBrowser.permanentKey;
+            aOtherBrowser.permanentKey = ourPermanentKey;
+
             // Restore the progress listener
             this.mTabListeners[index] = tabListener =
               this.mTabProgressListener(aOurTab, ourBrowser, false);
@@ -3163,6 +3170,7 @@
         <![CDATA[
           let browserStack = document.getAnonymousElementByAttribute(this, "anonid", "browserStack");
           this.mCurrentBrowser = document.getAnonymousElementByAttribute(this, "anonid", "initialBrowser");
+          this.mCurrentBrowser.permanentKey = {};
 
           this.mCurrentTab = this.tabContainer.firstChild;
           document.addEventListener("keypress", this, false);
