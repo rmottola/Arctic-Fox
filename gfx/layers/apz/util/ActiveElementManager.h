@@ -16,7 +16,7 @@ namespace mozilla {
 namespace dom {
 class Element;
 class EventTarget;
-}
+} // namespace dom
 
 namespace layers {
 
@@ -92,7 +92,7 @@ private:
   void CancelTask();
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* mozilla_layers_ActiveElementManager_h */

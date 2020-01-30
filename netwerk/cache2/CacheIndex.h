@@ -1156,7 +1156,7 @@ private:
   bool mLocked;
 };
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla
 
 #endif

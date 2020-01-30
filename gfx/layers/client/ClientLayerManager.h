@@ -409,7 +409,7 @@ CreateShadowFor(ClientLayer* aLayer,
                   &ShadowLayerForwarder::Created ## _type ## Layer)
 
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* GFX_CLIENTLAYERMANAGER_H */

@@ -2732,8 +2732,8 @@ void StrokeLineWithSnapping(const nsPoint& aP1, const nsPoint& aP2,
 
     void MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager, nsView* aView);
 
-  }
-}
+  } // namespace layout
+} // namespace mozilla
 
 class nsSetAttrRunnable : public nsRunnable
 {

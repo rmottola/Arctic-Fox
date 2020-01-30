@@ -25,8 +25,8 @@ template <typename T> class FallibleTArray;
 namespace mozilla {
 namespace gfx {
 struct RectCornerRadii;
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 /**
  * This is the main class for doing actual drawing. It is initialized using

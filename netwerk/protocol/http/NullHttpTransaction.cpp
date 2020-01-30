@@ -326,6 +326,6 @@ NullHttpTransaction::PipelinePosition()
   return 1;
 }
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla
 

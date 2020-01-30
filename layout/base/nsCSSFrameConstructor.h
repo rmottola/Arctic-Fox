@@ -48,8 +48,8 @@ namespace dom {
 
 class FlattenedChildIterator;
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsCSSFrameConstructor : public nsFrameManager
 {

@@ -141,5 +141,5 @@ BasicLayerManager::CreateContainerLayer()
   return layer.forget();
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

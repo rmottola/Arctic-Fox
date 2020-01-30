@@ -117,7 +117,7 @@ private:
   nsCString mCharSet;
 };
 
-} // anonymous namespace
+} // namespace
 
 nscolor
 nsPresContext::MakeColorPref(const nsString& aColor)

@@ -475,7 +475,7 @@ private:
   UniquePtr<AudioInfo> mInfo;
 };
 
-}  // namespace mp3
-}  // namespace mozilla
+} // namespace mp3
+} // namespace mozilla
 
 #endif

@@ -19,7 +19,7 @@ class nsIContentParent;
 
 namespace ipc {
 class URIParams;
-};
+} // namespace ipc
 
 enum DomainSetChangeType{
     ACTIVATE_POLICY,

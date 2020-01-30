@@ -19,7 +19,7 @@ class nsIntRegion;
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
-}
+} // namespace gfx
 
 using namespace gfx;
 

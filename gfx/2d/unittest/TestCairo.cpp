@@ -49,5 +49,5 @@ TEST(Cairo, Bug825721) {
   TryCircle(0.0, 1.0, 5761126469220696064.0);
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

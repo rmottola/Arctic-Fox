@@ -182,7 +182,7 @@ protected:
   virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 };
 
-} // namespace mozilla
 } // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_HTMLSharedElement_h

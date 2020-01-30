@@ -398,7 +398,7 @@ class FreeOp : public JSFreeOp
 
 namespace JS {
 struct RuntimeSizes;
-}
+} // namespace JS
 
 /* Various built-in or commonly-used names pinned on first context. */
 struct JSAtomState

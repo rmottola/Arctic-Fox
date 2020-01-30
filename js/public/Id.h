@@ -178,6 +178,6 @@ template <> struct GCMethods<jsid>
 
 #undef id
 
-}
+} // namespace js
 
 #endif /* js_Id_h */

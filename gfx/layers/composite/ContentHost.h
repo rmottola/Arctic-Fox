@@ -36,7 +36,7 @@
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
-}
+} // namespace gfx
 namespace layers {
 class Compositor;
 class ThebesBufferData;
@@ -223,7 +223,7 @@ public:
                             nsIntRegion* aUpdatedRegionBack);
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

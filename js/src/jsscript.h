@@ -27,14 +27,14 @@
 
 namespace JS {
 struct ScriptSourceInfo;
-}
+} // namespace JS
 
 namespace js {
 
 namespace jit {
     struct BaselineScript;
     struct IonScriptCounts;
-}
+} // namespace jit
 
 # define ION_DISABLED_SCRIPT ((js::jit::IonScript*)0x1)
 # define ION_COMPILING_SCRIPT ((js::jit::IonScript*)0x2)
@@ -53,7 +53,7 @@ class NestedScopeObject;
 namespace frontend {
     struct BytecodeEmitter;
     class UpvarCookie;
-}
+} // namespace frontend
 
 }
 
@@ -2191,7 +2191,7 @@ CloneFunctionScript(JSContext *cx, HandleFunction original, HandleFunction clone
 namespace JS {
 namespace ubi {
 template<> struct Concrete<js::LazyScript> : TracerConcrete<js::LazyScript> { };
-}
-}
+} // namespace ubi
+} // namespace JS
 
 #endif /* jsscript_h */

@@ -273,5 +273,5 @@ AutoMounterSetting::Observe(nsISupports* aSubject,
   return NS_OK;
 }
 
-}   // namespace system
-}   // namespace mozilla
+} // namespace system
+} // namespace mozilla

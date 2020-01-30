@@ -44,7 +44,7 @@ namespace mozilla {
 namespace gl {
 class GLContext;
 class SkiaGLGlue;
-}
+} // namespace gl
 namespace gfx {
 class DrawTarget;
 class SourceSurface;
@@ -58,8 +58,9 @@ BackendTypeBit(BackendType b)
 {
   return 1 << uint8_t(b);
 }
-}
-}
+
+} // namespace gfx
+} // namespace mozilla
 
 #define MOZ_PERFORMANCE_WARNING(module, ...) \
   do { \

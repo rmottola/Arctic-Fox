@@ -37,6 +37,7 @@
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
+- Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -84,6 +85,7 @@
 - Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes¿
 - Bug 1151466 - update talos to the latest version to include some pref
 - Bug 1153658 - browser_compartments.js logspam.
+- remaining parts of Bug 968923 (2015-06)
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
 - Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
@@ -114,6 +116,10 @@
 - Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1151974
 - Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
+- Bug 749804 - part 0: remove the add-on bar, r=jaws
+- Bug 1128768: Part 3 - Update BHR to allow for hang annotations; r=vladan
+- Bug 932865 - Add way for telemetry to iterate over active threads;
+- Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
 
@@ -122,15 +128,18 @@ More session store stuff to check:
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
-
+- Bug 1209689 - Tabs that haven't yet been restored should not crash.
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 - Bug 1148505, remove cpow usage from back-forward menu by using sessio
 
-- Bug 785487 - Have AboutHomeUtils use the asynchronous search service
+- Bug 1177310 - TabStateFlusher Promises should always resolve.
 
-Check on Mac:
-- Bug 1147236 - Use AppConstants in session store code (r=ttaubert)
-- Bug 1142542 - Use AppConstants in browser/modules (r=gavin)
+- Bug 1167508 - Reset epoch when receiving XULFrameLoaderCreated r=billm
+
+- Bug 1109875 - Don't flush state when closing tabs r=billm
+- Bug 1109875 - Ignore SessionStore:update messages that do not target (Attention: applies, but breaks restore!
+
+- Bug 785487 - Have AboutHomeUtils use the asynchronous search service
 
 Verify for pre-Australis:
 - Bug 1123517 - Refactor sidebar code. r=florian
@@ -146,9 +155,9 @@ What with LightweightThemeConsumer.jsm
 
 
 Parents of:
+https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
 https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
-https://github.com/mozilla/newtab-dev/commit/0dad1fee4b8acc1840bc272da9c14069902f00ad
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;

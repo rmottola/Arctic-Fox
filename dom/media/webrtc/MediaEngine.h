@@ -254,6 +254,6 @@ protected:
 
 };
 
-}
+} // namespace mozilla
 
 #endif /* MEDIAENGINE_H_ */

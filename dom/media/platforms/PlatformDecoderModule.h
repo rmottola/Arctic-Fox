@@ -24,7 +24,7 @@ class MediaByteBuffer;
 
 namespace layers {
 class ImageContainer;
-}
+} // namespace layers
 
 class MediaDataDecoder;
 class MediaDataDecoderCallback;

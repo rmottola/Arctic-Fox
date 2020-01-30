@@ -40,5 +40,6 @@ struct ChangesToFlush {
   bool mFlushAnimations;
 };
 
-}
+} // namespace mozilla
+
 #endif /* mozFlushType_h___ */

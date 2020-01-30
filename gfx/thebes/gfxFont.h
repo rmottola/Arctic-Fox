@@ -63,8 +63,8 @@ struct gfxTextRunDrawCallbacks;
 namespace mozilla {
 namespace gfx {
 class GlyphRenderingOptions;
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 struct gfxFontStyle {
     gfxFontStyle();

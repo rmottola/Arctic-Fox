@@ -351,8 +351,8 @@ private:
 
 static const dom::AudioContext::AudioContextId NO_AUDIO_CONTEXT = 0;
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

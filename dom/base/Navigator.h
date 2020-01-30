@@ -38,8 +38,8 @@ class WakeLock;
 class ArrayBufferViewOrBlobOrStringOrFormData;
 struct MobileIdOptions;
 class ServiceWorkerContainer;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #ifdef MOZ_B2G_RIL
 class nsIDOMMozIccManager;
@@ -76,7 +76,7 @@ class MozGetUserMediaDevicesSuccessCallback;
 
 namespace network {
 class Connection;
-} // namespace Connection;
+} // namespace network
 
 #ifdef MOZ_B2G_BT
 namespace bluetooth {

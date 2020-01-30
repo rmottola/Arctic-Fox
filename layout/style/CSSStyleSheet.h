@@ -45,10 +45,10 @@ namespace css {
 class Rule;
 class GroupRule;
 class ImportRule;
-}
+} // namespace css
 namespace dom {
 class CSSRuleList;
-}
+} // namespace dom
 
 // -------------------------------
 // CSS Style Sheet Inner Data Container

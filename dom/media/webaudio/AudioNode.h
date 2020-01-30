@@ -246,7 +246,7 @@ private:
   bool mPassThrough;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

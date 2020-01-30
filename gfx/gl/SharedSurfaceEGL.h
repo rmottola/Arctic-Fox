@@ -106,7 +106,8 @@ public:
     }
 };
 
-} /* namespace gfx */
+} // namespace gl
+
 } /* namespace mozilla */
 
 #endif /* SHARED_SURFACE_EGL_H_ */

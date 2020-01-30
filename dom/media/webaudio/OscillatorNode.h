@@ -106,8 +106,8 @@ private:
   bool mStopped;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

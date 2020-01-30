@@ -42,8 +42,8 @@ namespace dom {
 class Geolocation;
 typedef CallbackObjectHolder<PositionCallback, nsIDOMGeoPositionCallback> GeoPositionCallback;
 typedef CallbackObjectHolder<PositionErrorCallback, nsIDOMGeoPositionErrorCallback> GeoPositionErrorCallback;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 struct CachedPositionAndAccuracy {
   nsCOMPtr<nsIDOMGeoPosition> position;
@@ -247,13 +247,14 @@ private:
   nsRefPtr<Geolocation> mParent;
 };
 
-}
+} // namespace dom
 
 inline nsISupports*
 ToSupports(dom::Geolocation* aGeolocation)
 {
   return ToSupports(static_cast<nsIDOMGeoGeolocation*>(aGeolocation));
 }
-}
+
+} // namespace mozilla
 
 #endif /* nsGeoLocation_h */

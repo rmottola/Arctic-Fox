@@ -570,5 +570,5 @@ CairoImage::GetTextureClient(CompositableClient *aClient)
   return textureClient;
 }
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla

@@ -671,7 +671,7 @@ class OrderedHashTable
     OrderedHashTable(const OrderedHashTable&) = delete;
 };
 
-}  // namespace detail
+} // namespace detail
 
 template <class Key, class Value, class OrderedHashPolicy, class AllocPolicy>
 class OrderedHashMap
@@ -771,7 +771,7 @@ class OrderedHashSet
     }
 };
 
-}  // namespace js
+} // namespace js
 
 
 /*** HashableValue *******************************************************************************/

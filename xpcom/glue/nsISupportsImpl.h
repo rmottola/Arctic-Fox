@@ -81,7 +81,7 @@ struct HasDangerousPublicDestructor
       : IsDestructibleFallbackImpl::Selector<T>::type
     {
     };
-  }
+  } // namespace mozilla
 #  define MOZ_IS_DESTRUCTIBLE(X) (mozilla::IsDestructibleFallback<X>::value)
 #endif
 
@@ -375,7 +375,7 @@ private:
   // but could break pre-existing code that assumes sequential consistency.
   Atomic<nsrefcnt> mValue;
 };
-}
+} // namespace mozilla
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

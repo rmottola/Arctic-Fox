@@ -193,5 +193,5 @@ CopyableCanvasLayer::DiscardTempSurface()
   mCachedTempSurface = nullptr;
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

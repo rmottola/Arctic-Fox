@@ -314,7 +314,7 @@ private:
   nsresult mRv;
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 WebSocketImpl::PrintErrorOnConsole(const char *aBundleURI,
@@ -488,7 +488,7 @@ private:
   const nsCString mReasonString;
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 WebSocketImpl::CloseConnection(uint16_t aReasonCode,
@@ -628,7 +628,7 @@ private:
   WebSocketImpl* mImpl;
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 WebSocketImpl::Disconnect()
@@ -1181,7 +1181,7 @@ private:
   ErrorResult& mRv;
 };
 
-} // anonymous namespace
+} // namespace
 
 already_AddRefed<WebSocket>
 WebSocket::Constructor(const GlobalObject& aGlobal,
@@ -2122,7 +2122,7 @@ private:
   WebSocketImpl* mWebSocketImpl;
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 WebSocketImpl::AddRefObject()
@@ -2553,7 +2553,7 @@ private:
   nsRefPtr<WebSocketImpl> mImpl;
 };
 
-} // anonymous namespace
+} // namespace
 
 // Window closed, stop/reload button pressed, user navigated away from page, etc.
 NS_IMETHODIMP
@@ -2724,7 +2724,7 @@ private:
   nsCOMPtr<nsIRunnable> mEvent;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 WebSocketImpl::Dispatch(nsIRunnable* aEvent, uint32_t aFlags)
@@ -2776,5 +2776,5 @@ WebSocket::AssertIsOnTargetThread() const
   MOZ_ASSERT(NS_IsMainThread() == mIsMainThread);
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

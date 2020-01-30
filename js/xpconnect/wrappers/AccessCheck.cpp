@@ -448,4 +448,4 @@ ExposedPropertiesOnly::deny(js::Wrapper::Action act, HandleId id)
     return false;
 }
 
-}
+} // namespace xpc

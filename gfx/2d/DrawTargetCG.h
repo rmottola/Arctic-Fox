@@ -209,8 +209,8 @@ private:
   bool mMayContainInvalidPremultipliedData;
 };
 
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 #endif
 

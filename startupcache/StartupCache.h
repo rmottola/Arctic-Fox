@@ -228,4 +228,5 @@ class StartupCacheWrapper final
 
 } // namespace scache
 } // namespace mozilla
+
 #endif //StartupCache_h_

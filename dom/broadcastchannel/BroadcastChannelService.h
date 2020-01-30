@@ -42,7 +42,7 @@ private:
   nsTHashtable<nsPtrHashKey<BroadcastChannelParent>> mAgents;
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_BroadcastChannelService_h

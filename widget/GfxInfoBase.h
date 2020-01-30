@@ -107,7 +107,7 @@ private:
 
 };
 
-}
-}
+} // namespace widget
+} // namespace mozilla
 
 #endif /* __mozilla_widget_GfxInfoBase_h__ */

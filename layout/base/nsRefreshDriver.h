@@ -34,8 +34,8 @@ namespace mozilla {
 class RefreshDriverTimer;
 namespace layout {
 class VsyncChild;
-}
-}
+} // namespace layout
+} // namespace mozilla
 
 /**
  * An abstract base class to be implemented by callers wanting to be

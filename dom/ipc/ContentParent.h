@@ -49,7 +49,7 @@ class TestShellParent;
 namespace jsipc {
 class JavaScriptShared;
 class PJavaScriptParent;
-}
+} // namespace jsipc
 
 namespace layers {
 class PCompositorParent;

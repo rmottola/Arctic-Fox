@@ -1305,7 +1305,7 @@ struct MessageManagerReferentCount
   nsDataHashtable<nsStringHashKey, uint32_t> mMessageCounter;
 };
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

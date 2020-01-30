@@ -361,6 +361,7 @@ private:
     int64_t                        mContentBytesWritten0RTT;
 };
 
-}} // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
 
 #endif // nsHttpConnection_h__

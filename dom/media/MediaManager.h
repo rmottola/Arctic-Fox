@@ -48,7 +48,7 @@ struct MediaStreamConstraints;
 class NavigatorUserMediaSuccessCallback;
 class NavigatorUserMediaErrorCallback;
 struct MediaTrackConstraintSet;
-}
+} // namespace dom
 
 #ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaManagerLog();

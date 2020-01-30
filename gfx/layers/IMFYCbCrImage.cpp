@@ -288,6 +288,5 @@ IMFYCbCrImage::GetTextureClient(CompositableClient* aClient)
   return mTextureClient;
 }
 
-
-} /* layers */
-} /* mozilla */
+} // namespace layers
+} // namespace mozilla

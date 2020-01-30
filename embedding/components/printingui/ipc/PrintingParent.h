@@ -47,6 +47,7 @@ private:
     nsIDOMWindow*
     DOMWindowFromBrowserParent(PBrowserParent* parent);
 };
+
 } // namespace embedding
 } // namespace mozilla
 

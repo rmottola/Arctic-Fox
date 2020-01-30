@@ -149,4 +149,4 @@ void VideoFrameContainer::InvalidateWithFlags(uint32_t aFlags)
   nsSVGEffects::InvalidateDirectRenderingObservers(mElement);
 }
 
-}
+} // namespace mozilla

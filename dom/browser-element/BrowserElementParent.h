@@ -18,7 +18,7 @@ namespace mozilla {
 
 namespace dom {
 class TabParent;
-}
+} // namespace dom
 
 /**
  * BrowserElementParent implements a portion of the parent-process side of

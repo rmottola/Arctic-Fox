@@ -330,5 +330,6 @@ protected:
   uint32_t mVideoBitrate;
 };
 
-}
+} // namespace mozilla
+
 #endif

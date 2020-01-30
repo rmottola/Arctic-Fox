@@ -31,8 +31,8 @@ struct HttpRetParams;
 
 //-----------------------------------------------------------------------------
 
-class nsHttpConnectionMgr : public nsIObserver
-                          , public AltSvcCache
+class nsHttpConnectionMgr final : public nsIObserver
+                                , public AltSvcCache
 {
 public:
     NS_DECL_THREADSAFE_ISUPPORTS
@@ -728,6 +728,7 @@ private:
     nsCString mLogData;
 };
 
-}} // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
 
 #endif // !nsHttpConnectionMgr_h__

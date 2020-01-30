@@ -148,7 +148,7 @@ GetPromise(JSContext* aCx, JS::Handle<JSObject*> aFunc)
   UNWRAP_OBJECT(Promise, &promiseVal.toObject(), promise);
   return promise;
 }
-};
+} // namespace
 
 // Main thread runnable to resolve thenables.
 // Equivalent to the specification's ResolvePromiseViaThenableTask.

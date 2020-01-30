@@ -771,5 +771,5 @@ AudioBufferSourceNode::SendLoopParametersToStream()
   }
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

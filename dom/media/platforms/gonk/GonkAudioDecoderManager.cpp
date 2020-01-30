@@ -264,4 +264,5 @@ GonkAudioDecoderManager::Flush()
   }
   return NS_OK;
 }
+
 } // namespace mozilla

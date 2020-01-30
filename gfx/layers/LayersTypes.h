@@ -262,7 +262,7 @@ operator|=(EventRegionsOverride& a, EventRegionsOverride b)
   return a;
 }
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif /* GFX_LAYERSTYPES_H */

@@ -51,7 +51,7 @@ NotifyObserversWithMobileMessage(const char* aEventName,
   obs->NotifyObservers(msg, aEventName, nullptr);
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

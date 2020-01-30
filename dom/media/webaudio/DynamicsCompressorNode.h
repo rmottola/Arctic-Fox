@@ -83,8 +83,8 @@ private:
   nsRefPtr<AudioParam> mRelease;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

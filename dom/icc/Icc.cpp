@@ -40,7 +40,7 @@ IsPukCardLockType(IccLockType aLockType)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(Icc, DOMEventTargetHelper, mIccInfo)
 

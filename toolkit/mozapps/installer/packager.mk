@@ -48,7 +48,7 @@ stage-package: $(MOZ_PKG_MANIFEST)
 		$(addprefix --unify ,$(UNIFY_DIST)) \
 		$(MOZ_PKG_MANIFEST) $(DIST) $(DIST)/$(STAGEPATH)$(MOZ_PKG_DIR)$(if $(MOZ_PKG_MANIFEST),,$(_BINPATH)) \
 		$(if $(filter omni,$(MOZ_PACKAGER_FORMAT)),$(if $(NON_OMNIJAR_FILES),--non-resource $(NON_OMNIJAR_FILES)))
-	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/find-dupes.py $(DIST)/$(STAGEPATH)$(MOZ_PKG_DIR)
+	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/find-dupes.py $(DEFINES) $(ACDEFINES) $(MOZ_PKG_DUPEFLAGS) $(DIST)/$(MOZ_PKG_DIR)
 ifndef LIBXUL_SDK
 ifdef MOZ_PACKAGE_JSSHELL
 # Package JavaScript Shell

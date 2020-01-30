@@ -68,7 +68,7 @@ class WrapperAnswer : public virtual JavaScriptShared
     bool ok(ReturnStatus *rs, const JS::ObjectOpResult &result);
 };
 
-} // mozilla
-} // jsipc
+} // namespace jsipc
+} // namespace mozilla
 
 #endif

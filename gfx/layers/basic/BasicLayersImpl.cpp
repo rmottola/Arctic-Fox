@@ -191,5 +191,5 @@ ShouldShadow(Layer* aLayer)
 }
 
 
-}
-}
+} // namespace layers
+} // namespace mozilla

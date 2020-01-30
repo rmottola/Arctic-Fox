@@ -371,6 +371,6 @@ private:
   nsRefPtr<AudioNode> mStreamNode;
 };
 
-}
+} // namespace mozilla
 
 #endif /* NSDOMMEDIASTREAM_H_ */

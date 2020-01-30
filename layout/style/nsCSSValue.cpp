@@ -829,7 +829,7 @@ private:
   nsCSSValue::Serialization mValueSerialization;
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 nsCSSValue::AppendPolygonToString(nsCSSProperty aProperty, nsAString& aResult,

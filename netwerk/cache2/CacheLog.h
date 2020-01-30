@@ -17,7 +17,7 @@ extern PRLogModuleInfo* GetCache2Log();
 #define LOG(x)
 #endif /* PR_LOGGING */
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla
 
 #endif

@@ -170,7 +170,7 @@ ToHeadersEntryList(nsTArray<HeadersEntry>& aOut, InternalHeaders* aHeaders)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

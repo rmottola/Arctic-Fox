@@ -2685,9 +2685,11 @@ PaintInactiveLayer(nsDisplayListBuilder* aBuilder,
     tempDT = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
                                       itemVisibleRect.Size().ToIntSize(),
                                       SurfaceFormat::B8G8R8A8);
-    context = new gfxContext(tempDT);
-    context->SetMatrix(gfxMatrix::Translation(-itemVisibleRect.x,
-                                              -itemVisibleRect.y));
+    if (tempDT) {
+      context = new gfxContext(tempDT);
+      context->SetMatrix(gfxMatrix::Translation(-itemVisibleRect.x,
+                                                -itemVisibleRect.y));
+    }
   }
 #endif
   basic->BeginTransaction();
@@ -2709,7 +2711,7 @@ PaintInactiveLayer(nsDisplayListBuilder* aBuilder,
   basic->SetTarget(nullptr);
 
 #ifdef MOZ_DUMP_PAINTING
-  if (gfxUtils::sDumpPainting) {
+  if (gfxUtils::sDumpPainting && tempDT) {
     RefPtr<SourceSurface> surface = tempDT->Snapshot();
     DumpPaintedImage(aItem, surface);
 

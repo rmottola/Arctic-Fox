@@ -281,5 +281,5 @@ WakeLock::GetParentObject() const
   return window;
 }
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla

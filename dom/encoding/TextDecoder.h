@@ -116,7 +116,7 @@ private:
   bool mFatal;
 };
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_textdecoder_h_

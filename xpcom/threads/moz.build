@@ -48,6 +48,7 @@ UNIFIED_SOURCES += [
     'nsThreadManager.cpp',
     'nsThreadPool.cpp',
     'nsTimerImpl.cpp',
+    'ThreadStackHelper.cpp',
     'TimerThread.cpp',
 ]
 
@@ -56,6 +57,7 @@ MSVC_ENABLE_PGO = True
 LOCAL_INCLUDES += [
     '../build',
     '/caps',
+    '/tools/profiler',
 ]
 
 # BHR disabled for Release builds because of bug 965392.

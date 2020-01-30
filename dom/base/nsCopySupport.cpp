@@ -51,6 +51,7 @@
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/Selection.h"
+#include "mozilla/IntegerRange.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -149,7 +150,8 @@ SelectionCopyHelper(nsISelection *aSel, nsIDocument *aDoc,
       nsIDocumentEncoder::OutputAbsoluteLinks |
       nsIDocumentEncoder::SkipInvisibleContent |
       nsIDocumentEncoder::OutputDropInvisibleBreak |
-      (aFlags & nsIDocumentEncoder::OutputNoScriptContent);
+      (aFlags & (nsIDocumentEncoder::OutputNoScriptContent |
+                 nsIDocumentEncoder::OutputRubyAnnotation));
 
     mimeType.AssignLiteral(kTextMime);
     rv = docEncoder->Init(domDoc, mimeType, flags);
@@ -274,11 +276,13 @@ SelectionCopyHelper(nsISelection *aSel, nsIDocument *aDoc,
 
 nsresult
 nsCopySupport::HTMLCopy(nsISelection* aSel, nsIDocument* aDoc,
-                        int16_t aClipboardID)
+                        int16_t aClipboardID, bool aWithRubyAnnotation)
 {
-  return SelectionCopyHelper(aSel, aDoc, true, aClipboardID,
-                             nsIDocumentEncoder::SkipInvisibleContent,
-                             nullptr);
+  uint32_t flags = nsIDocumentEncoder::SkipInvisibleContent;
+  if (aWithRubyAnnotation) {
+    flags |= nsIDocumentEncoder::OutputRubyAnnotation;
+  }
+  return SelectionCopyHelper(aSel, aDoc, true, aClipboardID, flags, nullptr);
 }
 
 nsresult
@@ -587,6 +591,38 @@ nsCopySupport::CanCopy(nsIDocument* aDocument)
   return !isCollapsed;
 }
 
+static bool
+IsInsideRuby(nsINode* aNode)
+{
+  for (; aNode; aNode = aNode->GetParent()) {
+    if (aNode->IsHTMLElement(nsGkAtoms::ruby)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool
+IsSelectionInsideRuby(nsISelection* aSelection)
+{
+  int32_t rangeCount;
+  nsresult rv = aSelection->GetRangeCount(&rangeCount);
+  if (NS_FAILED(rv)) {
+    return false;
+  }
+  for (auto i : MakeRange(rangeCount)) {
+    nsCOMPtr<nsIDOMRange> range;
+    aSelection->GetRangeAt(i, getter_AddRefs(range));
+    nsCOMPtr<nsIDOMNode> node;
+    range->GetCommonAncestorContainer(getter_AddRefs(node));
+    nsCOMPtr<nsINode> n = do_QueryInterface(node);
+    if (!IsInsideRuby(n)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool
 nsCopySupport::FireClipboardEvent(int32_t aType, int32_t aClipboardType, nsIPresShell* aPresShell,
                                   nsISelection* aSelection, bool* aActionTaken)
@@ -715,8 +751,13 @@ nsCopySupport::FireClipboardEvent(int32_t aType, int32_t aClipboardType, nsIPres
         }
         return false;
       }
+      // XXX Code which decides whether we should copy text with ruby
+      // annotation is currenct depending on whether each range of the
+      // selection is inside a same ruby container. But we really should
+      // expose the full functionality in browser. See bug 1130891.
+      bool withRubyAnnotation = IsSelectionInsideRuby(sel);
       // call the copy code
-      rv = HTMLCopy(sel, doc, aClipboardType);
+      rv = HTMLCopy(sel, doc, aClipboardType, withRubyAnnotation);
       if (NS_FAILED(rv)) {
         return false;
       }

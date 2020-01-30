@@ -39,7 +39,7 @@ struct nsIntSize;
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
-}
+} // namespace gfx
 
 namespace layers {
 
@@ -317,7 +317,7 @@ private:
   bool                         mPendingLowPrecisionUpload;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

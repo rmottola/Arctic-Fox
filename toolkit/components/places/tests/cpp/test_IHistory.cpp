@@ -140,7 +140,7 @@ test_wait_checkpoint()
 namespace test_unvisited_does_not_notify {
   nsCOMPtr<nsIURI> testURI;
   nsRefPtr<Link> testLink;
-}
+} // namespace test_unvisited_does_not_notify
 void
 test_unvisited_does_not_notify_part1()
 {
@@ -372,7 +372,7 @@ namespace test_observer_topic_dispatched_helpers {
     statusObserver,
     nsIObserver
   )
-}
+} // namespace test_observer_topic_dispatched_helpers
 void
 test_observer_topic_dispatched()
 {

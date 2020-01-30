@@ -60,6 +60,6 @@ protected:
   nsTArray<TrackMapEntry> mTrackMap;
 };
 
-}
+} // namespace mozilla
 
 #endif /* MOZILLA_MEDIASTREAMGRAPH_H_ */

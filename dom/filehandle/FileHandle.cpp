@@ -189,7 +189,7 @@ private:
   nsCOMPtr<nsIInputStream> mStream;
 };
 
-} // anonymous namespace
+} // namespace
 
 FileHandleBase::FileHandleBase(FileMode aMode,
                                RequestMode aRequestMode)

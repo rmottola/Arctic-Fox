@@ -95,6 +95,6 @@ AlarmHalService::Notify(
     aSystemTimezoneChangeInfo.newTimezoneOffsetMinutes());
 }
 
-} // alarm
-} // dom
-} // mozilla
+} // namespace alarm
+} // namespace dom
+} // namespace mozilla

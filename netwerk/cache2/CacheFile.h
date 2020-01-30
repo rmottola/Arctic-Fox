@@ -44,9 +44,9 @@ public:
 NS_DEFINE_STATIC_IID_ACCESSOR(CacheFileListener, CACHEFILELISTENER_IID)
 
 
-class CacheFile : public CacheFileChunkListener
-                , public CacheFileIOListener
-                , public CacheFileMetadataListener
+class CacheFile final : public CacheFileChunkListener
+                      , public CacheFileIOListener
+                      , public CacheFileMetadataListener
 {
 public:
   NS_DECL_THREADSAFE_ISUPPORTS
@@ -250,7 +250,7 @@ private:
   bool mLocked;
 };
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla
 
 #endif

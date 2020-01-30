@@ -181,4 +181,5 @@ NS_DEFINE_STATIC_IID_ACCESSOR(MediaSource, MOZILLA_DOM_MEDIASOURCE_IMPLEMENTATIO
 } // namespace dom
 
 } // namespace mozilla
+
 #endif /* mozilla_dom_MediaSource_h_ */

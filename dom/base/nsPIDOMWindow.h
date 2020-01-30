@@ -38,11 +38,11 @@ namespace mozilla {
 namespace dom {
 class AudioContext;
 class Element;
-}
+} // namespace dom
 namespace gfx {
 class VRHMDInfo;
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 // Popup control state enum. The values in this enum must go from most
 // permissive to least permissive so that it's safe to push state in

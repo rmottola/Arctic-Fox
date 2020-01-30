@@ -370,7 +370,7 @@ private:
   void ThreadFunc();
 };
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif /* DOMStorageDBThread_h___ */

@@ -22,7 +22,7 @@ struct ElementDependentRuleProcessorData;
 
 namespace mozilla {
 struct StyleTransition;
-}
+} // namespace mozilla
 
 /*****************************************************************************
  * Per-Element data                                                          *

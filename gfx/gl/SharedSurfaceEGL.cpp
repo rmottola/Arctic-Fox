@@ -233,5 +233,6 @@ SurfaceFactory_EGLImage::Create(GLContext* prodGL,
     return Move(ret);
 }
 
-} /* namespace gfx */
+} // namespace gl
+
 } /* namespace mozilla */

@@ -382,7 +382,7 @@ nsIdleServiceDaily::DailyCallback(nsITimer* aTimer, void* aClosure)
 
 namespace { 
 nsIdleService* gIdleService;
-}
+} // namespace
 
 already_AddRefed<nsIdleService>
 nsIdleService::GetInstance()

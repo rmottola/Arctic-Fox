@@ -919,4 +919,5 @@ GetErrorString(nsresult rv, nsAString& errorString)
     CopyUTF8toUTF16(errorCString, errorString);
 }
 
-} } // namespace mozilla::net
+} // namespace net
+} // namespace mozilla

@@ -817,7 +817,7 @@ nsresult LoadURLFromConsole()
     return NS_OK;
 }
 
-} // namespace
+} // namespace TestProtocols
 
 using namespace TestProtocols;
 

@@ -89,7 +89,7 @@ PRLogModuleInfo *gOfflineCacheUpdateLog;
 #undef LOG_ENABLED
 #define LOG_ENABLED() PR_LOG_TEST(gOfflineCacheUpdateLog, 4)
 
-namespace { // anon
+namespace {
 
 nsresult
 GetAppIDAndInBrowserFromWindow(nsIDOMWindow *aWindow,
@@ -119,7 +119,7 @@ GetAppIDAndInBrowserFromWindow(nsIDOMWindow *aWindow,
     return NS_OK;
 }
 
-} // anon
+} // namespace
 
 //-----------------------------------------------------------------------------
 // nsOfflineCachePendingUpdate

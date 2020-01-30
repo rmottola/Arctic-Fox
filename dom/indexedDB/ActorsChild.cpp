@@ -774,7 +774,7 @@ DispatchSuccessEvent(ResultHelper* aResultHelper,
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 /*******************************************************************************
  * Local class implementations

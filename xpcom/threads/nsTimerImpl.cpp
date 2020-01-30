@@ -108,7 +108,7 @@ public:
   void Free(void* aPtr);
 };
 
-} // anonymous namespace
+} // namespace
 
 class nsTimerEvent : public nsRunnable
 {
@@ -212,7 +212,7 @@ TimerEventAllocator::Free(void* aPtr)
   mFirstFree = entry;
 }
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_QUERY_INTERFACE(nsTimerImpl, nsITimer)
 NS_IMPL_ADDREF(nsTimerImpl)

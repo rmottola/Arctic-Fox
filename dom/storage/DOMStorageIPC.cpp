@@ -288,7 +288,7 @@ DOMStorageDBParent::ReleaseIPDLReference()
   Release();
 }
 
-namespace { // anon
+namespace {
 
 class SendInitialChildDataRunnable : public nsRunnable
 {
@@ -332,7 +332,7 @@ private:
   nsRefPtr<DOMStorageDBParent> mParent;
 };
 
-} // anon
+} // namespace
 
 DOMStorageDBParent::DOMStorageDBParent()
 : mIPCOpen(false)
@@ -410,7 +410,7 @@ DOMStorageDBParent::RecvAsyncGetUsage(const nsCString& aScope)
   return true;
 }
 
-namespace { // anon
+namespace {
 
 // We need another implementation of DOMStorageCacheBridge to do
 // synchronous IPC preload.  This class just receives Load* notifications
@@ -480,7 +480,7 @@ private:
   uint32_t mLoadedCount;
 };
 
-} // anon
+} // namespace
 
 bool
 DOMStorageDBParent::RecvPreload(const nsCString& aScope,
@@ -603,7 +603,7 @@ DOMStorageDBParent::Observe(const char* aTopic,
   return NS_OK;
 }
 
-namespace { // anon
+namespace {
 
 // Results must be sent back on the main thread
 class LoadRunnable : public nsRunnable
@@ -664,7 +664,7 @@ private:
   }
 };
 
-} // anon
+} // namespace
 
 // DOMStorageDBParent::CacheParentBridge
 
@@ -707,7 +707,7 @@ DOMStorageDBParent::CacheParentBridge::LoadWait()
 
 // DOMStorageDBParent::UsageParentBridge
 
-namespace { // anon
+namespace {
 
 class UsageRunnable : public nsRunnable
 {
@@ -734,7 +734,7 @@ private:
   int64_t mUsage;
 };
 
-} // anon
+} // namespace
 
 void
 DOMStorageDBParent::UsageParentBridge::LoadUsage(const int64_t aUsage)
@@ -743,5 +743,5 @@ DOMStorageDBParent::UsageParentBridge::LoadUsage(const int64_t aUsage)
   NS_DispatchToMainThread(r);
 }
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla

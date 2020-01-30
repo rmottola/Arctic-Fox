@@ -97,6 +97,9 @@ const NOEPOCH_MESSAGES = new Set([
 const CLOSED_MESSAGES = new Set([
   // For a description see above.
   "SessionStore:crashedTabRevived",
+
+  // For a description see above.
+  "SessionStore:update",
 ]);
 
 // These are tab events that we listen to.
@@ -344,6 +347,11 @@ let SessionStoreInternal = {
   // they get restored).
   _crashedBrowsers: new WeakSet(),
 
+  // A map (xul:browser -> object) that maps a browser associated with a
+  // recently closed tab to all its necessary state information we need to
+  // properly handle final update message.
+  _closedTabs: new WeakMap(),
+
   // whether a setBrowserState call is in progress
   _browserSetState: false,
 
@@ -487,10 +495,8 @@ let SessionStoreInternal = {
             }
           }
 
-          // Load the session start time from the previous state
-          this._sessionStartTime = state.session &&
-                                   state.session.startTime ||
-                                   this._sessionStartTime;
+          // Update the session start time using the restored session state.
+          this._updateSessionStartTime(state);
 
           // make sure that at least the first window doesn't have anything hidden
           delete state.windows[0].hidden;
@@ -637,9 +643,48 @@ let SessionStoreInternal = {
           // and not yet been revived.
           return;
         }
+
+        // Record telemetry measurements done in the child and update the tab's
+        // cached state. Mark the window as dirty and trigger a delayed write.
         this.recordTelemetry(aMessage.data.telemetry);
         TabState.update(browser, aMessage.data);
         this.saveStateDelayed(win);
+
+        // Handle any updates sent by the child after the tab was closed. This
+        // might be the final update as sent by the "unload" handler but also
+        // any async update message that was sent before the child unloaded.
+        if (this._closedTabs.has(browser.permanentKey)) {
+          let {closedTabs, tabData} = this._closedTabs.get(browser.permanentKey);
+
+          // Update the closed tab's state. This will be reflected in its
+          // window's list of closed tabs as that refers to the same object.
+          TabState.copyFromCache({linkedBrowser: browser}, tabData.state);
+
+          // Is this the tab's final message?
+          if (aMessage.data.isFinal) {
+            // We expect no further updates.
+            this._closedTabs.delete(browser.permanentKey);
+            // The tab state no longer needs this reference.
+            delete tabData.permanentKey;
+
+            // Determine whether the tab state is worth saving.
+            let shouldSave = this._shouldSaveTabState(tabData.state);
+            let index = closedTabs.indexOf(tabData);
+
+            if (shouldSave && index == -1) {
+              // If the tab state is worth saving and we didn't push it onto
+              // the list of closed tabs when it was closed (because we deemed
+              // the state not worth saving) then add it to the window's list
+              // of closed tabs now.
+              this.saveClosedTabData(closedTabs, tabData);
+            } else if (!shouldSave && index > -1) {
+              // Remove from the list of closed tabs. The update messages sent
+              // after the tab was closed changed enough state so that we no
+              // longer consider its data interesting enough to keep around.
+              this.removeClosedTabData(closedTabs, index);
+            }
+          }
+        }
         break;
       case "SessionStore:restoreHistoryComplete":
         // Notify the tabbrowser that the tab chrome has been restored.
@@ -1377,9 +1422,6 @@ let SessionStoreInternal = {
       return;
     }
 
-    // Flush all data queued in the content script before the tab is gone.
-    TabState.flush(aTab.linkedBrowser);
-
     // Get the latest data for this tab (generally, from the cache)
     let tabState = TabState.collect(aTab);
 
@@ -1389,23 +1431,96 @@ let SessionStoreInternal = {
       return;
     }
 
-    // store closed-tab data for undo
-    if (this._shouldSaveTabState(tabState)) {
-      let tabTitle = aTab.label;
-      let tabbrowser = aWindow.gBrowser;
-      tabTitle = this._replaceLoadingTitle(tabTitle, tabbrowser, aTab);
+    // Store closed-tab data for undo.
+    let tabbrowser = aWindow.gBrowser;
+    let tabTitle = this._replaceLoadingTitle(aTab.label, tabbrowser, aTab);
+    let {permanentKey} = aTab.linkedBrowser;
 
-      this._windows[aWindow.__SSi]._closedTabs.unshift({
-        state: tabState,
-        title: tabTitle,
-        image: tabbrowser.getIcon(aTab),
-        pos: aTab._tPos,
-        closedAt: Date.now()
-      });
-      var length = this._windows[aWindow.__SSi]._closedTabs.length;
-      if (length > this._max_tabs_undo)
-        this._windows[aWindow.__SSi]._closedTabs.splice(this._max_tabs_undo, length - this._max_tabs_undo);
+    let tabData = {
+      permanentKey,
+      state: tabState,
+      title: tabTitle,
+      image: tabbrowser.getIcon(aTab),
+      pos: aTab._tPos,
+      closedAt: Date.now()
+    };
+
+    let closedTabs = this._windows[aWindow.__SSi]._closedTabs;
+
+    // Determine whether the tab contains any information worth saving. Note
+    // that there might be pending state changes queued in the child that
+    // didn't reach the parent yet. If a tab is emptied before closing then we
+    // might still remove it from the list of closed tabs later.
+    if (this._shouldSaveTabState(tabState)) {
+      // Save the tab state, for now. We might push a valid tab out
+      // of the list but those cases should be extremely rare and
+      // do probably never occur when using the browser normally.
+      // (Tests or add-ons might do weird things though.)
+      this.saveClosedTabData(closedTabs, tabData);
     }
+
+    // Remember the closed tab to properly handle any last updates included in
+    // the final "update" message sent by the frame script's unload handler.
+    this._closedTabs.set(permanentKey, {closedTabs, tabData});
+  },
+
+  /**
+   * Insert a given |tabData| object into the list of |closedTabs|. We will
+   * determine the right insertion point based on the .closedAt properties of
+   * all tabs already in the list. The list will be truncated to contain a
+   * maximum of |this._max_tabs_undo| entries.
+   *
+   * @param closedTabs (array)
+   *        The list of closed tabs for a window.
+   * @param tabData (object)
+   *        The tabData to be inserted.
+   */
+  saveClosedTabData(closedTabs, tabData) {
+    // Find the index of the first tab in the list
+    // of closed tabs that was closed before our tab.
+    let index = closedTabs.findIndex(tab => {
+      return tab.closedAt < tabData.closedAt;
+    });
+
+    // If we found no tab closed before our
+    // tab then just append it to the list.
+    if (index == -1) {
+      index = closedTabs.length;
+    }
+
+    // Insert tabData at the right position.
+    closedTabs.splice(index, 0, tabData);
+
+    // Truncate the list of closed tabs, if needed.
+    if (closedTabs.length > this._max_tabs_undo) {
+      closedTabs.splice(this._max_tabs_undo, closedTabs.length);
+    }
+  },
+
+  /**
+   * Remove the closed tab data at |index| from the list of |closedTabs|. If
+   * the tab's final message is still pending we will simply discard it when
+   * it arrives so that the tab doesn't reappear in the list.
+   *
+   * @param closedTabs (array)
+   *        The list of closed tabs for a window.
+   * @param index (uint)
+   *        The index of the tab to remove.
+   */
+  removeClosedTabData(closedTabs, index) {
+    // Remove the given index from the list.
+    let [closedTab] = closedTabs.splice(index, 1);
+
+    // If the closed tab's state still has a .permanentKey property then we
+    // haven't seen its final update message yet. Remove it from the map of
+    // closed tabs so that we will simply discard its last messages and will
+    // not add it back to the list of closed tabs again.
+    if (closedTab.permanentKey) {
+      this._closedTabs.delete(closedTab.permanentKey);
+      delete closedTab.permanentKey;
+    }
+
+    return closedTab;
   },
 
   /**
@@ -1712,18 +1827,17 @@ let SessionStoreInternal = {
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
 
     // fetch the data of closed tab, while removing it from the array
-    let [closedTab] = closedTabs.splice(aIndex, 1);
-    let closedTabState = closedTab.state;
+    let {state, pos} = this.removeClosedTabData(closedTabs, aIndex);
 
     // create a new tab
     let tabbrowser = aWindow.gBrowser;
     let tab = tabbrowser.selectedTab = tabbrowser.addTab();
 
     // restore tab content
-    this.restoreTab(tab, closedTabState);
+    this.restoreTab(tab, state);
 
     // restore the tab's position
-    tabbrowser.moveTabTo(tab, closedTab.pos);
+    tabbrowser.moveTabTo(tab, pos);
 
     // focus the tab's content area (bug 342432)
     tab.linkedBrowser.focus();
@@ -1743,7 +1857,7 @@ let SessionStoreInternal = {
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
 
     // remove closed tab from the array
-    closedTabs.splice(aIndex, 1);
+    this.removeClosedTabData(closedTabs, aIndex);
   },
 
   getClosedWindowCount: function ssi_getClosedWindowCount() {
@@ -1999,9 +2113,9 @@ let SessionStoreInternal = {
     // Set data that persists between sessions
     this._recentCrashes = lastSessionState.session &&
                           lastSessionState.session.recentCrashes || 0;
-    this._sessionStartTime = lastSessionState.session &&
-                             lastSessionState.session.startTime ||
-                             this._sessionStartTime;
+
+    // Update the session start time using the restored session state.
+    this._updateSessionStartTime(lastSessionState);
 
     LastSession.clear();
   },
@@ -2889,6 +3003,20 @@ let SessionStoreInternal = {
   },
 
   /* ........ Auxiliary Functions .............. */
+
+  /**
+   * Update the session start time and send a telemetry measurement
+   * for the number of days elapsed since the session was started.
+   *
+   * @param state
+   *        The session state.
+   */
+  _updateSessionStartTime: function ssi_updateSessionStartTime(state) {
+    // Attempt to load the session start time from the session state
+    if (state.session && state.session.startTime) {
+      this._sessionStartTime = state.session.startTime;
+    }
+  },
 
   /**
    * call a callback for all currently opened browser windows

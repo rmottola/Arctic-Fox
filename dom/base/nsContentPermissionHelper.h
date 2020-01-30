@@ -25,7 +25,7 @@ class nsContentPermissionRequestProxy;
 // That will mess up windows build.
 namespace IPC {
 class Principal;
-}
+} // namespace IPC
 
 namespace mozilla {
 namespace dom {

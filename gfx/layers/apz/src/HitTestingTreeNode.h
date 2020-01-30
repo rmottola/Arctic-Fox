@@ -131,7 +131,7 @@ private:
   EventRegionsOverride mOverride;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_HitTestingTreeNode_h

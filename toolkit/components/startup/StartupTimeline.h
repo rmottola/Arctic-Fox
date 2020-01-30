@@ -94,7 +94,7 @@ private:
   static NS_EXTERNAL_VIS_(const char *) sStartupTimelineDesc[MAX_EVENT_ID];
 };
 
-}
+} // namespace mozilla
 
 #endif /* mozilla_StartupTimeline */
 

@@ -573,7 +573,7 @@ TiledLayerBuffer<Derived, Tile>::Update(const nsIntRegion& newValidRegion,
   mPaintedRegion.Or(mPaintedRegion, aPaintRegion);
 }
 
-} // layers
-} // mozilla
+} // namespace layers
+} // namespace mozilla
 
 #endif // GFX_TILEDLAYERBUFFER_H

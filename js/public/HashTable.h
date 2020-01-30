@@ -29,7 +29,7 @@ template <class, class> class HashMapEntry;
 namespace detail {
     template <class T> class HashTableEntry;
     template <class T, class HashPolicy, class AllocPolicy> class HashTable;
-}
+} // namespace detail
 
 /*****************************************************************************/
 
@@ -1700,7 +1700,7 @@ class HashTable : private AllocPolicy
 #undef METER
 };
 
-}  // namespace detail
-}  // namespace js
+} // namespace detail
+} // namespace js
 
 #endif  /* js_HashTable_h */

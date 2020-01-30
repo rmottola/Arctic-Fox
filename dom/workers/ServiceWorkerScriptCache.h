@@ -34,10 +34,10 @@ nsresult
 Compare(nsIPrincipal* aPrincipal, const nsAString& aCacheName,
         const nsAString& aURL, CompareCallback* aCallback);
 
-} // serviceWorkerScriptCache namespace
+} // namespace serviceWorkerScriptCache
 
-} // workers namespace
-} // dom namespace
-} // mozilla namespace
+} // namespace workers
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_workers_ServiceWorkerScriptCache_h

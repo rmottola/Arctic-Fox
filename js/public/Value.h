@@ -1992,7 +1992,7 @@ extern JS_PUBLIC_DATA(const HandleValue) UndefinedHandleValue;
 extern JS_PUBLIC_DATA(const HandleValue) TrueHandleValue;
 extern JS_PUBLIC_DATA(const HandleValue) FalseHandleValue;
 
-}
+} // namespace JS
 
 #undef JS_VALUE_IS_CONSTEXPR
 #undef JS_RETURN_LAYOUT_FROM_BITS

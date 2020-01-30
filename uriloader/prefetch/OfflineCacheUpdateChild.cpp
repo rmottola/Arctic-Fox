@@ -533,5 +533,5 @@ OfflineCacheUpdateChild::RecvFinish(const bool &succeeded,
     return true;
 }
 
-}
-}
+} // namespace docshell
+} // namespace mozilla

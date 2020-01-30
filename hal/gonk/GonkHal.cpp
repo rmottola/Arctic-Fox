@@ -392,7 +392,7 @@ EnsureVibratorThreadInitialized()
   NS_NewThread(getter_AddRefs(thread), sVibratorRunnable);
 }
 
-} // anonymous namespace
+} // namespace
 
 void
 Vibrate(const nsTArray<uint32_t> &pattern, const hal::WindowIdentifier &)
@@ -469,7 +469,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 class BatteryObserver : public IUeventObserver
 {
@@ -664,7 +664,7 @@ bool sCpuSleepAllowed = true;
 // when reading or writing this variable to ensure thread-safe.
 int32_t sInternalLockCpuCount = 0;
 
-} // anonymous namespace
+} // namespace
 
 bool
 GetScreenEnabled()
@@ -1922,7 +1922,7 @@ private:
   hal::ThreadPriority mThreadPriority;
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 SetCurrentThreadPriority(ThreadPriority aThreadPriority)

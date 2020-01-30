@@ -198,7 +198,7 @@ private:
   bool mIPCOpen;
 };
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif

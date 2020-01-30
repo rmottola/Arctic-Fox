@@ -2066,5 +2066,5 @@ BorrowedCGContext::ReturnCGContextToDrawTarget(DrawTarget *aDT, CGContextRef cg)
 }
 
 
-}
-}
+} // namespace gfx
+} // namespace mozilla

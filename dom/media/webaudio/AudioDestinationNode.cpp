@@ -772,5 +772,5 @@ AudioDestinationNode::InputMuted(bool aMuted)
   CanPlayChanged(state);
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

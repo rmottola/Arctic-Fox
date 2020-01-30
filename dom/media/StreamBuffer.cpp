@@ -101,4 +101,4 @@ StreamBuffer::ForgetUpTo(StreamTime aTime)
   }
 }
 
-}
+} // namespace mozilla

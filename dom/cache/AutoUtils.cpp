@@ -129,7 +129,7 @@ CleanupParentFds(CacheReadStreamOrVoid& aReadStreamOrVoid, CleanupAction aAction
   CleanupParentFds(aReadStreamOrVoid.get_CacheReadStream(), aAction);
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

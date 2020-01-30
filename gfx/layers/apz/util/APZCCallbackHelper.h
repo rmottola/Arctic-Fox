@@ -165,7 +165,7 @@ public:
                                               const nsRefPtr<SetTargetAPZCCallback>& aCallback);
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* mozilla_layers_APZCCallbackHelper_h */

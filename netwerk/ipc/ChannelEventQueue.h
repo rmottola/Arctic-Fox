@@ -175,7 +175,7 @@ class MOZ_STACK_CLASS AutoEventEnqueuer
   nsRefPtr<ChannelEventQueue> mEventQueue;
 };
 
-}
-}
+} // namespace net
+} // namespace mozilla
 
 #endif

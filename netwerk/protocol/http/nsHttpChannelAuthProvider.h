@@ -151,6 +151,7 @@ private:
     nsRefPtr<nsHttpHandler>           mHttpHandler;  // keep gHttpHandler alive
 };
 
-}} // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
 
 #endif // nsHttpChannelAuthProvider_h__

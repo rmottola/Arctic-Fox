@@ -34,8 +34,8 @@ class imgMemoryReporter;
 namespace mozilla {
 namespace image {
 class ImageURL;
-}
-}
+} // namespace image
+} // namespace mozilla
 
 class imgCacheEntry
 {

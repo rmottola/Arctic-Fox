@@ -19,8 +19,8 @@ namespace dom {
 class File;
 class GlobalObject;
 template<typename> class Optional;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 BEGIN_WORKERS_NAMESPACE
 

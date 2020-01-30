@@ -48,7 +48,7 @@ struct LoopUnroller
     void go(LoopIterationBound* bound);
 };
 
-} // anonymous namespace
+} // namespace
 
 MDefinition*
 LoopUnroller::getReplacementDefinition(MDefinition* def)

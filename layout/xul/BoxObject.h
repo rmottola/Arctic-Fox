@@ -86,7 +86,7 @@ protected:
   nsIContent* mContent; // [WEAK]
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

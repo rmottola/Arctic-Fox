@@ -888,7 +888,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 bool
 Proxy::Init()

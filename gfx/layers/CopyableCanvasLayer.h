@@ -65,7 +65,7 @@ protected:
   void DiscardTempSurface();
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

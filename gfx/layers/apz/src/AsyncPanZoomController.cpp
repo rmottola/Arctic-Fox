@@ -3133,5 +3133,5 @@ void AsyncPanZoomController::ShareCompositorFrameMetrics() {
   }
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

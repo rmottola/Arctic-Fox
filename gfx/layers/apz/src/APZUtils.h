@@ -36,7 +36,7 @@ enum class ScrollSource {
 
 typedef uint32_t TouchBehaviorFlags;
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_APZUtils_h

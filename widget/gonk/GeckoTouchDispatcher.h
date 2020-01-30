@@ -86,4 +86,5 @@ private:
 };
 
 } // namespace mozilla
+
 #endif // GECKO_TOUCH_INPUT_DISPATCHER_h

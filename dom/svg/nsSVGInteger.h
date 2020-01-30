@@ -19,8 +19,8 @@ class nsSMILValue;
 namespace mozilla {
 namespace dom {
 class SVGAnimationElement;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsSVGInteger
 {

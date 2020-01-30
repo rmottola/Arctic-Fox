@@ -15433,7 +15433,7 @@ CSSParserImpl::IsValueValidForProperty(const nsCSSProperty aPropID,
   return parsedOK;
 }
 
-} // anonymous namespace
+} // namespace
 
 // Recycling of parser implementation objects
 

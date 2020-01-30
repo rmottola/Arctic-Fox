@@ -81,8 +81,8 @@ private:
   FallibleTArray<float> mOutputBuffer;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

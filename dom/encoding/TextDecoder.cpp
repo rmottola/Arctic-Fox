@@ -137,5 +137,5 @@ TextDecoder::GetEncoding(nsAString& aEncoding)
   nsContentUtils::ASCIIToLower(aEncoding);
 }
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla
