@@ -1,6 +1,8 @@
 # Backlog of Mozilla patches:
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
+- Bug 1533969 - Fix build error with newer glibc. (gettid)
+
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
 - 1472925 - keep a strong reference to MediaStreamGraph from GraphDriver
