@@ -681,7 +681,10 @@ private:
         MOZ_ASSERT(NS_IsMainThread());
         MOZ_ASSERT(mTabChild);
 
-        unused << PBrowserChild::Send__delete__(mTabChild);
+        // Check in case ActorDestroy was called after RecvDestroy message.
+        if (mTabChild->IPCOpen()) {
+            unused << PBrowserChild::Send__delete__(mTabChild);
+        }
 
         mTabChild = nullptr;
         return NS_OK;
@@ -847,6 +850,7 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mUniqueId(aTabId)
   , mDPI(0)
   , mDefaultScale(0)
+  , mIPCOpen(true)
   , mParentIsActive(false)
 {
   // preloaded TabChild should not be added to child map
@@ -1593,6 +1597,8 @@ TabChild::DestroyWindow()
 void
 TabChild::ActorDestroy(ActorDestroyReason why)
 {
+  mIPCOpen = false;
+
   DestroyWindow();
 
   if (mTabChildGlobal) {

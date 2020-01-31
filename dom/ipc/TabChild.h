@@ -492,6 +492,8 @@ public:
       return mParentIsActive;
     }
 
+    bool IPCOpen() { return mIPCOpen; }
+
 protected:
     virtual ~TabChild();
 
@@ -625,6 +627,7 @@ private:
     TabId mUniqueId;
     float mDPI;
     double mDefaultScale;
+    bool mIPCOpen;
     bool mParentIsActive;
 
     DISALLOW_EVIL_CONSTRUCTORS(TabChild);
