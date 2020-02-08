@@ -1642,7 +1642,7 @@ ContentParent::ShutDownMessageManager()
   }
 
   mMessageManager->ReceiveMessage(
-            static_cast<nsIContentFrameMessageManager*>(mMessageManager.get()),
+            static_cast<nsIContentFrameMessageManager*>(mMessageManager.get()), nullptr,
             CHILD_PROCESS_SHUTDOWN_MESSAGE, false,
             nullptr, nullptr, nullptr, nullptr);
 
