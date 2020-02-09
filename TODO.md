@@ -159,7 +159,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
-https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
+https://github.com/mozilla/newtab-dev/commit/b35c2674a24b7078cfff4c374dde4006b503cd6d
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -178,6 +178,8 @@ Check ApplicationReputation.cpp which is missing, possibly from here:
 Bug 837199 - Write interface to query application reputation 
 
 no components/url-classifier ?
+
+Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
 ### Further ToDo which would help portability:
 
