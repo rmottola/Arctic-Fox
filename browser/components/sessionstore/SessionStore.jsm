@@ -2004,15 +2004,6 @@ let SessionStoreInternal = {
 
     if (deleteFrom && aKey in deleteFrom) {
       delete deleteFrom[aKey];
-
-      // Keep the extData object only if it is not empty, to save
-      // a little disk space when serializing the tab state later.
-      if (Object.keys(deleteFrom).length) {
-        TabStateCache.updateField(aTab, "extData", deleteFrom);
-      } else {
-        TabStateCache.removeField(aTab, "extData");
-      }
-
       this.saveStateDelayed(aTab.ownerDocument.defaultView);
     }
   },
