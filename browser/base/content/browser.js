@@ -791,7 +791,7 @@ function _loadURIWithFlags(browser, uri, flags, referrer, charset, postdata) {
 // Starts a new load in the browser first switching the browser to the correct
 // process
 function LoadInOtherProcess(browser, loadOptions, historyIndex = -1) {
-  let tab = gBrowser._getTabForBrowser(browser);
+  let tab = gBrowser.getTabForBrowser(browser);
   // Flush the tab state before getting it
   TabState.flush(browser);
   let tabState = JSON.parse(SessionStore.getTabState(tab));

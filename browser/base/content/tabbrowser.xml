@@ -1361,7 +1361,7 @@
               return false;
 
             // Unhook our progress listener.
-            let tab = this._getTabForBrowser(aBrowser);
+            let tab = this.getTabForBrowser(aBrowser);
             let index = tab._tPos;
             let filter = this.mTabFilters[index];
             aBrowser.webProgress.removeProgressListener(filter);
