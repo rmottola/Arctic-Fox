@@ -33,12 +33,6 @@ NSDISTMODE = copy
 
 include $(topsrcdir)/config/config.mk
 
-ifeq ($(OS_ARCH),WINNT)
-# Rebuild firefox.exe if the manifest changes - it's included by splash.rc.
-# (this dependency should really be just for firefox.exe, not other targets)
-EXTRA_DEPS += $(PROGRAM).manifest
-endif
-
 PROGRAMS_DEST = $(DIST)/bin
 
 include $(topsrcdir)/config/rules.mk

@@ -210,6 +210,8 @@ ParseIDFromDeviceID(const nsAString &key, const char *prefix, int length)
 // based on http://msdn.microsoft.com/en-us/library/ms724834(VS.85).aspx
 enum {
   kWindowsUnknown = 0,
+  kWindowsXP = 0x50001,
+  kWindowsServer2003 = 0x50002,
   kWindowsVista = 0x60000,
   kWindows7 = 0x60001,
   kWindows8 = 0x60002,
@@ -731,6 +733,10 @@ static OperatingSystem
 WindowsVersionToOperatingSystem(int32_t aWindowsVersion)
 {
   switch(aWindowsVersion) {
+    case kWindowsXP:
+      return DRIVER_OS_WINDOWS_XP;
+    case kWindowsServer2003:
+      return DRIVER_OS_WINDOWS_SERVER_2003;
     case kWindowsVista:
       return DRIVER_OS_WINDOWS_VISTA;
     case kWindows7:
@@ -866,6 +872,22 @@ GfxInfo::GetGfxDriverInfo()
     IMPLEMENT_INTEL_DRIVER_BLOCKLIST_D2D(DRIVER_OS_WINDOWS_7, IntelGMAX3000, V(8,15,10,1930));
     IMPLEMENT_INTEL_DRIVER_BLOCKLIST_D2D(DRIVER_OS_WINDOWS_7, IntelGMAX4500HD, V(8,15,10,2202));
 
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMA500,   V(3,0,20,3200));
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMA900,   V(6,14,10,4764));
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMA950,   V(6,14,10,4926));
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMA3150,  V(6,14,10,5134));
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMAX3000, V(6,14,10,5218));
+    IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_XP, IntelGMAX4500HD, V(6,14,10,4969));
+
+    // StrechRect seems to suffer from precision issues which leads to artifacting
+    // during content drawing starting with at least version 6.14.10.5082
+    // and going until 6.14.10.5218. See bug 919454 and bug 949275 for more info.
+    APPEND_TO_DRIVER_BLOCKLIST_RANGE(DRIVER_OS_WINDOWS_XP,
+      const_cast<nsAString&>(GfxDriverInfo::GetDeviceVendor(VendorIntel)),
+      const_cast<GfxDeviceFamily*>(GfxDriverInfo::GetDeviceFamily(IntelGMAX4500HD)),
+      GfxDriverInfo::allFeatures, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
+      DRIVER_BETWEEN_EXCLUSIVE, V(6,14,10,5076), V(6,14,10,5218), "6.14.10.5218");
+
     IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_VISTA, IntelGMA500,   V(3,0,20,3200));
     IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_VISTA, IntelGMA900,   GfxDriverInfo::allDriverVersions);
     IMPLEMENT_INTEL_DRIVER_BLOCKLIST(DRIVER_OS_WINDOWS_VISTA, IntelGMA950,   V(7,14,10,1504));
@@ -996,6 +1018,12 @@ GfxInfo::GetGfxDriverInfo()
       GfxDriverInfo::allFeatures, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
       DRIVER_BETWEEN_INCLUSIVE, V(8,17,12,5730), V(8,17,12,6901), "Nvidia driver > 8.17.12.6901");
 
+    /* Bug 1153381: WebGL issues with D3D11 ANGLE on Intel. These may be fixed by an ANGLE update. */
+    APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_ALL,
+      (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorIntel), (GfxDeviceFamily*)GfxDriverInfo::GetDeviceFamily(IntelGMAX4500HD),
+      nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+      DRIVER_LESS_THAN, GfxDriverInfo::allDriverVersions);
+
   }
   return *mDriverInfo;
 }
@@ -1048,6 +1076,27 @@ GfxInfo::GetFeatureStatusImpl(int32_t aFeature,
       return NS_ERROR_FAILURE;
     }
 
+    // special-case the WinXP test slaves: they have out-of-date drivers, but we still want to
+    // whitelist them, actually we do know that this combination of device and driver version
+    // works well.
+    if (mWindowsVersion == kWindowsXP &&
+        adapterVendorID.Equals(GfxDriverInfo::GetDeviceVendor(VendorNVIDIA), nsCaseInsensitiveStringComparator()) &&
+        adapterDeviceID.LowerCaseEqualsLiteral("0x0861") && // GeForce 9400
+        driverVersion == V(6,14,11,7756))
+    {
+      *aStatus = FEATURE_STATUS_OK;
+      return NS_OK;
+    }
+
+    // Windows Server 2003 should be just like Windows XP for present purpose, but still has a different version number.
+    // OTOH Windows Server 2008 R1 and R2 already have the same version numbers as Vista and Seven respectively
+    if (os == DRIVER_OS_WINDOWS_SERVER_2003)
+      os = DRIVER_OS_WINDOWS_XP;
+
+    if (mHasDriverVersionMismatch) {
+      *aStatus = nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION;
+      return NS_OK;
+    }
   }
 
   return GfxInfoBase::GetFeatureStatusImpl(aFeature, aStatus, aSuggestedDriverVersion, aDriverInfo, &os);

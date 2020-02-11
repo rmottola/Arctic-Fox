@@ -25,6 +25,7 @@
 #include "WinUtils.h"
 #include "nsPIDOMWindow.h"
 
+using mozilla::IsVistaOrLater;
 using namespace mozilla::widget;
 
 char16_t *nsFilePicker::mLastUsedUnicodeDirectory;
@@ -688,6 +689,15 @@ nsFilePicker::ShowXPFilePicker(const nsString& aInitialDir)
               OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_ENABLESIZING | 
               OFN_EXPLORER;
 
+  // Windows Vista and up won't allow you to use the new looking dialogs with
+  // a hook procedure.  The hook procedure fixes a problem on XP dialogs for
+  // file picker visibility.  Vista and up automatically ensures the file 
+  // picker is always visible.
+  if (!IsVistaOrLater()) {
+    ofn.lpfnHook = FilePickerHook;
+    ofn.Flags |= OFN_ENABLEHOOK;
+  }
+
   // Handle add to recent docs settings
   if (IsPrivacyModeEnabled() || !mAddToRecentDocs) {
     ofn.Flags |= OFN_DONTADDTORECENT;
@@ -732,9 +742,24 @@ nsFilePicker::ShowXPFilePicker(const nsString& aInitialDir)
     case modeOpenMultiple:
       ofn.Flags |= OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT;
 
-      // XXX: We need to eventually move to
-      // the new Common File Dialogs for Windows.
-      result = FilePickerWrapper(&ofn, PICKER_TYPE_OPEN);
+      // The hook set here ensures that the buffer returned will always be
+      // large enough to hold all selected files.  The hook may modify the
+      // value of ofn.lpstrFile and deallocate the old buffer that it pointed
+      // to (fileBuffer). The hook assumes that the passed in value is heap 
+      // allocated and that the returned value should be freed by the caller.
+      // If the hook changes the buffer, it will deallocate the old buffer.
+      // This fix would be nice to have in Vista and up, but it would force
+      // the file picker to use the old style dialogs because hooks are not
+      // allowed in the new file picker UI.  We need to eventually move to
+      // the new Common File Dialogs for Vista and up.
+      if (!IsVistaOrLater()) {
+        ofn.lpfnHook = MultiFilePickerHook;
+        fileBuffer.forget();
+        result = FilePickerWrapper(&ofn, PICKER_TYPE_OPEN);
+        fileBuffer = ofn.lpstrFile;
+      } else {
+        result = FilePickerWrapper(&ofn, PICKER_TYPE_OPEN);
+      }
       break;
 
     case modeSave:
@@ -1019,18 +1044,20 @@ nsFilePicker::ShowW(int16_t *aReturnVal)
   mUnicodeFile.Truncate();
   mFiles.Clear();
 
-  // Launch the XP-style file/folder picker as a fallback. 
+  // Launch the XP file/folder picker on XP and as a fallback on Vista+. 
   // The CoCreateInstance call to CLSID_FileOpenDialog fails with "(0x80040111)
   // ClassFactory cannot supply requested class" when the checkbox for
   // Disable Visual Themes is on in the compatability tab within the shortcut
   // properties.
   bool result = false, wasInitError = true;
   if (mMode == modeGetFolder) {
-    result = ShowFolderPicker(initialDir, wasInitError);
+    if (IsVistaOrLater())
+      result = ShowFolderPicker(initialDir, wasInitError);
     if (!result && wasInitError)
       result = ShowXPFolderPicker(initialDir);
   } else {
-    result = ShowFilePicker(initialDir, wasInitError);
+    if (IsVistaOrLater())
+      result = ShowFilePicker(initialDir, wasInitError);
     if (!result && wasInitError)
       result = ShowXPFilePicker(initialDir);
   }
@@ -1221,7 +1248,11 @@ nsFilePicker::AppendXPFilter(const nsAString& aTitle, const nsAString& aFilter)
 NS_IMETHODIMP
 nsFilePicker::AppendFilter(const nsAString& aTitle, const nsAString& aFilter)
 {
-  mComFilterList.Append(aTitle, aFilter);
+  if (IsVistaOrLater()) {
+    mComFilterList.Append(aTitle, aFilter);
+  } else {
+    AppendXPFilter(aTitle, aFilter);
+  }
   return NS_OK;
 }
 

@@ -91,6 +91,12 @@ function check_mp3(v, enabled) {
   check("audio/mp3; codecs=mp3", "probably");
 }
 
+function IsWindowsVistaOrLater() {
+  var re = /Windows NT (\d+\.\d)/;
+  var winver = navigator.userAgent.match(re);
+  return winver && winver.length == 2 && parseFloat(winver[1]) >= 6.0;
+}
+
 function IsMacOSSnowLeopardOrLater() {
   var re = /Mac OS X (\d+)\.(\d+)/;
   var ver = navigator.userAgent.match(re);
@@ -110,11 +116,11 @@ function getPref(name) {
   return pref;
 }
 
-var haveMp4 = getPref("media.windows-media-foundation.enabled") ||
-              IsMacOSSnowLeopardOrLater() ||
-              IsJellyBeanOrLater() ||
-              getPref("media.omx.enabled") ||
-              getPref("media.ffmpeg.enabled");
+var haveMp4 = (getPref("media.windows-media-foundation.enabled") && IsWindowsVistaOrLater()) ||
+               IsMacOSSnowLeopardOrLater() ||
+               IsJellyBeanOrLater() ||
+               getPref("media.omx.enabled") ||
+               getPref("media.ffmpeg.enabled");
              
 check_mp4(document.getElementById('v'), haveMp4);
 

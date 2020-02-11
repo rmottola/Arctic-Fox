@@ -14,6 +14,10 @@
 namespace mozilla
 {
 
+static int (*avcodec_decode_audio4)(AVCodecContext*,AVFrame*,
+                         int*,const AVPacket*) = nullptr;
+static void (*av_init_packet1)(AVPacket*) = nullptr;
+
 FFmpegAudioDecoder<LIBAV_VER>::FFmpegAudioDecoder(
   FlushableMediaTaskQueue* aTaskQueue, MediaDataDecoderCallback* aCallback,
   const AudioInfo& aConfig)
@@ -31,6 +35,9 @@ FFmpegAudioDecoder<LIBAV_VER>::Init()
 {
   nsresult rv = FFmpegDataDecoder::Init();
   NS_ENSURE_SUCCESS(rv, rv);
+
+  avcodec_decode_audio4 = (decltype(avcodec_decode_audio4))FFmpegRuntimeLinker::avc_ptr[_decode_audio4];
+  av_init_packet1 = (decltype(av_init_packet1))FFmpegRuntimeLinker::avc_ptr[_init_packet];
 
   return NS_OK;
 }
@@ -101,7 +108,7 @@ void
 FFmpegAudioDecoder<LIBAV_VER>::DecodePacket(MediaRawData* aSample)
 {
   AVPacket packet;
-  av_init_packet(&packet);
+  av_init_packet1(&packet);
 
   packet.data = const_cast<uint8_t*>(aSample->Data());
   packet.size = aSample->Size();

@@ -1223,6 +1223,11 @@ TEST(GoannaMediaPlugins, GMPPluginVoucher) {
 
 #if defined(XP_WIN)
 TEST(GoannaMediaPlugins, GMPOutputProtection) {
+  // Output Protection is not available pre-Vista.
+  if (!IsVistaOrLater()) {
+    return;
+  }
+
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestOutputProtection);
 }

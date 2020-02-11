@@ -21,6 +21,11 @@ public:
   static already_AddRefed<PlatformDecoderModule> Create();
 };
 
+#if defined(XP_WIN)
+HMODULE FFmpegRuntimeLinker::avcd=NULL;
+HMODULE FFmpegRuntimeLinker::avutl=NULL;
+void* FFmpegRuntimeLinker::avc_ptr[avc_symbs_count];
+#else
 static const char* sLibs[] = {
 #if defined(XP_DARWIN)
   "libavcodec.58.dylib",
@@ -44,13 +49,15 @@ static const char* sLibs[] = {
 
 PRLibrary* FFmpegRuntimeLinker::sLinkedLib = nullptr;
 const char* FFmpegRuntimeLinker::sLib = nullptr;
-static unsigned (*avcodec_version)() = nullptr;
-
 #define AV_FUNC(func, ver) void (*func)();
 #define LIBAVCODEC_ALLVERSION
 #include "FFmpegFunctionList.h"
 #undef LIBAVCODEC_ALLVERSION
 #undef AV_FUNC
+
+#endif
+
+static unsigned (*avcodec_version)() = nullptr;
 
 /* static */ bool
 FFmpegRuntimeLinker::Link()
@@ -60,6 +67,92 @@ FFmpegRuntimeLinker::Link()
   }
 
   MOZ_ASSERT(NS_IsMainThread());
+
+#if defined(XP_WIN)
+  HKEY aKey;
+  DWORD d;
+  HMODULE hModule = nullptr;
+  char* dllpath = new char[1000];
+
+  if(::RegOpenKeyExA(HKEY_CLASSES_ROOT,
+    "CLSID\\{171252A0-8820-4AFE-9DF8-5C92B2D66B04}\\InprocServer32",
+     0,KEY_READ, &aKey)!=0) { /*return false;*/ }
+
+  if(::RegQueryValueExA(aKey, NULL, NULL, NULL, (LPBYTE)dllpath, &d)!=0) {
+    /*return false;*/
+    /*::lstrcpyA(&dllpath[0], ".\"); /* try to load bundled ffmpeg libraries */
+trybundled:
+    hModule = ::GetModuleHandle(NULL);
+    if(hModule == NULL) return false; /* can't get self handle, bail out */
+    ::GetModuleFileNameA(hModule, dllpath, 1000);
+    d = ::lstrlenA(dllpath);
+  }
+
+  ::RegCloseKey(aKey);
+
+  int i = (int)d;
+	do{
+		i--;
+	} while (dllpath[i]!='\\'&&i>0);
+  i++;
+  ::lstrcpyA(&dllpath[i], "avcodec-lav-57.dll");
+  avcd=::LoadLibraryExA(dllpath,0,LOAD_WITH_ALTERED_SEARCH_PATH);
+  ::lstrcpyA(&dllpath[i], "avutil-lav-55.dll");
+  avutl=::LoadLibraryExA(dllpath,0,LOAD_WITH_ALTERED_SEARCH_PATH);
+
+  if(avcd==NULL||avutl==NULL){
+     if(!hModule) goto trybundled;
+     delete [] dllpath;
+     return false;
+     } 
+
+  HMODULE hmod=avcd;
+
+  const char* avc_symbs[]={
+  "avcodec_version",
+  "avcodec_alloc_context3",
+  "avcodec_close",
+  "avcodec_decode_audio4",
+  "avcodec_decode_video2",
+  "avcodec_find_decoder",
+  "avcodec_flush_buffers",
+  "avcodec_open2",
+  "avcodec_register_all",
+  "av_init_packet",
+  "av_parser_init",
+  "av_parser_close",
+  "av_parser_parse2",
+  /* libavutil */
+  "av_log_set_level",
+  "av_freep",
+  "av_frame_alloc",
+  "av_frame_free",
+  "av_frame_unref"
+  };
+
+  i=0;
+
+  do{
+  if (i==13) hmod=avutl;
+    avc_ptr[i] = GetProcAddress(hmod,avc_symbs[i]);
+    if (avc_ptr[i]==NULL){
+      ::GetModuleFileNameA(hmod,dllpath,1000);
+      d=::lstrlenA(dllpath);
+  	do{
+		d--;
+	} while (dllpath[i]!='\\'&&i>0);
+      FFMPEG_LOG("Couldn't load function ",avc_symbs[i]," from %s.", &dllpath[d]);
+      delete [] dllpath;
+      return false;
+     }
+    i++;
+  }while(i<avc_symbs_count);
+  delete [] dllpath;
+  avcodec_version = (decltype(avcodec_version))avc_ptr[0];
+  sLinkStatus = LinkStatus_SUCCEEDED;
+  return true;
+
+#else
 
   for (size_t i = 0; i < ArrayLength(sLibs); i++) {
     const char* lib = sLibs[i];
@@ -88,8 +181,10 @@ FFmpegRuntimeLinker::Link()
 
   sLinkStatus = LinkStatus_FAILED;
   return false;
+#endif
 }
 
+#if !defined(XP_WIN)
 /* static */ bool
 FFmpegRuntimeLinker::Bind(const char* aLibName)
 {
@@ -161,6 +256,7 @@ FFmpegRuntimeLinker::Bind(const char* aLibName)
 #undef LIBAVCODEC_ALLVERSION
   return true;
 }
+#endif
 
 /* static */ already_AddRefed<PlatformDecoderModule>
 FFmpegRuntimeLinker::CreateDecoderModule()
@@ -172,13 +268,14 @@ FFmpegRuntimeLinker::CreateDecoderModule()
   if (!GetVersion(major, minor, micro)) {
     return  nullptr;
   }
-
   nsRefPtr<PlatformDecoderModule> module;
   switch (major) {
+#if !defined(XP_WIN)
     case 53: module = FFmpegDecoderModule<53>::Create(); break;
     case 54: module = FFmpegDecoderModule<54>::Create(); break;
     case 55:
     case 56: module = FFmpegDecoderModule<55>::Create(); break;
+#endif
     case 57: module = FFmpegDecoderModule<57>::Create(); break;
     case 58: module = FFmpegDecoderModule<58>::Create(); break;
     default: module = nullptr;
@@ -189,6 +286,12 @@ FFmpegRuntimeLinker::CreateDecoderModule()
 /* static */ void
 FFmpegRuntimeLinker::Unlink()
 {
+#if defined(XP_WIN)
+    ::FreeLibrary(avcd);
+    ::FreeLibrary(avutl);
+    sLinkStatus = LinkStatus_INIT;
+    avcodec_version = nullptr;
+#else
   if (sLinkedLib) {
     PR_UnloadLibrary(sLinkedLib);
     sLinkedLib = nullptr;
@@ -196,6 +299,7 @@ FFmpegRuntimeLinker::Unlink()
     sLinkStatus = LinkStatus_INIT;
     avcodec_version = nullptr;
   }
+#endif
 }
 
 /* static */ uint32_t

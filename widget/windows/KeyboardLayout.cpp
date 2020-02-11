@@ -1016,7 +1016,9 @@ NativeKey::GetScanCodeWithExtendedFlag() const
   // MapVirtualKeyEx() has been improved for supporting extended keys since
   // Vista.  When we call it for mapping a scancode of an extended key and
   // a virtual keycode, we need to add 0xE000 to the scancode.
-  if (!mIsExtended) {
+  // On Win XP and Win Server 2003, this doesn't support. On them, we have
+  // no way to get virtual keycodes from scancode of extended keys.
+  if (!mIsExtended || !IsVistaOrLater()) {
     return mScanCode;
   }
   return (0xE000 | mScanCode);
@@ -1092,7 +1094,12 @@ bool
 NativeKey::CanComputeVirtualKeyCodeFromScanCode() const
 {
   // Vista or later supports ScanCodeEx.
-  return true;
+  if (IsVistaOrLater()) {
+    return true;
+  }
+  // Otherwise, MapVirtualKeyEx() can compute virtual keycode only with
+  // non-extended key.
+  return !mIsExtended;
 }
 
 uint8_t
@@ -1118,7 +1125,8 @@ NativeKey::ComputeScanCodeExFromVirtualKeyCode(UINT aVirtualKeyCode) const
 {
   return static_cast<uint16_t>(
            ::MapVirtualKeyEx(aVirtualKeyCode,
-                             MAPVK_VK_TO_VSC_EX,
+                             IsVistaOrLater() ? MAPVK_VK_TO_VSC_EX :
+                                                MAPVK_VK_TO_VSC,
                              mKeyboardLayout));
 }
 
@@ -2374,7 +2382,8 @@ KeyboardLayout::LoadLayout(HKL aLayout)
 #ifdef PR_LOGGING
   if (PR_LOG_TEST(sKeyboardLayoutLogger, PR_LOG_DEBUG)) {
     static const UINT kExtendedScanCode[] = { 0x0000, 0xE000 };
-    static const UINT kMapType = MAPVK_VSC_TO_VK_EX;
+    static const UINT kMapType =
+      IsVistaOrLater() ? MAPVK_VSC_TO_VK_EX : MAPVK_VSC_TO_VK;
     PR_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
            ("Logging virtual keycode values for scancode (0x%p)...",
             mKeyboardLayout));
@@ -2385,6 +2394,11 @@ KeyboardLayout::LoadLayout(HKL aLayout)
           ::MapVirtualKeyEx(scanCode, kMapType, mKeyboardLayout);
         PR_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
                ("0x%04X, %s", scanCode, kVirtualKeyName[virtualKeyCode]));
+      }
+      // XP and Server 2003 don't support 0xE0 prefix of the scancode.
+      // Therefore, we don't need to continue on them.
+      if (!IsVistaOrLater()) {
+        break;
       }
     }
   }

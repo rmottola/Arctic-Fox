@@ -485,6 +485,8 @@ gfxWindowsPlatform::UpdateRenderMode()
 
     mRenderMode = RENDER_GDI;
 
+    bool isVistaOrHigher = IsVistaOrLater();
+
     bool safeMode = false;
     nsCOMPtr<nsIXULRuntime> xr = do_GetService("@mozilla.org/xre/runtime;1");
     if (xr)
@@ -526,7 +528,8 @@ gfxWindowsPlatform::UpdateRenderMode()
     }
 
     ID3D11Device *device = GetD3D11Device();
-    if (!safeMode && tryD2D && device &&
+    if (isVistaOrHigher && !safeMode && tryD2D &&
+        device &&
         device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_10_0 &&
         DoesD3D11TextureSharingWork(device)) {
 
@@ -541,8 +544,9 @@ gfxWindowsPlatform::UpdateRenderMode()
 #endif
 
 #ifdef CAIRO_HAS_DWRITE_FONT
-    // Enable when it's preffed on or when we're going to use D2D.
-    if (!mDWriteFactory && mUseDirectWrite) {
+    // Enable when it's preffed on -and- we're using Vista or higher. Or when
+    // we're going to use D2D.
+    if (!mDWriteFactory && (mUseDirectWrite && isVistaOrHigher)) {
         decltype(DWriteCreateFactory)* createDWriteFactory = (decltype(DWriteCreateFactory)*)
             GetProcAddress(LoadLibraryW(L"dwrite.dll"), "DWriteCreateFactory");
 
@@ -1854,6 +1858,7 @@ gfxWindowsPlatform::InitD3D11Devices()
   featureLevels.AppendElement(D3D_FEATURE_LEVEL_11_0);
   featureLevels.AppendElement(D3D_FEATURE_LEVEL_10_1);
   featureLevels.AppendElement(D3D_FEATURE_LEVEL_10_0);
+  featureLevels.AppendElement(D3D_FEATURE_LEVEL_9_3);
 
   RefPtr<IDXGIAdapter1> adapter;
 

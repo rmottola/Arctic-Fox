@@ -378,10 +378,10 @@ nsNPAPIPlugin::RunPluginOOP(const nsPluginTag *aPluginTag)
 #endif
 
 #ifdef XP_WIN
-    // We force Flash to run in OOPP mode when no specific override exists,
-    // because Adobe doesn't test Flash in-process and there
+    // On Windows Vista+, we force Flash to run in OOPP mode when no specific
+    // override exists, because Adobe doesn't test Flash in-process and there
     // are known stability bugs. (See also bug 769721)
-    if (aPluginTag->mIsFlashPlugin) {
+    if (aPluginTag->mIsFlashPlugin && IsVistaOrLater()) {
 #ifdef ACCESSIBILITY
       if (!useA11yPref)
         return true;

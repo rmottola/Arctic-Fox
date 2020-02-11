@@ -39,10 +39,10 @@
 #ifdef HAVE_64BIT_BUILD
 !define HAVE_64BIT_BUILD
 !define ARCH "x64"
-!define MinSupportedVer "Microsoft Windows Vista x64"
+!define MinSupportedVer "Microsoft Windows XP x64"
 #else
 !define ARCH "x86"
-!define MinSupportedVer "Microsoft Windows Vista"
+!define MinSupportedVer "Microsoft Windows XP"
 #endif
 
 # File details shared by both the installer and uninstaller

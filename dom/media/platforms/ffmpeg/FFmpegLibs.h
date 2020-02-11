@@ -29,10 +29,11 @@ enum { LIBAV_VER = LIBAVCODEC_VERSION_MAJOR };
 
 namespace mozilla {
 
+#if !defined(XP_WIN)
 #define AV_FUNC(func, ver) extern typeof(func)* func;
 #include "FFmpegFunctionList.h"
 #undef AV_FUNC
-
+#endif
 }
 
 #endif // __FFmpegLibs_h__

@@ -7,15 +7,11 @@
 // Implement TimeStamp::Now() with QueryPerformanceCounter() controlled with
 // values of GetTickCount().
 
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
-
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/TimeStamp.h"
 #include "nsWindowsHelpers.h"
 #include <windows.h>
-#include <winbase.h>
 
 #include "nsCRT.h"
 #include "prlog.h"
@@ -172,7 +168,40 @@ static CRITICAL_SECTION sTimeStampLock;
 // Kept in [mt]
 static ULONGLONG sFaultIntoleranceCheckpoint = 0;
 
+// Used only when GetTickCount64 is not available on the platform.
+// Last result of GetTickCount call.
+//
+// Kept in [ms]
+static DWORD sLastGTCResult = 0;
+
+// Higher part of the 64-bit value of MozGetTickCount64,
+// incremented atomically.
+static DWORD sLastGTCRollover = 0;
+
 namespace mozilla {
+
+typedef ULONGLONG (WINAPI* GetTickCount64_t)();
+static GetTickCount64_t sGetTickCount64 = nullptr;
+
+// Function protecting GetTickCount result from rolling over,
+// result is in [ms]
+static ULONGLONG WINAPI
+MozGetTickCount64()
+{
+  DWORD GTC = ::GetTickCount();
+
+  // Cheaper then CMPXCHG8B
+  AutoCriticalSection lock(&sTimeStampLock);
+
+  // Pull the rollover counter forward only if new value of GTC goes way
+  // down under the last saved result
+  if ((sLastGTCResult > GTC) && ((sLastGTCResult - GTC) > (1UL << 30))) {
+    ++sLastGTCRollover;
+  }
+
+  sLastGTCResult = GTC;
+  return ULONGLONG(sLastGTCRollover) << 32 | sLastGTCResult;
+}
 
 // Result is in [mt]
 static inline ULONGLONG
@@ -338,7 +367,7 @@ TimeStampValue::CheckQPC(const TimeStampValue& aOther) const
   if (duration < sHardFailureLimit) {
     // Interval between the two time stamps is very short, consider
     // QPC as unstable and record a failure.
-    uint64_t now = ms2mt(GetTickCount64());
+    uint64_t now = ms2mt(sGetTickCount64());
 
     AutoCriticalSection lock(&sTimeStampLock);
 
@@ -460,6 +489,17 @@ HasStableTSC()
 nsresult
 TimeStamp::Startup()
 {
+  // Decide which implementation to use for the high-performance timer.
+
+  HMODULE kernelDLL = GetModuleHandleW(L"kernel32.dll");
+  sGetTickCount64 = reinterpret_cast<GetTickCount64_t>(
+    GetProcAddress(kernelDLL, "GetTickCount64"));
+  if (!sGetTickCount64) {
+    // If the platform does not support the GetTickCount64 (Windows XP doesn't),
+    // then use our fallback implementation based on GetTickCount.
+    sGetTickCount64 = MozGetTickCount64;
+  }
+
   InitializeCriticalSectionAndSpinCount(&sTimeStampLock, kLockSpinCount);
 
   sHasStableTSC = HasStableTSC();
@@ -498,7 +538,7 @@ TimeStamp::Now(bool aHighResolution)
 
   // Both values are in [mt] units.
   ULONGLONG QPC = useQPC ? PerformanceCounter() : uint64_t(0);
-  ULONGLONG GTC = ms2mt(GetTickCount64());
+  ULONGLONG GTC = ms2mt(sGetTickCount64());
   return TimeStamp(TimeStampValue(GTC, QPC, useQPC));
 }
 

@@ -121,11 +121,14 @@ NS_IMETHODIMP nsPrintProgress::OpenProgressDialog(nsIDOMWindow *parent,
     nsCOMPtr<nsIDOMWindow> ownerWindow = do_GetInterface(ownerXULWindow);
     NS_ENSURE_STATE(ownerWindow);
 
+    nsCOMPtr<nsPIDOMWindow> piOwnerWindow = do_QueryInterface(ownerWindow);
+    MOZ_ASSERT(piOwnerWindow);
+
     // Open the dialog.
     nsCOMPtr<nsIDOMWindow> newWindow;
-    rv = ownerWindow->OpenDialog(NS_ConvertASCIItoUTF16(dialogURL),
-                                 NS_LITERAL_STRING("_blank"),
-                                 NS_LITERAL_STRING("chrome,titlebar,dependent,centerscreen"),
+    rv = piOwnerWindow->OpenDialog(NS_ConvertASCIItoUTF16(dialogURL),
+                                   NS_LITERAL_STRING("_blank"),
+                                   NS_LITERAL_STRING("chrome,titlebar,dependent,centerscreen"),
                                  array, getter_AddRefs(newWindow));
   }
 

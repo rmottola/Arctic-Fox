@@ -6,5 +6,5 @@ include $(topsrcdir)/config/rules.mk
 
 # We don't want OpenMP for KISS-FFT
 ifeq ($(OS_ARCH),WINNT)
-  CFLAGS := $(filter-out -openmp,$(CFLAGS))
+#  CFLAGS := $(filter-out -openmp,$(CFLAGS))
 endif

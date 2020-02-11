@@ -437,7 +437,7 @@ WinUtils::Initialize()
     gWindowsLog = PR_NewLogModule("Widget");
   }
 #endif
-  if (!sDwmDll) {
+  if (!sDwmDll && IsVistaOrLater()) {
     sDwmDll = ::LoadLibraryW(kDwmLibraryName);
 
     if (sDwmDll) {

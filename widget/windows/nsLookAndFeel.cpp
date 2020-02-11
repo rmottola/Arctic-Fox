@@ -34,8 +34,10 @@ nsLookAndFeel::GetOperatingSystemVersion()
     version = eOperatingSystemVersion_Windows8;
   } else if (IsWin7OrLater()) {
     version = eOperatingSystemVersion_Windows7;
-  } else {
+  } else if (IsVistaOrLater()) {
     version = eOperatingSystemVersion_WindowsVista;
+  } else {
+    version = eOperatingSystemVersion_WindowsXP;
   }
 
   return version;
@@ -191,7 +193,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       idx = COLOR_HIGHLIGHT;
       break;
     case eColorID__moz_menubarhovertext:
-      if (!IsAppThemed())
+      if (!IsVistaOrLater() || !IsAppThemed())
       {
         idx = nsUXThemeData::sFlatMenus ?
                 COLOR_HIGHLIGHTTEXT :
@@ -200,7 +202,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       }
       // Fall through
     case eColorID__moz_menuhovertext:
-      if (IsAppThemed())
+      if (IsVistaOrLater() && IsAppThemed())
       {
         res = ::GetColorFromTheme(eUXMenu,
                                   MENU_POPUPITEM, MPI_HOT, TMT_TEXTCOLOR, aColor);
@@ -293,7 +295,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       aColor = NS_RGB(0, 0, 0);
       return NS_OK;
     case eColorID__moz_win_mediatext:
-      if (IsAppThemed()) {
+      if (IsVistaOrLater() && IsAppThemed()) {
         res = ::GetColorFromTheme(eUXMediaToolbar,
                                   TP_BUTTON, TS_NORMAL, TMT_TEXTCOLOR, aColor);
         if (NS_SUCCEEDED(res))
@@ -303,7 +305,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       idx = COLOR_WINDOWTEXT;
       break;
     case eColorID__moz_win_communicationstext:
-      if (IsAppThemed())
+      if (IsVistaOrLater() && IsAppThemed())
       {
         res = ::GetColorFromTheme(eUXCommunicationsToolbar,
                                   TP_BUTTON, TS_NORMAL, TMT_TEXTCOLOR, aColor);

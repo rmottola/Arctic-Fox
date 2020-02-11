@@ -12,19 +12,11 @@
  * https://bugzilla.mozilla.org/show_bug.cgi?id=427099
  */
 
- #if defined(__cplusplus)
- #  include <new>
- // Since libstdc++ 6, including the C headers (e.g. stdlib.h) instead of the
- // corresponding C++ header (e.g. cstdlib) can cause confusion in C++ code
- // using things defined there. Specifically, with stdlib.h, the use of abs()
- // in gfx/graphite2/src/inc/UtfCodec.h somehow ends up picking the wrong abs()
- #  include <cstdlib>
- #  include <cstring>
- #else
- #  include <stdlib.h>
- #  include <string.h>
- #endif
-
+#include <stdlib.h>
+#include <string.h>
+#if defined(__cplusplus)
+#  include <new>
+#endif
 #include "xpcom-config.h"
 
 #if defined(__cplusplus)
@@ -188,12 +180,6 @@ MFBT_API void* moz_valloc(size_t size)
  */
 #define MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 #define MOZALLOC_THROW_BAD_ALLOC_IF_HAS_EXCEPTIONS
-#elif __cplusplus >= 201103
-/*
- * C++11 has deprecated exception-specifications in favour of |noexcept|.
- */
-#define MOZALLOC_THROW_IF_HAS_EXCEPTIONS noexcept(true)
-#define MOZALLOC_THROW_BAD_ALLOC_IF_HAS_EXCEPTIONS noexcept(false)
 #else
 #define MOZALLOC_THROW_IF_HAS_EXCEPTIONS throw()
 #define MOZALLOC_THROW_BAD_ALLOC_IF_HAS_EXCEPTIONS throw(std::bad_alloc)

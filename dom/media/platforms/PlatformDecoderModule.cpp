@@ -24,6 +24,7 @@
 #include "GMPDecoderModule.h"
 
 #include "mozilla/Preferences.h"
+#include "mozilla/WindowsVersion.h"
 #include "SharedThreadPool.h"
 #include "MediaTaskQueue.h"
 
@@ -84,9 +85,6 @@ PlatformDecoderModule::Init()
 #ifdef MOZ_APPLEMEDIA
   AppleDecoderModule::Init();
 #endif
-#ifdef MOZ_FFMPEG
-  FFmpegRuntimeLinker::Link();
-#endif
 }
 
 /* static */
@@ -118,8 +116,10 @@ PlatformDecoderModule::CreatePDM()
     return CreateBlankDecoderModule();
   }
 #ifdef XP_WIN
+  if(IsVistaOrLater()&&!Preferences::GetBool("media.ffmpeg.enabled", false)){
   nsRefPtr<PlatformDecoderModule> m(new WMFDecoderModule());
   return m.forget();
+  }
 #endif
 #ifdef MOZ_FFMPEG
   nsRefPtr<PlatformDecoderModule> mffmpeg = FFmpegRuntimeLinker::CreateDecoderModule();

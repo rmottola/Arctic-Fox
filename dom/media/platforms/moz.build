@@ -30,10 +30,15 @@ if CONFIG['MOZ_FFMPEG']:
         'ffmpeg/FFmpegLog.cpp',
         'ffmpeg/FFmpegRuntimeLinker.cpp',
     ]
+
+    if CONFIG['OS_TARGET'] == 'Linux':
+         DIRS += [
+            'ffmpeg/libav53',
+            'ffmpeg/libav54',
+            'ffmpeg/libav55',
+        ]
+
     DIRS += [
-        'ffmpeg/libav53',
-        'ffmpeg/libav54',
-        'ffmpeg/libav55',
         'ffmpeg/ffmpeg57',
         'ffmpeg/ffmpeg58',
     ]

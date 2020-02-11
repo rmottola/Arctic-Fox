@@ -5091,7 +5091,7 @@
 
       !ifdef HAVE_64BIT_BUILD
         ${Unless} ${RunningX64}
-        ${OrUnless} ${AtLeastWinVista}
+        ${OrUnless} ${AtLeastWinXP}
           MessageBox MB_OK|MB_ICONSTOP "$R9" IDOK
           ; Nothing initialized so no need to call OnEndCommon
           Quit
@@ -5123,7 +5123,6 @@
           ${If} ${Errors}
           ${OrIf} "$R8" == "3"
           ${OrIf} "$R8" == "4"
-          ${OrIf} "$R8" == "5"
             MessageBox MB_OK|MB_ICONSTOP "$R9" IDOK
             ; Nothing initialized so no need to call OnEndCommon
             Quit
