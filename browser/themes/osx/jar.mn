@@ -5,6 +5,7 @@
 browser.jar:
 % skin browser classic/1.0 %skin/classic/browser/
         skin/classic/browser/sanitizeDialog.css
+        skin/classic/browser/aboutNetError.css                    (../shared/aboutNetError.css)
 *       skin/classic/browser/aboutPrivateBrowsing.css
 *       skin/classic/browser/aboutSessionRestore.css
         skin/classic/browser/aboutSessionRestore-window-icon.png     (preferences/application.png)
