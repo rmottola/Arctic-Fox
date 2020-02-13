@@ -96,6 +96,168 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
   });
 }
 
+let handleContentContextMenu = function (event) {
+  let defaultPrevented = event.defaultPrevented;
+  if (!Services.prefs.getBoolPref("dom.event.contextmenu.enabled")) {
+    let plugin = null;
+    try {
+      plugin = event.target.QueryInterface(Ci.nsIObjectLoadingContent);
+    } catch (e) {}
+    if (plugin && plugin.displayedType == Ci.nsIObjectLoadingContent.TYPE_PLUGIN) {
+      // Don't open a context menu for plugins.
+      return;
+    }
+
+    defaultPrevented = false;
+  }
+
+  if (defaultPrevented)
+    return;
+
+  let addonInfo = {};
+  let subject = {
+    event: event,
+    addonInfo: addonInfo,
+  };
+  subject.wrappedJSObject = subject;
+  Services.obs.notifyObservers(subject, "content-contextmenu", null);
+
+  if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+    let editFlags = SpellCheckHelper.isEditable(event.target, content);
+    let spellInfo;
+    if (editFlags &
+        (SpellCheckHelper.EDITABLE | SpellCheckHelper.CONTENTEDITABLE)) {
+      spellInfo =
+        InlineSpellCheckerContent.initContextMenu(event, editFlags, this);
+    }
+
+    sendSyncMessage("contextmenu", { editFlags, spellInfo, addonInfo }, { event, popupNode: event.target });
+  }
+  else {
+    // Break out to the parent window and pass the add-on info along
+    let browser = docShell.chromeEventHandler;
+    let mainWin = browser.ownerDocument.defaultView;
+    mainWin.gContextMenuContentData = {
+      isRemote: false,
+      event: event,
+      popupNode: event.target,
+      browser: browser,
+      addonInfo: addonInfo,
+    };
+  }
+}
+
+Cc["@mozilla.org/eventlistenerservice;1"]
+  .getService(Ci.nsIEventListenerService)
+  .addSystemEventListener(global, "contextmenu", handleContentContextMenu, false);
+
+let AboutNetErrorListener = {
+  init: function(chromeGlobal) {
+    chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
+    chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
+    chromeGlobal.addEventListener('AboutNetErrorSendReport', this, false, true);
+  },
+
+  get isAboutNetError() {
+    return content.document.documentURI.startsWith("about:neterror");
+  },
+
+  handleEvent: function(aEvent) {
+    if (!this.isAboutNetError) {
+      return;
+    }
+
+    switch (aEvent.type) {
+    case "AboutNetErrorLoad":
+      this.onPageLoad(aEvent);
+      break;
+    case "AboutNetErrorSetAutomatic":
+      this.onSetAutomatic(aEvent);
+      break;
+    case "AboutNetErrorSendReport":
+      this.onSendReport(aEvent);
+      break;
+    }
+  },
+
+  onPageLoad: function(evt) {
+    let automatic = Services.prefs.getBoolPref("security.ssl.errorReporting.automatic");
+    content.dispatchEvent(new content.CustomEvent("AboutNetErrorOptions", {
+            detail: JSON.stringify({
+              enabled: Services.prefs.getBoolPref("security.ssl.errorReporting.enabled"),
+            automatic: automatic
+            })
+          }
+    ));
+    if (automatic) {
+      this.onSendReport(evt);
+    }
+  },
+
+  onSetAutomatic: function(evt) {
+    sendAsyncMessage("Browser:SetSSLErrorReportAuto", {
+        automatic: evt.detail
+      });
+  },
+
+  onSendReport: function(evt) {
+    let contentDoc = content.document;
+
+    let reportSendingMsg = contentDoc.getElementById("reportSendingMessage");
+    let reportSentMsg = contentDoc.getElementById("reportSentMessage");
+    let reportBtn = contentDoc.getElementById("reportCertificateError");
+    let retryBtn = contentDoc.getElementById("reportCertificateErrorRetry");
+
+    addMessageListener("Browser:SSLErrorReportStatus", function(message) {
+      // show and hide bits - but only if this is a message for the right
+      // document - we'll compare on document URI
+      if (contentDoc.documentURI === message.data.documentURI) {
+        switch(message.data.reportStatus) {
+        case "activity":
+          // Hide the button that was just clicked
+          reportBtn.style.display = "none";
+          retryBtn.style.display = "none";
+          reportSentMsg.style.display = "none";
+          reportSendingMsg.style.display = "inline";
+          break;
+        case "error":
+          // show the retry button
+          retryBtn.style.display = "inline";
+          reportSendingMsg.style.display = "none";
+          break;
+        case "complete":
+          // Show a success indicator
+          reportSentMsg.style.display = "inline";
+          reportSendingMsg.style.display = "none";
+          break;
+        }
+      }
+    });
+
+
+    let failedChannel = docShell.failedChannel;
+    let location = contentDoc.location.href;
+
+    let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
+                     .getService(Ci.nsISerializationHelper);
+
+    let serializable =  docShell.failedChannel.securityInfo
+                                .QueryInterface(Ci.nsITransportSecurityInfo)
+                                .QueryInterface(Ci.nsISerializable);
+
+    let serializedSecurityInfo = serhelper.serializeToString(serializable);
+
+    sendAsyncMessage("Browser:SendSSLErrorReport", {
+        elementId: evt.target.id,
+        documentURI: contentDoc.documentURI,
+        location: contentDoc.location,
+        securityInfo: serializedSecurityInfo
+      });
+  }
+}
+
+AboutNetErrorListener.init(this);
+
 let AboutHomeListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutHomeLoad', () => this.onPageLoad(), false, true);
