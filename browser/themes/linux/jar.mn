@@ -35,6 +35,7 @@ browser.jar:
   skin/classic/browser/identity-icons-https-ev.png
   skin/classic/browser/identity-icons-https-mixed-active.png
   skin/classic/browser/Info.png
+  skin/classic/browser/in-content/common.css                    (../shared/in-content/common.css)
   skin/classic/browser/KUI-close.png
   skin/classic/browser/bad-content-blocked-16.png
   skin/classic/browser/bad-content-blocked-64.png
