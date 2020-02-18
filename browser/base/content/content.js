@@ -55,6 +55,17 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
   }
 });
 
+addEventListener("DOMFormHasPassword", function(event) {
+  InsecurePasswordUtils.checkForInsecurePasswords(event.target);
+  LoginManagerContent.onFormPassword(event);
+});
+addEventListener("DOMAutoComplete", function(event) {
+  LoginManagerContent.onUsernameInput(event);
+});
+addEventListener("blur", function(event) {
+  LoginManagerContent.onUsernameInput(event);
+});
+
 if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
   addEventListener("contextmenu", function (event) {
     let defaultPrevented = event.defaultPrevented;
@@ -84,16 +95,6 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
     }
   }, false);
 } else {
-  addEventListener("DOMFormHasPassword", function(event) {
-    InsecurePasswordUtils.checkForInsecurePasswords(event.target);
-    LoginManagerContent.onFormPassword(event);
-  });
-  addEventListener("DOMAutoComplete", function(event) {
-    LoginManagerContent.onUsernameInput(event);
-  });
-  addEventListener("blur", function(event) {
-    LoginManagerContent.onUsernameInput(event);
-  });
 }
 
 let handleContentContextMenu = function (event) {

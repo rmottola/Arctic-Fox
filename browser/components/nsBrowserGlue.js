@@ -82,6 +82,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
 XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
                                   "resource:///modules/AsyncShutdown.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
+                                  "resource://gre/modules/LoginManagerParent.jsm");
+
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -533,6 +536,8 @@ BrowserGlue.prototype = {
 
     if (Services.prefs.getBoolPref("browser.tabs.remote"))
       ContentClick.init();
+
+    LoginManagerParent.init();
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
