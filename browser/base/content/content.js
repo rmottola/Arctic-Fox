@@ -38,6 +38,11 @@ addMessageListener("WebNavigation:LoadURI", function (message) {
 
   webNavigation.loadURI(message.json.uri, flags, null, null, null);
 });
+XPCOMUtils.defineLazyGetter(this, "PageMenuChild", function() {
+  let tmp = {};
+  Cu.import("resource://gre/modules/PageMenu.jsm", tmp);
+  return new tmp.PageMenuChild();
+});
 
 // TabChildGlobal
 var global = this;
@@ -53,6 +58,10 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
       (container = doc.getElementById("sessionRestoreContainer"))){
     container.hidden = true;
   }
+});
+
+addMessageListener("ContextMenu:DoCustomCommand", function(message) {
+  PageMenuChild.executeMenu(message.data);
 });
 
 addEventListener("DOMFormHasPassword", function(event) {
@@ -132,7 +141,8 @@ let handleContentContextMenu = function (event) {
         InlineSpellCheckerContent.initContextMenu(event, editFlags, this);
     }
 
-    sendSyncMessage("contextmenu", { editFlags, spellInfo, addonInfo }, { event, popupNode: event.target });
+    let customMenuItems = PageMenuChild.build(event.target);
+    sendSyncMessage("contextmenu", { editFlags, spellInfo, customMenuItems, addonInfo }, { event, popupNode: event.target });
   }
   else {
     // Break out to the parent window and pass the add-on info along
