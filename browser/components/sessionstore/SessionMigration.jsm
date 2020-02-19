@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-this.EXPORTED_SYMBOLS = ["SessionMigration"];
-
 "use strict";
+
+this.EXPORTED_SYMBOLS = ["SessionMigration"];
 
 const Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
@@ -72,14 +72,9 @@ let SessionMigrationInternal = {
       win._closedTabs = [];
       return win;
     });
-    let wrappedState = {
-      url: "about:welcomeback",
-      formdata: {
-        id: {"sessionData": state},
-        xpath: {}
-      }
-    };
-    return {windows: [{tabs: [{entries: [wrappedState]}]}]};
+    let url = "about:welcomeback";
+    let formdata = {id: {sessionData: state}, url};
+    return {windows: [{tabs: [{entries: [{url}], formdata}]}]};
   },
   /**
    * Asynchronously read session restore state (JSON) from a path

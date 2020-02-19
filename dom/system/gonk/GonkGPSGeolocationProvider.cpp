@@ -986,7 +986,7 @@ ConvertToGpsNetworkType(int aNetworkInterfaceType)
       return -1;
   }
 }
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 GonkGPSGeolocationProvider::Observe(nsISupports* aSubject,

@@ -14,6 +14,8 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PluralForm.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "MediaManagerService",
                                    "@mozilla.org/mediaManagerService;1",
                                    "nsIMediaManagerService");

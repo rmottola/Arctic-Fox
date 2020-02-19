@@ -218,7 +218,7 @@ protected:
   static mozilla::Atomic<int32_t> sSerialCounter;
 };
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

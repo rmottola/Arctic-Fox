@@ -1278,11 +1278,11 @@ nsContextMenu.prototype = {
   },
 
   playPlugin: function() {
-    gPluginHandler._showClickToPlayNotification(this.browser, this.target);
+    gPluginHandler.contextMenuCommand(this.browser, this.target, "play");
   },
 
   hidePlugin: function() {
-    gPluginHandler.hideClickToPlayOverlay(this.target);
+    gPluginHandler.contextMenuCommand(this.browser, this.target, "hide");
   },
 
   // Generate email address and put it on clipboard.
@@ -1436,12 +1436,11 @@ nsContextMenu.prototype = {
 
   isDisabledForEvents: function(aNode) {
     let ownerDoc = aNode.ownerDocument;
-    return
-      ownerDoc.defaultView &&
-      ownerDoc.defaultView
-              .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-              .getInterface(Components.interfaces.nsIDOMWindowUtils)
-              .isNodeDisabledForEvents(aNode);
+    return ownerDoc.defaultView &&
+           ownerDoc.defaultView
+           .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+           .getInterface(Components.interfaces.nsIDOMWindowUtils)
+           .isNodeDisabledForEvents(aNode);
   },
 
   isTargetATextBox: function(node) {

@@ -162,7 +162,7 @@ private:
   bool Check3gppPermission();
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

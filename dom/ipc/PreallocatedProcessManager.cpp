@@ -417,7 +417,7 @@ inline PreallocatedProcessManagerImpl* GetPPMImpl()
   return PreallocatedProcessManagerImpl::Singleton();
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 

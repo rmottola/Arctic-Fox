@@ -953,7 +953,7 @@ public:
   Float _51, _52, _53, _54;
 };
 
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 #endif /* MOZILLA_GFX_MATRIX_H_ */

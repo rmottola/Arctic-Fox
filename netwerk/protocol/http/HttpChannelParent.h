@@ -29,19 +29,19 @@ namespace mozilla {
 namespace dom{
 class TabParent;
 class PBrowserOrId;
-}
+} // namespace dom
 
 namespace net {
 
 class HttpChannelParentListener;
 
-class HttpChannelParent : public PHttpChannelParent
-                        , public nsIParentRedirectingChannel
-                        , public nsIProgressEventSink
-                        , public nsIInterfaceRequestor
-                        , public ADivertableParentChannel
-                        , public nsIAuthPromptProvider
-                        , public DisconnectableParent
+class HttpChannelParent final : public PHttpChannelParent
+                              , public nsIParentRedirectingChannel
+                              , public nsIProgressEventSink
+                              , public nsIInterfaceRequestor
+                              , public ADivertableParentChannel
+                              , public nsIAuthPromptProvider
+                              , public DisconnectableParent
 {
   virtual ~HttpChannelParent();
 

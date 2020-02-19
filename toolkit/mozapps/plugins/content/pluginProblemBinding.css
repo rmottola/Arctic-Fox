@@ -25,9 +25,6 @@ object:-moz-handler-clicktoplay,
 object:-moz-handler-playpreview,
 object:-moz-handler-vulnerable-updatable,
 object:-moz-handler-vulnerable-no-update {
-  /* Initialize the overlay with visibility:hidden to prevent flickering if
-   * the plugin is too small to show the overlay */
-    visibility: hidden;
     display: inline-block;
     overflow: hidden;
     opacity: 1 !important;

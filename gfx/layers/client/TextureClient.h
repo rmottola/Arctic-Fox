@@ -779,6 +779,7 @@ protected:
   RefPtr<T> mData;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
+
 #endif

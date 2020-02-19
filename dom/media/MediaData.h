@@ -20,7 +20,7 @@ namespace mozilla {
 namespace layers {
 class Image;
 class ImageContainer;
-}
+} // namespace layers
 
 class MediaLargeByteBuffer;
 class MediaByteBuffer;
@@ -137,7 +137,7 @@ protected:
 namespace layers {
 class TextureClient;
 class PlanarYCbCrImage;
-}
+} // namespace layers
 
 class VideoInfo;
 

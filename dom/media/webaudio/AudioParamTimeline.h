@@ -93,8 +93,8 @@ AudioParamTimeline::GetValueAtTime(int64_t aTime, size_t aCounter)
     (mStream ? AudioNodeInputValue(aCounter) : 0.0f);
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

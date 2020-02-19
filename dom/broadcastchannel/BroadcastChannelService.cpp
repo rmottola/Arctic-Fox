@@ -23,7 +23,7 @@ namespace {
 
 BroadcastChannelService* sInstance = nullptr;
 
-} // anonymous namespace
+} // namespace
 
 BroadcastChannelService::BroadcastChannelService()
 {
@@ -138,7 +138,7 @@ PostMessageEnumerator(nsPtrHashKey<BroadcastChannelParent>* aKey, void* aPtr)
   return PL_DHASH_NEXT;
 }
 
-} // anonymous namespace
+} // namespace
 
 void
 BroadcastChannelService::PostMessage(BroadcastChannelParent* aParent,
@@ -155,5 +155,5 @@ BroadcastChannelService::PostMessage(BroadcastChannelParent* aParent,
   mAgents.EnumerateEntries(PostMessageEnumerator, &data);
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

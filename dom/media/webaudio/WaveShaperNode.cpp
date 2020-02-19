@@ -336,5 +336,5 @@ WaveShaperNode::SetOversample(OverSampleType aType)
   SendInt32ParameterToStream(WaveShaperNodeEngine::TYPE, static_cast<int32_t>(aType));
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

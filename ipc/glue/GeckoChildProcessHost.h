@@ -162,7 +162,6 @@ protected:
   std::vector<std::wstring> mAllowedFilesReadWrite;
   bool mEnableSandboxLogging;
   int32_t mSandboxLevel;
-  bool mMoreStrictSandbox;
 #endif
 #endif // XP_WIN
 

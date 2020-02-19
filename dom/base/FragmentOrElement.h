@@ -35,8 +35,8 @@ class nsIURI;
 namespace mozilla {
 namespace dom {
 class Element;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 /**
  * Class that implements the nsIDOMNodeList interface (a list of children of

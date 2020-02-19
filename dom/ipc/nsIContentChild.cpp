@@ -123,5 +123,5 @@ nsIContentChild::RecvAsyncMessage(const nsString& aMsg,
   return true;
 }
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla

@@ -26,4 +26,4 @@ SourceBufferContentManager::CreateManager(dom::SourceBufferAttributes* aAttribut
   return  manager.forget();
 }
 
-}
+} // namespace mozilla

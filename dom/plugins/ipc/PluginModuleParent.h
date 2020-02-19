@@ -11,11 +11,11 @@
 #include "mozilla/FileUtils.h"
 #include "mozilla/HangAnnotations.h"
 #include "mozilla/PluginLibrary.h"
-#include "mozilla/plugins/ScopedMethodFactory.h"
 #include "mozilla/plugins/PluginProcessParent.h"
 #include "mozilla/plugins/PPluginModuleParent.h"
 #include "mozilla/plugins/PluginMessageUtils.h"
 #include "mozilla/plugins/PluginTypes.h"
+#include "mozilla/plugins/TaskFactory.h"
 #include "mozilla/TimeStamp.h"
 #include "npapi.h"
 #include "npfunctions.h"
@@ -23,6 +23,9 @@
 #include "nsDataHashtable.h"
 #include "nsHashKeys.h"
 #include "nsIObserver.h"
+#ifdef XP_WIN
+#include "nsWindowsHelpers.h"
+#endif
 
 class nsPluginTag;
 
@@ -36,6 +39,9 @@ class PluginInstanceParent;
 
 #ifdef XP_WIN
 class PluginHangUIParent;
+#endif
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+class FinishInjectorInitTask;
 #endif
 
 /**
@@ -253,7 +259,7 @@ protected:
     NPNetscapeFuncs* mNPNIface;
     NPPluginFuncs* mNPPIface;
     nsNPAPIPlugin* mPlugin;
-    ScopedMethodFactory<PluginModuleParent> mTaskFactory;
+    TaskFactory<PluginModuleParent> mTaskFactory;
     nsString mPluginDumpID;
     nsString mBrowserDumpID;
     nsString mHangID;
@@ -416,7 +422,7 @@ private:
     PluginProcessParent* mSubprocess;
     uint32_t mPluginId;
 
-    ScopedMethodFactory<PluginModuleChromeParent> mChromeTaskFactory;
+    TaskFactory<PluginModuleChromeParent> mChromeTaskFactory;
 
     enum HangAnnotationFlags
     {
@@ -452,6 +458,20 @@ private:
 #endif
 
     friend class mozilla::plugins::PluginAsyncSurrogate;
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    friend class mozilla::plugins::FinishInjectorInitTask;
+
+    void InitializeInjector();
+    void DoInjection(const nsAutoHandle& aSnapshot);
+    static DWORD WINAPI GetToolhelpSnapshot(LPVOID aContext);
+
+    void OnCrash(DWORD processID) MOZ_OVERRIDE;
+
+    DWORD mFlashProcess1;
+    DWORD mFlashProcess2;
+    mozilla::plugins::FinishInjectorInitTask* mFinishInitTask;
+#endif
 
     void OnProcessLaunched(const bool aSucceeded);
 

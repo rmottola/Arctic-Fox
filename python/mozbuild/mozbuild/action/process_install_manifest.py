@@ -8,6 +8,7 @@ import argparse
 import sys
 from mozpack.copier import FileCopier
 from mozpack.manifests import InstallManifest
+from mozbuild.util import DefinesAction
 
 
 COMPLETE = 'From {dest}: Kept {existing} existing; Added/updated {updated}; ' \

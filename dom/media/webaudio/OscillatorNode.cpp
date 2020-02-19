@@ -546,5 +546,5 @@ OscillatorNode::NotifyMainThreadStateChanged()
   }
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

@@ -477,7 +477,7 @@ ParseElementBaseTimeValueSpec(const nsAString& aSpec,
   return true;
 }
 
-} // end anonymous namespace block
+} // namespace
 
 //------------------------------------------------------------------------------
 // Implementation

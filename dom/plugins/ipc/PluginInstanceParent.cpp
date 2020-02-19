@@ -1474,7 +1474,7 @@ ActorSearch(NPObject* aKey,
     return PL_DHASH_NEXT;
 }
 
-} // anonymous namespace
+} // namespace
 #endif // DEBUG
 
 bool

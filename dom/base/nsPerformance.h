@@ -24,8 +24,8 @@ namespace mozilla {
 class ErrorResult;
 namespace dom {
   class PerformanceEntry;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 // Script "performance.timing" object
 class nsPerformanceTiming final : public nsWrapperCache

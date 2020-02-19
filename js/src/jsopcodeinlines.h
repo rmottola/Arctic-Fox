@@ -114,6 +114,6 @@ class BytecodeRange {
     jsbytecode* pc, *end;
 };
 
-}
+} // namespace js
 
 #endif /* jsopcodeinlines_h */

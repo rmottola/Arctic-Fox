@@ -7939,8 +7939,8 @@ MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager, nsView* aView)
   }
 }
 
-}
-}
+} // namespace layout
+} // namespace mozilla
 
 /* static */ bool
 nsLayoutUtils::IsOutlineStyleAutoEnabled()

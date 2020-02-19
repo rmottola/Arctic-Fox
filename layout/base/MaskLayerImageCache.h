@@ -14,7 +14,7 @@ namespace mozilla {
 
 namespace layers {
 class ImageContainer;
-}
+} // namespace layers
 
 /**
  * Keeps a record of image containers for mask layers, containers are mapped
@@ -236,7 +236,7 @@ protected:
 };
 
 
-}
+} // namespace mozilla
 
 
 #endif

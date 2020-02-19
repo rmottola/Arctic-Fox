@@ -142,7 +142,7 @@ private:
   EncodingUtils() = delete;
 };
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_encodingutils_h_

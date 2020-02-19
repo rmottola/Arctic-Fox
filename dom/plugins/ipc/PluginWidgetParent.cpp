@@ -7,9 +7,10 @@
 #include "mozilla/dom/ContentParent.h"
 #include "nsComponentManagerUtils.h"
 #include "nsWidgetsCID.h"
+
+#include "mozilla/unused.h"
 #include "mozilla/DebugOnly.h"
 #include "nsDebug.h"
-#include "mozilla/unused.h"
 
 #if defined(MOZ_WIDGET_GTK)
 #include "nsPluginNativeWindowGtk.h"
@@ -19,16 +20,19 @@ using namespace mozilla;
 using namespace mozilla::widget;
 
 #define PWLOG(...)
-// #define PWLOG(...) printf_stderr(__VA_ARGS__)
+//#define PWLOG(...) printf_stderr(__VA_ARGS__)
+
+#if defined(XP_WIN)
+namespace mozilla {
+namespace dom {
+// For nsWindow
+const wchar_t* kPluginWidgetContentParentProperty =
+  L"kPluginWidgetParentProperty";
+} }
+#endif
 
 namespace mozilla {
 namespace plugins {
-
-#if defined(XP_WIN)
-// For nsWindow
-const wchar_t* kPluginWidgetParentProperty =
-  L"kPluginWidgetParentProperty";
-#endif
 
 static NS_DEFINE_CID(kWidgetCID, NS_CHILD_CID);
 
@@ -40,22 +44,6 @@ static NS_DEFINE_CID(kWidgetCID, NS_CHILD_CID);
     return true;                                              \
   }                                                           \
 }
-
-/*
- * Tear down scenarios
- * layout (plugin content unloading):
- *  - PluginWidgetProxy::Destroy() calls PluginWidgetChild::ProxyShutdown(), calls SendDestroy()
- *  - PluginWidgetParent::RecvDestroy(), sends async ParentShutdown(CONTENT)
- *  - PluginWidgetChild::RecvParentShutdown(CONTENT), calls Send__delete__()
- *  - PluginWidgetParent::ActorDestroy() called in response to __delete__
- * PBrowser teardown (tab closing):
- *  - PluginWidgetParent::ParentDestroy() called by TabParent::Destroy(), sends async ParentShutdown(TAB_CLOSURE)
- *  - PluginWidgetChild::RecvParentShutdown(TAB_CLOSURE) (PluginWidgetProxy disabled)
- *  - PluginWidgetParent::ActorDestroy()
- *  - PluginWidgetParent::~PluginWidgetParent() in response to PBrowserParent::DeallocSubtree()
- *  - PluginWidgetChild::ActorDestroy() from PPluginWidgetChild::DestroySubtree
- *  - ~PluginWidgetChild() in response to PBrowserChild::DeallocSubtree()
- **/
 
 PluginWidgetParent::PluginWidgetParent()
 {
@@ -70,18 +58,7 @@ PluginWidgetParent::~PluginWidgetParent()
   // A destroy call can actually get skipped if a widget is associated
   // with the last out-of-process page, make sure and cleanup any left
   // over widgets if we have them.
-  if (mWidget) {
-#if defined(MOZ_WIDGET_GTK)
-    mWidget->SetNativeData(NS_NATIVE_PLUGIN_OBJECT_PTR, (uintptr_t)0);
-    mWrapper = nullptr;
-#elif defined(XP_WIN)
-    ::RemovePropW((HWND)mWidget->GetNativeData(NS_NATIVE_WINDOW),
-                  kPluginWidgetParentProperty);
-#endif
-    mWidget->UnregisterPluginWindowForRemoteUpdates();
-    mWidget->Destroy();
-    mWidget = nullptr;
-  }
+  KillWidget();
 }
 
 mozilla::dom::TabParent*
@@ -97,25 +74,6 @@ PluginWidgetParent::SetParent(nsIWidget* aParent)
     mWidget->SetParent(aParent);
   }
 }
-
-#if defined(XP_WIN)
-// static
-void
-PluginWidgetParent::SendAsyncUpdate(nsIWidget* aWidget)
-{
-  if (!aWidget || aWidget->Destroyed()) {
-    return;
-  }
-  // Fire off an async request to the plugin to paint its window
-  HWND hwnd = (HWND)aWidget->GetNativeData(NS_NATIVE_WINDOW);
-  NS_ASSERTION(hwnd, "Expected valid hwnd value.");
-  PluginWidgetParent* parent = reinterpret_cast<PluginWidgetParent*>(
-    ::GetPropW(hwnd, mozilla::plugins::kPluginWidgetParentProperty));
-  if (parent && !parent->ActorDestroyed()) {
-    parent->SendUpdateWindow((uintptr_t)hwnd);
-  }
-}
-#endif // defined(XP_WIN)
 
 // When plugins run in chrome, nsPluginNativeWindow(Plat) implements platform
 // specific functionality that wraps plugin widgets. With e10s we currently
@@ -135,6 +93,7 @@ PluginWidgetParent::RecvCreate(nsresult* aResult)
   // we can send over to content -> plugin.
   PLUG_NewPluginNativeWindow((nsPluginNativeWindow**)&mWrapper);
   if (!mWrapper) {
+    KillWidget();
     return false;
   }
   // Give a copy of this to the widget, which handles some update
@@ -147,6 +106,7 @@ PluginWidgetParent::RecvCreate(nsresult* aResult)
   // If this fails, bail.
   if (!parentWidget) {
     *aResult = NS_ERROR_NOT_AVAILABLE;
+    KillWidget();
     return true;
   }
 
@@ -158,8 +118,7 @@ PluginWidgetParent::RecvCreate(nsresult* aResult)
   *aResult = mWidget->Create(parentWidget.get(), nullptr, nsIntRect(0,0,0,0),
                              &initData);
   if (NS_FAILED(*aResult)) {
-    mWidget->Destroy();
-    mWidget = nullptr;
+    KillWidget();
     // This should never fail, abort.
     return false;
   }
@@ -178,7 +137,8 @@ PluginWidgetParent::RecvCreate(nsresult* aResult)
 #elif defined(XP_WIN)
   DebugOnly<DWORD> winres =
     ::SetPropW((HWND)mWidget->GetNativeData(NS_NATIVE_WINDOW),
-               kPluginWidgetParentProperty, this);
+               mozilla::dom::kPluginWidgetContentParentProperty,
+               GetTabParent()->Manager()->AsContentParent());
   NS_ASSERTION(winres, "SetPropW call failure");
 #endif
 
@@ -192,21 +152,29 @@ PluginWidgetParent::RecvCreate(nsresult* aResult)
 }
 
 void
-PluginWidgetParent::Shutdown(ShutdownType aType)
+PluginWidgetParent::KillWidget()
 {
+  PWLOG("PluginWidgetParent::KillWidget() widget=%p\n", (void*)mWidget.get());
   if (mWidget) {
     mWidget->UnregisterPluginWindowForRemoteUpdates();
     DebugOnly<nsresult> rv = mWidget->Destroy();
     NS_ASSERTION(NS_SUCCEEDED(rv), "widget destroy failure");
+#if defined(MOZ_WIDGET_GTK)
+    mWidget->SetNativeData(NS_NATIVE_PLUGIN_OBJECT_PTR, (uintptr_t)0);
+    mWrapper = nullptr;
+#elif defined(XP_WIN)
+    ::RemovePropW((HWND)mWidget->GetNativeData(NS_NATIVE_WINDOW),
+                  mozilla::dom::kPluginWidgetContentParentProperty);
+#endif
     mWidget = nullptr;
-    unused << SendParentShutdown(aType);
   }
 }
 
 void
 PluginWidgetParent::ActorDestroy(ActorDestroyReason aWhy)
 {
-  PWLOG("PluginWidgetParent::ActorDestroy()\n");
+  PWLOG("PluginWidgetParent::ActorDestroy(%d)\n", aWhy);
+  KillWidget();
 }
 
 // Called by TabParent's Destroy() in response to an early tear down (Early
@@ -216,17 +184,6 @@ void
 PluginWidgetParent::ParentDestroy()
 {
   PWLOG("PluginWidgetParent::ParentDestroy()\n");
-  Shutdown(TAB_CLOSURE);
-}
-
-// Called by the child when a plugin is torn down within a tab
-// normally. Messages back via ParentShutdown().
-bool
-PluginWidgetParent::RecvDestroy()
-{
-  PWLOG("PluginWidgetParent::RecvDestroy()\n");
-  Shutdown(CONTENT);
-  return true;
 }
 
 bool
@@ -242,7 +199,6 @@ bool
 PluginWidgetParent::RecvGetNativePluginPort(uintptr_t* value)
 {
   ENSURE_CHANNEL;
-  PWLOG("PluginWidgetParent::RecvGetNativeData()\n");
 #if defined(MOZ_WIDGET_GTK)
   *value = (uintptr_t)mWrapper->window;
   NS_ASSERTION(*value, "no xid??");

@@ -27,7 +27,7 @@ class nsIntRegion;
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
-}
+} // namespace gfx
 namespace layers {
 
 class Compositor;
@@ -127,7 +127,7 @@ protected:
 
 #endif
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

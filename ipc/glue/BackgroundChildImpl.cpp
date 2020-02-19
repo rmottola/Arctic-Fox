@@ -42,7 +42,7 @@ public:
   Recv__delete__(const nsCString& aTestArg) override;
 };
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace ipc {

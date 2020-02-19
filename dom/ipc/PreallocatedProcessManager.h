@@ -16,7 +16,7 @@ class nsIRunnable;
 namespace mozilla {
 namespace dom {
 class ContentParent;
-}
+} // namespace dom
 
 /**
  * This class manages a ContentParent that it starts up ahead of any particular

@@ -21,5 +21,5 @@ SetProcessPriority(int aPid,
           aBackgroundLRU);
 }
 
-} // hal_impl
+} // namespace hal_impl
 } // namespace mozilla

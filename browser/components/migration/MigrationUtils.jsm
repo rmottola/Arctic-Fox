@@ -48,7 +48,7 @@ function getMigratorKeyForDefaultBrowser() {
   const APP_DESC_TO_KEY = {
     "Internet Explorer":     "ie",
     "Safari":                "safari",
-    "Arctic Fox":            "firefox",
+    "Firefox":               "firefox",
     "Google Chrome":         "chrome",  // Windows, Linux
     "Chrome":                "chrome",  // OS X
   };

@@ -120,4 +120,5 @@ protected:
 
 
 } // namespace mozilla
+
 #endif // MediaEngineCameraVideoSource_h

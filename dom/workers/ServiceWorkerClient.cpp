@@ -148,7 +148,7 @@ private:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 ServiceWorkerClient::PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,

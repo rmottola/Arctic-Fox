@@ -27,7 +27,7 @@ class DnsData;
 class WebSocketRequest;
 class ConnectionData;
 
-class Dashboard
+class Dashboard final
     : public nsIDashboard
     , public nsIDashboardEventNotifier
 {
@@ -101,5 +101,7 @@ private:
     nsCOMPtr<nsIDNSService> mDnsService;
 };
 
-} } // namespace mozilla::net
+} // namespace net
+} // namespace mozilla
+
 #endif // nsDashboard_h__

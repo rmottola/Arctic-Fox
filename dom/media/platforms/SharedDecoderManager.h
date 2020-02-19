@@ -83,6 +83,7 @@ private:
   nsRefPtr<SharedDecoderManager> mManager;
   MediaDataDecoderCallback* mCallback;
 };
-}
+
+} // namespace mozilla
 
 #endif

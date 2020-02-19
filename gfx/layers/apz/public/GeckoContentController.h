@@ -173,7 +173,7 @@ protected:
   virtual ~GeckoContentController() {}
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_GeckoContentController_h

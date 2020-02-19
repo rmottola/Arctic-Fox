@@ -28,8 +28,8 @@ class nsFrame;
 namespace mozilla {
 namespace dom {
 class HTMLInputElement;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 /**
  * nsTextEditorState is a class which is responsible for managing the state of

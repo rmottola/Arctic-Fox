@@ -82,8 +82,8 @@ private:
 };
 
 // Helper class that implements the nsIDOMMozNamedAttrMap interface.
-class nsDOMAttributeMap : public nsIDOMMozNamedAttrMap
-                        , public nsWrapperCache
+class nsDOMAttributeMap final : public nsIDOMMozNamedAttrMap
+                              , public nsWrapperCache
 {
 public:
   typedef mozilla::dom::Attr Attr;

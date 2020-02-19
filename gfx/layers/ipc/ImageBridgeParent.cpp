@@ -455,5 +455,5 @@ ImageBridgeParent::SendPendingAsyncMessges(base::ProcessId aChildProcessId)
   imageBridge->SendPendingAsyncMessges();
 }
 
-} // layers
-} // mozilla
+} // namespace layers
+} // namespace mozilla

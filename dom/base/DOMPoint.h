@@ -72,7 +72,7 @@ public:
   void SetW(double aW) { mW = aW; }
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif /*MOZILLA_DOMPOINT_H_*/

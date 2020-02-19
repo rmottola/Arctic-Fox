@@ -65,7 +65,7 @@ IsValidPutRequestMethod(const OwningRequestOrUSVString& aRequest,
   return IsValidPutRequestMethod(*aRequest.GetAsRequest().get(), aRv);
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace dom {

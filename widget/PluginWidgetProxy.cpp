@@ -122,6 +122,10 @@ PluginWidgetProxy::GetNativeData(uint32_t aDataType)
   if (!mActor) {
     return nullptr;
   }
+  auto tab = static_cast<mozilla::dom::TabChild*>(mActor->Manager());
+  if (tab && tab->IsDestroyed()) {
+    return nullptr;
+  }
   switch (aDataType) {
     case NS_NATIVE_PLUGIN_PORT:
     case NS_NATIVE_WINDOW:
@@ -146,5 +150,5 @@ PluginWidgetProxy::SetFocus(bool aRaise)
   return NS_OK;
 }
 
-}  // namespace widget
-}  // namespace mozilla
+} // namespace widget
+} // namespace mozilla

@@ -52,8 +52,8 @@ class PStorageChild;
 class ClonedMessageData;
 class TabChild;
 
-class ContentChild : public PContentChild
-                   , public nsIContentChild
+class ContentChild final : public PContentChild
+                         , public nsIContentChild
 {
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
     typedef mozilla::ipc::OptionalURIParams OptionalURIParams;
@@ -372,6 +372,7 @@ public:
                                        const base::ProcessId& aProcessId) override;
     virtual bool RecvLoadPluginResult(const uint32_t& aPluginId,
                                       const bool& aResult) override;
+    virtual bool RecvUpdateWindow(const uintptr_t& aChildId) override;
 
     virtual bool RecvStartProfiler(const uint32_t& aEntries,
                                    const double& aInterval,

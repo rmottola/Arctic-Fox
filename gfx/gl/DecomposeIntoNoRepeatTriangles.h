@@ -71,7 +71,7 @@ void DecomposeIntoNoRepeatTriangles(const nsIntRect& aTexCoordRect,
                                     RectTriangles& aRects,
                                     bool aFlipY = false);
 
-}
-}
+} // namespace gl
+} // namespace mozilla
 
 #endif // DecomposeIntoNoRepeatTriangles_h_

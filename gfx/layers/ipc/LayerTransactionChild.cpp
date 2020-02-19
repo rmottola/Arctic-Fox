@@ -163,5 +163,5 @@ LayerTransactionChild::DeallocPTextureChild(PTextureChild* actor)
   return TextureClient::DestroyIPDLActor(actor);
 }
 
-}  // namespace layers
-}  // namespace mozilla
+} // namespace layers
+} // namespace mozilla

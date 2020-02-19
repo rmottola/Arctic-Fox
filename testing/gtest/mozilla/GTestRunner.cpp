@@ -95,4 +95,4 @@ public:
   }
 } InitRunGTest;
 
-}
+} // namespace mozilla

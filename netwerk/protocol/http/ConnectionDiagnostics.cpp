@@ -250,5 +250,5 @@ nsHttpTransaction::PrintDiagnostics(nsCString &log)
   log.AppendPrintf("     classification = 0x%x\n", mClassification);
 }
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla

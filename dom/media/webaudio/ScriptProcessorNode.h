@@ -106,8 +106,8 @@ private:
   const uint32_t mNumberOfOutputChannels;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

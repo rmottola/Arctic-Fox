@@ -65,7 +65,7 @@ protected:
   std::vector<AsyncParentMessageData> mPendingAsyncMessage;
 };
 
-} // namespace
-} // namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

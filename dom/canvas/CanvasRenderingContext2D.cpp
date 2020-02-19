@@ -5810,5 +5810,5 @@ CanvasPath::EnsurePathBuilder() const
   mPath = nullptr;
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

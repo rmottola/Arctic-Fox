@@ -32,8 +32,8 @@ class nsITransferable;
 namespace mozilla {
 namespace dom {
 class Selection;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 /**
  * The text editor implementation.

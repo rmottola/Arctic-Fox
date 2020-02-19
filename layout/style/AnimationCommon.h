@@ -197,7 +197,7 @@ private:
   InfallibleTArray<PropertyValuePair> mPropertyValuePairs;
 };
 
-} /* end css sub-namespace */
+} // namespace css
 
 typedef InfallibleTArray<nsRefPtr<dom::AnimationPlayer> >
   AnimationPlayerPtrArray;

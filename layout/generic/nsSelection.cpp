@@ -423,7 +423,8 @@ struct MOZ_STACK_CLASS AutoPrepareFocusRange
   Maybe<Selection::AutoUserInitiated> mUserSelect;
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
-}
+
+} // namespace mozilla
 
 ////////////BEGIN nsFrameSelection methods
 
@@ -6291,7 +6292,8 @@ nsAutoCopyListener::NotifySelectionChanged(nsIDOMDocument *aDoc,
   NS_ENSURE_TRUE(doc, NS_ERROR_FAILURE);
 
   // call the copy code
-  return nsCopySupport::HTMLCopy(aSel, doc, nsIClipboard::kSelectionClipboard);
+  return nsCopySupport::HTMLCopy(aSel, doc,
+                                 nsIClipboard::kSelectionClipboard, false);
 }
 
 // SelectionChangeListener

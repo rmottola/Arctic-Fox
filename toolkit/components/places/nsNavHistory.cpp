@@ -226,7 +226,7 @@ protected:
   nsNavHistory& mNavHistory;
 };
 
-} // anonymouse namespace
+} // namespace
 
 
 // Queries rows indexes to bind or get values, if adding a new one, be sure to
@@ -578,7 +578,7 @@ private:
   PRTime mLastVisitDate;
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 nsNavHistory::DispatchFrecencyChangedNotification(const nsACString& aSpec,
@@ -1006,7 +1006,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 nsNavHistory::invalidateFrecencies(const nsCString& aPlaceIdsQueryString)
@@ -3173,7 +3173,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 nsNavHistory::DecayFrecency()
@@ -4433,7 +4433,7 @@ void ParseSearchTermsFromQueries(const nsCOMArray<nsNavHistoryQuery>& aQueries,
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 
 nsresult
@@ -4499,7 +4499,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 nsNavHistory::FixInvalidFrecencies()

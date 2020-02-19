@@ -280,6 +280,6 @@ MobileMessageCallback::NotifyGetSmscAddressFailed(int32_t aError)
   return NotifyError(aError);
 }
 
-} // namesapce mobilemessage
+} // namespace mobilemessage
 } // namespace dom
 } // namespace mozilla

@@ -250,12 +250,12 @@ namespace CType {
    */
   static JSObject* GetGlobalCTypes(JSContext* cx, JSObject* obj);
 
-}
+} // namespace CType
 
 namespace ABI {
   bool IsABI(JSObject* obj);
   static bool ToSource(JSContext* cx, unsigned argc, jsval* vp);
-}
+} // namespace ABI
 
 namespace PointerType {
   static bool Create(JSContext* cx, unsigned argc, jsval* vp);
@@ -274,7 +274,7 @@ namespace PointerType {
   // The following is not an instance function, since we don't want to expose arbitrary
   // pointer arithmetic at this moment.
   static bool OffsetBy(JSContext* cx, const CallArgs& args, int offset);
-}
+} // namespace PointerType
 
 namespace ArrayType {
   bool IsArrayType(HandleValue v);
@@ -290,7 +290,7 @@ namespace ArrayType {
   static bool Setter(JSContext* cx, HandleObject obj, HandleId idval, MutableHandleValue vp,
                      ObjectOpResult &result);
   static bool AddressOfElement(JSContext* cx, unsigned argc, jsval* vp);
-}
+} // namespace ArrayType
 
 namespace StructType {
   bool IsStruct(HandleValue v);
@@ -306,7 +306,7 @@ namespace StructType {
                           MutableHandleValue vp, ObjectOpResult &result);
   static bool AddressOfField(JSContext* cx, unsigned argc, jsval* vp);
   static bool Define(JSContext* cx, unsigned argc, jsval* vp);
-}
+} // namespace StructType
 
 namespace FunctionType {
   static bool Create(JSContext* cx, unsigned argc, jsval* vp);
@@ -350,7 +350,7 @@ namespace CData {
 #if defined(XP_WIN)
   bool LastErrorGetter(JSContext* cx, const JS::CallArgs& args);
 #endif // defined(XP_WIN)
-}
+} // namespace CData
 
 namespace CDataFinalizer {
   /*
@@ -415,7 +415,7 @@ namespace CDataFinalizer {
     static bool Forget(JSContext* cx, unsigned argc, jsval* vp);
     static bool ToSource(JSContext* cx, unsigned argc, jsval* vp);
     static bool ToString(JSContext* cx, unsigned argc, jsval* vp);
-  }
+  } // namespace Methods
 
   /*
    * Utility functions
@@ -463,7 +463,7 @@ namespace CDataFinalizer {
   static bool GetValue(JSContext* cx, JSObject* obj, MutableHandleValue result);
 
   static JSObject* GetCData(JSContext* cx, JSObject* obj);
- }
+} // namespace CDataFinalizer
 
 
 // Int64Base provides functions common to Int64 and UInt64.
@@ -480,7 +480,7 @@ namespace Int64Base {
                 bool isUnsigned);
 
   static void Finalize(JSFreeOp* fop, JSObject* obj);
-}
+} // namespace Int64Base
 
 namespace Int64 {
   static bool Construct(JSContext* cx, unsigned argc, jsval* vp);
@@ -492,7 +492,7 @@ namespace Int64 {
   static bool Lo(JSContext* cx, unsigned argc, jsval* vp);
   static bool Hi(JSContext* cx, unsigned argc, jsval* vp);
   static bool Join(JSContext* cx, unsigned argc, jsval* vp);
-}
+} // namespace Int64
 
 namespace UInt64 {
   static bool Construct(JSContext* cx, unsigned argc, jsval* vp);
@@ -504,7 +504,7 @@ namespace UInt64 {
   static bool Lo(JSContext* cx, unsigned argc, jsval* vp);
   static bool Hi(JSContext* cx, unsigned argc, jsval* vp);
   static bool Join(JSContext* cx, unsigned argc, jsval* vp);
-}
+} // namespace UInt64
 
 /*******************************************************************************
 ** JSClass definitions and initialization functions
@@ -7802,5 +7802,5 @@ UInt64::Join(JSContext* cx, unsigned argc, jsval* vp)
   return true;
 }
 
-}
-}
+} // namespace ctypes
+} // namespace js

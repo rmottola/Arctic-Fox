@@ -2,9 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+  "resource://gre/modules/AppConstants.jsm");
 
 var gStateObject;
 var gTreeData;
@@ -12,6 +15,14 @@ var gTreeData;
 // Page initialization
 
 window.onload = function() {
+  // pages used by this script may have a link that needs to be updated to
+  // the in-product link.
+  let anchor = document.getElementById("linkMoreTroubleshooting");
+  if (anchor) {
+    let baseURL = Services.urlFormatter.formatURLPref("app.support.baseURL");
+    anchor.setAttribute("href", baseURL + "troubleshooting");
+  }
+
   // the crashed session state is kept inside a textbox so that SessionStore picks it up
   // (for when the tab is closed or the session crashes right again)
   var sessionData = document.getElementById("sessionData");
@@ -20,19 +31,7 @@ window.onload = function() {
     return;
   }
 
-  // remove unneeded braces (added for compatibility with Firefox 2.0 and 3.0)
-  if (sessionData.value.charAt(0) == '(')
-    sessionData.value = sessionData.value.slice(1, -1);
-  try {
-    gStateObject = JSON.parse(sessionData.value);
-  }
-  catch (exJSON) {
-    var s = new Cu.Sandbox("about:blank", {sandboxName: 'aboutSessionRestore'});
-    gStateObject = Cu.evalInSandbox("(" + sessionData.value + ")", s);
-    // If we couldn't parse the string with JSON.parse originally, make sure
-    // that the value in the textbox will be parsable.
-    sessionData.value = JSON.stringify(gStateObject);
-  }
+  gStateObject = JSON.parse(sessionData.value);
 
   // make sure the data is tracked to be restored in case of a subsequent crash
   var event = document.createEvent("UIEvents");
@@ -83,6 +82,14 @@ function initTreeView() {
 function restoreSession() {
   document.getElementById("errorTryAgain").disabled = true;
 
+  if (!gTreeData.some(aItem => aItem.checked)) {
+    // This should only be possible when we have no "cancel" button, and thus
+    // the "Restore session" button always remains enabled.  In that case and
+    // when nothing is selected, we just want a new session.
+    startNewSession();
+    return;
+  }
+
   // remove all unselected tabs from the state before restoring it
   var ix = gStateObject.windows.length - 1;
   for (var t = gTreeData.length - 1; t >= 0; t--) {
@@ -111,14 +118,20 @@ function restoreSession() {
 
   // restore the session into a new window and close the current tab
   var newWindow = top.openDialog(top.location, "_blank", "chrome,dialog=no,all");
-  newWindow.addEventListener("load", function() {
-    newWindow.removeEventListener("load", arguments.callee, true);
+
+  var obs = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
+  obs.addObserver(function observe(win, topic) {
+    if (win != newWindow) {
+      return;
+    }
+
+    obs.removeObserver(observe, topic);
     ss.setWindowState(newWindow, stateString, true);
 
     var tabbrowser = top.gBrowser;
     var tabIndex = tabbrowser.getBrowserIndexForDocument(document);
     tabbrowser.removeTab(tabbrowser.tabs[tabIndex]);
-  }, true);
+  }, "browser-delayed-startup-finished", false);
 }
 
 function startNewSession() {
@@ -138,11 +151,9 @@ function onListClick(aEvent) {
   if (cell.col) {
     // Restore this specific tab in the same window for middle/double/accel clicking
     // on a tab's title.
-#ifdef XP_MACOSX
-    let accelKey = aEvent.metaKey;
-#else
-    let accelKey = aEvent.ctrlKey;
-#endif
+    let accelKey = AppConstants.platform == "macosx" ?
+                   aEvent.metaKey :
+                   aEvent.ctrlKey;
     if ((aEvent.button == 1 || aEvent.button == 0 && aEvent.detail == 2 || accelKey) &&
         cell.col.id == "title" &&
         !treeView.isContainer(cell.row)) {
@@ -164,14 +175,6 @@ function onListKeyDown(aEvent) {
     var ix = document.getElementById("tabList").currentIndex;
     if (aEvent.ctrlKey && !treeView.isContainer(ix))
       restoreSingleTab(ix, aEvent.shiftKey);
-    break;
-  case KeyEvent.DOM_VK_UP:
-  case KeyEvent.DOM_VK_DOWN:
-  case KeyEvent.DOM_VK_PAGE_UP:
-  case KeyEvent.DOM_VK_PAGE_DOWN:
-  case KeyEvent.DOM_VK_HOME:
-  case KeyEvent.DOM_VK_END:
-    aEvent.preventDefault(); // else the page scrolls unwantedly
     break;
   }
 }
@@ -205,7 +208,10 @@ function toggleRowChecked(aIx) {
     treeView.treeBox.invalidateRow(gTreeData.indexOf(item.parent));
   }
 
-  document.getElementById("errorTryAgain").disabled = !gTreeData.some(isChecked);
+  // we only disable the button when there's no cancel button.
+  if (document.getElementById("errorCancel")) {
+    document.getElementById("errorTryAgain").disabled = !gTreeData.some(isChecked);
+  }
 }
 
 function restoreSingleTab(aIx, aShifted) {

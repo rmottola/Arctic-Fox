@@ -16,8 +16,8 @@ extern bool                 gDirty;
 namespace mozilla {
 namespace dom {
 class PrefSetting;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 enum pref_SaveTypes { SAVE_NONSHARED, SAVE_SHARED, SAVE_ALL, SAVE_ALL_AND_DEFAULTS };
 

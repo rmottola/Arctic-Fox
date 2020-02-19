@@ -16,7 +16,7 @@
 namespace mozilla {
 namespace net {
 
-class DNSRequestChild
+class DNSRequestChild final
   : public PDNSRequestChild
   , public nsICancelable
 {
@@ -57,4 +57,5 @@ protected:
 
 } // namespace net
 } // namespace mozilla
+
 #endif // mozilla_net_DNSRequestChild_h

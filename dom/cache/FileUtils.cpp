@@ -36,7 +36,7 @@ nsresult
 BodyIdToFile(nsIFile* aBaseDir, const nsID& aId, BodyFileType aType,
              nsIFile** aBodyFileOut);
 
-} // anonymous namespace
+} // namespace
 
 // static
 nsresult
@@ -317,7 +317,7 @@ BodyIdToFile(nsIFile* aBaseDir, const nsID& aId, BodyFileType aType,
   return rv;
 }
 
-} // anonymous namespace
+} // namespace
 
 } // namespace cache
 } // namespace dom

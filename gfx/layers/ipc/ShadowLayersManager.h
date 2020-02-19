@@ -39,7 +39,7 @@ public:
                                 APZTestData* aOutData) { }
 };
 
-} // layers
-} // mozilla
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_ShadowLayersManager_h

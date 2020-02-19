@@ -49,7 +49,7 @@ class GradientStopsCairo : public GradientStops
     ExtendMode mExtendMode;
 };
 
-class DrawTargetCairo : public DrawTarget
+class DrawTargetCairo final : public DrawTarget
 {
 public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(DrawTargetCairo, override)
@@ -217,7 +217,7 @@ private: // data
   static cairo_surface_t *mDummySurface;
 };
 
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 #endif // _MOZILLA_GFX_DRAWTARGET_CAIRO_H_

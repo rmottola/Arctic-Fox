@@ -94,7 +94,7 @@ getDefaultServiceId(const char* aPrefKey)
   return id;
 }
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_ISUPPORTS(SmsIPCService,
                   nsISmsService,

@@ -2894,7 +2894,7 @@ FireControllerChangeOnMatchingDocument(nsISupports* aKey,
 
   return PL_DHASH_NEXT;
 }
-} // anonymous namespace
+} // namespace
 
 void
 ServiceWorkerManager::GetAllClients(const nsCString& aScope,

@@ -117,7 +117,7 @@ private:
   friend class ContentParent;
 };
 
-} // dom
-} // mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_ContentBridgeParent_h

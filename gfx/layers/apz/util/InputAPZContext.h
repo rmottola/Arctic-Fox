@@ -39,7 +39,7 @@ private:
   bool mOldRoutedToChildProcess;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* mozilla_layers_InputAPZContext_h */

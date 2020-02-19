@@ -564,7 +564,7 @@ CategoryNotificationRunnable::Run()
   return NS_OK;
 }
 
-} // anonymous namespace
+} // namespace
 
 
 void

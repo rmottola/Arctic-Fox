@@ -118,8 +118,8 @@ private:
   bool mExtraCurrentTimeUpdatedSinceLastStableState;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

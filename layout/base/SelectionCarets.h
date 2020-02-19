@@ -32,7 +32,7 @@ namespace mozilla {
 
 namespace dom {
 class Selection;
-}
+} // namespace dom
 
 /**
  * The SelectionCarets draw a pair of carets when the selection is not
@@ -271,6 +271,7 @@ private:
   // Preference
   static int32_t sSelectionCaretsInflateSize;
 };
+
 } // namespace mozilla
 
 #endif //SelectionCarets_h__

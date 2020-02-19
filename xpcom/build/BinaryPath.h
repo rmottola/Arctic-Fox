@@ -181,6 +181,6 @@ public:
   }
 };
 
-}
+} // namespace mozilla
 
 #endif /* mozilla_BinaryPath_h */

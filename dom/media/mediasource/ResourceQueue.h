@@ -228,4 +228,5 @@ private:
 #undef SBR_DEBUGV
 
 } // namespace mozilla
+
 #endif /* MOZILLA_RESOURCEQUEUE_H_ */

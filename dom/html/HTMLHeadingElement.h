@@ -49,7 +49,7 @@ private:
                                     nsRuleData* aData);
 };
 
-} // namespace mozilla
 } // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_HTMLHeadingElement_h

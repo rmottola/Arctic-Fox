@@ -36,6 +36,6 @@ private:
   bool IsEnabled();
 };
 
-}
+} // namespace mozilla
 
 #endif /* MOZILLA_AUDIONODESTREAM_H_ */

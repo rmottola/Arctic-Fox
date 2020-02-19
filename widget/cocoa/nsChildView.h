@@ -40,15 +40,15 @@ class nsCocoaWindow;
 namespace {
 class GLPresenter;
 class RectTextureImage;
-}
+} // namespace
 
 namespace mozilla {
 class VibrancyManager;
 namespace layers {
 class GLManager;
 class APZCTreeManager;
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 @interface NSEvent (Undocumented)
 

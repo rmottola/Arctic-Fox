@@ -26,11 +26,11 @@
 namespace mozilla {
 namespace dom {
 
-namespace { // anon
+namespace {
 
 int32_t gQuotaLimit = DEFAULT_QUOTA_LIMIT;
 
-} // anon
+} // namespace
 
 DOMLocalStorageManager*
 DOMLocalStorageManager::sSelf = nullptr;
@@ -118,7 +118,7 @@ DOMStorageManager::~DOMStorageManager()
   }
 }
 
-namespace { // anon
+namespace {
 
 nsresult
 CreateScopeKey(nsIPrincipal* aPrincipal,
@@ -249,7 +249,7 @@ CreateQuotaDBKey(nsIPrincipal* aPrincipal,
   return NS_OK;
 }
 
-} // anon
+} // namespace
 
 DOMStorageCache*
 DOMStorageManager::GetCache(const nsACString& aScope) const
@@ -489,7 +489,7 @@ DOMStorageManager::GetLocalStorageForPrincipal(nsIPrincipal* aPrincipal,
   return CreateStorage(nullptr, aPrincipal, aDocumentURI, aPrivate, aRetval);
 }
 
-namespace { // anon
+namespace {
 
 class ClearCacheEnumeratorData
 {
@@ -502,7 +502,7 @@ public:
   nsCString mKeyPrefix;
 };
 
-} // anon
+} // namespace
 
 PLDHashOperator
 DOMStorageManager::ClearCacheEnumerator(DOMStorageCacheHashKey* aEntry, void* aClosure)
@@ -659,5 +659,5 @@ DOMSessionStorageManager::DOMSessionStorageManager()
   }
 }
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla

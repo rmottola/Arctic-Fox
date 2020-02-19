@@ -121,6 +121,6 @@ static gfx::PointTyped<TargetUnits> TransformVector(const gfx::Matrix4x4& aTrans
   return transformedEnd - transformedStart;
 }
 
-}
+} // namespace mozilla
 
 #endif

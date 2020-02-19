@@ -90,7 +90,7 @@ const char *kDownloadWatcherNotify = "download-watcher-notify";
 
 namespace mozilla {
   MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedPRFileDesc, PRFileDesc, PR_Close);
-}
+} // namespace mozilla
 
 StaticAutoPtr<DeviceStorageUsedSpaceCache>
   DeviceStorageUsedSpaceCache::sDeviceStorageUsedSpaceCache;

@@ -811,4 +811,4 @@ bool DecoderTraits::IsSupportedInVideoDocument(const nsACString& aType)
     false;
 }
 
-}
+} // namespace mozilla

@@ -5650,7 +5650,7 @@ StaticRefPtr<DEBUGThreadSlower> gDEBUGThreadSlower;
 
 #endif // DEBUG
 
-} // anonymous namespace
+} // namespace
 
 /*******************************************************************************
  * Exported functions

@@ -64,7 +64,7 @@ protected:
   mutable nsRefPtr<QuadBounds> mBounds; // allocated lazily
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif /*MOZILLA_DOMRECT_H_*/

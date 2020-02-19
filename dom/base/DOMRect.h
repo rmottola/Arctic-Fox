@@ -209,8 +209,7 @@ protected:
   nsCOMPtr<nsISupports> mParent;
 };
 
-}
-
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif /*MOZILLA_DOMRECT_H_*/

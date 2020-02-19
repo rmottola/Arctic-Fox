@@ -257,7 +257,7 @@ bool IsValidBufferSize(uint32_t aBufferSize) {
   }
 }
 
-}
+} // namespace
 
 already_AddRefed<MediaStreamAudioDestinationNode>
 AudioContext::CreateMediaStreamDestination(ErrorResult& aRv)
@@ -1020,5 +1020,5 @@ AudioContext::ExtraCurrentTime() const
   return mDestination->ExtraCurrentTime();
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

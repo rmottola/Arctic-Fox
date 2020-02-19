@@ -211,6 +211,6 @@ private:
 
 };
 
-}
+} // namespace mozilla
 
 #endif

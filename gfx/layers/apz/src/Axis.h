@@ -294,7 +294,7 @@ public:
   virtual const char* Name() const override;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

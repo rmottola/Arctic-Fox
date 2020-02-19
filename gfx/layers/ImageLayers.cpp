@@ -60,5 +60,5 @@ void ImageLayer::ComputeEffectiveTransforms(const gfx::Matrix4x4& aTransformToSu
   ComputeEffectiveTransformForMaskLayer(aTransformToSurface);
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

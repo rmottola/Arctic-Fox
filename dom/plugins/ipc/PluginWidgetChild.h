@@ -10,7 +10,7 @@
 namespace mozilla {
 namespace widget {
 class PluginWidgetProxy;
-}
+} // namespace widget
 namespace plugins {
 
 class PluginWidgetChild : public PPluginWidgetChild
@@ -19,9 +19,7 @@ public:
   PluginWidgetChild();
   virtual ~PluginWidgetChild();
 
-  virtual bool RecvUpdateWindow(const uintptr_t& aChildId) override;
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
-  virtual bool RecvParentShutdown(const uint16_t& aType) override;
 
   void SetWidget(mozilla::widget::PluginWidgetProxy* aWidget) {
     mWidget = aWidget;

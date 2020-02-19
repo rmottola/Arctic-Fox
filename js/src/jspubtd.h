@@ -127,8 +127,8 @@ namespace gc {
 class StoreBuffer;
 void MarkPersistentRootedChains(JSTracer*);
 void FinishPersistentRootedChains(JSRuntime*);
-}
-}
+} // namespace gc
+} // namespace js
 
 namespace JS {
 

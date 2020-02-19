@@ -58,7 +58,7 @@ private:
   uint32_t mLength;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif

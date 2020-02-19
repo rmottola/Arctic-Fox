@@ -21,11 +21,11 @@ namespace mozilla {
 
 namespace ipc {
 class Shmem;
-}
+} // namespace ipc
 
 namespace layout {
 class RenderFrameParent;
-}
+} // namespace layout
 
 namespace layers {
 
@@ -35,8 +35,8 @@ class ShadowLayerParent;
 class CompositableParent;
 class ShadowLayersManager;
 
-class LayerTransactionParent : public PLayerTransactionParent,
-                               public CompositableParentManager
+class LayerTransactionParent final : public PLayerTransactionParent,
+                                     public CompositableParentManager
 {
   typedef mozilla::layout::RenderFrameParent RenderFrameParent;
   typedef InfallibleTArray<Edit> EditArray;

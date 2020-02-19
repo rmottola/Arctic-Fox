@@ -79,7 +79,7 @@ InitRndisAddress()
   return true;
 }
 
-} // anonymous namespace
+} // namespace
 
 namespace mozilla {
 namespace ipc {

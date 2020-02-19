@@ -176,5 +176,5 @@ DecomposeIntoNoRepeatTriangles(const nsIntRect& aTexCoordRect,
     }
 }
 
-}
-}
+} // namespace gl
+} // namespace mozilla

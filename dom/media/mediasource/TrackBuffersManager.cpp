@@ -1910,6 +1910,6 @@ TrackBuffersManager::GetNextRandomAccessPoint(TrackInfo::TrackType aTrack)
   return media::TimeUnit::FromInfinity();
 }
 
-}
+} // namespace mozilla
 #undef MSE_DEBUG
 #undef MSE_DEBUGV

@@ -242,5 +242,6 @@ SharedSurface_GLTexture::ConsTexture(GLContext* consGL)
     return mTex;
 }
 
-} /* namespace gfx */
+} // namespace gl
+
 } /* namespace mozilla */

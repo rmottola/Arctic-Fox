@@ -556,7 +556,7 @@ private:
   ClientTiledLayerBuffer mLowPrecisionTiledBuffer;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif

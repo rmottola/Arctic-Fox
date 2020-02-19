@@ -135,7 +135,7 @@ public:
   DOMSessionStorageManager();
 };
 
-} // ::dom
-} // ::mozilla
+} // namespace dom
+} // namespace mozilla
 
 #endif /* nsDOMStorageManager_h__ */

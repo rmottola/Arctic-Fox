@@ -983,7 +983,8 @@ class Signature
     RetType retType() const { return retType_; }
 };
 
-} /* namespace anonymous */
+} // namespace
+
 
 static
 bool operator==(const Signature& lhs, const Signature& rhs)
@@ -5601,7 +5602,7 @@ class CheckSimdVectorScalarArgs
     }
 };
 
-} // anonymous namespace
+} // namespace
 
 static inline bool
 CheckSimdUnary(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
@@ -5683,7 +5684,7 @@ CheckSimdCast(FunctionCompiler& f, ParseNode* call, AsmJSSimdType fromType, AsmJ
     return true;
 }
 
-}
+} // namespace
 
 static bool
 CheckSimdShuffleSelectors(FunctionCompiler& f, ParseNode* lane, int32_t lanes[4], uint32_t maxLane)

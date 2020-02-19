@@ -1475,7 +1475,7 @@ RemoteInputStream::BlockAndGetInternalStream()
   return mStream;
 }
 
-} // anonymous namespace
+} // namespace
 
 StaticAutoPtr<BlobParent::IDTable> BlobParent::sIDTable;
 StaticAutoPtr<Mutex> BlobParent::sIDTableMutex;

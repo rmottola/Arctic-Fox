@@ -424,4 +424,4 @@ bool PeerConnectionCtx::gmpHasH264() {
   return true;
 }
 
-}  // namespace mozilla
+} // namespace mozilla

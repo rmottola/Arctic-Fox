@@ -526,7 +526,7 @@ private:
   static float sDPI;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif // mozilla_layers_PanZoomController_h

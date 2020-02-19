@@ -47,6 +47,7 @@
 #include "mozilla/layers/PCompositorChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/net/NeckoChild.h"
+#include "mozilla/plugins/PluginInstanceParent.h"
 #include "mozilla/plugins/PluginModuleParent.h"
 
 #if defined(MOZ_CONTENT_SANDBOX)
@@ -1065,8 +1066,10 @@ SetUpSandboxEnvironment()
 void
 ContentChild::CleanUpSandboxEnvironment()
 {
-    // Sandbox environment is only currently set up with the more strict sandbox.
-    if (!Preferences::GetBool("security.sandbox.windows.content.moreStrict")) {
+    // Sandbox environment is only currently a low integrity temp, which only
+    // makes sense for sandbox pref level 1 (and will eventually not be needed
+    // at all, once all file access is via chrome/broker process).
+    if (Preferences::GetInt("security.sandbox.content.level") != 1) {
         return;
     }
 
@@ -1207,7 +1210,10 @@ ContentChild::RecvSetProcessSandbox()
     SetContentProcessSandbox();
 #elif defined(XP_WIN)
     mozilla::SandboxTarget::Instance()->StartSandbox();
-    if (Preferences::GetBool("security.sandbox.windows.content.moreStrict")) {
+    // Sandbox environment is only currently a low integrity temp, which only
+    // makes sense for sandbox pref level 1 (and will eventually not be needed
+    // at all, once all file access is via chrome/broker process).
+    if (Preferences::GetInt("security.sandbox.content.level") == 1) {
         SetUpSandboxEnvironment();
     }
 #elif defined(XP_MACOSX)
@@ -2624,11 +2630,10 @@ ContentChild::RecvShutdown()
     if (os) {
         os->NotifyObservers(this, "content-child-shutdown", nullptr);
     }
-    // Let the parent know we're done and let it close the channel.
-    // Both sides will clean up even if an error occurs here.
-    MessageLoop::current()->PostTask(
-        FROM_HERE,
-        NewRunnableMethod(this, &ContentChild::SendFinishShutdown));
+
+    // Ignore errors here. If this fails, the parent will kill us after a
+    // timeout.
+    unused << SendFinishShutdown();
     return true;
 }
 
@@ -2642,6 +2647,26 @@ ContentChild::GetBrowserOrId(TabChild* aTabChild)
     else {
         return PBrowserOrId(aTabChild->GetTabId());
     }
+}
+
+bool
+ContentChild::RecvUpdateWindow(const uintptr_t& aChildId)
+{
+#if defined(XP_WIN)
+  NS_ASSERTION(aChildId, "Expected child hwnd value for remote plugin instance.");
+  mozilla::plugins::PluginInstanceParent* parentInstance =
+    mozilla::plugins::PluginInstanceParent::LookupPluginInstanceByID(aChildId);
+  NS_ASSERTION(parentInstance, "Expected matching plugin instance");
+  if (parentInstance) {
+    // sync! update call to the plugin instance that forces the
+    // plugin to paint its child window.
+    parentInstance->CallUpdateWindow();
+  }
+  return true;
+#else
+  NS_NOTREACHED("ContentChild::RecvUpdateWindow calls unexpected on this platform.");
+  return false;
+#endif
 }
 
 // This code goes here rather than nsGlobalWindow.cpp because nsGlobalWindow.cpp

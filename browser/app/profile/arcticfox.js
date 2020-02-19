@@ -635,14 +635,13 @@ pref("accessibility.typeaheadfind.flashBar", 1);
 pref("plugins.hide_infobar_for_blocked_plugin", false);
 pref("plugins.hide_infobar_for_outdated_plugin", false);
 
-// Pale Moon:pref to always show the plugin indicator or not (default=false)
-pref("plugins.always_show_indicator", false);
-
 pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
 pref("plugins.update.notifyUser", false);
 
 //Enable tri-state option (Always/Never/Ask)
 pref("plugins.click_to_play", true);
+
+pref("plugins.hideMissingPluginsNotification", false);
 
 #ifdef XP_WIN
 pref("browser.preferences.instantApply", false);
@@ -790,15 +789,12 @@ pref("browser.sessionstore.max_resumed_crashes", 1);
 pref("browser.sessionstore.max_serialize_back", 10);
 // number of forward button session history entries to restore (-1 = all of them)
 pref("browser.sessionstore.max_serialize_forward", -1);
-// restore_on_demand overrides browser.sessionstore.max_concurrent_tabs
+// restore_on_demand overrides MAX_CONCURRENT_TAB_RESTORES (sessionstore constant)
 // and restore_hidden_tabs. When true, tabs will not be restored until they are
 // focused (also applies to tabs that aren't visible). When false, the values
-// for browser.sessionstore.max_concurrent_tabs and restore_hidden_tabs are 
-// respected. Selected tabs are always restored regardless of this pref.
+// for MAX_CONCURRENT_TAB_RESTORES and restore_hidden_tabs are respected.
+// Selected tabs are always restored regardless of this pref.
 pref("browser.sessionstore.restore_on_demand", true);
-// The number of tabs that can restore concurrently.
-// Sane values are 1..10, default 3.
-pref("browser.sessionstore.max_concurrent_tabs", 3);
 // Whether to automatically restore hidden tabs (i.e., tabs in other tab groups) or not
 pref("browser.sessionstore.restore_hidden_tabs", false);
 // If restore_on_demand is set, pinned tabs are restored on startup by default.
@@ -926,6 +922,37 @@ pref("dom.ipc.plugins.enabled", true);
 
 pref("browser.tabs.remote", false);
 
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+// When this pref is true the Windows process sandbox will set up dummy
+// interceptions and log to the browser console when calls fail in the sandboxed
+// process and also if they are subsequently allowed by the broker process.
+// This will require a restart.
+pref("security.sandbox.windows.log", false);
+
+#if defined(MOZ_CONTENT_SANDBOX)
+// This controls the strength of the Windows content process sandbox for testing
+// purposes. This will require a restart.
+// On windows these levels are:
+// 0 - sandbox with USER_NON_ADMIN access token level
+// 1 - a more strict sandbox, which causes problems in specific areas
+// 2 - a policy that we can reasonably call an effective sandbox
+// 3 - an equivalent basic policy to the Chromium renderer processes
+pref("security.sandbox.content.level", 0);
+
+// ID (a UUID when set by gecko) that is used as a per profile suffix to a low
+// integrity temp directory.
+pref("security.sandbox.content.tempDirSuffix", "");
+
+#if defined(MOZ_STACKWALKING)
+// This controls the depth of stack trace that is logged when Windows sandbox
+// logging is turned on.  This is only currently available for the content
+// process because the only other sandbox (for GMP) has too strict a policy to
+// allow stack tracing.  This does not require a restart to take effect.
+pref("security.sandbox.windows.log.stackTraceDepth", 0);
+#endif
+#endif
+#endif
+
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
 // This pref is discussed in bug 1083344, the naming is inspired from its Windows
 // counterpart, but on Mac it's an integer which means:
@@ -935,7 +962,7 @@ pref("browser.tabs.remote", false);
 // This setting is read when the content process is started. On Mac the content
 // process is killed when all windows are closed, so a change will take effect
 // when the 1st window is opened. It was decided to default this setting to 1.
-pref("security.sandbox.macos.content.level", 1);
+pref("security.sandbox.content.level", 1);
 #endif
 
 #if defined(NIGHTLY_BUILD) && defined(XP_MACOSX)

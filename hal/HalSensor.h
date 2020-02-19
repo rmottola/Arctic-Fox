@@ -47,8 +47,8 @@ class SensorAccuracy;
 
 typedef Observer<SensorAccuracy> ISensorAccuracyObserver;
 
-}
-}
+} // namespace hal
+} // namespace mozilla
 
 #include "ipc/IPCMessageUtils.h"
 

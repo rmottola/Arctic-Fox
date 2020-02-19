@@ -604,7 +604,7 @@ static const int SYNC1 = 0;
 static const int SYNC2_VERSION_LAYER_PROTECTION = 1;
 static const int BITRATE_SAMPLERATE_PADDING_PRIVATE = 2;
 static const int CHANNELMODE_MODEEXT_COPY_ORIG_EMPH = 3;
-}
+} // namespace frame_header
 
 FrameParser::FrameParser()
 {
@@ -1226,5 +1226,5 @@ ID3Parser::ID3Header::Update(uint8_t c) {
   return IsValid(mPos++);
 }
 
-}  // namespace mp3
-}  // namespace mozilla
+} // namespace mp3
+} // namespace mozilla

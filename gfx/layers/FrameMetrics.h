@@ -801,7 +801,7 @@ struct ZoomConstraints {
   }
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* GFX_FRAMEMETRICS_H */

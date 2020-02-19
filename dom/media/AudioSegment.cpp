@@ -212,4 +212,4 @@ AudioSegment::WriteTo(uint64_t aID, AudioMixer& aMixer, uint32_t aOutputChannels
   }
 }
 
-}
+} // namespace mozilla

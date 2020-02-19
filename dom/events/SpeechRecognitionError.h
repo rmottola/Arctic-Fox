@@ -56,7 +56,7 @@ protected:
   nsString mMessage;
 };
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif // SpeechRecognitionError_h__

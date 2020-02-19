@@ -568,6 +568,7 @@ struct PositionComparator
     return 1;
   }
 };
+
 } // namespace
 
 bool
@@ -5914,7 +5915,7 @@ public:
 
 NS_IMPL_ISUPPORTS(ProcessStackRunner, nsIRunnable);
 
-} // anonymous namespace
+} // namespace
 
 void
 nsDocument::EnqueueLifecycleCallback(nsIDocument::ElementCallbackType aType,
@@ -9581,7 +9582,7 @@ struct SuppressArgs
   uint32_t mIncrease;
 };
 
-}
+} // namespace
 
 static bool
 SuppressEventHandlingInDocument(nsIDocument* aDocument, void* aData)
@@ -9819,7 +9820,7 @@ public:
 };
 NS_IMPL_ISUPPORTS(StubCSSLoaderObserver, nsICSSLoaderObserver)
 
-}
+} // namespace
 
 void
 nsDocument::PreloadStyle(nsIURI* uri, const nsAString& charset,
@@ -9876,7 +9877,7 @@ struct UnsuppressArgs
   nsTArray<nsCOMPtr<nsIDocument>> mDocs;
 };
 
-}
+} // namespace
 
 static bool
 GetAndUnsuppressSubDocuments(nsIDocument* aDocument,

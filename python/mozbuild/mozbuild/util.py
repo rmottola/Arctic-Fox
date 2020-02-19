@@ -7,6 +7,7 @@
 
 from __future__ import unicode_literals
 
+import argparse
 import collections
 import copy
 import difflib
@@ -976,3 +977,20 @@ def group_unified_files(files, unified_prefix, unified_suffix,
                                               files)):
         just_the_filenames = list(filter_out_dummy(unified_group))
         yield '%s%d.%s' % (unified_prefix, i, unified_suffix), just_the_filenames
+
+
+class DefinesAction(argparse.Action):
+    '''An ArgumentParser action to handle -Dvar[=value] type of arguments.'''
+    def __call__(self, parser, namespace, values, option_string):
+        defines = getattr(namespace, self.dest)
+        if defines is None:
+            defines = {}
+        values = values.split('=', 1)
+        if len(values) == 1:
+            name, value = values[0], 1
+        else:
+            name, value = values
+            if value.isdigit():
+                value = int(value)
+        defines[name] = value
+        setattr(namespace, self.dest, defines)

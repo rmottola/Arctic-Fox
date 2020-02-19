@@ -241,7 +241,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 already_AddRefed<Promise>
 ServiceWorkerClients::MatchAll(const ClientQueryOptions& aOptions,

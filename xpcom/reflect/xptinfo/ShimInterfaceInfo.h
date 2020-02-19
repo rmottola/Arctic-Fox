@@ -21,8 +21,8 @@ namespace mozilla {
 namespace dom {
 struct ConstantSpec;
 struct NativePropertyHooks;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class ShimInterfaceInfo final : public nsIInterfaceInfo
 {

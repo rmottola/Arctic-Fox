@@ -2145,7 +2145,7 @@ public:
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 void
 WebSocketChannel::CleanupConnection()
@@ -3759,5 +3759,5 @@ WebSocketChannel::SaveNetworkStats(bool enforce)
 #endif
 }
 
-} // namespace mozilla::net
+} // namespace net
 } // namespace mozilla

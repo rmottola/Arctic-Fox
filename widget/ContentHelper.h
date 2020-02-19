@@ -33,7 +33,7 @@ public:
   static TouchBehaviorFlags GetAllowedTouchBehavior(nsIWidget* aWidget, const nsIntPoint& aPoint);
 };
 
-}
-}
+} // namespace widget
+} // namespace mozilla
 
 #endif /*__mozilla_widget_ContentHelper_h__ */

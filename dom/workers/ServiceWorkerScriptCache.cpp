@@ -602,7 +602,7 @@ CompareCache::ManageValueResult(JSContext* aCx, JS::Handle<JS::Value> aValue)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 nsresult
 PurgeCache(nsIPrincipal* aPrincipal, const nsAString& aCacheName)
@@ -673,6 +673,6 @@ Compare(nsIPrincipal* aPrincipal, const nsAString& aCacheName,
   return NS_OK;
 }
 
-} // serviceWorkerScriptCache namespace
+} // namespace serviceWorkerScriptCache
 
 END_WORKERS_NAMESPACE

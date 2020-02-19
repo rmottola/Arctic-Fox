@@ -187,5 +187,5 @@ BasicLayerManager::GetImageFactory()
   return mFactory.get();
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

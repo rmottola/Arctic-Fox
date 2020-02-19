@@ -192,6 +192,7 @@ SpdyPushCache::RemovePushedStreamHttp2(nsCString key)
     mHashHttp2.Remove(key);
   return rv;
 }
-} // namespace mozilla::net
+
+} // namespace net
 } // namespace mozilla
 

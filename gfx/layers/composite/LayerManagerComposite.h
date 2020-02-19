@@ -41,7 +41,7 @@ struct nsIntSize;
 namespace mozilla {
 namespace gfx {
 class DrawTarget;
-}
+} // namespace gfx
 
 namespace gl {
 class GLContext;
@@ -463,7 +463,7 @@ protected:
 };
 
 
-} /* layers */
-} /* mozilla */
+} // namespace layers
+} // namespace mozilla
 
 #endif /* GFX_LayerManagerComposite_H */

@@ -22,7 +22,7 @@ class nsIRunnable;
 
 namespace js {
 struct Class;
-}
+} // namespace js
 
 namespace mozilla {
 

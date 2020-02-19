@@ -114,7 +114,7 @@ struct Module
   UnloadFuncPtr unloadProc;
 };
 
-} // namespace
+} // namespace mozilla
 
 #if defined(MOZILLA_INTERNAL_API)
 #  define NSMODULE_NAME(_name) _name##_NSModule

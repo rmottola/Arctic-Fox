@@ -55,5 +55,6 @@ SpeechRecognitionAlternative::Confidence() const
 {
   return mConfidence;
 }
+
 } // namespace dom
 } // namespace mozilla

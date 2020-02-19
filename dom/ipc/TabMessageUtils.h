@@ -23,8 +23,8 @@ struct RemoteDOMEvent
 bool ReadRemoteEvent(const IPC::Message* aMsg, void** aIter,
                      mozilla::dom::RemoteDOMEvent* aResult);
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 namespace IPC {
 
@@ -84,7 +84,7 @@ struct ParamTraits<mozilla::dom::AudioChannelState>
                                     mozilla::dom::AUDIO_CHANNEL_STATE_LAST>
 { };
 
-}
+} // namespace IPC
 
 
 #endif

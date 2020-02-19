@@ -1922,6 +1922,7 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 %include ../../../toolkit/themes/shared/devtools/commandline.inc.css
 %endif
 %include ../shared/plugin-doorhanger.inc.css
+%include ../shared/badcontent-doorhanger.inc.css
 
 %ifdef MOZ_DEVTOOLS
 .gcli-panel {

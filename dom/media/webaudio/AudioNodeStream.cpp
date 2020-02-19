@@ -644,4 +644,4 @@ AudioNodeStream::DestinationTimeFromTicks(AudioNodeStream* aDestination,
   return StreamTimeToSeconds(destinationTime);
 }
 
-}
+} // namespace mozilla

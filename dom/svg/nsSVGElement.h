@@ -46,7 +46,7 @@ static const unsigned short SVG_UNIT_TYPE_UNKNOWN           = 0;
 static const unsigned short SVG_UNIT_TYPE_USERSPACEONUSE    = 1;
 static const unsigned short SVG_UNIT_TYPE_OBJECTBOUNDINGBOX = 2;
 
-}
+} // namespace dom
 
 class SVGAnimatedNumberList;
 class SVGNumberList;
@@ -61,9 +61,9 @@ class DOMSVGStringList;
 
 namespace gfx {
 class Matrix;
-}
+} // namespace gfx
 
-}
+} // namespace mozilla
 
 class gfxMatrix;
 struct nsSVGEnumMapping;

@@ -19,8 +19,8 @@ namespace mozilla {
 namespace dom {
 class File;
 struct objectURLOptions;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 BEGIN_WORKERS_NAMESPACE
 

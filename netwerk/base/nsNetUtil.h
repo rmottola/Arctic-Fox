@@ -2872,7 +2872,7 @@ InScriptableRange(uint64_t val)
     return val <= kJS_MAX_SAFE_UINTEGER;
 }
 
+} // namespace net
 } // namespace mozilla
-} // namespace mozilla::net
 
 #endif // !nsNetUtil_h__

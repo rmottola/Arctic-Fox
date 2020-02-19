@@ -215,5 +215,5 @@ StereoPannerNode::SendPanToStream(AudioNode* aNode)
   SendTimelineParameterToStream(This, StereoPannerNodeEngine::PAN, *This->mPan);
 }
 
-}
-}
+} // namespace dom
+} // namespace mozilla

@@ -743,7 +743,7 @@ VibrateWindowListener::RemoveListener()
                                     true /* use capture */);
 }
 
-} // anonymous namespace
+} // namespace
 
 void
 Navigator::AddIdleObserver(MozIdleObserver& aIdleObserver, ErrorResult& aRv)

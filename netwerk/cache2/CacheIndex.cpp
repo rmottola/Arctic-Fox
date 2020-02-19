@@ -1662,7 +1662,7 @@ CacheIndex::WriteIndexToDisk()
   mSkipEntries = 0;
 }
 
-namespace { // anon
+namespace {
 
 struct WriteRecordsHelper
 {
@@ -1675,7 +1675,7 @@ struct WriteRecordsHelper
 #endif
 };
 
-} // anon
+} // namespace
 
 void
 CacheIndex::WriteRecords()
@@ -3244,7 +3244,7 @@ CacheIndex::ReleaseBuffer()
   mRWBufPos = 0;
 }
 
-namespace { // anon
+namespace {
 
 class FrecencyComparator
 {
@@ -3275,7 +3275,7 @@ public:
   }
 };
 
-} // anon
+} // namespace
 
 void
 CacheIndex::InsertRecordToFrecencyArray(CacheIndexRecord *aRecord)
@@ -3715,5 +3715,5 @@ CacheIndex::SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf)
   return mallocSizeOf(gInstance) + SizeOfExcludingThis(mallocSizeOf);
 }
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla

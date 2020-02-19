@@ -1198,4 +1198,5 @@ HttpChannelParent::GetAuthPrompt(uint32_t aPromptReason, const nsIID& iid,
   return NS_OK;
 }
 
-}} // mozilla::net
+} // namespace net
+} // namespace mozilla

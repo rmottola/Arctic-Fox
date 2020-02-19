@@ -100,7 +100,7 @@ DataAtOffset(DataSourceSurface* aSurface, IntPoint aPoint);
 bool
 SurfaceContainsPoint(SourceSurface* aSurface, const IntPoint& aPoint);
 
-}
-}
+} // namespace gfx
+} // namespace mozilla
 
 #endif // _MOZILLA_GFX_DATASURFACEHELPERS_H

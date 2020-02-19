@@ -81,8 +81,8 @@ ThreeDPoint operator*(const ThreeDPoint& lhs, const ThreeDPoint& rhs);
 ThreeDPoint operator*(const ThreeDPoint& lhs, const double rhs);
 bool operator==(const ThreeDPoint& lhs, const ThreeDPoint& rhs);
 
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 #endif
 

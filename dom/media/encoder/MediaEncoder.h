@@ -176,5 +176,6 @@ private:
   }
 };
 
-}
+} // namespace mozilla
+
 #endif

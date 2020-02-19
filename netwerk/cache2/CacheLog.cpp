@@ -26,5 +26,5 @@ PRLogModuleInfo* GetCache2Log()
 }
 #endif
 
-} // net
-} // mozilla
+} // namespace net
+} // namespace mozilla

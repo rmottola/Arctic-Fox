@@ -70,7 +70,7 @@ public:
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate);
 };
 
-} // anonymous namespace
+} // namespace
 
 BEGIN_WORKERS_NAMESPACE
 

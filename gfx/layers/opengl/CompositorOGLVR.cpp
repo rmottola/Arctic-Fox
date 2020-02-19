@@ -321,5 +321,5 @@ CompositorOGL::DrawVRDistortion(const gfx::Rect& aRect,
   gl()->fDisableVertexAttribArray(mVR.mAGenericAttribs);
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla

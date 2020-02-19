@@ -533,4 +533,4 @@ FindFrameTargetedByInputEvent(WidgetGUIEvent* aEvent,
   return target;
 }
 
-}
+} // namespace mozilla

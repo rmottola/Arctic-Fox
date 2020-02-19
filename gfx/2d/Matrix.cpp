@@ -256,5 +256,5 @@ Matrix4x4::SetNAN()
   _44 = UnspecifiedNaN<Float>();
 }
 
-}
-}
+} // namespace gfx
+} // namespace mozilla

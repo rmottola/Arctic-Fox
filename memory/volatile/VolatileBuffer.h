@@ -164,6 +164,6 @@ private:
   VolatileBufferPtr(VolatileBufferPtr const& vbufptr) = delete;
 };
 
-}; /* namespace mozilla */
+} // namespace mozilla
 
 #endif /* mozalloc_VolatileBuffer_h */

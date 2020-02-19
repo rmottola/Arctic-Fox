@@ -38,7 +38,6 @@
 #ifdef XP_WIN
 #include "mozilla/plugins/PluginSurfaceParent.h"
 #include "mozilla/widget/AudioSession.h"
-#include "nsWindowsHelpers.h"
 #include "PluginHangUIParent.h"
 #endif
 
@@ -101,6 +100,71 @@ mozilla::plugins::SetupBridge(uint32_t aPluginId,
     }
     return PPluginModule::Bridge(aContentParent, chromeParent);
 }
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+
+/**
+ * Use for executing CreateToolhelp32Snapshot off main thread
+ */
+class mozilla::plugins::FinishInjectorInitTask : public CancelableTask
+{
+public:
+    FinishInjectorInitTask()
+        : mMutex("FlashInjectorInitTask::mMutex")
+        , mParent(nullptr)
+        , mMainThreadMsgLoop(MessageLoop::current())
+    {
+        MOZ_ASSERT(NS_IsMainThread());
+    }
+
+    void Init(PluginModuleChromeParent* aParent)
+    {
+        MOZ_ASSERT(aParent);
+        mParent = aParent;
+    }
+
+    void PostToMainThread()
+    {
+        mSnapshot.own(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+        bool deleteThis = false;
+        {   // Scope for lock
+            mozilla::MutexAutoLock lock(mMutex);
+            if (mMainThreadMsgLoop) {
+                mMainThreadMsgLoop->PostTask(FROM_HERE, this);
+            } else {
+                deleteThis = true;
+            }
+        }
+        if (deleteThis) {
+            delete this;
+        }
+    }
+
+    void Run() override
+    {
+        mParent->DoInjection(mSnapshot);
+        // We don't need to hold this lock during DoInjection, but we do need
+        // to obtain it before returning from Run() to ensure that
+        // PostToMainThread has completed before we return.
+        mozilla::MutexAutoLock lock(mMutex);
+    }
+
+    void Cancel() override
+    {
+        mozilla::MutexAutoLock lock(mMutex);
+        mMainThreadMsgLoop = nullptr;
+    }
+
+private:
+    mozilla::Mutex            mMutex;
+    nsAutoHandle              mSnapshot;
+    PluginModuleChromeParent* mParent;
+    MessageLoop*              mMainThreadMsgLoop;
+};
+
+#endif // MOZ_CRASHREPORTER_INJECTOR
+
+namespace {
 
 /**
  * Objects of this class remain linked until either an error occurs in the
@@ -251,6 +315,8 @@ PRCList PluginModuleMapping::sModuleListHead =
     PR_INIT_STATIC_CLIST(&PluginModuleMapping::sModuleListHead);
 
 bool PluginModuleMapping::sIsLoadModuleOnStack = false;
+
+} // anonymous namespace
 
 void
 mozilla::plugins::TerminatePlugin(uint32_t aPluginId)
@@ -554,6 +620,11 @@ PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath, uint32
     , mCrashReporter(nullptr)
 #endif
 #endif
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    , mFlashProcess1(0)
+    , mFlashProcess2(0)
+    , mFinishInitTask(nullptr)
+#endif
     , mInitOnAsyncConnect(false)
     , mAsyncInitRv(NS_ERROR_NOT_INITIALIZED)
     , mAsyncInitError(NPERR_NO_ERROR)
@@ -585,6 +656,17 @@ PluginModuleChromeParent::~PluginModuleChromeParent()
         mSubprocess->Delete();
         mSubprocess = nullptr;
     }
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    if (mFlashProcess1)
+        UnregisterInjectorCallback(mFlashProcess1);
+    if (mFlashProcess2)
+        UnregisterInjectorCallback(mFlashProcess2);
+    if (mFinishInitTask) {
+        // mFinishInitTask will be deleted by the main thread message_loop
+        mFinishInitTask->Cancel();
+    }
+#endif
 
     UnregisterSettingsCallbacks();
 
@@ -736,7 +818,7 @@ GetProcessCpuUsage(const InfallibleTArray<base::ProcessHandle>& processHandles, 
   return true;
 }
 
-} // anonymous namespace
+} // namespace
 
 #endif // #ifdef XP_WIN
 
@@ -2396,4 +2478,170 @@ PluginModuleChromeParent::RecvNotifyContentModuleDestroyed()
     }
     return true;
 }
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+
+// We only add the crash reporter to subprocess which have the filename
+// FlashPlayerPlugin*
+#define FLASH_PROCESS_PREFIX "FLASHPLAYERPLUGIN"
+
+static DWORD
+GetFlashChildOfPID(DWORD pid, HANDLE snapshot)
+{
+    PROCESSENTRY32 entry = {
+        sizeof(entry)
+    };
+    for (BOOL ok = Process32First(snapshot, &entry);
+         ok;
+         ok = Process32Next(snapshot, &entry)) {
+        if (entry.th32ParentProcessID == pid) {
+            nsString name(entry.szExeFile);
+            ToUpperCase(name);
+            if (StringBeginsWith(name, NS_LITERAL_STRING(FLASH_PROCESS_PREFIX))) {
+                return entry.th32ProcessID;
+            }
+        }
+    }
+    return 0;
+}
+
+// We only look for child processes of the Flash plugin, NPSWF*
+#define FLASH_PLUGIN_PREFIX "NPSWF"
+
+void
+PluginModuleChromeParent::InitializeInjector()
+{
+    if (!Preferences::GetBool("dom.ipc.plugins.flash.subprocess.crashreporter.enabled", false))
+        return;
+
+    nsCString path(Process()->GetPluginFilePath().c_str());
+    ToUpperCase(path);
+    int32_t lastSlash = path.RFindCharInSet("\\/");
+    if (kNotFound == lastSlash)
+        return;
+
+    if (!StringBeginsWith(Substring(path, lastSlash + 1),
+                          NS_LITERAL_CSTRING(FLASH_PLUGIN_PREFIX)))
+        return;
+
+    TimeStamp th32Start = TimeStamp::Now();
+    mFinishInitTask = mChromeTaskFactory.NewTask<FinishInjectorInitTask>();
+    mFinishInitTask->Init(this);
+    if (!::QueueUserWorkItem(&PluginModuleChromeParent::GetToolhelpSnapshot,
+                             mFinishInitTask, WT_EXECUTEDEFAULT)) {
+        delete mFinishInitTask;
+        mFinishInitTask = nullptr;
+        return;
+    }
+    TimeStamp th32End = TimeStamp::Now();
+    mTimeBlocked += (th32End - th32Start);
+}
+
+void
+PluginModuleChromeParent::DoInjection(const nsAutoHandle& aSnapshot)
+{
+    DWORD pluginProcessPID = GetProcessId(Process()->GetChildProcessHandle());
+    mFlashProcess1 = GetFlashChildOfPID(pluginProcessPID, aSnapshot);
+    if (mFlashProcess1) {
+        InjectCrashReporterIntoProcess(mFlashProcess1, this);
+
+        mFlashProcess2 = GetFlashChildOfPID(mFlashProcess1, aSnapshot);
+        if (mFlashProcess2) {
+            InjectCrashReporterIntoProcess(mFlashProcess2, this);
+        }
+    }
+    mFinishInitTask = nullptr;
+}
+
+DWORD WINAPI
+PluginModuleChromeParent::GetToolhelpSnapshot(LPVOID aContext)
+{
+    FinishInjectorInitTask* task = static_cast<FinishInjectorInitTask*>(aContext);
+    MOZ_ASSERT(task);
+    task->PostToMainThread();
+    return 0;
+}
+
+void
+PluginModuleChromeParent::OnCrash(DWORD processID)
+{
+    if (!mShutdown) {
+        GetIPCChannel()->CloseWithError();
+        KillProcess(OtherProcess(), 1, false);
+    }
+}
+
+#endif // MOZ_CRASHREPORTER_INJECTOR
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+class PluginProfilerObserver MOZ_FINAL : public nsIObserver,
+                                         public nsSupportsWeakReference
+{
+public:
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIOBSERVER
+
+    explicit PluginProfilerObserver(PluginModuleParent* pmp)
+      : mPmp(pmp)
+    {}
+
+private:
+    ~PluginProfilerObserver() {}
+    PluginModuleParent* mPmp;
+};
+
+NS_IMPL_ISUPPORTS(PluginProfilerObserver, nsIObserver, nsISupportsWeakReference)
+
+NS_IMETHODIMP
+PluginProfilerObserver::Observe(nsISupports *aSubject,
+                                const char *aTopic,
+                                const char16_t *aData)
+{
+    if (!strcmp(aTopic, "profiler-started")) {
+        nsCOMPtr<nsIProfilerStartParams> params(do_QueryInterface(aSubject));
+        uint32_t entries;
+        double interval;
+        params->GetEntries(&entries);
+        params->GetInterval(&interval);
+        const nsTArray<nsCString>& features = params->GetFeatures();
+        const nsTArray<nsCString>& threadFilterNames = params->GetThreadFilterNames();
+        unused << mPmp->SendStartProfiler(entries, interval, features, threadFilterNames);
+    } else if (!strcmp(aTopic, "profiler-stopped")) {
+        unused << mPmp->SendStopProfiler();
+    } else if (!strcmp(aTopic, "profiler-subprocess")) {
+        nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
+        if (pse) {
+            nsCString result;
+            bool success = mPmp->CallGetProfile(&result);
+            if (success && !result.IsEmpty()) {
+                pse->AddSubProfile(result.get());
+            }
+        }
+    }
+    return NS_OK;
+}
+
+void
+PluginModuleChromeParent::InitPluginProfiling()
+{
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    if (observerService) {
+        mProfilerObserver = new PluginProfilerObserver(this);
+        observerService->AddObserver(mProfilerObserver, "profiler-started", false);
+        observerService->AddObserver(mProfilerObserver, "profiler-stopped", false);
+        observerService->AddObserver(mProfilerObserver, "profiler-subprocess", false);
+    }
+}
+
+void
+PluginModuleChromeParent::ShutdownPluginProfiling()
+{
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    if (observerService) {
+        observerService->RemoveObserver(mProfilerObserver, "profiler-started");
+        observerService->RemoveObserver(mProfilerObserver, "profiler-stopped");
+        observerService->RemoveObserver(mProfilerObserver, "profiler-subprocess");
+    }
+}
+#endif
 

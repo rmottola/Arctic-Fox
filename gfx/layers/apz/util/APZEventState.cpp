@@ -68,7 +68,7 @@ WidgetModifiersToDOMModifiers(mozilla::Modifiers aModifiers)
   return result;
 }
 
-}
+} // namespace
 
 namespace mozilla {
 namespace layers {
@@ -393,6 +393,6 @@ APZEventState::GetWidget() const
   return result.forget();
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 

@@ -55,6 +55,18 @@ html|applet:not([height]), html|applet[height=""] {
   line-height: initial;
 }
 
+/* Initialize the overlay with visibility:hidden to prevent flickering if
+* the plugin is too small to show the overlay */
+.mainBox > .hoverBox,
+.mainBox > .closeIcon {
+  visibility: hidden;
+}
+
+.visible > .hoverBox,
+.visible > .closeIcon {
+  visibility: visible;
+}
+
 .mainBox[chromedir="rtl"] {
   direction: rtl;
 }

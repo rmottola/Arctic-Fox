@@ -127,7 +127,7 @@ enum AppId {
   kUnknownAppId = nsIScriptSecurityManager::UNKNOWN_APP_ID
 };
 
-} // anonymous namespace
+} // namespace
 
 BEGIN_QUOTA_NAMESPACE
 
@@ -1257,7 +1257,7 @@ GetTemporaryStorageLimit(nsIFile* aDirectory, uint64_t aCurrentUsage,
   return NS_OK;
 }
 
-} // anonymous namespace
+} // namespace
 
 QuotaManager::QuotaManager()
 : mCurrentWindowIndex(BAD_TLS_INDEX),
