@@ -132,8 +132,6 @@ More session store stuff to check:
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1209689 - Tabs that haven't yet been restored should not crash.
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
-- Bug 1148505, remove cpow usage from back-forward menu by using sessio
-- Bug 1072980 - Don't allow CPOWs to be passed to C++ code (r=mrbkap,al
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
