@@ -5,6 +5,7 @@
 browser.jar:
 % skin browser classic/1.0 %skin/classic/browser/
         skin/classic/browser/sanitizeDialog.css
+        skin/classic/browser/aboutNetError.css                    (../shared/aboutNetError.css)
 *       skin/classic/browser/aboutPrivateBrowsing.css
 *       skin/classic/browser/aboutSessionRestore.css
         skin/classic/browser/aboutSessionRestore-window-icon.png     (preferences/application.png)
@@ -31,6 +32,7 @@ browser.jar:
         skin/classic/browser/Push-64.png
         skin/classic/browser/Push-64@2x.png
         skin/classic/browser/Info.png
+        skin/classic/browser/in-content/common.css                (../shared/in-content/common.css)
         skin/classic/browser/identity.png
         skin/classic/browser/imagedocument.png 
         skin/classic/browser/identity-icons-generic.png

@@ -5,11 +5,7 @@ var gConfig;
 
 if (Cc === undefined) {
   var Cc = Components.classes;
-}
-if (Ci === undefined) {
   var Ci = Components.interfaces;
-}
-if (Cu === undefined) {
   var Cu = Components.utils;
 }
 
@@ -19,14 +15,14 @@ Cu.import("resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
   "resource://gre/modules/Services.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
+  "resource:///modules/BrowserNewTabPreloader.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "CustomizationTabPreloader",
   "resource:///modules/CustomizationTabPreloader.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
   "resource:///modules/ContentSearch.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "SelfSupportBackend",
-  "resource:///modules/SelfSupportBackend.jsm");
 
 const SIMPLETEST_OVERRIDES =
   ["ok", "is", "isnot", "ise", "todo", "todo_is", "todo_isnot", "info", "expectAssertions", "requestCompleteLog"];
@@ -39,54 +35,10 @@ window.addEventListener("load", function testOnLoad() {
   });
 });
 
-function b2gStart() {
-  let homescreen = document.getElementById('systemapp');
-  var webNav = homescreen.contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-                                   .getInterface(Ci.nsIWebNavigation);
-  var url = "chrome://mochikit/content/harness.xul?manifestFile=tests.json";
-
-  webNav.loadURI(url, null, null, null, null);
-}
-
-let TabDestroyObserver = {
-  outstanding: new Set(),
-  promiseResolver: null,
-
-  init: function() {
-    Services.obs.addObserver(this, "message-manager-close", false);
-    Services.obs.addObserver(this, "message-manager-disconnect", false);
-  },
-
-  destroy: function() {
-    Services.obs.removeObserver(this, "message-manager-close");
-    Services.obs.removeObserver(this, "message-manager-disconnect");
-  },
-
-  observe: function(subject, topic, data) {
-    if (topic == "message-manager-close") {
-      this.outstanding.add(subject);
-    } else if (topic == "message-manager-disconnect") {
-      this.outstanding.delete(subject);
-      if (!this.outstanding.size && this.promiseResolver) {
-        this.promiseResolver();
-      }
-    }
-  },
-
-  wait: function() {
-    if (!this.outstanding.size) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      this.promiseResolver = resolve;
-    });
-  },
-};
-
 function testInit() {
   gConfig = readConfig();
   if (gConfig.testRoot == "browser" ||
+      gConfig.testRoot == "metro" ||
       gConfig.testRoot == "webapprtChrome") {
     // Make sure to launch the test harness for the first opened window only
     var prefs = Services.prefs;
@@ -124,9 +76,6 @@ function testInit() {
   if (gConfig.e10s) {
     e10s_init();
   }
-  let globalMM = Cc["@mozilla.org/globalmessagemanager;1"]
-                     .getService(Ci.nsIMessageListenerManager);
-  globalMM.loadFrameScript("chrome://mochikit/content/shutdown-leaks-collector.js", true);
 }
 
 function Tester(aTests, aDumper, aCallback) {
@@ -151,9 +100,6 @@ function Tester(aTests, aDumper, aCallback) {
 
   this.MemoryStats = simpleTestScope.MemoryStats;
   this.Task = Task;
-  this.ContentTask = Components.utils.import("resource://testing-common/ContentTask.jsm", null).ContentTask;
-  this.BrowserTestUtils = Components.utils.import("resource://testing-common/BrowserTestUtils.jsm", null).BrowserTestUtils;
-  this.TestUtils = Components.utils.import("resource://testing-common/TestUtils.jsm", null).TestUtils;
   this.Task.Debugging.maintainStack = true;
   this.Promise = Components.utils.import("resource://gre/modules/Promise.jsm", null).Promise;
   this.Assert = Components.utils.import("resource://testing-common/Assert.jsm", null).Assert;
@@ -198,7 +144,6 @@ Tester.prototype = {
   EventUtils: {},
   SimpleTest: {},
   Task: null,
-  ContentTask: null,
   Assert: null,
 
   repeat: 0,
@@ -217,8 +162,6 @@ Tester.prototype = {
   },
 
   start: function Tester_start() {
-    TabDestroyObserver.init();
-
     //if testOnLoad was not called, then gConfig is not defined
     if (!gConfig)
       gConfig = readConfig();
@@ -308,8 +251,6 @@ Tester.prototype = {
   },
 
   finish: function Tester_finish(aSkipSummary) {
-    TabDestroyObserver.destroy();
-
     this.Promise.Debugging.flushUncaughtErrors();
 
     var passCount = this.tests.reduce(function(a, f) a + f.passCount, 0);
@@ -422,7 +363,7 @@ Tester.prototype = {
       }
 
       if (testScope.__expected == 'fail' && testScope.__num_failed <= 0) {
-        this.currentTest.addResult(new testResult(false, "We expected at least one assertion to fail because this test file was marked as fail-if in the manifest!", "", true));
+        this.currentTest.addResult(new testResult(false, "We expected at least one assertion to fail because this test file was marked as fail-if in the manifest", "", false));
       }
 
       this.Promise.Debugging.flushUncaughtErrors();
@@ -504,7 +445,8 @@ Tester.prototype = {
           .getService(Ci.nsIXULRuntime)
           .processType == Ci.nsIXULRuntime.PROCESS_TYPE_DEFAULT)
       {
-        this.MemoryStats.dump(this.currentTestIndex,
+        this.MemoryStats.dump(this.dumper.structuredLogger,
+                              this.currentTestIndex,
                               this.currentTest.path,
                               gConfig.dumpOutputDirectory,
                               gConfig.dumpAboutMemoryAfterTest,
@@ -562,6 +504,8 @@ Tester.prototype = {
             Cu.import("resource://gre/modules/BackgroundPageThumbs.jsm", {});
           BackgroundPageThumbs._destroy();
 
+          BrowserNewTabPreloader.uninit();
+
           // Destroy preloaded browsers.
           if (gBrowser._preloadedBrowser) {
             let browser = gBrowser._preloadedBrowser;
@@ -569,7 +513,6 @@ Tester.prototype = {
             gBrowser.getNotificationBox(browser).remove();
           }
 
-          SelfSupportBackend.uninit();
           CustomizationTabPreloader.uninit();
           SocialFlyout.unload();
           SocialShare.uninit();
@@ -613,17 +556,10 @@ Tester.prototype = {
         Services.obs.notifyObservers({wrappedJSObject: barrier},
           "shutdown-leaks-before-check", null);
 
-        barrier.client.addBlocker("ShutdownLeaks: Wait for tabs to finish closing",
-                                  TabDestroyObserver.wait());
-
         barrier.wait().then(() => {
           // Simulate memory pressure so that we're forced to free more resources
           // and thus get rid of more false leaks like already terminated workers.
           Services.obs.notifyObservers(null, "memory-pressure", "heap-minimize");
-
-          let ppmm = Cc["@mozilla.org/parentprocessmessagemanager;1"]
-                       .getService(Ci.nsIMessageBroadcaster);
-          ppmm.broadcastAsyncMessage("browser-test:collect-request");
 
           checkForLeakedGlobalWindows(aResults => {
             if (aResults.length == 0) {
@@ -664,9 +600,6 @@ Tester.prototype = {
     this.currentTest.scope.SimpleTest = this.SimpleTest;
     this.currentTest.scope.gTestPath = this.currentTest.path;
     this.currentTest.scope.Task = this.Task;
-    this.currentTest.scope.ContentTask = this.ContentTask;
-    this.currentTest.scope.BrowserTestUtils = this.BrowserTestUtils;
-    this.currentTest.scope.TestUtils = this.TestUtils;
     // Pass a custom report function for mochitest style reporting.
     this.currentTest.scope.Assert = new this.Assert(function(err, message, stack) {
       let res;
@@ -774,8 +707,7 @@ Tester.prototype = {
       var self = this;
       var timeoutExpires = Date.now() + gTimeoutSeconds * 1000;
       var waitUntilAtLeast = timeoutExpires - 1000;
-      this.currentTest.scope.__waitTimer =
-        this.SimpleTest._originalSetTimeout.apply(window, [function timeoutFn() {
+      this.currentTest.scope.__waitTimer = setTimeout(function timeoutFn() {
         // We sometimes get woken up long before the gTimeoutSeconds
         // have elapsed (when running in chaos mode for example). This
         // code ensures that we don't wrongly time out in that case.
@@ -814,7 +746,7 @@ Tester.prototype = {
         self.currentTest.timedOut = true;
         self.currentTest.scope.__waitTimer = null;
         self.nextTest();
-      }, gTimeoutSeconds * 1000]);
+      }, gTimeoutSeconds * 1000);
     }
   },
 
@@ -1062,9 +994,6 @@ testScope.prototype = {
   EventUtils: {},
   SimpleTest: {},
   Task: null,
-  ContentTask: null,
-  BrowserTestUtils: null,
-  TestUtils: null,
   Assert: null,
 
   /**

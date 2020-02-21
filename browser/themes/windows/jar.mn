@@ -13,6 +13,8 @@ browser.jar:
         skin/classic/browser/aboutCertError_sectionCollapsed.png
         skin/classic/browser/aboutCertError_sectionCollapsed-rtl.png
         skin/classic/browser/aboutCertError_sectionExpanded.png
+        skin/classic/browser/aboutNetError.css                       (../shared/aboutNetError.css)
+        skin/classic/browser/aboutNetError_info.svg                  (../shared/aboutNetError_info.svg)
 #ifdef MOZ_SERVICES_SYNC
         skin/classic/browser/aboutSyncTabs.css
 #endif
@@ -31,6 +33,7 @@ browser.jar:
         skin/classic/browser/Push-16.png
         skin/classic/browser/Push-64.png
         skin/classic/browser/Info.png
+        skin/classic/browser/in-content/common.css                  (../shared/in-content/common.css)
         skin/classic/browser/identity.png
         skin/classic/browser/imagedocument.png					
         skin/classic/browser/identity-icons-generic.png

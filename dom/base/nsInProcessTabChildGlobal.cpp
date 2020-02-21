@@ -19,6 +19,7 @@
 #include "nsIMozBrowserFrame.h"
 #include "nsDOMClassInfoID.h"
 #include "mozilla/EventDispatcher.h"
+#include "mozilla/dom/SameProcessMessageQueue.h"
 #include "mozilla/dom/StructuredCloneUtils.h"
 #include "js/StructuredClone.h"
 
@@ -35,24 +36,21 @@ nsInProcessTabChildGlobal::DoSendBlockingMessage(JSContext* aCx,
                                                  InfallibleTArray<nsString>* aJSONRetVal,
                                                  bool aIsSync)
 {
-  nsTArray<nsCOMPtr<nsIRunnable> > asyncMessages;
-  asyncMessages.SwapElements(mASyncMessages);
-  uint32_t len = asyncMessages.Length();
-  for (uint32_t i = 0; i < len; ++i) {
-    nsCOMPtr<nsIRunnable> async = asyncMessages[i];
-    async->Run();
-  }
+  SameProcessMessageQueue* queue = SameProcessMessageQueue::Get();
+  queue->Flush();
+
   if (mChromeMessageManager) {
     SameProcessCpowHolder cpows(js::GetRuntime(aCx), aCpows);
     nsRefPtr<nsFrameMessageManager> mm = mChromeMessageManager;
-    mm->ReceiveMessage(mOwner, aMessage, true, &aData, &cpows, aPrincipal,
+    nsCOMPtr<nsIFrameLoader> fl = GetFrameLoader();
+    mm->ReceiveMessage(mOwner, fl, aMessage, true, &aData, &cpows, aPrincipal,
                        aJSONRetVal);
   }
   return true;
 }
 
 class nsAsyncMessageToParent : public nsSameProcessAsyncMessageBase,
-                               public nsRunnable
+                               public SameProcessMessageQueue::Runnable
 {
 public:
   nsAsyncMessageToParent(JSContext* aCx,
@@ -62,25 +60,17 @@ public:
                          JS::Handle<JSObject *> aCpows,
                          nsIPrincipal* aPrincipal)
     : nsSameProcessAsyncMessageBase(aCx, aMessage, aData, aCpows, aPrincipal),
-      mTabChild(aTabChild), mRun(false)
+      mTabChild(aTabChild)
   {
   }
 
-  NS_IMETHOD Run()
+  virtual nsresult HandleMessage() override
   {
-    if (mRun) {
-      return NS_OK;
-    }
-
-    mRun = true;
-    mTabChild->mASyncMessages.RemoveElement(this);
-    ReceiveMessage(mTabChild->mOwner, mTabChild->mChromeMessageManager);
+    nsCOMPtr<nsIFrameLoader> fl = mTabChild->GetFrameLoader();
+    ReceiveMessage(mTabChild->mOwner, fl, mTabChild->mChromeMessageManager);
     return NS_OK;
   }
   nsRefPtr<nsInProcessTabChildGlobal> mTabChild;
-  // True if this runnable has already been called. This can happen if DoSendSyncMessage
-  // is called while waiting for an asynchronous message send.
-  bool mRun;
 };
 
 bool
@@ -90,10 +80,10 @@ nsInProcessTabChildGlobal::DoSendAsyncMessage(JSContext* aCx,
                                               JS::Handle<JSObject *> aCpows,
                                               nsIPrincipal* aPrincipal)
 {
-  nsCOMPtr<nsIRunnable> ev =
+  SameProcessMessageQueue* queue = SameProcessMessageQueue::Get();
+  nsRefPtr<nsAsyncMessageToParent> ev =
     new nsAsyncMessageToParent(aCx, this, aMessage, aData, aCpows, aPrincipal);
-  mASyncMessages.AppendElement(ev);
-  NS_DispatchToCurrentThread(ev);
+  queue->Push(ev);
   return true;
 }
 
@@ -186,6 +176,12 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
 NS_IMPL_ADDREF_INHERITED(nsInProcessTabChildGlobal, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(nsInProcessTabChildGlobal, DOMEventTargetHelper)
+
+void
+nsInProcessTabChildGlobal::CacheFrameLoader(nsIFrameLoader* aFrameLoader)
+{
+  mFrameLoader = aFrameLoader;
+}
 
 NS_IMETHODIMP
 nsInProcessTabChildGlobal::GetContent(nsIDOMWindow** aContent)
@@ -346,4 +342,15 @@ nsInProcessTabChildGlobal::LoadFrameScript(const nsAString& aURL, bool aRunInGlo
   mLoadingScript = true;
   LoadScriptInternal(aURL, aRunInGlobalScope);
   mLoadingScript = tmp;
+}
+
+already_AddRefed<nsIFrameLoader>
+nsInProcessTabChildGlobal::GetFrameLoader()
+{
+  nsCOMPtr<nsIFrameLoaderOwner> owner = do_QueryInterface(mOwner);
+  nsCOMPtr<nsIFrameLoader> fl = owner ? owner->GetFrameLoader() : nullptr;
+  if (!fl) {
+    fl = mFrameLoader;
+  }
+  return fl.forget();
 }
