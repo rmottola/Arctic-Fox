@@ -86,7 +86,7 @@ static void Output(const char *fmt, ... )
 #else
   MessageBoxW(nullptr, 
               wide_msg,
-              L"Pale Moon",
+              L"Arctic Fox",
               MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
 #endif
 #endif

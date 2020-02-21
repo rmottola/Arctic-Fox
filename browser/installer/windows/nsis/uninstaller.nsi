@@ -196,8 +196,8 @@ Section "Uninstall"
 
   ${MUI_INSTALLOPTIONS_READ} $0 "unconfirm.ini" "Field 3" "State"
   ${If} "$0" == "1"
-    ${un.DeleteRelativeProfiles} "Moonchild Productions\Pale Moon"
-    ${un.DeleteRelativeProfiles} "Moonchild Productions\MetroPM"
+    ${un.DeleteRelativeProfiles} "Arctic Fox Developers\Arctic Fox"
+    ${un.DeleteRelativeProfiles} "Arctic Fox Developers\MetroPM"
     RmDir "$APPDATA\Mozilla\Extensions\{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}"
     RmDir "$APPDATA\Mozilla\Extensions"
     RmDir "$APPDATA\Mozilla"
@@ -218,7 +218,7 @@ Section "Uninstall"
   ${EndIf}
 
   ; Remove the updates directory for Vista and above
-  ${un.CleanUpdateDirectories} "Moonchild Productions\Pale Moon" "Moonchild Productions\updates"
+  ${un.CleanUpdateDirectories} "Arctic Fox Developers\Arctic Fox" "Arctic Fox Developers\updates"
 
   ; Remove any app model id's stored in the registry for this install path
   DeleteRegValue HKCU "Software\Mozilla\${AppName}\TaskBarIDs" "$INSTDIR"

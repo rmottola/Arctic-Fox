@@ -4,15 +4,15 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 # These defines should match application.ini settings
-!define AppName               "Pale Moon"
+!define AppName               "Arctic Fox"
 !define AppVersion            "@APP_VERSION@"
 !define GREVersion            @MOZILLA_VERSION@
 !define AB_CD                 "@AB_CD@"
 
 !define FileMainEXE           "@MOZ_APP_NAME@.exe"
-!define WindowClass           "Pale MoonMessageWindow"
-!define DDEApplication        "Pale Moon"
-!define AppRegName            "Pale Moon"
+!define WindowClass           "Arctic FoxMessageWindow"
+!define DDEApplication        "Arctic Fox"
+!define AppRegName            "Arctic Fox"
 
 !define BrandShortName        "@MOZ_APP_DISPLAYNAME@"
 !define BrandFullName         "${BrandFullNameInternal}"
@@ -47,12 +47,12 @@
 
 # File details shared by both the installer and uninstaller
 VIProductVersion "1.0.0.0"
-VIAddVersionKey "ProductName"     "Pale Moon"
-VIAddVersionKey "CompanyName"     "Moonchild Productions"
+VIAddVersionKey "ProductName"     "Arctic Fox"
+VIAddVersionKey "CompanyName"     "Arctic Fox Developers"
 #ifdef MOZ_OFFICIAL_BRANDING
-VIAddVersionKey "LegalTrademarks" "Pale Moon is the intellectual property of Moonchild Productions."
+VIAddVersionKey "LegalTrademarks" "Arctic Fox is the intellectual property of the Arctic Fox Developers."
 #endif
-VIAddVersionKey "LegalCopyright"  "Moonchild Productions"
+VIAddVersionKey "LegalCopyright"  "Arctic Fox Developers"
 VIAddVersionKey "FileVersion"     "${AppVersion}"
 VIAddVersionKey "ProductVersion"  "${AppVersion}"
 # Comments is not used but left below commented out for future reference
