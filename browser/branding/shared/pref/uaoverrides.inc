@@ -8,8 +8,7 @@
 #define PM_SLICE Arcticfox/@MOZ_APP_VERSION@
 
 #define GK_VERSION @MOZILLA_COMPATVERSION_U@
-// Changed Gecko compat to display "Mobile" page layouts for testing purposes. Possibly add proper mobile compat mode in the future.
-#define GK_SLICE Mobile/2010.01.01
+#define GK_SLICE Gecko/20100101
 #define FX_SLICE Firefox/@GK_VERSION@
 
 #ifdef XP_UNIX
@@ -23,13 +22,12 @@
 #endif
 
 // Required for google to play nice with Arctic Fox
-pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.9 @PM_SLICE@");
-pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:38.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/38.9 @PM_SLICE@");
-pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:31.9) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/31.9 @PM_SLICE@");
+pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
+pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
+pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
 
-// Force youtube to present the old style layout
-pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) Gecko/20010101 Firefox/42.0 @PM_SLICE@");
-pref("@GUAO_PREF@.gaming.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:42.0) Gecko/20010101 Firefox/42.0");
+// now YouTube needs to be fooled too
+pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 Firefox/52.0 @PM_SLICE@");
 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
@@ -44,6 +42,10 @@ pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) Gecko/
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
 pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; Mobile) @GK_SLICE@ Firefox/48.0");
+
+// yahoo is nasty too
+pref("@GUAO_PREF@.yahoo.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.0");
+
 
 // ============================================================================
 // Spoof the useragent and platform to a generic one for user experience and privacy
