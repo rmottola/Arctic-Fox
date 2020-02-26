@@ -159,8 +159,7 @@
           if (!window.gShowPageResizers)
             return;
 
-          var show = document.getElementById("addon-bar").collapsed &&
-                     window.windowState == window.STATE_NORMAL;
+          var show = window.windowState == window.STATE_NORMAL;
           for (let i = 0; i < this.browsers.length; i++) {
             this.browsers[i].showWindowResizer = show;
           }
