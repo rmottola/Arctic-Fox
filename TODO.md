@@ -116,11 +116,6 @@
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 1: Change SandboxTarg
-- Bug 1151974
-- Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
-- Bug 749804 - part 0: remove the add-on bar, r=jaws
-- Bug 1128768: Part 3 - Update BHR to allow for hang annotations; r=vladan
-- Bug 932865 - Add way for telemetry to iterate over active threads;
 - Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
