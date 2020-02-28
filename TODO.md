@@ -111,11 +111,6 @@
 - Bug 1149015 - Part 1: Remove some use of expression closure from jste
 - Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
 - Bug 1146696 - Don't assume there are no arenas available after last d
-- Bug 1145997 - Suppress GC in debugger GC callback 
-- Bug 1119878 Part 2: Change IPC code to hold ProcessID instead of Proc
-- Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
-- Bug 1092102 - Rename Suspend/Resume to Freeze
-- Bug 1119878 Part 1: Change SandboxTarg
 - Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
