@@ -285,3 +285,6 @@ chrome/toolkit/skin/classic/global/dirListing/folder.png
 chrome/toolkit/skin/classic/global/dirListing/local.png
 browser/chrome/browser/skin/classic/browser/aboutSessionRestore-window-icon.png
 browser/chrome/browser/skin/classic/browser/preferences/application.png
+#Windows ArcticFox exceptions
+chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png
+chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric.png
