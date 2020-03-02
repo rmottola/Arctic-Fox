@@ -111,6 +111,10 @@
 - Bug 1149015 - Part 1: Remove some use of expression closure from jste
 - Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
 - Bug 1146696 - Don't assume there are no arenas available after last d
+  https://github.com/mozilla/newtab-dev/commit/6131f67cc897e7dfc56621a31b11b8c3f894f5dd
+
+- Bug 1148214 - Replace manual AllocKind range checks with a few centra
+
 - Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
