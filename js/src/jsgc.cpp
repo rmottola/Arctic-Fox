@@ -3484,7 +3484,7 @@ GCRuntime::shouldReleaseObservedTypes()
  * arbitrary compartment in the zone.
  */
 void
-Zone::sweepCompartments(FreeOp* fop, bool keepAtleastOne, bool lastGC)
+Zone::sweepCompartments(FreeOp *fop, bool keepAtleastOne, bool destroyingRuntime)
 {
     JSRuntime* rt = runtimeFromMainThread();
     JSDestroyCompartmentCallback callback = rt->destroyCompartmentCallback;
@@ -3502,7 +3502,7 @@ Zone::sweepCompartments(FreeOp* fop, bool keepAtleastOne, bool lastGC)
          * deleted and keepAtleastOne is true.
          */
         bool dontDelete = read == end && !foundOne && keepAtleastOne;
-        if ((!comp->marked && !dontDelete) || lastGC) {
+        if ((!comp->marked && !dontDelete) || destroyingRuntime) {
             if (callback)
                 callback(fop, comp);
             if (comp->principals)
@@ -3518,7 +3518,7 @@ Zone::sweepCompartments(FreeOp* fop, bool keepAtleastOne, bool lastGC)
 }
 
 void
-GCRuntime::sweepZones(FreeOp* fop, bool lastGC)
+GCRuntime::sweepZones(FreeOp *fop, bool destroyingRuntime)
 {
     MOZ_ASSERT_IF(destroyingRuntime, rt->gc.numActiveZoneIters == 0);
     if (rt->gc.numActiveZoneIters)
@@ -3541,19 +3541,19 @@ GCRuntime::sweepZones(FreeOp* fop, bool lastGC)
         if (zone->wasGCStarted()) {
             if ((!zone->isQueuedForBackgroundSweep() &&
                  zone->arenas.arenaListsAreEmpty() &&
-                 !zone->hasMarkedCompartments()) || lastGC)
+                 !zone->hasMarkedCompartments()) || destroyingRuntime)
             {
                 zone->arenas.checkEmptyFreeLists();
                 AutoUnlockGC unlock(lock);
 
                 if (callback)
                     callback(zone);
-                zone->sweepCompartments(fop, false, lastGC);
+                zone->sweepCompartments(fop, false, destroyingRuntime);
                 MOZ_ASSERT(zone->compartments.empty());
                 fop->delete_(zone);
                 continue;
             }
-            zone->sweepCompartments(fop, true, lastGC);
+            zone->sweepCompartments(fop, true, destroyingRuntime);
         }
         *write++ = zone;
     }
@@ -4981,7 +4981,7 @@ GCRuntime::endSweepingZoneGroup()
 }
 
 void
-GCRuntime::beginSweepPhase(bool lastGC)
+GCRuntime::beginSweepPhase(bool destroyingRuntime)
 {
     /*
      * Sweep phase.
@@ -5002,7 +5002,7 @@ GCRuntime::beginSweepPhase(bool lastGC)
     gcstats::AutoPhase ap(stats, gcstats::PHASE_SWEEP);
 
     sweepOnBackgroundThread =
-        !lastGC && !TraceEnabled() && CanUseExtraThreads();
+        !destroyingRuntime && !TraceEnabled() && CanUseExtraThreads();
 
     releaseObservedTypes = shouldReleaseObservedTypes();
 
@@ -5202,14 +5202,14 @@ GCRuntime::sweepPhase(SliceBudget& sliceBudget)
 }
 
 void
-GCRuntime::endSweepPhase(bool lastGC)
+GCRuntime::endSweepPhase(bool destroyingRuntime)
 {
     AutoSetThreadIsSweeping threadIsSweeping;
 
     gcstats::AutoPhase ap(stats, gcstats::PHASE_SWEEP);
     FreeOp fop(rt);
 
-    MOZ_ASSERT_IF(lastGC, !sweepOnBackgroundThread);
+    MOZ_ASSERT_IF(destroyingRuntime, !sweepOnBackgroundThread);
 
     /*
      * Recalculate whether GC was full or not as this may have changed due to
@@ -5257,8 +5257,8 @@ GCRuntime::endSweepPhase(bool lastGC)
          * This removes compartments from rt->compartment, so we do it last to make
          * sure we don't miss sweeping any compartments.
          */
-        if (!lastGC)
-            sweepZones(&fop, lastGC);
+        if (!destroyingRuntime)
+            sweepZones(&fop, destroyingRuntime);
     }
 
     {
@@ -5288,8 +5288,8 @@ GCRuntime::endSweepPhase(bool lastGC)
         }
 
         /* Ensure the compartments get swept if it's the last GC. */
-        if (lastGC)
-            sweepZones(&fop, lastGC);
+        if (destroyingRuntime)
+            sweepZones(&fop, destroyingRuntime);
     }
 
     finishMarkingValidation();
@@ -5680,7 +5680,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
     AutoCopyFreeListToArenasForGC copy(rt);
     AutoGCSlice slice(rt);
 
-    bool lastGC = (reason == JS::gcreason::DESTROY_RUNTIME);
+    bool destroyingRuntime = (reason == JS::gcreason::DESTROY_RUNTIME);
 
     gc::State initialState = incrementalState;
 
@@ -5722,7 +5722,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
             return;
         }
 
-        if (!lastGC)
+        if (!destroyingRuntime)
             pushZealSelectedObjects();
 
         incrementalState = MARK;
@@ -5765,7 +5765,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
          * This runs to completion, but we don't continue if the budget is
          * now exhasted.
          */
-        beginSweepPhase(lastGC);
+        beginSweepPhase(destroyingRuntime);
         if (budget.isOverBudget())
             break;
 
@@ -5784,7 +5784,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         if (sweepPhase(budget) == NotFinished)
             break;
 
-        endSweepPhase(lastGC);
+        endSweepPhase(destroyingRuntime);
 
         incrementalState = COMPACT;
 
