@@ -227,12 +227,12 @@ FOR_ALL_NON_OBJECT_GC_LAYOUTS(DECL_ALLOCATOR_INSTANCES)
 #undef DECL_ALLOCATOR_INSTANCES
 
 template <typename T, AllowGC allowGC>
-/* static */ T *
-GCRuntime::tryNewTenuredThing(ExclusiveContext *cx, AllocKind kind, size_t thingSize)
+/* static */ T*
+GCRuntime::tryNewTenuredThing(ExclusiveContext* cx, AllocKind kind, size_t thingSize)
 {
-    T *t = reinterpret_cast<T *>(cx->arenas()->allocateFromFreeList(kind, thingSize));
+    T* t = reinterpret_cast<T*>(cx->arenas()->allocateFromFreeList(kind, thingSize));
     if (!t)
-        t = reinterpret_cast<T *>(refillFreeListFromAnyThread<allowGC>(cx, kind));
+        t = reinterpret_cast<T*>(refillFreeListFromAnyThread<allowGC>(cx, kind));
 
     checkIncrementalZoneState(cx, t);
     TraceTenuredAlloc(t, kind);
@@ -240,8 +240,8 @@ GCRuntime::tryNewTenuredThing(ExclusiveContext *cx, AllocKind kind, size_t thing
 }
 
 template <AllowGC allowGC>
-/* static */ void *
-GCRuntime::refillFreeListFromAnyThread(ExclusiveContext *cx, AllocKind thingKind)
+/* static */ void*
+GCRuntime::refillFreeListFromAnyThread(ExclusiveContext* cx, AllocKind thingKind)
 {
     MOZ_ASSERT(cx->arenas()->freeLists[thingKind].isEmpty());
 
@@ -252,15 +252,15 @@ GCRuntime::refillFreeListFromAnyThread(ExclusiveContext *cx, AllocKind thingKind
 }
 
 template <AllowGC allowGC>
-/* static */ void *
-GCRuntime::refillFreeListFromMainThread(JSContext *cx, AllocKind thingKind)
+/* static */ void*
+GCRuntime::refillFreeListFromMainThread(JSContext* cx, AllocKind thingKind)
 {
-    JSRuntime *rt = cx->runtime();
+    JSRuntime* rt = cx->runtime();
     MOZ_ASSERT(!rt->isHeapBusy(), "allocating while under GC");
     MOZ_ASSERT_IF(allowGC, !rt->currentThreadHasExclusiveAccess());
 
     // Try to allocate; synchronize with background GC threads if necessary.
-    void *thing = tryRefillFreeListFromMainThread(cx, thingKind);
+    void* thing = tryRefillFreeListFromMainThread(cx, thingKind);
     if (MOZ_LIKELY(thing))
         return thing;
 
