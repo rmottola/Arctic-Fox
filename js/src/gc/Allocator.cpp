@@ -291,15 +291,15 @@ GCRuntime::refillFreeListFromMainThread(JSContext* cx, AllocKind thingKind, size
     return nullptr;
 }
 
-/* static */ void *
-GCRuntime::tryRefillFreeListFromMainThread(JSContext *cx, AllocKind thingKind)
+/* static */ void*
+GCRuntime::tryRefillFreeListFromMainThread(JSContext* cx, AllocKind thingKind)
 {
-    ArenaLists *arenas = cx->arenas();
-    Zone *zone = cx->zone();
+    ArenaLists* arenas = cx->arenas();
+    Zone* zone = cx->zone();
 
     AutoMaybeStartBackgroundAllocation maybeStartBGAlloc;
 
-    void *thing = arenas->allocateFromArena(zone, thingKind, maybeStartBGAlloc);
+    void* thing = arenas->allocateFromArena(zone, thingKind, maybeStartBGAlloc);
     if (MOZ_LIKELY(thing))
         return thing;
 
@@ -317,12 +317,12 @@ GCRuntime::tryRefillFreeListFromMainThread(JSContext *cx, AllocKind thingKind)
     return nullptr;
 }
 
-/* static */ void *
-GCRuntime::refillFreeListOffMainThread(ExclusiveContext *cx, AllocKind thingKind)
+/* static */ void*
+GCRuntime::refillFreeListOffMainThread(ExclusiveContext* cx, AllocKind thingKind)
 {
-    ArenaLists *arenas = cx->arenas();
-    Zone *zone = cx->zone();
-    JSRuntime *rt = zone->runtimeFromAnyThread();
+    ArenaLists* arenas = cx->arenas();
+    Zone* zone = cx->zone();
+    JSRuntime* rt = zone->runtimeFromAnyThread();
 
     AutoMaybeStartBackgroundAllocation maybeStartBGAlloc;
 
@@ -333,7 +333,7 @@ GCRuntime::refillFreeListOffMainThread(ExclusiveContext *cx, AllocKind thingKind
     while (rt->isHeapBusy())
         HelperThreadState().wait(GlobalHelperThreadState::PRODUCER);
 
-    void *thing = arenas->allocateFromArena(zone, thingKind, maybeStartBGAlloc);
+    void* thing = arenas->allocateFromArena(zone, thingKind, maybeStartBGAlloc);
     if (thing)
         return thing;
 
@@ -341,11 +341,11 @@ GCRuntime::refillFreeListOffMainThread(ExclusiveContext *cx, AllocKind thingKind
     return nullptr;
 }
 
-TenuredCell *
-ArenaLists::allocateFromArena(JS::Zone *zone, AllocKind thingKind,
+TenuredCell*
+ArenaLists::allocateFromArena(JS::Zone* zone, AllocKind thingKind,
                               AutoMaybeStartBackgroundAllocation &maybeStartBGAlloc)
 {
-    JSRuntime *rt = zone->runtimeFromAnyThread();
+    JSRuntime* rt = zone->runtimeFromAnyThread();
     Maybe<AutoLockGC> maybeLock;
 
     // See if we can proceed without taking the GC lock.
