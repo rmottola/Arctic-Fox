@@ -48,8 +48,8 @@
 #if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #  undef NS_WARN_UNUSED_RESULT
 #  define NS_WARN_UNUSED_RESULT
-#  undef NS_ATTR_MALLOC
-#  define NS_ATTR_MALLOC
+#  undef MOZ_ALLOCATOR
+#  define MOZ_ALLOCATOR
 #endif
 
 #if defined(__cplusplus)
@@ -84,16 +84,16 @@ extern "C" {
  */
 
 MFBT_API void* moz_xmalloc(size_t size)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 
 MFBT_API void* moz_xcalloc(size_t nmemb, size_t size)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 
 MFBT_API void* moz_xrealloc(void* ptr, size_t size)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 
 MFBT_API char* moz_xstrdup(const char* str)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 
 MFBT_API size_t moz_malloc_usable_size(void *ptr);
 
@@ -101,7 +101,7 @@ MFBT_API size_t moz_malloc_size_of(const void *ptr);
 
 #if defined(HAVE_STRNDUP)
 MFBT_API char* moz_xstrndup(const char* str, size_t strsize)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 #endif /* if defined(HAVE_STRNDUP) */
 
 
@@ -116,13 +116,13 @@ MFBT_API int moz_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 #if defined(HAVE_MEMALIGN)
 MFBT_API void* moz_xmemalign(size_t boundary, size_t size)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 #endif /* if defined(HAVE_MEMALIGN) */
 
 
 #if defined(HAVE_VALLOC)
 MFBT_API void* moz_xvalloc(size_t size)
-    NS_ATTR_MALLOC NS_WARN_UNUSED_RESULT;
+    MOZ_ALLOCATOR;
 #endif /* if defined(HAVE_VALLOC) */
 
 
