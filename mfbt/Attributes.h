@@ -345,7 +345,6 @@
 #  define MOZ_ALLOCATOR
 #endif
 
-#ifdef __cplusplus
 
 /*
  * override explicitly indicates that a virtual member function in a class
@@ -475,6 +474,8 @@
 #else
 #  define MOZ_WARN_UNUSED_RESULT
 #endif
+
+#ifdef __cplusplus
 
 /*
  * The following macros are attributes that support the static analysis plugin
