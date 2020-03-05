@@ -110,12 +110,8 @@
 - Bug 1149015 - Part 2: Remove some use of expression closure from jste
 - Bug 1149015 - Part 1: Remove some use of expression closure from jste
 - Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
-- Bug 1146696 - Don't assume there are no arenas available after last d
-  https://github.com/mozilla/newtab-dev/commit/6131f67cc897e7dfc56621a31b11b8c3f894f5dd
 
-- Bug 1148214 - Replace manual AllocKind range checks with a few centra
 
-- Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
 
@@ -150,7 +146,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
-https://github.com/mozilla/newtab-dev/commit/b35c2674a24b7078cfff4c374dde4006b503cd6d
+
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
