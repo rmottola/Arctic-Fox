@@ -25,8 +25,6 @@
  #  include <string.h>
  #endif
 
-#include "xpcom-config.h"
-
 #if defined(__cplusplus)
 #include "mozilla/fallible.h"
 #include "mozilla/TemplateLib.h"
