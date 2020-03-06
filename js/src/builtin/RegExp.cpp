@@ -273,7 +273,7 @@ IsRegExp(HandleValue v)
 }
 
 MOZ_ALWAYS_INLINE bool
-regexp_compile_impl(JSContext* cx, const CallArgs& args)
+regexp_compile_impl(JSContext *cx, const CallArgs &args)
 {
     MOZ_ASSERT(IsRegExp(args.thisv()));
     RegExpObjectBuilder builder(cx, &args.thisv().toObject().as<RegExpObject>());
@@ -281,14 +281,14 @@ regexp_compile_impl(JSContext* cx, const CallArgs& args)
 }
 
 static bool
-regexp_compile(JSContext* cx, unsigned argc, Value* vp)
+regexp_compile(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<IsRegExp, regexp_compile_impl>(cx, args);
 }
 
 static bool
-regexp_construct(JSContext* cx, unsigned argc, Value* vp)
+regexp_construct(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -564,7 +564,7 @@ static const JSPropertySpec regexp_static_props[] = {
     JS_PS_END
 };
 
-JSObject*
+JSObject *
 js::InitRegExpClass(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->isNative());

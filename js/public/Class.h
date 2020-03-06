@@ -439,9 +439,9 @@ struct ClassSpec
 {
     ClassObjectCreationOp createConstructor;
     ClassObjectCreationOp createPrototype;
-    const JSFunctionSpec* constructorFunctions;
-    const JSFunctionSpec* prototypeFunctions;
-    const JSPropertySpec* prototypeProperties;
+    const JSFunctionSpec *constructorFunctions;
+    const JSFunctionSpec *prototypeFunctions;
+    const JSPropertySpec *prototypeProperties;
     FinishClassInitOp finishInit;
     uintptr_t flags;
 
@@ -538,7 +538,7 @@ typedef void (*JSClassInternal)();
 struct JSClass {
     JS_CLASS_MEMBERS(JSFinalizeOp);
 
-    void*               reserved[24];
+    void                *reserved[24];
 };
 
 #define JSCLASS_HAS_PRIVATE             (1<<0)  // objects have private slot
