@@ -86,7 +86,8 @@ const char* const XPCJSRuntime::mStrings[] = {
     "lineNumber",           // IDX_LINENUMBER
     "columnNumber",         // IDX_COLUMNNUMBER
     "stack",                // IDX_STACK
-    "message"               // IDX_MESSAGE
+    "message",              // IDX_MESSAGE
+    "lastIndex"             // IDX_LASTINDEX
 };
 
 /***************************************************************************/
