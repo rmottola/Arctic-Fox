@@ -105,8 +105,6 @@
 - Bug 1054755 - Part 1: Add Symbol.match
 - Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
 - Bug 1005110 - Warn about unreachable expression after semicolon-less
-- Bug 1148899 - Rename isExprClosure/setIsExprClosure/EXPR_CLOSURE
-
 
 
 More session store stuff to check:
@@ -121,7 +119,6 @@ More session store stuff to check:
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
-- Bug 1167508 - Reset epoch when receiving XULFrameLoaderCreated r=billm
 
 
 - Bug 785487 - Have AboutHomeUtils use the asynchronous search service
