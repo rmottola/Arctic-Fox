@@ -21,8 +21,6 @@
 <?xul-overlay href="chrome://browser/content/baseMenuOverlay.xul"?>
 <?xul-overlay href="chrome://browser/content/places/placesOverlay.xul"?>
 
-# Padlock feature
-<?xul-overlay href="chrome://browser/content/padlock.xul"?>
 # Improve bookmark menu dragging
 <?xul-overlay href="chrome://browser/content/browser-menudragging.xul"?>
 # Automatic browser recovery
@@ -1001,22 +999,6 @@
    </toolbar>
 #endif
 
-    <toolbar id="addon-bar"
-             toolbarname="&statusBar.label;" accesskey="&statusBar.accesskey;"
-             collapsed="true"
-             class="toolbar-primary chromeclass-toolbar"
-             context="toolbar-context-menu" toolboxid="navigator-toolbox"
-             mode="icons" iconsize="small" defaulticonsize="small"
-             lockiconsize="true"
-             defaultset="addonbar-closebutton,spring,status-bar"
-             customizable="true"
-             key="key_toggleAddonBar">
-      <toolbarbutton id="addonbar-closebutton"
-                     class="close-icon"
-                     tooltiptext="&addonBarCloseButton.tooltip;"
-                     oncommand="setToolbarVisibility(this.parentNode, false);"/>
-      <statusbar id="status-bar" ordinal="1000"/>
-    </toolbar>
   </vbox>
 
 #ifndef XP_UNIX

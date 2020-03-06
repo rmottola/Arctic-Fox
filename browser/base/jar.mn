@@ -43,6 +43,7 @@ browser.jar:
         content/browser/abouthome/settings@2x.png      (content/abouthome/settings@2x.png)
         content/browser/abouthome/restore@2x.png       (content/abouthome/restore@2x.png)
         content/browser/abouthome/restore-large@2x.png (content/abouthome/restore-large@2x.png)
+        content/browser/aboutNetError.xhtml            (content/aboutNetError.xhtml)
         content/browser/aboutRobots-icon.png          (content/aboutRobots-icon.png)
         content/browser/aboutRobots-widget-left.png   (content/aboutRobots-widget-left.png)
         content/browser/autorecovery.js               (content/autorecovery.js)
@@ -57,17 +58,6 @@ browser.jar:
 *       content/browser/browser.xul                   (content/browser.xul)
 *       content/browser/browser-tabPreviews.xml       (content/browser-tabPreviews.xml)
         content/browser/content.js                    (content/content.js)
-        content/browser/padlock.xul                   (content/padlock.xul)
-        content/browser/padlock.js                    (content/padlock.js)
-        content/browser/padlock.css                   (content/padlock.css)
-        content/browser/padlock_mod_ev.png            (content/padlock_mod_ev.png)
-        content/browser/padlock_mod_https.png         (content/padlock_mod_https.png)
-        content/browser/padlock_mod_low.png           (content/padlock_mod_low.png)
-        content/browser/padlock_mod_broken.png        (content/padlock_mod_broken.png)
-        content/browser/padlock_classic_ev.png        (content/padlock_classic_ev.png)
-        content/browser/padlock_classic_https.png     (content/padlock_classic_https.png)
-        content/browser/padlock_classic_low.png       (content/padlock_classic_low.png)
-        content/browser/padlock_classic_broken.png    (content/padlock_classic_broken.png)
         content/browser/newtab/newTab.xul             (content/newtab/newTab.xul)
 *       content/browser/newtab/newTab.js              (content/newtab/newTab.js)
         content/browser/newtab/newTab.css             (content/newtab/newTab.css)
@@ -130,3 +120,5 @@ browser.jar:
 # the following files are browser-specific overrides
 *       content/browser/license.html                  (/toolkit/content/license.html)
 % override chrome://global/content/license.html chrome://browser/content/license.html
+
+% override chrome://global/content/netError.xhtml chrome://browser/content/aboutNetError.xhtml

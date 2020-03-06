@@ -1,6 +1,9 @@
 # Backlog of Mozilla patches:
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
+- Bug 1533969 - Fix build error with newer glibc. (gettid)
+
+- Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
 - 1472925 - keep a strong reference to MediaStreamGraph from GraphDriver
@@ -114,11 +117,6 @@
 - Bug 1119878 Part 1: Change SandboxTarget to hold sandbox target servi
 - Bug 1092102 - Rename Suspend/Resume to Freeze
 - Bug 1119878 Part 1: Change SandboxTarg
-- Bug 1151974
-- Bug 1134518 - 2015-04-22 - Cap shistory entries in the SessionWorker when shutting
-- Bug 749804 - part 0: remove the add-on bar, r=jaws
-- Bug 1128768: Part 3 - Update BHR to allow for hang annotations; r=vladan
-- Bug 932865 - Add way for telemetry to iterate over active threads;
 - Bug 1110888 - Always do plugin IME in main process, even with e10s. r
 
 More session store stuff to check:
@@ -130,14 +128,11 @@ More session store stuff to check:
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1209689 - Tabs that haven't yet been restored should not crash.
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
-- Bug 1148505, remove cpow usage from back-forward menu by using sessio
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
 - Bug 1167508 - Reset epoch when receiving XULFrameLoaderCreated r=billm
 
-- Bug 1109875 - Don't flush state when closing tabs r=billm
-- Bug 1109875 - Ignore SessionStore:update messages that do not target (Attention: applies, but breaks restore!
 
 - Bug 785487 - Have AboutHomeUtils use the asynchronous search service
 
@@ -157,7 +152,7 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
 
-https://github.com/mozilla/newtab-dev/commit/8bb15120a98ea5838ce19e97ae5c685d9bbf3f04
+https://github.com/mozilla/newtab-dev/commit/b35c2674a24b7078cfff4c374dde4006b503cd6d
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
@@ -176,6 +171,8 @@ Check ApplicationReputation.cpp which is missing, possibly from here:
 Bug 837199 - Write interface to query application reputation 
 
 no components/url-classifier ?
+
+Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
 ### Further ToDo which would help portability:
 

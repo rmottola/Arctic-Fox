@@ -573,7 +573,8 @@ var PlacesOrganizer = {
     let fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     let fpCallback = function fpCallback_done(aResult) {
       if (aResult != Ci.nsIFilePicker.returnCancel) {
-        BookmarkJSONUtils.exportToFile(fp.file);
+        // There is no OS.File version of the filepicker yet (Bug 937812).
+PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
       }
     };
 

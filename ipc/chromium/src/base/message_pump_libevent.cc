@@ -10,6 +10,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(OS_POSIX)
+#include <pthread.h>
+#endif
+
 #include "eintr_wrapper.h"
 #include "base/logging.h"
 #include "base/scoped_nsautorelease_pool.h"

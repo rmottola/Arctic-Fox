@@ -107,6 +107,7 @@ let MessageListener = {
     "SessionStore:restoreHistory",
     "SessionStore:restoreTabContent",
     "SessionStore:resetRestore",
+    "SessionStore:flush",
   ],
 
   init: function () {
@@ -137,6 +138,9 @@ let MessageListener = {
         break;
       case "SessionStore:resetRestore":
         gContentRestore.resetRestore();
+        break;
+      case "SessionStore:flush":
+        this.flush(data);
         break;
       default:
         debug("received unknown message '" + name + "'");
@@ -188,6 +192,11 @@ let MessageListener = {
       // Pretend that the load succeeded so that event handlers fire correctly.
       sendAsyncMessage("SessionStore:restoreTabContentComplete", {epoch});
     }
+  },
+
+  flush({id}) {
+    // Flush the message queue, send the latest updates.
+    MessageQueue.send({flushID: id});
   }
 };
 
@@ -595,6 +604,8 @@ let MessageQueue = {
    * @param options (object)
    *        {id: 123} to override the update ID used to accumulate data to send.
    *        {sync: true} to send data to the parent process synchronously.
+   *        {flushID: 123} to specify that this is a flush
+   *        {isFinal: true} to signal this is the final message sent on unload
    */
   send: function (options = {}) {
     // Looks like we have been called off a timeout after the tab has been
@@ -611,6 +622,7 @@ let MessageQueue = {
 
     let sync = options && options.sync;
     let startID = (options && options.id) || this._id;
+    let flushID = (options && options.flushID) || 0;
 
     // We use sendRpcMessage in the sync case because we may have been called
     // through a CPOW. RPC messages are the only synchronous messages that the
@@ -646,7 +658,7 @@ let MessageQueue = {
 
     // Send all data to the parent process.
     sendMessage("SessionStore:update", {
-      id: this._id, data, telemetry,
+      id: this._id, data, telemetry, flushID,
       isFinal: options.isFinal || false,
       epoch: gCurrentEpoch
     });
