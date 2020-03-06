@@ -106,10 +106,6 @@
 - Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
 - Bug 1005110 - Warn about unreachable expression after semicolon-less
 - Bug 1148899 - Rename isExprClosure/setIsExprClosure/EXPR_CLOSURE
-- Bug 1149015 - Part 3: Remove some use of expression closure from jit
-- Bug 1149015 - Part 2: Remove some use of expression closure from jste
-- Bug 1149015 - Part 1: Remove some use of expression closure from jste
-- Bug 1149135 - Don't create HashMapEntry on stack when adding to a Has
 
 
 
