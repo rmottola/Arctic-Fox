@@ -2506,7 +2506,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
         tokenStream.ungetToken();
         bodyType = ExpressionBody;
 #if JS_HAS_EXPR_CLOSURES
-        fun->setIsExprClosure();
+        fun->setIsExprBody();
 #endif
     }
 
