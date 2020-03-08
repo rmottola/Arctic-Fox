@@ -2402,10 +2402,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
   margin: 0px;
 }
 
-#identity-popup-container {
-  min-width: 280px;
-}
-
 /* Bookmarks roots menu-items */
 #appmenu_subscribeToPage:not([disabled]),
 #appmenu_subscribeToPageMenu,
