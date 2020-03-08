@@ -891,7 +891,11 @@ nsContextMenu.prototype = {
 
   // Open new "view source" window with the frame's URL.
   viewFrameSource: function() {
-    BrowserViewSourceOfDocument(this.target.ownerDocument);
+    BrowserViewSourceOfDocument({
+      browser: this.browser,
+      URL: gContextMenuContentData.docLocation,
+      outerWindowID: gContextMenuContentData.frameOuterWindowID,
+    });
   },
 
   viewInfo: function() {
