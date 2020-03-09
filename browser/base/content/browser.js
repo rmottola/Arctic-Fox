@@ -2488,7 +2488,7 @@ let BrowserOnClick = {
                               msg.data.sslStatusAsString);
       break;
       case "Browser:SiteBlockedError":
-        this.onAboutBlocked(msg.data.elementId, msg.data.isMalware,
+        this.onAboutBlocked(msg.data.elementId, msg.data.reason,
                             msg.data.isTopFrame, msg.data.location);
       break;
       case "Browser:NetworkError":
@@ -2659,6 +2659,42 @@ let BrowserOnClick = {
       case "expertContent":
         break;
 
+    }
+  },
+
+  onAboutBlocked: function (elementId, reason, isTopFrame, location) {
+    // Depending on what page we are displaying here (malware/phishing/unwanted)
+    // use the right strings and links for each.
+    let bucketName = "WARNING_PHISHING_PAGE_";
+    if (reason === 'malware') {
+      bucketName = "WARNING_MALWARE_PAGE_";
+    } else if (reason === 'unwanted') {
+      bucketName = "WARNING_UNWANTED_PAGE_";
+    }
+    let secHistogram = Services.telemetry.getHistogramById("SECURITY_UI");
+    let nsISecTel = Ci.nsISecurityUITelemetry;
+    bucketName += isTopFrame ? "TOP_" : "FRAME_";
+    switch (elementId) {
+      case "getMeOutButton":
+        secHistogram.add(nsISecTel[bucketName + "GET_ME_OUT_OF_HERE"]);
+        getMeOutOfHere();
+        break;
+
+      case "reportButton":
+        // This is the "Why is this site blocked" button. We redirect
+        // to the generic page describing phishing/malware protection.
+
+        // We log even if malware/phishing/unwanted info URL couldn't be found:
+        // the measurement is for how many users clicked the WHY BLOCKED button
+        secHistogram.add(nsISecTel[bucketName + "WHY_BLOCKED"]);
+
+        openHelpLink("phishing-malware", false, "current");
+        break;
+
+      case "ignoreWarningButton":
+        secHistogram.add(nsISecTel[bucketName + "IGNORE_WARNING"]);
+        this.ignoreWarningButton(reason);
+        break;
     }
   },
 
