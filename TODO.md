@@ -104,8 +104,7 @@
 - Bug 1054755 - Part 2: Implement IsRegExp.
 - Bug 1054755 - Part 1: Add Symbol.match
 - Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
-- Bug 1005110 - Warn about unreachable expression after semicolon-less
-
+- Bug 1165599 - Restore basic external view source. r=jsantell 
 
 More session store stuff to check:
 
@@ -118,6 +117,11 @@ More session store stuff to check:
 - Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
+
+Bug 1177310 - Don't flush windows synchronously on application shutdo
+Bug 1169723 - Load view source frame script lazily. r=mconley 
+https://github.com/mozilla/newtab-dev/commits/4c6ec6031250fc6c78df0eae8ef9dde3883f0715/toolkit/components/viewsource/ViewSourceBrowser.jsm
+Bug 1067325 - Extract view source core to support tabs. r=mconley 
 
 
 
