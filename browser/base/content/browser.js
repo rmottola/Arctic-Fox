@@ -2484,7 +2484,8 @@ let BrowserOnClick = {
     switch (msg.name) {
       case "Browser:CertExceptionError":
         this.onAboutCertError(msg.target, msg.json.elementId,
-                              msg.json.isTopFrame, msg.json.location);
+                              msg.json.isTopFrame, msg.json.location,
+                              msg.objects.failedChannel);
       break;
       case "Browser:SiteBlockedError":
         this.onAboutBlocked(msg.json.elementId, msg.json.isMalware,
@@ -2612,11 +2613,18 @@ let BrowserOnClick = {
     xhr.send(JSON.stringify(report));
   },
 
-  onAboutCertError: function (browser, elementId, isTopFrame, location) {
+  onAboutCertError: function (browser, elementId, isTopFrame, location, failedChannel) {
     let secHistogram = Services.telemetry.getHistogramById("SECURITY_UI");
+
     switch (elementId) {
       case "exceptionDialogButton":
-        let params = { exceptionAdded : false };
+        if (isTopFrame) {
+          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_BAD_CERT_TOP_CLICK_ADD_EXCEPTION);
+        }
+        let sslStatus = failedChannel.securityInfo.QueryInterface(Ci.nsISSLStatusProvider)
+                                                  .SSLStatus;
+        let params = { exceptionAdded : false,
+                       sslStatus : sslStatus };
 
         try {
           switch (Services.prefs.getIntPref("browser.ssl_override_behavior")) {
