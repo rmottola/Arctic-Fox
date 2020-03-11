@@ -884,13 +884,21 @@ nsContextMenu.prototype = {
 
     let inTab = Services.prefs.getBoolPref("view_source.tab");
     if (inTab) {
-      let tab = gBrowser.loadOneTab("about:blank", {
+      let tabBrowser = gBrowser;
+      // In the case of sidebars and chat windows, gBrowser is defined but null,
+      // because no #content element exists.  For these cases, we need to find
+      // the most recent browser window.
+      if (!tabBrowser) {
+        let browserWindow = RecentWindow.getMostRecentBrowserWindow();
+        tabBrowser = browserWindow.gBrowser;
+      }
+      let tab = tabBrowser.loadOneTab("about:blank", {
         relatedToCurrent: true,
         inBackground: false
       });
-      let viewSourceBrowser = gBrowser.getBrowserForTab(tab);
-      top.gViewSourceUtils.viewSourceFromSelectionInBrowser(reference,
-                                                            viewSourceBrowser);
+      let viewSourceBrowser = tabBrowser.getBrowserForTab(tab);
+      top.gViewSourceUtils
+          .viewSourceFromSelectionInBrowser(reference, viewSourceBrowser);
     } else {
       // unused (and play nice for fragments generated via XSLT too)
       var docUrl = null;
