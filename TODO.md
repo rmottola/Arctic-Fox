@@ -35,8 +35,10 @@
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
+- Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+- Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
@@ -104,7 +106,6 @@
 - Bug 1054755 - Part 2: Implement IsRegExp.
 - Bug 1054755 - Part 1: Add Symbol.match
 - Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
-- Bug 1165599 - Restore basic external view source. r=jsantell 
 
 More session store stuff to check:
 
@@ -119,9 +120,6 @@ More session store stuff to check:
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
 Bug 1177310 - Don't flush windows synchronously on application shutdo
-Bug 1169723 - Load view source frame script lazily. r=mconley 
-https://github.com/mozilla/newtab-dev/commits/4c6ec6031250fc6c78df0eae8ef9dde3883f0715/toolkit/components/viewsource/ViewSourceBrowser.jsm
-Bug 1067325 - Extract view source core to support tabs. r=mconley 
 
 
 
@@ -157,11 +155,6 @@ To verify:
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
-
-Check ApplicationReputation.cpp which is missing, possibly from here:
-Bug 837199 - Write interface to query application reputation 
-
-no components/url-classifier ?
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
