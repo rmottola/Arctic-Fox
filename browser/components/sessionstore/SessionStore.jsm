@@ -161,6 +161,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "TabStateFlusher",
   "resource:///modules/sessionstore/TabStateFlusher.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Utils",
   "resource:///modules/sessionstore/Utils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ViewSourceBrowser",
+  "resource://gre/modules/ViewSourceBrowser.jsm");
 
 /**
  * |true| if we are in debug mode, |false| otherwise.
@@ -2853,6 +2855,12 @@ let SessionStoreInternal = {
       uri = loadArguments.uri;
     }
     tabbrowser.updateBrowserRemotenessByURL(browser, uri);
+
+    // If the restored browser wants to show view source content, start up a
+    // view source browser that will load the required frame script.
+    if (uri && ViewSourceBrowser.isViewSource(uri)) {
+      new ViewSourceBrowser(browser);
+    }
 
     // Start a new epoch to discard all frame script messages relating to a
     // previous epoch. All async messages that are still on their way to chrome
