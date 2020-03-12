@@ -266,6 +266,34 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder,
     return true;
 }
 
+/* ES6 draft rc3 7.2.8. */
+bool
+js::IsRegExp(JSContext* cx, HandleValue value, bool* result)
+{
+    /* Step 1. */
+    if (!value.isObject()) {
+        *result = false;
+        return true;
+    }
+    RootedObject obj(cx, &value.toObject());
+
+    /* Steps 2-3. */
+    RootedValue isRegExp(cx);
+    RootedId matchId(cx, SYMBOL_TO_JSID(cx->wellKnownSymbols().match));
+    if (!GetProperty(cx, obj, obj, matchId, &isRegExp))
+        return false;
+
+    /* Step 4. */
+    if (!isRegExp.isUndefined()) {
+        *result = ToBoolean(isRegExp);
+        return true;
+    }
+
+    /* Steps 5-6. */
+    *result = IsObjectWithClass(value, ESClass_RegExp, cx);
+    return true;
+}
+
 MOZ_ALWAYS_INLINE bool
 IsRegExpObject(HandleValue v)
 {
