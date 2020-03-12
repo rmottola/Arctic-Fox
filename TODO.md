@@ -102,10 +102,6 @@
 - Bug 1147491, part 2 - Disable use of BaseTimeDuration::operator/ w
 - Bug 1147491, part 1 - Fix playbackRate crash due to integer rounding 
 - Bug 1072037, part 3 - Tests for the effect of setting CSS transition
-- Bug 1054755 - Part 3: Use IsRegExp in String.prototype.
-- Bug 1054755 - Part 2: Implement IsRegExp.
-- Bug 1054755 - Part 1: Add Symbol.match
-- Bug 1054755 - Part 0: Rename existing IsRegExp to IsRegExpObject.
 
 More session store stuff to check:
 
