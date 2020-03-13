@@ -1962,7 +1962,7 @@ let Impl = {
     }
   }),
 
-  _onEnvironmentChange: function(reason, data) {
+  _onEnvironmentChange: function(reason, oldEnvironment) {
     this._log.trace("_onEnvironmentChange", reason);
     let payload = this.getSessionPayload(REASON_ENVIRONMENT_CHANGE, true);
 
@@ -1973,6 +1973,7 @@ let Impl = {
       retentionDays: RETENTION_DAYS,
       addClientId: true,
       addEnvironment: true,
+      overrideEnvironment: oldEnvironment,
     };
     TelemetryPing.send(getPingType(payload), payload, options);
   },
