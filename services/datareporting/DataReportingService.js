@@ -16,7 +16,6 @@ Cu.import("resource://gre/modules/osfile.jsm");
 
 const ROOT_BRANCH = "datareporting.";
 const POLICY_BRANCH = ROOT_BRANCH + "policy.";
-const SESSIONS_BRANCH = ROOT_BRANCH + "sessions.";
 const HEALTHREPORT_BRANCH = ROOT_BRANCH + "healthreport.";
 const HEALTHREPORT_LOGGING_BRANCH = HEALTHREPORT_BRANCH + "logging.";
 const DEFAULT_LOAD_DELAY_MSEC = 10 * 1000;
@@ -71,10 +70,6 @@ this.DataReportingService = function () {
 
   this._stateDir = null;
   this._stateFilePath = null;
-
-  // Used for testing only, when true results in getSessionRecorder() returning
-  // undefined. Controlled via simulate* methods.
-  this._simulateNoSessionRecorder = false;
 }
 
 DataReportingService.prototype = Object.freeze({
@@ -125,16 +120,6 @@ DataReportingService.prototype = Object.freeze({
 
         try {
           this._prefs = new Preferences(HEALTHREPORT_BRANCH);
-
-          // We don't initialize the sessions recorder unless Health Report is
-          // around to provide pruning of data.
-          //
-          // FUTURE consider having the SessionsRecorder always enabled and/or
-          // living in its own XPCOM service.
-          if (this._prefs.get("service.enabled", true)) {
-            this.sessionRecorder = new SessionRecorder(SESSIONS_BRANCH);
-            this.sessionRecorder.onStartup();
-          }
 
           // We can't interact with prefs until after the profile is present.
           let policyPrefs = new Preferences(POLICY_BRANCH);
@@ -291,9 +276,7 @@ DataReportingService.prototype = Object.freeze({
       }
     }
 
-    this._healthReporter = new ns.HealthReporter(HEALTHREPORT_BRANCH,
-                                                 this.policy,
-                                                 this.sessionRecorder);
+    this._healthReporter = new ns.HealthReporter(HEALTHREPORT_BRANCH, this.policy);
 
     // Wait for initialization to finish so if a shutdown occurs before init
     // has finished we don't adversely affect app startup on next run.
@@ -395,25 +378,6 @@ DataReportingService.prototype = Object.freeze({
     return this._clientID;
   }),
 
-  /**
-   * Returns the SessionRecorder instance associated with the data reporting service.
-   * Returns an actual object only if FHR is enabled and after initialization,
-   * else returns undefined.
-   */
-  getSessionRecorder: function() {
-    return this._simulateNoSessionRecorder ? undefined : this.sessionRecorder;
-  },
-
-  // These two simulate* methods below are only used for testings and control
-  // whether getSessionRecorder() behaves normally or forced to return undefined
-  simulateNoSessionRecorder() {
-    this._simulateNoSessionRecorder = true;
-  },
-
-  simulateRestoreSessionRecorder() {
-    this._simulateNoSessionRecorder = false;
-  },
-
   /*
    * Simulate a restart of the service. This is for testing only.
    */
@@ -431,7 +395,5 @@ this.NSGetFactory = XPCOMUtils.generateNSGetFactory([DataReportingService]);
 #include ../common/observers.js
 ;
 #include policy.jsm
-;
-#include ../../toolkit/modules/SessionRecorder.jsm
 ;
 
