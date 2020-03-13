@@ -184,5 +184,8 @@ Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
 Services.prefs.setBoolPref("toolkit.telemetry.log.dump", true);
 TelemetryPing.initLogging();
 
+// Telemetry archiving should be on.
+Services.prefs.setBoolPref("toolkit.telemetry.archive.enabled", true);
+
 // Avoid timers interrupting test behavior.
 fakeSchedulerTimer(() => {}, () => {});

@@ -1163,6 +1163,10 @@ pref("geo.provider.use_corelocation", true);
 // currently irrelevant for desktop e10s
 pref("network.disable.ipc.security", true);
 
+// Telemetry settings.
+// Determines if Telemetry pings can be archived locally.
+pref("toolkit.telemetry.archive.enabled", true);
+
 //Arctic Fox padlock overlay preferences
 pref("browser.padlock.shown", true);
 /* Where to show the padlock
