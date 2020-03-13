@@ -522,16 +522,14 @@ let Impl = {
       Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", o);
       appTimestamps = o.TelemetryTimestamps.get();
     } catch (ex) {}
-    try {
-      if (!IS_CONTENT_PROCESS) {
+
+    // Only submit this if the extended set is enabled.
+    if (!IS_CONTENT_PROCESS && Telemetry.canRecordExtended) {
+      try {
         ret.addonManager = AddonManagerPrivate.getSimpleMeasures();
-      }
-    } catch (ex) {}
-    try {
-      if (!IS_CONTENT_PROCESS) {
         ret.UITelemetry = UITelemetry.getSimpleMeasures();
-      }
-    } catch (ex) {}
+      } catch (ex) {}
+    }
 
     if (si.process) {
       for each (let field in Object.keys(si)) {
@@ -668,11 +666,20 @@ let Impl = {
     return retgram;
   },
 
+  /**
+   * Get the type of the dataset that needs to be collected, based on the preferences.
+   * @return {Integer} A value from nsITelemetry.DATASET_*.
+   */
+  getDatasetType: function() {
+    return Telemetry.canRecordExtended ? Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN
+                                       : Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTOUT;
+  },
+
   getHistograms: function getHistograms(subsession, clearSubsession) {
     this._log.trace("getHistograms - subsession: " + subsession + ", clearSubsession: " + clearSubsession);
 
     let registered =
-      Telemetry.registeredHistograms(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, []);
+      Telemetry.registeredHistograms(this.getDatasetType(), []);
     let hls = subsession ? Telemetry.snapshotSubsessionHistograms(clearSubsession)
                          : Telemetry.histogramSnapshots;
     let ret = {};
@@ -711,7 +718,7 @@ let Impl = {
     this._log.trace("getKeyedHistograms - subsession: " + subsession + ", clearSubsession: " + clearSubsession);
 
     let registered =
-      Telemetry.registeredKeyedHistograms(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, []);
+      Telemetry.registeredKeyedHistograms(this.getDatasetType(), []);
     let ret = {};
 
     for (let id of registered) {
@@ -787,6 +794,11 @@ let Impl = {
    * Pull values from about:memory into corresponding histograms
    */
   gatherMemory: function gatherMemory() {
+    if (!Telemetry.canRecordExtended) {
+      this._log.trace("gatherMemory - Extended data recording disabled, skipping.");
+      return;
+    }
+
     this._log.trace("gatherMemory");
 
     let mgr;
@@ -914,7 +926,7 @@ let Impl = {
     this._log.trace("gatherStartupHistograms");
 
     let info =
-      Telemetry.registeredHistograms(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, []);
+      Telemetry.registeredHistograms(this.getDatasetType(), []);
     let snapshots = Telemetry.histogramSnapshots;
     for (let name of info) {
       // Only duplicate histograms with actual data.
@@ -956,17 +968,21 @@ let Impl = {
 
     // Additional payload for chrome process.
     payloadObj.info = info;
-    payloadObj.slowSQL = Telemetry.slowSQL;
-    payloadObj.fileIOReports = Telemetry.fileIOReports;
-    payloadObj.lateWrites = Telemetry.lateWrites;
-    payloadObj.addonHistograms = this.getAddonHistograms();
-    payloadObj.addonDetails = AddonManagerPrivate.getTelemetryDetails();
-    payloadObj.UIMeasurements = UITelemetry.getUIMeasurements();
 
-    if (Object.keys(this._slowSQLStartup).length != 0 &&
-        (Object.keys(this._slowSQLStartup.mainThread).length ||
-         Object.keys(this._slowSQLStartup.otherThreads).length)) {
-      payloadObj.slowSQLStartup = this._slowSQLStartup;
+    // Add extended set measurements for chrome process.
+    if (Telemetry.canRecordExtended) {
+      payloadObj.slowSQL = Telemetry.slowSQL;
+      payloadObj.fileIOReports = Telemetry.fileIOReports;
+      payloadObj.lateWrites = Telemetry.lateWrites;
+      payloadObj.addonHistograms = this.getAddonHistograms();
+      payloadObj.addonDetails = AddonManagerPrivate.getTelemetryDetails();
+      payloadObj.UIMeasurements = UITelemetry.getUIMeasurements();
+
+      if (Object.keys(this._slowSQLStartup).length != 0 &&
+          (Object.keys(this._slowSQLStartup.mainThread).length ||
+           Object.keys(this._slowSQLStartup.otherThreads).length)) {
+        payloadObj.slowSQLStartup = this._slowSQLStartup;
+      }
     }
 
     if (this._childTelemetry.length) {
