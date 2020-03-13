@@ -1203,6 +1203,7 @@ let Impl = {
     default:
       throw new Error("Telemetry.receiveMessage: bad message name");
     }
+    return Promise.resolve();
   },
 
   _processUUID: generateUUID(),
