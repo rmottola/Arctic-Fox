@@ -1494,7 +1494,7 @@ let Impl = {
         yield this._checkAbortedSessionPing();
 
         TelemetryEnvironment.registerChangeListener(ENVIRONMENT_CHANGE_LISTENER,
-                                                    () => this._onEnvironmentChange());
+                                                    (reason, data) => this._onEnvironmentChange(reason, data));
         // Write the first aborted-session ping as early as possible. Just do that
         // if we are not testing, since calling Telemetry.reset() will make a previous
         // aborted ping a pending ping.
@@ -1508,7 +1508,7 @@ let Impl = {
 
         this._delayedInitTaskDeferred.resolve();
       } catch (e) {
-        this._delayedInitTaskDeferred.reject();
+        this._delayedInitTaskDeferred.reject(e);
       } finally {
         this._delayedInitTask = null;
         this._delayedInitTaskDeferred = null;
@@ -1962,8 +1962,8 @@ let Impl = {
     }
   }),
 
-  _onEnvironmentChange: function() {
-    this._log.trace("_onEnvironmentChange");
+  _onEnvironmentChange: function(reason, data) {
+    this._log.trace("_onEnvironmentChange", reason);
     let payload = this.getSessionPayload(REASON_ENVIRONMENT_CHANGE, true);
 
     let clonedPayload = Cu.cloneInto(payload, myScope);

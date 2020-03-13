@@ -79,12 +79,18 @@ add_task(function* test_prefWatchPolicies() {
   prefsToWatch[PREF_TEST_1] = TelemetryEnvironment.RECORD_PREF_VALUE;
   prefsToWatch[PREF_TEST_2] = TelemetryEnvironment.RECORD_PREF_STATE;
   prefsToWatch[PREF_TEST_3] = TelemetryEnvironment.RECORD_PREF_STATE;
+  prefsToWatch[PREF_TEST_4] = TelemetryEnvironment.RECORD_PREF_VALUE;
 
-  yield TelemetryEnvironment.init();
+  Preferences.set(PREF_TEST_4, expectedValue);
 
   // Set the Environment preferences to watch.
   TelemetryEnvironment._watchPreferences(prefsToWatch);
   let deferred = PromiseUtils.defer();
+
+  // Check that the pref values are missing or present as expected
+  Assert.strictEqual(TelemetryEnvironment.currentEnvironment.settings.userPrefs[PREF_TEST_1], undefined);
+  Assert.strictEqual(TelemetryEnvironment.currentEnvironment.settings.userPrefs[PREF_TEST_4], expectedValue);
+
   TelemetryEnvironment.registerChangeListener("testWatchPrefs", deferred.resolve);
 
   // Trigger a change in the watched preferences.
@@ -96,18 +102,14 @@ add_task(function* test_prefWatchPolicies() {
   TelemetryEnvironment.unregisterChangeListener("testWatchPrefs");
 
   // Check environment contains the correct data.
-  let environmentData = yield TelemetryEnvironment.getEnvironmentData();
-
-  let userPrefs = environmentData.settings.userPrefs;
+  let userPrefs = TelemetryEnvironment.currentEnvironment.settings.userPrefs;
 
   Assert.equal(userPrefs[PREF_TEST_1], expectedValue,
                "Environment contains the correct preference value.");
-  Assert.equal(userPrefs[PREF_TEST_2], null,
-               "Report that the pref was user set and has no value.");
+  Assert.equal(userPrefs[PREF_TEST_2], "<user-set>",
+               "Report that the pref was user set but the value is not shown.");
   Assert.ok(!(PREF_TEST_3 in userPrefs),
             "Do not report if preference not user set.");
-
-  yield TelemetryEnvironment.shutdown();
 });
 
 add_task(function* test_prefWatch_prefReset() {
@@ -118,20 +120,21 @@ add_task(function* test_prefWatch_prefReset() {
   // Set the preference to a non-default value.
   Preferences.set(PREF_TEST, false);
 
-  yield TelemetryEnvironment.init();
-
   // Set the Environment preferences to watch.
   TelemetryEnvironment._watchPreferences(prefsToWatch);
   let deferred = PromiseUtils.defer();
   TelemetryEnvironment.registerChangeListener("testWatchPrefs_reset", deferred.resolve);
 
+  Assert.strictEqual(TelemetryEnvironment.currentEnvironment.settings.userPrefs[PREF_TEST], "<user-set>");
+
   // Trigger a change in the watched preferences.
   Preferences.reset(PREF_TEST);
   yield deferred.promise;
 
+  Assert.strictEqual(TelemetryEnvironment.currentEnvironment.settings.userPrefs[PREF_TEST], undefined);
+
   // Unregister the listener.
   TelemetryEnvironment.unregisterChangeListener("testWatchPrefs_reset");
-  yield TelemetryEnvironment.shutdown();
 });
 
 add_task(function*() {
