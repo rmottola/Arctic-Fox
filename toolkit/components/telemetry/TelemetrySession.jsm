@@ -1906,7 +1906,8 @@ let Impl = {
 #if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
     // If required, also save the payload as an aborted session.
     if (saveAsAborted) {
-      return promise.then(() => this._saveAbortedSessionPing(payload));
+      let abortedPromise = this._saveAbortedSessionPing(payload);
+      promise = promise.then(() => abortedPromise);
     }
 #endif
     return promise;
@@ -2012,8 +2013,13 @@ let Impl = {
     const FILE_PATH = OS.Path.join(OS.Constants.Path.profileDir, DATAREPORTING_DIRECTORY,
                                    ABORTED_SESSION_FILE_NAME);
     try {
+      this._log.trace("_removeAbortedSessionPing - success");
       return OS.File.remove(FILE_PATH);
-    } catch (ex if ex.becauseNoSuchFile) { }
+    } catch (ex if ex.becauseNoSuchFile) {
+      this._log.trace("_removeAbortedSessionPing - no such file");
+    } catch (ex) {
+      this._log.error("_removeAbortedSessionPing - error removing ping", ex)
+    }
     return Promise.resolve();
   },
 
