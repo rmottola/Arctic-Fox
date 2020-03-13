@@ -144,6 +144,8 @@ function generateUUID() {
  */
 let Policy = {
   now: () => new Date(),
+  generateSessionUUID: () => generateUUID(),
+  generateSubsessionUUID: () => generateUUID(),
   setDailyTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
   clearDailyTimeout: (id) => clearTimeout(id),
 };
@@ -405,6 +407,7 @@ this.TelemetrySession = Object.freeze({
    * Used only for testing purposes.
    */
   reset: function() {
+    Impl._sessionId = Policy.generateSessionUUID();
     Impl._subsessionCounter = 0;
     Impl._profileSubsessionCounter = 0;
     this.uninstall();
@@ -472,7 +475,7 @@ let Impl = {
   _childTelemetry: [],
   // Generate a unique id once per session so the server can cope with duplicate
   // submissions, orphaning and other oddities. The id is shared across subsessions.
-  _sessionId: generateUUID(),
+  _sessionId: Policy.generateSessionUUID(),
   // Random subsession id.
   _subsessionId: null,
   // Subsession id of the previous subsession (even if it was in a different session),
@@ -975,7 +978,7 @@ let Impl = {
   startNewSubsession: function () {
     this._subsessionStartDate = Policy.now();
     this._previousSubsessionId = this._subsessionId;
-    this._subsessionId = generateUUID();
+    this._subsessionId = Policy.generateSubsessionUUID();
     this._subsessionCounter++;
     this._profileSubsessionCounter++;
   },
