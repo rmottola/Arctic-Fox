@@ -20,6 +20,17 @@ const HAS_DATAREPORTINGSERVICE = "@mozilla.org/datareporting/service;1" in Cc;
 let gOldAppInfo = null;
 let gGlobalScope = this;
 
+function loadAddonManager(id, name, version, platformVersion) {
+  let ns = {};
+  Cu.import("resource://gre/modules/Services.jsm", ns);
+  let head = "../../../../mozapps/extensions/test/xpcshell/head_addons.js";
+  let file = do_get_file(head);
+  let uri = ns.Services.io.newFileURI(file);
+  ns.Services.scriptloader.loadSubScript(uri.spec, gGlobalScope);
+  createAppInfo(id, name, version, platformVersion);
+  startupManager();
+}
+
 /**
  * Decode the payload of an HTTP request into a ping.
  * @param {Object} request The data representing an HTTP request (nsIHttpRequest).
