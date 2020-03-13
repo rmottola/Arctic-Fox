@@ -1627,9 +1627,8 @@ let Impl = {
       addClientId: true,
       addEnvironment: true,
       overwrite: true,
-      filePath: file.path,
     };
-    return TelemetryPing.addPendingPing(getPingType(payload), payload, options);
+    return TelemetryPing.savePing(getPingType(payload), payload, file.path, options);
   },
 
   /**
@@ -2010,7 +2009,7 @@ let Impl = {
     if (abortedExists) {
       this._log.trace("_checkAbortedSessionPing - aborted session found: " + FILE_PATH);
       yield this._abortedSessionSerializer.enqueueTask(
-        () => TelemetryPing.addPendingPing(FILE_PATH, true));
+        () => TelemetryPing.addPendingPingFromFile(FILE_PATH, true));
     }
   }),
 
