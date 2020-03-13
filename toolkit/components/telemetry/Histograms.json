@@ -4255,6 +4255,12 @@
     "kind": "count",
     "description": "Count of discarded content payloads."
   },
+  "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of discarded content payloads."
+  },
   "TELEMETRY_FILES_EVICTED": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com", "rvitillo@mozilla.com"],
     "expires_in_version": "never",
