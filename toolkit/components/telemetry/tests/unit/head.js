@@ -133,6 +133,35 @@ function fakeSchedulerTimer(set, clear) {
   session.Policy.clearSchedulerTickTimeout = clear;
 }
 
+**
+ * Fake the current date.
+ * This passes all received arguments to a new Date constructor and
+ * uses the resulting date to fake the time in Telemetry modules.
+ *
+ * @return Date The new faked date.
+ */
+function fakeNow(...arguments) {
+  const date = new Date(...arguments);
+
+  let ping = Cu.import("resource://gre/modules/TelemetryPing.jsm");
+  ping.Policy.now = () => date;
+  let session = Cu.import("resource://gre/modules/TelemetrySession.jsm");
+  session.Policy.now = () => date;
+  let environment = Cu.import("resource://gre/modules/TelemetryEnvironment.jsm");
+  environment.Policy.now = () => date;
+
+  return new Date(date);
+}
+
+// Return a date that is |offset| ms in the future from |date|.
+function futureDate(date, offset) {
+  return new Date(date.getTime() + offset);
+}
+
+function truncateToDays(aMsec) {
+  return Math.floor(aMsec / MILLISECONDS_PER_DAY);
+}
+
 // Set logging preferences for all the tests.
 Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
 Services.prefs.setBoolPref("toolkit.telemetry.log.dump", true);
