@@ -1927,8 +1927,7 @@ let Impl = {
     this._log.trace("_onEnvironmentChange", reason);
     let payload = this.getSessionPayload(REASON_ENVIRONMENT_CHANGE, true);
 
-    let clonedPayload = Cu.cloneInto(payload, myScope);
-    TelemetryScheduler.reschedulePings(REASON_ENVIRONMENT_CHANGE, clonedPayload);
+    TelemetryScheduler.reschedulePings(REASON_ENVIRONMENT_CHANGE, payload);
 
     let options = {
       retentionDays: RETENTION_DAYS,
@@ -2013,7 +2012,7 @@ let Impl = {
 
     let payload = null;
     if (aProvidedPayload) {
-      payload = aProvidedPayload;
+      payload = Cu.cloneInto(aProvidedPayload, myScope);
       // Overwrite the original reason.
       payload.info.reason = REASON_ABORTED_SESSION;
     } else {
