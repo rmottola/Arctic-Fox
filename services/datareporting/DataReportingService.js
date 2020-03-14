@@ -295,15 +295,6 @@ DataReportingService.prototype = Object.freeze({
   resetClientID: Task.async(function* () {
     return ClientID.resetClientID();
   }),
-
-  /*
-   * Simulate a restart of the service. This is for testing only.
-   */
-  _reset: Task.async(function* () {
-    yield this._loadClientIdTask;
-    yield this._saveClientIdTask;
-    this._clientID = null;
-  }),
 });
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([DataReportingService]);
