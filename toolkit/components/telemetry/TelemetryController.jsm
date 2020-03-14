@@ -42,7 +42,7 @@ const PREF_UNIFIED = PREF_BRANCH + "unified";
 // Changing this pref requires a restart.
 const IS_UNIFIED_TELEMETRY = Preferences.get(PREF_UNIFIED, false);
 
-const PING_FORMAT_VERSION = 2;
+const PING_FORMAT_VERSION = 4;
 
 // Delay before intializing telemetry (ms)
 const TELEMETRY_DELAY = 60000;
