@@ -19,6 +19,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "gNetworkWorker",
                                    "@mozilla.org/network/worker;1",
                                    "nsINetworkWorker");
 
+XPCOMUtils.defineLazyServiceGetter(this, "gPACGenerator",
+                                   "@mozilla.org/pac-generator;1",
+                                   "nsIPACGenerator");
+
 // 1xx - Requested action is proceeding
 const NETD_COMMAND_PROCEEDING   = 100;
 // 2xx - Requested action has been successfully completed
@@ -33,7 +37,8 @@ const NETD_COMMAND_UNSOLICITED  = 600;
 
 const WIFI_CTRL_INTERFACE = "wl0.1";
 
-const MANUAL_PROXY_CONFIGURATION = 1;
+const PROXY_TYPE_MANUAL = Ci.nsIProtocolProxyService.PROXYCONFIG_MANUAL;
+const PROXY_TYPE_PAC = Ci.nsIProtocolProxyService.PROXYCONFIG_PAC;
 
 let DEBUG = false;
 
@@ -484,9 +489,7 @@ NetworkService.prototype = {
         return;
       }
 
-      if (DEBUG) debug("Going to set proxy settings for " + network.name + " network interface.");
-      // Sets manual proxy configuration.
-      Services.prefs.setIntPref("network.proxy.type", MANUAL_PROXY_CONFIGURATION);
+      debug("Going to set proxy settings for " + network.name + " network interface.");
       // Do not use this proxy server for all protocols.
       Services.prefs.setBoolPref("network.proxy.share_proxy_settings", false);
       Services.prefs.setCharPref("network.proxy.http", network.httpProxyHost);
@@ -494,6 +497,19 @@ NetworkService.prototype = {
       let port = network.httpProxyPort === 0 ? 8080 : network.httpProxyPort;
       Services.prefs.setIntPref("network.proxy.http_port", port);
       Services.prefs.setIntPref("network.proxy.ssl_port", port);
+
+      let usePAC;
+      try {
+        usePAC = Services.prefs.getBoolPref("network.proxy.pac_generator");
+      } catch (ex) {}
+
+      if (usePAC) {
+        Services.prefs.setCharPref("network.proxy.autoconfig_url",
+                                   gPACGenerator.generate());
+        Services.prefs.setIntPref("network.proxy.type", PROXY_TYPE_PAC);
+      } else {
+        Services.prefs.setIntPref("network.proxy.type", PROXY_TYPE_MANUAL);
+      }
     } catch(ex) {
         if (DEBUG) debug("Exception " + ex + ". Unable to set proxy setting for " +
                          network.name + " network interface.");
@@ -503,12 +519,24 @@ NetworkService.prototype = {
   clearNetworkProxy: function() {
     if (DEBUG) debug("Going to clear all network proxy.");
 
-    Services.prefs.clearUserPref("network.proxy.type");
     Services.prefs.clearUserPref("network.proxy.share_proxy_settings");
     Services.prefs.clearUserPref("network.proxy.http");
     Services.prefs.clearUserPref("network.proxy.http_port");
     Services.prefs.clearUserPref("network.proxy.ssl");
     Services.prefs.clearUserPref("network.proxy.ssl_port");
+
+    let usePAC;
+    try {
+      usePAC = Services.prefs.getBoolPref("network.proxy.pac_generator");
+    } catch (ex) {}
+
+    if (usePAC) {
+      Services.prefs.setCharPref("network.proxy.autoconfig_url",
+                                 gPACGenerator.generate());
+      Services.prefs.setIntPref("network.proxy.type", PROXY_TYPE_PAC);
+    } else {
+      Services.prefs.clearUserPref("network.proxy.type");
+    }
   },
 
   // Enable/Disable DHCP server.

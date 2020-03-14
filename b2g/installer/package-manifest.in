@@ -644,6 +644,9 @@
 @BINPATH@/components/TestInterfaceJS.manifest
 #endif
 
+@RESPATH@/components/PACGenerator.js
+@RESPATH@/components/PACGenerator.manifest
+
 ; Modules
 @BINPATH@/modules/*
 
