@@ -217,7 +217,9 @@ function checkPayloadInfo(data) {
   let revisionCheck = arg => {
     return (Services.appinfo.isOfficial) ? stringCheck(arg) : (typeof arg == "string");
   };
-  let uuidCheck = arg => uuidRegex.test(arg);
+  let uuidCheck = arg => {
+    return UUID_REGEX.test(arg);
+  };
 
   const EXPECTED_INFO_FIELDS_TYPES = {
     reason: stringCheck,
