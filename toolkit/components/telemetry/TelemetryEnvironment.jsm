@@ -822,7 +822,7 @@ EnvironmentCache.prototype = {
       this._log.error("_isDefaultBrowser - Could not obtain shell service");
       return null;
     }
-
+/* FIXME why is this not working RM 2020-03-14
     let shellService;
     try {
       shellService = Cc["@mozilla.org/browser/shell-service;1"]
@@ -841,7 +841,7 @@ EnvironmentCache.prototype = {
         return null;
       }
     }
-
+*/
     return null;
   },
 
