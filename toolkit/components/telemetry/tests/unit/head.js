@@ -222,7 +222,6 @@ function promiseRejects(promise) {
 
 // Set logging preferences for all the tests.
 Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
-Services.prefs.setBoolPref("toolkit.telemetry.log.dump", true);
 TelemetryPing.initLogging();
 
 // Telemetry archiving should be on.
