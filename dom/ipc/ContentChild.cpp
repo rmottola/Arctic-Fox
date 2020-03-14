@@ -75,6 +75,7 @@
 #include "nsIMutable.h"
 #include "nsIObserverService.h"
 #include "nsIScriptSecurityManager.h"
+#include "nsIServiceWorkerManager.h"
 #include "nsScreenManagerProxy.h"
 #include "nsMemoryInfoDumper.h"
 #include "nsServiceManagerUtils.h"
@@ -1244,6 +1245,16 @@ ContentChild::RecvSpeakerManagerNotify()
     return true;
 #endif
     return false;
+}
+
+bool
+ContentChild::RecvUpdateServiceWorkerRegistrations()
+{
+    nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
+    if (swm) {
+        swm->UpdateAllRegistrations();
+    }
+    return true;
 }
 
 static CancelableTask* sFirstIdleTask;

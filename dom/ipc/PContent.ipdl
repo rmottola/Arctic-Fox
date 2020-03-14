@@ -443,6 +443,8 @@ child:
 
     async SpeakerManagerNotify();
 
+    async UpdateServiceWorkerRegistrations();
+
     async DataStoreNotify(uint32_t aAppId, nsString aName,
                           nsString aManifestURL);
 
