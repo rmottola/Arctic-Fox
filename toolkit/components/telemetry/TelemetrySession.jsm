@@ -20,6 +20,7 @@ Cu.import("resource://gre/modules/DeferredTask.jsm", this);
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
+Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
 Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
 
 const Utils = TelemetryUtils;
@@ -702,13 +703,11 @@ this.TelemetrySession = Object.freeze({
     return Impl.requestChildPayloads();
   },
   /**
-   * Save histograms to a file.
+   * Save the session state to a pending file.
    * Used only for testing purposes.
-   *
-   * @param {nsIFile} aFile The file to load from.
    */
-  testSaveHistograms: function(aFile) {
-    return Impl.testSaveHistograms(aFile);
+  testSavePendingPing: function() {
+    return Impl.testSavePendingPing();
   },
   /**
    * Collect and store information about startup.
@@ -917,9 +916,8 @@ let Impl = {
       hasPingBeenSent = Telemetry.getHistogramById("TELEMETRY_SUCCESS").snapshot().sum > 0;
     } catch(e) {
     }
-    if (!forSavedSession || hasPingBeenSent) {
-      ret.savedPings = TelemetryStorage.pingsLoaded;
-    }
+
+    ret.savedPings = TelemetryStorage.pendingPingCount;
 
     ret.activeTicks = -1;
     let sr = TelemetryController.getSessionRecorder();
@@ -936,8 +934,8 @@ let Impl = {
       ret.activeTicks = activeTicks;
     }
 
-    ret.pingsOverdue = TelemetryStorage.pingsOverdue;
-    ret.pingsDiscarded = TelemetryStorage.pingsDiscarded;
+    ret.pingsOverdue = TelemetrySend.overduePingsCount;
+    ret.pingsDiscarded = TelemetrySend.discardedPingsCount;
 
     return ret;
   },
@@ -1632,15 +1630,15 @@ let Impl = {
   }),
 
 
-  testSaveHistograms: function testSaveHistograms(file) {
-    this._log.trace("testSaveHistograms - Path: " + file.path);
+  testSavePendingPing: function testSaveHistograms() {
+    this._log.trace("testSaveHistograms");
     let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
     let options = {
       addClientId: true,
       addEnvironment: true,
       overwrite: true,
     };
-    return TelemetryController.savePing(getPingType(payload), payload, file.path, options);
+    return TelemetryController.addPendingPing(getPingType(payload), payload, options);
   },
 
   /**

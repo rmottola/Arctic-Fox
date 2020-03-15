@@ -44,6 +44,12 @@ this.TelemetryUtils = {
     return nextMidnight;
   },
 
+  generateUUID: function() {
+    let str = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator).generateUUID().toString();
+    // strip {}
+    return str.substring(1, str.length - 1);
+  },
+
   /**
    * Get the midnight which is closer to the provided date.
    * @param {Object} date The date object to check.
