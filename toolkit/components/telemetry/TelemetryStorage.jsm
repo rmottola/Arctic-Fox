@@ -1015,8 +1015,8 @@ let TelemetryStorageImpl = {
   removeAbortedSessionPing: function() {
     return this._abortedSessionSerializer.enqueueTask(Task.async(function*() {
       try {
+        yield OS.File.remove(gAbortedSessionFilePath, { ignoreAbsent: false });
         this._log.trace("removeAbortedSessionPing - success");
-        yield OS.File.remove(gAbortedSessionFilePath);
       } catch (ex if ex.becauseNoSuchFile) {
         this._log.trace("removeAbortedSessionPing - no such file");
       } catch (ex) {
