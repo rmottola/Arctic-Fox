@@ -1211,18 +1211,6 @@ let Impl = {
     };
   },
 
-  /**
-   * This tells TelemetryPing to uninitialize and save any pending pings.
-   * @param testing Optional. If true, always saves the ping whether Telemetry
-   *                can send pings or not, which is used for testing.
-   */
-  shutdown: function(testing = false) {
-    this.uninstall();
-    if (Telemetry.canSend || testing) {
-      return this.savePendingPings();
-    }
-  },
-
   _reschedulePingSendTimer: function(timestamp) {
     this._clearPingSendTimer();
     const interval = timestamp - Policy.now();
