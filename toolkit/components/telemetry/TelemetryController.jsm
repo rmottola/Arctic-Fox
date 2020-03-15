@@ -176,14 +176,6 @@ this.TelemetryController = Object.freeze({
     Impl._clientID = null;
     return this.setup();
   },
-
-
-  /**
-   * Used only for testing purposes.
-   */
-  shutdown: function() {
-    return Impl.shutdown(true);
-  },
   /**
    * Used only for testing purposes.
    */
