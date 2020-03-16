@@ -248,8 +248,8 @@ add_task(function* test_midnightPingSendFuzzing() {
   PingServer.clearRequests();
   yield TelemetryController.reset();
 
-  // A ping submitted shortly before midnight should not get sent yet.
-  now = new Date(2030, 5, 1, 23, 55, 0);
+  // A ping just before the end of the fuzzing delay should not get sent.
+  now = new Date(2030, 5, 2, 0, 59, 59);
   fakeNow(now);
   PingServer.registerPingHandler((req, res) => {
     Assert.ok(false, "No ping should be received yet.");
@@ -287,6 +287,13 @@ add_task(function* test_midnightPingSendFuzzing() {
   now = futureDate(now, 5 * 60 * 1000);
   yield sendPing(true, true);
   let ping = yield PingServer.promiseNextPing();
+  checkPingFormat(ping, TEST_PING_TYPE, true, true);
+
+  // Check that pings shortly before midnight are immediately sent.
+  now = fakeNow(2030, 5, 3, 23, 59, 0);
+  yield sendPing(true, true);
+  request = yield gRequestIterator.next();
+  ping = decodeRequestPayload(request);
   checkPingFormat(ping, TEST_PING_TYPE, true, true);
 
   // Clean-up.
