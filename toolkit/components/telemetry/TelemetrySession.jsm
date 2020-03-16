@@ -27,13 +27,6 @@ const Utils = TelemetryUtils;
 
 const myScope = this;
 
-const IS_CONTENT_PROCESS = (function() {
-  // We cannot use Services.appinfo here because in telemetry xpcshell tests,
-  // appinfo is initially unavailable, and becomes available only later on.
-  let runtime = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime);
-  return runtime.processType == Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT;
-})();
-
 // When modifying the payload in incompatible ways, please bump this version number
 const PAYLOAD_VERSION = 4;
 const PING_TYPE_MAIN = "main";
@@ -58,7 +51,7 @@ const MIN_SUBSESSION_LENGTH_MS = 10 * 60 * 1000;
 #expand const HISTOGRAMS_FILE_VERSION = "__HISTOGRAMS_FILE_VERSION__";
 
 const LOGGER_NAME = "Toolkit.Telemetry";
-const LOGGER_PREFIX = "TelemetrySession" + (IS_CONTENT_PROCESS ? "#content::" : "::");
+const LOGGER_PREFIX = "TelemetrySession" + (Utils.isContentProcess ? "#content::" : "::");
 
 const PREF_BRANCH = "toolkit.telemetry.";
 const PREF_PREVIOUS_BUILDID = PREF_BRANCH + "previousBuildID";
@@ -747,6 +740,12 @@ this.TelemetrySession = Object.freeze({
   /**
    * Used only for testing purposes.
    */
+  setupContent: function() {
+    return Impl.setupContentProcess(true);
+  },
+  /**
+   * Used only for testing purposes.
+   */
   uninstall: function() {
     try {
       Impl.uninstall();
@@ -849,7 +848,7 @@ let Impl = {
     } catch (ex) {}
 
     // Only submit this if the extended set is enabled.
-    if (!IS_CONTENT_PROCESS && Telemetry.canRecordExtended) {
+    if (!Utils.isContentProcess && Telemetry.canRecordExtended) {
       try {
         ret.addonManager = AddonManagerPrivate.getSimpleMeasures();
         ret.UITelemetry = UITelemetry.getSimpleMeasures();
@@ -878,7 +877,7 @@ let Impl = {
       ret.maximalNumberOfConcurrentThreads = maximalNumberOfConcurrentThreads;
     }
 
-    if (IS_CONTENT_PROCESS) {
+    if (Utils.isContentProcess) {
       return ret;
     }
 
@@ -1285,7 +1284,7 @@ let Impl = {
       log: TelemetryLog.entries(),
     };
 
-    if (IS_CONTENT_PROCESS) {
+    if (Utils.isContentProcess) {
       return payloadObj;
     }
 
@@ -1337,10 +1336,10 @@ let Impl = {
 
     let measurements =
       this.getSimpleMeasurements(reason == REASON_SAVED_SESSION, isSubsession, clearSubsession);
-    let info = !IS_CONTENT_PROCESS ? this.getMetadata(reason) : null;
+    let info = !Utils.isContentProcess ? this.getMetadata(reason) : null;
     let payload = this.assemblePayloadWithMeasurements(measurements, info, reason, clearSubsession);
 
-    if (!IS_CONTENT_PROCESS && clearSubsession) {
+    if (!Utils.isContentProcess && clearSubsession) {
       this.startNewSubsession();
       // Persist session data to disk (don't wait until it completes).
       let sessionData = this._getSessionDataObject();
@@ -1501,10 +1500,11 @@ let Impl = {
   /**
    * Initializes telemetry for a content process.
    */
-  setupContentProcess: function setupContentProcess() {
+  setupContentProcess: function setupContentProcess(testing) {
     this._log.trace("setupContentProcess");
 
     if (!Telemetry.canRecordBase) {
+      this._log.trace("setupContentProcess - base recording is disabled, not initializing");
       return;
     }
 
@@ -1518,7 +1518,7 @@ let Impl = {
 
       this.attachObservers();
       this.gatherMemory();
-    }.bind(this), TELEMETRY_DELAY);
+    }.bind(this), testing ? TELEMETRY_TEST_DELAY : TELEMETRY_DELAY);
 
     delayedTask.arm();
   },
