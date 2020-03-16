@@ -1166,6 +1166,8 @@ pref("network.disable.ipc.security", true);
 // Telemetry settings.
 // Determines if Telemetry pings can be archived locally.
 pref("toolkit.telemetry.archive.enabled", true);
+// Whether we enable opt-out Telemetry for a sample of the release population.
+pref("toolkit.telemetry.optoutSample", true);
 
 //Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
