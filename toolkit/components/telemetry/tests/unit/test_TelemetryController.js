@@ -9,7 +9,6 @@
  * checked in the second request.
  */
 
-Cu.import("resource://testing-common/httpd.js", this);
 Cu.import("resource://gre/modules/ClientID.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
@@ -37,14 +36,11 @@ const PREF_UNIFIED = PREF_BRANCH + "unified";
 
 const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 
-let gHttpServer = new HttpServer();
-let gServerStarted = false;
-let gRequestIterator = null;
 let gClientID = null;
 
 function sendPing(aSendClientId, aSendEnvironment) {
-  if (gServerStarted) {
-    TelemetrySend.setServer("http://localhost:" + gHttpServer.identity.primaryPort);
+  if (PingServer.started) {
+    TelemetrySend.setServer("http://localhost:" + PingServer.port);
   } else {
     TelemetrySend.setServer("http://doesnotexist");
   }
@@ -54,24 +50,6 @@ function sendPing(aSendClientId, aSendEnvironment) {
     addEnvironment: aSendEnvironment,
   };
   return TelemetryController.submitExternalPing(TEST_PING_TYPE, {}, options);
-}
-
-function wrapWithExceptionHandler(f) {
-  function wrapper(...args) {
-    try {
-      f(...args);
-    } catch (ex if typeof(ex) == 'object') {
-      dump("Caught exception: " + ex.message + "\n");
-      dump(ex.stack);
-      do_test_finished();
-    }
-  }
-  return wrapper;
-}
-
-function registerPingHandler(handler) {
-  gHttpServer.registerPrefixHandler("/submit/telemetry/",
-				   wrapWithExceptionHandler(handler));
 }
 
 function checkPingFormat(aPing, aType, aHasClientId, aHasEnvironment) {
@@ -114,15 +92,6 @@ function checkPingFormat(aPing, aType, aHasClientId, aHasEnvironment) {
   Assert.equal("environment" in aPing, aHasEnvironment);
 }
 
-/**
- * Start the webserver used in the tests.
- */
-function startWebserver() {
-  gHttpServer.start(-1);
-  gServerStarted = true;
-  gRequestIterator = Iterator(new Request());
-}
-
 function run_test() {
   do_test_pending();
 
@@ -158,10 +127,10 @@ add_task(function* test_overwritePing() {
 
 // Checks that a sent ping is correctly received by a dummy http server.
 add_task(function* test_simplePing() {
-  startWebserver();
+  PingServer.start();
 
   yield sendPing(false, false);
-  let request = yield gRequestIterator.next();
+  let request = yield PingServer.promiseNextRequest();
 
   // Check that we have a version query parameter in the URL.
   Assert.notEqual(request.queryString, "");
@@ -178,8 +147,7 @@ add_task(function* test_pingHasClientId() {
   // Send a ping with a clientId.
   yield sendPing(true, false);
 
-  let request = yield gRequestIterator.next();
-  let ping = decodeRequestPayload(request);
+  let ping = yield PingServer.promiseNextPing();
   checkPingFormat(ping, TEST_PING_TYPE, true, false);
 
   if (HAS_DATAREPORTINGSERVICE &&
@@ -192,8 +160,7 @@ add_task(function* test_pingHasClientId() {
 add_task(function* test_pingHasEnvironment() {
   // Send a ping with the environment data.
   yield sendPing(false, true);
-  let request = yield gRequestIterator.next();
-  let ping = decodeRequestPayload(request);
+  let ping = yield PingServer.promiseNextPing();
   checkPingFormat(ping, TEST_PING_TYPE, false, true);
 
   // Test a field in the environment build section.
@@ -203,8 +170,7 @@ add_task(function* test_pingHasEnvironment() {
 add_task(function* test_pingHasEnvironmentAndClientId() {
   // Send a ping with the environment data and client id.
   yield sendPing(true, true);
-  let request = yield gRequestIterator.next();
-  let ping = decodeRequestPayload(request);
+  let ping = yield PingServer.promiseNextPing();
   checkPingFormat(ping, TEST_PING_TYPE, true, true);
 
   // Test a field in the environment build section.
@@ -254,12 +220,12 @@ add_task(function* test_archivePings() {
 
   now = new Date(2014, 06, 18, 22, 0, 0);
   fakeNow(now);
-  // Restore the non asserting ping handler. This is done by the Request() constructor.
-  gRequestIterator = Iterator(new Request());
+  // Restore the non asserting ping handler.
+  PingServer.resetPingHandler();
   pingId = yield sendPing(true, true);
 
   // Check that we archive pings when successfully sending them.
-  yield gRequestIterator.next();
+  yield PingServer.promiseNextPing();
   ping = yield TelemetryArchive.promiseArchivedPingById(pingId);
   Assert.equal(ping.id, pingId,
     "TelemetryController should still archive pings if ping upload is enabled.");
@@ -280,13 +246,13 @@ add_task(function* test_midnightPingSendFuzzing() {
     pingSendTimeout = timeout;
   }, () => {});
 
-  gRequestIterator = Iterator(new Request());
+  PingServer.clearRequests();
   yield TelemetryController.reset();
 
   // A ping submitted shortly before midnight should not get sent yet.
   now = new Date(2030, 5, 1, 23, 55, 0);
   fakeNow(now);
-  registerPingHandler((req, res) => {
+  PingServer.registerPingHandler((req, res) => {
     Assert.ok(false, "No ping should be received yet.");
   });
   yield sendPing(true, true);
@@ -301,27 +267,23 @@ add_task(function* test_midnightPingSendFuzzing() {
   yield sendPing(true, true);
   Assert.deepEqual(futureDate(now, pingSendTimeout), new Date(2030, 5, 2, 1, 0, 0));
 
-  // The Request constructor restores the previous ping handler.
-  gRequestIterator = Iterator(new Request());
+  // Restore the previous ping handler.
+  PingServer.resetPingHandler();
 
   // Setting the clock to after the fuzzing delay, we should trigger the two ping sends
   // with the timer callback.
   now = futureDate(now, pingSendTimeout);
   fakeNow(now);
   yield pingSendTimerCallback();
-  let requests = [];
-  requests.push(yield gRequestIterator.next());
-  requests.push(yield gRequestIterator.next());
-  for (let req of requests) {
-    let ping = decodeRequestPayload(req);
+  const pings = yield PingServer.promiseNextPings(2);
+  for (let ping of pings) {
     checkPingFormat(ping, TEST_PING_TYPE, true, true);
   }
 
   // Moving the clock further we should still send pings immediately.
   now = futureDate(now, 5 * 60 * 1000);
   yield sendPing(true, true);
-  let request = yield gRequestIterator.next();
-  let ping = decodeRequestPayload(request);
+  let ping = yield PingServer.promiseNextPing();
   checkPingFormat(ping, TEST_PING_TYPE, true, true);
 
   // Clean-up.
@@ -330,31 +292,6 @@ add_task(function* test_midnightPingSendFuzzing() {
 });
 
 add_task(function* stopServer(){
-  gHttpServer.stop(do_test_finished);
+  yield PingServer.stop();
+  do_test_finished();
 });
-
-// An iterable sequence of http requests
-function Request() {
-  let defers = [];
-  let current = 0;
-
-  function RequestIterator() {}
-
-  // Returns a promise that resolves to the next http request
-  RequestIterator.prototype.next = function() {
-    let deferred = defers[current++];
-    return deferred.promise;
-  }
-
-  this.__iterator__ = function(){
-    return new RequestIterator();
-  }
-
-  registerPingHandler((request, response) => {
-    let deferred = defers[defers.length - 1];
-    defers.push(Promise.defer());
-    deferred.resolve(request);
-  });
-
-  defers.push(Promise.defer());
-}
