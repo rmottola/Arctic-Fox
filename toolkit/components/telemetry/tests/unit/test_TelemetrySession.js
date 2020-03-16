@@ -1011,6 +1011,7 @@ add_task(function* test_environmentChange() {
   let timerDelay = null;
 
   clearPendingPings();
+  yield TelemetrySend.reset();
   PingServer.clearRequests();
 
   fakeNow(now);
