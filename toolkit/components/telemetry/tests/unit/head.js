@@ -302,13 +302,19 @@ function fakeNow(...args) {
 // Fake the timeout functions for TelemetryController sending.
 function fakePingSendTimer(set, clear) {
   let module = Cu.import("resource://gre/modules/TelemetrySend.jsm");
-  module.Policy.setPingSendTimeout = set;
-  module.Policy.clearPingSendTimeout = clear;
+  let obj = Cu.cloneInto({set, clear}, module, {cloneFunctions:true});
+  module.Policy.setSchedulerTickTimeout = obj.set;
+  module.Policy.clearSchedulerTickTimeout = obj.clear;
 }
 
 function fakeMidnightPingFuzzingDelay(delayMs) {
   let module = Cu.import("resource://gre/modules/TelemetrySend.jsm");
   module.Policy.midnightPingFuzzingDelay = () => delayMs;
+}
+
+function fakeGeneratePingId(func) {
+  let module = Cu.import("resource://gre/modules/TelemetryController.jsm");
+  module.Policy.generatePingId = func;
 }
 
 // Return a date that is |offset| ms in the future from |date|.
@@ -326,15 +332,21 @@ function promiseRejects(promise) {
   return promise.then(() => false, () => true);
 }
 
-// Set logging preferences for all the tests.
-Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
-TelemetryController.initLogging();
+if (runningInParent) {
+  // Set logging preferences for all the tests.
+  Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
+  // Telemetry archiving should be on.
+  Services.prefs.setBoolPref("toolkit.telemetry.archive.enabled", true);
 
-// Telemetry archiving should be on.
-Services.prefs.setBoolPref("toolkit.telemetry.archive.enabled", true);
+  fakePingSendTimer((callback, timeout) => {
+    Services.tm.mainThread.dispatch(() => callback(), Ci.nsIThread.DISPATCH_NORMAL);
+  },
+  () => {});
+
+  do_register_cleanup(() => TelemetrySend.shutdown());
+}
 
 // Avoid timers interrupting test behavior.
 fakeSchedulerTimer(() => {}, () => {});
-fakePingSendTimer(() => {}, () => {});
 // Make pind sending predictable.
 fakeMidnightPingFuzzingDelay(0);

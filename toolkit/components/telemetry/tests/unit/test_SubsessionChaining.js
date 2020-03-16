@@ -223,5 +223,6 @@ add_task(function* test_subsessionsChaining() {
 });
 
 add_task(function* () {
+  yield TelemetrySend.shutdown();
   do_test_finished();
 });
