@@ -19,6 +19,7 @@ Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/PromiseUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/ObjectUtils.jsm");
+Cu.import("resource://gre/modules/TelemetryController.jsm", this);
 
 XPCOMUtils.defineLazyModuleGetter(this, "ctypes",
                                   "resource://gre/modules/ctypes.jsm");
@@ -861,6 +862,7 @@ EnvironmentCache.prototype = {
 #endif
       e10sEnabled: Preferences.get(PREF_E10S_ENABLED, false),
       telemetryEnabled: Preferences.get(PREF_TELEMETRY_ENABLED, false),
+      isInOptoutSample: TelemetryController.isInOptoutSample,
       locale: getBrowserLocale(),
       update: {
         channel: updateChannel,

@@ -36,6 +36,7 @@ Structure::
         isDefaultBrowser: <bool>, // null on failure, not available on Android
         e10sEnabled: <bool>, // false on failure
         telemetryEnabled: <bool>, // false on failure
+        isInOptoutSample: <bool>, // whether this client is part of the opt-out sample
         locale: <string>, // e.g. "it", null on failure
         update: {
           channel: <string>, // e.g. "release", null on failure
