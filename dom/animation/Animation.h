@@ -306,7 +306,11 @@ public:
   bool IsCurrent(const AnimationPlayer& aPlayer) const;
   bool IsInEffect() const;
 
-  bool HasAnimationOfProperty(nsCSSProperty aProperty) const;
+  const AnimationProperty*
+  GetAnimationOfProperty(nsCSSProperty aProperty) const;
+  bool HasAnimationOfProperty(nsCSSProperty aProperty) const {
+    return GetAnimationOfProperty(aProperty) != nullptr;
+  }
   const InfallibleTArray<AnimationProperty>& Properties() const {
     return mProperties;
   }
