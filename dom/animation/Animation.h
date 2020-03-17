@@ -287,7 +287,7 @@ public:
     mIsFinishedTransition = true;
   }
 
-  bool IsCurrent() const;
+  bool IsCurrent(const AnimationPlayer& aPlayer) const;
   bool IsInEffect() const;
 
   bool HasAnimationOfProperty(nsCSSProperty aProperty) const;
