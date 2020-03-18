@@ -622,7 +622,9 @@ AnimationPlayer::UpdateFinishedState(bool aSeekFlag)
     mFinished = nullptr;
   }
   mIsPreviousStateFinished = currentFinishedState;
-  mPreviousCurrentTime = currentTime;
+  // We must recalculate the current time to take account of any mHoldTime
+  // changes the code above made.
+  mPreviousCurrentTime = GetCurrentTime();
 }
 
 void
