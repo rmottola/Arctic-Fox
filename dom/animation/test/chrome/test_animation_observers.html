@@ -191,6 +191,8 @@ function assert_records(expected, desc) {
     assert_records([{ added: players, changed: [], removed: [] }],
                    "records after transition start");
 
+    // Advance until near the end of the transition, then wait for it to finish.
+    players[0].currentTime = 99900;
     yield transitionEnd;
 
     // After the transition has finished, the AnimationPlayer should disappear.
