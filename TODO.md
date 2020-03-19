@@ -39,6 +39,7 @@
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
+- Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
@@ -90,6 +91,7 @@
 - Bug 1151466 - update talos to the latest version to include some pref
 - Bug 1153658 - browser_compartments.js logspam.
 - remaining parts of Bug 968923 (2015-06)
+- Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 674779 - Deactivating subtest of test_measure for Windows XP
 - Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
@@ -99,9 +101,9 @@
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
 - Bug 1150555 - about:performance should not confuse Jetpack addons. 
 - Bug 1125848 - 2015-03-09 Consolidate PCompositor's creation-destruction logic
-- Bug 1147491, part 2 - Disable use of BaseTimeDuration::operator/ w
-- Bug 1147491, part 1 - Fix playbackRate crash due to integer rounding 
-- Bug 1072037, part 3 - Tests for the effect of setting CSS transition
+- Bug 1149848 
+- Bug 847287 part 1 to 14
+
 
 More session store stuff to check:
 
@@ -135,8 +137,6 @@ What with LightweightThemeConsumer.jsm
 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/1e817a57be5457816f23e2221bdcb1dd44ac7325
-
 
 
 To verify:
@@ -144,8 +144,17 @@ To verify:
 
 - Verify requirements of 968520
 
+Verify all here:
+https://github.com/mozilla/newtab-dev/commits/6fd700984bdd3fcbcf548d0fdd8c0b571ba7d7e0/layout/base/nsDisplayList.cpp
+
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
+Specifically check for duplicates:
+  browser/themes/osx/devtools/server
+  browser/themes/osx/devtools/shared/inspector/
+
+Shell Service not working? present but fails.
+Check TelemetryEnvironment.jsm _isDefaultBrowser
 
 
 Analyze all:
