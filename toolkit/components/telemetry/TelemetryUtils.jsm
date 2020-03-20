@@ -17,7 +17,19 @@ const IS_CONTENT_PROCESS = (function() {
   return runtime.processType == Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT;
 })();
 
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
 this.TelemetryUtils = {
+  /**
+   * Turn a millisecond timestamp into a day timestamp.
+   *
+   * @param aMsec A number of milliseconds since Unix epoch.
+   * @return The number of whole days since Unix epoch.
+   */
+  millisecondsToDays: function(aMsec) {
+    return Math.floor(aMsec / MILLISECONDS_PER_DAY);
+  },
+
   /**
    * True if this is a content process.
    */
@@ -82,5 +94,16 @@ this.TelemetryUtils = {
       return nextMidnightDate;
     }
     return null;
+  },
+
+  /**
+   * Find how many months passed between two dates.
+   * @param {Object} aStartDate The starting date.
+   * @param {Object} aEndDate The ending date.
+   * @return {Integer} The number of months between the two dates.
+   */
+  getElapsedTimeInMonths: function(aStartDate, aEndDate) {
+    return (aEndDate.getMonth() - aStartDate.getMonth())
+           + 12 * (aEndDate.getFullYear() - aStartDate.getFullYear());
   },
 };
