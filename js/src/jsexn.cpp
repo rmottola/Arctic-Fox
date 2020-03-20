@@ -274,7 +274,7 @@ js::ComputeStackString(JSContext* cx)
         SuppressErrorsGuard seg(cx);
         for (NonBuiltinFrameIter i(cx, FrameIter::ALL_CONTEXTS, FrameIter::GO_THROUGH_SAVED,
                                    FrameIter::FOLLOW_DEBUGGER_EVAL_PREV_LINK,
-                                   cx->compartment()->principals);
+                                   cx->compartment()->principals());
              !i.done();
              ++i)
         {
@@ -367,7 +367,7 @@ Error(JSContext* cx, unsigned argc, Value* vp)
     }
 
     /* Find the scripted caller, but only ones we're allowed to know about. */
-    NonBuiltinFrameIter iter(cx, cx->compartment()->principals);
+    NonBuiltinFrameIter iter(cx, cx->compartment()->principals());
 
     /* Set the 'fileName' property. */
     RootedString fileName(cx);
@@ -894,7 +894,7 @@ ErrorReport::populateUncaughtExceptionReportVA(JSContext* cx, va_list ap)
     // XXXbz this assumes the stack we have right now is still
     // related to our exception object.  It would be better if we
     // could accept a passed-in stack of some sort instead.
-    NonBuiltinFrameIter iter(cx, cx->compartment()->principals);
+    NonBuiltinFrameIter iter(cx, cx->compartment()->principals());
     if (!iter.done()) {
         ownedReport.filename = iter.scriptFilename();
         ownedReport.lineno = iter.computeLine(&ownedReport.column);
