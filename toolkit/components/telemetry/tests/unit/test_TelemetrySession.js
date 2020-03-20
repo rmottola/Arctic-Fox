@@ -1024,8 +1024,10 @@ add_task(function* test_environmentChange() {
 
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   Preferences.reset(PREF_TEST);
-  let prefsToWatch = {};
-  prefsToWatch[PREF_TEST] = TelemetryEnvironment.RECORD_PREF_VALUE;
+
+  const PREFS_TO_WATCH = new Map([
+    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+  ]);
 
   // Setup.
   yield TelemetrySession.setup();
@@ -1139,8 +1141,9 @@ add_task(function* test_savedSessionData() {
 
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   Preferences.reset(PREF_TEST);
-  let prefsToWatch = {};
-  prefsToWatch[PREF_TEST] = TelemetryEnvironment.RECORD_PREF_VALUE;
+  const PREFS_TO_WATCH = new Map([
+    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+  ]);
 
   // We expect one new subsession when starting TelemetrySession and one after triggering
   // an environment change.
@@ -1154,7 +1157,7 @@ add_task(function* test_savedSessionData() {
 
   // _watchPreferences triggers a subsession notification
   fakeNow(new Date(2050, 1, 1, 12, 0, 0));
-  TelemetryEnvironment._watchPreferences(prefsToWatch);
+  TelemetryEnvironment._watchPreferences(PREFS_TO_WATCH);
   let changePromise = new Promise(resolve =>
     TelemetryEnvironment.registerChangeListener("test_fake_change", resolve));
   Preferences.set(PREF_TEST, 1);
@@ -1494,8 +1497,9 @@ add_task(function* test_schedulerEnvironmentReschedules() {
   // Reset the test preference.
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   Preferences.reset(PREF_TEST);
-  let prefsToWatch = {};
-  prefsToWatch[PREF_TEST] = TelemetryEnvironment.RECORD_PREF_VALUE;
+  const PREFS_TO_WATCH = new Map([
+    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+  ]);
 
   yield clearPendingPings();
   PingServer.clearRequests();
@@ -1506,7 +1510,7 @@ add_task(function* test_schedulerEnvironmentReschedules() {
   let schedulerTickCallback = null;
   fakeSchedulerTimer(callback => schedulerTickCallback = callback, () => {});
   yield TelemetrySession.reset();
-  TelemetryEnvironment._watchPreferences(prefsToWatch);
+  TelemetryEnvironment._watchPreferences(PREFS_TO_WATCH);
 
   // Set the current time at midnight.
   let future = futureDate(nowDate, MS_IN_ONE_DAY);
