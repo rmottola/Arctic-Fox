@@ -964,6 +964,8 @@ EnvironmentCache.prototype = {
       },
       userPrefs: this._getPrefData(),
     };
+
+    this._updateSearchEngine();
   },
 
   /**
