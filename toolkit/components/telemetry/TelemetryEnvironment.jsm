@@ -1066,6 +1066,7 @@ EnvironmentCache.prototype = {
 #elif defined(XP_WIN)
       servicePackMajor: servicePack.major,
       servicePackMinor: servicePack.minor,
+      installYear: getSysinfoProperty("installYear", null),
 #endif
       locale: getSystemLocale(),
     };
