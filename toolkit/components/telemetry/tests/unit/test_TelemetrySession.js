@@ -84,6 +84,13 @@ function generateUUID() {
   return str.substring(1, str.length - 1);
 }
 
+function truncateDateToDays(date) {
+  return new Date(date.getFullYear(),
+                  date.getMonth(),
+                  date.getDate(),
+                  0, 0, 0, 0);
+}
+
 function sendPing() {
   TelemetrySession.gatherStartup();
   if (PingServer.started) {
@@ -1006,7 +1013,6 @@ add_task(function* test_dailyOverdue() {
 
 add_task(function* test_environmentChange() {
   let now = new Date(2040, 1, 1, 12, 0, 0);
-  let nowDay = new Date(2040, 1, 1, 0, 0, 0);
   let timerCallback = null;
   let timerDelay = null;
 
@@ -1039,6 +1045,10 @@ add_task(function* test_environmentChange() {
   keyed.add("b", 1);
 
   // Trigger and collect environment-change ping.
+  let startDay = truncateDateToDays(now);
+  now = futureDate(now, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(now);
+
   Preferences.set(PREF_TEST, 1);
   let ping = yield PingServer.promiseNextPing();
   Assert.ok(!!ping);
@@ -1047,12 +1057,16 @@ add_task(function* test_environmentChange() {
   Assert.equal(ping.environment.settings.userPrefs[PREF_TEST], undefined);
   Assert.equal(ping.payload.info.reason, REASON_ENVIRONMENT_CHANGE);
   let subsessionStartDate = new Date(ping.payload.info.subsessionStartDate);
-  Assert.equal(subsessionStartDate.toISOString(), nowDay.toISOString());
+  Assert.equal(subsessionStartDate.toISOString(), startDay.toISOString());
 
   Assert.equal(ping.payload.histograms[COUNT_ID].sum, 1);
   Assert.equal(ping.payload.keyedHistograms[KEYED_ID]["a"].sum, 1);
 
   // Trigger and collect another ping. The histograms should be reset.
+  startDay = truncateDateToDays(now);
+  now = futureDate(now, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(now);
+
   Preferences.set(PREF_TEST, 2);
   ping = yield PingServer.promiseNextPing();
   Assert.ok(!!ping);
@@ -1061,7 +1075,7 @@ add_task(function* test_environmentChange() {
   Assert.equal(ping.environment.settings.userPrefs[PREF_TEST], 1);
   Assert.equal(ping.payload.info.reason, REASON_ENVIRONMENT_CHANGE);
   subsessionStartDate = new Date(ping.payload.info.subsessionStartDate);
-  Assert.equal(subsessionStartDate.toISOString(), nowDay.toISOString());
+  Assert.equal(subsessionStartDate.toISOString(), startDay.toISOString());
 
   Assert.equal(ping.payload.histograms[COUNT_ID].sum, 0);
   Assert.deepEqual(ping.payload.keyedHistograms[KEYED_ID], {});
@@ -1139,6 +1153,7 @@ add_task(function* test_savedSessionData() {
   // Watch a test preference, trigger and environment change and wait for it to propagate.
 
   // _watchPreferences triggers a subsession notification
+  fakeNow(new Date(2050, 1, 1, 12, 0, 0));
   TelemetryEnvironment._watchPreferences(prefsToWatch);
   let changePromise = new Promise(resolve =>
     TelemetryEnvironment.registerChangeListener("test_fake_change", resolve));
@@ -1448,7 +1463,7 @@ add_task(function* test_schedulerComputerSleep() {
   yield OS.File.removeDir(DATAREPORTING_PATH, { ignoreAbsent: true });
 
   // Set a fake current date and start Telemetry.
-  let nowDate = new Date(2009, 10, 18, 0, 00, 0);
+  let nowDate = new Date(2060, 10, 18, 0, 00, 0);
   fakeNow(nowDate);
   let schedulerTickCallback = null;
   fakeSchedulerTimer(callback => schedulerTickCallback = callback, () => {});

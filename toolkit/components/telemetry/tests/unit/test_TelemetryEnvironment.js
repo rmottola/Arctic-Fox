@@ -74,6 +74,8 @@ add_task(function* test_prefWatchPolicies() {
   const PREF_TEST_3 = "toolkit.telemetry.test.pref2";
 
   const expectedValue = "some-test-value";
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
 
   let prefsToWatch = {};
   prefsToWatch[PREF_TEST_1] = TelemetryEnvironment.RECORD_PREF_VALUE;
@@ -123,6 +125,9 @@ add_task(function* test_prefWatch_prefReset() {
   // Set the preference to a non-default value.
   Preferences.set(PREF_TEST, false);
 
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+
   // Set the Environment preferences to watch.
   TelemetryEnvironment._watchPreferences(prefsToWatch);
   let deferred = PromiseUtils.defer();
@@ -138,6 +143,45 @@ add_task(function* test_prefWatch_prefReset() {
 
   // Unregister the listener.
   TelemetryEnvironment.unregisterChangeListener("testWatchPrefs_reset");
+});
+
+add_task(function* test_changeThrottling() {
+  const PREF_TEST = "toolkit.telemetry.test.pref1";
+  let prefsToWatch = {};
+  prefsToWatch[PREF_TEST] = TelemetryEnvironment.RECORD_PREF_STATE;
+  Preferences.reset(PREF_TEST);
+
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+
+  // Set the Environment preferences to watch.
+  TelemetryEnvironment._watchPreferences(prefsToWatch);
+  let deferred = PromiseUtils.defer();
+  let changeCount = 0;
+  TelemetryEnvironment.registerChangeListener("testWatchPrefs_throttling", () => {
+    ++changeCount;
+    deferred.resolve();
+  });
+
+  // The first pref change should trigger a notification.
+  Preferences.set(PREF_TEST, 1);
+  yield deferred.promise;
+  Assert.equal(changeCount, 1);
+
+  // We should only get a change notification for second of the following changes.
+  deferred = PromiseUtils.defer();
+  gNow = futureDate(gNow, MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+  Preferences.set(PREF_TEST, 2);
+  gNow = futureDate(gNow, 5 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+  Preferences.set(PREF_TEST, 3);
+  yield deferred.promise;
+
+  Assert.equal(changeCount, 2);
+
+  // Unregister the listener.
+  TelemetryEnvironment.unregisterChangeListener("testWatchPrefs_throttling");
 });
 
 add_task(function*() {
