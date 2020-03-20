@@ -370,7 +370,7 @@ GetFirstSubsumedFrame(JSContext *cx, HandleSavedFrame frame, bool &skippedAsync)
     if (!subsumes)
         return frame;
 
-    JSPrincipals* principals = cx->compartment()->principals;
+    JSPrincipals* principals = cx->compartment()->principals();
 
     RootedSavedFrame rootedFrame(cx, frame);
     while (rootedFrame && !subsumes(principals, rootedFrame->getPrincipals())) {
@@ -475,8 +475,8 @@ public:
         if (obj && cx->compartment() != obj->compartment())
         {
             JSSubsumesOp subsumes = cx->runtime()->securityCallbacks->subsumes;
-            if (subsumes && subsumes(cx->compartment()->principals,
-                                     obj->compartment()->principals))
+            if (subsumes && subsumes(cx->compartment()->principals(),
+                                     obj->compartment()->principals()))
             {
                 ac_.emplace(cx, obj);
             }
@@ -648,7 +648,7 @@ StringifySavedFrameStack(JSContext *cx, HandleObject stack, MutableHandleString 
             return true;
         }
         DebugOnly<JSSubsumesOp> subsumes = cx->runtime()->securityCallbacks->subsumes;
-        DebugOnly<JSPrincipals *> principals = cx->compartment()->principals;
+        DebugOnly<JSPrincipals*> principals = cx->compartment()->principals();
 
         js::RootedSavedFrame parent(cx);
         do {
@@ -928,7 +928,7 @@ SavedStacks::insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFram
           iter.isNonEvalFunctionFrame() ? iter.functionDisplayAtom() : nullptr,
           nullptr,
           nullptr,
-          iter.compartment()->principals
+          iter.compartment()->principals()
         );
 
         ++iter;

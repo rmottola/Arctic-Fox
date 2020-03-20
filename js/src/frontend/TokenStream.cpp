@@ -665,7 +665,7 @@ TokenStream::reportCompileErrorNumberVA(uint32_t offset, unsigned flags, unsigne
         NonBuiltinFrameIter iter(cx->asJSContext(),
                                  FrameIter::ALL_CONTEXTS, FrameIter::GO_THROUGH_SAVED,
                                  FrameIter::FOLLOW_DEBUGGER_EVAL_PREV_LINK,
-                                 cx->compartment()->principals);
+                                 cx->compartment()->principals());
         if (!iter.done() && iter.scriptFilename()) {
             callerFilename = true;
             err.report.filename = iter.scriptFilename();
