@@ -19,3 +19,5 @@
 #
 
 Clobber required KISS-FFT build config change
+
+Bug 1039866: Removing the metro browser
