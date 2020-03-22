@@ -43,6 +43,7 @@
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
+- Bug 1210607 - Check for null compartment in PopulateReport
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -97,12 +98,9 @@
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
 - Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
-- Bug 1150555 - about:performance should not confuse Jetpack addons. 
-- Bug 1125848 - 2015-03-09 Consolidate PCompositor's creation-destruction logic
 - Bug 1149848 
-- Bug 847287 part 1 to 14
+- Bug 847287 part 4 to 14
 
 
 More session store stuff to check:
@@ -118,6 +116,10 @@ More session store stuff to check:
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
 Bug 1177310 - Don't flush windows synchronously on application shutdo
+
+Devtools stuff to check - files not there:
+- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
+- Bug 1150555 - about:performance should not confuse Jetpack addons. 
 
 
 
