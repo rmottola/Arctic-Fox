@@ -881,7 +881,7 @@ add_task(function test_basic_appinfo() {
     verify(reporter.obtainAppInfo());
     let payload = yield reporter.collectAndObtainJSONPayload(true);
     do_check_eq(payload["version"], 2);
-    verify(payload["goannaAppInfo"]);
+    verify(payload["geckoAppInfo"]);
   } finally {
     yield reporter._shutdown();
   }
