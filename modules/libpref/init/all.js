@@ -292,6 +292,8 @@ pref("media.wakelock_timeout", 2000);
 // opened as top-level documents, as opposed to inside a media element.
 pref("media.play-stand-alone", true);
 
+pref("media.hardware-video-decoding.enabled", true);
+
 // Whether we should delay actioning a "play()" JS function call and autoplay
 // attribute until the media element's owner document is visible.
 pref("media.block-play-until-visible", false);
@@ -331,7 +333,6 @@ pref("media.fragmented-mp4.enabled", true);
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
 pref("media.windows-media-foundation.enabled", true);
-pref("media.windows-media-foundation.use-dxva", true);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
