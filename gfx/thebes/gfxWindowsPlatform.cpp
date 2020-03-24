@@ -2210,3 +2210,10 @@ gfxWindowsPlatform::CreateHardwareVsyncSource()
   nsRefPtr<VsyncSource> d3dVsyncSource = new D3DVsyncSource();
   return d3dVsyncSource.forget();
 }
+
+bool
+gfxWindowsPlatform::SupportsApzTouchInput()
+{
+  int value = Preferences::GetInt("dom.w3c_touch_events.enabled", 0);
+  return value == 1 || value == 2;
+}

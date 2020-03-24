@@ -379,6 +379,7 @@ gfxPlatform::gfxPlatform()
   : mTileWidth(-1)
   , mTileHeight(-1)
   , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
+  , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -2330,6 +2331,45 @@ gfxPlatform::UsesOffMainThreadCompositing()
   }
 
   return result;
+}
+
+void
+gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
+{
+  if (SupportsApzWheelInput()) {
+    static const char *sBadPrefs[] = {
+      "mousewheel.system_scroll_override_on_root_content.enabled",
+      "mousewheel.default.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_x",
+      "mousewheel.with_control.delta_multiplier_x",
+      "mousewheel.with_meta.delta_multiplier_x",
+      "mousewheel.with_shift.delta_multiplier_x",
+      "mousewheel.with_win.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_y",
+      "mousewheel.with_control.delta_multiplier_y",
+      "mousewheel.with_meta.delta_multiplier_y",
+      "mousewheel.with_shift.delta_multiplier_y",
+      "mousewheel.with_win.delta_multiplier_y",
+    };
+
+    nsString badPref;
+    for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sBadPrefs); i++) {
+      if (Preferences::HasUserValue(sBadPrefs[i])) {
+        badPref.AssignASCII(sBadPrefs[i]);
+        break;
+      }
+    }
+
+    aObj.DefineProperty("ApzWheelInput", 1);
+    if (badPref.Length()) {
+      aObj.DefineProperty("ApzWheelInputWarning", badPref);
+    }
+  }
+
+  if (SupportsApzTouchInput()) {
+    aObj.DefineProperty("ApzTouchInput", 1);
+  }
 }
 
 already_AddRefed<mozilla::gfx::VsyncSource>
