@@ -11,6 +11,7 @@ EXTRA_JS_MODULES += [ 'promise.js' ]
 EXTRA_JS_MODULES += [
     'AboutHome.jsm',
     'BrowserNewTabPreloader.jsm',
+    'BrowserUITelemetry.jsm',
     'ContentClick.jsm',
     'E10SUtils.jsm',
     'FormSubmitObserver.jsm',

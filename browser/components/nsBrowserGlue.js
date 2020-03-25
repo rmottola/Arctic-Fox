@@ -85,6 +85,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+                                  "resource:///modules/BrowserUITelemetry.jsm");
+
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -525,6 +528,7 @@ BrowserGlue.prototype = {
     webrtcUI.init();
     AboutHome.init();
     SessionStore.init();
+    BrowserUITelemetry.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();
