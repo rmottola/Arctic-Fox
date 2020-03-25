@@ -88,6 +88,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
                                   "resource:///modules/BrowserUITelemetry.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
+                                  "resource:///modules/ContentSearch.jsm");
+
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -529,6 +532,7 @@ BrowserGlue.prototype = {
     AboutHome.init();
     SessionStore.init();
     BrowserUITelemetry.init();
+    ContentSearch.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();
