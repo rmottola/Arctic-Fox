@@ -1857,57 +1857,54 @@ Engine.prototype = {
       case "https":
       case "ftp":
         // No use downloading the icon if the engine file is read-only
-        if (!this._readOnly ||
-            getBoolPref(BROWSER_SEARCH_PREF + "cache.enabled", true)) {
-          LOG("_setIcon: Downloading icon: \"" + uri.spec +
-              "\" for engine: \"" + this.name + "\"");
-          var chan = NetUtil.ioService.newChannelFromURI2(uri,
-                                                          null,      // aLoadingNode
-                                                          Services.scriptSecurityManager.getSystemPrincipal(),
-                                                          null,      // aTriggeringPrincipal
-                                                          Ci.nsILoadInfo.SEC_NORMAL,
-                                                          Ci.nsIContentPolicy.TYPE_IMAGE);
+        LOG("_setIcon: Downloading icon: \"" + uri.spec +
+            "\" for engine: \"" + this.name + "\"");
+        var chan = NetUtil.ioService.newChannelFromURI2(uri,
+                                                        null,      // aLoadingNode
+                                                        Services.scriptSecurityManager.getSystemPrincipal(),
+                                                        null,      // aTriggeringPrincipal
+                                                        Ci.nsILoadInfo.SEC_NORMAL,
+                                                        Ci.nsIContentPolicy.TYPE_IMAGE);
 
-          let iconLoadCallback = function (aByteArray, aEngine) {
-            // This callback may run after we've already set a preferred icon,
-            // so check again.
-            if (aEngine._hasPreferredIcon && !aIsPreferred)
-              return;
+        let iconLoadCallback = function (aByteArray, aEngine) {
+          // This callback may run after we've already set a preferred icon,
+          // so check again.
+          if (aEngine._hasPreferredIcon && !aIsPreferred)
+            return;
 
-            if (!aByteArray || aByteArray.length > MAX_ICON_SIZE) {
-              LOG("iconLoadCallback: load failed, or the icon was too large!");
-              return;
-            }
-
-            var str = btoa(String.fromCharCode.apply(null, aByteArray));
-            let dataURL = ICON_DATAURL_PREFIX + str;
-            aEngine._iconURI = makeURI(dataURL);
-
-            if (aWidth && aHeight) {
-              aEngine._addIconToMap(aWidth, aHeight, dataURL)
-            }
-
-            // The engine might not have a file yet, if it's being downloaded,
-            // because the request for the engine file itself (_onLoad) may not
-            // yet be complete. In that case, this change will be written to
-            // file when _onLoad is called. For readonly engines, we'll store
-            // the changes in the cache once notified below.
-            if (aEngine._file && !aEngine._readOnly)
-              aEngine._serializeToFile();
-
-            notifyAction(aEngine, SEARCH_ENGINE_CHANGED);
-            aEngine._hasPreferredIcon = aIsPreferred;
+          if (!aByteArray || aByteArray.length > MAX_ICON_SIZE) {
+            LOG("iconLoadCallback: load failed, or the icon was too large!");
+            return;
           }
 
-          // If we're currently acting as an "update engine", then the callback
-          // should set the icon on the engine we're updating and not us, since
-          // |this| might be gone by the time the callback runs.
-          var engineToSet = this._engineToUpdate || this;
+          var str = btoa(String.fromCharCode.apply(null, aByteArray));
+          let dataURL = ICON_DATAURL_PREFIX + str;
+          aEngine._iconURI = makeURI(dataURL);
 
-          var listener = new loadListener(chan, engineToSet, iconLoadCallback);
-          chan.notificationCallbacks = listener;
-          chan.asyncOpen(listener, null);
+          if (aWidth && aHeight) {
+            aEngine._addIconToMap(aWidth, aHeight, dataURL)
+          }
+
+          // The engine might not have a file yet, if it's being downloaded,
+          // because the request for the engine file itself (_onLoad) may not
+          // yet be complete. In that case, this change will be written to
+          // file when _onLoad is called. For readonly engines, we'll store
+          // the changes in the cache once notified below.
+          if (aEngine._file && !aEngine._readOnly)
+            aEngine._serializeToFile();
+
+          notifyAction(aEngine, SEARCH_ENGINE_CHANGED);
+          aEngine._hasPreferredIcon = aIsPreferred;
         }
+
+        // If we're currently acting as an "update engine", then the callback
+        // should set the icon on the engine we're updating and not us, since
+        // |this| might be gone by the time the callback runs.
+        var engineToSet = this._engineToUpdate || this;
+
+        var listener = new loadListener(chan, engineToSet, iconLoadCallback);
+        chan.notificationCallbacks = listener;
+        chan.asyncOpen(listener, null);
         break;
     }
   },
@@ -3378,9 +3375,6 @@ SearchService.prototype = {
   },
 
   _buildCache: function SRCH_SVC__buildCache() {
-    if (!getBoolPref(BROWSER_SEARCH_PREF + "cache.enabled", true))
-      return;
-
     TelemetryStopwatch.start("SEARCH_SERVICE_BUILD_CACHE_MS");
     let cache = {};
     let locale = getLocale();
@@ -3466,13 +3460,10 @@ SearchService.prototype = {
     LOG("_syncLoadEngines: start");
     // See if we have a cache file so we don't have to parse a bunch of XML.
     let cache = {};
-    let cacheEnabled = getBoolPref(BROWSER_SEARCH_PREF + "cache.enabled", true);
-    if (cacheEnabled) {
-      let cacheFile = getDir(NS_APP_USER_PROFILE_50_DIR);
-      cacheFile.append("search.json");
-      if (cacheFile.exists())
-        cache = this._readCacheFile(cacheFile);
-    }
+    let cacheFile = getDir(NS_APP_USER_PROFILE_50_DIR);
+    cacheFile.append("search.json");
+    if (cacheFile.exists())
+      cache = this._readCacheFile(cacheFile);
 
     let loadDirs = [];
     let locations = getDir(NS_APP_SEARCH_DIR_LIST, Ci.nsISimpleEnumerator);
@@ -3509,14 +3500,13 @@ SearchService.prototype = {
                        toLoad.some(notInCachePath) ||
                        toLoad.some(modifiedDir);
 
-    if (!cacheEnabled || rebuildCache) {
+    if (rebuildCache) {
       LOG("_loadEngines: Absent or outdated cache. Loading engines from disk.");
       loadDirs.forEach(this._loadEnginesFromDir, this);
 
       this._loadFromChromeURLs(chromeURIs);
 
-      if (cacheEnabled)
-        this._buildCache();
+      this._buildCache();
       return;
     }
 
@@ -3538,11 +3528,8 @@ SearchService.prototype = {
       LOG("_asyncLoadEngines: start");
       // See if we have a cache file so we don't have to parse a bunch of XML.
       let cache = {};
-      let cacheEnabled = getBoolPref(BROWSER_SEARCH_PREF + "cache.enabled", true);
-      if (cacheEnabled) {
-        let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
-        cache = yield checkForSyncCompletion(this._asyncReadCacheFile(cacheFilePath));
-      }
+      let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
+      cache = yield checkForSyncCompletion(this._asyncReadCacheFile(cacheFilePath));
 
       // Add all the non-empty directories of NS_APP_SEARCH_DIR_LIST to
       // loadDirs.
@@ -3608,7 +3595,7 @@ SearchService.prototype = {
                          toLoad.some(notInCachePath) ||
                          (yield checkForSyncCompletion(hasModifiedDir(toLoad)));
 
-      if (!cacheEnabled || rebuildCache) {
+      if (rebuildCache) {
         LOG("_asyncLoadEngines: Absent or outdated cache. Loading engines from disk.");
         let engines = [];
         for (let loadDir of loadDirs) {
@@ -3623,8 +3610,7 @@ SearchService.prototype = {
         for (let engine of engines) {
           this._addEngineToStore(engine);
         }
-        if (cacheEnabled)
-          this._buildCache();
+        this._buildCache();
         return;
       }
 
@@ -5258,12 +5244,6 @@ var engineUpdateService = {
     let engine = aEngine.wrappedJSObject;
     ULOG("update called for " + aEngine._name);
     if (!getBoolPref(BROWSER_SEARCH_PREF + "update", true) || !engine._hasUpdates)
-      return;
-
-    // We use the cache to store updated app engines, so refuse to update if the
-    // cache is disabled.
-    if (engine._readOnly &&
-        !getBoolPref(BROWSER_SEARCH_PREF + "cache.enabled", true))
       return;
 
     let testEngine = null;
