@@ -167,12 +167,13 @@ let AboutHome = {
           Cu.reportError(ex);
           break;
         }
+	let engine = Services.search.currentEngine;
         if (AppConstants.MOZ_SERVICES_HEALTHREPORT) {
           window.BrowserSearch.recordSearchInHealthReport(engine, "abouthome", data.selection);
         }
 
         // Trigger a search through nsISearchEngine.getSubmission()
-        let submission = Services.search.currentEngine.getSubmission(data.searchTerms);
+        let submission = engine.getSubmission(data.searchTerms, null, "homepage");
         window.loadURI(submission.uri.spec, null, submission.postData);
         break;
     }
