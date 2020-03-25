@@ -66,6 +66,8 @@ let gPage = {
 
     this._initialized = true;
 
+    gSearch.init();
+
     gLinks.populateCache(function () {
       // Initialize and render the grid.
       gGrid.init();
@@ -79,6 +81,10 @@ let gPage = {
       document.addEventListener("drop", this, false);
 #endif
     }.bind(this));
+
+     // content.js isn't loaded for the page while it's in the preloader,
+     // which is why this is necessary.
+     gSearch.setUpInitialState();
   },
 
   /**
@@ -87,7 +93,7 @@ let gPage = {
    */
   _updateAttributes: function Page_updateAttributes(aValue) {
     // Set the nodes' states.
-    let nodeSelector = "#newtab-scrollbox, #newtab-toggle, #newtab-grid";
+    let nodeSelector = "#newtab-scrollbox, #newtab-toggle, #newtab-grid, #newtab-search-container";
     for (let node of document.querySelectorAll(nodeSelector)) {
       if (aValue)
         node.removeAttribute("page-disabled");
