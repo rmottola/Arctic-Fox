@@ -66,7 +66,8 @@ endif
 
 SEARCHPLUGINS_NAMES = $(shell cat $(call MERGE_FILE,/searchplugins/list.txt))
 SEARCHPLUGINS_PATH := $(FINAL_TARGET)/searchplugins
-SEARCHPLUGINS := $(addsuffix .xml,$(SEARCHPLUGINS_NAMES))
+SEARCHPLUGINS_TARGET := libs searchplugins
+SEARCHPLUGINS := $(foreach plugin,$(addsuffix .xml,$(SEARCHPLUGINS_NAMES)),$(or $(wildcard $(call MERGE_FILE,searchplugins/$(plugin))),$(info Missing searchplugin: $(plugin))))
 # Some locale-specific search plugins may have preprocessor directives, but the
 # default en-US ones do not.
 SEARCHPLUGINS_FLAGS := --silence-missing-directive-warnings
