@@ -802,7 +802,7 @@ EnvironmentCache.prototype = {
   _addObservers: function () {
     // Watch the search engine change and service topics.
     Services.obs.addObserver(this, SEARCH_ENGINE_MODIFIED_TOPIC, false);
-    Services.obs.addObserver(this, SEARCH_SERVICE_TOPIC, false);
+// RM HACK fixes AboutHome    Services.obs.addObserver(this, SEARCH_SERVICE_TOPIC, false);
   },
 
   _removeObservers: function () {
