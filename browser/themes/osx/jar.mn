@@ -176,5 +176,4 @@ browser.jar:
         skin/classic/browser/syncSetup.css
         skin/classic/browser/syncCommon.css
         skin/classic/browser/syncQuota.css
-        skin/classic/browser/syncProgress.css
 #endif

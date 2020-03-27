@@ -85,8 +85,6 @@ browser.jar:
         content/browser/sync/quota.xul                (content/sync/quota.xul)
         content/browser/sync/quota.js                 (content/sync/quota.js)
         content/browser/sync/utils.js                 (content/sync/utils.js)
-        content/browser/sync/progress.js              (content/sync/progress.js)
-        content/browser/sync/progress.xhtml           (content/sync/progress.xhtml)
 #endif
         content/browser/openLocation.js               (content/openLocation.js)
         content/browser/openLocation.xul              (content/openLocation.xul)
