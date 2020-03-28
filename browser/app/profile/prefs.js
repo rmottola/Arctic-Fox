@@ -11,7 +11,7 @@
  *
  * To make a manual change to preferences, you can visit the URL about:config
  */
-# Enable webm by default to enable playback of youtube/vimio/vevo etc.
+// Enable webm by default to enable playback of youtube/vimio/vevo etc.
 pref("media.mediasource.enabled", true);
 pref("media.mediasource.webm.enabled", true);
 pref("media.mediasource.format-reader", false);
