@@ -16,3 +16,5 @@ pref("media.mediasource.enabled", true);
 pref("media.mediasource.webm.enabled", true);
 pref("media.mediasource.format-reader", false);
 pref("media.mediasource.mp4.enabled", true);
+// Enable skipping loop filter and allow non spec compliant speedup tricks.
+pref("media.ffmpeg.skip_loop_filter", true);
