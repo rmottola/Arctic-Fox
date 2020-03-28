@@ -416,7 +416,7 @@ pref("browser.tabs.loadBookmarksInBackground", false);
 pref("browser.tabs.noWindowActivationOnExternal", false);
 pref("browser.tabs.tabClipWidth", 140);
 pref("browser.tabs.animate", true);
-pref("browser.tabs.onTop", true);
+pref("browser.tabs.onTop", false); // Put tabs back on the bottom where they belong.
 #ifdef XP_WIN
 pref("browser.tabs.drawInTitlebar", true);
 #else
