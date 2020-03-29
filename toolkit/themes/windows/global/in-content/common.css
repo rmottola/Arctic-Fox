@@ -62,6 +62,12 @@ xul|*.inline-link:-moz-focusring {
   border: 1px dotted -moz-DialogText;
 }
 
+html|a:-moz-focusring,
+xul|*.text-link:-moz-focusring,
+xul|*.inline-link:-moz-focusring {
+  border: 1px dotted -moz-DialogText;
+}
+
 /* Don't draw a transparent border for the focusring because when page
    colors are disabled, the border is drawn in -moz-DialogText */
 xul|*.text-link:not(:-moz-focusring),
