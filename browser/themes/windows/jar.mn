@@ -5,7 +5,6 @@
 browser.jar:
 % skin browser classic/1.0 %skin/classic/browser/
         skin/classic/browser/sanitizeDialog.css
-*       skin/classic/browser/aboutPrivateBrowsing.css
 *       skin/classic/browser/aboutSessionRestore.css
         skin/classic/browser/aboutSessionRestore-window-icon.png
         skin/classic/browser/aboutWelcomeBack.css                    (../shared/aboutWelcomeBack.css)
@@ -44,6 +43,8 @@ browser.jar:
         skin/classic/browser/KUI-background.png
         skin/classic/browser/KUI-close.png
         skin/classic/browser/livemark-folder.png
+        skin/classic/browser/mask.png                               (../shared/mask.png)
+        skin/classic/browser/mask@2x.png                            (../shared/mask@2x.png)
         skin/classic/browser/menu-back.png
         skin/classic/browser/menu-forward.png
         skin/classic/browser/bad-content-blocked-16.png
