@@ -54,6 +54,24 @@ radio[pane=paneSync] {
   -moz-box-flex: 1;
 }
 
+/**
+ * Privacy Pane
+ */
+
+html|a.inline-link {
+  color: -moz-nativehyperlinktext;
+  text-decoration: none;
+}
+
+html|a.inline-link:hover {
+  text-decoration: underline;
+}
+
+html|a.inline-link:-moz-focusring {
+  outline-width: 0;
+  box-shadow: @focusRingShadow@;
+}
+
 /* Modeless Window Dialogs */
 .windowDialog,
 .windowDialog prefpane {
