@@ -837,9 +837,9 @@ AnimationPlayerCollection::EnsureStyleRuleFor(TimeStamp aRefreshTime,
       mPlayers[playerIdx]->ComposeStyle(mStyleRule, properties,
                                         mNeedsRefreshes);
     }
-  }
 
-  mManager->CheckNeedsRefresh();
+    mManager->CheckNeedsRefresh();
+  }
 }
 
 bool
