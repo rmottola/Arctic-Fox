@@ -120,9 +120,8 @@ CommonAnimationManager::CheckNeedsRefresh()
 
 AnimationPlayerCollection*
 CommonAnimationManager::GetAnimationsForCompositor(nsIContent* aContent,
-  nsIAtom* aElementProperty,
-  nsCSSProperty aProperty,
-  GetCompositorAnimationOptions aFlags)
+                                                   nsIAtom* aElementProperty,
+                                                   nsCSSProperty aProperty)
 {
   if (!aContent->MayHaveAnimations())
     return nullptr;
@@ -135,10 +134,6 @@ CommonAnimationManager::GetAnimationsForCompositor(nsIContent* aContent,
       !collection->CanPerformOnCompositorThread(
         AnimationPlayerCollection::CanAnimate_AllowPartial)) {
     return nullptr;
-  }
-
-  if (!(aFlags & GetCompositorAnimationOptions::NotifyActiveLayerTracker)) {
-    return collection;
   }
 
   // This animation can be done on the compositor.
