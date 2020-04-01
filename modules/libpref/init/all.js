@@ -4384,7 +4384,6 @@ pref("gfx.xrender.enabled",true);
 // Whether to disable the automatic detection and use of direct2d.
 pref("gfx.direct2d.disabled", false);
 pref("gfx.direct2d.use1_1", true);
-pref("gfx.direct2d.allow-fallback", false);
 
 // Whether to attempt to enable Direct2D regardless of automatic detection or
 // blacklisting
