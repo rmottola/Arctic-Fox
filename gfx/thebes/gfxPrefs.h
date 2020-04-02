@@ -353,6 +353,11 @@ private:
   DECL_GFX_PREF(Once, "webgl.angle.try-d3d11",                 WebGLANGLETryD3D11, bool, false);
   DECL_GFX_PREF(Once, "webgl.angle.force-d3d11",               WebGLANGLEForceD3D11, bool, false);
   DECL_GFX_PREF(Once, "webgl.force-layers-readback",           WebGLForceLayersReadback, bool, false);
+
+  // WARNING:
+  // Please make sure that you've added your new preference to the list above in alphabetical order.
+  // Please do not just append it to the end of the list.
+
 public:
   // Manage the singleton:
   static gfxPrefs& GetSingleton()
