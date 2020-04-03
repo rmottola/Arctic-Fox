@@ -11,3 +11,10 @@
  *
  * To make a manual change to preferences, you can visit the URL about:config
  */
+// Enable webm by default to enable playback of youtube/vimio/vevo etc.
+pref("media.mediasource.enabled", true);
+pref("media.mediasource.webm.enabled", true);
+pref("media.mediasource.format-reader", false);
+pref("media.mediasource.mp4.enabled", true);
+// Enable skipping loop filter and allow non spec compliant speedup tricks.
+pref("media.ffmpeg.skip_loop_filter", true);

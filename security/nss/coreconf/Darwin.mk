@@ -104,6 +104,13 @@ endif
 
 ARCH		= darwin
 
+# Fix missing libmozglue.dylib on 32-bit OSX build
+ifeq ($(CPU_ARCH), x86)
+EXTRA_SHARED_LIBS += \
+	-L$(DIST)/bin \
+	$(NULL)
+endif
+
 DSO_CFLAGS	= -fPIC
 # May override this with different compatibility and current version numbers.
 DARWIN_DYLIB_VERSIONS = -compatibility_version 1 -current_version 1

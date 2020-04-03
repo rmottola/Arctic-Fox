@@ -3,6 +3,7 @@
 
 - Bug 1533969 - Fix build error with newer glibc. (gettid)
 
+- Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
 - 1472925 - keep a strong reference to MediaStreamGraph from GraphDriver
