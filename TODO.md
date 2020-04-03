@@ -21,6 +21,12 @@
 - 1342849 - Don't do any notifications for newly added background t
 - 1324406 - Treat 'data:' documents as unique, opaque origins
 - 1300118 P1 Make TaskQueue deliver runnables to nsIEventTarget
+- Add d3d11/d2d and compositor information to telemetry. (bug 1179051
+- Bug 1184705 - Search A/B testing cohort identifier should be recorded
+- Add layers.offmainthreadcomposition.enabled to telemetry. (bug 1187453
+- Add a "blacklisted" property to d3d11 telemetry. (bug 1187453, 
+-  Add compositor, layers, and rendering info to nsIGfxInfo. (bug 1179051 part 5, r=mattwoodrow)\
+- Split gfxWindowsPlatform::UpdateRenderMode() into multiple functions.  (bug 1179051 part 1, r=bas)
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
@@ -31,6 +37,9 @@
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- Bug 1184130. Report mismatches of adapter description and vendor id t
+- Bug 1159751: Ensure WARP can never be used for Windows 7. r=milan 
+- Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
@@ -44,6 +53,7 @@
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
+- Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -81,6 +91,7 @@
 - 1145440 - Ship constant names for tracked strategy and outcomes i
 - 1143860 - Deduplicate tracked optimizations when streaming the pr
 - 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
@@ -93,15 +104,12 @@
 - Bug 1153658 - browser_compartments.js logspam.
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
-- Bug 674779 - Deactivating subtest of test_measure for Windows XP
-- Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
 - Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
-- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
-- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
-- Bug 1149848 
-- Bug 847287 part 4 to 14
+- Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 
+Mac Specific
+- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+- Bug 1085607 - libvpx doesn't build on OS X with Apple clang from OS X
 
 More session store stuff to check:
 
@@ -116,6 +124,9 @@ More session store stuff to check:
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
 
 Bug 1177310 - Don't flush windows synchronously on application shutdo
+
+Not applying / Breaking build:
+Bug 1162569 - default engine files should be in the omni.ja file,
 
 Devtools stuff to check - files not there:
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux.
