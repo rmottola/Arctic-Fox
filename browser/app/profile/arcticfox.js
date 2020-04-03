@@ -37,16 +37,6 @@ pref("extensions.strictCompatibility", false);
 // for it to be compatible by default.
 pref("extensions.minCompatibleAppVersion", "1.5");
 
-// Preferences for AMO integration
-pref("extensions.getAddons.cache.enabled", true);
-pref("extensions.getAddons.maxResults", 15);
-pref("extensions.getAddons.get.url", "https://services.addons.mozilla.org/%LOCALE%/firefox/api/%API_VERSION%/search/guid:%IDS%?src=firefox&appOS=%OS%&appVersion=%VERSION%");
-pref("extensions.getAddons.getWithPerformance.url", "https://services.addons.mozilla.org/%LOCALE%/firefox/api/%API_VERSION%/search/guid:%IDS%?src=firefox&appOS=%OS%&appVersion=%VERSION%&tMain=%TIME_MAIN%&tFirstPaint=%TIME_FIRST_PAINT%&tSessionRestored=%TIME_SESSION_RESTORED%");
-pref("extensions.getAddons.search.browseURL", "https://addons.mozilla.org/%LOCALE%/firefox/search?q=%TERMS%&platform=%OS%&appver=%VERSION%");
-pref("extensions.getAddons.search.url", "https://services.addons.mozilla.org/%LOCALE%/firefox/api/%API_VERSION%/search/%TERMS%/all/%MAX_RESULTS%/%OS%/%VERSION%/%COMPATIBILITY_MODE%?src=firefox");
-pref("extensions.webservice.discoverURL", "https://services.addons.mozilla.org/%LOCALE%/firefox/discovery/pane/%VERSION%/%OS%/%COMPATIBILITY_MODE%");
-pref("extensions.getAddons.recommended.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/list/recommended/all/%MAX_RESULTS%/%OS%/%VERSION%?src=firefox");
-
 // Blocklist preferences
 pref("extensions.blocklist.enabled", true);
 pref("extensions.blocklist.interval", 86400);
@@ -65,10 +55,10 @@ pref("extensions.update.autoUpdateDefault", true);
 pref("extensions.autoDisableScopes", 15);
 
 // Dictionary download preference
-pref("browser.dictionaries.download.url", "https://addons.mozilla.org/%LOCALE%/firefox/dictionaries/");
+pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/dicts/");
 
 // Get More Tools link URL
-pref("browser.getdevtools.url","https://addons.mozilla.org/firefox/collections/mozilla/webdeveloper/");
+pref("browser.getdevtools.url","https://addons.palemoon.org/extensions/web-development/");
 
 // Feedback URL
 pref("browser.feedback.url", "https://forums.macrumors.com/threads/arctic-fox-web-browser-for-10-6-64bit.2133051/");
@@ -344,7 +334,7 @@ pref("browser.download.panel.shown", false);
 pref("browser.download.panel.firstSessionCompleted", false);
 
 // search engines URL
-pref("browser.search.searchEnginesURL",      "https://addons.mozilla.org/%LOCALE%/firefox/search-engines/");
+pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
@@ -426,7 +416,7 @@ pref("browser.tabs.loadBookmarksInBackground", false);
 pref("browser.tabs.noWindowActivationOnExternal", false);
 pref("browser.tabs.tabClipWidth", 140);
 pref("browser.tabs.animate", true);
-pref("browser.tabs.onTop", true);
+pref("browser.tabs.onTop", false); // Put tabs back on the bottom where they belong.
 #ifdef XP_WIN
 pref("browser.tabs.drawInTitlebar", true);
 #else
