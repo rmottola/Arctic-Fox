@@ -862,6 +862,7 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
         GenericCreateConstructor<TypedArrayConstructor, 3, JSFunction::FinalizeKind>,
         GenericCreatePrototype,
         TypedArrayObject::staticFunctions,
+        nullptr,
         TypedArrayObject::protoFunctions,
         TypedArrayObject::protoAccessors,
         FinishTypedArrayInit,
@@ -1801,6 +1802,7 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                                                                   \
     nullptr,                                                                   \
     nullptr,                                                                   \
+    nullptr,                                                                   \
     _typedArray::finishClassInit,                                              \
     JSProto_TypedArray                                                         \
 }
@@ -1871,6 +1873,7 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
     { \
         typedArray::createConstructor, \
         typedArray::createPrototype, \
+        nullptr, \
         nullptr, \
         nullptr, \
         nullptr, \

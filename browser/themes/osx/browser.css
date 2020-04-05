@@ -1907,6 +1907,20 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     -moz-image-region: rect(32px, 32px, 48px, 16px);
 }
 
+#identity-popup > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0;
+}
+
+#identity-popup-container {
+  padding: 16px;
+}
+
+#identity-popup-button-container {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.04) 60%, transparent);
+  padding: 16px;
+  margin-top: 5px;
+}
+
 %include ../shared/notification-icons.inc.css
 
 /* Notification icon box */

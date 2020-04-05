@@ -66,6 +66,12 @@ Object.defineProperty(this, "gCrashReporter", {
   configurable: true
 });
 
+// `true` if this is a content process, `false` otherwise.
+// It would be nicer to go through `Services.appInfo`, but some tests need to be
+// able to replace that field with a custom implementation before it is first
+// called.
+const isContent = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).processType == Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT;
+
 // Display timeout warnings after 10 seconds
 const DELAY_WARNING_MS = 10 * 1000;
 
@@ -940,9 +946,26 @@ Barrier.prototype = Object.freeze({
 // when they start/stop. For compatibility with existing startup/shutdown
 // mechanisms, we register a few phases here.
 
-this.AsyncShutdown.profileChangeTeardown = getPhase("profile-change-teardown");
-this.AsyncShutdown.profileBeforeChange = getPhase("profile-before-change");
-this.AsyncShutdown.sendTelemetry = getPhase("profile-before-change2");
+// Parent process
+if (!isContent) {
+  this.AsyncShutdown.profileChangeTeardown = getPhase("profile-change-teardown");
+  this.AsyncShutdown.profileBeforeChange = getPhase("profile-before-change");
+  this.AsyncShutdown.placesClosingInternalConnection = getPhase("places-will-close-connection");
+  this.AsyncShutdown.sendTelemetry = getPhase("profile-before-change2");
+}
+
+// Notifications that fire in the parent and content process, but should
+// only have phases in the parent process.
+if (!isContent) {
+  this.AsyncShutdown.quitApplicationGranted = getPhase("quit-application-granted");
+}
+
+// Content process
+if (isContent) {
+  this.AsyncShutdown.contentChildShutdown = getPhase("content-child-shutdown");
+}
+
+// All processes
 this.AsyncShutdown.webWorkersShutdown = getPhase("web-workers-shutdown");
 this.AsyncShutdown.xpcomThreadsShutdown = getPhase("xpcom-threads-shutdown");
 

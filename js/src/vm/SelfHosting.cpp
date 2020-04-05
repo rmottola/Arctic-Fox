@@ -1095,7 +1095,7 @@ JSRuntime::createSelfHostingGlobal(JSContext* cx)
 
     cx->runtime()->selfHostingGlobal_ = shg;
     compartment->isSelfHosting = true;
-    compartment->isSystem = true;
+    compartment->setIsSystem(true);
 
     if (!GlobalObject::initSelfHostingBuiltins(cx, shg, intrinsic_functions))
         return nullptr;

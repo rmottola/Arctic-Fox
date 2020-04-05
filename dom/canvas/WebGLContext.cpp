@@ -193,6 +193,7 @@ WebGLContextOptions::WebGLContextOptions()
     , premultipliedAlpha(true)
     , antialias(true)
     , preserveDrawingBuffer(false)
+    , failIfMajorPerformanceCaveat(false)
 {
     // Set default alpha state based on preference.
     if (Preferences::GetBool("webgl.default-no-alpha", false))
@@ -436,6 +437,7 @@ WebGLContext::SetContextOptions(JSContext* cx, JS::Handle<JS::Value> options)
     newOpts.premultipliedAlpha = attributes.mPremultipliedAlpha;
     newOpts.antialias = attributes.mAntialias;
     newOpts.preserveDrawingBuffer = attributes.mPreserveDrawingBuffer;
+    newOpts.failIfMajorPerformanceCaveat = attributes.mFailIfMajorPerformanceCaveat;
 
     if (attributes.mAlpha.WasPassed())
         newOpts.alpha = attributes.mAlpha.Value();
@@ -501,6 +503,30 @@ IsFeatureInBlacklist(const nsCOMPtr<nsIGfxInfo>& gfxInfo, int32_t feature)
         return false;
 
     return status != nsIGfxInfo::FEATURE_STATUS_OK;
+}
+
+static bool
+HasAcceleratedLayers(const nsCOMPtr<nsIGfxInfo>& gfxInfo)
+{
+    int32_t status;
+
+    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, &status);
+    if (status)
+        return true;
+    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_10_LAYERS, &status);
+    if (status)
+        return true;
+    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_10_1_LAYERS, &status);
+    if (status)
+        return true;
+    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status);
+    if (status)
+        return true;
+    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &status);
+    if (status)
+        return true;
+
+    return false;
 }
 
 static already_AddRefed<GLContext>
@@ -571,7 +597,6 @@ CreateHeadlessEGL(bool forceEnabled, bool requireCompatProfile,
 
     return gl.forget();
 }
-
 
 static already_AddRefed<GLContext>
 CreateHeadlessGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
@@ -869,6 +894,18 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
     if (disabled) {
         GenerateWarning("WebGL creation is disabled, and so disallowed here.");
         return NS_ERROR_FAILURE;
+    }
+
+    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    bool failIfMajorPerformanceCaveat =
+                    !gfxPrefs::WebGLDisableFailIfMajorPerformanceCaveat() &&
+                    !HasAcceleratedLayers(gfxInfo);
+    if (failIfMajorPerformanceCaveat) {
+        Nullable<dom::WebGLContextAttributes> contextAttributes;
+        this->GetContextAttributes(contextAttributes);
+        if (contextAttributes.Value().mFailIfMajorPerformanceCaveat) {
+            return NS_ERROR_FAILURE;
+        }
     }
 
     // Alright, now let's start trying.
@@ -1251,6 +1288,7 @@ WebGLContext::GetContextAttributes(Nullable<dom::WebGLContextAttributes>& retval
     result.mAntialias = mOptions.antialias;
     result.mPremultipliedAlpha = mOptions.premultipliedAlpha;
     result.mPreserveDrawingBuffer = mOptions.preserveDrawingBuffer;
+    result.mFailIfMajorPerformanceCaveat = mOptions.failIfMajorPerformanceCaveat;
 }
 
 /* [noscript] DOMString mozGetUnderlyingParamString(in GLenum pname); */

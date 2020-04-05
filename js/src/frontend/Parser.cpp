@@ -2506,7 +2506,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
         tokenStream.ungetToken();
         bodyType = ExpressionBody;
 #if JS_HAS_EXPR_CLOSURES
-        fun->setIsExprClosure();
+        fun->setIsExprBody();
 #endif
     }
 
@@ -5146,8 +5146,20 @@ Parser<ParseHandler>::returnStatement()
     if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
         return null();
     switch (tt) {
+      case TOK_EOL: {
+        bool startsExpr;
+        if (!tokenStream.nextTokenStartsExpr(&startsExpr, TokenStream::Operand))
+            return null();
+        if (startsExpr) {
+            TokenPos pos;
+            if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
+                return null();
+            if (!reportWithOffset(ParseWarning, false, pos.begin, JSMSG_STMT_AFTER_SEMI_LESS))
+                return null();
+        }
+        // Fall through.
+      }
       case TOK_EOF:
-      case TOK_EOL:
       case TOK_SEMI:
       case TOK_RC:
         exprNode = null();

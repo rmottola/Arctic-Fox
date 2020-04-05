@@ -3053,6 +3053,7 @@ const Class DateObject::class_ = {
         GenericCreateConstructor<DateConstructor, MAXARGS, JSFunction::FinalizeKind>,
         GenericCreatePrototype,
         date_static_methods,
+        nullptr,
         date_methods,
         nullptr,
         FinishDateClassInit

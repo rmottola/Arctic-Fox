@@ -67,7 +67,7 @@ public:
   AsCSSAnimationPlayer() override { return this; }
 
   virtual dom::Promise* GetReady(ErrorResult& aRv) override;
-  virtual void Play() override;
+  virtual void Play(LimitBehavior aLimitBehavior) override;
   virtual void Pause() override;
 
   virtual dom::AnimationPlayState PlayStateFromJS() const override;
@@ -79,6 +79,13 @@ public:
   bool IsStylePaused() const { return mIsStylePaused; }
 
   void QueueEvents(EventArray& aEventsToDispatch);
+
+  // Is this animation currently in effect for the purposes of computing
+  // mWinsInCascade.  (In general, this can be computed from the timing
+  // function.  This boolean remembers the state as of the last time we
+  // called UpdateCascadeResults so we know if it changes and we need to
+  // call UpdateCascadeResults again.)
+  bool mInEffectForCascadeResults;
 
 protected:
   virtual ~CSSAnimationPlayer() { }
@@ -171,6 +178,9 @@ public:
   void QueueEvents(mozilla::AnimationPlayerCollection* aEA,
                    mozilla::EventArray &aEventsToDispatch);
 
+  void MaybeUpdateCascadeResults(mozilla::AnimationPlayerCollection*
+                                   aCollection);
+
   // nsIStyleRuleProcessor (parts)
   virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf)
     const MOZ_MUST_OVERRIDE override;
@@ -236,6 +246,10 @@ private:
                     float aFromKey, nsStyleContext* aFromContext,
                     mozilla::css::Declaration* aFromDeclaration,
                     float aToKey, nsStyleContext* aToContext);
+
+  static void UpdateCascadeResults(nsStyleContext* aStyleContext,
+                                   mozilla::AnimationPlayerCollection*
+                                     aElementAnimations);
 
   // The guts of DispatchEvents
   void DoDispatchEvents();

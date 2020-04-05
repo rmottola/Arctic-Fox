@@ -174,7 +174,7 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
   }
 
   AnimationPlayerCollection* collection =
-    GetAnimationPlayers(aElement, pseudoType, false);
+    GetAnimations(aElement, pseudoType, false);
   if (!collection &&
       disp->mTransitionPropertyCount == 1 &&
       disp->mTransitions[0].GetCombinedDuration() <= 0.0f) {
@@ -347,6 +347,8 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
              "must have element transitions if we started any transitions");
 
   if (collection) {
+    UpdateCascadeResultsWithTransitions(collection);
+
     // Set the style rule refresh time to null so that EnsureStyleRuleFor
     // creates a new style rule if we started *or* stopped transitions.
     collection->mStyleRuleRefreshTime = TimeStamp();
@@ -545,6 +547,7 @@ nsTransitionManager::ConsiderStartingTransition(
 
   AnimationProperty& prop = *pt->Properties().AppendElement();
   prop.mProperty = aProperty;
+  prop.mWinsInCascade = true;
 
   AnimationPropertySegment& segment = *prop.mSegments.AppendElement();
   segment.mFromValue = startValue;
@@ -563,7 +566,7 @@ nsTransitionManager::ConsiderStartingTransition(
 
   if (!aElementTransitions) {
     aElementTransitions =
-      GetAnimationPlayers(aElement, aNewStyleContext->GetPseudoType(), true);
+      GetAnimations(aElement, aNewStyleContext->GetPseudoType(), true);
     if (!aElementTransitions) {
       NS_WARNING("allocating CommonAnimationManager failed");
       return;
@@ -597,6 +600,106 @@ nsTransitionManager::ConsiderStartingTransition(
 
   *aStartedAny = true;
   aWhichStarted->AddProperty(aProperty);
+}
+
+void
+nsTransitionManager::UpdateCascadeResultsWithTransitions(
+                       AnimationPlayerCollection* aTransitions)
+{
+  AnimationPlayerCollection* animations =
+    mPresContext->AnimationManager()->
+      GetAnimations(aTransitions->mElement,
+                    aTransitions->PseudoElementType(), false);
+  UpdateCascadeResults(aTransitions, animations);
+}
+
+void
+nsTransitionManager::UpdateCascadeResultsWithAnimations(
+                       AnimationPlayerCollection* aAnimations)
+{
+  AnimationPlayerCollection* transitions =
+    mPresContext->TransitionManager()->
+      GetAnimations(aAnimations->mElement,
+                    aAnimations->PseudoElementType(), false);
+  UpdateCascadeResults(transitions, aAnimations);
+}
+
+void
+nsTransitionManager::UpdateCascadeResultsWithAnimationsToBeDestroyed(
+                       const AnimationPlayerCollection* aAnimations)
+{
+  // aAnimations is about to be destroyed.  So get transitions from it,
+  // but then don't pass it to UpdateCascadeResults, since it has
+  // information that may now be incorrect.
+  AnimationPlayerCollection* transitions =
+    mPresContext->TransitionManager()->
+      GetAnimations(aAnimations->mElement,
+                    aAnimations->PseudoElementType(), false);
+  UpdateCascadeResults(transitions, nullptr);
+}
+
+void
+nsTransitionManager::UpdateCascadeResults(
+                       AnimationPlayerCollection* aTransitions,
+                       AnimationPlayerCollection* aAnimations)
+{
+  if (!aTransitions) {
+    // Nothing to do.
+    return;
+  }
+
+  nsCSSPropertySet propertiesUsed;
+#ifdef DEBUG
+  nsCSSPropertySet propertiesWithTransitions;
+#endif
+
+  // http://dev.w3.org/csswg/css-transitions/#application says that
+  // transitions do not apply when the same property has a CSS Animation
+  // on that element (even though animations are lower in the cascade).
+  if (aAnimations) {
+    TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
+    // Passing EnsureStyleRule_IsThrottled is OK since we will
+    // unthrottle when animations are finishing.
+    aAnimations->EnsureStyleRuleFor(now, EnsureStyleRule_IsThrottled);
+
+    if (aAnimations->mStyleRule) {
+      aAnimations->mStyleRule->AddPropertiesToSet(propertiesUsed);
+    }
+  }
+
+  // Since we should never have more than one transition for the same
+  // property, it doesn't matter what order we iterate the transitions.
+  // But let's go the same way as animations.
+  bool changed = false;
+  AnimationPlayerPtrArray& players = aTransitions->mPlayers;
+  for (size_t playerIdx = players.Length(); playerIdx-- != 0; ) {
+    MOZ_ASSERT(players[playerIdx]->GetSource() &&
+               players[playerIdx]->GetSource()->Properties().Length() == 1,
+               "Should have one animation property for a transition");
+    AnimationProperty& prop = players[playerIdx]->GetSource()->Properties()[0];
+    bool newWinsInCascade = !propertiesUsed.HasProperty(prop.mProperty);
+    if (prop.mWinsInCascade != newWinsInCascade) {
+      changed = true;
+    }
+    prop.mWinsInCascade = newWinsInCascade;
+    // assert that we don't need to bother adding the transitioned
+    // properties into propertiesUsed
+#ifdef DEBUG
+    MOZ_ASSERT(!propertiesWithTransitions.HasProperty(prop.mProperty),
+               "we're assuming we have only one transition per property");
+    propertiesWithTransitions.AddProperty(prop.mProperty);
+#endif
+  }
+
+  if (changed) {
+    mPresContext->RestyleManager()->IncrementAnimationGeneration();
+    aTransitions->UpdateAnimationGeneration(mPresContext);
+    aTransitions->PostUpdateLayerAnimations();
+
+    // Invalidate our style rule.
+    aTransitions->mStyleRuleRefreshTime = TimeStamp();
+    aTransitions->mNeedsRefreshes = true;
+  }
 }
 
 /*

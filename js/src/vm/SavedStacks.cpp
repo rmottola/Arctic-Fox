@@ -201,6 +201,7 @@ SavedFrame::finishSavedFrameInit(JSContext* cx, HandleObject ctor, HandleObject 
         GenericCreateConstructor<SavedFrame::construct, 0, JSFunction::FinalizeKind>,
         GenericCreatePrototype,
         SavedFrame::staticFunctions,
+        nullptr,
         SavedFrame::protoFunctions,
         SavedFrame::protoAccessors,
         SavedFrame::finishSavedFrameInit,
@@ -369,7 +370,7 @@ GetFirstSubsumedFrame(JSContext *cx, HandleSavedFrame frame, bool &skippedAsync)
     if (!subsumes)
         return frame;
 
-    JSPrincipals* principals = cx->compartment()->principals;
+    JSPrincipals* principals = cx->compartment()->principals();
 
     RootedSavedFrame rootedFrame(cx, frame);
     while (rootedFrame && !subsumes(principals, rootedFrame->getPrincipals())) {
@@ -474,8 +475,8 @@ public:
         if (obj && cx->compartment() != obj->compartment())
         {
             JSSubsumesOp subsumes = cx->runtime()->securityCallbacks->subsumes;
-            if (subsumes && subsumes(cx->compartment()->principals,
-                                     obj->compartment()->principals))
+            if (subsumes && subsumes(cx->compartment()->principals(),
+                                     obj->compartment()->principals()))
             {
                 ac_.emplace(cx, obj);
             }
@@ -632,48 +633,56 @@ GetSavedFrameParent(JSContext *cx, HandleObject savedFrame, MutableHandleObject 
 JS_PUBLIC_API(bool)
 StringifySavedFrameStack(JSContext *cx, HandleObject stack, MutableHandleString stringp)
 {
-    AutoMaybeEnterFrameCompartment ac(cx, stack);
-    bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, stack, skippedAsync));
-    if (!frame) {
-        stringp.set(cx->runtime()->emptyString);
-        return true;
-    }
-
     js::StringBuffer sb(cx);
-    DebugOnly<JSSubsumesOp> subsumes = cx->runtime()->securityCallbacks->subsumes;
-    DebugOnly<JSPrincipals*> principals = cx->compartment()->principals;
 
-    js::RootedSavedFrame parent(cx);
-    do {
-        MOZ_ASSERT_IF(subsumes, (*subsumes)(principals, frame->getPrincipals()));
-        if (!frame->isSelfHosted()) {
-            RootedString asyncCause(cx, frame->getAsyncCause());
-            if (!asyncCause && skippedAsync) {
-                asyncCause.set(cx->names().Async);
-            }
-            js::RootedAtom name(cx, frame->getFunctionDisplayName());
-            if ((asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
-                || (name && !sb.append(name))
-                || !sb.append('@')
-                || !sb.append(frame->getSource())
-                || !sb.append(':')
-                || !NumberValueToStringBuffer(cx, NumberValue(frame->getLine()), sb)
-                || !sb.append(':')
-                || !NumberValueToStringBuffer(cx, NumberValue(frame->getColumn()), sb)
-                || !sb.append('\n'))
-            {
-                return false;
-            }
+    // Enter a new block to constrain the scope of possibly entering the stack's
+    // compartment. This ensures that when we finish the StringBuffer, we are
+    // back in the cx's original compartment, and fulfill our contract with
+    // callers to place the output string in the cx's current compartment.
+    {
+        AutoMaybeEnterFrameCompartment ac(cx, stack);
+        bool skippedAsync;
+        js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, stack, skippedAsync));
+        if (!frame) {
+            stringp.set(cx->runtime()->emptyString);
+            return true;
         }
+        DebugOnly<JSSubsumesOp> subsumes = cx->runtime()->securityCallbacks->subsumes;
+        DebugOnly<JSPrincipals*> principals = cx->compartment()->principals();
 
-        parent = frame->getParent();
-        frame = js::GetFirstSubsumedFrame(cx, parent, skippedAsync);
-    } while (frame);
+        js::RootedSavedFrame parent(cx);
+        do {
+            MOZ_ASSERT_IF(subsumes, (*subsumes)(principals, frame->getPrincipals()));
+
+            if (!frame->isSelfHosted()) {
+                RootedString asyncCause(cx, frame->getAsyncCause());
+                if (!asyncCause && skippedAsync)
+                    asyncCause.set(cx->names().Async);
+
+                js::RootedAtom name(cx, frame->getFunctionDisplayName());
+                if ((asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
+                    || (name && !sb.append(name))
+                    || !sb.append('@')
+                    || !sb.append(frame->getSource())
+                    || !sb.append(':')
+                    || !NumberValueToStringBuffer(cx, NumberValue(frame->getLine()), sb)
+                    || !sb.append(':')
+                    || !NumberValueToStringBuffer(cx, NumberValue(frame->getColumn()), sb)
+                    || !sb.append('\n'))
+                {
+                    return false;
+                }
+            }
+
+            parent = frame->getParent();
+            frame = js::GetFirstSubsumedFrame(cx, parent, skippedAsync);
+        } while (frame);
+    }
 
     JSString* str = sb.finishString();
     if (!str)
         return false;
+    assertSameCompartment(cx, str);
     stringp.set(str);
     return true;
 }
@@ -802,7 +811,7 @@ SavedStacks::sweep(JSRuntime* rt)
             JSObject* obj = e.front().unbarrieredGet();
             JSObject* temp = obj;
 
-            if (IsObjectAboutToBeFinalizedFromAnyThread(&obj)) {
+            if (IsObjectAboutToBeFinalized(&obj)) {
                 e.removeFront();
             } else {
                 SavedFrame* frame = &obj->as<SavedFrame>();
@@ -919,7 +928,7 @@ SavedStacks::insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFram
           iter.isNonEvalFunctionFrame() ? iter.functionDisplayAtom() : nullptr,
           nullptr,
           nullptr,
-          iter.compartment()->principals
+          iter.compartment()->principals()
         );
 
         ++iter;
@@ -1059,7 +1068,7 @@ SavedStacks::sweepPCLocationMap()
     for (PCLocationMap::Enum e(pcLocationMap); !e.empty(); e.popFront()) {
         PCKey key = e.front().key();
         JSScript* script = key.script.get();
-        if (IsScriptAboutToBeFinalizedFromAnyThread(&script)) {
+        if (IsScriptAboutToBeFinalized(&script)) {
             e.removeFront();
         } else if (script != key.script.get()) {
             key.script = script;

@@ -28,6 +28,8 @@ Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/TelemetryStopwatch.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "TelemetryController",
+                                  "resource://gre/modules/TelemetryController.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateChannel",
                                   "resource://gre/modules/UpdateChannel.jsm");
 
@@ -242,21 +244,6 @@ HealthReporterState.prototype = Object.freeze({
     this._s.lastPingTime = date.getTime();
     return this.removeRemoteIDs(ids);
   },
-
-  /**
-   * Reset the client ID to something else.
-   * Returns a promise that is resolved when completed.
-   */
-  resetClientID: Task.async(function* () {
-    let drs = Cc["@mozilla.org/datareporting/service;1"]
-                .getService(Ci.nsISupports)
-                .wrappedJSObject;
-    yield drs.resetClientID();
-    this._s.clientID = yield drs.getClientID();
-    this._log.info("Reset client id to " + this._s.clientID + ".");
-
-    yield this.save();
-  }),
 
   _migratePrefs: function () {
     let prefs = this._reporter._prefs;
@@ -545,7 +532,7 @@ AbstractHealthReporter.prototype = Object.freeze({
       // HealthReporter instances, we need to encode a unique identifier in
       // the timer ID.
       try {
-        let timerName = this._branch.replace(".", "-", "g") + "lastDailyCollection";
+        let timerName = this._branch.replace(/\./g, "-") + "lastDailyCollection";
         let tm = Cc["@mozilla.org/updates/timer-manager;1"]
                    .getService(Ci.nsIUpdateTimerManager);
         tm.registerTimer(timerName, this.collectMeasurements.bind(this),
@@ -762,13 +749,18 @@ AbstractHealthReporter.prototype = Object.freeze({
     // where UAppData is underneath the profile directory (or vice-versa) so we
     // don't substitute incomplete strings.
 
+    // Return a /g regex that matches the provided string exactly.
+    function regexify(s) {
+      return new RegExp(s.replace(/[-\\^$*+?.()|[\]{}]/g, "\\$&"), "g");
+    }
+
     function replace(uri, path, thing) {
       // Try is because .spec can throw on invalid URI.
       try {
-        recordMessage = recordMessage.replace(uri.spec, '<' + thing + 'URI>', 'g');
+        recordMessage = recordMessage.replace(regexify(uri.spec), "<" + thing + "URI>");
       } catch (ex) { }
 
-      recordMessage = recordMessage.replace(path, '<' + thing + 'Path>', 'g');
+      recordMessage = recordMessage.replace(regexify(path), "<" + thing + "Path>");
     }
 
     if (appData.path.includes(profile.path)) {
@@ -938,7 +930,7 @@ AbstractHealthReporter.prototype = Object.freeze({
       clientID: this._state.clientID,
       clientIDVersion: this._state.clientIDVersion,
       thisPingDate: pingDateString,
-      goannaAppInfo: this.obtainAppInfo(this._log),
+      geckoAppInfo: this.obtainAppInfo(this._log),
       data: {last: {}, days: {}},
     };
 
@@ -1182,11 +1174,11 @@ AbstractHealthReporter.prototype = Object.freeze({
  * @param policy
  *        (HealthReportPolicy) Policy driving execution of HealthReporter.
  */
-this.HealthReporter = function (branch, policy, sessionRecorder, stateLeaf=null) {
+this.HealthReporter = function (branch, policy, stateLeaf=null) {
   this._stateLeaf = stateLeaf;
   this._uploadInProgress = false;
 
-  AbstractHealthReporter.call(this, branch, policy, sessionRecorder);
+  AbstractHealthReporter.call(this, branch, policy, TelemetryController.getSessionRecorder());
 
   if (!this.serverURI) {
     throw new Error("No server URI defined. Did you forget to define the pref?");
@@ -1526,13 +1518,6 @@ this.HealthReporter.prototype = Object.freeze({
       } catch (ex) {
         this._log.error("Error processing request to delete data: " +
                         CommonUtils.exceptionStr(error));
-      } finally {
-        // If we don't have any remote documents left, nuke the ID.
-        // This is done for privacy reasons. Why preserve the ID if we
-        // don't need to?
-        if (!this.haveRemoteData()) {
-          yield this._state.resetClientID();
-        }
       }
     }.bind(this));
   },

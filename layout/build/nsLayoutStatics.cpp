@@ -66,6 +66,7 @@
 #include "CounterStyleManager.h"
 #include "FrameLayerBuilder.h"
 #include "mozilla/dom/RequestSyncWifiService.h"
+#include "AnimationCommon.h"
 
 #include "AudioChannelService.h"
 #include "mozilla/dom/DataStoreService.h"

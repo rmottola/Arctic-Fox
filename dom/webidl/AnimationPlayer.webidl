@@ -24,14 +24,14 @@ interface AnimationPlayer {
   [SetterThrows, BinaryName="currentTimeAsDouble"]
   attribute double? currentTime;
 
-  /* Not yet implemented
-           attribute double             playbackRate; */
+           attribute double             playbackRate;
   [BinaryName="playStateFromJS"]
   readonly attribute AnimationPlayState playState;
   [Throws]
   readonly attribute Promise<AnimationPlayer> ready;
-  /*
+  [Throws]
   readonly attribute Promise<AnimationPlayer> finished;
+  /*
   void cancel ();
   void finish ();
   */

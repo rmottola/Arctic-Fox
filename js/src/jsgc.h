@@ -50,6 +50,8 @@ namespace gcstats {
 struct Statistics;
 } // namespace gcstats
 
+class Nursery;
+
 namespace gc {
 
 struct FinalizePhase;
@@ -79,7 +81,7 @@ template <> struct MapTypeToFinalizeKind<jit::JitCode>      { static const Alloc
 static inline bool
 IsNurseryAllocable(AllocKind kind)
 {
-    MOZ_ASSERT(kind < AllocKind::LIMIT);
+    MOZ_ASSERT(IsValidAllocKind(kind));
     static const bool map[] = {
         false,     /* AllocKind::OBJECT0 */
         true,      /* AllocKind::OBJECT0_BACKGROUND */
@@ -112,7 +114,7 @@ IsNurseryAllocable(AllocKind kind)
 static inline bool
 IsBackgroundFinalized(AllocKind kind)
 {
-    MOZ_ASSERT(kind < AllocKind::LIMIT);
+    MOZ_ASSERT(IsValidAllocKind(kind));
     static const bool map[] = {
         false,     /* AllocKind::OBJECT0 */
         true,      /* AllocKind::OBJECT0_BACKGROUND */
@@ -145,7 +147,7 @@ IsBackgroundFinalized(AllocKind kind)
 static inline bool
 CanBeFinalizedInBackground(AllocKind kind, const Class *clasp)
 {
-    MOZ_ASSERT(kind <= AllocKind::OBJECT_LAST);
+    MOZ_ASSERT(IsObjectAllocKind(kind));
     /* If the class has no finalizer or a finalizer that is safe to call on
      * a different thread, we change the alloc kind. For example,
      * AllocKind::OBJECT0 calls the finalizer on the main thread,
@@ -217,7 +219,7 @@ static inline AllocKind
 GetBackgroundAllocKind(AllocKind kind)
 {
     MOZ_ASSERT(!IsBackgroundFinalized(kind));
-    MOZ_ASSERT(kind < AllocKind::OBJECT_LAST);
+    MOZ_ASSERT(IsObjectAllocKind(kind));
     return AllocKind(size_t(kind) + 1);
 }
 
@@ -478,7 +480,7 @@ class ArenaList {
     ArenaHeader *removeRemainingArenas(ArenaHeader **arenap);
     ArenaHeader **pickArenasToRelocate(size_t &arenaTotalOut, size_t &relocTotalOut);
     ArenaHeader *relocateArenas(ArenaHeader *toRelocate, ArenaHeader *relocated,
-                                gcstats::Statistics& stats);
+                                SliceBudget &sliceBudget, gcstats::Statistics& stats);
 };
 
 /*
@@ -616,11 +618,11 @@ class ArenaLists
 
   public:
     explicit ArenaLists(JSRuntime *rt) : runtime_(rt) {
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             freeLists[i].initAsEmpty();
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             backgroundFinalizeState[i] = BFS_DONE;
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             arenaListsToSweep[i] = nullptr;
         incrementalSweptArenaKind = AllocKind::LIMIT;
         gcShapeArenasToUpdate = nullptr;
@@ -660,7 +662,7 @@ class ArenaLists
     }
 
     bool arenaListsAreEmpty() const {
-        for (ALL_ALLOC_KINDS(i)) {
+        for (auto i : AllAllocKinds()) {
             /*
              * The arena cannot be empty if the background finalization is not yet
              * done.
@@ -674,7 +676,7 @@ class ArenaLists
     }
 
     void unmarkAll() {
-        for (ALL_ALLOC_KINDS(i)) {
+        for (auto i : AllAllocKinds()) {
             /* The background finalization must have stopped at this point. */
             MOZ_ASSERT(backgroundFinalizeState[i] == BFS_DONE);
             for (ArenaHeader* aheader = arenaLists[i].head(); aheader; aheader = aheader->next)
@@ -695,7 +697,7 @@ class ArenaLists
      * run the finalizers over unitialized bytes from free things.
      */
     void purge() {
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             purge(i);
     }
 
@@ -716,7 +718,7 @@ class ArenaLists
      * outside the GC.
      */
     void copyFreeListsToArenas() {
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             copyFreeListToArena(i);
     }
 
@@ -734,7 +736,7 @@ class ArenaLists
      * copyToArenas.
      */
     void clearFreeListsInArenas() {
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             clearFreeListInArena(i);
     }
 
@@ -780,11 +782,6 @@ class ArenaLists
         return freeLists[thingKind].allocate(thingSize);
     }
 
-    // Returns false on Out-Of-Memory. This method makes no attempt to
-    // synchronize with background finalization, so may miss available memory
-    // that is waiting to be finalized.
-    TenuredCell* allocateFromArena(JS::Zone* zone, AllocKind thingKind);
-
     /*
      * Moves all arenas from |fromArenaLists| into |this|.
      */
@@ -795,7 +792,7 @@ class ArenaLists
 
     void checkEmptyFreeLists() {
 #ifdef DEBUG
-        for (ALL_ALLOC_KINDS(i))
+        for (auto i : AllAllocKinds())
             checkEmptyFreeList(i);
 #endif
     }
@@ -805,7 +802,7 @@ class ArenaLists
     }
 
     bool relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason reason,
-                        gcstats::Statistics& stats);
+                        SliceBudget &sliceBudget, gcstats::Statistics& stats);
 
     void queueForegroundObjectsForSweep(FreeOp *fop);
     void queueForegroundThingsForSweep(FreeOp *fop);
@@ -841,12 +838,12 @@ class ArenaLists
 
     enum ArenaAllocMode { HasFreeThings = true, IsEmpty = false };
     template <ArenaAllocMode hasFreeThings>
-    inline TenuredCell* allocateFromArenaInner(JS::Zone* zone, ArenaHeader* aheader,
-                                               AllocKind thingKind);
+    TenuredCell *allocateFromArenaInner(JS::Zone *zone, ArenaHeader *aheader, AllocKind kind);
 
     inline void normalizeBackgroundFinalizeState(AllocKind thingKind);
 
     friend class GCRuntime;
+    friend class js::Nursery;
 };
 
 /* The number of GC cycles an empty chunk can survive before been released. */
@@ -1392,6 +1389,7 @@ class ZoneList
     void append(Zone* zone);
     void transferFrom(ZoneList& other);
     void removeFront();
+    void clear();
 
   private:
     explicit ZoneList(Zone* singleZone);

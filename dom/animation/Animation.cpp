@@ -229,10 +229,24 @@ Animation::ActiveDuration(const AnimationTiming& aTiming)
     aTiming.mIterationDuration.MultDouble(aTiming.mIterationCount));
 }
 
+// http://w3c.github.io/web-animations/#in-play
 bool
-Animation::IsCurrent() const
+Animation::IsInPlay(const AnimationPlayer& aPlayer) const
 {
-  if (IsFinishedTransition()) {
+  if (IsFinishedTransition() ||
+      aPlayer.PlayState() == AnimationPlayState::Finished) {
+    return false;
+  }
+
+  return GetComputedTiming().mPhase == ComputedTiming::AnimationPhase_Active;
+}
+
+// http://w3c.github.io/web-animations/#current
+bool
+Animation::IsCurrent(const AnimationPlayer& aPlayer) const
+{
+  if (IsFinishedTransition() ||
+      aPlayer.PlayState() == AnimationPlayState::Finished) {
     return false;
   }
 
@@ -252,16 +266,20 @@ Animation::IsInEffect() const
   return computedTiming.mTimeFraction != ComputedTiming::kNullTimeFraction;
 }
 
-bool
-Animation::HasAnimationOfProperty(nsCSSProperty aProperty) const
+const AnimationProperty*
+Animation::GetAnimationOfProperty(nsCSSProperty aProperty) const
 {
   for (size_t propIdx = 0, propEnd = mProperties.Length();
        propIdx != propEnd; ++propIdx) {
     if (aProperty == mProperties[propIdx].mProperty) {
-      return true;
+      const AnimationProperty* result = &mProperties[propIdx];
+      if (!result->mWinsInCascade) {
+        result = nullptr;
+      }
+      return result;
     }
   }
-  return false;
+  return nullptr;
 }
 
 void
@@ -294,6 +312,16 @@ Animation::ComposeStyle(nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
       // from the last animation to first. For animations targetting the
       // same property, the later one wins. So if this property is already set,
       // we should not override it.
+      continue;
+    }
+
+    if (!prop.mWinsInCascade) {
+      // This isn't the winning declaration, so don't add it to style.
+      // For transitions, this is important, because it's how we
+      // implement the rule that CSS transitions don't run when a CSS
+      // animation is running on the same property and element.  For
+      // animations, this is only skipping things that will otherwise be
+      // overridden.
       continue;
     }
 

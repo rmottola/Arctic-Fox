@@ -17,6 +17,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
   "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Promise",
+  "resource://gre/modules/Promise.jsm");
 
 // Url to fetch snippets, in the urlFormatter service format.
 const SNIPPETS_URL_PREF = "browser.aboutHomeSnippets.updateUrl";
@@ -25,7 +27,9 @@ const SNIPPETS_URL_PREF = "browser.aboutHomeSnippets.updateUrl";
 const STARTPAGE_VERSION = 4;
 
 this.AboutHomeUtils = {
-  get snippetsVersion() STARTPAGE_VERSION,
+  get snippetsVersion() {
+    return STARTPAGE_VERSION;
+  },
 
   /*
    * showKnowYourRights - Determines if the user should be shown the
@@ -167,13 +171,26 @@ let AboutHome = {
           Cu.reportError(ex);
           break;
         }
-        if (AppConstants.MOZ_SERVICES_HEALTHREPORT) {
-          window.BrowserSearch.recordSearchInHealthReport(engine, "abouthome", data.selection);
-        }
 
-        // Trigger a search through nsISearchEngine.getSubmission()
-        let submission = Services.search.currentEngine.getSubmission(data.searchTerms);
-        window.loadURI(submission.uri.spec, null, submission.postData);
+        Services.search.init(function(status) {
+          if (!Components.isSuccessCode(status)) {
+            return;
+          }
+
+          let engine = Services.search.currentEngine;
+          if (AppConstants.MOZ_SERVICES_HEALTHREPORT) {
+            window.BrowserSearch.recordSearchInHealthReport(engine, "abouthome", data.selection);
+          }
+
+          // Trigger a search through nsISearchEngine.getSubmission()
+          let submission = engine.getSubmission(data.searchTerms, null, "homepage");
+          window.loadURI(submission.uri.spec, null, submission.postData);
+
+          // Used for testing
+          let mm = aMessage.target.messageManager;
+          mm.sendAsyncMessage("AboutHome:SearchTriggered", aMessage.data.searchData);
+        });
+
         break;
     }
   },
@@ -185,13 +202,26 @@ let AboutHome = {
     Components.utils.import("resource:///modules/sessionstore/SessionStore.jsm",
       wrapper);
     let ss = wrapper.SessionStore;
+
     ss.promiseInitialized.then(function() {
+      let deferred = Promise.defer();
+
+      Services.search.init(function (status){
+        if (!Components.isSuccessCode(status)) {
+          deferred.reject(status);
+        } else {
+          deferred.resolve(Services.search.defaultEngine.name);
+        }
+      });
+
+      return deferred.promise;
+    }).then(function(engineName) {
       let data = {
         showRestoreLastSession: ss.canRestoreLastSession,
         snippetsURL: AboutHomeUtils.snippetsURL,
         showKnowYourRights: AboutHomeUtils.showKnowYourRights,
         snippetsVersion: AboutHomeUtils.snippetsVersion,
-        defaultEngineName: Services.search.defaultEngine.name
+        defaultEngineName: engineName
       };
 
       if (AboutHomeUtils.showKnowYourRights) {
@@ -200,7 +230,7 @@ let AboutHome = {
         Services.prefs.setBoolPref("browser.rights." + currentVersion + ".shown", true);
       }
 
-      if (target) {
+     if (target && target.messageManager) {
         target.messageManager.sendAsyncMessage("AboutHome:Update", data);
       } else {
         let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);

@@ -96,6 +96,18 @@ regexp_test_no_statics(JSContext* cx, unsigned argc, Value* vp);
 extern bool
 regexp_construct_no_statics(JSContext* cx, unsigned argc, Value* vp);
 
+extern bool
+IsRegExp(JSContext* cx, HandleValue value, bool* result);
+
+// RegExp ClassSpec members used in RegExpObject.cpp.
+extern bool
+regexp_construct(JSContext *cx, unsigned argc, Value *vp);
+extern JSObject *
+CreateRegExpPrototype(JSContext *cx, JSProtoKey key);
+extern const JSPropertySpec regexp_static_props[];
+extern const JSPropertySpec regexp_properties[];
+extern const JSFunctionSpec regexp_methods[];
+
 } /* namespace js */
 
 #endif /* builtin_RegExp_h */

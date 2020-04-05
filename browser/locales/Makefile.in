@@ -66,7 +66,8 @@ endif
 
 SEARCHPLUGINS_NAMES = $(shell cat $(call MERGE_FILE,/searchplugins/list.txt))
 SEARCHPLUGINS_PATH := $(FINAL_TARGET)/searchplugins
-SEARCHPLUGINS := $(addsuffix .xml,$(SEARCHPLUGINS_NAMES))
+SEARCHPLUGINS_TARGET := libs searchplugins
+SEARCHPLUGINS := $(foreach plugin,$(addsuffix .xml,$(SEARCHPLUGINS_NAMES)),$(or $(wildcard $(call EN_US_OR_L10N_FILE,searchplugins/$(plugin))),$(info Missing searchplugin: $(plugin))))
 # Some locale-specific search plugins may have preprocessor directives, but the
 # default en-US ones do not.
 SEARCHPLUGINS_FLAGS := --silence-missing-directive-warnings
@@ -117,10 +118,6 @@ install:: $(addprefix generic/profile/,$(PROFILE_FILES))
 
 install:: $(call MERGE_FILES,$(addprefix profile/chrome/,$(PROFILE_CHROME)))
 	$(SYSINSTALL) $(IFLAGS1) $^ $(DESTDIR)$(mozappdir)/defaults/profile/chrome
-
-# metro build calls back here for search engine plugins
-searchplugins: $(addprefix $(FINAL_TARGET)/searchplugins/,$(SEARCHPLUGINS))
-.PHONY: searchplugins
 
 libs-%:
 	$(NSINSTALL) -D $(DIST)/install

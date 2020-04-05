@@ -501,6 +501,60 @@ let AboutHomeListener = {
 };
 AboutHomeListener.init(this);
 
+
+let ContentSearchMediator = {
+
+  whitelist: new Set([
+    "about:newtab",
+  ]),
+
+  init: function (chromeGlobal) {
+    chromeGlobal.addEventListener("ContentSearchClient", this, true, true);
+    addMessageListener("ContentSearch", this);
+  },
+
+  handleEvent: function (event) {
+    if (this._contentWhitelisted) {
+      this._sendMsg(event.detail.type, event.detail.data);
+    }
+  },
+
+  receiveMessage: function (msg) {
+    if (msg.data.type == "AddToWhitelist") {
+      for (let uri of msg.data.data) {
+        this.whitelist.add(uri);
+      }
+      this._sendMsg("AddToWhitelistAck");
+      return;
+    }
+    if (this._contentWhitelisted) {
+      this._fireEvent(msg.data.type, msg.data.data);
+    }
+  },
+
+  get _contentWhitelisted() {
+    return this.whitelist.has(content.document.documentURI.toLowerCase());
+  },
+
+  _sendMsg: function (type, data=null) {
+    sendAsyncMessage("ContentSearch", {
+      type: type,
+      data: data,
+    });
+  },
+
+  _fireEvent: function (type, data=null) {
+    content.dispatchEvent(new content.CustomEvent("ContentSearchService", {
+      detail: {
+        type: type,
+        data: data,
+      },
+    }));
+  },
+};
+ContentSearchMediator.init(this);
+
+
 var global = this;
 
 let ClickEventHandler = {
@@ -561,17 +615,39 @@ let ClickEventHandler = {
   },
 
   onAboutCertError: function (targetElement, ownerDoc) {
+    let docshell = ownerDoc.defaultView.QueryInterface(Ci.nsIInterfaceRequestor)
+                                       .getInterface(Ci.nsIWebNavigation)
+                                       .QueryInterface(Ci.nsIDocShell);
+    let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
+                     .getService(Ci.nsISerializationHelper);
+    let serializedSSLStatus = "";
+
+    try {
+      let serializable =  docShell.failedChannel.securityInfo
+                                  .QueryInterface(Ci.nsISSLStatusProvider)
+                                  .SSLStatus
+                                  .QueryInterface(Ci.nsISerializable);
+      serializedSSLStatus = serhelper.serializeToString(serializable);
+    } catch (e) { }
+
     sendAsyncMessage("Browser:CertExceptionError", {
       location: ownerDoc.location.href,
       elementId: targetElement.getAttribute("id"),
-      isTopFrame: (ownerDoc.defaultView.parent === ownerDoc.defaultView)
+      isTopFrame: (ownerDoc.defaultView.parent === ownerDoc.defaultView),
+      sslStatusAsString: serializedSSLStatus
     });
   },
 
   onAboutBlocked: function (targetElement, ownerDoc) {
+    var reason = 'phishing';
+    if (/e=malwareBlocked/.test(ownerDoc.documentURI)) {
+      reason = 'malware';
+    } else if (/e=unwantedBlocked/.test(ownerDoc.documentURI)) {
+      reason = 'unwanted';
+    }
     sendAsyncMessage("Browser:SiteBlockedError", {
       location: ownerDoc.location.href,
-      isMalware: /e=malwareBlocked/.test(ownerDoc.documentURI),
+      reason: reason,
       elementId: targetElement.getAttribute("id"),
       isTopFrame: (ownerDoc.defaultView.parent === ownerDoc.defaultView)
     });
