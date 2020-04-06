@@ -2235,7 +2235,9 @@ let SessionStoreInternal = {
     browser.loadURI("about:blank", null, null);
 
     let data = TabState.collect(aTab);
-    this.restoreTab(aTab, data);
+    this.restoreTab(aTab, data, {
+      forceOnDemand: true,
+    });
   },
 
   /**
@@ -2849,6 +2851,7 @@ let SessionStoreInternal = {
     let browser = tab.linkedBrowser;
     let window = tab.ownerDocument.defaultView;
     let tabbrowser = window.gBrowser;
+    let forceOnDemand = options.forceOnDemand;
 
     // Increase the busy state counter before modifying the tab.
     this._setWindowStateBusy(window);
@@ -2947,7 +2950,7 @@ let SessionStoreInternal = {
     // it ensures each window will have its selected tab loaded.
     if (restoreImmediately || tabbrowser.selectedBrowser == browser || loadArguments) {
       this.restoreTabContent(tab, loadArguments);
-    } else {
+    } else if (!forceOnDemand) {
       TabRestoreQueue.add(tab);
       this.restoreNextTab();
     }
@@ -3999,8 +4002,6 @@ let TabRestoreQueue = {
     if (index > -1) {
       hidden.splice(index, 1);
       visible.push(tab);
-    } else {
-      throw new Error("restore queue: hidden tab not found");
     }
   },
 
@@ -4012,8 +4013,6 @@ let TabRestoreQueue = {
     if (index > -1) {
       visible.splice(index, 1);
       hidden.push(tab);
-    } else {
-      throw new Error("restore queue: visible tab not found");
     }
   }
 };
