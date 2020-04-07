@@ -1013,6 +1013,9 @@ var gBrowserInit = {
       document.documentElement.setAttribute("height", defaultHeight);
     }
 
+    if (!gShowPageResizers)
+      document.getElementById("status-bar").setAttribute("hideresizer", "true");
+
     if (!window.toolbar.visible) {
       // adjust browser UI for popups
       if (gURLBar) {
@@ -1140,6 +1143,7 @@ var gBrowserInit = {
     BrowserOffline.init();
     OfflineApps.init();
     IndexedDBPromptHelper.init();
+    AddonManager.addAddonListener(AddonsMgrListener);
     WebrtcIndicator.init();
     gRemoteTabsUI.init();
 
@@ -1495,6 +1499,7 @@ var gBrowserInit = {
       BrowserOffline.uninit();
       OfflineApps.uninit();
       IndexedDBPromptHelper.uninit();
+      AddonManager.removeAddonListener(AddonsMgrListener);
     }
 
     // Final window teardown, do this last.
@@ -1520,7 +1525,7 @@ var gBrowserInit = {
                          'viewToolbarsMenu', 'viewSidebarMenuMenu', 'Browser:Reload',
                          'viewFullZoomMenu', 'pageStyleMenu', 'charsetMenu', 'View:PageSource', 'View:FullScreen',
                          'viewHistorySidebar', 'Browser:AddBookmarkAs', 'Browser:BookmarkAllTabs',
-                         'View:PageInfo'];
+                         'View:PageInfo', 'Browser:ToggleAddonBar'];
     var element;
 
     for (let disabledItem of disabledItems) {
@@ -2947,6 +2952,9 @@ var PrintPreviewListener = {
     notificationBox.notificationsHidden = true;
 
     document.getElementById("sidebar").setAttribute("src", "about:blank");
+    var addonBar = document.getElementById("addon-bar");
+    this._chromeState.addonBarOpen = !addonBar.collapsed;
+    addonBar.collapsed = true;
     gBrowser.updateWindowResizers();
 
     this._chromeState.findOpen = gFindBarInitialized && !gFindBar.hidden;
@@ -2967,6 +2975,11 @@ var PrintPreviewListener = {
   _showChrome: function () {
     if (this._chromeState.notificationsOpen)
       gBrowser.getNotificationBox().notificationsHidden = false;
+
+    if (this._chromeState.addonBarOpen) {
+      document.getElementById("addon-bar").collapsed = false;
+      gBrowser.updateWindowResizers();
+    }
 
     if (this._chromeState.findOpen)
       gFindBar.open();
@@ -4760,6 +4773,7 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
   var firstMenuItem = aInsertPoint || popup.firstChild;
 
   let toolbarNodes = Array.slice(gNavToolbox.childNodes);
+  toolbarNodes.push(document.getElementById("addon-bar"));
 
   for (let toolbar of toolbarNodes) {
     let toolbarName = toolbar.getAttribute("toolbarname");
@@ -7456,6 +7470,11 @@ function duplicateTabIn(aTab, where, delta) {
       gBrowser.selectedTab = newTab;
       break;
   }
+}
+
+function toggleAddonBar() {
+  let addonBar = document.getElementById("addon-bar");
+  setToolbarVisibility(addonBar, addonBar.collapsed);
 }
 
 #ifdef MOZ_DEVTOOLS
