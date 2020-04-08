@@ -1083,6 +1083,42 @@ var gBrowserInit = {
         setTimeout(pageShowEventHandlers, 0, event.persisted);
     }, true);
 
+    gBrowser.addEventListener("AboutTabCrashedLoad", function(event) {
+#ifdef MOZ_CRASHREPORTER
+      TabCrashReporter.onAboutTabCrashedLoad(gBrowser.getBrowserForDocument(event.target));
+#endif
+    }, false, true);
+
+    gBrowser.addEventListener("AboutTabCrashedMessage", function(event) {
+      let ownerDoc = event.originalTarget;
+
+      if (!ownerDoc.documentURI.startsWith("about:tabcrashed")) {
+        return;
+      }
+
+      let isTopFrame = (ownerDoc.defaultView.parent === ownerDoc.defaultView);
+      if (!isTopFrame) {
+        return;
+      }
+
+      let browser = gBrowser.getBrowserForDocument(ownerDoc);
+#ifdef MOZ_CRASHREPORTER
+      if (event.detail.sendCrashReport) {
+        TabCrashReporter.submitCrashReport(browser);
+      }
+#endif
+
+      let tab = gBrowser.getTabForBrowser(browser);
+      switch (event.detail.message) {
+      case "closeTab":
+        gBrowser.removeTab(tab, { animate: true });
+        break;
+      case "restoreTab":
+        SessionStore.reviveCrashedTab(tab);
+        break;
+      }
+    }, false, true);
+
     if (uriToLoad && uriToLoad != "about:blank") {
       if (uriToLoad instanceof Ci.nsISupportsArray) {
         let count = uriToLoad.Count();
@@ -2534,9 +2570,6 @@ let BrowserOnClick = {
         ownerDoc.documentURI.toLowerCase() == "about:newtab") {
       this.onE10sAboutNewTab(event, ownerDoc);
     }
-    else if (ownerDoc.documentURI.startsWith("about:tabcrashed")) {
-      this.onAboutTabCrashed(event, ownerDoc);
-    }
   },
 
   receiveMessage: function (msg) {
@@ -2775,30 +2808,6 @@ let BrowserOnClick = {
         anchorTarget.classList.contains("newtab-link")) {
       event.preventDefault();
       openUILinkIn(anchorTarget.href, "current");
-    }
-  },
-
-  /**
-   * The about:tabcrashed can't do window.reload() because that
-   * would reload the page but not use a remote browser.
-   */
-  onAboutTabCrashed: function(event, ownerDoc) {
-    let isTopFrame = (ownerDoc.defaultView.parent === ownerDoc.defaultView);
-    if (!isTopFrame) {
-      return;
-    }
-
-    let button = event.originalTarget;
-    if (button.id == "tryAgain") {
-      let browser = gBrowser.getBrowserForDocument(ownerDoc);
-#ifdef MOZ_CRASHREPORTER
-      if (ownerDoc.getElementById("checkSendReport").checked) {
-        TabCrashReporter.submitCrashReport(browser);
-      }
-#endif
-
-      let tab = gBrowser.getTabForBrowser(browser);
-      SessionStore.reviveCrashedTab(tab);
     }
   },
 };
@@ -4538,11 +4547,6 @@ var TabsProgressListener = {
         if (event.target.documentElement)
           event.target.documentElement.removeAttribute("hasBrowserHandlers");
       }, true);
-
-#ifdef MOZ_CRASHREPORTER
-      if (doc.documentURI.startsWith("about:tabcrashed"))
-        TabCrashReporter.onAboutTabCrashedLoad(aBrowser);
-#endif
     }
   },
 
