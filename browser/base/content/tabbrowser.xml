@@ -3402,8 +3402,9 @@
           browser.setAttribute("crashedPageTitle", title);
           browser.docShell.displayLoadError(Cr.NS_ERROR_CONTENT_CRASHED, uri, null);
           browser.removeAttribute("crashedPageTitle");
-	  let tab = this.getTabForBrowser(browser);
-	  tab.setAttribute("crashed", true);
+          let tab = this.getTabForBrowser(browser);
+          tab.setAttribute("crashed", true);
+          tab.removeAttribute("soundplaying");
           this.setIcon(tab, icon);
         ]]>
       </handler>
