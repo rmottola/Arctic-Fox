@@ -1072,6 +1072,9 @@ var gBrowserInit = {
 
   _delayedStartup: function(mustLoadSidebar) {
     let tmp = {};
+    Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", tmp);
+    let TelemetryTimestamps = tmp.TelemetryTimestamps;
+    TelemetryTimestamps.add("delayedStartupStarted");
 
     this._cancelDelayedStartup();
 
@@ -1407,8 +1410,10 @@ var gBrowserInit = {
         TabView.init();
       }
     });
+    this.delayedStartupFinished = true;
 
     Services.obs.notifyObservers(window, "browser-delayed-startup-finished", "");
+    TelemetryTimestamps.add("delayedStartupFinished");
   },
 
   // Returns the URI(s) to load at startup.
