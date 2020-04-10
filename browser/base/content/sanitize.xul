@@ -59,7 +59,6 @@
       <preference id="privacy.cpd.sessions"              name="privacy.cpd.sessions"              type="bool"/>
       <preference id="privacy.cpd.offlineApps"           name="privacy.cpd.offlineApps"           type="bool"/>
       <preference id="privacy.cpd.siteSettings"          name="privacy.cpd.siteSettings"          type="bool"/>
-      <preference id="privacy.cpd.connectivityData"      name="privacy.cpd.connectivityData"      type="bool"/>
     </preferences>
     
     <preferences id="nonItemPreferences">
@@ -176,12 +175,6 @@
                 type="checkbox"
                 accesskey="&itemSitePreferences.accesskey;"
                 preference="privacy.cpd.siteSettings"
-                noduration="true"
-                onsyncfrompreference="return gSanitizePromptDialog.onReadGeneric();"/>
-      <listitem label="&itemConnectivityData.label;"
-                type="checkbox"
-                accesskey="&itemConnectivityData.accesskey;"
-                preference="privacy.cpd.connectivityData"
                 noduration="true"
                 onsyncfrompreference="return gSanitizePromptDialog.onReadGeneric();"/>
     </listbox>

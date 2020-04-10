@@ -415,21 +415,6 @@ Sanitizer.prototype = {
         return true;
       }
     },
-
-    connectivityData: {
-      clear: function ()
-      {
-        // Clear site security settings
-        var sss = Components.classes["@mozilla.org/ssservice;1"]
-                            .getService(Components.interfaces.nsISiteSecurityService);
-        sss.clearAll();
-      },
-
-      get canClear()
-      {
-        return true;
-      }
-    }
   }
 };
 
