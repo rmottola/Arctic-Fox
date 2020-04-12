@@ -444,6 +444,17 @@ let PermissionDefaults = {
     let value = (aValue != this.DENY);
     Services.prefs.setBoolPref("full-screen-api.pointer-lock.enabled", value);
   },
+
+  get push() {
+    if (!Services.prefs.getBoolPref("dom.push.enabled")) {
+      return this.DENY;
+    }
+    return this.UNKNOWN;
+  },
+  set push(aValue) {
+    let value = (aValue != this.DENY);
+    Services.prefs.setBoolPref("dom.push.enabled", value);
+  },
 }
 
 /**
