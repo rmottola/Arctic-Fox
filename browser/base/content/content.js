@@ -578,7 +578,43 @@ let ClickEventHandler = {
       return;
     } else if (ownerDoc.documentURI.startsWith("about:blocked")) {
       this.onAboutBlocked(originalTarget, ownerDoc);
-      return;
+
+let DOMFullscreenHandler = {
+  _fullscreenDoc: null,
+
+  init: function() {
+    addMessageListener("DOMFullscreen:Approved", this);
+    addMessageListener("DOMFullscreen:CleanUp", this);
+    addEventListener("MozEnteredDomFullscreen", this);
+  },
+
+  receiveMessage: function(aMessage) {
+    switch(aMessage.name) {
+      case "DOMFullscreen:Approved": {
+        if (this._fullscreenDoc) {
+          Services.obs.notifyObservers(this._fullscreenDoc,
+                                       "fullscreen-approved",
+                                       "");
+        }
+        break;
+      }
+      case "DOMFullscreen:CleanUp": {
+        this._fullscreenDoc = null;
+        break;
+      }
+    }
+  },
+
+  handleEvent: function(aEvent) {
+    if (aEvent.type == "MozEnteredDomFullscreen") {
+      this._fullscreenDoc = aEvent.target;
+      sendAsyncMessage("MozEnteredDomFullscreen", {
+        origin: this._fullscreenDoc.nodePrincipal.origin,
+      });
+    }
+  }
+};
+DOMFullscreenHandler.init();      return;
     } else if (ownerDoc.documentURI.startsWith("about:neterror")) {
       this.onAboutNetError(originalTarget, ownerDoc);
     }

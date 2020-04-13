@@ -635,6 +635,10 @@ nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen*)
                sVirtualBounds.width, sVirtualBounds.height,
                /*repaint*/true);
     }
+
+    if (nsIWidgetListener* listener = GetWidgetListener()) {
+      listener->FullscreenChanged(aFullScreen);
+    }
     return NS_OK;
 }
 
