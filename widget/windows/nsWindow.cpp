@@ -2883,8 +2883,10 @@ nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
     taskbarInfo->PrepareFullScreenHWND(mWnd, FALSE);
   }
 
-  if (mWidgetListener)
+  if (mWidgetListener) {
     mWidgetListener->SizeModeChanged(mSizeMode);
+    mWidgetListener->FullscreenChanged(aFullScreen);
+  }
 
   return rv;
 }
