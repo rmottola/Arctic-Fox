@@ -444,6 +444,17 @@ let PermissionDefaults = {
     let value = (aValue != this.DENY);
     Services.prefs.setBoolPref("full-screen-api.pointer-lock.enabled", value);
   },
+
+  get push() {
+    if (!Services.prefs.getBoolPref("dom.push.enabled")) {
+      return this.DENY;
+    }
+    return this.UNKNOWN;
+  },
+  set push(aValue) {
+    let value = (aValue != this.DENY);
+    Services.prefs.setBoolPref("dom.push.enabled", value);
+  },
 }
 
 /**
@@ -538,7 +549,6 @@ let AboutPermissions = {
     Services.prefs.addObserver("dom.indexedDB.enabled", this, false);
     Services.prefs.addObserver("plugins.click_to_play", this, false);
     Services.prefs.addObserver("full-screen-api.enabled", this, false);
-    Services.prefs.addObserver("dom.push.enabled", this, false);
     Services.prefs.addObserver("full-screen-api.pointer-lock.enabled", this, false);
     Services.prefs.addObserver("permissions.places-sites-limit", this, false);
 
@@ -692,7 +702,6 @@ let AboutPermissions = {
       Services.prefs.removeObserver("dom.indexedDB.enabled", this, false);
       Services.prefs.removeObserver("plugins.click_to_play", this, false);
       Services.prefs.removeObserver("full-screen-api.enabled", this, false);
-      Services.prefs.removeObserver("dom.push.enabled", this, false);
       Services.prefs.removeObserver("full-screen-api.pointer-lock.enabled", this, false);
       Services.prefs.removeObserver("permissions.places-sites-limit", this, false);
 
