@@ -55,7 +55,7 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
   let doc = content.document;
   let container;
   if (doc.documentURI.toLowerCase() == "about:home" &&
-      (container = doc.getElementById("sessionRestoreContainer"))){
+      (container = doc.getElementById("sessionRestoreContainer"))) {
     container.hidden = true;
   }
 });
@@ -381,18 +381,37 @@ AboutNetErrorListener.init(this);
 
 let AboutHomeListener = {
   init: function(chromeGlobal) {
-    chromeGlobal.addEventListener('AboutHomeLoad', () => this.onPageLoad(), false, true);
+    chromeGlobal.addEventListener('AboutHomeLoad', this, false, true);
+  },
+
+  get isAboutHome() {
+    return content.document.documentURI.toLowerCase() == "about:home";
   },
 
   handleEvent: function(aEvent) {
+    if (!this.isAboutHome) {
+      return;
+    }
     switch (aEvent.type) {
       case "AboutHomeLoad":
         this.onPageLoad();
+        break;
+      case "AboutHomeSearchEvent":
+        this.onSearch(aEvent);
+        break;
+      case "click":
+        this.onClick(aEvent);
+        break;
+      case "pagehide":
+        this.onPageHide(aEvent);
         break;
     }
   },
 
   receiveMessage: function(aMessage) {
+    if (!this.isAboutHome) {
+      return;
+    }
     switch (aMessage.name) {
       case "AboutHome:Update":
         this.onUpdate(aMessage.data);
@@ -405,9 +424,6 @@ let AboutHomeListener = {
 
   onUpdate: function(aData) {
     let doc = content.document;
-    if (doc.documentURI.toLowerCase() != "about:home")
-      return;
-
     if (aData.showRestoreLastSession && !PrivateBrowsingUtils.isWindowPrivate(content))
       doc.getElementById("launcher").setAttribute("session", "true");
 
@@ -424,25 +440,15 @@ let AboutHomeListener = {
 
   onPageLoad: function() {
     let doc = content.document;
-    if (doc.documentURI.toLowerCase() != "about:home" ||
-        doc.documentElement.hasAttribute("hasBrowserHandlers")) {
+    if (doc.documentElement.hasAttribute("hasBrowserHandlers")) {
       return;
     }
 
     doc.documentElement.setAttribute("hasBrowserHandlers", "true");
-    let self = this;
-    addMessageListener("AboutHome:Update", self);
-    addMessageListener("AboutHome:FocusInput", self);
-    addEventListener("click", this.onClick, true);
-    addEventListener("pagehide", function onPageHide(event) {
-      if (event.target.defaultView.frameElement)
-        return;
-      removeMessageListener("AboutHome:Update", self);
-      removeEventListener("click", self.onClick, true);
-      removeEventListener("pagehide", onPageHide, true);
-      if (event.target.documentElement)
-        event.target.documentElement.removeAttribute("hasBrowserHandlers");
-    }, true);
+    addMessageListener("AboutHome:Update", this);
+    addMessageListener("AboutHome:FocusInput", this);
+    addEventListener("click", this, true);
+    addEventListener("pagehide", this, true);
 
     // XXX bug 738646 - when Marketplace is launched, remove this statement and
     // the hidden attribute set on the apps button in aboutHome.xhtml
@@ -451,10 +457,7 @@ let AboutHomeListener = {
       doc.getElementById("apps").removeAttribute("hidden");
 
     sendAsyncMessage("AboutHome:RequestUpdate");
-
-    doc.addEventListener("AboutHomeSearchEvent", function onSearch(e) {
-      sendAsyncMessage("AboutHome:Search", { searchData: e.detail });
-    }, true, true);
+    doc.addEventListener("AboutHomeSearchEvent", this, true, true);
   },
 
   onClick: function(aEvent) {
@@ -508,8 +511,27 @@ let AboutHomeListener = {
     }
   },
 
+  onPageHide: function(aEvent) {
+    if (event.target.defaultView.frameElement) {
+      return;
+    }
+    removeMessageListener("AboutHome:Update", this);
+    removeEventListener("click", this, true);
+    removeEventListener("pagehide", this, true);
+    if (event.target.documentElement) {
+      event.target.documentElement.removeAttribute("hasBrowserHandlers");
+    }
+  },
+
+  onSearch: function(aEvent) {
+    sendAsyncMessage("AboutHome:Search", { searchData: aEvent.detail });
+  },
+
   onFocusInput: function () {
-    content.document.getElementById("searchText").focus();
+    let searchInput = content.document.getElementById("searchText");
+    if (searchInput) {
+      searchInput.focus();
+    }
   },
 };
 AboutHomeListener.init(this);
