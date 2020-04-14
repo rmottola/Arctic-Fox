@@ -18,7 +18,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
 
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
-
+XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
+                                  "resource:///modules/ContentSearch.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
+                                  "resource:///modules/AboutHome.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
                                    "@mozilla.org/network/dns-service;1",
                                    "nsIDNSService");
@@ -3321,13 +3324,27 @@ const BrowserSearch = {
       return;
     }
 #endif
-    var searchBar = this.searchBar;
+    let openSearchPageIfFieldIsNotActive = function(aSearchBar) {
+      let doc = gBrowser.selectedBrowser.contentDocument;
+      let url = doc.documentURI.toLowerCase();
+      let mm = gBrowser.selectedBrowser.messageManager;
+
+      if (url === "about:home") {
+        AboutHome.focusInput(mm);
+      } else if (url === "about:newtab") {
+        ContentSearch.focusInput(mm);
+      } else if (!aSearchBar || document.activeElement != aSearchBar.textbox.inputField) {
+        openUILinkIn(Services.search.defaultEngine.searchForm, "current");
+      }
+    };
+
+    let searchBar = this.searchBar;
     if (searchBar && window.fullScreen)
       FullScreen.mouseoverToggle(true);
     if (searchBar)
       searchBar.select();
-    if (!searchBar || document.activeElement != searchBar.textbox.inputField)
-      openUILinkIn(Services.search.defaultEngine.searchForm, "current");
+
+    openSearchPageIfFieldIsNotActive(searchBar);
   },
 
   /**

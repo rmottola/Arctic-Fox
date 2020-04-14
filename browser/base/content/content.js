@@ -397,6 +397,9 @@ let AboutHomeListener = {
       case "AboutHome:Update":
         this.onUpdate(aMessage.data);
         break;
+      case "AboutHome:FocusInput":
+        this.onFocusInput();
+        break;
     }
   },
 
@@ -429,6 +432,7 @@ let AboutHomeListener = {
     doc.documentElement.setAttribute("hasBrowserHandlers", "true");
     let self = this;
     addMessageListener("AboutHome:Update", self);
+    addMessageListener("AboutHome:FocusInput", self);
     addEventListener("click", this.onClick, true);
     addEventListener("pagehide", function onPageHide(event) {
       if (event.target.defaultView.frameElement)
@@ -502,6 +506,10 @@ let AboutHomeListener = {
         sendAsyncMessage("AboutHome:Settings");
         break;
     }
+  },
+
+  onFocusInput: function () {
+    content.document.getElementById("searchText").focus();
   },
 };
 AboutHomeListener.init(this);

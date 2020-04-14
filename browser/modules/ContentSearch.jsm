@@ -56,6 +56,17 @@ this.ContentSearch = {
     Services.obs.addObserver(this, "browser-search-engine-modified", false);
   },
 
+  /**
+   * Focuses the search input in the page with the given message manager.
+   * @param  messageManager
+   *         The MessageManager object of the selected browser.
+   */
+  focusInput: function (messageManager) {
+    messageManager.sendAsyncMessage(OUTBOUND_MESSAGE, {
+      type: "FocusInput"
+    });
+  },
+
   receiveMessage: function (msg) {
     let methodName = "on" + msg.data.type;
     if (methodName in this) {
