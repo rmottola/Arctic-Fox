@@ -26,6 +26,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "FormSubmitObserver",
   "resource:///modules/FormSubmitObserver.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AboutReader",
+  "resource://gre/modules/AboutReader.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ReaderMode",
+  "resource://gre/modules/ReaderMode.jsm");
 
 // Bug 671101 - directly using webNavigation in this context
 // causes docshells to leak
@@ -536,6 +540,71 @@ let AboutHomeListener = {
 };
 AboutHomeListener.init(this);
 
+let AboutReaderListener = {
+  _savedArticle: null,
+
+  init: function() {
+    addEventListener("AboutReaderContentLoaded", this, false, true);
+    addEventListener("pageshow", this, false);
+    addMessageListener("Reader:SavedArticleGet", this);
+  },
+
+  receiveMessage: function(message) {
+    switch (message.name) {
+      case "Reader:SavedArticleGet":
+        sendAsyncMessage("Reader:SavedArticleData", { article: this._savedArticle });
+        break;
+    }
+  },
+
+  get isAboutReader() {
+    return content.document.documentURI.startsWith("about:reader");
+  },
+
+  handleEvent: function(aEvent) {
+    if (aEvent.originalTarget.defaultView != content) {
+      return;
+    }
+
+    switch (aEvent.type) {
+      case "AboutReaderContentLoaded":
+        if (!this.isAboutReader) {
+          return;
+        }
+
+        if (content.document.body) {
+          new AboutReader(global, content);
+        }
+        break;
+
+      case "pageshow":
+        if (!ReaderMode.isEnabledForParseOnLoad || this.isAboutReader) {
+          return;
+        }
+
+        // Reader mode is disabled until proven enabled.
+        this._savedArticle = null;
+        sendAsyncMessage("Reader:UpdateIsArticle", { isArticle: false });
+
+        ReaderMode.parseDocument(content.document).then(article => {
+          // The loaded page may have changed while we were parsing the document.
+          // Make sure we've got the current one.
+          let currentURL = Services.io.newURI(content.document.documentURI, null, null).specIgnoringRef;
+
+          // Do nothing if there's no article or the page in this tab has changed.
+          if (article == null || (article.url != currentURL)) {
+            return;
+          }
+
+          this._savedArticle = article;
+          sendAsyncMessage("Reader:UpdateIsArticle", { isArticle: true });
+
+        }).catch(e => Cu.reportError("Error parsing document: " + e));
+        break;
+    }
+  }
+};
+AboutReaderListener.init();
 
 let ContentSearchMediator = {
 
