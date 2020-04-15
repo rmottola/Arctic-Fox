@@ -4681,18 +4681,22 @@ nsBrowserAccess.prototype = {
       else
         aWhere = gPrefService.getIntPref("browser.link.open_newwindow");
     }
+    let isPrivate = PrivateBrowsingUtils.isWindowPrivate(aOpener || window);
     switch (aWhere) {
       case Ci.nsIBrowserDOMWindow.OPEN_NEWWINDOW :
         // FIXME: Bug 408379. So how come this doesn't send the
         // referrer like the other loads do?
         var url = aURI ? aURI.spec : "about:blank";
+        let features = "all,dialog=no";
+        if (isPrivate) {
+          features += ",private";
+        }
         // Pass all params to openDialog to ensure that "url" isn't passed through
         // loadOneOrMoreURIs, which splits based on "|"
-        newWindow = openDialog(getBrowserURL(), "_blank", "all,dialog=no", url, null, null, null);
+        newWindow = openDialog(getBrowserURL(), "_blank", features, url, null, null, null);
         break;
       case Ci.nsIBrowserDOMWindow.OPEN_NEWTAB :
         let referrer = aOpener ? makeURI(aOpener.location.href) : null;
-        let isPrivate = PrivateBrowsingUtils.isWindowPrivate(aOpener || window);
         // If we have an opener, that means that the caller is expecting access
         // to the nsIDOMWindow of the opened tab right away. For e10s windows,
         // this means forcing the newly opened browser to be non-remote so that
