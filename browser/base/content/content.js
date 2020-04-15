@@ -691,8 +691,11 @@ let ContentSearchMediator = {
 };
 ContentSearchMediator.init(this);
 
-
-var global = this;
+// Lazily load the finder code
+addMessageListener("Finder:Initialize", function () {
+  let {RemoteFinderListener} = Cu.import("resource://gre/modules/RemoteFinder.jsm", {});
+  new RemoteFinderListener(global);
+});
 
 let ClickEventHandler = {
   init: function init() {
@@ -715,45 +718,10 @@ let ClickEventHandler = {
       return;
     } else if (ownerDoc.documentURI.startsWith("about:blocked")) {
       this.onAboutBlocked(originalTarget, ownerDoc);
-
-let DOMFullscreenHandler = {
-  _fullscreenDoc: null,
-
-  init: function() {
-    addMessageListener("DOMFullscreen:Approved", this);
-    addMessageListener("DOMFullscreen:CleanUp", this);
-    addEventListener("MozEnteredDomFullscreen", this);
-  },
-
-  receiveMessage: function(aMessage) {
-    switch(aMessage.name) {
-      case "DOMFullscreen:Approved": {
-        if (this._fullscreenDoc) {
-          Services.obs.notifyObservers(this._fullscreenDoc,
-                                       "fullscreen-approved",
-                                       "");
-        }
-        break;
-      }
-      case "DOMFullscreen:CleanUp": {
-        this._fullscreenDoc = null;
-        break;
-      }
-    }
-  },
-
-  handleEvent: function(aEvent) {
-    if (aEvent.type == "MozEnteredDomFullscreen") {
-      this._fullscreenDoc = aEvent.target;
-      sendAsyncMessage("MozEnteredDomFullscreen", {
-        origin: this._fullscreenDoc.nodePrincipal.origin,
-      });
-    }
-  }
-};
-DOMFullscreenHandler.init();      return;
+      return;
     } else if (ownerDoc.documentURI.startsWith("about:neterror")) {
       this.onAboutNetError(originalTarget, ownerDoc);
+      return;
     }
 
     let [href, node] = this._hrefAndLinkNodeForClickEvent(event);
@@ -882,120 +850,9 @@ DOMFullscreenHandler.init();      return;
     return [href ? makeURLAbsolute(baseURI, href) : null, null];
   }
 };
-
-addMessageListener("ContextMenu:SaveVideoFrameAsImage", (message) => {
-  let video = message.objects.target;
-  let canvas = content.document.createElementNS("http://www.w3.org/1999/xhtml", "canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  let ctxDraw = canvas.getContext("2d");
-  ctxDraw.drawImage(video, 0, 0);
-  sendAsyncMessage("ContextMenu:SaveVideoFrameAsImage:Result", {
-    dataURL: canvas.toDataURL("image/jpeg", ""),
-  });
-});
-
-addMessageListener("ContextMenu:MediaCommand", (message) => {
-  let media = message.objects.element;
-
-  switch (message.data.command) {
-    case "play":
-      media.play();
-      break;
-    case "pause":
-      media.pause();
-      break;
-    case "mute":
-      media.muted = true;
-      break;
-    case "unmute":
-      media.muted = false;
-      break;
-    case "playbackRate":
-      media.playbackRate = message.data.data;
-      break;
-    case "hidecontrols":
-      media.removeAttribute("controls");
-      break;
-    case "showcontrols":
-      media.setAttribute("controls", "true");
-      break;
-    case "hidestats":
-    case "showstats":
-      let event = media.ownerDocument.createEvent("CustomEvent");
-      event.initCustomEvent("media-showStatistics", false, true,
-                            message.data.command == "showstats");
-      media.dispatchEvent(event);
-      break;
-    case "fullscreen":
-      if (content.document.mozFullScreenEnabled)
-        media.mozRequestFullScreen();
-      break;
-  }
-});
 ClickEventHandler.init();
 
 ContentLinkHandler.init(this);
-
-function gKeywordURIFixup(fixupInfo) {
-  fixupInfo.QueryInterface(Ci.nsIURIFixupInfo);
-
-  // Ignore info from other docshells
-  let parent = fixupInfo.consumer.QueryInterface(Ci.nsIDocShellTreeItem).sameTypeRootTreeItem;
-  if (parent != docShell)
-    return;
-
-  let data = {};
-  for (let f of Object.keys(fixupInfo)) {
-    if (f == "consumer" || typeof fixupInfo[f] == "function")
-      continue;
-
-    if (fixupInfo[f] && fixupInfo[f] instanceof Ci.nsIURI) {
-      data[f] = fixupInfo[f].spec;
-    } else {
-      data[f] = fixupInfo[f];
-    }
-  }
-
-  sendAsyncMessage("Browser:URIFixup", data);
-}
-Services.obs.addObserver(gKeywordURIFixup, "keyword-uri-fixup", false);
-addEventListener("unload", () => {
-  Services.obs.removeObserver(gKeywordURIFixup, "keyword-uri-fixup");
-}, false);
-
-addMessageListener("Browser:AppTab", function(message) {
-  docShell.isAppTab = message.data.isAppTab;
-});
-
-let WebBrowserChrome = {
-  onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
-    return BrowserUtils.onBeforeLinkTraversal(originalTarget, linkURI, linkNode, isAppTab);
-  },
-
-  // Check whether this URI should load in the current process
-  shouldLoadURI: function(aDocShell, aURI, aReferrer) {
-    if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
-      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer);
-      return false;
-    }
-
-    return true;
-  },
-};
-
-if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
-  let tabchild = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                         .getInterface(Ci.nsITabChild);
-  tabchild.webBrowserChrome = WebBrowserChrome;
-}
-
-// Lazily load the finder code
-addMessageListener("Finder:Initialize", function () {
-  let {RemoteFinderListener} = Cu.import("resource://gre/modules/RemoteFinder.jsm", {});
-  new RemoteFinderListener(global);
-});
 
 // TODO: Load this lazily so the JSM is run only if a relevant event/message fires.
 let pluginContent = new PluginContent(global);
@@ -1099,3 +956,146 @@ let PageStyleHandler = {
   },
 };
 PageStyleHandler.init();
+
+let DOMFullscreenHandler = {
+  _fullscreenDoc: null,
+
+  init: function() {
+    addMessageListener("DOMFullscreen:Approved", this);
+    addMessageListener("DOMFullscreen:CleanUp", this);
+    addEventListener("MozEnteredDomFullscreen", this);
+  },
+
+  receiveMessage: function(aMessage) {
+    switch(aMessage.name) {
+      case "DOMFullscreen:Approved": {
+        if (this._fullscreenDoc) {
+          Services.obs.notifyObservers(this._fullscreenDoc,
+                                       "fullscreen-approved",
+                                       "");
+        }
+        break;
+      }
+      case "DOMFullscreen:CleanUp": {
+        this._fullscreenDoc = null;
+        break;
+      }
+    }
+  },
+
+  handleEvent: function(aEvent) {
+    if (aEvent.type == "MozEnteredDomFullscreen") {
+      this._fullscreenDoc = aEvent.target;
+      sendAsyncMessage("MozEnteredDomFullscreen", {
+        origin: this._fullscreenDoc.nodePrincipal.origin,
+      });
+    }
+  }
+};
+DOMFullscreenHandler.init();
+
+function gKeywordURIFixup(fixupInfo) {
+  fixupInfo.QueryInterface(Ci.nsIURIFixupInfo);
+
+  // Ignore info from other docshells
+  let parent = fixupInfo.consumer.QueryInterface(Ci.nsIDocShellTreeItem).sameTypeRootTreeItem;
+  if (parent != docShell)
+    return;
+
+  let data = {};
+  for (let f of Object.keys(fixupInfo)) {
+    if (f == "consumer" || typeof fixupInfo[f] == "function")
+      continue;
+
+    if (fixupInfo[f] && fixupInfo[f] instanceof Ci.nsIURI) {
+      data[f] = fixupInfo[f].spec;
+    } else {
+      data[f] = fixupInfo[f];
+    }
+  }
+
+  sendAsyncMessage("Browser:URIFixup", data);
+}
+Services.obs.addObserver(gKeywordURIFixup, "keyword-uri-fixup", false);
+addEventListener("unload", () => {
+  Services.obs.removeObserver(gKeywordURIFixup, "keyword-uri-fixup");
+}, false);
+
+addMessageListener("Browser:AppTab", function(message) {
+  docShell.isAppTab = message.data.isAppTab;
+});
+
+let WebBrowserChrome = {
+  onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
+    return BrowserUtils.onBeforeLinkTraversal(originalTarget, linkURI, linkNode, isAppTab);
+  },
+
+  // Check whether this URI should load in the current process
+  shouldLoadURI: function(aDocShell, aURI, aReferrer) {
+    if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
+      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer);
+      return false;
+    }
+
+    return true;
+  },
+};
+
+if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+  let tabchild = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
+                         .getInterface(Ci.nsITabChild);
+  tabchild.webBrowserChrome = WebBrowserChrome;
+}
+
+
+addMessageListener("ContextMenu:SaveVideoFrameAsImage", (message) => {
+  let video = message.objects.target;
+  let canvas = content.document.createElementNS("http://www.w3.org/1999/xhtml", "canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  let ctxDraw = canvas.getContext("2d");
+  ctxDraw.drawImage(video, 0, 0);
+  sendAsyncMessage("ContextMenu:SaveVideoFrameAsImage:Result", {
+    dataURL: canvas.toDataURL("image/jpeg", ""),
+  });
+});
+
+addMessageListener("ContextMenu:MediaCommand", (message) => {
+  let media = message.objects.element;
+
+  switch (message.data.command) {
+    case "play":
+      media.play();
+      break;
+    case "pause":
+      media.pause();
+      break;
+    case "mute":
+      media.muted = true;
+      break;
+    case "unmute":
+      media.muted = false;
+      break;
+    case "playbackRate":
+      media.playbackRate = message.data.data;
+      break;
+    case "hidecontrols":
+      media.removeAttribute("controls");
+      break;
+    case "showcontrols":
+      media.setAttribute("controls", "true");
+      break;
+    case "hidestats":
+    case "showstats":
+      let event = media.ownerDocument.createEvent("CustomEvent");
+      event.initCustomEvent("media-showStatistics", false, true,
+                            message.data.command == "showstats");
+      media.dispatchEvent(event);
+      break;
+    case "fullscreen":
+      if (content.document.mozFullScreenEnabled)
+        media.mozRequestFullScreen();
+      break;
+  }
+});
