@@ -1266,12 +1266,17 @@ nsContextMenu.prototype = {
     if (this.onCanvas) {
       // Bypass cache, since it's a data: URL.
       saveImageURL(this.target.toDataURL(), "canvas.png", "SaveImageTitle",
-                   true, false, BrowserUtils.makeURIFromCPOW(doc.documentURIObject), doc);
-    } else if (this.onImage) {
+                   true, false, gContextMenuContentData.documentURIObject,
+                   doc);
+    }
+    else if (this.onImage) {
       urlSecurityCheck(this.mediaURL, this.principal);
+      let uri = gContextMenuContentData.documentURIObject;
       saveImageURL(this.mediaURL, null, "SaveImageTitle", false,
-      false, BrowserUtils.makeURIFromCPOW(doc.documentURIObject), doc);
-    } else if (this.onVideo || this.onAudio) {
+                   false, uri, doc, gContextMenuContentData.contentType,
+                   gContextMenuContentData.contentDisposition);
+    }
+    else if (this.onVideo || this.onAudio) {
       urlSecurityCheck(this.mediaURL, this.principal);
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";
       this.saveHelper(this.mediaURL, null, dialogTitle, false, doc, "");
