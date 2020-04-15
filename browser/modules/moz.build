@@ -16,6 +16,7 @@ EXTRA_JS_MODULES += [
     'ContentClick.jsm',
     'ContentSearch.jsm',
     'E10SUtils.jsm',
+    'Feeds.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
