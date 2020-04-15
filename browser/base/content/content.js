@@ -46,6 +46,23 @@ XPCOMUtils.defineLazyGetter(this, "PageMenuChild", function() {
   return new tmp.PageMenuChild();
 });
 
+XPCOMUtils.defineLazyGetter(this, "SimpleServiceDiscovery", function() {
+  let ssdp = Cu.import("resource://gre/modules/SimpleServiceDiscovery.jsm", {}).SimpleServiceDiscovery;
+  // Register targets
+  ssdp.registerDevice({
+    id: "roku:ecp",
+    target: "roku:ecp",
+    factory: function(aService) {
+      Cu.import("resource://gre/modules/RokuApp.jsm");
+      return new RokuApp(aService);
+    },
+    mirror: true,
+    types: ["video/mp4"],
+    extensions: ["mp4"]
+  });
+  return ssdp;
+});
+
 // TabChildGlobal
 var global = this;
 
@@ -64,6 +81,16 @@ addMessageListener("Browser:HideSessionRestoreButton", function (message) {
 
 addMessageListener("ContextMenu:DoCustomCommand", function(message) {
   PageMenuChild.executeMenu(message.data);
+});
+
+addMessageListener("SecondScreen:tab-mirror", function(message) {
+  let app = SimpleServiceDiscovery.findAppForService(message.data.service);
+  if (app) {
+    let width = content.scrollWidth;
+    let height = content.scrollHeight;
+    let viewport = {cssWidth: width, cssHeight: height, width: width, height: height};
+    app.mirror(function() {}, content, viewport, function() {}, content);
+  }
 });
 
 addEventListener("DOMFormHasPassword", function(event) {
