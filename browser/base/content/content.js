@@ -14,6 +14,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
   "resource:///modules/E10SUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
   "resource://gre/modules/BrowserUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ContentLinkHandler",
+  "resource:///modules/ContentLinkHandler.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerContent",
   "resource://gre/modules/LoginManagerContent.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "InsecurePasswordUtils",
@@ -933,6 +935,8 @@ addMessageListener("ContextMenu:MediaCommand", (message) => {
   }
 });
 ClickEventHandler.init();
+
+ContentLinkHandler.init(this);
 
 function gKeywordURIFixup(fixupInfo) {
   fixupInfo.QueryInterface(Ci.nsIURIFixupInfo);
