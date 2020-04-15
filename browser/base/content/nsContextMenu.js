@@ -1264,28 +1264,13 @@ nsContextMenu.prototype = {
   saveMedia: function() {
     var doc = this.target.ownerDocument;
     if (this.onCanvas) {
-      // Bypass cache, since it's a blob: URL.
-      var target = this.target;
-      var win = doc.defaultView;
-      if (!win) {
-        Components.utils.reportError(
-            "Save Image As (on the <canvas> element):\n" +
-            "This feature cannot be used, because it hasn't found " + 
-            "an appropriate window.");
-      } else {
-        new Promise.resolve({then: function (resolve) {
-          target.toBlob((blob) => {
-          resolve(win.URL.createObjectURL(blob));
-        })
-        }}).then(function (blobURL) {
-          saveImageURL(blobURL, "canvas.png", "SaveImageTitle", true,
-                       false, doc.documentURIObject, doc);
-        }, Components.utils.reportError);
-      }
+      // Bypass cache, since it's a data: URL.
+      saveImageURL(this.target.toDataURL(), "canvas.png", "SaveImageTitle",
+                   true, false, BrowserUtils.makeURIFromCPOW(doc.documentURIObject), doc);
     } else if (this.onImage) {
       urlSecurityCheck(this.mediaURL, this.principal);
       saveImageURL(this.mediaURL, null, "SaveImageTitle", false,
-                   false, doc.documentURIObject, doc);
+      false, BrowserUtils.makeURIFromCPOW(doc.documentURIObject), doc);
     } else if (this.onVideo || this.onAudio) {
       urlSecurityCheck(this.mediaURL, this.principal);
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";
