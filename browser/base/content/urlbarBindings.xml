@@ -604,6 +604,11 @@
                 this._mayTrimURLs = this._prefs.getBoolPref(aData);
                 break;
             }
+          } else {
+            let originalUrl = ReaderParent.parseReaderUrl(aValue);
+            if (originalUrl) {
+              returnValue = originalUrl;
+            }
           }
         ]]></body>
       </method>
