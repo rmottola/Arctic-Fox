@@ -81,7 +81,6 @@
     locale/browser/preferences/sync.dtd               (%chrome/browser/preferences/sync.dtd)
 #endif
     locale/browser/preferences/tabs.dtd               (%chrome/browser/preferences/tabs.dtd)
-    locale/browser/readerMode.properties              (%chrome/browser/readerMode.properties)
 #ifdef MOZ_SERVICES_SYNC
     locale/browser/syncBrand.dtd                (%chrome/browser/syncBrand.dtd)
     locale/browser/syncSetup.dtd                (%chrome/browser/syncSetup.dtd)
