@@ -598,7 +598,7 @@
                      label="&bookmarksMenuButton.label;"
                      tooltiptext="&bookmarksMenuButton.tooltip;"
                      onclick="if (event.button == 1)
-                                toggleSidebar('viewBookmarksSidebar');"
+                                SidebarUI.toggle('viewBookmarksSidebar');"
                      ondragenter="PlacesMenuDNDHandler.onDragEnter(event);"
                      ondragover="PlacesMenuDNDHandler.onDragOver(event);"
                      ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
@@ -686,7 +686,7 @@
                      label="&historyButton.label;"
                      tooltiptext="&historyButton.tooltip;"
                      onclick="if (event.button == 1)
-                                toggleSidebar('viewHistorySidebar');">
+                                SidebarUI.toggle('viewHistorySidebar');">
         <menupopup id="HMB_historyPopup"
                    placespopup="true"
                    context="placesContext"
@@ -993,7 +993,7 @@
       <sidebarheader id="sidebar-header" align="center">
         <label id="sidebar-title" persist="value" flex="1" crop="end" control="sidebar"/>
         <image id="sidebar-throbber"/>
-        <toolbarbutton class="tabs-closebutton close-icon" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="toggleSidebar();"/>
+        <toolbarbutton class="tabs-closebutton close-icon" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="SidebarUI.hide();"/>
       </sidebarheader>
       <browser id="sidebar" flex="1" autoscroll="false" disablehistory="true"
                 style="min-width: 14em; width: 18em; max-width: 36em;"/>
