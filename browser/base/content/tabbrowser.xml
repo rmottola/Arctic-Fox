@@ -3180,6 +3180,7 @@
                                           referrerPolicy: aMessage.data.referrerPolicy,
                                           contentType: aMessage.data.contentType,
                                           contentDisposition: aMessage.data.contentDisposition,
+                                          frameOuterWindowID: aMessage.data.frameOuterWindowID,
                                         };
               let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
               popup.openPopup(browser, "overlap",
