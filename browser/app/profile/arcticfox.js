@@ -1167,6 +1167,9 @@ pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 pref("view_source.tab", true);
 
+// Disable reader mode by default.
+pref("reader.parse-on-load.enabled", false);
+
 // ****************** domain-specific UAs ******************
 
 // AMO needs "Firefox", obviously - pass on the OS (determined at build time)
