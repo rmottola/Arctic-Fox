@@ -644,6 +644,7 @@ let AboutReaderListener = {
   init: function() {
     addEventListener("AboutReaderContentLoaded", this, false, true);
     addEventListener("DOMContentLoaded", this, false);
+    addEventListener("pageshow", this, false);
     addEventListener("pagehide", this, false);
     addMessageListener("Reader:ParseDocument", this);
   },
@@ -683,6 +684,13 @@ let AboutReaderListener = {
         sendAsyncMessage("Reader:UpdateReaderButton", { isArticle: false });
         break;
 
+      case "pageshow":
+        // If a page is loaded from the bfcache, we won't get a "DOMContentLoaded"
+        // event, so we need to rely on "pageshow" in this case.
+        if (!aEvent.persisted) {
+          break;
+        }
+        // Fall through.
       case "DOMContentLoaded":
         if (!ReaderMode.isEnabledForParseOnLoad || this.isAboutReader) {
           return;
