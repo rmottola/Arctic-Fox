@@ -11,6 +11,8 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
 
 
+XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
+                                  "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Deprecated",
                                   "resource://gre/modules/Deprecated.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
@@ -196,6 +198,7 @@ let gInitialPages = [
 #include browser-places.js
 #include browser-plugins.js
 #include browser-tabPreviews.js
+#include browser-readinglist.js
 #include browser-sidebar.js
 #include browser-thumbnails.js
 #include browser-webrtcUI.js
@@ -1382,6 +1385,8 @@ var gBrowserInit = {
         TabView.init();
       }
 
+      ReadingListUI.init();
+
       PanicButtonNotifier.init();
     });
     this.delayedStartupFinished = true;
@@ -1461,6 +1466,8 @@ var gBrowserInit = {
     ToolbarIconColor.uninit();
 
     DevEdition.uninit();
+
+    ReadingListUI.uninit();
 
     SidebarUI.uninit();
 

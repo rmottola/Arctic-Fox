@@ -211,6 +211,11 @@
                               key="key_gotoHistory"
                               observes="viewHistorySidebar"
                               label="&historyButton.label;"/>
+                    <menuitem id="menu_readingListSidebar"
+                              key="key_readingListSidebar"
+                              observes="readingListSidebar"
+                              label="&readingList.label;"/>
+
                   </menupopup>
                 </menu>
                 <menuseparator/>

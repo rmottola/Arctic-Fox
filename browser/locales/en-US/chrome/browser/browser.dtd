@@ -697,3 +697,5 @@ just addresses the organization to follow, e.g. "This site is run by " -->
 <!ENTITY panicButton.thankyou.msg2                "Safe browsing!">
 <!ENTITY panicButton.thankyou.buttonlabel         "Thanks!">
 
+<!ENTITY readingList.label                        "Reading List">
+<!ENTITY readingList.sidebar.commandKey           "R">
