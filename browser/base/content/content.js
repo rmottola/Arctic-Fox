@@ -1166,6 +1166,10 @@ addMessageListener("ContextMenu:SaveVideoFrameAsImage", (message) => {
   let ctxDraw = canvas.getContext("2d");
   ctxDraw.drawImage(video, 0, 0);
   sendAsyncMessage("ContextMenu:SaveVideoFrameAsImage:Result", {
+
+addMessageListener("ContextMenu:ReloadFrame", (message) => {
+  message.objects.target.ownerDocument.location.reload();
+});
     dataURL: canvas.toDataURL("image/jpeg", ""),
   });
 });
