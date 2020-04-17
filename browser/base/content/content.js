@@ -1101,6 +1101,14 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
   tabchild.webBrowserChrome = WebBrowserChrome;
 }
 
+addEventListener("pageshow", function(event) {
+  if (event.target == content.document) {
+    sendAsyncMessage("PageVisibility:Show", {
+      persisted: event.persisted,
+    });
+  }
+});
+
 
 addMessageListener("ContextMenu:SaveVideoFrameAsImage", (message) => {
   let video = message.objects.target;
