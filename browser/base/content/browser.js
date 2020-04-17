@@ -1019,8 +1019,6 @@ var gBrowserInit = {
     retrieveToolbarIconsizesFromTheme();
     ToolbarIconColor.init();
 
-    BrowserOnClick.uninit();
-
 #ifdef XP_WIN
     if (window.matchMedia("(-moz-os-version: windows-win8)").matches &&
         window.matchMedia("(-moz-windows-default-theme)").matches) {
@@ -1467,6 +1465,8 @@ var gBrowserInit = {
     TabsInTitlebar.uninit();
     
     ToolbarIconColor.uninit();
+
+    BrowserOnClick.uninit();
 
     DevEdition.uninit();
 
