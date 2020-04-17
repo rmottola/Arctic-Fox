@@ -1015,6 +1015,7 @@ var gBrowserInit = {
     TabsOnTop.init();
     gPrivateBrowsingUI.init();
     TabsInTitlebar.init();
+    ReadingListUI.init();
     retrieveToolbarIconsizesFromTheme();
     ToolbarIconColor.init();
 
@@ -1388,8 +1389,6 @@ var gBrowserInit = {
       if ("TabView" in window) {
         TabView.init();
       }
-
-      ReadingListUI.init();
 
       PanicButtonNotifier.init();
     });
@@ -2471,6 +2470,7 @@ function UpdatePageProxyState()
 function SetPageProxyState(aState)
 {
   BookmarkingUI.onPageProxyStateChanged(aState);
+  ReadingListUI.onPageProxyStateChanged(aState);
 
   if (!gURLBar)
     return;

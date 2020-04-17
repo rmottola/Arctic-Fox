@@ -550,6 +550,10 @@
                    class="urlbar-icon"
                    tooltiptext="&goEndCap.tooltip;"
                    onclick="gURLBar.handleCommand(event);"/>
+                <toolbarbutton id="readinglist-addremove-button"
+                               class="tabbable urlbar-icon"
+                               hidden="true"
+                               oncommand="ReadingListUI.togglePageByBrowser(gBrowser.selectedBrowser);"/>
                 <toolbarbutton id="reader-mode-button"
                                class="tabbable"
                                hidden="true"
