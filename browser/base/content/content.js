@@ -30,6 +30,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutReader",
   "resource://gre/modules/AboutReader.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderMode",
   "resource://gre/modules/ReaderMode.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PageMetadata",
+  "resource://gre/modules/PageMetadata.jsm");
 
 // Bug 671101 - directly using webNavigation in this context
 // causes docshells to leak
@@ -1109,6 +1111,29 @@ addEventListener("pageshow", function(event) {
   }
 });
 
+let PageMetadataMessenger = {
+  init: function() {
+    addMessageListener("PageMetadata:GetPageData", this);
+    addMessageListener("PageMetadata:GetMicrodata", this);
+  },
+  receiveMessage: function(aMessage) {
+    switch(aMessage.name) {
+      case "PageMetadata:GetPageData": {
+        let result = PageMetadata.getData(content.document);
+        sendAsyncMessage("PageMetadata:PageDataResult", result);
+        break;
+      }
+
+      case "PageMetadata:GetMicrodata": {
+        let target = aMessage.objects;
+        let result = PageMetadata.getMicrodata(content.document, target);
+        sendAsyncMessage("PageMetadata:MicrodataResult", result);
+        break;
+      }
+    }
+  }
+}
+PageMetadataMessenger.init();
 
 addMessageListener("ContextMenu:SaveVideoFrameAsImage", (message) => {
   let video = message.objects.target;
