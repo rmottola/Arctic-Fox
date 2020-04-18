@@ -95,6 +95,7 @@
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
+- Bug 1079245 - 2015-04-15 Set about:privatebrowsing to load in child. r=mossop
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
@@ -117,14 +118,10 @@ More session store stuff to check:
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-- Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
-- Bug 1209689 - Tabs that haven't yet been restored should not crash.
-- Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
-
-Bug 1177310 - Don't flush windows synchronously on application shutdo
+- Bug 1177310 - Don't flush windows synchronously on application shutdo
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
@@ -136,9 +133,6 @@ Devtools stuff to check - files not there:
 
 
 - Bug 785487 - Have AboutHomeUtils use the asynchronous search service
-
-Verify for pre-Australis:
-- Bug 1123517 - Refactor sidebar code. r=florian
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
