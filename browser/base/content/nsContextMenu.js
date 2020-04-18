@@ -888,7 +888,7 @@ nsContextMenu.prototype = {
   viewPartialSource: function(aContext) {
     var focusedWindow = document.commandDispatcher.focusedWindow;
     if (focusedWindow == window)
-      focusedWindow = content;
+      focusedWindow = gBrowser.selectedBrowser.contentWindowAsCPOW;
 
     var docCharset = null;
     if (focusedWindow)
@@ -1597,7 +1597,7 @@ nsContextMenu.prototype = {
   },
 
   savePageAs: function CM_savePageAs() {
-    saveDocument(this.browser.contentDocument);
+    saveDocument(this.browser.contentDocumentAsCPOW);
   },
 
   sendPage: function CM_sendPage() {
@@ -1609,7 +1609,7 @@ nsContextMenu.prototype = {
   },
 
   switchPageDirection: function CM_switchPageDirection() {
-    SwitchDocumentDirection(this.browser.contentWindow);
+    SwitchDocumentDirection(this.browser.contentWindowAsCPOW);
   },
 
   mediaCommand : function CM_mediaCommand(command, data) {
