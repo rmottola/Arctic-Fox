@@ -1609,7 +1609,7 @@ nsContextMenu.prototype = {
   },
 
   switchPageDirection: function CM_switchPageDirection() {
-    SwitchDocumentDirection(this.browser.contentWindowAsCPOW);
+    this.browser.messageManager.sendAsyncMessage("SwitchDocumentDirection");
   },
 
   mediaCommand : function CM_mediaCommand(command, data) {
