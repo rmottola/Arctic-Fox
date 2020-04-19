@@ -153,7 +153,6 @@ public:
     EndTouch,
     APZStateChangeSentinel
   };
-
   /**
    * General notices of APZ state changes for consumers.
    * |aGuid| identifies the APZC originating the state change.
@@ -164,6 +163,12 @@ public:
   virtual void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                     APZStateChange aChange,
                                     int aArg = 0) {}
+
+  /**
+   * Notify content of a MozMouseScrollFailed event.
+   */
+  virtual void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId, const nsString& aEvent)
+  {}
 
   GeckoContentController() {}
   virtual void Destroy() {}

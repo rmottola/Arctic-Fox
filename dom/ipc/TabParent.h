@@ -245,6 +245,7 @@ public:
     void NotifyAPZStateChange(ViewID aViewId,
                               APZStateChange aChange,
                               int aArg);
+    void NotifyMouseScrollTestEvent(const ViewID& aScrollId, const nsString& aEvent);
     void Activate();
     void Deactivate();
 
