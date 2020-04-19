@@ -233,6 +233,10 @@ public:
   NS_IMETHOD              UnregisterTouchWindow() override;
   NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() override final;
 
+  // Helper function for dispatching events which are not processed by APZ,
+  // but need to be transformed by APZ.
+  nsEventStatus DispatchInputEvent(mozilla::WidgetInputEvent* aEvent);
+
   // Dispatch an event that must be first be routed through APZ.
   nsEventStatus DispatchAPZAwareEvent(mozilla::WidgetInputEvent* aEvent) override;
 
