@@ -2160,20 +2160,6 @@
               }, 0, this.tabContainer);
             }
 
-            // Pale Moon: if resizing immediately, select the tab immediately to the left
-            // instead of the right (if not leftmost) to prevent focus swap and
-            // "selected tab not under cursor"
-            // FIXME: Tabs must be sliding in from the left for this, or it'd unfocus
-            // in the other direction! Disabled for now. Is there an easier way? :hover?
-            // Is this even needed when resizing immediately?...
-            
-            //if (Services.prefs.getBoolPref("browser.tabs.resize_immediately")) {
-            //  if (this.selectedTab._tPos > 1) {
-            //    let newPos = this.selectedTab._tPos - 1;
-            //    this.selectedTab = this.tabs[newPos];
-            //  }
-            //}
-
             // update tab positional properties and attributes
             this.selectedTab._selected = true;
             this.tabContainer._setPositionalAttributes();
@@ -3854,26 +3840,12 @@
             if (aTab.owner)
               return;
 
-            // Resize immediately if preffed
-            // XXX: we may want to make this a three-state pref to disable this early
-            // exit if people prefer a mix of behavior (don't resize in overflow,
-            // but resize if not overflowing)
-            if (Services.prefs.getBoolPref("browser.tabs.resize_immediately"))
-              return;
-
             this._expandSpacerBy(tabWidth);
           } else { // non-overflow mode
             // Locking is neither in effect nor needed, so let tabs expand normally.
             if (isEndTab && !this._hasTabTempMaxWidth)
               return;
               
-            // Resize immediately if preffed
-            // XXX: we may want to make this a three-state pref to disable this early
-            // exit if people prefer a mix of behavior (don't resize in overflow,
-            // but resize if not overflowing)
-            if (Services.prefs.getBoolPref("browser.tabs.resize_immediately"))
-              return;
-
             let numPinned = this.tabbrowser._numPinnedTabs;
             // Force tabs to stay the same width, unless we're closing the last tab,
             // which case we need to let them expand just enough so that the overall

@@ -422,7 +422,6 @@ pref("browser.tabs.drawInTitlebar", true);
 #else
 pref("browser.tabs.drawInTitlebar", false);
 #endif
-pref("browser.tabs.resize_immediately", false);
 
 // Where to show tab close buttons:
 // 0  on active tab only
