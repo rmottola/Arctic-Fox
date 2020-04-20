@@ -98,7 +98,7 @@ browser.jar:
 *       content/browser/sanitizeDialog.js             (content/sanitizeDialog.js)
         content/browser/sanitizeDialog.css            (content/sanitizeDialog.css)
         content/browser/tabbrowser.css                (content/tabbrowser.css)
-*       content/browser/tabbrowser.xml                (content/tabbrowser.xml)
+        content/browser/tabbrowser.xml                (content/tabbrowser.xml)
 *       content/browser/urlbarBindings.xml            (content/urlbarBindings.xml)
 *       content/browser/utilityOverlay.js             (content/utilityOverlay.js)
         content/browser/web-panels.js                 (content/web-panels.js)
