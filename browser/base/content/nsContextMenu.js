@@ -42,7 +42,7 @@ nsContextMenu.prototype = {
                                                    Ci.nsIPrefLocalizedString).data;
     } catch (e) { }
 
-    this.isContentSelected = this.isContentSelection();
+    this.isContentSelected = !this.selectionInfo.docSelectionIsCollapsed;
     this.onPlainTextLink = false;
 
     // Initialize (disable/remove) menu items.
@@ -85,33 +85,15 @@ nsContextMenu.prototype = {
                           (mailtoHandler.preferredApplicationHandler instanceof Ci.nsIWebHandlerApp));
     }
 
-    // Time to do some bad things and see if we've highlighted a URL that
-    // isn't actually linked.
-    if (this.isTextSelected && !this.onLink) {
-      // Ok, we have some text, let's figure out if it looks like a URL.
-      let selection =  this.focusedWindow.getSelection();
-      let linkText = selection.toString().trim();
-      let uri;
-      if (/^(?:https?|ftp):/i.test(linkText)) {
-        try {
-          uri = makeURI(linkText);
-        } catch (ex) {}
-      }
-      // Check if this could be a valid url, just missing the protocol.
-      else if (/^[-a-z\d\.]+\.[-a-z\d]{2,}[-_=~:#%&\?\w\/\.]*$/i.test(linkText)) {
-        let uriFixup = Cc["@mozilla.org/docshell/urifixup;1"]
-                         .getService(Ci.nsIURIFixup);
-        try {
-          uri = uriFixup.createFixupURI(linkText, uriFixup.FIXUP_FLAG_NONE);
-        } catch (ex) {}
-      }
+    if (this.isTextSelected && !this.onLink &&
+        this.selectionInfo && this.selectionInfo.linkURL) {
+      this.linkURL = this.selectionInfo.linkURL;
+      try {
+        this.linkURI = makeURI(this.linkURL);
+      } catch (ex) {}
 
-      if (uri && uri.host) {
-        this.linkURI = uri;
-        this.linkURL = this.linkURI.spec;
-        this.linkText = linkText;
-        this.onPlainTextLink = true;
-      }
+      this.linkText = this.selectionInfo.linkText;
+      this.onPlainTextLink = true;
     }
 
     var shouldShow = this.onSaveableLink || isMailtoInternal || this.onPlainTextLink;
@@ -507,15 +489,18 @@ nsContextMenu.prototype = {
     this.isDesignMode      = false;
     this.onCTPPlugin       = false;
     this.canSpellCheck     = false;
-    this.textSelected      = getBrowserSelection();
+
+    if (this.isRemote) {
+      this.selectionInfo = gContextMenuContentData.selectionInfo;
+    } else {
+      this.selectionInfo = BrowserUtils.getSelectionDetails(window);
+    }
+
+    this.textSelected      = this.selectionInfo.text;
     this.isTextSelected    = this.textSelected.length != 0;
 
     // Remember the node that was clicked.
     this.target = aNode;
-
-    let [elt, win] = BrowserUtils.getFocusSync(document);
-    this.focusedWindow = win;
-    this.focusedElement = elt;
 
     let ownerDoc = this.target.ownerDocument;
     this.ownerDoc = ownerDoc;
@@ -1489,11 +1474,6 @@ nsContextMenu.prototype = {
     }
 
     return text;
-  },
-
-  // Returns true if anything is selected.
-  isContentSelection: function() {
-    return !this.focusedWindow.getSelection().isCollapsed;
   },
 
   isMediaURLReusable: function(aURL) {

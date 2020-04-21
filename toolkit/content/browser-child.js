@@ -14,22 +14,6 @@ Cu.import("resource://gre/modules/Timer.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbUtils",
   "resource://gre/modules/PageThumbUtils.jsm");
 
-let FocusSyncHandler = {
-  init: function() {
-    sendAsyncMessage("SetSyncHandler", {}, {handler: this});
-  },
-
-  getFocusedElementAndWindow: function() {
-    let fm = Cc["@mozilla.org/focus-manager;1"].getService(Ci.nsIFocusManager);
-
-    let focusedWindow = {};
-    let elt = fm.getFocusedElementForWindow(content, true, focusedWindow);
-    return [elt, focusedWindow.value];
-  },
-};
-
-FocusSyncHandler.init();
-
 let WebProgressListener = {
   init: function() {
     this._filter = Cc["@mozilla.org/appshell/component/browser-status-filter;1"]
