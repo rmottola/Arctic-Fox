@@ -1268,15 +1268,8 @@ nsContextMenu.prototype = {
   // Save URL of clicked-on link.
   saveLink: function() {
     var doc =  this.target.ownerDocument;
-    var linkText;
-    // If selected text is found to match valid URL pattern.
-    if (this.onPlainTextLink)
-      linkText = this.focusedWindow.getSelection().toString().trim();
-    else
-      linkText = this.linkText();
     urlSecurityCheck(this.linkURL, this.principal);
-
-    this.saveHelper(this.linkURL, linkText, null, true, doc,
+    this.saveHelper(this.linkURL, this.linkText, null, true, doc,
                     this.linkDownload);
   },
 
