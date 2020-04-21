@@ -866,6 +866,8 @@ var gBrowserInit = {
     // loading the frame script to ensure that we don't miss any
     // message sent between when the frame script is loaded and when
     // the listener is registered.
+    DOMLinkHandler.init();
+    gPageStyleMenu.init();
     DevEdition.init();
     BrowserOnClick.init();
     
@@ -912,9 +914,6 @@ var gBrowserInit = {
     // hook up UI through progress listener
     gBrowser.addProgressListener(window.XULBrowserWindow);
     gBrowser.addTabsProgressListener(window.TabsProgressListener);
-
-    // setup our common DOMLinkAdded listener
-    DOMLinkHandler.init();
 
     // setup our MozApplicationManifest listener
     gBrowser.addEventListener("MozApplicationManifest",
@@ -1156,7 +1155,6 @@ var gBrowserInit = {
     AddonManager.addAddonListener(AddonsMgrListener);
     WebrtcIndicator.init();
     gRemoteTabsUI.init();
-    gPageStyleMenu.init();
 
     // Ensure login manager is up and running.
     Services.logins;
