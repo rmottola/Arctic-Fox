@@ -238,6 +238,7 @@ pref("browser.slowStartup.timeThreshold", 60000);
 pref("browser.slowStartup.maxSamples", 5);
 
 pref("browser.enable_automatic_image_resizing", true);
+pref("browser.casting.enabled", true);
 pref("browser.chrome.site_icons", true);
 pref("browser.chrome.favicons", true);
 // browser.warnOnQuit == false will override all other possible prompts when quitting or restarting
