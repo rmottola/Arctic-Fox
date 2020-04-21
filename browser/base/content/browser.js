@@ -2841,7 +2841,7 @@ function BrowserFullScreen()
 
 function mirrorShow(popup) {
   let services = CastingApps.getServicesForMirroring();
-  popup.ownerDocument.getElementById("menu_mirrorTabCmd").disabled = !services.length;
+  popup.ownerDocument.getElementById("menu_mirrorTabCmd").hidden = !services.length;
 }
 
 function mirrorMenuItemClicked(event) {
