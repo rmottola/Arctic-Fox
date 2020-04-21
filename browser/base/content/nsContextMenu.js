@@ -109,6 +109,7 @@ nsContextMenu.prototype = {
       if (uri && uri.host) {
         this.linkURI = uri;
         this.linkURL = this.linkURI.spec;
+        this.linkText = linkText;
         this.onPlainTextLink = true;
       }
     }
@@ -491,6 +492,7 @@ nsContextMenu.prototype = {
     this.link              = null;
     this.linkURL           = "";
     this.linkURI           = null;
+    this.linkText          = "";
     this.linkProtocol      = "";
     this.linkDownload      = "";
     this.linkHasNoReferrer = false;
@@ -649,6 +651,7 @@ nsContextMenu.prototype = {
           this.link = elem;
           this.linkURL = this.getLinkURL();
           this.linkURI = this.getLinkURI();
+          this.linkText = this.getLinkText();
           this.linkProtocol = this.getLinkProtocol();
           this.onMailtoLink = (this.linkProtocol == "mailto");
           this.onSaveableLink = this.isLinkSaveable( this.link );
@@ -1468,7 +1471,7 @@ nsContextMenu.prototype = {
   },
 
   // Get text of link.
-  linkText: function() {
+  getLinkText: function() {
     var text = gatherTextUnder(this.link);
     if (!text || !text.match(/\S/)) {
       text = this.link.getAttribute("title");
@@ -1549,14 +1552,8 @@ nsContextMenu.prototype = {
   },
 
   bookmarkLink: function CM_bookmarkLink() {
-    var linkText;
-    // If selected text is found to match valid URL pattern.
-    if (this.onPlainTextLink)
-      linkText = this.focusedWindow.getSelection().toString().trim();
-    else
-      linkText = this.linkText();
-    window.top.PlacesCommandHook.bookmarkLink(PlacesUtils.bookmarksMenuFolderId, this.linkURL,
-                                              linkText);
+    window.top.PlacesCommandHook.bookmarkLink(PlacesUtils.bookmarksMenuFolderId,
+                                              this.linkURL, this.linkText);
   },
 
   addBookmarkForFrame: function CM_addBookmarkForFrame() {
@@ -1624,7 +1621,7 @@ nsContextMenu.prototype = {
   // Formats the 'Search <engine> for "<selection or link text>"' context menu.
   formatSearchContextItem: function() {
     var menuItem = document.getElementById("context-searchselect");
-    var selectedText = this.isTextSelected ? this.textSelected : this.linkText();
+    let selectedText = this.isTextSelected ? this.textSelected : this.linkText;
 
     // Store searchTerms in context menu item so we know what to search onclick
     menuItem.searchTerms = selectedText;
