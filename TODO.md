@@ -44,11 +44,20 @@
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
+- Bug 1251347 - Refining SessionFile Shutdown hang details;r
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1243549 - Add missing bits. r=post-facto 
+- Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+- Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
+- Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
+- Bug 1053413 part 1 - Some code style conversion on affected code.
+- Bug 947854 - 2015-05-05 parto 0 to 4
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
