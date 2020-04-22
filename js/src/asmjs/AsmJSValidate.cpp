@@ -4475,8 +4475,8 @@ FoldMaskedArrayIndex(FunctionCompiler& f, ParseNode** indexExpr, int32_t* mask,
 }
 
 static bool
-CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
-                 Scalar::Type* viewType, MDefinition** def, NeedsBoundsCheck* needsBoundsCheck)
+CheckArrayAccess(FunctionCompiler &f, ParseNode *viewName, ParseNode *indexExpr,
+                 Scalar::Type *viewType, MDefinition **def, NeedsBoundsCheck *needsBoundsCheck)
 {
     *needsBoundsCheck = NEEDS_BOUNDS_CHECK;
 
@@ -4577,10 +4577,10 @@ CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
 }
 
 static bool
-CheckLoadArray(FunctionCompiler& f, ParseNode* elem, MDefinition** def, Type* type)
+CheckLoadArray(FunctionCompiler &f, ParseNode *elem, MDefinition **def, Type *type)
 {
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckArrayAccess(f, ElemBase(elem), ElemIndex(elem), &viewType, &pointerDef, &needsBoundsCheck))
         return false;
@@ -4893,9 +4893,9 @@ CheckMathMinMax(FunctionCompiler& f, ParseNode* callNode, MDefinition** def, boo
 }
 
 static bool
-CheckSharedArrayAtomicAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
-                             Scalar::Type* viewType, MDefinition** pointerDef,
-                             NeedsBoundsCheck* needsBoundsCheck)
+CheckSharedArrayAtomicAccess(FunctionCompiler &f, ParseNode *viewName, ParseNode *indexExpr,
+                             Scalar::Type *viewType, MDefinition **pointerDef,
+                             NeedsBoundsCheck *needsBoundsCheck)
 {
     if (!CheckArrayAccess(f, viewName, indexExpr, viewType, pointerDef, needsBoundsCheck))
         return false;
@@ -8213,7 +8213,7 @@ StackDecrementForCall(MacroAssembler& masm, uint32_t alignment, const VectorT& a
 // The ARM system ABI also includes d15 & s31 in the non volatile float registers.
 // Also exclude lr (a.k.a. r14) as we preserve it manually)
 static const RegisterSet NonVolatileRegs =
-    RegisterSet(GeneralRegisterSet(Registers::NonVolatileMask&
+    RegisterSet(GeneralRegisterSet(Registers::NonVolatileMask &
                                    ~(uint32_t(1) << Registers::lr)),
                 FloatRegisterSet(FloatRegisters::NonVolatileMask
                                  | (1ULL << FloatRegisters::d15)
@@ -9015,7 +9015,7 @@ GenerateOnOutOfBoundsLabelExit(ModuleCompiler& m, Label* throwLabel)
 }
 
 static const RegisterSet AllRegsExceptSP =
-    RegisterSet(GeneralRegisterSet(Registers::AllMask&
+    RegisterSet(GeneralRegisterSet(Registers::AllMask &
                                    ~(uint32_t(1) << Registers::StackPointer)),
                 FloatRegisterSet(FloatRegisters::AllDoubleMask));
 
