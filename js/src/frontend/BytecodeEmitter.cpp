@@ -256,28 +256,28 @@ CheckStrictOrSloppy(BytecodeEmitter *bce, JSOp op)
 #endif
 
 ptrdiff_t
-frontend::Emit1(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
+frontend::Emit1(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
     ptrdiff_t offset = EmitCheck(cx, bce, 1);
     if (offset < 0)
         return -1;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     UpdateDepth(cx, bce, offset);
     return offset;
 }
 
 ptrdiff_t
-frontend::Emit2(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, jsbytecode op1)
+frontend::Emit2(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, jsbytecode op1)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
     ptrdiff_t offset = EmitCheck(cx, bce, 2);
     if (offset < 0)
         return -1;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     code[1] = op1;
     UpdateDepth(cx, bce, offset);
@@ -307,7 +307,7 @@ frontend::Emit3(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, jsbytecode 
 }
 
 ptrdiff_t
-frontend::EmitN(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, size_t extra)
+frontend::EmitN(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, size_t extra)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
     ptrdiff_t length = 1 + (ptrdiff_t)extra;
@@ -315,7 +315,7 @@ frontend::EmitN(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, size_t extr
     if (offset < 0)
         return -1;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     /* The remaining |extra| bytes are set by the caller */
 
@@ -580,7 +580,7 @@ FlushPops(ExclusiveContext* cx, BytecodeEmitter* bce, int* npops)
 }
 
 static bool
-PopIterator(ExclusiveContext* cx, BytecodeEmitter* bce)
+PopIterator(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
     if (Emit1(cx, bce, JSOP_ENDITER) < 0)
         return false;
@@ -692,7 +692,7 @@ NonLocalExitScope::prepareForNonLocalJump(StmtInfoBCE* toStmt)
 
         if (stmt->isBlockScope) {
             MOZ_ASSERT(stmt->isNestedScope);
-            StaticBlockObject& blockObj = stmt->staticBlock();
+            StaticBlockObject &blockObj = stmt->staticBlock();
             if (Emit1(cx, bce, JSOP_DEBUGLEAVEBLOCK) < 0)
                 return false;
             if (!popScopeForNonLocalExit(stmt->blockScopeIndex))
