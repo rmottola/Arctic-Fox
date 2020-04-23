@@ -4897,7 +4897,7 @@ CheckMathMinMax(FunctionCompiler& f, ParseNode* callNode, MDefinition** def, boo
 
 static bool
 CheckSharedArrayAtomicAccess(FunctionCompiler &f, ParseNode *viewName, ParseNode *indexExpr,
-                             Scalar::Type *viewType, MDefinition **pointerDef,
+                             Scalar::Type *viewType, MDefinition** pointerDef,
                              NeedsBoundsCheck *needsBoundsCheck)
 {
     if (!CheckArrayAccess(f, viewName, indexExpr, viewType, pointerDef, needsBoundsCheck))
@@ -4946,7 +4946,7 @@ CheckAtomicsLoad(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type* 
     ParseNode* indexArg = NextNode(arrayArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
         return false;
@@ -4967,12 +4967,12 @@ CheckAtomicsStore(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type*
     ParseNode* valueArg = NextNode(indexArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
         return false;
 
-    MDefinition* rhsDef;
+    MDefinition *rhsDef;
     Type rhsType;
     if (!CheckExpr(f, valueArg, &rhsDef, &rhsType))
         return false;
@@ -4998,12 +4998,12 @@ CheckAtomicsBinop(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type*
     ParseNode* valueArg = NextNode(indexArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
         return false;
 
-    MDefinition* valueArgDef;
+    MDefinition *valueArgDef;
     Type valueArgType;
     if (!CheckExpr(f, valueArg, &valueArgDef, &valueArgType))
         return false;
@@ -5022,23 +5022,23 @@ CheckAtomicsCompareExchange(FunctionCompiler& f, ParseNode* call, MDefinition** 
     if (CallArgListLength(call) != 4)
         return f.fail(call, "Atomics.compareExchange must be passed 4 arguments");
 
-    ParseNode* arrayArg = CallArgList(call);
-    ParseNode* indexArg = NextNode(arrayArg);
-    ParseNode* oldValueArg = NextNode(indexArg);
-    ParseNode* newValueArg = NextNode(oldValueArg);
+    ParseNode *arrayArg = CallArgList(call);
+    ParseNode *indexArg = NextNode(arrayArg);
+    ParseNode *oldValueArg = NextNode(indexArg);
+    ParseNode *newValueArg = NextNode(oldValueArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
         return false;
 
-    MDefinition* oldValueArgDef;
+    MDefinition *oldValueArgDef;
     Type oldValueArgType;
     if (!CheckExpr(f, oldValueArg, &oldValueArgDef, &oldValueArgType))
         return false;
 
-    MDefinition* newValueArgDef;
+    MDefinition *newValueArgDef;
     Type newValueArgType;
     if (!CheckExpr(f, newValueArg, &newValueArgDef, &newValueArgType))
         return false;
@@ -5091,9 +5091,9 @@ CheckCallArgs(FunctionCompiler& f, ParseNode* callNode, CheckArgType checkArg,
 {
     f.startCallArgs(call);
 
-    ParseNode* argNode = CallArgList(callNode);
+    ParseNode *argNode = CallArgList(callNode);
     for (unsigned i = 0; i < CallArgListLength(callNode); i++, argNode = NextNode(argNode)) {
-        MDefinition* def;
+        MDefinition *def;
         Type type;
         if (!CheckExpr(f, argNode, &def, &type))
             return false;
@@ -5242,7 +5242,7 @@ CheckFuncPtrCall(FunctionCompiler& f, ParseNode* callNode, RetType retType, MDef
     if (!IsLiteralInt(f.m(), maskNode, &mask) || mask == UINT32_MAX || !IsPowerOfTwo(mask + 1))
         return f.fail(maskNode, "function-pointer table index mask value must be a power of two minus 1");
 
-    MDefinition* indexDef;
+    MDefinition *indexDef;
     Type indexType;
     if (!CheckExpr(f, indexNode, &indexDef, &indexType))
         return false;
@@ -5255,7 +5255,7 @@ CheckFuncPtrCall(FunctionCompiler& f, ParseNode* callNode, RetType retType, MDef
     if (!CheckCallArgs(f, callNode, CheckIsVarType, &call))
         return false;
 
-    ModuleCompiler::FuncPtrTable* table;
+    ModuleCompiler::FuncPtrTable *table;
     if (!CheckFuncPtrTableAgainstExisting(f.m(), tableNode, name, Move(call.sig()), mask, &table))
         return false;
 
@@ -6295,7 +6295,7 @@ CheckBitNot(FunctionCompiler& f, ParseNode* neg, MDefinition** def, Type* type)
     if (operand->isKind(PNK_BITNOT))
         return CheckCoerceToInt(f, operand, def, type);
 
-    MDefinition* operandDef;
+    MDefinition *operandDef;
     Type operandType;
     if (!CheckExpr(f, operand, &operandDef, &operandType))
         return false;
