@@ -97,10 +97,6 @@
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
-- 1142669 part 6 - Don't inline scripts that are known to inline a 
-- 1145440 - Ship constant names for tracked strategy and outcomes i
-- 1143860 - Deduplicate tracked optimizations when streaming the pr
-- 1142669 part 3 - Limit the total inlined bytecode size to avoid e
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
@@ -108,14 +104,9 @@
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
-- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
-- Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes¿
-- Bug 1151466 - update talos to the latest version to include some pref
-- Bug 1153658 - browser_compartments.js logspam.
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
-- Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 
 Mac Specific
@@ -139,9 +130,6 @@ Devtools stuff to check - files not there:
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux.
 - Bug 1150555 - about:performance should not confuse Jetpack addons. 
 
-
-
-- Bug 785487 - Have AboutHomeUtils use the asynchronous search service
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
