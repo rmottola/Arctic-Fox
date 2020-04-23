@@ -39,7 +39,7 @@ CodeGeneratorShared::ensureMasm(MacroAssembler* masmArg)
     return *maybeMasm_;
 }
 
-CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masmArg)
+CodeGeneratorShared::CodeGeneratorShared(MIRGenerator *gen, LIRGraph *graph, MacroAssembler *masmArg)
   : oolIns(nullptr),
     maybeMasm_(),
     masm(ensureMasm(masmArg)),

@@ -5785,11 +5785,11 @@ CheckSimdShuffle(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType, MDe
 }
 
 static bool
-CheckSimdLoadStoreArgs(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
-                       unsigned numElems, Scalar::Type* viewType, MDefinition** index,
-                       NeedsBoundsCheck* needsBoundsCheck)
+CheckSimdLoadStoreArgs(FunctionCompiler &f, ParseNode *call, AsmJSSimdType opType,
+                       unsigned numElems, Scalar::Type *viewType, MDefinition **index,
+                       NeedsBoundsCheck *needsBoundsCheck)
 {
-    ParseNode* view = CallArgList(call);
+    ParseNode *view = CallArgList(call);
     if (!view->isKind(PNK_NAME))
         return f.fail(view, "expected Uint8Array view as SIMD.*.load/store first argument");
 
@@ -5839,15 +5839,15 @@ CheckSimdLoadStoreArgs(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opTyp
 }
 
 static bool
-CheckSimdLoad(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
-              unsigned numElems, MDefinition** def, Type* type)
+CheckSimdLoad(FunctionCompiler &f, ParseNode *call, AsmJSSimdType opType,
+              unsigned numElems, MDefinition **def, Type *type)
 {
     unsigned numArgs = CallArgListLength(call);
     if (numArgs != 2)
         return f.failf(call, "expected 2 arguments to SIMD load, got %u", numArgs);
 
     Scalar::Type viewType;
-    MDefinition* index;
+    MDefinition *index;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSimdLoadStoreArgs(f, call, opType, numElems, &viewType, &index, &needsBoundsCheck))
         return false;
@@ -5868,14 +5868,14 @@ CheckSimdStore(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
         return f.failf(call, "expected 3 arguments to SIMD store, got %u", numArgs);
 
     Scalar::Type viewType;
-    MDefinition* index;
+    MDefinition *index;
     NeedsBoundsCheck needsBoundsCheck;
     if (!CheckSimdLoadStoreArgs(f, call, opType, numElems, &viewType, &index, &needsBoundsCheck))
         return false;
 
     Type retType = opType;
-    ParseNode* vecExpr = NextNode(NextNode(CallArgList(call)));
-    MDefinition* vec;
+    ParseNode *vecExpr = NextNode(NextNode(CallArgList(call)));
+    MDefinition *vec;
     Type vecType;
     if (!CheckExpr(f, vecExpr, &vec, &vecType))
         return false;
