@@ -996,7 +996,7 @@ EnterNestedScope(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* stmt, 
 static bool
 PopStatementBCE(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
-    StmtInfoBCE* stmt = bce->topStmt;
+    StmtInfoBCE *stmt = bce->topStmt;
     if (!stmt->isTrying() &&
         (!BackPatch(cx, bce, stmt->breaks, bce->code().end(), JSOP_GOTO) ||
          !BackPatch(cx, bce, stmt->continues, bce->code(stmt->update), JSOP_GOTO)))
@@ -3569,7 +3569,7 @@ EmitDestructuringOpsArrayHelper(ExclusiveContext* cx, BytecodeEmitter* bce, Pars
             if (off < 0)
                 return false;
             CheckTypeSet(cx, bce, JSOP_NEWARRAY);
-            jsbytecode* pc = bce->code(off);
+            jsbytecode *pc = bce->code(off);
             SET_UINT24(pc, 0);
 
             if (!EmitNumberOp(cx, 0, bce))                             // ... OBJ? ITER ARRAY INDEX
