@@ -1038,7 +1038,7 @@ EmitIndex32(ExclusiveContext *cx, JSOp op, uint32_t index, BytecodeEmitter *bce)
     if (offset < 0)
         return false;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     SET_UINT32_INDEX(code, index);
     UpdateDepth(cx, bce, offset);
@@ -1065,7 +1065,7 @@ EmitIndexOp(ExclusiveContext *cx, JSOp op, uint32_t index, BytecodeEmitter *bce)
 }
 
 static bool
-EmitAtomOp(ExclusiveContext *cx, JSAtom* atom, JSOp op, BytecodeEmitter *bce)
+EmitAtomOp(ExclusiveContext *cx, JSAtom *atom, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) == JOF_ATOM);
 
@@ -1086,7 +1086,7 @@ EmitAtomOp(ExclusiveContext *cx, JSAtom* atom, JSOp op, BytecodeEmitter *bce)
 }
 
 static bool
-EmitAtomOp(ExclusiveContext *cx, ParseNode* pn, JSOp op, BytecodeEmitter *bce)
+EmitAtomOp(ExclusiveContext *cx, ParseNode *pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->pn_atom != nullptr);
     return EmitAtomOp(cx, pn->pn_atom, op, bce);
@@ -1185,7 +1185,7 @@ EmitScopeCoordOp(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, ScopeCoord
     if (off < 0)
         return false;
 
-    jsbytecode* pc = bce->code(off);
+    jsbytecode *pc = bce->code(off);
     SET_SCOPECOORD_HOPS(pc, sc.hops());
     pc += SCOPECOORD_HOPS_LEN;
     SET_SCOPECOORD_SLOT(pc, sc.slot());
@@ -1305,7 +1305,7 @@ NodeNeedsCheckLexical(ParseNode* pn)
 }
 
 static bool
-EmitAliasedVarOp(ExclusiveContext* cx, JSOp op, ParseNode* pn, BytecodeEmitter* bce)
+EmitAliasedVarOp(ExclusiveContext *cx, JSOp op, ParseNode *pn, BytecodeEmitter *bce)
 {
     /*
      * While pn->pn_cookie tells us how many function scopes are between the use and the def this
@@ -1317,7 +1317,7 @@ EmitAliasedVarOp(ExclusiveContext* cx, JSOp op, ParseNode* pn, BytecodeEmitter* 
      *  - all the intervening let/catch blocks must be counted.
      */
     unsigned skippedScopes = 0;
-    BytecodeEmitter* bceOfDef = bce;
+    BytecodeEmitter *bceOfDef = bce;
     if (pn->isUsed()) {
         /*
          * As explained in BindNameToSlot, the 'level' of a use indicates how
