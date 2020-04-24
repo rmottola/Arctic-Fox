@@ -503,7 +503,7 @@ UpdateSourceCoordNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offs
     return true;
 }
 
-static ptrdiff_t
+static bool
 EmitLoopHead(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *nextpn)
 {
     if (nextpn) {
@@ -516,13 +516,10 @@ EmitLoopHead(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *nextpn)
         if (nextpn->isKind(PNK_STATEMENTLIST) && nextpn->pn_head)
             nextpn = nextpn->pn_head;
         if (!UpdateSourceCoordNotes(cx, bce, nextpn->pn_pos.begin))
-            return -1;
+            return false;
     }
 
-    ptrdiff_t offset = bce->offset();
-    if (!Emit1(cx, bce, JSOP_LOOPHEAD))
-        return -1;
-    return offset;
+    return Emit1(cx, bce, JSOP_LOOPHEAD);
 }
 
 static bool
@@ -4956,7 +4953,7 @@ EmitForOf(ExclusiveContext *cx, BytecodeEmitter *bce, StmtType type, ParseNode *
 
     top = bce->offset();
     SET_STATEMENT_TOP(&stmtInfo, top);
-    if (EmitLoopHead(cx, bce, nullptr) < 0)
+    if (!EmitLoopHead(cx, bce, nullptr))
         return false;
 
     if (type == STMT_SPREAD)
@@ -5111,7 +5108,7 @@ EmitForIn(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t t
 
     top = bce->offset();
     SET_STATEMENT_TOP(&stmtInfo, top);
-    if (EmitLoopHead(cx, bce, nullptr) < 0)
+    if (!EmitLoopHead(cx, bce, nullptr))
         return false;
 
 #ifdef DEBUG
@@ -5239,7 +5236,7 @@ EmitNormalFor(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff
     SET_STATEMENT_TOP(&stmtInfo, top);
 
     /* Emit code for the loop body. */
-    if (EmitLoopHead(cx, bce, forBody) < 0)
+    if (!EmitLoopHead(cx, bce, forBody))
         return false;
     if (jmp == -1 && !EmitLoopEntry(cx, bce, forBody))
         return false;
@@ -5510,8 +5507,8 @@ EmitDo(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
         return false;
 
     /* Compile the loop body. */
-    ptrdiff_t top = EmitLoopHead(cx, bce, pn->pn_left);
-    if (top < 0)
+    ptrdiff_t top = bce->offset();
+    if (!EmitLoopHead(cx, bce, pn->pn_left))
         return false;
 
     LoopStmtInfo stmtInfo(cx);
@@ -5583,8 +5580,8 @@ EmitWhile(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t t
     if (jmp < 0)
         return false;
 
-    top = EmitLoopHead(cx, bce, pn->pn_right);
-    if (top < 0)
+    top = bce->offset();
+    if (!EmitLoopHead(cx, bce, pn->pn_right))
         return false;
 
     if (!EmitTree(cx, bce, pn->pn_right))
