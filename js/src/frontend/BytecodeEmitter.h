@@ -92,13 +92,13 @@ struct BytecodeEmitter
 {
     typedef StmtInfoBCE StmtInfo;
 
-    SharedContext*  const sc;      /* context shared between parsing and bytecode generation */
+    SharedContext  *const sc;      /* context shared between parsing and bytecode generation */
 
-    BytecodeEmitter* const parent;  /* enclosing function or global context */
+    BytecodeEmitter *const parent;  /* enclosing function or global context */
 
     Rooted<JSScript*> script;       /* the JSScript we're ultimately producing */
 
-    Rooted<LazyScript*> lazyScript; /* the lazy script if mode is LazyFunction,
+    Rooted<LazyScript *> lazyScript; /* the lazy script if mode is LazyFunction,
                                         nullptr otherwise. */
 
     struct EmitSection {
@@ -109,7 +109,7 @@ struct BytecodeEmitter
         uint32_t    lastColumn;     /* zero-based column index on currentLine of
                                        last SRC_COLSPAN-annotated opcode */
 
-        EmitSection(ExclusiveContext* cx, uint32_t lineNum)
+        EmitSection(ExclusiveContext *cx, uint32_t lineNum)
           : code(cx), notes(cx), lastNoteOffset(0), currentLine(lineNum), lastColumn(0)
         {}
     };
@@ -122,8 +122,8 @@ struct BytecodeEmitter
     Handle<StaticEvalObject*> evalStaticScope;
                                    /* compile time scope for eval; does not imply stmt stack */
 
-    StmtInfoBCE*    topStmt;       /* top of statement info stack */
-    StmtInfoBCE*    topScopeStmt;  /* top lexical scope statement */
+    StmtInfoBCE    *topStmt;       /* top of statement info stack */
+    StmtInfoBCE    *topScopeStmt;  /* top lexical scope statement */
     Rooted<NestedScopeObject*> staticScope;
                                     /* compile time scope chain */
 
@@ -250,8 +250,8 @@ struct BytecodeEmitter
     unsigned lastColumn() const { return current->lastColumn; }
 
     bool reportError(ParseNode* pn, unsigned errorNumber, ...);
-    bool reportStrictWarning(ParseNode* pn, unsigned errorNumber, ...);
-    bool reportStrictModeError(ParseNode* pn, unsigned errorNumber, ...);
+    bool reportStrictWarning(ParseNode *pn, unsigned errorNumber, ...);
+    bool reportStrictModeError(ParseNode *pn, unsigned errorNumber, ...);
 };
 
 /*
@@ -270,25 +270,25 @@ Emit2(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, jsbytecode op1);
  * Emit three bytecodes, an opcode with two bytes of immediate operands.
  */
 ptrdiff_t
-Emit3(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, jsbytecode op1, jsbytecode op2);
+Emit3(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, jsbytecode op1, jsbytecode op2);
 
 /*
  * Emit (1 + extra) bytecodes, for N bytes of op and its immediate operand.
  */
 ptrdiff_t
-EmitN(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, size_t extra);
+EmitN(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, size_t extra);
 
 /*
  * Emit code into bce for the tree rooted at pn.
  */
 bool
-EmitTree(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn);
+EmitTree(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn);
 
 /*
  * Emit function code using bce for the tree rooted at body.
  */
 bool
-EmitFunctionScript(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* body);
+EmitFunctionScript(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *body);
 
 /*
  * Append a new source note of the given type (and therefore size) to bce's
@@ -297,24 +297,24 @@ EmitFunctionScript(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* body);
  * memory.
  */
 int
-NewSrcNote(ExclusiveContext* cx, BytecodeEmitter* bce, SrcNoteType type);
+NewSrcNote(ExclusiveContext *cx, BytecodeEmitter *bce, SrcNoteType type);
 
 int
-NewSrcNote2(ExclusiveContext* cx, BytecodeEmitter* bce, SrcNoteType type, ptrdiff_t offset);
+NewSrcNote2(ExclusiveContext *cx, BytecodeEmitter *bce, SrcNoteType type, ptrdiff_t offset);
 
 int
-NewSrcNote3(ExclusiveContext* cx, BytecodeEmitter* bce, SrcNoteType type, ptrdiff_t offset1,
+NewSrcNote3(ExclusiveContext *cx, BytecodeEmitter *bce, SrcNoteType type, ptrdiff_t offset1,
                ptrdiff_t offset2);
 
 /* NB: this function can add at most one extra extended delta note. */
 bool
-AddToSrcNoteDelta(ExclusiveContext* cx, BytecodeEmitter* bce, jssrcnote* sn, ptrdiff_t delta);
+AddToSrcNoteDelta(ExclusiveContext *cx, BytecodeEmitter *bce, jssrcnote *sn, ptrdiff_t delta);
 
 bool
-FinishTakingSrcNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t* out);
+FinishTakingSrcNotes(ExclusiveContext *cx, BytecodeEmitter *bce, uint32_t *out);
 
 void
-CopySrcNotes(BytecodeEmitter* bce, jssrcnote* destination, uint32_t nsrcnotes);
+CopySrcNotes(BytecodeEmitter *bce, jssrcnote *destination, uint32_t nsrcnotes);
 
 } /* namespace frontend */
 } /* namespace js */

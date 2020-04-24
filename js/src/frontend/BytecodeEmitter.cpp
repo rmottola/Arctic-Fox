@@ -116,7 +116,7 @@ BytecodeEmitter::BytecodeEmitter(BytecodeEmitter* parent,
                                  Parser<FullParseHandler>* parser, SharedContext* sc,
                                  HandleScript script, Handle<LazyScript*> lazyScript,
                                  bool insideEval, HandleScript evalCaller,
-                                 Handle<StaticEvalObject*> staticEvalScope,
+                                 Handle<StaticEvalObject *> staticEvalScope,
                                  bool hasGlobalScope, uint32_t lineNum, EmitterMode emitterMode)
   : sc(sc),
     parent(parent),
@@ -198,7 +198,7 @@ BytecodeEmitter::updateLocalsToFrameSlots()
 }
 
 static ptrdiff_t
-EmitCheck(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t delta)
+EmitCheck(ExclusiveContext *cx, BytecodeEmitter *bce, ptrdiff_t delta)
 {
     ptrdiff_t offset = bce->code().length();
 
@@ -285,7 +285,7 @@ frontend::Emit2(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, jsbytecode 
 }
 
 ptrdiff_t
-frontend::Emit3(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, jsbytecode op1,
+frontend::Emit3(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, jsbytecode op1,
                 jsbytecode op2)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
@@ -298,7 +298,7 @@ frontend::Emit3(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, jsbytecode 
     if (offset < 0)
         return -1;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     code[1] = op1;
     code[2] = op2;
@@ -330,13 +330,13 @@ frontend::EmitN(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, size_t extr
 }
 
 static ptrdiff_t
-EmitJump(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, ptrdiff_t off)
+EmitJump(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, ptrdiff_t off)
 {
     ptrdiff_t offset = EmitCheck(cx, bce, 5);
     if (offset < 0)
         return -1;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     SET_JUMP_OFFSET(code, off);
     UpdateDepth(cx, bce, offset);
@@ -344,7 +344,7 @@ EmitJump(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, ptrdiff_t off)
 }
 
 static ptrdiff_t
-EmitCall(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, uint16_t argc, ParseNode* pn=nullptr)
+EmitCall(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, uint16_t argc, ParseNode *pn=nullptr)
 {
     if (pn && !UpdateSourceCoordNotes(cx, bce, pn->pn_pos.begin))
         return -1;
@@ -362,7 +362,7 @@ EmitCall(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, uint16_t argc, Par
 // separately, but they all together form one script with one fixed stack
 // frame).
 static bool
-EmitDupAt(ExclusiveContext* cx, BytecodeEmitter* bce, unsigned slot)
+EmitDupAt(ExclusiveContext *cx, BytecodeEmitter *bce, unsigned slot)
 {
     MOZ_ASSERT(slot < unsigned(bce->stackDepth));
     // The slot's position on the operand stack, measured from the top.
@@ -374,7 +374,7 @@ EmitDupAt(ExclusiveContext* cx, BytecodeEmitter* bce, unsigned slot)
     ptrdiff_t off = EmitN(cx, bce, JSOP_DUPAT, 3);
     if (off < 0)
         return false;
-    jsbytecode* pc = bce->code(off);
+    jsbytecode *pc = bce->code(off);
     SET_UINT24(pc, slotFromTop);
     return true;
 }
@@ -426,7 +426,7 @@ ReportStatementTooLarge(TokenStream& ts, StmtInfoBCE* topStmt)
  * so that we can walk back up the chain fixing up the op and jump offset.
  */
 static ptrdiff_t
-EmitBackPatchOp(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t* lastp)
+EmitBackPatchOp(ExclusiveContext *cx, BytecodeEmitter *bce, ptrdiff_t *lastp)
 {
     ptrdiff_t offset, delta;
 
@@ -506,7 +506,7 @@ UpdateSourceCoordNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offs
 }
 
 static ptrdiff_t
-EmitLoopHead(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* nextpn)
+EmitLoopHead(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *nextpn)
 {
     if (nextpn) {
         /*
@@ -528,7 +528,7 @@ EmitLoopHead(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* nextpn)
 }
 
 static bool
-EmitLoopEntry(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* nextpn)
+EmitLoopEntry(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *nextpn)
 {
     if (nextpn) {
         /* Update the line number, as for LOOPHEAD. */
@@ -539,7 +539,7 @@ EmitLoopEntry(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* nextpn)
             return false;
     }
 
-    LoopStmtInfo* loop = LoopStmtInfo::fromStmtInfo(bce->topStmt);
+    LoopStmtInfo *loop = LoopStmtInfo::fromStmtInfo(bce->topStmt);
     MOZ_ASSERT(loop->loopDepth > 0);
 
     uint8_t loopDepthAndFlags = PackLoopEntryDepthHintAndFlags(loop->loopDepth, loop->canIonOsr);
@@ -551,7 +551,7 @@ EmitLoopEntry(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* nextpn)
  * reserve a type set to store its result.
  */
 static inline void
-CheckTypeSet(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
+CheckTypeSet(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op)
 {
     if (js_CodeSpec[op].format & JOF_TYPESET) {
         if (bce->typesetCount < UINT16_MAX)
@@ -574,7 +574,7 @@ CheckTypeSet(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
     JS_END_MACRO
 
 static bool
-FlushPops(ExclusiveContext* cx, BytecodeEmitter* bce, int* npops)
+FlushPops(ExclusiveContext *cx, BytecodeEmitter *bce, int *npops)
 {
     MOZ_ASSERT(*npops != 0);
     EMIT_UINT16_IMM_OP(JSOP_POPN, *npops);
@@ -648,7 +648,7 @@ NonLocalExitScope::prepareForNonLocalJump(StmtInfoBCE* toStmt)
 
 #define FLUSH_POPS() if (npops && !FlushPops(cx, bce, &npops)) return false
 
-    for (StmtInfoBCE* stmt = bce->topStmt; stmt != toStmt; stmt = stmt->down) {
+    for (StmtInfoBCE *stmt = bce->topStmt; stmt != toStmt; stmt = stmt->down) {
         switch (stmt->type) {
           case STMT_FINALLY:
             FLUSH_POPS();
@@ -714,7 +714,7 @@ NonLocalExitScope::prepareForNonLocalJump(StmtInfoBCE* toStmt)
 }  // anonymous namespace
 
 static ptrdiff_t
-EmitGoto(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* toStmt, ptrdiff_t* lastp,
+EmitGoto(ExclusiveContext *cx, BytecodeEmitter *bce, StmtInfoBCE *toStmt, ptrdiff_t *lastp,
          SrcNoteType noteType = SRC_NULL)
 {
     NonLocalExitScope nle(cx, bce);
@@ -731,9 +731,9 @@ EmitGoto(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* toStmt, ptrdif
 }
 
 static bool
-BackPatch(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t last, jsbytecode* target, jsbytecode op)
+BackPatch(ExclusiveContext *cx, BytecodeEmitter *bce, ptrdiff_t last, jsbytecode *target, jsbytecode op)
 {
-    jsbytecode* pc, *stop;
+    jsbytecode *pc, *stop;
     ptrdiff_t delta, span;
 
     pc = bce->code(last);
@@ -752,26 +752,26 @@ BackPatch(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t last, jsbytecode
     ((stmt)->update = (top), (stmt)->breaks = (stmt)->continues = (-1))
 
 static void
-PushStatementInner(BytecodeEmitter* bce, StmtInfoBCE* stmt, StmtType type, ptrdiff_t top)
+PushStatementInner(BytecodeEmitter *bce, StmtInfoBCE *stmt, StmtType type, ptrdiff_t top)
 {
     SET_STATEMENT_TOP(stmt, top);
     PushStatement(bce, stmt, type);
 }
 
 static void
-PushStatementBCE(BytecodeEmitter* bce, StmtInfoBCE* stmt, StmtType type, ptrdiff_t top)
+PushStatementBCE(BytecodeEmitter *bce, StmtInfoBCE *stmt, StmtType type, ptrdiff_t top)
 {
     PushStatementInner(bce, stmt, type, top);
     MOZ_ASSERT(!stmt->isLoop());
 }
 
 static void
-PushLoopStatement(BytecodeEmitter* bce, LoopStmtInfo* stmt, StmtType type, ptrdiff_t top)
+PushLoopStatement(BytecodeEmitter *bce, LoopStmtInfo *stmt, StmtType type, ptrdiff_t top)
 {
     PushStatementInner(bce, stmt, type, top);
     MOZ_ASSERT(stmt->isLoop());
 
-    LoopStmtInfo* downLoop = nullptr;
+    LoopStmtInfo *downLoop = nullptr;
     for (StmtInfoBCE* outer = stmt->down; outer; outer = outer->down) {
         if (outer->isLoop()) {
             downLoop = LoopStmtInfo::fromStmtInfo(outer);
@@ -867,7 +867,7 @@ ComputeAliasedSlots(ExclusiveContext* cx, BytecodeEmitter* bce, Handle<StaticBlo
 }
 
 static bool
-EmitInternedObjectOp(ExclusiveContext* cx, uint32_t index, JSOp op, BytecodeEmitter* bce);
+EmitInternedObjectOp(ExclusiveContext *cx, uint32_t index, JSOp op, BytecodeEmitter *bce);
 
 // In a function, block-scoped locals go after the vars, and form part of the
 // fixed part of a stack frame.  Outside a function, there are no fixed vars,
@@ -997,7 +997,7 @@ EnterNestedScope(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* stmt, 
 // Patches |breaks| and |continues| unless the top statement info record
 // represents a try-catch-finally suite. May fail if a jump offset overflows.
 static bool
-PopStatementBCE(ExclusiveContext* cx, BytecodeEmitter* bce)
+PopStatementBCE(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
     StmtInfoBCE* stmt = bce->topStmt;
     if (!stmt->isTrying() &&
@@ -1046,7 +1046,7 @@ LeaveNestedScope(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* stmt)
 }
 
 static bool
-EmitIndex32(ExclusiveContext* cx, JSOp op, uint32_t index, BytecodeEmitter* bce)
+EmitIndex32(ExclusiveContext *cx, JSOp op, uint32_t index, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
     const size_t len = 1 + UINT32_INDEX_LEN;
@@ -1064,7 +1064,7 @@ EmitIndex32(ExclusiveContext* cx, JSOp op, uint32_t index, BytecodeEmitter* bce)
 }
 
 static bool
-EmitIndexOp(ExclusiveContext* cx, JSOp op, uint32_t index, BytecodeEmitter* bce)
+EmitIndexOp(ExclusiveContext *cx, JSOp op, uint32_t index, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(CheckStrictOrSloppy(bce, op));
     const size_t len = js_CodeSpec[op].length;
@@ -1073,7 +1073,7 @@ EmitIndexOp(ExclusiveContext* cx, JSOp op, uint32_t index, BytecodeEmitter* bce)
     if (offset < 0)
         return false;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = jsbytecode(op);
     SET_UINT32_INDEX(code, index);
     UpdateDepth(cx, bce, offset);
@@ -1082,7 +1082,7 @@ EmitIndexOp(ExclusiveContext* cx, JSOp op, uint32_t index, BytecodeEmitter* bce)
 }
 
 static bool
-EmitAtomOp(ExclusiveContext* cx, JSAtom* atom, JSOp op, BytecodeEmitter* bce)
+EmitAtomOp(ExclusiveContext *cx, JSAtom* atom, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) == JOF_ATOM);
 
@@ -1103,14 +1103,14 @@ EmitAtomOp(ExclusiveContext* cx, JSAtom* atom, JSOp op, BytecodeEmitter* bce)
 }
 
 static bool
-EmitAtomOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitAtomOp(ExclusiveContext *cx, ParseNode* pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->pn_atom != nullptr);
     return EmitAtomOp(cx, pn->pn_atom, op, bce);
 }
 
 static bool
-EmitInternedObjectOp(ExclusiveContext* cx, uint32_t index, JSOp op, BytecodeEmitter* bce)
+EmitInternedObjectOp(ExclusiveContext *cx, uint32_t index, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) == JOF_OBJECT);
     MOZ_ASSERT(index < bce->objectList.length);
@@ -1118,14 +1118,14 @@ EmitInternedObjectOp(ExclusiveContext* cx, uint32_t index, JSOp op, BytecodeEmit
 }
 
 static bool
-EmitObjectOp(ExclusiveContext* cx, ObjectBox* objbox, JSOp op, BytecodeEmitter* bce)
+EmitObjectOp(ExclusiveContext *cx, ObjectBox *objbox, JSOp op, BytecodeEmitter *bce)
 {
     return EmitInternedObjectOp(cx, bce->objectList.add(objbox), op, bce);
 }
 
 static bool
-EmitObjectPairOp(ExclusiveContext* cx, ObjectBox* objbox1, ObjectBox* objbox2, JSOp op,
-                 BytecodeEmitter* bce)
+EmitObjectPairOp(ExclusiveContext *cx, ObjectBox *objbox1, ObjectBox *objbox2, JSOp op,
+                 BytecodeEmitter *bce)
 {
     uint32_t index = bce->objectList.add(objbox1);
     bce->objectList.add(objbox2);
@@ -1133,7 +1133,7 @@ EmitObjectPairOp(ExclusiveContext* cx, ObjectBox* objbox1, ObjectBox* objbox2, J
 }
 
 static bool
-EmitRegExp(ExclusiveContext* cx, uint32_t index, BytecodeEmitter* bce)
+EmitRegExp(ExclusiveContext *cx, uint32_t index, BytecodeEmitter *bce)
 {
     return EmitIndex32(cx, JSOP_REGEXP, index, bce);
 }
@@ -1146,7 +1146,7 @@ EmitRegExp(ExclusiveContext* cx, uint32_t index, BytecodeEmitter* bce)
  * used as a non-asserting version of EMIT_UINT16_IMM_OP.
  */
 static bool
-EmitLocalOp(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, uint32_t slot)
+EmitLocalOp(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, uint32_t slot)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) != JOF_SCOPECOORD);
     MOZ_ASSERT(IsLocalOp(op));
@@ -1160,8 +1160,8 @@ EmitLocalOp(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, uint32_t slot)
 }
 
 static bool
-EmitUnaliasedVarOp(ExclusiveContext* cx, JSOp op, uint32_t slot, MaybeCheckLexical checkLexical,
-                   BytecodeEmitter* bce)
+EmitUnaliasedVarOp(ExclusiveContext *cx, JSOp op, uint32_t slot, MaybeCheckLexical checkLexical,
+                   BytecodeEmitter *bce)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) != JOF_SCOPECOORD);
 
@@ -1191,7 +1191,7 @@ EmitUnaliasedVarOp(ExclusiveContext* cx, JSOp op, uint32_t slot, MaybeCheckLexic
 }
 
 static bool
-EmitScopeCoordOp(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, ScopeCoordinate sc)
+EmitScopeCoordOp(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op, ScopeCoordinate sc)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) == JOF_SCOPECOORD);
 
@@ -1212,8 +1212,8 @@ EmitScopeCoordOp(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op, ScopeCoord
 }
 
 static bool
-EmitAliasedVarOp(ExclusiveContext* cx, JSOp op, ScopeCoordinate sc, MaybeCheckLexical checkLexical,
-                 BytecodeEmitter* bce)
+EmitAliasedVarOp(ExclusiveContext *cx, JSOp op, ScopeCoordinate sc, MaybeCheckLexical checkLexical,
+                 BytecodeEmitter *bce)
 {
     if (checkLexical) {
         MOZ_ASSERT(op != JSOP_INITALIASEDLEXICAL);
@@ -1395,7 +1395,7 @@ EmitAliasedVarOp(ExclusiveContext* cx, JSOp op, ParseNode* pn, BytecodeEmitter* 
 }
 
 static bool
-EmitVarOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitVarOp(ExclusiveContext *cx, ParseNode *pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->isKind(PNK_FUNCTION) || pn->isKind(PNK_NAME));
     MOZ_ASSERT(!pn->pn_cookie.isFree());
@@ -1427,7 +1427,7 @@ EmitVarOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
 }
 
 static JSOp
-GetIncDecInfo(ParseNodeKind kind, bool* post)
+GetIncDecInfo(ParseNodeKind kind, bool *post)
 {
     MOZ_ASSERT(kind == PNK_POSTINCREMENT || kind == PNK_PREINCREMENT ||
                kind == PNK_POSTDECREMENT || kind == PNK_PREDECREMENT);
@@ -1436,7 +1436,7 @@ GetIncDecInfo(ParseNodeKind kind, bool* post)
 }
 
 static bool
-EmitVarIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
+EmitVarIncDec(ExclusiveContext *cx, ParseNode *pn, BytecodeEmitter *bce)
 {
     JSOp op = pn->pn_kid->getOp();
     MOZ_ASSERT(IsArgOp(op) || IsLocalOp(op) || IsAliasedVarOp(op));
@@ -2232,14 +2232,14 @@ BytecodeEmitter::reportStrictModeError(ParseNode* pn, unsigned errorNumber, ...)
 }
 
 static bool
-EmitNewInit(ExclusiveContext* cx, BytecodeEmitter* bce, JSProtoKey key)
+EmitNewInit(ExclusiveContext *cx, BytecodeEmitter *bce, JSProtoKey key)
 {
     const size_t len = 1 + UINT32_INDEX_LEN;
     ptrdiff_t offset = EmitCheck(cx, bce, len);
     if (offset < 0)
         return false;
 
-    jsbytecode* code = bce->code(offset);
+    jsbytecode *code = bce->code(offset);
     code[0] = JSOP_NEWINIT;
     code[1] = jsbytecode(key);
     code[2] = 0;
@@ -2284,7 +2284,7 @@ IteratorResultShape(ExclusiveContext* cx, BytecodeEmitter* bce, unsigned* shape)
 }
 
 static bool
-EmitPrepareIteratorResult(ExclusiveContext* cx, BytecodeEmitter* bce)
+EmitPrepareIteratorResult(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
     if (bce->script->compileAndGo()) {
         unsigned shape;
@@ -2297,7 +2297,7 @@ EmitPrepareIteratorResult(ExclusiveContext* cx, BytecodeEmitter* bce)
 }
 
 static bool
-EmitFinishIteratorResult(ExclusiveContext* cx, BytecodeEmitter* bce, bool done)
+EmitFinishIteratorResult(ExclusiveContext *cx, BytecodeEmitter *bce, bool done)
 {
     jsatomid value_id;
     if (!bce->makeAtomIndex(cx->names().value, &value_id))
@@ -2316,7 +2316,7 @@ EmitFinishIteratorResult(ExclusiveContext* cx, BytecodeEmitter* bce, bool done)
 }
 
 static bool
-EmitNameOp(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, bool callContext)
+EmitNameOp(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, bool callContext)
 {
     if (!BindNameToSlot(cx, bce, pn))
         return false;
@@ -2354,10 +2354,10 @@ EmitNameOp(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, bool callC
 }
 
 static bool
-EmitPropLHS(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitPropLHS(ExclusiveContext *cx, ParseNode *pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->isKind(PNK_DOT));
-    ParseNode* pn2 = pn->maybeExpr();
+    ParseNode *pn2 = pn->maybeExpr();
 
     /*
      * If the object operand is also a dotted property reference, reverse the
@@ -2365,8 +2365,8 @@ EmitPropLHS(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
      * bottom up (reversing again as we go), to avoid excessive recursion.
      */
     if (pn2->isKind(PNK_DOT)) {
-        ParseNode* pndot = pn2;
-        ParseNode* pnup = nullptr, *pndown;
+        ParseNode *pndot = pn2;
+        ParseNode *pnup = nullptr, *pndown;
         ptrdiff_t top = bce->offset();
         for (;;) {
             /* Reverse pndot->pn_expr to point up, not down. */
@@ -2402,7 +2402,7 @@ EmitPropLHS(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
 }
 
 static bool
-EmitPropOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitPropOp(ExclusiveContext *cx, ParseNode *pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->isArity(PN_NAME));
 
@@ -2422,7 +2422,7 @@ EmitPropOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
 }
 
 static bool
-EmitPropIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
+EmitPropIncDec(ExclusiveContext *cx, ParseNode *pn, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->pn_kid->getKind() == PNK_DOT);
 
@@ -2462,9 +2462,9 @@ EmitPropIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
 }
 
 static bool
-EmitNameIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
+EmitNameIncDec(ExclusiveContext *cx, ParseNode *pn, BytecodeEmitter *bce)
 {
-    const JSCodeSpec* cs = &js_CodeSpec[pn->pn_kid->getOp()];
+    const JSCodeSpec *cs = &js_CodeSpec[pn->pn_kid->getOp()];
 
     bool global = (cs->format & JOF_GNAME);
     bool post;
@@ -2505,7 +2505,7 @@ EmitNameIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
  * value to be assigned must already be pushed.
  */
 static bool
-EmitElemOperands(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitElemOperands(ExclusiveContext *cx, ParseNode *pn, JSOp op, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->isArity(PN_BINARY));
     if (!EmitTree(cx, bce, pn->pn_left))
@@ -2521,7 +2521,7 @@ EmitElemOperands(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* 
 }
 
 static inline bool
-EmitElemOpBase(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
+EmitElemOpBase(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op)
 {
     if (!Emit1(cx, bce, op))
         return false;
@@ -2530,13 +2530,13 @@ EmitElemOpBase(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
 }
 
 static bool
-EmitElemOp(ExclusiveContext* cx, ParseNode* pn, JSOp op, BytecodeEmitter* bce)
+EmitElemOp(ExclusiveContext *cx, ParseNode* pn, JSOp op, BytecodeEmitter *bce)
 {
     return EmitElemOperands(cx, pn, op, bce) && EmitElemOpBase(cx, bce, op);
 }
 
 static bool
-EmitElemIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
+EmitElemIncDec(ExclusiveContext *cx, ParseNode *pn, BytecodeEmitter *bce)
 {
     MOZ_ASSERT(pn->pn_kid->getKind() == PNK_ELEM);
 
@@ -2585,7 +2585,7 @@ EmitElemIncDec(ExclusiveContext* cx, ParseNode* pn, BytecodeEmitter* bce)
 }
 
 static bool
-EmitNumberOp(ExclusiveContext* cx, double dval, BytecodeEmitter* bce)
+EmitNumberOp(ExclusiveContext *cx, double dval, BytecodeEmitter *bce)
 {
     int32_t ival;
     uint32_t u;
@@ -2696,7 +2696,7 @@ EnterBlockScope(ExclusiveContext* cx, BytecodeEmitter* bce, StmtInfoBCE* stmtInf
  * into EmitTree which is recursive and uses relatively little stack space.
  */
 MOZ_NEVER_INLINE static bool
-EmitSwitch(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitSwitch(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     JSOp switchOp;
     bool hasDefault;
@@ -3037,7 +3037,7 @@ BytecodeEmitter::isRunOnceLambda()
 }
 
 static bool
-EmitYieldOp(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp op)
+EmitYieldOp(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp op)
 {
     if (op == JSOP_FINALYIELDRVAL)
         return Emit1(cx, bce, JSOP_FINALYIELDRVAL);
@@ -3197,8 +3197,8 @@ frontend::EmitFunctionScript(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNo
 }
 
 static bool
-MaybeEmitVarDecl(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp prologOp, ParseNode* pn,
-                 jsatomid* result)
+MaybeEmitVarDecl(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp prologOp, ParseNode *pn,
+                 jsatomid *result)
 {
     jsatomid atomIndex;
 
@@ -3241,7 +3241,7 @@ enum VarEmitOption
 };
 
 typedef bool
-(*DestructuringDeclEmitter)(ExclusiveContext* cx, BytecodeEmitter* bce, JSOp prologOp, ParseNode* pn);
+(*DestructuringDeclEmitter)(ExclusiveContext *cx, BytecodeEmitter *bce, JSOp prologOp, ParseNode *pn);
 
 template <DestructuringDeclEmitter EmitName>
 static bool
@@ -3329,7 +3329,7 @@ EmitInitializeDestructuringDecls(ExclusiveContext* cx, BytecodeEmitter* bce, JSO
 }
 
 static bool
-EmitDestructuringOpsHelper(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pattern,
+EmitDestructuringOpsHelper(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pattern,
                            VarEmitOption emitOption);
 
 /*
@@ -3480,15 +3480,15 @@ EmitDestructuringLHS(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* targ
     return true;
 }
 
-static bool EmitSpread(ExclusiveContext* cx, BytecodeEmitter* bce);
-static bool EmitIterator(ExclusiveContext* cx, BytecodeEmitter* bce);
+static bool EmitSpread(ExclusiveContext *cx, BytecodeEmitter *bce);
+static bool EmitIterator(ExclusiveContext *cx, BytecodeEmitter *bce);
 
 /**
  * EmitIteratorNext will pop iterator from the top of the stack.
  * It will push the result of |.next()| onto the stack.
  */
 static bool
-EmitIteratorNext(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn=nullptr)
+EmitIteratorNext(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn=nullptr)
 {
     MOZ_ASSERT(bce->emitterMode != BytecodeEmitter::SelfHosting,
                ".next() iteration is prohibited in self-hosted code because it "
@@ -3511,7 +3511,7 @@ EmitIteratorNext(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn=nullp
  * If so, it will replace that value on the stack with the value defined by |defaultExpr|.
  */
 static bool
-EmitDefault(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* defaultExpr)
+EmitDefault(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *defaultExpr)
 {
     if (!Emit1(cx, bce, JSOP_DUP))                             // VALUE VALUE
         return false;
@@ -3625,7 +3625,7 @@ EmitDestructuringOpsArrayHelper(ExclusiveContext* cx, BytecodeEmitter* bce, Pars
             return false;
 
         // Destructure into the pattern the element contains.
-        ParseNode* subpattern = elem;
+        ParseNode *subpattern = elem;
         if (subpattern->isKind(PNK_ELISION)) {
             // The value destructuring into an elision just gets ignored.
             if (!Emit1(cx, bce, JSOP_POP))                             // ... OBJ? ITER
@@ -3668,7 +3668,7 @@ EmitDestructuringOpsArrayHelper(ExclusiveContext* cx, BytecodeEmitter* bce, Pars
 }
 
 static bool
-EmitDestructuringOpsObjectHelper(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pattern,
+EmitDestructuringOpsObjectHelper(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pattern,
                                  VarEmitOption emitOption)
 {
     MOZ_ASSERT(pattern->isKind(PNK_OBJECT));
@@ -3676,7 +3676,7 @@ EmitDestructuringOpsObjectHelper(ExclusiveContext* cx, BytecodeEmitter* bce, Par
 
     MOZ_ASSERT(bce->stackDepth != 0);                                  // ... OBJ
 
-    for (ParseNode* member = pattern->pn_head; member; member = member->pn_next) {
+    for (ParseNode *member = pattern->pn_head; member; member = member->pn_next) {
         // Duplicate the value being destructured to use as a reference base.
         if (!Emit1(cx, bce, JSOP_DUP))                                 // ... OBJ OBJ
             return false;
@@ -3686,7 +3686,7 @@ EmitDestructuringOpsObjectHelper(ExclusiveContext* cx, BytecodeEmitter* bce, Par
         // initialiser.
         bool needsGetElem = true;
 
-        ParseNode* subpattern;
+        ParseNode *subpattern;
         if (member->isKind(PNK_MUTATEPROTO)) {
             if (!EmitAtomOp(cx, cx->names().proto, JSOP_GETPROP, bce)) // ... OBJ PROP
                 return false;
@@ -3830,11 +3830,11 @@ EmitDestructuringOps(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* patt
 }
 
 static bool
-EmitTemplateString(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitTemplateString(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
 
-    for (ParseNode* pn2 = pn->pn_head; pn2 != NULL; pn2 = pn2->pn_next) {
+    for (ParseNode *pn2 = pn->pn_head; pn2 != NULL; pn2 = pn2->pn_next) {
         if (pn2->getKind() != PNK_STRING && pn2->getKind() != PNK_TEMPLATE_STRING) {
             // We update source notes before emitting the expression
             if (!UpdateSourceCoordNotes(cx, bce, pn2->pn_pos.begin))
@@ -3860,19 +3860,19 @@ EmitTemplateString(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitVariables(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, VarEmitOption emitOption,
+EmitVariables(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, VarEmitOption emitOption,
               bool isLetExpr = false)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
     MOZ_ASSERT(isLetExpr == (emitOption == PushInitialValues));
 
-    ParseNode* next;
-    for (ParseNode* pn2 = pn->pn_head; ; pn2 = next) {
+    ParseNode *next;
+    for (ParseNode *pn2 = pn->pn_head; ; pn2 = next) {
         if (!UpdateSourceCoordNotes(cx, bce, pn2->pn_pos.begin))
             return false;
         next = pn2->pn_next;
 
-        ParseNode* pn3;
+        ParseNode *pn3;
         if (!pn2->isKind(PNK_NAME)) {
             if (pn2->isKind(PNK_ARRAY) || pn2->isKind(PNK_OBJECT)) {
                 // If the emit option is DefineVars, emit variable binding
@@ -4036,7 +4036,7 @@ EmitVariables(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, VarEmit
 }
 
 static bool
-EmitAssignment(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* lhs, JSOp op, ParseNode* rhs)
+EmitAssignment(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *lhs, JSOp op, ParseNode *rhs)
 {
     /*
      * Check left operand type and generate specialized code for it.
@@ -4376,7 +4376,7 @@ EmitSingletonInitialiser(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *
 }
 
 static bool
-EmitCallSiteObject(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitCallSiteObject(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     RootedValue value(cx);
     if (!pn->getConstantValue(cx, ParseNode::AllowObjects, &value))
@@ -4384,7 +4384,7 @@ EmitCallSiteObject(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 
     MOZ_ASSERT(value.isObject());
 
-    ObjectBox* objbox1 = bce->parser->newObjectBox(&value.toObject().as<NativeObject>());
+    ObjectBox *objbox1 = bce->parser->newObjectBox(&value.toObject().as<NativeObject>());
     if (!objbox1)
         return false;
 
@@ -4393,7 +4393,7 @@ EmitCallSiteObject(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 
     MOZ_ASSERT(value.isObject());
 
-    ObjectBox* objbox2 = bce->parser->newObjectBox(&value.toObject().as<NativeObject>());
+    ObjectBox *objbox2 = bce->parser->newObjectBox(&value.toObject().as<NativeObject>());
     if (!objbox2)
         return false;
 
@@ -4417,13 +4417,13 @@ class EmitLevelManager
 } /* anonymous namespace */
 
 static bool
-EmitCatch(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitCatch(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     /*
      * Morph STMT_BLOCK to STMT_CATCH, note the block entry code offset,
      * and save the block object atom.
      */
-    StmtInfoBCE* stmt = bce->topStmt;
+    StmtInfoBCE *stmt = bce->topStmt;
     MOZ_ASSERT(stmt->type == STMT_BLOCK && stmt->isBlockScope);
     stmt->type = STMT_CATCH;
 
@@ -4442,7 +4442,7 @@ EmitCatch(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
     if (pn->pn_kid2 && !Emit1(cx, bce, JSOP_DUP))
         return false;
 
-    ParseNode* pn2 = pn->pn_kid1;
+    ParseNode *pn2 = pn->pn_kid1;
     switch (pn2->getKind()) {
       case PNK_ARRAY:
       case PNK_OBJECT:
@@ -4513,7 +4513,7 @@ EmitCatch(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 // comment on EmitSwitch.
 //
 MOZ_NEVER_INLINE static bool
-EmitTry(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitTry(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     StmtInfoBCE stmtInfo(cx);
 
@@ -4682,7 +4682,7 @@ EmitTry(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitIf(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitIf(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     StmtInfoBCE stmtInfo(cx);
 
@@ -4713,7 +4713,7 @@ EmitIf(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
     }
 
     /* Emit an annotated branch-if-false around the then part. */
-    ParseNode* pn3 = pn->pn_kid3;
+    ParseNode *pn3 = pn->pn_kid3;
     noteIndex = NewSrcNote(cx, bce, pn3 ? SRC_IF_ELSE : SRC_IF);
     if (noteIndex < 0)
         return false;
@@ -4772,7 +4772,7 @@ EmitIf(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * the comment on EmitSwitch.
  */
 MOZ_NEVER_INLINE static bool
-EmitLetBlock(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pnLet)
+EmitLetBlock(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pnLet)
 {
     MOZ_ASSERT(pnLet->isArity(PN_BINARY));
     ParseNode* varList = pnLet->pn_left;
@@ -4842,7 +4842,7 @@ EmitWith(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * It will replace that stack value with the corresponding iterator
  */
 static bool
-EmitIterator(ExclusiveContext* cx, BytecodeEmitter* bce)
+EmitIterator(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
     // Convert iterable to iterator.
     if (!Emit1(cx, bce, JSOP_DUP))                             // OBJ OBJ
@@ -4860,7 +4860,7 @@ EmitIterator(ExclusiveContext* cx, BytecodeEmitter* bce)
 }
 
 static bool
-EmitForInOrOfVariables(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, bool* letDecl)
+EmitForInOrOfVariables(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, bool *letDecl)
 {
     *letDecl = pn->isKind(PNK_LEXICALSCOPE);
     MOZ_ASSERT_IF(*letDecl, pn->isLexical());
@@ -4902,17 +4902,17 @@ EmitForInOrOfVariables(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn
  * stack convention.
  */
 static bool
-EmitForOf(ExclusiveContext* cx, BytecodeEmitter* bce, StmtType type, ParseNode* pn, ptrdiff_t top)
+EmitForOf(ExclusiveContext *cx, BytecodeEmitter *bce, StmtType type, ParseNode *pn, ptrdiff_t top)
 {
     MOZ_ASSERT(type == STMT_FOR_OF_LOOP || type == STMT_SPREAD);
     MOZ_ASSERT_IF(type == STMT_FOR_OF_LOOP, pn && pn->pn_left->isKind(PNK_FOROF));
     MOZ_ASSERT_IF(type == STMT_SPREAD, !pn);
 
-    ParseNode* forHead = pn ? pn->pn_left : nullptr;
-    ParseNode* forHeadExpr = forHead ? forHead->pn_kid3 : nullptr;
-    ParseNode* forBody = pn ? pn->pn_right : nullptr;
+    ParseNode *forHead = pn ? pn->pn_left : nullptr;
+    ParseNode *forHeadExpr = forHead ? forHead->pn_kid3 : nullptr;
+    ParseNode *forBody = pn ? pn->pn_right : nullptr;
 
-    ParseNode* pn1 = forHead ? forHead->pn_kid1 : nullptr;
+    ParseNode *pn1 = forHead ? forHead->pn_kid1 : nullptr;
     bool letDecl = false;
     if (pn1 && !EmitForInOrOfVariables(cx, bce, pn1, &letDecl))
         return false;
@@ -5056,12 +5056,12 @@ EmitForOf(ExclusiveContext* cx, BytecodeEmitter* bce, StmtType type, ParseNode* 
 }
 
 static bool
-EmitForIn(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t top)
+EmitForIn(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
-    ParseNode* forHead = pn->pn_left;
-    ParseNode* forBody = pn->pn_right;
+    ParseNode *forHead = pn->pn_left;
+    ParseNode *forBody = pn->pn_right;
 
-    ParseNode* pn1 = forHead->pn_kid1;
+    ParseNode *pn1 = forHead->pn_kid1;
     bool letDecl = false;
     if (pn1 && !EmitForInOrOfVariables(cx, bce, pn1, &letDecl))
         return false;
@@ -5178,13 +5178,13 @@ EmitForIn(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t t
 }
 
 static bool
-EmitNormalFor(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t top)
+EmitNormalFor(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
     LoopStmtInfo stmtInfo(cx);
     PushLoopStatement(bce, &stmtInfo, STMT_FOR_LOOP, top);
 
-    ParseNode* forHead = pn->pn_left;
-    ParseNode* forBody = pn->pn_right;
+    ParseNode *forHead = pn->pn_left;
+    ParseNode *forBody = pn->pn_right;
 
     /* C-style for (init; cond; update) ... loop. */
     bool forLoopRequiresFreshening = false;
@@ -5333,7 +5333,7 @@ EmitNormalFor(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff
 }
 
 static inline bool
-EmitFor(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t top)
+EmitFor(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
     if (pn->pn_left->isKind(PNK_FORIN))
         return EmitForIn(cx, bce, pn, top);
@@ -5498,7 +5498,7 @@ EmitFunc(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, bool needsPr
 }
 
 static bool
-EmitDo(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitDo(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     /* Emit an annotated nop so IonBuilder can recognize the 'do' loop. */
     ptrdiff_t noteIndex = NewSrcNote(cx, bce, SRC_WHILE);
@@ -5557,7 +5557,7 @@ EmitDo(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitWhile(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t top)
+EmitWhile(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
     /*
      * Minimize bytecodes issued for one or more iterations by jumping to
@@ -5610,9 +5610,9 @@ EmitWhile(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t t
 }
 
 static bool
-EmitBreak(ExclusiveContext* cx, BytecodeEmitter* bce, PropertyName* label)
+EmitBreak(ExclusiveContext *cx, BytecodeEmitter *bce, PropertyName *label)
 {
-    StmtInfoBCE* stmt = bce->topStmt;
+    StmtInfoBCE *stmt = bce->topStmt;
     SrcNoteType noteType;
     if (label) {
         while (stmt->type != STMT_LABEL || stmt->label != label)
@@ -5628,12 +5628,12 @@ EmitBreak(ExclusiveContext* cx, BytecodeEmitter* bce, PropertyName* label)
 }
 
 static bool
-EmitContinue(ExclusiveContext* cx, BytecodeEmitter* bce, PropertyName* label)
+EmitContinue(ExclusiveContext *cx, BytecodeEmitter *bce, PropertyName *label)
 {
-    StmtInfoBCE* stmt = bce->topStmt;
+    StmtInfoBCE *stmt = bce->topStmt;
     if (label) {
         /* Find the loop statement enclosed by the matching label. */
-        StmtInfoBCE* loop = nullptr;
+        StmtInfoBCE *loop = nullptr;
         while (stmt->type != STMT_LABEL || stmt->label != label) {
             if (stmt->isLoop())
                 loop = stmt;
@@ -5649,9 +5649,9 @@ EmitContinue(ExclusiveContext* cx, BytecodeEmitter* bce, PropertyName* label)
 }
 
 static bool
-InTryBlockWithFinally(BytecodeEmitter* bce)
+InTryBlockWithFinally(BytecodeEmitter *bce)
 {
-    for (StmtInfoBCE* stmt = bce->topStmt; stmt; stmt = stmt->down) {
+    for (StmtInfoBCE *stmt = bce->topStmt; stmt; stmt = stmt->down) {
         if (stmt->type == STMT_FINALLY)
             return true;
     }
@@ -5659,7 +5659,7 @@ InTryBlockWithFinally(BytecodeEmitter* bce)
 }
 
 static bool
-EmitReturn(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitReturn(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     if (!UpdateSourceCoordNotes(cx, bce, pn->pn_pos.begin))
         return false;
@@ -5670,7 +5670,7 @@ EmitReturn(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
     }
 
     /* Push a return value */
-    if (ParseNode* pn2 = pn->pn_left) {
+    if (ParseNode *pn2 = pn->pn_left) {
         if (!EmitTree(cx, bce, pn2))
             return false;
     } else {
@@ -5751,7 +5751,7 @@ EmitReturn(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitYield(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitYield(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(bce->sc->isFunctionBox());
 
@@ -5788,7 +5788,7 @@ EmitYield(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitYieldStar(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* iter, ParseNode* gen)
+EmitYieldStar(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode* iter, ParseNode *gen)
 {
     MOZ_ASSERT(bce->sc->isFunctionBox());
     MOZ_ASSERT(bce->sc->asFunctionBox()->isStarGenerator());
@@ -5940,19 +5940,19 @@ EmitYieldStar(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* iter, Parse
 }
 
 static bool
-EmitStatementList(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptrdiff_t top)
+EmitStatementList(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
 
     StmtInfoBCE stmtInfo(cx);
     PushStatementBCE(bce, &stmtInfo, STMT_BLOCK, top);
 
-    ParseNode* pnchild = pn->pn_head;
+    ParseNode *pnchild = pn->pn_head;
 
     if (pn->pn_xflags & PNX_DESTRUCT)
         pnchild = pnchild->pn_next;
 
-    for (ParseNode* pn2 = pnchild; pn2; pn2 = pn2->pn_next) {
+    for (ParseNode *pn2 = pnchild; pn2; pn2 = pn2->pn_next) {
         if (!EmitTree(cx, bce, pn2))
             return false;
     }
@@ -5961,11 +5961,11 @@ EmitStatementList(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, ptr
 }
 
 static bool
-EmitStatement(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitStatement(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_SEMI));
 
-    ParseNode* pn2 = pn->pn_kid;
+    ParseNode *pn2 = pn->pn_kid;
     if (!pn2)
         return true;
 
@@ -6053,13 +6053,13 @@ EmitStatement(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitDelete(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitDelete(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     /*
      * Under ECMA 3, deleting a non-reference returns true -- but alas we
      * must evaluate the operand if it appears it might have side effects.
      */
-    ParseNode* pn2 = pn->pn_kid;
+    ParseNode *pn2 = pn->pn_kid;
     switch (pn2->getKind()) {
       case PNK_NAME:
         if (!BindNameToSlot(cx, bce, pn2))
@@ -6108,10 +6108,10 @@ EmitDelete(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitArray(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, uint32_t count);
+EmitArray(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, uint32_t count);
 
 static bool
-EmitSelfHostedCallFunction(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitSelfHostedCallFunction(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     // Special-casing of callFunction to emit bytecode that directly
     // invokes the callee with the correct |this| object and arguments.
@@ -6155,7 +6155,7 @@ EmitSelfHostedCallFunction(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode
 }
 
 static bool
-EmitSelfHostedResumeGenerator(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitSelfHostedResumeGenerator(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     // Syntax: resumeGenerator(gen, value, 'next'|'throw'|'close')
     if (pn->pn_count != 4) {
@@ -6163,17 +6163,17 @@ EmitSelfHostedResumeGenerator(ExclusiveContext* cx, BytecodeEmitter* bce, ParseN
         return false;
     }
 
-    ParseNode* funNode = pn->pn_head;  // The resumeGenerator node.
+    ParseNode *funNode = pn->pn_head;  // The resumeGenerator node.
 
-    ParseNode* genNode = funNode->pn_next;
+    ParseNode *genNode = funNode->pn_next;
     if (!EmitTree(cx, bce, genNode))
         return false;
 
-    ParseNode* valNode = genNode->pn_next;
+    ParseNode *valNode = genNode->pn_next;
     if (!EmitTree(cx, bce, valNode))
         return false;
 
-    ParseNode* kindNode = valNode->pn_next;
+    ParseNode *kindNode = valNode->pn_next;
     MOZ_ASSERT(kindNode->isKind(PNK_STRING));
     uint16_t operand = GeneratorObject::getResumeKind(cx, kindNode->pn_atom);
     MOZ_ASSERT(!kindNode->pn_next);
@@ -6185,7 +6185,7 @@ EmitSelfHostedResumeGenerator(ExclusiveContext* cx, BytecodeEmitter* bce, ParseN
 }
 
 static bool
-EmitSelfHostedForceInterpreter(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitSelfHostedForceInterpreter(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     if (!Emit1(cx, bce, JSOP_FORCEINTERPRETER))
         return false;
@@ -6195,7 +6195,7 @@ EmitSelfHostedForceInterpreter(ExclusiveContext* cx, BytecodeEmitter* bce, Parse
 }
 
 static bool
-EmitCallOrNew(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitCallOrNew(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     bool callop = pn->isKind(PNK_CALL) || pn->isKind(PNK_TAGGED_TEMPLATE);
     /*
@@ -6222,7 +6222,7 @@ EmitCallOrNew(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
         return false;
     }
 
-    ParseNode* pn2 = pn->pn_head;
+    ParseNode *pn2 = pn->pn_head;
     bool spread = JOF_OPTYPE(pn->getOp()) == JOF_BYTE;
     switch (pn2->getKind()) {
       case PNK_NAME:
@@ -6332,7 +6332,7 @@ EmitCallOrNew(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitLogical(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitLogical(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
 
@@ -6347,7 +6347,7 @@ EmitLogical(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
      */
 
     /* Left-associative operator chain: avoid too much recursion. */
-    ParseNode* pn2 = pn->pn_head;
+    ParseNode *pn2 = pn->pn_head;
     if (!EmitTree(cx, bce, pn2))
         return false;
     ptrdiff_t top = EmitJump(cx, bce, JSOP_BACKPATCH, 0);
@@ -6390,10 +6390,10 @@ EmitLogical(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * the comment on EmitSwitch.
  */
 MOZ_NEVER_INLINE static bool
-EmitIncOrDec(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitIncOrDec(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     /* Emit lvalue-specialized code for ++/-- operators. */
-    ParseNode* pn2 = pn->pn_kid;
+    ParseNode *pn2 = pn->pn_kid;
     switch (pn2->getKind()) {
       case PNK_DOT:
         if (!EmitPropIncDec(cx, pn, bce))
@@ -6471,7 +6471,7 @@ EmitIncOrDec(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * the comment on EmitSwitch.
  */
 MOZ_NEVER_INLINE static bool
-EmitLabeledStatement(ExclusiveContext* cx, BytecodeEmitter* bce, const LabeledStatement* pn)
+EmitLabeledStatement(ExclusiveContext *cx, BytecodeEmitter *bce, const LabeledStatement *pn)
 {
     /*
      * Emit a JSOP_LABEL instruction. The argument is the offset to the statement
@@ -6555,7 +6555,7 @@ static bool
 EmitPropertyList(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn,
                  MutableHandlePlainObject objp, PropListType type)
 {
-    for (ParseNode* propdef = pn->pn_head; propdef; propdef = propdef->pn_next) {
+    for (ParseNode *propdef = pn->pn_head; propdef; propdef = propdef->pn_next) {
         if (!UpdateSourceCoordNotes(cx, bce, propdef->pn_pos.begin))
             return false;
 
@@ -6721,7 +6721,7 @@ EmitObject(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 }
 
 static bool
-EmitArrayComp(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitArrayComp(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     if (!EmitNewInit(cx, bce, JSProto_Array))
         return false;
@@ -6750,13 +6750,13 @@ EmitArrayComp(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * The stack after iteration will look like |ARRAY INDEX|.
  */
 static bool
-EmitSpread(ExclusiveContext* cx, BytecodeEmitter* bce)
+EmitSpread(ExclusiveContext *cx, BytecodeEmitter *bce)
 {
     return EmitForOf(cx, bce, STMT_SPREAD, nullptr, -1);
 }
 
 static bool
-EmitArray(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, uint32_t count)
+EmitArray(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, uint32_t count)
 {
     /*
      * Emit code for [a, b, c] that is equivalent to constructing a new
@@ -6777,7 +6777,7 @@ EmitArray(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, uint32_t co
     if (off < 0)
         return false;
     CheckTypeSet(cx, bce, JSOP_NEWARRAY);
-    jsbytecode* pc = bce->code(off);
+    jsbytecode *pc = bce->code(off);
 
     // For arrays with spread, this is a very pessimistic allocation, the
     // minimum possible final size.
@@ -6830,7 +6830,7 @@ EmitArray(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn, uint32_t co
 }
 
 static bool
-EmitUnary(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitUnary(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     if (!UpdateSourceCoordNotes(cx, bce, pn->pn_pos.begin))
         return false;
@@ -6851,11 +6851,11 @@ EmitUnary(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
 }
 
 static bool
-EmitDefaults(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+EmitDefaults(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_ARGSBODY));
 
-    ParseNode* arg, *pnlast = pn->last();
+    ParseNode *arg, *pnlast = pn->last();
     for (arg = pn->pn_head; arg != pnlast; arg = arg->pn_next) {
         if (!(arg->pn_dflags & PND_DEFAULT))
             continue;
