@@ -217,11 +217,11 @@ BytecodeEmitter::emitCheck(ptrdiff_t delta)
 }
 
 static void
-UpdateDepth(ExclusiveContext* cx, BytecodeEmitter* bce, ptrdiff_t target)
+UpdateDepth(ExclusiveContext *cx, BytecodeEmitter *bce, ptrdiff_t target)
 {
-    jsbytecode* pc = bce->code(target);
+    jsbytecode *pc = bce->code(target);
     JSOp op = (JSOp) *pc;
-    const JSCodeSpec* cs = &js_CodeSpec[op];
+    const JSCodeSpec *cs = &js_CodeSpec[op];
 
     if (cs->format & JOF_TMPSLOT_MASK) {
         /*
@@ -401,7 +401,7 @@ static_assert(MOZ_ARRAY_LENGTH(statementName) == STMT_LIMIT,
               "statementName array and StmtType enum must be consistent");
 
 static const char*
-StatementName(StmtInfoBCE* topStmt)
+StatementName(StmtInfoBCE *topStmt)
 {
     if (!topStmt)
         return js_script_str;
@@ -409,7 +409,7 @@ StatementName(StmtInfoBCE* topStmt)
 }
 
 static void
-ReportStatementTooLarge(TokenStream& ts, StmtInfoBCE* topStmt)
+ReportStatementTooLarge(TokenStream& ts, StmtInfoBCE *topStmt)
 {
     ts.reportError(JSMSG_NEED_DIET, StatementName(topStmt));
 }
@@ -435,9 +435,9 @@ LengthOfSetLine(unsigned line)
 
 /* Updates line number notes, not column notes. */
 static inline bool
-UpdateLineNumberNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offset)
+UpdateLineNumberNotes(ExclusiveContext *cx, BytecodeEmitter *bce, uint32_t offset)
 {
-    TokenStream* ts = &bce->parser->tokenStream;
+    TokenStream *ts = &bce->parser->tokenStream;
     bool onThisLine;
     if (!ts->srcCoords.isOnThisLine(offset, bce->currentLine(), &onThisLine))
         return ts->reportError(JSMSG_OUT_OF_MEMORY);
@@ -473,7 +473,7 @@ UpdateLineNumberNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offse
 
 /* Updates the line number and column number information in the source notes. */
 static bool
-UpdateSourceCoordNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offset)
+UpdateSourceCoordNotes(ExclusiveContext *cx, BytecodeEmitter *bce, uint32_t offset)
 {
     if (!UpdateLineNumberNotes(cx, bce, offset))
         return false;
@@ -849,7 +849,7 @@ ComputeAliasedSlots(ExclusiveContext* cx, BytecodeEmitter* bce, Handle<StaticBlo
 // but block-scoped locals still form part of the fixed part of a stack frame
 // and are thus addressable via GETLOCAL and friends.
 static void
-ComputeLocalOffset(ExclusiveContext* cx, BytecodeEmitter* bce, Handle<StaticBlockObject*> blockObj)
+ComputeLocalOffset(ExclusiveContext *cx, BytecodeEmitter *bce, Handle<StaticBlockObject*> blockObj)
 {
     unsigned nbodyfixed = bce->sc->isFunctionBox()
                           ? bce->script->bindings.numUnaliasedBodyLevelLocals()
@@ -1669,7 +1669,7 @@ TryConvertFreeName(BytecodeEmitter* bce, ParseNode* pn)
  * op=, e.g. +=).
  */
 static bool
-BindNameToSlotHelper(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+BindNameToSlotHelper(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_NAME));
 
@@ -1875,7 +1875,7 @@ BindNameToSlotHelper(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
      * associated TypeSet.
      */
     if (skip) {
-        BytecodeEmitter* bceSkipped = bce;
+        BytecodeEmitter *bceSkipped = bce;
         for (unsigned i = 0; i < skip; i++)
             bceSkipped = bceSkipped->parent;
         if (!bceSkipped->sc->isFunctionBox())
@@ -1897,7 +1897,7 @@ BindNameToSlotHelper(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
  * and we do not want to allow self-hosted code to use the dynamic scope.
  */
 static bool
-BindNameToSlot(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
+BindNameToSlot(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 {
     if (!BindNameToSlotHelper(cx, bce, pn))
         return false;
@@ -7171,7 +7171,7 @@ frontend::EmitTree(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
       case PNK_MOD: {
         MOZ_ASSERT(pn->isArity(PN_LIST));
         /* Left-associative operator chain: avoid too much recursion. */
-        ParseNode* subexpr = pn->pn_head;
+        ParseNode *subexpr = pn->pn_head;
         if (!EmitTree(cx, bce, subexpr))
             return false;
         JSOp op = pn->getOp();
@@ -7491,7 +7491,7 @@ frontend::AddToSrcNoteDelta(ExclusiveContext* cx, BytecodeEmitter* bce, jssrcnot
 }
 
 static bool
-SetSrcNoteOffset(ExclusiveContext* cx, BytecodeEmitter* bce, unsigned index, unsigned which,
+SetSrcNoteOffset(ExclusiveContext *cx, BytecodeEmitter *bce, unsigned index, unsigned which,
                  ptrdiff_t offset)
 {
     if (!SN_REPRESENTABLE_OFFSET(offset)) {
@@ -7502,7 +7502,7 @@ SetSrcNoteOffset(ExclusiveContext* cx, BytecodeEmitter* bce, unsigned index, uns
     SrcNotesVector& notes = bce->notes();
 
     /* Find the offset numbered which (i.e., skip exactly which offsets). */
-    jssrcnote* sn = notes.begin() + index;
+    jssrcnote *sn = notes.begin() + index;
     MOZ_ASSERT(SN_TYPE(sn) != SRC_XDELTA);
     MOZ_ASSERT((int) which < js_SrcNoteSpec[SN_TYPE(sn)].arity);
     for (sn++; which; sn++, which--) {
