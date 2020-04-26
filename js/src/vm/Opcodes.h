@@ -1523,7 +1523,8 @@
      * Pops the top two values on the stack as 'val' and 'scope', sets property
      * of 'scope' as 'val' and pushes 'val' back on the stack.
      *
-     * 'scope' should be the global scope.
+     * 'scope' should be the global scope unless the script has a polluted
+     * global scope, in which case acts like JSOP_SETNAME.
      *   Category: Variables and Scopes
      *   Type: Free Variables
      *   Operands: uint32_t nameIndex
@@ -1536,7 +1537,8 @@
      * of 'scope' as 'val' and pushes 'val' back on the stack. Throws a
      * TypeError if the set fails, per strict mode semantics.
      *
-     * 'scope' should be the global scope.
+     * 'scope' should be the global scope unless the script has a polluted
+     * global scope, in which case acts like JSOP_STRICTSETNAME.
      *   Category: Variables and Scopes
      *   Type: Free Variables
      *   Operands: uint32_t nameIndex
