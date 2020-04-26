@@ -1823,9 +1823,6 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_getgname(name);
       }
 
-      case JSOP_BINDGNAME:
-        return pushConstant(ObjectValue(script()->global()));
-
       case JSOP_SETGNAME:
       case JSOP_STRICTSETGNAME:
       {
@@ -1846,6 +1843,10 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_intrinsic(name);
       }
 
+      case JSOP_BINDGNAME:
+        if (!script()->hasPollutedGlobalScope())
+            return pushConstant(ObjectValue(script()->global()));
+        // Fall through to JSOP_BINDNAME
       case JSOP_BINDNAME:
         return jsop_bindname(info().getName(pc));
 
