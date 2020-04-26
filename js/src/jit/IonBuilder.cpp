@@ -1819,8 +1819,10 @@ IonBuilder::inspectOpcode(JSOp op)
 
       case JSOP_GETGNAME:
       {
-        PropertyName* name = info().getAtom(pc)->asPropertyName();
-        return jsop_getgname(name);
+        PropertyName *name = info().getAtom(pc)->asPropertyName();
+        if (!script()->hasPollutedGlobalScope())
+            return jsop_getgname(name);
+        return jsop_getname(name);
       }
 
       case JSOP_SETGNAME:
@@ -7567,11 +7569,11 @@ IonBuilder::jsop_getgname(PropertyName* name)
 }
 
 bool
-IonBuilder::jsop_getname(PropertyName* name)
+IonBuilder::jsop_getname(PropertyName *name)
 {
-    MDefinition* object;
-    if (js_CodeSpec[*pc].format & JOF_GNAME) {
-        MInstruction* global = constant(ObjectValue(script()->global()));
+    MDefinition *object;
+    if (IsGlobalOp(JSOp(*pc)) && !script()->hasPollutedGlobalScope()) {
+        MInstruction *global = constant(ObjectValue(script()->global()));
         object = global;
     } else {
         current->push(current->scopeChain());

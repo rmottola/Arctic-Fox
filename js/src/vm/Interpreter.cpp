@@ -296,7 +296,7 @@ GetNameOperation(JSContext *cx, InterpreterFrame *fp, jsbytecode *pc, MutableHan
      * the actual behavior even if the id could be found on the scope chain
      * before the global object.
      */
-    if (IsGlobalOp(JSOp(*pc)))
+    if (IsGlobalOp(JSOp(*pc)) && !fp->script()->hasPollutedGlobalScope())
         obj = &obj->global();
 
     Shape* shape = nullptr;
@@ -3021,6 +3021,8 @@ CASE(JSOP_GETNAME)
 
     PUSH_COPY(rval);
     TypeScript::Monitor(cx, script, REGS.pc, rval);
+    static_assert(JSOP_NAME_LEGNTH == JSOP_GETGNAME_LENGTH,
+                  "We're sharing the END_CASE so the lengths better match");
 }
 END_CASE(JSOP_GETNAME)
 
