@@ -280,7 +280,7 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
         return nullptr;
 
     // We can specialize a bit for the given scope chain if that scope chain is the global object.
-    JSObject* globalScope =
+    JSObject *globalScope =
         scopeChain && scopeChain == &scopeChain->global() ? (JSObject*) scopeChain : nullptr;
     MOZ_ASSERT_IF(globalScope, globalScope->isNative());
     MOZ_ASSERT_IF(globalScope, JSCLASS_HAS_GLOBAL_FLAG_AND_SLOTS(globalScope->getClass()));
@@ -517,11 +517,11 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
 // Compile a JS function body, which might appear as the value of an event
 // handler attribute in an HTML <INPUT> tag, or in a Function() constructor.
 static bool
-CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyCompileOptions& options,
-                    const AutoNameVector& formals, SourceBufferHolder& srcBuf,
+CompileFunctionBody(JSContext *cx, MutableHandleFunction fun, const ReadOnlyCompileOptions &options,
+                    const AutoNameVector &formals, SourceBufferHolder &srcBuf,
                     HandleObject enclosingScope, GeneratorKind generatorKind)
 {
-    js::TraceLoggerThread* logger = js::TraceLoggerForMainThread(cx->runtime());
+    js::TraceLoggerThread *logger = js::TraceLoggerForMainThread(cx->runtime());
     js::TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, options);
     js::AutoTraceLog scriptLogger(logger, event);
     js::AutoTraceLog typeLogger(logger, TraceLogger_ParserCompileFunction);
