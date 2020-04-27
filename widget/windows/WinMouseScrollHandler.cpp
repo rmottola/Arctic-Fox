@@ -639,7 +639,7 @@ MouseScrollHandler::HandleMouseWheelMessage(nsWindowBase* aWidget,
     PR_LOG(gMouseScrollLog, PR_LOG_ALWAYS,
       ("MouseScroll::HandleMouseWheelMessage: dispatching "
        "NS_WHEEL_WHEEL event"));
-    Widget->DispatchWheelEvent(&wheelEvent);
+    aWidget->DispatchWheelEvent(&wheelEvent);
     if (aWidget->Destroyed()) {
       PR_LOG(gMouseScrollLog, PR_LOG_ALWAYS,
         ("MouseScroll::HandleMouseWheelMessage: The window was destroyed "
