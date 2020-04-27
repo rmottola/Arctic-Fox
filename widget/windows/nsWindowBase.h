@@ -63,7 +63,7 @@ public:
    * is called by ScrollHandler to dispatch goanna events.
    * Returns true if it's consumed.  Otherwise, false.
    */
-  virtual bool DispatchScrollEvent(mozilla::WidgetWheelEvent* aEvent) = 0;
+  virtual bool DispatchWheelEvent(mozilla::WidgetWheelEvent* aEvent) = 0;
 
   /*
    * Dispatch a gecko content command event for this widget. This
