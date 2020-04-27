@@ -2394,8 +2394,7 @@ MacroAssembler::profilerPreCallImpl(Register reg, Register reg2)
 void
 MacroAssembler::alignJitStackBasedOnNArgs(Register nargs)
 {
-    const uint32_t alignment = JitStackAlignment / sizeof(Value);
-    if (alignment == 1)
+    if (JitStackValueAlignment == 1)
         return;
 
     // A JitFrameLayout is composed of the following:
@@ -2408,7 +2407,7 @@ MacroAssembler::alignJitStackBasedOnNArgs(Register nargs)
 
     // Which implies that |argN| is aligned if |nargs| is even, and offset by
     // |sizeof(Value)| if |nargs| is odd.
-    MOZ_ASSERT(alignment == 2);
+    MOZ_ASSERT(JitStackValueAlignment == 2);
 
     // Thus the |padding| is offset by |sizeof(Value)| if |nargs| is even, and
     // aligned if |nargs| is odd.
@@ -2443,8 +2442,7 @@ MacroAssembler::alignJitStackBasedOnNArgs(Register nargs)
 void
 MacroAssembler::alignJitStackBasedOnNArgs(uint32_t nargs)
 {
-    const uint32_t alignment = JitStackAlignment / sizeof(Value);
-    if (alignment == 1)
+    if (JitStackValueAlignment == 1)
         return;
 
     // A JitFrameLayout is composed of the following:
@@ -2457,7 +2455,7 @@ MacroAssembler::alignJitStackBasedOnNArgs(uint32_t nargs)
 
     // Which implies that |argN| is aligned if |nargs| is even, and offset by
     // |sizeof(Value)| if |nargs| is odd.
-    MOZ_ASSERT(alignment == 2);
+    MOZ_ASSERT(JitStackValueAlignment == 2);
 
     // Thus the |padding| is offset by |sizeof(Value)| if |nargs| is even, and
     // aligned if |nargs| is odd.
