@@ -1227,18 +1227,18 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
         push(ImmTag(JSVAL_TYPE_TO_TAG(type)));
         ma_push(reg);
     }
-    void pushValue(const Address& addr);
-    void Push(const ValueOperand& val) {
+    void pushValue(const Address &addr);
+    void Push(const ValueOperand &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
-    void Pop(const ValueOperand& val) {
+    void Pop(const ValueOperand &val) {
         popValue(val);
         framePushed_ -= sizeof(Value);
     }
-    void storePayload(const Value& val, Operand dest);
+    void storePayload(const Value &val, Operand dest);
     void storePayload(Register src, Operand dest);
-    void storePayload(const Value& val, const BaseIndex& dest);
+    void storePayload(const Value &val, const BaseIndex &dest);
     void storePayload(Register src, const BaseIndex& dest);
     void storeTypeTag(ImmTag tag, Operand dest);
     void storeTypeTag(ImmTag tag, const BaseIndex& dest);

@@ -1963,7 +1963,7 @@ MacroAssembler::PushEmptyRooted(VMFunction::RootType rootType)
 
 void
 MacroAssembler::popRooted(VMFunction::RootType rootType, Register cellReg,
-                          const ValueOperand& valueReg)
+                          const ValueOperand &valueReg)
 {
     switch (rootType) {
       case VMFunction::RootNone:
@@ -1982,8 +1982,8 @@ MacroAssembler::popRooted(VMFunction::RootType rootType, Register cellReg,
 }
 
 bool
-MacroAssembler::convertConstantOrRegisterToFloatingPoint(JSContext* cx, ConstantOrRegister src,
-                                                         FloatRegister output, Label* fail,
+MacroAssembler::convertConstantOrRegisterToFloatingPoint(JSContext *cx, ConstantOrRegister src,
+                                                         FloatRegister output, Label *fail,
                                                          MIRType outputType)
 {
     if (src.constant())

@@ -24,7 +24,7 @@ class CodeGenerator;
 class MoveEmitterX86
 {
     bool inCycle_;
-    MacroAssemblerSpecific& masm;
+    MacroAssemblerSpecific &masm;
 
     // Original stack push value.
     uint32_t pushedAtStart_;
@@ -58,9 +58,9 @@ class MoveEmitterX86
     void completeCycle(const MoveOperand& to, MoveOp::Type type);
 
   public:
-    explicit MoveEmitterX86(MacroAssemblerSpecific& masm);
+    explicit MoveEmitterX86(MacroAssemblerSpecific &masm);
     ~MoveEmitterX86();
-    void emit(const MoveResolver& moves);
+    void emit(const MoveResolver &moves);
     void finish();
 
     void setScratchRegister(Register reg) {

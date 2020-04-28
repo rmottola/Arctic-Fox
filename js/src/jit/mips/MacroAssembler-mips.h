@@ -942,18 +942,18 @@ public:
         push(ImmTag(JSVAL_TYPE_TO_TAG(type)));
         ma_push(reg);
     }
-    void pushValue(const Address& addr);
-    void Push(const ValueOperand& val) {
+    void pushValue(const Address &addr);
+    void Push(const ValueOperand &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
-    void Pop(const ValueOperand& val) {
+    void Pop(const ValueOperand &val) {
         popValue(val);
         framePushed_ -= sizeof(Value);
     }
-    void storePayload(const Value& val, Address dest);
+    void storePayload(const Value &val, Address dest);
     void storePayload(Register src, Address dest);
-    void storePayload(const Value& val, const BaseIndex& dest);
+    void storePayload(const Value &val, const BaseIndex& dest);
     void storePayload(Register src, const BaseIndex& dest);
     void storeTypeTag(ImmTag tag, Address dest);
     void storeTypeTag(ImmTag tag, const BaseIndex& dest);

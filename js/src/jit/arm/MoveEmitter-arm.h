@@ -18,7 +18,7 @@ class CodeGenerator;
 class MoveEmitterARM
 {
     uint32_t inCycle_;
-    MacroAssemblerARMCompat& masm;
+    MacroAssemblerARMCompat &masm;
 
     // Original stack push value.
     uint32_t pushedAtStart_;
@@ -49,12 +49,12 @@ class MoveEmitterARM
                     MoveOp::Type type, uint32_t slot);
     void completeCycle(const MoveOperand& from, const MoveOperand& to,
                        MoveOp::Type type, uint32_t slot);
-    void emit(const MoveOp& move);
+    void emit(const MoveOp &move);
 
   public:
-    MoveEmitterARM(MacroAssemblerARMCompat& masm);
+    MoveEmitterARM(MacroAssemblerARMCompat &masm);
     ~MoveEmitterARM();
-    void emit(const MoveResolver& moves);
+    void emit(const MoveResolver &moves);
     void finish();
 
     void setScratchRegister(Register reg) {}

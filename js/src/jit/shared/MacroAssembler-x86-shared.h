@@ -566,7 +566,7 @@ class MacroAssemblerX86Shared : public Assembler
 
     // The following functions are exposed for use in platform-shared code.
     template <typename T>
-    void Push(const T& t) {
+    void Push(const T &t) {
         push(t);
         framePushed_ += sizeof(intptr_t);
     }
@@ -583,7 +583,7 @@ class MacroAssemblerX86Shared : public Assembler
     }
 
     template <typename T>
-    void Pop(const T& t) {
+    void Pop(const T &t) {
         pop(t);
         framePushed_ -= sizeof(intptr_t);
     }

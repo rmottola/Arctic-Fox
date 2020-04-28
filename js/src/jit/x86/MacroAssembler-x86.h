@@ -238,15 +238,15 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         push(tagOf(addr));
         push(payloadOf(addr));
     }
-    void Push(const ValueOperand& val) {
+    void Push(const ValueOperand &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
-    void Pop(const ValueOperand& val) {
+    void Pop(const ValueOperand &val) {
         popValue(val);
         framePushed_ -= sizeof(Value);
     }
-    void storePayload(const Value& val, Operand dest) {
+    void storePayload(const Value &val, Operand dest) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         if (val.isMarkable())
             movl(ImmGCPtr((gc::Cell*)jv.s.payload.ptr), ToPayload(dest));
@@ -1211,15 +1211,15 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         orl(Imm32(type), frameSizeReg);
     }
 
-    void callWithExitFrame(JitCode* target, Register dynStack) {
+    void callWithExitFrame(JitCode *target, Register dynStack) {
         addPtr(ImmWord(framePushed()), dynStack);
         makeFrameDescriptor(dynStack, JitFrame_IonJS);
         Push(dynStack);
         call(target);
     }
 
-    void branchPtrInNurseryRange(Condition cond, Register ptr, Register temp, Label* label);
-    void branchValueIsNurseryObject(Condition cond, ValueOperand value, Register temp, Label* label);
+    void branchPtrInNurseryRange(Condition cond, Register ptr, Register temp, Label *label);
+    void branchValueIsNurseryObject(Condition cond, ValueOperand value, Register temp, Label *label);
 
     // Instrumentation for entering and leaving the profiler.
     void profilerEnterFrame(Register framePtr, Register scratch);

@@ -536,7 +536,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         PopRegsInMaskIgnore(set, ignore, FloatRegisterSet());
     }
 
-    void branchIfFunctionHasNoScript(Register fun, Label* label) {
+    void branchIfFunctionHasNoScript(Register fun, Label *label) {
         // 16-bit loads are slow and unaligned 32-bit loads may be too so
         // perform an aligned 32-bit load and adjust the bitmask accordingly.
         MOZ_ASSERT(JSFunction::offsetOfNargs() % sizeof(uint32_t) == 0);
@@ -555,7 +555,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         branchTest32(Assembler::NonZero, address, Imm32(bit), label);
     }
 
-    void branchIfNotInterpretedConstructor(Register fun, Register scratch, Label* label);
+    void branchIfNotInterpretedConstructor(Register fun, Register scratch, Label *label);
 
     using MacroAssemblerSpecific::Push;
     using MacroAssemblerSpecific::Pop;
@@ -568,13 +568,13 @@ class MacroAssembler : public MacroAssemblerSpecific
             // push it using ImmGCPtr, and then rematerialize the id at runtime.
 
             if (JSID_IS_STRING(id)) {
-                JSString* str = JSID_TO_STRING(id);
+                JSString *str = JSID_TO_STRING(id);
                 MOZ_ASSERT(((size_t)str & JSID_TYPE_MASK) == 0);
                 MOZ_ASSERT(JSID_TYPE_STRING == 0x0);
                 Push(ImmGCPtr(str));
             } else {
                 MOZ_ASSERT(JSID_IS_SYMBOL(id));
-                JS::Symbol* sym = JSID_TO_SYMBOL(id);
+                JS::Symbol *sym = JSID_TO_SYMBOL(id);
                 movePtr(ImmGCPtr(sym), scratchReg);
                 orPtr(Imm32(JSID_TYPE_SYMBOL), scratchReg);
                 Push(scratchReg);
@@ -606,12 +606,12 @@ class MacroAssembler : public MacroAssemblerSpecific
             Push(v.reg());
     }
 
-    void Push(const ValueOperand& val) {
+    void Push(const ValueOperand &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
 
-    void Push(const Value& val) {
+    void Push(const Value &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
@@ -621,14 +621,14 @@ class MacroAssembler : public MacroAssemblerSpecific
         framePushed_ += sizeof(Value);
     }
 
-    void PushValue(const Address& addr) {
+    void PushValue(const Address &addr) {
         MOZ_ASSERT(addr.base != StackPointer);
         pushValue(addr);
         framePushed_ += sizeof(Value);
     }
 
     void PushEmptyRooted(VMFunction::RootType rootType);
-    void popRooted(VMFunction::RootType rootType, Register cellReg, const ValueOperand& valueReg);
+    void popRooted(VMFunction::RootType rootType, Register cellReg, const ValueOperand &valueReg);
 
     void adjustStack(int amount) {
         if (amount > 0)
@@ -637,7 +637,7 @@ class MacroAssembler : public MacroAssemblerSpecific
             reserveStack(-amount);
     }
 
-    void bumpKey(Int32Key* key, int diff) {
+    void bumpKey(Int32Key *key, int diff) {
         if (key->isRegister())
             add32(Imm32(diff), key->reg());
         else

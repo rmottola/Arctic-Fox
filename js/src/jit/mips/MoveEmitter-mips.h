@@ -18,7 +18,7 @@ class CodeGenerator;
 class MoveEmitterMIPS
 {
     uint32_t inCycle_;
-    MacroAssemblerMIPSCompat& masm;
+    MacroAssemblerMIPSCompat &masm;
 
     // Original stack push value.
     uint32_t pushedAtStart_;
@@ -49,12 +49,12 @@ class MoveEmitterMIPS
                     MoveOp::Type type, uint32_t slot);
     void completeCycle(const MoveOperand& from, const MoveOperand& to,
                        MoveOp::Type type, uint32_t slot);
-    void emit(const MoveOp& move);
+    void emit(const MoveOp &move);
 
   public:
-    MoveEmitterMIPS(MacroAssemblerMIPSCompat& masm);
+    MoveEmitterMIPS(MacroAssemblerMIPSCompat &masm);
     ~MoveEmitterMIPS();
-    void emit(const MoveResolver& moves);
+    void emit(const MoveResolver &moves);
     void finish();
 
     void setScratchRegister(Register reg) {}

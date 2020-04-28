@@ -215,14 +215,14 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void pushValue(ValueOperand val) {
         push(val.valueReg());
     }
-    void Push(const ValueOperand& val) {
+    void Push(const ValueOperand &val) {
         pushValue(val);
         framePushed_ += sizeof(Value);
     }
     void popValue(ValueOperand val) {
         pop(val.valueReg());
     }
-    void pushValue(const Value& val) {
+    void pushValue(const Value &val) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         if (val.isMarkable()) {
             movWithPatch(ImmWord(jv.asBits), ScratchReg);
@@ -236,15 +236,15 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         boxValue(type, reg, ScratchReg);
         push(ScratchReg);
     }
-    void pushValue(const Address& addr) {
+    void pushValue(const Address &addr) {
         push(Operand(addr));
     }
-    void Pop(const ValueOperand& val) {
+    void Pop(const ValueOperand &val) {
         popValue(val);
         framePushed_ -= sizeof(Value);
     }
 
-    void moveValue(const Value& val, Register dest) {
+    void moveValue(const Value &val, Register dest) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         movWithPatch(ImmWord(jv.asBits), dest);
         writeDataRelocation(val);
@@ -1449,7 +1449,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         orq(Imm32(type), frameSizeReg);
     }
 
-    void callWithExitFrame(JitCode* target, Register dynStack) {
+    void callWithExitFrame(JitCode *target, Register dynStack) {
         addPtr(Imm32(framePushed()), dynStack);
         makeFrameDescriptor(dynStack, JitFrame_IonJS);
         Push(dynStack);
@@ -1457,7 +1457,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     }
 
     // See CodeGeneratorX64 calls to noteAsmJSGlobalAccess.
-    void patchAsmJSGlobalAccess(CodeOffsetLabel patchAt, uint8_t* code, uint8_t* globalData,
+    void patchAsmJSGlobalAccess(CodeOffsetLabel patchAt, uint8_t *code, uint8_t *globalData,
                                 unsigned globalDataOffset)
     {
         uint8_t* nextInsn = code + patchAt.offset();
