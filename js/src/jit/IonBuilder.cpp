@@ -1819,18 +1819,19 @@ IonBuilder::inspectOpcode(JSOp op)
 
       case JSOP_GETGNAME:
       {
-        PropertyName* name = info().getAtom(pc)->asPropertyName();
-        return jsop_getgname(name);
+        PropertyName *name = info().getAtom(pc)->asPropertyName();
+        if (!script()->hasPollutedGlobalScope())
+            return jsop_getgname(name);
+        return jsop_getname(name);
       }
-
-      case JSOP_BINDGNAME:
-        return pushConstant(ObjectValue(script()->global()));
 
       case JSOP_SETGNAME:
       case JSOP_STRICTSETGNAME:
       {
-        PropertyName* name = info().getAtom(pc)->asPropertyName();
-        JSObject* obj = &script()->global();
+        PropertyName *name = info().getAtom(pc)->asPropertyName();
+        if (script()->hasPollutedGlobalScope())
+            return jsop_setprop(name);
+        JSObject *obj = &script()->global();
         return setStaticName(obj, name);
       }
 
@@ -1846,6 +1847,10 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_intrinsic(name);
       }
 
+      case JSOP_BINDGNAME:
+        if (!script()->hasPollutedGlobalScope())
+            return pushConstant(ObjectValue(script()->global()));
+        // Fall through to JSOP_BINDNAME
       case JSOP_BINDNAME:
         return jsop_bindname(info().getName(pc));
 
@@ -7566,11 +7571,11 @@ IonBuilder::jsop_getgname(PropertyName* name)
 }
 
 bool
-IonBuilder::jsop_getname(PropertyName* name)
+IonBuilder::jsop_getname(PropertyName *name)
 {
-    MDefinition* object;
-    if (js_CodeSpec[*pc].format & JOF_GNAME) {
-        MInstruction* global = constant(ObjectValue(script()->global()));
+    MDefinition *object;
+    if (IsGlobalOp(JSOp(*pc)) && !script()->hasPollutedGlobalScope()) {
+        MInstruction *global = constant(ObjectValue(script()->global()));
         object = global;
     } else {
         current->push(current->scopeChain());

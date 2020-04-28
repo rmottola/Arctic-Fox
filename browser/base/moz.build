@@ -6,6 +6,10 @@
 
 SPHINX_TREES['sslerrorreport'] = 'content/docs/sslerrorreport'
 
+TESTING_JS_MODULES += [
+    'content/test/BrowserUITestUtils.jsm',
+]
+
 BROWSER_CHROME_MANIFESTS += [
     'content/test/referrer/browser.ini',
 ]

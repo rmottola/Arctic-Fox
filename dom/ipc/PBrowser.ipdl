@@ -55,7 +55,8 @@ using mozilla::CSSToScreenScale from "Units.h";
 using mozilla::CommandInt from "mozilla/EventForwards.h";
 using mozilla::Modifiers from "mozilla/EventForwards.h";
 using mozilla::layers::GeckoContentController::APZStateChange from "mozilla/layers/GeckoContentController.h";
-using mozilla::WritingMode from "WritingModes.h";
+using mozilla::WritingMode from "mozilla/WritingModes.h";
+using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
 
 namespace mozilla {
 namespace dom {
@@ -440,6 +441,13 @@ parent:
     SetTargetAPZC(uint64_t aInputBlockId, ScrollableLayerGuid[] aTargets);
 
     /**
+     * Notifies the APZ code of the allowed touch-behaviours for a particular
+     * input block. Each item in the aFlags array corresponds to one touch point
+     * in the touch event.
+     */
+    SetAllowedTouchBehavior(uint64_t aInputBlockId, TouchBehaviorFlags[] aFlags);
+
+    /**
      * Updates the zoom constraints for a scrollable frame in this tab.
      * The zoom controller code lives on the parent side and so this allows it to
      * have up-to-date zoom constraints.
@@ -484,7 +492,9 @@ parent:
      */
     async SetDimensions(uint32_t aFlags, int32_t aX, int32_t aY, int32_t aCx, int32_t aCy);
 
-    prio(high) sync SynthesizedMouseWheelEvent(WidgetWheelEvent event);
+    prio(high) sync DispatchWheelEvent(WidgetWheelEvent event);
+    prio(high) sync DispatchMouseEvent(WidgetMouseEvent event);
+    prio(high) sync DispatchKeyboardEvent(WidgetKeyboardEvent event);
 
 child:
     /**
@@ -563,6 +573,11 @@ child:
              int32_t aCharCode,
              int32_t aModifiers,
              bool aPreventDefault);
+
+    /**
+     * APZ notification for mouse scroll testing events.
+     */
+    MouseScrollTestEvent(ViewID aScrollId, nsString aEvent);
 
     CompositionEvent(WidgetCompositionEvent event);
 

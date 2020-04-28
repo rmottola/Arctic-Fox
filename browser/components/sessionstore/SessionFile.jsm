@@ -39,6 +39,8 @@ Cu.import("resource://gre/modules/Preferences.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
   "resource://gre/modules/devtools/Console.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
+  "resource://gre/modules/PromiseUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RunState",
   "resource:///modules/sessionstore/RunState.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
@@ -51,6 +53,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "sessionStartup",
   "@mozilla.org/browser/sessionstartup;1", "nsISessionStartup");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionWorker",
   "resource:///modules/sessionstore/SessionWorker.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm");
 
 const PREF_UPGRADE_BACKUP = "browser.sessionstore.upgradeBackup.latestBuildID";
 const PREF_MAX_UPGRADE_BACKUPS = "browser.sessionstore.upgradeBackup.maxUpgradeBackups";
@@ -177,6 +181,10 @@ let SessionFileInternal = {
   // Used for error-reporting.
   _hasWriteEverSucceeded: false,
 
+  // Resolved once initialization is complete.
+  // The promise never rejects.
+  _deferredInitialized: PromiseUtils.defer(),
+
   // The ID of the latest version of Gecko for which we have an upgrade backup
   // or |undefined| if no upgrade backup was ever written.
   get latestUpgradeBackupID() {
@@ -199,6 +207,12 @@ let SessionFileInternal = {
         let startMs = Date.now();
         let source = yield OS.File.read(path, { encoding: "utf-8" });
         let parsed = JSON.parse(source);
+
+        if (!SessionStore.isFormatVersionCompatible(parsed.version || ["sessionrestore", 0] /*fallback for old versions*/)) {
+          // Skip sessionstore files that we don't understand.
+          Cu.reportError("Cannot extract data from Session Restore file " + path + ". Wrong format/version: " + JSON.stringify(parsed.version) + ".");
+          continue;
+        }
         result = {
           origin: key,
           source: source,
@@ -247,11 +261,13 @@ let SessionFileInternal = {
 
     // Initialize the worker to let it handle backups and also
     // as a workaround for bug 964531.
-    SessionWorker.post("init", [result.origin, this.Paths, {
+    let initialized = SessionWorker.post("init", [result.origin, this.Paths, {
       maxUpgradeBackups: Preferences.get(PREF_MAX_UPGRADE_BACKUPS, 3),
       maxSerializeBack: Preferences.get(PREF_MAX_SERIALIZE_BACK, 10),
       maxSerializeForward: Preferences.get(PREF_MAX_SERIALIZE_FWD, -1)
     }]);
+
+    initialized.catch(Promise.reject).then(() => this._deferredInitialized.resolve());
 
     return result;
   }),
@@ -273,7 +289,7 @@ let SessionFileInternal = {
       !sessionStartup.isAutomaticRestoreEnabled();
 
     let options = {isFinalWrite, performShutdownCleanup};
-    let promise = SessionWorker.post("write", [aData, options]);
+    let promise = this._deferredInitialized.promise.then(() => SessionWorker.post("write", [aData, options]));
 
     // Wait until the write is done.
     promise = promise.then(msg => {
@@ -320,7 +336,7 @@ let SessionFileInternal = {
   },
 
   wipe: function () {
-    return SessionWorker.post("wipe");
+    return this._deferredInitialized.promise.then(() => SessionWorker.post("wipe"));
   },
 
   _recordTelemetry: function(telemetry) {

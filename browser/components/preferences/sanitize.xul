@@ -40,7 +40,6 @@
       <preference id="privacy.clearOnShutdown.offlineApps"           name="privacy.clearOnShutdown.offlineApps"           type="bool"/>
       <preference id="privacy.clearOnShutdown.sessions"              name="privacy.clearOnShutdown.sessions"              type="bool"/>
       <preference id="privacy.clearOnShutdown.siteSettings"          name="privacy.clearOnShutdown.siteSettings"          type="bool"/>
-      <preference id="privacy.clearOnShutdown.connectivityData"      name="privacy.clearOnShutdown.connectivityData"      type="bool"/>
     </preferences>
 
     <description>&clearDataSettings2.label;</description>
@@ -97,9 +96,6 @@
             <checkbox label="&itemSitePreferences.label;"
                       accesskey="&itemSitePreferences.accesskey;"
                       preference="privacy.clearOnShutdown.siteSettings"/>
-            <checkbox label="&itemConnectivityData.label;"
-                      accesskey="&itemConnectivityData.accesskey;"
-                      preference="privacy.clearOnShutdown.connectivityData"/>
           </row>
         </rows>
       </grid>

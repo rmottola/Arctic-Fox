@@ -22,6 +22,12 @@
 - 1342849 - Don't do any notifications for newly added background t
 - 1324406 - Treat 'data:' documents as unique, opaque origins
 - 1300118 P1 Make TaskQueue deliver runnables to nsIEventTarget
+- Add d3d11/d2d and compositor information to telemetry. (bug 1179051
+- Bug 1184705 - Search A/B testing cohort identifier should be recorded
+- Add layers.offmainthreadcomposition.enabled to telemetry. (bug 1187453
+- Add a "blacklisted" property to d3d11 telemetry. (bug 1187453, 
+-  Add compositor, layers, and rendering info to nsIGfxInfo. (bug 1179051 part 5, r=mattwoodrow)\
+- Split gfxWindowsPlatform::UpdateRenderMode() into multiple functions.  (bug 1179051 part 1, r=bas)
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
@@ -32,19 +38,32 @@
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
+- Bug 1184130. Report mismatches of adapter description and vendor id t
+- Bug 1159751: Ensure WARP can never be used for Windows 7. r=milan 
+- Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
+- Bug 1251347 - Refining SessionFile Shutdown hang details;r
+- Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1243549 - Add missing bits. r=post-facto 
+- Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+- Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
+- Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
+- Bug 1053413 part 1 - Some code style conversion on affected code.
+- Bug 947854 - 2015-05-05 parto 0 to 4
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
+- Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -78,56 +97,39 @@
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 - 1144366 (big pointer style refactor, see below.... ToDo)
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
-- 1142669 part 6 - Don't inline scripts that are known to inline a 
-- 1145440 - Ship constant names for tracked strategy and outcomes i
-- 1143860 - Deduplicate tracked optimizations when streaming the pr
-- 1142669 part 3 - Limit the total inlined bytecode size to avoid e
+- Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
+- Bug 1079245 - 2015-04-15 Set about:privatebrowsing to load in child. r=mossop
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
 - Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
-- Bug 1135903 - 2015-03-25 - OdinMonkey: Make signal-handler OOB checking an indepen
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
-- Bug 1150563 - Intermittent test_compartments.js | test_measure - [tes¿
-- Bug 1151466 - update talos to the latest version to include some pref
-- Bug 1153658 - browser_compartments.js logspam.
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
-- Bug 674779 - Deactivating subtest of test_measure for Windows XP
-- Bug 674779 - PerformanceStatsService data is not monotonic (wallpaper
-- Bug 1150555 - 2015-04-02 - about:performance should not confuse Jetpack addons.
-- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, high-level.
-- Bug 674779 - 2015-03-31 - Per-component CPU monitoring, low-level. 
-- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
-- Bug 1149848 
-- Bug 847287 part 4 to 14
+- Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 
+Mac Specific
+- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+- Bug 1085607 - libvpx doesn't build on OS X with Apple clang from OS X
 
 More session store stuff to check:
 
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-- Bug 1243549 - SessionFile.wipe() now waits until SessionFile has been
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
-- Bug 1209689 - Tabs that haven't yet been restored should not crash.
-- Bug 1147822 - Add a format version number for sessionstore.js. r=Yoric
 
 - Bug 1177310 - TabStateFlusher Promises should always resolve.
+- Bug 1177310 - Don't flush windows synchronously on application shutdo
 
-Bug 1177310 - Don't flush windows synchronously on application shutdo
+Not applying / Breaking build:
+Bug 1162569 - default engine files should be in the omni.ja file,
 
 Devtools stuff to check - files not there:
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux.
 - Bug 1150555 - about:performance should not confuse Jetpack addons. 
 
-
-
-- Bug 785487 - Have AboutHomeUtils use the asynchronous search service
-
-Verify for pre-Australis:
-- Bug 1123517 - Refactor sidebar code. r=florian
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 

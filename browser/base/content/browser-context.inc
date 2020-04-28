@@ -118,7 +118,7 @@
       <menuitem id="context-video-fullscreen"
                 accesskey="&videoFullScreen.accesskey;"
                 label="&videoFullScreen.label;"
-                oncommand="gContextMenu.fullScreenVideo();"/>
+                oncommand="gContextMenu.mediaCommand('fullscreen');"/>
       <menuitem id="context-leave-dom-fullscreen"
                 accesskey="&leaveDOMFullScreen.accesskey;"
                 label="&leaveDOMFullScreen.label;"
@@ -173,6 +173,11 @@
                 label="&viewImageInfoCmd.label;"
                 accesskey="&viewImageInfoCmd.accesskey;"
                 oncommand="gContextMenu.viewImageInfo();"/>
+      <menuitem id="context-viewimagedesc"
+                label="&viewImageDescCmd.label;"
+                accesskey="&viewImageDescCmd.accesskey;"
+                oncommand="gContextMenu.viewImageDesc(event);"
+                onclick="checkForMiddleClick(this, event);"/>
       <menuitem id="context-savevideo"
                 label="&saveVideoCmd.label;"
                 accesskey="&saveVideoCmd.accesskey;"
@@ -189,6 +194,11 @@
                 label="&emailVideoCmd.label;"
                 accesskey="&emailVideoCmd.accesskey;"
                 oncommand="gContextMenu.sendMedia();"/>
+      <menu id="context-castvideo"
+                label="&castVideoCmd.label;"
+                accesskey="&castVideoCmd.accesskey;">
+        <menupopup id="context-castvideo-popup" onpopupshowing="gContextMenu.populateCastVideoMenu(this)"/>
+      </menu>
       <menuitem id="context-sendaudio"
                 label="&emailAudioCmd.label;"
                 accesskey="&emailAudioCmd.accesskey;"

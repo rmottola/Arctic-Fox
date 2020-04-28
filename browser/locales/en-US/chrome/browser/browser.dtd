@@ -77,6 +77,8 @@ can reach it easily. -->
 <!ENTITY personalbarCmd.label "Bookmarks Toolbar">
 <!ENTITY personalbarCmd.accesskey "B">
 <!ENTITY bookmarksToolbarItem.label "Bookmarks Toolbar Items">
+<!ENTITY addonBarCmd.label "Add-on Bar">
+<!ENTITY addonBarCmd.accesskey "A">
 <!ENTITY statusBar.label               "Status Bar">
 <!ENTITY statusBar.accesskey           "S">
 
@@ -86,6 +88,8 @@ can reach it easily. -->
 <!ENTITY pageInfoCmd.label "Page Info">
 <!ENTITY pageInfoCmd.accesskey "I">
 <!ENTITY pageInfoCmd.commandkey "i">
+<!ENTITY mirrorTabCmd.label "Mirror Tab">
+<!ENTITY mirrorTabCmd.accesskey "m">
 <!-- LOCALIZATION NOTE (enterFullScreenCmd.label, exitFullScreenCmd.label):
 These should match what Safari and other Apple applications use on OS X Lion. -->
 <!ENTITY enterFullScreenCmd.label "Enter Full Screen">
@@ -398,6 +402,8 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY viewImageCmd.accesskey       "I">
 <!ENTITY viewImageInfoCmd.label       "View Image Info">
 <!ENTITY viewImageInfoCmd.accesskey   "f">
+<!ENTITY viewImageDescCmd.label       "View Description">
+<!ENTITY viewImageDescCmd.accesskey   "D">
 <!ENTITY viewVideoCmd.label           "View Video">
 <!ENTITY viewVideoCmd.accesskey       "I">
 <!ENTITY viewBGImageCmd.label         "View Background Image">
@@ -437,6 +443,8 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY emailImageCmd.accesskey      "g">
 <!ENTITY emailVideoCmd.label          "Email Video…">
 <!ENTITY emailVideoCmd.accesskey      "a">
+<!ENTITY castVideoCmd.label           "Send Video To Device">
+<!ENTITY castVideoCmd.accesskey       "e">
 <!ENTITY emailAudioCmd.label          "Email Audio…">
 <!ENTITY emailAudioCmd.accesskey      "a">
 <!ENTITY playPluginCmd.label          "Activate this plugin">
@@ -634,6 +642,9 @@ just addresses the organization to follow, e.g. "This site is run by " -->
 <!ENTITY syncSyncNowItem.accesskey    "S">
 <!ENTITY syncToolbarButton.label      "Sync">
 
+<!ENTITY addonBarCloseButton.tooltip  "Close Add-on Bar">
+<!ENTITY toggleAddonBarCmd.key        "/">
+
 <!ENTITY getUserMedia.selectCamera.label "Camera to share:">
 <!ENTITY getUserMedia.selectCamera.accesskey "C">
 <!ENTITY getUserMedia.selectMicrophone.label "Microphone to share:">
@@ -661,8 +672,41 @@ just addresses the organization to follow, e.g. "This site is run by " -->
 <!ENTITY pluginActivateNow.label "Allow Now">
 <!ENTITY pluginActivateAlways.label "Allow and Remember">
 <!ENTITY pluginBlockNow.label "Block Plugin">
+<!-- LOCALIZATION NOTE: (panicButton.view.mainTimeframeDesc, panicButton.view.5min, panicButton.view.2hr, panicButton.view.day):
+     The .mainTimeframeDesc string combined with any of the 3 others is meant to form a complete sentence, e.g. "Forget the last: Five minutes".
+     Please ensure that this remains the case in the translation. -->
+<!ENTITY panicButton.view.mainTimeframeDesc       "Forget the last:">
+<!ENTITY panicButton.view.5min                    "Five minutes">
+<!ENTITY panicButton.view.2hr                     "Two hours">
+<!ENTITY panicButton.view.day                     "24 hours">
 
-<!ENTITY tabCrashed.header "Tab crashed">
-<!ENTITY tabCrashed.message "Well, this is embarrassing. We tried to display this Web page, but it's not responding.">
-<!ENTITY tabCrashed.checkSendReport "Tell &vendorShortName; about this crash so they can fix it.">
-<!ENTITY tabCrashed.tryAgain "Try Again">
+<!-- LOCALIZATION NOTE: (panicButton.view.mainLabel, panicButton.view.deleteCookies, panicButton.view.deleteHistory, panicButton.view.deleteTabsAndWindows, panicButton.view.openNewWindow):
+     The .mainActionDesc string combined with any of the 4 others is meant to form a complete sentence, e.g. "Proceeding will: Delete Recent Cookies".
+     Note also that the deleteCookies, deleteHistory and deleteTabsAndWindows strings include <html:strong> tags for emphasis on the words "Cookies", "History", "Tabs" and "Windows".
+     The translation should do the same. -->
+<!ENTITY panicButton.view.mainActionDesc          "Proceeding will:">
+<!ENTITY panicButton.view.deleteCookies           "Delete Recent <html:strong>Cookies</html:strong>">
+<!ENTITY panicButton.view.deleteHistory           "Delete Recent <html:strong>History</html:strong>">
+<!ENTITY panicButton.view.deleteTabsAndWindows    "Close all <html:strong>Tabs</html:strong> and <html:strong>Windows</html:strong>">
+<!ENTITY panicButton.view.openNewWindow           "Open a new clean Window">
+
+<!ENTITY panicButton.view.undoWarning             "This action cannot be undone.">
+<!ENTITY panicButton.view.forgetButton            "Forget!">
+
+<!ENTITY panicButton.thankyou.msg1                "Your recent history is cleared.">
+<!ENTITY panicButton.thankyou.msg2                "Safe browsing!">
+<!ENTITY panicButton.thankyou.buttonlabel         "Thanks!">
+
+<!ENTITY readingList.label                        "Reading List">
+<!ENTITY readingList.sidebar.commandKey           "R">
+<!-- Pre-landed string for bug 1124400 -->
+<!ENTITY readingList.showSidebar.label            "Show Reading List Sidebar">
+<!-- Pre-landed string for bug 1124153 -->
+<!ENTITY readingList.sidebar.showMore.label       "Show more…">
+<!-- Pre-landed string for bug 1133662 -->
+<!ENTITY readingList.sidebar.emptyText            "Add articles to your Reading List to save them for later and find them easily when you need them.">
+<!-- Pre-landed string for bug 1123525 -->
+<!ENTITY readingList.sidebar.delete.tooltip       "Remove this from your Reading List">
+<!-- Pre-landed strings for bug 1123519 -->
+<!ENTITY readingList.sidebar.add.label            "Add to Reading List">
+<!ENTITY readingList.sidebar.add.tooltip          "Add this page to your Reading List">

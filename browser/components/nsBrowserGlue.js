@@ -67,9 +67,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
-                                  "resource:///modules/sessionstore/SessionStore.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
@@ -79,17 +76,26 @@ XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
 XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
                                   "resource://gre/modules/AddonWatcher.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+                                  "resource:///modules/sessionstore/SessionStore.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+                                  "resource:///modules/BrowserUITelemetry.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
                                   "resource:///modules/AsyncShutdown.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
-                                  "resource:///modules/BrowserUITelemetry.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
+                                  "resource://gre/modules/SimpleServiceDiscovery.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
+                                  "resource:///modules/ReaderParent.jsm");
 
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
@@ -546,6 +552,7 @@ BrowserGlue.prototype = {
       ContentClick.init();
 
     LoginManagerParent.init();
+    ReaderParent.init();
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
@@ -701,8 +708,33 @@ BrowserGlue.prototype = {
     this._dispose();
   },
 
+  _initServiceDiscovery: function () {
+    if (!Services.prefs.getBoolPref("browser.casting.enabled")) {
+      return;
+    }
+    var rokuDevice = {
+      id: "roku:ecp",
+      target: "roku:ecp",
+      factory: function(aService) {
+        Cu.import("resource://gre/modules/RokuApp.jsm");
+        return new RokuApp(aService);
+      },
+      mirror: true,
+      types: ["video/mp4"],
+      extensions: ["mp4"]
+    };
+
+    // Register targets
+    SimpleServiceDiscovery.registerDevice(rokuDevice);
+
+    // Search for devices continuously every 120 seconds
+    SimpleServiceDiscovery.search(120 * 1000);
+  },
+
   // All initial windows have opened.
   _onWindowsRestored: function BG__onWindowsRestored() {
+    this._initServiceDiscovery();
+
     // Show update notification, if needed.
     if (Services.prefs.prefHasUserValue("app.update.postupdate"))
       this._showUpdateNotification();

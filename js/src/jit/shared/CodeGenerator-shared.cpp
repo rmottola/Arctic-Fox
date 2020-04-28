@@ -39,9 +39,8 @@ CodeGeneratorShared::ensureMasm(MacroAssembler* masmArg)
     return *maybeMasm_;
 }
 
-CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masmArg)
-  : oolIns(nullptr),
-    maybeMasm_(),
+CodeGeneratorShared::CodeGeneratorShared(MIRGenerator *gen, LIRGraph *graph, MacroAssembler *masmArg)
+  : maybeMasm_(),
     masm(ensureMasm(masmArg)),
     gen(gen),
     graph(*graph),
@@ -129,10 +128,8 @@ CodeGeneratorShared::generateOutOfLineCode()
         lastPC_ = outOfLineCode_[i]->pc();
         outOfLineCode_[i]->bind(&masm);
 
-        oolIns = outOfLineCode_[i];
         outOfLineCode_[i]->generate(this);
     }
-    oolIns = nullptr;
 
     return true;
 }

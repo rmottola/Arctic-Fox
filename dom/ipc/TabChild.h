@@ -47,6 +47,7 @@ class RenderFrameChild;
 namespace layers {
 class APZEventState;
 struct SetTargetAPZCCallback;
+struct SetAllowedTouchBehaviorCallback;
 }
 
 namespace widget {
@@ -243,6 +244,7 @@ class TabChild final : public TabChildBase,
     typedef mozilla::layout::RenderFrameChild RenderFrameChild;
     typedef mozilla::layers::APZEventState APZEventState;
     typedef mozilla::layers::SetTargetAPZCCallback SetTargetAPZCCallback;
+    typedef mozilla::layers::SetAllowedTouchBehaviorCallback SetAllowedTouchBehaviorCallback;
 
 public:
     /**
@@ -367,6 +369,8 @@ public:
                               const int32_t&  aCharCode,
                               const int32_t&  aModifiers,
                               const bool&     aPreventDefault) override;
+    virtual bool RecvMouseScrollTestEvent(const FrameMetrics::ViewID& aScrollId,
+                                          const nsString& aEvent) override;
     virtual bool RecvCompositionEvent(const mozilla::WidgetCompositionEvent& event) override;
     virtual bool RecvSelectionEvent(const mozilla::WidgetSelectionEvent& event) override;
     virtual bool RecvActivateFrameEvent(const nsString& aType, const bool& capture) override;
@@ -620,6 +624,7 @@ private:
     bool mIgnoreKeyPressEvent;
     nsRefPtr<APZEventState> mAPZEventState;
     nsRefPtr<SetTargetAPZCCallback> mSetTargetAPZCCallback;
+    nsRefPtr<SetAllowedTouchBehaviorCallback> mSetAllowedTouchBehaviorCallback;
     bool mHasValidInnerSize;
     bool mDestroyed;
     // Position of tab, relative to parent widget (typically the window)

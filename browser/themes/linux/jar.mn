@@ -18,7 +18,7 @@ browser.jar:
 #ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/aboutSyncTabs.css
 #endif
-  skin/classic/browser/aboutTabCrashed.css
+  skin/classic/browser/aboutTabCrashed.css                      (../shared/aboutTabCrashed.css)
   skin/classic/browser/actionicon-tab.png
 * skin/classic/browser/browser.css
 * skin/classic/browser/devedition.css
@@ -61,6 +61,13 @@ browser.jar:
   skin/classic/browser/Toolbar.png
   skin/classic/browser/Toolbar-small.png
   skin/classic/browser/urlbar-arrow.png
+  skin/classic/browser/reader-mode-16.png             (../shared/reader/reader-mode-16.png)
+  skin/classic/browser/readinglist/icons.svg          (../shared/readinglist/icons.svg)
+  skin/classic/browser/readinglist/readinglist-icon.svg (../shared/readinglist/readinglist-icon.svg)
+  skin/classic/browser/readinglist/sidebar.css        (../shared/readinglist/sidebar.css)
+  skin/classic/browser/session-restore.svg                  (../shared/incontent-icons/session-restore.svg)
+  skin/classic/browser/tab-crashed.svg                      (../shared/incontent-icons/tab-crashed.svg)
+  skin/classic/browser/welcome-back.svg                     (../shared/incontent-icons/welcome-back.svg)
   skin/classic/browser/webRTC-shareDevice-16.png
   skin/classic/browser/webRTC-shareDevice-64.png
   skin/classic/browser/webRTC-sharingDevice-16.png
@@ -84,6 +91,9 @@ browser.jar:
   skin/classic/browser/newtab/newTab.css              (newtab/newTab.css)
   skin/classic/browser/newtab/controls.png            (newtab/controls.png)
   skin/classic/browser/newtab/noise.png               (newtab/noise.png)
+  skin/classic/browser/panic-panel/header.png         (../shared/panic-panel/header.png)
+  skin/classic/browser/panic-panel/header-small.png   (../shared/panic-panel/header-small.png)
+  skin/classic/browser/panic-panel/icons.png          (../shared/panic-panel/icons.png)
   skin/classic/browser/places/bookmarksMenu.png       (places/bookmarksMenu.png)
   skin/classic/browser/places/bookmarksToolbar.png    (places/bookmarksToolbar.png)
   skin/classic/browser/places/calendar.png            (places/calendar.png)
@@ -123,6 +133,7 @@ browser.jar:
 #endif
   skin/classic/browser/tabbrowser/alltabs.png         (tabbrowser/alltabs.png)
   skin/classic/browser/tabbrowser/connecting.png      (tabbrowser/connecting.png)
+  skin/classic/browser/tabbrowser/crashed.svg         (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/loading.png         (tabbrowser/loading.png)
   skin/classic/browser/tabbrowser/tab.png             (tabbrowser/tab.png)
   skin/classic/browser/tabbrowser/tab-overflow-border.png (tabbrowser/tab-overflow-border.png)

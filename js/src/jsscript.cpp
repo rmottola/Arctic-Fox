@@ -3030,7 +3030,7 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
                     else
                         enclosingScope = objects[FindScopeObjectIndex(src, ssi.staticWith())];
 
-                    clone = CloneFunctionAndScript(cx, enclosingScope, innerFun);
+                    clone = CloneFunctionAndScript(cx, enclosingScope, innerFun, polluted);
                 }
             } else {
                 /*

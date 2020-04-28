@@ -502,6 +502,11 @@ menuitem:not([type]):not(.menuitem-tooltip):not(.menuitem-iconic-tooltip) {
   list-style-image: url("chrome://browser/skin/places/unsortedBookmarks.png");
 }
 
+#menu_readingList,
+#BMB_readingList {
+  list-style-image: url("chrome://browser/skin/readinglist/readinglist-icon.svg");
+}
+
 #appmenu_downloads,
 #menu_openDownloads {
   list-style-image: url("chrome://browser/skin/Toolbar-small.png");
@@ -1336,6 +1341,30 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   list-style-image: url("chrome://browser/skin/Info.png");
 }
 
+%include ../shared/readinglist.inc.css
+
+/* Reader mode button */
+
+#reader-mode-button {
+  -moz-appearance: none;
+  padding: 0;
+  list-style-image: url("chrome://browser/skin/reader-mode-16.png");
+  -moz-image-region: rect(0, 16px, 16px, 0);
+}
+
+#reader-mode-button > .toolbarbutton-icon {
+  width: 16px;
+}
+
+#reader-mode-button:focus {
+  outline: 1px dotted;
+}
+
+#reader-mode-button:hover:active,
+#reader-mode-button[readeractive] {
+   -moz-image-region: rect(0, 32px, 16px, 16px);
+}
+
 /* Star button */
 #star-button {
   list-style-image: url("chrome://browser/skin/places/starPage.png");
@@ -1841,6 +1870,38 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 #wrapper-appmenu-toolbar-button,
 .appmenu-edit-button[disabled="true"] {
   opacity: .3;
+}
+
+/* Add-on bar */
+
+#addon-bar {
+  box-shadow: 0 1px 0 rgba(0,0,0,.15) inset;
+  padding: 0;
+  min-height: 20px;
+}
+
+#status-bar {
+  min-height: 0;
+  -moz-appearance: none;
+  background-color: transparent;
+  border: none;
+}
+
+#addon-bar[customizing] > #status-bar {
+  opacity: .5;
+  background-image: repeating-linear-gradient(135deg,
+                                              rgba(255,255,255,.3), rgba(255,255,255,.3) 5px,
+                                              rgba(0,0,0,.3) 5px, rgba(0,0,0,.3) 10px);
+}
+
+#status-bar > statusbarpanel {
+  border-width: 0;
+  -moz-appearance: none;
+}
+
+#addonbar-closebutton > .toolbarbutton-icon {
+  margin-top: -2px;
+  margin-bottom: -2px;
 }
 
 /* Status panel */

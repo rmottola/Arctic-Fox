@@ -7,22 +7,22 @@
 #ifndef mozilla_tabs_TabParent_h
 #define mozilla_tabs_TabParent_h
 
-#include "mozilla/EventForwards.h"
+#include "js/TypeDecls.h"
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/dom/PBrowserParent.h"
 #include "mozilla/dom/PFilePickerParent.h"
 #include "mozilla/dom/TabContext.h"
-#include "mozilla/dom/ipc/IdType.h"
+#include "mozilla/EventForwards.h"
+#include "mozilla/WritingModes.h"
 #include "nsCOMPtr.h"
 #include "nsIAuthPromptProvider.h"
 #include "nsIBrowserDOMWindow.h"
+#include "nsIDOMEventListener.h"
 #include "nsISecureBrowserUI.h"
 #include "nsITabParent.h"
 #include "nsIXULBrowserWindow.h"
 #include "nsWeakReference.h"
 #include "Units.h"
-#include "WritingModes.h"
-#include "js/TypeDecls.h"
-#include "TabMessageUtils.h"
 
 class nsFrameLoader;
 class nsIFrameLoader;
@@ -60,6 +60,7 @@ class Element;
 struct StructuredCloneData;
 
 class TabParent final : public PBrowserParent
+                      , public nsIDOMEventListener
                       , public nsITabParent
                       , public nsIAuthPromptProvider
                       , public nsISecureBrowserUI
@@ -73,6 +74,8 @@ class TabParent final : public PBrowserParent
 public:
     // nsITabParent
     NS_DECL_NSITABPARENT
+    // nsIDOMEventListener interfaces
+    NS_DECL_NSIDOMEVENTLISTENER
 
     TabParent(nsIContentParent* aManager,
               const TabId& aTabId,
@@ -106,6 +109,8 @@ public:
     nsIXULBrowserWindow* GetXULBrowserWindow();
 
     void Destroy();
+
+    void RemoveWindowListeners();
 
     virtual bool RecvMoveFocus(const bool& aForward) override;
     virtual bool RecvEvent(const RemoteDOMEvent& aEvent) override;
@@ -210,7 +215,11 @@ public:
                                                const bool& aPreventDefault) override;
     virtual bool RecvSetTargetAPZC(const uint64_t& aInputBlockId,
                                    nsTArray<ScrollableLayerGuid>&& aTargets) override;
-    virtual bool RecvSynthesizedMouseWheelEvent(const mozilla::WidgetWheelEvent& aEvent) override;
+    virtual bool RecvSetAllowedTouchBehavior(const uint64_t& aInputBlockId,
+                                             nsTArray<TouchBehaviorFlags>&& aTargets) override;
+    virtual bool RecvDispatchWheelEvent(const mozilla::WidgetWheelEvent& aEvent) override;
+    virtual bool RecvDispatchMouseEvent(const mozilla::WidgetMouseEvent& aEvent) override;
+    virtual bool RecvDispatchKeyboardEvent(const mozilla::WidgetKeyboardEvent& aEvent) override;
 
     virtual PColorPickerParent*
     AllocPColorPickerParent(const nsString& aTitle, const nsString& aInitialColor) override;
@@ -221,8 +230,7 @@ public:
     // message-sending functions under a layer of indirection and
     // eating the return values
     void Show(const ScreenIntSize& size, bool aParentIsActive);
-    void UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
-                          const nsIntPoint& chromeDisp);
+    void UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size);
     void UpdateFrame(const layers::FrameMetrics& aFrameMetrics);
     void UIResolutionChanged();
     void RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
@@ -244,6 +252,7 @@ public:
     void NotifyAPZStateChange(ViewID aViewId,
                               APZStateChange aChange,
                               int aArg);
+    void NotifyMouseScrollTestEvent(const ViewID& aScrollId, const nsString& aEvent);
     void Activate();
     void Deactivate();
 
@@ -426,6 +435,7 @@ protected:
     CSSToLayoutDeviceScale mDefaultScale;
     bool mShown;
     bool mUpdatedDimensions;
+    nsIntPoint mChromeOffset;
 
 private:
     already_AddRefed<nsFrameLoader> GetFrameLoader(bool aUseCachedFrameLoaderAfterDestroy = false) const;

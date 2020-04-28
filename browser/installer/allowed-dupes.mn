@@ -224,6 +224,8 @@ res/table-remove-row.gif
 # (I think several of these are real duplicates that need to be fixed)
 browser/chrome/browser/skin/classic/browser/Push-16.png
 browser/chrome/browser/skin/classic/browser/Push-64.png
+browser/chrome/browser/skin/classic/browser/Geolocation-16.png
+browser/chrome/browser/skin/classic/browser/Geolocation-64.png
 chrome/toolkit/skin/classic/global/arrow/arrow-lft-hov.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-lft.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-rit-hov.gif

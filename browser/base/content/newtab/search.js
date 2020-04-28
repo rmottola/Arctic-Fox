@@ -69,6 +69,10 @@ let gSearch = {
     this._setCurrentEngine(engineName);
   },
 
+  onFocusInput: function () {
+    this._nodes.text.focus();
+  },
+
   _nodeIDSuffixes: [
     "form",
     "logo",

@@ -79,7 +79,7 @@
       <property name="finder" readonly="true">
         <getter><![CDATA[
           if (!this._remoteFinder) {
-            // Don't attempt to create the remote web progress if the
+            // Don't attempt to create the remote finder if the
             // messageManager has already gone away
             if (!this.messageManager)
               return null;
@@ -161,12 +161,6 @@
 
       <property name="contentDocumentAsCPOW"
                 onget="return this.contentWindowAsCPOW ? this.contentWindowAsCPOW.document : null"
-                readonly="true"/>
-
-      <field name="_syncHandler">null</field>
-
-      <property name="syncHandler"
-                onget="return this._syncHandler"
                 readonly="true"/>
 
       <field name="_imageDocument">null</field>
@@ -251,7 +245,6 @@
           this.messageManager.addMessageListener("Browser:Init", this);
           this.messageManager.addMessageListener("DOMTitleChanged", this);
           this.messageManager.addMessageListener("ImageDocumentLoaded", this);
-          this.messageManager.addMessageListener("SetSyncHandler", this);
           this.messageManager.addMessageListener("DocumentInserted", this);
           this.messageManager.addMessageListener("FullZoomChange", this);
           this.messageManager.addMessageListener("TextZoomChange", this);
@@ -317,10 +310,6 @@
               };
               break;
 
-            case "SetSyncHandler":
-              this._syncHandler = aMessage.objects.handler;
-              break;
-
             case "Forms:ShowDropDown": {
               Cu.import("resource://gre/modules/SelectParentHelper.jsm");
               let menulist = document.getElementById(this.getAttribute("selectmenulist"));
@@ -377,6 +366,20 @@
               break;
             }
 
+            case "DOMFullscreen:RequestExit": {
+              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                                      .getInterface(Ci.nsIDOMWindowUtils);
+              windowUtils.exitFullscreen();
+              break;
+            }
+
+            case "DOMFullscreen:RequestRollback": {
+              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                                      .getInterface(Ci.nsIDOMWindowUtils);
+              windowUtils.remoteFrameFullscreenReverted();
+              break;
+            }
+
             default:
               // Delegate to browser.xml.
               return this._receiveMessage(aMessage);
@@ -398,6 +401,34 @@
         ]]></body>
       </method>
 
+      <method name="observe">
+        <parameter name="aSubject"/>
+        <parameter name="aTopic"/>
+        <parameter name="aData"/>
+        <body><![CDATA[
+          if (aTopic == "ask-children-to-exit-fullscreen") {
+            if (aSubject == window.document) {
+              this.messageManager.sendAsyncMessage("DOMFullscreen:ChildrenMustExit");
+            }
+          }
+        ]]></body>
+      </method>
+
+      <method name="enableDisableCommands">
+        <parameter name="aAction"/>
+        <parameter name="aEnabledLength"/>
+        <parameter name="aEnabledCommands"/>
+        <parameter name="aDisabledLength"/>
+        <parameter name="aDisabledCommands"/>
+        <body>
+          if (this._controller) {
+            this._controller.enableDisableCommands(aAction,
+                                                   aEnabledLength, aEnabledCommands,
+                                                   aDisabledLength, aDisabledCommands);
+          }
+        </body>
+      </method>
+
       <!--
         For out-of-process code, event.screen[XY] is relative to the
         left/top of the content view. For in-process code,
@@ -416,21 +447,6 @@
           return { x: aScreenX + this.boxObject.screenX,
                    y: aScreenY + this.boxObject.screenY };
         ]]>
-        </body>
-      </method>
-
-      <method name="enableDisableCommands">
-        <parameter name="aAction"/>
-        <parameter name="aEnabledLength"/>
-        <parameter name="aEnabledCommands"/>
-        <parameter name="aDisabledLength"/>
-        <parameter name="aDisabledCommands"/>
-        <body>
-          if (this._controller) {
-            this._controller.enableDisableCommands(aAction,
-                                                   aEnabledLength, aEnabledCommands,
-                                                   aDisabledLength, aDisabledCommands);
-          }
         </body>
       </method>
 

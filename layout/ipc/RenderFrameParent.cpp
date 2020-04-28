@@ -275,6 +275,20 @@ public:
     }
   }
 
+  void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId, const nsString& aEvent) override {
+    if (MessageLoop::current() != mUILoop) {
+      mUILoop->PostTask(
+        FROM_HERE,
+        NewRunnableMethod(this, &RemoteContentController::NotifyMozMouseScrollEvent, aScrollId, aEvent));
+      return;
+    }
+
+    if (mRenderFrame) {
+      TabParent* browser = TabParent::GetFrom(mRenderFrame->Manager());
+      browser->NotifyMouseScrollTestEvent(aScrollId, aEvent);
+    }
+  }
+
   // Methods used by RenderFrameParent to set fields stored here.
 
   void SaveZoomConstraints(const ZoomConstraints& aConstraints)
@@ -575,6 +589,17 @@ RenderFrameParent::SetTargetAPZC(uint64_t aInputBlockId,
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         GetApzcTreeManager(), setTargetApzcFunc,
         aInputBlockId, aTargets));
+  }
+}
+
+void
+RenderFrameParent::SetAllowedTouchBehavior(uint64_t aInputBlockId,
+                                           const nsTArray<TouchBehaviorFlags>& aFlags)
+{
+  if (GetApzcTreeManager()) {
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
+        GetApzcTreeManager(), &APZCTreeManager::SetAllowedTouchBehavior,
+        aInputBlockId, aFlags));
   }
 }
 

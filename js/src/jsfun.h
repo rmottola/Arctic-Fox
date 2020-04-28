@@ -687,8 +687,9 @@ bool
 XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope,
                        HandleScript enclosingScript, MutableHandleFunction objp);
 
-extern JSObject*
-CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun);
+extern JSObject *
+CloneFunctionAndScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun,
+                       PollutedGlobalScopeOption polluted);
 
 /*
  * Report an error that call.thisv is not compatible with the specified class,

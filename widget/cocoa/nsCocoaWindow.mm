@@ -1284,6 +1284,9 @@ void nsCocoaWindow::EnteredFullScreen(bool aFullScreen)
   mInFullScreenTransition = false;
   mFullScreen = aFullScreen;
   DispatchSizeModeEvent();
+  if (mWidgetListener) {
+    mWidgetListener->FullscreenChanged(aFullScreen);
+  }
 }
 
 NS_METHOD nsCocoaWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)

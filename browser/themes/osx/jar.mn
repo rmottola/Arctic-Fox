@@ -16,7 +16,7 @@ browser.jar:
 #ifdef MOZ_SERVICES_SYNC
         skin/classic/browser/aboutSyncTabs.css
 #endif
- 	skin/classic/browser/aboutTabCrashed.css
+	skin/classic/browser/aboutTabCrashed.css                   (../shared/aboutTabCrashed.css)
         skin/classic/browser/actionicon-tab.png
         skin/classic/browser/appmenu-icons.png
         skin/classic/browser/appmenu-dropmarker.png
@@ -78,6 +78,14 @@ browser.jar:
         skin/classic/browser/urlbar-arrow.png
         skin/classic/browser/urlbar-popup-blocked.png
         skin/classic/browser/urlbar-history-dropmarker.png
+        skin/classic/browser/reader-mode-16.png             (../shared/reader/reader-mode-16.png)
+        skin/classic/browser/reader-mode-16@2x.png          (../shared/reader/reader-mode-16@2x.png)
+        skin/classic/browser/readinglist/icons.svg          (../shared/readinglist/icons.svg)
+        skin/classic/browser/readinglist/readinglist-icon.svg (../shared/readinglist/readinglist-icon.svg)
+        skin/classic/browser/readinglist/sidebar.css        (../shared/readinglist/sidebar.css)
+        skin/classic/browser/session-restore.svg            (../shared/incontent-icons/session-restore.svg)
+        skin/classic/browser/tab-crashed.svg                (../shared/incontent-icons/tab-crashed.svg)
+        skin/classic/browser/welcome-back.svg               (../shared/incontent-icons/welcome-back.svg)
         skin/classic/browser/webapps-16.png
         skin/classic/browser/webapps-64.png
         skin/classic/browser/notification-pluginNormal.png           (../shared/plugins/notification-pluginNormal.png)
@@ -106,6 +114,12 @@ browser.jar:
         skin/classic/browser/newtab/newTab.css                       (newtab/newTab.css)
         skin/classic/browser/newtab/controls.png                     (newtab/controls.png)
         skin/classic/browser/newtab/noise.png                        (newtab/noise.png)
+        skin/classic/browser/panic-panel/header.png               (../shared/panic-panel/header.png)
+        skin/classic/browser/panic-panel/header@2x.png            (../shared/panic-panel/header@2x.png)
+        skin/classic/browser/panic-panel/header-small.png         (../shared/panic-panel/header-small.png)
+        skin/classic/browser/panic-panel/header-small@2x.png      (../shared/panic-panel/header-small@2x.png)
+        skin/classic/browser/panic-panel/icons.png                (../shared/panic-panel/icons.png)
+        skin/classic/browser/panic-panel/icons@2x.png             (../shared/panic-panel/icons@2x.png)
         skin/classic/browser/places/places.css                       (places/places.css)
 *       skin/classic/browser/places/organizer.css                    (places/organizer.css)
         skin/classic/browser/places/editBookmark.png                 (places/editBookmark.png)
@@ -156,6 +170,7 @@ browser.jar:
 #endif
         skin/classic/browser/tabbrowser/alltabs.png                  (tabbrowser/alltabs.png)
         skin/classic/browser/tabbrowser/alltabs-inverted.png         (tabbrowser/alltabs-inverted.png)
+	skin/classic/browser/tabbrowser/crashed.svg                            (../shared/tabbrowser/crashed.svg)
         skin/classic/browser/tabbrowser/newtab.png                   (tabbrowser/newtab.png)
         skin/classic/browser/tabbrowser/newtab-inverted.png          (tabbrowser/newtab-inverted.png)
         skin/classic/browser/tabbrowser/connecting.png               (tabbrowser/connecting.png)

@@ -62,10 +62,9 @@ struct NativeToTrackedOptimizations
 
 class CodeGeneratorShared : public LElementVisitor
 {
-    js::Vector<OutOfLineCode*, 0, SystemAllocPolicy> outOfLineCode_;
-    OutOfLineCode* oolIns;
+    js::Vector<OutOfLineCode *, 0, SystemAllocPolicy> outOfLineCode_;
 
-    MacroAssembler& ensureMasm(MacroAssembler* masm);
+    MacroAssembler &ensureMasm(MacroAssembler *masm);
     mozilla::Maybe<MacroAssembler> maybeMasm_;
 
   public:
@@ -483,12 +482,11 @@ class CodeGeneratorShared : public LElementVisitor
     ReciprocalMulConstants computeDivisionConstants(int d);
 
   protected:
-    void addOutOfLineCode(OutOfLineCode* code, const MInstruction* mir);
-    void addOutOfLineCode(OutOfLineCode* code, const BytecodeSite* site);
-    bool hasOutOfLineCode() { return !outOfLineCode_.empty(); }
+    void addOutOfLineCode(OutOfLineCode *code, const MInstruction *mir);
+    void addOutOfLineCode(OutOfLineCode *code, const BytecodeSite *site);
     bool generateOutOfLineCode();
 
-    Label* labelForBackedgeWithImplicitCheck(MBasicBlock* mir);
+    Label *labelForBackedgeWithImplicitCheck(MBasicBlock *mir);
 
     // Generate a jump to the start of the specified block, adding information
     // if this is a loop backedge. Use this in place of jumping directly to

@@ -918,6 +918,23 @@ private:
   nsRefPtr<APZCTreeManager> mTreeManager;
 };
 
+class ChromeProcessSetAllowedTouchBehaviorCallback : public SetAllowedTouchBehaviorCallback {
+public:
+  explicit ChromeProcessSetAllowedTouchBehaviorCallback(APZCTreeManager* aTreeManager)
+    : mTreeManager(aTreeManager)
+  {}
+
+  void Run(uint64_t aInputBlockId, const nsTArray<TouchBehaviorFlags>& aFlags) const override {
+    MOZ_ASSERT(NS_IsMainThread());
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
+        mTreeManager.get(), &APZCTreeManager::SetAllowedTouchBehavior,
+        aInputBlockId, aFlags));
+  }
+
+private:
+  nsRefPtr<APZCTreeManager> mTreeManager;
+};
+
 class ChromeProcessContentReceivedInputBlockCallback : public ContentReceivedInputBlockCallback {
 public:
   explicit ChromeProcessContentReceivedInputBlockCallback(APZCTreeManager* aTreeManager)
@@ -946,6 +963,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
   mAPZEventState = new APZEventState(this,
       new ChromeProcessContentReceivedInputBlockCallback(mAPZC));
   mSetTargetAPZCCallback = new ChromeProcessSetTargetAPZCCallback(mAPZC);
+  mSetAllowedTouchBehaviorCallback = new ChromeProcessSetAllowedTouchBehaviorCallback(mAPZC);
 
   nsRefPtr<GeckoContentController> controller = CreateRootContentController();
   if (controller) {
@@ -982,6 +1000,10 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
     // call into APZEventState::Process*Event() as well.
     if (WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent()) {
       if (touchEvent->message == NS_TOUCH_START) {
+        if (gfxPrefs::TouchActionEnabled()) {
+          APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(this, *touchEvent,
+              aInputBlockId, mSetAllowedTouchBehaviorCallback);
+        }
         APZCCallbackHelper::SendSetTargetAPZCNotification(this, GetDocument(), *aEvent,
             aGuid, aInputBlockId, mSetTargetAPZCCallback);
       }
@@ -993,6 +1015,21 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
     }
   }
 
+  return status;
+}
+
+nsEventStatus
+nsBaseWidget::DispatchInputEvent(WidgetInputEvent* aEvent)
+{
+  if (mAPZC) {
+    nsEventStatus result = mAPZC->ReceiveInputEvent(*aEvent, nullptr, nullptr);
+    if (result == nsEventStatus_eConsumeNoDefault) {
+      return result;
+    }
+  }
+
+  nsEventStatus status;
+  DispatchEvent(aEvent, status);
   return status;
 }
 

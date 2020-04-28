@@ -810,6 +810,22 @@ private:
   nsWeakPtr mTabChild;
 };
 
+class TabChildSetAllowedTouchBehaviorCallback : public SetAllowedTouchBehaviorCallback {
+public:
+  explicit TabChildSetAllowedTouchBehaviorCallback(TabChild* aTabChild)
+    : mTabChild(do_GetWeakReference(static_cast<nsITabChild*>(aTabChild)))
+  {}
+
+  void Run(uint64_t aInputBlockId, const nsTArray<TouchBehaviorFlags>& aFlags) const override {
+    if (nsCOMPtr<nsITabChild> tabChild = do_QueryReferent(mTabChild)) {
+      static_cast<TabChild*>(tabChild.get())->SendSetAllowedTouchBehavior(aInputBlockId, aFlags);
+    }
+  }
+
+private:
+  nsWeakPtr mTabChild;
+};
+
 class TabChildContentReceivedInputBlockCallback : public ContentReceivedInputBlockCallback {
 public:
   explicit TabChildContentReceivedInputBlockCallback(TabChild* aTabChild)
@@ -845,6 +861,7 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mUpdateHitRegion(false)
   , mIgnoreKeyPressEvent(false)
   , mSetTargetAPZCCallback(new TabChildSetTargetAPZCCallback(this))
+  , mSetAllowedTouchBehaviorCallback(new TabChildSetAllowedTouchBehaviorCallback(this))
   , mHasValidInnerSize(false)
   , mDestroyed(false)
   , mUniqueId(aTabId)
@@ -2002,8 +2019,8 @@ TabChild::RecvUpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
     mOrientation = orientation;
     ScreenIntSize oldScreenSize = mInnerSize;
     mInnerSize = size;
-    mWidget->Resize(0, 0, size.width, size.height,
-                    true);
+    mWidget->Resize(rect.x + chromeDisp.x, rect.y + chromeDisp.y, size.width, size.height,
+                     true);
 
     nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(WebNavigation());
     baseWin->SetPositionAndSize(0, 0, size.width, size.height,
@@ -2184,6 +2201,13 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
   return true;
 }
 
+bool
+TabChild::RecvMouseScrollTestEvent(const FrameMetrics::ViewID& aScrollId, const nsString& aEvent)
+{
+  APZCCallbackHelper::NotifyMozMouseScrollEvent(aScrollId, aEvent);
+  return true;
+}
+
 static Touch*
 GetTouchForIdentifier(const WidgetTouchEvent& aEvent, int32_t aId)
 {
@@ -2353,6 +2377,10 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
       mWidget->GetDefaultScale(), GetPresShellResolution());
 
   if (localEvent.message == NS_TOUCH_START && gfxPrefs::AsyncPanZoomEnabled()) {
+    if (gfxPrefs::TouchActionEnabled()) {
+      APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(WebWidget(),
+          localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
+    }
     nsCOMPtr<nsIDocument> document = GetDocument();
     APZCCallbackHelper::SendSetTargetAPZCNotification(WebWidget(), document,
         localEvent, aGuid, aInputBlockId, mSetTargetAPZCCallback);

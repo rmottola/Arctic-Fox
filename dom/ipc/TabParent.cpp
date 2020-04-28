@@ -80,6 +80,7 @@
 #include "nsICancelable.h"
 #include "gfxPrefs.h"
 #include "nsILoginManagerPrompter.h"
+#include "nsPIWindowRoot.h"
 #include <algorithm>
 
 using namespace mozilla::dom;
@@ -267,6 +268,7 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mDefaultScale(0)
   , mShown(false)
   , mUpdatedDimensions(false)
+  , mChromeOffset(0, 0)
   , mManager(aManager)
   , mMarkedDestroying(false)
   , mIsDestroyed(false)
@@ -324,8 +326,34 @@ TabParent::CacheFrameLoader(nsFrameLoader* aFrameLoader)
 void
 TabParent::SetOwnerElement(Element* aElement)
 {
+  // If we held previous content then unregister for its events.
+  RemoveWindowListeners();
+
+  // Update to the new content, and register to listen for events from it.
   mFrameElement = aElement;
+  if (mFrameElement && mFrameElement->OwnerDoc()->GetWindow()) {
+    nsCOMPtr<nsPIDOMWindow> window = mFrameElement->OwnerDoc()->GetWindow();
+    nsCOMPtr<EventTarget> eventTarget = window->GetTopWindowRoot();
+    if (eventTarget) {
+      eventTarget->AddEventListener(NS_LITERAL_STRING("MozUpdateWindowPos"),
+                                    this, false, false);
+    }
+  }
+
   TryCacheDPIAndScale();
+}
+
+void
+TabParent::RemoveWindowListeners()
+{
+  if (mFrameElement && mFrameElement->OwnerDoc()->GetWindow()) {
+    nsCOMPtr<nsPIDOMWindow> window = mFrameElement->OwnerDoc()->GetWindow();
+    nsCOMPtr<EventTarget> eventTarget = window->GetTopWindowRoot();
+    if (eventTarget) {
+      eventTarget->RemoveEventListener(NS_LITERAL_STRING("MozUpdateWindowPos"),
+                                       this, false);
+    }
+  }
 }
 
 void
@@ -879,8 +907,7 @@ TabParent::RecvSetDimensions(const uint32_t& aFlags,
 }
 
 void
-TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
-                            const nsIntPoint& aChromeDisp)
+TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
 {
   if (mIsDestroyed) {
     return;
@@ -888,15 +915,25 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
   hal::ScreenConfiguration config;
   hal::GetCurrentScreenConfiguration(&config);
   ScreenOrientation orientation = config.orientation();
+  nsIntPoint chromeOffset = -LayoutDevicePixel::ToUntyped(GetChildProcessOffset());
 
   if (!mUpdatedDimensions || mOrientation != orientation ||
-      mDimensions != size || !mRect.IsEqualEdges(rect)) {
+      mDimensions != size || !mRect.IsEqualEdges(rect) ||
+      chromeOffset != mChromeOffset) {
+    nsCOMPtr<nsIWidget> widget = GetWidget();
+    nsIntRect contentRect = rect;
+    if (widget) {
+      contentRect.x += widget->GetClientOffset().x;
+      contentRect.y += widget->GetClientOffset().y;
+    }
+
     mUpdatedDimensions = true;
-    mRect = rect;
+    mRect = contentRect;
     mDimensions = size;
     mOrientation = orientation;
+    mChromeOffset = chromeOffset;
 
-    unused << SendUpdateDimensions(mRect, mDimensions, mOrientation, aChromeDisp);
+    unused << SendUpdateDimensions(mRect, mDimensions, mOrientation, mChromeOffset);
   }
 }
 
@@ -979,6 +1016,14 @@ void TabParent::NotifyAPZStateChange(ViewID aViewId,
 {
   if (!mIsDestroyed) {
     unused << SendNotifyAPZStateChange(aViewId, aChange, aArg);
+  }
+}
+
+void
+TabParent::NotifyMouseScrollTestEvent(const ViewID& aScrollId, const nsString& aEvent)
+{
+  if (!mIsDestroyed) {
+    unused << SendMouseScrollTestEvent(aScrollId, aEvent);
   }
 }
 
@@ -1229,7 +1274,7 @@ bool TabParent::SendMouseWheelEvent(WidgetWheelEvent& event)
   return PBrowserParent::SendMouseWheelEvent(event, guid, blockId);
 }
 
-bool TabParent::RecvSynthesizedMouseWheelEvent(const mozilla::WidgetWheelEvent& aEvent)
+bool TabParent::RecvDispatchWheelEvent(const mozilla::WidgetWheelEvent& aEvent)
 {
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) {
@@ -1241,6 +1286,38 @@ bool TabParent::RecvSynthesizedMouseWheelEvent(const mozilla::WidgetWheelEvent& 
   localEvent.refPoint -= GetChildProcessOffset();
 
   widget->DispatchAPZAwareEvent(&localEvent);
+  return true;
+}
+
+bool
+TabParent::RecvDispatchMouseEvent(const mozilla::WidgetMouseEvent& aEvent)
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  WidgetMouseEvent localEvent(aEvent);
+  localEvent.widget = widget;
+  localEvent.refPoint -= GetChildProcessOffset();
+
+  widget->DispatchInputEvent(&localEvent);
+  return true;
+}
+
+bool
+TabParent::RecvDispatchKeyboardEvent(const mozilla::WidgetKeyboardEvent& aEvent)
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  WidgetKeyboardEvent localEvent(aEvent);
+  localEvent.widget = widget;
+  localEvent.refPoint -= GetChildProcessOffset();
+
+  widget->DispatchInputEvent(&localEvent);
   return true;
 }
 
@@ -2489,6 +2566,16 @@ TabParent::RecvSetTargetAPZC(const uint64_t& aInputBlockId,
   return true;
 }
 
+bool
+TabParent::RecvSetAllowedTouchBehavior(const uint64_t& aInputBlockId,
+                                       nsTArray<TouchBehaviorFlags>&& aFlags)
+{
+  if (RenderFrameParent* rfp = GetRenderFrame()) {
+    rfp->SetAllowedTouchBehavior(aInputBlockId, aFlags);
+  }
+  return true;
+}
+
 already_AddRefed<nsILoadContext>
 TabParent::GetLoadContext()
 {
@@ -2701,6 +2788,27 @@ TabParent::DeallocPPluginWidgetParent(mozilla::plugins::PPluginWidgetParent* aAc
 {
   delete aActor;
   return true;
+}
+
+nsresult
+TabParent::HandleEvent(nsIDOMEvent* aEvent)
+{
+  nsAutoString eventType;
+  aEvent->GetType(eventType);
+
+  if (eventType.EqualsLiteral("MozUpdateWindowPos") && !mIsDestroyed) {
+    // This event is sent when the widget moved.  Therefore we only update
+    // the position.
+    nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
+    if (!frameLoader) {
+      return NS_OK;
+    }
+    nsIntRect windowDims;
+    NS_ENSURE_SUCCESS(frameLoader->GetWindowDimensions(windowDims), NS_ERROR_FAILURE);
+    UpdateDimensions(windowDims, mDimensions);
+    return NS_OK;
+  }
+  return NS_OK;
 }
 
 class FakeChannel final : public nsIChannel,

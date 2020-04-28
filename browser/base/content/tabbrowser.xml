@@ -76,6 +76,9 @@
          Components.classes["@mozilla.org/autocomplete/search;1?name=history"]
                    .getService(Components.interfaces.mozIPlacesAutoComplete);
       </field>
+      <field name="AppConstants" readonly="true">
+        (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
+      </field>
       <field name="mTabBox" readonly="true">
         document.getAnonymousElementByAttribute(this, "anonid", "tabbox");
       </field>
@@ -113,11 +116,7 @@
         new Map();
       </field>
       <field name="arrowKeysShouldWrap" readonly="true">
-#ifdef XP_MACOSX
-        true
-#else
-        false
-#endif
+        this.AppConstants.platform == "macosx";
       </field>
 
       <field name="_autoScrollPopup">
@@ -126,6 +125,10 @@
 
       <field name="_previewMode">
         false
+      </field>
+
+      <field name="_lastFindValue">
+        ""
       </field>
 
       <property name="_numPinnedTabs" readonly="true">
@@ -154,12 +157,46 @@
         ]]></getter>
       </property>
 
+      <method name="isFindBarInitialized">
+        <parameter name="aTab"/>
+        <body><![CDATA[
+          return (aTab || this.selectedTab)._findBar != undefined;
+        ]]></body>
+      </method>
+
+      <method name="getFindBar">
+        <parameter name="aTab"/>
+        <body><![CDATA[
+          if (!aTab)
+            aTab = this.selectedTab;
+
+          if (aTab._findBar)
+            return aTab._findBar;
+
+          let findBar = document.createElementNS(this.namespaceURI, "findbar");
+          let browser = this.getBrowserForTab(aTab);
+          let browserContainer = this.getBrowserContainer(browser);
+          browserContainer.appendChild(findBar);
+
+          // Force a style flush to ensure that our binding is attached.
+          findBar.clientTop;
+
+          findBar.browser = browser;
+          findBar._findField.value = this._lastFindValue;
+
+          aTab._findBar = findBar;
+
+          return findBar;
+        ]]></body>
+      </method>
+
       <method name="updateWindowResizers">
         <body><![CDATA[
           if (!window.gShowPageResizers)
             return;
 
-          var show = window.windowState == window.STATE_NORMAL;
+          var show = document.getElementById("addon-bar").collapsed &&
+                     window.windowState == window.STATE_NORMAL;
           for (let i = 0; i < this.browsers.length; i++) {
             this.browsers[i].showWindowResizer = show;
           }
@@ -585,8 +622,12 @@
                 // We need to add 2 because loadURIWithFlags may have
                 // cancelled a pending load which would have cleared
                 // its anchor scroll detection temporary increment.
-                if (aWebProgress.isTopLevel)
+                if (aWebProgress.isTopLevel) {
                   this.mBrowser.userTypedClear += 2;
+
+                  // If the browser is loading it must not be crashed anymore
+                  this.mTab.removeAttribute("crashed");
+                }
 
                 if (this._shouldShowProgress(aRequest)) {
                   if (!(aStateFlags & nsIWebProgressListener.STATE_RESTORING)) {
@@ -1049,9 +1090,11 @@
               this.mCurrentTab.removeAttribute("unread");
               this.selectedTab.lastAccessed = Date.now();
 
-              // Bug 666816 - TypeAheadFind support for e10s
-              if (!gMultiProcessBrowser)
-                this._fastFind.setDocShell(this.mCurrentBrowser.docShell);
+              let oldFindBar = oldTab._findBar;
+              if (oldFindBar &&
+                  oldFindBar.findMode == oldFindBar.FIND_NORMAL &&
+                  !oldFindBar.hidden)
+                this._lastFindValue = oldFindBar._findField.value;
 
               this.updateTitlebar();
 
@@ -1252,6 +1295,7 @@
         <parameter name="aAllowThirdPartyFixup"/>
         <body>
           <![CDATA[
+            var aReferrerPolicy;
             var aFromExternal;
             var aRelatedToCurrent;
             var aAllowMixedContent;
@@ -1263,6 +1307,7 @@
                 !(arguments[1] instanceof Ci.nsIURI)) {
               let params = arguments[1];
               aReferrerURI          = params.referrerURI;
+              aReferrerPolicy       = params.referrerPolicy;
               aCharset              = params.charset;
               aPostData             = params.postData;
               aLoadInBackground     = params.inBackground;
@@ -1280,6 +1325,7 @@
             var owner = bgLoad ? null : this.selectedTab;
             var tab = this.addTab(aURI, {
                                   referrerURI: aReferrerURI,
+                                  referrerPolicy: aReferrerPolicy,
                                   charset: aCharset,
                                   postData: aPostData,
                                   ownerTab: owner,
@@ -1544,6 +1590,7 @@
         <body>
           <![CDATA[
             const NS_XUL = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+            var aReferrerPolicy;
             var aFromExternal;
             var aRelatedToCurrent;
             var aSkipAnimation;
@@ -1555,6 +1602,7 @@
                 !(arguments[1] instanceof Ci.nsIURI)) {
               let params = arguments[1];
               aReferrerURI          = params.referrerURI;
+              aReferrerPolicy       = params.referrerPolicy;
               aCharset              = params.charset;
               aPostData             = params.postData;
               aOwner                = params.ownerTab;
@@ -1665,7 +1713,6 @@
             this.mTabListeners[position] = tabListener;
             this.mTabFilters[position] = filter;
 
-            b._fastFind = this.fastFind;
             b.droppedLinkHandler = handleDroppedLink;
 
             // Swap in a preloaded customize tab, if available.
@@ -1698,9 +1745,13 @@
               if (aAllowMixedContent)
                 flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_MIXED_CONTENT;
               try {
-                b.loadURIWithFlags(aURI, flags,
-                                   aNoReferrer ? null : aReferrerURI,
-                                   aCharset, aPostData);
+                b.loadURIWithFlags(aURI, {
+                                   flags: flags,
+                                   referrerURI: aNoReferrer ? null: aReferrerURI,
+                                   referrerPolicy: aReferrerPolicy,
+                                   charset: aCharset,
+                                   postData: aPostData,
+                                   });
               } catch (ex) {
                 Cu.reportError(ex);
               }
@@ -2146,20 +2197,6 @@
               }, 0, this.tabContainer);
             }
 
-            // Pale Moon: if resizing immediately, select the tab immediately to the left
-            // instead of the right (if not leftmost) to prevent focus swap and
-            // "selected tab not under cursor"
-            // FIXME: Tabs must be sliding in from the left for this, or it'd unfocus
-            // in the other direction! Disabled for now. Is there an easier way? :hover?
-            // Is this even needed when resizing immediately?...
-            
-            //if (Services.prefs.getBoolPref("browser.tabs.resize_immediately")) {
-            //  if (this.selectedTab._tPos > 1) {
-            //    let newPos = this.selectedTab._tPos - 1;
-            //    this.selectedTab = this.tabs[newPos];
-            //  }
-            //}
-
             // update tab positional properties and attributes
             this.selectedTab._selected = true;
             this.tabContainer._setPositionalAttributes();
@@ -2318,6 +2355,15 @@
               }
 
               this._swapBrowserDocShells(aOurTab, otherBrowser);
+            }
+
+            // Handle findbar data (if any)
+            let otherFindBar = aOtherTab._findBar;
+            if (otherFindBar &&
+                otherFindBar.findMode == otherFindBar.FIND_NORMAL) {
+              let ourFindBar = this.getFindBar(aOurTab);
+              ourFindBar.hidden = otherFindBar.hidden;
+              ourFindBar._findField.value = otherFindBar._findField.value;
             }
 
             // Finish tearing down the tab that's going away.
@@ -2609,6 +2655,20 @@
         </body>
       </method>
 
+      <!-- Opens a given tab to a non-remote window. -->
+      <method name="openNonRemoteWindow">
+        <parameter name="aTab"/>
+        <body>
+          <![CDATA[
+            if (!this.AppConstants.E10S_TESTING_ONLY) {
+              throw "This method is intended only for e10s testing!";
+            }
+            let url = aTab.linkedBrowser.currentURI.spec;
+            return window.openDialog("chrome://browser/content/", "_blank", "chrome,all,dialog=no,non-remote", url);
+          ]]>
+        </body>
+      </method>
+
       <method name="moveTabTo">
         <parameter name="aTab"/>
         <parameter name="aIndex"/>
@@ -2812,6 +2872,11 @@
         <parameter name="aPostData"/>
         <body>
           <![CDATA[
+            // Note - the callee understands both:
+            // (a) loadURIWithFlags(aURI, aFlags, ...)
+            // (b) loadURIWithFlags(aURI, { flags: aFlags, ... })
+            // Forwarding it as (a) here actually supports both (a) and (b),
+            // so you can call us either way too.
             return this.mCurrentBrowser.loadURIWithFlags(aURI, aFlags, aReferrerURI, aCharset, aPostData);
           ]]>
         </body>
@@ -2869,21 +2934,6 @@
       <property name="currentURI"
                 onget="return this.mCurrentBrowser.currentURI;"
                 readonly="true"/>
-
-      <field name="_fastFind">null</field>
-      <property name="fastFind"
-                readonly="true">
-        <getter>
-        <![CDATA[
-          if (!this._fastFind) {
-            this._fastFind = Components.classes["@mozilla.org/typeaheadfind;1"]
-                                       .createInstance(Components.interfaces.nsITypeAheadFind);
-            this._fastFind.init(this.docShell);
-          }
-          return this._fastFind;
-        ]]>
-        </getter>
-      </property>
 
       <field name="_lastSearchString">null</field>
       <field name="_lastSearchHighlight">false</field>
@@ -3012,7 +3062,7 @@
                 onget="return this.mCurrentBrowser.isSyntheticDocument;"
                 readonly="true"/>
 
-      <method name="_handleKeyEvent">
+      <method name="_handleKeyDownEvent">
         <parameter name="aEvent"/>
         <body><![CDATA[
           if (!aEvent.isTrusted) {
@@ -3023,62 +3073,59 @@
           if (aEvent.altKey)
             return;
 
+          // Don't check if the event was already consumed because tab
+          // navigation should always work for better user experience.
+
           if (aEvent.ctrlKey && aEvent.shiftKey && !aEvent.metaKey) {
             switch (aEvent.keyCode) {
               case aEvent.DOM_VK_PAGE_UP:
                 this.moveTabBackward();
-                aEvent.stopPropagation();
                 aEvent.preventDefault();
                 return;
               case aEvent.DOM_VK_PAGE_DOWN:
                 this.moveTabForward();
-                aEvent.stopPropagation();
                 aEvent.preventDefault();
                 return;
             }
           }
 
-          // We need to take care of FAYT-watching as long as the findbar
-          // isn't initialized.  The checks on aEvent are copied from
-          // _shouldFastFind (see findbar.xml).
-          if (!gFindBarInitialized &&
-              !(aEvent.ctrlKey || aEvent.metaKey) &&
-              !aEvent.defaultPrevented) {
-            let charCode = aEvent.charCode;
-            if (charCode) {
-              let char = String.fromCharCode(charCode);
-              if (char == "'" || char == "/" ||
-                  Services.prefs.getBoolPref("accessibility.typeaheadfind")) {
-                gFindBar._onBrowserKeypress(aEvent);
-                return;
-              }
+          if (this.AppConstants.platform != "macosx") {
+            if (aEvent.ctrlKey && !aEvent.shiftKey && !aEvent.metaKey &&
+                aEvent.keyCode == KeyEvent.DOM_VK_F4 &&
+                !this.mCurrentTab.pinned) {
+              this.removeCurrentTab({animate: true});
+              aEvent.preventDefault();
             }
           }
+        ]]></body>
+      </method>
 
-#ifdef XP_MACOSX
-          if (!aEvent.metaKey)
+      <method name="_handleKeyPressEventMac">
+        <parameter name="aEvent"/>
+        <body><![CDATA[
+          if (!aEvent.isTrusted) {
+            // Don't let untrusted events mess with tabs.
+            return;
+          }
+
+          if (aEvent.altKey)
             return;
 
-          var offset = 1;
-          switch (aEvent.charCode) {
-            case '}'.charCodeAt(0):
-              offset = -1;
-            case '{'.charCodeAt(0):
-              if (window.getComputedStyle(this, null).direction == "ltr")
-                offset *= -1;
-              this.tabContainer.advanceSelectedTab(offset, true);
-              aEvent.stopPropagation();
-              aEvent.preventDefault();
+          if (this.AppConstants.platform == "macosx") {
+            if (!aEvent.metaKey)
+              return;
+
+            var offset = 1;
+            switch (aEvent.charCode) {
+              case '}'.charCodeAt(0):
+                offset = -1;
+              case '{'.charCodeAt(0):
+                if (window.getComputedStyle(this, null).direction == "ltr")
+                  offset *= -1;
+                this.tabContainer.advanceSelectedTab(offset, true);
+                aEvent.preventDefault();
+            }
           }
-#else
-          if (aEvent.ctrlKey && !aEvent.shiftKey && !aEvent.metaKey &&
-              aEvent.keyCode == KeyEvent.DOM_VK_F4 &&
-              !this.mCurrentTab.pinned) {
-            this.removeCurrentTab({animate: true});
-            aEvent.stopPropagation();
-            aEvent.preventDefault();
-          }
-#endif
         ]]></body>
       </method>
 
@@ -3109,8 +3156,11 @@
         <parameter name="aEvent"/>
         <body><![CDATA[
           switch (aEvent.type) {
+            case "keydown":
+              this._handleKeyDownEvent(aEvent);
+              break;
             case "keypress":
-              this._handleKeyEvent(aEvent);
+              this._handleKeyPressEventMac(aEvent);
               break;
             case "sizemodechange":
               if (aEvent.target == window) {
@@ -3142,6 +3192,9 @@
               let spellInfo = aMessage.data.spellInfo;
               if (spellInfo)
                 spellInfo.target = aMessage.target.messageManager;
+              let documentURIObject = makeURI(aMessage.data.docLocation,
+                                              aMessage.data.charSet,
+                                              makeURI(aMessage.data.baseURI));
               gContextMenuContentData = { isRemote: true,
                                           event: aMessage.objects.event,
                                           popupNode: aMessage.objects.popupNode,
@@ -3150,12 +3203,20 @@
                                           spellInfo: spellInfo,
                                           principal: aMessage.data.principal,
                                           customMenuItems: aMessage.data.customMenuItems,
-                                          addonInfo: aMessage.data.addonInfo };
+                                          addonInfo: aMessage.data.addonInfo,
+                                          documentURIObject: documentURIObject,
+                                          docLocation: aMessage.data.docLocation,
+                                          charSet: aMessage.data.charSet,
+                                          referrer: aMessage.data.referrer,
+                                          referrerPolicy: aMessage.data.referrerPolicy,
+                                          contentType: aMessage.data.contentType,
+                                          contentDisposition: aMessage.data.contentDisposition,
+                                          frameOuterWindowID: aMessage.data.frameOuterWindowID,
+                                          selectionInfo: aMessage.data.selectionInfo,
+                                        };
               let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
-              popup.openPopup(browser, "overlap",
-                              gContextMenuContentData.event.clientX,
-                              gContextMenuContentData.event.clientY,
-                              true, false, null);
+              let event = gContextMenuContentData.event;
+              popup.openPopupAtScreen(event.screenX, event.screenY, true);
               break;
             }
             case "DOMWebNotificationClicked": {
@@ -3166,6 +3227,14 @@
               window.focus();
               break;
             }
+            case "Findbar:Keypress":
+              if (!gFindBarInitialized) {
+                // If the find bar for this tab is not yet alive, change that,
+                // and make sure we return the result:
+                return gFindBar.receiveMessage(aMessage);
+              }
+              break;
+
           }
         ]]></body>
       </method>
@@ -3177,7 +3246,11 @@
           this.mCurrentBrowser.permanentKey = {};
 
           this.mCurrentTab = this.tabContainer.firstChild;
-          document.addEventListener("keypress", this, false);
+          let els = Cc["@mozilla.org/eventlistenerservice;1"].getService(Ci.nsIEventListenerService);
+          els.addSystemEventListener(document, "keydown", this, false);
+          if (this.AppConstants.platform == "macosx") {
+            els.addSystemEventListener(document, "keypress", this, false);
+          }
           window.addEventListener("sizemodechange", this, false);
 
           var uniqueId = "panel" + Date.now();
@@ -3233,6 +3306,7 @@
                                               this.mCurrentBrowser);
           }
           messageManager.addMessageListener("DOMWebNotificationClicked", this);
+          messageManager.addMessageListener("Findbar:Keypress", this);
         ]]>
       </constructor>
 
@@ -3275,7 +3349,11 @@
             this.mTabListeners[i].destroy();
             this.mTabListeners[i] = null;
           }
-          document.removeEventListener("keypress", this, false);
+          let els = Cc["@mozilla.org/eventlistenerservice;1"].getService(Ci.nsIEventListenerService);
+          els.removeSystemEventListener(document, "keydown", this, false);
+          if (this.AppConstants.platform == "macosx") {
+            els.removeSystemEventListener(document, "keypress", this, false);
+          }
           window.removeEventListener("sizemodechange", this, false);
 
           if (gMultiProcessBrowser) {
@@ -3391,12 +3469,23 @@
           let browser = event.originalTarget;
           let title = browser.contentTitle;
           let uri = browser.currentURI;
+          let icon = browser.mIconURL;
 
-          this.updateBrowserRemotenessByURL(browser, "about:tabcrashed");
+          let tab = this.getTabForBrowser(browser);
 
-          browser.setAttribute("crashedPageTitle", title);
-          browser.docShell.displayLoadError(Cr.NS_ERROR_CONTENT_CRASHED, uri, null);
-          browser.removeAttribute("crashedPageTitle");
+          if (this.selectedBrowser == browser) {
+            this.updateBrowserRemotenessByURL(browser, "about:tabcrashed");
+            browser.setAttribute("crashedPageTitle", title);
+            browser.docShell.displayLoadError(Cr.NS_ERROR_CONTENT_CRASHED, uri, null);
+            browser.removeAttribute("crashedPageTitle");
+            tab.setAttribute("crashed", true);
+          } else {
+            this.updateBrowserRemoteness(browser, false);
+            SessionStore.reviveCrashedTab(tab);
+          }
+
+          tab.removeAttribute("soundplaying");
+          this.setIcon(tab, icon);
         ]]>
       </handler>
     </handlers>
@@ -3468,15 +3557,16 @@
       </xul:hbox>
       <xul:arrowscrollbox anonid="arrowscrollbox" orient="horizontal" flex="1"
                           style="min-width: 1px;"
-#ifndef XP_MACOSX
-                          clicktoscroll="true"
-#endif
                           class="tabbrowser-arrowscrollbox">
-# This is a hack to circumvent bug 472020, otherwise the tabs show up on the
-# right of the newtab button.
+<!--
+ This is a hack to circumvent bug 472020, otherwise the tabs show up on the
+ right of the newtab button.
+-->
         <children includes="tab"/>
-# This is to ensure anything extensions put here will go before the newtab
-# button, necessary due to the previous hack.
+<!--
+  This is to ensure anything extensions put here will go before the newtab
+  button, necessary due to the previous hack.
+-->
         <children/>
         <xul:toolbarbutton class="tabs-newtab-button"
                            command="cmd_newNavigatorTab"
@@ -3771,15 +3861,9 @@
           this._lastTabClosedByMouse = true;
 
           if (this.getAttribute("overflow") == "true") {
-#ifdef XP_WIN
-            // Don't need to do anything if we're in overflow mode and we're closing
-            // the last tab.
-            if (isEndTab)
-#else
             // Don't need to do anything if we're in overflow mode and aren't scrolled
             // all the way to the right, or if we're closing the last tab.
             if (isEndTab || !this.mTabstrip._scrollButtonDown.disabled)
-#endif
               return;
 
             // If the tab has an owner that will become the active tab, the owner will
@@ -3788,26 +3872,12 @@
             if (aTab.owner)
               return;
 
-            // Resize immediately if preffed
-            // XXX: we may want to make this a three-state pref to disable this early
-            // exit if people prefer a mix of behavior (don't resize in overflow,
-            // but resize if not overflowing)
-            if (Services.prefs.getBoolPref("browser.tabs.resize_immediately"))
-              return;
-
             this._expandSpacerBy(tabWidth);
           } else { // non-overflow mode
             // Locking is neither in effect nor needed, so let tabs expand normally.
             if (isEndTab && !this._hasTabTempMaxWidth)
               return;
               
-            // Resize immediately if preffed
-            // XXX: we may want to make this a three-state pref to disable this early
-            // exit if people prefer a mix of behavior (don't resize in overflow,
-            // but resize if not overflowing)
-            if (Services.prefs.getBoolPref("browser.tabs.resize_immediately"))
-              return;
-
             let numPinned = this.tabbrowser._numPinnedTabs;
             // Force tabs to stay the same width, unless we're closing the last tab,
             // which case we need to let them expand just enough so that the overall
@@ -4159,11 +4229,8 @@
                   PrivateBrowsingUtils.isWindowPrivate(sourceNode.ownerDocument.defaultView))
                 return dt.effectAllowed = "none";
 
-#ifdef XP_MACOSX
-              return dt.effectAllowed = event.altKey ? "copy" : "move";
-#else
-              return dt.effectAllowed = event.ctrlKey ? "copy" : "move";
-#endif
+              let copyModifier = this.AppConstants.platform == "macosx" ? event.altKey : event.ctrlKey;
+              return dt.effectAllowed = copyModifier ? "copy" : "move";
             }
           }
 
@@ -4320,14 +4387,13 @@
       ]]></handler>
 
       <handler event="dblclick"><![CDATA[
-#ifndef XP_MACOSX
-        // When the tabbar has an unified appearance with the titlebar
-        // and menubar, a double-click in it should have the same behavior
-        // as double-clicking the titlebar
-        if (TabsInTitlebar.enabled ||
-            (TabsOnTop.enabled && this.parentNode._dragBindingAlive))
-          return;
-#endif
+        if (gBrowser.AppConstants.platform != "macosx") {
+          // When the tabbar has an unified appearance with the titlebar
+          // and menubar, a double-click in it should have the same behavior
+          // as double-clicking the titlebar
+          if (TabsInTitlebar.enabled || this.parentNode._dragBindingAlive)
+            return;
+        }
 
         if (event.button != 0 ||
             event.originalTarget.localName != "box")
@@ -4356,14 +4422,22 @@
         event.stopPropagation();
       ]]></handler>
 
-      <handler event="keypress"><![CDATA[
-        if (event.altKey || event.shiftKey ||
-#ifdef XP_MACOSX
-            !event.metaKey)
-#else
-            !event.ctrlKey || event.metaKey)
-#endif
+      <handler event="keydown" group="system"><![CDATA[
+        if (event.altKey || event.shiftKey)
           return;
+
+        let wrongModifiers;
+        if (this.tabbrowser.AppConstants.platform == "macosx") {
+          wrongModifiers = !event.metaKey;
+        } else {
+          wrongModifiers = !event.ctrlKey || event.metaKey;
+        }
+
+        if (wrongModifiers)
+          return;
+
+        // Don't check if the event was already consumed because tab navigation
+        // should work always for better user experience.
 
         switch (event.keyCode) {
           case KeyEvent.DOM_VK_UP:
@@ -4383,11 +4457,10 @@
             this.tabbrowser.moveTabToEnd();
             break;
           default:
-            // Stop the keypress event for the above keyboard
+            // Consume the keydown event for the above keyboard
             // shortcuts only.
             return;
         }
-        event.stopPropagation();
         event.preventDefault();
       ]]></handler>
 
@@ -4686,13 +4759,12 @@
           window.moveTo(left, top);
           window.focus();
         } else {
-          this.tabbrowser.replaceTabWithWindow(draggedTab, { screenX: left,
-                                                             screenY: top,
-#ifndef XP_WIN
-                                                             outerWidth: winWidth,
-                                                             outerHeight: winHeight
-#endif
-                                                             });
+          let props = { screenX: left, screenY: top };
+          if (this.tabbrowser.AppConstants.platform != "win") {
+            props.outerWidth = winWidth;
+            props.outerHeight = winHeight;
+          }
+          this.tabbrowser.replaceTabWithWindow(draggedTab, props);
         }
         event.stopPropagation();
       ]]></handler>
@@ -4807,10 +4879,14 @@
                      class="tab-throbber"
                      role="presentation"
                      layer="true" />
-          <xul:image xbl:inherits="validate,src=image,fadein,pinned,selected"
+          <xul:image xbl:inherits="src=image,fadein,pinned,selected,busy,crashed"
+                     anonid="tab-icon-image"
                      class="tab-icon-image"
-                     role="presentation"
-                     anonid="tab-icon"/>
+                     validate="never"
+                     role="presentation"/>
+          <xul:image xbl:inherits="crashed,busy"
+                     class="tab-icon-overlay"
+                     role="presentation"/>
           <xul:label flex="1"
                      anonid="tab-label"
                      xbl:inherits="value=visibleLabel,crop,accesskey,fadein,pinned,selected"
@@ -5226,7 +5302,16 @@
         <parameter name="aPostData"/>
         <body>
           <![CDATA[
-            _loadURIWithFlags(this, aURI, aFlags, aReferrerURI, aCharset, aPostData);
+            var params = arguments[1];
+            if (typeof(params) == "number") {
+              params = {
+                flags: aFlags,
+                referrerURI: aReferrerURI,
+                charset: aCharset,
+                postData: aPostData,
+              };
+            }
+            _loadURIWithFlags(this, aURI, params);
           ]]>
         </body>
       </method>
@@ -5245,7 +5330,16 @@
         <parameter name="aPostData"/>
         <body>
           <![CDATA[
-            _loadURIWithFlags(this, aURI, aFlags, aReferrerURI, aCharset, aPostData);
+            var params = arguments[1];
+            if (typeof(params) == "number") {
+              params = {
+                flags: aFlags,
+                referrerURI: aReferrerURI,
+                charset: aCharset,
+                postData: aPostData,
+              };
+            }
+            _loadURIWithFlags(this, aURI, params);
           ]]>
         </body>
       </method>

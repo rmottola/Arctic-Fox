@@ -3850,7 +3850,7 @@ CheckTypeAnnotation(ModuleCompiler& m, ParseNode* coercionNode, AsmJSCoercion* c
       default:;
     }
 
-    return m.fail(coercionNode, "must be of the form +x, fround(x), simdType(x) or x|0");
+    return m.fail(coercionNode, "must be of the form +x, x|0, fround(x), or a SIMD check(x)");
 }
 
 static bool
@@ -4474,9 +4474,12 @@ FoldMaskedArrayIndex(FunctionCompiler& f, ParseNode** indexExpr, int32_t* mask,
     return false;
 }
 
+static const int32_t NoMask = -1;
+
 static bool
-CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
-                 Scalar::Type* viewType, MDefinition** def, NeedsBoundsCheck* needsBoundsCheck)
+CheckArrayAccess(FunctionCompiler &f, ParseNode *viewName, ParseNode *indexExpr,
+                 Scalar::Type *viewType, MDefinition **def, NeedsBoundsCheck *needsBoundsCheck,
+                 int32_t *mask)
 {
     *needsBoundsCheck = NEEDS_BOUNDS_CHECK;
 
@@ -4502,6 +4505,7 @@ CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
                                       f.m().minHeapLength(), f.m().module().maxHeapLength());
         }
 
+        *mask = NoMask;
         *needsBoundsCheck = NO_BOUNDS_CHECK;
         *def = f.constant(Int32Value(byteOffset), Type::Int);
         return true;
@@ -4510,7 +4514,7 @@ CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
     // Mask off the low bits to account for the clearing effect of a right shift
     // followed by the left shift implicit in the array access. E.g., H32[i>>2]
     // loses the low two bits.
-    int32_t mask = ~(TypedArrayElemSize(*viewType) - 1);
+    *mask = ~(TypedArrayElemSize(*viewType) - 1);
 
     MDefinition* pointerDef;
     if (indexExpr->isKind(PNK_RSH)) {
@@ -4527,7 +4531,7 @@ CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
         ParseNode* pointerNode = BitwiseLeft(indexExpr);
 
         if (pointerNode->isKind(PNK_BITAND))
-            FoldMaskedArrayIndex(f, &pointerNode, &mask, needsBoundsCheck);
+            FoldMaskedArrayIndex(f, &pointerNode, mask, needsBoundsCheck);
 
         f.enterHeapExpression();
 
@@ -4538,52 +4542,62 @@ CheckArrayAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
         f.leaveHeapExpression();
 
         if (!pointerType.isIntish())
-            return f.failf(indexExpr, "%s is not a subtype of int", pointerType.toChars());
+            return f.failf(pointerNode, "%s is not a subtype of int", pointerType.toChars());
     } else {
+        // For legacy compatibility, accept Int8/Uint8 accesses with no shift.
         if (TypedArrayShift(*viewType) != 0)
             return f.fail(indexExpr, "index expression isn't shifted; must be an Int8/Uint8 access");
 
-        MOZ_ASSERT(mask == -1);
+        MOZ_ASSERT(*mask == NoMask);
         bool folded = false;
 
-        if (indexExpr->isKind(PNK_BITAND))
-            folded = FoldMaskedArrayIndex(f, &indexExpr, &mask, needsBoundsCheck);
+        ParseNode *pointerNode = indexExpr;
+
+        if (pointerNode->isKind(PNK_BITAND))
+            folded = FoldMaskedArrayIndex(f, &pointerNode, mask, needsBoundsCheck);
 
         f.enterHeapExpression();
 
         Type pointerType;
-        if (!CheckExpr(f, indexExpr, &pointerDef, &pointerType))
+        if (!CheckExpr(f, pointerNode, &pointerDef, &pointerType))
             return false;
 
         f.leaveHeapExpression();
 
         if (folded) {
             if (!pointerType.isIntish())
-                return f.failf(indexExpr, "%s is not a subtype of intish", pointerType.toChars());
+                return f.failf(pointerNode, "%s is not a subtype of intish", pointerType.toChars());
         } else {
             if (!pointerType.isInt())
-                return f.failf(indexExpr, "%s is not a subtype of int", pointerType.toChars());
+                return f.failf(pointerNode, "%s is not a subtype of int", pointerType.toChars());
         }
     }
 
-    // Don't generate the mask op if there is no need for it which could happen for
-    // a shift of zero.
-    if (mask == -1)
-        *def = pointerDef;
-    else
-        *def = f.bitwise<MBitAnd>(pointerDef, f.constant(Int32Value(mask), Type::Int));
-
+    *def = pointerDef;
     return true;
 }
 
+static void
+PrepareArrayIndex(FunctionCompiler &f, MDefinition **def, NeedsBoundsCheck needsBoundsCheck,
+                  int32_t mask)
+{
+    // Don't generate the mask op if there is no need for it which could happen for
+    // a shift of zero or a SIMD access.
+    if (mask != NoMask)
+        *def = f.bitwise<MBitAnd>(*def, f.constant(Int32Value(mask), Type::Int));
+}
+
 static bool
-CheckLoadArray(FunctionCompiler& f, ParseNode* elem, MDefinition** def, Type* type)
+CheckLoadArray(FunctionCompiler &f, ParseNode *elem, MDefinition **def, Type *type)
 {
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckArrayAccess(f, ElemBase(elem), ElemIndex(elem), &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckArrayAccess(f, ElemBase(elem), ElemIndex(elem), &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     *def = f.loadHeap(viewType, pointerDef, needsBoundsCheck);
     *type = TypedArrayLoadType(viewType);
@@ -4641,7 +4655,8 @@ CheckStoreArray(FunctionCompiler& f, ParseNode* lhs, ParseNode* rhs, MDefinition
     Scalar::Type viewType;
     MDefinition* pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckArrayAccess(f, ElemBase(lhs), ElemIndex(lhs), &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckArrayAccess(f, ElemBase(lhs), ElemIndex(lhs), &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
 
     f.enterHeapExpression();
@@ -4678,6 +4693,8 @@ CheckStoreArray(FunctionCompiler& f, ParseNode* lhs, ParseNode* rhs, MDefinition
       default:
         MOZ_CRASH("Unexpected view type");
     }
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     f.storeHeap(viewType, pointerDef, rhsDef, needsBoundsCheck);
 
@@ -4893,11 +4910,11 @@ CheckMathMinMax(FunctionCompiler& f, ParseNode* callNode, MDefinition** def, boo
 }
 
 static bool
-CheckSharedArrayAtomicAccess(FunctionCompiler& f, ParseNode* viewName, ParseNode* indexExpr,
-                             Scalar::Type* viewType, MDefinition** pointerDef,
-                             NeedsBoundsCheck* needsBoundsCheck)
+CheckSharedArrayAtomicAccess(FunctionCompiler &f, ParseNode *viewName, ParseNode *indexExpr,
+                             Scalar::Type *viewType, MDefinition** pointerDef,
+                             NeedsBoundsCheck *needsBoundsCheck, int32_t *mask)
 {
-    if (!CheckArrayAccess(f, viewName, indexExpr, viewType, pointerDef, needsBoundsCheck))
+    if (!CheckArrayAccess(f, viewName, indexExpr, viewType, pointerDef, needsBoundsCheck, mask))
         return false;
 
     // Atomic accesses may be made on shared integer arrays only.
@@ -4943,10 +4960,13 @@ CheckAtomicsLoad(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type* 
     ParseNode* indexArg = NextNode(arrayArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     *def = f.atomicLoadHeap(viewType, pointerDef, needsBoundsCheck);
     *type = Type::Signed;
@@ -4964,18 +4984,21 @@ CheckAtomicsStore(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type*
     ParseNode* valueArg = NextNode(indexArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
 
-    MDefinition* rhsDef;
+    MDefinition *rhsDef;
     Type rhsType;
     if (!CheckExpr(f, valueArg, &rhsDef, &rhsType))
         return false;
 
     if (!rhsType.isIntish())
         return f.failf(arrayArg, "%s is not a subtype of intish", rhsType.toChars());
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     f.atomicStoreHeap(viewType, pointerDef, rhsDef, needsBoundsCheck);
 
@@ -4995,18 +5018,21 @@ CheckAtomicsBinop(FunctionCompiler& f, ParseNode* call, MDefinition** def, Type*
     ParseNode* valueArg = NextNode(indexArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
 
-    MDefinition* valueArgDef;
+    MDefinition *valueArgDef;
     Type valueArgType;
     if (!CheckExpr(f, valueArg, &valueArgDef, &valueArgType))
         return false;
 
     if (!valueArgType.isIntish())
         return f.failf(valueArg, "%s is not a subtype of intish", valueArgType.toChars());
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     *def = f.atomicBinopHeap(op, viewType, pointerDef, valueArgDef, needsBoundsCheck);
     *type = Type::Signed;
@@ -5019,23 +5045,24 @@ CheckAtomicsCompareExchange(FunctionCompiler& f, ParseNode* call, MDefinition** 
     if (CallArgListLength(call) != 4)
         return f.fail(call, "Atomics.compareExchange must be passed 4 arguments");
 
-    ParseNode* arrayArg = CallArgList(call);
-    ParseNode* indexArg = NextNode(arrayArg);
-    ParseNode* oldValueArg = NextNode(indexArg);
-    ParseNode* newValueArg = NextNode(oldValueArg);
+    ParseNode *arrayArg = CallArgList(call);
+    ParseNode *indexArg = NextNode(arrayArg);
+    ParseNode *oldValueArg = NextNode(indexArg);
+    ParseNode *newValueArg = NextNode(oldValueArg);
 
     Scalar::Type viewType;
-    MDefinition* pointerDef;
+    MDefinition *pointerDef;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck))
+    int32_t mask;
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &pointerDef, &needsBoundsCheck, &mask))
         return false;
 
-    MDefinition* oldValueArgDef;
+    MDefinition *oldValueArgDef;
     Type oldValueArgType;
     if (!CheckExpr(f, oldValueArg, &oldValueArgDef, &oldValueArgType))
         return false;
 
-    MDefinition* newValueArgDef;
+    MDefinition *newValueArgDef;
     Type newValueArgType;
     if (!CheckExpr(f, newValueArg, &newValueArgDef, &newValueArgType))
         return false;
@@ -5045,6 +5072,8 @@ CheckAtomicsCompareExchange(FunctionCompiler& f, ParseNode* call, MDefinition** 
 
     if (!newValueArgType.isIntish())
         return f.failf(newValueArg, "%s is not a subtype of intish", newValueArgType.toChars());
+
+    PrepareArrayIndex(f, &pointerDef, needsBoundsCheck, mask);
 
     *def = f.atomicCompareExchangeHeap(viewType, pointerDef, oldValueArgDef, newValueArgDef,
                                        needsBoundsCheck);
@@ -5088,9 +5117,9 @@ CheckCallArgs(FunctionCompiler& f, ParseNode* callNode, CheckArgType checkArg,
 {
     f.startCallArgs(call);
 
-    ParseNode* argNode = CallArgList(callNode);
+    ParseNode *argNode = CallArgList(callNode);
     for (unsigned i = 0; i < CallArgListLength(callNode); i++, argNode = NextNode(argNode)) {
-        MDefinition* def;
+        MDefinition *def;
         Type type;
         if (!CheckExpr(f, argNode, &def, &type))
             return false;
@@ -5239,7 +5268,7 @@ CheckFuncPtrCall(FunctionCompiler& f, ParseNode* callNode, RetType retType, MDef
     if (!IsLiteralInt(f.m(), maskNode, &mask) || mask == UINT32_MAX || !IsPowerOfTwo(mask + 1))
         return f.fail(maskNode, "function-pointer table index mask value must be a power of two minus 1");
 
-    MDefinition* indexDef;
+    MDefinition *indexDef;
     Type indexType;
     if (!CheckExpr(f, indexNode, &indexDef, &indexType))
         return false;
@@ -5252,7 +5281,7 @@ CheckFuncPtrCall(FunctionCompiler& f, ParseNode* callNode, RetType retType, MDef
     if (!CheckCallArgs(f, callNode, CheckIsVarType, &call))
         return false;
 
-    ModuleCompiler::FuncPtrTable* table;
+    ModuleCompiler::FuncPtrTable *table;
     if (!CheckFuncPtrTableAgainstExisting(f.m(), tableNode, name, Move(call.sig()), mask, &table))
         return false;
 
@@ -5756,11 +5785,11 @@ CheckSimdShuffle(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType, MDe
 }
 
 static bool
-CheckSimdLoadStoreArgs(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
-                       unsigned numElems, Scalar::Type* viewType, MDefinition** index,
-                       NeedsBoundsCheck* needsBoundsCheck)
+CheckSimdLoadStoreArgs(FunctionCompiler &f, ParseNode *call, AsmJSSimdType opType,
+                       Scalar::Type *viewType, MDefinition **index,
+                       NeedsBoundsCheck *needsBoundsCheck)
 {
-    ParseNode* view = CallArgList(call);
+    ParseNode *view = CallArgList(call);
     if (!view->isKind(PNK_NAME))
         return f.fail(view, "expected Uint8Array view as SIMD.*.load/store first argument");
 
@@ -5810,18 +5839,20 @@ CheckSimdLoadStoreArgs(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opTyp
 }
 
 static bool
-CheckSimdLoad(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
-              unsigned numElems, MDefinition** def, Type* type)
+CheckSimdLoad(FunctionCompiler &f, ParseNode *call, AsmJSSimdType opType,
+              unsigned numElems, MDefinition **def, Type *type)
 {
     unsigned numArgs = CallArgListLength(call);
     if (numArgs != 2)
         return f.failf(call, "expected 2 arguments to SIMD load, got %u", numArgs);
 
     Scalar::Type viewType;
-    MDefinition* index;
+    MDefinition *index;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSimdLoadStoreArgs(f, call, opType, numElems, &viewType, &index, &needsBoundsCheck))
+    if (!CheckSimdLoadStoreArgs(f, call, opType, &viewType, &index, &needsBoundsCheck))
         return false;
+
+    PrepareArrayIndex(f, &index, needsBoundsCheck, NoMask);
 
     *def = f.loadSimdHeap(viewType, index, needsBoundsCheck, numElems);
     *type = opType;
@@ -5837,19 +5868,21 @@ CheckSimdStore(FunctionCompiler& f, ParseNode* call, AsmJSSimdType opType,
         return f.failf(call, "expected 3 arguments to SIMD store, got %u", numArgs);
 
     Scalar::Type viewType;
-    MDefinition* index;
+    MDefinition *index;
     NeedsBoundsCheck needsBoundsCheck;
-    if (!CheckSimdLoadStoreArgs(f, call, opType, numElems, &viewType, &index, &needsBoundsCheck))
+    if (!CheckSimdLoadStoreArgs(f, call, opType, &viewType, &index, &needsBoundsCheck))
         return false;
 
     Type retType = opType;
-    ParseNode* vecExpr = NextNode(NextNode(CallArgList(call)));
-    MDefinition* vec;
+    ParseNode *vecExpr = NextNode(NextNode(CallArgList(call)));
+    MDefinition *vec;
     Type vecType;
     if (!CheckExpr(f, vecExpr, &vec, &vecType))
         return false;
     if (!(vecType <= retType))
         return f.failf(vecExpr, "%s is not a subtype of %s", vecType.toChars(), retType.toChars());
+
+    PrepareArrayIndex(f, &index, needsBoundsCheck, NoMask);
 
     f.storeSimdHeap(viewType, index, vec, needsBoundsCheck, numElems);
     *def = vec;
@@ -6292,7 +6325,7 @@ CheckBitNot(FunctionCompiler& f, ParseNode* neg, MDefinition** def, Type* type)
     if (operand->isKind(PNK_BITNOT))
         return CheckCoerceToInt(f, operand, def, type);
 
-    MDefinition* operandDef;
+    MDefinition *operandDef;
     Type operandType;
     if (!CheckExpr(f, operand, &operandDef, &operandType))
         return false;
@@ -8213,7 +8246,7 @@ StackDecrementForCall(MacroAssembler& masm, uint32_t alignment, const VectorT& a
 // The ARM system ABI also includes d15 & s31 in the non volatile float registers.
 // Also exclude lr (a.k.a. r14) as we preserve it manually)
 static const RegisterSet NonVolatileRegs =
-    RegisterSet(GeneralRegisterSet(Registers::NonVolatileMask&
+    RegisterSet(GeneralRegisterSet(Registers::NonVolatileMask &
                                    ~(uint32_t(1) << Registers::lr)),
                 FloatRegisterSet(FloatRegisters::NonVolatileMask
                                  | (1ULL << FloatRegisters::d15)
@@ -9015,7 +9048,7 @@ GenerateOnOutOfBoundsLabelExit(ModuleCompiler& m, Label* throwLabel)
 }
 
 static const RegisterSet AllRegsExceptSP =
-    RegisterSet(GeneralRegisterSet(Registers::AllMask&
+    RegisterSet(GeneralRegisterSet(Registers::AllMask &
                                    ~(uint32_t(1) << Registers::StackPointer)),
                 FloatRegisterSet(FloatRegisters::AllDoubleMask));
 

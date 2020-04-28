@@ -441,6 +441,7 @@ private:
   nsEventStatus ProcessEvent(WidgetInputEvent& inputEvent,
                              ScrollableLayerGuid* aOutTargetGuid,
                              uint64_t* aOutInputBlockId);
+  void UpdateWheelTransaction(WidgetInputEvent& aEvent);
   void UpdateZoomConstraintsRecursively(HitTestingTreeNode* aNode,
                                         const ZoomConstraints& aConstraints);
   void FlushRepaintsRecursively(HitTestingTreeNode* aNode);

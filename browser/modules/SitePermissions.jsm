@@ -225,4 +225,8 @@ let gPermissionObject = {
   "pointerLock": {
     exactHostMatch: true
   }
+
+  "push": {
+    exactHostMatch: true
+  }
 };

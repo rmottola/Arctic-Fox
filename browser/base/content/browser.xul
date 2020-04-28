@@ -92,6 +92,10 @@
                 accesskey="&moveToNewWindow.accesskey;"
                 tbattr="tabbrowser-multiple"
                 oncommand="gBrowser.replaceTabWithWindow(TabContextMenu.contextTab);"/>
+      <menuitem id="context_openNonRemoteWindow" label="Open in new non-e10s window"
+                tbattr="tabbrowser-remote"
+                hidden="true"
+                oncommand="gBrowser.openNonRemoteWindow(TabContextMenu.contextTab);"/>
       <menuseparator/>
       <menuitem id="context_reloadAllTabs" label="&reloadAllTabs.label;" accesskey="&reloadAllTabs.accesskey;"
                 tbattr="tabbrowser-multiple-visible"
@@ -120,6 +124,7 @@
                oncommand="gotoHistoryIndex(event); event.stopPropagation();"
                onclick="checkForMiddleClick(this, event);"/>
     <tooltip id="aHTMLTooltip" page="true"/>
+    <tooltip id="remoteBrowserTooltip"/>
 
     <!-- for search and content formfill/pw manager -->
     <panel type="autocomplete" id="PopupAutoComplete" noautofocus="true" hidden="true"/>
@@ -549,6 +554,15 @@
                    class="urlbar-icon"
                    tooltiptext="&goEndCap.tooltip;"
                    onclick="gURLBar.handleCommand(event);"/>
+                <toolbarbutton id="readinglist-addremove-button"
+                               class="tabbable urlbar-icon"
+                               hidden="true"
+                               oncommand="ReadingListUI.togglePageByBrowser(gBrowser.selectedBrowser);"/>
+                <toolbarbutton id="reader-mode-button"
+                               class="tabbable"
+                               hidden="true"
+                               onclick="ReaderParent.handleReaderButtonEvent(event);"
+                               onkeypress="ReaderParent.handleReaderButtonEvent(event);"/>
           </hbox>
           <toolbarbutton id="urlbar-go-button"
                          class="chromeclass-toolbar-additional"
@@ -592,7 +606,7 @@
                      label="&bookmarksMenuButton.label;"
                      tooltiptext="&bookmarksMenuButton.tooltip;"
                      onclick="if (event.button == 1)
-                                toggleSidebar('viewBookmarksSidebar');"
+                                SidebarUI.toggle('viewBookmarksSidebar');"
                      ondragenter="PlacesMenuDNDHandler.onDragEnter(event);"
                      ondragover="PlacesMenuDNDHandler.onDragOver(event);"
                      ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
@@ -661,6 +675,22 @@
                        onpopupshowing="if (!this.parentNode._placesView)
                                          new PlacesMenu(event, 'place:folder=TOOLBAR');"/>
           </menu>
+            <menuseparator>
+              <observes element="readingListSidebar" attribute="hidden"/>
+            </menuseparator>
+            <menu id="BMB_readingList"
+                  class="menu-iconic bookmark-item subviewbutton"
+                  label="&readingList.label;"
+                  container="true">
+              <observes element="readingListSidebar" attribute="hidden"/>
+              <menupopup id="BMB_readingListPopup"
+                         placespopup="true"
+                         onpopupshowing="ReadingListUI.onReadingListPopupShowing(this);">
+                <menuitem id="BMB_viewReadingListSidebar" class="subviewbutton"
+                          oncommand="SidebarUI.show('readingListSidebar');"
+                          label="&readingList.showSidebar.label;"/>
+              </menupopup>
+            </menu>
           <menuseparator/>
           <!-- Bookmarks menu items -->
           <menuseparator builder="end"
@@ -680,7 +710,7 @@
                      label="&historyButton.label;"
                      tooltiptext="&historyButton.tooltip;"
                      onclick="if (event.button == 1)
-                                toggleSidebar('viewHistorySidebar');">
+                                SidebarUI.toggle('viewHistorySidebar');">
         <menupopup id="HMB_historyPopup"
                    placespopup="true"
                    context="placesContext"
@@ -987,15 +1017,15 @@
       <sidebarheader id="sidebar-header" align="center">
         <label id="sidebar-title" persist="value" flex="1" crop="end" control="sidebar"/>
         <image id="sidebar-throbber"/>
-        <toolbarbutton class="tabs-closebutton close-icon" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="toggleSidebar();"/>
+        <toolbarbutton class="tabs-closebutton close-icon" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="SidebarUI.hide();"/>
       </sidebarheader>
       <browser id="sidebar" flex="1" autoscroll="false" disablehistory="true"
-                style="min-width: 14em; width: 18em; max-width: 36em;"/>
+                style="min-width: 14em; width: 18em; max-width: 36em;" tooltip="aHTMLTooltip"/>
     </vbox>
 
     <splitter id="sidebar-splitter" class="chromeclass-extrachrome sidebar-splitter" hidden="true"/>
     <vbox id="appcontent" flex="1">
-      <tabbrowser id="content" disablehistory="true"
+      <tabbrowser id="content"
                   flex="1" contenttooltip="aHTMLTooltip"
                   tabcontainer="tabbrowser-tabs"
                   contentcontextmenu="contentAreaContextMenu"
@@ -1057,6 +1087,22 @@
    </toolbar>
 #endif
 
+    <toolbar id="addon-bar"
+             toolbarname="&statusBar.label;" accesskey="&statusBar.accesskey;"
+             collapsed="true"
+             class="toolbar-primary chromeclass-toolbar"
+             context="toolbar-context-menu" toolboxid="navigator-toolbox"
+             mode="icons" iconsize="small" defaulticonsize="small"
+             lockiconsize="true"
+             defaultset="addonbar-closebutton,spring,status-bar"
+             customizable="true"
+             key="key_toggleAddonBar">
+      <toolbarbutton id="addonbar-closebutton"
+                     class="close-icon"
+                     tooltiptext="&addonBarCloseButton.tooltip;"
+                     oncommand="setToolbarVisibility(this.parentNode, false);"/>
+      <statusbar id="status-bar" ordinal="1000"/>
+    </toolbar>
   </vbox>
 
 #ifndef XP_UNIX

@@ -2538,8 +2538,7 @@ nsWindow::OnEnterNotifyEvent(GdkEventCrossing *aEvent)
 
     LOG(("OnEnterNotify: %p\n", (void *)this));
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 // XXX Is this the right test for embedding cases?
@@ -2583,8 +2582,7 @@ nsWindow::OnLeaveNotifyEvent(GdkEventCrossing *aEvent)
 
     LOG(("OnLeaveNotify: %p\n", (void *)this));
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 void
@@ -2662,8 +2660,7 @@ nsWindow::OnMotionNotifyEvent(GdkEventMotion *aEvent)
 
     KeymapWrapper::InitInputEvent(event, modifierState);
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 // If the automatic pointer grab on ButtonPress has deactivated before
@@ -2713,8 +2710,7 @@ nsWindow::DispatchMissedButtonReleases(GdkEventCrossing *aGdkEvent)
             WidgetMouseEvent synthEvent(true, NS_MOUSE_BUTTON_UP, this,
                                         WidgetMouseEvent::eSynthesized);
             synthEvent.button = buttonType;
-            nsEventStatus status;
-            DispatchEvent(&synthEvent, status);
+            DispatchInputEvent(&synthEvent);
         }
     }
 }
@@ -2780,8 +2776,6 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
 {
     LOG(("Button %u press on %p\n", aEvent->button, (void *)this));
 
-    nsEventStatus status;
-
     // If you double click in GDK, it will actually generate a second
     // GDK_BUTTON_PRESS before sending the GDK_2BUTTON_PRESS, and this is
     // different than the DOM spec.  GDK puts this in the queue
@@ -2844,7 +2838,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
     InitButtonEvent(event, aEvent);
     event.pressure = mLastMotionPressure;
 
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 
     // right menu click on linux should also pop up a context menu
     if (domButton == WidgetMouseEvent::eRightButton &&
@@ -2853,7 +2847,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
                                           WidgetMouseEvent::eReal);
         InitButtonEvent(contextMenuEvent, aEvent);
         contextMenuEvent.pressure = mLastMotionPressure;
-        DispatchEvent(&contextMenuEvent, status);
+        DispatchInputEvent(&contextMenuEvent);
     }
 }
 
@@ -2887,8 +2881,7 @@ nsWindow::OnButtonReleaseEvent(GdkEventButton *aEvent)
     gdk_event_get_axis ((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
     event.pressure = pressure ? pressure : mLastMotionPressure;
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
     mLastMotionPressure = pressure;
 }
 
@@ -3011,10 +3004,9 @@ nsWindow::DispatchKeyDownEvent(GdkEventKey *aEvent, bool *aCancelled)
     }
 
     // send the key down event
-    nsEventStatus status;
     WidgetKeyboardEvent downEvent(true, NS_KEY_DOWN, this);
     KeymapWrapper::InitKeyEvent(downEvent, aEvent);
-    DispatchEvent(&downEvent, status);
+    nsEventStatus status = DispatchInputEvent(&downEvent);
     *aCancelled = (status == nsEventStatus_eConsumeNoDefault);
     return true;
 }
@@ -3124,14 +3116,14 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
         contextMenuEvent.time = aEvent->time;
         contextMenuEvent.clickCount = 1;
         KeymapWrapper::InitInputEvent(contextMenuEvent, aEvent->state);
-        DispatchEvent(&contextMenuEvent, status);
+        status = DispatchInputEvent(&contextMenuEvent);
     }
     else {
         // If the character code is in the BMP, send the key press event.
         // Otherwise, send a compositionchange event with the equivalent UTF-16
         // string.
         if (IS_IN_BMP(event.charCode)) {
-            DispatchEvent(&event, status);
+            status = DispatchInputEvent(&event);
         }
         else {
             WidgetCompositionEvent compositionChangeEvent(
@@ -3167,8 +3159,7 @@ nsWindow::OnKeyReleaseEvent(GdkEventKey *aEvent)
     WidgetKeyboardEvent event(true, NS_KEY_UP, this);
     KeymapWrapper::InitKeyEvent(event, aEvent);
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    nsEventStatus status = DispatchInputEvent(&event);
 
     // If the event was consumed, return.
     if (status == nsEventStatus_eConsumeNoDefault) {
@@ -3317,6 +3308,7 @@ nsWindow::OnWindowStateEvent(GtkWidget *aWidget, GdkEventWindowState *aEvent)
         return;
     }
 
+    bool wasInFullscreen = mSizeState == nsSizeMode_Fullscreen;
     if (aEvent->new_window_state & GDK_WINDOW_STATE_ICONIFIED) {
         LOG(("\tIconified\n"));
         mSizeState = nsSizeMode_Minimized;
@@ -3343,8 +3335,14 @@ nsWindow::OnWindowStateEvent(GtkWidget *aWidget, GdkEventWindowState *aEvent)
 #endif //ACCESSIBILITY
     }
 
-    if (mWidgetListener)
+    if (mWidgetListener) {
       mWidgetListener->SizeModeChanged(mSizeState);
+
+      bool isInFullscreen = mSizeState == nsSizeMode_Fullscreen;
+      if (isInFullscreen != wasInFullscreen) {
+        mWidgetListener->FullscreenChanged(isInFullscreen);
+      }
+    }
 }
 
 void
@@ -3386,8 +3384,7 @@ nsWindow::DispatchDragEvent(uint32_t aMsg, const nsIntPoint& aRefPoint,
     event.refPoint = LayoutDeviceIntPoint::FromUntyped(aRefPoint);
     event.time = aTime;
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 void
