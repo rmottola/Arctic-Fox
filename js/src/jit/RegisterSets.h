@@ -408,7 +408,7 @@ class TypedRegisterSet
     // Determine if some register are still allocated.  This function should
     // be used with the set of allocatable registers used for the initialization
     // of the current set.
-    bool someAllocated(const TypedRegisterSet& allocatable) const {
+    bool someAllocated(const TypedRegisterSet &allocatable) const {
         return allocatable.bits_ & ~bits_;
     }
     bool empty() const {
@@ -641,7 +641,7 @@ class RegisterSet {
         else
             addUnchecked(any.gpr());
     }
-    void addAllAliasedUnchecked(const AnyRegister& reg) {
+    void addAllAliasedUnchecked(const AnyRegister &reg) {
         if (reg.isFloat())
             fpu_.addAllAliasedUnchecked(reg.fpu());
         else
@@ -701,7 +701,7 @@ class RegisterSet {
     MOZ_CONSTEXPR FloatRegisterSet fpus() const {
         return fpu_;
     }
-    bool operator ==(const RegisterSet& other) const {
+    bool operator ==(const RegisterSet &other) const {
         return other.gpr_ == gpr_ && other.fpu_ == fpu_;
     }
 
@@ -739,7 +739,7 @@ class TypedRegisterIterator
   public:
     explicit TypedRegisterIterator(TypedRegisterSet<T> regset) : regset_(regset)
     { }
-    TypedRegisterIterator(const TypedRegisterIterator& other) : regset_(other.regset_)
+    TypedRegisterIterator(const TypedRegisterIterator &other) : regset_(other.regset_)
     { }
 
     bool more() const {
@@ -768,7 +768,7 @@ class TypedRegisterBackwardIterator
   public:
     explicit TypedRegisterBackwardIterator(TypedRegisterSet<T> regset) : regset_(regset)
     { }
-    TypedRegisterBackwardIterator(const TypedRegisterBackwardIterator& other)
+    TypedRegisterBackwardIterator(const TypedRegisterBackwardIterator &other)
       : regset_(other.regset_)
     { }
 
@@ -798,7 +798,7 @@ class TypedRegisterForwardIterator
   public:
     explicit TypedRegisterForwardIterator(TypedRegisterSet<T> regset) : regset_(regset)
     { }
-    TypedRegisterForwardIterator(const TypedRegisterForwardIterator& other) : regset_(other.regset_)
+    TypedRegisterForwardIterator(const TypedRegisterForwardIterator &other) : regset_(other.regset_)
     { }
 
     bool more() const {
@@ -837,10 +837,10 @@ class AnyRegisterIterator
     AnyRegisterIterator(GeneralRegisterSet genset, FloatRegisterSet floatset)
       : geniter_(genset), floatiter_(floatset)
     { }
-    explicit AnyRegisterIterator(const RegisterSet& set)
+    explicit AnyRegisterIterator(const RegisterSet &set)
       : geniter_(set.gpr_), floatiter_(set.fpu_)
     { }
-    AnyRegisterIterator(const AnyRegisterIterator& other)
+    AnyRegisterIterator(const AnyRegisterIterator &other)
       : geniter_(other.geniter_), floatiter_(other.floatiter_)
     { }
     bool more() const {
