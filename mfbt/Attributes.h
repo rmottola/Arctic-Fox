@@ -50,8 +50,6 @@
  * don't indicate support for them here, due to
  * http://stackoverflow.com/questions/20498142/visual-studio-2013-explicit-keyword-bug
  */
-#  define MOZ_HAVE_CXX11_FINAL         final
-#  define MOZ_HAVE_CXX11_OVERRIDE
 #  define MOZ_HAVE_NEVER_INLINE          __declspec(noinline)
 #  define MOZ_HAVE_NORETURN              __declspec(noreturn)
 #  if _MSC_VER >= 1900
@@ -83,10 +81,6 @@
 #  if __has_extension(cxx_explicit_conversions)
 #    define MOZ_HAVE_EXPLICIT_CONVERSION
 #  endif
-#  if __has_extension(cxx_override_control)
-#    define MOZ_HAVE_CXX11_OVERRIDE
-#    define MOZ_HAVE_CXX11_FINAL         final
-#  endif
 #  if __has_attribute(noinline)
 #    define MOZ_HAVE_NEVER_INLINE        __attribute__((noinline))
 #  endif
@@ -95,19 +89,10 @@
 #  endif
 #elif defined(__GNUC__)
 #  if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
-#    if MOZ_GCC_VERSION_AT_LEAST(4, 7, 0)
-#      define MOZ_HAVE_CXX11_OVERRIDE
-#      define MOZ_HAVE_CXX11_FINAL       final
-#    endif
 #    if MOZ_GCC_VERSION_AT_LEAST(4, 6, 0)
 #      define MOZ_HAVE_CXX11_CONSTEXPR
 #    endif
 #      define MOZ_HAVE_EXPLICIT_CONVERSION
-#  else
-     /* __final is a non-C++11 GCC synonym for 'final', per GCC r176655. */
-#    if MOZ_GCC_VERSION_AT_LEAST(4, 7, 0)
-#      define MOZ_HAVE_CXX11_FINAL       __final
-#    endif
 #  endif
 #  define MOZ_HAVE_NEVER_INLINE          __attribute__((noinline))
 #  define MOZ_HAVE_NORETURN              __attribute__((noreturn))
@@ -345,116 +330,6 @@
 #  define MOZ_ALLOCATOR
 #endif
 
-
-/*
- * override explicitly indicates that a virtual member function in a class
- * overrides a member function of a base class, rather than potentially being a
- * new member function.  override should be placed immediately before the
- * ';' terminating the member function's declaration, or before '= 0;' if the
- * member function is pure.  If the member function is defined in the class
- * definition, it should appear before the opening brace of the function body.
- *
- *   class Base
- *   {
- *   public:
- *     virtual void f() = 0;
- *   };
- *   class Derived1 : public Base
- *   {
- *   public:
- *     virtual void f() override;
- *   };
- *   class Derived2 : public Base
- *   {
- *   public:
- *     virtual void f() override = 0;
- *   };
- *   class Derived3 : public Base
- *   {
- *   public:
- *     virtual void f() override { }
- *   };
- *
- * In compilers supporting C++11 override controls, override *requires* that
- * the function marked with it override a member function of a base class: it
- * is a compile error if it does not.  Otherwise override does not affect
- * semantics and merely documents the override relationship to the reader (but
- * of course must still be used correctly to not break C++11 compilers).
- */
-#if defined(MOZ_HAVE_CXX11_OVERRIDE)
-#  define override          override
-#else
-#  define override          /* no support */
-#endif
-
-/*
- * final indicates that some functionality cannot be overridden through
- * inheritance.  It can be used to annotate either classes/structs or virtual
- * member functions.
- *
- * To annotate a class/struct with final, place final immediately after
- * the name of the class, before the list of classes from which it derives (if
- * any) and before its opening brace.  final must not be used to annotate
- * unnamed classes or structs.  (With some compilers, and with C++11 proper, the
- * underlying expansion is ambiguous with specifying a class name.)
- *
- *   class Base final
- *   {
- *   public:
- *     Base();
- *     ~Base();
- *     virtual void f() { }
- *   };
- *   // This will be an error in some compilers:
- *   class Derived : public Base
- *   {
- *   public:
- *     ~Derived() { }
- *   };
- *
- * One particularly common reason to specify final upon a class is to tell
- * the compiler that it's not dangerous for it to have a non-virtual destructor
- * yet have one or more virtual functions, silencing the warning it might emit
- * in this case.  Suppose Base above weren't annotated with final.  Because
- * ~Base() is non-virtual, an attempt to delete a Derived* through a Base*
- * wouldn't call ~Derived(), so any cleanup ~Derived() might do wouldn't happen.
- * (Formally C++ says behavior is undefined, but compilers will likely just call
- * ~Base() and not ~Derived().)  Specifying final tells the compiler that
- * it's safe for the destructor to be non-virtual.
- *
- * In compilers implementing final controls, it is an error to inherit from a
- * class annotated with final.  In other compilers it serves only as
- * documentation.
- *
- * To annotate a virtual member function with final, place final
- * immediately before the ';' terminating the member function's declaration, or
- * before '= 0;' if the member function is pure.  If the member function is
- * defined in the class definition, it should appear before the opening brace of
- * the function body.  (This placement is identical to that for override.
- * If both are used, they should appear in the order 'final override'
- * for consistency.)
- *
- *   class Base
- *   {
- *   public:
- *     virtual void f() final;
- *   };
- *   class Derived
- *   {
- *   public:
- *     // This will be an error in some compilers:
- *     virtual void f();
- *   };
- *
- * In compilers implementing final controls, it is an error for a derived class
- * to override a method annotated with final.  In other compilers it serves
- * only as documentation.
- */
-#if defined(MOZ_HAVE_CXX11_FINAL)
-#  define final             MOZ_HAVE_CXX11_FINAL
-#else
-#  define final             /* no support */
-#endif
 
 /**
  * MOZ_WARN_UNUSED_RESULT tells the compiler to emit a warning if a function's
