@@ -1386,7 +1386,7 @@ class LSafepoint : public TempObject
         liveRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const RegisterSet& liveRegs() const {
+    const RegisterSet &liveRegs() const {
         return liveRegs_;
     }
 #ifdef CHECK_OSIPOINT_REGISTERS
@@ -1394,7 +1394,7 @@ class LSafepoint : public TempObject
         clobberedRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const RegisterSet& clobberedRegs() const {
+    const RegisterSet &clobberedRegs() const {
         return clobberedRegs_;
     }
 #endif
@@ -1411,11 +1411,11 @@ class LSafepoint : public TempObject
             assertInvariants();
         return result;
     }
-    SlotList& gcSlots() {
+    SlotList &gcSlots() {
         return gcSlots_;
     }
 
-    SlotList& slotsOrElementsSlots() {
+    SlotList &slotsOrElementsSlots() {
         return slotsOrElementsSlots_;
     }
     GeneralRegisterSet slotsOrElementsRegs() const {

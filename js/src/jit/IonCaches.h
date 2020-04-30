@@ -547,7 +547,7 @@ class GetPropertyIC : public RepatchIonCache
     RegisterSet liveRegs_;
 
     Register object_;
-    PropertyName* name_;
+    PropertyName *name_;
     TypedOrValueRegister output_;
 
     // Only valid if idempotent
@@ -563,7 +563,7 @@ class GetPropertyIC : public RepatchIonCache
 
   public:
     GetPropertyIC(RegisterSet liveRegs,
-                  Register object, PropertyName* name,
+                  Register object, PropertyName *name,
                   TypedOrValueRegister output,
                   bool monitoredResult)
       : liveRegs_(liveRegs),
@@ -692,7 +692,7 @@ class SetPropertyIC : public RepatchIonCache
     RegisterSet liveRegs_;
 
     Register object_;
-    PropertyName* name_;
+    PropertyName *name_;
     ConstantOrRegister value_;
     bool strict_;
     bool needsTypeBarrier_;
@@ -700,7 +700,7 @@ class SetPropertyIC : public RepatchIonCache
     bool hasGenericProxyStub_;
 
   public:
-    SetPropertyIC(RegisterSet liveRegs, Register object, PropertyName* name,
+    SetPropertyIC(RegisterSet liveRegs, Register object, PropertyName *name,
                   ConstantOrRegister value, bool strict, bool needsTypeBarrier)
       : liveRegs_(liveRegs),
         object_(object),
@@ -1012,12 +1012,12 @@ class NameIC : public RepatchIonCache
 
     bool typeOf_;
     Register scopeChain_;
-    PropertyName* name_;
+    PropertyName *name_;
     TypedOrValueRegister output_;
 
   public:
     NameIC(RegisterSet liveRegs, bool typeOf,
-           Register scopeChain, PropertyName* name,
+           Register scopeChain, PropertyName *name,
            TypedOrValueRegister output)
       : liveRegs_(liveRegs),
         typeOf_(typeOf),

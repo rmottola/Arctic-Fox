@@ -344,9 +344,9 @@ JitFrameIterator::machineState() const
     for (GeneralRegisterBackwardIterator iter(reader.allGprSpills()); iter.more(); iter++)
         machine.setRegisterLocation(*iter, --spill);
 
-    uint8_t* spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t*>(spill), 0);
+    uint8_t *spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t *>(spill), 0);
 
-    char* floatSpill = reinterpret_cast<char*>(spillAlign);
+    char *floatSpill = reinterpret_cast<char *>(spillAlign);
     FloatRegisterSet fregs = reader.allFloatSpills();
     fregs = fregs.reduceSetForPush();
     for (FloatRegisterBackwardIterator iter(fregs); iter.more(); iter++) {
@@ -1079,7 +1079,7 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
         gc::MarkValueRoot(trc, v, "ion-gc-slot");
     }
 
-    uintptr_t* spill = frame.spillBase();
+    uintptr_t *spill = frame.spillBase();
     GeneralRegisterSet gcRegs = safepoint.gcSpills();
     GeneralRegisterSet valueRegs = safepoint.valueSpills();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
@@ -1164,11 +1164,11 @@ UpdateIonJSFrameForMinorGC(JSTracer* trc, const JitFrameIterator& frame)
 
     Nursery& nursery = trc->runtime()->gc.nursery;
 
-    const SafepointIndex* si = ionScript->getSafepointIndex(frame.returnAddressToFp());
+    const SafepointIndex *si = ionScript->getSafepointIndex(frame.returnAddressToFp());
     SafepointReader safepoint(ionScript, si);
 
     GeneralRegisterSet slotsRegs = safepoint.slotsOrElementsSpills();
-    uintptr_t* spill = frame.spillBase();
+    uintptr_t *spill = frame.spillBase();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (slotsRegs.has(*iter))

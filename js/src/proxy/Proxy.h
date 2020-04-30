@@ -26,11 +26,11 @@ class Proxy
 {
   public:
     /* Standard internal methods. */
-    static bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+    static bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                          MutableHandle<JSPropertyDescriptor> desc);
-    static bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+    static bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                MutableHandle<JSPropertyDescriptor> desc, ObjectOpResult &result);
-    static bool ownPropertyKeys(JSContext* cx, HandleObject proxy, AutoIdVector& props);
+    static bool ownPropertyKeys(JSContext *cx, HandleObject proxy, AutoIdVector &props);
     static bool delete_(JSContext *cx, HandleObject proxy, HandleId id, ObjectOpResult &result);
     static bool enumerate(JSContext *cx, HandleObject proxy, MutableHandleObject objp);
     static bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible);

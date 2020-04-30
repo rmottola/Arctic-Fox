@@ -94,9 +94,9 @@ class CPOWProxyHandler : public BaseProxyHandler
         return false;
     }
 
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                 MutableHandle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const override;
     virtual bool ownPropertyKeys(JSContext *cx, HandleObject proxy,
@@ -212,7 +212,7 @@ WrapperOwner::getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, Handle
 }
 
 bool
-CPOWProxyHandler::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+CPOWProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                  MutableHandle<JSPropertyDescriptor> desc,
                                  ObjectOpResult &result) const
 {

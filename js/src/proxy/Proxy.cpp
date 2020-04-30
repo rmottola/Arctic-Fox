@@ -133,11 +133,11 @@ Proxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
 }
 
 bool
-Proxy::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+Proxy::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                       MutableHandle<PropertyDescriptor> desc, ObjectOpResult &result)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
     AutoEnterPolicy policy(cx, handler, proxy, id, BaseProxyHandler::SET, true);
     if (!policy.allowed()) {
         if (!policy.returnValue())

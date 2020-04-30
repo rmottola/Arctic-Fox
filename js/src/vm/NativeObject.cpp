@@ -1446,7 +1446,7 @@ js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId 
 
 template <AllowGC allowGC>
 bool
-js::NativeLookupOwnProperty(ExclusiveContext* cx,
+js::NativeLookupOwnProperty(ExclusiveContext *cx,
                             typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
                             typename MaybeRooted<jsid, allowGC>::HandleType id,
                             typename MaybeRooted<Shape*, allowGC>::MutableHandleType propp)
@@ -1456,16 +1456,16 @@ js::NativeLookupOwnProperty(ExclusiveContext* cx,
 }
 
 template bool
-js::NativeLookupOwnProperty<CanGC>(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+js::NativeLookupOwnProperty<CanGC>(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
                                    MutableHandleShape propp);
 
 template bool
-js::NativeLookupOwnProperty<NoGC>(ExclusiveContext* cx, NativeObject* obj, jsid id,
+js::NativeLookupOwnProperty<NoGC>(ExclusiveContext *cx, NativeObject *obj, jsid id,
                                   FakeMutableHandle<Shape*> propp);
 
 template <AllowGC allowGC>
 bool
-js::NativeLookupProperty(ExclusiveContext* cx,
+js::NativeLookupProperty(ExclusiveContext *cx,
                          typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
                          typename MaybeRooted<jsid, allowGC>::HandleType id,
                          typename MaybeRooted<JSObject*, allowGC>::MutableHandleType objp,
@@ -1475,16 +1475,16 @@ js::NativeLookupProperty(ExclusiveContext* cx,
 }
 
 template bool
-js::NativeLookupProperty<CanGC>(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+js::NativeLookupProperty<CanGC>(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
                                 MutableHandleObject objp, MutableHandleShape propp);
 
 template bool
-js::NativeLookupProperty<NoGC>(ExclusiveContext* cx, NativeObject* obj, jsid id,
+js::NativeLookupProperty<NoGC>(ExclusiveContext *cx, NativeObject *obj, jsid id,
                                FakeMutableHandle<JSObject*> objp,
                                FakeMutableHandle<Shape*> propp);
 
 bool
-js::NativeLookupElement(JSContext* cx, HandleNativeObject obj, uint32_t index,
+js::NativeLookupElement(JSContext *cx, HandleNativeObject obj, uint32_t index,
                         MutableHandleObject objp, MutableHandleShape propp)
 {
     RootedId id(cx);

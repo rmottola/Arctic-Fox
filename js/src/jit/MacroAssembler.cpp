@@ -1657,7 +1657,7 @@ MacroAssembler::handleFailure()
 
 #ifdef DEBUG
 static void
-AssumeUnreachable_(const char* output) {
+AssumeUnreachable_(const char *output) {
     MOZ_ReportAssertionFailure(output, __FILE__, __LINE__);
 }
 #endif
@@ -1674,7 +1674,7 @@ MacroAssembler::assumeUnreachable(const char* output)
         setupUnalignedABICall(1, temp);
         movePtr(ImmPtr(output), temp);
         passABIArg(temp);
-        callWithABI(JS_FUNC_TO_DATA_PTR(void*, AssumeUnreachable_));
+        callWithABI(JS_FUNC_TO_DATA_PTR(void *, AssumeUnreachable_));
 
         PopRegsInMask(RegisterSet::Volatile());
     }
@@ -1706,7 +1706,7 @@ Printf0_(const char* output) {
 }
 
 void
-MacroAssembler::printf(const char* output)
+MacroAssembler::printf(const char *output)
 {
     RegisterSet regs = RegisterSet::Volatile();
     PushRegsInMask(regs);
@@ -1716,7 +1716,7 @@ MacroAssembler::printf(const char* output)
     setupUnalignedABICall(1, temp);
     movePtr(ImmPtr(output), temp);
     passABIArg(temp);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, Printf0_));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, Printf0_));
 
     PopRegsInMask(RegisterSet::Volatile());
 }
@@ -1729,7 +1729,7 @@ Printf1_(const char* output, uintptr_t value) {
 }
 
 void
-MacroAssembler::printf(const char* output, Register value)
+MacroAssembler::printf(const char *output, Register value)
 {
     RegisterSet regs = RegisterSet::Volatile();
     PushRegsInMask(regs);
@@ -1765,7 +1765,7 @@ MacroAssembler::tracelogStartId(Register logger, uint32_t textId, bool force)
     passABIArg(logger);
     move32(Imm32(textId), temp);
     passABIArg(temp);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStartEventPrivate));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, TraceLogStartEventPrivate));
 
     PopRegsInMask(RegisterSet::Volatile());
 }
@@ -1784,7 +1784,7 @@ MacroAssembler::tracelogStartId(Register logger, Register textId)
     setupUnalignedABICall(2, temp);
     passABIArg(logger);
     passABIArg(textId);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStartEventPrivate));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, TraceLogStartEventPrivate));
 
     PopRegsInMask(RegisterSet::Volatile());
 }
@@ -1792,7 +1792,7 @@ MacroAssembler::tracelogStartId(Register logger, Register textId)
 void
 MacroAssembler::tracelogStartEvent(Register logger, Register event)
 {
-    void (&TraceLogFunc)(TraceLoggerThread*, const TraceLoggerEvent&) = TraceLogStartEvent;
+    void (&TraceLogFunc)(TraceLoggerThread *, const TraceLoggerEvent &) = TraceLogStartEvent;
 
     PushRegsInMask(RegisterSet::Volatile());
 
@@ -1805,7 +1805,7 @@ MacroAssembler::tracelogStartEvent(Register logger, Register event)
     setupUnalignedABICall(2, temp);
     passABIArg(logger);
     passABIArg(event);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogFunc));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, TraceLogFunc));
 
     PopRegsInMask(RegisterSet::Volatile());
 }
@@ -1828,7 +1828,7 @@ MacroAssembler::tracelogStopId(Register logger, uint32_t textId, bool force)
     move32(Imm32(textId), temp);
     passABIArg(temp);
 
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStopEventPrivate));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, TraceLogStopEventPrivate));
 
     PopRegsInMask(RegisterSet::Volatile());
 }
@@ -1847,7 +1847,7 @@ MacroAssembler::tracelogStopId(Register logger, Register textId)
     setupUnalignedABICall(2, temp);
     passABIArg(logger);
     passABIArg(textId);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStopEventPrivate));
+    callWithABI(JS_FUNC_TO_DATA_PTR(void *, TraceLogStopEventPrivate));
 
     PopRegsInMask(RegisterSet::Volatile());
 }

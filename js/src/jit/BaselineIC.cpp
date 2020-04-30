@@ -734,7 +734,7 @@ ICStubCompiler::leaveStubFrame(MacroAssembler& masm, bool calledIntoIon)
 }
 
 inline bool
-ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, ValueOperand val,
+ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler &masm, Register obj, ValueOperand val,
                                          Register scratch, GeneralRegisterSet saveRegs)
 {
     Label skipBarrier;
@@ -3187,13 +3187,13 @@ GetDOMProxyProto(JSObject* obj)
 // Callers are expected to have already guarded on the shape of the
 // object, which guarantees the object is a DOM proxy.
 static void
-CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, Register object,
-                                  const Address& checkExpandoShapeAddr,
-                                  Address* expandoAndGenerationAddr,
-                                  Address* generationAddr,
+CheckDOMProxyExpandoDoesNotShadow(JSContext *cx, MacroAssembler &masm, Register object,
+                                  const Address &checkExpandoShapeAddr,
+                                  Address *expandoAndGenerationAddr,
+                                  Address *generationAddr,
                                   Register scratch,
-                                  GeneralRegisterSet& domProxyRegSet,
-                                  Label* checkFailed)
+                                  GeneralRegisterSet &domProxyRegSet,
+                                  Label *checkFailed)
 {
     // Guard that the object does not have expando properties, or has an expando
     // which is known to not have the desired property.
@@ -4146,7 +4146,7 @@ typedef bool (*DoAtomizeStringFn)(JSContext*, HandleString, MutableHandleValue);
 static const VMFunction DoAtomizeStringInfo = FunctionInfo<DoAtomizeStringFn>(DoAtomizeString);
 
 bool
-ICGetElemNativeCompiler::emitCallNative(MacroAssembler& masm, Register objReg)
+ICGetElemNativeCompiler::emitCallNative(MacroAssembler &masm, Register objReg)
 {
     GeneralRegisterSet regs = availableGeneralRegs(0);
     regs.takeUnchecked(objReg);
@@ -4173,7 +4173,7 @@ ICGetElemNativeCompiler::emitCallNative(MacroAssembler& masm, Register objReg)
 }
 
 bool
-ICGetElemNativeCompiler::emitCallScripted(MacroAssembler& masm, Register objReg)
+ICGetElemNativeCompiler::emitCallScripted(MacroAssembler &masm, Register objReg)
 {
     GeneralRegisterSet regs = availableGeneralRegs(0);
     regs.takeUnchecked(objReg);
@@ -4240,7 +4240,7 @@ ICGetElemNativeCompiler::emitCallScripted(MacroAssembler& masm, Register objReg)
 }
 
 bool
-ICGetElemNativeCompiler::generateStubCode(MacroAssembler& masm)
+ICGetElemNativeCompiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     Label failurePopR1;
@@ -7926,7 +7926,7 @@ typedef bool (*DoGetPropGenericFn)(JSContext*, BaselineFrame*, ICGetProp_Generic
 static const VMFunction DoGetPropGenericInfo = FunctionInfo<DoGetPropGenericFn>(DoGetPropGeneric);
 
 bool
-ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler &masm)
 {
     GeneralRegisterSet regs(availableGeneralRegs(1));
 
@@ -7953,7 +7953,7 @@ ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICGetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_Unboxed::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
 
@@ -7986,7 +7986,7 @@ ICGetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICGetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
+ICGetProp_TypedObject::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
 
@@ -8858,7 +8858,7 @@ ICSetProp_Unboxed::Compiler::generateStubCode(MacroAssembler &masm)
 }
 
 bool
-ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
+ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
 
@@ -8980,7 +8980,7 @@ ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICSetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
+ICSetProp_CallScripted::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     Label failureUnstow;
@@ -9100,7 +9100,7 @@ static const VMFunction DoCallNativeSetterInfo =
     FunctionInfo<DoCallNativeSetterFn>(DoCallNativeSetter);
 
 bool
-ICSetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
+ICSetProp_CallNative::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     Label failureUnstow;
@@ -9830,7 +9830,7 @@ DoSpreadCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_
 }
 
 void
-ICCallStubCompiler::pushCallArguments(MacroAssembler& masm, GeneralRegisterSet regs,
+ICCallStubCompiler::pushCallArguments(MacroAssembler &masm, GeneralRegisterSet regs,
                                       Register argcReg, bool isJitCall)
 {
     MOZ_ASSERT(!regs.has(argcReg));
@@ -9883,7 +9883,7 @@ ICCallStubCompiler::guardSpreadCall(MacroAssembler& masm, Register argcReg, Labe
 }
 
 void
-ICCallStubCompiler::pushSpreadCallArguments(MacroAssembler& masm, GeneralRegisterSet regs,
+ICCallStubCompiler::pushSpreadCallArguments(MacroAssembler &masm, GeneralRegisterSet regs,
                                             Register argcReg, bool isJitCall)
 {
     // Push arguments
@@ -9920,8 +9920,8 @@ ICCallStubCompiler::pushSpreadCallArguments(MacroAssembler& masm, GeneralRegiste
 }
 
 Register
-ICCallStubCompiler::guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
-                                  bool checkNative, FunApplyThing applyThing, Label* failure)
+ICCallStubCompiler::guardFunApply(MacroAssembler &masm, GeneralRegisterSet regs, Register argcReg,
+                                  bool checkNative, FunApplyThing applyThing, Label *failure)
 {
     // Ensure argc == 2
     masm.branch32(Assembler::NotEqual, argcReg, Imm32(2), failure);
@@ -10040,7 +10040,7 @@ ICCallStubCompiler::guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs,
 }
 
 void
-ICCallStubCompiler::pushCallerArguments(MacroAssembler& masm, GeneralRegisterSet regs)
+ICCallStubCompiler::pushCallerArguments(MacroAssembler &masm, GeneralRegisterSet regs)
 {
     // Initialize copyReg to point to start caller arguments vector.
     // Initialize argcReg to poitn to the end of it.
@@ -10065,7 +10065,7 @@ ICCallStubCompiler::pushCallerArguments(MacroAssembler& masm, GeneralRegisterSet
 }
 
 void
-ICCallStubCompiler::pushArrayArguments(MacroAssembler& masm, Address arrayVal,
+ICCallStubCompiler::pushArrayArguments(MacroAssembler &masm, Address arrayVal,
                                        GeneralRegisterSet regs)
 {
     // Load start and end address of values to copy.
@@ -10101,7 +10101,7 @@ static const VMFunction DoSpreadCallFallbackInfo =
     FunctionInfo<DoSpreadCallFallbackFn>(DoSpreadCallFallback);
 
 bool
-ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_Fallback::Compiler::generateStubCode(MacroAssembler &masm)
 {
     MOZ_ASSERT(R0 == JSReturnOperand);
 
@@ -10215,7 +10215,7 @@ typedef bool (*CreateThisFn)(JSContext* cx, HandleObject callee, MutableHandleVa
 static const VMFunction CreateThisInfoBaseline = FunctionInfo<CreateThisFn>(CreateThis);
 
 bool
-ICCallScriptedCompiler::generateStubCode(MacroAssembler& masm)
+ICCallScriptedCompiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     GeneralRegisterSet regs(availableGeneralRegs(0));
@@ -10480,7 +10480,7 @@ typedef bool (*CopyArrayFn)(JSContext*, HandleArrayObject, MutableHandleValue);
 static const VMFunction CopyArrayInfo = FunctionInfo<CopyArrayFn>(CopyArray);
 
 bool
-ICCall_StringSplit::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_StringSplit::Compiler::generateStubCode(MacroAssembler &masm)
 {
     // Stack Layout: [ ..., CalleeVal, ThisVal, Arg0Val, +ICStackValueOffset+ ]
     GeneralRegisterSet regs = availableGeneralRegs(0);
@@ -10571,7 +10571,7 @@ ICCall_StringSplit::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICCall_IsSuspendedStarGenerator::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_IsSuspendedStarGenerator::Compiler::generateStubCode(MacroAssembler &masm)
 {
     // The IsSuspendedStarGenerator intrinsic is only called in self-hosted
     // code, so it's safe to assume we have a single argument and the callee
@@ -10613,7 +10613,7 @@ ICCall_IsSuspendedStarGenerator::Compiler::generateStubCode(MacroAssembler& masm
 }
 
 bool
-ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_Native::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     GeneralRegisterSet regs(availableGeneralRegs(0));
@@ -10717,7 +10717,7 @@ ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     GeneralRegisterSet regs(availableGeneralRegs(0));
@@ -10804,7 +10804,7 @@ ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     GeneralRegisterSet regs(availableGeneralRegs(0));
@@ -10906,7 +10906,7 @@ ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler& masm)
+ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler &masm)
 {
     Label failure;
     GeneralRegisterSet regs(availableGeneralRegs(0));

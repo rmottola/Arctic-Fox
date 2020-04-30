@@ -549,7 +549,7 @@ ScriptedDirectProxyHandler::getOwnPropertyDescriptor(JSContext* cx, HandleObject
 
 // ES6 draft rev 31 (15 Jan 2015) 9.5.6 Proxy.[[DefineOwnProperty]](P, Desc)
 bool
-ScriptedDirectProxyHandler::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+ScriptedDirectProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                            MutableHandle<PropertyDescriptor> desc,
                                            ObjectOpResult &result) const
 {

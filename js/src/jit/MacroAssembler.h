@@ -1223,21 +1223,21 @@ class MacroAssembler : public MacroAssemblerSpecific
         uint32_t alignmentPadding;
     };
 
-    void alignFrameForICArguments(AfterICSaveLive& aic);
-    void restoreFrameAlignmentForICArguments(AfterICSaveLive& aic);
+    void alignFrameForICArguments(AfterICSaveLive &aic);
+    void restoreFrameAlignmentForICArguments(AfterICSaveLive &aic);
 
-    AfterICSaveLive icSaveLive(RegisterSet& liveRegs) {
+    AfterICSaveLive icSaveLive(RegisterSet &liveRegs) {
         PushRegsInMask(liveRegs);
         AfterICSaveLive aic(framePushed());
         alignFrameForICArguments(aic);
         return aic;
     }
 
-    bool icBuildOOLFakeExitFrame(void* fakeReturnAddr, AfterICSaveLive& aic) {
+    bool icBuildOOLFakeExitFrame(void *fakeReturnAddr, AfterICSaveLive &aic) {
         return buildOOLFakeExitFrame(fakeReturnAddr);
     }
 
-    void icRestoreLive(RegisterSet& liveRegs, AfterICSaveLive& aic) {
+    void icRestoreLive(RegisterSet &liveRegs, AfterICSaveLive &aic) {
         restoreFrameAlignmentForICArguments(aic);
         MOZ_ASSERT(framePushed() == aic.initialStack);
         PopRegsInMask(liveRegs);

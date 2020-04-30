@@ -33,7 +33,7 @@ DirectProxyHandler::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, 
 }
 
 bool
-DirectProxyHandler::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+DirectProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                    MutableHandle<PropertyDescriptor> desc,
                                    ObjectOpResult &result) const
 {

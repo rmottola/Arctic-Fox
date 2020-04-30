@@ -146,7 +146,7 @@ AddonWrapper<Base>::set(JSContext* cx, JS::HandleObject wrapper, JS::HandleObjec
 
 template<typename Base>
 bool
-AddonWrapper<Base>::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+AddonWrapper<Base>::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                                    MutableHandle<JSPropertyDescriptor> desc,
                                    JS::ObjectOpResult &result) const
 {

@@ -1125,7 +1125,7 @@ class ICStubCompiler
     // Some stubs need to emit SPS profiler updates.  This emits the guarding
     // jitcode for those stubs.  If profiling is not enabled, jumps to the
     // given label.
-    void guardProfilingEnabled(MacroAssembler& masm, Register scratch, Label* skip);
+    void guardProfilingEnabled(MacroAssembler &masm, Register scratch, Label *skip);
 
     inline GeneralRegisterSet availableGeneralRegs(size_t numInputs) const {
         GeneralRegisterSet regs(GeneralRegisterSet::All());
@@ -1161,11 +1161,11 @@ class ICStubCompiler
         return regs;
     }
 
-    inline bool emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, ValueOperand val,
+    inline bool emitPostWriteBarrierSlot(MacroAssembler &masm, Register obj, ValueOperand val,
                                          Register scratch, GeneralRegisterSet saveRegs);
 
   public:
-    virtual ICStub* getStub(ICStubSpace* space) = 0;
+    virtual ICStub *getStub(ICStubSpace *space) = 0;
 
     static ICStubSpace* StubSpaceForKind(ICStub::Kind kind, JSScript* script) {
         if (ICStub::CanMakeCalls(kind))
@@ -5259,15 +5259,15 @@ class ICCallStubCompiler : public ICStubCompiler
         FunApply_Array
     };
 
-    void pushCallArguments(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
+    void pushCallArguments(MacroAssembler &masm, GeneralRegisterSet regs, Register argcReg,
                            bool isJitCall);
-    void pushSpreadCallArguments(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
+    void pushSpreadCallArguments(MacroAssembler &masm, GeneralRegisterSet regs, Register argcReg,
                                  bool isJitCall);
-    void guardSpreadCall(MacroAssembler& masm, Register argcReg, Label* failure);
-    Register guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
-                           bool checkNative, FunApplyThing applyThing, Label* failure);
-    void pushCallerArguments(MacroAssembler& masm, GeneralRegisterSet regs);
-    void pushArrayArguments(MacroAssembler& masm, Address arrayVal, GeneralRegisterSet regs);
+    void guardSpreadCall(MacroAssembler &masm, Register argcReg, Label *failure);
+    Register guardFunApply(MacroAssembler &masm, GeneralRegisterSet regs, Register argcReg,
+                           bool checkNative, FunApplyThing applyThing, Label *failure);
+    void pushCallerArguments(MacroAssembler &masm, GeneralRegisterSet regs);
+    void pushArrayArguments(MacroAssembler &masm, Address arrayVal, GeneralRegisterSet regs);
 };
 
 class ICCall_Fallback : public ICMonitoredFallbackStub

@@ -1029,7 +1029,7 @@ CodeGeneratorShared::markOsiPoint(LOsiPoint* ins)
 #ifdef CHECK_OSIPOINT_REGISTERS
 template <class Op>
 static void
-HandleRegisterDump(Op op, MacroAssembler& masm, RegisterSet liveRegs, Register activation,
+HandleRegisterDump(Op op, MacroAssembler &masm, RegisterSet liveRegs, Register activation,
                    Register scratch)
 {
     const size_t baseOffset = JitActivation::offsetOfRegs();
@@ -1088,7 +1088,7 @@ class StoreOp
 };
 
 static void
-StoreAllLiveRegs(MacroAssembler& masm, RegisterSet liveRegs)
+StoreAllLiveRegs(MacroAssembler &masm, RegisterSet liveRegs)
 {
     // Store a copy of all live registers before performing the call.
     // When we reach the OsiPoint, we can use this to check nothing

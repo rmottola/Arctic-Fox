@@ -48,7 +48,7 @@ CrossCompartmentWrapper::getOwnPropertyDescriptor(JSContext* cx, HandleObject wr
 }
 
 bool
-CrossCompartmentWrapper::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+CrossCompartmentWrapper::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                                         MutableHandle<PropertyDescriptor> desc,
                                         ObjectOpResult &result) const
 {

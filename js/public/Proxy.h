@@ -249,13 +249,13 @@ class JS_FRIEND_API(BaseProxyHandler)
                        bool* bp) const;
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const = 0;
-    virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                 MutableHandle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const = 0;
-    virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
-                                 AutoIdVector& props) const = 0;
+    virtual bool ownPropertyKeys(JSContext *cx, HandleObject proxy,
+                                 AutoIdVector &props) const = 0;
     virtual bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
                          ObjectOpResult &result) const = 0;
     /*
@@ -370,13 +370,13 @@ class JS_FRIEND_API(DirectProxyHandler) : public BaseProxyHandler
     { }
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                                 MutableHandle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const override;
-    virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
-                                 AutoIdVector& props) const override;
+    virtual bool ownPropertyKeys(JSContext *cx, HandleObject proxy,
+                                 AutoIdVector &props) const override;
     virtual bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
                          ObjectOpResult &result) const override;
     virtual bool enumerate(JSContext *cx, HandleObject proxy,

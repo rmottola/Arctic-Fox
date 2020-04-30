@@ -960,12 +960,12 @@ GenerateReadUnboxed(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 }
 
 static bool
-EmitGetterCall(JSContext* cx, MacroAssembler& masm,
-               IonCache::StubAttacher& attacher, JSObject* obj,
-               JSObject* holder, HandleShape shape,
+EmitGetterCall(JSContext *cx, MacroAssembler &masm,
+               IonCache::StubAttacher &attacher, JSObject *obj,
+               JSObject *holder, HandleShape shape,
                RegisterSet liveRegs, Register object,
                TypedOrValueRegister output,
-               void* returnAddr)
+               void *returnAddr)
 {
     MOZ_ASSERT(output.hasValue());
     MacroAssembler::AfterICSaveLive aic = masm.icSaveLive(liveRegs);
@@ -987,7 +987,7 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
         Register argUintNReg     = regSet.takeGeneral();
         Register argVpReg        = regSet.takeGeneral();
 
-        JSFunction* target = &shape->getterValue().toObject().as<JSFunction>();
+        JSFunction *target = &shape->getterValue().toObject().as<JSFunction>();
         MOZ_ASSERT(target);
         MOZ_ASSERT(target->isNative());
 
@@ -1525,9 +1525,9 @@ PushObjectOpResult(MacroAssembler &masm)
 }
 
 static bool
-EmitCallProxyGet(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                 PropertyName* name, RegisterSet liveRegs, Register object,
-                 TypedOrValueRegister output, jsbytecode* pc, void* returnAddr)
+EmitCallProxyGet(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &attacher,
+                 PropertyName *name, RegisterSet liveRegs, Register object,
+                 TypedOrValueRegister output, jsbytecode *pc, void *returnAddr)
 {
     MOZ_ASSERT(output.hasValue());
     MacroAssembler::AfterICSaveLive aic = masm.icSaveLive(liveRegs);
@@ -1537,7 +1537,7 @@ EmitCallProxyGet(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& at
     RegisterSet regSet(RegisterSet::All());
     regSet.take(AnyRegister(object));
 
-    // Proxy::get(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
+    // Proxy::get(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
     //            MutableHandleValue vp)
     Register argJSContextReg = regSet.takeGeneral();
     Register argProxyReg     = regSet.takeGeneral();
@@ -1546,9 +1546,9 @@ EmitCallProxyGet(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& at
 
     Register scratch         = regSet.takeGeneral();
 
-    void* getFunction = JSOp(*pc) == JSOP_CALLPROP                      ?
-                            JS_FUNC_TO_DATA_PTR(void*, Proxy::callProp) :
-                            JS_FUNC_TO_DATA_PTR(void*, Proxy::get);
+    void *getFunction = JSOp(*pc) == JSOP_CALLPROP                      ?
+                            JS_FUNC_TO_DATA_PTR(void *, Proxy::callProp) :
+                            JS_FUNC_TO_DATA_PTR(void *, Proxy::get);
 
     // Push stubCode for marking.
     attacher.pushStubCodePointer(masm);
@@ -2235,9 +2235,9 @@ EmitObjectOpResultCheck(MacroAssembler &masm, Label *failure, bool strict,
 }
 
 static bool
-EmitCallProxySet(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
+EmitCallProxySet(JSContext *cx, MacroAssembler &masm, IonCache::StubAttacher &attacher,
                  HandleId propId, RegisterSet liveRegs, Register object,
-                 ConstantOrRegister value, void* returnAddr, bool strict)
+                 ConstantOrRegister value, void *returnAddr, bool strict)
 {
     MacroAssembler::AfterICSaveLive aic = masm.icSaveLive(liveRegs);
 
@@ -2251,7 +2251,7 @@ EmitCallProxySet(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& at
     RegisterSet regSet(RegisterSet::All());
     regSet.take(AnyRegister(object));
 
-    // Proxy::set(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
+    // Proxy::set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
     //            MutableHandleValue vp, ObjectOpResult &result)
     Register argJSContextReg = regSet.takeGeneral();
     Register argProxyReg     = regSet.takeGeneral();
@@ -2406,11 +2406,11 @@ SetPropertyIC::attachDOMProxyShadowed(JSContext* cx, HandleScript outerScript, I
 }
 
 static bool
-GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
-                   IonCache::StubAttacher& attacher, HandleObject obj,
+GenerateCallSetter(JSContext *cx, IonScript *ion, MacroAssembler& masm,
+                   IonCache::StubAttacher &attacher, HandleObject obj,
                    HandleObject holder, HandleShape shape, bool strict, Register object,
-                   ConstantOrRegister value, Label* failure, RegisterSet liveRegs,
-                   void* returnAddr)
+                   ConstantOrRegister value, Label *failure, RegisterSet liveRegs,
+                   void *returnAddr)
 {
     // Generate prototype guards if needed.
     // Take a scratch register for use, save on stack.
@@ -3758,7 +3758,7 @@ GenerateGetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
 
         masm.setupUnalignedABICall(1, temp);
         masm.passABIArg(str);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, GetIndexFromString));
+        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, GetIndexFromString));
         masm.mov(ReturnReg, indexReg);
 
         RegisterSet ignore = RegisterSet();

@@ -592,7 +592,7 @@ JSXrayTraits::delete_(JSContext *cx, HandleObject wrapper, HandleId id, ObjectOp
 }
 
 bool
-JSXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+JSXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                              MutableHandle<JSPropertyDescriptor> desc,
                              Handle<JSPropertyDescriptor> existingDesc,
                              ObjectOpResult &result,
@@ -1414,7 +1414,7 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
 }
 
 bool
-XPCWrappedNativeXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+XPCWrappedNativeXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                                            MutableHandle<JSPropertyDescriptor> desc,
                                            Handle<JSPropertyDescriptor> existingDesc,
                                            JS::ObjectOpResult &result, bool *defined)
@@ -1575,7 +1575,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
 }
 
 bool
-DOMXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
+DOMXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
                               MutableHandle<JSPropertyDescriptor> desc,
                               Handle<JSPropertyDescriptor> existingDesc,
                               JS::ObjectOpResult &result, bool *defined)
@@ -1930,7 +1930,7 @@ XrayWrapper<Base, Traits>::getOwnPropertyDescriptor(JSContext* cx, HandleObject 
 // to the content object. This is ok, because the the expando object is only
 // ever accessed by code across the compartment boundary.
 static bool
-RecreateLostWaivers(JSContext* cx, JSPropertyDescriptor* orig,
+RecreateLostWaivers(JSContext *cx, JSPropertyDescriptor *orig,
                     MutableHandle<JSPropertyDescriptor> wrapped)
 {
     // Compute whether the original objects were waived, and implicitly, whether
@@ -1974,7 +1974,7 @@ RecreateLostWaivers(JSContext* cx, JSPropertyDescriptor* orig,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::defineProperty(JSContext* cx, HandleObject wrapper,
+XrayWrapper<Base, Traits>::defineProperty(JSContext *cx, HandleObject wrapper,
                                           HandleId id, MutableHandle<JSPropertyDescriptor> desc,
                                           ObjectOpResult &result) const
 {

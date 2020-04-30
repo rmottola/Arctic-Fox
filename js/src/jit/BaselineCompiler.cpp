@@ -798,7 +798,7 @@ BaselineCompiler::emitDebugTrap()
 bool
 BaselineCompiler::emitTraceLoggerEnter()
 {
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
     RegisterSet regs = RegisterSet::Volatile();
     Register loggerReg = regs.takeGeneral();
     Register scriptReg = regs.takeGeneral();
@@ -832,7 +832,7 @@ BaselineCompiler::emitTraceLoggerEnter()
 bool
 BaselineCompiler::emitTraceLoggerExit()
 {
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
     Register loggerReg = RegisterSet::Volatile().takeGeneral();
 
     Label noTraceLogger;

@@ -1685,7 +1685,7 @@ class DebugScopeProxy : public BaseProxyHandler
         }
     }
 
-    bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+    bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
                         MutableHandle<PropertyDescriptor> desc,
                         ObjectOpResult &result) const override
     {

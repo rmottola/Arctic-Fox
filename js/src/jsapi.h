@@ -2587,7 +2587,7 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         value().setUndefined();
     }
 
-    void assign(JSPropertyDescriptor& other) {
+    void assign(JSPropertyDescriptor &other) {
         object().set(other.obj);
         setAttributes(other.attrs);
         setGetter(other.getter);

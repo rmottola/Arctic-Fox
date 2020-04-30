@@ -6060,7 +6060,7 @@ JitRuntime::generateMallocStub(JSContext* cx)
     masm.movePtr(ImmPtr(cx->runtime()), regRuntime);
     masm.passABIArg(regRuntime);
     masm.passABIArg(regNBytes);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, MallocWrapper));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, MallocWrapper));
     masm.storeCallResult(regReturn);
 
     masm.PopRegsInMask(regs);
@@ -6096,7 +6096,7 @@ JitRuntime::generateFreeStub(JSContext* cx)
 
     masm.setupUnalignedABICall(1, regTemp);
     masm.passABIArg(regSlots);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js_free));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, js_free));
 
     masm.PopRegsInMask(regs);
 
@@ -6777,7 +6777,7 @@ CodeGenerator::emitArrayPopShift(LInstruction* lir, const MArrayPopShift* mir, R
         saveVolatile(temps);
         masm.setupUnalignedABICall(1, lengthTemp);
         masm.passABIArg(obj);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js::ArrayShiftMoveElements));
+        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, js::ArrayShiftMoveElements));
         restoreVolatile(temps);
     }
 
@@ -7847,7 +7847,7 @@ CodeGenerator::visitStoreFixedSlotT(LStoreFixedSlotT* ins)
 }
 
 void
-CodeGenerator::visitGetNameCache(LGetNameCache* ins)
+CodeGenerator::visitGetNameCache(LGetNameCache *ins)
 {
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register scopeChain = ToRegister(ins->scopeObj());
@@ -7879,9 +7879,9 @@ CodeGenerator::visitNameIC(OutOfLineUpdateCache* ool, DataPtr<NameIC>& ic)
 }
 
 void
-CodeGenerator::addGetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Register objReg,
-                                   PropertyName* name, TypedOrValueRegister output,
-                                   bool monitoredResult, jsbytecode* profilerLeavePc)
+CodeGenerator::addGetPropertyCache(LInstruction *ins, RegisterSet liveRegs, Register objReg,
+                                   PropertyName *name, TypedOrValueRegister output,
+                                   bool monitoredResult, jsbytecode *profilerLeavePc)
 {
     GetPropertyIC cache(liveRegs, objReg, name, output, monitoredResult);
     cache.setProfilerLeavePC(profilerLeavePc);
@@ -7889,9 +7889,9 @@ CodeGenerator::addGetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Regi
 }
 
 void
-CodeGenerator::addSetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Register objReg,
-                                   PropertyName* name, ConstantOrRegister value, bool strict,
-                                   bool needsTypeBarrier, jsbytecode* profilerLeavePc)
+CodeGenerator::addSetPropertyCache(LInstruction *ins, RegisterSet liveRegs, Register objReg,
+                                   PropertyName *name, ConstantOrRegister value, bool strict,
+                                   bool needsTypeBarrier, jsbytecode *profilerLeavePc)
 {
     SetPropertyIC cache(liveRegs, objReg, name, value, strict, needsTypeBarrier);
     cache.setProfilerLeavePC(profilerLeavePc);
@@ -7912,7 +7912,7 @@ CodeGenerator::addSetElementCache(LInstruction* ins, Register obj, Register unbo
 }
 
 void
-CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV* ins)
+CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV *ins)
 {
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
@@ -7925,7 +7925,7 @@ CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV* ins)
 }
 
 void
-CodeGenerator::visitGetPropertyCacheT(LGetPropertyCacheT* ins)
+CodeGenerator::visitGetPropertyCacheT(LGetPropertyCacheT *ins)
 {
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
@@ -8169,7 +8169,7 @@ CodeGenerator::visitCallDeleteElement(LCallDeleteElement* lir)
 }
 
 void
-CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV* ins)
+CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV *ins)
 {
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
@@ -8181,7 +8181,7 @@ CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV* ins)
 }
 
 void
-CodeGenerator::visitSetPropertyCacheT(LSetPropertyCacheT* ins)
+CodeGenerator::visitSetPropertyCacheT(LSetPropertyCacheT *ins)
 {
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));

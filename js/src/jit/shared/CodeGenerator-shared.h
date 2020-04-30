@@ -442,13 +442,13 @@ class CodeGeneratorShared : public LElementVisitor
     // any modifications of the stack.  Modification of the stack made after
     // these calls should update the framePushed variable, needed by the exit
     // frame produced by callVM.
-    inline void saveLive(LInstruction* ins);
-    inline void restoreLive(LInstruction* ins);
-    inline void restoreLiveIgnore(LInstruction* ins, RegisterSet reg);
+    inline void saveLive(LInstruction *ins);
+    inline void restoreLive(LInstruction *ins);
+    inline void restoreLiveIgnore(LInstruction *ins, RegisterSet reg);
 
     // Save/restore all registers that are both live and volatile.
-    inline void saveLiveVolatile(LInstruction* ins);
-    inline void restoreLiveVolatile(LInstruction* ins);
+    inline void saveLiveVolatile(LInstruction *ins);
+    inline void restoreLiveVolatile(LInstruction *ins);
 
     template <typename T>
     void pushArg(const T& t) {
@@ -643,7 +643,7 @@ class ArgSeq : public SeqType
         return ArgSeq<ThisType, NextType>(*this, last);
     }
 
-    inline void generate(CodeGeneratorShared* codegen) const {
+    inline void generate(CodeGeneratorShared *codegen) const {
         codegen->pushArg(last_);
         this->SeqType::generate(codegen);
     }
@@ -666,7 +666,7 @@ class ArgSeq<void, void>
         return ArgSeq<ThisType, NextType>(*this, last);
     }
 
-    inline void generate(CodeGeneratorShared* codegen) const {
+    inline void generate(CodeGeneratorShared *codegen) const {
     }
 };
 

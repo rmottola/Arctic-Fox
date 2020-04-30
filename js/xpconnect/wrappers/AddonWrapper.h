@@ -24,10 +24,10 @@ class AddonWrapper : public Base {
   public:
     explicit MOZ_CONSTEXPR AddonWrapper(unsigned flags) : Base(flags) { }
 
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, JS::Handle<JSObject*> wrapper,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, JS::Handle<JSObject*> wrapper,
                                           JS::Handle<jsid> id,
                                           JS::MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext* cx, JS::HandleObject proxy, JS::HandleId id,
+    virtual bool defineProperty(JSContext *cx, JS::HandleObject proxy, JS::HandleId id,
                                 JS::MutableHandle<JSPropertyDescriptor> desc,
                                 JS::ObjectOpResult &result) const override;
     virtual bool delete_(JSContext *cx, JS::HandleObject proxy, JS::HandleId id,

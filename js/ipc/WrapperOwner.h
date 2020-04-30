@@ -29,9 +29,9 @@ class WrapperOwner : public virtual JavaScriptShared
 
     // Standard internal methods.
     // (The traps should be in the same order like js/Proxy.h)
-    bool getOwnPropertyDescriptor(JSContext* cx, JS::HandleObject proxy, JS::HandleId id,
+    bool getOwnPropertyDescriptor(JSContext *cx, JS::HandleObject proxy, JS::HandleId id,
                                   JS::MutableHandle<JSPropertyDescriptor> desc);
-    bool defineProperty(JSContext* cx, JS::HandleObject proxy, JS::HandleId id,
+    bool defineProperty(JSContext *cx, JS::HandleObject proxy, JS::HandleId id,
                         JS::MutableHandle<JSPropertyDescriptor> desc,
                         JS::ObjectOpResult &result);
     bool ownPropertyKeys(JSContext *cx, JS::HandleObject proxy, JS::AutoIdVector &props);
