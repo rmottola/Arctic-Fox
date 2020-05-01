@@ -2918,7 +2918,7 @@ JS_ForwardSetPropertyTo(JSContext *cx, HandleObject obj, HandleId id, HandleValu
 }
 
 static bool
-SetElement(JSContext* cx, HandleObject obj, uint32_t index, MutableHandleValue vp)
+SetElement(JSContext *cx, HandleObject obj, uint32_t index, MutableHandleValue vp)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2929,42 +2929,42 @@ SetElement(JSContext* cx, HandleObject obj, uint32_t index, MutableHandleValue v
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleValue v)
 {
     RootedValue value(cx, v);
     return SetElement(cx, obj, index, &value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleObject v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleObject v)
 {
     RootedValue value(cx, ObjectOrNullValue(v));
     return SetElement(cx, obj, index, &value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleString v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleString v)
 {
     RootedValue value(cx, StringValue(v));
     return SetElement(cx, obj, index, &value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, int32_t v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, int32_t v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, &value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, uint32_t v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, uint32_t v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, &value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, double v)
+JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, double v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, &value);

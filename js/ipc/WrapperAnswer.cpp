@@ -308,13 +308,13 @@ WrapperAnswer::RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
 }
 
 bool
-WrapperAnswer::RecvSet(const ObjectId& objId, const ObjectVariant& receiverVar,
+WrapperAnswer::RecvSet(const ObjectId &objId, const ObjectVariant &receiverVar,
                        const JSIDVariant &idVar, const JSVariant &value, ReturnStatus *rs,
                        JSVariant *resultValue)
 {
     // We may run scripted setters.
     AutoEntryScript aes(xpc::NativeGlobal(scopeForTargetObjects()));
-    JSContext* cx = aes.cx();
+    JSContext *cx = aes.cx();
 
     // The outparam will be written to the buffer, so it must be set even if
     // the parent won't read it.

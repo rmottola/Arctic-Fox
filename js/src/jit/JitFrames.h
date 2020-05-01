@@ -697,9 +697,9 @@ class IonOOLSetterOpExitFrameLayout : public IonOOLPropertyOpExitFrameLayout
     }
 };
 
-// Proxy::get(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
+// Proxy::get(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
 //            MutableHandleValue vp)
-// Proxy::set(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
+// Proxy::set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
 //            MutableHandleValue vp, ObjectOpResult &result)
 class IonOOLProxyExitFrameLayout
 {

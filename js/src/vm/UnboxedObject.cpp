@@ -761,7 +761,7 @@ UnboxedPlainObject::obj_getProperty(JSContext *cx, HandleObject obj, HandleObjec
 UnboxedPlainObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
                                     HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (const UnboxedLayout::Property *property = layout.lookup(id)) {
         if (obj == receiver) {

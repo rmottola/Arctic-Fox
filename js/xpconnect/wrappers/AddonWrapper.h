@@ -32,13 +32,13 @@ class AddonWrapper : public Base {
                                 JS::ObjectOpResult &result) const override;
     virtual bool delete_(JSContext *cx, JS::HandleObject proxy, JS::HandleId id,
                          JS::ObjectOpResult &result) const override;
-    virtual bool get(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
+    virtual bool get(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
                      JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp) const override;
-    virtual bool set(JSContext* cx, JS::HandleObject wrapper, JS::HandleObject receiver,
+    virtual bool set(JSContext *cx, JS::HandleObject wrapper, JS::HandleObject receiver,
                      JS::HandleId id, JS::MutableHandleValue vp,
                      JS::ObjectOpResult &result) const override;
 
-    virtual bool getPropertyDescriptor(JSContext* cx, JS::Handle<JSObject*> wrapper,
+    virtual bool getPropertyDescriptor(JSContext *cx, JS::Handle<JSObject*> wrapper,
                                        JS::Handle<jsid> id,
                                        JS::MutableHandle<JSPropertyDescriptor> desc) const override;
 

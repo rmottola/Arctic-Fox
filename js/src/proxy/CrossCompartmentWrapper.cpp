@@ -169,7 +169,7 @@ CrossCompartmentWrapper::get(JSContext* cx, HandleObject wrapper, HandleObject r
 }
 
 bool
-CrossCompartmentWrapper::set(JSContext* cx, HandleObject wrapper, HandleObject receiver,
+CrossCompartmentWrapper::set(JSContext *cx, HandleObject wrapper, HandleObject receiver,
                              HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
 {
     RootedObject receiverCopy(cx, receiver);
@@ -181,7 +181,7 @@ CrossCompartmentWrapper::set(JSContext* cx, HandleObject wrapper, HandleObject r
 }
 
 bool
-CrossCompartmentWrapper::getOwnEnumerablePropertyKeys(JSContext* cx, HandleObject wrapper,
+CrossCompartmentWrapper::getOwnEnumerablePropertyKeys(JSContext *cx, HandleObject wrapper,
                                                       AutoIdVector& props) const
 {
     PIERCE(cx, wrapper,

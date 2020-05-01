@@ -1577,11 +1577,11 @@ js::CreateThisForFunction(JSContext* cx, HandleObject callee, NewObjectKind newK
 }
 
 /* static */ bool
-JSObject::nonNativeSetProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
+JSObject::nonNativeSetProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
                                HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     if (MOZ_UNLIKELY(obj->watched())) {
-        WatchpointMap* wpmap = cx->compartment()->watchpointMap;
+        WatchpointMap *wpmap = cx->compartment()->watchpointMap;
         if (wpmap && !wpmap->triggerWatchpoint(cx, obj, id, vp))
             return false;
     }
@@ -1589,7 +1589,7 @@ JSObject::nonNativeSetProperty(JSContext* cx, HandleObject obj, HandleObject rec
 }
 
 /* static */ bool
-JSObject::nonNativeSetElement(JSContext* cx, HandleObject obj, HandleObject receiver,
+JSObject::nonNativeSetElement(JSContext *cx, HandleObject obj, HandleObject receiver,
                               uint32_t index, MutableHandleValue vp, ObjectOpResult &result)
 {
     RootedId id(cx);

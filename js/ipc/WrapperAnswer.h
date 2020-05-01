@@ -34,15 +34,15 @@ class WrapperAnswer : public virtual JavaScriptShared
                  ReturnStatus* rs, bool* bp);
     bool RecvHasOwn(const ObjectId& objId, const JSIDVariant& id,
                     ReturnStatus* rs, bool* bp);
-    bool RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
-                 const JSIDVariant& id,
-                 ReturnStatus* rs, JSVariant* result);
-    bool RecvSet(const ObjectId& objId, const ObjectVariant& receiverVar,
+    bool RecvGet(const ObjectId &objId, const ObjectVariant &receiverVar,
+                 const JSIDVariant &id,
+                 ReturnStatus *rs, JSVariant *result);
+    bool RecvSet(const ObjectId &objId, const ObjectVariant &receiverVar,
                  const JSIDVariant &id, const JSVariant &value, ReturnStatus *rs,
                  JSVariant *result);
 
-    bool RecvIsExtensible(const ObjectId& objId, ReturnStatus* rs,
-                          bool* result);
+    bool RecvIsExtensible(const ObjectId &objId, ReturnStatus *rs,
+                          bool *result);
     bool RecvCallOrConstruct(const ObjectId& objId, InfallibleTArray<JSParam>&& argv,
                              const bool& construct, ReturnStatus* rs, JSVariant* result,
                              nsTArray<JSParam>* outparams);

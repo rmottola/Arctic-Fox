@@ -304,7 +304,7 @@ ScriptedIndirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObjec
 }
 
 bool
-ScriptedIndirectProxyHandler::set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+ScriptedIndirectProxyHandler::set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                                   HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
 {
     RootedObject handler(cx, GetIndirectProxyHandlerObject(proxy));

@@ -922,7 +922,7 @@ ScriptedDirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject 
 
 // ES6 draft rev 32 (2015 Feb 2) 9.5.9 Proxy.[[Set]](P, V, Receiver)
 bool
-ScriptedDirectProxyHandler::set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+ScriptedDirectProxyHandler::set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                                 HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
 {
     // step 2-3 (Steps 1 and 4 are irrelevant assertions.)

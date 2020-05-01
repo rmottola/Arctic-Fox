@@ -2570,7 +2570,7 @@ GenerateCallSetter(JSContext *cx, IonScript *ion, MacroAssembler& masm,
         masm.passABIArg(argIdReg);
         masm.passABIArg(argVpReg);
         masm.passABIArg(argResultReg);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, target));
+        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, target));
 
         // Test for error.
         masm.branchIfFalseBool(ReturnReg, masm.exceptionLabel());

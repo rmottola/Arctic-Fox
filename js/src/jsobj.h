@@ -471,17 +471,17 @@ class JSObject : public js::gc::Cell
      * callable a TypeError will be thrown. On success the value returned by
      * the call is stored in *vp.
      */
-    bool callMethod(JSContext* cx, js::HandleId id, unsigned argc, js::Value* argv,
+    bool callMethod(JSContext *cx, js::HandleId id, unsigned argc, js::Value *argv,
                     js::MutableHandleValue vp);
 
-    static bool nonNativeSetProperty(JSContext* cx, js::HandleObject obj,
+    static bool nonNativeSetProperty(JSContext *cx, js::HandleObject obj,
                                      js::HandleObject receiver, js::HandleId id,
                                      js::MutableHandleValue vp, JS::ObjectOpResult &result);
-    static bool nonNativeSetElement(JSContext* cx, js::HandleObject obj,
+    static bool nonNativeSetElement(JSContext *cx, js::HandleObject obj,
                                     js::HandleObject receiver, uint32_t index,
                                     js::MutableHandleValue vp, JS::ObjectOpResult &result);
 
-    static bool swap(JSContext* cx, JS::HandleObject a, JS::HandleObject b);
+    static bool swap(JSContext *cx, JS::HandleObject a, JS::HandleObject b);
 
   private:
     void fixDictionaryShapeAfterSwap();
@@ -865,11 +865,11 @@ GetElementNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, uint32_t index,
  * argument instead, but this has to change. See bug 1113369.
  */
 inline bool
-SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+SetProperty(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
             MutableHandleValue vp, ObjectOpResult &result);
 
 inline bool
-SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, PropertyName* name,
+SetProperty(JSContext *cx, HandleObject obj, HandleObject receiver, PropertyName *name,
             MutableHandleValue vp, ObjectOpResult &result)
 {
     RootedId id(cx, NameToId(name));
@@ -877,7 +877,7 @@ SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, PropertyName
 }
 
 inline bool
-SetElement(JSContext* cx, HandleObject obj, HandleObject receiver, uint32_t index,
+SetElement(JSContext *cx, HandleObject obj, HandleObject receiver, uint32_t index,
            MutableHandleValue vp, ObjectOpResult &result);
 
 inline bool

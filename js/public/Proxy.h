@@ -291,10 +291,10 @@ class JS_FRIEND_API(BaseProxyHandler)
      * The base-class implementations work by calling getPropertyDescriptor().
      * They do not follow any standard. When in doubt, override them.
      */
-    virtual bool has(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const;
-    virtual bool get(JSContext* cx, HandleObject proxy, HandleObject receiver,
+    virtual bool has(JSContext *cx, HandleObject proxy, HandleId id, bool *bp) const;
+    virtual bool get(JSContext *cx, HandleObject proxy, HandleObject receiver,
                      HandleId id, MutableHandleValue vp) const;
-    virtual bool set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+    virtual bool set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                      HandleId id, MutableHandleValue vp, ObjectOpResult &result) const;
 
     /*
@@ -395,11 +395,11 @@ class JS_FRIEND_API(DirectProxyHandler) : public BaseProxyHandler
                      bool *bp) const override;
     virtual bool get(JSContext *cx, HandleObject proxy, HandleObject receiver,
                      HandleId id, MutableHandleValue vp) const override;
-    virtual bool set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+    virtual bool set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                      HandleId id, MutableHandleValue vp,
                      ObjectOpResult &result) const override;
-    virtual bool call(JSContext* cx, HandleObject proxy, const CallArgs& args) const override;
-    virtual bool construct(JSContext* cx, HandleObject proxy, const CallArgs& args) const override;
+    virtual bool call(JSContext *cx, HandleObject proxy, const CallArgs &args) const override;
+    virtual bool construct(JSContext *cx, HandleObject proxy, const CallArgs &args) const override;
 
     /* SpiderMonkey extensions. */
     virtual bool getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,

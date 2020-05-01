@@ -1904,10 +1904,10 @@ TypedObject::obj_getArrayElement(JSContext* cx,
 }
 
 bool
-TypedObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+TypedObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
                              MutableHandleValue vp, ObjectOpResult &result)
 {
-    Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
+    Rooted<TypedObject *> typedObj(cx, &obj->as<TypedObject>());
 
     switch (typedObj->typeDescr().kind()) {
       case type::Scalar:

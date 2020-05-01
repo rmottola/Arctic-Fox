@@ -66,19 +66,19 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
                       ReturnStatus* rs, bool* bp) {
         return Answer::RecvHasOwn(ObjectId::deserialize(objId), id, rs, bp);
     }
-    bool RecvGet(const uint64_t& objId, const ObjectVariant& receiverVar,
-                   const JSIDVariant& id,
-                   ReturnStatus* rs, JSVariant* result) {
+    bool RecvGet(const uint64_t &objId, const ObjectVariant &receiverVar,
+                   const JSIDVariant &id,
+                   ReturnStatus *rs, JSVariant *result) {
         return Answer::RecvGet(ObjectId::deserialize(objId), receiverVar, id, rs, result);
     }
-    bool RecvSet(const uint64_t& objId, const ObjectVariant& receiverVar,
+    bool RecvSet(const uint64_t &objId, const ObjectVariant &receiverVar,
                  const JSIDVariant &id, const JSVariant &value, ReturnStatus *rs,
                  JSVariant *result) {
         return Answer::RecvSet(ObjectId::deserialize(objId), receiverVar, id, value, rs, result);
     }
 
-    bool RecvIsExtensible(const uint64_t& objId, ReturnStatus* rs,
-                            bool* result) {
+    bool RecvIsExtensible(const uint64_t &objId, ReturnStatus *rs,
+                            bool *result) {
         return Answer::RecvIsExtensible(ObjectId::deserialize(objId), rs, result);
     }
     bool RecvCallOrConstruct(const uint64_t& objId, InfallibleTArray<JSParam>&& argv,
@@ -156,19 +156,19 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
                     ReturnStatus* rs, bool* bp) {
         return Base::SendHasOwn(objId.serialize(), id, rs, bp);
     }
-    bool SendGet(const ObjectId& objId, const ObjectVariant& receiverVar,
-                 const JSIDVariant& id,
-                 ReturnStatus* rs, JSVariant* result) {
+    bool SendGet(const ObjectId &objId, const ObjectVariant &receiverVar,
+                 const JSIDVariant &id,
+                 ReturnStatus *rs, JSVariant *result) {
         return Base::SendGet(objId.serialize(), receiverVar, id, rs, result);
     }
-    bool SendSet(const ObjectId& objId, const ObjectVariant& receiverVar,
+    bool SendSet(const ObjectId &objId, const ObjectVariant &receiverVar,
                  const JSIDVariant &id, const JSVariant &value, ReturnStatus *rs,
                  JSVariant *result) {
         return Base::SendSet(objId.serialize(), receiverVar, id, value, rs, result);
     }
 
-    bool SendIsExtensible(const ObjectId& objId, ReturnStatus* rs,
-                          bool* result) {
+    bool SendIsExtensible(const ObjectId &objId, ReturnStatus *rs,
+                          bool *result) {
         return Base::SendIsExtensible(objId.serialize(), rs, result);
     }
     bool SendCallOrConstruct(const ObjectId& objId, const nsTArray<JSParam>& argv,

@@ -30,7 +30,7 @@ ChromeObjectWrapper::defineProperty(JSContext* cx, HandleObject wrapper,
 }
 
 bool
-ChromeObjectWrapper::set(JSContext* cx, HandleObject wrapper,
+ChromeObjectWrapper::set(JSContext *cx, HandleObject wrapper,
                          HandleObject receiver, HandleId id,
                          MutableHandleValue vp, ObjectOpResult &result) const
 {

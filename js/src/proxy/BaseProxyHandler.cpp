@@ -72,7 +72,7 @@ BaseProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
 }
 
 bool
-BaseProxyHandler::set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+BaseProxyHandler::set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                       HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);
@@ -139,7 +139,7 @@ js::SetPropertyIgnoringNamedGetter(JSContext *cx, HandleObject obj, HandleId id,
 
         // A very old nonstandard SpiderMonkey extension: default to the Class
         // getter and setter ops.
-        const Class* clasp = receiver->getClass();
+        const Class *clasp = receiver->getClass();
         MOZ_ASSERT(clasp->getProperty != JS_PropertyStub);
         MOZ_ASSERT(clasp->setProperty != JS_StrictPropertyStub);
         return DefineProperty(cx, receiver, id, vp, clasp->getProperty, clasp->setProperty,

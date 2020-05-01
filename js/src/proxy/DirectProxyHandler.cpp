@@ -224,7 +224,7 @@ DirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver
 }
 
 bool
-DirectProxyHandler::set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+DirectProxyHandler::set(JSContext *cx, HandleObject proxy, HandleObject receiver,
                         HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);

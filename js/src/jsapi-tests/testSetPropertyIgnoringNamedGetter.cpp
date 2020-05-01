@@ -27,7 +27,7 @@ class CustomProxyHandler : public DirectProxyHandler {
         return impl(cx, proxy, id, desc, true);
     }
 
-    bool set(JSContext* cx, HandleObject proxy, HandleObject receiver,
+    bool set(JSContext *cx, HandleObject proxy, HandleObject receiver,
              HandleId id, MutableHandleValue vp, ObjectOpResult &result) const override
     {
         Rooted<JSPropertyDescriptor> desc(cx);

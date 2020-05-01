@@ -532,7 +532,7 @@ with_GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleI
 }
 
 static bool
-with_SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+with_SetProperty(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
                  MutableHandleValue vp, ObjectOpResult &result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
@@ -998,7 +998,7 @@ uninitialized_GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver
 }
 
 static bool
-uninitialized_SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+uninitialized_SetProperty(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
                           MutableHandleValue vp, ObjectOpResult &result)
 {
     ReportUninitializedLexicalId(cx, id);
