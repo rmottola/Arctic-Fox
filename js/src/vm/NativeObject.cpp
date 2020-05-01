@@ -2118,7 +2118,7 @@ SetDenseOrTypedArrayElement(JSContext* cx, HandleNativeObject obj, uint32_t inde
  * conforms to no standard and there is a lot of legacy baggage here.
  */
 static bool
-NativeSet(JSContext* cx, HandleNativeObject obj, HandleObject receiver,
+NativeSet(JSContext *cx, HandleNativeObject obj, HandleObject receiver,
           HandleShape shape, MutableHandleValue vp, ObjectOpResult &result)
 {
     MOZ_ASSERT(obj->isNative());
