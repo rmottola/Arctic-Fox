@@ -2522,7 +2522,7 @@ GenerateCallSetter(JSContext *cx, IonScript *ion, MacroAssembler& masm,
         MOZ_ASSERT(target);
 
         // JSSetterOp: bool fn(JSContext *cx, HandleObject obj,
-        //                     HandleId id, bool strict, MutableHandleValue vp);
+        //                     HandleId id, MutableHandleValue vp, ObjectOpResult &result);
 
         // First, allocate an ObjectOpResult on the stack. We push this before
         // the stubCode pointer in order to match the layout of
