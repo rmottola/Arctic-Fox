@@ -38,7 +38,7 @@ Shape::search(ExclusiveContext* cx, jsid id)
 }
 
 inline bool
-Shape::set(JSContext *cx, HandleNativeObject obj, HandleObject receiver, MutableHandleValue vp,
+Shape::set(JSContext* cx, HandleNativeObject obj, HandleObject receiver, MutableHandleValue vp,
            ObjectOpResult &result)
 {
     MOZ_ASSERT_IF(hasDefaultSetter(), hasGetterValue());
