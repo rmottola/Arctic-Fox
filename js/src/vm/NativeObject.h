@@ -1333,11 +1333,11 @@ enum QualifiedBool {
 };
 
 extern bool
-NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
+NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
                   QualifiedBool qualified, MutableHandleValue vp, ObjectOpResult &result);
 
 extern bool
-NativeSetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
+NativeSetElement(JSContext *cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
                  MutableHandleValue vp, ObjectOpResult &result);
 
 extern bool
@@ -1449,7 +1449,7 @@ js::GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, V
 }
 
 inline bool
-js::SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
+js::SetProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
                 HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     if (obj->getOps()->setProperty)

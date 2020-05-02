@@ -346,7 +346,7 @@ CallSetter(JSContext *cx, HandleObject obj, HandleId id, SetterOp op, unsigned a
 }
 
 bool
-ScriptedIndirectProxyHandler::derivedSet(JSContext* cx, HandleObject proxy, HandleObject receiver,
+ScriptedIndirectProxyHandler::derivedSet(JSContext *cx, HandleObject proxy, HandleObject receiver,
                                          HandleId id, MutableHandleValue vp,
                                          ObjectOpResult &result) const
 {

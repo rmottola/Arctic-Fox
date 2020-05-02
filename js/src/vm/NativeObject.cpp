@@ -1980,7 +1980,7 @@ MaybeReportUndeclaredVarAssignment(JSContext* cx, JSString* propname)
  * is really old code and there are a few barnacles.
  */
 bool
-js::SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleObject receiver,
+js::SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleObject receiver,
                           HandleId id, HandleValue v, bool objHasOwn, ObjectOpResult &result)
 {
     // Step 5.c-d: Test whether receiver has an existing own property
@@ -2042,7 +2042,7 @@ js::SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleObject receiver
 // When setting |id| for |receiver| and |obj| has no property for id, continue
 // the search up the prototype chain.
 bool
-js::SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleObject receiver,
+js::SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleObject receiver,
                        HandleId id, MutableHandleValue vp, ObjectOpResult &result)
 {
     MOZ_ASSERT(!obj->is<ProxyObject>());
@@ -2063,7 +2063,7 @@ js::SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleObject receiver,
  * Note that receiver is not necessarily native.
  */
 static bool
-SetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
+SetNonexistentProperty(JSContext *cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
                        QualifiedBool qualified, HandleValue v, ObjectOpResult &result)
 {
     // We should never add properties to lexical blocks.
@@ -2082,7 +2082,7 @@ SetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleObject recei
  * array element.
  */
 static bool
-SetDenseOrTypedArrayElement(JSContext* cx, HandleNativeObject obj, uint32_t index,
+SetDenseOrTypedArrayElement(JSContext *cx, HandleNativeObject obj, uint32_t index,
                             MutableHandleValue vp, ObjectOpResult &result)
 {
     if (IsAnyTypedArray(obj)) {
@@ -2174,7 +2174,7 @@ NativeSet(JSContext *cx, HandleNativeObject obj, HandleObject receiver,
  * dense or typed array element (i.e. not actually a pointer to a Shape).
  */
 static bool
-SetExistingProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
+SetExistingProperty(JSContext *cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
                     HandleNativeObject pobj, HandleShape shape, MutableHandleValue vp,
                     ObjectOpResult &result)
 {
@@ -2219,7 +2219,7 @@ SetExistingProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver
 }
 
 bool
-js::NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
+js::NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
                       QualifiedBool qualified, MutableHandleValue vp, ObjectOpResult &result)
 {
     // Fire watchpoints, if any.
@@ -2287,7 +2287,7 @@ js::NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiv
 }
 
 bool
-js::NativeSetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
+js::NativeSetElement(JSContext *cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
                      MutableHandleValue vp, ObjectOpResult &result)
 {
     RootedId id(cx);
