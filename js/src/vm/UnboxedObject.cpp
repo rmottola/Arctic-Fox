@@ -349,11 +349,6 @@ UnboxedPlainObject::getValue(const UnboxedLayout::Property& property)
 void
 UnboxedPlainObject::trace(JSTracer *trc, JSObject *obj)
 {
-    if (obj->as<UnboxedPlainObject>().expando_) {
-        MarkObjectUnbarriered(trc, reinterpret_cast<NativeObject**>(&obj->as<UnboxedPlainObject>().expando_),
-                              "unboxed_expando");
-    }
-
     const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layoutDontCheckGeneration();
     const int32_t *list = layout.traceList();
     if (!list)
@@ -375,39 +370,6 @@ UnboxedPlainObject::trace(JSTracer *trc, JSObject *obj)
 
     // Unboxed objects don't have Values to trace.
     MOZ_ASSERT(*(list + 1) == -1);
-}
-
-/* static */ UnboxedExpandoObject *
-UnboxedPlainObject::ensureExpando(JSContext *cx, Handle<UnboxedPlainObject *> obj)
-{
-    if (obj->expando_)
-        return obj->expando_;
-
-    UnboxedExpandoObject *expando = NewObjectWithGivenProto<UnboxedExpandoObject>(cx, NullPtr());
-    if (!expando)
-        return nullptr;
-
-    // As with setValue(), we need to manually trigger post barriers on the
-    // whole object. If we treat the field as a HeapPtrObject and later convert
-    // the object to its native representation, we will end up with a corrupted
-    // store buffer entry.
-    if (IsInsideNursery(expando) && !IsInsideNursery(obj))
-        cx->runtime()->gc.storeBuffer.putWholeCellFromMainThread(obj);
-
-    obj->expando_ = expando;
-    return expando;
-}
-
-bool
-UnboxedPlainObject::containsUnboxedOrExpandoProperty(ExclusiveContext *cx, jsid id) const
-{
-    if (layout().lookup(id))
-        return true;
-
-    if (maybeExpando() && maybeExpando()->containsShapeOrElement(cx, id))
-        return true;
-
-    return false;
 }
 
 /* static */ bool
@@ -512,7 +474,6 @@ UnboxedLayout::makeNativeGroup(JSContext *cx, ObjectGroup *group)
 UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
 {
     const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
-    UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando();
 
     if (!layout.nativeGroup()) {
         if (!UnboxedLayout::makeNativeGroup(cx, obj->group()))
@@ -535,41 +496,6 @@ UnboxedPlainObject::convertToNative(JSContext *cx, JSObject *obj)
     for (size_t i = 0; i < values.length(); i++)
         obj->as<PlainObject>().initSlotUnchecked(i, values[i]);
 
-    if (expando) {
-        // Add properties from the expando object to the object, in order.
-        // Suppress GC here, so that callers don't need to worry about this
-        // method collecting. The stuff below can only fail due to OOM, in
-        // which case the object will not have been completely filled back in.
-        gc::AutoSuppressGC suppress(cx);
-
-        Vector<jsid> ids(cx);
-        for (Shape::Range<NoGC> r(expando->lastProperty()); !r.empty(); r.popFront()) {
-            if (!ids.append(r.front().propid()))
-                return false;
-        }
-        for (size_t i = 0; i < expando->getDenseInitializedLength(); i++) {
-            if (!expando->getDenseElement(i).isMagic(JS_ELEMENTS_HOLE)) {
-                if (!ids.append(INT_TO_JSID(i)))
-                    return false;
-            }
-        }
-        ::Reverse(ids.begin(), ids.end());
-
-        RootedPlainObject nobj(cx, &obj->as<PlainObject>());
-        Rooted<UnboxedExpandoObject *> nexpando(cx, expando);
-        RootedId id(cx);
-        Rooted<PropertyDescriptor> desc(cx);
-        for (size_t i = 0; i < ids.length(); i++) {
-            id = ids[i];
-            if (!GetOwnPropertyDescriptor(cx, nexpando, id, &desc))
-                return false;
-            ObjectOpResult result;
-            if (!StandardDefineProperty(cx, nobj, id, desc, result))
-                return false;
-            MOZ_ASSERT(result.ok());
-        }
-    }
-
     return true;
 }
 
@@ -585,8 +511,8 @@ UnboxedPlainObject::create(ExclusiveContext *cx, HandleObjectGroup group, NewObj
     if (!res)
         return nullptr;
 
-    // Overwrite the dummy shape which was written to the object's expando field.
-    res->initExpando();
+    // Avoid spurious shape guard hits.
+    res->dummy_ = nullptr;
 
     // Initialize reference fields of the object. All fields in the object will
     // be overwritten shortly, but references need to be safe for the GC.
@@ -662,7 +588,7 @@ UnboxedPlainObject::obj_lookupProperty(JSContext *cx, HandleObject obj,
                                        HandleId id, MutableHandleObject objp,
                                        MutableHandleShape propp)
 {
-    if (obj->as<UnboxedPlainObject>().containsUnboxedOrExpandoProperty(cx, id)) {
+    if (obj->as<UnboxedPlainObject>().layout().lookup(id)) {
         MarkNonNativePropertyFound<CanGC>(propp);
         objp.set(obj);
         return true;
@@ -683,39 +609,17 @@ UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId
                                        Handle<JSPropertyDescriptor> desc,
                                        ObjectOpResult &result)
 {
-    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
-
-    if (const UnboxedLayout::Property *property = layout.lookup(id)) {
-        if (!desc.getter() && !desc.setter() && desc.attributes() == JSPROP_ENUMERATE) {
-            // This define is equivalent to setting an existing property.
-            if (obj->as<UnboxedPlainObject>().setValue(cx, *property, desc.value()))
-                return true;
-        }
-
-        // Trying to incompatibly redefine an existing property requires the
-        // object to be converted to a native object.
-        if (!convertToNative(cx, obj))
-            return false;
-
-        return DefineProperty(cx, obj, id, desc, result) &&
-               result.checkStrict(cx, obj, id);
-    }
-
-    // Define the property on the expando object.
-    Rooted<UnboxedExpandoObject *> expando(cx, ensureExpando(cx, obj.as<UnboxedPlainObject>()));
-    if (!expando)
+    if (!convertToNative(cx, obj))
         return false;
 
-    // Update property types on the unboxed object as well.
-    AddTypePropertyId(cx, obj, id, desc.value());
-
-    return DefineProperty(cx, expando, id, desc, result);
+    return DefineProperty(cx, obj, id, desc, result) &&
+           result.checkStrict(cx, obj, id);
 }
 
 /* static */ bool
 UnboxedPlainObject::obj_hasProperty(JSContext *cx, HandleObject obj, HandleId id, bool *foundp)
 {
-    if (obj->as<UnboxedPlainObject>().containsUnboxedOrExpandoProperty(cx, id)) {
+    if (obj->as<UnboxedPlainObject>().layout().lookup(id)) {
         *foundp = true;
         return true;
     }
@@ -738,14 +642,6 @@ UnboxedPlainObject::obj_getProperty(JSContext *cx, HandleObject obj, HandleObjec
     if (const UnboxedLayout::Property* property = layout.lookup(id)) {
         vp.set(obj->as<UnboxedPlainObject>().getValue(*property));
         return true;
-    }
-
-    if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
-        if (expando->containsShapeOrElement(cx, id)) {
-            RootedObject nexpando(cx, expando);
-            RootedObject nreceiver(cx, (obj == receiver) ? expando : receiver.get());
-            return GetProperty(cx, nexpando, nreceiver, id, vp);
-        }
     }
 
     RootedObject proto(cx, obj->getProto());
@@ -776,19 +672,6 @@ UnboxedPlainObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleId id
         return SetPropertyByDefining(cx, obj, id, v, receiver, false, result);
     }
 
-    if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
-        if (expando->containsShapeOrElement(cx, id)) {
-            // Update property types on the unboxed object as well.
-            AddTypePropertyId(cx, obj, id, v);
-
-            RootedObject nexpando(cx, expando);
-            RootedValue nreceiver(cx, (receiver.isObject() && obj == &receiver.toObject())
-                                      ? ObjectValue(*expando)
-                                      : receiver);
-            return SetProperty(cx, nexpando, id, v, nreceiver, result);
-        }
-    }
-
     return SetPropertyOnProto(cx, obj, id, v, receiver, result);
 }
 
@@ -803,13 +686,6 @@ UnboxedPlainObject::obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj
         desc.setAttributes(JSPROP_ENUMERATE);
         desc.object().set(obj);
         return true;
-    }
-
-    if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
-        if (expando->containsShapeOrElement(cx, id)) {
-            RootedObject nexpando(cx, expando);
-            return GetOwnPropertyDescriptor(cx, nexpando, id, desc);
-        }
     }
 
     desc.object().set(nullptr);
@@ -836,45 +712,16 @@ UnboxedPlainObject::obj_watch(JSContext *cx, HandleObject obj, HandleId id, Hand
 /* static */ bool
 UnboxedPlainObject::obj_enumerate(JSContext *cx, HandleObject obj, AutoIdVector &properties)
 {
-    UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando();
-
-    // Add dense elements in the expando first, for consistency with plain objects.
-    if (expando) {
-        for (size_t i = 0; i < expando->getDenseInitializedLength(); i++) {
-            if (!expando->getDenseElement(i).isMagic(JS_ELEMENTS_HOLE)) {
-                if (!properties.append(INT_TO_JSID(i)))
-                    return false;
-            }
-        }
-    }
-
     const UnboxedLayout::PropertyVector &unboxed = obj->as<UnboxedPlainObject>().layout().properties();
     for (size_t i = 0; i < unboxed.length(); i++) {
         if (!properties.append(NameToId(unboxed[i].name)))
             return false;
     }
-
-    if (expando) {
-        Vector<jsid> ids(cx);
-        for (Shape::Range<NoGC> r(expando->lastProperty()); !r.empty(); r.popFront()) {
-            if (!ids.append(r.front().propid()))
-                return false;
-        }
-        ::Reverse(ids.begin(), ids.end());
-        if (!properties.append(ids.begin(), ids.length()))
-            return false;
-    }
-
     return true;
 }
 
-const Class UnboxedExpandoObject::class_ = {
-    "UnboxedExpandoObject",
-    JSCLASS_IMPLEMENTS_BARRIERS
-};
-
 const Class UnboxedPlainObject::class_ = {
-    js_Object_str,
+    "Object",
     Class::NON_NATIVE | JSCLASS_IMPLEMENTS_BARRIERS,
     nullptr,        /* addProperty */
     nullptr,        /* delProperty */
@@ -1156,7 +1003,6 @@ js::TryConvertToUnboxedLayout(ExclusiveContext *cx, Shape *templateShape,
         if (!objects->get(i))
             continue;
         UnboxedPlainObject *obj = &objects->get(i)->as<UnboxedPlainObject>();
-        obj->initExpando();
         memset(obj->data(), 0, layout->size());
         for (size_t j = 0; j < templateShape->slotSpan(); j++) {
             Value v = values[valueCursor++];
