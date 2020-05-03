@@ -701,24 +701,15 @@ UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId
 result.checkStrict(cx, obj, id);
     }
 
-    // Expandos are currently disabled. FIXME bug 1137180
-#if 0
     // Define the property on the expando object.
     Rooted<UnboxedExpandoObject *> expando(cx, ensureExpando(cx, obj.as<UnboxedPlainObject>()));
     if (!expando)
         return false;
 
     // Update property types on the unboxed object as well.
-    AddTypePropertyId(cx, obj, id, desc.value);
+    AddTypePropertyId(cx, obj, id, desc.value());
 
     return DefineProperty(cx, expando, id, desc, result);
-#else
-    if (!convertToNative(cx, obj))
-        return false;
-
-    return DefineProperty(cx, obj, id, desc, result) &&
-           result.checkStrict(cx, obj, id);
-#endif
 }
 
 /* static */ bool
