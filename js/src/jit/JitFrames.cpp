@@ -347,7 +347,7 @@ JitFrameIterator::machineState() const
     uint8_t *spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t *>(spill), 0);
 
     char *floatSpill = reinterpret_cast<char *>(spillAlign);
-    FloatRegisterSet fregs = reader.allFloatSpills();
+    FloatRegisterSet fregs = reader.allFloatSpills().set();
     fregs = fregs.reduceSetForPush();
     for (FloatRegisterBackwardIterator iter(fregs); iter.more(); iter++) {
         floatSpill -= (*iter).size();
@@ -1080,8 +1080,8 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
     }
 
     uintptr_t *spill = frame.spillBase();
-    GeneralRegisterSet gcRegs = safepoint.gcSpills();
-    GeneralRegisterSet valueRegs = safepoint.valueSpills();
+    LiveGeneralRegisterSet gcRegs = safepoint.gcSpills();
+    LiveGeneralRegisterSet valueRegs = safepoint.valueSpills();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (gcRegs.has(*iter))
@@ -1167,7 +1167,7 @@ UpdateIonJSFrameForMinorGC(JSTracer* trc, const JitFrameIterator& frame)
     const SafepointIndex *si = ionScript->getSafepointIndex(frame.returnAddressToFp());
     SafepointReader safepoint(ionScript, si);
 
-    GeneralRegisterSet slotsRegs = safepoint.slotsOrElementsSpills();
+    LiveGeneralRegisterSet slotsRegs = safepoint.slotsOrElementsSpills();
     uintptr_t *spill = frame.spillBase();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
