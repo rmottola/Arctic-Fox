@@ -5017,9 +5017,8 @@ MacroAssemblerARMCompat::asMasm() const
 // Stack manipulation functions.
 
 void
-MacroAssembler::PushRegsInMask(LiveRegisterSet set, LiveFloatRegisterSet simdSet)
+MacroAssembler::PushRegsInMask(LiveRegisterSet set)
 {
-    MOZ_ASSERT(!SupportsSimd() && simdSet.set().size() == 0);
     int32_t diffF = set.fpus().getPushSizeInBytes();
     int32_t diffG = set.gprs().size() * sizeof(intptr_t);
 
@@ -5046,10 +5045,8 @@ MacroAssembler::PushRegsInMask(LiveRegisterSet set, LiveFloatRegisterSet simdSet
 }
 
 void
-MacroAssembler::PopRegsInMaskIgnore(LiveRegisterSet set, LiveRegisterSet ignore,
-                                    LiveFloatRegisterSet simdSet)
+MacroAssembler::PopRegsInMaskIgnore(LiveRegisterSet set, LiveRegisterSet ignore)
 {
-    MOZ_ASSERT(!SupportsSimd() && simdSet.set().size() == 0);
     int32_t diffG = set.gprs().size() * sizeof(intptr_t);
     int32_t diffF = set.fpus().getPushSizeInBytes();
     const int32_t reservedG = diffG;
