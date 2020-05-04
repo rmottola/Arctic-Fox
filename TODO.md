@@ -55,6 +55,7 @@
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
+- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 947854 - 2015-05-05 parto 0 to 4
@@ -95,19 +96,19 @@
 - 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
-- 1144366 (big pointer style refactor, see below.... ToDo)
+- Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
+- Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 - Bug 1079245 - 2015-04-15 Set about:privatebrowsing to load in child. r=mossop
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
-- Bug 1134626 part 2 - 2015-04-02 - Move x86 & x64 Architecture into a shared file.
-- Bug 1134626 part 1 - 2015-03-31 - Move all x86-shared files into their own directo
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
+- Bug 1010675 - 2015-03-30 - Stop allowing button contents to overflow into the CSS 
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
