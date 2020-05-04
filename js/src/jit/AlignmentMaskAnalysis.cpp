@@ -19,7 +19,7 @@ IsAlignmentMask(uint32_t m)
 }
 
 static void
-AnalyzeAsmHeapAddress(MDefinition *ptr, MIRGraph &graph)
+AnalyzeAsmHeapAddress(MDefinition* ptr, MIRGraph& graph)
 {
     // Fold (a+i)&m to (a&m)+i, since the users of the BitAnd include heap
     // accesses. This will expose the redundancy for GVN when expressions

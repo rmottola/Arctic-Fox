@@ -139,7 +139,7 @@ ErrorTakesIdArgument(unsigned msg)
 }
 
 JS_PUBLIC_API(bool)
-JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, HandleId id,
+JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, HandleId id,
                                                bool strict)
 {
     static_assert(unsigned(OkCode) == unsigned(JSMSG_NOT_AN_ERROR),
@@ -170,7 +170,7 @@ JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, 
 }
 
 JS_PUBLIC_API(bool)
-JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, bool strict)
+JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, bool strict)
 {
     MOZ_ASSERT(code_ != Uninitialized);
     MOZ_ASSERT(!ok());
@@ -1987,15 +1987,15 @@ JS_NewObject(JSContext *cx, const JSClass *jsclasp)
     return NewObjectWithClassProto(cx, clasp, NullPtr());
 }
 
-JS_PUBLIC_API(JSObject *)
-JS_NewObjectWithGivenProto(JSContext *cx, const JSClass *jsclasp, HandleObject proto)
+JS_PUBLIC_API(JSObject*)
+JS_NewObjectWithGivenProto(JSContext* cx, const JSClass* jsclasp, HandleObject proto)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, proto);
 
-    const Class *clasp = Valueify(jsclasp);
+    const Class* clasp = Valueify(jsclasp);
     if (!clasp)
         clasp = &PlainObject::class_;    /* default class is Object */
 
@@ -2223,7 +2223,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
         RootedAtom atom(cx, JSID_IS_ATOM(id) ? JSID_TO_ATOM(id) : nullptr);
         if (getter && !(attrs & JSPROP_GETTER)) {
             RootedObject global(cx, (JSObject*) &obj->global());
-            JSFunction *getobj = NewNativeFunction(cx, (Native) getter, 0, atom);
+            JSFunction* getobj = NewNativeFunction(cx, (Native) getter, 0, atom);
             if (!getobj)
                 return false;
 
@@ -2237,7 +2237,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
             // Root just the getter, since the setter is not yet a JSObject.
             AutoRooterGetterSetter getRoot(cx, JSPROP_GETTER, &getter, nullptr);
             RootedObject global(cx, (JSObject*) &obj->global());
-            JSFunction *setobj = NewNativeFunction(cx, (Native) setter, 1, atom);
+            JSFunction* setobj = NewNativeFunction(cx, (Native) setter, 1, atom);
             if (!setobj)
                 return false;
 
@@ -2336,8 +2336,8 @@ JS_DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, double value
 }
 
 static bool
-DefinePropertyByDescriptor(JSContext *cx, HandleObject obj, HandleId id,
-                           Handle<JSPropertyDescriptor> desc, ObjectOpResult &result)
+DefinePropertyByDescriptor(JSContext* cx, HandleObject obj, HandleId id,
+                           Handle<JSPropertyDescriptor> desc, ObjectOpResult& result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2347,14 +2347,14 @@ DefinePropertyByDescriptor(JSContext *cx, HandleObject obj, HandleId id,
 }
 
 JS_PUBLIC_API(bool)
-JS_DefinePropertyById(JSContext *cx, HandleObject obj, HandleId id,
-                      Handle<JSPropertyDescriptor> desc, ObjectOpResult &result)
+JS_DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id,
+                      Handle<JSPropertyDescriptor> desc, ObjectOpResult& result)
 {
     return DefinePropertyByDescriptor(cx, obj, id, desc, result);
 }
 
 JS_PUBLIC_API(bool)
-JS_DefinePropertyById(JSContext *cx, HandleObject obj, HandleId id,
+JS_DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id,
                       Handle<JSPropertyDescriptor> desc)
 {
     ObjectOpResult result;
@@ -2619,11 +2619,11 @@ JS_DefineUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_
 }
 
 JS_PUBLIC_API(bool)
-JS_DefineUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
+JS_DefineUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_t namelen,
                     Handle<JSPropertyDescriptor> desc,
-                    ObjectOpResult &result)
+                    ObjectOpResult& result)
 {
-    JSAtom *atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
+    JSAtom* atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
@@ -2631,10 +2631,10 @@ JS_DefineUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_
 }
 
 JS_PUBLIC_API(bool)
-JS_DefineUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
+JS_DefineUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_t namelen,
                     Handle<JSPropertyDescriptor> desc)
 {
-    JSAtom *atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
+    JSAtom* atom = AtomizeChars(cx, name, AUTO_NAMELEN(name, namelen));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
@@ -2771,7 +2771,7 @@ JS_DefineProperties(JSContext* cx, HandleObject obj, const JSPropertySpec* ps)
 }
 
 JS_PUBLIC_API(bool)
-JS::ObjectToCompletePropertyDescriptor(JSContext *cx,
+JS::ObjectToCompletePropertyDescriptor(JSContext* cx,
                                        HandleObject obj,
                                        HandleValue descObj,
                                        MutableHandle<JSPropertyDescriptor> desc)
@@ -2794,10 +2794,10 @@ JS_GetOwnPropertyDescriptorById(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 JS_PUBLIC_API(bool)
-JS_GetOwnUCPropertyDescriptor(JSContext *cx, HandleObject obj, const char16_t *name,
+JS_GetOwnUCPropertyDescriptor(JSContext* cx, HandleObject obj, const char16_t* name,
                               MutableHandle<JSPropertyDescriptor> desc)
 {
-    JSAtom *atom = AtomizeChars(cx, name, js_strlen(name));
+    JSAtom* atom = AtomizeChars(cx, name, js_strlen(name));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
@@ -2901,8 +2901,8 @@ JS_SetPropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue v)
 }
 
 JS_PUBLIC_API(bool)
-JS_ForwardSetPropertyTo(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                        HandleValue receiver, ObjectOpResult &result)
+JS_ForwardSetPropertyTo(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                        HandleValue receiver, ObjectOpResult& result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2912,7 +2912,7 @@ JS_ForwardSetPropertyTo(JSContext *cx, HandleObject obj, HandleId id, HandleValu
 }
 
 static bool
-SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleValue v)
+SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2986,7 +2986,7 @@ JS_SetUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_t n
 }
 
 JS_PUBLIC_API(bool)
-JS_DeletePropertyById(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+JS_DeletePropertyById(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -2996,7 +2996,7 @@ JS_DeletePropertyById(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResu
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteElement(JSContext *cx, HandleObject obj, uint32_t index, ObjectOpResult &result)
+JS_DeleteElement(JSContext* cx, HandleObject obj, uint32_t index, ObjectOpResult& result)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -3214,8 +3214,8 @@ JS_NewFunction(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
            : NewNativeFunction(cx, native, nargs, atom);
 }
 
-JS_PUBLIC_API(JSFunction *)
-JS_NewFunctionById(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
+JS_PUBLIC_API(JSFunction*)
+JS_NewFunctionById(JSContext* cx, JSNative native, unsigned nargs, unsigned flags,
                    HandleId id)
 {
     MOZ_ASSERT(JSID_IS_STRING(id));
@@ -3251,7 +3251,7 @@ JS::GetSelfHostedFunction(JSContext* cx, const char* selfHostedName, HandleId id
 }
 
 static bool
-CreateScopeObjectsForScopeChain(JSContext *cx, AutoObjectVector &scopeChain,
+CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
                                 MutableHandleObject dynamicScopeObj,
                                 MutableHandleObject staticScopeObj)
 {
@@ -3843,7 +3843,7 @@ JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
 }
 
 bool
-JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options, FILE *fp,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& options, FILE* fp,
             MutableHandleScript script)
 {
     FileContents buffer(cx);
@@ -3854,7 +3854,7 @@ JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options, FILE *fp,
 }
 
 bool
-JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &optionsArg, const char *filename,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& optionsArg, const char* filename,
             MutableHandleScript script)
 {
     AutoFile file;
@@ -4012,9 +4012,9 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
  * enclosingDynamicScope is a dynamic scope to use, if it's not the global.
  */
 static bool
-CompileFunction(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
-                const char *name, unsigned nargs, const char *const *argnames,
-                SourceBufferHolder &srcBuf,
+CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
+                const char* name, unsigned nargs, const char* const* argnames,
+                SourceBufferHolder& srcBuf,
                 HandleObject enclosingDynamicScope,
                 HandleObject enclosingStaticScope,
                 MutableHandleFunction fun)
@@ -4510,14 +4510,14 @@ JS_RestoreFrameChain(JSContext* cx)
 }
 
 JS::AutoSetAsyncStackForNewCalls::AutoSetAsyncStackForNewCalls(
-  JSContext *cx, HandleObject stack, HandleString asyncCause)
+  JSContext* cx, HandleObject stack, HandleString asyncCause)
   : cx(cx),
     oldAsyncStack(cx, cx->runtime()->asyncStackForNewActivations),
     oldAsyncCause(cx, cx->runtime()->asyncCauseForNewActivations)
 {
     CHECK_REQUEST(cx);
 
-    SavedFrame *asyncStack = &stack->as<SavedFrame>();
+    SavedFrame* asyncStack = &stack->as<SavedFrame>();
     MOZ_ASSERT(!asyncCause->empty());
 
     cx->runtime()->asyncStackForNewActivations = asyncStack;

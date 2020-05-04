@@ -70,4 +70,4 @@ void MacroAssembler::Push(const ImmGCPtr ptr) { MOZ_CRASH(); }
 void MacroAssembler::Push(FloatRegister reg) { MOZ_CRASH(); }
 
 void MacroAssembler::Pop(Register reg) { MOZ_CRASH(); }
-void MacroAssembler::Pop(const ValueOperand &val) { MOZ_CRASH(); }
+void MacroAssembler::Pop(const ValueOperand& val) { MOZ_CRASH(); }

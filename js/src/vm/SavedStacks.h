@@ -240,10 +240,10 @@ class SavedStacks {
     PCLocationMap pcLocationMap;
 
     void sweepPCLocationMap();
-    bool getLocation(JSContext *cx, const FrameIter &iter, MutableHandleLocationValue locationp);
+    bool getLocation(JSContext* cx, const FrameIter& iter, MutableHandleLocationValue locationp);
 };
 
-JSObject *SavedStacksMetadataCallback(JSContext *cx);
+JSObject* SavedStacksMetadataCallback(JSContext* cx);
 
 } /* namespace js */
 

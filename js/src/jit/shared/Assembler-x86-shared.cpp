@@ -294,9 +294,9 @@ CPUInfo::SetSSEVersion()
     }
 }
 
-const char *
+const char*
 FloatRegister::name() const {
-    static const char *const names[] = {
+    static const char* const names[] = {
 
 #ifdef JS_CODEGEN_X64
 #define FLOAT_REGS_(TYPE) \

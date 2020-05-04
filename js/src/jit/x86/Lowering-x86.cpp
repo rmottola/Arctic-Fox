@@ -15,7 +15,7 @@ using namespace js;
 using namespace js::jit;
 
 void
-LIRGeneratorX86::useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1,
+LIRGeneratorX86::useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1,
                              Register reg2)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);
@@ -226,7 +226,7 @@ LIRGeneratorX86::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins)
                            ? useRegisterAtStart(ptr)
                            : useRegisterOrZeroAtStart(ptr);
 
-    LAsmJSStoreHeap *lir = nullptr;
+    LAsmJSStoreHeap* lir = nullptr;
     switch (ins->accessType()) {
       case Scalar::Int8: case Scalar::Uint8:
         // See comment for LIRGeneratorX86::useByteOpRegister.
@@ -272,11 +272,11 @@ LIRGeneratorX86::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic
 }
 
 void
-LIRGeneratorX86::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap *ins)
+LIRGeneratorX86::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins)
 {
     MOZ_ASSERT(ins->accessType() < Scalar::Float32);
 
-    MDefinition *ptr = ins->ptr();
+    MDefinition* ptr = ins->ptr();
     MOZ_ASSERT(ptr->type() == MIRType_Int32);
 
     bool byteArray = byteSize(ins->accessType()) == 1;
@@ -296,7 +296,7 @@ LIRGeneratorX86::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap *ins)
     const LAllocation oldval = useRegister(ins->oldValue());
     const LAllocation newval = byteArray ? useFixed(ins->newValue(), ebx) : useRegister(ins->newValue());
 
-    LAsmJSCompareExchangeHeap *lir =
+    LAsmJSCompareExchangeHeap* lir =
         new(alloc()) LAsmJSCompareExchangeHeap(useRegister(ptr), oldval, newval);
 
     lir->setAddrTemp(temp());
@@ -304,11 +304,11 @@ LIRGeneratorX86::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap *ins)
 }
 
 void
-LIRGeneratorX86::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap *ins)
+LIRGeneratorX86::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins)
 {
     MOZ_ASSERT(ins->accessType() < Scalar::Float32);
 
-    MDefinition *ptr = ins->ptr();
+    MDefinition* ptr = ins->ptr();
     MOZ_ASSERT(ptr->type() == MIRType_Int32);
 
     bool byteArray = byteSize(ins->accessType()) == 1;
@@ -364,7 +364,7 @@ LIRGeneratorX86::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap *ins)
             tempDef = temp();
     }
 
-    LAsmJSAtomicBinopHeap *lir =
+    LAsmJSAtomicBinopHeap* lir =
         new(alloc()) LAsmJSAtomicBinopHeap(useRegister(ptr), value, tempDef);
 
     lir->setAddrTemp(temp());

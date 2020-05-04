@@ -18,7 +18,7 @@ class CodeGenerator;
 class MoveEmitterARM
 {
     uint32_t inCycle_;
-    MacroAssembler &masm;
+    MacroAssembler& masm;
 
     // Original stack push value.
     uint32_t pushedAtStart_;

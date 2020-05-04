@@ -261,7 +261,7 @@ public:
         return false;
     }
 
-    bool getPrototype(JSContext *cx, JS::HandleObject wrapper,
+    bool getPrototype(JSContext* cx, JS::HandleObject wrapper,
                       JS::HandleObject target,
                       JS::MutableHandleObject protop)
     {
@@ -467,19 +467,19 @@ class XrayWrapper : public Base {
   private:
     template <bool HasPrototype>
     typename mozilla::EnableIf<HasPrototype, bool>::Type
-        getPrototypeHelper(JSContext *cx, JS::HandleObject wrapper,
+        getPrototypeHelper(JSContext* cx, JS::HandleObject wrapper,
                            JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return Traits::singleton.getPrototype(cx, wrapper, target, protop);
     }
     template <bool HasPrototype>
     typename mozilla::EnableIf<!HasPrototype, bool>::Type
-        getPrototypeHelper(JSContext *cx, JS::HandleObject wrapper,
+        getPrototypeHelper(JSContext* cx, JS::HandleObject wrapper,
                            JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return Base::getPrototype(cx, wrapper, protop);
     }
-    bool getPrototypeHelper(JSContext *cx, JS::HandleObject wrapper,
+    bool getPrototypeHelper(JSContext* cx, JS::HandleObject wrapper,
                             JS::HandleObject target, JS::MutableHandleObject protop) const
     {
         return getPrototypeHelper<Traits::HasPrototype>(cx, wrapper, target,

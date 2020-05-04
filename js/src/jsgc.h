@@ -145,7 +145,7 @@ IsBackgroundFinalized(AllocKind kind)
 }
 
 static inline bool
-CanBeFinalizedInBackground(AllocKind kind, const Class *clasp)
+CanBeFinalizedInBackground(AllocKind kind, const Class* clasp)
 {
     MOZ_ASSERT(IsObjectAllocKind(kind));
     /* If the class has no finalizer or a finalizer that is safe to call on
@@ -477,10 +477,10 @@ class ArenaList {
         return *this;
     }
 
-    ArenaHeader *removeRemainingArenas(ArenaHeader **arenap);
-    ArenaHeader **pickArenasToRelocate(size_t &arenaTotalOut, size_t &relocTotalOut);
-    ArenaHeader *relocateArenas(ArenaHeader *toRelocate, ArenaHeader *relocated,
-                                SliceBudget &sliceBudget, gcstats::Statistics& stats);
+    ArenaHeader* removeRemainingArenas(ArenaHeader** arenap);
+    ArenaHeader** pickArenasToRelocate(size_t& arenaTotalOut, size_t& relocTotalOut);
+    ArenaHeader* relocateArenas(ArenaHeader* toRelocate, ArenaHeader* relocated,
+                                SliceBudget& sliceBudget, gcstats::Statistics& stats);
 };
 
 /*
@@ -596,7 +596,7 @@ class ArenaLists
     AllAllocKindArray<BackgroundFinalizeState> backgroundFinalizeState;
 
     /* For each arena kind, a list of arenas remaining to be swept. */
-    AllAllocKindArray<ArenaHeader *> arenaListsToSweep;
+    AllAllocKindArray<ArenaHeader*> arenaListsToSweep;
 
     /* During incremental sweeping, a list of the arenas already swept. */
     AllocKind incrementalSweptArenaKind;
@@ -604,20 +604,20 @@ class ArenaLists
 
     // Arena lists which have yet to be swept, but need additional foreground
     // processing before they are swept.
-    ArenaHeader *gcShapeArenasToUpdate;
-    ArenaHeader *gcAccessorShapeArenasToUpdate;
-    ArenaHeader *gcScriptArenasToUpdate;
-    ArenaHeader *gcObjectGroupArenasToUpdate;
+    ArenaHeader* gcShapeArenasToUpdate;
+    ArenaHeader* gcAccessorShapeArenasToUpdate;
+    ArenaHeader* gcScriptArenasToUpdate;
+    ArenaHeader* gcObjectGroupArenasToUpdate;
 
     // While sweeping type information, these lists save the arenas for the
     // objects which have already been finalized in the foreground (which must
     // happen at the beginning of the GC), so that type sweeping can determine
     // which of the object pointers are marked.
     ObjectAllocKindArray<ArenaList> savedObjectArenas;
-    ArenaHeader *savedEmptyObjectArenas;
+    ArenaHeader* savedEmptyObjectArenas;
 
   public:
-    explicit ArenaLists(JSRuntime *rt) : runtime_(rt) {
+    explicit ArenaLists(JSRuntime* rt) : runtime_(rt) {
         for (auto i : AllAllocKinds())
             freeLists[i].initAsEmpty();
         for (auto i : AllAllocKinds())
@@ -1168,11 +1168,11 @@ class RelocationOverlay
         next_ = nullptr;
     }
 
-    RelocationOverlay *next() const {
+    RelocationOverlay* next() const {
         return next_;
     }
 
-    static bool isCellForwarded(Cell *cell) {
+    static bool isCellForwarded(Cell* cell) {
         return fromCell(cell)->isForwarded();
     }
 };
@@ -1261,7 +1261,7 @@ MaybeForwarded(T t)
 
 template <typename T>
 inline void
-CheckGCThingAfterMovingGC(T *t)
+CheckGCThingAfterMovingGC(T* t)
 {
     MOZ_ASSERT_IF(t, !IsInsideNursery(t));
     MOZ_ASSERT_IF(t, !RelocationOverlay::isCellForwarded(t));

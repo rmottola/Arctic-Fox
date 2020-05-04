@@ -55,15 +55,15 @@ using mozilla::UniquePtr;
 
 struct frontend::StmtInfoBCE : public StmtInfoBase
 {
-    StmtInfoBCE     *down;          /* info for enclosing statement */
-    StmtInfoBCE     *downScope;     /* next enclosing lexical scope */
+    StmtInfoBCE*    down;          /* info for enclosing statement */
+    StmtInfoBCE*    downScope;     /* next enclosing lexical scope */
 
     ptrdiff_t       update;         /* loop update offset (top if none) */
     ptrdiff_t       breaks;         /* offset of last break in loop */
     ptrdiff_t       continues;      /* offset of last continue in loop */
     uint32_t        blockScopeIndex; /* index of scope in BlockScopeArray */
 
-    explicit StmtInfoBCE(ExclusiveContext *cx) : StmtInfoBase(cx) {}
+    explicit StmtInfoBCE(ExclusiveContext* cx) : StmtInfoBase(cx) {}
 
     /*
      * To reuse space, alias two of the ptrdiff_t fields for use during
@@ -214,9 +214,9 @@ BytecodeEmitter::emitCheck(ptrdiff_t delta)
 void
 BytecodeEmitter::updateDepth(ptrdiff_t target)
 {
-    jsbytecode *pc = code(target);
+    jsbytecode* pc = code(target);
     JSOp op = (JSOp) *pc;
-    const JSCodeSpec *cs = &js_CodeSpec[op];
+    const JSCodeSpec* cs = &js_CodeSpec[op];
 
     if (cs->format & JOF_TMPSLOT_MASK) {
         /*
@@ -259,7 +259,7 @@ BytecodeEmitter::emit1(JSOp op)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = jsbytecode(op);
     updateDepth(offset);
     return true;
@@ -273,7 +273,7 @@ BytecodeEmitter::emit2(JSOp op, jsbytecode op1)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = jsbytecode(op);
     code[1] = op1;
     updateDepth(offset);
@@ -293,7 +293,7 @@ BytecodeEmitter::emit3(JSOp op, jsbytecode op1, jsbytecode op2)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = jsbytecode(op);
     code[1] = op1;
     code[2] = op2;
@@ -339,7 +339,7 @@ BytecodeEmitter::emitJump(JSOp op, ptrdiff_t off)
 }
 
 bool
-BytecodeEmitter::emitCall(JSOp op, uint16_t argc, ParseNode *pn)
+BytecodeEmitter::emitCall(JSOp op, uint16_t argc, ParseNode* pn)
 {
     if (pn && !updateSourceCoordNotes(pn->pn_pos.begin))
         return false;
@@ -362,7 +362,7 @@ BytecodeEmitter::emitDupAt(unsigned slot)
     if (off < 0)
         return false;
 
-    jsbytecode *pc = code(off);
+    jsbytecode* pc = code(off);
     SET_UINT24(pc, slotFromTop);
     return true;
 }
@@ -414,7 +414,7 @@ ReportStatementTooLarge(TokenStream& ts, StmtInfoBCE *topStmt)
  * so that we can walk back up the chain fixing up the op and jump offset.
  */
 bool
-BytecodeEmitter::emitBackPatchOp(ptrdiff_t *lastp)
+BytecodeEmitter::emitBackPatchOp(ptrdiff_t* lastp)
 {
     ptrdiff_t delta = offset() - *lastp;
     *lastp = offset();
@@ -491,7 +491,7 @@ BytecodeEmitter::updateSourceCoordNotes(uint32_t offset)
 }
 
 bool
-BytecodeEmitter::emitLoopHead(ParseNode *nextpn)
+BytecodeEmitter::emitLoopHead(ParseNode* nextpn)
 {
     if (nextpn) {
         /*
@@ -510,7 +510,7 @@ BytecodeEmitter::emitLoopHead(ParseNode *nextpn)
 }
 
 bool
-BytecodeEmitter::emitLoopEntry(ParseNode *nextpn)
+BytecodeEmitter::emitLoopEntry(ParseNode* nextpn)
 {
     if (nextpn) {
         /* Update the line number, as for LOOPHEAD. */
@@ -521,7 +521,7 @@ BytecodeEmitter::emitLoopEntry(ParseNode *nextpn)
             return false;
     }
 
-    LoopStmtInfo *loop = LoopStmtInfo::fromStmtInfo(topStmt);
+    LoopStmtInfo* loop = LoopStmtInfo::fromStmtInfo(topStmt);
     MOZ_ASSERT(loop->loopDepth > 0);
 
     uint8_t loopDepthAndFlags = PackLoopEntryDepthHintAndFlags(loop->loopDepth, loop->canIonOsr);
@@ -548,7 +548,7 @@ BytecodeEmitter::emitUint16Operand(JSOp op, uint32_t i)
 }
 
 bool
-BytecodeEmitter::flushPops(int *npops)
+BytecodeEmitter::flushPops(int* npops)
 {
     MOZ_ASSERT(*npops != 0);
     if (!emitUint16Operand(JSOP_POPN, *npops))
@@ -669,7 +669,7 @@ NonLocalExitScope::prepareForNonLocalJump(StmtInfoBCE* toStmt)
 
         if (stmt->isBlockScope) {
             MOZ_ASSERT(stmt->isNestedScope);
-            StaticBlockObject &blockObj = stmt->staticBlock();
+            StaticBlockObject& blockObj = stmt->staticBlock();
             if (!bce->emit1(JSOP_DEBUGLEAVEBLOCK))
                 return false;
             if (!popScopeForNonLocalExit(stmt->blockScopeIndex))
@@ -708,10 +708,10 @@ BytecodeEmitter::emitGoto(StmtInfoBCE *toStmt, ptrdiff_t *lastp, SrcNoteType not
 }
 
 void
-BytecodeEmitter::backPatch(ptrdiff_t last, jsbytecode *target, jsbytecode op)
+BytecodeEmitter::backPatch(ptrdiff_t last, jsbytecode* target, jsbytecode op)
 {
-    jsbytecode *pc = code(last);
-    jsbytecode *stop = code(-1);
+    jsbytecode* pc = code(last);
+    jsbytecode* stop = code(-1);
     while (pc != stop) {
         ptrdiff_t delta = GET_JUMP_OFFSET(pc);
         ptrdiff_t span = target - pc;
@@ -1022,7 +1022,7 @@ BytecodeEmitter::emitIndex32(JSOp op, uint32_t index)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = jsbytecode(op);
     SET_UINT32_INDEX(code, index);
     updateDepth(offset);
@@ -1042,7 +1042,7 @@ BytecodeEmitter::emitIndexOp(JSOp op, uint32_t index)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = jsbytecode(op);
     SET_UINT32_INDEX(code, index);
     updateDepth(offset);
@@ -1051,7 +1051,7 @@ BytecodeEmitter::emitIndexOp(JSOp op, uint32_t index)
 }
 
 bool
-BytecodeEmitter::emitAtomOp(JSAtom *atom, JSOp op)
+BytecodeEmitter::emitAtomOp(JSAtom* atom, JSOp op)
 {
     MOZ_ASSERT(JOF_OPTYPE(op) == JOF_ATOM);
 
@@ -1072,7 +1072,7 @@ BytecodeEmitter::emitAtomOp(JSAtom *atom, JSOp op)
 }
 
 bool
-BytecodeEmitter::emitAtomOp(ParseNode *pn, JSOp op)
+BytecodeEmitter::emitAtomOp(ParseNode* pn, JSOp op)
 {
     MOZ_ASSERT(pn->pn_atom != nullptr);
     return emitAtomOp(pn->pn_atom, op);
@@ -1087,13 +1087,13 @@ BytecodeEmitter::emitInternedObjectOp(uint32_t index, JSOp op)
 }
 
 bool
-BytecodeEmitter::emitObjectOp(ObjectBox *objbox, JSOp op)
+BytecodeEmitter::emitObjectOp(ObjectBox* objbox, JSOp op)
 {
     return emitInternedObjectOp(objectList.add(objbox), op);
 }
 
 bool
-BytecodeEmitter::emitObjectPairOp(ObjectBox *objbox1, ObjectBox *objbox2, JSOp op)
+BytecodeEmitter::emitObjectPairOp(ObjectBox* objbox1, ObjectBox* objbox2, JSOp op)
 {
     uint32_t index = objectList.add(objbox1);
     objectList.add(objbox2);
@@ -1162,7 +1162,7 @@ BytecodeEmitter::emitScopeCoordOp(JSOp op, ScopeCoordinate sc)
     if (off < 0)
         return false;
 
-    jsbytecode *pc = code(off);
+    jsbytecode* pc = code(off);
     SET_SCOPECOORD_HOPS(pc, sc.hops());
     pc += SCOPECOORD_HOPS_LEN;
     SET_SCOPECOORD_SLOT(pc, sc.slot());
@@ -1293,7 +1293,7 @@ BytecodeEmitter::emitAliasedVarOp(JSOp op, ParseNode *pn)
      *  - all the intervening let/catch blocks must be counted.
      */
     unsigned skippedScopes = 0;
-    BytecodeEmitter *bceOfDef = this;
+    BytecodeEmitter* bceOfDef = this;
     if (pn->isUsed()) {
         /*
          * As explained in bindNameToSlot, the 'level' of a use indicates how
@@ -1354,7 +1354,7 @@ BytecodeEmitter::emitAliasedVarOp(JSOp op, ParseNode *pn)
 }
 
 bool
-BytecodeEmitter::emitVarOp(ParseNode *pn, JSOp op)
+BytecodeEmitter::emitVarOp(ParseNode* pn, JSOp op)
 {
     MOZ_ASSERT(pn->isKind(PNK_FUNCTION) || pn->isKind(PNK_NAME));
     MOZ_ASSERT(!pn->pn_cookie.isFree());
@@ -1386,7 +1386,7 @@ BytecodeEmitter::emitVarOp(ParseNode *pn, JSOp op)
 }
 
 static JSOp
-GetIncDecInfo(ParseNodeKind kind, bool *post)
+GetIncDecInfo(ParseNodeKind kind, bool* post)
 {
     MOZ_ASSERT(kind == PNK_POSTINCREMENT || kind == PNK_PREINCREMENT ||
                kind == PNK_POSTDECREMENT || kind == PNK_PREDECREMENT);
@@ -1395,7 +1395,7 @@ GetIncDecInfo(ParseNodeKind kind, bool *post)
 }
 
 bool
-BytecodeEmitter::emitVarIncDec(ParseNode *pn)
+BytecodeEmitter::emitVarIncDec(ParseNode* pn)
 {
     JSOp op = pn->pn_kid->getOp();
     MOZ_ASSERT(IsArgOp(op) || IsLocalOp(op) || IsAliasedVarOp(op));
@@ -1903,7 +1903,7 @@ BindNameToSlotHelper(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
  * and we do not want to allow self-hosted code to use the dynamic scope.
  */
 bool
-BytecodeEmitter::bindNameToSlot(ParseNode *pn)
+BytecodeEmitter::bindNameToSlot(ParseNode* pn)
 {
     if (!BindNameToSlotHelper(cx, this, pn))
         return false;
@@ -2138,7 +2138,7 @@ BytecodeEmitter::needsImplicitThis()
     if (sc->isFunctionBox() && sc->asFunctionBox()->inWith)
         return true;
 
-    for (StmtInfoBCE *stmt = topStmt; stmt; stmt = stmt->down) {
+    for (StmtInfoBCE* stmt = topStmt; stmt; stmt = stmt->down) {
         if (stmt->type == STMT_WITH)
             return true;
     }
@@ -2212,7 +2212,7 @@ BytecodeEmitter::emitNewInit(JSProtoKey key)
     if (offset < 0)
         return false;
 
-    jsbytecode *code = this->code(offset);
+    jsbytecode* code = this->code(offset);
     code[0] = JSOP_NEWINIT;
     code[1] = jsbytecode(key);
     code[2] = 0;
@@ -7309,7 +7309,7 @@ BytecodeEmitter::emitTree(ParseNode *pn)
                     if (!ObjectElements::MakeElementsCopyOnWrite(cx, obj))
                         return false;
 
-                    ObjectBox *objbox = parser->newObjectBox(obj);
+    ObjectBox* objbox = parser->newObjectBox(obj);
                     if (!objbox)
                         return false;
 
@@ -7609,7 +7609,7 @@ frontend::CopySrcNotes(BytecodeEmitter* bce, jssrcnote* destination, uint32_t ns
 }
 
 void
-CGConstList::finish(ConstArray *array)
+CGConstList::finish(ConstArray* array)
 {
     MOZ_ASSERT(length() == array->length);
 
@@ -7660,7 +7660,7 @@ CGConstList::finish(ConstArray *array)
  * the pre-compilation prototype, a pigeon-hole problem for instanceof tests.
  */
 unsigned
-CGObjectList::add(ObjectBox *objbox)
+CGObjectList::add(ObjectBox* objbox)
 {
     MOZ_ASSERT(!objbox->emitLink);
     objbox->emitLink = lastbox;
@@ -7669,23 +7669,23 @@ CGObjectList::add(ObjectBox *objbox)
 }
 
 unsigned
-CGObjectList::indexOf(JSObject *obj)
+CGObjectList::indexOf(JSObject* obj)
 {
     MOZ_ASSERT(length > 0);
     unsigned index = length - 1;
-    for (ObjectBox *box = lastbox; box->object != obj; box = box->emitLink)
+    for (ObjectBox* box = lastbox; box->object != obj; box = box->emitLink)
         index--;
     return index;
 }
 
 void
-CGObjectList::finish(ObjectArray *array)
+CGObjectList::finish(ObjectArray* array)
 {
     MOZ_ASSERT(length <= INDEX_LIMIT);
     MOZ_ASSERT(length == array->length);
 
-    js::HeapPtrObject *cursor = array->vector + array->length;
-    ObjectBox *objbox = lastbox;
+    js::HeapPtrObject* cursor = array->vector + array->length;
+    ObjectBox* objbox = lastbox;
     do {
         --cursor;
         MOZ_ASSERT(!*cursor);
@@ -7698,7 +7698,7 @@ ObjectBox*
 CGObjectList::find(uint32_t index)
 {
     MOZ_ASSERT(index < length);
-    ObjectBox *box = lastbox;
+    ObjectBox* box = lastbox;
     for (unsigned n = length - 1; n > index; n--)
         box = box->emitLink;
     return box;
@@ -7721,7 +7721,7 @@ CGTryNoteList::append(JSTryNoteKind kind, uint32_t stackDepth, size_t start, siz
 }
 
 void
-CGTryNoteList::finish(TryNoteArray *array)
+CGTryNoteList::finish(TryNoteArray* array)
 {
     MOZ_ASSERT(length() == array->length);
 
@@ -7826,7 +7826,7 @@ js::SrcNoteLength(jssrcnote *sn)
 }
 
 JS_FRIEND_API(ptrdiff_t)
-js::GetSrcNoteOffset(jssrcnote *sn, unsigned which)
+js::GetSrcNoteOffset(jssrcnote* sn, unsigned which)
 {
     /* Find the offset numbered which (i.e., skip exactly which offsets). */
     MOZ_ASSERT(SN_TYPE(sn) != SRC_XDELTA);

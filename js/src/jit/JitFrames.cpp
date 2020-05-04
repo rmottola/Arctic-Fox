@@ -998,7 +998,7 @@ ReadAllocation(const JitFrameIterator& frame, const LAllocation* a)
 #endif
 
 static void
-MarkThisAndArguments(JSTracer *trc, JitFrameLayout *layout)
+MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
@@ -1023,15 +1023,15 @@ MarkThisAndArguments(JSTracer *trc, JitFrameLayout *layout)
 }
 
 static void
-MarkThisAndArguments(JSTracer *trc, const JitFrameIterator &frame)
+MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
 {
-    JitFrameLayout *layout = frame.jsFrame();
+    JitFrameLayout* layout = frame.jsFrame();
     MarkThisAndArguments(trc, layout);
 }
 
 #ifdef JS_NUNBOX32
 static inline void
-WriteAllocation(const JitFrameIterator &frame, const LAllocation *a, uintptr_t value)
+WriteAllocation(const JitFrameIterator& frame, const LAllocation* a, uintptr_t value)
 {
     if (a->isGeneralReg()) {
         Register reg = a->toGeneralReg()->reg();
@@ -1308,15 +1308,15 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
     // CodeGenerator.cpp which handle the case of a native function call. We
     // need to mark the argument vector of the function call.
     if (frame.isExitFrameLayout<NativeExitFrameLayout>()) {
-        NativeExitFrameLayout *native = frame.exitFrame()->as<NativeExitFrameLayout>();
+        NativeExitFrameLayout* native = frame.exitFrame()->as<NativeExitFrameLayout>();
         size_t len = native->argc() + 2;
-        Value *vp = native->vp();
+        Value* vp = native->vp();
         gc::MarkValueRootRange(trc, len, vp, "ion-native-args");
         return;
     }
 
     if (frame.isExitFrameLayout<IonOOLNativeExitFrameLayout>()) {
-        IonOOLNativeExitFrameLayout *oolnative =
+        IonOOLNativeExitFrameLayout* oolnative =
             frame.exitFrame()->as<IonOOLNativeExitFrameLayout>();
         gc::MarkJitCodeRoot(trc, oolnative->stubCode(), "ion-ool-native-code");
         gc::MarkValueRoot(trc, oolnative->vp(), "iol-ool-native-vp");
@@ -1331,7 +1331,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
         // A SetterOp frame is a different size, but that's the only relevant
         // difference between the two. The fields that need marking are all in
         // the common base class.
-        IonOOLPropertyOpExitFrameLayout *oolgetter =
+        IonOOLPropertyOpExitFrameLayout* oolgetter =
             frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>()
             ? frame.exitFrame()->as<IonOOLPropertyOpExitFrameLayout>()
             : frame.exitFrame()->as<IonOOLSetterOpExitFrameLayout>();
@@ -1369,8 +1369,8 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
     }
 
     if (frame.isExitFrameLayout<LazyLinkExitFrameLayout>()) {
-        LazyLinkExitFrameLayout *ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
-        JitFrameLayout *layout = ll->jsFrame();
+        LazyLinkExitFrameLayout* ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
+        JitFrameLayout* layout = ll->jsFrame();
 
         gc::MarkJitCodeRoot(trc, ll->stubCode(), "lazy-link-code");
         layout->replaceCalleeToken(MarkCalleeToken(trc, layout->calleeToken()));
@@ -2504,20 +2504,20 @@ InlineFrameIterator::isFunctionFrame() const
 }
 
 MachineState
-MachineState::FromBailout(RegisterDump::GPRArray &regs, RegisterDump::FPUArray &fpregs)
+MachineState::FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& fpregs)
 {
     MachineState machine;
 
     for (unsigned i = 0; i < Registers::Total; i++)
         machine.setRegisterLocation(Register::FromCode(i), &regs[i].r);
 #ifdef JS_CODEGEN_ARM
-    float *fbase = (float*)&fpregs[0];
+    float* fbase = (float*)&fpregs[0];
     for (unsigned i = 0; i < FloatRegisters::TotalDouble; i++)
         machine.setRegisterLocation(FloatRegister(i, FloatRegister::Double), &fpregs[i].d);
     for (unsigned i = 0; i < FloatRegisters::TotalSingle; i++)
         machine.setRegisterLocation(FloatRegister(i, FloatRegister::Single), (double*)&fbase[i]);
 #elif defined(JS_CODEGEN_MIPS)
-    float *fbase = (float*)&fpregs[0];
+    float* fbase = (float*)&fpregs[0];
     for (unsigned i = 0; i < FloatRegisters::TotalDouble; i++) {
         machine.setRegisterLocation(FloatRegister::FromIndex(i, FloatRegister::Double),
                                     &fpregs[i].d);
@@ -3017,9 +3017,9 @@ void
 JitProfilingFrameIterator::fixBaselineDebugModeOSRReturnAddress()
 {
     MOZ_ASSERT(type_ == JitFrame_BaselineJS);
-    BaselineFrame *bl = (BaselineFrame *)(fp_ - BaselineFrame::FramePointerOffset -
+    BaselineFrame* bl = (BaselineFrame*)(fp_ - BaselineFrame::FramePointerOffset -
                                           BaselineFrame::Size());
-    if (BaselineDebugModeOSRInfo *info = bl->getDebugModeOSRInfo())
+    if (BaselineDebugModeOSRInfo* info = bl->getDebugModeOSRInfo())
         returnAddressToFp_ = info->resumeAddr;
 }
 

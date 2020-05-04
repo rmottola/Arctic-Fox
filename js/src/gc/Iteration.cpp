@@ -30,7 +30,7 @@ js::TraceRuntime(JSTracer* trc)
 }
 
 static void
-IterateCompartmentsArenasCells(JSRuntime *rt, Zone *zone, void *data,
+IterateCompartmentsArenasCells(JSRuntime* rt, Zone* zone, void* data,
                                JSIterateCompartmentCallback compartmentCallback,
                                IterateArenaCallback arenaCallback,
                                IterateCellCallback cellCallback)
@@ -43,7 +43,7 @@ IterateCompartmentsArenasCells(JSRuntime *rt, Zone *zone, void *data,
         size_t thingSize = Arena::thingSize(thingKind);
 
         for (ArenaIter aiter(zone, thingKind); !aiter.done(); aiter.next()) {
-            ArenaHeader *aheader = aiter.get();
+            ArenaHeader* aheader = aiter.get();
             (*arenaCallback)(rt, data, aheader->getArena(), traceKind, thingSize);
             for (ArenaCellIterUnderGC iter(aheader); !iter.done(); iter.next())
                 (*cellCallback)(rt, data, iter.getCell(), traceKind, thingSize);

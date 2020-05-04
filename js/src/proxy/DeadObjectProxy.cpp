@@ -15,7 +15,7 @@ using namespace js;
 using namespace js::gc;
 
 bool
-DeadObjectProxy::getPropertyDescriptor(JSContext *cx, HandleObject wrapper, HandleId id,
+DeadObjectProxy::getPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
                                        MutableHandle<PropertyDescriptor> desc) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
@@ -23,7 +23,7 @@ DeadObjectProxy::getPropertyDescriptor(JSContext *cx, HandleObject wrapper, Hand
 }
 
 bool
-DeadObjectProxy::getOwnPropertyDescriptor(JSContext *cx, HandleObject wrapper, HandleId id,
+DeadObjectProxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
                                           MutableHandle<PropertyDescriptor> desc) const
 {
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);

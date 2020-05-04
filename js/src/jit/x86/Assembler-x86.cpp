@@ -92,7 +92,7 @@ CodeFromJump(uint8_t* jump)
 }
 
 void
-Assembler::TraceJumpRelocations(JSTracer *trc, JitCode *code, CompactBufferReader &reader)
+Assembler::TraceJumpRelocations(JSTracer* trc, JitCode* code, CompactBufferReader& reader)
 {
     RelocationIterator iter(reader);
     while (iter.read()) {
@@ -103,7 +103,7 @@ Assembler::TraceJumpRelocations(JSTracer *trc, JitCode *code, CompactBufferReade
 }
 
 FloatRegisterSet
-FloatRegister::ReduceSetForPush(const FloatRegisterSet &s)
+FloatRegister::ReduceSetForPush(const FloatRegisterSet& s)
 {
     SetType bits = s.bits();
 
@@ -122,7 +122,7 @@ FloatRegister::ReduceSetForPush(const FloatRegisterSet &s)
 }
 
 uint32_t
-FloatRegister::GetPushSizeInBytes(const FloatRegisterSet &s)
+FloatRegister::GetPushSizeInBytes(const FloatRegisterSet& s)
 {
     SetType all = s.bits();
     SetType float32x4Set =

@@ -132,15 +132,15 @@ EmptyShape::ensureInitialCustomShape(ExclusiveContext* cx, Handle<ObjectSubclass
 }
 
 inline
-AutoRooterGetterSetter::Inner::Inner(ExclusiveContext *cx, uint8_t attrs,
-                                     GetterOp *pgetter_, SetterOp *psetter_)
+AutoRooterGetterSetter::Inner::Inner(ExclusiveContext* cx, uint8_t attrs,
+                                     GetterOp* pgetter_, SetterOp* psetter_)
   : CustomAutoRooter(cx), attrs(attrs),
     pgetter(pgetter_), psetter(psetter_)
 {}
 
 inline
-AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext *cx, uint8_t attrs,
-                                               GetterOp *pgetter, SetterOp *psetter
+AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t attrs,
+                                               GetterOp* pgetter, SetterOp* psetter
                                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
 {
     if (attrs & (JSPROP_GETTER | JSPROP_SETTER))

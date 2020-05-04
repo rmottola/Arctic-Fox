@@ -19,7 +19,7 @@ using namespace js::jit;
 using mozilla::FloorLog2;
 
 void
-LIRGeneratorMIPS::useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1,
+LIRGeneratorMIPS::useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1,
                               Register reg2)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);

@@ -20,8 +20,8 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
 {
   private:
     // Perform a downcast. Should be removed by Bug 996602.
-    MacroAssembler &asMasm();
-    const MacroAssembler &asMasm() const;
+    MacroAssembler& asMasm();
+    const MacroAssembler& asMasm() const;
 
   private:
     // Number of bytes the stack is adjusted inside a call to C. Calls to C may

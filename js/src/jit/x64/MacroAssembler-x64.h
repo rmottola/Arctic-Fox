@@ -36,8 +36,8 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
 {
   private:
     // Perform a downcast. Should be removed by Bug 996602.
-    MacroAssembler &asMasm();
-    const MacroAssembler &asMasm() const;
+    MacroAssembler& asMasm();
+    const MacroAssembler& asMasm() const;
 
   private:
     // Number of bytes the stack is adjusted inside a call to C. Calls to C may
@@ -222,7 +222,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void popValue(ValueOperand val) {
         pop(val.valueReg());
     }
-    void pushValue(const Value &val) {
+    void pushValue(const Value& val) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         if (val.isMarkable()) {
             movWithPatch(ImmWord(jv.asBits), ScratchReg);

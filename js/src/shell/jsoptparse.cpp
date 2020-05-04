@@ -81,11 +81,11 @@ OptionParser::error(const char* fmt, ...)
 
 /* Quick and dirty paragraph printer. */
 static void
-PrintParagraph(const char *text, unsigned startColno, const unsigned limitColno, bool padFirstLine)
+PrintParagraph(const char* text, unsigned startColno, const unsigned limitColno, bool padFirstLine)
 {
     unsigned colno = startColno;
     unsigned indent = 0;
-    const char *it = text;
+    const char* it = text;
 
     if (padFirstLine)
         printf("%*s", startColno, "");
@@ -147,8 +147,8 @@ PrintParagraph(const char *text, unsigned startColno, const unsigned limitColno,
     }
 }
 
-static const char *
-OptionFlagsToFormatInfo(char shortflag, bool isValued, size_t *length)
+static const char*
+OptionFlagsToFormatInfo(char shortflag, bool isValued, size_t* length)
 {
     static const char * const fmt[4] = { "  -%c --%s ",
                                          "  --%s ",

@@ -19,8 +19,8 @@ namespace js {
 bool
 regexp_flags(JSContext *cx, unsigned argc, JS::Value *vp);
 
-JSObject *
-InitRegExpClass(JSContext *cx, HandleObject obj);
+JSObject*
+InitRegExpClass(JSContext* cx, HandleObject obj);
 
 // Whether RegExp statics should be updated with the input and results of a
 // regular expression execution.

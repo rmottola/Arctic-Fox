@@ -98,7 +98,7 @@ MIRGenerator::abort(const char* message, ...)
 }
 
 void
-MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup *group)
+MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup* group)
 {
     for (size_t i = 0; i < abortedPreliminaryGroups_.length(); i++) {
         if (group == abortedPreliminaryGroups_[i])

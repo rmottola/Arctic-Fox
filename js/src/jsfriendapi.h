@@ -1422,7 +1422,7 @@ struct MOZ_STACK_CLASS JS_FRIEND_API(ErrorReport)
 
 /* Implemented in vm/StructuredClone.cpp. */
 extern JS_FRIEND_API(uint64_t)
-GetSCOffset(JSStructuredCloneWriter *writer);
+GetSCOffset(JSStructuredCloneWriter* writer);
 
 namespace Scalar {
 
@@ -2393,11 +2393,11 @@ struct JSTypedMethodJitInfo
 
 namespace js {
 
-static MOZ_ALWAYS_INLINE shadow::Function *
-FunctionObjectToShadowFunction(JSObject *fun)
+static MOZ_ALWAYS_INLINE shadow::Function*
+FunctionObjectToShadowFunction(JSObject* fun)
 {
     MOZ_ASSERT(GetObjectClass(fun) == FunctionClassPtr);
-    return reinterpret_cast<shadow::Function *>(fun);
+    return reinterpret_cast<shadow::Function*>(fun);
 }
 
 /* Statically asserted in jsfun.h. */
@@ -2405,13 +2405,13 @@ static const unsigned JS_FUNCTION_INTERPRETED_BITS = 0x1001;
 
 // Return whether the given function object is native.
 static MOZ_ALWAYS_INLINE bool
-FunctionObjectIsNative(JSObject *fun)
+FunctionObjectIsNative(JSObject* fun)
 {
     return !(FunctionObjectToShadowFunction(fun)->flags & JS_FUNCTION_INTERPRETED_BITS);
 }
 
 static MOZ_ALWAYS_INLINE JSNative
-GetFunctionObjectNative(JSObject *fun)
+GetFunctionObjectNative(JSObject* fun)
 {
     MOZ_ASSERT(FunctionObjectIsNative(fun));
     return FunctionObjectToShadowFunction(fun)->native;
@@ -2419,7 +2419,7 @@ GetFunctionObjectNative(JSObject *fun)
 
 } // namespace js
 
-static MOZ_ALWAYS_INLINE const JSJitInfo *
+static MOZ_ALWAYS_INLINE const JSJitInfo*
 FUNCTION_VALUE_TO_JITINFO(const JS::Value& v)
 {
     MOZ_ASSERT(js::FunctionObjectIsNative(&v.toObject()));
@@ -2586,8 +2586,8 @@ class JS_FRIEND_API(AutoCTypesActivityCallback) {
     }
 };
 
-typedef JSObject *
-(* ObjectMetadataCallback)(JSContext *cx);
+typedef JSObject*
+(* ObjectMetadataCallback)(JSContext* cx);
 
 /*
  * Specify a callback to invoke when creating each JS object in the current

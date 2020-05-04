@@ -67,13 +67,13 @@ struct DtoaState;
 namespace js {
 
 extern MOZ_COLD void
-ReportOutOfMemory(ExclusiveContext *cx);
+ReportOutOfMemory(ExclusiveContext* cx);
 
 extern MOZ_COLD void
-ReportAllocationOverflow(ExclusiveContext *maybecx);
+ReportAllocationOverflow(ExclusiveContext* maybecx);
 
 extern MOZ_COLD void
-ReportOverRecursed(ExclusiveContext *cx);
+ReportOverRecursed(ExclusiveContext* cx);
 
 
 class Activation;
@@ -345,7 +345,7 @@ class NewObjectCache
         js_memcpy(&entry->templateObject, obj, entry->nbytes);
     }
 
-    static void copyCachedToObject(NativeObject *dst, NativeObject *src, gc::AllocKind kind) {
+    static void copyCachedToObject(NativeObject* dst, NativeObject* src, gc::AllocKind kind) {
         js_memcpy(dst, src, gc::Arena::thingSize(kind));
         Shape::writeBarrierPost(dst->shape_, &dst->shape_);
         ObjectGroup::writeBarrierPost(dst->group_, &dst->group_);

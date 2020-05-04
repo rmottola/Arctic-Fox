@@ -491,8 +491,8 @@ class CodeGenerator : public CodeGeneratorSpecific
     // Barriered objects in a bit mask.
     uint32_t simdRefreshTemplatesDuringLink_;
 
-    void registerSimdTemplate(InlineTypedObject *templateObject);
-    void captureSimdTemplate(JSContext *cx);
+    void registerSimdTemplate(InlineTypedObject* templateObject);
+    void captureSimdTemplate(JSContext* cx);
 };
 
 } // namespace jit

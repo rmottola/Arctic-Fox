@@ -669,7 +669,7 @@ js::Nursery::moveObjectToTenured(MinorCollectionTracer *trc,
 
     js_memcpy(dst, src, srcSize);
     if (src->isNative()) {
-        NativeObject *ndst = &dst->as<NativeObject>(), *nsrc = &src->as<NativeObject>();
+        NativeObject* ndst = &dst->as<NativeObject>(), *nsrc = &src->as<NativeObject>();
         tenuredSize += moveSlotsToTenured(ndst, nsrc, dstKind);
         tenuredSize += moveElementsToTenured(ndst, nsrc, dstKind);
 
@@ -686,7 +686,7 @@ js::Nursery::moveObjectToTenured(MinorCollectionTracer *trc,
 }
 
 MOZ_ALWAYS_INLINE size_t
-js::Nursery::moveSlotsToTenured(NativeObject *dst, NativeObject *src, AllocKind dstKind)
+js::Nursery::moveSlotsToTenured(NativeObject* dst, NativeObject* src, AllocKind dstKind)
 {
     /* Fixed slots have already been copied over. */
     if (!src->hasDynamicSlots())
