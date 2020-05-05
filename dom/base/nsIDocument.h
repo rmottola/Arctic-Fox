@@ -31,7 +31,6 @@
 #include "nsExpirationTracker.h"
 #include "nsClassHashtable.h"
 #include "prclist.h"
-#include "gfxVR.h"
 
 class imgIRequest;
 class nsAString;
@@ -99,6 +98,10 @@ class Loader;
 class ImageLoader;
 } // namespace css
 
+namespace gfx {
+class VRHMDInfo;
+} // namespace gfx
+
 namespace dom {
 class AnimationTimeline;
 class AnonymousContent;
@@ -145,7 +148,7 @@ template<typename, typename> class CallbackObjectHolder;
 typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 
 struct FullScreenOptions {
-  FullScreenOptions() { }
+  FullScreenOptions();
   nsRefPtr<gfx::VRHMDInfo> mVRHMDDevice;
 };
 
