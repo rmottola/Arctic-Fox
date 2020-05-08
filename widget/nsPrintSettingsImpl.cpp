@@ -6,6 +6,7 @@
 #include "nsPrintSettingsImpl.h"
 #include "nsReadableUtils.h"
 #include "nsIPrintSession.h"
+#include "mozilla/RefPtr.h"
 
 #define DEFAULT_MARGIN_WIDTH 0.5
 
