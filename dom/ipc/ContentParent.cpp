@@ -148,6 +148,8 @@
 #include "private/pprio.h"
 #include "ContentProcessManager.h"
 
+#include "nsIBidiKeyboard.h"
+
 #if defined(ANDROID) || defined(LINUX)
 #include "nsSystemInfo.h"
 #endif
@@ -2744,11 +2746,11 @@ ContentParent::RecvAddNewProcess(const uint32_t& aPid,
     }
 
     // Update offline settings.
-    bool isOffline;
+    bool isOffline, isLangRTL;
     InfallibleTArray<nsString> unusedDictionaries;
     ClipboardCapabilities clipboardCaps;
     DomainPolicyClone domainPolicy;
-    RecvGetXPCOMProcessAttributes(&isOffline, &unusedDictionaries,
+    RecvGetXPCOMProcessAttributes(&isOffline, &isLangRTL, &unusedDictionaries,
                                   &clipboardCaps, &domainPolicy);
     mozilla::unused << content->SendSetOffline(isOffline);
     MOZ_ASSERT(!clipboardCaps.supportsSelectionClipboard() &&
@@ -3059,6 +3061,7 @@ ContentParent::RecvGetProcessAttributes(ContentParentId* aCpId,
 
 bool
 ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
+                                             bool* aIsLangRTL,
                                              InfallibleTArray<nsString>* dictionaries,
                                              ClipboardCapabilities* clipboardCaps,
                                              DomainPolicyClone* domainPolicy)
@@ -3067,6 +3070,13 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
     MOZ_ASSERT(io, "No IO service?");
     DebugOnly<nsresult> rv = io->GetOffline(aIsOffline);
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Failed getting offline?");
+
+    nsIBidiKeyboard* bidi = nsContentUtils::GetBidiKeyboard();
+
+    *aIsLangRTL = false;
+    if (bidi) {
+        bidi->IsLangRTL(aIsLangRTL);
+    }
 
     nsCOMPtr<nsISpellChecker> spellChecker(do_GetService(NS_SPELLCHECKER_CONTRACTID));
     MOZ_ASSERT(spellChecker, "No spell checker?");

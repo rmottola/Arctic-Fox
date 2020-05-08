@@ -125,6 +125,10 @@ EXPORTS.mozilla += [
     'WidgetUtils.h',
 ]
 
+EXPORTS.mozilla.widget += [
+    'PuppetBidiKeyboard.h',
+]
+
 UNIFIED_SOURCES += [
     'ContentHelper.cpp',
     'GfxDriverInfo.cpp',
@@ -153,6 +157,7 @@ UNIFIED_SOURCES += [
     'nsTransferable.cpp',
     'nsXPLookAndFeel.cpp',
     'PluginWidgetProxy.cpp',
+    'PuppetBidiKeyboard.cpp',
     'PuppetWidget.cpp',
     'ScreenProxy.cpp',
     'SharedWidgetUtils.cpp',
