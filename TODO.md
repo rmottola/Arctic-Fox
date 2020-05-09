@@ -65,6 +65,8 @@
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
+- remaining parts of Bug 968923 (2015-06)
+- Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -105,10 +107,13 @@
 - Bug 1079245 - 2015-04-15 Set about:privatebrowsing to load in child. r=mossop
 - Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
-- remaining parts of Bug 968923 (2015-06)
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
-- Bug 1010675 - 2015-03-30 - Stop allowing button contents to overflow into the CSS 
+
+Sequence:
+Bug 1152171 part 2 - Rename AnimationTimeline to DocumentTimeline
+Bug 1026350 - Part 1: Inputport API implementation
+Bug 1114935 - Part 3 to 35!
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
