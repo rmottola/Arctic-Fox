@@ -49,11 +49,11 @@
 #  include <android/log.h>
 #  define LOG(fmt, ...) \
      __android_log_print(ANDROID_LOG_INFO, \
-       "Goanna:ProcessPriorityManager", \
+       "Gecko:ProcessPriorityManager", \
        fmt, ## __VA_ARGS__)
 #  define LOGP(fmt, ...) \
     __android_log_print(ANDROID_LOG_INFO, \
-      "Goanna:ProcessPriorityManager", \
+      "Gecko:ProcessPriorityManager", \
       "[%schild-id=%llu, pid=%d] " fmt, \
       NameWithComma().get(), \
       (long long unsigned) ChildID(), Pid(), ## __VA_ARGS__)
