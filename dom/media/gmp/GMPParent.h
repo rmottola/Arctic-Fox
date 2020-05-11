@@ -7,7 +7,7 @@
 #define GMPParent_h_
 
 #include "GMPProcessParent.h"
-#include "GMPService.h"
+#include "GMPServiceParent.h"
 #include "GMPAudioDecoderParent.h"
 #include "GMPDecryptorParent.h"
 #include "GMPVideoDecoderParent.h"
@@ -51,7 +51,7 @@ public:
 
   GMPParent();
 
-  nsresult Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir);
+  nsresult Init(GeckoMediaPluginServiceParent* aService, nsIFile* aPluginDir);
   nsresult CloneFrom(const GMPParent* aOther);
 
   void Crash();
@@ -134,7 +134,7 @@ public:
 
 private:
   ~GMPParent();
-  nsRefPtr<GeckoMediaPluginService> mService;
+  nsRefPtr<GeckoMediaPluginServiceParent> mService;
   bool EnsureProcessLoaded();
   nsresult ReadGMPMetaData();
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;

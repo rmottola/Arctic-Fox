@@ -95,7 +95,7 @@ this.ForgetAboutSite = {
     // EME
     promises.push(Task.spawn(function*() {
       let mps = Cc["@mozilla.org/goanna-media-plugin-service;1"].
-                getService(Ci.mozIGoannaMediaPluginService);
+                 getService(Ci.mozIGeckoMediaPluginChromeService);
       mps.forgetThisSite(aDomain);
     }).catch(ex => {
       throw new Error("Exception thrown while Encrypted Media Extensions: " + ex);

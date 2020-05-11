@@ -11,12 +11,13 @@
 #include "GMPVideoDecoderProxy.h"
 #include "GMPVideoEncoderProxy.h"
 #include "GMPDecryptorProxy.h"
-#include "GMPService.h"
+#include "GMPServiceParent.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsIFile.h"
 #include "nsISimpleEnumerator.h"
 #include "mozilla/Atomics.h"
 #include "nsNSSComponent.h"
+#include "mozilla/DebugOnly.h"
 
 #if defined(XP_WIN)
 #include "mozilla/WindowsVersion.h"
@@ -42,8 +43,8 @@ private:
 void
 GMPTestRunner::RunTestGMPTestCodec()
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
 
   GMPVideoHost* host = nullptr;
   GMPVideoDecoderProxy* decoder = nullptr;
@@ -71,8 +72,8 @@ GMPTestRunner::RunTestGMPTestCodec()
 void
 GMPTestRunner::RunTestGMPCrossOrigin()
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
 
   GMPVideoHost* host = nullptr;
   nsTArray<nsCString> tags;
@@ -113,8 +114,8 @@ GMPTestRunner::RunTestGMPCrossOrigin()
 static already_AddRefed<nsIThread>
 GetGMPThread()
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
   nsCOMPtr<nsIThread> thread;
   EXPECT_TRUE(NS_SUCCEEDED(service->GetThread(getter_AddRefs(thread))));
   return thread.forget();
@@ -158,8 +159,8 @@ template<typename T>
 static nsresult
 EnumerateGMPStorageDir(const nsACString& aDir, T&& aDirIter)
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   MOZ_ASSERT(service);
 
   // $profileDir/gmp/
@@ -317,8 +318,8 @@ GetNodeId(const nsAString& aOrigin,
           const nsAString& aTopLevelOrigin,
           bool aInPBMode)
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   EXPECT_TRUE(service);
   nsCString nodeId;
   nsresult rv = service->GetNodeId(aOrigin,
@@ -332,8 +333,8 @@ GetNodeId(const nsAString& aOrigin,
 static bool
 IsGMPStorageIsEmpty()
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   MOZ_ASSERT(service);
   nsCOMPtr<nsIFile> storage;
   nsresult rv = service->GetStorageDir(getter_AddRefs(storage));
@@ -348,8 +349,8 @@ IsGMPStorageIsEmpty()
 static void
 AssertIsOnGMPThread()
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
   MOZ_ASSERT(service);
   nsCOMPtr<nsIThread> thread;
   service->GetThread(getter_AddRefs(thread));
@@ -440,8 +441,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
   void CreateDecryptor(const nsAString& aOrigin,
                        const nsAString& aTopLevelOrigin,
                        bool aInPBMode) {
-    nsRefPtr<GoannaMediaPluginService> service =
-      GoannaMediaPluginService::GetGoannaMediaPluginService();
+    nsRefPtr<GeckoMediaPluginService> service =
+      GeckoMediaPluginService::GetGeckoMediaPluginService();
     EXPECT_TRUE(service);
 
     mNodeId = GetNodeId(aOrigin, aTopLevelOrigin, aInPBMode);
@@ -463,8 +464,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     AssertIsOnGMPThread();
     EXPECT_TRUE(IsGMPStorageIsEmpty());
 
-    nsRefPtr<GoannaMediaPluginService> service =
-      GoannaMediaPluginService::GetGoannaMediaPluginService();
+    nsRefPtr<GeckoMediaPluginService> service =
+      GeckoMediaPluginService::GetGeckoMediaPluginService();
 
     CreateDecryptor(NS_LITERAL_STRING("example1.com"),
                     NS_LITERAL_STRING("example2.com"),
@@ -545,8 +546,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
   }
 
   void TestForgetThisSite_Forget(nsAutoPtr<NodeInfo> aSiteInfo) {
-    nsRefPtr<GoannaMediaPluginService> service =
-        GoannaMediaPluginService::GetGoannaMediaPluginService();
+    nsRefPtr<GeckoMediaPluginServiceParent> service =
+        GeckoMediaPluginServiceParent::GetSingleton();
     service->ForgetThisSite(NS_ConvertUTF8toUTF16(aSiteInfo->siteToForget));
 
     nsCOMPtr<nsIThread> thread;
@@ -1148,97 +1149,97 @@ private:
 void
 GMPTestRunner::DoTest(void (GMPTestRunner::*aTestMethod)())
 {
-  nsRefPtr<GoannaMediaPluginService> service =
-    GoannaMediaPluginService::GetGoannaMediaPluginService();
+  nsRefPtr<GeckoMediaPluginService> service =
+    GeckoMediaPluginService::GetGeckoMediaPluginService();
   nsCOMPtr<nsIThread> thread;
 
   service->GetThread(getter_AddRefs(thread));
   thread->Dispatch(NS_NewRunnableMethod(this, aTestMethod), NS_DISPATCH_SYNC);
 }
 
-TEST(GoannaMediaPlugins, GMPTestCodec) {
+TEST(GeckoMediaPlugins, GMPTestCodec) {
   nsRefPtr<GMPTestRunner> runner = new GMPTestRunner();
   runner->DoTest(&GMPTestRunner::RunTestGMPTestCodec);
 }
 
-TEST(GoannaMediaPlugins, GMPCrossOrigin) {
+TEST(GeckoMediaPlugins, GMPCrossOrigin) {
   nsRefPtr<GMPTestRunner> runner = new GMPTestRunner();
   runner->DoTest(&GMPTestRunner::RunTestGMPCrossOrigin);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageGetNodeId) {
+TEST(GeckoMediaPlugins, GMPStorageGetNodeId) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestGetNodeId);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageBasic) {
+TEST(GeckoMediaPlugins, GMPStorageBasic) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestBasicStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageForgetThisSite) {
+TEST(GeckoMediaPlugins, GMPStorageForgetThisSite) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestForgetThisSite);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageClearRecentHistory1) {
+TEST(GeckoMediaPlugins, GMPStorageClearRecentHistory1) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestClearRecentHistory1);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageClearRecentHistory2) {
+TEST(GeckoMediaPlugins, GMPStorageClearRecentHistory2) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestClearRecentHistory2);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageClearRecentHistory3) {
+TEST(GeckoMediaPlugins, GMPStorageClearRecentHistory3) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestClearRecentHistory3);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageCrossOrigin) {
+TEST(GeckoMediaPlugins, GMPStorageCrossOrigin) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestCrossOriginStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPStoragePrivateBrowsing) {
+TEST(GeckoMediaPlugins, GMPStoragePrivateBrowsing) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestPBStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageAsyncShutdownTimeout) {
+TEST(GeckoMediaPlugins, GMPStorageAsyncShutdownTimeout) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestAsyncShutdownTimeout);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageAsyncShutdownStorage) {
+TEST(GeckoMediaPlugins, GMPStorageAsyncShutdownStorage) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestAsyncShutdownStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPPluginVoucher) {
+TEST(GeckoMediaPlugins, GMPPluginVoucher) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestPluginVoucher);
 }
 
 #if defined(XP_WIN)
-TEST(GoannaMediaPlugins, GMPOutputProtection) {
+TEST(GeckoMediaPlugins, GMPOutputProtection) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestOutputProtection);
 }
 #endif
 
-TEST(GoannaMediaPlugins, GMPStorageGetRecordNamesInMemoryStorage) {
+TEST(GeckoMediaPlugins, GMPStorageGetRecordNamesInMemoryStorage) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestGetRecordNamesInMemoryStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageGetRecordNamesPersistentStorage) {
+TEST(GeckoMediaPlugins, GMPStorageGetRecordNamesPersistentStorage) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::GetRecordNamesPersistentStorage);
 }
 
-TEST(GoannaMediaPlugins, GMPStorageLongRecordNames) {
+TEST(GeckoMediaPlugins, GMPStorageLongRecordNames) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestLongRecordNames);
 }

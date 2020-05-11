@@ -83,7 +83,7 @@ GMPParent::CloneFrom(const GMPParent* aOther)
 }
 
 nsresult
-GMPParent::Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir)
+GMPParent::Init(GeckoMediaPluginServiceParent* aService, nsIFile* aPluginDir)
 {
   MOZ_ASSERT(aPluginDir);
   MOZ_ASSERT(aService);
@@ -181,8 +181,8 @@ AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  nsRefPtr<GeckoMediaPluginService> service =
-    GeckoMediaPluginService::GetGeckoMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     service->AsyncShutdownComplete(parent);
   }
@@ -209,8 +209,8 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   }
 
   int32_t timeout = GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT;
-  nsRefPtr<GeckoMediaPluginService> service =
-    GeckoMediaPluginService::GetGeckoMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     timeout = service->AsyncShutdownTimeoutMs();
   }
@@ -395,12 +395,22 @@ public:
 void
 GMPParent::ChildTerminated()
 {
-  nsRefPtr<GMPParent> self(this);
-  GMPThread()->Dispatch(NS_NewRunnableMethodWithArg<nsRefPtr<GMPParent>>(
-                          mService,
-                          &GeckoMediaPluginService::PluginTerminated,
-                          self),
-                        NS_DISPATCH_NORMAL);
+  RefPtr<GMPParent> self(this);
+  nsIThread* gmpThread = GMPThread();
+
+  if (!gmpThread) {
+    // Bug 1163239 - this can happen on shutdown.
+    // PluginTerminated removes the GMP from the GMPService.
+    // On shutdown we can have this case where it is already been
+    // removed so there is no harm in not trying to remove it again.
+    LOGD(("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__));
+  } else {
+    gmpThread->Dispatch(NS_NewRunnableMethodWithArg<RefPtr<GMPParent>>(
+                         mService,
+                         &GeckoMediaPluginServiceParent::PluginTerminated,
+                         self),
+                         NS_DISPATCH_NORMAL);
+  }
 }
 
 void
