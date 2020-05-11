@@ -122,6 +122,7 @@ protected:
 private:
   GMPParent* ClonePlugin(const GMPParent* aOriginal);
   nsresult EnsurePluginsOnDiskScanned();
+  nsresult InitStorage();
 
   class PathRunnable : public nsRunnable
   {
