@@ -777,9 +777,11 @@ public:
 NS_IMETHODIMP
 GeckoMediaPluginService::GetPluginVersionForAPI(const nsACString& aAPI,
                                                 nsTArray<nsCString>* aTags,
+                                                bool* aHasPlugin,
                                                 nsACString& aOutVersion)
 {
   NS_ENSURE_ARG(aTags && aTags->Length() > 0);
+  NS_ENSURE_ARG(aHasPlugin);
 
   nsresult rv = EnsurePluginsOnDiskScanned();
   if (NS_FAILED(rv)) {
@@ -791,10 +793,12 @@ GeckoMediaPluginService::GetPluginVersionForAPI(const nsACString& aAPI,
     MutexAutoLock lock(mMutex);
     nsCString api(aAPI);
     GMPParent* gmp = FindPluginForAPIFrom(0, api, *aTags, nullptr);
-    if (!gmp) {
-      return NS_ERROR_FAILURE;
+    if (gmp) {
+      *aHasPlugin = true;
+      aOutVersion = gmp->GetVersion();
+    } else {
+      *aHasPlugin = false;
     }
-    aOutVersion = gmp->GetVersion();
   }
 
   return NS_OK;
@@ -824,23 +828,8 @@ GeckoMediaPluginService::HasPluginForAPI(const nsACString& aAPI,
                                          nsTArray<nsCString>* aTags,
                                          bool* aOutHavePlugin)
 {
-  NS_ENSURE_ARG(aTags && aTags->Length() > 0);
-  NS_ENSURE_ARG(aOutHavePlugin);
-
-  nsresult rv = EnsurePluginsOnDiskScanned();
-  if (NS_FAILED(rv)) {
-    NS_WARNING("Failed to load GMPs from disk.");
-    return rv;
-  }
-
-  {
-    MutexAutoLock lock(mMutex);
-    nsCString api(aAPI);
-    GMPParent* gmp = FindPluginForAPIFrom(0, api, *aTags, nullptr);
-    *aOutHavePlugin = (gmp != nullptr);
-  }
-
-  return NS_OK;
+  nsCString unused;
+  return GetPluginVersionForAPI(aAPI, aTags, aOutHavePlugin, unused);
 }
 
 GMPParent*
