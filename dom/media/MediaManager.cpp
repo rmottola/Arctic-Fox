@@ -424,7 +424,7 @@ MediaDevice::MediaDevice(MediaEngineSource* aSource)
 
 VideoDevice::VideoDevice(MediaEngineVideoSource* aSource)
   : MediaDevice(aSource) {
-#ifdef MOZ_B2G_CAMERA
+#if defined(MOZ_B2G_CAMERA) && defined(MOZ_WIDGET_GONK)
   if (mName.EqualsLiteral("back")) {
     mHasFacingMode = true;
     mFacingMode = dom::VideoFacingModeEnum::Environment;
@@ -1892,7 +1892,7 @@ MediaManager::GetUserMedia(
     }
   }
 
-#ifdef MOZ_B2G_CAMERA
+#if defined(MOZ_B2G_CAMERA) && defined(MOZ_WIDGET_GONK)
   if (mCameraManager == nullptr) {
     mCameraManager = nsDOMCameraManager::CreateInstance(aWindow);
   }
