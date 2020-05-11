@@ -780,7 +780,6 @@ GeckoMediaPluginService::GetPluginVersionForAPI(const nsACString& aAPI,
                                                 nsACString& aOutVersion)
 {
   NS_ENSURE_ARG(aTags && aTags->Length() > 0);
-  NS_ENSURE_ARG(aOutVersion.IsEmpty());
 
   nsresult rv = EnsurePluginsOnDiskScanned();
   if (NS_FAILED(rv)) {
@@ -791,23 +790,11 @@ GeckoMediaPluginService::GetPluginVersionForAPI(const nsACString& aAPI,
   {
     MutexAutoLock lock(mMutex);
     nsCString api(aAPI);
-    size_t index = 0;
-
-    // We must parse the version number into a float for comparison. Yuck.
-    double maxParsedVersion = -1.;
-
-    while (GMPParent* gmp = FindPluginForAPIFrom(index, api, *aTags, &index)) {
-      double parsedVersion = atof(gmp->GetVersion().get());
-      if (maxParsedVersion < 0 || parsedVersion > maxParsedVersion) {
-        maxParsedVersion = parsedVersion;
-        aOutVersion = gmp->GetVersion();
-      }
-      index++;
-    }
-
-    if (maxParsedVersion < 0) {
+    GMPParent* gmp = FindPluginForAPIFrom(0, api, *aTags, nullptr);
+    if (!gmp) {
       return NS_ERROR_FAILURE;
     }
+    aOutVersion = gmp->GetVersion();
   }
 
   return NS_OK;
