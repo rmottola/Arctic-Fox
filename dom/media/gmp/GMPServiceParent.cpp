@@ -882,7 +882,7 @@ GeckoMediaPluginServiceParent::IsPersistentStorageAllowed(const nsACString& aNod
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
                                          const nsAString& aTopLevelOrigin,
                                          bool aInPrivateBrowsing,
@@ -1028,6 +1028,18 @@ GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
   mPersistentStorageAllowed.Put(salt, true);
 
   return NS_OK;
+}
+
+NS_IMETHODIMP
+GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
+                                         const nsAString& aTopLevelOrigin,
+                                         bool aInPrivateBrowsing,
+                                         UniquePtr<GetNodeIdCallback>&& aCallback)
+{
+  nsCString nodeId;
+  nsresult rv = GetNodeId(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, nodeId);
+  aCallback->Done(rv, nodeId);
+  return rv;
 }
 
 bool
