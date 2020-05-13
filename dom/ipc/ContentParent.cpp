@@ -27,6 +27,7 @@
 #include "AppProcessChecker.h"
 #include "AudioChannelService.h"
 #include "BlobParent.h"
+#include "GMPServiceParent.h"
 #include "IHistory.h"
 #include "mozIApplication.h"
 #ifdef ACCESSIBILITY
@@ -226,6 +227,7 @@ using namespace mozilla::dom::mobilemessage;
 using namespace mozilla::dom::telephony;
 using namespace mozilla::dom::voicemail;
 using namespace mozilla::embedding;
+using namespace mozilla::gmp;
 using namespace mozilla::hal;
 using namespace mozilla::ipc;
 using namespace mozilla::layers;
@@ -988,6 +990,23 @@ static nsIDocShell* GetOpenerDocShellHelper(Element* aFrameElement)
     }
 
     return docShell;
+}
+
+bool
+ContentParent::RecvCreateGMPService()
+{
+    return PGMPService::Open(this);
+}
+
+bool
+ContentParent::RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
+                                             nsTArray<nsCString>&& aTags,
+                                             bool* aHasVersion,
+                                             nsCString* aVersion)
+{
+    return GMPServiceParent::RecvGetGMPPluginVersionForAPI(aAPI, Move(aTags),
+                                                           aHasVersion,
+                                                           aVersion);
 }
 
 bool
@@ -3010,6 +3029,13 @@ ContentParent::RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc, PDocAcc
   }
 #endif
   return true;
+}
+
+PGMPServiceParent*
+ContentParent::AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
+                                      base::ProcessId aOtherProcess)
+{
+    return GMPServiceParent::Create(aTransport, aOtherProcess);
 }
 
 PCompositorParent*
