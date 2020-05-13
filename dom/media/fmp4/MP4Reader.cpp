@@ -29,7 +29,6 @@ using mozilla::layers::LayerManager;
 using mozilla::layers::LayersBackend;
 using mozilla::media::TimeUnit;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetDemuxerLog() {
   static PRLogModuleInfo* log = nullptr;
   if (!log) {
@@ -39,10 +38,6 @@ PRLogModuleInfo* GetDemuxerLog() {
 }
 #define LOG(arg, ...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, ("MP4Reader(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 #define VLOG(arg, ...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, ("MP4Reader(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
-#else
-#define LOG(...)
-#define VLOG(...)
-#endif
 
 using namespace mp4_demuxer;
 
@@ -51,7 +46,6 @@ namespace mozilla {
 // Uncomment to enable verbose per-sample logging.
 //#define LOG_SAMPLE_DECODE 1
 
-#ifdef PR_LOGGING
 static const char*
 TrackTypeToStr(TrackInfo::TrackType aTrack)
 {
@@ -66,7 +60,6 @@ TrackTypeToStr(TrackInfo::TrackType aTrack)
     return "Unknown";
   }
 }
-#endif
 
 bool
 AccumulateSPSTelemetry(const MediaByteBuffer* aExtradata)

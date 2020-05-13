@@ -58,13 +58,9 @@ static const uint64_t ESTIMATED_DURATION_FUZZ_FACTOR_USECS = USECS_PER_S / 2;
 // avoid redefined macro in unified build
 #undef DECODER_LOG
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gMediaDecoderLog;
 #define DECODER_LOG(x, ...) \
   PR_LOG(gMediaDecoderLog, PR_LOG_DEBUG, ("Decoder=%p " x, this, ##__VA_ARGS__))
-#else
-#define DECODER_LOG(x, ...)
-#endif
 
 static const char* const gPlayStateStr[] = {
   "START",

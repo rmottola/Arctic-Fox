@@ -31,16 +31,11 @@
 
 #undef LOG
 
-#ifdef PR_LOGGING
 #include "prprf.h"
 #define LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
 #ifdef SEEK_LOGGING
 #define SEEK_LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
 #else
-#define SEEK_LOG(type, msg)
-#endif
-#else
-#define LOG(type, msg)
 #define SEEK_LOG(type, msg)
 #endif
 
@@ -107,7 +102,6 @@ static void webm_log(nestegg * context,
                      unsigned int severity,
                      char const * format, ...)
 {
-#ifdef PR_LOGGING
   va_list args;
   char msg[256];
   const char * sevStr;
@@ -140,7 +134,6 @@ static void webm_log(nestegg * context,
   PR_LOG(gNesteggLog, PR_LOG_DEBUG, (msg));
 
   va_end(args);
-#endif
 }
 
 #if defined(MOZ_PDM_VPX)
@@ -163,11 +156,9 @@ WebMReader::WebMReader(AbstractMediaDecoder* aDecoder)
   , mHasAudio(false)
 {
   MOZ_COUNT_CTOR(WebMReader);
-#ifdef PR_LOGGING
   if (!gNesteggLog) {
     gNesteggLog = PR_NewLogModule("Nestegg");
   }
-#endif
 
 #if defined(MOZ_PDM_VPX)
   sIsIntelDecoderEnabled = Preferences::GetBool("media.webm.intel_decoder.enabled", false);

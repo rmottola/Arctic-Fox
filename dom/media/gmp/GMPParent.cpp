@@ -30,14 +30,9 @@ namespace mozilla {
 #undef LOG
 #undef LOGD
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetGMPLog();
 #define LOG(level, x, ...) PR_LOG(GetGMPLog(), (level), (x, ##__VA_ARGS__))
 #define LOGD(x, ...) LOG(PR_LOG_DEBUG, "GMPParent[%p|childPid=%d] " x, this, mChildPid, ##__VA_ARGS__)
-#else
-#define LOG(level, x, ...)
-#define LOGD(x, ...)
-#endif
 
 namespace gmp {
 
@@ -51,9 +46,7 @@ GMPParent::GMPParent()
   , mGMPContentChildCount(0)
   , mAsyncShutdownRequired(false)
   , mAsyncShutdownInProgress(false)
-#ifdef PR_LOGGING
   , mChildPid(0)
-#endif
 {
   LOGD("GMPParent ctor");
   // Use the parent address to identify it.
@@ -135,9 +128,7 @@ GMPParent::LoadProcess()
       return NS_ERROR_FAILURE;
     }
 
-#ifdef PR_LOGGING
     mChildPid = base::GetProcId(mProcess->GetChildProcessHandle());
-#endif
 
     bool opened = Open(mProcess->GetChannel(),
                        base::GetProcId(mProcess->GetChildProcessHandle()));

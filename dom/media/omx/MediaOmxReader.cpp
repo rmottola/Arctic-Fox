@@ -28,12 +28,8 @@ using namespace android;
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gMediaDecoderLog;
 #define DECODER_LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
-#else
-#define DECODER_LOG(type, msg)
-#endif
 
 class OmxReaderProcessCachedDataTask : public Task
 {
@@ -149,11 +145,9 @@ MediaOmxReader::MediaOmxReader(AbstractMediaDecoder *aDecoder)
   , mMP3FrameParser(-1)
   , mIsWaitingResources(false)
 {
-#ifdef PR_LOGGING
   if (!gMediaDecoderLog) {
     gMediaDecoderLog = PR_NewLogModule("MediaDecoder");
   }
-#endif
 
   mAudioChannel = dom::AudioChannelService::GetDefaultAudioChannel();
 }

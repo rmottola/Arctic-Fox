@@ -31,12 +31,8 @@
 #undef LOG
 #endif
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gMediaEncoderLog;
 #define LOG(type, msg) PR_LOG(gMediaEncoderLog, type, msg)
-#else
-#define LOG(type, msg)
-#endif
 
 namespace mozilla {
 
@@ -81,11 +77,9 @@ MediaEncoder::CreateEncoder(const nsAString& aMIMEType, uint32_t aAudioBitrate,
                             uint32_t aVideoBitrate, uint32_t aBitrate,
                             uint8_t aTrackTypes)
 {
-#ifdef PR_LOGGING
   if (!gMediaEncoderLog) {
     gMediaEncoderLog = PR_NewLogModule("MediaEncoder");
   }
-#endif
   PROFILER_LABEL("MediaEncoder", "CreateEncoder",
     js::ProfileEntry::Category::OTHER);
 

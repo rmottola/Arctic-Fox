@@ -22,13 +22,9 @@
 #include "VideoUtils.h"
 #include <algorithm>
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetAppleMediaLog();
 #define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
-#else
-#define LOG(...)
-#endif
 
 namespace mozilla {
 

@@ -200,9 +200,7 @@ private:
   bool mAsyncShutdownRequired;
   bool mAsyncShutdownInProgress;
 
-#ifdef PR_LOGGING
   int mChildPid;
-#endif
 };
 
 } // namespace gmp

@@ -39,12 +39,8 @@
 #include "nsThreadUtils.h"
 #include "nsVideoFrame.h"
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gTrackElementLog;
 #define LOG(type, msg) PR_LOG(gTrackElementLog, type, msg)
-#else
-#define LOG(type, msg)
-#endif
 
 // Replace the usual NS_IMPL_NS_NEW_HTML_ELEMENT(Track) so
 // we can return an UnknownElement instead when pref'd off.
@@ -79,11 +75,9 @@ static MOZ_CONSTEXPR const char* kKindTableDefaultString = kKindTable->tag;
 HTMLTrackElement::HTMLTrackElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo)
   : nsGenericHTMLElement(aNodeInfo)
 {
-#ifdef PR_LOGGING
   if (!gTrackElementLog) {
     gTrackElementLog = PR_NewLogModule("nsTrackElement");
   }
-#endif
 }
 
 HTMLTrackElement::~HTMLTrackElement()

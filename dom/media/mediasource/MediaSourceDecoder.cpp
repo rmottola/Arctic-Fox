@@ -18,15 +18,10 @@
 #include "MediaSourceDemuxer.h"
 #include <algorithm>
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaSourceLog();
 
 #define MSE_DEBUG(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, ("MediaSourceDecoder(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 #define MSE_DEBUGV(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG + 1, ("MediaSourceDecoder(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
-#else
-#define MSE_DEBUG(...)
-#define MSE_DEBUGV(...)
-#endif
 
 using namespace mozilla::media;
 
