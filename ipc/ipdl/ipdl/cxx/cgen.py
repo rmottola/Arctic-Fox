@@ -187,7 +187,7 @@ class CxxCodeGen(CodePrinter, Visitor):
             self.write('MOZ_WARN_UNUSED_RESULT ')
         if md.inline:
             self.write('inline ')
-        if md.inline:
+        if md.never_inline:
             self.write('MOZ_NEVER_INLINE ')
         if md.static:
             self.write('static ')
