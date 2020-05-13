@@ -200,7 +200,7 @@ public:
                                             bool* aHasPlugin,
                                             nsCString* aVersion);
 
-  virtual void ActorDestroy(ActorDestroyReason aWhy);
+  virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
   static PGMPServiceParent* Create(Transport* aTransport, ProcessId aOtherPid);
 
