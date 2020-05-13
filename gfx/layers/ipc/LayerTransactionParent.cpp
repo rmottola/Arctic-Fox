@@ -971,7 +971,7 @@ LayerTransactionParent::ActorDestroy(ActorDestroyReason why)
 
 bool LayerTransactionParent::IsSameProcess() const
 {
-  return OtherPid() == ipc::kCurrentProcessId;
+  return OtherPid() == base::GetCurrentProcId();
 }
 
 void

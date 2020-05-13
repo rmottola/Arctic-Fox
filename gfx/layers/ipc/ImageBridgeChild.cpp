@@ -631,7 +631,7 @@ bool ImageBridgeChild::StartUpOnThread(Thread* aThread)
     }
     sImageBridgeChildSingleton = new ImageBridgeChild();
     sImageBridgeParentSingleton = new ImageBridgeParent(
-      CompositorParent::CompositorLoop(), nullptr, ipc::kCurrentProcessId);
+      CompositorParent::CompositorLoop(), nullptr, base::GetCurrentProcId());
     sImageBridgeChildSingleton->ConnectAsync(sImageBridgeParentSingleton);
     return true;
   } else {
@@ -959,7 +959,7 @@ void ImageBridgeChild::RemoveTexture(TextureClient* aTexture)
 
 bool ImageBridgeChild::IsSameProcess() const
 {
-  return OtherPid() == ipc::kCurrentProcessId;
+  return OtherPid() == base::GetCurrentProcId();
 }
 
 void ImageBridgeChild::SendPendingAsyncMessges()
