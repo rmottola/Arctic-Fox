@@ -73,7 +73,8 @@ NS_IMPL_ISUPPORTS_INHERITED(GeckoMediaPluginServiceParent,
                             mozIGeckoMediaPluginChromeService)
 
 static int32_t sMaxAsyncShutdownWaitMs = 0;
-static bool sHaveSetTimeoutPrefCache = false;
+static bool sAllowInsecureGMP = false;
+static bool sHaveSetGMPServiceParentPrefCaches = false;
 
 GeckoMediaPluginServiceParent::GeckoMediaPluginServiceParent()
   : mShuttingDown(false)
@@ -81,11 +82,13 @@ GeckoMediaPluginServiceParent::GeckoMediaPluginServiceParent()
   , mWaitingForPluginsAsyncShutdown(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (!sHaveSetTimeoutPrefCache) {
-    sHaveSetTimeoutPrefCache = true;
+  if (!sHaveSetGMPServiceParentPrefCaches) {
+    sHaveSetGMPServiceParentPrefCaches = true;
     Preferences::AddIntVarCache(&sMaxAsyncShutdownWaitMs,
                                 "media.gmp.async-shutdown-timeout",
                                 GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT);
+    Preferences::AddBoolVarCache(&sAllowInsecureGMP,
+                                 "media.gmp.insecure.allow", false);
   }
 }
 
@@ -98,7 +101,7 @@ GeckoMediaPluginServiceParent::~GeckoMediaPluginServiceParent()
 int32_t
 GeckoMediaPluginServiceParent::AsyncShutdownTimeoutMs()
 {
-  MOZ_ASSERT(sHaveSetTimeoutPrefCache);
+  MOZ_ASSERT(sHaveSetGMPServiceParentPrefCaches);
   return sMaxAsyncShutdownWaitMs;
 }
 
@@ -594,45 +597,30 @@ GeckoMediaPluginServiceParent::SelectPluginForAPI(const nsACString& aNodeId,
   return nullptr;
 }
 
-class CreateGMPParentTask : public nsRunnable {
-public:
-  NS_IMETHOD Run() {
-    MOZ_ASSERT(NS_IsMainThread());
+RefPtr<GMPParent>
+CreateGMPParent()
+{
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
-    if (!SandboxInfo::Get().CanSandboxMedia()) {
-      if (!Preferences::GetBool("media.gmp.insecure.allow")) {
-        NS_WARNING("Denying media plugin load due to lack of sandboxing.");
-        return NS_ERROR_NOT_AVAILABLE;
-      }
-      NS_WARNING("Loading media plugin despite lack of sandboxing.");
+  if (!SandboxInfo::Get().CanSandboxMedia()) {
+    if (!sAllowInsecureGMP) {
+      NS_WARNING("Denying media plugin load due to lack of sandboxing.");
+      return nullptr;
     }
+    NS_WARNING("Loading media plugin despite lack of sandboxing.");
+  }
 #endif
-    mParent = new GMPParent();
-    return NS_OK;
-  }
-  already_AddRefed<GMPParent> GetParent() {
-    return mParent.forget();
-  }
-private:
-  nsRefPtr<GMPParent> mParent;
-};
+  return new GMPParent();
+}
+
+
 
 GMPParent*
 GeckoMediaPluginServiceParent::ClonePlugin(const GMPParent* aOriginal)
 {
   MOZ_ASSERT(aOriginal);
 
-  // The GMPParent inherits from IToplevelProtocol, which must be created
-  // on the main thread to be threadsafe. See Bug 1035653.
-  nsRefPtr<CreateGMPParentTask> task(new CreateGMPParentTask());
-  if (!NS_IsMainThread()) {
-    nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
-    MOZ_ASSERT(mainThread);
-    mozilla::SyncRunnable::DispatchToThread(mainThread, task);
-  }
-
-  nsRefPtr<GMPParent> gmp = task->GetParent();
-  nsresult rv = gmp->CloneFrom(aOriginal);
+  RefPtr<GMPParent> gmp = CreateGMPParent();
+  nsresult rv = gmp ? gmp->CloneFrom(aOriginal) : NS_ERROR_NOT_AVAILABLE;
 
   if (NS_FAILED(rv)) {
     NS_WARNING("Can't Create GMPParent");
@@ -676,13 +664,7 @@ GeckoMediaPluginServiceParent::AddOnGMPThread(const nsAString& aDirectory)
     return;
   }
 
-  // The GMPParent inherits from IToplevelProtocol, which must be created
-  // on the main thread to be threadsafe. See Bug 1035653.
-  nsRefPtr<CreateGMPParentTask> task(new CreateGMPParentTask());
-  nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
-  MOZ_ASSERT(mainThread);
-  mozilla::SyncRunnable::DispatchToThread(mainThread, task);
-  nsRefPtr<GMPParent> gmp = task->GetParent();
+  RefPtr<GMPParent> gmp = CreateGMPParent();
   rv = gmp ? gmp->Init(this, directory) : NS_ERROR_NOT_AVAILABLE;
   if (NS_FAILED(rv)) {
     NS_WARNING("Can't Create GMPParent");
