@@ -965,14 +965,6 @@ gfxFontUtils::DetermineFontDataType(const uint8_t *aFontData, uint32_t aFontData
     return GFX_USERFONT_UNKNOWN;
 }
 
-static int
-DirEntryCmp(const void* aKey, const void* aItem)
-{
-    int32_t tag = *static_cast<const int32_t*>(aKey);
-    const TableDirEntry* entry = static_cast<const TableDirEntry*>(aItem);
-    return tag - int32_t(entry->tag);
-}
-
 /* static */
 TableDirEntry*
 gfxFontUtils::FindTableDirEntry(const void* aFontData, uint32_t aTableTag)
@@ -986,19 +978,6 @@ gfxFontUtils::FindTableDirEntry(const void* aFontData, uint32_t aTableTag)
                  sizeof(TableDirEntry), DirEntryCmp));
 }
 
-/* static */
-hb_blob_t*
-gfxFontUtils::GetTableFromFontData(const void* aFontData, uint32_t aTableTag)
-{
-    const TableDirEntry* dir = FindTableDirEntry(aFontData, aTableTag);
-    if (dir) {
-        return hb_blob_create(reinterpret_cast<const char*>(aFontData) +
-                                  dir->offset, dir->length,
-                              HB_MEMORY_MODE_READONLY, nullptr, nullptr);
-
-    }
-    return nullptr;
-}
 
 nsresult
 gfxFontUtils::RenameFont(const nsAString& aName, const uint8_t *aFontData, 
