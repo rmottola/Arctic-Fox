@@ -50,7 +50,6 @@
 
 using namespace mozilla;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo *
 GetFontInfoLog()
 {
@@ -59,7 +58,6 @@ GetFontInfoLog()
         sLog = PR_NewLogModule("fontInfoLog");
     return sLog;
 }
-#endif /* PR_LOGGING */
 
 #undef LOG
 #define LOG(args) PR_LOG(GetFontInfoLog(), PR_LOG_DEBUG, args)
@@ -1060,7 +1058,6 @@ gfxFT2FontList::AddFaceToList(const nsCString& aEntryName, uint32_t aIndex,
         fe->CheckForBrokenFont(family);
 
         AppendToFaceList(aFaceList, name, fe);
-#ifdef PR_LOGGING
         if (LOG_ENABLED()) {
             LOG(("(fontinit) added (%s) to family (%s)"
                  " with style: %s weight: %d stretch: %d",
@@ -1069,7 +1066,6 @@ gfxFT2FontList::AddFaceToList(const nsCString& aEntryName, uint32_t aIndex,
                  fe->IsItalic() ? "italic" : "normal",
                  fe->Weight(), fe->Stretch()));
         }
-#endif
     }
 }
 

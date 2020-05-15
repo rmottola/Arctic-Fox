@@ -1495,7 +1495,7 @@ gfxFontFamily::FindFontForChar(GlobalFontMatch *aMatchData)
         if (fe->HasCharacter(aMatchData->mCh)) {
             rank += RANK_MATCHED_CMAP;
             aMatchData->mCount++;
-#ifdef PR_LOGGING
+
             PRLogModuleInfo *log = gfxPlatform::GetLog(eGfxLog_textrun);
 
             if (MOZ_UNLIKELY(PR_LOG_TEST(log, PR_LOG_DEBUG))) {
@@ -1508,7 +1508,6 @@ gfxFontFamily::FindFontForChar(GlobalFontMatch *aMatchData)
                         unicodeRange, script,
                         NS_ConvertUTF16toUTF8(fe->Name()).get()));
             }
-#endif
         }
 
         aMatchData->mCmapsTested++;
