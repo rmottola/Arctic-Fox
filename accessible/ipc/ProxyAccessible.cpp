@@ -363,5 +363,21 @@ ProxyAccessible::CharAt(int32_t aOffset)
   return static_cast<char16_t>(retval);
 }
 
+nsIntPoint
+ProxyAccessible::ImagePosition(uint32_t aCoordType)
+{
+  nsIntPoint retVal;
+  unused << mDoc->SendImagePosition(mID, aCoordType, &retVal);
+  return retVal;
+}
+
+nsIntSize
+ProxyAccessible::ImageSize()
+{
+  nsIntSize retVal;
+  unused << mDoc->SendImageSize(mID, &retVal);
+  return retVal;
+}
+
 }
 }
