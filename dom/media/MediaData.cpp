@@ -260,7 +260,7 @@ VideoData::Create(const VideoInfo& aInfo,
                                         aDuration,
                                         aKeyframe,
                                         aTimecode,
-                                        aInfo.mDisplay.ToIntSize()));
+                                        aInfo.mDisplay));
     return v.forget();
   }
 
@@ -302,7 +302,7 @@ VideoData::Create(const VideoInfo& aInfo,
                                       aDuration,
                                       aKeyframe,
                                       aTimecode,
-                                      aInfo.mDisplay.ToIntSize()));
+                                      aInfo.mDisplay));
 #ifdef MOZ_WIDGET_GONK
   const YCbCrBuffer::Plane &Y = aBuffer.mPlanes[0];
   const YCbCrBuffer::Plane &Cb = aBuffer.mPlanes[1];
@@ -404,7 +404,7 @@ VideoData::CreateFromImage(const VideoInfo& aInfo,
                                       aDuration,
                                       aKeyframe,
                                       aTimecode,
-                                      aInfo.mDisplay.ToIntSize()));
+                                      aInfo.mDisplay));
   v->mImage = aImage;
   return v.forget();
 }
@@ -430,7 +430,7 @@ VideoData::Create(const VideoInfo& aInfo,
                                         aDuration,
                                         aKeyframe,
                                         aTimecode,
-                                        aInfo.mDisplay.ToIntSize()));
+                                        aInfo.mDisplay));
     return v.forget();
   }
 
@@ -457,7 +457,7 @@ VideoData::Create(const VideoInfo& aInfo,
                                       aDuration,
                                       aKeyframe,
                                       aTimecode,
-                                      aInfo.mDisplay.ToIntSize()));
+                                      aInfo.mDisplay));
 
   v->mImage = aContainer->CreateImage(ImageFormat::GRALLOC_PLANAR_YCBCR);
   if (!v->mImage) {

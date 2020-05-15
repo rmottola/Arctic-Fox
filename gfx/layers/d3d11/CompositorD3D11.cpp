@@ -1234,7 +1234,7 @@ CompositorD3D11::UpdateRenderTarget()
   }
 
   mDefaultRT = new CompositingRenderTargetD3D11(backBuf, IntPoint(0, 0));
-  mDefaultRT->SetSize(mSize.ToIntSize());
+  mDefaultRT->SetSize(mSize);
 }
 
 bool

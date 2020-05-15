@@ -471,7 +471,7 @@ Decoder::InternalAddFrame(uint32_t aFrameNum,
   }
 
   const uint32_t bytesPerPixel = aPaletteDepth == 0 ? 4 : 1;
-  if (!SurfaceCache::CanHold(aFrameRect.Size().ToIntSize(), bytesPerPixel)) {
+  if (!SurfaceCache::CanHold(aFrameRect.Size(), bytesPerPixel)) {
     NS_WARNING("Trying to add frame that's too large for the SurfaceCache");
     return RawAccessFrameRef();
   }
@@ -493,7 +493,7 @@ Decoder::InternalAddFrame(uint32_t aFrameNum,
 
   InsertOutcome outcome =
     SurfaceCache::Insert(frame, ImageKey(mImage.get()),
-                         RasterSurfaceKey(aTargetSize.ToIntSize(),
+                         RasterSurfaceKey(aTargetSize,
                                           aDecodeFlags,
                                           aFrameNum),
                          Lifetime::Persistent);
