@@ -163,14 +163,14 @@ ia2Accessible::role(long* aRole)
   if (acc->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-#define ROLE(_goannaRole, stringRole, atkRole, macRole, \
+#define ROLE(_geckoRole, stringRole, atkRole, macRole, \
              msaaRole, ia2Role, nameRule) \
-  case roles::_goannaRole: \
+  case roles::_geckoRole: \
     *aRole = ia2Role; \
     break;
 
-  a11y::role goannaRole = acc->Role();
-  switch (goannaRole) {
+  a11y::role geckoRole = acc->Role();
+  switch (geckoRole) {
 #include "RoleMap.h"
     default:
       MOZ_CRASH("Unknown role.");
@@ -180,7 +180,7 @@ ia2Accessible::role(long* aRole)
 
   // Special case, if there is a ROLE_ROW inside of a ROLE_TREE_TABLE, then call
   // the IA2 role a ROLE_OUTLINEITEM.
-  if (goannaRole == roles::ROW) {
+  if (geckoRole == roles::ROW) {
     Accessible* xpParent = acc->Parent();
     if (xpParent && xpParent->Role() == roles::TREE_TABLE)
       *aRole = ROLE_SYSTEM_OUTLINEITEM;

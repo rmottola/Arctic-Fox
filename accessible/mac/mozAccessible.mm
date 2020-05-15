@@ -411,8 +411,8 @@ GetClosestInterestingAccessible(id anObject)
                "Does not support Text when it should");
 #endif
 
-#define ROLE(goannaRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule) \
-  case roles::goannaRole: \
+#define ROLE(geckoRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule) \
+  case roles::geckoRole: \
     return macRole;
 
   switch (mRole) {
