@@ -217,11 +217,11 @@ ia2Accessible::scrollToPoint(enum IA2CoordinateType aCoordType,
   if (acc->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-  uint32_t goannaCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
+  uint32_t geckoCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
     nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE :
     nsIAccessibleCoordinateType::COORDTYPE_PARENT_RELATIVE;
 
-  acc->ScrollToPoint(goannaCoordType, aX, aY);
+  acc->ScrollToPoint(geckoCoordType, aX, aY);
   return S_OK;
 
   A11Y_TRYBLOCK_END

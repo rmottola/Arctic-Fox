@@ -102,11 +102,11 @@ ia2AccessibleText::get_characterExtents(long aOffset,
   if (textAcc->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-  uint32_t goannaCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
+  uint32_t geckoCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
     nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE :
     nsIAccessibleCoordinateType::COORDTYPE_PARENT_RELATIVE;
 
-  nsIntRect rect = textAcc->CharBounds(aOffset, goannaCoordType);
+  nsIntRect rect = textAcc->CharBounds(aOffset, geckoCoordType);
 
   *aX = rect.x;
   *aY = rect.y;
@@ -151,11 +151,11 @@ ia2AccessibleText::get_offsetAtPoint(long aX, long aY,
   if (textAcc->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-  uint32_t goannaCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
+  uint32_t geckoCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
     nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE :
     nsIAccessibleCoordinateType::COORDTYPE_PARENT_RELATIVE;
 
-  *aOffset = textAcc->OffsetAtPoint(aX, aY, goannaCoordType);
+  *aOffset = textAcc->OffsetAtPoint(aX, aY, geckoCoordType);
   return *aOffset == -1 ? S_FALSE : S_OK;
 
   A11Y_TRYBLOCK_END
@@ -457,12 +457,12 @@ ia2AccessibleText::scrollSubstringToPoint(long aStartIndex, long aEndIndex,
   if (!textAcc->IsValidRange(aStartIndex, aEndIndex))
     return E_INVALIDARG;
 
-  uint32_t goannaCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
+  uint32_t geckoCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
     nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE :
     nsIAccessibleCoordinateType::COORDTYPE_PARENT_RELATIVE;
 
   textAcc->ScrollSubstringToPoint(aStartIndex, aEndIndex,
-                                  goannaCoordType, aX, aY);
+                                  geckoCoordType, aX, aY);
   return S_OK;
 
   A11Y_TRYBLOCK_END

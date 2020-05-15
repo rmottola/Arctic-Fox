@@ -82,11 +82,11 @@ ia2AccessibleImage::get_imagePosition(enum IA2CoordinateType aCoordType,
   if (imageAcc->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-  uint32_t goannaCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
+  uint32_t geckoCoordType = (aCoordType == IA2_COORDTYPE_SCREEN_RELATIVE) ?
     nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE :
     nsIAccessibleCoordinateType::COORDTYPE_PARENT_RELATIVE;
 
-  nsIntPoint pos = imageAcc->Position(goannaCoordType);
+  nsIntPoint pos = imageAcc->Position(geckoCoordType);
   *aX = pos.x;
   *aY = pos.y;
   return S_OK;
