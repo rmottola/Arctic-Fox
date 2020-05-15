@@ -14,8 +14,6 @@
 #include "nsCOMPtr.h"
 #include "nsTArray.h"
 
-class nsIInputStream;
-
 namespace mozilla {
 namespace dom {
 
@@ -25,9 +23,7 @@ namespace indexedDB {
 
 class FileInfo;
 class IDBDatabase;
-class IDBTransaction;
 class SerializedStructuredCloneReadInfo;
-class SerializedStructuredCloneWriteInfo;
 
 struct StructuredCloneFile
 {

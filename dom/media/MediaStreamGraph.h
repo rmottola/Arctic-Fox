@@ -246,7 +246,6 @@ class MediaInputPort;
 class AudioNodeEngine;
 class AudioNodeExternalInputStream;
 class AudioNodeStream;
-struct AudioChunk;
 class CameraPreviewMediaStream;
 
 /**

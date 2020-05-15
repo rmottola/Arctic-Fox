@@ -22,7 +22,6 @@
 #include "nsTArray.h"
 #include "nsIFile.h"
 
-class nsILineInputStream;
 class nsIThread;
 
 namespace mozilla {
