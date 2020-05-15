@@ -16,7 +16,6 @@
 #include "nsIContentViewer.h"
 #include "nsWeakReference.h"
 
-class nsIAtom;
 class nsIPresShell;
 class nsIRequest;
 class nsILoadGroup;

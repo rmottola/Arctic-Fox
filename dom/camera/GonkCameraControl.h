@@ -48,9 +48,6 @@ namespace layers {
   class ImageContainer;
 }
 
-class GonkRecorderProfile;
-class GonkRecorderProfileManager;
-
 class nsGonkCameraControl : public CameraControlImpl
 {
 public:
