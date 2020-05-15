@@ -13,11 +13,6 @@
 class nsIURI;
 class nsIInputStream;
 class nsGenericHTMLElement;
-class nsILinkHandler;
-class nsIFormControl;
-class nsIDOMHTMLElement;
-class nsIDocShell;
-class nsIRequest;
 class nsISaveAsCharset;
 class nsIMultiplexInputStream;
 
