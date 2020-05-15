@@ -175,6 +175,10 @@ public:
   virtual bool RecvPasteText(const uint64_t& aID,
                              const int32_t& aPosition) override;
 
+  virtual bool RecvCharAt(const uint64_t& aID,
+                          const int32_t& aOffset,
+                          uint16_t* aChar) MOZ_OVERRIDE;
+
 private:
   bool PersistentPropertiesToArray(nsIPersistentProperties* aProps,
                                    nsTArray<Attribute>* aAttributes);

@@ -339,5 +339,13 @@ ProxyAccessible::PasteText(int32_t aPosition)
   unused << mDoc->SendPasteText(mID, aPosition);
 }
 
+char16_t
+ProxyAccessible::CharAt(int32_t aOffset)
+{
+  uint16_t retval = 0;
+  unused << mDoc->SendCharAt(mID, aOffset, &retval);
+  return static_cast<char16_t>(retval);
+}
+
 }
 }

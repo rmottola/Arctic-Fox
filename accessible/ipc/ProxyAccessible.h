@@ -103,6 +103,8 @@ public:
   int32_t CharacterCount();
   int32_t SelectionCount();
 
+  char16_t CharAt(int32_t aOffset);
+
   /**
    * Get the text between the given offsets.
    */
