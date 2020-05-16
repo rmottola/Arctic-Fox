@@ -48,9 +48,15 @@
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto 
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
+- Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
+- Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
+- Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
+. Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
+- Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
+- Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1161802 - 2015-06-10  part 1 to 8
@@ -65,6 +71,7 @@
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
+- Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
@@ -84,6 +91,7 @@
 - 1041586 - Implement Symbol.isConcatSpreadable
 - 1041586 - Autogenerate symbol names
 - Bug 1242578
+- Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - 1227567 - Optimise module namespace imports in Ion where we have
@@ -104,11 +112,11 @@
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
-- Bug 1079245 - 2015-04-15 Set about:privatebrowsing to load in child. r=mossop
-- Bug 1153922 - 2015-04-13 Add a SandboxOptions option for creating the sandbox in
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
+
+- Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
 Sequence:
 Bug 1152171 part 2 - Rename AnimationTimeline to DocumentTimeline
@@ -126,8 +134,6 @@ More session store stuff to check:
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 
-- Bug 1177310 - TabStateFlusher Promises should always resolve.
-- Bug 1177310 - Don't flush windows synchronously on application shutdo
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
@@ -148,7 +154,7 @@ What with LightweightThemeConsumer.jsm
 
 
 Parents of:
-
+https://github.com/mozilla/newtab-dev/commit/f277e7a606edb3dfb9fa6e0320a350c3bdd06904
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
