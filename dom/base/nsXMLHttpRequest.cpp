@@ -1804,6 +1804,19 @@ nsXMLHttpRequest::Open(const nsACString& inMethod, const nsACString& url,
   return rv;
 }
 
+void
+nsXMLHttpRequest::PopulateNetworkInterfaceId()
+{
+  if (mNetworkInterfaceId.IsEmpty()) {
+    return;
+  }
+  nsCOMPtr<nsIHttpChannelInternal> channel(do_QueryInterface(mChannel));
+  if (!channel) {
+    return;
+  }
+  channel->SetNetworkInterfaceId(mNetworkInterfaceId);
+}
+
 /*
  * "Copy" from a stream.
  */
@@ -2655,6 +2668,8 @@ nsresult
 nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
 {
   NS_ENSURE_TRUE(mPrincipal, NS_ERROR_NOT_INITIALIZED);
+
+  PopulateNetworkInterfaceId();
 
   nsresult rv = CheckInnerWindowCorrectness();
   NS_ENSURE_SUCCESS(rv, rv);
