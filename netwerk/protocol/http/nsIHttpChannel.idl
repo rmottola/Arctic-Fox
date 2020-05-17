@@ -321,9 +321,4 @@ interface nsIHttpChannel : nsIChannel
      *         has been opened.
      */
     void redirectTo(in nsIURI aNewURI);
-
-    /**
-     * Identifies the scheduling context for this load.
-     */
-    [noscript] attribute nsID schedulingContextID;
 };
