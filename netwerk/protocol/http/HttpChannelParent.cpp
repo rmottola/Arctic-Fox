@@ -32,6 +32,7 @@
 #include "nsIOService.h"
 #include "nsICachingChannel.h"
 #include "mozilla/LoadInfo.h"
+#include "nsIHttpHeaderVisitor.h"
 
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
@@ -111,6 +112,7 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
                        a.requestingPrincipalInfo(), a.triggeringPrincipalInfo(),
                        a.securityFlags(), a.contentPolicyType(), a.innerWindowID(),
+                       a.synthesizedResponseHead(),
                        a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
@@ -135,7 +137,68 @@ NS_IMPL_ISUPPORTS(HttpChannelParent,
                   nsIStreamListener,
                   nsIParentChannel,
                   nsIAuthPromptProvider,
-                  nsIParentRedirectingChannel)
+                  nsIParentRedirectingChannel,
+                  nsINetworkInterceptController)
+
+NS_IMETHODIMP
+HttpChannelParent::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate, bool* aShouldIntercept)
+{
+  *aShouldIntercept = !!mSynthesizedResponseHead;
+  return NS_OK;
+}
+
+class HeaderVisitor final : public nsIHttpHeaderVisitor
+{
+  nsCOMPtr<nsIInterceptedChannel> mChannel;
+  ~HeaderVisitor()
+  {
+  }
+public:
+  HeaderVisitor(nsIInterceptedChannel* aChannel) : mChannel(aChannel)
+  {
+  }
+
+  NS_DECL_ISUPPORTS
+
+  NS_IMETHOD VisitHeader(const nsACString& aHeader, const nsACString& aValue) override
+  {
+    mChannel->SynthesizeHeader(aHeader, aValue);
+    return NS_OK;
+  }
+};
+
+NS_IMPL_ISUPPORTS(HeaderVisitor, nsIHttpHeaderVisitor)
+
+class FinishSynthesizedResponse : public nsRunnable
+{
+  nsCOMPtr<nsIInterceptedChannel> mChannel;
+public:
+  FinishSynthesizedResponse(nsIInterceptedChannel* aChannel)
+  : mChannel(aChannel)
+  {
+  }
+
+  NS_IMETHOD Run()
+  {
+    mChannel->FinishSynthesizedResponse();
+    return NS_OK;
+  }
+};
+
+NS_IMETHODIMP
+HttpChannelParent::ChannelIntercepted(nsIInterceptedChannel* aChannel)
+{
+  aChannel->SynthesizeStatus(mSynthesizedResponseHead->Status(),
+                             mSynthesizedResponseHead->StatusText());
+  nsCOMPtr<nsIHttpHeaderVisitor> visitor = new HeaderVisitor(aChannel);
+  mSynthesizedResponseHead->Headers().VisitHeaders(visitor);
+
+  nsCOMPtr<nsIRunnable> event = new FinishSynthesizedResponse(aChannel);
+  NS_DispatchToCurrentThread(event);
+
+  mSynthesizedResponseHead = nullptr;
+  return NS_OK;
+}
 
 //-----------------------------------------------------------------------------
 // HttpChannelParent::nsIInterfaceRequestor
@@ -204,6 +267,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const uint32_t&            aSecurityFlags,
                                  const uint32_t&            aContentPolicyType,
                                  const uint32_t&            aInnerWindowID,
+                                 const OptionalHttpResponseHead& aSynthesizedResponseHead,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -322,6 +386,10 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   }
 
   mChannel->SetAllowStaleCacheContent(aAllowStaleCacheContent);
+
+  if (aSynthesizedResponseHead.type() == OptionalHttpResponseHead::TnsHttpResponseHead) {
+    mSynthesizedResponseHead = new nsHttpResponseHead(aSynthesizedResponseHead.get_nsHttpResponseHead());
+  }
 
   if (priority != nsISupportsPriority::PRIORITY_NORMAL) {
     mChannel->SetPriority(priority);
