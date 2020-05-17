@@ -1631,6 +1631,7 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.chooseApplicationCache() = mChooseApplicationCache;
   openArgs.appCacheClientID() = appCacheClientId;
   openArgs.allowSpdy() = mAllowSpdy;
+  openArgs.allowAltSvc() = mAllowAltSvc;
   
   openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 

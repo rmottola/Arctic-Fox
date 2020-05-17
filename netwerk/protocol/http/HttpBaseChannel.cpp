@@ -69,6 +69,7 @@ HttpBaseChannel::HttpBaseChannel()
   , mTracingEnabled(true)
   , mTimingEnabled(false)
   , mAllowSpdy(true)
+  , mAllowAltSvc(true)
   , mResponseTimeoutEnabled(true)
   , mAllRedirectsSameOrigin(true)
   , mAllRedirectsPassTimingAllowCheck(true)
@@ -1885,6 +1886,22 @@ HttpBaseChannel::SetAllowSpdy(bool aAllowSpdy)
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::GetAllowAltSvc(bool *aAllowAltSvc)
+{
+  NS_ENSURE_ARG_POINTER(aAllowAltSvc);
+
+  *aAllowAltSvc = mAllowAltSvc;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpBaseChannel::SetAllowAltSvc(bool aAllowAltSvc)
+{
+  mAllowAltSvc = aAllowAltSvc;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::GetApiRedirectToURI(nsIURI ** aResult)
 {
   NS_ENSURE_ARG_POINTER(aResult);
@@ -2341,6 +2358,7 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
     // Convey third party cookie and spdy flags.
     httpInternal->SetThirdPartyFlags(mThirdPartyFlags);
     httpInternal->SetAllowSpdy(mAllowSpdy);
+    httpInternal->SetAllowAltSvc(mAllowAltSvc);
 
     // update the DocumentURI indicator since we are being redirected.
     // if this was a top-level document channel, then the new channel
