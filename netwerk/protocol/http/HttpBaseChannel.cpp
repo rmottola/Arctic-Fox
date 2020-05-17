@@ -37,6 +37,7 @@
 #include "nsPerformance.h"
 #include "nsINetworkInterceptController.h"
 #include "mozIThirdPartyUtil.h"
+#include "nsILoadGroupChild.h"
 
 #include <algorithm>
 
@@ -96,6 +97,7 @@ HttpBaseChannel::HttpBaseChannel()
 #endif
   mSelfAddr.raw.family = PR_AF_UNSPEC;
   mPeerAddr.raw.family = PR_AF_UNSPEC;
+  mSchedulingContextID.Clear();
 }
 
 HttpBaseChannel::~HttpBaseChannel()
@@ -1519,6 +1521,21 @@ HttpBaseChannel::RedirectTo(nsIURI *newURI)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+HttpBaseChannel::GetSchedulingContextID(nsID *aSCID)
+{
+  NS_ENSURE_ARG_POINTER(aSCID);
+  *aSCID = mSchedulingContextID;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpBaseChannel::SetSchedulingContextID(const nsID aSCID)
+{
+  mSchedulingContextID = aSCID;
+  return NS_OK;
+}
+
 //-----------------------------------------------------------------------------
 // HttpBaseChannel::nsIHttpChannelInternal
 //-----------------------------------------------------------------------------
@@ -2730,6 +2747,35 @@ HttpBaseChannel::GetPerformance()
 }
 
 //------------------------------------------------------------------------------
+
+bool
+HttpBaseChannel::EnsureSchedulingContextID()
+{
+    nsID nullID;
+    nullID.Clear();
+    if (!mSchedulingContextID.Equals(nullID)) {
+        // Already have a scheduling context ID, no need to do the rest of this work
+        return true;
+    }
+
+    // Find the loadgroup at the end of the chain in order
+    // to make sure all channels derived from the load group
+    // use the same connection scope.
+    nsCOMPtr<nsILoadGroupChild> childLoadGroup = do_QueryInterface(mLoadGroup);
+    if (!childLoadGroup) {
+        return false;
+    }
+
+    nsCOMPtr<nsILoadGroup> rootLoadGroup;
+    childLoadGroup->GetRootLoadGroup(getter_AddRefs(rootLoadGroup));
+    if (!rootLoadGroup) {
+        return false;
+    }
+
+    // Set the load group connection scope on the transaction
+    rootLoadGroup->GetSchedulingContextID(&mSchedulingContextID);
+    return true;
+}
 
 } // namespace net
 } // namespace mozilla

@@ -116,6 +116,7 @@ protected:
                    const uint32_t&            aSecurityFlags,
                    const uint32_t&            aContentPolicyType,
                    const uint32_t&            aInnerWindowID,
+                   const nsCString&           aSchedulingContextID,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;
