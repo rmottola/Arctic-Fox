@@ -52,9 +52,7 @@ using namespace mozilla;
 using namespace mozilla::psm;
 using mozilla::psm::SharedSSLState;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 static nsresult
 attemptToLogInWithDefaultPassword()

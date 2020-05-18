@@ -27,9 +27,7 @@
 
 using namespace mozilla;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 static NS_DEFINE_CID(kCertOverrideCID, NS_CERTOVERRIDE_CID);
 

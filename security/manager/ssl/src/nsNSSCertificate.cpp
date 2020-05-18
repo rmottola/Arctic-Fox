@@ -54,9 +54,7 @@
 using namespace mozilla;
 using namespace mozilla::psm;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 // This is being stored in an uint32_t that can otherwise
 // only take values from nsIX509Cert's list of cert types.
