@@ -4435,20 +4435,6 @@ nsFrame::ShrinkWidthToFit(nsRenderingContext *aRenderingContext,
 }
 
 void
-nsFrame::WillReflow(nsPresContext* aPresContext)
-{
-#ifdef DEBUG_dbaron_off
-  // bug 81268
-  NS_ASSERTION(!(mState & NS_FRAME_IN_REFLOW),
-               "nsFrame::WillReflow: frame is already in reflow");
-#endif
-
-  NS_FRAME_TRACE_MSG(NS_FRAME_TRACE_CALLS,
-                     ("WillReflow: oldState=%x", mState));
-  mState |= NS_FRAME_IN_REFLOW;
-}
-
-void
 nsFrame::DidReflow(nsPresContext*           aPresContext,
                    const nsHTMLReflowState*  aReflowState,
                    nsDidReflowStatus         aStatus)
@@ -4548,6 +4534,7 @@ nsFrame::Reflow(nsPresContext*          aPresContext,
                 const nsHTMLReflowState& aReflowState,
                 nsReflowStatus&          aStatus)
 {
+  MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsFrame");
   aDesiredSize.ClearSize();
   aStatus = NS_FRAME_COMPLETE;
@@ -8645,7 +8632,6 @@ nsFrame::BoxReflow(nsBoxLayoutState&        aState,
     #endif
 
        // place the child and reflow
-    WillReflow(aPresContext);
 
     Reflow(aPresContext, aDesiredSize, reflowState, status);
 
