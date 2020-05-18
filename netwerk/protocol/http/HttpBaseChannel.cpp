@@ -2362,7 +2362,6 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
     // Transfer existing redirect information. Add all of our existing
     // redirects to the new channel.
     for (int32_t i = 0; i < mRedirects.Count(); ++i) {
-#ifdef PR_LOGGING
       nsCOMPtr<nsIURI> uri;
       mRedirects[i]->GetURI(getter_AddRefs(uri));
       nsCString spec;
@@ -2371,7 +2370,7 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
       }
       LOG(("HttpBaseChannel::SetupReplacementChannel adding redirect \'%s\' "
            "[this=%p]", spec.get(), this));
-#endif
+
       httpInternal->AddRedirect(mRedirects[i]);
     }
 

@@ -6678,12 +6678,10 @@ nsHttpChannel::MaybeInvalidateCacheEntryForSubsequentGet()
     }
 
     // Invalidate the request-uri.
-#ifdef PR_LOGGING
     nsAutoCString key;
     mURI->GetAsciiSpec(key);
     LOG(("MaybeInvalidateCacheEntryForSubsequentGet [this=%p uri=%s]\n",
         this, key.get()));
-#endif
 
     DoInvalidateCacheEntry(mURI);
 
@@ -6726,11 +6724,9 @@ nsHttpChannel::DoInvalidateCacheEntry(nsIURI* aURI)
 
     nsresult rv;
 
-#ifdef PR_LOGGING
     nsAutoCString key;
     aURI->GetAsciiSpec(key);
     LOG(("DoInvalidateCacheEntry [channel=%p key=%s]", this, key.get()));
-#endif
 
     nsCOMPtr<nsICacheStorageService> cacheStorageService =
         do_GetService("@mozilla.org/netwerk/cache-storage-service;1", &rv);

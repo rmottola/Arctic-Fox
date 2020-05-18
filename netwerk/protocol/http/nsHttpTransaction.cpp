@@ -63,7 +63,6 @@ namespace net {
 // helpers
 //-----------------------------------------------------------------------------
 
-#if defined(PR_LOGGING)
 static void
 LogHeaders(const char *lineStart)
 {
@@ -81,7 +80,6 @@ LogHeaders(const char *lineStart)
         lineStart = endOfLine + 2;
     }
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // nsHttpTransaction <public>
@@ -315,13 +313,11 @@ nsHttpTransaction::Init(uint32_t caps,
     mReqHeaderBuf.Truncate();
     requestHead->Flatten(mReqHeaderBuf, pruneProxyHeaders);
 
-#if defined(PR_LOGGING)
     if (LOG3_ENABLED()) {
         LOG3(("http request [\n"));
         LogHeaders(mReqHeaderBuf.get());
         LOG3(("]\n"));
     }
-#endif
 
     // If the request body does not include headers or if there is no request
     // body, then we must add the header/body separator manually.
@@ -1506,7 +1502,6 @@ nsHttpTransaction::HandleContentStart()
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
     if (mResponseHead) {
-#if defined(PR_LOGGING)
         if (LOG3_ENABLED()) {
             LOG3(("http response [\n"));
             nsAutoCString headers;
@@ -1514,7 +1509,7 @@ nsHttpTransaction::HandleContentStart()
             LogHeaders(headers.get());
             LOG3(("]\n"));
         }
-#endif
+
         // Save http version, mResponseHead isn't available anymore after
         // TakeResponseHead() is called
         mHttpVersion = mResponseHead->Version();
@@ -1595,10 +1590,8 @@ nsHttpTransaction::HandleContentStart()
                 // Ignore server specified Content-Length.
                 mContentLength = -1;
             }
-#if defined(PR_LOGGING)
             else if (mContentLength == int64_t(-1))
                 LOG(("waiting for the server to close the connection.\n"));
-#endif
         }
         if (mRestartInProgressVerifier.IsSetup() &&
             !mRestartInProgressVerifier.Verify(mContentLength, mResponseHead)) {
