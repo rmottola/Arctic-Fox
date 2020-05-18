@@ -375,7 +375,6 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
                                nsIStreamListener **aDocListener,
                                bool aReset, nsIContentSink* aSink)
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
 
         nsCOMPtr<nsIURI> uri;
@@ -389,7 +388,6 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
             }
         }
     }
-#endif
     // NOTE: If this ever starts calling nsDocument::StartDocumentLoad
     // we'll possibly need to reset our content type afterwards.
     mStillWalking = true;
@@ -561,7 +559,6 @@ XULDocument::EndLoad()
     }
 
     OnPrototypeLoadDone(true);
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
         nsAutoCString urlspec;
         rv = uri->GetSpec(urlspec);
@@ -570,7 +567,6 @@ XULDocument::EndLoad()
                    ("xul: Finished loading document '%s'", urlspec.get()));
         }
     }
-#endif
 }
 
 NS_IMETHODIMP
@@ -1906,10 +1902,8 @@ XULDocument::Init()
     Preferences::RegisterCallback(XULDocument::DirectionChanged,
                                   "intl.uidirection.", this);
 
-#ifdef PR_LOGGING
     if (! gXULLog)
         gXULLog = PR_NewLogModule("XULDocument");
-#endif
 
     return NS_OK;
 }
@@ -2291,7 +2285,6 @@ XULDocument::PrepareToWalk()
     nsXULPrototypeElement* proto = mCurrentPrototype->GetRootElement();
 
     if (! proto) {
-#ifdef PR_LOGGING
         if (PR_LOG_TEST(gXULLog, PR_LOG_ERROR)) {
             nsCOMPtr<nsIURI> url = mCurrentPrototype->GetURI();
 
@@ -2302,7 +2295,6 @@ XULDocument::PrepareToWalk()
             PR_LOG(gXULLog, PR_LOG_ERROR,
                    ("xul: error parsing '%s'", urlspec.get()));
         }
-#endif
 
         return NS_OK;
     }
@@ -2564,7 +2556,6 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
     *aShouldReturn = false;
     *aFailureFromContent = false;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_DEBUG)) {
         nsAutoCString urlspec;
         aURI->GetSpec(urlspec);
@@ -2579,7 +2570,6 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
         PR_LOG(gXULLog, PR_LOG_DEBUG,
                 ("xul: %s loading overlay %s", parentDoc.get(), urlspec.get()));
     }
-#endif
 
     if (aIsDynamic)
         mResolutionPhase = nsForwardReference::eStart;
@@ -3602,13 +3592,11 @@ XULDocument::CreateElementFromPrototype(nsXULPrototypeElement* aPrototype,
     *aResult = nullptr;
     nsresult rv = NS_OK;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         PR_LOG(gXULLog, PR_LOG_NOTICE,
                ("xul: creating <%s> from prototype",
                 NS_ConvertUTF16toUTF8(aPrototype->mNodeInfo->QualifiedName()).get()));
     }
-#endif
 
     nsRefPtr<Element> result;
 
@@ -3874,7 +3862,6 @@ XULDocument::OverlayForwardReference::Resolve()
         if (NS_FAILED(rv)) return eResolve_Error;
     }
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         nsAutoCString idC;
         idC.AssignWithConversion(id);
@@ -3882,7 +3869,6 @@ XULDocument::OverlayForwardReference::Resolve()
                ("xul: overlay resolved '%s'",
                 idC.get()));
     }
-#endif
 
     mResolved = true;
     return eResolve_Succeeded;
@@ -4045,7 +4031,6 @@ XULDocument::OverlayForwardReference::Merge(nsIContent* aTargetNode,
 
 XULDocument::OverlayForwardReference::~OverlayForwardReference()
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
         nsAutoString id;
         mOverlay->GetAttr(kNameSpaceID_None, nsGkAtoms::id, id);
@@ -4066,7 +4051,6 @@ XULDocument::OverlayForwardReference::~OverlayForwardReference()
                ("xul: %s overlay failed to resolve '%s' in %s",
                 urlspec.get(), idC.get(), parentDoc.get()));
     }
-#endif
 }
 
 
@@ -4090,7 +4074,6 @@ XULDocument::BroadcasterHookup::Resolve()
 
 XULDocument::BroadcasterHookup::~BroadcasterHookup()
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
         // Tell the world we failed
 
@@ -4115,7 +4098,6 @@ XULDocument::BroadcasterHookup::~BroadcasterHookup()
                 attributeC.get(),
                 broadcasteridC.get()));
     }
-#endif
 }
 
 
@@ -4312,7 +4294,6 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
         return domRv.ErrorCode();
     }
 
-#ifdef PR_LOGGING
     // Tell the world we succeeded
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         nsCOMPtr<nsIContent> content =
@@ -4331,7 +4312,6 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
                 attributeC.get(),
                 broadcasteridC.get()));
     }
-#endif
 
     *aNeedsHookup = false;
     *aDidResolve = true;

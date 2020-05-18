@@ -484,7 +484,6 @@ nsXULTemplateQueryProcessorRDF::GenerateResults(nsISupports* aDatasource,
                 mLastRef = aRef;
             }
 
-#ifdef PR_LOGGING
             if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG)) {
                 nsAutoString id;
                 aRef->GetId(id);
@@ -500,7 +499,6 @@ nsXULTemplateQueryProcessorRDF::GenerateResults(nsISupports* aDatasource,
                        NS_ConvertUTF16toUTF8(rvar).get(),
                        NS_ConvertUTF16toUTF8(mvar).get()));
             }
-#endif
 
             if (root) {
                 // the seed is the initial instantiation, which has a single
@@ -867,7 +865,6 @@ nsXULTemplateQueryProcessorRDF::Propagate(nsIRDFResource* aSource,
 
     ReteNodeSet livenodes;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG)) {
         const char* sourceStr;
         aSource->GetValueConst(&sourceStr);
@@ -880,7 +877,6 @@ nsXULTemplateQueryProcessorRDF::Propagate(nsIRDFResource* aSource,
                ("nsXULTemplateQueryProcessorRDF::Propagate: [%s] -> [%s] -> [%s]\n",
                sourceStr, propertyStr, NS_ConvertUTF16toUTF8(targetStr).get()));
     }
-#endif
 
     {
         ReteNodeSet::Iterator last = mRDFTests.Last();
@@ -956,7 +952,6 @@ nsXULTemplateQueryProcessorRDF::Retract(nsIRDFResource* aSource,
                                         nsIRDFNode* aTarget)
 {
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG)) {
         const char* sourceStr;
         aSource->GetValueConst(&sourceStr);
@@ -969,7 +964,6 @@ nsXULTemplateQueryProcessorRDF::Retract(nsIRDFResource* aSource,
                ("nsXULTemplateQueryProcessorRDF::Retract: [%s] -> [%s] -> [%s]\n",
                sourceStr, propertyStr, NS_ConvertUTF16toUTF8(targetStr).get()));
     }
-#endif
 
     // Retract any currently active rules that will no longer be matched.
     ReteNodeSet::ConstIterator lastnode = mRDFTests.Last();
@@ -1025,7 +1019,6 @@ nsXULTemplateQueryProcessorRDF::SynchronizeAll(nsIRDFResource* aSource,
     return NS_OK;
 }
 
-#ifdef PR_LOGGING
 nsresult
 nsXULTemplateQueryProcessorRDF::Log(const char* aOperation,
                                     nsIRDFResource* aSource,
@@ -1062,7 +1055,6 @@ nsXULTemplateQueryProcessorRDF::Log(const char* aOperation,
     }
     return NS_OK;
 }
-#endif
 
 nsresult
 nsXULTemplateQueryProcessorRDF::CheckContainer(nsIRDFResource* aResource,
@@ -1280,7 +1272,6 @@ nsXULTemplateQueryProcessorRDF::CompileQueryChild(nsIAtom* aTag,
         rv = CompileMemberCondition(aQuery, aCondition, aParentNode, aResult);
     }
     else {
-#ifdef PR_LOGGING
         nsAutoString tagstr;
         aTag->ToString(tagstr);
 
@@ -1289,7 +1280,6 @@ nsXULTemplateQueryProcessorRDF::CompileQueryChild(nsIAtom* aTag,
         PR_LOG(gXULTemplateLog, PR_LOG_ALWAYS,
                ("xultemplate[%p] unrecognized condition test <%s>",
                 this, tagstrC.get()));
-#endif
 
         rv = NS_OK;
     }
