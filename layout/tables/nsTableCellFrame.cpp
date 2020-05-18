@@ -885,9 +885,9 @@ CalcUnpaginagedHeight(nsPresContext*        aPresContext,
 
 void
 nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
-                                   nsHTMLReflowMetrics&     aDesiredSize,
-                                   const nsHTMLReflowState& aReflowState,
-                                   nsReflowStatus&          aStatus)
+                         nsHTMLReflowMetrics&     aDesiredSize,
+                         const nsHTMLReflowState& aReflowState,
+                         nsReflowStatus&          aStatus)
 {
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsTableCellFrame");
