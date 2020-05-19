@@ -2272,6 +2272,17 @@ TabParent::RecvIsParentWindowMainWidgetVisible(bool* aIsVisible)
 }
 
 bool
+TabParent::RecvSynthesizeNativeMouseMove(const mozilla::LayoutDeviceIntPoint& aPoint)
+{
+  // The widget associated with the browser window
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (widget) {
+    widget->SynthesizeNativeMouseMove(aPoint);
+  }
+  return true;
+}
+
+bool
 TabParent::RecvGetDPI(float* aValue)
 {
   TryCacheDPIAndScale();
