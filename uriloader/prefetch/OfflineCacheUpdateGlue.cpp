@@ -12,7 +12,7 @@
 #include "nsIApplicationCacheContainer.h"
 #include "nsIChannel.h"
 #include "nsIDocument.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #if defined(PR_LOGGING)
 //

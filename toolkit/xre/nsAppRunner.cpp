@@ -166,7 +166,7 @@
 #endif
 
 #ifdef DEBUG
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #endif
 
 #ifdef MOZ_JPROF

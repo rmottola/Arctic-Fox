@@ -34,7 +34,7 @@
 #include "nsSupportsPrimitives.h"
 #include "nsThreadUtils.h"
 #include "nsString.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "mozilla/dom/CSPReportBinding.h"
 #include "mozilla/net/ReferrerPolicy.h"
 #include "nsINetworkInterceptController.h"

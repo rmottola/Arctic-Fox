@@ -12,7 +12,7 @@ enum pType {
      PACKAGE_TYPE_NTLM
 };
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #if defined( PR_LOGGING )
 //

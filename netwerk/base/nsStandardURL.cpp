@@ -15,7 +15,7 @@
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
 #include "nsIIDNService.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsAutoPtr.h"
 #include "nsIProgrammingLanguage.h"
 #include "nsIURLParser.h"

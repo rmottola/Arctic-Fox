@@ -13,7 +13,7 @@
 #include "nsCharSeparatedTokenizer.h"
 #include "nsContentTypeParser.h"
 #include "VideoUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #ifdef XP_WIN
 #include "mozilla/WindowsVersion.h"
