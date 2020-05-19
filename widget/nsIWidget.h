@@ -1618,6 +1618,16 @@ class nsIWidget : public nsISupports {
     virtual void CleanupRemoteDrawing() = 0;
 
     /**
+     * A hook for the widget to prepare a Compositor, during the latter's initialization.
+     *
+     * If this method returns true, it means that the widget will be able to
+     * present frames from the compoositor.
+     * Returning false will cause the compositor's initialization to fail, and
+     * a different compositor backend will be used (if any).
+     */
+    virtual bool InitCompositor(mozilla::layers::Compositor*) { return true; }
+
+    /**
      * Called when Goanna knows which themed widgets exist in this window.
      * The passed array contains an entry for every themed widget of the right
      * type (currently only NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR and
@@ -1882,16 +1892,6 @@ class nsIWidget : public nsISupports {
     virtual nsresult SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                 uint32_t aNativeMessage,
                                                 uint32_t aModifierFlags) = 0;
-
-    /**
-     * A hook for the widget to prepare a Compositor, during the latter's initialization.
-     *
-     * If this method returns true, it means that the widget will be able to
-     * present frames from the compoositor.
-     * Returning false will cause the compositor's initialization to fail, and
-     * a different compositor backend will be used (if any).
-     */
-    virtual bool InitCompositor(mozilla::layers::Compositor*) { return true; }
 
     /**
      * A shortcut to SynthesizeNativeMouseEvent, abstracting away the native message.
