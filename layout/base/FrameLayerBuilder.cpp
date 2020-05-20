@@ -2321,10 +2321,12 @@ ContainerState::PopPaintedLayerData()
   layer->SetLayerBounds(layerBounds);
 
 #ifdef MOZ_DUMP_PAINTING
-  if (PaintedLayerData* containingPld = mLayerBuilder->GetContainingPaintedLayerData()) {
-    containingPld->mLayer->AddExtraDumpInfo(nsCString(data->mLog));
-  } else {
-    layer->AddExtraDumpInfo(nsCString(data->mLog));
+  if (!data->mLog.IsEmpty()) {
+    if (PaintedLayerData* containingPld = mLayerBuilder->GetContainingPaintedLayerData()) {
+      containingPld->mLayer->AddExtraDumpInfo(nsCString(data->mLog));
+    } else {
+      layer->AddExtraDumpInfo(nsCString(data->mLog));
+    }
   }
 #endif
 
