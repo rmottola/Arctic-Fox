@@ -2284,7 +2284,7 @@ TabParent::RecvSynthesizeNativeMouseMove(const mozilla::LayoutDeviceIntPoint& aP
   // The widget associated with the browser window
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (widget) {
-    widget->SynthesizeNativeMouseMove(aPoint);
+    widget->SynthesizeNativeMouseMove(aPoint, nullptr);
   }
   return true;
 }
