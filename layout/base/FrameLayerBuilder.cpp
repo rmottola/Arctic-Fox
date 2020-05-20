@@ -3277,7 +3277,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
 
         InvalidateForLayerChange(item, paintedLayerData->mLayer);
 
-        mLayerBuilder->AddPaintedDisplayItem(paintedLayerData, item, itemClip, itemVisibleRect,
+        mLayerBuilder->AddPaintedDisplayItem(paintedLayerData, item, itemClip,
                                             *this, layerState, topLeft);
         nsIntRegion opaquePixels = ComputeOpaqueRect(item,
             animatedGeometryRoot, paintedLayerData->mFixedPosFrameForLayerData,
@@ -3446,7 +3446,6 @@ void
 FrameLayerBuilder::AddPaintedDisplayItem(PaintedLayerData* aLayerData,
                                         nsDisplayItem* aItem,
                                         const DisplayItemClip& aClip,
-                                        const nsIntRect& aItemVisibleRect,
                                         ContainerState& aContainerState,
                                         LayerState aLayerState,
                                         const nsPoint& aTopLeft)
