@@ -2078,10 +2078,6 @@ void
 PaintedLayerData::UpdateCommonClipCount(
     const DisplayItemClip& aCurrentClip)
 {
-  if (!mLayer->Manager()->IsWidgetLayerManager()) {
-    return;
-  }
-
   if (mCommonClipCount >= 0) {
     mCommonClipCount = mItemClip.GetCommonRoundedRectCount(aCurrentClip, mCommonClipCount);
   } else {
@@ -3273,7 +3269,9 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       } else {
         // check to see if the new item has rounded rect clips in common with
         // other items in the layer
-        paintedLayerData->UpdateCommonClipCount(itemClip);
+        if (mManager->IsWidgetLayerManager()) {
+          paintedLayerData->UpdateCommonClipCount(itemClip);
+        }
 
         InvalidateForLayerChange(item, paintedLayerData->mLayer);
 
