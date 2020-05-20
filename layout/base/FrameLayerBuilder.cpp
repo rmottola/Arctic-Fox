@@ -34,6 +34,7 @@
 #include "gfxPrefs.h"
 #include "LayersLogging.h"
 #include "mozilla/unused.h"
+#include "mozilla/ReverseIterator.h"
 
 #include <algorithm>
 
@@ -295,6 +296,21 @@ protected:
   bool mIsInfinite;
 };
 
+struct AssignedDisplayItem
+{
+  AssignedDisplayItem(nsDisplayItem* aItem,
+                      const DisplayItemClip& aClip,
+                      LayerState aLayerState)
+    : mItem(aItem)
+    , mClip(aClip)
+    , mLayerState(aLayerState)
+  {}
+
+  nsDisplayItem* mItem;
+  DisplayItemClip mClip;
+  LayerState mLayerState;
+};
+
 /**
  * We keep a stack of these to represent the PaintedLayers that are
  * currently available to have display items added to.
@@ -350,7 +366,8 @@ public:
                   nsDisplayItem* aItem,
                   const nsIntRegion& aClippedOpaqueRegion,
                   const nsIntRect& aVisibleRect,
-                  const DisplayItemClip& aClip);
+                  const DisplayItemClip& aClip,
+                  LayerState aLayerState);
   const nsIFrame* GetAnimatedGeometryRoot() { return mAnimatedGeometryRoot; }
 
   /**
@@ -442,6 +459,10 @@ public:
    * active scrolled root.
    */
   const nsIFrame* mAnimatedGeometryRoot;
+  /**
+   * The offset between mAnimatedGeometryRoot and the reference frame.
+   */
+  nsPoint mAnimatedGeometryRootOffset;
   /**
    * Whether or not this layer is async scrollable. If it is, that means display
    * items above this layer should not end up in a layer below this one, as they
@@ -543,6 +564,11 @@ public:
    * This is a conservative approximation: it contains the true region.
    */
   PossiblyInfiniteRegion mVisibleAboveRegion;
+  /**
+   * All the display items that have been assigned to this painted layer.
+   * These items get added by Accumulate().
+   */
+  nsTArray<AssignedDisplayItem> mAssignedDisplayItems;
 
 };
 
@@ -2024,11 +2050,8 @@ ContainerState::FindOpaqueBackgroundColorFor(const nsIntRegion& aTargetVisibleRe
     nsRect appUnitRect = deviceRect.ToAppUnits(mAppUnitsPerDevPixel);
     appUnitRect.ScaleInverseRoundOut(mParameters.mXScale, mParameters.mYScale);
 
-    FrameLayerBuilder::PaintedLayerItemsEntry* entry =
-      mLayerBuilder->GetPaintedLayerItemsEntry(candidate->mLayer);
-    NS_ASSERTION(entry, "Must know about this layer!");
-    for (int32_t j = entry->mItems.Length() - 1; j >= 0; --j) {
-      nsDisplayItem* item = entry->mItems[j].mItem;
+    for (auto& assignedItem : Reversed(candidate->mAssignedDisplayItems)) {
+      nsDisplayItem* item = assignedItem.mItem;
       bool snap;
       nsRect bounds = item->GetBounds(mBuilder, &snap);
       if (snap && mSnappingEnabled) {
@@ -2207,6 +2230,15 @@ ContainerState::PopPaintedLayerData()
 
   int32_t lastIndex = mPaintedLayerDataStack.Length() - 1;
   PaintedLayerData* data = mPaintedLayerDataStack[lastIndex];
+
+  for (auto& item : data->mAssignedDisplayItems) {
+    MOZ_ASSERT(item.mItem->GetType() != nsDisplayItem::TYPE_LAYER_EVENT_REGIONS);
+
+    InvalidateForLayerChange(item.mItem, data->mLayer);
+    mLayerBuilder->AddPaintedDisplayItem(data, item.mItem, item.mClip,
+                                         *this, item.mLayerState,
+                                         data->mAnimatedGeometryRootOffset);
+  }
 
   NewLayerEntry* newLayerEntry = &mNewChildLayers[data->mNewChildLayersIndex];
   nsRefPtr<Layer> layer;
@@ -2474,7 +2506,8 @@ PaintedLayerData::Accumulate(ContainerState* aState,
                             nsDisplayItem* aItem,
                             const nsIntRegion& aClippedOpaqueRegion,
                             const nsIntRect& aVisibleRect,
-                            const DisplayItemClip& aClip)
+                            const DisplayItemClip& aClip,
+                            LayerState aLayerState)
 {
   FLB_LOG_PAINTED_LAYER_DECISION(this, "Accumulating dp=%s(%p), f=%p against pld=%p\n", aItem->Name(), aItem, aItem->Frame(), this);
 
@@ -2494,6 +2527,8 @@ PaintedLayerData::Accumulate(ContainerState* aState,
 
   bool clipMatches = mItemClip == aClip;
   mItemClip = aClip;
+
+  mAssignedDisplayItems.AppendElement(AssignedDisplayItem(aItem, aClip, aLayerState));
 
   if (!mIsSolidColorInVisibleRegion && mOpaqueRegion.Contains(aVisibleRect) &&
       mVisibleRegion.Contains(aVisibleRect) && !mImage) {
@@ -2694,6 +2729,7 @@ ContainerState::FindPaintedLayerFor(nsDisplayItem* aItem,
     mPaintedLayerDataStack.AppendElement(paintedLayerData);
     paintedLayerData->mLayer = layer;
     paintedLayerData->mAnimatedGeometryRoot = aAnimatedGeometryRoot;
+    paintedLayerData->mAnimatedGeometryRootOffset = aTopLeft;
     paintedLayerData->mFixedPosFrameForLayerData =
       FindFixedPosFrameForLayerData(aAnimatedGeometryRoot, aShouldFixToViewport);
     paintedLayerData->mIsAsyncScrollable =
@@ -3280,11 +3316,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         MOZ_ASSERT(nsIntRegion(itemDrawRect).Contains(opaquePixels));
         opaquePixels.AndWith(itemVisibleRect);
         paintedLayerData->Accumulate(this, item, opaquePixels,
-            itemVisibleRect, itemClip);
-
-        InvalidateForLayerChange(item, paintedLayerData->mLayer);
-        mLayerBuilder->AddPaintedDisplayItem(paintedLayerData, item, itemClip,
-                                             *this, layerState, topLeft);
+            itemVisibleRect, itemClip, layerState);
       }
     }
 
