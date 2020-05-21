@@ -57,3 +57,10 @@ pref(layout.animated-image-layers.enabled,true) skip-if(Android||gtk2Widget) == 
 != paintedlayer-recycling-7.html about:blank
 != masklayer-1.html about:blank
 != masklayer-2.html about:blank
+!= layer-splitting-1.html about:blank
+!= layer-splitting-2.html about:blank
+!= layer-splitting-3.html about:blank
+!= layer-splitting-4.html about:blank
+!= layer-splitting-5.html about:blank
+!= layer-splitting-6.html about:blank
+!= layer-splitting-7.html about:blank
