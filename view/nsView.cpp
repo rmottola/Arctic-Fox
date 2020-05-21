@@ -775,8 +775,8 @@ void nsView::List(FILE* out, int32_t aIndent) const
     nsRect windowBounds = rect.ToAppUnits(p2a);
     mWindow->GetBounds(rect);
     nsRect nonclientBounds = rect.ToAppUnits(p2a);
-    nsrefcnt widgetRefCnt = mWindow->AddRef() - 1;
-    mWindow->Release();
+    nsrefcnt widgetRefCnt = mWindow.get()->AddRef() - 1;
+    mWindow.get()->Release();
     int32_t Z = mWindow->GetZIndex();
     fprintf(out, "(widget=%p[%" PRIuPTR "] z=%d pos={%d,%d,%d,%d}) ",
             (void*)mWindow, widgetRefCnt, Z,
