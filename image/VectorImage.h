@@ -37,7 +37,8 @@ public:
   nsresult Init(const char* aMimeType,
                 uint32_t aFlags) override;
 
-  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf) const override;
+  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf)
+    const override;
   virtual size_t SizeOfDecoded(gfxMemoryLocation aLocation,
                                MallocSizeOf aMallocSizeOf) const override;
 
@@ -101,9 +102,10 @@ private:
   /// Count of locks on this image (roughly correlated to visible instances).
   uint32_t mLockCount;
 
-  bool           mIsInitialized;          // Have we been initalized?
+  bool           mIsInitialized;          // Have we been initialized?
   bool           mDiscardable;            // Are we discardable?
-  bool           mIsFullyLoaded;          // Has the SVG document finished loading?
+  bool           mIsFullyLoaded;          // Has the SVG document finished
+                                          // loading?
   bool           mIsDrawing;              // Are we currently drawing?
   bool           mHaveAnimations;         // Is our SVG content SMIL-animated?
                                           // (Only set after mIsFullyLoaded.)
@@ -116,7 +118,7 @@ private:
   friend class ImageFactory;
 };
 
-inline NS_IMETHODIMP VectorImage::GetAnimationMode(uint16_t *aAnimationMode) {
+inline NS_IMETHODIMP VectorImage::GetAnimationMode(uint16_t* aAnimationMode) {
   return GetAnimationModeInternal(aAnimationMode);
 }
 
