@@ -518,6 +518,7 @@ DataTextureSourceD3D9::Update(gfxWindowsSurface* aSurface)
 void
 DataTextureSourceD3D9::SetCompositor(Compositor* aCompositor)
 {
+  MOZ_ASSERT(aCompositor);
   CompositorD3D9* d3dCompositor = static_cast<CompositorD3D9*>(aCompositor);
   if (mCompositor && mCompositor != d3dCompositor) {
     Reset();
@@ -1055,6 +1056,7 @@ DXGITextureHostD3D9::Unlock()
 void
 DXGITextureHostD3D9::SetCompositor(Compositor* aCompositor)
 {
+  MOZ_ASSERT(aCompositor);
   mCompositor = static_cast<CompositorD3D9*>(aCompositor);
 }
 
@@ -1086,6 +1088,7 @@ DXGIYCbCrTextureHostD3D9::GetDevice()
 void
 DXGIYCbCrTextureHostD3D9::SetCompositor(Compositor* aCompositor)
 {
+  MOZ_ASSERT(aCompositor);
   mCompositor = static_cast<CompositorD3D9*>(aCompositor);
 }
 
