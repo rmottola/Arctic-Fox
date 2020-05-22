@@ -373,7 +373,7 @@ imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
   // Draw using the drawable the caller provided.
   nsIntRect imageRect(0, 0, mSize.width, mSize.height);
   nsRefPtr<gfxContext> ctx = new gfxContext(target);
-  gfxUtils::DrawPixelSnapped(ctx, aDrawable, ThebesIntSize(mSize),
+  gfxUtils::DrawPixelSnapped(ctx, aDrawable, mSize,
                              ImageRegion::Create(imageRect),
                              mFormat, aFilter, aImageFlags);
 
@@ -558,7 +558,7 @@ imgFrame::SurfaceForDrawing(bool               aDoPadding,
   IntSize size(int32_t(aImageRect.Width()), int32_t(aImageRect.Height()));
   if (!aDoPadding && !aDoPartialDecode) {
     NS_ASSERTION(!mSinglePixel, "This should already have been handled");
-    return SurfaceWithFormat(new gfxSurfaceDrawable(aSurface, ThebesIntSize(size)), mFormat);
+    return SurfaceWithFormat(new gfxSurfaceDrawable(aSurface, size), mFormat);
   }
 
   gfxRect available = gfxRect(mDecoded.x, mDecoded.y, mDecoded.width, mDecoded.height);
@@ -586,7 +586,7 @@ imgFrame::SurfaceForDrawing(bool               aDoPadding,
     }
 
     RefPtr<SourceSurface> newsurf = target->Snapshot();
-    return SurfaceWithFormat(new gfxSurfaceDrawable(newsurf, ThebesIntSize(size)), target->GetFormat());
+    return SurfaceWithFormat(new gfxSurfaceDrawable(newsurf, size), target->GetFormat());
   }
 
   // Not tiling, and we have a surface, so we can account for

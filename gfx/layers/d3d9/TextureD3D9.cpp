@@ -713,7 +713,7 @@ CairoTextureClientD3D9::BorrowDrawTarget()
       gfxCriticalError() << "Failed to lock rect borrowing the target in D3D9 " << hexa(hr);
       return nullptr;
     }
-    mSurface = new gfxImageSurface((uint8_t*)rect.pBits, ThebesIntSize(mSize),
+    mSurface = new gfxImageSurface((uint8_t*)rect.pBits, mSize,
                                    rect.Pitch, SurfaceFormatToImageFormat(mFormat));
     mLockRect = true;
   }

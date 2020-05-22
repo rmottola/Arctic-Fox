@@ -808,7 +808,7 @@ VectorImage::Draw(gfxContext* aContext,
     RefPtr<SourceSurface> surface = frameRef->GetSurface();
     if (surface) {
       nsRefPtr<gfxDrawable> svgDrawable =
-        new gfxSurfaceDrawable(surface, ThebesIntSize(frameRef->GetSize()));
+        new gfxSurfaceDrawable(surface, frameRef->GetSize());
       Show(svgDrawable, params);
       return DrawResult::SUCCESS;
     }
@@ -835,7 +835,7 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams)
                            aParams.flags);
 
   nsRefPtr<gfxDrawable> svgDrawable =
-    new gfxCallbackDrawable(cb, ThebesIntSize(aParams.size));
+    new gfxCallbackDrawable(cb, aParams.size);
 
   // We take an early exit without using the surface cache if too large,
   // because for vector images this can cause bad perf issues if large sizes
@@ -878,7 +878,7 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams)
   // our gfxDrawable into it. (We use FILTER_NEAREST since we never scale here.)
   nsRefPtr<imgFrame> frame = new imgFrame;
   nsresult rv =
-    frame->InitWithDrawable(svgDrawable, ThebesIntSize(aParams.size),
+    frame->InitWithDrawable(svgDrawable, aParams.size,
                             SurfaceFormat::B8G8R8A8,
                             GraphicsFilter::FILTER_NEAREST, aParams.flags);
 
@@ -903,7 +903,7 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams)
 
   // Draw.
   nsRefPtr<gfxDrawable> drawable =
-    new gfxSurfaceDrawable(surface, ThebesIntSize(aParams.size));
+    new gfxSurfaceDrawable(surface, aParams.size);
   Show(drawable, aParams);
 
   // Send out an invalidation so that surfaces that are still in use get
@@ -918,7 +918,7 @@ VectorImage::Show(gfxDrawable* aDrawable, const SVGDrawingParameters& aParams)
 {
   MOZ_ASSERT(aDrawable, "Should have a gfxDrawable by now");
   gfxUtils::DrawPixelSnapped(aParams.context, aDrawable,
-                             ThebesIntSize(aParams.size),
+                             aParams.size,
                              aParams.region,
                              SurfaceFormat::B8G8R8A8,
                              aParams.filter, aParams.flags, aParams.opacity);
