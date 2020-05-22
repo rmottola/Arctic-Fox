@@ -6054,7 +6054,7 @@ nsLayoutUtils::DrawSingleImage(gfxContext&            aContext,
                                const nsRect*          aSourceArea)
 {
   nscoord appUnitsPerCSSPixel = nsDeviceContext::AppUnitsPerCSSPixel();
-  nsIntSize pixelImageSize(ComputeSizeForDrawingWithFallback(aImage, aDest.Size()));
+  CSSIntSize pixelImageSize(ComputeSizeForDrawingWithFallback(aImage, aDest.Size()));
   if (pixelImageSize.width < 1 || pixelImageSize.height < 1) {
     NS_ASSERTION(pixelImageSize.width >= 0 && pixelImageSize.height >= 0,
                  "Image width or height is negative");
@@ -6098,7 +6098,7 @@ nsLayoutUtils::DrawSingleImage(gfxContext&            aContext,
 
 /* static */ void
 nsLayoutUtils::ComputeSizeForDrawing(imgIContainer *aImage,
-                                     nsIntSize&     aImageSize, /*outparam*/
+                                     CSSIntSize&    aImageSize, /*outparam*/
                                      nsSize&        aIntrinsicRatio, /*outparam*/
                                      bool&          aGotWidth,  /*outparam*/
                                      bool&          aGotHeight  /*outparam*/)
@@ -6111,16 +6111,16 @@ nsLayoutUtils::ComputeSizeForDrawing(imgIContainer *aImage,
     // We hit an error (say, because the image failed to load or couldn't be
     // decoded) and should return zero size.
     aGotWidth = aGotHeight = true;
-    aImageSize = nsIntSize(0, 0);
+    aImageSize = CSSIntSize(0, 0);
     aIntrinsicRatio = nsSize(0, 0);
   }
 }
 
-/* static */ nsIntSize
+/* static */ CSSIntSize
 nsLayoutUtils::ComputeSizeForDrawingWithFallback(imgIContainer* aImage,
                                                  const nsSize&  aFallbackSize)
 {
-  nsIntSize imageSize;
+  CSSIntSize imageSize;
   nsSize imageRatio;
   bool gotHeight, gotWidth;
   ComputeSizeForDrawing(aImage, imageSize, imageRatio, gotWidth, gotHeight);
