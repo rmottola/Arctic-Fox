@@ -51,6 +51,8 @@ public:
                                        nsresult aResult,
                                        bool aLastPart) override;
 
+  void OnSurfaceDiscarded() override;
+
   /**
    * Callback for SVGRootRenderingObserver.
    *
@@ -96,7 +98,11 @@ private:
   nsRefPtr<SVGLoadEventListener>     mLoadEventListener;
   nsRefPtr<SVGParseCompleteListener> mParseCompleteListener;
 
+  /// Count of locks on this image (roughly correlated to visible instances).
+  uint32_t mLockCount;
+
   bool           mIsInitialized;          // Have we been initalized?
+  bool           mDiscardable;            // Are we discardable?
   bool           mIsFullyLoaded;          // Has the SVG document finished loading?
   bool           mIsDrawing;              // Are we currently drawing?
   bool           mHaveAnimations;         // Is our SVG content SMIL-animated?
