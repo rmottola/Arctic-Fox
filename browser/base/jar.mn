@@ -92,7 +92,7 @@ browser.jar:
         content/browser/openLocation.xul              (content/openLocation.xul)
         content/browser/safeMode.css                  (content/safeMode.css)
         content/browser/safeMode.js                   (content/safeMode.js)
-*       content/browser/safeMode.xul                  (content/safeMode.xul)
+        content/browser/safeMode.xul                  (content/safeMode.xul)
 *       content/browser/sanitize.js                   (content/sanitize.js)
 *       content/browser/sanitize.xul                  (content/sanitize.xul)
 *       content/browser/sanitizeDialog.js             (content/sanitizeDialog.js)
