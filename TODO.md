@@ -37,6 +37,7 @@
 - 1235656 - Set canonical name in self-hosted builtins
 - 1223690 - Remove implicit Rect conversions
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
+- Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
 - Bug 1184130. Report mismatches of adapter description and vendor id t
 - Bug 1159751: Ensure WARP can never be used for Windows 7. r=milan 
@@ -56,6 +57,7 @@
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 . Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
+- Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 1202085 2015-10-26 - Part 0 to 6
@@ -70,6 +72,7 @@
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
+- Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - remaining parts of Bug 968923 (2015-06)
@@ -112,9 +115,13 @@
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
+-  1102048 style patches, check which still apply
 - Bug 1153657 - Performance Monitoring is not ready to ride the trains
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
+
+- Bug 1139958 - Start using AppConstants.jsm in Toolkit r=mossop
+- 2015-04-03 changes for nsUpdateService.js - Bug 1149334 - Remove preprocessing o
 
 - Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
@@ -133,6 +140,10 @@ More session store stuff to check:
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
+
+- Build stuff
+- Bug 1151005 - Show notifications when the 'install' and 'package' mac
+- Bug 1151005 - Refactor terminal notification stuff from 'mach build'
 
 
 Not applying / Breaking build:
