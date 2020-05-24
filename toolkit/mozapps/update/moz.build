@@ -32,11 +32,11 @@ if CONFIG['MOZ_UPDATER']:
 
     EXTRA_COMPONENTS += [
         'nsUpdateService.manifest',
+        'nsUpdateServiceStub.js',
     ]
 
     EXTRA_PP_COMPONENTS += [
         'nsUpdateService.js',
-        'nsUpdateServiceStub.js',
     ]
 
     EXTRA_JS_MODULES += [
