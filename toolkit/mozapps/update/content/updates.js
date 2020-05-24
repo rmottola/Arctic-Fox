@@ -28,6 +28,8 @@ const PREF_APP_UPDATE_NOTIFIEDUNSUPPORTED = "app.update.notifiedUnsupported";
 const PREF_APP_UPDATE_TEST_LOOP           = "app.update.test.loop";
 const PREF_PLUGINS_UPDATEURL              = "plugins.update.url";
 
+const PREF_EM_HOTFIX_ID                   = "extensions.hotfix.id";
+
 const UPDATE_TEST_LOOP_INTERVAL     = 2000;
 
 const URI_UPDATES_PROPERTIES  = "chrome://mozapps/locale/update/updates.properties";
