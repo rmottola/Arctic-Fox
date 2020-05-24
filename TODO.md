@@ -116,9 +116,9 @@
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
-- Bug 1153657 - Performance Monitoring is not ready to ride the trains
 - Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
+- Bug 1094888 - part 1 and 2
 
 - Bug 1139958 - Start using AppConstants.jsm in Toolkit r=mossop
 - 2015-04-03 changes for nsUpdateService.js - Bug 1149334 - Remove preprocessing o
@@ -139,7 +139,6 @@ More session store stuff to check:
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-- Bug 1251347 - Making sure that SessionFile.write initializes its work
 
 - Build stuff
 - Bug 1151005 - Show notifications when the 'install' and 'package' mac
