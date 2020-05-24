@@ -556,7 +556,9 @@ BrowserGlue.prototype = {
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
+#ifdef NIGHTLY_BUILD
     AddonWatcher.init(this._notifySlowAddon);
+#endif
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
@@ -704,7 +706,9 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
+#ifdef NIGHTLY_BUILD
     AddonWatcher.uninit();
+#endif
     this._dispose();
   },
 
