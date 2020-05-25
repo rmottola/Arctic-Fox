@@ -120,9 +120,6 @@
 - Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 - Bug 1094888 - part 1 and 2
 
-- Bug 1139958 - Start using AppConstants.jsm in Toolkit r=mossop
-- 2015-04-03 changes for nsUpdateService.js - Bug 1149334 - Remove preprocessing o
-
 - Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
 Sequence:
