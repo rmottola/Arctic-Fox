@@ -4427,7 +4427,7 @@ CanvasRenderingContext2D::DrawImage(const HTMLImageOrCanvasOrVideoElement& image
       return;
     }
 
-    imgSize = gfx::ToIntSize(res.mSize);
+    imgSize = res.mSize;
 
     // Scale sw/sh based on aspect ratio
     if (image.IsHTMLVideoElement()) {
