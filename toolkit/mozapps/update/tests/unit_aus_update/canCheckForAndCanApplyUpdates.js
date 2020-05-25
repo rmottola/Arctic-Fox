@@ -22,8 +22,8 @@ function run_test() {
     logTestInfo("attempting to create mutex");
     let handle = createMutex(getPerInstallationMutexName());
 
-    logTestInfo("testing that the mutex was successfully created");
-    do_check_neq(handle, null);
+    debugDump("testing that the mutex was successfully created");
+    do_check_true(!!handle);
 
     // Check if available updates cannot be checked for when there is a mutex
     // for this installation.
