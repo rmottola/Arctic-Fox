@@ -7,6 +7,7 @@
 #include "nsThemeConstants.h"
 #include "gtkdrawing.h"
 
+#include "gfx2DGlue.h"
 #include "nsIObserverService.h"
 #include "nsIServiceManager.h"
 #include "nsIFrame.h"
@@ -824,7 +825,7 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
   nsIntRect overflowRect(widgetRect);
   nsIntMargin extraSize;
   if (GetExtraSizeForWidget(aFrame, aWidgetType, &extraSize)) {
-    overflowRect.Inflate(extraSize);
+    overflowRect.Inflate(gfx::ToIntMargin(extraSize));
   }
 
   // This is the rectangle that will actually be drawn, in gdk pixels

@@ -18,11 +18,14 @@
 #include "mozilla/layers/LayersMessages.h"
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
-#include "nsRect.h"                     // for nsIntRect
 #include "LayersLogging.h"
 
 namespace mozilla {
 namespace layers {
+
+using gfx::Rect;
+using gfx::IntRect;
+using gfx::IntSize;
 
 ClientTiledPaintedLayer::ClientTiledPaintedLayer(ClientLayerManager* const aManager,
                                                ClientLayerManager::PaintedLayerCreationHint aCreationHint)
@@ -424,12 +427,12 @@ ClientTiledPaintedLayer::RenderLayer()
     // outside of our texture coords. Make the visible region a single rect,
     // and pad it out by 1 pixel (restricted to tile boundaries) so that
     // we always have valid content or transparent pixels to sample from.
-    nsIntRect bounds = neededRegion.GetBounds();
-    nsIntRect wholeTiles = bounds;
-    wholeTiles.InflateToMultiple(nsIntSize(
+    IntRect bounds = neededRegion.GetBounds();
+    IntRect wholeTiles = bounds;
+    wholeTiles.InflateToMultiple(IntSize(
       gfxPlatform::GetPlatform()->GetTileWidth(),
       gfxPlatform::GetPlatform()->GetTileHeight()));
-    nsIntRect padded = bounds;
+    IntRect padded = bounds;
     padded.Inflate(1);
     padded.IntersectRect(padded, wholeTiles);
     neededRegion = padded;
