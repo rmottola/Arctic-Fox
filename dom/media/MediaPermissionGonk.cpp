@@ -130,6 +130,7 @@ private:
   nsRefPtr<dom::GetUserMediaRequest> mRequest;
   nsTArray<nsCOMPtr<nsIMediaDevice> > mAudioDevices; // candidate audio devices
   nsTArray<nsCOMPtr<nsIMediaDevice> > mVideoDevices; // candidate video devices
+  nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
 // MediaPermissionRequest
@@ -156,6 +157,9 @@ MediaPermissionRequest::MediaPermissionRequest(nsRefPtr<dom::GetUserMediaRequest
       mVideoDevices.AppendElement(device);
     }
   }
+
+  nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+  mRequester = new nsContentPermissionRequester(window.get());
 }
 
 // nsIContentPermissionRequest methods
@@ -273,6 +277,16 @@ MediaPermissionRequest::Allow(JS::HandleValue aChoices)
   }
 
   return DoAllow(audioDevice, videoDevice);
+}
+
+NS_IMETHODIMP
+MediaPermissionRequest::GetRequester(nsIContentPermissionRequester** aRequester)
+{
+  NS_ENSURE_ARG_POINTER(aRequester);
+
+  nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+  requester.forget(aRequester);
+  return NS_OK;
 }
 
 nsresult

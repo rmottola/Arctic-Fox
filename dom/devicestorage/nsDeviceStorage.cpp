@@ -2175,6 +2175,7 @@ nsDOMDeviceStorageCursor::nsDOMDeviceStorageCursor(nsPIDOMWindow* aWindow,
   , mSince(aSince)
   , mFile(aFile)
   , mPrincipal(aPrincipal)
+  , mRequester(new nsContentPermissionRequester(GetOwner()))
 {
 }
 
@@ -2261,6 +2262,16 @@ nsDOMDeviceStorageCursor::Allow(JS::HandleValue aChoices)
 
   nsCOMPtr<nsIRunnable> event = new InitCursorEvent(this, mFile);
   target->Dispatch(event, NS_DISPATCH_NORMAL);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMDeviceStorageCursor::GetRequester(nsIContentPermissionRequester** aRequester)
+{
+  NS_ENSURE_ARG_POINTER(aRequester);
+
+  nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+  requester.forget(aRequester);
   return NS_OK;
 }
 
@@ -2850,6 +2861,7 @@ public:
     , mFile(aFile)
     , mRequest(aRequest)
     , mDeviceStorage(aDeviceStorage)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mWindow);
     MOZ_ASSERT(mPrincipal);
@@ -2870,6 +2882,7 @@ public:
     , mFile(aFile)
     , mRequest(aRequest)
     , mBlob(aBlob)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mWindow);
     MOZ_ASSERT(mPrincipal);
@@ -2889,6 +2902,7 @@ public:
     , mFile(aFile)
     , mRequest(aRequest)
     , mDSFileDescriptor(aDSFileDescriptor)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mRequestType == DEVICE_STORAGE_REQUEST_CREATEFD);
     MOZ_ASSERT(mWindow);
@@ -3298,6 +3312,15 @@ public:
     return NS_OK;
   }
 
+  NS_IMETHODIMP GetRequester(nsIContentPermissionRequester** aRequester)
+  {
+    NS_ENSURE_ARG_POINTER(aRequester);
+
+    nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+    requester.forget(aRequester);
+    return NS_OK;
+  }
+
 private:
   ~DeviceStorageRequest() {}
 
@@ -3310,6 +3333,7 @@ private:
   nsCOMPtr<nsIDOMBlob> mBlob;
   nsRefPtr<nsDOMDeviceStorage> mDeviceStorage;
   nsRefPtr<DeviceStorageFileDescriptor> mDSFileDescriptor;
+  nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(DeviceStorageRequest)

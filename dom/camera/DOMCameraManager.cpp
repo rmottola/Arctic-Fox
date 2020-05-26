@@ -152,6 +152,7 @@ public:
     , mCameraId(aCameraId)
     , mInitialConfig(aInitialConfig)
     , mPromise(aPromise)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   { }
 
 protected:
@@ -166,6 +167,7 @@ protected:
   uint32_t mCameraId;
   CameraConfiguration mInitialConfig;
   nsRefPtr<Promise> mPromise;
+  nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
 NS_IMPL_CYCLE_COLLECTION(CameraPermissionRequest, mWindow, mPromise)
@@ -217,6 +219,16 @@ CameraPermissionRequest::Allow(JS::HandleValue aChoices)
 {
   MOZ_ASSERT(aChoices.isUndefined());
   return DispatchCallback(nsIPermissionManager::ALLOW_ACTION);
+}
+
+NS_IMETHODIMP
+CameraPermissionRequest::GetRequester(nsIContentPermissionRequester** aRequester)
+{
+  NS_ENSURE_ARG_POINTER(aRequester);
+
+  nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+  requester.forget(aRequester);
+  return NS_OK;
 }
 
 nsresult

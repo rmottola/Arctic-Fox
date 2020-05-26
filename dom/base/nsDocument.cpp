@@ -11974,7 +11974,13 @@ public:
   nsPointerLockPermissionRequest(Element* aElement, bool aUserInputOrChromeCaller)
   : mElement(do_GetWeakReference(aElement)),
     mDocument(do_GetWeakReference(aElement->OwnerDoc())),
-    mUserInputOrChromeCaller(aUserInputOrChromeCaller) {}
+    mUserInputOrChromeCaller(aUserInputOrChromeCaller)
+  {
+    nsCOMPtr<nsIDocument> doc = do_QueryReferent(mDocument);
+    if (doc) {
+      mRequester = new nsContentPermissionRequester(doc->GetInnerWindow());
+    }
+  }
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSICONTENTPERMISSIONREQUEST
@@ -12034,6 +12040,7 @@ public:
 
 protected:
   virtual ~nsPointerLockPermissionRequest() {}
+  nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
 NS_IMPL_ISUPPORTS_INHERITED(nsPointerLockPermissionRequest,
@@ -12136,6 +12143,16 @@ nsPointerLockPermissionRequest::Allow(JS::HandleValue aChoices)
                "aElement and this should support weak references!");
 
   DispatchPointerLockChange(d);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsPointerLockPermissionRequest::GetRequester(nsIContentPermissionRequester** aRequester)
+{
+  NS_ENSURE_ARG_POINTER(aRequester);
+
+  nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+  requester.forget(aRequester);
   return NS_OK;
 }
 
