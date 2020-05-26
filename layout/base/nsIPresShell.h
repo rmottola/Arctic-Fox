@@ -93,7 +93,6 @@ class DocAccessible;
 } // namespace a11y
 } // namespace mozilla
 #endif
-class nsIWidget;
 struct nsArenaMemoryStats;
 class nsITimer;
 

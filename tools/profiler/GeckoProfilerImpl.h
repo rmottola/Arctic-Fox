@@ -34,7 +34,6 @@
 #endif
 
 class TableTicker;
-class JSCustomObject;
 
 namespace mozilla {
 class TimeStamp;
