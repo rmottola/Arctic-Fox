@@ -117,9 +117,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", this);
 Cu.import("resource://gre/modules/TelemetryStopwatch.jsm", this);
 Cu.import("resource://gre/modules/debug.js", this);
-XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
-  "@mozilla.org/parentprocessmessagemanager;1",
-  "nsIMessageListenerManager");Cu.import("resource://gre/modules/osfile.jsm", this);
+Cu.import("resource://gre/modules/osfile.jsm", this);
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
