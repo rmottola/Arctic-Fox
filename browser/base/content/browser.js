@@ -114,6 +114,9 @@ this.__defineSetter__("PluralForm", function (val) {
   return this.PluralForm = val;
 });
 
+XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
+  "resource://gre/modules/TelemetryStopwatch.jsm");
+
 #ifdef MOZ_SERVICES_SYNC
 XPCOMUtils.defineLazyModuleGetter(this, "Weave",
   "resource://services-sync/main.js");
