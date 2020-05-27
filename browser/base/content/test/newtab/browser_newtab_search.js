@@ -4,13 +4,16 @@
 // See browser/components/search/test/browser_*_behavior.js for tests of actual
 // searches.
 
-const ENGINE_LOGO = "searchEngineLogo.xml";
 const ENGINE_NO_LOGO = "searchEngineNoLogo.xml";
+const ENGINE_1X_LOGO = "searchEngine1xLogo.xml";
+const ENGINE_2X_LOGO = "searchEngine2xLogo.xml";
+const ENGINE_1X_2X_LOGO = "searchEngine1x2xLogo.xml";
+const ENGINE_SUGGESTIONS = "searchSuggestionEngine.xml";
 
 const SERVICE_EVENT_NAME = "ContentSearchService";
 
-const LOGO_LOW_DPI_SIZE = [65, 26];
-const LOGO_HIGH_DPI_SIZE = [130, 52];
+const LOGO_1X_DPI_SIZE = [65, 26];
+const LOGO_2X_DPI_SIZE = [130, 52];
 
 // The test has an expected search event queue and a search event listener.
 // Search events that are expected to happen are added to the queue, and the
@@ -28,7 +31,6 @@ function runTests() {
   let oldCurrentEngine = Services.search.currentEngine;
 
   yield addNewTabPageTab();
-  yield whenSearchInitDone();
 
   // The tab is removed at the end of the test, so there's no need to remove
   // this listener at the end of the test.
@@ -42,31 +44,61 @@ function runTests() {
   // children, which makes the test click the wrong children, so disable it.
   panel.setAttribute("animate", "false");
 
-  // Add the two test engines.
-  let logoEngine = null;
-  yield promiseNewSearchEngine(true).then(engine => {
-    logoEngine = engine;
-    TestRunner.next();
-  });
-  ok(!!logoEngine.getIconURLBySize(...LOGO_LOW_DPI_SIZE),
-     "Sanity check: engine should have 1x logo");
-  ok(!!logoEngine.getIconURLBySize(...LOGO_HIGH_DPI_SIZE),
-     "Sanity check: engine should have 2x logo");
-
+  // Add the engine without any logos and switch to it.
   let noLogoEngine = null;
-  yield promiseNewSearchEngine(false).then(engine => {
+  yield promiseNewSearchEngine(ENGINE_NO_LOGO, 0).then(engine => {
     noLogoEngine = engine;
     TestRunner.next();
   });
-  ok(!noLogoEngine.getIconURLBySize(...LOGO_LOW_DPI_SIZE),
+  ok(!noLogoEngine.getIconURLBySize(...LOGO_1X_DPI_SIZE),
      "Sanity check: engine should not have 1x logo");
-  ok(!noLogoEngine.getIconURLBySize(...LOGO_HIGH_DPI_SIZE),
+  ok(!noLogoEngine.getIconURLBySize(...LOGO_2X_DPI_SIZE),
      "Sanity check: engine should not have 2x logo");
-
-  // Use the search service to change the current engine to the logo engine.
-  Services.search.currentEngine = logoEngine;
+  Services.search.currentEngine = noLogoEngine;
   yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
-  checkCurrentEngine(ENGINE_LOGO);
+  yield checkCurrentEngine(ENGINE_NO_LOGO, false, false);
+
+  // Add the engine with a 1x-DPI logo and switch to it.
+  let logo1xEngine = null;
+  yield promiseNewSearchEngine(ENGINE_1X_LOGO, 1).then(engine => {
+    logo1xEngine = engine;
+    TestRunner.next();
+  });
+  ok(!!logo1xEngine.getIconURLBySize(...LOGO_1X_DPI_SIZE),
+     "Sanity check: engine should have 1x logo");
+  ok(!logo1xEngine.getIconURLBySize(...LOGO_2X_DPI_SIZE),
+     "Sanity check: engine should not have 2x logo");
+  Services.search.currentEngine = logo1xEngine;
+  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
+  yield checkCurrentEngine(ENGINE_1X_LOGO, true, false);
+
+  // Add the engine with a 2x-DPI logo and switch to it.
+  let logo2xEngine = null;
+  yield promiseNewSearchEngine(ENGINE_2X_LOGO, 1).then(engine => {
+    logo2xEngine = engine;
+    TestRunner.next();
+  });
+  ok(!logo2xEngine.getIconURLBySize(...LOGO_1X_DPI_SIZE),
+     "Sanity check: engine should not have 1x logo");
+  ok(!!logo2xEngine.getIconURLBySize(...LOGO_2X_DPI_SIZE),
+     "Sanity check: engine should have 2x logo");
+  Services.search.currentEngine = logo2xEngine;
+  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
+  yield checkCurrentEngine(ENGINE_2X_LOGO, false, true);
+
+  // Add the engine with 1x- and 2x-DPI logos and switch to it.
+  let logo1x2xEngine = null;
+  yield promiseNewSearchEngine(ENGINE_1X_2X_LOGO, 2).then(engine => {
+    logo1x2xEngine = engine;
+    TestRunner.next();
+  });
+  ok(!!logo1x2xEngine.getIconURLBySize(...LOGO_1X_DPI_SIZE),
+     "Sanity check: engine should have 1x logo");
+  ok(!!logo1x2xEngine.getIconURLBySize(...LOGO_2X_DPI_SIZE),
+     "Sanity check: engine should have 2x logo");
+  Services.search.currentEngine = logo1x2xEngine;
+  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
+  yield checkCurrentEngine(ENGINE_1X_2X_LOGO, true, true);
 
   // Click the logo to open the search panel.
   yield Promise.all([
@@ -89,12 +121,12 @@ function runTests() {
     promiseClick(noLogoBox),
   ]).then(TestRunner.next);
 
-  checkCurrentEngine(ENGINE_NO_LOGO);
+  yield checkCurrentEngine(ENGINE_NO_LOGO, false, false);
 
-  // Switch back to the logo engine.
-  Services.search.currentEngine = logoEngine;
+  // Switch back to the 1x-and-2x logo engine.
+  Services.search.currentEngine = logo1x2xEngine;
   yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
-  checkCurrentEngine(ENGINE_LOGO);
+  yield checkCurrentEngine(ENGINE_1X_2X_LOGO, true, true);
 
   // Open the panel again.
   yield Promise.all([
@@ -110,6 +142,50 @@ function runTests() {
     promiseClick(manageBox),
   ]).then(TestRunner.next);
 
+  // Add the engine that provides search suggestions and switch to it.
+  let suggestionEngine = null;
+  yield promiseNewSearchEngine(ENGINE_SUGGESTIONS, 0).then(engine => {
+    suggestionEngine = engine;
+    TestRunner.next();
+  });
+  Services.search.currentEngine = suggestionEngine;
+  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
+  yield checkCurrentEngine(ENGINE_SUGGESTIONS, false, false);
+
+  // Avoid intermittent failures.
+  gSearch()._suggestionController.remoteTimeout = 5000;
+
+  // Type an X in the search input.  This is only a smoke test.  See
+  // browser_searchSuggestionUI.js for comprehensive content search suggestion
+  // UI tests.
+  let input = $("text");
+  input.focus();
+  EventUtils.synthesizeKey("x", {});
+  let suggestionsPromise = promiseSearchEvents(["Suggestions"]);
+
+  // Wait for the search suggestions to become visible and for the Suggestions
+  // message.
+  let table = getContentDocument().getElementById("searchSuggestionTable");
+  info("Waiting for suggestions table to open");
+  let observer = new MutationObserver(() => {
+    if (input.getAttribute("aria-expanded") == "true") {
+      observer.disconnect();
+      ok(!table.hidden, "Search suggestion table unhidden");
+      TestRunner.next();
+    }
+  });
+  observer.observe(input, {
+    attributes: true,
+    attributeFilter: ["aria-expanded"],
+  });
+  yield undefined;
+  yield suggestionsPromise.then(TestRunner.next);
+
+  // Empty the search input, causing the suggestions to be hidden.
+  EventUtils.synthesizeKey("a", { accelKey: true });
+  EventUtils.synthesizeKey("VK_DELETE", {});
+  ok(table.hidden, "Search suggestion table hidden");
+
   // Done.  Revert the current engine and remove the new engines.
   Services.search.currentEngine = oldCurrentEngine;
   yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
@@ -117,7 +193,7 @@ function runTests() {
   let events = [];
   for (let engine of gNewEngines) {
     Services.search.removeEngine(engine);
-    events.push("State");
+    events.push("CurrentState");
   }
   yield promiseSearchEvents(events).then(TestRunner.next);
 }
@@ -157,16 +233,15 @@ function promiseSearchEvents(events) {
   return Promise.all(events.map(e => e.deferred.promise));
 }
 
-function promiseNewSearchEngine(withLogo) {
-  let basename = withLogo ? ENGINE_LOGO : ENGINE_NO_LOGO;
+function promiseNewSearchEngine(basename, numLogos) {
   info("Waiting for engine to be added: " + basename);
 
   // Wait for the search events triggered by adding the new engine.
   // engine-added engine-loaded
-  let expectedSearchEvents = ["State", "State"];
-  if (withLogo) {
-    // an engine-changed for each of the two logos
-    expectedSearchEvents.push("State", "State");
+  let expectedSearchEvents = ["CurrentState", "CurrentState"];
+  // engine-changed for each of the logos
+  for (let i = 0; i < numLogos; i++) {
+    expectedSearchEvents.push("CurrentState");
   }
   let eventPromise = promiseSearchEvents(expectedSearchEvents);
 
@@ -197,7 +272,7 @@ function promiseNewSearchEngine(withLogo) {
   return deferred.promise;
 }
 
-function checkCurrentEngine(basename) {
+function checkCurrentEngine(basename, has1xLogo, has2xLogo) {
   let engine = Services.search.currentEngine;
   ok(engine.name.contains(basename),
      "Sanity check: current engine: engine.name=" + engine.name +
@@ -208,30 +283,57 @@ function checkCurrentEngine(basename) {
      "currentEngineName: " + engine.name);
 
   // search bar logo
-  let logoSize = [px * window.devicePixelRatio for (px of LOGO_LOW_DPI_SIZE)];
-  let logoURI = engine.getIconURLBySize(...logoSize);
+  let logoURI = null;
+  if (window.devicePixelRatio == 2) {
+    if (has2xLogo) {
+      logoURI = engine.getIconURLBySize(...LOGO_2X_DPI_SIZE);
+      ok(!!logoURI, "Sanity check: engine should have 2x logo");
+    }
+  }
+  else {
+    if (has1xLogo) {
+      logoURI = engine.getIconURLBySize(...LOGO_1X_DPI_SIZE);
+      ok(!!logoURI, "Sanity check: engine should have 1x logo");
+    }
+    else if (has2xLogo) {
+      logoURI = engine.getIconURLBySize(...LOGO_2X_DPI_SIZE);
+      ok(!!logoURI, "Sanity check: engine should have 2x logo");
+    }
+  }
   let logo = logoImg();
   is(logo.hidden, !logoURI,
      "Logo should be visible iff engine has a logo: " + engine.name);
   if (logoURI) {
-    is(logo.style.backgroundImage, 'url("' + logoURI + '")', "Logo URI");
+    // The URLs of blobs created with the same ArrayBuffer are different, so
+    // just check that the URI is a blob URI.
+    ok(/^url\("blob:/.test(logo.style.backgroundImage), "Logo URI"); //"
+  }
+
+  if (logo.hidden) {
+    executeSoon(TestRunner.next);
+    return;
   }
 
   // "selected" attributes of engines in the panel
   let panel = searchPanel();
-  for (let engineBox of panel.childNodes) {
-    let engineName = engineBox.getAttribute("engine");
-    if (engineName == engine.name) {
-      is(engineBox.getAttribute("selected"), "true",
-         "Engine box's selected attribute should be true for " +
-         "selected engine: " + engineName);
+  promisePanelShown(panel).then(() => {
+    panel.hidePopup();
+    for (let engineBox of panel.childNodes) {
+      let engineName = engineBox.getAttribute("engine");
+      if (engineName == engine.name) {
+        is(engineBox.getAttribute("selected"), "true",
+           "Engine box's selected attribute should be true for " +
+           "selected engine: " + engineName);
+      }
+      else {
+        ok(!engineBox.hasAttribute("selected"),
+           "Engine box's selected attribute should be absent for " +
+           "non-selected engine: " + engineName);
+      }
     }
-    else {
-      ok(!engineBox.hasAttribute("selected"),
-         "Engine box's selected attribute should be absent for " +
-         "non-selected engine: " + engineName);
-    }
-  }
+    TestRunner.next();
+  });
+  panel.openPopup(logo);
 }
 
 function promisePanelShown(panel) {
@@ -293,3 +395,4 @@ function logoImg() {
 function gSearch() {
   return getContentWindow().gSearch;
 }
+
