@@ -1143,6 +1143,28 @@
               this._tabAttrModified(oldTab);
               this._tabAttrModified(this.mCurrentTab);
 
+              if (oldBrowser != newBrowser &&
+                  oldBrowser.docShell &&
+                  oldBrowser.docShell.contentViewer.inPermitUnload) {
+                // Since the user is switching away from a tab that has
+                // a beforeunload prompt active, we remove the prompt.
+                // This prevents confusing user flows like the following:
+                //   1. User attempts to close Firefox
+                //   2. User switches tabs (ingoring a beforeunload prompt)
+                //   3. User returns to tab, presses "Leave page"
+                let promptBox = this.getTabModalPromptBox(oldBrowser);
+                let prompts = promptBox.listPrompts();
+                // There might not be any prompts here if the tab was closed
+                // while in an onbeforeunload prompt, which will have
+                // destroyed aforementioned prompt already, so check there's
+                // something to remove, first:
+                if (prompts.length) {
+                  // NB: This code assumes that the beforeunload prompt
+                  //     is the top-most prompt on the tab.
+                  promptBox.removePrompt(prompts[prompts.length - 1]);
+                }
+              }
+
               oldBrowser._urlbarFocused = (gURLBar && gURLBar.focused);
               if (this.isFindBarInitialized(oldTab)) {
                 let findBar = this.getFindBar(oldTab);
@@ -2040,13 +2062,11 @@
         <body>
           <![CDATA[
             if (aTab.closing ||
-                aTab._pendingPermitUnload ||
                 this._windowIsClosing)
               return false;
 
             var browser = this.getBrowserForTab(aTab);
-
-            if (!aTabWillBeMoved) {
+            if (!aTab._pendingPermitUnload && !aTabWillBeMoved) {
               let ds = browser.docShell;
               if (ds && ds.contentViewer) {
                 // We need to block while calling permitUnload() because it
@@ -2055,9 +2075,14 @@
                 aTab._pendingPermitUnload = true;
                 let permitUnload = ds.contentViewer.permitUnload();
                 delete aTab._pendingPermitUnload;
-
-                if (!permitUnload)
+                // If we were closed during the unload, we return false now so
+                // we don't (try to) close the same tab again. Of course, we
+                // also stop if the unload was cancelled by the user:
+                if (aTab.closing || !permitUnload) {
+                  // NB: deliberately keep the _closedDuringPermitUnload set to
+                  // true so we keep exiting early in case of multiple calls.
                   return false;
+                }
               }
             }
 
