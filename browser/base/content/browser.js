@@ -15,6 +15,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Deprecated",
                                   "resource://gre/modules/Deprecated.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+                                  "resource:///modules/BrowserUITelemetry.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
                                   "resource:///modules/E10SUtils.jsm");
 
@@ -3297,7 +3299,10 @@ const BrowserSearch = {
    * BrowserSearch.loadSearch for the preferred API.
    */
   loadSearchFromContext: function (terms) {
-    let engine = BrowserSearch.loadSearch(terms, true, "contextmenu");
+    let engine = BrowserSearch._loadSearch(terms, true, "contextmenu");
+    if (engine) {
+      BrowserSearch.recordSearchInHealthReport(engine, "contextmenu");
+    }
   },
 
   /**
@@ -3312,6 +3317,45 @@ const BrowserSearch = {
     var where = newWindowPref == 3 ? "tab" : "window";
     var searchEnginesURL = formatURL("browser.search.searchEnginesURL", true);
     openUILinkIn(searchEnginesURL, where);
+  },
+
+/**
+   * Helper to record a search with Firefox Health Report.
+   *
+   * FHR records only search counts and nothing pertaining to the search itself.
+   *
+   * @param engine
+   *        (nsISearchEngine) The engine handling the search.
+   * @param source
+   *        (string) Where the search originated from. See the FHR
+   *        SearchesProvider for allowed values.
+   * @param selection [optional]
+   *        ({index: The selected index, kind: "key" or "mouse"}) If
+   *        the search was a suggested search, this indicates where the
+   *        item was in the suggestion list and how the user selected it.
+   */
+  recordSearchInHealthReport: function (engine, source, selection) {
+    BrowserUITelemetry.countSearchEvent(source, null, selection);
+#ifdef MOZ_SERVICES_HEALTHREPORT
+    let reporter = Cc["@mozilla.org/datareporting/service;1"]
+                     .getService()
+                     .wrappedJSObject
+                     .healthReporter;
+
+    // This can happen if the FHR component of the data reporting service is
+    // disabled. This is controlled by a pref that most will never use.
+    if (!reporter) {
+      return;
+    }
+
+    reporter.onInit().then(function record() {
+      try {
+        reporter.getProvider("org.mozilla.searches").recordSearch(engine, source);
+      } catch (ex) {
+        Cu.reportError(ex);
+      }
+    });
+#endif
   },
 };
 
