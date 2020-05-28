@@ -292,9 +292,15 @@ function onSearchSubmit(aEvent)
     document.dispatchEvent(event);
   }
 
-  aEvent.preventDefault();
+  gSearchSuggestionController.addInputValueToFormHistory();
+
+  if (aEvent) {
+    aEvent.preventDefault();
+  }
 }
 
+
+let gSearchSuggestionController;
 
 function setupSearchEngine()
 {
@@ -323,6 +329,12 @@ function setupSearchEngine()
     searchText.placeholder = searchEngineName;
   }
 
+  if (!gSearchSuggestionController) {
+    gSearchSuggestionController =
+      new SearchSuggestionUIController(searchText, searchText.parentNode,
+                                       onSearchSubmit);
+  }
+  gSearchSuggestionController.engineName = searchEngineName;
 }
 
 function fitToWidth() {
