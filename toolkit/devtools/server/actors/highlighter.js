@@ -2268,7 +2268,7 @@ GeometryEditorHighlighter.prototype = Heritage.extend(AutoRefreshHighlighter.pro
       let xDelta = parseFloat(this.computedStyle.left);
       let yDelta = parseFloat(this.computedStyle.top);
       if (xDelta || yDelta) {
-        let {p1, p2, p3, p4} = this.currentQuads.margin;
+        let {p1, p2, p3, p4} = this.currentQuads.margin[0];
         let points = (p1.x - xDelta) + "," + (p1.y - yDelta) + " " +
                      (p2.x - xDelta) + "," + (p2.y - yDelta) + " " +
                      (p3.x - xDelta) + "," + (p3.y - yDelta) + " " +
@@ -2287,7 +2287,7 @@ GeometryEditorHighlighter.prototype = Heritage.extend(AutoRefreshHighlighter.pro
 
   updateCurrentNode: function() {
     let box = this.markup.getElement(this.ID_CLASS_PREFIX + "current-node");
-    let {p1, p2, p3, p4} = this.currentQuads.margin;
+    let {p1, p2, p3, p4} = this.currentQuads.margin[0];
     let attr = p1.x + "," + p1.y + " " +
                p2.x + "," + p2.y + " " +
                p3.x + "," + p3.y + " " +
@@ -2342,7 +2342,7 @@ GeometryEditorHighlighter.prototype = Heritage.extend(AutoRefreshHighlighter.pro
       let labelEl = this.markup.getElement(id + "label-size");
       let labelTextEl = this.markup.getElement(id + "label-text-size");
 
-      let {bounds} = this.currentQuads.margin;
+      let {bounds} = this.currentQuads.margin[0];
 
       labelEl.setAttribute("transform", "translate(" +
         (bounds.left + bounds.width/2) + " " +
@@ -2356,11 +2356,11 @@ GeometryEditorHighlighter.prototype = Heritage.extend(AutoRefreshHighlighter.pro
     this.hideArrows();
 
     // Position arrows always end at the node's margin box.
-    let marginBox = this.currentQuads.margin.bounds;
+    let marginBox = this.currentQuads.margin.bounds[0];
     // But size arrows are displayed in the box that corresponds to the current
     // box-sizing.
     let boxSizing = this.computedStyle.boxSizing.split("-")[0];
-    let box = this.currentQuads[boxSizing].bounds;
+    let box = this.currentQuads[boxSizing].bounds[0];
 
     // Position the side arrows which need to be visible.
     // Arrows always start at the offsetParent edge, and end at the middle
@@ -2379,8 +2379,8 @@ GeometryEditorHighlighter.prototype = Heritage.extend(AutoRefreshHighlighter.pro
     // +------------------+----------------+
     let getSideArrowStartPos = side => {
       // In case an offsetParent exists and is highlighted.
-      if (this.parentQuads) {
-        return this.parentQuads.bounds[side];
+      if (this.parentQuads && this.parentQuads.length) {
+        return this.parentQuads[0].bounds[side];
       }
 
       // In case of relative positioning.
