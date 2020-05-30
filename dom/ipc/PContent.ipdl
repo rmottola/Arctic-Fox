@@ -22,6 +22,7 @@ include protocol PFileDescriptorSet;
 include protocol PFMRadio;
 include protocol PFileSystemRequest;
 include protocol PHal;
+include protocol PIcc;
 include protocol PProcessHangMonitor;
 include protocol PImageBridge;
 include protocol PMemoryReportRequest;
@@ -391,6 +392,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PFileDescriptorSet;
     manages PFMRadio;
     manages PHal;
+    manages PIcc;
     manages PMemoryReportRequest;
     manages PMobileConnection;
     manages PNecko;
@@ -685,6 +687,8 @@ parent:
         returns (bool isSecureURI);
 
     PHal();
+
+    PIcc(uint32_t serviceId);
 
     PMobileConnection(uint32_t clientId);
 
