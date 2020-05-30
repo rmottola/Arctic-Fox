@@ -14,7 +14,7 @@ add_test(function test_personalization_state() {
 
   context.ICCRecordHelper.readICCID = function fakeReadICCID() {};
 
-  function testPersonalization(isCdma, cardPersoState, goannaCardState) {
+  function testPersonalization(isCdma, cardPersoState, geckoCardState) {
     let iccStatus = {
       cardState: CARD_STATE_PRESENT,
       gsmUmtsSubscriptionAppIndex: (!isCdma) ? 0 : -1,
@@ -28,7 +28,7 @@ add_test(function test_personalization_state() {
 
     ril._isCdma = isCdma;
     ril._processICCStatus(iccStatus);
-    do_check_eq(ril.cardState, goannaCardState);
+    do_check_eq(ril.cardState, geckoCardState);
   }
 
   // Test GSM personalization state.
@@ -106,7 +106,7 @@ add_test(function test_card_app_state() {
 
   context.ICCRecordHelper.readICCID = function fakeReadICCID() {};
 
-  function testCardAppState(cardAppState, goannaCardState) {
+  function testCardAppState(cardAppState, geckoCardState) {
     let iccStatus = {
       cardState: CARD_STATE_PRESENT,
       gsmUmtsSubscriptionAppIndex: 0,
@@ -117,7 +117,7 @@ add_test(function test_card_app_state() {
     };
 
     ril._processICCStatus(iccStatus);
-    do_check_eq(ril.cardState, goannaCardState);
+    do_check_eq(ril.cardState, geckoCardState);
   }
 
   testCardAppState(CARD_APPSTATE_ILLEGAL,
