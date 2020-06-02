@@ -2621,6 +2621,7 @@ class PropertyDescriptorOperations
                                      JSPROP_SHARED |
                                      JSPROP_REDEFINE_NONCONFIGURABLE |
                                      SHADOWABLE)) == 0);
+        MOZ_ASSERT_IF(isAccessorDescriptor(), has(JSPROP_GETTER) && has(JSPROP_SETTER));
 #endif
     }
 
