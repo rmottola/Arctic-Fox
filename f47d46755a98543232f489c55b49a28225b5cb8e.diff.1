@@ -1,0 +1,280 @@
+diff --git a/js/src/jsapi-tests/testDefinePropertyIgnoredAttributes.cpp b/js/src/jsapi-tests/testDefinePropertyIgnoredAttributes.cpp
+index 1cab3dbdeb8f..093bbb3bf580 100644
+--- a/js/src/jsapi-tests/testDefinePropertyIgnoredAttributes.cpp
++++ b/js/src/jsapi-tests/testDefinePropertyIgnoredAttributes.cpp
+@@ -7,15 +7,6 @@
+ 
+ #include "jsapi-tests/tests.h"
+ 
+-static const unsigned IgnoreWithValue = JSPROP_IGNORE_ENUMERATE | JSPROP_IGNORE_READONLY |
+-                               JSPROP_IGNORE_PERMANENT;
+-static const unsigned IgnoreAll = IgnoreWithValue | JSPROP_IGNORE_VALUE;
+-
+-static const unsigned AllowConfigure = IgnoreAll & ~JSPROP_IGNORE_PERMANENT;
+-static const unsigned AllowEnumerate = IgnoreAll & ~JSPROP_IGNORE_ENUMERATE;
+-static const unsigned AllowWritable  = IgnoreAll & ~JSPROP_IGNORE_READONLY;
+-static const unsigned ValueWithConfigurable = IgnoreWithValue & ~JSPROP_IGNORE_PERMANENT;
+-
+ static bool
+ Getter(JSContext* cx, unsigned argc, JS::Value* vp)
+ {
+@@ -51,9 +42,11 @@ BEGIN_TEST(testDefinePropertyIgnoredAttributes)
+     JS::Rooted<JSPropertyDescriptor> desc(cx);
+     JS::RootedValue defineValue(cx);
+ 
+-    // Try a getter. Allow it to fill in the defaults.
++    // Try a getter. Allow it to fill in the defaults. Because we're passing a
++    // JSNative, JS_DefineProperty will infer JSPROP_GETTER even though we
++    // aren't passing it.
+     CHECK(JS_DefineProperty(cx, obj, "foo", defineValue,
+-                            IgnoreAll | JSPROP_SHARED,
++                            JSPROP_IGNORE_ENUMERATE | JSPROP_IGNORE_PERMANENT | JSPROP_SHARED,
+                             Getter));
+ 
+     CHECK(JS_GetPropertyDescriptor(cx, obj, "foo", &desc));
+@@ -63,36 +56,42 @@ BEGIN_TEST(testDefinePropertyIgnoredAttributes)
+ 
+     // Install another configurable property, so we can futz with it.
+     CHECK(JS_DefineProperty(cx, obj, "bar", defineValue,
+-                            AllowConfigure | JSPROP_SHARED,
++                            JSPROP_IGNORE_ENUMERATE | JSPROP_SHARED,
+                             Getter));
+     CHECK(JS_GetPropertyDescriptor(cx, obj, "bar", &desc));
+     CHECK(CheckDescriptor(desc, AccessorDescriptor, false, true, true));
+ 
+-    // Rewrite the descriptor to now be enumerable, ensuring that the lack of
+-    // configurablity stayed.
++    // Rewrite the descriptor to now be enumerable, leaving the configurability
++    // unchanged.
+     CHECK(JS_DefineProperty(cx, obj, "bar", defineValue,
+-                            AllowEnumerate |
+-                            JSPROP_ENUMERATE |
+-                            JSPROP_SHARED,
++                            JSPROP_IGNORE_PERMANENT | JSPROP_ENUMERATE | JSPROP_SHARED,
+                             Getter));
+     CHECK(JS_GetPropertyDescriptor(cx, obj, "bar", &desc));
+     CHECK(CheckDescriptor(desc, AccessorDescriptor, true, true, true));
+ 
+     // Now try the same game with a value property
+     defineValue.setObject(*obj);
+-    CHECK(JS_DefineProperty(cx, obj, "baz", defineValue, IgnoreWithValue));
++    CHECK(JS_DefineProperty(cx, obj, "baz", defineValue,
++                            JSPROP_IGNORE_ENUMERATE |
++                            JSPROP_IGNORE_READONLY |
++                            JSPROP_IGNORE_PERMANENT));
+     CHECK(JS_GetPropertyDescriptor(cx, obj, "baz", &desc));
+     CHECK(CheckDescriptor(desc, DataDescriptor, false, false, false));
+ 
+     // Now again with a configurable property
+-    CHECK(JS_DefineProperty(cx, obj, "quox", defineValue, ValueWithConfigurable));
+-    CHECK(JS_GetPropertyDescriptor(cx, obj, "quox", &desc));
++    CHECK(JS_DefineProperty(cx, obj, "quux", defineValue,
++                            JSPROP_IGNORE_ENUMERATE | JSPROP_IGNORE_READONLY));
++    CHECK(JS_GetPropertyDescriptor(cx, obj, "quux", &desc));
+     CHECK(CheckDescriptor(desc, DataDescriptor, false, false, true));
+ 
+-    // Just make it writable. Leave the old value and everythign else alone.
++    // Just make it writable. Leave the old value and everything else alone.
+     defineValue.setUndefined();
+-    CHECK(JS_DefineProperty(cx, obj, "quox", defineValue, AllowWritable));
+-    CHECK(JS_GetPropertyDescriptor(cx, obj, "quox", &desc));
++    CHECK(JS_DefineProperty(cx, obj, "quux", defineValue,
++                            JSPROP_IGNORE_ENUMERATE |
++                            JSPROP_IGNORE_PERMANENT |
++                            JSPROP_IGNORE_VALUE));
++
++    CHECK(JS_GetPropertyDescriptor(cx, obj, "quux", &desc));
+     CHECK(CheckDescriptor(desc, DataDescriptor, false, true, true));
+     CHECK_SAME(JS::ObjectValue(*obj), desc.value());
+ 
+diff --git a/js/src/jsapi.cpp b/js/src/jsapi.cpp
+index 2874dca97218..8937de65da12 100644
+--- a/js/src/jsapi.cpp
++++ b/js/src/jsapi.cpp
+@@ -3438,6 +3438,7 @@ JS_DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
+             if (flags & JSPROP_DEFINE_LATE)
+                 continue;
+         }
++        flags &= ~JSPROP_DEFINE_LATE;
+ 
+         /*
+          * Define a generic arity N+1 static method for the arity N prototype
+diff --git a/js/src/jsapi.h b/js/src/jsapi.h
+index 3336b0b49164..29d970a5b441 100644
+--- a/js/src/jsapi.h
++++ b/js/src/jsapi.h
+@@ -2521,6 +2521,13 @@ class PropertyDescriptorOperations
+         return (desc()->attrs & bits) != 0;
+     }
+ 
++    bool hasAll(unsigned bits) const {
++        return (desc()->attrs & bits) == bits;
++    }
++
++    // Non-API attributes bit used internally for arguments objects.
++    enum { SHADOWABLE = JSPROP_INTERNAL_USE_BIT };
++
+   public:
+     // Descriptors with JSGetterOp/JSSetterOp are considered data
+     // descriptors. It's complicated.
+@@ -2568,6 +2575,58 @@ class PropertyDescriptorOperations
+     unsigned attributes() const { return desc()->attrs; }
+     JSGetterOp getter() const { return desc()->getter; }
+     JSSetterOp setter() const { return desc()->setter; }
++
++    void assertValid() const {
++#ifdef DEBUG
++        MOZ_ASSERT((attributes() & ~(JSPROP_ENUMERATE | JSPROP_IGNORE_ENUMERATE |
++                                     JSPROP_PERMANENT | JSPROP_IGNORE_PERMANENT |
++                                     JSPROP_READONLY | JSPROP_IGNORE_READONLY |
++                                     JSPROP_IGNORE_VALUE |
++                                     JSPROP_GETTER |
++                                     JSPROP_SETTER |
++                                     JSPROP_SHARED |
++                                     JSPROP_REDEFINE_NONCONFIGURABLE |
++                                     SHADOWABLE)) == 0);
++        MOZ_ASSERT(!hasAll(JSPROP_IGNORE_ENUMERATE | JSPROP_ENUMERATE));
++        MOZ_ASSERT(!hasAll(JSPROP_IGNORE_PERMANENT | JSPROP_PERMANENT));
++        if (isAccessorDescriptor()) {
++            MOZ_ASSERT(has(JSPROP_SHARED));
++            MOZ_ASSERT(!has(JSPROP_READONLY));
++            MOZ_ASSERT(!has(JSPROP_IGNORE_READONLY));
++            MOZ_ASSERT(!has(JSPROP_IGNORE_VALUE));
++            MOZ_ASSERT(!has(SHADOWABLE));
++            MOZ_ASSERT(desc()->value.isUndefined());
++            MOZ_ASSERT_IF(!has(JSPROP_GETTER), !getter());
++            MOZ_ASSERT_IF(!has(JSPROP_SETTER), !setter());
++        } else {
++            MOZ_ASSERT(!hasAll(JSPROP_IGNORE_READONLY | JSPROP_READONLY));
++            MOZ_ASSERT_IF(has(JSPROP_IGNORE_VALUE), value().isUndefined());
++        }
++        MOZ_ASSERT(getter() != JS_PropertyStub);
++        MOZ_ASSERT(setter() != JS_StrictPropertyStub);
++#endif
++    }
++
++    void assertComplete() const {
++#ifdef DEBUG
++        assertValid();
++        MOZ_ASSERT((attributes() & ~(JSPROP_ENUMERATE |
++                                     JSPROP_PERMANENT |
++                                     JSPROP_READONLY |
++                                     JSPROP_GETTER |
++                                     JSPROP_SETTER |
++                                     JSPROP_SHARED |
++                                     JSPROP_REDEFINE_NONCONFIGURABLE |
++                                     SHADOWABLE)) == 0);
++#endif
++    }
++
++    void assertCompleteIfFound() const {
++#ifdef DEBUG
++        if (object())
++            assertComplete();
++#endif
++    }
+ };
+ 
+ template <typename Outer>
+diff --git a/js/src/jsobj.cpp b/js/src/jsobj.cpp
+index 1efb983810a1..ed5d436c76dd 100644
+--- a/js/src/jsobj.cpp
++++ b/js/src/jsobj.cpp
+@@ -3123,8 +3123,12 @@ bool
+ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
+                              MutableHandle<PropertyDescriptor> desc)
+ {
+-    if (GetOwnPropertyOp op = obj->getOps()->getOwnPropertyDescriptor)
+-        return op(cx, obj, id, desc);
++    if (GetOwnPropertyOp op = obj->getOps()->getOwnPropertyDescriptor) {
++        bool ok = op(cx, obj, id, desc);
++        if (ok)
++            desc.assertCompleteIfFound();
++        return ok;
++    }
+ 
+     RootedShape shape(cx);
+     if (!NativeLookupOwnProperty<CanGC>(cx, obj.as<NativeObject>(), id, &shape))
+@@ -3174,6 +3178,7 @@ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
+ 
+     desc.value().set(value);
+     desc.object().set(obj);
++    desc.assertComplete();
+     return true;
+ }
+ 
+@@ -3181,6 +3186,7 @@ bool
+ js::DefineProperty(JSContext* cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc,
+                    ObjectOpResult& result)
+ {
++    desc.assertValid();
+     if (DefinePropertyOp op = obj->getOps()->defineProperty)
+         return op(cx, obj, id, desc, result);
+     return NativeDefineProperty(cx, obj.as<NativeObject>(), id, desc, result);
+@@ -3288,8 +3294,12 @@ js::GetPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
+     RootedObject pobj(cx);
+ 
+     for (pobj = obj; pobj;) {
+-        if (pobj->is<ProxyObject>())
+-            return Proxy::getPropertyDescriptor(cx, pobj, id, desc);
++        if (pobj->is<ProxyObject>()) {
++            bool ok = Proxy::getPropertyDescriptor(cx, pobj, id, desc);
++            if (ok)
++                desc.assertCompleteIfFound();
++            return ok;
++        }
+ 
+         if (!GetOwnPropertyDescriptor(cx, pobj, id, desc))
+             return false;
+diff --git a/js/src/proxy/BaseProxyHandler.cpp b/js/src/proxy/BaseProxyHandler.cpp
+index b2d2c33243f5..31bf65d44e1d 100644
+--- a/js/src/proxy/BaseProxyHandler.cpp
++++ b/js/src/proxy/BaseProxyHandler.cpp
+@@ -55,6 +55,7 @@ BaseProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
+         vp.setUndefined();
+         return true;
+     }
++    desc.assertComplete();
+     MOZ_ASSERT(desc.getter() != JS_PropertyStub);
+     if (!desc.getter()) {
+         vp.set(desc.value());
+@@ -84,6 +85,7 @@ BaseProxyHandler::set(JSContext* cx, HandleObject proxy, HandleId id, HandleValu
+     Rooted<PropertyDescriptor> ownDesc(cx);
+     if (!getOwnPropertyDescriptor(cx, proxy, id, &ownDesc))
+         return false;
++    ownDesc.assertCompleteIfFound();
+ 
+     // The rest is factored out into a separate function with a weird name.
+     // This algorithm continues just below.
+@@ -185,6 +187,8 @@ BaseProxyHandler::getOwnEnumerablePropertyKeys(JSContext* cx, HandleObject proxy
+         Rooted<PropertyDescriptor> desc(cx);
+         if (!getOwnPropertyDescriptor(cx, proxy, id, &desc))
+             return false;
++        desc.assertCompleteIfFound();
++
+         if (desc.object() && desc.enumerable())
+             props[i++].set(id);
+     }
+diff --git a/js/src/vm/NativeObject.cpp b/js/src/vm/NativeObject.cpp
+index c0f5cf1a1d76..6609cba5d1ca 100644
+--- a/js/src/vm/NativeObject.cpp
++++ b/js/src/vm/NativeObject.cpp
+@@ -1324,14 +1324,15 @@ CheckAccessorRedefinition(ExclusiveContext* cx, HandleObject obj, HandleShape sh
+ 
+ bool
+ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+-                         Handle<JSPropertyDescriptor> desc,
++                         Handle<PropertyDescriptor> desc,
+                          ObjectOpResult& result)
+ {
++    desc.assertValid();
++
+     GetterOp getter = desc.getter();
+     SetterOp setter = desc.setter();
+     unsigned attrs = desc.attributes();
+-    MOZ_ASSERT(getter != JS_PropertyStub);
+-    MOZ_ASSERT(setter != JS_StrictPropertyStub);
++
+     MOZ_ASSERT(!(attrs & JSPROP_PROPOP_ACCESSORS));
+ 
+     AutoRooterGetterSetter gsRoot(cx, attrs, &getter, &setter);

@@ -3457,6 +3457,7 @@ JS_DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
             if (flags & JSPROP_DEFINE_LATE)
                 continue;
         }
+        flags &= ~JSPROP_DEFINE_LATE;
 
         /*
          * Define a generic arity N+1 static method for the arity N prototype

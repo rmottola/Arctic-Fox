@@ -3122,8 +3122,12 @@ bool
 js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
                              MutableHandle<PropertyDescriptor> desc)
 {
-    if (GetOwnPropertyOp op = obj->getOps()->getOwnPropertyDescriptor)
-        return op(cx, obj, id, desc);
+    if (GetOwnPropertyOp op = obj->getOps()->getOwnPropertyDescriptor) {
+        bool ok = op(cx, obj, id, desc);
+        if (ok)
+            desc.assertCompleteIfFound();
+        return ok;
+    }
 
     RootedShape shape(cx);
     if (!NativeLookupOwnProperty<CanGC>(cx, obj.as<NativeObject>(), id, &shape))
@@ -3173,6 +3177,7 @@ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
 
     desc.value().set(value);
     desc.object().set(obj);
+    desc.assertComplete();
     return true;
 }
 
@@ -3180,6 +3185,7 @@ bool
 js::DefineProperty(JSContext *cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc,
                    ObjectOpResult &result)
 {
+    desc.assertValid();
     if (DefinePropertyOp op = obj->getOps()->defineProperty)
         return op(cx, obj, id, desc, result);
     return NativeDefineProperty(cx, obj.as<NativeObject>(), id, desc, result);
@@ -3287,8 +3293,12 @@ js::GetPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
     RootedObject pobj(cx);
 
     for (pobj = obj; pobj;) {
-        if (pobj->is<ProxyObject>())
-            return Proxy::getPropertyDescriptor(cx, pobj, id, desc);
+        if (pobj->is<ProxyObject>()) {
+            bool ok = Proxy::getPropertyDescriptor(cx, pobj, id, desc);
+            if (ok)
+                desc.assertCompleteIfFound();
+            return ok;
+        }
 
         if (!GetOwnPropertyDescriptor(cx, pobj, id, desc))
             return false;
