@@ -122,6 +122,14 @@
 
 - Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
+- Bug 1097987
+- Bug 1135731 - fix encoding inconsistency in NS_NewXBLProtoImpl; r=mrbkap
+-  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
+- Bug 1151981 - Remove the void* marking functions;
+- Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
+- Bug 1149739
+- Bug 1149352 - Part 0 to 11
+
 Sequence:
 Bug 1152171 part 2 - Rename AnimationTimeline to DocumentTimeline
 Bug 1026350 - Part 1: Inputport API implementation
@@ -158,10 +166,11 @@ Check with Roy Tam:
 
 What with LightweightThemeConsumer.jsm 
 
+-> check that 1085607 did not break Apple build!
 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/f277e7a606edb3dfb9fa6e0320a350c3bdd06904
+https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
 
 To verify:
 - Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
