@@ -1399,6 +1399,9 @@ class ZoneList
     ZoneList& operator=(const ZoneList& other) = delete;
 };
 
+JSObject *
+NewMemoryStatisticsObject(JSContext *cx);
+
 } /* namespace gc */
 
 #ifdef DEBUG

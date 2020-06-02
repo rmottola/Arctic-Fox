@@ -786,6 +786,8 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
         return;
     }
 
+    rt->gc.incMinorGcNumber();
+
     rt->gc.stats.count(gcstats::STAT_MINOR_GC);
 
     TraceMinorGCStart();

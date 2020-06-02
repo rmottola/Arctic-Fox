@@ -5267,7 +5267,6 @@ extern JS_PUBLIC_API(bool)
 StringifySavedFrameStack(JSContext *cx, HandleObject stack, MutableHandleString stringp);
 
 
-
 } /* namespace JS */
 
 
