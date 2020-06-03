@@ -412,6 +412,11 @@ partial interface Navigator {
   readonly attribute TVManager? tv;
 };
 
+partial interface Navigator {
+  [Throws, Pref="dom.inputport.enabled", CheckPermissions="inputport", AvailableIn=CertifiedApps]
+  readonly attribute InputPortManager inputPortManager;
+};
+
 #ifdef NIGHTLY_BUILD
 partial interface Navigator {
   [Func="Navigator::IsE10sEnabled"]

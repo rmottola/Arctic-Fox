@@ -90,6 +90,7 @@ class IccManager;
 class Telephony;
 class Voicemail;
 class TVManager;
+class InputPortManager;
 
 namespace time {
 class TimeManager;
@@ -222,6 +223,7 @@ public:
   Telephony* GetMozTelephony(ErrorResult& aRv);
   Voicemail* GetMozVoicemail(ErrorResult& aRv);
   TVManager* GetTv();
+  InputPortManager* GetInputPortManager(ErrorResult& aRv);
   network::Connection* GetConnection(ErrorResult& aRv);
   nsDOMCameraManager* GetMozCameras(ErrorResult& aRv);
   MediaDevices* GetMediaDevices(ErrorResult& aRv);
@@ -344,6 +346,7 @@ private:
   nsRefPtr<Telephony> mTelephony;
   nsRefPtr<Voicemail> mVoicemail;
   nsRefPtr<TVManager> mTVManager;
+  nsRefPtr<InputPortManager> mInputPortManager;
   nsRefPtr<network::Connection> mConnection;
 #ifdef MOZ_B2G_RIL
   nsRefPtr<MobileConnectionArray> mMobileConnections;

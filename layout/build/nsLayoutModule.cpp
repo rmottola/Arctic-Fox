@@ -242,6 +242,11 @@ static void Shutdown();
 #include "mozilla/dom/TVTypes.h"
 #include "nsITVService.h"
 
+#include "FakeInputPortService.h"
+#include "InputPortData.h"
+#include "InputPortServiceFactory.h"
+#include "nsIInputPortService.h"
+
 #ifdef MOZ_WIDGET_GONK
 #include "GonkGPSGeolocationProvider.h"
 #endif
@@ -391,7 +396,9 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(TVChannelData)
 NS_GENERIC_FACTORY_CONSTRUCTOR(TVProgramData)
 NS_GENERIC_FACTORY_CONSTRUCTOR(PresentationDeviceManager)
 NS_GENERIC_FACTORY_CONSTRUCTOR(TextInputProcessor)
-
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(FakeInputPortService,
+                                         InputPortServiceFactory::CreateFakeInputPortService)
+NS_GENERIC_FACTORY_CONSTRUCTOR(InputPortData)
 //-----------------------------------------------------------------------------
 
 static bool gInitialized = false;
@@ -835,6 +842,9 @@ NS_DEFINE_NAMED_CID(TV_TUNER_DATA_CID);
 NS_DEFINE_NAMED_CID(TV_CHANNEL_DATA_CID);
 NS_DEFINE_NAMED_CID(TV_PROGRAM_DATA_CID);
 
+NS_DEFINE_NAMED_CID(FAKE_INPUTPORT_SERVICE_CID);
+NS_DEFINE_NAMED_CID(INPUTPORT_DATA_CID);
+
 NS_DEFINE_NAMED_CID(GECKO_MEDIA_PLUGIN_SERVICE_CID);
 
 NS_DEFINE_NAMED_CID(PRESENTATION_DEVICE_MANAGER_CID);
@@ -1136,6 +1146,8 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kTV_PROGRAM_DATA_CID, false, nullptr, TVProgramDataConstructor },
   { &kPRESENTATION_DEVICE_MANAGER_CID, false, nullptr, PresentationDeviceManagerConstructor },
   { &kTEXT_INPUT_PROCESSOR_CID, false, nullptr, TextInputProcessorConstructor },
+  { &kFAKE_INPUTPORT_SERVICE_CID, false, nullptr, FakeInputPortServiceConstructor },
+  { &kINPUTPORT_DATA_CID, false, nullptr, InputPortDataConstructor },
   { nullptr }
 };
 
@@ -1304,6 +1316,8 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
 #endif
   { PRESENTATION_DEVICE_MANAGER_CONTRACTID, &kPRESENTATION_DEVICE_MANAGER_CID },
   { "@mozilla.org/text-input-processor;1", &kTEXT_INPUT_PROCESSOR_CID },
+  { FAKE_INPUTPORT_SERVICE_CONTRACTID, &kFAKE_INPUTPORT_SERVICE_CID },
+  { INPUTPORT_DATA_CONTRACTID, &kINPUTPORT_DATA_CID },
   { nullptr }
 };
 
