@@ -29,7 +29,7 @@
 
 
 using mozilla::layers::Layer;
-using mozilla::dom::AnimationPlayer;
+using mozilla::dom::Animation;
 using mozilla::dom::KeyframeEffectReadonly;
 
 namespace mozilla {
@@ -603,7 +603,7 @@ AnimationPlayerCollection::CanPerformOnCompositorThread(
   }
 
   for (size_t playerIdx = mPlayers.Length(); playerIdx-- != 0; ) {
-    const AnimationPlayer* player = mPlayers[playerIdx];
+    const Animation* player = mPlayers[playerIdx];
     if (!player->IsPlaying()) {
       continue;
     }
@@ -622,7 +622,7 @@ AnimationPlayerCollection::CanPerformOnCompositorThread(
 
   bool existsProperty = false;
   for (size_t playerIdx = mPlayers.Length(); playerIdx-- != 0; ) {
-    const AnimationPlayer* player = mPlayers[playerIdx];
+    const Animation* player = mPlayers[playerIdx];
     if (!player->IsPlaying()) {
       continue;
     }
@@ -930,7 +930,7 @@ AnimationPlayerCollection::HasCurrentAnimationsForProperties(
                               size_t aPropertyCount) const
 {
   for (size_t playerIdx = mPlayers.Length(); playerIdx-- != 0; ) {
-    const AnimationPlayer& player = *mPlayers[playerIdx];
+    const Animation& player = *mPlayers[playerIdx];
     const KeyframeEffectReadonly* effect = player.GetEffect();
     if (effect &&
         effect->IsCurrent(player) &&

@@ -116,7 +116,7 @@ class EventStateManager;
 
 namespace dom {
 
-class AnimationPlayer;
+class Animation;
 class Link;
 class UndoManager;
 class DOMRect;
@@ -835,7 +835,7 @@ public:
   {
   }
 
-  void GetAnimations(nsTArray<nsRefPtr<AnimationPlayer> >& aAnimations);
+  void GetAnimations(nsTArray<nsRefPtr<Animation>>& aAnimations);
 
   NS_IMETHOD GetInnerHTML(nsAString& aInnerHTML);
   virtual void SetInnerHTML(const nsAString& aInnerHTML, ErrorResult& aError);

@@ -10,7 +10,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/dom/AnimationPlayer.h"
+#include "mozilla/dom/Animation.h"
 #include "mozilla/dom/KeyframeEffect.h"
 #include "AnimationCommon.h"
 #include "nsCSSPseudoElements.h"
@@ -74,11 +74,11 @@ struct ElementPropertyTransition : public dom::KeyframeEffectReadonly
   double CurrentValuePortion() const;
 };
 
-class CSSTransitionPlayer final : public dom::AnimationPlayer
+class CSSTransitionPlayer final : public dom::Animation
 {
 public:
  explicit CSSTransitionPlayer(dom::DocumentTimeline* aTimeline)
-    : dom::AnimationPlayer(aTimeline)
+    : dom::Animation(aTimeline)
   {
   }
 
@@ -90,7 +90,7 @@ public:
 
   // A variant of Play() that avoids posting style updates since this method
   // is expected to be called whilst already updating style.
-  void PlayFromStyle() { DoPlay(AnimationPlayer::LimitBehavior::Continue); }
+  void PlayFromStyle() { DoPlay(Animation::LimitBehavior::Continue); }
 
 protected:
   virtual ~CSSTransitionPlayer() { }

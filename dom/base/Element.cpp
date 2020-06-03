@@ -14,7 +14,7 @@
 
 #include "AnimationCommon.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/dom/AnimationPlayer.h"
+#include "mozilla/dom/Animation.h"
 #include "mozilla/dom/Attr.h"
 #include "nsDOMAttributeMap.h"
 #include "nsIAtom.h"
@@ -3228,7 +3228,7 @@ Element::MozRequestPointerLock()
 }
 
 void
-Element::GetAnimations(nsTArray<nsRefPtr<AnimationPlayer> >& aAnimations)
+Element::GetAnimations(nsTArray<nsRefPtr<Animation>>& aAnimations)
 {
   nsIDocument* doc = GetComposedDoc();
   if (doc) {
@@ -3248,7 +3248,7 @@ Element::GetAnimations(nsTArray<nsRefPtr<AnimationPlayer> >& aAnimations)
     for (size_t playerIdx = 0;
          playerIdx < collection->mPlayers.Length();
          playerIdx++) {
-      AnimationPlayer* player = collection->mPlayers[playerIdx];
+      Animation* player = collection->mPlayers[playerIdx];
       if (player->IsRelevant()) {
         aAnimations.AppendElement(player);
       }
