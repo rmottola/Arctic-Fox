@@ -503,9 +503,9 @@ nsDisplayListBuilder::AddAnimationsAndTransitionsToLayer(Layer* aLayer,
   if (!content) {
     return;
   }
-  AnimationPlayerCollection* transitions =
+  AnimationCollection* transitions =
     nsTransitionManager::GetAnimationsForCompositor(content, aProperty);
-  AnimationPlayerCollection* animations =
+  AnimationCollection* animations =
     nsAnimationManager::GetAnimationsForCompositor(content, aProperty);
 
   if (!animations && !transitions) {
@@ -5422,8 +5422,8 @@ nsDisplayOpacity::CanUseAsyncAnimations(nsDisplayListBuilder* aBuilder)
   if (nsLayoutUtils::IsAnimationLoggingEnabled()) {
     nsCString message;
     message.AppendLiteral("Performance warning: Async animation disabled because frame was not marked active for opacity animation");
-    AnimationPlayerCollection::LogAsyncAnimationFailure(message,
-                                                        Frame()->GetContent());
+    AnimationCollection::LogAsyncAnimationFailure(message,
+                                                  Frame()->GetContent());
   }
   return false;
 }
@@ -5476,8 +5476,8 @@ nsDisplayTransform::ShouldPrerenderTransformedContent(nsDisplayListBuilder* aBui
     if (aLogAnimations) {
       nsCString message;
       message.AppendLiteral("Performance warning: Async animation disabled because frame was not marked active for transform animation");
-      AnimationPlayerCollection::LogAsyncAnimationFailure(message,
-                                                          aFrame->GetContent());
+      AnimationCollection::LogAsyncAnimationFailure(message,
+                                                    aFrame->GetContent());
     }
     return false;
   }
@@ -5516,8 +5516,8 @@ nsDisplayTransform::ShouldPrerenderTransformedContent(nsDisplayListBuilder* aBui
     message.AppendLiteral(") is larger than the max allowable value (");
     message.AppendInt(nsPresContext::AppUnitsToIntCSSPixels(maxInAppUnits));
     message.Append(')');
-    AnimationPlayerCollection::LogAsyncAnimationFailure(message,
-                                                        aFrame->GetContent());
+    AnimationCollection::LogAsyncAnimationFailure(message,
+                                                  aFrame->GetContent());
   }
   return false;
 }

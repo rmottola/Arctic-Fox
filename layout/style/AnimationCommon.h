@@ -32,7 +32,7 @@ class nsPresContext;
 namespace mozilla {
 
 class RestyleTracker;
-struct AnimationPlayerCollection;
+struct AnimationCollection;
 
 namespace css {
 
@@ -81,7 +81,7 @@ public:
   // elements.
   void AddStyleUpdatesTo(mozilla::RestyleTracker& aTracker);
 
-  AnimationPlayerCollection*
+  AnimationCollection*
   GetAnimations(dom::Element *aElement,
                 nsCSSPseudoElements::Type aPseudoType,
                 bool aCreateIfNeeded);
@@ -101,7 +101,7 @@ public:
 
   // Notify this manager that one of its collections of animation players,
   // has been updated.
-  void NotifyCollectionUpdated(AnimationPlayerCollection& aCollection);
+  void NotifyCollectionUpdated(AnimationCollection& aCollection);
 
   enum FlushFlags {
     Can_Throttle,
@@ -140,9 +140,9 @@ protected:
   virtual ~CommonAnimationManager();
 
   // For ElementCollectionRemoved
-  friend struct mozilla::AnimationPlayerCollection;
+  friend struct mozilla::AnimationCollection;
 
-  void AddElementCollection(AnimationPlayerCollection* aCollection);
+  void AddElementCollection(AnimationCollection* aCollection);
   void ElementCollectionRemoved() { MaybeStartOrStopObservingRefreshDriver(); }
   void RemoveAllElementCollections();
 
@@ -161,7 +161,7 @@ protected:
     return false;
   }
 
-  static AnimationPlayerCollection*
+  static AnimationCollection*
   GetAnimationsForCompositor(nsIContent* aContent,
                              nsIAtom* aElementProperty,
                              nsCSSProperty aProperty);
@@ -229,10 +229,10 @@ enum EnsureStyleRuleFlags {
   EnsureStyleRule_IsNotThrottled
 };
 
-struct AnimationPlayerCollection : public PRCList
+struct AnimationCollection : public PRCList
 {
-  AnimationPlayerCollection(dom::Element *aElement, nsIAtom *aElementProperty,
-                            mozilla::css::CommonAnimationManager *aManager)
+  AnimationCollection(dom::Element *aElement, nsIAtom *aElementProperty,
+                      mozilla::css::CommonAnimationManager *aManager)
     : mElement(aElement)
     , mElementProperty(aElementProperty)
     , mManager(aManager)
@@ -243,14 +243,14 @@ struct AnimationPlayerCollection : public PRCList
     , mCalledPropertyDtor(false)
 #endif
   {
-    MOZ_COUNT_CTOR(AnimationPlayerCollection);
+    MOZ_COUNT_CTOR(AnimationCollection);
     PR_INIT_CLIST(this);
   }
-  ~AnimationPlayerCollection()
+  ~AnimationCollection()
   {
     MOZ_ASSERT(mCalledPropertyDtor,
                "must call destructor through element property dtor");
-    MOZ_COUNT_DTOR(AnimationPlayerCollection);
+    MOZ_COUNT_DTOR(AnimationCollection);
     PR_REMOVE_LINK(this);
     mManager->ElementCollectionRemoved();
   }
