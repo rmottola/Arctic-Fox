@@ -779,7 +779,7 @@ public:
   virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() override;
 
   static bool IsWebAnimationsEnabled(JSContext* aCx, JSObject* aObject);
-  virtual mozilla::dom::AnimationTimeline* Timeline() override;
+  virtual mozilla::dom::DocumentTimeline* Timeline() override;
 
   virtual nsresult SetSubDocumentFor(Element* aContent,
                                      nsIDocument* aSubDoc) override;
@@ -1797,7 +1797,7 @@ private:
 
   nsRefPtr<mozilla::dom::UndoManager> mUndoManager;
 
-  nsRefPtr<mozilla::dom::AnimationTimeline> mAnimationTimeline;
+  nsRefPtr<mozilla::dom::DocumentTimeline> mDocumentTimeline;
 
   enum ViewportType {
     DisplayWidthHeight,

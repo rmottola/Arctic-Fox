@@ -54,7 +54,7 @@ typedef InfallibleTArray<AnimationEventInfo> EventArray;
 class CSSAnimationPlayer final : public dom::AnimationPlayer
 {
 public:
- explicit CSSAnimationPlayer(dom::AnimationTimeline* aTimeline)
+ explicit CSSAnimationPlayer(dom::DocumentTimeline* aTimeline)
     : dom::AnimationPlayer(aTimeline)
     , mIsStylePaused(false)
     , mPauseShouldStick(false)
@@ -236,7 +236,7 @@ protected:
 private:
   void BuildAnimations(nsStyleContext* aStyleContext,
                        mozilla::dom::Element* aTarget,
-                       mozilla::dom::AnimationTimeline* aTimeline,
+                       mozilla::dom::DocumentTimeline* aTimeline,
                        mozilla::AnimationPlayerPtrArray& aAnimations);
   bool BuildSegment(InfallibleTArray<mozilla::AnimationPropertySegment>&
                       aSegments,
