@@ -14,6 +14,7 @@
 #include "mozilla/StyleAnimationValue.h" // for StyleAnimationValue, etc
 #include "mozilla/WidgetUtils.h"        // for ComputeTransformForRotation
 #include "mozilla/dom/AnimationPlayer.h" // for AnimationPlayer
+#include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadonly
 #include "mozilla/gfx/BaseRect.h"       // for BaseRect
 #include "mozilla/gfx/Point.h"          // for RoundedToInt, PointTyped
 #include "mozilla/gfx/Rect.h"           // for RoundedToInt, RectTyped
@@ -475,7 +476,7 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
     timing.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BOTH;
 
     ComputedTiming computedTiming =
-      dom::Animation::GetComputedTimingAt(
+      dom::KeyframeEffectReadonly::GetComputedTimingAt(
         Nullable<TimeDuration>(elapsedDuration), timing);
 
     MOZ_ASSERT(0.0 <= computedTiming.mTimeFraction &&
