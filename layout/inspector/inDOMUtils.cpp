@@ -235,8 +235,7 @@ inDOMUtils::GetCSSStyleRules(nsIDOMElement *aElement,
     }
   }
 
-  *_retval = rules;
-  NS_ADDREF(*_retval);
+  rules.forget(_retval);
 
   return NS_OK;
 }
@@ -903,7 +902,7 @@ inDOMUtils::GetBindingURLs(nsIDOMElement *aElement, nsIArray **_retval)
     binding = binding->GetBaseBinding();
   }
 
-  NS_ADDREF(*_retval = urls);
+  urls.forget(_retval);
   return NS_OK;
 }
 

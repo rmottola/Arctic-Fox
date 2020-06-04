@@ -234,7 +234,7 @@ ContentPermissionType::GetOptions(nsIArray** aOptions)
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  NS_ADDREF(*aOptions = options);
+  options.forget(aOptions);
   return NS_OK;
 }
 
