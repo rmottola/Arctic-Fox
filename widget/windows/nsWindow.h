@@ -287,6 +287,7 @@ protected:
   virtual ~nsWindow();
 
   virtual void WindowUsesOMTC() override;
+  virtual void ConfigureAPZCTreeManager() override;
 
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;
