@@ -477,9 +477,6 @@ public:
   virtual bool CanClose() override;
   virtual void ForceClose() override;
 
-  virtual void MaybeUpdateTouchState() override;
-  virtual void UpdateTouchState() override;
-
   // Outer windows only.
   virtual bool DispatchCustomEvent(const nsAString& aEventName) override;
   bool DispatchResizeEvent(const mozilla::CSSIntSize& aSize);

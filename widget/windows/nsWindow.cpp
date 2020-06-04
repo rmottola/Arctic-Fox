@@ -1290,10 +1290,7 @@ void nsWindow::SetThemeRegion()
 
 /**************************************************************
  *
- * SECTION: nsIWidget::RegisterTouchWindow,
- * nsIWidget::UnregisterTouchWindow, and helper functions
- *
- * Used to register the native window to receive touch events
+ * SECTION: Touch and APZ-related functions
  *
  **************************************************************/
 
@@ -1310,34 +1307,19 @@ void nsWindow::ConfigureAPZCTreeManager()
   RegisterTouchWindow();
 }
 
-NS_METHOD nsWindow::RegisterTouchWindow() {
+void nsWindow::RegisterTouchWindow() {
   if (Preferences::GetInt("dom.w3c_touch_events.enabled", 0) ||
       gIsPointerEventsEnabled) {
     mTouchWindow = true;
     mGesture.RegisterTouchWindow(mWnd);
     ::EnumChildWindows(mWnd, nsWindow::RegisterTouchForDescendants, 0);
   }
-  return NS_OK;
-}
-
-NS_METHOD nsWindow::UnregisterTouchWindow() {
-  mTouchWindow = false;
-  mGesture.UnregisterTouchWindow(mWnd);
-  ::EnumChildWindows(mWnd, nsWindow::UnregisterTouchForDescendants, 0);
-  return NS_OK;
 }
 
 BOOL CALLBACK nsWindow::RegisterTouchForDescendants(HWND aWnd, LPARAM aMsg) {
   nsWindow* win = WinUtils::GetNSWindowPtr(aWnd);
   if (win)
     win->mGesture.RegisterTouchWindow(aWnd);
-  return TRUE;
-}
-
-BOOL CALLBACK nsWindow::UnregisterTouchForDescendants(HWND aWnd, LPARAM aMsg) {
-  nsWindow* win = WinUtils::GetNSWindowPtr(aWnd);
-  if (win)
-    win->mGesture.UnregisterTouchWindow(aWnd);
   return TRUE;
 }
 

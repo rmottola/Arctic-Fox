@@ -229,8 +229,6 @@ public:
   NS_IMETHOD              AttachViewToTopLevel(bool aUseAttachedEvents) override;
   virtual nsIWidgetListener* GetAttachedWidgetListener() override;
   virtual void               SetAttachedWidgetListener(nsIWidgetListener* aListener) override;
-  NS_IMETHOD              RegisterTouchWindow() override;
-  NS_IMETHOD              UnregisterTouchWindow() override;
   NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() override final;
 
   // Helper function for dispatching events which are not processed by APZ,
