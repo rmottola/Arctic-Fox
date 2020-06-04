@@ -1080,6 +1080,9 @@ pref("browser.devedition.theme.enabled", false);
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
 
+// The default service workers UI setting
+pref("devtools.serviceWorkers.testing.enabled", false);
+
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
 pref("browser.menu.showCharacterEncoding", "chrome://browser/locale/browser.properties");

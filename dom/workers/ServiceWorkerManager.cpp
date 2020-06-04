@@ -899,6 +899,10 @@ ServiceWorkerManager::Register(nsIDOMWindow* aWindow,
 
   nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
 
+  nsCOMPtr<nsPIDOMWindow> outerWindow = window->GetOuterWindow();
+  bool serviceWorkersTestingEnabled =
+    outerWindow->GetServiceWorkersTestingEnabled();
+
   nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
   if (!doc) {
     return NS_ERROR_FAILURE;
@@ -907,8 +911,8 @@ ServiceWorkerManager::Register(nsIDOMWindow* aWindow,
   nsCOMPtr<nsIURI> documentURI = doc->GetBaseURI();
 
   bool authenticatedOrigin = false;
-  // FIXME(nsm): Bug 1003991. Disable check when devtools are open.
-  if (Preferences::GetBool("dom.serviceWorkers.testing.enabled")) {
+  if (Preferences::GetBool("dom.serviceWorkers.testing.enabled") ||
+      serviceWorkersTestingEnabled) {
     authenticatedOrigin = true;
   }
 

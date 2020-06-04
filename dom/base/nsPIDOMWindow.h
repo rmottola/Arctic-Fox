@@ -203,6 +203,18 @@ public:
 
   float GetAudioGlobalVolume();
 
+  virtual void SetServiceWorkersTestingEnabled(bool aEnabled)
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    mServiceWorkersTestingEnabled = aEnabled;
+  }
+
+  bool GetServiceWorkersTestingEnabled()
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    return mServiceWorkersTestingEnabled;
+  }
+
 protected:
   // Lazily instantiate an about:blank document if necessary, and if
   // we have what it takes to do so.
@@ -828,6 +840,10 @@ protected:
   bool mHasNotifiedGlobalCreated;
 
   uint32_t mMarkedCCGeneration;
+
+  // Let the service workers plumbing know that some feature are enabled while
+  // testing.
+  bool mServiceWorkersTestingEnabled;
 };
 
 
