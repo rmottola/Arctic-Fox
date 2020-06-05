@@ -387,6 +387,12 @@ public:
    */
   bool MayHavePaintEventListener() { return mMayHavePaintEventListener; }
 
+  /**
+   * Returns true if there may be a touch event listener registered,
+   * false if there definitely isn't.
+   */
+  bool MayHaveTouchEventListener() { return mMayHaveTouchEventListener; }
+
   bool MayHaveMouseEnterLeaveEventListener() { return mMayHaveMouseEnterLeaveEventListener; }
   bool MayHavePointerEnterLeaveEventListener() { return mMayHavePointerEnterLeaveEventListener; }
 
@@ -536,6 +542,7 @@ protected:
   uint32_t mMayHaveMutationListeners : 1;
   uint32_t mMayHaveCapturingListeners : 1;
   uint32_t mMayHaveSystemGroupListeners : 1;
+  uint32_t mMayHaveTouchEventListener : 1;
   uint32_t mMayHaveMouseEnterLeaveEventListener : 1;
   uint32_t mMayHavePointerEnterLeaveEventListener : 1;
   uint32_t mClearingListeners : 1;
