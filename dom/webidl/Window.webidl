@@ -160,8 +160,10 @@ dictionary ScrollToOptions : ScrollOptions {
 partial interface Window {
   //[Throws,NewObject] MediaQueryList matchMedia(DOMString query);
   [Throws,NewObject] MediaQueryList? matchMedia(DOMString query);
-  //[SameObject]
-  [Throws] readonly attribute Screen screen;
+  // Per spec, screen is SameObject, but we don't actually guarantee that given
+  // nsGlobalWindow::Cleanup.  :(
+  //[SameObject, Replaceable, Throws] readonly attribute Screen screen;
+  [Replaceable, Throws] readonly attribute Screen screen;
 
   // browsing context
   //[Throws] void moveTo(double x, double y);
@@ -180,25 +182,27 @@ partial interface Window {
   [Throws] attribute long innerHeight;
 
   // viewport scrolling
-  //[Throws] readonly attribute double scrollX;
-  //[Throws] readonly attribute double pageXOffset;
-  //[Throws] readonly attribute double scrollY;
-  //[Throws] readonly attribute double pageYOffset;
   void scroll(unrestricted double x, unrestricted double y);
   void scroll(optional ScrollToOptions options);
   void scrollTo(unrestricted double x, unrestricted double y);
   void scrollTo(optional ScrollToOptions options);
   void scrollBy(unrestricted double x, unrestricted double y);
   void scrollBy(optional ScrollToOptions options);
-  [Replaceable, Throws] readonly attribute double scrollX;
   // mozScrollSnap is used by chrome to perform scroll snapping after the
   // user performs actions that may affect scroll position
   // mozScrollSnap is deprecated, to be replaced by a web accessible API, such
   // as an extension to the ScrollOptions dictionary.  See bug 1137937.
   [ChromeOnly] void mozScrollSnap();
-  [Throws] readonly attribute double pageXOffset;
-  [Replaceable, Throws] readonly attribute double scrollY;
-  [Throws] readonly attribute double pageYOffset;
+  // The four properties below are double per spec at the moment, but whether
+  // that will continue is unclear.
+  //[Replaceable, Throws] readonly attribute double scrollX;
+  //[Replaceable, Throws] readonly attribute double pageXOffset;
+  //[Replaceable, Throws] readonly attribute double scrollY;
+  //[Replaceable, Throws] readonly attribute double pageYOffset;
+  [Replaceable, Throws] readonly attribute long scrollX;
+  [Replaceable, Throws] readonly attribute long pageXOffset;
+  [Replaceable, Throws] readonly attribute long scrollY;
+  [Replaceable, Throws] readonly attribute long pageYOffset;
 
   // client
   //[Throws] readonly attribute double screenX;
@@ -303,7 +307,7 @@ partial interface Window {
 
   [Throws] readonly attribute float               mozInnerScreenX;
   [Throws] readonly attribute float               mozInnerScreenY;
-  [Throws] readonly attribute float               devicePixelRatio;
+  [Replaceable, Throws] readonly attribute float  devicePixelRatio;
 
   /* The maximum offset that the window can be scrolled to
      (i.e., the document width/height minus the scrollport width/height) */
