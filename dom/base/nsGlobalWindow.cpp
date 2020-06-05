@@ -2723,7 +2723,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
   // up with the outer. See bug 969156.
   if (createdInnerWindow) {
     // AutoEntryScript required to invoke debugger hook, which is a
-    // Goanna-specific concept at present.
+    // Gecko-specific concept at present.
     AutoEntryScript aes(newInnerWindow);
     JS::Rooted<JSObject*> global(aes.cx(), newInnerWindow->GetWrapper());
     JS_FireOnNewGlobalObject(aes.cx(), global);
@@ -6204,7 +6204,7 @@ nsGlobalWindow::Dump(const nsAString& aStr)
     PrintToDebugger(cstr);
 #endif
 #ifdef ANDROID
-    __android_log_write(ANDROID_LOG_INFO, "GoannaDump", cstr);
+    __android_log_write(ANDROID_LOG_INFO, "GeckoDump", cstr);
 #endif
     FILE *fp = gDumpFile ? gDumpFile : stdout;
     fputs(cstr, fp);
