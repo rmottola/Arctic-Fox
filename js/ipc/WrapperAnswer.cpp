@@ -319,7 +319,7 @@ WrapperAnswer::RecvSet(const ObjectId &objId, const JSIDVariant &idVar, const JS
 {
     // We may run scripted setters.
     AutoEntryScript aes(xpc::NativeGlobal(scopeForTargetObjects()));
-    JSContext *cx = aes.cx();
+    JSContext* cx = aes.cx();
 
     RootedObject obj(cx, findObjectById(cx, objId));
     if (!obj)
