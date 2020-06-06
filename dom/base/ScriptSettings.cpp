@@ -566,6 +566,7 @@ AutoJSAPI::StealException(JS::MutableHandle<JS::Value> aVal)
 }
 
 AutoEntryScript::AutoEntryScript(nsIGlobalObject* aGlobalObject,
+                                 const char *aReason,
                                  bool aIsMainThread,
                                  JSContext* aCx)
   : AutoJSAPI(aGlobalObject, aIsMainThread,
@@ -586,7 +587,7 @@ AutoEntryScript::AutoEntryScript(nsIGlobalObject* aGlobalObject,
   }
 
   if (mDocShellForJSRunToCompletion) {
-    mDocShellForJSRunToCompletion->NotifyJSRunToCompletionStart();
+    mDocShellForJSRunToCompletion->NotifyJSRunToCompletionStart(aReason);
   }
 }
 

@@ -404,7 +404,7 @@ nsXBLProtoImplField::InstallField(JS::Handle<JSObject*> aBoundNode,
 
   // We are going to run script via EvaluateString, so we need a script entry
   // point, but as this is XBL related it does not appear in the HTML spec.
-  AutoEntryScript entryScript(globalObject, true);
+  AutoEntryScript entryScript(globalObject, "XBL <field> initialization", true);
   entryScript.TakeOwnershipOfErrorReporting();
   JSContext* cx = entryScript.cx();
 

@@ -14093,7 +14093,7 @@ nsDocShell::GetURLSearchParams()
 }
 
 void
-nsDocShell::NotifyJSRunToCompletionStart()
+nsDocShell::NotifyJSRunToCompletionStart(const char *aReason)
 {
   bool timelineOn = nsIDocShell::GetRecordProfileTimelineMarkers();
 
