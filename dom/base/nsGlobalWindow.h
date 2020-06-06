@@ -1103,6 +1103,8 @@ public:
                     JS::MutableHandle<JS::Value> aRetval,
                     mozilla::ErrorResult& aError);
 
+  already_AddRefed<nsWindowRoot> GetWindowRoot(mozilla::ErrorResult& aError);
+
 protected:
   // Web IDL helpers
 
