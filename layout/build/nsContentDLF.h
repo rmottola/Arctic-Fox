@@ -56,35 +56,35 @@ NS_NewContentDocumentLoaderFactory(nsIDocumentLoaderFactory** aResult);
 
 #ifdef MOZ_WEBM
 #define CONTENTDLF_WEBM_CATEGORIES \
-    { "Goanna-Content-Viewers", VIDEO_WEBM, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", AUDIO_WEBM, "@mozilla.org/content/document-loader-factory;1" },
+    { "Gecko-Content-Viewers", VIDEO_WEBM, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", AUDIO_WEBM, "@mozilla.org/content/document-loader-factory;1" },
 #else
 #define CONTENTDLF_WEBM_CATEGORIES
 #endif
 
 #define CONTENTDLF_CATEGORIES \
-    { "Goanna-Content-Viewers", TEXT_HTML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_PLAIN, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_CACHE_MANIFEST, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_CSS, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_JAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_ECMASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_JAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_ECMASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_XJAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_JSON, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_JSON, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_XHTML_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_RDF_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_RDF, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_XUL, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_CACHED_XUL, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", VIEWSOURCE_CONTENT_TYPE, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", IMAGE_SVG_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", APPLICATION_MATHML_XML, "@mozilla.org/content/document-loader-factory;1" }, \
-    { "Goanna-Content-Viewers", TEXT_VTT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_HTML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_PLAIN, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_CACHE_MANIFEST, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_CSS, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_JAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_ECMASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_JAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_ECMASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_XJAVASCRIPT, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_JSON, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_JSON, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_XHTML_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_RDF_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_RDF, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_XUL, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_CACHED_XUL, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", VIEWSOURCE_CONTENT_TYPE, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", IMAGE_SVG_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", APPLICATION_MATHML_XML, "@mozilla.org/content/document-loader-factory;1" }, \
+    { "Gecko-Content-Viewers", TEXT_VTT, "@mozilla.org/content/document-loader-factory;1" }, \
     CONTENTDLF_WEBM_CATEGORIES
 
 

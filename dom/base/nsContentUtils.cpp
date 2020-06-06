@@ -6482,7 +6482,7 @@ nsContentUtils::FindInternalContentViewer(const nsACString& aType,
   nsCOMPtr<nsIDocumentLoaderFactory> docFactory;
 
   nsXPIDLCString contractID;
-  nsresult rv = catMan->GetCategoryEntry("Goanna-Content-Viewers",
+  nsresult rv = catMan->GetCategoryEntry("Gecko-Content-Viewers",
                                          PromiseFlatCString(aType).get(),
                                          getter_Copies(contractID));
   if (NS_SUCCEEDED(rv)) {

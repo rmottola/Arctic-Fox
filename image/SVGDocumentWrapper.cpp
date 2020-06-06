@@ -309,7 +309,7 @@ SVGDocumentWrapper::SetupViewer(nsIRequest* aRequest,
     do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
   NS_ENSURE_TRUE(catMan, NS_ERROR_NOT_AVAILABLE);
   nsXPIDLCString contractId;
-  nsresult rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", IMAGE_SVG_XML,
+  nsresult rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", IMAGE_SVG_XML,
                                          getter_Copies(contractId));
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDocumentLoaderFactory> docLoaderFactory =

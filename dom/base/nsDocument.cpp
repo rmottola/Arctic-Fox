@@ -1218,7 +1218,7 @@ nsExternalResourceMap::PendingLoad::SetupViewer(nsIRequest* aRequest,
     do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
   NS_ENSURE_TRUE(catMan, NS_ERROR_NOT_AVAILABLE);
   nsXPIDLCString contractId;
-  nsresult rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", type.get(),
+  nsresult rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", type.get(),
                                          getter_Copies(contractId));
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDocumentLoaderFactory> docLoaderFactory =

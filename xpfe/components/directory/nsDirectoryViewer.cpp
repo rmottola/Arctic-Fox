@@ -153,7 +153,7 @@ nsHTTPIndex::OnFTPControlLog(bool server, const char *msg)
     NS_ENSURE_TRUE(globalObject, NS_OK);
 
     // We're going to run script via JS_CallFunctionName, so we need an
-    // AutoEntryScript. This is Goanna specific and not in any spec.
+    // AutoEntryScript. This is Gecko specific and not in any spec.
     dom::AutoEntryScript aes(globalObject);
     JSContext* cx = aes.cx();
 
@@ -226,7 +226,7 @@ nsHTTPIndex::OnStartRequest(nsIRequest *request, nsISupports* aContext)
     NS_ENSURE_TRUE(globalObject, NS_ERROR_FAILURE);
 
     // We might run script via JS_SetProperty, so we need an AutoEntryScript.
-    // This is Goanna specific and not in any spec.
+    // This is Gecko specific and not in any spec.
     dom::AutoEntryScript aes(globalObject);
     JSContext* cx = aes.cx();
 
@@ -1288,7 +1288,7 @@ nsDirectoryViewerFactory::CreateInstance(const char *aCommand,
     if (NS_FAILED(rv))
       return rv;
     nsXPIDLCString contractID;
-    rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", "application/vnd.mozilla.xul+xml",
+    rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", "application/vnd.mozilla.xul+xml",
                                   getter_Copies(contractID));
     if (NS_FAILED(rv))
       return rv;
@@ -1348,7 +1348,7 @@ nsDirectoryViewerFactory::CreateInstance(const char *aCommand,
   if (NS_FAILED(rv))
     return rv;
   nsXPIDLCString contractID;
-  rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", "text/html",
+  rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", "text/html",
                                 getter_Copies(contractID));
   if (NS_FAILED(rv))
     return rv;

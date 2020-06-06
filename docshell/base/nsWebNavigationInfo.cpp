@@ -40,7 +40,7 @@ nsWebNavigationInfo::IsTypeSupported(const nsACString& aType,
   // an nsSHistory, but not much we can do with that).  So if we start using
   // it here, we need to be careful to get to the docshell correctly.
 
-  // For now just report what the Goanna-Content-Viewers category has
+  // For now just report what the Gecko-Content-Viewers category has
   // to say for itself.
   *aIsTypeSupported = nsIWebNavigationInfo::UNSUPPORTED;
 
