@@ -11,6 +11,11 @@
 #include "JavaScriptShared.h"
 
 namespace mozilla {
+
+namespace dom {
+class AutoJSAPI;
+}
+
 namespace jsipc {
 
 class WrapperAnswer : public virtual JavaScriptShared
@@ -62,9 +67,9 @@ class WrapperAnswer : public virtual JavaScriptShared
     bool RecvDropObject(const ObjectId& objId);
 
   private:
-    bool fail(JSContext* cx, ReturnStatus* rs);
-    bool ok(ReturnStatus *rs);
-    bool ok(ReturnStatus *rs, const JS::ObjectOpResult &result);
+    bool fail(dom::AutoJSAPI& jsapi, ReturnStatus* rs);
+    bool ok(ReturnStatus* rs);
+    bool ok(ReturnStatus* rs, const JS::ObjectOpResult& result);
 };
 
 } // namespace jsipc
