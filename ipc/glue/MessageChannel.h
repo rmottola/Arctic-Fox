@@ -203,7 +203,7 @@ class MessageChannel : HasResultCodes
 
   public:
     void ProcessNativeEventsInInterruptCall();
-    static void NotifyGoannaEventDispatch();
+    static void NotifyGeckoEventDispatch();
 
   private:
     void SpinInternalEventLoop();

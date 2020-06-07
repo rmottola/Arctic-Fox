@@ -60,7 +60,7 @@ jclass anp_system_loadJavaClass(NPP instance, const char* className)
   nsCString libName;
   lib->GetLibraryPath(libName);
 
-  return mozilla::widget::GoannaAppShell::LoadPluginClass(className, libName).Forget();
+  return mozilla::widget::GeckoAppShell::LoadPluginClass(className, libName).Forget();
 }
 
 void anp_system_setPowerState(NPP instance, ANPPowerState powerState)

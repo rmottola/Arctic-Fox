@@ -768,7 +768,7 @@ MessageChannel::SyncStackFrame* MessageChannel::sStaticTopFrame;
 // a nested goanna event loop. In which case the remote process needs
 // to know about it.
 void /* static */
-MessageChannel::NotifyGoannaEventDispatch()
+MessageChannel::NotifyGeckoEventDispatch()
 {
   // sStaticTopFrame is only valid for Interrupt channels
   if (!sStaticTopFrame || sStaticTopFrame->mListenerNotified)

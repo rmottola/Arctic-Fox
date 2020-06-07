@@ -26,7 +26,7 @@ AndroidLocationProvider::~AndroidLocationProvider()
 NS_IMETHODIMP
 AndroidLocationProvider::Startup()
 {
-    widget::GoannaAppShell::EnableLocation(true);
+    widget::GeckoAppShell::EnableLocation(true);
     return NS_OK;
 }
 
@@ -42,13 +42,13 @@ AndroidLocationProvider::Watch(nsIGeolocationUpdate* aCallback)
 NS_IMETHODIMP
 AndroidLocationProvider::Shutdown()
 {
-    widget::GoannaAppShell::EnableLocation(false);
+    widget::GeckoAppShell::EnableLocation(false);
     return NS_OK;
 }
 
 NS_IMETHODIMP
 AndroidLocationProvider::SetHighAccuracy(bool enable)
 {
-    widget::GoannaAppShell::EnableLocationHighAccuracy(enable);
+    widget::GeckoAppShell::EnableLocationHighAccuracy(enable);
     return NS_OK;
 }

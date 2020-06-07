@@ -180,7 +180,7 @@ nsAppShell::Exit(void)
 }
 
 void
-nsAppShell::DoProcessMoreGoannaEvents()
+nsAppShell::DoProcessMoreGeckoEvents()
 {
   // Called by nsBaseAppShell's NativeEventCallback() after it has finished
   // processing pending goanna events and there are still goanna events pending
@@ -231,7 +231,7 @@ bool
 nsAppShell::ProcessNextNativeEvent(bool mayWait)
 {
   // Notify ipc we are spinning a (possibly nested) goanna event loop.
-  mozilla::ipc::MessageChannel::NotifyGoannaEventDispatch();
+  mozilla::ipc::MessageChannel::NotifyGeckoEventDispatch();
 
   bool gotMessage = false;
 
@@ -294,7 +294,7 @@ nsAppShell::ProcessNextNativeEvent(bool mayWait)
   // See DoProcessNextNativeEvent, mEventloopNestingLevel will be
   // one when a modal loop unwinds.
   if (mNativeCallbackPending && mEventloopNestingLevel == 1)
-    DoProcessMoreGoannaEvents();
+    DoProcessMoreGeckoEvents();
 
   // Check for starved native callbacks. If we haven't processed one
   // of these events in NATIVE_EVENT_STARVATION_LIMIT, fire one off.

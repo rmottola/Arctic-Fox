@@ -135,7 +135,7 @@ NS_IMETHODIMP nsAlertsService::CloseAlert(const nsAString& aAlertName,
   }
 
 #ifdef MOZ_WIDGET_ANDROID
-  widget::GoannaAppShell::CloseNotification(aAlertName);
+  widget::GeckoAppShell::CloseNotification(aAlertName);
   return NS_OK;
 #else
 
@@ -156,7 +156,7 @@ NS_IMETHODIMP nsAlertsService::OnProgress(const nsAString & aAlertName,
                                           const nsAString & aAlertText)
 {
 #ifdef MOZ_WIDGET_ANDROID
-  widget::GoannaAppShell::AlertsProgressListener_OnProgress(aAlertName,
+  widget::GeckoAppShell::AlertsProgressListener_OnProgress(aAlertName,
                                                            aProgress, aProgressMax,
                                                            aAlertText);
   return NS_OK;
@@ -168,7 +168,7 @@ NS_IMETHODIMP nsAlertsService::OnProgress(const nsAString & aAlertName,
 NS_IMETHODIMP nsAlertsService::OnCancel(const nsAString & aAlertName)
 {
 #ifdef MOZ_WIDGET_ANDROID
-  widget::GoannaAppShell::CloseNotification(aAlertName);
+  widget::GeckoAppShell::CloseNotification(aAlertName);
   return NS_OK;
 #else
   return NS_ERROR_NOT_IMPLEMENTED;

@@ -344,7 +344,7 @@ nsSystemInfo::Init()
           "android/os/Build", "HARDWARE", str)) {
       SetPropertyAsAString(NS_LITERAL_STRING("hardware"), str);
     }
-    bool isTablet = mozilla::widget::GoannaAppShell::IsTablet();
+    bool isTablet = mozilla::widget::GeckoAppShell::IsTablet();
     SetPropertyAsBool(NS_LITERAL_STRING("tablet"), isTablet);
     // NSPR "version" is the kernel version. For Android we want the Android version.
     // Rename SDK version to version and put the kernel version into kernel_version.

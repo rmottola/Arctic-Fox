@@ -22,7 +22,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.mozilla.goanna.gfx.LayerView;
 import org.mozilla.goanna.gfx.PanningPerfAPI;
-import org.mozilla.goanna.util.GoannaEventListener;
+import org.mozilla.goanna.util.GeckoEventListener;
 
 import android.app.Activity;
 import android.util.Log;
@@ -248,7 +248,7 @@ public class FennecNativeDriver implements Driver {
 
     @Override
     public void setupScrollHandling() {
-        EventDispatcher.getInstance().registerGoannaThreadListener(new GoannaEventListener() {
+        EventDispatcher.getInstance().registerGeckoThreadListener(new GeckoEventListener() {
             @Override
             public void handleMessage(final String event, final JSONObject message) {
                 try {

@@ -32,8 +32,8 @@ import android.view.SurfaceHolder.Callback;
 import android.view.SurfaceHolder;
 import android.view.WindowManager;
 
-import org.mozilla.goanna.GoannaAppShell;
-import org.mozilla.goanna.GoannaAppShell.AppStateListener;
+import org.mozilla.goanna.GeckoAppShell;
+import org.mozilla.goanna.GeckoAppShell.AppStateListener;
 import org.mozilla.goanna.mozglue.WebRTCJNITarget;
 
 // Wrapper for android Camera, with support for direct local preview rendering.
@@ -122,7 +122,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback, AppStateL
   }
 
   public int GetRotateAmount() {
-    int rotation = GoannaAppShell.getGoannaInterface().getActivity().getWindowManager().getDefaultDisplay().getRotation();
+    int rotation = GeckoAppShell.getGoannaInterface().getActivity().getWindowManager().getDefaultDisplay().getRotation();
     int degrees = 0;
     switch (rotation) {
       case Surface.ROTATION_0: degrees = 0; break;
@@ -328,7 +328,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback, AppStateL
       mCaptureMaxFPS = max_mfps;
       // If we are resuming a paused capture, the listener is already active.
       if (!mResumeCapture) {
-        GoannaAppShell.getGoannaInterface().addAppStateListener(this);
+        GeckoAppShell.getGoannaInterface().addAppStateListener(this);
       }
       exchange(result, true);
       return;
@@ -405,7 +405,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback, AppStateL
       camera = null;
       // If we want to resume after onResume, keep the listener in place.
       if (!mResumeCapture) {
-        GoannaAppShell.getGoannaInterface().removeAppStateListener(this);
+        GeckoAppShell.getGoannaInterface().removeAppStateListener(this);
         ViERenderer.DestroyLocalRenderer();
       }
       exchange(result, true);

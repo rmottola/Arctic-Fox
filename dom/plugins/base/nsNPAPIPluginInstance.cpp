@@ -847,7 +847,7 @@ void nsNPAPIPluginInstance::NotifyFullScreen(bool aFullScreen)
   SendLifecycleEvent(this, mFullScreen ? kEnterFullScreen_ANPLifecycleAction : kExitFullScreen_ANPLifecycleAction);
 
   if (mFullScreen && mFullScreenOrientation != dom::eScreenOrientation_None) {
-    widget::GoannaAppShell::LockScreenOrientation(mFullScreenOrientation);
+    widget::GeckoAppShell::LockScreenOrientation(mFullScreenOrientation);
   }
 }
 
@@ -904,11 +904,11 @@ void nsNPAPIPluginInstance::SetFullScreenOrientation(uint32_t orientation)
     // We're already fullscreen so immediately apply the orientation change
 
     if (mFullScreenOrientation != dom::eScreenOrientation_None) {
-      widget::GoannaAppShell::LockScreenOrientation(mFullScreenOrientation);
+      widget::GeckoAppShell::LockScreenOrientation(mFullScreenOrientation);
     } else if (oldOrientation != dom::eScreenOrientation_None) {
       // We applied an orientation when we entered fullscreen, but
       // we don't want it anymore
-      widget::GoannaAppShell::UnlockScreenOrientation();
+      widget::GeckoAppShell::UnlockScreenOrientation();
     }
   }
 }

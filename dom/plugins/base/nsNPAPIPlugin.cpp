@@ -2280,7 +2280,7 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
     }
 
     case kJavaContext_ANPGetValue: {
-      auto ret = widget::GoannaAppShell::GetContext();
+      auto ret = widget::GeckoAppShell::GetContext();
       if (!ret)
         return NPERR_GENERIC_ERROR;
 

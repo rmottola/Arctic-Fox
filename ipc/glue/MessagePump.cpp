@@ -116,7 +116,7 @@ MessagePump::Run(MessagePump::Delegate* aDelegate)
     // get here if the normal Goanna event loop has been awoken above.
     // Bug 750713
     if (MOZ_LIKELY(AndroidBridge::HasEnv())) {
-        did_work |= mozilla::widget::GoannaAppShell::PumpMessageLoop();
+        did_work |= mozilla::widget::GeckoAppShell::PumpMessageLoop();
     }
 #endif
 

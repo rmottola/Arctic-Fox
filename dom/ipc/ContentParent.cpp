@@ -2618,7 +2618,7 @@ ContentParent::RecvGetShowPasswordSetting(bool* showPassword)
 #ifdef MOZ_WIDGET_ANDROID
     NS_ASSERTION(AndroidBridge::Bridge() != nullptr, "AndroidBridge is not available");
 
-    *showPassword = mozilla::widget::GoannaAppShell::GetShowPasswordSetting();
+    *showPassword = mozilla::widget::GeckoAppShell::GetShowPasswordSetting();
 #endif
     return true;
 }

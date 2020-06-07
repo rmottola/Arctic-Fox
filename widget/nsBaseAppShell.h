@@ -49,7 +49,7 @@ protected:
    * trigger goanna event processing when there are pending goanna
    * events.
    */
-  virtual void DoProcessMoreGoannaEvents();
+  virtual void DoProcessMoreGeckoEvents();
 
   /**
    * Implemented by subclasses.  Invoke NativeEventCallback from a native
@@ -151,7 +151,7 @@ private:
    * Tracks whether we have processed any goanna events in NativeEventCallback so
    * that we can avoid erroneously entering a blocking loop waiting for goanna
    * events to show up during OnProcessNextEvent.  This is required because on
-   * OS X ProcessGoannaEvents may be invoked inside the context of
+   * OS X ProcessGeckoEvents may be invoked inside the context of
    * ProcessNextNativeEvent and may result in NativeEventCallback being invoked
    * and in turn invoking NS_ProcessPendingEvents.  Because
    * ProcessNextNativeEvent may be invoked prior to the NS_HasPendingEvents
@@ -162,7 +162,7 @@ private:
    * call to DoProcessNextNativeEvent.  It is set to true by
    * NativeEventCallback after calling NS_ProcessPendingEvents.
    */
-  bool mProcessedGoannaEvents;
+  bool mProcessedGeckoEvents;
 };
 
 #endif // nsBaseAppShell_h__

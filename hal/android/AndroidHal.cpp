@@ -54,19 +54,19 @@ CancelVibrate(const WindowIdentifier &)
 {
   // Ignore WindowIdentifier parameter.
 
-  mozilla::widget::GoannaAppShell::CancelVibrate();
+  mozilla::widget::GeckoAppShell::CancelVibrate();
 }
 
 void
 EnableBatteryNotifications()
 {
-  mozilla::widget::GoannaAppShell::EnableBatteryNotifications();
+  mozilla::widget::GeckoAppShell::EnableBatteryNotifications();
 }
 
 void
 DisableBatteryNotifications()
 {
-  mozilla::widget::GoannaAppShell::DisableBatteryNotifications();
+  mozilla::widget::GeckoAppShell::DisableBatteryNotifications();
 }
 
 void
@@ -78,13 +78,13 @@ GetCurrentBatteryInformation(hal::BatteryInformation* aBatteryInfo)
 void
 EnableNetworkNotifications()
 {
-  mozilla::widget::GoannaAppShell::EnableNetworkNotifications();
+  mozilla::widget::GeckoAppShell::EnableNetworkNotifications();
 }
 
 void
 DisableNetworkNotifications()
 {
-  mozilla::widget::GoannaAppShell::DisableNetworkNotifications();
+  mozilla::widget::GeckoAppShell::DisableNetworkNotifications();
 }
 
 void
@@ -96,13 +96,13 @@ GetCurrentNetworkInformation(hal::NetworkInformation* aNetworkInfo)
 void
 EnableScreenConfigurationNotifications()
 {
-  mozilla::widget::GoannaAppShell::EnableScreenOrientationNotifications();
+  mozilla::widget::GeckoAppShell::EnableScreenOrientationNotifications();
 }
 
 void
 DisableScreenConfigurationNotifications()
 {
-  mozilla::widget::GoannaAppShell::DisableScreenOrientationNotifications();
+  mozilla::widget::GeckoAppShell::DisableScreenOrientationNotifications();
 }
 
 void
@@ -148,7 +148,7 @@ LockScreenOrientation(const ScreenOrientation& aOrientation)
     case eScreenOrientation_LandscapeSecondary:
     case eScreenOrientation_LandscapePrimary | eScreenOrientation_LandscapeSecondary:
     case eScreenOrientation_Default:
-      mozilla::widget::GoannaAppShell::LockScreenOrientation(aOrientation);
+      mozilla::widget::GeckoAppShell::LockScreenOrientation(aOrientation);
       return true;
     default:
       return false;
@@ -158,7 +158,7 @@ LockScreenOrientation(const ScreenOrientation& aOrientation)
 void
 UnlockScreenOrientation()
 {
-  mozilla::widget::GoannaAppShell::UnlockScreenOrientation();
+  mozilla::widget::GeckoAppShell::UnlockScreenOrientation();
 }
 
 } // hal_impl
