@@ -152,6 +152,10 @@
 #include "ipc/Nuwa.h"
 #endif
 
+#ifdef MOZ_GAMEPAD
+#include "mozilla/dom/GamepadService.h"
+#endif
+
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/cellbroadcast/CellBroadcastIPCService.h"
 #include "mozilla/dom/icc/IccChild.h"
@@ -2791,6 +2795,18 @@ ContentChild::DeallocPContentPermissionRequestChild(PContentPermissionRequestChi
 {
     auto child = static_cast<RemotePermissionRequest*>(actor);
     child->IPDLRelease();
+    return true;
+}
+
+bool
+ContentChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
+{
+#ifdef MOZ_GAMEPAD
+    nsRefPtr<GamepadService> svc(GamepadService::GetService());
+    if (svc) {
+        svc->Update(aGamepadEvent);
+    }
+#endif
     return true;
 }
 

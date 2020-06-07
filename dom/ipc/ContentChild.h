@@ -463,6 +463,8 @@ public:
     virtual bool
     DeallocPContentPermissionRequestChild(PContentPermissionRequestChild* actor) override;
 
+    virtual bool RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent) override;
+
 private:
     virtual void ActorDestroy(ActorDestroyReason why) override;
 
