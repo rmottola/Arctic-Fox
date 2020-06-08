@@ -132,9 +132,7 @@ using namespace mozilla::dom;
 
 //-----------------------------------------------------
 // PR LOGGING
-#include "prlog.h"
-
-#ifdef PR_LOGGING
+#include "mozilla/Logging.h"
 
 #ifdef NS_PRINTING
 static PRLogModuleInfo *
@@ -149,10 +147,6 @@ GetPrintingLog()
 #endif // NS_PRINTING
 
 #define PRT_YESNO(_p) ((_p)?"YES":"NO")
-#else
-#define PRT_YESNO(_p)
-#define PR_PL(_p1)
-#endif
 //-----------------------------------------------------
 
 class nsDocumentViewer;

@@ -8,7 +8,7 @@
  * Implementation of the "@mozilla.org/layout/content-policy;1" contract.
  */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsISupports.h"
 #include "nsXPCOM.h"
@@ -25,9 +25,7 @@
 
 NS_IMPL_ISUPPORTS(nsContentPolicy, nsIContentPolicy)
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gConPolLog;
-#endif
 
 nsresult
 NS_NewContentPolicy(nsIContentPolicy **aResult)
@@ -43,11 +41,9 @@ nsContentPolicy::nsContentPolicy()
     : mPolicies(NS_CONTENTPOLICY_CATEGORY)
     , mSimplePolicies(NS_SIMPLECONTENTPOLICY_CATEGORY)
 {
-#ifdef PR_LOGGING
     if (! gConPolLog) {
         gConPolLog = PR_NewLogModule("nsContentPolicy");
     }
-#endif
 }
 
 nsContentPolicy::~nsContentPolicy()
@@ -204,14 +200,12 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
     return NS_OK;
 }
 
-#ifdef PR_LOGGING
-
 //uses the parameters from ShouldXYZ to produce and log a message
 //logType must be a literal string constant
 #define LOG_CHECK(logType)                                                    \
   PR_BEGIN_MACRO                                                              \
-    /* skip all this nonsense if the call failed */                           \
-    if (NS_SUCCEEDED(rv)) {                                                   \
+    /* skip all this nonsense if the call failed or logging is disabled */    \
+    if (NS_SUCCEEDED(rv) && PR_LOG_TEST(gConPolLog, PR_LOG_DEBUG)) {          \
       const char *resultName;                                                 \
       if (decision) {                                                         \
         resultName = NS_CP_ResponseName(*decision);                           \
@@ -232,12 +226,6 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
              );                                                               \
     }                                                                         \
   PR_END_MACRO
-
-#else //!defined(PR_LOGGING)
-
-#define LOG_CHECK(logType)
-
-#endif //!defined(PR_LOGGING)
 
 NS_IMETHODIMP
 nsContentPolicy::ShouldLoad(uint32_t          contentType,

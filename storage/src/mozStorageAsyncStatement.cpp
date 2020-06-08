@@ -26,11 +26,9 @@
 #include "mozStorageStatement.h"
 #include "nsDOMClassInfo.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo *gStorageLog;
-#endif
 
 namespace mozilla {
 namespace storage {

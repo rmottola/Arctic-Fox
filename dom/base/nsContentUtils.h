@@ -51,18 +51,14 @@ class nsIConsoleService;
 class nsIContent;
 class nsIContentPolicy;
 class nsIContentSecurityPolicy;
-class nsIDocShell;
 class nsIDocument;
 class nsIDocumentLoaderFactory;
-class nsIDocumentObserver;
 class nsIDOMDocument;
 class nsIDOMDocumentFragment;
 class nsIDOMEvent;
-class nsIDOMHTMLFormElement;
 class nsIDOMHTMLInputElement;
 class nsIDOMKeyEvent;
 class nsIDOMNode;
-class nsIDOMScriptObjectFactory;
 class nsIDOMWindow;
 class nsIDragSession;
 class nsIEditor;
@@ -71,7 +67,6 @@ class nsIFrame;
 class nsIImageLoadingContent;
 class nsIInterfaceRequestor;
 class nsIIOService;
-class nsIJSRuntimeService;
 class nsILineBreaker;
 class nsIMessageBroadcaster;
 class nsNameSpaceManager;
@@ -83,10 +78,10 @@ class nsIPrincipal;
 class nsIRequest;
 class nsIRunnable;
 class nsIScriptContext;
-class nsIScriptGlobalObject;
 class nsIScriptSecurityManager;
 class nsIStringBundle;
 class nsIStringBundleService;
+class nsISupportsArray;
 class nsISupportsHashKey;
 class nsIURI;
 class nsIWidget;
@@ -95,7 +90,6 @@ class nsIXPConnect;
 class nsNodeInfoManager;
 class nsPIDOMWindow;
 class nsPresContext;
-class nsScriptObjectTracer;
 class nsStringBuffer;
 class nsStringHashKey;
 class nsTextFragment;
@@ -120,7 +114,10 @@ namespace dom {
 class DocumentFragment;
 class Element;
 class EventTarget;
+class IPCDataTransfer;
 class NodeInfo;
+class nsIContentChild;
+class nsIContentParent;
 class Selection;
 class TabParent;
 } // namespace dom
@@ -2373,6 +2370,10 @@ public:
                                       CallOnRemoteChildFunction aCallback,
                                       void* aArg);
 
+  static void TransferablesToIPCTransferables(nsISupportsArray* aTransferables,
+                                              nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
+                                              mozilla::dom::nsIContentChild* aChild,
+                                              mozilla::dom::nsIContentParent* aParent);
 private:
   static bool InitializeEventTable();
 

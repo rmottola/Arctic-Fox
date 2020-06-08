@@ -15,14 +15,9 @@ using dom::OwningDoubleOrConstrainDoubleRange;
 using dom::ConstrainDoubleRange;
 using dom::MediaTrackConstraintSet;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaManagerLog();
 #define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
 #define LOGFRAME(msg) PR_LOG(GetMediaManagerLog(), 6, msg)
-#else
-#define LOG(msg)
-#define LOGFRAME(msg)
-#endif
 
 // guts for appending data to the MSG track
 bool MediaEngineCameraVideoSource::AppendToTrack(SourceMediaStream* aSource,
@@ -191,13 +186,45 @@ MediaEngineCameraVideoSource::GetBestFitnessDistance(
   return candidateSet[0].mDistance;
 }
 
+void
+MediaEngineCameraVideoSource::LogConstraints(
+    const MediaTrackConstraintSet& aConstraints, bool aAdvanced)
+{
+  NormalizedConstraintSet c(aConstraints, aAdvanced);
+  LOG(((c.mWidth.mIdeal.WasPassed()?
+        "Constraints: width: { min: %d, max: %d, ideal: %d }" :
+        "Constraints: width: { min: %d, max: %d }"),
+       c.mWidth.mMin, c.mWidth.mMax,
+       c.mWidth.mIdeal.WasPassed()? c.mWidth.mIdeal.Value() : 0));
+  LOG(((c.mHeight.mIdeal.WasPassed()?
+        "             height: { min: %d, max: %d, ideal: %d }" :
+        "             height: { min: %d, max: %d }"),
+       c.mHeight.mMin, c.mHeight.mMax,
+       c.mHeight.mIdeal.WasPassed()? c.mHeight.mIdeal.Value() : 0));
+  LOG(((c.mFrameRate.mIdeal.WasPassed()?
+        "             frameRate: { min: %f, max: %f, ideal: %f }" :
+        "             frameRate: { min: %f, max: %f }"),
+       c.mFrameRate.mMin, c.mFrameRate.mMax,
+       c.mFrameRate.mIdeal.WasPassed()? c.mFrameRate.mIdeal.Value() : 0));
+}
+
 bool
 MediaEngineCameraVideoSource::ChooseCapability(
     const dom::MediaTrackConstraints &aConstraints,
     const MediaEnginePrefs &aPrefs)
 {
-  LOG(("ChooseCapability: prefs: %dx%d @%d-%dfps",
-       aPrefs.mWidth, aPrefs.mHeight, aPrefs.mFPS, aPrefs.mMinFPS));
+  if (PR_LOG_TEST(GetMediaManagerLog(), PR_LOG_DEBUG)) {
+    LOG(("ChooseCapability: prefs: %dx%d @%d-%dfps",
+         aPrefs.GetWidth(), aPrefs.GetHeight(),
+         aPrefs.mFPS, aPrefs.mMinFPS));
+    LogConstraints(aConstraints, false);
+    if (aConstraints.mAdvanced.WasPassed()) {
+      LOG(("Advanced array[%u]:", aConstraints.mAdvanced.Value().Length()));
+      for (auto& advanced : aConstraints.mAdvanced.Value()) {
+        LogConstraints(advanced, true);
+      }
+    }
+  }
 
   size_t num = NumCapabilities();
 

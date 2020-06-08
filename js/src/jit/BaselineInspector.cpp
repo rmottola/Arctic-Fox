@@ -118,7 +118,7 @@ BaselineInspector::maybeInfoForPropertyOp(jsbytecode* pc,
         if (stub->isGetProp_Native()) {
             shape = stub->toGetProp_Native()->receiverGuard().ownShape();
         } else if (stub->isSetProp_Native()) {
-            shape = stub->toSetProp_Native()->receiverGuard().ownShape();
+            shape = stub->toSetProp_Native()->shape();
         } else if (stub->isGetProp_Unboxed()) {
             group = stub->toGetProp_Unboxed()->group();
         } else if (stub->isSetProp_Unboxed()) {

@@ -59,6 +59,7 @@
 #include "nsContentPolicyUtils.h" // NS_CheckContentLoadPolicy(...)
 #include "nsISeekableStream.h"
 #include "nsAutoPtr.h"
+#include "nsQueryObject.h"
 #include "nsIWritablePropertyBag2.h"
 #include "nsIAppShell.h"
 #include "nsWidgetsCID.h"
@@ -150,7 +151,7 @@
 
 #include "nsIJARChannel.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsISelectionDisplay.h"
 
@@ -3125,7 +3126,7 @@ nsDocShell::AddProfileTimelineMarker(const char* aName,
 }
 
 void
-nsDocShell::AddProfileTimelineMarker(UniquePtr<TimelineMarker>& aMarker)
+nsDocShell::AddProfileTimelineMarker(UniquePtr<TimelineMarker>&& aMarker)
 {
   if (mProfileTimelineRecording) {
     mProfileTimelineMarkers.AppendElement(aMarker.release());
@@ -14092,7 +14093,7 @@ nsDocShell::GetURLSearchParams()
 }
 
 void
-nsDocShell::NotifyJSRunToCompletionStart()
+nsDocShell::NotifyJSRunToCompletionStart(const char *aReason)
 {
   bool timelineOn = nsIDocShell::GetRecordProfileTimelineMarkers();
 

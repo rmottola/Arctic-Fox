@@ -647,7 +647,7 @@ gfxDownloadedFcFontEntry::GetFontTable(uint32_t aTableTag)
     // so we can just return a blob that "wraps" the appropriate chunk of it.
     // The blob should not attempt to free its data, as the entire sfnt data
     // will be freed when the font entry is deleted.
-    return gfxFontUtils::GetTableFromFontData(mFontData, aTableTag);
+    return GetTableFromFontData(mFontData, aTableTag);
 }
 
 /*
@@ -1262,6 +1262,7 @@ gfxPangoFontGroup::gfxPangoFontGroup(const FontFamilyList& aFontFamilyList,
 
     // dummy entry, will be replaced when actually needed
     mFonts.AppendElement(FamilyFace());
+    mSkipUpdateUserFonts = true;
 }
 
 gfxPangoFontGroup::~gfxPangoFontGroup()

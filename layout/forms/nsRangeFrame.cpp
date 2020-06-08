@@ -279,6 +279,7 @@ nsRangeFrame::Reflow(nsPresContext*           aPresContext,
                      const nsHTMLReflowState& aReflowState,
                      nsReflowStatus&          aStatus)
 {
+  MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsRangeFrame");
   DISPLAY_REFLOW(aPresContext, this, aReflowState, aDesiredSize, aStatus);
 
@@ -516,7 +517,7 @@ nsRangeFrame::GetValueAtEventPoint(WidgetGUIEvent* aEvent)
     // We need to get the size of the thumb from the theme.
     nsPresContext *presContext = PresContext();
     bool notUsedCanOverride;
-    nsIntSize size;
+    LayoutDeviceIntSize size;
     presContext->GetTheme()->
       GetMinimumWidgetSize(presContext, this, NS_THEME_RANGE_THUMB, &size,
                            &notUsedCanOverride);

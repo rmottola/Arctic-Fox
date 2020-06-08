@@ -21,7 +21,7 @@
 #include "nsXULAppAPI.h"
 #include "pkix/pkixtypes.h"
 #include "plstr.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prnetdb.h"
 #include "prprf.h"
 #include "PublicKeyPinningService.h"
@@ -40,7 +40,6 @@
 using namespace mozilla;
 using namespace mozilla::psm;
 
-#if defined(PR_LOGGING)
 static PRLogModuleInfo *
 GetSSSLog()
 {
@@ -49,7 +48,6 @@ GetSSSLog()
     gSSSLog = PR_NewLogModule("nsSSService");
   return gSSSLog;
 }
-#endif
 
 #define SSSLOG(args) PR_LOG(GetSSSLog(), 4, args)
 

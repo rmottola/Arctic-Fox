@@ -15,8 +15,6 @@
 #include "mozilla/RefPtr.h"
 #include "nsTArrayForwardDeclare.h"
 
-class nsIThread;
-
 namespace mozilla {
 namespace dom {
 namespace cache {

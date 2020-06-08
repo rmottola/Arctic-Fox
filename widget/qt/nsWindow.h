@@ -21,7 +21,7 @@
 
 #ifdef MOZ_LOGGING
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsTArray.h"
 
 extern PRLogModuleInfo *gWidgetLog;
@@ -59,7 +59,6 @@ extern PRLogModuleInfo *gWidgetDrawLog;
 
 #endif /* MOZ_LOGGING */
 
-class nsIdleService;
 class QCloseEvent;
 class QFocusEvent;
 class QHideEvent;

@@ -137,7 +137,7 @@ gfxSVGGlyphsDocument::SetupPresentation()
 {
     nsCOMPtr<nsICategoryManager> catMan = do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
     nsXPIDLCString contractId;
-    nsresult rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", "image/svg+xml", getter_Copies(contractId));
+    nsresult rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", "image/svg+xml", getter_Copies(contractId));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIDocumentLoaderFactory> docLoaderFactory = do_GetService(contractId);

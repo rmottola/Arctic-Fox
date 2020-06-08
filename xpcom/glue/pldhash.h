@@ -9,9 +9,11 @@
 /*
  * Double hashing, a la Knuth 6.
  */
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h" // for MOZ_ALWAYS_INLINE
 #include "mozilla/fallible.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Move.h"
 #include "mozilla/Types.h"
 #include "nscore.h"
 
@@ -147,6 +149,9 @@ typedef size_t (*PLDHashSizeOfEntryExcludingThisFun)(
  * on most architectures, and may be allocated on the stack or within another
  * structure or class (see below for the Init and Finish functions to use).
  *
+ * No entry storage is allocated until the first element is added. This means
+ * that empty hash tables are cheap, which is good because they are common.
+ *
  * There used to be a long, math-heavy comment here about the merits of
  * double hashing vs. chaining; it was removed in bug 1058335. In short, double
  * hashing is more space-efficient unless the element size gets large (in which
@@ -161,22 +166,11 @@ class PLDHashTable
 private:
   const PLDHashTableOps* mOps;        /* Virtual operations; see below. */
   int16_t             mHashShift;     /* multiplicative hash shift */
-  /*
-   * |mRecursionLevel| is only used in debug builds, but is present in opt
-   * builds to avoid binary compatibility problems when mixing DEBUG and
-   * non-DEBUG components.  (Actually, even if it were removed,
-   * sizeof(PLDHashTable) wouldn't change, due to struct padding.) Make it
-   * protected to suppress -Wunused-private-field warnings in opt builds.
-   */
-protected:
-  mutable uint16_t    mRecursionLevel;/* used to detect unsafe re-entry */
-private:
   uint32_t            mEntrySize;     /* number of bytes in an entry */
   uint32_t            mEntryCount;    /* number of entries in table */
   uint32_t            mRemovedCount;  /* removed entry sentinels in table */
   uint32_t            mGeneration;    /* entry storage generation number */
-  char*               mEntryStore;    /* entry storage */
-
+  char*               mEntryStore;    /* entry storage; allocated lazily */
 #ifdef PL_DHASHMETER
   struct PLDHashStats
   {
@@ -200,6 +194,15 @@ private:
   } mStats;
 #endif
 
+#ifdef DEBUG
+  // We use an atomic counter here so that the various ++/-- operations can't
+  // get corrupted when a table is shared between threads. The associated
+  // assertions should in no way be taken to mean that thread safety is being
+  // validated! Proper synchronization and thread safety assertions must be
+  // employed by any consumers.
+  mutable mozilla::Atomic<uint32_t> mRecursionLevel;
+#endif
+
 public:
   // The most important thing here is that we zero |mOps| because it's used to
   // determine if Init() has been called. (The use of MOZ_CONSTEXPR means all
@@ -207,7 +210,6 @@ public:
   MOZ_CONSTEXPR PLDHashTable()
     : mOps(nullptr)
     , mHashShift(0)
-    , mRecursionLevel(0)
     , mEntrySize(0)
     , mEntryCount(0)
     , mRemovedCount(0)
@@ -216,7 +218,36 @@ public:
 #ifdef PL_DHASHMETER
     , mStats()
 #endif
+#ifdef DEBUG
+    , mRecursionLevel()
+#endif
   {}
+
+  PLDHashTable(PLDHashTable&& aOther) { *this = mozilla::Move(aOther); }
+
+  PLDHashTable& operator=(PLDHashTable&& aOther)
+  {
+    using mozilla::Move;
+
+    mOps = Move(aOther.mOps);
+    mHashShift = Move(aOther.mHashShift);
+    mEntrySize = Move(aOther.mEntrySize);
+    mEntryCount = Move(aOther.mEntryCount);
+    mRemovedCount = Move(aOther.mRemovedCount);
+    mGeneration = Move(aOther.mGeneration);
+    mEntryStore = Move(aOther.mEntryStore);
+
+#ifdef PL_DHASHMETER
+    mStats = Move(aOther.mStats);
+#endif
+
+#ifdef DEBUG
+    // Atomic<> doesn't have an |operator=(Atomic<>&&)|.
+    mRecursionLevel = uint32_t(aOther.mRecursionLevel);
+#endif
+
+    return *this;
+  }
 
   bool IsInitialized() const { return !!mOps; }
 
@@ -226,25 +257,25 @@ public:
 
   /*
    * Size in entries (gross, not net of free and removed sentinels) for table.
-   * We store mHashShift rather than sizeLog2 to optimize the collision-free
-   * case in SearchTable.
+   * This can be zero if no elements have been added yet, in which case the
+   * entry storage will not have yet been allocated.
    */
   uint32_t Capacity() const
   {
-    return ((uint32_t)1 << (PL_DHASH_BITS - mHashShift));
+    return mEntryStore ? CapacityFromHashShift() : 0;
   }
 
   uint32_t EntrySize()  const { return mEntrySize; }
   uint32_t EntryCount() const { return mEntryCount; }
   uint32_t Generation() const { return mGeneration; }
 
-  bool Init(const PLDHashTableOps* aOps, uint32_t aEntrySize,
-            const mozilla::fallible_t&, uint32_t aLength);
+  void Init(const PLDHashTableOps* aOps, uint32_t aEntrySize, uint32_t aLength);
 
   void Finish();
 
   PLDHashEntryHdr* Search(const void* aKey);
   PLDHashEntryHdr* Add(const void* aKey, const mozilla::fallible_t&);
+  PLDHashEntryHdr* Add(const void* aKey);
   void Remove(const void* aKey);
 
   void RawRemove(PLDHashEntryHdr* aEntry);
@@ -297,6 +328,13 @@ public:
 private:
   static bool EntryIsFree(PLDHashEntryHdr* aEntry);
 
+  // We store mHashShift rather than sizeLog2 to optimize the collision-free
+  // case in SearchTable.
+  uint32_t CapacityFromHashShift() const
+  {
+    return ((uint32_t)1 << (PL_DHASH_BITS - mHashShift));
+  }
+
   PLDHashNumber ComputeKeyHash(const void* aKey);
 
   enum SearchReason { ForSearchOrRemove, ForAdd };
@@ -308,6 +346,9 @@ private:
   PLDHashEntryHdr* PL_DHASH_FASTCALL FindFreeEntry(PLDHashNumber aKeyHash);
 
   bool ChangeTable(int aDeltaLog2);
+
+  PLDHashTable(const PLDHashTable& aOther) = delete;
+  PLDHashTable& operator=(const PLDHashTable& aOther) = delete;
 };
 
 /*
@@ -425,7 +466,7 @@ const PLDHashTableOps* PL_DHashGetStubOps(void);
 
 /*
  * Dynamically allocate a new PLDHashTable, initialize it using
- * PL_DHashTableInit, and return its address. Return null on allocation failure.
+ * PL_DHashTableInit, and return its address. Never returns null.
  */
 PLDHashTable* PL_NewDHashTable(
   const PLDHashTableOps* aOps, uint32_t aEntrySize,
@@ -439,25 +480,18 @@ PLDHashTable* PL_NewDHashTable(
 void PL_DHashTableDestroy(PLDHashTable* aTable);
 
 /*
- * Initialize aTable with aOps, aEntrySize, and aCapacity. The table's initial
- * capacity will be chosen such that |aLength| elements can be inserted without
- * rehashing. If |aLength| is a power-of-two, this capacity will be |2*length|.
+ * Initialize aTable with aOps and aEntrySize. The table's initial capacity
+ * will be chosen such that |aLength| elements can be inserted without
+ * rehashing; if |aLength| is a power-of-two, this capacity will be |2*length|.
+ * However, because entry storage is allocated lazily, this initial capacity
+ * won't be relevant until the first element is added; prior to that the
+ * capacity will be zero.
  *
- * This function will crash if it can't allocate enough memory, or if
- * |aEntrySize| and/or |aLength| are too large.
+ * This function will crash if |aEntrySize| and/or |aLength| are too large.
  */
 void PL_DHashTableInit(
   PLDHashTable* aTable, const PLDHashTableOps* aOps,
   uint32_t aEntrySize, uint32_t aLength = PL_DHASH_DEFAULT_INITIAL_LENGTH);
-
-/*
- * Initialize aTable. This is the same as PL_DHashTableInit, except that it
- * returns a boolean indicating success, rather than crashing on failure.
- */
-MOZ_WARN_UNUSED_RESULT bool PL_DHashTableInit(
-  PLDHashTable* aTable, const PLDHashTableOps* aOps,
-  uint32_t aEntrySize, const mozilla::fallible_t&,
-  uint32_t aLength = PL_DHASH_DEFAULT_INITIAL_LENGTH);
 
 /*
  * Free |aTable|'s entry storage (via aTable->mOps->freeTable). Use this

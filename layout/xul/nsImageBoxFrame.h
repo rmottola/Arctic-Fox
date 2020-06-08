@@ -41,6 +41,7 @@ class nsImageBoxFrame final : public nsLeafBoxFrame
 {
 public:
   typedef mozilla::image::DrawResult DrawResult;
+  typedef mozilla::layers::ImageContainer ImageContainer;
   typedef mozilla::layers::LayerManager LayerManager;
 
   friend class nsDisplayXULImage;
@@ -95,7 +96,9 @@ public:
                         const nsRect& aDirtyRect,
                         nsPoint aPt, uint32_t aFlags);
 
-  already_AddRefed<mozilla::layers::ImageContainer> GetContainer(LayerManager* aManager);
+  already_AddRefed<ImageContainer> GetContainer(LayerManager* aManager,
+                                                uint32_t aFlags);
+
 protected:
   explicit nsImageBoxFrame(nsStyleContext* aContext);
 
@@ -141,7 +144,8 @@ public:
 
   virtual already_AddRefed<ImageContainer> GetContainer(LayerManager* aManager,
                                                         nsDisplayListBuilder* aBuilder) override;
-  virtual void ConfigureLayer(ImageLayer* aLayer, const nsIntPoint& aOffset) override;
+  virtual void ConfigureLayer(ImageLayer* aLayer,
+                              const ContainerLayerParameters& aParameters) override;
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override
   {
     *aSnap = true;

@@ -38,7 +38,6 @@
 #include "mozilla/MemoryReporting.h"
 
 class nsRange;
-class nsIDragService;
 
 struct RangePaintInfo;
 struct nsCallbackEventRequest;
@@ -320,9 +319,7 @@ public:
   virtual void VerifyStyleTree() override;
 #endif
 
-#ifdef PR_LOGGING
   static PRLogModuleInfo* gLog;
-#endif
 
   virtual void DisableNonTestMouseEvents(bool aDisable) override;
 

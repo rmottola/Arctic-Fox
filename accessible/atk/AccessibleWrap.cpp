@@ -689,9 +689,9 @@ getRoleCB(AtkObject *aAtkObj)
     role = accWrap->Role();
   }
 
-#define ROLE(goannaRole, stringRole, atkRole, macRole, \
+#define ROLE(geckoRole, stringRole, atkRole, macRole, \
              msaaRole, ia2Role, nameRule) \
-  case roles::goannaRole: \
+  case roles::geckoRole: \
     aAtkObj->role = atkRole; \
     break;
 

@@ -17,7 +17,7 @@ interface nsIPrincipal;
 /**
  * To get a component that implements nsIDocumentLoaderFactory
  * for a given mimetype, use nsICategoryManager to find an entry
- * with the mimetype as its name in the category "Goanna-Content-Viewers".
+ * with the mimetype as its name in the category "Gecko-Content-Viewers".
  * The value of the entry is the contractid of the component.
  * The component is a service, so use GetService, not CreateInstance to get it.
  */

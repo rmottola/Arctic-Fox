@@ -11,6 +11,8 @@
 #include "mozilla/ReentrantMonitor.h"
 #include "mozilla/CheckedInt.h"
 #include "nsIThread.h"
+#include "nsSize.h"
+#include "nsRect.h"
 
 #if !(defined(XP_WIN) || defined(XP_MACOSX) || defined(LINUX)) || \
     defined(MOZ_ASAN)
@@ -27,9 +29,6 @@ using mozilla::CheckedInt64;
 using mozilla::CheckedUint64;
 using mozilla::CheckedInt32;
 using mozilla::CheckedUint32;
-
-struct nsIntSize;
-struct nsIntRect;
 
 // This file contains stuff we'd rather put elsewhere, but which is
 // dependent on other changes which we don't want to wait for. We plan to
@@ -263,7 +262,11 @@ ExtractH264CodecDetails(const nsAString& aCodecs,
                         int16_t& aLevel);
 
 // Use a cryptographic quality PRNG to generate raw random bytes
-// and convert that to a base64 string suitable for use as a file or URL
+// and convert that to a base64 string.
+nsresult
+GenerateRandomName(nsCString& aOutSalt, uint32_t aLength);
+
+// This version returns a string suitable for use as a file or URL
 // path. This is based on code from nsExternalAppHandler::SetUpTempFile.
 nsresult
 GenerateRandomPathName(nsCString& aOutSalt, uint32_t aLength);

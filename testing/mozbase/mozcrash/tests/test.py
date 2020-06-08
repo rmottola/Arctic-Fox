@@ -178,10 +178,10 @@ class TestCrash(unittest.TestCase):
 
 class TestJavaException(unittest.TestCase):
        def setUp(self):
-               self.test_log = ["01-30 20:15:41.937 E/GoannaAppShell( 1703): >>> REPORTING UNCAUGHT EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")",
-                       "01-30 20:15:41.937 E/GoannaAppShell( 1703): java.lang.NullPointerException",
-                       "01-30 20:15:41.937 E/GoannaAppShell( 1703):    at org.mozilla.goanna.GoannaApp$21.run(GoannaApp.java:1833)",
-                       "01-30 20:15:41.937 E/GoannaAppShell( 1703):    at android.os.Handler.handleCallback(Handler.java:587)"]
+               self.test_log = ["01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> REPORTING UNCAUGHT EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")",
+                       "01-30 20:15:41.937 E/GeckoAppShell( 1703): java.lang.NullPointerException",
+                       "01-30 20:15:41.937 E/GeckoAppShell( 1703):    at org.mozilla.goanna.GoannaApp$21.run(GoannaApp.java:1833)",
+                       "01-30 20:15:41.937 E/GeckoAppShell( 1703):    at android.os.Handler.handleCallback(Handler.java:587)"]
 
        def test_uncaught_exception(self):
                """
@@ -194,7 +194,7 @@ class TestJavaException(unittest.TestCase):
                Test for an exception which should be caught
                """
                fatal_log = list(self.test_log)
-               fatal_log[0] = "01-30 20:15:41.937 E/GoannaAppShell( 1703): >>> FATAL EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")"
+               fatal_log[0] = "01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> FATAL EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")"
                self.assert_(mozcrash.check_for_java_exception(fatal_log, quiet=True))
 
        def test_truncated_exception(self):
@@ -211,7 +211,7 @@ class TestJavaException(unittest.TestCase):
                Test for an exception which should not be caught
                """
                passable_log = list(self.test_log)
-               passable_log[0] = "01-30 20:15:41.937 E/GoannaAppShell( 1703): >>> NOT-SO-BAD EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")"
+               passable_log[0] = "01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> NOT-SO-BAD EXCEPTION FROM THREAD 9 (\"GoannaBackgroundThread\")"
                self.assert_(not mozcrash.check_for_java_exception(passable_log, quiet=True))
 
 if __name__ == '__main__':

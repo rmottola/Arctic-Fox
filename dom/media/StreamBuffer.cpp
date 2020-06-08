@@ -4,17 +4,13 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "StreamBuffer.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include <algorithm>
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gMediaStreamGraphLog;
 #define STREAM_LOG(type, msg) PR_LOG(gMediaStreamGraphLog, type, msg)
-#else
-#define STREAM_LOG(type, msg)
-#endif
 
 #ifdef DEBUG
 void

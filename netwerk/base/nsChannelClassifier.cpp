@@ -31,17 +31,15 @@
 
 #include "mozilla/Preferences.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 using mozilla::ArrayLength;
 using mozilla::Preferences;
 
-#if defined(PR_LOGGING)
 //
 // NSPR_LOG_MODULES=nsChannelClassifier:5
 //
 static PRLogModuleInfo *gChannelClassifierLog;
-#endif
 #undef LOG
 #define LOG(args)     PR_LOG(gChannelClassifierLog, PR_LOG_DEBUG, args)
 
@@ -52,10 +50,8 @@ nsChannelClassifier::nsChannelClassifier()
   : mIsAllowListed(false),
     mSuspendedChannel(false)
 {
-#if defined(PR_LOGGING)
     if (!gChannelClassifierLog)
         gChannelClassifierLog = PR_NewLogModule("nsChannelClassifier");
-#endif
 }
 
 nsresult

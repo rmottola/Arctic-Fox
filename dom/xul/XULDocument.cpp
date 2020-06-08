@@ -50,7 +50,7 @@
 #include "nsPIWindowRoot.h"
 #include "nsXULCommandDispatcher.h"
 #include "nsXULElement.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "rdf.h"
 #include "nsIFrame.h"
 #include "nsXBLService.h"
@@ -375,7 +375,6 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
                                nsIStreamListener **aDocListener,
                                bool aReset, nsIContentSink* aSink)
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
 
         nsCOMPtr<nsIURI> uri;
@@ -389,7 +388,6 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
             }
         }
     }
-#endif
     // NOTE: If this ever starts calling nsDocument::StartDocumentLoad
     // we'll possibly need to reset our content type afterwards.
     mStillWalking = true;
@@ -561,7 +559,6 @@ XULDocument::EndLoad()
     }
 
     OnPrototypeLoadDone(true);
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
         nsAutoCString urlspec;
         rv = uri->GetSpec(urlspec);
@@ -570,7 +567,6 @@ XULDocument::EndLoad()
                    ("xul: Finished loading document '%s'", urlspec.get()));
         }
     }
-#endif
 }
 
 NS_IMETHODIMP
@@ -769,11 +765,6 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
 
     if (! mBroadcasterMap) {
         mBroadcasterMap = PL_NewDHashTable(&gOps, sizeof(BroadcasterMapEntry));
-
-        if (! mBroadcasterMap) {
-            aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-            return;
-        }
     }
 
     BroadcasterMapEntry* entry =
@@ -978,7 +969,7 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
                     static_cast<BroadcastListener*>(entry->mListeners[i]);
 
                 if ((bl->mAttribute == aAttribute) ||
-                    (bl->mAttribute == nsGkAtoms::_asterix)) {
+                    (bl->mAttribute == nsGkAtoms::_asterisk)) {
                     nsCOMPtr<Element> listenerEl
                         = do_QueryReferent(bl->mListener);
                     if (listenerEl) {
@@ -1906,10 +1897,8 @@ XULDocument::Init()
     Preferences::RegisterCallback(XULDocument::DirectionChanged,
                                   "intl.uidirection.", this);
 
-#ifdef PR_LOGGING
     if (! gXULLog)
         gXULLog = PR_NewLogModule("XULDocument");
-#endif
 
     return NS_OK;
 }
@@ -2041,8 +2030,7 @@ XULDocument::PrepareToLoadPrototype(nsIURI* aURI, const char* aCommand,
                                kCharsetFromDocTypeDefault);
     parser->SetContentSink(sink); // grabs a reference to the parser
 
-    *aResult = parser;
-    NS_ADDREF(*aResult);
+    parser.forget(aResult);
     return NS_OK;
 }
 
@@ -2291,7 +2279,6 @@ XULDocument::PrepareToWalk()
     nsXULPrototypeElement* proto = mCurrentPrototype->GetRootElement();
 
     if (! proto) {
-#ifdef PR_LOGGING
         if (PR_LOG_TEST(gXULLog, PR_LOG_ERROR)) {
             nsCOMPtr<nsIURI> url = mCurrentPrototype->GetURI();
 
@@ -2302,7 +2289,6 @@ XULDocument::PrepareToWalk()
             PR_LOG(gXULLog, PR_LOG_ERROR,
                    ("xul: error parsing '%s'", urlspec.get()));
         }
-#endif
 
         return NS_OK;
     }
@@ -2564,7 +2550,6 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
     *aShouldReturn = false;
     *aFailureFromContent = false;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_DEBUG)) {
         nsAutoCString urlspec;
         aURI->GetSpec(urlspec);
@@ -2579,7 +2564,6 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
         PR_LOG(gXULLog, PR_LOG_DEBUG,
                 ("xul: %s loading overlay %s", parentDoc.get(), urlspec.get()));
     }
-#endif
 
     if (aIsDynamic)
         mResolutionPhase = nsForwardReference::eStart;
@@ -3565,8 +3549,8 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
     nsAutoMicroTask mt;
 
     // We're about to run script via JS::CloneAndExecuteScript, so we need an
-    // AutoEntryScript. This is Goanna specific and not in any spec.
-    AutoEntryScript aes(mScriptGlobalObject);
+    // AutoEntryScript. This is Gecko specific and not in any spec.
+    AutoEntryScript aes(mScriptGlobalObject, "precompiled XUL <script> element");
     aes.TakeOwnershipOfErrorReporting();
     JSContext* cx = aes.cx();
     JS::Rooted<JSObject*> baseGlobal(cx, JS::CurrentGlobalOrNull(cx));
@@ -3602,13 +3586,11 @@ XULDocument::CreateElementFromPrototype(nsXULPrototypeElement* aPrototype,
     *aResult = nullptr;
     nsresult rv = NS_OK;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         PR_LOG(gXULLog, PR_LOG_NOTICE,
                ("xul: creating <%s> from prototype",
                 NS_ConvertUTF16toUTF8(aPrototype->mNodeInfo->QualifiedName()).get()));
     }
-#endif
 
     nsRefPtr<Element> result;
 
@@ -3663,7 +3645,7 @@ XULDocument::CreateOverlayElement(nsXULPrototypeElement* aPrototype,
     rv = AddForwardReference(fwdref);
     if (NS_FAILED(rv)) return rv;
 
-    NS_ADDREF(*aResult = element);
+    element.forget(aResult);
     return NS_OK;
 }
 
@@ -3874,7 +3856,6 @@ XULDocument::OverlayForwardReference::Resolve()
         if (NS_FAILED(rv)) return eResolve_Error;
     }
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         nsAutoCString idC;
         idC.AssignWithConversion(id);
@@ -3882,7 +3863,6 @@ XULDocument::OverlayForwardReference::Resolve()
                ("xul: overlay resolved '%s'",
                 idC.get()));
     }
-#endif
 
     mResolved = true;
     return eResolve_Succeeded;
@@ -4045,7 +4025,6 @@ XULDocument::OverlayForwardReference::Merge(nsIContent* aTargetNode,
 
 XULDocument::OverlayForwardReference::~OverlayForwardReference()
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
         nsAutoString id;
         mOverlay->GetAttr(kNameSpaceID_None, nsGkAtoms::id, id);
@@ -4066,7 +4045,6 @@ XULDocument::OverlayForwardReference::~OverlayForwardReference()
                ("xul: %s overlay failed to resolve '%s' in %s",
                 urlspec.get(), idC.get(), parentDoc.get()));
     }
-#endif
 }
 
 
@@ -4090,7 +4068,6 @@ XULDocument::BroadcasterHookup::Resolve()
 
 XULDocument::BroadcasterHookup::~BroadcasterHookup()
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
         // Tell the world we failed
 
@@ -4115,7 +4092,6 @@ XULDocument::BroadcasterHookup::~BroadcasterHookup()
                 attributeC.get(),
                 broadcasteridC.get()));
     }
-#endif
 }
 
 
@@ -4171,7 +4147,7 @@ XULDocument::BroadcastAttributeChangeFromOverlay(nsIContent* aNode,
             (entry->mListeners[i]);
 
         if ((bl->mAttribute != aAttribute) &&
-            (bl->mAttribute != nsGkAtoms::_asterix))
+            (bl->mAttribute != nsGkAtoms::_asterisk))
             continue;
 
         nsCOMPtr<nsIContent> l = do_QueryReferent(bl->mListener);
@@ -4312,7 +4288,6 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
         return domRv.ErrorCode();
     }
 
-#ifdef PR_LOGGING
     // Tell the world we succeeded
     if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
         nsCOMPtr<nsIContent> content =
@@ -4331,7 +4306,6 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
                 attributeC.get(),
                 broadcasteridC.get()));
     }
-#endif
 
     *aNeedsHookup = false;
     *aDidResolve = true;

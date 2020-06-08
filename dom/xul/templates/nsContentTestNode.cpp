@@ -12,10 +12,8 @@
 #include "nsIXULTemplateBuilder.h"
 #include "nsXULTemplateQueryProcessorRDF.h"
 
-#include "prlog.h"
-#ifdef PR_LOGGING
+#include "mozilla/Logging.h"
 extern PRLogModuleInfo* gXULTemplateLog;
-#endif
 
 nsContentTestNode::nsContentTestNode(nsXULTemplateQueryProcessorRDF* aProcessor,
                                      nsIAtom* aRefVariable)
@@ -25,7 +23,6 @@ nsContentTestNode::nsContentTestNode(nsXULTemplateQueryProcessorRDF* aProcessor,
       mRefVariable(aRefVariable),
       mTag(nullptr)
 {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG)) {
         nsAutoString tag(NS_LITERAL_STRING("(none)"));
         if (mTag)
@@ -40,7 +37,6 @@ nsContentTestNode::nsContentTestNode(nsXULTemplateQueryProcessorRDF* aProcessor,
                 this, NS_ConvertUTF16toUTF8(refvar).get(),
                 NS_ConvertUTF16toUTF8(tag).get()));
     }
-#endif
 }
 
 nsresult

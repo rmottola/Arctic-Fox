@@ -10,7 +10,7 @@
 #include "mozilla/Attributes.h"
 #include "StaticPtr.h"
 #include "PeerConnectionImpl.h"
-#include "mozIGoannaMediaPluginService.h"
+#include "mozIGeckoMediaPluginService.h"
 #include "nsIRunnable.h"
 
 namespace mozilla {
@@ -87,12 +87,12 @@ public:
 private:
 #endif
 
-  // We cannot form offers/answers properly until the Goanna Media Plugin stuff
+  // We cannot form offers/answers properly until the Gecko Media Plugin stuff
   // has been initted, which is a complicated mess of thread dispatches,
   // including sync dispatches to main. So, we need to be able to queue up
   // offer creation (or SetRemote, when we're the answerer) until all of this is
   // ready to go, since blocking on this init is just begging for deadlock.
-  nsCOMPtr<mozIGoannaMediaPluginService> mGMPService;
+  nsCOMPtr<mozIGeckoMediaPluginService> mGMPService;
   bool mGMPReady;
   nsTArray<nsCOMPtr<nsIRunnable>> mQueuedJSEPOperations;
 

@@ -74,9 +74,10 @@ public:
 
   virtual gfx::SurfaceFormat GetFormat() const override;
 
-  virtual TextureSource* GetTextureSources() override
+  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override
   {
-    return mTextureSource;
+    aTexture = mTextureSource;
+    return !!aTexture;
   }
 
   virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override

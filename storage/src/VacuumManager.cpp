@@ -13,7 +13,7 @@
 #include "nsIObserverService.h"
 #include "nsIFile.h"
 #include "nsThreadUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prtime.h"
 
 #include "mozStorageConnection.h"
@@ -39,9 +39,7 @@
 // Time between subsequent vacuum calls for a certain database.
 #define VACUUM_INTERVAL_SECONDS 30 * 86400 // 30 days.
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo *gStorageLog;
-#endif
 
 namespace mozilla {
 namespace storage {
@@ -246,8 +244,7 @@ Vacuumer::HandleError(mozIStorageError *aError)
   NS_WARNING(warnMsg.get());
 #endif
 
-#ifdef PR_LOGGING
-  {
+  if (PR_LOG_TEST(gStorageLog, PR_LOG_ERROR)) {
     int32_t result;
     nsresult rv = aError->GetResult(&result);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -258,7 +255,6 @@ Vacuumer::HandleError(mozIStorageError *aError)
            ("Vacuum failed with error: %d '%s'. Database was: '%s'",
             result, message.get(), mDBFilename.get()));
   }
-#endif
   return NS_OK;
 }
 

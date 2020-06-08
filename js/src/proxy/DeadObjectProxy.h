@@ -19,12 +19,12 @@ class DeadObjectProxy : public BaseProxyHandler
     { }
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject wrapper, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
-                                MutableHandle<JSPropertyDescriptor> desc,
+    virtual bool defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+                                Handle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const override;
-    virtual bool ownPropertyKeys(JSContext* cx, HandleObject wrapper,
+    virtual bool ownPropertyKeys(JSContext *cx, HandleObject wrapper,
                                  AutoIdVector& props) const override;
     virtual bool delete_(JSContext *cx, HandleObject wrapper, HandleId id,
                          ObjectOpResult &result) const override;

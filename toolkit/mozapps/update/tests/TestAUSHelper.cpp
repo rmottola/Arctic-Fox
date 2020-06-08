@@ -77,8 +77,9 @@ static void
 WriteMsg(const NS_tchar *path, const char *status)
 {
   FILE* outFP = NS_tfopen(path, NS_T("wb"));
-  if (!outFP)
+  if (!outFP) {
     return;
+  }
 
   fprintf(outFP, "%s\n", status);
   fclose(outFP);
@@ -207,7 +208,7 @@ int NS_main(int argc, NS_tchar **argv)
     } else {
       return 1;
     }
-#else 
+#else
     // Not implemented on non-Windows platforms
     return 1;
 #endif
@@ -285,7 +286,7 @@ int NS_main(int argc, NS_tchar **argv)
     } else {
       return serviceState;
     }
-#else 
+#else
     // Not implemented on non-Windows platforms
     return 1;
 #endif
@@ -303,7 +304,7 @@ int NS_main(int argc, NS_tchar **argv)
     } else {
       return 2;
     }
-#else 
+#else
     // Not implemented on non-Windows platforms
     return 1;
 #endif
@@ -372,4 +373,4 @@ int NS_main(int argc, NS_tchar **argv)
   }
 
   return 0;
-} 
+}

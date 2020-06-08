@@ -4,12 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "GMPAudioDecoderParent.h"
-#include "GMPParent.h"
+#include "GMPContentParent.h"
 #include <stdio.h>
 #include "mozilla/unused.h"
 #include "GMPMessageUtils.h"
 #include "nsThreadUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 namespace mozilla {
 
@@ -17,19 +17,14 @@ namespace mozilla {
 #undef LOG
 #endif
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetGMPLog();
 
 #define LOGD(msg) PR_LOG(GetGMPLog(), PR_LOG_DEBUG, msg)
 #define LOG(level, msg) PR_LOG(GetGMPLog(), (level), msg)
-#else
-#define LOGD(msg)
-#define LOG(level, msg)
-#endif
 
 namespace gmp {
 
-GMPAudioDecoderParent::GMPAudioDecoderParent(GMPParent* aPlugin)
+GMPAudioDecoderParent::GMPAudioDecoderParent(GMPContentParent* aPlugin)
   : mIsOpen(false)
   , mShuttingDown(false)
   , mPlugin(aPlugin)
@@ -260,6 +255,13 @@ GMPAudioDecoderParent::RecvError(const GMPErr& aError)
   // Ignore any return code. It is OK for this to fail without killing the process.
   mCallback->Error(aError);
 
+  return true;
+}
+
+bool
+GMPAudioDecoderParent::RecvShutdown()
+{
+  Shutdown();
   return true;
 }
 

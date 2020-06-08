@@ -14,17 +14,19 @@
 #include "nsString.h"
 
 class nsIPrincipal;
-class nsPIDOMWindow;
 
 namespace mozilla {
 namespace dom {
+
+class Element;
+
 namespace indexedDB {
 
 class PermissionRequestBase
   : public nsIObserver
   , public nsIInterfaceRequestor
 {
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<Element> mOwnerElement;
   nsCOMPtr<nsIPrincipal> mPrincipal;
 
 public:
@@ -51,7 +53,7 @@ public:
   PromptIfNeeded(PermissionValue* aCurrentValue);
 
 protected:
-  PermissionRequestBase(nsPIDOMWindow* aWindow,
+  PermissionRequestBase(Element* aOwnerElement,
                         nsIPrincipal* aPrincipal);
 
   // Reference counted.

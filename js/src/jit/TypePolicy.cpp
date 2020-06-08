@@ -64,7 +64,7 @@ BoxInputsPolicy::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-ArithPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+ArithPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
     if (specialization == MIRType_None)
@@ -757,18 +757,18 @@ MaybeSimdUnbox(TempAllocator &alloc, MInstruction *ins, MIRType type, unsigned o
 
 template <unsigned Op>
 bool
-SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins)
+SimdSameAsReturnedTypePolicy<Op>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     return MaybeSimdUnbox(alloc, ins, ins->type(), Op);
 }
 
 template bool
-SimdSameAsReturnedTypePolicy<0>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins);
+SimdSameAsReturnedTypePolicy<0>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
 template bool
-SimdSameAsReturnedTypePolicy<1>::staticAdjustInputs(TempAllocator &alloc, MInstruction *ins);
+SimdSameAsReturnedTypePolicy<1>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
 
 bool
-SimdAllPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+SimdAllPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
     for (unsigned i = 0, e = ins->numOperands(); i < e; i++) {
@@ -780,20 +780,20 @@ SimdAllPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 
 template <unsigned Op>
 bool
-SimdPolicy<Op>::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+SimdPolicy<Op>::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     return MaybeSimdUnbox(alloc, ins, ins->typePolicySpecialization(), Op);
 }
 
 template bool
-SimdPolicy<0>::adjustInputs(TempAllocator &alloc, MInstruction *ins);
+SimdPolicy<0>::adjustInputs(TempAllocator& alloc, MInstruction* ins);
 
 bool
-SimdShufflePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+SimdShufflePolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
 
-    MSimdGeneralShuffle *s = ins->toSimdGeneralShuffle();
+    MSimdGeneralShuffle* s = ins->toSimdGeneralShuffle();
 
     for (unsigned i = 0; i < s->numVectors(); i++) {
         if (!MaybeSimdUnbox(alloc, ins, specialization, i))
@@ -802,11 +802,11 @@ SimdShufflePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 
     // Next inputs are the lanes, which need to be int32
     for (unsigned i = 0; i < s->numLanes(); i++) {
-        MDefinition *in = ins->getOperand(s->numVectors() + i);
+        MDefinition* in = ins->getOperand(s->numVectors() + i);
         if (in->type() == MIRType_Int32)
             continue;
 
-        MInstruction *replace = MToInt32::New(alloc, in, MacroAssembler::IntConversion_NumbersOnly);
+        MInstruction* replace = MToInt32::New(alloc, in, MacroAssembler::IntConversion_NumbersOnly);
         ins->block()->insertBefore(ins, replace);
         ins->replaceOperand(s->numVectors() + i, replace);
         if (!replace->typePolicy()->adjustInputs(alloc, replace))
@@ -817,7 +817,7 @@ SimdShufflePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 }
 
 bool
-SimdSelectPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+SimdSelectPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
 
@@ -882,15 +882,15 @@ InstanceOfPolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 }
 
 bool
-StoreUnboxedScalarPolicy::adjustValueInput(TempAllocator &alloc, MInstruction *ins,
-                                           Scalar::Type writeType, MDefinition *value,
+StoreUnboxedScalarPolicy::adjustValueInput(TempAllocator& alloc, MInstruction* ins,
+                                           Scalar::Type writeType, MDefinition* value,
                                            int valueOperand)
 {
     // Storing a SIMD value just implies that we might need a SimdUnbox.
     if (Scalar::isSimdType(writeType))
         return MaybeSimdUnbox(alloc, ins, ScalarTypeToMIRType(writeType), valueOperand);
 
-    MDefinition *curValue = value;
+    MDefinition* curValue = value;
     // First, ensure the value is int32, boolean, double or Value.
     // The conversion is based on TypedArrayObjectTemplate::setElementTail.
     switch (value->type()) {
@@ -969,11 +969,11 @@ StoreUnboxedScalarPolicy::adjustValueInput(TempAllocator &alloc, MInstruction *i
 }
 
 bool
-StoreUnboxedScalarPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+StoreUnboxedScalarPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     SingleObjectPolicy::staticAdjustInputs(alloc, ins);
 
-    MStoreUnboxedScalar *store = ins->toStoreUnboxedScalar();
+    MStoreUnboxedScalar* store = ins->toStoreUnboxedScalar();
     MOZ_ASSERT(IsValidElementsType(store->elements(), store->offsetAdjustment()));
     MOZ_ASSERT(store->index()->type() == MIRType_Int32);
 

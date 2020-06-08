@@ -94,14 +94,14 @@ nsBaseAppShell::NativeEventCallback()
   IncrementEventloopNestingLevel();
   EventloopNestingState prevVal = mEventloopNestingState;
   NS_ProcessPendingEvents(thread, THREAD_EVENT_STARVATION_LIMIT);
-  mProcessedGoannaEvents = true;
+  mProcessedGeckoEvents = true;
   mEventloopNestingState = prevVal;
   mBlockNativeEvent = prevBlockNativeEvent;
 
   // Continue processing pending events later (we don't want to starve the
   // embedders event loop).
   if (NS_HasPendingEvents(thread))
-    DoProcessMoreGoannaEvents();
+    DoProcessMoreGeckoEvents();
 
   DecrementEventloopNestingLevel();
 }
@@ -109,7 +109,7 @@ nsBaseAppShell::NativeEventCallback()
 // Note, this is currently overidden on windows, see comments in nsAppShell for
 // details.
 void
-nsBaseAppShell::DoProcessMoreGoannaEvents()
+nsBaseAppShell::DoProcessMoreGeckoEvents()
 {
   OnDispatchedEvent(nullptr);
 }
@@ -267,7 +267,7 @@ nsBaseAppShell::OnProcessNextEvent(nsIThreadInternal *thr, bool mayWait,
   bool needEvent = mayWait;
   // Reset prior to invoking DoProcessNextNativeEvent which might cause
   // NativeEventCallback to process goanna events.
-  mProcessedGoannaEvents = false;
+  mProcessedGeckoEvents = false;
 
   if (mFavorPerf <= 0 && start > mSwitchTime + mStarvationDelay) {
     // Favor pending native events
@@ -285,7 +285,7 @@ nsBaseAppShell::OnProcessNextEvent(nsIThreadInternal *thr, bool mayWait,
     }
   }
 
-  while (!NS_HasPendingEvents(thr) && !mProcessedGoannaEvents) {
+  while (!NS_HasPendingEvents(thr) && !mProcessedGeckoEvents) {
     // If we have been asked to exit from Run, then we should not wait for
     // events to process.  Note that an inner nested event loop causes
     // 'mayWait' to become false too, through 'mBlockedWait'.

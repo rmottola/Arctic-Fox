@@ -20,15 +20,12 @@
 #include "nsCOMPtr.h"
 #include "plhash.h"
 
-#include "prlog.h"
-#ifdef PR_LOGGING
+#include "mozilla/Logging.h"
 extern PRLogModuleInfo* gXULTemplateLog;
 
 #include "nsString.h"
 #include "nsUnicharUtils.h"
 #include "nsXULContentUtils.h"
-
-#endif
 
 #include "nsRuleNetwork.h"
 #include "nsXULTemplateResultSetRDF.h"

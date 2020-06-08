@@ -7,7 +7,7 @@
 #include "AudioSinkInputPin.h"
 #include "AudioSinkFilter.h"
 #include "SampleSink.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include <wmsdkidl.h>
 
@@ -15,12 +15,8 @@ using namespace mozilla::media;
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetDirectShowLog();
 #define LOG(...) PR_LOG(GetDirectShowLog(), PR_LOG_DEBUG, (__VA_ARGS__))
-#else
-#define LOG(...)
-#endif
 
 AudioSinkInputPin::AudioSinkInputPin(wchar_t* aObjectName,
                                      AudioSinkFilter* aFilter,

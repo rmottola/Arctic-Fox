@@ -19,11 +19,12 @@
 #include "nsFrameManager.h"
 #include "nsRefreshDriver.h"
 #include "mozilla/dom/Touch.h"
-#include "mozilla/PendingPlayerTracker.h"
+#include "mozilla/PendingAnimationTracker.h"
 #include "nsIObjectLoadingContent.h"
 #include "nsFrame.h"
 #include "mozilla/layers/ShadowLayers.h"
 #include "ClientLayerManager.h"
+#include "nsQueryObject.h"
 
 #include "nsIScrollableFrame.h"
 
@@ -1300,7 +1301,8 @@ nsDOMWindowUtils::SendNativeKeyEvent(int32_t aNativeKeyboardLayout,
                                      int32_t aNativeKeyCode,
                                      int32_t aModifiers,
                                      const nsAString& aCharacters,
-                                     const nsAString& aUnmodifiedCharacters)
+                                     const nsAString& aUnmodifiedCharacters,
+                                     nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1309,8 +1311,11 @@ nsDOMWindowUtils::SendNativeKeyEvent(int32_t aNativeKeyboardLayout,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  return widget->SynthesizeNativeKeyEvent(aNativeKeyboardLayout, aNativeKeyCode,
-                                          aModifiers, aCharacters, aUnmodifiedCharacters);
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+    <int32_t, int32_t, uint32_t, nsString, nsString, nsIObserver*>
+    (widget, &nsIWidget::SynthesizeNativeKeyEvent, aNativeKeyboardLayout,
+    aNativeKeyCode, aModifiers, aCharacters, aUnmodifiedCharacters, aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1318,7 +1323,8 @@ nsDOMWindowUtils::SendNativeMouseEvent(int32_t aScreenX,
                                        int32_t aScreenY,
                                        int32_t aNativeMessage,
                                        int32_t aModifierFlags,
-                                       nsIDOMElement* aElement)
+                                       nsIDOMElement* aElement,
+                                       nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1327,8 +1333,12 @@ nsDOMWindowUtils::SendNativeMouseEvent(int32_t aScreenX,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  return widget->SynthesizeNativeMouseEvent(LayoutDeviceIntPoint(aScreenX, aScreenY),
-                                            aNativeMessage, aModifierFlags);
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+    <LayoutDeviceIntPoint, int32_t, int32_t, nsIObserver*>
+    (widget, &nsIWidget::SynthesizeNativeMouseEvent,
+    LayoutDeviceIntPoint(aScreenX, aScreenY), aNativeMessage, aModifierFlags,
+    aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1340,7 +1350,8 @@ nsDOMWindowUtils::SendNativeMouseScrollEvent(int32_t aScreenX,
                                              double aDeltaZ,
                                              uint32_t aModifierFlags,
                                              uint32_t aAdditionalFlags,
-                                             nsIDOMElement* aElement)
+                                             nsIDOMElement* aElement,
+                                             nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1350,12 +1361,12 @@ nsDOMWindowUtils::SendNativeMouseScrollEvent(int32_t aScreenX,
     return NS_ERROR_FAILURE;
   }
 
-  return widget->SynthesizeNativeMouseScrollEvent(LayoutDeviceIntPoint(aScreenX,
-                                                                       aScreenY),
-                                                  aNativeMessage,
-                                                  aDeltaX, aDeltaY, aDeltaZ,
-                                                  aModifierFlags,
-                                                  aAdditionalFlags);
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+    <mozilla::LayoutDeviceIntPoint, uint32_t, double, double, double, uint32_t, uint32_t, nsIObserver*>
+    (widget, &nsIWidget::SynthesizeNativeMouseScrollEvent,
+    LayoutDeviceIntPoint(aScreenX, aScreenY), aNativeMessage, aDeltaX, aDeltaY,
+    aDeltaZ, aModifierFlags, aAdditionalFlags, aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1364,7 +1375,8 @@ nsDOMWindowUtils::SendNativeTouchPoint(uint32_t aPointerId,
                                        int32_t aScreenX,
                                        int32_t aScreenY,
                                        double aPressure,
-                                       uint32_t aOrientation)
+                                       uint32_t aOrientation,
+                                       nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1377,16 +1389,19 @@ nsDOMWindowUtils::SendNativeTouchPoint(uint32_t aPointerId,
     return NS_ERROR_INVALID_ARG;
   }
 
-  return widget->SynthesizeNativeTouchPoint(aPointerId,
-                                            (nsIWidget::TouchPointerState)aTouchState,
-                                            nsIntPoint(aScreenX, aScreenY),
-                                            aPressure, aOrientation);
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+    <uint32_t, nsIWidget::TouchPointerState, nsIntPoint, double, uint32_t, nsIObserver*>
+    (widget, &nsIWidget::SynthesizeNativeTouchPoint, aPointerId,
+    (nsIWidget::TouchPointerState)aTouchState, nsIntPoint(aScreenX, aScreenY),
+    aPressure, aOrientation, aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsDOMWindowUtils::SendNativeTouchTap(int32_t aScreenX,
                                      int32_t aScreenY,
-                                     bool aLongTap)
+                                     bool aLongTap,
+                                     nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1394,11 +1409,16 @@ nsDOMWindowUtils::SendNativeTouchTap(int32_t aScreenX,
   if (!widget) {
     return NS_ERROR_FAILURE;
   }
-  return widget->SynthesizeNativeTouchTap(nsIntPoint(aScreenX, aScreenY), aLongTap);
+
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+    <nsIntPoint, bool, nsIObserver*>
+    (widget, &nsIWidget::SynthesizeNativeTouchTap,
+    nsIntPoint(aScreenX, aScreenY), aLongTap, aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::ClearNativeTouchSequence()
+nsDOMWindowUtils::ClearNativeTouchSequence(nsIObserver* aObserver)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -1406,7 +1426,10 @@ nsDOMWindowUtils::ClearNativeTouchSequence()
   if (!widget) {
     return NS_ERROR_FAILURE;
   }
-  return widget->ClearNativeTouchSequence();
+
+  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs<nsIObserver*>
+    (widget, &nsIWidget::ClearNativeTouchSequence, aObserver));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -2586,16 +2609,15 @@ nsDOMWindowUtils::AdvanceTimeAndRefresh(int64_t aMilliseconds)
   // Before we advance the time, we should trigger any animations that are
   // waiting to start. This is because there are many tests that call this
   // which expect animations to start immediately. Ideally, we should make
-  // all these tests do an asynchronous wait on the corresponding animation
-  // player's 'ready' promise before continuing. Then we could remove the
-  // special handling here and the code path followed when testing would
-  // more closely match the code path during regular operation. Filed as
-  // bug 1112957.
+  // all these tests do an asynchronous wait on the corresponding animation's
+  // 'ready' promise before continuing. Then we could remove the special
+  // handling here and the code path followed when testing would more closely
+  // match the code path during regular operation. Filed as bug 1112957.
   nsCOMPtr<nsIDocument> doc = GetDocument();
   if (doc) {
-    PendingPlayerTracker* tracker = doc->GetPendingPlayerTracker();
+    PendingAnimationTracker* tracker = doc->GetPendingAnimationTracker();
     if (tracker) {
-      tracker->TriggerPendingPlayersNow();
+      tracker->TriggerPendingAnimationsNow();
     }
   }
 
@@ -2890,19 +2912,6 @@ nsDOMWindowUtils::LeafLayersPartitionWindow(bool* aResult)
     *aResult = false;
   }
 #endif
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsDOMWindowUtils::GetMayHaveTouchEventListeners(bool* aResult)
-{
-  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(mWindow);
-  NS_ENSURE_TRUE(window, NS_ERROR_FAILURE);
-
-  nsPIDOMWindow* innerWindow = window->GetCurrentInnerWindow();
-  *aResult = innerWindow ? innerWindow->HasTouchEventListeners() : false;
   return NS_OK;
 }
 
@@ -3995,6 +4004,32 @@ nsDOMWindowUtils::GetFramesReflowed(uint64_t* aResult)
   }
 
   *aResult = presContext->FramesReflowedCount();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::SetServiceWorkersTestingEnabled(bool aEnabled)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(mWindow);
+  NS_ENSURE_STATE(window);
+
+  window->SetServiceWorkersTestingEnabled(aEnabled);
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetServiceWorkersTestingEnabled(bool *aEnabled)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(mWindow);
+  NS_ENSURE_STATE(window);
+
+  *aEnabled = window->GetServiceWorkersTestingEnabled();
+
   return NS_OK;
 }
 

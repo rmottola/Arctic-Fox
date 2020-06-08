@@ -16,7 +16,7 @@
 
 #include "nsNativeModuleLoader.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prinit.h"
 #include "prerror.h"
 

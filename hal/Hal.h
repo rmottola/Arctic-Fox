@@ -17,7 +17,6 @@
 #include "mozilla/dom/battery/Types.h"
 #include "mozilla/dom/network/Types.h"
 #include "mozilla/dom/power/Types.h"
-#include "mozilla/hal_sandbox/PHal.h"
 #include "mozilla/dom/ScreenOrientation.h"
 #include "mozilla/HalScreenConfiguration.h"
 
@@ -468,13 +467,7 @@ void NotifyAlarmFired();
 bool SetAlarm(int32_t aSeconds, int32_t aNanoseconds);
 
 /**
- * Set the priority of the given process.  A process's priority is a two-tuple
- * consisting of a hal::ProcessPriority value and a hal::ProcessCPUPriority
- * value.
- *
- * Two processes with the same ProcessCPUPriority value don't necessarily have
- * the same CPU priority; the CPU priority we assign to a process is a function
- * of its ProcessPriority and ProcessCPUPriority.
+ * Set the priority of the given process.
  *
  * Exactly what this does will vary between platforms.  On *nix we might give
  * background processes higher nice values.  On other platforms, we might
@@ -482,7 +475,6 @@ bool SetAlarm(int32_t aSeconds, int32_t aNanoseconds);
  */
 void SetProcessPriority(int aPid,
                         hal::ProcessPriority aPriority,
-                        hal::ProcessCPUPriority aCPUPriority,
                         uint32_t aLRU = 0);
 
 
@@ -604,16 +596,6 @@ void StartForceQuitWatchdog(hal::ShutdownMode aMode, int32_t aTimeoutSecs);
  * Perform Factory Reset to wipe out all user data.
  */
 void FactoryReset(mozilla::dom::FactoryResetReason& aReason);
-
-/**
- * Start monitoring the status of gamepads attached to the system.
- */
-void StartMonitoringGamepadStatus();
-
-/**
- * Stop monitoring the status of gamepads attached to the system.
- */
-void StopMonitoringGamepadStatus();
 
 /**
  * Start monitoring disk space for low space situations.

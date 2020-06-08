@@ -12,13 +12,11 @@
 #include "nsCOMArray.h"
 
 struct CharacterDataChangeInfo;
-class nsIVariant;
-class nsIDOMNode;
 template<class E> class nsCOMArray;
 class nsCycleCollectionTraversalCallback;
 namespace mozilla {
 namespace dom {
-class AnimationPlayer;
+class Animation;
 }
 }
 
@@ -127,9 +125,9 @@ public:
     }
   }
 
-  static void AnimationAdded(mozilla::dom::AnimationPlayer* aPlayer);
-  static void AnimationChanged(mozilla::dom::AnimationPlayer* aPlayer);
-  static void AnimationRemoved(mozilla::dom::AnimationPlayer* aPlayer);
+  static void AnimationAdded(mozilla::dom::Animation* aAnimation);
+  static void AnimationChanged(mozilla::dom::Animation* aAnimation);
+  static void AnimationRemoved(mozilla::dom::Animation* aAnimation);
 
   /**
    * To be called when reference count of aNode drops to zero.

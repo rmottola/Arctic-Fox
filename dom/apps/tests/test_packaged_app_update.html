@@ -172,7 +172,7 @@ var steps = [
       };
       PackagedTestHelper.gApp.ondownloadsuccess =
         checkLastAppState.bind(undefined, miniManifestURL, false, false,
-                               2, PackagedTestHelper.next);
+                               "2", PackagedTestHelper.next);
     };
 
     var request = navigator.mozApps.installPackage(miniManifestURL);
@@ -231,7 +231,7 @@ var steps = [
   },
   function() {
     info("== TEST == Update packaged app");
-    updateApp(true, 2, 3);
+    updateApp(true, "2", "3");
   },
   function() {
     info("== TEST == Check that saved permissions were kept");

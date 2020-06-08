@@ -1316,7 +1316,7 @@ GetOffsetRootContent(nsIFrame* aFrame)
       int32_t newAPD = f ? f->PresContext()->AppUnitsPerDevPixel() : 0;
       if (!f || newAPD != currAPD) {
         // Convert docOffset to the right APD and add it to offset.
-        offset += docOffset.ConvertAppUnits(currAPD, apd);
+        offset += docOffset.ScaleToOtherAppUnits(currAPD, apd);
         docOffset.x = docOffset.y = 0;
       }
       currAPD = newAPD;
@@ -1324,7 +1324,7 @@ GetOffsetRootContent(nsIFrame* aFrame)
     }
   }
 
-  offset += docOffset.ConvertAppUnits(currAPD, apd);
+  offset += docOffset.ScaleToOtherAppUnits(currAPD, apd);
 
   return offset;
 }
@@ -1362,7 +1362,7 @@ void nsPluginInstanceOwner::RemovePluginView()
   if (!mInstance || !mJavaView)
     return;
 
-  widget::GoannaAppShell::RemovePluginView(
+  widget::GeckoAppShell::RemovePluginView(
       jni::Object::Ref::From(jobject(mJavaView)), mFullScreen);
   AndroidBridge::GetJNIEnv()->DeleteGlobalRef((jobject)mJavaView);
   mJavaView = nullptr;

@@ -28,11 +28,7 @@
 #include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
 #include "nscore.h"                     // for nsACString
 #include "mozilla/layers/AtomicRefCountedWithFinalize.h"
-
-class gfxReusableSurfaceWrapper;
-struct nsIntPoint;
-struct nsIntSize;
-struct nsIntRect;
+#include "mozilla/gfx/Rect.h"
 
 namespace mozilla {
 namespace gl {
@@ -45,7 +41,6 @@ class Shmem;
 namespace layers {
 
 class Compositor;
-class CompositableHost;
 class CompositableParentManager;
 class SurfaceDescriptor;
 class SharedSurfaceDescriptor;
@@ -72,7 +67,7 @@ class BigImageIterator
 public:
   virtual void BeginBigImageIteration() = 0;
   virtual void EndBigImageIteration() {};
-  virtual nsIntRect GetTileRect() = 0;
+  virtual gfx::IntRect GetTileRect() = 0;
   virtual size_t GetTileCount() = 0;
   virtual bool NextTile() = 0;
 };
@@ -201,19 +196,6 @@ public:
       mRef->ReleaseCompositableRef();
     }
     mRef = aOther.get();
-    return *this;
-  }
-
-  CompositableTextureRef& operator=(const already_AddRefed<T>& aOther)
-  {
-    RefPtr<T> temp = aOther;
-    if (temp) {
-      temp->AddCompositableRef();
-    }
-    if (mRef) {
-      mRef->ReleaseCompositableRef();
-    }
-    mRef = temp;
     return *this;
   }
 
@@ -379,15 +361,6 @@ public:
   virtual gfx::SurfaceFormat GetFormat() const = 0;
 
   /**
-   * Return a list of TextureSources for use with a Compositor.
-   *
-   * This can trigger texture uploads, so do not call it inside transactions
-   * so as to not upload textures while the main thread is blocked.
-   * Must not be called while this TextureHost is not sucessfully Locked.
-   */
-  virtual TextureSource* GetTextureSources() = 0;
-
-  /**
    * Called during the transaction. The TextureSource may or may not be composited.
    *
    * Note that this is called outside of lock/unlock.
@@ -399,7 +372,7 @@ public:
    *
    * Note that this is called only withing lock/unlock.
    */
-  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture);
+  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) = 0;
 
   /**
    * Called when another TextureHost will take over.
@@ -586,7 +559,7 @@ public:
 
   virtual void Unlock() override;
 
-  virtual TextureSource* GetTextureSources() override;
+  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override;
 
   virtual void DeallocateDeviceData() override;
 
@@ -594,7 +567,7 @@ public:
 
   /**
    * Return the format that is exposed to the compositor when calling
-   * GetTextureSources.
+   * BindTextureSource.
    *
    * If the shared format is YCbCr and the compositor does not support it,
    * GetFormat will be RGB32 (even though mFormat is SurfaceFormat::YUV).
@@ -723,10 +696,11 @@ public:
   virtual bool Lock() override;
   virtual void Unlock() override;
 
-  virtual TextureSource* GetTextureSources() override {
+  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override {
     MOZ_ASSERT(mIsLocked);
     MOZ_ASSERT(mTexSource);
-    return mTexSource;
+    aTexture = mTexSource;
+    return !!aTexture;
   }
 
   virtual gfx::SurfaceFormat GetFormat() const override;

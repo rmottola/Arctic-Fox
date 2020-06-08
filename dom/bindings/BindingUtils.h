@@ -2475,7 +2475,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 bool
 XrayDefineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                    JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                   JS::MutableHandle<JSPropertyDescriptor> desc,
+                   JS::Handle<JSPropertyDescriptor> desc,
                    JS::ObjectOpResult &result,
                    bool *defined);
 
@@ -3251,7 +3251,7 @@ WrappedJSToDictionary(nsISupports* aObject, T& aDictionary)
 
   // we need this AutoEntryScript here because the spec requires us to execute
   // getters when parsing a dictionary
-  AutoEntryScript aes(global);
+  AutoEntryScript aes(global, "WebIDL dictionary creation");
   aes.TakeOwnershipOfErrorReporting();
 
   JS::Rooted<JS::Value> v(aes.cx(), JS::ObjectValue(*obj));

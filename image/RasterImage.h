@@ -30,6 +30,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Pair.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/UniquePtr.h"
@@ -38,7 +39,6 @@
 #endif
 
 class nsIInputStream;
-class nsIThreadPool;
 class nsIRequest;
 
 #define NS_RASTERIMAGE_CID \
@@ -122,7 +122,6 @@ class nsIRequest;
 namespace mozilla {
 
 namespace layers {
-class LayerManager;
 class ImageContainer;
 class Image;
 } // namespace layers
@@ -298,8 +297,9 @@ private:
 
   already_AddRefed<gfx::SourceSurface> CopyFrame(uint32_t aWhichFrame,
                                              uint32_t aFlags);
-  already_AddRefed<gfx::SourceSurface> GetFrameInternal(uint32_t aWhichFrame,
-                                                    uint32_t aFlags);
+
+  Pair<DrawResult, RefPtr<gfx::SourceSurface>>
+    GetFrameInternal(uint32_t aWhichFrame, uint32_t aFlags);
 
   DrawableFrameRef LookupFrameInternal(uint32_t aFrameNum,
                                        const gfx::IntSize& aSize,
@@ -315,8 +315,9 @@ private:
   size_t SizeOfDecodedWithComputedFallbackIfHeap(gfxMemoryLocation aLocation,
                                                  MallocSizeOf aMallocSizeOf) const;
 
-  already_AddRefed<layers::Image>
-    GetCurrentImage(layers::ImageContainer* aContainer);
+  Pair<DrawResult, nsRefPtr<layers::Image>>
+    GetCurrentImage(layers::ImageContainer* aContainer, uint32_t aFlags);
+
   void UpdateImageContainer();
 
   // We would like to just check if we have a zero lock count, but we can't do
@@ -384,6 +385,10 @@ private: // data
   // A weak pointer to our ImageContainer, which stays alive only as long as
   // the layer system needs it.
   WeakPtr<layers::ImageContainer> mImageContainer;
+
+  // If mImageContainer is non-null, this contains the DrawResult we obtained
+  // the last time we updated it.
+  DrawResult mLastImageContainerDrawResult;
 
 #ifdef DEBUG
   uint32_t                   mFramesNotified;

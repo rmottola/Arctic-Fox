@@ -21,17 +21,12 @@
 using namespace mozilla::net;
 using namespace mozilla::media;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gRtspMediaResourceLog;
 #define RTSP_LOG(msg, ...) PR_LOG(gRtspMediaResourceLog, PR_LOG_DEBUG, \
                                   (msg, ##__VA_ARGS__))
 // Debug logging macro with object pointer and class name.
 #define RTSPMLOG(msg, ...) \
         RTSP_LOG("%p [RtspMediaResource]: " msg, this, ##__VA_ARGS__)
-#else
-#define RTSP_LOG(msg, ...)
-#define RTSPMLOG(msg, ...)
-#endif
 
 namespace mozilla {
 
@@ -505,11 +500,9 @@ RtspMediaResource::RtspMediaResource(MediaDecoder* aDecoder,
   MOZ_ASSERT(mMediaStreamController);
   mListener = new Listener(this);
   mMediaStreamController->AsyncOpen(mListener);
-#ifdef PR_LOGGING
   if (!gRtspMediaResourceLog) {
     gRtspMediaResourceLog = PR_NewLogModule("RtspMediaResource");
   }
-#endif
 #endif
 }
 

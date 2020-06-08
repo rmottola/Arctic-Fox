@@ -28,13 +28,6 @@ NativeObject::fixedData(size_t nslots) const
     return reinterpret_cast<uint8_t*>(&fixedSlots()[nslots]);
 }
 
-/* static */ inline bool
-NativeObject::changePropertyAttributes(JSContext* cx, HandleNativeObject obj,
-                                       HandleShape shape, unsigned attrs)
-{
-    return !!changeProperty(cx, obj, shape, attrs, 0, shape->getter(), shape->setter());
-}
-
 inline void
 NativeObject::removeLastProperty(ExclusiveContext* cx)
 {
@@ -72,8 +65,7 @@ NativeObject::clearShouldConvertDoubleElements()
 }
 
 inline void
-NativeObject::setDenseElementWithType(ExclusiveContext* cx, uint32_t index,
-                                      const Value& val)
+NativeObject::setDenseElementWithType(ExclusiveContext *cx, uint32_t index, const Value &val)
 {
     // Avoid a slow AddTypePropertyId call if the type is the same as the type
     // of the previous element.
@@ -84,8 +76,7 @@ NativeObject::setDenseElementWithType(ExclusiveContext* cx, uint32_t index,
 }
 
 inline void
-NativeObject::initDenseElementWithType(ExclusiveContext* cx, uint32_t index,
-                                       const Value& val)
+NativeObject::initDenseElementWithType(ExclusiveContext *cx, uint32_t index, const Value &val)
 {
     MOZ_ASSERT(!shouldConvertDoubleElements());
     AddTypePropertyId(cx, this, JSID_VOID, val);

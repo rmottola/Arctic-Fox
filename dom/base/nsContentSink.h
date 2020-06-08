@@ -23,7 +23,7 @@
 #include "nsITimer.h"
 #include "nsStubDocumentObserver.h"
 #include "nsIContentSink.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsThreadUtils.h"
 
@@ -31,11 +31,9 @@ class nsIDocument;
 class nsIURI;
 class nsIChannel;
 class nsIDocShell;
-class nsIParser;
 class nsIAtom;
 class nsIChannel;
 class nsIContent;
-class nsViewManager;
 class nsNodeInfoManager;
 class nsScriptLoader;
 class nsIApplicationCache;

@@ -40,7 +40,6 @@ class ContentParent;
 
 BEGIN_QUOTA_NAMESPACE
 
-class AcquireListener;
 class AsyncUsageRunnable;
 class CollectOriginsHelper;
 class FinalizeOriginEvictionRunnable;
@@ -154,17 +153,6 @@ public:
                  const nsACString& aGroup,
                  const nsACString& aOrigin,
                  const nsAString& aPath);
-
-  // Set the Window that the current thread is doing operations for.
-  // The caller is responsible for ensuring that aWindow is held alive.
-  static void
-  SetCurrentWindow(nsPIDOMWindow* aWindow)
-  {
-    QuotaManager* quotaManager = Get();
-    NS_ASSERTION(quotaManager, "Must have a manager here!");
-
-    quotaManager->SetCurrentWindowInternal(aWindow);
-  }
 
   // Called when a storage is created.
   bool
@@ -333,9 +321,6 @@ private:
   nsresult
   Init();
 
-  void
-  SetCurrentWindowInternal(nsPIDOMWindow* aWindow);
-
   uint64_t
   LockedCollectOriginsForEviction(uint64_t aMinSizeToBeFreed,
                                   nsTArray<OriginInfo*>& aOriginInfos);
@@ -446,9 +431,6 @@ private:
                                      GroupInfoPair* aValue,
                                      void* aUserArg);
 
-  // TLS storage index for the current thread's window.
-  unsigned int mCurrentWindowIndex;
-
   mozilla::Mutex mQuotaMutex;
 
   nsClassHashtable<nsCStringHashKey, GroupInfoPair> mGroupInfoPairs;
@@ -486,20 +468,6 @@ private:
   bool mTemporaryStorageInitialized;
 
   bool mStorageAreaInitialized;
-};
-
-class AutoEnterWindow
-{
-public:
-  explicit AutoEnterWindow(nsPIDOMWindow* aWindow)
-  {
-    QuotaManager::SetCurrentWindow(aWindow);
-  }
-
-  ~AutoEnterWindow()
-  {
-    QuotaManager::SetCurrentWindow(nullptr);
-  }
 };
 
 END_QUOTA_NAMESPACE

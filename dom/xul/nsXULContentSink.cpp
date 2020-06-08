@@ -41,7 +41,7 @@
 #include "nsXPIDLString.h"
 #include "nsReadableUtils.h"
 #include "nsXULElement.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prmem.h"
 #include "nsCRT.h"
 
@@ -57,9 +57,7 @@
 #include "nsIScriptError.h"
 #include "nsContentTypeParser.h"
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gContentSinkLog;
-#endif
 
 //----------------------------------------------------------------------
 
@@ -168,10 +166,8 @@ XULContentSinkImpl::XULContentSinkImpl()
       mParser(nullptr)
 {
 
-#ifdef PR_LOGGING
     if (! gContentSinkLog)
         gContentSinkLog = PR_NewLogModule("nsXULContentSink");
-#endif
 }
 
 
@@ -765,7 +761,6 @@ XULContentSinkImpl::OpenRoot(const char16_t** aAttributes,
     rv = CreateElement(aNodeInfo, &element);
 
     if (NS_FAILED(rv)) {
-#ifdef PR_LOGGING
         if (PR_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
             nsAutoString anodeC;
             aNodeInfo->GetName(anodeC);
@@ -774,7 +769,6 @@ XULContentSinkImpl::OpenRoot(const char16_t** aAttributes,
                     NS_ConvertUTF16toUTF8(anodeC).get(),
                     -1)); // XXX pass in line number
         }
-#endif
 
         return rv;
     }
@@ -808,7 +802,6 @@ XULContentSinkImpl::OpenTag(const char16_t** aAttributes,
     rv = CreateElement(aNodeInfo, &element);
 
     if (NS_FAILED(rv)) {
-#ifdef PR_LOGGING
         if (PR_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
             nsAutoString anodeC;
             aNodeInfo->GetName(anodeC);
@@ -817,7 +810,6 @@ XULContentSinkImpl::OpenTag(const char16_t** aAttributes,
                     NS_ConvertUTF16toUTF8(anodeC).get(),
                     aLineNumber));
         }
-#endif
 
         return rv;
     }
@@ -1028,7 +1020,6 @@ XULContentSinkImpl::AddAttributes(const char16_t** aAttributes,
                                mDocumentURL);
       NS_ENSURE_SUCCESS(rv, rv);
 
-#ifdef PR_LOGGING
       if (PR_LOG_TEST(gContentSinkLog, PR_LOG_DEBUG)) {
           nsAutoString extraWhiteSpace;
           int32_t cnt = mContextStack.Depth();
@@ -1044,7 +1035,6 @@ XULContentSinkImpl::AddAttributes(const char16_t** aAttributes,
                   NS_ConvertUTF16toUTF8(qnameC).get(),
                   NS_ConvertUTF16toUTF8(valueC).get()));
       }
-#endif
   }
 
   return NS_OK;

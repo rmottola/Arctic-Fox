@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nspr.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsDocLoader.h"
 #include "nsCURILoader.h"
@@ -20,6 +20,7 @@
 #include "nscore.h"
 #include "nsWeakPtr.h"
 #include "nsAutoPtr.h"
+#include "nsQueryObject.h"
 
 #include "nsIDOMWindow.h"
 

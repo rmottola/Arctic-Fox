@@ -15,7 +15,7 @@
 #include "nsCOMPtr.h"
 #include "nsString.h"
 #include "prproces.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prenv.h"
 #include "nsVersionComparator.h"
 #include "nsXREDirProvider.h"
@@ -194,7 +194,7 @@ GetXULRunnerStubPath(const char* argv0, nsIFile* *aResult)
   if (NS_FAILED(rv))
     return rv;
 
-  NS_ADDREF(*aResult = static_cast<nsIFile*>(lfm.get()));
+  lfm.forget(aResult);
   return NS_OK;
 }
 #endif /* XP_MACOSX */
@@ -1208,11 +1208,7 @@ nsUpdateProcessor::UpdateDone()
   nsCOMPtr<nsIUpdateManager> um =
     do_GetService("@mozilla.org/updates/update-manager;1");
   if (um) {
-    nsCOMPtr<nsIUpdate> update;
-    um->GetActiveUpdate(getter_AddRefs(update));
-    if (update) {
-      um->RefreshUpdateStatus(update);
-    }
+    um->RefreshUpdateStatus();
   }
 
   ShutdownWatcherThread();

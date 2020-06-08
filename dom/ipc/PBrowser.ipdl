@@ -10,7 +10,6 @@ include protocol PColorPicker;
 include protocol PContent;
 include protocol PContentBridge;
 include protocol PDocumentRenderer;
-include protocol PContentPermissionRequest;
 include protocol PFilePicker;
 include protocol PIndexedDBPermissionRequest;
 include protocol PRenderFrame;
@@ -18,7 +17,6 @@ include protocol PPluginWidget;
 include DOMTypes;
 include JavaScriptTypes;
 include URIParams;
-include PContentPermission;
 include ServiceWorkerRegistrarTypes;
 
 
@@ -27,6 +25,7 @@ using class mozilla::gfx::Matrix from "mozilla/gfx/Matrix.h";
 using struct gfxSize from "gfxPoint.h";
 using CSSRect from "Units.h";
 using LayoutDeviceIntRect from "Units.h";
+using mozilla::LayoutDeviceIntPoint from "Units.h";
 using ScreenIntSize from "Units.h";
 using struct mozilla::layers::FrameMetrics from "FrameMetrics.h";
 using struct mozilla::layers::ScrollableLayerGuid from "FrameMetrics.h";
@@ -38,12 +37,13 @@ using nscolor from "nsColor.h";
 using class mozilla::WidgetCompositionEvent from "ipc/nsGUIEventIPC.h";
 using struct mozilla::widget::IMENotification from "nsIWidget.h";
 using struct nsIMEUpdatePreference from "nsIWidget.h";
-using struct nsIntPoint from "nsPoint.h";
-using struct nsIntRect from "nsRect.h";
-using struct nsIntSize from "nsSize.h";
+using mozilla::gfx::IntSize from "mozilla/gfx/Point.h";
+using mozilla::gfx::IntPoint from "mozilla/gfx/Point.h";
+using mozilla::gfx::IntRect from "mozilla/gfx/Rect.h";
 using class mozilla::WidgetKeyboardEvent from "ipc/nsGUIEventIPC.h";
 using class mozilla::WidgetMouseEvent from "ipc/nsGUIEventIPC.h";
 using class mozilla::WidgetWheelEvent from "ipc/nsGUIEventIPC.h";
+using class mozilla::WidgetDragEvent from "ipc/nsGUIEventIPC.h";
 using struct nsRect from "nsRect.h";
 using class mozilla::WidgetSelectionEvent from "ipc/nsGUIEventIPC.h";
 using class mozilla::WidgetTouchEvent from "ipc/nsGUIEventIPC.h";
@@ -57,6 +57,7 @@ using mozilla::Modifiers from "mozilla/EventForwards.h";
 using mozilla::layers::GeckoContentController::APZStateChange from "mozilla/layers/GeckoContentController.h";
 using mozilla::WritingMode from "mozilla/WritingModes.h";
 using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
+using nsIWidget::TouchPointerState from "nsIWidget.h";
 
 namespace mozilla {
 namespace dom {
@@ -100,7 +101,6 @@ prio(normal upto urgent) sync protocol PBrowser
 
     manages PColorPicker;
     manages PDocumentRenderer;
-    manages PContentPermissionRequest;
     manages PFilePicker;
     manages PIndexedDBPermissionRequest;
     manages PRenderFrame;
@@ -333,6 +333,14 @@ parent:
     sync IsParentWindowMainWidgetVisible() returns (bool visible);
 
     /**
+     * Returns the offset of this tab from the top level window
+     * origin in device pixels.
+     *
+     * aPoint offset values in device pixels.
+     */
+    sync GetTabOffset() returns (LayoutDeviceIntPoint aPoint);
+
+    /**
      * Gets the DPI of the screen corresponding to this browser.
      */
     sync GetDPI() returns (float value);
@@ -372,21 +380,6 @@ parent:
      * but don't open it yet.
      */
     PColorPicker(nsString title, nsString initialColor);
-
-    /**
-     * Initiates an asynchronous request for permission for the
-     * provided principal.
-     *
-     * @param aRequests
-     *   The array of permissions to request.
-     * @param aPrincipal
-     *   The principal of the request.
-     *
-     * NOTE: The principal is untrusted in the parent process. Only
-     *       principals that can live in the content process should
-     *       provided.
-     */
-    PContentPermissionRequest(PermissionRequest[] aRequests, Principal aPrincipal);
 
     PFilePicker(nsString aTitle, int16_t aMode);
 
@@ -473,6 +466,41 @@ parent:
     sync RequestNativeKeyBindings(WidgetKeyboardEvent event)
         returns (MaybeNativeKeyBinding bindings);
 
+    SynthesizeNativeKeyEvent(int32_t aNativeKeyboardLayout,
+                             int32_t aNativeKeyCode,
+                             uint32_t aModifierFlags,
+                             nsString aCharacters,
+                             nsString aUnmodifiedCharacters,
+                             uint64_t aObserverId);
+    SynthesizeNativeMouseEvent(LayoutDeviceIntPoint aPoint,
+                               uint32_t aNativeMessage,
+                               uint32_t aModifierFlags,
+                               uint64_t aObserverId);
+    SynthesizeNativeMouseMove(LayoutDeviceIntPoint aPoint,
+                              uint64_t aObserverId);
+    SynthesizeNativeMouseScrollEvent(LayoutDeviceIntPoint aPoint,
+                                     uint32_t aNativeMessage,
+                                     double aDeltaX,
+                                     double aDeltaY,
+                                     double aDeltaZ,
+                                     uint32_t aModifierFlags,
+                                     uint32_t aAdditionalFlags,
+                                     uint64_t aObserverId);
+    SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                               TouchPointerState aPointerState,
+                               IntPoint aPointerScreenPoint,
+                               double aPointerPressure,
+                               uint32_t aPointerOrientation,
+                               uint64_t aObserverId);
+    SynthesizeNativeTouchTap(IntPoint aPointerScreenPoint,
+                             bool aLongTap,
+                             uint64_t aObserverId);
+    ClearNativeTouchSequence(uint64_t aObserverId);
+child:
+    NativeSynthesisResponse(uint64_t aObserverId, nsCString aResponse);
+
+parent:
+
     /**
      * Child informs the parent that the graphics objects are ready for
      * compositing.  This is sent when all pending changes have been
@@ -496,6 +524,9 @@ parent:
     prio(high) sync DispatchMouseEvent(WidgetMouseEvent event);
     prio(high) sync DispatchKeyboardEvent(WidgetKeyboardEvent event);
 
+    InvokeDragSession(IPCDataTransfer[] transfers, uint32_t action,
+                      nsCString visualData, uint32_t width, uint32_t height,
+                      uint32_t stride, uint8_t format, int32_t dragAreaX, int32_t dragAreaY);
 child:
     /**
      * Notify the remote browser that it has been Show()n on this
@@ -517,8 +548,8 @@ child:
 
     CacheFileDescriptor(nsString path, FileDescriptor fd);
 
-    UpdateDimensions(nsIntRect rect, ScreenIntSize size, ScreenOrientation orientation,
-                     nsIntPoint chromeDisp) compress;
+    UpdateDimensions(IntRect rect, ScreenIntSize size, ScreenOrientation orientation,
+                     LayoutDeviceIntPoint chromeDisp) compress;
 
     UpdateFrame(FrameMetrics frame);
 
@@ -564,6 +595,7 @@ child:
     MouseWheelEvent(WidgetWheelEvent event, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
     RealTouchEvent(WidgetTouchEvent aEvent, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
     RealTouchMoveEvent(WidgetTouchEvent aEvent, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+    RealDragEvent(WidgetDragEvent aEvent, uint32_t aDragAction, uint32_t aDropEffect);
 
     /**
      * @see nsIDOMWindowUtils sendKeyEvent.
@@ -606,7 +638,7 @@ child:
     PDocumentRenderer(nsRect documentRect, Matrix transform,
                       nsString bgcolor,
                       uint32_t renderFlags, bool flushLayout,
-                      nsIntSize renderSize);
+                      IntSize renderSize);
 
     /**
      * Sent by the chrome process when it no longer wants this remote

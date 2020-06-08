@@ -406,49 +406,49 @@ class CodeGeneratorShared : public LElementVisitor
     // instruction [this is purely an optimization].  All other volatiles must
     // be saved and restored in case future LIR instructions need those values.)
     void saveVolatile(Register output) {
-        RegisterSet regs = RegisterSet::Volatile();
+        LiveRegisterSet regs(RegisterSet::Volatile());
         regs.takeUnchecked(output);
         masm.PushRegsInMask(regs);
     }
     void restoreVolatile(Register output) {
-        RegisterSet regs = RegisterSet::Volatile();
+        LiveRegisterSet regs(RegisterSet::Volatile());
         regs.takeUnchecked(output);
         masm.PopRegsInMask(regs);
     }
     void saveVolatile(FloatRegister output) {
-        RegisterSet regs = RegisterSet::Volatile();
+        LiveRegisterSet regs(RegisterSet::Volatile());
         regs.takeUnchecked(output);
         masm.PushRegsInMask(regs);
     }
     void restoreVolatile(FloatRegister output) {
-        RegisterSet regs = RegisterSet::Volatile();
+        LiveRegisterSet regs(RegisterSet::Volatile());
         regs.takeUnchecked(output);
         masm.PopRegsInMask(regs);
     }
-    void saveVolatile(RegisterSet temps) {
-        masm.PushRegsInMask(RegisterSet::VolatileNot(temps));
+    void saveVolatile(LiveRegisterSet temps) {
+        masm.PushRegsInMask(LiveRegisterSet(RegisterSet::VolatileNot(temps.set())));
     }
-    void restoreVolatile(RegisterSet temps) {
-        masm.PopRegsInMask(RegisterSet::VolatileNot(temps));
+    void restoreVolatile(LiveRegisterSet temps) {
+        masm.PopRegsInMask(LiveRegisterSet(RegisterSet::VolatileNot(temps.set())));
     }
     void saveVolatile() {
-        masm.PushRegsInMask(RegisterSet::Volatile());
+        masm.PushRegsInMask(LiveRegisterSet(RegisterSet::Volatile()));
     }
     void restoreVolatile() {
-        masm.PopRegsInMask(RegisterSet::Volatile());
+        masm.PopRegsInMask(LiveRegisterSet(RegisterSet::Volatile()));
     }
 
     // These functions have to be called before and after any callVM and before
     // any modifications of the stack.  Modification of the stack made after
     // these calls should update the framePushed variable, needed by the exit
     // frame produced by callVM.
-    inline void saveLive(LInstruction* ins);
-    inline void restoreLive(LInstruction* ins);
-    inline void restoreLiveIgnore(LInstruction* ins, RegisterSet reg);
+    inline void saveLive(LInstruction *ins);
+    inline void restoreLive(LInstruction *ins);
+    inline void restoreLiveIgnore(LInstruction *ins, LiveRegisterSet reg);
 
     // Save/restore all registers that are both live and volatile.
-    inline void saveLiveVolatile(LInstruction* ins);
-    inline void restoreLiveVolatile(LInstruction* ins);
+    inline void saveLiveVolatile(LInstruction *ins);
+    inline void restoreLiveVolatile(LInstruction *ins);
 
     template <typename T>
     void pushArg(const T& t) {
@@ -643,7 +643,7 @@ class ArgSeq : public SeqType
         return ArgSeq<ThisType, NextType>(*this, last);
     }
 
-    inline void generate(CodeGeneratorShared* codegen) const {
+    inline void generate(CodeGeneratorShared *codegen) const {
         codegen->pushArg(last_);
         this->SeqType::generate(codegen);
     }
@@ -666,7 +666,7 @@ class ArgSeq<void, void>
         return ArgSeq<ThisType, NextType>(*this, last);
     }
 
-    inline void generate(CodeGeneratorShared* codegen) const {
+    inline void generate(CodeGeneratorShared *codegen) const {
     }
 };
 
@@ -682,8 +682,8 @@ struct StoreNothing
 {
     inline void generate(CodeGeneratorShared* codegen) const {
     }
-    inline RegisterSet clobbered() const {
-        return RegisterSet(); // No register gets clobbered
+    inline LiveRegisterSet clobbered() const {
+        return LiveRegisterSet(); // No register gets clobbered
     }
 };
 
@@ -700,8 +700,8 @@ class StoreRegisterTo
     inline void generate(CodeGeneratorShared* codegen) const {
         codegen->storeResultTo(out_);
     }
-    inline RegisterSet clobbered() const {
-        RegisterSet set = RegisterSet();
+    inline LiveRegisterSet clobbered() const {
+        LiveRegisterSet set;
         set.add(out_);
         return set;
     }
@@ -720,8 +720,8 @@ class StoreFloatRegisterTo
     inline void generate(CodeGeneratorShared* codegen) const {
         codegen->storeFloatResultTo(out_);
     }
-    inline RegisterSet clobbered() const {
-        RegisterSet set = RegisterSet();
+    inline LiveRegisterSet clobbered() const {
+        LiveRegisterSet set;
         set.add(out_);
         return set;
     }
@@ -741,8 +741,8 @@ class StoreValueTo_
     inline void generate(CodeGeneratorShared* codegen) const {
         codegen->storeResultValueTo(out_);
     }
-    inline RegisterSet clobbered() const {
-        RegisterSet set = RegisterSet();
+    inline LiveRegisterSet clobbered() const {
+        LiveRegisterSet set;
         set.add(out_);
         return set;
     }

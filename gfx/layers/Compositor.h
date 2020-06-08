@@ -106,7 +106,6 @@
  */
 
 class nsIWidget;
-struct nsIntSize;
 class nsIntRegion;
 
 namespace mozilla {
@@ -121,7 +120,6 @@ namespace layers {
 struct Effect;
 struct EffectChain;
 class Image;
-class ISurfaceAllocator;
 class Layer;
 class TextureSource;
 class DataTextureSource;

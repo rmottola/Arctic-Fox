@@ -35,17 +35,12 @@
 
 using mozilla::media::TimeUnit;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gMediaResourceLog;
 #define RESOURCE_LOG(msg, ...) PR_LOG(gMediaResourceLog, PR_LOG_DEBUG, \
                                       (msg, ##__VA_ARGS__))
 // Debug logging macro with object pointer and class name.
 #define CMLOG(msg, ...) \
         RESOURCE_LOG("%p [ChannelMediaResource]: " msg, this, ##__VA_ARGS__)
-#else
-#define RESOURCE_LOG(msg, ...)
-#define CMLOG(msg, ...)
-#endif
 
 static const uint32_t HTTP_OK_CODE = 200;
 static const uint32_t HTTP_PARTIAL_RESPONSE_CODE = 206;
@@ -81,11 +76,9 @@ ChannelMediaResource::ChannelMediaResource(MediaDecoder* aDecoder,
     mIgnoreResume(false),
     mIsTransportSeekable(true)
 {
-#ifdef PR_LOGGING
   if (!gMediaResourceLog) {
     gMediaResourceLog = PR_NewLogModule("MediaResource");
   }
-#endif
 }
 
 ChannelMediaResource::~ChannelMediaResource()

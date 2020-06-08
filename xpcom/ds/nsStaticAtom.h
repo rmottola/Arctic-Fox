@@ -8,7 +8,7 @@
 
 #include "nsIAtom.h"
 #include "nsStringBuffer.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 typedef char16_t nsStaticAtomStringType;
 

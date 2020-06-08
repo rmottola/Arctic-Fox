@@ -12,7 +12,6 @@
 
 class nsIDOMWindow;
 class nsIGlobalObject;
-class nsIDOMEventListener;
 
 namespace mozilla {
 

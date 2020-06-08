@@ -12,11 +12,11 @@
 #include "nsCOMPtr.h"
 #include "nsAlgorithm.h"
 #include "nsAutoPtr.h"
+#include "nsRect.h"
 #include <algorithm>
 
 #undef DEBUG_TABLE_CELLMAP
 
-class nsTableColFrame;
 class nsTableCellFrame;
 class nsTableRowFrame;
 class nsTableRowGroupFrame;
@@ -24,7 +24,6 @@ class nsTableFrame;
 class nsCellMap;
 class nsPresContext;
 class nsCellMapColumnIterator;
-struct nsIntRect;
 
 struct nsColInfo
 {

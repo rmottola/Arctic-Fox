@@ -24,8 +24,10 @@
 #include "nsBindingManager.h"
 #include "nsGenericHTMLElement.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/dom/Animation.h"
 #include "mozilla/dom/HTMLImageElement.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/dom/KeyframeEffect.h"
 #include "nsWrapperCacheInlines.h"
 #include "nsObjectLoadingContent.h"
 #include "nsDOMMutationObserver.h"
@@ -214,16 +216,16 @@ nsNodeUtils::ContentRemoved(nsINode* aContainer,
 }
 
 static inline Element*
-GetTarget(AnimationPlayer* aPlayer)
+GetTarget(Animation* aAnimation)
 {
-  Animation* source = aPlayer->GetSource();
-  if (!source) {
+  KeyframeEffectReadonly* effect = aAnimation->GetEffect();
+  if (!effect) {
     return nullptr;
   }
 
   Element* target;
   nsCSSPseudoElements::Type pseudoType;
-  source->GetTarget(target, pseudoType);
+  effect->GetTarget(target, pseudoType);
 
   // If the animation targets a pseudo-element, we don't dispatch
   // notifications for it.  (In the future we will have PseudoElement
@@ -232,48 +234,48 @@ GetTarget(AnimationPlayer* aPlayer)
     return nullptr;
   }
 
-  return source->GetTarget();
+  return effect->GetTarget();
 }
 
 void
-nsNodeUtils::AnimationAdded(AnimationPlayer* aPlayer)
+nsNodeUtils::AnimationAdded(Animation* aAnimation)
 {
-  Element* target = GetTarget(aPlayer);
+  Element* target = GetTarget(aAnimation);
   if (!target) {
     return;
   }
   nsIDocument* doc = target->OwnerDoc();
 
   if (doc->MayHaveAnimationObservers()) {
-    IMPL_ANIMATION_NOTIFICATION(AnimationAdded, target, (aPlayer));
+    IMPL_ANIMATION_NOTIFICATION(AnimationAdded, target, (aAnimation));
   }
 }
 
 void
-nsNodeUtils::AnimationChanged(AnimationPlayer* aPlayer)
+nsNodeUtils::AnimationChanged(Animation* aAnimation)
 {
-  Element* target = GetTarget(aPlayer);
+  Element* target = GetTarget(aAnimation);
   if (!target) {
     return;
   }
   nsIDocument* doc = target->OwnerDoc();
 
   if (doc->MayHaveAnimationObservers()) {
-    IMPL_ANIMATION_NOTIFICATION(AnimationChanged, target, (aPlayer));
+    IMPL_ANIMATION_NOTIFICATION(AnimationChanged, target, (aAnimation));
   }
 }
 
 void
-nsNodeUtils::AnimationRemoved(AnimationPlayer* aPlayer)
+nsNodeUtils::AnimationRemoved(Animation* aAnimation)
 {
-  Element* target = GetTarget(aPlayer);
+  Element* target = GetTarget(aAnimation);
   if (!target) {
     return;
   }
   nsIDocument* doc = target->OwnerDoc();
 
   if (doc->MayHaveAnimationObservers()) {
-    IMPL_ANIMATION_NOTIFICATION(AnimationRemoved, target, (aPlayer));
+    IMPL_ANIMATION_NOTIFICATION(AnimationRemoved, target, (aAnimation));
   }
 }
 

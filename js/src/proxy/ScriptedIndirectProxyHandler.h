@@ -20,10 +20,10 @@ class ScriptedIndirectProxyHandler : public BaseProxyHandler
     { }
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
-                                MutableHandle<JSPropertyDescriptor> desc,
+    virtual bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+                                Handle<JSPropertyDescriptor> desc,
                                 ObjectOpResult &result) const override;
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
                                  AutoIdVector& props) const override;
@@ -37,8 +37,8 @@ class ScriptedIndirectProxyHandler : public BaseProxyHandler
     virtual bool has(JSContext *cx, HandleObject proxy, HandleId id, bool *bp) const override;
     virtual bool get(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
                      MutableHandleValue vp) const override;
-    virtual bool set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
-                     MutableHandleValue vp, ObjectOpResult &result) const override;
+    virtual bool set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v,
+                     HandleValue receiver, ObjectOpResult &result) const override;
 
     /* SpiderMonkey extensions. */
     virtual bool getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
@@ -55,8 +55,8 @@ class ScriptedIndirectProxyHandler : public BaseProxyHandler
     static const ScriptedIndirectProxyHandler singleton;
 
 private:
-    bool derivedSet(JSContext* cx, HandleObject proxy, HandleObject receiver, HandleId id,
-                    MutableHandleValue vp, ObjectOpResult &result) const;
+    bool derivedSet(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v,
+                    HandleValue receiver, ObjectOpResult &result) const;
 };
 
 /* Derived class to handle Proxy.createFunction() */

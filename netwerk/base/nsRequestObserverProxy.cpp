@@ -9,13 +9,11 @@
 #include "nsRequestObserverProxy.h"
 #include "nsIRequest.h"
 #include "nsAutoPtr.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 using namespace mozilla;
 
-#if defined(PR_LOGGING)
 static PRLogModuleInfo *gRequestObserverProxyLog;
-#endif
 
 #undef LOG
 #define LOG(args) PR_LOG(gRequestObserverProxyLog, PR_LOG_DEBUG, args)
@@ -176,10 +174,8 @@ nsRequestObserverProxy::Init(nsIRequestObserver *observer, nsISupports *context)
 {
     NS_ENSURE_ARG_POINTER(observer);
 
-#if defined(PR_LOGGING)
     if (!gRequestObserverProxyLog)
         gRequestObserverProxyLog = PR_NewLogModule("nsRequestObserverProxy");
-#endif
 
     mObserver = new nsMainThreadPtrHolder<nsIRequestObserver>(observer);
     mContext = new nsMainThreadPtrHolder<nsISupports>(context);

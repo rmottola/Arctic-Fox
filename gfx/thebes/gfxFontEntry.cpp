@@ -6,7 +6,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsServiceManagerUtils.h"
 #include "nsExpirationTracker.h"
@@ -679,6 +679,33 @@ gfxFontEntry::ShareFontTableAndGetBlob(uint32_t aTag,
     }
 
     return entry->ShareTableAndGetBlob(*aBuffer, mFontTableCache);
+}
+
+static int
+DirEntryCmp(const void* aKey, const void* aItem)
+{
+    int32_t tag = *static_cast<const int32_t*>(aKey);
+    const TableDirEntry* entry = static_cast<const TableDirEntry*>(aItem);
+    return tag - int32_t(entry->tag);
+}
+
+hb_blob_t*
+gfxFontEntry::GetTableFromFontData(const void* aFontData, uint32_t aTableTag)
+{
+    const SFNTHeader* header =
+        reinterpret_cast<const SFNTHeader*>(aFontData);
+    const TableDirEntry* dir =
+        reinterpret_cast<const TableDirEntry*>(header + 1);
+    dir = static_cast<const TableDirEntry*>
+        (bsearch(&aTableTag, dir, uint16_t(header->numTables),
+                 sizeof(TableDirEntry), DirEntryCmp));
+    if (dir) {
+        return hb_blob_create(reinterpret_cast<const char*>(aFontData) +
+                                  dir->offset, dir->length,
+                              HB_MEMORY_MODE_READONLY, nullptr, nullptr);
+
+    }
+    return nullptr;
 }
 
 already_AddRefed<gfxCharacterMap>
@@ -1468,7 +1495,7 @@ gfxFontFamily::FindFontForChar(GlobalFontMatch *aMatchData)
         if (fe->HasCharacter(aMatchData->mCh)) {
             rank += RANK_MATCHED_CMAP;
             aMatchData->mCount++;
-#ifdef PR_LOGGING
+
             PRLogModuleInfo *log = gfxPlatform::GetLog(eGfxLog_textrun);
 
             if (MOZ_UNLIKELY(PR_LOG_TEST(log, PR_LOG_DEBUG))) {
@@ -1481,7 +1508,6 @@ gfxFontFamily::FindFontForChar(GlobalFontMatch *aMatchData)
                         unicodeRange, script,
                         NS_ConvertUTF16toUTF8(fe->Name()).get()));
             }
-#endif
         }
 
         aMatchData->mCmapsTested++;

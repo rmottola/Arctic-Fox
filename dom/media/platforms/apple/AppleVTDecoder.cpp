@@ -16,16 +16,12 @@
 #include "mozilla/ArrayUtils.h"
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "VideoUtils.h"
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetAppleMediaLog();
 #define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
-#else
-#define LOG(...)
-#endif
 
 #ifdef LOG_MEDIA_SHA1
 #include "mozilla/SHA1.h"

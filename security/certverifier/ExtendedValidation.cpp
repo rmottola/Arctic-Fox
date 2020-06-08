@@ -10,16 +10,13 @@
 #include "certdb.h"
 #include "base64.h"
 #include "hasht.h"
-#include "pkix/stdkeywords.h"
 #include "pkix/pkixtypes.h"
 #include "pk11pub.h"
 #include "secerr.h"
 #include "prerror.h"
 #include "prinit.h"
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 #define CONST_OID static const unsigned char
 #define OI(x) { siDEROID, (unsigned char*) x, sizeof x }

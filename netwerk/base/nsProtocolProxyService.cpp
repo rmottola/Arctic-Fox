@@ -18,6 +18,7 @@
 #include "nsICancelable.h"
 #include "nsIDNSService.h"
 #include "nsPIDNSService.h"
+#include "nsIScriptSecurityManager.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
 #include "nsThreadUtils.h"
@@ -46,9 +47,7 @@ namespace mozilla {
 
 using namespace mozilla;
 
-#include "prlog.h"
-#if defined(PR_LOGGING)
-#endif
+#include "mozilla/Logging.h"
 #undef LOG
 #define LOG(args) PR_LOG(net::GetProxyLog(), PR_LOG_DEBUG, args)
 
@@ -467,7 +466,6 @@ nsProtocolProxyService::Init()
         // register for shutdown notification so we can clean ourselves up
         // properly.
         obs->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
-
         obs->AddObserver(this, NS_NETWORK_LINK_TOPIC, false);
     }
 
@@ -540,6 +538,13 @@ nsProtocolProxyService::Observe(nsISupports     *aSubject,
             mPACMan->Shutdown();
             mPACMan = nullptr;
         }
+
+        nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+        if (obs) {
+            obs->RemoveObserver(this, NS_NETWORK_LINK_TOPIC);
+            obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID);
+        }
+
     } else if (strcmp(aTopic, NS_NETWORK_LINK_TOPIC) == 0) {
         nsCString converted = NS_ConvertUTF16toUTF8(aData);
         const char *state = converted.get();
@@ -1310,11 +1315,22 @@ nsProtocolProxyService::AsyncResolve(nsISupports *channelOrURI, uint32_t flags,
             return NS_ERROR_NO_INTERFACE;
         }
 
-        // make a temporary channel from the URI
-        nsCOMPtr<nsIIOService> ios(do_GetIOService(&rv));
-        if (NS_FAILED(rv)) return rv;
-        rv = ios->NewChannelFromURI(uri, getter_AddRefs(channel));
-        if (NS_FAILED(rv)) return rv;
+        nsCOMPtr<nsIScriptSecurityManager> secMan(
+            do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv));
+        NS_ENSURE_SUCCESS(rv, rv);
+        nsCOMPtr<nsIPrincipal> systemPrincipal;
+        rv = secMan->GetSystemPrincipal(getter_AddRefs(systemPrincipal));
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // creating a temporary channel from the URI which is not
+        // used to perform any network loads, hence its safe to
+        // use systemPrincipal as the loadingPrincipal.
+        rv = NS_NewChannel(getter_AddRefs(channel),
+                           uri,
+                           systemPrincipal,
+                           nsILoadInfo::SEC_NORMAL,
+                           nsIContentPolicy::TYPE_OTHER);
+        NS_ENSURE_SUCCESS(rv, rv);
     }
 
     return AsyncResolveInternal(channel, flags, callback, result, false);
@@ -1892,11 +1908,11 @@ nsProtocolProxyService::ApplyFilters(nsIChannel *channel,
     // somewhat inefficient, but it seems like a good idea since we want each
     // filter to "see" a valid proxy list.
 
-    nsresult rv;
     nsCOMPtr<nsIProxyInfo> result;
 
     for (FilterLink *iter = mFilters; iter; iter = iter->next) {
         PruneProxyInfo(info, list);
+        nsresult rv = NS_OK;
         if (iter->filter) {
           nsCOMPtr<nsIURI> uri;
           rv = GetProxyURI(channel, getter_AddRefs(uri));

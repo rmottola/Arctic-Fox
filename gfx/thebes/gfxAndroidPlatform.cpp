@@ -132,8 +132,7 @@ gfxAndroidPlatform::CreateOffscreenSurface(const IntSize& size,
                                            gfxContentType contentType)
 {
     nsRefPtr<gfxASurface> newSurface;
-    newSurface = new gfxImageSurface(ThebesIntSize(size),
-                                     OptimalFormatForContent(contentType));
+    newSurface = new gfxImageSurface(size, OptimalFormatForContent(contentType));
 
     return newSurface.forget();
 }
@@ -248,9 +247,9 @@ gfxAndroidPlatform::GetFontList(nsIAtom *aLangGroup,
 }
 
 void
-gfxAndroidPlatform::GetFontList(InfallibleTArray<FontListEntry>* retValue)
+gfxAndroidPlatform::GetSystemFontList(InfallibleTArray<FontListEntry>* retValue)
 {
-    gfxFT2FontList::PlatformFontList()->GetFontList(retValue);
+    gfxFT2FontList::PlatformFontList()->GetSystemFontList(retValue);
 }
 
 nsresult

@@ -18,15 +18,13 @@
 #include "nsQAppInstance.h"
 
 #ifdef MOZ_LOGGING
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #endif
 
-#ifdef PR_LOGGING
 PRLogModuleInfo *gWidgetLog = nullptr;
 PRLogModuleInfo *gWidgetFocusLog = nullptr;
 PRLogModuleInfo *gWidgetIMLog = nullptr;
 PRLogModuleInfo *gWidgetDrawLog = nullptr;
-#endif
 
 static int sPokeEvent;
 
@@ -38,7 +36,6 @@ nsAppShell::~nsAppShell()
 nsresult
 nsAppShell::Init()
 {
-#ifdef PR_LOGGING
     if (!gWidgetLog)
         gWidgetLog = PR_NewLogModule("Widget");
     if (!gWidgetFocusLog)
@@ -47,7 +44,7 @@ nsAppShell::Init()
         gWidgetIMLog = PR_NewLogModule("WidgetIM");
     if (!gWidgetDrawLog)
         gWidgetDrawLog = PR_NewLogModule("WidgetDraw");
-#endif
+
     sPokeEvent = QEvent::registerEventType();
 
     nsQAppInstance::AddRef();

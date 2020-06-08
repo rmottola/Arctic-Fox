@@ -35,9 +35,7 @@ class nsAutoRefTraits<SpeexResamplerState> : public nsPointerRefTraits<SpeexResa
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gMediaStreamGraphLog;
-#endif
 
 /*
  * MediaStreamGraph is a framework for synchronized audio/video processing
@@ -248,7 +246,6 @@ class MediaInputPort;
 class AudioNodeEngine;
 class AudioNodeExternalInputStream;
 class AudioNodeStream;
-struct AudioChunk;
 class CameraPreviewMediaStream;
 
 /**

@@ -37,16 +37,11 @@
 #include "mozilla/dom/ElementBinding.h"
 #include "Units.h"
 
-class nsIDOMEventListener;
 class nsIFrame;
 class nsIDOMMozNamedAttrMap;
-class nsIDOMCSSStyleDeclaration;
 class nsIURI;
-class nsIControllers;
-class nsEventChainVisitor;
 class nsIScrollableFrame;
 class nsAttrValueOrString;
-class ContentUnbinder;
 class nsContentList;
 class nsDOMSettableTokenList;
 class nsDOMTokenList;
@@ -121,7 +116,7 @@ class EventStateManager;
 
 namespace dom {
 
-class AnimationPlayer;
+class Animation;
 class Link;
 class UndoManager;
 class DOMRect;
@@ -840,7 +835,7 @@ public:
   {
   }
 
-  void GetAnimations(nsTArray<nsRefPtr<AnimationPlayer> >& aAnimations);
+  void GetAnimations(nsTArray<nsRefPtr<Animation>>& aAnimations);
 
   NS_IMETHOD GetInnerHTML(nsAString& aInnerHTML);
   virtual void SetInnerHTML(const nsAString& aInnerHTML, ErrorResult& aError);

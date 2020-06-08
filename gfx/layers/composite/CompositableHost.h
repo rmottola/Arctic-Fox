@@ -28,9 +28,6 @@
 #include "nscore.h"                     // for nsACString
 #include "Units.h"                      // for CSSToScreenScale
 
-struct nsIntPoint;
-struct nsIntRect;
-
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
@@ -40,9 +37,7 @@ class DataSourceSurface;
 namespace layers {
 
 class Layer;
-class SurfaceDescriptor;
 class Compositor;
-class ISurfaceAllocator;
 class ThebesBufferData;
 class TiledLayerComposer;
 class CompositableParentManager;
@@ -108,7 +103,7 @@ public:
 
   virtual LayerRenderState GetRenderState() = 0;
 
-  virtual void SetPictureRect(const nsIntRect& aPictureRect)
+  virtual void SetPictureRect(const gfx::IntRect& aPictureRect)
   {
     MOZ_ASSERT(false, "Should have been overridden");
   }

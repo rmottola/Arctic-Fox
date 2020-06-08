@@ -29,9 +29,7 @@ namespace layers {
  * the main thread and the compositor thread context. It's primary
  * purpose is to manage the PLayerTransaction sub protocol.
  */
-// This should really be 'sync', but we're using 'rpc' as a workaround
-// for Bug 716631.
-intr protocol PCompositor
+sync protocol PCompositor
 {
   // A Compositor manages a single Layer Manager (PLayerTransaction)
   manages PLayerTransaction;
@@ -62,7 +60,7 @@ child:
    * application on the widgets. Used on Windows and Linux in managing
    * plugin widgets.
    */
-  async UpdatePluginConfigurations(nsIntPoint aContentOffset,
+  async UpdatePluginConfigurations(IntPoint aContentOffset,
                                    nsIntRegion aVisibleRegion,
                                    PluginWindowData[] aPlugins);
 
@@ -97,7 +95,7 @@ parent:
   //
   // NB: this message will result in animations, transforms, effects,
   // and so forth being interpolated.  That's what we want to happen.
-  sync MakeSnapshot(SurfaceDescriptor inSnapshot, nsIntRect dirtyRect);
+  sync MakeSnapshot(SurfaceDescriptor inSnapshot, IntRect dirtyRect);
 
   // Make sure any pending composites are started immediately and
   // block until they are completed.

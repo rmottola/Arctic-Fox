@@ -125,7 +125,7 @@ class ScaleRunner : public nsRunnable
 public:
   ScaleRunner(RasterImage* aImage,
               uint32_t aImageFlags,
-              const nsIntSize& aSize,
+              const IntSize& aSize,
               RawAccessFrameRef&& aSrcRef)
     : mImage(aImage)
     , mSrcRef(Move(aSrcRef))
@@ -165,7 +165,7 @@ public:
     // Insert the new surface into the cache immediately. We need to do this so
     // that we won't start multiple scaling jobs for the same size.
     SurfaceCache::Insert(mDstRef.get(), ImageKey(mImage.get()),
-                         RasterSurfaceKey(mDstSize.ToIntSize(), mImageFlags, 0),
+                         RasterSurfaceKey(mDstSize, mImageFlags, 0),
                          Lifetime::Transient);
 
     return true;
@@ -214,7 +214,7 @@ public:
 
       // Remove the frame from the cache since we know we don't need it.
       SurfaceCache::RemoveSurface(ImageKey(mImage.get()),
-                                  RasterSurfaceKey(mDstSize.ToIntSize(),
+                                  RasterSurfaceKey(mDstSize,
                                                    mImageFlags, 0));
 
       // Release everything we're holding, too.
@@ -238,7 +238,7 @@ private:
   WeakPtr<RasterImage> mImage;
   RawAccessFrameRef    mSrcRef;
   RawAccessFrameRef    mDstRef;
-  const nsIntSize      mDstSize;
+  const IntSize      mDstSize;
   uint32_t             mImageFlags;
   ScaleState           mState;
 };
@@ -260,6 +260,7 @@ RasterImage::RasterImage(ProgressTracker* aProgressTracker,
   mLockCount(0),
   mDecodeCount(0),
   mRequestedSampleSize(0),
+  mLastImageContainerDrawResult(DrawResult::NOT_READY),
 #ifdef DEBUG
   mFramesNotified(0),
 #endif
@@ -464,16 +465,8 @@ RasterImage::GetType(uint16_t *aType)
 {
   NS_ENSURE_ARG_POINTER(aType);
 
-  *aType = GetType();
+  *aType = imgIContainer::TYPE_RASTER;
   return NS_OK;
-}
-
-//******************************************************************************
-/* [noscript, notxpcom] uint16_t GetType(); */
-NS_IMETHODIMP_(uint16_t)
-RasterImage::GetType()
-{
-  return imgIContainer::TYPE_RASTER;
 }
 
 DrawableFrameRef
@@ -521,14 +514,13 @@ RasterImage::LookupFrameInternal(uint32_t aFrameNum,
 
 DrawableFrameRef
 RasterImage::LookupFrame(uint32_t aFrameNum,
-                         const nsIntSize& aSize,
+                         const IntSize& aSize,
                          uint32_t aFlags)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   IntSize requestedSize = CanDownscaleDuringDecode(aSize, aFlags)
-                        ? aSize.ToIntSize()
-                        : mSize.ToIntSize();
+                        ? aSize : mSize;
 
   DrawableFrameRef ref = LookupFrameInternal(aFrameNum, requestedSize, aFlags);
 
@@ -541,7 +533,7 @@ RasterImage::LookupFrame(uint32_t aFrameNum,
     // The OS threw this frame away. We need to redecode if we can.
     MOZ_ASSERT(!mAnim, "Animated frames should be locked");
 
-    Decode(Some(ThebesIntSize(requestedSize)), aFlags);
+    Decode(Some(requestedSize), aFlags);
 
     // If we can sync decode, we should already have the frame.
     if (aFlags & FLAG_SYNC_DECODE) {
@@ -586,7 +578,7 @@ RasterImage::GetRequestedFrameIndex(uint32_t aWhichFrame) const
   return aWhichFrame == FRAME_FIRST ? 0 : GetCurrentFrameIndex();
 }
 
-nsIntRect
+IntRect
 RasterImage::GetFirstFrameRect()
 {
   if (mAnim) {
@@ -594,7 +586,7 @@ RasterImage::GetFirstFrameRect()
   }
 
   // Fall back to our size. This is implicitly zero-size if !mHasSize.
-  return nsIntRect(nsIntPoint(0,0), mSize);
+  return IntRect(IntPoint(0,0), mSize);
 }
 
 NS_IMETHODIMP_(bool)
@@ -715,7 +707,7 @@ RasterImage::CopyFrame(uint32_t aWhichFrame, uint32_t aFlags)
     return nullptr;
   }
 
-  nsIntRect intFrameRect = frameRef->GetRect();
+  IntRect intFrameRect = frameRef->GetRect();
   Rect rect(intFrameRect.x, intFrameRect.y,
             intFrameRect.width, intFrameRect.height);
   if (frameRef->IsSinglePixel()) {
@@ -745,19 +737,21 @@ NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 RasterImage::GetFrame(uint32_t aWhichFrame,
                       uint32_t aFlags)
 {
-  return GetFrameInternal(aWhichFrame, aFlags);
+  return GetFrameInternal(aWhichFrame, aFlags).second().forget();
 }
 
-already_AddRefed<SourceSurface>
+Pair<DrawResult, RefPtr<SourceSurface>>
 RasterImage::GetFrameInternal(uint32_t aWhichFrame, uint32_t aFlags)
 {
   MOZ_ASSERT(aWhichFrame <= FRAME_MAX_VALUE);
 
-  if (aWhichFrame > FRAME_MAX_VALUE)
-    return nullptr;
+  if (aWhichFrame > FRAME_MAX_VALUE) {
+    return MakePair(DrawResult::BAD_ARGS, RefPtr<SourceSurface>());
+  }
 
-  if (mError)
-    return nullptr;
+  if (mError) {
+    return MakePair(DrawResult::BAD_IMAGE, RefPtr<SourceSurface>());
+  }
 
   // Get the frame. If it's not there, it's probably the caller's fault for
   // not waiting for the data to be loaded from the network or not passing
@@ -766,13 +760,13 @@ RasterImage::GetFrameInternal(uint32_t aWhichFrame, uint32_t aFlags)
     LookupFrame(GetRequestedFrameIndex(aWhichFrame), mSize, aFlags);
   if (!frameRef) {
     // The OS threw this frame away and we couldn't redecode it.
-    return nullptr;
+    return MakePair(DrawResult::TEMPORARY_ERROR, RefPtr<SourceSurface>());
   }
 
   // If this frame covers the entire image, we can just reuse its existing
   // surface.
   RefPtr<SourceSurface> frameSurf;
-  nsIntRect frameRect = frameRef->GetRect();
+  IntRect frameRect = frameRef->GetRect();
   if (frameRect.x == 0 && frameRect.y == 0 &&
       frameRect.width == mSize.width &&
       frameRect.height == mSize.height) {
@@ -785,50 +779,57 @@ RasterImage::GetFrameInternal(uint32_t aWhichFrame, uint32_t aFlags)
     frameSurf = CopyFrame(aWhichFrame, aFlags);
   }
 
-  return frameSurf.forget();
+  if (!frameRef->IsImageComplete()) {
+    return MakePair(DrawResult::INCOMPLETE, Move(frameSurf));
+  }
+
+  return MakePair(DrawResult::SUCCESS, Move(frameSurf));
 }
 
-already_AddRefed<layers::Image>
-RasterImage::GetCurrentImage(ImageContainer* aContainer)
+Pair<DrawResult, nsRefPtr<layers::Image>>
+RasterImage::GetCurrentImage(ImageContainer* aContainer, uint32_t aFlags)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aContainer);
 
-  RefPtr<SourceSurface> surface =
-    GetFrameInternal(FRAME_CURRENT, FLAG_ASYNC_NOTIFY);
-  if (!surface) {
+  auto result = GetFrameInternal(FRAME_CURRENT, aFlags | FLAG_ASYNC_NOTIFY);
+  if (!result.second()) {
     // The OS threw out some or all of our buffer. We'll need to wait for the
     // redecode (which was automatically triggered by GetFrame) to complete.
-    return nullptr;
+    return MakePair(result.first(), nsRefPtr<layers::Image>());
   }
 
   CairoImage::Data cairoData;
   GetWidth(&cairoData.mSize.width);
   GetHeight(&cairoData.mSize.height);
-  cairoData.mSourceSurface = surface;
+  cairoData.mSourceSurface = result.second();
 
   nsRefPtr<layers::Image> image =
     aContainer->CreateImage(ImageFormat::CAIRO_SURFACE);
-  NS_ASSERTION(image, "Failed to create Image");
+  MOZ_ASSERT(image);
 
   static_cast<CairoImage*>(image.get())->SetData(cairoData);
 
-  return image.forget();
+  return MakePair(result.first(), Move(image));
 }
 
 
-NS_IMETHODIMP
-RasterImage::GetImageContainer(LayerManager* aManager, ImageContainer **_retval)
+NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
+RasterImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aManager);
+  MOZ_ASSERT((aFlags & ~(FLAG_SYNC_DECODE |
+                         FLAG_SYNC_DECODE_IF_FAST |
+                         FLAG_ASYNC_NOTIFY))
+               == FLAG_NONE,
+             "Unsupported flag passed to GetImageContainer");
 
   int32_t maxTextureSize = aManager->GetMaxTextureSize();
   if (!mHasSize ||
       mSize.width > maxTextureSize ||
       mSize.height > maxTextureSize) {
-    *_retval = nullptr;
-    return NS_OK;
+    return nullptr;
   }
 
   if (IsUnlocked() && mProgressTracker) {
@@ -836,28 +837,34 @@ RasterImage::GetImageContainer(LayerManager* aManager, ImageContainer **_retval)
   }
 
   nsRefPtr<layers::ImageContainer> container = mImageContainer.get();
-  if (container) {
-    container.forget(_retval);
-    return NS_OK;
+
+  bool mustRedecode =
+    (aFlags & (FLAG_SYNC_DECODE | FLAG_SYNC_DECODE_IF_FAST)) &&
+    mLastImageContainerDrawResult != DrawResult::SUCCESS &&
+    mLastImageContainerDrawResult != DrawResult::BAD_IMAGE;
+
+  if (container && !mustRedecode) {
+    return container.forget();
   }
 
   // We need a new ImageContainer, so create one.
   container = LayerManager::CreateImageContainer();
 
-  nsRefPtr<layers::Image> image = GetCurrentImage(container);
-  if (!image) {
-    return NS_ERROR_NOT_AVAILABLE;
+  auto result = GetCurrentImage(container, aFlags);
+  if (!result.second()) {
+    // We couldn't get an Image.
+    return nullptr;
   }
 
-  // |image| holds a reference to a SourceSurface which in turn holds a lock on
-  // the current frame's VolatileBuffer, ensuring that it doesn't get freed as
-  // long as the layer system keeps this ImageContainer alive.
-  container->SetCurrentImageInTransaction(image);
+  // |result.second()| holds a reference to a SourceSurface which in turn holds
+  // a lock on the current frame's VolatileBuffer, ensuring that it doesn't get
+  // freed as long as the layer system keeps this ImageContainer alive.
+  container->SetCurrentImageInTransaction(result.second());
 
+  mLastImageContainerDrawResult = result.first();
   mImageContainer = container;
-  container.forget(_retval);
 
-  return NS_OK;
+  return container.forget();
 }
 
 void
@@ -870,12 +877,14 @@ RasterImage::UpdateImageContainer()
     return;
   }
 
-  nsRefPtr<layers::Image> image = GetCurrentImage(container);
-  if (!image) {
+  auto result = GetCurrentImage(container, FLAG_NONE);
+  if (!result.second()) {
+    // We couldn't get an Image.
     return;
   }
 
-  container->SetCurrentImage(image);
+  mLastImageContainerDrawResult = result.first();
+  container->SetCurrentImage(result.second());
 }
 
 size_t
@@ -901,7 +910,7 @@ class OnAddedFrameRunnable : public nsRunnable
 public:
   OnAddedFrameRunnable(RasterImage* aImage,
                        uint32_t aNewFrameCount,
-                       const nsIntRect& aNewRefreshArea)
+                       const IntRect& aNewRefreshArea)
     : mImage(aImage)
     , mNewFrameCount(aNewFrameCount)
     , mNewRefreshArea(aNewRefreshArea)
@@ -918,12 +927,12 @@ public:
 private:
   nsRefPtr<RasterImage> mImage;
   uint32_t mNewFrameCount;
-  nsIntRect mNewRefreshArea;
+  IntRect mNewRefreshArea;
 };
 
 void
 RasterImage::OnAddedFrame(uint32_t aNewFrameCount,
-                          const nsIntRect& aNewRefreshArea)
+                          const IntRect& aNewRefreshArea)
 {
   if (!NS_IsMainThread()) {
     nsCOMPtr<nsIRunnable> runnable =
@@ -942,7 +951,7 @@ RasterImage::OnAddedFrame(uint32_t aNewFrameCount,
     if (aNewFrameCount == 2) {
       // We're becoming animated, so initialize animation stuff.
       MOZ_ASSERT(!mAnim, "Already have animation state?");
-      mAnim = MakeUnique<FrameAnimator>(this, mSize.ToIntSize(), mAnimationMode);
+      mAnim = MakeUnique<FrameAnimator>(this, mSize, mAnimationMode);
 
       // We don't support discarding animated images (See bug 414259).
       // Lock the image and throw away the key.
@@ -1135,8 +1144,8 @@ RasterImage::SetLoopCount(int32_t aLoopCount)
   }
 }
 
-NS_IMETHODIMP_(nsIntRect)
-RasterImage::GetImageSpaceInvalidationRect(const nsIntRect& aRect)
+NS_IMETHODIMP_(IntRect)
+RasterImage::GetImageSpaceInvalidationRect(const IntRect& aRect)
 {
   return aRect;
 }
@@ -1336,7 +1345,7 @@ RasterImage::CanDiscard() {
 
 // Sets up a decoder for this image.
 already_AddRefed<Decoder>
-RasterImage::CreateDecoder(const Maybe<nsIntSize>& aSize, uint32_t aFlags)
+RasterImage::CreateDecoder(const Maybe<IntSize>& aSize, uint32_t aFlags)
 {
   // Make sure we actually get size before doing a full decode.
   if (aSize) {
@@ -1484,7 +1493,7 @@ RasterImage::StartDecoding()
 }
 
 NS_IMETHODIMP
-RasterImage::RequestDecodeForSize(const nsIntSize& aSize, uint32_t aFlags)
+RasterImage::RequestDecodeForSize(const IntSize& aSize, uint32_t aFlags)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -1499,7 +1508,7 @@ RasterImage::RequestDecodeForSize(const nsIntSize& aSize, uint32_t aFlags)
 
   // Fall back to our intrinsic size if we don't support
   // downscale-during-decode.
-  nsIntSize targetSize = mDownscaleDuringDecode ? aSize : mSize;
+  IntSize targetSize = mDownscaleDuringDecode ? aSize : mSize;
 
   // Decide whether to sync decode images we can decode quickly. Here we are
   // explicitly trading off flashing for responsiveness in the case that we're
@@ -1519,7 +1528,7 @@ RasterImage::RequestDecodeForSize(const nsIntSize& aSize, uint32_t aFlags)
 }
 
 NS_IMETHODIMP
-RasterImage::Decode(const Maybe<nsIntSize>& aSize, uint32_t aFlags)
+RasterImage::Decode(const Maybe<IntSize>& aSize, uint32_t aFlags)
 {
   MOZ_ASSERT(!aSize || NS_IsMainThread());
 
@@ -1582,7 +1591,7 @@ RasterImage::Decode(const Maybe<nsIntSize>& aSize, uint32_t aFlags)
 }
 
 void
-RasterImage::RecoverFromLossOfFrames(const nsIntSize& aSize, uint32_t aFlags)
+RasterImage::RecoverFromLossOfFrames(const IntSize& aSize, uint32_t aFlags)
 {
   if (!mHasSize) {
     return;
@@ -1607,7 +1616,7 @@ RasterImage::RecoverFromLossOfFrames(const nsIntSize& aSize, uint32_t aFlags)
 
 bool
 RasterImage::CanScale(GraphicsFilter aFilter,
-                      const nsIntSize& aSize,
+                      const IntSize& aSize,
                       uint32_t aFlags)
 {
 #ifndef MOZ_ENABLE_SKIA
@@ -1651,7 +1660,7 @@ RasterImage::CanScale(GraphicsFilter aFilter,
   }
 
   // There's no point in scaling if we can't store the result.
-  if (!SurfaceCache::CanHold(aSize.ToIntSize())) {
+  if (!SurfaceCache::CanHold(aSize)) {
     return false;
   }
 
@@ -1667,7 +1676,7 @@ RasterImage::CanScale(GraphicsFilter aFilter,
 }
 
 bool
-RasterImage::CanDownscaleDuringDecode(const nsIntSize& aSize, uint32_t aFlags)
+RasterImage::CanDownscaleDuringDecode(const IntSize& aSize, uint32_t aFlags)
 {
   // Check basic requirements: downscale-during-decode is enabled for this
   // image, we have all the source data and know our size, the flags allow us to
@@ -1693,7 +1702,7 @@ RasterImage::CanDownscaleDuringDecode(const nsIntSize& aSize, uint32_t aFlags)
   }
 
   // There's no point in scaling if we can't store the result.
-  if (!SurfaceCache::CanHold(aSize.ToIntSize())) {
+  if (!SurfaceCache::CanHold(aSize)) {
     return false;
   }
 
@@ -1705,13 +1714,13 @@ RasterImage::NotifyNewScaledFrame()
 {
   // Send an invalidation so observers will repaint and can take advantage of
   // the new scaled frame if possible.
-  NotifyProgress(NoProgress, nsIntRect(0, 0, mSize.width, mSize.height));
+  NotifyProgress(NoProgress, IntRect(0, 0, mSize.width, mSize.height));
 }
 
 void
 RasterImage::RequestScale(imgFrame* aFrame,
                           uint32_t aFlags,
-                          const nsIntSize& aSize)
+                          const IntSize& aSize)
 {
   // We don't scale frames which aren't fully decoded.
   if (!aFrame->IsImageComplete()) {
@@ -1744,7 +1753,7 @@ RasterImage::RequestScale(imgFrame* aFrame,
 DrawResult
 RasterImage::DrawWithPreDownscaleIfNeeded(DrawableFrameRef&& aFrameRef,
                                           gfxContext* aContext,
-                                          const nsIntSize& aSize,
+                                          const IntSize& aSize,
                                           const ImageRegion& aRegion,
                                           GraphicsFilter aFilter,
                                           uint32_t aFlags)
@@ -1754,7 +1763,7 @@ RasterImage::DrawWithPreDownscaleIfNeeded(DrawableFrameRef&& aFrameRef,
   if (CanScale(aFilter, aSize, aFlags)) {
     frameRef =
       SurfaceCache::Lookup(ImageKey(this),
-                           RasterSurfaceKey(aSize.ToIntSize(),
+                           RasterSurfaceKey(aSize,
                                             DecodeFlags(aFlags),
                                             0));
     if (!frameRef) {
@@ -1782,7 +1791,7 @@ RasterImage::DrawWithPreDownscaleIfNeeded(DrawableFrameRef&& aFrameRef,
   // adjust the drawing parameters accordingly.
   IntSize finalSize = frameRef->GetImageSize();
   bool couldRedecodeForBetterFrame = false;
-  if (ThebesIntSize(finalSize) != aSize) {
+  if (finalSize != aSize) {
     gfx::Size scale(double(aSize.width) / finalSize.width,
                     double(aSize.height) / finalSize.height);
     aContext->Multiply(gfxMatrix::Scaling(scale.width, scale.height));
@@ -1810,14 +1819,14 @@ RasterImage::DrawWithPreDownscaleIfNeeded(DrawableFrameRef&& aFrameRef,
  *                      in gfxGraphicsFilter aFilter,
  *                      [const] in gfxMatrix aUserSpaceToImageSpace,
  *                      [const] in gfxRect aFill,
- *                      [const] in nsIntRect aSubimage,
- *                      [const] in nsIntSize aViewportSize,
+ *                      [const] in IntRect aSubimage,
+ *                      [const] in IntSize aViewportSize,
  *                      [const] in SVGImageContext aSVGContext,
  *                      in uint32_t aWhichFrame,
  *                      in uint32_t aFlags); */
 NS_IMETHODIMP_(DrawResult)
 RasterImage::Draw(gfxContext* aContext,
-                  const nsIntSize& aSize,
+                  const IntSize& aSize,
                   const ImageRegion& aRegion,
                   uint32_t aWhichFrame,
                   GraphicsFilter aFilter,
@@ -2032,7 +2041,7 @@ RasterImage::GetFramesNotified(uint32_t *aFramesNotified)
 
 void
 RasterImage::NotifyProgress(Progress aProgress,
-                            const nsIntRect& aInvalidRect /* = nsIntRect() */,
+                            const IntRect& aInvalidRect /* = IntRect() */,
                             uint32_t aFlags /* = DECODE_FLAGS_DEFAULT */)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -2122,7 +2131,7 @@ RasterImage::Unwrap()
   return self.forget();
 }
 
-nsIntSize
+IntSize
 RasterImage::OptimalImageSizeForDest(const gfxSize& aDest, uint32_t aWhichFrame,
                                      GraphicsFilter aFilter, uint32_t aFlags)
 {
@@ -2131,10 +2140,10 @@ RasterImage::OptimalImageSizeForDest(const gfxSize& aDest, uint32_t aWhichFrame,
              "Unexpected destination size");
 
   if (mSize.IsEmpty() || aDest.IsEmpty()) {
-    return nsIntSize(0, 0);
+    return IntSize(0, 0);
   }
 
-  nsIntSize destSize(ceil(aDest.width), ceil(aDest.height));
+  IntSize destSize(ceil(aDest.width), ceil(aDest.height));
 
   if (aFilter == GraphicsFilter::FILTER_GOOD &&
       CanDownscaleDuringDecode(destSize, aFlags)) {
@@ -2142,7 +2151,7 @@ RasterImage::OptimalImageSizeForDest(const gfxSize& aDest, uint32_t aWhichFrame,
   } else if (CanScale(aFilter, destSize, aFlags)) {
     DrawableFrameRef frameRef =
       SurfaceCache::Lookup(ImageKey(this),
-                           RasterSurfaceKey(destSize.ToIntSize(),
+                           RasterSurfaceKey(destSize,
                                             DecodeFlags(aFlags),
                                             0));
 

@@ -691,12 +691,8 @@ class NativeObject : public JSObject
 
     /* Change the given property into a sibling with the same id in this scope. */
     static Shape *
-    changeProperty(ExclusiveContext *cx, HandleNativeObject obj,
-                   HandleShape shape, unsigned attrs, unsigned mask,
-                   JSGetterOp getter, JSSetterOp setter);
-
-    static inline bool changePropertyAttributes(JSContext* cx, HandleNativeObject obj,
-                                                HandleShape shape, unsigned attrs);
+    changeProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleShape shape,
+                   unsigned attrs, JSGetterOp getter, JSSetterOp setter);
 
     /* Remove the property named by id from this object. */
     bool removeProperty(ExclusiveContext *cx, jsid id);
@@ -1257,6 +1253,11 @@ IsObjectValueInCompartment(Value v, JSCompartment* comp)
  */
 
 extern bool
+NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+                     Handle<PropertyDescriptor> desc,
+                     ObjectOpResult &result);
+
+extern bool
 NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
                      GetterOp getter, SetterOp, unsigned attrs,
                      ObjectOpResult &result);
@@ -1308,12 +1309,12 @@ NativeGetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, MutableH
 }
 
 bool
-SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
-                      HandleValue v, bool objHasOwn, ObjectOpResult &result);
+SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                      HandleValue receiver, bool objHasOwn, ObjectOpResult &result);
 
 bool
-SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleObject receiver, HandleId id,
-                   MutableHandleValue vp, ObjectOpResult &result);
+SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                   HandleValue receiver, ObjectOpResult &result);
 
 /*
  * Indicates whether an assignment operation is qualified (`x.y = 0`) or
@@ -1328,12 +1329,12 @@ enum QualifiedBool {
 };
 
 extern bool
-NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
-                  QualifiedBool qualified, MutableHandleValue vp, ObjectOpResult &result);
+NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleValue v,
+                  HandleValue receiver, QualifiedBool qualified, ObjectOpResult &result);
 
 extern bool
-NativeSetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
-                 MutableHandleValue vp, ObjectOpResult &result);
+NativeSetElement(JSContext *cx, HandleNativeObject obj, uint32_t index, HandleValue v,
+                 HandleValue receiver, ObjectOpResult &result);
 
 extern bool
 NativeDeleteProperty(JSContext *cx, HandleNativeObject obj, HandleId id, ObjectOpResult &result);
@@ -1444,21 +1445,21 @@ js::GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, V
 }
 
 inline bool
-js::SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
-                HandleId id, MutableHandleValue vp, ObjectOpResult &result)
+js::SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                HandleValue receiver, ObjectOpResult &result)
 {
     if (obj->getOps()->setProperty)
-        return JSObject::nonNativeSetProperty(cx, obj, receiver, id, vp, result);
-    return NativeSetProperty(cx, obj.as<NativeObject>(), receiver, id, Qualified, vp, result);
+        return JSObject::nonNativeSetProperty(cx, obj, id, v, receiver, result);
+    return NativeSetProperty(cx, obj.as<NativeObject>(), id, v, receiver, Qualified, result);
 }
 
 inline bool
-js::SetElement(JSContext* cx, HandleObject obj, HandleObject receiver, uint32_t index,
-               MutableHandleValue vp, ObjectOpResult &result)
+js::SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleValue v,
+               HandleValue receiver, ObjectOpResult &result)
 {
     if (obj->getOps()->setProperty)
-        return JSObject::nonNativeSetElement(cx, obj, receiver, index, vp, result);
-    return NativeSetElement(cx, obj.as<NativeObject>(), receiver, index, vp, result);
+        return JSObject::nonNativeSetElement(cx, obj, index, v, receiver, result);
+    return NativeSetElement(cx, obj.as<NativeObject>(), index, v, receiver, result);
 }
 
 #endif /* vm_NativeObject_h */

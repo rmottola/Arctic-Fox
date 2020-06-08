@@ -266,23 +266,42 @@ window.addEventListener("pagehide", function() {
 
 function onSearchSubmit(aEvent)
 {
-  let searchTerms = document.getElementById("searchText").value;
+  let searchText = document.getElementById("searchText");
+  let searchTerms = searchText.value;
   let engineName = document.documentElement.getAttribute("searchEngineName");
 
   if (engineName && searchTerms.length > 0) {
     // Send an event that will perform a search and Firefox Health Report will
     // record that a search from about:home has occurred.
-    let eventData = JSON.stringify({
+    let useNewTab = aEvent && aEvent.button == 1;
+    let eventData = {
       engineName: engineName,
-      searchTerms: searchTerms
-    });
+      searchTerms: searchTerms,
+      useNewTab: useNewTab,
+    };
+
+    if (searchText.hasAttribute("selection-index")) {
+      eventData.selection = {
+        index: searchText.getAttribute("selection-index"),
+        kind: searchText.getAttribute("selection-kind")
+      };
+    }
+
+    eventData = JSON.stringify(eventData);
+
     let event = new CustomEvent("AboutHomeSearchEvent", {detail: eventData});
     document.dispatchEvent(event);
   }
 
-  aEvent.preventDefault();
+  gSearchSuggestionController.addInputValueToFormHistory();
+
+  if (aEvent) {
+    aEvent.preventDefault();
+  }
 }
 
+
+let gSearchSuggestionController;
 
 function setupSearchEngine()
 {
@@ -311,6 +330,12 @@ function setupSearchEngine()
     searchText.placeholder = searchEngineName;
   }
 
+  if (!gSearchSuggestionController) {
+    gSearchSuggestionController =
+      new SearchSuggestionUIController(searchText, searchText.parentNode,
+                                       onSearchSubmit);
+  }
+  gSearchSuggestionController.engineName = searchEngineName;
 }
 
 function fitToWidth() {

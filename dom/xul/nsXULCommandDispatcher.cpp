@@ -25,7 +25,7 @@
 #include "nsPIWindowRoot.h"
 #include "nsRDFCID.h"
 #include "nsXULCommandDispatcher.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsContentUtils.h"
 #include "nsReadableUtils.h"
 #include "nsCRT.h"
@@ -37,9 +37,7 @@
 
 using namespace mozilla;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gCommandLog;
-#endif
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -47,10 +45,8 @@ nsXULCommandDispatcher::nsXULCommandDispatcher(nsIDocument* aDocument)
     : mDocument(aDocument), mUpdaters(nullptr)
 {
 
-#ifdef PR_LOGGING
   if (! gCommandLog)
     gCommandLog = PR_NewLogModule("nsXULCommandDispatcher");
-#endif
 }
 
 nsXULCommandDispatcher::~nsXULCommandDispatcher()

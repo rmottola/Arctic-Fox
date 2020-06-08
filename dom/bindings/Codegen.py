@@ -9822,7 +9822,7 @@ class CGProxySpecialOperation(CGPerSignatureCall):
     false.
     """
     def __init__(self, descriptor, operation, checkFound=True,
-                 argumentMutableValue=None, resultVar=None, foundVar=None):
+                 argumentHandleValue=None, resultVar=None, foundVar=None):
         self.checkFound = checkFound
         self.foundVar = foundVar or "found"
 
@@ -9847,12 +9847,12 @@ class CGProxySpecialOperation(CGPerSignatureCall):
                 treatNullAs=argument.treatNullAs,
                 sourceDescription=("value being assigned to %s setter" %
                                    descriptor.interface.identifier.name))
-            if argumentMutableValue is None:
-                argumentMutableValue = "desc.value()"
+            if argumentHandleValue is None:
+                argumentHandleValue = "desc.value()"
             templateValues = {
                 "declName": argument.identifier.name,
                 "holderName": argument.identifier.name + "_holder",
-                "val": argumentMutableValue,
+                "val": argumentHandleValue,
                 "obj": "obj",
                 "passedToJSImpl": "false"
             }
@@ -9897,10 +9897,10 @@ class CGProxyIndexedOperation(CGProxySpecialOperation):
     foundVar: See the docstring for CGProxySpecialOperation.
     """
     def __init__(self, descriptor, name, doUnwrap=True, checkFound=True,
-                 argumentMutableValue=None, resultVar=None, foundVar=None):
+                 argumentHandleValue=None, resultVar=None, foundVar=None):
         self.doUnwrap = doUnwrap
         CGProxySpecialOperation.__init__(self, descriptor, name, checkFound,
-                                         argumentMutableValue=argumentMutableValue,
+                                         argumentHandleValue=argumentHandleValue,
                                          resultVar=resultVar,
                                          foundVar=foundVar)
 
@@ -9958,9 +9958,9 @@ class CGProxyIndexedSetter(CGProxyIndexedOperation):
     """
     Class to generate a call to an indexed setter.
     """
-    def __init__(self, descriptor, argumentMutableValue=None):
+    def __init__(self, descriptor, argumentHandleValue=None):
         CGProxyIndexedOperation.__init__(self, descriptor, 'IndexedSetter',
-                                         argumentMutableValue=argumentMutableValue)
+                                         argumentHandleValue=argumentHandleValue)
 
 
 class CGProxyIndexedDeleter(CGProxyIndexedOperation):
@@ -9988,10 +9988,10 @@ class CGProxyNamedOperation(CGProxySpecialOperation):
 
     foundVar: See the docstring for CGProxySpecialOperation.
     """
-    def __init__(self, descriptor, name, value=None, argumentMutableValue=None,
+    def __init__(self, descriptor, name, value=None, argumentHandleValue=None,
                  resultVar=None, foundVar=None):
         CGProxySpecialOperation.__init__(self, descriptor, name,
-                                         argumentMutableValue=argumentMutableValue,
+                                         argumentHandleValue=argumentHandleValue,
                                          resultVar=resultVar,
                                          foundVar=foundVar)
         self.value = value
@@ -10089,9 +10089,9 @@ class CGProxyNamedSetter(CGProxyNamedOperation):
     """
     Class to generate a call to a named setter.
     """
-    def __init__(self, descriptor, argumentMutableValue=None):
+    def __init__(self, descriptor, argumentHandleValue=None):
         CGProxyNamedOperation.__init__(self, descriptor, 'NamedSetter',
-                                       argumentMutableValue=argumentMutableValue)
+                                       argumentHandleValue=argumentHandleValue)
 
 
 class CGProxyNamedDeleter(CGProxyNamedOperation):
@@ -10261,7 +10261,7 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
         args = [Argument('JSContext*', 'cx'),
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('JS::MutableHandle<JSPropertyDescriptor>', 'desc'),
+                Argument('JS::Handle<JSPropertyDescriptor>', 'desc'),
                 Argument('JS::ObjectOpResult&', 'opresult'),
                 Argument('bool*', 'defined')]
         ClassMethod.__init__(self, "defineProperty", "bool", args, virtual=True, override=True, const=True)
@@ -10708,7 +10708,7 @@ class CGDOMJSProxyHandler_setCustom(ClassMethod):
         args = [Argument('JSContext*', 'cx'),
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('JS::MutableHandle<JS::Value>', 'vp'),
+                Argument('JS::Handle<JS::Value>', 'v'),
                 Argument('bool*', 'done')]
         ClassMethod.__init__(self, "setCustom", "bool", args, virtual=True, override=True, const=True)
         self.descriptor = descriptor
@@ -10733,7 +10733,7 @@ class CGDOMJSProxyHandler_setCustom(ClassMethod):
                 raise ValueError("In interface " + self.descriptor.name + ": " +
                                  "Can't cope with [OverrideBuiltins] and unforgeable members")
 
-            callSetter = CGProxyNamedSetter(self.descriptor, argumentMutableValue="vp")
+            callSetter = CGProxyNamedSetter(self.descriptor, argumentHandleValue="v")
             return (assertion +
                     callSetter.define() +
                     "*done = true;\n"
@@ -10758,7 +10758,7 @@ class CGDOMJSProxyHandler_setCustom(ClassMethod):
 
                 """,
                 callSetter=CGProxyIndexedSetter(self.descriptor,
-                                                argumentMutableValue="vp").define())
+                                                argumentHandleValue="v").define())
         else:
             setIndexed = ""
 
@@ -13707,9 +13707,9 @@ class CGCallback(CGClass):
         self.baseName = baseName
         self._deps = idlObject.getDeps()
         self.idlObject = idlObject
-        name = idlObject.identifier.name
+        self.name = idlObject.identifier.name
         if isJSImplementedDescriptor(descriptorProvider):
-            name = jsImplName(name)
+            self.name = jsImplName(self.name)
         # For our public methods that needThisHandling we want most of the
         # same args and the same return type as what CallbackMember
         # generates.  So we want to take advantage of all its
@@ -13724,11 +13724,11 @@ class CGCallback(CGClass):
                 realMethods.extend(self.getMethodImpls(method))
         realMethods.append(
             ClassMethod("operator==", "bool",
-                        [Argument("const %s&" % name, "aOther")],
+                        [Argument("const %s&" % self.name, "aOther")],
                         inline=True, bodyInHeader=True,
                         const=True,
                         body=("return %s::operator==(aOther);\n" % baseName)))
-        CGClass.__init__(self, name,
+        CGClass.__init__(self, self.name,
                          bases=[ClassBase(baseName)],
                          constructors=self.getConstructors(),
                          methods=realMethods+getters+setters)
@@ -13766,8 +13766,10 @@ class CGCallback(CGClass):
         argnamesWithThis = ["s.GetContext()", "thisValJS"] + argnames
         argnamesWithoutThis = ["s.GetContext()", "JS::UndefinedHandleValue"] + argnames
         # Now that we've recorded the argnames for our call to our private
-        # method, insert our optional argument for deciding whether the
-        # CallSetup should re-throw exceptions on aRv.
+        # method, insert our optional arguments for the execution reason and for
+        # deciding whether the CallSetup should re-throw exceptions on aRv.
+        args.append(Argument("const char*", "aExecutionReason",
+                             "nullptr"))
         args.append(Argument("ExceptionHandling", "aExceptionHandling",
                              "eReportExceptions"))
         # And the argument for communicating when exceptions should really be
@@ -13783,13 +13785,17 @@ class CGCallback(CGClass):
 
         setupCall = fill(
             """
-            CallSetup s(this, aRv, aExceptionHandling, aCompartment);
+            if (!aExecutionReason) {
+              aExecutionReason = "${executionReason}";
+            }
+            CallSetup s(this, aRv, aExecutionReason, aExceptionHandling, aCompartment);
             if (!s.GetContext()) {
               aRv.Throw(NS_ERROR_UNEXPECTED);
               return${errorReturn};
             }
             """,
-            errorReturn=errorReturn)
+            errorReturn=errorReturn,
+            executionReason=method.getPrettyName())
 
         bodyWithThis = fill(
             """
@@ -14096,6 +14102,8 @@ class CallbackMember(CGNativeMember):
             # Since we don't need this handling, we're the actual method that
             # will be called, so we need an aRethrowExceptions argument.
             if not self.rethrowContentException:
+                args.append(Argument("const char*", "aExecutionReason",
+                                     "nullptr"))
                 args.append(Argument("ExceptionHandling", "aExceptionHandling",
                                      "eReportExceptions"))
             args.append(Argument("JSCompartment*", "aCompartment", "nullptr"))
@@ -14113,10 +14121,10 @@ class CallbackMember(CGNativeMember):
         if self.rethrowContentException:
             # getArgs doesn't add the aExceptionHandling argument but does add
             # aCompartment for us.
-            callSetup += ", eRethrowContentExceptions, aCompartment, /* aIsJSImplementedWebIDL = */ "
+            callSetup += ', "%s", eRethrowContentExceptions, aCompartment, /* aIsJSImplementedWebIDL = */ ' % self.getPrettyName()
             callSetup += toStringBool(isJSImplementedDescriptor(self.descriptorProvider))
         else:
-            callSetup += ", aExceptionHandling, aCompartment"
+            callSetup += ', "%s", aExceptionHandling, aCompartment' % self.getPrettyName()
         callSetup += ");\n"
         return fill(
             """

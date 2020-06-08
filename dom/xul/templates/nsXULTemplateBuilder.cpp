@@ -55,7 +55,7 @@
 #include "nsGkAtoms.h"
 #include "nsXULElement.h"
 #include "jsapi.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "rdf.h"
 #include "pldhash.h"
 #include "plhash.h"
@@ -86,9 +86,7 @@ nsIScriptSecurityManager* nsXULTemplateBuilder::gScriptSecurityManager;
 nsIPrincipal*             nsXULTemplateBuilder::gSystemPrincipal;
 nsIObserverService*       nsXULTemplateBuilder::gObserverService;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gXULTemplateLog;
-#endif
 
 #define NS_QUERY_PROCESSOR_CONTRACTID_PREFIX "@mozilla.org/xul/xul-query-processor;1?name="
 
@@ -167,10 +165,8 @@ nsXULTemplateBuilder::InitGlobals()
             return rv;
     }
 
-#ifdef PR_LOGGING
     if (! gXULTemplateLog)
         gXULTemplateLog = PR_NewLogModule("nsXULTemplateBuilder");
-#endif
 
     return NS_OK;
 }
@@ -1385,7 +1381,7 @@ nsXULTemplateBuilder::InitHTMLTemplateRoot()
 
     // We are going to run script via JS_SetProperty, so we need a script entry
     // point, but as this is XUL related it does not appear in the HTML spec.
-    AutoEntryScript entryScript(innerWin, true);
+    AutoEntryScript entryScript(innerWin, "nsXULTemplateBuilder creation", true);
     JSContext* jscontext = entryScript.cx();
 
     JS::Rooted<JS::Value> v(jscontext);
@@ -1714,11 +1710,9 @@ nsXULTemplateBuilder::CompileQueries()
         mFlags |= eLoggingEnabled;
     }
 
-#ifdef PR_LOGGING
     // always enable logging if the debug setting is used
     if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG))
         mFlags |= eLoggingEnabled;
-#endif
 
     nsCOMPtr<nsIDOMNode> rootnode = do_QueryInterface(mRoot);
     nsresult rv =

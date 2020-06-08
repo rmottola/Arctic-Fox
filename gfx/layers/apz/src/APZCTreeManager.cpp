@@ -29,6 +29,7 @@
 #include "gfxPrefs.h"                   // for gfxPrefs
 #include "OverscrollHandoffState.h"     // for OverscrollHandoffState
 #include "LayersLogging.h"              // for Stringify
+#include "Units.h"                      // for ParentlayerPixel
 
 #define ENABLE_APZCTM_LOGGING 0
 // #define ENABLE_APZCTM_LOGGING 1
@@ -196,20 +197,19 @@ APZCTreeManager::UpdateHitTestingTree(CompositorParent* aCompositor,
 
 // Compute the clip region to be used for a layer with an APZC. This function
 // is only called for layers which actually have scrollable metrics and an APZC.
-static nsIntRegion
+static ParentLayerIntRegion
 ComputeClipRegion(GeckoContentController* aController,
                   const LayerMetricsWrapper& aLayer)
 {
-  nsIntRegion clipRegion;
+  ParentLayerIntRegion clipRegion;
   if (aLayer.GetClipRect()) {
-    clipRegion = nsIntRegion(*aLayer.GetClipRect());
+    clipRegion = *aLayer.GetClipRect();
   } else {
     // if there is no clip on this layer (which should only happen for the
     // root scrollable layer in a process, or for some of the LayerMetrics
     // expansions of a multi-metrics layer), fall back to using the comp
     // bounds which should be equivalent.
-    clipRegion = nsIntRegion(ParentLayerIntRect::ToUntyped(
-        RoundedToInt(aLayer.Metrics().mCompositionBounds)));
+    clipRegion = RoundedToInt(aLayer.Metrics().mCompositionBounds);
   }
 
   // Optionally, the GeckoContentController can provide a touch-sensitive
@@ -229,10 +229,10 @@ ComputeClipRegion(GeckoContentController* aController,
     // Not sure what rounding option is the most correct here, but if we ever
     // figure it out we can change this. For now I'm rounding in to minimize
     // the chances of getting a complex region.
-    nsIntRect extraClip = ParentLayerIntRect::ToUntyped(RoundedIn(
+    ParentLayerIntRegion extraClip = RoundedIn(
         touchSensitiveRegion
         * aLayer.Metrics().GetDevPixelsPerCSSPixel()
-        * parentCumulativeResolution));
+        * parentCumulativeResolution);
     clipRegion.AndWith(extraClip);
   }
 
@@ -335,7 +335,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     node = RecycleOrCreateNode(aState, nullptr);
     AttachNodeToTree(node, aParent, aNextSibling);
     node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(),
-        aLayer.GetClipRect() ? Some(nsIntRegion(*aLayer.GetClipRect())) : Nothing(),
+        aLayer.GetClipRect() ? Some(ParentLayerIntRegion(*aLayer.GetClipRect())) : Nothing(),
         GetEventRegionsOverride(aParent, aLayer));
     return node;
   }
@@ -431,7 +431,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     // or not, depending on whether it went through the newApzc branch above.
     MOZ_ASSERT(node->IsPrimaryHolder() && node->GetApzc() && node->GetApzc()->Matches(guid));
 
-    nsIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
+    ParentLayerIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
     node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(), Some(clipRegion),
         GetEventRegionsOverride(aParent, aLayer));
     apzc->SetAncestorTransform(aAncestorTransform);
@@ -486,7 +486,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     // ancestor be the same.
     MOZ_ASSERT(aAncestorTransform == apzc->GetAncestorTransform());
 
-    nsIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
+    ParentLayerIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
     node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(), Some(clipRegion),
         GetEventRegionsOverride(aParent, aLayer));
   }

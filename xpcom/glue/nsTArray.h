@@ -397,10 +397,10 @@ protected:
                                                        size_type aCount,
                                                        size_type aElemSize);
 
-  // Resize the storage to the minimum required amount.
+  // Tries to resize the storage to the minimum required amount. If this fails,
+  // the array is left as-is.
   // @param aElemSize  The size of an array element.
   // @param aElemAlign The alignment in bytes of an array element.
-  template<typename ActualAlloc>
   void ShrinkCapacity(size_type aElemSize, size_t aElemAlign);
 
   // This method may be called to resize a "gap" in the array by shifting
@@ -1825,8 +1825,7 @@ public:
   // This method may be called to minimize the memory used by this array.
   void Compact()
   {
-    this->template ShrinkCapacity<Alloc>(sizeof(elem_type),
-                                         MOZ_ALIGNOF(elem_type));
+    ShrinkCapacity(sizeof(elem_type), MOZ_ALIGNOF(elem_type));
   }
 
   //

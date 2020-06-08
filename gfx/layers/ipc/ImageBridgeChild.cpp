@@ -38,8 +38,6 @@
 #include "mozilla/StaticPtr.h"          // for StaticRefPtr
 #include "mozilla/layers/TextureClient.h"
 
-struct nsIntRect;
-
 namespace mozilla {
 namespace ipc {
 class Shmem;
@@ -182,7 +180,7 @@ ImageBridgeChild::SendFenceHandle(AsyncTransactionTracker* aTracker,
 
 void
 ImageBridgeChild::UpdatePictureRect(CompositableClient* aCompositable,
-                                    const nsIntRect& aRect)
+                                    const gfx::IntRect& aRect)
 {
   MOZ_ASSERT(aCompositable);
   MOZ_ASSERT(aCompositable->GetIPDLActor());
@@ -631,7 +629,7 @@ bool ImageBridgeChild::StartUpOnThread(Thread* aThread)
     }
     sImageBridgeChildSingleton = new ImageBridgeChild();
     sImageBridgeParentSingleton = new ImageBridgeParent(
-      CompositorParent::CompositorLoop(), nullptr, ipc::kCurrentProcessId);
+      CompositorParent::CompositorLoop(), nullptr, base::GetCurrentProcId());
     sImageBridgeChildSingleton->ConnectAsync(sImageBridgeParentSingleton);
     return true;
   } else {
@@ -959,7 +957,7 @@ void ImageBridgeChild::RemoveTexture(TextureClient* aTexture)
 
 bool ImageBridgeChild::IsSameProcess() const
 {
-  return OtherPid() == ipc::kCurrentProcessId;
+  return OtherPid() == base::GetCurrentProcId();
 }
 
 void ImageBridgeChild::SendPendingAsyncMessges()

@@ -14,9 +14,7 @@
 #include "gfxTypes.h"
 #include <windows.h>
 #include "mozilla/TimeStamp.h"
-
-struct nsIntRect;
-struct nsIntSize;
+#include "nsSize.h"
 
 class nsNativeThemeWin : private nsNativeTheme,
                          public nsITheme {
@@ -52,7 +50,7 @@ public:
 
   NS_IMETHOD GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aFrame,
                                   uint8_t aWidgetType,
-                                  nsIntSize* aResult,
+                                  mozilla::LayoutDeviceIntSize* aResult,
                                   bool* aIsOverridable);
 
   virtual Transparency GetWidgetTransparency(nsIFrame* aFrame, uint8_t aWidgetType);
@@ -105,7 +103,7 @@ protected:
                                nsIntMargin* aResult);
   nsresult ClassicGetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aFrame,
                                        uint8_t aWidgetType,
-                                       nsIntSize* aResult,
+                                       mozilla::LayoutDeviceIntSize* aResult,
                                        bool* aIsOverridable);
   bool ClassicThemeSupportsWidget(nsPresContext* aPresContext, 
                                   nsIFrame* aFrame,

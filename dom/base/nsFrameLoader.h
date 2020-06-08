@@ -51,9 +51,6 @@ class RenderFrameParent;
 #if defined(MOZ_WIDGET_GTK)
 typedef struct _GtkWidget GtkWidget;
 #endif
-#ifdef MOZ_WIDGET_QT
-class QX11EmbedContainer;
-#endif
 
 class nsFrameLoader final : public nsIFrameLoader,
                             public nsStubMutationObserver,

@@ -126,19 +126,20 @@ DIBTextureHost::DIBTextureHost(TextureFlags aFlags,
     dont_AddRef(reinterpret_cast<gfxWindowsSurface*>(aDescriptor.surface()));
   MOZ_ASSERT(mSurface);
 
-  mSize = ToIntSize(mSurface->GetSize());
+  mSize = mSurface->GetSize();
   mFormat = ImageFormatToSurfaceFormat(
     gfxPlatform::GetPlatform()->OptimalFormatForContent(mSurface->GetContentType()));
 }
 
-TextureSource*
-DIBTextureHost::GetTextureSources()
+bool
+DIBTextureHost::BindTextureSource(CompositableTextureSourceRef& aTexture)
 {
   if (!mTextureSource) {
     Updated();
   }
 
-  return mTextureSource;
+  aTexture = mTextureSource;
+  return !!aTexture;
 }
 
 void

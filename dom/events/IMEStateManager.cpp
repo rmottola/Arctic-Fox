@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "mozilla/IMEStateManager.h"
 
@@ -41,7 +41,6 @@ namespace mozilla {
 using namespace dom;
 using namespace widget;
 
-#ifdef PR_LOGGING
 /**
  * When a method is called, log its arguments and/or related static variables
  * with PR_LOG_ALWAYS.  However, if it puts too many logs like
@@ -175,7 +174,6 @@ GetNotifyIMEMessageName(IMEMessage aMessage)
       return "unacceptable IME notification message";
   }
 }
-#endif // #ifdef PR_LOGGING
 
 nsIContent* IMEStateManager::sContent = nullptr;
 nsPresContext* IMEStateManager::sPresContext = nullptr;
@@ -192,11 +190,9 @@ TextCompositionArray* IMEStateManager::sTextCompositions = nullptr;
 void
 IMEStateManager::Init()
 {
-#ifdef PR_LOGGING
   if (!sISMLog) {
     sISMLog = PR_NewLogModule("IMEStateManager");
   }
-#endif
 }
 
 // static
@@ -230,7 +226,6 @@ IMEStateManager::OnDestroyPresContext(nsPresContext* aPresContext)
       // there should be only one composition per presContext object.
       sTextCompositions->ElementAt(i)->Destroy();
       sTextCompositions->RemoveElementAt(i);
-#if defined DEBUG || PR_LOGGING
       if (sTextCompositions->IndexOf(aPresContext) !=
             TextCompositionArray::NoIndex) {
         PR_LOG(sISMLog, PR_LOG_ERROR,
@@ -238,7 +233,6 @@ IMEStateManager::OnDestroyPresContext(nsPresContext* aPresContext)
            "TextComposition instance from the array"));
         MOZ_CRASH("Failed to remove TextComposition instance from the array");
       }
-#endif // #if defined DEBUG || PR_LOGGING
     }
   }
 
@@ -511,15 +505,15 @@ IMEStateManager::OnMouseButtonEventInEditor(nsPresContext* aPresContext,
   bool consumed =
     sActiveIMEContentObserver->OnMouseButtonEvent(aPresContext, internalEvent);
 
-#ifdef PR_LOGGING
-  nsAutoString eventType;
-  aMouseEvent->GetType(eventType);
-  PR_LOG(sISMLog, PR_LOG_ALWAYS,
-    ("ISM:   IMEStateManager::OnMouseButtonEventInEditor(), "
-     "mouse event (type=%s, button=%d) is %s",
-     NS_ConvertUTF16toUTF8(eventType).get(), internalEvent->button,
-     consumed ? "consumed" : "not consumed"));
-#endif
+  if (PR_LOG_TEST(sISMLog, PR_LOG_ALWAYS)) {
+    nsAutoString eventType;
+    aMouseEvent->GetType(eventType);
+    PR_LOG(sISMLog, PR_LOG_ALWAYS,
+      ("ISM:   IMEStateManager::OnMouseButtonEventInEditor(), "
+       "mouse event (type=%s, button=%d) is %s",
+       NS_ConvertUTF16toUTF8(eventType).get(), internalEvent->button,
+       consumed ? "consumed" : "not consumed"));
+  }
 
   return consumed;
 }

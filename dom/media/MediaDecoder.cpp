@@ -58,13 +58,9 @@ static const uint64_t ESTIMATED_DURATION_FUZZ_FACTOR_USECS = USECS_PER_S / 2;
 // avoid redefined macro in unified build
 #undef DECODER_LOG
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gMediaDecoderLog;
 #define DECODER_LOG(x, ...) \
   PR_LOG(gMediaDecoderLog, PR_LOG_DEBUG, ("Decoder=%p " x, this, ##__VA_ARGS__))
-#else
-#define DECODER_LOG(x, ...)
-#endif
 
 static const char* const gPlayStateStr[] = {
   "START",
@@ -126,6 +122,7 @@ StaticRefPtr<MediaMemoryTracker> MediaMemoryTracker::sUniqueInstance;
 PRLogModuleInfo* gStateWatchingLog;
 PRLogModuleInfo* gMediaPromiseLog;
 PRLogModuleInfo* gMediaTimerLog;
+PRLogModuleInfo* gMediaSampleLog;
 
 void
 MediaDecoder::InitStatics()
@@ -134,11 +131,11 @@ MediaDecoder::InitStatics()
   SharedThreadPool::InitStatics();
 
   // Log modules.
-#ifdef PR_LOGGING
   gMediaDecoderLog = PR_NewLogModule("MediaDecoder");
-#endif
   gMediaPromiseLog = PR_NewLogModule("MediaPromise");
   gStateWatchingLog = PR_NewLogModule("StateWatching");
+  gMediaTimerLog = PR_NewLogModule("MediaTimer");
+  gMediaSampleLog = PR_NewLogModule("MediaSample");
 }
 
 NS_IMPL_ISUPPORTS(MediaMemoryTracker, nsIMemoryReporter)

@@ -11,8 +11,6 @@
 #ifndef nsAppShell_h_
 #define nsAppShell_h_
 
-class nsCocoaWindow;
-
 #include "nsBaseAppShell.h"
 #include "nsTArray.h"
 
@@ -52,7 +50,7 @@ protected:
   virtual void ScheduleNativeEventCallback();
   virtual bool ProcessNextNativeEvent(bool aMayWait);
 
-  static void ProcessGoannaEvents(void* aInfo);
+  static void ProcessGeckoEvents(void* aInfo);
 
 protected:
   CFMutableArrayRef  mAutoreleasePools;

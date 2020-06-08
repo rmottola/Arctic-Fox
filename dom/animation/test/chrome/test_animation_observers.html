@@ -315,9 +315,9 @@ function assert_records(expected, desc) {
     assert_records([{ added: [firstAnimation], changed: [], removed: [] }],
                    "records after transition start");
 
-    // Wait for the Animation to get going, then seek well into
+    // Wait for the Animation to be playing, then seek well into
     // the transition.
-    yield await_frame();
+    yield firstAnimation.ready;
     firstAnimation.currentTime = 50000;
 
     // Reverse the transition by setting the background-color back to its

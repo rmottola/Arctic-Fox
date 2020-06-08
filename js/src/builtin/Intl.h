@@ -39,7 +39,7 @@ InitIntlClass(JSContext *cx, HandleObject obj);
  * Usage: collator = intl_Collator(locales, options)
  */
 extern bool
-intl_Collator(JSContext *cx, unsigned argc, Value *vp);
+intl_Collator(JSContext* cx, unsigned argc, Value* vp);
 
 /**
  * Returns an object indicating the supported locales for collation

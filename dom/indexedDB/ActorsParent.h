@@ -6,15 +6,12 @@
 #define mozilla_dom_indexeddb_actorsparent_h__
 
 template <class> struct already_AddRefed;
-class nsCString;
-struct nsID;
 class nsIPrincipal;
-class nsPIDOMWindow;
 
 namespace mozilla {
 namespace dom {
 
-class TabParent;
+class Element;
 
 namespace quota {
 
@@ -39,7 +36,7 @@ bool
 DeallocPBackgroundIDBFactoryParent(PBackgroundIDBFactoryParent* aActor);
 
 PIndexedDBPermissionRequestParent*
-AllocPIndexedDBPermissionRequestParent(nsPIDOMWindow* aWindow,
+AllocPIndexedDBPermissionRequestParent(Element* aOwnerElement,
                                        nsIPrincipal* aPrincipal);
 
 bool

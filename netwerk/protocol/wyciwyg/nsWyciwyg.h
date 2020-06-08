@@ -10,9 +10,8 @@
 // Get rid of chromium's LOG.
 #undef LOG
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#if defined(PR_LOGGING)
 //
 // Log module for HTTP Protocol logging...
 //
@@ -25,7 +24,6 @@
 // the file wyciwyg.log
 //
 extern PRLogModuleInfo *gWyciwygLog;
-#endif
 
 // http logging
 #define LOG1(args) PR_LOG(gWyciwygLog, 1, args)

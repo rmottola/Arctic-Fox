@@ -153,7 +153,7 @@ nsWindow::nsWindow()
         win->query(win, NATIVE_WINDOW_HEIGHT, &screenSize.height)) {
         NS_RUNTIMEABORT("Failed to get native window size, aborting...");
     }
-    gScreenBounds = nsIntRect(nsIntPoint(0, 0), screenSize);
+    gScreenBounds = gfx::IntRect(gfx::IntPoint(0, 0), screenSize);
 
     char propValue[PROPERTY_VALUE_MAX];
     property_get("ro.sf.hwrotation", propValue, "0");
@@ -339,8 +339,11 @@ nsWindow::SynthesizeNativeTouchPoint(uint32_t aPointerId,
                                      TouchPointerState aPointerState,
                                      nsIntPoint aPointerScreenPoint,
                                      double aPointerPressure,
-                                     uint32_t aPointerOrientation)
+                                     uint32_t aPointerOrientation,
+                                     nsIObserver* aObserver)
 {
+    AutoObserverNotifier notifier(aObserver, "touchpoint");
+
     if (aPointerState == TOUCH_HOVER) {
         return NS_ERROR_UNEXPECTED;
     }

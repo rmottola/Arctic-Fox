@@ -14,7 +14,7 @@ import org.mozilla.goanna.gfx.LayerView;
 import org.mozilla.goanna.gfx.LayerView.DrawListener;
 import org.mozilla.goanna.mozglue.GoannaLoader;
 import org.mozilla.goanna.sqlite.SQLiteBridge;
-import org.mozilla.goanna.util.GoannaEventListener;
+import org.mozilla.goanna.util.GeckoEventListener;
 
 import android.app.Activity;
 import android.app.Instrumentation;
@@ -40,39 +40,39 @@ public class FennecNativeActions implements Actions {
         GoannaLoader.loadSQLiteLibs(activity, activity.getApplication().getPackageResourcePath());
     }
 
-    class GoannaEventExpecter implements RepeatedEventExpecter {
+    class GeckoEventExpecter implements RepeatedEventExpecter {
         private static final int MAX_WAIT_MS = 180000;
 
         private volatile boolean mIsRegistered;
 
-        private final String mGoannaEvent;
-        private final GoannaEventListener mListener;
+        private final String mGeckoEvent;
+        private final GeckoEventListener mListener;
 
         private volatile boolean mEventEverReceived;
         private String mEventData;
         private BlockingQueue<String> mEventDataQueue;
 
-        GoannaEventExpecter(final String goannaEvent) {
-            if (TextUtils.isEmpty(goannaEvent)) {
-                throw new IllegalArgumentException("goannaEvent must not be empty");
+        GeckoEventExpecter(final String geckoEvent) {
+            if (TextUtils.isEmpty(geckoEvent)) {
+                throw new IllegalArgumentException("geckoEvent must not be empty");
             }
 
-            mGoannaEvent = goannaEvent;
+            mGeckoEvent = geckoEvent;
             mEventDataQueue = new LinkedBlockingQueue<String>();
 
-            final GoannaEventExpecter expecter = this;
-            mListener = new GoannaEventListener() {
+            final GeckoEventExpecter expecter = this;
+            mListener = new GeckoEventListener() {
                 @Override
                 public void handleMessage(final String event, final JSONObject message) {
                     FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG,
-                            "handleMessage called for: " + event + "; expecting: " + mGoannaEvent);
-                    mAsserter.is(event, mGoannaEvent, "Given message occurred for registered event: " + message);
+                            "handleMessage called for: " + event + "; expecting: " + mGeckoEvent);
+                    mAsserter.is(event, mGeckoEvent, "Given message occurred for registered event: " + message);
 
                     expecter.notifyOfEvent(message);
                 }
             };
 
-            EventDispatcher.getInstance().registerGoannaThreadListener(mListener, mGoannaEvent);
+            EventDispatcher.getInstance().registerGeckoThreadListener(mListener, mGeckoEvent);
             mIsRegistered = true;
         }
 
@@ -93,15 +93,15 @@ public class FennecNativeActions implements Actions {
             if (mEventData == null) {
                 if (failOnTimeout) {
                     FennecNativeDriver.logAllStackTraces(FennecNativeDriver.LogLevel.ERROR);
-                    mAsserter.ok(false, "GoannaEventExpecter",
-                        "blockForEvent timeout: "+mGoannaEvent);
+                    mAsserter.ok(false, "GeckoEventExpecter",
+                        "blockForEvent timeout: "+mGeckoEvent);
                 } else {
                     FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG,
-                        "blockForEvent timeout: "+mGoannaEvent);
+                        "blockForEvent timeout: "+mGeckoEvent);
                 }
             } else {
                 FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG,
-                    "unblocked on expecter for " + mGoannaEvent);
+                    "unblocked on expecter for " + mGeckoEvent);
             }
         }
 
@@ -121,7 +121,7 @@ public class FennecNativeActions implements Actions {
             }
             if (mEventData == null) {
                 FennecNativeDriver.logAllStackTraces(FennecNativeDriver.LogLevel.ERROR);
-                mAsserter.ok(false, "GoannaEventExpecter", "blockUntilClear timeout");
+                mAsserter.ok(false, "GeckoEventExpecter", "blockUntilClear timeout");
                 return;
             }
             // now wait for a period of millis where we don't get an event
@@ -137,7 +137,7 @@ public class FennecNativeActions implements Actions {
                 }
             }
             FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG,
-                "unblocked on expecter for " + mGoannaEvent);
+                "unblocked on expecter for " + mGeckoEvent);
         }
 
         public String blockForEventData() {
@@ -156,9 +156,9 @@ public class FennecNativeActions implements Actions {
             }
 
             FennecNativeDriver.log(LogLevel.INFO,
-                    "EventExpecter: no longer listening for " + mGoannaEvent);
+                    "EventExpecter: no longer listening for " + mGeckoEvent);
 
-            EventDispatcher.getInstance().unregisterGoannaThreadListener(mListener, mGoannaEvent);
+            EventDispatcher.getInstance().unregisterGeckoThreadListener(mListener, mGeckoEvent);
             mIsRegistered = false;
         }
 
@@ -168,7 +168,7 @@ public class FennecNativeActions implements Actions {
 
         void notifyOfEvent(final JSONObject message) {
             FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG,
-                    "received event " + mGoannaEvent);
+                    "received event " + mGeckoEvent);
 
             mEventEverReceived = true;
 
@@ -181,25 +181,25 @@ public class FennecNativeActions implements Actions {
         }
     }
 
-    public RepeatedEventExpecter expectGoannaEvent(final String goannaEvent) {
-        FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG, "waiting for " + goannaEvent);
-        return new GoannaEventExpecter(goannaEvent);
+    public RepeatedEventExpecter expectGeckoEvent(final String geckoEvent) {
+        FennecNativeDriver.log(FennecNativeDriver.LogLevel.DEBUG, "waiting for " + geckoEvent);
+        return new GeckoEventExpecter(geckoEvent);
     }
 
-    public void sendGoannaEvent(final String goannaEvent, final String data) {
-        GoannaAppShell.sendEventToGoanna(GoannaEvent.createBroadcastEvent(goannaEvent, data));
+    public void sendGeckoEvent(final String geckoEvent, final String data) {
+        GeckoAppShell.sendEventToGecko(GeckoEvent.createBroadcastEvent(geckoEvent, data));
     }
 
     public void sendPreferencesGetEvent(int requestId, String[] prefNames) {
-        GoannaAppShell.sendEventToGoanna(GoannaEvent.createPreferencesGetEvent(requestId, prefNames));
+        GeckoAppShell.sendEventToGecko(GeckoEvent.createPreferencesGetEvent(requestId, prefNames));
     }
 
     public void sendPreferencesObserveEvent(int requestId, String[] prefNames) {
-        GoannaAppShell.sendEventToGoanna(GoannaEvent.createPreferencesObserveEvent(requestId, prefNames));
+        GeckoAppShell.sendEventToGecko(GeckoEvent.createPreferencesObserveEvent(requestId, prefNames));
     }
 
     public void sendPreferencesRemoveObserversEvent(int requestId) {
-        GoannaAppShell.sendEventToGoanna(GoannaEvent.createPreferencesRemoveObserversEvent(requestId));
+        GeckoAppShell.sendEventToGecko(GeckoEvent.createPreferencesRemoveObserversEvent(requestId));
     }
 
     class PaintExpecter implements RepeatedEventExpecter {
@@ -213,7 +213,7 @@ public class FennecNativeActions implements Actions {
 
         PaintExpecter() {
             final PaintExpecter expecter = this;
-            mLayerView = GoannaAppShell.getLayerView();
+            mLayerView = GeckoAppShell.getLayerView();
             mDrawListener = new DrawListener() {
                 @Override
                 public void drawFinished() {

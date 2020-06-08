@@ -33,6 +33,7 @@
 #include "nsColor.h"
 #include "nsCompatibility.h"
 #include "nsFrameManagerBase.h"
+#include "nsRect.h"
 #include "mozFlushType.h"
 #include "nsWeakReference.h"
 #include <stdio.h> // for FILE definition
@@ -79,8 +80,6 @@ class nsDisplayListBuilder;
 class nsPIDOMWindow;
 struct nsPoint;
 class nsINode;
-struct nsIntPoint;
-struct nsIntRect;
 struct nsRect;
 class nsRegion;
 class nsRefreshDriver;
@@ -94,7 +93,6 @@ class DocAccessible;
 } // namespace a11y
 } // namespace mozilla
 #endif
-class nsIWidget;
 struct nsArenaMemoryStats;
 class nsITimer;
 

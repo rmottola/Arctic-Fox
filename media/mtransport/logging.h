@@ -10,7 +10,7 @@
 #define logging_h__
 
 #include <sstream>
-#include <prlog.h>
+#include "mozilla/Logging.h"
 
 #if defined(PR_LOGGING)
 

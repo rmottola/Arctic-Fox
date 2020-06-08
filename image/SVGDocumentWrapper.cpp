@@ -86,7 +86,7 @@ SVGDocumentWrapper::UpdateViewportBounds(const nsIntSize& aViewportSize)
 
   // If the bounds have changed, we need to do a layout flush.
   if (currentBounds.Size() != aViewportSize) {
-    mViewer->SetBounds(nsIntRect(nsIntPoint(0, 0), aViewportSize));
+    mViewer->SetBounds(IntRect(IntPoint(0, 0), aViewportSize));
     FlushLayout();
   }
 
@@ -309,7 +309,7 @@ SVGDocumentWrapper::SetupViewer(nsIRequest* aRequest,
     do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
   NS_ENSURE_TRUE(catMan, NS_ERROR_NOT_AVAILABLE);
   nsXPIDLCString contractId;
-  nsresult rv = catMan->GetCategoryEntry("Goanna-Content-Viewers", IMAGE_SVG_XML,
+  nsresult rv = catMan->GetCategoryEntry("Gecko-Content-Viewers", IMAGE_SVG_XML,
                                          getter_Copies(contractId));
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDocumentLoaderFactory> docLoaderFactory =

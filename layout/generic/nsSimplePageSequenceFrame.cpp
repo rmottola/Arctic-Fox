@@ -41,8 +41,7 @@ static const char sPrintOptionsContractID[] = "@mozilla.org/gfx/printsettings-se
 
 //
 
-#include "prlog.h"
-#ifdef PR_LOGGING 
+#include "mozilla/Logging.h"
 PRLogModuleInfo *
 GetLayoutPrintingLog()
 {
@@ -52,9 +51,6 @@ GetLayoutPrintingLog()
   return sLog;
 }
 #define PR_PL(_p1)  PR_LOG(GetLayoutPrintingLog(), PR_LOG_DEBUG, _p1)
-#else
-#define PR_PL(_p1)
-#endif
 
 nsSimplePageSequenceFrame*
 NS_NewSimplePageSequenceFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
@@ -161,6 +157,7 @@ nsSimplePageSequenceFrame::Reflow(nsPresContext*          aPresContext,
                                   const nsHTMLReflowState& aReflowState,
                                   nsReflowStatus&          aStatus)
 {
+  MarkInReflow();
   NS_PRECONDITION(aPresContext->IsRootPaginatedDocument(),
                   "A Page Sequence is only for real pages");
   DO_GLOBAL_REFLOW_COUNT("nsSimplePageSequenceFrame");

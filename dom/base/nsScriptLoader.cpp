@@ -40,7 +40,7 @@
 #include "nsThreadUtils.h"
 #include "nsDocShellCID.h"
 #include "nsIContentSecurityPolicy.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsCRT.h"
 #include "nsContentCreatorFunctions.h"
 #include "nsCORSListenerProxy.h"
@@ -55,9 +55,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/unused.h"
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gCspPRLog;
-#endif
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -139,10 +137,8 @@ nsScriptLoader::nsScriptLoader(nsIDocument *aDocument)
     mBlockingDOMContentLoaded(false)
 {
   // enable logging for CSP
-#ifdef PR_LOGGING
   if (!gCspPRLog)
     gCspPRLog = PR_NewLogModule("CSP");
-#endif
 }
 
 nsScriptLoader::~nsScriptLoader()
@@ -1137,7 +1133,8 @@ nsScriptLoader::EvaluateScript(nsScriptLoadRequest* aRequest,
 
   // New script entry point required, due to the "Create a script" sub-step of
   // http://www.whatwg.org/specs/web-apps/current-work/#execute-the-script-block
-  AutoEntryScript entryScript(globalObject, true, context->GetNativeContext());
+  AutoEntryScript entryScript(globalObject, "<script> element", true,
+                              context->GetNativeContext());
   entryScript.TakeOwnershipOfErrorReporting();
   JS::Rooted<JSObject*> global(entryScript.cx(),
                                globalObject->GetGlobalJSObject());

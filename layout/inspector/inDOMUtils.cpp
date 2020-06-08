@@ -45,6 +45,7 @@
 #include "nsColor.h"
 #include "nsStyleSet.h"
 #include "nsStyleUtil.h"
+#include "nsQueryObject.h"
 
 using namespace mozilla;
 using namespace mozilla::css;
@@ -234,8 +235,7 @@ inDOMUtils::GetCSSStyleRules(nsIDOMElement *aElement,
     }
   }
 
-  *_retval = rules;
-  NS_ADDREF(*_retval);
+  rules.forget(_retval);
 
   return NS_OK;
 }
@@ -902,7 +902,7 @@ inDOMUtils::GetBindingURLs(nsIDOMElement *aElement, nsIArray **_retval)
     binding = binding->GetBaseBinding();
   }
 
-  NS_ADDREF(*_retval = urls);
+  urls.forget(_retval);
   return NS_OK;
 }
 

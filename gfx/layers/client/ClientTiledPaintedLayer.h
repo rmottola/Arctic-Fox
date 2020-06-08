@@ -12,8 +12,6 @@
 #include "nsDebug.h"                    // for NS_RUNTIMEABORT
 #include "nsRegion.h"                   // for nsIntRegion
 
-class gfxContext;
-
 namespace mozilla {
 namespace layers {
 
@@ -81,7 +79,8 @@ public:
    * which hold the return values; the values passed in may be null.
    */
   void GetAncestorLayers(LayerMetricsWrapper* aOutScrollAncestor,
-                         LayerMetricsWrapper* aOutDisplayPortAncestor);
+                         LayerMetricsWrapper* aOutDisplayPortAncestor,
+                         bool* aOutHasTransformAnimation);
 
 private:
   ClientLayerManager* ClientManager()
@@ -94,12 +93,6 @@ private:
    * needed for that paint and any repeated transactions.
    */
   void BeginPaint();
-
-  /**
-   * Determine if we can use a fast path to just do a single high-precision,
-   * non-progressive paint.
-   */
-  bool UseFastPath();
 
   /**
    * Check if the layer is being scrolled by APZ on the compositor.

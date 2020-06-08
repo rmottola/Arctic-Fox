@@ -216,7 +216,7 @@ struct Statistics
         }
 
         JS::gcreason::Reason reason;
-        const char *resetReason;
+        const char* resetReason;
         int64_t start, end;
         size_t startFaults, endFaults;
         int64_t phaseTimes[MAX_MULTIPARENT_PHASES + 1][PHASE_LIMIT];
@@ -248,7 +248,7 @@ struct Statistics
 
     JSGCInvocationKind gckind;
 
-    const char *nonincrementalReason_;
+    const char* nonincrementalReason_;
 
     SliceDataVector slices;
 

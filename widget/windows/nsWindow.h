@@ -49,14 +49,12 @@
 
 class nsNativeDragTarget;
 class nsIRollupListener;
-class nsIFile;
 class nsIntRegion;
 class imgIContainer;
 
 namespace mozilla {
 namespace widget {
 class NativeKey;
-class ModifierKeyState;
 struct MSGResult;
 } // namespace widget
 } // namespacw mozilla;
@@ -162,13 +160,16 @@ public:
                                                    int32_t aNativeKeyCode,
                                                    uint32_t aModifierFlags,
                                                    const nsAString& aCharacters,
-                                                   const nsAString& aUnmodifiedCharacters);
+                                                   const nsAString& aUnmodifiedCharacters,
+                                                   nsIObserver* aObserver) override;
   virtual nsresult        SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                      uint32_t aNativeMessage,
-                                                     uint32_t aModifierFlags);
+                                                     uint32_t aModifierFlags,
+                                                     nsIObserver* aObserver) override;
 
-  virtual nsresult        SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint)
-                          { return SynthesizeNativeMouseEvent(aPoint, MOUSEEVENTF_MOVE, 0); }
+  virtual nsresult        SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint,
+                                                    nsIObserver* aObserver) override
+                          { return SynthesizeNativeMouseEvent(aPoint, MOUSEEVENTF_MOVE, 0, aObserver); }
 
   virtual nsresult        SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                            uint32_t aNativeMessage,
@@ -176,13 +177,12 @@ public:
                                                            double aDeltaY,
                                                            double aDeltaZ,
                                                            uint32_t aModifierFlags,
-                                                           uint32_t aAdditionalFlags);
+                                                           uint32_t aAdditionalFlags,
+                                                           nsIObserver* aObserver) override;
   NS_IMETHOD_(void)       SetInputContext(const InputContext& aContext,
                                           const InputContextAction& aAction);
   NS_IMETHOD_(InputContext) GetInputContext();
   NS_IMETHOD              GetToggledKeyState(uint32_t aKeyCode, bool* aLEDState);
-  NS_IMETHOD              RegisterTouchWindow();
-  NS_IMETHOD              UnregisterTouchWindow();
 #ifdef MOZ_XUL
   virtual void            SetTransparencyMode(nsTransparencyMode aMode);
   virtual nsTransparencyMode GetTransparencyMode();
@@ -285,6 +285,8 @@ protected:
   virtual ~nsWindow();
 
   virtual void WindowUsesOMTC() override;
+  virtual void ConfigureAPZCTreeManager() override;
+  void RegisterTouchWindow();
 
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;

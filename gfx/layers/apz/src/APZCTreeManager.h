@@ -23,8 +23,6 @@
 #include "mozilla/gfx/Logging.h"        // for gfx::TreeLog
 #include "mozilla/layers/APZUtils.h"    // for HitTestResult
 
-class nsIntRegion;
-
 namespace mozilla {
 class InputData;
 class MultiTouchInput;
@@ -43,7 +41,6 @@ enum AllowedTouchBehavior {
 class Layer;
 class AsyncPanZoomController;
 class CompositorParent;
-class APZPaintLogHelper;
 class OverscrollHandoffChain;
 struct OverscrollHandoffState;
 class LayerMetricsWrapper;

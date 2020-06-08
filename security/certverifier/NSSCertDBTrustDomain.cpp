@@ -18,34 +18,22 @@
 #include "pk11pub.h"
 #include "pkix/pkix.h"
 #include "pkix/pkixnss.h"
-#include "pkix/ScopedPtr.h"
 #include "prerror.h"
 #include "prmem.h"
 #include "prprf.h"
 #include "ScopedNSSTypes.h"
 #include "secerr.h"
-#include "secmod.h"
 
 using namespace mozilla;
 using namespace mozilla::pkix;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gCertVerifierLog;
-#endif
 
 static const uint64_t ServerFailureDelaySeconds = 5 * 60;
 
 namespace mozilla { namespace psm {
 
 const char BUILTIN_ROOTS_MODULE_DEFAULT_NAME[] = "Builtin Roots Module";
-
-void PORT_Free_string(char* str) { PORT_Free(str); }
-
-namespace {
-
-typedef ScopedPtr<SECMODModule, SECMOD_DestroyModule> ScopedSECMODModule;
-
-} // unnamed namespace
 
 NSSCertDBTrustDomain::NSSCertDBTrustDomain(SECTrustType certDBTrustType,
                                            OCSPFetching ocspFetching,
@@ -827,14 +815,15 @@ LoadLoadableRoots(/*optional*/ const char* dir, const char* modNameUTF8)
     return SECFailure;
   }
 
-  ScopedPtr<char, PR_FreeLibraryName> fullLibraryPath(
-    PR_GetLibraryName(dir, "nssckbi"));
+  UniquePtr<char, void(&)(char*)>
+    fullLibraryPath(PR_GetLibraryName(dir, "nssckbi"), PR_FreeLibraryName);
   if (!fullLibraryPath) {
     return SECFailure;
   }
 
-  ScopedPtr<char, PORT_Free_string> escaped_fullLibraryPath(
-    nss_addEscape(fullLibraryPath.get(), '\"'));
+  UniquePtr<char, void(&)(void*)>
+    escaped_fullLibraryPath(nss_addEscape(fullLibraryPath.get(), '\"'),
+                            PORT_Free);
   if (!escaped_fullLibraryPath) {
     return SECFailure;
   }
@@ -843,9 +832,10 @@ LoadLoadableRoots(/*optional*/ const char* dir, const char* modNameUTF8)
   int modType;
   SECMOD_DeleteModule(modNameUTF8, &modType);
 
-  ScopedPtr<char, PR_smprintf_free> pkcs11ModuleSpec(
-    PR_smprintf("name=\"%s\" library=\"%s\"", modNameUTF8,
-                escaped_fullLibraryPath.get()));
+  UniquePtr<char, void(&)(char*)>
+    pkcs11ModuleSpec(PR_smprintf("name=\"%s\" library=\"%s\"", modNameUTF8,
+                                 escaped_fullLibraryPath.get()),
+                     PR_smprintf_free);
   if (!pkcs11ModuleSpec) {
     return SECFailure;
   }
@@ -961,7 +951,7 @@ SaveIntermediateCerts(const ScopedCERTCertList& certList)
     // We have found a signer cert that we want to remember.
     char* nickname = DefaultServerNicknameForCert(node->cert);
     if (nickname && *nickname) {
-      ScopedPtr<PK11SlotInfo, PK11_FreeSlot> slot(PK11_GetInternalKeySlot());
+      ScopedPK11SlotInfo slot(PK11_GetInternalKeySlot());
       if (slot) {
         PK11_ImportCert(slot.get(), node->cert, CK_INVALID_HANDLE,
                         nickname, false);

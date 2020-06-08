@@ -17,6 +17,7 @@
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/gfx/Rect.h"
 
 #include "imgRequest.h"
 #include "IProgressObserver.h"
@@ -32,7 +33,6 @@
 class imgINotificationObserver;
 class imgRequestNotifyRunnable;
 class imgStatusNotifyRunnable;
-struct nsIntRect;
 class ProxyBehaviour;
 
 namespace mozilla {
@@ -97,7 +97,7 @@ public:
 
   // imgINotificationObserver methods:
   virtual void Notify(int32_t aType,
-                      const nsIntRect* aRect = nullptr) override;
+                      const mozilla::gfx::IntRect* aRect = nullptr) override;
   virtual void OnLoadComplete(bool aLastPart) override;
 
   // imgIOnloadBlocker methods:

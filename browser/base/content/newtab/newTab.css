@@ -207,3 +207,8 @@ input[type=button] {
   background-color: #fff;
   opacity: 0.01;
 }
+
+.searchSuggestionTable {
+  font: message-box;
+  font-size: 16px;
+}

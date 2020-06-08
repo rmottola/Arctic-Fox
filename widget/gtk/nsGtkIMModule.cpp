@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prtime.h"
 
 #include "nsGtkIMModule.h"
@@ -18,7 +18,6 @@
 using namespace mozilla;
 using namespace mozilla::widget;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gGtkIMLog = nullptr;
 
 static const char*
@@ -56,7 +55,6 @@ GetEnabledStateName(uint32_t aState)
             return "UNKNOWN ENABLED STATUS!!";
     }
 }
-#endif
 
 const static bool kUseSimpleContextDefault = MOZ_WIDGET_GTK == 2;
 
@@ -77,11 +75,9 @@ nsGtkIMModule::nsGtkIMModule(nsWindow* aOwnerWindow)
     , mIsIMFocused(false)
     , mIsDeletingSurrounding(false)
 {
-#ifdef PR_LOGGING
     if (!gGtkIMLog) {
         gGtkIMLog = PR_NewLogModule("nsGtkIMModuleWidgets");
     }
-#endif
     static bool sFirstInstance = true;
     if (sFirstInstance) {
         sFirstInstance = false;

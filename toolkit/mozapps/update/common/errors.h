@@ -9,9 +9,12 @@
 
 #define OK 0
 
-// Old unused error codes:
-// #define MEM_ERROR 1  // Replaced with errors 10-16 (inclusive)
-// #define IO_ERROR 2  // Use READ_ERROR or WRITE_ERROR instead
+// Error codes that are no longer used should not be used again unless they
+// aren't used in client code (e.g. nsUpdateService.js, updates.js,
+// UpdatePrompt.js, etc.).
+
+#define MAR_ERROR_EMPTY_ACTION_LIST 1
+#define LOADSOURCE_ERROR_WRONG_SIZE 2
 
 // Error codes 3-16 are for general update problems.
 #define USAGE_ERROR 3
@@ -39,8 +42,7 @@
 #define MAR_CHANNEL_MISMATCH_ERROR 22
 #define VERSION_DOWNGRADE_ERROR 23
 
-// Error codes 24-34 are related to the maintenance service
-// and so are Windows only
+// Error codes 24-33 and 49 are for the Windows maintenance service.
 #define SERVICE_UPDATER_COULD_NOT_BE_STARTED 24
 #define SERVICE_NOT_ENOUGH_COMMAND_LINE_ARGS 25
 #define SERVICE_UPDATER_SIGN_ERROR 26

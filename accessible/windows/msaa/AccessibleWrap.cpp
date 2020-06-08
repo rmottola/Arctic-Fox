@@ -398,27 +398,27 @@ AccessibleWrap::get_accRole(
   if (xpAccessible->IsDefunct())
     return CO_E_OBJNOTCONNECTED;
 
-  a11y::role goannaRole;
+  a11y::role geckoRole;
   if (xpAccessible->IsProxy()) {
-    goannaRole = xpAccessible->Proxy()->Role();
+    geckoRole = xpAccessible->Proxy()->Role();
   } else {
 #ifdef DEBUG
     NS_ASSERTION(nsAccUtils::IsTextInterfaceSupportCorrect(xpAccessible),
                  "Does not support Text when it should");
 #endif
 
-    goannaRole = xpAccessible->Role();
+    geckoRole = xpAccessible->Role();
   }
 
   uint32_t msaaRole = 0;
 
-#define ROLE(_goannaRole, stringRole, atkRole, macRole, \
+#define ROLE(_geckoRole, stringRole, atkRole, macRole, \
              _msaaRole, ia2Role, nameRule) \
-  case roles::_goannaRole: \
+  case roles::_geckoRole: \
     msaaRole = _msaaRole; \
     break;
 
-  switch (goannaRole) {
+  switch (geckoRole) {
 #include "RoleMap.h"
     default:
       MOZ_CRASH("Unknown role.");
@@ -430,11 +430,11 @@ AccessibleWrap::get_accRole(
   // a ROLE_OUTLINEITEM for consistency and compatibility.
   // We need this because ARIA has a role of "row" for both grid and treegrid
   if (xpAccessible->IsProxy()) {
-      if (goannaRole == roles::ROW
+      if (geckoRole == roles::ROW
           && xpAccessible->Proxy()->Parent()->Role() == roles::TREE_TABLE)
         msaaRole = ROLE_SYSTEM_OUTLINEITEM;
   } else {
-    if (goannaRole == roles::ROW) {
+    if (geckoRole == roles::ROW) {
       Accessible* xpParent = Parent();
       if (xpParent && xpParent->Role() == roles::TREE_TABLE)
         msaaRole = ROLE_SYSTEM_OUTLINEITEM;

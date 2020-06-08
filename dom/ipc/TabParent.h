@@ -13,7 +13,9 @@
 #include "mozilla/dom/PFilePickerParent.h"
 #include "mozilla/dom/TabContext.h"
 #include "mozilla/EventForwards.h"
+#include "mozilla/dom/File.h"
 #include "mozilla/WritingModes.h"
+#include "mozilla/RefPtr.h"
 #include "nsCOMPtr.h"
 #include "nsIAuthPromptProvider.h"
 #include "nsIBrowserDOMWindow.h"
@@ -52,11 +54,17 @@ namespace widget {
 struct IMENotification;
 }
 
+namespace gfx {
+class SourceSurface;
+class DataSourceSurface;
+}
+
 namespace dom {
 
 class ClonedMessageData;
 class nsIContentParent;
 class Element;
+class DataTransfer;
 struct StructuredCloneData;
 
 class TabParent final : public PBrowserParent
@@ -200,6 +208,7 @@ public:
     virtual bool RecvIsParentWindowMainWidgetVisible(bool* aIsVisible) override;
     virtual bool RecvShowTooltip(const uint32_t& aX, const uint32_t& aY, const nsString& aTooltip) override;
     virtual bool RecvHideTooltip() override;
+    virtual bool RecvGetTabOffset(LayoutDeviceIntPoint* aPoint) override;
     virtual bool RecvGetDPI(float* aValue) override;
     virtual bool RecvGetDefaultScale(double* aValue) override;
     virtual bool RecvGetWidgetNativeData(WindowsHandle* aValue) override;
@@ -264,6 +273,37 @@ public:
     virtual bool RecvRequestNativeKeyBindings(const mozilla::WidgetKeyboardEvent& aEvent,
                                               MaybeNativeKeyBinding* aBindings) override;
 
+    virtual bool RecvSynthesizeNativeKeyEvent(const int32_t& aNativeKeyboardLayout,
+                                              const int32_t& aNativeKeyCode,
+                                              const uint32_t& aModifierFlags,
+                                              const nsString& aCharacters,
+                                              const nsString& aUnmodifiedCharacters,
+                                              const uint64_t& aObserverId) override;
+    virtual bool RecvSynthesizeNativeMouseEvent(const LayoutDeviceIntPoint& aPoint,
+                                                const uint32_t& aNativeMessage,
+                                                const uint32_t& aModifierFlags,
+                                                const uint64_t& aObserverId) override;
+    virtual bool RecvSynthesizeNativeMouseMove(const LayoutDeviceIntPoint& aPoint,
+                                               const uint64_t& aObserverId) override;
+    virtual bool RecvSynthesizeNativeMouseScrollEvent(const LayoutDeviceIntPoint& aPoint,
+                                                      const uint32_t& aNativeMessage,
+                                                      const double& aDeltaX,
+                                                      const double& aDeltaY,
+                                                      const double& aDeltaZ,
+                                                      const uint32_t& aModifierFlags,
+                                                      const uint32_t& aAdditionalFlags,
+                                                      const uint64_t& aObserverId) override;
+    virtual bool RecvSynthesizeNativeTouchPoint(const uint32_t& aPointerId,
+                                                const TouchPointerState& aPointerState,
+                                                const nsIntPoint& aPointerScreenPoint,
+                                                const double& aPointerPressure,
+                                                const uint32_t& aPointerOrientation,
+                                                const uint64_t& aObserverId) override;
+    virtual bool RecvSynthesizeNativeTouchTap(const nsIntPoint& aPointerScreenPoint,
+                                              const bool& aLongTap,
+                                              const uint64_t& aObserverId) override;
+    virtual bool RecvClearNativeTouchSequence(const uint64_t& aObserverId) override;
+
     void SendMouseEvent(const nsAString& aType, float aX, float aY,
                         int32_t aButton, int32_t aClickCount,
                         int32_t aModifiers, bool aIgnoreRootScrollFrame);
@@ -271,6 +311,8 @@ public:
                       int32_t aCharCode, int32_t aModifiers,
                       bool aPreventDefault);
     bool SendRealMouseEvent(mozilla::WidgetMouseEvent& event);
+    bool SendRealDragEvent(mozilla::WidgetDragEvent& aEvent, uint32_t aDragAction,
+                           uint32_t aDropEffect);
     bool SendMouseWheelEvent(mozilla::WidgetWheelEvent& event);
     bool SendRealKeyEvent(mozilla::WidgetKeyboardEvent& event);
     bool SendRealTouchEvent(WidgetTouchEvent& event);
@@ -287,12 +329,6 @@ public:
                                  const bool& flushLayout,
                                  const nsIntSize& renderSize) override;
     virtual bool DeallocPDocumentRendererParent(PDocumentRendererParent* actor) override;
-
-    virtual PContentPermissionRequestParent*
-    AllocPContentPermissionRequestParent(const InfallibleTArray<PermissionRequest>& aRequests,
-                                         const IPC::Principal& aPrincipal) override;
-    virtual bool
-    DeallocPContentPermissionRequestParent(PContentPermissionRequestParent* actor) override;
 
     virtual PFilePickerParent*
     AllocPFilePickerParent(const nsString& aTitle,
@@ -368,6 +404,18 @@ public:
     bool RequestNotifyLayerTreeCleared();
     bool LayerTreeUpdate(bool aActive);
 
+    virtual bool
+    RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
+                          const uint32_t& aAction,
+                          const nsCString& aVisualDnDData,
+                          const uint32_t& aWidth, const uint32_t& aHeight,
+                          const uint32_t& aStride, const uint8_t& aFormat,
+                          const int32_t& aDragAreaX, const int32_t& aDragAreaY) override;
+
+    void AddInitialDnDDataTo(DataTransfer* aDataTransfer);
+
+    void TakeDragVisualization(RefPtr<mozilla::gfx::SourceSurface>& aSurface,
+                               int32_t& aDragAreaX, int32_t& aDragAreaY);
 protected:
     bool ReceiveMessage(const nsString& aMessage,
                         bool aSync,
@@ -435,7 +483,7 @@ protected:
     CSSToLayoutDeviceScale mDefaultScale;
     bool mShown;
     bool mUpdatedDimensions;
-    nsIntPoint mChromeOffset;
+    LayoutDeviceIntPoint mChromeOffset;
 
 private:
     already_AddRefed<nsFrameLoader> GetFrameLoader(bool aUseCachedFrameLoaderAfterDestroy = false) const;
@@ -454,11 +502,6 @@ private:
     // be null.
     void ApzAwareEventRoutingToChild(ScrollableLayerGuid* aOutTargetGuid,
                                      uint64_t* aOutInputBlockId);
-    // The offset for the child process which is sampled at touch start. This
-    // means that the touch events are relative to where the frame was at the
-    // start of the touch. We need to look for a better solution to this
-    // problem see bug 872911.
-    LayoutDeviceIntPoint mChildProcessOffsetAtTouchStart;
     // When true, we've initiated normal shutdown and notified our
     // managing PContent.
     bool mMarkedDestroying;
@@ -473,6 +516,24 @@ private:
     bool mSendOfflineStatus;
 
     uint32_t mChromeFlags;
+
+    struct DataTransferItem
+    {
+      nsCString mFlavor;
+      nsString mStringData;
+      nsRefPtr<mozilla::dom::FileImpl> mBlobData;
+      enum DataType
+      {
+        eString,
+        eBlob
+      };
+      DataType mType;
+    };
+    nsTArray<nsTArray<DataTransferItem>> mInitialDataTransferItems;
+
+    mozilla::RefPtr<gfx::DataSourceSurface> mDnDVisualization;
+    int32_t mDragAreaX;
+    int32_t mDragAreaY;
 
     // When true, the TabParent is initialized without child side's request.
     // When false, the TabParent is initialized by window.open() from child side.

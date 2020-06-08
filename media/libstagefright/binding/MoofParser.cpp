@@ -8,7 +8,7 @@
 #include <limits>
 #include "Intervals.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #ifdef PR_LOGGING
 extern PRLogModuleInfo* GetDemuxerLog();

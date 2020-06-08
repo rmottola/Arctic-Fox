@@ -327,7 +327,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       layer->SetEventRegions(common.eventRegions());
       layer->SetContentFlags(common.contentFlags());
       layer->SetOpacity(common.opacity());
-      layer->SetClipRect(common.useClipRect() ? &common.clipRect() : nullptr);
+      layer->SetClipRect(common.useClipRect() ? Some(common.clipRect()) : Nothing());
       layer->SetBaseTransform(common.transform().value());
       layer->SetPostScale(common.postXScale(), common.postYScale());
       layer->SetIsFixedPosition(common.isFixedPosition());
@@ -625,11 +625,9 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
         severity = 1.f;
       }
       mLayerManager->VisualFrameWarning(severity);
-#ifdef PR_LOGGING
       PR_LogPrint("LayerTransactionParent::RecvUpdate transaction from process %d took %f ms",
                   OtherPid(),
                   latency.ToMilliseconds());
-#endif
     }
   }
 
@@ -971,7 +969,7 @@ LayerTransactionParent::ActorDestroy(ActorDestroyReason why)
 
 bool LayerTransactionParent::IsSameProcess() const
 {
-  return OtherPid() == ipc::kCurrentProcessId;
+  return OtherPid() == base::GetCurrentProcId();
 }
 
 void

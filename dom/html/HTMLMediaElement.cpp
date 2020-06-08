@@ -35,6 +35,7 @@
 #include "nsIThreadInternal.h"
 #include "nsContentUtils.h"
 #include "nsIRequest.h"
+#include "nsQueryObject.h"
 
 #include "nsIScriptSecurityManager.h"
 #include "nsIXPConnect.h"
@@ -90,15 +91,10 @@
 #include "nsRange.h"
 #include <algorithm>
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gMediaElementLog;
 static PRLogModuleInfo* gMediaElementEventsLog;
 #define LOG(type, msg) PR_LOG(gMediaElementLog, type, msg)
 #define LOG_EVENT(type, msg) PR_LOG(gMediaElementEventsLog, type, msg)
-#else
-#define LOG(type, msg)
-#define LOG_EVENT(type, msg)
-#endif
 
 #include "nsIContentSecurityPolicy.h"
 
@@ -2085,14 +2081,12 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
     mHasUserInteraction(false),
     mDefaultPlaybackStartPosition(0.0)
 {
-#ifdef PR_LOGGING
   if (!gMediaElementLog) {
     gMediaElementLog = PR_NewLogModule("nsMediaElement");
   }
   if (!gMediaElementEventsLog) {
     gMediaElementEventsLog = PR_NewLogModule("nsMediaElementEvents");
   }
-#endif
   ErrorResult rv;
 
   double defaultVolume = Preferences::GetFloat("media.default_volume", 1.0);
@@ -3622,7 +3616,6 @@ HTMLMediaElement::UpdateReadyStateInternal()
   ChangeReadyState(nsIDOMHTMLMediaElement::HAVE_FUTURE_DATA);
 }
 
-#ifdef PR_LOGGING
 static const char* const gReadyStateToString[] = {
   "HAVE_NOTHING",
   "HAVE_METADATA",
@@ -3630,7 +3623,6 @@ static const char* const gReadyStateToString[] = {
   "HAVE_FUTURE_DATA",
   "HAVE_ENOUGH_DATA"
 };
-#endif
 
 void HTMLMediaElement::ChangeReadyState(nsMediaReadyState aState)
 {
@@ -3682,14 +3674,12 @@ void HTMLMediaElement::ChangeReadyState(nsMediaReadyState aState)
   }
 }
 
-#ifdef PR_LOGGING
 static const char* const gNetworkStateToString[] = {
   "EMPTY",
   "IDLE",
   "LOADING",
   "NO_SOURCE"
  };
-#endif
 
 void HTMLMediaElement::ChangeNetworkState(nsMediaNetworkState aState)
 {

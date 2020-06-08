@@ -160,7 +160,7 @@ class ObjectOpResult
      *     return true.
      * -   Otherwise, do nothing and return true.
      */
-    bool checkStrictErrorOrWarning(JSContext *cx, HandleObject obj, HandleId id, bool strict) {
+    bool checkStrictErrorOrWarning(JSContext* cx, HandleObject obj, HandleId id, bool strict) {
         if (ok())
             return true;
         return reportStrictErrorOrWarning(cx, obj, id, strict);
@@ -172,12 +172,12 @@ class ObjectOpResult
      * used for [[PreventExtensions]] and [[SetPrototypeOf]]. failureCode()
      * must not be an error that has "{0}" in the error message.
      */
-    bool checkStrictErrorOrWarning(JSContext *cx, HandleObject obj, bool strict) {
+    bool checkStrictErrorOrWarning(JSContext* cx, HandleObject obj, bool strict) {
         return ok() || reportStrictErrorOrWarning(cx, obj, strict);
     }
 
     /* Throw a TypeError. Call this only if !ok(). */
-    bool reportError(JSContext *cx, HandleObject obj, HandleId id) {
+    bool reportError(JSContext* cx, HandleObject obj, HandleId id) {
         return reportStrictErrorOrWarning(cx, obj, id, true);
     }
 
@@ -185,19 +185,19 @@ class ObjectOpResult
      * The same as reportError(cx, obj, id), except the operation is not
      * associated with a particular property id.
      */
-    bool reportError(JSContext *cx, HandleObject obj) {
+    bool reportError(JSContext* cx, HandleObject obj) {
         return reportStrictErrorOrWarning(cx, obj, true);
     }
 
     /* Helper function for checkStrictErrorOrWarning's slow path. */
-    JS_PUBLIC_API(bool) reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, HandleId id, bool strict);
-    JS_PUBLIC_API(bool) reportStrictErrorOrWarning(JSContext *cx, HandleObject obj, bool strict);
+    JS_PUBLIC_API(bool) reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, HandleId id, bool strict);
+    JS_PUBLIC_API(bool) reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, bool strict);
 
     /*
      * Convenience method. Return true if ok() or if strict is false; otherwise
      * throw a TypeError and return false.
      */
-    bool checkStrict(JSContext *cx, HandleObject obj, HandleId id) {
+    bool checkStrict(JSContext* cx, HandleObject obj, HandleId id) {
         return checkStrictErrorOrWarning(cx, obj, id, true);
     }
 
@@ -205,7 +205,7 @@ class ObjectOpResult
      * Convenience method. The same as checkStrict(cx, id), except the
      * operation is not associated with a particular property id.
      */
-    bool checkStrict(JSContext *cx, HandleObject obj) {
+    bool checkStrict(JSContext* cx, HandleObject obj) {
         return checkStrictErrorOrWarning(cx, obj, true);
     }
 };
@@ -218,7 +218,7 @@ class ObjectOpResult
 // be a string (Unicode property identifier) or an int (element index).  The
 // *vp out parameter, on success, is the new property value after the action.
 typedef bool
-(* JSGetterOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+(* JSGetterOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                JS::MutableHandleValue vp);
 
 typedef JSGetterOp JSAddPropertyOp;
@@ -229,8 +229,8 @@ typedef JSGetterOp JSAddPropertyOp;
 // parameter, on success, is the new property value after the
 // set.
 typedef bool
-(* JSSetterOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-               JS::MutableHandleValue vp, JS::ObjectOpResult &result);
+(* JSSetterOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+               JS::MutableHandleValue vp, JS::ObjectOpResult& result);
 
 // Delete a property named by id in obj.
 //
@@ -246,8 +246,8 @@ typedef bool
 // property, or an inherited property, is allowed -- it's just pointless),
 // call result.succeed() and return true.
 typedef bool
-(* JSDeletePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                       JS::ObjectOpResult &result);
+(* JSDeletePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                       JS::ObjectOpResult& result);
 
 // The type of ObjectOps::enumerate. This callback overrides a portion of SpiderMonkey's default
 // [[Enumerate]] internal method. When an ordinary object is enumerated, that object and each object
@@ -333,17 +333,17 @@ typedef bool
 (* LookupPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                      JS::MutableHandleObject objp, JS::MutableHandle<Shape*> propp);
 typedef bool
-(* DefinePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
-                     JSGetterOp getter, JSSetterOp setter, unsigned attrs,
+(* DefinePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+                     JS::Handle<JSPropertyDescriptor> desc,
                      JS::ObjectOpResult &result);
 typedef bool
 (* HasPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool *foundp);
 typedef bool
-(* GetPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
+(* GetPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
                   JS::MutableHandleValue vp);
 typedef bool
-(* SetPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
-                  JS::MutableHandleValue vp, JS::ObjectOpResult &result);
+(* SetPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v,
+                  JS::HandleValue receiver, JS::ObjectOpResult &result);
 typedef bool
 (* GetOwnPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::MutableHandle<JSPropertyDescriptor> desc);
@@ -439,10 +439,10 @@ struct ClassSpec
 {
     ClassObjectCreationOp createConstructor;
     ClassObjectCreationOp createPrototype;
-    const JSFunctionSpec *constructorFunctions;
-    const JSPropertySpec *constructorProperties;
-    const JSFunctionSpec *prototypeFunctions;
-    const JSPropertySpec *prototypeProperties;
+    const JSFunctionSpec* constructorFunctions;
+    const JSPropertySpec* constructorProperties;
+    const JSFunctionSpec* prototypeFunctions;
+    const JSPropertySpec* prototypeProperties;
     FinishClassInitOp finishInit;
     uintptr_t flags;
 

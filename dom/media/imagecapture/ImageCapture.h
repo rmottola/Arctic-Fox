@@ -9,26 +9,14 @@
 
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/dom/ImageCaptureBinding.h"
-#include "prlog.h"
-
-class nsIDOMBlob;
+#include "mozilla/Logging.h"
 
 namespace mozilla {
-
-#ifdef PR_LOGGING
 
 #ifndef IC_LOG
 PRLogModuleInfo* GetICLog();
 #define IC_LOG(...) PR_LOG(GetICLog(), PR_LOG_DEBUG, (__VA_ARGS__))
 #endif
-
-#else
-
-#ifndef IC_LOG
-#define IC_LOG(...)
-#endif
-
-#endif // PR_LOGGING
 
 namespace dom {
 

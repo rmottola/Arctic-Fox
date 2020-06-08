@@ -6,7 +6,7 @@
 #include "nsIOService.h"
 #include "nsFtpControlConnection.h"
 #include "nsFtpProtocolHandler.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsIInputStream.h"
 #include "nsISocketTransportService.h"
 #include "nsISocketTransport.h"
@@ -15,9 +15,7 @@
 #include "nsNetCID.h"
 #include <algorithm>
 
-#if defined(PR_LOGGING)
 extern PRLogModuleInfo* gFTPLog;
-#endif
 #define LOG(args)         PR_LOG(gFTPLog, PR_LOG_DEBUG, args)
 #define LOG_ALWAYS(args)  PR_LOG(gFTPLog, PR_LOG_ALWAYS, args)
 

@@ -30,9 +30,7 @@
 class mozIApplication;
 class nsConsoleService;
 class nsICycleCollectorLogSink;
-class nsIDOMBlob;
 class nsIDumpGCAndCCLogsCallback;
-class nsIMemoryReporter;
 class nsITimer;
 class ParentIdleListener;
 class nsIWidget;
@@ -48,7 +46,6 @@ class TestShellParent;
 } // namespace ipc
 
 namespace jsipc {
-class JavaScriptShared;
 class PJavaScriptParent;
 } // namespace jsipc
 
@@ -167,6 +164,12 @@ public:
                                         bool* aIsForBrowser,
                                         TabId* aTabId) override;
     virtual bool RecvBridgeToChildProcess(const ContentParentId& aCpId) override;
+
+    virtual bool RecvCreateGMPService() override;
+    virtual bool RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
+                                               nsTArray<nsCString>&& aTags,
+                                               bool* aHasPlugin,
+                                               nsCString* aVersion) override;
 
     virtual bool RecvLoadPlugin(const uint32_t& aPluginId, nsresult* aRv) override;
     virtual bool RecvConnectPluginBridge(const uint32_t& aPluginId, nsresult* aRv) override;
@@ -357,6 +360,17 @@ public:
 
     virtual bool RecvFinishShutdown() override;
 
+    void MaybeInvokeDragSession(TabParent* aParent);
+
+    virtual PContentPermissionRequestParent*
+    AllocPContentPermissionRequestParent(const InfallibleTArray<PermissionRequest>& aRequests,
+                                         const IPC::Principal& aPrincipal,
+                                         const TabId& aTabId) override;
+    virtual bool
+    DeallocPContentPermissionRequestParent(PContentPermissionRequestParent* actor) override;
+
+    bool HasGamepadListener() const { return mHasGamepadListener; }
+
 protected:
     void OnChannelConnected(int32_t pid) override;
     virtual void ActorDestroy(ActorDestroyReason why) override;
@@ -495,6 +509,9 @@ private:
 
     static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
 
+    PGMPServiceParent*
+    AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
+                           base::ProcessId aOtherProcess) override;
     PCompositorParent*
     AllocPCompositorParent(mozilla::ipc::Transport* aTransport,
                            base::ProcessId aOtherProcess) override;
@@ -517,6 +534,7 @@ private:
                                           bool* aIsForApp,
                                           bool* aIsForBrowser) override;
     virtual bool RecvGetXPCOMProcessAttributes(bool* aIsOffline,
+                                               bool* aIsLangRTL,
                                                InfallibleTArray<nsString>* dictionaries,
                                                ClipboardCapabilities* clipboardCaps,
                                                DomainPolicyClone* domainPolicy)
@@ -555,6 +573,9 @@ private:
 
     virtual bool DeallocPHalParent(PHalParent*) override;
 
+    virtual PIccParent* AllocPIccParent(const uint32_t& aServiceId) override;
+    virtual bool DeallocPIccParent(PIccParent* aActor) override;
+
     virtual PMemoryReportRequestParent*
     AllocPMemoryReportRequestParent(const uint32_t& aGeneration,
                                     const bool &aAnonymize,
@@ -576,6 +597,10 @@ private:
     virtual bool DeallocPMobileConnectionParent(PMobileConnectionParent* aActor) override;
 
     virtual bool DeallocPNeckoParent(PNeckoParent* necko) override;
+
+    virtual PPSMContentDownloaderParent* AllocPPSMContentDownloaderParent(
+            const uint32_t& aCertType) override;
+    virtual bool DeallocPPSMContentDownloaderParent(PPSMContentDownloaderParent* aDownloader) override;
 
     virtual PExternalHelperAppParent* AllocPExternalHelperAppParent(
             const OptionalURIParams& aUri,
@@ -748,7 +773,7 @@ private:
                                   OptionalURIParams* aURI) override;
 
     virtual bool RecvNotifyKeywordSearchLoading(const nsString &aProvider,
-                                                const nsString &aKeyword) override; 
+                                                const nsString &aKeyword) override;
 
     virtual void ProcessingError(Result aCode, const char* aMsgName) override;
 
@@ -800,6 +825,12 @@ private:
     virtual bool RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
                                                PDocAccessibleParent* aParentDoc, const uint64_t& aParentID) override;
 
+    virtual bool RecvUpdateDropEffect(const uint32_t& aDragAction,
+                                      const uint32_t& aDropEffect) override;
+
+    virtual bool RecvGamepadListenerAdded() override;
+    virtual bool RecvGamepadListenerRemoved() override;
+
     // If you add strong pointers to cycle collected objects here, be sure to
     // release these objects in ShutDownProcess.  See the comment there for more
     // details.
@@ -844,6 +875,7 @@ private:
     bool mSendDataStoreInfos;
     bool mIsForBrowser;
     bool mIsNuwaProcess;
+    bool mHasGamepadListener;
 
     // These variables track whether we've called Close(), CloseWithError()
     // and KillHard() on our channel.

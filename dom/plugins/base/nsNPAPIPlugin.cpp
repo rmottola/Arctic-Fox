@@ -1507,7 +1507,7 @@ _evaluate(NPP npp, NPObject* npobj, NPString *script, NPVariant *result)
     return false;
   }
 
-  dom::AutoEntryScript aes(win);
+  dom::AutoEntryScript aes(win, "NPAPI NPN_evaluate");
   aes.TakeOwnershipOfErrorReporting();
   JSContext* cx = aes.cx();
 
@@ -2280,7 +2280,7 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
     }
 
     case kJavaContext_ANPGetValue: {
-      auto ret = widget::GoannaAppShell::GetContext();
+      auto ret = widget::GeckoAppShell::GetContext();
       if (!ret)
         return NPERR_GENERIC_ERROR;
 

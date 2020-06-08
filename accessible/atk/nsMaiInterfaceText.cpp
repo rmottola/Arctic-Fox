@@ -209,15 +209,21 @@ static gunichar
 getCharacterAtOffsetCB(AtkText* aText, gint aOffset)
 {
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
-  if (!accWrap)
-    return 0;
+  if (accWrap) {
+    HyperTextAccessible* text = accWrap->AsHyperText();
+    if (!text || !text->IsTextRole()) {
+      return 0;
+    }
 
-  HyperTextAccessible* text = accWrap->AsHyperText();
-  if (!text || !text->IsTextRole())
-    return 0;
+    // char16_t is unsigned short in Mozilla, gnuichar is guint32 in glib.
+    return static_cast<gunichar>(text->CharAt(aOffset));
+  }
 
-  // char16_t is unsigned short in Mozilla, gnuichar is guint32 in glib.
-  return static_cast<gunichar>(text->CharAt(aOffset));
+  if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
+    return static_cast<gunichar>(proxy->CharAt(aOffset));
+  }
+
+  return 0;
 }
 
 static gchar*
@@ -249,14 +255,20 @@ static gint
 getCaretOffsetCB(AtkText *aText)
 {
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
-  if (!accWrap)
-    return 0;
+  if (accWrap) {
+    HyperTextAccessible* text = accWrap->AsHyperText();
+    if (!text || !text->IsTextRole()) {
+      return 0;
+    }
 
-  HyperTextAccessible* text = accWrap->AsHyperText();
-  if (!text || !text->IsTextRole())
-    return 0;
+    return static_cast<gint>(text->CaretOffset());
+  }
 
-  return static_cast<gint>(text->CaretOffset());
+  if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
+    return static_cast<gint>(proxy->CaretOffset());
+  }
+
+  return 0;
 }
 
 static AtkAttributeSet*
@@ -333,7 +345,7 @@ getCharacterExtentsCB(AtkText *aText, gint aOffset,
   nsIntRect rect;
   uint32_t geckoCoordType;
   if (aCoords == ATK_XY_SCREEN) {
-    goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
+    geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
   } else {
     giabbaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
   }
@@ -345,9 +357,9 @@ getCharacterExtentsCB(AtkText *aText, gint aOffset,
       return;
     }
 
-    rect = text->CharBounds(aOffset, goannaCoordType);
+    rect = text->CharBounds(aOffset, geckoCoordType);
   } else if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
-    rect = proxy->CharBounds(aOffset, goannaCoordType);
+    rect = proxy->CharBounds(aOffset, geckoCoordType);
   } else {
     return;
   }
@@ -367,11 +379,11 @@ getRangeExtentsCB(AtkText *aText, gint aStartOffset, gint aEndOffset,
   }
 
   nsIntRect rect;
-  uint32_t goannaCoordType;
+  uint32_t geckoCoordType;
   if (aCoords == ATK_XY_SCREEN) {
-      goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
+      geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
   } else {
-      goannaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
+      geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
   }
 
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
@@ -553,15 +565,23 @@ static gboolean
 setCaretOffsetCB(AtkText *aText, gint aOffset)
 {
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
-  if (!accWrap)
-    return FALSE;
+  if (accWrap) {
+    HyperTextAccessible* text = accWrap->AsHyperText();
+    if (!text || !text->IsTextRole() || !text->IsValidOffset(aOffset)) {
+      return FALSE;
+    }
 
-  HyperTextAccessible* text = accWrap->AsHyperText();
-  if (!text || !text->IsTextRole() || !text->IsValidOffset(aOffset))
-    return FALSE;
+    text->SetCaretOffset(aOffset);
+    return TRUE;
+  }
 
-  text->SetCaretOffset(aOffset);
-  return TRUE;
+  if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
+    if (proxy->SetCaretOffset(aOffset)) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }
 }
 

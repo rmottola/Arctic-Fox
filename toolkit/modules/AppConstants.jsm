@@ -8,7 +8,7 @@
 this.EXPORTED_SYMBOLS = ["AppConstants"];
 
 // Immutable for export.
-let AppConstants = Object.freeze({
+this.AppConstants = Object.freeze({
   // See this wiki page for more details about channel specific build
   // defines: https://wiki.mozilla.org/Platform/Channel-specific_build_defines
   NIGHTLY_BUILD:
@@ -63,8 +63,33 @@ let AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_SANDBOX:
+#ifdef MOZ_SANDBOX
+  true,
+#else
+  false,
+#endif
+
+  MOZ_SHARK:
+#ifdef XP_MACOSX
+#ifdef MOZ_SHARK
+  true,
+#else
+  false,
+#endif
+#else
+  false,
+#endif
+
   MOZ_TELEMETRY_REPORTING:
 #ifdef MOZ_TELEMETRY_REPORTING
+  true,
+#else
+  false,
+#endif
+
+  MOZ_UPDATER:
+#ifdef MOZ_UPDATER
   true,
 #else
   false,
@@ -77,6 +102,8 @@ let AppConstants = Object.freeze({
   false,
 #endif
 
+# NOTE! XP_LINUX has to go after MOZ_WIDGET_ANDROID otherwise Android
+# builds will be misidentified as linux.
   platform:
 #ifdef MOZ_WIDGET_GTK
   "linux",
@@ -90,12 +117,21 @@ let AppConstants = Object.freeze({
   "android",
 #elif MOZ_WIDGET_GONK
   "gonk",
+#elif XP_LINUX
+  "linux",
 #else
   "other",
 #endif
 
   MOZ_CRASHREPORTER:
 #ifdef MOZ_CRASHREPORTER
+  true,
+#else
+  false,
+#endif
+
+  MOZ_MAINTENANCE_SERVICE:
+#ifdef MOZ_MAINTENANCE_SERVICE
   true,
 #else
   false,
@@ -108,7 +144,10 @@ let AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_APP_NAME: "@MOZ_APP_NAME@",
   MOZ_APP_VERSION: "@MOZ_APP_VERSION@",
-
+  MOZ_BUILD_APP: "@MOZ_BUILD_APP@",
+  MOZ_UPDATE_CHANNEL: "@MOZ_UPDATE_CHANNEL@",
+  MOZ_WIDGET_TOOLKIT: "@MOZ_WIDGET_TOOLKIT@",
   ANDROID_PACKAGE_NAME: "@ANDROID_PACKAGE_NAME@",
 });

@@ -9,14 +9,12 @@
 #include "nsIEventTarget.h"
 #include "nsCOMPtr.h"
 #include "nsNetCID.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#if defined(PR_LOGGING)
 //
 // set NSPR_LOG_MODULES=Test:5
 //
 static PRLogModuleInfo *gTestLog = nullptr;
-#endif
 #define LOG(args) PR_LOG(gTestLog, PR_LOG_DEBUG, args)
 
 class nsIOEvent : public nsIRunnable {
@@ -59,9 +57,7 @@ int main(int argc, char **argv)
 
     nsresult rv;
 
-#if defined(PR_LOGGING)
     gTestLog = PR_NewLogModule("Test");
-#endif
 
     rv = NS_InitXPCOM2(nullptr, nullptr, nullptr);
     if (NS_FAILED(rv))

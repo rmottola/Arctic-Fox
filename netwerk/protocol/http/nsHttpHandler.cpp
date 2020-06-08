@@ -211,9 +211,7 @@ nsHttpHandler::nsHttpHandler()
     , mTCPKeepaliveLongLivedIdleTimeS(600)
     , mEnforceH1Framing(FRAMECHECK_BARELY)
 {
-#if defined(PR_LOGGING)
     gHttpLog = PR_NewLogModule("nsHttp");
-#endif
 
     LOG(("Creating nsHttpHandler [this=%p].\n", this));
 
@@ -360,6 +358,8 @@ nsHttpHandler::Init()
     nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
     mObserverService = new nsMainThreadPtrHolder<nsIObserverService>(obsService);
     if (mObserverService) {
+        // register the handler object as a weak callback as we don't need to worry
+        // about shutdown ordering.
         mObserverService->AddObserver(this, "profile-change-net-teardown", true);
         mObserverService->AddObserver(this, "profile-change-net-restore", true);
         mObserverService->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, true);
@@ -368,7 +368,7 @@ nsHttpHandler::Init()
         mObserverService->AddObserver(this, "net:failed-to-process-uri-content", true);
         mObserverService->AddObserver(this, "last-pb-context-exited", true);
         mObserverService->AddObserver(this, "browser:purge-session-history", true);
-        mObserverService->AddObserver(this, NS_NETWORK_LINK_TOPIC, false);
+        mObserverService->AddObserver(this, NS_NETWORK_LINK_TOPIC, true);
     }
 
     MakeNewRequestTokenBucket();
