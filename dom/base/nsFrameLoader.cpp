@@ -2505,7 +2505,9 @@ nsFrameLoader::GetMessageManager(nsIMessageSender** aManager)
 {
   EnsureMessageManager();
   if (mMessageManager) {
-    CallQueryInterface(mMessageManager, aManager);
+    nsRefPtr<nsFrameMessageManager> mm(mMessageManager);
+    mm.forget(aManager);
+    return NS_OK;
   }
   return NS_OK;
 }

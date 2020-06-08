@@ -1903,7 +1903,7 @@ HTMLInputElement::GetList(nsIDOMHTMLElement** aValue)
     return NS_OK;
   }
 
-  CallQueryInterface(element, aValue);
+  element.forget(aValue);
   return NS_OK;
 }
 

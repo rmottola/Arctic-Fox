@@ -1492,11 +1492,12 @@ NS_NewGlobalMessageManager(nsIMessageBroadcaster** aResult)
 {
   NS_ENSURE_TRUE(XRE_GetProcessType() == GeckoProcessType_Default,
                  NS_ERROR_NOT_AVAILABLE);
-  nsFrameMessageManager* mm = new nsFrameMessageManager(nullptr,
-                                                        nullptr,
-                                                        MM_CHROME | MM_GLOBAL | MM_BROADCASTER);
+  nsRefPtr<nsFrameMessageManager> mm = new nsFrameMessageManager(nullptr,
+                                                                 nullptr,
+                                                                 MM_CHROME | MM_GLOBAL | MM_BROADCASTER);
   RegisterStrongMemoryReporter(new MessageManagerReporter());
-  return CallQueryInterface(mm, aResult);
+  mm.forget(aResult);
+  return NS_OK;
 }
 
 nsDataHashtable<nsStringHashKey, nsMessageManagerScriptHolder*>*
@@ -1991,7 +1992,8 @@ NS_NewParentProcessMessageManager(nsIMessageBroadcaster** aResult)
                                                                  MM_CHROME | MM_PROCESSMANAGER | MM_BROADCASTER);
   nsFrameMessageManager::sParentProcessManager = mm;
   nsFrameMessageManager::NewProcessMessageManager(false); // Create same process message manager.
-  return CallQueryInterface(mm, aResult);
+  mm.forget(aResult);
+  return NS_OK;
 }
 
 
@@ -2038,9 +2040,10 @@ NS_NewChildProcessMessageManager(nsISyncMessageSender** aResult)
                                                         nullptr,
                                                         MM_PROCESSMANAGER | MM_OWNSCALLBACK);
   nsFrameMessageManager::SetChildProcessManager(mm);
-  ProcessGlobal* global = new ProcessGlobal(mm);
+  nsRefPtr<ProcessGlobal> global = new ProcessGlobal(mm);
   NS_ENSURE_TRUE(global->Init(), NS_ERROR_UNEXPECTED);
-  return CallQueryInterface(global, aResult);
+  global.forget(aResult);
+  return NS_OK;
 
 }
 
