@@ -3352,10 +3352,7 @@ NS_IMETHODIMP nsFrame::HandleRelease(nsPresContext* aPresContext,
       // If not, the user must have clicked in a part of the selection.
       // Place the caret before continuing!
 
-      bool mouseDown = frameselection->GetDragState();
-
-      if (!mouseDown && frameselection->HasDelayedCaretData() &&
-          frameselection->GetClickCountInDelayedCaretData() < 2) {
+      if (frameselection->MouseDownRecorded()) {
         nsPoint pt = nsLayoutUtils::GetEventCoordinatesRelativeTo(aEvent, this);
         offsets = GetContentOffsetsFromPoint(pt, SKIP_HIDDEN);
         handleTableSelection = false;
