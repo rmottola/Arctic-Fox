@@ -1779,7 +1779,7 @@ public:
     nsINode* parent = GetParentNode();
     mozilla::ErrorResult rv;
     parent->RemoveChild(*this, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   // ChildNode methods
@@ -2029,7 +2029,7 @@ ToCanonicalSupports(nsINode* aPointer)
   { \
     mozilla::ErrorResult rv; \
     nsINode::SetNodeValue(aNodeValue, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD GetNodeType(uint16_t* aNodeType) __VA_ARGS__ override \
   { \
@@ -2097,7 +2097,7 @@ ToCanonicalSupports(nsINode* aPointer)
     mozilla::ErrorResult rv; \
     nsCOMPtr<nsINode> clone = nsINode::CloneNode(aDeep, rv); \
     if (rv.Failed()) { \
-      return rv.ErrorCode(); \
+      return rv.StealNSResult(); \
     } \
     *aResult = clone.forget().take()->AsDOMNode(); \
     return NS_OK; \
@@ -2140,13 +2140,13 @@ ToCanonicalSupports(nsINode* aPointer)
   { \
     mozilla::ErrorResult rv; \
     nsINode::GetTextContent(aTextContent, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD SetTextContent(const nsAString& aTextContent) __VA_ARGS__ override \
   { \
     mozilla::ErrorResult rv; \
     nsINode::SetTextContent(aTextContent, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD LookupPrefix(const nsAString& aNamespaceURI, nsAString& aResult) __VA_ARGS__ override \
   { \

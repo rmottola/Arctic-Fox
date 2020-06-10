@@ -498,7 +498,7 @@ nsImageLoadingContent::GetRequest(int32_t aRequestType,
   ErrorResult result;
   *aRequest = GetRequest(aRequestType, result).take();
 
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 NS_IMETHODIMP_(bool)
@@ -610,7 +610,7 @@ nsImageLoadingContent::GetRequestType(imgIRequest* aRequest,
 
   ErrorResult result;
   *aRequestType = GetRequestType(aRequest, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 already_AddRefed<nsIURI>
@@ -636,7 +636,7 @@ nsImageLoadingContent::GetCurrentURI(nsIURI** aURI)
 
   ErrorResult result;
   *aURI = GetCurrentURI(result).take();
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 already_AddRefed<nsIStreamListener>
@@ -693,7 +693,7 @@ nsImageLoadingContent::LoadImageWithChannel(nsIChannel* aChannel,
 
   ErrorResult result;
   *aListener = LoadImageWithChannel(aChannel, result).take();
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -733,7 +733,7 @@ nsImageLoadingContent::ForceReload(bool aNotify /* = true */,
 
   ErrorResult result;
   ForceReload(notify, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 NS_IMETHODIMP

@@ -1571,7 +1571,7 @@ NS_IMETHODIMP HTMLMediaElement::SetCurrentTime(double aCurrentTime)
 
   ErrorResult rv;
   SetCurrentTime(aCurrentTime, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* readonly attribute double duration; */
@@ -1691,7 +1691,7 @@ NS_IMETHODIMP HTMLMediaElement::Pause()
 {
   ErrorResult rv;
   Pause(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute double volume; */
@@ -1724,7 +1724,7 @@ NS_IMETHODIMP HTMLMediaElement::SetVolume(double aVolume)
 {
   ErrorResult rv;
   SetVolume(aVolume, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 // Helper struct with arguments for our hash iterator.
@@ -1796,7 +1796,7 @@ HTMLMediaElement::MozGetMetadata(JSContext* cx, JS::MutableHandle<JS::Value> aVa
     aValue.setObject(*obj);
   }
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute boolean muted; */
@@ -3291,11 +3291,11 @@ void HTMLMediaElement::LoadAborted()
   Error(nsIDOMMediaError::MEDIA_ERR_ABORTED);
 }
 
-void HTMLMediaElement::Error(uint16_t aErrorCode)
+void HTMLMediaElement::Error(uint16_t aStealNSResult)
 {
-  NS_ASSERTION(aErrorCode == nsIDOMMediaError::MEDIA_ERR_DECODE ||
-               aErrorCode == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
-               aErrorCode == nsIDOMMediaError::MEDIA_ERR_ABORTED,
+  NS_ASSERTION(aStealNSResult == nsIDOMMediaError::MEDIA_ERR_DECODE ||
+               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
+               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_ABORTED,
                "Only use nsIDOMMediaError codes!");
 
   // Since we have multiple paths calling into DecodeError, e.g.
@@ -3305,7 +3305,7 @@ void HTMLMediaElement::Error(uint16_t aErrorCode)
     return;
   }
 
-  mError = new MediaError(this, aErrorCode);
+  mError = new MediaError(this, aStealNSResult);
   DispatchAsyncEvent(NS_LITERAL_STRING("error"));
   if (mReadyState == nsIDOMHTMLMediaElement::HAVE_NOTHING) {
     ChangeNetworkState(nsIDOMHTMLMediaElement::NETWORK_EMPTY);
@@ -4341,7 +4341,7 @@ NS_IMETHODIMP HTMLMediaElement::SetDefaultPlaybackRate(double aDefaultPlaybackRa
 {
   ErrorResult rv;
   SetDefaultPlaybackRate(aDefaultPlaybackRate, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute double playbackRate; */
@@ -4381,7 +4381,7 @@ NS_IMETHODIMP HTMLMediaElement::SetPlaybackRate(double aPlaybackRate)
 {
   ErrorResult rv;
   SetPlaybackRate(aPlaybackRate, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute bool mozPreservesPitch; */

@@ -328,7 +328,7 @@ ImageDocument::GetImageRequest(imgIRequest** aImageRequest)
 {
   ErrorResult rv;
   *aImageRequest = GetImageRequest(rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void

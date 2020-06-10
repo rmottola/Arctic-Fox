@@ -73,7 +73,7 @@ CreateElementTxn::DoTransaction()
   ErrorResult rv;
   if (mOffsetInParent == -1) {
     mParent->AppendChild(*mNewNode, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   mOffsetInParent = std::min(mOffsetInParent,
@@ -84,7 +84,7 @@ CreateElementTxn::DoTransaction()
 
   nsCOMPtr<nsIContent> refNode = mRefNode;
   mParent->InsertBefore(*mNewNode, refNode, rv);
-  NS_ENSURE_SUCCESS(rv.ErrorCode(), rv.ErrorCode());
+  NS_ENSURE_SUCCESS(rv.StealNSResult(), rv.StealNSResult());
 
   // Only set selection to insertion point if editor gives permission
   if (!mEditor->GetShouldTxnSetSelection()) {
@@ -109,7 +109,7 @@ CreateElementTxn::UndoTransaction()
   ErrorResult rv;
   mParent->RemoveChild(*mNewNode, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -125,7 +125,7 @@ CreateElementTxn::RedoTransaction()
   ErrorResult rv;
   nsCOMPtr<nsIContent> refNode = mRefNode;
   mParent->InsertBefore(*mNewNode, refNode, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP

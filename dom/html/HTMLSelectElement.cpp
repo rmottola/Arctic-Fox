@@ -663,7 +663,7 @@ HTMLSelectElement::Add(nsIDOMHTMLElement* aElement,
       dataType == nsIDataType::VTYPE_VOID) {
     ErrorResult error;
     Add(*htmlElement, (nsGenericHTMLElement*)nullptr, error);
-    return error.ErrorCode();
+    return error.StealNSResult();
   }
 
   nsCOMPtr<nsISupports> supports;
@@ -679,7 +679,7 @@ HTMLSelectElement::Add(nsIDOMHTMLElement* aElement,
 
     ErrorResult error;
     Add(*htmlElement, beforeHTMLElement, error);
-    return error.ErrorCode();
+    return error.StealNSResult();
   }
 
   // otherwise, whether aBefore is long
@@ -688,7 +688,7 @@ HTMLSelectElement::Add(nsIDOMHTMLElement* aElement,
 
   ErrorResult error;
   Add(*htmlElement, index, error);
-  return error.ErrorCode();
+  return error.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -737,7 +737,7 @@ HTMLSelectElement::SetLength(uint32_t aLength)
 {
   ErrorResult rv;
   SetLength(aLength, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void

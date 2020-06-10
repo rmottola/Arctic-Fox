@@ -923,7 +923,7 @@ nsHTMLDocument::SetDomain(const nsAString& aDomain)
 {
   ErrorResult rv;
   SetDomain(aDomain, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -1044,7 +1044,7 @@ nsHTMLDocument::SetBody(nsIDOMHTMLElement* aBody)
              "How could we be an nsIContent but not actually HTML here?");
   ErrorResult rv;
   SetBody(static_cast<nsGenericHTMLElement*>(newBody.get()), rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -1223,7 +1223,7 @@ nsHTMLDocument::GetCookie(nsAString& aCookie)
 {
   ErrorResult rv;
   GetCookie(aCookie, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<nsIChannel>
@@ -1311,7 +1311,7 @@ nsHTMLDocument::SetCookie(const nsAString& aCookie)
 {
   ErrorResult rv;
   SetCookie(aCookie, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -1372,7 +1372,7 @@ nsHTMLDocument::Open(const nsAString& aContentTypeOrUrl,
     ErrorResult rv;
     *aReturn = Open(cx, aContentTypeOrUrl, aReplaceOrName, aFeatures,
                     false, rv).take();
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   nsString type;
@@ -1387,7 +1387,7 @@ nsHTMLDocument::Open(const nsAString& aContentTypeOrUrl,
   }
   ErrorResult rv;
   *aReturn = Open(cx, type, replace, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<nsIDOMWindow>
@@ -1761,7 +1761,7 @@ nsHTMLDocument::Close()
 {
   ErrorResult rv;
   Close(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -2235,7 +2235,7 @@ nsHTMLDocument::GetSelection(nsISelection** aReturn)
 {
   ErrorResult rv;
   NS_IF_ADDREF(*aReturn = nsDocument::GetSelection(rv));
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -2904,7 +2904,7 @@ nsHTMLDocument::SetDesignMode(const nsAString & aDesignMode)
 {
   ErrorResult rv;
   SetDesignMode(aDesignMode, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -3185,7 +3185,7 @@ nsHTMLDocument::ExecCommand(const nsAString& commandID,
 {
   ErrorResult rv;
   *_retval = ExecCommand(commandID, doShowUI, value, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -3322,7 +3322,7 @@ nsHTMLDocument::QueryCommandEnabled(const nsAString& commandID,
 {
   ErrorResult rv;
   *_retval = QueryCommandEnabled(commandID, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -3377,7 +3377,7 @@ nsHTMLDocument::QueryCommandIndeterm(const nsAString & commandID,
 {
   ErrorResult rv;
   *_retval = QueryCommandIndeterm(commandID, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -3434,7 +3434,7 @@ nsHTMLDocument::QueryCommandState(const nsAString & commandID, bool *_retval)
 {
   ErrorResult rv;
   *_retval = QueryCommandState(commandID, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -3536,7 +3536,7 @@ nsHTMLDocument::QueryCommandValue(const nsAString & commandID,
 {
   ErrorResult rv;
   QueryCommandValue(commandID, _retval, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void

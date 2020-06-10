@@ -1116,7 +1116,7 @@ Selection::ToStringWithFormat(const char* aFormatType, uint32_t aFlags,
   NS_ConvertUTF8toUTF16 format(aFormatType);
   ToStringWithFormat(format, aFlags, aWrapCol, aReturn, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -1173,7 +1173,7 @@ Selection::SetInterlinePosition(bool aHintRight)
   ErrorResult result;
   SetInterlinePosition(aHintRight, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -1194,7 +1194,7 @@ Selection::GetInterlinePosition(bool* aHintRight)
   ErrorResult result;
   *aHintRight = GetInterlinePosition(result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -3991,7 +3991,7 @@ Selection::GetRangesForInterval(nsIDOMNode* aBeginNode, int32_t aBeginOffset,
   GetRangesForInterval(*beginNode, aBeginOffset, *endNode, aEndOffset,
                        aAllowAdjacent, results, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   *aResultCount = results.Length();
   if (*aResultCount == 0) {
@@ -4694,7 +4694,7 @@ Selection::RemoveAllRanges()
 {
   ErrorResult result;
   RemoveAllRanges(result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -4732,7 +4732,7 @@ Selection::AddRange(nsIDOMRange* aDOMRange)
   nsRange* range = static_cast<nsRange*>(aDOMRange);
   ErrorResult result;
   AddRange(*range, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -4815,7 +4815,7 @@ Selection::RemoveRange(nsIDOMRange* aDOMRange)
   nsRange* range = static_cast<nsRange*>(aDOMRange);
   ErrorResult result;
   RemoveRange(*range, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -4913,7 +4913,7 @@ Selection::Collapse(nsINode* aParentNode, int32_t aOffset)
 
   ErrorResult result;
   Collapse(*aParentNode, static_cast<uint32_t>(aOffset), result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -4989,7 +4989,7 @@ Selection::CollapseToStart()
 {
   ErrorResult result;
   CollapseToStart(result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -5030,7 +5030,7 @@ Selection::CollapseToEnd()
 {
   ErrorResult result;
   CollapseToEnd(result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -5110,7 +5110,7 @@ Selection::GetRangeAt(int32_t aIndex, nsIDOMRange** aReturn)
   ErrorResult result;
   *aReturn = GetRangeAt(aIndex, result);
   NS_IF_ADDREF(*aReturn);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 nsRange*
@@ -5217,7 +5217,7 @@ Selection::Extend(nsINode* aParentNode, int32_t aOffset)
 
   ErrorResult result;
   Extend(*aParentNode, static_cast<uint32_t>(aOffset), result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -5517,7 +5517,7 @@ Selection::SelectAllChildren(nsIDOMNode* aParentNode)
   nsCOMPtr<nsINode> node = do_QueryInterface(aParentNode);
   NS_ENSURE_TRUE(node, NS_ERROR_INVALID_ARG);
   SelectAllChildren(*node, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -5550,7 +5550,7 @@ Selection::ContainsNode(nsIDOMNode* aNode, bool aAllowPartial, bool* aYes)
   }
   ErrorResult result;
   *aYes = ContainsNode(*node, aAllowPartial, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 bool
@@ -5794,7 +5794,7 @@ Selection::ScrollIntoView(SelectionRegion aRegion, bool aIsSynchronous,
   ErrorResult result;
   ScrollIntoView(aRegion, aIsSynchronous, aVPercent, aHPercent, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -5890,7 +5890,7 @@ Selection::AddSelectionListener(nsISelectionListener* aNewListener)
   ErrorResult result;
   AddSelectionListener(aNewListener, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -5913,7 +5913,7 @@ Selection::RemoveSelectionListener(nsISelectionListener* aListenerToRemove)
   ErrorResult result;
   RemoveSelectionListener(aListenerToRemove, result);
   if (result.Failed()) {
-    return result.ErrorCode();
+    return result.StealNSResult();
   }
   return NS_OK;
 }
@@ -6003,7 +6003,7 @@ Selection::DeleteFromDocument()
 {
   ErrorResult result;
   DeleteFromDocument(result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void
@@ -6023,7 +6023,7 @@ Selection::Modify(const nsAString& aAlter, const nsAString& aDirection,
 {
   ErrorResult result;
   Modify(aAlter, aDirection, aGranularity, result);
-  return result.ErrorCode();
+  return result.StealNSResult();
 }
 
 void

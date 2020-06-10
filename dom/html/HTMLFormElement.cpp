@@ -272,7 +272,7 @@ HTMLFormElement::Submit()
 {
   ErrorResult rv;
   Submit(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP

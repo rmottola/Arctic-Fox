@@ -1759,7 +1759,7 @@ mozInlineSpellChecker::RemoveRange(Selection *aSpellCheckSelection,
   if (!rv.Failed() && mNumWordsInSpellSelection)
     mNumWordsInSpellSelection--;
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 

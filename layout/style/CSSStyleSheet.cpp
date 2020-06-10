@@ -1769,7 +1769,7 @@ CSSStyleSheet::GetCssRules(nsIDOMCSSRuleList** aCssRules)
   ErrorResult rv;
   nsCOMPtr<nsIDOMCSSRuleList> rules = GetCssRules(rv);
   rules.forget(aCssRules);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 CSSRuleList*

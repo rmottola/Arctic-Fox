@@ -267,7 +267,7 @@ nsDOMAttributeMap::SetNamedItem(nsIDOMAttr* aAttr, nsIDOMAttr** aReturn)
 
   ErrorResult rv;
   *aReturn = SetNamedItem(*attribute, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -278,7 +278,7 @@ nsDOMAttributeMap::SetNamedItemNS(nsIDOMAttr* aAttr, nsIDOMAttr** aReturn)
 
   ErrorResult rv;
   *aReturn = SetNamedItemNS(*attribute, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<Attr>
@@ -396,7 +396,7 @@ nsDOMAttributeMap::RemoveNamedItem(const nsAString& aName,
 
   ErrorResult rv;
   *aReturn = RemoveNamedItem(aName, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<Attr>
@@ -534,7 +534,7 @@ nsDOMAttributeMap::RemoveNamedItemNS(const nsAString& aNamespaceURI,
   NS_ENSURE_ARG_POINTER(aReturn);
   ErrorResult rv;
   *aReturn = RemoveNamedItemNS(aNamespaceURI, aLocalName, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<Attr>

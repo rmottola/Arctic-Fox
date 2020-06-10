@@ -36,7 +36,7 @@ public:
   {
     mozilla::ErrorResult rv;
     SetAlign(aAlign, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   void GetAlign(DOMString& aAlign)

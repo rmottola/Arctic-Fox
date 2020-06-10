@@ -556,7 +556,7 @@ nsINode::RemoveChild(nsIDOMNode* aOldChild, nsIDOMNode** aReturn)
   if (!rv.Failed()) {
     NS_ADDREF(*aReturn = aOldChild);
   }
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -2463,7 +2463,7 @@ nsINode::ReplaceOrInsertBefore(bool aReplace, nsIDOMNode *aNewChild,
   if (result) {
     NS_ADDREF(*aReturn = result->AsDOMNode());
   }
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsresult
@@ -2858,7 +2858,7 @@ nsINode::QuerySelector(const nsAString& aSelector, nsIDOMElement **aReturn)
   ErrorResult rv;
   Element* result = nsINode::QuerySelector(aSelector, rv);
   if (rv.Failed()) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
   nsCOMPtr<nsIDOMElement> elt = do_QueryInterface(result);
   elt.forget(aReturn);
@@ -2870,7 +2870,7 @@ nsINode::QuerySelectorAll(const nsAString& aSelector, nsIDOMNodeList **aReturn)
 {
   ErrorResult rv;
   *aReturn = nsINode::QuerySelectorAll(aSelector, rv).take();
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 Element*
