@@ -5459,7 +5459,7 @@ nsDocument::CreateElement(const nsAString& aTagName,
   *aReturn = nullptr;
   ErrorResult rv;
   nsCOMPtr<Element> element = nsIDocument::CreateElement(aTagName, rv);
-  NS_ENSURE_FALSE(rv.Failed(), rv.ErrorCode());
+  NS_ENSURE_FALSE(rv.Failed(), rv.StealNSResult());
   return CallQueryInterface(element, aReturn);
 }
 
@@ -5566,7 +5566,7 @@ nsDocument::CreateElementNS(const nsAString& aNamespaceURI,
   ErrorResult rv;
   nsCOMPtr<Element> element =
     nsIDocument::CreateElementNS(aNamespaceURI, aQualifiedName, rv);
-  NS_ENSURE_FALSE(rv.Failed(), rv.ErrorCode());
+  NS_ENSURE_FALSE(rv.Failed(), rv.StealNSResult());
   return CallQueryInterface(element, aReturn);
 }
 

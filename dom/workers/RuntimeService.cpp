@@ -2378,7 +2378,7 @@ RuntimeService::CreateSharedWorkerFromLoadInfo(JSContext* aCx,
     workerPrivate =
       WorkerPrivate::Constructor(aCx, aScriptURL, false,
                                  aType, aName, aLoadInfo, rv);
-    NS_ENSURE_TRUE(workerPrivate, rv.ErrorCode());
+    NS_ENSURE_TRUE(workerPrivate, rv.StealNSResult());
 
     created = true;
   } else {
