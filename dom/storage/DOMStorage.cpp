@@ -131,7 +131,7 @@ DOMStorage::SetItem(const nsAString& aKey, const nsAString& aData,
     return;
   }
 
-  if (aRv.ErrorCode() != NS_SUCCESS_DOM_NO_OPERATION) {
+  if (!aRv.ErrorCodeIs(NS_SUCCESS_DOM_NO_OPERATION)) {
     BroadcastChangeNotification(aKey, old, aData);
   }
 }
@@ -150,7 +150,7 @@ DOMStorage::RemoveItem(const nsAString& aKey, ErrorResult& aRv)
     return;
   }
 
-  if (aRv.ErrorCode() != NS_SUCCESS_DOM_NO_OPERATION) {
+  if (!aRv.ErrorCodeIs(NS_SUCCESS_DOM_NO_OPERATION)) {
     BroadcastChangeNotification(aKey, old, NullString());
   }
 }
@@ -168,7 +168,7 @@ DOMStorage::Clear(ErrorResult& aRv)
     return;
   }
 
-  if (aRv.ErrorCode() != NS_SUCCESS_DOM_NO_OPERATION) {
+  if (!aRv.ErrorCodeIs(NS_SUCCESS_DOM_NO_OPERATION)) {
     BroadcastChangeNotification(NullString(), NullString(), NullString());
   }
 }
