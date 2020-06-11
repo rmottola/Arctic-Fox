@@ -82,7 +82,8 @@ public:
     * @param aAttribute     [IN] a string containing the name of a HTML
     *                            attribute carried by the element above
     */
-  bool IsCSSEditableProperty(nsIContent* aNode, nsIAtom* aProperty, const nsAString* aAttribute);
+  bool IsCSSEditableProperty(nsINode* aNode, nsIAtom* aProperty,
+                             const nsAString* aAttribute);
   bool IsCSSEditableProperty(nsIDOMNode* aNode, nsIAtom* aProperty, const nsAString* aAttribute);
 
   /** adds/remove a CSS declaration to the STYLE atrribute carried by a given element
@@ -186,7 +187,7 @@ public:
     *
     * The nsIContent variant returns aIsSet instead of using an out parameter.
     */
-  bool IsCSSEquivalentToHTMLInlineStyleSet(nsIContent* aContent,
+  bool IsCSSEquivalentToHTMLInlineStyleSet(nsINode* aContent,
                                            nsIAtom* aProperty,
                                            const nsAString* aAttribute,
                                            const nsAString& aValue,
