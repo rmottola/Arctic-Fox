@@ -40,6 +40,12 @@ if CONFIG['OS_TARGET'] == 'Linux':
     LOCAL_INCLUDES += [
         '/media/mtransport/third_party/nrappkit/src/port/linux/include',
     ]
+    USE_LIBS += [
+        'static:/nsprpub/lib/libc/src/plc4',
+    ]
+    OS_LIBS += [
+        '-lrt',
+    ]
 
 if CONFIG['OS_TARGET'] == 'Darwin':
     LOCAL_INCLUDES += [
@@ -80,14 +86,22 @@ LOCAL_INCLUDES += [
     '/media/mtransport/third_party/nrappkit/src/util/libekr',
     '/media/webrtc/trunk/testing/gtest/include/',
     '/netwerk/sctp/src/',
+    '/xpcom/libxpcomrt',
 ]
 
 USE_LIBS += [
     '/media/webrtc/trunk/testing/gtest_gtest/gtest',
-    'mtransport_s',
+    'fallible',
+    'mfbt',
+    'mozglue',
+    'mtransport_standalone',
+    'necko_standalone',
     'nicer',
     'nrappkit',
+    'nspr',
     'nss',
+    'unicharutil_standalone',
+    'xpcomrt',
 ]
 
 if not CONFIG['MOZ_NATIVE_NSS'] and not CONFIG['MOZ_FOLD_LIBS']:
@@ -100,3 +114,5 @@ if CONFIG['MOZ_SCTP']:
     USE_LIBS += [
         'nksctp_s',
     ]
+
+USE_LIBS += ['mozglue']
