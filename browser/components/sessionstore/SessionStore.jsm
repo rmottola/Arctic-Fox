@@ -1893,6 +1893,10 @@ let SessionStoreInternal = {
       debug("State argument must contain field 'entries'");
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
     }
+    if (!aTab.ownerDocument) {
+      debug("Tab argument must have an owner document");
+      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    }
 
     let window = aTab.ownerDocument.defaultView;
     if (!("__SSi" in window)) {
