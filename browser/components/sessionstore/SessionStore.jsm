@@ -82,6 +82,9 @@ const NOTAB_MESSAGES = new Set([
   "SessionStore:setupSyncHandler",
 
   // For a description see above.
+  "SessionStore:crashedTabRevived",
+
+  // For a description see above.
   "SessionStore:update",
 ]);
 
@@ -129,9 +132,6 @@ XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
   "@mozilla.org/gfx/screenmanager;1", "nsIScreenManager");
 XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
   "@mozilla.org/base/telemetry;1", "nsITelemetry");
-XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
-  "@mozilla.org/parentprocessmessagemanager;1",
-  "nsIMessageListenerManager");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
   "resource://gre/modules/devtools/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
@@ -1798,7 +1798,7 @@ let SessionStoreInternal = {
     // Don't include any deferred initial state.
     delete state.deferredInitialState;
 
-    return this._toJSONString(state);
+    return JSON.stringify(state);
   },
 
   setBrowserState: function ssi_setBrowserState(aState) {
@@ -1808,8 +1808,12 @@ let SessionStoreInternal = {
       var state = JSON.parse(aState);
     }
     catch (ex) { /* invalid state object - don't restore anything */ }
-    if (!state || !state.windows)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!state) {
+      throw Components.Exception("Invalid state string: not JSON", Cr.NS_ERROR_INVALID_ARG);
+    }
+    if (!state.windows) {
+      throw Components.Exception("No windows", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     this._browserSetState = true;
 
@@ -1847,20 +1851,21 @@ let SessionStoreInternal = {
 
   getWindowState: function ssi_getWindowState(aWindow) {
     if ("__SSi" in aWindow) {
-      return this._toJSONString(this._getWindowState(aWindow));
+      return JSON.stringify(this._getWindowState(aWindow));
     }
 
     if (DyingWindowCache.has(aWindow)) {
       let data = DyingWindowCache.get(aWindow);
-      return this._toJSONString({ windows: [data] });
+      return JSON.stringify({ windows: [data] });
     }
 
-    throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
   },
 
   setWindowState: function ssi_setWindowState(aWindow, aState, aOverwrite) {
-    if (!aWindow.__SSi)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!aWindow.__SSi) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     this.restoreWindows(aWindow, aState, {overwriteTabs: aOverwrite});
   },
@@ -1872,7 +1877,7 @@ let SessionStoreInternal = {
 
     let tabState = TabState.collect(aTab);
 
-    return this._toJSONString(tabState);
+    return JSON.stringify(tabState);
   },
 
   setTabState: function ssi_setTabState(aTab, aState, aOptions) {
@@ -1882,22 +1887,18 @@ let SessionStoreInternal = {
     // by |restoreTabs|.
     let tabState = JSON.parse(aState);
     if (!tabState) {
-      debug("Empty state argument");
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+      throw Components.Exception("Invalid state string: not JSON", Cr.NS_ERROR_INVALID_ARG);
     }
     if (typeof tabState != "object") {
-      debug("State argument does not represent an object");
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+      throw Components.Exception("Not an object", Cr.NS_ERROR_INVALID_ARG);
     }
     if (!("entries" in tabState)) {
-      debug("State argument must contain field 'entries'");
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+      throw Components.Exception("Invalid state object: no entries", Cr.NS_ERROR_INVALID_ARG);
     }
 
     let window = aTab.ownerDocument.defaultView;
     if (!("__SSi" in window)) {
-      debug("Default view of ownerDocument must have a unique identifier");
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
 
     if (aTab.linkedBrowser.__SS_restoreState) {
@@ -1967,36 +1968,40 @@ let SessionStoreInternal = {
       return this._windows[aWindow.__SSi]._closedTabs.length;
     }
 
-    if (DyingWindowCache.has(aWindow)) {
-      return DyingWindowCache.get(aWindow)._closedTabs.length;
+
+    if (!DyingWindowCache.has(aWindow)) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
 
-    throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    return DyingWindowCache.get(aWindow)._closedTabs.length;
   },
 
   getClosedTabData: function ssi_getClosedTabDataAt(aWindow) {
     if ("__SSi" in aWindow) {
-      return this._toJSONString(this._windows[aWindow.__SSi]._closedTabs);
+      return JSON.stringify(this._windows[aWindow.__SSi]._closedTabs);
     }
 
-    if (DyingWindowCache.has(aWindow)) {
-      let data = DyingWindowCache.get(aWindow);
-      return this._toJSONString(data._closedTabs);
+    if (!DyingWindowCache.has(aWindow)) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
 
-    throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    let data = DyingWindowCache.get(aWindow);
+    return JSON.stringify(data._closedTabs);
   },
 
   undoCloseTab: function ssi_undoCloseTab(aWindow, aIndex) {
-    if (!aWindow.__SSi)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!aWindow.__SSi) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     var closedTabs = this._windows[aWindow.__SSi]._closedTabs;
 
     // default to the most-recently closed tab
     aIndex = aIndex || 0;
-    if (!(aIndex in closedTabs))
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    aIndex = aIndex || 0;
+    if (!(aIndex in closedTabs)) {
+      throw Components.Exception("Invalid index: not in the closed tabs", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     // fetch the data of closed tab, while removing it from the array
     let {state, pos} = this.removeClosedTabData(closedTabs, aIndex);
@@ -2018,15 +2023,17 @@ let SessionStoreInternal = {
   },
 
   forgetClosedTab: function ssi_forgetClosedTab(aWindow, aIndex) {
-    if (!aWindow.__SSi)
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!aWindow.__SSi) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     var closedTabs = this._windows[aWindow.__SSi]._closedTabs;
 
     // default to the most-recently closed tab
     aIndex = aIndex || 0;
-    if (!(aIndex in closedTabs))
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!(aIndex in closedTabs)) {
+      throw Components.Exception("Invalid index: not in the closed tabs", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     // remove closed tab from the array
     this.removeClosedTabData(closedTabs, aIndex);
@@ -2037,12 +2044,13 @@ let SessionStoreInternal = {
   },
 
   getClosedWindowData: function ssi_getClosedWindowData() {
-    return this._toJSONString(this._closedWindows);
+    return JSON.stringify(this._closedWindows);
   },
 
   undoCloseWindow: function ssi_undoCloseWindow(aIndex) {
-    if (!(aIndex in this._closedWindows))
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!(aIndex in this._closedWindows)) {
+      throw Components.Exception("Invalid index: not in the closed windows", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     // reopen the window
     let state = { windows: this._closedWindows.splice(aIndex, 1) };
@@ -2056,8 +2064,9 @@ let SessionStoreInternal = {
   forgetClosedWindow: function ssi_forgetClosedWindow(aIndex) {
     // default to the most-recently closed window
     aIndex = aIndex || 0;
-    if (!(aIndex in this._closedWindows))
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    if (!(aIndex in this._closedWindows)) {
+      throw Components.Exception("Invalid index: not in the closed windows", Cr.NS_ERROR_INVALID_ARG);
+    }
 
     // remove closed window from the array
     this._closedWindows.splice(aIndex, 1);
@@ -2074,23 +2083,21 @@ let SessionStoreInternal = {
       return data[aKey] || "";
     }
 
-    throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
+    throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
   },
 
   setWindowValue: function ssi_setWindowValue(aWindow, aKey, aStringValue) {
     if (typeof aStringValue != "string") {
       throw new TypeError("setWindowValue only accepts string values");
     }
-    if (aWindow.__SSi) {
-      if (!this._windows[aWindow.__SSi].extData) {
-        this._windows[aWindow.__SSi].extData = {};
-      }
-      this._windows[aWindow.__SSi].extData[aKey] = aStringValue;
-      this.saveStateDelayed(aWindow);
+
+    if (!("__SSi" in aWindow)) {
+      throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
+    } if (!this._windows[aWindow.__SSi].extData) {
+      this._windows[aWindow.__SSi].extData = {};
     }
-    else {
-      throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
-    }
+    this._windows[aWindow.__SSi].extData[aKey] = aStringValue;
+    this.saveStateDelayed(aWindow);
   },
 
   deleteWindowValue: function ssi_deleteWindowValue(aWindow, aKey) {
@@ -2159,8 +2166,9 @@ let SessionStoreInternal = {
    */
   restoreLastSession: function ssi_restoreLastSession() {
     // Use the public getter since it also checks PB mode
-    if (!this.canRestoreLastSession)
-      throw (Components.returnCode = Cr.NS_ERROR_FAILURE);
+    if (!this.canRestoreLastSession) {
+      throw Components.Exception("Last session can not be restored");
+    }
 
     // First collect each window with its id...
     let windows = {};
@@ -2172,8 +2180,10 @@ let SessionStoreInternal = {
     let lastSessionState = LastSession.getState();
 
     // This shouldn't ever be the case...
-    if (!lastSessionState.windows.length)
-      throw (Components.returnCode = Cr.NS_ERROR_UNEXPECTED);
+    // This shouldn't ever be the case...
+    if (!lastSessionState.windows.length) {
+      throw Components.Exception("lastSessionState has no windows", Cr.NS_ERROR_UNEXPECTED);
+    }
 
     // We're technically doing a restore, so set things up so we send the
     // notification when we're done. We want to send "sessionstore-browser-state-restored".
@@ -2771,7 +2781,7 @@ let SessionStoreInternal = {
       delete this._windows[aWindow.__SSi].extData;
     }
     if (winData.cookies) {
-      this.restoreCookies(winData.cookies);
+      SessionCookies.restore(winData.cookies);
     }
     if (winData.extData) {
       if (!this._windows[aWindow.__SSi].extData) {
@@ -2942,6 +2952,14 @@ let SessionStoreInternal = {
     // It's important to set the window state to dirty so that
     // we collect their data for the first time when saving state.
     DirtyWindows.add(window);
+
+    // In case we didn't collect/receive data for any tabs yet we'll have to
+    // fill the array with at least empty tabData objects until |_tPos| or
+    // we'll end up with |null| entries.
+    for (let tab of Array.slice(tabbrowser.tabs, 0, tab._tPos)) {
+      let emptyState = {entries: [], lastAccessed: tab.lastAccessed};
+      this._windows[window.__SSi].tabs.push(emptyState);
+    }
 
     // Update the tab state in case we shut down without being notified.
     this._windows[window.__SSi].tabs[tab._tPos] = tabData;
@@ -3259,25 +3277,6 @@ let SessionStoreInternal = {
     // we might want to re-focus the last focused window
     if (this.windowToFocus) {
       this.windowToFocus.focus();
-    }
-  },
-
-  /**
-   * Restores cookies
-   * @param aCookies
-   *        Array of cookie objects
-   */
-  restoreCookies: function ssi_restoreCookies(aCookies) {
-    // MAX_EXPIRY should be 2^63-1, but JavaScript can't handle that precision
-    var MAX_EXPIRY = Math.pow(2, 62);
-    for (let i = 0; i < aCookies.length; i++) {
-      var cookie = aCookies[i];
-      try {
-        Services.cookies.add(cookie.host, cookie.path || "", cookie.name || "",
-                             cookie.value, !!cookie.secure, !!cookie.httponly, true,
-                             "expiry" in cookie ? cookie.expiry : MAX_EXPIRY);
-      }
-      catch (ex) { console.error(ex); } // don't let a single cookie stop recovering
     }
   },
 
@@ -3664,19 +3663,6 @@ let SessionStoreInternal = {
       }
       cIndex++;
     }
-  },
-
-  /**
-   * Converts a JavaScript object into a JSON string
-   * (see http://www.json.org/ for more information).
-   *
-   * The inverse operation consists of JSON.parse(JSON_string).
-   *
-   * @param aJSObject is the object to be converted
-   * @returns the object's JSON representation
-   */
-  _toJSONString: function ssi_toJSONString(aJSObject) {
-    return JSON.stringify(aJSObject);
   },
 
   _sendRestoreCompletedNotifications: function ssi_sendRestoreCompletedNotifications() {
