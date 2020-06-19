@@ -35,7 +35,7 @@ if CONFIG['MOZ_AUTH_EXTENSION']:
 if CONFIG['MOZ_UPDATER']:
     DIRS += ['/other-licenses/bsdiff']
 
-# Goanna/Core components.
+# Gecko/Core components.
 
 DIRS += [
     '/ipc',
