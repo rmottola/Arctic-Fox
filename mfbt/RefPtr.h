@@ -107,8 +107,9 @@ public:
 private:
   void assign(T* aVal)
   {
-    unref(mPtr);
+    T* tmp = mPtr;
     mPtr = aVal;
+    unref(tmp);
   }
 
   T* MOZ_OWNING_REF mPtr;
