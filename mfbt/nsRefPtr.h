@@ -511,4 +511,12 @@ operator!=(::detail::nsRefPtrZero* aLhs, const nsRefPtr<T>& aRhs)
 
 /*****************************************************************************/
 
+template <class T>
+inline already_AddRefed<T>
+do_AddRef(T*&& aObj)
+{
+  nsRefPtr<T> ref(aObj);
+  return ref.forget();
+}
+
 #endif /* mozilla_nsRefPtr_h */
