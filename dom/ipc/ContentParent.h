@@ -537,8 +537,7 @@ private:
                                                bool* aIsLangRTL,
                                                InfallibleTArray<nsString>* dictionaries,
                                                ClipboardCapabilities* clipboardCaps,
-                                               DomainPolicyClone* domainPolicy)
-        override;
+                                               DomainPolicyClone* domainPolicy) override;
 
     virtual bool DeallocPJavaScriptParent(mozilla::jsipc::PJavaScriptParent*) override;
 
@@ -743,6 +742,8 @@ private:
     virtual bool RecvAudioChannelChangeDefVolChannel(const int32_t& aChannel,
                                                      const bool& aHidden) override;
     virtual bool RecvGetSystemMemory(const uint64_t& getterId) override;
+
+    virtual bool RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
 
     virtual bool RecvDataStoreGetStores(
                        const nsString& aName,
