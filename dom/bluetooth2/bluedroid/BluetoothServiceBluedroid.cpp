@@ -1231,9 +1231,9 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
                             InfallibleTArray<nsString>());
     }
 
-    BluetoothSignal signal(NS_LITERAL_STRING("PropertyChanged"),
-                           NS_LITERAL_STRING(KEY_ADAPTER), props);
-    bs->DistributeSignal(signal);
+    bs->DistributeSignal(NS_LITERAL_STRING("PropertyChanged"),
+                         NS_LITERAL_STRING(KEY_ADAPTER),
+                         BluetoothValue(props));
 
     // Cleanup bluetooth interfaces after BT state becomes BT_STATE_OFF.
     nsRefPtr<ProfileDeinitResultHandler> res =
@@ -1336,9 +1336,9 @@ BluetoothServiceBluedroid::AdapterPropertiesNotification(
 
   NS_ENSURE_TRUE_VOID(propertiesArray.Length() > 0);
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("PropertyChanged"),
-                                   NS_LITERAL_STRING(KEY_ADAPTER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("PropertyChanged"),
+                   NS_LITERAL_STRING(KEY_ADAPTER),
+                   BluetoothValue(propertiesArray));
 
   // Send reply for SetProperty
   if (!sSetPropertyRunnableArray.IsEmpty()) {
@@ -1498,9 +1498,9 @@ BluetoothServiceBluedroid::DeviceFoundNotification(
     }
   }
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("DeviceFound"),
-                                   NS_LITERAL_STRING(KEY_ADAPTER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("DeviceFound"),
+                   NS_LITERAL_STRING(KEY_ADAPTER),
+                   BluetoothValue(propertiesArray));
 }
 
 void
@@ -1514,9 +1514,9 @@ BluetoothServiceBluedroid::DiscoveryStateChangedNotification(bool aState)
   InfallibleTArray<BluetoothNamedValue> propertiesArray;
   BT_APPEND_NAMED_VALUE(propertiesArray, "Discovering", sAdapterDiscovering);
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("PropertyChanged"),
-                                   NS_LITERAL_STRING(KEY_ADAPTER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("PropertyChanged"),
+                   NS_LITERAL_STRING(KEY_ADAPTER),
+                   BluetoothValue(propertiesArray));
 
   // Reply that Promise is resolved
   if (!sChangeDiscoveryRunnableArray.IsEmpty()) {
@@ -1540,9 +1540,9 @@ BluetoothServiceBluedroid::PinRequestNotification(const nsAString& aRemoteBdAddr
   BT_APPEND_NAMED_VALUE(propertiesArray, "type",
                         NS_LITERAL_STRING(PAIRING_REQ_TYPE_ENTERPINCODE));
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("PairingRequest"),
-                                   NS_LITERAL_STRING(KEY_PAIRING_LISTENER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("PairingRequest"),
+                   NS_LITERAL_STRING(KEY_PAIRING_LISTENER),
+                   BluetoothValue(propertiesArray));
 }
 
 void
@@ -1586,9 +1586,9 @@ BluetoothServiceBluedroid::SspRequestNotification(
   BT_APPEND_NAMED_VALUE(propertiesArray, "passkey", passkey);
   BT_APPEND_NAMED_VALUE(propertiesArray, "type", pairingType);
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("PairingRequest"),
-                                   NS_LITERAL_STRING(KEY_PAIRING_LISTENER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("PairingRequest"),
+                   NS_LITERAL_STRING(KEY_PAIRING_LISTENER),
+                   BluetoothValue(propertiesArray));
 }
 
 void
@@ -1619,9 +1619,10 @@ BluetoothServiceBluedroid::BondStateChangedNotification(
   InfallibleTArray<BluetoothNamedValue> propertiesArray;
   BT_APPEND_NAMED_VALUE(propertiesArray, "Paired", bonded);
 
-  DistributeSignal(BluetoothSignal(NS_LITERAL_STRING("PropertyChanged"),
-                                   nsString(aRemoteBdAddr),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(NS_LITERAL_STRING("PropertyChanged"),
+                   aRemoteBdAddr,
+                   BluetoothValue(propertiesArray));
+
   propertiesArray.Clear();
 
   // Append signal properties and notify adapter.
@@ -1631,9 +1632,9 @@ BluetoothServiceBluedroid::BondStateChangedNotification(
   nsString signalName = bonded ? NS_LITERAL_STRING(DEVICE_PAIRED_ID)
                                : NS_LITERAL_STRING(DEVICE_UNPAIRED_ID);
 
-  DistributeSignal(BluetoothSignal(signalName,
-                                   NS_LITERAL_STRING(KEY_ADAPTER),
-                                   BluetoothValue(propertiesArray)));
+  DistributeSignal(signalName,
+                   NS_LITERAL_STRING(KEY_ADAPTER),
+                   BluetoothValue(propertiesArray));
 
   if (aStatus == STATUS_SUCCESS) {
     // Resolve existing pair/unpair promise when pair/unpair succeeded
