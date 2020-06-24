@@ -237,8 +237,12 @@ Convert(const nsAString& aIn, BluetoothPropertyType& aOut);
 nsresult
 Convert(const nsAString& aIn, BluetoothServiceName& aOut);
 
+#ifdef MOZ_B2G_BT_API_V2
+// Removed in bluetooth2
+#else
 nsresult
 Convert(const nsAString& aIn, BluetoothSspPairingVariant& aOut);
+#endif
 
 nsresult
 Convert(BluetoothAclState aIn, bool& aOut);
@@ -311,6 +315,13 @@ Convert(BluetoothSspPairingVariant aIn, nsAString& aOut);
 
 nsresult
 Convert(ControlPlayStatus aIn, uint8_t& aOut);
+
+#ifdef MOZ_B2G_BT_API_V2
+nsresult
+Convert(nsresult aIn, BluetoothStatus& aOut);
+#else
+// Missing in bluetooth1
+#endif
 
 //
 // Packing
