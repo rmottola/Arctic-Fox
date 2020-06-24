@@ -28,7 +28,9 @@ union BluetoothValue
   nsString[];
   uint8_t[];
   BluetoothNamedValue[];
+  BluetoothGattId;
   BluetoothGattId[];
+  BluetoothGattServiceId;
   BluetoothGattServiceId[];
 };
 

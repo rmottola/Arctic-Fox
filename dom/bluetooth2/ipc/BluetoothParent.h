@@ -227,6 +227,12 @@ protected:
   DoRequest(const DiscoverGattServicesRequest& aRequest);
 
   bool
+  DoRequest(const GattClientStartNotificationsRequest& aRequest);
+
+  bool
+  DoRequest(const GattClientStopNotificationsRequest& aRequest);
+
+  bool
   DoRequest(const UnregisterGattClientRequest& aRequest);
 
   bool
