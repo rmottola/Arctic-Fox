@@ -206,6 +206,11 @@ public:
   UnregisterGattClientInternal(int aClientIf,
                                BluetoothReplyRunnable* aRunnable) override;
 
+  virtual void
+  GattClientReadRemoteRssiInternal(int aClientIf,
+                                   const nsAString& aDeviceAddress,
+                                   BluetoothReplyRunnable* aRunnable) override;
+
 protected:
   BluetoothServiceChildProcess();
   virtual ~BluetoothServiceChildProcess();
