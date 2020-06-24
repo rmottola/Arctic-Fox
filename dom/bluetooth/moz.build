@@ -109,13 +109,16 @@ if CONFIG['MOZ_B2G_BT']:
 
     FINAL_LIBRARY = 'xul'
 
+EXPORTS.mozilla.dom.bluetooth += [
+  'BluetoothCommon.h'
+]
+
 EXPORTS.mozilla.dom.bluetooth.ipc += [
     'bluetooth1/ipc/BluetoothMessageUtils.h',
 ]
 
 EXPORTS.mozilla.dom.bluetooth += [
     'bluetooth1/BluetoothAdapter.h',
-    'bluetooth1/BluetoothCommon.h',
     'bluetooth1/BluetoothDevice.h',
     'bluetooth1/BluetoothManager.h',
 ]

@@ -17,7 +17,4 @@
 #
 # Modifying this file will now automatically clobber the buildbot machines \o/
 #
-
-Clobber required KISS-FFT build config change
-
-Bug 1039866: Removing the metro browser
+Bug 1152821: Merge BluetoothCommon.h variants into single file
