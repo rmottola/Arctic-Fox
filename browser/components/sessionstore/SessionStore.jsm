@@ -603,7 +603,8 @@ let SessionStoreInternal = {
         this.onClose(aSubject);
         break;
       case "quit-application-granted":
-        this.onQuitApplicationGranted();
+        let syncShutdown = aData == "syncShutdown";
+        this.onQuitApplicationGranted(syncShutdown);
         break;
       case "browser-lastwindow-close-granted":
         this.onLastWindowCloseGranted();
@@ -1264,7 +1265,7 @@ let SessionStoreInternal = {
   /**
    * On quit application granted
    */
-  onQuitApplicationGranted: function ssi_onQuitApplicationGranted() {
+  onQuitApplicationGranted: function ssi_onQuitApplicationGranted(syncShutdown=false) {
     // Collect an initial snapshot of window data before we do the flush
     this._forEachBrowserWindow((win) => {
       this._collectWindowData(win);
@@ -1282,10 +1283,16 @@ let SessionStoreInternal = {
     // tabs correctly.
     RunState.setQuitting();
 
-    AsyncShutdown.quitApplicationGranted.addBlocker(
-      "SessionStore: flushing all windows",
-      this.flushAllWindowsAsync(progress),
-      () => progress);
+    if (!syncShutdown) {
+      // We've got some time to shut down, so let's do this properly.
+      AsyncShutdown.quitApplicationGranted.addBlocker(
+        "SessionStore: flushing all windows",
+        this.flushAllWindowsAsync(progress),
+        () => progress);
+    } else {
+      // We have to shut down NOW, which means we only get to save whatever
+      // we already had cached.
+    }
   },
 
   /**
