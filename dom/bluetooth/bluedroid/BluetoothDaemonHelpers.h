@@ -26,13 +26,6 @@ enum BluetoothAclState {
   ACL_STATE_DISCONNECTED
 };
 
-enum BluetoothSspPairingVariant {
-  SSP_VARIANT_PASSKEY_CONFIRMATION,
-  SSP_VARIANT_PASSKEY_ENTRY,
-  SSP_VARIANT_CONSENT,
-  SSP_VARIANT_PASSKEY_NOTIFICATION
-};
-
 struct BluetoothAddress {
   uint8_t mAddr[6];
 };
@@ -211,7 +204,7 @@ nsresult
 Convert(uint8_t aIn, BluetoothScanMode& aOut);
 
 nsresult
-Convert(uint8_t aIn, BluetoothSspPairingVariant& aOut);
+Convert(uint8_t aIn, BluetoothSspVariant& aOut);
 
 nsresult
 Convert(uint8_t aIn, BluetoothStatus& aOut);
@@ -241,7 +234,7 @@ Convert(const nsAString& aIn, BluetoothServiceName& aOut);
 // Removed in bluetooth2
 #else
 nsresult
-Convert(const nsAString& aIn, BluetoothSspPairingVariant& aOut);
+Convert(const nsAString& aIn, BluetoothSspVariant& aOut);
 #endif
 
 nsresult
@@ -308,10 +301,10 @@ nsresult
 Convert(BluetoothSocketType aIn, uint8_t& aOut);
 
 nsresult
-Convert(BluetoothSspPairingVariant aIn, uint8_t& aOut);
+Convert(BluetoothSspVariant aIn, uint8_t& aOut);
 
 nsresult
-Convert(BluetoothSspPairingVariant aIn, nsAString& aOut);
+Convert(BluetoothSspVariant aIn, nsAString& aOut);
 
 nsresult
 Convert(ControlPlayStatus aIn, uint8_t& aOut);
@@ -440,7 +433,7 @@ nsresult
 PackPDU(BluetoothSocketType aIn, BluetoothDaemonPDU& aPDU);
 
 nsresult
-PackPDU(BluetoothSspPairingVariant aIn, BluetoothDaemonPDU& aPDU);
+PackPDU(BluetoothSspVariant aIn, BluetoothDaemonPDU& aPDU);
 
 nsresult
 PackPDU(BluetoothScanMode aIn, BluetoothDaemonPDU& aPDU);
@@ -823,7 +816,7 @@ nsresult
 UnpackPDU(BluetoothDaemonPDU& aPDU, BluetoothServiceRecord& aOut);
 
 nsresult
-UnpackPDU(BluetoothDaemonPDU& aPDU, BluetoothSspPairingVariant& aOut);
+UnpackPDU(BluetoothDaemonPDU& aPDU, BluetoothSspVariant& aOut);
 
 nsresult
 UnpackPDU(BluetoothDaemonPDU& aPDU, BluetoothStatus& aOut);

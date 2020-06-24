@@ -296,6 +296,13 @@ enum BluetoothSspVariant {
   SSP_VARIANT_PASSKEY_NOTIFICATION
 };
 
+enum BluetoothSspVariant {
+  SSP_VARIANT_PASSKEY_CONFIRMATION,
+  SSP_VARIANT_PASSKEY_ENTRY,
+  SSP_VARIANT_CONSENT,
+  SSP_VARIANT_PASSKEY_NOTIFICATION
+};
+
 struct BluetoothUuid {
   uint8_t mUuid[16];
 
