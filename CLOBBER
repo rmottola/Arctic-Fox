@@ -17,4 +17,8 @@
 #
 # Modifying this file will now automatically clobber the buildbot machines \o/
 #
-Bug 1152821: Merge BluetoothCommon.h variants into single file
+Bug 1154235: Merge BluetoothUtils.{cpp,h} variants into single file
+
+This patch set renames and removes source files. This requires updating
+the build system's dependency information from scratch. The issue has
+been reported in bug 1154232.
