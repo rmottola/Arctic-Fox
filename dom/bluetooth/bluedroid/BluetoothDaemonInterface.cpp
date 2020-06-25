@@ -912,9 +912,8 @@ private:
 
   typedef BluetoothNotificationRunnable5<NotificationHandlerWrapper, void,
                                          nsString, nsString, uint32_t,
-                                         nsString, uint32_t,
-                                         const nsAString&, const nsAString&,
-                                         uint32_t, const nsAString&>
+                                         BluetoothSspVariant, uint32_t,
+                                         const nsAString&, const nsAString&>
     SspRequestNotification;
 
   typedef BluetoothNotificationRunnable3<NotificationHandlerWrapper, void,
@@ -1149,7 +1148,7 @@ private:
 
     nsresult
     operator () (nsString& aArg1, nsString& aArg2, uint32_t& aArg3,
-                 nsString& aArg4, uint32_t& aArg5) const
+                 BluetoothSspVariant aArg4, uint32_t& aArg5) const
     {
       BluetoothDaemonPDU& pdu = GetPDU();
 
@@ -1174,8 +1173,7 @@ private:
       }
 
       /* Read pairing variant */
-      rv = UnpackPDU(
-        pdu, UnpackConversion<BluetoothSspVariant, nsAString>(aArg4));
+      rv = UnpackPDU(pdu, aArg4);
       if (NS_FAILED(rv)) {
         return rv;
       }
