@@ -598,6 +598,11 @@ enum BluetoothGattCharPropBit {
 typedef uint8_t BluetoothGattCharProp;
 #define BLUETOOTH_EMPTY_GATT_CHAR_PROP  static_cast<BluetoothGattCharProp>(0x00)
 
+enum BluetoothGattStatus {
+  GATT_STATUS_SUCCESS,
+  GATT_STATUS_ERROR
+};
+
 struct BluetoothGattAdvData {
   uint8_t mAdvData[62];
 };
