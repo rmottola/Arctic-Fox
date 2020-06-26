@@ -45,8 +45,8 @@ public:
 
   virtual ~BluetoothOppManager();
   static BluetoothOppManager* Get();
-  void ClientDataHandler(mozilla::ipc::UnixSocketRawData* aMessage);
-  void ServerDataHandler(mozilla::ipc::UnixSocketRawData* aMessage);
+  void ClientDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
+  void ServerDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
 
   bool Listen();
 
@@ -68,7 +68,7 @@ public:
   // The following functions are inherited from BluetoothSocketObserver
   void ReceiveSocketData(
     BluetoothSocket* aSocket,
-    nsAutoPtr<mozilla::ipc::UnixSocketRawData>& aMessage) override;
+    nsAutoPtr<mozilla::ipc::UnixSocketBuffer>& aMessage) override;
   virtual void OnSocketConnectSuccess(BluetoothSocket* aSocket) override;
   virtual void OnSocketConnectError(BluetoothSocket* aSocket) override;
   virtual void OnSocketDisconnect(BluetoothSocket* aSocket) override;
@@ -116,7 +116,7 @@ private:
    *         length.
    */
   bool ComposePacket(uint8_t aOpCode,
-                     mozilla::ipc::UnixSocketRawData* aMessage);
+                     mozilla::ipc::UnixSocketBuffer* aMessage);
 
   /**
    * OBEX session status.
