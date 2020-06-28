@@ -19,8 +19,6 @@ interface FetchEvent : Event {
 
   [Throws] void respondWith(Promise<Response> r);
   [Throws] void respondWith(Response r);
-  Promise<Response> forwardTo(USVString url);
-  Promise<Response> default();
 };
 
 dictionary FetchEventInit : EventInit {
