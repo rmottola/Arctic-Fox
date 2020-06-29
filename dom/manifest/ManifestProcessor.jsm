@@ -31,7 +31,7 @@ const imports = {};
 Cu.import('resource://gre/modules/Services.jsm', imports);
 Cu.importGlobalProperties(['URL']);
 const securityManager = imports.Services.scriptSecurityManager;
-const netutil = Cc['@mozilla.org/network/util;1'].getService(Ci.nsINetUtil_ESR_38);
+const netutil = Cc['@mozilla.org/network/util;1'].getService(Ci.nsINetUtil);
 const defaultDisplayMode = 'browser';
 const displayModes = new Set([
   'fullscreen',
@@ -206,7 +206,7 @@ this.ManifestProcessor.prototype.process = function({
     }
     return result;
 
-    //Converts a URL to a Goanna URI
+    //Converts a URL to a Gecko URI
     function makeURI(webURL) {
       return imports.Services.io.newURI(webURL.toString(), null, null);
     }
@@ -258,7 +258,7 @@ this.ManifestProcessor.prototype.process = function({
         };
       let value = extractValue(obj),
         isParsable = (typeof value === 'string' && value.length > 0);
-      value = (isParsable) ? netutil.parseRequestContentType(value.trim(), charset, hadCharset) : undefined;
+      value = (isParsable) ? netutil.parseContentType(value.trim(), charset, hadCharset) : undefined;
       return (value === '') ? undefined : value;
     }
 
@@ -312,7 +312,7 @@ this.ManifestProcessor.prototype.process = function({
           return true;
         }
         size = size.toLowerCase();
-        if (!size.includes('x') || size.indexOf('x') !== size.lastIndexOf('x')) {
+        if (!size.contains('x') || size.indexOf('x') !== size.lastIndexOf('x')) {
           return false;
         }
 
