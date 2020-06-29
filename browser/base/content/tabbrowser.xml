@@ -1235,7 +1235,7 @@
         // can focus the content area right away, since tab switching is synchronous.
         // If we're using remote tabs, we have to wait until after we've finalized
         // switching the tabs.
-        let fm = Cc["@mozilla.org/focus-manager;1"].getService(Ci.nsIFocusManager);
+	let fm = Services.focus;
         let focusFlags = fm.FLAG_NOSCROLL;
         if (!gMultiProcessBrowser) {
           let newFocusedElement = fm.getFocusedElementForWindow(window.content, true, {});
