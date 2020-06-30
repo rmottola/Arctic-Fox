@@ -1579,6 +1579,7 @@ this.PlacesUtils = {
    *  - tags (string): csv string of the bookmark's tags.
    *  - charset (string): the last known charset of the bookmark.
    *  - keyword (string): the bookmark's keyword (unset if none).
+   *  - postData (string): the bookmark's keyword postData (unset if none).
    *  - iconuri (string): the bookmark's favicon url.
    * The last four properties are not set at all if they're irrelevant (e.g.
    * |charset| is not set if no charset was previously set for the bookmark
@@ -1593,7 +1594,7 @@ this.PlacesUtils = {
    * resolved to null.
    */
   promiseBookmarksTree: Task.async(function* (aItemGuid = "", aOptions = {}) {
-    let createItemInfoObject = (aRow, aIncludeParentGuid) => {
+    let createItemInfoObject = function* (aRow, aIncludeParentGuid) {
       let item = {};
       let copyProps = (...props) => {
         for (let prop of props) {
@@ -1632,9 +1633,11 @@ this.PlacesUtils = {
           // If this throws due to an invalid url, the item will be skipped.
           item.uri = NetUtil.newURI(aRow.getResultByName("url")).spec;
           // Keywords are cached, so this should be decently fast.
-          let keyword = PlacesUtils.bookmarks.getKeywordForBookmark(itemId);
-          if (keyword)
-            item.keyword = keyword;
+          let entry = yield PlacesUtils.keywords.fetch({ url: item.uri });
+          if (entry) {
+            item.keyword = entry.keyword;
+            item.postData = entry.postData;
+          }
           break;
         case Ci.nsINavBookmarksService.TYPE_FOLDER:
           item.type = PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER;
@@ -1656,7 +1659,7 @@ this.PlacesUtils = {
           break;
       }
       return item;
-    };
+    }.bind(this);
 
     const QUERY_STR =
       `WITH RECURSIVE
@@ -1709,40 +1712,34 @@ this.PlacesUtils = {
       return exclude;
     };
 
-    let rootItem = null, rootItemCreationEx = null;
+    let rootItem = null;
     let parentsMap = new Map();
-    try {
-      let conn = yield this.promiseDBConnection();
-      yield conn.executeCached(QUERY_STR,
-          { tags_folder: PlacesUtils.tagsFolderId,
-            charset_anno: PlacesUtils.CHARSET_ANNO,
-            item_guid: aItemGuid }, (aRow) => {
-        let item;
-        if (!rootItem) {
+    let conn = yield this.promiseDBConnection();
+    let rows = yield conn.executeCached(QUERY_STR,
+        { tags_folder: PlacesUtils.tagsFolderId,
+          charset_anno: PlacesUtils.CHARSET_ANNO,
+          item_guid: aItemGuid });
+    for (let row of rows) {
+      let item;
+      if (!rootItem) {
+        try {
           // This is the first row.
-          try {
-            rootItem = item = createItemInfoObject(aRow, true);
-          }
-          catch(ex) {
-            // If we couldn't figure out the root item, that is just as bad
-            // as a failed query.  Bail out.
-            rootItemCreationEx = ex;
-            throw StopIteration;
-          }
-
-          Object.defineProperty(rootItem, "itemsCount",
-                                { value: 1
-                                , writable: true
-                                , enumerable: false
-                                , configurable: false });
+          rootItem = item = yield createItemInfoObject(row, true);
+          Object.defineProperty(rootItem, "itemsCount", { value: 1
+                                                        , writable: true
+                                                        , enumerable: false
+                                                        , configurable: false });
+        } catch(ex) {
+          throw new Error("Failed to fetch the data for the root item " + ex);
         }
-        else {
+      } else {
+        try {
           // Our query guarantees that we always visit parents ahead of their
           // children.
-          item = createItemInfoObject(aRow, false);
-          let parentGuid = aRow.getResultByName("parentGuid");
+          item = yield createItemInfoObject(row, false);
+          let parentGuid = row.getResultByName("parentGuid");
           if (hasExcludeItemsCallback && shouldExcludeItem(item, parentGuid))
-            return;
+            continue;
 
           let parentItem = parentsMap.get(parentGuid);
           if ("children" in parentItem)
@@ -1751,17 +1748,15 @@ this.PlacesUtils = {
             parentItem.children = [item];
 
           rootItem.itemsCount++;
+        } catch(ex) {
+          // This is a bogus child, report and skip it.
+          Cu.reportError("Failed to fetch the data for an item " + ex);
+          continue;
         }
+      }
 
-        if (item.type == this.TYPE_X_MOZ_PLACE_CONTAINER)
-          parentsMap.set(item.guid, item);
-      });
-    } catch(e) {
-      throw new Error("Unable to query the database " + e);
-    }
-    if (rootItemCreationEx) {
-      throw new Error("Failed to fetch the data for the root item" +
-                      rootItemCreationEx);
+      if (item.type == this.TYPE_X_MOZ_PLACE_CONTAINER)
+        parentsMap.set(item.guid, item);
     }
 
     return rootItem;
