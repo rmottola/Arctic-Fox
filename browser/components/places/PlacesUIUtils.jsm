@@ -26,6 +26,9 @@ XPCOMUtils.defineLazyGetter(this, "PlacesUtils", function() {
   return PlacesUtils;
 });
 
+XPCOMUtils.defineLazyModuleGetter(this, "Weave",
+                                  "resource://services-sync/main.js");
+
 this.PlacesUIUtils = {
   ORGANIZER_LEFTPANE_VERSION: 7,
   ORGANIZER_FOLDER_ANNO: "PlacesOrganizer/OrganizerFolder",
@@ -1135,7 +1138,21 @@ this.PlacesUIUtils = {
       }
     }
     return queryName;
-  }
+  },
+
+  shouldShowTabsFromOtherComputersMenuitem: function() {
+    // If Sync isn't configured yet, then don't show the menuitem.
+    return Weave.Status.checkSetup() != Weave.CLIENT_NOT_CONFIGURED &&
+           Weave.Svc.Prefs.get("firstSync", "") != "notReady";
+  },
+
+  shouldEnableTabsFromOtherComputersMenuitem: function() {
+    // The tabs engine might never be inited (if services.sync.registerEngines
+    // is modified), so make sure we avoid undefined errors.
+    return Weave.Service.isLoggedIn &&
+           Weave.Service.engineManager.get("tabs") &&
+           Weave.Service.engineManager.get("tabs").enabled;
+  },
 };
 
 XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF",
