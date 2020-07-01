@@ -7213,57 +7213,8 @@ Object.defineProperty(this, "HUDService", {
 #endif
 
 // Prompt user to restart the browser in safe mode or normally
-function restart(safeMode)
-{
-  let promptTitleString = null;
-  let promptMessageString = null;
-  let restartTextString = null;
-  if (safeMode) {
-    promptTitleString = "safeModeRestartPromptTitle";
-    promptMessageString = "safeModeRestartPromptMessage";
-    restartTextString = "safeModeRestartButton";
-  } else {
-    promptTitleString = "restartPromptTitle";
-    promptMessageString = "restartPromptMessage";
-    restartTextString = "restartButton";
-  }
-
-  let flags = Ci.nsIAppStartup.eAttemptQuit;
-
-  // Prompt the user to confirm
-  let promptTitle = gNavigatorBundle.getString(promptTitleString);
-  let brandBundle = document.getElementById("bundle_brand");
-  let brandShortName = brandBundle.getString("brandShortName");
-  let promptMessage =
-    gNavigatorBundle.getFormattedString(promptMessageString, [brandShortName]);
-  let restartText = gNavigatorBundle.getString(restartTextString);
-  let buttonFlags = (Services.prompt.BUTTON_POS_0 *
-                     Services.prompt.BUTTON_TITLE_IS_STRING) +
-                    (Services.prompt.BUTTON_POS_1 *
-                     Services.prompt.BUTTON_TITLE_CANCEL) +
-                    Services.prompt.BUTTON_POS_0_DEFAULT;
-
-  let rv = Services.prompt.confirmEx(window, promptTitle, promptMessage,
-                                     buttonFlags, restartText, null, null,
-                                     null, {});
-
-  if (rv == 0) {
-    // Notify all windows that an application quit has been requested.
-    let cancelQuit = Components.classes["@mozilla.org/supports-PRBool;1"]
-                     .createInstance(Ci.nsISupportsPRBool);
-    Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
-
-    // Something aborted the quit process.
-    if (cancelQuit.data) {
-      return;
-    }
-
-    if (safeMode) {    
-      Services.startup.restartInSafeMode(flags);
-    } else {
-      Services.startup.quit(flags | Ci.nsIAppStartup.eRestart);
-    }
-  }
+function safeModeRestart() {
+  Services.obs.notifyObservers(null, "restart-in-safe-mode", "");
 }
 
 let PanicButtonNotifier = {
