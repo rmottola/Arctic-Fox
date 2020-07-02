@@ -560,7 +560,7 @@
                         label="&syncSetup.label;"
                         accesskey="&syncSetup.accesskey;"
                         observes="sync-setup-state"
-                        oncommand="gSyncUI.openSetup()"/>
+                        oncommand="gSyncUI.openSetup(null, 'menubar')"/>
               <menuitem id="sync-syncnowitem"
                         label="&syncSyncNowItem.label;"
                         accesskey="&syncSyncNowItem.accesskey;"
