@@ -12,68 +12,60 @@
  * same keyword appear in the list.
  */
 
-add_task(function* test_keyword_searc() {
-  let uri1 = NetUtil.newURI("http://abc/?search=%s");
-  let uri2 = NetUtil.newURI("http://abc/?search=ThisPageIsInHistory");
-  yield PlacesTestUtils.addVisits([
-    { uri: uri1, title: "Generic page title" },
-    { uri: uri2, title: "Generic page title" }
-  ]);
-  addBookmark({ uri: uri1, title: "Keyword title", keyword: "key"});
+// Details for the keyword bookmark
+let keyBase = "http://abc/?search=";
+let keyKey = "key";
 
-  do_print("Plain keyword query");
-  yield check_autocomplete({
-    search: "key term",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=term"), title: "Keyword title", style: ["keyword"] } ]
-  });
+// A second keyword bookmark with the same keyword
+let otherBase = "http://xyz/?foo=";
 
-  do_print("Multi-word keyword query");
-  yield check_autocomplete({
-    search: "key multi word",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=multi+word"), title: "Keyword title", style: ["keyword"] } ]
-  });
+let unescaped = "ユニコード";
+let pageInHistory = "ThisPageIsInHistory";
 
-  do_print("Keyword query with +");
-  yield check_autocomplete({
-    search: "key blocking+",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=blocking%2B"), title: "Keyword title", style: ["keyword"] } ]
-  });
+// Define some shared uris and titles (each page needs its own uri)
+let kURIs = [
+  keyBase + "%s",
+  keyBase + "term",
+  keyBase + "multi+word",
+  keyBase + "blocking%2B",
+  keyBase + unescaped,
+  keyBase + pageInHistory,
+  keyBase,
+  otherBase + "%s",
+  keyBase + "twoKey",
+  otherBase + "twoKey"
+];
+let kTitles = [
+  "Generic page title",
+  "Keyword title",
+];
 
-  do_print("Unescaped term in query");
-  yield check_autocomplete({
-    search: "key ユニコード",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=ユニコード"), title: "Keyword title", style: ["keyword"] } ]
-  });
+// Add the keyword bookmark
+addPageBook(0, 0, 1, [], keyKey);
+// Add in the "fake pages" for keyword searches
+gPages[1] = [1,0];
+gPages[2] = [2,0];
+gPages[3] = [3,0];
+gPages[4] = [4,0];
+// Add a page into history
+addPageBook(5, 0);
+gPages[6] = [6,0];
 
-  do_print("Keyword that happens to match a page");
-  yield check_autocomplete({
-    search: "key ThisPageIsInHistory",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=ThisPageIsInHistory"), title: "Generic page title", style: ["bookmark"] } ]
-  });
-
-  do_print("Keyword without query (without space)");
-  yield check_autocomplete({
-    search: "key",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search="), title: "Keyword title", style: ["keyword"] } ]
-  });
-
-  do_print("Keyword without query (with space)");
-  yield check_autocomplete({
-    search: "key ",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search="), title: "Keyword title", style: ["keyword"] } ]
-  });
-
-  // This adds a second keyword so anything after this will match 2 keywords
-  let uri3 = NetUtil.newURI("http://xyz/?foo=%s");
-  yield PlacesTestUtils.addVisits([ { uri: uri3, title: "Generic page title" } ]);
-  addBookmark({ uri: uri3, title: "Keyword title", keyword: "key", style: ["keyword"] });
-
-  do_print("Two keywords matched");
-  yield check_autocomplete({
-    search: "key twoKey",
-    matches: [ { uri: NetUtil.newURI("http://abc/?search=twoKey"), title: "Keyword title", style: ["keyword"] },
-               { uri: NetUtil.newURI("http://xyz/?foo=twoKey"), title: "Keyword title", style: ["keyword"] } ]
-  });
-
-  yield cleanup();
-});
+// Provide for each test: description; search terms; array of gPages indices of
+// pages that should match; optional function to be run before the test
+let gTests = [
+  ["0: Plain keyword query",
+   keyKey + " term", [1]],
+  ["1: Multi-word keyword query",
+   keyKey + " multi word", [2]],
+  ["2: Keyword query with +",
+   keyKey + " blocking+", [3]],
+  ["3: Unescaped term in query",
+   keyKey + " " + unescaped, [4]],
+  ["4: Keyword that happens to match a page",
+   keyKey + " " + pageInHistory, [5]],
+  ["5: Keyword without query (without space)",
+   keyKey, [6]],
+  ["6: Keyword without query (with space)",
+   keyKey + " ", [6]],
+];
