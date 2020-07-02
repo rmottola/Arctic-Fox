@@ -1042,7 +1042,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
   // We can end up here in all sorts of compartments, per above.  Make
   // sure to JS_WrapValue!
   rval.set(JS::ObjectValue(*obj));
-  return JS_WrapValue(cx, rval);
+  return MaybeWrapObjectValue(cx, rval);
 }
 
 // Create a JSObject wrapping "value", for cases when "value" is a
@@ -1090,7 +1090,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
   // We can end up here in all sorts of compartments, per above.  Make
   // sure to JS_WrapValue!
   rval.set(JS::ObjectValue(*obj));
-  return JS_WrapValue(cx, rval);
+  return MaybeWrapObjectValue(cx, rval);
 }
 
 // Helper for smart pointers (nsRefPtr/nsCOMPtr).
