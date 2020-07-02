@@ -176,6 +176,7 @@
 #ifdef MOZ_SERVICES_SYNC
     <broadcaster id="sync-setup-state"/>
     <broadcaster id="sync-syncnow-state"/>
+    <broadcaster id="sync-reauth-state" hidden="true"/>
 #endif
     <broadcaster id="workOfflineMenuitemState"/>
 

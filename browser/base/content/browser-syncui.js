@@ -139,7 +139,7 @@ let gSyncUI = {
     let loginFailed = this._loginFailed();
 
     // Start off with a clean slate
-//    document.getElementById("sync-reauth-state").hidden = true;
+    document.getElementById("sync-reauth-state").hidden = true;
     document.getElementById("sync-setup-state").hidden = true;
     document.getElementById("sync-syncnow-state").hidden = true;
 
