@@ -1,5 +1,3 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -64,7 +62,6 @@
 #include "nsIEventTarget.h"
 #include "nsIFile.h"
 #include "nsIFileURL.h"
-#include "nsIFileProtocolHandler.h"
 #include "nsIInputStream.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsInterfaceHashtable.h"
@@ -2203,22 +2200,8 @@ GetDatabaseFileURL(nsIFile* aDatabaseFile,
   MOZ_ASSERT(aDatabaseFile);
   MOZ_ASSERT(aResult);
 
-  nsresult rv;
-
-  nsCOMPtr<nsIProtocolHandler> protocolHandler(
-    do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "file", &rv));
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
-  nsCOMPtr<nsIFileProtocolHandler> fileHandler(
-    do_QueryInterface(protocolHandler, &rv));
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
   nsCOMPtr<nsIURI> uri;
-  rv = fileHandler->NewFileURI(aDatabaseFile, getter_AddRefs(uri));
+  nsresult rv = NS_NewFileURI(getter_AddRefs(uri), aDatabaseFile);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -3429,7 +3412,7 @@ private:
     mCachedStatements;
   nsTArray<nsRefPtr<FullObjectStoreMetadata>>
     mModifiedAutoIncrementObjectStoreMetadataArray;
-  uint64_t mTransactionId;
+  const uint64_t mTransactionId;
   const nsCString mDatabaseId;
   const int64_t mLoggingSerialNumber;
   uint64_t mActiveRequestCount;
@@ -3483,12 +3466,10 @@ public:
   }
 
   void
-  SetActive(uint64_t aTransactionId)
+  SetActive()
   {
     AssertIsOnBackgroundThread();
-    MOZ_ASSERT(aTransactionId);
 
-    mTransactionId = aTransactionId;
     mHasBeenActive = true;
   }
 
@@ -5290,9 +5271,9 @@ class PermissionRequestHelper final
   bool mActorDestroyed;
 
 public:
-  PermissionRequestHelper(Element* aOwnerElement,
+  PermissionRequestHelper(nsPIDOMWindow* aWindow,
                           nsIPrincipal* aPrincipal)
-    : PermissionRequestBase(aOwnerElement, aPrincipal)
+    : PermissionRequestBase(aWindow, aPrincipal)
     , mActorDestroyed(false)
   { }
 
@@ -5457,7 +5438,7 @@ public:
     MOZ_ASSERT(NS_IsMainThread());
 
     if (sInstance) {
-      return sInstance->IsShuttingDown();
+      return sInstance->mShutdownRequested;
     }
 
     return QuotaManager::IsShuttingDown();
@@ -5538,11 +5519,13 @@ class QuotaClient::ShutdownTransactionThreadPoolRunnable final
   : public nsRunnable
 {
   nsRefPtr<QuotaClient> mQuotaClient;
+  bool mHasRequestedShutDown;
 
 public:
 
   explicit ShutdownTransactionThreadPoolRunnable(QuotaClient* aQuotaClient)
     : mQuotaClient(aQuotaClient)
+    , mHasRequestedShutDown(false)
   {
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_ASSERT(aQuotaClient);
@@ -5908,7 +5891,7 @@ StaticRefPtr<DEBUGThreadSlower> gDEBUGThreadSlower;
 
 #endif // DEBUG
 
-} // namespace
+} // anonymous namespace
 
 /*******************************************************************************
  * Exported functions
@@ -5951,13 +5934,13 @@ DeallocPBackgroundIDBFactoryParent(PBackgroundIDBFactoryParent* aActor)
 }
 
 PIndexedDBPermissionRequestParent*
-AllocPIndexedDBPermissionRequestParent(Element* aOwnerElement,
+AllocPIndexedDBPermissionRequestParent(nsPIDOMWindow* aWindow,
                                        nsIPrincipal* aPrincipal)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   nsRefPtr<PermissionRequestHelper> actor =
-    new PermissionRequestHelper(aOwnerElement, aPrincipal);
+    new PermissionRequestHelper(aWindow, aPrincipal);
   return actor.forget().take();
 }
 
@@ -6150,6 +6133,16 @@ Factory::Create(const LoggingInfo& aLoggingInfo)
 
   // If this is the first instance then we need to do some initialization.
   if (!sFactoryInstanceCount) {
+    if (!gTransactionThreadPool) {
+      nsRefPtr<TransactionThreadPool> threadPool =
+        TransactionThreadPool::Create();
+      if (NS_WARN_IF(!threadPool)) {
+        return nullptr;
+      }
+
+      gTransactionThreadPool = threadPool;
+    }
+
     MOZ_ASSERT(!gLiveDatabaseHashtable);
     gLiveDatabaseHashtable = new DatabaseActorHashtable();
 
@@ -6802,29 +6795,18 @@ Database::RecvPBackgroundIDBTransactionConstructor(
     return true;
   }
 
-  if (!gTransactionThreadPool) {
-    nsRefPtr<TransactionThreadPool> threadPool =
-      TransactionThreadPool::Create();
-    if (NS_WARN_IF(!threadPool)) {
-      return false;
-    }
-
-    gTransactionThreadPool = threadPool;
-  }
-
-  const uint64_t transactionId = gTransactionThreadPool->NextTransactionId();
-
   auto* transaction = static_cast<NormalTransaction*>(aActor);
-  transaction->SetActive(transactionId);
 
   // Add a placeholder for this transaction immediately.
-  gTransactionThreadPool->Start(transactionId,
+  gTransactionThreadPool->Start(transaction->TransactionId(),
                                 mMetadata->mDatabaseId,
                                 aObjectStoreNames,
                                 aMode,
                                 GetLoggingInfo()->Id(),
                                 transaction->LoggingSerialNumber(),
                                 gStartTransactionRunnable);
+
+  transaction->SetActive();
 
   if (NS_WARN_IF(!RegisterTransaction(transaction))) {
     IDB_REPORT_INTERNAL_ERR();
@@ -6918,7 +6900,7 @@ Database::RecvClose()
 
 TransactionBase::TransactionBase(Database* aDatabase, Mode aMode)
   : mDatabase(aDatabase)
-  , mTransactionId(0)
+  , mTransactionId(gTransactionThreadPool->NextTransactionId())
   , mDatabaseId(aDatabase->Id())
   , mLoggingSerialNumber(aDatabase->GetLoggingInfo()->NextTransactionSN(aMode))
   , mActiveRequestCount(0)
@@ -6936,6 +6918,7 @@ TransactionBase::TransactionBase(Database* aDatabase, Mode aMode)
 {
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(aDatabase);
+  MOZ_ASSERT(mTransactionId);
   MOZ_ASSERT(mLoggingSerialNumber);
 }
 
@@ -10202,6 +10185,7 @@ QuotaClient::
 ShutdownTransactionThreadPoolRunnable::Run()
 {
   if (NS_IsMainThread()) {
+    MOZ_ASSERT(mHasRequestedShutDown);
     MOZ_ASSERT(QuotaClient::GetInstance() == mQuotaClient);
     MOZ_ASSERT(mQuotaClient->mShutdownRunnable == this);
 
@@ -10213,11 +10197,16 @@ ShutdownTransactionThreadPoolRunnable::Run()
 
   AssertIsOnBackgroundThread();
 
-  nsRefPtr<TransactionThreadPool> threadPool = gTransactionThreadPool.get();
-  if (threadPool) {
-    threadPool->Shutdown();
+  if (!mHasRequestedShutDown) {
+    mHasRequestedShutDown = true;
 
-    gTransactionThreadPool = nullptr;
+    nsRefPtr<TransactionThreadPool> threadPool = gTransactionThreadPool.get();
+    if (threadPool) {
+      threadPool->Shutdown();
+
+      gTransactionThreadPool = nullptr;
+    }
+
   }
 
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(this)));
@@ -11026,18 +11015,15 @@ FactoryOp::WaitForTransactions()
   nsTArray<nsCString> databaseIds;
   databaseIds.AppendElement(mDatabaseId);
 
+  nsRefPtr<TransactionThreadPool> threadPool = gTransactionThreadPool.get();
+  MOZ_ASSERT(threadPool);
+
+  // WaitForDatabasesToComplete() will run this op immediately if there are no
+  // transactions blocking it, so be sure to set the next state here before
+  // calling it.
   mState = State_WaitingForTransactionsToComplete;
 
-  nsRefPtr<TransactionThreadPool> threadPool = gTransactionThreadPool.get();
-  if (threadPool) {
-    // WaitForDatabasesToComplete() will run this op immediately if there are no
-    // transactions blocking it, so be sure to set the next state here before
-    // calling it.
-
-    threadPool->WaitForDatabasesToComplete(databaseIds, this);
-  } else {
-    unused << Run();
-  }
+  threadPool->WaitForDatabasesToComplete(databaseIds, this);
   return;
 }
 
@@ -12062,6 +12048,7 @@ OpenDatabaseOp::BeginVersionChange()
   MOZ_ASSERT(!mVersionChangeTransaction);
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
+      !OperationMayProceed() ||
       IsActorDestroyed()) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -12179,24 +12166,10 @@ OpenDatabaseOp::DispatchToWorkThread()
                IDBTransaction::VERSION_CHANGE);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
 
-  if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
-      IsActorDestroyed()) {
+  if (IsActorDestroyed()) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
-
-  if (!gTransactionThreadPool) {
-    nsRefPtr<TransactionThreadPool> threadPool =
-      TransactionThreadPool::Create();
-    if (!threadPool) {
-      IDB_REPORT_INTERNAL_ERR();
-      return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    }
-
-    gTransactionThreadPool = threadPool;
-  }
-
-  const uint64_t transactionId = gTransactionThreadPool->NextTransactionId();
 
   mState = State_DatabaseWorkVersionChange;
 
@@ -12210,15 +12183,15 @@ OpenDatabaseOp::DispatchToWorkThread()
 
   nsRefPtr<VersionChangeOp> versionChangeOp = new VersionChangeOp(this);
 
-  mVersionChangeTransaction->SetActive(transactionId);
-
-  gTransactionThreadPool->Start(transactionId,
+  gTransactionThreadPool->Start(mVersionChangeTransaction->TransactionId(),
                                 mVersionChangeTransaction->DatabaseId(),
                                 objectStoreNames,
                                 mVersionChangeTransaction->GetMode(),
                                 backgroundChildLoggingId,
                                 loggingSerialNumber,
                                 versionChangeOp);
+
+  mVersionChangeTransaction->SetActive();
 
   mVersionChangeTransaction->NoteActiveRequest();
 
@@ -12240,6 +12213,7 @@ OpenDatabaseOp::SendUpgradeNeeded()
   MOZ_ASSERT_IF(!IsActorDestroyed(), mDatabase);
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
+      !OperationMayProceed() ||
       IsActorDestroyed()) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -12279,8 +12253,8 @@ OpenDatabaseOp::SendResults()
 
   mMaybeBlockedDatabases.Clear();
 
-  // Only needed if we're being called from within NoteDatabaseClosed() since
-  // this OpenDatabaseOp is only held alive by the gLiveDatabaseHashtable.
+  // Only needed if we're being called from within NoteDatabaseDone() since this
+  // OpenDatabaseOp is only held alive by the gLiveDatabaseHashtable.
   nsRefPtr<OpenDatabaseOp> kungFuDeathGrip;
 
   DatabaseActorInfo* info;
@@ -12300,11 +12274,7 @@ OpenDatabaseOp::SendResults()
     mVersionChangeTransaction = nullptr;
   }
 
-  if (IsActorDestroyed()) {
-    if (NS_SUCCEEDED(mResultCode)) {
-      mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    }
-  } else {
+  if (!IsActorDestroyed()) {
     FactoryRequestResponse response;
 
     if (NS_SUCCEEDED(mResultCode)) {
@@ -12339,19 +12309,14 @@ OpenDatabaseOp::SendResults()
       PBackgroundIDBFactoryRequestParent::Send__delete__(this, response);
   }
 
-  if (mDatabase) {
-    MOZ_ASSERT(!mOfflineStorage);
-
-    if (NS_FAILED(mResultCode)) {
-      mDatabase->Invalidate();
-    }
-
-    // Make sure to release the database on this thread.
-    mDatabase = nullptr;
-  } else if (mOfflineStorage) {
+  if (NS_FAILED(mResultCode) && mOfflineStorage) {
     mOfflineStorage->CloseOnOwningThread();
     DatabaseOfflineStorage::UnregisterOnOwningThread(mOfflineStorage.forget());
   }
+
+  // Make sure to release the database on this thread.
+  nsRefPtr<Database> database;
+  mDatabase.swap(database);
 
   FinishSendResults();
 }
@@ -12946,6 +12911,7 @@ DeleteDatabaseOp::BeginVersionChange()
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
+      !OperationMayProceed() ||
       IsActorDestroyed()) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -12985,6 +12951,7 @@ DeleteDatabaseOp::DispatchToWorkThread()
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
+      !OperationMayProceed() ||
       IsActorDestroyed()) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -13054,11 +13021,6 @@ DeleteDatabaseOp::SendResults()
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(mState == State_SendingResults);
-
-  // Needed if we're being called from within NoteDatabaseClosed() since
-  // this DeleteDatabaseOp is only held alive by the gFactoryOps array and
-  // is about to be removed from the array in FinishSendResults().
-  nsRefPtr<DeleteDatabaseOp> kungFuDeathGrip = this;
 
   if (!IsActorDestroyed()) {
     FactoryRequestResponse response;
@@ -15228,6 +15190,8 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(TransactionBase* aTransaction)
   {
     size_t compressedLength = snappy::MaxCompressedLength(uncompressedLength);
 
+    // malloc is equivalent to NS_Alloc, which we use because mozStorage
+    // expects to be able to free the adopted pointer with NS_Free.
     char* compressed = static_cast<char*>(malloc(compressedLength));
     if (NS_WARN_IF(!compressed)) {
       return NS_ERROR_OUT_OF_MEMORY;
@@ -15239,9 +15203,12 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(TransactionBase* aTransaction)
     uint8_t* dataBuffer = reinterpret_cast<uint8_t*>(compressed);
     size_t dataBufferLength = compressedLength;
 
+    // If this call succeeds, | compressed | is now owned by the statement, and
+    // we are no longer responsible for it.
     rv = stmt->BindAdoptedBlobByName(NS_LITERAL_CSTRING("data"), dataBuffer,
                                      dataBufferLength);
     if (NS_WARN_IF(NS_FAILED(rv))) {
+      free(compressed);
       return rv;
     }
   }
