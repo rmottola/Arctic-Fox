@@ -5887,9 +5887,9 @@ class PermissionRequestHelper final
   bool mActorDestroyed;
 
 public:
-  PermissionRequestHelper(nsPIDOMWindow* aWindow,
+  PermissionRequestHelper(Element* aOwnerElement,
                           nsIPrincipal* aPrincipal)
-    : PermissionRequestBase(aWindow, aPrincipal)
+    : PermissionRequestBase(aOwnerElement, aPrincipal)
     , mActorDestroyed(false)
   { }
 
@@ -6509,7 +6509,7 @@ StaticRefPtr<DEBUGThreadSlower> gDEBUGThreadSlower;
 
 #endif // DEBUG
 
-} // anonymous namespace
+} // namespace
 
 /*******************************************************************************
  * Exported functions
@@ -6559,13 +6559,13 @@ DeallocPBackgroundIDBFactoryParent(PBackgroundIDBFactoryParent* aActor)
 }
 
 PIndexedDBPermissionRequestParent*
-AllocPIndexedDBPermissionRequestParent(nsPIDOMWindow* aWindow,
+AllocPIndexedDBPermissionRequestParent(Element* aOwnerElement,
                                        nsIPrincipal* aPrincipal)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   nsRefPtr<PermissionRequestHelper> actor =
-    new PermissionRequestHelper(aWindow, aPrincipal);
+  new PermissionRequestHelper(aOwnerElement, aPrincipal);
   return actor.forget().take();
 }
 
@@ -17887,8 +17887,6 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
   {
     size_t compressedLength = snappy::MaxCompressedLength(uncompressedLength);
 
-    // malloc is equivalent to NS_Alloc, which we use because mozStorage
-    // expects to be able to free the adopted pointer with NS_Free.
     char* compressed = static_cast<char*>(malloc(compressedLength));
     if (NS_WARN_IF(!compressed)) {
       return NS_ERROR_OUT_OF_MEMORY;
