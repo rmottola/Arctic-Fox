@@ -663,14 +663,14 @@ class MachCommandConditions(object):
 
     @staticmethod
     def is_b2g(cls):
-        """Must have a Boot to Goanna build."""
+        """Must have a Boot to Gecko build."""
         if hasattr(cls, 'substs'):
             return cls.substs.get('MOZ_WIDGET_TOOLKIT') == 'gonk'
         return False
 
     @staticmethod
     def is_b2g_desktop(cls):
-        """Must have a Boot to Goanna desktop build."""
+        """Must have a Boot to Gecko desktop build."""
         if hasattr(cls, 'substs'):
             return cls.substs.get('MOZ_BUILD_APP') == 'b2g' and \
                    cls.substs.get('MOZ_WIDGET_TOOLKIT') != 'gonk'
