@@ -30,6 +30,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/AutoRestore.h"
+#include "mozilla/AutoTimelineMarker.h"
 #include "mozilla/Base64.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
@@ -1040,7 +1041,7 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
     result |= eParseHTMLInteger_Error | eParseHTMLInteger_ErrorNoValue;
   }
 
-  if (negate) {
+  if (value.isValid() && negate) {
     value = -value;
     // Checking the special case of -0.
     if (value == 0) {
@@ -1048,7 +1049,8 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
     }
   }
 
-  if (leadingZeros > 1 || (leadingZeros == 1 && !(value == 0))) {
+  if (value.isValid() &&
+      (leadingZeros > 1 || (leadingZeros == 1 && !(value == 0)))) {
     result |= eParseHTMLInteger_NonStandard;
   }
 
@@ -1057,7 +1059,7 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
   }
 
   *aResult = (ParseHTMLIntegerResultFlags)result;
-  return value.value();
+  return value.isValid() ? value.value() : 0;
 }
 
 #define SKIP_WHITESPACE(iter, end_iter, end_res)                 \
@@ -4270,6 +4272,8 @@ nsContentUtils::ParseFragmentHTML(const nsAString& aSourceBuffer,
                                   bool aQuirks,
                                   bool aPreventScriptExecution)
 {
+  AutoTimelineMarker m(aTargetNode->OwnerDoc()->GetDocShell(), "Parse HTML");
+
   if (nsContentUtils::sFragmentParsingActive) {
     NS_NOTREACHED("Re-entrant fragment parsing attempted.");
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -4296,6 +4300,8 @@ nsContentUtils::ParseDocumentHTML(const nsAString& aSourceBuffer,
                                   nsIDocument* aTargetDocument,
                                   bool aScriptingEnabledForNoscriptParsing)
 {
+  AutoTimelineMarker m(aTargetDocument->GetDocShell(), "Parse HTML");
+
   if (nsContentUtils::sFragmentParsingActive) {
     NS_NOTREACHED("Re-entrant fragment parsing attempted.");
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -4321,6 +4327,8 @@ nsContentUtils::ParseFragmentXML(const nsAString& aSourceBuffer,
                                  bool aPreventScriptExecution,
                                  nsIDOMDocumentFragment** aReturn)
 {
+  AutoTimelineMarker m(aDocument->GetDocShell(), "Parse XML");
+
   if (nsContentUtils::sFragmentParsingActive) {
     NS_NOTREACHED("Re-entrant fragment parsing attempted.");
     return NS_ERROR_DOM_INVALID_STATE_ERR;
