@@ -2120,7 +2120,7 @@ bool
 TabChild::RecvHandleLongTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId)
 {
   if (mGlobal && mTabChildGlobal) {
-    mAPZEventState->ProcessLongTap(GetDOMWindowUtils(), aPoint, aModifiers, aGuid,
+    mAPZEventState->ProcessLongTap(GetPresShell(), aPoint, aModifiers, aGuid,
         aInputBlockId, GetPresShellResolution());
   }
   return true;
@@ -2180,7 +2180,7 @@ TabChild::RecvMouseEvent(const nsString& aType,
                          const int32_t&  aModifiers,
                          const bool&     aIgnoreRootScrollFrame)
 {
-  APZCCallbackHelper::DispatchMouseEvent(GetDOMWindowUtils(), aType, CSSPoint(aX, aY),
+  APZCCallbackHelper::DispatchMouseEvent(GetPresShell(), aType, CSSPoint(aX, aY),
       aButton, aClickCount, aModifiers, aIgnoreRootScrollFrame, nsIDOMMouseEvent::MOZ_SOURCE_UNKNOWN);
   return true;
 }
@@ -2343,7 +2343,7 @@ TabChild::FireContextMenuEvent()
 
   MOZ_ASSERT(mTapHoldTimer && mActivePointerId >= 0);
   bool defaultPrevented = APZCCallbackHelper::DispatchMouseEvent(
-      GetDOMWindowUtils(),
+      GetPresShell(),
       NS_LITERAL_STRING("contextmenu"),
       mGestureDownPoint / CSSToLayoutDeviceScale(scale),
       2 /* Right button */,
@@ -2540,11 +2540,9 @@ TabChild::RecvKeyEvent(const nsString& aType,
                        const int32_t& aModifiers,
                        const bool& aPreventDefault)
 {
-  nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
-  NS_ENSURE_TRUE(utils, true);
   bool ignored = false;
-  utils->SendKeyEvent(aType, aKeyCode, aCharCode,
-                      aModifiers, aPreventDefault, &ignored);
+  nsContentUtils::SendKeyEvent(mWidget, aType, aKeyCode, aCharCode,
+                               aModifiers, aPreventDefault, &ignored);
   return true;
 }
 
