@@ -265,7 +265,7 @@ nsDOMDataChannel::Send(const nsAString& aData, ErrorResult& aRv)
 }
 
 void
-nsDOMDataChannel::Send(File& aData, ErrorResult& aRv)
+nsDOMDataChannel::Send(Blob& aData, ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Not running on main thread");
 

@@ -441,10 +441,10 @@ ExtractFromArrayBufferView(const ArrayBufferView& aBuffer,
 }
 
 nsresult
-ExtractFromBlob(const File& aFile, nsIInputStream** aStream,
+ExtractFromBlob(const Blob& aBlob, nsIInputStream** aStream,
                 nsCString& aContentType)
 {
-  nsRefPtr<FileImpl> impl = aFile.Impl();
+  nsRefPtr<FileImpl> impl = aBlob.Impl();
   nsresult rv = impl->GetInternalStream(aStream);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -768,7 +768,7 @@ private:
       }
       p = nullptr;
 
-      nsRefPtr<File> file =
+      nsRefPtr<Blob> file =
         File::CreateMemoryFile(mParentObject,
                                reinterpret_cast<void *>(copy), body.Length(),
                                NS_ConvertUTF8toUTF16(mFilename),
@@ -905,7 +905,7 @@ ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDa
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
     return ExtractFromArrayBufferView(buf, aStream);
   } else if (aBodyInit.IsBlob()) {
-    const File& blob = aBodyInit.GetAsBlob();
+    const Blob& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
   } else if (aBodyInit.IsFormData()) {
     nsFormData& form = aBodyInit.GetAsFormData();
@@ -937,7 +937,7 @@ ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUS
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
     return ExtractFromArrayBufferView(buf, aStream);
   } else if (aBodyInit.IsBlob()) {
-    const File& blob = aBodyInit.GetAsBlob();
+    const Blob& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
   } else if (aBodyInit.IsFormData()) {
     nsFormData& form = aBodyInit.GetAsFormData();
@@ -1502,9 +1502,10 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       return;
     }
     case CONSUME_BLOB: {
-      nsRefPtr<File> blob =
-        File::CreateMemoryFile(DerivedClass()->GetParentObject(),
-                               reinterpret_cast<void *>(aResult), aResultLength, NS_ConvertUTF8toUTF16(mMimeType));
+      nsRefPtr<dom::Blob> blob =
+        Blob::CreateMemoryBlob(DerivedClass()->GetParentObject(),
+                               reinterpret_cast<void *>(aResult), aResultLength,
+                               NS_ConvertUTF8toUTF16(mMimeType));
 
       if (!blob) {
         localPromise->MaybeReject(NS_ERROR_DOM_UNKNOWN_ERR);
