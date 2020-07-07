@@ -52,7 +52,7 @@ public:
    */
   virtual nsresult AddNameFilePair(const nsAString& aName,
                                    mozilla::dom::File* aBlob) = 0;
-  
+
   /**
    * Reports whether the instance supports AddIsindex().
    *
