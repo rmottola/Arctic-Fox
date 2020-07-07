@@ -58,12 +58,12 @@ const TIMELINE_BLUEPRINT = {
   },
   "Parse HTML": {
     group: 1,
-    colorName: "highlight-purple",
+    colorName: "highlight-lightorange",
     label: L10N.getStr("timeline.label.parseHTML")
   },
   "Parse XML": {
     group: 1,
-    colorName: "highlight-purple",
+    colorName: "highlight-lightorange",
     label: L10N.getStr("timeline.label.parseXML")
   },
   "ConsoleTime": {
