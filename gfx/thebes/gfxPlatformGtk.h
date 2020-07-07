@@ -119,7 +119,7 @@ public:
 
     virtual int GetScreenDepth() const override;
 
-    bool SupportsApzWheelInput() override {
+    bool SupportsApzWheelInput() const override {
       return true;
     }
 
