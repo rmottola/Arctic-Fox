@@ -893,11 +893,18 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
   nsEventStatus status = ReceiveInputEvent(input, aOutTargetGuid, aOutInputBlockId);
   aEvent.refPoint.x = input.mOrigin.x;
   aEvent.refPoint.y = input.mOrigin.y;
+  aEvent.mFlags.mHandledByAPZ = true;
   return status;
 }
 
-bool
-APZCTreeManager::WillHandleWheelEvent(WidgetWheelEvent* aEvent)
+// Returns whether or not a wheel event action will be (or was) performed by
+// APZ. If this returns true, the event must not perform a synchronous
+// scroll.
+//
+// Even if this returns false, all wheel events in APZ-aware widgets must
+// be sent through APZ so they are transformed correctly for TabParent.
+static bool
+WillHandleWheelEvent(WidgetWheelEvent* aEvent)
 {
   return EventStateManager::WheelEventIsScrollAction(aEvent) &&
          aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
