@@ -542,12 +542,7 @@ nsDOMWindowUtils::GetResolution(float* aResolution)
     return NS_ERROR_FAILURE;
   }
 
-  nsIScrollableFrame* sf = presShell->GetRootScrollFrameAsScrollable();
-  if (sf) {
-    *aResolution = sf->GetResolution();
-  } else {
-    *aResolution = presShell->GetResolution();
-  }
+  *aResolution = nsLayoutUtils::GetResolution(presShell);
 
   return NS_OK;
 }
