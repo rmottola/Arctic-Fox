@@ -481,7 +481,6 @@ protected:
     ScreenOrientation mOrientation;
     float mDPI;
     CSSToLayoutDeviceScale mDefaultScale;
-    bool mShown;
     bool mUpdatedDimensions;
     LayoutDeviceIntPoint mChromeOffset;
 

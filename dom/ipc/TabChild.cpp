@@ -1710,6 +1710,10 @@ bool
 TabChild::RecvLoadURL(const nsCString& aURI,
                       const BrowserConfiguration& aConfiguration)
 {
+    if (!InitTabChildGlobal()) {
+      return false;
+    }
+
     SetProcessNameToAppName();
 
     nsresult rv = WebNavigation()->LoadURI(NS_ConvertUTF8toUTF16(aURI).get(),
