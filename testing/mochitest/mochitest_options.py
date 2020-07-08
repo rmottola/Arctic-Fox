@@ -93,6 +93,12 @@ class MochitestOptions(optparse.OptionParser):
           "help": "Group tests such that each chunk has roughly the same runtime.",
           "default": False,
           }],
+        [["--chunk-by-runtime"],
+         {"action": "store_true",
+          "dest": "chunkByRuntime",
+          "help": "group tests such that each chunk has roughly the same runtime",
+          "default": False,
+          }],
         [["--chunk-by-dir"],
          {"type": "int",
           "dest": "chunkByDir",
@@ -533,6 +539,10 @@ class MochitestOptions(optparse.OptionParser):
             # to --chunk-by-dir
             options.chunkByRuntime = False
             options.chunkByDir = 5
+
+        if options.chunkByDir and options.chunkByRuntime:
+            self.error(
+                "can only use one of --chunk-by-dir or --chunk-by-runtime")
 
         if options.xrePath is None:
             # default xrePath to the app path if not provided
