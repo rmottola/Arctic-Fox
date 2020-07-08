@@ -837,11 +837,11 @@ class B2GOptions(MochitestOptions):
           "help": "ip address where the remote web server is hosted at",
           "default": None,
           }],
-        [["--goanna-path"],
+        [["--gecko-path"],
          {"action": "store",
           "type": "string",
-          "dest": "goannaPath",
-          "help": "the path to a goanna distribution that should \
+          "dest": "geckoPath",
+          "help": "the path to a gecko distribution that should \
                    be installed on the emulator prior to test",
           "default": None,
           }],
@@ -904,9 +904,9 @@ class B2GOptions(MochitestOptions):
                     "You must specify a --remote-webserver=<ip address>")
         options.webServer = options.remoteWebServer
 
-        if options.goannaPath and not options.emulator:
+        if options.geckoPath and not options.emulator:
             self.error(
-                "You must specify --emulator if you specify --goanna-path")
+                "You must specify --emulator if you specify --gecko-path")
 
         if options.logdir and not options.emulator:
             self.error("You must specify --emulator if you specify --logdir")
