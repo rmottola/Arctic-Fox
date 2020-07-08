@@ -115,4 +115,4 @@ def HostLibrary(name):
     HOST_LIBRARY_NAME = name
 
 
-include('goanna_templates.mozbuild')
+include('gecko_templates.mozbuild')

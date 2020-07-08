@@ -487,7 +487,7 @@ public:
   /**
    * Convert aInput (in encoding aEncoding) to UTF16 in aOutput.
    *
-   * @param aEncoding the Goanna-canonical name of the encoding or the empty
+   * @param aEncoding the Gecko-canonical name of the encoding or the empty
    *                  string (meaning UTF-8)
    */
   static nsresult ConvertStringFromEncoding(const nsACString& aEncoding,

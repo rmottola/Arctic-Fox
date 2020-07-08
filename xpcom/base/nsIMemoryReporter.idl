@@ -465,7 +465,7 @@ XPCOM_API(nsresult) RegisterWeakMemoryReporter(nsIMemoryReporter* aReporter);
 XPCOM_API(nsresult) UnregisterWeakMemoryReporter(nsIMemoryReporter* aReporter);
 
 // The memory reporter manager provides access to several distinguished
-// amounts via attributes.  Some of these amounts are provided by Goanna
+// amounts via attributes.  Some of these amounts are provided by Gecko
 // components that cannot be accessed directly from XPCOM code.  So we provide
 // the following functions for those components to be registered with the
 // manager.

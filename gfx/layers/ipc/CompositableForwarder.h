@@ -180,7 +180,7 @@ public:
   /**
    * Returns the type of backend that is used off the main thread.
    * We only don't allow changing the backend type at runtime so this value can
-   * be queried once and will not change until Goanna is restarted.
+   * be queried once and will not change until Gecko is restarted.
    */
   virtual LayersBackend GetCompositorBackendType() const override
   {

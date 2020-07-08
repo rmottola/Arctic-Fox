@@ -8,9 +8,9 @@
 
 @interface mozTextAccessible : mozAccessible
 {
-  // both of these are the same old mGoannaAccessible, but already
+  // both of these are the same old mGeckoAccessible, but already
   // QI'd for us, to the right type, for convenience.
-  mozilla::a11y::HyperTextAccessible* mGoannaTextAccessible; // strong
+  mozilla::a11y::HyperTextAccessible* mGeckoTextAccessible; // strong
 }
 @end
 

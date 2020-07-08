@@ -37,7 +37,7 @@ WorkerDataStore::WorkerDataStore(WorkerGlobalScope* aScope)
 already_AddRefed<WorkerDataStore>
 WorkerDataStore::Constructor(GlobalObject& aGlobal, ErrorResult& aRv)
 {
-  // We don't allow Goanna to create WorkerDataStore through JS codes like
+  // We don't allow Gecko to create WorkerDataStore through JS codes like
   // window.DataStore() on the worker, so disable this for now.
   NS_NOTREACHED("Cannot use the chrome constructor on the worker!");
   return nullptr;

@@ -48,7 +48,7 @@ using namespace mozilla;
 
 static PRLogModuleInfo *sLog = nullptr;
 
-#define LOG_TAG "GoannaIdleService"
+#define LOG_TAG "GeckoIdleService"
 #define LOG_LEVEL ANDROID_LOG_DEBUG
 
 // Use this to find previously added observers in our array:

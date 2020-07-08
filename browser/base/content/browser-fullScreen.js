@@ -350,7 +350,7 @@ var FullScreen = {
                            Services.perms.EXPIRE_NEVER);
       else if (isApproved) {
         // The user has only temporarily approved fullscren for this fullscreen
-        // session only. Add the permission (so Goanna knows to approve any further
+        // session only. Add the permission (so Gecko knows to approve any further
         // fullscreen requests for this host in this fullscreen session) but add
         // a listener to revoke the permission when the chrome document exits
         // fullscreen.
@@ -371,7 +371,7 @@ var FullScreen = {
     }
     if (this.warningBox)
       this.warningBox.setAttribute("fade-warning-out", "true");
-    // If the document has been granted fullscreen, notify Goanna so it can resume
+    // If the document has been granted fullscreen, notify Gecko so it can resume
     // any pending pointer lock requests, otherwise exit fullscreen; the user denied
     // the fullscreen request.
     if (isApproved) {

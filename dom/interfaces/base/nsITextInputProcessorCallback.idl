@@ -20,12 +20,12 @@ interface nsITextInputProcessorNotification : nsISupports
    * one of following values:
    *
    * "request-to-commit"  (required to be handled)
-   *   This is requested when Goanna believes that active composition should be
+   *   This is requested when Gecko believes that active composition should be
    *   committed.  nsITextInputProcessorCallback::onNotify() has to handle this
    *   notification.
    *
    * "request-to-cancel" (required to be handled)
-   *   This is requested when Goanna believes that active composition should be
+   *   This is requested when Gecko believes that active composition should be
    *   canceled.  I.e., composition should be committed with empty string.
    *   nsITextInputProcessorCallback::onNotify() has to handle this
    *   notification.
@@ -37,12 +37,12 @@ interface nsITextInputProcessorNotification : nsISupports
    *   input.
    *
    * "notify-focus" (optional)
-   *   This is notified when an editable editor gets focus and Goanna starts
+   *   This is notified when an editable editor gets focus and Gecko starts
    *   to observe changes in the content. E.g., selection changes.
    *   IME shouldn't change DOM tree, focus nor something when this is notified.
    *
    * "notify-blur" (optional)
-   *   This is notified when an editable editor loses focus and Goanna stops
+   *   This is notified when an editable editor loses focus and Gecko stops
    *   observing the changes in the content.
    */
   readonly attribute ACString type;
@@ -63,7 +63,7 @@ interface nsITextInputProcessorNotification : nsISupports
 interface nsITextInputProcessorCallback : nsISupports
 {
   /**
-   * When Goanna notifies IME of something or requests something to IME,
+   * When Gecko notifies IME of something or requests something to IME,
    * this is called.
    *
    * @param aTextInputProcessor Reference to the nsITextInputProcessor service

@@ -12,7 +12,7 @@ interface nsIDOMWindow;
 /**
  * An interface for in-process accessibility clients
  * that wish to retrieve information about a document.
- * When accessibility is turned on in Goanna,
+ * When accessibility is turned on in Gecko,
  * there is an nsIAccessibleDocument for each document
  * whether it is XUL, HTML or whatever.
  * You can QueryInterface to nsIAccessibleDocument from the nsIAccessible for

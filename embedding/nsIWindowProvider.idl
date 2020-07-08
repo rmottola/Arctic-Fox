@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * nsIWindowProvider is a callback interface used by Goanna when it needs to
- * open a new window.  This interface can be implemented by Goanna consumers who
+ * nsIWindowProvider is a callback interface used by Gecko when it needs to
+ * open a new window.  This interface can be implemented by Gecko consumers who
  * wish to provide a custom "new window" of their own (for example by returning
  * a new tab, an existing window, etc) instead of just having a real new
  * toplevel window open.

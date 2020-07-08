@@ -94,9 +94,9 @@ const OVERRIDE_NEW_BUILD_ID = 3;
  * Returns:
  *  OVERRIDE_NEW_PROFILE if this is the first run with a new profile.
  *  OVERRIDE_NEW_MSTONE if this is the first run with a build with a different
- *                      Goanna milestone (i.e. right after an upgrade).
+ *                      Gecko milestone (i.e. right after an upgrade).
  *  OVERRIDE_NEW_BUILD_ID if this is the first run with a new build ID of the
- *                        same Goanna milestone (i.e. after a nightly upgrade).
+ *                        same Gecko milestone (i.e. after a nightly upgrade).
  *  OVERRIDE_NONE otherwise.
  */
 function needHomepageOverride(prefb) {

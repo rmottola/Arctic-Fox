@@ -1330,7 +1330,7 @@ class JS_PUBLIC_API(ContextOptions) {
     // JS_ReportError* functions that eventually report the error even when dontReportUncaught is
     // set, if script is not running. We want a way to indicate that the embedder will always
     // handle any exceptions, and that SpiderMonkey should just leave them on the context. This is
-    // the way we want to do all future error handling in Goanna - stealing the exception explicitly
+    // the way we want to do all future error handling in Gecko - stealing the exception explicitly
     // from the context and handling it as per the situation. This will eventually become the
     // default and these 2 flags should go away.
     bool autoJSAPIOwnsErrorReporting_ : 1;

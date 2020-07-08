@@ -14,7 +14,7 @@
  * Please DO NOT #include this file in comm-central code, in your XULRunner
  * app or binary extensions.
  *
- * Please DO NOT #include this into new files even inside Goanna. It is more
+ * Please DO NOT #include this into new files even inside Gecko. It is more
  * likely than not that #including this header is the wrong thing to do.
  */
 
@@ -65,7 +65,7 @@ enum eStreamState {eNone,eOnStart,eOnDataAvail,eOnStop};
  * Please DO NOT #include this file in comm-central code, in your XULRunner
  * app or binary extensions.
  *
- * Please DO NOT #include this into new files even inside Goanna. It is more
+ * Please DO NOT #include this into new files even inside Gecko. It is more
  * likely than not that #including this header is the wrong thing to do.
  */
 class nsIParser : public nsParserBase {

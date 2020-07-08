@@ -194,7 +194,7 @@ function getSelection(type, rangeNumber) {
   else if (type == HTML) {
     let range = safeGetRange(selection, rangeNumber);
     // Another way, but this includes the xmlns attribute for all elements in
-    // Goanna 1.9.2+ :
+    // Gecko 1.9.2+ :
     // return Cc["@mozilla.org/xmlextras/xmlserializer;1"].
     //   createInstance(Ci.nsIDOMSerializer).serializeToSTring(range.
     //     cloneContents());

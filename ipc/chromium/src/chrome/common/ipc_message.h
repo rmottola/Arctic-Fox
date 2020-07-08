@@ -11,7 +11,7 @@
 #include "base/pickle.h"
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 #endif
 
 #if defined(OS_POSIX)

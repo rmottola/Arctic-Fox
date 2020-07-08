@@ -503,7 +503,7 @@ interface nsITextInputProcessor : nsISupports
    * non-printable key.  However, if you try to emulate physical keyboard of
    * desktop platform, you need to specify proper value explicitly because
    * the mapping table of this API isn't enough to emulate the behavior of
-   * Goanna for desktop platforms.
+   * Gecko for desktop platforms.
    *
    * NOTE: Even if this has composition, JS-Keyboard should call keydown() and
    *       keyup().  Although, with the default preferences and normal

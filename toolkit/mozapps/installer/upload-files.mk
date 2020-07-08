@@ -347,7 +347,7 @@ else
 INNER_ROBOCOP_PACKAGE=echo 'Testing is disabled - No Android Robocop for you'
 endif
 
-# Create goannaview_library/goannaview_{assets,library}.zip for third-party GoannaView consumers.
+# Create goannaview_library/goannaview_{assets,library}.zip for third-party GeckoView consumers.
 ifdef NIGHTLY_BUILD
 ifndef MOZ_DISABLE_GECKOVIEW
 INNER_MAKE_GECKOVIEW_LIBRARY= \
@@ -355,12 +355,12 @@ INNER_MAKE_GECKOVIEW_LIBRARY= \
 INNER_MAKE_GECKOVIEW_EXAMPLE= \
 	$(MAKE) -C ../embedding/android/goannaview_example package
 else
-INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GoannaView library packaging is disabled'
-INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GoannaView example packaging is disabled'
+INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GeckoView library packaging is disabled'
+INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GeckoView example packaging is disabled'
 endif
 else
-INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GoannaView library packaging is only enabled on Nightly'
-INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GoannaView example packaging is only enabled on Nightly'
+INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GeckoView library packaging is only enabled on Nightly'
+INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GeckoView example packaging is only enabled on Nightly'
 endif
 
 # Create goannalibs Android ARchive and metadata for download by local

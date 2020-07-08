@@ -278,7 +278,7 @@ private:
   // close by setting this to the max value.
   int64_t                      mRequestBodyLenRemaining;
 
-  uint32_t                     mPriority; // goannaish weight
+  uint32_t                     mPriority; // geckoish weight
   uint32_t                     mPriorityDependency; // h2 stream id 3 - 0xb
   uint8_t                      mPriorityWeight; // h2 weight
 

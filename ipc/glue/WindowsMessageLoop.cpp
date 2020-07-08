@@ -78,7 +78,7 @@ extern const wchar_t* kPropNameTabContent;
 // widget related message id constants we need to defer
 namespace mozilla {
 namespace widget {
-extern UINT sAppShellGoannaMsgId;
+extern UINT sAppShellGeckoMsgId;
 }
 }
 
@@ -410,7 +410,7 @@ ProcessOrDeferMessage(HWND hwnd,
     default: {
       // Unknown messages only are logged in debug builds and sent to
       // DefWindowProc.
-      if (uMsg && uMsg == mozilla::widget::sAppShellGoannaMsgId) {
+      if (uMsg && uMsg == mozilla::widget::sAppShellGeckoMsgId) {
         // Widget's registered native event callback
         deferred = new DeferredSendMessage(hwnd, uMsg, wParam, lParam);
       }
@@ -484,7 +484,7 @@ WindowIsDeferredWindow(HWND hWnd)
   // Common mozilla windows we must defer messages to.
   nsDependentString className(buffer, length);
   if (StringBeginsWith(className, NS_LITERAL_STRING("Mozilla")) ||
-      StringBeginsWith(className, NS_LITERAL_STRING("Goanna")) ||
+      StringBeginsWith(className, NS_LITERAL_STRING("Gecko")) ||
       className.EqualsLiteral("nsToolkitClass") ||
       className.EqualsLiteral("nsAppShell:EventWindowClass")) {
     return true;
@@ -763,9 +763,9 @@ MessageChannel::SyncStackFrame::~SyncStackFrame()
 
 MessageChannel::SyncStackFrame* MessageChannel::sStaticTopFrame;
 
-// nsAppShell's notification that goanna events are being processed.
+// nsAppShell's notification that gecko events are being processed.
 // If we are here and there is an Interrupt Incall active, we are spinning
-// a nested goanna event loop. In which case the remote process needs
+// a nested gecko event loop. In which case the remote process needs
 // to know about it.
 void /* static */
 MessageChannel::NotifyGeckoEventDispatch()

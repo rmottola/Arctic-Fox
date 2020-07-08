@@ -1765,7 +1765,7 @@ enum IsNameLookup { NotNameLookup = false, NameLookup = true };
  *
  * 3.  We also emit an optional warning for this. (It's not super useful on the
  *     web, as there are too many false positives, but anecdotally useful in
- *     Goanna code.)
+ *     Gecko code.)
  */
 static bool
 GetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleId id,

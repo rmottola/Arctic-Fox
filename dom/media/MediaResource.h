@@ -330,7 +330,7 @@ public:
   virtual void Pin() = 0;
   virtual void Unpin() = 0;
   // Get the estimated download rate in bytes per second (assuming no
-  // pausing of the channel is requested by Goanna).
+  // pausing of the channel is requested by Gecko).
   // *aIsReliable is set to true if we think the estimate is useful.
   virtual double GetDownloadRate(bool* aIsReliable) = 0;
   // Get the length of the stream in bytes. Returns -1 if not known.

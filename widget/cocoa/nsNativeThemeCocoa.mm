@@ -643,7 +643,7 @@ static void DrawCellWithScaling(NSCell *cell,
 
   // Only skip the buffer if the area of our cell (in pixels^2) is too large.
   if (drawRect.size.width * drawRect.size.height > BITMAP_MAX_AREA) {
-    // Inflate the rect Goanna gave us by the margin for the control.
+    // Inflate the rect Gecko gave us by the margin for the control.
     InflateControlRect(&drawRect, controlSize, marginSet);
 
     NSGraphicsContext* savedContext = [NSGraphicsContext currentContext];
@@ -946,7 +946,7 @@ static float VerticalAlignFactor(nsIFrame *aFrame)
   }
 }
 
-// These are the sizes that Goanna needs to request to draw if it wants
+// These are the sizes that Gecko needs to request to draw if it wants
 // to get a standard-sized Aqua radio button drawn. Note that the rects
 // that draw these are actually a little bigger.
 static const CellRenderSettings radioSettings = {
@@ -2049,7 +2049,7 @@ nsNativeThemeCocoa::GetScrollbarDrawInfo(HIThemeTrackDrawInfo& aTdi, nsIFrame *a
   aTdi.enableState = FrameIsInActiveWindow(aFrame) ? kThemeTrackActive : kThemeTrackInactive;
 
   /* Only display features if we have enough room for them.
-   * Goanna still maintains the scrollbar info; this is just a visual issue (bug 380185).
+   * Gecko still maintains the scrollbar info; this is just a visual issue (bug 380185).
    */
   int32_t longSideLength = (int32_t)(isHorizontal ? (aSize.width) : (aSize.height));
   if (longSideLength >= (isSmall ? MIN_SMALL_SCROLLBAR_SIZE_WITH_THUMB : MIN_SCROLLBAR_SIZE_WITH_THUMB)) {
@@ -3540,7 +3540,7 @@ nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType,
 NS_IMETHODIMP
 nsNativeThemeCocoa::ThemeChanged()
 {
-  // This is unimplemented because we don't care if goanna changes its theme
+  // This is unimplemented because we don't care if gecko changes its theme
   // and Mac OS X doesn't have themes.
   return NS_OK;
 }

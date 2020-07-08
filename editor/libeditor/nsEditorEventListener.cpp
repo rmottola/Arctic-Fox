@@ -472,7 +472,7 @@ nsEditorEventListener::HandleEvent(nsIDOMEvent* aEvent)
   nsAutoString eventType;
   aEvent->GetType(eventType);
   // We should accept "focus" and "blur" event even if it's synthesized with
-  // wrong interface for compatibility with older Goanna.
+  // wrong interface for compatibility with older Gecko.
   if (eventType.EqualsLiteral("focus")) {
     return Focus(aEvent);
   }

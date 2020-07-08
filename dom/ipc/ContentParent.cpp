@@ -2238,7 +2238,7 @@ ContentParent::ContentParent(ContentParent* aTemplate,
     const FileDescriptor* fd = FindFdProtocolFdMapping(aFds, GetProtocolId());
 
     NS_ASSERTION(fd != nullptr, "IPC Channel for PContent is necessary!");
-    mSubprocess = new GoannaExistingProcessHost(GeckoProcessType_Content,
+    mSubprocess = new GeckoExistingProcessHost(GeckoProcessType_Content,
                                                aPid,
                                                *fd);
 

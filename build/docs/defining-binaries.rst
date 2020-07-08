@@ -290,26 +290,26 @@ On e.g. Linux, the above ``myprog`` will have DT_NEEDED markers for
 requirement for ``myprog`` is ``libfoo.so`` instead of ``libotherlib.so``.
 
 
-Goanna-related binaries
+Gecko-related binaries
 ======================
 
-Some programs or libraries are totally independent of Goanna, and can use the
-above mentioned templates. Others are Goanna-related in some way, and may
+Some programs or libraries are totally independent of Gecko, and can use the
+above mentioned templates. Others are Gecko-related in some way, and may
 need XPCOM linkage, mozglue. These things are tedious. A set of additional
 templates exists to ease defining such programs and libraries. They are
-essentially the same as the above mentioned templates, prefixed with "Goanna":
+essentially the same as the above mentioned templates, prefixed with "Gecko":
 
-  - ``GoannaProgram``
-  - ``GoannaSimplePrograms``
-  - ``GoannaCppUnitTests``
-  - ``GoannaSharedLibrary``
-  - ``GoannaFramework``
+  - ``GeckoProgram``
+  - ``GeckoSimplePrograms``
+  - ``GeckoCppUnitTests``
+  - ``GeckoSharedLibrary``
+  - ``GeckoFramework``
 
 There is also ``XPCOMBinaryComponent`` for XPCOM components, which is a
 special kind of library.
 
-All the Goanna-prefixed templates take the same arguments as their
-non-Goanna-prefixed counterparts, and can take a few more arguments
-for non-standard cases. See the definition of ``GoannaBinary`` in
-build/goanna_templates.mozbuild for more details, but most usecases
+All the Gecko-prefixed templates take the same arguments as their
+non-Gecko-prefixed counterparts, and can take a few more arguments
+for non-standard cases. See the definition of ``GeckoBinary`` in
+build/gecko_templates.mozbuild for more details, but most usecases
 should not require these additional arguments.

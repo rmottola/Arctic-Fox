@@ -216,7 +216,7 @@ class FirefoxUIUpdates(FirefoxUITests):
         uvc.read(self.updates_config_file)
         self.channel = uvc.channel
 
-        # Filter out any releases that are less than Goanna 38
+        # Filter out any releases that are less than Gecko 38
         uvc.releases = [r for r in uvc.releases \
                 if int(r["release"].split('.')[0]) >= 38]
 

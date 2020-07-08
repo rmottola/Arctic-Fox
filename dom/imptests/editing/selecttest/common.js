@@ -891,7 +891,7 @@ function getDomExceptionName(e) {
 	if (typeof e.name == "string"
 	&& /^[A-Z_]+_ERR$/.test(e.name)) {
 		// Either following the standard, or prefixing NS_ERROR_DOM (I'm
-		// looking at you, Goanna).
+		// looking at you, Gecko).
 		return e.name.replace(/^NS_ERROR_DOM_/, "");
 	}
 

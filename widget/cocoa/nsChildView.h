@@ -168,13 +168,13 @@ typedef NSInteger NSEventGestureAxis;
 @private
   // the nsChildView that created the view. It retains this NSView, so
   // the link back to it must be weak.
-  nsChildView* mGoannaChild;
+  nsChildView* mGeckoChild;
 
-  // Text input handler for mGoannaChild and us.  Note that this is a weak
+  // Text input handler for mGeckoChild and us.  Note that this is a weak
   // reference.  Ideally, this should be a strong reference but a ChildView
-  // object can live longer than the mGoannaChild that owns it.  And if
+  // object can live longer than the mGeckoChild that owns it.  And if
   // mTextInputHandler were a strong reference, this would make it difficult
-  // for Goanna's leak detector to detect leaked TextInputHandler objects.
+  // for Gecko's leak detector to detect leaked TextInputHandler objects.
   // This is initialized by [mozView installTextInputHandler:aHandler] and
   // cleared by [mozView uninstallTextInputHandler].
   mozilla::widget::TextInputHandler* mTextInputHandler;  // [WEAK]
@@ -185,7 +185,7 @@ typedef NSInteger NSEventGestureAxis;
   // Needed for IME support in e10s mode.  Strong.
   NSEvent* mLastKeyDownEvent;
 
-  // Whether the last mouse down event was blocked from Goanna.
+  // Whether the last mouse down event was blocked from Gecko.
   BOOL mBlockedLastMouseDown;
 
   // when acceptsFirstMouse: is called, we store the event here (strong)
@@ -215,7 +215,7 @@ typedef NSInteger NSEventGestureAxis;
   // mGestureState is used to detect when Cocoa has called both
   // magnifyWithEvent and rotateWithEvent within the same
   // beginGestureWithEvent and endGestureWithEvent sequence. We
-  // discard the spurious gesture event so as not to confuse Goanna.
+  // discard the spurious gesture event so as not to confuse Gecko.
   //
   // mCumulativeMagnification keeps track of the total amount of
   // magnification peformed during a magnify gesture so that we can
@@ -388,7 +388,7 @@ public:
   // ratio of pixels in the window's backing store to Cocoa points. Prior to
   // HiDPI support in OS X 10.7, this was always 1.0, but in HiDPI mode it
   // will be 2.0 (and might potentially other values as screen resolutions
-  // evolve). This gives the relationship between what Goanna calls "device
+  // evolve). This gives the relationship between what Gecko calls "device
   // pixels" and the Cocoa "points" coordinate system.
   CGFloat                 BackingScaleFactor() const;
 
@@ -442,7 +442,7 @@ public:
                       const mozilla::WidgetKeyboardEvent& aEvent,
                       DoCommandCallback aCallback,
                       void* aCallbackData,
-                      uint32_t aGoannaKeyCode,
+                      uint32_t aGeckoKeyCode,
                       uint32_t aCocoaKeyCode);
   virtual nsIMEUpdatePreference GetIMEUpdatePreference() override;
   NS_IMETHOD        GetToggledKeyState(uint32_t aKeyCode,

@@ -62,7 +62,7 @@ ShouldExposeChildWindow(nsString& aNameBeingResolved, nsIDOMWindow *aChild)
   //     "dolske".
   //
   // Unfortunately, (c) would require some engineering effort to be performant
-  // in Goanna, and probably in other UAs as well. So we go with a simpler
+  // in Gecko, and probably in other UAs as well. So we go with a simpler
   // approximation of the above. This approximation will only break sites that
   // rely on their cross-origin subframes setting window.name to a known value,
   // which is unlikely to be very common. And while it does introduce a

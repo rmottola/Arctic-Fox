@@ -14,7 +14,7 @@
 
 using namespace mozilla;
 
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #define ASSIGN(obj, name)   (obj)->name = anp_native_window_##name
 
 static ANPNativeWindow anp_native_window_acquireNativeWindow(NPP instance) {

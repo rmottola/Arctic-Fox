@@ -101,7 +101,7 @@ NS_GetAuthHostPort(nsIChannel* aChannel, nsIAuthInformation* aAuthInfo,
 
 /**
  * Creates the key for looking up passwords in the password manager. This
- * function uses the same format that Goanna functions have always used, thus
+ * function uses the same format that Gecko functions have always used, thus
  * ensuring backwards compatibility.
  */
 inline void

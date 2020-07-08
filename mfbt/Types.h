@@ -11,7 +11,7 @@
 
 /*
  * This header must be valid C and C++, includable by code embedding either
- * SpiderMonkey or Goanna.
+ * SpiderMonkey or Gecko.
  */
 
 /* Expose all <stdint.h> types and size_t. */

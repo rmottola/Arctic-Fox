@@ -10,7 +10,7 @@ const DevToolsUtils = require("devtools/toolkit/DevToolsUtils.js");
 let DEFAULT_PROFILER_ENTRIES = 1000000;
 let DEFAULT_PROFILER_INTERVAL = 1;
 let DEFAULT_PROFILER_FEATURES = ["js"];
-let DEFAULT_PROFILER_THREADFILTERS = ["GoannaMain"];
+let DEFAULT_PROFILER_THREADFILTERS = ["GeckoMain"];
 
 /**
  * The nsIProfiler is target agnostic and interacts with the whole platform.
@@ -282,7 +282,7 @@ function getElapsedTime() {
   // Assign `gProfilingStartTime` now if no client of this actor has actually
   // started it yet, but the built-in profiler module is somehow already active
   // (it could happen if the MOZ_PROFILER_STARTUP environment variable is set,
-  // or the Goanna Profiler add-on is installed and isn't using this actor).
+  // or the Gecko Profiler add-on is installed and isn't using this actor).
   // Otherwise, the returned value is bogus and messes up the samples filtering.
   if (gProfilingStartTime == -1) {
     let profile = nsIProfilerModule.getProfileData();
@@ -320,7 +320,7 @@ function checkProfilerConsumers() {
 /**
  * The request types this actor can handle.
  * At the moment there are two known users of the Profiler actor:
- * the devtools and the Goanna Profiler addon, which uses the debugger
+ * the devtools and the Gecko Profiler addon, which uses the debugger
  * protocol to get profiles from Fennec.
  */
 ProfilerActor.prototype.requestTypes = {

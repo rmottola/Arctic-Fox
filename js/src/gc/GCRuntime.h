@@ -285,7 +285,7 @@ class GCSchedulingTunables
  *
  *   1) Do a GC now because the embedding knows something useful about the
  *      zone's memory retention state. These are gcreasons like LOAD_END,
- *      PAGE_HIDE, SET_NEW_DOCUMENT, DOM_UTILS. Mostly, Goanna uses these to
+ *      PAGE_HIDE, SET_NEW_DOCUMENT, DOM_UTILS. Mostly, Gecko uses these to
  *      indicate that a significant fraction of the scheduled zone's memory is
  *      probably reclaimable.
  *

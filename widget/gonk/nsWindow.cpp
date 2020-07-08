@@ -306,7 +306,7 @@ nsWindow::DispatchTouchEventForAPZ(const MultiTouchInput& aInput,
     MOZ_ASSERT(NS_IsMainThread());
     UserActivity();
 
-    // Convert it to an event we can send to Goanna
+    // Convert it to an event we can send to Gecko
     WidgetTouchEvent event = aInput.ToWidgetTouchEvent(this);
 
     // Dispatch the event into the gecko root process for "normal" flow.

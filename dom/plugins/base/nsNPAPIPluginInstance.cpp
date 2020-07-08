@@ -652,7 +652,7 @@ nsresult nsNPAPIPluginInstance::Print(NPPrint* platformPrint)
 }
 
 nsresult nsNPAPIPluginInstance::HandleEvent(void* event, int16_t* result,
-                                            NSPluginCallReentry aSafeToReenterGoanna)
+                                            NSPluginCallReentry aSafeToReenterGecko)
 {
   if (RUNNING != mRunning)
     return NS_OK;
@@ -675,7 +675,7 @@ nsresult nsNPAPIPluginInstance::HandleEvent(void* event, int16_t* result,
 #endif
 #if defined(XP_WIN)
     NS_TRY_SAFE_CALL_RETURN(tmpResult, (*pluginFunctions->event)(&mNPP, event), this,
-                            aSafeToReenterGoanna);
+                            aSafeToReenterGecko);
 #else
     MAIN_THREAD_JNI_REF_GUARD;
     tmpResult = (*pluginFunctions->event)(&mNPP, event);

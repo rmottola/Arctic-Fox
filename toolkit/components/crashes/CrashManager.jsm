@@ -136,7 +136,7 @@ this.CrashManager.prototype = Object.freeze({
   // A crash in a plugin process.
   PROCESS_TYPE_PLUGIN: "plugin",
 
-  // A crash in a Goanna media plugin process.
+  // A crash in a Gecko media plugin process.
   PROCESS_TYPE_GMPLUGIN: "gmplugin",
 
   // A real crash.

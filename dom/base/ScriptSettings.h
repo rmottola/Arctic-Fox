@@ -407,7 +407,7 @@ protected:
 
   // We need this Init() method because we can't use delegating constructor for
   // the moment. It is a C++11 feature and we do not require C++11 to be
-  // supported to be able to compile Goanna.
+  // supported to be able to compile Gecko.
   void Init(bool aSafe MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
 
   JSContext* mCx;

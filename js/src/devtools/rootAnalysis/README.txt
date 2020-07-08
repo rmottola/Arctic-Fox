@@ -11,7 +11,7 @@ To use it on SpiderMonkey:
     without the `CFLAGS` and `CXXFLAGS` settings from
     http://trac.wildfiregames.com/wiki/StaticRootingAnalysis .)
 
-2.  Have the Goanna build prerequisites installed.
+2.  Have the Gecko build prerequisites installed.
 
 3.  In this directory, run these commands.
 

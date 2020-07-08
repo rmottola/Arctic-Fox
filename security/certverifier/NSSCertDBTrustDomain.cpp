@@ -242,9 +242,9 @@ NSSCertDBTrustDomain::GetCertTrust(EndEntityOrCA endEntityOrCA,
       return Success;
     }
 
-    // For TRUST, we only use the CERTDB_TRUSTED_CA bit, because Goanna hasn't
+    // For TRUST, we only use the CERTDB_TRUSTED_CA bit, because Gecko hasn't
     // needed to consider end-entity certs to be their own trust anchors since
-    // Goanna implemented nsICertOverrideService.
+    // Gecko implemented nsICertOverrideService.
     if (flags & CERTDB_TRUSTED_CA) {
       if (policy.IsAnyPolicy()) {
         trustLevel = TrustLevel::TrustAnchor;

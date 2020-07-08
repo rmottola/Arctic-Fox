@@ -340,7 +340,7 @@ struct GLContextSymbols
     PFNINVALIDATESUBFRAMEBUFFER fInvalidateSubFramebuffer;
 
         // These functions are only used by Skia/GL in desktop mode.
-        // Other parts of Goanna should avoid using these
+        // Other parts of Gecko should avoid using these
         typedef void (GLAPIENTRY * PFNGLCLIENTACTIVETEXTURE) (GLenum texture);
         PFNGLCLIENTACTIVETEXTURE fClientActiveTexture;
         typedef void (GLAPIENTRY * PFNDISABLECLIENTSTATE) (GLenum capability);

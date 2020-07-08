@@ -17,7 +17,7 @@ partial interface XMLDocument {
   boolean load(DOMString url);
 };
 
-// Goanna extensions?
+// Gecko extensions?
 partial interface XMLDocument {
   attribute boolean async;
 };

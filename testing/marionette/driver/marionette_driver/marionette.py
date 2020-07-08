@@ -597,7 +597,7 @@ class Marionette(object):
                 except (ConfigParser.NoOptionError,
                         ConfigParser.NoSectionError,
                         KeyError):
-                    instance_class = goannainstance.GoannaInstance
+                    instance_class = goannainstance.GeckoInstance
             self.instance = instance_class(host=self.host, port=self.port,
                                            bin=self.bin, profile=self.profile,
                                            app_args=app_args, symbols_path=symbols_path,

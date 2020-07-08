@@ -10,7 +10,7 @@ interface nsIDOMElement;
 interface nsIFrameLoader;
 
 /**
- * When a content process hangs, Goanna notifies "process-hang-report" observers
+ * When a content process hangs, Gecko notifies "process-hang-report" observers
  * and passes an nsIHangReport for the subject parameter. There is at most one
  * nsIHangReport associated with a given content process. As long as the content
  * process stays stuck, the "process-hang-report" observer will continue to be

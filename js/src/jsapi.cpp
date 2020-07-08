@@ -571,7 +571,7 @@ JS_ShutDown(void)
                "JS_ShutDown must only be called after JS_Init and can't race with it");
 #ifdef DEBUG
     if (JSRuntime::hasLiveRuntimes()) {
-        // Goanna is too buggy to assert this just yet.
+        // Gecko is too buggy to assert this just yet.
         fprintf(stderr,
                 "WARNING: YOU ARE LEAKING THE WORLD (at least one JSRuntime "
                 "and everything alive inside it, that is) AT JS_ShutDown "
@@ -1107,7 +1107,7 @@ JS_TransplantObject(JSContext* cx, HandleObject origobj, HandleObject target)
 
 /*
  * Recompute all cross-compartment wrappers for an object, resetting state.
- * Goanna uses this to clear Xray wrappers when doing a navigation that reuses
+ * Gecko uses this to clear Xray wrappers when doing a navigation that reuses
  * the inner window and global object.
  */
 JS_PUBLIC_API(bool)

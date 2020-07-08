@@ -1321,7 +1321,7 @@ PluginInstanceChild::Initialize()
 
 #if defined(OS_WIN)
 
-static const TCHAR kWindowClassName[] = TEXT("GoannaPluginWindow");
+static const TCHAR kWindowClassName[] = TEXT("GeckoPluginWindow");
 static const TCHAR kPluginInstanceChildProperty[] = TEXT("PluginInstanceChildProperty");
 static const TCHAR kFlashThrottleProperty[] = TEXT("MozillaFlashThrottleProperty");
 
@@ -1474,7 +1474,7 @@ PluginInstanceChild::PluginWindowProcInternal(HWND hWnd,
 
     // Adobe's shockwave positions the plugin window relative to the browser
     // frame when it initializes. With oopp disabled, this wouldn't have an
-    // effect. With oopp, GoannaPluginWindow is a child of the parent plugin
+    // effect. With oopp, GeckoPluginWindow is a child of the parent plugin
     // window, so the move offsets the child within the parent. Generally
     // we don't want plugins moving or sizing our window, so we prevent these
     // changes here.

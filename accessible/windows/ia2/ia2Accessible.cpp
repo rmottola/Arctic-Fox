@@ -368,7 +368,7 @@ ia2Accessible::get_states(AccessibleStates* aStates)
   if (state & states::REQUIRED)
     *aStates |= IA2_STATE_REQUIRED;
 
-  // The following IA2 states are not supported by Goanna
+  // The following IA2 states are not supported by Gecko
   // IA2_STATE_ARMED
   // IA2_STATE_MANAGES_DESCENDANTS
   // IA2_STATE_ICONIFIED

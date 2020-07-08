@@ -107,7 +107,7 @@ interface nsIPrinterEnumerator : nsISupports
 {
   /**
    * The name of the system default printer. This name should also be
-   * present in printerNameList below. This is not necessarily goanna's
+   * present in printerNameList below. This is not necessarily gecko's
    * default printer; see nsIPrintSettingsService.defaultPrinterName
    * for that.
    */

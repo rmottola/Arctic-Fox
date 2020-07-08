@@ -608,7 +608,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
 #ifdef COMPOSITOR_PERFORMANCE_WARNING
   int compositeTime = (int)(mozilla::TimeStamp::Now() - updateStart).ToMilliseconds();
   if (compositeTime > 15) {
-    printf_stderr("Compositor: Layers update took %i ms (blocking goanna).\n", compositeTime);
+    printf_stderr("Compositor: Layers update took %i ms (blocking gecko).\n", compositeTime);
   }
 #endif
 

@@ -92,7 +92,7 @@ private:
     DebugOnly<bool> mInitialized;
   };
 
-  // This singleton pointer must be defined on the program side. In Goanna,
+  // This singleton pointer must be defined on the program side. In Gecko,
   // this is done in xpcom/base/nsMemoryInfoDumper.cpp.
   static /* DMDFuncs:: */Singleton sSingleton;
 #endif

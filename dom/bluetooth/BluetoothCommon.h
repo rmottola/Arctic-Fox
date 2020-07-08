@@ -47,7 +47,7 @@ extern bool gBluetoothDebugFlag;
 #define BT_LOGD(msg, ...)                                            \
   do {                                                               \
     if (gBluetoothDebugFlag) {                                       \
-      __android_log_print(ANDROID_LOG_INFO, "GoannaBluetooth",        \
+      __android_log_print(ANDROID_LOG_INFO, "GeckoBluetooth",        \
                           "%s: " msg, __FUNCTION__, ##__VA_ARGS__);  \
     }                                                                \
   } while(0)
@@ -56,7 +56,7 @@ extern bool gBluetoothDebugFlag;
  * Prints 'R'ELEASE build logs, which show in both RELEASE and DEBUG builds.
  */
 #define BT_LOGR(msg, ...)                                            \
-  __android_log_print(ANDROID_LOG_INFO, "GoannaBluetooth",            \
+  __android_log_print(ANDROID_LOG_INFO, "GeckoBluetooth",            \
                       "%s: " msg, __FUNCTION__, ##__VA_ARGS__)       \
 
 /**

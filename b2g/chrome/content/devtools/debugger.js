@@ -323,7 +323,7 @@ let WiFiRemoteDebugger = {
   let devtoolsWiFi = false;
 
   // Keep the old setting to not break people that won't have updated
-  // gaia and goanna.
+  // gaia and gecko.
   SettingsListener.observe("devtools.debugger.remote-enabled", false,
                            function(value) {
     devtoolsUSB = value;

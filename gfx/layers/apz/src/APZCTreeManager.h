@@ -192,12 +192,12 @@ public:
                                   uint64_t* aOutInputBlockId);
 
   /**
-   * A helper for transforming coordinates to goanna coordinate space.
+   * A helper for transforming coordinates to gecko coordinate space.
    *
    * @param aPoint point to transform
    * @param aOutTransformedPoint resulting transformed point
    */
-  void TransformCoordinateToGoanna(const ScreenIntPoint& aPoint,
+  void TransformCoordinateToGecko(const ScreenIntPoint& aPoint,
                                   LayoutDeviceIntPoint* aOutTransformedPoint);
 
   /**
@@ -398,7 +398,7 @@ public:
   already_AddRefed<AsyncPanZoomController> GetTargetAPZC(const ScreenPoint& aPoint,
                                                          HitTestResult* aOutHitResult);
   gfx::Matrix4x4 GetScreenToApzcTransform(const AsyncPanZoomController *aApzc) const;
-  gfx::Matrix4x4 GetApzcToGoannaTransform(const AsyncPanZoomController *aApzc) const;
+  gfx::Matrix4x4 GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) const;
 private:
   typedef bool (*GuidComparator)(const ScrollableLayerGuid&, const ScrollableLayerGuid&);
 

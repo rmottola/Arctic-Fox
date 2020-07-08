@@ -5786,7 +5786,7 @@ StableRound(const gfxPoint& aPoint)
 /**
  * Given a set of input parameters, compute certain output parameters
  * for drawing an image with the image snapping algorithm.
- * See https://wiki.mozilla.org/Goanna:Image_Snapping_and_Rendering
+ * See https://wiki.mozilla.org/Gecko:Image_Snapping_and_Rendering
  *
  *  @see nsLayoutUtils::DrawImage() for the descriptions of input parameters
  */

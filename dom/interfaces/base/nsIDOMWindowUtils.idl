@@ -1011,7 +1011,7 @@ interface nsIDOMWindowUtils : nsISupports {
   /**
    * Get the current zoom factor.
    * This is _approximately_ the same as nsIContentViewer.fullZoom,
-   * but takes into account Goanna's quantization of the zoom factor, which is
+   * but takes into account Gecko's quantization of the zoom factor, which is
    * implemented by adjusting the (integer) number of appUnits per devPixel.
    */
   readonly attribute float fullZoom;

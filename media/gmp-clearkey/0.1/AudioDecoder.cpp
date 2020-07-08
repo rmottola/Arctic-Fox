@@ -151,7 +151,7 @@ AudioDecoder::DecodeTask(GMPAudioSamples* aInput)
     if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) {
       AutoLock lock(mMutex);
       if (mNumInputTasks == 0) {
-        // We have run all input tasks. We *must* notify Goanna so that it will
+        // We have run all input tasks. We *must* notify Gecko so that it will
         // send us more data.
         MaybeRunOnMainThread(WrapTask(mCallback, &GMPAudioDecoderCallback::InputDataExhausted));
       }

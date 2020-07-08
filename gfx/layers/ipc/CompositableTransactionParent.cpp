@@ -236,7 +236,7 @@ CompositableParentManager::SendPendingAsyncMessges()
 
   // Some type of AsyncParentMessageData message could have
   // one file descriptor (e.g. OpDeliverFence).
-  // A number of file descriptors per goanna ipc message have a limitation
+  // A number of file descriptors per gecko ipc message have a limitation
   // on OS_POSIX (MACOSX or LINUX).
 #if defined(OS_POSIX)
   static const uint32_t kMaxMessageNumber = FileDescriptorSet::MAX_DESCRIPTORS_PER_MESSAGE;

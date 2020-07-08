@@ -121,7 +121,7 @@ class Patch(object):
         if isinstance(message, CommitMessage):
             self.message = message
         else:
-            self.message = GoannaCommitMessage(message)
+            self.message = GeckoCommitMessage(message)
         self.diff = diff
 
     def __repr__(self):
@@ -136,8 +136,8 @@ class Patch(object):
         return bool(self.diff.strip())
 
 
-class GoannaCommitMessage(CommitMessage):
-    """Commit message following the Goanna conventions for identifying bug number
+class GeckoCommitMessage(CommitMessage):
+    """Commit message following the Gecko conventions for identifying bug number
     and reviewer"""
 
     # c.f. http://hg.mozilla.org/hgcustom/version-control-tools/file/tip/hghooks/mozhghooks/commit-message.py
@@ -167,8 +167,8 @@ class GoannaCommitMessage(CommitMessage):
             self.bug, self.summary, self.reviewer = None, self.full_summary, None
 
 
-class GoannaCommit(Commit):
-    msg_cls = GoannaCommitMessage
+class GeckoCommit(Commit):
+    msg_cls = GeckoCommitMessage
 
     def export_patch(self, path=None):
         """Convert a commit in the tree to a Patch with the bug number and

@@ -370,7 +370,7 @@ interface nsIPrefBranch : nsISupports
    * It is possible to change preferences during the notification.
    *
    * @note
-   * It is not safe to change observers during this callback in Goanna 
+   * It is not safe to change observers during this callback in Gecko 
    * releases before 1.9. If you want a safe way to remove a pref observer,
    * please use an nsITimer.
    *

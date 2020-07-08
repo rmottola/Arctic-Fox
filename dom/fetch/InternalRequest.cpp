@@ -32,7 +32,7 @@ InternalRequest::GetRequestConstructorCopy(nsIGlobalObject* aGlobal, ErrorResult
   copy->mBodyStream = mBodyStream;
   copy->mForceOriginHeader = true;
   // The "client" is not stored in our implementation. Fetch API users should
-  // use the appropriate window/document/principal and other Goanna security
+  // use the appropriate window/document/principal and other Gecko security
   // mechanisms as appropriate.
   copy->mSameOriginDataURL = true;
   copy->mPreserveContentCodings = true;

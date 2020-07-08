@@ -279,7 +279,7 @@ protected:
   nsINode*                           mTarget;
   nsDOMMutationObserver*             mObserver;
   nsRefPtr<nsMutationReceiverBase>   mParent; // Cleared after microtask.
-  // The node to which Goanna-internal nsIMutationObserver was registered to.
+  // The node to which Gecko-internal nsIMutationObserver was registered to.
   // This is different than mTarget when dealing with transient observers.
   nsINode*                           mRegisterTarget;
   nsCOMArray<nsMutationReceiverBase> mTransientReceivers;

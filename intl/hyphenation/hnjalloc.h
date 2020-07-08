@@ -19,7 +19,7 @@
 /*
  * To enable us to load hyphenation dictionaries from arbitrary resource URIs,
  * not just through file paths using stdio, we override the (few) stdio APIs
- * that hyphen.c uses and provide our own reimplementation that calls Goanna
+ * that hyphen.c uses and provide our own reimplementation that calls Gecko
  * i/o methods.
  */
 

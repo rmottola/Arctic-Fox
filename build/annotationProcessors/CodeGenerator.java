@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.mozilla.goanna.annotationProcessors;
+package org.mozilla.gecko.annotationProcessors;
 
-import org.mozilla.goanna.annotationProcessors.classloader.AnnotatableEntity;
-import org.mozilla.goanna.annotationProcessors.classloader.ClassWithOptions;
-import org.mozilla.goanna.annotationProcessors.utils.Utils;
+import org.mozilla.gecko.annotationProcessors.classloader.AnnotatableEntity;
+import org.mozilla.gecko.annotationProcessors.classloader.ClassWithOptions;
+import org.mozilla.gecko.annotationProcessors.utils.Utils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;

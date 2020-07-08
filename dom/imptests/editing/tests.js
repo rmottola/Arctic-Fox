@@ -52,7 +52,7 @@ if (typeof testsJsLibraryOnly == "undefined" || !testsJsLibraryOnly) {
 	updateAlertRowStyle();
 
 	// Feature-test whether the browser wraps at <wbr> or not, and set word-wrap:
-	// break-word where necessary if not.  (IE and Opera don't wrap, Goanna and
+	// break-word where necessary if not.  (IE and Opera don't wrap, Gecko and
 	// WebKit do.)  word-wrap: break-word will break anywhere at all, so it looks
 	// significantly uglier.
 	//@{
@@ -1705,7 +1705,7 @@ var tests = {
 	indent: [
 	//@{
 		// All these have a trailing unselected paragraph, because otherwise
-		// Goanna is unhappy: it throws exceptions in non-CSS mode, and in CSS
+		// Gecko is unhappy: it throws exceptions in non-CSS mode, and in CSS
 		// mode it adds the indentation invisibly to the wrapper div in many
 		// cases.
 		'foo[]bar<p>extra',
@@ -1746,7 +1746,7 @@ var tests = {
 		'<div>foo<p>[bar]</p>baz</div><p>extra',
 
 		// These mimic existing indentation in various browsers, to see how
-		// they cope with indenting twice.  This is spec, Goanna non-CSS, and
+		// they cope with indenting twice.  This is spec, Gecko non-CSS, and
 		// Opera:
 		'<blockquote><p>foo[bar]</p><p>baz</p></blockquote><p>extra',
 		'<blockquote><p>foo[bar</p><p>b]az</p></blockquote><p>extra',
@@ -3403,7 +3403,7 @@ var tests = {
 	outdent: [
 	//@{
 		// These mimic existing indentation in various browsers, to see how
-		// they cope with outdenting various things.  This is spec, Goanna
+		// they cope with outdenting various things.  This is spec, Gecko
 		// non-CSS, and Opera:
 		'<blockquote><p>foo[bar]</p><p>baz</p></blockquote><p>extra',
 		'<blockquote><p>foo[bar</p><p>b]az</p></blockquote><p>extra',
@@ -5519,11 +5519,11 @@ function normalizeSerializedStyle(wrapper) {
 			// Random spacing differences
 			.replace(/; ?$/, "")
 			.replace(/: /g, ":")
-			// Goanna likes "transparent"
+			// Gecko likes "transparent"
 			.replace(/transparent/g, "rgba(0, 0, 0, 0)")
 			// WebKit likes to look overly precise
 			.replace(/, 0.496094\)/g, ", 0.5)")
-			// Goanna converts anything with full alpha to "transparent" which
+			// Gecko converts anything with full alpha to "transparent" which
 			// then becomes "rgba(0, 0, 0, 0)", so we have to make other
 			// browsers match
 			.replace(/rgba\([0-9]+, [0-9]+, [0-9]+, 0\)/g, "rgba(0, 0, 0, 0)")

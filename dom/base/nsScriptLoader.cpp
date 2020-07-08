@@ -657,7 +657,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
     }
     if (!aElement->GetParserCreated()) {
       // Violate the HTML5 spec in order to make LABjs and the "order" plug-in
-      // for RequireJS work with their Goanna-sniffed code path. See
+      // for RequireJS work with their Gecko-sniffed code path. See
       // http://lists.w3.org/Archives/Public/public-html/2010Oct/0088.html
       mNonAsyncExternalScriptInsertedRequests.AppendElement(request);
       if (!request->mLoading) {
@@ -1214,7 +1214,7 @@ nsScriptLoader::ProcessPendingRequests()
          !mNonAsyncExternalScriptInsertedRequests[0]->mLoading) {
     // Violate the HTML5 spec and execute these in the insertion order in
     // order to make LABjs and the "order" plug-in for RequireJS work with
-    // their Goanna-sniffed code path. See
+    // their Gecko-sniffed code path. See
     // http://lists.w3.org/Archives/Public/public-html/2010Oct/0088.html
     request.swap(mNonAsyncExternalScriptInsertedRequests[0]);
     mNonAsyncExternalScriptInsertedRequests.RemoveElementAt(0);

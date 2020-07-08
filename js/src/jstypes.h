@@ -30,7 +30,7 @@
 // So include them here.
 // XXX: including them in js/RequiredDefines.h should be a better option, since
 // that is by definition the header file that should be included in all
-// SpiderMonkey code.  However, Goanna doesn't do this!  See bug 909576.
+// SpiderMonkey code.  However, Gecko doesn't do this!  See bug 909576.
 #include "js-config.h"
 #include "jsversion.h"
 

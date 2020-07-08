@@ -247,7 +247,7 @@ interface nsIWebProgressListener : nsISupports
     *
     * STATE_IDENTITY_EV_TOPLEVEL
     *   The topmost document uses an EV cert.
-    *   NOTE: Available since Goanna 1.9
+    *   NOTE: Available since Gecko 1.9
     */
 
   const unsigned long STATE_IDENTITY_EV_TOPLEVEL    = 0x00100000;

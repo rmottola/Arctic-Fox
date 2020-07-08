@@ -395,7 +395,7 @@ nsBindingManager::DoProcessAttachedQueue()
     // They're evil, but we'll fight back!  Just poll on them being
     // done and repost the attached queue event.
     //
-    // But don't poll in a tight loop -- otherwise we keep the Goanna
+    // But don't poll in a tight loop -- otherwise we keep the Gecko
     // event loop non-empty and trigger bug 1021240 on OS X.
     nsresult rv = NS_ERROR_FAILURE;
     nsCOMPtr<nsITimer> timer = do_CreateInstance(NS_TIMER_CONTRACTID);

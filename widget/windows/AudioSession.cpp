@@ -145,7 +145,7 @@ AudioSession::GetSingleton()
     service.forget(&AudioSession::sService);
   }
 
-  // We don't refcount AudioSession on the Goanna side, we hold one single ref
+  // We don't refcount AudioSession on the Gecko side, we hold one single ref
   // as long as the appshell is running.
   return AudioSession::sService;
 }

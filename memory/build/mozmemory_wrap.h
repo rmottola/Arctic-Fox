@@ -10,7 +10,7 @@
  * allocation functions.
  *
  * There are several types of functions related to memory allocation
- * that are meant to be used publicly by the Goanna codebase:
+ * that are meant to be used publicly by the Gecko codebase:
  *
  * - malloc implementation functions:
  *   - malloc
@@ -73,7 +73,7 @@
  * dedicated to jemalloc specific functions.
  *
  *
- * All these functions are meant to be called with no prefix from Goanna code.
+ * All these functions are meant to be called with no prefix from Gecko code.
  * In most cases, this is because that's how they are available at runtime.
  * However, on Android, this relies on faulty.lib (the custom dynamic linker)
  * resolving mozglue symbols before libc symbols, which is guaranteed by the

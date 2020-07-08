@@ -20,7 +20,7 @@ function test()
   printBugNumber(BUGNUMBER);
   printStatus (summary);
 
-  print('This test will fail in Goanna prior to 1.9');
+  print('This test will fail in Gecko prior to 1.9');
 
   if (!options().match(/strict/))
   {

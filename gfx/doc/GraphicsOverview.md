@@ -49,7 +49,7 @@ We need to create a layer tree (from the frames tree), which will give us the co
 ### Graphics API
 
 #### Moz2D
-* The Moz2D graphics API, part of the Azure project, is a cross-platform interface onto the various graphics backends that Goanna uses for rendering such as Direct2D (1.0 and 1.1), Skia, Cairo, Quartz, and NV Path. Adding a new graphics platform to Goanna is accomplished by adding a backend to Moz2D.
+* The Moz2D graphics API, part of the Azure project, is a cross-platform interface onto the various graphics backends that Gecko uses for rendering such as Direct2D (1.0 and 1.1), Skia, Cairo, Quartz, and NV Path. Adding a new graphics platform to Gecko is accomplished by adding a backend to Moz2D.
 \see [Moz2D documentation on wiki](https://wiki.mozilla.org/Platform/GFX/Moz2D)
 
 #### Compositing

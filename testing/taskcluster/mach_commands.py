@@ -131,7 +131,7 @@ class DecisionTask(object):
         help='Treeherder project name')
     @CommandArgument('--url',
         required=True,
-        help='Goanna repository to use as head repository.')
+        help='Gecko repository to use as head repository.')
     @CommandArgument('--revision',
         required=True,
         help='Revision for this project')
@@ -528,7 +528,7 @@ class CIDockerRun(object):
             cmd_out.extend(flags.split())
         if local_goanna_repo:
             if not os.path.exists(local_goanna_repo):
-                print("Goanna repository path doesn't exist: %s" % local_goanna_repo)
+                print("Gecko repository path doesn't exist: %s" % local_goanna_repo)
                 sys.exit(1)
             if not goanna_revision:
                 goanna_revision = get_latest_hg_revision(local_goanna_repo)

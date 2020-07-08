@@ -162,7 +162,7 @@ protected:
   android::sp<android::Fence> mAcquireFence;
 
   /**
-   * Hold previous ReleaseFence to prevent Fence delivery failure via goanna IPC.
+   * Hold previous ReleaseFence to prevent Fence delivery failure via gecko IPC.
    * Fence is a kernel object and its lifetime is managed by a reference count.
    * Until the Fence is delivered to client side, need to hold Fence on host side.
    */

@@ -219,7 +219,7 @@ let LogShake = {
       Cu.reportError("Unable to get device properties: " + ex);
     }
 
-    // Let Goanna perfom the dump to a file, and just collect it
+    // Let Gecko perfom the dump to a file, and just collect it
     try {
       LogCapture.readAboutMemory().then(aboutMemory => {
         let file = OS.Path.basename(aboutMemory);

@@ -16,7 +16,7 @@ XPCSHELL_TESTS_MANIFESTS += [
     'unit_ipc/xpcshell.ini',
 ]
 
-GoannaSimplePrograms([
+GeckoSimplePrograms([
     'PropertiesTest',
     'ReadNTLM',
     'TestBlockingSocket',

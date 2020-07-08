@@ -41,14 +41,14 @@
         }
 
         if (applicationName == "")
-          applicationName = "Goanna based application";
+          applicationName = "Gecko based application";
       }
       is (accessible.name, applicationName, "wrong application accessible name");
 
       // nsIAccessibleApplication
       is(accessible.appName, appInfo.name, "Wrong application name");
       is(accessible.appVersion, appInfo.version, "Wrong application version");
-      is(accessible.platformName, "Goanna", "Wrong platform name");
+      is(accessible.platformName, "Gecko", "Wrong platform name");
       is(accessible.platformVersion, appInfo.platformVersion,
          "Wrong platform version");
 

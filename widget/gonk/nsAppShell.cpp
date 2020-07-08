@@ -74,7 +74,7 @@
 // Defines kKeyMapping and GetKeyNameIndex()
 #include "GonkKeyMapping.h"
 #include "mozilla/layers/CompositorParent.h"
-#include "GoannaTouchDispatcher.h"
+#include "GeckoTouchDispatcher.h"
 
 #define LOG(args...)                                            \
     __android_log_print(ANDROID_LOG_INFO, "Gonk" , ## args)
@@ -102,7 +102,7 @@ static int32_t sMicrophoneState;
 
 // Amount of time in MS before an input is considered expired.
 static const uint64_t kInputExpirationThresholdMs = 1000;
-static const char kKey_WAKE_LOCK_ID[] = "GoannaKeyEvent";
+static const char kKey_WAKE_LOCK_ID[] = "GeckoKeyEvent";
 
 NS_IMPL_ISUPPORTS_INHERITED(nsAppShell, nsBaseAppShell, nsIObserver)
 
@@ -323,7 +323,7 @@ void
 KeyEventDispatcher::Dispatch()
 {
     // XXX Even if unknown key is pressed, DOM key event should be
-    //     dispatched since Goanna for the other platforms are implemented
+    //     dispatched since Gecko for the other platforms are implemented
     //     as so.
     if (!mDOMKeyCode && mDOMKeyNameIndex == KEY_NAME_INDEX_Unidentified) {
         VERBOSE_LOG("Got unknown key event code. "
@@ -390,13 +390,13 @@ updateHeadphoneSwitch()
     NS_DispatchToMainThread(new SwitchEventRunnable(event));
 }
 
-class GoannaPointerController : public PointerControllerInterface {
+class GeckoPointerController : public PointerControllerInterface {
     float mX;
     float mY;
     int32_t mButtonState;
     InputReaderConfiguration* mConfig;
 public:
-    GoannaPointerController(InputReaderConfiguration* config)
+    GeckoPointerController(InputReaderConfiguration* config)
         : mX(0)
         , mY(0)
         , mButtonState(0)
@@ -419,7 +419,7 @@ public:
 };
 
 bool
-GoannaPointerController::getBounds(float* outMinX,
+GeckoPointerController::getBounds(float* outMinX,
                                   float* outMinY,
                                   float* outMaxX,
                                   float* outMaxY) const
@@ -435,7 +435,7 @@ GoannaPointerController::getBounds(float* outMinX,
 }
 
 void
-GoannaPointerController::move(float deltaX, float deltaY)
+GeckoPointerController::move(float deltaX, float deltaY)
 {
     float minX, minY, maxX, maxY;
     getBounds(&minX, &minY, &maxX, &maxY);
@@ -445,41 +445,41 @@ GoannaPointerController::move(float deltaX, float deltaY)
 }
 
 void
-GoannaPointerController::setButtonState(int32_t buttonState)
+GeckoPointerController::setButtonState(int32_t buttonState)
 {
     mButtonState = buttonState;
 }
 
 int32_t
-GoannaPointerController::getButtonState() const
+GeckoPointerController::getButtonState() const
 {
     return mButtonState;
 }
 
 void
-GoannaPointerController::setPosition(float x, float y)
+GeckoPointerController::setPosition(float x, float y)
 {
     mX = x;
     mY = y;
 }
 
 void
-GoannaPointerController::getPosition(float* outX, float* outY) const
+GeckoPointerController::getPosition(float* outX, float* outY) const
 {
     *outX = mX;
     *outY = mY;
 }
 
-class GoannaInputReaderPolicy : public InputReaderPolicyInterface {
+class GeckoInputReaderPolicy : public InputReaderPolicyInterface {
     InputReaderConfiguration mConfig;
 public:
-    GoannaInputReaderPolicy() {}
+    GeckoInputReaderPolicy() {}
 
     virtual void getReaderConfiguration(InputReaderConfiguration* outConfig);
     virtual sp<PointerControllerInterface> obtainPointerController(int32_t
 deviceId)
     {
-        return new GoannaPointerController(&mConfig);
+        return new GeckoPointerController(&mConfig);
     };
     virtual void notifyInputDevicesChanged(const android::Vector<InputDeviceInfo>& inputDevices) {};
     virtual sp<KeyCharacterMap> getKeyboardLayoutOverlay(const String8& inputDeviceDescriptor)
@@ -494,19 +494,19 @@ deviceId)
     void setDisplayInfo();
 
 protected:
-    virtual ~GoannaInputReaderPolicy() {}
+    virtual ~GeckoInputReaderPolicy() {}
 };
 
-class GoannaInputDispatcher : public InputDispatcherInterface {
+class GeckoInputDispatcher : public InputDispatcherInterface {
 public:
-    GoannaInputDispatcher(sp<EventHub> &aEventHub)
-        : mQueueLock("GoannaInputDispatcher::mQueueMutex")
+    GeckoInputDispatcher(sp<EventHub> &aEventHub)
+        : mQueueLock("GeckoInputDispatcher::mQueueMutex")
         , mEventHub(aEventHub)
         , mKeyDownCount(0)
         , mKeyEventsFiltered(false)
         , mPowerWakelock(false)
     {
-        mTouchDispatcher = new GoannaTouchDispatcher();
+        mTouchDispatcher = new GeckoTouchDispatcher();
     }
 
     virtual void dump(String8& dump);
@@ -542,7 +542,7 @@ public:
 
 
 protected:
-    virtual ~GoannaInputDispatcher() { }
+    virtual ~GeckoInputDispatcher() { }
 
 private:
     // mQueueLock should generally be locked while using mEventQueue.
@@ -551,16 +551,16 @@ private:
     mozilla::Mutex mQueueLock;
     std::queue<UserInputData> mEventQueue;
     sp<EventHub> mEventHub;
-    nsRefPtr<GoannaTouchDispatcher> mTouchDispatcher;
+    nsRefPtr<GeckoTouchDispatcher> mTouchDispatcher;
 
     int mKeyDownCount;
     bool mKeyEventsFiltered;
     bool mPowerWakelock;
 };
 
-// GoannaInputReaderPolicy
+// GeckoInputReaderPolicy
 void
-GoannaInputReaderPolicy::setDisplayInfo()
+GeckoInputReaderPolicy::setDisplayInfo()
 {
     static_assert(nsIScreen::ROTATION_0_DEG ==
                   DISPLAY_ORIENTATION_0,
@@ -591,15 +591,15 @@ GoannaInputReaderPolicy::setDisplayInfo()
     mConfig.setDisplayInfo(false, viewport);
 }
 
-void GoannaInputReaderPolicy::getReaderConfiguration(InputReaderConfiguration* outConfig)
+void GeckoInputReaderPolicy::getReaderConfiguration(InputReaderConfiguration* outConfig)
 {
     *outConfig = mConfig;
 }
 
 
-// GoannaInputDispatcher
+// GeckoInputDispatcher
 void
-GoannaInputDispatcher::dump(String8& dump)
+GeckoInputDispatcher::dump(String8& dump)
 {
 }
 
@@ -612,7 +612,7 @@ isExpired(const UserInputData& data)
 }
 
 void
-GoannaInputDispatcher::dispatchOnce()
+GeckoInputDispatcher::dispatchOnce()
 {
     UserInputData data;
     {
@@ -655,12 +655,12 @@ GoannaInputDispatcher::dispatchOnce()
 }
 
 void
-GoannaInputDispatcher::notifyConfigurationChanged(const NotifyConfigurationChangedArgs*)
+GeckoInputDispatcher::notifyConfigurationChanged(const NotifyConfigurationChangedArgs*)
 {
 }
 
 void
-GoannaInputDispatcher::notifyKey(const NotifyKeyArgs* args)
+GeckoInputDispatcher::notifyKey(const NotifyKeyArgs* args)
 {
     UserInputData data;
     data.timeMs = nanosecsToMillisecs(args->eventTime);
@@ -716,7 +716,7 @@ addMultiTouch(MultiTouchInput& aMultiTouch,
 }
 
 void
-GoannaInputDispatcher::notifyMotion(const NotifyMotionArgs* args)
+GeckoInputDispatcher::notifyMotion(const NotifyMotionArgs* args)
 {
     uint32_t time = nanosecsToMillisecs(args->eventTime);
     int32_t action = args->action & AMOTION_EVENT_ACTION_MASK;
@@ -770,7 +770,7 @@ GoannaInputDispatcher::notifyMotion(const NotifyMotionArgs* args)
     mTouchDispatcher->NotifyTouch(touchData, timestamp);
 }
 
-void GoannaInputDispatcher::notifySwitch(const NotifySwitchArgs* args)
+void GeckoInputDispatcher::notifySwitch(const NotifySwitchArgs* args)
 {
     if (!sDevInputAudioJack)
         return;
@@ -793,11 +793,11 @@ void GoannaInputDispatcher::notifySwitch(const NotifySwitchArgs* args)
         updateHeadphoneSwitch();
 }
 
-void GoannaInputDispatcher::notifyDeviceReset(const NotifyDeviceResetArgs* args)
+void GeckoInputDispatcher::notifyDeviceReset(const NotifyDeviceResetArgs* args)
 {
 }
 
-int32_t GoannaInputDispatcher::injectInputEvent(
+int32_t GeckoInputDispatcher::injectInputEvent(
     const InputEvent* event,
     int32_t injectorPid, int32_t injectorUid, int32_t syncMode,
     int32_t timeoutMillis, uint32_t policyFlags)
@@ -806,29 +806,29 @@ int32_t GoannaInputDispatcher::injectInputEvent(
 }
 
 void
-GoannaInputDispatcher::setInputWindows(const android::Vector<sp<InputWindowHandle> >& inputWindowHandles)
+GeckoInputDispatcher::setInputWindows(const android::Vector<sp<InputWindowHandle> >& inputWindowHandles)
 {
 }
 
 void
-GoannaInputDispatcher::setFocusedApplication(const sp<InputApplicationHandle>& inputApplicationHandle)
+GeckoInputDispatcher::setFocusedApplication(const sp<InputApplicationHandle>& inputApplicationHandle)
 {
 }
 
 void
-GoannaInputDispatcher::setInputDispatchMode(bool enabled, bool frozen)
+GeckoInputDispatcher::setInputDispatchMode(bool enabled, bool frozen)
 {
 }
 
 status_t
-GoannaInputDispatcher::registerInputChannel(const sp<InputChannel>& inputChannel,
+GeckoInputDispatcher::registerInputChannel(const sp<InputChannel>& inputChannel,
                                            const sp<InputWindowHandle>& inputWindowHandle, bool monitor)
 {
     return OK;
 }
 
 status_t
-GoannaInputDispatcher::unregisterInputChannel(const sp<InputChannel>& inputChannel)
+GeckoInputDispatcher::unregisterInputChannel(const sp<InputChannel>& inputChannel)
 {
     return OK;
 }
@@ -955,9 +955,9 @@ nsAppShell::InitInputDevices()
     sMicrophoneState = AKEY_STATE_UNKNOWN;
 
     mEventHub = new EventHub();
-    mReaderPolicy = new GoannaInputReaderPolicy();
+    mReaderPolicy = new GeckoInputReaderPolicy();
     mReaderPolicy->setDisplayInfo();
-    mDispatcher = new GoannaInputDispatcher(mEventHub);
+    mDispatcher = new GeckoInputDispatcher(mEventHub);
 
     mReader = new InputReader(mEventHub, mReaderPolicy, mDispatcher);
     mReaderThread = new InputReaderThread(mReader);

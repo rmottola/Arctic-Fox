@@ -50,7 +50,7 @@
           return;
 
         // Note: always test against valuetext first because the existence of 
-        // aria-valuetext takes precedence over aria-valuenow in goanna.
+        // aria-valuetext takes precedence over aria-valuenow in gecko.
         is(acc.value, (aValuetext != undefined)? aValuetext : aValuenow,
             "Wrong value of " + prettyName(aNodeOrID));
       }

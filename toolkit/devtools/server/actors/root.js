@@ -158,7 +158,7 @@ RootActor.prototype = {
     // Whether the page style actor implements the getUsedFontFaces method
     // that returns the font faces used on a node
     getUsedFontFaces: true,
-    // Trait added in Goanna 38, indicating that all features necessary for
+    // Trait added in Gecko 38, indicating that all features necessary for
     // grabbing allocations from the MemoryActor are available for the performance tool
     memoryActorAllocations: true
   },

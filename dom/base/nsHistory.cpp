@@ -159,7 +159,7 @@ nsHistory::Go(int32_t aDelta, ErrorResult& aRv)
       // 4.x needed it, but we don't, and it's a horrible experience
       // for nothing.  In stead of reloading the page, just clear
       // style data and reflow the page since some sites may use this
-      // trick to work around goanna reflow bugs, and this should have
+      // trick to work around gecko reflow bugs, and this should have
       // the same effect.
 
       nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();

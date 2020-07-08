@@ -62,7 +62,7 @@ if CONFIG['_MSC_VER']:
       '-wd4987', # nonstandard extension used
   ]
 
-  # Goanna headers aren't warning-free enough for us to enable these warnings
+  # Gecko headers aren't warning-free enough for us to enable these warnings
   CXXFLAGS += [
     '-wd4100', # 'symbol' : unreferenced formal parameter
     '-wd4127', # conditional expression is constant

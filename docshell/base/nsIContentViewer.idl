@@ -181,7 +181,7 @@ interface nsIContentViewer : nsISupports
   /**
    * Returns whether this content viewer is in a hidden state.
    *
-   * @note Only Goanna internal code should set the attribute!
+   * @note Only Gecko internal code should set the attribute!
    */
   attribute boolean isHidden;
 

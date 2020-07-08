@@ -228,7 +228,7 @@ public:
 
 /**
  * The generic class for event dispatching.
- * Must not be used outside Goanna!
+ * Must not be used outside Gecko!
  */
 class EventDispatcher
 {

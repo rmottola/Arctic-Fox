@@ -20,7 +20,7 @@ typedef AtkUtil MaiUtil;
 typedef AtkUtilClass MaiUtilClass;
 
 #define MAI_VERSION MOZILLA_VERSION
-#define MAI_NAME "Goanna"
+#define MAI_NAME "Gecko"
 
 extern "C" {
 static guint (*gail_add_global_event_listener)(GSignalEmissionHook listener,

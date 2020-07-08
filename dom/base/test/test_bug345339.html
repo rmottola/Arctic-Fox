@@ -33,7 +33,7 @@ function afterLoad() {
     iframeDoc.getElementById("select").selectedIndex = 1;
     iframeDoc.getElementById("radio2").checked = true;
     iframeDoc.getElementById("password").value = "123456";
-    iframeDoc.getElementById("hidden").value = "goanna";
+    iframeDoc.getElementById("hidden").value = "gecko";
 
     SpecialPowers.wrap(iframeDoc).getElementById("file").mozSetFileArray([file]);
 
@@ -55,7 +55,7 @@ function afterReload() {
        "radio button #2 value preserved");
     isnot(iframeDoc.getElementById("password").value, "123456",
        "password field value forgotten");
-    is(iframeDoc.getElementById("hidden").value, "goanna",
+    is(iframeDoc.getElementById("hidden").value, "gecko",
        "hidden field value preserved");
 
     // The new file object isn't ===, but it's extensionally equal:

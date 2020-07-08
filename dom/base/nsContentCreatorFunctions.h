@@ -12,7 +12,7 @@
 #include "mozilla/dom/FromParser.h"
 
 /**
- * Functions to create content, to be used only inside Goanna
+ * Functions to create content, to be used only inside Gecko
  * (mozilla/content and mozilla/layout).
  */
 

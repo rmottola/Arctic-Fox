@@ -6,7 +6,7 @@
 
 // This service reads a file of rules describing TLD-like domain names.  For a
 // complete description of the expected file format and parsing rules, see
-// http://wiki.mozilla.org/Goanna:Effective_TLD_Service
+// http://wiki.mozilla.org/Gecko:Effective_TLD_Service
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/MemoryReporting.h"

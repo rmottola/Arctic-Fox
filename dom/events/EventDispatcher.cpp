@@ -33,7 +33,7 @@
 #include "mozilla/unused.h"
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 #include "mozilla/dom/Element.h"
 using namespace mozilla::tasktracer;
 #endif

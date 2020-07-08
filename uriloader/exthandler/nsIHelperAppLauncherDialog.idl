@@ -24,7 +24,7 @@ interface nsIFile;
 [scriptable, uuid(bfc739f3-8d75-4034-a6f8-1039a5996bad)]
 interface nsIHelperAppLauncherDialog : nsISupports {
   /**
-   * This request is passed to the helper app dialog because Goanna can not
+   * This request is passed to the helper app dialog because Gecko can not
    * handle content of this type.
    */
   const unsigned long REASON_CANTHANDLE = 0;
@@ -35,7 +35,7 @@ interface nsIHelperAppLauncherDialog : nsISupports {
   const unsigned long REASON_SERVERREQUEST = 1;
 
   /**
-   * Goanna detected that the type sent by the server (e.g. text/plain) does
+   * Gecko detected that the type sent by the server (e.g. text/plain) does
    * not match the actual type.
    */
   const unsigned long REASON_TYPESNIFFED = 2;

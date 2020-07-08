@@ -267,7 +267,7 @@ main(int argc, char* argv[])
 
     char *buffer = PR_smprintf("GET %s HTTP/1.1" CRLF
                                "host: %s" CRLF
-                               "user-agent: Mozilla/5.0 (X11; N; Linux 2.2.16-22smp i686; en-US; m18) Goanna/20001220" CRLF
+                               "user-agent: Mozilla/5.0 (X11; N; Linux 2.2.16-22smp i686; en-US; m18) Gecko/20001220" CRLF
                                "accept: */*" CRLF
                                "accept-language: en" CRLF
                                "accept-encoding: gzip,deflate,compress,identity" CRLF

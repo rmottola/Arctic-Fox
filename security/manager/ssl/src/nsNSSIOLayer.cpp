@@ -1346,7 +1346,7 @@ checkHandshake(int32_t bytesTransfered, bool wasReading,
 
   if (bytesTransfered < 0) {
     // Remember that we encountered an error so that getSocketInfoIfRunning
-    // will correctly cause us to fail if another part of Goanna
+    // will correctly cause us to fail if another part of Gecko
     // (erroneously) calls an I/O function (PR_Send/PR_Recv/etc.) again on
     // this socket. Note that we use the original error because if we use
     // PR_CONNECT_RESET_ERROR, we'll repeated try to reconnect.

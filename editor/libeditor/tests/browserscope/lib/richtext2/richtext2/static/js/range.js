@@ -1359,7 +1359,7 @@ goog.userAgent.init_ = function() {
   goog.userAgent.detectedIe_ = false;
   goog.userAgent.detectedWebkit_ = false;
   goog.userAgent.detectedMobile_ = false;
-  goog.userAgent.detectedGoanna_ = false;
+  goog.userAgent.detectedGecko_ = false;
   var ua;
   if(!goog.userAgent.BROWSER_KNOWN_ && (ua = goog.userAgent.getUserAgentString())) {
     var navigator = goog.userAgent.getNavigator();
@@ -1367,7 +1367,7 @@ goog.userAgent.init_ = function() {
     goog.userAgent.detectedIe_ = !goog.userAgent.detectedOpera_ && ua.indexOf("MSIE") != -1;
     goog.userAgent.detectedWebkit_ = !goog.userAgent.detectedOpera_ && ua.indexOf("WebKit") != -1;
     goog.userAgent.detectedMobile_ = goog.userAgent.detectedWebkit_ && ua.indexOf("Mobile") != -1;
-    goog.userAgent.detectedGoanna_ = !goog.userAgent.detectedOpera_ && !goog.userAgent.detectedWebkit_ && navigator.product == "Goanna"
+    goog.userAgent.detectedGecko_ = !goog.userAgent.detectedOpera_ && !goog.userAgent.detectedWebkit_ && navigator.product == "Gecko"
   }
 };
 if(!goog.userAgent.BROWSER_KNOWN_) {
@@ -1375,7 +1375,7 @@ if(!goog.userAgent.BROWSER_KNOWN_) {
 }
 goog.userAgent.OPERA = goog.userAgent.BROWSER_KNOWN_ ? goog.userAgent.ASSUME_OPERA : goog.userAgent.detectedOpera_;
 goog.userAgent.IE = goog.userAgent.BROWSER_KNOWN_ ? goog.userAgent.ASSUME_IE : goog.userAgent.detectedIe_;
-goog.userAgent.GECKO = goog.userAgent.BROWSER_KNOWN_ ? goog.userAgent.ASSUME_GECKO : goog.userAgent.detectedGoanna_;
+goog.userAgent.GECKO = goog.userAgent.BROWSER_KNOWN_ ? goog.userAgent.ASSUME_GECKO : goog.userAgent.detectedGecko_;
 goog.userAgent.WEBKIT = goog.userAgent.BROWSER_KNOWN_ ? goog.userAgent.ASSUME_WEBKIT || goog.userAgent.ASSUME_MOBILE_WEBKIT : goog.userAgent.detectedWebkit_;
 goog.userAgent.MOBILE = goog.userAgent.ASSUME_MOBILE_WEBKIT || goog.userAgent.detectedMobile_;
 goog.userAgent.SAFARI = goog.userAgent.WEBKIT;
@@ -4797,19 +4797,19 @@ goog.dom.browserrange.W3cRange.prototype.surroundWithNodes = function(startNode,
 goog.dom.browserrange.W3cRange.prototype.collapse = function(toStart) {
   this.range_.collapse(toStart)
 };
-goog.provide("goog.dom.browserrange.GoannaRange");
+goog.provide("goog.dom.browserrange.GeckoRange");
 goog.require("goog.dom.browserrange.W3cRange");
-goog.dom.browserrange.GoannaRange = function(range) {
+goog.dom.browserrange.GeckoRange = function(range) {
   goog.dom.browserrange.W3cRange.call(this, range)
 };
-goog.inherits(goog.dom.browserrange.GoannaRange, goog.dom.browserrange.W3cRange);
-goog.dom.browserrange.GoannaRange.createFromNodeContents = function(node) {
-  return new goog.dom.browserrange.GoannaRange(goog.dom.browserrange.W3cRange.getBrowserRangeForNode(node))
+goog.inherits(goog.dom.browserrange.GeckoRange, goog.dom.browserrange.W3cRange);
+goog.dom.browserrange.GeckoRange.createFromNodeContents = function(node) {
+  return new goog.dom.browserrange.GeckoRange(goog.dom.browserrange.W3cRange.getBrowserRangeForNode(node))
 };
-goog.dom.browserrange.GoannaRange.createFromNodes = function(startNode, startOffset, endNode, endOffset) {
-  return new goog.dom.browserrange.GoannaRange(goog.dom.browserrange.W3cRange.getBrowserRangeForNodes(startNode, startOffset, endNode, endOffset))
+goog.dom.browserrange.GeckoRange.createFromNodes = function(startNode, startOffset, endNode, endOffset) {
+  return new goog.dom.browserrange.GeckoRange(goog.dom.browserrange.W3cRange.getBrowserRangeForNodes(startNode, startOffset, endNode, endOffset))
 };
-goog.dom.browserrange.GoannaRange.prototype.selectInternal = function(selection, reversed) {
+goog.dom.browserrange.GeckoRange.prototype.selectInternal = function(selection, reversed) {
   var anchorNode = reversed ? this.getEndNode() : this.getStartNode();
   var anchorOffset = reversed ? this.getEndOffset() : this.getStartOffset();
   var focusNode = reversed ? this.getStartNode() : this.getEndNode();
@@ -5322,7 +5322,7 @@ goog.dom.browserrange.WebKitRange.prototype.selectInternal = function(selection,
 goog.provide("goog.dom.browserrange");
 goog.provide("goog.dom.browserrange.Error");
 goog.require("goog.dom");
-goog.require("goog.dom.browserrange.GoannaRange");
+goog.require("goog.dom.browserrange.GeckoRange");
 goog.require("goog.dom.browserrange.IeRange");
 goog.require("goog.dom.browserrange.OperaRange");
 goog.require("goog.dom.browserrange.W3cRange");
@@ -5337,7 +5337,7 @@ goog.dom.browserrange.createRange = function(range) {
       return new goog.dom.browserrange.WebKitRange(range)
     }else {
       if(goog.userAgent.GECKO) {
-        return new goog.dom.browserrange.GoannaRange(range)
+        return new goog.dom.browserrange.GeckoRange(range)
       }else {
         if(goog.userAgent.OPERA) {
           return new goog.dom.browserrange.OperaRange(range)
@@ -5356,7 +5356,7 @@ goog.dom.browserrange.createRangeFromNodeContents = function(node) {
       return goog.dom.browserrange.WebKitRange.createFromNodeContents(node)
     }else {
       if(goog.userAgent.GECKO) {
-        return goog.dom.browserrange.GoannaRange.createFromNodeContents(node)
+        return goog.dom.browserrange.GeckoRange.createFromNodeContents(node)
       }else {
         if(goog.userAgent.OPERA) {
           return goog.dom.browserrange.OperaRange.createFromNodeContents(node)
@@ -5375,7 +5375,7 @@ goog.dom.browserrange.createRangeFromNodes = function(startNode, startOffset, en
       return goog.dom.browserrange.WebKitRange.createFromNodes(startNode, startOffset, endNode, endOffset)
     }else {
       if(goog.userAgent.GECKO) {
-        return goog.dom.browserrange.GoannaRange.createFromNodes(startNode, startOffset, endNode, endOffset)
+        return goog.dom.browserrange.GeckoRange.createFromNodes(startNode, startOffset, endNode, endOffset)
       }else {
         if(goog.userAgent.OPERA) {
           return goog.dom.browserrange.OperaRange.createFromNodes(startNode, startOffset, endNode, endOffset)

@@ -18,7 +18,7 @@ function waitEitherEnabledOrDisabled() {
 
   // Listen 'adapteradded' rather than 'enabled' since the current API can't
   // disable BT before the BT adapter is initialized.
-  // We should listen to 'enabled' when goanna can handle the case I mentioned
+  // We should listen to 'enabled' when gecko can handle the case I mentioned
   // above, please refer to the follow-up bug 973482.
   bluetoothManager.addEventListener("adapteradded", onEnabledDisabled);
   bluetoothManager.addEventListener("disabled", onEnabledDisabled);

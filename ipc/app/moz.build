@@ -19,7 +19,7 @@ else:
             USE_LIBS += [
                 'mozalloc_staticruntime',
             ]
-    GoannaProgram(CONFIG['MOZ_CHILD_PROCESS_NAME'], **kwargs)
+    GeckoProgram(CONFIG['MOZ_CHILD_PROCESS_NAME'], **kwargs)
 
     SOURCES += [
         'MozillaRuntimeMain.cpp',

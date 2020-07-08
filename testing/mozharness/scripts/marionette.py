@@ -74,7 +74,7 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
         {"action": "store",
          "dest": "marionette_address",
          "default": None,
-         "help": "The host:port of the Marionette server running inside Goanna.  Unused for emulator testing",
+         "help": "The host:port of the Marionette server running inside Gecko.  Unused for emulator testing",
          }
     ], [
         ["--emulator"],
@@ -145,7 +145,7 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
 
     error_list = [
         {'substr': 'FAILED (errors=', 'level': WARNING},
-        {'substr': r'''Could not successfully complete transport of message to Goanna, socket closed''', 'level': ERROR},
+        {'substr': r'''Could not successfully complete transport of message to Gecko, socket closed''', 'level': ERROR},
         {'substr': r'''Connection to Marionette server is lost. Check goanna''', 'level': ERROR},
         {'substr': 'Timeout waiting for marionette on port', 'level': ERROR},
         {'regex': re.compile(r'''(TEST-UNEXPECTED|PROCESS-CRASH)'''), 'level': ERROR},

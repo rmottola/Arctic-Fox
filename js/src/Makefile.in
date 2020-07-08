@@ -217,7 +217,7 @@ install:: js-config.h
 ######################################################
 # BEGIN SpiderMonkey header installation
 #
-# Mozilla/Goanna/Firefox mostly doesn't concern itself with defining a sensible
+# Mozilla/Gecko/Firefox mostly doesn't concern itself with defining a sensible
 # install target, because it's shipping primarily packaged builds.  And even if
 # it did, those builds wouldn't really have reason to include header files.  So
 # we have to install public headers ourselves, rather than using something from

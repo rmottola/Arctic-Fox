@@ -6055,7 +6055,7 @@
  * @param   _APP_VERSION
  *          The application version
  * @param   _GRE_VERSION
- *          The Goanna Runtime Engine version
+ *          The Gecko Runtime Engine version
  *
  * $R6 = _APP_NAME
  * $R7 = _AB_CD

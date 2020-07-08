@@ -14,7 +14,7 @@
 #include <string.h>             // strerror
 
 // For gcc, we define these inline to abort so that we're absolutely
-// certain that (i) no exceptions are thrown from Goanna; (ii) these
+// certain that (i) no exceptions are thrown from Gecko; (ii) these
 // errors are always terminal and caught by breakpad.
 
 #include "mozilla/mozalloc_abort.h"

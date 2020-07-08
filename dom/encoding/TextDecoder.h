@@ -66,10 +66,10 @@ public:
   void Init(const nsAString& aLabel, const bool aFatal, ErrorResult& aRv);
 
   /**
-   * Performs initialization with a Goanna-canonical encoding name (as opposed
+   * Performs initialization with a Gecko-canonical encoding name (as opposed
    * to a label.)
    *
-   * @param aEncoding    A Goanna-canonical encoding name
+   * @param aEncoding    A Gecko-canonical encoding name
    * @param aFatal       indicates whether to throw an 'EncodingError'
    *                     exception or not when decoding.
    */

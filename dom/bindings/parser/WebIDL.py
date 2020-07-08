@@ -1685,9 +1685,9 @@ class IDLType(IDLObject):
     def isNonCallbackInterface(self):
         return False
 
-    def isGoannaInterface(self):
+    def isGeckoInterface(self):
         """ Returns a boolean indicating whether this type is an 'interface'
-            type that is implemented in Goanna. At the moment, this returns
+            type that is implemented in Gecko. At the moment, this returns
             true for all interface types that are not types from the TypedArray
             spec."""
         return self.isInterface() and not self.isSpiderMonkeyInterface()
@@ -2527,7 +2527,7 @@ class IDLWrapperType(IDLType):
             if other.isSpiderMonkeyInterface():
                 # Just let |other| handle things
                 return other.isDistinguishableFrom(self)
-            assert self.isGoannaInterface() and other.isGoannaInterface()
+            assert self.isGeckoInterface() and other.isGeckoInterface()
             if self.inner.isExternal() or other.unroll().inner.isExternal():
                 return self != other
             return (len(self.inner.interfacesBasedOnSelf &

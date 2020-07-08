@@ -4,7 +4,7 @@
 // evangelism are included.
 {
   // bug 826347, msn.com
-  "msn.com": "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Goanna) Chrome/18.0.1025.133 Mobile Safari/535.19",
+  "msn.com": "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile Safari/535.19",
   // bug 826353, itau.com.br
   "itau.com.br": "\\(Mobile#(Android; Mobile",
   // bug 826510, r7.com
@@ -24,7 +24,7 @@
   // bug 827573, webmotors.com.br
   "webmotors.com.br": "\\(Mobile#(Android; Mobile",
   // bug 827670, elpais.com.co
-  "elpais.com.co": "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Goanna) Chrome/18.0.1025.133 Mobile Safari/535.19",
+  "elpais.com.co": "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile Safari/535.19",
   // bug 827674, avianca.com
   "avianca.com": "\\(Mobile#(Android; Mobile",
   // bug 827678, marca.com

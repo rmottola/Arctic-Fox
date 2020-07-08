@@ -49,7 +49,7 @@
 # define LOGE_IF(cond, ...) \
      ( (CONDITION(cond)) \
      ? ((void)__android_log_print(ANDROID_LOG_ERROR, \
-       "Goanna:MozillaRntimeMain", __VA_ARGS__)) \
+       "Gecko:MozillaRntimeMain", __VA_ARGS__)) \
      : (void)0 )
 
 # ifdef MOZ_CONTENT_SANDBOX

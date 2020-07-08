@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
- * An implementation for a Goanna-style content sink that knows how
+ * An implementation for a Gecko-style content sink that knows how
  * to build a content model (the "prototype" document) from XUL.
  *
  * For more information on XUL,

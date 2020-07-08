@@ -1044,7 +1044,7 @@ static void cpuid(uint32_t fxn, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t 
 // -------------------------Runtime SSEx Detection-----------------------------
 
 /* MMX is always supported per
- *  Goanna v1.9.1 minimum CPU requirements */
+ *  Gecko v1.9.1 minimum CPU requirements */
 #define SSE1_EDX_MASK (1UL << 25)
 #define SSE2_EDX_MASK (1UL << 26)
 #define SSE3_ECX_MASK (1UL <<  0)

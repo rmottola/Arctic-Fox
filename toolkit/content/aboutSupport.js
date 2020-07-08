@@ -419,7 +419,7 @@ function copyRawDataToClipboard(button) {
         message: stringBundle().GetStringFromName("rawDataCopied"),
         duration: "short"
       };
-      Services.androidBridge.handleGoannaMessage(message);
+      Services.androidBridge.handleGeckoMessage(message);
 #endif
     });
   }
@@ -473,7 +473,7 @@ function copyContentsToClipboard() {
     message: stringBundle().GetStringFromName("textCopied"),
     duration: "short"
   };
-  Services.androidBridge.handleGoannaMessage(message);
+  Services.androidBridge.handleGeckoMessage(message);
 #endif
 }
 

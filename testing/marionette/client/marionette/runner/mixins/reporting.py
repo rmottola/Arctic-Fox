@@ -149,9 +149,9 @@ class HTMLReportingTestRunnerMixin(object):
                 dm_type=os.environ.get('DM_TRANS', 'adb')))
 
         configuration = {
-            'Goanna version': version.get('application_version'),
-            'Goanna build': version.get('application_buildid'),
-            'Goanna revision': version.get('application_revision'),
+            'Gecko version': version.get('application_version'),
+            'Gecko build': version.get('application_buildid'),
+            'Gecko revision': version.get('application_revision'),
             'Gaia date': version.get('gaia_date') and
             time.strftime(date_format, time.localtime(
                 int(version.get('gaia_date')))),
@@ -164,7 +164,7 @@ class HTMLReportingTestRunnerMixin(object):
             'Device firmware (release)': version.get('device_firmware_version_release')}
 
         if version.get('application_changeset') and version.get('application_repository'):
-            configuration['Goanna revision'] = html.a(
+            configuration['Gecko revision'] = html.a(
                 version.get('application_changeset'),
                 href='/'.join([version.get('application_repository'),
                                version.get('application_changeset')]),

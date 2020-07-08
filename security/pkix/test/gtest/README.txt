@@ -11,7 +11,7 @@ You can run just the tests for functions defined in filename pkixfoo.cpp with:
 
   mach gtest "pkixfoo*"
 
-If you run "mach gtest" then you'll end up running every gtest in Goanna.
+If you run "mach gtest" then you'll end up running every gtest in Gecko.
 
 
 

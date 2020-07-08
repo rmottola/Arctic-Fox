@@ -468,7 +468,7 @@ nsHTMLDocument::TryTLD(int32_t& aCharsetSource, nsACString& aCharset)
   }
   int32_t index = host.RFindChar('.');
   if (index == kNotFound) {
-    // We have an intranet host, Goanna-internal URL or an IPv6 address.
+    // We have an intranet host, Gecko-internal URL or an IPv6 address.
     return;
   }
   // Since the string didn't end with a dot and we found a dot,
