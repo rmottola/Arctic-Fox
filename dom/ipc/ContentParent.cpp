@@ -592,6 +592,10 @@ static nsTArray<PrefSetting>* sNuwaPrefUpdates;
 // case between StartUp() and ShutDown() or JoinAllSubprocesses().
 static bool sCanLaunchSubprocesses;
 
+// Set to true if the DISABLE_UNSAFE_CPOW_WARNINGS environment variable is
+// set.
+static bool sDisableUnsafeCPOWWarnings = false;
+
 // The first content child has ID 1, so the chrome process can have ID 0.
 static uint64_t gContentChildID = 1;
 
@@ -745,6 +749,8 @@ ContentParent::StartUp()
     // Test the PBackground infrastructure on ENABLE_TESTS builds when a special
     // testing preference is set.
     MaybeTestPBackground();
+
+    sDisableUnsafeCPOWWarnings = PR_GetEnv("DISABLE_UNSAFE_CPOW_WARNINGS");
 }
 
 /*static*/ void
@@ -1741,16 +1747,18 @@ ContentParent::OnBeginSyncTransaction() {
     if (XRE_GetProcessType() == GeckoProcessType_Default) {
         nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
         JSContext *cx = nsContentUtils::GetCurrentJSContext();
-        if (console && cx) {
-            nsAutoString filename;
-            uint32_t lineno = 0;
-            nsJSUtils::GetCallingLocation(cx, filename, &lineno);
-            nsCOMPtr<nsIScriptError> error(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
-            error->Init(NS_LITERAL_STRING("unsafe CPOW usage"), filename, EmptyString(),
-                        lineno, 0, nsIScriptError::warningFlag, "chrome javascript");
-            console->LogMessage(error);
-        } else {
-            NS_WARNING("Unsafe synchronous IPC message");
+        if (!sDisableUnsafeCPOWWarnings) {
+            if (console && cx) {
+                nsAutoString filename;
+                uint32_t lineno = 0;
+                nsJSUtils::GetCallingLocation(cx, filename, &lineno);
+                nsCOMPtr<nsIScriptError> error(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
+                error->Init(NS_LITERAL_STRING("unsafe CPOW usage"), filename, EmptyString(),
+                            lineno, 0, nsIScriptError::warningFlag, "chrome javascript");
+                console->LogMessage(error);
+            } else {
+                NS_WARNING("Unsafe synchronous IPC message");
+            }
         }
     }
 }
