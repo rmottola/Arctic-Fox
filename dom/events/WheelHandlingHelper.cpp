@@ -213,7 +213,6 @@ WheelTransaction::OnEvent(WidgetEvent* aEvent)
     case NS_MOUSE_BUTTON_UP:
     case NS_MOUSE_BUTTON_DOWN:
     case NS_MOUSE_DOUBLECLICK:
-    case NS_MOUSE_AUXCLICK:
     case NS_MOUSE_CLICK:
     case NS_CONTEXTMENU:
     case NS_DRAGDROP_DROP:

@@ -1296,8 +1296,7 @@ nsXULElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
          aVisitor.mEvent->message == NS_XUL_COMMAND ||
          aVisitor.mEvent->message == NS_CONTEXTMENU ||
          aVisitor.mEvent->message == NS_DRAGDROP_START ||
-         aVisitor.mEvent->message == NS_DRAGDROP_GESTURE ||
-         aVisitor.mEvent->message == NS_MOUSE_AUXCLICK)) {
+         aVisitor.mEvent->message == NS_DRAGDROP_GESTURE)) {
         // Don't propagate these events from native anonymous scrollbar.
         aVisitor.mCanHandle = true;
         aVisitor.mParentTarget = nullptr;

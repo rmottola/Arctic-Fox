@@ -4577,12 +4577,6 @@ EventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
       }
-      if (NS_SUCCEEDED(ret) && mouseContent && fireAuxClick &&
-          mouseContent->IsInComposedDoc()) {
-        ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_AUXCLICK,
-                                        presShell, mouseContent, currentTarget,
-                                        false);
-      }
     }
   }
   return ret;

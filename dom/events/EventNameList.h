@@ -164,10 +164,6 @@ EVENT(change,
       NS_FORM_CHANGE,
       EventNameType_HTMLXUL,
       eBasicEventClass)
-EVENT(auxclick,
-      NS_MOUSE_AUXCLICK,
-      EventNameType_All,
-      eMouseEventClass)
 EVENT(click,
       NS_MOUSE_CLICK,
       EventNameType_All,
