@@ -456,6 +456,9 @@ public:
     virtual bool
     DeallocPOfflineCacheUpdateChild(POfflineCacheUpdateChild* offlineCacheUpdate) override;
 
+    virtual PWebrtcGlobalChild* AllocPWebrtcGlobalChild() override;
+    virtual bool DeallocPWebrtcGlobalChild(PWebrtcGlobalChild *aActor) override;
+
     virtual PContentPermissionRequestChild*
     AllocPContentPermissionRequestChild(const InfallibleTArray<PermissionRequest>& aRequests,
                                         const IPC::Principal& aPrincipal,

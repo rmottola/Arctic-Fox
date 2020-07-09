@@ -160,6 +160,10 @@
 
 #include "nsIBidiKeyboard.h"
 
+#ifdef MOZ_WEBRTC
+#include "signaling/src/peerconnection/WebrtcGlobalParent.h"
+#endif
+
 #if defined(ANDROID) || defined(LINUX)
 #include "nsSystemInfo.h"
 #endif
@@ -2565,7 +2569,7 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
         raw->GuaranteePersistance();
 
         nsRefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
-        nsCOMPtr<imgIContainer> imageContainer(image::ImageOps::CreateFromDrawable(drawable)); 
+        nsCOMPtr<imgIContainer> imageContainer(image::ImageOps::CreateFromDrawable(drawable));
 
         nsCOMPtr<nsISupportsInterfacePointer>
           imgPtr(do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID, &rv));
@@ -4795,6 +4799,27 @@ ContentParent::DeallocPOfflineCacheUpdateParent(POfflineCacheUpdateParent* aActo
     nsRefPtr<mozilla::docshell::OfflineCacheUpdateParent> update =
         dont_AddRef(static_cast<mozilla::docshell::OfflineCacheUpdateParent*>(aActor));
     return true;
+}
+
+PWebrtcGlobalParent *
+ContentParent::AllocPWebrtcGlobalParent()
+{
+#ifdef MOZ_WEBRTC
+    return WebrtcGlobalParent::Alloc();
+#else
+    return nullptr;
+#endif
+}
+
+bool
+ContentParent::DeallocPWebrtcGlobalParent(PWebrtcGlobalParent *aActor)
+{
+#ifdef MOZ_WEBRTC
+    WebrtcGlobalParent::Dealloc(static_cast<WebrtcGlobalParent*>(aActor));
+    return true;
+#else
+    return false;
+#endif
 }
 
 bool
