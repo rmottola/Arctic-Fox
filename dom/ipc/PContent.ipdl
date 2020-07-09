@@ -49,6 +49,7 @@ include protocol PTestShell;
 include protocol PVoicemail;
 include protocol PJavaScript;
 include protocol PRemoteSpellcheckEngine;
+include protocol PWebrtcGlobal;
 include DOMTypes;
 include JavaScriptTypes;
 include InputStreamParams;
@@ -440,6 +441,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PVoicemail;
     manages PJavaScript;
     manages PRemoteSpellcheckEngine;
+    manages PWebrtcGlobal;
 
 both:
     // Depending on exactly how the new browser is being created, it might be
@@ -757,6 +759,8 @@ parent:
     PFMRadio();
 
     PAsmJSCacheEntry(OpenMode openMode, WriteParams write, Principal principal);
+
+    PWebrtcGlobal();
 
     // Services remoting
 
