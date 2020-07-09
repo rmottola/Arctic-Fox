@@ -130,7 +130,6 @@ nsBaseWidget::nsBaseWidget()
 , mBorderStyle(eBorderStyle_none)
 , mUseLayersAcceleration(false)
 , mForceLayersAcceleration(false)
-, mTemporarilyUseBasicLayerManager(false)
 , mUseAttachedEvents(false)
 , mBounds(0,0,0,0)
 , mOriginalBounds(nullptr)
@@ -824,20 +823,6 @@ nsBaseWidget::AutoLayerManagerSetup::~AutoLayerManagerSetup()
   }
 }
 
-nsBaseWidget::AutoUseBasicLayerManager::AutoUseBasicLayerManager(nsBaseWidget* aWidget)
-  : mWidget(aWidget)
-{
-  mPreviousTemporarilyUseBasicLayerManager =
-    mWidget->mTemporarilyUseBasicLayerManager;
-  mWidget->mTemporarilyUseBasicLayerManager = true;
-}
-
-nsBaseWidget::AutoUseBasicLayerManager::~AutoUseBasicLayerManager()
-{
-  mWidget->mTemporarilyUseBasicLayerManager =
-    mPreviousTemporarilyUseBasicLayerManager;
-}
-
 bool
 nsBaseWidget::ComputeShouldAccelerate(bool aDefault)
 {
@@ -1221,15 +1206,10 @@ LayerManager* nsBaseWidget::GetLayerManager(PLayerTransactionChild* aShadowManag
       mLayerManager = CreateBasicLayerManager();
     }
   }
-  if (mTemporarilyUseBasicLayerManager && !mBasicLayerManager) {
-    mBasicLayerManager = CreateBasicLayerManager();
-  }
-  LayerManager* usedLayerManager = mTemporarilyUseBasicLayerManager ?
-                                     mBasicLayerManager : mLayerManager;
   if (aAllowRetaining) {
-    *aAllowRetaining = (usedLayerManager == mLayerManager);
+    *aAllowRetaining = true;
   }
-  return usedLayerManager;
+  return mLayerManager;
 }
 
 LayerManager* nsBaseWidget::CreateBasicLayerManager()
