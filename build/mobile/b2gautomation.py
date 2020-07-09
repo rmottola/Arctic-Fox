@@ -221,7 +221,7 @@ class B2GRemoteAutomation(Automation):
         print 'device:', serial, 'status:', rstatus
 
     def Process(self, cmd, stdout=None, stderr=None, env=None, cwd=None):
-        # On a desktop or fennec run, the Process method invokes a goanna
+        # On a desktop or fennec run, the Process method invokes a gecko
         # process in which to the tests.  For B2G, we simply
         # reboot the device (which was configured with a test profile
         # already), wait for B2G to start up, and then navigate to the

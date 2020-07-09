@@ -1873,7 +1873,7 @@ GetRangeExtent(ITfRange* aRange, LONG* aStart, LONG* aLength)
 }
 
 static uint32_t
-GetGoannaSelectionValue(TF_DISPLAYATTRIBUTE &aDisplayAttr)
+GetGeckoSelectionValue(TF_DISPLAYATTRIBUTE &aDisplayAttr)
 {
   uint32_t result;
   switch (aDisplayAttr.bAttr) {
@@ -2308,7 +2308,7 @@ nsTextStore::RecordCompositionUpdateAction()
     if (FAILED(hr)) {
       newRange.mRangeType = NS_TEXTRANGE_RAWINPUT;
     } else {
-      newRange.mRangeType = GetGoannaSelectionValue(attr);
+      newRange.mRangeType = GetGeckoSelectionValue(attr);
       if (GetColor(attr.crText, newRange.mRangeStyle.mForegroundColor)) {
         newRange.mRangeStyle.mDefinedStyles |=
                                TextRangeStyle::DEFINED_FOREGROUND_COLOR;
@@ -2344,7 +2344,7 @@ nsTextStore::RecordCompositionUpdateAction()
   // one).  So, the composition string looks like normal (or committed) string.
   // At this time, current selection range is same as the composition string
   // range.  Other applications set a wide caret which covers the composition
-  // string,  however, Goanna doesn't support the wide caret drawing now (Goanna
+  // string,  however, Gecko doesn't support the wide caret drawing now (Gecko
   // doesn't support XOR drawing), unfortunately.  For now, we should change
   // the range style to undefined.
   if (!currentSel.IsCollapsed() && action->mRanges->Length() == 1) {

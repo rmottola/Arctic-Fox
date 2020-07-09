@@ -844,9 +844,9 @@ nsAccessibilityService::GetStringRelationType(uint32_t aRelationType,
 {
   NS_ENSURE_ARG(aRelationType <= static_cast<uint32_t>(RelationType::LAST));
 
-#define RELATIONTYPE(goannaType, goannaTypeName, atkType, msaaType, ia2Type) \
-  case RelationType::goannaType: \
-    aString.AssignLiteral(goannaTypeName); \
+#define RELATIONTYPE(geckoType, geckoTypeName, atkType, msaaType, ia2Type) \
+  case RelationType::geckoType: \
+    aString.AssignLiteral(geckoTypeName); \
     return NS_OK;
 
   RelationType relationType = static_cast<RelationType>(aRelationType);

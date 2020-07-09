@@ -590,7 +590,7 @@ TestAsyncShutdown::BeginShutdown() {
       mHost->ShutdownComplete();
       break;
     case ShutdownTimeout:
-      // Don't do anything; wait for timeout, Goanna should kill
+      // Don't do anything; wait for timeout, Gecko should kill
       // the plugin and recover.
       break;
     case ShutdownStoreToken:

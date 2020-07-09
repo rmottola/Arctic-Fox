@@ -37,7 +37,7 @@ if (typeof window != 'undefined')
 }
 else
 {
-  expect = actual = 'Test can only run in a Goanna 1.9 browser or later.';
+  expect = actual = 'Test can only run in a Gecko 1.9 browser or later.';
   print(actual);
 }
 reportCompare(expect, actual, summary);

@@ -24,7 +24,7 @@ public:
 
 // A proxy to GMPVideoEncoder in the child process.
 // GMPVideoEncoderParent exposes this to users the GMP.
-// This enables Goanna to pass nsTArrays to the child GMP and avoid
+// This enables Gecko to pass nsTArrays to the child GMP and avoid
 // an extra copy when doing so.
 
 // The consumer must call Close() when done with the codec, or when

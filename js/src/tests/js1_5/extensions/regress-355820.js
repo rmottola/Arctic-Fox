@@ -20,7 +20,7 @@ function test()
   printBugNumber(BUGNUMBER);
   printStatus (summary);
 
-  print('This test will fail in goanna prior to 1.9');
+  print('This test will fail in gecko prior to 1.9');
  
   expect = 'undefined';
   actual = typeof Script;

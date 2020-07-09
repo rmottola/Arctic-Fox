@@ -87,7 +87,7 @@ child:
   async SetParentHangTimeout(uint32_t seconds);
 
   /**
-   * Control the Goanna Profiler in the plugin process.
+   * Control the Gecko Profiler in the plugin process.
    */
   async StartProfiler(uint32_t aEntries, double aInterval, nsCString[] aFeatures,
                       nsCString[] aThreadNameFilters);

@@ -24,7 +24,7 @@ GetObjectOrRepresentedView(id <mozAccessible> aObject)
 }
 
 inline mozAccessible*
-GetNativeFromGoannaAccessible(mozilla::a11y::Accessible* aAccessible)
+GetNativeFromGeckoAccessible(mozilla::a11y::Accessible* aAccessible)
 {
   mozAccessible* native = nil;
   aAccessible->GetNativeInterface((void**)&native);
@@ -36,7 +36,7 @@ GetNativeFromGoannaAccessible(mozilla::a11y::Accessible* aAccessible)
   /**
    * Weak reference; it owns us.
    */
-  mozilla::a11y::AccessibleWrap* mGoannaAccessible;
+  mozilla::a11y::AccessibleWrap* mGeckoAccessible;
   
   /**
    * Strong ref to array of children
@@ -49,13 +49,13 @@ GetNativeFromGoannaAccessible(mozilla::a11y::Accessible* aAccessible)
   mozAccessible* mParent;
 
   /**
-   * The role of our goanna accessible.
+   * The role of our gecko accessible.
    */
   mozilla::a11y::role        mRole;
 }
 
-// inits with the goanna owner.
-- (id)initWithAccessible:(mozilla::a11y::AccessibleWrap*)goannaParent;
+// inits with the gecko owner.
+- (id)initWithAccessible:(mozilla::a11y::AccessibleWrap*)geckoParent;
 
 // our accessible parent (AXParent)
 - (id <mozAccessible>)parent;

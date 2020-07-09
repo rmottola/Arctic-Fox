@@ -36,7 +36,7 @@ WorkerDataStoreCursor::WorkerDataStoreCursor(WorkerDataStore* aWorkerStore)
 already_AddRefed<WorkerDataStoreCursor>
 WorkerDataStoreCursor::Constructor(GlobalObject& aGlobal, ErrorResult& aRv)
 {
-  // We don't allow Goanna to create WorkerDataStoreCursor through JS codes like
+  // We don't allow Gecko to create WorkerDataStoreCursor through JS codes like
   // window.DataStoreCursor() on the worker, so disable this for now.
   NS_NOTREACHED("Cannot use the chrome constructor on the worker!");
   return nullptr;

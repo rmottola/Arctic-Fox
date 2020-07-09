@@ -92,7 +92,7 @@ BackCert::Init()
     return rv;
   }
   // TODO(bug XXXXXXX): We rely on the the caller of mozilla::pkix to validate
-  // that the name is syntactically valid, if they care. In Goanna we do this
+  // that the name is syntactically valid, if they care. In Gecko we do this
   // implicitly by parsing the certificate into a CERTCertificate object.
   // Instead of relying on the caller to do this, we should do it ourselves.
   rv = der::ExpectTagAndGetTLV(tbsCertificate, der::SEQUENCE, subject);

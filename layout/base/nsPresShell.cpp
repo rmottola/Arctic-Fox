@@ -184,7 +184,7 @@
 #endif
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 using namespace mozilla::tasktracer;
 #endif
 
@@ -10998,7 +10998,7 @@ nsIPresShell::RecomputeFontSizeInflationEnabled()
   // have any metadata about the width and/or height. On mobile, the screen size
   // and the size of the content area are very close, or the same value.
   // In XUL fennec, the content area is the size of the <browser> widget, but
-  // in native fennec, the content area is the size of the Goanna LayerView
+  // in native fennec, the content area is the size of the Gecko LayerView
   // object.
 
   // TODO:

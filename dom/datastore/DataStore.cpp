@@ -59,7 +59,7 @@ DataStore::EnabledForScope(JSContext* aCx, JS::Handle<JSObject*> aObj)
 {
   // Only expose the interface when it is:
   // 1. enabled by the preference and
-  // 2. accessed by the chrome codes in Goanna.
+  // 2. accessed by the chrome codes in Gecko.
   return (Navigator::HasDataStoreSupport(aCx, aObj) &&
           nsContentUtils::ThreadsafeIsCallerChrome());
 }

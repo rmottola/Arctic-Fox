@@ -99,6 +99,10 @@ public:
    * the transaction. Otherwise, returns null.
    */
   WheelBlockState* GetCurrentWheelTransaction() const;
+  /**
+   * Remove all input blocks from the input queue.
+   */
+  void Clear();
 
 private:
   ~InputQueue();

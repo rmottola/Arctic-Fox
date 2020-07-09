@@ -455,7 +455,7 @@
   ${WriteRegStr2} $TmpVal "$0" "Plugins" "$8\plugins" 0
 
   StrCpy $0 "Software\Mozilla\${BrandFullNameInternal} ${AppVersion}"
-  ${WriteRegStr2} $TmpVal "$0" "GoannaVer" "${GREVersion}" 0
+  ${WriteRegStr2} $TmpVal "$0" "GeckoVer" "${GREVersion}" 0
 
   StrCpy $0 "Software\Mozilla\${BrandFullNameInternal}"
   ${WriteRegStr2} $TmpVal "$0" "" "${GREVersion}" 0

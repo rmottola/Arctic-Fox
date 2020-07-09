@@ -17,7 +17,7 @@
 
 #include "FrameMetrics.h"
 #include "GeckoProfiler.h"
-#include "GoannaTouchDispatcher.h"
+#include "GeckoTouchDispatcher.h"
 #include "InputData.h"
 #include "ProfilerMarkers.h"
 #include "base/basictypes.h"
@@ -49,13 +49,13 @@ namespace mozilla {
 // Amount of time in MS before an input is considered expired.
 static const uint64_t kInputExpirationThresholdMs = 1000;
 
-static StaticRefPtr<GoannaTouchDispatcher> sTouchDispatcher;
+static StaticRefPtr<GeckoTouchDispatcher> sTouchDispatcher;
 
-GoannaTouchDispatcher::GoannaTouchDispatcher()
-  : mTouchQueueLock("GoannaTouchDispatcher::mTouchQueueLock")
+GeckoTouchDispatcher::GeckoTouchDispatcher()
+  : mTouchQueueLock("GeckoTouchDispatcher::mTouchQueueLock")
   , mTouchEventsFiltered(false)
 {
-  // Since GoannaTouchDispatcher is initialized when input is initialized
+  // Since GeckoTouchDispatcher is initialized when input is initialized
   // and reads gfxPrefs, it is the first thing to touch gfxPrefs.
   // The first thing to touch gfxPrefs MUST occur on the main thread and init
   // the singleton
@@ -75,7 +75,7 @@ GoannaTouchDispatcher::GoannaTouchDispatcher()
 }
 
 /* static */ void
-GoannaTouchDispatcher::SetCompositorVsyncObserver(mozilla::layers::CompositorVsyncObserver *aObserver)
+GeckoTouchDispatcher::SetCompositorVsyncObserver(mozilla::layers::CompositorVsyncObserver *aObserver)
 {
   MOZ_ASSERT(sTouchDispatcher != nullptr);
   MOZ_ASSERT(NS_IsMainThread());
@@ -88,7 +88,7 @@ GoannaTouchDispatcher::SetCompositorVsyncObserver(mozilla::layers::CompositorVsy
 
 // Timestamp is in nanoseconds
 /* static */ bool
-GoannaTouchDispatcher::NotifyVsync(TimeStamp aVsyncTimestamp)
+GeckoTouchDispatcher::NotifyVsync(TimeStamp aVsyncTimestamp)
 {
   if (sTouchDispatcher == nullptr) {
     return false;
@@ -111,7 +111,7 @@ GoannaTouchDispatcher::NotifyVsync(TimeStamp aVsyncTimestamp)
 
 // Touch data timestamps are in milliseconds, aEventTime is in nanoseconds
 void
-GoannaTouchDispatcher::NotifyTouch(MultiTouchInput& aTouch, TimeStamp aEventTime)
+GeckoTouchDispatcher::NotifyTouch(MultiTouchInput& aTouch, TimeStamp aEventTime)
 {
   if (mCompositorVsyncObserver) {
     mCompositorVsyncObserver->SetNeedsComposite(true);
@@ -132,15 +132,15 @@ GoannaTouchDispatcher::NotifyTouch(MultiTouchInput& aTouch, TimeStamp aEventTime
     }
 
     layers::APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-      this, &GoannaTouchDispatcher::DispatchTouchMoveEvents, TimeStamp::Now()));
+      this, &GeckoTouchDispatcher::DispatchTouchMoveEvents, TimeStamp::Now()));
   } else {
     layers::APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-      this, &GoannaTouchDispatcher::DispatchTouchEvent, aTouch));
+      this, &GeckoTouchDispatcher::DispatchTouchEvent, aTouch));
   }
 }
 
 void
-GoannaTouchDispatcher::DispatchTouchMoveEvents(TimeStamp aVsyncTime)
+GeckoTouchDispatcher::DispatchTouchMoveEvents(TimeStamp aVsyncTime)
 {
   MultiTouchInput touchMove;
 
@@ -256,7 +256,7 @@ ResampleTouch(MultiTouchInput& aOutTouch,
  */
 
 void
-GoannaTouchDispatcher::ResampleTouchMoves(MultiTouchInput& aOutTouch, TimeStamp aVsyncTime)
+GeckoTouchDispatcher::ResampleTouchMoves(MultiTouchInput& aOutTouch, TimeStamp aVsyncTime)
 {
   MOZ_RELEASE_ASSERT(mTouchMoveEvents.size() >= 2);
   mTouchQueueLock.AssertCurrentThreadOwns();
@@ -298,7 +298,7 @@ IsExpired(const MultiTouchInput& aTouch)
   return (timeNowMs - aTouch.mTime) > kInputExpirationThresholdMs;
 }
 void
-GoannaTouchDispatcher::DispatchTouchEvent(MultiTouchInput aMultiTouch)
+GeckoTouchDispatcher::DispatchTouchEvent(MultiTouchInput aMultiTouch)
 {
   if ((aMultiTouch.mType == MultiTouchInput::MULTITOUCH_END ||
        aMultiTouch.mType == MultiTouchInput::MULTITOUCH_CANCEL) &&

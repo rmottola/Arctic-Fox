@@ -95,7 +95,7 @@ __RCSID("$NetBSD: res_send.c,v 1.9 2006/01/24 17:41:25 christos Exp $");
 #endif /* LIBC_SCCS and not lint */
 
 /* Set to 0 to not use the small/simple/limited DNS cache
- * Cache implemented higher up in Goanna */
+ * Cache implemented higher up in Gecko */
 #define  USE_RESOLV_CACHE  0
 
 /*

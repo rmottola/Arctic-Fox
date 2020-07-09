@@ -16,9 +16,9 @@ add_test(function test_is_ruim_service_available() {
   context.RIL._isCdma = true;
   context.RIL.appType = CARD_APPTYPE_RUIM;
 
-  function test_table(cst, goannaService, enabled) {
+  function test_table(cst, geckoService, enabled) {
     context.RIL.iccInfoPrivate.cst = cst;
-    do_check_eq(context.ICCUtilsHelper.isICCServiceAvailable(goannaService),
+    do_check_eq(context.ICCUtilsHelper.isICCServiceAvailable(geckoService),
                 enabled);
   }
 

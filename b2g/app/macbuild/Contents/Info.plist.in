@@ -31,6 +31,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>
-	<string>GoannaNSApplication</string>
+	<string>GeckoNSApplication</string>
 </dict>
 </plist>

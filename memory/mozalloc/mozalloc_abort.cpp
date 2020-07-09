@@ -25,7 +25,7 @@ mozalloc_abort(const char* const msg)
     fputs(msg, stderr);
     fputs("\n", stderr);
 #else
-    __android_log_print(ANDROID_LOG_ERROR, "Goanna", "mozalloc_abort: %s", msg);
+    __android_log_print(ANDROID_LOG_ERROR, "Gecko", "mozalloc_abort: %s", msg);
 #endif
 #ifdef MOZ_WIDGET_ANDROID
     abortThroughJava(msg);

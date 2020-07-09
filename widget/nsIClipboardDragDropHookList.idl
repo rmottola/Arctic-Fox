@@ -10,11 +10,11 @@ interface nsISimpleEnumerator;
 
 /**
  * Please note that the following api is not intended for embedders;
- * it is intended as an internal (to goanna).  Embedders can indirectly
+ * it is intended as an internal (to gecko).  Embedders can indirectly
  * call these by sending commands (see description in 
  * nsIClipboardDragDropHooks.idl).
  *
- * Internal goanna usage is accomplished by calling get_Interface on a
+ * Internal gecko usage is accomplished by calling get_Interface on a
  * docshell.
  */
 

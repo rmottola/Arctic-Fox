@@ -292,7 +292,7 @@ class BaseMarionetteOptions(OptionParser):
         self.add_option('--address',
                         dest='address',
                         action='store',
-                        help='host:port of running Goanna instance to connect to')
+                        help='host:port of running Gecko instance to connect to')
         self.add_option('--device',
                         dest='device_serial',
                         action='store',

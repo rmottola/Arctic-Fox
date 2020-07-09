@@ -50,11 +50,11 @@ ProxyEvent(ProxyAccessible*, uint32_t)
 }
 }
 
-@interface GoannaNSApplication(a11y)
+@interface GeckoNSApplication(a11y)
 -(void)accessibilitySetValue:(id)value forAttribute:(NSString*)attribute;
 @end
 
-@implementation GoannaNSApplication(a11y)
+@implementation GeckoNSApplication(a11y)
 
 -(void)accessibilitySetValue:(id)value forAttribute:(NSString*)attribute
 {

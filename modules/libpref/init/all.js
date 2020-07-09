@@ -2227,7 +2227,7 @@ pref("mousewheel.acceleration.factor", 10);
 // speed is multiplied by the following factors.  The value will be used as
 // 1/100.  E.g., 200 means 2.00.
 // NOTE: Even if "mousewheel.system_scroll_override_on_root_content.enabled" is
-// true, when Goanna detects the user customized the system scrolling speed
+// true, when Gecko detects the user customized the system scrolling speed
 // settings, the override isn't executed.
 pref("mousewheel.system_scroll_override_on_root_content.vertical.factor", 200);
 pref("mousewheel.system_scroll_override_on_root_content.horizontal.factor", 200);
@@ -3368,7 +3368,7 @@ pref("mousewheel.system_scroll_override_on_root_content.enabled", true);
 pref("mousewheel.enable_pixel_scrolling", true);
 
 // If your mouse drive sends WM_*SCROLL messages when you turn your mouse wheel,
-// set this to true.  Then, goanna processes them as mouse wheel messages.
+// set this to true.  Then, gecko processes them as mouse wheel messages.
 pref("mousewheel.emulate_at_wm_scroll", false);
 
 // Enables or disabled the TrackPoint hack, -1 is autodetect, 0 is off,
@@ -5031,7 +5031,7 @@ pref("reader.toolbar.vertical", true);
 
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
 // Whether to allow, on a Linux system that doesn't support the necessary sandboxing
-// features, loading Goanna Media Plugins unsandboxed.
+// features, loading Gecko Media Plugins unsandboxed.
 pref("media.gmp.insecure.allow", false);
 #endif
 

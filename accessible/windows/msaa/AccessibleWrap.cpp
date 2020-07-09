@@ -516,7 +516,7 @@ AccessibleWrap::get_accState(
 
   // MSAA only has 31 states and the lowest 31 bits of our state bit mask
   // are the same states as MSAA.
-  // Note: we map the following Goanna states to different MSAA states:
+  // Note: we map the following Gecko states to different MSAA states:
   //   REQUIRED -> ALERT_LOW
   //   ALERT -> ALERT_MEDIUM
   //   INVALID -> ALERT_HIGH
@@ -968,9 +968,9 @@ AccessibleWrap::accNavigate(
   Accessible* navAccessible = nullptr;
   Maybe<RelationType> xpRelation;
 
-#define RELATIONTYPE(goannaType, stringType, atkType, msaaType, ia2Type) \
+#define RELATIONTYPE(geckoType, stringType, atkType, msaaType, ia2Type) \
   case msaaType: \
-    xpRelation.emplace(RelationType::goannaType); \
+    xpRelation.emplace(RelationType::geckoType); \
     break;
 
   switch(navDir) {
@@ -1361,7 +1361,7 @@ AccessibleWrap::GetXPAccessibleFor(const VARIANT& aVarChild)
     return nullptr;
   }
 
-  // Goanna child indices are 0-based in contrast to indices used in MSAA.
+  // Gecko child indices are 0-based in contrast to indices used in MSAA.
   return GetChildAt(aVarChild.lVal - 1);
 }
 
@@ -1384,7 +1384,7 @@ AccessibleWrap::UpdateSystemCaretFor(Accessible* aAccessible)
   }
 
   // Create invisible bitmap for caret, otherwise its appearance interferes
-  // with Goanna caret
+  // with Gecko caret
   HBITMAP caretBitMap = CreateBitmap(1, caretRect.height, 1, 1, nullptr);
   if (::CreateCaret(caretWnd, caretBitMap, 1, caretRect.height)) {  // Also destroys the last caret
     ::ShowCaret(caretWnd);

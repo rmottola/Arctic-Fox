@@ -5,8 +5,8 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 @template
-def GoannaBinary(linkage='dependent', msvcrt='dynamic', mozglue=None):
-    '''Template for Goanna-related binaries.
+def GeckoBinary(linkage='dependent', msvcrt='dynamic', mozglue=None):
+    '''Template for Gecko-related binaries.
 
     This template is meant to be used in other templates.
 
@@ -88,85 +88,85 @@ def GoannaBinary(linkage='dependent', msvcrt='dynamic', mozglue=None):
 
 
 @template
-def GoannaProgram(name, linkage='standalone', **kwargs):
-    '''Template for program executables related to Goanna.
+def GeckoProgram(name, linkage='standalone', **kwargs):
+    '''Template for program executables related to Gecko.
 
     `name` identifies the executable base name.
 
-    See the documentation for `GoannaBinary` for other possible arguments,
+    See the documentation for `GeckoBinary` for other possible arguments,
     with the notable difference that the default for `linkage` is 'standalone'.
     '''
     Program(name)
 
     kwargs.setdefault('mozglue', 'program')
 
-    GoannaBinary(linkage=linkage, **kwargs)
+    GeckoBinary(linkage=linkage, **kwargs)
 
 
 @template
-def GoannaSimplePrograms(names, **kwargs):
-    '''Template for simple program executables related to Goanna.
+def GeckoSimplePrograms(names, **kwargs):
+    '''Template for simple program executables related to Gecko.
 
     `names` identifies the executable base names for each executable.
 
-    See the documentation for `GoannaBinary` for other possible arguments.
+    See the documentation for `GeckoBinary` for other possible arguments.
     '''
     SimplePrograms(names)
 
     kwargs.setdefault('mozglue', 'program')
 
-    GoannaBinary(**kwargs)
+    GeckoBinary(**kwargs)
 
 
 @template
-def GoannaCppUnitTests(names, **kwargs):
-    '''Template for C++ unit tests related to Goanna.
+def GeckoCppUnitTests(names, **kwargs):
+    '''Template for C++ unit tests related to Gecko.
 
     `names` identifies the executable base names for each executable.
 
-    See the documentation for `GoannaBinary` for other possible arguments.
+    See the documentation for `GeckoBinary` for other possible arguments.
     '''
     CppUnitTests(names)
 
     kwargs.setdefault('mozglue', 'program')
 
-    GoannaBinary(**kwargs)
+    GeckoBinary(**kwargs)
 
 
 @template
-def GoannaSharedLibrary(name, **kwargs):
-    '''Template for shared libraries related to Goanna.
+def GeckoSharedLibrary(name, **kwargs):
+    '''Template for shared libraries related to Gecko.
 
     `name` identifies the library base name.
-    See the documentation for `GoannaBinary` for other possible arguments.
+    See the documentation for `GeckoBinary` for other possible arguments.
     '''
     SharedLibrary(name)
 
     kwargs.setdefault('mozglue', 'library')
 
-    GoannaBinary(**kwargs)
+    GeckoBinary(**kwargs)
 
 
 @template
-def GoannaFramework(name, **kwargs):
-    '''Template for OSX frameworks related to Goanna.
+def GeckoFramework(name, **kwargs):
+    '''Template for OSX frameworks related to Gecko.
 
     `name` identifies the library base name.
-    See the documentation for `GoannaBinary` for other possible arguments.
+    See the documentation for `GeckoBinary` for other possible arguments.
     '''
     Framework(name)
 
     kwargs.setdefault('mozglue', 'library')
 
-    GoannaBinary(**kwargs)
+    GeckoBinary(**kwargs)
 
 
 @template
 def XPCOMBinaryComponent(name, **kwargs):
-    '''Template defining an XPCOM binary component for Goanna.
+    '''Template defining an XPCOM binary component for Gecko.
 
     `name` is the name of the component.
     '''
-    GoannaSharedLibrary(name, **kwargs)
+    GeckoSharedLibrary(name, **kwargs)
 
     IS_COMPONENT = True

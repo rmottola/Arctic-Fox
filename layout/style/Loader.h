@@ -257,7 +257,7 @@ public:
    * @param aURL the URL of the sheet to load
    * @param aEnableUnsafeRules whether unsafe rules are enabled for this
    * sheet load
-   * Unsafe rules are rules that can violate key Goanna invariants if misused.
+   * Unsafe rules are rules that can violate key Gecko invariants if misused.
    * In particular, most anonymous box pseudoelements must be very carefully
    * styled or we will have severe problems. Therefore unsafe rules should
    * never be enabled for stylesheets controlled by untrusted sites; preferably

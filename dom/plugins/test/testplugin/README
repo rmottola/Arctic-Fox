@@ -210,7 +210,7 @@ window.
 non-client area.
 -- On GTK2, they're relative to the top-left corner of the toplevel window's
 window manager frame.
-This means they can be added to Goanna's window.screenX/screenY (if DPI is set
+This means they can be added to Gecko's window.screenX/screenY (if DPI is set
 to 96) to get screen coordinates.
 On the platforms that support window-mode plugins (Windows/GTK2), this only
 works for window-mode plugins. It will throw an error for windowless plugins.

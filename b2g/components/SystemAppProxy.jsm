@@ -51,7 +51,7 @@ let SystemAppProxy = {
   /*
    * Common way to send an event to the system app.
    *
-   * // In goanna code:
+   * // In gecko code:
    *   SystemAppProxy.sendCustomEvent('foo', { data: 'bar' });
    * // In system app:
    *   window.addEventListener('foo', function (event) {

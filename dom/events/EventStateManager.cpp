@@ -648,7 +648,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   case NS_DRAGDROP_GESTURE:
     if (Prefs::ClickHoldContextMenu()) {
       // an external drag gesture event came in, not generated internally
-      // by Goanna. Make sure we get rid of the click-hold timer.
+      // by Gecko. Make sure we get rid of the click-hold timer.
       KillClickHoldTimer();
     }
     break;

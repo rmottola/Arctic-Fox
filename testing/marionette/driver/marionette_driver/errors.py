@@ -81,7 +81,7 @@ class MarionetteException(Exception):
 
         return "".join(traceback.format_exception(self.__class__, msg, tb))
 
-class InstallGoannaError(MarionetteException):
+class InstallGeckoError(MarionetteException):
     pass
 
 class TimeoutException(MarionetteException):

@@ -37,7 +37,7 @@
 #include "gmp-errors.h"
 #include "gmp-platform.h"
 
-/* C functions exposed by Goanna Media Plugin shared library. */
+/* C functions exposed by Gecko Media Plugin shared library. */
 
 // GMPInit
 // - Called once after plugin library is loaded, before GMPGetAPI or GMPShutdown are called.

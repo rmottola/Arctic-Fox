@@ -64,26 +64,26 @@ nsCocoaUtils::FlippedScreenY(float y)
   return MenuBarScreenHeight() - y;
 }
 
-NSRect nsCocoaUtils::GoannaRectToCocoaRect(const nsIntRect &goannaRect)
+NSRect nsCocoaUtils::GeckoRectToCocoaRect(const nsIntRect &geckoRect)
 {
   // We only need to change the Y coordinate by starting with the primary screen
-  // height and subtracting the goanna Y coordinate of the bottom of the rect.
-  return NSMakeRect(goannaRect.x,
-                    MenuBarScreenHeight() - goannaRect.YMost(),
-                    goannaRect.width,
-                    goannaRect.height);
+  // height and subtracting the gecko Y coordinate of the bottom of the rect.
+  return NSMakeRect(geckoRect.x,
+                    MenuBarScreenHeight() - geckoRect.YMost(),
+                    geckoRect.width,
+                    geckoRect.height);
 }
 
-NSRect nsCocoaUtils::GoannaRectToCocoaRectDevPix(const nsIntRect &aGoannaRect,
+NSRect nsCocoaUtils::GeckoRectToCocoaRectDevPix(const nsIntRect &aGeckoRect,
                                                 CGFloat aBackingScale)
 {
-  return NSMakeRect(aGoannaRect.x / aBackingScale,
-                    MenuBarScreenHeight() - aGoannaRect.YMost() / aBackingScale,
-                    aGoannaRect.width / aBackingScale,
-                    aGoannaRect.height / aBackingScale);
+  return NSMakeRect(aGeckoRect.x / aBackingScale,
+                    MenuBarScreenHeight() - aGeckoRect.YMost() / aBackingScale,
+                    aGeckoRect.width / aBackingScale,
+                    aGeckoRect.height / aBackingScale);
 }
 
-nsIntRect nsCocoaUtils::CocoaRectToGoannaRect(const NSRect &cocoaRect)
+nsIntRect nsCocoaUtils::CocoaRectToGeckoRect(const NSRect &cocoaRect)
 {
   // We only need to change the Y coordinate by starting with the primary screen
   // height and subtracting both the cocoa y origin and the height of the
@@ -96,7 +96,7 @@ nsIntRect nsCocoaUtils::CocoaRectToGoannaRect(const NSRect &cocoaRect)
   return rect;
 }
 
-nsIntRect nsCocoaUtils::CocoaRectToGoannaRectDevPix(const NSRect &aCocoaRect,
+nsIntRect nsCocoaUtils::CocoaRectToGeckoRectDevPix(const NSRect &aCocoaRect,
                                                    CGFloat aBackingScale)
 {
   nsIntRect rect;
@@ -556,24 +556,24 @@ nsCocoaUtils::ToNSString(const nsAString& aString)
 
 // static
 void
-nsCocoaUtils::GoannaRectToNSRect(const nsIntRect& aGoannaRect,
+nsCocoaUtils::GeckoRectToNSRect(const nsIntRect& aGeckoRect,
                                 NSRect& aOutCocoaRect)
 {
-  aOutCocoaRect.origin.x = aGoannaRect.x;
-  aOutCocoaRect.origin.y = aGoannaRect.y;
-  aOutCocoaRect.size.width = aGoannaRect.width;
-  aOutCocoaRect.size.height = aGoannaRect.height;
+  aOutCocoaRect.origin.x = aGeckoRect.x;
+  aOutCocoaRect.origin.y = aGeckoRect.y;
+  aOutCocoaRect.size.width = aGeckoRect.width;
+  aOutCocoaRect.size.height = aGeckoRect.height;
 }
 
 // static
 void
-nsCocoaUtils::NSRectToGoannaRect(const NSRect& aCocoaRect,
-                                nsIntRect& aOutGoannaRect)
+nsCocoaUtils::NSRectToGeckoRect(const NSRect& aCocoaRect,
+                                nsIntRect& aOutGeckoRect)
 {
-  aOutGoannaRect.x = NSToIntRound(aCocoaRect.origin.x);
-  aOutGoannaRect.y = NSToIntRound(aCocoaRect.origin.y);
-  aOutGoannaRect.width = NSToIntRound(aCocoaRect.origin.x + aCocoaRect.size.width) - aOutGoannaRect.x;
-  aOutGoannaRect.height = NSToIntRound(aCocoaRect.origin.y + aCocoaRect.size.height) - aOutGoannaRect.y;
+  aOutGeckoRect.x = NSToIntRound(aCocoaRect.origin.x);
+  aOutGeckoRect.y = NSToIntRound(aCocoaRect.origin.y);
+  aOutGeckoRect.width = NSToIntRound(aCocoaRect.origin.x + aCocoaRect.size.width) - aOutGeckoRect.x;
+  aOutGeckoRect.height = NSToIntRound(aCocoaRect.origin.y + aCocoaRect.size.height) - aOutGeckoRect.y;
 }
 
 // static
@@ -809,7 +809,7 @@ struct KeyConversionData
 {
   const char* str;
   size_t strLength;
-  uint32_t goannaKeyCode;
+  uint32_t geckoKeyCode;
   uint32_t charCode;
 };
 
@@ -942,7 +942,7 @@ static const KeyConversionData gKeyConversions[] = {
 };
 
 uint32_t
-nsCocoaUtils::ConvertGoannaNameToMacCharCode(const nsAString& aKeyCodeName)
+nsCocoaUtils::ConvertGeckoNameToMacCharCode(const nsAString& aKeyCodeName)
 {
   if (aKeyCodeName.IsEmpty()) {
     return 0;
@@ -966,14 +966,14 @@ nsCocoaUtils::ConvertGoannaNameToMacCharCode(const nsAString& aKeyCodeName)
 }
 
 uint32_t
-nsCocoaUtils::ConvertGoannaKeyCodeToMacCharCode(uint32_t aKeyCode)
+nsCocoaUtils::ConvertGeckoKeyCodeToMacCharCode(uint32_t aKeyCode)
 {
   if (!aKeyCode) {
     return 0;
   }
 
   for (uint16_t i = 0; i < ArrayLength(gKeyConversions); ++i) {
-    if (gKeyConversions[i].goannaKeyCode == aKeyCode) {
+    if (gKeyConversions[i].geckoKeyCode == aKeyCode) {
       return gKeyConversions[i].charCode;
     }
   }

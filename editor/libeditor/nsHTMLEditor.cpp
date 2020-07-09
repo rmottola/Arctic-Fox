@@ -2840,7 +2840,7 @@ nsHTMLEditor::AddOverrideStyleSheet(const nsAString& aURL)
   // XXXbz Except this will actually try to load remote files
   // synchronously, of course..
   nsRefPtr<CSSStyleSheet> sheet;
-  // Editor override style sheets may want to style Goanna anonymous boxes
+  // Editor override style sheets may want to style Gecko anonymous boxes
   rv = ps->GetDocument()->CSSLoader()->
     LoadSheetSync(uaURI, true, true, getter_AddRefs(sheet));
 

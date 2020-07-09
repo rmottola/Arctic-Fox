@@ -163,7 +163,7 @@ ScriptSettingsStackEntry::~ScriptSettingsStackEntry()
 // |SpecialPowers.wrap(crossOriginWindow).eval(open())|
 //
 // trigger this case. Although both the entry global and the current global
-// have normal principals, the use of Goanna-specific System-Principaled JS
+// have normal principals, the use of Gecko-specific System-Principaled JS
 // puts the code from two different origins on the callstack at once, which
 // doesn't happen normally on the web.
 static nsIGlobalObject*

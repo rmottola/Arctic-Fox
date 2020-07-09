@@ -10,7 +10,7 @@ interface nsIURI;
 
 /**
  * Non-Web HTML parser functionality to Firefox extensions and XULRunner apps. 
- * Don't use this from within Goanna--use nsContentUtils, nsTreeSanitizer, etc.
+ * Don't use this from within Gecko--use nsContentUtils, nsTreeSanitizer, etc.
  * directly instead.
  */
 [scriptable, uuid(a1101145-0025-411e-8873-fdf57bf28128)]
@@ -82,10 +82,10 @@ interface nsIParserUtils : nsISupports
    * By default, comments and CSS is removed. To preserve comments, use
    * SanitizerAllowComments. To preserve <style> and style="", use 
    * SanitizerAllowStyle. -moz-binding is removed from <style> and style="" if
-   * present. In this case, properties that Goanna doesn't recognize can get 
+   * present. In this case, properties that Gecko doesn't recognize can get 
    * removed as a side effect. Note! If -moz-binding is not present, <style>
    * and style="" and SanitizerAllowStyle is specified, the sanitized content
-   * may still be XSS dangerous if loaded into a non-Goanna Web engine!
+   * may still be XSS dangerous if loaded into a non-Gecko Web engine!
    *
    * @param src the HTML source to parse (C++ callers are allowed but not
    *            required to use the same string for the return value.)

@@ -217,10 +217,10 @@ function* runKeyEventTests()
   // The first parameter is the complete input event. The second parameter is
   // what to test against. The third parameter is which key events should be
   // delived for the event.
-  function testKey(aEvent, aExpectedGoannaKeyCode, aExpectGoannaChar,
+  function testKey(aEvent, aExpectedGeckoKeyCode, aExpectGeckoChar,
                    aShouldDelivedEvent, aExpectLocation)
   {
-    ok(aExpectedGoannaKeyCode != undefined, "keycode is undefined");
+    ok(aExpectedGeckoKeyCode != undefined, "keycode is undefined");
     eventList = [];
 
     // The modifier key events which are fired for state changing are har to
@@ -253,7 +253,7 @@ function* runKeyEventTests()
     }
 
     testingEvent = aEvent;
-    expectedDOMKeyCode = aExpectedGoannaKeyCode;
+    expectedDOMKeyCode = aExpectedGeckoKeyCode;
 
     var name = eventToString(aEvent);
     ok(true, "Starting: " + name);
@@ -265,7 +265,7 @@ function* runKeyEventTests()
       expectEventTypeList.push("keydown");
     if (aShouldDelivedEvent & SHOULD_DELIVER_KEYPRESS) {
       expectEventTypeList.push("keypress");
-      for (var i = 1; i < aExpectGoannaChar.length; i++) {
+      for (var i = 1; i < aExpectGeckoChar.length; i++) {
         expectEventTypeList.push("keypress");
       }
     }
@@ -300,19 +300,19 @@ function* runKeyEventTests()
           is(e.shiftKey, !!(aEvent.modifiers.shiftKey || aEvent.modifiers.shiftRightKey), name + ", Shift mismatch");
         }
 
-        if (aExpectGoannaChar.length > 0 && e.type == "keypress") {
-          is(e.charCode, aExpectGoannaChar.charCodeAt(keypressCount++), name + ", charcode");
-          if (aExpectedGoannaKeyCode >= 0) {
-            if (aExpectGoannaChar) {
+        if (aExpectGeckoChar.length > 0 && e.type == "keypress") {
+          is(e.charCode, aExpectGeckoChar.charCodeAt(keypressCount++), name + ", charcode");
+          if (aExpectedGeckoKeyCode >= 0) {
+            if (aExpectGeckoChar) {
               is(e.keyCode, 0, name + ", wrong keycode");
             } else {
-              is(e.keyCode, aExpectedGoannaKeyCode, name + ", wrong keycode");
+              is(e.keyCode, aExpectedGeckoKeyCode, name + ", wrong keycode");
             }
           }
         } else {
           is(e.charCode, 0, name + ", no charcode");
-          if (aExpectedGoannaKeyCode >= 0) {
-            is(e.keyCode, aExpectedGoannaKeyCode, name + ", wrong keycode");
+          if (aExpectedGeckoKeyCode >= 0) {
+            is(e.keyCode, aExpectedGeckoKeyCode, name + ", wrong keycode");
           }
         }
         is(e.location, aExpectLocation, name + ", wrong location");

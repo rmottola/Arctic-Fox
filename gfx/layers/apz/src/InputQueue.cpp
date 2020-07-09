@@ -452,5 +452,13 @@ InputQueue::ProcessInputBlocks() {
   } while (!mInputBlockQueue.IsEmpty());
 }
 
+void
+InputQueue::Clear()
+{
+  APZThreadUtils::AssertOnControllerThread();
+
+  mInputBlockQueue.Clear();
+}
+
 } // namespace layers
 } // namespace mozilla

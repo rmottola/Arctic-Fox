@@ -91,7 +91,7 @@ static nsPluginInstanceOwner* sFullScreenInstance = nullptr;
 using namespace mozilla::dom;
 
 #include <android/log.h>
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
 using namespace mozilla;
@@ -222,7 +222,7 @@ nsPluginInstanceOwner::GetImageContainer()
   nsRefPtr<ImageContainer> container;
 
 #if MOZ_WIDGET_ANDROID
-  // Right now we only draw with Goanna layers on Honeycomb and higher. See Paint()
+  // Right now we only draw with Gecko layers on Honeycomb and higher. See Paint()
   // for what we do on other versions.
   if (AndroidBridge::Bridge()->GetAPIVersion() < 11)
     return nullptr;
@@ -909,27 +909,27 @@ NPBool nsPluginInstanceOwner::ConvertPointNoPuppet(nsIWidget *widget,
 
   nsIntRect pluginScreenRect = pluginFrame->GetScreenRect();
 
-  double screenXGoanna, screenYGoanna;
+  double screenXGecko, screenYGecko;
   switch (sourceSpace) {
     case NPCoordinateSpacePlugin:
-      screenXGoanna = pluginScreenRect.x + sourceX;
-      screenYGoanna = pluginScreenRect.y + sourceY;
+      screenXGecko = pluginScreenRect.x + sourceX;
+      screenYGecko = pluginScreenRect.y + sourceY;
       break;
     case NPCoordinateSpaceWindow:
-      screenXGoanna = windowX + sourceX;
-      screenYGoanna = windowY + (windowHeight - sourceY);
+      screenXGecko = windowX + sourceX;
+      screenYGecko = windowY + (windowHeight - sourceY);
       break;
     case NPCoordinateSpaceFlippedWindow:
-      screenXGoanna = windowX + sourceX;
-      screenYGoanna = windowY + sourceY;
+      screenXGecko = windowX + sourceX;
+      screenYGecko = windowY + sourceY;
       break;
     case NPCoordinateSpaceScreen:
-      screenXGoanna = sourceX;
-      screenYGoanna = screenHeight - sourceY;
+      screenXGecko = sourceX;
+      screenYGecko = screenHeight - sourceY;
       break;
     case NPCoordinateSpaceFlippedScreen:
-      screenXGoanna = sourceX;
-      screenYGoanna = sourceY;
+      screenXGecko = sourceX;
+      screenYGecko = sourceY;
       break;
     default:
       return false;
@@ -938,24 +938,24 @@ NPBool nsPluginInstanceOwner::ConvertPointNoPuppet(nsIWidget *widget,
   double destXCocoa, destYCocoa;
   switch (destSpace) {
     case NPCoordinateSpacePlugin:
-      destXCocoa = screenXGoanna - pluginScreenRect.x;
-      destYCocoa = screenYGoanna - pluginScreenRect.y;
+      destXCocoa = screenXGecko - pluginScreenRect.x;
+      destYCocoa = screenYGecko - pluginScreenRect.y;
       break;
     case NPCoordinateSpaceWindow:
-      destXCocoa = screenXGoanna - windowX;
-      destYCocoa = windowHeight - (screenYGoanna - windowY);
+      destXCocoa = screenXGecko - windowX;
+      destYCocoa = windowHeight - (screenYGecko - windowY);
       break;
     case NPCoordinateSpaceFlippedWindow:
-      destXCocoa = screenXGoanna - windowX;
-      destYCocoa = screenYGoanna - windowY;
+      destXCocoa = screenXGecko - windowX;
+      destYCocoa = screenYGecko - windowY;
       break;
     case NPCoordinateSpaceScreen:
-      destXCocoa = screenXGoanna;
-      destYCocoa = screenHeight - screenYGoanna;
+      destXCocoa = screenXGecko;
+      destYCocoa = screenHeight - screenYGecko;
       break;
     case NPCoordinateSpaceFlippedScreen:
-      destXCocoa = screenXGoanna;
-      destYCocoa = screenYGoanna;
+      destXCocoa = screenXGecko;
+      destYCocoa = screenYGecko;
       break;
     default:
       return false;

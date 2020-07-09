@@ -44,7 +44,7 @@ interface NavigatorID {
   [Constant, Cached]
   readonly attribute DOMString userAgent;
   [Constant, Cached]
-  readonly attribute DOMString product; // constant "Goanna"
+  readonly attribute DOMString product; // constant "Gecko"
 
   // Everyone but WebKit/Blink supports this.  See bug 679971.
   boolean taintEnabled(); // constant false

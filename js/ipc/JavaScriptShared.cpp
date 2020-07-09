@@ -234,7 +234,7 @@ JavaScriptShared::incref()
 }
 
 bool
-JavaScriptShared::convertIdToGoannaString(JSContext* cx, JS::HandleId id, nsString* to)
+JavaScriptShared::convertIdToGeckoString(JSContext* cx, JS::HandleId id, nsString* to)
 {
     RootedValue idval(cx);
     if (!JS_IdToValue(cx, id, &idval))
@@ -248,7 +248,7 @@ JavaScriptShared::convertIdToGoannaString(JSContext* cx, JS::HandleId id, nsStri
 }
 
 bool
-JavaScriptShared::convertGoannaStringToId(JSContext* cx, const nsString& from, JS::MutableHandleId to)
+JavaScriptShared::convertGeckoStringToId(JSContext* cx, const nsString& from, JS::MutableHandleId to)
 {
     RootedString str(cx, JS_NewUCStringCopyN(cx, from.BeginReading(), from.Length()));
     if (!str)
@@ -434,7 +434,7 @@ JavaScriptShared::fromJSIDVariant(JSContext* cx, const JSIDVariant& from, Mutabl
       }
 
       case JSIDVariant::TnsString:
-        return convertGoannaStringToId(cx, from.get_nsString(), to);
+        return convertGeckoStringToId(cx, from.get_nsString(), to);
 
       case JSIDVariant::Tint32_t:
         to.set(INT_TO_JSID(from.get_int32_t()));
@@ -744,7 +744,7 @@ JavaScriptShared::Wrap(JSContext* cx, HandleObject aObj, InfallibleTArray<CpowEn
         id = ids[i];
 
         nsString str;
-        if (!convertIdToGoannaString(cx, id, &str))
+        if (!convertIdToGeckoString(cx, id, &str))
             return false;
 
         if (!JS_GetPropertyById(cx, aObj, id, &v))

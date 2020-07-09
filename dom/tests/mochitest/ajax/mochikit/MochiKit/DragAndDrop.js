@@ -722,7 +722,7 @@ MochiKit.DragAndDrop.Draggable.prototype = {
             style.top = p[1] + 'px';
         }
         if (style.visibility == 'hidden') {
-            style.visibility = '';  // fix goanna rendering
+            style.visibility = '';  // fix gecko rendering
         }
     },
 

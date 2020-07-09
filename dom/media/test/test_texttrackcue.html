@@ -44,7 +44,7 @@ SpecialPowers.pushPrefEnv({"set": [["media.webvtt.regions.enabled", true]]},
       var cueList = trackElement.track.cues;
       is(cueList.length, 6, "Cue list length should be 6.");
 
-      // Check that the typedef of TextTrackCue works in Goanna.
+      // Check that the typedef of TextTrackCue works in Gecko.
       is(window.TextTrackCue, undefined, "TextTrackCue should be undefined.");
       isnot(window.VTTCue, undefined, "VTTCue should be defined.");
 

@@ -520,7 +520,7 @@ public:
   * This is a scaling factor for the display of the print preview.  It
   * does not affect layout.  It only affects the size of the onscreen pages
   * in print preview.
-  * XXX Temporary: see http://wiki.mozilla.org/Goanna:PrintPreview
+  * XXX Temporary: see http://wiki.mozilla.org/Gecko:PrintPreview
   */
   float GetPrintPreviewScale() { return mPPScale; }
   void SetPrintPreviewScale(float aScale) { mPPScale = aScale; }

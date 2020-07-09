@@ -3682,7 +3682,7 @@ public:
 
     bool wantXrays;
 
-    // This flag is intended for a very specific use, internal to Goanna. It may
+    // This flag is intended for a very specific use, internal to Gecko. It may
     // go away or change behavior at any time. It should not be added to any
     // documentation and it should not be used without consulting the XPConnect
     // module owner.

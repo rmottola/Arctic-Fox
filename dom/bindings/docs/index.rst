@@ -13,7 +13,7 @@ Overview
 ========
 
 ``.webidl`` files throughout the tree define interfaces the browser
-implements. Since Goanna/Firefox is implemented in C++, there is a
+implements. Since Gecko/Firefox is implemented in C++, there is a
 mechanism to convert these interfaces and associated metadata to
 C++ code. That's where the build system comes into play.
 

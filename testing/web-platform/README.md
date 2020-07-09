@@ -48,14 +48,14 @@ whenever a new upstream sync is performed.
 test runner. Again the contents of this directory will be overwritten
 on update.
 
-`meta/` contains Goanna-specific expectation data. This is explained in
+`meta/` contains Gecko-specific expectation data. This is explained in
 the following section.
 
 Expectation Data
 ----------------
 
 With the tests coming from upstream, it is not guaranteed that they
-all pass in Goanna-based browsers. For this reason it is necessary to
+all pass in Gecko-based browsers. For this reason it is necessary to
 provide metadata about the expected results of each test. This is
 provided in a set of manifest files in the `meta/` subdirectories.
 
@@ -134,7 +134,7 @@ Test Format
 
 Javascript tests are written using
 [testharness.js](http://github.com/w3c/testharness.js/). Reftests are
-similar to standard Goanna reftests without an explicit manifest file,
+similar to standard Gecko reftests without an explicit manifest file,
 but with in-test or filename conventions for identifying the
 reference.
 
@@ -190,4 +190,4 @@ to test in Chrome:
         python runtests.py --product=chrome --binary=~/bin/chromedriver --log-mach=-
 
 By default this will use the same test checkout and metadata as are in
-the Goanna tree, so it's easy to compare behaviour relative to Firefox.
+the Gecko tree, so it's easy to compare behaviour relative to Firefox.

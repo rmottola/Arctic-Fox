@@ -27,8 +27,8 @@ interface nsIAudioChannelAgentCallback : nsISupports
 };
 
 /**
- * This interface provides an agent for goanna components to participate
- * in the audio channel service. Goanna components are responsible for
+ * This interface provides an agent for gecko components to participate
+ * in the audio channel service. Gecko components are responsible for
  *   1. Indicating what channel type they are using (via the init() member
  *      function).
  *   2. Before playing, checking the playable status of the channel.
@@ -36,7 +36,7 @@ interface nsIAudioChannelAgentCallback : nsISupports
  *   4. Notifying the agent of changes to the visibility of the component using
  *      this channel.
  *
- * The agent will invoke a callback to notify Goanna components of
+ * The agent will invoke a callback to notify Gecko components of
  *   1. Changes to the playable status of this channel.
  */
 
@@ -72,7 +72,7 @@ interface nsIAudioChannelAgent : nsISupports
    *    Audio Channel Type listed as above
    * @param callback
    *    1. Once the playable status changes, agent uses this callback function
-   *       to notify Goanna component.
+   *       to notify Gecko component.
    *    2. The callback is allowed to be null. Ex: telephony doesn't need to
    *       listen change of the playable status.
    *    3. The AudioChannelAgent keeps a strong reference to the callback
@@ -103,7 +103,7 @@ interface nsIAudioChannelAgent : nsISupports
 
   /**
    * Notify the agent that we want to start playing.
-   * Note: Goanna component SHOULD call this function first then start to
+   * Note: Gecko component SHOULD call this function first then start to
    *          play audio stream only when return value is true.
    *
    *

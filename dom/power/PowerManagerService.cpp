@@ -160,7 +160,7 @@ PowerManagerService::Restart()
   LOG_FUNCTION_AND_JS_STACK() // bug 839452
 
   // FIXME/bug 796826 this implementation is currently gonk-specific,
-  // because it relies on the Gonk to initialize the Goanna processes to
+  // because it relies on the Gonk to initialize the Gecko processes to
   // restart B2G. It's better to do it here to have a real "restart".
   StartForceQuitWatchdog(eHalShutdownMode_Restart, mWatchdogTimeoutSecs);
   // Ensure all content processes are dead before we continue

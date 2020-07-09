@@ -44,8 +44,8 @@ public:
     void OnBlurWindow(nsWindow* aWindow);
     // OnDestroyWindow is a notification that aWindow is going to be destroyed.
     void OnDestroyWindow(nsWindow* aWindow);
-    // OnFocusChangeInGoanna is a notification that an editor gets focus.
-    void OnFocusChangeInGoanna(bool aFocus);
+    // OnFocusChangeInGecko is a notification that an editor gets focus.
+    void OnFocusChangeInGecko(bool aFocus);
     // OnSelectionChange is a notification that selection (caret) is changed
     // in the focused editor.
     void OnSelectionChange(nsWindow* aCaller);
@@ -229,7 +229,7 @@ protected:
      * enabled state.
      * WARNING:
      *     When this class receives some signals for a composition after focus
-     *     is moved in Goanna, the result of this may be different from given
+     *     is moved in Gecko, the result of this may be different from given
      *     context by the signals.
      */
     GtkIMContext* GetCurrentContext() const;
@@ -310,7 +310,7 @@ protected:
 
     /**
      *  WARNING:
-     *    Following methods dispatch goanna events.  Then, the focused widget
+     *    Following methods dispatch gecko events.  Then, the focused widget
      *    can be destroyed, and also it can be stolen focus.  If they returns
      *    FALSE, callers cannot continue the composition.
      *      - DispatchCompositionStart

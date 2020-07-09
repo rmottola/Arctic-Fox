@@ -60,13 +60,13 @@ GetClosestInterestingAccessible(id anObject)
 
 @implementation mozAccessible
  
-- (id)initWithAccessible:(AccessibleWrap*)goannaAccessible
+- (id)initWithAccessible:(AccessibleWrap*)geckoAccessible
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   if ((self = [super init])) {
-    mGoannaAccessible = goannaAccessible;
-    mRole = goannaAccessible->Role();
+    mGeckoAccessible = geckoAccessible;
+    mRole = geckoAccessible->Role();
   }
    
   return self;
@@ -92,8 +92,8 @@ GetClosestInterestingAccessible(id anObject)
 
   // unknown (either unimplemented, or irrelevant) elements are marked as ignored
   // as well as expired elements.
-  return !mGoannaAccessible || ([[self role] isEqualToString:NSAccessibilityUnknownRole] &&
-                               !(mGoannaAccessible->InteractiveState() & states::FOCUSABLE));
+  return !mGeckoAccessible || ([[self role] isEqualToString:NSAccessibilityUnknownRole] &&
+                               !(mGeckoAccessible->InteractiveState() & states::FOCUSABLE));
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(NO);
 }
@@ -103,7 +103,7 @@ GetClosestInterestingAccessible(id anObject)
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   // if we're expired, we don't support any attributes.
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return [NSArray array];
   
   static NSArray *generalAttributes = nil;
@@ -141,7 +141,7 @@ GetClosestInterestingAccessible(id anObject)
 {  
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
 #if DEBUG
@@ -183,9 +183,9 @@ GetClosestInterestingAccessible(id anObject)
   if ([attribute isEqualToString:NSAccessibilityTitleAttribute])
     return [self title];
   if ([attribute isEqualToString:NSAccessibilityTitleUIElementAttribute]) {
-    Relation rel = mGoannaAccessible->RelationByType(RelationType::LABELLED_BY);
+    Relation rel = mGeckoAccessible->RelationByType(RelationType::LABELLED_BY);
     Accessible* tempAcc = rel.Next();
-    return tempAcc ? GetNativeFromGoannaAccessible(tempAcc) : nil;
+    return tempAcc ? GetNativeFromGeckoAccessible(tempAcc) : nil;
   }
   if ([attribute isEqualToString:NSAccessibilityHelpAttribute])
     return [self help];
@@ -227,23 +227,23 @@ GetClosestInterestingAccessible(id anObject)
 
 - (id)accessibilityHitTest:(NSPoint)point
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
   // Convert the given screen-global point in the cocoa coordinate system (with
-  // origin in the bottom-left corner of the screen) into point in the Goanna
+  // origin in the bottom-left corner of the screen) into point in the Gecko
   // coordinate system (with origin in a top-left screen point).
   NSScreen* mainView = [[NSScreen screens] objectAtIndex:0];
   NSPoint tmpPoint = NSMakePoint(point.x,
                                  [mainView frame].size.height - point.y);
-  nsIntPoint goannaPoint = nsCocoaUtils::
+  nsIntPoint geckoPoint = nsCocoaUtils::
     CocoaPointsToDevPixels(tmpPoint, nsCocoaUtils::GetBackingScaleFactor(mainView));
 
-  Accessible* child = mGoannaAccessible->ChildAtPoint(goannaPoint.x, goannaPoint.y,
+  Accessible* child = mGeckoAccessible->ChildAtPoint(geckoPoint.x, geckoPoint.y,
                                                      Accessible::eDeepestChild);
 
   if (child) {
-    mozAccessible* nativeChild = GetNativeFromGoannaAccessible(child);
+    mozAccessible* nativeChild = GetNativeFromGeckoAccessible(child);
     if (nativeChild)
       return GetClosestInterestingAccessible(nativeChild);
   }
@@ -270,12 +270,12 @@ GetClosestInterestingAccessible(id anObject)
 
 - (id)accessibilityFocusedUIElement
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
   
-  Accessible* focusedGeckoChild = mGoannaAccessible->FocusedChild();
+  Accessible* focusedGeckoChild = mGeckoAccessible->FocusedChild();
   if (focusedGeckoChild) {
-    mozAccessible *focusedChild = GetNativeFromGoannaAccessible(focusedGeckoChild);
+    mozAccessible *focusedChild = GetNativeFromGeckoAccessible(focusedGeckoChild);
     if (focusedChild)
       return GetClosestInterestingAccessible(focusedChild);
   }
@@ -290,9 +290,9 @@ GetClosestInterestingAccessible(id anObject)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  Accessible* accessibleParent = mGoannaAccessible->GetUnignoredParent();
+  Accessible* accessibleParent = mGeckoAccessible->GetUnignoredParent();
   if (accessibleParent) {
-    id nativeParent = GetNativeFromGoannaAccessible(accessibleParent);
+    id nativeParent = GetNativeFromGeckoAccessible(accessibleParent);
     if (nativeParent)
       return GetClosestInterestingAccessible(nativeParent);
   }
@@ -303,7 +303,7 @@ GetClosestInterestingAccessible(id anObject)
   //
   // get the native root accessible, and tell it to return its first parent unignored accessible.
   id nativeParent =
-    GetNativeFromGoannaAccessible(mGoannaAccessible->RootAccessible());
+    GetNativeFromGeckoAccessible(mGeckoAccessible->RootAccessible());
   NSAssert1 (nativeParent, @"!!! we can't find a parent for %@", self);
 
   return GetClosestInterestingAccessible(nativeParent);
@@ -332,21 +332,21 @@ GetClosestInterestingAccessible(id anObject)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (mChildren || !mGoannaAccessible->AreChildrenCached())
+  if (mChildren || !mGeckoAccessible->AreChildrenCached())
     return mChildren;
 
   mChildren = [[NSMutableArray alloc] init];
 
   // get the array of children.
   nsAutoTArray<Accessible*, 10> childrenArray;
-  mGoannaAccessible->GetUnignoredChildren(&childrenArray);
+  mGeckoAccessible->GetUnignoredChildren(&childrenArray);
 
   // now iterate through the children array, and get each native accessible.
   uint32_t totalCount = childrenArray.Length();
   for (uint32_t idx = 0; idx < totalCount; idx++) {
     Accessible* curAccessible = childrenArray.ElementAt(idx);
     if (curAccessible) {
-      mozAccessible *curNative = GetNativeFromGoannaAccessible(curAccessible);
+      mozAccessible *curNative = GetNativeFromGeckoAccessible(curAccessible);
       if (curNative)
         [mChildren addObject:GetObjectOrRepresentedView(curNative)];
     }
@@ -370,10 +370,10 @@ GetClosestInterestingAccessible(id anObject)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
-  nsIntRect rect = mGoannaAccessible->Bounds();
+  nsIntRect rect = mGeckoAccessible->Bounds();
 
   NSScreen* mainView = [[NSScreen screens] objectAtIndex:0];
   CGFloat scaleFactor = nsCocoaUtils::GetBackingScaleFactor(mainView);
@@ -389,10 +389,10 @@ GetClosestInterestingAccessible(id anObject)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
-  nsIntRect rect = mGoannaAccessible->Bounds();
+  nsIntRect rect = mGeckoAccessible->Bounds();
   CGFloat scaleFactor =
     nsCocoaUtils::GetBackingScaleFactor([[NSScreen screens] objectAtIndex:0]);
   return [NSValue valueWithSize:NSMakeSize(static_cast<CGFloat>(rect.width) / scaleFactor,
@@ -403,11 +403,11 @@ GetClosestInterestingAccessible(id anObject)
 
 - (NSString*)role
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
 #ifdef DEBUG_A11Y
-  NS_ASSERTION(nsAccUtils::IsTextInterfaceSupportCorrect(mGoannaAccessible),
+  NS_ASSERTION(nsAccUtils::IsTextInterfaceSupportCorrect(mGeckoAccessible),
                "Does not support Text when it should");
 #endif
 
@@ -427,7 +427,7 @@ GetClosestInterestingAccessible(id anObject)
 
 - (NSString*)subrole
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
   nsIAtom* landmark = mGeckoAccessible->LandmarkRole();
@@ -457,7 +457,7 @@ GetClosestInterestingAccessible(id anObject)
       return @"AXContentList"; // 10.6+ NSAccessibilityContentListSubrole;
 
     case roles::ENTRY:
-      if (mGoannaAccessible->IsSearchbox())
+      if (mGeckoAccessible->IsSearchbox())
         return @"AXSearchField";
       break;
 
@@ -528,7 +528,7 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString title;
-  mGoannaAccessible->Name(title);
+  mGeckoAccessible->Name(title);
   return nsCocoaUtils::ToNSString(title);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -539,7 +539,7 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString value;
-  mGoannaAccessible->Value(value);
+  mGeckoAccessible->Value(value);
   return value.IsEmpty() ? nil : [NSString stringWithCharacters:reinterpret_cast<const unichar*>(value.BeginReading())
                                                          length:value.Length()];
 
@@ -568,11 +568,11 @@ struct RoleDescrComparator
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (mGoannaAccessible->IsDefunct())
+  if (mGeckoAccessible->IsDefunct())
     return nil;
 
   nsAutoString desc;
-  mGoannaAccessible->Description(desc);
+  mGeckoAccessible->Description(desc);
 
   return nsCocoaUtils::ToNSString(desc);
 
@@ -584,7 +584,7 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString helpText;
-  mGoannaAccessible->Help(helpText);
+  mGeckoAccessible->Help(helpText);
   return helpText.IsEmpty() ? nil : [NSString stringWithCharacters:reinterpret_cast<const unichar*>(helpText.BeginReading())
                                                             length:helpText.Length()];
 
@@ -603,26 +603,26 @@ struct RoleDescrComparator
 
 - (BOOL)isFocused
 {
-  return FocusMgr()->IsFocused(mGoannaAccessible);
+  return FocusMgr()->IsFocused(mGeckoAccessible);
 }
 
 - (BOOL)canBeFocused
 {
-  return mGoannaAccessible && (mGoannaAccessible->InteractiveState() & states::FOCUSABLE);
+  return mGeckoAccessible && (mGeckoAccessible->InteractiveState() & states::FOCUSABLE);
 }
 
 - (BOOL)focus
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return NO;
 
-  mGoannaAccessible->TakeFocus();
+  mGeckoAccessible->TakeFocus();
   return YES;
 }
 
 - (BOOL)isEnabled
 {
-  return mGoannaAccessible && ((mGoannaAccessible->InteractiveState() & states::UNAVAILABLE) == 0);
+  return mGeckoAccessible && ((mGeckoAccessible->InteractiveState() & states::UNAVAILABLE) == 0);
 }
 
 // The root accessible calls this when the focused node was
@@ -645,7 +645,7 @@ struct RoleDescrComparator
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  AccessibleWrap* accWrap = static_cast<AccessibleWrap*>(mGoannaAccessible);
+  AccessibleWrap* accWrap = static_cast<AccessibleWrap*>(mGeckoAccessible);
 
   // Get a pointer to the native window (NSWindow) we reside in.
   NSWindow *nativeWindow = nil;
@@ -676,7 +676,7 @@ struct RoleDescrComparator
   if (!mChildren)
     return;
     
-  mozAccessible *curNative = GetNativeFromGoannaAccessible(aAccessible);
+  mozAccessible *curNative = GetNativeFromGeckoAccessible(aAccessible);
   if (curNative)
     [mChildren addObject:GetObjectOrRepresentedView(curNative)];
 }
@@ -687,14 +687,14 @@ struct RoleDescrComparator
 
   [self invalidateChildren];
 
-  mGoannaAccessible = nullptr;
+  mGeckoAccessible = nullptr;
   
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 - (BOOL)isExpired
 {
-  return !mGoannaAccessible;
+  return !mGeckoAccessible;
 }
 
 #pragma mark -

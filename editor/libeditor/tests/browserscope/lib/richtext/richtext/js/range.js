@@ -69,20 +69,20 @@ var goog$now = Date.now || function() {
   else if(left > right)return 1;
   return 0
 };
-goog$now();var goog$userAgent$detectedOpera_, goog$userAgent$detectedIe_, goog$userAgent$detectedWebkit_, goog$userAgent$detectedMobile_, goog$userAgent$detectedGoanna_, goog$userAgent$detectedCamino_, goog$userAgent$detectedMac_, goog$userAgent$detectedWindows_, goog$userAgent$detectedLinux_, goog$userAgent$detectedX11_, goog$userAgent$getUserAgentString = function() {
+goog$now();var goog$userAgent$detectedOpera_, goog$userAgent$detectedIe_, goog$userAgent$detectedWebkit_, goog$userAgent$detectedMobile_, goog$userAgent$detectedGecko_, goog$userAgent$detectedCamino_, goog$userAgent$detectedMac_, goog$userAgent$detectedWindows_, goog$userAgent$detectedLinux_, goog$userAgent$detectedX11_, goog$userAgent$getUserAgentString = function() {
   return goog$global.navigator ? goog$global.navigator.userAgent : null
 }, goog$userAgent$getNavigator = function() {
   return goog$global.navigator
 };
-goog$userAgent$detectedCamino_ = goog$userAgent$detectedGoanna_ = goog$userAgent$detectedMobile_ = goog$userAgent$detectedWebkit_ = goog$userAgent$detectedIe_ = goog$userAgent$detectedOpera_ = false;
+goog$userAgent$detectedCamino_ = goog$userAgent$detectedGecko_ = goog$userAgent$detectedMobile_ = goog$userAgent$detectedWebkit_ = goog$userAgent$detectedIe_ = goog$userAgent$detectedOpera_ = false;
 var JSCompiler_inline_ua_15;
 if(JSCompiler_inline_ua_15 = goog$userAgent$getUserAgentString()) {
   var JSCompiler_inline_navigator$$1_16 = goog$userAgent$getNavigator();
   goog$userAgent$detectedOpera_ = JSCompiler_inline_ua_15.indexOf("Opera") == 0;
   goog$userAgent$detectedIe_ = !goog$userAgent$detectedOpera_ && JSCompiler_inline_ua_15.indexOf("MSIE") != -1;
   goog$userAgent$detectedMobile_ = (goog$userAgent$detectedWebkit_ = !goog$userAgent$detectedOpera_ && JSCompiler_inline_ua_15.indexOf("WebKit") != -1) && JSCompiler_inline_ua_15.indexOf("Mobile") != -1;
-  goog$userAgent$detectedCamino_ = (goog$userAgent$detectedGoanna_ = !goog$userAgent$detectedOpera_ && !goog$userAgent$detectedWebkit_ && JSCompiler_inline_navigator$$1_16.product == "Goanna") && JSCompiler_inline_navigator$$1_16.vendor == "Camino"
-}var goog$userAgent$OPERA = goog$userAgent$detectedOpera_, goog$userAgent$IE = goog$userAgent$detectedIe_, goog$userAgent$GECKO = goog$userAgent$detectedGoanna_, goog$userAgent$WEBKIT = goog$userAgent$detectedWebkit_, goog$userAgent$MOBILE = goog$userAgent$detectedMobile_, goog$userAgent$PLATFORM, JSCompiler_inline_navigator$$2_19 = goog$userAgent$getNavigator();
+  goog$userAgent$detectedCamino_ = (goog$userAgent$detectedGecko_ = !goog$userAgent$detectedOpera_ && !goog$userAgent$detectedWebkit_ && JSCompiler_inline_navigator$$1_16.product == "Gecko") && JSCompiler_inline_navigator$$1_16.vendor == "Camino"
+}var goog$userAgent$OPERA = goog$userAgent$detectedOpera_, goog$userAgent$IE = goog$userAgent$detectedIe_, goog$userAgent$GECKO = goog$userAgent$detectedGecko_, goog$userAgent$WEBKIT = goog$userAgent$detectedWebkit_, goog$userAgent$MOBILE = goog$userAgent$detectedMobile_, goog$userAgent$PLATFORM, JSCompiler_inline_navigator$$2_19 = goog$userAgent$getNavigator();
 goog$userAgent$PLATFORM = JSCompiler_inline_navigator$$2_19 && JSCompiler_inline_navigator$$2_19.platform || "";
 goog$userAgent$detectedMac_ = goog$string$contains(goog$userAgent$PLATFORM, "Mac");
 goog$userAgent$detectedWindows_ = goog$string$contains(goog$userAgent$PLATFORM, "Win");
@@ -490,7 +490,7 @@ goog$dom$browserrange$AbstractRange.prototype.containsBrowserRange = function(ra
   }
 };
 goog$dom$browserrange$AbstractRange.prototype.containsNode = function(node, opt_allowPartial) {
-  return this.containsRange(goog$userAgent$IE ? goog$dom$browserrange$IeRange$createFromNodeContents(node) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GoannaRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : new goog$dom$browserrange$W3cRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)), opt_allowPartial)
+  return this.containsRange(goog$userAgent$IE ? goog$dom$browserrange$IeRange$createFromNodeContents(node) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GeckoRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : new goog$dom$browserrange$W3cRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)), opt_allowPartial)
 };
 goog$dom$browserrange$AbstractRange.prototype.__iterator__ = function() {
   return new goog$dom$TextRangeIterator(this.getStartNode(), this.getStartOffset(), this.getEndNode(), this.getEndOffset())
@@ -545,11 +545,11 @@ goog$dom$browserrange$W3cRange.prototype.selectInternal = function(selection) {
 };
 goog$dom$browserrange$W3cRange.prototype.collapse = function(toStart) {
   this.range_.collapse(toStart)
-};var goog$dom$browserrange$GoannaRange = function(range) {
+};var goog$dom$browserrange$GeckoRange = function(range) {
   goog$dom$browserrange$W3cRange.call(this, range)
 };
-goog$inherits(goog$dom$browserrange$GoannaRange, goog$dom$browserrange$W3cRange);
-goog$dom$browserrange$GoannaRange.prototype.selectInternal = function(selection, reversed) {
+goog$inherits(goog$dom$browserrange$GeckoRange, goog$dom$browserrange$W3cRange);
+goog$dom$browserrange$GeckoRange.prototype.selectInternal = function(selection, reversed) {
   var anchorNode = reversed ? this.getEndNode() : this.getStartNode(), anchorOffset = reversed ? this.getEndOffset() : this.getStartOffset(), focusNode = reversed ? this.getStartNode() : this.getEndNode(), focusOffset = reversed ? this.getStartOffset() : this.getEndOffset();
   selection.collapse(anchorNode, anchorOffset);
   if(anchorNode != focusNode || anchorOffset != focusOffset)selection.extend(focusNode, focusOffset)
@@ -694,7 +694,7 @@ goog$dom$browserrange$WebKitRange.prototype.selectInternal = function(selection,
   selection.removeAllRanges();
   reversed ? selection.setBaseAndExtent(this.getEndNode(), this.getEndOffset(), this.getStartNode(), this.getStartOffset()) : selection.setBaseAndExtent(this.getStartNode(), this.getStartOffset(), this.getEndNode(), this.getEndOffset())
 };var goog$dom$browserrange$createRangeFromNodes = function(startNode, startOffset, endNode, endOffset) {
-  return goog$userAgent$IE ? new goog$dom$browserrange$IeRange(goog$dom$browserrange$IeRange$getBrowserRangeForNodes_(startNode, startOffset, endNode, endOffset), goog$dom$getOwnerDocument(startNode)) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNodes_(startNode, startOffset, endNode, endOffset)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GoannaRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNodes_(startNode, startOffset, 
+  return goog$userAgent$IE ? new goog$dom$browserrange$IeRange(goog$dom$browserrange$IeRange$getBrowserRangeForNodes_(startNode, startOffset, endNode, endOffset), goog$dom$getOwnerDocument(startNode)) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNodes_(startNode, startOffset, endNode, endOffset)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GeckoRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNodes_(startNode, startOffset, 
   endNode, endOffset)) : new goog$dom$browserrange$W3cRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNodes_(startNode, startOffset, endNode, endOffset))
 };var goog$dom$TextRange = function() {
 };
@@ -705,7 +705,7 @@ var goog$dom$TextRange$createFromBrowserRangeWrapper_ = function(browserRange, o
   range.isReversed_ = !!opt_isReversed;
   return range
 }, goog$dom$TextRange$createFromNodeContents = function(node, opt_isReversed) {
-  return goog$dom$TextRange$createFromBrowserRangeWrapper_(goog$userAgent$IE ? goog$dom$browserrange$IeRange$createFromNodeContents(node) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GoannaRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : new goog$dom$browserrange$W3cRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)), opt_isReversed)
+  return goog$dom$TextRange$createFromBrowserRangeWrapper_(goog$userAgent$IE ? goog$dom$browserrange$IeRange$createFromNodeContents(node) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : goog$userAgent$GECKO ? new goog$dom$browserrange$GeckoRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)) : new goog$dom$browserrange$W3cRange(goog$dom$browserrange$W3cRange$getBrowserRangeForNode(node)), opt_isReversed)
 }, goog$dom$TextRange$createFromNodes = function(anchorNode, anchorOffset, focusNode, focusOffset) {
   var range = new goog$dom$TextRange;
   range.isReversed_ = goog$dom$Range$isReversed(anchorNode, anchorOffset, focusNode, focusOffset);
@@ -931,7 +931,7 @@ goog$dom$MultiRange.prototype.getTextRangeCount = function() {
   return this.browserRanges_.length
 };
 goog$dom$MultiRange.prototype.getTextRange = function(i) {
-  this.ranges_[i] || (this.ranges_[i] = goog$dom$TextRange$createFromBrowserRangeWrapper_(goog$userAgent$IE ? new goog$dom$browserrange$IeRange(this.browserRanges_[i], goog$dom$getOwnerDocument(this.browserRanges_[i].parentElement())) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(this.browserRanges_[i]) : goog$userAgent$GECKO ? new goog$dom$browserrange$GoannaRange(this.browserRanges_[i]) : new goog$dom$browserrange$W3cRange(this.browserRanges_[i]), undefined));
+  this.ranges_[i] || (this.ranges_[i] = goog$dom$TextRange$createFromBrowserRangeWrapper_(goog$userAgent$IE ? new goog$dom$browserrange$IeRange(this.browserRanges_[i], goog$dom$getOwnerDocument(this.browserRanges_[i].parentElement())) : goog$userAgent$WEBKIT ? new goog$dom$browserrange$WebKitRange(this.browserRanges_[i]) : goog$userAgent$GECKO ? new goog$dom$browserrange$GeckoRange(this.browserRanges_[i]) : new goog$dom$browserrange$W3cRange(this.browserRanges_[i]), undefined));
   return this.ranges_[i]
 };
 goog$dom$MultiRange.prototype.getContainer = function() {

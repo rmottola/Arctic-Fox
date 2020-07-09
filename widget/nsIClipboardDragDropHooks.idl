@@ -55,7 +55,7 @@ interface nsIClipboardDragDropHooks : nsISupports
   boolean allowStartDrag(in nsIDOMEvent event);
   
   /**
-   * Tells goanna whether a drop is allowed on this content area
+   * Tells gecko whether a drop is allowed on this content area
    *
    * @param event   DOM event (drag over)
    * @param session the drag session from which client can get

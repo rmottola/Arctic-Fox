@@ -66,9 +66,9 @@ public:
     CreateHeadless(bool requireCompatProfile);
 
     /**
-     * Create wrapping Goanna GLContext for external gl context.
+     * Create wrapping Gecko GLContext for external gl context.
      *
-     * @param aContext External context which will be wrapped by Goanna GLContext.
+     * @param aContext External context which will be wrapped by Gecko GLContext.
      * @param aSurface External surface which is used for external context.
      *
      * @return Wrapping Context to use for rendering

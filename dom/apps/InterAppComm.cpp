@@ -22,7 +22,7 @@ InterAppComm::EnabledForScope(JSContext* /* unused */,
     return false;
   }
 
-  // Only expose the constructors to the chrome codes for Goanna internal uses.
+  // Only expose the constructors to the chrome codes for Gecko internal uses.
   // The content pages shouldn't be aware of the constructors.
   return nsContentUtils::ThreadsafeIsCallerChrome();
 }

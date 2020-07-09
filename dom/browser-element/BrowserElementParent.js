@@ -409,7 +409,7 @@ BrowserElementParent.prototype = {
       unblockMsgSent = true;
 
       // We don't need to sanitize evt.detail.returnValue (e.g. converting the
-      // return value of confirm() to a boolean); Goanna does that for us.
+      // return value of confirm() to a boolean); Gecko does that for us.
 
       let data = { windowID: windowID,
                    returnValue: evt.detail.returnValue };

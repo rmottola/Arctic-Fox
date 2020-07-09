@@ -46,7 +46,7 @@ protected:
 
   /**
    * Make a decision as to whether or not NativeEventCallback will
-   * trigger goanna event processing when there are pending goanna
+   * trigger gecko event processing when there are pending gecko
    * events.
    */
   virtual void DoProcessMoreGeckoEvents();
@@ -140,16 +140,16 @@ private:
   /**
    * mBlockNativeEvent blocks the appshell from processing native events.
    * It is set to true while a nested native event loop (eEventloopOther)
-   * is processing goanna events in NativeEventCallback(), thus queuing up
+   * is processing gecko events in NativeEventCallback(), thus queuing up
    * native events until we return to that loop (bug 420148).
-   * We force mBlockNativeEvent to false in case handling one of the goanna
+   * We force mBlockNativeEvent to false in case handling one of the gecko
    * events spins up a nested XPCOM event loop (eg. modal window) which would
    * otherwise lead to a "deadlock" where native events aren't processed at all.
    */
   bool mBlockNativeEvent;
   /**
-   * Tracks whether we have processed any goanna events in NativeEventCallback so
-   * that we can avoid erroneously entering a blocking loop waiting for goanna
+   * Tracks whether we have processed any gecko events in NativeEventCallback so
+   * that we can avoid erroneously entering a blocking loop waiting for gecko
    * events to show up during OnProcessNextEvent.  This is required because on
    * OS X ProcessGeckoEvents may be invoked inside the context of
    * ProcessNextNativeEvent and may result in NativeEventCallback being invoked

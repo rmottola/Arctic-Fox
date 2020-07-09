@@ -5,7 +5,7 @@ Metrics Collection Framework
 ============================
 
 The ``services/metrics`` directory contains a generic data metrics
-collecting and persisting framework for Goanna applications.
+collecting and persisting framework for Gecko applications.
 
 Overview
 ========

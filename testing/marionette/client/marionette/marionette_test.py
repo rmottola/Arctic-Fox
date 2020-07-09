@@ -16,7 +16,7 @@ import warnings
 
 
 from marionette_driver.errors import (
-        ErrorCodes, MarionetteException, InstallGoannaError, TimeoutException, InvalidResponseException,
+        ErrorCodes, MarionetteException, InstallGeckoError, TimeoutException, InvalidResponseException,
         JavascriptException, NoSuchElementException, XPathLookupException, NoSuchWindowException,
         StaleElementException, ScriptTimeoutException, ElementNotVisibleException,
         NoSuchFrameException, InvalidElementStateException, NoAlertPresentException,
@@ -440,7 +440,7 @@ permissions.forEach(function (perm) {
                 try:
                     self.marionette.delete_session()
                 except (socket.error, MarionetteException, IOError):
-                    # Goanna has crashed?
+                    # Gecko has crashed?
                     self.marionette.session = None
                     try:
                         self.marionette.client.close()

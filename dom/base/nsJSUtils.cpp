@@ -117,7 +117,7 @@ nsJSUtils::CompileFunction(AutoJSAPI& jsapi,
   mozilla::DebugOnly<nsIScriptContext*> ctx = GetScriptContextFromJSContext(cx);
   MOZ_ASSERT_IF(ctx, ctx->IsContextInitialized());
 
-  // Do the junk Goanna is supposed to do before calling into JSAPI.
+  // Do the junk Gecko is supposed to do before calling into JSAPI.
   for (size_t i = 0; i < aScopeChain.length(); ++i) {
     JS::ExposeObjectToActiveJS(aScopeChain[i]);
   }

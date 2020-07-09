@@ -1707,7 +1707,7 @@ invisibleSourceDragEnd(GtkWidget        *aWidget,
 // same GtkDragSourceInfo, which won't like being destroyed twice.
 //
 // Therefore we reply to the signals immediately and schedule a task to
-// dispatch the Goanna events, which may run the event loop.
+// dispatch the Gecko events, which may run the event loop.
 //
 // Action in response to drag-leave signals is also delayed until the event
 // loop runs again so that we find out whether a drag-drop signal follows.
@@ -1716,8 +1716,8 @@ invisibleSourceDragEnd(GtkWidget        *aWidget,
 // If further signals are received while the task is scheduled, the scheduled
 // response is updated, sometimes effectively compressing successive signals.
 //
-// No Goanna drag events are dispatched (during nested event loops) while other
-// Goanna drag events are in flight.  This helps event handlers that may not
+// No Gecko drag events are dispatched (during nested event loops) while other
+// Gecko drag events are in flight.  This helps event handlers that may not
 // expect nested events, while accessing an event's dataTransfer for example.
 
 gboolean

@@ -130,7 +130,7 @@ class MachCommands(MachCommandBase):
         parser=_parser,
     )
     @CommandArgument('--address',
-        help='host:port of running Goanna instance to connect to.')
+        help='host:port of running Gecko instance to connect to.')
     @CommandArgument('--type',
         default='browser',
         help='Test type, usually one of: browser, b2g, b2g-qemu.')

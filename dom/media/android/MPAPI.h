@@ -16,7 +16,7 @@ enum ColorFormat {
 };
 
 /*
- * A callback for the plugin to use to request a buffer owned by goanna. This can
+ * A callback for the plugin to use to request a buffer owned by gecko. This can
  * save us a copy or two down the line.
  */
 class BufferCallback {

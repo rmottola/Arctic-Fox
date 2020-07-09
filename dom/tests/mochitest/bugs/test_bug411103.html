@@ -65,7 +65,7 @@ var allNSTests =
    { args: ["http://example.com/", "\u0BC6:a"], code: 14,
      message: "non-ASCII character after colon is CombiningChar, which is " +
               "NCNameChar but not (Letter | \"_\") so invalid at start of " +
-              "NCName (Goanna chooses to throw 14 here, but either is valid " +
+              "NCName (Gecko chooses to throw 14 here, but either is valid " +
               "as this is both an invalid XML name and an invalid QName)" },
    { args: ["http://example.com/", "a:a\u0BC6"] },
    { args: ["http://example.com/", "a\u0BC6:a"] },

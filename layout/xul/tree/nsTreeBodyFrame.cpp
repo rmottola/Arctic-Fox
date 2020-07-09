@@ -3394,7 +3394,7 @@ nsTreeBodyFrame::PaintTwisty(int32_t              aRowIndex,
       if (isRTL)
         twistyRect.x = rightEdge - twistyRect.width;
       // yeah, I know it says we're drawing a background, but a twisty is really a fg
-      // object since it doesn't have anything that goanna would want to draw over it. Besides,
+      // object since it doesn't have anything that gecko would want to draw over it. Besides,
       // we have to prevent imagelib from drawing it.
       nsRect dirty;
       dirty.IntersectRect(twistyRect, aDirtyRect);

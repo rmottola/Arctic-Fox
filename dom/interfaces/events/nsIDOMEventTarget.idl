@@ -258,7 +258,7 @@ interface nsIDOMEventTarget : nsISupports
    * If aDOMEvent is not nullptr (in which case aEvent can be nullptr) it is used
    * for dispatching, otherwise aEvent is used.
    *
-   * @deprecated This method is here just until all the callers outside Goanna
+   * @deprecated This method is here just until all the callers outside Gecko
    *             have been converted to use nsIDOMEventTarget::dispatchEvent.
    */
   [noscript, nostdcall]

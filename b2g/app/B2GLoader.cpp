@@ -279,7 +279,7 @@ main(int argc, const char* argv[])
   ReserveFileDescriptors(reservedFds);
 
   /*
-   * Before fork(), libxul and static data of Goanna are loaded for
+   * Before fork(), libxul and static data of Gecko are loaded for
    * sharing.
    */
   bool ok = LoadStaticData(argc, argv);

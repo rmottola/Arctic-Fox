@@ -130,7 +130,7 @@ BrowserElementPrompt.prototype = {
       defaultButton: -1,
       buttons: [],
       // This map is for translating array index to the button number that
-      // is recognized by Goanna. This shouldn't be exposed to embedder.
+      // is recognized by Gecko. This shouldn't be exposed to embedder.
       indexToButtonNumberMap: []
     };
 

@@ -18,9 +18,9 @@ using namespace mozilla::a11y;
 #include "RoleMap.h"
 #undef ROLE
 
-#define RELATIONTYPE(goannaType, stringType, atkType, msaaType, ia2Type) \
-  static_assert(static_cast<uint32_t>(RelationType::goannaType) \
-                == static_cast<uint32_t>(nsIAccessibleRelation::RELATION_ ## goannaType), \
+#define RELATIONTYPE(geckoType, stringType, atkType, msaaType, ia2Type) \
+  static_assert(static_cast<uint32_t>(RelationType::geckoType) \
+                == static_cast<uint32_t>(nsIAccessibleRelation::RELATION_ ## geckoType), \
                 "internal and xpcom relations differ!");
 #include "RelationTypeMap.h"
 #undef RELATIONTYPE

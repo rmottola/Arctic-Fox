@@ -142,7 +142,7 @@ void
 ImageCapture::TakePhoto(ErrorResult& aResult)
 {
   // According to spec, VideoStreamTrack.readyState must be "live"; however
-  // goanna doesn't implement it yet (bug 910249). Instead of readyState, we
+  // gecko doesn't implement it yet (bug 910249). Instead of readyState, we
   // check VideoStreamTrack.enable before bug 910249 is fixed.
   // The error code should be INVALID_TRACK, but spec doesn't define it in
   // ImageCaptureError. So it returns PHOTO_ERROR here before spec updates.

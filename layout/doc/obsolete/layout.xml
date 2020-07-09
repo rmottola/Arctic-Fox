@@ -9,12 +9,12 @@
 <Documentation xmlns:html="http://www.w3.org/1999/xhtml"
                xmlns:xlink="http://www.w3.org/1999/xlink">
 
-<Title>Goanna Layout Engine</Title>
+<Title>Gecko Layout Engine</Title>
 <Author xlink:type="simple" xlink:show="new" xlink:href="mailto:troy@netscape.com">Troy Chevalier</Author>
 <UpdateDate>8 August 1999</UpdateDate>
 
 <SectionHeading>Overview</SectionHeading>
-<Body>Goanna is Mozilla's new layout engine. It is based on the HTML4, CSS1, XML 1.0,
+<Body>Gecko is Mozilla's new layout engine. It is based on the HTML4, CSS1, XML 1.0,
 and DOM Internet standards, and it is built using a modular XPCOM-based
 architecture.</Body>
 
@@ -92,7 +92,7 @@ The actual interfaces involved are:
 directory.</Body>
 
 <SectionHeading>Object Lifetimes</SectionHeading>
-<Body>Goanna supports multiple views of the same document. This means you can print the
+<Body>Gecko supports multiple views of the same document. This means you can print the
 same document that you're viewing on the screen, and there's only one content
 model. Because there's just a single content model, each of the content objects
 is referenced counted. The document holds a reference to the root content object,

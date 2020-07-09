@@ -13,11 +13,11 @@
  */
 
 extern "C" {
-    NS_EXPORT void JNICALL Java_org_mozilla_goanna_GeckoAppShell_cameraCallbackBridge(JNIEnv *, jclass, jbyteArray data);
+    NS_EXPORT void JNICALL Java_org_mozilla_gecko_GeckoAppShell_cameraCallbackBridge(JNIEnv *, jclass, jbyteArray data);
 }
 
 NS_EXPORT void JNICALL
-Java_org_mozilla_goanna_GeckoAppShell_cameraCallbackBridge(JNIEnv *env, jclass, jbyteArray data) {
+Java_org_mozilla_gecko_GeckoAppShell_cameraCallbackBridge(JNIEnv *env, jclass, jbyteArray data) {
     mozilla::net::CameraStreamImpl* impl = mozilla::net::CameraStreamImpl::GetInstance(0);
     
     impl->transmitFrame(env, &data);

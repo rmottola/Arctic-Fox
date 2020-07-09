@@ -915,14 +915,14 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
   // GetTransform here.
   Matrix4x4 oldTransform = aLayer->GetTransform();
 
-  CSSToLayerScale goannaZoom = metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
+  CSSToLayerScale geckoZoom = metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
 
-  LayerIntPoint scrollOffsetLayerPixels = RoundedToInt(metrics.GetScrollOffset() * goannaZoom);
+  LayerIntPoint scrollOffsetLayerPixels = RoundedToInt(metrics.GetScrollOffset() * geckoZoom);
 
   if (mIsFirstPaint) {
     mContentRect = metrics.GetScrollableRect();
     SetFirstPaintViewport(scrollOffsetLayerPixels,
-                          goannaZoom,
+                          geckoZoom,
                           mContentRect);
     mIsFirstPaint = false;
   } else if (!metrics.GetScrollableRect().IsEqualEdges(mContentRect)) {
@@ -937,7 +937,7 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
     (metrics.GetCriticalDisplayPort().IsEmpty()
       ? metrics.GetDisplayPort()
       : metrics.GetCriticalDisplayPort()
-    ) * goannaZoom);
+    ) * geckoZoom);
   displayPort += scrollOffsetLayerPixels;
 
   LayerMargin fixedLayerMargins(0, 0, 0, 0);
@@ -954,7 +954,7 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
                                * metrics.GetCumulativeResolution().ToScaleFactor()
                                * LayerToParentLayerScale(1));
   ParentLayerPoint userScroll = metrics.GetScrollOffset() * userZoom;
-  SyncViewportInfo(displayPort, goannaZoom, mLayersUpdated,
+  SyncViewportInfo(displayPort, geckoZoom, mLayersUpdated,
                    userScroll, userZoom, fixedLayerMargins,
                    offset);
   mLayersUpdated = false;
@@ -963,18 +963,18 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
   mLayerManager->GetCompositor()->SetScreenRenderOffset(offset);
 
   // Handle transformations for asynchronous panning and zooming. We determine the
-  // zoom used by Goanna from the transformation set on the root layer, and we
-  // determine the scroll offset used by Goanna from the frame metrics of the
+  // zoom used by Gecko from the transformation set on the root layer, and we
+  // determine the scroll offset used by Gecko from the frame metrics of the
   // primary scrollable layer. We compare this to the user zoom and scroll
   // offset in the view transform we obtained from Java in order to compute the
   // transformation we need to apply.
-  ParentLayerPoint goannaScroll(0, 0);
+  ParentLayerPoint geckoScroll(0, 0);
   if (metrics.IsScrollable()) {
-    goannaScroll = metrics.GetScrollOffset() * userZoom;
+    geckoScroll = metrics.GetScrollOffset() * userZoom;
   }
 
   LayerToParentLayerScale asyncZoom = userZoom / metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
-  ParentLayerPoint translation = userScroll - goannaScroll;
+  ParentLayerPoint translation = userScroll - geckoScroll;
   Matrix4x4 treeTransform = ViewTransform(asyncZoom, -translation);
 
   // Apply the tree transform on top of GetLocalTransform() here (rather than
@@ -1044,12 +1044,12 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame)
   //
   // Attempt to apply an async content transform to any layer that has
   // an async pan zoom controller (which means that it is rendered
-  // async using Goanna). If this fails, fall back to transforming the
+  // async using Gecko). If this fails, fall back to transforming the
   // primary scrollable layer.  "Failing" here means that we don't
   // find a frame that is async scrollable.  Note that the fallback
   // code also includes Fennec which is rendered async.  Fennec uses
   // its own platform-specific async rendering that is done partially
-  // in Goanna and partially in Java.
+  // in Gecko and partially in Java.
   wantNextFrame |= SampleAPZAnimations(LayerMetricsWrapper(root), aCurrentFrame);
   if (!ApplyAsyncContentTransformToTree(root)) {
     nsAutoTArray<Layer*,1> scrollableLayers;

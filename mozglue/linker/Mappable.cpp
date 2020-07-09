@@ -189,7 +189,7 @@ public:
     if (ioctl(fd, ASHMEM_SET_SIZE, length))
       return nullptr;
 
-    /* The Goanna crash reporter is confused by adjacent memory mappings of
+    /* The Gecko crash reporter is confused by adjacent memory mappings of
      * the same file and chances are we're going to map from the same file
      * descriptor right away. To avoid problems with the crash reporter,
      * create an empty anonymous page before or after the ashmem mapping,

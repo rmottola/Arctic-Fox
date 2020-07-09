@@ -162,7 +162,7 @@ protected:
 /**
  * And ImageClient to handle opaque video stream.
  * Such video stream does not upload new Image for each frame.
- * Goanna have no way to get the buffer content from the Image, since the Image
+ * Gecko have no way to get the buffer content from the Image, since the Image
  * does not contain the real buffer.
  * It need special hardware to display the Image
  */

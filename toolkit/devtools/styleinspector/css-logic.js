@@ -30,7 +30,7 @@
 
 /**
  * Provide access to the style information in a page.
- * CssLogic uses the standard DOM API, and the Goanna inIDOMUtils API to access
+ * CssLogic uses the standard DOM API, and the Gecko inIDOMUtils API to access
  * styling information in the page, and present this to the user in a way that
  * helps them understand:
  * - why their expectations may not have been fulfilled

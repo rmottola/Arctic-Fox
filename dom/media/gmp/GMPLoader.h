@@ -26,11 +26,11 @@ public:
 // Encapsulates generating the device-bound node id, activating the sandbox,
 // loading the GMP, and passing the node id to the GMP (in that order).
 //
-// In Desktop Goanna, the implementation of this lives in plugin-container,
+// In Desktop Gecko, the implementation of this lives in plugin-container,
 // and is passed into XUL code from on startup. The GMP IPC child protocol actor
 // uses this interface to load and retrieve interfaces from the GMPs.
 //
-// In Desktop Goanna the implementation lives in the plugin-container so that
+// In Desktop Gecko the implementation lives in the plugin-container so that
 // it can be covered by DRM vendor's voucher.
 //
 // On Android the GMPLoader implementation lives in libxul (because for the time

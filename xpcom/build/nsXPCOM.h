@@ -54,8 +54,8 @@ struct Module;
  *                         or use <CODE>nullptr</CODE> to use the working
  *                         directory.
  *
- * @param aAppFileLocationProvider The object to be used by Goanna that
- *                         specifies to Goanna where to find profiles, the
+ * @param aAppFileLocationProvider The object to be used by Gecko that
+ *                         specifies to Gecko where to find profiles, the
  *                         component registry preferences and so on; or use
  *                         <CODE>nullptr</CODE> for the default behaviour.
  *

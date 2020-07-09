@@ -88,8 +88,8 @@ public:
 
   /**
    * Instantiates a decoder for an encoding. The input must be a
-   * Goanna-canonical encoding name.
-   * @param aEncoding a Goanna-canonical encoding name
+   * Gecko-canonical encoding name.
+   * @param aEncoding a Gecko-canonical encoding name
    * @return a decoder
    */
   static already_AddRefed<nsIUnicodeDecoder>
@@ -101,8 +101,8 @@ public:
 
   /**
    * Instantiates a decoder for an encoding. The input must be a
-   * Goanna-canonical encoding name
-   * @param aEncoding a Goanna-canonical encoding name
+   * Gecko-canonical encoding name
+   * @param aEncoding a Gecko-canonical encoding name
    * @return a decoder
    */
   static already_AddRefed<nsIUnicodeDecoder>
@@ -110,8 +110,8 @@ public:
 
   /**
    * Instantiates an encoder for an encoding. The input must be a
-   * Goanna-canonical encoding name.
-   * @param aEncoding a Goanna-canonical encoding name
+   * Gecko-canonical encoding name.
+   * @param aEncoding a Gecko-canonical encoding name
    * @return an encoder
    */
   static already_AddRefed<nsIUnicodeEncoder>
@@ -123,15 +123,15 @@ public:
 
   /**
    * Instantiates an encoder for an encoding. The input must be a
-   * Goanna-canonical encoding name.
-   * @param aEncoding a Goanna-canonical encoding name
+   * Gecko-canonical encoding name.
+   * @param aEncoding a Gecko-canonical encoding name
    * @return an encoder
    */
   static already_AddRefed<nsIUnicodeEncoder>
   EncoderForEncoding(const nsACString& aEncoding);
 
   /**
-   * Finds a Goanna language group string (e.g. x-western) for a Goanna-canonical
+   * Finds a Gecko language group string (e.g. x-western) for a Gecko-canonical
    * encoding name.
    *
    * @param      aEncoding, incoming label describing charset to be decoded.

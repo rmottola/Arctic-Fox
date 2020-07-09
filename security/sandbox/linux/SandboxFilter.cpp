@@ -470,7 +470,7 @@ SandboxFilter::SandboxFilter(const sock_fprog** aStored, SandboxType aType,
 #ifdef MOZ_GMP_SANDBOX
     impl = new SandboxFilterImplGMP();
 #else
-    MOZ_CRASH("Goanna Media Plugin process sandboxing not supported in this"
+    MOZ_CRASH("Gecko Media Plugin process sandboxing not supported in this"
               " build!");
 #endif
     break;

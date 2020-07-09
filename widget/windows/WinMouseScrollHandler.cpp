@@ -468,7 +468,7 @@ MouseScrollHandler::ProcessNativeMouseWheelMessage(nsWindowBase* aWidget,
   }
 
   // If the window under cursor is not in our process, it means:
-  // 1. The window may be a plugin window (GoannaPluginWindow or its descendant).
+  // 1. The window may be a plugin window (GeckoPluginWindow or its descendant).
   // 2. The window may be another application's window.
   HWND pluginWnd = WinUtils::FindOurProcessWindow(underCursorWnd);
   if (!pluginWnd) {

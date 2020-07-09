@@ -266,9 +266,9 @@ void SetDebuggerMallocSizeOf(JSRuntime* runtime, mozilla::MallocSizeOf mallocSiz
 // -------------------------------
 //
 // The Debugger wants to observe behavior of promises, which are implemented by
-// Goanna with webidl and which SpiderMonkey knows nothing about. On the other
-// hand, Goanna knows nothing about which (if any) debuggers are observing a
-// promise's global. The compromise is that Goanna is responsible for calling
+// Gecko with webidl and which SpiderMonkey knows nothing about. On the other
+// hand, Gecko knows nothing about which (if any) debuggers are observing a
+// promise's global. The compromise is that Gecko is responsible for calling
 // these handlers at the appropriate times, and SpiderMonkey will handle
 // notifying any Debugger instances that are observing the given promise's
 // global.
@@ -284,7 +284,7 @@ onNewPromise(JSContext* cx, HandleObject promise);
 // getting locked in) because you can resolve a promise with another pending
 // promise, in which case neither promise has settled yet.
 //
-// It is Goanna's responsibility to ensure that this is never called on the same
+// It is Gecko's responsibility to ensure that this is never called on the same
 // promise more than once (because a promise can only make the transition from
 // unsettled to settled once).
 JS_PUBLIC_API(void)

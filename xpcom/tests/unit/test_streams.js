@@ -59,8 +59,8 @@ function test_binary_streams() {
 //  do_check_eq(is.readDouble(), Math.SQRT2);
   os.writeStringZ("Mozilla");
   do_check_eq(is.readCString(), "Mozilla");
-  os.writeWStringZ("Goanna");
-  do_check_eq(is.readString(), "Goanna");
+  os.writeWStringZ("Gecko");
+  do_check_eq(is.readString(), "Gecko");
   os.writeBytes(HelloStr, HelloStr.length);
   do_check_eq(is.available(), HelloStr.length);
   msg = is.readBytes(HelloStr.length);
@@ -91,7 +91,7 @@ function test_binary_streams() {
   os.writeFloat(2.5);
 //  os.writeDouble(Math.SQRT2);
   os.writeStringZ("Mozilla");
-  os.writeWStringZ("Goanna");
+  os.writeWStringZ("Gecko");
   os.writeBytes(HelloStr, HelloStr.length);
   os.writeByteArray(HelloArray, HelloArray.length);
   // Available should not be zero after a long write like this.
@@ -110,7 +110,7 @@ function test_binary_streams() {
   do_check_eq(is.readFloat(), 2.5);
 //  do_check_eq(is.readDouble(), Math.SQRT2);
   do_check_eq(is.readCString(), "Mozilla");
-  do_check_eq(is.readString(), "Goanna");
+  do_check_eq(is.readString(), "Gecko");
   // Remember, we wrote HelloStr twice - once as a string, and then as an array.
   do_check_eq(is.available(), HelloStr.length * 2);
   msg = is.readBytes(HelloStr.length);

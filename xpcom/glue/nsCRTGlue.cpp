@@ -376,7 +376,7 @@ vprintf_stderr(const char* aFmt, va_list aArgs)
     va_end(argsCpy);
   }
 
-  __android_log_vprint(ANDROID_LOG_INFO, "Goanna", aFmt, aArgs);
+  __android_log_vprint(ANDROID_LOG_INFO, "Gecko", aFmt, aArgs);
 }
 #else
 void

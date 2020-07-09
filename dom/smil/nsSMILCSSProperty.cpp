@@ -186,7 +186,7 @@ nsSMILCSSProperty::ClearAnimValue()
 bool
 nsSMILCSSProperty::IsPropertyAnimatable(nsCSSProperty aPropID)
 {
-  // NOTE: Right now, Goanna doesn't recognize the following properties from
+  // NOTE: Right now, Gecko doesn't recognize the following properties from
   // the SVG Property Index:
   //   alignment-baseline
   //   baseline-shift
@@ -256,7 +256,7 @@ nsSMILCSSProperty::IsPropertyAnimatable(nsCSSProperty aPropID)
       return true;
 
     // EXPLICITLY NON-ANIMATABLE PROPERTIES:
-    // (Some of these aren't supported at all in Goanna -- I've commented those
+    // (Some of these aren't supported at all in Gecko -- I've commented those
     // ones out. If/when we add support for them, uncomment their line here)
     // ----------------------------------------------------------------------
     // case eCSSProperty_enable_background:

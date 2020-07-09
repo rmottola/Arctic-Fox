@@ -58,7 +58,7 @@ ToNSString(id aValue)
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   if ((self = [super initWithAccessible:accessible])) {
-    mGoannaTextAccessible = accessible->AsHyperText();
+    mGeckoTextAccessible = accessible->AsHyperText();
   }
   return self;
 
@@ -67,7 +67,7 @@ ToNSString(id aValue)
 
 - (BOOL)accessibilityIsIgnored
 {
-  return !mGoannaAccessible;
+  return !mGeckoAccessible;
 }
 
 - (NSArray*)accessibilityAttributeNames
@@ -127,10 +127,10 @@ ToNSString(id aValue)
   }
 
   if ([attribute isEqualToString:@"AXRequired"])
-    return [NSNumber numberWithBool:!!(mGoannaAccessible->State() & states::REQUIRED)];
+    return [NSNumber numberWithBool:!!(mGeckoAccessible->State() & states::REQUIRED)];
 
   if ([attribute isEqualToString:@"AXInvalid"])
-    return [NSNumber numberWithBool:!!(mGoannaAccessible->State() & states::INVALID)];
+    return [NSNumber numberWithBool:!!(mGeckoAccessible->State() & states::INVALID)];
 
   if ([attribute isEqualToString:NSAccessibilityVisibleCharacterRangeAttribute])
     return [self visibleCharacterRange];
@@ -166,7 +166,7 @@ ToNSString(id aValue)
 
 - (id)accessibilityAttributeValue:(NSString*)attribute forParameter:(id)parameter
 {
-  if (!mGoannaTextAccessible)
+  if (!mGeckoTextAccessible)
     return nil;
 
   if ([attribute isEqualToString:NSAccessibilityStringForRangeParameterizedAttribute]) {
@@ -214,9 +214,9 @@ ToNSString(id aValue)
 
     int32_t start = range.location;
     int32_t end = start + range.length;
-    nsIntRect bounds = mGoannaTextAccessible->TextBounds(start, end);
+    nsIntRect bounds = mGeckoTextAccessible->TextBounds(start, end);
 
-    return [NSValue valueWithRect:nsCocoaUtils::GoannaRectToCocoaRect(bounds)];
+    return [NSValue valueWithRect:nsCocoaUtils::GeckoRectToCocoaRect(bounds)];
   }
 
 #if DEBUG
@@ -247,7 +247,7 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  if (!mGoannaTextAccessible)
+  if (!mGeckoTextAccessible)
     return;
 
   if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
@@ -262,12 +262,12 @@ ToNSString(id aValue)
       return;
 
     int32_t start = 0, end = 0;
-    mGoannaTextAccessible->SelectionBoundsAt(0, &start, &end);
-    mGoannaTextAccessible->DeleteText(start, end - start);
+    mGeckoTextAccessible->SelectionBoundsAt(0, &start, &end);
+    mGeckoTextAccessible->DeleteText(start, end - start);
 
     nsString text;
     nsCocoaUtils::GetStringForNSString(stringValue, text);
-    mGoannaTextAccessible->InsertText(text, start);
+    mGeckoTextAccessible->InsertText(text, start);
   }
 
   if ([attribute isEqualToString:NSAccessibilitySelectedTextRangeAttribute]) {
@@ -275,7 +275,7 @@ ToNSString(id aValue)
     if (!ToNSRange(value, &range))
       return;
 
-    mGoannaTextAccessible->SetSelectionBoundsAt(0, range.location,
+    mGeckoTextAccessible->SetSelectionBoundsAt(0, range.location,
                                                range.location + range.length);
     return;
   }
@@ -285,7 +285,7 @@ ToNSString(id aValue)
     if (!ToNSRange(value, &range))
       return;
 
-    mGoannaTextAccessible->ScrollSubstringTo(range.location, range.location + range.length,
+    mGeckoTextAccessible->ScrollSubstringTo(range.location, range.location + range.length,
                                             nsIAccessibleScrollType::SCROLL_TYPE_TOP_EDGE);
     return;
   } 
@@ -307,7 +307,7 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  mGoannaTextAccessible = nullptr;
+  mGeckoTextAccessible = nullptr;
   [super expire];
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
@@ -322,8 +322,8 @@ ToNSString(id aValue)
   if ([[self role] isEqualToString:NSAccessibilityStaticTextRole])
     return YES;
 
-  if (mGoannaTextAccessible)
-    return (mGoannaAccessible->State() & states::READONLY) == 0;
+  if (mGeckoTextAccessible)
+    return (mGeckoAccessible->State() & states::READONLY) == 0;
 
   return NO;
 
@@ -332,8 +332,8 @@ ToNSString(id aValue)
 
 - (NSNumber*)caretLineNumber
 {
-  int32_t lineNumber = mGoannaTextAccessible ?
-    mGoannaTextAccessible->CaretLineNumber() - 1 : -1;
+  int32_t lineNumber = mGeckoTextAccessible ?
+    mGeckoTextAccessible->CaretLineNumber() - 1 : -1;
 
   return (lineNumber >= 0) ? [NSNumber numberWithInt:lineNumber] : nil;
 }
@@ -342,10 +342,10 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  if (mGoannaTextAccessible) {
+  if (mGeckoTextAccessible) {
     nsString text;
     nsCocoaUtils::GetStringForNSString(aNewString, text);
-    mGoannaTextAccessible->ReplaceText(text);
+    mGeckoTextAccessible->ReplaceText(text);
   }
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
@@ -353,7 +353,7 @@ ToNSString(id aValue)
 
 - (NSString*)text
 {
-  if (!mGoannaAccessible || !mGoannaTextAccessible)
+  if (!mGeckoAccessible || !mGeckoTextAccessible)
     return nil;
 
   // A password text field returns an empty value
@@ -361,7 +361,7 @@ ToNSString(id aValue)
     return @"";
 
   nsAutoString text;
-  mGoannaTextAccessible->TextSubstring(0,
+  mGeckoTextAccessible->TextSubstring(0,
                                       nsIAccessibleText::TEXT_OFFSET_END_OF_TEXT,
                                       text);
   return nsCocoaUtils::ToNSString(text);
@@ -371,10 +371,10 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  if (!mGoannaAccessible || !mGoannaTextAccessible)
+  if (!mGeckoAccessible || !mGeckoTextAccessible)
     return 0;
 
-  return mGoannaTextAccessible ? mGoannaTextAccessible->CharacterCount() : 0;
+  return mGeckoTextAccessible ? mGeckoTextAccessible->CharacterCount() : 0;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(0);
 }
@@ -383,9 +383,9 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  if (mGoannaTextAccessible) {
+  if (mGeckoTextAccessible) {
     int32_t start = 0, end = 0;
-    mGoannaTextAccessible->SelectionBoundsAt(0, &start, &end);
+    mGeckoTextAccessible->SelectionBoundsAt(0, &start, &end);
     return (end - start);
   }
   return 0;
@@ -397,12 +397,12 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (mGoannaTextAccessible) {
+  if (mGeckoTextAccessible) {
     int32_t start = 0, end = 0;
-    mGoannaTextAccessible->SelectionBoundsAt(0, &start, &end);
+    mGeckoTextAccessible->SelectionBoundsAt(0, &start, &end);
     if (start != end) {
       nsAutoString selText;
-      mGoannaTextAccessible->TextSubstring(start, end, selText);
+      mGeckoTextAccessible->TextSubstring(start, end, selText);
       return nsCocoaUtils::ToNSString(selText);
     }
   }
@@ -415,17 +415,17 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
-  if (mGoannaTextAccessible) {
+  if (mGeckoTextAccessible) {
     int32_t start = 0;
     int32_t end = 0;
-    int32_t count = mGoannaTextAccessible->SelectionCount();
+    int32_t count = mGeckoTextAccessible->SelectionCount();
 
     if (count) {
-      mGoannaTextAccessible->SelectionBoundsAt(0, &start, &end);
+      mGeckoTextAccessible->SelectionBoundsAt(0, &start, &end);
       return [NSValue valueWithRange:NSMakeRange(start, end - start)];
     }
 
-    start = mGoannaTextAccessible->CaretOffset();
+    start = mGeckoTextAccessible->CaretOffset();
     return [NSValue valueWithRange:NSMakeRange(start != -1 ? start : 0, 0)]; 
   }
   return [NSValue valueWithRange:NSMakeRange(0, 0)];
@@ -438,8 +438,8 @@ ToNSString(id aValue)
   // XXX this won't work with Textarea and such as we actually don't give
   // the visible character range.
   return [NSValue valueWithRange:
-    NSMakeRange(0, mGoannaTextAccessible ? 
-                mGoannaTextAccessible->CharacterCount() : 0)];
+    NSMakeRange(0, mGeckoTextAccessible ? 
+                mGeckoTextAccessible->CharacterCount() : 0)];
 }
 
 - (void)valueDidChange
@@ -460,10 +460,10 @@ ToNSString(id aValue)
 
 - (NSString*)stringFromRange:(NSRange*)range
 {
-  NS_PRECONDITION(mGoannaTextAccessible && range, "no Goanna text accessible or range");
+  NS_PRECONDITION(mGeckoTextAccessible && range, "no Gecko text accessible or range");
 
   nsAutoString text;
-  mGoannaTextAccessible->TextSubstring(range->location,
+  mGeckoTextAccessible->TextSubstring(range->location,
                                       range->location + range->length, text);
   return nsCocoaUtils::ToNSString(text);
 }
@@ -496,18 +496,18 @@ ToNSString(id aValue)
 
 - (NSString*)text
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return nil;
 
-  return nsCocoaUtils::ToNSString(mGoannaAccessible->AsTextLeaf()->Text());
+  return nsCocoaUtils::ToNSString(mGeckoAccessible->AsTextLeaf()->Text());
 }
 
 - (long)textLength
 {
-  if (!mGoannaAccessible)
+  if (!mGeckoAccessible)
     return 0;
 
-  return mGoannaAccessible->AsTextLeaf()->Text().Length();
+  return mGeckoAccessible->AsTextLeaf()->Text().Length();
 }
 
 @end

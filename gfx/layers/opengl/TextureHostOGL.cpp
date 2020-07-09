@@ -141,7 +141,7 @@ TextureHostOGL::SetReleaseFence(const android::sp<android::Fence>& aReleaseFence
 android::sp<android::Fence>
 TextureHostOGL::GetAndResetReleaseFence()
 {
-  // Hold previous ReleaseFence to prevent Fence delivery failure via goanna IPC.
+  // Hold previous ReleaseFence to prevent Fence delivery failure via gecko IPC.
   mPrevReleaseFence = mReleaseFence;
   // Reset current ReleaseFence.
   mReleaseFence = android::Fence::NO_FENCE;

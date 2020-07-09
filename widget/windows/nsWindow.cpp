@@ -175,6 +175,8 @@
 
 #include <d3d11.h>
 
+#include "InkCollector.h"
+
 #if !defined(SM_CONVERTIBLESLATEMODE)
 #define SM_CONVERTIBLESLATEMODE 0x2003
 #endif
@@ -392,6 +394,7 @@ nsWindow::nsWindow() : nsWindowBase()
     // Init theme data
     nsUXThemeData::UpdateNativeThemeInfo();
     RedirectedKeyDownMessageManager::Forget();
+    InkCollector::sInkCollector = new InkCollector();
 
     Preferences::AddBoolVarCache(&gIsPointerEventsEnabled,
                                  "dom.w3c_pointer_events.enabled",
@@ -427,6 +430,8 @@ nsWindow::~nsWindow()
 
   // Global shutdown
   if (sInstanceCount == 0) {
+    InkCollector::sInkCollector->Shutdown();
+    InkCollector::sInkCollector = nullptr;
     IMEHandler::Terminate();
     NS_IF_RELEASE(sCursorImgContainer);
     if (sIsOleInitialized) {
@@ -648,6 +653,7 @@ nsWindow::Create(nsIWidget *aParent,
        !nsUXThemeData::sTitlebarInfoPopulatedAero)) {
     nsUXThemeData::UpdateTitlebarInfo(mWnd);
   }
+
   return NS_OK;
 }
 
@@ -2022,7 +2028,7 @@ void
 nsWindow::ResetLayout()
 {
   // This will trigger a frame changed event, triggering
-  // nc calc size and a sizemode goanna event.
+  // nc calc size and a sizemode gecko event.
   SetWindowPos(mWnd, 0, 0, 0, 0, 0,
                SWP_FRAMECHANGED|SWP_NOACTIVATE|SWP_NOMOVE|
                SWP_NOOWNERZORDER|SWP_NOSIZE|SWP_NOZORDER);
@@ -2031,7 +2037,7 @@ nsWindow::ResetLayout()
   if (!mIsVisible)
     return;
 
-  // Send a goanna size event to trigger reflow.
+  // Send a gecko size event to trigger reflow.
   RECT clientRc = {0};
   GetClientRect(mWnd, &clientRc);
   nsIntRect evRect(WinUtils::ToIntRect(clientRc));
@@ -3066,7 +3072,8 @@ LayoutDeviceIntPoint nsWindow::WidgetToScreenOffset()
   return LayoutDeviceIntPoint(point.x, point.y);
 }
 
-nsIntSize nsWindow::ClientToWindowSize(const nsIntSize& aClientSize)
+LayoutDeviceIntSize
+nsWindow::ClientToWindowSize(const LayoutDeviceIntSize& aClientSize)
 {
   if (mWindowType == eWindowType_popup && !IsPopupWithTitleBar())
     return aClientSize;
@@ -3079,7 +3086,7 @@ nsIntSize nsWindow::ClientToWindowSize(const nsIntSize& aClientSize)
   r.bottom = 200 + aClientSize.height;
   ::AdjustWindowRectEx(&r, WindowStyle(), false, WindowExStyle());
 
-  return nsIntSize(r.right - r.left, r.bottom - r.top);
+  return LayoutDeviceIntSize(r.right - r.left, r.bottom - r.top);
 }
 
 /**************************************************************
@@ -3780,6 +3787,20 @@ bool nsWindow::DispatchMouseEvent(uint32_t aEventType, WPARAM wParam,
 
   if (!mWidgetListener) {
     return result;
+  }
+
+  // Checking for NS_MOUSE_MOVE prevents a largest waterfall of unused initializations.
+  if (NS_MOUSE_MOVE != aEventType
+      // Since it is unclear whether a user will use the digitizer,
+      // Postpone initialization until first PEN message will be found.
+      && nsIDOMMouseEvent::MOZ_SOURCE_PEN == aInputSource
+      // Messages should be only at topLevel window.
+      && nsWindowType::eWindowType_toplevel == mWindowType
+      // Currently this scheme is used only when pointer events is enabled.
+      && gfxPrefs::PointerEventsEnabled()
+      // NS_MOUSE_EXIT is received, when InkCollector has been already initialized.
+      && NS_MOUSE_EXIT != aEventType) {
+    InkCollector::sInkCollector->SetTarget(mWnd);
   }
 
   switch (aEventType) {
@@ -4925,6 +4946,15 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       LPARAM pos = lParamToClient(::GetMessagePos());
       DispatchMouseEvent(NS_MOUSE_EXIT, mouseState, pos, false,
                          WidgetMouseEvent::eLeftButton, MOUSE_INPUT_SOURCE());
+    }
+    break;
+
+    case MOZ_WM_PEN_LEAVES_HOVER_OF_DIGITIZER:
+    {
+      LPARAM pos = lParamToClient(::GetMessagePos());
+      DispatchMouseEvent(NS_MOUSE_EXIT, wParam, pos, false,
+                         WidgetMouseEvent::eLeftButton,
+                         nsIDOMMouseEvent::MOZ_SOURCE_PEN);
     }
     break;
 
@@ -6074,18 +6104,18 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     // If a maximized window is resized, recalculate the non-client margins.
     if (mSizeMode == nsSizeMode_Maximized) {
       if (UpdateNonClientMargins(nsSizeMode_Maximized, true)) {
-        // goanna resize event already sent by UpdateNonClientMargins.
+        // gecko resize event already sent by UpdateNonClientMargins.
         return;
       }
     }
 
-    // Recalculate the width and height based on the client area for goanna events.
+    // Recalculate the width and height based on the client area for gecko events.
     if (::GetClientRect(mWnd, &r)) {
       rect.width  = r.right - r.left;
       rect.height = r.bottom - r.top;
     }
     
-    // Send a goanna resize event
+    // Send a gecko resize event
     OnResize(rect);
   }
 }

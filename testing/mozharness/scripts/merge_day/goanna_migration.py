@@ -37,8 +37,8 @@ VALID_MIGRATION_BEHAVIORS = (
 )
 
 
-# GoannaMigration {{{1
-class GoannaMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMixin):
+# GeckoMigration {{{1
+class GeckoMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMixin):
     config_options = [
         [['--hg-user', ], {
             "action": "store",
@@ -70,7 +70,7 @@ class GoannaMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMi
     goanna_repos = None
 
     def __init__(self, require_config_file=True):
-        super(GoannaMigration, self).__init__(
+        super(GeckoMigration, self).__init__(
             config_options=virtualenv_config_options + self.config_options,
             all_actions=[
                 'clobber',
@@ -113,7 +113,7 @@ class GoannaMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMi
             """
         if self.abs_dirs:
             return self.abs_dirs
-        dirs = super(GoannaMigration, self).query_abs_dirs()
+        dirs = super(GeckoMigration, self).query_abs_dirs()
         self.abs_dirs['abs_tools_dir'] = os.path.join(
             dirs['abs_work_dir'], 'tools'
         )
@@ -528,7 +528,7 @@ class GoannaMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMi
             "dest": "tools",
             "vcs": "hg",
         }] + self.query_goanna_repos()
-        super(GoannaMigration, self).pull(repos=repos)
+        super(GeckoMigration, self).pull(repos=repos)
 
     def lock_update_paths(self):
         self.lock_balrog_rules(self.config["balrog_rules_to_lock"])
@@ -649,5 +649,5 @@ The second run will be faster."""
 
 # __main__ {{{1
 if __name__ == '__main__':
-    goanna_migration = GoannaMigration()
+    goanna_migration = GeckoMigration()
     goanna_migration.run_and_exit()

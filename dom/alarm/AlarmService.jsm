@@ -44,8 +44,8 @@ XPCOMUtils.defineLazyGetter(this, "powerManagerService", function() {
  * AlarmService is primarily used by the mozAlarms API (navigator.mozAlarms)
  * which uses IPC to communicate with the service.
  *
- * AlarmService can also be used by Goanna code by importing the module and then
- * using AlarmService.add() and AlarmService.remove(). Only Goanna code running
+ * AlarmService can also be used by Gecko code by importing the module and then
+ * using AlarmService.add() and AlarmService.remove(). Only Gecko code running
  * in the parent process should do this.
  */
 

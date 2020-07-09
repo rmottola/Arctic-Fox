@@ -184,7 +184,7 @@ NS_GetContentList(nsINode* aRootNode,
 //----------------------------------------------------------------------
 
 // Document interface.  This is implemented by all document objects in
-// Goanna.
+// Gecko.
 class nsIDocument : public nsINode
 {
   typedef mozilla::dom::GlobalObject GlobalObject;
@@ -866,7 +866,7 @@ public:
    * front.
    *
    * By "built-in" user-agent style sheets we mean the user-agent style sheets
-   * that goanna itself supplies (such as html.css and svg.css) as opposed to
+   * that gecko itself supplies (such as html.css and svg.css) as opposed to
    * user-agent level style sheets inserted by add-ons or the like.
    *
    * This function prepends the given style sheet to the document's style set
@@ -1268,8 +1268,8 @@ public:
   }
 
   /**
-   * Only to be used inside Goanna, you can't really do anything with the
-   * pointer outside Goanna anyway.
+   * Only to be used inside Gecko, you can't really do anything with the
+   * pointer outside Gecko anyway.
    */
   nsNodeInfoManager* NodeInfoManager() const
   {

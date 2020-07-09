@@ -53,7 +53,7 @@ public:
                        uint32_t aCodecSpecificInfoLength) = 0;
 
   // Called when the encoder encounters a catestrophic error and cannot
-  // continue. Goanna will not send any more input for encoding.
+  // continue. Gecko will not send any more input for encoding.
   virtual void Error(GMPErr aError) = 0;
 };
 

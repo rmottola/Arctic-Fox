@@ -9,7 +9,7 @@ Package: xulrunner
 Architecture: any
 Depends: ${shlibs:Depends}
 Description: Web and JavaScript engine used by the Firefox Web browser
- The Mozilla runtime is the modern browser engine, also known as "Goanna," that powers Firefox and can be embedded by other applications
+ The Mozilla runtime is the modern browser engine, also known as "Gecko," that powers Firefox and can be embedded by other applications
 XB-Maemo-Display-Name: Mozilla Runtime
 XB-Maemo-Icon-26:
  MB5!.1PT*&@H````-24A$4@```!H````:"`8```"I2DS.````"7!(67,```L3

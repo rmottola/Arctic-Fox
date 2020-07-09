@@ -155,7 +155,7 @@ static inline char* js_strdup(const char* s)
  * Low-level memory management in SpiderMonkey:
  *
  *  ** Do not use the standard malloc/free/realloc: SpiderMonkey allows these
- *     to be redefined (via JS_USE_CUSTOM_ALLOCATOR) and Goanna even #define's
+ *     to be redefined (via JS_USE_CUSTOM_ALLOCATOR) and Gecko even #define's
  *     these symbols.
  *
  *  ** Do not use the builtin C++ operator new and delete: these throw on

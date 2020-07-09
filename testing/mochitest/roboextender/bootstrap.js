@@ -9,7 +9,7 @@ function loadIntoWindow(window) {}
 function unloadFromWindow(window) {}
 
 function _sendMessageToJava (aMsg) {
-  return Services.androidBridge.handleGoannaMessage(aMsg);
+  return Services.androidBridge.handleGeckoMessage(aMsg);
 };
 
 /*

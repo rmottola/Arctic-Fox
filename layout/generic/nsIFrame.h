@@ -397,7 +397,7 @@ static void ReleaseValue(void* aPropertyValue)
  * to destroy a frame. The lifetime of the frame hierarchy is bounded by the
  * lifetime of the presentation shell which owns the frames.
  *
- * nsIFrame is a private Goanna interface. If you are not Goanna then you
+ * nsIFrame is a private Gecko interface. If you are not Gecko then you
  * should not use it. If you're not in layout, then you won't be able to
  * link to many of the functions defined here. Too bad.
  *

@@ -14,7 +14,7 @@
  * The |AnimationPlayer| actor provides attributes and methods to inspect an
  * animation as well as pause/resume/seek it.
  *
- * The Web Animation spec implementation is ongoing in Goanna, and so this set
+ * The Web Animation spec implementation is ongoing in Gecko, and so this set
  * of actors should evolve when the implementation progresses.
  *
  * References:

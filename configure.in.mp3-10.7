@@ -641,7 +641,7 @@ See https://developer.mozilla.org/en/Windows_Build_Prerequisites.])
                 MOZ_MSVC_STL_WRAP_RAISE=1
                 AC_DEFINE(MOZ_MSVC_STL_WRAP_RAISE)
             else
-                AC_MSG_ERROR([Goanna exception wrapping doesn't understand your your MSVC/SDK.  Please file a bug describing this error and your build configuration.])
+                AC_MSG_ERROR([Gecko exception wrapping doesn't understand your your MSVC/SDK.  Please file a bug describing this error and your build configuration.])
             fi
         fi
 
@@ -2267,7 +2267,7 @@ ia64*-hpux*)
             dnl See https://connect.microsoft.com/VisualStudio/feedback/details/1044914/fatal-error-lnk1248
             LDFLAGS="$LDFLAGS -MaxILKSize:0x7FF00000"
         fi
-        dnl Minimum reqiurement of Goanna is VS2010 or later which supports
+        dnl Minimum reqiurement of Gecko is VS2010 or later which supports
         dnl both SSSE3 and SSE4.1.
         HAVE_TOOLCHAIN_SUPPORT_MSSSE3=1
         HAVE_TOOLCHAIN_SUPPORT_MSSE4_1=1
@@ -6218,7 +6218,7 @@ fi
 AC_SUBST(MOZ_CONTENT_SANDBOX)
 
 dnl ========================================================
-dnl = Goanna Media Plugin sandboxing
+dnl = Gecko Media Plugin sandboxing
 dnl ========================================================
 case $OS_TARGET in
 WINNT)

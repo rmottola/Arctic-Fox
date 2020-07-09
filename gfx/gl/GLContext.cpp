@@ -540,7 +540,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 { (PRFuncPtr*) &mSymbols.fPointParameterf, { "PointParameterf", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fDrawBuffer, { "DrawBuffer", nullptr } },
                     // These functions are only used by Skia/GL in desktop mode.
-                    // Other parts of Goanna should avoid using these
+                    // Other parts of Gecko should avoid using these
                     { (PRFuncPtr*) &mSymbols.fDrawBuffers, { "DrawBuffers", nullptr } },
                     { (PRFuncPtr*) &mSymbols.fClientActiveTexture, { "ClientActiveTexture", nullptr } },
                     { (PRFuncPtr*) &mSymbols.fDisableClientState, { "DisableClientState", nullptr } },

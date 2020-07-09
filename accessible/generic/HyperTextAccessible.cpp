@@ -1317,7 +1317,7 @@ HyperTextAccessible::GetCaretRect(nsIWidget** aWidget)
 
   // Correct for character size, so that caret always matches the size of
   // the character. This is important for font size transitions, and is
-  // necessary because the Goanna caret uses the previous character's size as
+  // necessary because the Gecko caret uses the previous character's size as
   // the user moves forward in the text by character.
   nsIntRect charRect = CharBounds(CaretOffset(),
                                   nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE);

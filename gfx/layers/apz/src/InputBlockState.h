@@ -67,7 +67,7 @@ protected:
  *
  * Each cancelable input block can be cancelled by web content, and
  * this information is stored in the mPreventDefault flag. Because web
- * content runs on the Goanna main thread, we cannot always wait for web content's
+ * content runs on the Gecko main thread, we cannot always wait for web content's
  * response. Instead, there is a timeout that sets this flag in the case
  * where web content doesn't respond in time. The mContentResponded
  * and mContentResponseTimerExpired flags indicate which of these scenarios
@@ -250,7 +250,7 @@ private:
  *
  * Additionally, if touch-action is enabled, each touch block should
  * have a set of allowed touch behavior flags; one for each touch point.
- * This also requires running code on the Goanna main thread, and so may
+ * This also requires running code on the Gecko main thread, and so may
  * be populated with some latency. The mAllowedTouchBehaviorSet and
  * mAllowedTouchBehaviors variables track this information.
  */

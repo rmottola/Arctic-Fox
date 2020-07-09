@@ -117,7 +117,7 @@ nsMenuX::nsMenuX()
     gMenuMethodsSwizzled = true;
   }
 
-  mMenuDelegate = [[MenuDelegate alloc] initWithGoannaMenu:this];
+  mMenuDelegate = [[MenuDelegate alloc] initWithGeckoMenu:this];
     
   if (!nsMenuBarX::sNativeEventTarget)
     nsMenuBarX::sNativeEventTarget = [[NativeMenuItemTarget alloc] init];
@@ -159,7 +159,7 @@ nsresult nsMenuX::Create(nsMenuObjectX* aParent, nsMenuGroupOwnerX* aMenuGroupOw
 
   mContent = aNode;
   mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::label, mLabel);
-  mNativeMenu = CreateMenuWithGoannaString(mLabel);
+  mNativeMenu = CreateMenuWithGeckoString(mLabel);
 
   // register this menu to be notified when changes are made to our content object
   mMenuGroupOwner = aMenuGroupOwner; // weak ref
@@ -469,12 +469,12 @@ nsresult nsMenuX::GetEnabled(bool* aIsEnabled)
   return NS_OK;
 }
 
-GoannaNSMenu* nsMenuX::CreateMenuWithGoannaString(nsString& menuTitle)
+GeckoNSMenu* nsMenuX::CreateMenuWithGeckoString(nsString& menuTitle)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   NSString* title = [NSString stringWithCharacters:(UniChar*)menuTitle.get() length:menuTitle.Length()];
-  GoannaNSMenu* myMenu = [[GoannaNSMenu alloc] initWithTitle:title];
+  GeckoNSMenu* myMenu = [[GeckoNSMenu alloc] initWithTitle:title];
   [myMenu setDelegate:mMenuDelegate];
 
   // We don't want this menu to auto-enable menu items because then Cocoa
@@ -786,13 +786,13 @@ nsresult nsMenuX::SetupIcon()
 
 @implementation MenuDelegate
 
-- (id)initWithGoannaMenu:(nsMenuX*)goannaMenu
+- (id)initWithGeckoMenu:(nsMenuX*)geckoMenu
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   if ((self = [super init])) {
-    NS_ASSERTION(goannaMenu, "Cannot initialize native menu delegate with NULL goanna menu! Will crash!");
-    mGoannaMenu = goannaMenu;
+    NS_ASSERTION(geckoMenu, "Cannot initialize native menu delegate with NULL gecko menu! Will crash!");
+    mGeckoMenu = geckoMenu;
   }
   return self;
 
@@ -801,10 +801,10 @@ nsresult nsMenuX::SetupIcon()
 
 - (void)menu:(NSMenu *)menu willHighlightItem:(NSMenuItem *)item
 {
-  if (!menu || !item || !mGoannaMenu)
+  if (!menu || !item || !mGeckoMenu)
     return;
 
-  nsMenuObjectX* target = mGoannaMenu->GetVisibleItemAt((uint32_t)[menu indexOfItem:item]);
+  nsMenuObjectX* target = mGeckoMenu->GetVisibleItemAt((uint32_t)[menu indexOfItem:item]);
   if (target && (target->MenuObjectType() == eMenuItemObjectType)) {
     nsMenuItemX* targetMenuItem = static_cast<nsMenuItemX*>(target);
     bool handlerCalledPreventDefault; // but we don't actually care
@@ -814,7 +814,7 @@ nsresult nsMenuX::SetupIcon()
 
 - (void)menuWillOpen:(NSMenu *)menu
 {
-  if (!mGoannaMenu)
+  if (!mGeckoMenu)
     return;
 
   // Don't do anything while the OS is (re)indexing our menus (on Leopard and
@@ -832,12 +832,12 @@ nsresult nsMenuX::SetupIcon()
       return;
     }
   }
-  mGoannaMenu->MenuOpened();
+  mGeckoMenu->MenuOpened();
 }
 
 - (void)menuDidClose:(NSMenu *)menu
 {
-  if (!mGoannaMenu)
+  if (!mGeckoMenu)
     return;
 
   // Don't do anything while the OS is (re)indexing our menus (on Leopard and
@@ -846,7 +846,7 @@ nsresult nsMenuX::SetupIcon()
   if (nsMenuX::sIndexingMenuLevel > 0)
     return;
 
-  mGoannaMenu->MenuClosed();
+  mGeckoMenu->MenuClosed();
 }
 
 @end

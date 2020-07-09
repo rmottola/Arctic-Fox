@@ -102,7 +102,7 @@ using mozilla::plugins::PluginModuleContentParent;
 #include "ANPBase.h"
 #include "AndroidBridge.h"
 #undef LOG
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
 using namespace mozilla;

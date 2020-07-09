@@ -311,9 +311,9 @@ nsPrintSettingsQt::SetPaperName(const char16_t* aPaperName)
     return NS_ERROR_FAILURE;
 }
 
-QPrinter::Unit GetQtUnit(int16_t aGoannaUnit)
+QPrinter::Unit GetQtUnit(int16_t aGeckoUnit)
 {
-    if (aGoannaUnit == nsIPrintSettings::kPaperSizeMillimeters) {
+    if (aGeckoUnit == nsIPrintSettings::kPaperSizeMillimeters) {
         return QPrinter::Millimeter;
     } else {
         return QPrinter::Inch;

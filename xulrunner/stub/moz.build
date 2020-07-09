@@ -11,7 +11,7 @@
 
 # We don't want to create a dependency on mozglue.
 # Statically link against the RTL on windows
-GoannaProgram(CONFIG['XULRUNNER_STUB_NAME'], mozglue=None, msvcrt='static')
+GeckoProgram(CONFIG['XULRUNNER_STUB_NAME'], mozglue=None, msvcrt='static')
 
 SOURCES += [
     'nsXULStub.cpp',

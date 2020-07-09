@@ -147,7 +147,7 @@ ErrorAccordingToNSPR(PRErrorCode errorCode)
     case PR_CONNECT_REFUSED_ERROR:
     // We lump the following NSPR codes in with PR_CONNECT_REFUSED_ERROR. We
     // could get better diagnostics by adding distinct XPCOM error codes for
-    // each of these, but there are a lot of places in Goanna that check
+    // each of these, but there are a lot of places in Gecko that check
     // specifically for NS_ERROR_CONNECTION_REFUSED, all of which would need to
     // be checked.
     case PR_NETWORK_UNREACHABLE_ERROR:
