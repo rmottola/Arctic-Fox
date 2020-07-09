@@ -710,7 +710,7 @@ parent:
 
     async PJavaScript();
 
-    sync PRemoteSpellcheckEngine();
+    PRemoteSpellcheckEngine();
     PDeviceStorageRequest(DeviceStorageParams params);
 
     PFileSystemRequest(FileSystemParams params);
