@@ -952,6 +952,10 @@ private:
   nsRefPtr<APZCTreeManager> mTreeManager;
 };
 
+bool nsBaseWidget::IsMultiProcessWindow()
+{
+  return mMultiProcessWindow;
+}
 
 void nsBaseWidget::ConfigureAPZCTreeManager()
 {
@@ -1144,6 +1148,12 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
   mCompositorParent->SetOtherProcessId(base::GetCurrentProcId());
 
   if (gfxPrefs::AsyncPanZoomEnabled() &&
+#if defined(XP_WIN) || defined(MOZ_WIDGET_COCOA) || defined(MOZ_WIDGET_GTK)
+      // For desktop platforms we only want to use APZ in e10s-enabled windows.
+      // If we ever get input events off the main thread we can consider
+      // relaxing this requirement.
+      IsMultiProcessWindow() &&
+#endif
       (WindowType() == eWindowType_toplevel || WindowType() == eWindowType_child)) {
     ConfigureAPZCTreeManager();
   }
