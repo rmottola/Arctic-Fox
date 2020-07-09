@@ -75,7 +75,6 @@
 #define NS_MOUSE_EXIT                   (NS_MOUSE_MESSAGE_START + 23)
 #define NS_MOUSE_DOUBLECLICK            (NS_MOUSE_MESSAGE_START + 24)
 #define NS_MOUSE_CLICK                  (NS_MOUSE_MESSAGE_START + 27)
-#define NS_MOUSE_AUXCLICK               (NS_MOUSE_MESSAGE_START + 28)
 #define NS_MOUSE_ACTIVATE               (NS_MOUSE_MESSAGE_START + 30)
 #define NS_MOUSE_ENTER_SYNTH            (NS_MOUSE_MESSAGE_START + 31)
 #define NS_MOUSE_EXIT_SYNTH             (NS_MOUSE_MESSAGE_START + 32)
