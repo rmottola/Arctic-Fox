@@ -495,6 +495,9 @@ public:
         // platform-specific override, by default do nothing
     }
 
+    // Are we in safe mode?
+    static bool InSafeMode();
+
     static bool OffMainThreadCompositingEnabled();
 
     static bool CanUseDirect3D9();
