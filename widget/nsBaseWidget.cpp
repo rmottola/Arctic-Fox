@@ -963,6 +963,8 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
   mAPZC = CompositorParent::GetAPZCTreeManager(rootLayerTreeId);
   MOZ_ASSERT(mAPZC);
 
+  ConfigureAPZControllerThread();
+
   mAPZC->SetDPI(GetDPI());
   mAPZEventState = new APZEventState(this,
       new ChromeProcessContentReceivedInputBlockCallback(mAPZC));
@@ -973,6 +975,12 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
   if (controller) {
     CompositorParent::SetControllerForLayerTree(rootLayerTreeId, controller);
   }
+}
+
+void nsBaseWidget::ConfigureAPZControllerThread()
+{
+  // By default the controller thread is the main thread.
+  APZThreadUtils::SetControllerThread(MessageLoop::current());
 }
 
 nsEventStatus
