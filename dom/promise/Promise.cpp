@@ -14,9 +14,11 @@
 #include "mozilla/dom/PromiseBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/MediaStreamError.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/Preferences.h"
 #include "PromiseCallback.h"
+#include "PromiseDebugging.h"
 #include "PromiseNativeHandler.h"
 #include "PromiseWorkerProxy.h"
 #include "nsContentUtils.h"
@@ -32,6 +34,11 @@
 
 namespace mozilla {
 namespace dom {
+
+namespace {
+// Generator used by Promise::GetID.
+Atomic<uintptr_t> gIDGenerator(0);
+}
 
 using namespace workers;
 
@@ -256,7 +263,11 @@ private:
 NS_IMPL_CYCLE_COLLECTION_CLASS(Promise)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Promise)
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
   tmp->MaybeReportRejectedOnce();
+#else
+  tmp->mResult = JS::UndefinedValue();
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mGlobal)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mResolveCallbacks)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRejectCallbacks)
@@ -320,8 +331,14 @@ Promise::Promise(nsIGlobalObject* aGlobal)
   , mRejectionStack(nullptr)
   , mFullfillmentStack(nullptr)
   , mState(Pending)
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
   , mHadRejectCallback(false)
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
+  , mTaskPending(false)
   , mResolvePending(false)
+  , mIsLastInChain(true)
+  , mWasNotifiedAsUncaught(false)
+  , mID(0)
 {
   MOZ_ASSERT(mGlobal);
 
@@ -332,7 +349,9 @@ Promise::Promise(nsIGlobalObject* aGlobal)
 
 Promise::~Promise()
 {
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
   MaybeReportRejectedOnce();
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
   mozilla::DropJSObjects(this);
 }
 
@@ -995,17 +1014,26 @@ void
 Promise::AppendCallbacks(PromiseCallback* aResolveCallback,
                          PromiseCallback* aRejectCallback)
 {
-  if (aResolveCallback) {
-    mResolveCallbacks.AppendElement(aResolveCallback);
-  }
+  MOZ_ASSERT(aResolveCallback);
+  MOZ_ASSERT(aRejectCallback);
 
-  if (aRejectCallback) {
-    mHadRejectCallback = true;
-    mRejectCallbacks.AppendElement(aRejectCallback);
-
-    // Now that there is a callback, we don't need to report anymore.
-    RemoveFeature();
+  if (mIsLastInChain && mState == PromiseState::Rejected) {
+    // This rejection is now consumed.
+    PromiseDebugging::AddConsumedRejection(*this);
+    // Note that we may not have had the opportunity to call
+    // RunResolveTask() yet, so we may never have called
+    // `PromiseDebugging:AddUncaughtRejection`.
   }
+  mIsLastInChain = false;
+
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
+  // Now that there is a callback, we don't need to report anymore.
+  mHadRejectCallback = true;
+  RemoveFeature();
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
+
+  mResolveCallbacks.AppendElement(aResolveCallback);
+  mRejectCallbacks.AppendElement(aRejectCallback);
 
   // If promise's state is fulfilled, queue a task to process our fulfill
   // callbacks with promise's result. If promise's state is rejected, queue a
@@ -1018,7 +1046,7 @@ Promise::AppendCallbacks(PromiseCallback* aResolveCallback,
 class WrappedWorkerRunnable final : public WorkerSameThreadRunnable
 {
 public:
-  WrappedWorkerRunnable(WorkerPrivate* aWorkerPrivate, nsIRunnable* aRunnable)
+  WrappedWorkerRunnable(workers::WorkerPrivate* aWorkerPrivate, nsIRunnable* aRunnable)
     : WorkerSameThreadRunnable(aWorkerPrivate)
     , mRunnable(aRunnable)
   {
@@ -1027,7 +1055,7 @@ public:
   }
 
   bool
-  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  WorkerRun(JSContext* aCx, workers::WorkerPrivate* aWorkerPrivate) override
   {
     NS_ASSERT_OWNINGTHREAD(WrappedWorkerRunnable);
     mRunnable->Run();
@@ -1058,6 +1086,7 @@ Promise::DispatchToMicroTask(nsIRunnable* aRunnable)
   microtaskQueue.AppendElement(aRunnable);
 }
 
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
 void
 Promise::MaybeReportRejected()
 {
@@ -1102,6 +1131,7 @@ Promise::MaybeReportRejected()
     new AsyncErrorReporter(CycleCollectedJSRuntime::Get()->Runtime(), xpcReport);
   NS_DispatchToMainThread(r);
 }
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
 
 void
 Promise::MaybeResolveInternal(JSContext* aCx,
@@ -1191,12 +1221,22 @@ Promise::Settle(JS::Handle<JS::Value> aValue, PromiseState aState)
   JSAutoCompartment ac(cx, wrapper);
   JS::dbg::onPromiseSettled(cx, wrapper);
 
+  if (aState == PromiseState::Rejected &&
+      mIsLastInChain) {
+    // The Promise has just been rejected, and it is last in chain.
+    // We need to inform PromiseDebugging.
+    // If the Promise is eventually not the last in chain anymore,
+    // we will need to inform PromiseDebugging again.
+    PromiseDebugging::AddUncaughtRejection(*this);
+  }
+
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
   // If the Promise was rejected, and there is no reject handler already setup,
   // watch for thread shutdown.
   if (aState == PromiseState::Rejected &&
       !mHadRejectCallback &&
       !NS_IsMainThread()) {
-    WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+    workers::WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
     worker->AssertIsOnWorkerThread();
 
@@ -1209,6 +1249,7 @@ Promise::Settle(JS::Handle<JS::Value> aValue, PromiseState aState)
       MaybeReportRejectedOnce();
     }
   }
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
 
   EnqueueCallbackTasks();
 }
@@ -1243,11 +1284,12 @@ Promise::EnqueueCallbackTasks()
   }
 }
 
+#if defined(DOM_PROMISE_DEPRECATED_REPORTING)
 void
 Promise::RemoveFeature()
 {
   if (mFeature) {
-    WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+    workers::WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
     worker->RemoveFeature(worker->GetJSContext(), mFeature);
     mFeature = nullptr;
@@ -1262,6 +1304,7 @@ PromiseReportRejectFeature::Notify(JSContext* aCx, workers::Status aStatus)
   // After this point, `this` has been deleted by RemoveFeature!
   return true;
 }
+#endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
 
 bool
 Promise::CaptureStack(JSContext* aCx, JS::Heap<JSObject*>& aTarget)
@@ -1361,7 +1404,7 @@ private:
 
 /* static */
 already_AddRefed<PromiseWorkerProxy>
-PromiseWorkerProxy::Create(WorkerPrivate* aWorkerPrivate,
+PromiseWorkerProxy::Create(workers::WorkerPrivate* aWorkerPrivate,
                            Promise* aWorkerPromise,
                            const JSStructuredCloneCallbacks* aCb)
 {
@@ -1385,7 +1428,7 @@ PromiseWorkerProxy::Create(WorkerPrivate* aWorkerPrivate,
   return proxy.forget();
 }
 
-PromiseWorkerProxy::PromiseWorkerProxy(WorkerPrivate* aWorkerPrivate,
+PromiseWorkerProxy::PromiseWorkerProxy(workers::WorkerPrivate* aWorkerPrivate,
                                        Promise* aWorkerPromise,
                                        const JSStructuredCloneCallbacks* aCallbacks)
   : mWorkerPrivate(aWorkerPrivate)
@@ -1402,7 +1445,7 @@ PromiseWorkerProxy::~PromiseWorkerProxy()
   MOZ_ASSERT(!mWorkerPromise);
 }
 
-WorkerPrivate*
+workers::WorkerPrivate*
 PromiseWorkerProxy::GetWorkerPrivate() const
 {
   // It's ok to race on |mCleanedUp|, because it will never cause us to fire
@@ -1430,7 +1473,7 @@ PromiseWorkerProxy::StoreISupports(nsISupports* aSupports)
 
 bool
 PromiseWorkerProxyControlRunnable::WorkerRun(JSContext* aCx,
-                                             WorkerPrivate* aWorkerPrivate)
+                                             workers::WorkerPrivate* aWorkerPrivate)
 {
   mProxy->CleanUp(aCx);
   return true;
@@ -1530,6 +1573,14 @@ void Promise::MaybeRejectBrokenly(const nsRefPtr<DOMError>& aArg) {
 template<>
 void Promise::MaybeRejectBrokenly(const nsAString& aArg) {
   MaybeSomething(aArg, &Promise::MaybeReject);
+}
+
+uint64_t
+Promise::GetID() {
+  if (mID != 0) {
+    return mID;
+  }
+  return mID = ++gIDGenerator;
 }
 
 } // namespace dom
