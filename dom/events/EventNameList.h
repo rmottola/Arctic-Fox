@@ -738,7 +738,7 @@ NON_IDL_EVENT(commandupdate,
 NON_IDL_EVENT(dragexit,
               NS_DRAGDROP_EXIT_SYNTH,
               EventNameType_XUL,
-              eBasicEventClass)
+              eDragEventClass)
 NON_IDL_EVENT(dragdrop,
               NS_DRAGDROP_DRAGDROP,
               EventNameType_XUL,
