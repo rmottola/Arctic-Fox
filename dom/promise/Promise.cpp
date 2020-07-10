@@ -248,7 +248,7 @@ protected:
       // console though, for debugging.
     }
 
-    return NS_OK;
+    return rv.StealNSResult();
   }
 
 private:
@@ -432,13 +432,24 @@ Promise::PerformMicroTaskCheckpoint()
     return false;
   }
 
+  Maybe<AutoSafeJSContext> cx;
+  if (NS_IsMainThread()) {
+    cx.emplace();
+  }
+
   do {
     nsCOMPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
     MOZ_ASSERT(runnable);
 
     // This function can re-enter, so we remove the element before calling.
     microtaskQueue.RemoveElementAt(0);
-    runnable->Run();
+    nsresult rv = runnable->Run();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return false;
+    }
+    if (cx.isSome()) {
+      JS_CheckForInterrupt(cx.ref());
+    }
   } while (!microtaskQueue.IsEmpty());
 
   return true;
@@ -1014,6 +1025,10 @@ void
 Promise::AppendCallbacks(PromiseCallback* aResolveCallback,
                          PromiseCallback* aRejectCallback)
 {
+  if (mGlobal->IsDying()) {
+    return;
+  }
+
   MOZ_ASSERT(aResolveCallback);
   MOZ_ASSERT(aRejectCallback);
 
@@ -1209,7 +1224,12 @@ Promise::RejectInternal(JSContext* aCx,
 void
 Promise::Settle(JS::Handle<JS::Value> aValue, PromiseState aState)
 {
+  if (mGlobal->IsDying()) {
+    return;
+  }
+
   mSettlementTimestamp = TimeStamp::Now();
+
   SetResult(aValue);
   SetState(aState);
 
