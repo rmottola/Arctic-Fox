@@ -190,10 +190,6 @@ EVENT(dragenter,
       NS_DRAGDROP_ENTER,
       EventNameType_HTMLXUL,
       eDragEventClass)
-EVENT(dragexit,
-      NS_DRAGDROP_EXIT_SYNTH,
-      EventNameType_HTMLXUL,
-      eDragEventClass)
 EVENT(dragleave,
       NS_DRAGDROP_LEAVE_SYNTH,
       EventNameType_HTMLXUL,
@@ -737,6 +733,10 @@ NON_IDL_EVENT(broadcast,
               eBasicEventClass)
 NON_IDL_EVENT(commandupdate,
               NS_XUL_COMMAND_UPDATE,
+              EventNameType_XUL,
+              eBasicEventClass)
+NON_IDL_EVENT(dragexit,
+              NS_DRAGDROP_EXIT_SYNTH,
               EventNameType_XUL,
               eBasicEventClass)
 NON_IDL_EVENT(dragdrop,
