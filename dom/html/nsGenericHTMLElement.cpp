@@ -2428,8 +2428,8 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(uint32_t aMessage,
 {
   switch (aMessage) {
     case NS_MOUSE_MOVE:
-    case NS_MOUSE_ENTER_SYNTH:
-    case NS_MOUSE_EXIT_SYNTH:
+    case NS_MOUSE_OVER:
+    case NS_MOUSE_OUT:
     case NS_MOUSEENTER:
     case NS_MOUSELEAVE:
     case NS_POINTER_MOVE:
