@@ -166,12 +166,9 @@ var PrintUtils = {
                       "to a browser.");
     }
 
-    let printSettings = this.getPrintSettings();
-
     let mm = aBrowser.messageManager;
 
     mm.sendAsyncMessage("Printing:Print", null, {
-      printSettings: printSettings,
       contentWindow: aWindow,
     });
   },
@@ -439,9 +436,7 @@ var PrintUtils = {
     // listener.
     let ppBrowser = this._listener.getPrintPreviewBrowser();
     let mm = ppBrowser.messageManager;
-    let printSettings = this.getPrintSettings();
     mm.sendAsyncMessage("Printing:Preview:Enter", null, {
-      printSettings: printSettings,
       contentWindow: this._sourceBrowser.contentWindowAsCPOW ||
                      this._sourceBrowser.contentWindow,
     });
