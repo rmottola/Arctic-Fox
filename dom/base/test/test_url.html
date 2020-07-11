@@ -337,9 +337,16 @@
   </script>
 
   <script>
-    var u = new URL('http://www.example.org');
-    ok(u.toJSON(), 'http://www.example.org', "URL.toJSON()");
-    is(JSON.stringify(u), "\"http://www.example.org/\"", "JSON.stringify(u) works");
+    var blob = new Blob(['a']);
+    var url = URL.createObjectURL(blob);
+    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
+    ok(true, "Calling revokeObjectURL twice should be ok");
+  </script>
+
+  <script>
+    URL.revokeObjectURL('blob:something');
+    ok(true, "This should not throw.");
   </script>
 </body>
 </html>
