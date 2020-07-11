@@ -242,13 +242,12 @@ class MemoryReportRequestChild : public PMemoryReportRequestChild,
 public:
     NS_DECL_ISUPPORTS
 
-    MemoryReportRequestChild(uint32_t aGeneration, bool aAnonymize,
+    MemoryReportRequestChild(bool aAnonymize,
                              const MaybeFileDesc& aDMDFile);
     NS_IMETHOD Run() override;
 private:
     virtual ~MemoryReportRequestChild();
 
-    uint32_t mGeneration;
     bool     mAnonymize;
     FileDescriptor mDMDFile;
 };
@@ -256,8 +255,8 @@ private:
 NS_IMPL_ISUPPORTS(MemoryReportRequestChild, nsIRunnable)
 
 MemoryReportRequestChild::MemoryReportRequestChild(
-    uint32_t aGeneration, bool aAnonymize, const MaybeFileDesc& aDMDFile)
-  : mGeneration(aGeneration), mAnonymize(aAnonymize)
+    bool aAnonymize, const MaybeFileDesc& aDMDFile)
+  : mAnonymize(aAnonymize)
 {
     MOZ_COUNT_CTOR(MemoryReportRequestChild);
     if (aDMDFile.type() == MaybeFileDesc::TFileDescriptor) {
@@ -855,7 +854,7 @@ ContentChild::AllocPMemoryReportRequestChild(const uint32_t& aGeneration,
                                              const MaybeFileDesc& aDMDFile)
 {
     MemoryReportRequestChild *actor =
-        new MemoryReportRequestChild(aGeneration, aAnonymize, aDMDFile);
+        new MemoryReportRequestChild(aAnonymize, aDMDFile);
     actor->AddRef();
     return actor;
 }
@@ -946,7 +945,7 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
     mgr->GetReportsForThisProcessExtended(cb, wrappedReports, mAnonymize,
                                           FileDescriptorToFILE(mDMDFile, "wb"));
 
-    bool sent = Send__delete__(this, mGeneration, reports);
+    bool sent = Send__delete__(this, reports);
     return sent ? NS_OK : NS_ERROR_FAILURE;
 }
 
