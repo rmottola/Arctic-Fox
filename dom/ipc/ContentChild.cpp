@@ -681,8 +681,6 @@ ContentChild::Init(MessageLoop* aIOLoop,
     SendBackUpXResources(FileDescriptor(xSocketFd));
 #endif
 
-    GetCPOWManager();
-
     SendGetProcessAttributes(&mID, &mIsForApp, &mIsForBrowser);
     InitProcessAttributes();
 
