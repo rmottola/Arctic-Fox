@@ -38,7 +38,7 @@ class BackgroundChild;
 
 namespace dom {
 
-class ServiceWorkerRegistration;
+class ServiceWorkerRegistrationBase;
 
 namespace workers {
 
@@ -340,7 +340,7 @@ public:
   // The scope should be a fully qualified valid URL.
   nsRefPtrHashtable<nsCStringHashKey, ServiceWorkerRegistrationInfo> mServiceWorkerRegistrationInfos;
 
-  nsTObserverArray<ServiceWorkerRegistration*> mServiceWorkerRegistrations;
+  nsTObserverArray<ServiceWorkerRegistrationBase*> mServiceWorkerRegistrations;
 
   nsRefPtrHashtable<nsISupportsHashKey, ServiceWorkerRegistrationInfo> mControlledDocuments;
 
