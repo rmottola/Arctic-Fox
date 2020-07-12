@@ -1371,7 +1371,6 @@ this.PushService = {
             "push-subscription-change",
             scope
           );
-          // TODO -- test needed.  E10s support needed.
           globalMM.broadcastAsyncMessage('pushsubscriptionchanged', scope);
         }
         resolve();
