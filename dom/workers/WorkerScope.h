@@ -20,6 +20,7 @@ class Console;
 class Function;
 class Promise;
 class RequestOrUSVString;
+class ServiceWorkerRegistrationWorkerThread;
 
 namespace cache {
 
@@ -199,6 +200,7 @@ class ServiceWorkerGlobalScope final : public WorkerGlobalScope
 {
   const nsString mScope;
   nsRefPtr<ServiceWorkerClients> mClients;
+  nsRefPtr<ServiceWorkerRegistrationWorkerThread> mRegistration;
 
   ~ServiceWorkerGlobalScope();
 
@@ -221,6 +223,9 @@ public:
 
   ServiceWorkerClients*
   Clients();
+
+  ServiceWorkerRegistrationWorkerThread*
+  Registration();
 
   IMPL_EVENT_HANDLER(activate)
   IMPL_EVENT_HANDLER(beforeevicted)

@@ -17,6 +17,7 @@ interface ServiceWorkerGlobalScope : WorkerGlobalScope {
   // readonly attribute CacheList caches;
 
   readonly attribute Clients clients;
+  readonly attribute ServiceWorkerRegistration registration;
 
   [Unforgeable] readonly attribute DOMString scope;
 
