@@ -479,9 +479,9 @@ ServiceWorkerGlobalScope::Clients()
 ServiceWorkerRegistrationWorkerThread*
 ServiceWorkerGlobalScope::Registration()
 {
-  //if (!mRegistration) {
-  //  mRegistration = new ServiceWorkerRegistrationWorkerThread(this);
-  //}
+  if (!mRegistration) {
+    mRegistration = new ServiceWorkerRegistrationWorkerThread(mScope);
+  }
 
   return mRegistration;
 }
