@@ -480,7 +480,8 @@ ServiceWorkerRegistrationWorkerThread*
 ServiceWorkerGlobalScope::Registration()
 {
   if (!mRegistration) {
-    mRegistration = new ServiceWorkerRegistrationWorkerThread(mScope);
+    mRegistration =
+      new ServiceWorkerRegistrationWorkerThread(mWorkerPrivate, mScope);
   }
 
   return mRegistration;
