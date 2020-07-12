@@ -38,7 +38,7 @@ class BackgroundChild;
 
 namespace dom {
 
-class ServiceWorkerRegistrationBase;
+class ServiceWorkerRegistrationListener;
 
 namespace workers {
 
@@ -340,7 +340,7 @@ public:
   // The scope should be a fully qualified valid URL.
   nsRefPtrHashtable<nsCStringHashKey, ServiceWorkerRegistrationInfo> mServiceWorkerRegistrationInfos;
 
-  nsTObserverArray<ServiceWorkerRegistrationBase*> mServiceWorkerRegistrations;
+  nsTObserverArray<ServiceWorkerRegistrationListener*> mServiceWorkerRegistrationListeners;
 
   nsRefPtrHashtable<nsISupportsHashKey, ServiceWorkerRegistrationInfo> mControlledDocuments;
 
@@ -398,6 +398,13 @@ public:
  void LoadRegistrations(
                  const nsTArray<ServiceWorkerRegistrationData>& aRegistrations);
 
+  NS_IMETHOD
+  AddRegistrationEventListener(const nsAString& aScope,
+                               ServiceWorkerRegistrationListener* aListener);
+
+  NS_IMETHOD
+  RemoveRegistrationEventListener(const nsAString& aScope,
+                                  ServiceWorkerRegistrationListener* aListener);
 private:
   ServiceWorkerManager();
   ~ServiceWorkerManager();
@@ -457,15 +464,7 @@ private:
                                              const nsAString& aName);
 
   void
-  FireEventOnServiceWorkerRegistrations(ServiceWorkerRegistrationInfo* aRegistration,
-                                        const nsAString& aName);
-
-  void
-  FireUpdateFound(ServiceWorkerRegistrationInfo* aRegistration)
-  {
-    FireEventOnServiceWorkerRegistrations(aRegistration,
-                                          NS_LITERAL_STRING("updatefound"));
-  }
+  FireUpdateFoundOnServiceWorkerRegistrations(ServiceWorkerRegistrationInfo* aRegistration);
 
   void
   FireControllerChange(ServiceWorkerRegistrationInfo* aRegistration);
