@@ -23,11 +23,6 @@ interface ServiceWorkerGlobalScope : WorkerGlobalScope {
   // FIXME(nsm): Bug 995484
   // ResponsePromise<any> fetch((Request or [EnsureUTF16] DOMString) request);
 
-  void update();
-
-  [Throws]
-  Promise<boolean> unregister();
-
   attribute EventHandler oninstall;
   attribute EventHandler onactivate;
   attribute EventHandler onfetch;
