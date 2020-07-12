@@ -111,6 +111,7 @@
 - 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
+- Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
 - Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
