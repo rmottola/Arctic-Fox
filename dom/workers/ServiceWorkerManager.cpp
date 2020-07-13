@@ -1048,6 +1048,7 @@ ServiceWorkerManager::AppendPendingOperation(nsIRunnable* aRunnable)
 class LifecycleEventPromiseHandler final : public PromiseNativeHandler
 {
   nsMainThreadPtrHandle<ContinueLifecycleTask> mTask;
+  nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
   bool mActivateImmediately;
 
   virtual
@@ -1056,8 +1057,10 @@ class LifecycleEventPromiseHandler final : public PromiseNativeHandler
 
 public:
   LifecycleEventPromiseHandler(const nsMainThreadPtrHandle<ContinueLifecycleTask>& aTask,
+                               const nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker,
                                bool aActivateImmediately)
     : mTask(aTask)
+    , mServiceWorker(aServiceWorker)
     , mActivateImmediately(aActivateImmediately)
   {
     MOZ_ASSERT(!NS_IsMainThread());
@@ -1140,7 +1143,7 @@ LifecycleEventWorkerRunnable::DispatchLifecycleEvent(JSContext* aCx, WorkerPriva
   }
 
   nsRefPtr<LifecycleEventPromiseHandler> handler =
-    new LifecycleEventPromiseHandler(mTask, false /* activateImmediately */);
+    new LifecycleEventPromiseHandler(mTask, mServiceWorker, false /* activateImmediately */);
   waitUntilPromise->AppendNativeHandler(handler);
   return true;
 }
