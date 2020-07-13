@@ -16,6 +16,7 @@
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIMutableArray.h"
+#include "nsIUploadChannel2.h"
 #include "nsPIDOMWindow.h"
 #include "nsScriptLoader.h"
 #include "nsDebug.h"
@@ -2359,6 +2360,7 @@ class FetchEventRunnable : public WorkerRunnable
   RequestMode mRequestMode;
   RequestCredentials mRequestCredentials;
   nsContentPolicyType mContentPolicyType;
+  nsCOMPtr<nsIInputStream> mUploadStream;
 public:
   FetchEventRunnable(WorkerPrivate* aWorkerPrivate,
                      nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
@@ -2453,6 +2455,13 @@ public:
 
     mContentPolicyType = loadInfo->InternalContentPolicyType();
 
+    nsCOMPtr<nsIUploadChannel2> uploadChannel = do_QueryInterface(httpChannel);
+    if (uploadChannel) {
+      MOZ_ASSERT(!mUploadStream);
+      rv = uploadChannel->CloneUploadStream(getter_AddRefs(mUploadStream));
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
     return NS_OK;
   }
 
@@ -2512,8 +2521,6 @@ private:
     reqInit.mHeaders.Construct();
     reqInit.mHeaders.Value().SetAsHeaders() = headers;
 
-    //TODO(jdm): set request body
-
     reqInit.mMode.Construct(mRequestMode);
     reqInit.mCredentials.Construct(mRequestCredentials);
 
@@ -2526,6 +2533,8 @@ private:
     nsRefPtr<InternalRequest> internalReq = request->GetInternalRequest();
     MOZ_ASSERT(internalReq);
     internalReq->SetCreatedByFetchEvent();
+
+    internalReq->SetBody(mUploadStream);
 
     request->SetContentPolicyType(mContentPolicyType);
 
