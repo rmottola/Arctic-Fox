@@ -412,8 +412,6 @@ public:
 
     JSContext* cx = jsapi.cx();
 
-    JS::Rooted<JSString*> stack(cx, JS_GetEmptyString(JS_GetRuntime(cx)));
-
     JS::Rooted<JS::Value> fnval(cx);
     if (!ToJSValue(cx, aErrorDesc.mFilename, &fnval)) {
       JS_ClearPendingException(cx);
@@ -431,7 +429,7 @@ public:
     JS::Rooted<JSString*> msg(cx, msgval.toString());
 
     JS::Rooted<JS::Value> error(cx);
-    if (!JS::CreateError(cx, JSEXN_ERR, stack, fn, aErrorDesc.mLineno,
+    if (!JS::CreateError(cx, JSEXN_ERR, JS::NullPtr(), fn, aErrorDesc.mLineno,
                          aErrorDesc.mColno, nullptr, msg, &error)) {
       JS_ClearPendingException(cx);
       mPromise->MaybeReject(NS_ERROR_DOM_ABORT_ERR);
