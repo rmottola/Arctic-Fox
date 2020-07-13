@@ -22,6 +22,8 @@ interface nsIStackFrame : nsISupports
     readonly attribute int32_t                 lineNumber;
     readonly attribute int32_t                 columnNumber;
     readonly attribute AUTF8String             sourceLine;
+    readonly attribute AString                 asyncCause;
+    readonly attribute nsIStackFrame           asyncCaller;
     readonly attribute nsIStackFrame           caller;
 
     // Returns a formatted stack string that looks like the sort of
