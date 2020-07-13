@@ -31,6 +31,10 @@ interface nsIStackFrame : nsISupports
     // Only works on JS-language stack frames.
     readonly attribute AString                 formattedStack;
 
+    // Returns the underlying SavedFrame object for native JavaScript stacks,
+    // or null if this is not a native JavaScript stack frame.
+    readonly attribute jsval                   nativeSavedFrame;
+
     AUTF8String toString();
 };
 

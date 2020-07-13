@@ -312,6 +312,7 @@ public:
   NS_IMETHOD GetAsyncCaller(nsIStackFrame** aAsyncCaller) override;
   NS_IMETHOD GetCaller(nsIStackFrame** aCaller) override;
   NS_IMETHOD GetFormattedStack(nsAString& aStack) override;
+  NS_IMETHOD GetNativeSavedFrame(JS::MutableHandle<JS::Value> aSavedFrame) override;
 
 protected:
   virtual bool IsJSFrame() const override {
@@ -748,6 +749,19 @@ NS_IMETHODIMP JSStackFrame::GetFormattedStack(nsAString& aStack)
 NS_IMETHODIMP StackFrame::GetFormattedStack(nsAString& aStack)
 {
   aStack.Truncate();
+  return NS_OK;
+}
+
+/* readonly attribute jsval nativeSavedFrame; */
+NS_IMETHODIMP JSStackFrame::GetNativeSavedFrame(JS::MutableHandle<JS::Value> aSavedFrame)
+{
+  aSavedFrame.setObjectOrNull(mStack);
+  return NS_OK;
+}
+
+NS_IMETHODIMP StackFrame::GetNativeSavedFrame(JS::MutableHandle<JS::Value> aSavedFrame)
+{
+  aSavedFrame.setNull();
   return NS_OK;
 }
 
