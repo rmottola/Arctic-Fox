@@ -2522,6 +2522,10 @@ private:
     if (NS_WARN_IF(result.Failed())) {
       return false;
     }
+    // For Telemetry, note that this Request object was created by a Fetch event.
+    nsRefPtr<InternalRequest> internalReq = request->GetInternalRequest();
+    MOZ_ASSERT(internalReq);
+    internalReq->SetCreatedByFetchEvent();
 
     request->SetContentPolicyType(mContentPolicyType);
 

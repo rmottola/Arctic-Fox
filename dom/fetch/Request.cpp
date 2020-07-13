@@ -202,16 +202,19 @@ Request::Constructor(const GlobalObject& aGlobal,
                                    : fallbackCredentials;
 
   if (mode != RequestMode::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetMode(mode);
   }
 
   if (credentials != RequestCredentials::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetCredentialsMode(credentials);
   }
 
   RequestCache cache = aInit.mCache.WasPassed() ?
                        aInit.mCache.Value() : fallbackCache;
   if (cache != RequestCache::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetCacheMode(cache);
   }
 
@@ -240,8 +243,10 @@ Request::Constructor(const GlobalObject& aGlobal,
         upperCaseMethod.EqualsLiteral("POST") ||
         upperCaseMethod.EqualsLiteral("PUT") ||
         upperCaseMethod.EqualsLiteral("OPTIONS")) {
+      request->ClearCreatedByFetchEvent();
       request->SetMethod(upperCaseMethod);
     } else {
+      request->ClearCreatedByFetchEvent();
       request->SetMethod(method);
     }
   }
@@ -254,6 +259,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     if (aRv.Failed()) {
       return nullptr;
     }
+    request->ClearCreatedByFetchEvent();
     headers = h->GetInternalHeaders();
   } else {
     headers = new InternalHeaders(*requestHeaders);
@@ -299,6 +305,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     if (NS_WARN_IF(aRv.Failed())) {
       return nullptr;
     }
+    request->ClearCreatedByFetchEvent();
     request->SetBody(stream);
 
     if (!contentType.IsVoid() &&

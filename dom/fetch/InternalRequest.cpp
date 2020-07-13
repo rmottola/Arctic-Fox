@@ -43,6 +43,7 @@ InternalRequest::GetRequestConstructorCopy(nsIGlobalObject* aGlobal, ErrorResult
   copy->mMode = mMode;
   copy->mCredentialsMode = mCredentialsMode;
   copy->mCacheMode = mCacheMode;
+  copy->mCreatedByFetchEvent = mCreatedByFetchEvent;
   return copy.forget();
 }
 
@@ -90,6 +91,7 @@ InternalRequest::InternalRequest(const InternalRequest& aOther)
   , mSynchronous(aOther.mSynchronous)
   , mUnsafeRequest(aOther.mUnsafeRequest)
   , mUseURLCredentials(aOther.mUseURLCredentials)
+  , mCreatedByFetchEvent(aOther.mCreatedByFetchEvent)
 {
   // NOTE: does not copy body stream... use the fallible Clone() for that
 }
