@@ -1240,6 +1240,26 @@ ContentChild::RecvBidiKeyboardNotify(const bool& aIsLangRTL)
     return true;
 }
 
+bool
+ContentChild::RecvRemoveServiceWorkerRegistrationsForDomain(const nsString& aDomain)
+{
+    nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
+    if (swm) {
+        swm->Remove(NS_ConvertUTF16toUTF8(aDomain));
+    }
+    return true;
+}
+
+bool
+ContentChild::RecvRemoveServiceWorkerRegistrations()
+{
+    nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
+    if (swm) {
+        swm->RemoveAll();
+    }
+    return true;
+}
+
 static CancelableTask* sFirstIdleTask;
 
 static void FirstIdle(void)
