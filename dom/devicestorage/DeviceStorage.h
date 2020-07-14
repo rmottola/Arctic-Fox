@@ -294,6 +294,12 @@ public:
                           const nsAString& aType,
                           nsTArray<nsRefPtr<nsDOMDeviceStorage> >& aStores);
 
+  static void
+  CreateDeviceStorageByNameAndType(nsPIDOMWindow* aWin,
+                                   const nsAString& aName,
+                                   const nsAString& aType,
+                                   nsDOMDeviceStorage** aStore);
+
   void Shutdown();
 
   static void GetOrderedVolumeNames(nsTArray<nsString>& aVolumeNames);
@@ -335,6 +341,11 @@ private:
                                                   nsAString& aOutStoragePath);
   already_AddRefed<nsDOMDeviceStorage>
     GetStorageByName(const nsAString &aStorageName);
+
+  static already_AddRefed<nsDOMDeviceStorage>
+    GetStorageByNameAndType(nsPIDOMWindow* aWin,
+                            const nsAString& aStorageName,
+                            const nsAString& aType);
 
   nsCOMPtr<nsIPrincipal> mPrincipal;
 

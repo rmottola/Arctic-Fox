@@ -2335,6 +2335,21 @@ ContentChild::RecvFileSystemUpdate(const nsString& aFsName,
 }
 
 bool
+ContentChild::RecvVolumeRemoved(const nsString& aFsName)
+{
+#ifdef MOZ_WIDGET_GONK
+    nsRefPtr<nsVolumeService> vs = nsVolumeService::GetSingleton();
+    if (vs) {
+        vs->RemoveVolumeByName(aFsName);
+    }
+#else
+    // Remove warnings about unused arguments
+    unused << aFsName;
+#endif
+    return true;
+}
+
+bool
 ContentChild::RecvNotifyProcessPriorityChanged(
     const hal::ProcessPriority& aPriority)
 {

@@ -641,6 +641,7 @@ static const char* sObserverTopics[] = {
     "file-watcher-update",
 #ifdef MOZ_WIDGET_GONK
     NS_VOLUME_STATE_CHANGED,
+    NS_VOLUME_REMOVED,
     "phone-state-changed",
 #endif
 #ifdef ACCESSIBILITY
@@ -3102,6 +3103,15 @@ ContentParent::Observe(nsISupports* aSubject,
         nsString state(aData);
         unused << SendNotifyPhoneStateChange(state);
     }
+    else if(!strcmp(aTopic, NS_VOLUME_REMOVED)) {
+#ifdef MOZ_NUWA_PROCESS
+        if (!(IsNuwaReady() && IsNuwaProcess()))
+#endif
+        {
+            nsString volName(aData);
+            unused << SendVolumeRemoved(volName);
+        }
+    }
 #endif
 #ifdef ACCESSIBILITY
     // Make sure accessibility is running in content process when accessibility
@@ -4408,6 +4418,22 @@ ContentParent::RecvSetFakeVolumeState(const nsString& fsName, const int32_t& fsS
     return true;
 #else
     NS_WARNING("ContentParent::RecvSetFakeVolumeState shouldn't be called when MOZ_WIDGET_GONK is not defined");
+    return false;
+#endif
+}
+
+bool
+ContentParent::RecvRemoveFakeVolume(const nsString& fsName)
+{
+#ifdef MOZ_WIDGET_GONK
+    nsresult rv;
+    nsCOMPtr<nsIVolumeService> vs = do_GetService(NS_VOLUMESERVICE_CONTRACTID, &rv);
+    if (vs) {
+        vs->RemoveFakeVolume(fsName);
+    }
+    return true;
+#else
+    NS_WARNING("ContentParent::RecvRemoveFakeVolume shouldn't be called when MOZ_WIDGET_GONK is not defined");
     return false;
 #endif
 }
