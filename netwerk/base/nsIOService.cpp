@@ -230,6 +230,7 @@ nsIOService::Init()
     gIOService = this;
 
     InitializeNetworkLinkService();
+    SetOffline(false);
 
     return NS_OK;
 }
