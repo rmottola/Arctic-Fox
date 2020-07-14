@@ -197,6 +197,8 @@ public:
 
   explicit nsDOMDeviceStorage(nsPIDOMWindow* aWindow);
 
+  static int InstanceCount() { return sInstanceCount; }
+
   nsresult Init(nsPIDOMWindow* aWindow, const nsAString& aType,
                 const nsAString& aVolName);
 
@@ -320,6 +322,8 @@ private:
   EnumerateInternal(const nsAString& aName,
                     const EnumerationParameters& aOptions, bool aEditable,
                     ErrorResult& aRv);
+
+  static int sInstanceCount;
 
   nsString mStorageType;
   nsCOMPtr<nsIFile> mRootDirectory;
