@@ -542,7 +542,8 @@ private:
                                                bool* aIsLangRTL,
                                                InfallibleTArray<nsString>* dictionaries,
                                                ClipboardCapabilities* clipboardCaps,
-                                               DomainPolicyClone* domainPolicy) override;
+                                               DomainPolicyClone* domainPolicy,
+                                               OwningSerializedStructuredCloneBuffer* initialData) override;
 
     virtual bool DeallocPJavaScriptParent(mozilla::jsipc::PJavaScriptParent*) override;
 
