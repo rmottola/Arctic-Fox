@@ -1924,7 +1924,7 @@ nsIFileToJsval(nsPIDOMWindow* aWindow, DeviceStorageFile* aFile)
   MOZ_ASSERT(aFile->mLastModifiedDate != UINT64_MAX);
 
   nsCOMPtr<nsIDOMBlob> blob = Blob::Create(aWindow,
-    new FileImplFile(fullPath, aFile->mMimeType,
+    new BlobImplFile(fullPath, aFile->mMimeType,
                      aFile->mLength, aFile->mFile,
                      aFile->mLastModifiedDate));
   return InterfaceToJsval(aWindow, blob, &NS_GET_IID(nsIDOMBlob));
@@ -2609,7 +2609,7 @@ private:
 class WriteFileEvent : public nsRunnable
 {
 public:
-  WriteFileEvent(FileImpl* aBlobImpl,
+  WriteFileEvent(BlobImpl* aBlobImpl,
                  DeviceStorageFile *aFile,
                  already_AddRefed<DOMRequest> aRequest,
                  int32_t aRequestType)
@@ -2675,7 +2675,7 @@ public:
   }
 
 private:
-  nsRefPtr<FileImpl> mBlobImpl;
+  nsRefPtr<BlobImpl> mBlobImpl;
   nsRefPtr<DeviceStorageFile> mFile;
   nsRefPtr<DOMRequest> mRequest;
   int32_t mRequestType;
