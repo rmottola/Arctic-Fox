@@ -952,15 +952,16 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
   ScreenOrientation orientation = config.orientation();
   LayoutDeviceIntPoint chromeOffset = -GetChildProcessOffset();
 
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  nsIntRect contentRect = rect;
+  if (widget) {
+    contentRect.x += widget->GetClientOffset().x;
+    contentRect.y += widget->GetClientOffset().y;
+  }
+
   if (!mUpdatedDimensions || mOrientation != orientation ||
-      mDimensions != size || !mRect.IsEqualEdges(rect) ||
+      mDimensions != size || !mRect.IsEqualEdges(contentRect) ||
       chromeOffset != mChromeOffset) {
-    nsCOMPtr<nsIWidget> widget = GetWidget();
-    nsIntRect contentRect = rect;
-    if (widget) {
-      contentRect.x += widget->GetClientOffset().x;
-      contentRect.y += widget->GetClientOffset().y;
-    }
 
     mUpdatedDimensions = true;
     mRect = contentRect;
