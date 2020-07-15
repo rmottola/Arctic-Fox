@@ -71,6 +71,7 @@
 #include "MultipartFileImpl.h"
 #include "nsAlgorithm.h"
 #include "nsContentUtils.h"
+#include "nsCycleCollector.h"
 #include "nsError.h"
 #include "nsDOMJSUtils.h"
 #include "nsFormData.h"
