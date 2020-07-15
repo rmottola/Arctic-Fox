@@ -3054,7 +3054,7 @@ TabChild::DoSendBlockingMessage(JSContext* aCx,
                                 const StructuredCloneData& aData,
                                 JS::Handle<JSObject *> aCpows,
                                 nsIPrincipal* aPrincipal,
-                                InfallibleTArray<nsString>* aJSONRetVal,
+                                nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal,
                                 bool aIsSync)
 {
   ClonedMessageData data;
@@ -3067,11 +3067,11 @@ TabChild::DoSendBlockingMessage(JSContext* aCx,
   }
   if (aIsSync) {
     return SendSyncMessage(PromiseFlatString(aMessage), data, cpows,
-                           Principal(aPrincipal), aJSONRetVal);
+                           Principal(aPrincipal), aRetVal);
   }
 
   return SendRpcMessage(PromiseFlatString(aMessage), data, cpows,
-                        Principal(aPrincipal), aJSONRetVal);
+                        Principal(aPrincipal), aRetVal);
 }
 
 bool

@@ -187,7 +187,7 @@ nsIContentParent::RecvSyncMessage(const nsString& aMsg,
                                   const ClonedMessageData& aData,
                                   InfallibleTArray<CpowEntry>&& aCpows,
                                   const IPC::Principal& aPrincipal,
-                                  InfallibleTArray<nsString>* aRetvals)
+                                  nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals)
 {
   // FIXME Permission check in Content process
   nsIPrincipal* principal = aPrincipal;
@@ -214,7 +214,7 @@ nsIContentParent::RecvRpcMessage(const nsString& aMsg,
                                  const ClonedMessageData& aData,
                                  InfallibleTArray<CpowEntry>&& aCpows,
                                  const IPC::Principal& aPrincipal,
-                                 InfallibleTArray<nsString>* aRetvals)
+                                 nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals)
 {
   // FIXME Permission check in Content process
   nsIPrincipal* principal = aPrincipal;
