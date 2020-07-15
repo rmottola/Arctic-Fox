@@ -119,14 +119,11 @@
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
-- Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
-- Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 - Bug 1094888 - part 1 and 2
 
 - Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
 - Bug 1097987
-- Bug 1135731 - fix encoding inconsistency in NS_NewXBLProtoImpl; r=mrbkap
 -  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
@@ -140,18 +137,11 @@ Bug 1114935 - Part 3 to 35!
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
-- Bug 1085607 - libvpx doesn't build on OS X with Apple clang from OS X
 
 More session store stuff to check:
 
-- Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-
-- Build stuff
-- Bug 1151005 - Show notifications when the 'install' and 'package' mac
-- Bug 1151005 - Refactor terminal notification stuff from 'mach build'
-
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
@@ -168,9 +158,6 @@ Check with Roy Tam:
 
 
 What with LightweightThemeConsumer.jsm 
-
--> check that 1085607 did not break Apple build!
-
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
@@ -213,14 +200,9 @@ Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
-- Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
 
 - Bug 1172609 - 8 part ICU update
 
-
-
-For Windows:
-Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
 
 
 ### Further Further ToDo:
