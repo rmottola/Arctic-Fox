@@ -817,7 +817,7 @@ class Package(MachCommandBase):
         return self._run_make(directory=".", target='package', ensure_exit_code=False)
 		
 @CommandProvider
-class Installer(MachCommandBase):
+class Install(MachCommandBase):
     """Create the windows installer for the built product."""
 
     @Command('installer', category='post-build',
