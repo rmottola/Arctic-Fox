@@ -1887,7 +1887,7 @@ let SessionStoreInternal = {
     return JSON.stringify(tabState);
   },
 
-  setTabState: function ssi_setTabState(aTab, aState, aOptions) {
+  setTabState(aTab, aState) {
     // Remove the tab state from the cache.
     // Note that we cannot simply replace the contents of the cache
     // as |aState| can be an incomplete state that will be completed
@@ -1912,7 +1912,7 @@ let SessionStoreInternal = {
       this._resetTabRestoringState(aTab);
     }
 
-    this.restoreTab(aTab, tabState, aOptions);
+    this.restoreTab(aTab, tabState);
   },
 
   duplicateTab: function ssi_duplicateTab(aWindow, aTab, aDelta) {
@@ -2161,6 +2161,26 @@ let SessionStoreInternal = {
   persistTabAttribute: function ssi_persistTabAttribute(aName) {
     if (TabAttributes.persist(aName)) {
       this.saveStateDelayed();
+    }
+  },
+
+  updateTabLabelAndIcon(tab, tabData) {
+    let activePageData = tabData.entries[tabData.index - 1] || null;
+
+    // If the page has a title, set it.
+    if (activePageData) {
+      if (activePageData.title) {
+        tab.label = activePageData.title;
+        tab.crop = "end";
+      } else if (activePageData.url != "about:blank") {
+        tab.label = activePageData.url;
+        tab.crop = "center";
+      }
+    }
+
+    // Restore the tab icon.
+    if ("image" in tabData) {
+      tab.ownerDocument.defaultView.gBrowser.setIcon(tab, tabData.image);
     }
   },
 
@@ -2935,9 +2955,17 @@ let SessionStoreInternal = {
       this._windows[aWindow.__SSi].selected = aSelectTab;
     }
 
-    // Restore all tabs
+    // If we restore the selected tab, make sure it goes first.
+    let selectedIndex = aTabs.indexOf(tabbrowser.selectedTab);
+    if (selectedIndex > -1) {
+      this.restoreTab(tabbrowser.selectedTab, aTabData[selectedIndex]);
+    }
+
+    // Restore all tabs.
     for (let t = 0; t < aTabs.length; t++) {
-      this.restoreTab(aTabs[t], aTabData[t]);
+      if (t != selectedIndex) {
+        this.restoreTab(aTabs[t], aTabData[t]);
+      }
     }
   },
 
@@ -3048,6 +3076,10 @@ let SessionStoreInternal = {
 
     browser.messageManager.sendAsyncMessage("SessionStore:restoreHistory",
                                             {tabData: tabData, epoch: epoch, loadArguments});
+
+    // Update tab label and icon to show something
+    // while we wait for the messages to be processed.
+    this.updateTabLabelAndIcon(tab, tabData);
 
     // Restore tab attributes.
     if ("attributes" in tabData) {
