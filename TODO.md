@@ -142,6 +142,10 @@ More session store stuff to check:
 
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
+- Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
+- Bug 1174666 - Remove unneeded SessionSaver.clearLastSaveTime() r=Yoric
+
+
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
