@@ -81,6 +81,30 @@ namespace {
   bool sInShutdown = false;
   static const char kHfpCrlf[] = "\xd\xa";
 
+  // UUID of Handsfree Audio Gateway
+  static const BluetoothUuid kHandsfreeAG = {
+    {
+      0x00, 0x00, 0x11, 0x1F, 0x00, 0x00, 0x10, 0x00,
+      0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB
+    }
+  };
+
+  // UUID of Headset Audio Gateway
+  static const BluetoothUuid kHeadsetAG = {
+    {
+      0x00, 0x00, 0x11, 0x12, 0x00, 0x00, 0x10, 0x00,
+      0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB
+    }
+  };
+
+  // Unknown service UUID (for SCO socket)
+  static const BluetoothUuid kUnknownService = {
+    {
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+      0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB
+    }
+  };
+
 #ifdef MOZ_B2G_RIL
   // Sending ringtone related
   static bool sStopSendingRingFlag = true;
@@ -1177,6 +1201,8 @@ BluetoothHfpManager::Listen()
       new BluetoothSocket(this, BluetoothSocketType::RFCOMM, true, true);
 
     if (!mHandsfreeSocket->Listen(
+          NS_LITERAL_STRING("Handsfree Audio Gateway"),
+          kHandsfreeAG,
           BluetoothReservedChannels::CHANNEL_HANDSFREE_AG)) {
       BT_WARNING("[HFP] Can't listen on RFCOMM socket!");
       mHandsfreeSocket = nullptr;
@@ -1189,6 +1215,8 @@ BluetoothHfpManager::Listen()
       new BluetoothSocket(this, BluetoothSocketType::RFCOMM, true, true);
 
     if (!mHeadsetSocket->Listen(
+          NS_LITERAL_STRING("Headset Audio Gateway"),
+          kHeadsetAG,
           BluetoothReservedChannels::CHANNEL_HEADSET_AG)) {
       BT_WARNING("[HSP] Can't listen on RFCOMM socket!");
       mHandsfreeSocket->Disconnect();
@@ -1897,7 +1925,9 @@ BluetoothHfpManager::OnGetServiceChannel(const nsAString& aDeviceAddress,
 
   MOZ_ASSERT(mSocket);
 
-  if (!mSocket->Connect(NS_ConvertUTF16toUTF8(aDeviceAddress), aChannel)) {
+  if (!mSocket->Connect(aDeviceAddress,
+                        mIsHsp? kHeadsetAG : kHandsfreeAG,
+                        aChannel)) {
     OnConnect(NS_LITERAL_STRING(ERR_CONNECTION_FAILED));
   }
 }
@@ -1993,7 +2023,7 @@ BluetoothHfpManager::ConnectSco(BluetoothReplyRunnable* aRunnable)
   // Stop listening
   mScoSocket->Disconnect();
 
-  mScoSocket->Connect(NS_ConvertUTF16toUTF8(mDeviceAddress), -1);
+  mScoSocket->Connect(mDeviceAddress, kUnknownService, -1);
   mScoSocketStatus = mScoSocket->GetConnectionStatus();
 
   mScoRunnable = aRunnable;
@@ -2030,7 +2060,8 @@ BluetoothHfpManager::ListenSco()
 
   mScoSocket->Disconnect();
 
-  if (!mScoSocket->Listen(-1)) {
+  if (!mScoSocket->Listen(NS_LITERAL_STRING("Handsfree Audio Gateway SCO"),
+                          kUnknownService, -1)) {
     BT_WARNING("Can't listen on SCO socket!");
     return false;
   }
