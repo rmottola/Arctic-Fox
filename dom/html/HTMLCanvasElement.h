@@ -234,7 +234,7 @@ protected:
                          nsAString& aDataURL);
   nsresult MozGetAsBlobImpl(const nsAString& aName,
                             const nsAString& aType,
-                            nsIDOMFile** aResult);
+                            nsISupports** aResult);
   void CallPrintCallback();
 
   CanvasContextType mCurrentContextType;
