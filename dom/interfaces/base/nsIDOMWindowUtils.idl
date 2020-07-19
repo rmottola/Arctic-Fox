@@ -51,7 +51,7 @@ interface nsIJSRAIIHelper;
 interface nsIContentPermissionRequest;
 interface nsIObserver;
 
-[scriptable, uuid(7f2f44ab-2857-4cc2-8c9d-3d9816f5a4d6)]
+[scriptable, uuid(7ecfd6e7-120a-4567-85f7-14277f4c6d9f)]
 interface nsIDOMWindowUtils : nsISupports {
 
   /**
