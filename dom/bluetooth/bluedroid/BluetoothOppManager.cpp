@@ -744,7 +744,7 @@ BluetoothOppManager::RetrieveSentFileName()
 {
   mFileName.Truncate();
 
-  nsCOMPtr<nsIDOMFile> file = do_QueryInterface(mBlob);
+  nsRefPtr<File> file = static_cast<Blob*>(mBlob.get()).ToFile();
   if (file) {
     file->GetName(mFileName);
   }

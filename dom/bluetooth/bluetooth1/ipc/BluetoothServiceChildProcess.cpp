@@ -268,7 +268,7 @@ BluetoothServiceChildProcess::SendFile(
 void
 BluetoothServiceChildProcess::SendFile(
   const nsAString& aDeviceAddress,
-  nsIDOMBlob* aBlobChild,
+  Blob* aBlobChild,
   BluetoothReplyRunnable* aRunnable)
 {
   // Parent-process-only method
