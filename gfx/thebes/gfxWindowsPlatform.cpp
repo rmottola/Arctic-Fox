@@ -527,7 +527,7 @@ gfxWindowsPlatform::UpdateRenderMode()
     }
 
     ID3D11Device *device = GetD3D11Device();
-    if (isVistaOrHigher && !InSafeMode && tryD2D &&
+    if (isVistaOrHigher && !InSafeMode() && tryD2D &&
 	device &&
         device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_10_0 &&
         DoesD3D11TextureSharingWork(device)) {
