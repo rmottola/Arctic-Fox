@@ -1846,11 +1846,16 @@ MediaManager::GetUserMedia(
                                 "media.getusermedia.browser.enabled" :
                                 "media.getusermedia.screensharing.enabled"),
                                 false) ||
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
           (
             !Preferences::GetBool("media.getusermedia.screensharing.allow_on_old_platforms",
                                   false) &&
+#if defined(XP_MACOSX)
             !nsCocoaFeatures::OnLionOrLater()
+#endif
+#if defined (XP_WIN)
+              !IsVistaOrLater()
+#endif
             ) ||
 #endif
           (!privileged && !HostHasPermission(*docURI))) {
