@@ -912,8 +912,6 @@ var gBrowserInit = {
       Cc["@mozilla.org/eventlistenerservice;1"]
         .getService(Ci.nsIEventListenerService)
         .addSystemEventListener(gBrowser, "click", contentAreaClick, true);
-    } else {
-      gBrowser.updateBrowserRemoteness(gBrowser.selectedBrowser, true);
     }
 
     // hook up UI through progress listener
@@ -3942,6 +3940,13 @@ var XULBrowserWindow = {
 
   setJSStatus: function () {
     // unsupported
+  },
+
+  forceInitialBrowserRemote: function() {
+    let initBrowser =
+      document.getAnonymousElementByAttribute(gBrowser, "anonid", "initialBrowser");
+    gBrowser.updateBrowserRemoteness(initBrowser, true);
+    return initBrowser.frameLoader.tabParent;
   },
 
   setDefaultStatus: function (status) {
