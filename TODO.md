@@ -65,6 +65,7 @@
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
+- Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 947854 - 2015-05-05 parto 0 to 4
@@ -143,7 +144,6 @@ More session store stuff to check:
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
-- Bug 1174666 - Remove unneeded SessionSaver.clearLastSaveTime() r=Yoric
 
 
 
