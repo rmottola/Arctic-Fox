@@ -1775,8 +1775,7 @@ nsMessageManagerScriptExecutor::TryCacheLoadAndCompileScript(
       }
     } else {
       // We're going to run these against some non-global scope.
-      options.setCompileAndGo(false)
-             .setHasPollutedScope(true);
+      options.setHasPollutedScope(true);
       if (!JS::Compile(cx, options, srcBuf, &script)) {
         return;
       }
