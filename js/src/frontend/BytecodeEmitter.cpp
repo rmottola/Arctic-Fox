@@ -1683,7 +1683,7 @@ BytecodeEmitter::bindNameToSlotHelper(ParseNode* pn)
 
     if (dn->pn_cookie.isFree()) {
         if (evalCaller) {
-            MOZ_ASSERT(script->compileAndGo());
+            MOZ_ASSERT(script->treatAsRunOnce() || sc->isFunctionBox());
 
             /*
              * Don't generate upvars on the left side of a for loop. See
@@ -2076,10 +2076,16 @@ BytecodeEmitter::isInLoop()
 bool
 BytecodeEmitter::checkSingletonContext()
 {
-    if (!script->compileAndGo() || sc->isFunctionBox() || isInLoop())
+    if (!script->treatAsRunOnce() || sc->isFunctionBox() || isInLoop())
         return false;
     hasSingletons = true;
     return true;
+}
+
+bool
+BytecodeEmitter::checkRunOnceContext()
+{
+    return checkSingletonContext() || (!isInLoop() && isRunOnceLambda());
 }
 
 bool
@@ -5169,10 +5175,7 @@ BytecodeEmitter::emitFunction(ParseNode *pn, bool needsProto)
      * make a deep clone of its contents.
      */
     if (fun->isInterpreted()) {
-        bool singleton =
-            script->compileAndGo() &&
-            fun->isInterpreted() &&
-            (checkSingletonContext() || (!isInLoop() && isRunOnceLambda()));
+        bool singleton = checkRunOnceContext();
         if (!JSFunction::setTypeForScriptedFunction(cx, fun, singleton))
             return false;
 
@@ -6063,7 +6066,7 @@ BytecodeEmitter::emitCallOrNew(ParseNode *pn)
          * will just cause the inner scripts to be repeatedly cloned.
          */
         MOZ_ASSERT(!emittingRunOnceLambda);
-        if (checkSingletonContext() || (!isInLoop() && isRunOnceLambda())) {
+        if (checkRunOnceContext()) {
             emittingRunOnceLambda = true;
             if (!emitTree(pn2))
                 return false;
