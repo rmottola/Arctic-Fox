@@ -3269,7 +3269,7 @@ IsFunctionCloneable(HandleFunction fun, HandleObject dynamicScope)
         return false;
     }
 
-    return !fun->nonLazyScript()->compileAndGo() || dynamicScope->is<GlobalObject>();
+    return true;
 }
 
 static JSObject*
