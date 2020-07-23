@@ -6379,7 +6379,8 @@ CheckConditional(FunctionCompiler& f, ParseNode* ternary, MDefinition** def, Typ
     if (!condType.isInt())
         return f.failf(cond, "%s is not a subtype of int", condType.toChars());
 
-    MBasicBlock* thenBlock = nullptr, *elseBlock = nullptr;
+    MBasicBlock* thenBlock = nullptr;
+    MBasicBlock* elseBlock = nullptr;
     if (!f.branchAndStartThen(condDef, &thenBlock, &elseBlock, thenExpr, elseExpr))
         return false;
 
@@ -6498,7 +6499,8 @@ CheckAddOrSub(FunctionCompiler& f, ParseNode* expr, MDefinition** def, Type* typ
     ParseNode* lhs = AddSubLeft(expr);
     ParseNode* rhs = AddSubRight(expr);
 
-    MDefinition* lhsDef, *rhsDef;
+    MDefinition* lhsDef;
+    MDefinition* rhsDef;
     Type lhsType, rhsType;
     unsigned lhsNumAddOrSub, rhsNumAddOrSub;
 
@@ -6561,7 +6563,8 @@ CheckDivOrMod(FunctionCompiler& f, ParseNode* expr, MDefinition** def, Type* typ
     ParseNode* lhs = DivOrModLeft(expr);
     ParseNode* rhs = DivOrModRight(expr);
 
-    MDefinition* lhsDef, *rhsDef;
+    MDefinition* lhsDef;
+    MDefinition* rhsDef;
     Type lhsType, rhsType;
     if (!CheckExpr(f, lhs, &lhsDef, &lhsType))
         return false;
@@ -6616,7 +6619,8 @@ CheckComparison(FunctionCompiler& f, ParseNode* comp, MDefinition** def, Type* t
     ParseNode* lhs = ComparisonLeft(comp);
     ParseNode* rhs = ComparisonRight(comp);
 
-    MDefinition* lhsDef, *rhsDef;
+    MDefinition* lhsDef;
+    MDefinition* rhsDef;
     Type lhsType, rhsType;
     if (!CheckExpr(f, lhs, &lhsDef, &lhsType))
         return false;
@@ -6963,9 +6967,12 @@ CheckIfConditional(FunctionCompiler& f, ParseNode* conditional, ParseNode* thenS
     ParseNode* lhs = TernaryKid2(conditional);
     ParseNode* rhs = TernaryKid3(conditional);
 
-    MBasicBlock* maybeAndTest = nullptr, *maybeOrTest = nullptr;
-    MBasicBlock** ifTrueBlock = &maybeAndTest, **ifFalseBlock = &maybeOrTest;
-    ParseNode* ifTrueBlockNode = lhs, *ifFalseBlockNode = rhs;
+    MBasicBlock* maybeAndTest = nullptr;
+    MBasicBlock* maybeOrTest = nullptr;
+    MBasicBlock** ifTrueBlock = &maybeAndTest;
+    MBasicBlock** ifFalseBlock = &maybeOrTest;
+    ParseNode* ifTrueBlockNode = lhs;
+    ParseNode* ifFalseBlockNode = rhs;
 
     // Try to spot opportunities for short-circuiting in the AND subpart
     uint32_t andTestLiteral = 0;
@@ -7087,7 +7094,8 @@ CheckIf(FunctionCompiler& f, ParseNode* ifStmt)
     ParseNode* thenStmt = TernaryKid2(ifStmt);
     ParseNode* elseStmt = TernaryKid3(ifStmt);
 
-    MBasicBlock* thenBlock = nullptr, *elseBlock = nullptr;
+    MBasicBlock* thenBlock = nullptr;
+    MBasicBlock* elseBlock = nullptr;
     ParseNode* elseOrJoinStmt = elseStmt ? elseStmt : nextStmt;
 
     if (!CheckIfCondition(f, cond, thenStmt, elseOrJoinStmt, &thenBlock, &elseBlock))

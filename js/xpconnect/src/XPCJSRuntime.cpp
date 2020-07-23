@@ -3217,7 +3217,8 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
     if (!buf)
         return NS_ERROR_OUT_OF_MEMORY;
 
-    unsigned char* ptr = buf, *end = ptr + rawLen;
+    unsigned char* ptr = buf;
+    unsigned char* end = ptr + rawLen;
     while (ptr < end) {
         uint32_t bytesRead;
         rv = scriptStream->Read(reinterpret_cast<char*>(ptr), end - ptr, &bytesRead);

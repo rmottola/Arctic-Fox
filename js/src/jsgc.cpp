@@ -2598,8 +2598,8 @@ GCRuntime::updatePointersToRelocatedCells(Zone *zone)
 void
 GCRuntime::protectRelocatedArenas()
 {
-    for (ArenaHeader* arena = relocatedArenasToRelease, *next; arena; arena = next) {
-        next = arena->next;
+    for (ArenaHeader* arena = relocatedArenasToRelease; arena; ) {
+        ArenaHeader* next = arena->next;
 #if defined(XP_WIN)
         DWORD oldProtect;
         if (!VirtualProtect(arena, ArenaSize, PAGE_NOACCESS, &oldProtect))
@@ -2608,6 +2608,7 @@ GCRuntime::protectRelocatedArenas()
         if (mprotect(arena, ArenaSize, PROT_NONE))
             MOZ_CRASH();
 #endif
+        arena = next;
     }
 }
 
