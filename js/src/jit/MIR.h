@@ -9543,6 +9543,8 @@ class InlinePropertyTable : public TempObject
     }
 
     bool hasFunction(JSFunction* func) const;
+    bool hasObjectGroup(ObjectGroup* group) const;
+
     TemporaryTypeSet* buildTypeSetForFunction(JSFunction* func) const;
 
     // Remove targets that vetoed inlining from the InlinePropertyTable.
