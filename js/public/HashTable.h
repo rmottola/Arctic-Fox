@@ -1358,7 +1358,8 @@ class HashTable : private AllocPolicy
         for (Entry* src = oldTable, *end = src + oldCap; src < end; ++src) {
             if (src->isLive()) {
                 HashNumber hn = src->getKeyHash();
-                findFreeEntry(hn).setLive(hn, mozilla::Move(src->get()));
+                findFreeEntry(hn).setLive(
+                    hn, mozilla::Move(const_cast<typename Entry::NonConstT&>(src->get())));
                 src->destroy();
             }
         }
