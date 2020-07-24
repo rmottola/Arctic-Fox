@@ -6939,7 +6939,8 @@ class MAsmJSInterruptCheck
     }
 };
 
-// Checks if a value is JS_UNINITIALIZED_LEXICAL, throwing if so.
+// Checks if a value is JS_UNINITIALIZED_LEXICAL, bailout out if so, leaving
+// it to baseline to throw at the correct pc.
 class MLexicalCheck
   : public MUnaryInstruction,
     public BoxPolicy<0>::Data
@@ -6947,9 +6948,9 @@ class MLexicalCheck
     explicit MLexicalCheck(MDefinition* input)
       : MUnaryInstruction(input)
     {
-        setGuard();
         setResultType(MIRType_Value);
         setResultTypeSet(input->resultTypeSet());
+        setMovable();
     }
 
   public:
@@ -6965,6 +6966,10 @@ class MLexicalCheck
 
     MDefinition* input() const {
         return getOperand(0);
+    }
+
+    bool congruentTo(const MDefinition* ins) const override {
+        return congruentIfOperandsEqual(ins);
     }
 };
 
