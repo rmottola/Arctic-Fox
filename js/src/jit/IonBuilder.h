@@ -1117,6 +1117,10 @@ class IonBuilder
     // an outer script.
     bool failedShapeGuard_;
 
+    // True if script->failedLexicalCheck_ is set for the current script or
+    // an outer script.
+    bool failedLexicalCheck_;
+
     // Has an iterator other than 'for in'.
     bool nonStringIteration_;
 
