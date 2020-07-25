@@ -2162,9 +2162,9 @@ GCRuntime::relocateArenas(Zone *zone, JS::gcreason::Reason reason, SliceBudget &
 
 
 void
-MovingTracer::Visit(JSTracer *jstrc, void **thingp, JSGCTraceKind kind)
+MovingTracer::Visit(JSTracer* jstrc, void** thingp, JSGCTraceKind kind)
 {
-    TenuredCell *thing = TenuredCell::fromPointer(*thingp);
+    TenuredCell* thing = TenuredCell::fromPointer(*thingp);
 
     // Currently we only relocate objects.
     if (kind != JSTRACE_OBJECT) {
@@ -2172,7 +2172,7 @@ MovingTracer::Visit(JSTracer *jstrc, void **thingp, JSGCTraceKind kind)
         return;
     }
 
-    JSObject *obj = reinterpret_cast<JSObject*>(thing);
+    JSObject* obj = reinterpret_cast<JSObject*>(thing);
     if (IsForwarded(obj))
         *thingp = Forwarded(obj);
 }

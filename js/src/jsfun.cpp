@@ -822,7 +822,7 @@ JSFunction::trace(JSTracer* trc)
             // This information can either be a LazyScript, or the name of a
             // self-hosted function which can be cloned over again. The latter
             // is stored in the first extended slot.
-            JSRuntime *rt = trc->runtime();
+            JSRuntime* rt = trc->runtime();
             if (IsMarkingTracer(trc) &&
                 (rt->allowRelazificationForTesting || !compartment()->hasBeenEntered()) &&
                 !compartment()->isDebuggee() && !compartment()->isSelfHosting &&

@@ -335,31 +335,31 @@ class BufferGrayRootsTracer : public JSTracer
     void appendGrayRoot(void *thing, JSGCTraceKind kind);
 
   public:
-    explicit BufferGrayRootsTracer(JSRuntime *rt)
+    explicit BufferGrayRootsTracer(JSRuntime* rt)
       : JSTracer(rt, grayTraceCallback), bufferingGrayRootsFailed(false)
     {}
 
-    static void grayTraceCallback(JSTracer *trc, void **thingp, JSGCTraceKind kind) {
-        static_cast<BufferGrayRootsTracer *>(trc)->appendGrayRoot(*thingp, kind);
+    static void grayTraceCallback(JSTracer* trc, void** thingp, JSGCTraceKind kind) {
+        static_cast<BufferGrayRootsTracer*>(trc)->appendGrayRoot(*thingp, kind);
     }
 
     bool failed() const { return bufferingGrayRootsFailed; }
 };
 
 void
-SetMarkStackLimit(JSRuntime *rt, size_t limit);
+SetMarkStackLimit(JSRuntime* rt, size_t limit);
 
 // Return true if this trace is happening on behalf of gray buffering during
 // the marking phase of incremental GC.
 inline bool
-IsBufferingGrayRoots(JSTracer *trc)
+IsBufferingGrayRoots(JSTracer* trc)
 {
     return trc->callback == BufferGrayRootsTracer::grayTraceCallback;
 }
 
 // Return true if this trace is happening on behalf of the marking phase of GC.
 inline bool
-IsMarkingTracer(JSTracer *trc)
+IsMarkingTracer(JSTracer* trc)
 {
     // If we call this on the gray-buffering tracer, then we have encountered a
     // marking path that will be wrong when tracing with a callback marker to

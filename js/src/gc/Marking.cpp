@@ -141,11 +141,11 @@ IsThingPoisoned(T* thing)
 }
 #endif
 
-static GCMarker *
-AsGCMarker(JSTracer *trc)
+static GCMarker*
+AsGCMarker(JSTracer* trc)
 {
     MOZ_ASSERT(IsMarkingTracer(trc));
-    return static_cast<GCMarker *>(trc);
+    return static_cast<GCMarker*>(trc);
 }
 
 template <typename T> bool ThingIsPermanentAtom(T* thing) { return false; }
@@ -1825,9 +1825,9 @@ js::TraceChildren(JSTracer* trc, void* thing, JSGCTraceKind kind)
 
 #ifdef DEBUG
 static void
-AssertNonGrayGCThing(JSTracer *trc, void **thingp, JSGCTraceKind kind)
+AssertNonGrayGCThing(JSTracer* trc, void** thingp, JSGCTraceKind kind)
 {
-    DebugOnly<Cell *> thing(static_cast<Cell *>(*thingp));
+    DebugOnly<Cell*> thing(static_cast<Cell*>(*thingp));
     MOZ_ASSERT_IF(thing->isTenured(), !thing->asTenured().isMarked(js::gc::GRAY));
 }
 
