@@ -1879,7 +1879,7 @@ public:
     }
 
     void TraceInside(JSTracer* trc) {
-        if (JS_IsGCMarkingTracer(trc)) {
+        if (trc->isMarkingTracer()) {
             mSet->Mark();
             if (mScriptableInfo)
                 mScriptableInfo->Mark();
@@ -2184,7 +2184,7 @@ public:
 
     // Yes, we *do* need to mark the mScriptableInfo in both cases.
     inline void TraceInside(JSTracer* trc) {
-        if (JS_IsGCMarkingTracer(trc)) {
+        if (trc->isMarkingTracer()) {
             mSet->Mark();
             if (mScriptableInfo)
                 mScriptableInfo->Mark();

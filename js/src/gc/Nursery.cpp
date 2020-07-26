@@ -329,7 +329,7 @@ js::Nursery::allocateHugeSlots(JS::Zone* zone, size_t nslots)
 namespace js {
 namespace gc {
 
-class MinorCollectionTracer : public JSTracer
+class MinorCollectionTracer : public JS::CallbackTracer
 {
   public:
     Nursery* nursery;
@@ -359,7 +359,7 @@ class MinorCollectionTracer : public JSTracer
     }
 
     MinorCollectionTracer(JSRuntime* rt, Nursery* nursery)
-      : JSTracer(rt, Nursery::MinorGCCallback, TraceWeakMapKeysValues),
+      : JS::CallbackTracer(rt, Nursery::MinorGCCallback, TraceWeakMapKeysValues),
         nursery(nursery),
         session(rt, MinorCollecting),
         tenuredSize(0),
@@ -759,7 +759,7 @@ ShouldMoveToTenured(MinorCollectionTracer* trc, void** thingp)
 }
 
 /* static */ void
-js::Nursery::MinorGCCallback(JSTracer* jstrc, void** thingp, JSGCTraceKind kind)
+js::Nursery::MinorGCCallback(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
 {
     MinorCollectionTracer* trc = static_cast<MinorCollectionTracer*>(jstrc);
     if (ShouldMoveToTenured(trc, thingp))

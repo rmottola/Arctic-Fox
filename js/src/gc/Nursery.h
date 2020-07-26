@@ -162,7 +162,7 @@ class Nursery
     }
 
     static bool IsMinorCollectionTracer(JSTracer* trc) {
-        return trc->callback == MinorGCCallback;
+        return trc->isCallbackTracer() && trc->asCallbackTracer()->hasCallback(MinorGCCallback);
     }
 
 #ifdef JS_GC_ZEAL
@@ -340,7 +340,7 @@ class Nursery
     void growAllocableSpace();
     void shrinkAllocableSpace();
 
-    static void MinorGCCallback(JSTracer* trc, void** thingp, JSGCTraceKind kind);
+    static void MinorGCCallback(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind);
 
     friend class gc::MinorCollectionTracer;
     friend class jit::MacroAssembler;
