@@ -129,13 +129,7 @@
 -  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
-- Bug 1149739
 - Bug 1149352 - Part 0 to 11
-
-Sequence:
-Bug 1152171 part 2 - Rename AnimationTimeline to DocumentTimeline
-Bug 1026350 - Part 1: Inputport API implementation
-Bug 1114935 - Part 3 to 35!
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
@@ -153,7 +147,6 @@ Bug 1162569 - default engine files should be in the omni.ja file,
 
 Devtools stuff to check - files not there:
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux.
-- Bug 1150555 - about:performance should not confuse Jetpack addons. 
 
 
 Check with Roy Tam:
@@ -168,8 +161,6 @@ Parents of:
 https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
 
 To verify:
-- Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
-
 - Verify requirements of 968520
 
 Verify all here:
@@ -187,7 +178,7 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
-https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
+
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
