@@ -3,8 +3,8 @@
 #define GUAO_PREF general.useragent.override
 
 #define GRE_VERSION @MOZILLA_UAVERSION_U@
-#define GRE_VERSION_SLICE Gecko/@GRE_VERSION@
-#define GRE_DATE_SLICE Gecko/20170101
+#define GRE_VERSION_SLICE Goanna/@GRE_VERSION@
+#define GRE_DATE_SLICE Goanna/20170101
 #define PM_SLICE Arcticfox/@MOZ_APP_VERSION@
 
 #define GK_VERSION @MOZILLA_COMPATVERSION_U@
