@@ -386,10 +386,10 @@ nsGtkIMModule::OnKeyEvent(nsWindow* aCaller, GdkEventKey* aEvent,
 }
 
 void
-nsGtkIMModule::OnFocusChangeInGoanna(bool aFocus)
+nsGtkIMModule::OnFocusChangeInGecko(bool aFocus)
 {
     PR_LOG(gGtkIMLog, PR_LOG_ALWAYS,
-        ("GtkIMModule(%p): OnFocusChangeInGoanna, aFocus=%s, "
+        ("GtkIMModule(%p): OnFocusChangeInGecko, aFocus=%s, "
          "mCompositionState=%s, mIsIMFocused=%s",
          this, aFocus ? "YES" : "NO", GetCompositionStateName(),
          mIsIMFocused ? "YES" : "NO"));

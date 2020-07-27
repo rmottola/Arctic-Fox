@@ -14538,7 +14538,7 @@ var FontLoader = {
       // following code is a dirty hack to 'guess' when a font is
       // ready.  This code will be obsoleted by Mozilla bug 471915.
       //
-      // The only reliable way to know if a font is loaded in Goanna
+      // The only reliable way to know if a font is loaded in Gecko
       // (at the moment) is document.onload in a document with
       // a @font-face rule defined in a "static" stylesheet.  We use a
       // subdocument in an <iframe>, set up properly, to know when

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -25,12 +26,12 @@ public:
 
   nsresult AppendVoidPtr(const void* aData, uint32_t aLength);
   nsresult AppendString(const nsAString& aString, bool nativeEOL, JSContext* aCx);
-  nsresult AppendBlobImpl(FileImpl* aBlobImpl);
-  nsresult AppendBlobImpls(const nsTArray<nsRefPtr<FileImpl>>& aBlobImpls);
+  nsresult AppendBlobImpl(BlobImpl* aBlobImpl);
+  nsresult AppendBlobImpls(const nsTArray<nsRefPtr<BlobImpl>>& aBlobImpls);
 
-  nsTArray<nsRefPtr<FileImpl>>& GetBlobImpls() { Flush(); return mBlobImpls; }
+  nsTArray<nsRefPtr<BlobImpl>>& GetBlobImpls() { Flush(); return mBlobImpls; }
 
-  already_AddRefed<File> GetBlobInternal(nsISupports* aParent,
+  already_AddRefed<Blob> GetBlobInternal(nsISupports* aParent,
                                          const nsACString& aContentType);
 
 protected:
@@ -67,8 +68,8 @@ protected:
       // If we have some data, create a blob for it
       // and put it on the stack
 
-      nsRefPtr<FileImpl> blobImpl =
-        new FileImplMemory(mData, mDataLen, EmptyString());
+      nsRefPtr<BlobImpl> blobImpl =
+        new BlobImplMemory(mData, mDataLen, EmptyString());
       mBlobImpls.AppendElement(blobImpl);
       mData = nullptr; // The nsDOMMemoryFile takes ownership of the buffer
       mDataLen = 0;
@@ -76,7 +77,7 @@ protected:
     }
   }
 
-  nsTArray<nsRefPtr<FileImpl>> mBlobImpls;
+  nsTArray<nsRefPtr<BlobImpl>> mBlobImpls;
   void* mData;
   uint64_t mDataLen;
   uint64_t mDataBufferLen;

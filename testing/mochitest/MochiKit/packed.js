@@ -3476,7 +3476,7 @@ return 1;
 elem=MochiKit.DOM.getElement(elem);
 var self=MochiKit.Style;
 if(o==1){
-var _3b0=/Goanna/.test(navigator.userAgent)&&!(/Konqueror|Safari|KHTML/.test(navigator.userAgent));
+var _3b0=/Gecko/.test(navigator.userAgent)&&!(/Konqueror|Safari|KHTML/.test(navigator.userAgent));
 self.setStyle(elem,{opacity:_3b0?0.999999:1});
 if(/MSIE/.test(navigator.userAgent)){
 self.setStyle(elem,{filter:self.getStyle(elem,"filter").replace(/alpha\([^\)]*\)/gi,"")});

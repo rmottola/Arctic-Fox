@@ -1194,7 +1194,7 @@ policies and contribution forms [3].
             var message = String((typeof e === "object" && e !== null) ? e.message : e);
             if (typeof e.stack != "undefined") {
                 //Try to make it more informative for some exceptions, at least
-                //in Goanna and WebKit.  This results in a stack dump instead of
+                //in Gecko and WebKit.  This results in a stack dump instead of
                 //just errors like "Cannot read property 'parentNode' of null"
                 //or "root is null".  Makes it a lot longer, of course.
                 message += "(stack: " + e.stack + ")";

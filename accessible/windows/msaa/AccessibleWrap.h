@@ -162,7 +162,7 @@ public: // construction, destruction
    * The system caret works more universally than the MSAA caret
    * For example, Window-Eyes, JAWS, ZoomText and Windows Tablet Edition use it
    * We will use an invisible system caret.
-   * Goanna is still responsible for drawing its own caret
+   * Gecko is still responsible for drawing its own caret
    */
   void UpdateSystemCaretFor(Accessible* aAccessible);
 

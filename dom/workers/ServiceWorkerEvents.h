@@ -1,4 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,9 +10,9 @@
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/ExtendableEventBinding.h"
 #include "mozilla/dom/FetchEventBinding.h"
-#include "mozilla/dom/InstallEventBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/Response.h"
+#include "mozilla/dom/workers/bindings/ServiceWorker.h"
 
 #ifndef MOZ_SIMPLEPUSH
 #include "mozilla/dom/PushEventBinding.h"
@@ -24,13 +25,14 @@ class nsIInterceptedChannel;
 
 namespace mozilla {
 namespace dom {
-  class Request;
+class Blob;
+class Request;
+class ResponseOrPromise;
 } // namespace dom
 } // namespace mozilla
 
 BEGIN_WORKERS_NAMESPACE
 
-class ServiceWorker;
 class ServiceWorkerClient;
 
 class FetchEvent final : public Event
@@ -88,10 +90,7 @@ public:
   }
 
   void
-  RespondWith(Promise& aPromise, ErrorResult& aRv);
-
-  void
-  RespondWith(Response& aResponse, ErrorResult& aRv);
+  RespondWith(const ResponseOrPromise& aArg, ErrorResult& aRv);
 
   already_AddRefed<Promise>
   ForwardTo(const nsAString& aUrl);
@@ -156,74 +155,6 @@ public:
   }
 };
 
-class InstallEvent final : public ExtendableEvent
-{
-  // FIXME(nsm): Bug 982787 will allow actually populating this.
-  nsRefPtr<ServiceWorker> mActiveWorker;
-  bool mActivateImmediately;
-
-protected:
-  explicit InstallEvent(mozilla::dom::EventTarget* aOwner);
-  ~InstallEvent() {}
-
-public:
-  NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(InstallEvent, ExtendableEvent)
-  NS_FORWARD_TO_EVENT
-
-  virtual JSObject* WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
-  {
-    return mozilla::dom::InstallEventBinding::Wrap(aCx, this, aGivenProto);
-  }
-
-  static already_AddRefed<InstallEvent>
-  Constructor(mozilla::dom::EventTarget* aOwner,
-              const nsAString& aType,
-              const InstallEventInit& aOptions)
-  {
-    nsRefPtr<InstallEvent> e = new InstallEvent(aOwner);
-    bool trusted = e->Init(aOwner);
-    e->InitEvent(aType, aOptions.mBubbles, aOptions.mCancelable);
-    e->SetTrusted(trusted);
-    e->mActiveWorker = aOptions.mActiveWorker;
-    return e.forget();
-  }
-
-  static already_AddRefed<InstallEvent>
-  Constructor(const GlobalObject& aGlobal,
-              const nsAString& aType,
-              const InstallEventInit& aOptions,
-              ErrorResult& aRv)
-  {
-    nsCOMPtr<EventTarget> owner = do_QueryInterface(aGlobal.GetAsSupports());
-    return Constructor(owner, aType, aOptions);
-  }
-
-  already_AddRefed<ServiceWorker>
-  GetActiveWorker() const
-  {
-    nsRefPtr<ServiceWorker> sw = mActiveWorker;
-    return sw.forget();
-  }
-
-  void
-  Replace()
-  {
-    mActivateImmediately = true;
-  };
-
-  bool
-  ActivateImmediately() const
-  {
-    return mActivateImmediately;
-  }
-
-  InstallEvent* AsInstallEvent() override
-  {
-    return this;
-  }
-};
-
 #ifndef MOZ_SIMPLEPUSH
 
 class PushMessageData final : public nsISupports,
@@ -246,7 +177,7 @@ public:
   void Json(JSContext* cx, JS::MutableHandle<JSObject*> aRetval);
   void Text(nsAString& aData);
   void ArrayBuffer(JSContext* cx, JS::MutableHandle<JSObject*> aRetval);
-  mozilla::dom::File* Blob();
+  mozilla::dom::Blob* Blob();
 
   explicit PushMessageData(const nsAString& aData);
 private:

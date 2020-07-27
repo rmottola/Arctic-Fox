@@ -150,6 +150,7 @@ IonBuilder::IonBuilder(JSContext* analysisContext, CompileCompartment* comp,
     numLoopRestarts_(0),
     failedBoundsCheck_(info->script()->failedBoundsCheck()),
     failedShapeGuard_(info->script()->failedShapeGuard()),
+    failedLexicalCheck_(info->script()->failedLexicalCheck()),
     nonStringIteration_(false),
     lazyArguments_(nullptr),
     inlineCallInfo_(nullptr),
@@ -596,7 +597,8 @@ IonBuilder::analyzeNewLoopTypes(MBasicBlock* entry, jsbytecode* start, jsbytecod
     if (!loopHeaders_.append(LoopHeader(start, entry)))
         return false;
 
-    jsbytecode* last = nullptr, *earlier = nullptr;
+    jsbytecode* last = nullptr;
+    jsbytecode* earlier = nullptr;
     for (jsbytecode* pc = start; pc != end; earlier = last, last = pc, pc += GetBytecodeLength(pc)) {
         uint32_t slot;
         if (*pc == JSOP_SETLOCAL)
@@ -970,6 +972,9 @@ IonBuilder::buildInline(IonBuilder* callerBuilder, MResumePoint* callerResumePoi
     if (callerBuilder->failedShapeGuard_)
         failedShapeGuard_ = true;
 
+    if (callerBuilder->failedLexicalCheck_)
+        failedLexicalCheck_ = true;
+
     // Generate single entrance block.
     if (!setCurrentAndSpecializePhis(newBlock(pc)))
         return false;
@@ -1204,8 +1209,10 @@ IonBuilder::initScopeChain(MDefinition* callee)
                 return false;
         }
     } else {
-        // For CNG global scripts, the scope chain is the global object.
-        MOZ_ASSERT(script()->compileAndGo());
+        // For global scripts without a polluted global scope, the scope chain
+        // is the global object.
+        MOZ_ASSERT(!script()->isForEval());
+        MOZ_ASSERT(!script()->hasPollutedGlobalScope());
         scope = constant(ObjectValue(script()->global()));
     }
 
@@ -2573,7 +2580,8 @@ IonBuilder::processForUpdateEnd(CFGState& state)
 IonBuilder::DeferredEdge*
 IonBuilder::filterDeadDeferredEdges(DeferredEdge* edge)
 {
-    DeferredEdge* head = edge, *prev = nullptr;
+    DeferredEdge* head = edge;
+    DeferredEdge* prev = nullptr;
 
     while (edge) {
         if (edge->block->isDead()) {
@@ -5451,12 +5459,6 @@ IonBuilder::inlineCalls(CallInfo& callInfo, const ObjectVector& targets, BoolVec
     }
     retPhi->reserveLength(count);
 
-    // During inlining the 'this' value is assigned a type set which is
-    // specialized to the groups which can generate that inlining target.
-    // After inlining the original type set is restored.
-    TemporaryTypeSet* cacheObjectTypeSet =
-        maybeCache ? maybeCache->object()->resultTypeSet() : nullptr;
-
     // Inline each of the inlineable targets.
     for (uint32_t i = 0; i < targets.length(); i++) {
         // Target must be inlineable.
@@ -5504,12 +5506,16 @@ IonBuilder::inlineCalls(CallInfo& callInfo, const ObjectVector& targets, BoolVec
         inlineInfo.setFun(funcDef);
 
         if (maybeCache) {
+            // Assign the 'this' value a TypeSet specialized to the groups that
+            // can generate this inlining target.
             MOZ_ASSERT(callInfo.thisArg() == maybeCache->object());
-            TemporaryTypeSet* targetThisTypes =
-                maybeCache->propTable()->buildTypeSetForFunction(target);
-            if (!targetThisTypes)
+            TemporaryTypeSet* thisTypes = maybeCache->propTable()->buildTypeSetForFunction(target);
+            if (!thisTypes)
                 return false;
-            maybeCache->object()->setResultTypeSet(targetThisTypes);
+
+            MFilterTypeSet* filter = MFilterTypeSet::New(alloc(), inlineInfo.thisArg(), thisTypes);
+            inlineBlock->add(filter);
+            inlineInfo.setThis(filter);
         }
 
         // Inline the call into the inlineBlock.
@@ -5545,27 +5551,68 @@ IonBuilder::inlineCalls(CallInfo& callInfo, const ObjectVector& targets, BoolVec
     }
 
     // Patch the InlinePropertyTable to not dispatch to vetoed paths.
+    bool useFallback;
     if (maybeCache) {
-        maybeCache->object()->setResultTypeSet(cacheObjectTypeSet);
-
         InlinePropertyTable* propTable = maybeCache->propTable();
         propTable->trimTo(targets, choiceSet);
 
-        // If all paths were vetoed, output only a generic fallback path.
         if (propTable->numEntries() == 0) {
+            // If all paths were vetoed, output only a generic fallback path.
             MOZ_ASSERT(dispatch->numCases() == 0);
             maybeCache = nullptr;
+            useFallback = true;
+        } else {
+            // We need a fallback path if the ObjectGroup dispatch does not
+            // handle all incoming objects.
+            useFallback = false;
+            TemporaryTypeSet* objectTypes = maybeCache->object()->resultTypeSet();
+            for (uint32_t i = 0; i < objectTypes->getObjectCount(); i++) {
+                TypeSet::ObjectKey* obj = objectTypes->getObject(i);
+                if (!obj)
+                    continue;
+
+                if (!obj->isGroup()) {
+                    useFallback = true;
+                    break;
+                }
+
+                if (!propTable->hasObjectGroup(obj->group())) {
+                    useFallback = true;
+                    break;
+                }
+            }
+
+            if (!useFallback) {
+                // The object group dispatch handles all possible incoming
+                // objects, so the cache and barrier will not be reached and
+                // can be eliminated.
+                if (callInfo.fun()->isGetPropertyCache()) {
+                    MOZ_ASSERT(callInfo.fun() == maybeCache);
+                } else {
+                    MTypeBarrier *barrier = callInfo.fun()->toTypeBarrier();
+                    MOZ_ASSERT(!barrier->hasUses());
+                    MOZ_ASSERT(barrier->type() == MIRType_Object);
+                    MOZ_ASSERT(barrier->input()->isGetPropertyCache());
+                    MOZ_ASSERT(barrier->input()->toGetPropertyCache() == maybeCache);
+                    barrier->block()->discard(barrier);
+                }
+
+                MOZ_ASSERT(!maybeCache->hasUses());
+                maybeCache->block()->discard(maybeCache);
+            }
         }
+    } else {
+        useFallback = dispatch->numCases() < targets.length();
     }
 
     // If necessary, generate a fallback path.
-    // MObjectGroupDispatch always uses a fallback path.
-    if (maybeCache || dispatch->numCases() < targets.length()) {
+    if (useFallback) {
         // Generate fallback blocks, and set |current| to the fallback return block.
         if (maybeCache) {
             MBasicBlock* fallbackTarget;
-            if (!inlineObjectGroupFallback(callInfo, dispatchBlock, (MObjectGroupDispatch*)dispatch,
-                                          maybeCache, &fallbackTarget))
+            if (!inlineObjectGroupFallback(callInfo, dispatchBlock,
+                                           dispatch->toObjectGroupDispatch(),
+                                           maybeCache, &fallbackTarget))
             {
                 return false;
             }
@@ -7894,7 +7941,8 @@ IonBuilder::pushScalarLoadFromTypedObject(MDefinition* obj,
     MOZ_ASSERT(size == ScalarTypeDescr::alignment(elemType));
 
     // Find location within the owner object.
-    MDefinition* elements, *scaledOffset;
+    MDefinition* elements;
+    MDefinition* scaledOffset;
     int32_t adjustment;
     loadTypedObjectElements(obj, byteOffset, size, &elements, &scaledOffset, &adjustment);
 
@@ -7933,7 +7981,8 @@ IonBuilder::pushReferenceLoadFromTypedObject(MDefinition* typedObj,
                                              PropertyName* name)
 {
     // Find location within the owner object.
-    MDefinition* elements, *scaledOffset;
+    MDefinition* elements;
+    MDefinition* scaledOffset;
     int32_t adjustment;
     size_t alignment = ReferenceTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
@@ -10217,9 +10266,9 @@ MIRType
 IonBuilder::SimdTypeDescrToMIRType(SimdTypeDescr::Type type)
 {
     switch (type) {
-      case SimdTypeDescr::TYPE_INT32:   return MIRType_Int32x4;
-      case SimdTypeDescr::TYPE_FLOAT32: return MIRType_Float32x4;
-      case SimdTypeDescr::TYPE_FLOAT64: return MIRType_Undefined;
+      case SimdTypeDescr::Int32x4:   return MIRType_Int32x4;
+      case SimdTypeDescr::Float32x4: return MIRType_Float32x4;
+      case SimdTypeDescr::Float64x2: return MIRType_Undefined;
     }
     MOZ_CRASH("unimplemented MIR type for a SimdTypeDescr::Type");
 }
@@ -12735,7 +12784,8 @@ IonBuilder::storeScalarTypedObjectValue(MDefinition *typedObj,
                                         MDefinition *value)
 {
     // Find location within the owner object.
-    MDefinition *elements, *scaledOffset;
+    MDefinition* elements;
+    MDefinition* scaledOffset;
     int32_t adjustment;
     size_t alignment = ScalarTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
@@ -12779,7 +12829,8 @@ IonBuilder::storeReferenceTypedObjectValue(MDefinition* typedObj,
     }
 
     // Find location within the owner object.
-    MDefinition* elements, *scaledOffset;
+    MDefinition* elements;
+    MDefinition* scaledOffset;
     int32_t adjustment;
     size_t alignment = ReferenceTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
@@ -12844,21 +12895,27 @@ IonBuilder::addLexicalCheck(MDefinition* input)
 {
     MOZ_ASSERT(JSOp(*pc) == JSOP_CHECKLEXICAL || JSOp(*pc) == JSOP_CHECKALIASEDLEXICAL);
 
-    // If we're guaranteed to not be JS_UNINITIALIZED_LEXICAL, no need to check.
     MInstruction* lexicalCheck;
+
+    // If we're guaranteed to not be JS_UNINITIALIZED_LEXICAL, no need to check.
     if (input->type() == MIRType_MagicUninitializedLexical) {
         // Mark the input as implicitly used so the JS_UNINITIALIZED_LEXICAL
         // magic value will be preserved on bailout.
         input->setImplicitlyUsedUnchecked();
         lexicalCheck = MThrowUninitializedLexical::New(alloc());
+        current->add(lexicalCheck);
+        if (!resumeAfter(lexicalCheck))
+            return nullptr;
+        return constant(UndefinedValue());
     }
-    else if (input->type() == MIRType_Value)
-        lexicalCheck = MLexicalCheck::New(alloc(), input);
-    else
-        return input;
 
-    current->add(lexicalCheck);
-    if (!resumeAfter(lexicalCheck))
-        return nullptr;
-    return lexicalCheck->isLexicalCheck() ? lexicalCheck : constant(UndefinedValue());
+    if (input->type() == MIRType_Value) {
+        lexicalCheck = MLexicalCheck::New(alloc(), input);
+        current->add(lexicalCheck);
+        if (failedLexicalCheck_)
+            lexicalCheck->setNotMovableUnchecked();
+        return lexicalCheck;
+    }
+
+    return input;
 }

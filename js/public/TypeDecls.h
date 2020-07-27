@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // This file contains public type declarations that are used *frequently*.  If
-// it doesn't occur at least 10 times in Goanna, it probably shouldn't be in
+// it doesn't occur at least 10 times in Gecko, it probably shouldn't be in
 // here.
 //
 // It includes only:

@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.mozilla.goanna.annotationProcessors.utils;
+package org.mozilla.gecko.annotationProcessors.utils;
 
-import org.mozilla.goanna.annotationProcessors.AnnotationInfo;
-import org.mozilla.goanna.annotationProcessors.classloader.AnnotatableEntity;
+import org.mozilla.gecko.annotationProcessors.AnnotationInfo;
+import org.mozilla.gecko.annotationProcessors.classloader.AnnotatableEntity;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -50,7 +50,7 @@ public class GeneratableElementIterator implements Iterator<AnnotatableEntity> {
         // Check for "Wrap ALL the things" flag.
         for (Annotation annotation : aClass.getDeclaredAnnotations()) {
             final String annotationTypeName = annotation.annotationType().getName();
-            if (annotationTypeName.equals("org.mozilla.goanna.mozglue.generatorannotations.WrapEntireClassForJNI")) {
+            if (annotationTypeName.equals("org.mozilla.gecko.mozglue.generatorannotations.WrapEntireClassForJNI")) {
                 mIterateEveryEntry = true;
                 break;
             }
@@ -71,7 +71,7 @@ public class GeneratableElementIterator implements Iterator<AnnotatableEntity> {
                 // WrappedJNIMethod has parameters. Use Reflection to obtain them.
                 Class<? extends Annotation> annotationType = annotation.annotationType();
                 final String annotationTypeName = annotationType.getName();
-                if (annotationTypeName.equals("org.mozilla.goanna.mozglue.generatorannotations.WrapElementForJNI")) {
+                if (annotationTypeName.equals("org.mozilla.gecko.mozglue.generatorannotations.WrapElementForJNI")) {
                     String stubName = null;
                     boolean isMultithreadedStub = false;
                     boolean noThrow = false;

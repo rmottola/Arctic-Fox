@@ -281,7 +281,7 @@ nsScriptSecurityManager::AppStatusForPrincipal(nsIPrincipal *aPrin)
                       nsIPrincipal::APP_STATUS_NOT_INSTALLED);
 
     nsAutoCString origin;
-    NS_ENSURE_SUCCESS(aPrin->GetOrigin(getter_Copies(origin)),
+    NS_ENSURE_SUCCESS(aPrin->GetOrigin(origin),
                       nsIPrincipal::APP_STATUS_NOT_INSTALLED);
     nsString appOrigin;
     NS_ENSURE_SUCCESS(app->GetOrigin(appOrigin),
@@ -294,7 +294,7 @@ nsScriptSecurityManager::AppStatusForPrincipal(nsIPrincipal *aPrin)
                       nsIPrincipal::APP_STATUS_NOT_INSTALLED);
 
     nsAutoCString appOriginPunned;
-    NS_ENSURE_SUCCESS(nsPrincipal::GetOriginForURI(appURI, getter_Copies(appOriginPunned)),
+    NS_ENSURE_SUCCESS(nsPrincipal::GetOriginForURI(appURI, appOriginPunned),
                       nsIPrincipal::APP_STATUS_NOT_INSTALLED);
 
     if (!appOriginPunned.Equals(origin)) {
@@ -704,10 +704,10 @@ nsScriptSecurityManager::CheckLoadURIWithPrincipal(nsIPrincipal* aPrincipal,
             auto themeOrigin = Preferences::GetCString("b2g.theme.origin");
             if (themeOrigin) {
                 nsAutoCString targetOrigin;
-                nsPrincipal::GetOriginForURI(targetBaseURI, getter_Copies(targetOrigin));
+                nsPrincipal::GetOriginForURI(targetBaseURI, targetOrigin);
                 if (targetOrigin.Equals(themeOrigin)) {
                     nsAutoCString pOrigin;
-                    aPrincipal->GetOrigin(getter_Copies(pOrigin));
+                    aPrincipal->GetOrigin(pOrigin);
                     return nsContentUtils::IsExactSitePermAllow(aPrincipal, "themeable") ||
                            pOrigin.Equals(themeOrigin)
                         ? NS_OK : NS_ERROR_DOM_BAD_URI;
@@ -1003,7 +1003,8 @@ nsScriptSecurityManager::CreateCodebasePrincipal(nsIURI* aURI, uint32_t aAppId,
         nsCOMPtr<nsIPrincipal> principal;
         uriPrinc->GetPrincipal(getter_AddRefs(principal));
         if (!principal) {
-            return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
+            principal = nsNullPrincipal::Create();
+            NS_ENSURE_TRUE(principal, NS_ERROR_FAILURE);
         }
 
         principal.forget(result);
@@ -1098,15 +1099,16 @@ nsScriptSecurityManager::GetCodebasePrincipalInternal(nsIURI *aURI,
         NS_URIChainHasFlags(aURI,
                             nsIProtocolHandler::URI_INHERITS_SECURITY_CONTEXT,
                             &inheritsPrincipal);
-    if (NS_FAILED(rv) || inheritsPrincipal) {
-        return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
-    }
-
     nsCOMPtr<nsIPrincipal> principal;
-    rv = CreateCodebasePrincipal(aURI, aAppId, aInMozBrowser,
-                                 getter_AddRefs(principal));
-    NS_ENSURE_SUCCESS(rv, rv);
-    NS_IF_ADDREF(*result = principal);
+    if (NS_FAILED(rv) || inheritsPrincipal) {
+        principal = nsNullPrincipal::Create();
+        NS_ENSURE_TRUE(principal, NS_ERROR_FAILURE);
+    } else {
+        rv = CreateCodebasePrincipal(aURI, aAppId, aInMozBrowser,
+                                     getter_AddRefs(principal));
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
+    principal.forget(result);
 
     return NS_OK;
 }

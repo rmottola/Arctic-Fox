@@ -17,7 +17,7 @@ dfn { font-style: italic }
 blockquote { margin: 1em 40px }
 /* Some tests assume links are blue, for the sake of argument, but they aren't
  * blue in any browser.  And :visited definitely isn't blue, except in engines
- * like Goanna that lie.
+ * like Gecko that lie.
  *
  * This should really be #00e, probably.  See:
  * http://www.w3.org/Bugs/Public/show_bug.cgi?id=13330 */

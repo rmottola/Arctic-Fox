@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -109,7 +110,7 @@ public:
 
   /**
    * DispatchLegacyMouseScrollEvents() dispatches NS_MOUSE_SCROLL event and
-   * NS_MOUSE_PIXEL_SCROLL event for compatiblity with old Goanna.
+   * NS_MOUSE_PIXEL_SCROLL event for compatiblity with old Gecko.
    */
   void DispatchLegacyMouseScrollEvents(nsIFrame* aTargetFrame,
                                        WidgetWheelEvent* aEvent,
@@ -225,6 +226,10 @@ public:
 
   // Returns true if the given WidgetWheelEvent will resolve to a scroll action.
   static bool WheelEventIsScrollAction(WidgetWheelEvent* aEvent);
+
+  // Returns true if user prefs for wheel deltas apply to the given
+  // WidgetWheelEvent.
+  static bool WheelEventNeedsDeltaMultipliers(WidgetWheelEvent* aEvent);
 
   // Returns whether or not a frame can be vertically scrolled with a mouse
   // wheel (as opposed to, say, a selection or touch scroll).
@@ -430,6 +435,12 @@ protected:
      * user prefs.
      */
     void ApplyUserPrefsToDelta(WidgetWheelEvent* aEvent);
+
+    /**
+     * Returns whether or not ApplyUserPrefsToDelta() would change the delta
+     * values of an event.
+     */
+    bool HasUserPrefsForDelta(WidgetWheelEvent* aEvent);
 
     /**
      * If ApplyUserPrefsToDelta() changed the delta values with customized
@@ -954,7 +965,6 @@ private:
 #define NS_EVENT_NEEDS_FRAME(event) \
     (!(event)->HasPluginActivationEventMessage() && \
      (event)->message != NS_MOUSE_CLICK && \
-     (event)->message != NS_MOUSE_DOUBLECLICK && \
-     (event)->message != NS_MOUSE_AUXCLICK)
+     (event)->message != NS_MOUSE_DOUBLECLICK)
 
 #endif // mozilla_EventStateManager_h_

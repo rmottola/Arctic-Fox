@@ -18,7 +18,7 @@ class HTMLWin32ObjectOwnerAccessible : public AccessibleWrap
 public:
   // This will own the HTMLWin32ObjectAccessible. We create this where the
   // <object> or <embed> exists in the tree, so that get_accNextSibling() etc.
-  // will still point to Goanna accessible sibling content. This is necessary
+  // will still point to Gecko accessible sibling content. This is necessary
   // because the native plugin accessible doesn't know where it exists in the
   // Mozilla tree, and returns null for previous and next sibling. This would
   // have the effect of cutting off all content after the plugin.

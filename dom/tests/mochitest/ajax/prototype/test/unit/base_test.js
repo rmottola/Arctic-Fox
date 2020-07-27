@@ -374,9 +374,9 @@ new Test.Unit.Runner({
       this.assert(Prototype.Browser.IE);
     }
     
-    if (navigator.userAgent.indexOf('Goanna') > -1 && navigator.userAgent.indexOf('KHTML') == -1) {
-      this.info('Running on Goanna');
-      this.assert(Prototype.Browser.Goanna);
+    if (navigator.userAgent.indexOf('Gecko') > -1 && navigator.userAgent.indexOf('KHTML') == -1) {
+      this.info('Running on Gecko');
+      this.assert(Prototype.Browser.Gecko);
     } 
   },
   

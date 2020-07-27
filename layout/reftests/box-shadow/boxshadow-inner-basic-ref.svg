@@ -10,7 +10,7 @@
      impossible to express "the path consisting of the even-odd-rule
      composition of two |rect| elements" in SVG. This is a minor
      nuisance because we have to write everything out using |path|,
-     plus a major nuisance because Goanna uses the same ellipse-to-
+     plus a major nuisance because Gecko uses the same ellipse-to-
      Bezier conversion for rounded rectangles in SVG and HTML, but the
      SVG 'A' operator uses a different one. Therefore we cannot use 'A'.
      The 'C' parameters here were obtained by dumping out the cairo

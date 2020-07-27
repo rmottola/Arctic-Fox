@@ -17,12 +17,12 @@ class TextInputHandler;
 } // namespace mozilla
 
 // A protocol listing all the methods that an object which wants
-// to live in goanna's widget hierarchy must implement. |nsChildView|
+// to live in gecko's widget hierarchy must implement. |nsChildView|
 // makes assumptions that any NSView with which it comes in contact will
 // implement this protocol.
 @protocol mozView
 
-  // aHandler is Goanna's default text input handler:  It implements the
+  // aHandler is Gecko's default text input handler:  It implements the
   // NSTextInput protocol to handle key events.  Don't make aHandler a
   // strong reference -- that causes a memory leak.
 - (void)installTextInputHandler:(mozilla::widget::TextInputHandler*)aHandler;
@@ -39,7 +39,7 @@ class TextInputHandler;
 - (void)setNeedsPendingDisplay;
 - (void)setNeedsPendingDisplayInRect:(NSRect)invalidRect;
 
-  // called when our corresponding Goanna view goes away
+  // called when our corresponding Gecko view goes away
 - (void)widgetDestroyed;
 
 - (BOOL)isDragInProgress;
@@ -54,7 +54,7 @@ class TextInputHandler;
 
 // An informal protocol implemented by the NSWindow of the host application.
 // 
-// It's used to prevent re-entrant calls to -makeKeyAndOrderFront: when goanna
+// It's used to prevent re-entrant calls to -makeKeyAndOrderFront: when gecko
 // focus/activate events propagate out to the embedder's
 // nsIEmbeddingSiteWindow::SetFocus implementation.
 @interface NSObject(mozWindow)

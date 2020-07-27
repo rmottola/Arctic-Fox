@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -484,19 +484,20 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 
   NS_WARN_IF_FALSE(!aTargetFrame ||
                    !aTargetFrame->GetContent() ||
-                   aTargetFrame->GetContent() == aTargetContent,
-                   "aTargetContent should be related with aTargetFrame");
+                   aTargetFrame->GetContent() == aTargetContent ||
+                   aTargetFrame->GetContent()->GetParent() == aTargetContent,
+                   "aTargetFrame should be related with aTargetContent");
 
   mCurrentTarget = aTargetFrame;
   mCurrentTargetContent = nullptr;
 
-  // Do not take account NS_MOUSE_ENTER/EXIT so that loading a page
+  // Do not take account NS_MOUSE_ENTER_WIDGET/EXIT_WIDGET so that loading a page
   // when user is not active doesn't change the state to active.
   WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
   if (aEvent->mFlags.mIsTrusted &&
       ((mouseEvent && mouseEvent->IsReal() &&
-        mouseEvent->message != NS_MOUSE_ENTER &&
-        mouseEvent->message != NS_MOUSE_EXIT) ||
+        mouseEvent->message != NS_MOUSE_ENTER_WIDGET &&
+        mouseEvent->message != NS_MOUSE_EXIT_WIDGET) ||
        aEvent->mClass == eWheelEventClass ||
        aEvent->mClass == ePointerEventClass ||
        aEvent->mClass == eTouchEventClass ||
@@ -595,8 +596,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   }
-  case NS_MOUSE_EXIT:
-    // If this is a remote frame, we receive NS_MOUSE_EXIT from the parent
+  case NS_MOUSE_EXIT_WIDGET:
+    // If this is a remote frame, we receive NS_MOUSE_EXIT_WIDGET from the parent
     // the mouse exits our content. Since the parent may update the cursor
     // while the mouse is outside our frame, and since PuppetWidget caches the
     // current cursor internally, re-entering our content (say from over a
@@ -647,7 +648,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   case NS_DRAGDROP_GESTURE:
     if (Prefs::ClickHoldContextMenu()) {
       // an external drag gesture event came in, not generated internally
-      // by Goanna. Make sure we get rid of the click-hold timer.
+      // by Gecko. Make sure we get rid of the click-hold timer.
       KillClickHoldTimer();
     }
     break;
@@ -1196,7 +1197,9 @@ CrossProcessSafeEvent(const WidgetEvent& aEvent)
     case NS_MOUSE_BUTTON_UP:
     case NS_MOUSE_MOVE:
     case NS_CONTEXTMENU:
-    case NS_MOUSE_EXIT:
+    case NS_MOUSE_ENTER_WIDGET:
+    case NS_MOUSE_EXIT_WIDGET:
+    case NS_MOUSE_OVER:
       return true;
     default:
       return false;
@@ -2493,7 +2496,7 @@ EventStateManager::DoScrollText(nsIScrollableFrame* aScrollableFrame,
     actualDevPixelScrollAmount.y = 0;
   }
 
-  nsIScrollableFrame::ScrollSnapMode snapMode = nsIScrollableFrame::DISABLE_SNAP;
+  nsIScrollbarMediator::ScrollSnapMode snapMode = nsIScrollbarMediator::DISABLE_SNAP;
   nsIAtom* origin = nullptr;
   switch (aEvent->deltaMode) {
     case nsIDOMWheelEvent::DOM_DELTA_LINE:
@@ -3087,9 +3090,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       // When APZ is enabled, the actual scroll animation might be handled by
       // the compositor.
       WheelPrefs::Action action;
-      if (gfxPrefs::AsyncPanZoomEnabled() &&
-          layers::APZCTreeManager::WillHandleWheelEvent(wheelEvent))
-      {
+      if (wheelEvent->mFlags.mHandledByAPZ) {
         action = WheelPrefs::ACTION_NONE;
       } else {
         action = WheelPrefs::GetInstance()->ComputeActionFor(wheelEvent);
@@ -3340,7 +3341,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_MOUSE_ENTER:
+  case NS_MOUSE_ENTER_WIDGET:
     if (mCurrentTarget) {
       nsCOMPtr<nsIContent> targetContent;
       mCurrentTarget->GetContentForEvent(aEvent, getter_AddRefs(targetContent));
@@ -3762,8 +3763,8 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   if (sIsPointerLocked &&
       (aMessage == NS_MOUSELEAVE ||
        aMessage == NS_MOUSEENTER ||
-       aMessage == NS_MOUSE_ENTER_SYNTH ||
-       aMessage == NS_MOUSE_EXIT_SYNTH)) {
+       aMessage == NS_MOUSE_OVER ||
+       aMessage == NS_MOUSE_OUT)) {
     mCurrentTargetContent = nullptr;
     nsCOMPtr<Element> pointerLockedElement =
       do_QueryReferent(EventStateManager::sPointerLockedElement);
@@ -3805,20 +3806,28 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
     // the same object after event dispatch and handling, so refetch it.
     targetFrame = mPresContext->GetPrimaryFrameFor(aTargetContent);
 
-    // If we are leaving remote content, dispatch a mouse exit event to the
-    // remote frame.
-    if (aMessage == NS_MOUSE_EXIT_SYNTH && IsRemoteTarget(aTargetContent)) {
-      // For remote content, send a normal widget mouse exit event.
-      nsAutoPtr<WidgetMouseEvent> remoteEvent;
-      CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_EXIT,
-                                      aRelatedContent, remoteEvent);
+    // If we are entering/leaving remote content, dispatch a mouse enter/exit
+    // event to the remote frame.
+    if (IsRemoteTarget(aTargetContent)) {
+      if (aMessage == NS_MOUSE_OUT) {
+        // For remote content, send a "top-level" widget mouse exit event.
+        nsAutoPtr<WidgetMouseEvent> remoteEvent;
+        CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_EXIT_WIDGET,
+                                        aRelatedContent, remoteEvent);
+        remoteEvent->exit = WidgetMouseEvent::eTopLevel;
 
-      // mCurrentTarget is set to the new target, so we must reset it to the
-      // old target and then dispatch a cross-process event. (mCurrentTarget
-      // will be set back below.) HandleCrossProcessEvent will query for the
-      // proper target via GetEventTarget which will return mCurrentTarget.
-      mCurrentTarget = targetFrame;
-      HandleCrossProcessEvent(remoteEvent, &status);
+        // mCurrentTarget is set to the new target, so we must reset it to the
+        // old target and then dispatch a cross-process event. (mCurrentTarget
+        // will be set back below.) HandleCrossProcessEvent will query for the
+        // proper target via GetEventTarget which will return mCurrentTarget.
+        mCurrentTarget = targetFrame;
+        HandleCrossProcessEvent(remoteEvent, &status);
+      } else if (aMessage == NS_MOUSE_OVER) {
+        nsAutoPtr<WidgetMouseEvent> remoteEvent;
+        CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_ENTER_WIDGET,
+                                        aRelatedContent, remoteEvent);
+        HandleCrossProcessEvent(remoteEvent, &status);
+      }
     }
   }
 
@@ -3940,7 +3949,7 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
                                                    NS_MOUSELEAVE);
 
   // Fire mouseout
-  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : NS_MOUSE_EXIT_SYNTH,
+  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : NS_MOUSE_OUT,
                               wrapper->mLastOverElement, aMovingInto);
 
   wrapper->mLastOverFrame = nullptr;
@@ -4014,7 +4023,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
     // Fire mouseover
     wrapper->mLastOverFrame = 
       DispatchMouseOrPointerEvent(aMouseEvent,
-                                  isPointer ? NS_POINTER_OVER : NS_MOUSE_ENTER_SYNTH,
+                                  isPointer ? NS_POINTER_OVER : NS_MOUSE_OVER,
                                   aContent, lastOverElement);
     wrapper->mLastOverElement = aContent;
   } else {
@@ -4172,7 +4181,7 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
     break;
   case NS_POINTER_LEAVE:
   case NS_POINTER_CANCEL:
-  case NS_MOUSE_EXIT:
+  case NS_MOUSE_EXIT_WIDGET:
     {
       // This is actually the window mouse exit or pointer leave event. We're not moving
       // into any new element.
@@ -4301,7 +4310,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
                                                  getter_AddRefs(lastContent));
 
           FireDragEnterOrExit(sLastDragOverFrame->PresContext(),
-                              aDragEvent, NS_DRAGDROP_EXIT_SYNTH,
+                              aDragEvent, NS_DRAGDROP_EXIT,
                               targetContent, lastContent, sLastDragOverFrame);
         }
 
@@ -4310,7 +4319,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
 
         if (sLastDragOverFrame) {
           FireDragEnterOrExit(sLastDragOverFrame->PresContext(),
-                              aDragEvent, NS_DRAGDROP_LEAVE_SYNTH,
+                              aDragEvent, NS_DRAGDROP_LEAVE,
                               targetContent, lastContent, sLastDragOverFrame);
         }
 
@@ -4329,10 +4338,10 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
 
         nsRefPtr<nsPresContext> lastDragOverFramePresContext = sLastDragOverFrame->PresContext();
         FireDragEnterOrExit(lastDragOverFramePresContext,
-                            aDragEvent, NS_DRAGDROP_EXIT_SYNTH,
+                            aDragEvent, NS_DRAGDROP_EXIT,
                             nullptr, lastContent, sLastDragOverFrame);
         FireDragEnterOrExit(lastDragOverFramePresContext,
-                            aDragEvent, NS_DRAGDROP_LEAVE_SYNTH,
+                            aDragEvent, NS_DRAGDROP_LEAVE,
                             nullptr, lastContent, sLastDragOverFrame);
 
         sLastDragOverFrame = nullptr;
@@ -4381,7 +4390,7 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
 
     // collect any changes to moz cursor settings stored in the event's
     // data transfer.
-    if (aMsg == NS_DRAGDROP_LEAVE_SYNTH || aMsg == NS_DRAGDROP_EXIT_SYNTH ||
+    if (aMsg == NS_DRAGDROP_LEAVE || aMsg == NS_DRAGDROP_EXIT ||
         aMsg == NS_DRAGDROP_ENTER)
       UpdateDragDataTransfer(&event);
   }
@@ -4568,12 +4577,6 @@ EventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
       }
-      if (NS_SUCCEEDED(ret) && mouseContent && fireAuxClick &&
-          mouseContent->IsInComposedDoc()) {
-        ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_AUXCLICK,
-                                        presShell, mouseContent, currentTarget,
-                                        false);
-      }
     }
   }
   return ret;
@@ -4652,7 +4655,7 @@ static nsIContent* FindCommonAncestor(nsIContent *aNode1, nsIContent *aNode2)
     nsIContent *anc1 = aNode1;
     for (;;) {
       ++offset;
-      nsIContent* parent = anc1->GetParent();
+      nsIContent* parent = anc1->GetFlattenedTreeParent();
       if (!parent)
         break;
       anc1 = parent;
@@ -4660,7 +4663,7 @@ static nsIContent* FindCommonAncestor(nsIContent *aNode1, nsIContent *aNode2)
     nsIContent *anc2 = aNode2;
     for (;;) {
       --offset;
-      nsIContent* parent = anc2->GetParent();
+      nsIContent* parent = anc2->GetFlattenedTreeParent();
       if (!parent)
         break;
       anc2 = parent;
@@ -4669,16 +4672,16 @@ static nsIContent* FindCommonAncestor(nsIContent *aNode1, nsIContent *aNode2)
       anc1 = aNode1;
       anc2 = aNode2;
       while (offset > 0) {
-        anc1 = anc1->GetParent();
+        anc1 = anc1->GetFlattenedTreeParent();
         --offset;
       }
       while (offset < 0) {
-        anc2 = anc2->GetParent();
+        anc2 = anc2->GetFlattenedTreeParent();
         ++offset;
       }
       while (anc1 != anc2) {
-        anc1 = anc1->GetParent();
-        anc2 = anc2->GetParent();
+        anc1 = anc1->GetFlattenedTreeParent();
+        anc2 = anc2->GetFlattenedTreeParent();
       }
       return anc1;
     }
@@ -4734,7 +4737,7 @@ EventStateManager::UpdateAncestorState(nsIContent* aStartNode,
                                        bool aAddState)
 {
   for (; aStartNode && aStartNode != aStopBefore;
-       aStartNode = aStartNode->GetParent()) {
+       aStartNode = aStartNode->GetFlattenedTreeParent()) {
     // We might be starting with a non-element (e.g. a text node) and
     // if someone is doing something weird might be ending with a
     // non-element too (e.g. a document fragment)
@@ -4762,7 +4765,7 @@ EventStateManager::UpdateAncestorState(nsIContent* aStartNode,
     // still be in hover state.  To handle this situation we need to
     // keep walking up the tree and any time we find a label mark its
     // corresponding node as still in our state.
-    for ( ; aStartNode; aStartNode = aStartNode->GetParent()) {
+    for ( ; aStartNode; aStartNode = aStartNode->GetFlattenedTreeParent()) {
       if (!aStartNode->IsElement()) {
         continue;
       }
@@ -5603,9 +5606,25 @@ EventStateManager::WheelPrefs::NeedToComputeLineOrPageDelta(
 }
 
 bool
+EventStateManager::WheelPrefs::HasUserPrefsForDelta(WidgetWheelEvent* aEvent)
+{
+  Index index = GetIndexFor(aEvent);
+  Init(index);
+
+  return mMultiplierX[index] != 1.0 ||
+         mMultiplierY[index] != 1.0;
+}
+
+bool
 EventStateManager::WheelEventIsScrollAction(WidgetWheelEvent* aEvent)
 {
   return WheelPrefs::GetInstance()->ComputeActionFor(aEvent) == WheelPrefs::ACTION_SCROLL;
+}
+
+bool
+EventStateManager::WheelEventNeedsDeltaMultipliers(WidgetWheelEvent* aEvent)
+{
+  return WheelPrefs::GetInstance()->HasUserPrefsForDelta(aEvent);
 }
 
 bool

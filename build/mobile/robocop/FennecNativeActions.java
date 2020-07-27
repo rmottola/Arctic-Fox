@@ -2,19 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.mozilla.goanna;
+package org.mozilla.gecko;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.json.JSONObject;
-import org.mozilla.goanna.FennecNativeDriver.LogLevel;
-import org.mozilla.goanna.gfx.LayerView;
-import org.mozilla.goanna.gfx.LayerView.DrawListener;
-import org.mozilla.goanna.mozglue.GoannaLoader;
-import org.mozilla.goanna.sqlite.SQLiteBridge;
-import org.mozilla.goanna.util.GeckoEventListener;
+import org.mozilla.gecko.FennecNativeDriver.LogLevel;
+import org.mozilla.gecko.gfx.LayerView;
+import org.mozilla.gecko.gfx.LayerView.DrawListener;
+import org.mozilla.gecko.mozglue.GeckoLoader;
+import org.mozilla.gecko.sqlite.SQLiteBridge;
+import org.mozilla.gecko.util.GeckoEventListener;
 
 import android.app.Activity;
 import android.app.Instrumentation;
@@ -37,7 +37,7 @@ public class FennecNativeActions implements Actions {
         mInstr = instrumentation;
         mAsserter = asserter;
 
-        GoannaLoader.loadSQLiteLibs(activity, activity.getApplication().getPackageResourcePath());
+        GeckoLoader.loadSQLiteLibs(activity, activity.getApplication().getPackageResourcePath());
     }
 
     class GeckoEventExpecter implements RepeatedEventExpecter {

@@ -18,7 +18,7 @@
 #include "nsXULAppAPI.h"
 #include <dirent.h>
 #include <android/log.h>
-#define ALOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Goanna" , ## args)
+#define ALOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Gecko" , ## args)
 
 #include "ft2build.h"
 #include FT_FREETYPE_H

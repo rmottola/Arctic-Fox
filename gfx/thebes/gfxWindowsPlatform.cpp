@@ -489,10 +489,7 @@ gfxWindowsPlatform::UpdateRenderMode()
 
     mRenderMode = RENDER_GDI;
 
-    bool safeMode = false;
-    nsCOMPtr<nsIXULRuntime> xr = do_GetService("@mozilla.org/xre/runtime;1");
-    if (xr)
-      xr->GetInSafeMode(&safeMode);
+    bool isVistaOrHigher = IsVistaOrLater();
 
     mUseDirectWrite = Preferences::GetBool("gfx.font_rendering.directwrite.enabled", false);
 
@@ -530,7 +527,8 @@ gfxWindowsPlatform::UpdateRenderMode()
     }
 
     ID3D11Device *device = GetD3D11Device();
-    if (!safeMode && tryD2D && device &&
+    if (isVistaOrHigher && !InSafeMode() && tryD2D &&
+	device &&
         device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_10_0 &&
         DoesD3D11TextureSharingWork(device)) {
 
@@ -1860,13 +1858,7 @@ gfxWindowsPlatform::InitD3D11Devices()
 
   MOZ_ASSERT(!mD3D11Device); 
 
-  bool safeMode = false;
-  nsCOMPtr<nsIXULRuntime> xr = do_GetService("@mozilla.org/xre/runtime;1");
-  if (xr) {
-    xr->GetInSafeMode(&safeMode);
-  }
-
-  if (safeMode) {
+  if (InSafeMode()) {
     return;
   }
 
@@ -2262,7 +2254,7 @@ gfxWindowsPlatform::CreateHardwareVsyncSource()
 }
 
 bool
-gfxWindowsPlatform::SupportsApzTouchInput()
+gfxWindowsPlatform::SupportsApzTouchInput() const
 {
   int value = Preferences::GetInt("dom.w3c_touch_events.enabled", 0);
   return value == 1 || value == 2;

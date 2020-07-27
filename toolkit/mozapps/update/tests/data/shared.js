@@ -564,24 +564,24 @@ function getAppBaseDir() {
 }
 
 /**
- * Returns the Goanna Runtime Engine directory where files other than executable
+ * Returns the Gecko Runtime Engine directory where files other than executable
  * binaries are located. On Mac OS X this will be <bundle>/Contents/Resources/
  * and the installation directory on all other platforms.
  *
- * @return nsIFile for the Goanna Runtime Engine directory.
+ * @return nsIFile for the Gecko Runtime Engine directory.
  */
 function getGREDir() {
   return Services.dirsvc.get(NS_GRE_DIR, Ci.nsIFile);
 }
 
 /**
- * Returns the Goanna Runtime Engine Binary directory where the executable
+ * Returns the Gecko Runtime Engine Binary directory where the executable
  * binaries are located such as the updater binary (Windows and Linux) or
  * updater package (Mac OS X). On Mac OS X this will be
  * <bundle>/Contents/MacOS/ and the installation directory on all other
  * platforms.
  *
- * @return nsIFile for the Goanna Runtime Engine Binary directory.
+ * @return nsIFile for the Gecko Runtime Engine Binary directory.
  */
 function getGREBinDir() {
   return Services.dirsvc.get(NS_GRE_BIN_DIR, Ci.nsIFile);

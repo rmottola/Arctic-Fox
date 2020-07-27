@@ -32,10 +32,9 @@
           <label value="&editBookmarkOverlay.name.label;"
                  class="editBMPanel_rowLabel"
                  accesskey="&editBookmarkOverlay.name.accesskey;"
-                 control="editBMPanel_namePicker"
-                 observes="paneElementsBroadcaster"/>
+                 control="editBMPanel_namePicker"/>
           <textbox id="editBMPanel_namePicker"
-                   observes="paneElementsBroadcaster"/>
+                   onchange="gEditItemOverlay.onNamePickerChange();"/>
         </row>
 
         <row id="editBMPanel_locationRow"
@@ -48,33 +47,7 @@
                  observes="paneElementsBroadcaster"/>
           <textbox id="editBMPanel_locationField"
                    class="uri-element"
-                   observes="paneElementsBroadcaster"/>
-        </row>
-
-        <row id="editBMPanel_feedLocationRow"
-             align="center"
-             collapsed="true">
-          <label value="&editBookmarkOverlay.feedLocation.label;"
-                 class="editBMPanel_rowLabel"
-                 accesskey="&editBookmarkOverlay.feedLocation.accesskey;"
-                 control="editBMPanel_feedLocationField"
-                 observes="paneElementsBroadcaster"/>
-          <textbox id="editBMPanel_feedLocationField"
-                   class="uri-element"
-                   observes="paneElementsBroadcaster"/>
-        </row>
-
-        <row id="editBMPanel_siteLocationRow"
-             align="center"
-             collapsed="true">
-          <label value="&editBookmarkOverlay.siteLocation.label;"
-                 class="editBMPanel_rowLabel"
-                 accesskey="&editBookmarkOverlay.siteLocation.accesskey;"
-                 control="editBMPanel_siteLocationField"
-                 observes="paneElementsBroadcaster"/>
-          <textbox id="editBMPanel_siteLocationField"
-                   class="uri-element"
-                   observes="paneElementsBroadcaster"/>
+                   onchange="gEditItemOverlay.onLocationFieldChange();"/>
         </row>
 
         <row id="editBMPanel_folderRow"
@@ -140,7 +113,7 @@
               <button label="&editBookmarkOverlay.newFolderButton.label;"
                       id="editBMPanel_newFolderButton"
                       accesskey="&editBookmarkOverlay.newFolderButton.accesskey;"
-                      oncommand="gEditItemOverlay.newFolder();"/>
+                      oncommand="gEditItemOverlay.newFolder().catch(Components.utils.reportError);"/>
             </hbox>
           </vbox>
         </row>
@@ -163,7 +136,8 @@
                      tabscrolling="true"
                      showcommentcolumn="true"
                      observes="paneElementsBroadcaster"
-                     placeholder="&editBookmarkOverlay.tagsEmptyDesc.label;"/>
+                     placeholder="&editBookmarkOverlay.tagsEmptyDesc.label;"
+                     onchange="gEditItemOverlay.onTagsFieldChange();"/>
             <button id="editBMPanel_tagsSelectorExpander"
                     class="expander-down"
                     tooltiptext="&editBookmarkOverlay.tagsExpanderDown.tooltip;"
@@ -193,7 +167,7 @@
                  control="editBMPanel_keywordField"
                  observes="paneElementsBroadcaster"/>
           <textbox id="editBMPanel_keywordField"
-                   observes="paneElementsBroadcaster"/>
+                   onchange="gEditItemOverlay.onKeywordFieldChange();"/>
         </row>
 
         <row id="editBMPanel_descriptionRow"
@@ -206,7 +180,8 @@
                  observes="paneElementsBroadcaster"/>
           <textbox id="editBMPanel_descriptionField"
                    multiline="true"
-                   observes="paneElementsBroadcaster"/>
+                   rows="4"
+                   onchange="gEditItemOverlay.onDescriptionFieldChange();"/>
         </row>
       </rows>
     </grid>

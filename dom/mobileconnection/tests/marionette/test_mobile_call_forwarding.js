@@ -10,14 +10,14 @@ const TEST_DATA = [
     reason: MozMobileConnection.CALL_FORWARD_REASON_MOBILE_BUSY,
     number: "0912345678",
     timeSeconds: 5,
-    // Currently goanna only support ICC_SERVICE_CLASS_VOICE.
+    // Currently gecko only support ICC_SERVICE_CLASS_VOICE.
     serviceClass: MozMobileConnection.ICC_SERVICE_CLASS_VOICE
   }, {
     action: MozMobileConnection.CALL_FORWARD_ACTION_ENABLE,
     reason: MozMobileConnection.CALL_FORWARD_REASON_NO_REPLY,
     number: "+886912345678",
     timeSeconds: 20,
-    // Currently goanna only support ICC_SERVICE_CLASS_VOICE.
+    // Currently gecko only support ICC_SERVICE_CLASS_VOICE.
     serviceClass: MozMobileConnection.ICC_SERVICE_CLASS_VOICE
   }
 ];

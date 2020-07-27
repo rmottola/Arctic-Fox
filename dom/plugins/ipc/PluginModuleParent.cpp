@@ -1278,7 +1278,7 @@ PluginModuleParent::SetPluginFuncs(NPPluginFuncs* aFuncs)
     aFuncs->version = (NP_VERSION_MAJOR << 8) | NP_VERSION_MINOR;
     aFuncs->javaClass = nullptr;
 
-    // Goanna should always call these functions through a PluginLibrary object.
+    // Gecko should always call these functions through a PluginLibrary object.
     aFuncs->newp = nullptr;
     aFuncs->clearsitedata = nullptr;
     aFuncs->getsiteswithdata = nullptr;

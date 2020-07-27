@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.mozilla.goanna;
+package org.mozilla.gecko;
 
 import android.app.Activity;
 
@@ -24,10 +24,10 @@ public interface Driver {
     int getPageHeight();
     int getScrollHeight();
     int getHeight();
-    int getGoannaTop();
-    int getGoannaLeft();
-    int getGoannaWidth();
-    int getGoannaHeight();
+    int getGeckoTop();
+    int getGeckoLeft();
+    int getGeckoWidth();
+    int getGeckoHeight();
 
     void startFrameRecording();
     int stopFrameRecording();

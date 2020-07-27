@@ -1404,13 +1404,13 @@ nsEventStatus AsyncPanZoomController::OnScaleEnd(const PinchGestureInput& aEvent
 }
 
 bool
-AsyncPanZoomController::ConvertToGoanna(const ParentLayerPoint& aPoint, CSSPoint* aOut)
+AsyncPanZoomController::ConvertToGecko(const ParentLayerPoint& aPoint, CSSPoint* aOut)
 {
   if (APZCTreeManager* treeManagerLocal = GetApzcTreeManager()) {
-    Matrix4x4 transformToGoanna = treeManagerLocal->GetApzcToGoannaTransform(this);
+    Matrix4x4 transformToGecko = treeManagerLocal->GetApzcToGeckoTransform(this);
     // NOTE: This isn't *quite* LayoutDevicePoint, we just don't have a name
     // for this coordinate space and it maps the closest to LayoutDevicePoint.
-    LayoutDevicePoint layoutPoint = TransformTo<LayoutDevicePixel>(transformToGoanna, aPoint);
+    LayoutDevicePoint layoutPoint = TransformTo<LayoutDevicePixel>(transformToGecko, aPoint);
     { // scoped lock to access mFrameMetrics
       ReentrantMonitorAutoEnter lock(mMonitor);
       *aOut = layoutPoint / mFrameMetrics.GetDevPixelsPerCSSPixel();
@@ -1687,14 +1687,14 @@ nsEventStatus AsyncPanZoomController::OnLongPress(const TapGestureInput& aEvent)
   APZC_LOG("%p got a long-press in state %d\n", this, mState);
   nsRefPtr<GeckoContentController> controller = GetGeckoContentController();
   if (controller) {
-    CSSPoint goannaScreenPoint;
-    if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
+    CSSPoint geckoScreenPoint;
+    if (ConvertToGecko(aEvent.mLocalPoint, &geckoScreenPoint)) {
       if (CurrentTouchBlock()->IsDuringFastMotion()) {
         APZC_LOG("%p dropping long-press because of fast motion\n", this);
         return nsEventStatus_eIgnore;
       }
       uint64_t blockId = GetInputQueue()->InjectNewTouchBlock(this);
-      controller->HandleLongTap(goannaScreenPoint, aEvent.modifiers, GetGuid(), blockId);
+      controller->HandleLongTap(geckoScreenPoint, aEvent.modifiers, GetGuid(), blockId);
       return nsEventStatus_eConsumeNoDefault;
     }
   }
@@ -1705,9 +1705,9 @@ nsEventStatus AsyncPanZoomController::OnLongPressUp(const TapGestureInput& aEven
   APZC_LOG("%p got a long-tap-up in state %d\n", this, mState);
   nsRefPtr<GeckoContentController> controller = GetGeckoContentController();
   if (controller) {
-    CSSPoint goannaScreenPoint;
-    if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
-      controller->HandleLongTapUp(goannaScreenPoint, aEvent.modifiers, GetGuid());
+    CSSPoint geckoScreenPoint;
+    if (ConvertToGecko(aEvent.mLocalPoint, &geckoScreenPoint)) {
+      controller->HandleLongTapUp(geckoScreenPoint, aEvent.modifiers, GetGuid());
       return nsEventStatus_eConsumeNoDefault;
     }
   }
@@ -1717,8 +1717,8 @@ nsEventStatus AsyncPanZoomController::OnLongPressUp(const TapGestureInput& aEven
 nsEventStatus AsyncPanZoomController::GenerateSingleTap(const ParentLayerPoint& aPoint, mozilla::Modifiers aModifiers) {
   nsRefPtr<GeckoContentController> controller = GetGeckoContentController();
   if (controller) {
-    CSSPoint goannaScreenPoint;
-    if (ConvertToGoanna(aPoint, &goannaScreenPoint)) {
+    CSSPoint geckoScreenPoint;
+    if (ConvertToGecko(aPoint, &geckoScreenPoint)) {
       if (!CurrentTouchBlock()->SetSingleTapOccurred()) {
         return nsEventStatus_eIgnore;
       }
@@ -1729,7 +1729,7 @@ nsEventStatus AsyncPanZoomController::GenerateSingleTap(const ParentLayerPoint& 
       // See bug 965381 for the issue this was causing.
       controller->PostDelayedTask(
         NewRunnableMethod(controller.get(), &GeckoContentController::HandleSingleTap,
-                          goannaScreenPoint, aModifiers,
+                          geckoScreenPoint, aModifiers,
                           GetGuid()),
         0);
       return nsEventStatus_eConsumeNoDefault;
@@ -1765,9 +1765,9 @@ nsEventStatus AsyncPanZoomController::OnDoubleTap(const TapGestureInput& aEvent)
   nsRefPtr<GeckoContentController> controller = GetGeckoContentController();
   if (controller) {
     if (mZoomConstraints.mAllowDoubleTapZoom && CurrentTouchBlock()->TouchActionAllowsDoubleTapZoom()) {
-      CSSPoint goannaScreenPoint;
-      if (ConvertToGoanna(aEvent.mLocalPoint, &goannaScreenPoint)) {
-        controller->HandleDoubleTap(goannaScreenPoint, aEvent.modifiers, GetGuid());
+      CSSPoint geckoScreenPoint;
+      if (ConvertToGecko(aEvent.mLocalPoint, &geckoScreenPoint)) {
+        controller->HandleDoubleTap(geckoScreenPoint, aEvent.modifiers, GetGuid());
       }
     }
     return nsEventStatus_eConsumeNoDefault;
@@ -2816,7 +2816,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
   } else {
     // If we're not taking the aLayerMetrics wholesale we still need to pull
     // in some things into our local mFrameMetrics because these things are
-    // determined by Goanna and our copy in mFrameMetrics may be stale.
+    // determined by Gecko and our copy in mFrameMetrics may be stale.
 
     if (FuzzyEqualsAdditive(mFrameMetrics.mCompositionBounds.width, aLayerMetrics.mCompositionBounds.width) &&
         mFrameMetrics.GetDevPixelsPerCSSPixel() == aLayerMetrics.GetDevPixelsPerCSSPixel() &&
@@ -2866,7 +2866,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
       // going to be ignored by layout, and so mLastDispatchedPaintMetrics
       // becomes incorrect for the purposes of calculating the LD transform. To
       // correct this we need to update mLastDispatchedPaintMetrics to be the
-      // last thing we know was painted by Goanna.
+      // last thing we know was painted by Gecko.
       mLastDispatchedPaintMetrics = aLayerMetrics;
 
       // Since the scroll offset has changed, we need to recompute the

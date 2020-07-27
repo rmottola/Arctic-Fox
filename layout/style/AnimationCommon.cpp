@@ -30,7 +30,7 @@
 
 using mozilla::layers::Layer;
 using mozilla::dom::Animation;
-using mozilla::dom::KeyframeEffectReadonly;
+using mozilla::dom::KeyframeEffectReadOnly;
 
 namespace mozilla {
 
@@ -539,7 +539,7 @@ AnimationCollection::CanAnimatePropertyOnCompositor(
         frame->Preserves3DChildren()) {
       if (shouldLog) {
         nsCString message;
-        message.AppendLiteral("Goanna bug: Async animation of 'preserve-3d' transforms is not supported.  See bug 779598");
+        message.AppendLiteral("Gecko bug: Async animation of 'preserve-3d' transforms is not supported.  See bug 779598");
         LogAsyncAnimationFailure(message, aElement);
       }
       return false;
@@ -547,7 +547,7 @@ AnimationCollection::CanAnimatePropertyOnCompositor(
     if (frame->IsSVGTransformed()) {
       if (shouldLog) {
         nsCString message;
-        message.AppendLiteral("Goanna bug: Async 'transform' animations of frames with SVG transforms is not supported.  See bug 779599");
+        message.AppendLiteral("Gecko bug: Async 'transform' animations of frames with SVG transforms is not supported.  See bug 779599");
         LogAsyncAnimationFailure(message, aElement);
       }
       return false;
@@ -594,7 +594,7 @@ AnimationCollection::CanPerformOnCompositorThread(
       mElementProperty != nsGkAtoms::animationsProperty) {
     if (nsLayoutUtils::IsAnimationLoggingEnabled()) {
       nsCString message;
-      message.AppendLiteral("Goanna bug: Async animation of pseudoelements"
+      message.AppendLiteral("Gecko bug: Async animation of pseudoelements"
                             " not supported.  See bug 771367 (");
       message.Append(nsAtomCString(mElementProperty));
       message.Append(")");
@@ -609,7 +609,7 @@ AnimationCollection::CanPerformOnCompositorThread(
       continue;
     }
 
-    const KeyframeEffectReadonly* effect = anim->GetEffect();
+    const KeyframeEffectReadOnly* effect = anim->GetEffect();
     MOZ_ASSERT(effect, "A playing animation should have an effect");
 
     for (size_t propIdx = 0, propEnd = effect->Properties().Length();
@@ -628,7 +628,7 @@ AnimationCollection::CanPerformOnCompositorThread(
       continue;
     }
 
-    const KeyframeEffectReadonly* effect = anim->GetEffect();
+    const KeyframeEffectReadOnly* effect = anim->GetEffect();
     MOZ_ASSERT(effect, "A playing animation should have an effect");
 
     existsProperty = existsProperty || effect->Properties().Length() > 0;
@@ -681,7 +681,7 @@ bool
 AnimationCollection::HasAnimationOfProperty(nsCSSProperty aProperty) const
 {
   for (size_t animIdx = mAnimations.Length(); animIdx-- != 0; ) {
-    const KeyframeEffectReadonly* effect = mAnimations[animIdx]->GetEffect();
+    const KeyframeEffectReadOnly* effect = mAnimations[animIdx]->GetEffect();
     if (effect && effect->HasAnimationOfProperty(aProperty) &&
         !effect->IsFinishedTransition()) {
       return true;
@@ -930,7 +930,7 @@ AnimationCollection::HasCurrentAnimationsForProperties(
 {
   for (size_t animIdx = mAnimations.Length(); animIdx-- != 0; ) {
     const Animation& anim = *mAnimations[animIdx];
-    const KeyframeEffectReadonly* effect = anim.GetEffect();
+    const KeyframeEffectReadOnly* effect = anim.GetEffect();
     if (effect &&
         effect->IsCurrent(anim) &&
         effect->HasAnimationOfProperties(aProperties, aPropertyCount)) {

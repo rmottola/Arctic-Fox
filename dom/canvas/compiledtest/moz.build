@@ -7,7 +7,7 @@
 # http://support.microsoft.com/kb/143208
 DEFINES['NOMINMAX'] = True
 
-GoannaCppUnitTests([
+GeckoCppUnitTests([
     'TestWebGLElementArrayCache',
 ])
 

@@ -18,7 +18,7 @@
 #include "mozilla/nsRefPtr.h"
 
 template <class> class nsCOMPtr;
-class nsIDOMWindowUtils;
+class nsIPresShell;
 class nsIWidget;
 
 namespace mozilla {
@@ -53,7 +53,7 @@ public:
                         Modifiers aModifiers,
                         const ScrollableLayerGuid& aGuid,
                         float aPresShellResolution);
-  void ProcessLongTap(const nsCOMPtr<nsIDOMWindowUtils>& aUtils,
+  void ProcessLongTap(const nsCOMPtr<nsIPresShell>& aUtils,
                       const CSSPoint& aPoint,
                       Modifiers aModifiers,
                       const ScrollableLayerGuid& aGuid,
@@ -65,7 +65,8 @@ public:
                         float aPresShellResolution);
   void ProcessTouchEvent(const WidgetTouchEvent& aEvent,
                          const ScrollableLayerGuid& aGuid,
-                         uint64_t aInputBlockId);
+                         uint64_t aInputBlockId,
+                         nsEventStatus aApzResponse);
   void ProcessWheelEvent(const WidgetWheelEvent& aEvent,
                          const ScrollableLayerGuid& aGuid,
                          uint64_t aInputBlockId);
@@ -75,7 +76,7 @@ public:
                              int aArg);
 private:
   ~APZEventState();
-  void SendPendingTouchPreventedResponse(bool aPreventDefault,
+  bool SendPendingTouchPreventedResponse(bool aPreventDefault,
                                          const ScrollableLayerGuid& aGuid);
   already_AddRefed<nsIWidget> GetWidget() const;
 private:

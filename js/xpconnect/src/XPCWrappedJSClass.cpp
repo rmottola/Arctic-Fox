@@ -507,7 +507,7 @@ nsXPCWrappedJSClass::DelegatedQueryInterface(nsXPCWrappedJS* self,
     }
 
     // QI on an XPCWrappedJS can run script, so we need an AutoEntryScript.
-    // This is inherently Goanna-specific.
+    // This is inherently Gecko-specific.
     // We check both nativeGlobal and nativeGlobal->GetGlobalJSObject() even
     // though we have derived nativeGlobal from the JS global, because we know
     // there are cases where this can happen. See bug 1094953.
@@ -910,7 +910,7 @@ nsXPCWrappedJSClass::CallMethod(nsXPCWrappedJS* wrapper, uint16_t methodIndex,
     // to our real callee.
     //
     // We're about to call into script via an XPCWrappedJS, so we need an
-    // AutoEntryScript. This is probably Goanna-specific at this point, and
+    // AutoEntryScript. This is probably Gecko-specific at this point, and
     // definitely will be when we turn off XPConnect for the web.
     nsIGlobalObject* nativeGlobal =
       NativeGlobal(js::GetGlobalForObjectCrossCompartment(wrapper->GetJSObject()));

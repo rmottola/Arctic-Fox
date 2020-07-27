@@ -1,4 +1,4 @@
-### !!! Please do not add suppressions for new leaks in Goanna code, unless they are intentional !!!
+### !!! Please do not add suppressions for new leaks in Gecko code, unless they are intentional !!!
 
 ###
 ### Some of these leak in every test run.

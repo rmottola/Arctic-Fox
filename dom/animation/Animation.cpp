@@ -1,4 +1,5 @@
-/* vim: set shiftwidth=2 tabstop=8 autoindent cindent expandtab: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -30,6 +31,25 @@ JSObject*
 Animation::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return dom::AnimationBinding::Wrap(aCx, this, aGivenProto);
+}
+
+// ---------------------------------------------------------------------------
+//
+// Animation interface:
+//
+// ---------------------------------------------------------------------------
+
+void
+Animation::SetEffect(KeyframeEffectReadOnly* aEffect)
+{
+  if (mEffect) {
+    mEffect->SetParentTime(Nullable<TimeDuration>());
+  }
+  mEffect = aEffect;
+  if (mEffect) {
+    mEffect->SetParentTime(GetCurrentTime());
+  }
+  UpdateRelevance();
 }
 
 void
@@ -73,6 +93,7 @@ Animation::SetStartTime(const Nullable<TimeDuration>& aNewStartTime)
   PostUpdate();
 }
 
+// http://w3c.github.io/web-animations/#current-time
 Nullable<TimeDuration>
 Animation::GetCurrentTime() const
 {
@@ -90,27 +111,6 @@ Animation::GetCurrentTime() const
     }
   }
   return result;
-}
-
-// Implements http://w3c.github.io/web-animations/#silently-set-the-current-time
-void
-Animation::SilentlySetCurrentTime(const TimeDuration& aSeekTime)
-{
-  if (!mHoldTime.IsNull() ||
-      !mTimeline ||
-      mTimeline->GetCurrentTime().IsNull() ||
-      mPlaybackRate == 0.0
-      /*or, once supported, if we have a pending pause task*/) {
-    mHoldTime.SetValue(aSeekTime);
-    if (!mTimeline || mTimeline->GetCurrentTime().IsNull()) {
-      mStartTime.SetNull();
-    }
-  } else {
-    mStartTime.SetValue(mTimeline->GetCurrentTime().Value() -
-                          (aSeekTime.MultDouble(1 / mPlaybackRate)));
-  }
-
-  mPreviousCurrentTime.SetNull();
 }
 
 // Implements http://w3c.github.io/web-animations/#set-the-current-time
@@ -139,18 +139,6 @@ Animation::SetPlaybackRate(double aPlaybackRate)
   if (!previousTime.IsNull()) {
     ErrorResult rv;
     SetCurrentTime(previousTime.Value());
-    MOZ_ASSERT(!rv.Failed(), "Should not assert for non-null time");
-  }
-}
-
-void
-Animation::SilentlySetPlaybackRate(double aPlaybackRate)
-{
-  Nullable<TimeDuration> previousTime = GetCurrentTime();
-  mPlaybackRate = aPlaybackRate;
-  if (!previousTime.IsNull()) {
-    ErrorResult rv;
-    SilentlySetCurrentTime(previousTime.Value());
     MOZ_ASSERT(!rv.Failed(), "Should not assert for non-null time");
   }
 }
@@ -218,6 +206,38 @@ Animation::GetFinished(ErrorResult& aRv)
 }
 
 void
+Animation::Cancel()
+{
+  DoCancel();
+  PostUpdate();
+}
+
+// https://w3c.github.io/web-animations/#finish-an-animation
+void
+Animation::Finish(ErrorResult& aRv)
+{
+  if (mPlaybackRate == 0 ||
+      (mPlaybackRate > 0 && EffectEnd() == TimeDuration::Forever())) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return;
+  }
+
+  TimeDuration limit =
+    mPlaybackRate > 0 ? TimeDuration(EffectEnd()) : TimeDuration(0);
+
+  SetCurrentTime(limit);
+
+  if (mPendingState == PendingState::PlayPending) {
+    CancelPendingTasks();
+    if (mReady) {
+      mReady->MaybeResolve(this);
+    }
+  }
+  UpdateFinishedState(true);
+  PostUpdate();
+}
+
+void
 Animation::Play(LimitBehavior aLimitBehavior)
 {
   DoPlay(aLimitBehavior);
@@ -227,11 +247,15 @@ Animation::Play(LimitBehavior aLimitBehavior)
 void
 Animation::Pause()
 {
-  // TODO: The DoPause() call should not be synchronous (bug 1109390). See
-  // http://w3c.github.io/web-animations/#pausing-an-animation-section
   DoPause();
   PostUpdate();
 }
+
+// ---------------------------------------------------------------------------
+//
+// JS wrappers for Animation interface:
+//
+// ---------------------------------------------------------------------------
 
 Nullable<double>
 Animation::GetStartTimeAsDouble() const
@@ -265,18 +289,7 @@ Animation::SetCurrentTimeAsDouble(const Nullable<double>& aCurrentTime,
   return SetCurrentTime(TimeDuration::FromMilliseconds(aCurrentTime.Value()));
 }
 
-void
-Animation::SetEffect(KeyframeEffectReadonly* aEffect)
-{
-  if (mEffect) {
-    mEffect->SetParentTime(Nullable<TimeDuration>());
-  }
-  mEffect = aEffect;
-  if (mEffect) {
-    mEffect->SetParentTime(GetCurrentTime());
-  }
-  UpdateRelevance();
-}
+// ---------------------------------------------------------------------------
 
 void
 Animation::Tick()
@@ -349,8 +362,41 @@ Animation::GetCurrentOrPendingStartTime() const
   return result;
 }
 
+// http://w3c.github.io/web-animations/#silently-set-the-current-time
 void
-Animation::Cancel()
+Animation::SilentlySetCurrentTime(const TimeDuration& aSeekTime)
+{
+  if (!mHoldTime.IsNull() ||
+      mStartTime.IsNull() ||
+      !mTimeline ||
+      mTimeline->GetCurrentTime().IsNull() ||
+      mPlaybackRate == 0.0) {
+    mHoldTime.SetValue(aSeekTime);
+    if (!mTimeline || mTimeline->GetCurrentTime().IsNull()) {
+      mStartTime.SetNull();
+    }
+  } else {
+    mStartTime.SetValue(mTimeline->GetCurrentTime().Value() -
+                          (aSeekTime.MultDouble(1 / mPlaybackRate)));
+  }
+
+  mPreviousCurrentTime.SetNull();
+}
+
+void
+Animation::SilentlySetPlaybackRate(double aPlaybackRate)
+{
+  Nullable<TimeDuration> previousTime = GetCurrentTime();
+  mPlaybackRate = aPlaybackRate;
+  if (!previousTime.IsNull()) {
+    ErrorResult rv;
+    SilentlySetCurrentTime(previousTime.Value());
+    MOZ_ASSERT(!rv.Failed(), "Should not assert for non-null time");
+  }
+}
+
+void
+Animation::DoCancel()
 {
   if (mPendingState != PendingState::NotPending) {
     CancelPendingTasks();
@@ -493,6 +539,7 @@ Animation::ComposeStyle(nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
   }
 }
 
+// http://w3c.github.io/web-animations/#play-an-animation
 void
 Animation::DoPlay(LimitBehavior aLimitBehavior)
 {
@@ -556,6 +603,7 @@ Animation::DoPlay(LimitBehavior aLimitBehavior)
   UpdateTiming();
 }
 
+// http://w3c.github.io/web-animations/#pause-an-animation
 void
 Animation::DoPause()
 {

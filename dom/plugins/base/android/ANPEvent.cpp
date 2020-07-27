@@ -11,7 +11,7 @@
 #include "AndroidBridge.h"
 #include "nsNPAPIPlugin.h"
 
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #define ASSIGN(obj, name)   (obj)->name = anp_event_##name
 
 void

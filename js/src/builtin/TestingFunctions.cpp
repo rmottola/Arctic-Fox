@@ -774,12 +774,11 @@ struct JSCountHeapNode {
 
 typedef HashSet<void*, PointerHasher<void*, 3>, SystemAllocPolicy> VisitedSet;
 
-class CountHeapTracer
+class CountHeapTracer : public JS::CallbackTracer
 {
   public:
-    CountHeapTracer(JSRuntime* rt, JSTraceCallback callback) : base(rt, callback) {}
+    CountHeapTracer(JSRuntime* rt, JSTraceCallback callback) : CallbackTracer(rt, callback) {}
 
-    JSTracer            base;
     VisitedSet          visited;
     JSCountHeapNode*    traceList;
     JSCountHeapNode*    recycleList;
@@ -787,10 +786,8 @@ class CountHeapTracer
 };
 
 static void
-CountHeapNotify(JSTracer* trc, void** thingp, JSGCTraceKind kind)
+CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 {
-    MOZ_ASSERT(trc->callback == CountHeapNotify);
-
     CountHeapTracer* countTracer = (CountHeapTracer*)trc;
     void* thing = *thingp;
 
@@ -898,9 +895,9 @@ CountHeap(JSContext* cx, unsigned argc, jsval* vp)
     countTracer.recycleList = nullptr;
 
     if (startValue.isUndefined()) {
-        js::TraceRuntime(&countTracer.base);
+        js::TraceRuntime(&countTracer);
     } else {
-        JS_CallUnbarrieredValueTracer(&countTracer.base, startValue.address(), "root");
+        JS_CallUnbarrieredValueTracer(&countTracer, startValue.address(), "root");
     }
 
     JSCountHeapNode* node;
@@ -918,7 +915,7 @@ CountHeap(JSContext* cx, unsigned argc, jsval* vp)
         countTracer.traceList = node->next;
         node->next = countTracer.recycleList;
         countTracer.recycleList = node;
-        JS_TraceChildren(&countTracer.base, node->thing, node->kind);
+        JS_TraceChildren(&countTracer, node->thing, node->kind);
     }
     while ((node = countTracer.recycleList) != nullptr) {
         countTracer.recycleList = node->next;
@@ -2253,7 +2250,6 @@ EvalReturningScope(JSContext* cx, unsigned argc, jsval* vp)
     JS::CompileOptions options(cx);
     options.setFileAndLine(filename.get(), lineno);
     options.setNoScriptRval(true);
-    options.setCompileAndGo(false);
     options.setHasPollutedScope(true);
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
@@ -2325,7 +2321,6 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
     JS::CompileOptions options(cx);
     options.setFileAndLine(filename.get(), lineno);
     options.setNoScriptRval(true);
-    options.setCompileAndGo(false);
 
     JS::SourceBufferHolder srcBuf(src, srclen, JS::SourceBufferHolder::NoOwnership);
     RootedScript script(cx);
@@ -2344,7 +2339,7 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 
     AutoCompartment ac(cx, global);
 
-    if (!JS::CloneAndExecuteScript(cx, global, script))
+    if (!JS::CloneAndExecuteScript(cx, script))
         return false;
 
     args.rval().setUndefined();
@@ -2719,7 +2714,7 @@ gc::ZealModeHelpText),
     JS_FN_HELP("reportLargeAllocationFailure", ReportLargeAllocationFailure, 0, 0,
 "reportLargeAllocationFailure()",
 "  Call the large allocation failure callback, as though a large malloc call failed,\n"
-"  then return undefined. In Goanna, this sends a memory pressure notification, which\n"
+"  then return undefined. In Gecko, this sends a memory pressure notification, which\n"
 "  can free up some memory."),
 
     JS_FN_HELP("findPath", FindPath, 2, 0,

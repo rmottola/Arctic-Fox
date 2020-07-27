@@ -11,7 +11,7 @@ import time
 
 class MarionetteTransport(object):
     """ The Marionette socket client.  This speaks the same protocol
-        as the remote debugger inside Goanna, in which messages are
+        as the remote debugger inside Gecko, in which messages are
         always preceded by the message length and a colon, e.g.,
 
         20:{'command': 'test'}

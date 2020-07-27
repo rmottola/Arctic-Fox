@@ -4,7 +4,7 @@
 
 '''
 Script to produce an Android ARchive (.aar) containing the compiled
-Goanna library binaries.  The AAR file is intended for use by local
+Gecko library binaries.  The AAR file is intended for use by local
 developers using Gradle.
 '''
 

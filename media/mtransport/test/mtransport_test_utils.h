@@ -19,7 +19,7 @@
 
 #include "nsIComponentManager.h"
 #include "nsIComponentRegistrar.h"
-#include "nsNetUtil.h"
+#include "nsIEventTarget.h"
 #include "nsIIOService.h"
 #include "nsIServiceManager.h"
 #include "nsISocketTransportService.h"
@@ -27,7 +27,22 @@
 #include "nsDirectoryServiceDefs.h"
 #include "nsPISocketTransportService.h"
 #include "nsServiceManagerUtils.h"
+#if !defined(MOZILLA_XPCOMRT_API)
 #include "TestHarness.h"
+#else
+#include "XPCOMRTInit.h"
+class ScopedXPCOM {
+public:
+  explicit ScopedXPCOM(const char*)
+  {
+    NS_InitXPCOMRT();
+  }
+  ~ScopedXPCOM()
+  {
+    NS_ShutdownXPCOMRT();
+  }
+};
+#endif
 
 class MtransportTestUtils {
  public:
@@ -43,8 +58,6 @@ class MtransportTestUtils {
 
   void InitServices() {
     nsresult rv;
-    ioservice_ = do_GetIOService(&rv);
-    MOZ_ASSERT(NS_SUCCEEDED(rv));
     sts_target_ = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     sts_ = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
@@ -56,7 +69,6 @@ class MtransportTestUtils {
 
  private:
   ScopedXPCOM xpcom_;
-  nsCOMPtr<nsIIOService> ioservice_;
   nsCOMPtr<nsIEventTarget> sts_target_;
   nsCOMPtr<nsPISocketTransportService> sts_;
 };

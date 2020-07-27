@@ -8,7 +8,7 @@
     <uses-sdk android:minSdkVersion="8" />
 
     <instrumentation
-        android:name="org.mozilla.goanna.FennecInstrumentationTestRunner"
+        android:name="org.mozilla.gecko.FennecInstrumentationTestRunner"
         android:targetPackage="@ANDROID_PACKAGE_NAME@" />
 
     <application
@@ -16,7 +16,7 @@
         <uses-library android:name="android.test.runner" />
 
         <!-- Fake handlers to ensure that we have some share intents to show in our share handler list -->
-        <activity android:name="org.mozilla.goanna.RobocopShare1"
+        <activity android:name="org.mozilla.gecko.RobocopShare1"
                   android:label="Robocop fake activity">
 
             <intent-filter android:label="Fake robocop share handler 1">
@@ -28,7 +28,7 @@
 
         </activity>
 
-        <activity android:name="org.mozilla.goanna.RobocopShare2"
+        <activity android:name="org.mozilla.gecko.RobocopShare2"
                   android:label="Robocop fake activity 2">
 
             <intent-filter android:label="Fake robocop share handler 2">

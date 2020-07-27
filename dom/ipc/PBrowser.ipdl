@@ -17,7 +17,7 @@ include protocol PPluginWidget;
 include DOMTypes;
 include JavaScriptTypes;
 include URIParams;
-include ServiceWorkerRegistrarTypes;
+include BrowserConfiguration;
 
 
 using class IPC::Principal from "mozilla/dom/PermissionMessageUtils.h";
@@ -58,6 +58,8 @@ using mozilla::layers::GeckoContentController::APZStateChange from "mozilla/laye
 using mozilla::WritingMode from "mozilla/WritingModes.h";
 using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
 using nsIWidget::TouchPointerState from "nsIWidget.h";
+using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
+using struct mozilla::OwningSerializedStructuredCloneBuffer from "ipc/IPCMessageUtils.h";
 
 namespace mozilla {
 namespace dom {
@@ -67,11 +69,6 @@ struct NativeKeyBinding
   CommandInt[] singleLineCommands;
   CommandInt[] multiLineCommands;
   CommandInt[] richTextCommands;
-};
-
-struct BrowserConfiguration
-{
-  ServiceWorkerRegistrationData[] serviceWorkerRegistrations;
 };
 
 union MaybeNativeKeyBinding
@@ -151,11 +148,11 @@ parent:
 
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
                      CpowEntry[] aCpows, Principal aPrincipal)
-      returns (nsString[] retval);
+      returns (OwningSerializedStructuredCloneBuffer[] retval);
 
     prio(high) sync RpcMessage(nsString aMessage, ClonedMessageData aData,
                                CpowEntry[] aCpows, Principal aPrincipal)
-      returns (nsString[] retval);
+      returns (OwningSerializedStructuredCloneBuffer[] retval);
 
     /**
      * The IME sequence number (seqno) parameter is used to make sure
@@ -333,14 +330,6 @@ parent:
     sync IsParentWindowMainWidgetVisible() returns (bool visible);
 
     /**
-     * Returns the offset of this tab from the top level window
-     * origin in device pixels.
-     *
-     * aPoint offset values in device pixels.
-     */
-    sync GetTabOffset() returns (LayoutDeviceIntPoint aPoint);
-
-    /**
      * Gets the DPI of the screen corresponding to this browser.
      */
     sync GetDPI() returns (float value);
@@ -427,7 +416,7 @@ parent:
     ContentReceivedInputBlock(ScrollableLayerGuid aGuid, uint64_t aInputBlockId, bool aPreventDefault);
 
     /**
-     * Notifies the APZ code of the results of the goanna hit-test for a
+     * Notifies the APZ code of the results of the gecko hit-test for a
      * particular input block. Each target corresponds to one touch point in the
      * touch event.
      */
@@ -675,9 +664,21 @@ child:
     UIResolutionChanged();
 
     /**
+     * Tell the child that the system theme has changed, and that a repaint
+     * is necessary.
+     */
+    ThemeChanged(LookAndFeelInt[] lookAndFeelIntCache);
+
+    /**
      * Tell the child of an app's offline status
      */
     AppOfflineStatus(uint32_t id, bool offline);
+
+    /**
+     * Tell the browser that its frame loader has been swapped
+     * with another.
+     */
+    SwappedWithOtherRemoteLoader();
 
 /*
  * FIXME: write protocol!

@@ -705,13 +705,13 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
                     scopeChain = fun->environment();
                 }
             } else {
-                // For global, compile-and-go scripts the scope chain is the
-                // script's global (Ion does not compile non-compile-and-go
-                // scripts). Also note that it's invalid to resume into the
-                // prologue in this case because the prologue expects the scope
-                // chain in R1 for eval and global scripts.
+                // For global scripts without a polluted global scope the scope
+                // chain is the script's global (Ion does not compile scripts
+                // with a polluted global scope). Also note that it's invalid to
+                // resume into the prologue in this case because the prologue
+                // expects the scope chain in R1 for eval and global scripts.
                 MOZ_ASSERT(!script->isForEval());
-                MOZ_ASSERT(script->compileAndGo());
+                MOZ_ASSERT(!script->hasPollutedGlobalScope());
                 scopeChain = &(script->global());
             }
         }
@@ -1618,6 +1618,28 @@ HandleShapeGuardFailure(JSContext* cx, HandleScript outerScript, HandleScript in
 }
 
 static bool
+HandleLexicalCheckFailure(JSContext *cx, HandleScript outerScript, HandleScript innerScript)
+{
+    JitSpew(JitSpew_IonBailouts, "Lexical check failure %s:%d, inlined into %s:%d",
+            innerScript->filename(), innerScript->lineno(),
+            outerScript->filename(), outerScript->lineno());
+
+    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
+
+    if (!innerScript->failedLexicalCheck())
+        innerScript->setFailedLexicalCheck();
+
+    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to lexical check failure");
+    if (!Invalidate(cx, outerScript))
+        return false;
+
+    if (innerScript->hasIonScript() && !Invalidate(cx, innerScript))
+        return false;
+
+    return true;
+}
+
+static bool
 HandleBaselineInfoBailout(JSContext* cx, JSScript* outerScript, JSScript* innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
@@ -1839,6 +1861,10 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
         break;
       case Bailout_ShapeGuard:
         if (!HandleShapeGuardFailure(cx, outerScript, innerScript))
+            return false;
+        break;
+      case Bailout_UninitializedLexical:
+        if (!HandleLexicalCheckFailure(cx, outerScript, innerScript))
             return false;
         break;
       case Bailout_IonExceptionDebugMode:

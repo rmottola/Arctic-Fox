@@ -113,7 +113,7 @@ MessagePump::Run(MessagePump::Delegate* aDelegate)
 
 #ifdef MOZ_WIDGET_ANDROID
     // This processes messages in the Android Looper. Note that we only
-    // get here if the normal Goanna event loop has been awoken above.
+    // get here if the normal Gecko event loop has been awoken above.
     // Bug 750713
     if (MOZ_LIKELY(AndroidBridge::HasEnv())) {
         did_work |= mozilla::widget::GeckoAppShell::PumpMessageLoop();

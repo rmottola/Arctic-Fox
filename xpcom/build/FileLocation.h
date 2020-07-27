@@ -21,7 +21,7 @@ class FileLocation
 public:
   /**
    * FileLocation is an helper to handle different kind of file locations
-   * within Goanna:
+   * within Gecko:
    * - on filesystems
    * - in archives
    * - in archives within archives

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -185,7 +186,7 @@ nsSMILCSSProperty::ClearAnimValue()
 bool
 nsSMILCSSProperty::IsPropertyAnimatable(nsCSSProperty aPropID)
 {
-  // NOTE: Right now, Goanna doesn't recognize the following properties from
+  // NOTE: Right now, Gecko doesn't recognize the following properties from
   // the SVG Property Index:
   //   alignment-baseline
   //   baseline-shift
@@ -255,7 +256,7 @@ nsSMILCSSProperty::IsPropertyAnimatable(nsCSSProperty aPropID)
       return true;
 
     // EXPLICITLY NON-ANIMATABLE PROPERTIES:
-    // (Some of these aren't supported at all in Goanna -- I've commented those
+    // (Some of these aren't supported at all in Gecko -- I've commented those
     // ones out. If/when we add support for them, uncomment their line here)
     // ----------------------------------------------------------------------
     // case eCSSProperty_enable_background:

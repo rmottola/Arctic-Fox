@@ -526,7 +526,7 @@
             </hbox>
           </box>
           <box id="urlbar-display-box" align="center">
-            <label id="urlbar-display" value="&urlbar.switchToTab.label;"/>
+             <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
           </box>
           <hbox id="urlbar-icons">
             <image id="page-report-button"
@@ -1009,7 +1009,7 @@
     </toolbarpalette>
   </toolbox>
 
-  <hbox id="fullscr-toggler" collapsed="true"/>
+  <hbox id="fullscr-toggler" hidden="true"/>
 
   <hbox flex="1" id="browser">
     <vbox id="browser-border-start" hidden="true" layer="true"/>

@@ -134,7 +134,7 @@ nsHyphenator::Hyphenate(const nsAString& aString,
         // Surprisingly, hnj_hyphen_hyphenate2 converts the 'hyphens' buffer
         // from utf8 code unit indexing (which would match the utf8 input
         // string directly) to Unicode character indexing.
-        // We then need to convert this to utf16 code unit offsets for Goanna.
+        // We then need to convert this to utf16 code unit offsets for Gecko.
         const char *hyphPtr = utf8hyphens.Elements();
         const char16_t *cur = begin + wordStart;
         const char16_t *end = begin + wordLimit;

@@ -55,6 +55,7 @@
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
+- Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 . Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
@@ -64,6 +65,7 @@
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
+- Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 947854 - 2015-05-05 parto 0 to 4
@@ -73,7 +75,9 @@
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
+- Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
+- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope.
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
@@ -109,6 +113,7 @@
 - 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
+- Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
 - Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
@@ -116,38 +121,25 @@
 - Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
 - Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
-- Bug 1158425 - 2015-05-02 - Rename _SYNTH event names. r=smaug
-- Bug 1071558 - Correctly handle middle- and right-clicks on search sug
 - Bug 1094888 - part 1 and 2
 
 - Bug 1144366 followup - Stop declaring multiple pointers on a single line
 
 - Bug 1097987
-- Bug 1135731 - fix encoding inconsistency in NS_NewXBLProtoImpl; r=mrbkap
 -  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
-- Bug 1149739
 - Bug 1149352 - Part 0 to 11
-
-Sequence:
-Bug 1152171 part 2 - Rename AnimationTimeline to DocumentTimeline
-Bug 1026350 - Part 1: Inputport API implementation
-Bug 1114935 - Part 3 to 35!
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
-- Bug 1085607 - libvpx doesn't build on OS X with Apple clang from OS X
 
 More session store stuff to check:
 
-- Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
+- Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
 
-- Build stuff
-- Bug 1151005 - Show notifications when the 'install' and 'package' mac
-- Bug 1151005 - Refactor terminal notification stuff from 'mach build'
 
 
 Not applying / Breaking build:
@@ -155,7 +147,6 @@ Bug 1162569 - default engine files should be in the omni.ja file,
 
 Devtools stuff to check - files not there:
 - Bug 1150259 - Deactivating subtest under old Windows/old Linux.
-- Bug 1150555 - about:performance should not confuse Jetpack addons. 
 
 
 Check with Roy Tam:
@@ -166,15 +157,10 @@ Check with Roy Tam:
 
 What with LightweightThemeConsumer.jsm 
 
--> check that 1085607 did not break Apple build!
-
-
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
 
 To verify:
-- Bug 1133140 - Move runtime heap size limit checks up to GCIfNeeded;
-
 - Verify requirements of 968520
 
 Verify all here:
@@ -192,7 +178,7 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
-https://github.com/mozilla/gecko-dev/commits/04bd6d2255ca35057a7f8d18fc03e908d02f6907?after=04bd6d2255ca35057a7f8d18fc03e908d02f6907+454&path%5B%5D=dom
+
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
@@ -210,14 +196,9 @@ Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
-- Bug 1144366 - Switch SpiderMonkey and XPConnect style from |T *t| to |T* t|
 
 - Bug 1172609 - 8 part ICU update
 
-
-
-For Windows:
-Bug 1135138 - Remove UNICODE from DEFINES in moz.build rather than Ma
 
 
 ### Further Further ToDo:

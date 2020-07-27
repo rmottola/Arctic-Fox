@@ -192,7 +192,7 @@ public:
   }
 
   // Returns the given y coordinate, which must be in screen coordinates,
-  // flipped from Goanna to Cocoa or Cocoa to Goanna.
+  // flipped from Gecko to Cocoa or Cocoa to Gecko.
   static float FlippedScreenY(float y);
 
   // The following functions come in "DevPix" variants that work with
@@ -201,23 +201,23 @@ public:
   // The difference becomes important in HiDPI display modes, where Cocoa
   // points and backing-store pixels are no longer 1:1.
 
-  // Goanna rects (nsRect) contain an origin (x,y) in a coordinate
+  // Gecko rects (nsRect) contain an origin (x,y) in a coordinate
   // system with (0,0) in the top-left of the primary screen. Cocoa rects
   // (NSRect) contain an origin (x,y) in a coordinate system with (0,0)
   // in the bottom-left of the primary screen. Both nsRect and NSRect
   // contain width/height info, with no difference in their use.
-  // This function does no scaling, so the Goanna coordinates are
+  // This function does no scaling, so the Gecko coordinates are
   // expected to be CSS pixels, which we treat as equal to Cocoa points.
-  static NSRect GoannaRectToCocoaRect(const nsIntRect &goannaRect);
+  static NSRect GeckoRectToCocoaRect(const nsIntRect &geckoRect);
 
-  // Converts aGoannaRect in dev pixels to points in Cocoa coordinates
-  static NSRect GoannaRectToCocoaRectDevPix(const nsIntRect &aGoannaRect,
+  // Converts aGeckoRect in dev pixels to points in Cocoa coordinates
+  static NSRect GeckoRectToCocoaRectDevPix(const nsIntRect &aGeckoRect,
                                            CGFloat aBackingScale);
 
-  // See explanation for goannaRectToCocoaRect, guess what this does...
-  static nsIntRect CocoaRectToGoannaRect(const NSRect &cocoaRect);
+  // See explanation for geckoRectToCocoaRect, guess what this does...
+  static nsIntRect CocoaRectToGeckoRect(const NSRect &cocoaRect);
 
-  static nsIntRect CocoaRectToGoannaRectDevPix(const NSRect &aCocoaRect,
+  static nsIntRect CocoaRectToGeckoRectDevPix(const NSRect &aCocoaRect,
                                               CGFloat aBackingScale);
 
   // Gives the location for the event in screen coordinates. Do not call this
@@ -296,20 +296,20 @@ public:
   static NSString* ToNSString(const nsAString& aString);
 
   /**
-   * Returns NSRect for aGoannaRect.
+   * Returns NSRect for aGeckoRect.
    * Just copies values between the two types; it does no coordinate-system
    * conversion, so both rects must have the same coordinate origin/direction.
    */
-  static void GoannaRectToNSRect(const nsIntRect& aGoannaRect,
+  static void GeckoRectToNSRect(const nsIntRect& aGeckoRect,
                                 NSRect& aOutCocoaRect);
 
   /**
-   * Returns Goanna rect for aCocoaRect.
+   * Returns Gecko rect for aCocoaRect.
    * Just copies values between the two types; it does no coordinate-system
    * conversion, so both rects must have the same coordinate origin/direction.
    */
-  static void NSRectToGoannaRect(const NSRect& aCocoaRect,
-                                nsIntRect& aOutGoannaRect);
+  static void NSRectToGeckoRect(const NSRect& aCocoaRect,
+                                nsIntRect& aOutGeckoRect);
 
   /**
    * Makes NSEvent instance for aEventTytpe and aEvent.
@@ -352,16 +352,16 @@ public:
                                       nsTArray<KeyBindingsCommand>& aCommands);
 
   /**
-   * Converts the string name of a Goanna key (like "VK_HOME") to the
+   * Converts the string name of a Gecko key (like "VK_HOME") to the
    * corresponding Cocoa Unicode character.
    */
-  static uint32_t ConvertGoannaNameToMacCharCode(const nsAString& aKeyCodeName);
+  static uint32_t ConvertGeckoNameToMacCharCode(const nsAString& aKeyCodeName);
 
   /**
-   * Converts a Goanna key code (like NS_VK_HOME) to the corresponding Cocoa
+   * Converts a Gecko key code (like NS_VK_HOME) to the corresponding Cocoa
    * Unicode character.
    */
-  static uint32_t ConvertGoannaKeyCodeToMacCharCode(uint32_t aKeyCode);
+  static uint32_t ConvertGeckoKeyCodeToMacCharCode(uint32_t aKeyCode);
 };
 
 #endif // nsCocoaUtils_h_

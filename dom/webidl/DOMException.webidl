@@ -104,6 +104,6 @@ interface DOMException {
   readonly attribute unsigned short code;
 };
 
-// XXXkhuey copy all of Goanna's non-standard stuff onto DOMException, but leave
+// XXXkhuey copy all of Gecko's non-standard stuff onto DOMException, but leave
 // the prototype chain sane.
 DOMException implements ExceptionMembers;

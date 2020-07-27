@@ -19,7 +19,7 @@ else:
             USE_LIBS += [
                 'mozalloc_staticruntime',
             ]
-    GoannaProgram(CONFIG['MOZ_CHILD_PROCESS_NAME'], **kwargs)
+    GeckoProgram(CONFIG['MOZ_CHILD_PROCESS_NAME'], **kwargs)
 
     SOURCES += [
         'MozillaRuntimeMain.cpp',
@@ -72,6 +72,11 @@ if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_TARGET'] in ('Linux', 'Android'):
     # forcing there to be only one partition.
     if '-flto' in CONFIG['OS_CXXFLAGS'] and not CONFIG['CLANG_CXX']:
 	LDFLAGS += ['--param lto-partitions=1']
+
+if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_TARGET'] == 'Darwin':
+    USE_LIBS += [
+        'mozsandbox',
+    ]
 
 if CONFIG['_MSC_VER']:
     # Always enter a Windows program through wmain, whether or not we're

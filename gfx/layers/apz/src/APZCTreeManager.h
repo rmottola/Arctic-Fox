@@ -192,12 +192,12 @@ public:
                                   uint64_t* aOutInputBlockId);
 
   /**
-   * A helper for transforming coordinates to goanna coordinate space.
+   * A helper for transforming coordinates to gecko coordinate space.
    *
    * @param aPoint point to transform
    * @param aOutTransformedPoint resulting transformed point
    */
-  void TransformCoordinateToGoanna(const ScreenIntPoint& aPoint,
+  void TransformCoordinateToGecko(const ScreenIntPoint& aPoint,
                                   LayoutDeviceIntPoint* aOutTransformedPoint);
 
   /**
@@ -379,15 +379,6 @@ public:
    */
   nsRefPtr<const OverscrollHandoffChain> BuildOverscrollHandoffChain(const nsRefPtr<AsyncPanZoomController>& aInitialTarget);
 
-public:
-  // Returns whether or not a wheel event action will be (or was) performed by
-  // APZ. If this returns true, the event must not perform a synchronous
-  // scroll.
-  //
-  // Even if this returns false, all wheel events in APZ-aware widgets must
-  // be sent through APZ so they are transformed correctly for TabParent.
-  static bool WillHandleWheelEvent(WidgetWheelEvent* aEvent);
-
 protected:
   // Protected destructor, to discourage deletion outside of Release():
   virtual ~APZCTreeManager();
@@ -407,7 +398,7 @@ public:
   already_AddRefed<AsyncPanZoomController> GetTargetAPZC(const ScreenPoint& aPoint,
                                                          HitTestResult* aOutHitResult);
   gfx::Matrix4x4 GetScreenToApzcTransform(const AsyncPanZoomController *aApzc) const;
-  gfx::Matrix4x4 GetApzcToGoannaTransform(const AsyncPanZoomController *aApzc) const;
+  gfx::Matrix4x4 GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) const;
 private:
   typedef bool (*GuidComparator)(const ScrollableLayerGuid&, const ScrollableLayerGuid&);
 

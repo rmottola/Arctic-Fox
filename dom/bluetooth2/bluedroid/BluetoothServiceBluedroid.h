@@ -81,15 +81,30 @@ public:
                        BluetoothReplyRunnable* aRunnable);
 
   virtual void
-  SetPinCodeInternal(const nsAString& aDeviceAddress, const nsAString& aPinCode,
+  PinReplyInternal(const nsAString& aDeviceAddress,
+                   bool aAccept,
+                   const nsAString& aPinCode,
+                   BluetoothReplyRunnable* aRunnable);
+
+  virtual void
+  SspReplyInternal(const nsAString& aDeviceAddress,
+                   BluetoothSspVariant aVariant,
+                   bool aAccept,
+                   BluetoothReplyRunnable* aRunnable);
+
+  virtual void
+  SetPinCodeInternal(const nsAString& aDeviceAddress,
+                     const nsAString& aPinCode,
                      BluetoothReplyRunnable* aRunnable);
 
   virtual void
-  SetPasskeyInternal(const nsAString& aDeviceAddress, uint32_t aPasskey,
+  SetPasskeyInternal(const nsAString& aDeviceAddress,
+                     uint32_t aPasskey,
                      BluetoothReplyRunnable* aRunnable);
 
   virtual void
-  SetPairingConfirmationInternal(const nsAString& aDeviceAddress, bool aConfirm,
+  SetPairingConfirmationInternal(const nsAString& aDeviceAddress,
+                                 bool aConfirm,
                                  BluetoothReplyRunnable* aRunnable);
 
   virtual void
@@ -185,8 +200,31 @@ public:
                                BluetoothReplyRunnable* aRunnable) override;
 
   virtual void
+  DiscoverGattServicesInternal(const nsAString& aAppUuid,
+                               BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattClientStartNotificationsInternal(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServId,
+    const BluetoothGattId& aCharId,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattClientStopNotificationsInternal(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServId,
+    const BluetoothGattId& aCharId,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
   UnregisterGattClientInternal(int aClientIf,
                                BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattClientReadRemoteRssiInternal(
+    int aClientIf, const nsAString& aDeviceAddress,
+    BluetoothReplyRunnable* aRunnable) override;
 
   //
   // Bluetooth notifications
@@ -240,9 +278,6 @@ protected:
   static void NextBluetoothProfileController();
   static ControlPlayStatus PlayStatusStringToControlPlayStatus(
     const nsAString& aPlayStatus);
-  static void ReplyStatusError(BluetoothReplyRunnable* aReplyRunnable,
-                               BluetoothStatus aStatusCode,
-                               const nsAString& aCustomMsg);
 };
 
 END_BLUETOOTH_NAMESPACE

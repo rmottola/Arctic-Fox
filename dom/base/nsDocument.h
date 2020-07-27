@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -1038,8 +1038,6 @@ public:
   virtual void
     EnumerateExternalResources(nsSubDocEnumFunc aCallback, void* aData) override;
 
-  nsTArray<nsCString> mHostObjectURIs;
-
   // Returns our (lazily-initialized) animation controller.
   // If HasAnimationController is true, this is guaranteed to return non-null.
   nsSMILAnimationController* GetAnimationController() override;
@@ -1127,9 +1125,6 @@ public:
   virtual nsISupports* GetCurrentContentSink() override;
 
   virtual mozilla::EventStates GetDocumentState() override;
-
-  virtual void RegisterHostObjectUri(const nsACString& aUri) override;
-  virtual void UnregisterHostObjectUri(const nsACString& aUri) override;
 
   // Only BlockOnload should call this!
   void AsyncBlockOnload();

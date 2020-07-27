@@ -21,7 +21,7 @@
         "{workdir}/sources.xml"
     ],
     "upload_platform": "emulator-jb",
-    "goanna_l10n_root": "https://hg.mozilla.org/l10n-central",
+    "gecko_l10n_root": "https://hg.mozilla.org/l10n-central",
     "gaia": {
         "l10n": {
             "vcs": "hgtool",

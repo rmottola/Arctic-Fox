@@ -486,7 +486,7 @@ AudioManager::AudioManager()
   lock->Get("audio.volume.telephony", callback);
   lock->Get("audio.volume.bt_sco", callback);
 
-  // Goanna only control stream volume not master so set to default value
+  // Gecko only control stream volume not master so set to default value
   // directly.
   AudioSystem::setMasterVolume(1.0);
   AudioSystem::setErrorCallback(BinderDeadCallback);

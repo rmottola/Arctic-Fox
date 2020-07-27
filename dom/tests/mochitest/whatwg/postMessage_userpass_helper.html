@@ -18,7 +18,7 @@ function sendMessage(evt)
     msg += " wrong-source";
 
   // It would be good to guarantee that we've been opened with a userinfo of
-  // "bobhope:password", but Goanna elides that from the content-visible URL,
+  // "bobhope:password", but Gecko elides that from the content-visible URL,
   // and I can't find another way to actually detect this programmatically.
 
   window.parent.postMessage(msg, "http://mochi.test:8888");

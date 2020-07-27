@@ -329,7 +329,7 @@ js::Nursery::allocateHugeSlots(JS::Zone* zone, size_t nslots)
 namespace js {
 namespace gc {
 
-class MinorCollectionTracer : public JSTracer
+class MinorCollectionTracer : public JS::CallbackTracer
 {
   public:
     Nursery* nursery;
@@ -359,7 +359,7 @@ class MinorCollectionTracer : public JSTracer
     }
 
     MinorCollectionTracer(JSRuntime* rt, Nursery* nursery)
-      : JSTracer(rt, Nursery::MinorGCCallback, TraceWeakMapKeysValues),
+      : JS::CallbackTracer(rt, Nursery::MinorGCCallback, TraceWeakMapKeysValues),
         nursery(nursery),
         session(rt, MinorCollecting),
         tenuredSize(0),
@@ -590,7 +590,10 @@ js::Nursery::traceObject(MinorCollectionTracer* trc, JSObject* obj)
     if (!nobj->hasEmptyElements() && !nobj->denseElementsAreCopyOnWrite())
         markSlots(trc, nobj->getDenseElements(), nobj->getDenseInitializedLength());
 
-    HeapSlot* fixedStart, *fixedEnd, *dynStart, *dynEnd;
+    HeapSlot* fixedStart;
+    HeapSlot* fixedEnd;
+    HeapSlot* dynStart;
+    HeapSlot* dynEnd;
     nobj->getSlotRange(0, nobj->slotSpan(), &fixedStart, &fixedEnd, &dynStart, &dynEnd);
     markSlots(trc, fixedStart, fixedEnd);
     markSlots(trc, dynStart, dynEnd);
@@ -669,7 +672,8 @@ js::Nursery::moveObjectToTenured(MinorCollectionTracer *trc,
 
     js_memcpy(dst, src, srcSize);
     if (src->isNative()) {
-        NativeObject* ndst = &dst->as<NativeObject>(), *nsrc = &src->as<NativeObject>();
+        NativeObject* ndst = &dst->as<NativeObject>();
+        NativeObject* nsrc = &src->as<NativeObject>();
         tenuredSize += moveSlotsToTenured(ndst, nsrc, dstKind);
         tenuredSize += moveElementsToTenured(ndst, nsrc, dstKind);
 
@@ -755,7 +759,7 @@ ShouldMoveToTenured(MinorCollectionTracer* trc, void** thingp)
 }
 
 /* static */ void
-js::Nursery::MinorGCCallback(JSTracer* jstrc, void** thingp, JSGCTraceKind kind)
+js::Nursery::MinorGCCallback(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
 {
     MinorCollectionTracer* trc = static_cast<MinorCollectionTracer*>(jstrc);
     if (ShouldMoveToTenured(trc, thingp))

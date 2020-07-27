@@ -4167,7 +4167,9 @@ Debugger::drainTraceLoggerScriptCalls(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         if (textId != TraceLogger_Stop) {
-            const char* filename, *lineno, *colno;
+            const char* filename;
+            const char* lineno;
+            const char* colno;
             size_t filename_len, lineno_len, colno_len;
             logger->extractScriptDetails(textId, &filename, &filename_len, &lineno, &lineno_len,
                                          &colno, &colno_len);
@@ -6143,8 +6145,8 @@ EvaluateInEnv(JSContext* cx, Handle<Env*> env, HandleValue thisv, AbstractFrameP
     if (!staticScope)
         return false;
     CompileOptions options(cx);
-    options.setCompileAndGo(true)
-           .setHasPollutedScope(true)
+    options.setHasPollutedScope(true)
+           .setIsRunOnce(true)
            .setForEval(true)
            .setNoScriptRval(false)
            .setFileAndLine(filename, lineno)

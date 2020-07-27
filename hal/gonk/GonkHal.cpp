@@ -449,8 +449,8 @@ public:
 
     {
       // bug 975667
-      // Goanna gonk hal is required to emit battery charging/level notification via nsIObserverService.
-      // This is useful for XPCOM components that are not statically linked to Goanna and cannot call
+      // Gecko gonk hal is required to emit battery charging/level notification via nsIObserverService.
+      // This is useful for XPCOM components that are not statically linked to Gecko and cannot call
       // hal::EnableBatteryNotifications
       nsCOMPtr<nsIObserverService> obsService = mozilla::services::GetObserverService();
       nsCOMPtr<nsIWritablePropertyBag2> propbag =
@@ -760,7 +760,7 @@ UpdateCpuSleepState()
 
   sInternalLockCpuMonitor->AssertCurrentThreadOwns();
   bool allowed = sCpuSleepAllowed && !sInternalLockCpuCount;
-  WriteToFile(allowed ? wakeUnlockFilename : wakeLockFilename, "goanna");
+  WriteToFile(allowed ? wakeUnlockFilename : wakeLockFilename, "gecko");
 }
 
 static void

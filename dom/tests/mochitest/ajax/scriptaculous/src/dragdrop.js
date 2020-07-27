@@ -490,7 +490,7 @@ Draggable.prototype = {
     if((!this.options.constraint) || (this.options.constraint=='vertical'))
       style.top  = p[1] + "px";
     
-    if(style.visibility=="hidden") style.visibility = ""; // fix goanna rendering
+    if(style.visibility=="hidden") style.visibility = ""; // fix gecko rendering
   },
   
   stopScrolling: function() {
@@ -696,7 +696,7 @@ var Sortable = {
       hoverclass:   options.hoverclass
     }
 
-    // fix for goanna engine
+    // fix for gecko engine
     Element.cleanWhitespace(element); 
 
     options.draggables = [];
@@ -754,7 +754,7 @@ var Sortable = {
       Sortable.mark(dropon, 'before');
       if(dropon.previousSibling != element) {
         var oldParentNode = element.parentNode;
-        element.style.visibility = "hidden"; // fix goanna rendering
+        element.style.visibility = "hidden"; // fix gecko rendering
         dropon.parentNode.insertBefore(element, dropon);
         if(dropon.parentNode!=oldParentNode) 
           Sortable.options(oldParentNode).onChange(element);
@@ -765,7 +765,7 @@ var Sortable = {
       var nextElement = dropon.nextSibling || null;
       if(nextElement != element) {
         var oldParentNode = element.parentNode;
-        element.style.visibility = "hidden"; // fix goanna rendering
+        element.style.visibility = "hidden"; // fix gecko rendering
         dropon.parentNode.insertBefore(element, nextElement);
         if(dropon.parentNode!=oldParentNode) 
           Sortable.options(oldParentNode).onChange(element);

@@ -77,7 +77,7 @@ last ``#if`` was true (output was enabled), an ``#else`` makes it off
    unlike the C preprocessor.
 
    It does not matter whether any blocks before it were true. This behavior
-   changed on trunk (Goanna 1.9) on 2006-12-07; see Bug 277122 for details.
+   changed on trunk (Gecko 1.9) on 2006-12-07; see Bug 277122 for details.
 
 ::
 
@@ -143,7 +143,7 @@ The following two blocks are equivalent::
 .. warning:: An ``#elif``, ``#elifdef``, or ``#elifndef`` is relative to
    the last conditional block only (as well as the condition it implies),
    unlike the C preprocessor. It does not matter whether any blocks before
-   it were true. This behavior changed on trunk (Goanna 1.9) on 2006-12-07.
+   it were true. This behavior changed on trunk (Gecko 1.9) on 2006-12-07.
    See Bug 277122 for details.
 
 File Inclusion

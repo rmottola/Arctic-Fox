@@ -261,7 +261,7 @@ void InstallSignalHandlers(const char *ProgramName)
 
   if (XRE_GetProcessType() == GeckoProcessType_Content) {
     /*
-     * If the user is debugging a Goanna parent process in gdb and hits ^C to
+     * If the user is debugging a Gecko parent process in gdb and hits ^C to
      * suspend, a SIGINT signal will be sent to the child. We ignore this signal
      * so the child isn't killed.
      */

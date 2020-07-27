@@ -9,7 +9,7 @@ XPCSHELL_TESTS_MANIFESTS += [
     'unit_ipc/xpcshell.ini',
 ]
 
-GoannaCppUnitTests([
+GeckoCppUnitTests([
     'TestCSPParser',
     'TestGetURL',
     'TestNativeXMLHttpRequest',

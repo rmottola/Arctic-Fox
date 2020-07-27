@@ -8,7 +8,7 @@ function handleRequest(request, response)
   response.setStatusLine(null, 200, "OK");
   response.setHeader("Content-Type", "image/svg+xml", false);
 
-  // We need some body output or else goanna will not do an initial reflow
+  // We need some body output or else gecko will not do an initial reflow
   // while waiting for the rest of the document to load:
   response.bodyOutputStream.write("\n", 1);
 

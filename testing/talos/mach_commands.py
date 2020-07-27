@@ -143,7 +143,7 @@ class MachCommands(MachCommandBase):
                      help='The mozharness revision to clone. Defaults to '
                           'production')
     @CommandArgument('--spsProfile', default=False,
-                     help='Use the Goanna Profiler to capture profiles that can '
+                     help='Use the Gecko Profiler to capture profiles that can '
                           'then be displayed by Cleopatra.', action='store_true')
 
     def run_talos_test(self, suite, repo=None, rev=None, spsProfile=False):

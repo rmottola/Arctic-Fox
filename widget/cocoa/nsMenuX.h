@@ -28,9 +28,9 @@ class nsIWidget;
 @interface MenuDelegate : NSObject
 #endif
 {
-  nsMenuX* mGoannaMenu; // weak ref
+  nsMenuX* mGeckoMenu; // weak ref
 }
-- (id)initWithGoannaMenu:(nsMenuX*)goannaMenu;
+- (id)initWithGeckoMenu:(nsMenuX*)geckoMenu;
 @end
 
 // Once instantiated, this object lives until its DOM node or its parent window is destroyed.
@@ -80,7 +80,7 @@ protected:
   nsresult       AddMenu(nsMenuX* aMenu);
   void           LoadMenuItem(nsIContent* inMenuItemContent);  
   void           LoadSubMenu(nsIContent* inMenuContent);
-  GoannaNSMenu*   CreateMenuWithGoannaString(nsString& menuTitle);
+  GeckoNSMenu*   CreateMenuWithGeckoString(nsString& menuTitle);
 
   nsTArray< nsAutoPtr<nsMenuObjectX> > mMenuObjectsArray;
   nsString                  mLabel;
@@ -89,7 +89,7 @@ protected:
   nsMenuGroupOwnerX*        mMenuGroupOwner; // [weak]
   // The icon object should never outlive its creating nsMenuX object.
   nsRefPtr<nsMenuItemIconX> mIcon;
-  GoannaNSMenu*              mNativeMenu; // [strong]
+  GeckoNSMenu*              mNativeMenu; // [strong]
   MenuDelegate*             mMenuDelegate; // [strong]
   // nsMenuX objects should always have a valid native menu item.
   NSMenuItem*               mNativeMenuItem; // [strong]

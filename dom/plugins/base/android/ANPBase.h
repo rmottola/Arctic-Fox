@@ -9,14 +9,14 @@
 #include "nsISupportsImpl.h"
 
 #define NOT_IMPLEMENTED_FATAL() do {                                    \
-    __android_log_print(ANDROID_LOG_ERROR, "GoannaPlugins",              \
+    __android_log_print(ANDROID_LOG_ERROR, "GeckoPlugins",              \
                         "%s not implemented %s, %d",                    \
                         __PRETTY_FUNCTION__, __FILE__, __LINE__);       \
     abort();                                                            \
   } while(0)
 
 #define NOT_IMPLEMENTED()                                               \
-    __android_log_print(ANDROID_LOG_ERROR, "GoannaPlugins",              \
+    __android_log_print(ANDROID_LOG_ERROR, "GeckoPlugins",              \
                         "!!!!!!!!!!!!!!  %s not implemented %s, %d",    \
                         __PRETTY_FUNCTION__, __FILE__, __LINE__);       \
 

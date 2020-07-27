@@ -577,10 +577,10 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
 
         // Update the out-parameters so they are what the caller expects.
         apzc->GetGuid(aOutTargetGuid);
-        Matrix4x4 transformToGoanna = GetScreenToApzcTransform(apzc)
-                                   * GetApzcToGoannaTransform(apzc);
+        Matrix4x4 transformToGecko = GetScreenToApzcTransform(apzc)
+                                   * GetApzcToGeckoTransform(apzc);
         wheelInput.mOrigin =
-          TransformTo<ScreenPixel>(transformToGoanna, wheelInput.mOrigin);
+          TransformTo<ScreenPixel>(transformToGecko, wheelInput.mOrigin);
       }
       break;
     } case PANGESTURE_INPUT: {
@@ -597,12 +597,12 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
 
         // Update the out-parameters so they are what the caller expects.
         apzc->GetGuid(aOutTargetGuid);
-        Matrix4x4 transformToGoanna = GetScreenToApzcTransform(apzc)
-                                   * GetApzcToGoannaTransform(apzc);
+        Matrix4x4 transformToGecko = GetScreenToApzcTransform(apzc)
+                                   * GetApzcToGeckoTransform(apzc);
         panInput.mPanStartPoint = TransformTo<ScreenPixel>(
-            transformToGoanna, panInput.mPanStartPoint);
+            transformToGecko, panInput.mPanStartPoint);
         panInput.mPanDisplacement = TransformVector<ScreenPixel>(
-            transformToGoanna, panInput.mPanDisplacement, panInput.mPanStartPoint);
+            transformToGecko, panInput.mPanDisplacement, panInput.mPanStartPoint);
       }
       break;
     } case PINCHGESTURE_INPUT: {  // note: no one currently sends these
@@ -620,7 +620,7 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
         // Update the out-parameters so they are what the caller expects.
         apzc->GetGuid(aOutTargetGuid);
         Matrix4x4 outTransform = GetScreenToApzcTransform(apzc)
-                               * GetApzcToGoannaTransform(apzc);
+                               * GetApzcToGeckoTransform(apzc);
         pinchInput.mFocusPoint = TransformTo<ScreenPixel>(
             outTransform, pinchInput.mFocusPoint);
       }
@@ -640,7 +640,7 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
         // Update the out-parameters so they are what the caller expects.
         apzc->GetGuid(aOutTargetGuid);
         Matrix4x4 outTransform = GetScreenToApzcTransform(apzc)
-                               * GetApzcToGoannaTransform(apzc);
+                               * GetApzcToGeckoTransform(apzc);
         tapInput.mPoint = TransformTo<ScreenPixel>(outTransform, tapInput.mPoint);
       }
       break;
@@ -660,11 +660,11 @@ APZCTreeManager::GetTouchInputBlockAPZC(const MultiTouchInput& aEvent,
 
   { // In this block we flush repaint requests for the entire APZ tree. We need to do this
     // at the start of an input block for a number of reasons. One of the reasons is so that
-    // after we untransform the event into goanna space, it doesn't end up under something
+    // after we untransform the event into gecko space, it doesn't end up under something
     // else. Another reason is that if we hit-test this event and end up on a layer's
     // dispatch-to-content region we cannot be sure we actually got the correct layer. We
-    // have to fall back to the goanna hit-test to handle this case, but we can't untransform
-    // the event we send to goanna because we don't know the layer to untransform with
+    // have to fall back to the gecko hit-test to handle this case, but we can't untransform
+    // the event we send to gecko because we don't know the layer to untransform with
     // respect to.
     MonitorAutoLock lock(mTreeLock);
     FlushRepaintsRecursively(mRootNode);
@@ -754,12 +754,12 @@ APZCTreeManager::ProcessTouchInput(MultiTouchInput& aInput,
         /* aTargetConfirmed = */ mHitResultForInputBlock == HitLayer,
         aInput, aOutInputBlockId);
 
-    // For computing the event to pass back to Goanna, use up-to-date transforms
+    // For computing the event to pass back to Gecko, use up-to-date transforms
     // (i.e. not anything cached in an input block).
-    // This ensures that transformToApzc and transformToGoanna are in sync.
+    // This ensures that transformToApzc and transformToGecko are in sync.
     Matrix4x4 transformToApzc = GetScreenToApzcTransform(mApzcForInputBlock);
-    Matrix4x4 transformToGoanna = GetApzcToGoannaTransform(mApzcForInputBlock);
-    Matrix4x4 outTransform = transformToApzc * transformToGoanna;
+    Matrix4x4 transformToGecko = GetApzcToGeckoTransform(mApzcForInputBlock);
+    Matrix4x4 outTransform = transformToApzc * transformToGecko;
     for (size_t i = 0; i < aInput.mTouches.Length(); i++) {
       SingleTouchData& touchData = aInput.mTouches[i];
       touchData.mScreenPoint = TransformTo<ScreenPixel>(
@@ -791,15 +791,15 @@ APZCTreeManager::ProcessTouchInput(MultiTouchInput& aInput,
 }
 
 void
-APZCTreeManager::TransformCoordinateToGoanna(const ScreenIntPoint& aPoint,
+APZCTreeManager::TransformCoordinateToGecko(const ScreenIntPoint& aPoint,
                                             LayoutDeviceIntPoint* aOutTransformedPoint)
 {
   MOZ_ASSERT(aOutTransformedPoint);
   nsRefPtr<AsyncPanZoomController> apzc = GetTargetAPZC(aPoint, nullptr);
   if (apzc && aOutTransformedPoint) {
     Matrix4x4 transformToApzc = GetScreenToApzcTransform(apzc);
-    Matrix4x4 transformToGoanna = GetApzcToGoannaTransform(apzc);
-    Matrix4x4 outTransform = transformToApzc * transformToGoanna;
+    Matrix4x4 transformToGecko = GetApzcToGeckoTransform(apzc);
+    Matrix4x4 outTransform = transformToApzc * transformToGecko;
     *aOutTransformedPoint = TransformTo<LayoutDevicePixel>(outTransform, aPoint);
   }
 }
@@ -865,8 +865,8 @@ APZCTreeManager::ProcessEvent(WidgetInputEvent& aEvent,
     MOZ_ASSERT(hitResult == HitLayer || hitResult == HitDispatchToContentRegion);
     apzc->GetGuid(aOutTargetGuid);
     Matrix4x4 transformToApzc = GetScreenToApzcTransform(apzc);
-    Matrix4x4 transformToGoanna = GetApzcToGoannaTransform(apzc);
-    Matrix4x4 outTransform = transformToApzc * transformToGoanna;
+    Matrix4x4 transformToGecko = GetApzcToGeckoTransform(apzc);
+    Matrix4x4 outTransform = transformToApzc * transformToGecko;
     aEvent.refPoint = TransformTo<LayoutDevicePixel>(outTransform, aEvent.refPoint);
   }
   return result;
@@ -893,15 +893,23 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
   nsEventStatus status = ReceiveInputEvent(input, aOutTargetGuid, aOutInputBlockId);
   aEvent.refPoint.x = input.mOrigin.x;
   aEvent.refPoint.y = input.mOrigin.y;
+  aEvent.mFlags.mHandledByAPZ = true;
   return status;
 }
 
-bool
-APZCTreeManager::WillHandleWheelEvent(WidgetWheelEvent* aEvent)
+// Returns whether or not a wheel event action will be (or was) performed by
+// APZ. If this returns true, the event must not perform a synchronous
+// scroll.
+//
+// Even if this returns false, all wheel events in APZ-aware widgets must
+// be sent through APZ so they are transformed correctly for TabParent.
+static bool
+WillHandleWheelEvent(WidgetWheelEvent* aEvent)
 {
   return EventStateManager::WheelEventIsScrollAction(aEvent) &&
          aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
-         !gfxPrefs::MouseWheelHasScrollDeltaOverride();
+         !gfxPrefs::MouseWheelHasScrollDeltaOverride() &&
+         !EventStateManager::WheelEventNeedsDeltaMultipliers(aEvent);
 }
 
 nsEventStatus
@@ -1058,6 +1066,12 @@ APZCTreeManager::CancelAnimation(const ScrollableLayerGuid &aGuid)
 void
 APZCTreeManager::ClearTree()
 {
+  // Ensure that no references to APZCs are alive in any lingering input
+  // blocks. This breaks cycles from InputBlockState::mTargetApzc back to
+  // the InputQueue.
+  APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
+    mInputQueue.get(), &InputQueue::Clear));
+
   MonitorAutoLock lock(mTreeLock);
 
   // This can be done as part of a tree walk but it's easier to
@@ -1411,7 +1425,7 @@ APZCTreeManager::GetAPZCAtPoint(HitTestingTreeNode* aNode,
   return nullptr;
 }
 
-/* The methods GetScreenToApzcTransform() and GetApzcToGoannaTransform() return
+/* The methods GetScreenToApzcTransform() and GetApzcToGeckoTransform() return
    some useful transformations that input events may need applied. This is best
    illustrated with an example. Consider a chain of layers, L, M, N, O, P, Q, R. Layer L
    is the layer that corresponds to the argument |aApzc|, and layer R is the root
@@ -1447,15 +1461,15 @@ APZCTreeManager::GetAPZCAtPoint(HitTestingTreeNode* aNode,
         MC.Inverse()
    This combined transformation is returned by GetScreenToApzcTransform().
 
-   Next, if we want user inputs sent to goanna for event-dispatching, we will need to strip
+   Next, if we want user inputs sent to gecko for event-dispatching, we will need to strip
    out all of the async transforms that are involved in this chain. This is because async
-   transforms are stored only in the compositor and goanna does not account for them when
+   transforms are stored only in the compositor and gecko does not account for them when
    doing display-list-based hit-testing for event dispatching.
-   Furthermore, because these input events are processed by Goanna in a FIFO queue that
+   Furthermore, because these input events are processed by Gecko in a FIFO queue that
    includes other things (specifically paint requests), it is possible that by time the
-   input event reaches goanna, it will have painted something else. Therefore, we need to
+   input event reaches gecko, it will have painted something else. Therefore, we need to
    apply another transform to the input events to account for the possible disparity between
-   what we know goanna last painted and the last paint request we sent to goanna. Let this
+   what we know gecko last painted and the last paint request we sent to gecko. Let this
    transform be represented by LD, MD, ... RD.
    Therefore, given a user input in screen space, the following transforms need to be applied
    (in order from top to bottom):
@@ -1485,7 +1499,7 @@ APZCTreeManager::GetAPZCAtPoint(HitTestingTreeNode* aNode,
         ...
         RC
         RD
-   Since GetScreenToApzcTransform() can be obtained by calling that function, GetApzcToGoannaTransform()
+   Since GetScreenToApzcTransform() can be obtained by calling that function, GetApzcToGeckoTransform()
    returns the remaining transforms (LA.Inverse() * LD * ... * RD), so that the caller code can
    combine it with GetScreenToApzcTransform() to get the final transform required in this case.
 
@@ -1547,7 +1561,7 @@ APZCTreeManager::GetScreenToApzcTransform(const AsyncPanZoomController *aApzc) c
  * explanation of this function.
  */
 Matrix4x4
-APZCTreeManager::GetApzcToGoannaTransform(const AsyncPanZoomController *aApzc) const
+APZCTreeManager::GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) const
 {
   Matrix4x4 result;
   MonitorAutoLock lock(mTreeLock);
@@ -1561,11 +1575,11 @@ APZCTreeManager::GetApzcToGoannaTransform(const AsyncPanZoomController *aApzc) c
   // asyncUntransform is LA.Inverse()
   Matrix4x4 asyncUntransform = aApzc->GetCurrentAsyncTransformWithOverscroll().Inverse();
 
-  // aTransformToGoannaOut is initialized to LA.Inverse() * LD * MC * NC * OC * PC
+  // aTransformToGeckoOut is initialized to LA.Inverse() * LD * MC * NC * OC * PC
   result = asyncUntransform * aApzc->GetTransformToLastDispatchedPaint() * aApzc->GetAncestorTransform();
 
   for (AsyncPanZoomController* parent = aApzc->GetParent(); parent; parent = parent->GetParent()) {
-    // aTransformToGoannaOut is LA.Inverse() * LD * MC * NC * OC * PC * PD * QC * RC
+    // aTransformToGeckoOut is LA.Inverse() * LD * MC * NC * OC * PC * PD * QC * RC
     result = result * parent->GetTransformToLastDispatchedPaint() * parent->GetAncestorTransform();
 
     // The above value for result when parent == P matches the required output

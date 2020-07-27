@@ -16,7 +16,7 @@
 #include "nsThreadUtils.h"
 #include "mozilla/Mutex.h"
 
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPluginsAudio" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPluginsAudio" , ## args)
 #define ASSIGN(obj, name)   (obj)->name = anp_audio_##name
 
 /* android.media.AudioTrack */

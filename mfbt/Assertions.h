@@ -437,7 +437,7 @@ struct AssertionConditionType
  * expense of the program's behavior being undefined if control reaches the
  * MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE.
  *
- * In Goanna, you probably should not use this macro outside of performance- or
+ * In Gecko, you probably should not use this macro outside of performance- or
  * size-critical code, because it's unsafe.  If you don't care about code size
  * or performance, you should probably use MOZ_ASSERT or MOZ_CRASH.
  *

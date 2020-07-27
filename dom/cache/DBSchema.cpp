@@ -970,7 +970,7 @@ MatchByVaryHeader(mozIStorageConnection* aConn,
     ErrorResult errorResult;
 
     cachedHeaders->Append(name, value, errorResult);
-    if (errorResult.Failed()) { return errorResult.ErrorCode(); };
+    if (errorResult.Failed()) { return errorResult.StealNSResult(); };
   }
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
@@ -997,14 +997,14 @@ MatchByVaryHeader(mozIStorageConnection* aConn,
       nsAutoCString queryValue;
       queryHeaders->Get(header, queryValue, errorResult);
       if (errorResult.Failed()) {
-        errorResult.ClearMessage();
+        errorResult.SuppressException();
         MOZ_ASSERT(queryValue.IsEmpty());
       }
 
       nsAutoCString cachedValue;
       cachedHeaders->Get(header, cachedValue, errorResult);
       if (errorResult.Failed()) {
-        errorResult.ClearMessage();
+        errorResult.SuppressException();
         MOZ_ASSERT(cachedValue.IsEmpty());
       }
 

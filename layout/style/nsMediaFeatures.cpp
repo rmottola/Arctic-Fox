@@ -274,7 +274,7 @@ static nsresult
 GetScan(nsPresContext* aPresContext, const nsMediaFeature*,
         nsCSSValue& aResult)
 {
-    // Since Goanna doesn't support the 'tv' media type, the 'scan'
+    // Since Gecko doesn't support the 'tv' media type, the 'scan'
     // feature is never present.
     aResult.Reset();
     return NS_OK;
@@ -284,7 +284,7 @@ static nsresult
 GetGrid(nsPresContext* aPresContext, const nsMediaFeature*,
         nsCSSValue& aResult)
 {
-    // Goanna doesn't support grid devices (e.g., ttys), so the 'grid'
+    // Gecko doesn't support grid devices (e.g., ttys), so the 'grid'
     // feature is always 0.
     aResult.SetIntValue(0, eCSSUnit_Integer);
     return NS_OK;

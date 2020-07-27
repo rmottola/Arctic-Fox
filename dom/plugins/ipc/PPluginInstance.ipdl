@@ -102,7 +102,7 @@ child:
   async ContentsScaleFactorChanged(double aContentsScaleFactor);
 
   // ********************** Async plugins rendering
-  // see https://wiki.mozilla.org/Goanna:AsyncPluginPainting
+  // see https://wiki.mozilla.org/Gecko:AsyncPluginPainting
   // **********************
 
   // Async version of SetWindow call

@@ -571,7 +571,7 @@ JS_ShutDown(void)
                "JS_ShutDown must only be called after JS_Init and can't race with it");
 #ifdef DEBUG
     if (JSRuntime::hasLiveRuntimes()) {
-        // Goanna is too buggy to assert this just yet.
+        // Gecko is too buggy to assert this just yet.
         fprintf(stderr,
                 "WARNING: YOU ARE LEAKING THE WORLD (at least one JSRuntime "
                 "and everything alive inside it, that is) AT JS_ShutDown "
@@ -1107,7 +1107,7 @@ JS_TransplantObject(JSContext* cx, HandleObject origobj, HandleObject target)
 
 /*
  * Recompute all cross-compartment wrappers for an object, resetting state.
- * Goanna uses this to clear Xray wrappers when doing a navigation that reuses
+ * Gecko uses this to clear Xray wrappers when doing a navigation that reuses
  * the inner window and global object.
  */
 JS_PUBLIC_API(bool)
@@ -1462,12 +1462,6 @@ JS_PUBLIC_API(void)
 JS_RemoveExtraGCRootsTracer(JSRuntime* rt, JSTraceDataOp traceOp, void* data)
 {
     return rt->gc.removeBlackRootsTracer(traceOp, data);
-}
-
-extern JS_PUBLIC_API(bool)
-JS_IsGCMarkingTracer(JSTracer *trc)
-{
-    return js::IsMarkingTracer(trc);
 }
 
 JS_PUBLIC_API(void)
@@ -3269,7 +3263,7 @@ IsFunctionCloneable(HandleFunction fun, HandleObject dynamicScope)
         return false;
     }
 
-    return !fun->nonLazyScript()->compileAndGo() || dynamicScope->is<GlobalObject>();
+    return true;
 }
 
 static JSObject*
@@ -3677,7 +3671,6 @@ JS::ReadOnlyCompileOptions::copyPODOptions(const ReadOnlyCompileOptions& rhs)
     utf8 = rhs.utf8;
     lineno = rhs.lineno;
     column = rhs.column;
-    compileAndGo = rhs.compileAndGo;
     forEval = rhs.forEval;
     noScriptRval = rhs.noScriptRval;
     selfHostingMode = rhs.selfHostingMode;
@@ -3794,7 +3787,6 @@ JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
 {
     this->version = (version != JSVERSION_UNKNOWN) ? version : cx->findVersion();
 
-    compileAndGo = false;
     strictOption = cx->runtime()->options().strictMode();
     extraWarningsOption = cx->compartment()->options().extraWarnings(cx);
     werrorOption = cx->runtime()->options().werror();
@@ -3942,7 +3934,6 @@ JS_BufferIsCompilableUnit(JSContext* cx, HandleObject obj, const char* utf8, siz
     bool result = true;
 
     CompileOptions options(cx);
-    options.setCompileAndGo(false);
     Parser<frontend::FullParseHandler> parser(cx, &cx->tempLifoAlloc(),
                                               options, chars, length,
                                               /* foldConstants = */ true, nullptr, nullptr);
@@ -4042,9 +4033,7 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
         return false;
 
     // Make sure to handle cases when we have a polluted scopechain.
-    OwningCompileOptions options(cx);
-    if (!options.copy(cx, optionsArg))
-        return false;
+    CompileOptions options(cx, optionsArg);
     if (!enclosingDynamicScope->is<GlobalObject>())
         options.setHasPollutedScope(true);
 
@@ -4192,21 +4181,18 @@ JS_ExecuteScript(JSContext* cx, AutoObjectVector& scopeChain, HandleScript scrip
 }
 
 JS_PUBLIC_API(bool)
-JS::CloneAndExecuteScript(JSContext* cx, HandleObject obj, HandleScript scriptArg)
+JS::CloneAndExecuteScript(JSContext* cx, HandleScript scriptArg)
 {
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, obj);
     RootedScript script(cx, scriptArg);
     if (script->compartment() != cx->compartment()) {
-        PollutedGlobalScopeOption globalScopeOption = obj->is<GlobalObject>() ?
-            HasCleanGlobalScope : HasPollutedGlobalScope;
-        script = CloneScript(cx, NullPtr(), NullPtr(), script, globalScopeOption);
+        script = CloneScript(cx, NullPtr(), NullPtr(), script);
         if (!script)
             return false;
 
         js::Debugger::onNewScript(cx, script);
     }
-    return ExecuteScript(cx, obj, script, nullptr);
+    return ExecuteScript(cx, cx->global(), script, nullptr);
 }
 
 static const unsigned LARGE_SCRIPT_LENGTH = 500*1024;
@@ -4223,8 +4209,8 @@ Evaluate(JSContext *cx, HandleObject scope, const ReadOnlyCompileOptions &option
 
     AutoLastFrameCheck lfc(cx);
 
-    options.setCompileAndGo(scope->is<GlobalObject>());
     options.setHasPollutedScope(!scope->is<GlobalObject>());
+    options.setIsRunOnce(true);
     SourceCompressionTask sct(cx);
     RootedScript script(cx, frontend::CompileScript(cx, &cx->tempLifoAlloc(),
                                                     scope, NullPtr(), NullPtr(), options,
@@ -4460,6 +4446,12 @@ JS_New(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& inputArgs)
         obj = JS_NewHelper(cx, ctor, inputArgs);
     }
     return obj;
+}
+
+JS_PUBLIC_API(bool)
+JS_CheckForInterrupt(JSContext* cx)
+{
+    return js::CheckForInterrupt(cx);
 }
 
 JS_PUBLIC_API(JSInterruptCallback)

@@ -129,11 +129,6 @@ public:
     AllocPProcessHangMonitorChild(Transport* aTransport,
                                   ProcessId aOtherProcess) override;
 
-#if defined(XP_WIN) && defined(MOZ_CONTENT_SANDBOX)
-    // Cleans up any resources used by the process when sandboxed.
-    void CleanUpSandboxEnvironment();
-#endif
-
     virtual bool RecvSetProcessSandbox() override;
 
     PBackgroundChild*
@@ -293,12 +288,17 @@ public:
     virtual bool DeallocPRemoteSpellcheckEngineChild(PRemoteSpellcheckEngineChild*) override;
 
     virtual bool RecvSetOffline(const bool& offline) override;
+    virtual bool RecvSetConnectivity(const bool& connectivity) override;
 
     virtual bool RecvSpeakerManagerNotify() override;
 
+    virtual bool RecvBidiKeyboardNotify(const bool& isLangRTL) override;
+
     virtual bool RecvUpdateServiceWorkerRegistrations() override;
 
-    virtual bool RecvBidiKeyboardNotify(const bool& isLangRTL) override;
+    virtual bool RecvRemoveServiceWorkerRegistrationsForDomain(const nsString& aDomain) override;
+
+    virtual bool RecvRemoveServiceWorkerRegistrations() override;
 
     virtual bool RecvNotifyVisited(const URIParams& aURI) override;
     // auto remove when alertfinished is received.
@@ -358,6 +358,7 @@ public:
                                       const bool& aIsUnmounting,
                                       const bool& aIsRemovable,
                                       const bool& aIsHotSwappable) override;
+    virtual bool RecvVolumeRemoved(const nsString& aFsName) override;
 
     virtual bool RecvNuwaFork() override;
 
@@ -455,6 +456,9 @@ public:
             const TabId& aTabId) override;
     virtual bool
     DeallocPOfflineCacheUpdateChild(POfflineCacheUpdateChild* offlineCacheUpdate) override;
+
+    virtual PWebrtcGlobalChild* AllocPWebrtcGlobalChild() override;
+    virtual bool DeallocPWebrtcGlobalChild(PWebrtcGlobalChild *aActor) override;
 
     virtual PContentPermissionRequestChild*
     AllocPContentPermissionRequestChild(const InfallibleTArray<PermissionRequest>& aRequests,

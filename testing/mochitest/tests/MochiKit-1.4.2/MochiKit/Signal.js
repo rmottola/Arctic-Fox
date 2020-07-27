@@ -572,7 +572,7 @@ MochiKit.Base.update(MochiKit.Signal, {
     },
 
     _browserLacksMouseWheelEvent: function () {
-        return /Goanna\//.test(navigator.userAgent);
+        return /Gecko\//.test(navigator.userAgent);
     },
 
     _mouseEnterListener: function (src, sig, func, obj) {

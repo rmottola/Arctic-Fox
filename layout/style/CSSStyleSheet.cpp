@@ -44,6 +44,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/dom/CSSStyleSheetBinding.h"
 #include "nsComponentManagerUtils.h"
+#include "nsNullPrincipal.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -734,7 +735,7 @@ CSSStyleSheetInner::CSSStyleSheetInner(CSSStyleSheet* aPrimarySheet,
   MOZ_COUNT_CTOR(CSSStyleSheetInner);
   mSheets.AppendElement(aPrimarySheet);
 
-  mPrincipal = do_CreateInstance("@mozilla.org/nullprincipal;1");
+  mPrincipal = nsNullPrincipal::Create();
   if (!mPrincipal) {
     NS_RUNTIMEABORT("OOM");
   }
@@ -1769,7 +1770,7 @@ CSSStyleSheet::GetCssRules(nsIDOMCSSRuleList** aCssRules)
   ErrorResult rv;
   nsCOMPtr<nsIDOMCSSRuleList> rules = GetCssRules(rv);
   rules.forget(aCssRules);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 CSSRuleList*

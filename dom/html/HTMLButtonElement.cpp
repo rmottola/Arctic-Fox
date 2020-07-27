@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -298,6 +299,63 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           }
         }
         break;// NS_KEY_PRESS
+
+      case NS_MOUSE_BUTTON_DOWN:
+        {
+          WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
+          if (mouseEvent->button == WidgetMouseEvent::eLeftButton) {
+            if (mouseEvent->mFlags.mIsTrusted) {
+              EventStateManager* esm =
+                aVisitor.mPresContext->EventStateManager();
+              EventStateManager::SetActiveManager(
+                static_cast<EventStateManager*>(esm), this);
+            }
+            nsIFocusManager* fm = nsFocusManager::GetFocusManager();
+            if (fm)
+              fm->SetFocus(this, nsIFocusManager::FLAG_BYMOUSE |
+                                 nsIFocusManager::FLAG_NOSCROLL);
+            mouseEvent->mFlags.mMultipleActionsPrevented = true;
+          } else if (mouseEvent->button == WidgetMouseEvent::eMiddleButton ||
+                     mouseEvent->button == WidgetMouseEvent::eRightButton) {
+            // cancel all of these events for buttons
+            //XXXsmaug What to do with these events? Why these should be cancelled?
+            if (aVisitor.mDOMEvent) {
+              aVisitor.mDOMEvent->StopPropagation();
+            }
+          }
+        }
+        break;
+
+      // cancel all of these events for buttons
+      //XXXsmaug What to do with these events? Why these should be cancelled?
+      case NS_MOUSE_BUTTON_UP:
+      case NS_MOUSE_DOUBLECLICK:
+        {
+          WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
+          if (aVisitor.mDOMEvent &&
+              (mouseEvent->button == WidgetMouseEvent::eMiddleButton ||
+               mouseEvent->button == WidgetMouseEvent::eRightButton)) {
+            aVisitor.mDOMEvent->StopPropagation();
+          }
+        }
+        break;
+
+      case NS_MOUSE_OVER:
+        {
+          aVisitor.mPresContext->EventStateManager()->
+            SetContentState(this, NS_EVENT_STATE_HOVER);
+          aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
+        }
+        break;
+
+        // XXX this doesn't seem to do anything yet
+      case NS_MOUSE_OUT:
+        {
+          aVisitor.mPresContext->EventStateManager()->
+            SetContentState(nullptr, NS_EVENT_STATE_HOVER);
+          aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
+        }
+	break;
 
       default:
         break;

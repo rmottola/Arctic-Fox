@@ -274,6 +274,11 @@
                   break;
                 }
               }
+            } else if (aEvent instanceof XULCommandEvent) {
+              if (target.getAttribute("anonid") == "paste-and-search") {
+                aEngine = this.currentEngine;
+                source = "paste";
+              }
             }
           }
         ]]></body>
@@ -617,8 +622,7 @@
           label = this._stringBundle.getString("cmd_pasteAndSearch");
           element.setAttribute("label", label);
           element.setAttribute("anonid", "paste-and-search");
-          element.setAttribute("oncommand",
-              "BrowserSearch.searchBar.select(); goDoCommand('cmd_paste'); BrowserSearch.searchBar.handleSearchCommand();");
+          element.setAttribute("oncommand", "BrowserSearch.pasteAndSearch(event)");
           cxmenu.insertBefore(element, insertLocation.nextSibling);
           pasteAndSearch = element;
         }

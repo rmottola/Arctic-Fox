@@ -337,7 +337,7 @@ Load(JSContext* cx, unsigned argc, jsval* vp)
         JS::CompileOptions options(cx);
         options.setUTF8(true)
                .setFileAndLine(filename.ptr(), 1)
-               .setCompileAndGo(true);
+               .setIsRunOnce(true);
         JS::Rooted<JSScript*> script(cx);
         JS::Rooted<JSObject*> global(cx, JS::CurrentGlobalOrNull(cx));
         JS::Compile(cx, options, file, &script);
@@ -709,7 +709,9 @@ static bool
 env_enumerate(JSContext* cx, HandleObject obj)
 {
     static bool reflected;
-    char** evp, *name, *value;
+    char** evp;
+    char* name;
+    char* value;
     RootedString valstr(cx);
     bool ok;
 
@@ -830,7 +832,7 @@ ProcessFile(JSContext *cx, const char *filename, FILE *file, bool forceTTY)
         JS::CompileOptions options(cx);
         options.setUTF8(true)
                .setFileAndLine(filename, 1)
-               .setCompileAndGo(true);
+               .setIsRunOnce(true);
         if (JS::Compile(cx, options, file, &script) && !compileOnly)
             (void)JS_ExecuteScript(cx, script, &result);
         JS_EndRequest(cx);
@@ -866,7 +868,7 @@ ProcessFile(JSContext *cx, const char *filename, FILE *file, bool forceTTY)
         JS_ClearPendingException(cx);
         JS::CompileOptions options(cx);
         options.setFileAndLine("typein", startline)
-               .setCompileAndGo(true);
+               .setIsRunOnce(true);
         if (JS_CompileScript(cx, buffer, strlen(buffer), options, &script)) {
             JSErrorReporter older;
 

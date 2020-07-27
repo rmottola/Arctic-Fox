@@ -302,7 +302,7 @@ def check_for_java_exception(logcat, quiet=False):
     logcat output.
 
     Example:
-    PROCESS-CRASH | java-exception | java.lang.NullPointerException at org.mozilla.goanna.GoannaApp$21.run(GoannaApp.java:1833)
+    PROCESS-CRASH | java-exception | java.lang.NullPointerException at org.mozilla.goanna.GeckoApp$21.run(GeckoApp.java:1833)
 
     `logcat` should be a list of strings.
 
@@ -316,9 +316,9 @@ def check_for_java_exception(logcat, quiet=False):
     for i, line in enumerate(logcat):
         # Logs will be of form:
         #
-        # 01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> REPORTING UNCAUGHT EXCEPTION FROM THREAD 9 ("GoannaBackgroundThread")
+        # 01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> REPORTING UNCAUGHT EXCEPTION FROM THREAD 9 ("GeckoBackgroundThread")
         # 01-30 20:15:41.937 E/GeckoAppShell( 1703): java.lang.NullPointerException
-        # 01-30 20:15:41.937 E/GeckoAppShell( 1703): 	at org.mozilla.goanna.GoannaApp$21.run(GoannaApp.java:1833)
+        # 01-30 20:15:41.937 E/GeckoAppShell( 1703): 	at org.mozilla.goanna.GeckoApp$21.run(GeckoApp.java:1833)
         # 01-30 20:15:41.937 E/GeckoAppShell( 1703): 	at android.os.Handler.handleCallback(Handler.java:587)
         if "REPORTING UNCAUGHT EXCEPTION" in line or "FATAL EXCEPTION" in line:
             # Strip away the date, time, logcat tag and pid from the next two lines and

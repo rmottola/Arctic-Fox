@@ -93,8 +93,7 @@ PlatformDecoderModule::Init()
 already_AddRefed<PlatformDecoderModule>
 PlatformDecoderModule::Create()
 {
-  // Note: This runs on the decode thread.
-  MOZ_ASSERT(!NS_IsMainThread());
+  // Note: This (usually) runs on the decode thread.
 
   nsRefPtr<PlatformDecoderModule> m(CreatePDM());
 

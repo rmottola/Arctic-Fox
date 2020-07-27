@@ -6,7 +6,7 @@
 
 /**
  * Usage: declare the macro RELATIONTYPE()with the following arguments:
- * RELATIONTYPE(goannaType, goannaTypeName, atkType, msaaType, ia2Type)
+ * RELATIONTYPE(geckoType, geckoTypeName, atkType, msaaType, ia2Type)
  */
 
 RELATIONTYPE(LABELLED_BY,

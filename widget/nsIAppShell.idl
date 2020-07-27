@@ -45,14 +45,14 @@ interface nsIAppShell : nsISupports
 
   /**
    * Suspends the use of additional platform-specific methods (besides the
-   * nsIAppShell->run() event loop) to run Goanna events on the main
+   * nsIAppShell->run() event loop) to run Gecko events on the main
    * application thread.  Under some circumstances these "additional methods"
-   * can cause Goanna event handlers to be re-entered, sometimes leading to
+   * can cause Gecko event handlers to be re-entered, sometimes leading to
    * hangs and crashes.  Calls to suspendNative() and resumeNative() may be
    * nested.  On some platforms (those that don't use any "additional
-   * methods") this will be a no-op.  Does not (in itself) stop Goanna events
+   * methods") this will be a no-op.  Does not (in itself) stop Gecko events
    * from being processed on the main application thread.  But if the
-   * nsIAppShell->run() event loop is blocked when this call is made, Goanna
+   * nsIAppShell->run() event loop is blocked when this call is made, Gecko
    * events will stop being processed until resumeNative() is called (even
    * if a plugin or library is temporarily processing events on a nested
    * event loop).
@@ -60,7 +60,7 @@ interface nsIAppShell : nsISupports
   void suspendNative();
 
   /**
-   * Resumes the use of additional platform-specific methods to run Goanna
+   * Resumes the use of additional platform-specific methods to run Gecko
    * events on the main application thread.  Calls to suspendNative() and
    * resumeNative() may be nested.  On some platforms this will be a no-op.
    */

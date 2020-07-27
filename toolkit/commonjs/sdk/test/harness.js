@@ -596,7 +596,7 @@ var runTests = exports.runTests = function runTests(options) {
   try {
     consoleListener.register();
     print("Running tests on " + system.name + " " + system.version +
-          "/Goanna " + system.platformVersion + " (" +
+          "/Gecko " + system.platformVersion + " (" +
           system.id + ") under " +
           system.platform + "/" + system.architecture + ".\n");
 

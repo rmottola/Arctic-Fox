@@ -7,7 +7,7 @@
 #include <android/log.h>
 #include "ANPBase.h"
 
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #define ASSIGN(obj, name)   (obj)->name = anp_surface_##name
 
 #define CLEAR_EXCEPTION(env) if (env->ExceptionOccurred()) env->ExceptionClear();

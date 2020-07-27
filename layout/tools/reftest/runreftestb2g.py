@@ -98,11 +98,11 @@ class B2GOptions(ReftestOptions):
                     type = "string", dest = "pidFile",
                     help = "name of the pidfile to generate")
         defaults["pidFile"] = ""
-        self.add_option("--goanna-path", action="store",
-                        type="string", dest="goannaPath",
-                        help="the path to a goanna distribution that should "
+        self.add_option("--gecko-path", action="store",
+                        type="string", dest="geckoPath",
+                        help="the path to a gecko distribution that should "
                         "be installed on the emulator prior to test")
-        defaults["goannaPath"] = None
+        defaults["geckoPath"] = None
         self.add_option("--logdir", action="store",
                         type="string", dest="logdir",
                         help="directory to store log files")
@@ -169,8 +169,8 @@ class B2GOptions(ReftestOptions):
         if not options.sslPort:
             options.sslPort = auto.DEFAULT_SSL_PORT
 
-        if options.goannaPath and not options.emulator:
-            self.error("You must specify --emulator if you specify --goanna-path")
+        if options.geckoPath and not options.emulator:
+            self.error("You must specify --emulator if you specify --gecko-path")
 
         if options.logdir and not options.emulator:
             self.error("You must specify --emulator if you specify --logdir")
@@ -526,8 +526,8 @@ def run_remote_reftests(parser, options, args):
         auto.setEmulator(True)
         if options.noWindow:
             kwargs['noWindow'] = True
-        if options.goannaPath:
-            kwargs['goanna_path'] = options.goannaPath
+        if options.geckoPath:
+            kwargs['gecko_path'] = options.geckoPath
         if options.logdir:
             kwargs['logdir'] = options.logdir
         if options.busybox:

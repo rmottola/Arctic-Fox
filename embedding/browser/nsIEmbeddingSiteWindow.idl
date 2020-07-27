@@ -10,7 +10,7 @@
 
 /**
  * The nsIEmbeddingSiteWindow is implemented by the embedder to provide
- * Goanna with the means to call up to the host to resize the window,
+ * Gecko with the means to call up to the host to resize the window,
  * hide or show it and set/get its title.
  */
 [scriptable, uuid(0b976267-4aaa-4f36-a2d4-27b5ca8d73bb)]

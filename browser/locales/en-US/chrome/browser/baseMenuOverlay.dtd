@@ -21,6 +21,8 @@
 <!ENTITY helpMac.commandkey       "?">
 <!ENTITY helpSafeMode.label       "Restart in Safe Mode…">
 <!ENTITY helpSafeMode.accesskey   "R">
+<!ENTITY helpSafeMode.stop.label       "Restart with Add-ons Enabled">
+<!ENTITY helpSafeMode.stop.accesskey   "R">
 
 <!ENTITY helpTroubleshootingInfo.label      "Troubleshooting Information">
 <!ENTITY helpTroubleshootingInfo.accesskey  "T">

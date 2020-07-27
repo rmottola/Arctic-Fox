@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -219,7 +220,7 @@ private:
 // Content is still loading such that there is nothing to show the
 // user (eg an image which hasn't started coming in yet).
 #define NS_EVENT_STATE_LOADING       NS_DEFINE_EVENT_STATE_MACRO(22)
-// Content is of a type that goanna can't handle.
+// Content is of a type that gecko can't handle.
 #define NS_EVENT_STATE_TYPE_UNSUPPORTED NS_DEFINE_EVENT_STATE_MACRO(23)
 #define NS_EVENT_STATE_INCREMENT_SCRIPT_LEVEL NS_DEFINE_EVENT_STATE_MACRO(24)
 // Handler for the content has been blocked.

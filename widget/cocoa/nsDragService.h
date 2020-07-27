@@ -39,7 +39,7 @@ private:
                               nsIntRect* aDragRect,
                               nsIScriptableRegion* aRegion);
 
-  nsCOMPtr<nsISupportsArray> mDataItems; // only valid for a drag started within goanna
+  nsCOMPtr<nsISupportsArray> mDataItems; // only valid for a drag started within gecko
   NSView* mNativeDragView;
   NSEvent* mNativeDragEvent;
 };

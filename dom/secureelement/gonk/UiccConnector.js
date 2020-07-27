@@ -221,7 +221,7 @@ UiccConnector.prototype = {
     // TODO: Bug 1118106: Handle Resource management / leaks by persisting
     // the newly opened channel in some persistent storage so that when this
     // module gets restarted (say after opening a channel) in the event of
-    // some erroneous conditions such as goanna restart /, crash it can read
+    // some erroneous conditions such as gecko restart /, crash it can read
     // the persistent storage to check if there are any held resources
     // (opened channels) and close them.
     iccProvider.iccOpenChannel(PREFERRED_UICC_CLIENTID, aid, {

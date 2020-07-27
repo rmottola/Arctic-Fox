@@ -273,14 +273,14 @@
 
 // The appearance of a top-level window depends on its main state (not its key
 // state).  So (for non-embedders) we need to ensure that a top-level window
-// is main when an NS_ACTIVATE event is sent to Goanna for it.
+// is main when an NS_ACTIVATE event is sent to Gecko for it.
 - (void)windowBecameMain:(NSNotification*)inNotification
 {
   NSWindow* window = (NSWindow*)[inNotification object];
 
   id delegate = [window delegate];
   // Don't send events to a top-level window that has a sheet open above it --
-  // as far as Goanna is concerned, it's inactive, and stays so until the sheet
+  // as far as Gecko is concerned, it's inactive, and stays so until the sheet
   // closes.
   if (delegate && [delegate isKindOfClass:[WindowDelegate class]] && ![window attachedSheet])
     [TopLevelWindowData activateInWindow:window];

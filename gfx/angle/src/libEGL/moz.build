@@ -74,7 +74,7 @@ else:
   ]
 
 
-GoannaSharedLibrary('libEGL', linkage=None)
+GeckoSharedLibrary('libEGL', linkage=None)
 
 RCFILE = SRCDIR + '/libEGL.rc'
 DEFFILE = SRCDIR + '/libEGL.def'

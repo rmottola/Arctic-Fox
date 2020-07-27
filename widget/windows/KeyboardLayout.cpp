@@ -2790,7 +2790,7 @@ KeyboardLayout::ConvertNativeKeyCodeToDOMKeyCode(UINT aNativeKeyCode) const
 
     // IE sets 0xC2 to the DOM keyCode for VK_ABNT_C2.  However, we're already
     // using NS_VK_SEPARATOR for the separator key on Mac and Linux.  Therefore,
-    // We should keep consistency between Goanna on all platforms rather than
+    // We should keep consistency between Gecko on all platforms rather than
     // with other browsers since a lot of keyCode values are already different
     // between browsers.
     case VK_ABNT_C2:

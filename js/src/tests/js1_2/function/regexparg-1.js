@@ -23,9 +23,9 @@ var TITLE   = "The variable statement";
 
 writeHeaderToLog( SECTION + " "+ TITLE);
 
-print("Note: Bug 61911 changed the behavior of typeof regexp in Goanna 1.9.");
-print("Prior to Goanna 1.9, typeof regexp returned 'function'.");
-print("However in Goanna 1.9 and later, typeof regexp will return 'object'.");
+print("Note: Bug 61911 changed the behavior of typeof regexp in Gecko 1.9.");
+print("Prior to Gecko 1.9, typeof regexp returned 'function'.");
+print("However in Gecko 1.9 and later, typeof regexp will return 'object'.");
 
 function f(x) {return x;}
 

@@ -78,9 +78,9 @@ void SetThisProcessName(const char *aName)
  * client side, the b2g process.  Then the b2g_main() is called to
  * start b2g process.
  *
- * ProcLoaderClientGoannaInit() is called by XRE_main() to create the
+ * ProcLoaderClientGeckoInit() is called by XRE_main() to create the
  * parent actor, |ProcLoaderParent|, of PProcLoader for servicing the
- * request to run Nuwa process later once Goanna has been initialized.
+ * request to run Nuwa process later once Gecko has been initialized.
  *
  * ProcLoaderServiceRun() is called by the server process.  It starts
  * an IOThread and event loop to serve the |ProcLoaderChild|
@@ -105,7 +105,7 @@ using base::file_handle_mapping_vector;
 
 static bool sProcLoaderClientOnDeinit = false;
 static DebugOnly<bool> sProcLoaderClientInitialized = false;
-static DebugOnly<bool> sProcLoaderClientGoannaInitialized = false;
+static DebugOnly<bool> sProcLoaderClientGeckoInitialized = false;
 static pid_t sProcLoaderPid = 0;
 static int sProcLoaderChannelFd = -1;
 static PProcLoaderParent *sProcLoaderParent = nullptr;
@@ -178,7 +178,7 @@ CloseFileDescriptors(FdArray& aFds)
  *
  * The initialization of B2G loader are divided into two stages. First
  * stage is to collect child info passed from the main program of the
- * loader.  Second stage is to initialize Goanna according to info from the
+ * loader.  Second stage is to initialize Gecko according to info from the
  * first stage and make the client of loader service ready.
  *
  * \param aPeerPid is the pid of the child.
@@ -195,16 +195,16 @@ ProcLoaderClientInit(pid_t aPeerPid, int aChannelFd)
 }
 
 /**
- * Initialize the client of B2G loader for Goanna.
+ * Initialize the client of B2G loader for Gecko.
  */
 void
-ProcLoaderClientGoannaInit()
+ProcLoaderClientGeckoInit()
 {
   MOZ_ASSERT(sProcLoaderClientInitialized, "call ProcLoaderClientInit() at first");
-  MOZ_ASSERT(!sProcLoaderClientGoannaInitialized,
-             "call ProcLoaderClientGoannaInit() more than once");
+  MOZ_ASSERT(!sProcLoaderClientGeckoInitialized,
+             "call ProcLoaderClientGeckoInit() more than once");
 
-  sProcLoaderClientGoannaInitialized = true;
+  sProcLoaderClientGeckoInitialized = true;
 
   TransportDescriptor fd;
   fd.mFd = base::FileDescriptor(sProcLoaderChannelFd, /*auto_close=*/ false);
@@ -224,8 +224,8 @@ ProcLoaderClientGoannaInit()
 static void
 ProcLoaderClientDeinit()
 {
-  MOZ_ASSERT(sProcLoaderClientGoannaInitialized && sProcLoaderClientInitialized);
-  sProcLoaderClientGoannaInitialized = false;
+  MOZ_ASSERT(sProcLoaderClientGeckoInitialized && sProcLoaderClientInitialized);
+  sProcLoaderClientGeckoInitialized = false;
   sProcLoaderClientInitialized = false;
 
   sProcLoaderClientOnDeinit = true;

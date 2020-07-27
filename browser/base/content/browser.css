@@ -259,7 +259,8 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
   visibility: visible;
 }
 
-#urlbar:not([actiontype]) > #urlbar-display-box {
+#urlbar:not([actiontype]) > #urlbar-display-box,
+#urlbar:not([actiontype="switchtab"]) > #urlbar-display-box > .urlbar-display-switchtab {
   display: none;
 }
 
@@ -697,6 +698,11 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 }
 
 /* Remove white bar at the bottom of the screen when watching HTML5 video in fullscreen */
+#main-window[inDOMFullscreen] #sidebar-box,
+#main-window[inDOMFullscreen] #sidebar-splitter {
+  visibility: collapse;
+}
+
 #main-window[inFullscreen] #global-notificationbox,
 #main-window[inFullscreen] #high-priority-global-notificationbox {
   visibility: collapse;

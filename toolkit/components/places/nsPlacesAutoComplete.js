@@ -316,7 +316,7 @@ function nsPlacesAutoComplete()
 
     // Autocomplete often fallbacks to a table scan due to lack of text indices.
     // In such cases a larger cache helps reducing IO.  The default Storage
-    // value is MAX_CACHE_SIZE_BYTES in storage/src/mozStorageConnection.cpp.
+    // value is MAX_CACHE_SIZE_BYTES in storage/mozStorageConnection.cpp.
     let stmt = db.createAsyncStatement("PRAGMA cache_size = -6144"); // 6MiB
     stmt.executeAsync();
     stmt.finalize();
@@ -414,24 +414,20 @@ function nsPlacesAutoComplete()
   XPCOMUtils.defineLazyGetter(this, "_keywordQuery", function() {
     return this._db.createAsyncStatement(
       `/* do not warn (bug 487787) */
-       SELECT
-       (SELECT REPLACE(url, '%s', :query_string) FROM moz_places WHERE id = b.fk)
-       AS search_url, h.title,
+       SELECT REPLACE(h.url, '%s', :query_string) AS search_url, h.title,
        IFNULL(f.url, (SELECT f.url
                       FROM moz_places
                       JOIN moz_favicons f ON f.id = favicon_id
-                      WHERE rev_host = (SELECT rev_host FROM moz_places WHERE id = b.fk)
+                      WHERE rev_host = h.rev_host
                       ORDER BY frecency DESC
                       LIMIT 1)
-       ), 1, b.title, NULL, h.visit_count, h.typed, IFNULL(h.id, b.fk),
+       ), 1, NULL, NULL, h.visit_count, h.typed, h.id,
        :query_type, t.open_count
        FROM moz_keywords k
-       JOIN moz_bookmarks b ON b.keyword_id = k.id
-       LEFT JOIN moz_places h ON h.url = search_url
+       JOIN moz_places h ON k.place_id = h.id
        LEFT JOIN moz_favicons f ON f.id = h.favicon_id
        LEFT JOIN moz_openpages_temp t ON t.url = search_url
-       WHERE LOWER(k.keyword) = LOWER(:keyword)
-       ORDER BY h.frecency DESC`
+       WHERE k.keyword = LOWER(:keyword)`
     );
   });
 

@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-// vim: ft=cpp tw=78 sw=2 et ts=2
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -657,7 +657,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
     }
     if (!aElement->GetParserCreated()) {
       // Violate the HTML5 spec in order to make LABjs and the "order" plug-in
-      // for RequireJS work with their Goanna-sniffed code path. See
+      // for RequireJS work with their Gecko-sniffed code path. See
       // http://lists.w3.org/Archives/Public/public-html/2010Oct/0088.html
       mNonAsyncExternalScriptInsertedRequests.AppendElement(request);
       if (!request->mLoading) {
@@ -1069,7 +1069,7 @@ nsScriptLoader::FillCompileOptionsForRequest(const AutoJSAPI &jsapi,
   aOptions->setIntroductionType("scriptElement");
   aOptions->setFileAndLine(aRequest->mURL.get(), aRequest->mLineNo);
   aOptions->setVersion(JSVersion(aRequest->mJSVersion));
-  aOptions->setCompileAndGo(JS_IsGlobalObject(aScopeChain));
+  aOptions->setIsRunOnce(true);
   // We only need the setNoScriptRval bit when compiling off-thread here, since
   // otherwise nsJSUtils::EvaluateString will set it up for us.
   aOptions->setNoScriptRval(true);
@@ -1214,7 +1214,7 @@ nsScriptLoader::ProcessPendingRequests()
          !mNonAsyncExternalScriptInsertedRequests[0]->mLoading) {
     // Violate the HTML5 spec and execute these in the insertion order in
     // order to make LABjs and the "order" plug-in for RequireJS work with
-    // their Goanna-sniffed code path. See
+    // their Gecko-sniffed code path. See
     // http://lists.w3.org/Archives/Public/public-html/2010Oct/0088.html
     request.swap(mNonAsyncExternalScriptInsertedRequests[0]);
     mNonAsyncExternalScriptInsertedRequests.RemoveElementAt(0);

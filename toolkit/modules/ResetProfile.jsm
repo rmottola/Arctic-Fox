@@ -7,11 +7,13 @@
 this.EXPORTED_SYMBOLS = ["ResetProfile"];
 
 const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
-//For Arctic Fox: Hard-code MOZ_APP_NAME to firefox because of hard-coded type in migrator.
-#expand const MOZ_APP_NAME = ("__MOZ_APP_NAME__" == "arcticfox") ? "firefox" : "__MOZ_APP_NAME__";
-#expand const MOZ_BUILD_APP = "__MOZ_BUILD_APP__";
 
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
+
+//For Arctic Fox: Hard-code MOZ_APP_NAME to firefox because of hard-coded type in migrator.
+const MOZ_APP_NAME = (AppConstants.MOZ_APP_NAME == "arcticfox") ? "firefox" : AppConstants.MOZ_APP_NAME;
+const MOZ_BUILD_APP = AppConstants.MOZ_BUILD_APP;
 
 this.ResetProfile = {
   /**

@@ -692,7 +692,7 @@ class BaseFinder(object):
         '''
         Yield path, BaseFile_instance pairs for all files under the base
         directory and its subdirectories that match the given pattern. See the
-        mozpack.path.match documentation for a description of the handled
+        mozpath.match documentation for a description of the handled
         patterns.
         '''
         while pattern.startswith('/'):
@@ -717,7 +717,7 @@ class BaseFinder(object):
     def contains(self, pattern):
         '''
         Return whether some files under the base directory match the given
-        pattern. See the mozpack.path.match documentation for a description of
+        pattern. See the mozpath.match documentation for a description of
         the handled patterns.
         '''
         return any(self.find(pattern))

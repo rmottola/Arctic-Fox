@@ -110,9 +110,9 @@ struct BluetoothServiceName {
 // Conversion
 //
 // PDUs can only store primitive data types, such as integers or
-// strings. Goanna often uses more complex data types, such as
+// strings. Gecko often uses more complex data types, such as
 // enumerators or structures. Conversion functions convert between
-// primitive data and internal Goanna's data types during a PDU's
+// primitive data and internal Gecko's data types during a PDU's
 // packing and unpacking.
 //
 
@@ -220,9 +220,6 @@ Convert(const nsAString& aIn, BluetoothPropertyType& aOut);
 
 nsresult
 Convert(const nsAString& aIn, BluetoothServiceName& aOut);
-
-nsresult
-Convert(const nsAString& aIn, BluetoothSspVariant& aOut);
 
 nsresult
 Convert(BluetoothAclState aIn, bool& aOut);

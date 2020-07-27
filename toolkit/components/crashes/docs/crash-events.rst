@@ -2,11 +2,11 @@
 Crash Events
 ============
 
-**Crash Events** refers to a special subsystem of Goanna that aims to capture
+**Crash Events** refers to a special subsystem of Gecko that aims to capture
 events of interest related to process crashing and hanging.
 
 When an event worthy of recording occurs, a file containing that event's
-information is written to a well-defined location on the filesystem. The Goanna
+information is written to a well-defined location on the filesystem. The Gecko
 process periodically scans for produced files and consolidates information
 into a more unified and efficient backend store.
 
@@ -16,7 +16,7 @@ Crash Event Files
 When a crash-related event occurs, a file describing that event is written
 to a well-defined directory. That directory is likely in the directory of
 the currently-active profile. However, if a profile is not yet active in
-the Goanna process, that directory likely resides in the user's *app data*
+the Gecko process, that directory likely resides in the user's *app data*
 directory (*UAppData* from the directory service).
 
 The filename of the event file is not relevant. However, producers need
@@ -50,7 +50,7 @@ that event type is committed to the main Firefox repository. If new metadata
 needs to be captured or the meaning of data captured in an event changes,
 that change should be expressed through the invention of a new event type.
 For this reason, event names are highly recommended to contain a version.
-e.g. instead of a *Goanna process crashed* event, we prefer a *Goanna process
+e.g. instead of a *Gecko process crashed* event, we prefer a *Gecko process
 crashed v1* event.
 
 Event Types
@@ -114,7 +114,7 @@ We attempt to document them in this section.
 Decoupling of Event Files from Final Data Structure
 ---------------------------------------------------
 
-While it is certainly possible for the Goanna process to write directly to
+While it is certainly possible for the Gecko process to write directly to
 the final data structure on disk, there is an intentional decoupling between
 the production of events and their transition into final storage. Along the
 same vein, the choice to have events written to multiple files by producers
@@ -129,12 +129,12 @@ to crash again or the machine's condition to worsen. This means that the act
 of recording a crash event must be very light weight. Writing a new file from
 nothing is very light weight. This is one reason we write separate files.
 
-Another reason we write separate files is because if the main Goanna process
+Another reason we write separate files is because if the main Gecko process
 itself crashes (as opposed to say a plugin process), the crash reporter (not
-Goanna) is running and the crash reporter needs to handle the writing of the
+Gecko) is running and the crash reporter needs to handle the writing of the
 event info. If this writing is involved (say loading, parsing, updating, and
 reserializing back to disk), this logic would need to be implemented in both
-Goanna and the crash reporter or would need to be implemented in such a way
+Gecko and the crash reporter or would need to be implemented in such a way
 that both could use. Neither of these is very practical from a software
 lifecycle management perspective. It's much easier to have separate processes
 write a simple file and to let a single implementation do all the complex

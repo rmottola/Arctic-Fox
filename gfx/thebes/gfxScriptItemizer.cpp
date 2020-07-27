@@ -5,7 +5,7 @@
 
 /*
  * This file is based on usc_impl.c from ICU 4.2.0.1, slightly adapted
- * for use within Mozilla Goanna, separate from a standard ICU build.
+ * for use within Mozilla Gecko, separate from a standard ICU build.
  *
  * The original ICU license of the code follows:
  *

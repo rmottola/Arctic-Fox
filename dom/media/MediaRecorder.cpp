@@ -159,7 +159,7 @@ NS_IMPL_RELEASE_INHERITED(MediaRecorder, DOMEventTargetHelper)
  * 1) MediaRecorder creates a Session in MediaRecorder::Start function and holds
  *    a reference to Session. Then the Session registers itself to
  *    ShutdownObserver and also holds a reference to MediaRecorder.
- *    Therefore, the reference dependency in goanna is:
+ *    Therefore, the reference dependency in gecko is:
  *    ShutdownObserver -> Session <-> MediaRecorder, note that there is a cycle
  *    reference between Session and MediaRecorder.
  * 2) A Session is destroyed in DestroyRunnable after MediaRecorder::Stop being called
@@ -1021,7 +1021,7 @@ MediaRecorder::CreateAndDispatchBlobEvent(already_AddRefed<nsIDOMBlob>&& aBlob)
   init.mCancelable = false;
 
   nsCOMPtr<nsIDOMBlob> blob = aBlob;
-  init.mData = static_cast<File*>(blob.get());
+  init.mData = static_cast<Blob*>(blob.get());
 
   nsRefPtr<BlobEvent> event =
     BlobEvent::Constructor(this,

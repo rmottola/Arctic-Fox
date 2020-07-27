@@ -1330,7 +1330,7 @@ class JS_PUBLIC_API(ContextOptions) {
     // JS_ReportError* functions that eventually report the error even when dontReportUncaught is
     // set, if script is not running. We want a way to indicate that the embedder will always
     // handle any exceptions, and that SpiderMonkey should just leave them on the context. This is
-    // the way we want to do all future error handling in Goanna - stealing the exception explicitly
+    // the way we want to do all future error handling in Gecko - stealing the exception explicitly
     // from the context and handling it as per the situation. This will eventually become the
     // default and these 2 flags should go away.
     bool autoJSAPIOwnsErrorReporting_ : 1;
@@ -1703,9 +1703,6 @@ JS_AddFinalizeCallback(JSRuntime* rt, JSFinalizeCallback cb, void* data);
 
 extern JS_PUBLIC_API(void)
 JS_RemoveFinalizeCallback(JSRuntime* rt, JSFinalizeCallback cb);
-
-extern JS_PUBLIC_API(bool)
-JS_IsGCMarkingTracer(JSTracer *trc);
 
 /*
  * Weak pointers and garbage collection
@@ -3403,8 +3400,8 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
         utf8(false),
         lineno(1),
         column(0),
-        compileAndGo(false),
         hasPollutedGlobalScope(false),
+        isRunOnce(false),
         forEval(false),
         noScriptRval(false),
         selfHostingMode(false),
@@ -3443,8 +3440,9 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
     bool utf8;
     unsigned lineno;
     unsigned column;
-    bool compileAndGo;
     bool hasPollutedGlobalScope;
+    // isRunOnce only applies to non-function scripts.
+    bool isRunOnce;
     bool forEval;
     bool noScriptRval;
     bool selfHostingMode;
@@ -3535,8 +3533,8 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
     OwningCompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     OwningCompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    OwningCompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
     OwningCompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
+    OwningCompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     OwningCompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     OwningCompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     OwningCompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
@@ -3619,8 +3617,8 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
     }
     CompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     CompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    CompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
     CompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
+    CompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     CompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     CompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     CompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
@@ -3806,7 +3804,7 @@ namespace JS {
  * cross-compartment, it is cloned into the current compartment before executing.
  */
 extern JS_PUBLIC_API(bool)
-CloneAndExecuteScript(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JSScript*> script);
+CloneAndExecuteScript(JSContext* cx, JS::Handle<JSScript*> script);
 
 } /* namespace JS */
 
@@ -3912,8 +3910,10 @@ extern JS_PUBLIC_API(bool)
 Construct(JSContext* cx, JS::HandleValue fun,
           const JS::HandleValueArray& args,
           MutableHandleValue rval);
-
 } /* namespace JS */
+
+extern JS_PUBLIC_API(bool)
+JS_CheckForInterrupt(JSContext* cx);
 
 /*
  * These functions allow setting an interrupt callback that will be called
@@ -4613,7 +4613,7 @@ JS_SetErrorReporter(JSRuntime* rt, JSErrorReporter er);
 namespace JS {
 
 extern JS_PUBLIC_API(bool)
-CreateError(JSContext* cx, JSExnType type, HandleString stack,
+CreateError(JSContext* cx, JSExnType type, HandleObject stack,
             HandleString fileName, uint32_t lineNumber, uint32_t columnNumber,
             JSErrorReport* report, HandleString message, MutableHandleValue rval);
 
@@ -5322,10 +5322,13 @@ GetSavedFrameParent(JSContext *cx, HandleObject savedFrame, MutableHandleObject 
  * Given a SavedFrame JSObject stack, stringify it in the same format as
  * Error.prototype.stack. The stringified stack out parameter is placed in the
  * cx's compartment. Defaults to the empty string.
+ *
+ * The same notes above about SavedFrame accessors applies here as well: cx
+ * doesn't need to be in stack's compartment, and stack can be null, a
+ * SavedFrame object, or a wrapper (CCW or Xray) around a SavedFrame object.
  */
 extern JS_PUBLIC_API(bool)
-StringifySavedFrameStack(JSContext *cx, HandleObject stack, MutableHandleString stringp);
-
+BuildStackString(JSContext *cx, HandleObject stack, MutableHandleString stringp);
 
 } /* namespace JS */
 

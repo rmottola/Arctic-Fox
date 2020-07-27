@@ -18,6 +18,8 @@
 #include "nsCOMPtr.h"
 #include "nsIContentSecurityPolicy.h"
 
+#include "mozilla/BasePrincipal.h"
+
 class nsIURI;
 
 #define NS_NULLPRINCIPAL_CID \
@@ -27,36 +29,50 @@ class nsIURI;
 
 #define NS_NULLPRINCIPAL_SCHEME "moz-nullprincipal"
 
-class nsNullPrincipal final : public nsJSPrincipals
+class nsNullPrincipal final : public mozilla::BasePrincipal
 {
 public:
-  nsNullPrincipal();
+  // This should only be used by deserialization, and the factory constructor.
+  // Other consumers should use the Create and CreateWithInheritedAttributes
+  // methods.
+  nsNullPrincipal() {}
 
-  // Our refcount is managed by nsJSPrincipals.  Use this macro to avoid an
-  // extra refcount member.
-
-  // FIXME: bug 327245 -- I sorta wish there were a clean way to share the
-  // nsJSPrincipals munging code between the various principal classes without
-  // giving up the NS_DECL_NSIPRINCIPAL goodness.
-  NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_NSIPRINCIPAL
   NS_DECL_NSISERIALIZABLE
 
+  NS_IMETHOD QueryInterface(REFNSIID aIID, void** aInstancePtr) override;
+  NS_IMETHOD Equals(nsIPrincipal* other, bool* _retval) override;
+  NS_IMETHOD EqualsConsideringDomain(nsIPrincipal* other, bool* _retval) override;
+  NS_IMETHOD GetHashValue(uint32_t* aHashValue) override;
+  NS_IMETHOD GetURI(nsIURI** aURI) override;
+  NS_IMETHOD GetDomain(nsIURI** aDomain) override;
+  NS_IMETHOD SetDomain(nsIURI* aDomain) override;
+  NS_IMETHOD GetOrigin(nsACString& aOrigin) override;
+  NS_IMETHOD Subsumes(nsIPrincipal* other, bool* _retval) override;
+  NS_IMETHOD SubsumesConsideringDomain(nsIPrincipal* other, bool* _retval) override;
+  NS_IMETHOD CheckMayLoad(nsIURI* uri, bool report, bool allowIfInheritsPrincipal) override;
+  NS_IMETHOD GetJarPrefix(nsACString& aJarPrefix) override;
+  NS_IMETHOD GetAppStatus(uint16_t* aAppStatus) override;
+  NS_IMETHOD GetAppId(uint32_t* aAppStatus) override;
+  NS_IMETHOD GetIsInBrowserElement(bool* aIsInBrowserElement) override;
+  NS_IMETHOD GetUnknownAppId(bool* aUnknownAppId) override;
+  NS_IMETHOD GetIsNullPrincipal(bool* aIsNullPrincipal) override;
+  NS_IMETHOD GetBaseDomain(nsACString& aBaseDomain) override;
+
+  // Returns null on failure.
   static already_AddRefed<nsNullPrincipal> CreateWithInheritedAttributes(nsIPrincipal *aInheritFrom);
+
+  // Returns null on failure.
+  static already_AddRefed<nsNullPrincipal>
+    Create(uint32_t aAppId = nsIScriptSecurityManager::NO_APP_ID,
+           bool aInMozBrowser = false);
 
   nsresult Init(uint32_t aAppId = nsIScriptSecurityManager::NO_APP_ID,
                 bool aInMozBrowser = false);
 
   virtual void GetScriptLocation(nsACString &aStr) override;
 
-  static nsresult GenerateNullPrincipalURI(nsACString &aStr);
-
-#ifdef DEBUG
-  virtual void dumpImpl() override;
-#endif 
-
  protected:
-  virtual ~nsNullPrincipal();
+  virtual ~nsNullPrincipal() {}
 
   nsCOMPtr<nsIURI> mURI;
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;

@@ -94,7 +94,7 @@ function sourceify(v)
 function messageReceiver(evt)
 {
   // It's not clear what the security model is for data: URLs and whether they
-  // can access their parents; WebKit denies access, while Goanna currently
+  // can access their parents; WebKit denies access, while Gecko currently
   // allows it.  We work around this problem by using postMessage (surprise!)
   // to start the round of tests when each iframe loads.
   if (evt.data === "next-test")

@@ -47,6 +47,7 @@
 #include "VideoUtils.h"
 #include "Latency.h"
 #include "nsProxyRelease.h"
+#include "nsNullPrincipal.h"
 
 // For PR_snprintf
 #include "prprf.h"
@@ -75,6 +76,8 @@
 #if defined (XP_WIN)
 #include "mozilla/WindowsVersion.h"
 #endif
+
+#include <map>
 
 // GetCurrentTime is defined in winbase.h as zero argument macro forwarding to
 // GetTickCount() and conflicts with MediaStream::GetCurrentTime.
@@ -110,6 +113,7 @@ GetMediaManagerLog()
 }
 #define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
 
+using dom::File;
 using dom::MediaStreamConstraints;
 using dom::MediaTrackConstraintSet;
 using dom::MediaTrackConstraints;
@@ -257,53 +261,6 @@ private:
   nsCOMPtr<SuccessCallbackType> mOnSuccess;
   nsCOMPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
   nsRefPtr<MediaMgrError> mError;
-  uint64_t mWindowID;
-  nsRefPtr<MediaManager> mManager; // get ref to this when creating the runnable
-};
-
-/**
- * Invoke the "onSuccess" callback in content. The callback will take a
- * DOMBlob in the case of {picture:true}, and a MediaStream in the case of
- * {audio:true} or {video:true}. There is a constructor available for each
- * form. Do this only on the main thread.
- */
-class SuccessCallbackRunnable : public nsRunnable
-{
-public:
-  SuccessCallbackRunnable(
-    nsCOMPtr<nsIDOMGetUserMediaSuccessCallback>& aOnSuccess,
-    nsCOMPtr<nsIDOMGetUserMediaErrorCallback>& aOnFailure,
-    nsIDOMFile* aFile, uint64_t aWindowID)
-    : mFile(aFile)
-    , mWindowID(aWindowID)
-    , mManager(MediaManager::GetInstance())
-  {
-    mOnSuccess.swap(aOnSuccess);
-    mOnFailure.swap(aOnFailure);
-  }
-
-  NS_IMETHOD
-  Run()
-  {
-    // Only run if the window is still active.
-    NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
-
-    nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> onSuccess = mOnSuccess.forget();
-    nsCOMPtr<nsIDOMGetUserMediaErrorCallback> onFailure = mOnFailure.forget();
-
-    if (!(mManager->IsWindowStillActive(mWindowID))) {
-      return NS_OK;
-    }
-    // This is safe since we're on main-thread, and the windowlist can only
-    // be invalidated from the main-thread (see OnNavigation)
-    onSuccess->OnSuccess(mFile);
-    return NS_OK;
-  }
-
-private:
-  nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> mOnSuccess;
-  nsCOMPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
-  nsCOMPtr<nsIDOMFile> mFile;
   uint64_t mWindowID;
   nsRefPtr<MediaManager> mManager; // get ref to this when creating the runnable
 };
@@ -525,22 +482,31 @@ uint32_t
 VideoDevice::GetBestFitnessDistance(
     const nsTArray<const MediaTrackConstraintSet*>& aConstraintSets)
 {
+  // TODO: Minimal kludge to fix plain and ideal facingMode regression, for
+  // smooth landing and uplift. Proper cleanup is forthcoming (1037389).
+  uint64_t distance = 0;
+
   // Interrogate device-inherent properties first.
   for (size_t i = 0; i < aConstraintSets.Length(); i++) {
     auto& c = *aConstraintSets[i];
     if (!c.mFacingMode.IsConstrainDOMStringParameters() ||
+        c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.WasPassed() ||
         c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.WasPassed()) {
       nsString deviceFacingMode;
       GetFacingMode(deviceFacingMode);
       if (c.mFacingMode.IsString()) {
         if (c.mFacingMode.GetAsString() != deviceFacingMode) {
-          return UINT32_MAX;
+          if (i == 0) {
+            distance = 1000;
+          }
         }
       } else if (c.mFacingMode.IsStringSequence()) {
         if (!c.mFacingMode.GetAsStringSequence().Contains(deviceFacingMode)) {
-          return UINT32_MAX;
+          if (i == 0) {
+            distance = 1000;
+          }
         }
-      } else {
+      } else if (c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.WasPassed()) {
         auto& exact = c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.Value();
         if (exact.IsString()) {
           if (exact.GetAsString() != deviceFacingMode) {
@@ -548,6 +514,19 @@ VideoDevice::GetBestFitnessDistance(
           }
         } else if (!exact.GetAsStringSequence().Contains(deviceFacingMode)) {
           return UINT32_MAX;
+        }
+      } else if (c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.WasPassed()) {
+        auto& ideal = c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.Value();
+        if (ideal.IsString()) {
+          if (ideal.GetAsString() != deviceFacingMode) {
+            if (i == 0) {
+              distance = 1000;
+            }
+          }
+        } else if (!ideal.GetAsStringSequence().Contains(deviceFacingMode)) {
+          if (i == 0) {
+            distance = 1000;
+          }
         }
       }
     }
@@ -558,7 +537,8 @@ VideoDevice::GetBestFitnessDistance(
     }
   }
   // Forward request to underlying object to interrogate per-mode capabilities.
-  return GetSource()->GetBestFitnessDistance(aConstraintSets);
+  distance += uint64_t(GetSource()->GetBestFitnessDistance(aConstraintSets));
+  return uint32_t(std::min(distance, uint64_t(UINT32_MAX)));
 }
 
 AudioDevice::AudioDevice(MediaEngineAudioSource* aSource)
@@ -1003,7 +983,7 @@ public:
 
     nsCOMPtr<nsIPrincipal> principal;
     if (mPeerIdentity) {
-      principal = do_CreateInstance("@mozilla.org/nullprincipal;1");
+      principal = nsNullPrincipal::Create();
       trackunion->SetPeerIdentity(mPeerIdentity.forget());
     } else {
       principal = window->GetExtantDoc()->NodePrincipal();
@@ -1117,12 +1097,22 @@ static void
   nsTArray<const MediaTrackConstraintSet*> aggregateConstraints;
   aggregateConstraints.AppendElement(&c);
 
+  std::multimap<uint32_t, nsRefPtr<DeviceType>> ordered;
+
   for (uint32_t i = 0; i < candidateSet.Length();) {
-    if (candidateSet[i]->GetBestFitnessDistance(aggregateConstraints) == UINT32_MAX) {
+    uint32_t distance = candidateSet[i]->GetBestFitnessDistance(aggregateConstraints);
+    if (distance == UINT32_MAX) {
       candidateSet.RemoveElementAt(i);
     } else {
+      ordered.insert(std::pair<uint32_t, nsRefPtr<DeviceType>>(distance,
+                                                               candidateSet[i]));
       ++i;
     }
+  }
+  // Order devices by shortest distance
+  for (auto& ordinal : ordered) {
+    candidateSet.RemoveElement(ordinal.second);
+    candidateSet.AppendElement(ordinal.second);
   }
 
   // Then apply advanced constraints.
@@ -1313,6 +1303,11 @@ public:
   {
     MOZ_ASSERT(mOnSuccess);
     MOZ_ASSERT(mOnFailure);
+
+    if (!IsOn(mConstraints.mVideo) && !IsOn(mConstraints.mAudio)) {
+      Fail(NS_LITERAL_STRING("NotSupportedError"));
+      return NS_ERROR_FAILURE;
+    }
     if (IsOn(mConstraints.mVideo)) {
       nsTArray<nsRefPtr<VideoDevice>> sources;
       GetSources(backend, GetInvariant(mConstraints.mVideo),
@@ -1336,6 +1331,11 @@ public:
       // Pick the first available device.
       mAudioDevice = sources[0];
       LOG(("Selected audio device"));
+    }
+
+    if (!mAudioDevice && !mVideoDevice) {
+      Fail(NS_LITERAL_STRING("NotFoundError"));
+      return NS_ERROR_FAILURE;
     }
 
     return NS_OK;
@@ -1846,11 +1846,18 @@ MediaManager::GetUserMedia(
                                 "media.getusermedia.browser.enabled" :
                                 "media.getusermedia.screensharing.enabled"),
                                 false) ||
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
           (
+            // Allow tab sharing for all platforms including XP and OSX 10.6
+            (src != dom::MediaSourceEnum::Browser) &&
             !Preferences::GetBool("media.getusermedia.screensharing.allow_on_old_platforms",
                                   false) &&
+#if defined(XP_MACOSX)
             !nsCocoaFeatures::OnLionOrLater()
+#endif
+#if defined (XP_WIN)
+              !IsVistaOrLater()
+#endif
             ) ||
 #endif
           (!privileged && !HostHasPermission(*docURI))) {
@@ -1983,8 +1990,7 @@ MediaManager::GetUserMediaDevices(nsPIDOMWindow* aWindow,
     Preferences::GetBool("media.navigator.streams.fake", false);
 
   nsCString origin;
-  nsPrincipal::GetOriginForURI(aWindow->GetDocumentURI(),
-                               getter_Copies(origin));
+  nsPrincipal::GetOriginForURI(aWindow->GetDocumentURI(), origin);
   bool inPrivateBrowsing;
   {
     nsCOMPtr<nsIDocument> doc = aWindow->GetDoc();
@@ -2239,7 +2245,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
     // cleared until the lambda function clears it.
 
     MediaManager::GetMessageLoop()->PostTask(FROM_HERE, new ShutdownTask(
-        media::CallbackRunnable::New([this]() mutable {
+        media::NewRunnableFrom([this]() mutable {
       // Close off any remaining active windows.
       MutexAutoLock lock(mMutex);
       GetActiveWindows()->Clear();

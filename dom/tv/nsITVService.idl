@@ -16,7 +16,7 @@ interface nsIArray;
 /**
  * XPCOM component which acts as the container for tuner data.
  *
- * NOTE: Use do_CreateInstance() to create the Goanna provided implementation,
+ * NOTE: Use do_CreateInstance() to create the Gecko provided implementation,
  * and then uses the setter functions to adjust the properties of the object
  * before passing it.
  */
@@ -56,7 +56,7 @@ interface nsITVTunerData : nsISupports
 /**
  * XPCOM component which acts as the container for channel data.
  *
- * NOTE: Use do_CreateInstance() to create the Goanna provided implementation,
+ * NOTE: Use do_CreateInstance() to create the Gecko provided implementation,
  * and then uses the setter functions to adjust the properties of the object
  * before passing it.
  */
@@ -83,7 +83,7 @@ interface nsITVChannelData : nsISupports
 /**
  * XPCOM component which acts as the container for program data.
  *
- * NOTE: Use do_CreateInstance() to create the Goanna provided implementation,
+ * NOTE: Use do_CreateInstance() to create the Gecko provided implementation,
  * and then uses the setter functions to adjust the properties of the object
  * before passing it.
  */

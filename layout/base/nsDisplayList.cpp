@@ -420,7 +420,7 @@ AddAnimationsForProperty(nsIFrame* aFrame, nsCSSProperty aProperty,
     if (!anim->IsPlaying()) {
       continue;
     }
-    dom::KeyframeEffectReadonly* effect = anim->GetEffect();
+    dom::KeyframeEffectReadOnly* effect = anim->GetEffect();
     MOZ_ASSERT(effect, "A playing animation should have an effect");
     const AnimationProperty* property =
       effect->GetAnimationOfProperty(aProperty);
@@ -1378,7 +1378,7 @@ nsDisplayListBuilder::AddToWillChangeBudget(nsIFrame* aFrame, const nsSize& aRec
     mWillChangeBudget.Get(key, &budget);
   }
 
-  // There's significant overhead for each layer created from Goanna
+  // There's significant overhead for each layer created from Gecko
   // (IPC+Shared Objects) and from the backend (like an OpenGL texture).
   // Therefore we set a minimum cost threshold of a 64x64 area.
   int minBudgetCost = 64 * 64;

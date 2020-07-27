@@ -56,8 +56,8 @@ class InputReader;
 class InputReaderThread;
 }
 
-class GoannaInputReaderPolicy;
-class GoannaInputDispatcher;
+class GeckoInputReaderPolicy;
+class GeckoInputDispatcher;
 
 class nsAppShell : public nsBaseAppShell {
 public:
@@ -97,8 +97,8 @@ private:
     nsTArray<FdHandler> mHandlers;
 
     android::sp<android::EventHub>               mEventHub;
-    android::sp<GoannaInputReaderPolicy> mReaderPolicy;
-    android::sp<GoannaInputDispatcher>   mDispatcher;
+    android::sp<GeckoInputReaderPolicy> mReaderPolicy;
+    android::sp<GeckoInputDispatcher>   mDispatcher;
     android::sp<android::InputReader>            mReader;
     android::sp<android::InputReaderThread>      mReaderThread;
 };

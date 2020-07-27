@@ -287,7 +287,7 @@ protected:
   nsresult MapIsoFromGonk(const char* aIso, nsAString& aIsoOut);
 
   // Call once to initialize local cached values used in translating other
-  // arguments between Goanna and Gonk. Always returns NS_OK.
+  // arguments between Gecko and Gonk. Always returns NS_OK.
   nsresult Initialize();
 
   // Returns true if we're a memory-constrained platform that requires

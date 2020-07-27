@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -30,6 +31,7 @@
 #include "mozilla/dom/Response.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/URLSearchParams.h"
+#include "mozilla/Telemetry.h"
 
 #include "InternalRequest.h"
 #include "InternalResponse.h"
@@ -233,6 +235,8 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
       return nullptr;
     }
 
+    Telemetry::Accumulate(Telemetry::FETCH_IS_MAINTHREAD, 1);
+
     nsRefPtr<MainThreadFetchResolver> resolver = new MainThreadFetchResolver(p);
     nsCOMPtr<nsILoadGroup> loadGroup = doc->GetDocumentLoadGroup();
     nsRefPtr<FetchDriver> fetch =
@@ -245,6 +249,8 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
   } else {
     WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
+
+    Telemetry::Accumulate(Telemetry::FETCH_IS_MAINTHREAD, 0);
 
     if (worker->IsServiceWorker()) {
       r->SetSkipServiceWorker();
@@ -440,10 +446,10 @@ ExtractFromArrayBufferView(const ArrayBufferView& aBuffer,
 }
 
 nsresult
-ExtractFromBlob(const File& aFile, nsIInputStream** aStream,
+ExtractFromBlob(const Blob& aBlob, nsIInputStream** aStream,
                 nsCString& aContentType)
 {
-  nsRefPtr<FileImpl> impl = aFile.Impl();
+  nsRefPtr<BlobImpl> impl = aBlob.Impl();
   nsresult rv = impl->GetInternalStream(aStream);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -767,7 +773,7 @@ private:
       }
       p = nullptr;
 
-      nsRefPtr<File> file =
+      nsRefPtr<Blob> file =
         File::CreateMemoryFile(mParentObject,
                                reinterpret_cast<void *>(copy), body.Length(),
                                NS_ConvertUTF8toUTF16(mFilename),
@@ -904,7 +910,7 @@ ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDa
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
     return ExtractFromArrayBufferView(buf, aStream);
   } else if (aBodyInit.IsBlob()) {
-    const File& blob = aBodyInit.GetAsBlob();
+    const Blob& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
   } else if (aBodyInit.IsFormData()) {
     nsFormData& form = aBodyInit.GetAsFormData();
@@ -936,7 +942,7 @@ ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUS
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
     return ExtractFromArrayBufferView(buf, aStream);
   } else if (aBodyInit.IsBlob()) {
-    const File& blob = aBodyInit.GetAsBlob();
+    const Blob& blob = aBodyInit.GetAsBlob();
     return ExtractFromBlob(blob, aStream, aContentType);
   } else if (aBodyInit.IsFormData()) {
     nsFormData& form = aBodyInit.GetAsFormData();
@@ -1501,9 +1507,10 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       return;
     }
     case CONSUME_BLOB: {
-      nsRefPtr<File> blob =
-        File::CreateMemoryFile(DerivedClass()->GetParentObject(),
-                               reinterpret_cast<void *>(aResult), aResultLength, NS_ConvertUTF8toUTF16(mMimeType));
+      nsRefPtr<dom::Blob> blob =
+        Blob::CreateMemoryBlob(DerivedClass()->GetParentObject(),
+                               reinterpret_cast<void *>(aResult), aResultLength,
+                               NS_ConvertUTF8toUTF16(mMimeType));
 
       if (!blob) {
         localPromise->MaybeReject(NS_ERROR_DOM_UNKNOWN_ERR);

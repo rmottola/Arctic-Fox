@@ -898,8 +898,8 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
           }
         }
         // Update UA components as-needed for this change:
-        // Compatmode on ->  rv:{FF-appversion}  Goanna/{Goanna-version}
-        // Compatmode off -> rv:{Goanna-version} Goanna/{BuildID}
+        // Compatmode on ->  rv:{FF-appversion}  Gecko/{Gecko-version}
+        // Compatmode off -> rv:{Gecko-version} Gecko/{BuildID}
         if (mCompatFirefoxEnabled) {
           mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
           mProductSub.AssignLiteral(MOZILLA_UAVERSION);          

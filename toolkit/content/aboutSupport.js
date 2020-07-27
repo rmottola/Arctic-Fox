@@ -419,7 +419,7 @@ function copyRawDataToClipboard(button) {
         message: stringBundle().GetStringFromName("rawDataCopied"),
         duration: "short"
       };
-      Services.androidBridge.handleGoannaMessage(message);
+      Services.androidBridge.handleGeckoMessage(message);
 #endif
     });
   }
@@ -473,7 +473,7 @@ function copyContentsToClipboard() {
     message: stringBundle().GetStringFromName("textCopied"),
     duration: "short"
   };
-  Services.androidBridge.handleGoannaMessage(message);
+  Services.androidBridge.handleGeckoMessage(message);
 #endif
 }
 
@@ -692,24 +692,14 @@ function populateActionBox() {
   }
 }
 
-// Restart the browser
-function restart(safeMode) {
-  // Notify all windows that an application quit has been requested.
+// Prompt user to restart the browser in safe mode
+function safeModeRestart() {
   let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"]
                      .createInstance(Ci.nsISupportsPRBool);
   Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
 
-  // Something aborted the quit process.
-  if (cancelQuit.data) {
-    return;
-  }
-
-  let flags = Ci.nsIAppStartup.eAttemptQuit;
-
-  if (safeMode) {
-    Services.startup.restartInSafeMode(flags);
-  } else {
-    Services.startup.quit(flags | Ci.nsIAppStartup.eRestart);
+  if (!cancelQuit.data) {
+    Services.startup.restartInSafeMode(Ci.nsIAppStartup.eAttemptQuit);
   }
 }
 
@@ -740,11 +730,8 @@ function setupEventListeners(){
       Services.obs.notifyObservers(null, "restart-in-safe-mode", "");
     }
     else {
-      restart(true);
+      safeModeRestart();
     }
-  });
-  $("restart-button").addEventListener("click", function (event) {
-    restart(false);
   });
   $("verify-place-integrity-button").addEventListener("click", function(event) {
     PlacesDBUtils.checkAndFixDatabase(function(aLog) {

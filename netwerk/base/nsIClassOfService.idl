@@ -13,7 +13,7 @@
  * Channels that implement this interface may make use of this
  * information in different ways.
  *
- * The default goanna HTTP/1 stack makes Followers wait for Leaders to
+ * The default gecko HTTP/1 stack makes Followers wait for Leaders to
  * complete before dispatching followers. Other classes run in
  * parallel - neither being blocked nor blocking. All grouping is done
  * based on the Load Group - separate load groups proceed

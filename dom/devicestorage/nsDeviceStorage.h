@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -31,6 +33,10 @@ class nsPIDOMWindow;
 
 namespace mozilla {
 class ErrorResult;
+
+namespace dom {
+class Blob;
+}
 } // namespace mozilla
 
 #define POST_ERROR_EVENT_FILE_EXISTS                 "NoModificationAllowedError"
@@ -155,7 +161,7 @@ public:
 
   void InitFromBundle(nsIStringBundle* aBundle);
 
-  bool Check(const nsAString& aType, nsIDOMBlob* aBlob);
+  bool Check(const nsAString& aType, mozilla::dom::Blob* aBlob);
   bool Check(const nsAString& aType, nsIFile* aFile);
   bool Check(const nsAString& aType, const nsString& aPath);
   void GetTypeFromFile(nsIFile* aFile, nsAString& aType);

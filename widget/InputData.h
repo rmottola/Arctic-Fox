@@ -459,7 +459,7 @@ class ScrollWheelInput : public InputData
 public:
   enum ScrollDeltaType
   {
-    // There are three kinds of scroll delta modes in Goanna: "page", "line" and
+    // There are three kinds of scroll delta modes in Gecko: "page", "line" and
     // "pixel". For apz, we currently only support "line" mode.
     SCROLLDELTA_LINE
   };

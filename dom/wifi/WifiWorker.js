@@ -3027,10 +3027,10 @@ WifiWorker.prototype = {
 
   /**
    * Compatibility flags for detecting if Gaia is controlling wifi by settings
-   * or API, once API is called, goanna will no longer accept wifi enable
+   * or API, once API is called, gecko will no longer accept wifi enable
    * control from settings.
    * This is used to deal with compatibility issue while Gaia adopted to use
-   * API but goanna doesn't remove the settings code in time.
+   * API but gecko doesn't remove the settings code in time.
    * TODO: Remove this flag in Bug 1050147
    */
   ignoreWifiEnabledFromSettings: false,

@@ -1,6 +1,6 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -51,6 +51,7 @@ class nsIConsoleService;
 class nsIContent;
 class nsIContentPolicy;
 class nsIContentSecurityPolicy;
+class nsIDocShellTreeItem;
 class nsIDocument;
 class nsIDocumentLoaderFactory;
 class nsIDOMDocument;
@@ -93,9 +94,11 @@ class nsPresContext;
 class nsStringBuffer;
 class nsStringHashKey;
 class nsTextFragment;
+class nsView;
 class nsViewportInfo;
 class nsWrapperCache;
 class nsAttrValue;
+class nsITransferable;
 
 struct JSPropertyDescriptor;
 struct JSRuntime;
@@ -121,6 +124,10 @@ class nsIContentParent;
 class Selection;
 class TabParent;
 } // namespace dom
+
+namespace gfx {
+class DataSourceSurface;
+} // namespace gfx
 
 namespace layers {
 class LayerManager;
@@ -481,7 +488,7 @@ public:
   /**
    * Convert aInput (in encoding aEncoding) to UTF16 in aOutput.
    *
-   * @param aEncoding the Goanna-canonical name of the encoding or the empty
+   * @param aEncoding the Gecko-canonical name of the encoding or the empty
    *                  string (meaning UTF-8)
    */
   static nsresult ConvertStringFromEncoding(const nsACString& aEncoding,
@@ -2361,6 +2368,7 @@ public:
    * otherwise it just outputs the hostname in aHost.
    */
   static void GetHostOrIPv6WithBrackets(nsIURI* aURI, nsAString& aHost);
+  static void GetHostOrIPv6WithBrackets(nsIURI* aURI, nsCString& aHost);
 
   /*
    * Call the given callback on all remote children of the given top-level
@@ -2374,6 +2382,67 @@ public:
                                               nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
                                               mozilla::dom::nsIContentChild* aChild,
                                               mozilla::dom::nsIContentParent* aParent);
+
+  static void TransferableToIPCTransferable(nsITransferable* aTransferable,
+                                            mozilla::dom::IPCDataTransfer* aIPCDataTransfer,
+                                            mozilla::dom::nsIContentChild* aChild,
+                                            mozilla::dom::nsIContentParent* aParent);
+
+  /*
+   * Get the pixel data from the given source surface and return it as a buffer.
+   * The length and stride will be assigned from the surface.
+   */
+  static mozilla::UniquePtr<char[]> GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
+                                                   size_t* aLength, int32_t* aStride);
+
+  // Helpers shared by the implementations of nsContentUtils methods and
+  // nsIDOMWindowUtils methods.
+  static mozilla::Modifiers GetWidgetModifiers(int32_t aModifiers);
+  static nsIWidget* GetWidget(nsIPresShell* aPresShell, nsPoint* aOffset);
+  static int16_t GetButtonsFlagForButton(int32_t aButton);
+  static mozilla::LayoutDeviceIntPoint ToWidgetPoint(const mozilla::CSSPoint& aPoint,
+                                                     const nsPoint& aOffset,
+                                                     nsPresContext* aPresContext);
+  static nsView* GetViewToDispatchEvent(nsPresContext* aPresContext,
+                                        nsIPresShell** aPresShell);
+
+  /**
+   * Synthesize a key event to the given widget
+   * (see nsIDOMWindowUtils.sendKeyEvent).
+   */
+  static nsresult SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
+                               const nsAString& aType,
+                               int32_t aKeyCode,
+                               int32_t aCharCode,
+                               int32_t aModifiers,
+                               uint32_t aAdditionalFlags,
+                               bool* aDefaultActionTaken);
+
+  /**
+   * Synthesize a mouse event to the given widget
+   * (see nsIDOMWindowUtils.sendMouseEvent).
+   */
+  static nsresult SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
+                                 const nsAString& aType,
+                                 float aX,
+                                 float aY,
+                                 int32_t aButton,
+                                 int32_t aClickCount,
+                                 int32_t aModifiers,
+                                 bool aIgnoreRootScrollFrame,
+                                 float aPressure,
+                                 unsigned short aInputSourceArg,
+                                 bool aToWindow,
+                                 bool *aPreventDefault,
+                                 bool aIsSynthesized);
+
+  static void FirePageShowEvent(nsIDocShellTreeItem* aItem,
+                                mozilla::dom::EventTarget* aChromeEventHandler,
+                                bool aFireIfShowing);
+
+  static void FirePageHideEvent(nsIDocShellTreeItem* aItem,
+                                mozilla::dom::EventTarget* aChromeEventHandler);
+
 private:
   static bool InitializeEventTable();
 

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.mozilla.goanna;
+package org.mozilla.gecko;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -20,9 +20,9 @@ import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.mozilla.goanna.gfx.LayerView;
-import org.mozilla.goanna.gfx.PanningPerfAPI;
-import org.mozilla.goanna.util.GeckoEventListener;
+import org.mozilla.gecko.gfx.LayerView;
+import org.mozilla.gecko.gfx.PanningPerfAPI;
+import org.mozilla.gecko.util.GeckoEventListener;
 
 import android.app.Activity;
 import android.util.Log;
@@ -64,58 +64,58 @@ public class FennecNativeDriver implements Driver {
         mRootPath = rootPath;
     }
 
-    //Information on the location of the Goanna Frame.
-    private boolean mGoannaInfo = false;
-    private int mGoannaTop = 100;
-    private int mGoannaLeft = 0;
-    private int mGoannaHeight= 700;
-    private int mGoannaWidth = 1024;
+    //Information on the location of the Gecko Frame.
+    private boolean mGeckoInfo = false;
+    private int mGeckoTop = 100;
+    private int mGeckoLeft = 0;
+    private int mGeckoHeight= 700;
+    private int mGeckoWidth = 1024;
 
-    private void getGoannaInfo() {
-        View goannaLayout = mActivity.findViewById(R.id.goanna_layout);
-        if (goannaLayout != null) {
+    private void getGeckoInfo() {
+        View geckoLayout = mActivity.findViewById(R.id.gecko_layout);
+        if (geckoLayout != null) {
             int[] pos = new int[2];
-            goannaLayout.getLocationOnScreen(pos);
-            mGoannaTop = pos[1];
-            mGoannaLeft = pos[0];
-            mGoannaWidth = goannaLayout.getWidth();
-            mGoannaHeight = goannaLayout.getHeight();
-            mGoannaInfo = true;
+            geckoLayout.getLocationOnScreen(pos);
+            mGeckoTop = pos[1];
+            mGeckoLeft = pos[0];
+            mGeckoWidth = geckoLayout.getWidth();
+            mGeckoHeight = geckoLayout.getHeight();
+            mGeckoInfo = true;
         } else {
-            throw new RoboCopException("Unable to find view goanna_layout");
+            throw new RoboCopException("Unable to find view gecko_layout");
         }
     }
 
     @Override
-    public int getGoannaTop() {
-        if (!mGoannaInfo) {
-            getGoannaInfo();
+    public int getGeckoTop() {
+        if (!mGeckoInfo) {
+            getGeckoInfo();
         }
-        return mGoannaTop;
+        return mGeckoTop;
     }
 
     @Override
-    public int getGoannaLeft() {
-        if (!mGoannaInfo) {
-            getGoannaInfo();
+    public int getGeckoLeft() {
+        if (!mGeckoInfo) {
+            getGeckoInfo();
         }
-        return mGoannaLeft;
+        return mGeckoLeft;
     }
 
     @Override
-    public int getGoannaHeight() {
-        if (!mGoannaInfo) {
-            getGoannaInfo();
+    public int getGeckoHeight() {
+        if (!mGeckoInfo) {
+            getGeckoInfo();
         }
-        return mGoannaHeight;
+        return mGeckoHeight;
     }
 
     @Override
-    public int getGoannaWidth() {
-        if (!mGoannaInfo) {
-            getGoannaInfo();
+    public int getGeckoWidth() {
+        if (!mGeckoInfo) {
+            getGeckoInfo();
         }
-        return mGoannaWidth;
+        return mGeckoWidth;
     }
 
     /** Find the element with given id.

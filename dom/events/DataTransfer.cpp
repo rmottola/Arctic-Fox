@@ -94,7 +94,7 @@ DataTransfer::DataTransfer(nsISupports* aParent, uint32_t aEventType,
   } else if (mIsExternal) {
     if (aEventType == NS_PASTE) {
       CacheExternalClipboardFormats();
-    } else if (aEventType >= NS_DRAGDROP_EVENT_START && aEventType <= NS_DRAGDROP_LEAVE_SYNTH) {
+    } else if (aEventType >= NS_DRAGDROP_EVENT_START && aEventType <= NS_DRAGDROP_LEAVE) {
       CacheExternalDragFormats();
     }
   }
@@ -304,11 +304,15 @@ DataTransfer::GetFiles(ErrorResult& aRv)
       if (file) {
         domFile = File::CreateFromFile(GetParentObject(), file);
       } else {
-        nsCOMPtr<FileImpl> fileImpl = do_QueryInterface(supports);
-        if (!fileImpl) {
+        nsCOMPtr<BlobImpl> blobImpl = do_QueryInterface(supports);
+        if (!blobImpl) {
           continue;
         }
-        domFile = new File(GetParentObject(), static_cast<FileImpl*>(fileImpl.get()));
+
+        MOZ_ASSERT(blobImpl->IsFile());
+
+        domFile = File::Create(GetParentObject(), blobImpl);
+        MOZ_ASSERT(domFile);
       }
 
       if (!mFiles->Append(domFile)) {
@@ -326,7 +330,7 @@ DataTransfer::GetFiles(nsIDOMFileList** aFileList)
 {
   ErrorResult rv;
   NS_IF_ADDREF(*aFileList = GetFiles(rv));
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMStringList>
@@ -402,7 +406,7 @@ DataTransfer::GetData(const nsAString& aFormat, nsAString& aData)
 {
   ErrorResult rv;
   GetData(aFormat, aData, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -425,7 +429,7 @@ DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData)
 {
   ErrorResult rv;
   SetData(aFormat, aData, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -454,7 +458,7 @@ DataTransfer::ClearData(const nsAString& aFormat)
   format = &aFormat;
   ErrorResult rv;
   ClearData(format, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -557,7 +561,7 @@ DataTransfer::MozTypesAt(uint32_t aIndex, nsISupports** aTypes)
   ErrorResult rv;
   nsRefPtr<DOMStringList> types = MozTypesAt(aIndex, rv);
   types.forget(aTypes);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -808,7 +812,7 @@ DataTransfer::MozClearDataAt(const nsAString& aFormat, uint32_t aIndex)
 {
   ErrorResult rv;
   MozClearDataAt(aFormat, aIndex, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -833,7 +837,7 @@ DataTransfer::SetDragImage(nsIDOMElement* aImage, int32_t aX, int32_t aY)
   if (image) {
     SetDragImage(*image, aX, aY, rv);
   }
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -857,7 +861,7 @@ DataTransfer::AddElement(nsIDOMElement* aElement)
 
   ErrorResult rv;
   AddElement(*element, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsresult

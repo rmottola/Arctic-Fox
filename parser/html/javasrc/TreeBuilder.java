@@ -438,7 +438,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
     private T headPointer;
 
     /**
-     * Used to work around Goanna limitations. Not used in Java.
+     * Used to work around Gecko limitations. Not used in Java.
      */
     private T deepTreeSurrogateParent;
 
@@ -1161,7 +1161,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
                                             err("Non-space characters found without seeing a doctype first. Expected e.g. \u201C<!DOCTYPE html>\u201D.");
                                             break;
                                         case HTML:
-                                            // XXX figure out a way to report this in the Goanna View Source case
+                                            // XXX figure out a way to report this in the Gecko View Source case
                                             err("Non-space characters found without seeing a doctype first. Expected \u201C<!DOCTYPE html>\u201D.");
                                             break;
                                         case HTML401_STRICT:

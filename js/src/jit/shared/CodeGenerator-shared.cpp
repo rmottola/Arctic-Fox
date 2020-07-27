@@ -342,7 +342,8 @@ CodeGeneratorShared::encodeAllocation(LSnapshot* snapshot, MDefinition* mir,
         MOZ_ASSERT(mir->isRecoveredOnBailout());
         uint32_t index = 0;
         LRecoverInfo* recoverInfo = snapshot->recoverInfo();
-        MNode** it = recoverInfo->begin(), **end = recoverInfo->end();
+        MNode** it = recoverInfo->begin();
+        MNode** end = recoverInfo->end();
         while (it != end && mir != *it) {
             ++it;
             ++index;
@@ -378,30 +379,46 @@ CodeGeneratorShared::encodeAllocation(LSnapshot* snapshot, MDefinition* mir,
       case MIRType_ObjectOrNull:
       case MIRType_Boolean:
       case MIRType_Double:
-      case MIRType_Float32:
       {
         LAllocation* payload = snapshot->payloadOfSlot(*allocIndex);
-        JSValueType valueType =
-            (type == MIRType_ObjectOrNull) ? JSVAL_TYPE_OBJECT : ValueTypeFromMIRType(type);
-        if (payload->isMemory()) {
-            if (type == MIRType_Float32)
-                alloc = RValueAllocation::Float32(ToStackIndex(payload));
-            else
-                alloc = RValueAllocation::Typed(valueType, ToStackIndex(payload));
-        } else if (payload->isGeneralReg()) {
-            alloc = RValueAllocation::Typed(valueType, ToRegister(payload));
-        } else if (payload->isFloatReg()) {
-            FloatRegister reg = ToFloatRegister(payload);
-            if (type == MIRType_Float32)
-                alloc = RValueAllocation::Float32(reg);
-            else
-                alloc = RValueAllocation::Double(reg);
-        } else {
+        if (payload->isConstant()) {
             MConstant* constant = mir->toConstant();
             uint32_t index;
             masm.propagateOOM(graph.addConstantToPool(constant->value(), &index));
             alloc = RValueAllocation::ConstantPool(index);
+            break;
         }
+
+        JSValueType valueType =
+            (type == MIRType_ObjectOrNull) ? JSVAL_TYPE_OBJECT : ValueTypeFromMIRType(type);
+
+        MOZ_ASSERT(payload->isMemory() || payload->isRegister());
+        if (payload->isMemory())
+            alloc = RValueAllocation::Typed(valueType, ToStackIndex(payload));
+        else if (payload->isGeneralReg())
+            alloc = RValueAllocation::Typed(valueType, ToRegister(payload));
+        else if (payload->isFloatReg())
+            alloc = RValueAllocation::Double(ToFloatRegister(payload));
+        break;
+      }
+      case MIRType_Float32:
+      case MIRType_Int32x4:
+      case MIRType_Float32x4:
+      {
+        LAllocation* payload = snapshot->payloadOfSlot(*allocIndex);
+        if (payload->isConstant()) {
+            MConstant* constant = mir->toConstant();
+            uint32_t index;
+            masm.propagateOOM(graph.addConstantToPool(constant->value(), &index));
+            alloc = RValueAllocation::ConstantPool(index);
+            break;
+        }
+
+        MOZ_ASSERT(payload->isMemory() || payload->isFloatReg());
+        if (payload->isFloatReg())
+            alloc = RValueAllocation::AnyFloat(ToFloatRegister(payload));
+        else
+            alloc = RValueAllocation::AnyFloat(ToStackIndex(payload));
         break;
       }
       case MIRType_MagicOptimizedArguments:
@@ -471,8 +488,8 @@ CodeGeneratorShared::encode(LRecoverInfo* recover)
 
     RecoverOffset offset = recovers_.startRecover(numInstructions, resumeAfter);
 
-    for (MNode** it = recover->begin(), **end = recover->end(); it != end; ++it)
-        recovers_.writeInstruction(*it);
+    for (MNode* insn : *recover)
+        recovers_.writeInstruction(insn);
 
     recovers_.endRecover();
     recover->setRecoverOffset(offset);
@@ -556,18 +573,15 @@ CodeGeneratorShared::assignBailoutId(LSnapshot* snapshot)
 void
 CodeGeneratorShared::encodeSafepoints()
 {
-    for (SafepointIndex* it = safepointIndices_.begin(), *end = safepointIndices_.end();
-         it != end;
-         ++it)
-    {
-        LSafepoint* safepoint = it->safepoint();
+    for (SafepointIndex& index : safepointIndices_) {
+        LSafepoint* safepoint = index.safepoint();
 
         if (!safepoint->encoded()) {
             safepoint->fixupOffset(&masm);
             safepoints_.encode(safepoint);
         }
 
-        it->resolve();
+        index.resolve();
     }
 }
 

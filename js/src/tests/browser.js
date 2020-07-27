@@ -303,9 +303,9 @@ function jsTestDriverBrowserInit()
     }
   }
 
-  if (!properties.version && navigator.userAgent.indexOf('Goanna/') != -1)
+  if (!properties.version && navigator.userAgent.indexOf('Gecko/') != -1)
   {
-    // If the version is not specified, and the browser is Goanna,
+    // If the version is not specified, and the browser is Gecko,
     // use the default version corresponding to the shell's version(0).
     // See https://bugzilla.mozilla.org/show_bug.cgi?id=522760#c11
     // Otherwise adjust the version to match the suite version for 1.6,

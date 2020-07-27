@@ -17,6 +17,7 @@ import unittest
 import xml.dom.minidom as dom
 
 from manifestparser import TestManifest
+from manifestparser.filters import tags
 from marionette_driver.marionette import Marionette
 from mixins.b2g import B2GTestResultMixin, get_b2g_pid, get_dm
 from mozhttpd import MozHttpd
@@ -291,7 +292,7 @@ class BaseMarionetteOptions(OptionParser):
         self.add_option('--address',
                         dest='address',
                         action='store',
-                        help='host:port of running Goanna instance to connect to')
+                        help='host:port of running Gecko instance to connect to')
         self.add_option('--device',
                         dest='device_serial',
                         action='store',
@@ -324,11 +325,11 @@ class BaseMarionetteOptions(OptionParser):
         self.add_option('--binary',
                         dest='binary',
                         action='store',
-                        help='goanna executable to launch before running the test')
+                        help='gecko executable to launch before running the test')
         self.add_option('--profile',
                         dest='profile',
                         action='store',
-                        help='profile to use when launching the goanna process. if not passed, then a profile will be '
+                        help='profile to use when launching the gecko process. if not passed, then a profile will be '
                              'constructed and used')
         self.add_option('--repeat',
                         dest='repeat',
@@ -385,14 +386,14 @@ class BaseMarionetteOptions(OptionParser):
                         help='url to a webserver or path to a document root from which content '
                         'resources are served (default: {}).'.format(os.path.join(
                             os.path.dirname(here), 'www')))
-        self.add_option('--goanna-log',
-                        dest='goanna_log',
+        self.add_option('--gecko-log',
+                        dest='gecko_log',
                         action='store',
                         help="Define the path to store log file. If the path is"
                              " a directory, the real log file will be created"
-                             " given the format goanna-(timestamp).log. If it is"
+                             " given the format gecko-(timestamp).log. If it is"
                              " a file, if will be used directly. '-' may be passed"
-                             " to write to stdout. Default: './goanna.log'")
+                             " to write to stdout. Default: './gecko.log'")
         self.add_option('--logger-name',
                         dest='logger_name',
                         action='store',
@@ -417,6 +418,12 @@ class BaseMarionetteOptions(OptionParser):
                         action='store_true',
                         default=False,
                         help='Enable e10s when running marionette tests.')
+        self.add_option('--tag',
+                        action='append', dest='test_tags',
+                        default=None,
+                        help="Filter out tests that don't have the given tag. Can be "
+                             "used multiple times in which case the test must contain "
+                             "at least one of the given tags.")
 
     def parse_args(self, args=None, values=None):
         options, tests = OptionParser.parse_args(self, args, values)
@@ -493,8 +500,8 @@ class BaseMarionetteTestRunner(object):
                  device_serial=None, symbols_path=None, timeout=None,
                  shuffle=False, shuffle_seed=random.randint(0, sys.maxint),
                  sdcard=None, this_chunk=1, total_chunks=1, sources=None,
-                 server_root=None, goanna_log=None, result_callbacks=None,
-                 adb_host=None, adb_port=None, prefs=None,
+                 server_root=None, gecko_log=None, result_callbacks=None,
+                 adb_host=None, adb_port=None, prefs=None, test_tags=None,
                  socket_timeout=BaseMarionetteOptions.socket_timeout_default,
                  **kwargs):
         self.address = address
@@ -532,7 +539,7 @@ class BaseMarionetteTestRunner(object):
         self.server_root = server_root
         self.this_chunk = this_chunk
         self.total_chunks = total_chunks
-        self.goanna_log = goanna_log
+        self.gecko_log = gecko_log
         self.mixin_run_tests = []
         self.manifest_skipped_tests = []
         self.tests = []
@@ -540,6 +547,7 @@ class BaseMarionetteTestRunner(object):
         self._adb_host = adb_host
         self._adb_port = adb_port
         self.prefs = prefs or {}
+        self.test_tags = test_tags
 
         def gather_debug(test, status):
             rv = {}
@@ -666,7 +674,7 @@ class BaseMarionetteTestRunner(object):
                 'app_args': self.app_args,
                 'bin': self.bin,
                 'profile': self.profile,
-                'goanna_log': self.goanna_log,
+                'gecko_log': self.gecko_log,
             })
 
         if self.emulator:
@@ -884,11 +892,20 @@ setReq.onerror = function() {
             manifest = TestManifest()
             manifest.read(filepath)
 
+            filters = []
+            if self.test_tags:
+                filters.append(tags(self.test_tags))
             manifest_tests = manifest.active_tests(exists=False,
                                                    disabled=True,
+                                                   filters=filters,
                                                    device=self.device,
                                                    app=self.appName,
                                                    **mozinfo.info)
+            if len(manifest_tests) == 0:
+                self.logger.error("no tests to run using specified "
+                                  "combination of filters: {}".format(
+                                       manifest.fmt_filters()))
+
             unfiltered_tests = []
             for test in manifest_tests:
                 if test.get('disabled'):

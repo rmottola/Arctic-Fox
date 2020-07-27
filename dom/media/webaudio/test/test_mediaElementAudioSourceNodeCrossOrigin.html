@@ -72,7 +72,7 @@ tests.forEach(function(e) {
       }
     }
     // It is acceptable to find a full buffer of silence here, even if we expect
-    // sound, because Goanna's looping on media elements is not seamless and we
+    // sound, because Gecko's looping on media elements is not seamless and we
     // can underrun. We are looking for at least one buffer of non-silent data.
     e.target.seenSound = !silent || e.target.seenSound;
     checkFinished(e.target);

@@ -79,6 +79,7 @@ SOURCES += [
 ]
 
 IPDL_SOURCES += [
+    'BrowserConfiguration.ipdlh',
     'DOMTypes.ipdlh',
     'PBlob.ipdl',
     'PBlobStream.ipdl',
@@ -104,13 +105,20 @@ FAIL_ON_WARNINGS = True
 include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'
+
+if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_TARGET'] == 'Darwin':
+    USE_LIBS += [
+        'mozsandbox',
+    ]
+
 LOCAL_INCLUDES += [
     '/caps',
     '/chrome',
     '/docshell/base',
     '/dom/base',
     '/dom/bluetooth',
-    '/dom/bluetooth/ipc',
+    '/dom/bluetooth/bluetooth1',
+    '/dom/bluetooth/bluetooth1/ipc',
     '/dom/devicestorage',
     '/dom/filesystem',
     '/dom/fmradio/ipc',
@@ -126,6 +134,7 @@ LOCAL_INCLUDES += [
     '/gfx/2d',
     '/hal/sandbox',
     '/layout/base',
+    '/media/webrtc',
     '/netwerk/base',
     '/toolkit/xre',
     '/uriloader/exthandler',
@@ -147,10 +156,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gonk', 'qt'):
 
 if CONFIG['MOZ_TOOLKIT_SEARCH']:
     DEFINES['MOZ_TOOLKIT_SEARCH'] = True
-
-for var in ('MOZ_PERMISSIONS', 'MOZ_CHILD_PERMISSIONS'):
-    if CONFIG[var]:
-        DEFINES[var] = True
 
 JAR_MANIFESTS += ['jar.mn']
 

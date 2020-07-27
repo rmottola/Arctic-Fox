@@ -145,7 +145,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           var action = this._parseActionUrl(aValue);
 
           if (action) {
-            returnValue = action.param;
+            switch (action.type) {
+              case "switchtab": {
+                returnValue = action.params.url;
+                break;
+              }
+            }
           }
 
           // Set the actiontype only if the user is not overriding actions.
@@ -274,12 +279,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           let matchLastLocationChange = true;
           if (action) {
-            url = action.param;
             if (this.hasAttribute("actiontype")) {
               if (action.type == "switchtab") {
+                url = action.params.url;
                 this.handleRevert();
                 let prevTab = gBrowser.selectedTab;
-                if (switchToTabHavingURI(url) &&
+                if (switchToTabHavingURI(action.params.originalUrl || url) &&
                     isTabEmpty(prevTab))
                   gBrowser.removeTab(prevTab);
               }
@@ -331,18 +336,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             gBrowser.selectedBrowser.focus();
 
             let isMouseEvent = aTriggeringEvent instanceof MouseEvent;
-            let altEnter = !isMouseEvent && aTriggeringEvent && aTriggeringEvent.altKey;
-
-            if (altEnter) {
-              // XXX This was added a long time ago, and I'm not sure why it is
-              // necessary. Alt+Enter's default action might cause a system beep,
-              // or something like that?
-              aTriggeringEvent.preventDefault();
-              aTriggeringEvent.stopPropagation();
-            }
 
             // If the current tab is empty, ignore Alt+Enter (just reuse this tab)
-            altEnter = altEnter && !isTabEmpty(gBrowser.selectedTab);
+            let altEnter = !isMouseEvent && aTriggeringEvent &&
+              aTriggeringEvent.altKey && !isTabEmpty(gBrowser.selectedTab);
 
             if (isMouseEvent || altEnter) {
               // Use the standard UI link behaviors for clicks or Alt+Enter
@@ -657,9 +654,24 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 onget="return this.value;">
         <setter>
           <![CDATA[
+          let uri;
           try {
-            val = losslessDecodeURI(makeURI(val));
-          } catch (ex) { }
+            uri = makeURI(val);
+          } catch (ex) {}
+
+          if (uri) {
+            let action = this._parseActionUrl(val);
+            if (action) {
+              if (action.params.url) {
+                // Store the original URL in the action URL.
+                action.params.originalUrl = action.params.url;
+                action.params.url = losslessDecodeURI(makeURI(action.params.url));
+                val = "moz-action:" + action.type + "," + JSON.stringify(action.params);
+              }
+            } else {
+              val = losslessDecodeURI(uri);
+            }
+          }
 
           // Trim popup selected values, but never trim results coming from
           // autofill.
@@ -687,9 +699,34 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           if (!aUrl.startsWith("moz-action:"))
             return null;
 
-          // url is in the format moz-action:ACTION,PARAM
-          let [, action, param] = aUrl.match(/^moz-action:([^,]+),(.*)$/);
-          return {type: action, param: param};
+          // URL is in the format moz-action:ACTION,PARAMS
+          // Where PARAMS is a JSON encoded object.
+          aUrl = decodeURI(aUrl);
+          let [, type, params] = aUrl.match(/^moz-action:([^,]+),(.*)$/);
+
+          let action = {
+            type: type,
+          };
+
+          try {
+            action.params = JSON.parse(params);
+            if (action.params.input) {
+              action.params.input = decodeURIComponent(action.params.input);
+            }
+            if (action.params.searchQuery) {
+              action.params.searchQuery = decodeURIComponent(action.params.searchQuery);
+            }
+          } catch (e) {
+            // If this failed, we assume that params is not a JSON object, and
+            // is instead just a flat string. This will happen when
+            // UnifiedComplete is disabled - in which case, the param is always
+            // a URL.
+            action.params = {
+              url: params,
+            }
+          }
+
+          return action;
         ]]></body>
       </method>
 
@@ -863,13 +900,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             else
               searchBar.value = search;
           }
-          ]]></body>
-        </method>
-      </implementation>
-    </binding>
+        ]]></body>
+      </method>
+    </implementation>
+  </binding>
 
-    <binding id="urlbar-rich-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-rich-result-popup">
-      <implementation>
+  <binding id="urlbar-rich-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-rich-result-popup">
+    <implementation>
       <field name="_maxResults">0</field>
 
       <field name="_bundle" readonly="true">

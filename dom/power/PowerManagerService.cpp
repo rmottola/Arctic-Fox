@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -159,7 +160,7 @@ PowerManagerService::Restart()
   LOG_FUNCTION_AND_JS_STACK() // bug 839452
 
   // FIXME/bug 796826 this implementation is currently gonk-specific,
-  // because it relies on the Gonk to initialize the Goanna processes to
+  // because it relies on the Gonk to initialize the Gecko processes to
   // restart B2G. It's better to do it here to have a real "restart".
   StartForceQuitWatchdog(eHalShutdownMode_Restart, mWatchdogTimeoutSecs);
   // Ensure all content processes are dead before we continue
@@ -227,7 +228,7 @@ PowerManagerService::NewWakeLock(const nsAString &aTopic,
   mozilla::ErrorResult rv;
   nsRefPtr<WakeLock> wakelock = NewWakeLock(aTopic, aWindow, rv);
   if (rv.Failed()) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   nsCOMPtr<nsIDOMEventListener> eventListener = wakelock.get();

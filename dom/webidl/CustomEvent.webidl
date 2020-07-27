@@ -15,7 +15,7 @@ interface CustomEvent : Event
 {
   readonly attribute any detail;
 
-  // initCustomEvent is a Goanna specific deprecated method.
+  // initCustomEvent is a Gecko specific deprecated method.
   [Throws]
   void initCustomEvent(DOMString type,
                        boolean canBubble,

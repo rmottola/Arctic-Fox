@@ -300,7 +300,7 @@ void
 MozTagAnonymousMemory(const void* aPtr, size_t aLength, const char* aTag) {}
 
 /* mozjemalloc and jemalloc use pthread_atfork, which Android doesn't have.
- * While goanna has one in libmozglue, the replay program can't use that.
+ * While gecko has one in libmozglue, the replay program can't use that.
  * Since we're not going to fork anyways, make it a dummy function. */
 int
 pthread_atfork(void (*aPrepare)(void), void (*aParent)(void),

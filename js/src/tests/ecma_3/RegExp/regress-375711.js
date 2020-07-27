@@ -23,7 +23,7 @@ function test()
   var s;
 
   // see bug 416933
-  print('see bug 416933 for changed behavior on Goanna 1.9');
+  print('see bug 416933 for changed behavior on Gecko 1.9');
 
   try
   {

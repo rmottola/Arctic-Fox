@@ -401,15 +401,15 @@ nsPrintDialogWidgetGTK::ImportSettings(nsIPrintSettings *aNSSettings)
   GtkPrintSettings* settings = aNSSettingsGTK->GetGtkPrintSettings();
   GtkPageSetup* setup = aNSSettingsGTK->GetGtkPageSetup();
 
-  bool goannaBool;
-  aNSSettings->GetShrinkToFit(&goannaBool);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shrink_to_fit_toggle), goannaBool);
+  bool geckoBool;
+  aNSSettings->GetShrinkToFit(&geckoBool);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shrink_to_fit_toggle), geckoBool);
 
-  aNSSettings->GetPrintBGColors(&goannaBool);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(print_bg_colors_toggle), goannaBool);
+  aNSSettings->GetPrintBGColors(&geckoBool);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(print_bg_colors_toggle), geckoBool);
 
-  aNSSettings->GetPrintBGImages(&goannaBool);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(print_bg_images_toggle), goannaBool);
+  aNSSettings->GetPrintBGImages(&geckoBool);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(print_bg_images_toggle), geckoBool);
 
   gtk_print_unix_dialog_set_settings(GTK_PRINT_UNIX_DIALOG(dialog), settings);
   gtk_print_unix_dialog_set_page_setup(GTK_PRINT_UNIX_DIALOG(dialog), setup);

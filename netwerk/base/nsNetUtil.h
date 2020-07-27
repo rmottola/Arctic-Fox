@@ -859,13 +859,14 @@ NS_NewDownloader(nsIStreamListener   **result,
 
 inline nsresult
 NS_NewStreamLoader(nsIStreamLoader        **result,
-                   nsIStreamLoaderObserver *observer)
+                   nsIStreamLoaderObserver *observer,
+                   nsIRequestObserver      *requestObserver = nullptr)
 {
     nsresult rv;
     nsCOMPtr<nsIStreamLoader> loader =
         do_CreateInstance(NS_STREAMLOADER_CONTRACTID, &rv);
     if (NS_SUCCEEDED(rv)) {
-        rv = loader->Init(observer);
+        rv = loader->Init(observer, requestObserver);
         if (NS_SUCCEEDED(rv)) {
             *result = nullptr;
             loader.swap(*result);
@@ -1980,10 +1981,13 @@ inline bool
 NS_IsOffline()
 {
     bool offline = true;
+    bool connectivity = true;
     nsCOMPtr<nsIIOService> ios = do_GetIOService();
-    if (ios)
+    if (ios) {
         ios->GetOffline(&offline);
-    return offline;
+        ios->GetConnectivity(&connectivity);
+    }
+    return offline || !connectivity;
 }
 
 inline bool

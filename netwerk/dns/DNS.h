@@ -69,10 +69,10 @@ const int kNetAddrMaxCStrBufSize = kLocalCStrBufSize;
 
 // This was all created at a time in which we were using NSPR for host
 // resolution and we were propagating NSPR types like "PRAddrInfo" and
-// "PRNetAddr" all over Goanna. This made it hard to use another host
+// "PRNetAddr" all over Gecko. This made it hard to use another host
 // resolver -- we were locked into NSPR. The goal here is to get away
 // from that. We'll translate what we get from NSPR or any other host
-// resolution library into the types below and use them in Goanna.
+// resolution library into the types below and use them in Gecko.
 
 union IPv6Addr {
   uint8_t  u8[16];

@@ -76,7 +76,7 @@ namespace mozilla {
  * Note that for simplicity and practicality, not all of the modes in
  * C++11 are supported.  The missing C++11 modes are either subsumed by
  * the modes we provide below, or not relevant for the CPUs we support
- * in Goanna.  These three modes are confusing enough as it is!
+ * in Gecko.  These three modes are confusing enough as it is!
  */
 enum MemoryOrdering {
   /*

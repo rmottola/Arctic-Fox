@@ -11,7 +11,7 @@ interface nsIDocShellTreeItem;
 
 /**
  * nsIWebBrowserChrome corresponds to the top-level, outermost window
- * containing an embedded Goanna web browser.
+ * containing an embedded Gecko web browser.
  */
 
 [scriptable, uuid(E8C414C4-DC38-4BA3-AB4E-EC4CBBE22907)]

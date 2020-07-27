@@ -86,7 +86,7 @@ public:
   /**
    * Returns the type of backend that is used off the main thread.
    * We only don't allow changing the backend type at runtime so this value can
-   * be queried once and will not change until Goanna is restarted.
+   * be queried once and will not change until Gecko is restarted.
    *
    * XXX - With e10s this may not be true anymore. we can have accelerated widgets
    * and non-accelerated widgets (small popups, etc.)

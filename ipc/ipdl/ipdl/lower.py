@@ -1922,7 +1922,7 @@ def _generateMessageClass(clsname, msgid, priority, prettyName, compress):
         StmtExpr(ExprCall(
             ExprVar('__android_log_write'),
             args=[ ExprVar('ANDROID_LOG_INFO'),
-                   ExprLiteral.String('GoannaIPC'),
+                   ExprLiteral.String('GeckoIPC'),
                    ExprCall(ExprSelect(msgvar, '.', 'c_str')) ])),
         CppDirective('endif')
     ])

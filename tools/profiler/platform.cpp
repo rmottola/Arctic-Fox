@@ -70,7 +70,7 @@ static mozilla::StaticAutoPtr<mozilla::ProfilerIOInterposeObserver>
 
 // The name that identifies the goanna thread for calls to
 // profiler_register_thread.
-static const char * gGeckoThreadName = "GoannaMain";
+static const char * gGeckoThreadName = "GeckoMain";
 
 void Sampler::Startup() {
   sRegisteredThreads = new std::vector<ThreadInfo*>();
@@ -524,7 +524,7 @@ void mozilla_sampler_init(void* stackTop)
 #endif
                          };
 
-  const char* threadFilters[] = { "GoannaMain", "Compositor" };
+  const char* threadFilters[] = { "GeckoMain", "Compositor" };
 
   profiler_start(PROFILE_DEFAULT_ENTRY, PROFILE_DEFAULT_INTERVAL,
                          features, MOZ_ARRAY_LENGTH(features),
@@ -732,7 +732,7 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
     if (javaInterval < 10) {
       aInterval = 10;
     }
-    mozilla::widget::GoannaJavaSampler::StartJavaProfiling(javaInterval, 1000);
+    mozilla::widget::GeckoJavaSampler::StartJavaProfiling(javaInterval, 1000);
   }
 #endif
 

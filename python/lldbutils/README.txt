@@ -1,9 +1,9 @@
-lldb debugging functionality for Goanna
+lldb debugging functionality for Gecko
 ======================================
 
 This directory contains a module, lldbutils, which is imported by the
 in-tree .lldbinit file.  The lldbutil modules define some lldb commands
-that are handy for debugging Goanna.
+that are handy for debugging Gecko.
 
 If you want to add a new command or Python-implemented type summary, either add
 it to one of the existing broad area Python files (such as lldbutils/layout.py

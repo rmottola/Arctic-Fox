@@ -93,7 +93,7 @@ static nsresult SetUpDragClipboard(nsISupportsArray* aTransferableArray)
     unsigned int typeCount = [pasteboardOutputDict count];
     NSMutableArray* types = [NSMutableArray arrayWithCapacity:typeCount + 1];
     [types addObjectsFromArray:[pasteboardOutputDict allKeys]];
-    // Goanna is initiating this drag so we always want its own views to consider
+    // Gecko is initiating this drag so we always want its own views to consider
     // it. Add our wildcard type to the pasteboard to accomplish this.
     [types addObject:kWildcardPboardType]; // we don't increase the count for the loop below on purpose
     [dragPBoard declareTypes:types owner:nil];

@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -315,8 +315,11 @@ BluetoothDaemonSocketInterface::Listen(BluetoothSocketType aType,
 {
   MOZ_ASSERT(mModule);
 
-  mModule->ListenCmd(aType, aServiceName, aServiceUuid, aChannel,
-                     aEncrypt, aAuth, aRes);
+  nsresult rv = mModule->ListenCmd(aType, aServiceName, aServiceUuid,
+                                   aChannel, aEncrypt, aAuth, aRes);
+  if (NS_FAILED(rv))  {
+    DispatchError(aRes, rv);
+  }
 }
 
 void
@@ -329,7 +332,11 @@ BluetoothDaemonSocketInterface::Connect(const nsAString& aBdAddr,
 {
   MOZ_ASSERT(mModule);
 
-  mModule->ConnectCmd(aBdAddr, aType, aUuid, aChannel, aEncrypt, aAuth, aRes);
+  nsresult rv = mModule->ConnectCmd(aBdAddr, aType, aUuid, aChannel,
+                                    aEncrypt, aAuth, aRes);
+  if (NS_FAILED(rv))  {
+    DispatchError(aRes, rv);
+  }
 }
 
 void
@@ -338,7 +345,10 @@ BluetoothDaemonSocketInterface::Accept(int aFd,
 {
   MOZ_ASSERT(mModule);
 
-  mModule->AcceptCmd(aFd, aRes);
+  nsresult rv = mModule->AcceptCmd(aFd, aRes);
+  if (NS_FAILED(rv))  {
+    DispatchError(aRes, rv);
+  }
 }
 
 void
@@ -346,7 +356,32 @@ BluetoothDaemonSocketInterface::Close(BluetoothSocketResultHandler* aRes)
 {
   MOZ_ASSERT(mModule);
 
-  mModule->CloseCmd(aRes);
+  nsresult rv = mModule->CloseCmd(aRes);
+  if (NS_FAILED(rv))  {
+    DispatchError(aRes, rv);
+  }
+}
+
+void
+BluetoothDaemonSocketInterface::DispatchError(
+  BluetoothSocketResultHandler* aRes, BluetoothStatus aStatus)
+{
+  BluetoothResultRunnable1<BluetoothSocketResultHandler, void,
+                           BluetoothStatus, BluetoothStatus>::Dispatch(
+    aRes, &BluetoothSocketResultHandler::OnError,
+    ConstantInitOp1<BluetoothStatus>(aStatus));
+}
+
+void
+BluetoothDaemonSocketInterface::DispatchError(
+  BluetoothSocketResultHandler* aRes, nsresult aRv)
+{
+  BluetoothStatus status;
+
+  if (NS_WARN_IF(NS_FAILED(Convert(aRv, status)))) {
+    status = STATUS_FAIL;
+  }
+  DispatchError(aRes, status);
 }
 
 END_BLUETOOTH_NAMESPACE

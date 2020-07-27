@@ -3,12 +3,12 @@ from setuptools import setup, find_packages
 version = '0.4'
 
 long_description = \
-"""Marionette_ is a Mozilla project to enable remote automation in Goanna-based
+"""Marionette_ is a Mozilla project to enable remote automation in Gecko-based
 projects, including desktop Firefox, mobile Firefox, and Firefox OS. It is
 inspired by `Selenium Webdriver`_.
 
 This package defines the transport layer used by a Marionette client to
-communicate with the Marionette server embedded in Goanna.  It has no entry
+communicate with the Marionette server embedded in Gecko.  It has no entry
 points; rather it's designed to be used by a Marionette client implementation.
 
 .. _Marionette: https://developer.mozilla.org/en/Marionette

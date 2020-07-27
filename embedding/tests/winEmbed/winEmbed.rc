@@ -110,7 +110,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "winEmbed"
     IDS_HELLO               "Embedding Mozilla is so much fun!!"
-    IDS_ABOUT               "winEmbed - Goanna embedding sample"
+    IDS_ABOUT               "winEmbed - Gecko embedding sample"
     IDS_ABOUT_TITLE         "About winEmbed"
     IDS_HIST_BACK           "Going Back to: "
     IDS_HIST_FORWARD        "Going Forward to: "

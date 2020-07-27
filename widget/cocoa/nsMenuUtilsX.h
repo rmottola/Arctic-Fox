@@ -20,8 +20,8 @@ namespace nsMenuUtilsX
 {
   void          DispatchCommandTo(nsIContent* aTargetContent);
   NSString*     GetTruncatedCocoaLabel(const nsString& itemLabel);
-  uint8_t       GoannaModifiersForNodeAttribute(const nsString& modifiersAttribute);
-  unsigned int  MacModifiersForGoannaModifiers(uint8_t goannaModifiers);
+  uint8_t       GeckoModifiersForNodeAttribute(const nsString& modifiersAttribute);
+  unsigned int  MacModifiersForGeckoModifiers(uint8_t geckoModifiers);
   nsMenuBarX*   GetHiddenWindowMenuBar(); // returned object is not retained
   NSMenuItem*   GetStandardEditMenuItem(); // returned object is not retained
   bool          NodeIsHiddenOrCollapsed(nsIContent* inContent);

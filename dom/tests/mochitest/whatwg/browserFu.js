@@ -3,4 +3,4 @@
  * in other browsers but which we wish to test.
  */
 
-var isMozilla = navigator.product === "Goanna" && "buildID" in navigator;
+var isMozilla = navigator.product === "Gecko" && "buildID" in navigator;

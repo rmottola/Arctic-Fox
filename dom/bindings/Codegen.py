@@ -48,10 +48,10 @@ def isTypeCopyConstructible(type):
              CGUnionStruct.isUnionCopyConstructible(type)) or
             (type.isDictionary() and
              CGDictionary.isDictionaryCopyConstructible(type.inner)) or
-            # Interface types are only copy-constructible if they're Goanna
+            # Interface types are only copy-constructible if they're Gecko
             # interfaces.  SpiderMonkey interfaces are not copy-constructible
             # because of rooting issues.
-            (type.isInterface() and type.isGoannaInterface()))
+            (type.isInterface() and type.isGeckoInterface()))
 
 
 def idlTypeNeedsCycleCollection(type):
@@ -63,7 +63,7 @@ def idlTypeNeedsCycleCollection(type):
         type.isObject() or
         type.isSpiderMonkeyInterface()):
         return False
-    elif type.isCallback() or type.isGoannaInterface():
+    elif type.isCallback() or type.isGeckoInterface():
         return True
     elif type.isUnion():
         return any(idlTypeNeedsCycleCollection(t) for t in type.flatMemberTypes)
@@ -1141,14 +1141,14 @@ class CGHeaders(CGWrapper):
         if len(callbacks) != 0:
             # We need CallbackFunction to serve as our parent class
             declareIncludes.add("mozilla/dom/CallbackFunction.h")
-            # And we need BindingUtils.h so we can wrap "this" objects
-            declareIncludes.add("mozilla/dom/BindingUtils.h")
+            # And we need ToJSValue.h so we can wrap "this" objects
+            declareIncludes.add("mozilla/dom/ToJSValue.h")
 
         if len(callbackDescriptors) != 0 or len(jsImplementedDescriptors) != 0:
             # We need CallbackInterface to serve as our parent class
             declareIncludes.add("mozilla/dom/CallbackInterface.h")
-            # And we need BindingUtils.h so we can wrap "this" objects
-            declareIncludes.add("mozilla/dom/BindingUtils.h")
+            # And we need ToJSValue.h so we can wrap "this" objects
+            declareIncludes.add("mozilla/dom/ToJSValue.h")
 
         # Also need to include the headers for ancestors of
         # JS-implemented interfaces.
@@ -3284,7 +3284,9 @@ class CGWrapWithCacheMethod(CGAbstractMethod):
         return fill(
             """
             $*{assertInheritance}
-            MOZ_ASSERT_IF(aGivenProto, !aCache->GetWrapper());
+            MOZ_ASSERT(!aCache->GetWrapper(),
+                       "You should probably not be using Wrap() directly; use "
+                       "GetOrCreateDOMReflector instead");
 
             MOZ_ASSERT(ToSupportsIsOnPrimaryInheritanceChain(aObject, aCache),
                        "nsISupports must be on our primary inheritance chain");
@@ -4718,7 +4720,7 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
                                         holderArgs=holderArgs,
                                         dealWithOptional=isOptional and (not nullable or isOwningUnion))
 
-    if type.isGoannaInterface():
+    if type.isGeckoInterface():
         assert not isEnforceRange and not isClamp
 
         descriptor = descriptorProvider.getDescriptor(
@@ -5812,7 +5814,7 @@ def getWrapTemplateForType(type, descriptorProvider, result, successCode,
 
         return (code, False)
 
-    if type.isGoannaInterface() and not type.isCallbackInterface():
+    if type.isGeckoInterface() and not type.isCallbackInterface():
         descriptor = descriptorProvider.getDescriptor(type.unroll().inner.identifier.name)
         if type.nullable():
             wrappingCode = ("if (!%s) {\n" % (result) +
@@ -6144,7 +6146,7 @@ def getRetvalDeclarationForType(returnType, descriptorProvider,
         if returnType.nullable():
             result = CGTemplatedType("Nullable", result)
         return result, None, None, None, None
-    if returnType.isGoannaInterface():
+    if returnType.isGeckoInterface():
         result = CGGeneric(descriptorProvider.getDescriptor(
             returnType.unroll().inner.identifier.name).nativeType)
         conversion = None
@@ -6313,7 +6315,7 @@ class CGCallGenerator(CGThing):
             if needsConst(a):
                 arg = CGWrapper(arg, pre="Constify(", post=")")
             # And convert NonNull<T> to T&
-            if (((a.type.isGoannaInterface() or a.type.isCallback()) and not a.type.nullable()) or
+            if (((a.type.isGeckoInterface() or a.type.isCallback()) and not a.type.nullable()) or
                 a.type.isDOMString()):
                 arg = CGWrapper(arg, pre="NonNullHelper(", post=")")
             args.append(arg)
@@ -6383,7 +6385,7 @@ class CGCallGenerator(CGThing):
 
 
 def getUnionMemberName(type):
-    if type.isGoannaInterface():
+    if type.isGeckoInterface():
         return type.inner.identifier.name
     if type.isEnum():
         return type.inner.identifier.name
@@ -6513,7 +6515,7 @@ def wrapTypeIntoCurrentCompartment(type, value, isMember=True):
         return CGList(memberWraps, "else ") if len(memberWraps) != 0 else None
 
     if (type.isString() or type.isPrimitive() or type.isEnum() or
-        type.isGoannaInterface() or type.isCallback() or type.isDate()):
+        type.isGeckoInterface() or type.isCallback() or type.isDate()):
         # All of these don't need wrapping
         return None
 
@@ -6761,7 +6763,7 @@ class CGPerSignatureCall(CGThing):
 
         returnsNewObject = memberReturnsNewObject(self.idlNode)
         if (returnsNewObject and
-            self.returnType.isGoannaInterface()):
+            self.returnType.isGeckoInterface()):
             wrapCode += dedent(
                 """
                 static_assert(!IsPointer<decltype(result)>::value,
@@ -6935,7 +6937,7 @@ class CGMethodCall(CGThing):
 
         def filteredSignatures(signatures, descriptor):
             def typeExposedInWorkers(type):
-                return (not type.isGoannaInterface() or
+                return (not type.isGeckoInterface() or
                         type.inner.isExposedInAnyWorker())
             if descriptor.workers:
                 # Filter out the signatures that should not be exposed in a
@@ -8344,7 +8346,7 @@ class CGMemberJITInfo(CGThing):
             return "JSVAL_TYPE_OBJECT"
         if t.isMozMap():
             return "JSVAL_TYPE_OBJECT"
-        if t.isGoannaInterface():
+        if t.isGeckoInterface():
             return "JSVAL_TYPE_OBJECT"
         if t.isString():
             return "JSVAL_TYPE_STRING"
@@ -8420,7 +8422,7 @@ class CGMemberJITInfo(CGThing):
             assert False
         if t.isSequence():
             return "JSJitInfo::Object"
-        if t.isGoannaInterface():
+        if t.isGeckoInterface():
             return "JSJitInfo::Object"
         if t.isString():
             return "JSJitInfo::String"
@@ -8595,7 +8597,7 @@ def getUnionAccessorSignatureType(type, descriptorProvider):
     # Nested unions are unwrapped automatically into our flatMemberTypes.
     assert not type.isUnion()
 
-    if type.isGoannaInterface():
+    if type.isGeckoInterface():
         descriptor = descriptorProvider.getDescriptor(
             type.unroll().inner.identifier.name)
         typeName = CGGeneric(descriptor.nativeType)
@@ -11046,7 +11048,7 @@ class CGDescriptor(CGThing):
             for m in methods:
                 for sig in m.signatures():
                     for arg in sig[1]:
-                        if (arg.type.isGoannaInterface() and
+                        if (arg.type.isGeckoInterface() and
                             not arg.type.inner.isExternal()):
                             self._deps.add(arg.type.inner.filename())
 
@@ -12247,7 +12249,7 @@ class CGForwardDeclarations(CGWrapper):
 
         def forwardDeclareForType(t, workerness='both'):
             t = t.unroll()
-            if t.isGoannaInterface():
+            if t.isGeckoInterface():
                 name = t.inner.identifier.name
                 # Find and add the non-worker implementation, if any.
                 if workerness != 'workeronly':
@@ -12658,7 +12660,7 @@ class CGNativeMember(ClassMethod):
             else:
                 defaultValue = "%s(0)" % enumName
             return enumName, defaultValue, "return ${declName};\n"
-        if type.isGoannaInterface():
+        if type.isGeckoInterface():
             iface = type.unroll().inner
             result = CGGeneric(self.descriptorProvider.getDescriptor(
                 iface.identifier.name).prettyNativeType)
@@ -12856,7 +12858,7 @@ class CGNativeMember(ClassMethod):
             # auto-wrapping in Nullable
             return CGUnionStruct.unionTypeDecl(type, isMember), True, False
 
-        if type.isGoannaInterface() and not type.isCallbackInterface():
+        if type.isGeckoInterface() and not type.isCallbackInterface():
             iface = type.unroll().inner
             argIsPointer = type.nullable() or iface.isExternal()
             forceOwningType = iface.isCallback() or isMember
@@ -13780,7 +13782,7 @@ class CGCallback(CGClass):
         args.append(Argument("JSCompartment*", "aCompartment", "nullptr"))
         # And now insert our template argument.
         argsWithoutThis = list(args)
-        args.insert(0, Argument("const T&",  "thisObjPtr"))
+        args.insert(0, Argument("const T&",  "thisVal"))
         errorReturn = method.getDefaultRetval()
 
         setupCall = fill(
@@ -13800,14 +13802,11 @@ class CGCallback(CGClass):
         bodyWithThis = fill(
             """
             $*{setupCall}
-            JS::Rooted<JSObject*> thisObjJS(s.GetContext(),
-              WrapCallThisObject(s.GetContext(), thisObjPtr));
-            if (!thisObjJS) {
+            JS::Rooted<JS::Value> thisValJS(s.GetContext());
+            if (!ToJSValue(s.GetContext(), thisVal, &thisValJS)) {
               aRv.Throw(NS_ERROR_FAILURE);
               return${errorReturn};
             }
-            JS::Rooted<JS::Value> thisValJS(s.GetContext(),
-                                            JS::ObjectValue(*thisObjJS));
             return ${methodName}(${callArgs});
             """,
             setupCall=setupCall,
@@ -14751,7 +14750,7 @@ class CGEventGetter(CGNativeMember):
     def getMethodBody(self):
         type = self.member.type
         memberName = CGDictionary.makeMemberName(self.member.identifier.name)
-        if (type.isPrimitive() and type.tag() in builtinNames) or type.isEnum() or type.isGoannaInterface():
+        if (type.isPrimitive() and type.tag() in builtinNames) or type.isEnum() or type.isGeckoInterface():
             return "return " + memberName + ";\n"
         if type.isDOMString() or type.isByteString() or type.isUSVString():
             return "aRetVal = " + memberName + ";\n"
@@ -15151,7 +15150,7 @@ class CGEventClass(CGBindingImplClass):
             nativeType = CGGeneric("nsString")
         elif type.isByteString():
             nativeType = CGGeneric("nsCString")
-        elif type.isGoannaInterface():
+        elif type.isGeckoInterface():
             iface = type.unroll().inner
             nativeType = self.descriptor.getDescriptor(
                 iface.identifier.name).nativeType
@@ -15175,7 +15174,7 @@ class CGEventClass(CGBindingImplClass):
                 innerType = type.inner
             if (not innerType.isPrimitive() and not innerType.isEnum() and
                 not innerType.isDOMString() and not innerType.isByteString() and
-                not innerType.isGoannaInterface()):
+                not innerType.isGeckoInterface()):
                 raise TypeError("Don't know how to properly manage GC/CC for "
                                 "event member of type %s" %
                                 type)

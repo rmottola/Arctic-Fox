@@ -453,7 +453,7 @@ class JarReader(object):
 class JarWriter(object):
     '''
     Class with methods to write Jar files. Can write more-or-less standard jar
-    archives as well as jar archives optimized for Goanna. See the documentation
+    archives as well as jar archives optimized for Gecko. See the documentation
     for the close() member function for a description of both layouts.
     '''
     def __init__(self, file=None, fileobj=None, compress=True, optimize=True):
@@ -462,7 +462,7 @@ class JarWriter(object):
         object if one is given instead of opening the given file name.
         The compress option determines the default behavior for storing data
         in the jar archive. The optimize options determines whether the jar
-        archive should be optimized for Goanna or not.
+        archive should be optimized for Gecko or not.
         '''
         if fileobj:
             self._data = fileobj
@@ -501,7 +501,7 @@ class JarWriter(object):
             - End of central directory, pointing at first central directory
               entry.
 
-        Jar archives optimized for Goanna are laid out like the following:
+        Jar archives optimized for Gecko are laid out like the following:
             - 32-bits unsigned integer giving the amount of data to preload.
             - Central directory entry pointing at Local file header 1
             - Central directory entry pointing at Local file header 2
@@ -627,7 +627,7 @@ class JarWriter(object):
     def preload(self, files):
         '''
         Set which members of the jar archive should be preloaded when opening
-        the archive in Goanna. This reorders the members according to the order
+        the archive in Gecko. This reorders the members according to the order
         of given list.
         '''
         new_contents = OrderedDict()
@@ -751,7 +751,7 @@ class Deflater(object):
 
 class JarLog(dict):
     '''
-    Helper to read the file Goanna generates when setting MOZ_JAR_LOG_FILE.
+    Helper to read the file Gecko generates when setting MOZ_JAR_LOG_FILE.
     The jar log is then available as a dict with the jar path as key (see
     canonicalize for more details on the key value), and the corresponding
     access log as a list value. Only the first access to a given member of

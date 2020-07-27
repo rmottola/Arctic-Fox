@@ -77,6 +77,7 @@ class ContentParent final : public PContentParent
     typedef mozilla::ipc::TestShellParent TestShellParent;
     typedef mozilla::ipc::URIParams URIParams;
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
+    typedef mozilla::OwningSerializedStructuredCloneBuffer OwningSerializedStructuredCloneBuffer;
 
 public:
 #ifdef MOZ_NUWA_PROCESS
@@ -217,6 +218,9 @@ public:
                   const ContentParentId& aCpId);
     static void
     DeallocateTabId(const TabId& aTabId, const ContentParentId& aCpId);
+
+    static bool
+    GetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration& aConfig);
 
     void ReportChildAlreadyBlocked();
     bool RequestRunToCompletion();
@@ -534,11 +538,12 @@ private:
                                           bool* aIsForApp,
                                           bool* aIsForBrowser) override;
     virtual bool RecvGetXPCOMProcessAttributes(bool* aIsOffline,
+                                               bool* aIsConnected,
                                                bool* aIsLangRTL,
                                                InfallibleTArray<nsString>* dictionaries,
                                                ClipboardCapabilities* clipboardCaps,
-                                               DomainPolicyClone* domainPolicy)
-        override;
+                                               DomainPolicyClone* domainPolicy,
+                                               OwningSerializedStructuredCloneBuffer* initialData) override;
 
     virtual bool DeallocPJavaScriptParent(mozilla::jsipc::PJavaScriptParent*) override;
 
@@ -653,12 +658,16 @@ private:
 
     virtual bool RecvReadPermissions(InfallibleTArray<IPC::Permission>* aPermissions) override;
 
-    virtual bool RecvSetClipboardText(const nsString& text,
-                                      const bool& isPrivateData,
-                                      const int32_t& whichClipboard) override;
-    virtual bool RecvGetClipboardText(const int32_t& whichClipboard, nsString* text) override;
-    virtual bool RecvEmptyClipboard(const int32_t& whichClipboard) override;
-    virtual bool RecvClipboardHasText(const int32_t& whichClipboard, bool* hasText) override;
+    virtual bool RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
+                                  const bool& aIsPrivateData,
+                                  const int32_t& aWhichClipboard) override;
+    virtual bool RecvGetClipboard(nsTArray<nsCString>&& aTypes,
+                                  const int32_t& aWhichClipboard,
+                                  IPCDataTransfer* aDataTransfer) override;
+    virtual bool RecvEmptyClipboard(const int32_t& aWhichClipboard) override;
+    virtual bool RecvClipboardHasType(nsTArray<nsCString>&& aTypes,
+                                      const int32_t& aWhichClipboard,
+                                      bool* aHasType) override;
 
     virtual bool RecvGetSystemColors(const uint32_t& colorsCount,
                                      InfallibleTArray<uint32_t>* colors) override;
@@ -693,12 +702,12 @@ private:
                                  const ClonedMessageData& aData,
                                  InfallibleTArray<CpowEntry>&& aCpows,
                                  const IPC::Principal& aPrincipal,
-                                 InfallibleTArray<nsString>* aRetvals) override;
+                                 nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals) override;
     virtual bool RecvRpcMessage(const nsString& aMsg,
                                 const ClonedMessageData& aData,
                                 InfallibleTArray<CpowEntry>&& aCpows,
                                 const IPC::Principal& aPrincipal,
-                                InfallibleTArray<nsString>* aRetvals) override;
+                                nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals) override;
     virtual bool RecvAsyncMessage(const nsString& aMsg,
                                   const ClonedMessageData& aData,
                                   InfallibleTArray<CpowEntry>&& aCpows,
@@ -744,6 +753,8 @@ private:
                                                      const bool& aHidden) override;
     virtual bool RecvGetSystemMemory(const uint64_t& getterId) override;
 
+    virtual bool RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
+
     virtual bool RecvDataStoreGetStores(
                        const nsString& aName,
                        const nsString& aOwner,
@@ -767,6 +778,8 @@ private:
 
     virtual bool RecvSetFakeVolumeState(const nsString& fsName, const int32_t& fsState) override;
 
+    virtual bool RecvRemoveFakeVolume(const nsString& fsName) override;
+
     virtual bool RecvKeywordToURI(const nsCString& aKeyword,
                                   nsString* aProviderName,
                                   OptionalInputStreamParams* aPostData,
@@ -774,6 +787,10 @@ private:
 
     virtual bool RecvNotifyKeywordSearchLoading(const nsString &aProvider,
                                                 const nsString &aKeyword) override;
+
+    virtual bool RecvCopyFavicon(const URIParams& aOldURI,
+                                 const URIParams& aNewURI,
+                                 const bool& aInPrivateBrowsing) override;
 
     virtual void ProcessingError(Result aCode, const char* aMsgName) override;
 
@@ -825,8 +842,14 @@ private:
     virtual bool RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
                                                PDocAccessibleParent* aParentDoc, const uint64_t& aParentID) override;
 
+    virtual PWebrtcGlobalParent* AllocPWebrtcGlobalParent() override;
+    virtual bool DeallocPWebrtcGlobalParent(PWebrtcGlobalParent *aActor) override;
+
+
     virtual bool RecvUpdateDropEffect(const uint32_t& aDragAction,
                                       const uint32_t& aDropEffect) override;
+
+    virtual bool RecvGetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration* aConfig) override;
 
     virtual bool RecvGamepadListenerAdded() override;
     virtual bool RecvGamepadListenerRemoved() override;

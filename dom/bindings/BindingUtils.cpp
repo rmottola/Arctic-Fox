@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-*/
-/* vim: set ts=2 sw=2 et tw=79: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -145,7 +145,7 @@ ErrorResult::ThrowErrorWithMessage(va_list ap, const dom::ErrNum errorNumber,
   MOZ_ASSERT(argCount <= 10);
   argCount = std::min<uint16_t>(argCount, 10);
   while (argCount--) {
-    message->mArgs.AppendElement(*va_arg(ap, nsString*));
+    message->mArgs.AppendElement(*va_arg(ap, const nsAString*));
   }
   mMessage = message;
 #ifdef DEBUG
@@ -222,13 +222,12 @@ ErrorResult::ReportErrorWithMessage(JSContext* aCx)
 void
 ErrorResult::ClearMessage()
 {
-  if (IsErrorWithMessage()) {
-    delete mMessage;
-    mMessage = nullptr;
+  MOZ_ASSERT(IsErrorWithMessage());
+  delete mMessage;
+  mMessage = nullptr;
 #ifdef DEBUG
-    mHasMessage = false;
+  mHasMessage = false;
 #endif
-  }
 }
 
 void
@@ -288,26 +287,6 @@ ErrorResult::ReportJSExceptionFromJSImplementation(JSContext* aCx)
   nsresult rv =
     UNWRAP_OBJECT(DOMException, &mJSException.toObject(), domException);
   if (NS_SUCCEEDED(rv)) {
-    // We may have to create a new DOMException object, because the one we
-    // have has a stack that includes the chrome code that threw it, and in
-    // particular has the wrong file/line/column information.
-    JS::Rooted<JS::Value> reflector(aCx);
-    if (!domException->Sanitize(aCx, &reflector)) {
-      // Well, that threw _an_ exception.  Let's forget ours.  We can just
-      // unroot and not change the value, since mJSException is completely
-      // ignored if mResult is not NS_ERROR_DOM_JS_EXCEPTION and we plan to
-      // change mResult to a different value.
-      js::RemoveRawValueRoot(aCx, &mJSException);
-
-      // We no longer have a useful exception but we do want to signal that an
-      // error occured.
-      mResult = NS_ERROR_FAILURE;
-
-      // But do make sure to not ReportJSException here, since we don't have one.
-      return;
-    }
-
-    mJSException = reflector;
     ReportJSException(aCx);
     return;
   }
@@ -346,17 +325,6 @@ ErrorResult::StealJSException(JSContext* cx,
   value.set(mJSException);
   js::RemoveRawValueRoot(cx, &mJSException);
   mResult = NS_OK;
-
-  if (value.isObject()) {
-    // If it's a DOMException we may need to sanitize it.
-    dom::DOMException* domException;
-    nsresult rv =
-      UNWRAP_OBJECT(DOMException, &value.toObject(), domException);
-    if (NS_SUCCEEDED(rv) && !domException->Sanitize(cx, value)) {
-      JS_GetPendingException(cx, value);
-      JS_ClearPendingException(cx);
-    }
-  }
 }
 
 void
@@ -371,21 +339,11 @@ ErrorResult::ReportNotEnoughArgsError(JSContext* cx,
 }
 
 void
-ErrorResult::SuppressException()
+ErrorResult::ReportGenericError(JSContext* cx)
 {
-  WouldReportJSException();
-  if (IsErrorWithMessage()) {
-    ClearMessage();
-  } else if (IsJSException()) {
-    JSContext* cx = nsContentUtils::GetDefaultJSContextForThread();
-    // Just steal it into a stack value (unrooting it in the process)
-    // that we then allow to die.
-    JS::Rooted<JS::Value> temp(cx);
-    StealJSException(cx, &temp);
-  }
-  // We don't use AssignErrorCode, because we want to override existing error
-  // states, which AssignErrorCode is not allowed to do.
-  mResult = NS_OK;
+  MOZ_ASSERT(!IsErrorWithMessage());
+  MOZ_ASSERT(!IsJSException());
+  dom::Throw(cx, ErrorCode());
 }
 
 ErrorResult&
@@ -424,6 +382,24 @@ ErrorResult::operator=(ErrorResult&& aRHS)
   mResult = aRHS.mResult;
   aRHS.mResult = NS_OK;
   return *this;
+}
+
+void
+ErrorResult::SuppressException()
+{
+  WouldReportJSException();
+  if (IsErrorWithMessage()) {
+    ClearMessage();
+  } else if (IsJSException()) {
+    JSContext* cx = nsContentUtils::GetDefaultJSContextForThread();
+    // Just steal it into a stack value (unrooting it in the process)
+    // that we then allow to die.
+    JS::Rooted<JS::Value> temp(cx);
+    StealJSException(cx, &temp);
+  }
+  // We don't use AssignErrorCode, because we want to override existing error
+  // states, which AssignErrorCode is not allowed to do.
+  mResult = NS_OK;
 }
 
 namespace dom {
@@ -2425,7 +2401,7 @@ IsInCertifiedApp(JSContext* aCx, JSObject* aObj)
 
 #ifdef DEBUG
 void
-VerifyTraceProtoAndIfaceCacheCalled(JSTracer *trc, void **thingp,
+VerifyTraceProtoAndIfaceCacheCalled(JS::CallbackTracer *trc, void **thingp,
                                     JSGCTraceKind kind)
 {
     // We don't do anything here, we only want to verify that

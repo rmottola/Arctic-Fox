@@ -33,7 +33,7 @@ this.AccessFu = { // jshint ignore:line
     Utils.init(aWindow);
 
     try {
-      Services.androidBridge.handleGoannaMessage(
+      Services.androidBridge.handleGeckoMessage(
           { type: 'Accessibility:Ready' });
       Services.obs.addObserver(this, 'Accessibility:Settings', false);
     } catch (x) {
@@ -611,7 +611,7 @@ var Output = {
             androidEvent.brailleOutput);
           break;
       }
-      this.androidBridge.handleGoannaMessage(androidEvent);
+      this.androidBridge.handleGeckoMessage(androidEvent);
     }
   },
 
@@ -801,7 +801,7 @@ var Input = {
 
         if (Utils.MozBuildApp == 'mobile/android') {
           // Return focus to native Android browser chrome.
-          Services.androidBridge.handleGoannaMessage(
+          Services.androidBridge.handleGeckoMessage(
               { type: 'ToggleChrome:Focus' });
         }
         break;

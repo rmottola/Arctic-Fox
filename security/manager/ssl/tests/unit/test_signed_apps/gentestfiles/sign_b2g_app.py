@@ -69,7 +69,7 @@ def sign_zip(in_zipfile_name, out_zipfile_name, cert, wincx, ids_json):
         elif name in seen_entries:
           # It is possible for a zipfile to have duplicate entries (with the exact
           # same filenames). Python's zipfile module accepts them, but our zip
-          # reader in Goanna cannot do anything useful with them, and there's no
+          # reader in Gecko cannot do anything useful with them, and there's no
           # sane reason for duplicate entries to exist, so reject them.
           raise ValueError("Duplicate entry in input file: %s" % (name))
         else:

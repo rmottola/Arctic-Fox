@@ -142,7 +142,7 @@ interface nsISiteSecurityService : nsISupports
     /**
      * Set public-key pins for a host. The resulting pins will be permanent
      * and visible from private and non-private contexts. These pins replace
-     * any already set by this mechanism or those built-in to Goanna.
+     * any already set by this mechanism or those built-in to Gecko.
      *
      * @param aHost the hostname (punycode) that pins will apply to
      * @param aIncludeSubdomains whether these pins also apply to subdomains

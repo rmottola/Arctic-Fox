@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -26,7 +26,9 @@ BluetoothSocket::BluetoothSocket(BluetoothSocketObserver* aObserver,
 }
 
 bool
-BluetoothSocket::Connect(const nsACString& aDeviceAddress, int aChannel)
+BluetoothSocket::Connect(const nsAString& aDeviceAddress,
+                         const BluetoothUuid& aServiceUuid,
+                         int aChannel)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!aDeviceAddress.IsEmpty());
@@ -34,7 +36,8 @@ BluetoothSocket::Connect(const nsACString& aDeviceAddress, int aChannel)
   nsAutoPtr<BluetoothUnixSocketConnector> c(
     new BluetoothUnixSocketConnector(mType, aChannel, mAuth, mEncrypt));
 
-  if (!ConnectSocket(c.forget(), aDeviceAddress.BeginReading())) {
+  if (!ConnectSocket(c.forget(),
+                     NS_ConvertUTF16toUTF8(aDeviceAddress).BeginReading())) {
     nsAutoString addr;
     GetAddress(addr);
     BT_LOGD("%s failed. Current connected device address: %s",
@@ -46,7 +49,9 @@ BluetoothSocket::Connect(const nsACString& aDeviceAddress, int aChannel)
 }
 
 bool
-BluetoothSocket::Listen(int aChannel)
+BluetoothSocket::Listen(const nsAString& aServiceName,
+                        const BluetoothUuid& aServiceUuid,
+                        int aChannel)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -69,7 +74,10 @@ BluetoothSocket::ReceiveSocketData(nsAutoPtr<UnixSocketRawData>& aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(mObserver);
-  mObserver->ReceiveSocketData(this, aMessage);
+
+  nsAutoPtr<UnixSocketBuffer> buffer(aMessage.forget());
+
+  mObserver->ReceiveSocketData(this, buffer);
 }
 
 void

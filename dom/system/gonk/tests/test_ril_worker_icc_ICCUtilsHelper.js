@@ -16,12 +16,12 @@ add_test(function test_is_icc_service_available() {
   let ICCUtilsHelper = context.ICCUtilsHelper;
   let RIL = context.RIL;
 
-  function test_table(sst, goannaService, simEnabled, usimEnabled) {
+  function test_table(sst, geckoService, simEnabled, usimEnabled) {
     RIL.iccInfoPrivate.sst = sst;
     RIL.appType = CARD_APPTYPE_SIM;
-    do_check_eq(ICCUtilsHelper.isICCServiceAvailable(goannaService), simEnabled);
+    do_check_eq(ICCUtilsHelper.isICCServiceAvailable(geckoService), simEnabled);
     RIL.appType = CARD_APPTYPE_USIM;
-    do_check_eq(ICCUtilsHelper.isICCServiceAvailable(goannaService), usimEnabled);
+    do_check_eq(ICCUtilsHelper.isICCServiceAvailable(geckoService), usimEnabled);
   }
 
   test_table([0x08], "ADN", true, false);
@@ -307,12 +307,12 @@ add_test(function test_is_cphs_service_available() {
   let RIL = context.RIL;
   RIL.iccInfoPrivate.cphsSt = Uint8Array(2);
 
-  function test_table(cphsSt, goannaService) {
+  function test_table(cphsSt, geckoService) {
     RIL.iccInfoPrivate.cphsSt.set(cphsSt);
 
     for (let service in GECKO_ICC_SERVICES.cphs) {
       do_check_eq(ICCUtilsHelper.isCphsServiceAvailable(service),
-                  goannaService == service);
+                  geckoService == service);
     }
   }
 

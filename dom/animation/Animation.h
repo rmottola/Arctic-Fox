@@ -1,4 +1,5 @@
-/* vim: set shiftwidth=2 tabstop=8 autoindent cindent expandtab: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -12,7 +13,7 @@
 #include "mozilla/TimeStamp.h" // for TimeStamp, TimeDuration
 #include "mozilla/dom/AnimationBinding.h" // for AnimationPlayState
 #include "mozilla/dom/DocumentTimeline.h" // for DocumentTimeline
-#include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadonly
+#include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadOnly
 #include "mozilla/dom/Promise.h" // for Promise
 #include "nsCSSProperty.h" // for nsCSSProperty
 
@@ -73,35 +74,43 @@ public:
   virtual CSSAnimation* AsCSSAnimation() { return nullptr; }
   virtual CSSTransition* AsCSSTransition() { return nullptr; }
 
-  // Flag to pass to DoPlay to indicate that it should not carry out finishing
-  // behavior (reset the current time to the beginning of the active duration).
-  enum LimitBehavior {
-    AutoRewind = 0,
-    Continue = 1
+  /**
+   * Flag to pass to Play to indicate whether or not it should automatically
+   * rewind the current time to the start point if the animation is finished.
+   * For regular calls to play() from script we should do this, but when a CSS
+   * animation's animation-play-state changes we shouldn't rewind the animation.
+   */
+  enum class LimitBehavior {
+    AutoRewind,
+    Continue
   };
 
-  // Animation methods
-  KeyframeEffectReadonly* GetEffect() const { return mEffect; }
+  // Animation interface methods
+
+  KeyframeEffectReadOnly* GetEffect() const { return mEffect; }
+  void SetEffect(KeyframeEffectReadOnly* aEffect);
   DocumentTimeline* Timeline() const { return mTimeline; }
   Nullable<TimeDuration> GetStartTime() const { return mStartTime; }
   void SetStartTime(const Nullable<TimeDuration>& aNewStartTime);
   Nullable<TimeDuration> GetCurrentTime() const;
-  void SilentlySetCurrentTime(const TimeDuration& aNewCurrentTime);
   void SetCurrentTime(const TimeDuration& aNewCurrentTime);
   double PlaybackRate() const { return mPlaybackRate; }
   void SetPlaybackRate(double aPlaybackRate);
-  void SilentlySetPlaybackRate(double aPlaybackRate);
   AnimationPlayState PlayState() const;
   virtual Promise* GetReady(ErrorResult& aRv);
   virtual Promise* GetFinished(ErrorResult& aRv);
+  void Cancel();
+  virtual void Finish(ErrorResult& aRv);
   virtual void Play(LimitBehavior aLimitBehavior);
   virtual void Pause();
   bool IsRunningOnCompositor() const { return mIsRunningOnCompositor; }
 
   // Wrapper functions for Animation DOM methods when called
-  // from script. We often use the same methods internally and from
-  // script but when called from script we (or one of our subclasses) perform
-  // extra steps such as flushing style or converting the return type.
+  // from script.
+  //
+  // We often use the same methods internally and from script but when called
+  // from script we (or one of our subclasses) perform extra steps such as
+  // flushing style or converting the return type.
   Nullable<double> GetStartTimeAsDouble() const;
   void SetStartTimeAsDouble(const Nullable<double>& aStartTime);
   Nullable<double> GetCurrentTimeAsDouble() const;
@@ -109,12 +118,18 @@ public:
                               ErrorResult& aRv);
   virtual AnimationPlayState PlayStateFromJS() const { return PlayState(); }
   virtual void PlayFromJS() { Play(LimitBehavior::AutoRewind); }
-  // PauseFromJS is currently only here for symmetry with PlayFromJS but
-  // in future we will likely have to flush style in
-  // CSSAnimation::PauseFromJS so we leave it for now.
+  /**
+   * PauseFromJS is currently only here for symmetry with PlayFromJS but
+   * in future we will likely have to flush style in
+   * CSSAnimation::PauseFromJS so we leave it for now.
+   */
   void PauseFromJS() { Pause(); }
+  // Wrapper functions for Animation DOM methods when called from style.
+  //
+  // Typically these DOM methods also notify style of changes but when
+  // we are calling from style we don't need to do this.
+  void CancelFromStyle() { DoCancel(); }
 
-  void SetEffect(KeyframeEffectReadonly* aEffect);
   void Tick();
 
   /**
@@ -169,17 +184,17 @@ public:
    * animation from any PendingAnimationTracker it may have been added to.
    */
   void TriggerOnNextTick(const Nullable<TimeDuration>& aReadyTime);
-
-  // Testing only: Start or pause a pending animation using the current timeline
-  // time. This is used to support existing tests that expect animations to
-  // begin immediately. Ideally we would rewrite the those tests and get rid of
-  // this method, but there are a lot of them.
-  //
-  // As with TriggerOnNextTick, the caller of this method is responsible for
-  // removing the animation from any PendingAnimationTracker it may have been
-  // added to.
+  /**
+   * Testing only: Start or pause a pending animation using the current
+   * timeline time. This is used to support existing tests that expect
+   * animations to begin immediately. Ideally we would rewrite the those tests
+   * and get rid of this method, but there are a lot of them.
+   *
+   * As with TriggerOnNextTick, the caller of this method is responsible for
+   * removing the animation from any PendingAnimationTracker it may have been
+   * added to.
+   */
   void TriggerNow();
-
   /**
    * When StartOnNextTick is called, we store the ready time but we don't apply
    * it until the next tick. In the meantime, GetStartTime() will return null.
@@ -199,8 +214,6 @@ public:
    * of those are available, it returns null.
    */
   Nullable<TimeDuration> GetCurrentOrPendingStartTime() const;
-
-  void Cancel();
 
   const nsString& Name() const
   {
@@ -242,30 +255,32 @@ public:
            (PlayState() == AnimationPlayState::Running ||
             mPendingState == PendingState::PlayPending);
   }
-
   bool IsRelevant() const { return mIsRelevant; }
   void UpdateRelevance();
-
   void SetIsRunningOnCompositor() { mIsRunningOnCompositor = true; }
   void ClearIsRunningOnCompositor() { mIsRunningOnCompositor = false; }
-
-  // Returns true if this animation does not currently need to update
-  // style on the main thread (e.g. because it is empty, or is
-  // running on the compositor).
+  /**
+   * Returns true if this animation does not currently need to update
+   * style on the main thread (e.g. because it is empty, or is
+   * running on the compositor).
+   */
   bool CanThrottle() const;
-
-  // Updates |aStyleRule| with the animation values of this animation's effect,
-  // if any.
-  // Any properties already contained in |aSetProperties| are not changed. Any
-  // properties that are changed are added to |aSetProperties|.
-  // |aNeedsRefreshes| will be set to true if this animation expects to update
-  // the style rule on the next refresh driver tick as well (because it
-  // is running and has an effect to sample).
+  /**
+   * Updates |aStyleRule| with the animation values of this animation's effect,
+   * if any.
+   * Any properties already contained in |aSetProperties| are not changed. Any
+   * properties that are changed are added to |aSetProperties|.
+   * |aNeedsRefreshes| will be set to true if this animation expects to update
+   * the style rule on the next refresh driver tick as well (because it
+   * is running and has an effect to sample).
+   */
   void ComposeStyle(nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
                     nsCSSPropertySet& aSetProperties,
                     bool& aNeedsRefreshes);
-
 protected:
+  void SilentlySetCurrentTime(const TimeDuration& aNewCurrentTime);
+  void SilentlySetPlaybackRate(double aPlaybackRate);
+  void DoCancel();
   void DoPlay(LimitBehavior aLimitBehavior);
   void DoPause();
   void ResumeAt(const TimeDuration& aReadyTime);
@@ -304,7 +319,7 @@ protected:
   AnimationCollection* GetCollection() const;
 
   nsRefPtr<DocumentTimeline> mTimeline;
-  nsRefPtr<KeyframeEffectReadonly> mEffect;
+  nsRefPtr<KeyframeEffectReadOnly> mEffect;
   // The beginning of the delay period.
   Nullable<TimeDuration> mStartTime; // Timeline timescale
   Nullable<TimeDuration> mHoldTime;  // Animation timescale

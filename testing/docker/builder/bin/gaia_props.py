@@ -29,7 +29,7 @@ props_path = os.path.join(args.goanna, 'b2g/config/gaia.json')
 
 if not os.path.isfile(props_path):
         print >> sys.stderr, \
-            'Goanna directory does not contain b2g/config/gaia.json'
+            'Gecko directory does not contain b2g/config/gaia.json'
         sys.exit(1)
 
 props = json.load(open(props_path))

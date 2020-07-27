@@ -29,7 +29,7 @@ class MediaResource;
   The intent of this class is to be used in Media backends that
   have a system component that does its own network requests. These
   requests are made against this server which then uses standard
-  Goanna network requests and media cache usage.
+  Gecko network requests and media cache usage.
 
   The AndroidMediaResourceServer can be instantiated on any thread and
   its methods are threadsafe - they can be called on any thread.

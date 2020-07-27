@@ -91,7 +91,7 @@ static nsPluginInstanceOwner* sFullScreenInstance = nullptr;
 using namespace mozilla::dom;
 
 #include <android/log.h>
-#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GoannaPlugins" , ## args)
+#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
 using namespace mozilla;
@@ -222,7 +222,7 @@ nsPluginInstanceOwner::GetImageContainer()
   nsRefPtr<ImageContainer> container;
 
 #if MOZ_WIDGET_ANDROID
-  // Right now we only draw with Goanna layers on Honeycomb and higher. See Paint()
+  // Right now we only draw with Gecko layers on Honeycomb and higher. See Paint()
   // for what we do on other versions.
   if (AndroidBridge::Bridge()->GetAPIVersion() < 11)
     return nullptr;
@@ -909,27 +909,27 @@ NPBool nsPluginInstanceOwner::ConvertPointNoPuppet(nsIWidget *widget,
 
   nsIntRect pluginScreenRect = pluginFrame->GetScreenRect();
 
-  double screenXGoanna, screenYGoanna;
+  double screenXGecko, screenYGecko;
   switch (sourceSpace) {
     case NPCoordinateSpacePlugin:
-      screenXGoanna = pluginScreenRect.x + sourceX;
-      screenYGoanna = pluginScreenRect.y + sourceY;
+      screenXGecko = pluginScreenRect.x + sourceX;
+      screenYGecko = pluginScreenRect.y + sourceY;
       break;
     case NPCoordinateSpaceWindow:
-      screenXGoanna = windowX + sourceX;
-      screenYGoanna = windowY + (windowHeight - sourceY);
+      screenXGecko = windowX + sourceX;
+      screenYGecko = windowY + (windowHeight - sourceY);
       break;
     case NPCoordinateSpaceFlippedWindow:
-      screenXGoanna = windowX + sourceX;
-      screenYGoanna = windowY + sourceY;
+      screenXGecko = windowX + sourceX;
+      screenYGecko = windowY + sourceY;
       break;
     case NPCoordinateSpaceScreen:
-      screenXGoanna = sourceX;
-      screenYGoanna = screenHeight - sourceY;
+      screenXGecko = sourceX;
+      screenYGecko = screenHeight - sourceY;
       break;
     case NPCoordinateSpaceFlippedScreen:
-      screenXGoanna = sourceX;
-      screenYGoanna = sourceY;
+      screenXGecko = sourceX;
+      screenYGecko = sourceY;
       break;
     default:
       return false;
@@ -938,24 +938,24 @@ NPBool nsPluginInstanceOwner::ConvertPointNoPuppet(nsIWidget *widget,
   double destXCocoa, destYCocoa;
   switch (destSpace) {
     case NPCoordinateSpacePlugin:
-      destXCocoa = screenXGoanna - pluginScreenRect.x;
-      destYCocoa = screenYGoanna - pluginScreenRect.y;
+      destXCocoa = screenXGecko - pluginScreenRect.x;
+      destYCocoa = screenYGecko - pluginScreenRect.y;
       break;
     case NPCoordinateSpaceWindow:
-      destXCocoa = screenXGoanna - windowX;
-      destYCocoa = windowHeight - (screenYGoanna - windowY);
+      destXCocoa = screenXGecko - windowX;
+      destYCocoa = windowHeight - (screenYGecko - windowY);
       break;
     case NPCoordinateSpaceFlippedWindow:
-      destXCocoa = screenXGoanna - windowX;
-      destYCocoa = screenYGoanna - windowY;
+      destXCocoa = screenXGecko - windowX;
+      destYCocoa = screenYGecko - windowY;
       break;
     case NPCoordinateSpaceScreen:
-      destXCocoa = screenXGoanna;
-      destYCocoa = screenHeight - screenYGoanna;
+      destXCocoa = screenXGecko;
+      destYCocoa = screenHeight - screenYGecko;
       break;
     case NPCoordinateSpaceFlippedScreen:
-      destXCocoa = screenXGoanna;
-      destYCocoa = screenYGoanna;
+      destXCocoa = screenXGecko;
+      destYCocoa = screenYGecko;
       break;
     default:
       return false;
@@ -1759,9 +1759,9 @@ CocoaEventTypeForEvent(const WidgetGUIEvent& anEvent, nsIFrame* aObjectFrame)
   }
 
   switch (anEvent.message) {
-    case NS_MOUSE_ENTER_SYNTH:
+    case NS_MOUSE_OVER:
       return NPCocoaEventMouseEntered;
-    case NS_MOUSE_EXIT_SYNTH:
+    case NS_MOUSE_OUT:
       return NPCocoaEventMouseExited;
     case NS_MOUSE_MOVE:
     {
@@ -1803,8 +1803,8 @@ TranslateToNPCocoaEvent(WidgetGUIEvent* anEvent, nsIFrame* aObjectFrame)
       anEvent->message == NS_MOUSE_BUTTON_DOWN ||
       anEvent->message == NS_MOUSE_BUTTON_UP ||
       anEvent->message == NS_MOUSE_SCROLL ||
-      anEvent->message == NS_MOUSE_ENTER_SYNTH ||
-      anEvent->message == NS_MOUSE_EXIT_SYNTH)
+      anEvent->message == NS_MOUSE_OVER ||
+      anEvent->message == NS_MOUSE_OUT)
   {
     nsPoint pt = nsLayoutUtils::GetEventCoordinatesRelativeTo(anEvent, aObjectFrame) -
                  aObjectFrame->GetContentRectRelativeToSelf().TopLeft();
@@ -2059,9 +2059,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
       NS_ASSERTION(anEvent.message == NS_MOUSE_BUTTON_DOWN ||
                    anEvent.message == NS_MOUSE_BUTTON_UP ||
                    anEvent.message == NS_MOUSE_DOUBLECLICK ||
-                   anEvent.message == NS_MOUSE_AUXCLICK ||
-                   anEvent.message == NS_MOUSE_ENTER_SYNTH ||
-                   anEvent.message == NS_MOUSE_EXIT_SYNTH ||
+                   anEvent.message == NS_MOUSE_OVER ||
+                   anEvent.message == NS_MOUSE_OUT ||
                    anEvent.message == NS_MOUSE_MOVE,
                    "Incorrect event type for coordinate translation");
       nsPoint pt =
@@ -2120,7 +2119,6 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
           {
           case NS_MOUSE_CLICK:
           case NS_MOUSE_DOUBLECLICK:
-          case NS_MOUSE_AUXCLICK:
             // Button up/down events sent instead.
             return rv;
           }
@@ -2147,11 +2145,11 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
 
         switch (anEvent.message)
           {
-          case NS_MOUSE_ENTER_SYNTH:
-          case NS_MOUSE_EXIT_SYNTH:
+          case NS_MOUSE_OVER:
+          case NS_MOUSE_OUT:
             {
               XCrossingEvent& event = pluginEvent.xcrossing;
-              event.type = anEvent.message == NS_MOUSE_ENTER_SYNTH ?
+              event.type = anEvent.message == NS_MOUSE_OVER ?
                 EnterNotify : LeaveNotify;
               event.root = root;
               event.time = anEvent.time;
@@ -2321,7 +2319,6 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
           {
           case NS_MOUSE_CLICK:
           case NS_MOUSE_DOUBLECLICK:
-          case NS_MOUSE_AUXCLICK:
             // Button up/down events sent instead.
             return rv;
           }

@@ -37,6 +37,9 @@ public:
     virtual void LeaveTestMode(LayerTransactionParent* aLayerTree) { }
     virtual void GetAPZTestData(const LayerTransactionParent* aLayerTree,
                                 APZTestData* aOutData) { }
+    virtual void SetConfirmedTargetAPZC(const LayerTransactionParent* aLayerTree,
+                                        const uint64_t& aInputBlockId,
+                                        const nsTArray<ScrollableLayerGuid>& aTargets) = 0;
 };
 
 } // namespace layers

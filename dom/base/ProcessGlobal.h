@@ -1,5 +1,5 @@
-/* -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 8; -*- */
-/* vim: set sw=4 ts=8 et tw=80 : */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -45,6 +45,7 @@ public:
   NS_FORWARD_SAFE_NSIMESSAGESENDER(mMessageManager)
   NS_FORWARD_SAFE_NSISYNCMESSAGESENDER(mMessageManager)
   NS_FORWARD_SAFE_NSIMESSAGEMANAGERGLOBAL(mMessageManager)
+  NS_FORWARD_SAFE_NSICONTENTPROCESSMESSAGEMANAGER(mMessageManager)
 
   virtual void LoadScript(const nsAString& aURL);
 
@@ -62,6 +63,8 @@ public:
   {
     MOZ_CRASH("ProcessGlobal doesn't use DOM bindings!");
   }
+
+  void SetInitialProcessData(JS::HandleValue aInitialData);
 
 protected:
   virtual ~ProcessGlobal();

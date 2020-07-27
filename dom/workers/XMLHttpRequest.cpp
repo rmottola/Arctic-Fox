@@ -1,4 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -1498,7 +1499,7 @@ OpenRunnable::MainThreadRunInternal()
   mProxy->mInOpen = false;
 
   if (rv2.Failed()) {
-    return rv2.ErrorCode();
+    return rv2.StealNSResult();
   }
 
   return mProxy->mXHR->SetResponseType(NS_LITERAL_STRING("text"));
@@ -2186,7 +2187,7 @@ XMLHttpRequest::Send(JS::Handle<JSObject*> aBody, ErrorResult& aRv)
 }
 
 void
-XMLHttpRequest::Send(File& aBody, ErrorResult& aRv)
+XMLHttpRequest::Send(Blob& aBody, ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
   JSContext* cx = mWorkerPrivate->GetJSContext();
@@ -2207,7 +2208,7 @@ XMLHttpRequest::Send(File& aBody, ErrorResult& aRv)
     return;
   }
 
-  nsRefPtr<FileImpl> blobImpl = aBody.Impl();
+  nsRefPtr<BlobImpl> blobImpl = aBody.Impl();
   MOZ_ASSERT(blobImpl);
 
   aRv = blobImpl->SetMutable(false);

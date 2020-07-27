@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=78: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -62,7 +62,7 @@ ShouldExposeChildWindow(nsString& aNameBeingResolved, nsIDOMWindow *aChild)
   //     "dolske".
   //
   // Unfortunately, (c) would require some engineering effort to be performant
-  // in Goanna, and probably in other UAs as well. So we go with a simpler
+  // in Gecko, and probably in other UAs as well. So we go with a simpler
   // approximation of the above. This approximation will only break sites that
   // rely on their cross-origin subframes setting window.name to a known value,
   // which is unlikely to be very common. And while it does introduce a

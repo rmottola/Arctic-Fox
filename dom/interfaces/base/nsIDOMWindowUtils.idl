@@ -39,8 +39,6 @@ interface nsIDOMStyleSheet;
 interface nsITransferable;
 interface nsIQueryContentEventResult;
 interface nsIDOMWindow;
-interface nsIDOMBlob;
-interface nsIDOMFile;
 interface nsIFile;
 interface nsIDOMClientRect;
 interface nsIURI;
@@ -51,7 +49,7 @@ interface nsIJSRAIIHelper;
 interface nsIContentPermissionRequest;
 interface nsIObserver;
 
-[scriptable, uuid(7f2f44ab-2857-4cc2-8c9d-3d9816f5a4d6)]
+[scriptable, uuid(34a42cdc-7a04-4e71-8a5c-63e092fba58e)]
 interface nsIDOMWindowUtils : nsISupports {
 
   /**
@@ -614,6 +612,11 @@ interface nsIDOMWindowUtils : nsISupports {
   const unsigned long MOUSESCROLL_PREFER_WIDGET_AT_POINT = 0x00000001;
 
   /**
+   * Interpret the scroll delta values as lines rather than pixels.
+   */
+  const unsigned long MOUSESCROLL_SCROLL_LINES = 0x00000002;
+
+  /**
    * The platform specific values of aAdditionalFlags.  Must be over 0x00010000.
    */
 
@@ -1011,7 +1014,7 @@ interface nsIDOMWindowUtils : nsISupports {
   /**
    * Get the current zoom factor.
    * This is _approximately_ the same as nsIContentViewer.fullZoom,
-   * but takes into account Goanna's quantization of the zoom factor, which is
+   * but takes into account Gecko's quantization of the zoom factor, which is
    * implemented by adjusting the (integer) number of appUnits per devPixel.
    */
   readonly attribute float fullZoom;
@@ -1328,6 +1331,13 @@ interface nsIDOMWindowUtils : nsISupports {
   readonly attribute boolean layerManagerRemote;
 
   /**
+   * True if we can initialize a hardware-backed h264 decoder for a simple
+   * test video, does not mean that all h264 video decoding will be done
+   * in hardware.
+   */
+  readonly attribute boolean supportsHardwareH264Decoding;
+
+  /**
    * Record (and return) frame-intervals for frames which were presented
    *   between calling StartFrameTimeRecording and StopFrameTimeRecording.
    *
@@ -1433,9 +1443,10 @@ interface nsIDOMWindowUtils : nsISupports {
                                   in AString value2);
 
   /**
-   * Wrap an nsIFile in an nsIDOMFile
+   * Wrap an nsIFile in an DOM File
+   * Returns a File object.
    */
-  nsIDOMFile wrapDOMFile(in nsIFile aFile);
+  nsISupports wrapDOMFile(in nsIFile aFile);
 
   /**
    * Get the type of the currently focused html input, if any.
@@ -1735,6 +1746,11 @@ interface nsIDOMWindowUtils : nsISupports {
     */
    [implicit_jscontext] jsval getContentAPZTestData();
    [implicit_jscontext] jsval getCompositorAPZTestData();
+
+   /**
+    * Posts an eRestyle_Self restyle event for the given element.
+    */
+   void postRestyleSelfEvent(in nsIDOMElement aElement);
 
    /**
     * With this it's possible to mute all the MediaElements in this window.

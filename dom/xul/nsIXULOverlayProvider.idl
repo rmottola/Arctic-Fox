@@ -10,7 +10,7 @@ interface nsIURI;
 
 /**
  * The chrome registry implements this interface to give overlays
- * to the goanna XUL engine.
+ * to the gecko XUL engine.
  */
 
 [scriptable, uuid(1d5b5b94-dc47-4050-93b7-ac092e383cad)]

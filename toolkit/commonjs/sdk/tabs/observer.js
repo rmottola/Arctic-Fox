@@ -33,7 +33,7 @@ const Observer = Class({
   implements: [EventTarget, DOMEventAssembler],
   initialize() {
     this[selectedTab] = null;
-    // Currently Goanna does not dispatch any event on the previously selected
+    // Currently Gecko does not dispatch any event on the previously selected
     // tab before / after "TabSelect" is dispatched. In order to work around this
     // limitation we keep track of selected tab and emit "deactivate" event with
     // that before emitting "activate" on selected tab.

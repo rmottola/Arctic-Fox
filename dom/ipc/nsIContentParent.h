@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -33,10 +33,11 @@ class CpowEntry;
 
 namespace dom {
 
+class Blob;
 class BlobConstructorParams;
+class BlobImpl;
 class BlobParent;
 class ContentParent;
-class File;
 class IPCTabContext;
 class PBlobParent;
 class PBrowserParent;
@@ -45,12 +46,15 @@ class nsIContentParent : public nsISupports
                        , public mozilla::dom::ipc::MessageManagerCallback
                        , public CPOWManagerGetter
 {
+    typedef mozilla::OwningSerializedStructuredCloneBuffer OwningSerializedStructuredCloneBuffer;
+
 public:
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICONTENTPARENT_IID)
 
   nsIContentParent();
 
-  BlobParent* GetOrCreateActorForBlob(File* aBlob);
+  BlobParent* GetOrCreateActorForBlob(Blob* aBlob);
+  BlobParent* GetOrCreateActorForBlobImpl(BlobImpl* aImpl);
 
   virtual ContentParentId ChildID() = 0;
   virtual bool IsForApp() = 0;
@@ -97,12 +101,12 @@ protected: // IPDL methods
                                const ClonedMessageData& aData,
                                InfallibleTArray<jsipc::CpowEntry>&& aCpows,
                                const IPC::Principal& aPrincipal,
-                               InfallibleTArray<nsString>* aRetvals);
+                               nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals);
   virtual bool RecvRpcMessage(const nsString& aMsg,
                               const ClonedMessageData& aData,
                               InfallibleTArray<jsipc::CpowEntry>&& aCpows,
                               const IPC::Principal& aPrincipal,
-                              InfallibleTArray<nsString>* aRetvals);
+                              nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals);
   virtual bool RecvAsyncMessage(const nsString& aMsg,
                                 const ClonedMessageData& aData,
                                 InfallibleTArray<jsipc::CpowEntry>&& aCpows,

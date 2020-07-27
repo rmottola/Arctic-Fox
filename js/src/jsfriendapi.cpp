@@ -879,13 +879,13 @@ JS::FormatStackDump(JSContext* cx, char* buf, bool showArgs, bool showLocals, bo
     return buf;
 }
 
-struct DumpHeapTracer : public JSTracer
+struct DumpHeapTracer : public JS::CallbackTracer
 {
     FILE*  output;
 
     DumpHeapTracer(FILE* fp, JSRuntime* rt, JSTraceCallback callback,
                    WeakMapTraceKind weakTraceKind)
-      : JSTracer(rt, callback, weakTraceKind), output(fp)
+      : JS::CallbackTracer(rt, callback, weakTraceKind), output(fp)
     {}
 };
 
@@ -940,7 +940,7 @@ DumpHeapVisitCell(JSRuntime* rt, void* data, void* thing,
 }
 
 static void
-DumpHeapVisitChild(JSTracer* trc, void** thingp, JSGCTraceKind kind)
+DumpHeapVisitChild(JS::CallbackTracer *trc, void** thingp, JSGCTraceKind kind)
 {
     if (gc::IsInsideNursery((js::gc::Cell*)*thingp))
         return;
@@ -952,7 +952,7 @@ DumpHeapVisitChild(JSTracer* trc, void** thingp, JSGCTraceKind kind)
 }
 
 static void
-DumpHeapVisitRoot(JSTracer* trc, void** thingp, JSGCTraceKind kind)
+DumpHeapVisitRoot(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 {
     if (gc::IsInsideNursery((js::gc::Cell*)*thingp))
         return;

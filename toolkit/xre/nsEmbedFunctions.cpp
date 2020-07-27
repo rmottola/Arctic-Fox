@@ -281,7 +281,7 @@ XRE_InitChildProcess(int aArgc,
 #endif
 
 #if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_GONK)
-  // On non-Fennec Goanna, the GMPLoader code resides in plugin-container,
+  // On non-Fennec Gecko, the GMPLoader code resides in plugin-container,
   // and we must forward it through to the GMP code here.
   GMPProcessChild::SetGMPLoader(aGMPLoader);
 #else
@@ -793,7 +793,7 @@ XRE_InstallX11ErrorHandler()
 extern const nsXREAppData* gAppData;
 
 /**
- * Preload static data of Goanna for B2G loader.
+ * Preload static data of Gecko for B2G loader.
  *
  * This function is supposed to be called before XPCOM is initialized.
  * For now, this function preloads

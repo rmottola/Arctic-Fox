@@ -121,7 +121,7 @@ config = {
         "xpcshell": {
             "category": "xpcshell",
             # XXX --manifest is superceded by testing/config/mozharness/android_x86_config.py.
-            # Remove when Goanna 35 no longer in tbpl.
+            # Remove when Gecko 35 no longer in tbpl.
             "extra_args": ["--manifest=tests/xpcshell_android.ini"]
         },
     }, # end of "test_definitions"
