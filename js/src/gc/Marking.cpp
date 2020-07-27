@@ -443,6 +443,15 @@ template <typename T>
 static bool
 IsMarked(T** thingp)
 {
+    MOZ_ASSERT_IF(!ThingIsPermanentAtom(*thingp),
+                  CurrentThreadCanAccessRuntime((*thingp)->runtimeFromMainThread()));
+    return IsMarkedFromAnyThread(thingp);
+}
+
+template <typename T>
+static bool
+IsMarkedFromAnyThread(T** thingp)
+{
     CheckIsMarkedThing(thingp);
     JSRuntime* rt = (*thingp)->runtimeFromAnyThread();
 
@@ -560,6 +569,12 @@ bool                                                                            
 Is##base##Marked(type **thingp)                                                                   \
 {                                                                                                 \
     return IsMarked<type>(thingp);                                                                \
+}                                                                                                 \
+                                                                                                  \
+bool                                                                                              \
+Is##base##MarkedFromAnyThread(BarrieredBase<type*>* thingp)                                       \
+{                                                                                                 \
+    return IsMarkedFromAnyThread<type>(thingp->unsafeGet());                                      \
 }                                                                                                 \
                                                                                                   \
 bool                                                                                              \
