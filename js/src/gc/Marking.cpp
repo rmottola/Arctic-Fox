@@ -463,6 +463,15 @@ template <typename T>
 static bool
 IsAboutToBeFinalized(T** thingp)
 {
+    MOZ_ASSERT_IF(!ThingIsPermanentAtom(*thingp),
+                  CurrentThreadCanAccessRuntime((*thingp)->runtimeFromMainThread()));
+    return IsAboutToBeFinalizedFromAnyThread(thingp);
+}
+
+template <typename T>
+static bool
+IsAboutToBeFinalizedFromAnyThread(T** thingp)
+{
     CheckIsMarkedThing(thingp);
     T* thing = *thingp;
     JSRuntime* rt = thing->runtimeFromAnyThread();
@@ -563,6 +572,12 @@ bool                                                                            
 Is##base##AboutToBeFinalized(type** thingp)                                                       \
 {                                                                                                 \
     return IsAboutToBeFinalized<type>(thingp);                                                    \
+}                                                                                                 \
+                                                                                                  \
+bool                                                                                              \
+Is##base##AboutToBeFinalizedFromAnyThread(type **thingp)                                          \
+{                                                                                                 \
+    return IsAboutToBeFinalizedFromAnyThread<type>(thingp);                                       \
 }                                                                                                 \
                                                                                                   \
 bool                                                                                              \
@@ -854,6 +869,28 @@ gc::IsValueAboutToBeFinalized(Value* v)
         MOZ_ASSERT(v->isSymbol());
         JS::Symbol* sym = v->toSymbol();
         rv = IsAboutToBeFinalized<JS::Symbol>(&sym);
+        v->setSymbol(sym);
+    }
+    return rv;
+}
+
+bool
+gc::IsValueAboutToBeFinalizedFromAnyThread(Value* v)
+{
+    MOZ_ASSERT(v->isMarkable());
+    bool rv;
+    if (v->isString()) {
+        JSString* str = (JSString*)v->toGCThing();
+        rv = IsAboutToBeFinalizedFromAnyThread<JSString>(&str);
+        v->setString(str);
+    } else if (v->isObject()) {
+        JSObject* obj = (JSObject*)v->toGCThing();
+        rv = IsAboutToBeFinalizedFromAnyThread<JSObject>(&obj);
+        v->setObject(*obj);
+    } else {
+        MOZ_ASSERT(v->isSymbol());
+        JS::Symbol* sym = v->toSymbol();
+        rv = IsAboutToBeFinalizedFromAnyThread<JS::Symbol>(&sym);
         v->setSymbol(sym);
     }
     return rv;
