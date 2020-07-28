@@ -445,51 +445,51 @@ struct BytecodeEmitter
     bool emitLocalOp(JSOp op, uint32_t slot);
 
     bool emitScopeCoordOp(JSOp op, ScopeCoordinate sc);
-    bool emitAliasedVarOp(JSOp op, ParseNode *pn);
+    bool emitAliasedVarOp(JSOp op, ParseNode* pn);
     bool emitAliasedVarOp(JSOp op, ScopeCoordinate sc, MaybeCheckLexical checkLexical);
     bool emitUnaliasedVarOp(JSOp op, uint32_t slot, MaybeCheckLexical checkLexical);
 
-    bool emitVarOp(ParseNode *pn, JSOp op);
-    bool emitVarIncDec(ParseNode *pn);
+    bool emitVarOp(ParseNode* pn, JSOp op);
+    bool emitVarIncDec(ParseNode* pn);
 
-    bool emitNameOp(ParseNode *pn, bool callContext);
-    bool emitNameIncDec(ParseNode *pn);
+    bool emitNameOp(ParseNode* pn, bool callContext);
+    bool emitNameIncDec(ParseNode* pn);
 
-    bool maybeEmitVarDecl(JSOp prologOp, ParseNode *pn, jsatomid *result);
-    bool emitVariables(ParseNode *pn, VarEmitOption emitOption, bool isLetExpr = false);
+    bool maybeEmitVarDecl(JSOp prologOp, ParseNode* pn, jsatomid* result);
+    bool emitVariables(ParseNode* pn, VarEmitOption emitOption, bool isLetExpr = false);
 
     bool emitNewInit(JSProtoKey key);
-    bool emitSingletonInitialiser(ParseNode *pn);
+    bool emitSingletonInitialiser(ParseNode* pn);
 
     bool emitPrepareIteratorResult();
     bool emitFinishIteratorResult(bool done);
     bool iteratorResultShape(unsigned *shape);
 
-    bool emitYield(ParseNode *pn);
+    bool emitYield(ParseNode* pn);
     bool emitYieldOp(JSOp op);
-    bool emitYieldStar(ParseNode *iter, ParseNode *gen);
+    bool emitYieldStar(ParseNode* iter, ParseNode* gen);
 
-    bool emitPropLHS(ParseNode *pn, JSOp op);
-    bool emitPropOp(ParseNode *pn, JSOp op);
-    bool emitPropIncDec(ParseNode *pn);
+    bool emitPropLHS(ParseNode* pn, JSOp op);
+    bool emitPropOp(ParseNode* pn, JSOp op);
+    bool emitPropIncDec(ParseNode* pn);
 
     // Emit bytecode to put operands for a JSOP_GETELEM/CALLELEM/SETELEM/DELELEM
     // opcode onto the stack in the right order. In the case of SETELEM, the
     // value to be assigned must already be pushed.
-    bool emitElemOperands(ParseNode *pn, JSOp op);
+    bool emitElemOperands(ParseNode* pn, JSOp op);
 
     bool emitElemOpBase(JSOp op);
-    bool emitElemOp(ParseNode *pn, JSOp op);
+    bool emitElemOp(ParseNode* pn, JSOp op);
     bool emitElemIncDec(ParseNode *pn);
 
-    bool emitCatch(ParseNode *pn);
-    bool emitIf(ParseNode *pn);
-    bool emitWith(ParseNode *pn);
+    bool emitCatch(ParseNode* pn);
+    bool emitIf(ParseNode* pn);
+    bool emitWith(ParseNode* pn);
 
-    MOZ_NEVER_INLINE bool emitLabeledStatement(const LabeledStatement *pn);
-    MOZ_NEVER_INLINE bool emitLetBlock(ParseNode *pnLet);
-    MOZ_NEVER_INLINE bool emitLexicalScope(ParseNode *pn);
-    MOZ_NEVER_INLINE bool emitSwitch(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitLabeledStatement(const LabeledStatement* pn);
+    MOZ_NEVER_INLINE bool emitLetBlock(ParseNode* pnLet);
+    MOZ_NEVER_INLINE bool emitLexicalScope(ParseNode* pn);
+    MOZ_NEVER_INLINE bool emitSwitch(ParseNode* pn);
     MOZ_NEVER_INLINE bool emitTry(ParseNode *pn);
 
     // EmitDestructuringLHS assumes the to-be-destructured value has been pushed on
@@ -502,24 +502,24 @@ struct BytecodeEmitter
     // If emitOption is PushInitialValues, the to-be-destructured value is replaced
     // with the initial values of the N (where 0 <= N) variables assigned in the
     // lhs expression. (Same post-condition as EmitDestructuringOpsHelper)
-    bool emitDestructuringLHS(ParseNode *target, VarEmitOption emitOption);
+    bool emitDestructuringLHS(ParseNode* target, VarEmitOption emitOption);
 
-    bool emitDestructuringOps(ParseNode *pattern, bool isLet = false);
-    bool emitDestructuringOpsHelper(ParseNode *pattern, VarEmitOption emitOption);
-    bool emitDestructuringOpsArrayHelper(ParseNode *pattern, VarEmitOption emitOption);
-    bool emitDestructuringOpsObjectHelper(ParseNode *pattern, VarEmitOption emitOption);
+    bool emitDestructuringOps(ParseNode* pattern, bool isLet = false);
+    bool emitDestructuringOpsHelper(ParseNode* pattern, VarEmitOption emitOption);
+    bool emitDestructuringOpsArrayHelper(ParseNode* pattern, VarEmitOption emitOption);
+    bool emitDestructuringOpsObjectHelper(ParseNode* pattern, VarEmitOption emitOption);
 
     typedef bool
-    (*DestructuringDeclEmitter)(BytecodeEmitter *bce, JSOp prologOp, ParseNode *pn);
+    (*DestructuringDeclEmitter)(BytecodeEmitter* bce, JSOp prologOp, ParseNode* pn);
 
     template <DestructuringDeclEmitter EmitName>
-    bool emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode *pattern);
+    bool emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode* pattern);
 
-    bool emitDestructuringDecls(JSOp prologOp, ParseNode *pattern);
+    bool emitDestructuringDecls(JSOp prologOp, ParseNode* pattern);
 
     // Emit code to initialize all destructured names to the value on the top of
     // the stack.
-    bool emitInitializeDestructuringDecls(JSOp prologOp, ParseNode *pattern);
+    bool emitInitializeDestructuringDecls(JSOp prologOp, ParseNode* pattern);
 
     // emitIterator expects the iterable to already be on the stack.
     // It will replace that stack value with the corresponding iterator
@@ -527,33 +527,33 @@ struct BytecodeEmitter
 
     // Pops iterator from the top of the stack. Pushes the result of |.next()|
     // onto the stack.
-    bool emitIteratorNext(ParseNode *pn);
+    bool emitIteratorNext(ParseNode* pn);
 
     // Check if the value on top of the stack is "undefined". If so, replace
     // that value on the stack with the value defined by |defaultExpr|.
-    bool emitDefault(ParseNode *defaultExpr);
+    bool emitDefault(ParseNode* defaultExpr);
 
-    bool emitCallSiteObject(ParseNode *pn);
-    bool emitTemplateString(ParseNode *pn);
-    bool emitAssignment(ParseNode *lhs, JSOp op, ParseNode *rhs);
+    bool emitCallSiteObject(ParseNode* pn);
+    bool emitTemplateString(ParseNode* pn);
+    bool emitAssignment(ParseNode* lhs, JSOp op, ParseNode* rhs);
 
-    bool emitReturn(ParseNode *pn);
-    bool emitStatement(ParseNode *pn);
-    bool emitStatementList(ParseNode *pn, ptrdiff_t top);
-    bool emitSyntheticStatements(ParseNode *pn, ptrdiff_t top);
+    bool emitReturn(ParseNode* pn);
+    bool emitStatement(ParseNode* pn);
+    bool emitStatementList(ParseNode* pn, ptrdiff_t top);
+    bool emitSyntheticStatements(ParseNode* pn, ptrdiff_t top);
 
-    bool emitDelete(ParseNode *pn);
-    bool emitLogical(ParseNode *pn);
-    bool emitUnary(ParseNode *pn);
+    bool emitDelete(ParseNode* pn);
+    bool emitLogical(ParseNode* pn);
+    bool emitUnary(ParseNode* pn);
 
-    MOZ_NEVER_INLINE bool emitIncOrDec(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitIncOrDec(ParseNode* pn);
 
-    bool emitConditionalExpression(ConditionalExpression &conditional);
+    bool emitConditionalExpression(ConditionalExpression& conditional);
 
-    bool emitCallOrNew(ParseNode *pn);
-    bool emitSelfHostedCallFunction(ParseNode *pn);
-    bool emitSelfHostedResumeGenerator(ParseNode *pn);
-    bool emitSelfHostedForceInterpreter(ParseNode *pn);
+    bool emitCallOrNew(ParseNode* pn);
+    bool emitSelfHostedCallFunction(ParseNode* pn);
+    bool emitSelfHostedResumeGenerator(ParseNode* pn);
+    bool emitSelfHostedForceInterpreter(ParseNode* pn);
 
     bool emitDo(ParseNode *pn);
     bool emitFor(ParseNode *pn, ptrdiff_t top);
