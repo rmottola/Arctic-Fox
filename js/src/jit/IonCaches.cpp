@@ -701,10 +701,10 @@ IsCacheableGetPropCallPropertyOp(JSObject* obj, JSObject* holder, Shape* shape)
 
 static void
 TestMatchingReceiver(MacroAssembler &masm, IonCache::StubAttacher &attacher,
-                     Register object, JSObject *obj, Label *failure,
+                     Register object, JSObject* obj, Label* failure,
                      bool alwaysCheckGroup = false)
 {
-    if (Shape *shape = obj->maybeShape()) {
+    if (Shape* shape = obj->maybeShape()) {
         attacher.branchNextStubOrLabel(masm, Assembler::NotEqual,
                                        Address(object, JSObject::offsetOfShape()),
                                        ImmGCPtr(shape), failure);
@@ -717,7 +717,7 @@ TestMatchingReceiver(MacroAssembler &masm, IonCache::StubAttacher &attacher,
 
         masm.branchTestObjGroup(Assembler::NotEqual, object, obj->group(), failure);
         Address expandoAddress(object, UnboxedPlainObject::offsetOfExpando());
-        if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
+        if (UnboxedExpandoObject* expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
             masm.branchPtr(Assembler::Equal, expandoAddress, ImmWord(0), failure);
             Label success;
             masm.push(object);

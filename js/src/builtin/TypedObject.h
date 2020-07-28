@@ -512,59 +512,59 @@ class TypedObject : public JSObject
 {
     static const bool IsTypedObjectClass = true;
 
-    static bool obj_getArrayElement(JSContext *cx,
-                                    Handle<TypedObject *> typedObj,
-                                    Handle<TypeDescr *> typeDescr,
+    static bool obj_getArrayElement(JSContext* cx,
+                                    Handle<TypedObject*> typedObj,
+                                    Handle<TypeDescr*> typeDescr,
                                     uint32_t index,
                                     MutableHandleValue vp);
 
   protected:
     HeapPtrShape shape_;
 
-    static bool obj_lookupProperty(JSContext *cx, HandleObject obj,
+    static bool obj_lookupProperty(JSContext* cx, HandleObject obj,
                                    HandleId id, MutableHandleObject objp,
                                    MutableHandleShape propp);
 
-    static bool obj_lookupElement(JSContext *cx, HandleObject obj, uint32_t index,
+    static bool obj_lookupElement(JSContext* cx, HandleObject obj, uint32_t index,
                                   MutableHandleObject objp, MutableHandleShape propp);
 
-    static bool obj_defineProperty(JSContext *cx, HandleObject obj, HandleId id,
+    static bool obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id,
                                    Handle<JSPropertyDescriptor> desc,
-                                   ObjectOpResult &result);
+                                   ObjectOpResult& result);
 
-    static bool obj_hasProperty(JSContext *cx, HandleObject obj, HandleId id, bool *foundp);
+    static bool obj_hasProperty(JSContext* cx, HandleObject obj, HandleId id, bool* foundp);
 
-    static bool obj_getProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
+    static bool obj_getProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
                                 HandleId id, MutableHandleValue vp);
 
-    static bool obj_getElement(JSContext *cx, HandleObject obj, HandleObject receiver,
+    static bool obj_getElement(JSContext* cx, HandleObject obj, HandleObject receiver,
                                uint32_t index, MutableHandleValue vp);
 
-    static bool obj_setProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                                HandleValue receiver, ObjectOpResult &result);
+    static bool obj_setProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                                HandleValue receiver, ObjectOpResult& result);
 
-    static bool obj_getOwnPropertyDescriptor(JSContext *cx, HandleObject obj, HandleId id,
+    static bool obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
                                              MutableHandle<JSPropertyDescriptor> desc);
 
-    static bool obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id,
-                                   ObjectOpResult &result);
+    static bool obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id,
+                                   ObjectOpResult& result);
 
-    static bool obj_enumerate(JSContext *cx, HandleObject obj, AutoIdVector &properties);
+    static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties);
 
   public:
-    TypedProto &typedProto() const {
+    TypedProto& typedProto() const {
         return getProto()->as<TypedProto>();
     }
 
-    TypedProto &maybeForwardedTypedProto() const {
+    TypedProto& maybeForwardedTypedProto() const {
         return MaybeForwarded(getProto())->as<TypedProto>();
     }
 
-    TypeDescr &typeDescr() const {
+    TypeDescr& typeDescr() const {
         return group()->typeDescr();
     }
 
-    TypeDescr &maybeForwardedTypeDescr() const {
+    TypeDescr& maybeForwardedTypeDescr() const {
         return MaybeForwarded(&typeDescr())->as<TypeDescr>();
     }
 

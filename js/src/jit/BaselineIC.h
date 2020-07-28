@@ -3888,17 +3888,17 @@ class ReceiverGuard
                 shape = obj->maybeShape();
                 if (!shape) {
                     group = obj->group();
-                    if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando())
+                    if (UnboxedExpandoObject* expando = obj->as<UnboxedPlainObject>().maybeExpando())
                         shape = expando->lastProperty();
                 }
             }
         }
 
-        explicit StackGuard(Shape *shape)
+        explicit StackGuard(Shape* shape)
           : group(nullptr), shape(shape)
         {}
 
-        Shape *ownShape() const {
+        Shape* ownShape() const {
             // Get a shape belonging to the object itself, rather than an unboxed expando.
             if (!group || !group->maybeUnboxedLayout())
                 return shape;
@@ -3906,7 +3906,7 @@ class ReceiverGuard
         }
     };
 
-    explicit ReceiverGuard(const StackGuard &guard)
+    explicit ReceiverGuard(const StackGuard& guard)
       : group_(guard.group), shape_(guard.shape)
     {}
 
@@ -3919,16 +3919,16 @@ class ReceiverGuard
         shape_ = other.shape;
     }
 
-    void trace(JSTracer *trc);
+    void trace(JSTracer* trc);
 
-    Shape *shape() const {
+    Shape* shape() const {
         return shape_;
     }
-    ObjectGroup *group() const {
+    ObjectGroup* group() const {
         return group_;
     }
 
-    Shape *ownShape() const {
+    Shape* ownShape() const {
         return StackGuard(*this).ownShape();
     }
 
@@ -3941,7 +3941,7 @@ class ReceiverGuard
 
     // Bits to munge into IC compiler keys when that IC has a ReceiverGuard.
     // This uses at two bits for data.
-    static int32_t keyBits(JSObject *obj) {
+    static int32_t keyBits(JSObject* obj) {
         if (obj->maybeShape())
             return 0;
         return obj->as<UnboxedPlainObject>().maybeExpando() ? 1 : 2;

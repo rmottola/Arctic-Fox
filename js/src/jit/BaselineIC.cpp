@@ -7232,9 +7232,9 @@ ICGetPropNativeCompiler::getStub(ICStubSpace *space)
 }
 
 static void
-GuardNativeOrUnboxedReceiver(MacroAssembler &masm, ReceiverGuard::StackGuard guard,
+GuardNativeOrUnboxedReceiver(MacroAssembler& masm, ReceiverGuard::StackGuard guard,
                              Register object, Register scratch,
-                             size_t receiverGuardOffset, Label *failure)
+                             size_t receiverGuardOffset, Label* failure)
 {
     Address groupAddress(BaselineStubReg, receiverGuardOffset + ReceiverGuard::offsetOfGroup());
     Address shapeAddress(BaselineStubReg, receiverGuardOffset + ReceiverGuard::offsetOfShape());
