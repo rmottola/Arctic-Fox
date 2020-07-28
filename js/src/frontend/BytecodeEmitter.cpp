@@ -113,7 +113,7 @@ BytecodeEmitter::BytecodeEmitter(BytecodeEmitter* parent,
     parent(parent),
     script(cx, script),
     lazyScript(cx, lazyScript),
-    prolog(cx, lineNum),
+    prologue(cx, lineNum),
     main(cx, lineNum),
     current(&main),
     parser(parser),
@@ -2961,7 +2961,7 @@ BytecodeEmitter::emitFunctionScript(ParseNode* body)
     FunctionBox* funbox = sc->asFunctionBox();
     if (funbox->argumentsHasLocalBinding()) {
         MOZ_ASSERT(offset() == 0);  /* See JSScript::argumentsBytecode. */
-        switchToProlog();
+        switchToPrologue();
         if (!emit1(JSOP_ARGUMENTS))
             return false;
         InternalBindingsHandle bindings(script, &script->bindings);
@@ -2989,7 +2989,7 @@ BytecodeEmitter::emitFunctionScript(ParseNode* body)
      */
     bool runOnce = isRunOnceLambda();
     if (runOnce) {
-        switchToProlog();
+        switchToPrologue();
         if (!emit1(JSOP_RUNONCE))
             return false;
         switchToMain();
@@ -3077,7 +3077,7 @@ BytecodeEmitter::emitFunctionScript(ParseNode* body)
 }
 
 bool
-BytecodeEmitter::maybeEmitVarDecl(JSOp prologOp, ParseNode *pn, jsatomid *result)
+BytecodeEmitter::maybeEmitVarDecl(JSOp prologueOp, ParseNode* pn, jsatomid* result)
 {
     jsatomid atomIndex;
 
@@ -3091,10 +3091,10 @@ BytecodeEmitter::maybeEmitVarDecl(JSOp prologOp, ParseNode *pn, jsatomid *result
     if (JOF_OPTYPE(pn->getOp()) == JOF_ATOM &&
         (!sc->isFunctionBox() || sc->asFunctionBox()->isHeavyweight()))
     {
-        switchToProlog();
+        switchToPrologue();
         if (!updateSourceCoordNotes(pn->pn_pos.begin))
             return false;
-        if (!emitIndexOp(prologOp, atomIndex))
+        if (!emitIndexOp(prologueOp, atomIndex))
             return false;
         switchToMain();
     }
@@ -3106,7 +3106,7 @@ BytecodeEmitter::maybeEmitVarDecl(JSOp prologOp, ParseNode *pn, jsatomid *result
 
 template <BytecodeEmitter::DestructuringDeclEmitter EmitName>
 bool
-BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode* pattern)
+BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologueOp, ParseNode* pattern)
 {
     if (pattern->isKind(PNK_ARRAY)) {
         for (ParseNode* element = pattern->pn_head; element; element = element->pn_next) {
@@ -3120,10 +3120,10 @@ BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode* pat
             if (target->isKind(PNK_ASSIGN))
                 target = target->pn_left;
             if (target->isKind(PNK_NAME)) {
-                if (!EmitName(this, prologOp, target))
+                if (!EmitName(this, prologueOp, target))
                     return false;
             } else {
-                if (!emitDestructuringDeclsWithEmitter<EmitName>(prologOp, target))
+                if (!emitDestructuringDeclsWithEmitter<EmitName>(prologueOp, target))
                     return false;
             }
         }
@@ -3141,10 +3141,10 @@ BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode* pat
         if (target->isKind(PNK_ASSIGN))
             target = target->pn_left;
         if (target->isKind(PNK_NAME)) {
-            if (!EmitName(this, prologOp, target))
+            if (!EmitName(this, prologueOp, target))
                 return false;
         } else {
-            if (!emitDestructuringDeclsWithEmitter<EmitName>(prologOp, target))
+            if (!emitDestructuringDeclsWithEmitter<EmitName>(prologueOp, target))
                 return false;
         }
     }
@@ -3152,24 +3152,24 @@ BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode* pat
 }
 
 static bool
-EmitDestructuringDecl(BytecodeEmitter* bce, JSOp prologOp, ParseNode* pn)
+EmitDestructuringDecl(BytecodeEmitter* bce, JSOp prologueOp, ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_NAME));
     if (!bce->bindNameToSlot(pn))
         return false;
 
     MOZ_ASSERT(!pn->isOp(JSOP_CALLEE));
-    return bce->maybeEmitVarDecl(prologOp, pn, nullptr);
+    return bce->maybeEmitVarDecl(prologueOp, pn, nullptr);
 }
 
 bool
-BytecodeEmitter::emitDestructuringDecls(JSOp prologOp, ParseNode* pattern)
+BytecodeEmitter::emitDestructuringDecls(JSOp prologueOp, ParseNode* pattern)
 {
-    return emitDestructuringDeclsWithEmitter<EmitDestructuringDecl>(prologOp, pattern);
+    return emitDestructuringDeclsWithEmitter<EmitDestructuringDecl>(prologueOp, pattern);
 }
 
 static bool
-EmitInitializeDestructuringDecl(BytecodeEmitter* bce, JSOp prologOp, ParseNode* pn)
+EmitInitializeDestructuringDecl(BytecodeEmitter* bce, JSOp prologueOp, ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_NAME));
     MOZ_ASSERT(pn->isBound());
@@ -3177,9 +3177,9 @@ EmitInitializeDestructuringDecl(BytecodeEmitter* bce, JSOp prologOp, ParseNode* 
 }
 
 bool
-BytecodeEmitter::emitInitializeDestructuringDecls(JSOp prologOp, ParseNode* pattern)
+BytecodeEmitter::emitInitializeDestructuringDecls(JSOp prologueOp, ParseNode* pattern)
 {
-    return emitDestructuringDeclsWithEmitter<EmitInitializeDestructuringDecl>(prologOp, pattern);
+    return emitDestructuringDeclsWithEmitter<EmitInitializeDestructuringDecl>(prologueOp, pattern);
 }
 
 bool
@@ -4681,7 +4681,7 @@ BytecodeEmitter::emitForInOrOfVariables(ParseNode *pn, bool *letDecl)
     MOZ_ASSERT_IF(*letDecl, pn->isLexical());
 
     // If the left part is 'var x', emit code to define x if necessary using a
-    // prolog opcode, but do not emit a pop. If it is 'let x', enterBlockScope
+    // prologue opcode, but do not emit a pop. If it is 'let x', enterBlockScope
     // will initialize let bindings in emitForOf and emitForIn with
     // undefineds.
     //
@@ -5255,7 +5255,7 @@ BytecodeEmitter::emitFunction(ParseNode *pn, bool needsProto)
 
     /*
      * For a script we emit the code as we parse. Thus the bytecode for
-     * top-level functions should go in the prolog to predefine their
+     * top-level functions should go in the prologue to predefine their
      * names in the variable object before the already-generated main code
      * is executed. This extra work for top-level scripts is not necessary
      * when we emit the code for a function. It is fully parsed prior to
@@ -5266,7 +5266,7 @@ BytecodeEmitter::emitFunction(ParseNode *pn, bool needsProto)
         MOZ_ASSERT(pn->pn_cookie.isFree());
         MOZ_ASSERT(pn->getOp() == JSOP_NOP);
         MOZ_ASSERT(!topStmt);
-        switchToProlog();
+        switchToPrologue();
         if (!emitIndex32(JSOP_DEFFUN, index))
             return false;
         if (!updateSourceCoordNotes(pn->pn_pos.begin))
@@ -6903,7 +6903,7 @@ BytecodeEmitter::emitTree(ParseNode *pn)
                 return false;
             if (pn2->pn_next == pnlast && fun->hasRest() && !hasDefaults) {
                 // Fill rest parameter. We handled the case with defaults above.
-                switchToProlog();
+                switchToPrologue();
                 if (!emit1(JSOP_REST))
                     return false;
                 checkTypeSet(JSOP_REST);
@@ -7450,21 +7450,21 @@ BytecodeEmitter::finishTakingSrcNotes(uint32_t* out)
 {
     MOZ_ASSERT(current == &main);
 
-    unsigned prologCount = prolog.notes.length();
-    if (prologCount && prolog.currentLine != firstLine) {
-        switchToProlog();
+    unsigned prologueCount = prologue.notes.length();
+    if (prologueCount && prologue.currentLine != firstLine) {
+        switchToPrologue();
         if (!newSrcNote2(SRC_SETLINE, ptrdiff_t(firstLine)))
             return false;
         switchToMain();
     } else {
         /*
-         * Either no prolog srcnotes, or no line number change over prolog.
+         * Either no prologue srcnotes, or no line number change over prologue.
          * We don't need a SRC_SETLINE, but we may need to adjust the offset
          * of the first main note, by adding to its delta and possibly even
-         * prepending SRC_XDELTA notes to it to account for prolog bytecodes
+         * prepending SRC_XDELTA notes to it to account for prologue bytecodes
          * that came at and after the last annotated bytecode.
          */
-        ptrdiff_t offset = prologOffset() - prolog.lastNoteOffset;
+        ptrdiff_t offset = prologueOffset() - prologue.lastNoteOffset;
         MOZ_ASSERT(offset >= 0);
         if (offset > 0 && main.notes.length() != 0) {
             /* NB: Use as much of the first main note's delta as we can. */
@@ -7486,23 +7486,23 @@ BytecodeEmitter::finishTakingSrcNotes(uint32_t* out)
         }
     }
 
-    // The prolog count might have changed, so we can't reuse prologCount.
+    // The prologue count might have changed, so we can't reuse prologueCount.
     // The + 1 is to account for the final SN_MAKE_TERMINATOR that is appended
     // when the notes are copied to their final destination by CopySrcNotes.
-    *out = prolog.notes.length() + main.notes.length() + 1;
+    *out = prologue.notes.length() + main.notes.length() + 1;
     return true;
 }
 
 void
 BytecodeEmitter::copySrcNotes(jssrcnote* destination, uint32_t nsrcnotes)
 {
-    unsigned prologCount = prolog.notes.length();
+    unsigned prologueCount = prologue.notes.length();
     unsigned mainCount = main.notes.length();
-    unsigned totalCount = prologCount + mainCount;
+    unsigned totalCount = prologueCount + mainCount;
     MOZ_ASSERT(totalCount == nsrcnotes - 1);
-    if (prologCount)
-        PodCopy(destination, prolog.notes.begin(), prologCount);
-    PodCopy(destination + prologCount, main.notes.begin(), mainCount);
+    if (prologueCount)
+        PodCopy(destination, prologue.notes.begin(), prologueCount);
+    PodCopy(destination + prologueCount, main.notes.begin(), mainCount);
     SN_MAKE_TERMINATOR(&destination[totalCount]);
 }
 
@@ -7685,12 +7685,12 @@ CGBlockScopeList::finish(BlockScopeArray* array)
 }
 
 void
-CGYieldOffsetList::finish(YieldOffsetArray& array, uint32_t prologLength)
+CGYieldOffsetList::finish(YieldOffsetArray& array, uint32_t prologueLength)
 {
     MOZ_ASSERT(length() == array.length());
 
     for (unsigned i = 0; i < length(); i++)
-        array[i] = prologLength + list[i];
+        array[i] = prologueLength + list[i];
 }
 
 /*
