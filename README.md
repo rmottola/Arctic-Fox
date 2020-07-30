@@ -6,7 +6,7 @@ Arctic Fox aims to be a desktop oriented browser, phone support has been removed
 
 The goal here is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.8, PowerPC's running Linux, etc.
 
-Arctic Fox will build for Mac OS X 10.6 and up, Windows XP, i386/x86_64/PowerPC Linux, and more than likely any other unix/bsd varient. Ideally, we'd like to get it working on PowerPC 10.5 as well. An older *unofficial 10.4/10.5 build can be found here: [Arctic Fox for 10.4/10.5](https://forums.macrumors.com/threads/so-this-finally-happened-sort-of.2172031/)
+Arctic Fox will build for Mac OS X 10.6 and up, Windows XP, i386/x86_64/PowerPC Linux, and more than likely any other unix/bsd varient. Ideally, we'd like to get it working on PowerPC 10.5 as well. An older *unofficial* 10.4/10.5 build can be found here: [Arctic Fox for 10.4/10.5](https://forums.macrumors.com/threads/so-this-finally-happened-sort-of.2172031/)
 
 ## Build tips
 
