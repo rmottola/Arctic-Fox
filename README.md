@@ -2,7 +2,7 @@
 
 Arctic Fox started as a forked and rebranded Pale Moon 27.9.4 and retains its _classic_ interface. Many fixes and enhancements have been imported from Firefox and TenFourFox.
 
-Arctic Fox aims to be a desktop oriented browser, phone support has been removed or is no longer updated in the tree.
+Arctic Fox aims to be a desktop oriented browser with phone support removed, or no longer updated in the tree.
 
 The goal here is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.8, PowerPC's running Linux, Windows XP, etc.
 
