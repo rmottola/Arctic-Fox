@@ -13,7 +13,7 @@
 #include "gfxPoint.h"                   // for gfxPoint, gfxSize
 #include "mozilla/StyleAnimationValue.h" // for StyleAnimationValue, etc
 #include "mozilla/WidgetUtils.h"        // for ComputeTransformForRotation
-#include "mozilla/dom/AnimationPlayer.h" // for AnimationPlayer
+#include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadOnly
 #include "mozilla/gfx/BaseRect.h"       // for BaseRect
 #include "mozilla/gfx/Point.h"          // for RoundedToInt, PointTyped
 #include "mozilla/gfx/Rect.h"           // for RoundedToInt, RectTyped
@@ -140,12 +140,10 @@ static void
 TransformClipRect(Layer* aLayer,
                   const Matrix4x4& aTransform)
 {
-  const nsIntRect* clipRect = aLayer->AsLayerComposite()->GetShadowClipRect();
+  const Maybe<ParentLayerIntRect>& clipRect = aLayer->AsLayerComposite()->GetShadowClipRect();
   if (clipRect) {
-    LayerIntRect transformed = TransformTo<LayerPixel>(
-        aTransform, LayerIntRect::FromUntyped(*clipRect));
-    nsIntRect shadowClip = LayerIntRect::ToUntyped(transformed);
-    aLayer->AsLayerComposite()->SetShadowClipRect(&shadowClip);
+    ParentLayerIntRect transformed = TransformTo<ParentLayerPixel>(aTransform, *clipRect);
+    aLayer->AsLayerComposite()->SetShadowClipRect(Some(transformed));
   }
 }
 
@@ -440,7 +438,8 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
 
   bool activeAnimations = false;
 
-  for (uint32_t i = animations.Length(); i-- !=0; ) {
+  // Process in order, since later animations override earlier ones.
+  for (size_t i = 0, iEnd = animations.Length(); i < iEnd; ++i) {
     Animation& animation = animations[i];
     AnimData& animData = animationData[i];
 
@@ -476,7 +475,7 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
     timing.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BOTH;
 
     ComputedTiming computedTiming =
-      dom::Animation::GetComputedTimingAt(
+      dom::KeyframeEffectReadOnly::GetComputedTimingAt(
         Nullable<TimeDuration>(elapsedDuration), timing);
 
     MOZ_ASSERT(0.0 <= computedTiming.mTimeFraction &&
@@ -558,8 +557,8 @@ AdjustForClip(const Matrix4x4& asyncTransform, Layer* aLayer)
   // then applying it to container as-is will produce incorrect results. To
   // avoid this, translate the layer so that the clip rect starts at the origin,
   // apply the tree transform, and translate back.
-  if (const nsIntRect* shadowClipRect = aLayer->AsLayerComposite()->GetShadowClipRect()) {
-    if (shadowClipRect->TopLeft() != nsIntPoint()) {  // avoid a gratuitous change of basis
+  if (const Maybe<ParentLayerIntRect>& shadowClipRect = aLayer->AsLayerComposite()->GetShadowClipRect()) {
+    if (shadowClipRect->TopLeft() != ParentLayerIntPoint()) {  // avoid a gratuitous change of basis
       result.ChangeBasis(shadowClipRect->x, shadowClipRect->y, 0);
     }
   }
@@ -582,7 +581,7 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer)
   Matrix4x4 combinedAsyncTransform;
   bool hasAsyncTransform = false;
   LayerMargin fixedLayerMargins(0, 0, 0, 0);
-  Maybe<nsIntRect> clipRect = ToMaybe(aLayer->AsLayerComposite()->GetShadowClipRect());
+  Maybe<ParentLayerIntRect> clipRect = aLayer->AsLayerComposite()->GetShadowClipRect();
 
   for (uint32_t i = 0; i < aLayer->GetFrameMetricsCount(); i++) {
     AsyncPanZoomController* controller = aLayer->GetAsyncPanZoomController(i);
@@ -632,15 +631,14 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer)
       // bounds at that level.
       ParentLayerRect transformed = TransformTo<ParentLayerPixel>(
         (Matrix4x4(asyncTransformWithoutOverscroll) * overscrollTransform),
-        ParentLayerRect(ViewAs<ParentLayerPixel>(*clipRect)));
-      clipRect = Some(ParentLayerIntRect::ToUntyped(
-        RoundedOut(transformed.Intersect(metrics.mCompositionBounds))));
+        ParentLayerRect(*clipRect));
+      clipRect = Some(RoundedOut(transformed.Intersect(metrics.mCompositionBounds)));
     }
   }
 
   if (hasAsyncTransform) {
     if (clipRect) {
-      aLayer->AsLayerComposite()->SetShadowClipRect(clipRect.ptr());
+      aLayer->AsLayerComposite()->SetShadowClipRect(clipRect);
     }
     // Apply the APZ transform on top of GetLocalTransform() here (rather than
     // GetTransform()) in case the OMTA code in SampleAnimations already set a
@@ -917,14 +915,14 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
   // GetTransform here.
   Matrix4x4 oldTransform = aLayer->GetTransform();
 
-  CSSToLayerScale goannaZoom = metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
+  CSSToLayerScale geckoZoom = metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
 
-  LayerIntPoint scrollOffsetLayerPixels = RoundedToInt(metrics.GetScrollOffset() * goannaZoom);
+  LayerIntPoint scrollOffsetLayerPixels = RoundedToInt(metrics.GetScrollOffset() * geckoZoom);
 
   if (mIsFirstPaint) {
     mContentRect = metrics.GetScrollableRect();
     SetFirstPaintViewport(scrollOffsetLayerPixels,
-                          goannaZoom,
+                          geckoZoom,
                           mContentRect);
     mIsFirstPaint = false;
   } else if (!metrics.GetScrollableRect().IsEqualEdges(mContentRect)) {
@@ -939,7 +937,7 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
     (metrics.GetCriticalDisplayPort().IsEmpty()
       ? metrics.GetDisplayPort()
       : metrics.GetCriticalDisplayPort()
-    ) * goannaZoom);
+    ) * geckoZoom);
   displayPort += scrollOffsetLayerPixels;
 
   LayerMargin fixedLayerMargins(0, 0, 0, 0);
@@ -956,7 +954,7 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
                                * metrics.GetCumulativeResolution().ToScaleFactor()
                                * LayerToParentLayerScale(1));
   ParentLayerPoint userScroll = metrics.GetScrollOffset() * userZoom;
-  SyncViewportInfo(displayPort, goannaZoom, mLayersUpdated,
+  SyncViewportInfo(displayPort, geckoZoom, mLayersUpdated,
                    userScroll, userZoom, fixedLayerMargins,
                    offset);
   mLayersUpdated = false;
@@ -965,18 +963,18 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
   mLayerManager->GetCompositor()->SetScreenRenderOffset(offset);
 
   // Handle transformations for asynchronous panning and zooming. We determine the
-  // zoom used by Goanna from the transformation set on the root layer, and we
-  // determine the scroll offset used by Goanna from the frame metrics of the
+  // zoom used by Gecko from the transformation set on the root layer, and we
+  // determine the scroll offset used by Gecko from the frame metrics of the
   // primary scrollable layer. We compare this to the user zoom and scroll
   // offset in the view transform we obtained from Java in order to compute the
   // transformation we need to apply.
-  ParentLayerPoint goannaScroll(0, 0);
+  ParentLayerPoint geckoScroll(0, 0);
   if (metrics.IsScrollable()) {
-    goannaScroll = metrics.GetScrollOffset() * userZoom;
+    geckoScroll = metrics.GetScrollOffset() * userZoom;
   }
 
   LayerToParentLayerScale asyncZoom = userZoom / metrics.LayersPixelsPerCSSPixel().ToScaleFactor();
-  ParentLayerPoint translation = userScroll - goannaScroll;
+  ParentLayerPoint translation = userScroll - geckoScroll;
   Matrix4x4 treeTransform = ViewTransform(asyncZoom, -translation);
 
   // Apply the tree transform on top of GetLocalTransform() here (rather than
@@ -1046,12 +1044,12 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame)
   //
   // Attempt to apply an async content transform to any layer that has
   // an async pan zoom controller (which means that it is rendered
-  // async using Goanna). If this fails, fall back to transforming the
+  // async using Gecko). If this fails, fall back to transforming the
   // primary scrollable layer.  "Failing" here means that we don't
   // find a frame that is async scrollable.  Note that the fallback
   // code also includes Fennec which is rendered async.  Fennec uses
   // its own platform-specific async rendering that is done partially
-  // in Goanna and partially in Java.
+  // in Gecko and partially in Java.
   wantNextFrame |= SampleAPZAnimations(LayerMetricsWrapper(root), aCurrentFrame);
   if (!ApplyAsyncContentTransformToTree(root)) {
     nsAutoTArray<Layer*,1> scrollableLayers;

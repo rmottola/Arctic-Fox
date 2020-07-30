@@ -467,7 +467,7 @@ BaselineCompiler::emitOutOfLinePostBarrierSlot()
     masm.bind(&postBarrierSlot_);
 
     Register objReg = R2.scratchReg();
-    GeneralRegisterSet regs(GeneralRegisterSet::All());
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(R0);
     regs.take(objReg);
     regs.take(BaselineFrameReg);
@@ -798,10 +798,10 @@ BaselineCompiler::emitDebugTrap()
 bool
 BaselineCompiler::emitTraceLoggerEnter()
 {
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-    RegisterSet regs = RegisterSet::Volatile();
-    Register loggerReg = regs.takeGeneral();
-    Register scriptReg = regs.takeGeneral();
+    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    AllocatableRegisterSet regs(RegisterSet::Volatile());
+    Register loggerReg = regs.takeAnyGeneral();
+    Register scriptReg = regs.takeAnyGeneral();
 
     Label noTraceLogger;
     traceLoggerEnterToggleOffset_ = masm.toggledJump(&noTraceLogger);
@@ -832,8 +832,9 @@ BaselineCompiler::emitTraceLoggerEnter()
 bool
 BaselineCompiler::emitTraceLoggerExit()
 {
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-    Register loggerReg = RegisterSet::Volatile().takeGeneral();
+    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    AllocatableRegisterSet regs(RegisterSet::Volatile());
+    Register loggerReg = regs.takeAnyGeneral();
 
     Label noTraceLogger;
     traceLoggerExitToggleOffset_ = masm.toggledJump(&noTraceLogger);
@@ -2056,6 +2057,9 @@ BaselineCompiler::emit_JSOP_IN()
 bool
 BaselineCompiler::emit_JSOP_GETGNAME()
 {
+    if (script->hasPollutedGlobalScope())
+        return emit_JSOP_GETNAME();
+
     RootedPropertyName name(cx, script->getName(pc));
 
     if (name == cx->names().undefined) {
@@ -2088,8 +2092,12 @@ BaselineCompiler::emit_JSOP_GETGNAME()
 bool
 BaselineCompiler::emit_JSOP_BINDGNAME()
 {
-    frame.push(ObjectValue(script->global()));
-    return true;
+    if (!script->hasPollutedGlobalScope()) {
+        frame.push(ObjectValue(script->global()));
+        return true;
+    }
+
+    return emit_JSOP_BINDNAME();
 }
 
 bool
@@ -3581,7 +3589,7 @@ BaselineCompiler::emit_JSOP_RESUME()
     frame.syncStack(0);
     masm.checkStackAlignment();
 
-    GeneralRegisterSet regs(GeneralRegisterSet::All());
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(BaselineFrameReg);
 
     // Load generator object.

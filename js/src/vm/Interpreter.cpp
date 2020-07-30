@@ -10,6 +10,7 @@
 
 #include "vm/Interpreter-inl.h"
 
+#include "mozilla/ArrayUtils.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/PodOperations.h"
@@ -51,6 +52,13 @@
 #include "vm/Probes-inl.h"
 #include "vm/ScopeObject-inl.h"
 #include "vm/Stack-inl.h"
+
+#if defined(XP_UNIX)
+#include <sys/resource.h>
+#elif defined(XP_WIN)
+#include <Processthreadsapi.h>
+#include <Windows.h>
+#endif // defined(XP_UNIX) || defined(XP_WIN)
 
 using namespace js;
 using namespace js::gc;
@@ -288,11 +296,12 @@ GetNameOperation(JSContext *cx, InterpreterFrame *fp, jsbytecode *pc, MutableHan
      * the actual behavior even if the id could be found on the scope chain
      * before the global object.
      */
-    if (IsGlobalOp(JSOp(*pc)))
+    if (IsGlobalOp(JSOp(*pc)) && !fp->script()->hasPollutedGlobalScope())
         obj = &obj->global();
 
     Shape* shape = nullptr;
-    JSObject* scope = nullptr, *pobj = nullptr;
+    JSObject* scope = nullptr;
+    JSObject* pobj = nullptr;
     if (LookupNameNoGC(cx, name, obj, &scope, &pobj, &shape)) {
         if (FetchNameNoGC(pobj, shape, vp))
             return CheckUninitializedLexical(cx, name, vp);
@@ -313,52 +322,20 @@ GetNameOperation(JSContext *cx, InterpreterFrame *fp, jsbytecode *pc, MutableHan
 }
 
 static bool
-SetObjectProperty(JSContext* cx, JSOp op, HandleValue lval, HandleId id, MutableHandleValue rref)
+SetPropertyOperation(JSContext *cx, JSOp op, HandleValue lval, HandleId id, HandleValue rval)
 {
-    MOZ_ASSERT(lval.isObject());
-
-    RootedObject obj(cx, &lval.toObject());
-
-    ObjectOpResult result;
-    if (MOZ_LIKELY(!obj->getOps()->setProperty)) {
-        if (!NativeSetProperty(cx, obj.as<NativeObject>(), obj.as<NativeObject>(), id,
-                               Qualified, rref, result))
-        {
-            return false;
-        }
-    } else {
-        if (!SetProperty(cx, obj, obj, id, rref, result))
-            return false;
-    }
-
-    return result.checkStrictErrorOrWarning(cx, obj, id, op == JSOP_STRICTSETPROP);
-}
-
-static bool
-SetPrimitiveProperty(JSContext* cx, JSOp op, HandleValue lval, HandleId id,
-                     MutableHandleValue rref)
-{
-    MOZ_ASSERT(lval.isPrimitive());
+    MOZ_ASSERT(op == JSOP_SETPROP || op == JSOP_STRICTSETPROP);
 
     RootedObject obj(cx, ToObjectFromStack(cx, lval));
     if (!obj)
         return false;
 
+    // Note: ES6 specifies that the value lval, not obj, is passed as receiver
+    // to obj's [[Set]] internal method. See bug 603201.
     RootedValue receiver(cx, ObjectValue(*obj));
-    return SetObjectProperty(cx, op, receiver, id, rref);
-}
-
-static bool
-SetPropertyOperation(JSContext* cx, JSOp op, HandleValue lval, HandleId id, HandleValue rval)
-{
-    MOZ_ASSERT(op == JSOP_SETPROP || op == JSOP_STRICTSETPROP);
-
-    RootedValue rref(cx, rval);
-
-    if (lval.isPrimitive())
-        return SetPrimitiveProperty(cx, op, lval, id, &rref);
-
-    return SetObjectProperty(cx, op, lval, id, &rref);
+    ObjectOpResult result;
+    return SetProperty(cx, obj, id, rval, receiver, result) &&
+           result.checkStrictErrorOrWarning(cx, obj, id, op == JSOP_STRICTSETPROP);
 }
 
 bool
@@ -414,11 +391,233 @@ ExecuteState::pushInterpreterFrame(JSContext* cx)
     return cx->runtime()->interpreterStack().pushExecuteFrame(cx, script_, thisv_, scopeChain_,
                                                               type_, evalInFrame_);
 }
+namespace js {
+
+// Implementation of per-performance group performance measurement.
+//
+//
+// All mutable state is stored in `Runtime::stopwatch` (per-process
+// performance stats and logistics) and in `PerformanceGroup` (per
+// group performance stats).
+struct AutoStopwatch final
+{
+    // If the stopwatch is active, constructing an instance of
+    // AutoStopwatch causes it to become the current owner of the
+    // stopwatch.
+    //
+    // Previous owner is restored upon destruction.
+    explicit inline AutoStopwatch(JSContext *cx MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+      : compartment_(nullptr)
+      , runtime_(nullptr)
+      , iteration_(0)
+      , isActive_(false)
+      , isTop_(false)
+      , userTimeStart_(0)
+      , systemTimeStart_(0)
+      , CPOWTimeStart_(0)
+    {
+        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+        runtime_ = cx->runtime();
+        if (!runtime_->stopwatch.isActive())
+            return;
+        compartment_ = cx->compartment();
+        MOZ_ASSERT(compartment_);
+        if (compartment_->scheduledForDestruction)
+            return;
+        iteration_ = runtime_->stopwatch.iteration;
+
+        PerformanceGroup *group = compartment_->performanceMonitoring.getGroup();
+        MOZ_ASSERT(group);
+
+        if (group->hasStopwatch(iteration_)) {
+            // Someone is already monitoring this group during this
+            // tick, no need for further monitoring.
+            return;
+        }
+
+        // Start the stopwatch.
+        if (!this->getTimes(&userTimeStart_, &systemTimeStart_))
+            return;
+        isActive_ = true;
+        CPOWTimeStart_ = runtime_->stopwatch.performance.totalCPOWTime;
+
+        // We are now in charge of monitoring this group for the tick,
+        // until destruction of `this` or until we enter a nested event
+        // loop and `iteration_` is incremented.
+        group->acquireStopwatch(iteration_, this);
+
+        if (runtime_->stopwatch.isEmpty) {
+            // This is the topmost stopwatch on the stack.
+            // It will be in charge of updating the per-process
+            // performance data.
+            runtime_->stopwatch.isEmpty = false;
+            runtime_->stopwatch.performance.ticks++;
+            isTop_ = true;
+        }
+    }
+    inline ~AutoStopwatch() {
+        if (!isActive_) {
+            // We are not in charge of monitoring anything.
+            return;
+        }
+
+        MOZ_ASSERT(!compartment_->scheduledForDestruction);
+
+        if (!runtime_->stopwatch.isActive()) {
+            // Monitoring has been stopped while we were
+            // executing the code. Drop everything.
+            return;
+        }
+
+        if (iteration_ != runtime_->stopwatch.iteration) {
+            // We have entered a nested event loop at some point.
+            // Any information we may have is obsolete.
+            return;
+        }
+
+        PerformanceGroup *group = compartment_->performanceMonitoring.getGroup();
+        MOZ_ASSERT(group);
+
+        // Compute time spent.
+        group->releaseStopwatch(iteration_, this);
+        uint64_t userTimeEnd, systemTimeEnd;
+        if (!this->getTimes(&userTimeEnd, &systemTimeEnd))
+            return;
+
+        uint64_t userTimeDelta = userTimeEnd - userTimeStart_;
+        uint64_t systemTimeDelta = systemTimeEnd - systemTimeStart_;
+        uint64_t CPOWTimeDelta = runtime_->stopwatch.performance.totalCPOWTime - CPOWTimeStart_;
+        group->data.totalUserTime += userTimeDelta;
+        group->data.totalSystemTime += systemTimeDelta;
+        group->data.totalCPOWTime += CPOWTimeDelta;
+
+        uint64_t totalTimeDelta = userTimeDelta + systemTimeDelta;
+        updateDurations(totalTimeDelta, group->data.durations);
+        group->data.ticks++;
+
+        if (isTop_) {
+            // This is the topmost stopwatch on the stack.
+            // Record the timing information.
+            runtime_->stopwatch.performance.totalUserTime = userTimeEnd;
+            runtime_->stopwatch.performance.totalSystemTime = systemTimeEnd;
+            updateDurations(totalTimeDelta, runtime_->stopwatch.performance.durations);
+            runtime_->stopwatch.isEmpty = true;
+        }
+    }
+
+ private:
+
+    // Update an array containing the number of times we have missed
+    // at least 2^0 successive ms, 2^1 successive ms, ...
+    // 2^i successive ms.
+    template<int N>
+    void updateDurations(uint64_t totalTimeDelta, uint64_t (&array)[N]) const {
+        // Duration of one frame, i.e. 16ms in museconds
+        size_t i = 0;
+        uint64_t duration = 1000;
+        for (i = 0, duration = 1000;
+             i < N && duration < totalTimeDelta;
+             ++i, duration *= 2) {
+            array[i]++;
+        }
+    }
+
+    // Get the OS-reported time spent in userland/systemland,
+    // in microseconds.
+    bool getTimes(uint64_t *userTime, uint64_t *systemTime) const {
+        MOZ_ASSERT(userTime);
+        MOZ_ASSERT(systemTime);
+
+#if defined(XP_UNIX)
+
+        struct rusage rusage;
+#if defined(RUSAGE_THREAD)
+        // Under Linux, we can obtain per-thread statistics
+        int err = getrusage(RUSAGE_THREAD, &rusage);
+#else
+        // Under other Unices, including MacOS X, we need to
+        // do with more noisy per-process statistics.
+        int err = getrusage(RUSAGE_SELF, &rusage);
+#endif // defined(RUSAGE_THREAD)
+        MOZ_ASSERT(!err);
+        if (err)
+            return false;
+
+        *userTime = rusage.ru_utime.tv_usec
+            + rusage.ru_utime.tv_sec * 1000000;
+        *systemTime = rusage.ru_stime.tv_usec
+            + rusage.ru_stime.tv_sec * 1000000;
+
+#elif defined(XP_WIN)
+        // Under Windows, we can obtain per-thread statistics,
+        // although experience seems to suggest that they are
+        // not very good under Windows XP.
+        FILETIME creationFileTime; // Ignored
+        FILETIME exitFileTime; // Ignored
+        FILETIME kernelFileTime;
+        FILETIME userFileTime;
+        BOOL success = GetThreadTimes(GetCurrentThread(),
+                                      &creationFileTime, &exitFileTime,
+                                      &kernelFileTime, &userFileTime);
+        MOZ_ASSERT(success);
+        if (!success)
+            return false;
+
+        ULARGE_INTEGER kernelTimeInt;
+        ULARGE_INTEGER userTimeInt;
+        kernelTimeInt.LowPart = kernelFileTime.dwLowDateTime;
+        kernelTimeInt.HighPart = kernelFileTime.dwHighDateTime;
+        *systemTime = kernelTimeInt.QuadPart / 10; // 100 ns to 1 us
+
+        userTimeInt.LowPart = userFileTime.dwLowDateTime;
+        userTimeInt.HighPart = userFileTime.dwHighDateTime;
+        *userTime = userTimeInt.QuadPart / 10; // 100 ns to 1 us
+#endif // defined(XP_UNIX) || defined(XP_WIN)
+
+        return true;
+    }
+
+  private:
+    // The compartment with which this object was initialized.
+    // Non-null.
+    JSCompartment *compartment_;
+
+    // The runtime with which this object was initialized.
+    // Non-null.
+    JSRuntime *runtime_;
+
+    // An indication of the number of times we have entered the event
+    // loop.  Used only for comparison.
+    uint64_t iteration_;
+
+    // `true` if this object is currently used to monitor performance,
+    // `false` otherwise, i.e. if the stopwatch mechanism is off or if
+    // another stopwatch is already in charge of monitoring for the
+    // same PerformanceGroup.
+    bool isActive_;
+
+    // `true` if this stopwatch is the topmost stopwatch on the stack
+    // for this event, `false` otherwise.
+    bool isTop_;
+
+    // Timestamps captured while starting the stopwatch.
+    uint64_t userTimeStart_;
+    uint64_t systemTimeStart_;
+    uint64_t CPOWTimeStart_;
+
+    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
+};
+
+}
 
 bool
 js::RunScript(JSContext* cx, RunState& state)
 {
     JS_CHECK_RECURSION(cx, return false);
+
+#if defined(NIGHTLY_BUILD)
+    js::AutoStopwatch stopwatch(cx);
+#endif // defined(NIGHTLY_BUILD)
 
     SPSEntryMarker marker(cx->runtime(), state.script());
 
@@ -616,8 +815,7 @@ js::InvokeConstructor(JSContext* cx, Value fval, unsigned argc, const Value* arg
 }
 
 bool
-js::InvokeGetterOrSetter(JSContext* cx, JSObject* obj, Value fval, unsigned argc,
-                         Value* argv, MutableHandleValue rval)
+js::InvokeGetter(JSContext *cx, JSObject *obj, Value fval, MutableHandleValue rval)
 {
     /*
      * Invoke could result in another try to get or set the same id again, see
@@ -625,7 +823,16 @@ js::InvokeGetterOrSetter(JSContext* cx, JSObject* obj, Value fval, unsigned argc
      */
     JS_CHECK_RECURSION(cx, return false);
 
-    return Invoke(cx, ObjectValue(*obj), fval, argc, argv, rval);
+    return Invoke(cx, ObjectValue(*obj), fval, 0, nullptr, rval);
+}
+
+bool
+js::InvokeSetter(JSContext *cx, const Value &thisv, Value fval, HandleValue v)
+{
+    JS_CHECK_RECURSION(cx, return false);
+
+    RootedValue ignored(cx);
+    return Invoke(cx, thisv, fval, 1, v.address(), &ignored);
 }
 
 bool
@@ -646,6 +853,15 @@ js::ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChainArg, c
     MOZ_ASSERT(terminatingScope->is<GlobalObject>() ||
                script->hasPollutedGlobalScope());
 #endif
+
+    if (script->treatAsRunOnce()) {
+        if (script->hasRunOnce()) {
+            JS_ReportError(cx, "Trying to execute a run-once script multiple times");
+            return false;
+        }
+
+        script->setHasRunOnce();
+    }
 
     if (script->isEmpty()) {
         if (result)
@@ -671,9 +887,6 @@ js::Execute(JSContext* cx, HandleScript script, JSObject& scopeChainArg, Value* 
     RootedObject scopeChain(cx, &scopeChainArg);
     MOZ_ASSERT(scopeChain == GetInnerObject(scopeChain));
 
-    MOZ_RELEASE_ASSERT(scopeChain->is<GlobalObject>() || !script->compileAndGo(),
-                       "Only non-compile-and-go scripts can be executed with "
-                       "interesting scopechains");
     MOZ_RELEASE_ASSERT(scopeChain->is<GlobalObject>() || script->hasPollutedGlobalScope(),
                        "Only scripts with polluted scopes can be executed with "
                        "interesting scopechains");
@@ -1337,7 +1550,7 @@ AddOperation(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, Muta
 
     bool lIsString, rIsString;
     if ((lIsString = lhs.isString()) | (rIsString = rhs.isString())) {
-        JSString* lstr, *rstr;
+        JSString* lstr;
         if (lIsString) {
             lstr = lhs.toString();
         } else {
@@ -1345,6 +1558,8 @@ AddOperation(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, Muta
             if (!lstr)
                 return false;
         }
+
+        JSString* rstr;
         if (rIsString) {
             rstr = rhs.toString();
         } else {
@@ -1442,7 +1657,7 @@ SetObjectElementOperation(JSContext* cx, Handle<JSObject*> obj, HandleId id, con
         return false;
 
     RootedValue tmp(cx, value);
-    return PutProperty(cx, obj, id, &tmp, strict);
+    return PutProperty(cx, obj, id, tmp, strict);
 }
 
 static MOZ_NEVER_INLINE bool
@@ -2076,28 +2291,33 @@ CASE(JSOP_SETCONST)
 }
 END_CASE(JSOP_SETCONST)
 
-CASE(JSOP_BINDGNAME)
-    PUSH_OBJECT(REGS.fp()->global());
-END_CASE(JSOP_BINDGNAME)
-
 CASE(JSOP_BINDINTRINSIC)
     PUSH_OBJECT(*cx->global()->intrinsicsHolder());
 END_CASE(JSOP_BINDINTRINSIC)
 
+CASE(JSOP_BINDGNAME)
 CASE(JSOP_BINDNAME)
 {
-    RootedObject& scopeChain = rootObject0;
-    scopeChain = REGS.fp()->scopeChain();
+    JSOp op = JSOp(*REGS.pc);
+    if (op == JSOP_BINDNAME || script->hasPollutedGlobalScope()) {
+        RootedObject &scopeChain = rootObject0;
+        scopeChain = REGS.fp()->scopeChain();
 
-    RootedPropertyName& name = rootName0;
-    name = script->getName(REGS.pc);
+        RootedPropertyName &name = rootName0;
+        name = script->getName(REGS.pc);
 
-    /* Assigning to an undeclared name adds a property to the global object. */
-    RootedObject& scope = rootObject1;
-    if (!LookupNameUnqualified(cx, name, scopeChain, &scope))
-        goto error;
+        /* Assigning to an undeclared name adds a property to the global object. */
+        RootedObject &scope = rootObject1;
+        if (!LookupNameUnqualified(cx, name, scopeChain, &scope))
+            goto error;
 
-    PUSH_OBJECT(*scope);
+        PUSH_OBJECT(*scope);
+    } else {
+        PUSH_OBJECT(REGS.fp()->global());
+    }
+
+    static_assert(JSOP_BINDNAME_LENGTH == JSOP_BINDGNAME_LENGTH,
+                  "We're sharing the END_CASE so the lengths better match");
 }
 END_CASE(JSOP_BINDNAME)
 
@@ -2275,7 +2495,8 @@ END_CASE(JSOP_ADD)
 
 CASE(JSOP_SUB)
 {
-    RootedValue& lval = rootValue0, &rval = rootValue1;
+    RootedValue& lval = rootValue0;
+    RootedValue& rval = rootValue1;
     lval = REGS.sp[-2];
     rval = REGS.sp[-1];
     MutableHandleValue res = REGS.stackHandleAt(-2);
@@ -2287,7 +2508,8 @@ END_CASE(JSOP_SUB)
 
 CASE(JSOP_MUL)
 {
-    RootedValue& lval = rootValue0, &rval = rootValue1;
+    RootedValue& lval = rootValue0;
+    RootedValue& rval = rootValue1;
     lval = REGS.sp[-2];
     rval = REGS.sp[-1];
     MutableHandleValue res = REGS.stackHandleAt(-2);
@@ -2299,7 +2521,8 @@ END_CASE(JSOP_MUL)
 
 CASE(JSOP_DIV)
 {
-    RootedValue& lval = rootValue0, &rval = rootValue1;
+    RootedValue& lval = rootValue0;
+    RootedValue& rval = rootValue1;
     lval = REGS.sp[-2];
     rval = REGS.sp[-1];
     MutableHandleValue res = REGS.stackHandleAt(-2);
@@ -2311,7 +2534,8 @@ END_CASE(JSOP_DIV)
 
 CASE(JSOP_MOD)
 {
-    RootedValue& lval = rootValue0, &rval = rootValue1;
+    RootedValue& lval = rootValue0;
+    RootedValue& rval = rootValue1;
     lval = REGS.sp[-2];
     rval = REGS.sp[-1];
     MutableHandleValue res = REGS.stackHandleAt(-2);
@@ -2440,7 +2664,8 @@ CASE(JSOP_TOID)
      * but we need to avoid the observable stringification the second time.
      * There must be an object value below the id, which will not be popped.
      */
-    RootedValue& objval = rootValue0, &idval = rootValue1;
+    RootedValue& objval = rootValue0;
+    RootedValue& idval = rootValue1;
     objval = REGS.sp[-2];
     idval = REGS.sp[-1];
 
@@ -2516,7 +2741,10 @@ CASE(JSOP_STRICTSETNAME)
                   "setname and strictsetname must be the same size");
     static_assert(JSOP_SETGNAME_LENGTH == JSOP_STRICTSETGNAME_LENGTH,
                   "setganem adn strictsetgname must be the same size");
-    RootedObject& scope = rootObject0;
+    static_assert(JSOP_SETNAME_LENGTH == JSOP_SETGNAME_LENGTH,
+                  "We're sharing the END_CASE so the lengths better match");
+
+    RootedObject &scope = rootObject0;
     scope = &REGS.sp[-2].toObject();
     HandleValue value = REGS.stackHandleAt(-1);
 
@@ -2771,6 +2999,8 @@ CASE(JSOP_GIMPLICITTHIS)
         // Treat it like JSOP_UNDEFINED.
         PUSH_UNDEFINED();
     }
+    static_assert(JSOP_IMPLICITTHIS_LENGTH == JSOP_GIMPLICITTHIS_LENGTH,
+                  "We're sharing the END_CASE so the lengths better match");
 }
 END_CASE(JSOP_IMPLICITTHIS)
 
@@ -2784,6 +3014,8 @@ CASE(JSOP_GETNAME)
 
     PUSH_COPY(rval);
     TypeScript::Monitor(cx, script, REGS.pc, rval);
+    static_assert(JSOP_GETNAME_LENGTH == JSOP_GETGNAME_LENGTH,
+                  "We're sharing the END_CASE so the lengths better match");
 }
 END_CASE(JSOP_GETNAME)
 
@@ -3871,7 +4103,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
         if (!fun)
             return false;
     } else {
-        MOZ_ASSERT(script->compileAndGo());
+        MOZ_ASSERT(script->treatAsRunOnce());
         MOZ_ASSERT(!script->functionNonDelazifying());
     }
 
@@ -3939,7 +4171,8 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
      */
 
     /* Step 5f. */
-    return PutProperty(cx, parent, name, &rval, script->strict());
+    RootedId id(cx, NameToId(name));
+    return PutProperty(cx, parent, id, rval, script->strict());
 }
 
 bool

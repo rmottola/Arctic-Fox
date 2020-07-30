@@ -231,7 +231,7 @@ int main(int argc, _CONST char* argv[])
   DllBlocklist_Initialize();
 #endif
 
-  // B2G loader has already initialized Goanna so we can't initialize
+  // B2G loader has already initialized Gecko so we can't initialize
   // it again here.
 #ifndef MOZ_B2G_LOADER
   // We do this because of data in bug 771745

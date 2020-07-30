@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -18,7 +18,6 @@
 #include "nsAutoPtr.h"
 #include "nsCycleCollectionParticipant.h"
 
-class nsIDOMFile;
 class nsPIDOMWindow;
 
 namespace mozilla {
@@ -28,6 +27,7 @@ class ErrorResult;
 namespace dom {
 
 class DOMRequest;
+class File;
 class MetadataParameters;
 
 namespace indexedDB {
@@ -83,7 +83,7 @@ public:
     return mFileInfo;
   }
 
-  already_AddRefed<nsIDOMFile>
+  already_AddRefed<File>
   CreateFileObject(IDBFileHandle* aFileHandle,
                    MetadataParameters* aMetadataParams);
 
@@ -101,12 +101,6 @@ public:
 
   virtual already_AddRefed<nsISupports>
   CreateStream(bool aReadOnly) override;
-
-  virtual void
-  SetThreadLocals() override;
-
-  virtual void
-  UnsetThreadLocals() override;
 
   // nsWrapperCache
   virtual JSObject*

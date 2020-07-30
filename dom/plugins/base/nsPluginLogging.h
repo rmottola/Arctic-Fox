@@ -8,7 +8,7 @@
 #ifndef nsPluginLogging_h__
 #define nsPluginLogging_h__
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #ifdef PR_LOGGING
 

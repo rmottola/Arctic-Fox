@@ -352,7 +352,7 @@ var gFlexboxTestcases =
  // NOTE: The expected computed "_main-size" values for the flex items below
  // appear to add up to more than their container's size, which would suggest
  // that they overflow their container unnecessarily. But they don't actually
- // overflow -- this discrepancy is simply because Goanna's code for reporting
+ // overflow -- this discrepancy is simply because Gecko's code for reporting
  // computed-sizes rounds to 6 significant figures (in particular, the method
  // (nsTSubstring_CharT::AppendFloat() does this).  Internally, in app-units,
  // the child frames' main-sizes add up exactly to the container's main-size,

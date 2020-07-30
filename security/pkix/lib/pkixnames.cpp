@@ -449,7 +449,7 @@ SearchNames(/*optional*/ const Input* subjectAltName,
   //
   // NSS's CERT_VerifyCertName finds the most specific CN via
   // CERT_GetCommoName, which uses CERT_GetLastNameElement. Note that many
-  // NSS-based applications, including Goanna, also use CERT_GetCommonName. It
+  // NSS-based applications, including Gecko, also use CERT_GetCommonName. It
   // is likely that other, non-NSS-based, applications also expect only the
   // most specific CN to be matched against the reference ID.
   //

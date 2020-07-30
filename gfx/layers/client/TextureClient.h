@@ -29,7 +29,6 @@
 #include "nsISupportsImpl.h"            // for TextureImage::AddRef, etc
 #include "GfxTexturesReporter.h"
 
-class gfxReusableSurfaceWrapper;
 class gfxImageSurface;
 
 namespace mozilla {
@@ -47,11 +46,9 @@ class SharedSurface;
 namespace layers {
 
 class AsyncTransactionTracker;
-class ContentClient;
 class CompositableForwarder;
 class ISurfaceAllocator;
 class CompositableClient;
-class PlanarYCbCrImage;
 struct PlanarYCbCrData;
 class Image;
 class PTextureChild;
@@ -403,7 +400,7 @@ public:
    * It's a temporary hack to ensure that DXGI textures don't get destroyed
    * between serialization and deserialization.
    */
-  void KeepUntilFullDeallocation(UniquePtr<KeepAlive> aKeep);
+  void KeepUntilFullDeallocation(UniquePtr<KeepAlive> aKeep, bool aMainThreadOnly = false);
 
   /**
    * Create and init the TextureChild/Parent IPDL actor pair.

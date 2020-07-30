@@ -24,9 +24,9 @@ public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GeckoContentController)
 
   /**
-   * Requests a paint of the given FrameMetrics |aFrameMetrics| from Goanna.
+   * Requests a paint of the given FrameMetrics |aFrameMetrics| from Gecko.
    * Implementations per-platform are responsible for actually handling this.
-   * This method will always be called on the Goanna main thread.
+   * This method will always be called on the Gecko main thread.
    */
   virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) = 0;
 
@@ -153,7 +153,6 @@ public:
     EndTouch,
     APZStateChangeSentinel
   };
-
   /**
    * General notices of APZ state changes for consumers.
    * |aGuid| identifies the APZC originating the state change.
@@ -164,6 +163,12 @@ public:
   virtual void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                     APZStateChange aChange,
                                     int aArg = 0) {}
+
+  /**
+   * Notify content of a MozMouseScrollFailed event.
+   */
+  virtual void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId, const nsString& aEvent)
+  {}
 
   GeckoContentController() {}
   virtual void Destroy() {}

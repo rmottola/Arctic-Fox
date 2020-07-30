@@ -17,6 +17,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/TextComposition.h"
 #include "mozilla/TextEvents.h"
+#include "mozilla/unused.h"
 #include "PuppetWidget.h"
 #include "nsIWidgetListener.h"
 
@@ -327,6 +328,28 @@ PuppetWidget::DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus)
   return NS_OK;
 }
 
+nsEventStatus
+PuppetWidget::DispatchInputEvent(WidgetInputEvent* aEvent)
+{
+  if (!mTabChild) {
+    return nsEventStatus_eIgnore;
+  }
+
+  switch (aEvent->mClass) {
+    case eMouseEventClass:
+      unused <<
+        mTabChild->SendDispatchMouseEvent(*aEvent->AsMouseEvent());
+      break;
+    case eKeyboardEventClass:
+      unused <<
+        mTabChild->SendDispatchKeyboardEvent(*aEvent->AsKeyboardEvent());
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("unsupported event type");
+  }
+
+  return nsEventStatus_eIgnore;
+}
 
 nsEventStatus
 PuppetWidget::DispatchAPZAwareEvent(WidgetInputEvent* aEvent)
@@ -343,13 +366,131 @@ PuppetWidget::DispatchAPZAwareEvent(WidgetInputEvent* aEvent)
 
   switch (aEvent->mClass) {
     case eWheelEventClass:
-      mTabChild->SendSynthesizedMouseWheelEvent(*aEvent->AsWheelEvent());
+      unused <<
+        mTabChild->SendDispatchWheelEvent(*aEvent->AsWheelEvent());
       break;
     default:
       MOZ_ASSERT_UNREACHABLE("unsupported event type");
   }
 
   return nsEventStatus_eIgnore;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeKeyEvent(int32_t aNativeKeyboardLayout,
+                                       int32_t aNativeKeyCode,
+                                       uint32_t aModifierFlags,
+                                       const nsAString& aCharacters,
+                                       const nsAString& aUnmodifiedCharacters,
+                                       nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "keyevent");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeKeyEvent(aNativeKeyboardLayout, aNativeKeyCode,
+    aModifierFlags, nsString(aCharacters), nsString(aUnmodifiedCharacters),
+    notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
+                                         uint32_t aNativeMessage,
+                                         uint32_t aModifierFlags,
+                                         nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "mouseevent");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeMouseEvent(aPoint, aNativeMessage,
+    aModifierFlags, notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint,
+                                        nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "mousemove");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeMouseMove(aPoint, notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
+                                               uint32_t aNativeMessage,
+                                               double aDeltaX,
+                                               double aDeltaY,
+                                               double aDeltaZ,
+                                               uint32_t aModifierFlags,
+                                               uint32_t aAdditionalFlags,
+                                               nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "mousescrollevent");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeMouseScrollEvent(aPoint, aNativeMessage,
+    aDeltaX, aDeltaY, aDeltaZ, aModifierFlags, aAdditionalFlags,
+    notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                                         TouchPointerState aPointerState,
+                                         nsIntPoint aPointerScreenPoint,
+                                         double aPointerPressure,
+                                         uint32_t aPointerOrientation,
+                                         nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "touchpoint");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeTouchPoint(aPointerId, aPointerState,
+    aPointerScreenPoint, aPointerPressure, aPointerOrientation,
+    notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::SynthesizeNativeTouchTap(nsIntPoint aPointerScreenPoint,
+                                       bool aLongTap,
+                                       nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "touchtap");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendSynthesizeNativeTouchTap(aPointerScreenPoint, aLongTap,
+    notifier.SaveObserver());
+  return NS_OK;
+}
+
+nsresult
+PuppetWidget::ClearNativeTouchSequence(nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "cleartouch");
+  if (!mTabChild) {
+    return NS_ERROR_FAILURE;
+  }
+  mTabChild->SendClearNativeTouchSequence(notifier.SaveObserver());
+  return NS_OK;
+}
+ 
+void
+PuppetWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
+                                     const nsTArray<ScrollableLayerGuid>& aTargets) const
+{
+  if (mTabChild) {
+    mTabChild->SendSetTargetAPZC(aInputBlockId, aTargets);
+  }
 }
 
 NS_IMETHODIMP_(bool)
@@ -977,7 +1118,7 @@ PuppetWidget::GetChromeDimensions()
     NS_WARNING("PuppetWidget without Tab does not have chrome information.");
     return nsIntPoint();
   }
-  return GetOwningTabChild()->GetChromeDisplacement();
+  return LayoutDeviceIntPoint::ToUntyped(GetOwningTabChild()->GetChromeDisplacement());
 }
 
 nsIntPoint
@@ -990,6 +1131,13 @@ PuppetWidget::GetWindowPosition()
   int32_t winX, winY, winW, winH;
   NS_ENSURE_SUCCESS(GetOwningTabChild()->GetDimensions(0, &winX, &winY, &winW, &winH), nsIntPoint());
   return nsIntPoint(winX, winY);
+}
+
+NS_METHOD
+PuppetWidget::GetScreenBounds(nsIntRect &aRect) {
+  aRect.MoveTo(gfx::ToIntPoint(LayoutDeviceIntPoint::ToUntyped(WidgetToScreenOffset())));
+  aRect.SizeTo(mBounds.Size());
+  return NS_OK;
 }
 
 PuppetScreen::PuppetScreen(void *nativeScreen)

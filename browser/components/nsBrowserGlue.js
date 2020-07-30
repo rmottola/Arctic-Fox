@@ -67,9 +67,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
-                                  "resource:///modules/sessionstore/SessionStore.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
@@ -79,11 +76,26 @@ XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
 XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
                                   "resource://gre/modules/AddonWatcher.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+                                  "resource:///modules/sessionstore/SessionStore.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+                                  "resource:///modules/BrowserUITelemetry.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
                                   "resource:///modules/AsyncShutdown.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
+                                  "resource://gre/modules/SimpleServiceDiscovery.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
+                                  "resource:///modules/ContentSearch.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
+                                  "resource:///modules/ReaderParent.jsm");
 
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
@@ -200,6 +212,9 @@ BrowserGlue.prototype = {
         // reset the console service's error buffer
         Services.console.logStringMessage(null); // clear the console (in case it's open)
         Services.console.reset();
+        break;
+      case "restart-in-safe-mode":
+        this._onSafeModeRestart();
         break;
       case "quit-application-requested":
         this._onQuitRequest(subject, data);
@@ -379,6 +394,7 @@ BrowserGlue.prototype = {
     os.addObserver(this, "profile-before-change", false);
     os.addObserver(this, "browser-search-engine-modified", false);
     os.addObserver(this, "browser-search-service", false);
+    os.addObserver(this, "restart-in-safe-mode", false);
     os.addObserver(this, "flash-plugin-hang", false);
 
     this._flashHangCount = 0;
@@ -393,6 +409,7 @@ BrowserGlue.prototype = {
     os.removeObserver(this, "browser:purge-session-history");
     os.removeObserver(this, "quit-application-requested");
     os.removeObserver(this, "quit-application-granted");
+    os.removeObserver(this, "restart-in-safe-mode");
 #ifdef OBSERVE_LASTWINDOW_CLOSE_TOPICS
     os.removeObserver(this, "browser-lastwindow-close-requested");
     os.removeObserver(this, "browser-lastwindow-close-granted");
@@ -525,6 +542,8 @@ BrowserGlue.prototype = {
     webrtcUI.init();
     AboutHome.init();
     SessionStore.init();
+    BrowserUITelemetry.init();
+    ContentSearch.init();
     FormValidationHandler.init();
     
     LoginManagerParent.init();
@@ -538,10 +557,13 @@ BrowserGlue.prototype = {
       ContentClick.init();
 
     LoginManagerParent.init();
+    ReaderParent.init();
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
+#ifdef NIGHTLY_BUILD
     AddonWatcher.init(this._notifySlowAddon);
+#endif
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
@@ -554,9 +576,36 @@ BrowserGlue.prototype = {
           cookies = aHttpChannel.getRequestHeader("Cookie");
         } catch (e) { /* no cookie sent */ }
         if (cookies && cookies.indexOf("MoodleSession") > -1)
-          return aOriginalUA.replace(/Goanna\/[^ ]*/, "Goanna/20100101");
+          return aOriginalUA.replace(/Gecko\/[^ ]*/, "Gecko/20100101");
         return null;
       });
+    }
+  },
+
+  _onSafeModeRestart: function BG_onSafeModeRestart() {
+    // prompt the user to confirm
+    let strings = Services.strings.createBundle("chrome://browser/locale/browser.properties");
+    let promptTitle = strings.GetStringFromName("safeModeRestartPromptTitle");
+    let promptMessage = strings.GetStringFromName("safeModeRestartPromptMessage");
+    let restartText = strings.GetStringFromName("safeModeRestartButton");
+    let buttonFlags = (Services.prompt.BUTTON_POS_0 *
+                       Services.prompt.BUTTON_TITLE_IS_STRING) +
+                      (Services.prompt.BUTTON_POS_1 *
+                       Services.prompt.BUTTON_TITLE_CANCEL) +
+                      Services.prompt.BUTTON_POS_0_DEFAULT;
+
+    let rv = Services.prompt.confirmEx(null, promptTitle, promptMessage,
+                                       buttonFlags, restartText, null, null,
+                                       null, {});
+    if (rv != 0)
+      return;
+
+    let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"]
+                       .createInstance(Ci.nsISupportsPRBool);
+    Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
+
+    if (!cancelQuit.data) {
+      Services.startup.restartInSafeMode(Ci.nsIAppStartup.eAttemptQuit);
     }
   },
 
@@ -689,12 +738,39 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
+#ifdef NIGHTLY_BUILD
     AddonWatcher.uninit();
+#endif
     this._dispose();
+  },
+
+  _initServiceDiscovery: function () {
+    if (!Services.prefs.getBoolPref("browser.casting.enabled")) {
+      return;
+    }
+    var rokuDevice = {
+      id: "roku:ecp",
+      target: "roku:ecp",
+      factory: function(aService) {
+        Cu.import("resource://gre/modules/RokuApp.jsm");
+        return new RokuApp(aService);
+      },
+      mirror: true,
+      types: ["video/mp4"],
+      extensions: ["mp4"]
+    };
+
+    // Register targets
+    SimpleServiceDiscovery.registerDevice(rokuDevice);
+
+    // Search for devices continuously every 120 seconds
+    SimpleServiceDiscovery.search(120 * 1000);
   },
 
   // All initial windows have opened.
   _onWindowsRestored: function BG__onWindowsRestored() {
+    this._initServiceDiscovery();
+
     // Show update notification, if needed.
     if (Services.prefs.prefHasUserValue("app.update.postupdate"))
       this._showUpdateNotification();

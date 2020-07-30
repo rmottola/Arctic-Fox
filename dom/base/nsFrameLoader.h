@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -50,9 +51,6 @@ class RenderFrameParent;
 
 #if defined(MOZ_WIDGET_GTK)
 typedef struct _GtkWidget GtkWidget;
-#endif
-#ifdef MOZ_WIDGET_QT
-class QX11EmbedContainer;
 #endif
 
 class nsFrameLoader final : public nsIFrameLoader,
@@ -230,6 +228,9 @@ public:
   void ActivateUpdateHitRegion();
   void DeactivateUpdateHitRegion();
 
+  // Properly retrieves documentSize of any subdocument type.
+  nsresult GetWindowDimensions(nsIntRect& aRect);
+
 private:
 
   void SetOwnerContent(mozilla::dom::Element* aContent);
@@ -284,9 +285,6 @@ private:
    */
   nsresult MaybeCreateDocShell();
   nsresult EnsureMessageManager();
-
-  // Properly retrieves documentSize of any subdocument type.
-  nsresult GetWindowDimensions(nsIntRect& aRect);
 
   // Updates the subdocument position and size. This gets called only
   // when we have our own in-process DocShell.

@@ -186,7 +186,8 @@ CodeGenerator::visitValueToInt32(LValueToInt32* lir)
 
         // We can only handle strings in truncation contexts, like bitwise
         // operations.
-        Label* stringEntry, *stringRejoin;
+        Label* stringEntry;
+        Label* stringRejoin;
         Register stringReg;
         if (input->mightBeType(MIRType_String)) {
             stringReg = ToRegister(lir->temp());
@@ -754,12 +755,10 @@ CodeGenerator::visitObjectGroupDispatch(LObjectGroupDispatch* lir)
     Register input = ToRegister(lir->input());
     Register temp = ToRegister(lir->temp());
 
-    // Hold the incoming ObjectGroup.
-
+    // Load the incoming ObjectGroup in temp.
     masm.loadPtr(Address(input, JSObject::offsetOfGroup()), temp);
 
     // Compare ObjectGroups.
-
     MacroAssembler::BranchGCPtr lastBranch;
     LBlock* lastBlock = nullptr;
     InlinePropertyTable* propTable = mir->propTable();
@@ -784,7 +783,22 @@ CodeGenerator::visitObjectGroupDispatch(LObjectGroupDispatch* lir)
         MOZ_ASSERT(found);
     }
 
-    // Unknown function: jump to fallback block.
+    // Jump to fallback block if we have an unknown ObjectGroup. If there's no
+    // fallback block, we should have handled all cases.
+
+    if (!mir->hasFallback()) {
+        MOZ_ASSERT(lastBranch.isInitialized());
+#ifdef DEBUG
+        Label ok;
+        lastBranch.relink(&ok);
+        lastBranch.emit(masm);
+        masm.assumeUnreachable("Unexpected ObjectGroup");
+        masm.bind(&ok);
+#endif
+        if (!isNextBlock(lastBlock))
+            masm.jump(lastBlock->label());
+        return;
+    }
 
     LBlock* fallback = skipTrivialBlocks(mir->getFallback())->lir();
     if (!lastBranch.isInitialized()) {
@@ -1125,7 +1139,7 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
     masm.store32(Imm32(0), matchResultAddress);
 
     // Save any volatile inputs.
-    GeneralRegisterSet volatileRegs;
+    LiveGeneralRegisterSet volatileRegs;
     if (input.volatile_())
         volatileRegs.add(input);
     if (regexp.volatile_())
@@ -1300,7 +1314,7 @@ JitCompartment::generateRegExpExecStub(JSContext* cx)
     ValueOperand result = JSReturnOperand;
 
     // We are free to clobber all registers, as LRegExpExec is a call instruction.
-    GeneralRegisterSet regs = GeneralRegisterSet::All();
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(input);
     regs.take(regexp);
 
@@ -1309,7 +1323,7 @@ JitCompartment::generateRegExpExecStub(JSContext* cx)
     // platforms.
     Register temp5;
     {
-        GeneralRegisterSet oregs = regs;
+        AllocatableGeneralRegisterSet oregs = regs;
         do {
             temp5 = oregs.takeAny();
         } while (!MacroAssembler::canUseInSingleByteInstruction(temp5));
@@ -1468,7 +1482,7 @@ CodeGenerator::visitOutOfLineRegExpExec(OutOfLineRegExpExec* ool)
     Register input = ToRegister(lir->string());
     Register regexp = ToRegister(lir->regexp());
 
-    GeneralRegisterSet regs = GeneralRegisterSet::All();
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(input);
     regs.take(regexp);
     Register temp = regs.takeAny();
@@ -1517,7 +1531,7 @@ JitCompartment::generateRegExpTestStub(JSContext* cx)
     MOZ_ASSERT(regexp != result && input != result);
 
     // We are free to clobber all registers, as LRegExpTest is a call instruction.
-    GeneralRegisterSet regs = GeneralRegisterSet::All();
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(input);
     regs.take(regexp);
     Register temp1 = regs.takeAny();
@@ -2649,7 +2663,7 @@ CodeGenerator::visitOutOfLineCallPostWriteBarrier(OutOfLineCallPostWriteBarrier*
 
     const LAllocation* obj = ool->object();
 
-    GeneralRegisterSet regs = GeneralRegisterSet::Volatile();
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::Volatile());
 
     Register objreg;
     bool isGlobal = false;
@@ -2686,9 +2700,7 @@ CodeGenerator::visitPostWriteBarrierO(LPostWriteBarrierO* lir)
     Register temp = ToTempRegisterOrInvalid(lir->temp());
 
     if (lir->object()->isConstant()) {
-#ifdef DEBUG
         MOZ_ASSERT(!IsInsideNursery(&lir->object()->toConstant()->toObject()));
-#endif
     } else {
         masm.branchPtrInNurseryRange(Assembler::Equal, ToRegister(lir->object()), temp,
                                      ool->rejoin());
@@ -3135,11 +3147,10 @@ CodeGenerator::emitPushArguments(LApplyArgsGeneric* apply, Register extraStackSp
     masm.movePtr(argcreg, extraStackSpace);
 
     // Align the JitFrameLayout on the JitStackAlignment.
-    const uint32_t alignment = JitStackAlignment / sizeof(Value);
-    if (alignment > 1) {
+    if (JitStackValueAlignment > 1) {
         MOZ_ASSERT(frameSize() % JitStackAlignment == 0,
             "Stack padding assumes that the frameSize is correct");
-        MOZ_ASSERT(alignment == 2);
+        MOZ_ASSERT(JitStackValueAlignment == 2);
         Label noPaddingNeeded;
         // if the number of arguments is odd, then we do not need any padding.
         masm.branchTestPtr(Assembler::NonZero, argcreg, Imm32(1), &noPaddingNeeded);
@@ -3156,8 +3167,8 @@ CodeGenerator::emitPushArguments(LApplyArgsGeneric* apply, Register extraStackSp
     // Put a magic value in the space reserved for padding. Note, this code
     // cannot be merged with the previous test, as not all architectures can
     // write below their stack pointers.
-    if (alignment > 1) {
-        MOZ_ASSERT(alignment == 2);
+    if (JitStackValueAlignment > 1) {
+        MOZ_ASSERT(JitStackValueAlignment == 2);
         Label noPaddingNeeded;
         // if the number of arguments is odd, then we do not need any padding.
         masm.branchTestPtr(Assembler::NonZero, argcreg, Imm32(1), &noPaddingNeeded);
@@ -3719,7 +3730,7 @@ CodeGenerator::emitAssertObjectOrStringResult(Register input, MIRType type, Temp
     MOZ_ASSERT(type == MIRType_Object || type == MIRType_ObjectOrNull ||
                type == MIRType_String || type == MIRType_Symbol);
 
-    GeneralRegisterSet regs(GeneralRegisterSet::All());
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(input);
 
     Register temp = regs.takeAny();
@@ -3786,7 +3797,7 @@ CodeGenerator::emitAssertObjectOrStringResult(Register input, MIRType type, Temp
 void
 CodeGenerator::emitAssertResultV(const ValueOperand input, TemporaryTypeSet *typeset)
 {
-    GeneralRegisterSet regs(GeneralRegisterSet::All());
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(input);
 
     Register temp1 = regs.takeAny();
@@ -4486,10 +4497,10 @@ CodeGenerator::visitSimdUnbox(LSimdUnbox* lir)
     js::SimdTypeDescr::Type type;
     switch (lir->mir()->type()) {
       case MIRType_Int32x4:
-        type = js::SimdTypeDescr::TYPE_INT32;
+        type = js::SimdTypeDescr::Int32x4;
         break;
       case MIRType_Float32x4:
-        type = js::SimdTypeDescr::TYPE_FLOAT32;
+        type = js::SimdTypeDescr::Float32x4;
         break;
       default:
         MOZ_CRASH("Unexpected SIMD Type.");
@@ -6045,26 +6056,26 @@ JitRuntime::generateMallocStub(JSContext* cx)
 
     MacroAssembler masm(cx);
 
-    RegisterSet regs = RegisterSet::Volatile();
+    AllocatableRegisterSet regs(RegisterSet::Volatile());
 #ifdef JS_USE_LINK_REGISTER
     masm.pushReturnAddress();
 #endif
     regs.takeUnchecked(regNBytes);
-    masm.PushRegsInMask(regs);
+    LiveRegisterSet save(regs.asLiveSet());
+    masm.PushRegsInMask(save);
 
-    const Register regTemp = regs.takeGeneral();
+    const Register regTemp = regs.takeAnyGeneral();
     const Register regRuntime = regTemp;
-    regs.add(regTemp);
     MOZ_ASSERT(regTemp != regNBytes);
 
     masm.setupUnalignedABICall(2, regTemp);
     masm.movePtr(ImmPtr(cx->runtime()), regRuntime);
     masm.passABIArg(regRuntime);
     masm.passABIArg(regNBytes);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, MallocWrapper));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, MallocWrapper));
     masm.storeCallResult(regReturn);
 
-    masm.PopRegsInMask(regs);
+    masm.PopRegsInMask(save);
     masm.ret();
 
     Linker linker(masm);
@@ -6087,19 +6098,19 @@ JitRuntime::generateFreeStub(JSContext* cx)
 #ifdef JS_USE_LINK_REGISTER
     masm.pushReturnAddress();
 #endif
-    RegisterSet regs = RegisterSet::Volatile();
+    AllocatableRegisterSet regs(RegisterSet::Volatile());
     regs.takeUnchecked(regSlots);
-    masm.PushRegsInMask(regs);
+    LiveRegisterSet save(regs.asLiveSet());
+    masm.PushRegsInMask(save);
 
-    const Register regTemp = regs.takeGeneral();
-    regs.add(regTemp);
+    const Register regTemp = regs.takeAnyGeneral();
     MOZ_ASSERT(regTemp != regSlots);
 
     masm.setupUnalignedABICall(1, regTemp);
     masm.passABIArg(regSlots);
-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js_free));
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, js_free));
 
-    masm.PopRegsInMask(regs);
+    masm.PopRegsInMask(save);
 
     masm.ret();
 
@@ -6123,7 +6134,7 @@ JitRuntime::generateLazyLinkStub(JSContext* cx)
     masm.pushReturnAddress();
 #endif
 
-    GeneralRegisterSet regs = GeneralRegisterSet::Volatile();
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::Volatile());
     Register temp0 = regs.takeAny();
 
     // The caller did not push an exit frame on the stack, it pushed a
@@ -6771,14 +6782,14 @@ CodeGenerator::emitArrayPopShift(LInstruction* lir, const MArrayPopShift* mir, R
 
     if (mir->mode() == MArrayPopShift::Shift) {
         // Don't save the temp registers.
-        RegisterSet temps;
+        LiveRegisterSet temps;
         temps.add(elementsTemp);
         temps.add(lengthTemp);
 
         saveVolatile(temps);
         masm.setupUnalignedABICall(1, lengthTemp);
         masm.passABIArg(obj);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js::ArrayShiftMoveElements));
+        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, js::ArrayShiftMoveElements));
         restoreVolatile(temps);
     }
 
@@ -7848,9 +7859,9 @@ CodeGenerator::visitStoreFixedSlotT(LStoreFixedSlotT* ins)
 }
 
 void
-CodeGenerator::visitGetNameCache(LGetNameCache* ins)
+CodeGenerator::visitGetNameCache(LGetNameCache *ins)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register scopeChain = ToRegister(ins->scopeObj());
     TypedOrValueRegister output(GetValueOutput(ins));
     bool isTypeOf = ins->mir()->accessKind() != MGetNameCache::NAME;
@@ -7880,9 +7891,9 @@ CodeGenerator::visitNameIC(OutOfLineUpdateCache* ool, DataPtr<NameIC>& ic)
 }
 
 void
-CodeGenerator::addGetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Register objReg,
-                                   PropertyName* name, TypedOrValueRegister output,
-                                   bool monitoredResult, jsbytecode* profilerLeavePc)
+CodeGenerator::addGetPropertyCache(LInstruction *ins, LiveRegisterSet liveRegs, Register objReg,
+                                   PropertyName *name, TypedOrValueRegister output,
+                                   bool monitoredResult, jsbytecode *profilerLeavePc)
 {
     GetPropertyIC cache(liveRegs, objReg, name, output, monitoredResult);
     cache.setProfilerLeavePC(profilerLeavePc);
@@ -7890,9 +7901,9 @@ CodeGenerator::addGetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Regi
 }
 
 void
-CodeGenerator::addSetPropertyCache(LInstruction* ins, RegisterSet liveRegs, Register objReg,
-                                   PropertyName* name, ConstantOrRegister value, bool strict,
-                                   bool needsTypeBarrier, jsbytecode* profilerLeavePc)
+CodeGenerator::addSetPropertyCache(LInstruction *ins, LiveRegisterSet liveRegs, Register objReg,
+                                   PropertyName *name, ConstantOrRegister value, bool strict,
+                                   bool needsTypeBarrier, jsbytecode *profilerLeavePc)
 {
     SetPropertyIC cache(liveRegs, objReg, name, value, strict, needsTypeBarrier);
     cache.setProfilerLeavePC(profilerLeavePc);
@@ -7913,9 +7924,9 @@ CodeGenerator::addSetElementCache(LInstruction* ins, Register obj, Register unbo
 }
 
 void
-CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV* ins)
+CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV *ins)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     PropertyName* name = ins->mir()->name();
     bool monitoredResult = ins->mir()->monitoredResult();
@@ -7926,9 +7937,9 @@ CodeGenerator::visitGetPropertyCacheV(LGetPropertyCacheV* ins)
 }
 
 void
-CodeGenerator::visitGetPropertyCacheT(LGetPropertyCacheT* ins)
+CodeGenerator::visitGetPropertyCacheT(LGetPropertyCacheT *ins)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     PropertyName* name = ins->mir()->name();
     bool monitoredResult = ins->mir()->monitoredResult();
@@ -7973,7 +7984,7 @@ CodeGenerator::addGetElementCache(LInstruction* ins, Register obj, ConstantOrReg
                                   TypedOrValueRegister output, bool monitoredResult,
                                   bool allowDoubleResult, jsbytecode* profilerLeavePc)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     GetElementIC cache(liveRegs, obj, index, output, monitoredResult, allowDoubleResult);
     cache.setProfilerLeavePC(profilerLeavePc);
     addCache(ins, allocateCache(cache));
@@ -8170,9 +8181,9 @@ CodeGenerator::visitCallDeleteElement(LCallDeleteElement* lir)
 }
 
 void
-CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV* ins)
+CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV *ins)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     ConstantOrRegister value = TypedOrValueRegister(ToValue(ins, LSetPropertyCacheV::Value));
 
@@ -8182,9 +8193,9 @@ CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV* ins)
 }
 
 void
-CodeGenerator::visitSetPropertyCacheT(LSetPropertyCacheT* ins)
+CodeGenerator::visitSetPropertyCacheT(LSetPropertyCacheT *ins)
 {
-    RegisterSet liveRegs = ins->safepoint()->liveRegs();
+    LiveRegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     ConstantOrRegister value;
 
@@ -8877,7 +8888,8 @@ CodeGenerator::visitClampVToUint8(LClampVToUint8* lir)
     Register output = ToRegister(lir->output());
     MDefinition* input = lir->mir()->input();
 
-    Label* stringEntry, *stringRejoin;
+    Label* stringEntry;
+    Label* stringRejoin;
     if (input->mightBeType(MIRType_String)) {
         OutOfLineCode* oolString = oolCallVM(StringToNumberInfo, lir, (ArgList(), output),
                                              StoreFloatRegisterTo(tempFloat));
@@ -9656,20 +9668,18 @@ CodeGenerator::visitRecompileCheck(LRecompileCheck* ins)
     masm.bind(&done);
 }
 
-typedef bool (*ThrowUninitializedLexicalFn)(JSContext*);
-static const VMFunction ThrowUninitializedLexicalInfo =
-    FunctionInfo<ThrowUninitializedLexicalFn>(ThrowUninitializedLexical);
-
 void
 CodeGenerator::visitLexicalCheck(LLexicalCheck* ins)
 {
-    OutOfLineCode* ool = oolCallVM(ThrowUninitializedLexicalInfo, ins, (ArgList()),
-                                   StoreNothing());
     ValueOperand inputValue = ToValue(ins, LLexicalCheck::Input);
-    masm.branchTestMagicValue(Assembler::Equal, inputValue, JS_UNINITIALIZED_LEXICAL,
-                              ool->entry());
-    masm.bind(ool->rejoin());
+    Label bail;
+    masm.branchTestMagicValue(Assembler::Equal, inputValue, JS_UNINITIALIZED_LEXICAL, &bail);
+    bailoutFrom(&bail, ins->snapshot());
 }
+
+typedef bool (*ThrowUninitializedLexicalFn)(JSContext *);
+static const VMFunction ThrowUninitializedLexicalInfo =
+    FunctionInfo<ThrowUninitializedLexicalFn>(ThrowUninitializedLexical);
 
 void
 CodeGenerator::visitThrowUninitializedLexical(LThrowUninitializedLexical* ins)

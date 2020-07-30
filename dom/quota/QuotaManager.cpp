@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -57,8 +57,6 @@
 #include "StorageMatcher.h"
 #include "UsageInfo.h"
 #include "Utilities.h"
-
-#define BAD_TLS_INDEX ((uint32_t) -1)
 
 // The amount of time, in milliseconds, that our IO thread will stay alive
 // after the last event it processes.
@@ -1260,8 +1258,7 @@ GetTemporaryStorageLimit(nsIFile* aDirectory, uint64_t aCurrentUsage,
 } // namespace
 
 QuotaManager::QuotaManager()
-: mCurrentWindowIndex(BAD_TLS_INDEX),
-  mQuotaMutex("QuotaManager.mQuotaMutex"),
+: mQuotaMutex("QuotaManager.mQuotaMutex"),
   mTemporaryStorageLimit(0),
   mTemporaryStorageUsage(0),
   mTemporaryStorageInitialized(false),
@@ -1338,15 +1335,6 @@ QuotaManager::IsShuttingDown()
 nsresult
 QuotaManager::Init()
 {
-  // We need a thread-local to hold the current window.
-  NS_ASSERTION(mCurrentWindowIndex == BAD_TLS_INDEX, "Huh?");
-
-  if (PR_NewThreadPrivateIndex(&mCurrentWindowIndex, nullptr) != PR_SUCCESS) {
-    NS_ERROR("PR_NewThreadPrivateIndex failed, QuotaManager disabled");
-    mCurrentWindowIndex = BAD_TLS_INDEX;
-    return NS_ERROR_FAILURE;
-  }
-
   nsresult rv;
   if (IsMainProcess()) {
     nsCOMPtr<nsIFile> baseDir;
@@ -2259,7 +2247,7 @@ QuotaManager::EnsureOriginIsInitialized(PersistenceType aPersistenceType,
 
   if (IsTreatedAsPersistent(aPersistenceType, aIsApp)) {
     if (mInitializedOrigins.Contains(OriginKey(aPersistenceType, aOrigin))) {
-      NS_ADDREF(*aDirectory = directory);
+      directory.forget(aDirectory);
       return NS_OK;
     }
   } else if (!mTemporaryStorageInitialized) {
@@ -2539,7 +2527,7 @@ QuotaManager::GetInfoFromPrincipal(nsIPrincipal* aPrincipal,
   }
 
   nsCString origin;
-  rv = aPrincipal->GetOrigin(getter_Copies(origin));
+  rv = aPrincipal->GetOrigin(origin);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (origin.EqualsLiteral(kChromeOrigin)) {
@@ -3001,24 +2989,6 @@ QuotaManager::Observe(nsISupports* aSubject,
 
   NS_NOTREACHED("Unknown topic!");
   return NS_ERROR_UNEXPECTED;
-}
-
-void
-QuotaManager::SetCurrentWindowInternal(nsPIDOMWindow* aWindow)
-{
-  NS_ASSERTION(mCurrentWindowIndex != BAD_TLS_INDEX,
-               "Should have a valid TLS storage index!");
-
-  if (aWindow) {
-    NS_ASSERTION(!PR_GetThreadPrivate(mCurrentWindowIndex),
-                 "Somebody forgot to clear the current window!");
-    PR_SetThreadPrivate(mCurrentWindowIndex, aWindow);
-  }
-  else {
-    // We cannot assert PR_GetThreadPrivate(mCurrentWindowIndex) here because
-    // there are some cases where we did not already have a window.
-    PR_SetThreadPrivate(mCurrentWindowIndex, nullptr);
-  }
 }
 
 uint64_t

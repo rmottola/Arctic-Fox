@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=79: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -395,7 +395,7 @@ nsBindingManager::DoProcessAttachedQueue()
     // They're evil, but we'll fight back!  Just poll on them being
     // done and repost the attached queue event.
     //
-    // But don't poll in a tight loop -- otherwise we keep the Goanna
+    // But don't poll in a tight loop -- otherwise we keep the Gecko
     // event loop non-empty and trigger bug 1021240 on OS X.
     nsresult rv = NS_ERROR_FAILURE;
     nsCOMPtr<nsITimer> timer = do_CreateInstance(NS_TIMER_CONTRACTID);

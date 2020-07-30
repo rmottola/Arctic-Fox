@@ -211,9 +211,7 @@ nsHttpHandler::nsHttpHandler()
     , mTCPKeepaliveLongLivedIdleTimeS(600)
     , mEnforceH1Framing(FRAMECHECK_BARELY)
 {
-#if defined(PR_LOGGING)
     gHttpLog = PR_NewLogModule("nsHttp");
-#endif
 
     LOG(("Creating nsHttpHandler [this=%p].\n", this));
 
@@ -360,6 +358,8 @@ nsHttpHandler::Init()
     nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
     mObserverService = new nsMainThreadPtrHolder<nsIObserverService>(obsService);
     if (mObserverService) {
+        // register the handler object as a weak callback as we don't need to worry
+        // about shutdown ordering.
         mObserverService->AddObserver(this, "profile-change-net-teardown", true);
         mObserverService->AddObserver(this, "profile-change-net-restore", true);
         mObserverService->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, true);
@@ -368,7 +368,7 @@ nsHttpHandler::Init()
         mObserverService->AddObserver(this, "net:failed-to-process-uri-content", true);
         mObserverService->AddObserver(this, "last-pb-context-exited", true);
         mObserverService->AddObserver(this, "browser:purge-session-history", true);
-        mObserverService->AddObserver(this, NS_NETWORK_LINK_TOPIC, false);
+        mObserverService->AddObserver(this, NS_NETWORK_LINK_TOPIC, true);
     }
 
     MakeNewRequestTokenBucket();
@@ -898,8 +898,8 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
           }
         }
         // Update UA components as-needed for this change:
-        // Compatmode on ->  rv:{FF-appversion}  Goanna/{Goanna-version}
-        // Compatmode off -> rv:{Goanna-version} Goanna/{BuildID}
+        // Compatmode on ->  rv:{FF-appversion}  Gecko/{Gecko-version}
+        // Compatmode off -> rv:{Gecko-version} Gecko/{BuildID}
         if (mCompatFirefoxEnabled) {
           mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
           mProductSub.AssignLiteral(MOZILLA_UAVERSION);          

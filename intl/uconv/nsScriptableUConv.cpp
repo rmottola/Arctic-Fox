@@ -306,7 +306,7 @@ nsScriptableUnicodeConverter::InitConverter()
       // internal encodings will be decoder-only in the future, let's relax
       // this. Note that the other methods check mEncoder for null anyway.
       // Let's try the upper case. E.g. UTF-7 and ISO-2022-CN have upper
-      // case Goanna-canonical names.
+      // case Gecko-canonical names.
       ToUpperCase(label);
       contractId.AssignLiteral(NS_UNICODEENCODER_CONTRACTID_BASE);
       contractId.Append(label);

@@ -14,10 +14,6 @@ class nsIRequest;
 class gfxDrawable;
 
 namespace mozilla {
-namespace layers {
-class LayerManager;
-class ImageContainer;
-}
 namespace image {
 
 struct SVGDrawingParameters;
@@ -41,7 +37,8 @@ public:
   nsresult Init(const char* aMimeType,
                 uint32_t aFlags) override;
 
-  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf) const override;
+  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf)
+    const override;
   virtual size_t SizeOfDecoded(gfxMemoryLocation aLocation,
                                MallocSizeOf aMallocSizeOf) const override;
 
@@ -54,6 +51,8 @@ public:
                                        nsISupports* aContext,
                                        nsresult aResult,
                                        bool aLastPart) override;
+
+  void OnSurfaceDiscarded() override;
 
   /**
    * Callback for SVGRootRenderingObserver.
@@ -100,8 +99,13 @@ private:
   nsRefPtr<SVGLoadEventListener>     mLoadEventListener;
   nsRefPtr<SVGParseCompleteListener> mParseCompleteListener;
 
-  bool           mIsInitialized;          // Have we been initalized?
-  bool           mIsFullyLoaded;          // Has the SVG document finished loading?
+  /// Count of locks on this image (roughly correlated to visible instances).
+  uint32_t mLockCount;
+
+  bool           mIsInitialized;          // Have we been initialized?
+  bool           mDiscardable;            // Are we discardable?
+  bool           mIsFullyLoaded;          // Has the SVG document finished
+                                          // loading?
   bool           mIsDrawing;              // Are we currently drawing?
   bool           mHaveAnimations;         // Is our SVG content SMIL-animated?
                                           // (Only set after mIsFullyLoaded.)
@@ -114,7 +118,7 @@ private:
   friend class ImageFactory;
 };
 
-inline NS_IMETHODIMP VectorImage::GetAnimationMode(uint16_t *aAnimationMode) {
+inline NS_IMETHODIMP VectorImage::GetAnimationMode(uint16_t* aAnimationMode) {
   return GetAnimationModeInternal(aAnimationMode);
 }
 

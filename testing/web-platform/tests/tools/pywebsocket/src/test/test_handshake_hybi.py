@@ -422,7 +422,7 @@ class HandshakerTest(unittest.TestCase):
                  {'Host': 'www.google.com',
                   'User-Agent':
                       'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.5;'
-                      ' en-US; rv:1.9.1.3) Goanna/20090824 Firefox/3.5.3'
+                      ' en-US; rv:1.9.1.3) Gecko/20090824 Firefox/3.5.3'
                       ' GTB6 GTBA',
                   'Accept':
                       'text/html,application/xhtml+xml,application/xml;q=0.9,'

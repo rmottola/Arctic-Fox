@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nsSecurityHeaderParser.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 // The character classes in this file are informed by [RFC2616], Section 2.2.
 // signed char is a signed data type one byte (8 bits) wide, so its value can
@@ -46,7 +46,6 @@ IsQuotedPairSymbol(signed char chr) {
   return (chr >= 0);
 }
 
-#if defined(PR_LOGGING)
 static PRLogModuleInfo *
 GetSHParserLog()
 {
@@ -56,7 +55,6 @@ GetSHParserLog()
   }
   return sSHParserLog;
 }
-#endif
 
 #define SHPARSERLOG(args) PR_LOG(GetSHParserLog(), PR_LOG_DEBUG, args)
 

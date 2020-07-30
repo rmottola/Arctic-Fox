@@ -45,7 +45,7 @@
 #include "nsString.h"
 #include "nsXPIDLString.h"
 #include "nsGkAtoms.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prtime.h"
 #include "rdf.h"
 #include "nsContentUtils.h"
@@ -67,9 +67,7 @@ nsIRDFService* nsXULContentUtils::gRDF;
 nsIDateTimeFormat* nsXULContentUtils::gFormat;
 nsICollation *nsXULContentUtils::gCollation;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gXULTemplateLog;
-#endif
 
 #define XUL_RESOURCE(ident, uri) nsIRDFResource* nsXULContentUtils::ident
 #define XUL_LITERAL(ident, val) nsIRDFLiteral* nsXULContentUtils::ident

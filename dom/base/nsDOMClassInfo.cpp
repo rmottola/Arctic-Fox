@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=78: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -687,6 +687,7 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_BEGIN_NO_CLASS_IF(ChromeMessageBroadcaster, nsISupports)
     DOM_CLASSINFO_MAP_ENTRY(nsIFrameScriptLoader)
     DOM_CLASSINFO_MAP_ENTRY(nsIProcessScriptLoader)
+    DOM_CLASSINFO_MAP_ENTRY(nsIGlobalProcessScriptLoader)
     DOM_CLASSINFO_MAP_ENTRY(nsIMessageListenerManager)
     DOM_CLASSINFO_MAP_ENTRY(nsIMessageBroadcaster)
   DOM_CLASSINFO_MAP_END
@@ -2315,7 +2316,7 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
 }
 
 struct InterfaceShimEntry {
-  const char *goannaName;
+  const char *geckoName;
   const char *domName;
 };
 
@@ -2379,7 +2380,7 @@ LookupComponentsShim(JSContext *cx, JS::Handle<JSObject*> global,
   for (uint32_t i = 0; i < ArrayLength(kInterfaceShimMap); ++i) {
 
     // Grab the names from the table.
-    const char *goannaName = kInterfaceShimMap[i].goannaName;
+    const char *geckoName = kInterfaceShimMap[i].geckoName;
     const char *domName = kInterfaceShimMap[i].domName;
 
     // Look up the appopriate interface object on the global.
@@ -2392,7 +2393,7 @@ LookupComponentsShim(JSContext *cx, JS::Handle<JSObject*> global,
     }
 
     // Define the shim on the interfaces object.
-    ok = JS_DefineProperty(cx, interfaces, goannaName, v,
+    ok = JS_DefineProperty(cx, interfaces, geckoName, v,
                            JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY,
                            JS_STUBGETTER, JS_STUBSETTER);
     NS_ENSURE_TRUE(ok, NS_ERROR_OUT_OF_MEMORY);

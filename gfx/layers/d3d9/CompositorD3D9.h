@@ -146,11 +146,13 @@ private:
    */
   void CheckResetCount();
 
+  void FailedToResetDevice();
+
   void ReportFailure(const nsACString &aMsg, HRESULT aCode);
 
   virtual gfx::IntSize GetWidgetSize() const override
   {
-    return gfx::ToIntSize(mSize);
+    return mSize;
   }
 
   /* Device manager instance for this compositor */
@@ -168,6 +170,7 @@ private:
   nsIntSize mSize;
 
   uint32_t mDeviceResetCount;
+  uint32_t mFailedResetAttemps;
 };
 
 }

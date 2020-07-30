@@ -90,7 +90,7 @@ var BrowserDetect = {
 	string:navigator.userAgent,subString:"MSIE",identity:"Explorer",versionSearch:"MSIE"
       },
       {
-	string:navigator.userAgent,subString:"Goanna",identity:"Mozilla",versionSearch:"rv"
+	string:navigator.userAgent,subString:"Gecko",identity:"Mozilla",versionSearch:"rv"
       },
       {
 	string:navigator.userAgent,subString:"Mozilla",identity:"Netscape",versionSearch:"Mozilla"

@@ -264,7 +264,8 @@ nsSliderFrame::AttributeChanged(int32_t aNameSpaceID,
           nsIScrollbarMediator* mediator = scrollbarFrame->GetScrollbarMediator();
           scrollbarFrame->SetIncrementToWhole(direction);
           if (mediator) {
-            mediator->ScrollByWhole(scrollbarFrame, direction);
+            mediator->ScrollByWhole(scrollbarFrame, direction,
+                                    nsIScrollbarMediator::ENABLE_SNAP);
           }
         }
         // 'this' might be destroyed here
@@ -570,10 +571,10 @@ nsSliderFrame::HandleEvent(nsPresContext* aPresContext,
 #endif
 
   // XXX hack until handle release is actually called in nsframe.
-//  if (aEvent->message == NS_MOUSE_EXIT_SYNTH || aEvent->message == NS_MOUSE_RIGHT_BUTTON_UP || aEvent->message == NS_MOUSE_LEFT_BUTTON_UP)
+//  if (aEvent->message == NS_MOUSE_OUT || aEvent->message == NS_MOUSE_RIGHT_BUTTON_UP || aEvent->message == NS_MOUSE_LEFT_BUTTON_UP)
   //   HandleRelease(aPresContext, aEvent, aEventStatus);
 
-  if (aEvent->message == NS_MOUSE_EXIT_SYNTH && mChange)
+  if (aEvent->message == NS_MOUSE_OUT && mChange)
      HandleRelease(aPresContext, aEvent, aEventStatus);
 
   return nsFrame::HandleEvent(aPresContext, aEvent, aEventStatus);
@@ -690,7 +691,7 @@ nsSliderFrame::CurrentPositionChanged()
 
   // avoid putting the scroll thumb at subpixel positions which cause needless invalidations
   nscoord appUnitsPerPixel = PresContext()->AppUnitsPerDevPixel();
-  nsRect snappedThumbRect = newThumbRect.ToNearestPixels(appUnitsPerPixel).ToAppUnits(appUnitsPerPixel);
+  nsRect snappedThumbRect = ToAppUnits(newThumbRect.ToNearestPixels(appUnitsPerPixel), appUnitsPerPixel);
   if (IsHorizontal()) {
     newThumbRect.x = snappedThumbRect.x;
     newThumbRect.width = snappedThumbRect.width;
@@ -1153,6 +1154,14 @@ nsSliderFrame::HandleRelease(nsPresContext* aPresContext,
 {
   StopRepeat();
 
+  nsIFrame* scrollbar = GetScrollbar();
+  nsScrollbarFrame* sb = do_QueryFrame(scrollbar);
+  if (sb) {
+    nsIScrollbarMediator* m = sb->GetScrollbarMediator();
+    if (m) {
+      m->ScrollbarReleased(sb);
+    }
+  }
   return NS_OK;
 }
 
@@ -1261,7 +1270,7 @@ nsSliderFrame::PageScroll(nscoord aChange)
     nsIScrollbarMediator* m = sb->GetScrollbarMediator();
     sb->SetIncrementToPage(aChange);
     if (m) {
-      m->ScrollByPage(sb, aChange);
+      m->ScrollByPage(sb, aChange, nsIScrollbarMediator::ENABLE_SNAP);
       return;
     }
   }

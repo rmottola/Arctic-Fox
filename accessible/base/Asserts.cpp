@@ -11,16 +11,16 @@
 
 using namespace mozilla::a11y;
 
-#define ROLE(goannaRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule) \
-  static_assert(static_cast<uint32_t>(roles::goannaRole) \
-                == static_cast<uint32_t>(nsIAccessibleRole::ROLE_ ## goannaRole), \
+#define ROLE(geckoRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule) \
+  static_assert(static_cast<uint32_t>(roles::geckoRole) \
+                == static_cast<uint32_t>(nsIAccessibleRole::ROLE_ ## geckoRole), \
                 "internal and xpcom roles differ!");
 #include "RoleMap.h"
 #undef ROLE
 
-#define RELATIONTYPE(goannaType, stringType, atkType, msaaType, ia2Type) \
-  static_assert(static_cast<uint32_t>(RelationType::goannaType) \
-                == static_cast<uint32_t>(nsIAccessibleRelation::RELATION_ ## goannaType), \
+#define RELATIONTYPE(geckoType, stringType, atkType, msaaType, ia2Type) \
+  static_assert(static_cast<uint32_t>(RelationType::geckoType) \
+                == static_cast<uint32_t>(nsIAccessibleRelation::RELATION_ ## geckoType), \
                 "internal and xpcom relations differ!");
 #include "RelationTypeMap.h"
 #undef RELATIONTYPE

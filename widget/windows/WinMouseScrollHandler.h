@@ -14,9 +14,9 @@
 #include "mozilla/TimeStamp.h"
 #include "Units.h"
 #include <windows.h>
+#include "nsPoint.h"
 
 class nsWindowBase;
-struct nsIntPoint;
 
 namespace mozilla {
 namespace widget {
@@ -67,13 +67,6 @@ private:
   bool mIsWaitingInternalMessage;
 
   static MouseScrollHandler* sInstance;
-
-  /**
-   * DispatchEvent() dispatches aEvent on aWidget.
-   *
-   * @return TRUE if the event was consumed.  Otherwise, FALSE.
-   */
-  static bool DispatchEvent(nsWindowBase* aWidget, WidgetGUIEvent& aEvent);
 
   /**
    * InitEvent() initializes the aEvent.  If aPoint is null, the result of
@@ -390,7 +383,6 @@ private:
     };
     Status mStatus;
 
-#ifdef PR_LOGGING
     const char* GetStatusName()
     {
       switch (mStatus) {
@@ -406,7 +398,6 @@ private:
           return "Unknown";
       }
     }
-#endif
 
     void Finish();
   }; // SynthesizingEvent

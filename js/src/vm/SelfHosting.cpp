@@ -371,10 +371,10 @@ js::intrinsic_UnsafePutElements(JSContext* cx, unsigned argc, Value* vp)
         if (IsAnyTypedArray(arrobj.get()) || arrobj->is<TypedObject>()) {
             MOZ_ASSERT_IF(IsAnyTypedArray(arrobj.get()), idx < AnyTypedArrayLength(arrobj.get()));
             MOZ_ASSERT_IF(arrobj->is<TypedObject>(), idx < uint32_t(arrobj->as<TypedObject>().length()));
-            RootedValue tmp(cx, args[elemi]);
             // XXX: Always non-strict.
             ObjectOpResult ignored;
-            if (!SetElement(cx, arrobj, arrobj, idx, &tmp, ignored))
+            RootedValue receiver(cx, ObjectValue(*arrobj));
+            if (!SetElement(cx, arrobj, idx, args[elemi], receiver, ignored))
                 return false;
         } else {
             MOZ_ASSERT(idx < arrobj->as<ArrayObject>().getDenseInitializedLength());
@@ -1095,7 +1095,7 @@ JSRuntime::createSelfHostingGlobal(JSContext* cx)
 
     cx->runtime()->selfHostingGlobal_ = shg;
     compartment->isSelfHosting = true;
-    compartment->isSystem = true;
+    compartment->setIsSystem(true);
 
     if (!GlobalObject::initSelfHostingBuiltins(cx, shg, intrinsic_functions))
         return nullptr;

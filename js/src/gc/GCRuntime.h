@@ -285,7 +285,7 @@ class GCSchedulingTunables
  *
  *   1) Do a GC now because the embedding knows something useful about the
  *      zone's memory retention state. These are gcreasons like LOAD_END,
- *      PAGE_HIDE, SET_NEW_DOCUMENT, DOM_UTILS. Mostly, Goanna uses these to
+ *      PAGE_HIDE, SET_NEW_DOCUMENT, DOM_UTILS. Mostly, Gecko uses these to
  *      indicate that a significant fraction of the scheduled zone's memory is
  *      probably reclaimable.
  *
@@ -752,6 +752,7 @@ class GCRuntime
     void removeBlackRootsTracer(JSTraceDataOp traceOp, void* data);
 
     void setMaxMallocBytes(size_t value);
+    int32_t getMallocBytes() const { return mallocBytesUntilGC; }
     void resetMallocBytes();
     bool isTooMuchMalloc() const { return mallocBytesUntilGC <= 0; }
     void updateMallocCounter(JS::Zone* zone, size_t nbytes);
@@ -780,6 +781,12 @@ class GCRuntime
 
     uint64_t gcNumber() { return number; }
     void incGcNumber() { ++number; }
+
+    uint64_t minorGCCount() { return minorGCNumber; }
+    void incMinorGcNumber() { ++minorGCNumber; }
+
+    uint64_t majorGCCount() { return majorGCNumber; }
+    void incMajorGcNumber() { ++majorGCNumber; }
 
     bool isIncrementalGc() { return isIncremental; }
     bool isFullGc() { return isFull; }
@@ -829,10 +836,6 @@ class GCRuntime
     bool isVerifyPreBarriersEnabled() const { return false; }
 #endif
 
-    template <AllowGC allowGC>
-    static void* refillFreeListFromAnyThread(ExclusiveContext* cx, AllocKind thingKind);
-    static void* refillFreeListInGC(Zone* zone, AllocKind thingKind);
-
     // Free certain LifoAlloc blocks from the background sweep thread.
     void freeUnusedLifoBlocksAfterSweeping(LifoAlloc* lifo);
     void freeAllLifoBlocksAfterSweeping(LifoAlloc* lifo);
@@ -841,6 +844,19 @@ class GCRuntime
     void releaseArena(ArenaHeader* aheader, const AutoLockGC& lock);
 
     void releaseHeldRelocatedArenas();
+
+    // Allocator
+    template <AllowGC allowGC>
+    bool checkAllocatorState(JSContext *cx, AllocKind kind);
+    template <AllowGC allowGC>
+    JSObject *tryNewNurseryObject(JSContext *cx, size_t thingSize, size_t nDynamicSlots,
+                                  const Class *clasp);
+    template <AllowGC allowGC>
+    static JSObject *tryNewTenuredObject(ExclusiveContext *cx, AllocKind kind, size_t thingSize,
+                                         size_t nDynamicSlots);
+    template <typename T, AllowGC allowGC>
+    static T *tryNewTenuredThing(ExclusiveContext *cx, AllocKind kind, size_t thingSize);
+    static void *refillFreeListInGC(Zone *zone, AllocKind thingKind);
 
   private:
     enum IncrementalProgress
@@ -856,11 +872,16 @@ class GCRuntime
     Chunk* pickChunk(const AutoLockGC& lock,
                      AutoMaybeStartBackgroundAllocation& maybeStartBGAlloc);
     ArenaHeader* allocateArena(Chunk* chunk, Zone* zone, AllocKind kind, const AutoLockGC& lock);
-    inline void arenaAllocatedDuringGC(JS::Zone* zone, ArenaHeader* arena);
+    void arenaAllocatedDuringGC(JS::Zone* zone, ArenaHeader* arena);
 
-    template <AllowGC allowGC>
-    static void* refillFreeListFromMainThread(JSContext* cx, AllocKind thingKind);
-    static void* tryRefillFreeListFromMainThread(JSContext* cx, AllocKind thingKind);
+    // Allocator internals
+    bool gcIfNeededPerAllocation(JSContext *cx);
+    template <typename T>
+    static void checkIncrementalZoneState(ExclusiveContext* cx, T* t);
+    static void* refillFreeListFromAnyThread(ExclusiveContext* cx, AllocKind thingKind,
+                                             size_t thingSize);
+    static void* refillFreeListFromMainThread(JSContext* cx, AllocKind thingKind,
+                                              size_t thingSize);
     static void* refillFreeListOffMainThread(ExclusiveContext* cx, AllocKind thingKind);
 
     /*
@@ -917,18 +938,20 @@ class GCRuntime
     void sweepBackgroundThings(ZoneList &zones, LifoAlloc &freeBlocks, ThreadType threadType);
     void assertBackgroundSweepingFinished();
     bool shouldCompact();
-    IncrementalProgress compactPhase(JS::gcreason::Reason reason);
+    IncrementalProgress beginCompactPhase();
+    IncrementalProgress compactPhase(JS::gcreason::Reason reason, SliceBudget &sliceBudget);
+    void endCompactPhase(JS::gcreason::Reason reason);
     void sweepTypesAfterCompacting(Zone *zone);
     void sweepZoneAfterCompacting(Zone *zone);
-    ArenaHeader *relocateArenas(JS::gcreason::Reason reason);
-    void updateAllCellPointersParallel(MovingTracer *trc);
-    void updateAllCellPointersSerial(MovingTracer *trc);
-    void updatePointersToRelocatedCells();
-    void releaseRelocatedArenas(ArenaHeader *relocatedList);
-    void releaseRelocatedArenasWithoutUnlocking(ArenaHeader *relocatedList, const AutoLockGC& lock);
+    bool relocateArenas(Zone *zone, JS::gcreason::Reason reason, SliceBudget &sliceBudget);
+    void updateAllCellPointersParallel(MovingTracer *trc, Zone *zone);
+    void updateAllCellPointersSerial(MovingTracer *trc, Zone *zone);
+    void updatePointersToRelocatedCells(Zone *zone);
+    void releaseRelocatedArenas();
+    void releaseRelocatedArenasWithoutUnlocking(const AutoLockGC& lock);
 #ifdef DEBUG
-    void protectRelocatedArenas(ArenaHeader *relocatedList);
-    void unprotectRelocatedArenas(ArenaHeader *relocatedList);
+    void protectRelocatedArenas();
+    void unprotectRelocatedArenas();
 #endif
     void finishCollection(JS::gcreason::Reason reason);
 
@@ -1044,6 +1067,9 @@ class GCRuntime
     /* Perform full GC if rt->keepAtoms() becomes false. */
     bool fullGCForAtomsRequested_;
 
+    /* Incremented at the start of every minor GC. */
+    uint64_t minorGCNumber;
+
     /* Incremented at the start of every major GC. */
     uint64_t majorGCNumber;
 
@@ -1096,6 +1122,7 @@ class GCRuntime
 
     /* Singly linekd list of zones to be swept in the background. */
     ZoneList backgroundSweepZones;
+
     /*
      * Free LIFO blocks are transferred to this allocator before being freed on
      * the background GC thread.
@@ -1126,6 +1153,13 @@ class GCRuntime
      * List head of arenas allocated during the sweep phase.
      */
     js::gc::ArenaHeader* arenasAllocatedDuringSweep;
+
+    /*
+     * Incremental compacting state.
+     */
+    bool startedCompacting;
+    js::gc::ZoneList zonesToMaybeCompact;
+    ArenaHeader* relocatedArenasToRelease;
 
 #ifdef JS_GC_MARKING_VALIDATION
     js::gc::MarkingValidator* markingValidator;
@@ -1261,9 +1295,6 @@ class GCRuntime
     int inUnsafeRegion;
 
     size_t noGCOrAllocationCheck;
-
-    ArenaHeader* relocatedArenasToRelease;
-
 #endif
 
     /* Synchronize GC heap access between main thread and GCHelperState. */

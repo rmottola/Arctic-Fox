@@ -103,12 +103,12 @@ public:
                          GestureBehavior aGestures = DEFAULT_GESTURES);
 
   // --------------------------------------------------------------------------
-  // These methods must only be called on the goanna thread.
+  // These methods must only be called on the gecko thread.
   //
 
   /**
    * Read the various prefs and do any global initialization for all APZC instances.
-   * This must be run on the goanna thread before any APZC instances are actually
+   * This must be run on the gecko thread before any APZC instances are actually
    * used for anything meaningful.
    */
   static void InitializeGlobalState();
@@ -225,10 +225,10 @@ public:
 
   /**
    * Returns the transform to take something from the coordinate space of the
-   * last thing we know goanna painted, to the coordinate space of the last thing
-   * we asked goanna to paint. In cases where that last request has not yet been
+   * last thing we know gecko painted, to the coordinate space of the last thing
+   * we asked gecko to paint. In cases where that last request has not yet been
    * processed, this is needed to transform input events properly into a space
-   * goanna will understand.
+   * gecko will understand.
    */
   Matrix4x4 GetTransformToLastDispatchedPaint() const;
 
@@ -355,6 +355,16 @@ public:
   ParentLayerPoint ToParentLayerCoordinates(const ScreenPoint& aVector,
                                             const ScreenPoint& aAnchor) const;
 
+  // Return whether or not a wheel event will be able to scroll in either
+  // direction.
+  bool CanScroll(const ScrollWheelInput& aEvent) const;
+
+  // Return whether or not a scroll delta will be able to scroll in either
+  // direction.
+  bool CanScroll(double aDeltaX, double aDeltaY) const;
+
+  void NotifyMozMouseScrollEvent(const nsString& aString) const;
+
 protected:
   // Protected destructor, to discourage deletion outside of Release():
   ~AsyncPanZoomController();
@@ -417,6 +427,10 @@ protected:
    */
   nsEventStatus OnScrollWheel(const ScrollWheelInput& aEvent);
 
+  void GetScrollWheelDelta(const ScrollWheelInput& aEvent,
+                           double& aOutDeltaX,
+                           double& aOutDeltaY) const;
+
   /**
    * Helper methods for long press gestures.
    */
@@ -439,7 +453,7 @@ protected:
   nsEventStatus OnDoubleTap(const TapGestureInput& aEvent);
 
   /**
-   * Helper method to cancel any gesture currently going to Goanna. Used
+   * Helper method to cancel any gesture currently going to Gecko. Used
    * primarily when a user taps the screen over some clickable content but then
    * pans down instead of letting go (i.e. to cancel a previous touch so that a
    * new one can properly take effect.
@@ -533,7 +547,7 @@ protected:
   void TrackTouch(const MultiTouchInput& aEvent);
 
   /**
-   * Utility function to send updated FrameMetrics to Goanna so that it can paint
+   * Utility function to send updated FrameMetrics to Gecko so that it can paint
    * the displayport area. Calls into GeckoContentController to do the actual
    * work. Note that only one paint request can be active at a time. If a paint
    * request is made while a paint is currently happening, it gets queued up. If
@@ -552,12 +566,12 @@ protected:
   void RequestContentRepaint(FrameMetrics& aFrameMetrics, bool aThrottled = true);
 
   /**
-   * Actually send the next pending paint request to goanna.
+   * Actually send the next pending paint request to gecko.
    */
   void DispatchRepaintRequest(const FrameMetrics& aFrameMetrics);
 
   /**
-   * Gets the current frame metrics. This is *not* the Goanna copy stored in the
+   * Gets the current frame metrics. This is *not* the Gecko copy stored in the
    * layers code.
    */
   const FrameMetrics& GetFrameMetrics() const;
@@ -588,7 +602,7 @@ protected:
    * NOTE: This must be converted to CSSPoint relative to the child
    * document before sending over IPC.
    */
-  bool ConvertToGoanna(const ParentLayerPoint& aPoint, CSSPoint* aOut);
+  bool ConvertToGecko(const ParentLayerPoint& aPoint, CSSPoint* aOut);
 
   enum AxisLockMode {
     FREE,     /* No locking at all */
@@ -644,16 +658,16 @@ private:
   // stored here so that it is accessible from the UI/controller thread.
   // These are the metrics at last content paint, the most recent
   // values we were notified of in NotifyLayersUpdate(). Since it represents
-  // the Goanna state, it should be used as a basis for untransformation when
-  // sending messages back to Goanna.
+  // the Gecko state, it should be used as a basis for untransformation when
+  // sending messages back to Gecko.
   FrameMetrics mLastContentPaintMetrics;
   // The last metrics that we requested a paint for. These are used to make sure
   // that we're not requesting a paint of the same thing that's already drawn.
   // If we don't do this check, we don't get a ShadowLayersUpdated back.
   FrameMetrics mLastPaintRequestMetrics;
-  // The last metrics that we actually sent to Goanna. This allows us to transform
-  // inputs into a coordinate space that Goanna knows about. This assumes the pipe
-  // through which input events and repaint requests are sent to Goanna operates
+  // The last metrics that we actually sent to Gecko. This allows us to transform
+  // inputs into a coordinate space that Gecko knows about. This assumes the pipe
+  // through which input events and repaint requests are sent to Gecko operates
   // in a FIFO manner.
   FrameMetrics mLastDispatchedPaintMetrics;
 
@@ -843,6 +857,9 @@ private:
 
   void StartSmoothScroll(ScrollSource aSource);
 
+  // Returns whether overscroll is allowed during a wheel event.
+  bool AllowScrollHandoffInWheelTransaction() const;
+
   /* ===================================================================
    * The functions and members in this section are used to make ancestor chains
    * out of APZC instances. These chains can only be walked or manipulated
@@ -977,6 +994,10 @@ public:
   Matrix4x4 GetAncestorTransform() const {
     return mAncestorTransform;
   }
+
+  // Returns whether or not this apzc contains the given screen point within
+  // its composition bounds.
+  bool Contains(const ScreenIntPoint& aPoint) const;
 
   bool IsOverscrolled() const {
     return mX.IsOverscrolled() || mY.IsOverscrolled();

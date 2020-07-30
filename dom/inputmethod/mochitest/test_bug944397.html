@@ -78,7 +78,7 @@ function runTest() {
       allow: true,
       context: imeUrl
     }], function() {
-      // STEP 2c: Tell Goanna to use this iframe as its keyboard app
+      // STEP 2c: Tell Gecko to use this iframe as its keyboard app
       let req = keyboard.setInputMethodActive(true);
 
       req.onsuccess = function() {

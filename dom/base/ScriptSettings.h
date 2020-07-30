@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-// vim: ft=cpp tw=78 sw=2 et ts=2
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -331,11 +331,16 @@ private:
 
 /*
  * A class that represents a new script entry point.
+ *
+ * |aReason| should be a statically-allocated C string naming the reason we're
+ * invoking JavaScript code: "setTimeout", "event", and so on. The devtools use
+ * these strings to label JS execution in timeline and profiling displays.
  */
 class MOZ_STACK_CLASS AutoEntryScript : public AutoJSAPI,
                                         protected ScriptSettingsStackEntry {
 public:
-  explicit AutoEntryScript(nsIGlobalObject* aGlobalObject,
+  AutoEntryScript(nsIGlobalObject* aGlobalObject,
+                  const char *aReason,
                   bool aIsMainThread = NS_IsMainThread(),
                   // Note: aCx is mandatory off-main-thread.
                   JSContext* aCx = nullptr);
@@ -402,7 +407,7 @@ protected:
 
   // We need this Init() method because we can't use delegating constructor for
   // the moment. It is a C++11 feature and we do not require C++11 to be
-  // supported to be able to compile Goanna.
+  // supported to be able to compile Gecko.
   void Init(bool aSafe MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
 
   JSContext* mCx;

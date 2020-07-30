@@ -635,7 +635,7 @@ GLContextProviderWGL::CreateHeadless(bool)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderWGL::CreateOffscreen(const gfxIntSize& size,
+GLContextProviderWGL::CreateOffscreen(const IntSize& size,
                                       const SurfaceCaps& caps,
                                       bool requireCompatProfile)
 {
@@ -643,7 +643,7 @@ GLContextProviderWGL::CreateOffscreen(const gfxIntSize& size,
     if (!glContext)
         return nullptr;
 
-    if (!glContext->InitOffscreen(ToIntSize(size), caps))
+    if (!glContext->InitOffscreen(size, caps))
         return nullptr;
 
     return glContext.forget();

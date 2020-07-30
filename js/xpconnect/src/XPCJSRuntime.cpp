@@ -31,6 +31,7 @@
 #include "nsContentUtils.h"
 #include "nsCCUncollectableMarker.h"
 #include "nsCycleCollectionNoteRootCallback.h"
+#include "nsCycleCollector.h"
 #include "nsScriptLoader.h"
 #include "jsfriendapi.h"
 #include "jsprf.h"
@@ -86,7 +87,8 @@ const char* const XPCJSRuntime::mStrings[] = {
     "lineNumber",           // IDX_LINENUMBER
     "columnNumber",         // IDX_COLUMNNUMBER
     "stack",                // IDX_STACK
-    "message"               // IDX_MESSAGE
+    "message",              // IDX_MESSAGE
+    "lastIndex"             // IDX_LASTINDEX
 };
 
 /***************************************************************************/
@@ -524,6 +526,8 @@ EnableUniversalXPConnect(JSContext* cx)
         return true;
     CompartmentPrivate* priv = CompartmentPrivate::Get(compartment);
     if (!priv)
+        return true;
+    if (priv->universalXPConnectEnabled)
         return true;
     priv->universalXPConnectEnabled = true;
 
@@ -1388,7 +1392,7 @@ XPCJSRuntime::InterruptCallback(JSContext* cx)
         return true;
     }
 
-    // Sometimes we get called back during XPConnect initialization, before Goanna
+    // Sometimes we get called back during XPConnect initialization, before Gecko
     // has finished bootstrapping. Avoid crashing in nsContentUtils below.
     if (!nsContentUtils::IsInitialized())
         return true;
@@ -1439,8 +1443,13 @@ XPCJSRuntime::InterruptCallback(JSContext* cx)
             win = WindowGlobalOrNull(proto);
         }
     }
-    if (!win)
+
+    if (!win) {
+        NS_WARNING("No active window");
         return true;
+    }
+
+    MOZ_ASSERT(!win->IsDying());
 
     if (win->GetIsPrerendered()) {
         // We cannot display a dialog if the page is being prerendered, so
@@ -3208,7 +3217,8 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
     if (!buf)
         return NS_ERROR_OUT_OF_MEMORY;
 
-    unsigned char* ptr = buf, *end = ptr + rawLen;
+    unsigned char* ptr = buf;
+    unsigned char* end = ptr + rawLen;
     while (ptr < end) {
         uint32_t bytesRead;
         rv = scriptStream->Read(reinterpret_cast<char*>(ptr), end - ptr, &bytesRead);
@@ -3413,7 +3423,7 @@ XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
     // function compiled with LAZY_SOURCE, it calls SourceHook to load it.
     ///
     // Note we do have to retain the source code in memory for scripts compiled in
-    // compileAndGo mode and compiled function bodies (from
+    // isRunOnce mode and compiled function bodies (from
     // JS::CompileFunction). In practice, this means content scripts and event
     // handlers.
     UniquePtr<XPCJSSourceHook> hook(new XPCJSSourceHook);

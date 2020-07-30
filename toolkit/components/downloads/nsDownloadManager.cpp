@@ -1275,7 +1275,7 @@ nsDownloadManager::GetDownloadFromDB(mozIStorageConnection* aDBConn,
   }
 
   // Addrefing and returning
-  NS_ADDREF(*retVal = dl);
+  dl.forget(retVal);
   return NS_OK;
 }
 
@@ -1670,7 +1670,7 @@ nsDownloadManager::AddDownload(DownloadType aDownloadType,
     }
   }
 
-  NS_ADDREF(*aDownload = dl);
+  dl.forget(aDownload);
 
   return NS_OK;
 }

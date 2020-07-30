@@ -2041,7 +2041,7 @@ nsLocalFile::Launch()
   }
 
   nsAutoCString fileUri = NS_LITERAL_CSTRING("file://") + mPath;
-  return widget::GoannaAppShell::OpenUriExternal(
+  return widget::GeckoAppShell::OpenUriExternal(
     NS_ConvertUTF8toUTF16(fileUri),
     NS_ConvertUTF8toUTF16(type),
     EmptyString(),

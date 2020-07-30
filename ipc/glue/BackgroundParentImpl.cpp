@@ -6,6 +6,7 @@
 
 #include "BroadcastChannelParent.h"
 #include "FileDescriptorSetParent.h"
+#include "mozilla/media/MediaParent.h"
 #include "mozilla/AppProcessChecker.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/ContentParent.h"
@@ -19,6 +20,7 @@
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
 #include "mozilla/ipc/PBackgroundTestParent.h"
 #include "mozilla/layout/VsyncParent.h"
+#include "nsIAppsService.h"
 #include "nsNetUtil.h"
 #include "mozilla/nsRefPtr.h"
 #include "nsThreadUtils.h"
@@ -260,7 +262,8 @@ BackgroundParentImpl::AllocPBroadcastChannelParent(
   AssertIsInMainProcess();
   AssertIsOnBackgroundThread();
 
-  return new BroadcastChannelParent(aOrigin, aChannel, aPrivateBrowsing);
+  return new BroadcastChannelParent(aPrincipalInfo, aOrigin, aChannel,
+                                    aPrivateBrowsing);
 }
 
 namespace {
@@ -287,30 +290,45 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
+    struct MOZ_STACK_CLASS RunRAII
+    {
+      explicit RunRAII(nsRefPtr<ContentParent>& aContentParent)
+        : mContentParent(aContentParent)
+      {}
+
+      ~RunRAII()
+      {
+        mContentParent = nullptr;
+      }
+
+      nsRefPtr<ContentParent>& mContentParent;
+    };
+
+    RunRAII raii(mContentParent);
+
     nsCOMPtr<nsIPrincipal> principal = PrincipalInfoToPrincipal(mPrincipalInfo);
     AssertAppPrincipal(mContentParent, principal);
 
     bool isNullPrincipal;
     nsresult rv = principal->GetIsNullPrincipal(&isNullPrincipal);
     if (NS_WARN_IF(NS_FAILED(rv)) || isNullPrincipal) {
-      mContentParent->KillHard("PBackground CheckPrincipal 1");
+      mContentParent->KillHard("BroadcastChannel killed: no null principal.");
       return NS_OK;
     }
 
     nsCOMPtr<nsIURI> uri;
     rv = NS_NewURI(getter_AddRefs(uri), mOrigin);
     if (NS_FAILED(rv) || !uri) {
-      mContentParent->KillHard("PBackground CheckPrincipal 2");
+      mContentParent->KillHard("BroadcastChannel killed: invalid origin URI.");
       return NS_OK;
     }
 
     rv = principal->CheckMayLoad(uri, false, false);
     if (NS_FAILED(rv)) {
-      mContentParent->KillHard("PBackground CheckPrincipal 3");
+      mContentParent->KillHard("BroadcastChannel killed: the url cannot be loaded by the principal.");
       return NS_OK;
     }
 
-    mContentParent = nullptr;
     return NS_OK;
   }
 
@@ -360,6 +378,18 @@ BackgroundParentImpl::DeallocPBroadcastChannelParent(
 
   delete static_cast<BroadcastChannelParent*>(aActor);
   return true;
+}
+
+media::PMediaParent*
+BackgroundParentImpl::AllocPMediaParent()
+{
+  return media::AllocPMediaParent();
+}
+
+bool
+BackgroundParentImpl::DeallocPMediaParent(media::PMediaParent *aActor)
+{
+  return media::DeallocPMediaParent(aActor);
 }
 
 namespace {

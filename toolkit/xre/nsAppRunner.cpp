@@ -166,7 +166,7 @@
 #endif
 
 #ifdef DEBUG
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #endif
 
 #ifdef MOZ_JPROF
@@ -1549,7 +1549,7 @@ static nsresult LaunchChild(nsINativeAppSupport* aNative,
   SaveToEnv("MOZ_LAUNCHED_CHILD=1");
 
 #if defined(MOZ_WIDGET_ANDROID)
-  mozilla::widget::GoannaAppShell::ScheduleRestart();
+  mozilla::widget::GeckoAppShell::ScheduleRestart();
 #else
 #if defined(XP_MACOSX)
   CommandLineServiceMac::SetupMacCommandLine(gRestartArgc, gRestartArgv, true);
@@ -1687,7 +1687,7 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
     if (aUnlocker) {
       int32_t button;
 #ifdef MOZ_WIDGET_ANDROID
-      mozilla::widget::GoannaAppShell::KillAnyZombies();
+      mozilla::widget::GeckoAppShell::KillAnyZombies();
       button = 0;
 #else
       const uint32_t flags =
@@ -1716,7 +1716,7 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
       }
     } else {
 #ifdef MOZ_WIDGET_ANDROID
-      if (mozilla::widget::GoannaAppShell::UnlockProfile()) {
+      if (mozilla::widget::GeckoAppShell::UnlockProfile()) {
         return NS_LockProfilePath(aProfileDir, aProfileLocalDir,
                                   nullptr, aResult);
       }
@@ -2875,6 +2875,13 @@ XREMain::XRE_mainInit(bool* aExitFlag)
     if (NS_FAILED(rv))
       return 2;
 
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIFile> parent;
+    greDir->GetParent(getter_AddRefs(parent));
+    greDir = parent.forget();
+    greDir->AppendNative(NS_LITERAL_CSTRING("Resources"));
+#endif
+
     greDir.forget(&mAppData->xreDirectory);
   }
 
@@ -2884,7 +2891,7 @@ XREMain::XRE_mainInit(bool* aExitFlag)
 
   if (mAppData->size > offsetof(nsXREAppData, minVersion)) {
     if (!mAppData->minVersion) {
-      Output(true, "Error: Goanna:MinVersion not specified in application.ini\n");
+      Output(true, "Error: Gecko:MinVersion not specified in application.ini\n");
       return 1;
     }
 
@@ -3513,7 +3520,7 @@ XREMain::XRE_mainRun()
   NS_ASSERTION(mScopedXPCOM, "Scoped xpcom not initialized.");
 
 #ifdef MOZ_B2G_LOADER
-  mozilla::ipc::ProcLoaderClientGoannaInit();
+  mozilla::ipc::ProcLoaderClientGeckoInit();
 #endif
 
 #ifdef NS_FUNCTION_TIMER

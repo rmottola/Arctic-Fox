@@ -11,14 +11,12 @@
 #include "nsNetUtil.h"
 #include "nsStringAPI.h"
 #include "nsCOMPtr.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#if defined(PR_LOGGING)
 //
 // set NSPR_LOG_MODULES=Test:5
 //
 static PRLogModuleInfo *gTestLog = nullptr;
-#endif
 #define LOG(args) PR_LOG(gTestLog, PR_LOG_DEBUG, args)
 
 class MySocketListener : public nsIServerSocketListener
@@ -119,9 +117,7 @@ main(int argc, char* argv[])
         return -1;
     }
 
-#if defined(PR_LOGGING)
     gTestLog = PR_NewLogModule("Test");
-#endif
 
     /* 
      * The following code only deals with XPCOM registration stuff. and setting

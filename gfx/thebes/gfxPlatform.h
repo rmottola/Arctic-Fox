@@ -6,7 +6,7 @@
 #ifndef GFX_PLATFORM_H
 #define GFX_PLATFORM_H
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "mozilla/gfx/Types.h"
 #include "nsTArray.h"
 #include "nsString.h"
@@ -38,11 +38,9 @@ class nsIURI;
 class nsIAtom;
 class nsIObserver;
 class SRGBOverrideObserver;
-struct gfxRGBA;
 
 namespace mozilla {
 namespace gl {
-class GLContext;
 class SkiaGLGlue;
 } // namespace gl
 namespace gfx {
@@ -167,7 +165,9 @@ enum class DeviceResetReason
   REMOVED,
   RESET,
   DRIVER_ERROR,
-  INVALID_CALL
+  INVALID_CALL,
+  OUT_OF_MEMORY,
+  UNKNOWN
 };
 
 class gfxPlatform {
@@ -296,6 +296,7 @@ public:
       aObj.DefineProperty("AzureFallbackCanvasBackend", GetBackendName(mFallbackCanvasBackend));
       aObj.DefineProperty("AzureContentBackend", GetBackendName(mContentBackend));
     }
+    void GetApzSupportInfo(mozilla::widget::InfoObject& aObj);
 
     mozilla::gfx::BackendType GetContentBackend() {
       return mContentBackend;
@@ -394,7 +395,7 @@ public:
 
     /**
      * True when hinting should be enabled.  This setting shouldn't
-     * change per goanna process, while the process is live.  If so the
+     * change per gecko process, while the process is live.  If so the
      * results are not defined.
      *
      * NB: this bit is only honored by the FT2 backend, currently.
@@ -410,7 +411,7 @@ public:
      * is only true for the browser process, not Gaia or other apps.
      *
      * Like FontHintingEnabled (above), this setting shouldn't
-     * change per goanna process, while the process is live.  If so the
+     * change per gecko process, while the process is live.  If so the
      * results are not defined.
      *
      * NB: this bit is only honored by the FT2 backend, currently.
@@ -470,6 +471,9 @@ public:
     // convert a lang group atom to enum constant
     static eFontPrefLang GetFontPrefLangFor(nsIAtom *aLang);
 
+    // convert an enum constant to a lang group atom
+    static nsIAtom* GetLangGroupForPrefLang(eFontPrefLang aLang);
+
     // convert a enum constant to lang group string (i.e. eFontPrefLang_ChineseTW ==> "zh-TW")
     static const char* GetPrefLangName(eFontPrefLang aLang);
    
@@ -491,11 +495,14 @@ public:
         // platform-specific override, by default do nothing
     }
 
+    // Are we in safe mode?
+    static bool InSafeMode();
+
     static bool OffMainThreadCompositingEnabled();
 
     static bool CanUseDirect3D9();
     static bool CanUseDirect3D11();
-    static bool CanUseDXVA();
+    static bool CanUseHardwareVideoDecoding();
     static bool CanUseDirect3D11ANGLE();
 
     /**
@@ -608,6 +615,16 @@ public:
       MOZ_ASSERT(mVsyncSource != nullptr);
       MOZ_ASSERT(XRE_IsParentProcess());
       return mVsyncSource;
+    }
+
+    /**
+     * Used to test which input types are handled via APZ.
+     */
+    virtual bool SupportsApzWheelInput() const {
+      return false;
+    }
+    virtual bool SupportsApzTouchInput() const {
+      return false;
     }
 
 protected:
@@ -724,6 +741,7 @@ private:
     int mTileHeight;
 
     mozilla::widget::GfxInfoCollector<gfxPlatform> mAzureCanvasBackendCollector;
+    mozilla::widget::GfxInfoCollector<gfxPlatform> mApzSupportCollector;
 
     mozilla::RefPtr<mozilla::gfx::DrawEventRecorder> mRecorder;
     mozilla::RefPtr<mozilla::gl::SkiaGLGlue> mSkiaGlue;

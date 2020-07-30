@@ -7,7 +7,6 @@
 
 #include "CompositableHost.h"           // for CompositableHost
 #include "LayersLogging.h"              // for AppendToString
-#include "gfx2DGlue.h"                  // for ToIntSize
 #include "mozilla/gfx/2D.h"             // for DataSourceSurface, Factory
 #include "mozilla/ipc/Shmem.h"          // for Shmem
 #include "mozilla/layers/CompositableTransactionParent.h" // for CompositableParentManager
@@ -58,8 +57,6 @@
 #else
 #define RECYCLE_LOG(...) do { } while (0)
 #endif
-
-struct nsIntPoint;
 
 namespace mozilla {
 namespace layers {
@@ -145,13 +142,6 @@ PTextureParent*
 TextureHost::GetIPDLActor()
 {
   return mActor;
-}
-
-bool
-TextureHost::BindTextureSource(CompositableTextureSourceRef& texture)
-{
-  texture = GetTextureSources();
-  return !!texture;
 }
 
 FenceHandle
@@ -408,6 +398,7 @@ BufferTextureHost::Updated(const nsIntRegion* aRegion)
 void
 BufferTextureHost::SetCompositor(Compositor* aCompositor)
 {
+  MOZ_ASSERT(aCompositor);
   if (mCompositor == aCompositor) {
     return;
   }
@@ -448,12 +439,13 @@ BufferTextureHost::Unlock()
   mLocked = false;
 }
 
-TextureSource*
-BufferTextureHost::GetTextureSources()
+bool
+BufferTextureHost::BindTextureSource(CompositableTextureSourceRef& aTexture)
 {
   MOZ_ASSERT(mLocked);
   MOZ_ASSERT(mFirstSource);
-  return mFirstSource;
+  aTexture = mFirstSource;
+  return !!aTexture;
 }
 
 gfx::SurfaceFormat

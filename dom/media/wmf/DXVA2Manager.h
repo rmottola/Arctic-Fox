@@ -9,9 +9,7 @@
 #include "WMF.h"
 #include "nsAutoPtr.h"
 #include "mozilla/Mutex.h"
-
-struct nsIntSize;
-struct nsIntRect;
+#include "nsRect.h"
 
 namespace mozilla {
 

@@ -93,6 +93,12 @@
 <!ENTITY options.disableCache.label2     "Disable Cache (when toolbox is open)">
 <!ENTITY options.disableCache.tooltip2   "Turning this option on will disable the cache for all tabs that have the toolbox open.">
 
+<!-- LOCALIZATION NOTE (options.enableServiceWorkersTesting.label,
+  -  options.enableServiceWorkersTesting.tooltip): This is the options panel label and
+  -  tooltip for the checkbox that toggles the service workers testing features on or off. -->
+<!ENTITY options.enableServiceWorkersTesting.label     "Enable Service Workers testing features (when toolbox is open)">
+<!ENTITY options.enableServiceWorkersTesting.tooltip   "Turning this option on will enable the service workers testing features for all tabs that have the toolbox open.">
+
 <!-- LOCALIZATION NOTE (options.selectDefaultTools.label): This is the label for
   -  the heading of group of checkboxes corresponding to the default developer
   -  tools. -->
@@ -169,9 +175,9 @@
   -  label for the checkbox that toggles the display of the platform data in the,
   -  Profiler i.e. devtools.profiler.ui.show-platform-data a boolean preference
   -  in about:config, in the options panel. -->
-<!ENTITY options.showPlatformData.label    "Show Goanna platform data">
+<!ENTITY options.showPlatformData.label    "Show Gecko platform data">
 <!ENTITY options.showPlatformData.tooltip  "If you enable this option the JavaScript Profiler reports will include
-Goanna platform symbols">
+Gecko platform symbols">
 
 <!-- LOCALIZATION NOTE (options.sourceeditor.*): Options under the editor
   -  section. -->

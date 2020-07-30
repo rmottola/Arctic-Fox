@@ -59,6 +59,7 @@
 #include "nsContentPolicyUtils.h" // NS_CheckContentLoadPolicy(...)
 #include "nsISeekableStream.h"
 #include "nsAutoPtr.h"
+#include "nsQueryObject.h"
 #include "nsIWritablePropertyBag2.h"
 #include "nsIAppShell.h"
 #include "nsWidgetsCID.h"
@@ -150,7 +151,7 @@
 
 #include "nsIJARChannel.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsISelectionDisplay.h"
 
@@ -1141,8 +1142,7 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
     nsCOMPtr<nsISHistory> shistory;
     nsresult rv = GetSessionHistory(getter_AddRefs(shistory));
     if (NS_SUCCEEDED(rv) && shistory) {
-      *aSink = shistory;
-      NS_ADDREF((nsISupports*)*aSink);
+      shistory.forget(aSink);
       return NS_OK;
     }
     return NS_NOINTERFACE;
@@ -1160,8 +1160,7 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
     nsCOMPtr<nsIEditingSession> editingSession;
     mEditorData->GetEditingSession(getter_AddRefs(editingSession));
     if (editingSession) {
-      *aSink = editingSession;
-      NS_ADDREF((nsISupports*)*aSink);
+      editingSession.forget(aSink);
       return NS_OK;
     }
 
@@ -1646,7 +1645,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
 
   if (aLoadFlags & LOAD_FLAGS_DISALLOW_INHERIT_OWNER) {
     inheritOwner = false;
-    owner = do_CreateInstance("@mozilla.org/nullprincipal;1");
+    owner = nsNullPrincipal::Create();
   }
 
   uint32_t flags = 0;
@@ -1777,8 +1776,7 @@ nsDocShell::CreateLoadInfo(nsIDocShellLoadInfo** aLoadInfo)
   NS_ENSURE_TRUE(loadInfo, NS_ERROR_OUT_OF_MEMORY);
   nsCOMPtr<nsIDocShellLoadInfo> localRef(loadInfo);
 
-  *aLoadInfo = localRef;
-  NS_ADDREF(*aLoadInfo);
+  localRef.forget(aLoadInfo);
   return NS_OK;
 }
 
@@ -3125,7 +3123,7 @@ nsDocShell::AddProfileTimelineMarker(const char* aName,
 }
 
 void
-nsDocShell::AddProfileTimelineMarker(UniquePtr<TimelineMarker>& aMarker)
+nsDocShell::AddProfileTimelineMarker(UniquePtr<TimelineMarker>&& aMarker)
 {
   if (mProfileTimelineRecording) {
     mProfileTimelineMarkers.AppendElement(aMarker.release());
@@ -5113,7 +5111,8 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
       }
     }
   } else if (NS_ERROR_PHISHING_URI == aError ||
-             NS_ERROR_MALWARE_URI == aError) {
+             NS_ERROR_MALWARE_URI == aError ||
+             NS_ERROR_UNWANTED_URI == aError) {
     nsAutoCString host;
     aURI->GetHost(host);
     CopyUTF8toUTF16(host, formatStrs[0]);
@@ -5132,14 +5131,19 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
       error.AssignLiteral("phishingBlocked");
       bucketId = IsFrame() ? nsISecurityUITelemetry::WARNING_PHISHING_PAGE_FRAME
                            : nsISecurityUITelemetry::WARNING_PHISHING_PAGE_TOP;
-    } else {
+    } else if (NS_ERROR_MALWARE_URI == aError) {
       error.AssignLiteral("malwareBlocked");
       bucketId = IsFrame() ? nsISecurityUITelemetry::WARNING_MALWARE_PAGE_FRAME
                            : nsISecurityUITelemetry::WARNING_MALWARE_PAGE_TOP;
+    } else {
+      error.AssignLiteral("unwantedBlocked");
+      bucketId = IsFrame() ? nsISecurityUITelemetry::WARNING_UNWANTED_PAGE_FRAME
+                           : nsISecurityUITelemetry::WARNING_UNWANTED_PAGE_TOP;
     }
 
-    if (errorPage.EqualsIgnoreCase("blocked"))
+    if (errorPage.EqualsIgnoreCase("blocked")) {
       Telemetry::Accumulate(Telemetry::SECURITY_UI, bucketId);
+    }
 
     cssClass.AssignLiteral("blacklist");
   } else if (NS_ERROR_CONTENT_CRASHED == aError) {
@@ -6299,7 +6303,7 @@ nsDocShell::GetOnePermittedSandboxedNavigator(nsIDocShell** aSandboxedNavigator)
   NS_ENSURE_ARG_POINTER(aSandboxedNavigator);
   nsCOMPtr<nsIDocShell> permittedNavigator =
     do_QueryReferent(mOnePermittedSandboxedNavigator);
-  NS_IF_ADDREF(*aSandboxedNavigator = permittedNavigator);
+  permittedNavigator.forget(aSandboxedNavigator);
   return NS_OK;
 }
 
@@ -7873,6 +7877,7 @@ nsDocShell::EndPageLoad(nsIWebProgress* aProgress,
              aStatus == NS_ERROR_OFFLINE ||
              aStatus == NS_ERROR_MALWARE_URI ||
              aStatus == NS_ERROR_PHISHING_URI ||
+             aStatus == NS_ERROR_UNWANTED_URI ||
              aStatus == NS_ERROR_UNSAFE_CONTENT_TYPE ||
              aStatus == NS_ERROR_REMOTE_XUL ||
              aStatus == NS_ERROR_OFFLINE ||
@@ -9460,8 +9465,11 @@ class nsCopyFaviconCallback final : public nsIFaviconDataCallback
 public:
   NS_DECL_ISUPPORTS
 
-  nsCopyFaviconCallback(nsIURI* aNewURI, bool aInPrivateBrowsing)
-    : mNewURI(aNewURI)
+  nsCopyFaviconCallback(mozIAsyncFavicons* aSvc,
+                        nsIURI* aNewURI,
+                        bool aInPrivateBrowsing)
+    : mSvc(aSvc)
+    , mNewURI(aNewURI)
     , mInPrivateBrowsing(aInPrivateBrowsing)
   {
   }
@@ -9475,13 +9483,10 @@ public:
       return NS_OK;
     }
 
-    NS_ASSERTION(aDataLen == 0,
-                 "We weren't expecting the callback to deliver data.");
-    nsCOMPtr<mozIAsyncFavicons> favSvc =
-      do_GetService("@mozilla.org/browser/favicon-service;1");
-    NS_ENSURE_STATE(favSvc);
+    MOZ_ASSERT(aDataLen == 0,
+               "We weren't expecting the callback to deliver data.");
 
-    return favSvc->SetAndFetchFaviconForPage(
+    return mSvc->SetAndFetchFaviconForPage(
       mNewURI, aFaviconURI, false,
       mInPrivateBrowsing ? nsIFaviconService::FAVICON_LOAD_PRIVATE :
                            nsIFaviconService::FAVICON_LOAD_NON_PRIVATE,
@@ -9491,6 +9496,7 @@ public:
 private:
   ~nsCopyFaviconCallback() {}
 
+  nsCOMPtr<mozIAsyncFavicons> mSvc;
   nsCOMPtr<nsIURI> mNewURI;
   bool mInPrivateBrowsing;
 };
@@ -9498,22 +9504,34 @@ private:
 NS_IMPL_ISUPPORTS(nsCopyFaviconCallback, nsIFaviconDataCallback)
 #endif
 
-// Tell the favicon service that aNewURI has the same favicon as aOldURI.
+} // namespace
+
 void
-CopyFavicon(nsIURI* aOldURI, nsIURI* aNewURI, bool aInPrivateBrowsing)
+nsDocShell::CopyFavicon(nsIURI* aOldURI,
+                        nsIURI* aNewURI,
+                        bool aInPrivateBrowsing)
 {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+    dom::ContentChild* contentChild = dom::ContentChild::GetSingleton();
+    if (contentChild) {
+      mozilla::ipc::URIParams oldURI, newURI;
+      SerializeURI(aOldURI, oldURI);
+      SerializeURI(aNewURI, newURI);
+      contentChild->SendCopyFavicon(oldURI, newURI, aInPrivateBrowsing);
+    }
+    return;
+  }
+
 #ifdef MOZ_PLACES
   nsCOMPtr<mozIAsyncFavicons> favSvc =
     do_GetService("@mozilla.org/browser/favicon-service;1");
   if (favSvc) {
     nsCOMPtr<nsIFaviconDataCallback> callback =
-      new nsCopyFaviconCallback(aNewURI, aInPrivateBrowsing);
+      new nsCopyFaviconCallback(favSvc, aNewURI, aInPrivateBrowsing);
     favSvc->GetFaviconURLForPage(aOldURI, callback);
   }
 #endif
 }
-
-} // namespace
 
 class InternalLoadEvent : public nsRunnable
 {
@@ -9898,7 +9916,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       // RM 2018-12-03 We miss all loadInfo setting up here 
       // so we cannot set aIsFromProcessingFrameAttributes
       rv = win->OpenNoNavigate(NS_ConvertUTF8toUTF16(spec),
-                               name,  // window name
+                               name,          // window name
                                features,
                                getter_AddRefs(newWin));
 
@@ -12119,8 +12137,7 @@ nsDocShell::AddToSessionHistory(nsIURI* aURI, nsIChannel* aChannel,
   if (aNewEntry) {
     *aNewEntry = nullptr;
     if (NS_SUCCEEDED(rv)) {
-      *aNewEntry = entry;
-      NS_ADDREF(*aNewEntry);
+      entry.forget(aNewEntry);
     }
   }
 
@@ -12189,7 +12206,7 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
       // Ensure that we have an owner.  Otherwise javascript: URIs will
       // pick it up from the about:blank page we just loaded, and we
       // don't really want even that in this case.
-      owner = do_CreateInstance("@mozilla.org/nullprincipal;1");
+      owner = nsNullPrincipal::Create();
       NS_ENSURE_TRUE(owner, NS_ERROR_OUT_OF_MEMORY);
     }
   }
@@ -13872,8 +13889,7 @@ nsDocShell::GetPrintPreview(nsIWebBrowserPrint** aPrintPreview)
   nsCOMPtr<nsIDocumentViewerPrint> print = do_QueryInterface(mContentViewer);
   if (!print || !print->IsInitializedForPrintPreview()) {
     Stop(nsIWebNavigation::STOP_ALL);
-    nsCOMPtr<nsIPrincipal> principal =
-      do_CreateInstance("@mozilla.org/nullprincipal;1");
+    nsCOMPtr<nsIPrincipal> principal = nsNullPrincipal::Create();
     NS_ENSURE_STATE(principal);
     nsresult rv = CreateAboutBlankContentViewer(principal, nullptr);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -14085,7 +14101,7 @@ nsDocShell::GetURLSearchParams()
 }
 
 void
-nsDocShell::NotifyJSRunToCompletionStart()
+nsDocShell::NotifyJSRunToCompletionStart(const char *aReason)
 {
   bool timelineOn = nsIDocShell::GetRecordProfileTimelineMarkers();
 

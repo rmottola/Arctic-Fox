@@ -11,8 +11,13 @@ EXTRA_JS_MODULES += [ 'promise.js' ]
 EXTRA_JS_MODULES += [
     'AboutHome.jsm',
     'BrowserNewTabPreloader.jsm',
+    'BrowserUITelemetry.jsm',
+    'CastingApps.jsm',
     'ContentClick.jsm',
+    'ContentLinkHandler.jsm',
+    'ContentSearch.jsm',
     'E10SUtils.jsm',
+    'Feeds.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
@@ -22,8 +27,10 @@ EXTRA_JS_MODULES += [
     'PluginContent.jsm',
     'PopupNotifications.jsm',
     'QuotaManager.jsm',
+    'ReaderParent.jsm',
     'RecentWindow.jsm',
     'SharedFrame.jsm',
+    'SitePermissions.jsm',
     'TabCrashReporter.jsm',
     'webrtcUI.jsm'
 ]

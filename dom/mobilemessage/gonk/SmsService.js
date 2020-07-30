@@ -40,7 +40,10 @@ const DOM_MOBILE_MESSAGE_DELIVERY_ERROR    = "error";
 const SMS_HANDLED_WAKELOCK_TIMEOUT = 5000;
 
 XPCOMUtils.defineLazyGetter(this, "gRadioInterfaces", function() {
-  let ril = Cc["@mozilla.org/ril;1"].getService(Ci.nsIRadioInterfaceLayer);
+  let ril = { numRadioInterfaces: 0 };
+  try {
+    ril = Cc["@mozilla.org/ril;1"].getService(Ci.nsIRadioInterfaceLayer);
+  } catch(e) {}
 
   let interfaces = [];
   for (let i = 0; i < ril.numRadioInterfaces; i++) {
@@ -876,7 +879,7 @@ SmsService.prototype = {
         if (DEBUG) debug("Error! Radio is disabled when sending SMS.");
         errorCode = Ci.nsIMobileMessageCallback.RADIO_DISABLED_ERROR;
       } else if (gRadioInterfaces[aServiceId].rilContext.cardState !=
-                 Ci.nsIIccProvider.CARD_STATE_READY) {
+                 Ci.nsIIcc.CARD_STATE_READY) {
         if (DEBUG) debug("Error! SIM card is not ready when sending SMS.");
         errorCode = Ci.nsIMobileMessageCallback.NO_SIM_CARD_ERROR;
       }

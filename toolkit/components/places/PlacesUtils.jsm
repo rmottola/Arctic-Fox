@@ -387,6 +387,23 @@ this.PlacesUtils = {
   },
 
   /**
+   * Gets the concrete item-guid for the given node. For everything but folder
+   * shortcuts, this is just node.bookmarkGuid.  For folder shortcuts, this is
+   * node.targetFolderGuid (see nsINavHistoryService.idl for the semantics).
+   *
+   * @param aNode
+   *        a result node.
+   * @return the concrete item-guid for aNode.
+   * @note unlike getConcreteItemId, this doesn't allow retrieving the guid of a
+   *       ta container.
+   */
+  getConcreteItemGuid(aNode) {
+    if (aNode.type == Ci.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT)
+      return asQuery(aNode).targetFolderGuid;
+    return aNode.bookmarkGuid;
+  },
+
+  /**
    * Reverse a host based on the moz_places algorithm, that is reverse the host
    * string and add a trailing period.  For example "google.com" becomes
    * "moc.elgoog.".
@@ -814,13 +831,26 @@ this.PlacesUtils = {
    *   @param aBookmarkId
    *   @returns string of POST data
    */
-  setPostDataForBookmark: function PU_setPostDataForBookmark(aBookmarkId, aPostData) {
-    const annos = this.annotations;
-    if (aPostData)
-      annos.setItemAnnotation(aBookmarkId, this.POST_DATA_ANNO, aPostData, 
-                              0, Ci.nsIAnnotationService.EXPIRE_NEVER);
-    else if (annos.itemHasAnnotation(aBookmarkId, this.POST_DATA_ANNO))
-      annos.removeItemAnnotation(aBookmarkId, this.POST_DATA_ANNO);
+  setPostDataForBookmark(aBookmarkId, aPostData) {
+    // For now we don't have a unified API to create a keyword with postData,
+    // thus here we can just try to complete a keyword that should already exist
+    // without any post data.
+    let nullPostDataFragment = aPostData ? "AND post_data ISNULL" : "";
+    let stmt = PlacesUtils.history.DBConnection.createStatement(
+      `UPDATE moz_keywords SET post_data = :post_data
+       WHERE id = (SELECT k.id FROM moz_keywords k
+                   JOIN moz_bookmarks b ON b.fk = k.place_id
+                   WHERE b.id = :item_id
+                   ${nullPostDataFragment}
+                   LIMIT 1)`);
+    stmt.params.item_id = aBookmarkId;
+    stmt.params.post_data = aPostData;
+    try {
+      stmt.execute();
+    }
+    finally {
+      stmt.finalize();
+    }
   },
 
   /**
@@ -828,12 +858,22 @@ this.PlacesUtils = {
    * @param aBookmarkId
    * @returns string of POST data if set for aBookmarkId. null otherwise.
    */
-  getPostDataForBookmark: function PU_getPostDataForBookmark(aBookmarkId) {
-    const annos = this.annotations;
-    if (annos.itemHasAnnotation(aBookmarkId, this.POST_DATA_ANNO))
-      return annos.getItemAnnotation(aBookmarkId, this.POST_DATA_ANNO);
-
-    return null;
+  getPostDataForBookmark(aBookmarkId) {
+    let stmt = PlacesUtils.history.DBConnection.createStatement(
+      `SELECT k.post_data
+       FROM moz_keywords k
+       JOIN moz_places h ON h.id = k.place_id
+       JOIN moz_bookmarks b ON b.fk = h.id
+       WHERE b.id = :item_id`);
+    stmt.params.item_id = aBookmarkId;
+    try {
+      if (!stmt.executeStep())
+        return null;
+      return stmt.row.post_data;
+    }
+    finally {
+      stmt.finalize();
+    }
   },
 
   /**
@@ -841,24 +881,21 @@ this.PlacesUtils = {
    * @param aKeyword string keyword
    * @returns an array containing a string URL and a string of POST data
    */
-  getURLAndPostDataForKeyword: function PU_getURLAndPostDataForKeyword(aKeyword) {
-    var url = null, postdata = null;
+  getURLAndPostDataForKeyword(aKeyword) {
+    let stmt = PlacesUtils.history.DBConnection.createStatement(
+      `SELECT h.url, k.post_data
+       FROM moz_keywords k
+       JOIN moz_places h ON h.id = k.place_id
+       WHERE k.keyword = :keyword`);
+    stmt.params.keyword = aKeyword;
     try {
-      var uri = this.bookmarks.getURIForKeyword(aKeyword);
-      if (uri) {
-        url = uri.spec;
-        var bookmarks = this.bookmarks.getBookmarkIdsForURI(uri);
-        for (let i = 0; i < bookmarks.length; i++) {
-          var bookmark = bookmarks[i];
-          var kw = this.bookmarks.getKeywordForBookmark(bookmark);
-          if (kw == aKeyword) {
-            postdata = this.getPostDataForBookmark(bookmark);
-            break;
-          }
-        }
-      }
-    } catch(ex) {}
-    return [url, postdata];
+      if (!stmt.executeStep())
+        return [ null, null ];
+      return [ stmt.row.url, stmt.row.post_data ];
+    }
+    finally {
+      stmt.finalize();
+    }
   },
 
   /**
@@ -1579,6 +1616,7 @@ this.PlacesUtils = {
    *  - tags (string): csv string of the bookmark's tags.
    *  - charset (string): the last known charset of the bookmark.
    *  - keyword (string): the bookmark's keyword (unset if none).
+   *  - postData (string): the bookmark's keyword postData (unset if none).
    *  - iconuri (string): the bookmark's favicon url.
    * The last four properties are not set at all if they're irrelevant (e.g.
    * |charset| is not set if no charset was previously set for the bookmark
@@ -1593,7 +1631,7 @@ this.PlacesUtils = {
    * resolved to null.
    */
   promiseBookmarksTree: Task.async(function* (aItemGuid = "", aOptions = {}) {
-    let createItemInfoObject = (aRow, aIncludeParentGuid) => {
+    let createItemInfoObject = function* (aRow, aIncludeParentGuid) {
       let item = {};
       let copyProps = (...props) => {
         for (let prop of props) {
@@ -1632,9 +1670,11 @@ this.PlacesUtils = {
           // If this throws due to an invalid url, the item will be skipped.
           item.uri = NetUtil.newURI(aRow.getResultByName("url")).spec;
           // Keywords are cached, so this should be decently fast.
-          let keyword = PlacesUtils.bookmarks.getKeywordForBookmark(itemId);
-          if (keyword)
-            item.keyword = keyword;
+          let entry = yield PlacesUtils.keywords.fetch({ url: item.uri });
+          if (entry) {
+            item.keyword = entry.keyword;
+            item.postData = entry.postData;
+          }
           break;
         case Ci.nsINavBookmarksService.TYPE_FOLDER:
           item.type = PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER;
@@ -1656,7 +1696,7 @@ this.PlacesUtils = {
           break;
       }
       return item;
-    };
+    }.bind(this);
 
     const QUERY_STR =
       `WITH RECURSIVE
@@ -1709,40 +1749,34 @@ this.PlacesUtils = {
       return exclude;
     };
 
-    let rootItem = null, rootItemCreationEx = null;
+    let rootItem = null;
     let parentsMap = new Map();
-    try {
-      let conn = yield this.promiseDBConnection();
-      yield conn.executeCached(QUERY_STR,
-          { tags_folder: PlacesUtils.tagsFolderId,
-            charset_anno: PlacesUtils.CHARSET_ANNO,
-            item_guid: aItemGuid }, (aRow) => {
-        let item;
-        if (!rootItem) {
+    let conn = yield this.promiseDBConnection();
+    let rows = yield conn.executeCached(QUERY_STR,
+        { tags_folder: PlacesUtils.tagsFolderId,
+          charset_anno: PlacesUtils.CHARSET_ANNO,
+          item_guid: aItemGuid });
+    for (let row of rows) {
+      let item;
+      if (!rootItem) {
+        try {
           // This is the first row.
-          try {
-            rootItem = item = createItemInfoObject(aRow, true);
-          }
-          catch(ex) {
-            // If we couldn't figure out the root item, that is just as bad
-            // as a failed query.  Bail out.
-            rootItemCreationEx = ex;
-            throw StopIteration;
-          }
-
-          Object.defineProperty(rootItem, "itemsCount",
-                                { value: 1
-                                , writable: true
-                                , enumerable: false
-                                , configurable: false });
+          rootItem = item = yield createItemInfoObject(row, true);
+          Object.defineProperty(rootItem, "itemsCount", { value: 1
+                                                        , writable: true
+                                                        , enumerable: false
+                                                        , configurable: false });
+        } catch(ex) {
+          throw new Error("Failed to fetch the data for the root item " + ex);
         }
-        else {
+      } else {
+        try {
           // Our query guarantees that we always visit parents ahead of their
           // children.
-          item = createItemInfoObject(aRow, false);
-          let parentGuid = aRow.getResultByName("parentGuid");
+          item = yield createItemInfoObject(row, false);
+          let parentGuid = row.getResultByName("parentGuid");
           if (hasExcludeItemsCallback && shouldExcludeItem(item, parentGuid))
-            return;
+            continue;
 
           let parentItem = parentsMap.get(parentGuid);
           if ("children" in parentItem)
@@ -1751,17 +1785,15 @@ this.PlacesUtils = {
             parentItem.children = [item];
 
           rootItem.itemsCount++;
+        } catch(ex) {
+          // This is a bogus child, report and skip it.
+          Cu.reportError("Failed to fetch the data for an item " + ex);
+          continue;
         }
+      }
 
-        if (item.type == this.TYPE_X_MOZ_PLACE_CONTAINER)
-          parentsMap.set(item.guid, item);
-      });
-    } catch(e) {
-      throw new Error("Unable to query the database " + e);
-    }
-    if (rootItemCreationEx) {
-      throw new Error("Failed to fetch the data for the root item" +
-                      rootItemCreationEx);
+      if (item.type == this.TYPE_X_MOZ_PLACE_CONTAINER)
+        parentsMap.set(item.guid, item);
     }
 
     return rootItem;
@@ -3069,7 +3101,7 @@ PlacesSortFolderByNameTransaction.prototype = {
     let callback = {
       _self: this,
       runBatched: function() {
-        for (item in this._self._oldOrder)
+        for (let item in this._self._oldOrder)
           PlacesUtils.bookmarks.setItemIndex(item, this._self._oldOrder[item]);
       }
     };

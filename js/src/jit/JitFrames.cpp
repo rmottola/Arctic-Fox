@@ -53,40 +53,46 @@ OffsetOfFrameSlot(int32_t slot)
     return -slot;
 }
 
+static inline uint8_t*
+AddressOfFrameSlot(JitFrameLayout* fp, int32_t slot)
+{
+    return (uint8_t*) fp + OffsetOfFrameSlot(slot);
+}
+
 static inline uintptr_t
 ReadFrameSlot(JitFrameLayout* fp, int32_t slot)
 {
-    return *(uintptr_t*)((char*)fp + OffsetOfFrameSlot(slot));
+    return *(uintptr_t*) AddressOfFrameSlot(fp, slot);
 }
 
 static inline void
 WriteFrameSlot(JitFrameLayout* fp, int32_t slot, uintptr_t value)
 {
-    *(uintptr_t*)((char*)fp + OffsetOfFrameSlot(slot)) = value;
+   *(uintptr_t*) AddressOfFrameSlot(fp, slot) = value;
 }
 
 static inline double
 ReadFrameDoubleSlot(JitFrameLayout* fp, int32_t slot)
 {
-    return *(double*)((char*)fp + OffsetOfFrameSlot(slot));
+    return *(double*) AddressOfFrameSlot(fp, slot);
 }
 
 static inline float
 ReadFrameFloat32Slot(JitFrameLayout* fp, int32_t slot)
 {
-    return *(float*)((char*)fp + OffsetOfFrameSlot(slot));
+    return *(float*) AddressOfFrameSlot(fp, slot);
 }
 
 static inline int32_t
 ReadFrameInt32Slot(JitFrameLayout* fp, int32_t slot)
 {
-    return *(int32_t*)((char*)fp + OffsetOfFrameSlot(slot));
+    return *(int32_t*) AddressOfFrameSlot(fp, slot);
 }
 
 static inline bool
 ReadFrameBooleanSlot(JitFrameLayout* fp, int32_t slot)
 {
-    return *(bool*)((char*)fp + OffsetOfFrameSlot(slot));
+    return *(bool*) AddressOfFrameSlot(fp, slot);
 }
 
 JitFrameIterator::JitFrameIterator()
@@ -344,10 +350,10 @@ JitFrameIterator::machineState() const
     for (GeneralRegisterBackwardIterator iter(reader.allGprSpills()); iter.more(); iter++)
         machine.setRegisterLocation(*iter, --spill);
 
-    uint8_t* spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t*>(spill), 0);
+    uint8_t *spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t *>(spill), 0);
 
-    char* floatSpill = reinterpret_cast<char*>(spillAlign);
-    FloatRegisterSet fregs = reader.allFloatSpills();
+    char *floatSpill = reinterpret_cast<char *>(spillAlign);
+    FloatRegisterSet fregs = reader.allFloatSpills().set();
     fregs = fregs.reduceSetForPush();
     for (FloatRegisterBackwardIterator iter(fregs); iter.more(); iter++) {
         floatSpill -= (*iter).size();
@@ -998,7 +1004,7 @@ ReadAllocation(const JitFrameIterator& frame, const LAllocation* a)
 #endif
 
 static void
-MarkThisAndArguments(JSTracer *trc, JitFrameLayout *layout)
+MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
@@ -1023,15 +1029,15 @@ MarkThisAndArguments(JSTracer *trc, JitFrameLayout *layout)
 }
 
 static void
-MarkThisAndArguments(JSTracer *trc, const JitFrameIterator &frame)
+MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
 {
-    JitFrameLayout *layout = frame.jsFrame();
+    JitFrameLayout* layout = frame.jsFrame();
     MarkThisAndArguments(trc, layout);
 }
 
 #ifdef JS_NUNBOX32
 static inline void
-WriteAllocation(const JitFrameIterator &frame, const LAllocation *a, uintptr_t value)
+WriteAllocation(const JitFrameIterator& frame, const LAllocation* a, uintptr_t value)
 {
     if (a->isGeneralReg()) {
         Register reg = a->toGeneralReg()->reg();
@@ -1079,9 +1085,9 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
         gc::MarkValueRoot(trc, v, "ion-gc-slot");
     }
 
-    uintptr_t* spill = frame.spillBase();
-    GeneralRegisterSet gcRegs = safepoint.gcSpills();
-    GeneralRegisterSet valueRegs = safepoint.valueSpills();
+    uintptr_t *spill = frame.spillBase();
+    LiveGeneralRegisterSet gcRegs = safepoint.gcSpills();
+    LiveGeneralRegisterSet valueRegs = safepoint.valueSpills();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (gcRegs.has(*iter))
@@ -1164,11 +1170,11 @@ UpdateIonJSFrameForMinorGC(JSTracer* trc, const JitFrameIterator& frame)
 
     Nursery& nursery = trc->runtime()->gc.nursery;
 
-    const SafepointIndex* si = ionScript->getSafepointIndex(frame.returnAddressToFp());
+    const SafepointIndex *si = ionScript->getSafepointIndex(frame.returnAddressToFp());
     SafepointReader safepoint(ionScript, si);
 
-    GeneralRegisterSet slotsRegs = safepoint.slotsOrElementsSpills();
-    uintptr_t* spill = frame.spillBase();
+    LiveGeneralRegisterSet slotsRegs = safepoint.slotsOrElementsSpills();
+    uintptr_t *spill = frame.spillBase();
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (slotsRegs.has(*iter))
@@ -1308,15 +1314,15 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
     // CodeGenerator.cpp which handle the case of a native function call. We
     // need to mark the argument vector of the function call.
     if (frame.isExitFrameLayout<NativeExitFrameLayout>()) {
-        NativeExitFrameLayout *native = frame.exitFrame()->as<NativeExitFrameLayout>();
+        NativeExitFrameLayout* native = frame.exitFrame()->as<NativeExitFrameLayout>();
         size_t len = native->argc() + 2;
-        Value *vp = native->vp();
+        Value* vp = native->vp();
         gc::MarkValueRootRange(trc, len, vp, "ion-native-args");
         return;
     }
 
     if (frame.isExitFrameLayout<IonOOLNativeExitFrameLayout>()) {
-        IonOOLNativeExitFrameLayout *oolnative =
+        IonOOLNativeExitFrameLayout* oolnative =
             frame.exitFrame()->as<IonOOLNativeExitFrameLayout>();
         gc::MarkJitCodeRoot(trc, oolnative->stubCode(), "ion-ool-native-code");
         gc::MarkValueRoot(trc, oolnative->vp(), "iol-ool-native-vp");
@@ -1331,7 +1337,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
         // A SetterOp frame is a different size, but that's the only relevant
         // difference between the two. The fields that need marking are all in
         // the common base class.
-        IonOOLPropertyOpExitFrameLayout *oolgetter =
+        IonOOLPropertyOpExitFrameLayout* oolgetter =
             frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>()
             ? frame.exitFrame()->as<IonOOLPropertyOpExitFrameLayout>()
             : frame.exitFrame()->as<IonOOLSetterOpExitFrameLayout>();
@@ -1369,8 +1375,8 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
     }
 
     if (frame.isExitFrameLayout<LazyLinkExitFrameLayout>()) {
-        LazyLinkExitFrameLayout *ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
-        JitFrameLayout *layout = ll->jsFrame();
+        LazyLinkExitFrameLayout* ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
+        JitFrameLayout* layout = ll->jsFrame();
 
         gc::MarkJitCodeRoot(trc, ll->stubCode(), "lazy-link-code");
         layout->replaceCalleeToken(MarkCalleeToken(trc, layout->calleeToken()));
@@ -1870,19 +1876,20 @@ SnapshotIterator::allocationValue(const RValueAllocation& alloc, ReadMethod rm)
       case RValueAllocation::DOUBLE_REG:
         return DoubleValue(fromRegister(alloc.fpuReg()));
 
-      case RValueAllocation::FLOAT32_REG:
+      case RValueAllocation::ANY_FLOAT_REG:
       {
         union {
             double d;
             float f;
         } pun;
+        MOZ_ASSERT(alloc.fpuReg().isSingle());
         pun.d = fromRegister(alloc.fpuReg());
         // The register contains the encoding of a float32. We just read
         // the bits without making any conversion.
         return Float32Value(pun.f);
       }
 
-      case RValueAllocation::FLOAT32_STACK:
+      case RValueAllocation::ANY_FLOAT_STACK:
         return Float32Value(ReadFrameFloat32Slot(fp_, alloc.stackOffset()));
 
       case RValueAllocation::TYPED_REG:
@@ -1970,6 +1977,21 @@ SnapshotIterator::allocationValue(const RValueAllocation& alloc, ReadMethod rm)
     }
 }
 
+const FloatRegisters::RegisterContent* 
+SnapshotIterator::floatAllocationPointer(const RValueAllocation& alloc) const
+{
+    switch (alloc.mode()) {
+      case RValueAllocation::ANY_FLOAT_REG:
+        return machine_.address(alloc.fpuReg());
+
+      case RValueAllocation::ANY_FLOAT_STACK:
+        return (FloatRegisters::RegisterContent*) AddressOfFrameSlot(fp_, alloc.stackOffset());
+
+      default:
+        MOZ_CRASH("Not a float allocation.");
+    }
+}
+
 Value
 SnapshotIterator::maybeRead(const RValueAllocation& a, MaybeReadFallback& fallback)
 {
@@ -2007,8 +2029,8 @@ SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, Val
       case RValueAllocation::CST_UNDEFINED:
       case RValueAllocation::CST_NULL:
       case RValueAllocation::DOUBLE_REG:
-      case RValueAllocation::FLOAT32_REG:
-      case RValueAllocation::FLOAT32_STACK:
+      case RValueAllocation::ANY_FLOAT_REG:
+      case RValueAllocation::ANY_FLOAT_STACK:
         MOZ_CRASH("Not a GC thing: Unexpected write");
         break;
 
@@ -2491,9 +2513,10 @@ InlineFrameIterator::computeScopeChain(Value scopeChainValue, MaybeReadFallback&
     if (isFunctionFrame())
         return callee(fallback)->environment();
 
-    // Ion does not handle scripts that are not compile-and-go.
+    // Ion does not handle non-function scripts that have anything other than
+    // the global on their scope chain.
     MOZ_ASSERT(!script()->isForEval());
-    MOZ_ASSERT(script()->compileAndGo());
+    MOZ_ASSERT(!script()->hasPollutedGlobalScope());
     return &script()->global();
 }
 
@@ -2504,20 +2527,20 @@ InlineFrameIterator::isFunctionFrame() const
 }
 
 MachineState
-MachineState::FromBailout(RegisterDump::GPRArray &regs, RegisterDump::FPUArray &fpregs)
+MachineState::FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& fpregs)
 {
     MachineState machine;
 
     for (unsigned i = 0; i < Registers::Total; i++)
         machine.setRegisterLocation(Register::FromCode(i), &regs[i].r);
 #ifdef JS_CODEGEN_ARM
-    float *fbase = (float*)&fpregs[0];
+    float* fbase = (float*)&fpregs[0];
     for (unsigned i = 0; i < FloatRegisters::TotalDouble; i++)
         machine.setRegisterLocation(FloatRegister(i, FloatRegister::Double), &fpregs[i].d);
     for (unsigned i = 0; i < FloatRegisters::TotalSingle; i++)
         machine.setRegisterLocation(FloatRegister(i, FloatRegister::Single), (double*)&fbase[i]);
 #elif defined(JS_CODEGEN_MIPS)
-    float *fbase = (float*)&fpregs[0];
+    float* fbase = (float*)&fpregs[0];
     for (unsigned i = 0; i < FloatRegisters::TotalDouble; i++) {
         machine.setRegisterLocation(FloatRegister::FromIndex(i, FloatRegister::Double),
                                     &fpregs[i].d);
@@ -2528,8 +2551,10 @@ MachineState::FromBailout(RegisterDump::GPRArray &regs, RegisterDump::FPUArray &
     }
 #elif defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
     for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {
-        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single), &fpregs[i].s);
-        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double), &fpregs[i].d);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single), &fpregs[i]);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double), &fpregs[i]);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Int32x4), &fpregs[i]);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Float32x4), &fpregs[i]);
     }
 #elif defined(JS_CODEGEN_NONE)
     MOZ_CRASH();
@@ -3017,9 +3042,9 @@ void
 JitProfilingFrameIterator::fixBaselineDebugModeOSRReturnAddress()
 {
     MOZ_ASSERT(type_ == JitFrame_BaselineJS);
-    BaselineFrame *bl = (BaselineFrame *)(fp_ - BaselineFrame::FramePointerOffset -
+    BaselineFrame* bl = (BaselineFrame*)(fp_ - BaselineFrame::FramePointerOffset -
                                           BaselineFrame::Size());
-    if (BaselineDebugModeOSRInfo *info = bl->getDebugModeOSRInfo())
+    if (BaselineDebugModeOSRInfo* info = bl->getDebugModeOSRInfo())
         returnAddressToFp_ = info->resumeAddr;
 }
 

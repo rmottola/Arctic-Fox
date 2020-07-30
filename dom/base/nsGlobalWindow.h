@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -51,6 +51,8 @@
 #include "mozilla/dom/WindowBinding.h"
 #include "Units.h"
 #include "nsComponentManagerUtils.h"
+#include "nsSize.h"
+#include "nsCheapSets.h"
 
 #define DEFAULT_HOME_PAGE "www.mozilla.org"
 #define PREF_BROWSER_STARTUP_HOMEPAGE "browser.startup.homepage"
@@ -90,7 +92,6 @@ class nsGlobalWindowObserver;
 class nsGlobalWindow;
 class nsDOMWindowUtils;
 class nsIIdleService;
-struct nsIntSize;
 struct nsRect;
 
 class nsWindowSizes;
@@ -478,7 +479,6 @@ public:
   virtual void ForceClose() override;
 
   virtual void MaybeUpdateTouchState() override;
-  virtual void UpdateTouchState() override;
 
   // Outer windows only.
   virtual bool DispatchCustomEvent(const nsAString& aEventName) override;
@@ -966,10 +966,14 @@ public:
   void ScrollByPages(int32_t numPages,
                      const mozilla::dom::ScrollOptions& aOptions);
   void MozScrollSnap();
-  int32_t GetInnerWidth(mozilla::ErrorResult& aError);
-  void SetInnerWidth(int32_t aInnerWidth, mozilla::ErrorResult& aError);
-  int32_t GetInnerHeight(mozilla::ErrorResult& aError);
-  void SetInnerHeight(int32_t aInnerHeight, mozilla::ErrorResult& aError);
+  void GetInnerWidth(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                     mozilla::ErrorResult& aError);
+  void SetInnerWidth(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                     mozilla::ErrorResult& aError);
+  void GetInnerHeight(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                     mozilla::ErrorResult& aError);
+  void SetInnerHeight(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                      mozilla::ErrorResult& aError);
   double GetScrollX(mozilla::ErrorResult& aError);
   double GetPageXOffset(mozilla::ErrorResult& aError)
   {
@@ -981,14 +985,22 @@ public:
     return GetScrollY(aError);
   }
   void MozRequestOverfill(mozilla::dom::OverfillCallback& aCallback, mozilla::ErrorResult& aError);
-  int32_t GetScreenX(mozilla::ErrorResult& aError);
-  void SetScreenX(int32_t aScreenX, mozilla::ErrorResult& aError);
-  int32_t GetScreenY(mozilla::ErrorResult& aError);
-  void SetScreenY(int32_t aScreenY, mozilla::ErrorResult& aError);
-  int32_t GetOuterWidth(mozilla::ErrorResult& aError);
-  void SetOuterWidth(int32_t aOuterWidth, mozilla::ErrorResult& aError);
-  int32_t GetOuterHeight(mozilla::ErrorResult& aError);
-  void SetOuterHeight(int32_t aOuterHeight, mozilla::ErrorResult& aError);
+  void GetScreenX(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                  mozilla::ErrorResult& aError);
+  void SetScreenX(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                  mozilla::ErrorResult& aError);
+  void GetScreenY(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                  mozilla::ErrorResult& aError);
+  void SetScreenY(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                  mozilla::ErrorResult& aError);
+  void GetOuterWidth(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                     mozilla::ErrorResult& aError);
+  void SetOuterWidth(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                     mozilla::ErrorResult& aError);
+  void GetOuterHeight(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
+                      mozilla::ErrorResult& aError);
+  void SetOuterHeight(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                      mozilla::ErrorResult& aError);
   int32_t RequestAnimationFrame(mozilla::dom::FrameRequestCallback& aCallback,
                                 mozilla::ErrorResult& aError);
   void CancelAnimationFrame(int32_t aHandle, mozilla::ErrorResult& aError);
@@ -1092,7 +1104,44 @@ public:
                     JS::MutableHandle<JS::Value> aRetval,
                     mozilla::ErrorResult& aError);
 
+  already_AddRefed<nsWindowRoot> GetWindowRoot(mozilla::ErrorResult& aError);
+
 protected:
+  // Web IDL helpers
+
+  // Redefine the property called aPropName on this window object to be a value
+  // property with the value aValue, much like we would do for a [Replaceable]
+  // property in IDL.
+  void RedefineProperty(JSContext* aCx, const char* aPropName,
+                        JS::Handle<JS::Value> aValue,
+                        mozilla::ErrorResult& aError);
+
+  // Implementation guts for our writable IDL attributes that are really
+  // supposed to be readonly replaceable.
+  typedef int32_t (nsGlobalWindow::*WindowCoordGetter)(mozilla::ErrorResult&);
+  typedef void (nsGlobalWindow::*WindowCoordSetter)(int32_t,
+                                                    mozilla::ErrorResult&);
+  void GetReplaceableWindowCoord(JSContext* aCx, WindowCoordGetter aGetter,
+                                 JS::MutableHandle<JS::Value> aRetval,
+                                 mozilla::ErrorResult& aError);
+  void SetReplaceableWindowCoord(JSContext* aCx, WindowCoordSetter aSetter,
+                                 JS::Handle<JS::Value> aValue,
+                                 const char* aPropName,
+                                 mozilla::ErrorResult& aError);
+  // And the implementations of WindowCoordGetter/WindowCoordSetter.
+  int32_t GetInnerWidth(mozilla::ErrorResult& aError);
+  void SetInnerWidth(int32_t aInnerWidth, mozilla::ErrorResult& aError);
+  int32_t GetInnerHeight(mozilla::ErrorResult& aError);
+  void SetInnerHeight(int32_t aInnerHeight, mozilla::ErrorResult& aError);
+  int32_t GetScreenX(mozilla::ErrorResult& aError);
+  void SetScreenX(int32_t aScreenX, mozilla::ErrorResult& aError);
+  int32_t GetScreenY(mozilla::ErrorResult& aError);
+  void SetScreenY(int32_t aScreenY, mozilla::ErrorResult& aError);
+  int32_t GetOuterWidth(mozilla::ErrorResult& aError);
+  void SetOuterWidth(int32_t aOuterWidth, mozilla::ErrorResult& aError);
+  int32_t GetOuterHeight(mozilla::ErrorResult& aError);
+  void SetOuterHeight(int32_t aOuterHeight, mozilla::ErrorResult& aError);
+
   // Array of idle observers that are notified of idle events.
   nsTObserverArray<IdleObserverHolder> mIdleObservers;
 
@@ -1267,7 +1316,7 @@ public:
   {
     mozilla::ErrorResult rv;
     ClearTimeoutOrInterval(aTimerID, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   // JS specific timeout functions (JS args grabbed from context).
@@ -1474,13 +1523,6 @@ protected:
   // show, in that case we show a separate dialog to ask this question.
   bool ConfirmDialogIfNeeded();
 
-  // When adding new member variables, be careful not to create cycles
-  // through JavaScript.  If there is any chance that a member variable
-  // could own objects that are implemented in JavaScript, then those
-  // objects will keep the global object (this object) alive.  To prevent
-  // these cycles, ownership of such members must be released in
-  // |CleanUp| and |DetachFromDocShell|.
-
   // This member is also used on both inner and outer windows, but
   // for slightly different purposes. On inner windows it means the
   // inner window is held onto by session history and should not
@@ -1550,6 +1592,7 @@ protected:
   // Indicates whether this window wants gamepad input events
   bool                   mHasGamepad : 1;
 #ifdef MOZ_GAMEPAD
+  nsCheapSet<nsUint32HashKey> mGamepadIndexSet;
   nsRefPtrHashtable<nsUint32HashKey, mozilla::dom::Gamepad> mGamepads;
   bool mHasSeenGamepadInput;
 #endif

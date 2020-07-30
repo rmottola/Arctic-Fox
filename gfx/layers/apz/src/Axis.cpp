@@ -8,7 +8,7 @@
 #include <math.h>                       // for fabsf, pow, powf
 #include <algorithm>                    // for max
 #include "AsyncPanZoomController.h"     // for AsyncPanZoomController
-#include "mozilla/dom/AnimationPlayer.h" // for ComputedTimingFunction
+#include "mozilla/dom/KeyframeEffect.h" // for ComputedTimingFunction
 #include "mozilla/layers/APZCTreeManager.h" // for APZCTreeManager
 #include "mozilla/layers/APZThreadUtils.h" // for AssertOnControllerThread
 #include "FrameMetrics.h"               // for FrameMetrics
@@ -391,6 +391,16 @@ void Axis::CancelTouch() {
 
 bool Axis::CanScroll() const {
   return GetPageLength() - GetCompositionLength() > COORDINATE_EPSILON;
+}
+
+bool Axis::CanScroll(double aDelta) const
+{
+  if (!CanScroll() || mAxisLocked) {
+    return false;
+  }
+
+  ParentLayerCoord delta = aDelta;
+  return DisplacementWillOverscrollAmount(delta) != delta;
 }
 
 bool Axis::CanScrollNow() const {

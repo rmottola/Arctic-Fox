@@ -11,11 +11,9 @@
 #include "nsIServiceManager.h"
 #include "nsDebug.h"
 #include "prlink.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* sIdleLog = nullptr;
-#endif
 
 typedef bool (*_XScreenSaverQueryExtension_fn)(Display* dpy, int* event_base,
                                                  int* error_base);
@@ -38,9 +36,7 @@ static void Initialize()
     PRLibrary* xsslib = PR_LoadLibrary("libXss.so.1");
     if (!xsslib) // ouch.
     {
-#ifdef PR_LOGGING
         PR_LOG(sIdleLog, PR_LOG_WARNING, ("Failed to find libXss.so!\n"));
-#endif
         return;
     }
 
@@ -50,14 +46,13 @@ static void Initialize()
         PR_FindFunctionSymbol(xsslib, "XScreenSaverAllocInfo");
     _XSSQueryInfo = (_XScreenSaverQueryInfo_fn)
         PR_FindFunctionSymbol(xsslib, "XScreenSaverQueryInfo");
-#ifdef PR_LOGGING
+
     if (!_XSSQueryExtension)
         PR_LOG(sIdleLog, PR_LOG_WARNING, ("Failed to get XSSQueryExtension!\n"));
     if (!_XSSAllocInfo)
         PR_LOG(sIdleLog, PR_LOG_WARNING, ("Failed to get XSSAllocInfo!\n"));
     if (!_XSSQueryInfo)
         PR_LOG(sIdleLog, PR_LOG_WARNING, ("Failed to get XSSQueryInfo!\n"));
-#endif
 
     sInitialized = true;
 }
@@ -65,10 +60,8 @@ static void Initialize()
 nsIdleServiceGTK::nsIdleServiceGTK()
     : mXssInfo(nullptr)
 {
-#ifdef PR_LOGGING
     if (!sIdleLog)
         sIdleLog = PR_NewLogModule("nsIIdleService");
-#endif
 
     Initialize();
 }
@@ -103,9 +96,7 @@ nsIdleServiceGTK::PollIdleTime(uint32_t *aIdleTime)
     // We might not have a display (cf. in xpcshell)
     Display *dplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     if (!dplay) {
-#ifdef PR_LOGGING
         PR_LOG(sIdleLog, PR_LOG_WARNING, ("No display found!\n"));
-#endif
         return false;
     }
 
@@ -125,9 +116,7 @@ nsIdleServiceGTK::PollIdleTime(uint32_t *aIdleTime)
         return true;
     }
     // If we get here, we couldn't get to XScreenSaver:
-#ifdef PR_LOGGING
     PR_LOG(sIdleLog, PR_LOG_WARNING, ("XSSQueryExtension returned false!\n"));
-#endif
     return false;
 }
 

@@ -39,7 +39,6 @@
 #include "nsIMessageManager.h"
 #include "mozilla/RestyleLogging.h"
 
-class nsBidiPresUtils;
 class nsAString;
 class nsIPrintSettings;
 class nsDocShell;
@@ -52,14 +51,10 @@ class nsIFrame;
 class nsFrameManager;
 class nsILinkHandler;
 class nsIAtom;
-class nsICSSPseudoComparator;
-struct nsStyleBackground;
-struct nsStyleBorder;
 class nsIRunnable;
 class gfxUserFontEntry;
 class gfxUserFontSet;
 class gfxTextPerfMetrics;
-struct nsFontFaceRuleContainer;
 class nsPluginFrame;
 class nsTransitionManager;
 class nsAnimationManager;
@@ -525,7 +520,7 @@ public:
   * This is a scaling factor for the display of the print preview.  It
   * does not affect layout.  It only affects the size of the onscreen pages
   * in print preview.
-  * XXX Temporary: see http://wiki.mozilla.org/Goanna:PrintPreview
+  * XXX Temporary: see http://wiki.mozilla.org/Gecko:PrintPreview
   */
   float GetPrintPreviewScale() { return mPPScale; }
   void SetPrintPreviewScale(float aScale) { mPPScale = aScale; }

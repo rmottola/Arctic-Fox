@@ -246,13 +246,13 @@ function testBodyCreation() {
   // FormData has its own function since it has blobs and files.
 
   var params = new URLSearchParams();
-  params.append("item", "Goannas");
+  params.append("item", "Geckos");
   params.append("feature", "stickyfeet");
   params.append("quantity", "700");
   var req3 = new Request("", { method: 'post', body: params });
   var p3 = req3.text().then(function(v) {
     var extracted = new URLSearchParams(v);
-    is(extracted.get("item"), "Goannas", "Param should match");
+    is(extracted.get("item"), "Geckos", "Param should match");
     is(extracted.get("feature"), "stickyfeet", "Param should match");
     is(extracted.get("quantity"), "700", "Param should match");
   });

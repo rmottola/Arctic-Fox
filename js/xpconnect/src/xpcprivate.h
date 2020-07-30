@@ -544,6 +544,7 @@ public:
         IDX_COLUMNNUMBER            ,
         IDX_STACK                   ,
         IDX_MESSAGE                 ,
+        IDX_LASTINDEX               ,
         IDX_TOTAL_COUNT // just a count of the above
     };
 
@@ -632,6 +633,7 @@ public:
     void OnProcessNextEvent() {
         mSlowScriptCheckpoint = mozilla::TimeStamp::NowLoRes();
         mSlowScriptSecondHalf = false;
+        js::ResetStopwatches(Get()->Runtime());
     }
     void OnAfterProcessNextEvent() {
         mSlowScriptCheckpoint = mozilla::TimeStamp();
@@ -1877,7 +1879,7 @@ public:
     }
 
     void TraceInside(JSTracer* trc) {
-        if (JS_IsGCMarkingTracer(trc)) {
+        if (trc->isMarkingTracer()) {
             mSet->Mark();
             if (mScriptableInfo)
                 mScriptableInfo->Mark();
@@ -2182,7 +2184,7 @@ public:
 
     // Yes, we *do* need to mark the mScriptableInfo in both cases.
     inline void TraceInside(JSTracer* trc) {
-        if (JS_IsGCMarkingTracer(trc)) {
+        if (trc->isMarkingTracer()) {
             mSet->Mark();
             if (mScriptableInfo)
                 mScriptableInfo->Mark();
@@ -3445,6 +3447,7 @@ public:
         , addonId(cx)
         , writeToGlobalPrototype(false)
         , sameZoneAs(cx)
+        , freshZone(false)
         , invisibleToDebugger(false)
         , discardSource(false)
         , metadata(cx)
@@ -3460,6 +3463,7 @@ public:
     JS::RootedString addonId;
     bool writeToGlobalPrototype;
     JS::RootedObject sameZoneAs;
+    bool freshZone;
     bool invisibleToDebugger;
     bool discardSource;
     GlobalProperties globalProperties;
@@ -3652,7 +3656,6 @@ public:
         , skipWriteToGlobalPrototype(false)
         , universalXPConnectEnabled(false)
         , forcePermissiveCOWs(false)
-        , CPOWTime(0)
         , skipCOWCallableChecks(false)
         , scriptability(c)
         , scope(nullptr)
@@ -3679,7 +3682,7 @@ public:
 
     bool wantXrays;
 
-    // This flag is intended for a very specific use, internal to Goanna. It may
+    // This flag is intended for a very specific use, internal to Gecko. It may
     // go away or change behavior at any time. It should not be added to any
     // documentation and it should not be used without consulting the XPConnect
     // module owner.
@@ -3705,9 +3708,6 @@ public:
     //
     // Using it in production is inherently unsafe.
     bool forcePermissiveCOWs;
-
-    // A running count of how much time we've spent processing CPOWs.
-    PRIntervalTime               CPOWTime;
 
     // Disables the XPConnect security checks that deny access to callables and
     // accessor descriptors on COWs. Do not use this unless you are bholley.

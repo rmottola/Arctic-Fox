@@ -629,13 +629,14 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
 }
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_ENCODE> *, HandleObject, HandleScript, MutableHandleFunction);
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_DECODE> *, HandleObject, HandleScript, MutableHandleFunction);
 
-JSObject*
-js::CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFunction srcFun)
+JSObject *
+js::CloneFunctionAndScript(JSContext *cx, HandleObject enclosingScope, HandleFunction srcFun,
+                           PollutedGlobalScopeOption polluted)
 {
     /* NB: Keep this in sync with XDRInterpretedFunction. */
     RootedObject cloneProto(cx);
@@ -657,7 +658,7 @@ js::CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFun
     RootedScript srcScript(cx, srcFun->getOrCreateScript(cx));
     if (!srcScript)
         return nullptr;
-    RootedScript clonedScript(cx, CloneScript(cx, enclosingScope, clone, srcScript));
+    RootedScript clonedScript(cx, CloneScript(cx, enclosingScope, clone, srcScript, polluted));
     if (!clonedScript)
         return nullptr;
 
@@ -821,8 +822,8 @@ JSFunction::trace(JSTracer* trc)
             // This information can either be a LazyScript, or the name of a
             // self-hosted function which can be cloned over again. The latter
             // is stored in the first extended slot.
-            JSRuntime *rt = trc->runtime();
-            if (IsMarkingTracer(trc) &&
+            JSRuntime* rt = trc->runtime();
+            if (trc->isMarkingTracer() &&
                 (rt->allowRelazificationForTesting || !compartment()->hasBeenEntered()) &&
                 !compartment()->isDebuggee() && !compartment()->isSelfHosting &&
                 u.i.s.script_->isRelazifiable() && (!isSelfHostedBuiltin() || isExtended()))
@@ -980,6 +981,7 @@ const Class JSFunction::class_ = {
         CreateFunctionConstructor,
         CreateFunctionPrototype,
         nullptr,
+        nullptr,
         function_methods,
         function_properties
     }
@@ -1040,7 +1042,7 @@ js::FindBody(JSContext* cx, HandleFunction fun, HandleLinearString src, size_t* 
             return false;
     }
     bool braced = tt == TOK_LC;
-    MOZ_ASSERT_IF(fun->isExprClosure(), !braced);
+    MOZ_ASSERT_IF(fun->isExprBody(), !braced);
     *bodyStart = ts.currentToken().pos.begin;
     if (braced)
         *bodyStart += 1;
@@ -1109,7 +1111,7 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool bodyOnly, bool lamb
         if (!src)
             return nullptr;
 
-        bool exprBody = fun->isExprClosure();
+        bool exprBody = fun->isExprBody();
 
         // The source data for functions created by calling the Function
         // constructor is only the function's body.  This depends on the fact,
@@ -1218,7 +1220,7 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool bodyOnly, bool lamb
         if (!lambdaParen && fun->isLambda() && !fun->isArrow() && !out.append(")"))
             return nullptr;
     } else {
-        MOZ_ASSERT(!fun->isExprClosure());
+        MOZ_ASSERT(!fun->isExprBody());
 
         if ((!bodyOnly && !out.append("() {\n    "))
             || !out.append("[native code]")
@@ -1878,7 +1880,6 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
     options.setMutedErrors(mutedErrors)
            .setFileAndLine(filename, 1)
            .setNoScriptRval(false)
-           .setCompileAndGo(true)
            .setIntroductionInfo(introducerFilename, introductionType, lineno, maybeScript, pcOffset);
 
     unsigned n = args.length() ? args.length() - 1 : 0;

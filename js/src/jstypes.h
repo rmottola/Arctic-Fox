@@ -30,7 +30,7 @@
 // So include them here.
 // XXX: including them in js/RequiredDefines.h should be a better option, since
 // that is by definition the header file that should be included in all
-// SpiderMonkey code.  However, Goanna doesn't do this!  See bug 909576.
+// SpiderMonkey code.  However, Gecko doesn't do this!  See bug 909576.
 #include "js-config.h"
 #include "jsversion.h"
 
@@ -169,10 +169,10 @@
 **      Macros to get the number of elements and the pointer to one past the
 **      last element of a C array. Use them like this:
 **
-**      char16_t buf[10], *s;
+**      char16_t buf[10];
 **      JSString* str;
 **      ...
-**      for (s = buf; s != JS_ARRAY_END(buf); ++s) *s = ...;
+**      for (char16_t* s = buf; s != JS_ARRAY_END(buf); ++s) *s = ...;
 **      ...
 **      str = JS_NewStringCopyN(cx, buf, JS_ARRAY_LENGTH(buf));
 **      ...

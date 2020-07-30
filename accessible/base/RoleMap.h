@@ -4,7 +4,7 @@
 
 /**
  * Usage: declare the macro ROLE()with the following arguments:
- * ROLE(goannaRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule)
+ * ROLE(geckoRole, stringRole, atkRole, macRole, msaaRole, ia2Role, nameRule)
  */
 
 ROLE(NOTHING,

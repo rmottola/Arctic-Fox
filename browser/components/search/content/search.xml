@@ -274,6 +274,11 @@
                   break;
                 }
               }
+            } else if (aEvent instanceof XULCommandEvent) {
+              if (target.getAttribute("anonid") == "paste-and-search") {
+                aEngine = this.currentEngine;
+                source = "paste";
+              }
             }
           }
         ]]></body>
@@ -450,6 +455,8 @@
           var textValue = textBox.value;
 
           var where = "current";
+
+          // Open ctrl/cmd clicks on one-off buttons in a new background tab.
           if (aEvent && aEvent.originalTarget.getAttribute("anonid") == "search-go-button") {
             if (aEvent.button == 2)
               return;
@@ -457,11 +464,20 @@
           }
           else {
             var newTabPref = textBox._prefBranch.getBoolPref("browser.search.openintab");
-            if ((aEvent && aEvent.altKey) ^ newTabPref)
+            if (((aEvent instanceof KeyboardEvent) && aEvent.altKey) ^ newTabPref)
               where = "tab";
+            if ((aEvent instanceof MouseEvent) && (aEvent.button == 1 ||
+#ifdef XP_MACOSX
+                                                   aEvent.metaKey))
+#else
+                                                   aEvent.ctrlKey))
+#endif
+              where = "tab-background";
           }
 
           this.doSearch(textValue, where);
+          if (where == "tab-background")
+            this.focus();
         ]]></body>
       </method>
 
@@ -484,7 +500,13 @@
           
           // null parameter below specifies HTML response for search
           var submission = this.currentEngine.getSubmission(aData);
-          openUILinkIn(submission.uri.spec, aWhere, null, submission.postData);
+          let params = {
+            postData: submission.postData,
+            inBackground: aWhere == "tab-background"
+          };
+          openUILinkIn(submission.uri.spec,
+                       aWhere == "tab-background" ? "tab" : aWhere,
+                       params);
         ]]></body>
       </method>
     </implementation>
@@ -600,8 +622,7 @@
           label = this._stringBundle.getString("cmd_pasteAndSearch");
           element.setAttribute("label", label);
           element.setAttribute("anonid", "paste-and-search");
-          element.setAttribute("oncommand",
-              "BrowserSearch.searchBar.select(); goDoCommand('cmd_paste'); BrowserSearch.searchBar.handleSearchCommand();");
+          element.setAttribute("oncommand", "BrowserSearch.pasteAndSearch(event)");
           cxmenu.insertBefore(element, insertLocation.nextSibling);
           pasteAndSearch = element;
         }

@@ -21,7 +21,7 @@
 
 #ifndef ALOG
 #if defined(DEBUG) || defined(FORCE_ALOG)
-#define ALOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Goanna - Cubeb" , ## args)
+#define ALOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Gecko - Cubeb" , ## args)
 #else
 #define ALOG(args...)
 #endif

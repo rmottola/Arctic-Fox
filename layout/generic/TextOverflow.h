@@ -15,7 +15,6 @@
 #include <algorithm>
 
 class nsIScrollableFrame;
-class gfxTextRun;
 class nsLineBox;
 
 namespace mozilla {

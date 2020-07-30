@@ -2,6 +2,13 @@
 // http://creativecommons.org/publicdomain/zero/1.0/
 
 function serviceWorkerTestExec(testFile) {
+  var isB2G = !navigator.userAgent.contains("Android") &&
+              /Mobile|Tablet/.test(navigator.userAgent);
+  if (isB2G) {
+    // TODO B2G doesn't support running service workers for now due to bug 1137683.
+    dump("Skipping running the test in SW until bug 1137683 gets fixed.\n");
+    return Promise.resolve();
+  }
   return new Promise(function(resolve, reject) {
     function setupSW(registration) {
       var worker = registration.waiting ||
@@ -31,17 +38,7 @@ function serviceWorkerTestExec(testFile) {
       document.body.appendChild(iframe);
     }
 
-    // FIXME: Remove the URL randomization code once bug 1141256 is fixed.
-    navigator.serviceWorker.register("worker_wrapper.js" + "?" + (Math.random()), {scope: "."})
-      .then(function(registration) {
-        if (registration.installing) {
-          registration.installing.onstatechange = function(e) {
-            e.target.onstatechange = null;
-            setupSW(registration);
-          };
-        } else {
-          setupSW(registration);
-        }
-      });
+    navigator.serviceWorker.ready.then(setupSW);
+    navigator.serviceWorker.register("worker_wrapper.js", {scope: "."});
   });
 }

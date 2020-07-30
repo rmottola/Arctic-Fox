@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -16,6 +16,7 @@
 #include "nsStreamUtils.h"
 #include "nsNetCID.h"
 #include "nsSerializationHelper.h"
+#include "nsQueryObject.h"
 
 #include "mozilla/dom/FetchEventBinding.h"
 #include "mozilla/dom/PromiseNativeHandler.h"
@@ -282,37 +283,32 @@ RespondWithHandler::CancelRequest()
 } // namespace
 
 void
-FetchEvent::RespondWith(Promise& aPromise, ErrorResult& aRv)
+FetchEvent::RespondWith(const ResponseOrPromise& aArg, ErrorResult& aRv)
 {
   if (mWaitToRespond) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
 
+  nsRefPtr<Promise> promise;
+
+  if (aArg.IsResponse()) {
+    nsRefPtr<Response> res = &aArg.GetAsResponse();
+    WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+    MOZ_ASSERT(worker);
+    worker->AssertIsOnWorkerThread();
+    promise = Promise::Create(worker->GlobalScope(), aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return;
+    }
+    promise->MaybeResolve(res);
+  } else if (aArg.IsPromise()) {
+    promise = &aArg.GetAsPromise();
+  }
   mWaitToRespond = true;
   nsRefPtr<RespondWithHandler> handler =
     new RespondWithHandler(mChannel, mServiceWorker, mRequest->Mode());
-  aPromise.AppendNativeHandler(handler);
-}
-
-void
-FetchEvent::RespondWith(Response& aResponse, ErrorResult& aRv)
-{
-  if (mWaitToRespond) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
-    return;
-  }
-
-  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
-  MOZ_ASSERT(worker);
-  worker->AssertIsOnWorkerThread();
-  nsRefPtr<Promise> promise = Promise::Create(worker->GlobalScope(), aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
-  promise->MaybeResolve(&aResponse);
-
-  RespondWith(*promise, aRv);
+  promise->AppendNativeHandler(handler);
 }
 
 already_AddRefed<ServiceWorkerClient>
@@ -327,36 +323,6 @@ FetchEvent::GetClient()
   }
   nsRefPtr<ServiceWorkerClient> client = mClient;
   return client.forget();
-}
-
-already_AddRefed<Promise>
-FetchEvent::ForwardTo(const nsAString& aUrl)
-{
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
-  MOZ_ASSERT(global);
-  ErrorResult result;
-  nsRefPtr<Promise> promise = Promise::Create(global, result);
-  if (NS_WARN_IF(result.Failed())) {
-    return nullptr;
-  }
-
-  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
-  return promise.forget();
-}
-
-already_AddRefed<Promise>
-FetchEvent::Default()
-{
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
-  MOZ_ASSERT(global);
-  ErrorResult result;
-  nsRefPtr<Promise> promise = Promise::Create(global, result);
-  if (result.Failed()) {
-    return nullptr;
-  }
-
-  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
-  return promise.forget();
 }
 
 NS_IMPL_ADDREF_INHERITED(FetchEvent, Event)
@@ -390,20 +356,6 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(ExtendableEvent)
 NS_INTERFACE_MAP_END_INHERITING(Event)
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ExtendableEvent, Event, mPromise)
-
-InstallEvent::InstallEvent(EventTarget* aOwner)
-  : ExtendableEvent(aOwner)
-  , mActivateImmediately(false)
-{
-}
-
-NS_IMPL_ADDREF_INHERITED(InstallEvent, ExtendableEvent)
-NS_IMPL_RELEASE_INHERITED(InstallEvent, ExtendableEvent)
-
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(InstallEvent)
-NS_INTERFACE_MAP_END_INHERITING(ExtendableEvent)
-
-NS_IMPL_CYCLE_COLLECTION_INHERITED(InstallEvent, ExtendableEvent, mActiveWorker)
 
 #ifndef MOZ_SIMPLEPUSH
 
@@ -439,7 +391,7 @@ PushMessageData::ArrayBuffer(JSContext* cx, JS::MutableHandle<JSObject*> aRetval
    NS_ABORT();
 }
 
-mozilla::dom::File*
+mozilla::dom::Blob*
 PushMessageData::Blob()
 {
   //todo bug 1149195.  Don't be lazy.

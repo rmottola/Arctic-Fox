@@ -24,8 +24,6 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
 
-class gfxASurface;
-
 namespace mozilla {
 
 namespace dom {
@@ -78,7 +76,7 @@ public:
                                int32_t* aY) override
   { *aX = kMaxDimension;  *aY = kMaxDimension;  return NS_OK; }
 
-  // We're always at <0, 0>, and so ignore move requests.
+  // Widget position is controlled by the parent process via TabChild.
   NS_IMETHOD Move(double aX, double aY) override
   { return NS_OK; }
 
@@ -90,8 +88,14 @@ public:
                     double aWidth,
                     double aHeight,
                     bool   aRepaint) override
-  // (we're always at <0, 0>)
-  { return Resize(aWidth, aHeight, aRepaint); }
+  {
+    if (mBounds.x != aX || mBounds.y != aY) {
+      NotifyWindowMoved(aX, aY);
+    }
+    mBounds.x = aX;
+    mBounds.y = aY;
+    return Resize(aWidth, aHeight, aRepaint);
+  }
 
   // XXX/cjones: copying gtk behavior here; unclear what disabling a
   // widget is supposed to entail
@@ -117,18 +121,20 @@ public:
   NS_IMETHOD ReparentNativeWidget(nsIWidget* aNewParent) override
   { return NS_ERROR_UNEXPECTED; }
 
-  // PuppetWidgets don't have any concept of titles. 
+  // PuppetWidgets don't have any concept of titles.
   NS_IMETHOD SetTitle(const nsAString& aTitle) override
   { return NS_ERROR_UNEXPECTED; }
-  
-  // PuppetWidgets are always at <0, 0>.
+
   virtual mozilla::LayoutDeviceIntPoint WidgetToScreenOffset() override
-  { return mozilla::LayoutDeviceIntPoint(0, 0); }
+  { return LayoutDeviceIntPoint::FromUntyped(GetWindowPosition() + GetChromeDimensions()); }
 
   void InitEvent(WidgetGUIEvent& aEvent, nsIntPoint* aPoint = nullptr);
 
   NS_IMETHOD DispatchEvent(WidgetGUIEvent* aEvent, nsEventStatus& aStatus) override;
   nsEventStatus DispatchAPZAwareEvent(WidgetInputEvent* aEvent) override;
+  nsEventStatus DispatchInputEvent(WidgetInputEvent* aEvent) override;
+  void SetConfirmedTargetAPZC(uint64_t aInputBlockId,
+                              const nsTArray<ScrollableLayerGuid>& aTargets) const override;
 
   NS_IMETHOD CaptureRollupEvents(nsIRollupListener* aListener,
                                  bool aDoCapture) override
@@ -197,11 +203,44 @@ public:
   // Get the screen position of the application window.
   nsIntPoint GetWindowPosition();
 
+  NS_IMETHOD GetScreenBounds(nsIntRect &aRect) override;
+
   NS_IMETHOD StartPluginIME(const mozilla::WidgetKeyboardEvent& aKeyboardEvent,
                             int32_t aPanelX, int32_t aPanelY,
                             nsString& aCommitted) override;
 
   NS_IMETHOD SetPluginFocused(bool& aFocused) override;
+
+  virtual nsresult SynthesizeNativeKeyEvent(int32_t aNativeKeyboardLayout,
+                                            int32_t aNativeKeyCode,
+                                            uint32_t aModifierFlags,
+                                            const nsAString& aCharacters,
+                                            const nsAString& aUnmodifiedCharacters,
+                                            nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
+                                              uint32_t aNativeMessage,
+                                              uint32_t aModifierFlags,
+                                              nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint,
+                                             nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
+                                                    uint32_t aNativeMessage,
+                                                    double aDeltaX,
+                                                    double aDeltaY,
+                                                    double aDeltaZ,
+                                                    uint32_t aModifierFlags,
+                                                    uint32_t aAdditionalFlags,
+                                                    nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                                              TouchPointerState aPointerState,
+                                              nsIntPoint aPointerScreenPoint,
+                                              double aPointerPressure,
+                                              uint32_t aPointerOrientation,
+                                              nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeTouchTap(nsIntPoint aPointerScreenPoint,
+                                            bool aLongTap,
+                                            nsIObserver* aObserver) override;
+  virtual nsresult ClearNativeTouchSequence(nsIObserver* aObserver) override;
 
 protected:
   bool mEnabled;

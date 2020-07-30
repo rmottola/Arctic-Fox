@@ -94,7 +94,7 @@ CSS_PSEUDO_CLASS(mozIsHTML, ":-moz-is-html", 0, "")
  CSS_STATE_PSEUDO_CLASS(unresolved, ":unresolved", 0, "", NS_EVENT_STATE_UNRESOLVED)
 
 // Matches nodes that are in a native-anonymous subtree (i.e., nodes in
-// a subtree of C++ anonymous content constructed by Goanna for its own
+// a subtree of C++ anonymous content constructed by Gecko for its own
 // purposes).
 CSS_PSEUDO_CLASS(mozNativeAnonymous, ":-moz-native-anonymous",
                  CSS_PSEUDO_CLASS_UA_SHEET_ONLY, "")

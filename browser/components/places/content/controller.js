@@ -659,27 +659,13 @@ PlacesController.prototype = {
   /**
    * Opens the bookmark properties for the selected URI Node.
    */
-  showBookmarkPropertiesForSelection:
-  function PC_showBookmarkPropertiesForSelection() {
-    var node = this._view.selectedNode;
+  showBookmarkPropertiesForSelection() {
+    let node = this._view.selectedNode;
     if (!node)
       return;
 
-    var itemType = PlacesUtils.nodeIsFolder(node) ||
-                   PlacesUtils.nodeIsTagQuery(node) ? "folder" : "bookmark";
-    var concreteId = PlacesUtils.getConcreteItemId(node);
-    var isRootItem = PlacesUtils.isRootItem(concreteId);
-    var itemId = node.itemId;
-    if (isRootItem || PlacesUtils.nodeIsTagQuery(node)) {
-      // If this is a root or the Tags query we use the concrete itemId to catch
-      // the correct title for the node.
-      itemId = concreteId;
-    }
-
     PlacesUIUtils.showBookmarkDialog({ action: "edit"
-                                     , type: itemType
-                                     , itemId: itemId
-                                     , readOnly: isRootItem
+				     , node
                                      , hiddenRows: [ "folderPicker" ]
                                      }, window.top);
   },

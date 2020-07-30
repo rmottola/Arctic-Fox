@@ -603,11 +603,6 @@ nsDNSService::Init()
 
     nsDNSPrefetch::Initialize(this);
 
-    // Don't initialize the resolver if we're in offline mode.
-    // Later on, the IO service will reinitialize us when going online.
-    if (gIOService->IsOffline() && !gIOService->IsComingOnline())
-        return NS_OK;
-
     nsCOMPtr<nsIIDNService> idn = do_GetService(NS_IDNSERVICE_CONTRACTID);
 
     nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
@@ -661,8 +656,17 @@ nsDNSService::Shutdown()
         res = mResolver;
         mResolver = nullptr;
     }
-    if (res)
+    if (res) {
         res->Shutdown();
+    }
+
+    nsCOMPtr<nsIObserverService> observerService =
+        mozilla::services::GetObserverService();
+    if (observerService) {
+        observerService->RemoveObserver(this, NS_NETWORK_LINK_TOPIC);
+        observerService->RemoveObserver(this, "last-pb-context-exited");
+    }
+
     return NS_OK;
 }
 

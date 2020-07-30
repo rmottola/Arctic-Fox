@@ -87,13 +87,14 @@
 #include "nsXULContentUtils.h"
 #include "nsNodeUtils.h"
 #include "nsFrameLoader.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "rdf.h"
 #include "nsIControllers.h"
 #include "nsAttrValueOrString.h"
 #include "nsAttrValueInlines.h"
 #include "mozilla/Attributes.h"
 #include "nsIController.h"
+#include "nsQueryObject.h"
 #include <algorithm>
 
 // The XUL doc interface
@@ -465,7 +466,7 @@ nsXULElement::GetElementsByAttributeNS(const nsAString& aNamespaceURI,
     ErrorResult rv;
     *aReturn =
         GetElementsByAttributeNS(aNamespaceURI, aAttribute, aValue, rv).take();
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 already_AddRefed<nsINodeList>
@@ -1295,8 +1296,7 @@ nsXULElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
          aVisitor.mEvent->message == NS_XUL_COMMAND ||
          aVisitor.mEvent->message == NS_CONTEXTMENU ||
          aVisitor.mEvent->message == NS_DRAGDROP_START ||
-         aVisitor.mEvent->message == NS_DRAGDROP_GESTURE ||
-         aVisitor.mEvent->message == NS_MOUSE_AUXCLICK)) {
+         aVisitor.mEvent->message == NS_DRAGDROP_GESTURE)) {
         // Don't propagate these events from native anonymous scrollbar.
         aVisitor.mCanHandle = true;
         aVisitor.mParentTarget = nullptr;
@@ -1371,7 +1371,7 @@ nsXULElement::GetResource(nsIRDFResource** aResource)
 {
     ErrorResult rv;
     *aResource = GetResource(rv).take();
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 already_AddRefed<nsIRDFResource>
@@ -1484,7 +1484,7 @@ nsXULElement::GetControllers(nsIControllers** aResult)
 {
     ErrorResult rv;
     NS_IF_ADDREF(*aResult = GetControllers(rv));
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 nsIControllers*
@@ -1496,8 +1496,7 @@ nsXULElement::GetControllers(ErrorResult& rv)
         rv = NS_NewXULControllers(nullptr, NS_GET_IID(nsIControllers),
                                   reinterpret_cast<void**>(&slots->mControllers));
 
-        NS_ASSERTION(NS_SUCCEEDED(rv.ErrorCode()),
-                     "unable to create a controllers");
+        NS_ASSERTION(!rv.Failed(), "unable to create a controllers");
         if (rv.Failed()) {
             return nullptr;
         }
@@ -1511,7 +1510,7 @@ nsXULElement::GetBoxObject(nsIBoxObject** aResult)
 {
     ErrorResult rv;
     *aResult = GetBoxObject(rv).take();
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 already_AddRefed<BoxObject>
@@ -1653,7 +1652,7 @@ nsXULElement::SwapFrameLoaders(nsIFrameLoaderOwner* aOtherOwner)
 
     ErrorResult rv;
     SwapFrameLoaders(*otherEl, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 void
@@ -1702,7 +1701,7 @@ nsXULElement::Focus()
 {
     ErrorResult rv;
     Focus(rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 void
@@ -1720,7 +1719,7 @@ nsXULElement::Blur()
 {
     ErrorResult rv;
     Blur(rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
 }
 
 void

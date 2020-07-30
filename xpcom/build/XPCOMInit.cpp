@@ -50,8 +50,6 @@
 #include "nsThreadManager.h"
 #include "nsThreadPool.h"
 
-#include "nsCompartmentInfo.h"
-
 #include "xptinfo.h"
 #include "nsIInterfaceInfoManager.h"
 #include "xptiprivate.h"
@@ -229,8 +227,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMemoryReporterManager, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMemoryInfoDumper)
 
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsStatusReporterManager, Init)
-
-NS_GENERIC_FACTORY_CONSTRUCTOR(nsCompartmentInfo)
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsIOUtil)
 
@@ -494,7 +490,7 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
 
   if (!MessageLoop::current()) {
     sMessageLoop = new MessageLoopForUI(MessageLoop::TYPE_MOZILLA_UI);
-    sMessageLoop->set_thread_name("Goanna");
+    sMessageLoop->set_thread_name("Gecko");
     // Set experimental values for main thread hangs:
     // 512ms for transient hangs and 8192ms for permanent hangs
     sMessageLoop->set_hang_timeouts(512, 8192);

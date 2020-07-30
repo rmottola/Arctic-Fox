@@ -7,7 +7,7 @@ Composer/M
 Fennec/M
 Firefox/M
 Flock/M
-Goanna/M
+Gecko/M
 JavaScript/M
 Lightning/M
 Mozilla/M

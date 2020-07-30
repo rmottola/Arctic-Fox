@@ -40,10 +40,10 @@ elif toolkit == 'windows':
         'msimg32',
     ]
 
-# must link statically with the CRT; nptest isn't Goanna code
+# must link statically with the CRT; nptest isn't Gecko code
 USE_STATIC_LIBS = True
 
-# Don't use STL wrappers; nptest isn't Goanna code
+# Don't use STL wrappers; nptest isn't Gecko code
 DISABLE_STL_WRAPPING = True
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':

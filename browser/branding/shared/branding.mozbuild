@@ -14,13 +14,6 @@ JS_PREFERENCE_FILES += [
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
-    FINAL_TARGET_FILES['..'] += [
-        'palemoon.VisualElementsManifest.xml',
-    ]
-    FINAL_TARGET_FILES.VisualElements += [
-        'VisualElements_150.png',
-        'VisualElements_70.png',
-    ]
     BRANDING_FILES += [
         '../shared/newtab.ico',
         '../shared/newwindow.ico',

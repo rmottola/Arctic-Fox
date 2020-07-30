@@ -7,15 +7,13 @@
 
 #include "nsTArray.h"
 #include "nsCocoaUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "mozilla/TextEvents.h"
 
 namespace mozilla {
 namespace widget {
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gNativeKeyBindingsLog = nullptr;
-#endif
 
 NativeKeyBindings* NativeKeyBindings::sInstanceForSingleLineEditor = nullptr;
 NativeKeyBindings* NativeKeyBindings::sInstanceForMultiLineEditor = nullptr;
@@ -65,16 +63,14 @@ NativeKeyBindings::NativeKeyBindings()
 void
 NativeKeyBindings::Init(NativeKeyBindingsType aType)
 {
-#ifdef PR_LOGGING
   if (!gNativeKeyBindingsLog) {
     gNativeKeyBindingsLog = PR_NewLogModule("NativeKeyBindings");
   }
-#endif
 
   PR_LOG(gNativeKeyBindingsLog, PR_LOG_ALWAYS,
     ("%p NativeKeyBindings::Init", this));
 
-  // Many selectors have a one-to-one mapping to a Goanna command. Those mappings
+  // Many selectors have a one-to-one mapping to a Gecko command. Those mappings
   // are registered in mSelectorToCommand.
 
   // Selectors from NSResponder's "Responding to Action Messages" section and
@@ -232,12 +228,11 @@ NativeKeyBindings::Execute(const WidgetKeyboardEvent& aEvent,
     ("%p NativeKeyBindings::KeyPress, bindingCommands=%u",
      this, bindingCommands.Length()));
 
-  nsAutoTArray<Command, 4> goannaCommands;
+  nsAutoTArray<Command, 4> geckoCommands;
 
   for (uint32_t i = 0; i < bindingCommands.Length(); i++) {
     SEL selector = bindingCommands[i].selector;
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gNativeKeyBindingsLog, PR_LOG_ALWAYS)) {
       NSString* selectorString = NSStringFromSelector(selector);
       nsAutoString nsSelectorString;
@@ -245,47 +240,46 @@ NativeKeyBindings::Execute(const WidgetKeyboardEvent& aEvent,
 
       PR_LOG(gNativeKeyBindingsLog, PR_LOG_ALWAYS,
         ("%p NativeKeyBindings::KeyPress, selector=%s",
-         this, ToNewCString(nsSelectorString)));
+         this, NS_LossyConvertUTF16toASCII(nsSelectorString).get()));
     }
-#endif
 
     // Try to find a simple mapping in the hashtable
-    Command goannaCommand = static_cast<Command>(mSelectorToCommand.Get(
+    Command geckoCommand = static_cast<Command>(mSelectorToCommand.Get(
       reinterpret_cast<struct objc_selector*>(selector)));
 
-    if (goannaCommand) {
-      goannaCommands.AppendElement(goannaCommand);
+    if (geckoCommand) {
+      geckoCommands.AppendElement(geckoCommand);
     } else if (selector == @selector(selectLine:)) {
       // This is functional, but Cocoa's version is direction-less in that
       // selection direction is not determined until some future directed action
       // is taken. See bug 282097, comment 79 for more details.
-      goannaCommands.AppendElement(CommandBeginLine);
-      goannaCommands.AppendElement(CommandSelectEndLine);
+      geckoCommands.AppendElement(CommandBeginLine);
+      geckoCommands.AppendElement(CommandSelectEndLine);
     } else if (selector == @selector(selectWord:)) {
       // This is functional, but Cocoa's version is direction-less in that
       // selection direction is not determined until some future directed action
       // is taken. See bug 282097, comment 79 for more details.
-      goannaCommands.AppendElement(CommandWordPrevious);
-      goannaCommands.AppendElement(CommandSelectWordNext);
+      geckoCommands.AppendElement(CommandWordPrevious);
+      geckoCommands.AppendElement(CommandSelectWordNext);
     }
   }
 
-  if (goannaCommands.IsEmpty()) {
+  if (geckoCommands.IsEmpty()) {
     PR_LOG(gNativeKeyBindingsLog, PR_LOG_ALWAYS,
       ("%p NativeKeyBindings::KeyPress, handled=false", this));
 
     return false;
   }
 
-  for (uint32_t i = 0; i < goannaCommands.Length(); i++) {
-    Command goannaCommand = goannaCommands[i];
+  for (uint32_t i = 0; i < geckoCommands.Length(); i++) {
+    Command geckoCommand = geckoCommands[i];
 
     PR_LOG(gNativeKeyBindingsLog, PR_LOG_ALWAYS,
       ("%p NativeKeyBindings::KeyPress, command=%s",
-       this, WidgetKeyboardEvent::GetCommandStr(goannaCommand)));
+       this, WidgetKeyboardEvent::GetCommandStr(geckoCommand)));
 
-    // Execute the Goanna command
-    aCallback(goannaCommand, aCallbackData);
+    // Execute the Gecko command
+    aCallback(geckoCommand, aCallbackData);
   }
 
   PR_LOG(gNativeKeyBindingsLog, PR_LOG_ALWAYS,

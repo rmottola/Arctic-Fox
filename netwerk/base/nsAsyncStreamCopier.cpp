@@ -8,17 +8,15 @@
 #include "nsStreamUtils.h"
 #include "nsThreadUtils.h"
 #include "nsNetUtil.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 using namespace mozilla;
 
 #undef LOG
-#if defined(PR_LOGGING)
 //
 // NSPR_LOG_MODULES=nsStreamCopier:5
 //
 static PRLogModuleInfo *gStreamCopierLog = nullptr;
-#endif
 #define LOG(args) PR_LOG(gStreamCopierLog, PR_LOG_DEBUG, args)
 
 /**
@@ -69,10 +67,8 @@ nsAsyncStreamCopier::nsAsyncStreamCopier()
     , mIsPending(false)
     , mShouldSniffBuffering(false)
 {
-#if defined(PR_LOGGING)
     if (!gStreamCopierLog)
         gStreamCopierLog = PR_NewLogModule("nsStreamCopier");
-#endif
     LOG(("Creating nsAsyncStreamCopier @%x\n", this));
 }
 

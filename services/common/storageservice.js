@@ -251,7 +251,7 @@ BasicStorageObject.prototype = {
  *     smaller batches.
  *
  *   network - A network error prevented this request from succeeding. If set,
- *     it will be an Error thrown by the Goanna network stack. If set, it could
+ *     it will be an Error thrown by the Gecko network stack. If set, it could
  *     mean that the request could not be performed or that an error occurred
  *     when the request was in flight. It is also possible the request
  *     succeeded on the server but the response was lost in transit.

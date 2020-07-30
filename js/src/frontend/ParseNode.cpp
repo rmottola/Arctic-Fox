@@ -23,9 +23,14 @@ ParseNode::checkListConsistency()
     ParseNode** tail;
     uint32_t count = 0;
     if (pn_head) {
-        ParseNode* pn, *last;
-        for (pn = last = pn_head; pn; last = pn, pn = pn->pn_next, count++)
-            ;
+        ParseNode* last = pn_head;
+        ParseNode* pn = last;
+        while (pn) {
+            last = pn;
+            pn = pn->pn_next;
+            count++;
+        }
+
         tail = &last->pn_next;
     } else {
         tail = &pn_head;
@@ -1109,6 +1114,7 @@ ObjectBox::ObjectBox(JSObject *object, ObjectBox* traceLink)
     emitLink(nullptr)
 {
     MOZ_ASSERT(!object->is<JSFunction>());
+    MOZ_ASSERT(object->isTenured());
 }
 
 ObjectBox::ObjectBox(JSFunction *function, ObjectBox* traceLink)
@@ -1118,6 +1124,7 @@ ObjectBox::ObjectBox(JSFunction *function, ObjectBox* traceLink)
 {
     MOZ_ASSERT(object->is<JSFunction>());
     MOZ_ASSERT(asFunctionBox()->function() == function);
+    MOZ_ASSERT(object->isTenured());
 }
 
 FunctionBox*

@@ -99,8 +99,13 @@ let AnimationsController = {
 
     let target = gToolbox.target;
     this.animationsFront = new AnimationsFront(target.client, target.form);
-    // Not all server versions provide a way to pause all animations at once.
+
+    // Expose actor capabilities.
     this.hasToggleAll = yield target.actorHasMethod("animations", "toggleAll");
+    this.hasSetCurrentTime = yield target.actorHasMethod("animationplayer",
+                                                         "setCurrentTime");
+    this.hasMutationEvents = yield target.actorHasMethod("animations",
+                                                         "stopAnimationPlayerUpdates");
 
     this.onPanelVisibilityChange = this.onPanelVisibilityChange.bind(this);
     this.onNewNodeFront = this.onNewNodeFront.bind(this);
@@ -223,6 +228,12 @@ let AnimationsController = {
   },
 
   destroyAnimationPlayers: Task.async(function*() {
+    // Let the server know that we're not interested in receiving updates about
+    // players for the current node. We're either being destroyed or a new node
+    // has been selected.
+    if (this.hasMutationEvents) {
+      yield this.animationsFront.stopAnimationPlayerUpdates();
+    }
     this.stopAllAutoRefresh();
     for (let front of this.animationPlayers) {
       yield front.release();

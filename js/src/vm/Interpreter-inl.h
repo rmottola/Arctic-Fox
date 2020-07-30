@@ -303,12 +303,13 @@ SetNameOperation(JSContext* cx, JSScript* script, jsbytecode* pc, HandleObject s
                *pc == JSOP_STRICTSETNAME ||
                *pc == JSOP_SETGNAME ||
                *pc == JSOP_STRICTSETGNAME);
-    MOZ_ASSERT_IF(*pc == JSOP_SETGNAME, scope == cx->global());
-    MOZ_ASSERT_IF(*pc == JSOP_STRICTSETGNAME, scope == cx->global());
+    MOZ_ASSERT_IF(*pc == JSOP_SETGNAME && !script->hasPollutedGlobalScope(),
+                  scope == cx->global());
+    MOZ_ASSERT_IF(*pc == JSOP_STRICTSETGNAME && !script->hasPollutedGlobalScope(),
+                  scope == cx->global());
 
     bool strict = *pc == JSOP_STRICTSETNAME || *pc == JSOP_STRICTSETGNAME;
     RootedPropertyName name(cx, script->getName(pc));
-    RootedValue valCopy(cx, val);
 
     // In strict mode, assigning to an undeclared global variable is an
     // error. To detect this, we call NativeSetProperty directly and pass
@@ -316,12 +317,13 @@ SetNameOperation(JSContext* cx, JSScript* script, jsbytecode* pc, HandleObject s
     bool ok;
     ObjectOpResult result;
     RootedId id(cx, NameToId(name));
+    RootedValue receiver(cx, ObjectValue(*scope));
     if (scope->isUnqualifiedVarObj()) {
         MOZ_ASSERT(!scope->getOps()->setProperty);
-        ok = NativeSetProperty(cx, scope.as<NativeObject>(), scope.as<NativeObject>(), id,
-                               Unqualified, &valCopy, result);
+        ok = NativeSetProperty(cx, scope.as<NativeObject>(), id, val, receiver, Unqualified,
+                               result);
     } else {
-        ok = SetProperty(cx, scope, scope, id, &valCopy, result);
+        ok = SetProperty(cx, scope, id, val, receiver, result);
     }
     return ok && result.checkStrictErrorOrWarning(cx, scope, id, strict);
 }
@@ -336,8 +338,7 @@ InitPropertyOperation(JSContext *cx, JSOp op, HandleObject obj, HandleId id, Han
     }
 
     MOZ_ASSERT(obj->as<UnboxedPlainObject>().layout().lookup(id));
-    RootedValue v(cx, rhs);
-    return PutProperty(cx, obj, id, &v, false);
+    return PutProperty(cx, obj, id, rhs, false);
 }
 
 inline bool
@@ -686,7 +687,8 @@ ProcessCallSiteObjOperation(JSContext* cx, RootedObject& cso, RootedObject& raw,
             if (!ToPrimitive(cx, JSTYPE_NUMBER, rhs))                         \
                 return false;                                                 \
             if (lhs.isString() && rhs.isString()) {                           \
-                JSString* l = lhs.toString(), *r = rhs.toString();            \
+                JSString* l = lhs.toString();                                 \
+                JSString* r = rhs.toString();                                 \
                 int32_t result;                                               \
                 if (!CompareStrings(cx, l, r, &result))                       \
                     return false;                                             \

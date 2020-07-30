@@ -12,7 +12,7 @@
 #include "mp4_demuxer/Adts.h"
 #include "VideoUtils.h"
 #include "nsTArray.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "stagefright/MediaBuffer.h"
 #include "stagefright/MetaData.h"
 #include "stagefright/MediaErrors.h"
@@ -25,12 +25,8 @@
 #include <android/log.h>
 #define GADM_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "GonkAudioDecoderManager", __VA_ARGS__)
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetDemuxerLog();
 #define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
-#else
-#define LOG(...)
-#endif
 #define READ_OUTPUT_BUFFER_TIMEOUT_US  3000
 
 using namespace android;

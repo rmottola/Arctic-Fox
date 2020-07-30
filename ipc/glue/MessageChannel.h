@@ -88,7 +88,7 @@ class MessageChannel : HasResultCodes
 
     void SetAbortOnError(bool abort)
     {
-        mAbortOnError = true;
+        mAbortOnError = abort;
     }
 
     // Misc. behavioral traits consumers can request for this channel
@@ -203,7 +203,7 @@ class MessageChannel : HasResultCodes
 
   public:
     void ProcessNativeEventsInInterruptCall();
-    static void NotifyGoannaEventDispatch();
+    static void NotifyGeckoEventDispatch();
 
   private:
     void SpinInternalEventLoop();
@@ -591,6 +591,7 @@ class MessageChannel : HasResultCodes
     // hitting a lot of corner cases with message nesting that we don't really
     // care about.
     int32_t mTimedOutMessageSeqno;
+    int mTimedOutMessagePriority;
 
     // If waiting for the reply to a sync out-message, it will be saved here
     // on the I/O thread and then read and cleared by the worker thread.

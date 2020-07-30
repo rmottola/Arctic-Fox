@@ -23,21 +23,7 @@
 #include "Units.h"
 
 extern nsIntRect gScreenBounds;
-
-namespace mozilla {
-namespace gl {
-class GLContext;
-}
-namespace layers {
-class LayersManager;
-}
-}
-
 class ANativeWindowBuffer;
-
-namespace android {
-class FramebufferNativeWindow;
-}
 
 namespace widget {
 struct InputContext;
@@ -91,14 +77,16 @@ public:
     void DispatchTouchInputViaAPZ(mozilla::MultiTouchInput& aInput);
     void DispatchTouchEventForAPZ(const mozilla::MultiTouchInput& aInput,
                                   const ScrollableLayerGuid& aGuid,
-                                  const uint64_t aInputBlockId);
+                                  const uint64_t aInputBlockId,
+                                  nsEventStatus aApzResponse);
     NS_IMETHOD DispatchEvent(mozilla::WidgetGUIEvent* aEvent,
                              nsEventStatus& aStatus);
     virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
                                                 TouchPointerState aPointerState,
                                                 nsIntPoint aPointerScreenPoint,
                                                 double aPointerPressure,
-                                                uint32_t aPointerOrientation) override;
+                                                uint32_t aPointerOrientation,
+                                                nsIObserver* aObserver) override;
 
     NS_IMETHOD CaptureRollupEvents(nsIRollupListener *aListener,
                                    bool aDoCapture)
@@ -132,6 +120,8 @@ public:
 
     virtual Composer2D* GetComposer2D() override;
 
+    void ConfigureAPZControllerThread() override;
+
 protected:
     nsWindow* mParent;
     bool mVisible;
@@ -144,7 +134,7 @@ protected:
     ANativeWindowBuffer* mFramebuffer;
     // If we're using a BasicCompositor, this is our window back
     // buffer.  The gralloc framebuffer driver expects us to draw the
-    // entire framebuffer on every frame, but goanna expects the
+    // entire framebuffer on every frame, but gecko expects the
     // windowing system to be tracking buffer updates for invalidated
     // regions.  We get stuck holding that bag.
     //

@@ -667,8 +667,9 @@ nsAnnotationService::GetPageAnnotation(nsIURI* aURI,
     }
   }
 
-  if (NS_SUCCEEDED(rv))
-    NS_ADDREF(*_retval = value);
+  if (NS_SUCCEEDED(rv)) {
+    value.forget(_retval);
+  }
 
   return rv;
 }
@@ -711,8 +712,9 @@ nsAnnotationService::GetItemAnnotation(int64_t aItemId,
     }
   }
 
-  if (NS_SUCCEEDED(rv))
-    NS_ADDREF(*_retval = value);
+  if (NS_SUCCEEDED(rv)) {
+    value.forget(_retval);
+  }
 
   return rv;
 }
@@ -1482,7 +1484,7 @@ nsAnnotationService::RemoveItemAnnotations(int64_t aItemId)
 
 
 /**
- * @note If we use annotations for some standard items like GoannaFlags, it
+ * @note If we use annotations for some standard items like GeckoFlags, it
  *       might be a good idea to blacklist these standard annotations from this
  *       copy function.
  */

@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim:set ts=2 sw=2 sts=2 et cindent: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -35,6 +35,7 @@
 #include "nsIThreadInternal.h"
 #include "nsContentUtils.h"
 #include "nsIRequest.h"
+#include "nsQueryObject.h"
 
 #include "nsIScriptSecurityManager.h"
 #include "nsIXPConnect.h"
@@ -90,15 +91,10 @@
 #include "nsRange.h"
 #include <algorithm>
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gMediaElementLog;
 static PRLogModuleInfo* gMediaElementEventsLog;
 #define LOG(type, msg) PR_LOG(gMediaElementLog, type, msg)
 #define LOG_EVENT(type, msg) PR_LOG(gMediaElementEventsLog, type, msg)
-#else
-#define LOG(type, msg)
-#define LOG_EVENT(type, msg)
-#endif
 
 #include "nsIContentSecurityPolicy.h"
 
@@ -1575,7 +1571,7 @@ NS_IMETHODIMP HTMLMediaElement::SetCurrentTime(double aCurrentTime)
 
   ErrorResult rv;
   SetCurrentTime(aCurrentTime, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* readonly attribute double duration; */
@@ -1695,7 +1691,7 @@ NS_IMETHODIMP HTMLMediaElement::Pause()
 {
   ErrorResult rv;
   Pause(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute double volume; */
@@ -1728,7 +1724,7 @@ NS_IMETHODIMP HTMLMediaElement::SetVolume(double aVolume)
 {
   ErrorResult rv;
   SetVolume(aVolume, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 // Helper struct with arguments for our hash iterator.
@@ -1800,7 +1796,7 @@ HTMLMediaElement::MozGetMetadata(JSContext* cx, JS::MutableHandle<JS::Value> aVa
     aValue.setObject(*obj);
   }
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute boolean muted; */
@@ -2085,14 +2081,12 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
     mHasUserInteraction(false),
     mDefaultPlaybackStartPosition(0.0)
 {
-#ifdef PR_LOGGING
   if (!gMediaElementLog) {
     gMediaElementLog = PR_NewLogModule("nsMediaElement");
   }
   if (!gMediaElementEventsLog) {
     gMediaElementEventsLog = PR_NewLogModule("nsMediaElementEvents");
   }
-#endif
   ErrorResult rv;
 
   double defaultVolume = Preferences::GetFloat("media.default_volume", 1.0);
@@ -3297,11 +3291,11 @@ void HTMLMediaElement::LoadAborted()
   Error(nsIDOMMediaError::MEDIA_ERR_ABORTED);
 }
 
-void HTMLMediaElement::Error(uint16_t aErrorCode)
+void HTMLMediaElement::Error(uint16_t aStealNSResult)
 {
-  NS_ASSERTION(aErrorCode == nsIDOMMediaError::MEDIA_ERR_DECODE ||
-               aErrorCode == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
-               aErrorCode == nsIDOMMediaError::MEDIA_ERR_ABORTED,
+  NS_ASSERTION(aStealNSResult == nsIDOMMediaError::MEDIA_ERR_DECODE ||
+               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
+               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_ABORTED,
                "Only use nsIDOMMediaError codes!");
 
   // Since we have multiple paths calling into DecodeError, e.g.
@@ -3311,7 +3305,7 @@ void HTMLMediaElement::Error(uint16_t aErrorCode)
     return;
   }
 
-  mError = new MediaError(this, aErrorCode);
+  mError = new MediaError(this, aStealNSResult);
   DispatchAsyncEvent(NS_LITERAL_STRING("error"));
   if (mReadyState == nsIDOMHTMLMediaElement::HAVE_NOTHING) {
     ChangeNetworkState(nsIDOMHTMLMediaElement::NETWORK_EMPTY);
@@ -3622,7 +3616,6 @@ HTMLMediaElement::UpdateReadyStateInternal()
   ChangeReadyState(nsIDOMHTMLMediaElement::HAVE_FUTURE_DATA);
 }
 
-#ifdef PR_LOGGING
 static const char* const gReadyStateToString[] = {
   "HAVE_NOTHING",
   "HAVE_METADATA",
@@ -3630,7 +3623,6 @@ static const char* const gReadyStateToString[] = {
   "HAVE_FUTURE_DATA",
   "HAVE_ENOUGH_DATA"
 };
-#endif
 
 void HTMLMediaElement::ChangeReadyState(nsMediaReadyState aState)
 {
@@ -3682,14 +3674,12 @@ void HTMLMediaElement::ChangeReadyState(nsMediaReadyState aState)
   }
 }
 
-#ifdef PR_LOGGING
 static const char* const gNetworkStateToString[] = {
   "EMPTY",
   "IDLE",
   "LOADING",
   "NO_SOURCE"
  };
-#endif
 
 void HTMLMediaElement::ChangeNetworkState(nsMediaNetworkState aState)
 {
@@ -4351,7 +4341,7 @@ NS_IMETHODIMP HTMLMediaElement::SetDefaultPlaybackRate(double aDefaultPlaybackRa
 {
   ErrorResult rv;
   SetDefaultPlaybackRate(aDefaultPlaybackRate, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute double playbackRate; */
@@ -4391,7 +4381,7 @@ NS_IMETHODIMP HTMLMediaElement::SetPlaybackRate(double aPlaybackRate)
 {
   ErrorResult rv;
   SetPlaybackRate(aPlaybackRate, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 /* attribute bool mozPreservesPitch; */

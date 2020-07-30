@@ -1,7 +1,7 @@
 Tutorial: Show Allocations Per Call Path
 ========================================
 
-{{ goanna_minversion_header(\'34\') }}
+{{ gecko_minversion_header(\'34\') }}
 
 This page shows how to use the [`Debugger` API][debugger] to show how many
 objects a web page allocates, sorted by the function call path that allocated

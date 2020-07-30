@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -31,7 +32,6 @@
 #include "nsExpirationTracker.h"
 #include "nsClassHashtable.h"
 #include "prclist.h"
-#include "gfxVR.h"
 
 class imgIRequest;
 class nsAString;
@@ -52,7 +52,6 @@ class nsIDocShell;
 class nsIDocumentEncoder;
 class nsIDocumentObserver;
 class nsIDOMDocument;
-class nsIDOMDocumentFragment;
 class nsIDOMDocumentType;
 class nsIDOMElement;
 class nsIDOMNodeFilter;
@@ -91,7 +90,7 @@ namespace mozilla {
 class CSSStyleSheet;
 class ErrorResult;
 class EventStates;
-class PendingPlayerTracker;
+class PendingAnimationTracker;
 class SVGAttrAnimationRuleProcessor;
 
 namespace css {
@@ -99,8 +98,11 @@ class Loader;
 class ImageLoader;
 } // namespace css
 
+namespace gfx {
+class VRHMDInfo;
+} // namespace gfx
+
 namespace dom {
-class AnimationTimeline;
 class AnonymousContent;
 class Attr;
 class BoxObject;
@@ -108,6 +110,7 @@ class CDATASection;
 class Comment;
 struct CustomElementDefinition;
 class DocumentFragment;
+class DocumentTimeline;
 class DocumentType;
 class DOMImplementation;
 class DOMStringList;
@@ -118,7 +121,6 @@ class EventTarget;
 class FontFaceSet;
 class FrameRequestCallback;
 class ImportManager;
-class OverfillCallback;
 class HTMLBodyElement;
 struct LifecycleCallbackArgs;
 class Link;
@@ -145,7 +147,7 @@ template<typename, typename> class CallbackObjectHolder;
 typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 
 struct FullScreenOptions {
-  FullScreenOptions() { }
+  FullScreenOptions();
   nsRefPtr<gfx::VRHMDInfo> mVRHMDDevice;
 };
 
@@ -182,7 +184,7 @@ NS_GetContentList(nsINode* aRootNode,
 //----------------------------------------------------------------------
 
 // Document interface.  This is implemented by all document objects in
-// Goanna.
+// Gecko.
 class nsIDocument : public nsINode
 {
   typedef mozilla::dom::GlobalObject GlobalObject;
@@ -864,7 +866,7 @@ public:
    * front.
    *
    * By "built-in" user-agent style sheets we mean the user-agent style sheets
-   * that goanna itself supplies (such as html.css and svg.css) as opposed to
+   * that gecko itself supplies (such as html.css and svg.css) as opposed to
    * user-agent level style sheets inserted by add-ons or the like.
    *
    * This function prepends the given style sheet to the document's style set
@@ -1266,8 +1268,8 @@ public:
   }
 
   /**
-   * Only to be used inside Goanna, you can't really do anything with the
-   * pointer outside Goanna anyway.
+   * Only to be used inside Gecko, you can't really do anything with the
+   * pointer outside Gecko anyway.
    */
   nsNodeInfoManager* NodeInfoManager() const
   {
@@ -1877,16 +1879,17 @@ public:
   // mAnimationController isn't yet initialized.
   virtual nsSMILAnimationController* GetAnimationController() = 0;
 
-  // Gets the tracker for animation players that are waiting to start.
-  // Returns nullptr if there is no pending player tracker for this document
+  // Gets the tracker for animations that are waiting to start.
+  // Returns nullptr if there is no pending animation tracker for this document
   // which will be the case if there have never been any CSS animations or
   // transitions on elements in the document.
-  virtual mozilla::PendingPlayerTracker* GetPendingPlayerTracker() = 0;
+  virtual mozilla::PendingAnimationTracker* GetPendingAnimationTracker() = 0;
 
-  // Gets the tracker for animation players that are waiting to start and
+  // Gets the tracker for animations that are waiting to start and
   // creates it if it doesn't already exist. As a result, the return value
   // will never be nullptr.
-  virtual mozilla::PendingPlayerTracker* GetOrCreatePendingPlayerTracker() = 0;
+  virtual mozilla::PendingAnimationTracker*
+  GetOrCreatePendingAnimationTracker() = 0;
 
   // Makes the images on this document capable of having their animation
   // active or suspended. An Image will animate as long as at least one of its
@@ -1977,6 +1980,12 @@ public:
     MOZ_ASSERT(!mOriginalDocument || !mOriginalDocument->GetOriginalDocument());
     return mOriginalDocument;
   }
+
+  /**
+   * If this document is a static clone, let the original document know that
+   * we're going away and then release our reference to it.
+   */
+  void UnlinkOriginalDocumentIfStatic();
 
   /**
    * These are called by the parser as it encounters <picture> tags, the end of
@@ -2087,15 +2096,6 @@ public:
 
   virtual nsISupports* GetCurrentContentSink() = 0;
 
-  /**
-   * Register/Unregister a hostobject uri as being "owned" by this document.
-   * I.e. that its lifetime is connected with this document. When the document
-   * goes away it should "kill" the uri by calling
-   * nsHostObjectProtocolHandler::RemoveDataEntry
-   */
-  virtual void RegisterHostObjectUri(const nsACString& aUri) = 0;
-  virtual void UnregisterHostObjectUri(const nsACString& aUri) = 0;
-
   virtual void SetScrollToRef(nsIURI *aDocumentURI) = 0;
   virtual void ScrollToRef() = 0;
   virtual void ResetScrolledToRefAlready() = 0;
@@ -2127,7 +2127,7 @@ public:
 
   virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() = 0;
 
-  virtual mozilla::dom::AnimationTimeline* Timeline() = 0;
+  virtual mozilla::dom::DocumentTimeline* Timeline() = 0;
 
   typedef mozilla::dom::CallbackObjectHolder<
     mozilla::dom::FrameRequestCallback,
@@ -2142,6 +2142,13 @@ public:
    * list, and forget about them.
    */
   void TakeFrameRequestCallbacks(FrameRequestCallbackList& aCallbacks);
+
+  /**
+   * @return true if this document's frame request callbacks should be
+   * throttled. We throttle requestAnimationFrame for documents which aren't
+   * visible (e.g. scrolled out of the viewport).
+   */
+  bool ShouldThrottleFrameRequests();
 
   // This returns true when the document tree is being teared down.
   bool InUnlinkOrDeletion() { return mInUnlinkOrDeletion; }
@@ -2910,6 +2917,9 @@ protected:
    * The current frame request callback handle
    */
   int32_t mFrameRequestCallbackCounter;
+
+  // Count of live static clones of this document.
+  uint32_t mStaticCloneCount;
 
   // Array of nodes that have been blocked to prevent user tracking.
   // They most likely have had their nsIChannel canceled by the URL

@@ -138,7 +138,7 @@ public:
    *                        string.  This should not be larger than the length
    *                        of the pending composition string.
    * @param aLength         Caret width.  If this is 0, caret will be collapsed.
-   *                        Note that Goanna doesn't supported wide caret yet,
+   *                        Note that Gecko doesn't supported wide caret yet,
    *                        therefore, this is ignored for now.
    */
   nsresult SetCaretInPendingComposition(uint32_t aOffset,

@@ -20,21 +20,22 @@
    we're midway through this process, so you will see inlined functions and member
    variables in this file.  -dwh */
 
+#include <algorithm>
 #include <stdio.h>
+
+#include "CaretAssociationHint.h"
+#include "FramePropertyTable.h"
+#include "mozilla/layout/FrameChildList.h"
+#include "mozilla/WritingModes.h"
+#include "nsDirection.h"
+#include "nsFrameList.h"
+#include "nsFrameState.h"
+#include "nsHTMLReflowMetrics.h"
+#include "nsITheme.h"
+#include "nsLayoutUtils.h"
 #include "nsQueryFrame.h"
 #include "nsStyleContext.h"
 #include "nsStyleStruct.h"
-#include "nsHTMLReflowMetrics.h"
-#include "nsFrameList.h"
-#include "mozilla/layout/FrameChildList.h"
-#include "FramePropertyTable.h"
-#include "nsDirection.h"
-#include "WritingModes.h"
-#include <algorithm>
-#include "nsITheme.h"
-#include "nsLayoutUtils.h"
-#include "nsFrameState.h"
-#include "CaretAssociationHint.h"
 
 #ifdef ACCESSIBILITY
 #include "mozilla/a11y/AccTypes.h"
@@ -58,14 +59,12 @@
  */
 
 struct nsHTMLReflowState;
-class nsHTMLReflowCommand;
 class nsIAtom;
 class nsPresContext;
 class nsIPresShell;
 class nsRenderingContext;
 class nsView;
 class nsIWidget;
-class nsIDOMRange;
 class nsISelectionController;
 class nsBoxLayoutState;
 class nsBoxLayout;
@@ -398,7 +397,7 @@ static void ReleaseValue(void* aPropertyValue)
  * to destroy a frame. The lifetime of the frame hierarchy is bounded by the
  * lifetime of the presentation shell which owns the frames.
  *
- * nsIFrame is a private Goanna interface. If you are not Goanna then you
+ * nsIFrame is a private Gecko interface. If you are not Gecko then you
  * should not use it. If you're not in layout, then you won't be able to
  * link to many of the functions defined here. Too bad.
  *
@@ -1767,17 +1766,6 @@ public:
                                            nscoord* aXMost);
 
   /**
-   * Pre-reflow hook. Before a frame is reflowed this method will be called.
-   * This call will always be invoked at least once before a subsequent Reflow
-   * and DidReflow call. It may be called more than once, In general you will
-   * receive on WillReflow notification before each Reflow request.
-   *
-   * XXX Is this really the semantics we want? Because we have the NS_FRAME_IN_REFLOW
-   * bit we can ensure we don't call it more than once...
-   */
-  virtual void WillReflow(nsPresContext* aPresContext) = 0;
-
-  /**
    * The frame is given an available size and asked for its desired
    * size.  This is the frame's opportunity to reflow its children.
    *
@@ -2831,15 +2819,27 @@ NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
    * the last repaint.
    */  
   void UpdatePaintCountForPaintedPresShells() {
-    nsTArray<nsWeakPtr> * list = PaintedPresShellList();
-    for (int i = 0, l = list->Length(); i < l; i++) {
-      nsCOMPtr<nsIPresShell> shell = do_QueryReferent(list->ElementAt(i));
-      
+    for (nsWeakPtr& item : *PaintedPresShellList()) {
+      nsCOMPtr<nsIPresShell> shell = do_QueryReferent(item);
       if (shell) {
         shell->IncrementPaintCount();
       }
     }
   }  
+
+  /**
+   * @return true if we painted @aShell during the last repaint.
+   */
+  bool DidPaintPresShell(nsIPresShell* aShell)
+  {
+    for (nsWeakPtr& item : *PaintedPresShellList()) {
+      nsCOMPtr<nsIPresShell> shell = do_QueryReferent(item);
+      if (shell == aShell) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * Accessors for the absolute containing block.
@@ -3035,6 +3035,14 @@ private:
   }
 
 protected:
+  void MarkInReflow() {
+#ifdef DEBUG_dbaron_off
+    // bug 81268
+    NS_ASSERTION(!(mState & NS_FRAME_IN_REFLOW), "frame is already in reflow");
+#endif
+    mState |= NS_FRAME_IN_REFLOW;
+  }
+
   nsFrameState     mState;
 
   // When there is an overflow area only slightly larger than mRect,

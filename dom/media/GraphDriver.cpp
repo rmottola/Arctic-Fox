@@ -10,12 +10,8 @@
 #include <sys/sysctl.h>
 #endif
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gMediaStreamGraphLog;
 #define STREAM_LOG(type, msg) PR_LOG(gMediaStreamGraphLog, type, msg)
-#else
-#define STREAM_LOG(type, msg)
-#endif
 
 // We don't use NSPR log here because we want this interleaved with adb logcat
 // on Android/B2G
@@ -23,7 +19,7 @@ extern PRLogModuleInfo* gMediaStreamGraphLog;
 #ifdef ENABLE_LIFECYCLE_LOG
 #ifdef ANDROID
 #include "android/log.h"
-#define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Goanna - MSG" , __VA_ARGS__); printf(__VA_ARGS__);printf("\n");
+#define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Gecko - MSG" , __VA_ARGS__); printf(__VA_ARGS__);printf("\n");
 #else
 #define LIFECYCLE_LOG(...) printf(__VA_ARGS__);printf("\n");
 #endif

@@ -16,10 +16,6 @@
 #include "nsISimpleEnumerator.h"
 #include "mozilla/Attributes.h"
 
-namespace mozilla {
-class ObserverServiceReporter;
-} // namespace mozilla
-
 struct ObserverRef
 {
   ObserverRef(const ObserverRef& aO) : isWeakRef(aO.isWeakRef), ref(aO.ref) {}

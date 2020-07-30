@@ -888,7 +888,7 @@ class MOZ_STACK_CLASS SourceBufferHolder final
                                            set of the same-named property in an
                                            object that delegates to a prototype
                                            containing this property */
-#define JSPROP_INDEX            0x80    /* name is actually (int) index */
+#define JSPROP_INTERNAL_USE_BIT 0x80    /* internal JS engine use only */
 #define JSPROP_DEFINE_LATE     0x100    /* Don't define property when initially creating
                                            the constructor. Some objects like Function/Object
                                            have self-hosted functions that can only be defined
@@ -964,19 +964,6 @@ JS_GetEmptyStringValue(JSContext* cx);
 extern JS_PUBLIC_API(JSString*)
 JS_GetEmptyString(JSRuntime* rt);
 
-struct CompartmentTimeStats {
-    char compartmentName[1024];
-    JSAddonId* addonId;
-    JSCompartment* compartment;
-    uint64_t time;  // microseconds
-    uint64_t cpowTime; // microseconds
-};
-
-typedef js::Vector<CompartmentTimeStats, 0, js::SystemAllocPolicy> CompartmentStatsVector;
-
-extern JS_PUBLIC_API(bool)
-JS_GetCompartmentStats(JSRuntime* rt, CompartmentStatsVector& stats);
-
 extern JS_PUBLIC_API(bool)
 JS_ValueToObject(JSContext* cx, JS::HandleValue v, JS::MutableHandleObject objp);
 
@@ -990,7 +977,7 @@ extern JS_PUBLIC_API(JSString*)
 JS_ValueToSource(JSContext* cx, JS::Handle<JS::Value> v);
 
 extern JS_PUBLIC_API(bool)
-JS_DoubleIsInt32(double d, int32_t* ip);
+JS_DoubleIsInt32(double d, int32_t *ip);
 
 extern JS_PUBLIC_API(JSType)
 JS_TypeOfValue(JSContext* cx, JS::Handle<JS::Value> v);
@@ -1343,7 +1330,7 @@ class JS_PUBLIC_API(ContextOptions) {
     // JS_ReportError* functions that eventually report the error even when dontReportUncaught is
     // set, if script is not running. We want a way to indicate that the embedder will always
     // handle any exceptions, and that SpiderMonkey should just leave them on the context. This is
-    // the way we want to do all future error handling in Goanna - stealing the exception explicitly
+    // the way we want to do all future error handling in Gecko - stealing the exception explicitly
     // from the context and handling it as per the situation. This will eventually become the
     // default and these 2 flags should go away.
     bool autoJSAPIOwnsErrorReporting_ : 1;
@@ -1717,9 +1704,6 @@ JS_AddFinalizeCallback(JSRuntime* rt, JSFinalizeCallback cb, void* data);
 extern JS_PUBLIC_API(void)
 JS_RemoveFinalizeCallback(JSRuntime* rt, JSFinalizeCallback cb);
 
-extern JS_PUBLIC_API(bool)
-JS_IsGCMarkingTracer(JSTracer *trc);
-
 /*
  * Weak pointers and garbage collection
  *
@@ -2018,9 +2002,9 @@ typedef struct JSNativeWrapper {
 #define JSNATIVE_WRAPPER(native) { {native, nullptr} }
 
 /*
- * To define an array element rather than a named property member, cast the
- * element's index to (const char*) and initialize name with it, and set the
- * JSPROP_INDEX bit in flags.
+ * Description of a property. JS_DefineProperties and JS_InitClass take arrays
+ * of these and define many properties at once. JS_PSG, JS_PSGS and JS_PS_END
+ * are helper macros for defining such arrays.
  */
 struct JSPropertySpec {
     struct SelfHostedWrapper {
@@ -2102,7 +2086,7 @@ inline int CheckIsSetterOp(JSSetterOp op);
    reinterpret_cast<To>(s))
 
 #define JS_CHECK_ACCESSOR_FLAGS(flags) \
-  (static_cast<mozilla::EnableIf<!((flags) & (JSPROP_READONLY | JSPROP_SHARED | JSPROP_PROPOP_ACCESSORS))>::Type>(0), \
+  (static_cast<mozilla::EnableIf<((flags) & ~(JSPROP_ENUMERATE | JSPROP_PERMANENT)) == 0>::Type>(0), \
    (flags))
 
 #define JS_PROPERTYOP_GETTER(v) \
@@ -2537,6 +2521,13 @@ class PropertyDescriptorOperations
         return (desc()->attrs & bits) != 0;
     }
 
+    bool hasAll(unsigned bits) const {
+        return (desc()->attrs & bits) == bits;
+    }
+
+    // Non-API attributes bit used internally for arguments objects.
+    enum { SHADOWABLE = JSPROP_INTERNAL_USE_BIT };
+
   public:
     // Descriptors with JSGetterOp/JSSetterOp are considered data
     // descriptors. It's complicated.
@@ -2584,6 +2575,59 @@ class PropertyDescriptorOperations
     unsigned attributes() const { return desc()->attrs; }
     JSGetterOp getter() const { return desc()->getter; }
     JSSetterOp setter() const { return desc()->setter; }
+
+    void assertValid() const {
+#ifdef DEBUG
+        MOZ_ASSERT((attributes() & ~(JSPROP_ENUMERATE | JSPROP_IGNORE_ENUMERATE |
+                                     JSPROP_PERMANENT | JSPROP_IGNORE_PERMANENT |
+                                     JSPROP_READONLY | JSPROP_IGNORE_READONLY |
+                                     JSPROP_IGNORE_VALUE |
+                                     JSPROP_GETTER |
+                                     JSPROP_SETTER |
+                                     JSPROP_SHARED |
+                                     JSPROP_REDEFINE_NONCONFIGURABLE |
+                                     SHADOWABLE)) == 0);
+        MOZ_ASSERT(!hasAll(JSPROP_IGNORE_ENUMERATE | JSPROP_ENUMERATE));
+        MOZ_ASSERT(!hasAll(JSPROP_IGNORE_PERMANENT | JSPROP_PERMANENT));
+        if (isAccessorDescriptor()) {
+            MOZ_ASSERT(has(JSPROP_SHARED));
+            MOZ_ASSERT(!has(JSPROP_READONLY));
+            MOZ_ASSERT(!has(JSPROP_IGNORE_READONLY));
+            MOZ_ASSERT(!has(JSPROP_IGNORE_VALUE));
+            MOZ_ASSERT(!has(SHADOWABLE));
+            MOZ_ASSERT(desc()->value.isUndefined());
+            MOZ_ASSERT_IF(!has(JSPROP_GETTER), !getter());
+            MOZ_ASSERT_IF(!has(JSPROP_SETTER), !setter());
+        } else {
+            MOZ_ASSERT(!hasAll(JSPROP_IGNORE_READONLY | JSPROP_READONLY));
+            MOZ_ASSERT_IF(has(JSPROP_IGNORE_VALUE), value().isUndefined());
+        }
+        MOZ_ASSERT(getter() != JS_PropertyStub);
+        MOZ_ASSERT(setter() != JS_StrictPropertyStub);
+#endif
+    }
+
+    void assertComplete() const {
+#ifdef DEBUG
+        assertValid();
+        MOZ_ASSERT((attributes() & ~(JSPROP_ENUMERATE |
+                                     JSPROP_PERMANENT |
+                                     JSPROP_READONLY |
+                                     JSPROP_GETTER |
+                                     JSPROP_SETTER |
+                                     JSPROP_SHARED |
+                                     JSPROP_REDEFINE_NONCONFIGURABLE |
+                                     SHADOWABLE)) == 0);
+        MOZ_ASSERT_IF(isAccessorDescriptor(), has(JSPROP_GETTER) && has(JSPROP_SETTER));
+#endif
+    }
+
+    void assertCompleteIfFound() const {
+#ifdef DEBUG
+        if (object())
+            assertComplete();
+#endif
+    }
 };
 
 template <typename Outer>
@@ -2600,7 +2644,19 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         value().setUndefined();
     }
 
-    void assign(JSPropertyDescriptor& other) {
+    void initFields(HandleObject obj, HandleValue v, unsigned attrs,
+                    JSGetterOp getterOp, JSSetterOp setterOp) {
+        MOZ_ASSERT(getterOp != JS_PropertyStub);
+        MOZ_ASSERT(setterOp != JS_StrictPropertyStub);
+
+        object().set(obj);
+        value().set(v);
+        setAttributes(attrs);
+        setGetter(getterOp);
+        setSetter(setterOp);
+    }
+
+    void assign(JSPropertyDescriptor &other) {
         object().set(other.obj);
         setAttributes(other.attrs);
         setGetter(other.getter);
@@ -3344,8 +3400,8 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
         utf8(false),
         lineno(1),
         column(0),
-        compileAndGo(false),
         hasPollutedGlobalScope(false),
+        isRunOnce(false),
         forEval(false),
         noScriptRval(false),
         selfHostingMode(false),
@@ -3384,8 +3440,9 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
     bool utf8;
     unsigned lineno;
     unsigned column;
-    bool compileAndGo;
     bool hasPollutedGlobalScope;
+    // isRunOnce only applies to non-function scripts.
+    bool isRunOnce;
     bool forEval;
     bool noScriptRval;
     bool selfHostingMode;
@@ -3476,8 +3533,8 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
     OwningCompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     OwningCompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    OwningCompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
     OwningCompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
+    OwningCompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     OwningCompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     OwningCompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     OwningCompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
@@ -3560,8 +3617,8 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
     }
     CompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     CompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    CompileOptions& setCompileAndGo(bool cng) { compileAndGo = cng; return *this; }
     CompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
+    CompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     CompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     CompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
     CompileOptions& setSelfHostingMode(bool shm) { selfHostingMode = shm; return *this; }
@@ -3747,7 +3804,7 @@ namespace JS {
  * cross-compartment, it is cloned into the current compartment before executing.
  */
 extern JS_PUBLIC_API(bool)
-CloneAndExecuteScript(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JSScript*> script);
+CloneAndExecuteScript(JSContext* cx, JS::Handle<JSScript*> script);
 
 } /* namespace JS */
 
@@ -3853,8 +3910,10 @@ extern JS_PUBLIC_API(bool)
 Construct(JSContext* cx, JS::HandleValue fun,
           const JS::HandleValueArray& args,
           MutableHandleValue rval);
-
 } /* namespace JS */
+
+extern JS_PUBLIC_API(bool)
+JS_CheckForInterrupt(JSContext* cx);
 
 /*
  * These functions allow setting an interrupt callback that will be called
@@ -4288,6 +4347,7 @@ GetSymbolDescription(HandleSymbol symbol);
 /* Well-known symbols. */
 #define JS_FOR_EACH_WELL_KNOWN_SYMBOL(macro) \
     macro(iterator) \
+    macro(match) \
     macro(species) \
     macro(hasInstance) \
     macro(unscopables)
@@ -4553,7 +4613,7 @@ JS_SetErrorReporter(JSRuntime* rt, JSErrorReporter er);
 namespace JS {
 
 extern JS_PUBLIC_API(bool)
-CreateError(JSContext* cx, JSExnType type, HandleString stack,
+CreateError(JSContext* cx, JSExnType type, HandleObject stack,
             HandleString fileName, uint32_t lineNumber, uint32_t columnNumber,
             JSErrorReport* report, HandleString message, MutableHandleValue rval);
 
@@ -5262,12 +5322,268 @@ GetSavedFrameParent(JSContext *cx, HandleObject savedFrame, MutableHandleObject 
  * Given a SavedFrame JSObject stack, stringify it in the same format as
  * Error.prototype.stack. The stringified stack out parameter is placed in the
  * cx's compartment. Defaults to the empty string.
+ *
+ * The same notes above about SavedFrame accessors applies here as well: cx
+ * doesn't need to be in stack's compartment, and stack can be null, a
+ * SavedFrame object, or a wrapper (CCW or Xray) around a SavedFrame object.
  */
 extern JS_PUBLIC_API(bool)
-StringifySavedFrameStack(JSContext *cx, HandleObject stack, MutableHandleString stringp);
-
-
+BuildStackString(JSContext *cx, HandleObject stack, MutableHandleString stringp);
 
 } /* namespace JS */
+
+
+/* Stopwatch-based CPU monitoring. */
+
+namespace js {
+
+struct AutoStopwatch;
+
+// Container for performance data
+// All values are monotonic.
+struct PerformanceData {
+    // Number of times we have spent at least 2^n consecutive
+    // milliseconds executing code in this group.
+    // durations[0] is increased whenever we spend at least 1 ms
+    // executing code in this group
+    // durations[1] whenever we spend 2ms+
+    //
+    // durations[i] whenever we spend 2^ims+
+    uint64_t durations[10];
+
+    // Total amount of time spent executing code in this group, in
+    // microseconds.
+    uint64_t totalUserTime;
+    uint64_t totalSystemTime;
+    uint64_t totalCPOWTime;
+
+    // Total number of times code execution entered this group,
+    // since process launch. This may be greater than the number
+    // of times we have entered the event loop.
+    uint64_t ticks;
+
+    PerformanceData()
+      : totalUserTime(0)
+      , totalSystemTime(0)
+      , totalCPOWTime(0)
+      , ticks(0)
+    {
+        mozilla::PodArrayZero(durations);
+    }
+    PerformanceData(const PerformanceData& from)
+      : totalUserTime(from.totalUserTime)
+      , totalSystemTime(from.totalSystemTime)
+      , totalCPOWTime(from.totalCPOWTime)
+      , ticks(from.ticks)
+    {
+        mozilla::PodArrayCopy(durations, from.durations);
+    }
+    PerformanceData& operator=(const PerformanceData& from)
+    {
+        mozilla::PodArrayCopy(durations, from.durations);
+        totalUserTime = from.totalUserTime;
+        totalSystemTime = from.totalSystemTime;
+        totalCPOWTime = from.totalCPOWTime;
+        ticks = from.ticks;
+        return *this;
+    }
+};
+
+// A group of compartments forming a single unit in terms of
+// performance monitoring.
+//
+// Two compartments belong to the same group if either:
+// - they are part of the same add-on;
+// - they are part of the same webpage;
+// - they are both system built-ins.
+//
+// This class is refcounted by instances of `JSCompartment`.
+// Do not attempt to hold to a pointer to a `PerformanceGroup`.
+struct PerformanceGroup {
+
+    // Performance data for this group.
+    PerformanceData data;
+
+    // `true` if an instance of `AutoStopwatch` is already monitoring
+    // the performance of this performance group for this iteration
+    // of the event loop, `false` otherwise.
+    bool hasStopwatch(uint64_t iteration) const {
+        return stopwatch_ != nullptr && iteration_ == iteration;
+    }
+
+    // Mark that an instance of `AutoStopwatch` is monitoring
+    // the performance of this group for a given iteration.
+    void acquireStopwatch(uint64_t iteration, const AutoStopwatch *stopwatch) {
+        iteration_ = iteration;
+        stopwatch_ = stopwatch;
+    }
+
+    // Mark that no `AutoStopwatch` is monitoring the
+    // performance of this group for the iteration.
+    void releaseStopwatch(uint64_t iteration, const AutoStopwatch *stopwatch) {
+        if (iteration_ != iteration)
+            return;
+
+        MOZ_ASSERT(stopwatch == stopwatch_ || stopwatch_ == nullptr);
+        stopwatch_ = nullptr;
+    }
+
+    PerformanceGroup()
+      : stopwatch_(nullptr)
+      , iteration_(0)
+      , refCount_(0)
+    { }
+    ~PerformanceGroup()
+    {
+        MOZ_ASSERT(refCount_ == 0);
+    }
+  private:
+    PerformanceGroup& operator=(const PerformanceGroup&) = delete;
+    PerformanceGroup(const PerformanceGroup&) = delete;
+
+    // The stopwatch currently monitoring the group,
+    // or `nullptr` if none. Used ony for comparison.
+    const AutoStopwatch *stopwatch_;
+
+    // The current iteration of the event loop. If necessary,
+    // may safely overflow.
+    uint64_t iteration_;
+
+    // Increment/decrement the refcounter, return the updated value.
+    uint64_t incRefCount() {
+        MOZ_ASSERT(refCount_ + 1 > 0);
+        return ++refCount_;
+    }
+    uint64_t decRefCount() {
+        MOZ_ASSERT(refCount_ > 0);
+        return --refCount_;
+    }
+    friend struct PerformanceGroupHolder;
+
+  private:
+    // A reference counter. Maintained by PerformanceGroupHolder.
+    uint64_t refCount_;
+};
+
+//
+// Indirection towards a PerformanceGroup.
+// This structure handles reference counting for instances of PerformanceGroup.
+//
+struct PerformanceGroupHolder {
+    // Get the group.
+    // On first call, this causes a single Hashtable lookup.
+    // Successive calls do not require further lookups.
+    js::PerformanceGroup *getGroup();
+
+    // `true` if the this holder is currently associated to a
+    // PerformanceGroup, `false` otherwise. Use this method to avoid
+    // instantiating a PerformanceGroup if you only need to get
+    // available performance data.
+    inline bool isLinked() const {
+        return group_ != nullptr;
+    }
+
+    // Remove the link to the PerformanceGroup. This method is designed
+    // as an invalidation mechanism if the JSCompartment changes nature
+    // (new values of `isSystem()`, `principals()` or `addonId`).
+    void unlink();
+
+    PerformanceGroupHolder(JSRuntime *runtime, JSCompartment *compartment)
+      : runtime_(runtime)
+      , compartment_(compartment)
+      , group_(nullptr)
+    {   }
+    ~PerformanceGroupHolder();
+private:
+    // Return the key representing this PerformanceGroup in
+    // Runtime::Stopwatch.
+    // Do not deallocate the key.
+    void* getHashKey();
+
+    JSRuntime *runtime_;
+    JSCompartment *compartment_;
+
+    // The PerformanceGroup held by this object.
+    // Initially set to `nullptr` until the first cal to `getGroup`.
+    // May be reset to `nullptr` by a call to `unlink`.
+    js::PerformanceGroup *group_;
+};
+
+/**
+ * Reset any stopwatch currently measuring.
+ *
+ * This function is designed to be called when we process a new event.
+ */
+extern JS_PUBLIC_API(void)
+ResetStopwatches(JSRuntime*);
+
+/**
+ * Turn on/off stopwatch-based CPU monitoring.
+ *
+ * `SetStopwatchActive` may return `false` if monitoring could not be
+ * activated, which may happen if we are out of memory.
+ */
+extern JS_PUBLIC_API(bool)
+SetStopwatchActive(JSRuntime*, bool);
+extern JS_PUBLIC_API(bool)
+IsStopwatchActive(JSRuntime*);
+
+/**
+ * Access the performance information stored in a compartment.
+ */
+extern JS_PUBLIC_API(PerformanceData*)
+GetPerformanceData(JSRuntime*);
+
+/**
+ * Performance statistics for a performance group (a process, an
+ * add-on, a webpage, the built-ins or a special compartment).
+ */
+struct PerformanceStats {
+    /**
+     * If this group represents an add-on, the ID of the addon,
+     * otherwise `nullptr`.
+     */
+    JSAddonId *addonId;
+
+    /**
+     * If this group represents a webpage, the process itself or a special
+     * compartment, a human-readable name. Unspecified for add-ons.
+     */
+    char name[1024];
+
+    /**
+     * `true` if the group represents in system compartments, `false`
+     * otherwise. A group may never contain both system and non-system
+     * compartments.
+     */
+    bool isSystem;
+
+    /**
+     * Performance information.
+     */
+    js::PerformanceData performance;
+
+    PerformanceStats()
+      : addonId(nullptr)
+      , isSystem(false)
+    {
+        name[0] = '\0';
+    }
+};
+
+typedef js::Vector<PerformanceStats, 0, js::SystemAllocPolicy> PerformanceStatsVector;
+
+    /**
+ * Extract the performance statistics.
+ *
+ * After a successful call, `stats` holds the `PerformanceStats` for
+ * all performance groups, and `global` holds a `PerformanceStats`
+ * representing the entire process.
+ */
+extern JS_PUBLIC_API(bool)
+GetPerformanceStats(JSRuntime *rt, js::PerformanceStatsVector &stats, js::PerformanceStats &global);
+
+} /* namespace js */
+
 
 #endif /* jsapi_h */

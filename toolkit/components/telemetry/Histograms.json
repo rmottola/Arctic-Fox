@@ -214,7 +214,12 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 10,
-    "description": "GPU Device Reset Reason (ok, hung, removed, reset, internal error, invalid call)"
+    "description": "GPU Device Reset Reason (ok, hung, removed, reset, internal error, invalid call, out of memory)"
+  },
+  "FETCH_IS_MAINTHREAD": {
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "Was Fetch request initiated from the main thread?"
   },
   "FORGET_SKIPPABLE_MAX": {
     "expires_in_version": "never",
@@ -341,19 +346,6 @@
     "kind": "enumerated",
     "n_values": 10,
     "description": "Use of SpiderMonkey's deprecated language extensions in web content: ForEach=0, DestructuringForIn=1, LegacyGenerator=2, ExpressionClosure=3, LetBlock=4, LetExpression=5, NoSuchMethod=6, FlagsArgument=7"
-  },
-  "TELEMETRY_PING": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": "3000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "Time taken to submit telemetry info (ms)"
-  },
-  "TELEMETRY_SUCCESS": {
-    "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Successful telemetry submission"
   },
   "XUL_CACHE_DISABLED": {
     "expires_in_version": "default",
@@ -3397,105 +3389,267 @@
     "n_buckets" : 10,
     "description": "PLACES: Days from last maintenance"
   },
-  "UPDATER_BACKGROUND_CHECK_CODE_EXTERNAL": {
-    "expires_in_version": "default",
-    "kind": "enumerated",
-    "n_values": 50,
-    "description": "Updater: externally initiated (typically by the application) background update check result code (see PING_BGUC_* constants defined in /toolkit/mozapps/update/nsUpdateService.js)"
+  "UPDATE_CHECK_NO_UPDATE_EXTERNAL" : {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of no updates were found for a background update check (externally initiated)"
   },
-  "UPDATER_BACKGROUND_CHECK_CODE_NOTIFY": {
-    "expires_in_version": "40",
-    "kind": "enumerated",
-    "n_values": 50,
-    "description": "Updater: timer initiated background update check result code (see PING_BGUC_* constants defined in /toolkit/mozapps/update/nsUpdateService.js)"
+  "UPDATE_CHECK_NO_UPDATE_NOTIFY" : {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of no updates were found for a background update check (timer initiated)"
   },
-  "UPDATER_INVALID_LASTUPDATETIME_EXTERNAL": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "Updater: Whether the last update time is invalid when a background update check was externally requested (typically by the application)"
-  },
-  "UPDATER_INVALID_LASTUPDATETIME_NOTIFY": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "Updater: Whether the last update time is invalid when a background update check was timer initiated"
-  },
-  "UPDATER_LAST_NOTIFY_INTERVAL_DAYS_EXTERNAL": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "n_buckets": 10,
-    "high": "60",
-    "description": "Updater: The interval in days between the previous and the current background update check when the check was externally requested (typically by the application)"
-  },
-  "UPDATER_LAST_NOTIFY_INTERVAL_DAYS_NOTIFY": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "n_buckets": 10,
-    "high": "60",
-    "description": "Updater: The interval in days between the previous and the current background update check when the check was timer initiated"
-  },
-  "UPDATER_STATUS_CODES": {
+  "UPDATE_CHECK_CODE_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 50,
-    "description": "Updater: the status of the latest update performed"
+    "description": "Update: background update check result code except for no updates found (externally initiated)"
   },
-  "UPDATER_UPDATES_ENABLED": {
-    "expires_in_version": "default",
+  "UPDATE_CHECK_CODE_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Update: background update check result code except for no updates found (timer initiated)"
+  },
+  "UPDATE_CHECK_EXTENDED_ERROR_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "keyed": true,
+    "description": "Update: keyed count (key names are prefixed with AUS_CHECK_EX_ERR_) of background update check extended error code (externally initiated)"
+  },
+  "UPDATE_CHECK_EXTENDED_ERROR_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "keyed": true,
+    "description": "Update: keyed count (key names are prefixed with AUS_CHECK_EX_ERR_) of background update check extended error code (timer initiated)"
+  },
+  "UPDATE_INVALID_LASTUPDATETIME_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that have a last update time greater than the current time (externally initiated)"
+  },
+  "UPDATE_INVALID_LASTUPDATETIME_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that have a last update time greater than the current time (timer initiated)"
+  },
+  "UPDATE_LAST_NOTIFY_INTERVAL_DAYS_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "n_buckets": 60,
+    "high": "365",
+    "description": "Update: interval in days since the last background update check (externally initiated)"
+  },
+  "UPDATE_LAST_NOTIFY_INTERVAL_DAYS_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "n_buckets": 30,
+    "high": "180",
+    "description": "Update: interval in days since the last background update check (timer initiated)"
+  },
+  "UPDATE_SERVICE_INSTALLED_EXTERNAL": {
+    "expires_in_version": "never",
     "kind": "boolean",
-    "description": "Updater: Whether or not updates are enabled"
+    "description": "Update: whether the service is installed (externally initiated)"
   },
-  "UPDATER_UPDATES_METRO_ENABLED": {
-    "expires_in_version": "default",
+  "UPDATE_SERVICE_INSTALLED_NOTIFY": {
+    "expires_in_version": "never",
     "kind": "boolean",
-    "description": "Updater: Whether or not Metro updates are enabled"
+    "description": "Update: whether the service is installed (timer initiated)"
   },
-  "UPDATER_UPDATES_AUTOMATIC": {
-    "expires_in_version": "40",
+  "UPDATE_SERVICE_MANUALLY_UNINSTALLED_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that manually uninstalled the service (externally initiated)"
+  },
+  "UPDATE_SERVICE_MANUALLY_UNINSTALLED_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that manually uninstalled the service (timer initiated)"
+  },
+  "UPDATE_CANNOT_APPLY_EXTERNAL": {
+    "expires_in_version": "never",
     "kind": "boolean",
-    "description": "Updater: Whether or not updates are automatic"
+    "description": "Update: systems that cannot apply updates (externally initiated)"
   },
-  "UPDATER_SERVICE_ENABLED": {
-    "expires_in_version": "default",
+  "UPDATE_CANNOT_APPLY_NOTIFY": {
+    "expires_in_version": "never",
     "kind": "boolean",
-    "description": "Updater: Whether or not the MozillaMaintenance service is enabled"
+    "description": "Update: systems that cannot apply updates (timer initiated)"
   },
-  "UPDATER_SERVICE_ERROR_CODE": {
-    "expires_in_version": "default",
+  "UPDATE_CANNOT_STAGE_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that cannot stage updates (externally initiated)"
+  },
+  "UPDATE_CANNOT_STAGE_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that cannot stage updates (timer initiated)"
+  },
+  "UPDATE_HAS_PREF_URL_OVERRIDE_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that have an app.update.url.override preference (externally initiated)"
+  },
+  "UPDATE_HAS_PREF_URL_OVERRIDE_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of systems that have an app.update.url.override preference (timer initiated)"
+  },
+  "UPDATE_PREF_UPDATE_CANCELATIONS_EXTERNAL": {
+    "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
-    "description": "Updater: 0=success else SERVICE_* error code defined in /toolkit/mozapps/update/common/errors.h"
+    "description": "Update: number of sequential update elevation request cancelations greater than 0 (externally initiated)"
   },
-  "UPDATER_SERVICE_ERRORS": {
-    "expires_in_version": "default",
+  "UPDATE_PREF_UPDATE_CANCELATIONS_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: number of sequential update elevation request cancelations greater than 0 (timer initiated)"
+  },
+  "UPDATE_PREF_SERVICE_ERRORS_EXTERNAL": {
+    "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 30,
-    "description": "Updater: The number of MozillaMaintenance service errors that have occurred"
+    "description": "Update: number of sequential update service errors greater than 0 (externally initiated)"
   },
-  "UPDATER_SERVICE_INSTALLED": {
-    "expires_in_version": "default",
-    "kind": "boolean",
-    "description": "Updater: Whether or not the MozillaMaintenance service is installed"
-  },
-  "UPDATER_SERVICE_MANUALLY_UNINSTALLED": {
-    "expires_in_version": "default",
-    "kind": "boolean",
-    "description": "Updater: Whether or not someone manually uninstalled the service."
-  },
-  "UPDATER_STAGE_ENABLED": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "Updater: Whether or not staging updates are enabled"
-  },
-  "UPDATER_HAS_PERMISSIONS": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "Updater: Whether or not the updater has permissions"
-  },
-  "UPDATER_WIZ_LAST_PAGE_CODE": {
-    "expires_in_version": "40",
+  "UPDATE_PREF_SERVICE_ERRORS_NOTIFY": {
+    "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": 25,
-    "description": "Updater: The update wizard page displayed when the UI was closed (mapped in toolkit/mozapps/update/content/updates.js)"
+    "n_values": 30,
+    "description": "Update: number of sequential update service errors greater than 0 (timer initiated)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_AUTO_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.auto boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_AUTO_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.auto boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_ENABLED_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_ENABLED_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_STAGING_ENABLED_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.staging.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_STAGING_ENABLED_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.staging.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_SERVICE_ENABLED_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.service.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_NOT_PREF_UPDATE_SERVICE_ENABLED_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Update: count of when the app.update.service.enabled boolean preference is not the default value of true (true values are not submitted)"
+  },
+  "UPDATE_DOWNLOAD_CODE_COMPLETE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Update: complete patch download result code"
+  },
+  "UPDATE_DOWNLOAD_CODE_PARTIAL": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Update: complete patch download result code"
+  },
+  "UPDATE_STATE_CODE_COMPLETE_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of a complete update from update.status on startup"
+  },
+  "UPDATE_STATE_CODE_PARTIAL_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of a partial patch update from update.status on startup"
+  },
+  "UPDATE_STATE_CODE_UNKNOWN_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of an unknown patch update from update.status on startup"
+  },
+  "UPDATE_STATE_CODE_COMPLETE_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of a complete patch update from update.status after staging"
+  },
+  "UPDATE_STATE_CODE_PARTIAL_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of a partial patch update from update.status after staging"
+  },
+  "UPDATE_STATE_CODE_UNKNOWN_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "Update: the state of an unknown patch update from update.status after staging"
+  },
+  "UPDATE_STATUS_ERROR_CODE_COMPLETE_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed complete patch update from update.status on startup"
+  },
+  "UPDATE_STATUS_ERROR_CODE_PARTIAL_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed partial patch update from update.status on startup"
+  },
+  "UPDATE_STATUS_ERROR_CODE_UNKNOWN_STARTUP": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed unknown patch update from update.status on startup"
+  },
+  "UPDATE_STATUS_ERROR_CODE_COMPLETE_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed complete patch update from update.status after staging"
+  },
+  "UPDATE_STATUS_ERROR_CODE_PARTIAL_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed partial patch update from update.status after staging"
+  },
+  "UPDATE_STATUS_ERROR_CODE_UNKNOWN_STAGE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "description": "Update: the status error code for a failed unknown patch update from update.status after staging"
+  },
+  "UPDATE_WIZ_LAST_PAGE_CODE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 30,
+    "description": "Update: the update wizard page displayed when the UI was closed (mapped in toolkit/mozapps/update/UpdateTelemetry.jsm)"
   },
   "THUNDERBIRD_GLODA_SIZE_MB": {
     "expires_in_version": "40",
@@ -4249,6 +4403,90 @@
     "extended_statistics_ok": true,
     "description": "Number of histograms with total count low errors"
   },
+  "TELEMETRY_ARCHIVE_DIRECTORIES_COUNT": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "13",
+    "n_buckets": 12,
+    "description": "Number of directories in the archive at scan"
+  },
+  "TELEMETRY_ARCHIVE_OLDEST_DIRECTORY_AGE": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "13",
+    "n_buckets": 12,
+    "description": "The age of the oldest Telemetry archive directory in months"
+  },
+  "TELEMETRY_ARCHIVE_SCAN_PING_COUNT": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "100000",
+    "n_buckets": 100,
+    "description": "Number of Telemetry pings in the archive at scan"
+  },
+  "TELEMETRY_ARCHIVE_SESSION_PING_COUNT": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of Telemetry pings added to the archive during the session"
+  },
+  "TELEMETRY_ARCHIVE_SIZE_MB": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "300",
+    "n_buckets": 60,
+    "description": "The size of the Telemetry archive (MB)"
+  },
+  "TELEMETRY_ARCHIVE_EVICTED_OVER_QUOTA": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "100000",
+    "n_buckets": 100,
+    "description": "Number of Telemetry pings evicted from the archive during cleanup, because they were over the quota"
+  },
+  "TELEMETRY_ARCHIVE_EVICTED_OLD_DIRS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "13",
+    "n_buckets": 12,
+    "description": "Number of Telemetry directories evicted from the archive during cleanup, because they were too old"
+  },
+  "TELEMETRY_ARCHIVE_EVICTING_DIRS_MS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "300000",
+    "n_buckets": 20,
+    "description": "Time (ms) it takes for evicting old directories"
+  },
+  "TELEMETRY_ARCHIVE_CHECKING_OVER_QUOTA_MS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "300000",
+    "n_buckets": 20,
+    "description": "Time (ms) it takes for checking if the archive is over-quota"
+  },
+  "TELEMETRY_ARCHIVE_EVICTING_OVER_QUOTA_MS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "300000",
+    "n_buckets": 20,
+    "description": "Time (ms) it takes for evicting over-quota pings"
+  },
+  "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of discarded content payloads."
+  },
   "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
@@ -4261,6 +4499,50 @@
     "kind": "enumerated",
     "n_values": 30,
     "description": "Number of telemetry pings evicted at startup"
+  },
+  "TELEMETRY_COMPRESS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "3000",
+    "n_buckets": 10,
+    "extended_statistics_ok": true,
+    "description": "Time taken to compress telemetry object (ms)"
+  },
+  "TELEMETRY_PING": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "3000",
+    "n_buckets": 10,
+    "extended_statistics_ok": true,
+    "description": "Time taken to submit telemetry info (ms)"
+  },
+  "TELEMETRY_SEND" : {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "3000",
+    "n_buckets": 10,
+    "extended_statistics_ok": true,
+    "description": "Time to send the compressed string to the Telemetry servers and get a reply back (ms)"
+  },
+  "TELEMETRY_STRINGIFY" : {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "3000",
+    "n_buckets": 10,
+    "extended_statistics_ok": true,
+    "description": "Time to stringify telemetry object (ms)"
+  },
+  "TELEMETRY_SUCCESS": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "Successful telemetry submission"
+  },
+  "TELEMETRY_INVALID_PING_TYPE_SUBMITTED": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "keyed": true,
+    "description": "Count of individual invalid ping types that were submitted to Telemetry."
   },
   "TELEMETRY_TEST_FLAG": {
     "expires_in_version": "never",
@@ -4441,7 +4723,7 @@
   "FENNEC_RESTORING_ACTIVITY": {
     "expires_in_version": "never",
     "kind": "flag",
-    "description": "Fennec is starting up but the Goanna thread was still running",
+    "description": "Fennec is starting up but the Gecko thread was still running",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_SEARCH_LOADER_TIME_MS": {
@@ -4457,7 +4739,7 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 4,
-    "description": "The way the GoannaApp was launched. (Normal, URL, Prefetch, Redirector)",
+    "description": "The way the GeckoApp was launched. (Normal, URL, Prefetch, Redirector)",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_STARTUP_TIME_GECKOREADY": {
@@ -4466,7 +4748,7 @@
     "low": 500,
     "high": "20000",
     "n_buckets": 20,
-    "description": "Time for the Goanna:Ready message to arrive (ms)",
+    "description": "Time for the Gecko:Ready message to arrive (ms)",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_STARTUP_TIME_JAVAUI": {
@@ -4504,6 +4786,22 @@
     "kind": "count",
     "keyed" : true,
     "description" : "Exceptions thrown by add-ons"
+  },
+  "MISBEHAVING_ADDONS_CPOW_TIME_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": 1,
+    "high": 10000,
+    "n_buckets": 20,
+    "keyed": true,
+    "description": "Time spent by an add-on performing blocking cross-process communications (ms, keyed by add-on ID, updated every 15s by default)"
+  },
+  "MISBEHAVING_ADDONS_JANK_LEVEL": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "keyed": true,
+    "description": "Longest blocking operation performed by the add-on (log2(duration in ms), keyed by add-on, updated every 15s by default)"
   },
   "SEARCH_COUNTS": {
     "expires_in_version": "never",
@@ -5874,6 +6172,11 @@
     "n_buckets": 20,
     "description": "Tracking how ServiceWorkerRegistrar loads data before the first content is shown"
   },
+  "SERVICE_WORKER_REQUEST_PASSTHROUGH": {
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "Intercepted fetch sending back same Request object."
+  },
   "LOOP_CLIENT_CALL_URL_REQUESTS_SUCCESS": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -5980,6 +6283,20 @@
     "keyed": true,
     "description": "Counts of plugin and content process crashes which are reported with a crash dump."
   },
+  "PROCESS_CRASH_SUBMIT_ATTEMPT": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "An attempt to submit a crash. Keyed on the CrashManager Crash.type."
+  },
+  "PROCESS_CRASH_SUBMIT_SUCCESS": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "The submission status when main/plugin/content crashes are submitted. 1 is success, 0 is failure. Keyed on the CrashManager Crash.type."
+  },
   "STUMBLER_TIME_BETWEEN_UPLOADS_SEC": {
     "expires_in_version": "45",
     "kind": "exponential",
@@ -6079,6 +6396,105 @@
     "kind": "enumerated",
     "n_values": 5,
     "description": "MSE video state when unloading. ended = 0, paused = 1, stalled = 2, seeking = 3, other = 4"
+  },
+  "FX_SANITIZE_TOTAL": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Total time it takes to sanitize (ms)"
+  },
+  "FX_SANITIZE_CACHE": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize the cache (ms)"
+  },
+  "FX_SANITIZE_COOKIES": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize cookies (ms)"
+  },
+  "FX_SANITIZE_OFFLINEAPPS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize stored offline app data (ms)"
+  },
+  "FX_SANITIZE_HISTORY": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize history (ms)"
+  },
+  "FX_SANITIZE_FORMDATA": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize stored form data (ms)"
+  },
+  "FX_SANITIZE_DOWNLOADS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize recent downloads (ms)"
+  },
+  "FX_SANITIZE_PASSWORDS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize saved passwords (ms)"
+  },
+  "FX_SANITIZE_SESSIONS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize saved sessions (ms)"
+  },
+  "FX_SANITIZE_SITESETTINGS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize site-specific settings (ms)"
+  },
+  "FX_SANITIZE_OPENWINDOWS": {
+    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
+    "expires_in_version": "40",
+    "kind": "exponential",
+    "high": "30000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Sanitize: Time it takes to sanitize the open windows list (ms)"
   },
   "FX_SANITIZE_TOTAL": {
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],

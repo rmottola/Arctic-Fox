@@ -116,7 +116,7 @@ class B2GOptions(RemoteXPCShellOptions):
 
         self.add_option('--address', action='store',
                         type='string', dest='address',
-                        help="host:port of running Goanna instance to connect to")
+                        help="host:port of running Gecko instance to connect to")
         defaults['address'] = None
 
         self.add_option('--use-device-libs', action='store_true',

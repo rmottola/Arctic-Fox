@@ -132,8 +132,7 @@ gfxAndroidPlatform::CreateOffscreenSurface(const IntSize& size,
                                            gfxContentType contentType)
 {
     nsRefPtr<gfxASurface> newSurface;
-    newSurface = new gfxImageSurface(ThebesIntSize(size),
-                                     OptimalFormatForContent(contentType));
+    newSurface = new gfxImageSurface(size, OptimalFormatForContent(contentType));
 
     return newSurface.forget();
 }
@@ -248,9 +247,9 @@ gfxAndroidPlatform::GetFontList(nsIAtom *aLangGroup,
 }
 
 void
-gfxAndroidPlatform::GetFontList(InfallibleTArray<FontListEntry>* retValue)
+gfxAndroidPlatform::GetSystemFontList(InfallibleTArray<FontListEntry>* retValue)
 {
-    gfxFT2FontList::PlatformFontList()->GetFontList(retValue);
+    gfxFT2FontList::PlatformFontList()->GetSystemFontList(retValue);
 }
 
 nsresult
@@ -354,11 +353,11 @@ gfxAndroidPlatform::FontHintingEnabled()
     // might not want hinting.  Let's see.
 
 #ifdef MOZ_USING_ANDROID_JAVA_WIDGETS
-    // On android-java, we currently only use goanna to render web
+    // On android-java, we currently only use gecko to render web
     // content that can always be be non-reflow-zoomed.  So turn off
     // hinting.
     // 
-    // XXX when goanna-android-java is used as an "app runtime", we may
+    // XXX when gecko-android-java is used as an "app runtime", we may
     // want to re-enable hinting for non-browser processes there.
     return false;
 #endif //  MOZ_USING_ANDROID_JAVA_WIDGETS
@@ -380,10 +379,10 @@ bool
 gfxAndroidPlatform::RequiresLinearZoom()
 {
 #ifdef MOZ_USING_ANDROID_JAVA_WIDGETS
-    // On android-java, we currently only use goanna to render web
+    // On android-java, we currently only use gecko to render web
     // content that can always be be non-reflow-zoomed.
     //
-    // XXX when goanna-android-java is used as an "app runtime", we may
+    // XXX when gecko-android-java is used as an "app runtime", we may
     // want to treat it like B2G and use linear zoom only for the web
     // browser process, not other apps.
     return true;

@@ -21,6 +21,7 @@ XPIDL_SOURCES += [
     'nsINetworkService.idl',
     'nsINetworkWorker.idl',
     'nsISystemWorkerManager.idl',
+    'nsITetheringService.idl',
     'nsIVolume.idl',
     'nsIVolumeMountLock.idl',
     'nsIVolumeService.idl',
@@ -75,6 +76,8 @@ EXTRA_COMPONENTS += [
     'NetworkManager.manifest',
     'NetworkService.js',
     'NetworkService.manifest',
+    'TetheringService.js',
+    'TetheringService.manifest',
 ]
 EXTRA_PP_COMPONENTS += [
     'NetworkManager.js',
@@ -88,9 +91,8 @@ if CONFIG['MOZ_B2G_RIL']:
         'nsIRadioInterfaceLayer.idl',
     ]
     EXTRA_COMPONENTS += [
-        'RadioInterfaceLayer.js',
-        'RadioInterfaceLayer.manifest',
-        'RILContentHelper.js',
+        'RILContentHelper.js', # TODO: Bug 815526, deprecate RILContentHelper.
+        'RILContentHelper.manifest', # TODO: Bug 815526, deprecate RILContentHelper.
         'RILSystemMessengerHelper.js',
         'RILSystemMessengerHelper.manifest',
     ]
@@ -100,6 +102,11 @@ if CONFIG['MOZ_B2G_RIL']:
         'ril_worker_buf_object.js',
         'RILSystemMessenger.jsm',
     ]
+    if not CONFIG['DISABLE_MOZ_RIL_GEOLOC']:
+        EXTRA_COMPONENTS += [
+            'RadioInterfaceLayer.js',
+            'RadioInterfaceLayer.manifest',
+        ]
 
 FAIL_ON_WARNINGS = True
 
@@ -108,6 +115,7 @@ include('/ipc/chromium/chromium-config.mozbuild')
 LOCAL_INCLUDES += [
     '/dom/base',
     '/dom/bluetooth',
+    '/dom/bluetooth/bluetooth1',
     '/dom/geolocation',
     '/dom/wifi',
 ]

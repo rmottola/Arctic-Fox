@@ -280,7 +280,7 @@ me.</p>
 
 <p>I think we could be better at this in Mozilla. I'm not suggesting people be assholes or anything, but I think some more pan-project analysis would be useful. </p>
 
-<p>Historically, I can point at a couple of groups of people who have attempted to do something like this. The <code>drivers@</code> group is one that looked beyond individual modules within Goanna to make sure that the right thing for the shipping products as a whole happened. The Firefox team is another example. By taking a holistic view, user experience was enhanced. </p>
+<p>Historically, I can point at a couple of groups of people who have attempted to do something like this. The <code>drivers@</code> group is one that looked beyond individual modules within Gecko to make sure that the right thing for the shipping products as a whole happened. The Firefox team is another example. By taking a holistic view, user experience was enhanced. </p>
 
 <p>I think contributors should not be afraid to poke their nose in other parts of the project and see how things are going. Ask questions. Learn more. Get involved in governance and management. If things don't seem intuitive, or a little arbitrary, ask, rather than assume it's for a good reason. One of the benefits of having an open, referencable set of discussion forums means that once you've answered a question once on the public forums, when someone else asks you can just give them a URL. </p>]]></description>
 <dc:subject></dc:subject>

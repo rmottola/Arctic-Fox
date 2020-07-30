@@ -337,7 +337,7 @@ interface nsIDOMDocument : nsIDOMNode
    * Element which is currently the full-screen element as per the DOM
    * full-screen api.
    *
-   * @see <https://wiki.mozilla.org/index.php?title=Goanna:FullScreenAPI>
+   * @see <https://wiki.mozilla.org/index.php?title=Gecko:FullScreenAPI>
    */
   readonly attribute nsIDOMElement mozFullScreenElement;
 
@@ -345,7 +345,7 @@ interface nsIDOMDocument : nsIDOMNode
    * Causes the document to leave DOM full-screen mode, if it's in
    * full-screen mode, as per the DOM full-screen api.
    *
-   * @see <https://wiki.mozilla.org/index.php?title=Goanna:FullScreenAPI>
+   * @see <https://wiki.mozilla.org/index.php?title=Gecko:FullScreenAPI>
    */
   void mozCancelFullScreen();   
   
@@ -353,7 +353,7 @@ interface nsIDOMDocument : nsIDOMNode
    * Denotes whether this document is in DOM full-screen mode, as per the DOM
    * full-screen api.
    *
-   * @see <https://wiki.mozilla.org/index.php?title=Goanna:FullScreenAPI>
+   * @see <https://wiki.mozilla.org/index.php?title=Gecko:FullScreenAPI>
    */
   readonly attribute boolean mozFullScreen;  
 
@@ -362,7 +362,7 @@ interface nsIDOMDocument : nsIDOMNode
    * plugins are present, and all ancestor documents have the
    * allowfullscreen attribute set.
    *
-   * @see <https://wiki.mozilla.org/index.php?title=Goanna:FullScreenAPI>
+   * @see <https://wiki.mozilla.org/index.php?title=Gecko:FullScreenAPI>
    */
   readonly attribute boolean mozFullScreenEnabled;
 

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -163,10 +164,6 @@ EVENT(change,
       NS_FORM_CHANGE,
       EventNameType_HTMLXUL,
       eBasicEventClass)
-EVENT(auxclick,
-      NS_MOUSE_AUXCLICK,
-      EventNameType_All,
-      eMouseEventClass)
 EVENT(click,
       NS_MOUSE_CLICK,
       EventNameType_All,
@@ -193,16 +190,12 @@ EVENT(dragenter,
       NS_DRAGDROP_ENTER,
       EventNameType_HTMLXUL,
       eDragEventClass)
-EVENT(dragexit,
-      NS_DRAGDROP_EXIT_SYNTH,
-      EventNameType_HTMLXUL,
-      eDragEventClass)
 EVENT(dragleave,
-      NS_DRAGDROP_LEAVE_SYNTH,
+      NS_DRAGDROP_LEAVE,
       EventNameType_HTMLXUL,
       eDragEventClass)
 EVENT(dragover,
-      NS_DRAGDROP_OVER_SYNTH,
+      NS_DRAGDROP_OVER,
       EventNameType_HTMLXUL,
       eDragEventClass)
 EVENT(dragstart,
@@ -290,11 +283,11 @@ EVENT(mousemove,
       EventNameType_All,
       eMouseEventClass)
 EVENT(mouseout,
-      NS_MOUSE_EXIT_SYNTH,
+      NS_MOUSE_OUT,
       EventNameType_All,
       eMouseEventClass)
 EVENT(mouseover,
-      NS_MOUSE_ENTER_SYNTH,
+      NS_MOUSE_OVER,
       EventNameType_All,
       eMouseEventClass)
 EVENT(mouseup,
@@ -448,7 +441,7 @@ EVENT(paste,
       NS_PASTE,
       EventNameType_HTMLXUL,
       eClipboardEventClass)
-// Goanna-specific extensions that apply to elements
+// Gecko-specific extensions that apply to elements
 EVENT(beforescriptexecute,
       NS_BEFORE_SCRIPT_EXECUTE,
       EventNameType_HTMLXUL,
@@ -742,6 +735,10 @@ NON_IDL_EVENT(commandupdate,
               NS_XUL_COMMAND_UPDATE,
               EventNameType_XUL,
               eBasicEventClass)
+NON_IDL_EVENT(dragexit,
+              NS_DRAGDROP_EXIT,
+              EventNameType_XUL,
+              eDragEventClass)
 NON_IDL_EVENT(dragdrop,
               NS_DRAGDROP_DRAGDROP,
               EventNameType_XUL,

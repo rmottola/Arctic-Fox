@@ -12,7 +12,7 @@
 #include "mozilla/EventForwards.h"
 #include "mozilla/Likely.h"
 #include "nsBox.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsIPresShell.h"
 #include "nsHTMLReflowState.h"
@@ -97,7 +97,6 @@
 //----------------------------------------------------------------------
 
 struct nsBoxLayoutMetrics;
-class nsDisplayBackgroundImage;
 struct nsRect;
 
 /**
@@ -302,7 +301,6 @@ public:
   nscoord ShrinkWidthToFit(nsRenderingContext *aRenderingContext,
                            nscoord aWidthInCB);
 
-  virtual void WillReflow(nsPresContext* aPresContext) override;
   /**
    * Calculates the size of this frame after reflowing (calling Reflow on, and
    * updating the size and position of) its children, as necessary.  The

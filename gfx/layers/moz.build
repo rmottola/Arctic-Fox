@@ -196,7 +196,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     ]
 
 # NB: Gralloc is available on other platforms that use the android GL
-# libraries, but only Gonk is able to use it reliably because Goanna
+# libraries, but only Gonk is able to use it reliably because Gecko
 # has full system permissions there.
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
     EXPORTS.mozilla.layers += [

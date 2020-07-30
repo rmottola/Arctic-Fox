@@ -10,7 +10,7 @@ function run_test() {
   logTestInfo("testing write access to the application directory");
   let testFile = getCurrentProcessDir();
   testFile.append("update_write_access_test");
-  testFile.create(AUS_Ci.nsIFile.NORMAL_FILE_TYPE, PERMS_FILE);
+  testFile.create(Ci.nsIFile.NORMAL_FILE_TYPE, PERMS_FILE);
   do_check_true(testFile.exists());
   testFile.remove(false);
   do_check_false(testFile.exists());
@@ -22,8 +22,8 @@ function run_test() {
     logTestInfo("attempting to create mutex");
     let handle = createMutex(getPerInstallationMutexName());
 
-    logTestInfo("testing that the mutex was successfully created");
-    do_check_neq(handle, null);
+    debugDump("testing that the mutex was successfully created");
+    do_check_true(!!handle);
 
     // Check if available updates cannot be checked for when there is a mutex
     // for this installation.
@@ -71,14 +71,14 @@ function getPerInstallationMutexName() {
     do_throw("Windows only function called by a different platform!");
   }
 
-  let hasher = AUS_Cc["@mozilla.org/security/hash;1"].
-               createInstance(AUS_Ci.nsICryptoHash);
+  let hasher = Cc["@mozilla.org/security/hash;1"].
+               createInstance(Ci.nsICryptoHash);
   hasher.init(hasher.SHA1);
 
-  let exeFile = Services.dirsvc.get(XRE_EXECUTABLE_FILE, AUS_Ci.nsILocalFile);
+  let exeFile = Services.dirsvc.get(XRE_EXECUTABLE_FILE, Ci.nsILocalFile);
 
-  let converter = AUS_Cc["@mozilla.org/intl/scriptableunicodeconverter"].
-                  createInstance(AUS_Ci.nsIScriptableUnicodeConverter);
+  let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"].
+                  createInstance(Ci.nsIScriptableUnicodeConverter);
   converter.charset = "UTF-8";
   let data = converter.convertToByteArray(exeFile.path.toLowerCase());
 

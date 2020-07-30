@@ -2068,7 +2068,7 @@ nsHttpConnectionMgr::BuildPipeline(nsConnectionEntry *ent,
 
     nsRefPtr<nsHttpPipeline> pipeline = new nsHttpPipeline();
     pipeline->AddTransaction(firstTrans);
-    NS_ADDREF(*result = pipeline);
+    pipeline.forget(result);
     return NS_OK;
 }
 
@@ -2478,7 +2478,7 @@ nsHttpConnectionMgr::OnMsgCancelTransaction(int32_t reason, void *param)
         // Cancel is a pretty strong signal that things might be hanging
         // so we want to cancel any null transactions related to this connection
         // entry. They are just optimizations, but they aren't hooked up to
-        // anything that might get canceled from the rest of goanna, so best
+        // anything that might get canceled from the rest of gecko, so best
         // to assume that's what was meant by the cancel we did receive if
         // it only applied to something in the queue.
         for (uint32_t index = 0;
@@ -3165,6 +3165,10 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
     socketTransport->SetConnectionFlags(tmpFlags);
 
     socketTransport->SetQoSBits(gHttpHandler->GetQoSBits());
+
+    if (!mEnt->mConnInfo->GetNetworkInterfaceId().IsEmpty()) {
+        socketTransport->SetNetworkInterfaceId(mEnt->mConnInfo->GetNetworkInterfaceId());
+    }
 
     rv = socketTransport->SetEventSink(this, nullptr);
     NS_ENSURE_SUCCESS(rv, rv);

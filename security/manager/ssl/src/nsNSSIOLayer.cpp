@@ -6,15 +6,15 @@
 
 #include "nsNSSIOLayer.h"
 
-#include "pkix/ScopedPtr.h"
 #include "pkix/pkixtypes.h"
 #include "nsNSSComponent.h"
 #include "mozilla/BinarySearch.h"
 #include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/UniquePtr.h"
 #include "mozilla/Telemetry.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prmem.h"
 #include "prnetdb.h"
 #include "nsIPrefService.h"
@@ -86,9 +86,7 @@ static const bool FALSE_START_REQUIRE_NPN_DEFAULT = false;
 
 } // unnamed namespace
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 nsNSSSocketInfo::nsNSSSocketInfo(SharedSSLState& aState, uint32_t providerFlags)
   : mFd(nullptr),
@@ -1348,7 +1346,7 @@ checkHandshake(int32_t bytesTransfered, bool wasReading,
 
   if (bytesTransfered < 0) {
     // Remember that we encountered an error so that getSocketInfoIfRunning
-    // will correctly cause us to fail if another part of Goanna
+    // will correctly cause us to fail if another part of Gecko
     // (erroneously) calls an I/O function (PR_Send/PR_Recv/etc.) again on
     // this socket. Note that we use the original error because if we use
     // PR_CONNECT_RESET_ERROR, we'll repeated try to reconnect.
@@ -2381,8 +2379,8 @@ ClientAuthDataRunnable::RunOnTargetThread()
       NS_ASSERTION(nicknames->numnicknames == NumberOfCerts, "nicknames->numnicknames != NumberOfCerts");
 
       // Get CN and O of the subject and O of the issuer
-      mozilla::pkix::ScopedPtr<char, PORT_Free_string> ccn(
-        CERT_GetCommonName(&mServerCert->subject));
+      UniquePtr<char, void(&)(void*)>
+        ccn(CERT_GetCommonName(&mServerCert->subject), PORT_Free);
       NS_ConvertUTF8toUTF16 cn(ccn.get());
 
       int32_t port;

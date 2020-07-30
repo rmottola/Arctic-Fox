@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -93,15 +93,24 @@ nsIContentChild::DeallocPBlobChild(PBlobChild* aActor)
 }
 
 BlobChild*
-nsIContentChild::GetOrCreateActorForBlob(File* aBlob)
+nsIContentChild::GetOrCreateActorForBlob(Blob* aBlob)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aBlob);
 
-  nsRefPtr<FileImpl> blobImpl = aBlob->Impl();
+  nsRefPtr<BlobImpl> blobImpl = aBlob->Impl();
   MOZ_ASSERT(blobImpl);
 
-  BlobChild* actor = BlobChild::GetOrCreate(this, blobImpl);
+  return GetOrCreateActorForBlobImpl(blobImpl);
+}
+
+BlobChild*
+nsIContentChild::GetOrCreateActorForBlobImpl(BlobImpl* aImpl)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aImpl);
+
+  BlobChild* actor = BlobChild::GetOrCreate(this, aImpl);
   NS_ENSURE_TRUE(actor, nullptr);
 
   return actor;

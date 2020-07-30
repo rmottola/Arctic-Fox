@@ -1,4 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -19,6 +20,7 @@ class Console;
 class Function;
 class Promise;
 class RequestOrUSVString;
+class ServiceWorkerRegistrationWorkerThread;
 
 namespace cache {
 
@@ -198,6 +200,7 @@ class ServiceWorkerGlobalScope final : public WorkerGlobalScope
 {
   const nsString mScope;
   nsRefPtr<ServiceWorkerClients> mClients;
+  nsRefPtr<ServiceWorkerRegistrationWorkerThread> mRegistration;
 
   ~ServiceWorkerGlobalScope();
 
@@ -218,14 +221,11 @@ public:
     aScope = mScope;
   }
 
-  void
-  Update();
-
-  already_AddRefed<Promise>
-  Unregister(ErrorResult& aRv);
-
   ServiceWorkerClients*
   Clients();
+
+  ServiceWorkerRegistrationWorkerThread*
+  Registration();
 
   IMPL_EVENT_HANDLER(activate)
   IMPL_EVENT_HANDLER(beforeevicted)

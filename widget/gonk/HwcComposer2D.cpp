@@ -148,7 +148,7 @@ HwcComposer2D::Init(hwc_display_t dpy, hwc_surface_t sur, gl::GLContext* aGLCont
     ANativeWindow *win = GetGonkDisplay()->GetNativeWindow();
     win->query(win, NATIVE_WINDOW_WIDTH, &screenSize.width);
     win->query(win, NATIVE_WINDOW_HEIGHT, &screenSize.height);
-    mScreenRect = nsIntRect(nsIntPoint(0, 0), screenSize);
+    mScreenRect = gfx::IntRect(gfx::IntPoint(0, 0), screenSize);
 
 #if ANDROID_VERSION >= 17
     int supported = 0;

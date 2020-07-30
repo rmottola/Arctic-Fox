@@ -57,8 +57,6 @@ struct IDirect3DDevice9;
 struct ID3D11Device;
 struct IDXGIAdapter1;
 
-class nsIMemoryReporter;
-
 /**
  * Utility to get a Windows HDC from a Moz2D DrawTarget.  If the DrawTarget is
  * not backed by a HDC this will get the HDC for the screen device context
@@ -257,6 +255,11 @@ public:
 
     bool IsWARP() { return mIsWARP; }
 
+    bool SupportsApzWheelInput() const override {
+      return true;
+    }
+    bool SupportsApzTouchInput() const override;
+
     virtual already_AddRefed<mozilla::gfx::VsyncSource> CreateHardwareVsyncSource() override;
     static mozilla::Atomic<size_t> sD3D11MemoryUsed;
     static mozilla::Atomic<size_t> sD3D9MemoryUsed;
@@ -273,6 +276,7 @@ private:
     void Init();
     void InitD3D11Devices();
     IDXGIAdapter1 *GetDXGIAdapter();
+    bool IsDeviceReset(HRESULT hr, DeviceResetReason* aReason);
 
     bool mUseDirectWrite;
     bool mUsingGDIFonts;
@@ -294,6 +298,9 @@ private:
     bool mD3D11DeviceInitialized;
     mozilla::RefPtr<mozilla::layers::ReadbackManagerD3D11> mD3D11ReadbackManager;
     bool mIsWARP;
+    bool mCanInitMediaDevice;
+    bool mHasDeviceReset;
+    DeviceResetReason mDeviceResetReason;
 
     virtual void GetPlatformCMSOutputProfile(void* &mem, size_t &size);
 };

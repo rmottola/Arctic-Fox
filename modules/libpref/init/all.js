@@ -292,6 +292,8 @@ pref("media.wakelock_timeout", 2000);
 // opened as top-level documents, as opposed to inside a media element.
 pref("media.play-stand-alone", true);
 
+pref("media.hardware-video-decoding.enabled", true);
+
 // Whether we should delay actioning a "play()" JS function call and autoplay
 // attribute until the media element's owner document is visible.
 pref("media.block-play-until-visible", false);
@@ -331,7 +333,6 @@ pref("media.fragmented-mp4.enabled", true);
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
 pref("media.windows-media-foundation.enabled", true);
-pref("media.windows-media-foundation.use-dxva", true);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
@@ -812,6 +813,8 @@ pref("toolkit.scrollbox.verticalScrollDistance", 3);
 pref("toolkit.scrollbox.horizontalScrollDistance", 5);
 pref("toolkit.scrollbox.clickToScroll.scrollDelay", 150);
 
+// Telemetry settings.
+// Server to submit telemetry pings to.
 pref("toolkit.telemetry.server", "https://incoming.telemetry.mozilla.org");
 // Telemetry server owner. Please change if you set toolkit.telemetry.server to a different server
 pref("toolkit.telemetry.server_owner", "Mozilla");
@@ -820,6 +823,8 @@ pref("toolkit.telemetry.infoURL", "https://www.mozilla.org/legal/privacy/firefox
 // Determines whether full SQL strings are returned when they might contain sensitive info
 // i.e. dynamically constructed SQL strings or SQL executed by addons against addon DBs
 pref("toolkit.telemetry.debugSlowSql", false);
+// Whether to use the unified telemetry behavior, requires a restart.
+pref("toolkit.telemetry.unified", true);
 
 // Identity module
 pref("toolkit.identity.enabled", false);
@@ -1485,6 +1490,11 @@ pref("network.warnOnAboutNetworking", true);
 
 // Example: make IMAP an exposed protocol
 // pref("network.protocol-handler.expose.imap", true);
+
+// Whether IOService.connectivity and NS_IsOffline depends on connectivity status
+pref("network.manage-offline-status", false);
+// If set to true, IOService.offline depends on IOService.connectivity
+pref("network.offline-mirrors-connectivity", true);
 
 // <http>
 pref("network.http.version", "1.1");      // default
@@ -2222,7 +2232,7 @@ pref("mousewheel.acceleration.factor", 10);
 // speed is multiplied by the following factors.  The value will be used as
 // 1/100.  E.g., 200 means 2.00.
 // NOTE: Even if "mousewheel.system_scroll_override_on_root_content.enabled" is
-// true, when Goanna detects the user customized the system scrolling speed
+// true, when Gecko detects the user customized the system scrolling speed
 // settings, the override isn't executed.
 pref("mousewheel.system_scroll_override_on_root_content.vertical.factor", 200);
 pref("mousewheel.system_scroll_override_on_root_content.horizontal.factor", 200);
@@ -3363,7 +3373,7 @@ pref("mousewheel.system_scroll_override_on_root_content.enabled", true);
 pref("mousewheel.enable_pixel_scrolling", true);
 
 // If your mouse drive sends WM_*SCROLL messages when you turn your mouse wheel,
-// set this to true.  Then, goanna processes them as mouse wheel messages.
+// set this to true.  Then, gecko processes them as mouse wheel messages.
 pref("mousewheel.emulate_at_wm_scroll", false);
 
 // Enables or disabled the TrackPoint hack, -1 is autodetect, 0 is off,
@@ -3886,6 +3896,18 @@ pref("intl.ime.use_simple_context_on_password_field", true);
 pref("intl.ime.use_simple_context_on_password_field", false);
 #endif
 
+# enable new platform fontlist for linux on GTK platforms
+# temporary pref to allow flipping back to the existing
+# gfxPangoFontGroup/gfxFontconfigUtils code for handling system fonts
+
+#ifdef MOZ_WIDGET_GTK
+#ifdef RELEASE_BUILD
+pref("gfx.font_rendering.fontconfig.fontlist.enabled", false);
+#else
+pref("gfx.font_rendering.fontconfig.fontlist.enabled", true);
+#endif
+#endif
+
 # XP_UNIX
 #endif
 #endif
@@ -4238,6 +4260,9 @@ pref("webgl.enable-draft-extensions", false);
 pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
 pref("webgl.enable-prototype-webgl2", false);
+pref("webgl.disable-fail-if-major-performance-caveat", false);
+pref("gl.require-hardware", false);
+
 #ifdef XP_WIN
 pref("webgl.angle.try-d3d11", true);
 pref("webgl.angle.force-d3d11", false);
@@ -4356,7 +4381,11 @@ pref("layers.offmainthreadcomposition.testing.enabled", false);
 pref("layers.offmainthreadcomposition.force-basic", false);
 
 // Whether to animate simple opacity and transforms on the compositor
+#ifdef RELEASE_BUILD
 pref("layers.offmainthreadcomposition.async-animations", false);
+#else
+pref("layers.offmainthreadcomposition.async-animations", true);
+#endif
 
 // Whether to log information about off main thread animations to stderr
 pref("layers.offmainthreadcomposition.log-animations", false);
@@ -4379,7 +4408,6 @@ pref("gfx.xrender.enabled",true);
 // Whether to disable the automatic detection and use of direct2d.
 pref("gfx.direct2d.disabled", false);
 pref("gfx.direct2d.use1_1", true);
-pref("gfx.direct2d.allow-fallback", false);
 
 // Whether to attempt to enable Direct2D regardless of automatic detection or
 // blacklisting
@@ -4781,11 +4809,11 @@ pref("dom.inter-app-communication-api.enabled", false);
 pref("dom.mapped_arraybuffer.enabled", false);
 
 // The tables used for Safebrowsing phishing and malware checks.
-pref("urlclassifier.malwareTable", "goog-malware-shavar,test-malware-simple");
+pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,test-malware-simple,test-unwanted-simple");
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.downloadBlockTable", "");
 pref("urlclassifier.downloadAllowTable", "");
-pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,goog-downloadwhite-digest256,mozpub-track-digest256");
+pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,goog-downloadwhite-digest256,mozpub-track-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
 // checks.
@@ -4956,6 +4984,27 @@ pref("media.gmp-manager.certs.2.commonName", "aus4.mozilla.org");
 // If this pref is disabled, we will never show a reader mode icon in the toolbar.
 pref("reader.parse-on-load.enabled", true);
 
+// Force-enables reader mode parsing, even on low-memory platforms, where it
+// is disabled by default.
+pref("reader.parse-on-load.force-enabled", false);
+
+// The default relative font size in reader mode (1-5)
+pref("reader.font_size", 3);
+
+// The default color scheme in reader mode (light, dark, auto)
+// auto = color automatically adjusts according to ambient light level
+pref("reader.color_scheme", "auto");
+
+// The font type in reader (sans-serif, serif)
+pref("reader.font_type", "sans-serif");
+
+// Whether or not the user has interacted with the reader mode toolbar.
+// This is used to show a first-launch tip in reader mode.
+pref("reader.has_used_toolbar", false);
+// Whether or not to perform reader mode article parsing on page load.
+// If this pref is disabled, we will never show a reader mode icon in the toolbar.
+pref("reader.parse-on-load.enabled", true);
+
 // After what size document we don't bother running Readability on it
 // because it'd slow things down too much
 pref("reader.parse-node-limit", 3000);
@@ -4987,7 +5036,7 @@ pref("reader.toolbar.vertical", true);
 
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
 // Whether to allow, on a Linux system that doesn't support the necessary sandboxing
-// features, loading Goanna Media Plugins unsandboxed.
+// features, loading Gecko Media Plugins unsandboxed.
 pref("media.gmp.insecure.allow", false);
 #endif
 

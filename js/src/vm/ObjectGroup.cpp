@@ -24,7 +24,7 @@ using mozilla::PodZero;
 // ObjectGroup
 /////////////////////////////////////////////////////////////////////
 
-ObjectGroup::ObjectGroup(const Class *clasp, TaggedProto proto, JSCompartment *comp,
+ObjectGroup::ObjectGroup(const Class* clasp, TaggedProto proto, JSCompartment* comp,
                          ObjectGroupFlags initialFlags)
 {
     PodZero(this);
@@ -291,8 +291,8 @@ JSObject::splicePrototype(JSContext* cx, const Class* clasp, Handle<TaggedProto>
     return true;
 }
 
-/* static */ ObjectGroup *
-JSObject::makeLazyGroup(JSContext *cx, HandleObject obj)
+/* static */ ObjectGroup*
+JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->hasLazyGroup());
     MOZ_ASSERT(cx->compartment() == obj->compartment());
@@ -318,7 +318,7 @@ JSObject::makeLazyGroup(JSContext *cx, HandleObject obj)
         initialFlags |= OBJECT_FLAG_LENGTH_OVERFLOW;
 
     Rooted<TaggedProto> proto(cx, obj->getTaggedProto());
-    ObjectGroup *group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
+    ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
                                                            initialFlags);
     if (!group)
         return nullptr;
@@ -593,7 +593,7 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
     AutoEnterAnalysis enter(cx);
 
     Rooted<TaggedProto> protoRoot(cx, proto);
-    ObjectGroup *group =
+    ObjectGroup* group =
         ObjectGroupCompartment::makeGroup(cx, clasp, protoRoot,
                                           OBJECT_FLAG_SINGLETON | OBJECT_FLAG_LAZY_SINGLETON);
     if (!group)
@@ -798,12 +798,12 @@ ObjectGroup::fixRestArgumentsGroup(ExclusiveContext* cx, ArrayObject* obj)
 }
 
 /* static */ void
-ObjectGroup::setGroupToHomogenousArray(ExclusiveContext *cx, JSObject *obj,
+ObjectGroup::setGroupToHomogenousArray(ExclusiveContext* cx, JSObject* obj,
                                        TypeSet::Type elementType)
 {
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
 
-    ObjectGroupCompartment::ArrayObjectTable *&table =
+    ObjectGroupCompartment::ArrayObjectTable*& table =
         cx->compartment()->objectGroups.arrayObjectTable;
 
     if (!table) {
@@ -841,24 +841,24 @@ ObjectGroup::setGroupToHomogenousArray(ExclusiveContext *cx, JSObject *obj,
 
 struct ObjectGroupCompartment::PlainObjectKey
 {
-    jsid *properties;
+    jsid* properties;
     uint32_t nproperties;
 
     struct Lookup {
-        IdValuePair *properties;
+        IdValuePair* properties;
         uint32_t nproperties;
 
-        Lookup(IdValuePair *properties, uint32_t nproperties)
+        Lookup(IdValuePair* properties, uint32_t nproperties)
           : properties(properties), nproperties(nproperties)
         {}
     };
 
-    static inline HashNumber hash(const Lookup &lookup) {
+    static inline HashNumber hash(const Lookup& lookup) {
         return (HashNumber) (JSID_BITS(lookup.properties[lookup.nproperties - 1].id) ^
                              lookup.nproperties);
     }
 
-    static inline bool match(const PlainObjectKey &v, const Lookup &lookup) {
+    static inline bool match(const PlainObjectKey& v, const Lookup& lookup) {
         if (lookup.nproperties != v.nproperties)
             return false;
         for (size_t i = 0; i < lookup.nproperties; i++) {
@@ -890,8 +890,8 @@ CanShareObjectGroup(IdValuePair *properties, size_t nproperties)
 }
 
 static bool
-AddPlainObjectProperties(ExclusiveContext *cx, HandlePlainObject obj,
-                         IdValuePair *properties, size_t nproperties)
+AddPlainObjectProperties(ExclusiveContext* cx, HandlePlainObject obj,
+                         IdValuePair* properties, size_t nproperties)
 {
     RootedId propid(cx);
     RootedValue value(cx);
@@ -906,8 +906,8 @@ AddPlainObjectProperties(ExclusiveContext *cx, HandlePlainObject obj,
     return true;
 }
 
-PlainObject *
-js::NewPlainObjectWithProperties(ExclusiveContext *cx, IdValuePair *properties, size_t nproperties,
+PlainObject*
+js::NewPlainObjectWithProperties(ExclusiveContext* cx, IdValuePair* properties, size_t nproperties,
                                  NewObjectKind newKind)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(nproperties);
@@ -917,15 +917,15 @@ js::NewPlainObjectWithProperties(ExclusiveContext *cx, IdValuePair *properties, 
     return obj;
 }
 
-/* static */ JSObject *
-ObjectGroup::newPlainObject(ExclusiveContext *cx, IdValuePair *properties, size_t nproperties,
+/* static */ JSObject*
+ObjectGroup::newPlainObject(ExclusiveContext* cx, IdValuePair* properties, size_t nproperties,
                             NewObjectKind newKind)
 {
     // Watch for simple cases where we don't try to reuse plain object groups.
     if (newKind == SingletonObject || nproperties == 0 || nproperties >= PropertyTree::MAX_HEIGHT)
         return NewPlainObjectWithProperties(cx, properties, nproperties, newKind);
 
-    ObjectGroupCompartment::PlainObjectTable *&table =
+    ObjectGroupCompartment::PlainObjectTable*& table =
         cx->compartment()->objectGroups.plainObjectTable;
 
     if (!table) {
@@ -966,7 +966,7 @@ ObjectGroup::newPlainObject(ExclusiveContext *cx, IdValuePair *properties, size_
         // default (which will have unknown properties) so that the group we
         // just created will be collected by the GC.
         if (obj->slotSpan() != nproperties) {
-            ObjectGroup *group = defaultNewGroup(cx, obj->getClass(), obj->getTaggedProto());
+            ObjectGroup* group = defaultNewGroup(cx, obj->getClass(), obj->getTaggedProto());
             if (!group)
                 return nullptr;
             obj->setGroup(group);
@@ -976,7 +976,7 @@ ObjectGroup::newPlainObject(ExclusiveContext *cx, IdValuePair *properties, size_
         // Keep track of the initial objects we create with this type.
         // If the initial ones have a consistent shape and property types, we
         // will try to use an unboxed layout for the group.
-        PreliminaryObjectArrayWithTemplate *preliminaryObjects =
+        PreliminaryObjectArrayWithTemplate* preliminaryObjects =
             cx->new_<PreliminaryObjectArrayWithTemplate>(obj->lastProperty());
         if (!preliminaryObjects)
             return nullptr;
@@ -1144,9 +1144,9 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
     if (JSOp(*pc) == JSOP_NEWOBJECT) {
         // Keep track of the preliminary objects with this group, so we can try
         // to use an unboxed layout for the object once some are allocated.
-        Shape *shape = script->getObject(pc)->as<PlainObject>().lastProperty();
+        Shape* shape = script->getObject(pc)->as<PlainObject>().lastProperty();
         if (!shape->isEmptyShape()) {
-            PreliminaryObjectArrayWithTemplate *preliminaryObjects =
+            PreliminaryObjectArrayWithTemplate* preliminaryObjects =
                 cx->new_<PreliminaryObjectArrayWithTemplate>(shape);
             if (preliminaryObjects)
                 res->setPreliminaryObjects(preliminaryObjects);
@@ -1161,10 +1161,10 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
     return res;
 }
 
-/* static */ ObjectGroup *
-ObjectGroup::callingAllocationSiteGroup(JSContext *cx, JSProtoKey key)
+/* static */ ObjectGroup*
+ObjectGroup::callingAllocationSiteGroup(JSContext* cx, JSProtoKey key)
 {
-    jsbytecode *pc;
+    jsbytecode* pc;
     RootedScript script(cx, cx->currentScript(&pc));
     if (script)
         return allocationSiteGroup(cx, script, pc, key);
@@ -1199,8 +1199,8 @@ ObjectGroup::setAllocationSiteObjectGroup(JSContext* cx,
     return true;
 }
 
-/* static */ ArrayObject *
-ObjectGroup::getOrFixupCopyOnWriteObject(JSContext *cx, HandleScript script, jsbytecode *pc)
+/* static */ ArrayObject*
+ObjectGroup::getOrFixupCopyOnWriteObject(JSContext* cx, HandleScript script, jsbytecode* pc)
 {
     // Make sure that the template object for script/pc has a type indicating
     // that the object and its copies have copy on write elements.
@@ -1221,7 +1221,7 @@ ObjectGroup::getOrFixupCopyOnWriteObject(JSContext *cx, HandleScript script, jsb
     // Update type information in the initializer object group.
     MOZ_ASSERT(obj->slotSpan() == 0);
     for (size_t i = 0; i < obj->getDenseInitializedLength(); i++) {
-        const Value &v = obj->getDenseElement(i);
+        const Value& v = obj->getDenseElement(i);
         AddTypePropertyId(cx, group, nullptr, JSID_VOID, v);
     }
 
@@ -1311,14 +1311,14 @@ ObjectGroupCompartment::replaceDefaultNewGroup(const Class* clasp, TaggedProto p
 }
 
 /* static */
-ObjectGroup *
-ObjectGroupCompartment::makeGroup(ExclusiveContext *cx, const Class *clasp,
+ObjectGroup*
+ObjectGroupCompartment::makeGroup(ExclusiveContext* cx, const Class* clasp,
                                   Handle<TaggedProto> proto,
                                   ObjectGroupFlags initialFlags /* = 0 */)
 {
     MOZ_ASSERT_IF(proto.isObject(), cx->isInsideCurrentCompartment(proto.toObject()));
 
-    ObjectGroup *group = Allocate<ObjectGroup>(cx);
+    ObjectGroup* group = Allocate<ObjectGroup>(cx);
     if (!group)
         return nullptr;
     new(group) ObjectGroup(clasp, proto, cx->compartment(), initialFlags);
@@ -1370,8 +1370,8 @@ ObjectGroupCompartment::clearTables()
         arrayObjectTable->clear();
     if (plainObjectTable && plainObjectTable->initialized()) {
         for (PlainObjectTable::Enum e(*plainObjectTable); !e.empty(); e.popFront()) {
-            const PlainObjectKey &key = e.front().key();
-            PlainObjectEntry &entry = e.front().value();
+            const PlainObjectKey& key = e.front().key();
+            PlainObjectEntry& entry = e.front().value();
             js_free(key.properties);
             js_free(entry.types);
         }
@@ -1399,17 +1399,17 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
             bool remove = false;
             if (!key.type.isUnknown() && key.type.isGroup()) {
                 ObjectGroup* group = key.type.groupNoBarrier();
-                if (IsObjectGroupAboutToBeFinalizedFromAnyThread(&group))
+                if (IsObjectGroupAboutToBeFinalized(&group))
                     remove = true;
                 else
                     key.type = TypeSet::ObjectType(group);
             }
             if (key.proto && key.proto != TaggedProto::LazyProto &&
-                IsObjectAboutToBeFinalizedFromAnyThread(&key.proto))
+                IsObjectAboutToBeFinalized(&key.proto))
             {
                 remove = true;
             }
-            if (IsObjectGroupAboutToBeFinalizedFromAnyThread(e.front().value().unsafeGet()))
+            if (IsObjectGroupAboutToBeFinalized(e.front().value().unsafeGet()))
                 remove = true;
 
             if (remove)
@@ -1425,19 +1425,19 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
             PlainObjectEntry& entry = e.front().value();
 
             bool remove = false;
-            if (IsObjectGroupAboutToBeFinalizedFromAnyThread(entry.group.unsafeGet()))
+            if (IsObjectGroupAboutToBeFinalized(entry.group.unsafeGet()))
                 remove = true;
-            if (IsShapeAboutToBeFinalizedFromAnyThread(entry.shape.unsafeGet()))
+            if (IsShapeAboutToBeFinalized(entry.shape.unsafeGet()))
                 remove = true;
             for (unsigned i = 0; !remove && i < key.nproperties; i++) {
                 if (JSID_IS_STRING(key.properties[i])) {
                     JSString* str = JSID_TO_STRING(key.properties[i]);
-                    if (IsStringAboutToBeFinalizedFromAnyThread(&str))
+                    if (IsStringAboutToBeFinalized(&str))
                         remove = true;
                     MOZ_ASSERT(AtomToId((JSAtom*)str) == key.properties[i]);
                 } else if (JSID_IS_SYMBOL(key.properties[i])) {
                     JS::Symbol* sym = JSID_TO_SYMBOL(key.properties[i]);
-                    if (IsSymbolAboutToBeFinalizedFromAnyThread(&sym))
+                    if (IsSymbolAboutToBeFinalized(&sym))
                         remove = true;
                 }
 
@@ -1445,7 +1445,7 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
                 ObjectGroup* group = nullptr;
                 if (entry.types[i].isGroup()) {
                     group = entry.types[i].groupNoBarrier();
-                    if (IsObjectGroupAboutToBeFinalizedFromAnyThread(&group))
+                    if (IsObjectGroupAboutToBeFinalized(&group))
                         remove = true;
                     else if (group != entry.types[i].groupNoBarrier())
                         entry.types[i] = TypeSet::ObjectType(group);
@@ -1463,8 +1463,8 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
     if (allocationSiteTable) {
         for (AllocationSiteTable::Enum e(*allocationSiteTable); !e.empty(); e.popFront()) {
             AllocationSiteKey key = e.front().key();
-            bool keyDying = IsScriptAboutToBeFinalizedFromAnyThread(&key.script);
-            bool valDying = IsObjectGroupAboutToBeFinalizedFromAnyThread(e.front().value().unsafeGet());
+            bool keyDying = IsScriptAboutToBeFinalized(&key.script);
+            bool valDying = IsObjectGroupAboutToBeFinalized(e.front().value().unsafeGet());
             if (keyDying || valDying)
                 e.removeFront();
             else if (key.script != e.front().key().script)
@@ -1482,8 +1482,8 @@ ObjectGroupCompartment::sweepNewTable(NewTable* table)
     if (table && table->initialized()) {
         for (NewTable::Enum e(*table); !e.empty(); e.popFront()) {
             NewEntry entry = e.front();
-            if (IsObjectGroupAboutToBeFinalizedFromAnyThread(entry.group.unsafeGet()) ||
-                (entry.associated && IsObjectAboutToBeFinalizedFromAnyThread(&entry.associated)))
+            if (IsObjectGroupAboutToBeFinalized(entry.group.unsafeGet()) ||
+                (entry.associated && IsObjectAboutToBeFinalized(&entry.associated)))
             {
                 e.removeFront();
             } else {

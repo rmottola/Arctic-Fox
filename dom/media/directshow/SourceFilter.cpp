@@ -9,7 +9,7 @@
 #include "mozilla/RefPtr.h"
 #include "DirectShowUtils.h"
 #include "MP3FrameParser.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include <algorithm>
 
 using namespace mozilla::media;
@@ -19,7 +19,7 @@ namespace mozilla {
 // Define to trace what's on...
 //#define DEBUG_SOURCE_TRACE 1
 
-#if defined(PR_LOGGING) && defined (DEBUG_SOURCE_TRACE)
+#if defined (DEBUG_SOURCE_TRACE)
 PRLogModuleInfo* GetDirectShowLog();
 #define DIRECTSHOW_LOG(...) PR_LOG(GetDirectShowLog(), PR_LOG_DEBUG, (__VA_ARGS__))
 #else
@@ -352,7 +352,7 @@ OutputPin::RequestAllocator(IMemAllocator* aPreferred,
 
   // Limit allocator's number of buffers. We know that the media will most
   // likely be bound by network speed, not by decoding speed. We also
-  // store the incoming data in a Goanna stream, if we don't limit buffers
+  // store the incoming data in a Gecko stream, if we don't limit buffers
   // here we'll end up duplicating a lot of storage. We must have enough
   // space for audio key frames to fit in the first batch of buffers however,
   // else pausing may fail for some downstream decoders.

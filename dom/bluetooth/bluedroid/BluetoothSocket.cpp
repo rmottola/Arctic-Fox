@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,6 +13,7 @@
 #include "BluetoothSocketObserver.h"
 #include "BluetoothInterface.h"
 #include "BluetoothUtils.h"
+#include "mozilla/ipc/UnixSocketWatcher.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/RefPtr.h"
 #include "nsThreadUtils.h"
@@ -22,10 +23,6 @@ using namespace mozilla::ipc;
 USING_BLUETOOTH_NAMESPACE
 
 static const size_t MAX_READ_SIZE = 1 << 16;
-static const uint8_t UUID_OBEX_OBJECT_PUSH[] = {
-  0x00, 0x00, 0x11, 0x05, 0x00, 0x00, 0x10, 0x00,
-  0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB
-};
 static BluetoothSocketInterface* sBluetoothSocketInterface;
 
 // helper functions
@@ -559,7 +556,9 @@ private:
 };
 
 bool
-BluetoothSocket::ConnectSocket(const nsAString& aDeviceAddress, int aChannel)
+BluetoothSocket::ConnectSocket(const nsAString& aDeviceAddress,
+                               const BluetoothUuid& aServiceUuid,
+                               int aChannel)
 {
   MOZ_ASSERT(NS_IsMainThread());
   NS_ENSURE_FALSE(mImpl, false);
@@ -571,12 +570,11 @@ BluetoothSocket::ConnectSocket(const nsAString& aDeviceAddress, int aChannel)
   BluetoothSocketResultHandler* res = new ConnectSocketResultHandler(mImpl);
   SetCurrentResultHandler(res);
 
-  // TODO: uuid as argument
   sBluetoothSocketInterface->Connect(
     aDeviceAddress,
     BluetoothSocketType::RFCOMM,
-    UUID_OBEX_OBJECT_PUSH,
-    aChannel, mEncrypt, mAuth, res);
+    aServiceUuid.mUuid, aChannel,
+    mEncrypt, mAuth, res);
 
   return true;
 }
@@ -610,7 +608,9 @@ private:
 };
 
 bool
-BluetoothSocket::ListenSocket(int aChannel)
+BluetoothSocket::ListenSocket(const nsAString& aServiceName,
+                              const BluetoothUuid& aServiceUuid,
+                              int aChannel)
 {
   MOZ_ASSERT(NS_IsMainThread());
   NS_ENSURE_FALSE(mImpl, false);
@@ -624,9 +624,8 @@ BluetoothSocket::ListenSocket(int aChannel)
 
   sBluetoothSocketInterface->Listen(
     BluetoothSocketType::RFCOMM,
-    NS_LITERAL_STRING("OBEX Object Push"),
-    UUID_OBEX_OBJECT_PUSH,
-    aChannel, mEncrypt, mAuth, res);
+    aServiceName, aServiceUuid.mUuid, aChannel,
+    mEncrypt, mAuth, res);
 
   return true;
 }
@@ -677,7 +676,10 @@ BluetoothSocket::ReceiveSocketData(nsAutoPtr<UnixSocketRawData>& aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(mObserver);
-  mObserver->ReceiveSocketData(this, aMessage);
+
+  nsAutoPtr<mozilla::ipc::UnixSocketBuffer> buffer(aMessage.forget());
+
+  mObserver->ReceiveSocketData(this, buffer);
 }
 
 void

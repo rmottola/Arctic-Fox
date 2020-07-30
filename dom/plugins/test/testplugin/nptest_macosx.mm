@@ -92,7 +92,7 @@ RectEquals(const NPRect& r1, const NPRect& r2)
 void
 pluginDoSetWindow(InstanceData* instanceData, NPWindow* newWindow)
 {
-  // Ugh. Due to a terrible Goanna bug, we have to ignore position changes
+  // Ugh. Due to a terrible Gecko bug, we have to ignore position changes
   // when the clip rect doesn't change; the position can be wrong
   // when set by a path other than nsPluginFrame::FixUpPluginWindow.
   int32_t oldX = instanceData->window.x;

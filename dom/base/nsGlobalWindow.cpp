@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -122,6 +122,7 @@
 #include "nsIControllerContext.h"
 #include "nsGlobalWindowCommands.h"
 #include "nsAutoPtr.h"
+#include "nsQueryObject.h"
 #include "nsContentUtils.h"
 #include "nsCSSProps.h"
 #include "nsIDOMFileList.h"
@@ -175,7 +176,7 @@
 #include "nsFrameLoader.h"
 #include "nsISupportsPrimitives.h"
 #include "nsXPCOMCID.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prenv.h"
 #include "prprf.h"
 
@@ -188,6 +189,7 @@
 #include "mozilla/dom/StructuredCloneTags.h"
 
 #ifdef MOZ_GAMEPAD
+#include "mozilla/dom/Gamepad.h"
 #include "mozilla/dom/GamepadService.h"
 #endif
 
@@ -217,6 +219,7 @@
 #include "mozilla/dom/MozSelfSupportBinding.h"
 #include "mozilla/dom/PopStateEvent.h"
 #include "mozilla/dom/PopupBlockedEvent.h"
+#include "mozilla/dom/PrimitiveConversions.h"
 #include "mozilla/dom/WindowBinding.h"
 #include "nsITabChild.h"
 #include "mozilla/dom/MediaQueryList.h"
@@ -245,9 +248,7 @@ class nsIScriptTimeoutHandler;
 #include <android/log.h>
 #endif
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gDOMLeakPRLog;
-#endif
 
 #ifdef XP_WIN
 #include <process.h>
@@ -502,7 +503,9 @@ public:
 private:
   ~nsGlobalWindowObserver() {}
 
-  nsGlobalWindow* mWindow;
+  // This reference is non-owning and safe because it's cleared by
+  // nsGlobalWindow::CleanUp().
+  nsGlobalWindow* MOZ_NON_OWNING_REF mWindow;
 };
 
 NS_IMPL_ISUPPORTS(nsGlobalWindowObserver, nsIObserver, nsIInterfaceRequestor)
@@ -586,7 +589,7 @@ nsPIDOMWindow::nsPIDOMWindow(nsPIDOMWindow *aOuterWindow)
   mOuterWindow(aOuterWindow),
   // Make sure no actual window ends up with mWindowID == 0
   mWindowID(NextWindowID()), mHasNotifiedGlobalCreated(false),
-  mMarkedCCGeneration(0)
+  mMarkedCCGeneration(0), mServiceWorkersTestingEnabled(false)
  {}
 
 nsPIDOMWindow::~nsPIDOMWindow() {}
@@ -623,7 +626,7 @@ public:
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
-                              JS::MutableHandle<JSPropertyDescriptor> desc,
+                              JS::Handle<JSPropertyDescriptor> desc,
                               JS::ObjectOpResult &result) const override;
   virtual bool ownPropertyKeys(JSContext *cx,
                                JS::Handle<JSObject*> proxy,
@@ -645,9 +648,8 @@ public:
                    JS::Handle<jsid> id,
                    JS::MutableHandle<JS::Value> vp) const override;
   virtual bool set(JSContext *cx, JS::Handle<JSObject*> proxy,
-                   JS::Handle<JSObject*> receiver,
-                   JS::Handle<jsid> id,
-                   JS::MutableHandle<JS::Value> vp,
+                   JS::Handle<jsid> id, JS::Handle<JS::Value> v,
+                   JS::Handle<JS::Value> receiver,
                    JS::ObjectOpResult &result) const override;
 
   // SpiderMonkey extensions
@@ -784,16 +786,15 @@ bool
 nsOuterWindowProxy::defineProperty(JSContext* cx,
                                    JS::Handle<JSObject*> proxy,
                                    JS::Handle<jsid> id,
-                                   JS::MutableHandle<JSPropertyDescriptor> desc,
+                                   JS::Handle<JSPropertyDescriptor> desc,
                                    JS::ObjectOpResult &result) const
 {
   int32_t index = GetArrayIndexFromId(cx, id);
   if (IsArrayIndex(index)) {
     // Spec says to Reject whether this is a supported index or not,
-    // since we have no indexed setter or indexed creator.  That means
-    // throwing in strict mode (FIXME: Bug 828137), doing nothing in
-    // non-strict mode.
-    return result.succeed();
+    // since we have no indexed setter or indexed creator.  It is up
+    // to the caller to decide whether to throw a TypeError.
+    return result.failCantDefineWindowElement();
   }
 
   // For now, allow chrome code to define non-configurable properties
@@ -912,19 +913,19 @@ nsOuterWindowProxy::get(JSContext *cx, JS::Handle<JSObject*> proxy,
 
 bool
 nsOuterWindowProxy::set(JSContext *cx, JS::Handle<JSObject*> proxy,
-                        JS::Handle<JSObject*> receiver,
                         JS::Handle<jsid> id,
-                        JS::MutableHandle<JS::Value> vp,
+                        JS::Handle<JS::Value> v,
+                        JS::Handle<JS::Value> receiver,
                         JS::ObjectOpResult &result) const
 {
   int32_t index = GetArrayIndexFromId(cx, id);
   if (IsArrayIndex(index)) {
-    // Reject (which means throw if and only if strict) the set.
-    // XXX See bug 828137.
-    return result.succeed();
+    // Reject the set.  It's up to the caller to decide whether to throw a
+    // TypeError.  If the caller is strict mode JS code, it'll throw.
+    return result.failReadOnly();
   }
 
-  return js::Wrapper::set(cx, proxy, receiver, id, vp, result);
+  return js::Wrapper::set(cx, proxy, id, v, receiver, result);
 }
 
 bool
@@ -1210,11 +1211,9 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
   }
 #endif
 
-#ifdef PR_LOGGING
   if (gDOMLeakPRLog)
     PR_LOG(gDOMLeakPRLog, PR_LOG_DEBUG,
            ("DOMWINDOW %p created outer=%p", this, aOuterWindow));
-#endif
 
   NS_ASSERTION(sWindowsById, "Windows hash table must be created!");
   NS_ASSERTION(!sWindowsById->Get(mWindowID),
@@ -1246,10 +1245,8 @@ nsGlobalWindow::Init()
   NS_ASSERTION(gEntropyCollector,
                "gEntropyCollector should have been initialized!");
 
-#ifdef PR_LOGGING
   gDOMLeakPRLog = PR_NewLogModule("DOMLeak");
   NS_ASSERTION(gDOMLeakPRLog, "gDOMLeakPRLog should have been initialized!");
-#endif
 
   sWindowsById = new WindowByIdTable();
 }
@@ -1304,11 +1301,9 @@ nsGlobalWindow::~nsGlobalWindow()
   }
 #endif
 
-#ifdef PR_LOGGING
   if (gDOMLeakPRLog)
     PR_LOG(gDOMLeakPRLog, PR_LOG_DEBUG,
            ("DOMWINDOW %p destroyed", this));
-#endif
 
   if (IsOuterWindow()) {
     JSObject *proxy = GetWrapperPreserveColor();
@@ -1437,6 +1432,8 @@ nsGlobalWindow::CleanUp()
   if (mCleanedUp)
     return;
   mCleanedUp = true;
+
+  StartDying();
 
   mEventTargetObjects.EnumerateEntries(DisconnectEventTargetObjects, nullptr);
   mEventTargetObjects.Clear();
@@ -1768,12 +1765,18 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
     cb.NoteNativeChild(timeout, NS_CYCLE_COLLECTION_PARTICIPANT(nsTimeout));
   }
 
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocation)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mHistory)
+
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocalStorage)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSessionStorage)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mApplicationCache)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSuspendedDoc)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIndexedDB)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocumentPrincipal)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDoc)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIdleService)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWakeLock)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPendingStorageEvents)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIdleObservers)
 
@@ -1800,6 +1803,9 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConsole)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mExternal)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMozSelfSupport)
+
+  tmp->TraverseHostObjectURIs(cb);
+
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -1829,15 +1835,20 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
     tmp->mListenerManager->Disconnect();
     NS_IMPL_CYCLE_COLLECTION_UNLINK(mListenerManager)
   }
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mLocation)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mHistory)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLocalStorage)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSessionStorage)
   if (tmp->mApplicationCache) {
     static_cast<nsDOMOfflineResourceList*>(tmp->mApplicationCache.get())->Disconnect();
     NS_IMPL_CYCLE_COLLECTION_UNLINK(mApplicationCache)
   }
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mSuspendedDoc)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mIndexedDB)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocumentPrincipal)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDoc)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mIdleService)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mWakeLock)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mPendingStorageEvents)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mIdleObservers)
 
@@ -1864,6 +1875,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mConsole)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mExternal)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMozSelfSupport)
+
+  tmp->UnlinkHostObjectURIs();
+
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
@@ -2720,8 +2734,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
   // up with the outer. See bug 969156.
   if (createdInnerWindow) {
     // AutoEntryScript required to invoke debugger hook, which is a
-    // Goanna-specific concept at present.
-    AutoEntryScript aes(newInnerWindow);
+    // Gecko-specific concept at present.
+    AutoEntryScript aes(newInnerWindow, "nsGlobalWindow report new global");
     JS::Rooted<JSObject*> global(aes.cx(), newInnerWindow->GetWrapper());
     JS_FireOnNewGlobalObject(aes.cx(), global);
   }
@@ -2815,7 +2829,6 @@ nsGlobalWindow::InnerSetNewDocument(JSContext* aCx, nsIDocument* aDocument)
   NS_PRECONDITION(IsInnerWindow(), "Must only be called on inner windows");
   MOZ_ASSERT(aDocument);
 
-#ifdef PR_LOGGING
   if (gDOMLeakPRLog && PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
     nsIURI *uri = aDocument->GetDocumentURI();
     nsAutoCString spec;
@@ -2823,7 +2836,6 @@ nsGlobalWindow::InnerSetNewDocument(JSContext* aCx, nsIDocument* aDocument)
       uri->GetSpec(spec);
     PR_LogPrint("DOMWINDOW %p SetNewDocument %s", this, spec.get());
   }
-#endif
 
   mDoc = aDocument;
   ClearDocumentDependentSlots(aCx);
@@ -3538,7 +3550,7 @@ NS_IMETHODIMP
 nsGlobalWindow::GetWindow(nsIDOMWindow** aWindow)
 {
   ErrorResult rv;
-  FORWARD_TO_OUTER_OR_THROW(GetWindow, (aWindow), rv, rv.ErrorCode());
+  FORWARD_TO_OUTER_OR_THROW(GetWindow, (aWindow), rv, rv.StealNSResult());
 
   nsCOMPtr<nsIDOMWindow> window = Window();
   window.forget(aWindow);
@@ -3556,7 +3568,7 @@ NS_IMETHODIMP
 nsGlobalWindow::GetSelf(nsIDOMWindow** aWindow)
 {
   ErrorResult rv;
-  FORWARD_TO_OUTER_OR_THROW(GetSelf, (aWindow), rv, rv.ErrorCode());
+  FORWARD_TO_OUTER_OR_THROW(GetSelf, (aWindow), rv, rv.StealNSResult());
   
   nsCOMPtr<nsIDOMWindow> window = Self();
   window.forget(aWindow);
@@ -3583,7 +3595,7 @@ nsGlobalWindow::GetNavigator(nsIDOMNavigator** aNavigator)
   nsCOMPtr<nsIDOMNavigator> navigator = GetNavigator(rv);
   navigator.forget(aNavigator);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsScreen*
@@ -3609,7 +3621,7 @@ nsGlobalWindow::GetScreen(nsIDOMScreen** aScreen)
   nsRefPtr<nsScreen> screen = GetScreen(rv);
   screen.forget(aScreen);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsHistory*
@@ -3631,7 +3643,7 @@ nsGlobalWindow::GetHistory(nsISupports** aHistory)
   nsCOMPtr<nsISupports> history = GetHistory(rv);
   history.forget(aHistory);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsPerformance*
@@ -4005,7 +4017,7 @@ nsGlobalWindow::GetContent(nsIDOMWindow** aContent)
   ErrorResult rv;
   *aContent = GetContentInternal(rv).take();
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 MozSelfSupport*
@@ -4031,7 +4043,7 @@ nsGlobalWindow::GetScriptableContent(JSContext* aCx, JS::MutableHandle<JS::Value
     aVal.setObjectOrNull(content);
   }
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -4052,7 +4064,7 @@ nsGlobalWindow::GetPrompter(nsIPrompt** aPrompt)
   nsCOMPtr<nsIPrompt> prompter(do_GetInterface(mDocShell));
   NS_ENSURE_TRUE(prompter, NS_ERROR_NO_INTERFACE);
 
-  NS_ADDREF(*aPrompt = prompter);
+  prompter.forget(aPrompt);
   return NS_OK;
 }
 
@@ -4075,7 +4087,7 @@ nsGlobalWindow::GetMenubar(nsISupports** aMenubar)
   nsCOMPtr<nsISupports> menubar = GetMenubar(rv);
   menubar.forget(aMenubar);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 BarProp*
@@ -4097,7 +4109,7 @@ nsGlobalWindow::GetToolbar(nsISupports** aToolbar)
   nsCOMPtr<nsISupports> toolbar = GetToolbar(rv);
   toolbar.forget(aToolbar);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 BarProp*
@@ -4118,7 +4130,7 @@ nsGlobalWindow::GetLocationbar(nsISupports** aLocationbar)
   nsCOMPtr<nsISupports> locationbar = GetLocationbar(rv);
   locationbar.forget(aLocationbar);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 BarProp*
@@ -4139,7 +4151,7 @@ nsGlobalWindow::GetPersonalbar(nsISupports** aPersonalbar)
   nsCOMPtr<nsISupports> personalbar = GetPersonalbar(rv);
   personalbar.forget(aPersonalbar);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 BarProp*
@@ -4160,7 +4172,7 @@ nsGlobalWindow::GetStatusbar(nsISupports** aStatusbar)
   nsCOMPtr<nsISupports> statusbar = GetStatusbar(rv);
   statusbar.forget(aStatusbar);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 BarProp*
@@ -4182,7 +4194,7 @@ nsGlobalWindow::GetScrollbars(nsISupports** aScrollbars)
   nsCOMPtr<nsISupports> scrollbars = GetScrollbars(rv);
   scrollbars.forget(aScrollbars);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -4200,7 +4212,7 @@ nsGlobalWindow::GetClosed(bool* aClosed)
   ErrorResult rv;
   *aClosed = GetClosed(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsDOMWindowList*
@@ -4386,7 +4398,7 @@ nsGlobalWindow::GetApplicationCache(nsIDOMOfflineResourceList **aApplicationCach
     GetApplicationCache(rv);
   applicationCache.forget(aApplicationCache);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 Crypto*
@@ -4408,7 +4420,7 @@ nsGlobalWindow::GetCrypto(nsIDOMCrypto** aCrypto)
   nsCOMPtr<nsIDOMCrypto> crypto = GetCrypto(rv);
   crypto.forget(aCrypto);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIControllers*
@@ -4452,7 +4464,7 @@ nsGlobalWindow::GetControllers(nsIControllers** aResult)
   nsCOMPtr<nsIControllers> controllers = GetControllers(rv);
   controllers.forget(aResult);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsPIDOMWindow*
@@ -4523,7 +4535,7 @@ nsGlobalWindow::GetScriptableOpener(JSContext* aCx,
   ErrorResult rv;
   GetOpener(aCx, aOpener, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 
@@ -4549,18 +4561,7 @@ nsGlobalWindow::SetOpener(JSContext* aCx, JS::Handle<JS::Value> aOpener,
   // get reset on navigation.  This is just like replaceable properties, but
   // we're not quite readonly.
   if (!aOpener.isNull() && !nsContentUtils::IsCallerChrome()) {
-    JS::Rooted<JSObject*> thisObj(aCx, GetWrapperPreserveColor());
-    if (!thisObj) {
-      aError.Throw(NS_ERROR_UNEXPECTED);
-      return;
-    }
-
-    if (!JS_WrapObject(aCx, &thisObj) ||
-        !JS_DefineProperty(aCx, thisObj, "opener", aOpener, JSPROP_ENUMERATE,
-                           JS_STUBGETTER, JS_STUBSETTER)) {
-      aError.Throw(NS_ERROR_FAILURE);
-    }
-
+    RedefineProperty(aCx, "opener", aOpener, aError);
     return;
   }
 
@@ -4605,7 +4606,7 @@ nsGlobalWindow::SetScriptableOpener(JSContext* aCx,
   ErrorResult rv;
   SetOpener(aCx, aOpener, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 
@@ -4623,7 +4624,7 @@ nsGlobalWindow::GetStatus(nsAString& aStatus)
   ErrorResult rv;
   GetStatus(aStatus, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -4655,7 +4656,7 @@ nsGlobalWindow::SetStatus(const nsAString& aStatus)
   ErrorResult rv;
   SetStatus(aStatus, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -4674,7 +4675,7 @@ nsGlobalWindow::GetName(nsAString& aName)
   ErrorResult rv;
   GetName(aName, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -4693,7 +4694,7 @@ nsGlobalWindow::SetName(const nsAString& aName)
   ErrorResult rv;
   SetName(aName, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 // Helper functions used by many methods below.
@@ -4806,13 +4807,22 @@ nsGlobalWindow::GetInnerWidth(ErrorResult& aError)
   return size.width;
 }
 
+void
+nsGlobalWindow::GetInnerWidth(JSContext* aCx,
+                              JS::MutableHandle<JS::Value> aValue,
+                              ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetInnerWidth, aValue,
+                            aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::GetInnerWidth(int32_t* aInnerWidth)
 {
   ErrorResult rv;
   *aInnerWidth = GetInnerWidth(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -4822,14 +4832,6 @@ nsGlobalWindow::SetInnerWidth(int32_t aInnerWidth, ErrorResult& aError)
 
   if (!mDocShell) {
     aError.Throw(NS_ERROR_UNEXPECTED);
-    return;
-  }
-
-  /*
-   * If caller is not chrome and the user has not explicitly exempted the site,
-   * prevent setting window.innerWidth by exiting early
-   */
-  if (!CanMoveResizeWindows() || IsFrame()) {
     return;
   }
 
@@ -4859,13 +4861,25 @@ nsGlobalWindow::SetInnerWidth(int32_t aInnerWidth, ErrorResult& aError)
   aError = SetDocShellWidthAndHeight(CSSToDevIntPixels(aInnerWidth), height);
 }
 
+void
+nsGlobalWindow::SetInnerWidth(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                              ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetInnerWidth,
+                            aValue, "innerWidth", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetInnerWidth(int32_t aInnerWidth)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetInnerWidth(aInnerWidth, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -4878,13 +4892,22 @@ nsGlobalWindow::GetInnerHeight(ErrorResult& aError)
   return size.height;
 }
 
+void
+nsGlobalWindow::GetInnerHeight(JSContext* aCx,
+                              JS::MutableHandle<JS::Value> aValue,
+                              ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetInnerHeight, aValue,
+                            aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::GetInnerHeight(int32_t* aInnerHeight)
 {
   ErrorResult rv;
   *aInnerHeight = GetInnerHeight(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -4894,14 +4917,6 @@ nsGlobalWindow::SetInnerHeight(int32_t aInnerHeight, ErrorResult& aError)
 
   if (!mDocShell) {
     aError.Throw(NS_ERROR_UNEXPECTED);
-    return;
-  }
-
-  /*
-   * If caller is not chrome and the user has not explicitly exempted the site,
-   * prevent setting window.innerHeight by exiting early
-   */
-  if (!CanMoveResizeWindows() || IsFrame()) {
     return;
   }
 
@@ -4930,13 +4945,25 @@ nsGlobalWindow::SetInnerHeight(int32_t aInnerHeight, ErrorResult& aError)
   aError = SetDocShellWidthAndHeight(width, CSSToDevIntPixels(aInnerHeight));
 }
 
+void
+nsGlobalWindow::SetInnerHeight(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                               ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetInnerHeight,
+                            aValue, "innerHeight", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetInnerHeight(int32_t aInnerHeight)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetInnerHeight(aInnerHeight, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIntSize
@@ -4972,13 +4999,22 @@ nsGlobalWindow::GetOuterWidth(ErrorResult& aError)
   return GetOuterSize(aError).width;
 }
 
+void
+nsGlobalWindow::GetOuterWidth(JSContext* aCx,
+                              JS::MutableHandle<JS::Value> aValue,
+                              ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetOuterWidth, aValue,
+                            aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::GetOuterWidth(int32_t* aOuterWidth)
 {
   ErrorResult rv;
   *aOuterWidth = GetOuterWidth(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -4988,13 +5024,22 @@ nsGlobalWindow::GetOuterHeight(ErrorResult& aError)
   return GetOuterSize(aError).height;
 }
 
+void
+nsGlobalWindow::GetOuterHeight(JSContext* aCx,
+                               JS::MutableHandle<JS::Value> aValue,
+                               ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetOuterHeight, aValue,
+                            aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::GetOuterHeight(int32_t* aOuterHeight)
 {
   ErrorResult rv;
   *aOuterHeight = GetOuterHeight(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -5002,15 +5047,6 @@ nsGlobalWindow::SetOuterSize(int32_t aLengthCSSPixels, bool aIsWidth,
                              ErrorResult& aError)
 {
   MOZ_ASSERT(IsOuterWindow());
-
-  /*
-   * If caller is not chrome and the user has not explicitly exempted the site,
-   * prevent setting window.outerWidth by exiting early
-   */
-
-  if (!CanMoveResizeWindows() || IsFrame()) {
-    return;
-  }
 
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
   if (!treeOwnerAsWin) {
@@ -5044,13 +5080,25 @@ nsGlobalWindow::SetOuterWidth(int32_t aOuterWidth, ErrorResult& aError)
   SetOuterSize(aOuterWidth, true, aError);
 }
 
+void
+nsGlobalWindow::SetOuterWidth(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                              ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetOuterWidth,
+                            aValue, "outerWidth", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetOuterWidth(int32_t aOuterWidth)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetOuterWidth(aOuterWidth, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -5061,13 +5109,25 @@ nsGlobalWindow::SetOuterHeight(int32_t aOuterHeight, ErrorResult& aError)
   SetOuterSize(aOuterHeight, false, aError);
 }
 
+void
+nsGlobalWindow::SetOuterHeight(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                               ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetOuterHeight,
+                            aValue, "outerHeight", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetOuterHeight(int32_t aOuterHeight)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetOuterHeight(aOuterHeight, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIntPoint
@@ -5094,13 +5154,22 @@ nsGlobalWindow::GetScreenX(ErrorResult& aError)
   return DevToCSSIntPixels(GetScreenXY(aError).x);
 }
 
+void
+nsGlobalWindow::GetScreenX(JSContext* aCx,
+                           JS::MutableHandle<JS::Value> aValue,
+                           ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetScreenX, aValue,
+                            aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::GetScreenX(int32_t* aScreenX)
 {
   ErrorResult rv;
   *aScreenX = GetScreenX(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsRect
@@ -5149,7 +5218,7 @@ nsGlobalWindow::GetMozInnerScreenX(float* aScreenX)
   ErrorResult rv;
   *aScreenX = GetMozInnerScreenX(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 float
@@ -5167,7 +5236,7 @@ nsGlobalWindow::GetMozInnerScreenY(float* aScreenY)
   ErrorResult rv;
   *aScreenY = GetMozInnerScreenY(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 float
@@ -5195,7 +5264,7 @@ nsGlobalWindow::GetDevicePixelRatio(float* aRatio)
   ErrorResult rv;
   *aRatio = GetDevicePixelRatio(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 uint64_t
@@ -5217,7 +5286,7 @@ nsGlobalWindow::GetMozPaintCount(uint64_t* aResult)
   ErrorResult rv;
   *aResult = GetMozPaintCount(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -5235,7 +5304,7 @@ nsGlobalWindow::MozRequestAnimationFrame(nsIFrameRequestCallback* aCallback,
   nsIDocument::FrameRequestCallbackHolder holder(aCallback);
   *aHandle = RequestAnimationFrame(holder, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -5290,7 +5359,7 @@ nsGlobalWindow::RequestAnimationFrame(JS::Handle<JS::Value> aCallback,
   ErrorResult rv;
   *aHandle = RequestAnimationFrame(*callback, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -5323,7 +5392,7 @@ nsGlobalWindow::CancelAnimationFrame(int32_t aHandle)
   ErrorResult rv;
   CancelAnimationFrame(aHandle, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int64_t
@@ -5349,7 +5418,7 @@ nsGlobalWindow::GetMozAnimationStartTime(int64_t *aTime)
   ErrorResult rv;
   *aTime = GetMozAnimationStartTime(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<MediaQueryList>
@@ -5378,22 +5447,13 @@ nsGlobalWindow::MatchMedia(const nsAString& aMediaQueryList,
   nsRefPtr<MediaQueryList> mediaQueryList = MatchMedia(aMediaQueryList, rv);
   mediaQueryList.forget(aResult);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
 nsGlobalWindow::SetScreenX(int32_t aScreenX, ErrorResult& aError)
 {
   FORWARD_TO_OUTER_OR_THROW(SetScreenX, (aScreenX, aError), aError, );
-
-  /*
-   * If caller is not chrome and the user has not explicitly exempted the site,
-   * prevent setting window.screenX by exiting early
-   */
-
-  if (!CanMoveResizeWindows() || IsFrame()) {
-    return;
-  }
 
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
   if (!treeOwnerAsWin) {
@@ -5413,13 +5473,25 @@ nsGlobalWindow::SetScreenX(int32_t aScreenX, ErrorResult& aError)
   aError = treeOwnerAsWin->SetPosition(x, y);
 }
 
+void
+nsGlobalWindow::SetScreenX(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                           ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetScreenX,
+                            aValue, "screenX", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetScreenX(int32_t aScreenX)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetScreenX(aScreenX, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -5436,22 +5508,22 @@ nsGlobalWindow::GetScreenY(int32_t* aScreenY)
   ErrorResult rv;
   *aScreenY = GetScreenY(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
+}
+
+void
+nsGlobalWindow::GetScreenY(JSContext* aCx,
+                           JS::MutableHandle<JS::Value> aValue,
+                           ErrorResult& aError)
+{
+  GetReplaceableWindowCoord(aCx, &nsGlobalWindow::GetScreenY, aValue,
+                            aError);
 }
 
 void
 nsGlobalWindow::SetScreenY(int32_t aScreenY, ErrorResult& aError)
 {
   FORWARD_TO_OUTER_OR_THROW(SetScreenY, (aScreenY, aError), aError, );
-
-  /*
-   * If caller is not chrome and the user has not explicitly exempted the site,
-   * prevent setting window.screenY by exiting early
-   */
-
-  if (!CanMoveResizeWindows() || IsFrame()) {
-    return;
-  }
 
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
   if (!treeOwnerAsWin) {
@@ -5471,13 +5543,25 @@ nsGlobalWindow::SetScreenY(int32_t aScreenY, ErrorResult& aError)
   aError = treeOwnerAsWin->SetPosition(x, y);
 }
 
+void
+nsGlobalWindow::SetScreenY(JSContext* aCx, JS::Handle<JS::Value> aValue,
+                           ErrorResult& aError)
+{
+  SetReplaceableWindowCoord(aCx, &nsGlobalWindow::SetScreenY,
+                            aValue, "screenY", aError);
+}
+
 NS_IMETHODIMP
 nsGlobalWindow::SetScreenY(int32_t aScreenY)
 {
+  if (IsFrame()) {
+    return NS_OK;
+  }
+
   ErrorResult rv;
   SetScreenY(aScreenY, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 // NOTE: Arguments to this function should have values scaled to
@@ -5666,7 +5750,7 @@ nsGlobalWindow::GetScrollMinX(int32_t* aScrollMinX)
   ErrorResult rv;
   *aScrollMinX = GetScrollMinX(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -5685,7 +5769,7 @@ nsGlobalWindow::GetScrollMinY(int32_t* aScrollMinY)
   ErrorResult rv;
   *aScrollMinY = GetScrollMinY(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -5704,7 +5788,7 @@ nsGlobalWindow::GetScrollMaxX(int32_t* aScrollMaxX)
   ErrorResult rv;
   *aScrollMaxX = GetScrollMaxX(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 int32_t
@@ -5723,7 +5807,7 @@ nsGlobalWindow::GetScrollMaxY(int32_t* aScrollMaxY)
   ErrorResult rv;
   *aScrollMaxY = GetScrollMaxY(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 CSSPoint
@@ -5766,7 +5850,7 @@ nsGlobalWindow::GetScrollX(int32_t* aScrollX)
   NS_ENSURE_ARG_POINTER(aScrollX);
   ErrorResult rv;
   *aScrollX = GetScrollX(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 double
@@ -5782,7 +5866,7 @@ nsGlobalWindow::GetScrollY(int32_t* aScrollY)
   NS_ENSURE_ARG_POINTER(aScrollY);
   ErrorResult rv;
   *aScrollY = GetScrollY(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 uint32_t
@@ -6056,7 +6140,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aRequireTrust, gfx:
     mWakeLock = pmService->NewWakeLock(NS_LITERAL_STRING("DOM_Fullscreen"),
                                        this, rv);
     if (rv.Failed()) {
-      return rv.ErrorCode();
+      return rv.StealNSResult();
     }
 
   } else if (mWakeLock && !mFullScreen) {
@@ -6104,7 +6188,7 @@ nsGlobalWindow::GetFullScreen(bool* aFullScreen)
   ErrorResult rv;
   *aFullScreen = GetFullScreen(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -6131,7 +6215,7 @@ nsGlobalWindow::Dump(const nsAString& aStr)
     PrintToDebugger(cstr);
 #endif
 #ifdef ANDROID
-    __android_log_write(ANDROID_LOG_INFO, "GoannaDump", cstr);
+    __android_log_write(ANDROID_LOG_INFO, "GeckoDump", cstr);
 #endif
     FILE *fp = gDumpFile ? gDumpFile : stdout;
     fputs(cstr, fp);
@@ -6404,7 +6488,7 @@ nsGlobalWindow::Alert(const nsAString& aString)
   ErrorResult rv;
   Alert(aString, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -6421,7 +6505,7 @@ nsGlobalWindow::Confirm(const nsAString& aString, bool* aReturn)
   ErrorResult rv;
   *aReturn = Confirm(aString, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<Promise>
@@ -6522,7 +6606,7 @@ nsGlobalWindow::Prompt(const nsAString& aMessage, const nsAString& aInitial,
   ErrorResult rv;
   Prompt(aMessage, aInitial, aReturn, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6641,7 +6725,7 @@ nsGlobalWindow::Focus()
   ErrorResult rv;
   Focus(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6682,7 +6766,7 @@ nsGlobalWindow::Blur()
   ErrorResult rv;
   Blur(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6705,7 +6789,7 @@ nsGlobalWindow::Back()
   ErrorResult rv;
   Back(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6728,7 +6812,7 @@ nsGlobalWindow::Forward()
   ErrorResult rv;
   Forward(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6789,7 +6873,7 @@ nsGlobalWindow::Home()
   ErrorResult rv;
   Home(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6809,7 +6893,7 @@ nsGlobalWindow::Stop()
   ErrorResult rv;
   Stop(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6895,7 +6979,7 @@ nsGlobalWindow::Print()
   ErrorResult rv;
   Print(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6933,7 +7017,7 @@ nsGlobalWindow::MoveTo(int32_t aXPos, int32_t aYPos)
   ErrorResult rv;
   MoveTo(aXPos, aYPos, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -6985,7 +7069,7 @@ nsGlobalWindow::MoveBy(int32_t aXDif, int32_t aYDif)
   ErrorResult rv;
   MoveBy(aXDif, aYDif, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -7035,7 +7119,7 @@ nsGlobalWindow::ResizeTo(int32_t aWidth, int32_t aHeight)
   ErrorResult rv;
   ResizeTo(aWidth, aHeight, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -7107,7 +7191,7 @@ nsGlobalWindow::ResizeBy(int32_t aWidthDif, int32_t aHeightDif)
   ErrorResult rv;
   ResizeBy(aWidthDif, aHeightDif, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -7166,7 +7250,7 @@ nsGlobalWindow::SizeToContent()
   ErrorResult rv;
   SizeToContent(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -7415,7 +7499,7 @@ nsGlobalWindow::ClearTimeout(int32_t aHandle)
   ErrorResult rv;
   ClearTimeout(aHandle, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -7432,7 +7516,7 @@ nsGlobalWindow::ClearInterval(int32_t aHandle)
   ErrorResult rv;
   ClearInterval(aHandle, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -7838,7 +7922,7 @@ nsGlobalWindow::GetFrames(nsIDOMWindow** aFrames)
   nsCOMPtr<nsIDOMWindow> frames = GetFrames(rv);
   frames.forget(aFrames);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsGlobalWindow*
@@ -7949,9 +8033,9 @@ PostMessageReadStructuredClone(JSContext* cx,
   if (tag == SCTAG_DOM_BLOB) {
     NS_ASSERTION(!data, "Data should be empty");
 
-    // What we get back from the reader is a FileImpl.
+    // What we get back from the reader is a BlobImpl.
     // From that we create a new File.
-    FileImpl* blobImpl;
+    BlobImpl* blobImpl;
     if (JS_ReadBytes(reader, &blobImpl, sizeof(blobImpl))) {
       MOZ_ASSERT(blobImpl);
 
@@ -7962,8 +8046,8 @@ PostMessageReadStructuredClone(JSContext* cx,
       // while destructors are running.
       JS::Rooted<JS::Value> val(cx);
       {
-        nsRefPtr<File> blob = new File(scInfo->window, blobImpl);
-        if (!GetOrCreateDOMReflector(cx, blob, &val)) {
+        nsRefPtr<Blob> blob = Blob::Create(scInfo->window, blobImpl);
+        if (!ToJSValue(cx, blob, &val)) {
           return nullptr;
         }
       }
@@ -8005,9 +8089,9 @@ PostMessageWriteStructuredClone(JSContext* cx,
 
   // See if this is a File/Blob object.
   {
-    File* blob = nullptr;
+    Blob* blob = nullptr;
     if (scInfo->subsumes && NS_SUCCEEDED(UNWRAP_OBJECT(Blob, obj, blob))) {
-      FileImpl* blobImpl = blob->Impl();
+      BlobImpl* blobImpl = blob->Impl();
       if (JS_WriteUint32Pair(writer, SCTAG_DOM_BLOB, 0) &&
           JS_WriteBytes(writer, &blobImpl, sizeof(blobImpl))) {
         scInfo->event->StoreISupports(blobImpl);
@@ -8418,7 +8502,7 @@ nsGlobalWindow::PostMessageMoz(JS::Handle<JS::Value> aMessage,
   ErrorResult rv;
   PostMessageMoz(aCx, aMessage, aOrigin, aTransfer, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 class nsCloseEvent : public nsRunnable {
@@ -8564,7 +8648,7 @@ nsGlobalWindow::Close()
   ErrorResult rv;
   Close(rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -8857,8 +8941,8 @@ nsGlobalWindow::IsInModalState()
   nsGlobalWindow *topWin = GetScriptableTopInternal();
 
   if (!topWin) {
-    NS_ERROR("Uh, IsInModalState() called w/o a reachable top window?");
-
+    // IsInModalState() getting called w/o a reachable top window is a bit
+    // iffy, but valid enough not to make noise about it.  See bug 404828
     return false;
   }
 
@@ -9120,7 +9204,7 @@ nsGlobalWindow::GetScriptableFrameElement(nsIDOMElement** aFrameElement)
   ErrorResult rv;
   nsCOMPtr<nsIDOMElement> frameElement = do_QueryInterface(GetFrameElement(rv));
   if (rv.Failed()) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   frameElement.forget(aFrameElement);
@@ -9182,7 +9266,7 @@ nsGlobalWindow::GetRealFrameElement(nsIDOMElement** aFrameElement)
     do_QueryInterface(GetRealFrameElement(rv));
   frameElement.forget(aFrameElement);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 // Helper for converting window.showModalDialog() options (list of ';'
@@ -9431,7 +9515,7 @@ nsGlobalWindow::ShowModalDialog(const nsAString& aURI, nsIVariant *aArgs_,
   nsCOMPtr<nsIVariant> retVal = ShowModalDialog(aURI, aArgs, aOptions, rv);
   retVal.forget(aRetVal);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 class ChildCommandDispatcher : public nsRunnable
@@ -9535,7 +9619,7 @@ nsGlobalWindow::GetSelection(nsISelection** aSelection)
   nsCOMPtr<nsISelection> selection = GetSelection(rv);
   selection.forget(aSelection);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -9625,7 +9709,7 @@ nsGlobalWindow::Find(const nsAString& aStr, bool aCaseSensitive,
   *aDidFind = Find(aStr, aCaseSensitive, aBackwards, aWrapAround, aWholeWord,
                    aSearchInFrames, aShowDialog, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -9642,7 +9726,7 @@ nsGlobalWindow::Atob(const nsAString& aAsciiBase64String,
   ErrorResult rv;
   Atob(aAsciiBase64String, aBinaryData, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -9659,7 +9743,7 @@ nsGlobalWindow::Btoa(const nsAString& aBinaryData,
   ErrorResult rv;
   Btoa(aBinaryData, aAsciiBase64String, rv);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 //*****************************************************************************
@@ -9906,7 +9990,7 @@ nsGlobalWindow::GetLocation(nsIDOMLocation ** aLocation)
   nsCOMPtr<nsIDOMLocation> location = GetLocation(rv);
   location.forget(aLocation);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -9998,15 +10082,6 @@ void nsGlobalWindow::MaybeUpdateTouchState()
 {
   FORWARD_TO_INNER_VOID(MaybeUpdateTouchState, ());
 
-  nsIFocusManager* fm = nsFocusManager::GetFocusManager();
-
-  nsCOMPtr<nsIDOMWindow> focusedWindow;
-  fm->GetFocusedWindow(getter_AddRefs(focusedWindow));
-
-  if(this == focusedWindow) {
-    UpdateTouchState();
-  }
-
   if (mMayHaveTouchEventListener) {
     nsCOMPtr<nsIObserverService> observerService =
       services::GetObserverService();
@@ -10016,22 +10091,6 @@ void nsGlobalWindow::MaybeUpdateTouchState()
                                        DOM_TOUCH_LISTENER_ADDED,
                                        nullptr);
     }
-  }
-}
-
-void nsGlobalWindow::UpdateTouchState()
-{
-  FORWARD_TO_INNER_VOID(UpdateTouchState, ());
-
-  nsCOMPtr<nsIWidget> mainWidget = GetMainWidget();
-  if (!mainWidget) {
-    return;
-  }
-
-  if (mMayHaveTouchEventListener) {
-    mainWidget->RegisterTouchWindow();
-  } else {
-    mainWidget->UnregisterTouchWindow();
   }
 }
 
@@ -10543,7 +10602,7 @@ nsGlobalWindow::GetComputedStyleHelper(nsIDOMElement* aElt,
     GetComputedStyleHelper(*element, aPseudoElt, aDefaultStylesOnly, rv);
   declaration.forget(aReturn);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<nsICSSDeclaration>
@@ -10605,11 +10664,9 @@ nsGlobalWindow::GetSessionStorage(ErrorResult& aError)
   }
 
   if (mSessionStorage) {
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
       PR_LogPrint("nsGlobalWindow %p has %p sessionStorage", this, mSessionStorage.get());
     }
-#endif
     bool canAccess = mSessionStorage->CanAccess(principal);
     NS_ASSERTION(canAccess,
                  "This window owned sessionStorage "
@@ -10658,11 +10715,9 @@ nsGlobalWindow::GetSessionStorage(ErrorResult& aError)
     mSessionStorage = static_cast<DOMStorage*>(storage.get());
     MOZ_ASSERT(mSessionStorage);
 
-#ifdef PR_LOGGING
     if (PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
       PR_LogPrint("nsGlobalWindow %p tried to get a new sessionStorage %p", this, mSessionStorage.get());
     }
-#endif
 
     if (!mSessionStorage) {
       aError.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
@@ -10670,11 +10725,9 @@ nsGlobalWindow::GetSessionStorage(ErrorResult& aError)
     }
   }
 
-#ifdef PR_LOGGING
   if (PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
     PR_LogPrint("nsGlobalWindow %p returns %p sessionStorage", this, mSessionStorage.get());
   }
-#endif
 
   return mSessionStorage;
 }
@@ -10686,7 +10739,7 @@ nsGlobalWindow::GetSessionStorage(nsISupports** aSessionStorage)
   nsCOMPtr<nsIDOMStorage> storage = GetSessionStorage(rv);
   storage.forget(aSessionStorage);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 DOMStorage*
@@ -10756,7 +10809,7 @@ nsGlobalWindow::GetLocalStorage(nsISupports** aLocalStorage)
   nsCOMPtr<nsIDOMStorage> storage = GetLocalStorage(rv);
   storage.forget(aLocalStorage);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 IDBFactory*
@@ -10777,7 +10830,7 @@ nsGlobalWindow::GetIndexedDB(nsISupports** _retval)
   nsCOMPtr<nsISupports> request(GetIndexedDB(rv));
   request.forget(_retval);
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 //*****************************************************************************
@@ -11590,12 +11643,10 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
         return NS_OK;
       }
 
-#ifdef PR_LOGGING
       if (PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
         PR_LogPrint("nsGlobalWindow %p with sessionStorage %p passing event from %p",
                     this, mSessionStorage.get(), changingStorage.get());
       }
-#endif
 
       fireMozStorageChanged = mSessionStorage == changingStorage;
       break;
@@ -11630,7 +11681,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
                           NS_LITERAL_STRING("storage"),
                         event, error);
     if (error.Failed()) {
-      return error.ErrorCode();
+      return error.StealNSResult();
     }
 
     newEvent->SetTrusted(true);
@@ -12444,6 +12495,13 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     sNestingLevel = timeout->mNestingLevel;
   }
 
+  const char *reason;
+  if (timeout->mIsInterval) {
+    reason = "setInterval handler";
+  } else {
+    reason = "setTimeout handler";
+  }
+
   nsCOMPtr<nsIScriptTimeoutHandler> handler(timeout->mScriptHandler);
   nsRefPtr<Function> callback = handler->GetCallback();
   if (!callback) {
@@ -12456,8 +12514,8 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     handler->GetLocation(&filename, &lineNo);
 
     // New script entry point required, due to the "Create a script" sub-step of
-    // http://www.whatwg.org/specs/web-apps/current-work/#timer-initialization-steps
-    AutoEntryScript entryScript(this, true, aScx->GetNativeContext());
+    // http://www.whatwg.org/specs/web-apps/current-work/#timer-initialisation-steps
+    AutoEntryScript entryScript(this, reason, true, aScx->GetNativeContext());
     entryScript.TakeOwnershipOfErrorReporting();
     JS::CompileOptions options(entryScript.cx());
     options.setFileAndLine(filename, lineNo)
@@ -12470,7 +12528,7 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     nsCOMPtr<nsISupports> me(static_cast<nsIDOMWindow *>(this));
     ErrorResult ignored;
     JS::Rooted<JS::Value> ignoredVal(CycleCollectedJSRuntime::Get()->Runtime());
-    callback->Call(me, handler->GetArgs(), &ignoredVal, ignored);
+    callback->Call(me, handler->GetArgs(), &ignoredVal, ignored, reason);
   }
 
   // We ignore any failures from calling EvaluateString() on the context or
@@ -13483,6 +13541,15 @@ void
 nsGlobalWindow::AddGamepad(uint32_t aIndex, Gamepad* aGamepad)
 {
   MOZ_ASSERT(IsInnerWindow());
+  // Create the index we will present to content based on which indices are
+  // already taken, as required by the spec.
+  // https://w3c.github.io/gamepad/gamepad.html#widl-Gamepad-index
+  int index = 0;
+  while(mGamepadIndexSet.Contains(index)) {
+    ++index;
+  }
+  mGamepadIndexSet.Put(index);
+  aGamepad->SetIndex(index);
   mGamepads.Put(aIndex, aGamepad);
 }
 
@@ -13490,6 +13557,12 @@ void
 nsGlobalWindow::RemoveGamepad(uint32_t aIndex)
 {
   MOZ_ASSERT(IsInnerWindow());
+  nsRefPtr<Gamepad> gamepad;
+  if (!mGamepads.Get(aIndex, getter_AddRefs(gamepad))) {
+    return;
+  }
+  // Free up the index we were using so it can be reused
+  mGamepadIndexSet.Remove(gamepad->Index());
   mGamepads.Remove(aIndex);
 }
 
@@ -13500,8 +13573,8 @@ nsGlobalWindow::EnumGamepadsForGet(const uint32_t& aKey, Gamepad* aData,
 {
   nsTArray<nsRefPtr<Gamepad> >* array =
     static_cast<nsTArray<nsRefPtr<Gamepad> >*>(aUserArg);
-  array->EnsureLengthAtLeast(aKey + 1);
-  (*array)[aKey] = aData;
+  array->EnsureLengthAtLeast(aData->Index() + 1);
+  (*array)[aData->Index()] = aData;
   return PL_DHASH_NEXT;
 }
 
@@ -13520,6 +13593,7 @@ nsGlobalWindow::GetGamepad(uint32_t aIndex)
 {
   MOZ_ASSERT(IsInnerWindow());
   nsRefPtr<Gamepad> gamepad;
+
   if (mGamepads.Get(aIndex, getter_AddRefs(gamepad))) {
     return gamepad.forget();
   }
@@ -13657,7 +13731,7 @@ nsGlobalChromeWindow::Maximize()
 {
   ErrorResult rv;
   Maximize(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13675,7 +13749,7 @@ nsGlobalChromeWindow::Minimize()
 {
   ErrorResult rv;
   Minimize(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13693,7 +13767,7 @@ nsGlobalChromeWindow::Restore()
 {
   ErrorResult rv;
   Restore(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13711,7 +13785,7 @@ nsGlobalChromeWindow::GetAttention()
 {
   ErrorResult rv;
   GetAttention(rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13725,7 +13799,7 @@ nsGlobalChromeWindow::GetAttentionWithCycleCount(int32_t aCycleCount)
 {
   ErrorResult rv;
   GetAttentionWithCycleCount(aCycleCount, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13751,7 +13825,7 @@ nsGlobalChromeWindow::BeginWindowMove(nsIDOMEvent *aMouseDownEvent, nsIDOMElemen
 
   ErrorResult rv;
   BeginWindowMove(*mouseDownEvent, panel, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13791,6 +13865,14 @@ nsGlobalWindow::BeginWindowMove(Event& aMouseDownEvent, Element* aPanel,
   aError = widget->BeginMoveDrag(mouseEvent);
 }
 
+already_AddRefed<nsWindowRoot>
+nsGlobalWindow::GetWindowRoot(mozilla::ErrorResult& aError)
+{
+  FORWARD_TO_OUTER_OR_THROW(GetWindowRoot, (aError), aError, nullptr);
+  nsCOMPtr<nsPIWindowRoot> root = GetTopWindowRoot();
+  return root.forget().downcast<nsWindowRoot>();
+}
+
 //Note: This call will lock the cursor, it will not change as it moves.
 //To unlock, the cursor must be set back to CURSOR_AUTO.
 NS_IMETHODIMP
@@ -13798,7 +13880,7 @@ nsGlobalChromeWindow::SetCursor(const nsAString& aCursor)
 {
   ErrorResult rv;
   SetCursor(aCursor, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13861,7 +13943,7 @@ nsGlobalChromeWindow::GetBrowserDOMWindow(nsIBrowserDOMWindow **aBrowserWindow)
 {
   ErrorResult rv;
   NS_IF_ADDREF(*aBrowserWindow = GetBrowserDOMWindow(rv));
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIBrowserDOMWindow*
@@ -13878,7 +13960,7 @@ nsGlobalChromeWindow::SetBrowserDOMWindow(nsIBrowserDOMWindow *aBrowserWindow)
 {
   ErrorResult rv;
   SetBrowserDOMWindow(aBrowserWindow, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13899,7 +13981,7 @@ nsGlobalChromeWindow::NotifyDefaultButtonLoaded(nsIDOMElement* aDefaultButton)
 
   ErrorResult rv;
   NotifyDefaultButtonLoaded(*defaultButton, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 void
@@ -13956,7 +14038,7 @@ nsGlobalChromeWindow::GetMessageManager(nsIMessageBroadcaster** aManager)
 {
   ErrorResult rv;
   NS_IF_ADDREF(*aManager = GetMessageManager(rv));
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIMessageBroadcaster*
@@ -13982,7 +14064,7 @@ nsGlobalChromeWindow::GetGroupMessageManager(const nsAString& aGroup,
 {
   ErrorResult rv;
   NS_IF_ADDREF(*aManager = GetGroupMessageManager(aGroup, rv));
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 nsIMessageBroadcaster*
@@ -14158,7 +14240,7 @@ nsGlobalWindow::GetConsole(JSContext* aCx,
   ErrorResult rv;
   nsRefPtr<Console> console = GetConsole(rv);
   if (rv.Failed()) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   if (!GetOrCreateDOMReflector(aCx, console, aConsole)) {
@@ -14171,18 +14253,9 @@ nsGlobalWindow::GetConsole(JSContext* aCx,
 NS_IMETHODIMP
 nsGlobalWindow::SetConsole(JSContext* aCx, JS::Handle<JS::Value> aValue)
 {
-  JS::Rooted<JSObject*> thisObj(aCx, GetWrapper());
-  if (!thisObj) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  if (!JS_WrapObject(aCx, &thisObj) ||
-      !JS_DefineProperty(aCx, thisObj, "console", aValue, JSPROP_ENUMERATE,
-                         JS_STUBGETTER, JS_STUBSETTER)) {
-    return NS_ERROR_FAILURE;
-  }
-
-  return NS_OK;
+  ErrorResult rv;
+  RedefineProperty(aCx, "console", aValue, rv);
+  return rv.StealNSResult();
 }
 
 Console*
@@ -14341,6 +14414,63 @@ nsGlobalWindow::DisableNetworkEvent(uint32_t aType)
   }
 }
 #endif // MOZ_B2G
+
+void
+nsGlobalWindow::RedefineProperty(JSContext* aCx, const char* aPropName,
+                                 JS::Handle<JS::Value> aValue,
+                                 ErrorResult& aError)
+{
+  JS::Rooted<JSObject*> thisObj(aCx, GetWrapperPreserveColor());
+  if (!thisObj) {
+    aError.Throw(NS_ERROR_UNEXPECTED);
+    return;
+  }
+
+  if (!JS_WrapObject(aCx, &thisObj) ||
+      !JS_DefineProperty(aCx, thisObj, aPropName, aValue, JSPROP_ENUMERATE,
+                         JS_STUBGETTER, JS_STUBSETTER)) {
+    aError.Throw(NS_ERROR_FAILURE);
+  }
+}
+
+void
+nsGlobalWindow::GetReplaceableWindowCoord(JSContext* aCx,
+                                          nsGlobalWindow::WindowCoordGetter aGetter,
+                                          JS::MutableHandle<JS::Value> aRetval,
+                                          ErrorResult& aError)
+{
+  int32_t coord = (this->*aGetter)(aError);
+  if (!aError.Failed() &&
+      !ToJSValue(aCx, coord, aRetval)) {
+    aError.Throw(NS_ERROR_FAILURE);
+  }
+}
+
+void
+nsGlobalWindow::SetReplaceableWindowCoord(JSContext* aCx,
+                                          nsGlobalWindow::WindowCoordSetter aSetter,
+                                          JS::Handle<JS::Value> aValue,
+                                          const char* aPropName,
+                                          ErrorResult& aError)
+{
+  /*
+   * If caller is not chrome and the user has not explicitly exempted the site,
+   * just treat this the way we would an IDL replaceable property.
+   */
+  nsGlobalWindow* outer = GetOuterWindowInternal();
+  if (!outer || !outer->CanMoveResizeWindows() || outer->IsFrame()) {
+    RedefineProperty(aCx, aPropName, aValue, aError);
+    return;
+  }
+
+  int32_t value;
+  if (!ValueToPrimitive<int32_t, eDefault>(aCx, aValue, &value)) {
+    aError.Throw(NS_ERROR_UNEXPECTED);
+    return;
+  }
+
+  (this->*aSetter)(value, aError);
+}
 
 #ifdef _WINDOWS_
 #error "Never include windows.h in this file!"

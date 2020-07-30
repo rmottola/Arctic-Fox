@@ -5,17 +5,27 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/content/searchSuggestionUI.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/content/newtab/newTab.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/newtab/newTab.css" type="text/css"?>
 
 <!DOCTYPE window [
   <!ENTITY % newTabDTD SYSTEM "chrome://browser/locale/newTab.dtd">
   %newTabDTD;
+  <!ENTITY % searchBarDTD SYSTEM "chrome://browser/locale/searchbar.dtd">
+  %searchBarDTD;
 ]>
 
 <xul:window id="newtab-window" xmlns="http://www.w3.org/1999/xhtml"
             xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-            title="&newtab.pageTitle;">
+	    title="&newtab.pageTitle;">
+
+  <xul:panel id="newtab-search-panel" orient="vertical" type="arrow"
+             noautohide="true">
+    <xul:hbox id="newtab-search-manage" class="newtab-search-panel-engine">
+      <xul:label>&cmd_engineManager.label;</xul:label>
+    </xul:hbox>
+  </xul:panel>
 
   <div id="newtab-scrollbox">
 
@@ -36,6 +46,16 @@
         </div>
       </div>
 
+      <div id="newtab-search-container">
+        <form id="newtab-search-form" name="searchForm">
+          <div id="newtab-search-logo"/>
+          <input type="text" name="q" value="" id="newtab-search-text"
+                 maxlength="256" dir="auto"/>
+          <input id="newtab-search-submit" type="submit"
+                 value="&searchEndCap.label;"/>
+        </form>
+      </div>
+
       <div id="newtab-horizontal-margin">
         <div class="newtab-side-margin"/>
 
@@ -52,4 +72,6 @@
 
   <xul:script type="text/javascript;version=1.8"
               src="chrome://browser/content/newtab/newTab.js"/>
+  <xul:script type="text/javascript;version=1.8"
+              src="chrome://browser/content/searchSuggestionUI.js"/>
 </xul:window>

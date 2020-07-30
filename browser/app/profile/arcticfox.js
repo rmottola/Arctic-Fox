@@ -238,6 +238,7 @@ pref("browser.slowStartup.timeThreshold", 60000);
 pref("browser.slowStartup.maxSamples", 5);
 
 pref("browser.enable_automatic_image_resizing", true);
+pref("browser.casting.enabled", true);
 pref("browser.chrome.site_icons", true);
 pref("browser.chrome.favicons", true);
 // browser.warnOnQuit == false will override all other possible prompts when quitting or restarting
@@ -422,7 +423,6 @@ pref("browser.tabs.drawInTitlebar", true);
 #else
 pref("browser.tabs.drawInTitlebar", false);
 #endif
-pref("browser.tabs.resize_immediately", false);
 
 // Where to show tab close buttons:
 // 0  on active tab only
@@ -493,7 +493,7 @@ pref("privacy.clearOnShutdown.cache",       true);
 pref("privacy.clearOnShutdown.sessions",    true);
 pref("privacy.clearOnShutdown.offlineApps", false);
 pref("privacy.clearOnShutdown.siteSettings", false);
-pref("privacy.clearOnShutdown.connectivityData", false);
+pref("privacy.clearOnShutdown.openWindows", false);
 
 pref("privacy.cpd.history",                 true);
 pref("privacy.cpd.formdata",                true);
@@ -504,7 +504,7 @@ pref("privacy.cpd.cache",                   true);
 pref("privacy.cpd.sessions",                true);
 pref("privacy.cpd.offlineApps",             false);
 pref("privacy.cpd.siteSettings",            false);
-pref("privacy.cpd.connectivityData",        false);
+pref("privacy.cpd.openWindows",             false);
 
 // What default should we use for the time span in the sanitizer:
 // 0 - Clear everything
@@ -512,10 +512,14 @@ pref("privacy.cpd.connectivityData",        false);
 // 2 - Last 2 Hours
 // 3 - Last 4 Hours
 // 4 - Today
+// 5 - Last 5 minutes
+// 6 - Last 24 hours
 pref("privacy.sanitize.timeSpan", 1);
 pref("privacy.sanitize.sanitizeOnShutdown", false);
 
 pref("privacy.sanitize.migrateFx3Prefs",    false);
+
+pref("privacy.panicButton.enabled",         true);
 
 pref("network.proxy.share_proxy_settings",  false); // use the same proxy settings for all protocols
 
@@ -585,7 +589,7 @@ pref("mousewheel.with_win.action", 1);
 pref("browser.xul.error_pages.enabled", true);
 pref("browser.xul.error_pages.expert_bad_cert", false);
 
-// Work Offline is best manually managed by the user.
+// If true, network link events will change the value of navigator.onLine
 pref("network.manage-offline-status", false);
 
 // We want to make sure mail URLs are handled externally...
@@ -694,7 +698,7 @@ pref("browser.audioFeeds.handler", "ask");
 // region.properties file is newer than the version number in the handler
 // service datastore, it will add any new handlers it finds in the prefs (as
 // seeded by this file) to its datastore.  
-pref("goanna.handlerService.defaultHandlersVersion", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.defaultHandlersVersion", "chrome://browser-region/locale/region.properties");
 
 // The default set of web-based protocol handlers shown in the application
 // selection dialog for webcal: ; I've arbitrarily picked 4 default handlers
@@ -702,47 +706,47 @@ pref("goanna.handlerService.defaultHandlersVersion", "chrome://browser-region/lo
 // protocol not currently listed here), we should go ahead and add those.
 
 // webcal
-pref("goanna.handlerService.schemes.webcal.0.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.0.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.1.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.1.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.2.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.2.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.3.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.webcal.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.0.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.0.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.1.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.1.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.2.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.2.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.3.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.webcal.3.uriTemplate", "chrome://browser-region/locale/region.properties");
 
 // mailto
-pref("goanna.handlerService.schemes.mailto.0.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.0.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.1.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.1.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.2.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.2.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.3.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.mailto.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.0.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.0.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.1.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.1.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.2.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.2.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.3.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.mailto.3.uriTemplate", "chrome://browser-region/locale/region.properties");
 
 // irc
-pref("goanna.handlerService.schemes.irc.0.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.0.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.1.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.1.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.2.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.2.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.3.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.irc.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.0.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.0.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.1.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.1.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.2.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.2.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.3.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.irc.3.uriTemplate", "chrome://browser-region/locale/region.properties");
 
 // ircs
-pref("goanna.handlerService.schemes.ircs.0.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.0.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.1.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.1.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.2.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.2.uriTemplate", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.3.name", "chrome://browser-region/locale/region.properties");
-pref("goanna.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.0.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.0.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.1.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.1.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.2.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.2.uriTemplate", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.3.name", "chrome://browser-region/locale/region.properties");
+pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region/locale/region.properties");
 
 // By default, we don't want protocol/content handlers to be registered from a different host, see bug 402287
-pref("goanna.handlerService.allowRegisterFromDifferentHost", false);
+pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
 
 pref("browser.geolocation.warning.infoURL", "http://www.palemoon.org/info-url/geolocation.shtml");
 pref("browser.mixedcontent.warning.infoURL", "http://www.palemoon.org/info-url/mixedcontent.shtml");
@@ -910,7 +914,11 @@ pref("dom.ipc.plugins.enabled.x86_64", true);
 pref("dom.ipc.plugins.enabled", true);
 #endif
 
-pref("browser.tabs.remote", false);
+pref("dom.ipc.shims.enabledWarnings", false);
+
+// Start the browser in e10s mode
+pref("browser.tabs.remote.autostart", false);
+pref("browser.tabs.remote.desktopbehavior", true);
 
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
 // When this pref is true the Windows process sandbox will set up dummy
@@ -1053,7 +1061,6 @@ pref("services.sync.prefs.sync.privacy.clearOnShutdown.offlineApps", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.passwords", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.sessions", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.siteSettings", true);
-pref("services.sync.prefs.sync.privacy.clearOnShutdown.connectivityData", true);
 pref("services.sync.prefs.sync.privacy.donottrackheader.enabled", true);
 pref("services.sync.prefs.sync.privacy.donottrackheader.value", true);
 pref("services.sync.prefs.sync.privacy.sanitize.sanitizeOnShutdown", true);
@@ -1072,6 +1079,9 @@ pref("browser.devedition.theme.enabled", false);
 
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
+
+// The default service workers UI setting
+pref("devtools.serviceWorkers.testing.enabled", false);
 
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
@@ -1129,7 +1139,7 @@ pref("security.csp.speccompliant", true);
 pref("security.mixed_content.block_active_content", true);
 
 
-// Override the Goanna-default value of false for Firefox.
+// Override the Gecko-default value of false for Firefox.
 pref("plain_text.wrap_long_lines", true);
 
 pref("media.webaudio.enabled", true);
@@ -1153,21 +1163,22 @@ pref("geo.provider.use_corelocation", true);
 // currently irrelevant for desktop e10s
 pref("network.disable.ipc.security", true);
 
-//Arctic Fox padlock overlay preferences
-pref("browser.padlock.shown", true);
-/* Where to show the padlock
-   1 = inside identity button, right side
-   2 = inside identity button, left side
-   3 = urlbar, right side (next to bookmark star)
-   4 = statusbar
-   5 = tabs bar, right side 
-   6-10 = same locations, classic style padlock */
-pref("browser.padlock.style", 1);
-// address bar border, 0 = no border, 1 = border, 2 = border only on secure sites
-pref("browser.padlock.urlbar_background", 2);
+// Disable ReadingList by default.
+pref("browser.readinglist.enabled", false);
+
+// Telemetry settings.
+// Determines if Telemetry pings can be archived locally.
+pref("toolkit.telemetry.archive.enabled", true);
+// Whether we enable opt-out Telemetry for a sample of the release population.
+pref("toolkit.telemetry.optoutSample", true);
 
 //Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
+
+pref("view_source.tab", true);
+
+// Disable reader mode by default.
+pref("reader.parse-on-load.enabled", false);
 
 // ****************** domain-specific UAs ******************
 

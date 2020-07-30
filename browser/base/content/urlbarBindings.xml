@@ -1,9 +1,11 @@
 <?xml version="1.0"?>
 
-# -*- Mode: HTML -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+<!--
+-*- Mode: HTML -*-
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-->
 
 <!DOCTYPE bindings [
 <!ENTITY % notificationDTD SYSTEM "chrome://global/locale/notification.dtd">
@@ -49,6 +51,9 @@
     </content>
 
     <implementation implements="nsIObserver, nsIDOMEventListener">
+      <field name="AppConstants" readonly="true">
+        (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
+      </field>
       <constructor><![CDATA[
         this._prefs = Components.classes["@mozilla.org/preferences-service;1"]
                                 .getService(Components.interfaces.nsIPrefService)
@@ -140,7 +145,12 @@
           var action = this._parseActionUrl(aValue);
 
           if (action) {
-            returnValue = action.param;
+            switch (action.type) {
+              case "switchtab": {
+                returnValue = action.params.url;
+                break;
+              }
+            }
           }
 
           // Set the actiontype only if the user is not overriding actions.
@@ -266,29 +276,35 @@
 
           var action = this._parseActionUrl(url);
           let lastLocationChange = gBrowser.selectedBrowser.lastLocationChange;
-          Task.spawn(function() {
-            let matchLastLocationChange = true;
-            if (action) {
-              url = action.param;
-              if (this.hasAttribute("actiontype")) {
-                if (action.type == "switchtab") {
-                  this.handleRevert();
-                  let prevTab = gBrowser.selectedTab;
-                  if (switchToTabHavingURI(url) &&
-                      isTabEmpty(prevTab))
-                    gBrowser.removeTab(prevTab);
-                }
-                return;
-              }
-            }
-            else {
-              [url, postData, mayInheritPrincipal] = yield this._canonizeURL(aTriggeringEvent);
-              matchLastLocationChange = (lastLocationChange ==
-                                         gBrowser.selectedBrowser.lastLocationChange);
-              if (!url)
-                return;
-            }
 
+          let matchLastLocationChange = true;
+          if (action) {
+            if (this.hasAttribute("actiontype")) {
+              if (action.type == "switchtab") {
+                url = action.params.url;
+                this.handleRevert();
+                let prevTab = gBrowser.selectedTab;
+                if (switchToTabHavingURI(action.params.originalUrl || url) &&
+                    isTabEmpty(prevTab))
+                  gBrowser.removeTab(prevTab);
+              }
+              return;
+            }
+            continueOperation.call(this);
+          }
+          else {
+            this._canonizeURL(aTriggeringEvent, response => {
+              [url, postData, mayInheritPrincipal] = response;
+              if (url) {
+                matchLastLocationChange = (lastLocationChange ==
+                                           gBrowser.selectedBrowser.lastLocationChange);
+                continueOperation.call(this);
+              }
+            });
+          }
+
+          function continueOperation()
+          {
             this.value = url;
             gBrowser.userTypedValue = url;
             try {
@@ -320,18 +336,10 @@
             gBrowser.selectedBrowser.focus();
 
             let isMouseEvent = aTriggeringEvent instanceof MouseEvent;
-            let altEnter = !isMouseEvent && aTriggeringEvent && aTriggeringEvent.altKey;
-
-            if (altEnter) {
-              // XXX This was added a long time ago, and I'm not sure why it is
-              // necessary. Alt+Enter's default action might cause a system beep,
-              // or something like that?
-              aTriggeringEvent.preventDefault();
-              aTriggeringEvent.stopPropagation();
-            }
 
             // If the current tab is empty, ignore Alt+Enter (just reuse this tab)
-            altEnter = altEnter && !isTabEmpty(gBrowser.selectedTab);
+            let altEnter = !isMouseEvent && aTriggeringEvent &&
+              aTriggeringEvent.altKey && !isTabEmpty(gBrowser.selectedTab);
 
             if (isMouseEvent || altEnter) {
               // Use the standard UI link behaviors for clicks or Alt+Enter
@@ -357,71 +365,72 @@
                 loadCurrent();
               }
             }
-          }.bind(this));
+          }
         ]]></body>
       </method>
 
       <method name="_canonizeURL">
         <parameter name="aTriggeringEvent"/>
+        <parameter name="aCallback"/>
         <body><![CDATA[
-          return Task.spawn(function() {
-            var url = this.value;
-            if (!url)
-              throw new Task.Result(["", null, false]);
+          var url = this.value;
+          if (!url) {
+            aCallback(["", null, false]);
+            return;
+          }
 
-            // Only add the suffix when the URL bar value isn't already "URL-like",
-            // and only if we get a keyboard event, to match user expectations.
-            if (/^\s*[^.:\/\s]+(?:\/.*|\s*)$/i.test(url) &&
-                (aTriggeringEvent instanceof KeyEvent)) {
-#ifdef XP_MACOSX
-              let accel = aTriggeringEvent.metaKey;
-#else
-              let accel = aTriggeringEvent.ctrlKey;
-#endif
-              let shift = aTriggeringEvent.shiftKey;
-              let suffix = "";
-              switch (true) {
-                case (accel && shift):
-                  suffix = ".org/";
-                  break;
-                case (shift):
-                  suffix = ".net/";
-                  break;
-                case (accel):
-                  try {
-                    suffix = gPrefService.getCharPref("browser.fixup.alternate.suffix");
-                    if (suffix.charAt(suffix.length - 1) != "/")
-                      suffix += "/";
-                  } catch(e) {
-                    suffix = ".com/";
-                  }
-                  break;
-              }
+          // Only add the suffix when the URL bar value isn't already "URL-like",
+          // and only if we get a keyboard event, to match user expectations.
+          if (/^\s*[^.:\/\s]+(?:\/.*|\s*)$/i.test(url) &&
+              (aTriggeringEvent instanceof KeyEvent)) {
+            let accel = this.AppConstants.platform == "macosx" ?
+                        aTriggeringEvent.metaKey :
+                        aTriggeringEvent.ctrlKey;
+            let shift = aTriggeringEvent.shiftKey;
 
-              if (suffix) {
-                // trim leading/trailing spaces (bug 233205)
-                url = url.trim();
+            let suffix = "";
 
-                // Tack www. and suffix on.  If user has appended directories, insert
-                // suffix before them (bug 279035).  Be careful not to get two slashes.
-
-                let firstSlash = url.indexOf("/");
-
-               if (firstSlash >= 0) {
-                  url = url.substring(0, firstSlash) + suffix +
-                        url.substring(firstSlash + 1);
-                } else {
-                  url = url + suffix;
+            switch (true) {
+              case (accel && shift):
+                suffix = ".org/";
+                break;
+              case (shift):
+                suffix = ".net/";
+                break;
+              case (accel):
+                try {
+                  suffix = gPrefService.getCharPref("browser.fixup.alternate.suffix");
+                  if (suffix.charAt(suffix.length - 1) != "/")
+                    suffix += "/";
+                } catch(e) {
+                  suffix = ".com/";
                 }
-
-                url = "http://www." + url;
-              }
+                break;
             }
 
-            let data = yield getShortcutOrURIAndPostData(url);
+            if (suffix) {
+              // trim leading/trailing spaces (bug 233205)
+              url = url.trim();
 
-            throw new Task.Result([data.url, data.postData, data.mayInheritPrincipal]);
-          }.bind(this));
+              // Tack www. and suffix on.  If user has appended directories, insert
+              // suffix before them (bug 279035).  Be careful not to get two slashes.
+
+              let firstSlash = url.indexOf("/");
+
+              if (firstSlash >= 0) {
+                url = url.substring(0, firstSlash) + suffix +
+                      url.substring(firstSlash + 1);
+              } else {
+                url = url + suffix;
+              }
+
+              url = "http://www." + url;
+            }
+          }
+
+          getShortcutOrURIAndPostData(url, data => {
+            aCallback([data.url, data.postData, data.mayInheritPrincipal]);
+          });
         ]]></body>
       </method>
 
@@ -604,6 +613,11 @@
                 this._mayTrimURLs = this._prefs.getBoolPref(aData);
                 break;
             }
+          } else {
+            let originalUrl = ReaderParent.parseReaderUrl(aValue);
+            if (originalUrl) {
+              returnValue = originalUrl;
+            }
           }
         ]]></body>
       </method>
@@ -640,9 +654,24 @@
                 onget="return this.value;">
         <setter>
           <![CDATA[
+          let uri;
           try {
-            val = losslessDecodeURI(makeURI(val));
-          } catch (ex) { }
+            uri = makeURI(val);
+          } catch (ex) {}
+
+          if (uri) {
+            let action = this._parseActionUrl(val);
+            if (action) {
+              if (action.params.url) {
+                // Store the original URL in the action URL.
+                action.params.originalUrl = action.params.url;
+                action.params.url = losslessDecodeURI(makeURI(action.params.url));
+                val = "moz-action:" + action.type + "," + JSON.stringify(action.params);
+              }
+            } else {
+              val = losslessDecodeURI(uri);
+            }
+          }
 
           // Trim popup selected values, but never trim results coming from
           // autofill.
@@ -670,9 +699,34 @@
           if (!aUrl.startsWith("moz-action:"))
             return null;
 
-          // url is in the format moz-action:ACTION,PARAM
-          let [, action, param] = aUrl.match(/^moz-action:([^,]+),(.*)$/);
-          return {type: action, param: param};
+          // URL is in the format moz-action:ACTION,PARAMS
+          // Where PARAMS is a JSON encoded object.
+          aUrl = decodeURI(aUrl);
+          let [, type, params] = aUrl.match(/^moz-action:([^,]+),(.*)$/);
+
+          let action = {
+            type: type,
+          };
+
+          try {
+            action.params = JSON.parse(params);
+            if (action.params.input) {
+              action.params.input = decodeURIComponent(action.params.input);
+            }
+            if (action.params.searchQuery) {
+              action.params.searchQuery = decodeURIComponent(action.params.searchQuery);
+            }
+          } catch (e) {
+            // If this failed, we assume that params is not a JSON object, and
+            // is instead just a flat string. This will happen when
+            // UnifiedComplete is disabled - in which case, the param is always
+            // a URL.
+            action.params = {
+              url: params,
+            }
+          }
+
+          return action;
         ]]></body>
       </method>
 
@@ -785,6 +839,10 @@
   <!-- Note: this binding is applied to the autocomplete popup used in the Search bar and in web page content -->
   <binding id="browser-autocomplete-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-result-popup">
     <implementation>
+      <field name="AppConstants" readonly="true">
+        (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
+      </field>
+
       <method name="openAutocompletePopup">
         <parameter name="aInput"/>
         <parameter name="aElement"/>
@@ -825,20 +883,30 @@
             this.closePopup();
             controller.handleEscape();
 
-            // Fill in the search bar's value
-            searchBar.value = search;
-
             // open the search results according to the clicking subtlety
             var where = whereToOpenLink(aEvent, false, true);
-            searchBar.doSearch(search, where);
-          }
-          ]]></body>
-        </method>
-      </implementation>
-    </binding>
 
-    <binding id="urlbar-rich-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-rich-result-popup">
-      <implementation>
+            // But open ctrl/cmd clicks on autocomplete items in a new background tab.
+            let modifier = this.AppConstants.platform == "macosx" ?
+                           aEvent.metaKey :
+                           aEvent.ctrlKey;
+            if (where == "tab" && (aEvent instanceof MouseEvent) &&
+                (aEvent.button == 1 || modifier))
+              where = "tab-background";
+
+            searchBar.doSearch(search, where);
+            if (where == "tab-background")
+              searchBar.focus();
+            else
+              searchBar.value = search;
+          }
+        ]]></body>
+      </method>
+    </implementation>
+  </binding>
+
+  <binding id="urlbar-rich-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-rich-result-popup">
+    <implementation>
       <field name="_maxResults">0</field>
 
       <field name="_bundle" readonly="true">

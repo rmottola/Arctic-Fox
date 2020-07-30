@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -47,7 +48,6 @@ class nsIPrincipal;
 class nsIURI;
 class nsNodeSupportsWeakRefTearoff;
 class nsNodeWeakReference;
-class nsXPCClassInfo;
 class nsDOMMutationObserver;
 
 namespace mozilla {
@@ -72,7 +72,6 @@ class DOMQuad;
 class DOMRectReadOnly;
 class Element;
 class EventHandlerNonNull;
-class OnErrorEventHandlerNonNull;
 template<typename T> class Optional;
 class OwningNodeOrString;
 template<typename> class Sequence;
@@ -1781,7 +1780,7 @@ public:
     nsINode* parent = GetParentNode();
     mozilla::ErrorResult rv;
     parent->RemoveChild(*this, rv);
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   // ChildNode methods
@@ -2031,7 +2030,7 @@ ToCanonicalSupports(nsINode* aPointer)
   { \
     mozilla::ErrorResult rv; \
     nsINode::SetNodeValue(aNodeValue, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD GetNodeType(uint16_t* aNodeType) __VA_ARGS__ override \
   { \
@@ -2099,7 +2098,7 @@ ToCanonicalSupports(nsINode* aPointer)
     mozilla::ErrorResult rv; \
     nsCOMPtr<nsINode> clone = nsINode::CloneNode(aDeep, rv); \
     if (rv.Failed()) { \
-      return rv.ErrorCode(); \
+      return rv.StealNSResult(); \
     } \
     *aResult = clone.forget().take()->AsDOMNode(); \
     return NS_OK; \
@@ -2142,13 +2141,13 @@ ToCanonicalSupports(nsINode* aPointer)
   { \
     mozilla::ErrorResult rv; \
     nsINode::GetTextContent(aTextContent, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD SetTextContent(const nsAString& aTextContent) __VA_ARGS__ override \
   { \
     mozilla::ErrorResult rv; \
     nsINode::SetTextContent(aTextContent, rv); \
-    return rv.ErrorCode(); \
+    return rv.StealNSResult(); \
   } \
   NS_IMETHOD LookupPrefix(const nsAString& aNamespaceURI, nsAString& aResult) __VA_ARGS__ override \
   { \

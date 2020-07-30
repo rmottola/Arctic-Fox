@@ -843,7 +843,6 @@ HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& modul
     CompileOptions options(cx);
     options.setMutedErrors(module.scriptSource()->mutedErrors())
            .setFile(module.scriptSource()->filename())
-           .setCompileAndGo(false)
            .setNoScriptRval(false);
 
     // The exported function inherits an implicit strict context if the module

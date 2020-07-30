@@ -34,7 +34,6 @@
 #include <limits>
 #include <algorithm>
 
-class nsIFormControlFrame;
 class nsPresContext;
 class nsIContent;
 class nsIAtom;
@@ -80,7 +79,6 @@ struct RectCornerRadii;
 } // namespace gfx
 namespace layers {
 class Layer;
-class ClientLayerManager;
 }
 }
 
@@ -135,6 +133,7 @@ public:
   typedef FrameMetrics::ViewID ViewID;
   typedef mozilla::CSSPoint CSSPoint;
   typedef mozilla::CSSSize CSSSize;
+  typedef mozilla::CSSIntSize CSSIntSize;
   typedef mozilla::ScreenMargin ScreenMargin;
   typedef mozilla::LayoutDeviceIntSize LayoutDeviceIntSize;
 
@@ -1645,7 +1644,7 @@ public:
   /**
    * Draw a background image.  The image's dimensions are as specified in aDest;
    * the image itself is not consulted to determine a size.
-   * See https://wiki.mozilla.org/Goanna:Image_Snapping_and_Rendering
+   * See https://wiki.mozilla.org/Gecko:Image_Snapping_and_Rendering
    *   @param aRenderingContext Where to draw the image, set up with an
    *                            appropriate scale and transform for drawing in
    *                            app units.
@@ -1671,7 +1670,7 @@ public:
   static DrawResult DrawBackgroundImage(gfxContext&         aContext,
                                         nsPresContext*      aPresContext,
                                         imgIContainer*      aImage,
-                                        const nsIntSize&    aImageSize,
+                                        const CSSIntSize&   aImageSize,
                                         GraphicsFilter      aGraphicsFilter,
                                         const nsRect&       aDest,
                                         const nsRect&       aFill,
@@ -1682,7 +1681,7 @@ public:
 
   /**
    * Draw an image.
-   * See https://wiki.mozilla.org/Goanna:Image_Snapping_and_Rendering
+   * See https://wiki.mozilla.org/Gecko:Image_Snapping_and_Rendering
    *   @param aRenderingContext Where to draw the image, set up with an
    *                            appropriate scale and transform for drawing in
    *                            app units.
@@ -1808,7 +1807,7 @@ public:
    * have less information about the frame tree.
    */
   static void ComputeSizeForDrawing(imgIContainer* aImage,
-                                    nsIntSize&     aImageSize,
+                                    CSSIntSize&    aImageSize,
                                     nsSize&        aIntrinsicRatio,
                                     bool&          aGotWidth,
                                     bool&          aGotHeight);
@@ -1821,8 +1820,9 @@ public:
    * after trying all these methods, no value is available for one or both
    * dimensions, the corresponding dimension of aFallbackSize is used instead.
    */
-  static nsIntSize ComputeSizeForDrawingWithFallback(imgIContainer* aImage,
-                                                     const nsSize&  aFallbackSize);
+  static CSSIntSize
+  ComputeSizeForDrawingWithFallback(imgIContainer* aImage,
+                                    const nsSize&  aFallbackSize);
 
   /**
    * Given a source area of an image (in appunits) and a destination area
@@ -1831,10 +1831,6 @@ public:
    * the aDest parameter of DrawImage, when we want to draw a subimage
    * of an overall image.
    */
-  static nsRect GetWholeImageDestination(const nsIntSize& aWholeImageSize,
-                                         const nsRect& aImageSourceArea,
-                                         const nsRect& aDestArea);
-
   static nsRect GetWholeImageDestination(const nsSize& aWholeImageSize,
                                          const nsRect& aImageSourceArea,
                                          const nsRect& aDestArea);
@@ -2147,10 +2143,11 @@ public:
 
   /**
    * Returns true if the content node has any current animations or transitions
-   * for the specified property.
+   * for any of the specified properties.
    */
-  static bool HasCurrentAnimationsForProperty(nsIContent* aContent,
-                                              nsCSSProperty aProperty);
+  static bool HasCurrentAnimationsForProperties(nsIContent* aContent,
+                                                const nsCSSProperty* aProperties,
+                                                size_t aPropertyCount);
 
   /**
    * Checks if off-main-thread animations are enabled.
@@ -2596,6 +2593,33 @@ public:
 
   static bool HasApzAwareListeners(mozilla::EventListenerManager* aElm);
   static bool HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell);
+
+  /**
+   * Get the resolution at which rescalable web content is drawn
+   * (see nsIDOMWindowUtils.getResolution).
+   */
+  static float GetResolution(nsIPresShell* aPresShell);
+
+  /**
+   * Set the resolution at which rescalable web content is drawn,
+   * and scales the content by the amount of the resolution
+   * (see nsIDOMWindowUtils.setResolutionAndScaleTo).
+   */
+  static void SetResolutionAndScaleTo(nsIPresShell* aPresShell, float aResolution);
+
+  /**
+   * Set the scroll port size for the purpose of clamping the scroll position
+   * for the root scroll frame of this document
+   * (see nsIDOMWindowUtils.setScrollPositionClampingScrollPortSize).
+   */
+  static void SetScrollPositionClampingScrollPortSize(nsIPresShell* aPresShell,
+                                                      CSSSize aSize);
+
+  /**
+   * Set the CSS viewport to the given size
+   * (see nsIDOMWindowUtils.setCSSViewport).
+   */
+  static void SetCSSViewport(nsIPresShell* aPresShell, CSSSize aSize);
 
 private:
   static uint32_t sFontSizeInflationEmPerLine;

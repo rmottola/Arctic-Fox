@@ -1649,7 +1649,7 @@ bool imgLoader::ValidateEntry(imgCacheEntry *aEntry,
   // data URIs are immutable and by their nature can't leak data, so we can
   // just return true in that case.  Doing so would mean that shift-reload
   // doesn't reload data URI documents/images though (which is handy for
-  // debugging during goanna development) so we make an exception in that case.
+  // debugging during gecko development) so we make an exception in that case.
   nsAutoCString scheme;
   aURI->GetScheme(scheme);
   if (scheme.EqualsLiteral("data") &&

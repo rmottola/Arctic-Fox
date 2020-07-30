@@ -1487,8 +1487,8 @@ add_test(function test_read_mbdn_recovered_from_cphs_mbn() {
     }
   };
 
-  iccUtilsHelper.isCphsServiceAvailable = function(goannaService) {
-    return goannaService == "MBN";
+  iccUtilsHelper.isCphsServiceAvailable = function(geckoService) {
+    return geckoService == "MBN";
   };
 
   let isRecovered = false;

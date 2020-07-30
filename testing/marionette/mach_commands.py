@@ -101,6 +101,10 @@ class B2GCommands(MachCommandBase):
     @CommandArgument('--type',
         default='b2g',
         help='Test type, usually one of: browser, b2g, b2g-qemu.')
+    @CommandArgument('--tag', action='append', dest='test_tags',
+        help='Filter out tests that don\'t have the given tag. Can be used '
+             'multiple times in which case the test must contain at least one '
+             'of the given tags.')
     @CommandArgument('tests', nargs='*', metavar='TESTS',
         help='Path to test(s) to run.')
     def run_marionette_webapi(self, tests, **kwargs):
@@ -126,7 +130,7 @@ class MachCommands(MachCommandBase):
         parser=_parser,
     )
     @CommandArgument('--address',
-        help='host:port of running Goanna instance to connect to.')
+        help='host:port of running Gecko instance to connect to.')
     @CommandArgument('--type',
         default='browser',
         help='Test type, usually one of: browser, b2g, b2g-qemu.')
@@ -141,6 +145,10 @@ class MachCommands(MachCommandBase):
              ' Pass in the debugger you want to use, eg pdb or ipdb.')
     @CommandArgument('--e10s', action='store_true',
         help='Enable electrolysis for marionette tests (desktop only).')
+    @CommandArgument('--tag', action='append', dest='test_tags',
+        help='Filter out tests that don\'t have the given tag. Can be used '
+             'multiple times in which case the test must contain at least one '
+             'of the given tags.')
     @CommandArgument('tests', nargs='*', metavar='TESTS',
         help='Path to test(s) to run.')
     def run_marionette_test(self, tests, **kwargs):

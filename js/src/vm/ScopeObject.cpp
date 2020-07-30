@@ -299,7 +299,7 @@ CallObject::createHollowForDebug(JSContext* cx, HandleFunction callee)
     RootedScript script(cx, callee->nonLazyScript());
     for (BindingIter bi(script); !bi.done(); bi++) {
         id = NameToId(bi->name());
-        if (!SetProperty(cx, callobj, callobj, id, &optimizedOut))
+        if (!SetProperty(cx, callobj, id, optimizedOut))
             return nullptr;
     }
 
@@ -501,12 +501,11 @@ with_LookupProperty(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 static bool
-with_DefineProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue value,
-                    JSGetterOp getter, JSSetterOp setter, unsigned attrs,
+with_DefineProperty(JSContext *cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc,
                     ObjectOpResult &result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
-    return DefineProperty(cx, actual, id, value, getter, setter, attrs, result);
+    return DefineProperty(cx, actual, id, desc, result);
 }
 
 static bool
@@ -533,14 +532,14 @@ with_GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleI
 }
 
 static bool
-with_SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
-                 MutableHandleValue vp, ObjectOpResult &result)
+with_SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                 HandleValue receiver, ObjectOpResult &result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
-    RootedObject actualReceiver(cx, receiver);
-    if (receiver == obj)
-        actualReceiver = actual;
-    return SetProperty(cx, actual, actualReceiver, id, vp, result);
+    RootedValue actualReceiver(cx, receiver);
+    if (receiver.isObject() && &receiver.toObject() == obj)
+        actualReceiver.setObject(*actual);
+    return SetProperty(cx, actual, id, v, actualReceiver, result);
 }
 
 static bool
@@ -999,8 +998,8 @@ uninitialized_GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver
 }
 
 static bool
-uninitialized_SetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
-                          MutableHandleValue vp, ObjectOpResult &result)
+uninitialized_SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                          HandleValue receiver, ObjectOpResult &result)
 {
     ReportUninitializedLexicalId(cx, id);
     return false;
@@ -1226,7 +1225,7 @@ void
 LiveScopeVal::sweep()
 {
     if (staticScope_)
-        MOZ_ALWAYS_FALSE(IsObjectAboutToBeFinalizedFromAnyThread(staticScope_.unsafeGet()));
+        MOZ_ALWAYS_FALSE(IsObjectAboutToBeFinalized(staticScope_.unsafeGet()));
 }
 
 // Live ScopeIter values may be added to DebugScopes::liveScopes, as
@@ -1662,8 +1661,8 @@ class DebugScopeProxy : public BaseProxyHandler
         }
     }
 
-    bool set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id,
-             MutableHandleValue vp, ObjectOpResult &result) const override
+    bool set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
+             ObjectOpResult &result) const override
     {
         Rooted<DebugScopeObject*> debugScope(cx, &proxy->as<DebugScopeObject>());
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
@@ -1672,21 +1671,25 @@ class DebugScopeProxy : public BaseProxyHandler
             return Throw(cx, id, JSMSG_DEBUG_CANT_SET_OPT_ENV);
 
         AccessResult access;
-        if (!handleUnaliasedAccess(cx, debugScope, scope, id, SET, vp, &access))
+        RootedValue valCopy(cx, v);
+        if (!handleUnaliasedAccess(cx, debugScope, scope, id, SET, &valCopy, &access))
             return false;
 
         switch (access) {
           case ACCESS_UNALIASED:
             return result.succeed();
           case ACCESS_GENERIC:
-            return SetProperty(cx, scope, scope, id, vp, result);
+            {
+                RootedValue scopeVal(cx, ObjectValue(*scope));
+                return SetProperty(cx, scope, id, v, scopeVal, result);
+            }
           default:
             MOZ_CRASH("bad AccessResult");
         }
     }
 
-    bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
-                        MutableHandle<PropertyDescriptor> desc,
+    bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+                        Handle<PropertyDescriptor> desc,
                         ObjectOpResult &result) const override
     {
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
@@ -1933,7 +1936,7 @@ DebugScopes::sweep(JSRuntime* rt)
      */
     for (MissingScopeMap::Enum e(missingScopes); !e.empty(); e.popFront()) {
         DebugScopeObject** debugScope = e.front().value().unsafeGet();
-        if (IsObjectAboutToBeFinalizedFromAnyThread(debugScope)) {
+        if (IsObjectAboutToBeFinalized(debugScope)) {
             /*
              * Note that onPopCall and onPopBlock rely on missingScopes to find
              * scope objects that we synthesized for the debugger's sake, and
@@ -1971,7 +1974,7 @@ DebugScopes::sweep(JSRuntime* rt)
          * Scopes can be finalized when a debugger-synthesized ScopeObject is
          * no longer reachable via its DebugScopeObject.
          */
-        if (IsObjectAboutToBeFinalizedFromAnyThread(&scope))
+        if (IsObjectAboutToBeFinalized(&scope))
             e.removeFront();
         else if (scope != e.front().key())
             e.rekeyFront(scope);
@@ -2624,7 +2627,17 @@ RemoveReferencedNames(JSContext* cx, HandleScript script, PropertyNameSet& remai
         switch (JSOp(*pc)) {
           case JSOP_GETNAME:
           case JSOP_SETNAME:
+          case JSOP_STRICTSETNAME:
             name = script->getName(pc);
+            break;
+
+          case JSOP_GETGNAME:
+          case JSOP_SETGNAME:
+          case JSOP_STRICTSETGNAME:
+            if (script->hasPollutedGlobalScope())
+                name = script->getName(pc);
+            else
+                name = nullptr;
             break;
 
           case JSOP_GETALIASEDVAR:

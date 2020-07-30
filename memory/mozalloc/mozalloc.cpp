@@ -120,11 +120,6 @@ moz_xstrdup(const char* str)
     }
     return dup;
 }
-char*
-moz_strdup(const char* str)
-{
-    return strdup_impl(str);
-}
 
 #if defined(HAVE_STRNDUP)
 char*
@@ -136,11 +131,6 @@ moz_xstrndup(const char* str, size_t strsize)
         return moz_xstrndup(str, strsize);
     }
     return dup;
-}
-char*
-moz_strndup(const char* str, size_t strsize)
-{
-    return strndup_impl(str, strsize);
 }
 #endif  // if defined(HAVE_STRNDUP)
 
@@ -191,11 +181,6 @@ moz_xmemalign(size_t boundary, size_t size)
     // non-NULL ptr or errno == EINVAL
     return ptr;
 }
-void*
-moz_memalign(size_t boundary, size_t size)
-{
-    return memalign_impl(boundary, size);
-}
 #endif // if defined(HAVE_MEMALIGN)
 
 #if defined(HAVE_VALLOC)
@@ -208,11 +193,6 @@ moz_xvalloc(size_t size)
         return moz_xvalloc(size);
     }
     return ptr;
-}
-void*
-moz_valloc(size_t size)
-{
-    return valloc_impl(size);
 }
 #endif // if defined(HAVE_VALLOC)
 

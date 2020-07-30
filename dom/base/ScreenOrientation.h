@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,7 +11,7 @@ namespace mozilla {
 namespace dom {
 
 // Make sure that any change here is also made in
-// * mobile/android/base/GoannaScreenOrientationListener.java
+// * mobile/android/base/GeckoScreenOrientationListener.java
 typedef uint32_t ScreenOrientation;
 
 static const ScreenOrientation eScreenOrientation_None               = 0;

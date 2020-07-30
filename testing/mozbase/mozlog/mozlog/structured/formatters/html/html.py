@@ -59,13 +59,13 @@ class HTMLFormatter(base.BaseFormatter):
             self.env["Gaia date"] = (
                 datetime.utcfromtimestamp(int(version_info.get("gaia_date"))).strftime(date_format) if
                 "gaia_date" in version_info else None)
-            self.env["Goanna version"] = version_info.get("application_version")
-            self.env["Goanna build"] = version_info.get("application_buildid")
+            self.env["Gecko version"] = version_info.get("application_version")
+            self.env["Gecko build"] = version_info.get("application_buildid")
 
             if version_info.get("application_changeset"):
-                self.env["Goanna revision"] = version_info.get("application_changeset")
+                self.env["Gecko revision"] = version_info.get("application_changeset")
                 if version_info.get("application_repository"):
-                    self.env["Goanna revision"] = html.a(
+                    self.env["Gecko revision"] = html.a(
                         version_info.get("application_changeset"),
                         href="/".join([version_info.get("application_repository"),
                                        version_info.get("application_changeset")]),

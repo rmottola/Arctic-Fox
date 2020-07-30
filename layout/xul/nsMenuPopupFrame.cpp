@@ -1247,8 +1247,8 @@ nsMenuPopupFrame::SetPopupPosition(nsIFrame* aAnchorFrame, bool aIsMove, bool aS
   parentRect.MoveBy(referenceFrame->GetScreenRectInAppUnits().TopLeft());
   // In its own app units
   parentRect =
-    parentRect.ConvertAppUnitsRoundOut(rootPresContext->AppUnitsPerDevPixel(),
-                                       presContext->AppUnitsPerDevPixel());
+    parentRect.ScaleToOtherAppUnitsRoundOut(rootPresContext->AppUnitsPerDevPixel(),
+                                            presContext->AppUnitsPerDevPixel());
 
   // Set the popup's size to the preferred size. Below, this size will be
   // adjusted to fit on the screen or within the content area. If the anchor
@@ -1499,7 +1499,7 @@ nsMenuPopupFrame::GetConstraintRect(const nsRect& aAnchorRect,
     }
   }
 
-  nsRect screenRect = screenRectPixels.ToAppUnits(presContext->AppUnitsPerDevPixel());
+  nsRect screenRect = ToAppUnits(screenRectPixels, presContext->AppUnitsPerDevPixel());
   if (mInContentShell) {
     // for content shells, clip to the client area rather than the screen area
     screenRect.IntersectRect(screenRect, aRootScreenRect);

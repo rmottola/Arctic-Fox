@@ -862,6 +862,7 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
         GenericCreateConstructor<TypedArrayConstructor, 3, JSFunction::FinalizeKind>,
         GenericCreatePrototype,
         TypedArrayObject::staticFunctions,
+        nullptr,
         TypedArrayObject::protoFunctions,
         TypedArrayObject::protoAccessors,
         FinishTypedArrayInit,
@@ -1801,6 +1802,7 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                                                                   \
     nullptr,                                                                   \
     nullptr,                                                                   \
+    nullptr,                                                                   \
     _typedArray::finishClassInit,                                              \
     JSProto_TypedArray                                                         \
 }
@@ -1839,7 +1841,7 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
 };
 
 // The various typed array prototypes are supposed to 1) be normal objects,
-// 2) stringify to "[object <name of constructor>]", and 3) (Goanna-specific)
+// 2) stringify to "[object <name of constructor>]", and 3) (Gecko-specific)
 // be xrayable.  The first and second requirements mandate (in the absence of
 // @@toStringTag) a custom class.  The third requirement mandates that each
 // prototype's class have the relevant typed array's cached JSProtoKey in them.
@@ -1871,6 +1873,7 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
     { \
         typedArray::createConstructor, \
         typedArray::createPrototype, \
+        nullptr, \
         nullptr, \
         nullptr, \
         nullptr, \

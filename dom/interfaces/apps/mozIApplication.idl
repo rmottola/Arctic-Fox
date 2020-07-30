@@ -8,7 +8,7 @@
 #include "domstubs.idl"
 
 /**
- * We expose Goanna-internal helpers related to "web apps" through this
+ * We expose Gecko-internal helpers related to "web apps" through this
  * sub-interface.
  */
 [scriptable, uuid(1d856b11-ac29-47d3-bd52-a86e3d45fcf5)]

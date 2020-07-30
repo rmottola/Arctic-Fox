@@ -29,11 +29,10 @@ class ChromeObjectWrapper : public ChromeObjectWrapperBase
 
     virtual bool defineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                                 JS::Handle<jsid> id,
-                                JS::MutableHandle<JSPropertyDescriptor> desc,
+                                JS::Handle<JSPropertyDescriptor> desc,
                                 JS::ObjectOpResult &result) const override;
-    virtual bool set(JSContext* cx, JS::Handle<JSObject*> wrapper,
-                     JS::Handle<JSObject*> receiver, JS::Handle<jsid> id,
-                     JS::MutableHandle<JS::Value> vp,
+    virtual bool set(JSContext *cx, JS::HandleObject wrapper, JS::HandleId id,
+                     JS::HandleValue v, JS::HandleValue receiver,
                      JS::ObjectOpResult &result) const override;
 
     static const ChromeObjectWrapper singleton;

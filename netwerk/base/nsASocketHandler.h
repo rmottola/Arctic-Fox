@@ -72,7 +72,7 @@ public:
     virtual void IsLocal(bool *aIsLocal) = 0;
 
     //
-    // called to determine if this socket should not be terminated when Goanna
+    // called to determine if this socket should not be terminated when Gecko
     // is turned offline. This is mostly useful for the debugging server
     // socket.
     //

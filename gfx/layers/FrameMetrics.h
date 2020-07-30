@@ -254,7 +254,7 @@ public:
   // instead.
   //
   // This value is valid for nested scrollable layers as well, and is still
-  // relative to the layer tree origin. This value is provided by Goanna at
+  // relative to the layer tree origin. This value is provided by Gecko at
   // layout/paint time.
   ParentLayerRect mCompositionBounds;
 
@@ -564,7 +564,7 @@ private:
   // The cumulative resolution that the current frame has been painted at.
   // This is the product of the pres-shell resolutions of the document
   // containing this scroll frame and its ancestors, and any css-driven
-  // resolution. This information is provided by Goanna at layout/paint time.
+  // resolution. This information is provided by Gecko at layout/paint time.
   // Note that this is allowed to have different x- and y-scales, but only
   // for subframes (mIsRoot = false). (The same applies to other scales that
   // "inherit" the 2D-ness of this one, such as mZoom.)
@@ -608,10 +608,10 @@ private:
   // not any parents, regardless of parent transforms.
   CSSPoint mScrollOffset;
 
-  // The "user zoom". Content is painted by goanna at mResolution * mDevPixelsPerCSSPixel,
+  // The "user zoom". Content is painted by gecko at mResolution * mDevPixelsPerCSSPixel,
   // but will be drawn to the screen at mZoom. In the steady state, the
   // two will be the same, but during an async zoom action the two may
-  // diverge. This information is initialized in Goanna but updated in the APZC.
+  // diverge. This information is initialized in Gecko but updated in the APZC.
   CSSToParentLayerScale2D mZoom;
 
   // Whether mScrollOffset was updated by something other than the APZ code, and

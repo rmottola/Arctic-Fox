@@ -68,7 +68,7 @@ class FileRegistry(object):
     def match(self, pattern):
         '''
         Return the list of paths, stored in the container, matching the
-        given pattern. See the mozpack.path.match documentation for a
+        given pattern. See the mozpath.match documentation for a
         description of the handled patterns.
         '''
         if '*' in pattern:
@@ -84,7 +84,7 @@ class FileRegistry(object):
     def remove(self, pattern):
         '''
         Remove paths matching the given pattern from the container. See the
-        mozpack.path.match documentation for a description of the handled
+        mozpath.match documentation for a description of the handled
         patterns.
         '''
         items = self.match(pattern)
@@ -114,7 +114,7 @@ class FileRegistry(object):
     def contains(self, pattern):
         '''
         Return whether the container contains paths matching the given
-        pattern. See the mozpack.path.match documentation for a description of
+        pattern. See the mozpath.match documentation for a description of
         the handled patterns.
         '''
         return len(self.match(pattern)) > 0

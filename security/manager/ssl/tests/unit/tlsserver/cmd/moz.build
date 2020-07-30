@@ -6,7 +6,7 @@
 
 FAIL_ON_WARNINGS = True
 
-GoannaSimplePrograms([
+GeckoSimplePrograms([
     'BadCertServer',
     'ClientAuthServer',
     'GenerateOCSPResponse',

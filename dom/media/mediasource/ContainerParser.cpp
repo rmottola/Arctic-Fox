@@ -9,7 +9,7 @@
 #include "WebMBufferedParser.h"
 #include "mozilla/Endian.h"
 #include "mp4_demuxer/MoofParser.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "MediaData.h"
 #ifdef MOZ_FMP4
 #include "MP4Stream.h"
@@ -18,7 +18,6 @@
 #endif
 #include "SourceBufferResource.h"
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaSourceLog();
 
 /* Polyfill __func__ on MSVC to pass to the log. */
@@ -30,10 +29,6 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 #define TOSTRING(x) STRINGIFY(x)
 #define MSE_DEBUG(name, arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, (TOSTRING(name) "(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
 #define MSE_DEBUGV(name, arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG + 1, (TOSTRING(name) "(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
-#else
-#define MSE_DEBUG(...)
-#define MSE_DEBUGV(...)
-#endif
 
 namespace mozilla {
 

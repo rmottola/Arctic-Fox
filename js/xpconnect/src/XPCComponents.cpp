@@ -13,9 +13,9 @@
 #include "nsJSUtils.h"
 #include "mozJSComponentLoader.h"
 #include "nsContentUtils.h"
+#include "nsCycleCollector.h"
 #include "jsfriendapi.h"
 #include "js/StructuredClone.h"
-#include "mozilla/dom/WindowBinding.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/Preferences.h"
@@ -26,8 +26,8 @@
 #include "mozilla/dom/DOMExceptionBinding.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/StructuredCloneTags.h"
+#include "mozilla/dom/WindowBinding.h"
 #include "nsZipArchive.h"
-#include "nsIDOMFile.h"
 #include "nsIDOMFileList.h"
 #include "nsWindowMemoryReporter.h"
 #include "nsDOMClassInfo.h"
@@ -2764,9 +2764,9 @@ nsXPCComponents_Utils::ForceGC()
 
 /* void forceCC (); */
 NS_IMETHODIMP
-nsXPCComponents_Utils::ForceCC()
+nsXPCComponents_Utils::ForceCC(nsICycleCollectorListener *listener)
 {
-    nsJSContext::CycleCollectNow();
+    nsJSContext::CycleCollectNow(listener);
     return NS_OK;
 }
 
@@ -2898,6 +2898,47 @@ nsXPCComponents_Utils::GetJSTestingFunctions(JSContext* cx,
     if (!obj)
         return NS_ERROR_XPC_JAVASCRIPT_ERROR;
     retval.setObject(*obj);
+    return NS_OK;
+}
+
+/* jsval callFunctionWithStack(in jsval function, in nsIStackFrame stack,
+                               in AString asyncCause); */
+NS_IMETHODIMP
+nsXPCComponents_Utils::CallFunctionWithAsyncStack(HandleValue function,
+                                                  nsIStackFrame *stack,
+                                                  const nsAString &asyncCause,
+                                                  JSContext *cx,
+                                                  MutableHandleValue retval)
+{
+    nsresult rv;
+
+    if (!stack || asyncCause.IsEmpty()) {
+        return NS_ERROR_INVALID_ARG;
+    }
+
+    JS::Rooted<JS::Value> asyncStack(cx);
+    rv = stack->GetNativeSavedFrame(&asyncStack);
+    if (NS_FAILED(rv))
+        return rv;
+    if (!asyncStack.isObject()) {
+        JS_ReportError(cx, "Must use a native JavaScript stack frame");
+        return NS_ERROR_INVALID_ARG;
+    }
+
+    JS::Rooted<JSObject*> asyncStackObj(cx, &asyncStack.toObject());
+    JS::Rooted<JSString*> asyncCauseString(cx, JS_NewUCStringCopyN(cx, asyncCause.BeginReading(),
+                                                                       asyncCause.Length()));
+    if (!asyncCauseString)
+        return NS_ERROR_OUT_OF_MEMORY;
+
+    JS::AutoSetAsyncStackForNewCalls sas(cx, asyncStackObj, asyncCauseString);
+
+    if (!JS_CallFunctionValue(cx, JS::NullPtr(), function,
+                              JS::HandleValueArray::empty(), retval))
+    {
+        return NS_ERROR_XPC_JAVASCRIPT_ERROR;
+    }
+
     return NS_OK;
 }
 

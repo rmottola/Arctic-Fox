@@ -22,6 +22,7 @@
 #include <stdint.h>
 
 #include "nsID.h"
+#include "nsIWidget.h"
 #include "nsMemory.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -84,6 +85,35 @@ struct SerializedStructuredCloneBuffer
 
   uint64_t* data;
   size_t dataLength;
+};
+
+struct OwningSerializedStructuredCloneBuffer : public SerializedStructuredCloneBuffer
+{
+  OwningSerializedStructuredCloneBuffer()
+  {}
+
+  OwningSerializedStructuredCloneBuffer(const OwningSerializedStructuredCloneBuffer&) = delete;
+
+  explicit OwningSerializedStructuredCloneBuffer(const JSAutoStructuredCloneBuffer& aOther)
+   : SerializedStructuredCloneBuffer(aOther)
+  {}
+
+  ~OwningSerializedStructuredCloneBuffer()
+  {
+    if (data) {
+      js_free(data);
+    }
+  }
+
+  OwningSerializedStructuredCloneBuffer&
+  operator=(const JSAutoStructuredCloneBuffer& aOther)
+  {
+    SerializedStructuredCloneBuffer::operator=(aOther);
+    return *this;
+  }
+
+  OwningSerializedStructuredCloneBuffer&
+  operator=(const OwningSerializedStructuredCloneBuffer& aOther) = delete;
 };
 
 } // namespace mozilla
@@ -741,6 +771,38 @@ struct ParamTraits<mozilla::SerializedStructuredCloneBuffer>
   {
     LogParam(aParam.dataLength, aLog);
   }
+};
+
+template <>
+struct ParamTraits<mozilla::OwningSerializedStructuredCloneBuffer>
+  : public ParamTraits<mozilla::SerializedStructuredCloneBuffer>
+{
+  typedef mozilla::OwningSerializedStructuredCloneBuffer paramType;
+
+  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  {
+    if (!ParamTraits<mozilla::SerializedStructuredCloneBuffer>::Read(aMsg, aIter, aResult)) {
+      return false;
+    }
+
+    if (aResult->data) {
+      uint64_t* data = static_cast<uint64_t*>(js_malloc(aResult->dataLength));
+      if (!data) {
+        return false;
+      }
+      memcpy(data, aResult->data, aResult->dataLength);
+      aResult->data = data;
+    }
+
+    return true;
+  }
+};
+
+template <>
+struct ParamTraits<nsIWidget::TouchPointerState>
+  : public BitFlagsEnumSerializer<nsIWidget::TouchPointerState,
+                                  nsIWidget::TouchPointerState::ALL_BITS>
+{
 };
 
 } /* namespace IPC */

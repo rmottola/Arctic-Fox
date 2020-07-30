@@ -18,7 +18,7 @@
 
 /* a presentation of a document, part 2 */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/CSSStyleSheet.h"
@@ -177,13 +177,14 @@
 #include "nsIFrameInlines.h"
 #include "mozilla/gfx/2D.h"
 #include "nsSubDocumentFrame.h"
+#include "nsQueryObject.h"
 
 #ifdef ANDROID
 #include "nsIDocShellTreeOwner.h"
 #endif
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 using namespace mozilla::tasktracer;
 #endif
 
@@ -535,9 +536,7 @@ private:
 
 bool PresShell::sDisableNonTestMouseEvents = false;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* PresShell::gLog;
-#endif
 
 #ifdef DEBUG
 static void
@@ -753,12 +752,10 @@ PresShell::PresShell()
   mReflowCountMgr->SetPresContext(mPresContext);
   mReflowCountMgr->SetPresShell(this);
 #endif
-#ifdef PR_LOGGING
   mLoadBegin = TimeStamp::Now();
   if (!gLog) {
     gLog = PR_NewLogModule("PresShell");
   }
-#endif
   mSelectionFlags = nsISelectionDisplay::DISPLAY_TEXT | nsISelectionDisplay::DISPLAY_IMAGES;
   mIsThemeSupportDisabled = false;
   mIsActive = true;
@@ -977,7 +974,6 @@ PresShell::Init(nsIDocument* aDocument,
   mTouchManager.Init(this, mDocument);
 }
 
-#ifdef PR_LOGGING
 enum TextPerfLogType {
   eLog_reflow,
   eLog_loaddone,
@@ -990,6 +986,18 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
                  const gfxTextPerfMetrics::TextCounts& aCounts,
                  float aTime, TextPerfLogType aLogType, const char* aURL)
 {
+  PRLogModuleInfo* tpLog = gfxPlatform::GetLog(eGfxLog_textperf);
+
+  // ignore XUL contexts unless at debug level
+  PRLogModuleLevel logLevel = PR_LOG_WARNING;
+  if (aCounts.numContentTextRuns == 0) {
+    logLevel = PR_LOG_DEBUG;
+  }
+
+  if (!PR_LOG_TEST(tpLog, logLevel)) {
+    return;
+  }
+
   char prefix[256];
 
   switch (aLogType) {
@@ -1002,14 +1010,6 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
     default:
       MOZ_ASSERT(aLogType == eLog_totals, "unknown textperf log type");
       sprintf(prefix, "(textperf-totals) %p", aPresShell);
-  }
-
-  PRLogModuleInfo* tpLog = gfxPlatform::GetLog(eGfxLog_textperf);
-
-  // ignore XUL contexts unless at debug level
-  PRLogModuleLevel logLevel = PR_LOG_WARNING;
-  if (aCounts.numContentTextRuns == 0) {
-    logLevel = PR_LOG_DEBUG;
   }
 
   double hitRatio = 0.0;
@@ -1058,7 +1058,6 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
             aTextPerf->cumulative.textrunDestr));
   }
 }
-#endif
 
 void
 PresShell::Destroy()
@@ -1067,7 +1066,6 @@ PresShell::Destroy()
     "destroy called on presshell while scripts not blocked");
 
   // dump out cumulative text perf metrics
-#ifdef PR_LOGGING
   gfxTextPerfMetrics* tp;
   if (mPresContext && (tp = mPresContext->GetTextPerfMetrics())) {
     tp->Accumulate();
@@ -1075,7 +1073,6 @@ PresShell::Destroy()
       LogTextPerfStats(tp, this, tp->cumulative, 0.0, eLog_totals, nullptr);
     }
   }
-#endif
 
 #ifdef MOZ_REFLOW_PERF
   DumpReflows();
@@ -2659,7 +2656,6 @@ PresShell::BeginLoad(nsIDocument *aDocument)
 {
   mDocumentLoading = true;
 
-#ifdef PR_LOGGING
   gfxTextPerfMetrics *tp = nullptr;
   if (mPresContext) {
     tp = mPresContext->GetTextPerfMetrics();
@@ -2680,7 +2676,6 @@ PresShell::BeginLoad(nsIDocument *aDocument)
            ("(presshell) %p load begin [%s]\n",
             this, spec.get()));
   }
-#endif
 }
 
 void
@@ -2696,7 +2691,6 @@ PresShell::EndLoad(nsIDocument *aDocument)
 void
 PresShell::LoadComplete()
 {
-#ifdef PR_LOGGING
   gfxTextPerfMetrics *tp = nullptr;
   if (mPresContext) {
     tp = mPresContext->GetTextPerfMetrics();
@@ -2724,7 +2718,6 @@ PresShell::LoadComplete()
       }
     }
   }
-#endif
 }
 
 #ifdef DEBUG
@@ -3750,7 +3743,7 @@ PresShell::ScrollFrameRectIntoView(nsIFrame*                aFrame,
       if (parent) {
         int32_t APD = container->PresContext()->AppUnitsPerDevPixel();
         int32_t parentAPD = parent->PresContext()->AppUnitsPerDevPixel();
-        rect = rect.ConvertAppUnitsRoundOut(APD, parentAPD);
+        rect = rect.ScaleToOtherAppUnitsRoundOut(APD, parentAPD);
         rect += extraOffset;
       }
     }
@@ -5303,7 +5296,7 @@ PresShell::RenderNode(nsIDOMNode* aNode,
     // combine the area with the supplied region
     nsIntRect rrectPixels = aRegion->GetBounds();
 
-    nsRect rrect = rrectPixels.ToAppUnits(nsPresContext::AppUnitsPerCSSPixel());
+    nsRect rrect = ToAppUnits(rrectPixels, nsPresContext::AppUnitsPerCSSPixel());
     area.IntersectRect(area, rrect);
 
     nsPresContext* pc = GetPresContext();
@@ -5755,7 +5748,7 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
     nsIFrame* frame = view->GetFrame();
     NS_ASSERTION(frame, "floating views can't be anonymous");
     viewAPD = frame->PresContext()->AppUnitsPerDevPixel();
-    refpoint = mMouseLocation.ConvertAppUnits(APD, viewAPD);
+    refpoint = mMouseLocation.ScaleToOtherAppUnits(APD, viewAPD);
     refpoint -= view->GetOffsetTo(rootView);
     refpoint += view->ViewToWidgetOffset();
   }
@@ -5889,7 +5882,7 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect)
       } else {
         rect.MoveBy(-aFrame->GetContentRectRelativeToSelf().TopLeft());
       }
-      rect = rect.ConvertAppUnitsRoundOut(
+      rect = rect.ScaleToOtherAppUnitsRoundOut(
         aFrame->PresContext()->AppUnitsPerDevPixel(),
         presShell->GetPresContext()->AppUnitsPerDevPixel());
 
@@ -6529,7 +6522,7 @@ void
 PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
 {
   switch (aEvent->message) {
-  case NS_MOUSE_ENTER:
+  case NS_MOUSE_ENTER_WIDGET:
     // In this case we have to know information about available mouse pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Put(mouseEvent->pointerId,
@@ -6554,7 +6547,7 @@ PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
       }
     }
     break;
-  case NS_MOUSE_EXIT:
+  case NS_MOUSE_EXIT_WIDGET:
     // In this case we have to remove information about disappeared mouse pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Remove(mouseEvent->pointerId);
@@ -6750,7 +6743,7 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
 
   if ((aEvent->message == NS_MOUSE_MOVE &&
        aEvent->AsMouseEvent()->reason == WidgetMouseEvent::eReal) ||
-      aEvent->message == NS_MOUSE_ENTER ||
+      aEvent->message == NS_MOUSE_ENTER_WIDGET ||
       aEvent->message == NS_MOUSE_BUTTON_DOWN ||
       aEvent->message == NS_MOUSE_BUTTON_UP) {
     nsIFrame* rootFrame = GetRootFrame();
@@ -6763,15 +6756,15 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
         nsLayoutUtils::GetEventCoordinatesRelativeTo(aEvent, rootFrame);
     }
 #ifdef DEBUG_MOUSE_LOCATION
-    if (aEvent->message == NS_MOUSE_ENTER)
+    if (aEvent->message == NS_MOUSE_ENTER_WIDGET)
       printf("[ps=%p]got mouse enter for %p\n",
              this, aEvent->widget);
     printf("[ps=%p]setting mouse location to (%d,%d)\n",
            this, mMouseLocation.x, mMouseLocation.y);
 #endif
-    if (aEvent->message == NS_MOUSE_ENTER)
+    if (aEvent->message == NS_MOUSE_ENTER_WIDGET)
       SynthesizeMouseMove(false);
-  } else if (aEvent->message == NS_MOUSE_EXIT) {
+  } else if (aEvent->message == NS_MOUSE_EXIT_WIDGET) {
     // Although we only care about the mouse moving into an area for which this
     // pres shell doesn't receive mouse move events, we don't check which widget
     // the mouse exit was for since this seems to vary by platform.  Hopefully
@@ -7468,7 +7461,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     }
 
     WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
-    bool isWindowLevelMouseExit = (aEvent->message == NS_MOUSE_EXIT) &&
+    bool isWindowLevelMouseExit = (aEvent->message == NS_MOUSE_EXIT_WIDGET) &&
       (mouseEvent && mouseEvent->exit == WidgetMouseEvent::eTopLevel);
 
     // Get the frame at the event point. However, don't do this if we're
@@ -8697,7 +8690,7 @@ PresShell::GetCurrentItemAndPositionForElement(nsIDOMElement *aCurrentEl,
           nsIFrame* f = do_QueryFrame(scrollFrame);
           int32_t APD = presContext->AppUnitsPerDevPixel();
           int32_t scrollAPD = f->PresContext()->AppUnitsPerDevPixel();
-          scrollAmount = scrollAmount.ConvertAppUnits(scrollAPD, APD);
+          scrollAmount = scrollAmount.ScaleToOtherAppUnits(scrollAPD, APD);
           if (extra > scrollAmount.height) {
             extra = scrollAmount.height;
           }
@@ -9146,8 +9139,6 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
   mCurrentReflowRoot = target;
 #endif
 
-  target->WillReflow(mPresContext);
-
   // If the target frame is the root of the frame hierarchy, then
   // use all the available space. If it's simply a `reflow root',
   // then use the target frame's size as the available space.
@@ -9284,7 +9275,6 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
     MaybeScheduleReflow();
   }
 
-#ifdef PR_LOGGING
   // dump text perf metrics for reflows with significant text processing
   if (tp) {
     if (tp->current.numChars > 100) {
@@ -9294,7 +9284,6 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
     }
     tp->Accumulate();
   }
-#endif
 
   if (docShell) {
     docShell->AddProfileTimelineMarker("Reflow", TRACING_INTERVAL_END);
@@ -11009,7 +10998,7 @@ nsIPresShell::RecomputeFontSizeInflationEnabled()
   // have any metadata about the width and/or height. On mobile, the screen size
   // and the size of the content area are very close, or the same value.
   // In XUL fennec, the content area is the size of the <browser> widget, but
-  // in native fennec, the content area is the size of the Goanna LayerView
+  // in native fennec, the content area is the size of the Gecko LayerView
   // object.
 
   // TODO:

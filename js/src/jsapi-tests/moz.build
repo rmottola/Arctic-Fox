@@ -4,7 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-GoannaProgram('jsapi-tests', linkage=None)
+GeckoProgram('jsapi-tests', linkage=None)
 
 UNIFIED_SOURCES += [
     'selfTest.cpp',
@@ -96,6 +96,7 @@ if CONFIG['ENABLE_ION']:
         'testJitMoveEmitterCycles-mips.cpp',
         'testJitMoveEmitterCycles.cpp',
         'testJitRangeAnalysis.cpp',
+        'testJitRegisterSet.cpp',
         'testJitRValueAlloc.cpp',
     ]
 

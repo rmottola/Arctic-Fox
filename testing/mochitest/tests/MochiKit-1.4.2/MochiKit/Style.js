@@ -182,7 +182,7 @@ MochiKit.Base.update(MochiKit.Style, {
         elem = MochiKit.DOM.getElement(elem);
         var self = MochiKit.Style;
         if (o == 1) {
-            var toSet = /Goanna/.test(navigator.userAgent) && !(/Konqueror|AppleWebKit|KHTML/.test(navigator.userAgent));
+            var toSet = /Gecko/.test(navigator.userAgent) && !(/Konqueror|AppleWebKit|KHTML/.test(navigator.userAgent));
             elem.style["opacity"] = toSet ? 0.999999 : 1.0;
             if (/MSIE/.test(navigator.userAgent)) {
                 elem.style['filter'] =

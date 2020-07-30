@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -1108,7 +1109,7 @@ Event::GetPreventDefault() const
       doc->WarnOnceAbout(nsIDocument::eGetPreventDefault);
     }
   }
-  // GetPreventDefault() is legacy and Goanna specific method.  Although,
+  // GetPreventDefault() is legacy and Gecko specific method.  Although,
   // the result should be same as defaultPrevented, we don't need to break
   // backward compatibility of legacy method.  Let's behave traditionally.
   return DefaultPrevented();

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsDragService.h"
 #include "nsObjCExceptions.h"
@@ -32,9 +32,7 @@
 using namespace mozilla;
 using namespace mozilla::gfx;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* sCocoaLog;
-#endif
 
 extern void EnsureLogInitialized();
 
@@ -95,7 +93,7 @@ static nsresult SetUpDragClipboard(nsISupportsArray* aTransferableArray)
     unsigned int typeCount = [pasteboardOutputDict count];
     NSMutableArray* types = [NSMutableArray arrayWithCapacity:typeCount + 1];
     [types addObjectsFromArray:[pasteboardOutputDict allKeys]];
-    // Goanna is initiating this drag so we always want its own views to consider
+    // Gecko is initiating this drag so we always want its own views to consider
     // it. Add our wildcard type to the pasteboard to accomplish this.
     [types addObject:kWildcardPboardType]; // we don't increase the count for the loop below on purpose
     [dragPBoard declareTypes:types owner:nil];

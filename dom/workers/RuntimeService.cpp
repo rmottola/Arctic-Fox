@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -160,6 +160,7 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
 #define PREF_DOM_CACHES_ENABLED        "dom.caches.enabled"
 #define PREF_WORKERS_LATEST_JS_VERSION "dom.workers.latestJSVersion"
 #define PREF_INTL_ACCEPT_LANGUAGES     "intl.accept_languages"
+#define PREF_SERVICEWORKERS_ENABLED    "dom.serviceWorkers.enabled"
 
 namespace {
 
@@ -1890,6 +1891,10 @@ RuntimeService::Init()
                                   WorkerPrefChanged,
                                   PREF_DOM_CACHES_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_DOM_CACHES))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
+                                  PREF_SERVICEWORKERS_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_SERVICEWORKERS))) ||
       NS_FAILED(Preferences::RegisterCallback(LoadRuntimeOptions,
                                               PREF_JS_OPTIONS_PREFIX,
                                               nullptr)) ||
@@ -2085,6 +2090,10 @@ RuntimeService::Cleanup()
         NS_FAILED(Preferences::UnregisterCallback(LoadRuntimeOptions,
                                                   PREF_WORKERS_OPTIONS_PREFIX,
                                                   nullptr)) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
+                                  PREF_SERVICEWORKERS_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_SERVICEWORKERS))) ||
         NS_FAILED(Preferences::UnregisterCallback(
                                   WorkerPrefChanged,
                                   PREF_DOM_CACHES_ENABLED,
@@ -2378,7 +2387,7 @@ RuntimeService::CreateSharedWorkerFromLoadInfo(JSContext* aCx,
     workerPrivate =
       WorkerPrivate::Constructor(aCx, aScriptURL, false,
                                  aType, aName, aLoadInfo, rv);
-    NS_ENSURE_TRUE(workerPrivate, rv.ErrorCode());
+    NS_ENSURE_TRUE(workerPrivate, rv.StealNSResult());
 
     created = true;
   } else {
@@ -2629,6 +2638,10 @@ RuntimeService::WorkerPrefChanged(const char* aPrefName, void* aClosure)
     key = WORKERPREF_DOM_CACHES;
     sDefaultPreferences[WORKERPREF_DOM_CACHES] =
       Preferences::GetBool(PREF_DOM_CACHES_ENABLED, false);
+  } else if (key == WORKERPREF_SERVICEWORKERS) {
+    key = WORKERPREF_SERVICEWORKERS;
+    sDefaultPreferences[WORKERPREF_SERVICEWORKERS] =
+      Preferences::GetBool(PREF_SERVICEWORKERS_ENABLED, false);
   }
   // This function should never be registered as a callback for a preference it
   // does not handle.

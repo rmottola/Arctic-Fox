@@ -16,7 +16,7 @@ interface nsIInterfaceRequestor;
 [scriptable, uuid(456ca3b2-02be-4f97-89a2-08c08d3ad88f)]
 interface nsIContentDispatchChooser : nsISupports {
  /**
-  * This request is passed to the helper app dialog because Goanna can not
+  * This request is passed to the helper app dialog because Gecko can not
   * handle content of this type.
   */
   const unsigned long REASON_CANNOT_HANDLE = 0;

@@ -62,13 +62,13 @@ function identityCall(message) {
 }
 
 /*
- * To close the dialog, we first tell the goanna SignInToWebsite manager that it
+ * To close the dialog, we first tell the gecko SignInToWebsite manager that it
  * can clean up.  Then we tell the gaia component that we are finished.  It is
- * necessary to notify goanna first, so that the message can be sent before gaia
+ * necessary to notify gecko first, so that the message can be sent before gaia
  * destroys our context.
  */
 function closeIdentityDialog() {
-  // tell goanna we're done.
+  // tell gecko we're done.
   func = null; options = null;
   sendAsyncMessage(kIdentityDelegateFinished);
 }

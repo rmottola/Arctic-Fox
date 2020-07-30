@@ -9,9 +9,11 @@
 
 #include "mozilla/a11y/Role.h"
 #include "nsIAccessibleText.h"
+#include "Accessible.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsRect.h"
+#include "Accessible.h"
 
 namespace mozilla {
 namespace a11y {
@@ -42,6 +44,9 @@ public:
 
   uint32_t ChildrenCount() const { return mChildren.Length(); }
   ProxyAccessible* ChildAt(uint32_t aIdx) const { return mChildren[aIdx]; }
+
+  // XXX evaluate if this is fast enough.
+  size_t IndexInParent() const { return mParent->mChildren.IndexOf(this); }
   bool MustPruneChildren() const;
 
   void Shutdown();
@@ -100,13 +105,18 @@ public:
   void Relations(nsTArray<RelationType>* aTypes,
                  nsTArray<nsTArray<ProxyAccessible*>>* aTargetSets) const;
 
+  int32_t CaretOffset();
+  bool SetCaretOffset(int32_t aOffset);
+
   int32_t CharacterCount();
   int32_t SelectionCount();
+
+  char16_t CharAt(int32_t aOffset);
 
   /**
    * Get the text between the given offsets.
    */
-  void TextSubstring(int32_t aStartOffset, int32_t aEndOfset,
+  bool TextSubstring(int32_t aStartOffset, int32_t aEndOfset,
                      nsString& aText) const;
 
   void GetTextAfterOffset(int32_t aOffset, AccessibleTextBoundary aBoundaryType,
@@ -159,15 +169,119 @@ public:
 
   void ReplaceText(const nsString& aText);
 
-  void InsertText(const nsString& aText, int32_t aPosition);
+  bool InsertText(const nsString& aText, int32_t aPosition);
 
-  void CopyText(int32_t aStartPos, int32_t aEndPos);
+  bool CopyText(int32_t aStartPos, int32_t aEndPos);
 
-  void CutText(int32_t aStartPos, int32_t aEndPos);
+  bool CutText(int32_t aStartPos, int32_t aEndPos);
 
-  void DeleteText(int32_t aStartPos, int32_t aEndPos);
+  bool DeleteText(int32_t aStartPos, int32_t aEndPos);
 
-  void PasteText(int32_t aPosition);
+  bool PasteText(int32_t aPosition);
+
+  nsIntPoint ImagePosition(uint32_t aCoordType);
+
+  nsIntSize ImageSize();
+
+  uint32_t StartOffset(bool* aOk);
+
+  uint32_t EndOffset(bool* aOk);
+
+  bool IsLinkValid();
+
+  uint32_t AnchorCount(bool* aOk);
+
+  void AnchorURIAt(uint32_t aIndex, nsCString& aURI, bool* aOk);
+
+  ProxyAccessible* AnchorAt(uint32_t aIndex);
+
+  uint32_t LinkCount();
+
+  ProxyAccessible* LinkAt(const uint32_t& aIndex);
+
+  int32_t LinkIndexOf(ProxyAccessible* aLink);
+
+  int32_t LinkIndexAtOffset(uint32_t aOffset);
+
+  ProxyAccessible* TableOfACell();
+
+  uint32_t ColIdx();
+
+  uint32_t RowIdx();
+
+  uint32_t ColExtent();
+
+  uint32_t RowExtent();
+
+  void ColHeaderCells(nsTArray<uint64_t>* aCells);
+
+  void RowHeaderCells(nsTArray<uint64_t>* aCells);
+
+  bool IsCellSelected();
+
+  ProxyAccessible* TableCaption();
+  void TableSummary(nsString& aSummary);
+  uint32_t TableColumnCount();
+  uint32_t TableRowCount();
+  ProxyAccessible* TableCellAt(uint32_t aRow, uint32_t aCol);
+  int32_t TableCellIndexAt(uint32_t aRow, uint32_t aCol);
+  int32_t TableColumnIndexAt(uint32_t aCellIndex);
+  int32_t TableRowIndexAt(uint32_t aCellIndex);
+  void TableRowAndColumnIndicesAt(uint32_t aCellIndex,
+                                  int32_t* aRow, int32_t* aCol);
+  uint32_t TableColumnExtentAt(uint32_t aRow, uint32_t aCol);
+  uint32_t TableRowExtentAt(uint32_t aRow, uint32_t aCol);
+  void TableColumnDescription(uint32_t aCol, nsString& aDescription);
+  void TableRowDescription(uint32_t aRow, nsString& aDescription);
+  bool TableColumnSelected(uint32_t aCol);
+  bool TableRowSelected(uint32_t aRow);
+  bool TableCellSelected(uint32_t aRow, uint32_t aCol);
+  uint32_t TableSelectedCellCount();
+  uint32_t TableSelectedColumnCount();
+  uint32_t TableSelectedRowCount();
+  void TableSelectedCells(nsTArray<ProxyAccessible*>* aCellIDs);
+  void TableSelectedCellIndices(nsTArray<uint32_t>* aCellIndices);
+  void TableSelectedColumnIndices(nsTArray<uint32_t>* aColumnIndices);
+  void TableSelectedRowIndices(nsTArray<uint32_t>* aRowIndices);
+  void TableSelectColumn(uint32_t aCol);
+  void TableSelectRow(uint32_t aRow);
+  void TableUnselectColumn(uint32_t aCol);
+  void TableUnselectRow(uint32_t aRow);
+  bool TableIsProbablyForLayout();
+
+  void SelectedItems(nsTArray<ProxyAccessible*>* aSelectedItems);
+  uint32_t SelectedItemCount();
+  ProxyAccessible* GetSelectedItem(uint32_t aIndex);
+  bool IsItemSelected(uint32_t aIndex);
+  bool AddItemToSelection(uint32_t aIndex);
+  bool RemoveItemFromSelection(uint32_t aIndex);
+  bool SelectAll();
+  bool UnselectAll();
+
+  bool DoAction(uint8_t aIndex);
+  uint8_t ActionCount();
+  void ActionDescriptionAt(uint8_t aIndex, nsString& aDescription);
+  void ActionNameAt(uint8_t aIndex, nsString& aName);
+  KeyBinding AccessKey();
+  KeyBinding KeyboardShortcut();
+
+  double CurValue();
+  bool SetCurValue(double aValue);
+  double MinValue();
+  double MaxValue();
+  double Step();
+
+  void TakeFocus();
+  ProxyAccessible* ChildAtPoint(int32_t aX, int32_t aY,
+                                Accessible::EWhichChildAtPoint aWhichChild);
+  nsIntRect Bounds();
+
+  void Language(nsString& aLocale);
+  void DocType(nsString& aType);
+  void URL(nsString& aURL);
+  void MimeType(nsString aMime);
+  void URLDocTypeMimeType(nsString& aURL, nsString& aDocType,
+                          nsString& aMimeType);
 
   /**
    * Allow the platform to store a pointers worth of data on us.

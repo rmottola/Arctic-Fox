@@ -9,6 +9,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHomeUtils",
   "resource:///modules/AboutHome.jsm");
 
+const TEST_CONTENT_HELPER = "chrome://mochitests/content/browser/browser/base/content/test/general/aboutHome_content_script.js";
 let gRightsVersion = Services.prefs.getIntPref("browser.rights.version");
 
 registerCleanupFunction(function() {
@@ -105,21 +106,19 @@ let gTests = [
     let deferred = Promise.defer();
     let doc = gBrowser.contentDocument;
     let engineName = doc.documentElement.getAttribute("searchEngineName");
+    let mm = gBrowser.selectedTab.linkedBrowser.messageManager;
 
-    doc.addEventListener("AboutHomeSearchEvent", function onSearch(e) {
-      let data = JSON.parse(e.detail);
+    mm.loadFrameScript(TEST_CONTENT_HELPER, false);
+
+    mm.addMessageListener("AboutHomeTest:CheckRecordedSearch", function (msg) {
+      let data = JSON.parse(msg.data);
       is(data.engineName, engineName, "Detail is search engine name");
 
-      // We use executeSoon() to ensure that this code runs after the
-      // count has been updated in browser.js, since it uses the same
-      // event.
-      executeSoon(function () {
-        getNumberOfSearches(engineName).then(num => {
-          is(num, numSearchesBefore + 1, "One more search recorded.");
-          deferred.resolve();
-        });
+      getNumberOfSearches(engineName).then(num => {
+        is(num, numSearchesBefore + 1, "One more search recorded.");
+        searchEventDeferred.resolve();
       });
-    }, true, true);
+    });
 
     // Get the current number of recorded searches.
     getNumberOfSearches(engineName).then(num => {
@@ -324,7 +323,91 @@ let gTests = [
                               Ci.nsISearchEngine.DATA_XML, null, false);
     return deferred.promise;
   }
-}
+},
+
+{
+  desc: "Make sure that a page can't imitate about:home",
+  setup: function () { },
+  run: function (aSnippetsMap)
+  {
+    let deferred = Promise.defer();
+
+    let browser = gBrowser.selectedTab.linkedBrowser;
+    waitForLoad(() => {
+      let button = browser.contentDocument.getElementById("settings");
+      ok(button, "Found settings button in test page");
+      button.click();
+
+      // It may take a few turns of the event loop before the window
+      // is displayed, so we wait.
+      function check(n) {
+        let win = Services.wm.getMostRecentWindow("Browser:Preferences");
+        ok(!win, "Preferences window not showing");
+        if (win) {
+          win.close();
+        }
+
+        if (n > 0) {
+          executeSoon(() => check(n-1));
+        } else {
+          deferred.resolve();
+        }
+      }
+
+      check(5);
+    });
+
+    browser.loadURI("https://example.com/browser/browser/base/content/test/general/test_bug959531.html");
+    return deferred.promise;
+  }
+},
+
+{
+  // See browser_searchSuggestionUI.js for comprehensive content search
+  // suggestion UI tests.
+  desc: "Search suggestion smoke test",
+  setup: function() {},
+  run: function()
+  {
+    return Task.spawn(function* () {
+      // Add a test engine that provides suggestions and switch to it.
+      let engine = yield promiseNewEngine("searchSuggestionEngine.xml");
+      let promise = promiseBrowserAttributes(gBrowser.selectedTab);
+      Services.search.currentEngine = engine;
+      yield promise;
+
+      // Avoid intermittent failures.
+      gBrowser.contentWindow.wrappedJSObject.gSearchSuggestionController.remoteTimeout = 5000;
+
+      // Type an X in the search input.
+      let input = gBrowser.contentDocument.getElementById("searchText");
+      input.focus();
+      EventUtils.synthesizeKey("x", {});
+
+      // Wait for the search suggestions to become visible.
+      let table =
+        gBrowser.contentDocument.getElementById("searchSuggestionTable");
+      let deferred = Promise.defer();
+      let observer = new MutationObserver(() => {
+        if (input.getAttribute("aria-expanded") == "true") {
+          observer.disconnect();
+          ok(!table.hidden, "Search suggestion table unhidden");
+          deferred.resolve();
+        }
+      });
+      observer.observe(input, {
+        attributes: true,
+        attributeFilter: ["aria-expanded"],
+      });
+      yield deferred.promise;
+
+      // Empty the search input, causing the suggestions to be hidden.
+      EventUtils.synthesizeKey("a", { accelKey: true });
+      EventUtils.synthesizeKey("VK_DELETE", {});
+      ok(table.hidden, "Search suggestion table hidden");
+    });
+  }
+},
 
 ];
 
@@ -523,4 +606,22 @@ function waitForLoad(cb) {
 
     cb();
   }, true);
+}
+
+function promiseNewEngine(basename) {
+  info("Waiting for engine to be added: " + basename);
+  let addDeferred = Promise.defer();
+  let url = getRootDirectory(gTestPath) + basename;
+  Services.search.addEngine(url, Ci.nsISearchEngine.TYPE_MOZSEARCH, "", false, {
+    onSuccess: function (engine) {
+      info("Search engine added: " + basename);
+      registerCleanupFunction(() => Services.search.removeEngine(engine));
+      addDeferred.resolve(engine);
+    },
+    onError: function (errCode) {
+      ok(false, "addEngine failed with error code " + errCode);
+      addDeferred.reject();
+    },
+  });
+  return addDeferred.promise;
 }

@@ -118,7 +118,7 @@ BaselineInspector::maybeInfoForPropertyOp(jsbytecode* pc,
         if (stub->isGetProp_Native()) {
             shape = stub->toGetProp_Native()->receiverGuard().ownShape();
         } else if (stub->isSetProp_Native()) {
-            shape = stub->toSetProp_Native()->receiverGuard().ownShape();
+            shape = stub->toSetProp_Native()->shape();
         } else if (stub->isGetProp_Unboxed()) {
             group = stub->toGetProp_Unboxed()->group();
         } else if (stub->isSetProp_Unboxed()) {
@@ -256,7 +256,8 @@ CanUseInt32Compare(ICStub::Kind kind)
 MCompare::CompareType
 BaselineInspector::expectedCompareType(jsbytecode* pc)
 {
-    ICStub* first = monomorphicStub(pc), *second = nullptr;
+    ICStub* first = monomorphicStub(pc);
+    ICStub* second = nullptr;
     if (!first && !dimorphicStub(pc, &first, &second))
         return MCompare::Compare_Unknown;
 

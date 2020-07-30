@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -54,6 +54,7 @@
 #include "mozilla/dom/MessageEventBinding.h"
 #include "mozilla/dom/MessagePortList.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/PromiseDebugging.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/StructuredClone.h"
 #include "mozilla/dom/WebCryptoCommon.h"
@@ -67,9 +68,10 @@
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
 #include "mozilla/Preferences.h"
-#include "MultipartFileImpl.h"
+#include "MultipartBlobImpl.h"
 #include "nsAlgorithm.h"
 #include "nsContentUtils.h"
+#include "nsCycleCollector.h"
 #include "nsError.h"
 #include "nsDOMJSUtils.h"
 #include "nsFormData.h"
@@ -79,6 +81,7 @@
 #include "nsNetUtil.h"
 #include "nsPrintfCString.h"
 #include "nsProxyRelease.h"
+#include "nsQueryObject.h"
 #include "nsSandboxFlags.h"
 #include "prthread.h"
 #include "xpcpublic.h"
@@ -307,7 +310,7 @@ LogErrorToConsole(const nsAString& aMessage,
   static const char kErrorString[] = "JS error in Web Worker: %s [%s:%u]";
 
 #ifdef ANDROID
-  __android_log_print(ANDROID_LOG_INFO, "Goanna", kErrorString, msg.get(),
+  __android_log_print(ANDROID_LOG_INFO, "Gecko", kErrorString, msg.get(),
                       filename.get(), aLineNumber);
 #endif
 
@@ -316,8 +319,8 @@ LogErrorToConsole(const nsAString& aMessage,
 }
 
 // Recursive!
-already_AddRefed<FileImpl>
-EnsureBlobForBackgroundManager(FileImpl* aBlobImpl,
+already_AddRefed<BlobImpl>
+EnsureBlobForBackgroundManager(BlobImpl* aBlobImpl,
                                PBackgroundChild* aManager = nullptr)
 {
   MOZ_ASSERT(aBlobImpl);
@@ -327,9 +330,9 @@ EnsureBlobForBackgroundManager(FileImpl* aBlobImpl,
     MOZ_ASSERT(aManager);
   }
 
-  nsRefPtr<FileImpl> blobImpl = aBlobImpl;
+  nsRefPtr<BlobImpl> blobImpl = aBlobImpl;
 
-  const nsTArray<nsRefPtr<FileImpl>>* subBlobImpls =
+  const nsTArray<nsRefPtr<BlobImpl>>* subBlobImpls =
     aBlobImpl->GetSubBlobImpls();
 
   if (!subBlobImpls) {
@@ -355,16 +358,16 @@ EnsureBlobForBackgroundManager(FileImpl* aBlobImpl,
   const uint32_t subBlobCount = subBlobImpls->Length();
   MOZ_ASSERT(subBlobCount);
 
-  nsTArray<nsRefPtr<FileImpl>> newSubBlobImpls;
+  nsTArray<nsRefPtr<BlobImpl>> newSubBlobImpls;
   newSubBlobImpls.SetLength(subBlobCount);
 
   bool newBlobImplNeeded = false;
 
   for (uint32_t index = 0; index < subBlobCount; index++) {
-    const nsRefPtr<FileImpl>& subBlobImpl = subBlobImpls->ElementAt(index);
+    const nsRefPtr<BlobImpl>& subBlobImpl = subBlobImpls->ElementAt(index);
     MOZ_ASSERT(subBlobImpl);
 
-    nsRefPtr<FileImpl>& newSubBlobImpl = newSubBlobImpls[index];
+    nsRefPtr<BlobImpl>& newSubBlobImpl = newSubBlobImpls[index];
 
     newSubBlobImpl = EnsureBlobForBackgroundManager(subBlobImpl, aManager);
     MOZ_ASSERT(newSubBlobImpl);
@@ -382,9 +385,9 @@ EnsureBlobForBackgroundManager(FileImpl* aBlobImpl,
       nsString name;
       blobImpl->GetName(name);
 
-      blobImpl = new MultipartFileImpl(newSubBlobImpls, name, contentType);
+      blobImpl = new MultipartBlobImpl(newSubBlobImpls, name, contentType);
     } else {
-      blobImpl = new MultipartFileImpl(newSubBlobImpls, contentType);
+      blobImpl = new MultipartBlobImpl(newSubBlobImpls, contentType);
     }
 
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(blobImpl->SetMutable(false)));
@@ -393,7 +396,7 @@ EnsureBlobForBackgroundManager(FileImpl* aBlobImpl,
   return blobImpl.forget();
 }
 
-already_AddRefed<File>
+already_AddRefed<Blob>
 ReadBlobOrFileNoWrap(JSContext* aCx,
                      JSStructuredCloneReader* aReader,
                      bool aIsMainThread)
@@ -401,9 +404,9 @@ ReadBlobOrFileNoWrap(JSContext* aCx,
   MOZ_ASSERT(aCx);
   MOZ_ASSERT(aReader);
 
-  nsRefPtr<FileImpl> blobImpl;
+  nsRefPtr<BlobImpl> blobImpl;
   {
-    FileImpl* rawBlobImpl;
+    BlobImpl* rawBlobImpl;
     MOZ_ALWAYS_TRUE(JS_ReadBytes(aReader, &rawBlobImpl, sizeof(rawBlobImpl)));
 
     MOZ_ASSERT(rawBlobImpl);
@@ -432,7 +435,7 @@ ReadBlobOrFileNoWrap(JSContext* aCx,
     parent = do_QueryObject(globalScope);
   }
 
-  nsRefPtr<File> blob = new File(parent, blobImpl);
+  nsRefPtr<Blob> blob = Blob::Create(parent, blobImpl);
   return blob.forget();
 }
 
@@ -442,7 +445,7 @@ ReadBlobOrFile(JSContext* aCx,
                bool aIsMainThread,
                JS::MutableHandle<JSObject*> aBlobOrFile)
 {
-  nsRefPtr<File> blob = ReadBlobOrFileNoWrap(aCx, aReader, aIsMainThread);
+  nsRefPtr<Blob> blob = ReadBlobOrFileNoWrap(aCx, aReader, aIsMainThread);
   aBlobOrFile.set(blob->WrapObject(aCx, JS::NullPtr()));
 }
 
@@ -491,7 +494,7 @@ ReadFormData(JSContext* aCx,
     if (isFile) {
       // Read out the tag since the blob reader isn't expecting it.
       MOZ_ALWAYS_TRUE(JS_ReadUint32Pair(aReader, &dummy, &dummy));
-      nsRefPtr<File> blob = ReadBlobOrFileNoWrap(aCx, aReader, aIsMainThread);
+      nsRefPtr<Blob> blob = ReadBlobOrFileNoWrap(aCx, aReader, aIsMainThread);
       MOZ_ASSERT(blob);
       formData->Append(name, *blob, thirdArg);
     } else {
@@ -507,26 +510,26 @@ ReadFormData(JSContext* aCx,
 bool
 WriteBlobOrFile(JSContext* aCx,
                 JSStructuredCloneWriter* aWriter,
-                FileImpl* aBlobOrFileImpl,
+                BlobImpl* aBlobOrBlobImpl,
                 nsTArray<nsCOMPtr<nsISupports>>& aClonedObjects)
 {
   MOZ_ASSERT(aCx);
   MOZ_ASSERT(aWriter);
-  MOZ_ASSERT(aBlobOrFileImpl);
+  MOZ_ASSERT(aBlobOrBlobImpl);
 
-  nsRefPtr<FileImpl> blobImpl = EnsureBlobForBackgroundManager(aBlobOrFileImpl);
+  nsRefPtr<BlobImpl> blobImpl = EnsureBlobForBackgroundManager(aBlobOrBlobImpl);
   MOZ_ASSERT(blobImpl);
 
-  aBlobOrFileImpl = blobImpl;
+  aBlobOrBlobImpl = blobImpl;
 
   if (NS_WARN_IF(!JS_WriteUint32Pair(aWriter, DOMWORKER_SCTAG_BLOB, 0)) ||
       NS_WARN_IF(!JS_WriteBytes(aWriter,
-                                &aBlobOrFileImpl,
-                                sizeof(aBlobOrFileImpl)))) {
+                                &aBlobOrBlobImpl,
+                                sizeof(aBlobOrBlobImpl)))) {
     return false;
   }
 
-  aClonedObjects.AppendElement(aBlobOrFileImpl);
+  aClonedObjects.AppendElement(aBlobOrBlobImpl);
   return true;
 }
 
@@ -642,9 +645,9 @@ struct WorkerStructuredCloneCallbacks
 
     // See if this is a Blob/File object.
     {
-      nsRefPtr<File> blob;
+      nsRefPtr<Blob> blob;
       if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob))) {
-        FileImpl* blobImpl = blob->Impl();
+        BlobImpl* blobImpl = blob->Impl();
         MOZ_ASSERT(blobImpl);
 
         if (WriteBlobOrFile(aCx, aWriter, blobImpl, *clonedObjects)) {
@@ -734,9 +737,9 @@ struct MainThreadWorkerStructuredCloneCallbacks
 
     // See if this is a Blob/File object.
     {
-      nsRefPtr<File> blob;
+      nsRefPtr<Blob> blob;
       if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob))) {
-        FileImpl* blobImpl = blob->Impl();
+        BlobImpl* blobImpl = blob->Impl();
         MOZ_ASSERT(blobImpl);
 
         if (!blobImpl->MayBeClonedToOtherThreads()) {
@@ -866,16 +869,13 @@ const JSStructuredCloneCallbacks gMainThreadChromeWorkerStructuredCloneCallbacks
 class MainThreadReleaseRunnable final : public nsRunnable
 {
   nsTArray<nsCOMPtr<nsISupports>> mDoomed;
-  nsTArray<nsCString> mHostObjectURIs;
   nsCOMPtr<nsILoadGroup> mLoadGroupToCancel;
 
 public:
   MainThreadReleaseRunnable(nsTArray<nsCOMPtr<nsISupports>>& aDoomed,
-                            nsTArray<nsCString>& aHostObjectURIs,
                             nsCOMPtr<nsILoadGroup>& aLoadGroupToCancel)
   {
     mDoomed.SwapElements(aDoomed);
-    mHostObjectURIs.SwapElements(aHostObjectURIs);
     mLoadGroupToCancel.swap(aLoadGroupToCancel);
   }
 
@@ -890,11 +890,6 @@ public:
     }
 
     mDoomed.Clear();
-
-    for (uint32_t index = 0; index < mHostObjectURIs.Length(); index++) {
-      nsHostObjectProtocolHandler::RemoveDataEntry(mHostObjectURIs[index]);
-    }
-
     return NS_OK;
   }
 
@@ -938,11 +933,8 @@ private:
     nsTArray<nsCOMPtr<nsISupports>> doomed;
     mFinishedWorker->ForgetMainThreadObjects(doomed);
 
-    nsTArray<nsCString> hostObjectURIs;
-    mFinishedWorker->StealHostObjectURIs(hostObjectURIs);
-
     nsRefPtr<MainThreadReleaseRunnable> runnable =
-      new MainThreadReleaseRunnable(doomed, hostObjectURIs, loadGroupToCancel);
+      new MainThreadReleaseRunnable(doomed, loadGroupToCancel);
     if (NS_FAILED(NS_DispatchToMainThread(runnable))) {
       NS_WARNING("Failed to dispatch, going to leak!");
     }
@@ -996,11 +988,8 @@ private:
     nsTArray<nsCOMPtr<nsISupports> > doomed;
     mFinishedWorker->ForgetMainThreadObjects(doomed);
 
-    nsTArray<nsCString> hostObjectURIs;
-    mFinishedWorker->StealHostObjectURIs(hostObjectURIs);
-
     nsRefPtr<MainThreadReleaseRunnable> runnable =
-      new MainThreadReleaseRunnable(doomed, hostObjectURIs, loadGroupToCancel);
+      new MainThreadReleaseRunnable(doomed, loadGroupToCancel);
     if (NS_FAILED(NS_DispatchToCurrentThread(runnable))) {
       NS_WARNING("Failed to dispatch, going to leak!");
     }
@@ -3964,17 +3953,16 @@ WorkerPrivateParent<Derived>::SetBaseURI(nsIURI* aBaseURI)
     mLocationInfo.mHref.Truncate();
   }
 
-  if (NS_FAILED(aBaseURI->GetHost(mLocationInfo.mHostname))) {
-    mLocationInfo.mHostname.Truncate();
-  }
+  mLocationInfo.mHostname.Truncate();
+  nsContentUtils::GetHostOrIPv6WithBrackets(aBaseURI, mLocationInfo.mHostname);
 
-  if (NS_FAILED(aBaseURI->GetPath(mLocationInfo.mPathname))) {
+  nsCOMPtr<nsIURL> url(do_QueryInterface(aBaseURI));
+  if (!url || NS_FAILED(url->GetFilePath(mLocationInfo.mPathname))) {
     mLocationInfo.mPathname.Truncate();
   }
 
   nsCString temp;
 
-  nsCOMPtr<nsIURL> url(do_QueryInterface(aBaseURI));
   if (url && NS_SUCCEEDED(url->GetQuery(temp)) && !temp.IsEmpty()) {
     mLocationInfo.mSearch.Assign('?');
     mLocationInfo.mSearch.Append(temp);
@@ -4064,29 +4052,6 @@ WorkerPrivateParent<Derived>::ParentJSContext() const
   return mLoadInfo.mScriptContext ?
          mLoadInfo.mScriptContext->GetNativeContext() :
          nsContentUtils::GetSafeJSContext();
-}
-
-template <class Derived>
-void
-WorkerPrivateParent<Derived>::RegisterHostObjectURI(const nsACString& aURI)
-{
-  AssertIsOnMainThread();
-  mHostObjectURIs.AppendElement(aURI);
-}
-
-template <class Derived>
-void
-WorkerPrivateParent<Derived>::UnregisterHostObjectURI(const nsACString& aURI)
-{
-  AssertIsOnMainThread();
-  mHostObjectURIs.RemoveElement(aURI);
-}
-
-template <class Derived>
-void
-WorkerPrivateParent<Derived>::StealHostObjectURIs(nsTArray<nsCString>& aArray)
-{
-  aArray.SwapElements(mHostObjectURIs);
 }
 
 template <class Derived>
@@ -5128,6 +5093,10 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
 
       // If we're supposed to die then we should exit the loop.
       if (currentStatus == Killing) {
+        // Flush uncaught rejections immediately, without
+        // waiting for a next tick.
+        PromiseDebugging::FlushUncaughtRejections();
+
         ShutdownGCTimers();
 
         DisableMemoryReporter();

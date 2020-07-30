@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -11,15 +11,13 @@
 #include "mozilla/dom/FileSystemRequestParent.h"
 #include "mozilla/dom/PFileSystemRequestChild.h"
 
-class nsIDOMFile;
-
 namespace mozilla {
 namespace dom {
 
+class BlobImpl;
 class BlobParent;
 class FileSystemBase;
 class FileSystemParams;
-class Promise;
 
 /*
  * The base class to implement a Task class.
@@ -206,7 +204,7 @@ protected:
   Recv__delete__(const FileSystemResponseValue& value) override;
 
   BlobParent*
-  GetBlobParent(nsIDOMFile* aFile) const;
+  GetBlobParent(BlobImpl* aBlob) const;
 
   nsresult mErrorValue;
 

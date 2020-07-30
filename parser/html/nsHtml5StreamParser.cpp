@@ -399,7 +399,7 @@ nsHtml5StreamParser::SetEncodingFromExpat(const char16_t* aEncoding)
       mCharsetSource = kCharsetFromMetaTag; // closest for XML
       return;
     }
-    // else the page declared an encoding Goanna doesn't support and we'd
+    // else the page declared an encoding Gecko doesn't support and we'd
     // end up defaulting to UTF-8 anyway. Might as well fall through here
     // right away and let the encoding be set to UTF-8 which we'd default to
     // anyway.
@@ -929,7 +929,7 @@ nsHtml5StreamParser::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
     // XXX does Necko have a way to renavigate POST, etc. without hitting
     // the network?
     if (!method.EqualsLiteral("GET")) {
-      // This is the old Goanna behavior but the HTML5 spec disagrees.
+      // This is the old Gecko behavior but the HTML5 spec disagrees.
       // Don't reparse on POST.
       mReparseForbidden = true;
       mFeedChardet = false; // can't restart anyway

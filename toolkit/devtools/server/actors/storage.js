@@ -1374,7 +1374,7 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
     }
     let window = docShell.contentViewer.DOMDocument.defaultView;
     if (window.location.href == "about:blank") {
-      // Skip out about:blank windows as Goanna creates them multiple times while
+      // Skip out about:blank windows as Gecko creates them multiple times while
       // creating any global.
       return null;
     }

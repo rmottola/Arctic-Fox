@@ -50,7 +50,7 @@ function testRegisterDataWhileDataEnabled() {
   log("Set data registration home while data enabled.");
 
   // When data registration is registered, data call will be (re)activated by
-  // goanna if ril.data.enabled is set to true.
+  // gecko if ril.data.enabled is set to true.
   return setEmulatorVoiceDataStateAndWait("data", "home")
     .then(() => checkOrWaitForDataState(true));
 }

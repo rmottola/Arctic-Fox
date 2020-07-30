@@ -32,7 +32,7 @@ interface nsIServerSocket : nsISupports
     /// from any interface.  To specify a particular network interface,
     /// use initWithAddress.
     const nsServerSocketFlag LoopbackOnly = 0x00000001;
-    /// The server socket will not be closed when Goanna is set
+    /// The server socket will not be closed when Gecko is set
     /// offline.
     const nsServerSocketFlag KeepWhenOffline = 0x00000002;
     /** @} */
@@ -63,7 +63,7 @@ interface nsIServerSocket : nsISupports
      * initSpecialConnection
      *
      * This method initializes a server socket and offers the ability to have
-     * that socket not get terminated if Goanna is set offline.
+     * that socket not get terminated if Gecko is set offline.
      *
      * @param aPort
      *        The port of the server socket.  Pass -1 to indicate no preference,

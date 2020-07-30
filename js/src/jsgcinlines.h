@@ -19,7 +19,7 @@ class Shape;
 namespace gc {
 
 static inline AllocKind
-GetGCObjectKind(const Class *clasp)
+GetGCObjectKind(const Class* clasp)
 {
     if (clasp == FunctionClassPtr)
         return JSFunction::FinalizeKind;
@@ -30,10 +30,10 @@ GetGCObjectKind(const Class *clasp)
 }
 
 inline JSGCTraceKind
-GetGCThingTraceKind(const void *thing)
+GetGCThingTraceKind(const void* thing)
 {
     MOZ_ASSERT(thing);
-    const Cell *cell = static_cast<const Cell *>(thing);
+    const Cell* cell = static_cast<const Cell*>(thing);
     if (IsInsideNursery(cell))
         return JSTRACE_OBJECT;
     return MapAllocToTraceKind(cell->asTenured().getAllocKind());
@@ -53,9 +53,9 @@ GCRuntime::poke()
 
 class ArenaIter
 {
-    ArenaHeader *aheader;
-    ArenaHeader *unsweptHeader;
-    ArenaHeader *sweptHeader;
+    ArenaHeader* aheader;
+    ArenaHeader* unsweptHeader;
+    ArenaHeader* sweptHeader;
 
   public:
     ArenaIter() {

@@ -1265,7 +1265,7 @@ nsWindow::wheelEvent(QWheelEvent* aEvent)
     wheelEvent.deltaMode = nsIDOMWheelEvent::DOM_DELTA_LINE;
 
     // negative values for aEvent->delta indicate downward scrolling;
-    // this is opposite Goanna usage.
+    // this is opposite Gecko usage.
     // TODO: Store the unused delta values due to fraction round and add it
     //       to next event.  The stored values should be reset by other
     //       direction scroll event.
@@ -1499,7 +1499,7 @@ void find_first_visible_parent(QWindow* aItem, QWindow*& aVisibleItem)
 NS_IMETHODIMP
 nsWindow::GetScreenBounds(nsIntRect &aRect)
 {
-    aRect = nsIntRect(nsIntPoint(0, 0), mBounds.Size());
+    aRect = gfx::IntRect(gfx::IntPoint(0, 0), mBounds.Size());
     if (mIsTopLevel) {
         QPoint pos = mWidget->position();
         aRect.MoveTo(pos.x(), pos.y());

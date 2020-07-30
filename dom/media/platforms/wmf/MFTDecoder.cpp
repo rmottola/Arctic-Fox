@@ -7,15 +7,10 @@
 #include "MFTDecoder.h"
 #include "nsThreadUtils.h"
 #include "WMFUtils.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetDemuxerLog();
 #define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
-#else
-#define LOG(...)
-#endif
-
 
 namespace mozilla {
 

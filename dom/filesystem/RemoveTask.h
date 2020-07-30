@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -14,7 +14,7 @@
 namespace mozilla {
 namespace dom {
 
-class FileImpl;
+class BlobImpl;
 class Promise;
 
 class RemoveTask final
@@ -23,7 +23,7 @@ class RemoveTask final
 public:
   RemoveTask(FileSystemBase* aFileSystem,
              const nsAString& aDirPath,
-             FileImpl* aTargetFile,
+             BlobImpl* aTargetBlob,
              const nsAString& aTargetPath,
              bool aRecursive,
              ErrorResult& aRv);
@@ -60,8 +60,8 @@ private:
   nsRefPtr<Promise> mPromise;
   nsString mDirRealPath;
   // This cannot be a File because this object will be used on a different
-  // thread and File is not thread-safe. Let's use the FileImpl instead.
-  nsRefPtr<FileImpl> mTargetFileImpl;
+  // thread and File is not thread-safe. Let's use the BlobImpl instead.
+  nsRefPtr<BlobImpl> mTargetBlobImpl;
   nsString mTargetRealPath;
   bool mRecursive;
   bool mReturnValue;

@@ -4,14 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "GMPVideoDecoderParent.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "mozilla/unused.h"
 #include "nsAutoRef.h"
 #include "nsThreadUtils.h"
 #include "GMPUtils.h"
 #include "GMPVideoEncodedFrameImpl.h"
 #include "GMPVideoi420FrameImpl.h"
-#include "GMPParent.h"
+#include "GMPContentParent.h"
 #include "GMPMessageUtils.h"
 #include "mozilla/gmp/GMPTypes.h"
 
@@ -21,15 +21,10 @@ namespace mozilla {
 #undef LOG
 #endif
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetGMPLog();
 
 #define LOGD(msg) PR_LOG(GetGMPLog(), PR_LOG_DEBUG, msg)
 #define LOG(level, msg) PR_LOG(GetGMPLog(), (level), msg)
-#else
-#define LOGD(msg)
-#define LOG(level, msg)
-#endif
 
 namespace gmp {
 
@@ -43,7 +38,7 @@ namespace gmp {
 //    on Shutdown -> Dead
 // Dead: mIsOpen == false
 
-GMPVideoDecoderParent::GMPVideoDecoderParent(GMPParent* aPlugin)
+GMPVideoDecoderParent::GMPVideoDecoderParent(GMPContentParent* aPlugin)
   : GMPSharedMemManager(aPlugin)
   , mIsOpen(false)
   , mShuttingDown(false)
@@ -332,6 +327,13 @@ GMPVideoDecoderParent::RecvError(const GMPErr& aError)
   // Ignore any return code. It is OK for this to fail without killing the process.
   mCallback->Error(aError);
 
+  return true;
+}
+
+bool
+GMPVideoDecoderParent::RecvShutdown()
+{
+  Shutdown();
   return true;
 }
 

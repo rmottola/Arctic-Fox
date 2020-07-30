@@ -12,7 +12,7 @@ interface DeviceOrientationEvent : Event
   readonly attribute double? gamma;
   readonly attribute boolean absolute;
 
-  // initDeviceOrientationEvent is a Goanna specific deprecated method.
+  // initDeviceOrientationEvent is a Gecko specific deprecated method.
   [Throws]
   void initDeviceOrientationEvent(DOMString type,
                                   boolean canBubble,

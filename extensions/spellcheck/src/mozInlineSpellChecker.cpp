@@ -1519,7 +1519,7 @@ nsresult mozInlineSpellChecker::DoSpellCheck(mozInlineSpellWordUtil& aWordUtil,
         aSpellCheckSelection->GetRangesForInterval(*beginNode, beginOffset,
                                                    *endNode, endOffset,
                                                    true, ranges, erv);
-        ENSURE_SUCCESS(erv, erv.ErrorCode());
+        ENSURE_SUCCESS(erv, erv.StealNSResult());
         for (uint32_t i = 0; i < ranges.Length(); i++)
           RemoveRange(aSpellCheckSelection, ranges[i]);
       }
@@ -1759,7 +1759,7 @@ mozInlineSpellChecker::RemoveRange(Selection *aSpellCheckSelection,
   if (!rv.Failed() && mNumWordsInSpellSelection)
     mNumWordsInSpellSelection--;
 
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 

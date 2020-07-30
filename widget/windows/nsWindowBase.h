@@ -38,7 +38,7 @@ public:
   virtual bool IsTopLevelWidget() = 0;
 
   /*
-   * Init a standard goanna event for this widget.
+   * Init a standard gecko event for this widget.
    * @param aEvent the event to initialize.
    * @param aPoint message position in physical coordinates.
    */
@@ -46,24 +46,31 @@ public:
                          nsIntPoint* aPoint = nullptr) = 0;
 
   /*
-   * Dispatch a goanna event for this widget.
+   * Dispatch a gecko event for this widget.
    * Returns true if it's consumed.  Otherwise, false.
    */
   virtual bool DispatchWindowEvent(mozilla::WidgetGUIEvent* aEvent) = 0;
 
   /*
-   * Dispatch a goanna keyboard event for this widget. This
-   * is called by KeyboardLayout to dispatch goanna events.
+   * Dispatch a gecko keyboard event for this widget. This
+   * is called by KeyboardLayout to dispatch gecko events.
    * Returns true if it's consumed.  Otherwise, false.
    */
-  virtual bool DispatchKeyboardEvent(mozilla::WidgetGUIEvent* aEvent) = 0;
+  virtual bool DispatchKeyboardEvent(mozilla::WidgetKeyboardEvent* aEvent) = 0;
 
   /*
-   * Dispatch a goanna scroll event for this widget. This
-   * is called by ScrollHandler to dispatch goanna events.
+   * Dispatch a gecko wheel event for this widget. This
+   * is called by ScrollHandler to dispatch gecko events.
    * Returns true if it's consumed.  Otherwise, false.
    */
-  virtual bool DispatchScrollEvent(mozilla::WidgetGUIEvent* aEvent) = 0;
+  virtual bool DispatchWheelEvent(mozilla::WidgetWheelEvent* aEvent) = 0;
+
+  /*
+   * Dispatch a gecko content command event for this widget. This
+   * is called by ScrollHandler to dispatch gecko events.
+   * Returns true if it's consumed.  Otherwise, false.
+   */
+  virtual bool DispatchContentCommandEvent(mozilla::WidgetContentCommandEvent* aEvent) = 0;
 
   /*
    * Default dispatch of a plugin event.
@@ -85,8 +92,9 @@ public:
                                               TouchPointerState aPointerState,
                                               nsIntPoint aPointerScreenPoint,
                                               double aPointerPressure,
-                                              uint32_t aPointerOrientation);
-  virtual nsresult ClearNativeTouchSequence();
+                                              uint32_t aPointerOrientation,
+                                              nsIObserver* aObserver) override;
+  virtual nsresult ClearNativeTouchSequence(nsIObserver* aObserver) override;
 
   /*
    * WM_APPCOMMAND common handler.

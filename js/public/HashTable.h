@@ -139,20 +139,21 @@ class HashMap
 
     template<typename KeyInput, typename ValueInput>
     bool add(AddPtr& p, KeyInput&& k, ValueInput&& v) {
-        Entry e(mozilla::Forward<KeyInput>(k), mozilla::Forward<ValueInput>(v));
-        return impl.add(p, mozilla::Move(e));
+        return impl.add(p,
+                        mozilla::Forward<KeyInput>(k),
+                        mozilla::Forward<ValueInput>(v));
     }
 
     template<typename KeyInput>
     bool add(AddPtr& p, KeyInput&& k) {
-        Entry e(mozilla::Forward<KeyInput>(k), Value());
-        return impl.add(p, mozilla::Move(e));
+        return impl.add(p, mozilla::Forward<KeyInput>(k), Value());
     }
 
     template<typename KeyInput, typename ValueInput>
     bool relookupOrAdd(AddPtr& p, KeyInput&& k, ValueInput&& v) {
-        Entry e(mozilla::Forward<KeyInput>(k), mozilla::Forward<ValueInput>(v));
-        return impl.relookupOrAdd(p, e.key(), mozilla::Move(e));
+        return impl.relookupOrAdd(p, k,
+                                  mozilla::Forward<KeyInput>(k),
+                                  mozilla::Forward<ValueInput>(v));
     }
 
     // |all()| returns a Range containing |count()| elements. E.g.:
@@ -232,8 +233,7 @@ class HashMap
     // Like put, but assert that the given key is not already present.
     template<typename KeyInput, typename ValueInput>
     bool putNew(KeyInput&& k, ValueInput&& v) {
-        Entry e(mozilla::Forward<KeyInput>(k), mozilla::Forward<ValueInput>(v));
-        return impl.putNew(e.key(), mozilla::Move(e));
+        return impl.putNew(k, mozilla::Forward<KeyInput>(k), mozilla::Forward<ValueInput>(v));
     }
 
     // Add (k,defaultValue) if |k| is not found. Return a false-y Ptr on oom.
@@ -741,12 +741,12 @@ class HashTableEntry
     bool matchHash(HashNumber hn)     { return (keyHash & ~sCollisionBit) == hn; }
     HashNumber getKeyHash() const     { return keyHash & ~sCollisionBit; }
 
-    template <class U>
-    void setLive(HashNumber hn, U&& u)
+    template <typename... Args>
+    void setLive(HashNumber hn, Args&&... args)
     {
         MOZ_ASSERT(!isLive());
         keyHash = hn;
-        new(mem.addr()) T(mozilla::Forward<U>(u));
+        new(mem.addr()) T(mozilla::Forward<Args>(args)...);
         MOZ_ASSERT(isLive());
     }
 };
@@ -877,7 +877,8 @@ class HashTable : private AllocPolicy
                 ++cur;
         }
 
-        Entry* cur, *end;
+        Entry* cur;
+        Entry* end;
 #ifdef JS_DEBUG
         const HashTable* table_;
         uint64_t mutationCount;
@@ -1099,7 +1100,8 @@ class HashTable : private AllocPolicy
 
     static void destroyTable(AllocPolicy& alloc, Entry* oldTable, uint32_t capacity)
     {
-        for (Entry* e = oldTable, *end = e + capacity; e < end; ++e)
+        Entry* end = oldTable + capacity;
+        for (Entry* e = oldTable; e < end; ++e)
             e->destroyIfLive();
         alloc.free_(oldTable);
     }
@@ -1355,10 +1357,12 @@ class HashTable : private AllocPolicy
         table = newTable;
 
         // Copy only live entries, leaving removed ones behind.
-        for (Entry* src = oldTable, *end = src + oldCap; src < end; ++src) {
+        Entry* end = oldTable + oldCap;
+        for (Entry* src = oldTable; src < end; ++src) {
             if (src->isLive()) {
                 HashNumber hn = src->getKeyHash();
-                findFreeEntry(hn).setLive(hn, mozilla::Move(src->get()));
+                findFreeEntry(hn).setLive(
+                    hn, mozilla::Move(const_cast<typename Entry::NonConstT&>(src->get())));
                 src->destroy();
             }
         }
@@ -1488,7 +1492,8 @@ class HashTable : private AllocPolicy
             memset(table, 0, sizeof(*table) * capacity());
         } else {
             uint32_t tableCapacity = capacity();
-            for (Entry* e = table, *end = table + tableCapacity; e < end; ++e)
+            Entry* end = table + tableCapacity;
+            for (Entry* e = table; e < end; ++e)
                 e->clear();
         }
         removedCount = 0;
@@ -1578,8 +1583,8 @@ class HashTable : private AllocPolicy
         return p;
     }
 
-    template <class U>
-    bool add(AddPtr& p, U&& u)
+    template <typename... Args>
+    bool add(AddPtr& p, Args&&... args)
     {
         mozilla::ReentrancyGuard g(*this);
         MOZ_ASSERT(table);
@@ -1601,7 +1606,7 @@ class HashTable : private AllocPolicy
                 p.entry_ = &findFreeEntry(p.keyHash);
         }
 
-        p.entry_->setLive(p.keyHash, mozilla::Forward<U>(u));
+        p.entry_->setLive(p.keyHash, mozilla::Forward<Args>(args)...);
         entryCount++;
 #ifdef JS_DEBUG
         mutationCount++;
@@ -1613,8 +1618,8 @@ class HashTable : private AllocPolicy
 
     // Note: |l| may be a reference to a piece of |u|, so this function
     // must take care not to use |l| after moving |u|.
-    template <class U>
-    void putNewInfallible(const Lookup& l, U&& u)
+    template <typename... Args>
+    void putNewInfallible(const Lookup& l, Args&&... args)
     {
         MOZ_ASSERT(table);
 
@@ -1627,29 +1632,29 @@ class HashTable : private AllocPolicy
             keyHash |= sCollisionBit;
         }
 
-        entry->setLive(keyHash, mozilla::Forward<U>(u));
+        entry->setLive(keyHash, mozilla::Forward<Args>(args)...);
         entryCount++;
 #ifdef JS_DEBUG
         mutationCount++;
 #endif
     }
 
-    // Note: |l| may be a reference to a piece of |u|, so this function
-    // must take care not to use |l| after moving |u|.
-    template <class U>
-    bool putNew(const Lookup& l, U&& u)
+    // Note: |l| may be alias arguments in |args|, so this function must take
+    // care not to use |l| after moving |args|.
+    template <typename... Args>
+    bool putNew(const Lookup& l, Args&&... args)
     {
         if (checkOverloaded() == RehashFailed)
             return false;
 
-        putNewInfallible(l, mozilla::Forward<U>(u));
+        putNewInfallible(l, mozilla::Forward<Args>(args)...);
         return true;
     }
 
     // Note: |l| may be a reference to a piece of |u|, so this function
     // must take care not to use |l| after moving |u|.
-    template <class U>
-    bool relookupOrAdd(AddPtr& p, const Lookup& l, U&& u)
+    template <typename... Args>
+    bool relookupOrAdd(AddPtr& p, const Lookup& l, Args&&... args)
     {
 #ifdef JS_DEBUG
         p.generation = generation();
@@ -1660,7 +1665,7 @@ class HashTable : private AllocPolicy
             MOZ_ASSERT(prepareHash(l) == p.keyHash); // l has not been destroyed
             p.entry_ = &lookup(l, p.keyHash, sCollisionBit);
         }
-        return p.found() || add(p, mozilla::Forward<U>(u));
+        return p.found() || add(p, mozilla::Forward<Args>(args)...);
     }
 
     void remove(Ptr p)

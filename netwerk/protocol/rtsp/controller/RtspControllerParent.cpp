@@ -13,7 +13,7 @@
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/unused.h"
 #include "nsNetUtil.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include <sys/types.h>
 
@@ -62,10 +62,8 @@ RtspControllerParent::RtspControllerParent()
   : mIPCOpen(true)
   , mTotalTracks(0)
 {
-#if defined(PR_LOGGING)
   if (!gRtspLog)
     gRtspLog = PR_NewLogModule("nsRtsp");
-#endif
 }
 
 RtspControllerParent::~RtspControllerParent()

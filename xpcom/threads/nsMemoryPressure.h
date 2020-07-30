@@ -31,14 +31,14 @@ enum MemoryPressureState
    * A repeated memory pressure implies to clean softly recent allocations.
    * It is supposed to happen after a new memory pressure which already
    * cleaned aggressivley.  So there is no need to damage the reactivity of
-   * Goanna by stopping the world again.
+   * Gecko by stopping the world again.
    *
    * In case of conflict with an new memory pressue, the new memory pressure
    * takes precedence over an ongoing memory pressure.  The reason being
    * that if no events are processed between 2 notifications (new followed
    * by ongoing, or ongoing followed by a new) we want to be as aggresive as
    * possible on the clean-up of the memory.  After all, we are trying to
-   * keep Goanna alive as long as possible.
+   * keep Gecko alive as long as possible.
    */
   MemPressure_Ongoing
 };

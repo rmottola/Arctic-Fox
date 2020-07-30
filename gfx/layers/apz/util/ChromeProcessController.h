@@ -22,7 +22,6 @@ namespace mozilla {
 namespace layers {
 
 class APZEventState;
-class CompositorParent;
 
 // A ChromeProcessController is attached to the root of a compositor's layer
 // tree.
@@ -57,6 +56,8 @@ public:
   virtual void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                     APZStateChange aChange,
                                     int aArg) override;
+  virtual void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId,
+                                         const nsString& aEvent) override;
 private:
   nsCOMPtr<nsIWidget> mWidget;
   nsRefPtr<APZEventState> mAPZEventState;

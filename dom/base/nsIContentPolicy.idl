@@ -50,12 +50,12 @@ interface nsIContentPolicy : nsIContentPolicyBase
    *                          attribute); does not reliably reflect the
    *                          actual MIME type of the requested content
    *
-   * @param aExtra            an OPTIONAL argument, pass-through for non-Goanna
+   * @param aExtra            an OPTIONAL argument, pass-through for non-Gecko
    *                          callers to pass extra data to callees.
    *
    * @param aRequestPrincipal an OPTIONAL argument, defines the principal that
    *                          caused the load. This is optional only for
-   *                          non-goanna code: all goanna code should set this
+   *                          non-gecko code: all gecko code should set this
    *                          argument.  For navigation events, this is
    *                          the principal of the page that caused this load.
    *
@@ -112,7 +112,7 @@ interface nsIContentPolicy : nsIContentPolicyBase
    *                          if available (may be empty if inappropriate for
    *                          the type, e.g., TYPE_REFRESH).
    *
-   * @param aExtra            an OPTIONAL argument, pass-through for non-Goanna
+   * @param aExtra            an OPTIONAL argument, pass-through for non-Gecko
    *                          callers to pass extra data to callees.
    *
    * @return ACCEPT or REJECT_*

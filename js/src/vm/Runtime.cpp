@@ -293,7 +293,7 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
     if (!atomsZone->compartments.append(atomsCompartment.get()))
         return false;
 
-    atomsCompartment->isSystem = true;
+    atomsCompartment->setIsSystem(true);
 
     atomsZone.forget();
     this->atomsCompartment_ = atomsCompartment.forget();
@@ -679,7 +679,9 @@ JSRuntime::getDefaultLocale()
     if (defaultLocale)
         return defaultLocale;
 
-    char* locale, *lang, *p;
+    char* locale;
+    char* lang;
+    char* p;
 #ifdef HAVE_SETLOCALE
     locale = setlocale(LC_ALL, nullptr);
 #else
@@ -861,4 +863,94 @@ JS::IsProfilingEnabledForRuntime(JSRuntime *runtime)
 {
     MOZ_ASSERT(runtime);
     return runtime->spsProfiler.enabled();
+}
+
+void
+js::ResetStopwatches(JSRuntime *rt)
+{
+    MOZ_ASSERT(rt);
+    rt->stopwatch.reset();
+}
+
+bool
+js::SetStopwatchActive(JSRuntime *rt, bool isActive)
+{
+    MOZ_ASSERT(rt);
+    return rt->stopwatch.setIsActive(isActive);
+}
+
+bool
+js::IsStopwatchActive(JSRuntime *rt)
+{
+    MOZ_ASSERT(rt);
+    return rt->stopwatch.isActive();
+}
+
+js::PerformanceGroupHolder::~PerformanceGroupHolder()
+{
+    unlink();
+}
+
+void*
+js::PerformanceGroupHolder::getHashKey()
+{
+    return compartment_->isSystem() ?
+        (void*)compartment_->addonId :
+        (void*)JS_GetCompartmentPrincipals(compartment_);
+    // This key may be `nullptr` if we have `isSystem() == true`
+    // and `compartment_->addonId`. This is absolutely correct,
+    // and this represents the `PerformanceGroup` used to track
+    // the performance of the the platform compartments.
+}
+
+void
+js::PerformanceGroupHolder::unlink()
+{
+    if (!group_) {
+        // The group has never been instantiated.
+        return;
+    }
+
+    js::PerformanceGroup* group = group_;
+    group_ = nullptr;
+
+    if (group->decRefCount() > 0) {
+        // The group has at least another owner.
+        return;
+    }
+
+
+    JSRuntime::Stopwatch::Groups::Ptr ptr =
+        runtime_->stopwatch.groups_.lookup(getHashKey());
+    MOZ_ASSERT(ptr);
+    runtime_->stopwatch.groups_.remove(ptr);
+    js_delete(group);
+}
+
+PerformanceGroup *
+js::PerformanceGroupHolder::getGroup()
+{
+    if (group_)
+        return group_;
+
+    void* key = getHashKey();
+    JSRuntime::Stopwatch::Groups::AddPtr ptr =
+        runtime_->stopwatch.groups_.lookupForAdd(key);
+    if (ptr) {
+        group_ = ptr->value();
+        MOZ_ASSERT(group_);
+    } else {
+        group_ = runtime_->new_<PerformanceGroup>();
+        runtime_->stopwatch.groups_.add(ptr, key, group_);
+    }
+
+    group_->incRefCount();
+
+    return group_;
+}
+
+PerformanceData*
+js::GetPerformanceData(JSRuntime *rt)
+{
+    return &rt->stopwatch.performance;
 }

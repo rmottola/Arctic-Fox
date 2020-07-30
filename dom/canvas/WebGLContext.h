@@ -68,7 +68,6 @@ class nsIDocShell;
 namespace mozilla {
 
 class WebGLActiveInfo;
-class WebGLContextBoundObject;
 class WebGLContextLossHandler;
 class WebGLBuffer;
 class WebGLExtensionBase;
@@ -84,7 +83,6 @@ class WebGLTexture;
 class WebGLTransformFeedback;
 class WebGLUniformLocation;
 class WebGLVertexArray;
-struct WebGLVertexAttribData;
 
 namespace dom {
 class Element;
@@ -130,6 +128,7 @@ struct WebGLContextOptions
     bool premultipliedAlpha;
     bool antialias;
     bool preserveDrawingBuffer;
+    bool failIfMajorPerformanceCaveat;
 };
 
 // From WebGLContextUtils

@@ -88,7 +88,6 @@ class nsIURIFixup;
 class nsIURILoader;
 class nsIWebBrowserFind;
 class nsIWidget;
-class ProfilerMarkerTracing;
 
 /* load commands were moved to nsIDocShell.h */
 /* load types were moved to nsDocShellLoadTypes.h */
@@ -272,11 +271,16 @@ public:
   // See nsIDocShell::recordProfileTimelineMarkers
   void AddProfileTimelineMarker(const char* aName,
                                 TracingMetadata aMetaData);
-  void AddProfileTimelineMarker(mozilla::UniquePtr<TimelineMarker>& aMarker);
+  void AddProfileTimelineMarker(mozilla::UniquePtr<TimelineMarker>&& aMarker);
 
   // Global counter for how many docShells are currently recording profile
   // timeline markers
   static unsigned long gProfileTimelineRecordingsCount;
+
+  // Tell the favicon service that aNewURI has the same favicon as aOldURI.
+  static void CopyFavicon(nsIURI* aOldURI,
+                          nsIURI* aNewURI,
+                          bool aInPrivateBrowsing);
 
 protected:
   // Object Management

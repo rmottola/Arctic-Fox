@@ -42,7 +42,6 @@ class ImageData;
 class StringOrCanvasGradientOrCanvasPattern;
 class OwningStringOrCanvasGradientOrCanvasPattern;
 class TextMetrics;
-class SVGMatrix;
 class CanvasFilterChainObserver;
 
 extern const mozilla::gfx::Float SIGMA_MAX;

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -31,7 +32,7 @@ InternalRequest::GetRequestConstructorCopy(nsIGlobalObject* aGlobal, ErrorResult
   copy->mBodyStream = mBodyStream;
   copy->mForceOriginHeader = true;
   // The "client" is not stored in our implementation. Fetch API users should
-  // use the appropriate window/document/principal and other Goanna security
+  // use the appropriate window/document/principal and other Gecko security
   // mechanisms as appropriate.
   copy->mSameOriginDataURL = true;
   copy->mPreserveContentCodings = true;
@@ -42,6 +43,7 @@ InternalRequest::GetRequestConstructorCopy(nsIGlobalObject* aGlobal, ErrorResult
   copy->mMode = mMode;
   copy->mCredentialsMode = mCredentialsMode;
   copy->mCacheMode = mCacheMode;
+  copy->mCreatedByFetchEvent = mCreatedByFetchEvent;
   return copy.forget();
 }
 
@@ -89,6 +91,7 @@ InternalRequest::InternalRequest(const InternalRequest& aOther)
   , mSynchronous(aOther.mSynchronous)
   , mUnsafeRequest(aOther.mUnsafeRequest)
   , mUseURLCredentials(aOther.mUseURLCredentials)
+  , mCreatedByFetchEvent(aOther.mCreatedByFetchEvent)
 {
   // NOTE: does not copy body stream... use the fallible Clone() for that
 }

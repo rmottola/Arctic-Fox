@@ -353,6 +353,7 @@
         <h1 id="et_nssFailure2">&nssFailure2.title;</h1>
         <h1 id="et_nssBadCert">&nssBadCert.title;</h1>
         <h1 id="et_malwareBlocked">&malwareBlocked.title;</h1>
+        <h1 id="et_unwantedBlocked">&unwantedBlocked.title;</h1>
         <h1 id="et_cspBlocked">&cspBlocked.title;</h1>
         <h1 id="et_remoteXUL">&remoteXUL.title;</h1>
         <h1 id="et_corruptedContentError">&corruptedContentError.title;</h1>
@@ -379,6 +380,7 @@
         <div id="ed_nssFailure2">&nssFailure2.longDesc2;</div>
         <div id="ed_nssBadCert">&nssBadCert.longDesc2;</div>
         <div id="ed_malwareBlocked">&malwareBlocked.longDesc;</div>
+        <div id="ed_unwantedBlocked">&unwantedBlocked.longDesc;</div>
         <div id="ed_cspBlocked">&cspBlocked.longDesc;</div>
         <div id="ed_remoteXUL">&remoteXUL.longDesc;</div>
         <div id="ed_corruptedContentError">&corruptedContentError.longDesc;</div>
@@ -438,19 +440,22 @@
       </div>
 
       <div id="certificateErrorReportingPanel">
-        <p>&errorReporting.longDesc;</p>
-        <p>
-          <input type="checkbox" id="automaticallyReportInFuture" />
-          <label for="automaticallyReportInFuture" id="automaticallyReportInFuture">&errorReporting.automatic;</label>
-        </p>
-        <!-- TODO add link to relevant page on sumo -->
-        <a href="https://support.mozilla.org/kb/certificate-pinning-reports" target="new">&errorReporting.learnMore;</a>
-        <span id="reportingState">
-          <button id="reportCertificateError">&errorReporting.report;</button>
-          <button id="reportCertificateErrorRetry">&errorReporting.tryAgain;</button>
-          <span id="reportSendingMessage">&errorReporting.sending;</span>
-          <span id="reportSentMessage">&errorReporting.sent;</span>
-        </span>
+        <div id="certificateErrorReportingDescription">
+          <p>&errorReporting.longDesc;</p>
+          <p>
+            <input type="checkbox" id="automaticallyReportInFuture" />
+            <label for="automaticallyReportInFuture" id="automaticallyReportInFuture">&errorReporting.automatic;</label>
+          </p>
+        </div>
+        <div id="errorStatePanel">
+          <a href="https://support.mozilla.org/kb/tls-error-reports" id="learnMoreLink" target="new">&errorReporting.learnMore;</a>
+          <span id="reportingState">
+            <button id="reportCertificateError">&errorReporting.report;</button>
+            <button id="reportCertificateErrorRetry">&errorReporting.tryAgain;</button>
+            <span id="reportSendingMessage">&errorReporting.sending;</span>
+            <span id="reportSentMessage">&errorReporting.sent;</span>
+          </span>
+        </div>
       </div>
 
     </div>

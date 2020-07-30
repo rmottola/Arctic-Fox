@@ -162,12 +162,6 @@ DynamicImage::GetType(uint16_t* aType)
   return NS_OK;
 }
 
-NS_IMETHODIMP_(uint16_t)
-DynamicImage::GetType()
-{
-  return imgIContainer::TYPE_RASTER;
-}
-
 NS_IMETHODIMP
 DynamicImage::GetAnimated(bool* aAnimated)
 {
@@ -205,12 +199,10 @@ DynamicImage::IsOpaque()
   return false;
 }
 
-NS_IMETHODIMP
-DynamicImage::GetImageContainer(LayerManager* aManager,
-                                ImageContainer** _retval)
+NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
+DynamicImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
 {
-  *_retval = nullptr;
-  return NS_OK;
+  return nullptr;
 }
 
 NS_IMETHODIMP_(DrawResult)

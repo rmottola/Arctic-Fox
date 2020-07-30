@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim:set tw=80 expandtab softtabstop=2 ts=2 sw=2: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -17,6 +17,7 @@
 #include "nsAttrValueInlines.h"
 #include "nsCOMPtr.h"
 #include "nsIAtom.h"
+#include "nsQueryObject.h"
 #include "nsIContentInlines.h"
 #include "nsIContentViewer.h"
 #include "mozilla/css/StyleRule.h"
@@ -153,7 +154,7 @@ public:
         fm->GetFocusedContent()->OwnerDoc() != document) {
       mozilla::ErrorResult rv;
       mElement->Focus(rv);
-      return rv.ErrorCode();
+      return rv.StealNSResult();
     }
 
     return NS_OK;
@@ -431,7 +432,7 @@ nsGenericHTMLElement::InsertAdjacentHTML(const nsAString& aPosition,
 {
   ErrorResult rv;
   Element::InsertAdjacentHTML(aPosition, aText, rv);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 bool
@@ -1868,12 +1869,12 @@ nsGenericHTMLElement::SetUndoScopeInternal(bool aUndoScope)
       ErrorResult rv;
       slots->mUndoManager->ClearRedo(rv);
       if (rv.Failed()) {
-        return rv.ErrorCode();
+        return rv.StealNSResult();
       }
 
       slots->mUndoManager->ClearUndo(rv);
       if (rv.Failed()) {
-        return rv.ErrorCode();
+        return rv.StealNSResult();
       }
 
       slots->mUndoManager->Disconnect();
@@ -2427,8 +2428,8 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(uint32_t aMessage,
 {
   switch (aMessage) {
     case NS_MOUSE_MOVE:
-    case NS_MOUSE_ENTER_SYNTH:
-    case NS_MOUSE_EXIT_SYNTH:
+    case NS_MOUSE_OVER:
+    case NS_MOUSE_OUT:
     case NS_MOUSEENTER:
     case NS_MOUSELEAVE:
     case NS_POINTER_MOVE:

@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "GMPParent.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsComponentManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsIInputStream.h"
@@ -14,6 +14,7 @@
 #include "nsThreadUtils.h"
 #include "nsIRunnable.h"
 #include "mozIGeckoMediaPluginService.h"
+#include "mozilla/SyncRunnable.h"
 #include "mozilla/unused.h"
 #include "nsIObserverService.h"
 #include "GMPTimerParent.h"
@@ -26,24 +27,12 @@
 
 namespace mozilla {
 
-#ifdef LOG
 #undef LOG
-#endif
+#undef LOGD
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetGMPLog();
-
-#define LOGD(msg) PR_LOG(GetGMPLog(), PR_LOG_DEBUG, msg)
-#define LOG(level, msg) PR_LOG(GetGMPLog(), (level), msg)
-#else
-#define LOGD(msg)
-#define LOG(level, msg)
-#endif
-
-#ifdef __CLASS__
-#undef __CLASS__
-#endif
-#define __CLASS__ "GMPParent"
+#define LOG(level, x, ...) PR_LOG(GetGMPLog(), (level), (x, ##__VA_ARGS__))
+#define LOGD(x, ...) LOG(PR_LOG_DEBUG, "GMPParent[%p|childPid=%d] " x, this, mChildPid, ##__VA_ARGS__)
 
 namespace gmp {
 
@@ -54,9 +43,12 @@ GMPParent::GMPParent()
   , mAbnormalShutdownInProgress(false)
   , mIsBlockingDeletion(false)
   , mCanDecrypt(false)
+  , mGMPContentChildCount(0)
   , mAsyncShutdownRequired(false)
   , mAsyncShutdownInProgress(false)
+  , mChildPid(0)
 {
+  LOGD("GMPParent ctor");
   // Use the parent address to identify it.
   // We could use any unique-to-the-parent value.
   mPluginId.AppendInt(reinterpret_cast<uint64_t>(this));
@@ -64,14 +56,7 @@ GMPParent::GMPParent()
 
 GMPParent::~GMPParent()
 {
-  // Can't Close or Destroy the process here, since destruction is MainThread only
-  MOZ_ASSERT(NS_IsMainThread());
-}
-
-void
-GMPParent::CheckThread()
-{
-  MOZ_ASSERT(mGMPThread == NS_GetCurrentThread());
+  LOGD("GMPParent dtor");
 }
 
 nsresult
@@ -83,7 +68,7 @@ GMPParent::CloneFrom(const GMPParent* aOther)
 }
 
 nsresult
-GMPParent::Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir)
+GMPParent::Init(GeckoMediaPluginServiceParent* aService, nsIFile* aPluginDir)
 {
   MOZ_ASSERT(aPluginDir);
   MOZ_ASSERT(aService);
@@ -104,8 +89,7 @@ GMPParent::Init(GeckoMediaPluginService *aService, nsIFile* aPluginDir)
   if (NS_FAILED(rv)) {
     return rv;
   }
-  LOGD(("%s::%s: %p for %s", __CLASS__, __FUNCTION__, this,
-       NS_LossyConvertUTF16toASCII(parentLeafName).get()));
+  LOGD("%s: for %s", __FUNCTION__, NS_LossyConvertUTF16toASCII(parentLeafName).get());
 
   MOZ_ASSERT(parentLeafName.Length() > 4);
   mName = Substring(parentLeafName, 4);
@@ -132,7 +116,7 @@ GMPParent::LoadProcess()
   if (NS_FAILED(mDirectory->GetPath(path))) {
     return NS_ERROR_FAILURE;
   }
-  LOGD(("%s::%s: %p for %s", __CLASS__, __FUNCTION__, this, path.get()));
+  LOGD("%s: for %s", __FUNCTION__, NS_ConvertUTF16toUTF8(path).get());
 
   if (!mProcess) {
     mProcess = new GMPProcessParent(NS_ConvertUTF16toUTF8(path).get());
@@ -142,33 +126,35 @@ GMPParent::LoadProcess()
       return NS_ERROR_FAILURE;
     }
 
+    mChildPid = base::GetProcId(mProcess->GetChildProcessHandle());
+
     bool opened = Open(mProcess->GetChannel(),
                        base::GetProcId(mProcess->GetChildProcessHandle()));
     if (!opened) {
-      LOGD(("%s::%s: Failed to create new child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+      LOGD("%s: Failed to create new child process", __FUNCTION__);
       mProcess->Delete();
       mProcess = nullptr;
       return NS_ERROR_FAILURE;
     }
-    LOGD(("%s::%s: Created new child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+    LOGD("%s: Created new child process", __FUNCTION__);
 
     bool ok = SendSetNodeId(mNodeId);
     if (!ok) {
-      LOGD(("%s::%s: Failed to send node id to child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+      LOGD("%s: Failed to send node id to child process", __FUNCTION__);
       mProcess->Delete();
       mProcess = nullptr;
       return NS_ERROR_FAILURE;
     }
-    LOGD(("%s::%s: Sent node id to child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+    LOGD("%s: Sent node id to child process", __FUNCTION__);
 
     ok = SendStartPlugin();
     if (!ok) {
-      LOGD(("%s::%s: Failed to send start to child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+      LOGD("%s: Failed to send start to child process", __FUNCTION__);
       mProcess->Delete();
       mProcess = nullptr;
       return NS_ERROR_FAILURE;
     }
-    LOGD(("%s::%s: Sent StartPlugin to child process %p", __CLASS__, __FUNCTION__, (void *)mProcess));
+    LOGD("%s: Sent StartPlugin to child process", __FUNCTION__);
   }
 
   mState = GMPStateLoaded;
@@ -181,8 +167,8 @@ AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  nsRefPtr<GeckoMediaPluginService> service =
-    GeckoMediaPluginService::GetGeckoMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     service->AsyncShutdownComplete(parent);
   }
@@ -209,8 +195,8 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   }
 
   int32_t timeout = GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT;
-  nsRefPtr<GeckoMediaPluginService> service =
-    GeckoMediaPluginService::GetGeckoMediaPluginService();
+  nsRefPtr<GeckoMediaPluginServiceParent> service =
+    GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     timeout = service->AsyncShutdownTimeoutMs();
   }
@@ -219,21 +205,26 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
     nsITimer::TYPE_ONE_SHOT);
 }
 
+bool
+GMPParent::RecvPGMPContentChildDestroyed()
+{
+  --mGMPContentChildCount;
+  if (!IsUsed()) {
+    CloseIfUnused();
+  }
+  return true;
+}
+
 void
 GMPParent::CloseIfUnused()
 {
   MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-  LOGD(("%s::%s: %p mAsyncShutdownRequired=%d", __CLASS__, __FUNCTION__, this,
-        mAsyncShutdownRequired));
+  LOGD("%s: mAsyncShutdownRequired=%d", __FUNCTION__, mAsyncShutdownRequired);
 
   if ((mDeleteProcessOnlyOnUnload ||
        mState == GMPStateLoaded ||
        mState == GMPStateUnloading) &&
-      mVideoDecoders.IsEmpty() &&
-      mVideoEncoders.IsEmpty() &&
-      mDecryptors.IsEmpty() &&
-      mAudioDecoders.IsEmpty()) {
-
+      !IsUsed()) {
     // Ensure all timers are killed.
     for (uint32_t i = mTimers.Length(); i > 0; i--) {
       mTimers[i - 1]->Shutdown();
@@ -241,8 +232,7 @@ GMPParent::CloseIfUnused()
 
     if (mAsyncShutdownRequired) {
       if (!mAsyncShutdownInProgress) {
-        LOGD(("%s::%s: %p sending async shutdown notification", __CLASS__,
-              __FUNCTION__, this));
+        LOGD("%s: sending async shutdown notification", __FUNCTION__);
         mAsyncShutdownInProgress = true;
         if (!SendBeginAsyncShutdown() ||
             NS_FAILED(EnsureAsyncShutdownTimeoutSet())) {
@@ -263,7 +253,7 @@ void
 GMPParent::AbortAsyncShutdown()
 {
   MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-  LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, this));
+  LOGD("%s", __FUNCTION__);
 
   if (mAsyncShutdownTimeout) {
     mAsyncShutdownTimeout->Cancel();
@@ -282,56 +272,20 @@ GMPParent::AbortAsyncShutdown()
 }
 
 void
-GMPParent::AudioDecoderDestroyed(GMPAudioDecoderParent* aDecoder)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  MOZ_ALWAYS_TRUE(mAudioDecoders.RemoveElement(aDecoder));
-
-  // Recv__delete__ is on the stack, don't potentially destroy the top-level actor
-  // until after this has completed.
-  nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &GMPParent::CloseIfUnused);
-  NS_DispatchToCurrentThread(event);
-}
-
-void
 GMPParent::CloseActive(bool aDieWhenUnloaded)
 {
-  LOGD(("%s::%s: %p state %d", __CLASS__, __FUNCTION__, this, mState));
+  LOGD("%s: state %d", __FUNCTION__, mState);
+  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
+
   if (aDieWhenUnloaded) {
     mDeleteProcessOnlyOnUnload = true; // don't allow this to go back...
   }
   if (mState == GMPStateLoaded) {
     mState = GMPStateUnloading;
   }
-
-  // Invalidate and remove any remaining API objects.
-  for (uint32_t i = mVideoDecoders.Length(); i > 0; i--) {
-    mVideoDecoders[i - 1]->Shutdown();
+  if (mState != GMPStateNotLoaded && IsUsed()) {
+    unused << SendCloseActive();
   }
-
-  for (uint32_t i = mVideoEncoders.Length(); i > 0; i--) {
-    mVideoEncoders[i - 1]->Shutdown();
-  }
-
-  for (uint32_t i = mDecryptors.Length(); i > 0; i--) {
-    mDecryptors[i - 1]->Shutdown();
-  }
-
-  for (uint32_t i = mAudioDecoders.Length(); i > 0; i--) {
-    mAudioDecoders[i - 1]->Shutdown();
-  }
-
-  // Note: we don't shutdown timers here, we do that in CloseIfUnused(),
-  // as there are multiple entry points to CloseIfUnused().
-
-  // Note: We don't shutdown storage API objects here, as they need to
-  // work during async shutdown of GMPs.
-
-  // Note: the shutdown of the codecs is async!  don't kill
-  // the plugin-container until they're all safely shut down via
-  // CloseIfUnused();
-  CloseIfUnused();
 }
 
 void
@@ -350,7 +304,7 @@ GMPParent::IsMarkedForDeletion()
 void
 GMPParent::Shutdown()
 {
-  LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, this));
+  LOGD("%s", __FUNCTION__);
   MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
 
   MOZ_ASSERT(!mAsyncShutdownTimeout, "Should have canceled shutdown timeout");
@@ -358,7 +312,8 @@ GMPParent::Shutdown()
   if (mAbnormalShutdownInProgress) {
     return;
   }
-  MOZ_ASSERT(mVideoDecoders.IsEmpty() && mVideoEncoders.IsEmpty());
+
+  MOZ_ASSERT(!IsUsed());
   if (mState == GMPStateNotLoaded || mState == GMPStateClosing) {
     return;
   }
@@ -395,18 +350,29 @@ public:
 void
 GMPParent::ChildTerminated()
 {
-  nsRefPtr<GMPParent> self(this);
-  GMPThread()->Dispatch(NS_NewRunnableMethodWithArg<nsRefPtr<GMPParent>>(
-                          mService,
-                          &GeckoMediaPluginService::PluginTerminated,
-                          self),
-                        NS_DISPATCH_NORMAL);
+  RefPtr<GMPParent> self(this);
+  nsIThread* gmpThread = GMPThread();
+
+  if (!gmpThread) {
+    // Bug 1163239 - this can happen on shutdown.
+    // PluginTerminated removes the GMP from the GMPService.
+    // On shutdown we can have this case where it is already been
+    // removed so there is no harm in not trying to remove it again.
+    //LOGD("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__);
+    LOGD("%s: GMPThread() returned nullptr.", __FUNCTION__);
+  } else {
+    gmpThread->Dispatch(NS_NewRunnableMethodWithArg<RefPtr<GMPParent>>(
+                         mService,
+                         &GeckoMediaPluginServiceParent::PluginTerminated,
+                         self),
+                         NS_DISPATCH_NORMAL);
+  }
 }
 
 void
 GMPParent::DeleteProcess()
 {
-  LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, this));
+  LOGD("%s", __FUNCTION__);
 
   if (mState != GMPStateClosing) {
     // Don't Close() twice!
@@ -415,7 +381,7 @@ GMPParent::DeleteProcess()
     Close();
   }
   mProcess->Delete(NS_NewRunnableMethod(this, &GMPParent::ChildTerminated));
-  LOGD(("%s::%s: Shut down process %p", __CLASS__, __FUNCTION__, (void *) mProcess));
+  LOGD("%s: Shut down process", __FUNCTION__);
   mProcess = nullptr;
   mState = GMPStateNotLoaded;
 
@@ -423,78 +389,6 @@ GMPParent::DeleteProcess()
     new NotifyGMPShutdownTask(NS_ConvertUTF8toUTF16(mNodeId)),
     NS_DISPATCH_NORMAL);
 
-}
-
-void
-GMPParent::VideoDecoderDestroyed(GMPVideoDecoderParent* aDecoder)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  // If the constructor fails, we'll get called before it's added
-  unused << NS_WARN_IF(!mVideoDecoders.RemoveElement(aDecoder));
-
-  if (mVideoDecoders.IsEmpty() &&
-      mVideoEncoders.IsEmpty()) {
-    // Recv__delete__ is on the stack, don't potentially destroy the top-level actor
-    // until after this has completed.
-    nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &GMPParent::CloseIfUnused);
-    NS_DispatchToCurrentThread(event);
-  }
-}
-
-void
-GMPParent::VideoEncoderDestroyed(GMPVideoEncoderParent* aEncoder)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  // If the constructor fails, we'll get called before it's added
-  unused << NS_WARN_IF(!mVideoEncoders.RemoveElement(aEncoder));
-
-  if (mVideoDecoders.IsEmpty() &&
-      mVideoEncoders.IsEmpty()) {
-    // Recv__delete__ is on the stack, don't potentially destroy the top-level actor
-    // until after this has completed.
-    nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &GMPParent::CloseIfUnused);
-    NS_DispatchToCurrentThread(event);
-  }
-}
-
-void
-GMPParent::DecryptorDestroyed(GMPDecryptorParent* aSession)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  MOZ_ALWAYS_TRUE(mDecryptors.RemoveElement(aSession));
-
-  // Recv__delete__ is on the stack, don't potentially destroy the top-level actor
-  // until after this has completed.
-  if (mDecryptors.IsEmpty()) {
-    nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &GMPParent::CloseIfUnused);
-    NS_DispatchToCurrentThread(event);
-  }
-}
-
-nsresult
-GMPParent::GetGMPDecryptor(GMPDecryptorParent** aGMPDP)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  if (!EnsureProcessLoaded()) {
-    return NS_ERROR_FAILURE;
-  }
-
-  PGMPDecryptorParent* pdp = SendPGMPDecryptorConstructor();
-  if (!pdp) {
-    return NS_ERROR_FAILURE;
-  }
-  GMPDecryptorParent* dp = static_cast<GMPDecryptorParent*>(pdp);
-  // This addref corresponds to the Proxy pointer the consumer is returned.
-  // It's dropped by calling Close() on the interface.
-  NS_ADDREF(dp);
-  mDecryptors.AppendElement(dp);
-  *aGMPDP = dp;
-
-  return NS_OK;
 }
 
 GMPState
@@ -558,81 +452,10 @@ GMPParent::EnsureProcessLoaded()
   return NS_SUCCEEDED(rv);
 }
 
-nsresult
-GMPParent::GetGMPAudioDecoder(GMPAudioDecoderParent** aGMPAD)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  if (!EnsureProcessLoaded()) {
-    return NS_ERROR_FAILURE;
-  }
-
-  PGMPAudioDecoderParent* pvap = SendPGMPAudioDecoderConstructor();
-  if (!pvap) {
-    return NS_ERROR_FAILURE;
-  }
-  GMPAudioDecoderParent* vap = static_cast<GMPAudioDecoderParent*>(pvap);
-  // This addref corresponds to the Proxy pointer the consumer is returned.
-  // It's dropped by calling Close() on the interface.
-  NS_ADDREF(vap);
-  *aGMPAD = vap;
-  mAudioDecoders.AppendElement(vap);
-
-  return NS_OK;
-}
-
-nsresult
-GMPParent::GetGMPVideoDecoder(GMPVideoDecoderParent** aGMPVD)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  if (!EnsureProcessLoaded()) {
-    return NS_ERROR_FAILURE;
-  }
-
-  // returned with one anonymous AddRef that locks it until Destroy
-  PGMPVideoDecoderParent* pvdp = SendPGMPVideoDecoderConstructor();
-  if (!pvdp) {
-    return NS_ERROR_FAILURE;
-  }
-  GMPVideoDecoderParent *vdp = static_cast<GMPVideoDecoderParent*>(pvdp);
-  // This addref corresponds to the Proxy pointer the consumer is returned.
-  // It's dropped by calling Close() on the interface.
-  NS_ADDREF(vdp);
-  *aGMPVD = vdp;
-  mVideoDecoders.AppendElement(vdp);
-
-  return NS_OK;
-}
-
-nsresult
-GMPParent::GetGMPVideoEncoder(GMPVideoEncoderParent** aGMPVE)
-{
-  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
-
-  if (!EnsureProcessLoaded()) {
-    return NS_ERROR_FAILURE;
-  }
-
-  // returned with one anonymous AddRef that locks it until Destroy
-  PGMPVideoEncoderParent* pvep = SendPGMPVideoEncoderConstructor();
-  if (!pvep) {
-    return NS_ERROR_FAILURE;
-  }
-  GMPVideoEncoderParent *vep = static_cast<GMPVideoEncoderParent*>(pvep);
-  // This addref corresponds to the Proxy pointer the consumer is returned.
-  // It's dropped by calling Close() on the interface.
-  NS_ADDREF(vep);
-  *aGMPVE = vep;
-  mVideoEncoders.AppendElement(vep);
-
-  return NS_OK;
-}
-
 void
 GMPParent::ActorDestroy(ActorDestroyReason aWhy)
 {
-  LOGD(("%s::%s: %p (%d)", __CLASS__, __FUNCTION__, this, (int) aWhy));
+  LOGD("%s: (%d)", __FUNCTION__, (int)aWhy);
   // warn us off trying to close again
   mState = GMPStateClosing;
   mAbnormalShutdownInProgress = true;
@@ -652,70 +475,6 @@ GMPParent::ActorDestroy(ActorDestroyReason aWhy)
     // Note: final destruction will be Dispatched to ourself
     mService->ReAddOnGMPThread(self);
   }
-}
-
-PGMPVideoDecoderParent*
-GMPParent::AllocPGMPVideoDecoderParent()
-{
-  GMPVideoDecoderParent* vdp = new GMPVideoDecoderParent(this);
-  NS_ADDREF(vdp);
-  return vdp;
-}
-
-bool
-GMPParent::DeallocPGMPVideoDecoderParent(PGMPVideoDecoderParent* aActor)
-{
-  GMPVideoDecoderParent* vdp = static_cast<GMPVideoDecoderParent*>(aActor);
-  NS_RELEASE(vdp);
-  return true;
-}
-
-PGMPVideoEncoderParent*
-GMPParent::AllocPGMPVideoEncoderParent()
-{
-  GMPVideoEncoderParent* vep = new GMPVideoEncoderParent(this);
-  NS_ADDREF(vep);
-  return vep;
-}
-
-bool
-GMPParent::DeallocPGMPVideoEncoderParent(PGMPVideoEncoderParent* aActor)
-{
-  GMPVideoEncoderParent* vep = static_cast<GMPVideoEncoderParent*>(aActor);
-  NS_RELEASE(vep);
-  return true;
-}
-
-PGMPDecryptorParent*
-GMPParent::AllocPGMPDecryptorParent()
-{
-  GMPDecryptorParent* ksp = new GMPDecryptorParent(this);
-  NS_ADDREF(ksp);
-  return ksp;
-}
-
-bool
-GMPParent::DeallocPGMPDecryptorParent(PGMPDecryptorParent* aActor)
-{
-  GMPDecryptorParent* ksp = static_cast<GMPDecryptorParent*>(aActor);
-  NS_RELEASE(ksp);
-  return true;
-}
-
-PGMPAudioDecoderParent*
-GMPParent::AllocPGMPAudioDecoderParent()
-{
-  GMPAudioDecoderParent* vdp = new GMPAudioDecoderParent(this);
-  NS_ADDREF(vdp);
-  return vdp;
-}
-
-bool
-GMPParent::DeallocPGMPAudioDecoderParent(PGMPAudioDecoderParent* aActor)
-{
-  GMPAudioDecoderParent* vdp = static_cast<GMPAudioDecoderParent*>(aActor);
-  NS_RELEASE(vdp);
-  return true;
 }
 
 PGMPStorageParent*
@@ -963,7 +722,7 @@ GMPParent::GetVersion() const
   return mVersion;
 }
 
-const nsACString&
+const nsCString&
 GMPParent::GetPluginId() const
 {
   return mPluginId;
@@ -972,7 +731,7 @@ GMPParent::GetPluginId() const
 bool
 GMPParent::RecvAsyncShutdownRequired()
 {
-  LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, this));
+  LOGD("%s", __FUNCTION__);
   if (mAsyncShutdownRequired) {
     NS_WARNING("Received AsyncShutdownRequired message more than once!");
     return true;
@@ -985,12 +744,116 @@ GMPParent::RecvAsyncShutdownRequired()
 bool
 GMPParent::RecvAsyncShutdownComplete()
 {
-  LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, this));
+  LOGD("%s", __FUNCTION__);
 
   MOZ_ASSERT(mAsyncShutdownRequired);
   AbortAsyncShutdown();
   return true;
 }
 
+class RunCreateContentParentCallbacks : public nsRunnable
+{
+public:
+  explicit RunCreateContentParentCallbacks(GMPContentParent* aGMPContentParent)
+    : mGMPContentParent(aGMPContentParent)
+  {
+  }
+
+  void TakeCallbacks(nsTArray<UniquePtr<GetGMPContentParentCallback>>& aCallbacks)
+  {
+    mCallbacks.SwapElements(aCallbacks);
+  }
+
+  NS_IMETHOD
+  Run()
+  {
+    for (uint32_t i = 0, length = mCallbacks.Length(); i < length; ++i) {
+      mCallbacks[i]->Done(mGMPContentParent);
+    }
+    return NS_OK;
+  }
+
+private:
+  nsRefPtr<GMPContentParent> mGMPContentParent;
+  nsTArray<UniquePtr<GetGMPContentParentCallback>> mCallbacks;
+};
+
+PGMPContentParent*
+GMPParent::AllocPGMPContentParent(Transport* aTransport, ProcessId aOtherPid)
+{
+  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
+  MOZ_ASSERT(!mGMPContentParent);
+
+  mGMPContentParent = new GMPContentParent(this);
+  mGMPContentParent->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop(),
+                          ipc::ParentSide);
+
+  nsRefPtr<RunCreateContentParentCallbacks> runCallbacks =
+    new RunCreateContentParentCallbacks(mGMPContentParent);
+  runCallbacks->TakeCallbacks(mCallbacks);
+  NS_DispatchToCurrentThread(runCallbacks);
+  MOZ_ASSERT(mCallbacks.IsEmpty());
+
+  return mGMPContentParent;
+}
+
+bool
+GMPParent::GetGMPContentParent(UniquePtr<GetGMPContentParentCallback>&& aCallback)
+{
+  LOGD("%s %p", __FUNCTION__, this);
+  MOZ_ASSERT(GMPThread() == NS_GetCurrentThread());
+
+  if (mGMPContentParent) {
+    aCallback->Done(mGMPContentParent);
+  } else {
+    mCallbacks.AppendElement(Move(aCallback));
+    // If we don't have a GMPContentParent and we try to get one for the first
+    // time (mCallbacks.Length() == 1) then call PGMPContent::Open. If more
+    // calls to GetGMPContentParent happen before mGMPContentParent has been
+    // set then we should just store them, so that they get called when we set
+    // mGMPContentParent as a result of the PGMPContent::Open call.
+    if (mCallbacks.Length() == 1) {
+      if (!EnsureProcessLoaded() || !PGMPContent::Open(this)) {
+        return false;
+      }
+      // We want to increment this as soon as possible, to avoid that we'd try
+      // to shut down the GMP process while we're still trying to get a
+      // PGMPContentParent actor.
+      ++mGMPContentChildCount;
+    }
+  }
+  return true;
+}
+
+already_AddRefed<GMPContentParent>
+GMPParent::ForgetGMPContentParent()
+{
+  MOZ_ASSERT(mCallbacks.IsEmpty());
+  return Move(mGMPContentParent.forget());
+}
+
+bool
+GMPParent::EnsureProcessLoaded(base::ProcessId* aID)
+{
+  if (!EnsureProcessLoaded()) {
+    return false;
+  }
+  *aID = OtherPid();
+  return true;
+}
+
+bool
+GMPParent::Bridge(GMPServiceParent* aGMPServiceParent)
+{
+  if (!PGMPContent::Bridge(aGMPServiceParent, this)) {
+    return false;
+  }
+  ++mGMPContentChildCount;
+  return true;
+}
+
 } // namespace gmp
 } // namespace mozilla
+
+#undef LOG
+#undef LOGD

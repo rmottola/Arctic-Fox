@@ -16,7 +16,7 @@ Nicolas Silva
 
 ## Definitions
 
-* Client and Host: In Goanna's compositing architecture, the client process is the producer, while the host process is the consumer side, where compositing takes place.
+* Client and Host: In Gecko's compositing architecture, the client process is the producer, while the host process is the consumer side, where compositing takes place.
 
 ## Use cases
 
@@ -122,11 +122,11 @@ In the other cases:
 
 The current design of MozSurface makes the surface accessible from both sides at the same time, forcing us to do Locking and have a hand shake around deallocating the shared data, while using pure message passing and making the surface accessible only from one side at a time would avoid these complications.
 
-Using pure message passing was actually the first approach we tried when we created the first version of TextureClient and TextureHost. This strategy failed in several places, partly because of some legacy in Goanna's architecture, and partly because of some of optimizations we do to avoid copying surfaces.
+Using pure message passing was actually the first approach we tried when we created the first version of TextureClient and TextureHost. This strategy failed in several places, partly because of some legacy in Gecko's architecture, and partly because of some of optimizations we do to avoid copying surfaces.
 
 We need a given surface to be accessible on both the client and host for the following reasons:
 
-* Goanna can at any time require read access on the client side to a surface that is shared with the host process, for example to build a temporary layer manager and generate a screenshot. This is mostly a legacy problem.
+* Gecko can at any time require read access on the client side to a surface that is shared with the host process, for example to build a temporary layer manager and generate a screenshot. This is mostly a legacy problem.
 * We do some copy-on-write optimizations on surfaces that are shared with the compositor in order to keep invalid regions as small as possible. Out tiling implementation is an example of that.
 * Our buffer rotation code on scrollable non-tiled layers also requires a synchronization on the client side between the front and back buffers, while the front buffer is used on the host side.
 

@@ -1125,10 +1125,10 @@ class ICStubCompiler
     // Some stubs need to emit SPS profiler updates.  This emits the guarding
     // jitcode for those stubs.  If profiling is not enabled, jumps to the
     // given label.
-    void guardProfilingEnabled(MacroAssembler& masm, Register scratch, Label* skip);
+    void guardProfilingEnabled(MacroAssembler &masm, Register scratch, Label *skip);
 
-    inline GeneralRegisterSet availableGeneralRegs(size_t numInputs) const {
-        GeneralRegisterSet regs(GeneralRegisterSet::All());
+    inline AllocatableGeneralRegisterSet availableGeneralRegs(size_t numInputs) const {
+        AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
         MOZ_ASSERT(!regs.has(BaselineStackReg));
 #if defined(JS_CODEGEN_ARM)
         MOZ_ASSERT(!regs.has(BaselineTailCallReg));
@@ -1161,11 +1161,11 @@ class ICStubCompiler
         return regs;
     }
 
-    inline bool emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, ValueOperand val,
-                                         Register scratch, GeneralRegisterSet saveRegs);
+    inline bool emitPostWriteBarrierSlot(MacroAssembler &masm, Register obj, ValueOperand val,
+                                         Register scratch, LiveGeneralRegisterSet saveRegs);
 
   public:
-    virtual ICStub* getStub(ICStubSpace* space) = 0;
+    virtual ICStub *getStub(ICStubSpace *space) = 0;
 
     static ICStubSpace* StubSpaceForKind(ICStub::Kind kind, JSScript* script) {
         if (ICStub::CanMakeCalls(kind))
@@ -3881,15 +3881,12 @@ class ReceiverGuard
           : group(guard.group), shape(guard.shape)
         {}
 
-        explicit StackGuard(JSObject *obj, bool guardGroup = false)
+        explicit StackGuard(JSObject *obj)
           : group(nullptr), shape(nullptr)
         {
             if (obj) {
                 shape = obj->maybeShape();
-                if (shape) {
-                    if (guardGroup)
-                        group = obj->group();
-                } else {
+                if (!shape) {
                     group = obj->group();
                     if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando())
                         shape = expando->lastProperty();
@@ -4763,14 +4760,18 @@ class ICSetProp_Native : public ICUpdatedStub
     friend class ICStubSpace;
 
   protected: // Protected to silence Clang warning.
-    ReceiverGuard receiverGuard_;
+    HeapPtrObjectGroup group_;
+    HeapPtrShape shape_;
     uint32_t offset_;
 
-    ICSetProp_Native(JitCode *stubCode, ReceiverGuard::StackGuard guard, uint32_t offset);
+    ICSetProp_Native(JitCode *stubCode, ObjectGroup *group, Shape *shape, uint32_t offset);
 
   public:
-    ReceiverGuard &receiverGuard() {
-        return receiverGuard_;
+    HeapPtrObjectGroup &group() {
+        return group_;
+    }
+    HeapPtrShape &shape() {
+        return shape_;
     }
     void notePreliminaryObject() {
         extra_ = 1;
@@ -4778,8 +4779,11 @@ class ICSetProp_Native : public ICUpdatedStub
     bool hasPreliminaryObject() const {
         return extra_;
     }
-    static size_t offsetOfReceiverGuard() {
-        return offsetof(ICSetProp_Native, receiverGuard_);
+    static size_t offsetOfGroup() {
+        return offsetof(ICSetProp_Native, group_);
+    }
+    static size_t offsetOfShape() {
+        return offsetof(ICSetProp_Native, shape_);
     }
     static size_t offsetOfOffset() {
         return offsetof(ICSetProp_Native, offset_);
@@ -4792,9 +4796,7 @@ class ICSetProp_Native : public ICUpdatedStub
 
       protected:
         virtual int32_t getKey() const {
-            return static_cast<int32_t>(kind) |
-                   (static_cast<int32_t>(isFixedSlot_) << 16) |
-                   (ReceiverGuard::keyBits(obj_) << 17);
+            return static_cast<int32_t>(kind) | (static_cast<int32_t>(isFixedSlot_) << 16);
         }
 
         bool generateStubCode(MacroAssembler &masm);
@@ -4820,20 +4822,20 @@ class ICSetProp_NativeAdd : public ICUpdatedStub
     static const size_t MAX_PROTO_CHAIN_DEPTH = 4;
 
   protected: // Protected to silence Clang warning.
-    ReceiverGuard receiverGuard_;
+    HeapPtrObjectGroup group_;
     HeapPtrShape newShape_;
     HeapPtrObjectGroup newGroup_;
     uint32_t offset_;
 
-    ICSetProp_NativeAdd(JitCode *stubCode, ReceiverGuard::StackGuard guard, size_t protoChainDepth,
+    ICSetProp_NativeAdd(JitCode *stubCode, ObjectGroup *group, size_t protoChainDepth,
                         Shape *newShape, ObjectGroup *newGroup, uint32_t offset);
 
   public:
     size_t protoChainDepth() const {
         return extra_;
     }
-    ReceiverGuard &receiverGuard() {
-        return receiverGuard_;
+    HeapPtrObjectGroup &group() {
+        return group_;
     }
     HeapPtrShape &newShape() {
         return newShape_;
@@ -4848,8 +4850,8 @@ class ICSetProp_NativeAdd : public ICUpdatedStub
         return static_cast<ICSetProp_NativeAddImpl<ProtoChainDepth> *>(this);
     }
 
-    static size_t offsetOfReceiverGuard() {
-        return offsetof(ICSetProp_NativeAdd, receiverGuard_);
+    static size_t offsetOfGroup() {
+        return offsetof(ICSetProp_NativeAdd, group_);
     }
     static size_t offsetOfNewShape() {
         return offsetof(ICSetProp_NativeAdd, newShape_);
@@ -4867,23 +4869,20 @@ class ICSetProp_NativeAddImpl : public ICSetProp_NativeAdd
 {
     friend class ICStubSpace;
 
-    static const size_t NumShapes = ProtoChainDepth;
+    static const size_t NumShapes = ProtoChainDepth + 1;
     mozilla::Array<HeapPtrShape, NumShapes> shapes_;
 
-    ICSetProp_NativeAddImpl(JitCode *stubCode, ReceiverGuard::StackGuard guard,
+    ICSetProp_NativeAddImpl(JitCode *stubCode, ObjectGroup *group,
                             const AutoShapeVector *shapes,
                             Shape *newShape, ObjectGroup *newGroup, uint32_t offset);
 
   public:
     void traceShapes(JSTracer *trc) {
-        // Note: using int32_t here to avoid gcc warning.
-        for (int32_t i = 0; i < int32_t(NumShapes); i++)
+        for (size_t i = 0; i < NumShapes; i++)
             MarkShape(trc, &shapes_[i], "baseline-setpropnativeadd-stub-shape");
     }
 
     static size_t offsetOfShape(size_t idx) {
-        // The shape array might be aligned differently if its length is zero.
-        JS_STATIC_ASSERT(NumShapes != 0);
         return offsetof(ICSetProp_NativeAddImpl, shapes_) + (idx * sizeof(HeapPtrShape));
     }
 };
@@ -4891,24 +4890,23 @@ class ICSetProp_NativeAddImpl : public ICSetProp_NativeAdd
 class ICSetPropNativeAddCompiler : public ICStubCompiler
 {
     RootedObject obj_;
-    ReceiverGuard::RootedStackGuard oldGuard_;
+    RootedShape oldShape_;
+    RootedObjectGroup oldGroup_;
     size_t protoChainDepth_;
     bool isFixedSlot_;
     uint32_t offset_;
 
   protected:
     virtual int32_t getKey() const {
-        return static_cast<int32_t>(kind) |
-               (static_cast<int32_t>(isFixedSlot_) << 16) |
-               (static_cast<int32_t>(ReceiverGuard::keyBits(obj_)) << 17) |
-               (static_cast<int32_t>(protoChainDepth_) << 19);
+        return static_cast<int32_t>(kind) | (static_cast<int32_t>(isFixedSlot_) << 16) |
+               (static_cast<int32_t>(protoChainDepth_) << 20);
     }
 
     bool generateStubCode(MacroAssembler &masm);
 
   public:
     ICSetPropNativeAddCompiler(JSContext *cx, HandleObject obj,
-                               ReceiverGuard::StackGuard oldGuard,
+                               HandleShape oldShape, HandleObjectGroup oldGroup,
                                size_t protoChainDepth, bool isFixedSlot, uint32_t offset);
 
     template <size_t ProtoChainDepth>
@@ -4921,17 +4919,13 @@ class ICSetPropNativeAddCompiler : public ICStubCompiler
         // Only specify newGroup when the object's group changes due to the
         // object becoming fully initialized per the acquired properties
         // analysis.
-        if (newGroup == oldGuard_.group)
+        if (newGroup == oldGroup_)
             newGroup = nullptr;
 
-        RootedShape newShape(cx);
-        if (obj_->is<UnboxedPlainObject>())
-            newShape = obj_->as<UnboxedPlainObject>().maybeExpando()->lastProperty();
-        else
-            newShape = obj_->as<NativeObject>().lastProperty();
+        RootedShape newShape(cx, obj_->as<NativeObject>().lastProperty());
 
         return ICStub::New<ICSetProp_NativeAddImpl<ProtoChainDepth>>(
-                    space, getStubCode(), oldGuard_, shapes, newShape, newGroup, offset_);
+                    space, getStubCode(), oldGroup_, shapes, newShape, newGroup, offset_);
     }
 
     ICUpdatedStub *getStub(ICStubSpace *space);
@@ -5259,15 +5253,17 @@ class ICCallStubCompiler : public ICStubCompiler
         FunApply_Array
     };
 
-    void pushCallArguments(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
-                           bool isJitCall);
-    void pushSpreadCallArguments(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
-                                 bool isJitCall);
-    void guardSpreadCall(MacroAssembler& masm, Register argcReg, Label* failure);
-    Register guardFunApply(MacroAssembler& masm, GeneralRegisterSet regs, Register argcReg,
-                           bool checkNative, FunApplyThing applyThing, Label* failure);
-    void pushCallerArguments(MacroAssembler& masm, GeneralRegisterSet regs);
-    void pushArrayArguments(MacroAssembler& masm, Address arrayVal, GeneralRegisterSet regs);
+    void pushCallArguments(MacroAssembler &masm, AllocatableGeneralRegisterSet regs,
+                           Register argcReg, bool isJitCall);
+    void pushSpreadCallArguments(MacroAssembler &masm, AllocatableGeneralRegisterSet regs,
+                                 Register argcReg, bool isJitCall);
+    void guardSpreadCall(MacroAssembler &masm, Register argcReg, Label *failure);
+    Register guardFunApply(MacroAssembler &masm, AllocatableGeneralRegisterSet regs,
+                           Register argcReg, bool checkNative, FunApplyThing applyThing,
+                           Label *failure);
+    void pushCallerArguments(MacroAssembler &masm, AllocatableGeneralRegisterSet regs);
+    void pushArrayArguments(MacroAssembler &masm, Address arrayVal,
+                            AllocatableGeneralRegisterSet regs);
 };
 
 class ICCall_Fallback : public ICMonitoredFallbackStub

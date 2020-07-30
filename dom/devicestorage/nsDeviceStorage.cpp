@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -273,7 +273,7 @@ DeviceStorageTypeChecker::InitFromBundle(nsIStringBundle* aBundle)
 
 
 bool
-DeviceStorageTypeChecker::Check(const nsAString& aType, nsIDOMBlob* aBlob)
+DeviceStorageTypeChecker::Check(const nsAString& aType, Blob* aBlob)
 {
   MOZ_ASSERT(aBlob);
 
@@ -1923,8 +1923,8 @@ nsIFileToJsval(nsPIDOMWindow* aWindow, DeviceStorageFile* aFile)
   MOZ_ASSERT(aFile->mLength != UINT64_MAX);
   MOZ_ASSERT(aFile->mLastModifiedDate != UINT64_MAX);
 
-  nsCOMPtr<nsIDOMBlob> blob = new File(aWindow,
-    new FileImplFile(fullPath, aFile->mMimeType,
+  nsCOMPtr<nsIDOMBlob> blob = Blob::Create(aWindow,
+    new BlobImplFile(fullPath, aFile->mMimeType,
                      aFile->mLength, aFile->mFile,
                      aFile->mLastModifiedDate));
   return InterfaceToJsval(aWindow, blob, &NS_GET_IID(nsIDOMBlob));
@@ -2175,6 +2175,7 @@ nsDOMDeviceStorageCursor::nsDOMDeviceStorageCursor(nsPIDOMWindow* aWindow,
   , mSince(aSince)
   , mFile(aFile)
   , mPrincipal(aPrincipal)
+  , mRequester(new nsContentPermissionRequester(GetOwner()))
 {
 }
 
@@ -2261,6 +2262,16 @@ nsDOMDeviceStorageCursor::Allow(JS::HandleValue aChoices)
 
   nsCOMPtr<nsIRunnable> event = new InitCursorEvent(this, mFile);
   target->Dispatch(event, NS_DISPATCH_NORMAL);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMDeviceStorageCursor::GetRequester(nsIContentPermissionRequester** aRequester)
+{
+  NS_ENSURE_ARG_POINTER(aRequester);
+
+  nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+  requester.forget(aRequester);
   return NS_OK;
 }
 
@@ -2598,7 +2609,7 @@ private:
 class WriteFileEvent : public nsRunnable
 {
 public:
-  WriteFileEvent(FileImpl* aBlobImpl,
+  WriteFileEvent(BlobImpl* aBlobImpl,
                  DeviceStorageFile *aFile,
                  already_AddRefed<DOMRequest> aRequest,
                  int32_t aRequestType)
@@ -2664,7 +2675,7 @@ public:
   }
 
 private:
-  nsRefPtr<FileImpl> mBlobImpl;
+  nsRefPtr<BlobImpl> mBlobImpl;
   nsRefPtr<DeviceStorageFile> mFile;
   nsRefPtr<DOMRequest> mRequest;
   int32_t mRequestType;
@@ -2850,6 +2861,7 @@ public:
     , mFile(aFile)
     , mRequest(aRequest)
     , mDeviceStorage(aDeviceStorage)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mWindow);
     MOZ_ASSERT(mPrincipal);
@@ -2863,13 +2875,14 @@ public:
                        nsIPrincipal* aPrincipal,
                        DeviceStorageFile* aFile,
                        DOMRequest* aRequest,
-                       nsIDOMBlob* aBlob = nullptr)
+                       Blob* aBlob = nullptr)
     : mRequestType(aRequestType)
     , mWindow(aWindow)
     , mPrincipal(aPrincipal)
     , mFile(aFile)
     , mRequest(aRequest)
     , mBlob(aBlob)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mWindow);
     MOZ_ASSERT(mPrincipal);
@@ -2889,6 +2902,7 @@ public:
     , mFile(aFile)
     , mRequest(aRequest)
     , mDSFileDescriptor(aDSFileDescriptor)
+    , mRequester(new nsContentPermissionRequester(mWindow))
   {
     MOZ_ASSERT(mRequestType == DEVICE_STORAGE_REQUEST_CREATEFD);
     MOZ_ASSERT(mWindow);
@@ -3033,7 +3047,7 @@ public:
         if (XRE_GetProcessType() != GeckoProcessType_Default) {
           BlobChild* actor
             = ContentChild::GetSingleton()->GetOrCreateActorForBlob(
-              static_cast<File*>(mBlob.get()));
+              static_cast<Blob*>(mBlob.get()));
           if (!actor) {
             return NS_ERROR_FAILURE;
           }
@@ -3079,7 +3093,7 @@ public:
         if (XRE_GetProcessType() != GeckoProcessType_Default) {
           BlobChild* actor
             = ContentChild::GetSingleton()->GetOrCreateActorForBlob(
-              static_cast<File*>(mBlob.get()));
+              static_cast<Blob*>(mBlob.get()));
           if (!actor) {
             return NS_ERROR_FAILURE;
           }
@@ -3298,6 +3312,15 @@ public:
     return NS_OK;
   }
 
+  NS_IMETHODIMP GetRequester(nsIContentPermissionRequester** aRequester)
+  {
+    NS_ENSURE_ARG_POINTER(aRequester);
+
+    nsCOMPtr<nsIContentPermissionRequester> requester = mRequester;
+    requester.forget(aRequester);
+    return NS_OK;
+  }
+
 private:
   ~DeviceStorageRequest() {}
 
@@ -3307,9 +3330,10 @@ private:
   nsRefPtr<DeviceStorageFile> mFile;
 
   nsRefPtr<DOMRequest> mRequest;
-  nsCOMPtr<nsIDOMBlob> mBlob;
+  nsRefPtr<Blob> mBlob;
   nsRefPtr<nsDOMDeviceStorage> mDeviceStorage;
   nsRefPtr<DeviceStorageFileDescriptor> mDSFileDescriptor;
+  nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(DeviceStorageRequest)
@@ -3336,6 +3360,8 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 NS_IMPL_ADDREF_INHERITED(nsDOMDeviceStorage, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(nsDOMDeviceStorage, DOMEventTargetHelper)
 
+int nsDOMDeviceStorage::sInstanceCount = 0;
+
 nsDOMDeviceStorage::nsDOMDeviceStorage(nsPIDOMWindow* aWindow)
   : DOMEventTargetHelper(aWindow)
   , mIsShareable(false)
@@ -3343,6 +3369,8 @@ nsDOMDeviceStorage::nsDOMDeviceStorage(nsPIDOMWindow* aWindow)
   , mIsWatchingFile(false)
   , mAllowedToWatchFile(false)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  sInstanceCount++;
 }
 
 /* virtual */ JSObject*
@@ -3426,6 +3454,8 @@ nsDOMDeviceStorage::Init(nsPIDOMWindow* aWindow, const nsAString &aType,
 
 nsDOMDeviceStorage::~nsDOMDeviceStorage()
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  sInstanceCount--;
 }
 
 void
@@ -3511,7 +3541,7 @@ nsDOMDeviceStorage::CreateDeviceStorageFor(nsPIDOMWindow* aWin,
     *aStore = nullptr;
     return;
   }
-  NS_ADDREF(*aStore = ds.get());
+  ds.forget(aStore);
 }
 
 // static
@@ -3543,6 +3573,30 @@ nsDOMDeviceStorage::CreateDeviceStoragesFor(
     }
     aStores.AppendElement(storage);
   }
+}
+
+// static
+void
+nsDOMDeviceStorage::CreateDeviceStorageByNameAndType(
+  nsPIDOMWindow* aWin,
+  const nsAString& aName,
+  const nsAString& aType,
+  nsDOMDeviceStorage** aStore)
+{
+  if (!DeviceStorageTypeChecker::IsVolumeBased(aType)) {
+    nsRefPtr<nsDOMDeviceStorage> storage = new nsDOMDeviceStorage(aWin);
+    if (NS_FAILED(storage->Init(aWin, aType, EmptyString()))) {
+      *aStore = nullptr;
+      return;
+    }
+    NS_ADDREF(*aStore = storage.get());
+    return;
+  }
+
+  nsRefPtr<nsDOMDeviceStorage> storage = GetStorageByNameAndType(aWin,
+                                                                 aName,
+                                                                 aType);
+  NS_ADDREF(*aStore = storage.get());
 }
 
 // static
@@ -3604,14 +3658,28 @@ nsDOMDeviceStorage::GetStorageByName(const nsAString& aStorageName)
     ds = this;
     return ds.forget();
   }
+
+  return GetStorageByNameAndType(GetOwner(), aStorageName, mStorageType);
+}
+
+// static
+already_AddRefed<nsDOMDeviceStorage>
+nsDOMDeviceStorage::GetStorageByNameAndType(nsPIDOMWindow* aWin,
+                                            const nsAString& aStorageName,
+                                            const nsAString& aType)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsRefPtr<nsDOMDeviceStorage> ds;
+
   VolumeNameArray volNames;
   GetOrderedVolumeNames(volNames);
   VolumeNameArray::size_type numVolumes = volNames.Length();
   VolumeNameArray::index_type i;
   for (i = 0; i < numVolumes; i++) {
     if (volNames[i].Equals(aStorageName)) {
-      ds = new nsDOMDeviceStorage(GetOwner());
-      nsresult rv = ds->Init(GetOwner(), mStorageType, aStorageName);
+      ds = new nsDOMDeviceStorage(aWin);
+      nsresult rv = ds->Init(aWin, aType, aStorageName);
       if (NS_FAILED(rv)) {
         return nullptr;
       }
@@ -3669,13 +3737,13 @@ NS_IMETHODIMP
 nsDOMDeviceStorage::Add(nsIDOMBlob *aBlob, nsIDOMDOMRequest * *_retval)
 {
   ErrorResult rv;
-  nsRefPtr<DOMRequest> request = Add(aBlob, rv);
+  nsRefPtr<DOMRequest> request = Add(static_cast<Blob*>(aBlob), rv);
   request.forget(_retval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
-nsDOMDeviceStorage::Add(nsIDOMBlob* aBlob, ErrorResult& aRv)
+nsDOMDeviceStorage::Add(Blob* aBlob, ErrorResult& aRv)
 {
   if (!aBlob) {
     return nullptr;
@@ -3718,13 +3786,13 @@ nsDOMDeviceStorage::AddNamed(nsIDOMBlob *aBlob,
                              nsIDOMDOMRequest * *_retval)
 {
   ErrorResult rv;
-  nsRefPtr<DOMRequest> request = AddNamed(aBlob, aPath, rv);
+  nsRefPtr<DOMRequest> request = AddNamed(static_cast<Blob*>(aBlob), aPath, rv);
   request.forget(_retval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
-nsDOMDeviceStorage::AddNamed(nsIDOMBlob* aBlob, const nsAString& aPath,
+nsDOMDeviceStorage::AddNamed(Blob* aBlob, const nsAString& aPath,
                              ErrorResult& aRv)
 {
   return AddOrAppendNamed(aBlob, aPath,
@@ -3732,7 +3800,7 @@ nsDOMDeviceStorage::AddNamed(nsIDOMBlob* aBlob, const nsAString& aPath,
 }
 
 already_AddRefed<DOMRequest>
-nsDOMDeviceStorage::AppendNamed(nsIDOMBlob* aBlob, const nsAString& aPath,
+nsDOMDeviceStorage::AppendNamed(Blob* aBlob, const nsAString& aPath,
                                 ErrorResult& aRv)
 {
   return AddOrAppendNamed(aBlob, aPath,
@@ -3741,7 +3809,7 @@ nsDOMDeviceStorage::AppendNamed(nsIDOMBlob* aBlob, const nsAString& aPath,
 
 
 already_AddRefed<DOMRequest>
-nsDOMDeviceStorage::AddOrAppendNamed(nsIDOMBlob* aBlob, const nsAString& aPath,
+nsDOMDeviceStorage::AddOrAppendNamed(Blob* aBlob, const nsAString& aPath,
                                      const int32_t aRequestType, ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -3816,7 +3884,7 @@ nsDOMDeviceStorage::Get(const nsAString& aPath, nsIDOMDOMRequest** aRetval)
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = Get(aPath, rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 NS_IMETHODIMP
@@ -3826,7 +3894,7 @@ nsDOMDeviceStorage::GetEditable(const nsAString& aPath,
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = GetEditable(aPath, rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
@@ -3893,7 +3961,7 @@ nsDOMDeviceStorage::Delete(const nsAString& aPath, nsIDOMDOMRequest** aRetval)
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = Delete(aPath, rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
@@ -3955,7 +4023,7 @@ nsDOMDeviceStorage::FreeSpace(nsIDOMDOMRequest** aRetval)
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = FreeSpace(rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
@@ -3989,7 +4057,7 @@ nsDOMDeviceStorage::UsedSpace(nsIDOMDOMRequest** aRetval)
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = UsedSpace(rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>
@@ -4027,7 +4095,7 @@ nsDOMDeviceStorage::Available(nsIDOMDOMRequest** aRetval)
   ErrorResult rv;
   nsRefPtr<DOMRequest> request = Available(rv);
   request.forget(aRetval);
-  return rv.ErrorCode();
+  return rv.StealNSResult();
 }
 
 already_AddRefed<DOMRequest>

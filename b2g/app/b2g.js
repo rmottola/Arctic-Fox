@@ -640,10 +640,11 @@ pref("dom.ipc.processPriorityManager.backgroundGracePeriodMS", 1000);
 pref("dom.ipc.processPriorityManager.backgroundPerceivableGracePeriodMS", 5000);
 pref("dom.ipc.processPriorityManager.temporaryPriorityLockMS", 5000);
 
-// Number of different background levels for background processes.  We use
-// these different levels to force the low-memory killer to kill processes in
-// a LRU order.
-pref("dom.ipc.processPriorityManager.backgroundLRUPoolLevels", 5);
+// Number of different background/foreground levels for background/foreground
+// processes.  We use these different levels to force the low-memory killer to
+// kill processes in a LRU order.
+pref("dom.ipc.processPriorityManager.BACKGROUND.LRUPoolLevels", 5);
+pref("dom.ipc.processPriorityManager.FOREGROUND.LRUPoolLevels", 3);
 
 // Kernel parameters for process priorities.  These affect how processes are
 // killed on low-memory and their relative CPU priorities.
@@ -791,7 +792,7 @@ pref("browser.prompt.allowNative", false);
 // a restart is required to enable a new value.
 pref("network.activity.blipIntervalMilliseconds", 250);
 
-// By default we want the NetworkManager service to manage Goanna's offline
+// By default we want the NetworkManager service to manage Gecko's offline
 // status for us according to the state of Wifi/cellular data connections.
 // In some environments, such as the emulator or hardware with other network
 // connectivity, this is not desireable, however, in which case this pref
@@ -929,6 +930,13 @@ pref("b2g.theme.origin", "app://theme.gaiamobile.org");
 pref("dom.mozApps.themable", true);
 pref("dom.mozApps.selected_theme", "default_theme.gaiamobile.org");
 
+// Enable PAC generator for B2G.
+pref("network.proxy.pac_generator", true);
+
+// List of app origins to apply browsing traffic proxy setting, separated by
+// comma.  Specify '*' in the list to apply to all apps.
+pref("network.proxy.browsing.app_origins", "app://system.gaiamobile.org");
+
 // Enable Web Speech synthesis API
 pref("media.webspeech.synth.enabled", true);
 
@@ -1031,6 +1039,9 @@ pref("dom.udpsocket.enabled", true);
 
 // Enable TV Manager API
 pref("dom.tv.enabled", true);
+
+// Enable Inputport Manager API
+pref("dom.inputport.enabled", true);
 
 pref("dom.mozSettings.SettingsDB.debug.enabled", true);
 pref("dom.mozSettings.SettingsManager.debug.enabled", true);

@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "SelectionCarets.h"
 
 #include "gfxPrefs.h"
@@ -38,7 +38,6 @@
 using namespace mozilla;
 using namespace mozilla::dom;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gSelectionCaretsLog;
 static const char* kSelectionCaretsLogModuleName = "SelectionCarets";
 
@@ -53,10 +52,6 @@ static const char* kSelectionCaretsLogModuleName = "SelectionCarets";
   PR_LOG(gSelectionCaretsLog, PR_LOG_DEBUG,                                    \
          ("SelectionCarets: %s:%d : " message "\n", __FUNCTION__, __LINE__,    \
           ##__VA_ARGS__));
-#else
-#define SELECTIONCARETS_LOG(message, ...)
-#define SELECTIONCARETS_LOG_STATIC(message, ...)
-#endif // #ifdef PR_LOGGING
 
 // We treat mouse/touch move as "REAL" move event once its move distance
 // exceed this value, in CSS pixel.
@@ -86,11 +81,9 @@ SelectionCarets::SelectionCarets(nsIPresShell* aPresShell)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef PR_LOGGING
   if (!gSelectionCaretsLog) {
     gSelectionCaretsLog = PR_NewLogModule(kSelectionCaretsLogModuleName);
   }
-#endif
 
   SELECTIONCARETS_LOG("Constructor, PresShell=%p", mPresShell);
 

@@ -125,7 +125,7 @@ StructuredFormatter.prototype.suite_end = function(message) {
  *
 **/
 var VALID_ACTIONS = ['suite_start', 'suite_end', 'test_start', 'test_end', 'test_status', 'process_output', 'log'];
-// This delimiter is used to avoid interleaving Mochitest/Goanna logs.
+// This delimiter is used to avoid interleaving Mochitest/Gecko logs.
 var LOG_DELIMITER = String.fromCharCode(0xe175) + String.fromCharCode(0xee31) + String.fromCharCode(0x2c32) + String.fromCharCode(0xacbf);
 
 function StructuredLogger(name) {

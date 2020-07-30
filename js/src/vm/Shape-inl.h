@@ -37,30 +37,6 @@ Shape::search(ExclusiveContext* cx, jsid id)
     return search(cx, this, id, &_);
 }
 
-inline bool
-Shape::set(JSContext *cx, HandleNativeObject obj, HandleObject receiver, MutableHandleValue vp,
-           ObjectOpResult &result)
-{
-    MOZ_ASSERT_IF(hasDefaultSetter(), hasGetterValue());
-    MOZ_ASSERT(!obj->is<DynamicWithObject>());  // See bug 1128681.
-
-    if (attrs & JSPROP_SETTER) {
-        Value fval = setterValue();
-        if (!InvokeGetterOrSetter(cx, receiver, fval, 1, vp.address(), vp))
-            return false;
-        return result.succeed();
-    }
-
-    if (attrs & JSPROP_GETTER)
-        return result.fail(JSMSG_GETTER_ONLY);
-
-    if (!setterOp())
-        return result.succeed();
-
-    RootedId id(cx, propid());
-    return CallJSSetterOp(cx, setterOp(), obj, id, vp, result);
-}
-
 /* static */ inline Shape *
 Shape::search(ExclusiveContext *cx, Shape *start, jsid id, ShapeTable::Entry **pentry, bool adding)
 {
@@ -156,15 +132,15 @@ EmptyShape::ensureInitialCustomShape(ExclusiveContext* cx, Handle<ObjectSubclass
 }
 
 inline
-AutoRooterGetterSetter::Inner::Inner(ExclusiveContext *cx, uint8_t attrs,
-                                     GetterOp *pgetter_, SetterOp *psetter_)
+AutoRooterGetterSetter::Inner::Inner(ExclusiveContext* cx, uint8_t attrs,
+                                     GetterOp* pgetter_, SetterOp* psetter_)
   : CustomAutoRooter(cx), attrs(attrs),
     pgetter(pgetter_), psetter(psetter_)
 {}
 
 inline
-AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext *cx, uint8_t attrs,
-                                               GetterOp *pgetter, SetterOp *psetter
+AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t attrs,
+                                               GetterOp* pgetter, SetterOp* psetter
                                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
 {
     if (attrs & (JSPROP_GETTER | JSPROP_SETTER))

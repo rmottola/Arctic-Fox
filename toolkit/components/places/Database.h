@@ -16,7 +16,7 @@
 
 // This is the schema version. Update it at any schema change and add a
 // corresponding migrateVxx method below.
-#define DATABASE_SCHEMA_VERSION 26
+#define DATABASE_SCHEMA_VERSION 27
 
 // Fired after Places inited.
 #define TOPIC_PLACES_INIT_COMPLETE "places-init-complete"
@@ -43,7 +43,6 @@
 // Fired when the connection has gone, nothing will work from now on.
 #define TOPIC_PLACES_CONNECTION_CLOSED "places-connection-closed"
 
-class nsIStringBundle;
 class nsIRunnable;
 
 namespace mozilla {
@@ -274,6 +273,7 @@ protected:
   nsresult MigrateV24Up();
   nsresult MigrateV25Up();
   nsresult MigrateV26Up();
+  nsresult MigrateV27Up();
 
   nsresult UpdateBookmarkRootTitles();
 

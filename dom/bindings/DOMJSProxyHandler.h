@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-*/
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -105,14 +106,14 @@ public:
   {}
 
   bool defineProperty(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-                      JS::MutableHandle<JSPropertyDescriptor> desc,
+                      JS::Handle<JSPropertyDescriptor> desc,
                       JS::ObjectOpResult &result) const override
   {
     bool unused;
     return defineProperty(cx, proxy, id, desc, result, &unused);
   }
   virtual bool defineProperty(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-                              JS::MutableHandle<JSPropertyDescriptor> desc,
+                              JS::Handle<JSPropertyDescriptor> desc,
                               JS::ObjectOpResult &result, bool *defined) const;
   bool delete_(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
                JS::ObjectOpResult &result) const override;
@@ -122,8 +123,8 @@ public:
                     const override;
   bool has(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
            bool* bp) const override;
-  bool set(JSContext *cx, JS::Handle<JSObject*> proxy, JS::Handle<JSObject*> receiver,
-           JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp, JS::ObjectOpResult &result)
+  bool set(JSContext *cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
+           JS::Handle<JS::Value> v, JS::Handle<JS::Value> receiver, JS::ObjectOpResult &result)
            const override;
 
   /*
@@ -132,7 +133,7 @@ public:
    * *done to false.
    */
   virtual bool setCustom(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-                         JS::MutableHandle<JS::Value> vp, bool *done) const;
+                         JS::Handle<JS::Value> v, bool *done) const;
 
   static JSObject* GetExpandoObject(JSObject* obj);
 

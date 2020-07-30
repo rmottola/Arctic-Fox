@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -19,6 +21,7 @@
 #include "mozilla/BasicEvents.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TypeTraits.h"
+#include "mozilla/dom/Element.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/dom/indexedDB/PBackgroundIDBDatabaseFileChild.h"
@@ -534,9 +537,9 @@ class PermissionRequestMainProcessHelper final
 public:
   PermissionRequestMainProcessHelper(BackgroundFactoryRequestChild* aActor,
                                      IDBFactory* aFactory,
-                                     nsPIDOMWindow* aWindow,
+                                     Element* aOwnerElement,
                                      nsIPrincipal* aPrincipal)
-    : PermissionRequestBase(aWindow, aPrincipal)
+    : PermissionRequestBase(aOwnerElement, aPrincipal)
     , mActor(aActor)
     , mFactory(aFactory)
   {
@@ -600,10 +603,10 @@ ConvertActorsToBlobs(IDBDatabase* aDatabase,
     for (uint32_t index = 0; index < count; index++) {
       BlobChild* actor = static_cast<BlobChild*>(blobs[index]);
 
-      nsRefPtr<FileImpl> blobImpl = actor->GetBlobImpl();
+      nsRefPtr<BlobImpl> blobImpl = actor->GetBlobImpl();
       MOZ_ASSERT(blobImpl);
 
-      nsRefPtr<File> blob = new File(aDatabase->GetOwner(), blobImpl);
+      nsRefPtr<Blob> blob = Blob::Create(aDatabase->GetOwner(), blobImpl);
 
       nsRefPtr<FileInfo> fileInfo;
       if (!fileInfos.IsEmpty()) {
@@ -620,7 +623,7 @@ ConvertActorsToBlobs(IDBDatabase* aDatabase,
       StructuredCloneFile* file = aFiles.AppendElement();
       MOZ_ASSERT(file);
 
-      file->mFile.swap(blob);
+      file->mBlob.swap(blob);
       file->mFileInfo.swap(fileInfo);
     }
   }
@@ -1135,8 +1138,14 @@ BackgroundFactoryRequestChild::RecvPermissionChallenge(
     nsCOMPtr<nsPIDOMWindow> window = mFactory->GetParentObject();
     MOZ_ASSERT(window);
 
+    nsCOMPtr<Element> ownerElement =
+      do_QueryInterface(window->GetChromeEventHandler());
+    if (NS_WARN_IF(!ownerElement)) {
+      return false;
+    }
+
     nsRefPtr<PermissionRequestMainProcessHelper> helper =
-      new PermissionRequestMainProcessHelper(this, mFactory, window, principal);
+      new PermissionRequestMainProcessHelper(this, mFactory, ownerElement, principal);
 
     PermissionRequestBase::PermissionValue permission;
     if (NS_WARN_IF(NS_FAILED(helper->PromptIfNeeded(&permission)))) {

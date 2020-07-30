@@ -189,7 +189,7 @@ AndroidSurfaceTexture::~AndroidSurfaceTexture()
   mFrameAvailableCallback = nullptr;
 
   if (mSurfaceTexture) {
-    GoannaAppShell::UnregisterSurfaceTextureFrameListener(mSurfaceTexture);
+    GeckoAppShell::UnregisterSurfaceTextureFrameListener(mSurfaceTexture);
     mSurfaceTexture = nullptr;
   }
 }
@@ -237,9 +237,9 @@ void
 AndroidSurfaceTexture::SetFrameAvailableCallback(nsIRunnable* aRunnable)
 {
   if (aRunnable) {
-    GoannaAppShell::RegisterSurfaceTextureFrameListener(mSurfaceTexture, mID);
+    GeckoAppShell::RegisterSurfaceTextureFrameListener(mSurfaceTexture, mID);
   } else {
-     GoannaAppShell::UnregisterSurfaceTextureFrameListener(mSurfaceTexture);
+     GeckoAppShell::UnregisterSurfaceTextureFrameListener(mSurfaceTexture);
   }
 
   mFrameAvailableCallback = aRunnable;

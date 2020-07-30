@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "gfxPlatform.h"
 #include "nsCOMPtr.h"
@@ -29,9 +29,7 @@ using mozilla::RefPtr;
 // Screenshots use the (undocumented) png pasteboard type.
 #define IMAGE_PASTEBOARD_TYPES NSTIFFPboardType, @"Apple PNG pasteboard type", nil
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* sCocoaLog;
-#endif
 
 extern void EnsureLogInitialized();
 
@@ -224,7 +222,7 @@ nsClipboard::TransferableFromPasteboard(nsITransferable *aTransferable, NSPasteb
       bool successfullyConverted = CGImageDestinationFinalize(dest);
 
       if (successfullyConverted) {
-        // Put the converted data in a form Goanna can understand
+        // Put the converted data in a form Gecko can understand
         nsCOMPtr<nsIInputStream> byteStream;
         NS_NewByteInputStream(getter_AddRefs(byteStream), (const char*)[encodedData bytes],
                                    [encodedData length], NS_ASSIGNMENT_COPY);

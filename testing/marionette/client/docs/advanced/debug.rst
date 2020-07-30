@@ -8,10 +8,10 @@ need to do some debugging. This page outlines some of the Marionette methods
 that can be useful to you.
 
 Please note that the best tools for debugging are the `ones that ship with
-Goanna`_. This page doesn't describe how to use those with Marionette. Also see
+Gecko`_. This page doesn't describe how to use those with Marionette. Also see
 a related topic about `using the debugger with Marionette`_ on MDN.
 
-.. _ones that ship with Goanna: https://developer.mozilla.org/en-US/docs/Tools
+.. _ones that ship with Gecko: https://developer.mozilla.org/en-US/docs/Tools
 .. _using the debugger with Marionette: https://developer.mozilla.org/en-US/docs/Marionette/Debugging
 
 

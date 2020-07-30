@@ -569,7 +569,7 @@ public:
     return rv;
   }
 
-  nsresult SspReplyCmd(const nsAString& aBdAddr, const nsAString& aVariant,
+  nsresult SspReplyCmd(const nsAString& aBdAddr, BluetoothSspVariant aVariant,
                        bool aAccept, uint32_t aPasskey,
                        BluetoothResultHandler* aRes)
   {
@@ -580,8 +580,7 @@ public:
 
     nsresult rv = PackPDU(
       PackConversion<nsAString, BluetoothAddress>(aBdAddr),
-      PackConversion<nsAString, BluetoothSspVariant>(aVariant),
-      aAccept, aPasskey, *pdu);
+      aVariant, aAccept, aPasskey, *pdu);
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -2121,17 +2120,17 @@ BluetoothDaemonInterface::CreateRandomAddressString(
  *      listen socket.
  *
  *  (2) Start the Bluetooth daemon: When the daemon starts up it will
- *      open two socket connections to Goanna and thus create the command
- *      and notification channels. Goanna already opened the listen socket
+ *      open two socket connections to Gecko and thus create the command
+ *      and notification channels. Gecko already opened the listen socket
  *      in step (1). Step (2) ends with the creation of the command channel.
  *
  *  (3) Start listening for the notification channel's socket connection:
  *      At the end of step (2), the command channel was opened by the
  *      daemon. In step (3), the daemon immediately tries to open the
- *      next socket for the notification channel. Goanna will accept the
+ *      next socket for the notification channel. Gecko will accept the
  *      incoming connection request for the notification channel. The
  *      listen socket remained open after step (2), so there's no race
- *      condition between Goanna and the Bluetooth daemon.
+ *      condition between Gecko and the Bluetooth daemon.
  *
  *  (4)(5) Register Core and Socket modules: The Core and Socket modules
  *      are always available and have to be registered after opening the
@@ -2420,7 +2419,7 @@ BluetoothDaemonInterface::PinReply(const nsAString& aBdAddr, bool aAccept,
 
 void
 BluetoothDaemonInterface::SspReply(const nsAString& aBdAddr,
-                                   const nsAString& aVariant,
+                                   BluetoothSspVariant aVariant,
                                    bool aAccept, uint32_t aPasskey,
                                    BluetoothResultHandler* aRes)
 {

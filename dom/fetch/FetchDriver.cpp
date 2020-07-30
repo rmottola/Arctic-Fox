@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -20,6 +21,7 @@
 #include "nsDataHandler.h"
 #include "nsHostObjectProtocolHandler.h"
 #include "nsNetUtil.h"
+#include "nsPrintfCString.h"
 #include "nsStreamUtils.h"
 #include "nsStringStream.h"
 
@@ -59,6 +61,9 @@ FetchDriver::Fetch(FetchDriverObserver* aObserver)
 {
   workers::AssertIsOnMainThread();
   mObserver = aObserver;
+
+  Telemetry::Accumulate(Telemetry::SERVICE_WORKER_REQUEST_PASSTHROUGH,
+                        mRequest->WasCreatedByFetchEvent());
 
   return Fetch(false /* CORS flag */);
 }
@@ -202,9 +207,9 @@ FetchDriver::BasicFetch()
   }
 
   if (scheme.LowerCaseEqualsLiteral("blob")) {
-    nsRefPtr<FileImpl> blobImpl;
+    nsRefPtr<BlobImpl> blobImpl;
     rv = NS_GetBlobForBlobURI(uri, getter_AddRefs(blobImpl));
-    FileImpl* blob = static_cast<FileImpl*>(blobImpl.get());
+    BlobImpl* blob = static_cast<BlobImpl*>(blobImpl.get());
     if (NS_WARN_IF(NS_FAILED(rv))) {
       FailWithNetworkError();
       return rv;
@@ -216,7 +221,7 @@ FetchDriver::BasicFetch()
       uint64_t size = blob->GetSize(result);
       if (NS_WARN_IF(result.Failed())) {
         FailWithNetworkError();
-        return result.ErrorCode();
+        return result.StealNSResult();
       }
 
       nsAutoString sizeStr;
@@ -224,7 +229,7 @@ FetchDriver::BasicFetch()
       response->Headers()->Append(NS_LITERAL_CSTRING("Content-Length"), NS_ConvertUTF16toUTF8(sizeStr), result);
       if (NS_WARN_IF(result.Failed())) {
         FailWithNetworkError();
-        return result.ErrorCode();
+        return result.StealNSResult();
       }
 
       nsAutoString type;
@@ -232,7 +237,7 @@ FetchDriver::BasicFetch()
       response->Headers()->Append(NS_LITERAL_CSTRING("Content-Type"), NS_ConvertUTF16toUTF8(type), result);
       if (NS_WARN_IF(result.Failed())) {
         FailWithNetworkError();
-        return result.ErrorCode();
+        return result.StealNSResult();
       }
     }
 
@@ -626,7 +631,13 @@ public:
   {
     ErrorResult result;
     mResponse->Headers()->Append(aHeader, aValue, result);
-    return result.ErrorCode();
+    if (result.Failed()) {
+      NS_WARNING(nsPrintfCString("Fetch ignoring illegal header - '%s': '%s'",
+                                 PromiseFlatCString(aHeader).get(),
+                                 PromiseFlatCString(aValue).get()).get());
+      result.SuppressException();
+    }
+    return NS_OK;
   }
 };
 

@@ -422,7 +422,7 @@ nsHtml5TreeOperation::CreateElement(int32_t aNs,
     if (aNs == kNameSpaceID_XHTML &&
         nsHtml5Atoms::a == aName &&
         nsHtml5Atoms::name == localName) {
-      // This is an HTML5-incompliant Goannaism.
+      // This is an HTML5-incompliant Geckoism.
       // Remove when fixing bug 582361
       NS_ConvertUTF16toUTF8 cname(*(aAttributes->getValueNoBoundsCheck(i)));
       NS_ConvertUTF8toUTF16 uv(nsUnescape(cname.BeginWriting()));
@@ -456,7 +456,7 @@ nsHtml5TreeOperation::SetFormElement(nsIContent* aNode, nsIContent* aParent)
   nsCOMPtr<nsIFormControl> formControl(do_QueryInterface(aNode));
   nsCOMPtr<nsIDOMHTMLImageElement> domImageElement = do_QueryInterface(aNode);
   // NS_ASSERTION(formControl, "Form-associated element did not implement nsIFormControl.");
-  // TODO: uncomment the above line when <keygen> (bug 101019) is supported by Goanna
+  // TODO: uncomment the above line when <keygen> (bug 101019) is supported by Gecko
   nsCOMPtr<nsIDOMHTMLFormElement> formElement(do_QueryInterface(aParent));
   NS_ASSERTION(formElement, "The form element doesn't implement nsIDOMHTMLFormElement.");
   // avoid crashing on <keygen>

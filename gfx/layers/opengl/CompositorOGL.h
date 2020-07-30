@@ -40,7 +40,6 @@
 class nsIWidget;
 
 namespace mozilla {
-class TimeStamp;
 
 namespace gfx {
 class Matrix4x4;
@@ -306,7 +305,7 @@ public:
 private:
   virtual gfx::IntSize GetWidgetSize() const override
   {
-    return gfx::ToIntSize(mWidgetSize);
+    return mWidgetSize;
   }
 
   bool InitializeVR();
@@ -320,7 +319,7 @@ private:
 
   /** Widget associated with this compositor */
   nsIWidget *mWidget;
-  nsIntSize mWidgetSize;
+  gfx::IntSize mWidgetSize;
   nsRefPtr<GLContext> mGLContext;
   UniquePtr<GLBlitTextureImageHelper> mBlitTextureImageHelper;
   gfx::Matrix4x4 mProjMatrix;

@@ -10,7 +10,7 @@
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prprf.h"
 
 #include "gfxPlatform.h"
@@ -72,6 +72,10 @@
 #include "GLContext.h"
 #include "GLContextProvider.h"
 #include "mozilla/gfx/Logging.h"
+
+#if defined(MOZ_WIDGET_GTK)
+#include "gfxPlatformGtk.h" // xxx - for UseFcFontList
+#endif
 
 #ifdef MOZ_WIDGET_ANDROID
 #include "TexturePoolOGL.h"
@@ -375,10 +379,44 @@ static const char *gPrefLangNames[] = {
     "x-unicode",
 };
 
+// this needs to match the list of pref font.default.xx entries listed in all.js!
+// the order *must* match the order in eFontPrefLang
+static nsIAtom* gPrefLangToLangGroups[] = {
+    nsGkAtoms::x_western,
+    nsGkAtoms::Japanese,
+    nsGkAtoms::Taiwanese,
+    nsGkAtoms::Chinese,
+    nsGkAtoms::HongKongChinese,
+    nsGkAtoms::ko,
+    nsGkAtoms::x_cyrillic,
+    nsGkAtoms::el,
+    nsGkAtoms::th,
+    nsGkAtoms::he,
+    nsGkAtoms::ar,
+    nsGkAtoms::x_devanagari,
+    nsGkAtoms::x_tamil,
+    nsGkAtoms::x_armn,
+    nsGkAtoms::x_beng,
+    nsGkAtoms::x_cans,
+    nsGkAtoms::x_ethi,
+    nsGkAtoms::x_geor,
+    nsGkAtoms::x_gujr,
+    nsGkAtoms::x_guru,
+    nsGkAtoms::x_khmr,
+    nsGkAtoms::x_mlym,
+    nsGkAtoms::x_orya,
+    nsGkAtoms::x_telu,
+    nsGkAtoms::x_knda,
+    nsGkAtoms::x_sinh,
+    nsGkAtoms::x_tibt,
+    nsGkAtoms::Unicode
+};
+
 gfxPlatform::gfxPlatform()
   : mTileWidth(-1)
   , mTileHeight(-1)
   , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
+  , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -500,12 +538,19 @@ gfxPlatform::Init()
 
     nsresult rv;
 
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID) // temporary, until this is implemented on others
-    rv = gfxPlatformFontList::Init();
-    if (NS_FAILED(rv)) {
-        NS_RUNTIMEABORT("Could not initialize gfxPlatformFontList");
-    }
+    bool usePlatformFontList = true;
+#if defined(MOZ_WIDGET_GTK)
+    usePlatformFontList = gfxPlatformGtk::UseFcFontList();
+#elif defined(MOZ_WIDGET_QT)
+    usePlatformFontList = false;
 #endif
+
+    if (usePlatformFontList) {
+        rv = gfxPlatformFontList::Init();
+        if (NS_FAILED(rv)) {
+            NS_RUNTIMEABORT("Could not initialize gfxPlatformFontList");
+        }
+    }
 
     gPlatform->mScreenReferenceSurface =
         gPlatform->CreateOffscreenSurface(IntSize(1, 1),
@@ -840,7 +885,7 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     surf.mFormat = format;
     surf.mType = NativeSurfaceType::CAIRO_SURFACE;
     surf.mSurface = aSurface->CairoSurface();
-    surf.mSize = ToIntSize(aSurface->GetSize());
+    surf.mSize = aSurface->GetSize();
     // We return here regardless of whether CreateSourceSurfaceFromNativeSurface
     // succeeds or not since we don't expect to be able to do any better below
     // if it fails.
@@ -865,7 +910,7 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     surf.mFormat = format;
     surf.mType = NativeSurfaceType::D3D10_TEXTURE;
     surf.mSurface = static_cast<gfxD2DSurface*>(aSurface)->GetTexture();
-    surf.mSize = ToIntSize(aSurface->GetSize());
+    surf.mSize = aSurface->GetSize();
     mozilla::gfx::DrawTarget *dt = static_cast<mozilla::gfx::DrawTarget*>(aSurface->GetData(&kDrawTarget));
     if (dt) {
       dt->Flush();
@@ -913,7 +958,7 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     surf.mFormat = format;
     surf.mType = NativeSurfaceType::CAIRO_SURFACE;
     surf.mSurface = aSurface->CairoSurface();
-    surf.mSize = ToIntSize(aSurface->GetSize());
+    surf.mSize = aSurface->GetSize();
     RefPtr<DrawTarget> drawTarget =
       Factory::CreateDrawTarget(BackendType::CAIRO, IntSize(1, 1), format);
     if (!drawTarget) {
@@ -959,7 +1004,7 @@ gfxPlatform::GetWrappedDataSourceSurface(gfxASurface* aSurface)
   RefPtr<DataSourceSurface> result =
     Factory::CreateWrappingDataSourceSurface(image->Data(),
                                              image->Stride(),
-                                             ToIntSize(image->GetSize()),
+                                             image->GetSize(),
                                              ImageFormatToSurfaceFormat(image->Format()));
 
   if (!result) {
@@ -1472,6 +1517,19 @@ gfxPlatform::GetFontPrefLangFor(nsIAtom *aLang)
     return GetFontPrefLangFor(lang.get());
 }
 
+nsIAtom*
+gfxPlatform::GetLangGroupForPrefLang(eFontPrefLang aLang)
+{
+    // the special CJK set pref lang should be resolved into separate
+    // calls to individual CJK pref langs before getting here
+    NS_ASSERTION(aLang != eFontPrefLang_CJKSet, "unresolved CJK set pref lang");
+
+    if (uint32_t(aLang) < ArrayLength(gPrefLangToLangGroups)) {
+        return gPrefLangToLangGroups[uint32_t(aLang)];
+    }
+    return nsGkAtoms::Unicode;
+}
+
 const char*
 gfxPlatform::GetPrefLangName(eFontPrefLang aLang)
 {
@@ -1755,6 +1813,22 @@ gfxPlatform::GetBackendPref(const char* aBackendPrefName, uint32_t &aBackendBitm
 
     aBackendBitmask = allowedBackends;
     return result;
+}
+
+bool
+gfxPlatform::InSafeMode()
+{
+  static bool sSafeModeInitialized = false;
+  static bool sInSafeMode = false;
+
+  if (!sSafeModeInitialized) {
+    sSafeModeInitialized = true;
+    nsCOMPtr<nsIXULRuntime> xr = do_GetService("@mozilla.org/xre/runtime;1");
+    if (xr) {
+      xr->GetInSafeMode(&sInSafeMode);
+    }
+  }
+  return sInSafeMode;
 }
 
 bool
@@ -2068,7 +2142,6 @@ PRLogModuleInfo*
 gfxPlatform::GetLog(eGfxLog aWhichLog)
 {
     // logs shared across gfx
-#ifdef PR_LOGGING
     static PRLogModuleInfo *sFontlistLog = nullptr;
     static PRLogModuleInfo *sFontInitLog = nullptr;
     static PRLogModuleInfo *sTextrunLog = nullptr;
@@ -2110,9 +2183,6 @@ gfxPlatform::GetLog(eGfxLog aWhichLog)
     }
 
     return nullptr;
-#else
-    return nullptr;
-#endif
 }
 
 int
@@ -2173,7 +2243,7 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
  */
 static bool sLayersSupportsD3D9 = false;
 static bool sLayersSupportsD3D11 = false;
-static bool sLayersSupportsDXVA = false;
+static bool sLayersSupportsHardwareVideoDecoding = false;
 static bool sANGLESupportsD3D11 = false;
 static bool sBufferRotationCheckPref = true;
 static bool sPrefBrowserTabsRemoteAutostart = false;
@@ -2194,41 +2264,45 @@ InitLayersAccelerationPrefs()
     gfxPrefs::GetSingleton();
     sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
 
+    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    int32_t status;
 #ifdef XP_WIN
     if (gfxPrefs::LayersAccelerationForceEnabled()) {
       sLayersSupportsD3D9 = true;
       sLayersSupportsD3D11 = true;
-    } else {
-      nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
-      if (gfxInfo) {
-        int32_t status;
-        if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, &status))) {
-          if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
-            sLayersSupportsD3D9 = true;
-          }
+    } else if (gfxInfo) {
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, &status))) {
+        if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
+          sLayersSupportsD3D9 = true;
         }
-        if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status))) {
-          if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
-            sLayersSupportsD3D11 = true;
-          }
-        }
-        if (!gfxPrefs::LayersD3D11DisableWARP()) {
-          // Always support D3D11 when WARP is allowed.
+      }
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status))) {
+        if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
           sLayersSupportsD3D11 = true;
         }
-        if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DXVA, &status))) {
-          if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
-            sLayersSupportsDXVA = true;
-          }
-        }
-        if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, &status))) {
-          if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
+      }
+      if (!gfxPrefs::LayersD3D11DisableWARP()) {
+        // Always support D3D11 when WARP is allowed.
+        sLayersSupportsD3D11 = true;
+      }
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, &status))) {
+        if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
             sANGLESupportsD3D11 = true;
-          }
         }
       }
     }
 #endif
+
+    if (Preferences::GetBool("media.hardware-video-decoding.enabled", false) &&
+#ifdef XP_WIN
+        Preferences::GetBool("media.windows-media-foundation.use-dxva", true) &&
+#endif
+        NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING,
+                                               &status))) {
+      if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
+        sLayersSupportsHardwareVideoDecoding = true;
+      }
+    }
 
     sLayersAccelerationPrefsInitialized = true;
   }
@@ -2253,12 +2327,12 @@ gfxPlatform::CanUseDirect3D11()
 }
 
 bool
-gfxPlatform::CanUseDXVA()
+gfxPlatform::CanUseHardwareVideoDecoding()
 {
   // this function is called from the compositor thread, so it is not
   // safe to init the prefs etc. from here.
   MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
-  return sLayersSupportsDXVA;
+  return sLayersSupportsHardwareVideoDecoding;
 }
 
 bool
@@ -2326,6 +2400,45 @@ gfxPlatform::UsesOffMainThreadCompositing()
   }
 
   return result;
+}
+
+void
+gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
+{
+  if (SupportsApzWheelInput()) {
+    static const char *sBadPrefs[] = {
+      "mousewheel.system_scroll_override_on_root_content.enabled",
+      "mousewheel.default.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_x",
+      "mousewheel.with_control.delta_multiplier_x",
+      "mousewheel.with_meta.delta_multiplier_x",
+      "mousewheel.with_shift.delta_multiplier_x",
+      "mousewheel.with_win.delta_multiplier_x",
+      "mousewheel.with_alt.delta_multiplier_y",
+      "mousewheel.with_control.delta_multiplier_y",
+      "mousewheel.with_meta.delta_multiplier_y",
+      "mousewheel.with_shift.delta_multiplier_y",
+      "mousewheel.with_win.delta_multiplier_y",
+    };
+
+    nsString badPref;
+    for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sBadPrefs); i++) {
+      if (Preferences::HasUserValue(sBadPrefs[i])) {
+        badPref.AssignASCII(sBadPrefs[i]);
+        break;
+      }
+    }
+
+    aObj.DefineProperty("ApzWheelInput", 1);
+    if (badPref.Length()) {
+      aObj.DefineProperty("ApzWheelInputWarning", badPref);
+    }
+  }
+
+  if (SupportsApzTouchInput()) {
+    aObj.DefineProperty("ApzTouchInput", 1);
+  }
 }
 
 already_AddRefed<mozilla::gfx::VsyncSource>

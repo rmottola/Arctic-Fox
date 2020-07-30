@@ -60,7 +60,7 @@ EnableBatteryNotifications()
   }
 
   // Create custom window to watch battery event
-  // If we can get Goanna's window handle, this is unnecessary.
+  // If we can get Gecko's window handle, this is unnecessary.
 
   if (sHWnd == nullptr) {
     WNDCLASSW wc;

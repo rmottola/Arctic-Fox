@@ -9,6 +9,7 @@ possible to define custom filters if the built-in ones are not enough.
 """
 
 from collections import defaultdict, MutableSequence
+import itertools
 import os
 
 from .expression import (
@@ -71,10 +72,23 @@ class InstanceFilter(object):
     Generally only one instance of a class filter should be applied at a time.
     Two instances of `InstanceFilter` are considered equal if they have the
     same class name. This ensures only a single instance is ever added to
-    `filterlist`.
+    `filterlist`. This class also formats filters' __str__ method for easier
+    debugging.
     """
+    unique = True
+
+    def __init__(self, *args, **kwargs):
+        self.fmt_args = ', '.join(itertools.chain(
+            [str(a) for a in args],
+            ['{}={}'.format(k, v) for k, v in kwargs.iteritems()]))
+
     def __eq__(self, other):
-        return self.__class__ == other.__class__
+        if self.unique:
+            return self.__class__ == other.__class__
+        return self.__hash__() == other.__hash__()
+
+    def __str__(self):
+        return "{}({})".format(self.__class__.__name__, self.fmt_args)
 
 
 class subsuite(InstanceFilter):
@@ -92,6 +106,7 @@ class subsuite(InstanceFilter):
     :param name: The name of the subsuite to run (default None)
     """
     def __init__(self, name=None):
+        InstanceFilter.__init__(self, name=name)
         self.name = name
 
     def __call__(self, tests, values):
@@ -123,18 +138,20 @@ class chunk_by_slice(InstanceFilter):
     """
     Basic chunking algorithm that splits tests evenly across total chunks.
 
-    :param this: the current chunk, 1 <= this <= total
-    :param total: the total number of chunks
+    :param this_chunk: the current chunk, 1 <= this_chunk <= total_chunks
+    :param total_chunks: the total number of chunks
     :param disabled: Whether to include disabled tests in the chunking
                      algorithm. If False, each chunk contains an equal number
                      of non-disabled tests. If True, each chunk contains an
                      equal number of tests (default False)
     """
 
-    def __init__(self, this, total, disabled=False):
-        assert 1 <= this <= total
-        self.this = this
-        self.total = total
+    def __init__(self, this_chunk, total_chunks, disabled=False):
+        assert 1 <= this_chunk <= total_chunks
+        InstanceFilter.__init__(self, this_chunk, total_chunks,
+                                disabled=disabled)
+        self.this_chunk = this_chunk
+        self.total_chunks = total_chunks
         self.disabled = disabled
 
     def __call__(self, tests, values):
@@ -144,20 +161,20 @@ class chunk_by_slice(InstanceFilter):
         else:
             chunk_tests = [t for t in tests if 'disabled' not in t]
 
-        tests_per_chunk = float(len(chunk_tests)) / self.total
-        start = int(round((self.this - 1) * tests_per_chunk))
-        end = int(round(self.this * tests_per_chunk))
+        tests_per_chunk = float(len(chunk_tests)) / self.total_chunks
+        start = int(round((self.this_chunk - 1) * tests_per_chunk))
+        end = int(round(self.this_chunk * tests_per_chunk))
 
         if not self.disabled:
             # map start and end back onto original list of tests. Disabled
             # tests will still be included in the returned list, but each
             # chunk will contain an equal number of enabled tests.
-            if self.this == 1:
+            if self.this_chunk == 1:
                 start = 0
             else:
                 start = tests.index(chunk_tests[start])
 
-            if self.this == self.total:
+            if self.this_chunk == self.total_chunks:
                 end = len(tests)
             else:
                 end = tests.index(chunk_tests[end])
@@ -176,15 +193,16 @@ class chunk_by_dir(InstanceFilter):
     paths must be relative to the same root (typically the root of the source
     repository).
 
-    :param this: the current chunk, 1 <= this <= total
-    :param total: the total number of chunks
+    :param this_chunk: the current chunk, 1 <= this_chunk <= total_chunks
+    :param total_chunks: the total number of chunks
     :param depth: the minimum depth of a subdirectory before it will be
                   considered unique
     """
 
-    def __init__(self, this, total, depth):
-        self.this = this
-        self.total = total
+    def __init__(self, this_chunk, total_chunks, depth):
+        InstanceFilter.__init__(self, this_chunk, total_chunks, depth)
+        self.this_chunk = this_chunk
+        self.total_chunks = total_chunks
         self.depth = depth
 
     def __call__(self, tests, values):
@@ -200,16 +218,105 @@ class chunk_by_dir(InstanceFilter):
             dirs = dirs[:min(self.depth, len(dirs)-1)]
             path = os.sep.join(dirs)
 
-            if path not in tests_by_dir:
+            # don't count directories that only have disabled tests in them,
+            # but still yield disabled tests that are alongside enabled tests
+            if path not in ordered_dirs and 'disabled' not in test:
                 ordered_dirs.append(path)
             tests_by_dir[path].append(test)
 
-        tests_per_chunk = float(len(tests_by_dir)) / self.total
-        start = int(round((self.this - 1) * tests_per_chunk))
-        end = int(round(self.this * tests_per_chunk))
+        tests_per_chunk = float(len(ordered_dirs)) / self.total_chunks
+        start = int(round((self.this_chunk - 1) * tests_per_chunk))
+        end = int(round(self.this_chunk * tests_per_chunk))
 
         for i in range(start, end):
-            for test in tests_by_dir[ordered_dirs[i]]:
+            for test in tests_by_dir.pop(ordered_dirs[i]):
+                yield test
+
+        # find directories that only contain disabled tests. They still need to
+        # be yielded for reporting purposes. Put them all in chunk 1 for
+        # simplicity.
+        if self.this_chunk == 1:
+            disabled_dirs = [v for k, v in tests_by_dir.iteritems()
+                             if k not in ordered_dirs]
+            for disabled_test in itertools.chain(*disabled_dirs):
+                yield disabled_test
+
+
+class chunk_by_runtime(InstanceFilter):
+    """
+    Chunking algorithm that attempts to group tests into chunks based on their
+    average runtimes. It keeps manifests of tests together and pairs slow
+    running manifests with fast ones.
+
+    :param this_chunk: the current chunk, 1 <= this_chunk <= total_chunks
+    :param total_chunks: the total number of chunks
+    :param runtimes: dictionary of test runtime data, of the form
+                     {<test path>: <average runtime>}
+    :param default_runtime: value in seconds to assign tests that don't exist
+                            in the runtimes file
+    """
+
+    def __init__(self, this_chunk, total_chunks, runtimes, default_runtime=0):
+        InstanceFilter.__init__(self, this_chunk, total_chunks, runtimes,
+                                default_runtime=default_runtime)
+        self.this_chunk = this_chunk
+        self.total_chunks = total_chunks
+
+        # defaultdict(lambda:<int>) assigns all non-existent keys the value of
+        # <int>. This means all tests we encounter that don't exist in the
+        # runtimes file will be assigned `default_runtime`.
+        self.runtimes = defaultdict(lambda: default_runtime)
+        self.runtimes.update(runtimes)
+
+    def __call__(self, tests, values):
+        tests = list(tests)
+        manifests = set(t['manifest'] for t in tests)
+
+        def total_runtime(tests):
+            return sum(self.runtimes[t['relpath']] for t in tests
+                       if 'disabled' not in t)
+
+        tests_by_manifest = []
+        for manifest in manifests:
+            mtests = [t for t in tests if t['manifest'] == manifest]
+            tests_by_manifest.append((total_runtime(mtests), mtests))
+        tests_by_manifest.sort(reverse=True)
+
+        tests_by_chunk = [[0, []] for i in range(self.total_chunks)]
+        for runtime, batch in tests_by_manifest:
+            # sort first by runtime, then by number of tests in case of a tie.
+            # This guarantees the chunk with the fastest runtime will always
+            # get the next batch of tests.
+            tests_by_chunk.sort(key=lambda x: (x[0], len(x[1])))
+            tests_by_chunk[0][0] += runtime
+            tests_by_chunk[0][1].extend(batch)
+
+        return (t for t in tests_by_chunk[self.this_chunk-1][1])
+
+
+class tags(InstanceFilter):
+    """
+    Removes tests that don't contain any of the given tags. This overrides
+    InstanceFilter's __eq__ method, so multiple instances can be added.
+    Multiple tag filters is equivalent to joining tags with the AND operator.
+
+    :param tags: A tag or list of tags to filter tests on
+    """
+    unique = False
+
+    def __init__(self, tags):
+        InstanceFilter.__init__(self, tags)
+        if isinstance(tags, basestring):
+            tags = [tags]
+        self.tags = tags
+
+    def __call__(self, tests, values):
+        for test in tests:
+            if 'tags' not in test:
+                continue
+
+            test_tags = [t.strip() for t in test['tags'].split(',')]
+            if any(t in self.tags for t in test_tags):
                 yield test
 
 

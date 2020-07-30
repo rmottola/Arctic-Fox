@@ -15,7 +15,7 @@
 new
 
 # FIXME: these headers haven't been reviewed yet, but we use them
-# unsafely in Goanna, so we might as well prevent them from
+# unsafely in Gecko, so we might as well prevent them from
 # throwing exceptions
 algorithm
 atomic

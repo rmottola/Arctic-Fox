@@ -9,6 +9,7 @@
 #include "CameraPreviewMediaStream.h"
 #include "mozilla/dom/CameraManagerBinding.h"
 #include "mozilla/dom/File.h"
+#include "nsQueryObject.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -357,14 +358,21 @@ DOMCameraControlListener::OnTakePictureComplete(uint8_t* aData, uint32_t aLength
     RunCallback(nsDOMCameraControl* aDOMCameraControl) override
     {
       nsCOMPtr<nsIDOMBlob> picture =
-        File::CreateMemoryFile(mDOMCameraControl.get(),
+        Blob::CreateMemoryBlob(mDOMCameraControl.get(),
                                static_cast<void*>(mData),
                                static_cast<uint64_t>(mLength),
                                mMimeType);
       aDOMCameraControl->OnTakePictureComplete(picture);
+      mData = NULL;
     }
 
   protected:
+    virtual
+    ~Callback()
+    {
+        free(mData);
+    }
+
     uint8_t* mData;
     uint32_t mLength;
     nsString mMimeType;

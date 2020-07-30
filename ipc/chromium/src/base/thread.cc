@@ -11,7 +11,7 @@
 #include "mozilla/IOInterposer.h"
 
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 #endif
 
 namespace base {

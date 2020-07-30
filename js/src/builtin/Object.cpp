@@ -1191,6 +1191,7 @@ const Class PlainObject::class_ = {
         CreateObjectConstructor,
         CreateObjectPrototype,
         object_static_methods,
+        nullptr,
         object_methods,
         object_properties,
         FinishObjectClassInit

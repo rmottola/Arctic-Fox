@@ -31,7 +31,7 @@
 #include "base/message_pump_android.h"
 #endif
 #ifdef MOZ_TASK_TRACER
-#include "GoannaTaskTracer.h"
+#include "GeckoTaskTracer.h"
 #endif
 
 #include "MessagePump.h"

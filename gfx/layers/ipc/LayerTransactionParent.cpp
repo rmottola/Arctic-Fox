@@ -327,7 +327,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       layer->SetEventRegions(common.eventRegions());
       layer->SetContentFlags(common.contentFlags());
       layer->SetOpacity(common.opacity());
-      layer->SetClipRect(common.useClipRect() ? &common.clipRect() : nullptr);
+      layer->SetClipRect(common.useClipRect() ? Some(common.clipRect()) : Nothing());
       layer->SetBaseTransform(common.transform().value());
       layer->SetPostScale(common.postXScale(), common.postYScale());
       layer->SetIsFixedPosition(common.isFixedPosition());
@@ -608,7 +608,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
 #ifdef COMPOSITOR_PERFORMANCE_WARNING
   int compositeTime = (int)(mozilla::TimeStamp::Now() - updateStart).ToMilliseconds();
   if (compositeTime > 15) {
-    printf_stderr("Compositor: Layers update took %i ms (blocking goanna).\n", compositeTime);
+    printf_stderr("Compositor: Layers update took %i ms (blocking gecko).\n", compositeTime);
   }
 #endif
 
@@ -625,11 +625,9 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
         severity = 1.f;
       }
       mLayerManager->VisualFrameWarning(severity);
-#ifdef PR_LOGGING
       PR_LogPrint("LayerTransactionParent::RecvUpdate transaction from process %d took %f ms",
                   OtherPid(),
                   latency.ToMilliseconds());
-#endif
     }
   }
 
@@ -798,6 +796,13 @@ LayerTransactionParent::RecvRequestProperty(const nsString& aProperty, float* aV
   return true;
 }
 
+bool
+LayerTransactionParent::RecvSetConfirmedTargetAPZC(const uint64_t& aBlockId,
+                                                   nsTArray<ScrollableLayerGuid>&& aTargets)
+{
+  mShadowLayersManager->SetConfirmedTargetAPZC(this, aBlockId, aTargets);
+  return true;
+}
 
 bool
 LayerTransactionParent::Attach(ShadowLayerParent* aLayerParent,
@@ -971,7 +976,7 @@ LayerTransactionParent::ActorDestroy(ActorDestroyReason why)
 
 bool LayerTransactionParent::IsSameProcess() const
 {
-  return OtherPid() == ipc::kCurrentProcessId;
+  return OtherPid() == base::GetCurrentProcId();
 }
 
 void

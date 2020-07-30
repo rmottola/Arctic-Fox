@@ -56,6 +56,16 @@ const TIMELINE_BLUEPRINT = {
     stroke: "hsl(39,82%,49%)",
     label: L10N.getStr("timeline.label.javascript2")
   },
+  "Parse HTML": {
+    group: 1,
+    colorName: "highlight-lightorange",
+    label: L10N.getStr("timeline.label.parseHTML")
+  },
+  "Parse XML": {
+    group: 1,
+    colorName: "highlight-lightorange",
+    label: L10N.getStr("timeline.label.parseXML")
+  },
   "ConsoleTime": {
     group: 2,
     fill: "hsl(0,0%,80%)",

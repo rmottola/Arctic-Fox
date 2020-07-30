@@ -99,7 +99,7 @@ class B2GTestResultMixin(object):
                     b2g_status = "The B2G process has restarted after crashing during  the tests so "
                 else:
                     b2g_status = "B2G is still running but "
-                extra_output = ("%s\n%sMarionette can't respond due to either a Goanna, Gaia or Marionette error. "
+                extra_output = ("%s\n%sMarionette can't respond due to either a Gecko, Gaia or Marionette error. "
                                 "Above, the 5 most recent errors are listed. "
                                 "Check logcat for all errors if these errors are not the cause "
                                 "of the failure." % (message, b2g_status))

@@ -3,7 +3,7 @@ toolkit.jar:
 %  content global-platform %content/global-platform/ platform
 %  content global-region %content/global-region/
 # provide the nsTransferable in nsDragAndDrop.js to extensions that have to
-# work with Goannas from before 1.9, when there was a separate file
+# work with Geckos from before 1.9, when there was a separate file
 %  override chrome://global/content/nsTransferable.js chrome://global/content/nsDragAndDrop.js
 *  content/global/license.html                (license.html)
    content/global/XPCNativeWrapper.js         (XPCNativeWrapper.js)
@@ -27,7 +27,7 @@ toolkit.jar:
    content/global/aboutwebrtc/aboutWebrtc.xhtml (aboutwebrtc/aboutWebrtc.xhtml)
 *  content/global/aboutSupport.js
 *  content/global/aboutSupport.xhtml
-*  content/global/aboutTelemetry.js
+   content/global/aboutTelemetry.js
    content/global/aboutTelemetry.xhtml
    content/global/aboutTelemetry.css          (aboutTelemetry.css)
    content/global/directionDetector.html

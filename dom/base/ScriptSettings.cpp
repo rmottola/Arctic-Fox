@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-// vim: ft=cpp tw=78 sw=2 et ts=2
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -163,7 +163,7 @@ ScriptSettingsStackEntry::~ScriptSettingsStackEntry()
 // |SpecialPowers.wrap(crossOriginWindow).eval(open())|
 //
 // trigger this case. Although both the entry global and the current global
-// have normal principals, the use of Goanna-specific System-Principaled JS
+// have normal principals, the use of Gecko-specific System-Principaled JS
 // puts the code from two different origins on the callstack at once, which
 // doesn't happen normally on the web.
 static nsIGlobalObject*
@@ -566,6 +566,7 @@ AutoJSAPI::StealException(JS::MutableHandle<JS::Value> aVal)
 }
 
 AutoEntryScript::AutoEntryScript(nsIGlobalObject* aGlobalObject,
+                                 const char *aReason,
                                  bool aIsMainThread,
                                  JSContext* aCx)
   : AutoJSAPI(aGlobalObject, aIsMainThread,
@@ -586,7 +587,7 @@ AutoEntryScript::AutoEntryScript(nsIGlobalObject* aGlobalObject,
   }
 
   if (mDocShellForJSRunToCompletion) {
-    mDocShellForJSRunToCompletion->NotifyJSRunToCompletionStart();
+    mDocShellForJSRunToCompletion->NotifyJSRunToCompletionStart(aReason);
   }
 }
 

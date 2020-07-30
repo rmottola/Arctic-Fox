@@ -36,10 +36,10 @@ toplevel_event_watcher(GSignalInvocationHint* ihint,
                        const GValue*          param_values,
                        gpointer               data)
 {
-  static GQuark sQuark_goanna_acc_obj = 0;
+  static GQuark sQuark_gecko_acc_obj = 0;
 
-  if (!sQuark_goanna_acc_obj)
-    sQuark_goanna_acc_obj = g_quark_from_static_string("GoannaAccObj");
+  if (!sQuark_gecko_acc_obj)
+    sQuark_gecko_acc_obj = g_quark_from_static_string("GeckoAccObj");
 
   if (nsAccessibilityService::IsShutdown())
     return TRUE;
@@ -58,7 +58,7 @@ toplevel_event_watcher(GSignalInvocationHint* ihint,
 
       // Attach the dialog accessible to app accessible tree
       Accessible* windowAcc = GetAccService()->AddNativeRootAccessible(child);
-      g_object_set_qdata(G_OBJECT(child), sQuark_goanna_acc_obj,
+      g_object_set_qdata(G_OBJECT(child), sQuark_gecko_acc_obj,
                          reinterpret_cast<gpointer>(windowAcc));
 
     } else {
@@ -66,10 +66,10 @@ toplevel_event_watcher(GSignalInvocationHint* ihint,
       // Deattach the dialog accessible
       Accessible* windowAcc =
         reinterpret_cast<Accessible*>
-                        (g_object_get_qdata(G_OBJECT(child), sQuark_goanna_acc_obj));
+                        (g_object_get_qdata(G_OBJECT(child), sQuark_gecko_acc_obj));
       if (windowAcc) {
         GetAccService()->RemoveNativeRootAccessible(windowAcc);
-        g_object_set_qdata(G_OBJECT(child), sQuark_goanna_acc_obj, nullptr);
+        g_object_set_qdata(G_OBJECT(child), sQuark_gecko_acc_obj, nullptr);
       }
 
     }

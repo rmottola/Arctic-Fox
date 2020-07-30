@@ -13,9 +13,8 @@
 #include "AppleVTLinker.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/DebugOnly.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetAppleMediaLog() {
   static PRLogModuleInfo* log = nullptr;
   if (!log) {
@@ -23,7 +22,6 @@ PRLogModuleInfo* GetAppleMediaLog() {
   }
   return log;
 }
-#endif
 
 namespace mozilla {
 

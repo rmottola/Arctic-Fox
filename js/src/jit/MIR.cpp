@@ -1518,8 +1518,8 @@ MPhi::removeOperand(size_t index)
 void
 MPhi::removeAllOperands()
 {
-    for (MUse* p = inputs_.begin(), *e = inputs_.end(); p < e; ++p)
-        p->producer()->removeUse(p);
+    for (MUse& p : inputs_)
+        p.producer()->removeUse(&p);
     inputs_.clear();
 }
 
@@ -2690,7 +2690,8 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
 bool
 MBinaryInstruction::tryUseUnsignedOperands()
 {
-    MDefinition* newlhs, *newrhs;
+    MDefinition* newlhs;
+    MDefinition* newrhs;
     if (MustBeUInt32(getOperand(0), &newlhs) && MustBeUInt32(getOperand(1), &newrhs)) {
         if (newlhs->type() != MIRType_Int32 || newrhs->type() != MIRType_Int32)
             return false;
@@ -4273,6 +4274,16 @@ InlinePropertyTable::hasFunction(JSFunction* func) const
 {
     for (size_t i = 0; i < numEntries(); i++) {
         if (entries_[i]->func == func)
+            return true;
+    }
+    return false;
+}
+
+bool
+InlinePropertyTable::hasObjectGroup(ObjectGroup* group) const
+{
+    for (size_t i = 0; i < numEntries(); i++) {
+        if (entries_[i]->group == group)
             return true;
     }
     return false;

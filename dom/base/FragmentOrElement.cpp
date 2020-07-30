@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=79: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -456,7 +456,7 @@ FragmentOrElement::Children()
 
   if (!slots->mChildrenList) {
     slots->mChildrenList = new nsContentList(this, kNameSpaceID_Wildcard, 
-                                             nsGkAtoms::_asterix, nsGkAtoms::_asterix,
+                                             nsGkAtoms::_asterisk, nsGkAtoms::_asterisk,
                                              false);
   }
 
@@ -676,8 +676,8 @@ nsIContent::PreHandleEvent(EventChainPreVisitor& aVisitor)
   // Don't propagate mouseover and mouseout events when mouse is moving
   // inside chrome access only content.
   bool isAnonForEvents = IsRootOfChromeAccessOnlySubtree();
-  if ((aVisitor.mEvent->message == NS_MOUSE_ENTER_SYNTH ||
-       aVisitor.mEvent->message == NS_MOUSE_EXIT_SYNTH ||
+  if ((aVisitor.mEvent->message == NS_MOUSE_OVER ||
+       aVisitor.mEvent->message == NS_MOUSE_OUT ||
        aVisitor.mEvent->message == NS_POINTER_OVER ||
        aVisitor.mEvent->message == NS_POINTER_OUT) &&
       // Check if we should stop event propagation when event has just been
@@ -738,7 +738,7 @@ nsIContent::PreHandleEvent(EventChainPreVisitor& aVisitor)
               printf("Stopping %s propagation:"
                      "\n\toriginalTarget=%s \n\tcurrentTarget=%s %s"
                      "\n\trelatedTarget=%s %s \n%s",
-                     (aVisitor.mEvent->message == NS_MOUSE_ENTER_SYNTH)
+                     (aVisitor.mEvent->message == NS_MOUSE_OVER)
                        ? "mouseover" : "mouseout",
                      NS_ConvertUTF16toUTF8(ot).get(),
                      NS_ConvertUTF16toUTF8(ct).get(),
@@ -2529,7 +2529,7 @@ ShouldEscape(nsIContent* aParent)
     // Per the current spec noscript should be escaped in case
     // scripts are disabled or if document doesn't have
     // browsing context. However the latter seems to be a spec bug
-    // and Goanna hasn't traditionally done the former.
+    // and Gecko hasn't traditionally done the former.
     nsGkAtoms::noscript    
   };
   static mozilla::BloomFilter<12, nsIAtom> sFilter;

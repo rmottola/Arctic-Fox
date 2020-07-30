@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -27,7 +27,6 @@
 #include "nsContentUtils.h"
 #include "nsDebug.h"
 #include "nsError.h"
-#include "nsIDOMFile.h"
 #include "nsIPrincipal.h"
 
 namespace mozilla {
@@ -275,23 +274,6 @@ IDBMutableFile::CreateStream(bool aReadOnly)
   return result.forget();
 }
 
-void
-IDBMutableFile::SetThreadLocals()
-{
-  MOZ_ASSERT(IndexedDatabaseManager::IsMainProcess());
-  MOZ_ASSERT(mDatabase->GetOwner(), "Should have owner!");
-
-  QuotaManager::SetCurrentWindow(mDatabase->GetOwner());
-}
-
-void
-IDBMutableFile::UnsetThreadLocals()
-{
-  MOZ_ASSERT(IndexedDatabaseManager::IsMainProcess());
-
-  QuotaManager::SetCurrentWindow(nullptr);
-}
-
 JSObject*
 IDBMutableFile::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
@@ -345,20 +327,22 @@ IDBMutableFile::GetFileId() const
   return mFileInfo->Id();
 }
 
-already_AddRefed<nsIDOMFile>
+already_AddRefed<File>
 IDBMutableFile::CreateFileObject(IDBFileHandle* aFileHandle,
                                  MetadataParameters* aMetadataParams)
 {
-  nsRefPtr<FileImpl> impl =
-    new FileImplSnapshot(mName,
+  nsRefPtr<BlobImpl> impl =
+    new BlobImplSnapshot(mName,
                          mType,
                          aMetadataParams,
                          mFile,
                          aFileHandle,
                          mFileInfo);
 
-  nsCOMPtr<nsIDOMFile> fileSnapshot = new File(GetOwner(), impl);
-  return fileSnapshot.forget();
+  nsRefPtr<File> file = File::Create(GetOwner(), impl);
+  MOZ_ASSERT(file);
+
+  return file.forget();
 }
 
 already_AddRefed<DOMRequest>
@@ -408,12 +392,10 @@ GetFileHelper::GetSuccessResult(JSContext* aCx,
 
   auto fileHandle = static_cast<IDBFileHandle*>(mFileHandle.get());
 
-  nsCOMPtr<nsIDOMFile> domFile =
+  nsRefPtr<File> domFile =
     mMutableFile->CreateFileObject(fileHandle, mParams);
 
-  nsresult rv =
-    nsContentUtils::WrapNative(aCx, domFile, &NS_GET_IID(nsIDOMFile), aVal);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
+  if (!ToJSValue(aCx, domFile, aVal)) {
     return NS_ERROR_DOM_FILEHANDLE_UNKNOWN_ERR;
   }
 

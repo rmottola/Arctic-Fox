@@ -14,7 +14,7 @@
 #include "nsString.h"
 #include "nsXULAppAPI.h"
 #include "prprf.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsError.h"
 #include "prerror.h"
 #include "prerr.h"
@@ -380,7 +380,7 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
 #endif
 
 #ifdef ANDROID
-  __android_log_print(ANDROID_LOG_INFO, "Goanna", "%s", buf.buffer);
+  __android_log_print(ANDROID_LOG_INFO, "Gecko", "%s", buf.buffer);
 #endif
 
   // Write the message to stderr unless it's a warning and MOZ_IGNORE_WARNINGS

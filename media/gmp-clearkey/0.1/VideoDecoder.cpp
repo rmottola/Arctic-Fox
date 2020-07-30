@@ -98,7 +98,7 @@ VideoDecoder::Decode(GMPVideoEncodedFrame* aInputFrame,
                      int64_t aRenderTimeMs)
 {
   if (aInputFrame->BufferType() != GMP_BufferLength32) {
-    // Goanna should only send frames with 4 byte NAL sizes to GMPs.
+    // Gecko should only send frames with 4 byte NAL sizes to GMPs.
     mCallback->Error(GMPGenericErr);
     return;
   }
@@ -209,7 +209,7 @@ VideoDecoder::DecodeTask(GMPVideoEncodedFrame* aInput)
     if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) {
       AutoLock lock(mMutex);
       if (mNumInputTasks == 0) {
-        // We have run all input tasks. We *must* notify Goanna so that it will
+        // We have run all input tasks. We *must* notify Gecko so that it will
         // send us more data.
         MaybeRunOnMainThread(
           WrapTask(mCallback,

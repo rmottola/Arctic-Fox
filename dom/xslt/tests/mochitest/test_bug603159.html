@@ -38,7 +38,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=603159
   var content = document.getElementById("content");
   content.appendChild(fragment);
   
-  // use Goanna's Date.parse to parse, then compare the milliseconds since epoch
+  // use Gecko's Date.parse to parse, then compare the milliseconds since epoch
   var xslt_ms = Date.parse(content.innerHTML);
   var now_ms = new Date().getTime();
   var accepted_diff = 30 * 60 * 1000; // 30 minutes

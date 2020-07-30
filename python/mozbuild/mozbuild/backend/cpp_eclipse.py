@@ -27,7 +27,7 @@ class CppEclipseBackend(CommonBackend):
         CommonBackend._init(self)
 
         self._paths_to_defines = {}
-        self._project_name = 'Goanna'
+        self._project_name = 'Gecko'
         self._workspace_dir = self._get_workspace_path()
         self._project_dir = os.path.join(self._workspace_dir, self._project_name)
         self._overwriting_workspace = os.path.isdir(self._workspace_dir)
@@ -454,7 +454,7 @@ GECKO_LAUNCH_CONFIG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalon
 <stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN_SYMBOL" value="main"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_ARGUMENTS" value="@LAUNCH_ARGS@"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="@LAUNCH_PROGRAM@"/>
-<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="Goanna"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="Gecko"/>
 <booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="true"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value=""/>
 <booleanAttribute key="org.eclipse.cdt.launch.use_terminal" value="true"/>
@@ -489,7 +489,7 @@ B2GFLASH_LAUNCH_CONFIG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standa
 <booleanAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN" value="false"/>
 <stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN_SYMBOL" value="main"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="@LAUNCH_PROGRAM@"/>
-<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="Goanna"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="Gecko"/>
 <booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="true"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value=""/>
 <stringAttribute key="org.eclipse.cdt.launch.WORKING_DIRECTORY" value="@OBJDIR@"/>

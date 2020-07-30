@@ -139,7 +139,7 @@ void
 StartForceQuitWatchdog(hal::ShutdownMode aMode, int32_t aTimeoutSecs)
 {
   // Force-quits are intepreted a little more ferociously on Gonk,
-  // because while Goanna is in the process of shutting down, the user
+  // because while Gecko is in the process of shutting down, the user
   // can't call 911, for example.  And if we hang on shutdown, bad
   // things happen.  So, make sure that doesn't happen.
   if (aTimeoutSecs <= 0) {
@@ -147,7 +147,7 @@ StartForceQuitWatchdog(hal::ShutdownMode aMode, int32_t aTimeoutSecs)
   }
 
   // Use a raw pthread here to insulate ourselves from bugs in other
-  // Goanna code that we're trying to protect!
+  // Gecko code that we're trying to protect!
   // 
   // Note that we let the watchdog in charge of releasing |paramPtr|
   // if the pthread is successfully created.

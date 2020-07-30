@@ -222,7 +222,7 @@ AppInfoProvider.prototype = Object.freeze({
     }.bind(this);
 
     // Services.appInfo should always be defined for any reasonably behaving
-    // Goanna app. If it isn't, we insert a empty string sentinel value.
+    // Gecko app. If it isn't, we insert a empty string sentinel value.
     let ai;
     try {
       ai = Services.appinfo;

@@ -30,7 +30,7 @@ interface nsIPowerManagerService : nsISupports
   void              reboot();
 
   /**
-   * This API will restart the Goanna processes without powering off the machine.
+   * This API will restart the Gecko processes without powering off the machine.
    */
   void              restart();
 

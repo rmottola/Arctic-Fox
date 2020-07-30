@@ -15,6 +15,6 @@ main.assets = TOPSRCDIR + '/mobile/android/base/tests/assets'
 main.referenced_projects += ['Fennec']
 
 main.add_classpathentry('harness', SRCDIR,
-    dstdir='harness/org/mozilla/goanna')
+    dstdir='harness/org/mozilla/gecko')
 main.add_classpathentry('src', TOPSRCDIR + '/mobile/android/base/tests',
-    dstdir='src/org/mozilla/goanna/tests')
+    dstdir='src/org/mozilla/gecko/tests')

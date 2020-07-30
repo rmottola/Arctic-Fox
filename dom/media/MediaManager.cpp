@@ -26,6 +26,12 @@
 #include "nsIIDNService.h"
 #include "nsNetUtil.h"
 #include "nsPrincipal.h"
+#include "nsICryptoHash.h"
+#include "nsICryptoHMAC.h"
+#include "nsIKeyModule.h"
+#include "nsAppDirectoryServiceDefs.h"
+#include "nsIInputStream.h"
+#include "nsILineInputStream.h"
 #include "mozilla/Types.h"
 #include "mozilla/PeerIdentity.h"
 #include "mozilla/dom/ContentChild.h"
@@ -34,9 +40,14 @@
 #include "mozilla/dom/MediaStreamTrackBinding.h"
 #include "mozilla/dom/GetUserMediaRequestBinding.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/Base64.h"
+#include "mozilla/ipc/BackgroundChild.h"
+#include "mozilla/media/MediaChild.h"
 #include "MediaTrackConstraints.h"
+#include "VideoUtils.h"
 #include "Latency.h"
 #include "nsProxyRelease.h"
+#include "nsNullPrincipal.h"
 
 // For PR_snprintf
 #include "prprf.h"
@@ -66,6 +77,8 @@
 #include "mozilla/WindowsVersion.h"
 #endif
 
+#include <map>
+
 // GetCurrentTime is defined in winbase.h as zero argument macro forwarding to
 // GetTickCount() and conflicts with MediaStream::GetCurrentTime.
 #ifdef GetCurrentTime
@@ -90,7 +103,6 @@ namespace mozilla {
 #undef LOG
 #endif
 
-#ifdef PR_LOGGING
 PRLogModuleInfo*
 GetMediaManagerLog()
 {
@@ -100,10 +112,8 @@ GetMediaManagerLog()
   return sLog;
 }
 #define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
-#else
-#define LOG(msg)
-#endif
 
+using dom::File;
 using dom::MediaStreamConstraints;
 using dom::MediaTrackConstraintSet;
 using dom::MediaTrackConstraints;
@@ -117,8 +127,8 @@ using dom::SupportedVideoConstraints;
 static bool
 HostInDomain(const nsCString &aHost, const nsCString &aPattern)
 {
-  PRInt32 patternOffset = 0;
-  PRInt32 hostOffset = 0;
+  int32_t patternOffset = 0;
+  int32_t hostOffset = 0;
 
   // Act on '*.' wildcard in the left-most position in a domain pattern.
   if (aPattern.Length() > 2 && aPattern[0] == '*' && aPattern[1] == '.') {
@@ -256,53 +266,6 @@ private:
 };
 
 /**
- * Invoke the "onSuccess" callback in content. The callback will take a
- * DOMBlob in the case of {picture:true}, and a MediaStream in the case of
- * {audio:true} or {video:true}. There is a constructor available for each
- * form. Do this only on the main thread.
- */
-class SuccessCallbackRunnable : public nsRunnable
-{
-public:
-  SuccessCallbackRunnable(
-    nsCOMPtr<nsIDOMGetUserMediaSuccessCallback>& aOnSuccess,
-    nsCOMPtr<nsIDOMGetUserMediaErrorCallback>& aOnFailure,
-    nsIDOMFile* aFile, uint64_t aWindowID)
-    : mFile(aFile)
-    , mWindowID(aWindowID)
-    , mManager(MediaManager::GetInstance())
-  {
-    mOnSuccess.swap(aOnSuccess);
-    mOnFailure.swap(aOnFailure);
-  }
-
-  NS_IMETHOD
-  Run()
-  {
-    // Only run if the window is still active.
-    NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
-
-    nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> onSuccess = mOnSuccess.forget();
-    nsCOMPtr<nsIDOMGetUserMediaErrorCallback> onFailure = mOnFailure.forget();
-
-    if (!(mManager->IsWindowStillActive(mWindowID))) {
-      return NS_OK;
-    }
-    // This is safe since we're on main-thread, and the windowlist can only
-    // be invalidated from the main-thread (see OnNavigation)
-    onSuccess->OnSuccess(mFile);
-    return NS_OK;
-  }
-
-private:
-  nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> mOnSuccess;
-  nsCOMPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
-  nsCOMPtr<nsIDOMFile> mFile;
-  uint64_t mWindowID;
-  nsRefPtr<MediaManager> mManager; // get ref to this when creating the runnable
-};
-
-/**
  * Invoke the GetUserMediaDevices success callback. Wrapped in a runnable
  * so that it may be called on the main thread. The error callback is also
  * passed so it can be released correctly.
@@ -335,6 +298,50 @@ public:
     }
   }
 
+  nsresult
+  AnonymizeId(nsAString& aId, const nsACString& aOriginKey)
+  {
+    nsresult rv;
+    nsCOMPtr<nsIKeyObjectFactory> factory =
+      do_GetService("@mozilla.org/security/keyobjectfactory;1", &rv);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    nsCString rawKey;
+    rv = Base64Decode(aOriginKey, rawKey);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    nsCOMPtr<nsIKeyObject> key;
+    rv = factory->KeyFromString(nsIKeyObject::HMAC, rawKey, getter_AddRefs(key));
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    nsCOMPtr<nsICryptoHMAC> hasher =
+      do_CreateInstance(NS_CRYPTO_HMAC_CONTRACTID, &rv);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    rv = hasher->Init(nsICryptoHMAC::SHA256, key);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    NS_ConvertUTF16toUTF8 id(aId);
+    rv = hasher->Update(reinterpret_cast<const uint8_t*> (id.get()), id.Length());
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    nsCString mac;
+    rv = hasher->Finish(true, mac);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    aId = NS_ConvertUTF8toUTF16(mac);
+    return NS_OK;
+  }
+
   NS_IMETHOD
   Run()
   {
@@ -348,7 +355,7 @@ public:
     nsCOMPtr<nsIWritableVariant> devices =
       do_CreateInstance("@mozilla.org/variant;1");
 
-    int32_t len = mDevices->Length();
+    size_t len = mDevices->Length();
     if (len == 0) {
       // XXX
       // We should in the future return an empty array, and dynamically add
@@ -364,8 +371,14 @@ public:
     }
 
     nsTArray<nsIMediaDevice*> tmp(len);
-    for (int32_t i = 0; i < len; i++) {
-      tmp.AppendElement(mDevices->ElementAt(i));
+    for (auto& device : *mDevices) {
+      if (!mOriginKey.IsEmpty()) {
+        nsString id;
+        device->GetId(id);
+        AnonymizeId(id, mOriginKey);
+        device->SetId(id);
+      }
+      tmp.AppendElement(device);
     }
 
     devices->SetAsArray(nsIDataType::VTYPE_INTERFACE,
@@ -379,6 +392,7 @@ public:
     return NS_OK;
   }
 
+  nsCString mOriginKey;
 private:
   nsCOMPtr<nsIGetUserMediaDevicesSuccessCallback> mOnSuccess;
   nsCOMPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
@@ -424,7 +438,7 @@ MediaDevice::MediaDevice(MediaEngineSource* aSource)
 
 VideoDevice::VideoDevice(MediaEngineVideoSource* aSource)
   : MediaDevice(aSource) {
-#ifdef MOZ_B2G_CAMERA
+#if defined(MOZ_B2G_CAMERA) && defined(MOZ_WIDGET_GONK)
   if (mName.EqualsLiteral("back")) {
     mHasFacingMode = true;
     mFacingMode = dom::VideoFacingModeEnum::Environment;
@@ -468,22 +482,31 @@ uint32_t
 VideoDevice::GetBestFitnessDistance(
     const nsTArray<const MediaTrackConstraintSet*>& aConstraintSets)
 {
+  // TODO: Minimal kludge to fix plain and ideal facingMode regression, for
+  // smooth landing and uplift. Proper cleanup is forthcoming (1037389).
+  uint64_t distance = 0;
+
   // Interrogate device-inherent properties first.
   for (size_t i = 0; i < aConstraintSets.Length(); i++) {
     auto& c = *aConstraintSets[i];
     if (!c.mFacingMode.IsConstrainDOMStringParameters() ||
+        c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.WasPassed() ||
         c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.WasPassed()) {
       nsString deviceFacingMode;
       GetFacingMode(deviceFacingMode);
       if (c.mFacingMode.IsString()) {
         if (c.mFacingMode.GetAsString() != deviceFacingMode) {
-          return UINT32_MAX;
+          if (i == 0) {
+            distance = 1000;
+          }
         }
       } else if (c.mFacingMode.IsStringSequence()) {
         if (!c.mFacingMode.GetAsStringSequence().Contains(deviceFacingMode)) {
-          return UINT32_MAX;
+          if (i == 0) {
+            distance = 1000;
+          }
         }
-      } else {
+      } else if (c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.WasPassed()) {
         auto& exact = c.mFacingMode.GetAsConstrainDOMStringParameters().mExact.Value();
         if (exact.IsString()) {
           if (exact.GetAsString() != deviceFacingMode) {
@@ -491,6 +514,19 @@ VideoDevice::GetBestFitnessDistance(
           }
         } else if (!exact.GetAsStringSequence().Contains(deviceFacingMode)) {
           return UINT32_MAX;
+        }
+      } else if (c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.WasPassed()) {
+        auto& ideal = c.mFacingMode.GetAsConstrainDOMStringParameters().mIdeal.Value();
+        if (ideal.IsString()) {
+          if (ideal.GetAsString() != deviceFacingMode) {
+            if (i == 0) {
+              distance = 1000;
+            }
+          }
+        } else if (!ideal.GetAsStringSequence().Contains(deviceFacingMode)) {
+          if (i == 0) {
+            distance = 1000;
+          }
         }
       }
     }
@@ -501,7 +537,8 @@ VideoDevice::GetBestFitnessDistance(
     }
   }
   // Forward request to underlying object to interrogate per-mode capabilities.
-  return GetSource()->GetBestFitnessDistance(aConstraintSets);
+  distance += uint64_t(GetSource()->GetBestFitnessDistance(aConstraintSets));
+  return uint32_t(std::min(distance, uint64_t(UINT32_MAX)));
 }
 
 AudioDevice::AudioDevice(MediaEngineAudioSource* aSource)
@@ -946,7 +983,7 @@ public:
 
     nsCOMPtr<nsIPrincipal> principal;
     if (mPeerIdentity) {
-      principal = do_CreateInstance("@mozilla.org/nullprincipal;1");
+      principal = nsNullPrincipal::Create();
       trackunion->SetPeerIdentity(mPeerIdentity.forget());
     } else {
       principal = window->GetExtantDoc()->NodePrincipal();
@@ -1060,12 +1097,22 @@ static void
   nsTArray<const MediaTrackConstraintSet*> aggregateConstraints;
   aggregateConstraints.AppendElement(&c);
 
+  std::multimap<uint32_t, nsRefPtr<DeviceType>> ordered;
+
   for (uint32_t i = 0; i < candidateSet.Length();) {
-    if (candidateSet[i]->GetBestFitnessDistance(aggregateConstraints) == UINT32_MAX) {
+    uint32_t distance = candidateSet[i]->GetBestFitnessDistance(aggregateConstraints);
+    if (distance == UINT32_MAX) {
       candidateSet.RemoveElementAt(i);
     } else {
+      ordered.insert(std::pair<uint32_t, nsRefPtr<DeviceType>>(distance,
+                                                               candidateSet[i]));
       ++i;
     }
+  }
+  // Order devices by shortest distance
+  for (auto& ordinal : ordered) {
+    candidateSet.RemoveElement(ordinal.second);
+    candidateSet.AppendElement(ordinal.second);
   }
 
   // Then apply advanced constraints.
@@ -1167,7 +1214,7 @@ public:
   void
   Run()
   {
-    NS_ASSERTION(!NS_IsMainThread(), "Don't call on main thread");
+    MOZ_ASSERT(!NS_IsMainThread());
     MOZ_ASSERT(mOnSuccess);
     MOZ_ASSERT(mOnFailure);
 
@@ -1256,6 +1303,11 @@ public:
   {
     MOZ_ASSERT(mOnSuccess);
     MOZ_ASSERT(mOnFailure);
+
+    if (!IsOn(mConstraints.mVideo) && !IsOn(mConstraints.mAudio)) {
+      Fail(NS_LITERAL_STRING("NotSupportedError"));
+      return NS_ERROR_FAILURE;
+    }
     if (IsOn(mConstraints.mVideo)) {
       nsTArray<nsRefPtr<VideoDevice>> sources;
       GetSources(backend, GetInvariant(mConstraints.mVideo),
@@ -1279,6 +1331,11 @@ public:
       // Pick the first available device.
       mAudioDevice = sources[0];
       LOG(("Selected audio device"));
+    }
+
+    if (!mAudioDevice && !mVideoDevice) {
+      Fail(NS_LITERAL_STRING("NotFoundError"));
+      return NS_ERROR_FAILURE;
     }
 
     return NS_OK;
@@ -1371,121 +1428,33 @@ private:
 };
 #endif
 
+class SanitizeDeviceIdsTask : public Task
+{
+public:
+  explicit SanitizeDeviceIdsTask(int64_t aSinceWhen)
+  : mSinceWhen(aSinceWhen) {}
+
+  void // NS_IMETHOD
+  Run()
+  {
+    MOZ_ASSERT(!NS_IsMainThread());
+    nsRefPtr<media::ChildPledge<bool>> p =
+        mozilla::media::SanitizeOriginKeys(mSinceWhen); // we fire and forget
+  }
+private:
+  int64_t mSinceWhen;
+};
+
 /**
  * Similar to GetUserMediaTask, but used for the chrome-only
  * GetUserMediaDevices function. Enumerates a list of audio & video devices,
  * wraps them up in nsIMediaDevice objects and returns it to the success
  * callback.
+ *
+ * All code in this class runs on the MediaManager thread.
  */
 class GetUserMediaDevicesTask : public Task
 {
-  static unsigned char* unconst_uchar_cast(const char *s) {
-    return reinterpret_cast<unsigned char*>(const_cast<char*>(s));
-  }
-
-  // Cribbed from nricectx.cpp
-  static nsresult
-  hmac_sha1(const char *key, int keyl, const char *buf, int bufl,
-            unsigned char *result) {
-    const CK_MECHANISM_TYPE mech = CKM_SHA_1_HMAC;
-    PK11SlotInfo *slot = 0;
-    MOZ_ASSERT(keyl > 0);
-    SECItem keyi = { siBuffer, unconst_uchar_cast(key),
-                     static_cast<unsigned int>(keyl) };
-    PK11SymKey *skey = 0;
-    PK11Context *hmac_ctx = 0;
-    SECStatus status;
-    unsigned int hmac_len;
-    SECItem param = { siBuffer, nullptr, 0 };
-    nsresult rv = NS_ERROR_UNEXPECTED;
-
-    slot = PK11_GetInternalKeySlot();
-    if (!slot) {
-      goto abort;
-    }
-    skey = PK11_ImportSymKey(slot, mech, PK11_OriginUnwrap, CKA_SIGN, &keyi,
-                             nullptr);
-    if (!skey) {
-      goto abort;
-    }
-
-    hmac_ctx = PK11_CreateContextBySymKey(mech, CKA_SIGN, skey, &param);
-    if (!hmac_ctx) {
-      goto abort;
-    }
-    status = PK11_DigestBegin(hmac_ctx);
-    if (status != SECSuccess) {
-      goto abort;
-    }
-    status = PK11_DigestOp(hmac_ctx, unconst_uchar_cast(buf), bufl);
-    if (status != SECSuccess) {
-      goto abort;
-    }
-    status = PK11_DigestFinal(hmac_ctx, result, &hmac_len, 20);
-    if (status != SECSuccess) {
-      goto abort;
-    }
-    MOZ_ASSERT(hmac_len == 20);
-    rv = NS_OK;
-
-  abort:
-    if (hmac_ctx) {
-      PK11_DestroyContext(hmac_ctx, PR_TRUE);
-    }
-    if (skey) {
-      PK11_FreeSymKey(skey);
-    }
-    if (slot) {
-      PK11_FreeSlot(slot);
-    }
-    return rv;
-  }
-
-  nsresult AnonymizeId(nsAString& aId, const nsACString& origin) {
-    // deviceId would be a supercookie if we returned it. Anonymize it:
-    // 1. Get (or create) a persistent uuid for this origin.
-    // 2. Return hmac_sha1(uuid, id) - an anonymized id unique to origin.
-
-    static bool loaded = false;
-    if (!loaded) {
-      // load OriginUuids from disk.
-    }
-    OriginUuid* originUuid;
-    if (!mManager->mOriginUuids.Get(origin, &originUuid)) {
-      char uuid[NSID_LENGTH];
-      {
-        nsresult rv;
-        nsID id;
-        {
-          nsCOMPtr<nsIUUIDGenerator> uuidgen =
-              do_GetService("@mozilla.org/uuid-generator;1", &rv);
-          NS_ENSURE_SUCCESS(rv, rv);
-          rv = uuidgen->GenerateUUIDInPlace(&id);
-          NS_ENSURE_SUCCESS(rv, rv);
-        }
-        id.ToProvidedString(uuid);
-      }
-      originUuid = new OriginUuid(uuid, false);
-      mManager->mOriginUuids.Put(origin, originUuid);
-    }
-
-    unsigned char mac[20];
-    {
-      NS_ConvertUTF16toUTF8 id(aId);
-      hmac_sha1(originUuid->mUuid.get(), originUuid->mUuid.Length(),
-                id.get(), id.Length(), mac);
-    }
-    char hex[sizeof(mac) * 2 + 1];
-    auto& m = mac;
-    PR_snprintf(hex, sizeof(hex), // Use first 16 bytes of hmac as id
-                "%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x"
-                "%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x",
-                m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
-                m[8], m[9], m[10],m[11], m[12], m[13], m[14], m[15]);
-    aId = NS_ConvertUTF8toUTF16(hex);
-    return NS_OK;
-  }
-
 public:
   GetUserMediaDevicesTask(
     const MediaStreamConstraints& aConstraints,
@@ -1493,7 +1462,7 @@ public:
     already_AddRefed<nsIDOMGetUserMediaErrorCallback> aOnFailure,
     uint64_t aWindowId, nsACString& aAudioLoopbackDev,
     nsACString& aVideoLoopbackDev, bool aPrivileged, const nsACString& aOrigin,
-    bool aUseFakeDevices)
+    bool aInPrivateBrowsing, bool aUseFakeDevices)
     : mConstraints(aConstraints)
     , mOnSuccess(aOnSuccess)
     , mOnFailure(aOnFailure)
@@ -1503,12 +1472,13 @@ public:
     , mLoopbackVideoDevice(aVideoLoopbackDev)
     , mPrivileged(aPrivileged)
     , mOrigin(aOrigin)
+    , mInPrivateBrowsing(aInPrivateBrowsing)
     , mUseFakeDevices(aUseFakeDevices) {}
 
   void // NS_IMETHOD
   Run()
   {
-    NS_ASSERTION(!NS_IsMainThread(), "Don't call on main thread");
+    MOZ_ASSERT(!NS_IsMainThread());
 
     nsRefPtr<MediaEngine> backend;
     if (mConstraints.mFake || mUseFakeDevices)
@@ -1537,35 +1507,29 @@ public:
         result->AppendElement(source);
       }
     }
-
-    nsresult rv = NS_OK;
-    if (!mPrivileged) {
-      for (auto& source : *result) {
-        nsString id;
-        source->GetId(id);
-        rv = AnonymizeId(id, mOrigin);
-        if (NS_FAILED(rv)) {
-          break;
-        }
-        source->SetId(id);
-      }
-    }
-    if (NS_SUCCEEDED(rv)) {
-      NS_DispatchToMainThread(new DeviceSuccessCallbackRunnable(mWindowId,
-                                                                mOnSuccess,
-                                                                mOnFailure,
-                                                                result.forget()));
+    // In the case of failure with this newly allocated runnable, we
+    // intentionally leak the runnable, because we've pawned mOnSuccess and
+    // mOnFailure onto it which are main thread objects unsafe to release here.
+    DeviceSuccessCallbackRunnable* runnable =
+        new DeviceSuccessCallbackRunnable(mWindowId, mOnSuccess, mOnFailure,
+                                          result.forget());
+    if (mPrivileged) {
+      NS_DispatchToMainThread(runnable);
     } else {
-      nsRefPtr<MediaMgrError> error = new
-          MediaMgrError(NS_LITERAL_STRING("InternalError"),
-                        NS_LITERAL_STRING("Unexpected error"));
-      NS_DispatchToMainThread(
-        new ErrorCallbackRunnable<nsIGetUserMediaDevicesSuccessCallback>(mOnSuccess,
-                                                                         mOnFailure,
-                                                                         *error,
-                                                                         mWindowId));
+      // Get persistent origin-unique uuid to anonymize deviceIds back on main.
+      //
+      // GetOriginKey is an async API that returns a pledge (as promise-like
+      // pattern). We use .Then() to pass in a lambda to run back on this
+      // thread once GetOriginKey resolves asynchronously . The "runnable"
+      // pointer is "captured" (passed by value) into the lambda.
+      nsRefPtr<media::ChildPledge<nsCString>> p =
+          media::GetOriginKey(mOrigin, mInPrivateBrowsing);
+      p->Then([runnable](nsCString result) mutable {
+        runnable->mOriginKey = result;
+        NS_DispatchToMainThread(runnable);
+      });
     }
-    // DeviceSuccessCallbackRunnable should have taken these.
+    // One of the Runnables have taken these.
     MOZ_ASSERT(!mOnSuccess && !mOnFailure);
   }
 
@@ -1583,6 +1547,7 @@ private:
   nsCString mLoopbackVideoDevice;
   bool mPrivileged;
   nsCString mOrigin;
+  bool mInPrivateBrowsing;
   bool mUseFakeDevices;
 };
 
@@ -1611,6 +1576,16 @@ NS_IMPL_ISUPPORTS(MediaManager, nsIMediaManagerService, nsIObserver)
 
 /* static */ StaticRefPtr<MediaManager> MediaManager::sSingleton;
 
+#ifdef DEBUG
+/* static */ bool
+MediaManager::IsInMediaThread()
+{
+  return sSingleton?
+      (sSingleton->mMediaThread->thread_id() == PlatformThread::CurrentId()) :
+      false;
+}
+#endif
+
 // NOTE: never Dispatch(....,NS_DISPATCH_SYNC) to the MediaManager
 // thread from the MainThread, as we NS_DISPATCH_SYNC to MainThread
 // from MediaManager thread.
@@ -1618,7 +1593,11 @@ NS_IMPL_ISUPPORTS(MediaManager, nsIMediaManagerService, nsIObserver)
 MediaManager::Get() {
   if (!sSingleton) {
     NS_ASSERTION(NS_IsMainThread(), "Only create MediaManager on main thread");
-
+#ifdef DEBUG
+    static int timesCreated = 0;
+    timesCreated++;
+    MOZ_ASSERT(timesCreated == 1);
+#endif
     sSingleton = new MediaManager();
 
     sSingleton->mMediaThread = new base::Thread("MediaManager");
@@ -1651,6 +1630,11 @@ MediaManager::Get() {
       prefs->AddObserver("media.navigator.video.default_minfps", sSingleton, false);
     }
   }
+  return sSingleton;
+}
+
+/* static */  MediaManager*
+MediaManager::GetIfExists() {
   return sSingleton;
 }
 
@@ -1862,11 +1846,18 @@ MediaManager::GetUserMedia(
                                 "media.getusermedia.browser.enabled" :
                                 "media.getusermedia.screensharing.enabled"),
                                 false) ||
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
           (
+            // Allow tab sharing for all platforms including XP and OSX 10.6
+            (src != dom::MediaSourceEnum::Browser) &&
             !Preferences::GetBool("media.getusermedia.screensharing.allow_on_old_platforms",
                                   false) &&
+#if defined(XP_MACOSX)
             !nsCocoaFeatures::OnLionOrLater()
+#endif
+#if defined (XP_WIN)
+              !IsVistaOrLater()
+#endif
             ) ||
 #endif
           (!privileged && !HostHasPermission(*docURI))) {
@@ -1892,7 +1883,7 @@ MediaManager::GetUserMedia(
     }
   }
 
-#ifdef MOZ_B2G_CAMERA
+#if defined(MOZ_B2G_CAMERA) && defined(MOZ_WIDGET_GONK)
   if (mCameraManager == nullptr) {
     mCameraManager = nsDOMCameraManager::CreateInstance(aWindow);
   }
@@ -1999,15 +1990,19 @@ MediaManager::GetUserMediaDevices(nsPIDOMWindow* aWindow,
     Preferences::GetBool("media.navigator.streams.fake", false);
 
   nsCString origin;
-  nsPrincipal::GetOriginForURI(aWindow->GetDocumentURI(),
-                               getter_Copies(origin));
-
+  nsPrincipal::GetOriginForURI(aWindow->GetDocumentURI(), origin);
+  bool inPrivateBrowsing;
+  {
+    nsCOMPtr<nsIDocument> doc = aWindow->GetDoc();
+    nsCOMPtr<nsILoadContext> loadContext = doc->GetLoadContext();
+    inPrivateBrowsing = loadContext && loadContext->UsePrivateBrowsing();
+  }
   MediaManager::GetMessageLoop()->PostTask(FROM_HERE,
     new GetUserMediaDevicesTask(
       aConstraints, onSuccess.forget(), onFailure.forget(),
       (aInnerWindowID ? aInnerWindowID : aWindow->WindowID()),
       loopbackAudioDevice, loopbackVideoDevice, aPrivileged, origin,
-      useFakeStreams));
+      inPrivateBrowsing, useFakeStreams));
 
   return NS_OK;
 }
@@ -2224,8 +2219,34 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
       prefs->RemoveObserver("media.navigator.video.default_minfps", this);
     }
 
-    // Close off any remaining active windows.
+    // Because mMediaThread is not an nsThread, we must dispatch to it so it can
+    // clean up BackgroundChild. Continue stopping thread once this is done.
+
+    class ShutdownTask : public Task
     {
+    public:
+      explicit ShutdownTask(nsRunnable* aReply) : mReply(aReply) {}
+    private:
+      virtual void
+      Run()
+      {
+        MOZ_ASSERT(MediaManager::IsInMediaThread());
+        mozilla::ipc::BackgroundChild::CloseForCurrentThread();
+        NS_DispatchToMainThread(mReply);
+      }
+      nsRefPtr<nsRunnable> mReply;
+    };
+
+    // Post ShutdownTask to execute on mMediaThread and pass in a lambda
+    // callback to be executed back on this thread once it is done.
+    //
+    // The lambda callback "captures" the 'this' pointer for member access.
+    // This is safe since this is guaranteed to be here since sSingleton isn't
+    // cleared until the lambda function clears it.
+
+    MediaManager::GetMessageLoop()->PostTask(FROM_HERE, new ShutdownTask(
+        media::NewRunnableFrom([this]() mutable {
+      // Close off any remaining active windows.
       MutexAutoLock lock(mMutex);
       GetActiveWindows()->Clear();
       mActiveCallbacks.Clear();
@@ -2237,11 +2258,8 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
         mMediaThread->Stop();
       }
       mBackend = nullptr;
-    }
-
-#ifdef MOZ_WEBRTC
-    StopWebRtcLog();
-#endif
+      return NS_OK;
+    })));
     return NS_OK;
 
   } else if (!strcmp(aTopic, "getUserMedia:response:allow")) {
@@ -2474,6 +2492,17 @@ MediaManager::MediaCaptureWindowState(nsIDOMWindow* aWindow, bool* aVideo,
        *aScreenShare ? "screenshare" : "",  *aWindowShare ? "windowshare" : "",
        *aAppShare ? "appshare" : "", *aBrowserShare ? "browsershare" : ""));
 #endif
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+MediaManager::SanitizeDeviceIds(int64_t aSinceWhen)
+{
+  NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
+  LOG(("%s: sinceWhen = %llu", __FUNCTION__, aSinceWhen));
+
+  MediaManager::GetMessageLoop()->PostTask(FROM_HERE,
+    new SanitizeDeviceIdsTask(aSinceWhen));
   return NS_OK;
 }
 

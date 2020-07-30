@@ -202,7 +202,7 @@ RunCustomRecreation() {
 /**
  * Every thread should be marked as either TINFO_FLAG_NUWA_SUPPORT or
  * TINFO_FLAG_NUWA_SKIP, or it means a potential error.  We force
- * Goanna code to mark every single thread to make sure there are no accidents
+ * Gecko code to mark every single thread to make sure there are no accidents
  * when recreating threads with Nuwa.
  *
  * Threads marked as TINFO_FLAG_NUWA_SUPPORT can be checkpointed explicitly, by

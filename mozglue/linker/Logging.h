@@ -9,9 +9,9 @@
 
 #ifdef ANDROID
 #include <android/log.h>
-#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "GoannaLinker", __VA_ARGS__)
-#define WARN(...) __android_log_print(ANDROID_LOG_WARN, "GoannaLinker", __VA_ARGS__)
-#define ERROR(...) __android_log_print(ANDROID_LOG_ERROR, "GoannaLinker", __VA_ARGS__)
+#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "GeckoLinker", __VA_ARGS__)
+#define WARN(...) __android_log_print(ANDROID_LOG_WARN, "GeckoLinker", __VA_ARGS__)
+#define ERROR(...) __android_log_print(ANDROID_LOG_ERROR, "GeckoLinker", __VA_ARGS__)
 #else
 #include <cstdio>
 

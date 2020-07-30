@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-*/
-/* vim: set ts=2 sw=2 et tw=79: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -28,10 +28,16 @@ ToJSValue(JSContext* aCx,
           const nsAString& aArgument,
           JS::MutableHandle<JS::Value> aValue);
 
-// Accept booleans.
-MOZ_WARN_UNUSED_RESULT inline bool
+// Accept booleans.  But be careful here: if we just have a function that takes
+// a boolean argument, then any pointer that doesn't match one of our other
+// signatures/templates will get treated as a boolean, which is clearly not
+// desirable.  So make this a template that only gets used if the argument type
+// is actually boolean
+template<typename T>
+MOZ_WARN_UNUSED_RESULT
+typename EnableIf<IsSame<T, bool>::value, bool>::Type
 ToJSValue(JSContext* aCx,
-          bool aArgument,
+          T aArgument,
           JS::MutableHandle<JS::Value> aValue)
 {
   // Make sure we're called in a compartment
@@ -174,17 +180,8 @@ ToJSValue(JSContext* aCx,
   return true;
 }
 
-// We don't want to include nsContentUtils here, so use a helper
-// function for the nsISupports case.
-namespace tojsvalue_detail {
-bool
-ISupportsToJSValue(JSContext* aCx,
-                   nsISupports* aArgument,
-                   JS::MutableHandle<JS::Value> aValue);
-} // namespace tojsvalue_detail
-
 // Accept objects that inherit from nsISupports but not nsWrapperCache (e.g.
-// nsIDOMFile).
+// DOM File).
 template <class T>
 MOZ_WARN_UNUSED_RESULT
 typename EnableIf<!IsBaseOf<nsWrapperCache, T>::value &&
@@ -197,7 +194,9 @@ ToJSValue(JSContext* aCx,
   // Make sure we're called in a compartment
   MOZ_ASSERT(JS::CurrentGlobalOrNull(aCx));
 
-  return tojsvalue_detail::ISupportsToJSValue(aCx, &aArgument, aValue);
+  qsObjectHelper helper(ToSupports(&aArgument), nullptr);
+  JS::Rooted<JSObject*> scope(aCx, JS::CurrentGlobalOrNull(aCx));
+  return XPCOMObjectToJsval(aCx, scope, helper, nullptr, true, aValue);
 }
 
 // Accept nsRefPtr/nsCOMPtr
@@ -255,6 +254,16 @@ ToJSValue(JSContext* aCx, const JS::Rooted<JS::Value>& aArgument,
 {
   aValue.set(aArgument);
   return MaybeWrapValue(aCx, aValue);
+}
+
+// Accept existing rooted JS objects (which may not be same-compartment with
+// us).
+MOZ_WARN_UNUSED_RESULT inline bool
+ToJSValue(JSContext* aCx, const JS::Rooted<JSObject*>& aArgument,
+          JS::MutableHandle<JS::Value> aValue)
+{
+  aValue.setObjectOrNull(aArgument);
+  return MaybeWrapObjectOrNullValue(aCx, aValue);
 }
 
 // Accept nsresult, for use in rejections, and create an XPCOM

@@ -6,7 +6,7 @@
 #include <olectl.h>
 #include <algorithm>
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nscore.h"
 #include "nsWindow.h"
@@ -26,7 +26,6 @@ using namespace mozilla::widget;
 static const char* kPrefNameEnableTSF = "intl.tsf.enable";
 static const char* kPrefNameForceEnableTSF = "intl.tsf.force_enable";
 
-#ifdef PR_LOGGING
 /**
  * TSF related code should log its behavior even on release build especially
  * in the interface methods.
@@ -628,8 +627,6 @@ GetModifiersName(Modifiers aModifiers)
   }
   return names;
 }
-
-#endif // #ifdef PR_LOGGING
 
 /******************************************************************/
 /* InputScopeImpl                                                 */
@@ -1876,7 +1873,7 @@ GetRangeExtent(ITfRange* aRange, LONG* aStart, LONG* aLength)
 }
 
 static uint32_t
-GetGoannaSelectionValue(TF_DISPLAYATTRIBUTE &aDisplayAttr)
+GetGeckoSelectionValue(TF_DISPLAYATTRIBUTE &aDisplayAttr)
 {
   uint32_t result;
   switch (aDisplayAttr.bAttr) {
@@ -1907,7 +1904,6 @@ nsTextStore::GetDisplayAttribute(ITfProperty* aAttrProperty,
 
   HRESULT hr;
 
-#ifdef PR_LOGGING
   if (PR_LOG_TEST(sTextStoreLog, PR_LOG_DEBUG)) {
     LONG start = 0, length = 0;
     hr = GetRangeExtent(aRange, &start, &length);
@@ -1918,7 +1914,6 @@ nsTextStore::GetDisplayAttribute(ITfProperty* aAttrProperty,
             start - mComposition.mStart + length,
             GetCommonReturnValueName(hr)));
   }
-#endif
 
   VARIANT propValue;
   ::VariantInit(&propValue);
@@ -2313,7 +2308,7 @@ nsTextStore::RecordCompositionUpdateAction()
     if (FAILED(hr)) {
       newRange.mRangeType = NS_TEXTRANGE_RAWINPUT;
     } else {
-      newRange.mRangeType = GetGoannaSelectionValue(attr);
+      newRange.mRangeType = GetGeckoSelectionValue(attr);
       if (GetColor(attr.crText, newRange.mRangeStyle.mForegroundColor)) {
         newRange.mRangeStyle.mDefinedStyles |=
                                TextRangeStyle::DEFINED_FOREGROUND_COLOR;
@@ -2349,7 +2344,7 @@ nsTextStore::RecordCompositionUpdateAction()
   // one).  So, the composition string looks like normal (or committed) string.
   // At this time, current selection range is same as the composition string
   // range.  Other applications set a wide caret which covers the composition
-  // string,  however, Goanna doesn't support the wide caret drawing now (Goanna
+  // string,  however, Gecko doesn't support the wide caret drawing now (Gecko
   // doesn't support XOR drawing), unfortunately.  For now, we should change
   // the range style to undefined.
   if (!currentSel.IsCollapsed() && action->mRanges->Length() == 1) {
@@ -3766,7 +3761,6 @@ nsTextStore::OnUpdateComposition(ITfCompositionView* pComposition,
     return hr;
   }
 
-#ifdef PR_LOGGING
   if (PR_LOG_TEST(sTextStoreLog, PR_LOG_ALWAYS)) {
     Selection& currentSel = CurrentSelection();
     if (currentSel.IsDirty()) {
@@ -3784,7 +3778,6 @@ nsTextStore::OnUpdateComposition(ITfCompositionView* pComposition,
             currentSel.StartOffset(), currentSel.EndOffset(),
             GetActiveSelEndName(currentSel.ActiveSelEnd())));
   }
-#endif // #ifdef PR_LOGGING
   return S_OK;
 }
 
@@ -4521,11 +4514,9 @@ nsTextStore::MarkContextAsEmpty(ITfContext* aContext)
 void
 nsTextStore::Initialize()
 {
-#ifdef PR_LOGGING
   if (!sTextStoreLog) {
     sTextStoreLog = PR_NewLogModule("nsTextStoreWidgets");
   }
-#endif
 
   PR_LOG(sTextStoreLog, PR_LOG_ALWAYS,
     ("TSF: nsTextStore::Initialize() is called..."));

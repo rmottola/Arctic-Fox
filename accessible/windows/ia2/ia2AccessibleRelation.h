@@ -24,6 +24,10 @@ class ia2AccessibleRelation final : public IAccessibleRelation
 public:
   ia2AccessibleRelation(RelationType aType, Relation* aRel);
 
+  ia2AccessibleRelation(RelationType aType,
+                        nsTArray<nsRefPtr<Accessible>>&& aTargets) :
+    mType(aType), mTargets(Move(aTargets)) {}
+
   // IUnknown
   DECL_IUNKNOWN
 
@@ -60,13 +64,13 @@ private:
 
 
 /**
- * Goanna to IAccessible2 relation types map.
+ * Gecko to IAccessible2 relation types map.
  */
 
 const WCHAR *const IA2_RELATION_NULL = L"";
 
-#define RELATIONTYPE(goannaType, name, atkType, msaaType, ia2Type) \
-  std::pair<RelationType, const WCHAR *const>(RelationType::goannaType, ia2Type),
+#define RELATIONTYPE(geckoType, name, atkType, msaaType, ia2Type) \
+  std::pair<RelationType, const WCHAR *const>(RelationType::geckoType, ia2Type),
 
 static const std::pair<RelationType, const WCHAR *const> sRelationTypePairs[] = {
 #include "RelationTypeMap.h"

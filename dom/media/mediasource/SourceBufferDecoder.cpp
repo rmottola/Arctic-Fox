@@ -6,11 +6,10 @@
 
 #include "MediaSourceUtils.h"
 #include "SourceBufferDecoder.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "AbstractMediaDecoder.h"
 #include "MediaDecoderReader.h"
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaSourceLog();
 /* Polyfill __func__ on MSVC to pass to the log. */
 #ifdef _MSC_VER
@@ -18,9 +17,6 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 #endif
 
 #define MSE_DEBUG(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, ("SourceBufferDecoder(%p:%s)::%s: " arg, this, mResource->GetContentType().get(), __func__, ##__VA_ARGS__))
-#else
-#define MSE_DEBUG(...)
-#endif
 
 namespace mozilla {
 

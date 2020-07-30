@@ -316,6 +316,9 @@ class Bindings
         return !callObjShape_->isEmptyShape();
     }
 
+    Binding* begin() const { return bindingArray(); }
+    Binding* end() const { return bindingArray() + count(); }
+
     static js::ThingRootKind rootKind() { return js::THING_ROOT_BINDINGS; }
     void trace(JSTracer* trc);
 };
@@ -925,9 +928,6 @@ class JSScript : public js::gc::TenuredCell
     // Code has "use strict"; explicitly.
     bool explicitUseStrict_:1;
 
-    // See Parser::compileAndGo.
-    bool compileAndGo_:1;
-
     // True if the script has a non-syntactic scope on its dynamic scope chain.
     // That is, there are objects about which we know nothing between the
     // outermost syntactic scope and the global.
@@ -950,7 +950,9 @@ class JSScript : public js::gc::TenuredCell
     // Script has singleton objects.
     bool hasSingletons_:1;
 
-    // Script is a lambda to treat as running once.
+    // Script is a lambda to treat as running once or a global or eval script
+    // that will only run once.  Which one it is can be disambiguated by
+    // checking whether function_ is null.
     bool treatAsRunOnce_:1;
 
     // If treatAsRunOnce, whether script has executed.
@@ -979,6 +981,9 @@ class JSScript : public js::gc::TenuredCell
 
     // Idempotent cache has triggered invalidation.
     bool invalidatedIdempotentCache_:1;
+
+    // Lexical check did fail and bail out.
+    bool failedLexicalCheck_:1;
 
     // If the generator was created implicitly via a generator expression,
     // isGeneratorExp will be true.
@@ -1154,10 +1159,6 @@ class JSScript : public js::gc::TenuredCell
 
     bool explicitUseStrict() const { return explicitUseStrict_; }
 
-    bool compileAndGo() const {
-        return compileAndGo_;
-    }
-
     bool hasPollutedGlobalScope() const {
         return hasPollutedGlobalScope_;
     }
@@ -1193,6 +1194,10 @@ class JSScript : public js::gc::TenuredCell
         MOZ_ASSERT(isActiveEval() && !isCachedEval());
         isActiveEval_ = false;
         isCachedEval_ = true;
+        // IsEvalCacheCandidate will make sure that there's nothing in this
+        // script that would prevent reexecution even if isRunOnce is
+        // true.  So just pretend like we never ran this script.
+        hasRunOnce_ = false;
     }
 
     void uncacheForEval() {
@@ -1226,12 +1231,16 @@ class JSScript : public js::gc::TenuredCell
     bool invalidatedIdempotentCache() const {
         return invalidatedIdempotentCache_;
     }
+    bool failedLexicalCheck() const {
+        return failedLexicalCheck_;
+    }
 
     void setFailedBoundsCheck() { failedBoundsCheck_ = true; }
     void setFailedShapeGuard() { failedShapeGuard_ = true; }
     void setHadFrequentBailouts() { hadFrequentBailouts_ = true; }
     void setUninlineable() { uninlineable_ = true; }
     void setInvalidatedIdempotentCache() { invalidatedIdempotentCache_ = true; }
+    void setFailedLexicalCheck() { failedLexicalCheck_ = true; }
 
     bool hasScriptCounts() const { return hasScriptCounts_; }
 
@@ -1574,6 +1583,7 @@ class JSScript : public js::gc::TenuredCell
     JSObject *getObject(size_t index) {
         js::ObjectArray *arr = objects();
         MOZ_ASSERT(index < arr->length);
+        MOZ_ASSERT(arr->vector[index]->isTenured());
         return arr->vector[index];
     }
 
@@ -1772,7 +1782,9 @@ class BindingIter
  */
 class AliasedFormalIter
 {
-    const Binding* begin_, *p_, *end_;
+    const Binding* begin_;
+    const Binding* p_;
+    const Binding* end_;
     unsigned slot_;
 
     void settle() {
@@ -1800,7 +1812,7 @@ class LazyScript : public gc::TenuredCell
   public:
     class FreeVariable
     {
-        // Free variable names are possible tagged JSAtom* s.
+        // Variable name is stored as a tagged JSAtom pointer.
         uintptr_t bits_;
 
         static const uintptr_t HOISTED_USE_BIT = 0x1;

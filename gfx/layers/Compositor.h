@@ -27,7 +27,7 @@
  * structures.
  * Most of the documentation for layers is directly in the source code in the
  * form of doc comments. An overview can also be found in the the wiki:
- * https://wiki.mozilla.org/Goanna:Overview#Graphics
+ * https://wiki.mozilla.org/Gecko:Overview#Graphics
  *
  *
  * # Main interfaces and abstractions
@@ -106,7 +106,6 @@
  */
 
 class nsIWidget;
-struct nsIntSize;
 class nsIntRegion;
 
 namespace mozilla {
@@ -121,7 +120,6 @@ namespace layers {
 struct Effect;
 struct EffectChain;
 class Image;
-class ISurfaceAllocator;
 class Layer;
 class TextureSource;
 class DataTextureSource;

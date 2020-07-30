@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "TouchCaret.h"
 
 #include <algorithm>
@@ -36,7 +36,6 @@
 
 using namespace mozilla;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gTouchCaretLog;
 static const char* kTouchCaretLogModuleName = "TouchCaret";
 
@@ -51,10 +50,6 @@ static const char* kTouchCaretLogModuleName = "TouchCaret";
   PR_LOG(gTouchCaretLog, PR_LOG_DEBUG,                                         \
          ("TouchCaret: %s:%d : " message "\n", __FUNCTION__, __LINE__,         \
           ##__VA_ARGS__));
-#else
-#define TOUCHCARET_LOG(message, ...)
-#define TOUCHCARET_LOG_STATIC(message, ...)
-#endif // #ifdef PR_LOGGING
 
 // Click on the boundary of input/textarea will place the caret at the
 // front/end of the content. To advoid this, we need to deflate the content
@@ -75,11 +70,9 @@ TouchCaret::TouchCaret(nsIPresShell* aPresShell)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef PR_LOGGING
   if (!gTouchCaretLog) {
     gTouchCaretLog = PR_NewLogModule(kTouchCaretLogModuleName);
   }
-#endif
 
   TOUCHCARET_LOG("Constructor, PresShell=%p", aPresShell);
 
@@ -358,7 +351,7 @@ TouchCaret::NotifySelectionChanged(nsIDOMDocument* aDoc, nsISelection* aSel,
 
   // Update touch caret position and visibility.
   // Hide touch caret while key event causes selection change.
-  // Also hide touch caret when goanna or javascript collapse the selection.
+  // Also hide touch caret when gecko or javascript collapse the selection.
   if (aReason & nsISelectionListener::KEYPRESS_REASON ||
       aReason & nsISelectionListener::COLLAPSETOSTART_REASON ||
       aReason & nsISelectionListener::COLLAPSETOEND_REASON) {

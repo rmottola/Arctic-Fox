@@ -49,7 +49,7 @@
 #include "pldhash.h"
 #include "plhash.h"
 #include "plstr.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "prprf.h"
 #include "prmem.h"
 #include "rdf.h"
@@ -70,9 +70,7 @@ static NS_DEFINE_IID(kIRDFIntIID,         NS_IRDFINT_IID);
 static NS_DEFINE_IID(kIRDFNodeIID,            NS_IRDFNODE_IID);
 static NS_DEFINE_IID(kISupportsIID,           NS_ISUPPORTS_IID);
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gLog = nullptr;
-#endif
 
 class BlobImpl;
 
@@ -755,10 +753,8 @@ RDFServiceImpl::Init()
     NS_ASSERTION(NS_SUCCEEDED(rv), "unable to get default resource factory");
     if (NS_FAILED(rv)) return rv;
 
-#ifdef PR_LOGGING
     if (! gLog)
         gLog = PR_NewLogModule("nsRDFService");
-#endif
 
     return NS_OK;
 }

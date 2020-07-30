@@ -94,16 +94,11 @@ hardware (via AudioStream).
 #include "StateMirroring.h"
 #include "DecodedStream.h"
 
-class nsITimer;
-
 namespace mozilla {
 
 class AudioSegment;
-class VideoSegment;
 class MediaTaskQueue;
-class SharedThreadPool;
 class AudioSink;
-class MediaDecoderStateMachineScheduler;
 
 /*
   The state machine class. This manages the decoding and seeking in the

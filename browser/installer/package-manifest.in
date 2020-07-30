@@ -57,8 +57,8 @@
 @RESPATH@/hyphenation/*
 @RESPATH@/browser/@PREF_DIR@/palemoon-l10n.js
 @RESPATH@/browser/searchplugins/*
-#ifdef XP_WIN32
-@RESPATH@/uninstall/helper.exe
+#ifdef HAVE_MAKENSISU
+@BINPATH@/uninstall/helper.exe
 #endif
 #ifdef MOZ_UPDATER
 @RESPATH@/update.locale
@@ -148,9 +148,6 @@
 ; [Base Browser Files]
 #ifndef XP_UNIX
 @BINPATH@/@MOZ_APP_NAME@.exe
-@BINPATH@/palemoon.VisualElementsManifest.xml
-@BINPATH@/browser/VisualElements/VisualElements_150.png
-@BINPATH@/browser/VisualElements/VisualElements_70.png
 #else
 @RESPATH@/@MOZ_APP_NAME@-bin
 @BINPATH@/@MOZ_APP_NAME@
@@ -192,7 +189,6 @@
 @RESPATH@/components/chrome.xpt
 @RESPATH@/components/commandhandler.xpt
 @RESPATH@/components/commandlines.xpt
-@RESPATH@/components/compartments.xpt
 @RESPATH@/components/composer.xpt
 @RESPATH@/components/content_events.xpt
 @RESPATH@/components/content_html.xpt
@@ -227,9 +223,11 @@
 @RESPATH@/components/dom_network.xpt
 @RESPATH@/components/dom_notification.xpt
 @RESPATH@/components/dom_html.xpt
+@RESPATH@/components/dom_icc.xpt
 @RESPATH@/components/dom_offline.xpt
 @RESPATH@/components/dom_json.xpt
 @RESPATH@/components/dom_power.xpt
+@RESPATH@/components/dom_push.xpt
 @RESPATH@/components/dom_quota.xpt
 @RESPATH@/components/dom_range.xpt
 @RESPATH@/components/dom_security.xpt
@@ -342,6 +340,9 @@
 @RESPATH@/components/toolkit_finalizationwitness.xpt
 @RESPATH@/components/toolkit_formautofill.xpt
 @RESPATH@/components/toolkit_osfile.xpt
+#ifdef NIGHTLY_BUILD
+@RESPATH@/components/toolkit_perfmonitoring.xpt
+#endif
 @RESPATH@/components/toolkit_xulstore.xpt
 @RESPATH@/components/toolkitprofile.xpt
 #ifdef MOZ_ENABLE_XREMOTE
@@ -574,7 +575,7 @@
 @RESPATH@/components/AlarmsManager.manifest
 @RESPATH@/components/Push.js
 @RESPATH@/components/Push.manifest
-@RESPATH@/components/PushServiceLauncher.js
+@RESPATH@/components/PushNotificationService.js
 
 @RESPATH@/components/SlowScriptDebug.manifest
 @RESPATH@/components/SlowScriptDebug.js
@@ -640,6 +641,9 @@
 @RESPATH@/components/TestInterfaceJS.js
 @RESPATH@/components/TestInterfaceJS.manifest
 #endif
+
+@RESPATH@/components/PACGenerator.js
+@RESPATH@/components/PACGenerator.manifest
 
 ; Modules
 @RESPATH@/browser/modules/*

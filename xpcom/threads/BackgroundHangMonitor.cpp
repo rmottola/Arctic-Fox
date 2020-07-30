@@ -11,6 +11,7 @@
 #include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/Telemetry.h"
 #include "mozilla/ThreadHangStats.h"
 #include "mozilla/ThreadLocal.h"
 #ifdef MOZ_NUWA_PROCESS
@@ -378,6 +379,9 @@ BackgroundHangThread::~BackgroundHangThread()
   if (sTlsKey.initialized()) {
     sTlsKey.set(nullptr);
   }
+
+  // Move our copy of ThreadHangStats to Telemetry storage
+  Telemetry::RecordThreadHangStats(mStats);
 }
 
 void

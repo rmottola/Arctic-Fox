@@ -11,6 +11,8 @@
 #include "mozilla/TextEvents.h"
 #include <algorithm>
 
+#include "GeckoProfiler.h"
+
 #include "prlink.h"
 #include "nsGTKToolkit.h"
 #include "nsIRollupListener.h"
@@ -1523,6 +1525,12 @@ nsWindow::GetScreenBounds(nsIntRect &aRect)
     return NS_OK;
 }
 
+gfx::IntSize
+nsWindow::GetClientSize()
+{
+  return gfx::IntSize(mBounds.width, mBounds.height);
+}
+
 NS_IMETHODIMP
 nsWindow::GetClientBounds(nsIntRect &aRect)
 {
@@ -1538,6 +1546,8 @@ nsWindow::GetClientBounds(nsIntRect &aRect)
 nsIntPoint
 nsWindow::GetClientOffset()
 {
+    PROFILER_LABEL("nsWindow", "GetClientOffset", js::ProfileEntry::Category::GRAPHICS);
+
     if (!mIsTopLevel) {
         return nsIntPoint(0, 0);
     }
@@ -1889,8 +1899,8 @@ nsWindow::CaptureRollupEvents(nsIRollupListener *aListener,
         gRollupListener = aListener;
         // real grab is only done when there is no dragging
         if (!nsWindow::DragInProgress()) {
-            // This widget grab ensures that a Goanna GtkWidget receives mouse
-            // events even when embedded in non-Goanna-owned GtkWidgets.
+            // This widget grab ensures that a Gecko GtkWidget receives mouse
+            // events even when embedded in non-Gecko-owned GtkWidgets.
             // The grab is placed on the toplevel GtkWindow instead of the
             // MozContainer to avoid double dispatch of keyboard events
             // (bug 707623).
@@ -2370,7 +2380,7 @@ nsWindow::UpdateAlpha(gfxPattern* aPattern, nsIntRect aBoundsRect)
     int32_t bufferSize = stride * aBoundsRect.height;
     nsAutoArrayPtr<uint8_t> imageBuffer(new (std::nothrow) uint8_t[bufferSize]);
     RefPtr<DrawTarget> drawTarget = gfxPlatform::GetPlatform()->
-        CreateDrawTargetForData(imageBuffer, ToIntSize(aBoundsRect.Size()),
+        CreateDrawTargetForData(imageBuffer, aBoundsRect.Size(),
                                 stride, SurfaceFormat::A8);
 
     if (drawTarget) {
@@ -2516,20 +2526,20 @@ nsWindow::OnEnterNotifyEvent(GdkEventCrossing *aEvent)
 {
     // This skips NotifyVirtual and NotifyNonlinearVirtual enter notify events
     // when the pointer enters a child window.  If the destination window is a
-    // Goanna window then we'll catch the corresponding event on that window,
+    // Gecko window then we'll catch the corresponding event on that window,
     // but we won't notice when the pointer directly enters a foreign (plugin)
-    // child window without passing over a visible portion of a Goanna window.
+    // child window without passing over a visible portion of a Gecko window.
     if (aEvent->subwindow != nullptr)
         return;
 
     // Check before is_parent_ungrab_enter() as the button state may have
-    // changed while a non-Goanna ancestor window had a pointer grab.
+    // changed while a non-Gecko ancestor window had a pointer grab.
     DispatchMissedButtonReleases(aEvent);
 
     if (is_parent_ungrab_enter(aEvent))
         return;
 
-    WidgetMouseEvent event(true, NS_MOUSE_ENTER, this, WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, NS_MOUSE_ENTER_WIDGET, this, WidgetMouseEvent::eReal);
 
     event.refPoint.x = nscoord(aEvent->x);
     event.refPoint.y = nscoord(aEvent->y);
@@ -2538,8 +2548,7 @@ nsWindow::OnEnterNotifyEvent(GdkEventCrossing *aEvent)
 
     LOG(("OnEnterNotify: %p\n", (void *)this));
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 // XXX Is this the right test for embedding cases?
@@ -2562,16 +2571,16 @@ nsWindow::OnLeaveNotifyEvent(GdkEventCrossing *aEvent)
 {
     // This ignores NotifyVirtual and NotifyNonlinearVirtual leave notify
     // events when the pointer leaves a child window.  If the destination
-    // window is a Goanna window then we'll catch the corresponding event on
+    // window is a Gecko window then we'll catch the corresponding event on
     // that window.
     //
     // XXXkt However, we will miss toplevel exits when the pointer directly
     // leaves a foreign (plugin) child window without passing over a visible
-    // portion of a Goanna window.
+    // portion of a Gecko window.
     if (aEvent->subwindow != nullptr)
         return;
 
-    WidgetMouseEvent event(true, NS_MOUSE_EXIT, this, WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, NS_MOUSE_EXIT_WIDGET, this, WidgetMouseEvent::eReal);
 
     event.refPoint.x = nscoord(aEvent->x);
     event.refPoint.y = nscoord(aEvent->y);
@@ -2583,8 +2592,7 @@ nsWindow::OnLeaveNotifyEvent(GdkEventCrossing *aEvent)
 
     LOG(("OnLeaveNotify: %p\n", (void *)this));
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 void
@@ -2662,23 +2670,22 @@ nsWindow::OnMotionNotifyEvent(GdkEventMotion *aEvent)
 
     KeymapWrapper::InitInputEvent(event, modifierState);
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 // If the automatic pointer grab on ButtonPress has deactivated before
 // ButtonRelease, and the mouse button is released while the pointer is not
-// over any a Goanna window, then the ButtonRelease event will not be received.
+// over any a Gecko window, then the ButtonRelease event will not be received.
 // (A similar situation exists when the pointer is grabbed with owner_events
 // True as the ButtonRelease may be received on a foreign [plugin] window).
 // Use this method to check for released buttons when the pointer returns to a
-// Goanna window.
+// Gecko window.
 void
 nsWindow::DispatchMissedButtonReleases(GdkEventCrossing *aGdkEvent)
 {
     guint changed = aGdkEvent->state ^ gButtonState;
     // Only consider button releases.
-    // (Ignore button presses that occurred outside Goanna.)
+    // (Ignore button presses that occurred outside Gecko.)
     guint released = changed & gButtonState;
     gButtonState = aGdkEvent->state;
 
@@ -2706,15 +2713,14 @@ nsWindow::DispatchMissedButtonReleases(GdkEventCrossing *aGdkEvent)
             LOG(("Synthesized button %u release on %p\n",
                  guint(buttonType + 1), (void *)this));
 
-            // Dispatch a synthesized button up event to tell Goanna about the
+            // Dispatch a synthesized button up event to tell Gecko about the
             // change in state.  This event is marked as synthesized so that
             // it is not dispatched as a DOM event, because we don't know the
             // position, widget, modifiers, or time/order.
             WidgetMouseEvent synthEvent(true, NS_MOUSE_BUTTON_UP, this,
                                         WidgetMouseEvent::eSynthesized);
             synthEvent.button = buttonType;
-            nsEventStatus status;
-            DispatchEvent(&synthEvent, status);
+            DispatchInputEvent(&synthEvent);
         }
     }
 }
@@ -2780,8 +2786,6 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
 {
     LOG(("Button %u press on %p\n", aEvent->button, (void *)this));
 
-    nsEventStatus status;
-
     // If you double click in GDK, it will actually generate a second
     // GDK_BUTTON_PRESS before sending the GDK_2BUTTON_PRESS, and this is
     // different than the DOM spec.  GDK puts this in the queue
@@ -2844,7 +2848,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
     InitButtonEvent(event, aEvent);
     event.pressure = mLastMotionPressure;
 
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 
     // right menu click on linux should also pop up a context menu
     if (domButton == WidgetMouseEvent::eRightButton &&
@@ -2853,7 +2857,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
                                           WidgetMouseEvent::eReal);
         InitButtonEvent(contextMenuEvent, aEvent);
         contextMenuEvent.pressure = mLastMotionPressure;
-        DispatchEvent(&contextMenuEvent, status);
+        DispatchInputEvent(&contextMenuEvent);
     }
 }
 
@@ -2887,8 +2891,7 @@ nsWindow::OnButtonReleaseEvent(GdkEventButton *aEvent)
     gdk_event_get_axis ((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
     event.pressure = pressure ? pressure : mLastMotionPressure;
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
     mLastMotionPressure = pressure;
 }
 
@@ -3011,10 +3014,9 @@ nsWindow::DispatchKeyDownEvent(GdkEventKey *aEvent, bool *aCancelled)
     }
 
     // send the key down event
-    nsEventStatus status;
     WidgetKeyboardEvent downEvent(true, NS_KEY_DOWN, this);
     KeymapWrapper::InitKeyEvent(downEvent, aEvent);
-    DispatchEvent(&downEvent, status);
+    nsEventStatus status = DispatchInputEvent(&downEvent);
     *aCancelled = (status == nsEventStatus_eConsumeNoDefault);
     return true;
 }
@@ -3124,14 +3126,14 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
         contextMenuEvent.time = aEvent->time;
         contextMenuEvent.clickCount = 1;
         KeymapWrapper::InitInputEvent(contextMenuEvent, aEvent->state);
-        DispatchEvent(&contextMenuEvent, status);
+        status = DispatchInputEvent(&contextMenuEvent);
     }
     else {
         // If the character code is in the BMP, send the key press event.
         // Otherwise, send a compositionchange event with the equivalent UTF-16
         // string.
         if (IS_IN_BMP(event.charCode)) {
-            DispatchEvent(&event, status);
+            status = DispatchInputEvent(&event);
         }
         else {
             WidgetCompositionEvent compositionChangeEvent(
@@ -3167,8 +3169,7 @@ nsWindow::OnKeyReleaseEvent(GdkEventKey *aEvent)
     WidgetKeyboardEvent event(true, NS_KEY_UP, this);
     KeymapWrapper::InitKeyEvent(event, aEvent);
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    nsEventStatus status = DispatchInputEvent(&event);
 
     // If the event was consumed, return.
     if (status == nsEventStatus_eConsumeNoDefault) {
@@ -3317,6 +3318,7 @@ nsWindow::OnWindowStateEvent(GtkWidget *aWidget, GdkEventWindowState *aEvent)
         return;
     }
 
+    bool wasInFullscreen = mSizeState == nsSizeMode_Fullscreen;
     if (aEvent->new_window_state & GDK_WINDOW_STATE_ICONIFIED) {
         LOG(("\tIconified\n"));
         mSizeState = nsSizeMode_Minimized;
@@ -3343,8 +3345,14 @@ nsWindow::OnWindowStateEvent(GtkWidget *aWidget, GdkEventWindowState *aEvent)
 #endif //ACCESSIBILITY
     }
 
-    if (mWidgetListener)
+    if (mWidgetListener) {
       mWidgetListener->SizeModeChanged(mSizeState);
+
+      bool isInFullscreen = mSizeState == nsSizeMode_Fullscreen;
+      if (isInFullscreen != wasInFullscreen) {
+        mWidgetListener->FullscreenChanged(isInFullscreen);
+      }
+    }
 }
 
 void
@@ -3386,8 +3394,7 @@ nsWindow::DispatchDragEvent(uint32_t aMsg, const nsIntPoint& aRefPoint,
     event.refPoint = LayoutDeviceIntPoint::FromUntyped(aRefPoint);
     event.time = aTime;
 
-    nsEventStatus status;
-    DispatchEvent(&event, status);
+    DispatchInputEvent(&event);
 }
 
 void
@@ -4080,14 +4087,14 @@ nsWindow::SetHasMappedToplevel(bool aState)
     }
 }
 
-nsIntSize
-nsWindow::GetSafeWindowSize(nsIntSize aSize)
+LayoutDeviceIntSize
+nsWindow::GetSafeWindowSize(LayoutDeviceIntSize aSize)
 {
     // The X protocol uses CARD32 for window sizes, but the server (1.11.3)
     // reads it as CARD16.  Sizes of pixmaps, used for drawing, are (unsigned)
     // CARD16 in the protocol, but the server's ProcCreatePixmap returns
     // BadAlloc if dimensions cannot be represented by signed shorts.
-    nsIntSize result = aSize;
+    LayoutDeviceIntSize result = aSize;
     const int32_t kInt16Max = 32767;
     if (result.width > kInt16Max) {
         result.width = kInt16Max;
@@ -6050,10 +6057,10 @@ nsWindow::NotifyIMEInternal(const IMENotification& aIMENotification)
         case REQUEST_TO_CANCEL_COMPOSITION:
             return mIMModule->EndIMEComposition(this);
         case NOTIFY_IME_OF_FOCUS:
-            mIMModule->OnFocusChangeInGoanna(true);
+            mIMModule->OnFocusChangeInGecko(true);
             return NS_OK;
         case NOTIFY_IME_OF_BLUR:
-            mIMModule->OnFocusChangeInGoanna(false);
+            mIMModule->OnFocusChangeInGecko(false);
             return NS_OK;
         case NOTIFY_IME_OF_COMPOSITION_UPDATE:
             mIMModule->OnUpdateComposition();
@@ -6111,11 +6118,11 @@ nsWindow::ExecuteNativeKeyBindingRemapped(NativeKeyBindingsType aType,
                                           const WidgetKeyboardEvent& aEvent,
                                           DoCommandCallback aCallback,
                                           void* aCallbackData,
-                                          uint32_t aGoannaKeyCode,
+                                          uint32_t aGeckoKeyCode,
                                           uint32_t aNativeKeyCode)
 {
     WidgetKeyboardEvent modifiedEvent(aEvent);
-    modifiedEvent.keyCode = aGoannaKeyCode;
+    modifiedEvent.keyCode = aGeckoKeyCode;
     static_cast<GdkEventKey*>(modifiedEvent.mNativeKeyEvent)->keyval =
         aNativeKeyCode;
 
@@ -6139,43 +6146,43 @@ nsWindow::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
         DispatchEvent(&query, status);
 
         if (query.mSucceeded && query.mReply.mWritingMode.IsVertical()) {
-            uint32_t goannaCode = 0;
+            uint32_t geckoCode = 0;
             uint32_t gdkCode = 0;
             switch (aEvent.keyCode) {
             case nsIDOMKeyEvent::DOM_VK_LEFT:
                 if (query.mReply.mWritingMode.IsVerticalLR()) {
-                    goannaCode = nsIDOMKeyEvent::DOM_VK_UP;
+                    geckoCode = nsIDOMKeyEvent::DOM_VK_UP;
                     gdkCode = GDK_Up;
                 } else {
-                    goannaCode = nsIDOMKeyEvent::DOM_VK_DOWN;
+                    geckoCode = nsIDOMKeyEvent::DOM_VK_DOWN;
                     gdkCode = GDK_Down;
                 }
                 break;
 
             case nsIDOMKeyEvent::DOM_VK_RIGHT:
                 if (query.mReply.mWritingMode.IsVerticalLR()) {
-                    goannaCode = nsIDOMKeyEvent::DOM_VK_DOWN;
+                    geckoCode = nsIDOMKeyEvent::DOM_VK_DOWN;
                     gdkCode = GDK_Down;
                 } else {
-                    goannaCode = nsIDOMKeyEvent::DOM_VK_UP;
+                    geckoCode = nsIDOMKeyEvent::DOM_VK_UP;
                     gdkCode = GDK_Up;
                 }
                 break;
 
             case nsIDOMKeyEvent::DOM_VK_UP:
-                goannaCode = nsIDOMKeyEvent::DOM_VK_LEFT;
+                geckoCode = nsIDOMKeyEvent::DOM_VK_LEFT;
                 gdkCode = GDK_Left;
                 break;
 
             case nsIDOMKeyEvent::DOM_VK_DOWN:
-                goannaCode = nsIDOMKeyEvent::DOM_VK_RIGHT;
+                geckoCode = nsIDOMKeyEvent::DOM_VK_RIGHT;
                 gdkCode = GDK_Right;
                 break;
             }
 
             return ExecuteNativeKeyBindingRemapped(aType, aEvent, aCallback,
                                                    aCallbackData,
-                                                   goannaCode, gdkCode);
+                                                   geckoCode, gdkCode);
         }
     }
 
@@ -6544,8 +6551,11 @@ nsWindow::GdkRectToDevicePixels(GdkRectangle rect) {
 nsresult
 nsWindow::SynthesizeNativeMouseEvent(LayoutDeviceIntPoint aPoint,
                                      uint32_t aNativeMessage,
-                                     uint32_t aModifierFlags)
+                                     uint32_t aModifierFlags,
+                                     nsIObserver* aObserver)
 {
+  AutoObserverNotifier notifier(aObserver, "mouseevent");
+
   if (!mGdkWindow) {
     return NS_OK;
   }
@@ -6579,6 +6589,66 @@ nsWindow::SynthesizeNativeMouseEvent(LayoutDeviceIntPoint aPoint,
     GdkScreen* screen = gdk_window_get_screen(mGdkWindow);
     gdk_display_warp_pointer(display, screen, aPoint.x, aPoint.y);
   }
+
+  return NS_OK;
+}
+
+nsresult
+nsWindow::SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
+                                           uint32_t aNativeMessage,
+                                           double aDeltaX,
+                                           double aDeltaY,
+                                           double aDeltaZ,
+                                           uint32_t aModifierFlags,
+                                           uint32_t aAdditionalFlags,
+                                           nsIObserver* aObserver)
+{
+  AutoObserverNotifier notifier(aObserver, "mousescrollevent");
+
+  if (!mGdkWindow) {
+    return NS_OK;
+  }
+
+  GdkEvent event;
+  memset(&event, 0, sizeof(GdkEvent));
+  event.type = GDK_SCROLL;
+  event.scroll.window = mGdkWindow;
+  event.scroll.time = GDK_CURRENT_TIME;
+#if (MOZ_WIDGET_GTK == 3)
+  // Get device for event source
+  GdkDisplay* display = gdk_window_get_display(mGdkWindow);
+  GdkDeviceManager *device_manager = gdk_display_get_device_manager(display);
+  event.scroll.device = gdk_device_manager_get_client_pointer(device_manager);
+#endif
+  event.scroll.x_root = aPoint.x;
+  event.scroll.y_root = aPoint.y;
+
+  LayoutDeviceIntPoint pointInWindow = aPoint - WidgetToScreenOffset();
+  event.scroll.x = pointInWindow.x;
+  event.scroll.y = pointInWindow.y;
+
+  // The delta values are backwards on Linux compared to Windows and Cocoa,
+  // hence the negation.
+#if GTK_CHECK_VERSION(3,4,0)
+  // TODO: is this correct? I don't have GTK 3.4+ so I can't check
+  event.scroll.direction = GDK_SCROLL_SMOOTH;
+  event.scroll.delta_x = -aDeltaX;
+  event.scroll.delta_y = -aDeltaY;
+#else
+  if (aDeltaX < 0) {
+    event.scroll.direction = GDK_SCROLL_RIGHT;
+  } else if (aDeltaX > 0) {
+    event.scroll.direction = GDK_SCROLL_LEFT;
+  } else if (aDeltaY < 0) {
+    event.scroll.direction = GDK_SCROLL_DOWN;
+  } else if (aDeltaY > 0) {
+    event.scroll.direction = GDK_SCROLL_UP;
+  } else {
+    return NS_OK;
+  }
+#endif
+
+  gdk_event_put(&event);
 
   return NS_OK;
 }

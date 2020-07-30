@@ -650,6 +650,7 @@ public:
   static void ShutdownTelemetry();
   static void RecordSlowStatement(const nsACString &sql, const nsACString &dbName,
                                   uint32_t delay);
+  static void RecordThreadHangStats(Telemetry::ThreadHangStats& aStats);
   static nsresult GetHistogramEnumId(const char *name, Telemetry::ID *id);
   size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf);
   struct Stat {
@@ -731,6 +732,9 @@ private:
   Mutex mHashMutex;
   HangReports mHangReports;
   Mutex mHangReportsMutex;
+  // mThreadHangStats stores recorded, inactive thread hang stats
+  Vector<Telemetry::ThreadHangStats> mThreadHangStats;
+  Mutex mThreadHangStatsMutex;
 
   CombinedStacks mLateWritesStacks; // This is collected out of the main thread.
   bool mCachedTelemetryData;
@@ -1775,6 +1779,7 @@ mCanRecordExtended(XRE_GetProcessType() == GeckoProcessType_Default ||
                    XRE_GetProcessType() == GeckoProcessType_Content),
 mHashMutex("Telemetry::mHashMutex"),
 mHangReportsMutex("Telemetry::mHangReportsMutex"),
+mThreadHangStatsMutex("Telemetry::mThreadHangStatsMutex"),
 mCachedTelemetryData(false),
 mLastShutdownTime(0),
 mFailedLockCount(0)
@@ -3160,6 +3165,17 @@ TelemetryImpl::RecordSlowStatement(const nsACString &sql,
   StoreSlowSQL(fullSQL, delay, Unsanitized);
 }
 
+void
+TelemetryImpl::RecordThreadHangStats(Telemetry::ThreadHangStats& aStats)
+{
+  if (!sTelemetry || !sTelemetry->mCanRecordExtended)
+    return;
+
+  MutexAutoLock autoLock(sTelemetry->mThreadHangStatsMutex);
+
+  sTelemetry->mThreadHangStats.append(Move(aStats));
+}
+
 NS_IMPL_ISUPPORTS(TelemetryImpl, nsITelemetry, nsIMemoryReporter)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITelemetry, TelemetryImpl::CreateTelemetryInstance)
 
@@ -3415,6 +3431,12 @@ void Init()
     do_GetService("@mozilla.org/base/telemetry;1");
   MOZ_ASSERT(telemetryService);
 }
+
+void RecordThreadHangStats(ThreadHangStats& aStats)
+{
+  TelemetryImpl::RecordThreadHangStats(aStats);
+}
+
 
 ProcessedStack::ProcessedStack()
 {

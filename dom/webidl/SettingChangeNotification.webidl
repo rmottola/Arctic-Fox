@@ -4,7 +4,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-// Used internally by Goanna
+// Used internally by Gecko
 dictionary SettingChangeNotification {
   DOMString key   = "";
   any       value;

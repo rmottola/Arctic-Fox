@@ -128,7 +128,7 @@ Leading by example::
             "isTelemetryEnabled": 1,
             "isBlocklistEnabled": 1
           },
-          "goannaAppInfo": {
+          "geckoAppInfo": {
             "updateChannel": "nightly",
             "id": "{aa3c5121-dab2-40e2-81ca-7ea25febc110}",
             "os": "Android",
@@ -150,7 +150,7 @@ Leading by example::
           }
         },
         "k2O3hlreMeS7L1qtxeMsYWxgWWQ=": {
-          "goannaAppInfo": {
+          "geckoAppInfo": {
             "platformBuildID": "20130630031138",
             "appBuildID": "20130630031138",
             "_v": 1
@@ -160,7 +160,7 @@ Leading by example::
           }
         },
         "1+KN9TutMpzdl4TJEl+aCxK+xcw=": {
-          "goannaAppInfo": {
+          "geckoAppInfo": {
             "platformBuildID": "20130626031100",
             "appBuildID": "20130626031100",
             "_v": 1
@@ -278,7 +278,7 @@ Keys are:
 "d"
     duration. Value in seconds.
 "sg"
-    Goanna startup time (msec). Present if this is a clean launch. This
+    Gecko startup time (msec). Present if this is a clean launch. This
     corresponds to the telemetry timer *FENNEC_STARTUP_TIME_GECKOREADY*.
 "sj"
     Java activity init time (msec). Present if this is a clean launch. This
@@ -353,9 +353,9 @@ Version 2
 =========
 
 Version 2 is the same as version 1 with the exception that it has an additional
-top-level field, *goannaAppInfo*, which contains basic application info.
+top-level field, *geckoAppInfo*, which contains basic application info.
 
-goannaAppInfo
+geckoAppInfo
 ------------
 
 This field is an object that is a simple map of string keys and values
@@ -386,11 +386,11 @@ id
     The value of nsXREAppData.ID.
 
 platformVersion
-    The version of the Goanna platform (as opposed to the app version). For
+    The version of the Gecko platform (as opposed to the app version). For
     Firefox, this is almost certainly equivalent to the *version* field.
 
 platformBuildID
-    The build ID/date of the Goanna platfor (as opposed to the app version).
+    The build ID/date of the Gecko platfor (as opposed to the app version).
     This is commonly equivalent to *appBuildID*.
 
 os
@@ -779,7 +779,7 @@ Example
 org.mozilla.appInfo.appinfo
 ---------------------------
 
-This measurement contains basic XUL application and Goanna platform
+This measurement contains basic XUL application and Gecko platform
 information. It is reported in the *last* section.
 
 Version 2
@@ -966,14 +966,14 @@ This measurement has the following properties:
 startDay
     Integer days since UNIX epoch when this session began.
 activeTicks
-    Integer count of *ticks* the session was active for. Goanna periodically
+    Integer count of *ticks* the session was active for. Gecko periodically
     sends out a signal when the session is active. Session activity
     involves keyboard or mouse interaction with the application. Each tick
     represents a window of 5 seconds where there was interaction.
 totalTime
     Integer seconds the session has been alive.
 main
-    Integer milliseconds it took for the Goanna process to start up.
+    Integer milliseconds it took for the Gecko process to start up.
 firstPaint
     Integer milliseconds from process start to first paint.
 sessionRestored
@@ -1114,7 +1114,7 @@ the number of crashes, hangs, or submissions that occurred on the given day:
 Version 5
 ^^^^^^^^^
 
-This version adds support for Goanna media plugin (GMP) crashes.
+This version adds support for Gecko media plugin (GMP) crashes.
 
 This measurement will be reported on each day there was a crash or crash
 submission. Records may contain the following fields, whose values indicate

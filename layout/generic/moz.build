@@ -40,6 +40,9 @@ EXPORTS += [
     'RubyUtils.h',
     'ScrollbarActivity.h',
     'Selection.h',
+]
+
+EXPORTS.mozilla += [
     'WritingModes.h',
 ]
 

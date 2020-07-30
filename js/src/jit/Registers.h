@@ -10,10 +10,8 @@
 #include "mozilla/Array.h"
 
 #include "jit/IonTypes.h"
-#if defined(JS_CODEGEN_X86)
-# include "jit/x86/Architecture-x86.h"
-#elif defined(JS_CODEGEN_X64)
-# include "jit/x64/Architecture-x64.h"
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+# include "jit/x86-shared/Architecture-x86-shared.h"
 #elif defined(JS_CODEGEN_ARM)
 # include "jit/arm/Architecture-arm.h"
 #elif defined(JS_CODEGEN_MIPS)
@@ -73,6 +71,11 @@ struct Register {
         MOZ_ASSERT(aliasIdx == 0);
         *ret = *this;
     }
+
+    SetType alignedOrDominatedAliasedSet() const {
+        return SetType(1) << code_;
+    }
+
     static uint32_t SetSize(SetType x) {
         return Codes::SetSize(x);
     }
@@ -122,6 +125,9 @@ class MachineState
     void setRegisterLocation(FloatRegister reg, double *dp) {
         fpregs_[reg.code()] = (FloatRegisters::RegisterContent *) dp;
     }
+    void setRegisterLocation(FloatRegister reg, FloatRegisters::RegisterContent* rp) {
+        fpregs_[reg.code()] = rp;
+    }
 
     bool has(Register reg) const {
         return regs_[reg.code()] != nullptr;
@@ -137,6 +143,9 @@ class MachineState
     }
     void write(Register reg, uintptr_t value) const {
         regs_[reg.code()]->r = value;
+    }
+    const FloatRegisters::RegisterContent* address(FloatRegister reg) const {
+        return fpregs_[reg.code()];
     }
 };
 

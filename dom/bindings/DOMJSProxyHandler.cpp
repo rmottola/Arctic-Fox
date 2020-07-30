@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- * vim: set ts=2 sw=2 et tw=99 ft=cpp: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -199,7 +199,7 @@ BaseDOMProxyHandler::getOwnPropertyDescriptor(JSContext* cx,
 
 bool
 DOMProxyHandler::defineProperty(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-                                MutableHandle<JSPropertyDescriptor> desc,
+                                Handle<JSPropertyDescriptor> desc,
                                 JS::ObjectOpResult &result, bool *defined) const
 {
   if (desc.hasGetterObject() && desc.setter() == JS_StrictPropertyStub) {
@@ -223,13 +223,14 @@ DOMProxyHandler::defineProperty(JSContext* cx, JS::Handle<JSObject*> proxy, JS::
 }
 
 bool
-DOMProxyHandler::set(JSContext *cx, Handle<JSObject*> proxy, Handle<JSObject*> receiver,
-                     Handle<jsid> id, MutableHandle<JS::Value> vp, ObjectOpResult &result) const
+DOMProxyHandler::set(JSContext *cx, Handle<JSObject*> proxy, Handle<jsid> id,
+                     Handle<JS::Value> v, Handle<JS::Value> receiver,
+                     ObjectOpResult &result) const
 {
   MOZ_ASSERT(!xpc::WrapperFactory::IsXrayWrapper(proxy),
              "Should not have a XrayWrapper here");
   bool done;
-  if (!setCustom(cx, proxy, id, vp, &done)) {
+  if (!setCustom(cx, proxy, id, v, &done)) {
     return false;
   }
   if (done) {
@@ -256,7 +257,7 @@ DOMProxyHandler::set(JSContext *cx, Handle<JSObject*> proxy, Handle<JSObject*> r
     }
   }
 
-  return js::SetPropertyIgnoringNamedGetter(cx, proxy, id, vp, receiver, &desc, result);
+  return js::SetPropertyIgnoringNamedGetter(cx, proxy, id, v, receiver, desc, result);
 }
 
 bool
@@ -354,7 +355,7 @@ IdToInt32(JSContext* cx, JS::Handle<jsid> id)
 
 bool
 DOMProxyHandler::setCustom(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
-                           JS::MutableHandle<JS::Value> vp, bool *done) const
+                           JS::Handle<JS::Value> v, bool *done) const
 {
   *done = false;
   return true;

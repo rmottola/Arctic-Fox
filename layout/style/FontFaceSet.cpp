@@ -6,7 +6,7 @@
 
 #include "FontFaceSet.h"
 
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "mozilla/css/Loader.h"
 #include "mozilla/dom/CSSFontFaceLoadEvent.h"
@@ -123,15 +123,22 @@ FontFaceSet::WrapObject(JSContext* aContext, JS::Handle<JSObject*> aGivenProto)
 void
 FontFaceSet::Disconnect()
 {
-  if (mDocument) {
-    mDocument->RemoveSystemEventListener(NS_LITERAL_STRING("DOMContentLoaded"),
-                                         this, false);
+  RemoveDOMContentLoadedListener();
+
+  if (mDocument && mDocument->CSSLoader()) {
     // We're null checking CSSLoader() since FontFaceSet::Disconnect() might be
     // being called during unlink, at which time the loader amy already have
     // been unlinked from the document.
-    if (mDocument->CSSLoader()) {
-      mDocument->CSSLoader()->RemoveObserver(this);
-    }
+    mDocument->CSSLoader()->RemoveObserver(this);
+  }
+}
+
+void
+FontFaceSet::RemoveDOMContentLoadedListener()
+{
+  if (mDocument) {
+    mDocument->RemoveSystemEventListener(NS_LITERAL_STRING("DOMContentLoaded"),
+                                         this, false);
   }
 }
 
@@ -409,7 +416,6 @@ FontFaceSet::StartLoad(gfxUserFontEntry* aUserFontEntry,
   if (!fontLoader)
     return NS_ERROR_OUT_OF_MEMORY;
 
-#ifdef PR_LOGGING
   if (LOG_ENABLED()) {
     nsAutoCString fontURI, referrerURI;
     aFontFaceSrc->mURI->GetSpec(fontURI);
@@ -419,7 +425,6 @@ FontFaceSet::StartLoad(gfxUserFontEntry* aUserFontEntry,
          "referrer uri: (%s)\n",
          fontLoader.get(), fontURI.get(), referrerURI.get()));
   }
-#endif
 
   nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(channel));
   if (httpChannel) {
@@ -611,14 +616,12 @@ FontFaceSet::UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules)
   // local rules have been rebuilt, so clear the flag
   mUserFontSet->mLocalRulesUsed = false;
 
-#if PR_LOGGING
   if (LOG_ENABLED() && !mRuleFaces.IsEmpty()) {
     LOG(("userfonts (%p) userfont rules update (%s) rule count: %d",
          mUserFontSet.get(),
          (modified ? "modified" : "not modified"),
          mRuleFaces.Length()));
   }
-#endif
 
   return modified;
 }
@@ -1074,11 +1077,9 @@ FontFaceSet::LogMessage(gfxUserFontEntry* aUserFontEntry,
   message.AppendLiteral(" source: ");
   message.Append(fontURI);
 
-#ifdef PR_LOGGING
   if (LOG_ENABLED()) {
     LOG(("userfonts (%p) %s", mUserFontSet.get(), message.get()));
   }
-#endif
 
   // try to give the user an indication of where the rule came from
   nsCSSFontFaceRule* rule = FindRuleForUserFontEntry(aUserFontEntry);
@@ -1498,7 +1499,7 @@ FontFaceSet::HandleEvent(nsIDOMEvent* aEvent)
     return NS_ERROR_FAILURE;
   }
 
-  Disconnect();
+  RemoveDOMContentLoadedListener();
   CheckLoadingFinished();
 
   return NS_OK;

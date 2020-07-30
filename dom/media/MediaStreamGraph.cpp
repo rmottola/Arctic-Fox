@@ -16,7 +16,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsWidgetsCID.h"
 #include "prerror.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "mozilla/Attributes.h"
 #include "TrackUnionStream.h"
 #include "ImageContainer.h"
@@ -41,12 +41,8 @@ using namespace mozilla::gfx;
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* gMediaStreamGraphLog;
 #define STREAM_LOG(type, msg) PR_LOG(gMediaStreamGraphLog, type, msg)
-#else
-#define STREAM_LOG(type, msg)
-#endif
 
 // #define ENABLE_LIFECYCLE_LOG
 
@@ -55,7 +51,7 @@ PRLogModuleInfo* gMediaStreamGraphLog;
 #ifdef ENABLE_LIFECYCLE_LOG
 #  ifdef ANDROID
 #    include "android/log.h"
-#    define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Goanna - MSG", ## __VA_ARGS__); printf(__VA_ARGS__);printf("\n");
+#    define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Gecko - MSG", ## __VA_ARGS__); printf(__VA_ARGS__);printf("\n");
 #  else
 #    define LIFECYCLE_LOG(...) printf(__VA_ARGS__);printf("\n");
 #  endif
@@ -2908,11 +2904,9 @@ MediaStreamGraphImpl::MediaStreamGraphImpl(bool aRealtime,
 #endif
   , mAudioChannel(static_cast<uint32_t>(aChannel))
 {
-#ifdef PR_LOGGING
   if (!gMediaStreamGraphLog) {
     gMediaStreamGraphLog = PR_NewLogModule("MediaStreamGraph");
   }
-#endif
 
   if (mRealtime) {
     if (aStartWithAudioDriver) {

@@ -98,7 +98,7 @@ MIRGenerator::abort(const char* message, ...)
 }
 
 void
-MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup *group)
+MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup* group)
 {
     for (size_t i = 0; i < abortedPreliminaryGroups_.length(); i++) {
         if (group == abortedPreliminaryGroups_[i])
@@ -990,8 +990,8 @@ MBasicBlock::discardPhi(MPhi* phi)
     phis_.remove(phi);
 
     if (phis_.empty()) {
-        for (MBasicBlock** pred = predecessors_.begin(), **end = predecessors_.end(); pred < end; ++pred)
-            (*pred)->clearSuccessorWithPhis();
+        for (MBasicBlock* pred : predecessors_)
+            pred->clearSuccessorWithPhis();
     }
 }
 

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -18,9 +19,6 @@
 #include "nsNetCID.h"
 #include "nsServiceManagerUtils.h"
 #endif
-
-class nsIDocument;
-class nsPIDOMWindow;
 
 namespace mozilla {
 namespace dom {
@@ -84,7 +82,6 @@ namespace dom {
  * TODO: Split TYPE_OBJECT into TYPE_EMBED and TYPE_OBJECT
  */
 
-class FetchBodyStream;
 class Request;
 
 #define kFETCH_CLIENT_REFERRER_STR "about:client"
@@ -351,6 +348,24 @@ public:
   already_AddRefed<InternalRequest>
   GetRequestConstructorCopy(nsIGlobalObject* aGlobal, ErrorResult& aRv) const;
 
+  bool
+  WasCreatedByFetchEvent() const
+  {
+    return mCreatedByFetchEvent;
+  }
+
+  void
+  SetCreatedByFetchEvent()
+  {
+    mCreatedByFetchEvent = true;
+  }
+
+  void
+  ClearCreatedByFetchEvent()
+  {
+    mCreatedByFetchEvent = false;
+  }
+
 private:
   // Does not copy mBodyStream.  Use fallible Clone() for complete copy.
   explicit InternalRequest(const InternalRequest& aOther);
@@ -384,6 +399,10 @@ private:
   bool mSynchronous;
   bool mUnsafeRequest;
   bool mUseURLCredentials;
+  // This is only set when a Request object is created by a fetch event.  We
+  // use it to check if Service Workers are simply fetching intercepted Request
+  // objects without modifying them.
+  bool mCreatedByFetchEvent = false;
 };
 
 } // namespace dom

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -201,16 +202,19 @@ Request::Constructor(const GlobalObject& aGlobal,
                                    : fallbackCredentials;
 
   if (mode != RequestMode::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetMode(mode);
   }
 
   if (credentials != RequestCredentials::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetCredentialsMode(credentials);
   }
 
   RequestCache cache = aInit.mCache.WasPassed() ?
                        aInit.mCache.Value() : fallbackCache;
   if (cache != RequestCache::EndGuard_) {
+    request->ClearCreatedByFetchEvent();
     request->SetCacheMode(cache);
   }
 
@@ -239,8 +243,10 @@ Request::Constructor(const GlobalObject& aGlobal,
         upperCaseMethod.EqualsLiteral("POST") ||
         upperCaseMethod.EqualsLiteral("PUT") ||
         upperCaseMethod.EqualsLiteral("OPTIONS")) {
+      request->ClearCreatedByFetchEvent();
       request->SetMethod(upperCaseMethod);
     } else {
+      request->ClearCreatedByFetchEvent();
       request->SetMethod(method);
     }
   }
@@ -253,6 +259,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     if (aRv.Failed()) {
       return nullptr;
     }
+    request->ClearCreatedByFetchEvent();
     headers = h->GetInternalHeaders();
   } else {
     headers = new InternalHeaders(*requestHeaders);
@@ -298,6 +305,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     if (NS_WARN_IF(aRv.Failed())) {
       return nullptr;
     }
+    request->ClearCreatedByFetchEvent();
     request->SetBody(stream);
 
     if (!contentType.IsVoid() &&

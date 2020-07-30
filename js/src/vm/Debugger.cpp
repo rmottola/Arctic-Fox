@@ -874,6 +874,10 @@ Debugger::wrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
 JSObject *
 Debugger::translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats)
 {
+    // If this functions triggers a GC then the statistics object will change
+    // underneath us.
+    gc::AutoSuppressGC suppressGC(cx);
+
     RootedObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!obj)
         return nullptr;
@@ -4163,7 +4167,9 @@ Debugger::drainTraceLoggerScriptCalls(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         if (textId != TraceLogger_Stop) {
-            const char* filename, *lineno, *colno;
+            const char* filename;
+            const char* lineno;
+            const char* colno;
             size_t filename_len, lineno_len, colno_len;
             logger->extractScriptDetails(textId, &filename, &filename_len, &lineno, &lineno_len,
                                          &colno, &colno_len);
@@ -6139,8 +6145,8 @@ EvaluateInEnv(JSContext* cx, Handle<Env*> env, HandleValue thisv, AbstractFrameP
     if (!staticScope)
         return false;
     CompileOptions options(cx);
-    options.setCompileAndGo(true)
-           .setHasPollutedScope(true)
+    options.setHasPollutedScope(true)
+           .setIsRunOnce(true)
            .setForEval(true)
            .setNoScriptRval(false)
            .setFileAndLine(filename, lineno)
@@ -7643,7 +7649,7 @@ DebuggerEnv_setVariable(JSContext* cx, unsigned argc, Value* vp)
         }
 
         /* Just set the property. */
-        if (!SetProperty(cx, env, env, id, &v))
+        if (!SetProperty(cx, env, id, v))
             return false;
     }
 

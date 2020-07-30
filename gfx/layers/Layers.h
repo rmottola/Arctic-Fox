@@ -10,7 +10,7 @@
 #include <stdio.h>                      // for FILE
 #include <sys/types.h>                  // for int32_t, int64_t
 #include "FrameMetrics.h"               // for FrameMetrics
-#include "Units.h"                      // for LayerMargin, LayerPoint
+#include "Units.h"                      // for LayerMargin, LayerPoint, ParentLayerIntRect
 #include "gfxContext.h"                 // for GraphicsOperator
 #include "gfxTypes.h"
 #include "gfxColor.h"                   // for gfxRGBA
@@ -21,6 +21,7 @@
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT_HELPER2, etc
 #include "mozilla/DebugOnly.h"          // for DebugOnly
 #include "mozilla/EventForwards.h"      // for nsPaintEvent
+#include "mozilla/Maybe.h"              // for Maybe
 #include "mozilla/RefPtr.h"             // for already_AddRefed
 #include "mozilla/StyleAnimationValue.h" // for StyleAnimationValue, etc
 #include "mozilla/TimeStamp.h"          // for TimeStamp, TimeDuration
@@ -43,7 +44,7 @@
 #include "nsTArray.h"                   // for nsTArray
 #include "nsTArrayForwardDeclare.h"     // for InfallibleTArray
 #include "nscore.h"                     // for nsACString, nsAString
-#include "prlog.h"                      // for PRLogModuleInfo
+#include "mozilla/Logging.h"                      // for PRLogModuleInfo
 #include "nsIWidget.h"                  // For plugin window configuration information structs
 #include "gfxVR.h"
 
@@ -56,11 +57,9 @@ namespace mozilla {
 class ComputedTimingFunction;
 class FrameLayerBuilder;
 class StyleAnimationValue;
-class WebGLContext;
 
 namespace gl {
 class GLContext;
-class SharedSurface;
 }
 
 namespace gfx {
@@ -77,7 +76,6 @@ class Animation;
 class AnimationData;
 class AsyncPanZoomController;
 class ClientLayerManager;
-class CommonLayerAttributes;
 class Layer;
 class LayerMetricsWrapper;
 class PaintedLayer;
@@ -94,10 +92,7 @@ class ShadowableLayer;
 class ShadowLayerForwarder;
 class LayerManagerComposite;
 class SpecificLayerAttributes;
-class SurfaceDescriptor;
 class Compositor;
-struct TextureFactoryIdentifier;
-struct EffectMask;
 
 namespace layerscope {
 class LayersPacket;
@@ -119,7 +114,7 @@ public:
  * Motivation: For truly smooth animation and video playback, we need to
  * be able to compose frames and render them on a dedicated thread (i.e.
  * off the main thread where DOM manipulation, script execution and layout
- * induce difficult-to-bound latency). This requires Goanna to construct
+ * induce difficult-to-bound latency). This requires Gecko to construct
  * some kind of persistent scene structure (graph or tree) that can be
  * safely transmitted across threads. We have other scenarios (e.g. mobile
  * browsing) where retaining some rendered data between paints is desired
@@ -134,8 +129,8 @@ public:
  * We want to support a variety of layer implementations, including
  * a simple "immediate mode" implementation that doesn't retain any
  * rendered data between paints (i.e. uses cairo in just the way that
- * Goanna used it before layers were introduced). But we also don't want
- * to have bifurcated "layers"/"non-layers" rendering paths in Goanna.
+ * Gecko used it before layers were introduced). But we also don't want
+ * to have bifurcated "layers"/"non-layers" rendering paths in Gecko.
  * Therefore the layers API is carefully designed to permit maximally
  * efficient implementation in an "immediate mode" style. See the
  * BasicLayerManager for such an implementation.
@@ -990,20 +985,20 @@ public:
    * in device pixels.
    * If aRect is null no clipping will be performed.
    */
-  void SetClipRect(const nsIntRect* aRect)
+  void SetClipRect(const Maybe<ParentLayerIntRect>& aRect)
   {
-    if (mUseClipRect) {
+    if (mClipRect) {
       if (!aRect) {
         MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ClipRect was %d,%d,%d,%d is <none>", this,
-                         mClipRect.x, mClipRect.y, mClipRect.width, mClipRect.height));
-        mUseClipRect = false;
+                         mClipRect->x, mClipRect->y, mClipRect->width, mClipRect->height));
+        mClipRect.reset();
         Mutated();
       } else {
-        if (!aRect->IsEqualEdges(mClipRect)) {
+        if (!aRect->IsEqualEdges(*mClipRect)) {
           MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ClipRect was %d,%d,%d,%d is %d,%d,%d,%d", this,
-                           mClipRect.x, mClipRect.y, mClipRect.width, mClipRect.height,
+                           mClipRect->x, mClipRect->y, mClipRect->width, mClipRect->height,
                            aRect->x, aRect->y, aRect->width, aRect->height));
-          mClipRect = *aRect;
+          mClipRect = aRect;
           Mutated();
         }
       }
@@ -1011,8 +1006,7 @@ public:
       if (aRect) {
         MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ClipRect was <none> is %d,%d,%d,%d", this,
                          aRect->x, aRect->y, aRect->width, aRect->height));
-        mUseClipRect = true;
-        mClipRect = *aRect;
+        mClipRect = aRect;
         Mutated();
       }
     }
@@ -1108,6 +1102,7 @@ public:
 
   // Call AddAnimation to add a new animation to this layer from layout code.
   // Caller must fill in all the properties of the returned animation.
+  // A later animation overrides an earlier one.
   Animation* AddAnimation();
   // ClearAnimations clears animations on this layer.
   void ClearAnimations();
@@ -1223,7 +1218,7 @@ public:
   // These getters can be used anytime.
   float GetOpacity() { return mOpacity; }
   gfx::CompositionOp GetMixBlendMode() const { return mMixBlendMode; }
-  const nsIntRect* GetClipRect() { return mUseClipRect ? &mClipRect : nullptr; }
+  const Maybe<ParentLayerIntRect>& GetClipRect() const { return mClipRect; }
   uint32_t GetContentFlags() { return mContentFlags; }
   const nsIntRect& GetLayerBounds() const { return mLayerBounds; }
   const nsIntRegion& GetVisibleRegion() const { return mVisibleRegion; }
@@ -1283,6 +1278,8 @@ public:
 
   uint64_t GetAnimationGeneration() { return mAnimationGeneration; }
   void SetAnimationGeneration(uint64_t aCount) { mAnimationGeneration = aCount; }
+
+  bool HasTransformAnimation() const;
 
   /**
    * Returns the local transform for this layer: either mTransform or,
@@ -1411,7 +1408,7 @@ public:
   // These getters can be used anytime.  They return the effective
   // values that should be used when drawing this layer to screen,
   // accounting for this layer possibly being a shadow.
-  const nsIntRect* GetEffectiveClipRect();
+  const Maybe<ParentLayerIntRect>& GetEffectiveClipRect();
   const nsIntRegion& GetEffectiveVisibleRegion();
 
   /**
@@ -1693,12 +1690,11 @@ protected:
   float mOpacity;
   gfx::CompositionOp mMixBlendMode;
   bool mForceIsolatedGroup;
-  nsIntRect mClipRect;
+  Maybe<ParentLayerIntRect> mClipRect;
   nsIntRect mTileSourceRect;
   nsIntRegion mInvalidRegion;
   nsTArray<nsRefPtr<AsyncPanZoomController> > mApzcs;
   uint32_t mContentFlags;
-  bool mUseClipRect;
   bool mUseTileSourceRect;
   bool mIsFixedPosition;
   LayerPoint mAnchor;

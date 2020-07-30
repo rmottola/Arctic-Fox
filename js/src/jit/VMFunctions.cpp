@@ -434,7 +434,6 @@ bool
 SetProperty(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
             bool strict, jsbytecode* pc)
 {
-    RootedValue v(cx, value);
     RootedId id(cx, NameToId(name));
 
     JSOp op = JSOp(*pc);
@@ -448,21 +447,21 @@ SetProperty(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValu
         return true;
     }
 
+    RootedValue receiver(cx, ObjectValue(*obj));
     ObjectOpResult result;
     if (MOZ_LIKELY(!obj->getOps()->setProperty)) {
         if (!NativeSetProperty(
-                cx, obj.as<NativeObject>(), obj.as<NativeObject>(), id,
+                cx, obj.as<NativeObject>(), id, value, receiver,
                 (op == JSOP_SETNAME || op == JSOP_STRICTSETNAME ||
                  op == JSOP_SETGNAME || op == JSOP_STRICTSETGNAME)
                 ? Unqualified
                 : Qualified,
-                &v,
                 result))
         {
             return false;
         }
     } else {
-        if (!SetProperty(cx, obj, obj, id, &v, result))
+        if (!SetProperty(cx, obj, id, value, receiver, result))
             return false;
     }
     return result.checkStrictErrorOrWarning(cx, obj, id, strict);
@@ -603,7 +602,8 @@ GetDynamicName(JSContext* cx, JSObject* scopeChain, JSString* str, Value* vp)
     }
 
     Shape* shape = nullptr;
-    JSObject* scope = nullptr, *pobj = nullptr;
+    JSObject* scope = nullptr;
+    JSObject* pobj = nullptr;
     if (LookupNameNoGC(cx, atom->asPropertyName(), scopeChain, &scope, &pobj, &shape)) {
         if (FetchNameNoGC(pobj, shape, MutableHandleValue::fromMarkedLocation(vp)))
             return;
@@ -1130,6 +1130,7 @@ AutoDetectInvalidation::setReturnOverride()
 void
 AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 {
+#ifdef DEBUG
     // Check what we can, so that we'll hopefully assert/crash if we get a
     // bogus object (pointer).
     MOZ_ASSERT(obj->compartment() == cx->compartment());
@@ -1140,10 +1141,11 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 
     if (obj->isTenured()) {
         MOZ_ASSERT(obj->isAligned());
-        mozilla::DebugOnly<gc::AllocKind> kind = obj->asTenured().getAllocKind();
-        MOZ_ASSERT(kind <= js::gc::AllocKind::OBJECT_LAST);
+        gc::AllocKind kind = obj->asTenured().getAllocKind();
+        MOZ_ASSERT(gc::IsObjectAllocKind(kind));
         MOZ_ASSERT(obj->asTenured().zone() == cx->zone());
     }
+#endif
 }
 
 void
@@ -1156,6 +1158,7 @@ AssertValidObjectOrNullPtr(JSContext* cx, JSObject* obj)
 void
 AssertValidStringPtr(JSContext* cx, JSString* str)
 {
+#ifdef DEBUG
     // We can't closely inspect strings from another runtime.
     if (str->runtimeFromAnyThread() != cx->runtime()) {
         MOZ_ASSERT(str->isPermanentAtom());
@@ -1171,7 +1174,7 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
     MOZ_ASSERT(str->isAligned());
     MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
 
-    mozilla::DebugOnly<gc::AllocKind> kind = str->getAllocKind();
+    gc::AllocKind kind = str->getAllocKind();
     if (str->isFatInline())
         MOZ_ASSERT(kind == gc::AllocKind::FAT_INLINE_STRING);
     else if (str->isExternal())
@@ -1180,6 +1183,7 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
         MOZ_ASSERT(kind == gc::AllocKind::STRING || kind == gc::AllocKind::FAT_INLINE_STRING);
     else
         MOZ_ASSERT(kind == gc::AllocKind::STRING);
+#endif
 }
 
 void

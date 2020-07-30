@@ -48,14 +48,14 @@ CrossCompartmentWrapper::getOwnPropertyDescriptor(JSContext* cx, HandleObject wr
 }
 
 bool
-CrossCompartmentWrapper::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
-                                        MutableHandle<PropertyDescriptor> desc,
+CrossCompartmentWrapper::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+                                        Handle<PropertyDescriptor> desc,
                                         ObjectOpResult &result) const
 {
     Rooted<PropertyDescriptor> desc2(cx, desc);
     PIERCE(cx, wrapper,
            cx->compartment()->wrap(cx, &desc2),
-           Wrapper::defineProperty(cx, wrapper, id, &desc2, result),
+           Wrapper::defineProperty(cx, wrapper, id, desc2, result),
            NOTHING);
 }
 
@@ -169,19 +169,20 @@ CrossCompartmentWrapper::get(JSContext* cx, HandleObject wrapper, HandleObject r
 }
 
 bool
-CrossCompartmentWrapper::set(JSContext* cx, HandleObject wrapper, HandleObject receiver,
-                             HandleId id, MutableHandleValue vp, ObjectOpResult &result) const
+CrossCompartmentWrapper::set(JSContext *cx, HandleObject wrapper, HandleId id, HandleValue v,
+                             HandleValue receiver, ObjectOpResult &result) const
 {
-    RootedObject receiverCopy(cx, receiver);
+    RootedValue valCopy(cx, v);
+    RootedValue receiverCopy(cx, receiver);
     PIERCE(cx, wrapper,
-           cx->compartment()->wrap(cx, &receiverCopy) &&
-           cx->compartment()->wrap(cx, vp),
-           Wrapper::set(cx, wrapper, receiverCopy, id, vp, result),
+           cx->compartment()->wrap(cx, &valCopy) &&
+           cx->compartment()->wrap(cx, &receiverCopy),
+           Wrapper::set(cx, wrapper, id, valCopy, receiverCopy, result),
            NOTHING);
 }
 
 bool
-CrossCompartmentWrapper::getOwnEnumerablePropertyKeys(JSContext* cx, HandleObject wrapper,
+CrossCompartmentWrapper::getOwnEnumerablePropertyKeys(JSContext *cx, HandleObject wrapper,
                                                       AutoIdVector& props) const
 {
     PIERCE(cx, wrapper,
@@ -579,10 +580,8 @@ js::RemapAllWrappersForObject(JSContext* cx, JSObject* oldTargetArg,
         }
     }
 
-    for (WrapperValue* begin = toTransplant.begin(), *end = toTransplant.end();
-         begin != end; ++begin)
-    {
-        if (!RemapWrapper(cx, &begin->toObject(), newTarget))
+    for (const WrapperValue& v : toTransplant) {
+        if (!RemapWrapper(cx, &v.toObject(), newTarget))
             MOZ_CRASH();
     }
 
@@ -618,9 +617,8 @@ js::RecomputeWrappers(JSContext* cx, const CompartmentFilter& sourceFilter,
     }
 
     // Recompute all the wrappers in the list.
-    for (WrapperValue* begin = toRecompute.begin(), *end = toRecompute.end(); begin != end; ++begin)
-    {
-        JSObject* wrapper = &begin->toObject();
+    for (const WrapperValue& v : toRecompute) {
+        JSObject* wrapper = &v.toObject();
         JSObject* wrapped = Wrapper::wrappedObject(wrapper);
         if (!RemapWrapper(cx, wrapper, wrapped))
             MOZ_CRASH();

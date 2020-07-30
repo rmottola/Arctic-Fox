@@ -35,10 +35,6 @@
 #include "nsIFile.h"
 #include "nsStringGlue.h"
 
-// Easy access to a five second startup delay used to get
-// a debugger attached in the metro environment. 
-// #define DEBUG_delay_start_metro
-
 #ifdef XP_WIN
 // we want a wmain entry point
 #include "nsWindowsWMain.cpp"
@@ -56,12 +52,6 @@ using namespace mozilla;
 #define kOSXResourcesFolder "Resources"
 #endif
 #define kDesktopFolder "browser"
-#define kMetroFolder "metro"
-#define kMetroAppIniFilename "metroapp.ini"
-#ifdef XP_WIN
-#define kMetroTestFile "tests.ini"
-const char* kMetroConsoleIdParam = "testconsoleid=";
-#endif
 
 static void Output(const char *fmt, ... )
 {
@@ -113,40 +103,6 @@ static bool IsArg(const char* arg, const char* s)
 
   return false;
 }
-
-#ifdef XP_WIN
-/*
- * AttachToTestHarness - Windows helper for when we are running
- * in the immersive environment. Firefox is launched by Windows in
- * response to a request by metrotestharness, which is launched by
- * runtests.py. As such stdout in fx doesn't point to the right
- * stream. This helper touches up stdout such that test output gets
- * routed to a named pipe metrotestharness creates and dumps to its
- * stdout.
- */
-static void AttachToTestHarness()
-{
-  // attach to the metrotestharness named logging pipe
-  HANDLE winOut = CreateFileA("\\\\.\\pipe\\metrotestharness",
-                              GENERIC_WRITE,
-                              FILE_SHARE_WRITE, 0,
-                              OPEN_EXISTING, 0, 0);
-  
-  if (winOut == INVALID_HANDLE_VALUE) {
-    OutputDebugStringW(L"Could not create named logging pipe.\n");
-    return;
-  }
-
-  // Set the c runtime handle
-  int stdOut = _open_osfhandle((intptr_t)winOut, _O_APPEND);
-  if (stdOut == -1) {
-    OutputDebugStringW(L"Could not open c-runtime handle.\n");
-    return;
-  }
-  FILE *fp = _fdopen(stdOut, "a");
-  *stdout = *fp;
-}
-#endif
 
 XRE_GetFileFromPathType XRE_GetFileFromPath;
 XRE_CreateAppDataType XRE_CreateAppData;
@@ -383,6 +339,7 @@ InitXPCOMGlue(const char *argv0, nsIFile **xreDirectory)
     return rv;
   }
 
+  // This will set this thread as the main thread.
   NS_LogInit();
 
   // chop XPCOM_DLL off exePath
@@ -404,9 +361,6 @@ InitXPCOMGlue(const char *argv0, nsIFile **xreDirectory)
 
 int main(int argc, char* argv[])
 {
-#ifdef DEBUG_delay_start_metro
-  Sleep(5000);
-#endif
   uint64_t start = TimeStamp_Now();
 
 #ifdef XP_MACOSX

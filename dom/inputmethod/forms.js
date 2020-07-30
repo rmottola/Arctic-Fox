@@ -737,7 +737,7 @@ let FormAssistant = {
 
   sendInputState: function(element) {
     // FIXME/bug 729623: work around apparent bug in the IME manager
-    // in goanna.
+    // in gecko.
     let readonly = element.getAttribute("readonly");
     if (readonly) {
       return false;
@@ -857,7 +857,7 @@ function getJSON(element, focusCounter) {
     }
   }
 
-  // Goanna has some support for @inputmode but behind a preference and
+  // Gecko has some support for @inputmode but behind a preference and
   // it is disabled by default.
   // Gaia is then using @x-inputmode has its proprietary way to set
   // inputmode for fields. This shouldn't be used outside of pre-installed

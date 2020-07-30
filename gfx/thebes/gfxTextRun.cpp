@@ -23,6 +23,10 @@
 #include "mozilla/Likely.h"
 #include "gfx2DGlue.h"
 
+#if defined(MOZ_WIDGET_GTK)
+#include "gfxPlatformGtk.h" // xxx - for UseFcFontList
+#endif
+
 #include "cairo.h"
 
 using namespace mozilla;
@@ -1526,6 +1530,7 @@ gfxFontGroup::gfxFontGroup(const FontFamilyList& aFontFamilyList,
     , mTextPerf(nullptr)
     , mPageLang(gfxPlatform::GetFontPrefLangFor(aStyle->language))
     , mSkipDrawing(false)
+    , mSkipUpdateUserFonts(false)
 {
     // We don't use SetUserFontSet() here, as we want to unconditionally call
     // BuildFontList() rather than only do UpdateUserFonts() if it changed.
@@ -1672,10 +1677,17 @@ void gfxFontGroup::EnumerateFontList(nsIAtom *aLanguage, void *aClosure)
 void
 gfxFontGroup::BuildFontList()
 {
-// gfxPangoFontGroup behaves differently, so this method is a no-op on that platform
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID)
-    EnumerateFontList(mStyle.language);
+    bool enumerateFonts = true;
+
+#if defined(MOZ_WIDGET_GTK)
+    // xxx - eliminate this once gfxPangoFontGroup is no longer needed
+    enumerateFonts = gfxPlatformGtk::UseFcFontList();
+#elif defined(MOZ_WIDGET_QT)
+    enumerateFonts = false;
 #endif
+    if (enumerateFonts) {
+        EnumerateFontList(mStyle.language);
+    }
 }
 
 void
@@ -1714,7 +1726,7 @@ gfxFontGroup::FindPlatformFont(const nsAString& aName,
     // Not known in the user font set ==> check system fonts
     if (!family) {
         gfxPlatformFontList *fontList = gfxPlatformFontList::PlatformFontList();
-        family = fontList->FindFamily(aName, mStyle.systemFont);
+        family = fontList->FindFamily(aName, mStyle.language, mStyle.systemFont);
         if (family) {
             fe = family->FindFontForStyle(mStyle, needsBold);
         }
@@ -2186,11 +2198,9 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
         }
     }
 
-#ifdef PR_LOGGING
     PRLogModuleInfo *log = (mStyle.systemFont ?
                             gfxPlatform::GetLog(eGfxLog_textrunui) :
                             gfxPlatform::GetLog(eGfxLog_textrun));
-#endif
 
     // variant fallback handling may end up passing through this twice
     bool redo;
@@ -2199,7 +2209,6 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
 
         if (sizeof(T) == sizeof(uint8_t) && !transformedString) {
 
-#ifdef PR_LOGGING
             if (MOZ_UNLIKELY(PR_LOG_TEST(log, PR_LOG_WARNING))) {
                 nsAutoCString lang;
                 mStyle.language->ToUTF8String(lang);
@@ -2225,7 +2234,6 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
                         sizeof(T),
                         str.get()));
             }
-#endif
 
             // the text is still purely 8-bit; bypass the script-run itemizer
             // and treat it as a single Latin run
@@ -2249,7 +2257,6 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
             int32_t runScript = MOZ_SCRIPT_LATIN;
             while (scriptRuns.Next(runStart, runLimit, runScript)) {
 
-    #ifdef PR_LOGGING
                 if (MOZ_UNLIKELY(PR_LOG_TEST(log, PR_LOG_WARNING))) {
                     nsAutoCString lang;
                     mStyle.language->ToUTF8String(lang);
@@ -2275,7 +2282,6 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
                             sizeof(T),
                             NS_ConvertUTF16toUTF8(textPtr + runStart, runLen).get()));
                 }
-    #endif
 
                 InitScriptRun(aContext, aTextRun, textPtr + runStart,
                               runStart, runLimit - runStart, runScript, aMFR);
@@ -2338,13 +2344,11 @@ gfxFontGroup::InitScriptRun(gfxContext *aContext,
     NS_ASSERTION(aTextRun->GetShapingState() != gfxTextRun::eShapingState_Aborted,
                  "don't call InitScriptRun with aborted shaping state");
 
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID)
-    // non-linux platforms build the fontlist lazily and include userfonts
-    // so need to confirm the load state of userfonts in the list
-    if (mUserFontSet && mCurrGeneration != mUserFontSet->GetGeneration()) {
+    // confirm the load state of userfonts in the list
+    if (!mSkipUpdateUserFonts && mUserFontSet &&
+        mCurrGeneration != mUserFontSet->GetGeneration()) {
         UpdateUserFonts();
     }
-#endif
 
     gfxFont *mainFont = GetFirstValidFont();
 
@@ -2600,10 +2604,6 @@ gfxFontGroup::FindNonItalicFaceForChar(gfxFontFamily* aFamily, uint32_t aCh)
     NS_ASSERTION(mStyle.style != NS_FONT_STYLE_NORMAL,
                  "should only be called in the italic/oblique case");
 
-    if (!aFamily->TestCharacterMap(aCh)) {
-        return nullptr;
-    }
-
     gfxFontStyle regularStyle = mStyle;
     regularStyle.style = NS_FONT_STYLE_NORMAL;
     bool needsBold;
@@ -2790,9 +2790,11 @@ gfxFontGroup::FindFontForChar(uint32_t aCh, uint32_t aPrevCh, uint32_t aNextCh,
 
         // If italic, test the regular face to see if it supports the character.
         // Only do this for platform fonts, not userfonts.
+        fe = ff.FontEntry();
         if (mStyle.style != NS_FONT_STYLE_NORMAL &&
-            !ff.FontEntry()->IsUserFont()) {
-            font = FindNonItalicFaceForChar(mFonts[i].Family(), aCh);
+            !fe->mIsUserFontContainer &&
+            !fe->IsUserFont()) {
+            font = FindNonItalicFaceForChar(ff.Family(), aCh);
             if (font) {
                 *aMatchType = gfxTextRange::kFontGroup;
                 return font.forget();
@@ -3075,7 +3077,10 @@ struct PrefFontCallbackData {
     {
         PrefFontCallbackData *prefFontData = static_cast<PrefFontCallbackData*>(aClosure);
 
-        gfxFontFamily *family = gfxPlatformFontList::PlatformFontList()->FindFamily(aName);
+        // map pref lang to langGroup for language-sensitive lookups
+        nsIAtom* lang = gfxPlatform::GetLangGroupForPrefLang(aLang);
+        gfxFontFamily *family =
+            gfxPlatformFontList::PlatformFontList()->FindFamily(aName, lang);
         if (family) {
             prefFontData->mPrefFamilies.AppendElement(family);
         }

@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -39,12 +40,8 @@
 #include "nsThreadUtils.h"
 #include "nsVideoFrame.h"
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gTrackElementLog;
 #define LOG(type, msg) PR_LOG(gTrackElementLog, type, msg)
-#else
-#define LOG(type, msg)
-#endif
 
 // Replace the usual NS_IMPL_NS_NEW_HTML_ELEMENT(Track) so
 // we can return an UnknownElement instead when pref'd off.
@@ -79,11 +76,9 @@ static MOZ_CONSTEXPR const char* kKindTableDefaultString = kKindTable->tag;
 HTMLTrackElement::HTMLTrackElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo)
   : nsGenericHTMLElement(aNodeInfo)
 {
-#ifdef PR_LOGGING
   if (!gTrackElementLog) {
     gTrackElementLog = PR_NewLogModule("nsTrackElement");
   }
-#endif
 }
 
 HTMLTrackElement::~HTMLTrackElement()

@@ -30,7 +30,7 @@ function testAddRange(exception, range, endpoints, qualifier, testName) {
 	}, testName + ": " + qualifier + " addRange() must result in rangeCount being 1");
 
 	// From here on out we check selection.getRangeAt(selection.rangeCount - 1)
-	// so as not to double-fail Goanna.
+	// so as not to double-fail Gecko.
 
 	test(function() {
 		assert_equals(exception, null, "Test setup must not throw exceptions");

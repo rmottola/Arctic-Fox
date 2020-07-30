@@ -364,8 +364,7 @@ SetArrayElement(JSContext* cx, HandleObject obj, double index, HandleValue v)
     if (!ToId(cx, index, &id))
         return false;
 
-    RootedValue tmp(cx, v);
-    return SetProperty(cx, obj, obj, id, &tmp);
+    return SetProperty(cx, obj, id, v);
 }
 
 /*
@@ -434,7 +433,7 @@ bool
 js::SetLengthProperty(JSContext* cx, HandleObject obj, double length)
 {
     RootedValue v(cx, NumberValue(length));
-    return SetProperty(cx, obj, obj, cx->names().length, &v);
+    return SetProperty(cx, obj, cx->names().length, v);
 }
 
 /*
@@ -700,8 +699,9 @@ js::ArraySetLength(JSContext* cx, Handle<ArrayObject*> arr, HandleId id,
     // the long run, with accessors replacing them both internally and at the
     // API level, just run with this.
     RootedShape lengthShape(cx, arr->lookup(cx, id));
-    if (!NativeObject::changeProperty(cx, arr, lengthShape, attrs,
-                                      JSPROP_PERMANENT | JSPROP_READONLY | JSPROP_SHARED,
+    if (!NativeObject::changeProperty(cx, arr, lengthShape,
+                                      attrs | JSPROP_PERMANENT | JSPROP_SHARED |
+                                      (lengthShape->attributes() & JSPROP_READONLY),
                                       array_length_getter, array_length_setter))
     {
         return false;
@@ -1270,11 +1270,10 @@ InitArrayElements(JSContext *cx, HandleObject obj, uint32_t start, uint32_t coun
     do {
         value = *vector++;
         indexv = DoubleValue(index);
-        if (!ValueToId<CanGC>(cx, indexv, &id) ||
-            !SetProperty(cx, obj, obj, id, &value))
-        {
+        if (!ValueToId<CanGC>(cx, indexv, &id))
             return false;
-        }
+        if (!SetProperty(cx, obj, id, value))
+            return false;
         index += 1;
     } while (vector != end);
 
@@ -3294,6 +3293,7 @@ const Class ArrayObject::class_ = {
         GenericCreateConstructor<ArrayConstructor, 1, JSFunction::FinalizeKind>,
         CreateArrayPrototype,
         array_static_methods,
+        nullptr,
         array_methods,
         nullptr,
         array_proto_finish

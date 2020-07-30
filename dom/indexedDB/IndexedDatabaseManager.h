@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -16,12 +16,10 @@
 #include "nsClassHashtable.h"
 #include "nsHashKeys.h"
 
-class nsPIDOMWindow;
 struct PRLogModuleInfo;
 
 namespace mozilla {
 
-class DOMEventTargetHelper;
 class EventChainPostVisitor;
 
 namespace dom {
@@ -109,7 +107,13 @@ public:
 #endif
 
   static bool
-  ExperimentalFeaturesEnabled(JSContext* aCx, JSObject* aGlobal);
+  ExperimentalFeaturesEnabled();
+
+  static bool
+  ExperimentalFeaturesEnabled(JSContext* /* aCx */, JSObject* /* aGlobal */)
+  {
+    return ExperimentalFeaturesEnabled();
+  }
 
   already_AddRefed<FileManager>
   GetFileManager(PersistenceType aPersistenceType,
@@ -184,7 +188,7 @@ private:
   // protected by any mutex but it is only ever touched on the IO thread.
   nsClassHashtable<nsCStringHashKey, FileManagerInfo> mFileManagerInfos;
 
-  // Lock protecting FileManager.mFileInfos and FileImplBase.mFileInfos
+  // Lock protecting FileManager.mFileInfos and BlobImplBase.mFileInfos
   // It's s also used to atomically update FileInfo.mRefCnt, FileInfo.mDBRefCnt
   // and FileInfo.mSliceRefCnt
   mozilla::Mutex mFileMutex;

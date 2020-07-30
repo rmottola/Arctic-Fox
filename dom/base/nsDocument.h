@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 sw=2 et tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -59,7 +59,7 @@
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/EventStates.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/PendingPlayerTracker.h"
+#include "mozilla/PendingAnimationTracker.h"
 #include "mozilla/dom/DOMImplementation.h"
 #include "mozilla/dom/StyleSheetList.h"
 #include "nsDataHashtable.h"
@@ -76,17 +76,12 @@
 
 
 class nsDOMStyleSheetSetList;
-class nsIOutputStream;
 class nsDocument;
-class nsIDTD;
 class nsIRadioVisitor;
 class nsIFormControl;
 struct nsRadioGroupStruct;
 class nsOnloadBlocker;
 class nsUnblockOnloadEvent;
-class nsChildContentList;
-class nsHTMLStyleSheet;
-class nsHTMLCSSStyleSheet;
 class nsDOMNavigationTiming;
 class nsWindowSizes;
 class nsHtml5TreeOpExecutor;
@@ -784,7 +779,7 @@ public:
   virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() override;
 
   static bool IsWebAnimationsEnabled(JSContext* aCx, JSObject* aObject);
-  virtual mozilla::dom::AnimationTimeline* Timeline() override;
+  virtual mozilla::dom::DocumentTimeline* Timeline() override;
 
   virtual nsresult SetSubDocumentFor(Element* aContent,
                                      nsIDocument* aSubDoc) override;
@@ -1043,20 +1038,18 @@ public:
   virtual void
     EnumerateExternalResources(nsSubDocEnumFunc aCallback, void* aData) override;
 
-  nsTArray<nsCString> mHostObjectURIs;
-
   // Returns our (lazily-initialized) animation controller.
   // If HasAnimationController is true, this is guaranteed to return non-null.
   nsSMILAnimationController* GetAnimationController() override;
 
-  virtual mozilla::PendingPlayerTracker*
-  GetPendingPlayerTracker() final override
+  virtual mozilla::PendingAnimationTracker*
+  GetPendingAnimationTracker() final override
   {
-    return mPendingPlayerTracker;
+    return mPendingAnimationTracker;
   }
 
-  virtual mozilla::PendingPlayerTracker*
-  GetOrCreatePendingPlayerTracker() override;
+  virtual mozilla::PendingAnimationTracker*
+  GetOrCreatePendingAnimationTracker() override;
 
   void SetImagesNeedAnimating(bool aAnimating) override;
 
@@ -1132,9 +1125,6 @@ public:
   virtual nsISupports* GetCurrentContentSink() override;
 
   virtual mozilla::EventStates GetDocumentState() override;
-
-  virtual void RegisterHostObjectUri(const nsACString& aUri) override;
-  virtual void UnregisterHostObjectUri(const nsACString& aUri) override;
 
   // Only BlockOnload should call this!
   void AsyncBlockOnload();
@@ -1535,9 +1525,9 @@ protected:
   // Array of observers
   nsTObserverArray<nsIDocumentObserver*> mObservers;
 
-  // Tracker for animation players that are waiting to start.
-  // nullptr until GetOrCreatePendingPlayerTracker is called.
-  nsRefPtr<mozilla::PendingPlayerTracker> mPendingPlayerTracker;
+  // Tracker for animations that are waiting to start.
+  // nullptr until GetOrCreatePendingAnimationTracker is called.
+  nsRefPtr<mozilla::PendingAnimationTracker> mPendingAnimationTracker;
 
   // Weak reference to the scope object (aka the script global object)
   // that, unlike mScriptGlobalObject, is never unset once set. This
@@ -1671,7 +1661,9 @@ public:
   // 'style-sheet-applicable-state-changed' notification.
   bool mSSApplicableStateNotificationPending:1;
 
-  uint32_t mCancelledPointerLockRequests;
+  // The number of pointer lock requests which are cancelled by the user.
+  // The value is saturated to kPointerLockRequestLimit+1 = 3.
+  uint8_t mCancelledPointerLockRequests:2;
 
   uint8_t mXMLDeclarationBits;
 
@@ -1800,7 +1792,7 @@ private:
 
   nsRefPtr<mozilla::dom::UndoManager> mUndoManager;
 
-  nsRefPtr<mozilla::dom::AnimationTimeline> mAnimationTimeline;
+  nsRefPtr<mozilla::dom::DocumentTimeline> mDocumentTimeline;
 
   enum ViewportType {
     DisplayWidthHeight,

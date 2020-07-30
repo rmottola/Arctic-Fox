@@ -12,6 +12,7 @@ import sys
 SCRIPT_DIR = os.path.abspath(os.path.realpath(os.path.dirname(__file__)))
 sys.path.insert(0, SCRIPT_DIR)
 
+from argparse import Namespace
 from urlparse import urlparse
 import ctypes
 import glob
@@ -21,7 +22,6 @@ import mozdebug
 import mozinfo
 import mozprocess
 import mozrunner
-import optparse
 import re
 import shutil
 import signal
@@ -46,7 +46,13 @@ from automationutils import (
 
 from datetime import datetime
 from manifestparser import TestManifest
-from manifestparser.filters import subsuite
+from manifestparser.filters import (
+    chunk_by_dir,
+    chunk_by_runtime,
+    chunk_by_slice,
+    subsuite,
+    tags,
+)
 from mochitest_options import MochitestOptions
 from mozprofile import Profile, Preferences
 from mozprofile.permissions import ServerLocations
@@ -54,9 +60,6 @@ from urllib import quote_plus as encodeURIComponent
 from mozlog.structured.formatters import TbplFormatter
 from mozlog.structured import commandline
 
-# This should use the `which` module already in tree, but it is
-# not yet present in the mozharness environment
-from mozrunner.utils import findInPath as which
 
 ###########################
 # Option for NSPR logging #
@@ -329,7 +332,7 @@ class MochitestServer(object):
     "Web server used to serve Mochitests, for closer fidelity to the real web."
 
     def __init__(self, options, logger):
-        if isinstance(options, optparse.Values):
+        if isinstance(options, Namespace):
             options = vars(options)
         self._log = logger
         self._closeWhenDone = options['closeWhenDone']
@@ -564,8 +567,6 @@ class MochitestUtilsMixin(object):
             closeWhenDone -- closes the browser after the tests
             hideResultsTable -- hides the table of individual test results
             logFile -- logs test run to an absolute path
-            totalChunks -- how many chunks to split tests into
-            thisChunk -- which chunk to run
             startAt -- name of test to start at
             endAt -- name of test to end at
             timeout -- per-test timeout in seconds
@@ -590,6 +591,8 @@ class MochitestUtilsMixin(object):
                 self.urlOpts.append("autorun=1")
             if options.timeout:
                 self.urlOpts.append("timeout=%d" % options.timeout)
+            if options.maxTimeouts:
+                self.urlOpts.append("maxTimeouts=%d" % options.maxTimeouts)
             if options.closeWhenDone:
                 self.urlOpts.append("closeWhenDone=1")
             if options.webapprtContent:
@@ -608,11 +611,6 @@ class MochitestUtilsMixin(object):
                     "consoleLevel=" +
                     encodeURIComponent(
                         options.consoleLevel))
-            if options.totalChunks:
-                self.urlOpts.append("totalChunks=%d" % options.totalChunks)
-                self.urlOpts.append("thisChunk=%d" % options.thisChunk)
-            if options.chunkByDir:
-                self.urlOpts.append("chunkByDir=%d" % options.chunkByDir)
             if options.startAt:
                 self.urlOpts.append("startAt=%s" % options.startAt)
             if options.endAt:
@@ -634,12 +632,6 @@ class MochitestUtilsMixin(object):
                     options.testPath)) and options.repeat > 0:
                 self.urlOpts.append("testname=%s" %
                                     ("/").join([self.TEST_PATH, options.testPath]))
-            if options.testManifest:
-                self.urlOpts.append("testManifest=%s" % options.testManifest)
-                if hasattr(options, 'runOnly') and options.runOnly:
-                    self.urlOpts.append("runOnly=true")
-                else:
-                    self.urlOpts.append("runOnly=false")
             if options.manifestFile:
                 self.urlOpts.append("manifestFile=%s" % options.manifestFile)
             if options.failureFile:
@@ -1523,6 +1515,11 @@ class Mochitest(MochitestUtilsMixin):
         if debugger and not options.slowscript:
             browserEnv["JS_DISABLE_SLOW_SCRIPT_SIGNALS"] = "1"
 
+        # For e10s, our tests default to suppressing the "unsafe CPOW usage"
+        # warnings that can plague test logs.
+        if not options.enableCPOWWarnings:
+            browserEnv["DISABLE_UNSAFE_CPOW_WARNINGS"] = "1"
+
         return browserEnv
 
     def cleanup(self, options):
@@ -1834,6 +1831,26 @@ class Mochitest(MochitestUtilsMixin):
         options.profilePath = None
         self.urlOpts = []
 
+    def resolve_runtime_file(self, options, info):
+        platform = info['platform_guess']
+        buildtype = info['buildtype_guess']
+
+        data_dir = os.path.join(SCRIPT_DIR, 'runtimes', '{}-{}'.format(
+            platform, buildtype))
+
+        flavor = self.getTestFlavor(options)
+        if flavor == 'browser-chrome' and options.subsuite == 'devtools':
+            flavor = 'devtools-chrome'
+        elif flavor == 'mochitest':
+            flavor = 'plain'
+
+        base = 'mochitest'
+        if options.e10s:
+            base = '{}-e10s'.format(base)
+        return os.path.join(data_dir, '{}-{}.runtimes.json'.format(
+            base, flavor))
+
+
     def getActiveTests(self, options, disabled=True):
         """
           This method is used to parse the manifest and return active filtered tests.
@@ -1841,14 +1858,7 @@ class Mochitest(MochitestUtilsMixin):
         self.setTestRoot(options)
         manifest = self.getTestManifest(options)
         if manifest:
-            # Python 2.6 doesn't allow unicode keys to be used for keyword
-            # arguments. This gross hack works around the problem until we
-            # rid ourselves of 2.6.
-            info = {}
-            for k, v in mozinfo.info.items():
-                if isinstance(k, unicode):
-                    k = k.encode('ascii')
-                info[k] = v
+            info = mozinfo.info
 
             # Bug 883858 - return all tests including disabled tests
             testPath = self.getTestPath(options)
@@ -1857,19 +1867,88 @@ class Mochitest(MochitestUtilsMixin):
                testPath.endswith('.xhtml') or \
                testPath.endswith('.xul') or \
                testPath.endswith('.js'):
-                    # In the case where we have a single file, we don't want to
-                    # filter based on options such as subsuite.
-                tests = manifest.active_tests(disabled=disabled, **info)
+                # In the case where we have a single file, we don't want to
+                # filter based on options such as subsuite.
+                tests = manifest.active_tests(
+                    exists=False, disabled=disabled, **info)
                 for test in tests:
                     if 'disabled' in test:
                         del test['disabled']
 
             else:
-                filters = [subsuite(options.subsuite)]
+                # Bug 1089034 - imptest failure expectations are encoded as
+                # test manifests, even though they aren't tests. This gross
+                # hack causes several problems in automation including
+                # throwing off the chunking numbers. Remove them manually
+                # until bug 1089034 is fixed.
+                def remove_imptest_failure_expectations(tests, values):
+                    return (t for t in tests
+                            if 'imptests/failures' not in t['path'])
+
+                # filter that implements old-style JSON manifests, remove
+                # once everything is using .ini
+                def apply_json_manifest(tests, values):
+                    m = os.path.join(SCRIPT_DIR, options.testManifest)
+                    with open(m, 'r') as f:
+                        m = json.loads(f.read())
+
+                    runtests = m.get('runtests')
+                    exctests = m.get('excludetests')
+                    if runtests is None and exctests is None:
+                        if options.runOnly:
+                            runtests = m
+                        else:
+                            exctests = m
+
+                    disabled = 'disabled by {}'.format(options.testManifest)
+                    for t in tests:
+                        if runtests and not any(t['relpath'].startswith(r)
+                                                for r in runtests):
+                            t['disabled'] = disabled
+                        if exctests and any(t['relpath'].startswith(r)
+                                            for r in exctests):
+                            t['disabled'] = disabled
+                        yield t
+
+                filters = [
+                    remove_imptest_failure_expectations,
+                    subsuite(options.subsuite),
+                ]
+
+                if options.testManifest:
+                    filters.append(apply_json_manifest)
+
+                # Add chunking filters if specified
+                if options.totalChunks:
+                    if options.chunkByDir:
+                        filters.append(chunk_by_dir(options.thisChunk,
+                                                    options.totalChunks,
+                                                    options.chunkByDir))
+                    elif options.chunkByRuntime:
+                        runtime_file = self.resolve_runtime_file(options, info)
+                        with open(runtime_file, 'r') as f:
+                            runtime_data = json.loads(f.read())
+                        runtimes = runtime_data['runtimes']
+                        default = runtime_data['excluded_test_average']
+                        filters.append(
+                            chunk_by_runtime(options.thisChunk,
+                                             options.totalChunks,
+                                             runtimes,
+                                             default_runtime=default))
+                    else:
+                        filters.append(chunk_by_slice(options.thisChunk,
+                                                      options.totalChunks))
+
+                if options.test_tags:
+                    filters.append(tags(options.test_tags))
+
                 tests = manifest.active_tests(
-                    disabled=disabled, filters=filters, **info)
+                    exists=False, disabled=disabled, filters=filters, **info)
+
                 if len(tests) == 0:
-                    tests = manifest.active_tests(disabled=True, **info)
+                    self.log.error("no tests to run using specified "
+                                   "combination of filters: {}".format(
+                                        manifest.fmt_filters()))
 
         paths = []
 
@@ -1989,15 +2068,6 @@ class Mochitest(MochitestUtilsMixin):
         # code for --run-by-dir
         dirs = self.getDirectories(options)
 
-        if options.totalChunks > 1:
-            chunkSize = int(len(dirs) / options.totalChunks) + 1
-            start = chunkSize * (options.thisChunk - 1)
-            end = chunkSize * (options.thisChunk)
-            dirs = dirs[start:end]
-
-        options.totalChunks = None
-        options.thisChunk = None
-        options.chunkByDir = 0
         result = 1  # default value, if no tests are run.
         inputTestPath = self.getTestPath(options)
         for dir in dirs:
@@ -2490,7 +2560,7 @@ def main():
     # parse command line options
     parser = MochitestOptions()
     commandline.add_logging_group(parser)
-    options, args = parser.parse_args()
+    options = parser.parse_args()
     if options is None:
         # parsing error
         sys.exit(1)

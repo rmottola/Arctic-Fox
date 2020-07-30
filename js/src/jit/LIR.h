@@ -1323,15 +1323,15 @@ class LSafepoint : public TempObject
     // registers: if passed to the call, the values passed will be marked via
     // MarkJitExitFrame, and no registers can be live after the instruction
     // except its outputs.
-    RegisterSet liveRegs_;
+    LiveRegisterSet liveRegs_;
 
     // The subset of liveRegs which contains gcthing pointers.
-    GeneralRegisterSet gcRegs_;
+    LiveGeneralRegisterSet gcRegs_;
 
 #ifdef CHECK_OSIPOINT_REGISTERS
     // Clobbered regs of the current instruction. This set is never written to
     // the safepoint; it's only used by assertions during compilation.
-    RegisterSet clobberedRegs_;
+    LiveRegisterSet clobberedRegs_;
 #endif
 
     // Offset to a position in the safepoint stream, or
@@ -1352,11 +1352,11 @@ class LSafepoint : public TempObject
     NunboxList nunboxParts_;
 #elif JS_PUNBOX64
     // The subset of liveRegs which have Values.
-    GeneralRegisterSet valueRegs_;
+    LiveGeneralRegisterSet valueRegs_;
 #endif
 
     // The subset of liveRegs which contains pointers to slots/elements.
-    GeneralRegisterSet slotsOrElementsRegs_;
+    LiveGeneralRegisterSet slotsOrElementsRegs_;
 
     // List of slots which have slots/elements pointers.
     SlotList slotsOrElementsSlots_;
@@ -1386,7 +1386,7 @@ class LSafepoint : public TempObject
         liveRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const RegisterSet& liveRegs() const {
+    const LiveRegisterSet &liveRegs() const {
         return liveRegs_;
     }
 #ifdef CHECK_OSIPOINT_REGISTERS
@@ -1394,7 +1394,7 @@ class LSafepoint : public TempObject
         clobberedRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const RegisterSet& clobberedRegs() const {
+    const LiveRegisterSet &clobberedRegs() const {
         return clobberedRegs_;
     }
 #endif
@@ -1402,7 +1402,7 @@ class LSafepoint : public TempObject
         gcRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    GeneralRegisterSet gcRegs() const {
+    LiveGeneralRegisterSet gcRegs() const {
         return gcRegs_;
     }
     bool addGcSlot(bool stack, uint32_t slot) {
@@ -1411,14 +1411,14 @@ class LSafepoint : public TempObject
             assertInvariants();
         return result;
     }
-    SlotList& gcSlots() {
+    SlotList &gcSlots() {
         return gcSlots_;
     }
 
-    SlotList& slotsOrElementsSlots() {
+    SlotList &slotsOrElementsSlots() {
         return slotsOrElementsSlots_;
     }
-    GeneralRegisterSet slotsOrElementsRegs() const {
+    LiveGeneralRegisterSet slotsOrElementsRegs() const {
         return slotsOrElementsRegs_;
     }
     void addSlotsOrElementsRegister(Register reg) {
@@ -1567,7 +1567,7 @@ class LSafepoint : public TempObject
         valueRegs_.add(reg);
         assertInvariants();
     }
-    GeneralRegisterSet valueRegs() const {
+    LiveGeneralRegisterSet valueRegs() const {
         return valueRegs_;
     }
 
@@ -1760,11 +1760,12 @@ class LIRGraph
     // platform stack alignment requirement, and so that it's a multiple of
     // the number of slots per Value.
     uint32_t paddedLocalSlotCount() const {
-        // Round to ABIStackAlignment, but also round to at least sizeof(Value)
-        // in case that's greater, because StackOffsetOfPassedArg rounds
-        // argument slots to 8-byte boundaries.
-        size_t Alignment = Max(size_t(JitStackAlignment), sizeof(Value));
-        return AlignBytes(localSlotCount(), Alignment);
+        // Round to JitStackAlignment, and implicitly to sizeof(Value) as
+        // JitStackAlignment is a multiple of sizeof(Value). These alignments
+        // are needed for spilling SIMD registers properly, and for
+        // StackOffsetOfPassedArg which rounds argument slots to 8-byte
+        // boundaries.
+        return AlignBytes(localSlotCount(), JitStackAlignment);
     }
     size_t paddedLocalSlotsSize() const {
         return paddedLocalSlotCount();
@@ -1843,7 +1844,7 @@ LAllocation::toRegister() const
 # elif defined(JS_CODEGEN_X64)
 #  include "jit/x64/LIR-x64.h"
 # endif
-# include "jit/shared/LIR-x86-shared.h"
+# include "jit/x86-shared/LIR-x86-shared.h"
 #elif defined(JS_CODEGEN_ARM)
 # include "jit/arm/LIR-arm.h"
 #elif defined(JS_CODEGEN_MIPS)

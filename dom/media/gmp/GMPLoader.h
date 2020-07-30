@@ -10,27 +10,33 @@
 #include <stdint.h>
 #include "gmp-entrypoints.h"
 
+#if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
+#include "mozilla/Sandbox.h"
+#endif
+
 namespace mozilla {
 namespace gmp {
 
 class SandboxStarter {
 public:
   virtual ~SandboxStarter() {}
-  virtual void Start(const char* aLibPath) = 0;
-};
-
-#if defined(XP_MACOSX)
-#define SANDBOX_NOT_STATICALLY_LINKED_INTO_PLUGIN_CONTAINER 1
+  virtual bool Start(const char* aLibPath) = 0;
+#if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
+  // On OS X we need to set Mac-specific sandbox info just before we start the
+  // sandbox, which we don't yet know when the GMPLoader and SandboxStarter
+  // objects are created.
+  virtual void SetSandboxInfo(MacSandboxInfo* aSandboxInfo) = 0;
 #endif
+};
 
 // Encapsulates generating the device-bound node id, activating the sandbox,
 // loading the GMP, and passing the node id to the GMP (in that order).
 //
-// In Desktop Goanna, the implementation of this lives in plugin-container,
+// In Desktop Gecko, the implementation of this lives in plugin-container,
 // and is passed into XUL code from on startup. The GMP IPC child protocol actor
 // uses this interface to load and retrieve interfaces from the GMPs.
 //
-// In Desktop Goanna the implementation lives in the plugin-container so that
+// In Desktop Gecko the implementation lives in the plugin-container so that
 // it can be covered by DRM vendor's voucher.
 //
 // On Android the GMPLoader implementation lives in libxul (because for the time
@@ -59,10 +65,11 @@ public:
   // plugin library.
   virtual void Shutdown() = 0;
 
-#ifdef SANDBOX_NOT_STATICALLY_LINKED_INTO_PLUGIN_CONTAINER
-  // Encapsulates starting the sandbox on Linux and MacOSX.
-  // TODO: Remove this, and put sandbox in plugin-container on all platforms.
-  virtual void SetStartSandboxStarter(SandboxStarter* aStarter) = 0;
+#if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
+  // On OS X we need to set Mac-specific sandbox info just before we start the
+  // sandbox, which we don't yet know when the GMPLoader and SandboxStarter
+  // objects are created.
+  virtual void SetSandboxInfo(MacSandboxInfo* aSandboxInfo) = 0;
 #endif
 };
 

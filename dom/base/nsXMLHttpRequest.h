@@ -51,8 +51,8 @@ class nsIJSID;
 namespace mozilla {
 
 namespace dom {
+class Blob;
 class BlobSet;
-class File;
 }
 
 // A helper for building up an ArrayBuffer object's data
@@ -352,7 +352,7 @@ private:
     {
       mValue.mArrayBufferView = aArrayBufferView;
     }
-    explicit RequestBody(mozilla::dom::File& aBlob) : mType(Blob)
+    explicit RequestBody(mozilla::dom::Blob& aBlob) : mType(Blob)
     {
       mValue.mBlob = &aBlob;
     }
@@ -386,7 +386,7 @@ private:
     union Value {
       const mozilla::dom::ArrayBuffer* mArrayBuffer;
       const mozilla::dom::ArrayBufferView* mArrayBufferView;
-      mozilla::dom::File* mBlob;
+      mozilla::dom::Blob* mBlob;
       nsIDocument* mDocument;
       const nsAString* mString;
       nsFormData* mFormData;
@@ -428,6 +428,11 @@ private:
 
   bool IsDeniedCrossSiteRequest();
 
+  // Tell our channel what network interface ID we were told to use.
+  // If it's an HTTP channel and we were told to use a non-default
+  // interface ID.
+  void PopulateNetworkInterfaceId();
+
 public:
   void Send(JSContext* /*aCx*/, ErrorResult& aRv)
   {
@@ -445,7 +450,7 @@ public:
   {
     aRv = Send(RequestBody(&aArrayBufferView));
   }
-  void Send(JSContext* /*aCx*/, mozilla::dom::File& aBlob, ErrorResult& aRv)
+  void Send(JSContext* /*aCx*/, mozilla::dom::Blob& aBlob, ErrorResult& aRv)
   {
     aRv = Send(RequestBody(aBlob));
   }
@@ -538,6 +543,16 @@ public:
     return mChannel;
   }
 
+  void GetNetworkInterfaceId(nsACString& aId) const
+  {
+    aId = mNetworkInterfaceId;
+  }
+
+  void SetNetworkInterfaceId(const nsACString& aId)
+  {
+    mNetworkInterfaceId = aId;
+  }
+
   // We need a GetInterface callable from JS for chrome JS
   void GetInterface(JSContext* aCx, nsIJSID* aIID,
                     JS::MutableHandle<JS::Value> aRetval, ErrorResult& aRv);
@@ -591,7 +606,7 @@ protected:
                 uint32_t *writeCount);
   nsresult CreateResponseParsedJSON(JSContext* aCx);
   void CreatePartialBlob();
-  bool CreateDOMFile(nsIRequest *request);
+  bool CreateDOMBlob(nsIRequest *request);
   // Change the state of the object with this. The broadcast argument
   // determines if the onreadystatechange listener should be called.
   nsresult ChangeState(uint32_t aState, bool aBroadcast = true);
@@ -695,12 +710,12 @@ protected:
 
   // It is either a cached blob-response from the last call to GetResponse,
   // but is also explicitly set in OnStopRequest.
-  nsRefPtr<mozilla::dom::File> mResponseBlob;
+  nsRefPtr<mozilla::dom::Blob> mResponseBlob;
   // Non-null only when we are able to get a os-file representation of the
   // response, i.e. when loading from a file.
-  nsRefPtr<mozilla::dom::File> mDOMFile;
+  nsRefPtr<mozilla::dom::Blob> mDOMBlob;
   // We stream data to mBlobSet when response type is "blob" or "moz-blob"
-  // and mDOMFile is null.
+  // and mDOMBlob is null.
   nsAutoPtr<mozilla::dom::BlobSet> mBlobSet;
 
   nsString mOverrideMimeType;
@@ -764,6 +779,10 @@ protected:
 
   bool mIsSystem;
   bool mIsAnon;
+
+  // A platform-specific identifer to represent the network interface
+  // that this request is associated with.
+  nsCString mNetworkInterfaceId;
 
   /**
    * Close the XMLHttpRequest's channels and dispatch appropriate progress

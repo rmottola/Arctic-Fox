@@ -1,12 +1,11 @@
-const Ci = Components.interfaces;
-const Cc = Components.classes;
-const Cu = Components.utils;
+/* Any copyright is dedicated to the Public Domain.
+   http://creativecommons.org/publicdomain/zero/1.0/ */
 
 Cu.import("resource://gre/modules/Services.jsm");
 
 function getMainThreadHangStats() {
   let threads = Services.telemetry.threadHangStats;
-  return threads.find((thread) => (thread.name === "Goanna"));
+  return threads.find((thread) => (thread.name === "Gecko"));
 }
 
 function run_test() {

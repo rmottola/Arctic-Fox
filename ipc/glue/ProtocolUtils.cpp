@@ -10,6 +10,7 @@
 #include "mozilla/ipc/MessageChannel.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/ipc/Transport.h"
+#include "mozilla/StaticMutex.h"
 
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
 #define TARGET_SANDBOX_EXPORTS
@@ -25,19 +26,36 @@ using base::ProcessId;
 namespace mozilla {
 namespace ipc {
 
-#ifdef MOZ_IPDL_TESTS
-bool IToplevelProtocol::sAllowNonMainThreadUse;
-#endif
+static StaticMutex gProtocolMutex;
+
+IToplevelProtocol::IToplevelProtocol(ProtocolId aProtoId)
+ : mOpener(nullptr)
+ , mProtocolId(aProtoId)
+ , mTrans(nullptr)
+{
+}
 
 IToplevelProtocol::~IToplevelProtocol()
 {
-  MOZ_ASSERT(NS_IsMainThread() || AllowNonMainThreadUse());
+  StaticMutexAutoLock al(gProtocolMutex);
+
+  for (IToplevelProtocol* actor = mOpenActors.getFirst();
+       actor;
+       actor = actor->getNext()) {
+    actor->mOpener = nullptr;
+  }
+
   mOpenActors.clear();
+
+  if (mOpener) {
+      removeFrom(mOpener->mOpenActors);
+  }
 }
 
-void IToplevelProtocol::AddOpenedActor(IToplevelProtocol* aActor)
+void
+IToplevelProtocol::AddOpenedActorLocked(IToplevelProtocol* aActor)
 {
-  MOZ_ASSERT(NS_IsMainThread() || AllowNonMainThreadUse());
+  gProtocolMutex.AssertCurrentThreadOwns();
 
 #ifdef DEBUG
   for (const IToplevelProtocol* actor = mOpenActors.getFirst();
@@ -48,7 +66,47 @@ void IToplevelProtocol::AddOpenedActor(IToplevelProtocol* aActor)
   }
 #endif
 
+  aActor->mOpener = this;
   mOpenActors.insertBack(aActor);
+}
+
+void
+IToplevelProtocol::AddOpenedActor(IToplevelProtocol* aActor)
+{
+  StaticMutexAutoLock al(gProtocolMutex);
+  AddOpenedActorLocked(aActor);
+}
+
+void
+IToplevelProtocol::GetOpenedActorsLocked(nsTArray<IToplevelProtocol*>& aActors)
+{
+  gProtocolMutex.AssertCurrentThreadOwns();
+
+  for (IToplevelProtocol* actor = mOpenActors.getFirst();
+       actor;
+       actor = actor->getNext()) {
+    aActors.AppendElement(actor);
+  }
+}
+
+void
+IToplevelProtocol::GetOpenedActors(nsTArray<IToplevelProtocol*>& aActors)
+{
+  StaticMutexAutoLock al(gProtocolMutex);
+  GetOpenedActorsLocked(aActors);
+}
+
+size_t
+IToplevelProtocol::GetOpenedActorsUnsafe(IToplevelProtocol** aActors, size_t aActorsMax)
+{
+  size_t count = 0;
+  for (IToplevelProtocol* actor = mOpenActors.getFirst();
+       actor;
+       actor = actor->getNext()) {
+    MOZ_RELEASE_ASSERT(count < aActorsMax);
+    aActors[count++] = actor;
+  }
+  return count;
 }
 
 IToplevelProtocol*
@@ -66,21 +124,16 @@ IToplevelProtocol::CloneOpenedToplevels(IToplevelProtocol* aTemplate,
                                         base::ProcessHandle aPeerProcess,
                                         ProtocolCloneContext* aCtx)
 {
-  for (IToplevelProtocol* actor = aTemplate->GetFirstOpenedActors();
-       actor;
-       actor = actor->getNext()) {
-    IToplevelProtocol* newactor = actor->CloneToplevel(aFds, aPeerProcess, aCtx);
-    AddOpenedActor(newactor);
+  StaticMutexAutoLock al(gProtocolMutex);
+
+  nsTArray<IToplevelProtocol*> actors;
+  aTemplate->GetOpenedActorsLocked(actors);
+
+  for (size_t i = 0; i < actors.Length(); i++) {
+    IToplevelProtocol* newactor = actors[i]->CloneToplevel(aFds, aPeerProcess, aCtx);
+    AddOpenedActorLocked(newactor);
   }
 }
-
-#ifdef MOZ_IPDL_TESTS
-void
-IToplevelProtocol::SetAllowNonMainThreadUse()
-{
-  sAllowNonMainThreadUse = true;
-}
-#endif
 
 class ChannelOpened : public IPC::Message
 {
@@ -193,7 +246,7 @@ bool DuplicateHandle(HANDLE aSourceHandle,
                      DWORD aDesiredAccess,
                      DWORD aOptions) {
   // If our process is the target just duplicate the handle.
-  if (aTargetProcessId == kCurrentProcessId) {
+  if (aTargetProcessId == base::GetCurrentProcId()) {
     return !!::DuplicateHandle(::GetCurrentProcess(), aSourceHandle,
                                ::GetCurrentProcess(), aTargetHandle,
                                aDesiredAccess, false, aOptions);
@@ -246,7 +299,7 @@ FatalError(const char* aProtocolName, const char* aMsg,
     formattedMessage.AppendLiteral("\". Killing child side as a result.");
     NS_ERROR(formattedMessage.get());
 
-    if (aOtherPid != kInvalidProcessId && aOtherPid != kCurrentProcessId) {
+    if (aOtherPid != kInvalidProcessId && aOtherPid != base::GetCurrentProcId()) {
       ScopedProcessHandle otherProcessHandle;
       if (base::OpenProcessHandle(aOtherPid, &otherProcessHandle.rwget())) {
         if (!base::KillProcess(otherProcessHandle,

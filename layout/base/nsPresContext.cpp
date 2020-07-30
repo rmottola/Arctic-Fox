@@ -68,6 +68,11 @@
 #include "gfxTextRun.h"
 #include "nsFontFaceUtils.h"
 
+#if defined(MOZ_WIDGET_GTK)
+#include "gfxPlatformGtk.h" // xxx - for UseFcFontList
+#endif
+
+
 // Needed for Start/Stop of Image Animation
 #include "imgIContainer.h"
 #include "nsIImageLoadingContent.h"
@@ -1675,6 +1680,12 @@ nsPresContext::ThemeChanged()
   }
 }
 
+static void
+NotifyThemeChanged(TabParent* aTabParent, void* aArg)
+{
+  aTabParent->ThemeChanged();
+}
+
 void
 nsPresContext::ThemeChangedInternal()
 {
@@ -1708,6 +1719,11 @@ nsPresContext::ThemeChangedInternal()
   // changes are not), and -moz-appearance (whose changes likewise are
   // not), so we need to reflow.
   MediaFeatureValuesChanged(eRestyle_Subtree, NS_STYLE_HINT_REFLOW);
+
+  // Recursively notify all remote leaf descendants that the
+  // system theme has changed.
+  nsContentUtils::CallOnAllRemoteChildren(mDocument->GetWindow(),
+                                          NotifyThemeChanged, nullptr);
 }
 
 void
@@ -2130,8 +2146,10 @@ nsPresContext::UserFontSetUpdated(gfxUserFontEntry* aUpdatedFont)
     return;
 
   bool usePlatformFontList = true;
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_QT)
-  usePlatformFontList = false;
+#if defined(MOZ_WIDGET_GTK)
+    usePlatformFontList = gfxPlatformGtk::UseFcFontList();
+#elif defined(MOZ_WIDGET_QT)
+    usePlatformFontList = false;
 #endif
 
   // xxx - until the Linux platform font list is always used, use full

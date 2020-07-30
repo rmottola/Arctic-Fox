@@ -41,9 +41,7 @@
 using namespace mozilla;
 using namespace mozilla::widget;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gWindowsLog;
-#endif
 
 NS_IMPL_ISUPPORTS_INHERITED(nsNativeThemeWin, nsNativeTheme, nsITheme)
 
@@ -352,7 +350,7 @@ static CaptionButtonPadding buttonData[3] = {
 
 // Adds "hot" caption button padding to minimum widget size.
 static void
-AddPaddingRect(nsIntSize* aSize, CaptionButton button) {
+AddPaddingRect(LayoutDeviceIntSize* aSize, CaptionButton button) {
   if (!aSize)
     return;
   RECT offset;
@@ -2050,7 +2048,7 @@ nsNativeThemeWin::GetWidgetPadding(nsDeviceContext* aContext,
 
   /* textfields need extra pixels on all sides, otherwise they
    * wrap their content too tightly.  The actual border is drawn 1px
-   * inside the specified rectangle, so Goanna will end up making the
+   * inside the specified rectangle, so Gecko will end up making the
    * contents look too small.  Instead, we add 2px padding for the
    * contents and fix this. (Used to be 1px added, see bug 430212)
    */
@@ -2170,7 +2168,7 @@ nsNativeThemeWin::GetWidgetOverflow(nsDeviceContext* aContext,
 NS_IMETHODIMP
 nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aFrame,
                                        uint8_t aWidgetType,
-                                       nsIntSize* aResult, bool* aIsOverridable)
+                                       LayoutDeviceIntSize* aResult, bool* aIsOverridable)
 {
   (*aResult).width = (*aResult).height = 0;
   *aIsOverridable = true;
@@ -2808,7 +2806,7 @@ nsNativeThemeWin::ClassicGetWidgetPadding(nsDeviceContext* aContext,
 nsresult
 nsNativeThemeWin::ClassicGetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aFrame,
                                        uint8_t aWidgetType,
-                                       nsIntSize* aResult, bool* aIsOverridable)
+                                       LayoutDeviceIntSize* aResult, bool* aIsOverridable)
 {
   (*aResult).width = (*aResult).height = 0;
   *aIsOverridable = true;

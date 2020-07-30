@@ -48,7 +48,6 @@ extern "C" {
 
 namespace mozilla {
 
-class DTLSConnection;
 class DataChannelConnection;
 class DataChannel;
 class DataChannelOnMessageAvailable;
@@ -144,6 +143,7 @@ public:
     PARTIAL_RELIABLE_TIMED = 2
   } Type;
 
+  MOZ_WARN_UNUSED_RESULT
   already_AddRefed<DataChannel> Open(const nsACString& label,
                                      const nsACString& protocol,
                                      Type type, bool inOrder,
@@ -151,7 +151,7 @@ public:
                                      DataChannelListener *aListener,
                                      nsISupports *aContext,
                                      bool aExternalNegotiated,
-                                     uint16_t aStream) NS_WARN_UNUSED_RESULT;
+                                     uint16_t aStream);
 
   void Close(DataChannel *aChannel);
   // CloseInt() must be called with mLock held

@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,6 +9,7 @@
 #include "mozilla/dom/cache/CacheStorage.h"
 #include "mozilla/dom/cache/Cache.h"
 #include "nsIThreadRetargetableRequest.h"
+#include "nsSerializationHelper.h"
 
 #include "nsIPrincipal.h"
 #include "Workers.h"
@@ -53,11 +56,13 @@ class CompareManager;
 
 // This class downloads a URL from the network and then it calls
 // NetworkFinished() in the CompareManager.
-class CompareNetwork final : public nsIStreamLoaderObserver
+class CompareNetwork final : public nsIStreamLoaderObserver,
+                             public nsIRequestObserver
 {
 public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSISTREAMLOADEROBSERVER
+  NS_DECL_NSIREQUESTOBSERVER
 
   explicit CompareNetwork(CompareManager* aManager)
     : mManager(aManager)
@@ -111,7 +116,7 @@ public:
     }
 
     nsCOMPtr<nsIStreamLoader> loader;
-    rv = NS_NewStreamLoader(getter_AddRefs(loader), this);
+    rv = NS_NewStreamLoader(getter_AddRefs(loader), this, this);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -151,12 +156,13 @@ private:
   nsString mBuffer;
 };
 
-NS_IMPL_ISUPPORTS(CompareNetwork, nsIStreamLoaderObserver)
+NS_IMPL_ISUPPORTS(CompareNetwork, nsIStreamLoaderObserver,
+                  nsIRequestObserver)
 
 // This class gets a cached Response from the CacheStorage and then it calls
 // CacheFinished() in the CompareManager.
 class CompareCache final : public PromiseNativeHandler
-                             , public nsIStreamLoaderObserver
+                         , public nsIStreamLoaderObserver
 {
 public:
   NS_DECL_ISUPPORTS
@@ -173,27 +179,7 @@ public:
 
   nsresult
   Initialize(nsIPrincipal* aPrincipal, const nsAString& aURL,
-             const nsAString& aCacheName)
-  {
-    MOZ_ASSERT(aPrincipal);
-    AssertIsOnMainThread();
-
-    mURL = aURL;
-
-    ErrorResult rv;
-    nsRefPtr<CacheStorage> cacheStorage = CreateCacheStorage(aPrincipal, rv);
-    if (NS_WARN_IF(rv.Failed())) {
-      return rv.ErrorCode();
-    }
-
-    nsRefPtr<Promise> promise = cacheStorage->Open(aCacheName, rv);
-    if (NS_WARN_IF(rv.Failed())) {
-      return rv.ErrorCode();
-    }
-
-    promise->AppendNativeHandler(this);
-    return NS_OK;
-  }
+             const nsAString& aCacheName);
 
   void
   Abort()
@@ -240,6 +226,12 @@ public:
     return mBuffer;
   }
 
+  const nsString& URL() const
+  {
+    AssertIsOnMainThread();
+    return mURL;
+  }
+
 private:
   ~CompareCache()
   {
@@ -268,13 +260,12 @@ private:
 
 NS_IMPL_ISUPPORTS(CompareCache, nsIStreamLoaderObserver)
 
-class CompareManager final
+class CompareManager final : public PromiseNativeHandler
 {
 public:
-  NS_INLINE_DECL_REFCOUNTING(CompareManager)
-
   explicit CompareManager(CompareCallback* aCallback)
     : mCallback(aCallback)
+    , mState(WaitingForOpen)
     , mNetworkFinished(false)
     , mCacheFinished(false)
     , mInCache(false)
@@ -289,6 +280,17 @@ public:
     AssertIsOnMainThread();
     MOZ_ASSERT(aPrincipal);
 
+    mURL = aURL;
+
+    // Always create a CacheStorage since we want to write the network entry to
+    // the cache even if there isn't an existing one.
+    ErrorResult result;
+    mCacheStorage = CreateCacheStorage(aPrincipal, result);
+    if (NS_WARN_IF(result.Failed())) {
+      MOZ_ASSERT(!result.IsErrorWithMessage());
+      return result.StealNSResult();
+    }
+
     mCN = new CompareNetwork(this);
     nsresult rv = mCN->Initialize(aPrincipal, aURL);
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -297,7 +299,7 @@ public:
 
     if (!aCacheName.IsEmpty()) {
       mCC = new CompareCache(this);
-      mCC->Initialize(aPrincipal, aURL, aCacheName);
+      rv = mCC->Initialize(aPrincipal, aURL, aCacheName);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         mCN->Abort();
         return rv;
@@ -305,6 +307,13 @@ public:
     }
 
     return NS_OK;
+  }
+
+  const nsAString&
+  URL() const
+  {
+    AssertIsOnMainThread();
+    return mURL;
   }
 
   void
@@ -363,6 +372,71 @@ public:
     ComparisonFinished(NS_OK, mCC->Buffer().Equals(mCN->Buffer()));
   }
 
+  // This class manages 2 promises: 1 is to retrieve Cache object, and 2 is to
+  // Put the value in the cache. For this reason we have mState to know what
+  // callback we are handling.
+  void
+  ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) override
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(mCallback);
+
+    if (mState == WaitingForOpen) {
+      if (NS_WARN_IF(!aValue.isObject())) {
+        Fail(NS_ERROR_FAILURE);
+        return;
+      }
+
+      JS::Rooted<JSObject*> obj(aCx, &aValue.toObject());
+      if (NS_WARN_IF(!obj)) {
+        Fail(NS_ERROR_FAILURE);
+        return;
+      }
+
+      Cache* cache = nullptr;
+      nsresult rv = UNWRAP_OBJECT(Cache, obj, cache);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        Fail(rv);
+        return;
+      }
+
+      // Just to be safe.
+      nsRefPtr<Cache> kungfuDeathGrip = cache;
+      WriteToCache(cache);
+      return;
+    }
+
+    MOZ_ASSERT(mState == WaitingForPut);
+    mCallback->ComparisonResult(NS_OK, false /* aIsEqual */, mNewCacheName);
+    Cleanup();
+  }
+
+  void
+  RejectedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue) override
+  {
+    AssertIsOnMainThread();
+    if (mState == WaitingForOpen) {
+      NS_WARNING("Could not open cache.");
+    } else {
+      NS_WARNING("Could not write to cache.");
+    }
+    Fail(NS_ERROR_FAILURE);
+  }
+
+  CacheStorage*
+  CacheStorage_()
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(mCacheStorage);
+    return mCacheStorage;
+  }
+
+  void
+  SetSecurityInfo(nsISerializable* aSecurityInfo)
+  {
+    NS_SerializeToString(aSecurityInfo, mSecurityInfo);
+  }
+
 private:
   ~CompareManager()
   {
@@ -372,26 +446,164 @@ private:
   }
 
   void
-  ComparisonFinished(nsresult aStatus, bool aIsEqual)
+  Fail(nsresult aStatus)
+  {
+    AssertIsOnMainThread();
+    mCallback->ComparisonResult(aStatus, false /* aIsEqual */, EmptyString());
+    Cleanup();
+  }
+
+  void
+  Cleanup()
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(mCallback);
-
-    mCallback->ComparisonResult(aStatus, aIsEqual);
     mCallback = nullptr;
     mCN = nullptr;
     mCC = nullptr;
   }
 
+  void
+  ComparisonFinished(nsresult aStatus, bool aIsEqual)
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(mCallback);
+
+    if (NS_FAILED(aStatus)) {
+      Fail(aStatus);
+      return;
+    }
+
+    if (aIsEqual) {
+      mCallback->ComparisonResult(aStatus, aIsEqual, EmptyString());
+      Cleanup();
+      return;
+    }
+
+    // Write to Cache so ScriptLoader reads succeed.
+    WriteNetworkBufferToNewCache();
+  }
+
+  void
+  WriteNetworkBufferToNewCache()
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(mCN);
+    MOZ_ASSERT(mCacheStorage);
+    MOZ_ASSERT(mNewCacheName.IsEmpty());
+
+    ErrorResult result;
+    result = serviceWorkerScriptCache::GenerateCacheName(mNewCacheName);
+    if (NS_WARN_IF(result.Failed())) {
+      MOZ_ASSERT(!result.IsErrorWithMessage());
+      Fail(result.StealNSResult());
+      return;
+    }
+
+    nsRefPtr<Promise> cacheOpenPromise = mCacheStorage->Open(mNewCacheName, result);
+    if (NS_WARN_IF(result.Failed())) {
+      MOZ_ASSERT(!result.IsErrorWithMessage());
+      Fail(result.StealNSResult());
+      return;
+    }
+
+    cacheOpenPromise->AppendNativeHandler(this);
+  }
+
+  void
+  WriteToCache(Cache* aCache)
+  {
+    AssertIsOnMainThread();
+    MOZ_ASSERT(aCache);
+    MOZ_ASSERT(mState == WaitingForOpen);
+
+    ErrorResult result;
+    nsCOMPtr<nsIInputStream> body;
+    result = NS_NewStringInputStream(getter_AddRefs(body), mCN->Buffer());
+    if (NS_WARN_IF(result.Failed())) {
+      MOZ_ASSERT(!result.IsErrorWithMessage());
+      Fail(result.StealNSResult());
+      return;
+    }
+
+    nsRefPtr<InternalResponse> ir =
+      new InternalResponse(200, NS_LITERAL_CSTRING("OK"));
+    ir->SetBody(body);
+
+    ir->SetSecurityInfo(mSecurityInfo);
+
+    nsRefPtr<Response> response = new Response(aCache->GetGlobalObject(), ir);
+
+    RequestOrUSVString request;
+    request.SetAsUSVString().Rebind(URL().Data(), URL().Length());
+
+    // For now we have to wait until the Put Promise is fulfilled before we can
+    // continue since Cache does not yet support starting a read that is being
+    // written to.
+    nsRefPtr<Promise> cachePromise = aCache->Put(request, *response, result);
+    if (NS_WARN_IF(result.Failed())) {
+      MOZ_ASSERT(!result.IsErrorWithMessage());
+      Fail(result.StealNSResult());
+      return;
+    }
+
+    mState = WaitingForPut;
+    cachePromise->AppendNativeHandler(this);
+  }
+
   nsRefPtr<CompareCallback> mCallback;
+  nsRefPtr<CacheStorage> mCacheStorage;
 
   nsRefPtr<CompareNetwork> mCN;
   nsRefPtr<CompareCache> mCC;
+
+  nsString mURL;
+  // Only used if the network script has changed and needs to be cached.
+  nsString mNewCacheName;
+
+  nsCString mSecurityInfo;
+
+  enum {
+    WaitingForOpen,
+    WaitingForPut
+  } mState;
 
   bool mNetworkFinished;
   bool mCacheFinished;
   bool mInCache;
 };
+
+NS_IMETHODIMP
+CompareNetwork::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
+{
+  AssertIsOnMainThread();
+
+#ifdef DEBUG
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
+  MOZ_ASSERT(channel == mChannel);
+#endif
+
+  nsCOMPtr<nsISupports> infoObj;
+  mChannel->GetSecurityInfo(getter_AddRefs(infoObj));
+  if (infoObj) {
+    nsCOMPtr<nsISerializable> serializable = do_QueryInterface(infoObj);
+    if (serializable) {
+      mManager->SetSecurityInfo(serializable);
+    } else {
+      NS_WARNING("A non-serializable object was obtained from nsIChannel::GetSecurityInfo()!");
+    }
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+CompareNetwork::OnStopRequest(nsIRequest* aRequest, nsISupports* aContext,
+                              nsresult aStatusCode)
+{
+  // Nothing to do here!
+  return NS_OK;
+}
 
 NS_IMETHODIMP
 CompareNetwork::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aContext,
@@ -451,6 +663,27 @@ CompareNetwork::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aContext
   mBuffer.Adopt(buffer, len);
 
   mManager->NetworkFinished(NS_OK);
+  return NS_OK;
+}
+
+nsresult
+CompareCache::Initialize(nsIPrincipal* aPrincipal, const nsAString& aURL,
+                         const nsAString& aCacheName)
+{
+  MOZ_ASSERT(aPrincipal);
+  AssertIsOnMainThread();
+
+  mURL = aURL;
+
+  ErrorResult rv;
+
+  nsRefPtr<Promise> promise = mManager->CacheStorage_()->Open(aCacheName, rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    MOZ_ASSERT(!rv.IsErrorWithMessage());
+    return rv.StealNSResult();
+  }
+
+  promise->AppendNativeHandler(this);
   return NS_OK;
 }
 
@@ -528,7 +761,7 @@ CompareCache::ManageCacheResult(JSContext* aCx, JS::Handle<JS::Value> aValue)
   CacheQueryOptions params;
   nsRefPtr<Promise> promise = cache->Match(request, params, error);
   if (NS_WARN_IF(error.Failed())) {
-    mManager->CacheFinished(error.ErrorCode(), false);
+    mManager->CacheFinished(error.StealNSResult(), false);
     return;
   }
 
@@ -617,14 +850,14 @@ PurgeCache(nsIPrincipal* aPrincipal, const nsAString& aCacheName)
   ErrorResult rv;
   nsRefPtr<CacheStorage> cacheStorage = CreateCacheStorage(aPrincipal, rv);
   if (NS_WARN_IF(rv.Failed())) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   // We use the ServiceWorker scope as key for the cacheStorage.
   nsRefPtr<Promise> promise =
     cacheStorage->Delete(aCacheName, rv);
   if (NS_WARN_IF(rv.Failed())) {
-    return rv.ErrorCode();
+    return rv.StealNSResult();
   }
 
   // We don't actually care about the result of the delete operation.

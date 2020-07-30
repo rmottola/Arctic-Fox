@@ -177,7 +177,7 @@ cat >> $CONFIG_STATUS <<EOF
 __all__ = ['topobjdir', 'topsrcdir', 'defines', 'non_global_defines', 'substs']
 EOF
 
-# We don't want js/src/config.status to do anything in goanna builds.
+# We don't want js/src/config.status to do anything in gecko builds.
 if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
 
     cat >> $CONFIG_STATUS <<EOF

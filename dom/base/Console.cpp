@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -57,7 +58,7 @@ struct
 ConsoleStructuredCloneData
 {
   nsCOMPtr<nsISupports> mParent;
-  nsTArray<nsRefPtr<FileImpl>> mFiles;
+  nsTArray<nsRefPtr<BlobImpl>> mBlobs;
 };
 
 /**
@@ -81,13 +82,13 @@ ConsoleStructuredCloneCallbacksRead(JSContext* aCx,
   MOZ_ASSERT(data);
 
   if (aTag == CONSOLE_TAG_BLOB) {
-    MOZ_ASSERT(data->mFiles.Length() > aIndex);
+    MOZ_ASSERT(data->mBlobs.Length() > aIndex);
 
     JS::Rooted<JS::Value> val(aCx);
     {
-      nsRefPtr<File> file =
-        new File(data->mParent, data->mFiles.ElementAt(aIndex));
-      if (!GetOrCreateDOMReflector(aCx, file, &val)) {
+      nsRefPtr<Blob> blob =
+        Blob::Create(data->mParent, data->mBlobs.ElementAt(aIndex));
+      if (!ToJSValue(aCx, blob, &val)) {
         return nullptr;
       }
     }
@@ -111,14 +112,14 @@ ConsoleStructuredCloneCallbacksWrite(JSContext* aCx,
     static_cast<ConsoleStructuredCloneData*>(aClosure);
   MOZ_ASSERT(data);
 
-  nsRefPtr<File> file;
-  if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, file)) &&
-      file->Impl()->MayBeClonedToOtherThreads()) {
-    if (!JS_WriteUint32Pair(aWriter, CONSOLE_TAG_BLOB, data->mFiles.Length())) {
+  nsRefPtr<Blob> blob;
+  if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob)) &&
+      blob->Impl()->MayBeClonedToOtherThreads()) {
+    if (!JS_WriteUint32Pair(aWriter, CONSOLE_TAG_BLOB, data->mBlobs.Length())) {
       return false;
     }
 
-    data->mFiles.AppendElement(file->Impl());
+    data->mBlobs.AppendElement(blob->Impl());
     return true;
   }
 
@@ -1057,7 +1058,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
               MakeUnique<ConsoleTimelineMarker>(docShell,
                                                 aMethodName == MethodTime ? TRACING_INTERVAL_START : TRACING_INTERVAL_END,
                                                 key);
-            docShell->AddProfileTimelineMarker(marker);
+            docShell->AddProfileTimelineMarker(Move(marker));
           }
         }
       }

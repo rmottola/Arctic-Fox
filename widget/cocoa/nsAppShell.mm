@@ -5,7 +5,7 @@
 
 /*
  * Runs the main native Cocoa run loop, interrupting it as needed to process
- * Goanna events.
+ * Gecko events.
  */
 
 #import <Cocoa/Cocoa.h>
@@ -42,7 +42,7 @@
 using namespace mozilla::widget;
 
 // A wake lock listener that disables screen saver when requested by
-// Goanna. For example when we're playing video in a foreground tab we
+// Gecko. For example when we're playing video in a foreground tab we
 // don't want the screen saver to turn on.
 
 class MacWakeLockListener final : public nsIDOMMozWakeLockListener {
@@ -95,7 +95,7 @@ extern int32_t             gXULModalLevel;
 
 static bool gAppShellMethodsSwizzled = false;
 
-@implementation GoannaNSApplication
+@implementation GeckoNSApplication
 
 - (void)sendEvent:(NSEvent *)anEvent
 {
@@ -273,7 +273,7 @@ nsAppShell::Init()
   [NSBundle loadNibFile:
                      [NSString stringWithUTF8String:(const char*)nibPath.get()]
       externalNameTable:
-           [NSDictionary dictionaryWithObject:[GoannaNSApplication sharedApplication]
+           [NSDictionary dictionaryWithObject:[GeckoNSApplication sharedApplication]
                                        forKey:@"NSOwner"]
                withZone:NSDefaultMallocZone()];
 
@@ -281,7 +281,7 @@ nsAppShell::Init()
   NS_ENSURE_STATE(mDelegate);
 
   // Add a CFRunLoopSource to the main native run loop.  The source is
-  // responsible for interrupting the run loop when Goanna events are ready.
+  // responsible for interrupting the run loop when Gecko events are ready.
 
   mCFRunLoop = [[NSRunLoop currentRunLoop] getCFRunLoop];
   NS_ENSURE_STATE(mCFRunLoop);
@@ -291,7 +291,7 @@ nsAppShell::Init()
   bzero(&context, sizeof(context));
   // context.version = 0;
   context.info = this;
-  context.perform = ProcessGoannaEvents;
+  context.perform = ProcessGeckoEvents;
   
   mCFRunLoopSource = ::CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context);
   NS_ENSURE_STATE(mCFRunLoopSource);
@@ -327,21 +327,21 @@ nsAppShell::Init()
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
 
-// ProcessGoannaEvents
+// ProcessGeckoEvents
 //
 // The "perform" target of mCFRunLoop, called when mCFRunLoopSource is
 // signalled from ScheduleNativeEventCallback.
 //
-// Arrange for Goanna events to be processed on demand (in response to a call
-// to ScheduleNativeEventCallback(), if processing of Goanna events via "native
+// Arrange for Gecko events to be processed on demand (in response to a call
+// to ScheduleNativeEventCallback(), if processing of Gecko events via "native
 // methods" hasn't been suspended).  This happens in NativeEventCallback().
 //
 // protected static
 void
-nsAppShell::ProcessGoannaEvents(void* aInfo)
+nsAppShell::ProcessGeckoEvents(void* aInfo)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
-  PROFILER_LABEL("Events", "ProcessGoannaEvents",
+  PROFILER_LABEL("Events", "ProcessGeckoEvents",
     js::ProfileEntry::Category::EVENTS);
 
   nsAppShell* self = static_cast<nsAppShell*> (aInfo);
@@ -394,10 +394,10 @@ nsAppShell::ProcessGoannaEvents(void* aInfo)
            atStart:NO];
 
   // Normally every call to ScheduleNativeEventCallback() results in
-  // exactly one call to ProcessGoannaEvents().  So each Release() here
+  // exactly one call to ProcessGeckoEvents().  So each Release() here
   // normally balances exactly one AddRef() in ScheduleNativeEventCallback().
   // But if Exit() is called just after ScheduleNativeEventCallback(), the
-  // corresponding call to ProcessGoannaEvents() will never happen.  We check
+  // corresponding call to ProcessGeckoEvents() will never happen.  We check
   // for this possibility in two different places -- here and in Exit()
   // itself.  If we find here that Exit() has been called (that mTerminated
   // is true), it's because we've been called recursively, that Exit() was
@@ -405,7 +405,7 @@ nsAppShell::ProcessGoannaEvents(void* aInfo)
   // the recursion.  In this case we'll never be called again, and we balance
   // here any extra calls to ScheduleNativeEventCallback().
   //
-  // When ProcessGoannaEvents() is called recursively, it's because of a
+  // When ProcessGeckoEvents() is called recursively, it's because of a
   // call to ScheduleNativeEventCallback() from NativeEventCallback().  We
   // balance the "extra" AddRefs here (rather than always in Exit()) in order
   // to ensure that 'self' stays alive until the end of this method.  We also
@@ -420,14 +420,14 @@ nsAppShell::ProcessGoannaEvents(void* aInfo)
     while (releaseCount-- > self->mNativeEventCallbackDepth)
       self->Release();
   } else {
-    // As best we can tell, every call to ProcessGoannaEvents() is triggered
+    // As best we can tell, every call to ProcessGeckoEvents() is triggered
     // by a call to ScheduleNativeEventCallback().  But we've seen a few
     // (non-reproducible) cases of double-frees that *might* have been caused
-    // by spontaneous calls (from the OS) to ProcessGoannaEvents().  So we
+    // by spontaneous calls (from the OS) to ProcessGeckoEvents().  So we
     // deal with that possibility here.
     if (PR_ATOMIC_DECREMENT(&self->mNativeEventScheduledDepth) < 0) {
       PR_ATOMIC_SET(&self->mNativeEventScheduledDepth, 0);
-      NS_WARNING("Spontaneous call to ProcessGoannaEvents()!");
+      NS_WARNING("Spontaneous call to ProcessGeckoEvents()!");
     } else {
       self->Release();
     }
@@ -460,20 +460,20 @@ nsAppShell::WillTerminate()
 
 // ScheduleNativeEventCallback
 //
-// Called (possibly on a non-main thread) when Goanna has an event that
-// needs to be processed.  The Goanna event needs to be processed on the
+// Called (possibly on a non-main thread) when Gecko has an event that
+// needs to be processed.  The Gecko event needs to be processed on the
 // main thread, so the native run loop must be interrupted.
 //
 // In nsBaseAppShell.cpp, the mNativeEventPending variable is used to
 // ensure that ScheduleNativeEventCallback() is called no more than once
-// per call to NativeEventCallback().  ProcessGoannaEvents() can skip its
-// call to NativeEventCallback() if processing of Goanna events by native
+// per call to NativeEventCallback().  ProcessGeckoEvents() can skip its
+// call to NativeEventCallback() if processing of Gecko events by native
 // means is suspended (using nsIAppShell::SuspendNative()), which will
 // suspend calls from nsBaseAppShell::OnDispatchedEvent() to
-// ScheduleNativeEventCallback().  But when Goanna event processing by
+// ScheduleNativeEventCallback().  But when Gecko event processing by
 // native means is resumed (in ResumeNative()), an extra call is made to
 // ScheduleNativeEventCallback() (from ResumeNative()).  This triggers
-// another call to ProcessGoannaEvents(), which calls NativeEventCallback(),
+// another call to ProcessGeckoEvents(), which calls NativeEventCallback(),
 // and nsBaseAppShell::OnDispatchedEvent() resumes calling
 // ScheduleNativeEventCallback().
 //
@@ -487,12 +487,12 @@ nsAppShell::ScheduleNativeEventCallback()
     return;
 
   // Each AddRef() here is normally balanced by exactly one Release() in
-  // ProcessGoannaEvents().  But there are exceptions, for which see
-  // ProcessGoannaEvents() and Exit().
+  // ProcessGeckoEvents().  But there are exceptions, for which see
+  // ProcessGeckoEvents() and Exit().
   NS_ADDREF_THIS();
   PR_ATOMIC_INCREMENT(&mNativeEventScheduledDepth);
 
-  // This will invoke ProcessGoannaEvents on the main thread.
+  // This will invoke ProcessGeckoEvents on the main thread.
   ::CFRunLoopSourceSignal(mCFRunLoopSource);
   ::CFRunLoopWakeUp(mCFRunLoop);
 
@@ -506,7 +506,7 @@ extern "C" EventAttributes GetEventAttributes(EventRef inEvent);
 // ProcessNextNativeEvent
 //
 // If aMayWait is false, process a single native event.  If it is true, run
-// the native run loop until stopped by ProcessGoannaEvents.
+// the native run loop until stopped by ProcessGeckoEvents.
 //
 // Returns true if more events are waiting in the native event queue.
 //
@@ -540,9 +540,9 @@ nsAppShell::ProcessNextNativeEvent(bool aMayWait)
   }
 
   // Only call -[NSApp sendEvent:] (and indirectly send user-input events to
-  // Goanna) if aMayWait is true.  Tbis ensures most calls to -[NSApp
+  // Gecko) if aMayWait is true.  Tbis ensures most calls to -[NSApp
   // sendEvent:] happen under nsAppShell::Run(), at the lowest level of
-  // recursion -- thereby making it less likely Goanna will process user-input
+  // recursion -- thereby making it less likely Gecko will process user-input
   // events in the wrong order or skip some of them.  It also avoids eating
   // too much CPU in nsBaseAppShell::OnProcessNextEvent() (which calls
   // us) -- thereby avoiding the starvation of nsIRunnable events in
@@ -630,9 +630,9 @@ nsAppShell::ProcessNextNativeEvent(bool aMayWait)
 //
 // Overrides the base class's Run() method to call [NSApp run] (which spins
 // the native run loop until the application quits).  Since (unlike the base
-// class's Run() method) we don't process any Goanna events here, they need
+// class's Run() method) we don't process any Gecko events here, they need
 // to be processed elsewhere (in NativeEventCallback(), called from
-// ProcessGoannaEvents()).
+// ProcessGeckoEvents()).
 //
 // Camino called [NSApp run] on its own (via NSApplicationMain()), and so
 // didn't call nsAppShell::Run().
@@ -692,10 +692,10 @@ nsAppShell::Exit(void)
   [NSApp stop:nullptr];
 
   // A call to Exit() just after a call to ScheduleNativeEventCallback()
-  // prevents the (normally) matching call to ProcessGoannaEvents() from
-  // happening.  If we've been called from ProcessGoannaEvents() (as usually
+  // prevents the (normally) matching call to ProcessGeckoEvents() from
+  // happening.  If we've been called from ProcessGeckoEvents() (as usually
   // happens), we take care of it there.  But if we have an unbalanced call
-  // to ScheduleNativeEventCallback() and ProcessGoannaEvents() isn't on the
+  // to ScheduleNativeEventCallback() and ProcessGeckoEvents() isn't on the
   // stack, we need to take care of the problem here.
   if (!mNativeEventCallbackDepth && mNativeEventScheduledDepth) {
     int32_t releaseCount = PR_ATOMIC_SET(&mNativeEventScheduledDepth, 0);
@@ -846,13 +846,13 @@ nsAppShell::AfterProcessNextEvent(nsIThreadInternal *aThread,
 //
 // Roll up our context menu (if any) when some other app (or the OS) opens
 // any sort of menu.  But make sure we don't do this for notifications we
-// send ourselves (whose 'sender' will be @"org.mozilla.goanna.PopupWindow").
+// send ourselves (whose 'sender' will be @"org.mozilla.gecko.PopupWindow").
 - (void)beginMenuTracking:(NSNotification*)aNotification
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   NSString *sender = [aNotification object];
-  if (!sender || ![sender isEqualToString:@"org.mozilla.goanna.PopupWindow"]) {
+  if (!sender || ![sender isEqualToString:@"org.mozilla.gecko.PopupWindow"]) {
     nsIRollupListener* rollupListener = nsBaseWidget::GetActiveRollupListener();
     nsCOMPtr<nsIWidget> rollupWidget = rollupListener->GetRollupWidget();
     if (rollupWidget)
@@ -865,7 +865,7 @@ nsAppShell::AfterProcessNextEvent(nsIThreadInternal *aThread,
 @end
 
 // We hook terminate: in order to make OS-initiated termination work nicely
-// with Goanna's shutdown sequence.  (Two ways to trigger OS-initiated
+// with Gecko's shutdown sequence.  (Two ways to trigger OS-initiated
 // termination:  1) Quit from the Dock menu; 2) Log out from (or shut down)
 // your computer while the browser is active.)
 @interface NSApplication (MethodSwizzling)
@@ -879,7 +879,7 @@ nsAppShell::AfterProcessNextEvent(nsIThreadInternal *aThread,
 // OS's original implementation.  The only thing the orginal method does which
 // we need is that it posts NSApplicationWillTerminateNotification.  Everything
 // else is unneeded (because it's handled elsewhere), or actively interferes
-// with Goanna's shutdown sequence.  For example the original terminate: method
+// with Gecko's shutdown sequence.  For example the original terminate: method
 // causes the app to exit() inside [NSApp run] (called from nsAppShell::Run()
 // above), which means that nothing runs after the call to nsAppStartup::Run()
 // in XRE_Main(), which in particular means that ScopedXPCOMStartup's destructor

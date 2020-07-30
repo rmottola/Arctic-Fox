@@ -59,7 +59,7 @@ public:
   virtual void ResetComplete() = 0;
 
   // Called when the decoder encounters a catestrophic error and cannot
-  // continue. Goanna will not send any more input for decoding.
+  // continue. Gecko will not send any more input for decoding.
   virtual void Error(GMPErr aError) = 0;
 };
 

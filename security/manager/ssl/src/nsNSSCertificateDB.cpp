@@ -20,7 +20,6 @@
 #include "nsNSSCertificate.h"
 #include "nsNSSHelper.h"
 #include "nsNSSCertHelper.h"
-#include "nsNSSCertCache.h"
 #include "nsCRT.h"
 #include "nsICertificateDialogs.h"
 #include "nsNSSCertTrust.h"
@@ -52,9 +51,7 @@ using namespace mozilla;
 using namespace mozilla::psm;
 using mozilla::psm::SharedSSLState;
 
-#ifdef PR_LOGGING
 extern PRLogModuleInfo* gPIPNSSLog;
-#endif
 
 static nsresult
 attemptToLogInWithDefaultPassword()

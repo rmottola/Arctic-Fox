@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,11 +14,6 @@
 class nsIURI;
 class nsIInputStream;
 class nsGenericHTMLElement;
-class nsILinkHandler;
-class nsIFormControl;
-class nsIDOMHTMLElement;
-class nsIDocShell;
-class nsIRequest;
 class nsISaveAsCharset;
 class nsIMultiplexInputStream;
 
@@ -52,11 +48,11 @@ public:
    * Submit a name/file pair
    *
    * @param aName the name of the parameter
-   * @param aBlob the file to submit. The file's name will be used
+   * @param aFile the file to submit. The file's name will be used
    */
   virtual nsresult AddNameFilePair(const nsAString& aName,
-                                   mozilla::dom::File* aBlob) = 0;
-  
+                                   mozilla::dom::File* aFile) = 0;
+
   /**
    * Reports whether the instance supports AddIsindex().
    *
@@ -164,7 +160,7 @@ public:
   virtual nsresult AddNameValuePair(const nsAString& aName,
                                     const nsAString& aValue) override;
   virtual nsresult AddNameFilePair(const nsAString& aName,
-                                   mozilla::dom::File* aBlob) override;
+                                   mozilla::dom::File* aFile) override;
   virtual nsresult GetEncodedSubmission(nsIURI* aURI,
                                         nsIInputStream** aPostDataStream) override;
 

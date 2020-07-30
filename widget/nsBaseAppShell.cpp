@@ -68,7 +68,7 @@ nsBaseAppShell::NativeEventCallback()
   // If DoProcessNextNativeEvent is on the stack, then we assume that we can
   // just unwind and let nsThread::ProcessNextEvent process the next event.
   // However, if we are called from a nested native event loop (maybe via some
-  // plug-in or library function), then go ahead and process Goanna events now.
+  // plug-in or library function), then go ahead and process Gecko events now.
   if (mEventloopNestingState == eEventloopXPCOM) {
     mEventloopNestingState = eEventloopOther;
     // XXX there is a tiny risk we will never get a new NativeEventCallback,
@@ -77,14 +77,14 @@ nsBaseAppShell::NativeEventCallback()
   }
 
   // nsBaseAppShell::Run is not being used to pump events, so this may be
-  // our only opportunity to process pending goanna events.
+  // our only opportunity to process pending gecko events.
 
   nsIThread *thread = NS_GetCurrentThread();
   bool prevBlockNativeEvent = mBlockNativeEvent;
   if (mEventloopNestingState == eEventloopOther) {
     if (!NS_HasPendingEvents(thread))
       return;
-    // We're in a nested native event loop and have some goanna events to
+    // We're in a nested native event loop and have some gecko events to
     // process.  While doing that we block processing native events from the
     // appshell - instead, we want to get back to the nested native event
     // loop ASAP (bug 420148).
@@ -94,14 +94,14 @@ nsBaseAppShell::NativeEventCallback()
   IncrementEventloopNestingLevel();
   EventloopNestingState prevVal = mEventloopNestingState;
   NS_ProcessPendingEvents(thread, THREAD_EVENT_STARVATION_LIMIT);
-  mProcessedGoannaEvents = true;
+  mProcessedGeckoEvents = true;
   mEventloopNestingState = prevVal;
   mBlockNativeEvent = prevBlockNativeEvent;
 
   // Continue processing pending events later (we don't want to starve the
   // embedders event loop).
   if (NS_HasPendingEvents(thread))
-    DoProcessMoreGoannaEvents();
+    DoProcessMoreGeckoEvents();
 
   DecrementEventloopNestingLevel();
 }
@@ -109,7 +109,7 @@ nsBaseAppShell::NativeEventCallback()
 // Note, this is currently overidden on windows, see comments in nsAppShell for
 // details.
 void
-nsBaseAppShell::DoProcessMoreGoannaEvents()
+nsBaseAppShell::DoProcessMoreGeckoEvents()
 {
   OnDispatchedEvent(nullptr);
 }
@@ -243,7 +243,7 @@ nsBaseAppShell::OnProcessNextEvent(nsIThreadInternal *thr, bool mayWait,
     if (!mayWait)
       return NS_OK;
     // Hmm, we're in a nested native event loop and would like to get
-    // back to it ASAP, but it seems a goanna event has caused us to
+    // back to it ASAP, but it seems a gecko event has caused us to
     // spin up a nested XPCOM event loop (eg. modal window), so we
     // really must start processing native events here again.
     mBlockNativeEvent = false;
@@ -266,8 +266,8 @@ nsBaseAppShell::OnProcessNextEvent(nsIThreadInternal *thr, bool mayWait,
   // on its event queue waiting for an event.
   bool needEvent = mayWait;
   // Reset prior to invoking DoProcessNextNativeEvent which might cause
-  // NativeEventCallback to process goanna events.
-  mProcessedGoannaEvents = false;
+  // NativeEventCallback to process gecko events.
+  mProcessedGeckoEvents = false;
 
   if (mFavorPerf <= 0 && start > mSwitchTime + mStarvationDelay) {
     // Favor pending native events
@@ -285,7 +285,7 @@ nsBaseAppShell::OnProcessNextEvent(nsIThreadInternal *thr, bool mayWait,
     }
   }
 
-  while (!NS_HasPendingEvents(thr) && !mProcessedGoannaEvents) {
+  while (!NS_HasPendingEvents(thr) && !mProcessedGeckoEvents) {
     // If we have been asked to exit from Run, then we should not wait for
     // events to process.  Note that an inner nested event loop causes
     // 'mayWait' to become false too, through 'mBlockedWait'.

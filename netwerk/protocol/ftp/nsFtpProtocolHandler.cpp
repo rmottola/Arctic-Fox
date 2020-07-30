@@ -25,7 +25,7 @@ using namespace mozilla::net;
 #include "nsFtpProtocolHandler.h"
 #include "nsFTPChannel.h"
 #include "nsIStandardURL.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
 #include "nsIObserverService.h"
@@ -34,7 +34,6 @@ using namespace mozilla::net;
 
 //-----------------------------------------------------------------------------
 
-#if defined(PR_LOGGING)
 //
 // Log module for FTP Protocol logging...
 //
@@ -47,7 +46,6 @@ using namespace mozilla::net;
 // the file nspr.log
 //
 PRLogModuleInfo* gFTPLog = nullptr;
-#endif
 #undef LOG
 #define LOG(args) PR_LOG(gFTPLog, PR_LOG_DEBUG, args)
 
@@ -69,10 +67,9 @@ nsFtpProtocolHandler::nsFtpProtocolHandler()
     , mControlQoSBits(0x00)
     , mDataQoSBits(0x00)
 {
-#if defined(PR_LOGGING)
     if (!gFTPLog)
         gFTPLog = PR_NewLogModule("nsFtp");
-#endif
+
     LOG(("FTP:creating handler @%x\n", this));
 
     gFtpHandler = this;

@@ -19,7 +19,7 @@ import android.hardware.Camera.Size;
 import android.hardware.Camera;
 import android.util.Log;
 
-import org.mozilla.goanna.mozglue.WebRTCJNITarget;
+import org.mozilla.gecko.mozglue.WebRTCJNITarget;
 
 public class VideoCaptureDeviceInfoAndroid {
   private final static String TAG = "WEBRTC-JC";

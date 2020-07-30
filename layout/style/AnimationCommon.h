@@ -15,7 +15,7 @@
 #include "nsDisplayList.h" // For nsDisplayItem::Type
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/StyleAnimationValue.h"
-#include "mozilla/dom/AnimationPlayer.h"
+#include "mozilla/dom/Animation.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/Nullable.h"
 #include "nsStyleStruct.h"
@@ -24,15 +24,15 @@
 #include "mozilla/FloatingPoint.h"
 #include "nsCSSPseudoElements.h"
 #include "nsCycleCollectionParticipant.h"
+#include "nsCSSPropertySet.h"
 
 class nsIFrame;
 class nsPresContext;
-class nsStyleChangeList;
 
 namespace mozilla {
 
 class RestyleTracker;
-struct AnimationPlayerCollection;
+struct AnimationCollection;
 
 namespace css {
 
@@ -64,6 +64,13 @@ public:
   virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
     const MOZ_MUST_OVERRIDE override;
 
+#ifdef DEBUG
+  static void Initialize();
+#endif
+
+  // NOTE:  This can return null after Disconnect().
+  nsPresContext* PresContext() const { return mPresContext; }
+
   /**
    * Notify the manager that the pres context is going away.
    */
@@ -74,10 +81,10 @@ public:
   // elements.
   void AddStyleUpdatesTo(mozilla::RestyleTracker& aTracker);
 
-  AnimationPlayerCollection*
-  GetAnimationPlayers(dom::Element *aElement,
-                      nsCSSPseudoElements::Type aPseudoType,
-                      bool aCreateIfNeeded);
+  AnimationCollection*
+  GetAnimations(dom::Element *aElement,
+                nsCSSPseudoElements::Type aPseudoType,
+                bool aCreateIfNeeded);
 
   // Returns true if aContent or any of its ancestors has an animation
   // or transition.
@@ -92,9 +99,9 @@ public:
     return false;
   }
 
-  // Notify this manager that one of its collections of animation players,
+  // Notify this manager that one of its collections of animations,
   // has been updated.
-  void NotifyCollectionUpdated(AnimationPlayerCollection& aCollection);
+  void NotifyCollectionUpdated(AnimationCollection& aCollection);
 
   enum FlushFlags {
     Can_Throttle,
@@ -123,18 +130,28 @@ protected:
 public:
   static const LayerAnimationRecord sLayerAnimationInfo[kLayerRecords];
 
+  // Will return non-null for any property with the
+  // CSS_PROPERTY_CAN_ANIMATE_ON_COMPOSITOR flag; should only be called
+  // on such properties.
+  static const LayerAnimationRecord*
+    LayerAnimationRecordFor(nsCSSProperty aProperty);
+
 protected:
   virtual ~CommonAnimationManager();
 
   // For ElementCollectionRemoved
-  friend struct mozilla::AnimationPlayerCollection;
+  friend struct mozilla::AnimationCollection;
 
-  void AddElementCollection(AnimationPlayerCollection* aCollection);
-  void ElementCollectionRemoved() { CheckNeedsRefresh(); }
+  void AddElementCollection(AnimationCollection* aCollection);
+  void ElementCollectionRemoved() { MaybeStartOrStopObservingRefreshDriver(); }
   void RemoveAllElementCollections();
 
-  // Check to see if we should stop or start observing the refresh driver
-  void CheckNeedsRefresh();
+  // We should normally only call MaybeStartOrStopObservingRefreshDriver in
+  // situations where we will also queue events since otherwise we may stop
+  // getting refresh driver ticks before we queue the necessary events.
+  void MaybeStartObservingRefreshDriver();
+  void MaybeStartOrStopObservingRefreshDriver();
+  bool NeedsRefresh() const;
 
   virtual nsIAtom* GetAnimationsAtom() = 0;
   virtual nsIAtom* GetAnimationsBeforeAtom() = 0;
@@ -144,9 +161,7 @@ protected:
     return false;
   }
 
-  // When this returns a value other than nullptr, it also,
-  // as a side-effect, notifies the ActiveLayerTracker.
-  static AnimationPlayerCollection*
+  static AnimationCollection*
   GetAnimationsForCompositor(nsIContent* aContent,
                              nsIAtom* aElementProperty,
                              nsCSSProperty aProperty);
@@ -191,6 +206,14 @@ public:
     mozilla::StyleAnimationValue mValue;
   };
 
+  void AddPropertiesToSet(nsCSSPropertySet& aSet) const
+  {
+    for (size_t i = 0, i_end = mPropertyValuePairs.Length(); i < i_end; ++i) {
+      const PropertyValuePair &cv = mPropertyValuePairs[i];
+      aSet.AddProperty(cv.mProperty);
+    }
+  }
+
 private:
   ~AnimValuesStyleRule() {}
 
@@ -199,18 +222,17 @@ private:
 
 } // namespace css
 
-typedef InfallibleTArray<nsRefPtr<dom::AnimationPlayer> >
-  AnimationPlayerPtrArray;
+typedef InfallibleTArray<nsRefPtr<dom::Animation>> AnimationPtrArray;
 
 enum EnsureStyleRuleFlags {
   EnsureStyleRule_IsThrottled,
   EnsureStyleRule_IsNotThrottled
 };
 
-struct AnimationPlayerCollection : public PRCList
+struct AnimationCollection : public PRCList
 {
-  AnimationPlayerCollection(dom::Element *aElement, nsIAtom *aElementProperty,
-                            mozilla::css::CommonAnimationManager *aManager)
+  AnimationCollection(dom::Element *aElement, nsIAtom *aElementProperty,
+                      mozilla::css::CommonAnimationManager *aManager)
     : mElement(aElement)
     , mElementProperty(aElementProperty)
     , mManager(aManager)
@@ -221,22 +243,22 @@ struct AnimationPlayerCollection : public PRCList
     , mCalledPropertyDtor(false)
 #endif
   {
-    MOZ_COUNT_CTOR(AnimationPlayerCollection);
+    MOZ_COUNT_CTOR(AnimationCollection);
     PR_INIT_CLIST(this);
   }
-  ~AnimationPlayerCollection()
+  ~AnimationCollection()
   {
     MOZ_ASSERT(mCalledPropertyDtor,
                "must call destructor through element property dtor");
-    MOZ_COUNT_DTOR(AnimationPlayerCollection);
+    MOZ_COUNT_DTOR(AnimationCollection);
     PR_REMOVE_LINK(this);
     mManager->ElementCollectionRemoved();
   }
 
   void Destroy()
   {
-    for (size_t playerIdx = mPlayers.Length(); playerIdx-- != 0; ) {
-      mPlayers[playerIdx]->Cancel();
+    for (size_t animIdx = mAnimations.Length(); animIdx-- != 0; ) {
+      mAnimations[animIdx]->CancelFromStyle();
     }
     // This will call our destructor.
     mElement->DeleteProperty(mElementProperty);
@@ -282,6 +304,9 @@ struct AnimationPlayerCollection : public PRCList
   // (This is useful for determining whether throttle the animation
   // (suppress main-thread style updates).)
   bool CanPerformOnCompositorThread(CanAnimateFlags aFlags) const;
+
+  void PostUpdateLayerAnimations();
+
   bool HasAnimationOfProperty(nsCSSProperty aProperty) const;
 
   bool IsForElement() const { // rather than for a pseudo-element
@@ -324,6 +349,19 @@ struct AnimationPlayerCollection : public PRCList
     return NS_LITERAL_STRING("::after");
   }
 
+  nsCSSPseudoElements::Type PseudoElementType() const
+  {
+    if (IsForElement()) {
+      return nsCSSPseudoElements::ePseudo_NotPseudoElement;
+    }
+    if (IsForBeforePseudo()) {
+      return nsCSSPseudoElements::ePseudo_before;
+    }
+    MOZ_ASSERT(IsForAfterPseudo(),
+               "::before & ::after should be the only pseudo-elements here");
+    return nsCSSPseudoElements::ePseudo_after;
+  }
+
   mozilla::dom::Element* GetElementToRestyle() const;
 
   void PostRestyleForAnimation(nsPresContext *aPresContext) {
@@ -335,7 +373,7 @@ struct AnimationPlayerCollection : public PRCList
     }
   }
 
-  void NotifyPlayerUpdated();
+  void NotifyAnimationUpdated();
 
   static void LogAsyncAnimationFailure(nsCString& aMessage,
                                        const nsIContent* aContent = nullptr);
@@ -348,7 +386,7 @@ struct AnimationPlayerCollection : public PRCList
 
   mozilla::css::CommonAnimationManager *mManager;
 
-  mozilla::AnimationPlayerPtrArray mPlayers;
+  mozilla::AnimationPtrArray mAnimations;
 
   // This style rule contains the style data for currently animating
   // values.  It only matches when styling with animation.  When we
@@ -381,9 +419,10 @@ struct AnimationPlayerCollection : public PRCList
 
   // Returns true if there is an animation that has yet to finish.
   bool HasCurrentAnimations() const;
-  // Returns true if there is an animation of the specified property that
-  // has yet to finish.
-  bool HasCurrentAnimationsForProperty(nsCSSProperty aProperty) const;
+  // Returns true if there is an animation of any of the specified properties
+  // that has yet to finish.
+  bool HasCurrentAnimationsForProperties(const nsCSSProperty* aProperties,
+                                         size_t aPropertyCount) const;
 
   // The refresh time associated with mStyleRule.
   TimeStamp mStyleRuleRefreshTime;

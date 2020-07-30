@@ -43,7 +43,7 @@ class ZoneHeapThreshold
 
     double gcHeapGrowthFactor() const { return gcHeapGrowthFactor_; }
     size_t gcTriggerBytes() const { return gcTriggerBytes_; }
-    bool isCloseToAllocTrigger(const js::gc::HeapUsage& usage, bool highFrequencyGC) const;
+    double allocTrigger(bool highFrequencyGC) const;
 
     void updateAfterGC(size_t lastBytes, JSGCInvocationKind gckind,
                        const GCSchedulingTunables& tunables, const GCSchedulingState& state);
@@ -329,7 +329,8 @@ enum ZoneSelector {
 class ZonesIter
 {
     gc::AutoEnterIteration iterMarker;
-    JS::Zone** it, **end;
+    JS::Zone** it;
+    JS::Zone** end;
 
   public:
     ZonesIter(JSRuntime* rt, ZoneSelector selector) : iterMarker(&rt->gc) {

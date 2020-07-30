@@ -11,6 +11,11 @@
 #include "JavaScriptShared.h"
 
 namespace mozilla {
+
+namespace dom {
+class AutoJSAPI;
+}
+
 namespace jsipc {
 
 class WrapperAnswer : public virtual JavaScriptShared
@@ -34,15 +39,14 @@ class WrapperAnswer : public virtual JavaScriptShared
                  ReturnStatus* rs, bool* bp);
     bool RecvHasOwn(const ObjectId& objId, const JSIDVariant& id,
                     ReturnStatus* rs, bool* bp);
-    bool RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
-                 const JSIDVariant& id,
-                 ReturnStatus* rs, JSVariant* result);
-    bool RecvSet(const ObjectId& objId, const ObjectVariant& receiverVar,
-                 const JSIDVariant &id, const JSVariant &value, ReturnStatus *rs,
-                 JSVariant *result);
+    bool RecvGet(const ObjectId &objId, const ObjectVariant &receiverVar,
+                 const JSIDVariant &id,
+                 ReturnStatus *rs, JSVariant *result);
+    bool RecvSet(const ObjectId &objId, const JSIDVariant &id, const JSVariant &value,
+                 const JSVariant &receiverVar, ReturnStatus *rs);
 
-    bool RecvIsExtensible(const ObjectId& objId, ReturnStatus* rs,
-                          bool* result);
+    bool RecvIsExtensible(const ObjectId &objId, ReturnStatus *rs,
+                          bool *result);
     bool RecvCallOrConstruct(const ObjectId& objId, InfallibleTArray<JSParam>&& argv,
                              const bool& construct, ReturnStatus* rs, JSVariant* result,
                              nsTArray<JSParam>* outparams);
@@ -63,9 +67,9 @@ class WrapperAnswer : public virtual JavaScriptShared
     bool RecvDropObject(const ObjectId& objId);
 
   private:
-    bool fail(JSContext* cx, ReturnStatus* rs);
-    bool ok(ReturnStatus *rs);
-    bool ok(ReturnStatus *rs, const JS::ObjectOpResult &result);
+    bool fail(dom::AutoJSAPI& jsapi, ReturnStatus* rs);
+    bool ok(ReturnStatus* rs);
+    bool ok(ReturnStatus* rs, const JS::ObjectOpResult& result);
 };
 
 } // namespace jsipc

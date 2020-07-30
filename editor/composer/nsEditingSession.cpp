@@ -980,7 +980,7 @@ nsEditingSession::EndDocumentLoad(nsIWebProgress *aWebProgress,
   
     if (makeEditable)
     {
-      // To keep pre Goanna 1.9 behavior, setup editor always when
+      // To keep pre Gecko 1.9 behavior, setup editor always when
       // mMakeWholeDocumentEditable.
       bool needsSetup = false;
       if (mMakeWholeDocumentEditable) {

@@ -135,13 +135,13 @@ def checkAppINI(appLocation):
     iniparser.readfp(appINI)
     if not (iniparser.has_section("App")):
         raise Exception("application.ini must have an App section")
-    if not (iniparser.has_section("Goanna")):
-        raise Exception("application.ini must have a Goanna section")
+    if not (iniparser.has_section("Gecko")):
+        raise Exception("application.ini must have a Gecko section")
     requireINIOption(iniparser, "App", "Name")
     requireINIOption(iniparser, "App", "Version")
     requireINIOption(iniparser, "App", "BuildID")
     requireINIOption(iniparser, "App", "ID")
-    requireINIOption(iniparser, "Goanna", "MinVersion")
+    requireINIOption(iniparser, "Gecko", "MinVersion")
 
     return zipApp, iniparser
     pass
@@ -198,7 +198,7 @@ def handleCommandLine():
     parser.add_argument(
         "--greDir",
         action="store",
-        help="The directory containing the Goanna SDK (usually where this Python script lives)",
+        help="The directory containing the Gecko SDK (usually where this Python script lives)",
         default=os.path.dirname(sys.argv[0])
     )
     parser.add_argument(

@@ -104,24 +104,24 @@ enum GMPMediaKeyStatus {
 typedef int64_t GMPTimestamp;
 
 // Capability definitions. The capabilities of the EME GMP are reported
-// to Goanna by calling the GMPDecryptorCallback::SetCapabilities()
+// to Gecko by calling the GMPDecryptorCallback::SetCapabilities()
 // callback and specifying the logical OR of the GMP_EME_CAP_* flags below.
 //
 // Note the DECRYPT and the DECRYPT_AND_DECODE are mutually exclusive;
 // only one mode should be reported for each stream type, but different
 // modes can be reported for different stream types.
 //
-// Note: Goanna does not currently support the caps changing at runtime.
+// Note: Gecko does not currently support the caps changing at runtime.
 // Set them once per plugin initialization, during the startup of
 // the GMPDecryptor.
 
 // Capability; CDM can decrypt encrypted buffers and return still
-// compressed buffers back to Goanna for decompression there.
+// compressed buffers back to Gecko for decompression there.
 #define GMP_EME_CAP_DECRYPT_AUDIO (uint64_t(1) << 0)
 #define GMP_EME_CAP_DECRYPT_VIDEO (uint64_t(1) << 1)
 
 // Capability; CDM can decrypt and then decode encrypted buffers,
-// and return decompressed samples to Goanna for playback.
+// and return decompressed samples to Gecko for playback.
 #define GMP_EME_CAP_DECRYPT_AND_DECODE_AUDIO (uint64_t(1) << 2)
 #define GMP_EME_CAP_DECRYPT_AND_DECODE_VIDEO (uint64_t(1) << 3)
 
@@ -197,7 +197,7 @@ public:
                             const char* aMessage,
                             uint32_t aMessageLength) = 0;
 
-  // Notifies the status of a key. Goanna will not call into the CDM to decrypt
+  // Notifies the status of a key. Gecko will not call into the CDM to decrypt
   // or decode content encrypted with a key unless the CDM has marked it
   // usable first. So a CDM *MUST* mark its usable keys as usable!
   virtual void KeyStatusChanged(const char* aSessionId,
@@ -209,12 +209,12 @@ public:
   // The CDM must report its capabilites of this CDM. aCaps should be a
   // logical OR of the GMP_EME_CAP_* flags. The CDM *MUST* call this
   // function and report whether it can decrypt and/or decode. Without
-  // this, Goanna does not know how to use the CDM and will not send
+  // this, Gecko does not know how to use the CDM and will not send
   // samples to the CDM to decrypt or decrypt-and-decode mode. Note a
   // CDM cannot change modes once playback has begun.
   virtual void SetCapabilities(uint64_t aCaps) = 0;
 
-  // Returns decrypted buffer to Goanna, or reports failure.
+  // Returns decrypted buffer to Gecko, or reports failure.
   virtual void Decrypted(GMPBuffer* aBuffer, GMPErr aResult) = 0;
 
   virtual ~GMPDecryptorCallback() {}
@@ -252,14 +252,14 @@ class GMPDecryptor {
 public:
 
   // Sets the callback to use with the decryptor to return results
-  // to Goanna.
+  // to Gecko.
   //
   // The CDM must also call GMPDecryptorCallback::SetCapabilities()
-  // exactly once during start up, to inform Goanna whether to use the CDM
+  // exactly once during start up, to inform Gecko whether to use the CDM
   // in decrypt or decrypt-and-decode mode.
   //
   // Note: GMPDecryptorCallback::SetCapabilities() must be called before
-  // Goanna will send any samples for decryption to the GMP.
+  // Gecko will send any samples for decryption to the GMP.
   virtual void Init(GMPDecryptorCallback* aCallback) = 0;
 
   // Initiates the creation of a session given |aType| and |aInitData|, and
@@ -342,7 +342,7 @@ public:
 
   // Asynchronously decrypts aBuffer in place. When the decryption is
   // complete, GMPDecryptor should write the decrypted data back into the
-  // same GMPBuffer object and return it to Goanna by calling Decrypted(),
+  // same GMPBuffer object and return it to Gecko by calling Decrypted(),
   // with the GMPNoErr successcode. If decryption fails, call Decrypted()
   // with a failure code, and an error event will fire on the media element.
   // Note: When Decrypted() is called and aBuffer is passed back, aBuffer

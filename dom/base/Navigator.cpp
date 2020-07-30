@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set sw=2 ts=2 et tw=78: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -32,10 +32,13 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "BatteryManager.h"
+#include "mozilla/dom/DeviceStorageAreaListener.h"
 #include "mozilla/dom/PowerManager.h"
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/CellBroadcast.h"
+#include "mozilla/dom/IccManager.h"
+#include "mozilla/dom/InputPortManager.h"
 #include "mozilla/dom/MobileMessageManager.h"
 #include "mozilla/dom/ServiceWorkerContainer.h"
 #include "mozilla/dom/Telephony.h"
@@ -53,7 +56,6 @@
 #include "nsIMobileIdentityService.h"
 #endif
 #ifdef MOZ_B2G_RIL
-#include "mozilla/dom/IccManager.h"
 #include "mozilla/dom/MobileConnectionArray.h"
 #endif
 #include "nsIIdleObserver.h"
@@ -174,14 +176,15 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBatteryManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPowerManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCellBroadcast)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIccManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTelephony)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVoicemail)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTVManager)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInputPortManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConnection)
 #ifdef MOZ_B2G_RIL
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileConnections)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIccManager)
 #endif
 #ifdef MOZ_B2G_BT
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBluetooth)
@@ -197,6 +200,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCachedResolveResults)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeviceStorageAreaListener)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -247,6 +251,11 @@ Navigator::Invalidate()
     mCellBroadcast = nullptr;
   }
 
+  if (mIccManager) {
+    mIccManager->Shutdown();
+    mIccManager = nullptr;
+  }
+
   if (mMobileMessageManager) {
     mMobileMessageManager->Shutdown();
     mMobileMessageManager = nullptr;
@@ -265,6 +274,10 @@ Navigator::Invalidate()
     mTVManager = nullptr;
   }
 
+  if (mInputPortManager) {
+    mInputPortManager = nullptr;
+  }
+
   if (mConnection) {
     mConnection->Shutdown();
     mConnection = nullptr;
@@ -273,11 +286,6 @@ Navigator::Invalidate()
 #ifdef MOZ_B2G_RIL
   if (mMobileConnections) {
     mMobileConnections = nullptr;
-  }
-
-  if (mIccManager) {
-    mIccManager->Shutdown();
-    mIccManager = nullptr;
   }
 #endif
 
@@ -311,6 +319,9 @@ Navigator::Invalidate()
 
   mServiceWorkerContainer = nullptr;
 
+  if (mDeviceStorageAreaListener) {
+    mDeviceStorageAreaListener = nullptr;
+  }
 }
 
 //*****************************************************************************
@@ -891,6 +902,20 @@ Navigator::RegisterProtocolHandler(const nsAString& aProtocol,
                                            mWindow->GetOuterWindow());
 }
 
+DeviceStorageAreaListener*
+Navigator::GetDeviceStorageAreaListener(ErrorResult& aRv)
+{
+  if (!mDeviceStorageAreaListener) {
+    if (!mWindow || !mWindow->GetOuterWindow() || !mWindow->GetDocShell()) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+    mDeviceStorageAreaListener = new DeviceStorageAreaListener(mWindow);
+  }
+
+  return mDeviceStorageAreaListener;
+}
+
 nsDOMDeviceStorage*
 Navigator::GetDeviceStorage(const nsAString& aType, ErrorResult& aRv)
 {
@@ -924,6 +949,28 @@ Navigator::GetDeviceStorages(const nsAString& aType,
   nsDOMDeviceStorage::CreateDeviceStoragesFor(mWindow, aType, aStores);
 
   mDeviceStorageStores.AppendElements(aStores);
+}
+
+nsDOMDeviceStorage*
+Navigator::GetDeviceStorageByNameAndType(const nsAString& aName,
+                                         const nsAString& aType,
+                                         ErrorResult& aRv)
+{
+  if (!mWindow || !mWindow->GetOuterWindow() || !mWindow->GetDocShell()) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  nsRefPtr<nsDOMDeviceStorage> storage;
+  nsDOMDeviceStorage::CreateDeviceStorageByNameAndType(mWindow, aName, aType,
+                                                       getter_AddRefs(storage));
+
+  if (!storage) {
+    return nullptr;
+  }
+
+  mDeviceStorageStores.AppendElement(storage);
+  return storage;
 }
 
 Geolocation*
@@ -1148,7 +1195,7 @@ Navigator::SendBeacon(const nsAString& aUrl,
       in = strStream;
 
     } else if (aData.Value().IsBlob()) {
-      File& blob = aData.Value().GetAsBlob();
+      Blob& blob = aData.Value().GetAsBlob();
       rv = blob.GetInternalStream(getter_AddRefs(in));
       if (NS_FAILED(rv)) {
         aRv.Throw(NS_ERROR_FAILURE);
@@ -1622,6 +1669,23 @@ Navigator::GetTv()
   return mTVManager;
 }
 
+InputPortManager*
+Navigator::GetInputPortManager(ErrorResult& aRv)
+{
+  if (!mInputPortManager) {
+    if (!mWindow) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+    mInputPortManager = InputPortManager::Create(mWindow, aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+  }
+
+  return mInputPortManager;
+}
+
 #ifdef MOZ_B2G
 already_AddRefed<Promise>
 Navigator::GetMobileIdAssertion(const MobileIdOptions& aOptions,
@@ -1708,8 +1772,6 @@ Navigator::GetMozVoicemail(ErrorResult& aRv)
   return mVoicemail;
 }
 
-#ifdef MOZ_B2G_RIL
-
 IccManager*
 Navigator::GetMozIccManager(ErrorResult& aRv)
 {
@@ -1725,7 +1787,6 @@ Navigator::GetMozIccManager(ErrorResult& aRv)
 
   return mIccManager;
 }
-#endif // MOZ_B2G_RIL
 
 #ifdef MOZ_GAMEPAD
 void
@@ -1983,8 +2044,8 @@ Navigator::OnNavigation()
   }
 
 #ifdef MOZ_MEDIA_NAVIGATOR
-  // Inform MediaManager in case there are live streams or pending callbacks.
-  MediaManager *manager = MediaManager::Get();
+  // If MediaManager is open let it inform any live streams or pending callbacks
+  MediaManager *manager = MediaManager::GetIfExists();
   if (manager) {
     manager->OnNavigation(mWindow->WindowID());
   }

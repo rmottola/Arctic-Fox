@@ -675,7 +675,7 @@ ServerSocketConnection.prototype = {
      *
      * Enforcing cipher suites here would be a bad idea, as we want TLS
      * cipher negotiation to work correctly.  The server already allows only
-     * Goanna's normal set of cipher suites.
+     * Gecko's normal set of cipher suites.
      */
     if (clientStatus.tlsVersionUsed < Ci.nsITLSClientStatus.TLS_VERSION_1_2) {
       this._handshakeDeferred.reject(Cr.NS_ERROR_CONNECTION_REFUSED);

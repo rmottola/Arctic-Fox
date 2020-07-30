@@ -1229,7 +1229,7 @@ GLContextProviderGLX::CreateOffscreen(const gfxIntSize& size,
     if (!glContext)
         return nullptr;
 
-    if (!glContext->InitOffscreen(ToIntSize(size), caps))
+    if (!glContext->InitOffscreen(size, caps))
         return nullptr;
 
     return glContext.forget();

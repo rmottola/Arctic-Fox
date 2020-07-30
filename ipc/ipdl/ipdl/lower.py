@@ -4,6 +4,7 @@
 
 import os, re, sys
 from copy import deepcopy
+from collections import OrderedDict
 
 import ipdl.ast
 import ipdl.builtin
@@ -1921,7 +1922,7 @@ def _generateMessageClass(clsname, msgid, priority, prettyName, compress):
         StmtExpr(ExprCall(
             ExprVar('__android_log_write'),
             args=[ ExprVar('ANDROID_LOG_INFO'),
-                   ExprLiteral.String('GoannaIPC'),
+                   ExprLiteral.String('GeckoIPC'),
                    ExprCall(ExprSelect(msgvar, '.', 'c_str')) ])),
         CppDirective('endif')
     ])
@@ -2780,7 +2781,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
 
         bridgeActorsCreated = ProcessGraph.bridgeEndpointsOf(ptype, self.side)
         opensActorsCreated = ProcessGraph.opensEndpointsOf(ptype, self.side)
-        channelOpenedActors = bridgeActorsCreated + opensActorsCreated
+        channelOpenedActors = OrderedDict.fromkeys(bridgeActorsCreated + opensActorsCreated, None)
 
         friends = _FindFriends().findFriends(ptype)
         if ptype.isManaged():
@@ -3004,7 +3005,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                     ret=Type.BOOL))
 
             openmeth.addstmts([
-                StmtExpr(ExprAssn(p.otherPidVar(), ExprVar('ipc::kCurrentProcessId'))),
+                StmtExpr(ExprAssn(p.otherPidVar(), ExprCall(ExprVar('base::GetCurrentProcId')))),
                 StmtReturn(ExprCall(ExprSelect(p.channelVar(), '.', 'Open'),
                                     [ aChannel, aMessageLoop, sidevar ]))
             ])

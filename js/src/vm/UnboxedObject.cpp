@@ -100,12 +100,12 @@ UnboxedLayout::makeConstructorCode(JSContext *cx, HandleObjectGroup group)
     MOZ_ASSERT(propertiesReg.volatile_());
     MOZ_ASSERT(newKindReg.volatile_());
 
-    GeneralRegisterSet regs(GeneralRegisterSet::All());
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(propertiesReg);
     regs.take(newKindReg);
     Register object = regs.takeAny(), scratch1 = regs.takeAny(), scratch2 = regs.takeAny();
 
-    GeneralRegisterSet savedNonVolatileRegisters = SavedNonVolatileRegisters(regs);
+    LiveGeneralRegisterSet savedNonVolatileRegisters = SavedNonVolatileRegisters(regs);
     for (GeneralRegisterForwardIterator iter(savedNonVolatileRegisters); iter.more(); ++iter)
         masm.Push(*iter);
 
@@ -679,16 +679,16 @@ UnboxedPlainObject::obj_lookupProperty(JSContext *cx, HandleObject obj,
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                                       GetterOp getter, SetterOp setter, unsigned attrs,
+UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId id,
+                                       Handle<JSPropertyDescriptor> desc,
                                        ObjectOpResult &result)
 {
     const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (const UnboxedLayout::Property *property = layout.lookup(id)) {
-        if (!getter && !setter && attrs == JSPROP_ENUMERATE) {
+        if (!desc.getter() && !desc.setter() && desc.attributes() == JSPROP_ENUMERATE) {
             // This define is equivalent to setting an existing property.
-            if (obj->as<UnboxedPlainObject>().setValue(cx, *property, v))
+            if (obj->as<UnboxedPlainObject>().setValue(cx, *property, desc.value()))
                 return true;
         }
 
@@ -697,7 +697,8 @@ UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId
         if (!convertToNative(cx, obj))
             return false;
 
-        return DefineProperty(cx, obj, id, v, getter, setter, attrs);
+        return DefineProperty(cx, obj, id, desc, result) &&
+result.checkStrict(cx, obj, id);
     }
 
     // Define the property on the expando object.
@@ -706,9 +707,9 @@ UnboxedPlainObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId
         return false;
 
     // Update property types on the unboxed object as well.
-    AddTypePropertyId(cx, obj, id, v);
+    AddTypePropertyId(cx, obj, id, desc.value());
 
-    return DefineProperty(cx, expando, id, v, getter, setter, attrs, result);
+    return DefineProperty(cx, expando, id, desc, result);
 }
 
 /* static */ bool
@@ -757,36 +758,38 @@ UnboxedPlainObject::obj_getProperty(JSContext *cx, HandleObject obj, HandleObjec
 }
 
 /* static */ bool
-UnboxedPlainObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleObject receiver,
-                                    HandleId id, MutableHandleValue vp, ObjectOpResult &result)
+UnboxedPlainObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+                                    HandleValue receiver, ObjectOpResult &result)
 {
-    const UnboxedLayout& layout = obj->as<UnboxedPlainObject>().layout();
+    const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layout();
 
     if (const UnboxedLayout::Property *property = layout.lookup(id)) {
-        if (obj == receiver) {
-            if (obj->as<UnboxedPlainObject>().setValue(cx, *property, vp))
+        if (receiver.isObject() && obj == &receiver.toObject()) {
+            if (obj->as<UnboxedPlainObject>().setValue(cx, *property, v))
                 return result.succeed();
 
             if (!convertToNative(cx, obj))
                 return false;
-            return SetProperty(cx, obj, receiver, id, vp, result);
+            return SetProperty(cx, obj, id, v, receiver, result);
         }
 
-        return SetPropertyByDefining(cx, obj, receiver, id, vp, false, result);
+        return SetPropertyByDefining(cx, obj, id, v, receiver, false, result);
     }
 
     if (UnboxedExpandoObject *expando = obj->as<UnboxedPlainObject>().maybeExpando()) {
         if (expando->containsShapeOrElement(cx, id)) {
             // Update property types on the unboxed object as well.
-            AddTypePropertyId(cx, obj, id, vp);
+            AddTypePropertyId(cx, obj, id, v);
 
             RootedObject nexpando(cx, expando);
-            RootedObject nreceiver(cx, (obj == receiver) ? expando : receiver.get());
-            return SetProperty(cx, nexpando, nreceiver, id, vp, result);
+            RootedValue nreceiver(cx, (receiver.isObject() && obj == &receiver.toObject())
+                                      ? ObjectValue(*expando)
+                                      : receiver);
+return SetProperty(cx, nexpando, id, v, nreceiver, result);
         }
     }
 
-    return SetPropertyOnProto(cx, obj, receiver, id, vp, result);
+    return SetPropertyOnProto(cx, obj, id, v, receiver, result);
 }
 
 /* static */ bool

@@ -12,7 +12,7 @@
  *
  * This API never returns a reference to the actual inserted DOM node on
  * purpose. This is to make sure the content cannot be randomly changed and the
- * DOM cannot be traversed from the node, so that Goanna can remain in control of
+ * DOM cannot be traversed from the node, so that Gecko can remain in control of
  * the inserted content.
  */
 

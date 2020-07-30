@@ -30,6 +30,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "uuidgen",
                                    "@mozilla.org/uuid-generator;1",
                                    "nsIUUIDGenerator");
 
+XPCOMUtils.defineLazyServiceGetter(this, "gPACGenerator",
+                                   "@mozilla.org/pac-generator;1",
+                                   "nsIPACGenerator");
+
 // Once Bug 731746 - Allow chrome JS object to implement nsIDOMEventTarget
 // is resolved this helper could be removed.
 var SettingsListener = {
@@ -316,7 +320,7 @@ setUpdateTrackingId();
   //In order of precedence they are:
   //
   //1. mozSettings "layers.composer.enabled"
-  //2. a goanna pref "layers.composer.enabled"
+  //2. a gecko pref "layers.composer.enabled"
   //3. presence of ro.display.colorfill at the Gonk level
 
   var req = navigator.mozSettings.createLock().get('layers.composer2d.enabled');
@@ -380,11 +384,11 @@ setUpdateTrackingId();
 // =================== Telemetry  ======================
 (function setupTelemetrySettings() {
   let gaiaSettingName = 'debug.performance_data.shared';
-  let goannaPrefName = 'toolkit.telemetry.enabled';
+  let geckoPrefName = 'toolkit.telemetry.enabled';
   SettingsListener.observe(gaiaSettingName, null, function(value) {
     if (value !== null) {
-      // Gaia setting has been set; update Goanna pref to that.
-      Services.prefs.setBoolPref(goannaPrefName, value);
+      // Gaia setting has been set; update Gecko pref to that.
+      Services.prefs.setBoolPref(geckoPrefName, value);
       return;
     }
     // Gaia setting has not been set; set the gaia setting to default.
@@ -394,7 +398,7 @@ setUpdateTrackingId();
     let prefValue = false;
 #endif
     try {
-      prefValue = Services.prefs.getBoolPref(goannaPrefName);
+      prefValue = Services.prefs.getBoolPref(geckoPrefName);
     } catch (e) {
       // Pref not set; use default value.
     }
@@ -406,14 +410,14 @@ setUpdateTrackingId();
 
 // =================== Low-precision buffer ======================
 (function setupLowPrecisionSettings() {
-  // The gaia setting layers.low-precision maps to two goanna prefs
+  // The gaia setting layers.low-precision maps to two gecko prefs
   SettingsListener.observe('layers.low-precision', null, function(value) {
     if (value !== null) {
-      // Update goanna from the new Gaia setting
+      // Update gecko from the new Gaia setting
       Services.prefs.setBoolPref('layers.low-precision-buffer', value);
       Services.prefs.setBoolPref('layers.progressive-paint', value);
     } else {
-      // Update gaia setting from goanna value
+      // Update gaia setting from gecko value
       try {
         let prefValue = Services.prefs.getBoolPref('layers.low-precision-buffer');
         let setting = { 'layers.low-precision': prefValue };
@@ -424,13 +428,13 @@ setUpdateTrackingId();
     }
   });
 
-  // The gaia setting layers.low-opacity maps to a string goanna pref (0.5/1.0)
+  // The gaia setting layers.low-opacity maps to a string gecko pref (0.5/1.0)
   SettingsListener.observe('layers.low-opacity', null, function(value) {
     if (value !== null) {
-      // Update goanna from the new Gaia setting
+      // Update gecko from the new Gaia setting
       Services.prefs.setCharPref('layers.low-precision-opacity', value ? '0.5' : '1.0');
     } else {
-      // Update gaia setting from goanna value
+      // Update gaia setting from gecko value
       try {
         let prefValue = Services.prefs.getCharPref('layers.low-precision-opacity');
         let setting = { 'layers.low-opacity': (prefValue == '0.5') };
@@ -481,6 +485,40 @@ SettingsListener.observe("theme.selected",
     Services.obs.notifyObservers(null, 'app-theme-changed', newTheme);
   }
 });
+
+// =================== Proxy server ======================
+(function setupBrowsingProxySettings() {
+  function setPAC() {
+    let usePAC;
+    try {
+      usePAC = Services.prefs.getBoolPref('network.proxy.pac_generator');
+    } catch (ex) {}
+
+    if (usePAC) {
+      Services.prefs.setCharPref('network.proxy.autoconfig_url',
+                                 gPACGenerator.generate());
+      Services.prefs.setIntPref('network.proxy.type',
+                                Ci.nsIProtocolProxyService.PROXYCONFIG_PAC);
+    }
+  }
+
+  SettingsListener.observe('browser.proxy.enabled', false, function(value) {
+    Services.prefs.setBoolPref('network.proxy.browsing.enabled', value);
+    setPAC();
+  });
+
+  SettingsListener.observe('browser.proxy.host', '', function(value) {
+    Services.prefs.setCharPref('network.proxy.browsing.host', value);
+    setPAC();
+  });
+
+  SettingsListener.observe('browser.proxy.port', 0, function(value) {
+    Services.prefs.setIntPref('network.proxy.browsing.port', value);
+    setPAC();
+  });
+
+  setPAC();
+})();
 
 // =================== Various simple mapping  ======================
 let settingsToObserve = {

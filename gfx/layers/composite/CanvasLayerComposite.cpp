@@ -17,7 +17,6 @@
 #include "nsAString.h"
 #include "mozilla/nsRefPtr.h"           // for nsRefPtr
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
-#include "nsPoint.h"                    // for nsIntPoint
 #include "nsString.h"                   // for nsAutoCString
 #include "gfxVR.h"
 
@@ -66,7 +65,7 @@ CanvasLayerComposite::SetLayerManager(LayerManagerComposite* aManager)
 {
   LayerComposite::SetLayerManager(aManager);
   mManager = aManager;
-  if (mImageHost) {
+  if (mImageHost && mCompositor) {
     mImageHost->SetCompositor(mCompositor);
   }
 }

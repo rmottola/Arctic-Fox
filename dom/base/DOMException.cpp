@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -680,32 +681,6 @@ DOMException::Create(nsresult aRv)
   nsRefPtr<DOMException> inst =
     new DOMException(aRv, message, name, code);
   return inst.forget();
-}
-
-bool
-DOMException::Sanitize(JSContext* aCx,
-                       JS::MutableHandle<JS::Value> aSanitizedValue)
-{
-  nsRefPtr<DOMException> retval = this;
-  if (mLocation && !mLocation->CallerSubsumes(aCx)) {
-    nsString message;
-    GetMessageMoz(message);
-    nsString name;
-    GetName(name);
-    retval = new dom::DOMException(nsresult(Result()),
-                                   NS_ConvertUTF16toUTF8(message),
-                                   NS_ConvertUTF16toUTF8(name),
-                                   Code());
-    // Now it's possible that the stack on retval still starts with
-    // stuff aCx is not supposed to touch; it depends on what's on the
-    // stack right this second.  Walk past all of that.
-    nsCOMPtr<nsIStackFrame> stack;
-    nsresult rv = retval->mLocation->GetSanitized(aCx, getter_AddRefs(stack));
-    NS_ENSURE_SUCCESS(rv, false);
-    retval->mLocation.swap(stack);
-  }
-
-  return ToJSValue(aCx, retval, aSanitizedValue);
 }
 
 } // namespace dom

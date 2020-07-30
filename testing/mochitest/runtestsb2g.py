@@ -265,8 +265,9 @@ class B2GMochitest(MochitestUtilsMixin):
         return status
 
     def getGMPPluginPath(self, options):
-        # TODO: bug 1043403
-        return None
+        if options.gmp_path:
+            return options.gmp_path
+        return '/system/b2g/gmp-clearkey/0.1'
 
     def getChromeTestDir(self, options):
         # The chrome test directory returned here is the remote location
@@ -495,7 +496,7 @@ def run_desktop_mochitests(parser, options):
 def main():
     parser = B2GOptions()
     structured.commandline.add_logging_group(parser)
-    options, args = parser.parse_args()
+    options = parser.parse_args()
 
     if options.desktop:
         run_desktop_mochitests(parser, options)

@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-// vim:set et cin sw=2 sts=2:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -44,7 +44,7 @@
 
 // Util headers
 #include "prenv.h"
-#include "prlog.h"
+#include "mozilla/Logging.h"
 
 #include "nsAutoPtr.h"
 #include "nsCURILoader.h"
@@ -107,7 +107,6 @@ static const char *kPrefYoutubeRewrite = "plugins.rewrite_youtube_embeds";
 using namespace mozilla;
 using namespace mozilla::dom;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo*
 GetObjectLog()
 {
@@ -116,7 +115,6 @@ GetObjectLog()
     sLog = PR_NewLogModule("objlc");
   return sLog;
 }
-#endif
 
 #define LOG(args) PR_LOG(GetObjectLog(), PR_LOG_DEBUG, args)
 #define LOG_ENABLED() PR_LOG_TEST(GetObjectLog(), PR_LOG_DEBUG)

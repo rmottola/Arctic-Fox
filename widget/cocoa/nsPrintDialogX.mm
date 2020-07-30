@@ -9,6 +9,7 @@
 #include "nsIPrintSettings.h"
 #include "nsPrintSettingsX.h"
 #include "nsCOMPtr.h"
+#include "nsQueryObject.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIWebProgressListener.h"
 #include "nsIStringBundle.h"
@@ -368,9 +369,9 @@ static const char sHeaderFooterTags[][4] =  {"", "&T", "&U", "&D", "&P", "&PT"};
   mPrintBGColorsCheckbox = [self checkboxWithLabel:"printBGColors"
                                           andFrame:NSMakeRect(156, 188, 0, 0)];
 
-  bool goannaBool;
-  mSettings->GetPrintBGColors(&goannaBool);
-  [mPrintBGColorsCheckbox setState:(goannaBool ? NSOnState : NSOffState)];
+  bool geckoBool;
+  mSettings->GetPrintBGColors(&geckoBool);
+  [mPrintBGColorsCheckbox setState:(geckoBool ? NSOnState : NSOffState)];
 
   [self addSubview:mPrintBGColorsCheckbox];
 
@@ -378,8 +379,8 @@ static const char sHeaderFooterTags[][4] =  {"", "&T", "&U", "&D", "&P", "&PT"};
   mPrintBGImagesCheckbox = [self checkboxWithLabel:"printBGImages"
                                           andFrame:NSMakeRect(156, 166, 0, 0)];
 
-  mSettings->GetPrintBGImages(&goannaBool);
-  [mPrintBGImagesCheckbox setState:(goannaBool ? NSOnState : NSOffState)];
+  mSettings->GetPrintBGImages(&geckoBool);
+  [mPrintBGImagesCheckbox setState:(geckoBool ? NSOnState : NSOffState)];
 
   [self addSubview:mPrintBGImagesCheckbox];
 }

@@ -323,15 +323,16 @@ if not CONFIG['ENABLE_ION']:
     ]
 elif CONFIG['JS_CODEGEN_X86'] or CONFIG['JS_CODEGEN_X64']:
     UNIFIED_SOURCES += [
-        'jit/shared/Assembler-x86-shared.cpp',
-        'jit/shared/AssemblerBuffer-x86-shared.cpp',
-        'jit/shared/BaselineCompiler-x86-shared.cpp',
-        'jit/shared/BaselineIC-x86-shared.cpp',
-        'jit/shared/CodeGenerator-x86-shared.cpp',
-        'jit/shared/Disassembler-x86-shared.cpp',
-        'jit/shared/Lowering-x86-shared.cpp',
-        'jit/shared/MacroAssembler-x86-shared.cpp',
-        'jit/shared/MoveEmitter-x86-shared.cpp',
+        'jit/x86-shared/Architecture-x86-shared.cpp',
+        'jit/x86-shared/Assembler-x86-shared.cpp',
+        'jit/x86-shared/AssemblerBuffer-x86-shared.cpp',
+        'jit/x86-shared/BaselineCompiler-x86-shared.cpp',
+        'jit/x86-shared/BaselineIC-x86-shared.cpp',
+        'jit/x86-shared/CodeGenerator-x86-shared.cpp',
+        'jit/x86-shared/Disassembler-x86-shared.cpp',
+        'jit/x86-shared/Lowering-x86-shared.cpp',
+        'jit/x86-shared/MacroAssembler-x86-shared.cpp',
+        'jit/x86-shared/MoveEmitter-x86-shared.cpp',
     ]
     if CONFIG['JS_CODEGEN_X64']:
         UNIFIED_SOURCES += [
@@ -441,7 +442,7 @@ HostSimplePrograms([
 # JS shell would like to link to the static library.
 
 if CONFIG['JS_SHARED_LIBRARY']:
-    GoannaSharedLibrary('js', linkage=None)
+    GeckoSharedLibrary('js', linkage=None)
     SHARED_LIBRARY_NAME = CONFIG['JS_LIBRARY_NAME']
     SDK_LIBRARY = True
 else:

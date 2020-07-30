@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * Many Goanna operations (painting, reflows, restyle, ...) can be tracked
+ * Many Gecko operations (painting, reflows, restyle, ...) can be tracked
  * in real time. A marker is a representation of one operation. A marker
  * has a name, start and end timestamps. Markers are stored in docShells.
  *
@@ -44,7 +44,7 @@ const DEFAULT_TIMELINE_DATA_PULL_TIMEOUT = 200; // ms
  */
 protocol.types.addType("array-of-numbers-as-strings", {
   write: (v) => v.join(","),
-  // In Goanna <= 37, `v` is an array; do not transform in this case.
+  // In Gecko <= 37, `v` is an array; do not transform in this case.
   read: (v) => typeof v === "string" ? v.split(",") : v
 });
 
@@ -185,7 +185,7 @@ let TimelineActor = exports.TimelineActor = protocol.ActorClass({
     let markers = [];
 
     for (let docShell of this.docShells) {
-      markers = [...markers, ...docShell.popProfileTimelineMarkers()];
+      markers.push(...docShell.popProfileTimelineMarkers());
     }
 
     // The docshell may return markers with stack traces attached.

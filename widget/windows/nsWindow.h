@@ -49,14 +49,12 @@
 
 class nsNativeDragTarget;
 class nsIRollupListener;
-class nsIFile;
 class nsIntRegion;
 class imgIContainer;
 
 namespace mozilla {
 namespace widget {
 class NativeKey;
-class ModifierKeyState;
 struct MSGResult;
 } // namespace widget
 } // namespacw mozilla;
@@ -85,8 +83,9 @@ public:
   virtual void InitEvent(mozilla::WidgetGUIEvent& aEvent,
                          nsIntPoint* aPoint = nullptr) override;
   virtual bool DispatchWindowEvent(mozilla::WidgetGUIEvent* aEvent) override;
-  virtual bool DispatchKeyboardEvent(mozilla::WidgetGUIEvent* aEvent) override;
-  virtual bool DispatchScrollEvent(mozilla::WidgetGUIEvent* aEvent) override;
+  virtual bool DispatchKeyboardEvent(mozilla::WidgetKeyboardEvent* aEvent) override;
+  virtual bool DispatchWheelEvent(mozilla::WidgetWheelEvent* aEvent) override;
+  virtual bool DispatchContentCommandEvent(mozilla::WidgetContentCommandEvent* aEvent) override;
   virtual nsWindowBase* GetParentWindowBase(bool aIncludeOwner) override;
   virtual bool IsTopLevelWidget() override { return mIsTopWidgetWindow; }
 
@@ -138,7 +137,7 @@ public:
   NS_IMETHOD              SetTitle(const nsAString& aTitle);
   NS_IMETHOD              SetIcon(const nsAString& aIconSpec);
   virtual mozilla::LayoutDeviceIntPoint WidgetToScreenOffset();
-  virtual nsIntSize       ClientToWindowSize(const nsIntSize& aClientSize);
+  virtual mozilla::LayoutDeviceIntSize ClientToWindowSize(const mozilla::LayoutDeviceIntSize& aClientSize) override;
   NS_IMETHOD              DispatchEvent(mozilla::WidgetGUIEvent* aEvent,
                                         nsEventStatus& aStatus);
   NS_IMETHOD              EnableDragDrop(bool aEnable);
@@ -161,13 +160,16 @@ public:
                                                    int32_t aNativeKeyCode,
                                                    uint32_t aModifierFlags,
                                                    const nsAString& aCharacters,
-                                                   const nsAString& aUnmodifiedCharacters);
+                                                   const nsAString& aUnmodifiedCharacters,
+                                                   nsIObserver* aObserver) override;
   virtual nsresult        SynthesizeNativeMouseEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                      uint32_t aNativeMessage,
-                                                     uint32_t aModifierFlags);
+                                                     uint32_t aModifierFlags,
+                                                     nsIObserver* aObserver) override;
 
-  virtual nsresult        SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint)
-                          { return SynthesizeNativeMouseEvent(aPoint, MOUSEEVENTF_MOVE, 0); }
+  virtual nsresult        SynthesizeNativeMouseMove(mozilla::LayoutDeviceIntPoint aPoint,
+                                                    nsIObserver* aObserver) override
+                          { return SynthesizeNativeMouseEvent(aPoint, MOUSEEVENTF_MOVE, 0, aObserver); }
 
   virtual nsresult        SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
                                                            uint32_t aNativeMessage,
@@ -175,13 +177,12 @@ public:
                                                            double aDeltaY,
                                                            double aDeltaZ,
                                                            uint32_t aModifierFlags,
-                                                           uint32_t aAdditionalFlags);
+                                                           uint32_t aAdditionalFlags,
+                                                           nsIObserver* aObserver) override;
   NS_IMETHOD_(void)       SetInputContext(const InputContext& aContext,
                                           const InputContextAction& aAction);
   NS_IMETHOD_(InputContext) GetInputContext();
   NS_IMETHOD              GetToggledKeyState(uint32_t aKeyCode, bool* aLEDState);
-  NS_IMETHOD              RegisterTouchWindow();
-  NS_IMETHOD              UnregisterTouchWindow();
 #ifdef MOZ_XUL
   virtual void            SetTransparencyMode(nsTransparencyMode aMode);
   virtual nsTransparencyMode GetTransparencyMode();
@@ -284,6 +285,8 @@ protected:
   virtual ~nsWindow();
 
   virtual void WindowUsesOMTC() override;
+  virtual void ConfigureAPZCTreeManager() override;
+  void RegisterTouchWindow();
 
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;

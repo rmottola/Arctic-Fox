@@ -505,7 +505,7 @@
      *   Operands: uint32_t nameIndex
      *   Stack: obj => obj[name]
      */ \
-    macro(JSOP_GETPROP,   53, "getprop",    NULL,         5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET|JOF_TMPSLOT3) \
+    macro(JSOP_GETPROP,   53, "getprop",    NULL,         5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET) \
     /*
      * Pops the top two values on the stack as 'val' and 'obj' and performs
      * 'obj.prop = val', pushing 'val' back onto the stack.
@@ -1080,7 +1080,7 @@
      *   Operands:
      *   Stack: obj, ctor => (obj instanceof ctor)
      */ \
-    macro(JSOP_INSTANCEOF,114,js_instanceof_str,js_instanceof_str,1,2,1,JOF_BYTE|JOF_LEFTASSOC|JOF_TMPSLOT) \
+    macro(JSOP_INSTANCEOF,114,js_instanceof_str,js_instanceof_str,1,2,1,JOF_BYTE|JOF_LEFTASSOC) \
     \
     /*
      * Invokes debugger.
@@ -1297,7 +1297,7 @@
      *   Operands: uint8_t n
      *   Stack: v[n], v[n-1], ..., v[1], v[0] => v[n-1], ..., v[1], v[0], v[n]
      */ \
-    macro(JSOP_PICK,        133, "pick",      NULL,       2,  0,  0,  JOF_UINT8|JOF_TMPSLOT2) \
+    macro(JSOP_PICK,        133, "pick",      NULL,       2,  0,  0,  JOF_UINT8) \
     \
     /*
      * This no-op appears at the top of the bytecode for a 'TryStatement'.
@@ -1507,7 +1507,9 @@
     macro(JSOP_RETRVAL,       153,"retrval",    NULL,       1,  0,  0,  JOF_BYTE) \
     \
     /*
-     * Looks up name on global scope and pushes its value onto the stack.
+     * Looks up name on global scope and pushes its value onto the stack, unless
+     * the script has a polluted global, in which case it acts just like
+     * JSOP_NAME.
      *
      * Free variable references that must either be found on the global or a
      * ReferenceError.
@@ -1521,7 +1523,8 @@
      * Pops the top two values on the stack as 'val' and 'scope', sets property
      * of 'scope' as 'val' and pushes 'val' back on the stack.
      *
-     * 'scope' should be the global scope.
+     * 'scope' should be the global scope unless the script has a polluted
+     * global scope, in which case acts like JSOP_SETNAME.
      *   Category: Variables and Scopes
      *   Type: Free Variables
      *   Operands: uint32_t nameIndex
@@ -1534,7 +1537,8 @@
      * of 'scope' as 'val' and pushes 'val' back on the stack. Throws a
      * TypeError if the set fails, per strict mode semantics.
      *
-     * 'scope' should be the global scope.
+     * 'scope' should be the global scope unless the script has a polluted
+     * global scope, in which case acts like JSOP_STRICTSETNAME.
      *   Category: Variables and Scopes
      *   Type: Free Variables
      *   Operands: uint32_t nameIndex
@@ -1598,7 +1602,7 @@
      *   Operands: uint32_t nameIndex
      *   Stack: obj => obj[name]
      */ \
-    macro(JSOP_CALLPROP,      184,"callprop",   NULL,     5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET|JOF_TMPSLOT3) \
+    macro(JSOP_CALLPROP,      184,"callprop",   NULL,     5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET) \
     \
     macro(JSOP_UNUSED185,     185,"unused185",  NULL,     1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED186,     186,"unused186",  NULL,     1,  0,  0,  JOF_BYTE) \
@@ -1787,9 +1791,10 @@
     macro(JSOP_UNUSED212,     212, "unused212",    NULL,  1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED213,     213, "unused213",    NULL,  1,  0,  0,  JOF_BYTE) \
     /*
-     * Pushes the global scope onto the stack.
+     * Pushes the global scope onto the stack if the script doesn't have a
+     * polluted global scope.  Otherwise will act like JSOP_BINDNAME.
      *
-     * 'nameIndex' is not used.
+     * 'nameIndex' is only used when acting like JSOP_BINDNAME.
      *   Category: Variables and Scopes
      *   Type: Free Variables
      *   Operands: uint32_t nameIndex
@@ -1822,7 +1827,7 @@
      *   Operands: uint32_t nameIndex
      *   Stack: obj => obj['length']
      */ \
-    macro(JSOP_LENGTH,        217, "length",       NULL,  5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET|JOF_TMPSLOT3) \
+    macro(JSOP_LENGTH,        217, "length",       NULL,  5,  1,  1, JOF_ATOM|JOF_PROP|JOF_TYPESET) \
     \
     /*
      * Pushes a JS_ELEMENTS_HOLE value onto the stack, representing an omitted

@@ -1,5 +1,5 @@
-/* -*- Mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 40 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,14 +7,14 @@
 #include "BluetoothRilListener.h"
 
 #include "BluetoothHfpManager.h"
-#include "nsIIccProvider.h"
+#include "nsIIccService.h"
 #include "nsIMobileConnectionInfo.h"
 #include "nsIMobileConnectionService.h"
 #include "nsITelephonyCallInfo.h"
 #include "nsITelephonyService.h"
-#include "nsRadioInterfaceLayer.h" // For NS_RILCONTENTHELPER_CONTRACTID.
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsQueryObject.h"
 
 USING_BLUETOOTH_NAMESPACE
 
@@ -60,15 +60,19 @@ IccListener::Listen(bool aStart)
 {
   NS_ENSURE_TRUE(mOwner, false);
 
-  nsCOMPtr<nsIIccProvider> provider =
-    do_GetService(NS_RILCONTENTHELPER_CONTRACTID);
-  NS_ENSURE_TRUE(provider, false);
+  nsCOMPtr<nsIIccService> service =
+    do_GetService(ICC_SERVICE_CONTRACTID);
+  NS_ENSURE_TRUE(service, false);
+
+  nsCOMPtr<nsIIcc> icc;
+  service->GetIccByServiceId(mOwner->mClientId, getter_AddRefs(icc));
+  NS_ENSURE_TRUE(icc, false);
 
   nsresult rv;
   if (aStart) {
-    rv = provider->RegisterIccMsg(mOwner->mClientId, this);
+    rv = icc->RegisterListener(this);
   } else {
-    rv = provider->UnregisterIccMsg(mOwner->mClientId, this);
+    rv = icc->UnregisterListener(this);
   }
 
   return NS_SUCCEEDED(rv);
