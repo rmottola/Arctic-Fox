@@ -1165,7 +1165,7 @@ BrowserGlue.prototype = {
         importBookmarks = true;
     } catch(ex) {}
 
-    Task.spawn(function() {
+    Task.spawn(function* () {
       // Check if Safe Mode or the user has required to restore bookmarks from
       // default profile's bookmarks.html
       var restoreDefaultBookmarks = false;
@@ -1249,30 +1249,21 @@ BrowserGlue.prototype = {
         if (bookmarksUrl) {
           // Import from bookmarks.html file.
           try {
-            BookmarkHTMLUtils.importFromURL(bookmarksUrl, true).then(null,
-              function onFailure() {
-                Cu.reportError(
-                    new Error("Bookmarks.html file could be corrupt."));
-              }
-            ).then(
-              function onComplete() {
-                try {
-                  // Now apply distribution customized bookmarks.
-                  // This should always run after Places initialization.
-                  this._distributionCustomizer.applyBookmarks();
-                  // Ensure that smart bookmarks are created once the operation
-                  // is complete.
-                  this.ensurePlacesDefaultQueriesInitialized();
-                } catch (e) {
-                  Cu.reportError(e);
-                }
-              }.bind(this)
-            );
+            yield BookmarkHTMLUtils.importFromURL(bookmarksUrl, true);
           } catch (e) {
-            Cu.reportError(
-                new Error("Bookmarks.html file could be corrupt." + "\n" +
-                e.message));
+            Cu.reportError("Bookmarks.html file could be corrupt. " + e);
           }
+          try {
+            // Now apply distribution customized bookmarks.
+            // This should always run after Places initialization.
+            this._distributionCustomizer.applyBookmarks();
+            // Ensure that smart bookmarks are created once the operation is
+            // complete.
+            this.ensurePlacesDefaultQueriesInitialized();
+          } catch (e) {
+            Cu.reportError(e);
+          }
+
         }
         else {
           Cu.reportError(new Error("Unable to find bookmarks.html file."));
