@@ -428,7 +428,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             }
           }
 
-          getShortcutOrURIAndPostData(url, data => {
+          getShortcutOrURIAndPostData(url).then(data => {
             aCallback([data.url, data.postData, data.mayInheritPrincipal]);
           });
         ]]></body>
