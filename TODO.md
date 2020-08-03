@@ -124,9 +124,8 @@
 -  1102048 style patches, check which still apply
 - Bug 1094888 - part 1 and 2
 
-- Bug 1144366 followup - Stop declaring multiple pointers on a single line
+https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
-- Bug 1097987
 -  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
