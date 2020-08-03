@@ -56,7 +56,7 @@ class CodeGenerator : public CodeGeneratorSpecific
   public:
     bool generate();
     bool generateAsmJS(AsmJSFunctionLabels* labels);
-    bool link(JSContext *cx, CompilerConstraintList* constraints);
+    bool link(JSContext* cx, CompilerConstraintList* constraints);
 
     void visitLabel(LLabel* lir);
     void visitNop(LNop* lir);
@@ -308,23 +308,23 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitIsObjectAndBranch(LIsObjectAndBranch* lir);
     void visitHasClass(LHasClass* lir);
     void visitAsmJSParameter(LAsmJSParameter* lir);
-    void visitAsmJSReturn(LAsmJSReturn *ret);
+    void visitAsmJSReturn(LAsmJSReturn* ret);
     void visitAsmJSVoidReturn(LAsmJSVoidReturn *ret);
-    void visitLexicalCheck(LLexicalCheck *ins);
-    void visitThrowUninitializedLexical(LThrowUninitializedLexical *ins);
-    void visitDebugger(LDebugger *ins);
+    void visitLexicalCheck(LLexicalCheck* ins);
+    void visitThrowUninitializedLexical(LThrowUninitializedLexical* ins);
+    void visitDebugger(LDebugger* ins);
 
     void visitCheckOverRecursed(LCheckOverRecursed* lir);
-    void visitCheckOverRecursedFailure(CheckOverRecursedFailure *ool);
+    void visitCheckOverRecursedFailure(CheckOverRecursedFailure* ool);
 
-    void visitInterruptCheckImplicit(LInterruptCheckImplicit *ins);
-    void visitOutOfLineInterruptCheckImplicit(OutOfLineInterruptCheckImplicit *ins);
+    void visitInterruptCheckImplicit(LInterruptCheckImplicit* ins);
+    void visitOutOfLineInterruptCheckImplicit(OutOfLineInterruptCheckImplicit* ins);
 
     void visitUnboxFloatingPoint(LUnboxFloatingPoint* lir);
-    void visitOutOfLineUnboxFloatingPoint(OutOfLineUnboxFloatingPoint *ool);
-    void visitOutOfLineStoreElementHole(OutOfLineStoreElementHole *ool);
+    void visitOutOfLineUnboxFloatingPoint(OutOfLineUnboxFloatingPoint* ool);
+    void visitOutOfLineStoreElementHole(OutOfLineStoreElementHole* ool);
 
-    void loadJSScriptForBlock(MBasicBlock *block, Register reg);
+    void loadJSScriptForBlock(MBasicBlock* block, Register reg);
     void loadOutermostJSScript(Register reg);
 
     // Inline caches visitors.
@@ -349,19 +349,19 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitBindNameIC(OutOfLineUpdateCache* ool, DataPtr<BindNameIC>& ic);
     void visitNameIC(OutOfLineUpdateCache* ool, DataPtr<NameIC>& ic);
 
-    void visitAssertRangeI(LAssertRangeI *ins);
-    void visitAssertRangeD(LAssertRangeD *ins);
-    void visitAssertRangeF(LAssertRangeF *ins);
-    void visitAssertRangeV(LAssertRangeV *ins);
+    void visitAssertRangeI(LAssertRangeI* ins);
+    void visitAssertRangeD(LAssertRangeD* ins);
+    void visitAssertRangeF(LAssertRangeF* ins);
+    void visitAssertRangeV(LAssertRangeV* ins);
 
-    void visitAssertResultV(LAssertResultV *ins);
-    void visitAssertResultT(LAssertResultT *ins);
-    void emitAssertResultV(const ValueOperand output, TemporaryTypeSet *typeset);
-    void emitAssertObjectOrStringResult(Register input, MIRType type, TemporaryTypeSet *typeset);
+    void visitAssertResultV(LAssertResultV* ins);
+    void visitAssertResultT(LAssertResultT* ins);
+    void emitAssertResultV(const ValueOperand output, TemporaryTypeSet* typeset);
+    void emitAssertObjectOrStringResult(Register input, MIRType type, TemporaryTypeSet* typeset);
 
     void visitInterruptCheck(LInterruptCheck* lir);
     void visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir);
-    void visitRecompileCheck(LRecompileCheck *ins);
+    void visitRecompileCheck(LRecompileCheck* ins);
 
     IonScriptCounts* extractScriptCounts() {
         IonScriptCounts* counts = scriptCounts_;
@@ -370,19 +370,19 @@ class CodeGenerator : public CodeGeneratorSpecific
     }
 
   private:
-    void addGetPropertyCache(LInstruction *ins, LiveRegisterSet liveRegs, Register objReg,
-                             PropertyName *name, TypedOrValueRegister output,
-                             bool monitoredResult, jsbytecode *profilerLeavePc);
-    void addGetElementCache(LInstruction *ins, Register obj, ConstantOrRegister index,
+    void addGetPropertyCache(LInstruction* ins, LiveRegisterSet liveRegs, Register objReg,
+                             PropertyName* name, TypedOrValueRegister output,
+                             bool monitoredResult, jsbytecode* profilerLeavePc);
+    void addGetElementCache(LInstruction* ins, Register obj, ConstantOrRegister index,
                             TypedOrValueRegister output, bool monitoredResult,
-                            bool allowDoubleResult, jsbytecode *profilerLeavePc);
-    void addSetPropertyCache(LInstruction *ins, LiveRegisterSet liveRegs, Register objReg,
-                             PropertyName *name, ConstantOrRegister value, bool strict,
+                            bool allowDoubleResult, jsbytecode* profilerLeavePc);
+    void addSetPropertyCache(LInstruction* ins, LiveRegisterSet liveRegs, Register objReg,
+                             PropertyName* name, ConstantOrRegister value, bool strict,
                              bool needsTypeBarrier, jsbytecode* profilerLeavePc);
-    void addSetElementCache(LInstruction *ins, Register obj, Register unboxIndex, Register temp,
+    void addSetElementCache(LInstruction* ins, Register obj, Register unboxIndex, Register temp,
                             FloatRegister tempDouble, FloatRegister tempFloat32,
                             ValueOperand index, ConstantOrRegister value,
-                            bool strict, bool guardHoles, jsbytecode *profilerLeavePc);
+                            bool strict, bool guardHoles, jsbytecode* profilerLeavePc);
 
     bool generateBranchV(const ValueOperand& value, Label* ifTrue, Label* ifFalse, FloatRegister fr);
 
@@ -458,15 +458,15 @@ class CodeGenerator : public CodeGeneratorSpecific
     void emitStoreHoleCheck(Register elements, const LAllocation* index, int32_t offsetAdjustment,
                             LSnapshot* snapshot);
 
-    void emitAssertRangeI(const Range *r, Register input);
-    void emitAssertRangeD(const Range *r, FloatRegister input, FloatRegister temp);
+    void emitAssertRangeI(const Range* r, Register input);
+    void emitAssertRangeD(const Range* r, FloatRegister input, FloatRegister temp);
 
     Vector<CodeOffsetLabel, 0, JitAllocPolicy> ionScriptLabels_;
 
-    void branchIfInvalidated(Register temp, Label *invalidated);
+    void branchIfInvalidated(Register temp, Label* invalidated);
 
 #ifdef DEBUG
-    void emitDebugResultChecks(LInstruction *ins);
+    void emitDebugResultChecks(LInstruction* ins);
     void emitObjectOrStringResultChecks(LInstruction* lir, MDefinition* mir);
     void emitValueResultChecks(LInstruction* lir, MDefinition* mir);
 #endif
