@@ -357,11 +357,6 @@ class JSFunction : public js::NativeObject
         return true;
     }
 
-    js::HeapPtrScript& mutableScript() {
-        MOZ_ASSERT(isInterpreted());
-        return *(js::HeapPtrScript*)&u.i.s.script_;
-    }
-
     js::LazyScript* lazyScript() const {
         MOZ_ASSERT(isInterpretedLazy() && u.i.s.lazy_);
         return u.i.s.lazy_;
@@ -390,12 +385,10 @@ class JSFunction : public js::NativeObject
     bool isStarGenerator() const { return generatorKind() == js::StarGenerator; }
 
     void setScript(JSScript* script_) {
-        MOZ_ASSERT(hasScript());
         mutableScript() = script_;
     }
 
     void initScript(JSScript* script_) {
-        MOZ_ASSERT(hasScript());
         mutableScript().init(script_);
     }
 
@@ -474,6 +467,11 @@ class JSFunction : public js::NativeObject
     size_t getBoundFunctionArgumentCount() const;
 
   private:
+    js::HeapPtrScript& mutableScript() {
+        MOZ_ASSERT(hasScript());
+        return* (js::HeapPtrScript*)&u.i.s.script_;
+    }
+
     inline js::FunctionExtended* toExtended();
     inline const js::FunctionExtended* toExtended() const;
 
