@@ -1575,10 +1575,7 @@ Debugger::onSingleStep(JSContext* cx, MutableHandleValue vp)
                 }
             }
         }
-        if (trappingScript->compileAndGo())
-            MOZ_ASSERT(stepperCount == trappingScript->stepModeCount());
-        else
-            MOZ_ASSERT(stepperCount <= trappingScript->stepModeCount());
+        MOZ_ASSERT(stepperCount == trappingScript->stepModeCount());
     }
 #endif
 
