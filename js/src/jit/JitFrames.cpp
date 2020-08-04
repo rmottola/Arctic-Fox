@@ -1008,8 +1008,8 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
-    // except when the script's lazy arguments object aliases those formals,
-    // in which case we mark them as well.
+    // except when the script might have lazy arguments, in which case we mark
+    // them as well.
 
     size_t nargs = layout->numActualArgs();
     size_t nformals = 0;
