@@ -655,7 +655,7 @@ js::CloneFunctionAndScript(JSContext *cx, HandleObject enclosingScope, HandleFun
     if (!clone)
         return nullptr;
 
-    RootedScript srcScript(cx, srcFun->getOrCreateScript(cx));
+    JSScript::AutoDelazify srcScript(cx, srcFun);
     if (!srcScript)
         return nullptr;
     RootedScript clonedScript(cx, CloneScript(cx, enclosingScope, clone, srcScript, polluted));
@@ -2218,9 +2218,10 @@ js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
 
     bool useSameScript = CloneFunctionObjectUseSameScript(cx->compartment(), fun, parent);
 
+    JSScript::AutoDelazify funScript(cx);
     if (!useSameScript && fun->isInterpretedLazy()) {
-        JSAutoCompartment ac(cx, fun);
-        if (!fun->getOrCreateScript(cx))
+        funScript = fun;
+        if (!funScript)
             return nullptr;
     }
 
@@ -2246,13 +2247,7 @@ js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
         return nullptr;
     RootedFunction clone(cx, &cloneobj->as<JSFunction>());
 
-    // Make sure fun didn't get re-lazified during a GC while creating the
-    // clone.
-    if (!useSameScript && fun->isInterpretedLazy()) {
-        JSAutoCompartment ac(cx, fun);
-        if (!fun->getOrCreateScript(cx))
-            return nullptr;
-    }
+    MOZ_ASSERT(useSameScript || !fun->isInterpretedLazy());
 
     uint16_t flags = fun->flags() & ~JSFunction::EXTENDED;
     if (allocKind == JSFunction::ExtendedFinalizeKind)
@@ -2265,6 +2260,7 @@ js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
         clone->initEnvironment(parent);
     } else if (fun->isInterpretedLazy()) {
         MOZ_ASSERT(fun->compartment() == clone->compartment());
+        MOZ_ASSERT(useSameScript);
         LazyScript* lazy = fun->lazyScriptOrNull();
         clone->initLazyScript(lazy);
         clone->initEnvironment(parent);
