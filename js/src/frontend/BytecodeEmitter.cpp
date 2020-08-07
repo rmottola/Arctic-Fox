@@ -6575,7 +6575,7 @@ BytecodeEmitter::emitArray(ParseNode *pn, uint32_t count)
      */
 
     int32_t nspread = 0;
-    for (ParseNode *elt = pn; elt; elt = elt->pn_next) {
+    for (ParseNode* elt = pn; elt; elt = elt->pn_next) {
         if (elt->isKind(PNK_SPREAD))
             nspread++;
     }
@@ -6584,7 +6584,7 @@ BytecodeEmitter::emitArray(ParseNode *pn, uint32_t count)
     if (!emitN(JSOP_NEWARRAY, 3, &off))                             // ARRAY
         return false;
     checkTypeSet(JSOP_NEWARRAY);
-    jsbytecode *pc = code(off);
+    jsbytecode* pc = code(off);
 
     // For arrays with spread, this is a very pessimistic allocation, the
     // minimum possible final size.

@@ -403,42 +403,42 @@ struct BytecodeEmitter
     bool emitUint32Operand(JSOp op, uint32_t operand);
 
     // Emit (1 + extra) bytecodes, for N bytes of op and its immediate operand.
-    bool emitN(JSOp op, size_t extra, ptrdiff_t *offset = nullptr);
+    bool emitN(JSOp op, size_t extra, ptrdiff_t* offset = nullptr);
 
     bool emitNumberOp(double dval);
 
-    bool emitJump(JSOp op, ptrdiff_t off, ptrdiff_t *jumpOffset = nullptr);
-    bool emitCall(JSOp op, uint16_t argc, ParseNode *pn = nullptr);
+    bool emitJump(JSOp op, ptrdiff_t off, ptrdiff_t* jumpOffset = nullptr);
+    bool emitCall(JSOp op, uint16_t argc, ParseNode* pn = nullptr);
 
-    bool emitLoopHead(ParseNode *nextpn);
-    bool emitLoopEntry(ParseNode *nextpn);
+    bool emitLoopHead(ParseNode* nextpn);
+    bool emitLoopEntry(ParseNode* nextpn);
 
     // Emit a backpatch op with offset pointing to the previous jump of this
     // type, so that we can walk back up the chain fixing up the op and jump
     // offset.
-    bool emitBackPatchOp(ptrdiff_t *lastp);
-    void backPatch(ptrdiff_t last, jsbytecode *target, jsbytecode op);
+    bool emitBackPatchOp(ptrdiff_t* lastp);
+    void backPatch(ptrdiff_t last, jsbytecode* target, jsbytecode op);
 
-    bool emitGoto(StmtInfoBCE *toStmt, ptrdiff_t *lastp, SrcNoteType noteType = SRC_NULL);
+    bool emitGoto(StmtInfoBCE* toStmt, ptrdiff_t* lastp, SrcNoteType noteType = SRC_NULL);
 
     bool emitIndex32(JSOp op, uint32_t index);
     bool emitIndexOp(JSOp op, uint32_t index);
 
-    bool emitAtomOp(JSAtom *atom, JSOp op);
-    bool emitAtomOp(ParseNode *pn, JSOp op);
+    bool emitAtomOp(JSAtom* atom, JSOp op);
+    bool emitAtomOp(ParseNode* pn, JSOp op);
 
-    bool emitArray(ParseNode *pn, uint32_t count);
-    bool emitArrayComp(ParseNode *pn);
+    bool emitArray(ParseNode* pn, uint32_t count);
+    bool emitArrayComp(ParseNode* pn);
 
     bool emitInternedObjectOp(uint32_t index, JSOp op);
-    bool emitObjectOp(ObjectBox *objbox, JSOp op);
-    bool emitObjectPairOp(ObjectBox *objbox1, ObjectBox *objbox2, JSOp op);
+    bool emitObjectOp(ObjectBox* objbox, JSOp op);
+    bool emitObjectPairOp(ObjectBox* objbox1, ObjectBox* objbox2, JSOp op);
     bool emitRegExp(uint32_t index);
 
-    MOZ_NEVER_INLINE bool emitFunction(ParseNode *pn, bool needsProto = false);
-    MOZ_NEVER_INLINE bool emitObject(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitFunction(ParseNode* pn, bool needsProto = false);
+    MOZ_NEVER_INLINE bool emitObject(ParseNode* pn);
 
-    bool emitPropertyList(ParseNode *pn, MutableHandlePlainObject objp, PropListType type);
+    bool emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp, PropListType type);
 
     // To catch accidental misuse, emitUint16Operand/emit3 assert that they are
     // not used to unconditionally emit JSOP_GETLOCAL. Variable access should
