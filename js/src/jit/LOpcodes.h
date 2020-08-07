@@ -72,6 +72,7 @@
     _(ApplyArgsGeneric)             \
     _(Bail)                         \
     _(Unreachable)                  \
+    _(EncodeSnapshot)               \
     _(GetDynamicName)               \
     _(CallDirectEvalS)              \
     _(CallDirectEvalV)              \

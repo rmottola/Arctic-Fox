@@ -138,6 +138,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitApplyArgsGeneric(LApplyArgsGeneric* apply);
     void visitBail(LBail* lir);
     void visitUnreachable(LUnreachable* unreachable);
+    void visitEncodeSnapshot(LEncodeSnapshot* lir);
     void visitGetDynamicName(LGetDynamicName* lir);
     void visitCallDirectEvalS(LCallDirectEvalS* lir);
     void visitCallDirectEvalV(LCallDirectEvalV* lir);
