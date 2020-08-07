@@ -2599,6 +2599,26 @@ IonBuilder::inlineTrue(CallInfo& callInfo)
     return InliningStatus_Inlined;
 }
 
+
+IonBuilder::InliningStatus
+IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
+{
+    callInfo.setImplicitlyUsedUnchecked();
+
+    MDefinition* secondArg = callInfo.getArg(1);
+
+    MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
+    MOZ_ASSERT(secondArg->isConstantValue());
+
+    bool mustBeFloat32 = secondArg->constantValue().toBoolean();
+    current->add(MAssertFloat32::New(alloc(), callInfo.getArg(0), mustBeFloat32));
+
+    MConstant* undefined = MConstant::New(alloc(), UndefinedValue());
+    current->add(undefined);
+    current->push(undefined);
+    return InliningStatus_Inlined;
+}
+
 IonBuilder::InliningStatus
 IonBuilder::inlineAssertRecoveredOnBailout(CallInfo &callInfo)
 {
@@ -2628,25 +2648,6 @@ IonBuilder::inlineAssertRecoveredOnBailout(CallInfo &callInfo)
     current->pop();
     current->push(constant(UndefinedValue()));
     callInfo.setImplicitlyUsedUnchecked();
-    return InliningStatus_Inlined;
-}
-
-IonBuilder::InliningStatus
-IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
-{
-    callInfo.setImplicitlyUsedUnchecked();
-
-    MDefinition* secondArg = callInfo.getArg(1);
-
-    MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
-    MOZ_ASSERT(secondArg->isConstantValue());
-
-    bool mustBeFloat32 = secondArg->constantValue().toBoolean();
-    current->add(MAssertFloat32::New(alloc(), callInfo.getArg(0), mustBeFloat32));
-
-    MConstant* undefined = MConstant::New(alloc(), UndefinedValue());
-    current->add(undefined);
-    current->push(undefined);
     return InliningStatus_Inlined;
 }
 
