@@ -62,6 +62,9 @@ BEGIN_TEST(testChromeBuffer)
      * buffer space.
      */
     {
+        JSRuntimeOptions oldOptions = JS::RuntimeOptionsRef(rt);
+        // Disable the JIT because if we don't this test fails.  See bug 1160414.
+        JS::RuntimeOptionsRef(rt).setIon(false).setBaseline(false);
         {
             JSAutoCompartment ac(cx, trusted_glob);
             const char* paramName = "x";
@@ -98,6 +101,7 @@ BEGIN_TEST(testChromeBuffer)
         JS::RootedValue rval(cx);
         CHECK(JS_CallFunction(cx, JS::NullPtr(), fun, JS::HandleValueArray(v), &rval));
         CHECK(rval.toInt32() == 100);
+        JS::RuntimeOptionsRef(rt) = oldOptions;
     }
 
     /*
