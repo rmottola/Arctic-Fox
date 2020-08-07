@@ -2603,7 +2603,8 @@ IonBuilder::inlineTrue(CallInfo& callInfo)
 IonBuilder::InliningStatus
 IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
 {
-    callInfo.setImplicitlyUsedUnchecked();
+    if (callInfo.argc() != 2)
+        return InliningStatus_NotInlined;
 
     MDefinition* secondArg = callInfo.getArg(1);
 
@@ -2616,12 +2617,16 @@ IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
     MConstant* undefined = MConstant::New(alloc(), UndefinedValue());
     current->add(undefined);
     current->push(undefined);
+    callInfo.setImplicitlyUsedUnchecked();
     return InliningStatus_Inlined;
 }
 
 IonBuilder::InliningStatus
 IonBuilder::inlineAssertRecoveredOnBailout(CallInfo &callInfo)
 {
+    if (callInfo.argc() != 2)
+        return InliningStatus_NotInlined;
+
     if (js_JitOptions.checkRangeAnalysis) {
         // If we are checking the range of all instructions, then the guards
         // inserted by Range Analysis prevent the use of recover
@@ -2631,8 +2636,14 @@ IonBuilder::inlineAssertRecoveredOnBailout(CallInfo &callInfo)
         return InliningStatus_Inlined;
     }
 
+    MDefinition *secondArg = callInfo.getArg(1);
+
+    MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
+    MOZ_ASSERT(secondArg->isConstantValue());
+
+    bool mustBeRecovered = secondArg->constantValue().toBoolean();
     MAssertRecoveredOnBailout *assert =
-        MAssertRecoveredOnBailout::New(alloc(), callInfo.getArg(0));
+        MAssertRecoveredOnBailout::New(alloc(), callInfo.getArg(0), mustBeRecovered);
     current->add(assert);
     current->push(assert);
 

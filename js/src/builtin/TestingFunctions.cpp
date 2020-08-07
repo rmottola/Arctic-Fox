@@ -1555,6 +1555,10 @@ bool
 js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 2) {
+        JS_ReportError(cx, "Expects only 2 arguments");
+        return false;
+    }
 
     // NOP when not in IonMonkey
     args.rval().setUndefined();
@@ -1812,6 +1816,10 @@ static bool
 Serialize(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 2) {
+        JS_ReportError(cx, "Expects only 2 arguments");
+        return false;
+    }
 
     JSAutoStructuredCloneBuffer clonebuf;
     if (!clonebuf.write(cx, args.get(0), args.get(1)))
