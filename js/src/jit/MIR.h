@@ -1148,7 +1148,8 @@ class MQuaternaryInstruction : public MAryInstruction<4>
     }
 };
 
-class MVariadicInstruction : public MInstruction
+template <class T>
+class MVariadicT : public T
 {
     FixedList<MUse> operands_;
 
@@ -1184,6 +1185,8 @@ class MVariadicInstruction : public MInstruction
         operands_[index].replaceProducer(operand);
     }
 };
+
+typedef MVariadicT<MInstruction> MVariadicInstruction;
 
 // Generates an LSnapshot without further effect.
 class MStart : public MNullaryInstruction
