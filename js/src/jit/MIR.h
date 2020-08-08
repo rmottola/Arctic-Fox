@@ -10191,9 +10191,9 @@ class MGuardReceiverPolymorphic
     public SingleObjectPolicy::Data
 {
     Vector<Shape*, 4, JitAllocPolicy> shapes_;
-    Vector<ObjectGroup *, 4, JitAllocPolicy> unboxedGroups_;
+    Vector<ObjectGroup*, 4, JitAllocPolicy> unboxedGroups_;
 
-    MGuardReceiverPolymorphic(TempAllocator &alloc, MDefinition *obj)
+    MGuardReceiverPolymorphic(TempAllocator& alloc, MDefinition* obj)
       : MUnaryInstruction(obj),
         shapes_(alloc),
 	unboxedGroups_(alloc)
@@ -10206,7 +10206,7 @@ class MGuardReceiverPolymorphic
   public:
     INSTRUCTION_HEADER(GuardReceiverPolymorphic)
 
-    static MGuardReceiverPolymorphic *New(TempAllocator &alloc, MDefinition *obj) {
+    static MGuardReceiverPolymorphic* New(TempAllocator& alloc, MDefinition* obj) {
         return new(alloc) MGuardReceiverPolymorphic(alloc, obj);
     }
 
@@ -10224,13 +10224,13 @@ class MGuardReceiverPolymorphic
         return shapes_[i];
     }
 
-    bool addUnboxedGroup(ObjectGroup *group) {
+    bool addUnboxedGroup(ObjectGroup* group) {
         return unboxedGroups_.append(group);
     }
     size_t numUnboxedGroups() const {
         return unboxedGroups_.length();
     }
-    ObjectGroup *getUnboxedGroup(size_t i) const {
+    ObjectGroup* getUnboxedGroup(size_t i) const {
         return unboxedGroups_[i];
     }
 
@@ -10246,12 +10246,12 @@ class MGuardObjectGroup
   : public MUnaryInstruction,
     public SingleObjectPolicy::Data
 {
-    AlwaysTenured<ObjectGroup *> group_;
+    AlwaysTenured<ObjectGroup*> group_;
     bool bailOnEquality_;
     BailoutKind bailoutKind_;
     bool checkUnboxedExpando_;
 
-    MGuardObjectGroup(MDefinition *obj, ObjectGroup *group, bool bailOnEquality,
+    MGuardObjectGroup(MDefinition* obj, ObjectGroup* group, bool bailOnEquality,
                       BailoutKind bailoutKind, bool checkUnboxedExpando)
       : MUnaryInstruction(obj),
         group_(group),
@@ -10271,17 +10271,17 @@ class MGuardObjectGroup
   public:
     INSTRUCTION_HEADER(GuardObjectGroup)
 
-    static MGuardObjectGroup *New(TempAllocator &alloc, MDefinition *obj, ObjectGroup *group,
+    static MGuardObjectGroup* New(TempAllocator& alloc, MDefinition* obj, ObjectGroup* group,
                                   bool bailOnEquality, BailoutKind bailoutKind,
                                   bool checkUnboxedExpando) {
         return new(alloc) MGuardObjectGroup(obj, group, bailOnEquality, bailoutKind,
                                             checkUnboxedExpando);
     }
 
-    MDefinition *obj() const {
+    MDefinition* obj() const {
         return getOperand(0);
     }
-    const ObjectGroup *group() const {
+    const ObjectGroup* group() const {
         return group_;
     }
     bool bailOnEquality() const {
@@ -10293,7 +10293,7 @@ class MGuardObjectGroup
     bool checkUnboxedExpando() const {
         return checkUnboxedExpando_;
     }
-    bool congruentTo(const MDefinition *ins) const override {
+    bool congruentTo(const MDefinition* ins) const override {
         if (!ins->isGuardObjectGroup())
             return false;
         if (group() != ins->toGuardObjectGroup()->group())

@@ -3870,18 +3870,18 @@ class ReceiverGuard
 
     struct StackGuard
     {
-        ObjectGroup *group;
-        Shape *shape;
+        ObjectGroup* group;
+        Shape* shape;
 
-        MOZ_IMPLICIT StackGuard(const ReceiverGuard &guard)
+        MOZ_IMPLICIT StackGuard(const ReceiverGuard& guard)
           : group(guard.group_), shape(guard.shape_)
         {}
 
-        MOZ_IMPLICIT StackGuard(const RootedStackGuard &guard)
+        MOZ_IMPLICIT StackGuard(const RootedStackGuard& guard)
           : group(guard.group), shape(guard.shape)
         {}
 
-        explicit StackGuard(JSObject *obj)
+        explicit StackGuard(JSObject* obj)
           : group(nullptr), shape(nullptr)
         {
             if (obj) {

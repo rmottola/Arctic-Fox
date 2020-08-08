@@ -394,19 +394,19 @@ class IonBuilder
 
     MDefinition* walkScopeChain(unsigned hops);
 
-    MInstruction *addConvertElementsToDoubles(MDefinition *elements);
-    MDefinition *addMaybeCopyElementsForWrite(MDefinition *object);
-    MInstruction *addBoundsCheck(MDefinition *index, MDefinition *length);
-    MInstruction *addShapeGuard(MDefinition *obj, Shape *const shape, BailoutKind bailoutKind);
-    MInstruction *addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind,
+    MInstruction* addConvertElementsToDoubles(MDefinition* elements);
+    MDefinition* addMaybeCopyElementsForWrite(MDefinition* object);
+    MInstruction* addBoundsCheck(MDefinition* index, MDefinition* length);
+    MInstruction* addShapeGuard(MDefinition* obj, Shape* const shape, BailoutKind bailoutKind);
+    MInstruction* addGroupGuard(MDefinition* obj, ObjectGroup* group, BailoutKind bailoutKind,
                                 bool checkUnboxedExpando = false);
 
-    MInstruction *
-    addGuardReceiverPolymorphic(MDefinition *obj,
-                                const BaselineInspector::ShapeVector &shapes,
-                                const BaselineInspector::ObjectGroupVector &unboxedGroups);
+    MInstruction*
+    addGuardReceiverPolymorphic(MDefinition* obj,
+                                const BaselineInspector::ShapeVector& shapes,
+                                const BaselineInspector::ObjectGroupVector& unboxedGroups);
 
-    MDefinition *convertShiftToMaskForStaticTypedArray(MDefinition *id,
+    MDefinition* convertShiftToMaskForStaticTypedArray(MDefinition* id,
                                                        Scalar::Type viewType);
 
     bool invalidatedIdempotentCache();
@@ -438,10 +438,10 @@ class IonBuilder
                            BarrierKind barrier, TemporaryTypeSet* types);
     bool getPropTryCommonGetter(bool *emitted, MDefinition *obj, PropertyName *name,
                                 TemporaryTypeSet *types);
-    bool getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName *name,
-                                BarrierKind barrier, TemporaryTypeSet *types);
-    bool getPropTrySimdGetter(bool *emitted, MDefinition *obj, PropertyName *name);
-    bool getPropTryTypedObject(bool *emitted, MDefinition *obj, PropertyName *name);
+    bool getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName* name,
+                                BarrierKind barrier, TemporaryTypeSet* types);
+    bool getPropTrySimdGetter(bool* emitted, MDefinition* obj, PropertyName* name);
+    bool getPropTryTypedObject(bool* emitted, MDefinition* obj, PropertyName* name);
     bool getPropTryScalarPropOfTypedObject(bool *emitted, MDefinition *typedObj,
                                            int32_t fieldOffset,
                                            TypedObjectPrediction fieldTypeReprs);
@@ -916,10 +916,10 @@ class IonBuilder
     bool testShouldDOMCall(TypeSet* inTypes,
                            JSFunction* func, JSJitInfo::OpType opType);
 
-    MDefinition *
-    addShapeGuardsForGetterSetter(MDefinition *obj, JSObject *holder, Shape *holderShape,
-                                  const BaselineInspector::ShapeVector &receiverShapes,
-                                  const BaselineInspector::ObjectGroupVector &receiverGroups,
+    MDefinition*
+    addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Shape* holderShape,
+                                  const BaselineInspector::ShapeVector& receiverShapes,
+                                  const BaselineInspector::ObjectGroupVector& receiverGroups,
                                   bool isOwnProperty);
 
     bool annotateGetPropertyCache(MDefinition* obj, MGetPropertyCache* getPropCache,

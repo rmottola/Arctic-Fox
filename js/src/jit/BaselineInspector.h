@@ -126,10 +126,10 @@ class BaselineInspector
 
     bool commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
                                JSFunction** commonGetter, Shape** globalShape, bool* isOwnProperty,
-                               ShapeVector &nativeShapes, ObjectGroupVector &unboxedGroups);
+                               ShapeVector& nativeShapes, ObjectGroupVector& unboxedGroups);
     bool commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
                                JSFunction** commonSetter, bool* isOwnProperty,
-                               ShapeVector &nativeShapes, ObjectGroupVector &unboxedGroups);
+                               ShapeVector& nativeShapes, ObjectGroupVector& unboxedGroups);
 
     bool instanceOfData(jsbytecode* pc, Shape** shape, uint32_t* slot, JSObject** prototypeObject);
 };

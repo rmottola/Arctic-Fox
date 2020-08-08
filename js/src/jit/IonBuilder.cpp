@@ -10593,8 +10593,8 @@ IonBuilder::getPropTryUnboxed(bool* emitted, MDefinition* obj, PropertyName* nam
 
 MDefinition*
 IonBuilder::addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Shape* holderShape,
-                const BaselineInspector::ShapeVector &receiverShapes,
-                const BaselineInspector::ObjectGroupVector &receiverUnboxedGroups,
+                const BaselineInspector::ShapeVector& receiverShapes,
+                const BaselineInspector::ObjectGroupVector& receiverUnboxedGroups,
                 bool isOwnProperty)
 {
     MOZ_ASSERT(holder);
@@ -12499,11 +12499,11 @@ IonBuilder::addShapeGuard(MDefinition* obj, Shape* const shape, BailoutKind bail
     return guard;
 }
 
-MInstruction *
-IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bailoutKind,
+MInstruction*
+IonBuilder::addGroupGuard(MDefinition* obj, ObjectGroup* group, BailoutKind bailoutKind,
                           bool checkUnboxedExpando)
 {
-    MGuardObjectGroup *guard = MGuardObjectGroup::New(alloc(), obj, group,
+    MGuardObjectGroup* guard = MGuardObjectGroup::New(alloc(), obj, group,
                                                       /* bailOnEquality = */ false,
                                                       bailoutKind, checkUnboxedExpando);
     current->add(guard);
@@ -12512,17 +12512,17 @@ IonBuilder::addGroupGuard(MDefinition *obj, ObjectGroup *group, BailoutKind bail
     if (failedShapeGuard_)
         guard->setNotMovable();
 
-    LifoAlloc *lifoAlloc = alloc().lifoAlloc();
+    LifoAlloc* lifoAlloc = alloc().lifoAlloc();
     guard->setResultTypeSet(lifoAlloc->new_<TemporaryTypeSet>(lifoAlloc,
                                                             TypeSet::ObjectType(group)));
 
     return guard;
 }
 
-MInstruction *
-IonBuilder::addGuardReceiverPolymorphic(MDefinition *obj,
-                                        const BaselineInspector::ShapeVector &shapes,
-                                        const BaselineInspector::ObjectGroupVector &unboxedGroups)
+MInstruction*
+IonBuilder::addGuardReceiverPolymorphic(MDefinition* obj,
+                                        const BaselineInspector::ShapeVector& shapes,
+                                        const BaselineInspector::ObjectGroupVector& unboxedGroups)
 {
     if (shapes.length() == 1 && unboxedGroups.empty())
         return addShapeGuard(obj, shapes[0], Bailout_ShapeGuard);
@@ -12536,7 +12536,7 @@ IonBuilder::addGuardReceiverPolymorphic(MDefinition *obj,
 
     MOZ_ASSERT(shapes.length() + unboxedGroups.length() > 1);
 
-    MGuardReceiverPolymorphic *guard = MGuardReceiverPolymorphic::New(alloc(), obj);
+    MGuardReceiverPolymorphic* guard = MGuardReceiverPolymorphic::New(alloc(), obj);
     current->add(guard);
 
     if (failedShapeGuard_)

@@ -2531,9 +2531,9 @@ CodeGenerator::visitGuardObjectIdentity(LGuardObjectIdentity* guard)
 }
 
 void
-CodeGenerator::visitGuardReceiverPolymorphic(LGuardReceiverPolymorphic *lir)
+CodeGenerator::visitGuardReceiverPolymorphic(LGuardReceiverPolymorphic* lir)
 {
-    const MGuardReceiverPolymorphic *mir = lir->mir();
+    const MGuardReceiverPolymorphic* mir = lir->mir();
     Register obj = ToRegister(lir->object());
     Register temp = ToRegister(lir->temp());
 
@@ -2545,7 +2545,7 @@ CodeGenerator::visitGuardReceiverPolymorphic(LGuardReceiverPolymorphic *lir)
         masm.loadObjShape(obj, temp);
 
         for (size_t i = 0; i < mir->numShapes(); i++) {
-            Shape *shape = mir->getShape(i);
+            Shape* shape = mir->getShape(i);
             if (i == mir->numShapes() - 1 && !mir->numUnboxedGroups())
                 bailoutCmpPtr(Assembler::NotEqual, temp, ImmGCPtr(shape), lir->snapshot());
             else
@@ -2561,7 +2561,7 @@ CodeGenerator::visitGuardReceiverPolymorphic(LGuardReceiverPolymorphic *lir)
         masm.loadObjGroup(obj, temp);
 
         for (size_t i = 0; i < mir->numUnboxedGroups(); i++) {
-            ObjectGroup *group = mir->getUnboxedGroup(i);
+            ObjectGroup* group = mir->getUnboxedGroup(i);
             if (i == mir->numUnboxedGroups() - 1)
                 bailoutCmpPtr(Assembler::NotEqual, temp, ImmGCPtr(group), lir->snapshot());
             else
