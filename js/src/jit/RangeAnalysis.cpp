@@ -1640,6 +1640,12 @@ MLimitedTruncate::computeRange(TempAllocator& alloc)
     setRange(output);
 }
 
+void
+MFilterTypeSet::computeRange(TempAllocator& alloc)
+{
+    setRange(new(alloc) Range(getOperand(0)));
+}
+
 static Range *
 GetTypedArrayRange(TempAllocator &alloc, Scalar::Type type)
 {
