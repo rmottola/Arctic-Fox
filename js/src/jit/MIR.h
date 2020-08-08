@@ -7545,7 +7545,7 @@ class MElements
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
-    bool mightAlias(const MDefinition* store) const;
+    bool mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MElements)
 };
@@ -7733,7 +7733,7 @@ class MInitializedLength
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
-    bool mightAlias(const MDefinition* store) const;
+    bool mightAlias(const MDefinition* store) const override;
 
     void computeRange(TempAllocator& alloc) override;
 
@@ -8260,7 +8260,7 @@ class MLoadElement
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::Element);
     }
-    bool mightAlias(const MDefinition* store) const;
+    bool mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MLoadElement)
 };
@@ -9225,7 +9225,7 @@ class MStoreUnboxedScalar
   public:
     INSTRUCTION_HEADER(StoreUnboxedScalar)
 
-    static MStoreUnboxedScalar* New(TempAllocator &alloc,
+    static MStoreUnboxedScalar* New(TempAllocator& alloc,
                                     MDefinition* elements, MDefinition* index,
                                     MDefinition* value, Scalar::Type indexType,
                                     MemoryBarrierRequirement requiresBarrier =
