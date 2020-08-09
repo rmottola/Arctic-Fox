@@ -816,7 +816,7 @@ SavedStacks::sweep(JSRuntime* rt)
             JSObject* obj = e.front().unbarrieredGet();
             JSObject* temp = obj;
 
-            if (IsObjectAboutToBeFinalizedFromAnyThread(&obj)) {
+            if (IsObjectAboutToBeFinalized(&obj)) {
                 e.removeFront();
             } else {
                 SavedFrame* frame = &obj->as<SavedFrame>();
@@ -1084,7 +1084,7 @@ SavedStacks::sweepPCLocationMap()
     for (PCLocationMap::Enum e(pcLocationMap); !e.empty(); e.popFront()) {
         PCKey key = e.front().key();
         JSScript* script = key.script.get();
-        if (IsScriptAboutToBeFinalizedFromAnyThread(&script)) {
+        if (IsScriptAboutToBeFinalized(&script)) {
             e.removeFront();
         } else if (script != key.script.get()) {
             key.script = script;
