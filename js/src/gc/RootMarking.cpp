@@ -162,7 +162,7 @@ AutoGCRooter::trace(JSTracer* trc)
       }
 
       case IDVALVECTOR: {
-        AutoIdValueVector::VectorImpl &vector = static_cast<AutoIdValueVector *>(this)->vector;
+        AutoIdValueVector::VectorImpl& vector = static_cast<AutoIdValueVector*>(this)->vector;
         for (size_t i = 0; i < vector.length(); i++) {
             MarkIdRoot(trc, &vector[i].id, "js::AutoIdValueVector id");
             MarkValueRoot(trc, &vector[i].value, "js::AutoIdValueVector value");
