@@ -335,29 +335,29 @@ ICStub::trace(JSTracer* trc)
         static_cast<ICGetName_Scope<6>*>(this)->traceScopes(trc);
         break;
       case ICStub::GetIntrinsic_Constant: {
-        ICGetIntrinsic_Constant *constantStub = toGetIntrinsic_Constant();
+        ICGetIntrinsic_Constant* constantStub = toGetIntrinsic_Constant();
         gc::MarkValue(trc, &constantStub->value(), "baseline-getintrinsic-constant-value");
         break;
       }
       case ICStub::GetProp_Primitive: {
-        ICGetProp_Primitive *propStub = toGetProp_Primitive();
+        ICGetProp_Primitive* propStub = toGetProp_Primitive();
         MarkShape(trc, &propStub->protoShape(), "baseline-getprop-primitive-stub-shape");
         break;
       }
       case ICStub::GetProp_Native: {
-        ICGetProp_Native *propStub = toGetProp_Native();
+        ICGetProp_Native* propStub = toGetProp_Native();
         propStub->receiverGuard().trace(trc);
         break;
       }
       case ICStub::GetProp_NativePrototype: {
-        ICGetProp_NativePrototype *propStub = toGetProp_NativePrototype();
+        ICGetProp_NativePrototype* propStub = toGetProp_NativePrototype();
         propStub->receiverGuard().trace(trc);
         MarkObject(trc, &propStub->holder(), "baseline-getpropnativeproto-stub-holder");
         MarkShape(trc, &propStub->holderShape(), "baseline-getpropnativeproto-stub-holdershape");
         break;
       }
       case ICStub::GetProp_NativeDoesNotExist: {
-        ICGetProp_NativeDoesNotExist *propStub = toGetProp_NativeDoesNotExist();
+        ICGetProp_NativeDoesNotExist* propStub = toGetProp_NativeDoesNotExist();
 	propStub->guard().trace(trc);
         JS_STATIC_ASSERT(ICGetProp_NativeDoesNotExist::MAX_PROTO_CHAIN_DEPTH == 8);
         switch (propStub->protoChainDepth()) {
@@ -375,12 +375,12 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_Unboxed: {
-        ICGetProp_Unboxed *propStub = toGetProp_Unboxed();
+        ICGetProp_Unboxed* propStub = toGetProp_Unboxed();
         MarkObjectGroup(trc, &propStub->group(), "baseline-getprop-unboxed-stub-group");
         break;
       }
       case ICStub::GetProp_TypedObject: {
-        ICGetProp_TypedObject *propStub = toGetProp_TypedObject();
+        ICGetProp_TypedObject* propStub = toGetProp_TypedObject();
         MarkShape(trc, &propStub->shape(), "baseline-getprop-typedobject-stub-shape");
         break;
       }
