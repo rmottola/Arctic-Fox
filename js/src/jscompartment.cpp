@@ -614,7 +614,7 @@ JSCompartment::sweepCrossCompartmentWrappers()
               break;
           case CrossCompartmentKey::StringWrapper:
               MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_STRING);
-              keyDying = IsStringAboutToBeFinalized(
+              keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSString**>(&key.wrapped));
               break;
           case CrossCompartmentKey::DebuggerScript:
