@@ -336,10 +336,12 @@ struct InternalGCMethods<Value>
 
     static void preBarrier(Value v) {
         MOZ_ASSERT(!CurrentThreadIsIonCompiling());
+        if (v.isString() && StringIsPermanentAtom(v.toString()))
+            return;
         if (v.isSymbol() && SymbolIsWellKnown(v.toSymbol()))
             return;
         if (v.isMarkable() && shadowRuntimeFromAnyThread(v)->needsIncrementalBarrier())
-            preBarrier(ZoneOfValueFromAnyThread(v), v);
+            preBarrierImpl(ZoneOfValueFromAnyThread(v), v);
     }
 
     static void preBarrier(Zone* zone, Value v) {
@@ -348,6 +350,11 @@ struct InternalGCMethods<Value>
             return;
         if (v.isSymbol() && SymbolIsWellKnown(v.toSymbol()))
             return;
+        preBarrierImpl(zone, v);
+    }
+
+  private:
+    static void preBarrierImpl(Zone* zone, Value v) {
         JS::shadow::Zone* shadowZone = JS::shadow::Zone::asShadowZone(zone);
         if (shadowZone->needsIncrementalBarrier()) {
             MOZ_ASSERT_IF(v.isMarkable(), shadowRuntimeFromMainThread(v)->needsIncrementalBarrier());
@@ -357,6 +364,7 @@ struct InternalGCMethods<Value>
         }
     }
 
+  public:
     static void postBarrier(Value* vp) {
         MOZ_ASSERT(!CurrentThreadIsIonCompiling());
         if (vp->isObject()) {
