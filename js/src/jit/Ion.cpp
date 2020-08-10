@@ -489,9 +489,9 @@ jit::LazyLinkTopActivation(JSContext *cx)
 JitRuntime::Mark(JSTracer *trc)
 {
     MOZ_ASSERT(!trc->runtime()->isHeapMinorCollecting());
-    Zone *zone = trc->runtime()->atomsCompartment()->zone();
+    Zone* zone = trc->runtime()->atomsCompartment()->zone();
     for (gc::ZoneCellIterUnderGC i(zone, gc::AllocKind::JITCODE); !i.done(); i.next()) {
-        JitCode *code = i.get<JitCode>();
+        JitCode* code = i.get<JitCode>();
         MarkJitCodeRoot(trc, &code, "wrapper");
     }
 }
