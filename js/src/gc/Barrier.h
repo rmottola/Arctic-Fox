@@ -237,14 +237,10 @@ template <> struct MapTypeToTraceKind<UnownedBaseShape> { static const JSGCTrace
 template <> struct MapTypeToTraceKind<jit::JitCode>     { static const JSGCTraceKind kind = JSTRACE_JITCODE; };
 template <> struct MapTypeToTraceKind<ObjectGroup>      { static const JSGCTraceKind kind = JSTRACE_OBJECT_GROUP; };
 
-// Direct value access used by the write barriers and the jits.
-void
-MarkValueForBarrier(JSTracer* trc, Value* v, const char* name);
-
-// These three declarations are also present in gc/Marking.h, via the DeclMarker
-// macro.  Not great, but hard to avoid.
-void
-MarkIdUnbarriered(JSTracer* trc, jsid* idp, const char* name);
+// Marking.h depends on these barrier definitions, so we need a separate
+// entry point for marking to implement the pre-barrier.
+void MarkValueForBarrier(JSTracer* trc, Value* v, const char* name);
+void MarkIdForBarrier(JSTracer* trc, jsid* idp, const char* name);
 
 } // namespace gc
 
@@ -422,7 +418,7 @@ struct InternalGCMethods<jsid>
         JS::shadow::Zone* shadowZone = JS::shadow::Zone::asShadowZone(zone);
         if (shadowZone->needsIncrementalBarrier()) {
             jsid tmp(id);
-            js::gc::MarkIdUnbarriered(shadowZone->barrierTracer(), &tmp, "id write barrier");
+            js::gc::MarkIdForBarrier(shadowZone->barrierTracer(), &tmp, "id write barrier");
             MOZ_ASSERT(tmp == id);
         }
     }
