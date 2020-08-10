@@ -594,7 +594,7 @@ RegExpShared::trace(JSTracer *trc)
     for (size_t i = 0; i < ArrayLength(compilationArray); i++) {
         RegExpCompilation& compilation = compilationArray[i];
         if (compilation.jitCode)
-            MarkJitCode(trc, &compilation.jitCode, "RegExpShared code");
+            TraceEdge(trc, &compilation.jitCode, "RegExpShared code");
     }
 }
 
@@ -924,7 +924,7 @@ RegExpCompartment::sweep(JSRuntime* rt)
         for (size_t i = 0; i < ArrayLength(shared->compilationArray); i++) {
             RegExpShared::RegExpCompilation& compilation = shared->compilationArray[i];
             if (compilation.jitCode &&
-                IsJitCodeAboutToBeFinalized(compilation.jitCode.unsafeGet()))
+                IsAboutToBeFinalized(&compilation.jitCode))
             {
                 keep = false;
             }

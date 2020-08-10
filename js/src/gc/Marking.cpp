@@ -1104,7 +1104,6 @@ Update##base##IfRelocated(JSRuntime* rt, type** thingp)                         
 }
 
 
-DeclMarkerImpl(JitCode, jit::JitCode)
 DeclMarkerImpl(Object, NativeObject)
 DeclMarkerImpl(Object, ArrayObject)
 DeclMarkerImpl(Object, ArgumentsObject)
