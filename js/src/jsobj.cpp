@@ -4095,7 +4095,7 @@ JSObject::markChildren(JSTracer *trc)
     if (clasp->isNative()) {
         NativeObject *nobj = &as<NativeObject>();
 
-        MarkShape(trc, &nobj->shape_, "shape");
+        TraceEdge(trc, &nobj->shape_, "shape");
 
         MarkObjectSlots(trc, nobj, 0, nobj->slotSpan());
 
