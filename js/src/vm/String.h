@@ -557,19 +557,19 @@ class JSRope : public JSString
     bool copyTwoByteCharsZ(js::ExclusiveContext* cx, js::ScopedJSFreePtr<char16_t>& out) const;
 
     template <typename CharT>
-    bool copyChars(js::ExclusiveContext *cx, js::ScopedJSFreePtr<CharT> &out) const;
+    bool copyChars(js::ExclusiveContext* cx, js::ScopedJSFreePtr<CharT>& out) const;
 
-    JSString *leftChild() const {
+    JSString* leftChild() const {
         MOZ_ASSERT(isRope());
         return d.s.u2.left;
     }
 
-    JSString *rightChild() const {
+    JSString* rightChild() const {
         MOZ_ASSERT(isRope());
         return d.s.u3.right;
     }
 
-    void markChildren(JSTracer *trc) {
+    void markChildren(JSTracer* trc) {
         js::gc::MarkStringUnbarriered(trc, &d.s.u2.left, "left child");
         js::gc::MarkStringUnbarriered(trc, &d.s.u3.right, "right child");
     }
