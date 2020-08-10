@@ -386,7 +386,7 @@ ICStub::trace(JSTracer* trc)
       }
       case ICStub::GetProp_CallDOMProxyNative:
       case ICStub::GetProp_CallDOMProxyWithGenerationNative: {
-        ICGetPropCallDOMProxyNativeStub *propStub;
+        ICGetPropCallDOMProxyNativeStub* propStub;
         if (kind() == ICStub::GetProp_CallDOMProxyNative)
             propStub = toGetProp_CallDOMProxyNative();
         else
@@ -408,7 +408,7 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_CallScripted: {
-        ICGetProp_CallScripted *callStub = toGetProp_CallScripted();
+        ICGetProp_CallScripted* callStub = toGetProp_CallScripted();
 	callStub->receiverGuard().trace(trc);
         MarkObject(trc, &callStub->holder(), "baseline-getpropcallscripted-stub-holder");
         MarkShape(trc, &callStub->holderShape(), "baseline-getpropcallscripted-stub-holdershape");
@@ -416,7 +416,7 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::GetProp_CallNative: {
-        ICGetProp_CallNative *callStub = toGetProp_CallNative();
+        ICGetProp_CallNative* callStub = toGetProp_CallNative();
         callStub->receiverGuard().trace(trc);
         MarkObject(trc, &callStub->holder(), "baseline-getpropcallnative-stub-holder");
         MarkShape(trc, &callStub->holderShape(), "baseline-getpropcallnative-stub-holdershape");
@@ -424,13 +424,13 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::SetProp_Native: {
-        ICSetProp_Native *propStub = toSetProp_Native();
+        ICSetProp_Native* propStub = toSetProp_Native();
         MarkShape(trc, &propStub->shape(), "baseline-setpropnative-stub-shape");
         MarkObjectGroup(trc, &propStub->group(), "baseline-setpropnative-stub-group");
         break;
       }
       case ICStub::SetProp_NativeAdd: {
-        ICSetProp_NativeAdd *propStub = toSetProp_NativeAdd();
+        ICSetProp_NativeAdd* propStub = toSetProp_NativeAdd();
         MarkObjectGroup(trc, &propStub->group(), "baseline-setpropnativeadd-stub-group");
         MarkShape(trc, &propStub->newShape(), "baseline-setpropnativeadd-stub-newshape");
         if (propStub->newGroup())
