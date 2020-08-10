@@ -975,7 +975,7 @@ MarkCalleeToken(JSTracer* trc, CalleeToken token)
       case CalleeToken_Script:
       {
         JSScript* script = CalleeTokenToScript(token);
-        MarkScriptRoot(trc, &script, "jit-script");
+        TraceRoot(trc, &script, "jit-script");
         return CalleeToToken(script);
       }
       default:
