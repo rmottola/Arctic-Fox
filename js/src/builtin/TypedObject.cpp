@@ -1640,12 +1640,12 @@ OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
     TypeDescr &descr = typedObj.maybeForwardedTypeDescr();
 
     // Mark the owner, watching in case it is moved by the tracer.
-    JSObject *oldOwner = typedObj.owner_;
+    JSObject* oldOwner = typedObj.owner_;
     gc::MarkObjectUnbarriered(trc, &typedObj.owner_, "typed object owner");
-    JSObject *owner = typedObj.owner_;
+    JSObject* owner = typedObj.owner_;
 
-    uint8_t *oldData = typedObj.outOfLineTypedMem();
-    uint8_t *newData = oldData;
+    uint8_t* oldData = typedObj.outOfLineTypedMem();
+    uint8_t* newData = oldData;
 
     // Update the data pointer if the owner moved and the owner's data is
     // inline with it. Note that an array buffer pointing to data in an inline
