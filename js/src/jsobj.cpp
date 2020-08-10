@@ -4086,7 +4086,7 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
 void
 JSObject::markChildren(JSTracer *trc)
 {
-    MarkObjectGroup(trc, &group_, "group");
+    TraceEdge(trc, &group_, "group");
 
     const Class *clasp = group_->clasp();
     if (clasp->trace)
