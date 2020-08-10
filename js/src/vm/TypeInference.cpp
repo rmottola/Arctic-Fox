@@ -708,11 +708,11 @@ TypeSet::IsTypeMarked(TypeSet::Type* v)
 {
     bool rv;
     if (v->isSingletonUnchecked()) {
-        JSObject *obj = v->singleton();
+        JSObject* obj = v->singleton();
         rv = IsObjectMarked(&obj);
         *v = TypeSet::ObjectType(obj);
     } else if (v->isGroupUnchecked()) {
-        ObjectGroup *group = v->group();
+        ObjectGroup* group = v->group();
         rv = IsObjectGroupMarked(&group);
         *v = TypeSet::ObjectType(group);
     } else {
@@ -726,10 +726,10 @@ TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
 {
     bool rv;
     if (v.isSingletonUnchecked()) {
-        JSObject *obj = v.singletonNoBarrier();
+        JSObject* obj = v.singletonNoBarrier();
         rv = obj->isTenured() && obj->asTenured().arenaHeader()->allocatedDuringIncremental;
     } else if (v.isGroupUnchecked()) {
-        ObjectGroup *group = v.groupNoBarrier();
+        ObjectGroup* group = v.groupNoBarrier();
         rv = group->arenaHeader()->allocatedDuringIncremental;
     } else {
         rv = false;
@@ -738,18 +738,18 @@ TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
 }
 
 static inline bool
-IsObjectKeyAboutToBeFinalized(TypeSet::ObjectKey **keyp)
+IsObjectKeyAboutToBeFinalized(TypeSet::ObjectKey** keyp)
 {
-    TypeSet::ObjectKey *key = *keyp;
+    TypeSet::ObjectKey* key = *keyp;
     bool isAboutToBeFinalized;
     if (key->isGroup()) {
-        ObjectGroup *group = key->groupNoBarrier();
+        ObjectGroup* group = key->groupNoBarrier();
         isAboutToBeFinalized = IsObjectGroupAboutToBeFinalized(&group);
         if (!isAboutToBeFinalized)
             *keyp = TypeSet::ObjectKey::get(group);
     } else {
         MOZ_ASSERT(key->isSingleton());
-        JSObject *singleton = key->singletonNoBarrier();
+        JSObject* singleton = key->singletonNoBarrier();
         isAboutToBeFinalized = IsObjectAboutToBeFinalized(&singleton);
         if (!isAboutToBeFinalized)
             *keyp = TypeSet::ObjectKey::get(singleton);
@@ -758,11 +758,11 @@ IsObjectKeyAboutToBeFinalized(TypeSet::ObjectKey **keyp)
 }
 
 bool
-TypeSet::IsTypeAboutToBeFinalized(TypeSet::Type *v)
+TypeSet::IsTypeAboutToBeFinalized(TypeSet::Type* v)
 {
     bool isAboutToBeFinalized;
     if (v->isObjectUnchecked()) {
-        TypeSet::ObjectKey *key = v->objectKey();
+        TypeSet::ObjectKey* key = v->objectKey();
         isAboutToBeFinalized = IsObjectKeyAboutToBeFinalized(&key);
         if (!isAboutToBeFinalized)
             *v = TypeSet::ObjectType(key);
@@ -773,7 +773,7 @@ TypeSet::IsTypeAboutToBeFinalized(TypeSet::Type *v)
 }
 
 bool
-TypeSet::clone(LifoAlloc *alloc, TemporaryTypeSet *result) const
+TypeSet::clone(LifoAlloc* alloc, TemporaryTypeSet* result) const
 {
     MOZ_ASSERT(result->empty());
 
@@ -4072,7 +4072,7 @@ ObjectGroup::maybeSweep(AutoClearTypeInferenceStateOnOOM* oom)
     if (maybeUnboxedLayout()) {
         // Remove unboxed layouts that are about to be finalized from the
         // compartment wide list while we are still on the main thread.
-        ObjectGroup *group = this;
+        ObjectGroup* group = this;
         if (IsObjectGroupAboutToBeFinalized(&group))
             unboxedLayout().detachFromCompartment();
 
