@@ -305,13 +305,6 @@ SetMaybeAliveFlag(JSObject* thing)
 
 template<>
 void
-SetMaybeAliveFlag(NativeObject* thing)
-{
-    thing->compartment()->maybeAlive = true;
-}
-
-template<>
-void
 SetMaybeAliveFlag(JSScript* thing)
 {
     thing->compartment()->maybeAlive = true;
@@ -353,6 +346,7 @@ FOR_EACH_GC_LAYOUT(NAMES)
     D(PlainObject*) \
     D(SavedFrame*) \
     D(ScopeObject*) \
+    D(ScriptSourceObject*) \
     D(SharedArrayBufferObject*) \
     D(SharedTypedArrayObject*) \
     D(JSScript*) \
@@ -1103,24 +1097,6 @@ Update##base##IfRelocated(JSRuntime* rt, type** thingp)                         
     return UpdateIfRelocated<type>(rt, thingp);                                                   \
 }
 
-
-DeclMarkerImpl(Object, NativeObject)
-DeclMarkerImpl(Object, ArrayObject)
-DeclMarkerImpl(Object, ArgumentsObject)
-DeclMarkerImpl(Object, ArrayBufferObject)
-DeclMarkerImpl(Object, ArrayBufferObjectMaybeShared)
-DeclMarkerImpl(Object, ArrayBufferViewObject)
-DeclMarkerImpl(Object, DebugScopeObject)
-DeclMarkerImpl(Object, GlobalObject)
-DeclMarkerImpl(Object, JSObject)
-DeclMarkerImpl(Object, JSFunction)
-DeclMarkerImpl(Object, NestedScopeObject)
-DeclMarkerImpl(Object, PlainObject)
-DeclMarkerImpl(Object, SavedFrame)
-DeclMarkerImpl(Object, ScopeObject)
-DeclMarkerImpl(Object, SharedArrayBufferObject)
-DeclMarkerImpl(Object, SharedTypedArrayObject)
-
 } /* namespace gc */
 } /* namespace js */
 
@@ -1366,7 +1342,7 @@ BaseShape::markChildren(JSTracer* trc)
 
     JSObject* global = compartment()->unsafeUnbarrieredMaybeGlobal();
     if (global)
-        MarkObjectUnbarriered(trc, &global, "global");
+        TraceManuallyBarrieredEdge(trc, &global, "global");
 }
 
 static void
@@ -1567,7 +1543,7 @@ gc::MarkCycleCollectorChildren(JSTracer* trc, Shape* shape)
      */
     JSObject* global = shape->compartment()->unsafeUnbarrieredMaybeGlobal();
     MOZ_ASSERT(global);
-    MarkObjectUnbarriered(trc, &global, "global");
+    TraceManuallyBarrieredEdge(trc, &global, "global");
 
     do {
         MOZ_ASSERT(global == shape->compartment()->unsafeUnbarrieredMaybeGlobal());
@@ -1579,13 +1555,13 @@ gc::MarkCycleCollectorChildren(JSTracer* trc, Shape* shape)
 
         if (shape->hasGetterObject()) {
             JSObject* tmp = shape->getterObject();
-            MarkObjectUnbarriered(trc, &tmp, "getter");
+            TraceManuallyBarrieredEdge(trc, &tmp, "getter");
             MOZ_ASSERT(tmp == shape->getterObject());
         }
 
         if (shape->hasSetterObject()) {
             JSObject* tmp = shape->setterObject();
-            MarkObjectUnbarriered(trc, &tmp, "setter");
+            TraceManuallyBarrieredEdge(trc, &tmp, "setter");
             MOZ_ASSERT(tmp == shape->setterObject());
         }
 
@@ -1639,7 +1615,7 @@ gc::MarkChildren(JSTracer* trc, ObjectGroup* group)
     }
 
     if (group->proto().isObject())
-        MarkObject(trc, &group->protoRaw(), "group_proto");
+        TraceEdge(trc, &group->protoRaw(), "group_proto");
 
     if (group->newScript())
         group->newScript()->trace(trc);
@@ -1656,12 +1632,12 @@ gc::MarkChildren(JSTracer* trc, ObjectGroup* group)
     }
 
     if (JSObject* descr = group->maybeTypeDescr()) {
-        MarkObjectUnbarriered(trc, &descr, "group_type_descr");
+        TraceManuallyBarrieredEdge(trc, &descr, "group_type_descr");
         group->setTypeDescr(&descr->as<TypeDescr>());
     }
 
     if (JSObject* fun = group->maybeInterpretedFunction()) {
-        MarkObjectUnbarriered(trc, &fun, "group_function");
+        TraceManuallyBarrieredEdge(trc, &fun, "group_function");
         group->setInterpretedFunction(&fun->as<JSFunction>());
     }
 }

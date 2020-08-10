@@ -1405,7 +1405,7 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
                     key.type = TypeSet::ObjectType(group);
             }
             if (key.proto && key.proto != TaggedProto::LazyProto &&
-                IsObjectAboutToBeFinalized(&key.proto))
+                IsAboutToBeFinalizedUnbarriered(&key.proto))
             {
                 remove = true;
             }
@@ -1474,7 +1474,7 @@ ObjectGroupCompartment::sweepNewTable(NewTable* table)
         for (NewTable::Enum e(*table); !e.empty(); e.popFront()) {
             NewEntry entry = e.front();
             if (IsAboutToBeFinalized(&entry.group) ||
-                (entry.associated && IsObjectAboutToBeFinalized(&entry.associated)))
+                (entry.associated && IsAboutToBeFinalizedUnbarriered(&entry.associated)))
             {
                 e.removeFront();
             } else {

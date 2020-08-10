@@ -709,7 +709,7 @@ TypeSet::IsTypeMarked(TypeSet::Type* v)
     bool rv;
     if (v->isSingletonUnchecked()) {
         JSObject* obj = v->singletonNoBarrier();
-        rv = IsObjectMarked(&obj);
+        rv = IsMarkedUnbarriered(&obj);
         *v = TypeSet::ObjectType(obj);
     } else if (v->isGroupUnchecked()) {
         ObjectGroup* group = v->groupNoBarrier();
@@ -750,7 +750,7 @@ IsObjectKeyAboutToBeFinalized(TypeSet::ObjectKey** keyp)
     } else {
         MOZ_ASSERT(key->isSingleton());
         JSObject* singleton = key->singletonNoBarrier();
-        isAboutToBeFinalized = IsObjectAboutToBeFinalized(&singleton);
+        isAboutToBeFinalized = IsAboutToBeFinalizedUnbarriered(&singleton);
         if (!isAboutToBeFinalized)
             *keyp = TypeSet::ObjectKey::get(singleton);
     }
@@ -1813,7 +1813,7 @@ class ConstraintDataFreezeObjectForTypedArrayData
 
     bool shouldSweep() {
         // Note: |viewData| is only used for equality testing.
-        return IsObjectAboutToBeFinalized(&obj);
+        return IsAboutToBeFinalizedUnbarriered(&obj);
     }
 };
 
@@ -3327,7 +3327,7 @@ PreliminaryObjectArray::sweep()
     // destroyed.
     for (size_t i = 0; i < COUNT; i++) {
         JSObject** ptr = &objects[i];
-        if (*ptr && IsObjectAboutToBeFinalized(ptr))
+        if (*ptr && IsAboutToBeFinalizedUnbarriered(ptr))
             *ptr = nullptr;
     }
 }
@@ -3891,10 +3891,10 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
 void
 TypeNewScript::trace(JSTracer* trc)
 {
-    MarkObject(trc, &function_, "TypeNewScript_function");
+    TraceEdge(trc, &function_, "TypeNewScript_function");
 
     if (templateObject_)
-        MarkObject(trc, &templateObject_, "TypeNewScript_templateObject");
+        TraceEdge(trc, &templateObject_, "TypeNewScript_templateObject");
 
     if (initializedShape_)
         TraceEdge(trc, &initializedShape_, "TypeNewScript_initializedShape");

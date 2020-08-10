@@ -350,8 +350,9 @@ void
 UnboxedPlainObject::trace(JSTracer *trc, JSObject *obj)
 {
     if (obj->as<UnboxedPlainObject>().expando_) {
-        MarkObjectUnbarriered(trc, reinterpret_cast<NativeObject**>(&obj->as<UnboxedPlainObject>().expando_),
-                              "unboxed_expando");
+        TraceManuallyBarrieredEdge(trc,
+            reinterpret_cast<NativeObject**>(&obj->as<UnboxedPlainObject>().expando_),
+            "unboxed_expando");
     }
 
     const UnboxedLayout &layout = obj->as<UnboxedPlainObject>().layoutDontCheckGeneration();
@@ -369,7 +370,7 @@ UnboxedPlainObject::trace(JSTracer *trc, JSObject *obj)
     while (*list != -1) {
         HeapPtrObject* heap = reinterpret_cast<HeapPtrObject*>(data + *list);
         if (*heap)
-            MarkObject(trc, heap, "unboxed_object");
+            TraceEdge(trc, heap, "unboxed_object");
         list++;
     }
 

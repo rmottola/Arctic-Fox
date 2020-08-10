@@ -1180,7 +1180,7 @@ void
 JSRuntime::markSelfHostingGlobal(JSTracer* trc)
 {
     if (selfHostingGlobal_ && !parentRuntime)
-        MarkObjectRoot(trc, &selfHostingGlobal_, "self-hosting global");
+        TraceRoot(trc, &selfHostingGlobal_, "self-hosting global");
 }
 
 bool
