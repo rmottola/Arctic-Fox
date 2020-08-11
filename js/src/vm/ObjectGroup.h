@@ -547,6 +547,7 @@ class ObjectGroup : public gc::TenuredCell
 
     inline void clearProperties();
     void maybeSweep(AutoClearTypeInferenceStateOnOOM* oom);
+    void traceChildren(JSTracer *trc);
 
   private:
 #ifdef DEBUG

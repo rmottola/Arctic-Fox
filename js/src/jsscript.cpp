@@ -3425,7 +3425,7 @@ JSScript::hasBreakpointsAt(jsbytecode* pc)
 }
 
 void
-JSScript::markChildren(JSTracer* trc)
+JSScript::traceChildren(JSTracer* trc)
 {
     // NOTE: this JSScript may be partially initialized at this point.  E.g. we
     // may have created it and partially initialized it with
@@ -3483,7 +3483,7 @@ JSScript::markChildren(JSTracer* trc)
 }
 
 void
-LazyScript::markChildren(JSTracer* trc)
+LazyScript::traceChildren(JSTracer* trc)
 {
     if (function_)
         TraceEdge(trc, &function_, "function");

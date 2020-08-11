@@ -459,7 +459,7 @@ class JSString : public js::gc::TenuredCell
 
     inline JSLinearString* base() const;
 
-    void markBase(JSTracer* trc) {
+    void traceBase(JSTracer* trc) {
         MOZ_ASSERT(hasBase());
         js::TraceManuallyBarrieredEdge(trc, &d.s.u3.base, "base");
     }
@@ -500,7 +500,7 @@ class JSString : public js::gc::TenuredCell
     bool equals(const char* s);
 #endif
 
-    inline void markChildren(JSTracer* trc);
+    inline void traceChildren(JSTracer* trc);
 
     static MOZ_ALWAYS_INLINE void readBarrier(JSString* thing) {
         if (thing->isPermanentAtom())
@@ -569,7 +569,7 @@ class JSRope : public JSString
         return d.s.u3.right;
     }
 
-    void markChildren(JSTracer* trc) {
+    void traceChildren(JSTracer* trc) {
         js::TraceManuallyBarrieredEdge(trc, &d.s.u2.left, "left child");
         js::TraceManuallyBarrieredEdge(trc, &d.s.u3.right, "right child");
     }
@@ -1236,12 +1236,12 @@ JSString::base() const
 }
 
 inline void
-JSString::markChildren(JSTracer* trc)
+JSString::traceChildren(JSTracer* trc)
 {
     if (hasBase())
-        markBase(trc);
+        traceBase(trc);
     else if (isRope())
-        asRope().markChildren(trc);
+        asRope().traceChildren(trc);
 }
 
 template<>
