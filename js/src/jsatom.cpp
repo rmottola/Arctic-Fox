@@ -224,10 +224,10 @@ js::MarkPermanentAtoms(JSTracer* trc)
 
     if (rt->permanentAtoms) {
         for (FrozenAtomSet::Range r(rt->permanentAtoms->all()); !r.empty(); r.popFront()) {
-            const AtomStateEntry &entry = r.front();
+            const AtomStateEntry& entry = r.front();
 
             JSAtom* atom = entry.asPtr();
-            MarkPermanentAtom(trc, atom, "permanent_table");
+            TraceProcessGlobalRoot(trc, atom, "permanent_table");
         }
     }
 }
@@ -242,7 +242,7 @@ js::MarkWellKnownSymbols(JSTracer* trc)
 
     if (WellKnownSymbols* wks = rt->wellKnownSymbols) {
         for (size_t i = 0; i < JS::WellKnownSymbolLimit; i++)
-            MarkWellKnownSymbol(trc, wks->get(i));
+            TraceProcessGlobalRoot(trc, wks->get(i).get(), "well_known_symbol");
     }
 }
 

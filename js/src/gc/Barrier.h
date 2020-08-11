@@ -599,7 +599,8 @@ class ImmutableTenuredPtr
         value = ptr;
     }
 
-    const T * address() { return &value; }
+    T get() const { return value; }
+    const T* address() { return &value; }
 };
 
 /*
