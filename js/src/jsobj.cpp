@@ -2307,7 +2307,7 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
      * Normally write barriers happen before the write. However, that's not
      * necessary here because nothing is being destroyed. We're just swapping.
      */
-    JS::Zone *zone = a->zone();
+    JS::Zone* zone = a->zone();
     if (zone->needsIncrementalBarrier()) {
         a->markChildren(zone->barrierTracer());
         b->markChildren(zone->barrierTracer());
@@ -4092,11 +4092,11 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
 }
 
 void
-JSObject::markChildren(JSTracer *trc)
+JSObject::markChildren(JSTracer* trc)
 {
     TraceEdge(trc, &group_, "group");
 
-    const Class *clasp = group_->clasp();
+    const Class* clasp = group_->clasp();
     if (clasp->trace)
         clasp->trace(trc, this);
 

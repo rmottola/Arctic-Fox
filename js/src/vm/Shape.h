@@ -457,7 +457,7 @@ class BaseShape : public gc::TenuredCell
 
     static inline ThingRootKind rootKind() { return THING_ROOT_BASE_SHAPE; }
 
-    void markChildren(JSTracer *trc);
+    void markChildren(JSTracer* trc);
 
     void fixupAfterMovingGC() {}
 

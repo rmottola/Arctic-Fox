@@ -239,36 +239,36 @@ class GCMarker : public JSTracer
 
     // Push an object onto the stack for later tracing and assert that it has
     // already been marked.
-    void repush(JSObject *obj) {
+    void repush(JSObject* obj) {
         MOZ_ASSERT(gc::TenuredCell::fromPointer(obj)->isMarked(markColor()));
         pushTaggedPtr(ObjectTag, obj);
     }
 
     template <typename T>
-    void markAndPush(StackTag tag, T *thing) {
+    void markAndPush(StackTag tag, T* thing) {
         if (mark(thing))
             pushTaggedPtr(tag, thing);
     }
 
     template <typename T>
-    void markAndTraverse(T *thing) {
+    void markAndTraverse(T* thing) {
         if (mark(thing))
             markChildren(thing);
     }
 
     template <typename T>
-    void markChildren(T *thing);
+    void markChildren(T* thing);
 
     // Mark the given GC thing, but do not trace its children. Return true
     // if the thing became marked.
     template <typename T>
-    bool mark(T *thing) {
+    bool mark(T* thing) {
         JS_COMPARTMENT_ASSERT(runtime(), thing);
         MOZ_ASSERT(!IsInsideNursery(gc::TenuredCell::fromPointer(thing)));
         return gc::TenuredCell::fromPointer(thing)->markIfUnmarked(markColor());
     }
 
-    void pushTaggedPtr(StackTag tag, void *ptr) {
+    void pushTaggedPtr(StackTag tag, void* ptr) {
         checkZone(ptr);
         uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
         MOZ_ASSERT(!(addr & StackTagMask));
@@ -276,7 +276,7 @@ class GCMarker : public JSTracer
             delayMarkingChildren(ptr);
     }
 
-    void pushValueArray(JSObject *obj, void* start, void *end) {
+    void pushValueArray(JSObject* obj, void* start, void* end) {
         checkZone(obj);
 
         MOZ_ASSERT(start <= end);

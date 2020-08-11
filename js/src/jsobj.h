@@ -263,7 +263,7 @@ class JSObject : public js::gc::Cell
 
     /* GC support. */
 
-    void markChildren(JSTracer *trc);
+    void markChildren(JSTracer* trc);
 
     void fixupAfterMovingGC();
 
@@ -271,23 +271,23 @@ class JSObject : public js::gc::Cell
     static const size_t MaxTagBits = 3;
     static bool isNullLike(const JSObject* obj) { return uintptr_t(obj) < (1 << MaxTagBits); }
 
-    MOZ_ALWAYS_INLINE JS::Zone *zone() const {
+    MOZ_ALWAYS_INLINE JS::Zone* zone() const {
         return group_->zone();
     }
-    MOZ_ALWAYS_INLINE JS::shadow::Zone *shadowZone() const {
+    MOZ_ALWAYS_INLINE JS::shadow::Zone* shadowZone() const {
         return JS::shadow::Zone::asShadowZone(zone());
     }
-    MOZ_ALWAYS_INLINE JS::Zone *zoneFromAnyThread() const {
+    MOZ_ALWAYS_INLINE JS::Zone* zoneFromAnyThread() const {
         return group_->zoneFromAnyThread();
     }
-    MOZ_ALWAYS_INLINE JS::shadow::Zone *shadowZoneFromAnyThread() const {
+    MOZ_ALWAYS_INLINE JS::shadow::Zone* shadowZoneFromAnyThread() const {
         return JS::shadow::Zone::asShadowZone(zoneFromAnyThread());
     }
-    static MOZ_ALWAYS_INLINE void readBarrier(JSObject *obj);
-    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSObject *obj);
-    static MOZ_ALWAYS_INLINE void writeBarrierPost(JSObject *obj, void *cellp);
-    static MOZ_ALWAYS_INLINE void writeBarrierPostRelocate(JSObject* obj, void *cellp);
-    static MOZ_ALWAYS_INLINE void writeBarrierPostRemove(JSObject *obj, void *cellp);
+    static MOZ_ALWAYS_INLINE void readBarrier(JSObject* obj);
+    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSObject* obj);
+    static MOZ_ALWAYS_INLINE void writeBarrierPost(JSObject* obj, void* cellp);
+    static MOZ_ALWAYS_INLINE void writeBarrierPostRelocate(JSObject* obj, void* cellp);
+    static MOZ_ALWAYS_INLINE void writeBarrierPostRemove(JSObject* obj, void* cellp);
 
     size_t tenuredSizeOfThis() const {
         MOZ_ASSERT(isTenured());
