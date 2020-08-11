@@ -1077,7 +1077,7 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
 
     while (safepoint.getGcSlot(&entry)) {
         uintptr_t* ref = layout->slotRef(entry);
-        gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(ref), "ion-gc-slot");
+        TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(ref), "ion-gc-slot");
     }
 
     while (safepoint.getValueSlot(&entry)) {
@@ -1091,7 +1091,7 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (gcRegs.has(*iter))
-            gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(spill), "ion-gc-spill");
+            gc::TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(spill), "ion-gc-spill");
         else if (valueRegs.has(*iter))
             TraceRoot(trc, reinterpret_cast<Value*>(spill), "ion-value-spill");
     }
@@ -1420,7 +1420,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
             TraceRoot(trc, reinterpret_cast<Value*>(argBase), "ion-vm-args");
             break;
           case VMFunction::RootCell:
-            gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(argBase), "ion-vm-args");
+            gc::TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(argBase), "ion-vm-args");
             break;
         }
 
@@ -1454,7 +1454,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
             TraceRoot(trc, footer->outParam<Value>(), "ion-vm-outvp");
             break;
           case VMFunction::RootCell:
-            gc::MarkGCThingRoot(trc, footer->outParam<void*>(), "ion-vm-out");
+            gc::TraceGenericPointerRoot(trc, footer->outParam<gc::Cell*>(), "ion-vm-out");
             break;
         }
     }
