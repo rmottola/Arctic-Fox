@@ -3622,7 +3622,7 @@ js::ToObjectSlow(JSContext* cx, JS::HandleValue val, bool reportScanStack)
 }
 
 void
-js::GetObjectSlotName(JSTracer *trc, char *buf, size_t bufsize)
+js::GetObjectSlotName(JSTracer* trc, char* buf, size_t bufsize)
 {
     MOZ_ASSERT(trc->debugPrinter() == GetObjectSlotName);
 
