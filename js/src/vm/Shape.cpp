@@ -814,11 +814,8 @@ NativeObject::putProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId
         if (shape->isAccessorShape()) {
             AccessorShape& accShape = shape->asAccessorShape();
             accShape.rawGetter = getter;
-            if (accShape.hasGetterObject())
-                GetterSetterWriteBarrierPost(&accShape, &accShape.getterObj);
             accShape.rawSetter = setter;
-            if (accShape.hasSetterObject())
-                GetterSetterWriteBarrierPost(&accShape, &accShape.setterObj);
+            GetterSetterWriteBarrierPost(&accShape);
         } else {
             MOZ_ASSERT(!getter);
             MOZ_ASSERT(!setter);
