@@ -147,7 +147,7 @@ ZoneIsAtomsZoneForString(JSRuntime *rt, T *thing);
 class GCMarker : public JSTracer
 {
   public:
-    explicit GCMarker(JSRuntime *rt);
+    explicit GCMarker(JSRuntime* rt);
     bool init(JSGCMode gcMode);
 
     void setMaxCapacity(size_t maxCap) { stack.setMaxCapacity(maxCap); }
@@ -158,12 +158,12 @@ class GCMarker : public JSTracer
     void reset();
 
     // Mark the given GC thing and traverse its children at some point.
-    void traverse(JSObject *thing) { markAndPush(ObjectTag, thing); }
-    void traverse(ObjectGroup *thing) { markAndPush(GroupTag, thing); }
-    void traverse(jit::JitCode *thing) { markAndPush(JitCodeTag, thing); }
+    void traverse(JSObject* thing) { markAndPush(ObjectTag, thing); }
+    void traverse(ObjectGroup* thing) { markAndPush(GroupTag, thing); }
+    void traverse(jit::JitCode* thing) { markAndPush(JitCodeTag, thing); }
     // The following traverse methods traverse immediately, go out-of-line to do so.
-    void traverse(JSScript *thing) { markAndTraverse(thing); }
-    void traverse(LazyScript *thing) { markAndTraverse(thing); }
+    void traverse(JSScript* thing) { markAndTraverse(thing); }
+    void traverse(LazyScript* thing) { markAndTraverse(thing); }
     // The other types are marked immediately and inline via a ScanFoo shared
     // between PushMarkStack and the processMarkStackTop. Since ScanFoo is
     // inline in Marking.cpp, we cannot inline it here, yet.
@@ -187,10 +187,10 @@ class GCMarker : public JSTracer
     }
     uint32_t markColor() const { return color; }
 
-    void delayMarkingArena(gc::ArenaHeader *aheader);
-    void delayMarkingChildren(const void *thing);
-    void markDelayedChildren(gc::ArenaHeader *aheader);
-    bool markDelayedChildren(SliceBudget &budget);
+    void delayMarkingArena(gc::ArenaHeader* aheader);
+    void delayMarkingChildren(const void* thing);
+    void markDelayedChildren(gc::ArenaHeader* aheader);
+    bool markDelayedChildren(SliceBudget& budget);
     bool hasDelayedChildren() const {
         return !!unmarkedArenaStackTop;
     }

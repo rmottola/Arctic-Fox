@@ -1002,13 +1002,13 @@ ScanShape(GCMarker* gcmarker, Shape* shape)
 }
 
 static inline void
-ScanBaseShape(GCMarker *gcmarker, BaseShape* base)
+ScanBaseShape(GCMarker* gcmarker, BaseShape* base)
 {
     base->assertConsistency();
 
     base->compartment()->mark();
 
-    if (GlobalObject *global = base->compartment()->unsafeUnbarrieredMaybeGlobal())
+    if (GlobalObject* global = base->compartment()->unsafeUnbarrieredMaybeGlobal())
         gcmarker->traverse(global);
 
     /*
