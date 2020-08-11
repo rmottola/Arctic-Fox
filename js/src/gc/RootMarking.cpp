@@ -484,7 +484,7 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
         /* Do not discard scripts with counts while profiling. */
         if (rt->profilingScripts && !isHeapMinorCollecting()) {
             for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
-                JSScript *script = i.get<JSScript>();
+                JSScript* script = i.get<JSScript>();
                 if (script->hasScriptCounts()) {
                     TraceRoot(trc, &script, "profilingScripts");
                     MOZ_ASSERT(script == i.get<JSScript>());
@@ -577,7 +577,7 @@ js::gc::GCRuntime::bufferGrayRoots()
 }
 
 void
-BufferGrayRootsTracer::appendGrayRoot(void *thing, JSGCTraceKind kind)
+BufferGrayRootsTracer::appendGrayRoot(void* thing, JSGCTraceKind kind)
 {
     MOZ_ASSERT(runtime()->isHeapBusy());
 
@@ -591,7 +591,7 @@ BufferGrayRootsTracer::appendGrayRoot(void *thing, JSGCTraceKind kind)
     root.debugPrintIndex = debugPrintIndex();
 #endif
 
-    Zone *zone = TenuredCell::fromPointer(thing)->zone();
+    Zone* zone = TenuredCell::fromPointer(thing)->zone();
     if (zone->isCollecting()) {
         // See the comment on SetMaybeAliveFlag to see why we only do this for
         // objects and scripts. We rely on gray root buffering for this to work,
@@ -599,10 +599,10 @@ BufferGrayRootsTracer::appendGrayRoot(void *thing, JSGCTraceKind kind)
         // incremental GCs (when we do gray root buffering).
         switch (kind) {
           case JSTRACE_OBJECT:
-            static_cast<JSObject *>(thing)->compartment()->maybeAlive = true;
+            static_cast<JSObject*>(thing)->compartment()->maybeAlive = true;
             break;
           case JSTRACE_SCRIPT:
-            static_cast<JSScript *>(thing)->compartment()->maybeAlive = true;
+            static_cast<JSScript*>(thing)->compartment()->maybeAlive = true;
             break;
           default:
             break;
@@ -613,12 +613,12 @@ BufferGrayRootsTracer::appendGrayRoot(void *thing, JSGCTraceKind kind)
 }
 
 void
-GCRuntime::markBufferedGrayRoots(JS::Zone *zone)
+GCRuntime::markBufferedGrayRoots(JS::Zone* zone)
 {
     MOZ_ASSERT(grayBufferState == GrayBufferState::Okay);
     MOZ_ASSERT(zone->isGCMarkingGray() || zone->isGCCompacting());
 
-    for (GrayRoot *elem = zone->gcGrayRoots.begin(); elem != zone->gcGrayRoots.end(); elem++) {
+    for (GrayRoot* elem = zone->gcGrayRoots.begin(); elem != zone->gcGrayRoots.end(); elem++) {
 #ifdef DEBUG
         marker.setTracingDetails(elem->debugPrinter, elem->debugPrintArg, elem->debugPrintIndex);
 #endif

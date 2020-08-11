@@ -332,7 +332,7 @@ class BufferGrayRootsTracer : public JS::CallbackTracer
     // Set to false if we OOM while buffering gray roots.
     bool bufferingGrayRootsFailed;
 
-    void appendGrayRoot(void *thing, JSGCTraceKind kind);
+    void appendGrayRoot(void* thing, JSGCTraceKind kind);
 
   public:
     explicit BufferGrayRootsTracer(JSRuntime* rt)
