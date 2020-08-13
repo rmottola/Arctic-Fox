@@ -111,8 +111,8 @@ IsOwnedByOtherRuntime(JSTracer* trc, T thing)
 }
 
 template<typename T>
-static inline void
-CheckMarkedThing(JSTracer* trc, T thing)
+void
+js::CheckTracedThing(JSTracer* trc, T thing)
 {
 #ifdef DEBUG
     MOZ_ASSERT(trc);
@@ -178,31 +178,38 @@ CheckMarkedThing(JSTracer* trc, T thing)
 #endif
 }
 
+namespace js {
 template<>
 void
-CheckMarkedThing<Value>(JSTracer* trc, Value val)
+CheckTracedThing<Value>(JSTracer* trc, Value val)
 {
 #ifdef DEBUG
     if (val.isString())
-        CheckMarkedThing(trc, val.toString());
+        CheckTracedThing(trc, val.toString());
     else if (val.isObject())
-        CheckMarkedThing(trc, &val.toObject());
+        CheckTracedThing(trc, &val.toObject());
     else if (val.isSymbol())
-        CheckMarkedThing(trc, val.toSymbol());
+        CheckTracedThing(trc, val.toSymbol());
 #endif
 }
 
 template <>
 void
-CheckMarkedThing<jsid>(JSTracer* trc, jsid id)
+CheckTracedThing<jsid>(JSTracer* trc, jsid id)
 {
 #ifdef DEBUG
     if (JSID_IS_STRING(id))
-        CheckMarkedThing(trc, JSID_TO_STRING(id));
+        CheckTracedThing(trc, JSID_TO_STRING(id));
     else if (JSID_IS_SYMBOL(id))
-        CheckMarkedThing(trc, JSID_TO_SYMBOL(id));
+        CheckTracedThing(trc, JSID_TO_SYMBOL(id));
 #endif
 }
+
+#define IMPL_CHECK_TRACED_THING(_, type, __) \
+    template void CheckTracedThing<type*>(JSTracer*, type*);
+FOR_EACH_GC_LAYOUT(IMPL_CHECK_TRACED_THING);
+#undef IMPL_CHECK_TRACED_THING
+} // namespace js
 
 #define JS_ROOT_MARKING_ASSERT(trc) \
     MOZ_ASSERT_IF(trc->isMarkingTracer(), \
@@ -393,7 +400,7 @@ js::TraceProcessGlobalRoot(JSTracer* trc, T* thing, const char* name)
     // things so they do not need to go through the mark stack and may simply
     // be marked directly.  Moreover, well-known symbols can refer only to
     // permanent atoms, so likewise require no subsquent marking.
-    CheckMarkedThing(trc, thing);
+    CheckTracedThing(trc, thing);
     if (trc->isMarkingTracer())
         thing->markIfUnmarked(gc::BLACK);
     else
@@ -416,8 +423,6 @@ DispatchToTracer(JSTracer* trc, T* thingp, const char* name)
             mozilla::IsSame<T, jsid>::value,
             "Only the base cell layout types are allowed into marking/tracing internals");
 #undef IS_SAME_TYPE_OR
-    CheckMarkedThing(trc, *thingp);
-
     if (trc->isMarkingTracer())
         return DoMarking(static_cast<GCMarker*>(trc), *thingp);
     return DoCallback(trc->asCallbackTracer(), thingp, name);
@@ -561,6 +566,7 @@ template <typename T>
 bool
 js::GCMarker::mark(T* thing)
 {
+    CheckTracedThing(this, thing);
     JS_COMPARTMENT_ASSERT(runtime(), thing);
     MOZ_ASSERT(!IsInsideNursery(gc::TenuredCell::fromPointer(thing)));
     return gc::ParticipatesInCC<T>::value
