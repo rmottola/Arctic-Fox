@@ -112,7 +112,7 @@ IsOwnedByOtherRuntime(JSTracer* trc, T thing)
 
 template<typename T>
 static inline void
-CheckMarkedThing(JSTracer* trc, T thingp)
+CheckMarkedThing(JSTracer* trc, T thing)
 {
 #ifdef DEBUG
     MOZ_ASSERT(trc);
