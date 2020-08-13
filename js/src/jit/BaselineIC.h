@@ -2915,7 +2915,7 @@ class ICGetElemNativeCompiler : public ICStubCompiler
         pcOffset_(pcOffset)
     {}
 
-    ICStub *getStub(ICStubSpace *space) {
+    ICStub* getStub(ICStubSpace* space) {
         RootedShape shape(cx, obj_->as<NativeObject>().lastProperty());
         if (kind == ICStub::GetElem_NativeSlot) {
             MOZ_ASSERT(obj_ == holder_);
