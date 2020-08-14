@@ -3573,7 +3573,7 @@ IonBuilder::improveTypesAtTypeOfCompare(MCompare* ins, bool trueBranch, MTest* t
     // since there are multiple ways to get an object. That is the reason
     // for the 'trueBranch' test.
     TemporaryTypeSet filter;
-    const JSAtomState &names = GetJitContext()->runtime->names();
+    const JSAtomState& names = GetJitContext()->runtime->names();
     if (constant->toString() == TypeName(JSTYPE_VOID, names)) {
         filter.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
         if (typeOf->inputMaybeCallableOrEmulatesUndefined() && trueBranch)
@@ -3595,9 +3595,8 @@ IonBuilder::improveTypesAtTypeOfCompare(MCompare* ins, bool trueBranch, MTest* t
         if (typeOf->inputMaybeCallableOrEmulatesUndefined() && trueBranch)
             filter.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
     } else {
-    	return true;
+        return true;
     }
-
 
     TemporaryTypeSet* type;
     if (trueBranch)
@@ -3814,7 +3813,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
         // If the typeset does emulate undefined, then we cannot filter out
         // objects.
         if (oldType->maybeEmulatesUndefined(constraints()))
-	    base.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
+            base.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
 
         type = TypeSet::intersectSets(&base, oldType, alloc_->lifoAlloc());
     }
@@ -4735,7 +4734,7 @@ IonBuilder::inlineScriptedCall(CallInfo& callInfo, JSFunction* target)
             calleeScript->setUninlineable();
             abortReason_ = AbortReason_Inlining;
         } else if (inlineBuilder.abortReason_ == AbortReason_PreliminaryObjects) {
-            const ObjectGroupVector &groups = inlineBuilder.abortedPreliminaryGroups();
+            const ObjectGroupVector& groups = inlineBuilder.abortedPreliminaryGroups();
             MOZ_ASSERT(!groups.empty());
             for (size_t i = 0; i < groups.length(); i++)
                 addAbortedPreliminaryGroup(groups[i]);
@@ -6683,7 +6682,7 @@ IonBuilder::jsop_initprop(PropertyName* name)
     }
 
     if (useSlowPath) {
-	current->pop();
+        current->pop();
         MInitProp* init = MInitProp::New(alloc(), obj, name, value);
         current->add(init);
         return resumeAfter(init);
