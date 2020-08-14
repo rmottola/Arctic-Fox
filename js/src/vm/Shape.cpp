@@ -1244,6 +1244,22 @@ BaseShape::assertConsistency()
 }
 
 void
+BaseShape::traceChildren(JSTracer* trc)
+{
+    assertConsistency();
+
+    if (trc->isMarkingTracer())
+        compartment()->mark();
+
+    if (isOwned())
+        TraceEdge(trc, &unowned_, "base");
+
+    JSObject* global = compartment()->unsafeUnbarrieredMaybeGlobal();
+    if (global)
+        TraceManuallyBarrieredEdge(trc, &global, "global");
+}
+
+void
 JSCompartment::sweepBaseShapeTable()
 {
     if (!baseShapes.initialized())
