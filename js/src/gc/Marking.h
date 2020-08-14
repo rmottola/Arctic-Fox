@@ -97,7 +97,7 @@ MarkObjectSlots(JSTracer* trc, NativeObject* obj, uint32_t start, uint32_t nslot
  * JS_TraceShapeCycleCollectorChildren.
  */
 void
-MarkCycleCollectorChildren(JSTracer *trc, Shape *shape);
+MarkCycleCollectorChildren(JSTracer* trc, Shape* shape);
 
 void
 PushArena(GCMarker* gcmarker, ArenaHeader* aheader);
