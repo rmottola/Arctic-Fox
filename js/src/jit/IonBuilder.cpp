@@ -3795,7 +3795,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
     if (oldType->unknown())
         return true;
 
-    // Decide either to set or filter.
+    // Decide either to set or remove.
     if (trueBranch) {
 	TemporaryTypeSet remove;
         remove.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
