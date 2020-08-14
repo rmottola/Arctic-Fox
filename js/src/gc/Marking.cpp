@@ -1052,9 +1052,11 @@ IsAboutToBeFinalizedInternal(T* thingp)
         return false;
 
     Nursery& nursery = rt->gc.nursery;
-    if (IsInsideNursery(thing)) {
-        MOZ_ASSERT(rt->isHeapMinorCollecting());
-        return !nursery.getForwardedPointer(thingp);
+    MOZ_ASSERT_IF(!rt->isHeapMinorCollecting(), !IsInsideNursery(thing));
+    if (rt->isHeapMinorCollecting()) {
+        if (IsInsideNursery(thing))
+            return !nursery.getForwardedPointer(thingp);
+        return false;
     }
 
     Zone* zone = thing->asTenured().zoneFromAnyThread();
