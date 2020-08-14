@@ -121,7 +121,7 @@ IsThingPoisoned(T* thing)
         JS_SWEPT_FRAME_PATTERN
     };
     const int numPoisonBytes = sizeof(poisonBytes) / sizeof(poisonBytes[0]);
-    uint32_t *p = reinterpret_cast<uint32_t*>(reinterpret_cast<FreeSpan*>(thing) + 1);
+    uint32_t* p = reinterpret_cast<uint32_t*>(reinterpret_cast<FreeSpan*>(thing) + 1);
     // Note: all free patterns are odd to make the common, not-poisoned case a single test.
     if ((*p & 1) == 0)
         return false;
@@ -155,17 +155,6 @@ template <> bool ThingIsPermanentAtomOrWellKnownSymbol<JS::Symbol>(JS::Symbol* s
     return sym->isWellKnownSymbol();
 }
 
-template <typename T>
-static inline bool
-IsOwnedByOtherRuntime(JSTracer* trc, T thing)
-{
-    bool other = thing->runtimeFromAnyThread() != trc->runtime();
-    MOZ_ASSERT_IF(other,
-                  ThingIsPermanentAtom(thing) ||
-                  thing->runtimeFromAnyThread()->isSelfHostingZone(thing->zoneFromAnyThread()));
-    return other;
-}
-
 template<typename T>
 void
 js::CheckTracedThing(JSTracer* trc, T thing)
@@ -184,10 +173,10 @@ js::CheckTracedThing(JSTracer* trc, T thing)
                   !IsForwarded(thing));
 
     /*
-     * Permanent atoms and things in the self-hosting zone are not associated
-     * with this runtime, but will be ignored during marking.
+     * Permanent atoms are not associated with this runtime, but will be
+     * ignored during marking.
      */
-    if (IsOwnedByOtherRuntime(trc, thing))
+    if (ThingIsPermanentAtomOrWellKnownSymbol(thing))
         return;
 
     Zone* zone = thing->zoneFromAnyThread();
@@ -987,7 +976,7 @@ CheckIsMarkedThing(T* thingp)
     MOZ_ASSERT(thingp);
     MOZ_ASSERT(*thingp);
     JSRuntime* rt = (*thingp)->runtimeFromAnyThread();
-    MOZ_ASSERT_IF(!ThingIsPermanentAtom(*thingp),
+    MOZ_ASSERT_IF(!ThingIsPermanentAtomOrWellKnownSymbol(*thingp),
                   CurrentThreadCanAccessRuntime(rt) ||
                   (rt->isHeapCollecting() && rt->gc.state() == SWEEP));
 #endif
@@ -1052,9 +1041,11 @@ IsAboutToBeFinalizedInternal(T* thingp)
         return false;
 
     Nursery& nursery = rt->gc.nursery;
-    if (IsInsideNursery(thing)) {
-        MOZ_ASSERT(rt->isHeapMinorCollecting());
-        return !nursery.getForwardedPointer(thingp);
+    MOZ_ASSERT_IF(!rt->isHeapMinorCollecting(), !IsInsideNursery(thing));
+    if (rt->isHeapMinorCollecting()) {
+        if (IsInsideNursery(thing))
+            return !nursery.getForwardedPointer(thingp);
+        return false;
     }
 
     Zone* zone = thing->asTenured().zoneFromAnyThread();

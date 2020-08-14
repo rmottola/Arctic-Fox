@@ -134,11 +134,11 @@ namespace gc {
 
 template <typename T>
 extern bool
-ZoneIsGCMarking(T *thing);
+ZoneIsGCMarking(T* thing);
 
 template <typename T>
 extern bool
-ZoneIsAtomsZoneForString(JSRuntime *rt, T *thing);
+ZoneIsAtomsZoneForString(JSRuntime* rt, T* thing);
 
 } /* namespace gc */
 #endif

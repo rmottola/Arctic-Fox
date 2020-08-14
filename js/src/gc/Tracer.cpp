@@ -631,7 +631,7 @@ GCMarker::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const
 }
 
 void
-js::SetMarkStackLimit(JSRuntime *rt, size_t limit)
+js::SetMarkStackLimit(JSRuntime* rt, size_t limit)
 {
     rt->gc.setMarkStackLimit(limit);
 }
