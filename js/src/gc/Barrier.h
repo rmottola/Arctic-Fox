@@ -199,9 +199,6 @@ CurrentThreadIsGCSweeping();
 bool
 StringIsPermanentAtom(JSString* str);
 
-bool
-SymbolIsWellKnown(JS::Symbol* sym);
-
 namespace gc {
 
 template <typename T> struct MapTypeToTraceKind {};
@@ -333,8 +330,6 @@ struct InternalGCMethods<Value>
         MOZ_ASSERT(!CurrentThreadIsIonCompiling());
         if (v.isString() && StringIsPermanentAtom(v.toString()))
             return;
-        if (v.isSymbol() && SymbolIsWellKnown(v.toSymbol()))
-            return;
         if (v.isMarkable() && shadowRuntimeFromAnyThread(v)->needsIncrementalBarrier())
             preBarrierImpl(ZoneOfValueFromAnyThread(v), v);
     }
@@ -389,8 +384,6 @@ struct InternalGCMethods<jsid>
     static void preBarrier(jsid id) {
         MOZ_ASSERT(!CurrentThreadIsIonCompiling());
         if (JSID_IS_STRING(id) && StringIsPermanentAtom(JSID_TO_STRING(id)))
-            return;
-        if (JSID_IS_SYMBOL(id) && SymbolIsWellKnown(JSID_TO_SYMBOL(id)))
             return;
         if (JSID_IS_GCTHING(id) && shadowRuntimeFromAnyThread(id)->needsIncrementalBarrier())
             preBarrierImpl(ZoneOfIdFromAnyThread(id), id);

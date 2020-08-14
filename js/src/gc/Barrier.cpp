@@ -69,10 +69,4 @@ StringIsPermanentAtom(JSString* str)
     return str->isPermanentAtom();
 }
 
-bool
-SymbolIsWellKnown(JS::Symbol* sym)
-{
-    return sym->isWellKnownSymbol();
-}
-
 } // namespace js
