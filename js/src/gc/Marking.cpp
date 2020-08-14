@@ -121,7 +121,7 @@ IsThingPoisoned(T* thing)
         JS_SWEPT_FRAME_PATTERN
     };
     const int numPoisonBytes = sizeof(poisonBytes) / sizeof(poisonBytes[0]);
-    uint32_t *p = reinterpret_cast<uint32_t*>(reinterpret_cast<FreeSpan*>(thing) + 1);
+    uint32_t* p = reinterpret_cast<uint32_t*>(reinterpret_cast<FreeSpan*>(thing) + 1);
     // Note: all free patterns are odd to make the common, not-poisoned case a single test.
     if ((*p & 1) == 0)
         return false;
