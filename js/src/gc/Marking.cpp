@@ -1589,7 +1589,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
     }
 
     if (tag == ObjectTag) {
-        obj = reinterpret_cast<JSObject *>(addr);
+        obj = reinterpret_cast<JSObject*>(addr);
         JS_COMPARTMENT_ASSERT(runtime(), obj);
         goto scan_obj;
     }
