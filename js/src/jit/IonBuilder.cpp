@@ -10302,7 +10302,7 @@ IonBuilder::getPropTrySimdGetter(bool* emitted, MDefinition* obj, PropertyName* 
         return true;
     }
 
-    const JSAtomState &names = compartment->runtime()->names();
+    const JSAtomState& names = compartment->runtime()->names();
 
     // Reading the signMask property.
     if (name == names.signMask) {
@@ -10852,7 +10852,6 @@ IonBuilder::getPropTryInlineAccess(bool* emitted, MDefinition* obj, PropertyName
         spew("Inlining monomorphic unboxed GETPROP");
 
         ObjectGroup* group = unboxedGroups[0];
-
         obj = addGroupGuard(obj, group, Bailout_ShapeGuard);
 
         const UnboxedLayout::Property* property = group->unboxedLayout().lookup(name);
@@ -11544,8 +11543,7 @@ IonBuilder::setPropTryInlineAccess(bool* emitted, MDefinition* obj,
         spew("Inlining monomorphic unboxed SETPROP");
 
         ObjectGroup* group = unboxedGroups[0];
-
-	obj = addGroupGuard(obj, group, Bailout_ShapeGuard);
+        obj = addGroupGuard(obj, group, Bailout_ShapeGuard);
 
         const UnboxedLayout::Property* property = group->unboxedLayout().lookup(name);
         storeUnboxedProperty(obj, property->offset, property->type, value);
