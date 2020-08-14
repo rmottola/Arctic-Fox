@@ -987,7 +987,7 @@ CheckIsMarkedThing(T* thingp)
     MOZ_ASSERT(thingp);
     MOZ_ASSERT(*thingp);
     JSRuntime* rt = (*thingp)->runtimeFromAnyThread();
-    MOZ_ASSERT_IF(!ThingIsPermanentAtom(*thingp),
+    MOZ_ASSERT_IF(!ThingIsPermanentAtomOrWellKnownSymbol(*thingp),
                   CurrentThreadCanAccessRuntime(rt) ||
                   (rt->isHeapCollecting() && rt->gc.state() == SWEEP));
 #endif
