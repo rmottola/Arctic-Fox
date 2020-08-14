@@ -2852,6 +2852,9 @@ IonBuilder::inlineAtomicsFence(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
+    if (!JitSupportsAtomics())
+        return InliningStatus_NotInlined;
+
     callInfo.setImplicitlyUsedUnchecked();
 
     MMemoryBarrier* fence = MMemoryBarrier::New(alloc());
@@ -2922,6 +2925,9 @@ IonBuilder::inlineAtomicsBinop(CallInfo& callInfo, JSFunction* target)
 bool
 IonBuilder::atomicsMeetsPreconditions(CallInfo& callInfo, Scalar::Type* arrayType)
 {
+    if (!JitSupportsAtomics())
+        return false;
+
     if (callInfo.getArg(0)->type() != MIRType_Object)
         return false;
 
