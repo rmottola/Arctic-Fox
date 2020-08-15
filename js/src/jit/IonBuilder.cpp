@@ -9464,6 +9464,10 @@ IonBuilder::getDefiniteSlot(TemporaryTypeSet* types, PropertyName* name, uint32_
                 if (!convertUnboxedGroups.append(key->group()))
                     CrashAtUnhandlableOOM("IonBuilder::getDefiniteSlot");
                 key = TypeSet::ObjectKey::get(nativeGroup);
+                if (key->unknownProperties()) {
+                    trackOptimizationOutcome(TrackedOutcome::UnknownProperties);
+                    return UINT32_MAX;
+                }
             }
         }
 
