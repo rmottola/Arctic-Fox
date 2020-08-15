@@ -977,7 +977,7 @@ PopBlockScope(JSContext* cx, BaselineFrame* frame)
 }
 
 bool
-FreshenBlockScope(JSContext *cx, BaselineFrame *frame)
+FreshenBlockScope(JSContext* cx, BaselineFrame* frame)
 {
     return frame->freshenBlock(cx);
 }
