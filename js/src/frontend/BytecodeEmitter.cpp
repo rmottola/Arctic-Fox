@@ -980,12 +980,12 @@ BytecodeEmitter::leaveNestedScope(StmtInfoBCE* stmt)
     if (!emit1(stmt->isBlockScope ? JSOP_DEBUGLEAVEBLOCK : JSOP_LEAVEWITH))
         return false;
 
-    blockScopeList.recordEnd(blockScopeIndex, offset());
-
     if (stmt->isBlockScope && stmt->staticScope->as<StaticBlockObject>().needsClone()) {
         if (!emit1(JSOP_POPBLOCKSCOPE))
             return false;
     }
+
+    blockScopeList.recordEnd(blockScopeIndex, offset());
 
     return true;
 }
