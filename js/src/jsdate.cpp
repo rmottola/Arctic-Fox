@@ -3043,6 +3043,7 @@ const Class DateObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     date_convert,
     nullptr, /* finalize */
     nullptr, /* call */

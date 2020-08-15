@@ -955,6 +955,7 @@ const Class AsmJSModuleObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     AsmJSModuleObject_finalize,
     nullptr, /* call */
