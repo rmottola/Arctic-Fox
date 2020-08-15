@@ -6730,7 +6730,7 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp, 
             propdef->pn_right->pn_funbox->needsHomeObject())
         {
             MOZ_ASSERT(propdef->pn_right->pn_funbox->function()->isMethod());
-            if (!emit1(JSOP_INITHOMEOBJECT))
+            if (!emit2(JSOP_INITHOMEOBJECT, isIndex))
                 return false;
         }
 
@@ -7087,7 +7087,7 @@ BytecodeEmitter::emitClass(ParseNode* pn)
         return false;
 
     if (constructor->pn_funbox->needsHomeObject()) {
-        if (!emit1(JSOP_INITHOMEOBJECT))
+        if (!emit2(JSOP_INITHOMEOBJECT, 0))
             return false;
     }
 
