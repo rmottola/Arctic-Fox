@@ -5407,7 +5407,7 @@ BytecodeEmitter::emitNormalFor(ParseNode* pn, ptrdiff_t top)
     return true;
 }
 
-inline bool
+bool
 BytecodeEmitter::emitFor(ParseNode* pn, ptrdiff_t top)
 {
     if (pn->pn_left->isKind(PNK_FORIN))
