@@ -572,7 +572,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         return extractObject(source, scratch);
     }
 
-    void branchIfFunctionHasNoScript(Register fun, Label *label) {
+    void branchIfFunctionHasNoScript(Register fun, Label* label) {
         // 16-bit loads are slow and unaligned 32-bit loads may be too so
         // perform an aligned 32-bit load and adjust the bitmask accordingly.
         MOZ_ASSERT(JSFunction::offsetOfNargs() % sizeof(uint32_t) == 0);
@@ -672,7 +672,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     template<typename T>
-    void loadFromTypedArray(Scalar::Type arrayType, const T &src, AnyRegister dest, Register temp, Label *fail,
+    void loadFromTypedArray(Scalar::Type arrayType, const T& src, AnyRegister dest, Register temp, Label* fail,
                             bool canonicalizeDoubles = true, unsigned numElems = 0);
 
     template<typename T>
@@ -708,9 +708,9 @@ class MacroAssembler : public MacroAssemblerSpecific
     void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S &value,
                                     const T &mem, Register temp1, Register temp2, AnyRegister output);
 
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex &dest,
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex& dest,
                                 unsigned numElems = 0);
-    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address &dest,
+    void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const Address& dest,
                                 unsigned numElems = 0);
 
     // Load a property from an UnboxedPlainObject.

@@ -2377,7 +2377,7 @@ TemporaryTypeSet::propertyNeedsBarrier(CompilerConstraintList* constraints, jsid
 }
 
 bool
-js::ClassCanHaveExtraProperties(const Class *clasp)
+js::ClassCanHaveExtraProperties(const Class* clasp)
 {
     return clasp->resolve
         || clasp->ops.lookupProperty
@@ -3333,25 +3333,25 @@ PreliminaryObjectArray::sweep()
 }
 
 void
-PreliminaryObjectArrayWithTemplate::trace(JSTracer *trc)
+PreliminaryObjectArrayWithTemplate::trace(JSTracer* trc)
 {
     TraceEdge(trc, &shape_, "PreliminaryObjectArrayWithTemplate_shape");
 }
 
 /* static */ void
-PreliminaryObjectArrayWithTemplate::writeBarrierPre(PreliminaryObjectArrayWithTemplate *objects)
+PreliminaryObjectArrayWithTemplate::writeBarrierPre(PreliminaryObjectArrayWithTemplate* objects)
 {
     if (!objects->shape()->runtimeFromAnyThread()->needsIncrementalBarrier())
         return;
 
-    JS::Zone *zone = objects->shape()->zoneFromAnyThread();
+    JS::Zone* zone = objects->shape()->zoneFromAnyThread();
     if (zone->needsIncrementalBarrier())
         objects->trace(zone->barrierTracer());
 }
 
 // Return whether shape consists entirely of plain data properties.
 static bool
-OnlyHasDataProperties(Shape *shape)
+OnlyHasDataProperties(Shape* shape)
 {
     MOZ_ASSERT(!shape->inDictionary());
 
@@ -3372,8 +3372,8 @@ OnlyHasDataProperties(Shape *shape)
 
 // Find the most recent common ancestor of two shapes, or an empty shape if
 // the two shapes have no common ancestor.
-static Shape *
-CommonPrefix(Shape *first, Shape *second)
+static Shape*
+CommonPrefix(Shape* first, Shape* second)
 {
     MOZ_ASSERT(OnlyHasDataProperties(first));
     MOZ_ASSERT(OnlyHasDataProperties(second));
@@ -3392,7 +3392,7 @@ CommonPrefix(Shape *first, Shape *second)
 }
 
 void
-PreliminaryObjectArrayWithTemplate::maybeAnalyze(ExclusiveContext *cx, ObjectGroup *group, bool force)
+PreliminaryObjectArrayWithTemplate::maybeAnalyze(ExclusiveContext* cx, ObjectGroup* group, bool force)
 {
     // Don't perform the analyses until sufficient preliminary objects have
     // been allocated.
@@ -3410,10 +3410,10 @@ PreliminaryObjectArrayWithTemplate::maybeAnalyze(ExclusiveContext *cx, ObjectGro
     // Make sure all the preliminary objects reflect the properties originally
     // in the template object.
     for (size_t i = 0; i < PreliminaryObjectArray::COUNT; i++) {
-        JSObject *objBase = preliminaryObjects->get(i);
+        JSObject* objBase = preliminaryObjects->get(i);
         if (!objBase)
             continue;
-        PlainObject *obj = &objBase->as<PlainObject>();
+        PlainObject* obj = &objBase->as<PlainObject>();
 
         if (obj->inDictionaryMode() || !OnlyHasDataProperties(obj->lastProperty()))
             return;
@@ -3470,9 +3470,9 @@ TypeNewScript::make(JSContext* cx, ObjectGroup* group, JSFunction* fun)
 
 // Make a TypeNewScript with the same initializer list as |newScript| but with
 // a new template object.
-/* static */ TypeNewScript *
-TypeNewScript::makeNativeVersion(JSContext *cx, TypeNewScript *newScript,
-                                 PlainObject *templateObject)
+/* static */ TypeNewScript*
+TypeNewScript::makeNativeVersion(JSContext* cx, TypeNewScript* newScript,
+                                 PlainObject* templateObject)
 {
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
 
@@ -3483,7 +3483,7 @@ TypeNewScript::makeNativeVersion(JSContext *cx, TypeNewScript *newScript,
     nativeNewScript->function_ = newScript->function();
     nativeNewScript->templateObject_ = templateObject;
 
-    Initializer *cursor = newScript->initializerList;
+    Initializer* cursor = newScript->initializerList;
     while (cursor->kind != Initializer::DONE) { cursor++; }
     size_t initializerLength = cursor - newScript->initializerList + 1;
 

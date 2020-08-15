@@ -26,20 +26,20 @@
 
 #include "vm/TypeInference-inl.h"
 
-inline js::Shape *
+inline js::Shape*
 JSObject::maybeShape() const
 {
     if (is<js::UnboxedPlainObject>())
         return nullptr;
-    return *reinterpret_cast<js::Shape **>(uintptr_t(this) + offsetOfShape());
+    return *reinterpret_cast<js::Shape**>(uintptr_t(this) + offsetOfShape());
 }
 
-inline js::Shape *
-JSObject::ensureShape(js::ExclusiveContext *cx)
+inline js::Shape*
+JSObject::ensureShape(js::ExclusiveContext* cx)
 {
     if (is<js::UnboxedPlainObject>() && !js::UnboxedPlainObject::convertToNative(cx->asJSContext(), this))
         return nullptr;
-    js::Shape *shape = maybeShape();
+    js::Shape* shape = maybeShape();
     MOZ_ASSERT(shape);
     return shape;
 }
