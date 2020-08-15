@@ -1185,11 +1185,23 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind, Hand
     MOZ_ASSERT_IF(kind == Statement, atom != nullptr);
 
     RootedFunction fun(context);
-    JSFunction::Flags flags = (kind == Expression)
-                              ? JSFunction::INTERPRETED_LAMBDA
-                              : (kind == Arrow)
-                                ? JSFunction::INTERPRETED_LAMBDA_ARROW
-                                : JSFunction::INTERPRETED;
+    
+    JSFunction::Flags flags;
+    switch(kind) {
+      case Expression:
+        flags = JSFunction::INTERPRETED_LAMBDA;
+        break;
+      case Arrow:
+        flags = JSFunction::INTERPRETED_LAMBDA_ARROW;
+        break;
+      case Method:
+        flags = JSFunction::INTERPRETED_METHOD;
+        break;
+      default:
+        flags = JSFunction::INTERPRETED;
+        break;
+    }
+    
     gc::AllocKind allocKind = JSFunction::FinalizeKind;
     if (kind == Arrow)
         allocKind = JSFunction::ExtendedFinalizeKind;
@@ -2429,7 +2441,8 @@ Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, unsigned st
     if (!funpc.init(tokenStream))
         return null();
 
-    if (!functionArgsAndBodyGeneric(pn, fun, Normal, Lazy)) {
+    FunctionSyntaxKind syntaxKind = fun->isMethod() ? Method : Statement;
+    if (!functionArgsAndBodyGeneric(pn, fun, Normal, syntaxKind)) {
         MOZ_ASSERT(directives == newDirectives);
         return null();
     }
@@ -2514,11 +2527,8 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
     if (!body)
         return false;
 
-    if (kind != Method && kind != Lazy &&
-        fun->name() && !checkStrictBinding(fun->name(), pn))
-    {
+    if (kind != Method && fun->name() && !checkStrictBinding(fun->name(), pn))
         return false;
-    }
 
     if (bodyType == StatementListBody) {
         bool matched;
@@ -2536,7 +2546,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(Node pn, HandleFunction fun, Fu
         if (tokenStream.hadError())
             return false;
         funbox->bufEnd = pos().end;
-        if ((kind == Statement || kind == Lazy) && !MatchOrInsertSemicolon(tokenStream))
+        if (kind == Statement && !MatchOrInsertSemicolon(tokenStream))
             return false;
     }
 
