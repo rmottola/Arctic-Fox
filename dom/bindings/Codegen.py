@@ -8178,7 +8178,7 @@ class CGMemberJITInfo(CGThing):
             initializer = fill(
                 """
                 {
-                 { ${opName} },
+                  { ${opName} },
                   prototypes::id::${name},
                   PrototypeTraits<prototypes::id::${name}>::Depth,
                   JSJitInfo::${opType},
@@ -8206,6 +8206,10 @@ class CGMemberJITInfo(CGThing):
                 slotIndex=slotIndex)
             return initializer.rstrip()
 
+        slotAssert = dedent(
+            """
+            static_assert(%s <= JSJitInfo::maxSlotIndex, "We won't fit");
+            """ % slotIndex)
         if args is not None:
             argTypes = "%s_argTypes" % infoName
             args = [CGMemberJITInfo.getJSArgType(arg.type) for arg in args]
@@ -8215,21 +8219,27 @@ class CGMemberJITInfo(CGThing):
                 (argTypes, ", ".join(args)))
             return fill(
                 """
-
                 $*{argTypesDecl}
                 static const JSTypedMethodJitInfo ${infoName} = {
-                  ${jitInfo},
+                ${jitInfo},
                   ${argTypes}
                 };
+                $*{slotAssert}
                 """,
                 argTypesDecl=argTypesDecl,
                 infoName=infoName,
-                jitInfo=jitInfoInitializer(True),
-                argTypes=argTypes)
+                jitInfo=indent(jitInfoInitializer(True)),
+                argTypes=argTypes,
+                slotAssert=slotAssert)
 
-        return ("\n"
-                "static const JSJitInfo %s = %s;\n"
-                % (infoName, jitInfoInitializer(False)))
+        return fill(
+            """
+            static const JSJitInfo ${infoName} = ${jitInfo};
+            $*{slotAssert}
+            """,
+            infoName=infoName,
+            jitInfo=jitInfoInitializer(False),
+            slotAssert=slotAssert)
 
     def define(self):
         if self.member.isAttr():
