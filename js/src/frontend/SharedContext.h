@@ -240,12 +240,12 @@ class SharedContext
 class GlobalSharedContext : public SharedContext
 {
   public:
-    GlobalSharedContext(ExclusiveContext *cx,
+    GlobalSharedContext(ExclusiveContext* cx,
                         Directives directives, bool extraWarnings)
       : SharedContext(cx, directives, extraWarnings)
     {}
 
-    ObjectBox *toObjectBox() { return nullptr; }
+    ObjectBox* toObjectBox() { return nullptr; }
 };
 
 class FunctionBox : public ObjectBox, public SharedContext
