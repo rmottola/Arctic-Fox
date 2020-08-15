@@ -359,7 +359,7 @@ bool
 DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain, HandleFunction funArg);
 
 bool
-SetCallOperation(JSContext* cx);
+ThrowMsgOperation(JSContext* cx, const unsigned errorNum);
 
 bool
 GetAndClearException(JSContext* cx, MutableHandleValue res);
