@@ -107,15 +107,15 @@ struct BytecodeEmitter
 {
     typedef StmtInfoBCE StmtInfo;
 
-    SharedContext *const sc;      /* context shared between parsing and bytecode generation */
+    SharedContext* const sc;      /* context shared between parsing and bytecode generation */
 
-    ExclusiveContext *const cx;
+    ExclusiveContext* const cx;
 
-    BytecodeEmitter *const parent;  /* enclosing function or global context */
+    BytecodeEmitter* const parent;  /* enclosing function or global context */
 
     Rooted<JSScript*> script;       /* the JSScript we're ultimately producing */
 
-    Rooted<LazyScript *> lazyScript; /* the lazy script if mode is LazyFunction,
+    Rooted<LazyScript*> lazyScript; /* the lazy script if mode is LazyFunction,
                                         nullptr otherwise. */
 
     struct EmitSection {
@@ -126,11 +126,11 @@ struct BytecodeEmitter
         uint32_t    lastColumn;     /* zero-based column index on currentLine of
                                        last SRC_COLSPAN-annotated opcode */
 
-        EmitSection(ExclusiveContext *cx, uint32_t lineNum)
+        EmitSection(ExclusiveContext* cx, uint32_t lineNum)
           : code(cx), notes(cx), lastNoteOffset(0), currentLine(lineNum), lastColumn(0)
         {}
     };
-    EmitSection prologue, main, *current;
+    EmitSection prologue, main,* current;
 
     /* the parser */
     Parser<FullParseHandler>* const parser;
@@ -139,8 +139,8 @@ struct BytecodeEmitter
     Handle<StaticEvalObject*> evalStaticScope;
                                    /* compile time scope for eval; does not imply stmt stack */
 
-    StmtInfoBCE    *topStmt;       /* top of statement info stack */
-    StmtInfoBCE    *topScopeStmt;  /* top lexical scope statement */
+    StmtInfoBCE*    topStmt;       /* top of statement info stack */
+    StmtInfoBCE*    topScopeStmt;  /* top lexical scope statement */
     Rooted<NestedScopeObject*> staticScope;
                                     /* compile time scope chain */
 
@@ -219,10 +219,10 @@ struct BytecodeEmitter
      * tempLifoAlloc and save the pointer beyond the next BytecodeEmitter
      * destruction.
      */
-    BytecodeEmitter(BytecodeEmitter *parent, Parser<FullParseHandler> *parser, SharedContext *sc,
-                    HandleScript script, Handle<LazyScript *> lazyScript,
+    BytecodeEmitter(BytecodeEmitter* parent, Parser<FullParseHandler>* parser, SharedContext* sc,
+                    HandleScript script, Handle<LazyScript*> lazyScript,
                     bool insideEval, HandleScript evalCaller,
-                    Handle<StaticEvalObject *> evalStaticScope, bool insideNonGlobalEval,
+                    Handle<StaticEvalObject*> evalStaticScope, bool insideNonGlobalEval,
                     uint32_t lineNum, EmitterMode emitterMode = Normal);
     bool init();
     bool updateLocalsToFrameSlots();
@@ -271,8 +271,8 @@ struct BytecodeEmitter
     unsigned lastColumn() const { return current->lastColumn; }
 
     bool reportError(ParseNode* pn, unsigned errorNumber, ...);
-    bool reportStrictWarning(ParseNode *pn, unsigned errorNumber, ...);
-    bool reportStrictModeError(ParseNode *pn, unsigned errorNumber, ...);
+    bool reportStrictWarning(ParseNode* pn, unsigned errorNumber, ...);
+    bool reportStrictModeError(ParseNode* pn, unsigned errorNumber, ...);
 
     // If pn contains a useful expression, return true with *answer set to true.
     // If pn contains a useless expression, return true with *answer set to
@@ -284,7 +284,7 @@ struct BytecodeEmitter
     // statement, we define useless code as code with no side effects, because
     // the main effect, the value left on the stack after the code executes,
     // will be discarded by a pop bytecode.
-    bool checkSideEffects(ParseNode *pn, bool *answer);
+    bool checkSideEffects(ParseNode* pn, bool* answer);
 
     bool inTryBlockWithFinally();
 
@@ -295,28 +295,28 @@ struct BytecodeEmitter
     // Append a new source note of the given type (and therefore size) to the
     // notes dynamic array, updating noteCount. Return the new note's index
     // within the array pointed at by current->notes as outparam.
-    bool newSrcNote(SrcNoteType type, unsigned *indexp = nullptr);
-    bool newSrcNote2(SrcNoteType type, ptrdiff_t offset, unsigned *indexp = nullptr);
+    bool newSrcNote(SrcNoteType type, unsigned* indexp = nullptr);
+    bool newSrcNote2(SrcNoteType type, ptrdiff_t offset, unsigned* indexp = nullptr);
     bool newSrcNote3(SrcNoteType type, ptrdiff_t offset1, ptrdiff_t offset2,
-                     unsigned *indexp = nullptr);
+                     unsigned* indexp = nullptr);
 
-    void copySrcNotes(jssrcnote *destination, uint32_t nsrcnotes);
+    void copySrcNotes(jssrcnote* destination, uint32_t nsrcnotes);
     bool setSrcNoteOffset(unsigned index, unsigned which, ptrdiff_t offset);
 
     // NB: this function can add at most one extra extended delta note.
-    bool addToSrcNoteDelta(jssrcnote *sn, ptrdiff_t delta);
+    bool addToSrcNoteDelta(jssrcnote* sn, ptrdiff_t delta);
 
     // Finish taking source notes in cx's notePool. If successful, the final
     // source note count is stored in the out outparam.
-    bool finishTakingSrcNotes(uint32_t *out);
+    bool finishTakingSrcNotes(uint32_t* out);
 
     void setJumpOffsetAt(ptrdiff_t off);
 
     // Emit code for the tree rooted at pn.
-    bool emitTree(ParseNode *pn);
+    bool emitTree(ParseNode* pn);
 
     // Emit function code for the tree rooted at body.
-    bool emitFunctionScript(ParseNode *body);
+    bool emitFunctionScript(ParseNode* body);
 
     // If op is JOF_TYPESET (see the type barriers comment in TypeInference.h),
     // reserve a type set to store its result.
@@ -326,52 +326,52 @@ struct BytecodeEmitter
     bool updateLineNumberNotes(uint32_t offset);
     bool updateSourceCoordNotes(uint32_t offset);
 
-    bool bindNameToSlot(ParseNode *pn);
-    bool bindNameToSlotHelper(ParseNode *pn);
+    bool bindNameToSlot(ParseNode* pn);
+    bool bindNameToSlotHelper(ParseNode* pn);
 
-    void strictifySetNameNode(ParseNode *pn);
+    void strictifySetNameNode(ParseNode* pn);
     JSOp strictifySetNameOp(JSOp op);
 
-    bool tryConvertFreeName(ParseNode *pn);
+    bool tryConvertFreeName(ParseNode* pn);
 
     void popStatement();
-    void pushStatement(StmtInfoBCE *stmt, StmtType type, ptrdiff_t top);
-    void pushStatementInner(StmtInfoBCE *stmt, StmtType type, ptrdiff_t top);
-    void pushLoopStatement(LoopStmtInfo *stmt, StmtType type, ptrdiff_t top);
+    void pushStatement(StmtInfoBCE* stmt, StmtType type, ptrdiff_t top);
+    void pushStatementInner(StmtInfoBCE* stmt, StmtType type, ptrdiff_t top);
+    void pushLoopStatement(LoopStmtInfo* stmt, StmtType type, ptrdiff_t top);
 
     // Return the enclosing lexical scope, which is the innermost enclosing static
     // block object or compiler created function.
-    JSObject *enclosingStaticScope();
+    JSObject* enclosingStaticScope();
 
     // Compute the number of nested scope objects that will actually be on the
     // scope chain at runtime, given the current staticScope.
     unsigned dynamicNestedScopeDepth();
 
-    bool enterNestedScope(StmtInfoBCE *stmt, ObjectBox *objbox, StmtType stmtType);
-    bool leaveNestedScope(StmtInfoBCE *stmt);
+    bool enterNestedScope(StmtInfoBCE* stmt, ObjectBox* objbox, StmtType stmtType);
+    bool leaveNestedScope(StmtInfoBCE* stmt);
 
-    bool enterBlockScope(StmtInfoBCE *stmtInfo, ObjectBox *objbox, JSOp initialValueOp,
+    bool enterBlockScope(StmtInfoBCE* stmtInfo, ObjectBox* objbox, JSOp initialValueOp,
                          unsigned alreadyPushed = 0);
 
-    bool computeAliasedSlots(Handle<StaticBlockObject *> blockObj);
+    bool computeAliasedSlots(Handle<StaticBlockObject*> blockObj);
 
-    bool lookupAliasedName(HandleScript script, PropertyName *name, uint32_t *pslot,
-                           ParseNode *pn = nullptr);
-    bool lookupAliasedNameSlot(PropertyName *name, ScopeCoordinate *sc);
+    bool lookupAliasedName(HandleScript script, PropertyName* name, uint32_t* pslot,
+                           ParseNode* pn = nullptr);
+    bool lookupAliasedNameSlot(PropertyName* name, ScopeCoordinate* sc);
 
     // Use this function instead of assigning directly to 'hops' to guard for
     // uint8_t overflows.
-    bool assignHops(ParseNode *pn, unsigned src, ScopeCoordinate *dst);
+    bool assignHops(ParseNode* pn, unsigned src, ScopeCoordinate* dst);
 
     // In a function, block-scoped locals go after the vars, and form part of the
     // fixed part of a stack frame.  Outside a function, there are no fixed vars,
     // but block-scoped locals still form part of the fixed part of a stack frame
     // and are thus addressable via GETLOCAL and friends.
-    void computeLocalOffset(Handle<StaticBlockObject *> blockObj);
+    void computeLocalOffset(Handle<StaticBlockObject*> blockObj);
 
-    bool flushPops(int *npops);
+    bool flushPops(int* npops);
 
-    bool emitCheck(ptrdiff_t delta, ptrdiff_t *offset);
+    bool emitCheck(ptrdiff_t delta, ptrdiff_t* offset);
 
     // Emit one bytecode.
     bool emit1(JSOp op);
@@ -466,7 +466,7 @@ struct BytecodeEmitter
 
     bool emitPrepareIteratorResult();
     bool emitFinishIteratorResult(bool done);
-    bool iteratorResultShape(unsigned *shape);
+    bool iteratorResultShape(unsigned* shape);
 
     bool emitYield(ParseNode* pn);
     bool emitYieldOp(JSOp op);
@@ -483,7 +483,7 @@ struct BytecodeEmitter
 
     bool emitElemOpBase(JSOp op);
     bool emitElemOp(ParseNode* pn, JSOp op);
-    bool emitElemIncDec(ParseNode *pn);
+    bool emitElemIncDec(ParseNode* pn);
 
     bool emitCatch(ParseNode* pn);
     bool emitIf(ParseNode* pn);
@@ -493,7 +493,7 @@ struct BytecodeEmitter
     MOZ_NEVER_INLINE bool emitLetBlock(ParseNode* pnLet);
     MOZ_NEVER_INLINE bool emitLexicalScope(ParseNode* pn);
     MOZ_NEVER_INLINE bool emitSwitch(ParseNode* pn);
-    MOZ_NEVER_INLINE bool emitTry(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitTry(ParseNode* pn);
 
     // EmitDestructuringLHS assumes the to-be-destructured value has been pushed on
     // the stack and emits code to destructure a single lhs expression (either a
@@ -558,21 +558,21 @@ struct BytecodeEmitter
     bool emitSelfHostedResumeGenerator(ParseNode* pn);
     bool emitSelfHostedForceInterpreter(ParseNode* pn);
 
-    bool emitDo(ParseNode *pn);
-    bool emitFor(ParseNode *pn, ptrdiff_t top);
-    bool emitForIn(ParseNode *pn, ptrdiff_t top);
-    bool emitForInOrOfVariables(ParseNode *pn, bool *letDecl);
-    bool emitNormalFor(ParseNode *pn, ptrdiff_t top);
-    bool emitWhile(ParseNode *pn, ptrdiff_t top);
+    bool emitDo(ParseNode* pn);
+    bool emitFor(ParseNode* pn, ptrdiff_t top);
+    bool emitForIn(ParseNode* pn, ptrdiff_t top);
+    bool emitForInOrOfVariables(ParseNode* pn, bool* letDecl);
+    bool emitNormalFor(ParseNode* pn, ptrdiff_t top);
+    bool emitWhile(ParseNode* pn, ptrdiff_t top);
 
-    bool emitBreak(PropertyName *label);
-    bool emitContinue(PropertyName *label);
+    bool emitBreak(PropertyName* label);
+    bool emitContinue(PropertyName* label);
 
-    bool emitDefaults(ParseNode *pn);
-    bool emitLexicalInitialization(ParseNode *pn, JSOp globalDefOp);
+    bool emitDefaults(ParseNode* pn);
+    bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
-    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockObject *> blockObj);
+    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockObject*> blockObj);
 
     // emitSpread expects the current index (I) of the array, the array itself
     // and the iterator to be on the stack in that order (iterator on the bottom).
@@ -590,9 +590,9 @@ struct BytecodeEmitter
     //
     // Please refer the comment above emitSpread for additional information about
     // stack convention.
-    bool emitForOf(StmtType type, ParseNode *pn, ptrdiff_t top);
+    bool emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top);
 
-    bool emitClass(ParseNode *pn);
+    bool emitClass(ParseNode* pn);
 };
 
 } /* namespace frontend */
