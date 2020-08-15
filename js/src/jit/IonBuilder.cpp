@@ -9572,10 +9572,9 @@ IonBuilder::jsop_not()
 {
     MDefinition* value = current->pop();
 
-    MNot* ins = MNot::New(alloc(), value);
+    MNot* ins = MNot::New(alloc(), value, constraints());
     current->add(ins);
     current->push(ins);
-    ins->cacheOperandMightEmulateUndefined(constraints());
     return true;
 }
 
