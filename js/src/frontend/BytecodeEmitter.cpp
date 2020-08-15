@@ -360,7 +360,7 @@ const char js_with_statement_str[] = "with statement";
 const char js_finally_block_str[]  = "finally block";
 const char js_script_str[]         = "script";
 
-static const char*  const statementName[] = {
+static const char * const statementName[] = {
     "label statement",       /* LABEL */
     "if statement",          /* IF */
     "else statement",        /* ELSE */
@@ -615,7 +615,7 @@ NonLocalExitScope::prepareForNonLocalJump(StmtInfoBCE* toStmt)
 
 #define FLUSH_POPS() if (npops && !bce->flushPops(&npops)) return false
 
-    for (StmtInfoBCE *stmt = bce->topStmt; stmt != toStmt; stmt = stmt->down) {
+    for (StmtInfoBCE* stmt = bce->topStmt; stmt != toStmt; stmt = stmt->down) {
         switch (stmt->type) {
           case STMT_FINALLY:
             FLUSH_POPS();
@@ -944,7 +944,7 @@ BytecodeEmitter::enterNestedScope(StmtInfoBCE* stmt, ObjectBox* objbox, StmtType
 
     pushStatement(stmt, stmtType, offset());
     scopeObj->initEnclosingNestedScope(enclosingStaticScope());
-    FinishPushNestedScope(this, stmt,* scopeObj);
+    FinishPushNestedScope(this, stmt, *scopeObj);
     MOZ_ASSERT(stmt->isNestedScope);
     stmt->isBlockScope = (stmtType == STMT_BLOCK);
 
@@ -7551,7 +7551,7 @@ BytecodeEmitter::emitTree(ParseNode* pn)
                     if (!ObjectElements::MakeElementsCopyOnWrite(cx, obj))
                         return false;
 
-    ObjectBox* objbox = parser->newObjectBox(obj);
+                    ObjectBox* objbox = parser->newObjectBox(obj);
                     if (!objbox)
                         return false;
 
@@ -7752,7 +7752,7 @@ BytecodeEmitter::setSrcNoteOffset(unsigned index, unsigned which, ptrdiff_t offs
     SrcNotesVector& notes = this->notes();
 
     /* Find the offset numbered which (i.e., skip exactly which offsets). */
-    jssrcnote *sn = &notes[index];
+    jssrcnote* sn = &notes[index];
     MOZ_ASSERT(SN_TYPE(sn) != SRC_XDELTA);
     MOZ_ASSERT((int) which < js_SrcNoteSpec[SN_TYPE(sn)].arity);
     for (sn++; which; sn++, which--) {
