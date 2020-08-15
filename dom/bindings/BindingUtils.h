@@ -2976,6 +2976,9 @@ ResolveGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj,
               JS::Handle<jsid> aId, bool* aResolvedp);
 
 bool
+MayResolveGlobal(const JSAtomState& aNames, jsid aId, JSObject* aMaybeObj);
+
+bool
 EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj);
 
 template <class T>

@@ -2821,6 +2821,12 @@ mozilla::dom::GetNameSpaceManager()
   return gNameSpaceManager;
 }
 
+nsScriptNameSpaceManager*
+mozilla::dom::PeekNameSpaceManager()
+{
+  return gNameSpaceManager;
+}
+
 void
 mozilla::dom::ShutdownJSEnvironment()
 {
