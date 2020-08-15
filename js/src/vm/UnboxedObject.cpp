@@ -435,7 +435,7 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
 
         PlainObject* templateObject = NewObjectWithGroup<PlainObject>(cx, replacementNewGroup,
                                                                       layout.getAllocKind(),
-                                                                      MaybeSingletonObject);
+                                                                      TenuredObject);
         if (!templateObject)
             return false;
 
