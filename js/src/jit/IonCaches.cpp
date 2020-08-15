@@ -3961,7 +3961,7 @@ GetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
     AutoDetectInvalidation adi(cx, res, ion);
 
     if (cache.isDisabled()) {
-        if (!GetObjectElementOperation(cx, JSOp(*pc), obj, idval, res))
+        if (!GetObjectElementOperation(cx, JSOp(*pc), obj, obj, idval, res))
             return false;
         if (!cache.monitoredResult())
             TypeScript::Monitor(cx, script, pc, res);
@@ -4010,7 +4010,7 @@ GetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
         }
     }
 
-    if (!GetObjectElementOperation(cx, JSOp(*pc), obj, idval, res))
+    if (!GetObjectElementOperation(cx, JSOp(*pc), obj, obj, idval, res))
         return false;
 
     // Disable cache when we reach max stubs or update failed too much.
