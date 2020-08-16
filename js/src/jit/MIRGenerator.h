@@ -37,8 +37,8 @@ class MIRGenerator
   public:
     MIRGenerator(CompileCompartment* compartment, const JitCompileOptions& options,
                  TempAllocator* alloc, MIRGraph* graph,
-                 CompileInfo *info, const OptimizationInfo *optimizationInfo,
-                 Label *outOfBoundsLabel = nullptr, bool usesSignalHandlersForAsmJSOOB = false);
+                 CompileInfo* info, const OptimizationInfo* optimizationInfo,
+                 Label* outOfBoundsLabel = nullptr, bool usesSignalHandlersForAsmJSOOB = false);
 
     TempAllocator& alloc() {
         return *alloc_;
@@ -200,12 +200,12 @@ class MIRGenerator
     // CodeGenerator::link).
     ObjectVector nurseryObjects_;
 
-    Label *outOfBoundsLabel_;
+    Label* outOfBoundsLabel_;
 #if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
     bool usesSignalHandlersForAsmJSOOB_;
 #endif
 
-    void addAbortedPreliminaryGroup(ObjectGroup *group);
+    void addAbortedPreliminaryGroup(ObjectGroup* group);
 
     void setForceAbort() {
         shouldForceAbort_ = true;
@@ -230,10 +230,10 @@ class MIRGenerator
         return nurseryObjects_;
     }
 
-    Label *outOfBoundsLabel() const {
+    Label* outOfBoundsLabel() const {
         return outOfBoundsLabel_;
     }
-    bool needsAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *access) const {
+    bool needsAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access) const {
         // A heap access needs a bounds-check branch if we're not relying on signal
         // handlers to catch errors, and if it's not proven to be within bounds.
         // We use signal-handlers on x64, but on x86 there isn't enough address

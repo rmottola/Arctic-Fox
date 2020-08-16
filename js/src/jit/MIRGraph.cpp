@@ -19,8 +19,8 @@ using mozilla::Swap;
 
 MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOptions& options,
                            TempAllocator* alloc, MIRGraph* graph, CompileInfo* info,
-                           const OptimizationInfo *optimizationInfo,
-                           Label *outOfBoundsLabel, bool usesSignalHandlersForAsmJSOOB)
+                           const OptimizationInfo* optimizationInfo,
+                           Label* outOfBoundsLabel, bool usesSignalHandlersForAsmJSOOB)
   : compartment(compartment),
     info_(info),
     optimizationInfo_(optimizationInfo),
