@@ -200,12 +200,12 @@ class MIRGenerator
     // CodeGenerator::link).
     ObjectVector nurseryObjects_;
 
+    void addAbortedPreliminaryGroup(ObjectGroup* group);
+
     Label* outOfBoundsLabel_;
 #if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
     bool usesSignalHandlersForAsmJSOOB_;
 #endif
-
-    void addAbortedPreliminaryGroup(ObjectGroup* group);
 
     void setForceAbort() {
         shouldForceAbort_ = true;
