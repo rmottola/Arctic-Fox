@@ -2523,6 +2523,7 @@ class FunctionCompiler
                                            options, alloc_,
                                            graph_, info_, optimizationInfo,
                                            &m().onOutOfBoundsLabel(),
+                                           /* conversionErrorLabel = */ nullptr,
                                            m().usesSignalHandlersForOOB());
 
         if (!newBlock(/* pred = */ nullptr, &curBlock_, fn_))
