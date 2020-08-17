@@ -4370,10 +4370,10 @@ js::DeletePropertyJit(JSContext* cx, HandleValue v, HandlePropertyName name, boo
     return true;
 }
 
-template bool js::DeletePropertyJit<true> (JSContext *cx, HandleValue val, HandlePropertyName name,
-                                           bool *bp);
-template bool js::DeletePropertyJit<false>(JSContext *cx, HandleValue val, HandlePropertyName name,
-                                           bool *bp);
+template bool js::DeletePropertyJit<true> (JSContext* cx, HandleValue val, HandlePropertyName name,
+                                           bool* bp);
+template bool js::DeletePropertyJit<false>(JSContext* cx, HandleValue val, HandlePropertyName name,
+                                           bool* bp);
 
 template <bool strict>
 bool
