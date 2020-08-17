@@ -815,7 +815,7 @@ js::InvokeConstructor(JSContext* cx, Value fval, unsigned argc, const Value* arg
 }
 
 bool
-js::InvokeGetter(JSContext *cx, JSObject *obj, Value fval, MutableHandleValue rval)
+js::InvokeGetter(JSContext* cx, JSObject* obj, Value fval, MutableHandleValue rval)
 {
     /*
      * Invoke could result in another try to get or set the same id again, see
@@ -965,7 +965,7 @@ js::HasInstance(JSContext* cx, HandleObject obj, HandleValue v, bool* bp)
 // XXX RM FIXME 2018-12-10 try to update this
     RootedValue val(cx, ObjectValue(*obj));
     ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
-                     JSDVG_SEARCH_STACK, val, js::NullPtr());
+                        JSDVG_SEARCH_STACK, val, NullPtr());
     return false;
 }
 
@@ -2303,7 +2303,7 @@ CASE(JSOP_BINDNAME)
         RootedObject& scopeChain = rootObject0;
         scopeChain = REGS.fp()->scopeChain();
 
-        RootedPropertyName &name = rootName0;
+        RootedPropertyName& name = rootName0;
         name = script->getName(REGS.pc);
 
         /* Assigning to an undeclared name adds a property to the global object. */
