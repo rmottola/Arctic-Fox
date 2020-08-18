@@ -579,16 +579,16 @@ BaselineInspector::templateCallObject()
     return &res->as<CallObject>();
 }
 
-static Shape *
-GlobalShapeForGetPropFunction(ICStub *stub)
+static Shape*
+GlobalShapeForGetPropFunction(ICStub* stub)
 {
     if (stub->isGetProp_CallNative()) {
-        ICGetProp_CallNative *nstub = stub->toGetProp_CallNative();
+        ICGetProp_CallNative* nstub = stub->toGetProp_CallNative();
         if (nstub->isOwnGetter())
             return nullptr;
 
-        const ReceiverGuard &guard = nstub->receiverGuard();
-        if (Shape *shape = guard.shape()) {
+        const ReceiverGuard& guard = nstub->receiverGuard();
+        if (Shape* shape = guard.shape()) {
             if (shape->getObjectClass()->flags & JSCLASS_IS_GLOBAL)
                 return shape;
         }
