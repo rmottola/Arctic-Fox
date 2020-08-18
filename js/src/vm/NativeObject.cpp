@@ -1144,14 +1144,14 @@ UpdateShapeTypeAndValue(ExclusiveContext* cx, NativeObject* obj, Shape* shape, c
 }
 
 static bool
-NativeSetExistingDataProperty(JSContext *cx, HandleNativeObject obj, HandleShape shape,
-                              HandleValue v, HandleValue receiver, ObjectOpResult &result);
+NativeSetExistingDataProperty(JSContext* cx, HandleNativeObject obj, HandleShape shape,
+                              HandleValue v, HandleValue receiver, ObjectOpResult& result);
 
 static inline bool
-DefinePropertyOrElement(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+DefinePropertyOrElement(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                         GetterOp getter, SetterOp setter,
                         unsigned attrs, HandleValue value,
-                        bool callSetterAfterwards, ObjectOpResult &result)
+                        bool callSetterAfterwards, ObjectOpResult& result)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);
     MOZ_ASSERT(setter != JS_StrictPropertyStub);
@@ -1329,7 +1329,7 @@ PurgeScopeChain(ExclusiveContext* cx, HandleObject obj, HandleId id)
  * throw if so.
  */
 static inline bool
-CheckAccessorRedefinition(ExclusiveContext *cx, HandleObject obj, HandleShape shape,
+CheckAccessorRedefinition(ExclusiveContext* cx, HandleObject obj, HandleShape shape,
                           GetterOp getter, SetterOp setter, HandleId id, unsigned attrs)
 {
     MOZ_ASSERT(shape->isAccessorDescriptor());
@@ -1523,9 +1523,9 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
 }
 
 bool
-js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                          HandleValue value, GetterOp getter, SetterOp setter, unsigned attrs,
-                         ObjectOpResult &result)
+                         ObjectOpResult& result)
 {
     Rooted<PropertyDescriptor> desc(cx);
     desc.initFields(obj, value, attrs, getter, setter);
@@ -1533,18 +1533,18 @@ js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId 
 }
 
 bool
-js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
                          HandleValue value, GetterOp getter, SetterOp setter, unsigned attrs,
-                         ObjectOpResult &result)
+                         ObjectOpResult& result)
 {
     RootedId id(cx, NameToId(name));
     return NativeDefineProperty(cx, obj, id, value, getter, setter, attrs, result);
 }
 
 bool
-js::NativeDefineElement(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index,
+js::NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index,
                         HandleValue value, GetterOp getter, SetterOp setter, unsigned attrs,
-                        ObjectOpResult &result)
+                        ObjectOpResult& result)
 {
     RootedId id(cx);
     if (index <= JSID_INT_MAX) {
@@ -1561,7 +1561,7 @@ js::NativeDefineElement(ExclusiveContext *cx, HandleNativeObject obj, uint32_t i
 }
 
 bool
-js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                          HandleValue value, GetterOp getter, SetterOp setter,
                          unsigned attrs)
 {
@@ -1581,7 +1581,7 @@ js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId 
 }
 
 bool
-js::NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
                          HandleValue value, GetterOp getter, SetterOp setter,
                          unsigned attrs)
 {
@@ -1855,7 +1855,7 @@ GetNonexistentProperty(JSContext* cx, NativeObject* obj, jsid id, JSObject* rece
 }
 
 static inline bool
-GeneralizedGetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleObject receiver,
+GeneralizedGetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleObject receiver,
                        IsNameLookup nameLookup, MutableHandleValue vp)
 {
     JS_CHECK_RECURSION(cx, return false);
@@ -1880,7 +1880,7 @@ GeneralizedGetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleObjec
 }
 
 static inline bool
-GeneralizedGetProperty(JSContext *cx, JSObject *obj, jsid id, JSObject *receiver,
+GeneralizedGetProperty(JSContext* cx, JSObject* obj, jsid id, JSObject* receiver,
                        IsNameLookup nameLookup, FakeMutableHandle<Value> vp)
 {
     JS_CHECK_RECURSION_DONT_REPORT(cx, return false);
@@ -2004,8 +2004,8 @@ MaybeReportUndeclaredVarAssignment(JSContext* cx, JSString* propname)
  * is really old code and there are a few barnacles.
  */
 bool
-js::SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                          HandleValue receiverValue, bool objHasOwn, ObjectOpResult &result)
+js::SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                          HandleValue receiverValue, bool objHasOwn, ObjectOpResult& result)
 {
     // Step 5.b.
     if (!receiverValue.isObject())
@@ -2073,8 +2073,8 @@ js::SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleId id, HandleVa
 // When setting |id| for |receiver| and |obj| has no property for id, continue
 // the search up the prototype chain.
 bool
-js::SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                       HandleValue receiver, ObjectOpResult &result)
+js::SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                       HandleValue receiver, ObjectOpResult& result)
 {
     MOZ_ASSERT(!obj->is<ProxyObject>());
 
@@ -2092,8 +2092,8 @@ js::SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleId id, HandleValue
  * steps 4.d.i and 5.
  */
 static bool
-SetNonexistentProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleValue v,
-                       HandleValue receiver, QualifiedBool qualified, ObjectOpResult &result)
+SetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue v,
+                       HandleValue receiver, QualifiedBool qualified, ObjectOpResult& result)
 {
     // We should never add properties to lexical blocks.
     MOZ_ASSERT_IF(receiver.isObject(), !receiver.toObject().is<BlockObject>());
@@ -2111,8 +2111,8 @@ SetNonexistentProperty(JSContext *cx, HandleNativeObject obj, HandleId id, Handl
  * array element.
  */
 static bool
-SetDenseOrTypedArrayElement(JSContext *cx, HandleNativeObject obj, uint32_t index, HandleValue v,
-                            ObjectOpResult &result)
+SetDenseOrTypedArrayElement(JSContext* cx, HandleNativeObject obj, uint32_t index, HandleValue v,
+                            ObjectOpResult& result)
 {
     if (IsAnyTypedArray(obj)) {
         double d;
@@ -2147,8 +2147,8 @@ SetDenseOrTypedArrayElement(JSContext *cx, HandleNativeObject obj, uint32_t inde
  * conforms to no standard and there is a lot of legacy baggage here.
  */
 static bool
-NativeSetExistingDataProperty(JSContext *cx, HandleNativeObject obj, HandleShape shape,
-                              HandleValue v, HandleValue receiver, ObjectOpResult &result)
+NativeSetExistingDataProperty(JSContext* cx, HandleNativeObject obj, HandleShape shape,
+                              HandleValue v, HandleValue receiver, ObjectOpResult& result)
 {
     MOZ_ASSERT(obj->isNative());
     MOZ_ASSERT(shape->isDataDescriptor());
@@ -2200,9 +2200,9 @@ NativeSetExistingDataProperty(JSContext *cx, HandleNativeObject obj, HandleShape
  * dense or typed array element (i.e. not actually a pointer to a Shape).
  */
 static bool
-SetExistingProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleValue v,
+SetExistingProperty(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue v,
                     HandleValue receiver, HandleNativeObject pobj, HandleShape shape,
-                    ObjectOpResult &result)
+                    ObjectOpResult& result)
 {
     // Step 5 for dense elements.
     if (IsImplicitDenseOrTypedArrayElement(shape)) {
@@ -2270,13 +2270,13 @@ SetExistingProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleVa
 }
 
 bool
-js::NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                      HandleValue receiver, QualifiedBool qualified, ObjectOpResult &result)
+js::NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
+                      HandleValue receiver, QualifiedBool qualified, ObjectOpResult& result)
 {
     // Fire watchpoints, if any.
     RootedValue v(cx, value);
     if (MOZ_UNLIKELY(obj->watched())) {
-        WatchpointMap *wpmap = cx->compartment()->watchpointMap;
+        WatchpointMap* wpmap = cx->compartment()->watchpointMap;
         if (wpmap && !wpmap->triggerWatchpoint(cx, obj, id, &v))
             return false;
     }
@@ -2339,8 +2339,8 @@ js::NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleId id, Handle
 }
 
 bool
-js::NativeSetElement(JSContext *cx, HandleNativeObject obj, uint32_t index, HandleValue v,
-                     HandleValue receiver, ObjectOpResult &result)
+js::NativeSetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, HandleValue v,
+                     HandleValue receiver, ObjectOpResult& result)
 {
     RootedId id(cx);
     if (!IndexToId(cx, index, &id))
@@ -2352,8 +2352,8 @@ js::NativeSetElement(JSContext *cx, HandleNativeObject obj, uint32_t index, Hand
 
 // ES6 draft rev31 9.1.10 [[Delete]]
 bool
-js::NativeDeleteProperty(JSContext *cx, HandleNativeObject obj, HandleId id,
-                         ObjectOpResult &result)
+js::NativeDeleteProperty(JSContext* cx, HandleNativeObject obj, HandleId id,
+                         ObjectOpResult& result)
 {
     // Steps 2-3.
     RootedShape shape(cx);
