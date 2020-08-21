@@ -404,7 +404,7 @@ class NativeObject : public JSObject
     uint32_t getDenseInitializedLength() {
         return getElementsHeader()->initializedLength;
     }
-    uint32_t getDenseCapacity() {
+    uint32_t getDenseCapacity() const {
         return getElementsHeader()->capacity;
     }
 
