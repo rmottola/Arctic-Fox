@@ -1055,7 +1055,7 @@ js::NativeLookupElement(JSContext *cx, HandleNativeObject obj, uint32_t index,
  * both while saving cycles for classes that stub their addProperty hook.
  */
 static inline bool
-CallAddPropertyHook(ExclusiveContext *cx, HandleNativeObject obj, HandleShape shape,
+CallAddPropertyHook(ExclusiveContext* cx, HandleNativeObject obj, HandleShape shape,
                     HandleValue nominal)
 {
     if (JSAddPropertyOp addProperty = obj->getClass()->addProperty) {
@@ -1083,12 +1083,12 @@ CallAddPropertyHook(ExclusiveContext *cx, HandleNativeObject obj, HandleShape sh
 }
 
 static inline bool
-CallAddPropertyHookDense(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index,
+CallAddPropertyHookDense(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index,
                          HandleValue nominal)
 {
     // Inline addProperty for array objects.
     if (obj->is<ArrayObject>()) {
-        ArrayObject *arr = &obj->as<ArrayObject>();
+        ArrayObject* arr = &obj->as<ArrayObject>();
         uint32_t length = arr->length();
         if (index >= length)
             arr->setLength(cx, index + 1);
