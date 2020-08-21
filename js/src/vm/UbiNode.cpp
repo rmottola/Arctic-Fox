@@ -225,7 +225,7 @@ TracerConcreteWithCompartment<Referent>::compartment() const
 }
 
 template<typename Referent>
-const char *
+const char*
 TracerConcreteWithCompartmentAndClassName<Referent>::jsObjectClassName() const
 {
     return TracerBase::get().getClass()->name;
