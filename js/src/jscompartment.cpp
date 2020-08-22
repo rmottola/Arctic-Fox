@@ -705,7 +705,7 @@ JSCompartment::setNewObjectMetadata(JSContext* cx, JSObject* obj)
 {
     MOZ_ASSERT(this == cx->compartment());
 
-    if (JSObject* metadata = objectMetadataCallback(cx)) {
+    if (JSObject* metadata = objectMetadataCallback(cx, obj)) {
         if (!objectMetadataTable) {
             objectMetadataTable = cx->new_<ObjectWeakMap>(cx);
             if (!objectMetadataTable)
