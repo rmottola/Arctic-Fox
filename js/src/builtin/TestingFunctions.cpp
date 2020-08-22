@@ -2504,6 +2504,32 @@ SetLazyParsingEnabled(JSContext *cx, unsigned argc, Value *vp)
     return true;
 }
 
+static bool
+GetConstructorName(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "getConstructorName", 1))
+        return false;
+
+    if (!args[0].isObject()) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
+                             "getConstructorName", "Object",
+                             InformalValueTypeName(args[0]));
+        return false;
+    }
+
+    RootedAtom name(cx);
+    if (!args[0].toObject().constructorDisplayAtom(cx, &name))
+        return false;
+
+    if (name) {
+        args.rval().setString(name);
+    } else {
+        args.rval().setNull();
+    }
+    return true;
+}
+
 static const JSFunctionSpecWithHelp TestingFunctions[] = {
     JS_FN_HELP("gc", ::GC, 0, 0,
 "gc([obj] | 'compartment' [, 'shrinking'])",
@@ -2891,6 +2917,11 @@ gc::ZealModeHelpText),
     JS_FN_HELP("setLazyParsingEnabled", SetLazyParsingEnabled, 1, 0,
 "setLazyParsingEnabled(bool)",
 "  Enable or disable lazy parsing in the current compartment.  The default is enabled."),
+
+    JS_FN_HELP("getConstructorName", GetConstructorName, 1, 0,
+"getConstructorName(object)",
+"  If the given object was created with `new Ctor`, return the constructor's display name. "
+"  Otherwise, return null."),
 
     JS_FS_HELP_END
 };
