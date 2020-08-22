@@ -1724,6 +1724,28 @@ Debugger::isDebuggee(const JSCompartment* compartment) const
     return compartment->isDebuggee() && debuggees.has(compartment->maybeGlobal());
 }
 
+/* static */ Debugger::AllocationSite*
+Debugger::AllocationSite::create(JSContext* cx, HandleObject frame, int64_t when, HandleObject obj)
+{
+    assertSameCompartment(cx, frame);
+
+    RootedAtom ctorName(cx);
+    {
+        AutoCompartment ac(cx, obj);
+        if (!obj->constructorDisplayAtom(cx, &ctorName))
+            return nullptr;
+    }
+
+    AllocationSite* allocSite = cx->new_<AllocationSite>(frame, when);
+    if (!allocSite)
+        return nullptr;
+
+    allocSite->className = obj->getClass()->name;
+    allocSite->ctorName = ctorName.get();
+    return allocSite;
+}
+
+
 bool
 Debugger::appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
                                int64_t when)
@@ -1733,7 +1755,7 @@ Debugger::appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame
     if (!cx->compartment()->wrap(cx, &wrappedFrame))
         return false;
 
-    AllocationSite* allocSite = cx->new_<AllocationSite>(wrappedFrame, when, obj->getClass()->name);
+    AllocationSite* allocSite = AllocationSite::create(cx, wrappedFrame, when, obj);
     if (!allocSite)
         return false;
 
@@ -2394,6 +2416,8 @@ Debugger::trace(JSTracer* trc)
     for (AllocationSite* s = allocationsLog.getFirst(); s; s = s->getNext()) {
         if (s->frame)
             TraceEdge(trc, &s->frame, "allocation log SavedFrame");
+        if (s->ctorName)
+            TraceEdge(trc, &s->ctorName, "allocation log constructor name");
     }
 
     /* Trace the weak map from JSScript instances to Debugger.Script objects. */
