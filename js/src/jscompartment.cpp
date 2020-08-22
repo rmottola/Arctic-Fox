@@ -701,11 +701,11 @@ JSCompartment::clearObjectMetadata()
 }
 
 void
-JSCompartment::setNewObjectMetadata(JSContext *cx, JSObject *obj)
+JSCompartment::setNewObjectMetadata(JSContext* cx, JSObject* obj)
 {
     MOZ_ASSERT(this == cx->compartment());
 
-    if (JSObject *metadata = objectMetadataCallback(cx)) {
+    if (JSObject* metadata = objectMetadataCallback(cx)) {
         if (!objectMetadataTable) {
             objectMetadataTable = cx->new_<ObjectWeakMap>(cx);
             if (!objectMetadataTable)
@@ -717,7 +717,7 @@ JSCompartment::setNewObjectMetadata(JSContext *cx, JSObject *obj)
 }
 
 static bool
-AddInnerLazyFunctionsFromScript(JSScript *script, AutoObjectVector& lazyFunctions)
+AddInnerLazyFunctionsFromScript(JSScript* script, AutoObjectVector& lazyFunctions)
 {
     if (!script->hasObjects())
         return true;

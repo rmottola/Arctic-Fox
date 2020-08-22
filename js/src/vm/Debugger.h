@@ -667,7 +667,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static inline void onNewScript(JSContext* cx, HandleScript script);
     static inline void onNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global);
     static inline bool onLogAllocationSite(JSContext* cx, HandleSavedFrame frame, int64_t when);
-    static inline void onGarbageCollection(JSRuntime *rt, const gcstats::Statistics &stats);
+    static inline void onGarbageCollection(JSRuntime* rt, const gcstats::Statistics& stats);
     static JSTrapStatus onTrap(JSContext* cx, MutableHandleValue vp);
     static JSTrapStatus onSingleStep(JSContext* cx, MutableHandleValue vp);
     static bool handleBaselineOsr(JSContext* cx, InterpreterFrame* from, jit::BaselineFrame* to);
@@ -984,7 +984,7 @@ Debugger::onLogAllocationSite(JSContext* cx, HandleSavedFrame frame, int64_t whe
 }
 
 /* static */ void
-Debugger::onGarbageCollection(JSRuntime *rt, const gcstats::Statistics &stats)
+Debugger::onGarbageCollection(JSRuntime* rt, const gcstats::Statistics &stats)
 {
     for (Debugger *dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext()) {
         if (dbg->debuggeeWasCollected && dbg->getHook(OnGarbageCollection)) {
