@@ -1115,7 +1115,7 @@ GetInitialHeap(NewObjectKind newKind, const Class* clasp)
 {
     if (newKind != GenericObject)
         return gc::TenuredHeap;
-    if (clasp->finalize && !(clasp->flags & JSCLASS_FINALIZE_FROM_NURSERY))
+    if (clasp->finalize && !(clasp->flags & JSCLASS_SKIP_NURSERY_FINALIZE))
         return gc::TenuredHeap;
     return gc::DefaultHeap;
 }
