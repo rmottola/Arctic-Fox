@@ -565,13 +565,13 @@ js::Nursery::markTraceList(MinorCollectionTracer* trc, const int32_t* traceList,
     }
     traceList++;
     while (*traceList != -1) {
-        JSObject** pobj = reinterpret_cast<JSObject **>(memory + *traceList);
+        JSObject** pobj = reinterpret_cast<JSObject**>(memory + *traceList);
         markObject(trc, pobj);
         traceList++;
     }
     traceList++;
     while (*traceList != -1) {
-        HeapSlot* pslot = reinterpret_cast<HeapSlot *>(memory + *traceList);
+        HeapSlot* pslot = reinterpret_cast<HeapSlot*>(memory + *traceList);
         markSlot(trc, pslot);
         traceList++;
     }
@@ -611,8 +611,8 @@ js::Nursery::moveToTenured(MinorCollectionTracer* trc, JSObject* src)
 }
 
 MOZ_ALWAYS_INLINE size_t
-js::Nursery::moveObjectToTenured(MinorCollectionTracer *trc,
-                                 JSObject *dst, JSObject *src, AllocKind dstKind)
+js::Nursery::moveObjectToTenured(MinorCollectionTracer* trc,
+                                 JSObject* dst, JSObject* src, AllocKind dstKind)
 {
     size_t srcSize = Arena::thingSize(dstKind);
     size_t tenuredSize = srcSize;

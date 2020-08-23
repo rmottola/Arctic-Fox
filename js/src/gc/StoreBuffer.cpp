@@ -47,12 +47,12 @@ StoreBuffer::SlotsEdge::mark(JSTracer* trc) const
 }
 
 void
-StoreBuffer::WholeCellEdges::mark(JSTracer *trc) const
+StoreBuffer::WholeCellEdges::mark(JSTracer* trc) const
 {
     MOZ_ASSERT(edge->isTenured());
     JSGCTraceKind kind = GetGCThingTraceKind(edge);
     if (kind <= JSTRACE_OBJECT) {
-        JSObject *object = static_cast<JSObject *>(edge);
+        JSObject* object = static_cast<JSObject*>(edge);
         if (object->is<ArgumentsObject>())
             ArgumentsObject::trace(trc, object);
         object->traceChildren(trc);
@@ -63,7 +63,7 @@ StoreBuffer::WholeCellEdges::mark(JSTracer *trc) const
 }
 
 void
-StoreBuffer::CellPtrEdge::mark(JSTracer *trc) const
+StoreBuffer::CellPtrEdge::mark(JSTracer* trc) const
 {
     if (!*edge)
         return;
