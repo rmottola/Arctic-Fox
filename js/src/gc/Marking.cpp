@@ -313,23 +313,39 @@ ShouldMarkCrossCompartment(JSTracer* trc, JSObject* src, Value val)
     return val.isMarkable() && ShouldMarkCrossCompartment(trc, src, (Cell*)val.toGCThing());
 }
 
-template <typename T>
-static bool
-ZoneIsAtomsZoneForString(JSRuntime* rt, T* thing)
+static void
+AssertZoneIsMarking(Cell* thing)
 {
-    JSGCTraceKind kind = GetGCThingTraceKind(thing);
-    if (kind == JSTRACE_STRING || kind == JSTRACE_SYMBOL)
-        return rt->isAtomsZone(thing->zone());
-    return false;
+    MOZ_ASSERT(TenuredCell::fromPointer(thing)->zone()->isGCMarking());
 }
 
-#define JS_COMPARTMENT_ASSERT(rt, thing) \
-    MOZ_ASSERT((thing)->zone()->isGCMarking() || ZoneIsAtomsZoneForString((rt), (thing)))
+static void
+AssertZoneIsMarking(JSString* str)
+{
+#ifdef DEBUG
+    Zone* zone = TenuredCell::fromPointer(str)->zone();
+    JSRuntime* rt = str->runtimeFromMainThread();
+    MOZ_ASSERT(zone->isGCMarking() || rt->isAtomsZone(zone));
+#endif
+}
 
-#define JS_ROOT_MARKING_ASSERT(trc) \
-    MOZ_ASSERT_IF(trc->isMarkingTracer(), \
-                  trc->runtime()->gc.state() == NO_INCREMENTAL || \
+static void
+AssertZoneIsMarking(JS::Symbol* sym)
+{
+#ifdef DEBUG
+    Zone* zone = TenuredCell::fromPointer(sym)->zone();
+    JSRuntime* rt = sym->runtimeFromMainThread();
+    MOZ_ASSERT(zone->isGCMarking() || rt->isAtomsZone(zone));
+#endif
+}
+
+static void
+AssertRootMarkingPhase(JSTracer* trc)
+{
+    MOZ_ASSERT_IF(trc->isMarkingTracer(),
+                  trc->runtime()->gc.state() == NO_INCREMENTAL ||
                   trc->runtime()->gc.state() == MARK_ROOTS);
+}
 
 
 /*** Tracing Interface ***************************************************************************/
@@ -441,7 +457,7 @@ template <typename T>
 void
 js::TraceRoot(JSTracer* trc, T* thingp, const char* name)
 {
-    JS_ROOT_MARKING_ASSERT(trc);
+    AssertRootMarkingPhase(trc);
     DispatchToTracer(trc, ConvertToBase(thingp), name);
 }
 
@@ -461,7 +477,7 @@ template <typename T>
 void
 js::TraceRootRange(JSTracer* trc, size_t len, T* vec, const char* name)
 {
-    JS_ROOT_MARKING_ASSERT(trc);
+    AssertRootMarkingPhase(trc);
     JS::AutoTracingIndex index(trc);
     for (auto i : MakeRange(len)) {
         if (InternalGCMethods<T>::isMarkable(vec[i]))
@@ -507,7 +523,7 @@ template <typename T>
 void
 js::TraceProcessGlobalRoot(JSTracer* trc, T* thing, const char* name)
 {
-    JS_ROOT_MARKING_ASSERT(trc);
+    AssertRootMarkingPhase(trc);
     MOZ_ASSERT(ThingIsPermanentAtomOrWellKnownSymbol(thing));
 
     // We have to mark permanent atoms and well-known symbols through a special
@@ -776,7 +792,7 @@ bool
 js::GCMarker::mark(T* thing)
 {
     CheckTracedThing(this, thing);
-    JS_COMPARTMENT_ASSERT(runtime(), thing);
+    AssertZoneIsMarking(thing);
     MOZ_ASSERT(!IsInsideNursery(gc::TenuredCell::fromPointer(thing)));
     return gc::ParticipatesInCC<T>::value
            ? gc::TenuredCell::fromPointer(thing)->markIfUnmarked(markColor())
@@ -900,7 +916,7 @@ JSString::traceBase(JSTracer* trc)
 inline void
 js::GCMarker::eagerlyMarkChildren(JSLinearString* linearStr)
 {
-    JS_COMPARTMENT_ASSERT(runtime(), linearStr);
+    AssertZoneIsMarking(linearStr);
     MOZ_ASSERT(linearStr->isMarked());
     MOZ_ASSERT(linearStr->JSString::isLinear());
 
@@ -910,7 +926,7 @@ js::GCMarker::eagerlyMarkChildren(JSLinearString* linearStr)
         MOZ_ASSERT(linearStr->JSString::isLinear());
         if (linearStr->isPermanentAtom())
             break;
-        JS_COMPARTMENT_ASSERT(runtime(), linearStr);
+        AssertZoneIsMarking(linearStr);
         if (!mark(static_cast<JSString*>(linearStr)))
             break;
     }
@@ -937,7 +953,7 @@ js::GCMarker::eagerlyMarkChildren(JSRope* rope)
     while (true) {
         JS_DIAGNOSTICS_ASSERT(GetGCThingTraceKind(rope) == JSTRACE_STRING);
         JS_DIAGNOSTICS_ASSERT(rope->JSString::isRope());
-        JS_COMPARTMENT_ASSERT(runtime(), rope);
+        AssertZoneIsMarking(rope);
         MOZ_ASSERT(rope->isMarked());
         JSRope* next = nullptr;
 
@@ -1132,7 +1148,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
 
       case ObjectTag: {
         obj = reinterpret_cast<JSObject*>(addr);
-        JS_COMPARTMENT_ASSERT(runtime(), obj);
+        AssertZoneIsMarking(obj);
         goto scan_obj;
       }
 
@@ -1219,7 +1235,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
 
   scan_obj:
     {
-        JS_COMPARTMENT_ASSERT(runtime(), obj);
+        AssertZoneIsMarking(obj);
 
         budget.step();
         if (budget.isOverBudget()) {
@@ -1912,7 +1928,7 @@ FOR_EACH_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS)
 void
 TypeSet::MarkTypeRoot(JSTracer* trc, TypeSet::Type* v, const char* name)
 {
-    JS_ROOT_MARKING_ASSERT(trc);
+    AssertRootMarkingPhase(trc);
     MarkTypeUnbarriered(trc, v, name);
 }
 
