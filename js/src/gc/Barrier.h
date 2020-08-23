@@ -793,6 +793,8 @@ class HeapSlot : public BarrieredBase<Value>
         reinterpret_cast<HeapSlot*>(const_cast<Value*>(&target))->post(owner, kind, slot, target);
     }
 
+    Value* unsafeGet() { return &value; }
+
   private:
     void post(NativeObject* owner, Kind kind, uint32_t slot, const Value& target) {
         MOZ_ASSERT(preconditionForWriteBarrierPost(owner, kind, slot, target));
@@ -803,22 +805,6 @@ class HeapSlot : public BarrieredBase<Value>
         }
     }
 };
-
-static inline const Value*
-Valueify(const BarrieredBase<Value>* array)
-{
-    JS_STATIC_ASSERT(sizeof(HeapValue) == sizeof(Value));
-    JS_STATIC_ASSERT(sizeof(HeapSlot) == sizeof(Value));
-    return (const Value*)array;
-}
-
-static inline HeapValue*
-HeapValueify(Value* v)
-{
-    JS_STATIC_ASSERT(sizeof(HeapValue) == sizeof(Value));
-    JS_STATIC_ASSERT(sizeof(HeapSlot) == sizeof(Value));
-    return (HeapValue*)v;
-}
 
 class HeapSlotArray
 {
@@ -838,7 +824,11 @@ class HeapSlotArray
 #endif
     {}
 
-    operator const Value*() const { return Valueify(array); }
+    operator const Value*() const {
+        JS_STATIC_ASSERT(sizeof(HeapValue) == sizeof(Value));
+        JS_STATIC_ASSERT(sizeof(HeapSlot) == sizeof(Value));
+        return reinterpret_cast<const Value*>(array);
+    }
     operator HeapSlot*() const { MOZ_ASSERT(allowWrite()); return array; }
 
     HeapSlotArray operator +(int offset) const { return HeapSlotArray(array + offset, allowWrite()); }
