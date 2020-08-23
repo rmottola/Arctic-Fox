@@ -1010,7 +1010,6 @@ class GCRuntime
      */
     mozilla::Atomic<uint32_t, mozilla::ReleaseAcquire> numArenasFreeCommitted;
     void* verifyPreData;
-    void* verifyPostData;
     bool chunkAllocationSinceLastGC;
     int64_t nextFullGCTime;
     int64_t lastGCTime;

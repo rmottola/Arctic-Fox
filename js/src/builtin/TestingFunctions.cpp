@@ -586,13 +586,13 @@ VerifyPreBarriers(JSContext* cx, unsigned argc, jsval* vp)
 static bool
 VerifyPostBarriers(JSContext* cx, unsigned argc, jsval* vp)
 {
+    // This is a no-op since the post barrier verifier was removed.
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length()) {
         RootedObject callee(cx, &args.callee());
         ReportUsageError(cx, callee, "Too many arguments");
         return false;
     }
-    gc::VerifyBarriers(cx->runtime(), gc::PostBarrierVerifier);
     args.rval().setUndefined();
     return true;
 }
@@ -2654,7 +2654,7 @@ gc::ZealModeHelpText),
 
     JS_FN_HELP("verifypostbarriers", VerifyPostBarriers, 0, 0,
 "verifypostbarriers()",
-"  Start or end a run of the post-write barrier verifier."),
+"  Does nothing (the post-write barrier verifier has been remove)."),
 
     JS_FN_HELP("gcstate", GCState, 0, 0,
 "gcstate()",
