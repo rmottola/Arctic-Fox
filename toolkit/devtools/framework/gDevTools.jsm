@@ -1170,6 +1170,17 @@ let gDevToolsBrowser = {
     }
   },
 
+
+  /**
+   * Connects to the SPS profiler when the developer tools are open. This is
+   * necessary because of the WebConsole's `profile` and `profileEnd` methods.
+   */
+  _connectToProfiler: function DT_connectToProfiler(event, toolbox) {
+    let SharedProfilerUtils = devtools.require("devtools/profiler/shared");
+    let connection = SharedProfilerUtils.getProfilerConnection(toolbox);
+    connection.open();
+  },
+
   /**
    * Remove the menuitem for a tool to all open browser windows.
    *
