@@ -81,7 +81,7 @@ class JS_PUBLIC_API(ProfilingFrameIterator)
         void* lr;
     };
 
-    ProfilingFrameIterator(JSRuntime *rt, const RegisterState &state,
+    ProfilingFrameIterator(JSRuntime* rt, const RegisterState &state,
                            uint32_t sampleBufferGen = UINT32_MAX);
     ~ProfilingFrameIterator();
     void operator++();
@@ -123,10 +123,10 @@ class JS_PUBLIC_API(ProfilingFrameIterator)
 };
 
 extern JS_PUBLIC_API(ProfilingFrameIterator::FrameKind)
-GetProfilingFrameKindFromNativeAddr(JSRuntime *runtime, void *pc);
+GetProfilingFrameKindFromNativeAddr(JSRuntime* runtime, void* pc);
 
 JS_FRIEND_API(bool)
-IsProfilingEnabledForRuntime(JSRuntime *runtime);
+IsProfilingEnabledForRuntime(JSRuntime* runtime);
 
 /**
  * After each sample run, this method should be called with the latest sample
@@ -137,7 +137,7 @@ IsProfilingEnabledForRuntime(JSRuntime *runtime);
  * JSRuntime for documentation about what these values are used for.
  */
 JS_FRIEND_API(void)
-UpdateJSRuntimeProfilerSampleBufferGen(JSRuntime *runtime, uint32_t generation,
+UpdateJSRuntimeProfilerSampleBufferGen(JSRuntime* runtime, uint32_t generation,
                                        uint32_t lapCount);
 
 } // namespace JS
