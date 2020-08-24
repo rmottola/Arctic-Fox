@@ -1077,6 +1077,13 @@ pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 // Developer edition preferences
 pref("browser.devedition.theme.enabled", false);
 
+// TODO remove `devtools.timeline.hiddenMarkers.` branches when performance
+// tool lands (bug 1075567)
+pref("devtools.timeline.hiddenMarkers", "[]");
+
+// The default Performance UI settings
+pref("devtools.performance.timeline.hidden-markers", "[]");
+
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
 
