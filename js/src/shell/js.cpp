@@ -279,7 +279,7 @@ extern JS_EXPORT_API(void)   add_history(char* line);
 #endif
 
 static char*
-GetLine(FILE* file, const char * prompt)
+GetLine(FILE* file, const char* prompt)
 {
     size_t size;
     char* buffer;
@@ -429,7 +429,7 @@ SkipUTF8BOM(FILE* file)
 }
 
 static void
-RunFile(JSContext *cx, const char *filename, FILE *file, bool compileOnly)
+RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 {
     SkipUTF8BOM(file);
 
@@ -476,8 +476,8 @@ RunFile(JSContext *cx, const char *filename, FILE *file, bool compileOnly)
 }
 
 static bool
-EvalAndPrint(JSContext *cx, const char *bytes, size_t length,
-             int lineno, bool compileOnly, FILE *out)
+EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
+             int lineno, bool compileOnly, FILE* out)
 {
     // Eval.
     JS::CompileOptions options(cx);
@@ -511,7 +511,7 @@ EvalAndPrint(JSContext *cx, const char *bytes, size_t length,
 }
 
 static void
-ReadEvalPrintLoop(JSContext *cx, FILE *in, FILE *out, bool compileOnly)
+ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
 {
     int lineno = 1;
     bool hitEOF = false;
@@ -578,7 +578,7 @@ class AutoCloseInputFile
 };
 
 static void
-Process(JSContext *cx, const char *filename, bool forceTTY)
+Process(JSContext* cx, const char* filename, bool forceTTY)
 {
     FILE* file;
     if (forceTTY || !filename || strcmp(filename, "-") == 0) {
@@ -2758,7 +2758,7 @@ struct WorkerInput
     }
 };
 
-static void SetWorkerRuntimeOptions(JSRuntime *rt);
+static void SetWorkerRuntimeOptions(JSRuntime* rt);
 
 static void
 WorkerMain(void* arg)
@@ -2851,14 +2851,14 @@ EvalInWorker(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ShapeOf(JSContext *cx, unsigned argc, JS::Value *vp)
+ShapeOf(JSContext* cx, unsigned argc, JS::Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
         JS_ReportError(cx, "shapeOf: object expected");
         return false;
     }
-    JSObject *obj = &args[0].toObject();
+    JSObject* obj = &args[0].toObject();
     args.rval().set(JS_NumberValue(double(uintptr_t(obj->maybeShape()) >> 3)));
     return true;
 }
@@ -2875,7 +2875,7 @@ IsBefore(int64_t t1, int64_t t2)
 }
 
 static bool
-Sleep_fn(JSContext *cx, unsigned argc, Value *vp)
+Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     int64_t t_ticks;
@@ -4306,17 +4306,17 @@ SetSharedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
 
 class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
 {
-    Sprinter *sp;
+    Sprinter* sp;
     bool startedTypes_;
 
   public:
-    explicit SprintOptimizationTypeInfoOp(Sprinter *sp)
+    explicit SprintOptimizationTypeInfoOp(Sprinter* sp)
       : sp(sp),
         startedTypes_(false)
     { }
 
-    void readType(const char *keyedBy, const char *name,
-                  const char *location, unsigned lineno) override
+    void readType(const char* keyedBy, const char* name,
+                  const char* location, unsigned lineno) override
     {
         if (!startedTypes_) {
             startedTypes_ = true;
@@ -4335,7 +4335,7 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
         Sprint(sp, "},");
     }
 
-    void operator()(TrackedTypeSite site, const char *mirType) override {
+    void operator()(TrackedTypeSite site, const char* mirType) override {
         if (startedTypes_) {
             // Clear trailing ,
             if ((*sp)[sp->getOffset() - 1] == ',')
@@ -4353,10 +4353,10 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
 
 class SprintOptimizationAttemptsOp : public ForEachTrackedOptimizationAttemptOp
 {
-    Sprinter *sp;
+    Sprinter* sp;
 
   public:
-    explicit SprintOptimizationAttemptsOp(Sprinter *sp)
+    explicit SprintOptimizationAttemptsOp(Sprinter* sp)
       : sp(sp)
     { }
 
@@ -4367,11 +4367,11 @@ class SprintOptimizationAttemptsOp : public ForEachTrackedOptimizationAttemptOp
 };
 
 static bool
-ReflectTrackedOptimizations(JSContext *cx, unsigned argc, Value *vp)
+ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject callee(cx, &args.callee());
-    JSRuntime *rt = cx->runtime();
+    JSRuntime* rt = cx->runtime();
 
     if (!rt->hasJitRuntime() || !rt->jitRuntime()->isOptimizationTrackingEnabled(rt)) {
         JS_ReportError(cx, "Optimization tracking is off.");
@@ -4394,13 +4394,13 @@ ReflectTrackedOptimizations(JSContext *cx, unsigned argc, Value *vp)
         return true;
     }
 
-    jit::JitcodeGlobalTable *table = rt->jitRuntime()->getJitcodeGlobalTable();
+    jit::JitcodeGlobalTable* table = rt->jitRuntime()->getJitcodeGlobalTable();
     jit::JitcodeGlobalEntry entry;
-    jit::IonScript *ion = fun->nonLazyScript()->ionScript();
+    jit::IonScript* ion = fun->nonLazyScript()->ionScript();
     table->lookupInfallible(ion->method()->raw(), &entry, rt);
 
     if (!entry.hasTrackedOptimizations()) {
-        JSObject *obj = JS_NewPlainObject(cx);
+        JSObject* obj = JS_NewPlainObject(cx);
         if (!obj)
             return false;
         args.rval().setObject(*obj);
@@ -4422,14 +4422,14 @@ ReflectTrackedOptimizations(JSContext *cx, unsigned argc, Value *vp)
             uint32_t startOffset, endOffset;
             uint8_t index;
             iter.readNext(&startOffset, &endOffset, &index);
-            JSScript *script;
-            jsbytecode *pc;
+            JSScript* script;
+            jsbytecode* pc;
             // Use endOffset, as startOffset may be associated with a
             // previous, adjacent region ending exactly at startOffset. That
             // is, suppose we have two regions [0, startOffset], [startOffset,
             // endOffset]. Since we are not querying a return address, we want
             // the second region and not the first.
-            uint8_t *addr = ion->method()->raw() + endOffset;
+            uint8_t* addr = ion->method()->raw() + endOffset;
             entry.youngestFrameLocationAtAddr(rt, addr, &script, &pc);
             Sprint(&sp, "{\"location\":\"%s:%u\",\"offset\":%u,\"index\":%u}%s",
                    script->filename(), script->lineno(), script->pcToOffset(pc), index,
@@ -5663,7 +5663,7 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
 }
 
 static bool
-BindScriptArgs(JSContext *cx, OptionParser *op)
+BindScriptArgs(JSContext* cx, OptionParser* op)
 {
     MultiStringRange msr = op->getMultiStringArg("scriptArgs");
     RootedObject scriptArgs(cx);
@@ -5695,7 +5695,7 @@ OptionFailure(const char* option, const char* str)
 }
 
 static int
-ProcessArgs(JSContext *cx, OptionParser *op)
+ProcessArgs(JSContext* cx, OptionParser* op)
 {
     if (op->getBoolOption('s'))
         JS::RuntimeOptionsRef(cx).toggleExtraWarnings();
@@ -5835,7 +5835,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     if (op.getBoolOption("ion-extra-checks"))
         jit::js_JitOptions.runExtraChecks = true;
 
-    if (const char *str = op.getStringOption("ion-inlining")) {
+    if (const char* str = op.getStringOption("ion-inlining")) {
         if (strcmp(str, "on") == 0)
             jit::js_JitOptions.disableInlining = false;
         else if (strcmp(str, "off") == 0)
@@ -5944,7 +5944,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 #endif
 
 #ifdef JS_GC_ZEAL
-    const char *zealStr = op.getStringOption("gc-zeal");
+    const char* zealStr = op.getStringOption("gc-zeal");
     gZealStr[0] = 0;
     if (zealStr) {
         if (!rt->gc.parseAndSetZeal(zealStr))
@@ -5958,7 +5958,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 }
 
 static void
-SetWorkerRuntimeOptions(JSRuntime *rt)
+SetWorkerRuntimeOptions(JSRuntime* rt)
 {
     // Copy option values from the main thread.
     JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
