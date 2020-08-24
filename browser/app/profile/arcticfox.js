@@ -1082,6 +1082,8 @@ pref("browser.devedition.theme.enabled", false);
 pref("devtools.timeline.hiddenMarkers", "[]");
 
 // The default Performance UI settings
+pref("devtools.performance.memory.sample-probability", "0.05");
+pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31) - 1
 pref("devtools.performance.timeline.hidden-markers", "[]");
 
 // Enable the error console
