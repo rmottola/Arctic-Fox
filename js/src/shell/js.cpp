@@ -4316,7 +4316,7 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
     { }
 
     void readType(const char* keyedBy, const char* name,
-                  const char* location, unsigned lineno) override
+                  const char* location, Maybe<unsigned> lineno) override
     {
         if (!startedTypes_) {
             startedTypes_ = true;
@@ -4330,8 +4330,8 @@ class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
             PutEscapedString(buf, mozilla::ArrayLength(buf), location, strlen(location), '"');
             Sprint(sp, ",\"location\":%s", buf);
         }
-        if (lineno != UINT32_MAX)
-            Sprint(sp, ",\"line\":%u", lineno);
+        if (lineno.isSome())
+            Sprint(sp, ",\"line\":%u", *lineno);
         Sprint(sp, "},");
     }
 
