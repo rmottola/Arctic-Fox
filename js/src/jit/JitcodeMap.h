@@ -443,10 +443,10 @@ class JitcodeGlobalEntry
         uint32_t callStackAtAddr(JSRuntime* rt, void* ptr, const char** results,
                                  uint32_t maxResults) const;
 
-        void youngestFrameLocationAtAddr(JSRuntime *rt, void *ptr,
-                                         JSScript **script, jsbytecode **pc) const;
+        void youngestFrameLocationAtAddr(JSRuntime* rt, void* ptr,
+                                         JSScript** script, jsbytecode** pc) const;
 
-        bool isMarkedFromAnyThread(JSRuntime *rt);
+        bool isMarkedFromAnyThread(JSRuntime* rt);
     };
 
     // Dummy entries are created for jitcode generated when profiling is not turned on,
@@ -454,7 +454,7 @@ class JitcodeGlobalEntry
     // stack when profiling is enabled.
     struct DummyEntry : public BaseEntry
     {
-        void init(JitCode *code, void *nativeStartAddr, void *nativeEndAddr) {
+        void init(JitCode* code, void* nativeStartAddr, void* nativeEndAddr) {
             BaseEntry::init(Dummy, code, nativeStartAddr, nativeEndAddr);
         }
 
@@ -472,8 +472,8 @@ class JitcodeGlobalEntry
             return 0;
         }
 
-        void youngestFrameLocationAtAddr(JSRuntime *rt, void *ptr,
-                                         JSScript **script, jsbytecode **pc) const
+        void youngestFrameLocationAtAddr(JSRuntime* rt, void* ptr,
+                                         JSScript** script, jsbytecode** pc) const
         {
             *script = nullptr;
             *pc = nullptr;
@@ -495,7 +495,7 @@ class JitcodeGlobalEntry
     };
 
   private:
-    JitcodeSkiplistTower *tower_;
+    JitcodeSkiplistTower* tower_;
 
     union {
         // Shadowing BaseEntry instance to allow access to base fields
@@ -585,7 +585,7 @@ class JitcodeGlobalEntry
         }
     }
 
-    JitCode *jitcode() const {
+    JitCode* jitcode() const {
         return baseEntry().jitcode();
     }
     void* nativeStartAddr() const {
@@ -742,8 +742,8 @@ class JitcodeGlobalEntry
     }
 
 
-    void youngestFrameLocationAtAddr(JSRuntime *rt, void *ptr,
-                                     JSScript **script, jsbytecode **pc) const
+    void youngestFrameLocationAtAddr(JSRuntime* rt, void* ptr,
+                                     JSScript** script, jsbytecode** pc) const
     {
         switch (kind()) {
           case Ion:
@@ -786,7 +786,7 @@ class JitcodeGlobalEntry
         return false;
     }
 
-    mozilla::Maybe<uint8_t> trackedOptimizationIndexAtAddr(void *addr, uint32_t *entryOffsetOut) {
+    mozilla::Maybe<uint8_t> trackedOptimizationIndexAtAddr(void* addr, uint32_t* entryOffsetOut) {
         switch (kind()) {
           case Ion:
             return ionEntry().trackedOptimizationIndexAtAddr(addr, entryOffsetOut);
@@ -812,11 +812,11 @@ class JitcodeGlobalEntry
         return ionEntry().allTrackedTypes();
     }
 
-    Zone *zone() {
+    Zone* zone() {
         return baseEntry().jitcode()->zone();
     }
 
-    bool markIfUnmarked(JSTracer *trc) {
+    bool markIfUnmarked(JSTracer* trc) {
         bool markedAny = baseEntry().markJitcodeIfUnmarked(trc);
         switch (kind()) {
           case Ion:
@@ -850,7 +850,7 @@ class JitcodeGlobalEntry
         }
     }
 
-    bool isMarkedFromAnyThread(JSRuntime *rt) {
+    bool isMarkedFromAnyThread(JSRuntime* rt) {
         if (!baseEntry().isJitcodeMarkedFromAnyThread())
             return false;
         switch (kind()) {
@@ -875,23 +875,23 @@ class JitcodeGlobalEntry
     // |JitcodeSkiplistTower *|.
     //
 
-    void addToFreeList(JitcodeGlobalEntry **freeList) {
+    void addToFreeList(JitcodeGlobalEntry** freeList) {
         MOZ_ASSERT(!isValid());
 
-        JitcodeGlobalEntry *nextFreeEntry = *freeList;
+        JitcodeGlobalEntry* nextFreeEntry = *freeList;
         MOZ_ASSERT_IF(nextFreeEntry, !nextFreeEntry->isValid());
 
-        tower_ = (JitcodeSkiplistTower *) nextFreeEntry;
+        tower_ = (JitcodeSkiplistTower*) nextFreeEntry;
         *freeList = this;
     }
 
-    static JitcodeGlobalEntry *PopFromFreeList(JitcodeGlobalEntry **freeList) {
+    static JitcodeGlobalEntry* PopFromFreeList(JitcodeGlobalEntry** freeList) {
         if (!*freeList)
             return nullptr;
 
-        JitcodeGlobalEntry *entry = *freeList;
+        JitcodeGlobalEntry* entry = *freeList;
         MOZ_ASSERT(!entry->isValid());
-        JitcodeGlobalEntry *nextFreeEntry = (JitcodeGlobalEntry *) entry->tower_;
+        JitcodeGlobalEntry* nextFreeEntry = (JitcodeGlobalEntry*) entry->tower_;
         entry->tower_ = nullptr;
         *freeList = nextFreeEntry;
         return entry;
@@ -907,12 +907,12 @@ class JitcodeGlobalTable
     static const size_t LIFO_CHUNK_SIZE = 16 * 1024;
 
     LifoAlloc alloc_;
-    JitcodeGlobalEntry *freeEntries_;
+    JitcodeGlobalEntry* freeEntries_;
     uint32_t rand_;
     uint32_t skiplistSize_;
 
-    JitcodeGlobalEntry *startTower_[JitcodeSkiplistTower::MAX_HEIGHT];
-    JitcodeSkiplistTower *freeTowers_[JitcodeSkiplistTower::MAX_HEIGHT];
+    JitcodeGlobalEntry* startTower_[JitcodeSkiplistTower::MAX_HEIGHT];
+    JitcodeSkiplistTower* freeTowers_[JitcodeSkiplistTower::MAX_HEIGHT];
 
   public:
     JitcodeGlobalTable()
@@ -930,10 +930,10 @@ class JitcodeGlobalTable
     }
 
     bool lookup(void* ptr, JitcodeGlobalEntry* result, JSRuntime* rt);
-    bool lookupForSampler(void *ptr, JitcodeGlobalEntry *result, JSRuntime *rt,
+    bool lookupForSampler(void* ptr, JitcodeGlobalEntry* result, JSRuntime* rt,
                           uint32_t sampleBufferGen);
 
-    void lookupInfallible(void *ptr, JitcodeGlobalEntry *result, JSRuntime *rt) {
+    void lookupInfallible(void* ptr, JitcodeGlobalEntry* result, JSRuntime* rt) {
         mozilla::DebugOnly<bool> success = lookup(ptr, result, rt);
         MOZ_ASSERT(success);
     }
@@ -951,16 +951,16 @@ class JitcodeGlobalTable
         return addEntry(JitcodeGlobalEntry(entry), rt);
     }
 
-    void removeEntry(JitcodeGlobalEntry &entry, JitcodeGlobalEntry **prevTower, JSRuntime *rt);
-    void releaseEntry(JitcodeGlobalEntry &entry, JitcodeGlobalEntry **prevTower, JSRuntime *rt);
+    void removeEntry(JitcodeGlobalEntry& entry, JitcodeGlobalEntry** prevTower, JSRuntime* rt);
+    void releaseEntry(JitcodeGlobalEntry& entry, JitcodeGlobalEntry** prevTower, JSRuntime* rt);
 
-    bool markIteratively(JSTracer *trc);
-    void sweep(JSRuntime *rt);
+    bool markIteratively(JSTracer* trc);
+    void sweep(JSRuntime* rt);
 
   private:
-    bool addEntry(const JitcodeGlobalEntry &entry, JSRuntime *rt);
+    bool addEntry(const JitcodeGlobalEntry& entry, JSRuntime* rt);
 
-    JitcodeGlobalEntry *lookupInternal(void *ptr);
+    JitcodeGlobalEntry* lookupInternal(void* ptr);
 
     // Initialize towerOut such that towerOut[i] (for i in [0, MAX_HEIGHT-1])
     // is a JitcodeGlobalEntry that is sorted to be <query, whose successor at
@@ -968,16 +968,16 @@ class JitcodeGlobalTable
     //
     // If entry with the given properties does not exist for level i, then
     // towerOut[i] is initialized to nullptr.
-    void searchInternal(const JitcodeGlobalEntry &query, JitcodeGlobalEntry **towerOut);
+    void searchInternal(const JitcodeGlobalEntry& query, JitcodeGlobalEntry** towerOut);
 
-    JitcodeGlobalEntry *searchAtHeight(unsigned level, JitcodeGlobalEntry *start,
-                                       const JitcodeGlobalEntry &query);
+    JitcodeGlobalEntry* searchAtHeight(unsigned level, JitcodeGlobalEntry* start,
+                                       const JitcodeGlobalEntry& query);
 
     // Calculate next random tower height.
     unsigned generateTowerHeight();
 
-    JitcodeSkiplistTower *allocateTower(unsigned height);
-    JitcodeGlobalEntry *allocateEntry();
+    JitcodeSkiplistTower* allocateTower(unsigned height);
+    JitcodeGlobalEntry* allocateEntry();
 
 #ifdef DEBUG
     void verifySkiplist();
@@ -990,7 +990,7 @@ class JitcodeGlobalTable
     {
       protected:
         JitcodeGlobalTable &table_;
-        JitcodeGlobalEntry *cur_;
+        JitcodeGlobalEntry* cur_;
 
       public:
         explicit Range(JitcodeGlobalTable &table)
@@ -998,7 +998,7 @@ class JitcodeGlobalTable
             cur_(table.startTower_[0])
         { }
 
-        JitcodeGlobalEntry *front() const {
+        JitcodeGlobalEntry* front() const {
             MOZ_ASSERT(!empty());
             return cur_;
         }
@@ -1017,12 +1017,12 @@ class JitcodeGlobalTable
     // functionality is not needed, use Range instead.
     class Enum : public Range
     {
-        JSRuntime *rt_;
-        JitcodeGlobalEntry *next_;
-        JitcodeGlobalEntry *prevTower_[JitcodeSkiplistTower::MAX_HEIGHT];
+        JSRuntime* rt_;
+        JitcodeGlobalEntry* next_;
+        JitcodeGlobalEntry* prevTower_[JitcodeSkiplistTower::MAX_HEIGHT];
 
       public:
-        Enum(JitcodeGlobalTable &table, JSRuntime *rt);
+        Enum(JitcodeGlobalTable& table, JSRuntime* rt);
 
         void popFront();
         void removeFront();
