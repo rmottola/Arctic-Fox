@@ -227,11 +227,11 @@ struct ForEachTrackedOptimizationTypeInfoOp
 };
 
 JS_PUBLIC_API(void)
-ForEachTrackedOptimizationTypeInfo(JSRuntime *rt, void *addr, uint8_t index,
-                                   ForEachTrackedOptimizationTypeInfoOp &op);
+ForEachTrackedOptimizationTypeInfo(JSRuntime* rt, void* addr, uint8_t index,
+                                   ForEachTrackedOptimizationTypeInfoOp& op);
 
 JS_PUBLIC_API(mozilla::Maybe<uint8_t>)
-TrackedOptimizationIndexAtAddr(JSRuntime *rt, void *addr, void **entryAddr);
+TrackedOptimizationIndexAtAddr(JSRuntime* rt, void* addr, void** entryAddr);
 
 } // namespace JS
 
