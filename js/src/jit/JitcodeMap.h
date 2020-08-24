@@ -446,6 +446,8 @@ class JitcodeGlobalEntry
         void youngestFrameLocationAtAddr(JSRuntime* rt, void* ptr,
                                          JSScript** script, jsbytecode** pc) const;
 
+        bool markIfUnmarked(JSTracer* trc);
+        void sweep(JSRuntime* rt);
         bool isMarkedFromAnyThread(JSRuntime* rt);
     };
 
@@ -826,6 +828,7 @@ class JitcodeGlobalEntry
             markedAny |= baselineEntry().markIfUnmarked(trc);
             break;
           case IonCache:
+            markedAny |= ionCacheEntry().markIfUnmarked(trc);
           case Dummy:
             break;
           default:
@@ -834,7 +837,7 @@ class JitcodeGlobalEntry
         return markedAny;
     }
 
-    void sweep() {
+    void sweep(JSRuntime* rt) {
         switch (kind()) {
           case Ion:
             ionEntry().sweep();
@@ -843,6 +846,7 @@ class JitcodeGlobalEntry
             baselineEntry().sweep();
             break;
           case IonCache:
+            ionCacheEntry().sweep(rt);
           case Dummy:
             break;
           default:
