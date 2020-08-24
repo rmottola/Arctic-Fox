@@ -27,6 +27,7 @@
 #include "jit/Ion.h"
 #include "jit/IonAnalysis.h"
 #include "jit/JitCompartment.h"
+#include "jit/OptimizationTracking.h"
 #include "js/MemoryMetrics.h"
 #include "vm/HelperThreads.h"
 #include "vm/Opcodes.h"
@@ -435,8 +436,9 @@ TypeSet::objectsIntersect(const TypeSet* other) const
     return false;
 }
 
+template <class TypeListT>
 bool
-TypeSet::enumerateTypes(TypeList* list) const
+TypeSet::enumerateTypes(TypeListT* list) const
 {
     /* If any type is possible, there's no need to worry about specifics. */
     if (flags & TYPE_FLAG_UNKNOWN)
@@ -467,6 +469,9 @@ TypeSet::enumerateTypes(TypeList* list) const
 
     return true;
 }
+
+template bool TypeSet::enumerateTypes<TypeSet::TypeList>(TypeList* list) const;
+template bool TypeSet::enumerateTypes<jit::TempTypeList>(jit::TempTypeList* list) const;
 
 inline bool
 TypeSet::addTypesToConstraint(JSContext* cx, TypeConstraint* constraint)

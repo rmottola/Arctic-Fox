@@ -886,12 +886,15 @@ class ReadTempAttemptsVectorOp : public JS::ForEachTrackedOptimizationAttemptOp
 
 struct ReadTempTypeInfoVectorOp : public IonTrackedOptimizationsTypeInfo::ForEachOp
 {
+    TempAllocator& alloc_;
     TempOptimizationTypeInfoVector* types_;
-    TypeSet::TypeList accTypes_;
+    TempTypeList accTypes_;
 
   public:
-    explicit ReadTempTypeInfoVectorOp(TempOptimizationTypeInfoVector* types)
-      : types_(types)
+    ReadTempTypeInfoVectorOp(TempAllocator& alloc, TempOptimizationTypeInfoVector* types)
+      : alloc_(alloc),
+        types_(types),
+        accTypes_(alloc)
     { }
 
     void readType(const IonTrackedTypeWithAddendum& tracked) override {
@@ -899,7 +902,7 @@ struct ReadTempTypeInfoVectorOp : public IonTrackedOptimizationsTypeInfo::ForEac
     }
 
     void operator()(JS::TrackedTypeSite site, MIRType mirType) override {
-        OptimizationTypeInfo ty(site, mirType);
+        OptimizationTypeInfo ty(alloc_, site, mirType);
         for (uint32_t i = 0; i < accTypes_.length(); i++)
             MOZ_ALWAYS_TRUE(ty.trackType(accTypes_[i]));
         MOZ_ALWAYS_TRUE(types_->append(mozilla::Move(ty)));
@@ -971,7 +974,7 @@ CodeGeneratorShared::verifyCompactTrackedOptimizationsMap(JitCode* code, uint32_
             // decoded.
             IonTrackedOptimizationsTypeInfo typeInfo = typesTable->entry(index);
             TempOptimizationTypeInfoVector tvec(alloc());
-            ReadTempTypeInfoVectorOp top(&tvec);
+            ReadTempTypeInfoVectorOp top(alloc(), &tvec);
             typeInfo.forEach(top, allTypes);
             MOZ_ASSERT(entry.optimizations->matchTypes(tvec));
 
