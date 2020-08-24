@@ -53,7 +53,6 @@ MSG_DEF(JSMSG_CANT_DELETE,             1, JSEXN_TYPEERR, "property {0} is non-co
 MSG_DEF(JSMSG_CANT_TRUNCATE_ARRAY,     0, JSEXN_TYPEERR, "can't delete non-configurable array element")
 MSG_DEF(JSMSG_NOT_FUNCTION,            1, JSEXN_TYPEERR, "{0} is not a function")
 MSG_DEF(JSMSG_NOT_CONSTRUCTOR,         1, JSEXN_TYPEERR, "{0} is not a constructor")
-MSG_DEF(JSMSG_CANT_CONVERT,            1, JSEXN_ERR, "can't convert {0} to an integer")
 MSG_DEF(JSMSG_CANT_CONVERT_TO,         2, JSEXN_TYPEERR, "can't convert {0} to {1}")
 MSG_DEF(JSMSG_NO_PROPERTIES,           1, JSEXN_TYPEERR, "{0} has no properties")
 MSG_DEF(JSMSG_BAD_REGEXP_FLAG,         1, JSEXN_SYNTAXERR, "invalid regular expression flag {0}")
@@ -95,7 +94,6 @@ MSG_DEF(JSMSG_NOT_EXPECTED_TYPE,       3, JSEXN_TYPEERR, "{0}: expected {1}, got
 MSG_DEF(JSMSG_NOT_ITERABLE,            1, JSEXN_TYPEERR, "{0} is not iterable")
 MSG_DEF(JSMSG_ALREADY_HAS_PRAGMA,      2, JSEXN_NONE, "{0} is being assigned a {1}, but already has one")
 MSG_DEF(JSMSG_NEXT_RETURNED_PRIMITIVE, 0, JSEXN_TYPEERR, "iterator.next() returned a non-object value")
-MSG_DEF(JSMSG_WRONG_VALUE,             2, JSEXN_ERR, "expected {0} but found {1}")
 MSG_DEF(JSMSG_CANT_SET_PROTO,          0, JSEXN_TYPEERR, "can't set prototype of this object")
 MSG_DEF(JSMSG_CANT_SET_PROTO_OF,       1, JSEXN_TYPEERR, "can't set prototype of {0}")
 MSG_DEF(JSMSG_CANT_SET_PROTO_CYCLE,    0, JSEXN_TYPEERR, "can't set prototype: it would cause a prototype chain cycle")
@@ -438,13 +436,14 @@ MSG_DEF(JSMSG_UNTERM_CLASS,            0, JSEXN_SYNTAXERR, "unterminated charact
 MSG_DEF(JSMSG_DEFAULT_LOCALE_ERROR,    0, JSEXN_ERR, "internal error getting the default locale")
 MSG_DEF(JSMSG_NO_SUCH_SELF_HOSTED_PROP,1, JSEXN_ERR, "No such property on self-hosted object: {0}")
 
-// Typed object
+// Typed object / SIMD
 MSG_DEF(JSMSG_INVALID_PROTOTYPE,       0, JSEXN_TYPEERR, "prototype field is not an object")
 MSG_DEF(JSMSG_TYPEDOBJECT_BAD_ARGS,    0, JSEXN_TYPEERR, "invalid arguments")
 MSG_DEF(JSMSG_TYPEDOBJECT_BINARYARRAY_BAD_INDEX, 0, JSEXN_RANGEERR, "invalid or out-of-range index")
 MSG_DEF(JSMSG_TYPEDOBJECT_HANDLE_UNATTACHED, 0, JSEXN_TYPEERR, "handle unattached")
 MSG_DEF(JSMSG_TYPEDOBJECT_STRUCTTYPE_BAD_ARGS, 0, JSEXN_RANGEERR, "invalid field descriptor")
 MSG_DEF(JSMSG_TYPEDOBJECT_TOO_BIG,     0, JSEXN_ERR, "Type is too large to allocate")
+MSG_DEF(JSMSG_SIMD_FAILED_CONVERSION,  0, JSEXN_RANGEERR, "SIMD conversion loses precision")
 
 // Typed array
 MSG_DEF(JSMSG_BAD_INDEX,               0, JSEXN_RANGEERR, "invalid or out-of-range index")
