@@ -80,6 +80,8 @@ toolkit.jar:
     content/global/devtools/shadereditor.js                           (shadereditor/shadereditor.js)
     content/global/devtools/canvasdebugger.xul                        (canvasdebugger/canvasdebugger.xul)
     content/global/devtools/canvasdebugger.js                         (canvasdebugger/canvasdebugger.js)
+    content/global/devtools/canvasdebugger/snapshotslist.js           (canvasdebugger/snapshotslist.js)
+    content/global/devtools/canvasdebugger/callslist.js               (canvasdebugger/callslist.js)
     content/global/devtools/d3.js                                     (shared/d3.js)
     content/global/devtools/webaudioeditor.xul                        (webaudioeditor/webaudioeditor.xul)
     content/global/devtools/dagre-d3.js                               (webaudioeditor/lib/dagre-d3.js)
