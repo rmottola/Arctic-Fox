@@ -1077,6 +1077,9 @@ pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 // Developer edition preferences
 pref("browser.devedition.theme.enabled", false);
 
+// Enable the error console
+pref("devtools.errorconsole.enabled", true);
+
 // Enable the Performance tools
 pref("devtools.performance.enabled", true);
 
@@ -1084,9 +1087,7 @@ pref("devtools.performance.enabled", true);
 pref("devtools.performance.memory.sample-probability", "0.05");
 pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31) - 1
 pref("devtools.performance.timeline.hidden-markers", "[]");
-
-// Enable the error console
-pref("devtools.errorconsole.enabled", true);
+pref("devtools.performance.ui.show-jit-optimizations", false);
 
 // The default service workers UI setting
 pref("devtools.serviceWorkers.testing.enabled", false);
