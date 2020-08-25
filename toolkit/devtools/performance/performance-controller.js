@@ -47,13 +47,13 @@ devtools.lazyRequireGetter(this, "JITOptimizations",
   "devtools/shared/profiler/jit", true);
 devtools.lazyRequireGetter(this, "OptionsView",
   "devtools/shared/options-view", true);
+devtools.lazyRequireGetter(this, "FlameGraphUtils",
+  "devtools/shared/widgets/FlameGraph", true);
+devtools.lazyRequireGetter(this, "FlameGraph",
+  "devtools/shared/widgets/FlameGraph", true);
 
 devtools.lazyImporter(this, "CanvasGraphUtils",
   "resource://gre/modules/devtools/Graphs.jsm");
-devtools.lazyImporter(this, "FlameGraphUtils",
-  "resource://gre/modules/devtools/FlameGraph.jsm");
-devtools.lazyImporter(this, "FlameGraph",
-  "resource://gre/modules/devtools/FlameGraph.jsm");
 devtools.lazyImporter(this, "SideMenuWidget",
   "resource://gre/modules/devtools/SideMenuWidget.jsm");
 devtools.lazyImporter(this, "PluralForm",
