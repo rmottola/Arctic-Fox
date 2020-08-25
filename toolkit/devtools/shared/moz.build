@@ -50,7 +50,6 @@ if CONFIG['MOZ_DEVTOOLS']:
         'timeline/global.js',
         'timeline/marker-details.js',
         'timeline/markers-overview.js',
-        'timeline/memory-overview.js',
         'timeline/waterfall.js',
     ]
 
