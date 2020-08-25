@@ -40,7 +40,7 @@ if CONFIG['MOZ_DEVTOOLS']:
         'layoutview',
         'markupview',
         'netmonitor',
-        'profiler',
+        'performance',
         'projecteditor',
         'responsivedesign',
         'scratchpad',
@@ -49,13 +49,9 @@ if CONFIG['MOZ_DEVTOOLS']:
         'storage',
         'styleeditor',
         'tilt',
-        'timeline',
         'webaudioeditor',
         'webide',
     ]
-
-    if CONFIG['MOZ_DEVTOOLS_PERFTOOLS']:
-      DIRS += ['performance']
 
     EXTRA_COMPONENTS += [
         'devtools-clhandler.js',
