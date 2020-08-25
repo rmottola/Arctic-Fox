@@ -110,6 +110,8 @@ toolkit.jar:
         skin/classic/global/devtools/filetype-store.svg            (../../shared/devtools/images/filetypes/store.svg)
         skin/classic/global/devtools/commandline-icon.png          (../../shared/devtools/images/commandline-icon.png)
         skin/classic/global/devtools/commandline-icon@2x.png          (../../shared/devtools/images/commandline-icon@2x.png)
++       skin/classic/global/devtools/command-rulers.png            (../../shared/devtools/images/command-rulers.png)
++       skin/classic/global/devtools/command-rulers@2x.png         (../../shared/devtools/images/command-rulers@2x.png)
         skin/classic/global/devtools/alerticon-warning.png         (../../shared/devtools/images/alerticon-warning.png)
         skin/classic/global/devtools/alerticon-warning@2x.png      (../../shared/devtools/images/alerticon-warning@2x.png)
 *       skin/classic/global/devtools/ruleview.css                  (../../shared/devtools/ruleview.css)
