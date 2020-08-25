@@ -56,6 +56,8 @@ devtools.lazyImporter(this, "FlameGraph",
   "resource://gre/modules/devtools/FlameGraph.jsm");
 devtools.lazyImporter(this, "SideMenuWidget",
   "resource://gre/modules/devtools/SideMenuWidget.jsm");
+devtools.lazyImporter(this, "PluralForm",
+  "resource://gre/modules/PluralForm.jsm");
 
 const BRANCH_NAME = "devtools.performance.ui.";
 
