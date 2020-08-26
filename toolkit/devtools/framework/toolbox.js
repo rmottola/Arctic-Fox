@@ -17,6 +17,7 @@ const SCREENSIZE_HISTOGRAM = "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER";
 let {Cc, Ci, Cu} = require("chrome");
 let {Promise: promise} = require("resource://gre/modules/Promise.jsm");
 let EventEmitter = require("devtools/toolkit/event-emitter");
+let Telemetry = require("devtools/shared/telemetry");
 let {getHighlighterUtils} = require("devtools/framework/toolbox-highlighter-utils");
 let {HUDService} = require("devtools/webconsole/hudservice");
 let {showDoorhanger} = require("devtools/shared/doorhanger");
@@ -105,6 +106,7 @@ const ToolboxButtons = [
 function Toolbox(target, selectedTool, hostType, hostOptions) {
   this._target = target;
   this._toolPanels = new Map();
+  this._telemetry = new Telemetry();
 
   this._toolRegistered = this._toolRegistered.bind(this);
   this._toolUnregistered = this._toolUnregistered.bind(this);
@@ -1740,6 +1742,8 @@ Toolbox.prototype = {
     if (this._requisition) {
       this._requisition.destroy();
     }
+    this._telemetry.toolClosed("toolbox");
+    this._telemetry.destroy();
 
     // Finish all outstanding tasks (which means finish destroying panels and
     // then destroying the host, successfully or not) before destroying the
