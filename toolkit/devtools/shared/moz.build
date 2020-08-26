@@ -61,6 +61,7 @@ if CONFIG['MOZ_DEVTOOLS']:
         'inplace-editor.js',
         'observable-object.js',
         'options-view.js',
+	'telemetry.js',
         'theme-switching.js',
         'theme.js',
         'undo.js',
