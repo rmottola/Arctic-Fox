@@ -78,6 +78,10 @@
   margin: 0;
 }
 
+#performance-view .notice-container vbox {
+  text-align: center;
+}
+
 /* Overview Panel */
 
 .record-button {
