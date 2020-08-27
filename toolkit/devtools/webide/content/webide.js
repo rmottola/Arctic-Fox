@@ -129,7 +129,7 @@ let UI = {
         AppManager.selectedProject.type != "mainProcess" &&
         AppManager.selectedProject.type != "runtimeApp" &&
         AppManager.selectedProject.type != "tab") {
-      AppManager.validateProject(AppManager.selectedProject);
+      AppManager.validateAndUpdateProject(AppManager.selectedProject);
     }
 
     // Hook to display promotional Developer Edition doorhanger. Only displayed once.
@@ -552,7 +552,7 @@ let UI = {
       menuindex: 1
     });
     this.projecteditor.on("onEditorSave", (editor, resource) => {
-      AppManager.validateProject(AppManager.selectedProject);
+      AppManager.validateAndUpdateProject(AppManager.selectedProject);
     });
     return this.projecteditor.loaded;
   },
@@ -651,9 +651,6 @@ let UI = {
         throw e;
       }
     }
-
-    // Validate project
-    yield AppManager.validateProject(project);
 
     // Select project
     AppManager.selectedProject = project;
@@ -1030,9 +1027,6 @@ let Cmds = {
       // Retrieve added project
       let project = AppProjects.get(ret.location);
 
-      // Validate project
-      yield AppManager.validateProject(project);
-
       // Select project
       AppManager.selectedProject = project;
 
@@ -1091,7 +1085,7 @@ let Cmds = {
           // The result of the validation process (storing names, icons, …) is not stored in
           // the IndexedDB database when App Manager v1 is used.
           // We need to run the validation again and update the name and icon of the app.
-          AppManager.validateProject(project).then(() => {
+          AppManager.validateAndUpdateProject(project).then(() => {
             panelItemNode.setAttribute("label", project.name);
             panelItemNode.setAttribute("image", project.icon);
           });
