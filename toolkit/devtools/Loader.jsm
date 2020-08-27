@@ -78,7 +78,7 @@ BuiltinProvider.prototype = {
         // When you add a line to this mapping, don't forget to make a
         // corresponding addition to the SrcdirProvider mapping below as well.
         "": "resource://gre/modules/commonjs/",
-        "main": "resource://gre/modules/devtools/main.js",
+        "main": "resource:///modules/devtools/main.js",
         "devtools": "resource://gre/modules/devtools",
         "devtools/toolkit": "resource://gre/modules/devtools",
         "devtools/server": "resource://gre/modules/devtools/server",

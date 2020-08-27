@@ -4,24 +4,13 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CONFIGURE_SUBST_FILES += ['installer/Makefile']
-
-DIRS += [
-    'base',
-    'components',
-    'fonts',
-    'locales',
-    'modules',
-    'themes',
+EXTRA_COMPONENTS += [
+    'devtools-clhandler.js',
+    'devtools-clhandler.manifest',
 ]
 
-DIRS += [
-    'devtools',
-    'app',
+JAR_MANIFESTS += ['jar.mn']
+
+EXTRA_JS_MODULES.devtools += [
+    'main.js',
 ]
-
-if CONFIG['MAKENSISU']:
-    DIRS += ['installer/windows']
-
-DIST_SUBDIR = 'browser'
-export('DIST_SUBDIR')

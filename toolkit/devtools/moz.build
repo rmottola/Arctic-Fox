@@ -53,11 +53,6 @@ if CONFIG['MOZ_DEVTOOLS']:
         'webide',
     ]
 
-    EXTRA_COMPONENTS += [
-        'devtools-clhandler.js',
-        'devtools-clhandler.manifest',
-    ]
-
 EXTRA_JS_MODULES.devtools += [
     'async-utils.js',
     'content-observer.js',
@@ -79,11 +74,6 @@ EXTRA_JS_MODULES.devtools += [
     'Loader.jsm',
     'Require.jsm',
 ]
-
-if CONFIG['MOZ_DEVTOOLS']:
-    EXTRA_JS_MODULES.devtools += [
-        'main.js',
-    ]
 
 EXTRA_JS_MODULES.devtools.server.actors += [
     'server/actors/highlighter.css'
