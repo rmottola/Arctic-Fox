@@ -5494,6 +5494,30 @@
     "n_values": 13,
     "description": "Screen resolution of DevTools user (0:lower, 1:800x600, 2:1024x768, 3:1280x800, 4:1280x1024, 5:1366x768, 6:1440x900, 7:1920x1080, 8:2560×1440, 9:2560×1600, 10:2880x1800, 11:other, 12:higher)"
   },
+  "DEVTOOLS_TOOLBOX_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's toolbox been opened?"
+  },
+  "DEVTOOLS_TOOLBOX_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many times has the devtool's toolbox been opened?"
+  },
+  "DEVTOOLS_TOOLBOX_TIME_ACTIVE_SECONDS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000000",
+    "n_buckets": 100,
+    "description": "How long has the toolbox been active (seconds)"
+  },
+  "DEVTOOLS_OPTIONS_TIME_ACTIVE_SECONDS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000000",
+    "n_buckets": 100,
+    "description": "How long has the options panel been active (seconds)"
+},
   "DEVTOOLS_TABS_OPEN_PEAK_LINEAR": {
     "expires_in_version": "never",
     "kind": "linear",
