@@ -24,7 +24,6 @@ function RuleViewTool(inspector, window, iframe) {
   this.doc = window.document;
 
   this.view = new RuleView.CssRuleView(inspector, this.doc);
-  this.doc.documentElement.appendChild(this.view.element);
 
   this.onLinkClicked = this.onLinkClicked.bind(this);
   this.onSelected = this.onSelected.bind(this);
@@ -152,8 +151,6 @@ RuleViewTool.prototype = {
     this.view.element.removeEventListener("CssRuleViewCSSLinkClicked", this.onLinkClicked);
     this.view.element.removeEventListener("CssRuleViewChanged", this.onPropertyChanged);
     this.view.element.removeEventListener("CssRuleViewRefreshed", this.onViewRefreshed);
-
-    this.doc.documentElement.removeChild(this.view.element);
 
     this.view.destroy();
 

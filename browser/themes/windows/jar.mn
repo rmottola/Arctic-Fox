@@ -169,6 +169,9 @@ browser.jar:
         skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
         skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
         skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
+        skin/classic/browser/devtools/search-clear-failed.svg        (../shared/devtools/images/search-clear-failed.svg)
+        skin/classic/browser/devtools/search-clear-light.svg         (../shared/devtools/images/search-clear-light.svg)
+        skin/classic/browser/devtools/search-clear-dark.svg          (../shared/devtools/images/search-clear-dark.svg)
 #ifdef MOZ_SERVICES_SYNC
         skin/classic/browser/sync-throbber.png
         skin/classic/browser/sync-16.png
