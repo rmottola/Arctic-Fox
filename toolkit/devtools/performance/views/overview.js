@@ -57,15 +57,15 @@ let OverviewView = {
   /**
    * Unbinds events.
    */
-  destroy: function () {
+  destroy: Task.async(function*() {
     if (this.markersOverview) {
-      this.markersOverview.destroy();
+      yield this.markersOverview.destroy();
     }
     if (this.memoryOverview) {
-      this.memoryOverview.destroy();
+      yield this.memoryOverview.destroy();
     }
     if (this.framerateGraph) {
-      this.framerateGraph.destroy();
+      yield this.framerateGraph.destroy();
     }
 
     PerformanceController.off(EVENTS.PREF_CHANGED, this._onPrefChanged);
@@ -78,7 +78,7 @@ let OverviewView = {
     PerformanceController.off(EVENTS.CONSOLE_RECORDING_STARTED, this._onRecordingStarted);
     PerformanceController.off(EVENTS.CONSOLE_RECORDING_STOPPED, this._onRecordingStopped);
     PerformanceController.off(EVENTS.CONSOLE_RECORDING_WILL_STOP, this._onRecordingWillStop);
-  },
+  }),
 
   /**
    * Disabled in the event we're using a Timeline mock, so we'll have no
