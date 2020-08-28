@@ -79,8 +79,8 @@ exports.isContent = function isContent (frame) {
   // Only C++ stack frames have associated category information.
   const { category, location } = frame;
   return !!(!category &&
-    !CHROME_SCHEMES.find(e => location.contains(e)) &&
-    CONTENT_SCHEMES.find(e => location.contains(e)));
+    !CHROME_SCHEMES.find(e => location.includes(e)) &&
+    CONTENT_SCHEMES.find(e => location.includes(e)));
 }
 
 /**

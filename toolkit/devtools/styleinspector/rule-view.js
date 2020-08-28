@@ -1972,7 +1972,7 @@ CssRuleView.prototype = {
 
     // Highlight search matches in the rule selectors
     for (let selectorNode of selectorNodes) {
-      if (selectorNode.textContent.toLowerCase().contains(aValue)) {
+      if (selectorNode.textContent.toLowerCase().includes(aValue)) {
         selectorNode.classList.add("ruleview-highlight");
         this._highlightedElements.push(selectorNode);
         isHighlighted = true;
@@ -1997,10 +1997,10 @@ CssRuleView.prototype = {
       // compare the input string directly against the name and value elements.
       let matches = false;
       if (propertyMatch && name && value) {
-        matches = propertyName.contains(name) && propertyValue.contains(value);
+        matches = propertyName.includes(name) && propertyValue.includes(value);
       } else {
-        matches = (name && propertyName.contains(name)) ||
-                  (value && propertyValue.contains(value));
+        matches = (name && propertyName.includes(name)) ||
+                  (value && propertyValue.includes(value));
       }
 
       if (matches) {
