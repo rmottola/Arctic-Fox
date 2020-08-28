@@ -39,6 +39,7 @@ if CONFIG['MOZ_DEVTOOLS']:
     ]
 
     EXTRA_JS_MODULES.devtools.shared.profiler += [
+	'profiler/frame-utils.js',
         'profiler/global.js',
 	'profiler/jit.js',
         'profiler/tree-model.js',
