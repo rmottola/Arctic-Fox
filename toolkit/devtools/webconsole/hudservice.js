@@ -203,22 +203,16 @@ HUD_SERVICE.prototype =
         DebuggerServer.init();
         DebuggerServer.addBrowserActors();
       }
+      DebuggerServer.allowChromeProcess = true;
 
       let client = new DebuggerClient(DebuggerServer.connectPipe());
-      client.connect(() =>
-        client.listTabs((aResponse) => {
-          // Add Global Process debugging...
-          let globals = Cu.cloneInto(aResponse, {});
-          delete globals.tabs;
-          delete globals.selected;
-          // ...only if there are appropriate actors (a 'from' property will
-          // always be there).
-          if (Object.keys(globals).length > 1) {
-            deferred.resolve({ form: globals, client: client, chrome: true });
-          } else {
-            deferred.reject("Global console not found!");
-          }
-        }));
+      client.connect(() => {
+        client.attachProcess().then(aResponse => {
+          // Set chrome:false in order to attach to the target
+          // (i.e. send an `attach` request to the chrome actor)
+          deferred.resolve({ form: aResponse.form, client: client, chrome: false });
+        }, deferred.reject);
+      });
 
       return deferred.promise;
     }
@@ -226,13 +220,7 @@ HUD_SERVICE.prototype =
     let target;
     function getTarget(aConnection)
     {
-      let options = {
-        form: aConnection.form,
-        client: aConnection.client,
-        chrome: true,
-      };
-
-      return devtools.TargetFactory.forRemoteTab(options);
+      return devtools.TargetFactory.forRemoteTab(aConnection);
     }
 
     function openWindow(aTarget)
@@ -257,12 +245,12 @@ HUD_SERVICE.prototype =
     }
 
     connect().then(getTarget).then(openWindow).then((aWindow) => {
-      this.openBrowserConsole(target, aWindow, aWindow)
+      return this.openBrowserConsole(target, aWindow, aWindow)
         .then((aBrowserConsole) => {
           this._browserConsoleDefer.resolve(aBrowserConsole);
           this._browserConsoleDefer = null;
         })
-    }, console.error);
+    }, console.error.bind(console));
 
     return this._browserConsoleDefer.promise;
   },
@@ -656,10 +644,13 @@ WebConsole.prototype = {
 
     this._destroyer = promise.defer();
 
-    let popupset = this.mainPopupSet;
-    let panels = popupset.querySelectorAll("panel[hudId=" + this.hudId + "]");
-    for (let panel of panels) {
-      panel.hidePopup();
+    // The document may already be removed
+    if (this.chromeUtilsWindow && this.mainPopupSet) {
+      let popupset = this.mainPopupSet;
+      let panels = popupset.querySelectorAll("panel[hudId=" + this.hudId + "]");
+      for (let panel of panels) {
+        panel.hidePopup();
+      }
     }
 
     let onDestroy = function WC_onDestroyUI() {

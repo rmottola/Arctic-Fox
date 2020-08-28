@@ -728,6 +728,7 @@ let gDevToolsBrowser = {
       DebuggerServer.init();
       DebuggerServer.addBrowserActors();
     }
+    DebuggerServer.allowChromeProcess = true;
 
     let transport = DebuggerServer.connectPipe();
     let client = new DebuggerClient(transport);
