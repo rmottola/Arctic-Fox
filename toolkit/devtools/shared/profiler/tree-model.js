@@ -15,8 +15,8 @@ loader.lazyRequireGetter(this, "CATEGORY_JIT",
 loader.lazyRequireGetter(this, "JITOptimizations",
   "devtools/shared/profiler/jit", true);
 
-const CHROME_SCHEMES = ["chrome://", "resource://"];
-const CONTENT_SCHEMES = ["http://", "https://", "file://"];
+const CHROME_SCHEMES = ["chrome://", "resource://", "jar:file://"];
+const CONTENT_SCHEMES = ["http://", "https://", "file://", "app://"];
 
 exports.ThreadNode = ThreadNode;
 exports.FrameNode = FrameNode;
