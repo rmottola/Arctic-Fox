@@ -10,9 +10,11 @@ Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
 const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {gDevTools} = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
 const {require} = devtools;
 const promise = require("promise");
 const {AppProjects} = require("devtools/app-manager/app-projects");
+gDevTools.testing = true;
 
 let TEST_BASE;
 if (window.location === "chrome://browser/content/browser.xul") {
@@ -32,6 +34,7 @@ Services.prefs.setCharPref("devtools.webide.templatesURL", TEST_BASE + "template
 
 
 SimpleTest.registerCleanupFunction(() => {
+  gDevTools.testing = false;
   Services.prefs.clearUserPref("devtools.webide.enabled");
   Services.prefs.clearUserPref("devtools.webide.enableLocalRuntime");
   Services.prefs.clearUserPref("devtools.webide.autoinstallADBHelper");
