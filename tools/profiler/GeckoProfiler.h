@@ -177,6 +177,22 @@ static inline char** profiler_get_features() { return nullptr; }
 // printing the location require symbolicating which is very slow.
 static inline void profiler_print_location() {}
 
+// Get information about the current buffer status.
+// Retursn (using outparams) the current write position in the buffer,
+// the total size of the buffer, and the generation of the buffer.
+// This information may be useful to a user-interface displaying the
+// current status of the profiler, allowing the user to get a sense
+// for how fast the buffer is being written to, and how much
+// data is visible.
+static inline void profiler_get_buffer_info(uint32_t *aCurrentPosition,
+                                            uint32_t *aTotalSize,
+                                            uint32_t *aGeneration)
+{
+  *aCurrentPosition = 0;
+  *aTotalSize = 0;
+  *aGeneration = 0;
+}
+
 // Discard the profile, throw away the profile and notify 'profiler-locked'.
 // This function is to be used when entering private browsing to prevent
 // the profiler from collecting sensitive data.

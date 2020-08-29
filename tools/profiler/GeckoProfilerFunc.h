@@ -36,6 +36,10 @@ void mozilla_sampler_save();
 char* mozilla_sampler_get_profile();
 JSObject *mozilla_sampler_get_profile_data(JSContext *aCx);
 const char** mozilla_sampler_get_features();
+
+void mozilla_sampler_get_buffer_info(uint32_t *aCurrentPosition, uint32_t *aTotalSize,
+                                     uint32_t *aGeneration);
+
 void mozilla_sampler_init();
 void mozilla_sampler_shutdown();
 void mozilla_sampler_print_location();

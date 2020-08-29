@@ -894,4 +894,10 @@ void mozilla_sampler_print_location1()
   delete syncProfile;
 }
 
-
+void
+TableTicker::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration)
+{
+  *aCurrentPosition = mBuffer->mWritePos;
+  *aTotalSize = mBuffer->mEntrySize;
+  *aGeneration = mBuffer->mGeneration;
+}
