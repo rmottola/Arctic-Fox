@@ -33,8 +33,11 @@ void mozilla_sampler_responsiveness(TimeStamp time);
 void mozilla_sampler_frame_number(int frameNumber);
 const double* mozilla_sampler_get_responsiveness();
 void mozilla_sampler_save();
-char* mozilla_sampler_get_profile();
-JSObject *mozilla_sampler_get_profile_data(JSContext *aCx);
+
+char* mozilla_sampler_get_profile(float aSinceTime);
+
+JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime);
+
 const char** mozilla_sampler_get_features();
 
 void mozilla_sampler_get_buffer_info(uint32_t *aCurrentPosition, uint32_t *aTotalSize,
