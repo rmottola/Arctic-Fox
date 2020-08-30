@@ -90,7 +90,9 @@ var GcliActor = exports.GcliActor = protocol.ActorClass({
       start: Arg(1, "number"), // Cursor start position
       rank: Arg(2, "number") // The prediction offset (# times UP/DOWN pressed)
     },
-    response: RetVal("json")
+    response: {
+      value: RetVal("array:json")
+    }
   }),
 
   /**
