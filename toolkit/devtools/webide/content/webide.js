@@ -103,6 +103,8 @@ let UI = {
                                .QueryInterface(Ci.nsIDocShell)
                                .contentViewer;
     this.contentViewer.fullZoom = Services.prefs.getCharPref("devtools.webide.zoom");
+
+    gDevToolsBrowser.isWebIDEInitialized.resolve();
   },
 
   uninit: function() {
