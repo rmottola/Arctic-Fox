@@ -145,6 +145,8 @@ toolkit.jar:
     content/global/devtools/spectrum.css                              (shared/widgets/spectrum.css)
     content/global/devtools/cubic-bezier-frame.xhtml                  (shared/widgets/cubic-bezier-frame.xhtml)
     content/global/devtools/cubic-bezier.css                          (shared/widgets/cubic-bezier.css)
+    content/global/devtools/filter-frame.xhtml                        (shared/widgets/filter-frame.xhtml)
+    content/global/devtools/filter-widget.css                         (shared/widgets/filter-widget.css)
     content/global/devtools/eyedropper.xul                            (eyedropper/eyedropper.xul)
     content/global/devtools/eyedropper/crosshairs.css                 (eyedropper/crosshairs.css)
     content/global/devtools/eyedropper/nocursor.css                   (eyedropper/nocursor.css)
