@@ -67,8 +67,7 @@ exports.items = [
     manual: gcli.lookup("cookieListManual"),
     returnType: "cookies",
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       let cookies = [];
@@ -104,8 +103,7 @@ exports.items = [
       }
     ],
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       while (enm.hasMoreElements()) {
@@ -124,8 +122,7 @@ exports.items = [
     to: "view",
     exec: function(cookies, context) {
       if (cookies.length == 0) {
-        let host = context.environment.document.location.host;
-        host = sanitizeHost(host);
+	let host = sanitizeHost(context.environment.document.location.host);
         let msg = gcli.lookupFormat("cookieListOutNoneHost", [ host ]);
         return context.createView({ html: "<span>" + msg + "</span>" });
       }
@@ -241,8 +238,7 @@ exports.items = [
       }
     ],
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let time = Date.parse(args.expires) / 1000;
 
       cookieMgr.add(args.domain ? "." + args.domain : host,
