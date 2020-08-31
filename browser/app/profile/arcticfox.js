@@ -1117,6 +1117,11 @@ pref("devtools.performance.ui.show-jit-optimizations", false);
 // The default service workers UI setting
 pref("devtools.serviceWorkers.testing.enabled", false);
 
+// Set imgur upload client ID
+pref("devtools.gcli.imgurClientID", '0df414e888d7240');
+// Imgur's upload URL
+pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
+
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
 pref("browser.menu.showCharacterEncoding", "chrome://browser/locale/browser.properties");

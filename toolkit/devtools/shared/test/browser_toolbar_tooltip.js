@@ -32,25 +32,25 @@ function* runTest() {
 
   let tooltipPanel = DeveloperToolbar.tooltipPanel;
 
-  DeveloperToolbar.display.focusManager.helpRequest();
-  yield DeveloperToolbar.display.inputter.setInput('help help');
+  DeveloperToolbar.focusManager.helpRequest();
+  yield DeveloperToolbar.inputter.setInput('help help');
 
-  DeveloperToolbar.display.inputter.setCursor({ start: 'help help'.length });
+  DeveloperToolbar.inputter.setCursor({ start: 'help help'.length });
   is(tooltipPanel._dimensions.start, 'help '.length,
           'search param start, when cursor at end');
   ok(getLeftMargin() > 30, 'tooltip offset, when cursor at end')
 
-  DeveloperToolbar.display.inputter.setCursor({ start: 'help'.length });
+  DeveloperToolbar.inputter.setCursor({ start: 'help'.length });
   is(tooltipPanel._dimensions.start, 0,
           'search param start, when cursor at end of command');
   ok(getLeftMargin() > 9, 'tooltip offset, when cursor at end of command')
 
-  DeveloperToolbar.display.inputter.setCursor({ start: 'help help'.length - 1 });
+  DeveloperToolbar.inputter.setCursor({ start: 'help help'.length - 1 });
   is(tooltipPanel._dimensions.start, 'help '.length,
           'search param start, when cursor at penultimate position');
   ok(getLeftMargin() > 30, 'tooltip offset, when cursor at penultimate position')
 
-  DeveloperToolbar.display.inputter.setCursor({ start: 0 });
+  DeveloperToolbar.inputter.setCursor({ start: 0 });
   is(tooltipPanel._dimensions.start, 0,
           'search param start, when cursor at start');
   ok(getLeftMargin() > 9, 'tooltip offset, when cursor at start')
