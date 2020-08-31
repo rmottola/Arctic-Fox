@@ -23,6 +23,7 @@ const {setTimeout} = require("sdk/timers");
 const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
 const {RuntimeScanners, RuntimeTypes} = require("devtools/webide/runtimes");
 const {NetUtil} = Cu.import("resource://gre/modules/NetUtil.jsm", {});
+const Telemetry = require("devtools/shared/telemetry");
 const {ProjectBuilding} = require("./build");
 
 const Strings = Services.strings.createBundle("chrome://global/locale/devtools/webide.properties");
@@ -52,6 +53,8 @@ let AppManager = exports.AppManager = {
     this._rebuildRuntimeList();
 
     this.onInstallProgress = this.onInstallProgress.bind(this);
+
+    this._telemetry = new Telemetry();
   },
 
   uninit: function() {
@@ -397,6 +400,29 @@ let AppManager = exports.AppManager = {
         deferred.reject(e);
       }
     }, deferred.reject);
+
+    // Record connection result in telemetry
+    let logResult = result => {
+      this._telemetry.log("DEVTOOLS_WEBIDE_CONNECTION_RESULT", result);
+      if (runtime.type) {
+        this._telemetry.log("DEVTOOLS_WEBIDE_" + runtime.type +
+                            "_CONNECTION_RESULT", result);
+      }
+    };
+    deferred.promise.then(() => logResult(true), () => logResult(false));
+
+    // If successful, record connection time in telemetry
+    deferred.promise.then(() => {
+      const timerId = "DEVTOOLS_WEBIDE_CONNECTION_TIME_SECONDS";
+      this._telemetry.startTimer(timerId);
+      this.connection.once(Connection.Events.STATUS_CHANGED, () => {
+        this._telemetry.stopTimer(timerId);
+      });
+    }).catch(() => {
+      // Empty rejection handler to silence uncaught rejection warnings
+      // |connectToRuntime| caller should listen for rejections.
+      // Bug 1121100 may find a better way to silence these.
+    });
 
     return deferred.promise;
   },

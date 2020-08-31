@@ -21,6 +21,7 @@ const {Devices} = Cu.import("resource://gre/modules/devtools/Devices.jsm");
 const {GetAvailableAddons} = require("devtools/webide/addons");
 const {GetTemplatesJSON, GetAddonsJSON} = require("devtools/webide/remote-resources");
 const utils = require("devtools/webide/utils");
+const Telemetry = require("devtools/shared/telemetry");
 const {RuntimeScanners, WiFiScanner} = require("devtools/webide/runtimes");
 const {showDoorhanger} = require("devtools/shared/doorhanger");
 
@@ -52,6 +53,9 @@ window.addEventListener("unload", function onUnload() {
 
 let UI = {
   init: function() {
+    this._telemetry = new Telemetry();
+    this._telemetry.toolOpened("webide");
+
     AppManager.init();
 
     this.onMessage = this.onMessage.bind(this);
@@ -113,6 +117,7 @@ let UI = {
     AppManager.uninit();
     window.removeEventListener("message", this.onMessage);
     this.updateConnectionTelemetry();
+    this._telemetry.toolClosed("webide");
   },
 
   canCloseProject: function() {
