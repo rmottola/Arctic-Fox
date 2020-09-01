@@ -429,6 +429,7 @@ function WiFiRuntime(deviceName) {
 }
 
 WiFiRuntime.prototype = {
+  type: RuntimeTypes.WIFI,
   connect: function(connection) {
     let service = discovery.getRemoteService("devtools", this.deviceName);
     if (!service) {
@@ -534,6 +535,7 @@ function SimulatorRuntime(simulator) {
 }
 
 SimulatorRuntime.prototype = {
+  type: RuntimeTypes.SIMULATOR,
   connect: function(connection) {
     return this.simulator.launch().then(port => {
       connection.host = "localhost";
@@ -555,6 +557,7 @@ SimulatorRuntime.prototype = {
 exports._SimulatorRuntime = SimulatorRuntime;
 
 let gLocalRuntime = {
+  type: RuntimeTypes.LOCAL,
   connect: function(connection) {
     if (!DebuggerServer.initialized) {
       DebuggerServer.init();
@@ -578,6 +581,7 @@ let gLocalRuntime = {
 exports._gLocalRuntime = gLocalRuntime;
 
 let gRemoteRuntime = {
+  type: RuntimeTypes.REMOTE,
   connect: function(connection) {
     let win = Services.wm.getMostRecentWindow("devtools:webide");
     if (!win) {
