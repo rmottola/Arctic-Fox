@@ -174,6 +174,7 @@ browser.jar:
         skin/classic/browser/devtools/search-clear-failed.svg        (../shared/devtools/images/search-clear-failed.svg)
         skin/classic/browser/devtools/search-clear-light.svg         (../shared/devtools/images/search-clear-light.svg)
         skin/classic/browser/devtools/search-clear-dark.svg          (../shared/devtools/images/search-clear-dark.svg)
+        skin/classic/browser/devtools/tool-profiler-active.svg       (../shared/devtools/images/tool-profiler-active.svg)
 #ifdef MOZ_SERVICES_SYNC
         skin/classic/browser/sync-throbber.png
         skin/classic/browser/sync-16.png

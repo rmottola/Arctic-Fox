@@ -239,6 +239,7 @@ Tools.performance = {
   ordinal: 7,
   icon: "chrome://global/skin/devtools/tool-profiler.svg",
   invertIconForLightTheme: true,
+  highlightedicon: "chrome://browser/skin/devtools/tool-profiler-active.svg",
   url: "chrome://global/content/devtools/performance.xul",
   visibilityswitch: "devtools.performance.enabled",
   label: l10n("profiler.label2", profilerStrings),
