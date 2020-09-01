@@ -62,6 +62,10 @@ const Strings = Services.strings.createBundle("chrome://global/locale/devtools/w
  * |name| field
  *   A user-visible label to identify the runtime that will be displayed in a
  *   runtime list.
+ * |prolongedConnection| field
+ *   A boolean value which should be |true| if the connection process is
+ *   expected to take a unknown or large amount of time.  A UI may use this as a
+ *   hint to skip timeouts or other time-based code paths.
  * connect()
  *   Configure the passed |connection| object with any settings need to
  *   successfully connect to the runtime, and call the |connection|'s connect()
@@ -430,6 +434,8 @@ function WiFiRuntime(deviceName) {
 
 WiFiRuntime.prototype = {
   type: RuntimeTypes.WIFI,
+  // Mark runtime as taking a long time to connect
+  prolongedConnection: true,
   connect: function(connection) {
     let service = discovery.getRemoteService("devtools", this.deviceName);
     if (!service) {
