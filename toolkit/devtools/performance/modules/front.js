@@ -582,13 +582,16 @@ PerformanceActorsConnection.prototype = {
    * them to consumers.
    */
   _pullAllocationSites: Task.async(function *() {
+    let deferred = promise.defer();
+    this._lastPullAllocationSitesFinished = deferred.promise;
+
     let isDetached = (yield this._request("memory", "getState")) !== "attached";
     if (isDetached) {
+
       return;
     }
 
     let memoryData = yield this._request("memory", "getAllocations");
-    let isStillAttached = yield this._request("memory", "getState") == "attached";
 
     this.emit("allocations", {
       sites: memoryData.allocations,
@@ -597,10 +600,10 @@ PerformanceActorsConnection.prototype = {
       counts: memoryData.counts
     });
 
-    if (isStillAttached) {
-      let delay = DEFAULT_ALLOCATION_SITES_PULL_TIMEOUT;
-      this._sitesPullTimeout = setTimeout(this._pullAllocationSites, delay);
-    }
+    let delay = DEFAULT_ALLOCATION_SITES_PULL_TIMEOUT;
+    this._sitesPullTimeout = setTimeout(this._pullAllocationSites, delay);
+
+    deferred.resolve();
   }),
 
   toString: () => "[object PerformanceActorsConnection]"
