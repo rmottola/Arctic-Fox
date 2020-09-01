@@ -39,6 +39,7 @@ SimpleTest.registerCleanupFunction(() => {
   Services.prefs.clearUserPref("devtools.webide.enableLocalRuntime");
   Services.prefs.clearUserPref("devtools.webide.autoinstallADBHelper");
   Services.prefs.clearUserPref("devtools.webide.autoinstallFxdtAdapters");
+  Services.prefs.clearUserPref("devtools.webide.sidebars");
 });
 
 function openWebIDE(autoInstallAddons) {
