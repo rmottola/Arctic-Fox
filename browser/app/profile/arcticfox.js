@@ -1113,6 +1113,15 @@ pref("devtools.performance.timeline.hidden-markers", "[]");
 pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
 pref("devtools.performance.ui.show-jit-optimizations", false);
+// If in aurora (40.0, will revert for 40.1), set default
+// to retro mode.
+// TODO bug 1160313
+#if MOZ_UPDATE_CHANNEL == aurora
+  pref("devtools.performance.ui.retro-mode", true);
+#else
+  pref("devtools.performance.ui.retro-mode", false);
+#endif
+
 
 // The default service workers UI setting
 pref("devtools.serviceWorkers.testing.enabled", false);
