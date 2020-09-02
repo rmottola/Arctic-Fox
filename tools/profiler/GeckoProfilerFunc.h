@@ -8,6 +8,7 @@
 
 #include "js/TypeDecls.h"
 #include "js/ProfilingStack.h"
+#include "mozilla/UniquePtr.h"
 #include <stdint.h>
 
 namespace mozilla {
@@ -34,7 +35,7 @@ void mozilla_sampler_frame_number(int frameNumber);
 const double* mozilla_sampler_get_responsiveness();
 void mozilla_sampler_save();
 
-char* mozilla_sampler_get_profile(float aSinceTime);
+mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime);
 
 JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime);
 
