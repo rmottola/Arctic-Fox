@@ -48,6 +48,7 @@
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1244650 - Failure to clear Forms and Search Data on exit. r
 - Bug 1243549 - Add missing bits. r=post-facto 
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
@@ -63,6 +64,7 @@
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
