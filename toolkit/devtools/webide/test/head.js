@@ -148,7 +148,7 @@ function lazyIframeIsLoaded(iframe) {
   let deferred = promise.defer();
   iframe.addEventListener("load", function onLoad() {
     iframe.removeEventListener("load", onLoad, true);
-    deferred.resolve();
+    deferred.resolve(nextTick());
   }, true);
   return deferred.promise;
 }
