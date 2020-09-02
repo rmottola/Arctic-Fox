@@ -1515,8 +1515,8 @@ SelectorView.prototype = {
           contentDoc = rawNode.ownerDocument;
         }
       }
-      let viewSourceUtils = inspector.viewSourceUtils;
-      viewSourceUtils.viewSource(rule.href, null, contentDoc, rule.line);
+      let toolbox = gDevTools.getToolbox(inspector.target);
+      toolbox.viewSource(rule.href, rule.line);
       return;
     }
 
