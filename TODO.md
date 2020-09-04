@@ -136,6 +136,11 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
 - Bug 1149352 - Part 0 to 11
 
+impacting download and shutdown:
+Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
+Bug 1150855 - Remove uses of the curly syntax. r=jaws
+Bug 875648 - Use Downloads.jsm functions to get download directories
+
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
 
