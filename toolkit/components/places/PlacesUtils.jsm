@@ -2889,13 +2889,15 @@ PlacesCreateFolderTransaction.prototype = {
  *        reverted manually when removing the bookmark item.
  *        a child transaction must support setting its bookmark-item
  *        identifier via an "id" js setter.
+ * @param [optional] aPostData
+ *        keyword's POST data, if available.
  *
  * @return nsITransaction object
  */
 this.PlacesCreateBookmarkTransaction =
  function PlacesCreateBookmarkTransaction(aURI, aParentId, aIndex, aTitle,
                                           aKeyword, aAnnotations,
-                                          aChildTransactions)
+                                          aChildTransactions, aPostData)
 {
   this.item = new TransactionItemCache();
   this.item.uri = aURI;
@@ -2903,6 +2905,7 @@ this.PlacesCreateBookmarkTransaction =
   this.item.index = aIndex;
   this.item.title = aTitle;
   this.item.keyword = aKeyword;
+  this.item.postData = aPostData;
   this.item.annotations = aAnnotations;
   this.childTransactions = aChildTransactions;
 }
@@ -2919,6 +2922,10 @@ PlacesCreateBookmarkTransaction.prototype = {
     if (this.item.keyword) {
       PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id,
                                                   this.item.keyword);
+      if (this.item.postData) {
+        PlacesUtils.setPostDataForBookmark(this.item.id,
+                                           this.item.postData);
+      }
     }
     if (this.item.annotations && this.item.annotations.length > 0)
       PlacesUtils.setAnnotationsForItem(this.item.id, this.item.annotations);
@@ -3205,6 +3212,8 @@ this.PlacesRemoveItemTransaction =
     this.item.uri = PlacesUtils.bookmarks.getBookmarkURI(this.item.id);
     this.item.keyword =
       PlacesUtils.bookmarks.getKeywordForBookmark(this.item.id);
+    if (this.item.keyword)
+      this.item.postData = PlacesUtils.getPostDataForBookmark(this.item.id);
   }
 
   if (this.item.itemType != Ci.nsINavBookmarksService.TYPE_SEPARATOR)
@@ -3256,6 +3265,9 @@ PlacesRemoveItemTransaction.prototype = {
       if (this.item.keyword) {
         PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id,
                                                     this.item.keyword);
+        if (this.item.postData) {
+          PlacesUtils.bookmarks.setPostDataForBookmark(this.item.id);
+        }
       }
     }
     else if (this.item.itemType == Ci.nsINavBookmarksService.TYPE_FOLDER) {
@@ -3507,16 +3519,19 @@ PlacesSetPageAnnotationTransaction.prototype = {
  *        id of the bookmark to edit
  * @param aNewKeyword
  *        new keyword for the bookmark
+ * @param aNewPostData [optional]
+ *        new keyword's POST data, if available
  *
  * @return nsITransaction object
  */
 this.PlacesEditBookmarkKeywordTransaction =
- function PlacesEditBookmarkKeywordTransaction(aItemId, aNewKeyword)
+ function PlacesEditBookmarkKeywordTransaction(aItemId, aNewKeyword, aNewPostData)
 {
   this.item = new TransactionItemCache();
   this.item.id = aItemId;
   this.new = new TransactionItemCache();
   this.new.keyword = aNewKeyword;
+  this.new.postData = aNewPostData
 }
 
 PlacesEditBookmarkKeywordTransaction.prototype = {
@@ -3524,13 +3539,22 @@ PlacesEditBookmarkKeywordTransaction.prototype = {
 
   doTransaction: function EBKTXN_doTransaction()
   {
+    // Store the current values.
     this.item.keyword = PlacesUtils.bookmarks.getKeywordForBookmark(this.item.id);
+    if (this.item.keyword)
+      this.item.postData = PlacesUtils.getPostDataForBookmark(this.item.id);
+
+    // Update the keyword.
     PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id, this.new.keyword);
+    if (this.new.keyword && this.new.postData)
+      PlacesUtils.setPostDataForBookmark(this.item.id, this.new.postData);
   },
 
   undoTransaction: function EBKTXN_undoTransaction()
   {
     PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id, this.item.keyword);
+    if (this.item.postData)
+      PlacesUtils.setPostDataForBookmark(this.item.id, this.item.postData);
   }
 };
 
