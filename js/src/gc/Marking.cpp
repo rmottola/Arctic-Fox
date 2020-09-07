@@ -794,6 +794,13 @@ js::GCMarker::traverse(S source, jsid id)
     DispatchIdTyped(TraverseFunctor<jsid, S>(), id, this, source);
 }
 
+template <typename S>
+void
+js::GCMarker::traverse(S source, Value v)
+{
+    DispatchValueTyped(TraverseFunctor<Value, S>(), v, this, source);
+}
+
 template <typename T>
 bool
 js::GCMarker::mark(T* thing)
@@ -1213,7 +1220,6 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
         unboxedTraceList++;
         while (*unboxedTraceList != -1) {
             JSObject* obj2 = *reinterpret_cast<JSObject**>(unboxedMemory + *unboxedTraceList);
-            MOZ_ASSERT_IF(obj2, obj->compartment() == obj2->compartment());
             if (obj2)
                 traverse(obj, obj2);
             unboxedTraceList++;
@@ -1221,13 +1227,7 @@ GCMarker::processMarkStackTop(SliceBudget& budget)
         unboxedTraceList++;
         while (*unboxedTraceList != -1) {
             const Value& v = *reinterpret_cast<Value*>(unboxedMemory + *unboxedTraceList);
-            if (v.isString()) {
-                traverse(obj, v.toString());
-            } else if (v.isObject()) {
-                traverse(obj, &v.toObject());
-            } else if (v.isSymbol()) {
-                traverse(obj, v.toSymbol());
-            }
+            traverse(obj, v);
             unboxedTraceList++;
         }
         return;
