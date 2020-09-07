@@ -469,14 +469,6 @@ class JSFunction : public js::NativeObject
         return offsetof(JSFunction, u.nativeOrScript);
     }
 
-#if JS_BITS_PER_WORD == 32
-    static const js::gc::AllocKind FinalizeKind = js::gc::AllocKind::OBJECT2_BACKGROUND;
-    static const js::gc::AllocKind ExtendedFinalizeKind = js::gc::AllocKind::OBJECT4_BACKGROUND;
-#else
-    static const js::gc::AllocKind FinalizeKind = js::gc::AllocKind::OBJECT4_BACKGROUND;
-    static const js::gc::AllocKind ExtendedFinalizeKind = js::gc::AllocKind::OBJECT8_BACKGROUND;
-#endif
-
     inline void trace(JSTracer* trc);
 
     /* Bound function accessors. */
@@ -500,8 +492,10 @@ class JSFunction : public js::NativeObject
 
   public:
     inline bool isExtended() const {
-        MOZ_ASSERT_IF(isTenured(), !!(flags() & EXTENDED) == (asTenured().getAllocKind() == ExtendedFinalizeKind));
-        return !!(flags() & EXTENDED);
+        bool extended = !!(flags() & EXTENDED);
+        MOZ_ASSERT_IF(isTenured(),
+                      extended == (asTenured().getAllocKind() == js::gc::AllocKind::FUNCTION_EXTENDED));
+        return extended;
     }
 
     /*
@@ -520,13 +514,13 @@ class JSFunction : public js::NativeObject
 
     /* GC support. */
     js::gc::AllocKind getAllocKind() const {
-        static_assert(FinalizeKind != ExtendedFinalizeKind,
+        static_assert(js::gc::AllocKind::FUNCTION != js::gc::AllocKind::FUNCTION_EXTENDED,
                       "extended/non-extended AllocKinds have to be different "
                       "for getAllocKind() to have a reason to exist");
 
-        js::gc::AllocKind kind = FinalizeKind;
+        js::gc::AllocKind kind = js::gc::AllocKind::FUNCTION;
         if (isExtended())
-            kind = ExtendedFinalizeKind;
+            kind = js::gc::AllocKind::FUNCTION_EXTENDED;
         MOZ_ASSERT_IF(isTenured(), kind == asTenured().getAllocKind());
         return kind;
     }
@@ -549,13 +543,13 @@ Generator(JSContext* cx, unsigned argc, Value* vp);
 // Allocate a new function backed by a JSNative.
 extern JSFunction*
 NewNativeFunction(ExclusiveContext* cx, JSNative native, unsigned nargs, HandleAtom atom,
-                  gc::AllocKind allocKind = JSFunction::FinalizeKind,
+                  gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                   NewObjectKind newKind = GenericObject);
 
 // Allocate a new constructor backed by a JSNative.
 extern JSFunction*
 NewNativeConstructor(ExclusiveContext* cx, JSNative native, unsigned nargs, HandleAtom atom,
-                     gc::AllocKind allocKind = JSFunction::FinalizeKind,
+                     gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                      NewObjectKind newKind = GenericObject,
                      JSFunction::Flags flags = JSFunction::NATIVE_CTOR);
 
@@ -564,7 +558,7 @@ NewNativeConstructor(ExclusiveContext* cx, JSNative native, unsigned nargs, Hand
 // the global.
 extern JSFunction*
 NewScriptedFunction(ExclusiveContext* cx, unsigned nargs, JSFunction::Flags flags,
-                    HandleAtom atom, gc::AllocKind allocKind = JSFunction::FinalizeKind,
+                    HandleAtom atom, gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                     NewObjectKind newKind = GenericObject,
                     HandleObject enclosingDynamicScope = NullPtr());
 
@@ -575,7 +569,7 @@ NewScriptedFunction(ExclusiveContext* cx, unsigned nargs, JSFunction::Flags flag
 extern JSFunction*
 NewFunctionWithProto(ExclusiveContext* cx, JSNative native, unsigned nargs,
                      JSFunction::Flags flags, HandleObject enclosingDynamicScope, HandleAtom atom,
-                     HandleObject proto, gc::AllocKind allocKind = JSFunction::FinalizeKind,
+                     HandleObject proto, gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                      NewObjectKind newKind = GenericObject);
 
 extern JSAtom*
@@ -584,7 +578,7 @@ IdToFunctionName(JSContext* cx, HandleId id);
 extern JSFunction*
 DefineFunction(JSContext* cx, HandleObject obj, HandleId id, JSNative native,
                unsigned nargs, unsigned flags,
-               gc::AllocKind allocKind = JSFunction::FinalizeKind,
+               gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                NewObjectKind newKind = GenericObject);
 
 bool
@@ -643,7 +637,7 @@ CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction fun,
 
 extern JSFunction*
 CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
-                    gc::AllocKind kind = JSFunction::FinalizeKind,
+                    gc::AllocKind kind = gc::AllocKind::FUNCTION,
                     NewObjectKind newKindArg = GenericObject,
                     HandleObject proto = NullPtr());
 

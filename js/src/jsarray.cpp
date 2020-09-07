@@ -3295,7 +3295,7 @@ const Class ArrayObject::class_ = {
     nullptr, /* construct */
     nullptr, /* trace */
     {
-        GenericCreateConstructor<ArrayConstructor, 1, JSFunction::FinalizeKind>,
+        GenericCreateConstructor<ArrayConstructor, 1, gc::AllocKind::FUNCTION>,
         CreateArrayPrototype,
         array_static_methods,
         nullptr,
