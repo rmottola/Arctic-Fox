@@ -823,9 +823,6 @@ LazyScript::traceChildren(JSTracer* trc)
     if (enclosingScope_)
         TraceEdge(trc, &enclosingScope_, "enclosingScope");
 
-    if (script_)
-        TraceEdge(trc, &script_, "realScript");
-
     // We rely on the fact that atoms are always tenured.
     FreeVariable* freeVariables = this->freeVariables();
     for (auto i : MakeRange(numFreeVariables())) {
@@ -848,9 +845,6 @@ js::GCMarker::eagerlyMarkChildren(LazyScript *thing)
 
     if (thing->enclosingScope_)
         traverse(thing, static_cast<JSObject*>(thing->enclosingScope_));
-
-    if (thing->script_)
-        traverse(thing, static_cast<JSScript*>(thing->script_));
 
     // We rely on the fact that atoms are always tenured.
     LazyScript::FreeVariable* freeVariables = thing->freeVariables();

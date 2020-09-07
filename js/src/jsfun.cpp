@@ -548,7 +548,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
             // This can only happen for re-lazified cloned functions, so this
             // does not apply to any JSFunction produced by the parser, only to
             // JSFunction created by the runtime.
-            MOZ_ASSERT(!fun->lazyScript()->maybeScript());
+            MOZ_ASSERT(!fun->lazyScript()->maybeScriptUnbarriered());
 
             // Encode a lazy script.
             firstword |= IsLazy;
@@ -1620,11 +1620,6 @@ JSFunction::maybeRelazify(JSRuntime* rt)
     u.i.s.lazy_ = lazy;
     if (lazy) {
         MOZ_ASSERT(!isSelfHostedBuiltin());
-        // If this is the script stored in the lazy script to be cloned
-        // for un-lazifying other functions, reset it so the script can
-        // be freed.
-        if (lazy->maybeScript() == script)
-            lazy->resetScript();
     } else {
         MOZ_ASSERT(isSelfHostedBuiltin());
         MOZ_ASSERT(isExtended());
