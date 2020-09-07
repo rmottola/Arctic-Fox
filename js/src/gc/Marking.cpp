@@ -672,6 +672,7 @@ DoMarking(GCMarker* gcmarker, T thing)
     if (MustSkipMarking(thing))
         return;
 
+    CheckTracedThing(gcmarker, thing);
     gcmarker->traverse(thing);
 
     // Mark the compartment as live.
@@ -797,7 +798,6 @@ template <typename T>
 bool
 js::GCMarker::mark(T* thing)
 {
-    CheckTracedThing(this, thing);
     AssertZoneIsMarking(thing);
     MOZ_ASSERT(!IsInsideNursery(gc::TenuredCell::fromPointer(thing)));
     return gc::ParticipatesInCC<T>::value
