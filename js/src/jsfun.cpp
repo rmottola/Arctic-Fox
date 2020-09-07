@@ -2094,8 +2094,8 @@ JSFunction::isBuiltinFunctionConstructor()
     return maybeNative() == Function || maybeNative() == Generator;
 }
 
-JSFunction *
-js::NewNativeFunction(ExclusiveContext *cx, Native native, unsigned nargs, HandleAtom atom,
+JSFunction*
+js::NewNativeFunction(ExclusiveContext* cx, Native native, unsigned nargs, HandleAtom atom,
                       gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
                       NewObjectKind newKind /* = GenericObject */)
 {
@@ -2103,8 +2103,8 @@ js::NewNativeFunction(ExclusiveContext *cx, Native native, unsigned nargs, Handl
                                 NullPtr(), atom, NullPtr(), allocKind, newKind);
 }
 
-JSFunction *
-js::NewNativeConstructor(ExclusiveContext *cx, Native native, unsigned nargs, HandleAtom atom,
+JSFunction*
+js::NewNativeConstructor(ExclusiveContext* cx, Native native, unsigned nargs, HandleAtom atom,
                          gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
                          NewObjectKind newKind /* = GenericObject */,
                          JSFunction::Flags flags /* = JSFunction::NATIVE_CTOR */)
@@ -2114,8 +2114,8 @@ js::NewNativeConstructor(ExclusiveContext *cx, Native native, unsigned nargs, Ha
                                 NullPtr(), allocKind, newKind);
 }
 
-JSFunction *
-js::NewScriptedFunction(ExclusiveContext *cx, unsigned nargs,
+JSFunction* 
+js::NewScriptedFunction(ExclusiveContext* cx, unsigned nargs,
                         JSFunction::Flags flags, HandleAtom atom,
                         gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,
                         NewObjectKind newKind /* = GenericObject */,
@@ -2126,8 +2126,8 @@ js::NewScriptedFunction(ExclusiveContext *cx, unsigned nargs,
                                 atom, NullPtr(), allocKind, newKind);
 }
 
-JSFunction *
-js::NewFunctionWithProto(ExclusiveContext *cx, Native native,
+JSFunction*
+js::NewFunctionWithProto(ExclusiveContext* cx, Native native,
                          unsigned nargs, JSFunction::Flags flags, HandleObject enclosingDynamicScope,
                          HandleAtom atom, HandleObject proto,
                          gc::AllocKind allocKind /* = JSFunction::FinalizeKind */,

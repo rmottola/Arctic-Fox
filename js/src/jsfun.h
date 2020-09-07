@@ -541,20 +541,20 @@ fun_toStringHelper(JSContext* cx, js::HandleObject obj, unsigned indent);
 namespace js {
 
 extern bool
-Function(JSContext *cx, unsigned argc, Value *vp);
+Function(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool
-Generator(JSContext *cx, unsigned argc, Value *vp);
+Generator(JSContext* cx, unsigned argc, Value* vp);
 
 // Allocate a new function backed by a JSNative.
-extern JSFunction *
-NewNativeFunction(ExclusiveContext *cx, JSNative native, unsigned nargs, HandleAtom atom,
+extern JSFunction*
+NewNativeFunction(ExclusiveContext* cx, JSNative native, unsigned nargs, HandleAtom atom,
                   gc::AllocKind allocKind = JSFunction::FinalizeKind,
                   NewObjectKind newKind = GenericObject);
 
 // Allocate a new constructor backed by a JSNative.
-extern JSFunction *
-NewNativeConstructor(ExclusiveContext *cx, JSNative native, unsigned nargs, HandleAtom atom,
+extern JSFunction*
+NewNativeConstructor(ExclusiveContext* cx, JSNative native, unsigned nargs, HandleAtom atom,
                      gc::AllocKind allocKind = JSFunction::FinalizeKind,
                      NewObjectKind newKind = GenericObject,
                      JSFunction::Flags flags = JSFunction::NATIVE_CTOR);
@@ -562,8 +562,8 @@ NewNativeConstructor(ExclusiveContext *cx, JSNative native, unsigned nargs, Hand
 // Allocate a new scripted function.  If enclosingDynamicScope is null, the
 // global will be used.  In all cases the parent of the resulting object will be
 // the global.
-extern JSFunction *
-NewScriptedFunction(ExclusiveContext *cx, unsigned nargs, JSFunction::Flags flags,
+extern JSFunction*
+NewScriptedFunction(ExclusiveContext* cx, unsigned nargs, JSFunction::Flags flags,
                     HandleAtom atom, gc::AllocKind allocKind = JSFunction::FinalizeKind,
                     NewObjectKind newKind = GenericObject,
                     HandleObject enclosingDynamicScope = NullPtr());
@@ -572,8 +572,8 @@ NewScriptedFunction(ExclusiveContext *cx, unsigned nargs, JSFunction::Flags flag
 // enclosingDynamicScope is null, the function will have a null environment()
 // (yes, null, not the global).  In all cases, the global will be used as the
 // parent.
-extern JSFunction *
-NewFunctionWithProto(ExclusiveContext *cx, JSNative native, unsigned nargs,
+extern JSFunction*
+NewFunctionWithProto(ExclusiveContext* cx, JSNative native, unsigned nargs,
                      JSFunction::Flags flags, HandleObject enclosingDynamicScope, HandleAtom atom,
                      HandleObject proto, gc::AllocKind allocKind = JSFunction::FinalizeKind,
                      NewObjectKind newKind = GenericObject);
@@ -638,11 +638,11 @@ class FunctionExtended : public JSFunction
 };
 
 extern bool
-CloneFunctionObjectUseSameScript(JSCompartment *compartment, HandleFunction fun,
+CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction fun,
                                  HandleObject newParent);
 
-extern JSFunction *
-CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
+extern JSFunction*
+CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
                     gc::AllocKind kind = JSFunction::FinalizeKind,
                     NewObjectKind newKindArg = GenericObject,
                     HandleObject proto = NullPtr());
