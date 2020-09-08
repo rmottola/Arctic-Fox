@@ -878,8 +878,8 @@ Debugger::wrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
     return true;
 }
 
-JSObject *
-Debugger::translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats)
+JSObject*
+Debugger::translateGCStatistics(JSContext* cx, const gcstats::Statistics& stats)
 {
     // If this functions triggers a GC then the statistics object will change
     // underneath us.
@@ -889,10 +889,10 @@ Debugger::translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats)
     if (!obj)
         return nullptr;
 
-    const char *nonincrementalReason = stats.nonincrementalReason();
+    const char* nonincrementalReason = stats.nonincrementalReason();
     RootedValue nonincrementalReasonValue(cx, NullValue());
     if (nonincrementalReason) {
-        JSAtom *atomized = Atomize(cx, nonincrementalReason, strlen(nonincrementalReason));
+        JSAtom* atomized = Atomize(cx, nonincrementalReason, strlen(nonincrementalReason));
         if (!atomized)
             return nullptr;
         nonincrementalReasonValue.setString(atomized);
@@ -910,8 +910,8 @@ Debugger::translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats)
         if (idx == 0) {
             // There is only one GC reason for the whole cycle, but for legacy
             // reasons, this data is stored and replicated on each slice.
-            const char *reason = gcstats::ExplainReason(range.front().reason);
-            JSAtom *atomized = Atomize(cx, reason, strlen(reason));
+            const char* reason = gcstats::ExplainReason(range.front().reason);
+            JSAtom* atomized = Atomize(cx, reason, strlen(reason));
             if (!atomized)
                 return nullptr;
             RootedValue reasonVal(cx, StringValue(atomized));
@@ -944,7 +944,7 @@ Debugger::translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats)
 }
 
 bool
-Debugger::unwrapDebuggeeObject(JSContext *cx, MutableHandleObject obj)
+Debugger::unwrapDebuggeeObject(JSContext* cx, MutableHandleObject obj)
 {
     if (obj->getClass() != &DebuggerObject_class) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
@@ -1332,7 +1332,7 @@ Debugger::fireNewScript(JSContext* cx, HandleScript script)
 }
 
 void
-Debugger::fireOnGarbageCollectionHook(JSRuntime *rt, const gcstats::Statistics &stats)
+Debugger::fireOnGarbageCollectionHook(JSRuntime* rt, const gcstats::Statistics& stats)
 {
     if (inOnGCHook)
         return;
@@ -1342,7 +1342,7 @@ Debugger::fireOnGarbageCollectionHook(JSRuntime *rt, const gcstats::Statistics &
     MOZ_ASSERT(debuggeeWasCollected);
     debuggeeWasCollected = false;
 
-    JSContext *cx = DefaultJSContext(rt);
+    JSContext* cx = DefaultJSContext(rt);
     MOZ_ASSERT(cx);
 
     RootedObject hook(cx, getHook(OnGarbageCollection));
@@ -1352,7 +1352,7 @@ Debugger::fireOnGarbageCollectionHook(JSRuntime *rt, const gcstats::Statistics &
     Maybe<AutoCompartment> ac;
     ac.emplace(cx, object);
 
-    JSObject *statsObj = translateGCStatistics(cx, stats);
+    JSObject* statsObj = translateGCStatistics(cx, stats);
     if (!statsObj) {
         handleUncaughtException(ac, false);
         return;

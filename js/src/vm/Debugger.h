@@ -185,11 +185,11 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     friend class DebuggerMemory;
     friend class SavedStacks;
     friend class mozilla::LinkedListElement<Debugger>;
-    friend bool (::JS_DefineDebuggerObject)(JSContext *cx, JS::HandleObject obj);
+    friend bool (::JS_DefineDebuggerObject)(JSContext* cx, JS::HandleObject obj);
     friend bool (::JS::dbg::IsDebugger)(JS::Value val);
-    friend JSObject *SavedStacksMetadataCallback(JSContext *cx);
-    friend void JS::dbg::onNewPromise(JSContext *cx, HandleObject promise);
-    friend void JS::dbg::onPromiseSettled(JSContext *cx, HandleObject promise);
+    friend JSObject* SavedStacksMetadataCallback(JSContext* cx);
+    friend void JS::dbg::onNewPromise(JSContext* cx, HandleObject promise);
+    friend void JS::dbg::onPromiseSettled(JSContext* cx, HandleObject promise);
 
   public:
     enum Hook {
@@ -561,7 +561,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * Receive a "garbage collection" event from the engine. A GC cycle with the
      * given statistics was just completed.
      */
-    void fireOnGarbageCollectionHook(JSRuntime *rt, const gcstats::Statistics &stats);
+    void fireOnGarbageCollectionHook(JSRuntime* rt, const gcstats::Statistics& stats);
 
     /*
      * Gets a Debugger.Frame object. If maybeIter is non-null, we eagerly copy
@@ -734,7 +734,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * JSObject that web developers should be able to make sense of. Returns
      * nullptr on failure.
      */
-    JSObject *translateGCStatistics(JSContext *cx, const gcstats::Statistics &stats);
+    JSObject* translateGCStatistics(JSContext* cx, const gcstats::Statistics& stats);
 
     /*
      * Unwrap a Debug.Object, without rewrapping it for any particular debuggee
@@ -1000,14 +1000,14 @@ Debugger::onLogAllocationSite(JSContext* cx, JSObject* obj, HandleSavedFrame fra
 /* static */ void
 Debugger::onGarbageCollection(JSRuntime* rt, const gcstats::Statistics &stats)
 {
-    for (Debugger *dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext()) {
+    for (Debugger* dbg = rt->debuggerList.getFirst(); dbg; dbg = dbg->getNext()) {
         if (dbg->debuggeeWasCollected && dbg->getHook(OnGarbageCollection)) {
             dbg->fireOnGarbageCollectionHook(rt, stats);
         }
     }
 }
 
-bool ReportObjectRequired(JSContext *cx);
+bool ReportObjectRequired(JSContext* cx);
 
 } /* namespace js */
 
