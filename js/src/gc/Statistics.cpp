@@ -530,6 +530,9 @@ Statistics::formatData(StatisticsSerializer& ss, uint64_t timestamp)
                 continue;
             }
 
+            char budgetDescription[200];
+            slices[i].budget.describe(budgetDescription, sizeof(budgetDescription) - 1);
+
             ss.beginObject(nullptr);
             ss.extra("    ");
             ss.appendNumber("Slice", "%d", "", i);
@@ -537,6 +540,7 @@ Statistics::formatData(StatisticsSerializer& ss, uint64_t timestamp)
             ss.extra(" (");
             ss.appendDecimal("When", "ms", t(slices[i].start - slices[0].start));
             ss.appendString("Reason", ExplainReason(slices[i].reason));
+            ss.appendString("Budget", budgetDescription);
             if (ss.isJSON()) {
                 ss.appendDecimal("Page Faults", "",
                                  double(slices[i].endFaults - slices[i].startFaults));
@@ -630,13 +634,16 @@ Statistics::formatDescription()
 UniqueChars
 Statistics::formatSliceDescription(unsigned i, const SliceData& slice)
 {
+    char budgetDescription[200];
+    slice.budget.describe(budgetDescription, sizeof(budgetDescription) - 1);
+
     const char* format =
 "\
   ---- Slice %u ----\n\
     Reason: %s\n\
     Reset: %s%s\n\
     Page Faults: %ld\n\
-    Pause: %.3fms  (@ %.3fms)\n\
+    Pause: %.3fms of %s budget (@ %.3fms)\n\
 ";
     char buffer[1024];
     memset(buffer, 0, sizeof(buffer));
@@ -644,7 +651,7 @@ Statistics::formatSliceDescription(unsigned i, const SliceData& slice)
                 ExplainReason(slice.reason),
                 slice.resetReason ? "yes - " : "no", slice.resetReason ? slice.resetReason : "",
                 uint64_t(slice.endFaults - slice.startFaults),
-                t(slice.duration()), t(slice.start - slices[0].start));
+                t(slice.duration()), budgetDescription, t(slice.start - slices[0].start));
     return make_string_copy(buffer);
 }
 
@@ -998,7 +1005,7 @@ Statistics::endGC()
 
 void
 Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
-                       JS::gcreason::Reason reason)
+                       SliceBudget budget, JS::gcreason::Reason reason)
 {
     this->zoneStats = zoneStats;
 
@@ -1006,7 +1013,7 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
     if (first)
         beginGC(gckind);
 
-    SliceData data(reason, PRMJ_Now(), GetPageFaultCount());
+    SliceData data(budget, reason, PRMJ_Now(), GetPageFaultCount());
     if (!slices.append(data)) {
         // OOM testing fails if we CrashAtUnhandlableOOM here.
         aborted = true;
