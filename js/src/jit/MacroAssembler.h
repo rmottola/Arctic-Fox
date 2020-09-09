@@ -313,17 +313,17 @@ class MacroAssembler : public MacroAssemblerSpecific
     void Push(jsid id, Register scratchReg);
     void Push(TypedOrValueRegister v);
     void Push(ConstantOrRegister v);
-    void Push(const ValueOperand &val);
-    void Push(const Value &val);
+    void Push(const ValueOperand& val);
+    void Push(const Value& val);
     void Push(JSValueType type, Register reg);
-    void PushValue(const Address &addr);
+    void PushValue(const Address& addr);
     void PushEmptyRooted(VMFunction::RootType rootType);
 
     void Pop(const Operand op) PER_ARCH ONLY_X86_X64;
     void Pop(Register reg) PER_ARCH;
     void Pop(FloatRegister t) PER_ARCH ONLY_X86_X64;
-    void Pop(const ValueOperand &val) PER_ARCH;
-    void popRooted(VMFunction::RootType rootType, Register cellReg, const ValueOperand &valueReg);
+    void Pop(const ValueOperand& val) PER_ARCH;
+    void popRooted(VMFunction::RootType rootType, Register cellReg, const ValueOperand& valueReg);
 
     void adjustStack(int amount);
 
@@ -829,7 +829,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         exitCodePatch_ = PushWithPatch(ImmWord(-1));
     }
 
-    void enterExitFrame(const VMFunction *f = nullptr) {
+    void enterExitFrame(const VMFunction* f = nullptr) {
         linkExitFrame();
         // Push the ioncode. (Bailout or VM wrapper)
         PushStubCode();
@@ -1269,21 +1269,21 @@ class MacroAssembler : public MacroAssemblerSpecific
         uint32_t alignmentPadding;
     };
 
-    void alignFrameForICArguments(AfterICSaveLive &aic);
-    void restoreFrameAlignmentForICArguments(AfterICSaveLive &aic);
+    void alignFrameForICArguments(AfterICSaveLive& aic);
+    void restoreFrameAlignmentForICArguments(AfterICSaveLive& aic);
 
-    AfterICSaveLive icSaveLive(LiveRegisterSet &liveRegs) {
+    AfterICSaveLive icSaveLive(LiveRegisterSet& liveRegs) {
         PushRegsInMask(liveRegs);
         AfterICSaveLive aic(framePushed());
         alignFrameForICArguments(aic);
         return aic;
     }
 
-    bool icBuildOOLFakeExitFrame(void *fakeReturnAddr, AfterICSaveLive &aic) {
+    bool icBuildOOLFakeExitFrame(void* fakeReturnAddr, AfterICSaveLive& aic) {
         return buildOOLFakeExitFrame(fakeReturnAddr);
     }
 
-    void icRestoreLive(LiveRegisterSet &liveRegs, AfterICSaveLive &aic) {
+    void icRestoreLive(LiveRegisterSet& liveRegs, AfterICSaveLive& aic) {
         restoreFrameAlignmentForICArguments(aic);
         MOZ_ASSERT(framePushed() == aic.initialStack);
         PopRegsInMask(liveRegs);

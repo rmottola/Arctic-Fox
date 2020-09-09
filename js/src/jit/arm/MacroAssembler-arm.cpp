@@ -5138,7 +5138,7 @@ MacroAssembler::Pop(Register reg)
 }
 
 void
-MacroAssembler::Pop(const ValueOperand &val)
+MacroAssembler::Pop(const ValueOperand& val)
 {
     popValue(val);
     framePushed_ -= sizeof(Value);

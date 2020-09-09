@@ -32,7 +32,7 @@ FrameSizeClass FrameSizeClass::FromDepth(uint32_t) { MOZ_CRASH(); }
 FrameSizeClass FrameSizeClass::ClassLimit() { MOZ_CRASH(); }
 uint32_t FrameSizeClass::frameSize() const { MOZ_CRASH(); }
 
-void DispatchIonCache::initializeAddCacheState(LInstruction *, AddCacheState *) { MOZ_CRASH(); }
+void DispatchIonCache::initializeAddCacheState(LInstructio *, AddCacheStat *) { MOZ_CRASH(); }
 
 const Register ABIArgGenerator::NonArgReturnReg0 = { Registers::invalid_reg };
 const Register ABIArgGenerator::NonArgReturnReg1 = {  Registers::invalid_reg };
@@ -50,11 +50,11 @@ BailoutFrameInfo::BailoutFrameInfo(const JitActivationIterator& iter, Invalidati
     MOZ_CRASH();
 }
 
-bool ICCompare_Int32::Compiler::generateStubCode(MacroAssembler &) { MOZ_CRASH(); }
-bool ICCompare_Double::Compiler::generateStubCode(MacroAssembler &) { MOZ_CRASH(); }
-bool ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &) { MOZ_CRASH(); }
-bool ICUnaryArith_Int32::Compiler::generateStubCode(MacroAssembler &) { MOZ_CRASH(); }
-JitCode *JitRuntime::generateProfilerExitFrameTailStub(JSContext *) { MOZ_CRASH(); }
+bool ICCompare_Int32::Compiler::generateStubCode(MacroAssembler&) { MOZ_CRASH(); }
+bool ICCompare_Double::Compiler::generateStubCode(MacroAssembler&) { MOZ_CRASH(); }
+bool ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler&) { MOZ_CRASH(); }
+bool ICUnaryArith_Int32::Compiler::generateStubCode(MacroAssembler&) { MOZ_CRASH(); }
+JitCode* JitRuntime::generateProfilerExitFrameTailStub(JSContext*) { MOZ_CRASH(); }
 
 // ===============================================================
 // Stack manipulation functions.
