@@ -506,7 +506,7 @@ MacroAssemblerX64::storeUnboxedValue(ConstantOrRegister value, MIRType valueType
                                      MIRType slotType);
 
 void
-MacroAssemblerX64::callWithExitFrame(JitCode *target, Register dynStack)
+MacroAssemblerX64::callWithExitFrame(JitCode* target, Register dynStack)
 {
     addPtr(Imm32(framePushed()), dynStack);
     makeFrameDescriptor(dynStack, JitFrame_IonJS);
@@ -564,14 +564,14 @@ MacroAssemblerX64::profilerExitFrame()
     jmp(GetJitContext()->runtime->jitRuntime()->getProfilerExitFrameTail());
 }
 
-MacroAssembler &
+MacroAssembler&
 MacroAssemblerX64::asMasm()
 {
-    return *static_cast<MacroAssembler *>(this);
+    return *static_cast<MacroAssembler*>(this);
 }
 
-const MacroAssembler &
+const MacroAssemble &
 MacroAssemblerX64::asMasm() const
 {
-    return *static_cast<const MacroAssembler *>(this);
+    return *static_cast<const MacroAssembler*>(this);
 }
