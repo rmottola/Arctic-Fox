@@ -942,9 +942,8 @@ MSimdSwizzle::foldsTo(TempAllocator& alloc)
     return this;
 }
 
-
 MDefinition*
-MSimdGeneralShuffle::foldsTo(TempAllocator &alloc)
+MSimdGeneralShuffle::foldsTo(TempAllocator& alloc)
 {
     FixedList<uint32_t> lanes;
     if (!lanes.init(alloc, numLanes()))
@@ -989,6 +988,16 @@ MSimdUnaryArith::printOpcode(FILE* fp) const
 {
     PrintOpcodeOperation(this, fp);
 }
+void
+MSimdBinaryComp::printOpcode(FILE* fp) const
+{
+    PrintOpcodeOperation(this, fp);
+}
+void
+MSimdShift::printOpcode(FILE* fp) const
+{
+    PrintOpcodeOperation(this, fp);
+}
 
 void
 MSimdInsertElement::printOpcode(FILE* fp) const
@@ -1016,16 +1025,6 @@ MCompare::printOpcode(FILE* fp) const
 {
     MDefinition::printOpcode(fp);
     fprintf(fp, " %s", js_CodeName[jsop()]);
-}
-void
-MSimdBinaryComp::printOpcode(FILE* fp) const
-{
-    PrintOpcodeOperation(this, fp);
-}
-void
-MSimdShift::printOpcode(FILE* fp) const
-{
-    PrintOpcodeOperation(this, fp);
 }
 
 void
@@ -2433,7 +2432,7 @@ MMathFunction::trySpecializeFloat32(TempAllocator& alloc)
 MHypot* MHypot::New(TempAllocator& alloc, const MDefinitionVector & vector)
 {
     uint32_t length = vector.length();
-    MHypot*  hypot = new(alloc) MHypot;
+    MHypot * hypot = new(alloc) MHypot;
     if (!hypot->init(alloc, length))
         return nullptr;
 
@@ -3445,7 +3444,7 @@ MCompare::tryFoldTypeOf(bool* result)
         return false;
     }
 
-    const JSAtomState &names = GetJitContext()->runtime->names();
+    const JSAtomState& names = GetJitContext()->runtime->names();
     if (constant->toString() == TypeName(JSTYPE_VOID, names)) {
         if (!typeOf->input()->mightBeType(MIRType_Undefined) &&
             !typeOf->inputMaybeCallableOrEmulatesUndefined())
@@ -4232,8 +4231,8 @@ MLoadElement::foldsTo(TempAllocator& alloc)
     return foldsToStoredValue(alloc, store->value());
 }
 
-static inline const MDefinition *
-GetStoreObject(const MDefinition *store)
+static inline const MDefinition*
+GetStoreObject(const MDefinition* store)
 {
     switch (store->op()) {
       case MDefinition::Op_StoreElement:
@@ -4247,8 +4246,8 @@ GetStoreObject(const MDefinition *store)
     }
 }
 
-static inline const MElements *
-MaybeUnwrapElements(const MDefinition *elements)
+static inline const MElements*
+MaybeUnwrapElements(const MDefinition* elements)
 {
     if (elements->isConvertElementsToDoubles())
         return elements->toConvertElementsToDoubles()->elements()->toElements();
@@ -4257,12 +4256,12 @@ MaybeUnwrapElements(const MDefinition *elements)
 }
 
 bool
-MElements::mightAlias(const MDefinition *store) const
+MElements::mightAlias(const MDefinition* store) const
 {
     if (!input()->resultTypeSet())
         return true;
 
-    const MDefinition *storeObj = GetStoreObject(store);
+    const MDefinition* storeObj = GetStoreObject(store);
     if (!storeObj)
         return true;
     if (!storeObj->resultTypeSet())
@@ -4272,24 +4271,24 @@ MElements::mightAlias(const MDefinition *store) const
 }
 
 bool
-MLoadElement::mightAlias(const MDefinition *store) const
+MLoadElement::mightAlias(const MDefinition* store) const
 {
     return MaybeUnwrapElements(elements())->mightAlias(store);
 }
 
 bool
-MInitializedLength::mightAlias(const MDefinition *store) const
+MInitializedLength::mightAlias(const MDefinition* store) const
 {
     return MaybeUnwrapElements(elements())->mightAlias(store);
 }
 
 bool
-MGuardReceiverPolymorphic::congruentTo(const MDefinition *ins) const
+MGuardReceiverPolymorphic::congruentTo(const MDefinition* ins) const
 {
     if (!ins->isGuardReceiverPolymorphic())
         return false;
 
-    const MGuardReceiverPolymorphic *other = ins->toGuardReceiverPolymorphic();
+    const MGuardReceiverPolymorphic* other = ins->toGuardReceiverPolymorphic();
 
     if (numReceivers() != other->numReceivers())
         return false;
