@@ -944,7 +944,7 @@ MSimdSwizzle::foldsTo(TempAllocator& alloc)
 }
 
 
-MDefinition *
+MDefinition*
 MSimdGeneralShuffle::foldsTo(TempAllocator &alloc)
 {
     FixedList<uint32_t> lanes;
@@ -969,37 +969,37 @@ MSimdGeneralShuffle::foldsTo(TempAllocator &alloc)
 
 template <typename T>
 static void
-PrintOpcodeOperation(T *mir, FILE *fp)
+PrintOpcodeOperation(T* mir, FILE* fp)
 {
     mir->MDefinition::printOpcode(fp);
     fprintf(fp, " (%s)", T::OperationName(mir->operation()));
 }
 
 void
-MSimdBinaryArith::printOpcode(FILE *fp) const
+MSimdBinaryArith::printOpcode(FILE* fp) const
 {
     PrintOpcodeOperation(this, fp);
 }
 void
-MSimdBinaryBitwise::printOpcode(FILE *fp) const
+MSimdBinaryBitwise::printOpcode(FILE* fp) const
 {
     PrintOpcodeOperation(this, fp);
 }
 void
-MSimdUnaryArith::printOpcode(FILE *fp) const
+MSimdUnaryArith::printOpcode(FILE* fp) const
 {
     PrintOpcodeOperation(this, fp);
 }
 
 void
-MSimdInsertElement::printOpcode(FILE *fp) const
+MSimdInsertElement::printOpcode(FILE* fp) const
 {
     MDefinition::printOpcode(fp);
     fprintf(fp, " (%s)", MSimdInsertElement::LaneName(lane()));
 }
 
 MCloneLiteral*
-MCloneLiteral::New(TempAllocator &alloc, MDefinition *obj)
+MCloneLiteral::New(TempAllocator& alloc, MDefinition* obj)
 {
     return new(alloc) MCloneLiteral(obj);
 }
@@ -1019,7 +1019,7 @@ MCompare::printOpcode(FILE* fp) const
     fprintf(fp, " %s", js_CodeName[jsop()]);
 }
 void
-MSimdBinaryComp::printOpcode(FILE *fp) const
+MSimdBinaryComp::printOpcode(FILE* fp) const
 {
     PrintOpcodeOperation(this, fp);
 }
@@ -1037,7 +1037,7 @@ MConstantElements::printOpcode(FILE* fp) const
 }
 
 void
-MLoadUnboxedScalar::printOpcode(FILE *fp) const
+MLoadUnboxedScalar::printOpcode(FILE* fp) const
 {
     MDefinition::printOpcode(fp);
     fprintf(fp, " %s", ScalarTypeDescr::typeName(indexType()));
@@ -2436,7 +2436,7 @@ MMathFunction::trySpecializeFloat32(TempAllocator& alloc)
 MHypot* MHypot::New(TempAllocator& alloc, const MDefinitionVector & vector)
 {
     uint32_t length = vector.length();
-    MHypot * hypot = new(alloc) MHypot;
+    MHypot*  hypot = new(alloc) MHypot;
     if (!hypot->init(alloc, length))
         return nullptr;
 
@@ -3429,15 +3429,15 @@ MCompare::tryFoldEqualOperands(bool* result)
 }
 
 bool
-MCompare::tryFoldTypeOf(bool *result)
+MCompare::tryFoldTypeOf(bool* result)
 {
     if (!lhs()->isTypeOf() && !rhs()->isTypeOf())
         return false;
     if (!lhs()->isConstantValue() && !rhs()->isConstantValue())
         return false;
 
-    MTypeOf *typeOf = lhs()->isTypeOf() ? lhs()->toTypeOf() : rhs()->toTypeOf();
-    const Value *constant = lhs()->isConstantValue() ? lhs()->constantVp() : rhs()->constantVp();
+    MTypeOf* typeOf = lhs()->isTypeOf() ? lhs()->toTypeOf() : rhs()->toTypeOf();
+    const Value* constant = lhs()->isConstantValue() ? lhs()->constantVp() : rhs()->constantVp();
 
     if (!constant->isString())
         return false;

@@ -4153,7 +4153,7 @@ SpewResumePoint(MBasicBlock* block, MInstruction* ins, MResumePoint* resumePoint
             int(resumePoint->block()->info().script()->pcToOffset(resumePoint->pc())));
 
     for (size_t i = 0, e = resumePoint->numOperands(); i < e; i++) {
-        MDefinition *in = resumePoint->getOperand(i);
+        MDefinition* in = resumePoint->getOperand(i);
         fprintf(JitSpewFile, "    slot%u: ", (unsigned)i);
         in->printName(JitSpewFile);
         fprintf(JitSpewFile, "\n");
