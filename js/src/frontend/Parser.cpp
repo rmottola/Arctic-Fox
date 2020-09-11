@@ -3802,6 +3802,8 @@ Parser<ParseHandler>::variables(ParseNodeKind kind, bool* psimple,
                 if (!data.binder(&data, name, this))
                     return null();
             }
+
+            handler.setEndPosition(pn, pn2);
         } while (false);
 
         bool matched;
