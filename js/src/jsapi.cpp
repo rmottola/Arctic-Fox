@@ -3238,7 +3238,7 @@ JS_NewFunctionById(JSContext* cx, JSNative native, unsigned nargs, unsigned flag
            : NewNativeFunction(cx, native, nargs, name);
 }
 
-JS_PUBLIC_API(JSFunction *)
+JS_PUBLIC_API(JSFunction*)
 JS::GetSelfHostedFunction(JSContext* cx, const char* selfHostedName, HandleId id, unsigned nargs)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
