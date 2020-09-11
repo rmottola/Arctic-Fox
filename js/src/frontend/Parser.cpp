@@ -564,8 +564,8 @@ Parser<ParseHandler>::~Parser()
 }
 
 template <typename ParseHandler>
-ObjectBox *
-Parser<ParseHandler>::newObjectBox(JSObject *obj)
+ObjectBox*
+Parser<ParseHandler>::newObjectBox(JSObject* obj)
 {
     MOZ_ASSERT(obj);
 
@@ -3318,7 +3318,7 @@ Parser<ParseHandler>::noteNameUse(HandlePropertyName name, Node pn)
 
 template <>
 bool
-Parser<FullParseHandler>::bindInitialized(BindData<FullParseHandler> *data, ParseNode *pn)
+Parser<FullParseHandler>::bindInitialized(BindData<FullParseHandler>* data, ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_NAME));
 
@@ -3854,7 +3854,7 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
      * enclosing maybe-scope StmtInfoPC isn't yet a scope statement) then
      * we also need to set pc->blockNode to be our PNK_LEXICALSCOPE.
      */
-    StmtInfoPC *stmt = pc->topStmt;
+    StmtInfoPC* stmt = pc->topStmt;
     if (stmt && (!stmt->maybeScope() || stmt->isForLetBlock)) {
         reportWithOffset(ParseError, false, errorPos.begin, JSMSG_LEXICAL_DECL_NOT_IN_BLOCK,
                          isConst ? "const" : "lexical");
@@ -3899,11 +3899,11 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
         MOZ_ASSERT(!stmt->downScope);
 
         /* Convert the block statement into a scope statement. */
-        StaticBlockObject *blockObj = StaticBlockObject::create(context);
+        StaticBlockObject* blockObj = StaticBlockObject::create(context);
         if (!blockObj)
             return false;
 
-        ObjectBox *blockbox = newObjectBox(blockObj);
+        ObjectBox* blockbox = newObjectBox(blockObj);
         if (!blockbox)
             return false;
 
@@ -3922,12 +3922,12 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
         stmt->staticScope = blockObj;
 
 #ifdef DEBUG
-        ParseNode *tmp = pc->blockNode;
+        ParseNode* tmp = pc->blockNode;
         MOZ_ASSERT(!tmp || !tmp->isKind(PNK_LEXICALSCOPE));
 #endif
 
         /* Create a new lexical scope node for these statements. */
-        ParseNode *pn1 = handler.new_<LexicalScopeNode>(blockbox, pc->blockNode);
+        ParseNode* pn1 = handler.new_<LexicalScopeNode>(blockbox, pc->blockNode);
         if (!pn1)
             return false;;
         pc->blockNode = pn1;
@@ -3935,15 +3935,15 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
     return true;
 }
 
-static StaticBlockObject *
-CurrentLexicalStaticBlock(ParseContext<FullParseHandler> *pc)
+static StaticBlockObject*
+CurrentLexicalStaticBlock(ParseContext<FullParseHandler>* pc)
 {
     return pc->atBodyLevel() ? nullptr :
            &pc->staticScope->as<StaticBlockObject>();
 }
 
 template <>
-ParseNode *
+ParseNode*
 Parser<FullParseHandler>::makeInitializedLexicalBinding(HandlePropertyName name, bool isConst,
                                                         const TokenPos &pos)
 {
@@ -3956,7 +3956,7 @@ Parser<FullParseHandler>::makeInitializedLexicalBinding(HandlePropertyName name,
             return null();
         data.initLexical(HoistVars, CurrentLexicalStaticBlock(pc), JSMSG_TOO_MANY_LOCALS, isConst);
     }
-    ParseNode *dn = newBindingNode(name, pc->atGlobalLevel());
+    ParseNode* dn = newBindingNode(name, pc->atGlobalLevel());
     if (!dn)
         return null();
     handler.setPosition(dn, pos);
@@ -3968,7 +3968,7 @@ Parser<FullParseHandler>::makeInitializedLexicalBinding(HandlePropertyName name,
 }
 
 template <>
-ParseNode *
+ParseNode*
 Parser<FullParseHandler>::lexicalDeclaration(bool isConst)
 {
     handler.disableSyntaxParser();
@@ -3996,7 +3996,7 @@ Parser<FullParseHandler>::lexicalDeclaration(bool isConst)
     else if (isConst)
         kind = PNK_CONST;
 
-    ParseNode *pn = variables(kind, nullptr,
+    ParseNode* pn = variables(kind, nullptr,
                               CurrentLexicalStaticBlock(pc),
                               HoistVars);
     if (!pn)
@@ -5674,7 +5674,7 @@ Parser<ParseHandler>::debuggerStatement()
 }
 
 template <>
-ParseNode *
+ParseNode*
 Parser<FullParseHandler>::classDefinition(ClassContext classContext)
 {
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_CLASS));
@@ -5706,7 +5706,7 @@ Parser<FullParseHandler>::classDefinition(ClassContext classContext)
         return null();
     }
 
-    ParseNode *classBlock = null();
+    ParseNode* classBlock = null();
     StmtInfoPC classStmt(context);
     if (name) {
         classBlock = pushLexicalScope(&classStmt);
@@ -5719,7 +5719,7 @@ Parser<FullParseHandler>::classDefinition(ClassContext classContext)
     // in order to provide it for the nodes created later.
     TokenPos namePos = pos();
 
-    ParseNode *classHeritage = null();
+    ParseNode* classHeritage = null();
     bool hasHeritage;
     if (!tokenStream.matchToken(&hasHeritage, TOK_EXTENDS))
         return null();
@@ -5733,14 +5733,14 @@ Parser<FullParseHandler>::classDefinition(ClassContext classContext)
 
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_CLASS);
 
-    ParseNode *classMethods = propertyList(ClassBody);
+    ParseNode* classMethods = propertyList(ClassBody);
     if (!classMethods)
         return null();
 
-    ParseNode *nameNode = null();
-    ParseNode *methodsOrBlock = classMethods;
+    ParseNode* nameNode = null();
+    ParseNode* methodsOrBlock = classMethods;
     if (name) {
-        ParseNode *innerBinding = makeInitializedLexicalBinding(name, true, namePos);
+        ParseNode* innerBinding = makeInitializedLexicalBinding(name, true, namePos);
         if (!innerBinding)
             return null();
 
@@ -5750,7 +5750,7 @@ Parser<FullParseHandler>::classDefinition(ClassContext classContext)
 
         PopStatementPC(tokenStream, pc);
 
-        ParseNode *outerBinding = null();
+        ParseNode* outerBinding = null();
         if (classContext == ClassStatement) {
             outerBinding = makeInitializedLexicalBinding(name, false, namePos);
             if (!outerBinding)
