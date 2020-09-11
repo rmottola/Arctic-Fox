@@ -1644,7 +1644,7 @@ Parser<ParseHandler>::functionArguments(FunctionSyntaxKind kind, FunctionType ty
                 if (list) {
                     handler.addList(list, item);
                 } else {
-                    list = handler.newList(PNK_VAR, item);
+                    list = handler.newDeclarationList(PNK_VAR, item);
                     if (!list)
                         return false;
                     *listp = list;
@@ -2796,6 +2796,9 @@ Parser<ParseHandler>::statements()
     pc->blockNode = pn;
 
     bool canHaveDirectives = pc->atBodyLevel();
+    bool afterReturn = false;
+    bool warnedAboutStatementsAfterReturn = false;
+    uint32_t statementBegin;
     for (;;) {
         TokenKind tt;
         if (!tokenStream.peekToken(&tt, TokenStream::Operand)) {
@@ -2805,11 +2808,31 @@ Parser<ParseHandler>::statements()
         }
         if (tt == TOK_EOF || tt == TOK_RC)
             break;
+        if (afterReturn) {
+            TokenPos pos(0, 0);
+            if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
+                return null();
+            statementBegin = pos.begin;
+        }
         Node next = statement(canHaveDirectives);
         if (!next) {
             if (tokenStream.isEOF())
                 isUnexpectedEOF_ = true;
             return null();
+        }
+        if (!warnedAboutStatementsAfterReturn) {
+            if (afterReturn) {
+                if (!handler.isStatementPermittedAfterReturnStatement(next)) {
+                    if (!reportWithOffset(ParseWarning, false, statementBegin,
+                                          JSMSG_STMT_AFTER_RETURN))
+                    {
+                        return null();
+                    }
+                    warnedAboutStatementsAfterReturn = true;
+                }
+            } else if (handler.isReturnStatement(next)) {
+                afterReturn = true;
+            }
         }
 
         if (canHaveDirectives) {
@@ -3670,7 +3693,7 @@ Parser<ParseHandler>::variables(ParseNodeKind kind, bool* psimple,
     else if (kind == PNK_GLOBALCONST)
         op = JSOP_DEFCONST;
 
-    Node pn = handler.newList(kind, op);
+    Node pn = handler.newDeclarationList(kind, op);
     if (!pn)
         return null();
 
@@ -4983,14 +5006,37 @@ Parser<ParseHandler>::switchStatement()
         if (!body)
             return null();
 
+        bool afterReturn = false;
+        bool warnedAboutStatementsAfterReturn = false;
+        uint32_t statementBegin;
         while (true) {
             if (!tokenStream.peekToken(&tt, TokenStream::Operand))
                 return null();
             if (tt == TOK_RC || tt == TOK_CASE || tt == TOK_DEFAULT)
                 break;
+            if (afterReturn) {
+                TokenPos pos(0, 0);
+                if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
+                    return null();
+                statementBegin = pos.begin;
+            }
             Node stmt = statement();
             if (!stmt)
                 return null();
+            if (!warnedAboutStatementsAfterReturn) {
+                if (afterReturn) {
+                    if (!handler.isStatementPermittedAfterReturnStatement(stmt)) {
+                        if (!reportWithOffset(ParseWarning, false, statementBegin,
+                                              JSMSG_STMT_AFTER_RETURN))
+                        {
+                            return null();
+                        }
+                        warnedAboutStatementsAfterReturn = true;
+                    }
+                } else if (handler.isReturnStatement(stmt)) {
+                    afterReturn = true;
+                }
+            }
             handler.addList(body, stmt);
         }
 
@@ -5134,19 +5180,7 @@ Parser<ParseHandler>::returnStatement()
     if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
         return null();
     switch (tt) {
-      case TOK_EOL: {
-        bool startsExpr;
-        if (!tokenStream.nextTokenStartsExpr(&startsExpr, TokenStream::Operand))
-            return null();
-        if (startsExpr) {
-            TokenPos pos;
-            if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
-                return null();
-            if (!reportWithOffset(ParseWarning, false, pos.begin, JSMSG_STMT_AFTER_SEMI_LESS))
-                return null();
-        }
-        // Fall through.
-      }
+      case TOK_EOL:
       case TOK_EOF:
       case TOK_SEMI:
       case TOK_RC:
