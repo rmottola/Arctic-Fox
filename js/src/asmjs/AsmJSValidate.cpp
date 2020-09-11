@@ -499,7 +499,7 @@ ParseVarOrConstStatement(AsmJSParser& parser, ParseNode** var)
         return true;
     }
 
-    *var = parser.statement();
+    *var = parser.statement(YieldIsName);
     if (!*var)
         return false;
 
@@ -7479,7 +7479,9 @@ ParseFunction(ModuleCompiler& m, ParseNode** fnOut)
     if (!funpc.init(tokenStream))
         return false;
 
-    if (!m.parser().functionArgsAndBodyGeneric(fn, fun, Normal, Statement)) {
+    if (!m.parser().functionArgsAndBodyGeneric(InAllowed, YieldIsName, fn, fun, Normal,
+                                               Statement))
+    {
         if (tokenStream.hadError() || directives == newDirectives)
             return false;
 
@@ -8057,7 +8059,7 @@ CheckModuleReturn(ModuleCompiler& m)
         return m.fail(nullptr, "invalid asm.js statement");
     }
 
-    ParseNode* returnStmt = m.parser().statement();
+    ParseNode* returnStmt = m.parser().statement(YieldIsName);
     if (!returnStmt)
         return false;
 
