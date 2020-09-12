@@ -25,6 +25,7 @@
 #include "vm/NativeObject-inl.h"
 #include "vm/StringObject-inl.h"
 #include "vm/TypeInference-inl.h"
+#include "vm/UnboxedObject-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -303,11 +304,11 @@ ArrayPushDense(JSContext* cx, HandleArrayObject obj, HandleValue v, uint32_t* le
 {
     if (MOZ_LIKELY(obj->lengthIsWritable())) {
         uint32_t idx = obj->length();
-        NativeObject::EnsureDenseResult result = obj->ensureDenseElements(cx, idx, 1);
-        if (result == NativeObject::ED_FAILED)
+        DenseElementResult result = obj->ensureDenseElements(cx, idx, 1);
+        if (result == DenseElementResult::Failure)
             return false;
 
-        if (result == NativeObject::ED_OK) {
+        if (result == DenseElementResult::Success) {
             obj->setDenseElement(idx, v);
             MOZ_ASSERT(idx < INT32_MAX);
             *length = idx + 1;
@@ -1105,41 +1106,14 @@ SetDenseOrUnboxedArrayElement(JSContext* cx, HandleObject obj, int32_t index,
                               HandleValue value, bool strict)
 {
     // This function is called from Ion code for StoreElementHole's OOL path.
-    // In this case we know the object is native or an unboxed array and we can
-    // use setDenseElement instead of setDenseElementWithType.
+    // In this case we know the object is native or an unboxed array and that
+    // no type changes are needed.
 
-    NativeObject::EnsureDenseResult result = NativeObject::ED_SPARSE;
-    do {
-        if (index < 0 || obj->is<UnboxedArrayObject>())
-            break;
-        bool isArray = obj->is<ArrayObject>();
-        if (isArray && !obj->as<ArrayObject>().lengthIsWritable())
-            break;
-        uint32_t idx = uint32_t(index);
-        result = obj->as<NativeObject>().ensureDenseElements(cx, idx, 1);
-        if (result != NativeObject::ED_OK)
-            break;
-        if (isArray) {
-            ArrayObject& arr = obj->as<ArrayObject>();
-            if (idx >= arr.length())
-                arr.setLengthInt32(idx + 1);
-        }
-        obj->as<NativeObject>().setDenseElement(idx, value);
-        return true;
-    } while (false);
-
-    if (result == NativeObject::ED_FAILED)
-        return false;
-    MOZ_ASSERT(result == NativeObject::ED_SPARSE);
-
-    if (index >= 0 && obj->is<UnboxedArrayObject>()) {
-        UnboxedArrayObject* nobj = &obj->as<UnboxedArrayObject>();
-        if (uint32_t(index) == nobj->initializedLength() &&
-            uint32_t(index) < UnboxedArrayObject::MaximumCapacity)
-        {
-            return nobj->appendElementNoTypeChange(cx, index, value);
-        }
-    }
+    DenseElementResult result =
+        SetOrExtendAnyBoxedOrUnboxedDenseElements(cx, obj, index, value.address(), 1,
+                                                  DontUpdateTypes);
+    if (result != DenseElementResult::Incomplete)
+        return result == DenseElementResult::Success;
 
     RootedValue indexVal(cx, Int32Value(index));
     return SetObjectElement(cx, obj, indexVal, value, strict);
@@ -1190,11 +1164,10 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
     }
 
     if (str->isAtom())
-        MOZ_ASSERT(cx->runtime()->isAtomsZone(str->zone()));
+        MOZ_ASSERT(str->zone()->isAtomsZone());
     else
         MOZ_ASSERT(str->zone() == cx->zone());
 
-    MOZ_ASSERT(str->runtimeFromMainThread() == cx->runtime());
     MOZ_ASSERT(str->isAligned());
     MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
 
@@ -1214,12 +1187,12 @@ void
 AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
 {
     // We can't closely inspect symbols from another runtime.
-    if (sym->runtimeFromAnyThread() != cx->runtime())
+    if (sym->runtimeFromAnyThread() != cx->runtime()) {
+        MOZ_ASSERT(sym->isWellKnownSymbol());
         return;
+    }
 
-    MOZ_ASSERT(cx->runtime()->isAtomsZone(sym->zone()));
-
-    MOZ_ASSERT(sym->runtimeFromMainThread() == cx->runtime());
+    MOZ_ASSERT(sym->zone()->isAtomsZone());
     MOZ_ASSERT(sym->isAligned());
     if (JSString* desc = sym->description()) {
         MOZ_ASSERT(desc->isAtom());

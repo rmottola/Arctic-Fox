@@ -1211,8 +1211,10 @@ BaseShape::getUnowned(ExclusiveContext* cx, StackBaseShape& base)
 {
     BaseShapeSet& table = cx->compartment()->baseShapes;
 
-    if (!table.initialized() && !table.init())
+    if (!table.initialized() && !table.init()) {
+        ReportOutOfMemory(cx);
         return nullptr;
+    }
 
     DependentAddPtr<BaseShapeSet> p(cx, table, base);
     if (p)
@@ -1289,7 +1291,7 @@ JSCompartment::checkBaseShapeTableAfterMovingGC()
         CheckGCThingAfterMovingGC(base);
 
         BaseShapeSet::Ptr ptr = baseShapes.lookup(base);
-        MOZ_ASSERT(ptr.found() && &*ptr == &e.front());
+        MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
     }
 }
 
@@ -1417,7 +1419,7 @@ JSCompartment::checkInitialShapesTableAfterMovingGC()
                                          shape->numFixedSlots(),
                                          shape->getObjectFlags());
         InitialShapeSet::Ptr ptr = initialShapes.lookup(lookup);
-        MOZ_ASSERT(ptr.found() && &*ptr == &e.front());
+        MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
     }
 }
 
@@ -1444,8 +1446,10 @@ EmptyShape::getInitialShape(ExclusiveContext *cx, const Class *clasp, TaggedProt
 
     InitialShapeSet& table = cx->compartment()->initialShapes;
 
-    if (!table.initialized() && !table.init())
+    if (!table.initialized() && !table.init()) {
+        ReportOutOfMemory(cx);
         return nullptr;
+    }
 
     typedef InitialShapeEntry::Lookup Lookup;
     DependentAddPtr<InitialShapeSet>

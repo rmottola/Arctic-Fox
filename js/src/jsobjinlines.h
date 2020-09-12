@@ -763,7 +763,7 @@ ObjectClassIs(HandleObject obj, ESClassValue classValue, JSContext* cx)
       case ESClass_Object: return obj->is<PlainObject>() || obj->is<UnboxedPlainObject>();
       case ESClass_Array:
       case ESClass_IsArray:
-        // There difference between those is only relevant for proxies.
+        // The difference between Array and IsArray is only relevant for proxies.
         return obj->is<ArrayObject>() || obj->is<UnboxedArrayObject>();
       case ESClass_Number: return obj->is<NumberObject>();
       case ESClass_String: return obj->is<StringObject>();
@@ -858,7 +858,7 @@ InitClass(JSContext* cx, js::HandleObject obj, HandleObject parent_proto,
           const JSPropertySpec* ps, const JSFunctionSpec* fs,
           const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
           NativeObject** ctorp = nullptr,
-          gc::AllocKind ctorKind = JSFunction::FinalizeKind);
+          gc::AllocKind ctorKind = gc::AllocKind::FUNCTION);
 
 } /* namespace js */
 

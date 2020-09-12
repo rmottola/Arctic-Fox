@@ -101,29 +101,38 @@ JSCompartment::~JSCompartment()
 }
 
 bool
-JSCompartment::init(JSContext* cx)
+JSCompartment::init(JSContext* maybecx)
 {
     /*
+     * maybecx is null when called to create the atoms compartment from
+     * JSRuntime::init().
+     *
      * As a hack, we clear our timezone cache every time we create a new
      * compartment. This ensures that the cache is always relatively fresh, but
      * shouldn't interfere with benchmarks which create tons of date objects
      * (unless they also create tons of iframes, which seems unlikely).
      */
-    if (cx)
-        cx->runtime()->dateTimeInfo.updateTimeZoneAdjustment();
+    if (maybecx)
+        maybecx->runtime()->dateTimeInfo.updateTimeZoneAdjustment();
 
-    if (!crossCompartmentWrappers.init(0))
+    if (!crossCompartmentWrappers.init(0)) {
+        if (maybecx)
+            ReportOutOfMemory(maybecx);
+        return false;
+    }
+
+    if (!regExps.init(maybecx))
         return false;
 
-    if (!regExps.init(cx))
-        return false;
-
-    enumerators = NativeIterator::allocateSentinel(cx);
+    enumerators = NativeIterator::allocateSentinel(maybecx);
     if (!enumerators)
         return false;
 
-    if (!savedStacks_.init())
+    if (!savedStacks_.init()) {
+        if (maybecx)
+            ReportOutOfMemory(maybecx);
         return false;
+    }
 
     return true;
 }
@@ -239,7 +248,7 @@ JSCompartment::checkWrapperMapAfterMovingGC()
         CheckGCThingAfterMovingGC(static_cast<Cell*>(e.front().value().get().toGCThing()));
 
         WrapperMap::Ptr ptr = crossCompartmentWrappers.lookup(key);
-        MOZ_ASSERT(ptr.found() && &*ptr == &e.front());
+        MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
     }
 }
 #endif
@@ -323,8 +332,7 @@ JSCompartment::wrap(JSContext* cx, MutableHandleString strp)
 
     /* If the string is an atom, we don't have to copy. */
     if (str->isAtom()) {
-        MOZ_ASSERT(str->isPermanentAtom() ||
-                   cx->runtime()->isAtomsZone(str->zone()));
+        MOZ_ASSERT(str->isPermanentAtom() || str->zone()->isAtomsZone());
         return true;
     }
 
@@ -737,23 +745,38 @@ CreateLazyScriptsForCompartment(JSContext* cx)
 {
     AutoObjectVector lazyFunctions(cx);
 
-    // Find all live lazy scripts in the compartment, and via them all root
-    // lazy functions in the compartment: those which have not been compiled,
-    // which have a source object, indicating that they have a parent, and
-    // which do not have an uncompiled enclosing script. The last condition is
-    // so that we don't compile lazy scripts whose enclosing scripts failed to
-    // compile, indicating that the lazy script did not escape the script.
-    for (gc::ZoneCellIter i(cx->zone(), gc::AllocKind::LAZY_SCRIPT); !i.done(); i.next()) {
-        LazyScript *lazy = i.get<LazyScript>();
-        JSFunction *fun = lazy->functionNonDelazifying();
-        if (fun->compartment() == cx->compartment() &&
-            lazy->sourceObject() && !lazy->maybeScript() &&
-            !lazy->hasUncompiledEnclosingScript())
+    // Find all live root lazy functions in the compartment: those which have a
+    // source object, indicating that they have a parent, and which do not have
+    // an uncompiled enclosing script. The last condition is so that we don't
+    // compile lazy scripts whose enclosing scripts failed to compile,
+    // indicating that the lazy script did not escape the script.
+    //
+    // Some LazyScripts have a non-null |JSScript* script| pointer. We still
+    // want to delazify in that case: this pointer is weak so the JSScript
+    // could be destroyed at the next GC.
+    //
+    // Note that while we ideally iterate over LazyScripts, LazyScripts do not
+    // currently stand in 1-1 relation with JSScripts; JSFunctions with the
+    // same LazyScript may create different JSScripts due to relazification of
+    // clones. See bug 1105306.
+    for (gc::ZoneCellIter i(cx->zone(), AllocKind::FUNCTION); !i.done(); i.next()) {
+        JSFunction* fun = &i.get<JSObject>()->as<JSFunction>();
+
+        // Sweeping is incremental; take care to not delazify functions that
+        // are about to be finalized. GC things referenced by objects that are
+        // about to be finalized (e.g., in slots) may already be freed.
+        if (gc::IsAboutToBeFinalizedUnbarriered(&fun) ||
+            fun->compartment() != cx->compartment())
         {
-            MOZ_ASSERT(fun->isInterpretedLazy());
-            MOZ_ASSERT(lazy == fun->lazyScriptOrNull());
-            if (!lazyFunctions.append(fun))
-                return false;
+            continue;
+        }
+
+        if (fun->isInterpretedLazy()) {
+            LazyScript* lazy = fun->lazyScriptOrNull();
+            if (lazy && lazy->sourceObject() && !lazy->hasUncompiledEnclosingScript()) {
+                if (!lazyFunctions.append(fun))
+                    return false;
+            }
         }
     }
 
@@ -761,17 +784,20 @@ CreateLazyScriptsForCompartment(JSContext* cx)
     // process with any newly exposed inner functions in created scripts.
     // A function cannot be delazified until its outer script exists.
     for (size_t i = 0; i < lazyFunctions.length(); i++) {
-        JSFunction *fun = &lazyFunctions[i]->as<JSFunction>();
+        JSFunction* fun = &lazyFunctions[i]->as<JSFunction>();
 
         // lazyFunctions may have been populated with multiple functions for
         // a lazy script.
         if (!fun->isInterpretedLazy())
             continue;
 
-        JSScript *script = fun->getOrCreateScript(cx);
+        LazyScript* lazy = fun->lazyScript();
+        bool lazyScriptHadNoScript = !lazy->maybeScript();
+
+        JSScript* script = fun->getOrCreateScript(cx);
         if (!script)
             return false;
-        if (!AddInnerLazyFunctionsFromScript(script, lazyFunctions))
+        if (lazyScriptHadNoScript && !AddInnerLazyFunctionsFromScript(script, lazyFunctions))
             return false;
     }
 

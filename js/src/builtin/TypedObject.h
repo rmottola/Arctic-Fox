@@ -439,7 +439,7 @@ class ArrayTypeDescr : public ComplexTypeDescr
 class StructMetaTypeDescr : public NativeObject
 {
   private:
-    static JSObject *create(JSContext *cx, HandleObject structTypeGlobal,
+    static JSObject* create(JSContext* cx, HandleObject structTypeGlobal,
                             HandleObject fields);
 
   public:
@@ -455,7 +455,7 @@ class StructMetaTypeDescr : public NativeObject
 
     // This is the function that gets called when the user
     // does `new StructType(...)`. It produces a struct type object.
-    static bool construct(JSContext *cx, unsigned argc, Value *vp);
+    static bool construct(JSContext* cx, unsigned argc, Value* vp);
 };
 
 class StructTypeDescr : public ComplexTypeDescr
@@ -570,8 +570,8 @@ class TypedObject : public JSObject
 
     int32_t offset() const;
     int32_t length() const;
-    uint8_t *typedMem() const;
-    uint8_t *typedMemBase() const;
+    uint8_t* typedMem() const;
+    uint8_t* typedMemBase() const;
     bool isAttached() const;
     bool maybeForwardedIsAttached() const;
 
@@ -579,7 +579,7 @@ class TypedObject : public JSObject
         return typeDescr().size();
     }
 
-    uint8_t *typedMem(size_t offset) const {
+    uint8_t* typedMem(size_t offset) const {
         // It seems a bit surprising that one might request an offset
         // == size(), but it can happen when taking the "address of" a
         // 0-sized value. (In other words, we maintain the invariant
@@ -594,18 +594,18 @@ class TypedObject : public JSObject
     // Creates a new typed object whose memory is freshly allocated and
     // initialized with zeroes (or, in the case of references, an appropriate
     // default value).
-    static TypedObject *createZeroed(JSContext *cx, HandleTypeDescr typeObj, int32_t length,
+    static TypedObject* createZeroed(JSContext* cx, HandleTypeDescr typeObj, int32_t length,
                                      gc::InitialHeap heap = gc::DefaultHeap);
 
     // User-accessible constructor (`new TypeDescriptor(...)`). Note that the
     // callee here is the type descriptor.
-    static bool construct(JSContext *cx, unsigned argc, Value *vp);
+    static bool construct(JSContext* cx, unsigned argc, Value* vp);
 
     /* Accessors for self hosted code. */
-    static bool GetBuffer(JSContext *cx, unsigned argc, Value *vp);
-    static bool GetByteOffset(JSContext *cx, unsigned argc, Value *vp);
+    static bool GetBuffer(JSContext* cx, unsigned argc, Value* vp);
+    static bool GetByteOffset(JSContext* cx, unsigned argc, Value* vp);
 
-    Shape *shapeFromGC() { return shape_; }
+    Shape** addressOfShapeFromGC() { return shape_.unsafeGet(); }
 };
 
 typedef Handle<TypedObject*> HandleTypedObject;
@@ -715,8 +715,8 @@ class InlineTypedObject : public TypedObject
         return gc::GetGCObjectKindForBytes(nbytes + sizeof(TypedObject));
     }
 
-    uint8_t *inlineTypedMem() const {
-        return (uint8_t *) &data_;
+    uint8_t* inlineTypedMem() const {
+        return (uint8_t*) &data_;
     }
 
     static void obj_trace(JSTracer* trace, JSObject* object);
@@ -1021,8 +1021,8 @@ TypedObject::opaque() const
     return IsOpaqueTypedObjectClass(getClass());
 }
 
-JSObject *
-InitTypedObjectModuleObject(JSContext *cx, JS::HandleObject obj);
+JSObject*
+InitTypedObjectModuleObject(JSContext* cx, JS::HandleObject obj);
 
 } // namespace js
 

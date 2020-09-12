@@ -87,6 +87,17 @@ let OverviewView = {
   }),
 
   /**
+   * Returns true if any of the overview graphs have mouse dragging active,
+   * false otherwise.
+   */
+  get isMouseActive() {
+    // Fetch all graphs currently stored in the GraphsController.
+    // These graphs are not necessarily active, but will not have
+    // an active mouse, in that case.
+    return !!this.graphs.getWidgets().some(e => e.isMouseActive);
+  },
+
+  /**
    * Disabled in the event we're using a Timeline mock, so we'll have no
    * timeline, ticks or memory data to show, so just block rendering and hide
    * the panel.

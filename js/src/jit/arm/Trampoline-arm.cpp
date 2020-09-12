@@ -6,7 +6,7 @@
 
 #include "jscompartment.h"
 
-#include "jit/arm/BaselineHelpers-arm.h"
+#include "jit/arm/SharedICHelpers-arm.h"
 #include "jit/Bailouts.h"
 #include "jit/JitCompartment.h"
 #include "jit/JitFrames.h"
@@ -16,6 +16,8 @@
 # include "jit/PerfSpewer.h"
 #endif
 #include "jit/VMFunctions.h"
+
+#include "jit/MacroAssembler-inl.h"
 
 using namespace js;
 using namespace js::jit;

@@ -377,7 +377,7 @@ struct JSCompartment
     JSCompartment(JS::Zone* zone, const JS::CompartmentOptions& options);
     ~JSCompartment();
 
-    bool init(JSContext* cx);
+    bool init(JSContext* maybecx);
 
     /* Mark cross-compartment wrappers. */
     void markCrossCompartmentWrappers(JSTracer* trc);
@@ -603,7 +603,7 @@ struct JSCompartment
 };
 
 inline bool
-JSRuntime::isAtomsZone(JS::Zone* zone)
+JSRuntime::isAtomsZone(const JS::Zone* zone) const
 {
     return zone == atomsCompartment_->zone();
 }

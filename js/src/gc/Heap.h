@@ -77,7 +77,10 @@ enum InitialHeap {
 /* The GC allocation kinds. */
 enum class AllocKind : uint8_t {
     FIRST,
-    OBJECT0 = FIRST,
+    OBJECT_FIRST = FIRST,
+    FUNCTION = FIRST,
+    FUNCTION_EXTENDED,
+    OBJECT0,
     OBJECT0_BACKGROUND,
     OBJECT2,
     OBJECT2_BACKGROUND,
@@ -108,13 +111,13 @@ enum class AllocKind : uint8_t {
 
 static_assert(int(AllocKind::FIRST) == 0, "Various places depend on AllocKind starting at 0, "
                                           "please audit them carefully!");
-static_assert(int(AllocKind::OBJECT0) == 0, "Various places depend on AllocKind::OBJECT0 being 0, "
-                                            "please audit them carefully!");
+static_assert(int(AllocKind::OBJECT_FIRST) == 0, "Various places depend on AllocKind::OBJECT_FIRST "
+                                                 "being 0, please audit them carefully!");
 
 inline bool
 IsObjectAllocKind(AllocKind kind)
 {
-    return kind >= AllocKind::OBJECT0 && kind <= AllocKind::OBJECT_LAST;
+    return kind >= AllocKind::OBJECT_FIRST && kind <= AllocKind::OBJECT_LAST;
 }
 
 inline bool
@@ -138,10 +141,10 @@ AllAllocKinds()
 
 // Returns a sequence for use in a range-based for loop,
 // to iterate over all object alloc kinds.
-inline decltype(mozilla::MakeEnumeratedRange<int>(AllocKind::OBJECT0, AllocKind::OBJECT_LIMIT))
+inline decltype(mozilla::MakeEnumeratedRange<int>(AllocKind::OBJECT_FIRST, AllocKind::OBJECT_LIMIT))
 ObjectAllocKinds()
 {
-    return mozilla::MakeEnumeratedRange<int>(AllocKind::OBJECT0, AllocKind::OBJECT_LIMIT);
+    return mozilla::MakeEnumeratedRange<int>(AllocKind::OBJECT_FIRST, AllocKind::OBJECT_LIMIT);
 }
 
 // Returns a sequence for use in a range-based for loop,
@@ -168,6 +171,8 @@ static inline JSGCTraceKind
 MapAllocToTraceKind(AllocKind kind)
 {
     static const JSGCTraceKind map[] = {
+        JSTRACE_OBJECT,       /* AllocKind::FUNCTION */
+        JSTRACE_OBJECT,       /* AllocKind::FUNCTION_EXTENDED */
         JSTRACE_OBJECT,       /* AllocKind::OBJECT0 */
         JSTRACE_OBJECT,       /* AllocKind::OBJECT0_BACKGROUND */
         JSTRACE_OBJECT,       /* AllocKind::OBJECT2 */
@@ -1022,18 +1027,19 @@ struct Chunk
     ArenaHeader* allocateArena(JSRuntime* rt, JS::Zone* zone, AllocKind kind,
                                const AutoLockGC& lock);
 
-    enum ArenaDecommitState { IsCommitted = false, IsDecommitted = true };
-    void releaseArena(JSRuntime* rt, ArenaHeader* aheader, const AutoLockGC& lock,
-                      ArenaDecommitState state = IsCommitted);
+    void releaseArena(JSRuntime* rt, ArenaHeader* aheader, const AutoLockGC& lock);
     void recycleArena(ArenaHeader* aheader, SortedArenaList& dest, AllocKind thingKind,
                       size_t thingsPerArena);
 
-    static Chunk* allocate(JSRuntime* rt);
+    bool decommitOneFreeArena(JSRuntime* rt, AutoLockGC& lock);
+    void decommitAllArenasWithoutUnlocking(const AutoLockGC& lock);
 
-    void decommitAllArenas(JSRuntime* rt);
+    static Chunk* allocate(JSRuntime* rt);
 
   private:
     inline void init(JSRuntime* rt);
+
+    void decommitAllArenas(JSRuntime* rt);
 
     /* Search for a decommitted arena to allocate. */
     unsigned findDecommittedArenaOffset();
@@ -1041,6 +1047,9 @@ struct Chunk
 
     void addArenaToFreeList(JSRuntime* rt, ArenaHeader* aheader);
     void addArenaToDecommittedList(JSRuntime* rt, const ArenaHeader* aheader);
+
+    void updateChunkListAfterAlloc(JSRuntime* rt, const AutoLockGC& lock);
+    void updateChunkListAfterFree(JSRuntime* rt, const AutoLockGC& lock);
 
   public:
     /* Unlink and return the freeArenasHead. */
@@ -1112,6 +1121,7 @@ inline uintptr_t
 ArenaHeader::address() const
 {
     uintptr_t addr = reinterpret_cast<uintptr_t>(this);
+    MOZ_ASSERT(addr);
     MOZ_ASSERT(!(addr & ArenaMask));
     MOZ_ASSERT(Chunk::withinArenasRange(addr));
     return addr;
@@ -1175,7 +1185,8 @@ ArenaHeader::setNextDelayedMarking(ArenaHeader* aheader)
     MOZ_ASSERT(!(uintptr_t(aheader) & ArenaMask));
     MOZ_ASSERT(!auxNextLink && !hasDelayedMarking);
     hasDelayedMarking = 1;
-    auxNextLink = aheader->arenaAddress() >> ArenaShift;
+    if (aheader)
+        auxNextLink = aheader->arenaAddress() >> ArenaShift;
 }
 
 inline void
@@ -1198,7 +1209,8 @@ ArenaHeader::setNextAllocDuringSweep(ArenaHeader* aheader)
 {
     MOZ_ASSERT(!auxNextLink && !allocatedDuringIncremental);
     allocatedDuringIncremental = 1;
-    auxNextLink = aheader->arenaAddress() >> ArenaShift;
+    if (aheader)
+        auxNextLink = aheader->arenaAddress() >> ArenaShift;
 }
 
 inline void

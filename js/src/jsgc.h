@@ -96,6 +96,8 @@ IsNurseryAllocable(AllocKind kind)
 {
     MOZ_ASSERT(IsValidAllocKind(kind));
     static const bool map[] = {
+        true,      /* AllocKind::FUNCTION */
+        true,      /* AllocKind::FUNCTION_EXTENDED */
         false,     /* AllocKind::OBJECT0 */
         true,      /* AllocKind::OBJECT0_BACKGROUND */
         false,     /* AllocKind::OBJECT2 */
@@ -129,6 +131,8 @@ IsBackgroundFinalized(AllocKind kind)
 {
     MOZ_ASSERT(IsValidAllocKind(kind));
     static const bool map[] = {
+        true,      /* AllocKind::FUNCTION */
+        true,      /* AllocKind::FUNCTION_EXTENDED */
         false,     /* AllocKind::OBJECT0 */
         true,      /* AllocKind::OBJECT0_BACKGROUND */
         false,     /* AllocKind::OBJECT2 */
@@ -287,9 +291,11 @@ GetGCKindSlots(AllocKind thingKind)
 {
     /* Using a switch in hopes that thingKind will usually be a compile-time constant. */
     switch (thingKind) {
+      case AllocKind::FUNCTION:
       case AllocKind::OBJECT0:
       case AllocKind::OBJECT0_BACKGROUND:
         return 0;
+      case AllocKind::FUNCTION_EXTENDED:
       case AllocKind::OBJECT2:
       case AllocKind::OBJECT2_BACKGROUND:
         return 2;
@@ -1312,8 +1318,10 @@ template <typename T>
 inline void
 CheckGCThingAfterMovingGC(T* t)
 {
-    MOZ_ASSERT_IF(t, !IsInsideNursery(t));
-    MOZ_ASSERT_IF(t, !RelocationOverlay::isCellForwarded(t));
+    if (t) {
+        MOZ_RELEASE_ASSERT(!IsInsideNursery(t));
+        MOZ_RELEASE_ASSERT(!RelocationOverlay::isCellForwarded(t));
+    }
 }
 
 struct CheckValueAfterMovingGCFunctor : public VoidDefaultAdaptor<Value> {

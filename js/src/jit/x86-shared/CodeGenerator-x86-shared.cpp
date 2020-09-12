@@ -17,6 +17,7 @@
 #include "jit/RangeAnalysis.h"
 #include "vm/TraceLogging.h"
 
+#include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
 
 using namespace js;
@@ -1528,11 +1529,11 @@ CodeGeneratorX86Shared::visitUrshD(LUrshD* ins)
 }
 
 MoveOperand
-CodeGeneratorX86Shared::toMoveOperand(const LAllocation* a) const
+CodeGeneratorX86Shared::toMoveOperand(LAllocation a) const
 {
-    if (a->isGeneralReg())
+    if (a.isGeneralReg())
         return MoveOperand(ToRegister(a));
-    if (a->isFloatReg())
+    if (a.isFloatReg())
         return MoveOperand(ToFloatRegister(a));
     return MoveOperand(StackPointer, ToStackOffset(a));
 }

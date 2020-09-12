@@ -279,7 +279,7 @@ const Class RegExpObject::class_ = {
 
     // ClassSpec
     {
-        GenericCreateConstructor<js::regexp_construct, 2, JSFunction::FinalizeKind>,
+        GenericCreateConstructor<js::regexp_construct, 2, gc::AllocKind::FUNCTION>,
         CreateRegExpPrototype,
         nullptr,
         js::regexp_static_props,
@@ -908,6 +908,9 @@ RegExpCompartment::init(JSContext* cx)
 void
 RegExpCompartment::sweep(JSRuntime* rt)
 {
+    if (!set_.initialized())
+        return;
+
     for (Set::Enum e(set_); !e.empty(); e.popFront()) {
         RegExpShared* shared = e.front();
 

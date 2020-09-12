@@ -44,6 +44,7 @@
 #include "jsobjinlines.h"
 
 #include "frontend/ParseNode-inl.h"
+#include "jit/MacroAssembler-inl.h"
 #include "vm/ArrayBufferObject-inl.h"
 #include "vm/Stack-inl.h"
 
@@ -964,13 +965,13 @@ const Class AsmJSModuleObject::class_ = {
     AsmJSModuleObject_trace
 };
 
-AsmJSModuleObject *
-AsmJSModuleObject::create(ExclusiveContext *cx, ScopedJSDeletePtr<AsmJSModule> *module)
+AsmJSModuleObject*
+AsmJSModuleObject::create(ExclusiveContext* cx, ScopedJSDeletePtr<AsmJSModule>* module)
 {
-    JSObject *obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, NullPtr());
+    JSObject* obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, NullPtr());
     if (!obj)
         return nullptr;
-    AsmJSModuleObject *nobj = &obj->as<AsmJSModuleObject>();
+    AsmJSModuleObject* nobj = &obj->as<AsmJSModuleObject>();
 
     nobj->setReservedSlot(MODULE_SLOT, PrivateValue(module->forget()));
     return nobj;

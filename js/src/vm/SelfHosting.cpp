@@ -340,18 +340,18 @@ js::intrinsic_NewDenseArray(JSContext* cx, unsigned argc, Value* vp)
         return false;
     buffer->setGroup(newgroup);
 
-    NativeObject::EnsureDenseResult edr = buffer->ensureDenseElements(cx, length, 0);
+    DenseElementResult edr = buffer->ensureDenseElements(cx, length, 0);
     switch (edr) {
-      case NativeObject::ED_OK:
+      case DenseElementResult::Success:
         args.rval().setObject(*buffer);
         return true;
 
-      case NativeObject::ED_SPARSE: // shouldn't happen!
+      case DenseElementResult::Incomplete: // shouldn't happen!
         MOZ_ASSERT(!"%EnsureDenseArrayElements() would yield sparse array");
         JS_ReportError(cx, "%EnsureDenseArrayElements() would yield sparse array");
         break;
 
-      case NativeObject::ED_FAILED:
+      case DenseElementResult::Failure:
         break;
     }
     return false;
@@ -1208,13 +1208,13 @@ JSRuntime::markSelfHostingGlobal(JSTracer* trc)
 }
 
 bool
-JSRuntime::isSelfHostingCompartment(JSCompartment* comp)
+JSRuntime::isSelfHostingCompartment(JSCompartment* comp) const
 {
     return selfHostingGlobal_->compartment() == comp;
 }
 
 bool
-JSRuntime::isSelfHostingZone(JS::Zone* zone)
+JSRuntime::isSelfHostingZone(const JS::Zone* zone) const
 {
     return selfHostingGlobal_ && selfHostingGlobal_->zoneFromAnyThread() == zone;
 }
@@ -1338,7 +1338,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
         // Arrow functions use the first extended slot for their lexical |this| value.
         MOZ_ASSERT(!selfHostedFunction->isArrow());
         js::gc::AllocKind kind = hasName
-                                 ? JSFunction::ExtendedFinalizeKind
+                                 ? gc::AllocKind::FUNCTION_EXTENDED
                                  : selfHostedFunction->getAllocKind();
         clone = CloneFunctionObject(cx, selfHostedFunction, cx->global(), kind, TenuredObject);
         // To be able to re-lazify the cloned function, its name in the
