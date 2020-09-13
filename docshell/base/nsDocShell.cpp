@@ -14100,6 +14100,23 @@ nsDocShell::GetURLSearchParams()
   return mURLSearchParams;
 }
 
+class JavascriptTimelineMarker : public TimelineMarker
+{
+public:
+
+  JavascriptTimelineMarker(nsDocShell* aDocShell, const char* aName,
+                           const char* aReason)
+    : TimelineMarker(aDocShell, aName, TRACING_INTERVAL_START,
+                     NS_ConvertUTF8toUTF16(aReason))
+  {
+  }
+
+  void AddDetails(mozilla::dom::ProfileTimelineMarker& aMarker) override
+  {
+    aMarker.mCauseName.Construct(GetCause());
+  }
+};
+
 void
 nsDocShell::NotifyJSRunToCompletionStart(const char *aReason)
 {
@@ -14107,7 +14124,9 @@ nsDocShell::NotifyJSRunToCompletionStart(const char *aReason)
 
   // If first start, mark interval start.
   if (timelineOn && mJSRunToCompletionDepth == 0) {
-    AddProfileTimelineMarker("Javascript", TRACING_INTERVAL_START);
+    mozilla::UniquePtr<TimelineMarker> marker =
+      MakeUnique<JavascriptTimelineMarker>(this, "Javascript", aReason);
+    AddProfileTimelineMarker(Move(marker));
   }
   mJSRunToCompletionDepth++;
 }
