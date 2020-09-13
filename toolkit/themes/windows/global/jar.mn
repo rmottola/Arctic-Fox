@@ -115,7 +115,7 @@ toolkit.jar:
         skin/classic/global/devtools/alerticon-warning.png         (../../shared/devtools/images/alerticon-warning.png)
         skin/classic/global/devtools/alerticon-warning@2x.png      (../../shared/devtools/images/alerticon-warning@2x.png)
 *       skin/classic/global/devtools/ruleview.css                  (../../shared/devtools/ruleview.css)
-        skin/classic/global/devtools/commandline.css               (devtools/commandline.css)
+        skin/classic/global/devtools/commandline.css               (../../shared/devtools/commandline.css)
         skin/classic/global/devtools/command-paintflashing.png     (../../shared/devtools/images/command-paintflashing.png)
         skin/classic/global/devtools/command-paintflashing@2x.png  (../../shared/devtools/images/command-paintflashing@2x.png)
         skin/classic/global/devtools/command-screenshot.png        (../../shared/devtools/images/command-screenshot.png)

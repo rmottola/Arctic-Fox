@@ -109,7 +109,6 @@ toolkit.jar:
     content/global/devtools/performance/views/recordings.js           (performance/views/recordings.js)
     content/global/devtools/performance/views/jit-optimizations.js    (performance/views/jit-optimizations.js)
     content/global/devtools/responsivedesign/resize-commands.js       (responsivedesign/resize-commands.js)
-    content/global/devtools/commandline.css                           (commandline/commandline.css)
     content/global/devtools/commandlineoutput.xhtml                   (commandline/commandlineoutput.xhtml)
     content/global/devtools/commandlinetooltip.xhtml                  (commandline/commandlinetooltip.xhtml)
     content/global/devtools/commandline/commands-index.js             (commandline/commands-index.js)
