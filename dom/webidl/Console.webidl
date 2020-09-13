@@ -21,6 +21,7 @@ interface Console {
   void groupEnd(any... data);
   void time(optional any time);
   void timeEnd(optional any time);
+  void timeStamp(optional any data);
 
   void profile(any... data);
   void profileEnd(any... data);
@@ -39,8 +40,6 @@ interface Console {
   void timeline();
   [BinaryName="noopMethod"]
   void timelineEnd();
-  [BinaryName="noopMethod"]
-  void timeStamp();
 };
 
 // This is used to propagate console events to the observers.
