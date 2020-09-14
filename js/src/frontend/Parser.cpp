@@ -1188,26 +1188,36 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind, Hand
     MOZ_ASSERT_IF(kind == Statement, atom != nullptr);
 
     RootedFunction fun(context);
-    
+
+    gc::AllocKind allocKind = gc::AllocKind::FUNCTION;
     JSFunction::Flags flags;
-    switch(kind) {
+    switch (kind) {
       case Expression:
         flags = JSFunction::INTERPRETED_LAMBDA;
         break;
       case Arrow:
         flags = JSFunction::INTERPRETED_LAMBDA_ARROW;
+        allocKind = gc::AllocKind::FUNCTION_EXTENDED;
         break;
       case Method:
         flags = JSFunction::INTERPRETED_METHOD;
+        allocKind = gc::AllocKind::FUNCTION_EXTENDED;
+        break;
+      case ClassConstructor:
+        flags = JSFunction::INTERPRETED_CLASS_CONSTRUCTOR;
+        allocKind = gc::AllocKind::FUNCTION_EXTENDED;
+        break;
+      case Getter:
+        flags = JSFunction::INTERPRETED_GETTER;
+        break;
+      case Setter:
+        flags = JSFunction::INTERPRETED_SETTER;
         break;
       default:
         flags = JSFunction::INTERPRETED;
         break;
     }
 
-    gc::AllocKind allocKind = gc::AllocKind::FUNCTION;
-    if (kind == Arrow || kind == Method)
-        allocKind = gc::AllocKind::FUNCTION_EXTENDED;
     fun = NewFunctionWithProto(context, nullptr, 0, flags, NullPtr(), atom, proto,
                                allocKind, TenuredObject);
     if (!fun)
@@ -1530,7 +1540,7 @@ Parser<ParseHandler>::bindDestructuringArg(BindData<ParseHandler>* data,
 template <typename ParseHandler>
 bool
 Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyntaxKind kind,
-                                        FunctionType type, Node* listp, Node funcpn, bool* hasRest)
+                                        Node* listp, Node funcpn, bool* hasRest)
 {
     FunctionBox* funbox = pc->sc->asFunctionBox();
 
@@ -1578,9 +1588,9 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
         bool hasDefaults = false;
         Node duplicatedArg = null();
         Node list = null();
-        bool disallowDuplicateArgs = kind == Arrow || kind == Method;
+        bool disallowDuplicateArgs = kind == Arrow || kind == Method || kind == ClassConstructor;
 
-        if (type == Getter) {
+        if (kind == Getter) {
             report(ParseError, false, null(), JSMSG_ACCESSOR_WRONG_ARGS, "getter", "no", "s");
             return false;
         }
@@ -1663,7 +1673,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
 
               case TOK_TRIPLEDOT:
               {
-                if (type == Setter) {
+                if (kind == Setter) {
                     report(ParseError, false, null(),
                            JSMSG_ACCESSOR_WRONG_ARGS, "setter", "one", "");
                     return false;
@@ -1740,7 +1750,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
                 return false;
             }
 
-            if (parenFreeArrow || type == Setter)
+            if (parenFreeArrow || kind == Setter)
                 break;
 
             bool matched;
@@ -1755,7 +1765,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
             if (!tokenStream.getToken(&tt))
                 return false;
             if (tt != TOK_RP) {
-                if (type == Setter) {
+                if (kind == Setter) {
                     report(ParseError, false, null(),
                            JSMSG_ACCESSOR_WRONG_ARGS, "setter", "one", "");
                     return false;
@@ -1768,7 +1778,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
 
         if (!hasDefaults)
             funbox->length = pc->numArgs() - *hasRest;
-    } else if (type == Setter) {
+    } else if (kind == Setter) {
         report(ParseError, false, null(), JSMSG_ACCESSOR_WRONG_ARGS, "setter", "one", "");
         return false;
     }
@@ -2125,9 +2135,8 @@ Parser<ParseHandler>::templateLiteral(YieldHandling yieldHandling)
 template <typename ParseHandler>
 typename ParseHandler::Node
 Parser<ParseHandler>::functionDef(InHandling inHandling, YieldHandling yieldHandling,
-                                  HandlePropertyName funName, FunctionType type,
-                                  FunctionSyntaxKind kind, GeneratorKind generatorKind,
-                                  InvokedPrediction invoked)
+                                  HandlePropertyName funName, FunctionSyntaxKind kind,
+                                  GeneratorKind generatorKind, InvokedPrediction invoked)
 {
     MOZ_ASSERT_IF(kind == Statement, funName);
 
@@ -2171,7 +2180,7 @@ Parser<ParseHandler>::functionDef(InHandling inHandling, YieldHandling yieldHand
     tokenStream.tell(&start);
 
     while (true) {
-        if (functionArgsAndBody(inHandling, pn, fun, type, kind, generatorKind, directives,
+        if (functionArgsAndBody(inHandling, pn, fun, kind, generatorKind, directives,
                                 &newDirectives))
         {
             break;
@@ -2279,8 +2288,8 @@ Parser<SyntaxParseHandler>::finishFunctionDefinition(Node pn, FunctionBox* funbo
 template <>
 bool
 Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* pn,
-                                              HandleFunction fun, FunctionType type,
-                                              FunctionSyntaxKind kind, GeneratorKind generatorKind,
+                                              HandleFunction fun, FunctionSyntaxKind kind,
+                                              GeneratorKind generatorKind,
                                               Directives inheritedDirectives,
                                               Directives* newDirectives)
 {
@@ -2320,8 +2329,7 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
                 return false;
 
             if (!parser->functionArgsAndBodyGeneric(inHandling, yieldHandling,
-                                                    SyntaxParseHandler::NodeGeneric, fun, type,
-                                                    kind))
+                                                    SyntaxParseHandler::NodeGeneric, fun, kind))
             {
                 if (parser->hadAbortedSyntaxParse()) {
                     // Try again with a full parse.
@@ -2359,7 +2367,7 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
     if (!funpc.init(tokenStream))
         return false;
 
-    if (!functionArgsAndBodyGeneric(inHandling, yieldHandling, pn, fun, type, kind))
+    if (!functionArgsAndBodyGeneric(inHandling, yieldHandling, pn, fun, kind))
         return false;
 
     if (!leaveFunction(pn, outerpc, kind))
@@ -2380,7 +2388,7 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
 template <>
 bool
 Parser<SyntaxParseHandler>::functionArgsAndBody(InHandling inHandling, Node pn, HandleFunction fun,
-                                                FunctionType type, FunctionSyntaxKind kind,
+                                                FunctionSyntaxKind kind,
                                                 GeneratorKind generatorKind,
                                                 Directives inheritedDirectives,
                                                 Directives* newDirectives)
@@ -2400,7 +2408,7 @@ Parser<SyntaxParseHandler>::functionArgsAndBody(InHandling inHandling, Node pn, 
         return false;
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
-    if (!functionArgsAndBodyGeneric(inHandling, yieldHandling, pn, fun, type, kind))
+    if (!functionArgsAndBodyGeneric(inHandling, yieldHandling, pn, fun, kind))
         return false;
 
     if (!leaveFunction(pn, outerpc, kind))
@@ -2462,8 +2470,16 @@ Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, unsigned st
         return null();
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
-    FunctionSyntaxKind syntaxKind = fun->isMethod() ? Method : Statement;
-    if (!functionArgsAndBodyGeneric(InAllowed, yieldHandling, pn, fun, Normal, syntaxKind)) {
+    FunctionSyntaxKind syntaxKind = Statement;
+    if (fun->isClassConstructor())
+        syntaxKind = ClassConstructor;
+    else if (fun->isMethod())
+        syntaxKind = Method;
+    else if (fun->isGetter())
+        syntaxKind = Getter;
+    else if (fun->isSetter())
+        syntaxKind = Setter;
+    if (!functionArgsAndBodyGeneric(InAllowed, yieldHandling, pn, fun, syntaxKind)) {
         MOZ_ASSERT(directives == newDirectives);
         return null();
     }
@@ -2491,8 +2507,7 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::functionArgsAndBodyGeneric(InHandling inHandling,
                                                  YieldHandling yieldHandling, Node pn,
-                                                 HandleFunction fun, FunctionType type,
-                                                 FunctionSyntaxKind kind)
+                                                 HandleFunction fun, FunctionSyntaxKind kind)
 {
     // Given a properly initialized parse context, try to parse an actual
     // function without concern for conversion to strict mode, use of lazy
@@ -2500,7 +2515,7 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(InHandling inHandling,
 
     Node prelude = null();
     bool hasRest;
-    if (!functionArguments(yieldHandling, kind, type, &prelude, pn, &hasRest))
+    if (!functionArguments(yieldHandling, kind, &prelude, pn, &hasRest))
         return false;
 
     FunctionBox* funbox = pc->sc->asFunctionBox();
@@ -2550,8 +2565,11 @@ Parser<ParseHandler>::functionArgsAndBodyGeneric(InHandling inHandling,
     if (!body)
         return false;
 
-    if (kind != Method && fun->name() && !checkStrictBinding(fun->name(), pn))
+    if ((kind != Method && kind != ClassConstructor) && fun->name() &&
+        !checkStrictBinding(fun->name(), pn))
+    {
         return false;
+    }
 
     if (bodyType == StatementListBody) {
         bool matched;
@@ -2624,7 +2642,7 @@ Parser<ParseHandler>::functionStmt(YieldHandling yieldHandling)
         !report(ParseStrictError, pc->sc->strict(), null(), JSMSG_STRICT_FUNCTION_STATEMENT))
         return null();
 
-    return functionDef(InAllowed, yieldHandling, name, Normal, Statement, generatorKind);
+    return functionDef(InAllowed, yieldHandling, name, Statement, generatorKind);
 }
 
 template <typename ParseHandler>
@@ -2656,7 +2674,7 @@ Parser<ParseHandler>::functionExpr(InvokedPrediction invoked)
     }
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
-    return functionDef(InAllowed, yieldHandling, name, Normal, Expression, generatorKind, invoked);
+    return functionDef(InAllowed, yieldHandling, name, Expression, generatorKind, invoked);
 }
 
 /*
@@ -6390,7 +6408,7 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
         if (!tokenStream.peekToken(&ignored))
             return null();
 
-        return functionDef(inHandling, yieldHandling, NullPtr(), Normal, Arrow, NotGenerator);
+        return functionDef(inHandling, yieldHandling, NullPtr(), Arrow, NotGenerator);
       }
 
       default:
@@ -7620,7 +7638,7 @@ Parser<ParseHandler>::checkAndMarkSuperScope()
                 sc->asFunctionBox()->setNeedsHomeObject();
             return true;
         } else if (sc->isFunctionBox() && !sc->asFunctionBox()->function()->isArrow()) {
-            // super is not legal is normal functions.
+            // super is not legal in normal functions.
             break;
         }
     }
@@ -8112,6 +8130,7 @@ Parser<ParseHandler>::propertyList(YieldHandling yieldHandling, PropListType typ
 
         JSOp op = JSOP_INITPROP;
         Node propname;
+        bool isConstructor = false;
         switch (ltok) {
           case TOK_NUMBER:
             atom = DoubleToAtom(context, tokenStream.currentToken().number());
@@ -8238,6 +8257,7 @@ Parser<ParseHandler>::propertyList(YieldHandling yieldHandling, PropListType typ
                     return null();
                 }
                 seenConstructor = true;
+                isConstructor = true;
             } else if (isStatic && atom == context->names().prototype) {
                 report(ParseError, false, propname, JSMSG_BAD_METHOD_DEF);
                 return null();
@@ -8313,7 +8333,8 @@ Parser<ParseHandler>::propertyList(YieldHandling yieldHandling, PropListType typ
                     return null();
             } else if (tt == TOK_LP) {
                 tokenStream.ungetToken();
-                if (!methodDefinition(yieldHandling, type, propList, propname, Normal,
+                if (!methodDefinition(yieldHandling, type, propList, propname,
+                                      isConstructor ? ClassConstructor : Method,
                                       isGenerator ? StarGenerator : NotGenerator, isStatic, op))
                 {
                     return null();
@@ -8357,17 +8378,18 @@ Parser<ParseHandler>::propertyList(YieldHandling yieldHandling, PropListType typ
 template <typename ParseHandler>
 bool
 Parser<ParseHandler>::methodDefinition(YieldHandling yieldHandling, PropListType listType,
-                                       Node propList, Node propname, FunctionType type,
+                                       Node propList, Node propname, FunctionSyntaxKind kind,
                                        GeneratorKind generatorKind, bool isStatic, JSOp op)
 {
+    MOZ_ASSERT(kind == Method || kind == ClassConstructor || kind == Getter || kind == Setter);
     /* NB: Getter function in { get x(){} } is unnamed. */
     RootedPropertyName funName(context);
-    if (type == Normal && tokenStream.isCurrentTokenType(TOK_NAME))
+    if ((kind == Method || kind == ClassConstructor) && tokenStream.isCurrentTokenType(TOK_NAME))
         funName = tokenStream.currentName();
     else
         funName = nullptr;
 
-    Node fn = functionDef(InAllowed, yieldHandling, funName, type, Method, generatorKind);
+    Node fn = functionDef(InAllowed, yieldHandling, funName, kind, generatorKind);
     if (!fn)
         return false;
 

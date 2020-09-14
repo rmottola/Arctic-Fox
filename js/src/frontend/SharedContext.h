@@ -316,7 +316,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     void setArgumentsHasLocalBinding()     { funCxFlags.argumentsHasLocalBinding = true; }
     void setDefinitelyNeedsArgsObj()       { MOZ_ASSERT(funCxFlags.argumentsHasLocalBinding);
                                              funCxFlags.definitelyNeedsArgsObj   = true; }
-    void setNeedsHomeObject()              { MOZ_ASSERT(function()->isMethod());
+    void setNeedsHomeObject()              { MOZ_ASSERT(allowSuperProperty());
                                              funCxFlags.needsHomeObject          = true; }
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
@@ -353,7 +353,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     }
 
     bool allowSuperProperty() const {
-        return function()->isMethod();
+        return function()->isMethod() || function()->isGetter() || function()->isSetter();
     }
 };
 
