@@ -32,7 +32,7 @@ FrameSizeClass FrameSizeClass::FromDepth(uint32_t) { MOZ_CRASH(); }
 FrameSizeClass FrameSizeClass::ClassLimit() { MOZ_CRASH(); }
 uint32_t FrameSizeClass::frameSize() const { MOZ_CRASH(); }
 
-void DispatchIonCache::initializeAddCacheState(LInstructio *, AddCacheStat *) { MOZ_CRASH(); }
+void DispatchIonCache::initializeAddCacheState(LInstruction*, AddCacheState*) { MOZ_CRASH(); }
 
 const Register ABIArgGenerator::NonArgReturnReg0 = { Registers::invalid_reg };
 const Register ABIArgGenerator::NonArgReturnReg1 = {  Registers::invalid_reg };
