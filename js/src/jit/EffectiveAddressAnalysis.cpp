@@ -102,9 +102,9 @@ AnalyzeLsh(TempAllocator& alloc, MLsh* lsh)
 
 template<typename MAsmJSHeapAccessType>
 static void
-AnalyzeAsmHeapAccess(MAsmJSHeapAccessType *ins, MIRGraph &graph)
+AnalyzeAsmHeapAccess(MAsmJSHeapAccessType* ins, MIRGraph& graph)
 {
-    MDefinition *ptr = ins->ptr();
+    MDefinition* ptr = ins->ptr();
 
     if (ptr->isConstantValue()) {
         // Look for heap[i] where i is a constant offset, and fold the offset.
@@ -114,7 +114,7 @@ AnalyzeAsmHeapAccess(MAsmJSHeapAccessType *ins, MIRGraph &graph)
         // offset doesn't actually fit into the address mode immediate.
         int32_t imm = ptr->constantValue().toInt32();
         if (imm != 0 && ins->tryAddDisplacement(imm)) {
-            MInstruction *zero = MConstant::New(graph.alloc(), Int32Value(0));
+            MInstruction* zero = MConstant::New(graph.alloc(), Int32Value(0));
             ins->block()->insertBefore(ins, zero);
             ins->replacePtr(zero);
         }
@@ -122,8 +122,8 @@ AnalyzeAsmHeapAccess(MAsmJSHeapAccessType *ins, MIRGraph &graph)
         // Look for heap[a+i] where i is a constant offset, and fold the offset.
         // Alignment masks have already been moved out of the way by the
         // Alignment Mask Analysis pass.
-        MDefinition *op0 = ptr->toAdd()->getOperand(0);
-        MDefinition *op1 = ptr->toAdd()->getOperand(1);
+        MDefinition* op0 = ptr->toAdd()->getOperand(0);
+        MDefinition* op1 = ptr->toAdd()->getOperand(1);
         if (op0->isConstantValue())
             mozilla::Swap(op0, op1);
         if (op1->isConstantValue()) {
