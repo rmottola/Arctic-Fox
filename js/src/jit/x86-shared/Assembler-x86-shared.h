@@ -1127,7 +1127,7 @@ class AssemblerX86Shared : public AssemblerShared
     void addl(Register src, Register dest) {
         masm.addl_rr(src.code(), dest.code());
     }
-    void addl(Register src, const Operand &dest) {
+    void addl(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::REG:
             masm.addl_rr(src.code(), dest.reg());
@@ -1175,7 +1175,7 @@ class AssemblerX86Shared : public AssemblerShared
     void orl(Register reg, Register dest) {
         masm.orl_rr(reg.code(), dest.code());
     }
-    void orl(Register src, const Operand &dest) {
+    void orl(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::REG:
             masm.orl_rr(src.code(), dest.reg());
@@ -1208,7 +1208,7 @@ class AssemblerX86Shared : public AssemblerShared
     void xorl(Register src, Register dest) {
         masm.xorl_rr(src.code(), dest.code());
     }
-    void xorl(Register src, const Operand &dest) {
+    void xorl(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::REG:
             masm.xorl_rr(src.code(), dest.reg());
@@ -1241,7 +1241,7 @@ class AssemblerX86Shared : public AssemblerShared
     void andl(Register src, Register dest) {
         masm.andl_rr(src.code(), dest.code());
     }
-    void andl(Register src, const Operand &dest) {
+    void andl(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::REG:
             masm.andl_rr(src.code(), dest.reg());
@@ -1423,7 +1423,7 @@ class AssemblerX86Shared : public AssemblerShared
         decl(op);
     }
 
-    void addb(Imm32 imm, const Operand &op) {
+    void addb(Imm32 imm, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.addb_im(imm.value, op.disp(), op.base());
@@ -1436,7 +1436,7 @@ class AssemblerX86Shared : public AssemblerShared
             break;
         }
     }
-    void addb(Register src, const Operand &op) {
+    void addb(Register src, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.addb_rm(src.code(), op.disp(), op.base());
@@ -1450,7 +1450,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void subb(Imm32 imm, const Operand &op) {
+    void subb(Imm32 imm, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.subb_im(imm.value, op.disp(), op.base());
@@ -1463,7 +1463,7 @@ class AssemblerX86Shared : public AssemblerShared
             break;
         }
     }
-    void subb(Register src, const Operand &op) {
+    void subb(Register src, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.subb_rm(src.code(), op.disp(), op.base());
@@ -1477,7 +1477,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void andb(Imm32 imm, const Operand &op) {
+    void andb(Imm32 imm, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.andb_im(imm.value, op.disp(), op.base());
@@ -1490,7 +1490,7 @@ class AssemblerX86Shared : public AssemblerShared
             break;
         }
     }
-    void andb(Register src, const Operand &op) {
+    void andb(Register src, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.andb_rm(src.code(), op.disp(), op.base());
@@ -1504,7 +1504,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void orb(Imm32 imm, const Operand &op) {
+    void orb(Imm32 imm, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.orb_im(imm.value, op.disp(), op.base());
@@ -1517,7 +1517,7 @@ class AssemblerX86Shared : public AssemblerShared
             break;
         }
     }
-    void orb(Register src, const Operand &op) {
+    void orb(Register src, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.orb_rm(src.code(), op.disp(), op.base());
@@ -1531,7 +1531,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void xorb(Imm32 imm, const Operand &op) {
+    void xorb(Imm32 imm, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.xorb_im(imm.value, op.disp(), op.base());
@@ -1544,7 +1544,7 @@ class AssemblerX86Shared : public AssemblerShared
             break;
         }
     }
-    void xorb(Register src, const Operand &op) {
+    void xorb(Register src, const Operand& op) {
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
             masm.xorb_rm(src.code(), op.disp(), op.base());
@@ -1559,57 +1559,57 @@ class AssemblerX86Shared : public AssemblerShared
     }
 
     template<typename T>
-    void lock_addb(T src, const Operand &op) {
+    void lock_addb(T src, const Operand& op) {
         masm.prefix_lock();
         addb(src, op);
     }
     template<typename T>
-    void lock_subb(T src, const Operand &op) {
+    void lock_subb(T src, const Operand& op) {
         masm.prefix_lock();
         subb(src, op);
     }
     template<typename T>
-    void lock_andb(T src, const Operand &op) {
+    void lock_andb(T src, const Operand& op) {
         masm.prefix_lock();
         andb(src, op);
     }
     template<typename T>
-    void lock_orb(T src, const Operand &op) {
+    void lock_orb(T src, const Operand& op) {
         masm.prefix_lock();
         orb(src, op);
     }
     template<typename T>
-    void lock_xorb(T src, const Operand &op) {
+    void lock_xorb(T src, const Operand& op) {
         masm.prefix_lock();
         xorb(src, op);
     }
 
     template<typename T>
-    void lock_addw(T src, const Operand &op) {
+    void lock_addw(T src, const Operand& op) {
         masm.prefix_lock();
         masm.prefix_16_for_32();
         addl(src, op);
     }
     template<typename T>
-    void lock_subw(T src, const Operand &op) {
+    void lock_subw(T src, const Operand& op) {
         masm.prefix_lock();
         masm.prefix_16_for_32();
         subl(src, op);
     }
     template<typename T>
-    void lock_andw(T src, const Operand &op) {
+    void lock_andw(T src, const Operand& op) {
         masm.prefix_lock();
         masm.prefix_16_for_32();
         andl(src, op);
     }
     template<typename T>
-    void lock_orw(T src, const Operand &op) {
+    void lock_orw(T src, const Operand& op) {
         masm.prefix_lock();
         masm.prefix_16_for_32();
         orl(src, op);
     }
     template<typename T>
-    void lock_xorw(T src, const Operand &op) {
+    void lock_xorw(T src, const Operand& op) {
         masm.prefix_lock();
         masm.prefix_16_for_32();
         xorl(src, op);
@@ -1618,32 +1618,32 @@ class AssemblerX86Shared : public AssemblerShared
     // Note, lock_addl(imm, op) is used for a memory barrier on non-SSE2 systems,
     // among other things.  Do not optimize, replace by XADDL, or similar.
     template<typename T>
-    void lock_addl(T src, const Operand &op) {
+    void lock_addl(T src, const Operand& op) {
         masm.prefix_lock();
         addl(src, op);
     }
     template<typename T>
-    void lock_subl(T src, const Operand &op) {
+    void lock_subl(T src, const Operand& op) {
         masm.prefix_lock();
         subl(src, op);
     }
     template<typename T>
-    void lock_andl(T src, const Operand &op) {
+    void lock_andl(T src, const Operand& op) {
         masm.prefix_lock();
         andl(src, op);
     }
     template<typename T>
-    void lock_orl(T src, const Operand &op) {
+    void lock_orl(T src, const Operand& op) {
         masm.prefix_lock();
         orl(src, op);
     }
     template<typename T>
-    void lock_xorl(T src, const Operand &op) {
+    void lock_xorl(T src, const Operand& op) {
         masm.prefix_lock();
         xorl(src, op);
     }
 
-    void lock_cmpxchgb(Register src, const Operand &mem) {
+    void lock_cmpxchgb(Register src, const Operand& mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1656,7 +1656,7 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_cmpxchgw(Register src, const Operand &mem) {
+    void lock_cmpxchgw(Register src, const Operand& mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1669,7 +1669,7 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_cmpxchgl(Register src, const Operand &mem) {
+    void lock_cmpxchgl(Register src, const Operand& mem) {
         masm.prefix_lock();
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1683,7 +1683,7 @@ class AssemblerX86Shared : public AssemblerShared
         }
     }
 
-    void lock_xaddb(Register srcdest, const Operand &mem) {
+    void lock_xaddb(Register srcdest, const Operand& mem) {
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
             masm.lock_xaddb_rm(srcdest.code(), mem.disp(), mem.base());
@@ -1695,11 +1695,11 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void lock_xaddw(Register srcdest, const Operand &mem) {
+    void lock_xaddw(Register srcdest, const Operand& mem) {
         masm.prefix_16_for_32();
         lock_xaddl(srcdest, mem);
     }
-    void lock_xaddl(Register srcdest, const Operand &mem) {
+    void lock_xaddl(Register srcdest, const Operand& mem) {
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
             masm.lock_xaddl_rm(srcdest.code(), mem.disp(), mem.base());
@@ -2354,7 +2354,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vpand_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vpand(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vpand(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2374,7 +2374,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vpor_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vpor(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vpor(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2394,7 +2394,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vpxor_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vpxor(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vpxor(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2435,7 +2435,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vpshufd_irr(mask, src.encoding(), dest.encoding());
     }
-    void vpshufd(uint32_t mask, const Operand &src1, FloatRegister dest) {
+    void vpshufd(uint32_t mask, const Operand& src1, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2463,7 +2463,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vunpcklps_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vunpcklps(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vunpcklps(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2503,7 +2503,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vshufps_irr(mask, src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vshufps(uint32_t mask, const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vshufps(uint32_t mask, const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2527,7 +2527,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vaddss_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vaddsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vaddsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2567,7 +2567,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vsubss_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vsubsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vsubsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2597,7 +2597,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vmulsd_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vmulsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vmulsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2635,7 +2635,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vdivss_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vdivsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vdivsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2648,7 +2648,7 @@ class AssemblerX86Shared : public AssemblerShared
             MOZ_CRASH("unexpected operand kind");
         }
     }
-    void vdivss(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vdivss(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2716,7 +2716,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE41());
         masm.vinsertps_irr(mask, src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vinsertps(uint32_t mask, const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vinsertps(uint32_t mask, const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE41());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2736,7 +2736,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE41());
         masm.vblendps_irr(mask, src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vblendps(unsigned mask, const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vblendps(unsigned mask, const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE41());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2753,7 +2753,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE41());
         masm.vblendvps_rr(mask.encoding(), src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vblendvps(FloatRegister mask, const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vblendvps(FloatRegister mask, const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE41());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2770,7 +2770,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE3());
         masm.vmovsldup_rr(src.encoding(), dest.encoding());
     }
-    void vmovsldup(const Operand &src, FloatRegister dest) {
+    void vmovsldup(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE3());
         switch (src.kind()) {
           case Operand::FPREG:
@@ -2787,7 +2787,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE3());
         masm.vmovshdup_rr(src.encoding(), dest.encoding());
     }
-    void vmovshdup(const Operand &src, FloatRegister dest) {
+    void vmovshdup(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE3());
         switch (src.kind()) {
           case Operand::FPREG:
@@ -2804,7 +2804,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vminsd_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vminsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vminsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:
@@ -2825,7 +2825,7 @@ class AssemblerX86Shared : public AssemblerShared
         MOZ_ASSERT(HasSSE2());
         masm.vmaxsd_rr(src1.encoding(), src0.encoding(), dest.encoding());
     }
-    void vmaxsd(const Operand &src1, FloatRegister src0, FloatRegister dest) {
+    void vmaxsd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src1.kind()) {
           case Operand::FPREG:

@@ -447,7 +447,7 @@ class Assembler : public AssemblerX86Shared
     }
 
     // Load from *(base + disp32) where disp32 can be patched.
-    CodeOffsetLabel movsblWithPatch(const Operand &src, Register dest) {
+    CodeOffsetLabel movsblWithPatch(const Operand& src, Register dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movsbl_mr_disp32(src.disp(), src.base(), dest.code());
@@ -460,7 +460,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movzblWithPatch(const Operand &src, Register dest) {
+    CodeOffsetLabel movzblWithPatch(const Operand& src, Register dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movzbl_mr_disp32(src.disp(), src.base(), dest.code());
@@ -473,7 +473,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movswlWithPatch(const Operand &src, Register dest) {
+    CodeOffsetLabel movswlWithPatch(const Operand& src, Register dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movswl_mr_disp32(src.disp(), src.base(), dest.code());
@@ -486,7 +486,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movzwlWithPatch(const Operand &src, Register dest) {
+    CodeOffsetLabel movzwlWithPatch(const Operand& src, Register dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movzwl_mr_disp32(src.disp(), src.base(), dest.code());
@@ -499,7 +499,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movlWithPatch(const Operand &src, Register dest) {
+    CodeOffsetLabel movlWithPatch(const Operand& src, Register dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movl_mr_disp32(src.disp(), src.base(), dest.code());
@@ -512,7 +512,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovssWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovssWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -526,7 +526,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovdWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovdWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -540,7 +540,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovqWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovqWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -554,7 +554,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovsdWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovsdWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -568,7 +568,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovupsWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovupsWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -582,7 +582,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovdquWithPatch(const Operand &src, FloatRegister dest) {
+    CodeOffsetLabel vmovdquWithPatch(const Operand& src, FloatRegister dest) {
         MOZ_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -598,7 +598,7 @@ class Assembler : public AssemblerX86Shared
     }
 
     // Store to *(base + disp32) where disp32 can be patched.
-    CodeOffsetLabel movbWithPatch(Register src, const Operand &dest) {
+    CodeOffsetLabel movbWithPatch(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movb_rm_disp32(src.code(), dest.disp(), dest.base());
@@ -611,7 +611,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movwWithPatch(Register src, const Operand &dest) {
+    CodeOffsetLabel movwWithPatch(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movw_rm_disp32(src.code(), dest.disp(), dest.base());
@@ -624,7 +624,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel movlWithPatch(Register src, const Operand &dest) {
+    CodeOffsetLabel movlWithPatch(Register src, const Operand& dest) {
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
             masm.movl_rm_disp32(src.code(), dest.disp(), dest.base());
@@ -637,7 +637,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovdWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovdWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -651,7 +651,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovqWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovqWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -665,7 +665,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovssWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovssWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -679,7 +679,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovsdWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovsdWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -693,7 +693,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovupsWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovupsWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -707,7 +707,7 @@ class Assembler : public AssemblerX86Shared
         }
         return CodeOffsetLabel(masm.currentOffset());
     }
-    CodeOffsetLabel vmovdquWithPatch(FloatRegister src, const Operand &dest) {
+    CodeOffsetLabel vmovdquWithPatch(FloatRegister src, const Operand& dest) {
         MOZ_ASSERT(HasSSE2());
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
