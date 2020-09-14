@@ -51,8 +51,8 @@ CanReuseFunctionForClone(JSContext* cx, HandleFunction fun)
     return true;
 }
 
-inline JSFunction *
-CloneFunctionObjectIfNotSingleton(JSContext *cx, HandleFunction fun, HandleObject parent,
+inline JSFunction*
+CloneFunctionObjectIfNotSingleton(JSContext* cx, HandleFunction fun, HandleObject parent,
                                   HandleObject proto = NullPtr(),
                                   NewObjectKind newKind = GenericObject)
 {

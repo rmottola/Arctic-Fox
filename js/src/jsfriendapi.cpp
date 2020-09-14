@@ -127,8 +127,8 @@ JS_SplicePrototype(JSContext* cx, HandleObject obj, HandleObject proto)
     return obj->splicePrototype(cx, obj->getClass(), tagged);
 }
 
-JS_FRIEND_API(JSObject *)
-JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject proto)
+JS_FRIEND_API(JSObject*)
+JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject proto)
 {
     /*
      * Create our object with a null proto and then splice in the correct proto
@@ -136,7 +136,7 @@ JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject pro
      * ObjectGroup attached to our proto with information about our object, since
      * we're not going to be using that ObjectGroup anyway.
      */
-    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class *)clasp, NullPtr(),
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class*)clasp, NullPtr(),
                                                  SingletonObject));
     if (!obj)
         return nullptr;
@@ -145,8 +145,8 @@ JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject pro
     return obj;
 }
 
-JS_FRIEND_API(JSObject *)
-JS_NewObjectWithoutMetadata(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto)
+JS_FRIEND_API(JSObject*)
+JS_NewObjectWithoutMetadata(JSContext* cx, const JSClass* clasp, JS::Handle<JSObject*> proto)
 {
     // Use an AutoEnterAnalysis to suppress invocation of the metadata callback.
     AutoEnterAnalysis enter(cx);

@@ -1771,7 +1771,7 @@ GetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleId id,
     // Ok, bad undefined property reference: whine about it.
     RootedValue val(cx, IdToValue(id));
     return ReportValueErrorFlags(cx, flags, JSMSG_UNDEFINED_PROP, JSDVG_IGNORE_STACK, val,
-                                 js::NullPtr(), nullptr, nullptr);
+                                    js::NullPtr(), nullptr, nullptr);
 }
 
 /* The NoGC version of GetNonexistentProperty, present only to make types line up. */

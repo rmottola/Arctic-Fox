@@ -1975,7 +1975,7 @@ DataViewObject::defineGetter(JSContext* cx, PropertyName* name, HandleNativeObje
     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
 
     Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
-    JSObject *getter =
+    JSObject* getter =
         NewNativeFunction(cx, DataViewObject::getter<ValueGetter>, 0, NullPtr());
     if (!getter)
         return false;
