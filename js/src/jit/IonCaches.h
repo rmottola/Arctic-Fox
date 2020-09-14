@@ -544,7 +544,7 @@ class GetPropertyIC : public RepatchIonCache
     LiveRegisterSet liveRegs_;
 
     Register object_;
-    PropertyName *name_;
+    PropertyName* name_;
     TypedOrValueRegister output_;
 
     // Only valid if idempotent
@@ -560,7 +560,7 @@ class GetPropertyIC : public RepatchIonCache
 
   public:
     GetPropertyIC(LiveRegisterSet liveRegs,
-                  Register object, PropertyName *name,
+                  Register object, PropertyName* name,
                   TypedOrValueRegister output,
                   bool monitoredResult)
       : liveRegs_(liveRegs),
@@ -665,19 +665,19 @@ class GetPropertyIC : public RepatchIonCache
 
     bool tryAttachUnboxed(JSContext* cx, HandleScript outerScript, IonScript* ion,
                           HandleObject obj, HandlePropertyName name,
-                          void *returnAddr, bool *emitted);
+                          void* returnAddr, bool* emitted);
 
-    bool tryAttachUnboxedExpando(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool tryAttachUnboxedExpando(JSContext* cx, HandleScript outerScript, IonScript* ion,
                                  HandleObject obj, HandlePropertyName name,
-                                 void *returnAddr, bool *emitted);
+                                 void* returnAddr, bool* emitted);
 
-    bool tryAttachTypedArrayLength(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                                   HandleObject obj, HandlePropertyName name, bool *emitted);
+    bool tryAttachTypedArrayLength(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                   HandleObject obj, HandlePropertyName name, bool* emitted);
 
-    bool tryAttachArgumentsLength(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                                  HandleObject obj, HandlePropertyName name, bool *emitted);
+    bool tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                  HandleObject obj, HandlePropertyName name, bool* emitted);
 
-    static bool update(JSContext *cx, HandleScript outerScript, size_t cacheIndex,
+    static bool update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
                        HandleObject obj, MutableHandleValue vp);
 };
 
@@ -689,7 +689,7 @@ class SetPropertyIC : public RepatchIonCache
     LiveRegisterSet liveRegs_;
 
     Register object_;
-    PropertyName *name_;
+    PropertyName* name_;
     ConstantOrRegister value_;
     bool strict_;
     bool needsTypeBarrier_;
@@ -697,7 +697,7 @@ class SetPropertyIC : public RepatchIonCache
     bool hasGenericProxyStub_;
 
   public:
-    SetPropertyIC(LiveRegisterSet liveRegs, Register object, PropertyName *name,
+    SetPropertyIC(LiveRegisterSet liveRegs, Register object, PropertyName* name,
                   ConstantOrRegister value, bool strict, bool needsTypeBarrier)
       : liveRegs_(liveRegs),
         object_(object),
@@ -739,24 +739,24 @@ class SetPropertyIC : public RepatchIonCache
         CanAttachCallSetter
     };
 
-    bool attachSetSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachSetSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
                        HandleObject obj, HandleShape shape, bool checkTypeset);
 
-    bool attachCallSetter(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachCallSetter(JSContext* cx, HandleScript outerScript, IonScript* ion,
                           HandleObject obj, HandleObject holder, HandleShape shape,
-                          void *returnAddr);
+                          void* returnAddr);
 
-    bool attachAddSlot(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachAddSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
                        HandleObject obj, HandleShape oldShape, HandleObjectGroup oldGroup,
                        bool checkTypeset);
 
-    bool attachSetUnboxed(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachSetUnboxed(JSContext* cx, HandleScript outerScript, IonScript* ion,
                           HandleObject obj, HandleId id,
                           uint32_t unboxedOffset, JSValueType unboxedType,
                           bool checkTypeset);
 
-    bool attachGenericProxy(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                            void *returnAddr);
+    bool attachGenericProxy(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                            void* returnAddr);
 
     bool attachDOMProxyShadowed(JSContext* cx, HandleScript outerScript, IonScript* ion,
                                 HandleObject obj, void* returnAddr);
@@ -841,26 +841,26 @@ class GetElementIC : public RepatchIonCache
         return monitoredResult();
     }
 
-    static bool canAttachGetProp(JSObject *obj, const Value &idval, jsid id);
-    static bool canAttachDenseElement(JSObject *obj, const Value &idval);
-    static bool canAttachDenseElementHole(JSObject *obj, const Value &idval,
+    static bool canAttachGetProp(JSObject* obj, const Value& idval, jsid id);
+    static bool canAttachDenseElement(JSObject* obj, const Value& idval);
+    static bool canAttachDenseElementHole(JSObject* obj, const Value& idval,
                                           TypedOrValueRegister output);
-    static bool canAttachTypedArrayElement(JSObject *obj, const Value &idval,
+    static bool canAttachTypedArrayElement(JSObject* obj, const Value& idval,
                                            TypedOrValueRegister output);
 
-    bool attachGetProp(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* ion,
                        HandleObject obj, const Value& idval, HandlePropertyName name);
 
-    bool attachDenseElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                            HandleObject obj, const Value &idval);
+    bool attachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                            HandleObject obj, const Value& idval);
 
-    bool attachDenseElementHole(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                                HandleObject obj, const Value &idval);
+    bool attachDenseElementHole(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                HandleObject obj, const Value& idval);
 
-    bool attachTypedArrayElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
-                                 HandleObject tarr, const Value &idval);
+    bool attachTypedArrayElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                 HandleObject tarr, const Value& idval);
 
-    bool attachArgumentsElement(JSContext *cx, HandleScript outerScript, IonScript *ion,
+    bool attachArgumentsElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
                                 HandleObject obj);
 
     static bool
@@ -1009,12 +1009,12 @@ class NameIC : public RepatchIonCache
 
     bool typeOf_;
     Register scopeChain_;
-    PropertyName *name_;
+    PropertyName* name_;
     TypedOrValueRegister output_;
 
   public:
     NameIC(LiveRegisterSet liveRegs, bool typeOf,
-           Register scopeChain, PropertyName *name,
+           Register scopeChain, PropertyName* name,
            TypedOrValueRegister output)
       : liveRegs_(liveRegs),
         typeOf_(typeOf),
