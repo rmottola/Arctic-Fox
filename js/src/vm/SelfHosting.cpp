@@ -272,6 +272,7 @@ intrinsic_MakeConstructible(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args.length() == 2);
     MOZ_ASSERT(args[0].isObject());
     MOZ_ASSERT(args[0].toObject().is<JSFunction>());
+    MOZ_ASSERT(args[0].toObject().as<JSFunction>().isSelfHostedBuiltin());
     MOZ_ASSERT(args[1].isObject());
 
     // Normal .prototype properties aren't enumerable.  But for this to clone
@@ -284,7 +285,7 @@ intrinsic_MakeConstructible(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    ctor->as<JSFunction>().setIsSelfHostedConstructor();
+    ctor->as<JSFunction>().setIsConstructor();
     args.rval().setUndefined();
     return true;
 }

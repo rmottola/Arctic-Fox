@@ -465,7 +465,7 @@ IonBuilder::canInlineTarget(JSFunction* target, CallInfo& callInfo)
     }
 
     JSScript* inlineScript = target->nonLazyScript();
-    if (callInfo.constructing() && !target->isInterpretedConstructor()) {
+    if (callInfo.constructing() && !target->isConstructor()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNotConstructor);
         return DontInline(inlineScript, "Callee is not a constructor");
     }
@@ -5911,7 +5911,7 @@ IonBuilder::createThis(JSFunction* target, MDefinition* callee)
 
     // Native constructors build the new Object themselves.
     if (target->isNative()) {
-        if (!target->isNativeConstructor())
+        if (!target->isConstructor())
             return nullptr;
 
         MConstant* magic = MConstant::New(alloc(), MagicValue(JS_IS_CONSTRUCTING));
@@ -6361,8 +6361,7 @@ IonBuilder::makeCall(JSFunction* target, CallInfo& callInfo)
 {
     // Constructor calls to non-constructors should throw. We don't want to use
     // CallKnown in this case.
-    MOZ_ASSERT_IF(callInfo.constructing() && target,
-                  target->isInterpretedConstructor() || target->isNativeConstructor());
+    MOZ_ASSERT_IF(callInfo.constructing() && target, target->isConstructor());
 
     MCall* call = makeCallHelper(target, callInfo);
     if (!call)

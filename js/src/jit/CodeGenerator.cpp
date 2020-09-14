@@ -3051,7 +3051,7 @@ CodeGenerator::visitCallKnown(LCallKnown* call)
     // Missing arguments must have been explicitly appended by the IonBuilder.
     MOZ_ASSERT(target->nargs() <= call->mir()->numStackArgs() - 1);
 
-    MOZ_ASSERT_IF(call->mir()->isConstructing(), target->isInterpretedConstructor());
+    MOZ_ASSERT_IF(call->mir()->isConstructing(), target->isConstructor());
 
     masm.checkStackAlignment();
 

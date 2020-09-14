@@ -2605,7 +2605,7 @@ JSObject::isConstructor() const
 {
     if (is<JSFunction>()) {
         const JSFunction& fun = as<JSFunction>();
-        return fun.isNativeConstructor() || fun.isInterpretedConstructor();
+        return fun.isConstructor();
     }
     return constructHook() != nullptr;
 }
