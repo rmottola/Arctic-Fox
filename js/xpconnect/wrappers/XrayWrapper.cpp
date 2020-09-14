@@ -770,7 +770,7 @@ JSXrayTraits::createHolder(JSContext* cx, JSObject* wrapper)
 {
     RootedObject target(cx, getTargetObject(wrapper));
     RootedObject holder(cx, JS_NewObjectWithGivenProto(cx, &HolderClass,
-                                                       JS::NullPtr()));
+                                                       nullptr));
     if (!holder)
         return nullptr;
 
@@ -968,7 +968,7 @@ XrayTraits::attachExpandoObject(JSContext* cx, HandleObject target,
 
     // Create the expando object.
     RootedObject expandoObject(cx,
-      JS_NewObjectWithGivenProto(cx, &ExpandoObjectClass, JS::NullPtr()));
+      JS_NewObjectWithGivenProto(cx, &ExpandoObjectClass, nullptr));
     if (!expandoObject)
         return nullptr;
 
@@ -1014,7 +1014,7 @@ XrayTraits::ensureExpandoObject(JSContext* cx, HandleObject wrapper,
         if (!JS_WrapObject(cx, &consumerGlobal))
             return nullptr;
         expandoObject = attachExpandoObject(cx, target, ObjectPrincipal(wrapper),
-                                            isSandbox ? (HandleObject)consumerGlobal : NullPtr());
+                                            isSandbox ? (HandleObject)consumerGlobal : nullptr);
     }
     return expandoObject;
 }
@@ -1150,7 +1150,7 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
 
     // This will do verification and the method lookup for us.
     RootedObject target(cx, getTargetObject(wrapper));
-    XPCCallContext ccx(JS_CALLER, cx, target, NullPtr(), id);
+    XPCCallContext ccx(JS_CALLER, cx, target, nullptr, id);
 
     // There are no native numeric (or symbol-keyed) properties, so we can
     // shortcut here. We will not find the property.
@@ -1466,7 +1466,7 @@ XPCWrappedNativeXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, 
 JSObject*
 XPCWrappedNativeXrayTraits::createHolder(JSContext* cx, JSObject* wrapper)
 {
-    return JS_NewObjectWithGivenProto(cx, &HolderClass, JS::NullPtr());
+    return JS_NewObjectWithGivenProto(cx, &HolderClass, nullptr);
 }
 
 bool
@@ -1477,7 +1477,7 @@ XPCWrappedNativeXrayTraits::call(JSContext* cx, HandleObject wrapper,
     // Run the call hook of the wrapped native.
     XPCWrappedNative* wn = getWN(wrapper);
     if (NATIVE_HAS_FLAG(wn, WantCall)) {
-        XPCCallContext ccx(JS_CALLER, cx, wrapper, NullPtr(), JSID_VOIDHANDLE, args.length(),
+        XPCCallContext ccx(JS_CALLER, cx, wrapper, nullptr, JSID_VOIDHANDLE, args.length(),
                            args.array(), args.rval().address());
         if (!ccx.IsValid())
             return false;
@@ -1503,7 +1503,7 @@ XPCWrappedNativeXrayTraits::construct(JSContext* cx, HandleObject wrapper,
     // Run the construct hook of the wrapped native.
     XPCWrappedNative* wn = getWN(wrapper);
     if (NATIVE_HAS_FLAG(wn, WantConstruct)) {
-        XPCCallContext ccx(JS_CALLER, cx, wrapper, NullPtr(), JSID_VOIDHANDLE, args.length(),
+        XPCCallContext ccx(JS_CALLER, cx, wrapper, nullptr, JSID_VOIDHANDLE, args.length(),
                            args.array(), args.rval().address());
         if (!ccx.IsValid())
             return false;
@@ -1681,7 +1681,7 @@ DOMXrayTraits::preserveWrapper(JSObject* target)
 JSObject*
 DOMXrayTraits::createHolder(JSContext* cx, JSObject* wrapper)
 {
-    return JS_NewObjectWithGivenProto(cx, nullptr, JS::NullPtr());
+    return JS_NewObjectWithGivenProto(cx, nullptr, nullptr);
 }
 
 namespace XrayUtils {

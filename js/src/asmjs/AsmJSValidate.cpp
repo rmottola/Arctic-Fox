@@ -7644,7 +7644,7 @@ CheckFunctionsSequential(ModuleCompiler& m)
 
         JitContext jcx(m.cx(), &mir->alloc());
 
-        IonSpewNewFunction(&mir->graph(), NullPtr());
+        IonSpewNewFunction(&mir->graph(), nullptr);
 
         if (!OptimizeMIR(mir))
             return m.failOffset(func->srcBegin(), "internal compiler failure (probably out of memory)");

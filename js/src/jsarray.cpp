@@ -2292,12 +2292,12 @@ NewFullyAllocatedArrayTryReuseGroup(JSContext* cx, JSObject* obj, size_t length)
 
     if (group->maybeUnboxedLayout()) {
         if (length > UnboxedArrayObject::MaximumCapacity)
-            return NewDenseFullyAllocatedArray(cx, length, NullPtr(), newKind);
+            return NewDenseFullyAllocatedArray(cx, length, nullptr, newKind);
 
         return UnboxedArrayObject::create(cx, group, length, newKind);
     }
 
-    ArrayObject* res = NewDenseFullyAllocatedArray(cx, length, NullPtr(), newKind);
+    ArrayObject* res = NewDenseFullyAllocatedArray(cx, length, nullptr, newKind);
     if (!res)
         return nullptr;
 
@@ -2333,9 +2333,9 @@ NewPartlyAllocatedArrayTryReuseGroup(JSContext* cx, JSObject* obj, size_t length
         newKind = TenuredObject;
 
     if (group->maybeUnboxedLayout())
-        return NewDensePartlyAllocatedArray(cx, length, NullPtr(), newKind);
+        return NewDensePartlyAllocatedArray(cx, length, nullptr, newKind);
 
-    ArrayObject* res = NewDensePartlyAllocatedArray(cx, length, NullPtr(), newKind);
+    ArrayObject* res = NewDensePartlyAllocatedArray(cx, length, nullptr, newKind);
     if (!res)
         return nullptr;
 
@@ -3305,7 +3305,7 @@ static bool
 array_proto_finish(JSContext* cx, JS::HandleObject ctor, JS::HandleObject proto)
 {
     // Add Array.prototype[@@unscopables]. ECMA-262 6.0 22.1.3.31.
-    RootedObject unscopables(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(), TenuredObject));
+    RootedObject unscopables(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr, TenuredObject));
     if (!unscopables)
         return false;
 
@@ -3464,7 +3464,7 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
 }
 
 ArrayObject * JS_FASTCALL
-js::NewDenseEmptyArray(JSContext* cx, HandleObject proto /* = NullPtr() */,
+js::NewDenseEmptyArray(JSContext* cx, HandleObject proto /* = nullptr */,
                        NewObjectKind newKind /* = GenericObject */)
 {
     return NewArray<0>(cx, 0, proto, newKind);
@@ -3472,7 +3472,7 @@ js::NewDenseEmptyArray(JSContext* cx, HandleObject proto /* = NullPtr() */,
 
 ArrayObject * JS_FASTCALL
 js::NewDenseFullyAllocatedArray(ExclusiveContext* cx, uint32_t length,
-                                HandleObject proto /* = NullPtr() */,
+                                HandleObject proto /* = nullptr */,
                                 NewObjectKind newKind /* = GenericObject */)
 {
     return NewArray<NativeObject::NELEMENTS_LIMIT>(cx, length, proto, newKind);
@@ -3480,7 +3480,7 @@ js::NewDenseFullyAllocatedArray(ExclusiveContext* cx, uint32_t length,
 
 ArrayObject * JS_FASTCALL
 js::NewDensePartlyAllocatedArray(ExclusiveContext* cx, uint32_t length,
-                                 HandleObject proto /* = NullPtr() */,
+                                 HandleObject proto /* = nullptr */,
                                  NewObjectKind newKind /* = GenericObject */)
 {
     return NewArray<ArrayObject::EagerAllocationMaxLength>(cx, length, proto, newKind);
@@ -3488,7 +3488,7 @@ js::NewDensePartlyAllocatedArray(ExclusiveContext* cx, uint32_t length,
 
 ArrayObject * JS_FASTCALL
 js::NewDenseUnallocatedArray(ExclusiveContext* cx, uint32_t length,
-                             HandleObject proto /* = NullPtr() */,
+                             HandleObject proto /* = nullptr */,
                              NewObjectKind newKind /* = GenericObject */)
 {
     return NewArray<0>(cx, length, proto, newKind);
@@ -3504,12 +3504,12 @@ js::NewDenseArray(ExclusiveContext* cx, uint32_t length, HandleObjectGroup group
 
     ArrayObject* arr;
     if (allocating == NewArray_Unallocating) {
-        arr = NewDenseUnallocatedArray(cx, length, NullPtr(), newKind);
+        arr = NewDenseUnallocatedArray(cx, length, nullptr, newKind);
     } else if (allocating == NewArray_PartlyAllocating) {
-        arr = NewDensePartlyAllocatedArray(cx, length, NullPtr(), newKind);
+        arr = NewDensePartlyAllocatedArray(cx, length, nullptr, newKind);
     } else {
         MOZ_ASSERT(allocating == NewArray_FullyAllocating);
-        arr = NewDenseFullyAllocatedArray(cx, length, NullPtr(), newKind);
+        arr = NewDenseFullyAllocatedArray(cx, length, nullptr, newKind);
     }
     if (!arr)
         return nullptr;
@@ -3530,7 +3530,7 @@ js::NewDenseArray(ExclusiveContext* cx, uint32_t length, HandleObjectGroup group
 
 ArrayObject*
 js::NewDenseCopiedArray(JSContext* cx, uint32_t length, HandleArrayObject src,
-                        uint32_t elementOffset, HandleObject proto /* = NullPtr() */)
+                        uint32_t elementOffset, HandleObject proto /* = nullptr */)
 {
     MOZ_ASSERT(!src->isIndexed());
 
@@ -3550,7 +3550,7 @@ js::NewDenseCopiedArray(JSContext* cx, uint32_t length, HandleArrayObject src,
 // values must point at already-rooted Value objects
 ArrayObject*
 js::NewDenseCopiedArray(JSContext* cx, uint32_t length, const Value* values,
-                        HandleObject proto /* = NullPtr() */,
+                        HandleObject proto /* = nullptr */,
                         NewObjectKind newKind /* = GenericObject */)
 {
     ArrayObject* arr = NewArray<NativeObject::NELEMENTS_LIMIT>(cx, length, proto);
@@ -3615,7 +3615,7 @@ js::ArrayInfo(JSContext* cx, unsigned argc, Value* vp)
         HandleValue arg = args[i];
 
         UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, arg, NullPtr());
+            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, arg, nullptr);
         if (!bytes)
             return false;
         if (arg.isPrimitive() ||

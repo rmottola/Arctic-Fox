@@ -579,7 +579,7 @@ extern JSFunction*
 NewScriptedFunction(ExclusiveContext* cx, unsigned nargs, JSFunction::Flags flags,
                     HandleAtom atom, gc::AllocKind allocKind = gc::AllocKind::FUNCTION,
                     NewObjectKind newKind = GenericObject,
-                    HandleObject enclosingDynamicScope = NullPtr());
+                    HandleObject enclosingDynamicScope = nullptr);
 
 // If proto is nullptr, Function.prototype is used instead.  If
 // enclosingDynamicScope is null, the function will have a null environment()
@@ -658,7 +658,7 @@ extern JSFunction*
 CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
                     gc::AllocKind kind = gc::AllocKind::FUNCTION,
                     NewObjectKind newKindArg = GenericObject,
-                    HandleObject proto = NullPtr());
+                    HandleObject proto = nullptr);
 
 extern bool
 FindBody(JSContext* cx, HandleFunction fun, HandleLinearString src, size_t* bodyStart,

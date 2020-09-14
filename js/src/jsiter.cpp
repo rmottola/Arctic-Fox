@@ -512,7 +512,7 @@ GetCustomIterator(JSContext* cx, HandleObject obj, unsigned flags, MutableHandle
             return false;
         RootedValue val(cx, ObjectValue(*obj));
         ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
-                          -1, val, js::NullPtr(), bytes.ptr());
+                          -1, val, nullptr, bytes.ptr());
         return false;
     }
     objp.set(&rval.toObject());
@@ -575,10 +575,8 @@ NewPropertyIteratorObject(JSContext *cx, unsigned flags)
         // next method on the prototype doesn't break cross-global for .. in.
         // We don't have to do this for JSITER_ENUMERATE because that object always
         // takes an optimized path.
-        RootedFunction next(cx, NewFunctionWithProto(cx, legacy_iterator_next, 0,
-                                                     JSFunction::NATIVE_FUN, NullPtr(),
-                                                     HandlePropertyName(cx->names().next),
-                                                     NullPtr()));
+        RootedFunction next(cx, NewNativeFunction(cx, legacy_iterator_next, 0,
+                                                  HandlePropertyName(cx->names().next)));
         if (!next)
             return nullptr;
 
