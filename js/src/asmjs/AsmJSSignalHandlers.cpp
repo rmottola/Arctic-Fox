@@ -616,7 +616,7 @@ EmulateHeapAccess(EMULATOR_CONTEXT *context, uint8_t *pc, uint8_t *faultingAddre
         uintptr_t base;
         StoreValueFromGPReg(&base, sizeof(uintptr_t),
                             AddressOfGPRegisterSlot(context, address.base()));
-        MOZ_RELEASE_ASSERT(reinterpret_cast<uint8_t *>(base) == module.maybeHeap());
+        MOZ_RELEASE_ASSERT(reinterpret_cast<uint8_t*>(base) == module.maybeHeap());
     }
     if (address.index() != Registers::Invalid) {
         uintptr_t index;
@@ -630,7 +630,7 @@ EmulateHeapAccess(EMULATOR_CONTEXT *context, uint8_t *pc, uint8_t *faultingAddre
     // rely on the faultingAddress given to us by the OS, because we need the
     // address of the start of the access, and the OS may sometimes give us an
     // address somewhere in the middle of the heap access.
-    uint8_t *accessAddress = ComputeAccessAddress(context, address);
+    uint8_t* accessAddress = ComputeAccessAddress(context, address);
     MOZ_RELEASE_ASSERT(size_t(faultingAddress - accessAddress) < access.size(),
                        "Given faulting address does not appear to be within computed "
                        "faulting address range");
