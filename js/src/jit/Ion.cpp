@@ -441,17 +441,17 @@ FinishAllOffThreadCompilations(JSCompartment* comp)
 }
 
 uint8_t*
-jit::LazyLinkTopActivation(JSContext *cx)
+jit::LazyLinkTopActivation(JSContext* cx)
 {
     JitActivationIterator iter(cx->runtime());
 
     // First frame should be an exit frame.
     JitFrameIterator it(iter);
-    LazyLinkExitFrameLayout *ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
-    JSScript *calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
+    LazyLinkExitFrameLayout* ll = it.exitFrame()->as<LazyLinkExitFrameLayout>();
+    JSScript* calleeScript = ScriptFromCalleeToken(ll->jsFrame()->calleeToken());
 
     // Get the pending builder from the Ion frame.
-    IonBuilder *builder = calleeScript->ionScript()->pendingBuilder();
+    IonBuilder* builder = calleeScript->ionScript()->pendingBuilder();
     calleeScript->setPendingIonBuilder(cx, nullptr);
 
     AutoEnterAnalysis enterTypes(cx);
@@ -490,7 +490,7 @@ jit::LazyLinkTopActivation(JSContext *cx)
 }
 
 /* static */ void
-JitRuntime::Mark(JSTracer *trc)
+JitRuntime::Mark(JSTracer* trc)
 {
     MOZ_ASSERT(!trc->runtime()->isHeapMinorCollecting());
     Zone* zone = trc->runtime()->atomsCompartment()->zone();
@@ -501,7 +501,7 @@ JitRuntime::Mark(JSTracer *trc)
 }
 
 /* static */ bool
-JitRuntime::MarkJitcodeGlobalTableIteratively(JSTracer *trc)
+JitRuntime::MarkJitcodeGlobalTableIteratively(JSTracer* trc)
 {
     if (trc->runtime()->hasJitRuntime() &&
         trc->runtime()->jitRuntime()->hasJitcodeGlobalTable())
@@ -512,7 +512,7 @@ JitRuntime::MarkJitcodeGlobalTableIteratively(JSTracer *trc)
 }
 
 /* static */ void
-JitRuntime::SweepJitcodeGlobalTable(JSRuntime *rt)
+JitRuntime::SweepJitcodeGlobalTable(JSRuntime* rt)
 {
     if (rt->hasJitRuntime() && rt->jitRuntime()->hasJitcodeGlobalTable())
         rt->jitRuntime()->getJitcodeGlobalTable()->sweep(rt);
@@ -600,11 +600,11 @@ JitRuntime::getVMWrapper(const VMFunction& f) const
 }
 
 template <AllowGC allowGC>
-JitCode *
-JitCode::New(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
-             ExecutablePool *pool, CodeKind kind)
+JitCode*
+JitCode::New(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
+             ExecutablePool* pool, CodeKind kind)
 {
-    JitCode *codeObj = Allocate<JitCode, allowGC>(cx);
+    JitCode* codeObj = Allocate<JitCode, allowGC>(cx);
     if (!codeObj) {
         pool->release(headerSize + bufferSize, kind);
         return nullptr;
@@ -615,14 +615,14 @@ JitCode::New(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerS
 }
 
 template
-JitCode *
-JitCode::New<CanGC>(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
-                    ExecutablePool *pool, CodeKind kind);
+JitCode*
+JitCode::New<CanGC>(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
+                    ExecutablePool* pool, CodeKind kind);
 
 template
-JitCode *
-JitCode::New<NoGC>(JSContext *cx, uint8_t *code, uint32_t bufferSize, uint32_t headerSize,
-                   ExecutablePool *pool, CodeKind kind);
+JitCode*
+JitCode::New<NoGC>(JSContext* cx, uint8_t* code, uint32_t bufferSize, uint32_t headerSize,
+                   ExecutablePool* pool, CodeKind kind);
 
 void
 JitCode::copyFrom(MacroAssembler& masm)
@@ -677,11 +677,11 @@ JitCode::fixupNurseryObjects(JSContext* cx, const ObjectVector& nurseryObjects)
 }
 
 void
-JitCode::finalize(FreeOp *fop)
+JitCode::finalize(FreeOp* fop)
 {
     // If this jitcode had a bytecode map, it must have already been removed.
 #ifdef DEBUG
-    JSRuntime *rt = fop->runtime();
+    JSRuntime* rt = fop->runtime();
     if (hasBytecodeMap_) {
         JitcodeGlobalEntry result;
         MOZ_ASSERT(rt->jitRuntime()->hasJitcodeGlobalTable());
@@ -1123,14 +1123,14 @@ IonScript::unlinkFromRuntime(FreeOp* fop)
 }
 
 void
-jit::ToggleBarriers(JS::Zone *zone, bool needs)
+jit::ToggleBarriers(JS::Zone* zone, bool needs)
 {
-    JSRuntime *rt = zone->runtimeFromMainThread();
+    JSRuntime* rt = zone->runtimeFromMainThread();
     if (!rt->hasJitRuntime())
         return;
 
     for (gc::ZoneCellIterUnderGC i(zone, gc::AllocKind::SCRIPT); !i.done(); i.next()) {
-        JSScript *script = i.get<JSScript>();
+        JSScript* script = i.get<JSScript>();
         if (script->hasIonScript())
             script->ionScript()->toggleBarriers(needs);
         if (script->hasBaselineScript())
@@ -1915,7 +1915,7 @@ IonCompile(JSContext* cx, JSScript* script,
             // to analyze. Do this now and we will try to build again shortly.
             const MIRGenerator::ObjectGroupVector &groups = builder->abortedPreliminaryGroups();
             for (size_t i = 0; i < groups.length(); i++) {
-                ObjectGroup *group = groups[i];
+                ObjectGroup* group = groups[i];
                 if (group->newScript()) {
                     if (!group->newScript()->maybeAnalyze(cx, group, nullptr, /* force = */ true))
                         return AbortReason_Alloc;
@@ -2153,7 +2153,7 @@ Compile(JSContext* cx, HandleScript script, BaselineFrame* osrFrame, jsbytecode*
 } // namespace js
 
 bool
-jit::OffThreadCompilationAvailable(JSContext *cx)
+jit::OffThreadCompilationAvailable(JSContext* cx)
 {
     // Even if off thread compilation is enabled, compilation must still occur
     // on the main thread in some cases.
