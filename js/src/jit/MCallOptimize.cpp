@@ -258,8 +258,6 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
         return inlineAssertFloat32(callInfo);
     if (native == testingFunc_assertRecoveredOnBailout)
         return inlineAssertRecoveredOnBailout(callInfo);
-    if (native == testingFunc_inIon || native == testingFunc_inJit)
-        return inlineTrue(callInfo);
 
     // Bound function
     if (native == js::CallOrConstructBoundFunction)
@@ -2601,16 +2599,6 @@ IonBuilder::inlineBailout(CallInfo& callInfo)
     current->push(undefined);
     return InliningStatus_Inlined;
 }
-
-IonBuilder::InliningStatus
-IonBuilder::inlineTrue(CallInfo& callInfo)
-{
-    callInfo.setImplicitlyUsedUnchecked();
-
-    pushConstant(BooleanValue(true));
-    return InliningStatus_Inlined;
-}
-
 
 IonBuilder::InliningStatus
 IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
