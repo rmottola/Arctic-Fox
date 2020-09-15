@@ -2490,8 +2490,16 @@
             if (remoteBrowser) {
               remoteBrowser._outerWindowIDBrowserMap.delete(aOtherBrowser.outerWindowID);
             }
+
             // Swap the docshells
             ourBrowser.swapDocShells(aOtherBrowser);
+
+            if (ourBrowser.isRemoteBrowser) {
+              // Switch outerWindowIDs for remote browsers.
+              let ourOuterWindowID = ourBrowser._outerWindowID;
+              ourBrowser._outerWindowID = aOtherBrowser._outerWindowID;
+              aOtherBrowser._outerWindowID = ourOuterWindowID;
+            }
 
             // Register new outerWindowIDs.
             this._outerWindowIDBrowserMap.set(ourBrowser.outerWindowID, ourBrowser);
