@@ -519,7 +519,7 @@ GlobalDebuggees_class = {
 };
 
 GlobalObject::DebuggerVector*
-GlobalObject::getDebuggers()
+GlobalObject::getDebuggers() const
 {
     Value debuggers = getReservedSlot(DEBUGGERS);
     if (debuggers.isUndefined())
