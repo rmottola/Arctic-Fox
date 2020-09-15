@@ -360,6 +360,9 @@ class AliasSet {
         MOZ_ASSERT(flags && !(flags & Store_));
         return AliasSet(flags | Store_);
     }
+    static uint32_t BoxedOrUnboxedElements(JSValueType type) {
+        return (type == JSVAL_TYPE_MAGIC) ? Element : UnboxedElement;
+    }
 };
 
 // An MDefinition is an SSA name.
@@ -7710,8 +7713,10 @@ class MMaybeCopyElementsForWrite
   : public MUnaryInstruction,
     public SingleObjectPolicy::Data
 {
-    explicit MMaybeCopyElementsForWrite(MDefinition* object)
-      : MUnaryInstruction(object)
+    bool checkNative_;
+
+    explicit MMaybeCopyElementsForWrite(MDefinition* object, bool checkNative)
+      : MUnaryInstruction(object), checkNative_(checkNative)
     {
         setGuard();
         setMovable();
@@ -7722,15 +7727,19 @@ class MMaybeCopyElementsForWrite
   public:
     INSTRUCTION_HEADER(MaybeCopyElementsForWrite)
 
-    static MMaybeCopyElementsForWrite* New(TempAllocator& alloc, MDefinition* object) {
-        return new(alloc) MMaybeCopyElementsForWrite(object);
+    static MMaybeCopyElementsForWrite* New(TempAllocator& alloc, MDefinition* object, bool checkNative) {
+        return new(alloc) MMaybeCopyElementsForWrite(object, checkNative);
     }
 
     MDefinition* object() const {
         return getOperand(0);
     }
+    bool checkNative() const {
+        return checkNative_;
+    }
     bool congruentTo(const MDefinition* ins) const override {
-        return congruentIfOperandsEqual(ins);
+        return congruentIfOperandsEqual(ins) &&
+               checkNative() == ins->toMaybeCopyElementsForWrite()->checkNative();
     }
     AliasSet getAliasSet() const override {
         return AliasSet::Store(AliasSet::ObjectFields);
@@ -8474,9 +8483,7 @@ class MLoadElementHole
         return congruentIfOperandsEqual(other);
     }
     AliasSet getAliasSet() const override {
-        return AliasSet::Load(unboxedType() == JSVAL_TYPE_MAGIC
-                              ? AliasSet::Element
-                              : AliasSet::UnboxedElement);
+        return AliasSet::Load(AliasSet::BoxedOrUnboxedElements(unboxedType()));
     }
     void collectRangeInfoPreTrunc() override;
 
@@ -8736,9 +8743,7 @@ class MStoreElementHole
         // StoreElementHole can update the initialized length, the array length
         // or reallocate obj->elements.
         return AliasSet::Store(AliasSet::ObjectFields |
-                               ((unboxedType() == JSVAL_TYPE_MAGIC)
-                                ? AliasSet::Element
-                                : AliasSet::UnboxedElement));
+                               AliasSet::BoxedOrUnboxedElements(unboxedType()));
     }
 
     ALLOW_CLONE(MStoreElementHole)
@@ -8750,11 +8755,12 @@ class MStoreUnboxedObjectOrNull
     public StoreUnboxedObjectOrNullPolicy::Data
 {
     int32_t offsetAdjustment_;
+    bool preBarrier_;
 
     MStoreUnboxedObjectOrNull(MDefinition* elements, MDefinition* index,
                               MDefinition* value, MDefinition* typedObj,
-                              int32_t offsetAdjustment)
-      : offsetAdjustment_(offsetAdjustment)
+                              int32_t offsetAdjustment, bool preBarrier)
+      : offsetAdjustment_(offsetAdjustment), preBarrier_(preBarrier)
     {
         initOperand(0, elements);
         initOperand(1, index);
@@ -8771,9 +8777,10 @@ class MStoreUnboxedObjectOrNull
     static MStoreUnboxedObjectOrNull* New(TempAllocator& alloc,
                                           MDefinition* elements, MDefinition* index,
                                           MDefinition* value, MDefinition* typedObj,
-                                          int32_t offsetAdjustment = 0) {
+                                          int32_t offsetAdjustment = 0,
+                                          bool preBarrier = true) {
         return new(alloc) MStoreUnboxedObjectOrNull(elements, index, value, typedObj,
-                                                    offsetAdjustment);
+                                                    offsetAdjustment, preBarrier);
     }
     MDefinition* elements() const {
         return getOperand(0);
@@ -8789,6 +8796,9 @@ class MStoreUnboxedObjectOrNull
     }
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
+    }
+    bool preBarrier() const {
+        return preBarrier_;
     }
     AliasSet getAliasSet() const override {
         return AliasSet::Store(AliasSet::UnboxedElement);
@@ -8808,10 +8818,11 @@ class MStoreUnboxedString
     public MixPolicy<SingleObjectPolicy, ConvertToStringPolicy<2> >::Data
 {
     int32_t offsetAdjustment_;
+    bool preBarrier_;
 
     MStoreUnboxedString(MDefinition* elements, MDefinition* index, MDefinition* value,
-                        int32_t offsetAdjustment)
-      : offsetAdjustment_(offsetAdjustment)
+                        int32_t offsetAdjustment, bool preBarrier)
+      : offsetAdjustment_(offsetAdjustment), preBarrier_(preBarrier)
     {
         initOperand(0, elements);
         initOperand(1, index);
@@ -8825,8 +8836,10 @@ class MStoreUnboxedString
 
     static MStoreUnboxedString* New(TempAllocator& alloc,
                                     MDefinition* elements, MDefinition* index,
-                                    MDefinition* value, int32_t offsetAdjustment = 0) {
-        return new(alloc) MStoreUnboxedString(elements, index, value, offsetAdjustment);
+                                    MDefinition* value, int32_t offsetAdjustment = 0,
+                                    bool preBarrier = true) {
+        return new(alloc) MStoreUnboxedString(elements, index, value,
+                                              offsetAdjustment, preBarrier);
     }
     MDefinition* elements() const {
         return getOperand(0);
@@ -8839,6 +8852,9 @@ class MStoreUnboxedString
     }
     int32_t offsetAdjustment() const {
         return offsetAdjustment_;
+    }
+    bool preBarrier() const {
+        return preBarrier_;
     }
     AliasSet getAliasSet() const override {
         return AliasSet::Store(AliasSet::UnboxedElement);
@@ -8914,21 +8930,23 @@ class MArrayPopShift
 
   private:
     Mode mode_;
+    JSValueType unboxedType_;
     bool needsHoleCheck_;
     bool maybeUndefined_;
 
-    MArrayPopShift(MDefinition* object, Mode mode, bool needsHoleCheck, bool maybeUndefined)
-      : MUnaryInstruction(object), mode_(mode), needsHoleCheck_(needsHoleCheck),
-        maybeUndefined_(maybeUndefined)
+    MArrayPopShift(MDefinition* object, Mode mode, JSValueType unboxedType,
+                   bool needsHoleCheck, bool maybeUndefined)
+      : MUnaryInstruction(object), mode_(mode), unboxedType_(unboxedType),
+        needsHoleCheck_(needsHoleCheck), maybeUndefined_(maybeUndefined)
     { }
 
   public:
     INSTRUCTION_HEADER(ArrayPopShift)
 
     static MArrayPopShift* New(TempAllocator& alloc, MDefinition* object, Mode mode,
-                               bool needsHoleCheck, bool maybeUndefined)
+                               JSValueType unboxedType, bool needsHoleCheck, bool maybeUndefined)
     {
-        return new(alloc) MArrayPopShift(object, mode, needsHoleCheck, maybeUndefined);
+        return new(alloc) MArrayPopShift(object, mode, unboxedType, needsHoleCheck, maybeUndefined);
     }
 
     MDefinition* object() const {
@@ -8943,8 +8961,12 @@ class MArrayPopShift
     bool mode() const {
         return mode_;
     }
+    JSValueType unboxedType() const {
+        return unboxedType_;
+    }
     AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
+        return AliasSet::Store(AliasSet::ObjectFields |
+                               AliasSet::BoxedOrUnboxedElements(unboxedType()));
     }
 
     ALLOW_CLONE(MArrayPopShift)
@@ -8955,8 +8977,10 @@ class MArrayPush
   : public MBinaryInstruction,
     public MixPolicy<SingleObjectPolicy, NoFloatPolicy<1> >::Data
 {
-    MArrayPush(MDefinition* object, MDefinition* value)
-      : MBinaryInstruction(object, value)
+    JSValueType unboxedType_;
+
+    MArrayPush(MDefinition* object, MDefinition* value, JSValueType unboxedType)
+      : MBinaryInstruction(object, value), unboxedType_(unboxedType)
     {
         setResultType(MIRType_Int32);
     }
@@ -8964,8 +8988,9 @@ class MArrayPush
   public:
     INSTRUCTION_HEADER(ArrayPush)
 
-    static MArrayPush* New(TempAllocator& alloc, MDefinition* object, MDefinition* value) {
-        return new(alloc) MArrayPush(object, value);
+    static MArrayPush* New(TempAllocator& alloc, MDefinition* object, MDefinition* value,
+                           JSValueType unboxedType) {
+        return new(alloc) MArrayPush(object, value, unboxedType);
     }
 
     MDefinition* object() const {
@@ -8974,8 +8999,12 @@ class MArrayPush
     MDefinition* value() const {
         return getOperand(1);
     }
+    JSValueType unboxedType() const {
+        return unboxedType_;
+    }
     AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
+        return AliasSet::Store(AliasSet::ObjectFields |
+                               AliasSet::BoxedOrUnboxedElements(unboxedType()));
     }
     void computeRange(TempAllocator& alloc) override;
 
@@ -8987,14 +9016,16 @@ class MArrayConcat
   : public MBinaryInstruction,
     public MixPolicy<ObjectPolicy<0>, ObjectPolicy<1> >::Data
 {
-    AlwaysTenured<ArrayObject*> templateObj_;
+    AlwaysTenuredObject templateObj_;
     gc::InitialHeap initialHeap_;
+    JSValueType unboxedType_;
 
     MArrayConcat(CompilerConstraintList* constraints, MDefinition* lhs, MDefinition* rhs,
-                 ArrayObject* templateObj, gc::InitialHeap initialHeap)
+                 JSObject* templateObj, gc::InitialHeap initialHeap, JSValueType unboxedType)
       : MBinaryInstruction(lhs, rhs),
         templateObj_(templateObj),
-        initialHeap_(initialHeap)
+        initialHeap_(initialHeap),
+        unboxedType_(unboxedType)
     {
         setResultType(MIRType_Object);
         setResultTypeSet(MakeSingletonTypeSet(constraints, templateObj));
@@ -9005,12 +9036,14 @@ class MArrayConcat
 
     static MArrayConcat* New(TempAllocator& alloc, CompilerConstraintList* constraints,
                              MDefinition* lhs, MDefinition* rhs,
-                             ArrayObject* templateObj, gc::InitialHeap initialHeap)
+                             JSObject* templateObj, gc::InitialHeap initialHeap,
+                             JSValueType unboxedType)
     {
-        return new(alloc) MArrayConcat(constraints, lhs, rhs, templateObj, initialHeap);
+        return new(alloc) MArrayConcat(constraints, lhs, rhs, templateObj,
+                                       initialHeap, unboxedType);
     }
 
-    ArrayObject* templateObj() const {
+    JSObject* templateObj() const {
         return templateObj_;
     }
 
@@ -9018,8 +9051,13 @@ class MArrayConcat
         return initialHeap_;
     }
 
+    JSValueType unboxedType() const {
+        return unboxedType_;
+    }
+
     AliasSet getAliasSet() const override {
-        return AliasSet::Store(AliasSet::Element | AliasSet::ObjectFields);
+        return AliasSet::Store(AliasSet::BoxedOrUnboxedElements(unboxedType()) |
+                               AliasSet::ObjectFields);
     }
     bool possiblyCalls() const override {
         return true;
