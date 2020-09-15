@@ -1501,6 +1501,10 @@
 
             if (aShouldBeRemote)
               tab.setAttribute("remote", "true");
+              // Switching the browser to be remote will connect to a new child
+              // process so the browser can no longer be considered to be
+              // crashed.
+              tab.removeAttribute("crashed");
             else
               tab.removeAttribute("remote");
 

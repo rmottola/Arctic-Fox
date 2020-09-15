@@ -6134,11 +6134,9 @@ function warnAboutClosingWindow() {
     return gBrowser.warnAboutClosingTabs(gBrowser.closingTabsEnum.ALL);
 
   // Figure out if there's at least one other browser window around.
-  let e = Services.wm.getEnumerator("navigator:browser");
   let otherPBWindowExists = false;
   let nonPopupPresent = false;
-  while (e.hasMoreElements()) {
-    let win = e.getNext();
+  for (let win of browserWindows()) {
     if (!win.closed && win != window) {
       if (isPBWindow && PrivateBrowsingUtils.isWindowPrivate(win))
         otherPBWindowExists = true;
