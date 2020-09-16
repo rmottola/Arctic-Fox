@@ -427,6 +427,11 @@
         ]]></getter>
       </property>
 
+      <field name="_permanentKey">({})</field>
+
+      <property name="permanentKey" readonly="true"
+                onget="return this._permanentKey;"/>
+
       <property name="outerWindowID" readonly="true">
         <getter><![CDATA[
           return this.contentWindow
@@ -435,12 +440,6 @@
                      .outerWindowID;
         ]]></getter>
       </property>
-
-      <field name="_permanentKey">({})</field>
-
-      <property name="permanentKey"
-                onget="return this._permanentKey;"
-onset="this._permanentKey = val;"/>
 
       <field name="_lastSearchString">null</field>
       <field name="_lastSearchHighlight">false</field>
