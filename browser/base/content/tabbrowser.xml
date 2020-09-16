@@ -1507,6 +1507,13 @@
             this._tabListeners.set(tab, listener);
             filter.addProgressListener(listener, Ci.nsIWebProgress.NOTIFY_ALL);
 
+            // Switching a browser's remoteness will create a new frameLoader.
+            // As frameLoaders start out with an active docShell we have to
+            // deactivate it if this is not the selected tab's browser or the
+            // browser window is minimized.
+            aBrowser.docShellIsActive = (aBrowser == this.selectedBrowser &&
+                                         window.windowState != window.STATE_MINIMIZED);
+
             // Restore the progress listener.
             aBrowser.webProgress.addProgressListener(filter, Ci.nsIWebProgress.NOTIFY_ALL);
 
