@@ -115,6 +115,9 @@
       <field name="_outerWindowIDBrowserMap">
         new Map();
       </field>
+      <field name="_outerWindowIDBrowserMap">
+        new Map();
+      </field>
       <field name="arrowKeysShouldWrap" readonly="true">
         this.AppConstants.platform == "macosx";
       </field>
@@ -334,6 +337,15 @@
           <![CDATA[
             var tab = this._getTabForContentWindow(aDocument.defaultView);
             return tab ? tab.linkedBrowser : null;
+          ]]>
+        </body>
+      </method>
+
+      <method name="getBrowserForOuterWindowID">
+        <parameter name="aID"/>
+        <body>
+          <![CDATA[
+            return this._outerWindowIDBrowserMap.get(aID);
           ]]>
         </body>
       </method>
@@ -1766,8 +1778,15 @@
               // No preloaded browser found, create one.
               b = this._createBrowser({remote, uriIsAboutBlank});
             }
-            let notificationbox = this.getNotificationBox(b);
 
+            // A remote browser doesn't initially have the outerWindowID
+            // set. Once a remote browser initializes, it sends the Browser:Init
+            // message, and we map the browser at that point.
+            if (!remote) {
+              this._outerWindowIDBrowserMap.set(b.outerWindowID, b);
+            }
+
+            let notificationbox = this.getNotificationBox(b);
             var position = this.tabs.length - 1;
             var uniqueId = "panel" + Date.now() + position;
             notificationbox.id = uniqueId;
@@ -3835,6 +3854,8 @@
               let tab = this.getTabForBrowser(browser);
               if (!tab)
                 return;
+
+              this._outerWindowIDBrowserMap.set(browser.outerWindowID, browser);
               browser.messageManager.sendAsyncMessage("Browser:AppTab", { isAppTab: tab.pinned })
               break;
             }
