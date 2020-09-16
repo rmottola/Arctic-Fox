@@ -59,45 +59,54 @@ add_task(function* test_navigation() {
   info("1");
   // Create a tab and load a remote page in it
   gBrowser.selectedTab = gBrowser.addTab("about:blank", {skipAnimation: true});
+  let {permanentKey} = gBrowser.selectedBrowser;
   yield waitForLoad("http://example.org/" + DUMMY_PATH);
-  is(gBrowser.selectedBrowser.isRemoteBroeser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
 
   info("2");
   // Load another page
   yield waitForLoad("http://example.com/" + DUMMY_PATH);
   is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("3");
   // Load a non-remote page
   yield waitForLoad("about:robots");
   is(gBrowser.selectedBrowser.isRemoteBrowser, "", "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("4");
   // Load a remote page
   yield waitForLoad("http://example.org/" + DUMMY_PATH);
   is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("5");
   yield back();
   is(gBrowser.selectedBrowser.isRemoteBrowser, "", "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("6");
   yield back();
   is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("7");
   yield forward();
   is(gBrowser.selectedBrowser.isRemoteBrowser, "", "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("8");
   yield forward();
   is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
+  is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
   check_history();
 
   info("9");
