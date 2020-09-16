@@ -55,7 +55,7 @@ enum MaybeTailCall {
 // specified. In this case, the return type must be boolean to indicate
 // failure.
 //
-// All functions described by VMFunction take a JSContext * as a first
+// All functions described by VMFunction take a JSContext* as a first
 // argument, and are treated as re-entrant into the VM and therefore fallible.
 struct VMFunction
 {
@@ -66,7 +66,7 @@ struct VMFunction
     // Address of the C function.
     void* wrapped;
 
-    // Number of arguments expected, excluding JSContext * as an implicit
+    // Number of arguments expected, excluding JSContext* as an implicit
     // first argument and an outparam as a possible implicit final argument.
     uint32_t explicitArgs;
 
@@ -636,22 +636,22 @@ class AutoDetectInvalidation
     }
 };
 
-bool InvokeFunction(JSContext *cx, HandleObject obj0, uint32_t argc, Value *argv, Value* rval);
-JSObject *NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-                      size_t ndynamic, const js::Class *clasp);
+bool InvokeFunction(JSContext* cx, HandleObject obj0, uint32_t argc, Value* argv, Value* rval);
+JSObject* NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+                      size_t ndynamic, const js::Class* clasp);
 
-bool CheckOverRecursed(JSContext *cx);
-bool CheckOverRecursedWithExtra(JSContext *cx, BaselineFrame *frame,
+bool CheckOverRecursed(JSContext* cx);
+bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
-bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
-bool SetConst(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
-bool MutatePrototype(JSContext *cx, HandlePlainObject obj, HandleValue value);
-bool InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue value,
-              jsbytecode *pc);
+bool DefVarOrConst(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
+bool SetConst(JSContext* cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
+bool MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value);
+bool InitProp(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
+              jsbytecode* pc);
 
 template<bool Equal>
-bool LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
+bool LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
 
 template<bool Equal>
 bool StrictlyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);

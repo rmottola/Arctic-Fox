@@ -4777,7 +4777,7 @@ CodeGenerator::visitCreateThisWithProto(LCreateThisWithProto* lir)
 
 typedef JSObject* (*NewGCObjectFn)(JSContext* cx, gc::AllocKind allocKind,
                                    gc::InitialHeap initialHeap, size_t ndynamic,
-                                   const js::Class *clasp);
+                                   const js::Class* clasp);
 static const VMFunction NewGCObjectInfo =
     FunctionInfo<NewGCObjectFn>(js::jit::NewGCObject);
 
@@ -4787,14 +4787,14 @@ CodeGenerator::visitCreateThisWithTemplate(LCreateThisWithTemplate* lir)
     JSObject* templateObject = lir->mir()->templateObject();
     gc::AllocKind allocKind = templateObject->asTenured().getAllocKind();
     gc::InitialHeap initialHeap = lir->mir()->initialHeap();
-    const js::Class *clasp = templateObject->getClass();
+    const js::Class* clasp = templateObject->getClass();
     size_t ndynamic = 0;
     if (templateObject->isNative())
         ndynamic = templateObject->as<NativeObject>().numDynamicSlots();
     Register objReg = ToRegister(lir->output());
     Register tempReg = ToRegister(lir->temp());
 
-    OutOfLineCode *ool = oolCallVM(NewGCObjectInfo, lir,
+    OutOfLineCode* ool = oolCallVM(NewGCObjectInfo, lir,
                                    (ArgList(), Imm32(int32_t(allocKind)), Imm32(initialHeap),
                                     Imm32(ndynamic), ImmPtr(clasp)),
                                    StoreRegisterTo(objReg));
@@ -5562,7 +5562,7 @@ CodeGenerator::visitIsNullOrLikeUndefinedAndBranchV(LIsNullOrLikeUndefinedAndBra
 }
 
 void
-CodeGenerator::visitIsNullOrLikeUndefinedT(LIsNullOrLikeUndefinedT * lir)
+CodeGenerator::visitIsNullOrLikeUndefinedT(LIsNullOrLikeUndefinedT* lir)
 {
     MOZ_ASSERT(lir->mir()->compareType() == MCompare::Compare_Undefined ||
                lir->mir()->compareType() == MCompare::Compare_Null);

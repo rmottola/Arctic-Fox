@@ -87,11 +87,11 @@ InvokeFunction(JSContext* cx, HandleObject obj, uint32_t argc, Value* argv, Valu
     return true;
 }
 
-JSObject *
-NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-            size_t ndynamic, const js::Class *clasp)
+JSObject*
+NewGCObject(JSContext* cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
+            size_t ndynamic, const js::Class* clasp)
 {
-    JSObject *obj = js::Allocate<JSObject>(cx, allocKind, ndynamic, initialHeap, clasp);
+    JSObject* obj = js::Allocate<JSObject>(cx, allocKind, ndynamic, initialHeap, clasp);
     if (!obj)
         return nullptr;
 
@@ -193,8 +193,8 @@ MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value)
 }
 
 bool
-InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue value,
-         jsbytecode *pc)
+InitProp(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
+         jsbytecode* pc)
 {
     RootedId id(cx, NameToId(name));
     return InitPropertyOperation(cx, JSOp(*pc), obj, id, value);
@@ -202,7 +202,7 @@ InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue v
 
 template<bool Equal>
 bool
-LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
+LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
 {
     if (!js::LooselyEqual(cx, lhs, rhs, res))
         return false;

@@ -357,7 +357,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     template <typename Source>
     void guardType(const Source& address, TypeSet::Type type, Register scratch, Label* miss);
 
-    void guardTypeSetMightBeIncomplete(Register obj, Register scratch, Label *label);
+    void guardTypeSetMightBeIncomplete(Register obj, Register scratch, Label* label);
 
     void loadObjShape(Register objReg, Register dest) {
         loadPtr(Address(objReg, JSObject::offsetOfShape()), dest);
@@ -384,10 +384,10 @@ class MacroAssembler : public MacroAssemblerSpecific
     void branchTestObjShape(Condition cond, Register obj, Register shape, Label* label) {
         branchPtr(cond, Address(obj, JSObject::offsetOfShape()), shape, label);
     }
-    void branchTestObjGroup(Condition cond, Register obj, ObjectGroup *group, Label *label) {
+    void branchTestObjGroup(Condition cond, Register obj, ObjectGroup* group, Label* label) {
         branchPtr(cond, Address(obj, JSObject::offsetOfGroup()), ImmGCPtr(group), label);
     }
-    void branchTestObjGroup(Condition cond, Register obj, Register group, Label *label) {
+    void branchTestObjGroup(Condition cond, Register obj, Register group, Label* label) {
         branchPtr(cond, Address(obj, JSObject::offsetOfGroup()), group, label);
     }
     void branchTestProxyHandlerFamily(Condition cond, Register proxy, Register scratch,
@@ -610,9 +610,9 @@ class MacroAssembler : public MacroAssemblerSpecific
         branchTest32(Assembler::NonZero, address, Imm32(bit), label);
     }
 
-    void branchIfNotInterpretedConstructor(Register fun, Register scratch, Label *label);
+    void branchIfNotInterpretedConstructor(Register fun, Register scratch, Label* label);
 
-    void bumpKey(Int32Key *key, int diff) {
+    void bumpKey(Int32Key* key, int diff) {
         if (key->isRegister())
             add32(Imm32(diff), key->reg());
         else
@@ -695,8 +695,8 @@ class MacroAssembler : public MacroAssemblerSpecific
                             bool canonicalizeDoubles = true, unsigned numElems = 0);
 
     template<typename T>
-    void loadFromTypedArray(Scalar::Type arrayType, const T &src, const ValueOperand &dest, bool allowDouble,
-                            Register temp, Label *fail);
+    void loadFromTypedArray(Scalar::Type arrayType, const T& src, const ValueOperand& dest, bool allowDouble,
+                            Register temp, Label* fail);
 
     template<typename S, typename T>
     void storeToTypedIntArray(Scalar::Type arrayType, const S& value, const T& dest) {
@@ -720,12 +720,12 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     template<typename T>
-    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T &mem, Register oldval, Register newval,
+    void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem, Register oldval, Register newval,
                                         Register temp, AnyRegister output);
 
     template<typename S, typename T>
-    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S &value,
-                                    const T &mem, Register temp1, Register temp2, AnyRegister output);
+    void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value,
+                                    const T& mem, Register temp1, Register temp2, AnyRegister output);
 
     void storeToTypedFloatArray(Scalar::Type arrayType, FloatRegister value, const BaseIndex& dest,
                                 unsigned numElems = 0);
@@ -796,43 +796,43 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     // Inline allocation.
   private:
-    void checkAllocatorState(Label *fail);
+    void checkAllocatorState(Label* fail);
     bool shouldNurseryAllocate(gc::AllocKind allocKind, gc::InitialHeap initialHeap);
     void nurseryAllocate(Register result, Register temp, gc::AllocKind allocKind,
-                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
-    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
+                         size_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
+    void freeListAllocate(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
     void allocateObject(Register result, Register temp, gc::AllocKind allocKind,
-                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label *fail);
-    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label *fail);
-    void copySlotsFromTemplate(Register obj, const NativeObject *templateObj,
+                        uint32_t nDynamicSlots, gc::InitialHeap initialHeap, Label* fail);
+    void allocateNonObject(Register result, Register temp, gc::AllocKind allocKind, Label* fail);
+    void copySlotsFromTemplate(Register obj, const NativeObject* templateObj,
                                uint32_t start, uint32_t end);
     void fillSlotsWithConstantValue(Address addr, Register temp, uint32_t start, uint32_t end,
-                                    const Value &v);
+                                    const Value& v);
     void fillSlotsWithUndefined(Address addr, Register temp, uint32_t start, uint32_t end);
     void fillSlotsWithUninitialized(Address addr, Register temp, uint32_t start, uint32_t end);
-    void initGCSlots(Register obj, Register temp, NativeObject *templateObj, bool initContents);
+    void initGCSlots(Register obj, Register temp, NativeObject* templateObj, bool initContents);
 
   public:
-    void callMallocStub(size_t nbytes, Register result, Label *fail);
+    void callMallocStub(size_t nbytes, Register result, Label* fail);
     void callFreeStub(Register slots);
-    void createGCObject(Register result, Register temp, JSObject *templateObj,
-                        gc::InitialHeap initialHeap, Label *fail, bool initContents = true,
+    void createGCObject(Register result, Register temp, JSObject* templateObj,
+                        gc::InitialHeap initialHeap, Label* fail, bool initContents = true,
                         bool convertDoubleElements = false);
 
-    void newGCThing(Register result, Register temp, JSObject *templateObj,
-                     gc::InitialHeap initialHeap, Label *fail);
-    void initGCThing(Register obj, Register temp, JSObject *templateObj,
+    void newGCThing(Register result, Register temp, JSObject* templateObj,
+                     gc::InitialHeap initialHeap, Label* fail);
+    void initGCThing(Register obj, Register temp, JSObject* templateObj,
                      bool initContents = true, bool convertDoubleElements = false);
 
-    void initUnboxedObjectContents(Register object, UnboxedPlainObject *templateObject);
+    void initUnboxedObjectContents(Register object, UnboxedPlainObject* templateObject);
 
-    void newGCString(Register result, Register temp, Label *fail);
-    void newGCFatInlineString(Register result, Register temp, Label *fail);
+    void newGCString(Register result, Register temp, Label* fail);
+    void newGCFatInlineString(Register result, Register temp, Label* fail);
 
     // Compares two strings for equality based on the JSOP.
     // This checks for identical pointers, atoms and length and fails for everything else.
     void compareStrings(JSOp op, Register left, Register right, Register result,
-                        Label *fail);
+                        Label* fail);
 
     // If the JitCode that created this assembler needs to transition into the VM,
     // we want to store the JitCode on the stack in order to mark it during a GC.
@@ -849,7 +849,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     // Push stub code, and the VMFunction pointer.
     inline void enterExitFrame(const VMFunction* f = nullptr);
 
-    // The JitCode * argument here is one of the tokens defined in the various
+    // The JitCode* argument here is one of the tokens defined in the various
     // exit frame layout classes, e.g. NativeExitFrameLayout::Token().
     inline void enterFakeExitFrame(JitCode* codeVal);
 
@@ -973,15 +973,15 @@ class MacroAssembler : public MacroAssemblerSpecific
     // On ARM64, sp can function as the zero register depending on context.
     // Code shared across platforms must use these functions to be valid.
     template <typename T>
-    void branchTestStackPtr(Condition cond, T t, Label *label) {
+    void branchTestStackPtr(Condition cond, T t, Label* label) {
         branchTestPtr(cond, getStackPointer(), t, label);
     }
     template <typename T>
-    void branchStackPtr(Condition cond, T rhs, Label *label) {
+    void branchStackPtr(Condition cond, T rhs, Label* label) {
         branchPtr(cond, getStackPointer(), rhs, label);
     }
     template <typename T>
-    void branchStackPtrRhs(Condition cond, T lhs, Label *label) {
+    void branchStackPtrRhs(Condition cond, T lhs, Label* label) {
         branchPtr(cond, lhs, getStackPointer(), label);
     }
 #endif // !JS_CODEGEN_ARM64
