@@ -1886,21 +1886,6 @@
             // Note: Only do this of we still have a docShell. The TabOpen
             // event was dispatched above and a gBrowser.removeTab() call from
             // one of its listeners could cause us to fail here.
-            if (Services.prefs.getPrefType("browser.tabs.remote") == Services.prefs.PREF_BOOL &&
-               !Services.prefs.getBoolPref("browser.tabs.remote")
-               && b.docShell) {
-              this._outerWindowIDBrowserMap.set(b.outerWindowID, b);
-            }
-
-            // When addTab() is called with an URL that is not "about:blank" we
-            // set the "nodefaultsrc" attribute that prevents a frameLoader
-            // from being created as soon as the linked <browser> is inserted
-            // into the DOM. We thus have to register the new outerWindowID
-            // for non-remote browsers after we have called browser.loadURI().
-            //
-            // Note: Only do this of we still have a docShell. The TabOpen
-            // event was dispatched above and a gBrowser.removeTab() call from
-            // one of its listeners could cause us to fail here.
             if (!remote && b.docShell) {
               this._outerWindowIDBrowserMap.set(b.outerWindowID, b);
             }
