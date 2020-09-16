@@ -5278,6 +5278,8 @@ IonBuilder::inlineCallsite(const ObjectVector& targets, CallInfo& callInfo)
         if (target->isSingleton()) {
             // Replace the function with an MConstant.
             MConstant* constFun = constant(ObjectValue(*target));
+            if (callInfo.constructing() && callInfo.getNewTarget() == callInfo.fun())
+                callInfo.setNewTarget(constFun);
             callInfo.setFun(constFun);
         }
 
@@ -6150,7 +6152,7 @@ IonBuilder::jsop_call(uint32_t argc, bool constructing)
         }
     }
 
-    int calleeDepth = -((int)argc + 2);
+    int calleeDepth = -((int)argc + 2 + constructing);
 
     // Acquire known call target if existent.
     ObjectVector targets(alloc());
@@ -6293,10 +6295,13 @@ IonBuilder::makeCallHelper(JSFunction* target, CallInfo& callInfo)
         }
     }
 
-    MCall* call = MCall::New(alloc(), target, targetArgs + 1, callInfo.argc(),
-                             callInfo.constructing(), isDOMCall);
+    MCall* call = MCall::New(alloc(), target, targetArgs + 1 + callInfo.constructing(),
+                             callInfo.argc(), callInfo.constructing(), isDOMCall);
     if (!call)
         return nullptr;
+
+    if (callInfo.constructing())
+        call->addArg(targetArgs + 1, callInfo.getNewTarget());
 
     // Explicitly pad any missing arguments with |undefined|.
     // This permits skipping the argumentsRectifier.
@@ -9437,7 +9442,7 @@ IonBuilder::jsop_rest()
     }
 
     // We know the exact number of arguments the callee pushed.
-    unsigned numActuals = inlineCallInfo_->argv().length();
+    unsigned numActuals = inlineCallInfo_->argc();
     unsigned numFormals = info().nargs() - 1;
     unsigned numRest = numActuals > numFormals ? numActuals - numFormals : 0;
 
