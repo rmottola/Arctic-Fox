@@ -28,6 +28,25 @@ interface nsICacheInfoChannel : nsISupports
   boolean isFromCache();
 
   /**
+   * Set/get the cache key... uniquely identifies the data in the cache
+   * for this channel.  Holding a reference to this key does NOT prevent
+   * the cached data from being removed.
+   *
+   * A cache key retrieved from a particular instance of nsICachingChannel
+   * could be set on another instance of nsICachingChannel provided the
+   * underlying implementations are compatible and provided the new 
+   * channel instance was created with the same URI.  The implementation of
+   * nsICachingChannel would be expected to use the cache entry identified
+   * by the cache token.  Depending on the value of nsIRequest::loadFlags,
+   * the cache entry may be validated, overwritten, or simply read.
+   *
+   * The cache key may be NULL indicating that the URI of the channel is
+   * sufficient to locate the same cache entry.  Setting a NULL cache key
+   * is likewise valid.
+   */
+  attribute nsISupports cacheKey;
+
+  /**
    * Tells the channel to behave as if the LOAD_FROM_CACHE flag has been set,
    * but without affecting the loads for the entire loadGroup in case of this
    * channel being the default load group's channel.
