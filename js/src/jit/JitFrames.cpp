@@ -117,6 +117,9 @@ JitFrameIterator::JitFrameIterator(JSContext* cx)
         current_ = activation_->bailoutData()->fp();
         frameSize_ = activation_->bailoutData()->topFrameSize();
         type_ = JitFrame_Bailout;
+    } else if (activation_->isLazyLinkExitFrame()) {
+        type_ = JitFrame_LazyLink;
+        MOZ_ASSERT(isExitFrameLayout<LazyLinkExitFrameLayout>());
     }
 }
 
@@ -132,6 +135,9 @@ JitFrameIterator::JitFrameIterator(const ActivationIterator& activations)
         current_ = activation_->bailoutData()->fp();
         frameSize_ = activation_->bailoutData()->topFrameSize();
         type_ = JitFrame_Bailout;
+    } else if (activation_->isLazyLinkExitFrame()) {
+        type_ = JitFrame_LazyLink;
+        MOZ_ASSERT(isExitFrameLayout<LazyLinkExitFrameLayout>());
     }
 }
 
@@ -264,6 +270,7 @@ SizeOfFramePrefix(FrameType type)
       case JitFrame_Unwound_Rectifier:
         return IonUnwoundRectifierFrameLayout::Size();
       case JitFrame_Exit:
+      case JitFrame_LazyLink:
         return ExitFrameLayout::Size();
       case JitFrame_IonAccessorIC:
       case JitFrame_Unwound_IonAccessorIC:
@@ -949,6 +956,7 @@ EnsureExitFrame(CommonFrameLayout* frame)
 
       case JitFrame_Exit:
       case JitFrame_Bailout:
+      case JitFrame_LazyLink:
         // Fall-through to MOZ_CRASH below.
         break;
     }
@@ -1489,6 +1497,7 @@ MarkJitActivation(JSTracer* trc, const JitActivationIterator& activations)
     for (JitFrameIterator frames(activations); !frames.done(); ++frames) {
         switch (frames.type()) {
           case JitFrame_Exit:
+          case JitFrame_LazyLink:
             MarkJitExitFrame(trc, frames);
             break;
           case JitFrame_BaselineJS:
@@ -1563,7 +1572,7 @@ GetPcScript(JSContext* cx, JSScript** scriptRes, jsbytecode** pcRes)
     JitActivationIterator iter(rt);
     JitFrameIterator it(iter);
     uint8_t* retAddr;
-    if (it.type() == JitFrame_Exit) {
+    if (it.isExitFrame()) {
         ++it;
 
         // Skip rectifier frames.
@@ -2768,6 +2777,7 @@ JitFrameIterator::dump() const
         fprintf(stderr, "Warning! Unwound JS frames are not observable.\n");
         break;
       case JitFrame_Exit:
+      case JitFrame_LazyLink:
         break;
     };
     fputc('\n', stderr);
@@ -3207,7 +3217,7 @@ AssertJitStackInvariants(JSContext* cx)
                   "The frame size is optimal");
             }
 
-            if (frames.type() == JitFrame_Exit) {
+            if (frames.isExitFrame()) {
                 // For the moment, we do not keep the JitStackAlignment
                 // alignment for exit frames.
                 frameSize -= ExitFrameLayout::Size();
