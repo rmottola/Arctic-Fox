@@ -299,27 +299,27 @@ class NewObjectCache
      * nullptr if returning the object could possibly trigger GC (does not
      * indicate failure).
      */
-    inline NativeObject *newObjectFromHit(JSContext *cx, EntryIndex entry, js::gc::InitialHeap heap);
+    inline NativeObject* newObjectFromHit(JSContext* cx, EntryIndex entry, js::gc::InitialHeap heap);
 
     /* Fill an entry after a cache miss. */
-    void fillProto(EntryIndex entry, const Class *clasp, js::TaggedProto proto,
-                   gc::AllocKind kind, NativeObject *obj);
+    void fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto proto,
+                   gc::AllocKind kind, NativeObject* obj);
 
-    inline void fillGlobal(EntryIndex entry, const Class *clasp, js::GlobalObject *global,
-                           gc::AllocKind kind, NativeObject *obj);
+    inline void fillGlobal(EntryIndex entry, const Class* clasp, js::GlobalObject* global,
+                           gc::AllocKind kind, NativeObject* obj);
 
-    void fillGroup(EntryIndex entry, js::ObjectGroup *group, gc::AllocKind kind,
-                   NativeObject *obj)
+    void fillGroup(EntryIndex entry, js::ObjectGroup* group, gc::AllocKind kind,
+                   NativeObject* obj)
     {
         MOZ_ASSERT(obj->group() == group);
         return fill(entry, group->clasp(), group, kind, obj);
     }
 
     /* Invalidate any entries which might produce an object with shape/proto. */
-    void invalidateEntriesForShape(JSContext *cx, HandleShape shape, HandleObject proto);
+    void invalidateEntriesForShape(JSContext* cx, HandleShape shape, HandleObject proto);
 
   private:
-    EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
+    EntryIndex makeIndex(const Class* clasp, gc::Cell* key, gc::AllocKind kind) {
         uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + size_t(kind);
         return hash % mozilla::ArrayLength(entries);
     }
@@ -679,14 +679,14 @@ struct JSRuntime : public JS::shadow::Runtime,
      * New activations will reset this to nullptr on construction after getting
      * the current value, and will restore the previous value on destruction.
      */
-    js::SavedFrame *asyncStackForNewActivations;
+    js::SavedFrame* asyncStackForNewActivations;
 
     /*
      * Value of asyncCause to be attached to asyncStackForNewActivations.
      */
-    JSString *asyncCauseForNewActivations;
+    JSString* asyncCauseForNewActivations;
 
-    js::Activation *const *addressOfActivation() const {
+    js::Activation* const* addressOfActivation() const {
         return &activation_;
     }
     static unsigned offsetOfActivation() {
