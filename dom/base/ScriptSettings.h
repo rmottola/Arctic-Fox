@@ -16,6 +16,7 @@
 #include "mozilla/Maybe.h"
 
 #include "jsapi.h"
+#include "js/Debug.h"
 
 class nsPIDOMWindow;
 class nsGlobalWindow;
@@ -352,6 +353,30 @@ public:
   }
 
 private:
+  // A subclass of AutoEntryMonitor that notifies the docshell.
+  class DocshellEntryMonitor : public JS::dbg::AutoEntryMonitor
+  {
+  public:
+    DocshellEntryMonitor(JSContext* aCx, const char* aReason);
+
+    void Entry(JSContext* aCx, JSFunction* aFunction) override
+    {
+      Entry(aCx, aFunction, nullptr);
+    }
+
+    void Entry(JSContext* aCx, JSScript* aScript) override
+    {
+      Entry(aCx, nullptr, aScript);
+    }
+
+    void Exit(JSContext* aCx) override;
+
+  private:
+    void Entry(JSContext* aCx, JSFunction* aFunction, JSScript* aScript);
+
+    const char* mReason;
+  };
+
   // It's safe to make this a weak pointer, since it's the subject principal
   // when we go on the stack, so can't go away until after we're gone.  In
   // particular, this is only used from the CallSetup constructor, and only in
@@ -362,7 +387,7 @@ private:
   nsIPrincipal* MOZ_NON_OWNING_REF mWebIDLCallerPrincipal;
   friend nsIPrincipal* GetWebIDLCallerPrincipal();
 
-  nsCOMPtr<nsIDocShell> mDocShellForJSRunToCompletion;
+  Maybe<DocshellEntryMonitor> mDocShellEntryMonitor;
 };
 
 /*
