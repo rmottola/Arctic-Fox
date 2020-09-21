@@ -307,13 +307,13 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::In_Native: {
-        ICIn_Native *inStub = toIn_Native();
+        ICIn_Native* inStub = toIn_Native();
         TraceEdge(trc, &inStub->shape(), "baseline-innative-stub-shape");
         TraceEdge(trc, &inStub->name(), "baseline-innative-stub-name");
         break;
       }
       case ICStub::In_NativePrototype: {
-        ICIn_NativePrototype *inStub = toIn_NativePrototype();
+        ICIn_NativePrototype* inStub = toIn_NativePrototype();
         TraceEdge(trc, &inStub->shape(), "baseline-innativeproto-stub-shape");
         TraceEdge(trc, &inStub->name(), "baseline-innativeproto-stub-name");
         TraceEdge(trc, &inStub->holder(), "baseline-innativeproto-stub-holder");
@@ -321,7 +321,7 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::In_NativeDoesNotExist: {
-        ICIn_NativeDoesNotExist *inStub = toIn_NativeDoesNotExist();
+        ICIn_NativeDoesNotExist* inStub = toIn_NativeDoesNotExist();
         TraceEdge(trc, &inStub->name(), "baseline-innativedoesnotexist-stub-name");
         JS_STATIC_ASSERT(ICIn_NativeDoesNotExist::MAX_PROTO_CHAIN_DEPTH == 8);
         switch (inStub->protoChainDepth()) {
@@ -339,7 +339,7 @@ ICStub::trace(JSTracer* trc)
         break;
       }
       case ICStub::In_Dense: {
-        ICIn_Dense *inStub = toIn_Dense();
+        ICIn_Dense* inStub = toIn_Dense();
         TraceEdge(trc, &inStub->shape(), "baseline-in-dense-shape");
         break;
       }
@@ -3800,7 +3800,7 @@ ArgumentsGetElemStubExists(ICGetElem_Fallback* stub, ICGetElem_Arguments::Which 
 }
 
 static bool
-IsOptimizableElementPropertyName(JSContext *cx, HandleValue key, MutableHandleId idp)
+IsOptimizableElementPropertyName(JSContext* cx, HandleValue key, MutableHandleId idp)
 {
     if (!key.isString())
         return false;
@@ -6023,8 +6023,8 @@ ICSetElem_TypedArray::Compiler::generateStubCode(MacroAssembler& masm)
 //
 
 static bool
-TryAttachDenseInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
-                     HandleValue key, HandleObject obj, bool *attached)
+TryAttachDenseInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
+                     HandleValue key, HandleObject obj, bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
@@ -6033,7 +6033,7 @@ TryAttachDenseInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
 
     JitSpew(JitSpew_BaselineIC, "  Generating In(Native[Int32] dense) stub");
     ICIn_Dense::Compiler compiler(cx, obj->as<NativeObject>().lastProperty());
-    ICStub *denseStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* denseStub = compiler.getStub(compiler.getStubSpace(script));
     if (!denseStub)
         return false;
 
@@ -6043,8 +6043,8 @@ TryAttachDenseInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
 }
 
 static bool
-TryAttachNativeInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
-                      HandleValue key, HandleObject obj, bool *attached)
+TryAttachNativeInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
+                      HandleValue key, HandleObject obj, bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
@@ -6064,7 +6064,7 @@ TryAttachNativeInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
         JitSpew(JitSpew_BaselineIC, "  Generating In(Native %s) stub",
                     (obj == holder) ? "direct" : "prototype");
         ICInNativeCompiler compiler(cx, kind, obj, holder, name);
-        ICStub *newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
         if (!newStub)
             return false;
 
@@ -6077,9 +6077,9 @@ TryAttachNativeInStub(JSContext *cx, HandleScript script, ICIn_Fallback *stub,
 }
 
 static bool
-TryAttachNativeInDoesNotExistStub(JSContext *cx, HandleScript script,
-                                  ICIn_Fallback *stub, HandleValue key,
-                                  HandleObject obj, bool *attached)
+TryAttachNativeInDoesNotExistStub(JSContext* cx, HandleScript script,
+                                  ICIn_Fallback* stub, HandleValue key,
+                                  HandleObject obj, bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
@@ -6101,7 +6101,7 @@ TryAttachNativeInDoesNotExistStub(JSContext *cx, HandleScript script,
     // Confirmed no-such-property. Add stub.
     JitSpew(JitSpew_BaselineIC, "  Generating In_NativeDoesNotExist stub");
     ICInNativeDoesNotExistCompiler compiler(cx, obj, name, protoChainDepth);
-    ICStub *newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
     if (!newStub)
         return false;
 
@@ -6111,7 +6111,7 @@ TryAttachNativeInDoesNotExistStub(JSContext *cx, HandleScript script,
 }
 
 static bool
-DoInFallback(JSContext *cx, BaselineFrame *frame, ICIn_Fallback *stub_,
+DoInFallback(JSContext* cx, BaselineFrame* frame, ICIn_Fallback* stub_,
              HandleValue key, HandleValue objValue, MutableHandleValue res)
 {
     // This fallback stub may trigger debug mode toggling.
@@ -6160,7 +6160,7 @@ DoInFallback(JSContext *cx, BaselineFrame *frame, ICIn_Fallback *stub_,
     return true;
 }
 
-typedef bool (*DoInFallbackFn)(JSContext *, BaselineFrame *, ICIn_Fallback *, HandleValue,
+typedef bool (*DoInFallbackFn)(JSContext* , BaselineFrame* , ICIn_Fallback* , HandleValue,
                                HandleValue, MutableHandleValue);
 static const VMFunction DoInFallbackInfo =
     FunctionInfo<DoInFallbackFn>(DoInFallback, TailCall, PopValues(2));
@@ -6228,8 +6228,8 @@ ICInNativeCompiler::generateStubCode(MacroAssembler &masm)
     return true;
 }
 
-ICStub *
-ICInNativeDoesNotExistCompiler::getStub(ICStubSpace *space)
+ICStub*
+ICInNativeDoesNotExistCompiler::getStub(ICStubSpace* space)
 {
     AutoShapeVector shapes(cx);
     if (!shapes.append(obj_->as<NativeObject>().lastProperty()))
@@ -6240,7 +6240,7 @@ ICInNativeDoesNotExistCompiler::getStub(ICStubSpace *space)
 
     JS_STATIC_ASSERT(ICIn_NativeDoesNotExist::MAX_PROTO_CHAIN_DEPTH == 8);
 
-    ICStub *stub = nullptr;
+    ICStub* stub = nullptr;
     switch (protoChainDepth_) {
       case 0: stub = getStubSpecific<0>(space, &shapes); break;
       case 1: stub = getStubSpecific<1>(space, &shapes); break;
@@ -7478,10 +7478,10 @@ TryAttachPrimitiveGetPropStub(JSContext* cx, HandleScript script, jsbytecode* pc
 }
 
 static bool
-TryAttachNativeGetPropDoesNotExistStub(JSContext *cx, HandleScript script,
-                                       jsbytecode *pc, ICGetProp_Fallback *stub,
+TryAttachNativeGetPropDoesNotExistStub(JSContext* cx, HandleScript script,
+                                       jsbytecode* pc, ICGetProp_Fallback* stub,
                                        HandlePropertyName name, HandleValue val,
-                                       bool *attached)
+                                       bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
@@ -12560,7 +12560,7 @@ ICGetElem_Dense::Clone(JSContext* cx, ICStubSpace* space, ICStub* firstMonitorSt
 }
 
 ICGetElem_UnboxedArray::ICGetElem_UnboxedArray(JitCode* stubCode, ICStub* firstMonitorStub,
-                                               ObjectGroup *group)
+                                               ObjectGroup* group)
   : ICMonitoredStub(GetElem_UnboxedArray, stubCode, firstMonitorStub),
     group_(group)
 { }
@@ -12623,14 +12623,14 @@ ICSetElem_TypedArray::ICSetElem_TypedArray(JitCode* stubCode, Shape* shape, Scal
     extra_ |= (static_cast<uint16_t>(expectOutOfBounds) << 8);
 }
 
-ICInNativeStub::ICInNativeStub(ICStub::Kind kind, JitCode *stubCode, HandleShape shape,
+ICInNativeStub::ICInNativeStub(ICStub::Kind kind, JitCode* stubCode, HandleShape shape,
                                HandlePropertyName name)
   : ICStub(kind, stubCode),
     shape_(shape),
     name_(name)
 { }
 
-ICIn_NativePrototype::ICIn_NativePrototype(JitCode *stubCode, HandleShape shape,
+ICIn_NativePrototype::ICIn_NativePrototype(JitCode* stubCode, HandleShape shape,
                                            HandlePropertyName name, HandleObject holder,
                                            HandleShape holderShape)
   : ICInNativeStub(In_NativePrototype, stubCode, shape, name),
@@ -12638,7 +12638,7 @@ ICIn_NativePrototype::ICIn_NativePrototype(JitCode *stubCode, HandleShape shape,
     holderShape_(holderShape)
 { }
 
-ICIn_NativeDoesNotExist::ICIn_NativeDoesNotExist(JitCode *stubCode, size_t protoChainDepth,
+ICIn_NativeDoesNotExist::ICIn_NativeDoesNotExist(JitCode* stubCode, size_t protoChainDepth,
                                                  HandlePropertyName name)
   : ICStub(In_NativeDoesNotExist, stubCode),
     name_(name)
@@ -12658,7 +12658,7 @@ ICIn_NativeDoesNotExist::offsetOfShape(size_t idx)
 
 template <size_t ProtoChainDepth>
 ICIn_NativeDoesNotExistImpl<ProtoChainDepth>::ICIn_NativeDoesNotExistImpl(
-        JitCode *stubCode, const AutoShapeVector *shapes, HandlePropertyName name)
+        JitCode* stubCode, const AutoShapeVector* shapes, HandlePropertyName name)
   : ICIn_NativeDoesNotExist(stubCode, ProtoChainDepth, name)
 {
     MOZ_ASSERT(shapes->length() == NumShapes);
@@ -12667,7 +12667,7 @@ ICIn_NativeDoesNotExistImpl<ProtoChainDepth>::ICIn_NativeDoesNotExistImpl(
 }
 
 ICInNativeDoesNotExistCompiler::ICInNativeDoesNotExistCompiler(
-        JSContext *cx, HandleObject obj, HandlePropertyName name, size_t protoChainDepth)
+        JSContext* cx, HandleObject obj, HandlePropertyName name, size_t protoChainDepth)
   : ICStubCompiler(cx, ICStub::In_NativeDoesNotExist),
     obj_(cx, obj),
     name_(cx, name),
@@ -12676,7 +12676,7 @@ ICInNativeDoesNotExistCompiler::ICInNativeDoesNotExistCompiler(
     MOZ_ASSERT(protoChainDepth_ <= ICIn_NativeDoesNotExist::MAX_PROTO_CHAIN_DEPTH);
 }
 
-ICIn_Dense::ICIn_Dense(JitCode *stubCode, HandleShape shape)
+ICIn_Dense::ICIn_Dense(JitCode* stubCode, HandleShape shape)
   : ICStub(In_Dense, stubCode),
     shape_(shape)
 { }
