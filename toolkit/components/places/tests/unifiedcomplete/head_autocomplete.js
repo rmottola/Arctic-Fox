@@ -223,7 +223,8 @@ function addBookmark(aBookmarkObj) {
                                           PlacesUtils.bookmarks.DEFAULT_INDEX,
                                           aBookmarkObj.title || "A bookmark");
   if (aBookmarkObj.keyword) {
-    PlacesUtils.bookmarks.setKeywordForBookmark(itemId, aBookmarkObj.keyword);
+    yield PlacesUtils.keywords.insert({ keyword: aBookmarkObj.keyword,
+                                        url: aBookmarkObj.uri.spec });
   }
 
   if (aBookmarkObj.tags) {
