@@ -3278,8 +3278,8 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
         // The property did not exist before, now we can try to inline the property add.
         bool checkTypeset;
         if (!addedSetterStub && canCache == MaybeCanAttachAddSlot &&
-        IsPropertyAddInlineable(&obj->as<NativeObject>(), id, cache.value(), oldShape,
-                                cache.needsTypeBarrier(), &checkTypeset))
+            IsPropertyAddInlineable(&obj->as<NativeObject>(), id, cache.value(), oldShape,
+                                    cache.needsTypeBarrier(), &checkTypeset))
     {
         if (!cache.attachAddSlot(cx, outerScript, ion, obj, oldShape, oldGroup, checkTypeset))
             return false;
