@@ -2808,7 +2808,7 @@ CASE(JSOP_STRICTSETPROP_SUPER)
 
     RootedValue& receiver = rootValue0;
     receiver = REGS.sp[-3];
-    
+
     RootedObject& obj = rootObject0;
     obj = &REGS.sp[-2].toObject();
 
@@ -4005,7 +4005,7 @@ CASE(JSOP_INITHOMEOBJECT)
     /* Load the function to be initialized */
     RootedFunction& func = rootFunction0;
     func = &REGS.sp[-1].toObject().as<JSFunction>();
-    MOZ_ASSERT(func->isMethod());
+    MOZ_ASSERT(func->allowSuperProperty());
 
     /* Load the home object */
     RootedNativeObject& obj = rootNativeObject0;
@@ -4022,7 +4022,14 @@ CASE(JSOP_SUPERBASE)
     for (; !si.done(); ++si) {
         if (si.hasScopeObject() && si.type() == ScopeIter::Call) {
             JSFunction& callee = si.scope().as<CallObject>().callee();
-            MOZ_ASSERT(callee.isMethod());
+
+            // Arrow functions don't have the information we're looking for,
+            // their enclosing scopes do. Nevertheless, they might have call
+            // objects. Skip them to find what we came for.
+            if (callee.isArrow())
+                continue;
+
+            MOZ_ASSERT(callee.allowSuperProperty());
             MOZ_ASSERT(callee.nonLazyScript()->needsHomeObject());
             const Value& homeObjVal = callee.getExtendedSlot(FunctionExtended::METHOD_HOMEOBJECT_SLOT);
 
@@ -4637,10 +4644,8 @@ js::SpreadCallOperation(JSContext* cx, HandleScript script, jsbytecode* pc, Hand
     if (!GetElements(cx, aobj, length, args.array()))
         return false;
 
-    if (constructing) {
-        MOZ_ASSERT(newTarget.isObject());
+    if (constructing)
         args.newTarget().set(newTarget);
-    }
 
     switch (op) {
       case JSOP_SPREADNEW:
