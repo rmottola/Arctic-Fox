@@ -19,6 +19,7 @@ namespace gfx {
 
 enum class VRHMDType : uint16_t {
   Oculus,
+  Cardboard,
   NumHMDTypes
 };
 
