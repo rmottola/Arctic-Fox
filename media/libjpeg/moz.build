@@ -150,8 +150,6 @@ else: # No SIMD support?
         'jsimd_none.c',
     ]
 
-MSVC_ENABLE_PGO = True
-
 ASFLAGS += CONFIG['LIBJPEG_TURBO_ASFLAGS']
 ASFLAGS += ['-I%s/media/libjpeg/simd/' % TOPSRCDIR]
 

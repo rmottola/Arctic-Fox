@@ -62,8 +62,6 @@ UNIFIED_SOURCES += [
     'hb-warning.cc',
 ]
 
-MSVC_ENABLE_PGO = True
-
 if 'gtk' in CONFIG['MOZ_WIDGET_TOOLKIT']:
     EXPORTS.harfbuzz += [
         'hb-glib.h',
