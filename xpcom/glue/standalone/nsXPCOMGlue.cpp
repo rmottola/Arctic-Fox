@@ -571,7 +571,7 @@ NS_NewNativeLocalFile(const nsACString& aPath, bool aFollowLinks,
 }
 
 XPCOM_API(nsresult)
-NS_GetDebug(nsIDebug** aResult)
+NS_GetDebug(nsIDebug2** aResult)
 {
   if (!xpcomFunctions.getDebug) {
     return NS_ERROR_NOT_INITIALIZED;
