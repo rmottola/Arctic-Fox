@@ -114,21 +114,21 @@ class RegisterDump
 // Information needed to recover machine register state.
 class MachineState
 {
-    mozilla::Array<Registers::RegisterContent *, Registers::Total> regs_;
-    mozilla::Array<FloatRegisters::RegisterContent *, FloatRegisters::Total> fpregs_;
+    mozilla::Array<Registers::RegisterContent*, Registers::Total> regs_;
+    mozilla::Array<FloatRegisters::RegisterContent*, FloatRegisters::Total> fpregs_;
 
   public:
-    static MachineState FromBailout(RegisterDump::GPRArray &regs, RegisterDump::FPUArray &fpregs);
+    static MachineState FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& fpregs);
 
-    void setRegisterLocation(Register reg, uintptr_t *up) {
-        regs_[reg.code()] = (Registers::RegisterContent *) up;
+    void setRegisterLocation(Register reg, uintptr_t* up) {
+        regs_[reg.code()] = (Registers::RegisterContent* ) up;
     }
-    void setRegisterLocation(FloatRegister reg, float *fp) {
+    void setRegisterLocation(FloatRegister reg, float* fp) {
         MOZ_ASSERT(reg.isSingle());
-        fpregs_[reg.code()] = (FloatRegisters::RegisterContent *) fp;
+        fpregs_[reg.code()] = (FloatRegisters::RegisterContent*) fp;
     }
-    void setRegisterLocation(FloatRegister reg, double *dp) {
-        fpregs_[reg.code()] = (FloatRegisters::RegisterContent *) dp;
+    void setRegisterLocation(FloatRegister reg, double* dp) {
+        fpregs_[reg.code()] = (FloatRegisters::RegisterContent*) dp;
     }
     void setRegisterLocation(FloatRegister reg, FloatRegisters::RegisterContent* rp) {
         fpregs_[reg.code()] = rp;
