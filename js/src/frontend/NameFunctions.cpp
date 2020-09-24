@@ -351,7 +351,6 @@ class NameResolver
           case PNK_DIVASSIGN:
           case PNK_MODASSIGN:
           case PNK_ELEM:
-          case PNK_LETEXPR:
           case PNK_IMPORT_SPEC:
           case PNK_EXPORT_SPEC:
           case PNK_COLON:
