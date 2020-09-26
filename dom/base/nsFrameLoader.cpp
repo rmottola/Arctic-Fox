@@ -164,7 +164,7 @@ nsFrameLoader::~nsFrameLoader()
   if (mMessageManager) {
     mMessageManager->Disconnect();
   }
-  nsFrameLoader::Destroy();
+  MOZ_RELEASE_ASSERT(mDestroyCalled);
 }
 
 nsFrameLoader*
