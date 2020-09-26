@@ -52,6 +52,8 @@ NewObjectCache::newObjectFromHit(JSContext* cx, EntryIndex entryIndex, gc::Initi
     // on the templateObj, which is not a GC thing and can't use runtimeFromAnyThread.
     ObjectGroup* group = templateObj->group_;
 
+    MOZ_ASSERT(!group->hasUnanalyzedPreliminaryObjects());
+
     if (group->shouldPreTenure())
         heap = gc::TenuredHeap;
 
@@ -60,8 +62,11 @@ NewObjectCache::newObjectFromHit(JSContext* cx, EntryIndex entryIndex, gc::Initi
 
     NativeObject* obj = static_cast<NativeObject*>(Allocate<JSObject, NoGC>(cx, entry->kind, 0,
                                                                              heap, group->clasp()));
-    if (!obj)
+    if (!obj) {
+        // It's expected that this can return nullptr.
+        cx->recoverFromOutOfMemory();
         return nullptr;
+    }
 
     copyCachedToObject(obj, templateObj, entry->kind);
 

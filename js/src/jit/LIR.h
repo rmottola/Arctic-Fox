@@ -32,9 +32,7 @@ class LStackSlot;
 class LArgument;
 class LConstantIndex;
 class MBasicBlock;
-class MTableSwitch;
 class MIRGenerator;
-class MSnapshot;
 
 static const uint32_t VREG_INCREMENT = 1;
 
@@ -107,14 +105,6 @@ class LAllocation : public TempObject
     LAllocation() : bits_(0)
     {
         MOZ_ASSERT(isBogus());
-    }
-
-    static LAllocation* New(TempAllocator& alloc) {
-        return new(alloc) LAllocation();
-    }
-    template <typename T>
-    static LAllocation* New(TempAllocator& alloc, const T& other) {
-        return new(alloc) LAllocation(other);
     }
 
     // The value pointer must be rooted in MIR and have its low bits cleared.
@@ -712,11 +702,11 @@ class LNode
         return false;
     }
 
-    virtual void dump(FILE* fp);
+    virtual void dump(GenericPrinter& out);
     void dump();
-    static void printName(FILE* fp, Opcode op);
-    virtual void printName(FILE* fp);
-    virtual void printOperands(FILE* fp);
+    static void printName(GenericPrinter& out, Opcode op);
+    virtual void printName(GenericPrinter& out);
+    virtual void printOperands(GenericPrinter& out);
 
   public:
     // Opcode testing and casts.
@@ -958,7 +948,6 @@ class LBlock
         instructions_.insertAfter(at, ins);
     }
     void insertBefore(LInstruction* at, LInstruction* ins) {
-        MOZ_ASSERT(!at->isLabel());
         instructions_.insertBefore(at, ins);
     }
     const LNode* firstElementWithId() const {
@@ -994,13 +983,10 @@ class LBlock
     // Test whether this basic block is empty except for a simple goto, and
     // which is not forming a loop. No code will be emitted for such blocks.
     bool isTrivial() {
-        LInstructionIterator ins(begin());
-        while (ins->isLabel())
-            ++ins;
-        return ins->isGoto() && !mir()->isLoopHeader();
+        return begin()->isGoto() && !mir()->isLoopHeader();
     }
 
-    void dump(FILE* fp);
+    void dump(GenericPrinter& out);
     void dump();
 };
 
@@ -1813,7 +1799,7 @@ class LIRGraph
         return safepoints_[i];
     }
 
-    void dump(FILE* fp);
+    void dump(GenericPrinter& out);
     void dump();
 };
 

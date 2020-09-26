@@ -146,7 +146,7 @@ NativeObject::ensureDenseInitializedLength(ExclusiveContext* cx, uint32_t index,
     ensureDenseInitializedLengthNoPackedCheck(cx, index, extra);
 }
 
-NativeObject::EnsureDenseResult
+DenseElementResult
 NativeObject::extendDenseElements(ExclusiveContext* cx,
                                   uint32_t requiredCapacity, uint32_t extra)
 {
@@ -159,7 +159,7 @@ NativeObject::extendDenseElements(ExclusiveContext* cx,
      */
     if (!nonProxyIsExtensible() || watched()) {
         MOZ_ASSERT(getDenseCapacity() == 0);
-        return ED_SPARSE;
+        return DenseElementResult::Incomplete;
     }
 
     /*
@@ -168,7 +168,7 @@ NativeObject::extendDenseElements(ExclusiveContext* cx,
      * every time a new index is added.
      */
     if (isIndexed())
-        return ED_SPARSE;
+        return DenseElementResult::Incomplete;
 
     /*
      * We use the extra argument also as a hint about number of non-hole
@@ -176,16 +176,16 @@ NativeObject::extendDenseElements(ExclusiveContext* cx,
      */
     if (requiredCapacity > MIN_SPARSE_INDEX &&
         willBeSparseElements(requiredCapacity, extra)) {
-        return ED_SPARSE;
+        return DenseElementResult::Incomplete;
     }
 
     if (!growElements(cx, requiredCapacity))
-        return ED_FAILED;
+        return DenseElementResult::Failure;
 
-    return ED_OK;
+    return DenseElementResult::Success;
 }
 
-inline NativeObject::EnsureDenseResult
+inline DenseElementResult
 NativeObject::ensureDenseElements(ExclusiveContext* cx, uint32_t index, uint32_t extra)
 {
     MOZ_ASSERT(isNative());
@@ -194,7 +194,7 @@ NativeObject::ensureDenseElements(ExclusiveContext* cx, uint32_t index, uint32_t
         markDenseElementsNotPacked(cx);
 
     if (!maybeCopyElementsForWrite(cx))
-        return ED_FAILED;
+        return DenseElementResult::Failure;
 
     uint32_t currentCapacity = getDenseCapacity();
 
@@ -203,31 +203,31 @@ NativeObject::ensureDenseElements(ExclusiveContext* cx, uint32_t index, uint32_t
         /* Optimize for the common case. */
         if (index < currentCapacity) {
             ensureDenseInitializedLengthNoPackedCheck(cx, index, 1);
-            return ED_OK;
+            return DenseElementResult::Success;
         }
         requiredCapacity = index + 1;
         if (requiredCapacity == 0) {
             /* Overflow. */
-            return ED_SPARSE;
+            return DenseElementResult::Incomplete;
         }
     } else {
         requiredCapacity = index + extra;
         if (requiredCapacity < index) {
             /* Overflow. */
-            return ED_SPARSE;
+            return DenseElementResult::Incomplete;
         }
         if (requiredCapacity <= currentCapacity) {
             ensureDenseInitializedLengthNoPackedCheck(cx, index, extra);
-            return ED_OK;
+            return DenseElementResult::Success;
         }
     }
 
-    EnsureDenseResult edr = extendDenseElements(cx, requiredCapacity, extra);
-    if (edr != ED_OK)
-        return edr;
+    DenseElementResult result = extendDenseElements(cx, requiredCapacity, extra);
+    if (result != DenseElementResult::Success)
+        return result;
 
     ensureDenseInitializedLengthNoPackedCheck(cx, index, extra);
-    return ED_OK;
+    return DenseElementResult::Success;
 }
 
 inline Value
@@ -414,6 +414,11 @@ CallResolveOp(JSContext* cx, HandleNativeObject obj, HandleId id, MutableHandleS
     if (!resolved)
         return true;
 
+    // Assert the mayResolve hook, if there is one, returns true for this
+    // property.
+    MOZ_ASSERT_IF(obj->getClass()->mayResolve,
+                  obj->getClass()->mayResolve(cx->names(), id, obj));
+
     if (JSID_IS_INT(id) && obj->containsDenseElement(JSID_TO_INT(id))) {
         MarkDenseOrTypedArrayElementFound<CanGC>(propp);
         return true;
@@ -422,6 +427,28 @@ CallResolveOp(JSContext* cx, HandleNativeObject obj, HandleId id, MutableHandleS
     MOZ_ASSERT(!IsAnyTypedArray(obj));
 
     propp.set(obj->lookup(cx, id));
+    return true;
+}
+
+static MOZ_ALWAYS_INLINE bool
+ClassMayResolveId(const JSAtomState& names, const Class* clasp, jsid id, JSObject* maybeObj)
+{
+    MOZ_ASSERT_IF(maybeObj, maybeObj->getClass() == clasp);
+
+    if (!clasp->resolve) {
+        // Sanity check: we should only have a mayResolve hook if we have a
+        // resolve hook.
+        MOZ_ASSERT(!clasp->mayResolve, "Class with mayResolve hook but no resolve hook");
+        return false;
+    }
+
+    if (clasp->mayResolve) {
+        // Tell the analysis our mayResolve hooks won't trigger GC.
+        JS::AutoSuppressGCAnalysis nogc;
+        if (!clasp->mayResolve(names, id, maybeObj))
+            return false;
+    }
+
     return true;
 }
 
@@ -574,14 +601,6 @@ LookupPropertyInline(ExclusiveContext* cx,
     objp.set(nullptr);
     propp.set(nullptr);
     return true;
-}
-
-inline bool
-NativeLookupProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
-                     MutableHandleObject objp, MutableHandleShape propp)
-{
-    RootedId id(cx, NameToId(name));
-    return NativeLookupProperty<CanGC>(cx, obj, id, objp, propp);
 }
 
 inline bool

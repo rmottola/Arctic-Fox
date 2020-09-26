@@ -350,7 +350,7 @@ class SharedTypedArrayObjectTemplate : public SharedTypedArrayObject
         unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
 
         Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
-        JSObject *getter = NewNativeFunction(cx, native, 0, NullPtr());
+        JSObject* getter = NewNativeFunction(cx, native, 0, nullptr);
         if (!getter)
             return false;
 
@@ -690,7 +690,7 @@ IMPL_SHARED_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
 #define SHARED_TYPED_ARRAY_CLASS_SPEC(_typedArray)                             \
 {                                                                              \
     GenericCreateConstructor<Shared##_typedArray##Object::class_constructor, 3, \
-                             JSFunction::FinalizeKind>,                        \
+                             gc::AllocKind::FUNCTION>,                         \
     Shared##_typedArray##Object::CreatePrototype,                              \
     nullptr,                                                                   \
     nullptr,                                                                   \
@@ -711,6 +711,7 @@ IMPL_SHARED_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                 /* setProperty */                                 \
     nullptr,                 /* enumerate   */                                 \
     nullptr,                 /* resolve     */                                 \
+    nullptr,                 /* mayResolve  */                                 \
     nullptr,                 /* convert     */                                 \
     nullptr,                 /* finalize    */                                 \
     nullptr,                 /* call        */                                 \
@@ -732,6 +733,7 @@ IMPL_SHARED_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                 /* setProperty */                                 \
     nullptr,                 /* enumerate   */                                 \
     nullptr,                 /* resolve     */                                 \
+    nullptr,                 /* mayResolve  */                                 \
     nullptr,                 /* convert     */                                 \
     nullptr,                 /* finalize    */                                 \
     nullptr,                 /* call        */                                 \

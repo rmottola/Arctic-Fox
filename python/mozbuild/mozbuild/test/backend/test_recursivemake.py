@@ -274,9 +274,6 @@ class TestRecursiveMakeBackend(BackendTester):
             'FAIL_ON_WARNINGS': [
                 'FAIL_ON_WARNINGS := 1',
             ],
-            'MSVC_ENABLE_PGO': [
-                'MSVC_ENABLE_PGO := 1',
-            ],
             'VISIBILITY_FLAGS': [
                 'VISIBILITY_FLAGS :=',
             ],

@@ -252,8 +252,8 @@ unum_setTextAttribute(UNumberFormat* fmt, UNumberFormatTextAttribute tag, const 
 
 class Locale {
   public:
-    Locale(const char* language, const char* country = 0, const char* variant = 0,
-           const char* keywordsAndValues = 0);
+    explicit Locale(const char* language, const char* country = 0, const char* variant = 0,
+                    const char* keywordsAndValues = 0);
 };
 
 Locale::Locale(const char* language, const char* country, const char* variant,
@@ -420,7 +420,7 @@ IntlInitialize(JSContext* cx, HandleObject obj, Handle<PropertyName*> initialize
 static bool
 CreateDefaultOptions(JSContext* cx, MutableHandleValue defaultOptions)
 {
-    RootedObject options(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr()));
+    RootedObject options(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr));
     if (!options)
         return false;
     defaultOptions.setObject(*options);
@@ -439,7 +439,7 @@ static bool
 intl_availableLocales(JSContext* cx, CountAvailable countAvailable,
                       GetAvailable getAvailable, MutableHandleValue result)
 {
-    RootedObject locales(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr()));
+    RootedObject locales(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr));
     if (!locales)
         return false;
 
@@ -565,6 +565,7 @@ static const Class CollatorClass = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     collator_finalize
 };
@@ -1057,6 +1058,7 @@ static const Class NumberFormatClass = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     numberFormat_finalize
 };
@@ -1516,6 +1518,7 @@ static const Class DateTimeFormatClass = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     dateTimeFormat_finalize
 };

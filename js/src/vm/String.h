@@ -457,16 +457,13 @@ class JSString : public js::gc::TenuredCell
         return d.u1.flags & HAS_BASE_BIT;
     }
 
-    inline JSLinearString *base() const;
+    inline JSLinearString* base() const;
 
-    void markBase(JSTracer *trc) {
-        MOZ_ASSERT(hasBase());
-        js::gc::MarkStringUnbarriered(trc, &d.s.u3.base, "base");
-    }
+    void traceBase(JSTracer* trc);
 
     /* Only called by the GC for strings with the AllocKind::STRING kind. */
 
-    inline void finalize(js::FreeOp *fop);
+    inline void finalize(js::FreeOp* fop);
 
     /* Gets the number of bytes that the chars take on the heap. */
 
@@ -497,19 +494,19 @@ class JSString : public js::gc::TenuredCell
     template <typename CharT>
     static void dumpChars(const CharT* s, size_t len, FILE* fp=stderr);
 
-    bool equals(const char *s);
+    bool equals(const char* s);
 #endif
 
-    inline void markChildren(JSTracer *trc);
+    void traceChildren(JSTracer* trc);
 
-    static MOZ_ALWAYS_INLINE void readBarrier(JSString *thing) {
+    static MOZ_ALWAYS_INLINE void readBarrier(JSString* thing) {
         if (thing->isPermanentAtom())
             return;
 
         TenuredCell::readBarrier(thing);
     }
 
-    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSString *thing) {
+    static MOZ_ALWAYS_INLINE void writeBarrierPre(JSString* thing) {
         if (isNullLike(thing) || thing->isPermanentAtom())
             return;
 
@@ -557,22 +554,19 @@ class JSRope : public JSString
     bool copyTwoByteCharsZ(js::ExclusiveContext* cx, js::ScopedJSFreePtr<char16_t>& out) const;
 
     template <typename CharT>
-    bool copyChars(js::ExclusiveContext *cx, js::ScopedJSFreePtr<CharT> &out) const;
+    bool copyChars(js::ExclusiveContext* cx, js::ScopedJSFreePtr<CharT>& out) const;
 
-    JSString *leftChild() const {
+    JSString* leftChild() const {
         MOZ_ASSERT(isRope());
         return d.s.u2.left;
     }
 
-    JSString *rightChild() const {
+    JSString* rightChild() const {
         MOZ_ASSERT(isRope());
         return d.s.u3.right;
     }
 
-    void markChildren(JSTracer *trc) {
-        js::gc::MarkStringUnbarriered(trc, &d.s.u2.left, "left child");
-        js::gc::MarkStringUnbarriered(trc, &d.s.u3.right, "right child");
-    }
+    void traceChildren(JSTracer* trc);
 
     static size_t offsetOfLeft() {
         return offsetof(JSRope, d.s.u2.left);
@@ -1101,13 +1095,13 @@ NameToId(PropertyName* name)
     return NON_INTEGER_ATOM_TO_JSID(name);
 }
 
-class AutoNameVector : public AutoVectorRooter<PropertyName*>
+class AutoNameVector : public JS::AutoVectorRooterBase<PropertyName*>
 {
-    typedef AutoVectorRooter<PropertyName*> BaseType;
+    typedef AutoVectorRooterBase<PropertyName*> BaseType;
   public:
     explicit AutoNameVector(JSContext* cx
                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<PropertyName*>(cx, NAMEVECTOR)
+        : AutoVectorRooterBase<PropertyName*>(cx, NAMEVECTOR)
     {
         MOZ_GUARD_OBJECT_NOTIFIER_INIT;
     }
@@ -1227,7 +1221,7 @@ JSString::ensureFlat(js::ExclusiveContext* cx)
              : asRope().flatten(cx);
 }
 
-inline JSLinearString *
+inline JSLinearString*
 JSString::base() const
 {
     MOZ_ASSERT(hasBase());
@@ -1235,25 +1229,16 @@ JSString::base() const
     return d.s.u3.base;
 }
 
-inline void
-JSString::markChildren(JSTracer *trc)
-{
-    if (hasBase())
-        markBase(trc);
-    else if (isRope())
-        asRope().markChildren(trc);
-}
-
 template<>
-MOZ_ALWAYS_INLINE const char16_t *
-JSLinearString::nonInlineChars(const JS::AutoCheckCannotGC &nogc) const
+MOZ_ALWAYS_INLINE const char16_t*
+JSLinearString::nonInlineChars(const JS::AutoCheckCannotGC& nogc) const
 {
     return nonInlineTwoByteChars(nogc);
 }
 
 template<>
-MOZ_ALWAYS_INLINE const JS::Latin1Char *
-JSLinearString::nonInlineChars(const JS::AutoCheckCannotGC &nogc) const
+MOZ_ALWAYS_INLINE const JS::Latin1Char*
+JSLinearString::nonInlineChars(const JS::AutoCheckCannotGC& nogc) const
 {
     return nonInlineLatin1Chars(nogc);
 }

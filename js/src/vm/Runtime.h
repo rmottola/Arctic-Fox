@@ -31,6 +31,7 @@
 #include "gc/GCRuntime.h"
 #include "gc/Tracer.h"
 #include "irregexp/RegExpStack.h"
+#include "js/Debug.h"
 #include "js/HashTable.h"
 #ifdef DEBUG
 # include "js/Proxy.h" // For AutoEnterPolicy
@@ -298,27 +299,27 @@ class NewObjectCache
      * nullptr if returning the object could possibly trigger GC (does not
      * indicate failure).
      */
-    inline NativeObject *newObjectFromHit(JSContext *cx, EntryIndex entry, js::gc::InitialHeap heap);
+    inline NativeObject* newObjectFromHit(JSContext* cx, EntryIndex entry, js::gc::InitialHeap heap);
 
     /* Fill an entry after a cache miss. */
-    void fillProto(EntryIndex entry, const Class *clasp, js::TaggedProto proto,
-                   gc::AllocKind kind, NativeObject *obj);
+    void fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto proto,
+                   gc::AllocKind kind, NativeObject* obj);
 
-    inline void fillGlobal(EntryIndex entry, const Class *clasp, js::GlobalObject *global,
-                           gc::AllocKind kind, NativeObject *obj);
+    inline void fillGlobal(EntryIndex entry, const Class* clasp, js::GlobalObject* global,
+                           gc::AllocKind kind, NativeObject* obj);
 
-    void fillGroup(EntryIndex entry, js::ObjectGroup *group, gc::AllocKind kind,
-                   NativeObject *obj)
+    void fillGroup(EntryIndex entry, js::ObjectGroup* group, gc::AllocKind kind,
+                   NativeObject* obj)
     {
         MOZ_ASSERT(obj->group() == group);
         return fill(entry, group->clasp(), group, kind, obj);
     }
 
     /* Invalidate any entries which might produce an object with shape/proto. */
-    void invalidateEntriesForShape(JSContext *cx, HandleShape shape, HandleObject proto);
+    void invalidateEntriesForShape(JSContext* cx, HandleShape shape, HandleObject proto);
 
   private:
-    EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
+    EntryIndex makeIndex(const Class* clasp, gc::Cell* key, gc::AllocKind kind) {
         uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + size_t(kind);
         return hash % mozilla::ArrayLength(entries);
     }
@@ -575,8 +576,6 @@ class PerThreadData : public PerThreadDataFriendFields
 };
 
 class AutoLockForExclusiveAccess;
-
-struct AutoStopwatch;
 } // namespace js
 
 struct JSRuntime : public JS::shadow::Runtime,
@@ -680,14 +679,17 @@ struct JSRuntime : public JS::shadow::Runtime,
      * New activations will reset this to nullptr on construction after getting
      * the current value, and will restore the previous value on destruction.
      */
-    js::SavedFrame *asyncStackForNewActivations;
+    js::SavedFrame* asyncStackForNewActivations;
 
     /*
      * Value of asyncCause to be attached to asyncStackForNewActivations.
      */
-    JSString *asyncCauseForNewActivations;
+    JSString* asyncCauseForNewActivations;
 
-    js::Activation *const *addressOfActivation() const {
+    /* If non-null, report JavaScript entry points to this monitor. */
+    JS::dbg::AutoEntryMonitor* entryMonitor;
+
+    js::Activation* const* addressOfActivation() const {
         return &activation_;
     }
     static unsigned offsetOfActivation() {
@@ -914,8 +916,8 @@ struct JSRuntime : public JS::shadow::Runtime,
     bool isSelfHostingGlobal(JSObject* global) {
         return global == selfHostingGlobal_;
     }
-    bool isSelfHostingCompartment(JSCompartment* comp);
-    bool isSelfHostingZone(JS::Zone* zone);
+    bool isSelfHostingCompartment(JSCompartment* comp) const;
+    bool isSelfHostingZone(const JS::Zone* zone) const;
     bool cloneSelfHostedFunctionScript(JSContext* cx, js::Handle<js::PropertyName*> name,
                                        js::Handle<JSFunction*> targetFun);
     bool cloneSelfHostedValue(JSContext* cx, js::Handle<js::PropertyName*> name,
@@ -1260,7 +1262,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     }
 
     // The atoms compartment is the only one in its zone.
-    inline bool isAtomsZone(JS::Zone* zone);
+    inline bool isAtomsZone(const JS::Zone* zone) const;
 
     bool activeGCInAtomsZone();
 

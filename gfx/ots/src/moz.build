@@ -46,8 +46,6 @@ UNIFIED_SOURCES += [
     'vmtx.cc',
 ]
 
-MSVC_ENABLE_PGO = True
-
 if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
     NO_VISIBILITY_FLAGS = True
 

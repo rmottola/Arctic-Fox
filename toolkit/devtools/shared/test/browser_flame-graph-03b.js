@@ -9,7 +9,7 @@ let TEST_WIDTH = 200;
 let TEST_HEIGHT = 100;
 let TEST_DPI_DENSITIY = 2;
 
-let {FlameGraph} = Cu.import("resource://gre/modules/devtools/FlameGraph.jsm", {});
+let {FlameGraph} = devtools.require("devtools/shared/widgets/FlameGraph");
 let {Promise} = devtools.require("resource://gre/modules/Promise.jsm");
 
 add_task(function*() {
@@ -30,7 +30,7 @@ function* performTest() {
 
   testGraph(graph);
 
-  graph.destroy();
+  yield graph.destroy();
   host.destroy();
 }
 

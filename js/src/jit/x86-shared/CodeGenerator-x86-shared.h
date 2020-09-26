@@ -53,47 +53,55 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
     // Additional bounds checking for heap accesses with constant offsets.
     class OffsetBoundsCheck : public OutOfLineCodeBase<CodeGeneratorX86Shared>
     {
-        Label *outOfBounds_;
+        Label* outOfBounds_;
         Register ptrReg_;
         int32_t offset_;
       public:
-        OffsetBoundsCheck(Label *outOfBounds, Register ptrReg, int32_t offset)
+        OffsetBoundsCheck(Label* outOfBounds, Register ptrReg, int32_t offset)
           : outOfBounds_(outOfBounds), ptrReg_(ptrReg), offset_(offset)
         {}
 
-        Label *outOfBounds() const { return outOfBounds_; }
+        Label* outOfBounds() const { return outOfBounds_; }
         Register ptrReg() const { return ptrReg_; }
         int32_t offset() const { return offset_; }
-        void accept(CodeGeneratorX86Shared *codegen) {
+        void accept(CodeGeneratorX86Shared* codegen) {
             codegen->visitOffsetBoundsCheck(this);
+        }
+    };
+
+    // Additional bounds check for vector Float to Int conversion, when the
+    // undefined pattern is seen. Might imply a bailout.
+    class OutOfLineSimdFloatToIntCheck : public OutOfLineCodeBase<CodeGeneratorX86Shared>
+    {
+        Register temp_;
+        FloatRegister input_;
+        LInstruction* ins_;
+
+      public:
+        OutOfLineSimdFloatToIntCheck(Register temp, FloatRegister input, LInstruction *ins)
+          : temp_(temp), input_(input), ins_(ins)
+        {}
+
+        Register temp() const { return temp_; }
+        FloatRegister input() const { return input_; }
+        LInstruction* ins() const { return ins_; }
+
+        void accept(CodeGeneratorX86Shared* codegen) {
+            codegen->visitOutOfLineSimdFloatToIntCheck(this);
         }
     };
 
     // Functions for emitting bounds-checking code with branches.
     MOZ_WARN_UNUSED_RESULT
-    uint32_t emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *mir, const MInstruction *ins,
-                                        Register ptr, Label *fail);
-    void cleanupAfterAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *mir, Register ptr);
+    uint32_t emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* mir, const MInstruction* ins,
+                                        Register ptr, Label* fail);
+    void cleanupAfterAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* mir, Register ptr);
 
     // Label for the common return path.
     NonAssertingLabel returnLabel_;
     NonAssertingLabel deoptLabel_;
 
-    inline Operand ToOperand(const LAllocation& a) {
-        if (a.isGeneralReg())
-            return Operand(a.toGeneralReg()->reg());
-        if (a.isFloatReg())
-            return Operand(a.toFloatReg()->reg());
-        return Operand(StackPointer, ToStackOffset(&a));
-    }
-    inline Operand ToOperand(const LAllocation* a) {
-        return ToOperand(*a);
-    }
-    inline Operand ToOperand(const LDefinition* def) {
-        return ToOperand(def->output());
-    }
-
-    MoveOperand toMoveOperand(const LAllocation* a) const;
+    MoveOperand toMoveOperand(LAllocation a) const;
 
     void bailoutIf(Assembler::Condition condition, LSnapshot* snapshot);
     void bailoutIf(Assembler::DoubleCondition condition, LSnapshot* snapshot);
@@ -282,6 +290,7 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
     void visitModOverflowCheck(ModOverflowCheck* ool);
     void visitReturnZero(ReturnZero* ool);
     void visitOutOfLineTableSwitch(OutOfLineTableSwitch* ool);
+    void visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIntCheck* ool);
     void generateInvalidateEpilogue();
 };
 

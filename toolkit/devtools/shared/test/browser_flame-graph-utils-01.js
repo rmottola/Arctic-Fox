@@ -4,7 +4,8 @@
 // Tests that text metrics and data conversion from profiler samples
 // widget work properly in the flame graph.
 
-let {FlameGraphUtils} = Cu.import("resource://gre/modules/devtools/FlameGraph.jsm", {});
+let {FlameGraphUtils, FLAME_GRAPH_BLOCK_HEIGHT} = devtools.require("devtools/shared/widgets/FlameGraph");
+let { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
 
 add_task(function*() {
   yield promiseTab("about:blank");
@@ -13,7 +14,7 @@ add_task(function*() {
 });
 
 function* performTest() {
-  let out = FlameGraphUtils.createFlameGraphDataFromSamples(TEST_DATA);
+  let out = FlameGraphUtils.createFlameGraphDataFromThread(TEST_DATA);
 
   ok(out, "Some data was outputted properly");
   is(out.length, 10, "The outputted length is correct.");
@@ -42,7 +43,7 @@ function* performTest() {
   }
 }
 
-let TEST_DATA = [{
+let TEST_DATA = synthesizeProfileForTest([{
   frames: [{
     location: "M"
   }, {
@@ -96,7 +97,7 @@ let TEST_DATA = [{
     location: "Z"
   }],
   time: 500
-}];
+}]);
 
 let EXPECTED_OUTPUT = [{
   blocks: []
@@ -111,7 +112,7 @@ let EXPECTED_OUTPUT = [{
     x: 50,
     y: 0,
     width: 410,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "A"
   }]
 }, {
@@ -121,9 +122,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "B"
     },
     x: 50,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 160,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "B"
   }, {
     srcData: {
@@ -131,9 +132,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "B"
     },
     x: 330,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 130,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "B"
   }]
 }, {
@@ -145,7 +146,7 @@ let EXPECTED_OUTPUT = [{
     x: 0,
     y: 0,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "M"
   }, {
     srcData: {
@@ -153,9 +154,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "C"
     },
     x: 50,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "C"
   }, {
     srcData: {
@@ -163,9 +164,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "C"
     },
     x: 330,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 130,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "C"
   }]
 }, {
@@ -175,9 +176,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "N"
     },
     x: 0,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "N"
   }, {
     srcData: {
@@ -185,9 +186,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "D"
     },
     x: 100,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 110,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "D"
   }, {
     srcData: {
@@ -197,7 +198,7 @@ let EXPECTED_OUTPUT = [{
     x: 460,
     y: 0,
     width: 40,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "X"
   }]
 }, {
@@ -207,9 +208,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "E"
     },
     x: 210,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 120,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "E"
   }, {
     srcData: {
@@ -217,9 +218,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "Y"
     },
     x: 460,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 40,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "Y"
   }]
 }, {
@@ -229,9 +230,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "P"
     },
     x: 0,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "P"
   }, {
     srcData: {
@@ -239,9 +240,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "F"
     },
     x: 210,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 120,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "F"
   }, {
     srcData: {
@@ -249,9 +250,9 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "Z"
     },
     x: 460,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 40,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "Z"
   }]
 }, {

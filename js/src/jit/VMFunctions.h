@@ -55,7 +55,7 @@ enum MaybeTailCall {
 // specified. In this case, the return type must be boolean to indicate
 // failure.
 //
-// All functions described by VMFunction take a JSContext * as a first
+// All functions described by VMFunction take a JSContext* as a first
 // argument, and are treated as re-entrant into the VM and therefore fallible.
 struct VMFunction
 {
@@ -66,7 +66,7 @@ struct VMFunction
     // Address of the C function.
     void* wrapped;
 
-    // Number of arguments expected, excluding JSContext * as an implicit
+    // Number of arguments expected, excluding JSContext* as an implicit
     // first argument and an outparam as a possible implicit final argument.
     uint32_t explicitArgs;
 
@@ -636,22 +636,23 @@ class AutoDetectInvalidation
     }
 };
 
-bool InvokeFunction(JSContext *cx, HandleObject obj0, uint32_t argc, Value *argv, Value* rval);
-JSObject *NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-                      size_t ndynamic, const js::Class *clasp);
+bool InvokeFunction(JSContext* cx, HandleObject obj0, bool constructing, uint32_t argc,
+                    Value* argv, MutableHandleValue rval);
+bool InvokeFunctionShuffleNewTarget(JSContext* cx, HandleObject obj, uint32_t numActualArgs,
+                                    uint32_t numFormalArgs, Value* argv, MutableHandleValue rval);
 
-bool CheckOverRecursed(JSContext *cx);
-bool CheckOverRecursedWithExtra(JSContext *cx, BaselineFrame *frame,
+bool CheckOverRecursed(JSContext* cx);
+bool CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
                                 uint32_t extra, uint32_t earlyCheck);
 
-bool DefVarOrConst(JSContext *cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
-bool SetConst(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
-bool MutatePrototype(JSContext *cx, HandlePlainObject obj, HandleValue value);
-bool InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue value,
-              jsbytecode *pc);
+bool DefVarOrConst(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain);
+bool SetConst(JSContext* cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval);
+bool MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value);
+bool InitProp(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
+              jsbytecode* pc);
 
 template<bool Equal>
-bool LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
+bool LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
 
 template<bool Equal>
 bool StrictlyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res);
@@ -665,7 +666,7 @@ template<bool Equal>
 bool StringsEqual(JSContext* cx, HandleString left, HandleString right, bool* res);
 
 bool ArrayPopDense(JSContext* cx, HandleObject obj, MutableHandleValue rval);
-bool ArrayPushDense(JSContext* cx, HandleArrayObject obj, HandleValue v, uint32_t* length);
+bool ArrayPushDense(JSContext* cx, HandleObject obj, HandleValue v, uint32_t* length);
 bool ArrayShiftDense(JSContext* cx, HandleObject obj, MutableHandleValue rval);
 JSObject* ArrayConcatDense(JSContext* cx, HandleObject obj1, HandleObject obj2, HandleObject res);
 JSString* ArrayJoin(JSContext* cx, HandleObject array, HandleString sep);
@@ -731,7 +732,9 @@ bool LeaveWith(JSContext* cx, BaselineFrame* frame);
 
 bool PushBlockScope(JSContext* cx, BaselineFrame* frame, Handle<StaticBlockObject*> block);
 bool PopBlockScope(JSContext* cx, BaselineFrame* frame);
-bool FreshenBlockScope(JSContext *cx, BaselineFrame *frame);
+bool DebugLeaveThenPopBlockScope(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
+bool FreshenBlockScope(JSContext* cx, BaselineFrame* frame);
+bool DebugLeaveThenFreshenBlockScope(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
 bool DebugLeaveBlock(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
 
 bool InitBaselineFrameForOsr(BaselineFrame* frame, InterpreterFrame* interpFrame,
@@ -749,20 +752,20 @@ JSString* RegExpReplace(JSContext* cx, HandleString string, HandleObject regexp,
 JSString* StringReplace(JSContext* cx, HandleString string, HandleString pattern,
                         HandleString repl);
 
-bool SetDenseElement(JSContext *cx, HandleNativeObject obj, int32_t index, HandleValue value,
-                     bool strict);
+bool SetDenseOrUnboxedArrayElement(JSContext* cx, HandleObject obj, int32_t index,
+                                   HandleValue value, bool strict);
 
-void AssertValidObjectPtr(JSContext *cx, JSObject *obj);
-void AssertValidObjectOrNullPtr(JSContext *cx, JSObject *obj);
-void AssertValidStringPtr(JSContext *cx, JSString *str);
-void AssertValidSymbolPtr(JSContext *cx, JS::Symbol *sym);
-void AssertValidValue(JSContext *cx, Value *v);
+void AssertValidObjectPtr(JSContext* cx, JSObject* obj);
+void AssertValidObjectOrNullPtr(JSContext* cx, JSObject* obj);
+void AssertValidStringPtr(JSContext* cx, JSString* str);
+void AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym);
+void AssertValidValue(JSContext* cx, Value* v);
 
-void MarkValueFromIon(JSRuntime *rt, Value *vp);
-void MarkStringFromIon(JSRuntime *rt, JSString **stringp);
-void MarkObjectFromIon(JSRuntime *rt, JSObject **objp);
-void MarkShapeFromIon(JSRuntime *rt, Shape **shapep);
-void MarkObjectGroupFromIon(JSRuntime *rt, ObjectGroup **groupp);
+void MarkValueFromIon(JSRuntime* rt, Value* vp);
+void MarkStringFromIon(JSRuntime* rt, JSString** stringp);
+void MarkObjectFromIon(JSRuntime* rt, JSObject** objp);
+void MarkShapeFromIon(JSRuntime* rt, Shape** shapep);
+void MarkObjectGroupFromIon(JSRuntime* rt, ObjectGroup** groupp);
 
 // Helper for generatePreBarrier.
 inline void*

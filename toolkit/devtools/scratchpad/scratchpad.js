@@ -2153,16 +2153,17 @@ ScratchpadWindow.prototype = Heritage.extend(ScratchpadTab.prototype, {
       DebuggerServer.init();
       DebuggerServer.addBrowserActors();
     }
+    DebuggerServer.allowChromeProcess = true;
 
     let client = new DebuggerClient(DebuggerServer.connectPipe());
     client.connect(() => {
-      client.listTabs(aResponse => {
+      client.getProcess().then(aResponse => {
         if (aResponse.error) {
           reportError("listTabs", aResponse);
           deferred.reject(aResponse);
         }
         else {
-          deferred.resolve({ form: aResponse, client: client });
+          deferred.resolve({ form: aResponse.form, client: client });
         }
       });
     });

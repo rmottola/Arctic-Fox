@@ -206,7 +206,9 @@ let DebuggerController = {
 
     if (target.isAddon) {
       yield this._startAddonDebugging(actor);
-    } else if (target.chrome) {
+    } else if (!target.isTabActor) {
+      // Some actors like AddonActor or RootActor for chrome debugging
+      // do not support attach/detach and can be used directly
       yield this._startChromeDebugging(chromeDebugger);
     } else {
       yield this._startDebuggingTab();
@@ -1201,7 +1203,7 @@ SourceScripts.prototype = {
    * Callback for the debugger's active thread getSources() method.
    */
   _onSourcesAdded: function(aResponse) {
-    if (aResponse.error) {
+    if (aResponse.error || !aResponse.sources) {
       let msg = "Error getting sources: " + aResponse.message;
       Cu.reportError(msg);
       dumpn(msg);

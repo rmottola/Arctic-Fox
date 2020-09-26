@@ -20,12 +20,7 @@ CONFIGURE_SUBST_FILES += [
     'js.pc',
 ]
 
-if CONFIG['JS_STANDALONE']:
-    DEFINES['IMPL_MFBT'] = True
-    USE_LIBS += [
-        'mfbt',
-    ]
-else:
+if not CONFIG['JS_STANDALONE']:
     CONFIGURE_SUBST_FILES += [
         '../../config/autoconf-js.mk',
         '../../config/emptyvars-js.mk',
@@ -103,6 +98,7 @@ UNIFIED_SOURCES += [
     'builtin/MapObject.cpp',
     'builtin/Object.cpp',
     'builtin/Profilers.cpp',
+    'builtin/ReflectParse.cpp',
     'builtin/SIMD.cpp',
     'builtin/SymbolObject.cpp',
     'builtin/TestingFunctions.cpp',
@@ -170,9 +166,7 @@ UNIFIED_SOURCES += [
     'jit/JitSpewer.cpp',
     'jit/JSONSpewer.cpp',
     'jit/LICM.cpp',
-    'jit/LinearScan.cpp',
     'jit/LIR.cpp',
-    'jit/LiveRangeAllocator.cpp',
     'jit/LoopUnroller.cpp',
     'jit/Lowering.cpp',
     'jit/MacroAssembler.cpp',
@@ -217,7 +211,6 @@ UNIFIED_SOURCES += [
     'jsopcode.cpp',
     'jsprf.cpp',
     'jspropertytree.cpp',
-    'jsreflect.cpp',
     'jsscript.cpp',
     'jsstr.cpp',
     'jswatchpoint.cpp',
@@ -254,8 +247,10 @@ UNIFIED_SOURCES += [
     'vm/NativeObject.cpp',
     'vm/ObjectGroup.cpp',
     'vm/PIC.cpp',
+    'vm/Printer.cpp',
     'vm/Probes.cpp',
     'vm/ProxyObject.cpp',
+    'vm/ReceiverGuard.cpp',
     'vm/RegExpObject.cpp',
     'vm/RegExpStatics.cpp',
     'vm/Runtime.cpp',
@@ -426,8 +421,6 @@ else:
     SOURCES += [
         'perf/pm_stub.cpp'
     ]
-
-MSVC_ENABLE_PGO = True
 
 HostSimplePrograms([
     'host_jskwgen',

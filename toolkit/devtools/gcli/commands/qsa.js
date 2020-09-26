@@ -4,16 +4,16 @@
 
 "use strict";
 
-const gcli = require("gcli/index");
+const l10n = require("gcli/l10n");
 
 exports.items = [
   {
     name: "qsa",
-    description: gcli.lookup("qsaDesc"),
+    description: l10n.lookup("qsaDesc"),
     params: [{
       name: "query",
       type: "nodelist",
-      description: gcli.lookup("qsaQueryDesc")
+      description: l10n.lookup("qsaQueryDesc")
     }],
     exec: function(args, context) {
       return args.query.length;

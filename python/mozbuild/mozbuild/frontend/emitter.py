@@ -549,7 +549,6 @@ class TreeMetadataEmitter(LoggingMixin):
             'EXTRA_PP_COMPONENTS',
             'FAIL_ON_WARNINGS',
             'USE_STATIC_LIBS',
-            'MSVC_ENABLE_PGO',
             'PYTHON_UNIT_TESTS',
             'RCFILE',
             'RESFILE',

@@ -12,7 +12,9 @@ function test() {
   let { ThreadNode } = devtools.require("devtools/shared/profiler/tree-model");
   let { CallView } = devtools.require("devtools/shared/profiler/tree-view");
 
-  let threadNode = new ThreadNode(gSamples);
+  let threadNode = new ThreadNode(gThread);
+  // Don't display the synthesized (root) and the real (root) node twice.
+  threadNode.calls = threadNode.calls[0].calls;
   let treeRoot = new CallView({ frame: threadNode });
 
   let container = document.createElement("vbox");
@@ -44,26 +46,22 @@ function test() {
   ok(!A.target.querySelector(".call-tree-category").hidden,
     "The .A.B.D node's category label cell should not be hidden.");
 
-  is(D.target.childNodes.length, 8,
+  is(D.target.childNodes.length, 6,
     "The number of columns displayed for tree items is correct.");
   is(D.target.childNodes[0].getAttribute("type"), "duration",
     "The first column displayed for tree items is correct.");
   is(D.target.childNodes[1].getAttribute("type"), "percentage",
     "The third column displayed for tree items is correct.");
-  is(D.target.childNodes[2].getAttribute("type"), "allocations",
+  is(D.target.childNodes[2].getAttribute("type"), "self-duration",
     "The second column displayed for tree items is correct.");
-  is(D.target.childNodes[3].getAttribute("type"), "self-duration",
-    "The second column displayed for tree items is correct.");
-  is(D.target.childNodes[4].getAttribute("type"), "self-percentage",
+  is(D.target.childNodes[3].getAttribute("type"), "self-percentage",
     "The fourth column displayed for tree items is correct.");
-  is(D.target.childNodes[5].getAttribute("type"), "self-allocations",
-    "The fourth column displayed for tree items is correct.");
-  is(D.target.childNodes[6].getAttribute("type"), "samples",
+  is(D.target.childNodes[4].getAttribute("type"), "samples",
     "The fifth column displayed for tree items is correct.");
-  is(D.target.childNodes[7].getAttribute("type"), "function",
+  is(D.target.childNodes[5].getAttribute("type"), "function",
     "The sixth column displayed for tree items is correct.");
 
-  let functionCell = D.target.childNodes[7];
+  let functionCell = D.target.childNodes[5];
 
   is(functionCell.childNodes.length, 9,
     "The number of columns displayed for function cells is correct.");
@@ -89,7 +87,7 @@ function test() {
   finish();
 }
 
-let gSamples = [{
+let gThread = synthesizeProfileForTest([{
   time: 5,
   frames: [
     { category: CATEGORY_MASK('other'),  location: "(root)" },
@@ -121,4 +119,4 @@ let gSamples = [{
     { category: CATEGORY_MASK('gc', 2),   location: "E (http://foo/bar/baz:90)" },
     { category: CATEGORY_MASK('network'), location: "F (http://foo/bar/baz:99)" }
   ]
-}];
+}]);

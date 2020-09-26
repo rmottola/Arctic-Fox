@@ -62,7 +62,8 @@ enum TracingMetadata {
   TRACING_INTERVAL_START,
   TRACING_INTERVAL_END,
   TRACING_EVENT,
-  TRACING_EVENT_BACKTRACE
+  TRACING_EVENT_BACKTRACE,
+  TRACING_TIMESTAMP
 };
 
 #if !defined(MOZ_ENABLE_PROFILER_SPS) || defined(MOZILLA_XPCOMRT_API)
@@ -160,10 +161,15 @@ static inline void profiler_responsiveness(const mozilla::TimeStamp& aTime) {}
 static inline void profiler_set_frame_number(int frameNumber) {}
 
 // Get the profile encoded as a JSON string.
-static inline char* profiler_get_profile() { return nullptr; }
+static inline mozilla::UniquePtr<char[]> profiler_get_profile(float aSinceTime = 0) {
+  return nullptr;
+}
 
 // Get the profile encoded as a JSON object.
-static inline JSObject* profiler_get_profile_jsobject(JSContext* aCx) { return nullptr; }
+static inline JSObject* profiler_get_profile_jsobject(JSContext* aCx,
+                                                      float aSinceTime = 0) {
+  return nullptr;
+}
 
 // Get the profile and write it into a file
 static inline void profiler_save_profile_to_file(char* aFilename) { }
@@ -176,6 +182,22 @@ static inline char** profiler_get_features() { return nullptr; }
 // to show the profiler's combined js/c++ if the profiler is running. Note that
 // printing the location require symbolicating which is very slow.
 static inline void profiler_print_location() {}
+
+// Get information about the current buffer status.
+// Retursn (using outparams) the current write position in the buffer,
+// the total size of the buffer, and the generation of the buffer.
+// This information may be useful to a user-interface displaying the
+// current status of the profiler, allowing the user to get a sense
+// for how fast the buffer is being written to, and how much
+// data is visible.
+static inline void profiler_get_buffer_info(uint32_t *aCurrentPosition,
+                                            uint32_t *aTotalSize,
+                                            uint32_t *aGeneration)
+{
+  *aCurrentPosition = 0;
+  *aTotalSize = 0;
+  *aGeneration = 0;
+}
 
 // Discard the profile, throw away the profile and notify 'profiler-locked'.
 // This function is to be used when entering private browsing to prevent

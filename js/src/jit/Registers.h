@@ -30,35 +30,40 @@ struct Register {
     typedef Codes::Encoding Encoding;
     typedef Codes::Code Code;
     typedef Codes::SetType SetType;
-    Code code_;
-    static Register FromCode(uint32_t i) {
+
+    Codes::Encoding reg_;
+    static Register FromCode(Code i) {
         MOZ_ASSERT(i < Registers::Total);
-        Register r = { Code(i) };
+        Register r = { Encoding(i) };
         return r;
     }
     static Register FromName(const char* name) {
         Code code = Registers::FromName(name);
-        Register r = { code };
+        Register r = { Encoding(code) };
         return r;
     }
     Code code() const {
-        MOZ_ASSERT((uint32_t)code_ < Registers::Total);
-        return code_;
+        MOZ_ASSERT(Code(reg_) < Registers::Total);
+        return Code(reg_);
+    }
+    Encoding encoding() const {
+        MOZ_ASSERT(Code(reg_) < Registers::Total);
+        return reg_;
     }
     const char* name() const {
         return Registers::GetName(code());
     }
     bool operator ==(Register other) const {
-        return code_ == other.code_;
+        return reg_ == other.reg_;
     }
     bool operator !=(Register other) const {
-        return code_ != other.code_;
+        return reg_ != other.reg_;
     }
     bool volatile_() const {
-        return !!((1 << code()) & Registers::VolatileMask);
+        return !!((SetType(1) << code()) & Registers::VolatileMask);
     }
     bool aliases(const Register& other) const {
-        return code_ == other.code_;
+        return reg_ == other.reg_;
     }
     uint32_t numAliased() const {
         return 1;
@@ -73,7 +78,7 @@ struct Register {
     }
 
     SetType alignedOrDominatedAliasedSet() const {
-        return SetType(1) << code_;
+        return SetType(1) << code();
     }
 
     static uint32_t SetSize(SetType x) {
@@ -109,21 +114,28 @@ class RegisterDump
 // Information needed to recover machine register state.
 class MachineState
 {
-    mozilla::Array<Registers::RegisterContent *, Registers::Total> regs_;
-    mozilla::Array<FloatRegisters::RegisterContent *, FloatRegisters::Total> fpregs_;
+    mozilla::Array<Registers::RegisterContent*, Registers::Total> regs_;
+    mozilla::Array<FloatRegisters::RegisterContent*, FloatRegisters::Total> fpregs_;
 
   public:
-    static MachineState FromBailout(RegisterDump::GPRArray &regs, RegisterDump::FPUArray &fpregs);
+    MachineState() {
+        for (unsigned i = 0; i < Registers::Total; i++)
+            regs_[i] = reinterpret_cast<Registers::RegisterContent*>(i + 0x100);
+        for (unsigned i = 0; i < FloatRegisters::Total; i++)
+            fpregs_[i] = reinterpret_cast<FloatRegisters::RegisterContent*>(i + 0x200);
+    }
 
-    void setRegisterLocation(Register reg, uintptr_t *up) {
-        regs_[reg.code()] = (Registers::RegisterContent *) up;
+    static MachineState FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& fpregs);
+
+    void setRegisterLocation(Register reg, uintptr_t* up) {
+        regs_[reg.code()] = (Registers::RegisterContent* ) up;
     }
-    void setRegisterLocation(FloatRegister reg, float *fp) {
+    void setRegisterLocation(FloatRegister reg, float* fp) {
         MOZ_ASSERT(reg.isSingle());
-        fpregs_[reg.code()] = (FloatRegisters::RegisterContent *) fp;
+        fpregs_[reg.code()] = (FloatRegisters::RegisterContent*) fp;
     }
-    void setRegisterLocation(FloatRegister reg, double *dp) {
-        fpregs_[reg.code()] = (FloatRegisters::RegisterContent *) dp;
+    void setRegisterLocation(FloatRegister reg, double* dp) {
+        fpregs_[reg.code()] = (FloatRegisters::RegisterContent*) dp;
     }
     void setRegisterLocation(FloatRegister reg, FloatRegisters::RegisterContent* rp) {
         fpregs_[reg.code()] = rp;

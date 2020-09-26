@@ -14,6 +14,8 @@
 #include "mozilla/Alignment.h"
 #include "mozilla/Array.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/DeferredFinalize.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/CallbackObject.h"
 #include "mozilla/dom/DOMJSClass.h"
@@ -26,8 +28,6 @@
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
-#include "nsCycleCollector.h"
 #include "nsIGlobalObject.h"
 #include "nsIXPConnect.h"
 #include "nsJSUtils.h"
@@ -927,7 +927,7 @@ DoGetOrCreateDOMReflector(JSContext* cx, T* value,
       return false;
     }
 
-    obj = value->WrapObject(cx, JS::NullPtr());
+    obj = value->WrapObject(cx, nullptr);
     if (!obj) {
       // At this point, obj is null, so just return false.
       // Callers seem to be testing JS_IsExceptionPending(cx) to
@@ -1036,7 +1036,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     }
 
     MOZ_ASSERT(js::IsObjectInContextCompartment(scope, cx));
-    if (!value->WrapObject(cx, JS::NullPtr(), &obj)) {
+    if (!value->WrapObject(cx, nullptr, &obj)) {
       return false;
     }
   }
@@ -1082,7 +1082,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     }
 
     MOZ_ASSERT(js::IsObjectInContextCompartment(scope, cx));
-    if (!value->WrapObject(cx, JS::NullPtr(), &obj)) {
+    if (!value->WrapObject(cx, nullptr, &obj)) {
       return false;
     }
 
@@ -1518,7 +1518,7 @@ struct WrapNativeParentHelper
     if (!CouldBeDOMBinding(parent)) {
       obj = WrapNativeParentFallback<T>::Wrap(cx, parent, cache);
     } else {
-      obj = parent->WrapObject(cx, JS::NullPtr());
+      obj = parent->WrapObject(cx, nullptr);
     }
 
     return obj;
@@ -2976,6 +2976,9 @@ ResolveGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj,
               JS::Handle<jsid> aId, bool* aResolvedp);
 
 bool
+MayResolveGlobal(const JSAtomState& aNames, jsid aId, JSObject* aMaybeObj);
+
+bool
 EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj);
 
 template <class T>
@@ -3026,7 +3029,7 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
                                  JS::DontFireOnNewGlobalHook, aOptions));
   if (!aGlobal) {
     NS_WARNING("Failed to create global");
-    return JS::NullPtr();
+    return nullptr;
   }
 
   JSAutoCompartment ac(aCx, aGlobal);
@@ -3041,7 +3044,7 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
                                     CreateGlobalOptions<T>::ProtoAndIfaceCacheKind);
 
     if (!CreateGlobalOptions<T>::PostCreateGlobal(aCx, aGlobal)) {
-      return JS::NullPtr();
+      return nullptr;
     }
   }
 
@@ -3049,13 +3052,13 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
       !CreateGlobalOptions<T>::ForceInitStandardClassesToFalse &&
       !JS_InitStandardClasses(aCx, aGlobal)) {
     NS_WARNING("Failed to init standard classes");
-    return JS::NullPtr();
+    return nullptr;
   }
 
   JS::Handle<JSObject*> proto = GetProto(aCx, aGlobal);
   if (!proto || !JS_SplicePrototype(aCx, aGlobal, proto)) {
     NS_WARNING("Failed to set proto");
-    return JS::NullPtr();
+    return nullptr;
   }
 
   return proto;

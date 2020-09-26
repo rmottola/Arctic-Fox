@@ -30,6 +30,7 @@
 #include "vm/Interpreter.h"
 #include "vm/ProxyObject.h"
 #include "vm/SavedStacks.h"
+#include "vm/Stack.h"
 #include "vm/TraceLogging.h"
 
 #include "jscntxtinlines.h"
@@ -193,6 +194,18 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, jsval* vp)
     value = BooleanValue(false);
 #endif
     if (!JS_SetProperty(cx, info, "mapped-array-buffer", value))
+        return false;
+
+#ifdef MOZ_MEMORY
+    value = BooleanValue(true);
+#else
+    value = BooleanValue(false);
+#endif
+    if (!JS_SetProperty(cx, info, "moz-memory", value))
+        return false;
+
+    value.setInt32(sizeof(void *));
+    if (!JS_SetProperty(cx, info, "pointer-byte-size", value))
         return false;
 
     args.rval().setObject(*info);
@@ -574,13 +587,13 @@ VerifyPreBarriers(JSContext* cx, unsigned argc, jsval* vp)
 static bool
 VerifyPostBarriers(JSContext* cx, unsigned argc, jsval* vp)
 {
+    // This is a no-op since the post barrier verifier was removed.
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length()) {
         RootedObject callee(cx, &args.callee());
         ReportUsageError(cx, callee, "Too many arguments");
         return false;
     }
-    gc::VerifyBarriers(cx->runtime(), gc::PostBarrierVerifier);
     args.rval().setUndefined();
     return true;
 }
@@ -700,6 +713,22 @@ GCSlice(JSContext* cx, unsigned argc, Value* vp)
     else
         rt->gc.debugGCSlice(budget);
 
+    args.rval().setUndefined();
+    return true;
+}
+
+static bool
+AbortGC(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (args.length() != 0) {
+        RootedObject callee(cx, &args.callee());
+        ReportUsageError(cx, callee, "Wrong number of arguments");
+        return false;
+    }
+
+    cx->runtime()->gc.abortGC();
     args.rval().setUndefined();
     return true;
 }
@@ -969,7 +998,7 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
             return false;
         if (d < 0) {
             ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                  JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                                  JSDVG_SEARCH_STACK, args[0], nullptr,
                                   "not a valid maximum frame count", NULL);
             return false;
         }
@@ -980,7 +1009,7 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
     if (args.length() >= 2) {
         if (!args[1].isObject()) {
             ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                  JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                                  JSDVG_SEARCH_STACK, args[0], nullptr,
                                   "not an object", NULL);
             return false;
         }
@@ -1077,7 +1106,7 @@ MakeFakePromise(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    RootedObject obj(cx, NewObjectWithGivenProto(cx, &FakePromiseClass, NullPtr()));
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, &FakePromiseClass, nullptr));
     if (!obj)
         return false;
 
@@ -1118,6 +1147,7 @@ static const JSClass FinalizeCounterClass = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     finalize_counter_finalize
 };
@@ -1127,7 +1157,7 @@ MakeFinalizeObserver(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    JSObject *obj = JS_NewObjectWithGivenProto(cx, &FinalizeCounterClass, JS::NullPtr());
+    JSObject* obj = JS_NewObjectWithGivenProto(cx, &FinalizeCounterClass, nullptr);
     if (!obj)
         return false;
 
@@ -1386,8 +1416,8 @@ DisplayName(JSContext* cx, unsigned argc, jsval* vp)
     return true;
 }
 
-static JSObject *
-ShellObjectMetadataCallback(JSContext *cx)
+static JSObject*
+ShellObjectMetadataCallback(JSContext* cx, JSObject*)
 {
     RootedObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!obj)
@@ -1467,6 +1497,71 @@ js::testingFunc_bailout(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
+js::testingFunc_inJit(JSContext* cx, unsigned argc, jsval* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!IsBaselineEnabled(cx)) {
+        JSString* error = JS_NewStringCopyZ(cx, "Baseline is disabled.");
+        if(!error)
+            return false;
+
+        args.rval().setString(error);
+        return true;
+    }
+
+    JSScript* script = cx->currentScript();
+    if (script && script->getWarmUpResetCount() >= 20) {
+        JSString* error = JS_NewStringCopyZ(cx, "Compilation is being repeatedly prevented. Giving up.");
+        if (!error)
+            return false;
+
+        args.rval().setString(error);
+        return true;
+    }
+
+    args.rval().setBoolean(cx->currentlyRunningInJit());
+    return true;
+}
+
+bool
+js::testingFunc_inIon(JSContext* cx, unsigned argc, jsval* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!IsIonEnabled(cx)) {
+        JSString* error = JS_NewStringCopyZ(cx, "Ion is disabled.");
+        if (!error)
+            return false;
+
+        args.rval().setString(error);
+        return true;
+    }
+
+    ScriptFrameIter iter(cx);
+    if (iter.isIon()) {
+        // Reset the counter of the IonScript's script.
+        JitFrameIterator jitIter(cx);
+        ++jitIter;
+        jitIter.script()->resetWarmUpResetCounter();
+    } else {
+        // Check if we missed multiple attempts at compiling the innermost script.
+        JSScript* script = cx->currentScript();
+        if (script && script->getWarmUpResetCount() >= 20) {
+            JSString* error = JS_NewStringCopyZ(cx, "Compilation is being repeatedly prevented. Giving up.");
+            if (!error)
+                return false;
+
+            args.rval().setString(error);
+            return true;
+        }
+    }
+
+    args.rval().setBoolean(iter.isIon());
+    return true;
+}
+
+bool
 js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -1482,6 +1577,20 @@ TestingFunc_assertJitStackInvariants(JSContext* cx, unsigned argc, jsval* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     jit::AssertJitStackInvariants(cx);
+    args.rval().setUndefined();
+    return true;
+}
+
+bool
+js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, jsval* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 2) {
+        JS_ReportError(cx, "Expects only 2 arguments");
+        return false;
+    }
+
+    // NOP when not in IonMonkey
     args.rval().setUndefined();
     return true;
 }
@@ -1724,6 +1833,7 @@ const Class CloneBufferObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     Finalize
 };
@@ -1737,6 +1847,10 @@ static bool
 Serialize(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 2) {
+        JS_ReportError(cx, "Expects only 2 arguments");
+        return false;
+    }
 
     JSAutoStructuredCloneBuffer clonebuf;
     if (!clonebuf.write(cx, args.get(0), args.get(1)))
@@ -2131,14 +2245,14 @@ FindPath(JSContext* cx, unsigned argc, jsval* vp)
     // Non-GCThing endpoints don't make much sense.
     if (!args[0].isObject() && !args[0].isString() && !args[0].isSymbol()) {
         ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                              JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                              JSDVG_SEARCH_STACK, args[0], nullptr,
                               "not an object, string, or symbol", NULL);
         return false;
     }
 
     if (!args[1].isObject() && !args[1].isString() && !args[1].isSymbol()) {
         ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                              JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                              JSDVG_SEARCH_STACK, args[0], nullptr,
                               "not an object, string, or symbol", NULL);
         return false;
     }
@@ -2364,11 +2478,18 @@ ByteSize(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     mozilla::MallocSizeOf mallocSizeOf = cx->runtime()->debuggerMallocSizeOf;
-    JS::ubi::Node node = args.get(0);
-    if (node)
-        args.rval().set(NumberValue(node.size(mallocSizeOf)));
-    else
-        args.rval().setUndefined();
+
+    {
+        // We can't tolerate the GC moving things around while we're using a
+        // ubi::Node. Check that nothing we do causes a GC.
+        JS::AutoCheckCannotGC autoCannotGC;
+
+        JS::ubi::Node node = args.get(0);
+        if (node)
+            args.rval().setNumber(uint32_t(node.size(mallocSizeOf)));
+        else
+            args.rval().setUndefined();
+    }
     return true;
 }
 
@@ -2405,6 +2526,32 @@ SetLazyParsingEnabled(JSContext *cx, unsigned argc, Value *vp)
     JS::CompartmentOptionsRef(cx->compartment()).setDiscardSource(!arg);
 
     args.rval().setUndefined();
+    return true;
+}
+
+static bool
+GetConstructorName(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "getConstructorName", 1))
+        return false;
+
+    if (!args[0].isObject()) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
+                             "getConstructorName", "Object",
+                             InformalValueTypeName(args[0]));
+        return false;
+    }
+
+    RootedAtom name(cx);
+    if (!args[0].toObject().constructorDisplayAtom(cx, &name))
+        return false;
+
+    if (name) {
+        args.rval().setString(name);
+    } else {
+        args.rval().setNull();
+    }
     return true;
 }
 
@@ -2532,7 +2679,7 @@ gc::ZealModeHelpText),
 
     JS_FN_HELP("verifypostbarriers", VerifyPostBarriers, 0, 0,
 "verifypostbarriers()",
-"  Start or end a run of the post-write barrier verifier."),
+"  Does nothing (the post-write barrier verifier has been remove)."),
 
     JS_FN_HELP("gcstate", GCState, 0, 0,
 "gcstate()",
@@ -2552,6 +2699,10 @@ gc::ZealModeHelpText),
     JS_FN_HELP("gcslice", GCSlice, 1, 0,
 "gcslice([n])",
 "  Start or continue an an incremental GC, running a slice that processes about n objects."),
+
+    JS_FN_HELP("abortgc", AbortGC, 1, 0,
+"abortgc()",
+"  Abort the current incremental GC."),
 
     JS_FN_HELP("validategc", ValidateGC, 1, 0,
 "validategc(true|false)",
@@ -2662,6 +2813,20 @@ gc::ZealModeHelpText),
     JS_FN_HELP("bailout", testingFunc_bailout, 0, 0,
 "bailout()",
 "  Force a bailout out of ionmonkey (if running in ionmonkey)."),
+
+    JS_FN_HELP("inJit", testingFunc_inJit, 0, 0,
+"inJit()",
+"  Returns true when called within (jit-)compiled code. When jit compilation is disabled this\n"
+"  function returns an error string. This function returns false in all other cases.\n"
+"  Depending on truthiness, you should continue to wait for compilation to happen or stop execution.\n"),
+
+    JS_FN_HELP("inIon", testingFunc_inIon, 0, 0,
+"inIon()",
+"  Returns true when called within ion. When ion is disabled or when compilation is abnormally\n"
+"  slow to start, this function returns an error string. Otherwise, this function returns false.\n"
+"  This behaviour ensures that a falsy value means that we are not in ion, but expect a\n"
+"  compilation to occur in the future. Conversely, a truthy value means that we are either in\n"
+"  ion or that there is litle or no chance of ion ever compiling the current script."),
 
     JS_FN_HELP("assertJitStackInvariants", TestingFunc_assertJitStackInvariants, 0, 0,
 "assertJitStackInvariants()",
@@ -2781,6 +2946,11 @@ gc::ZealModeHelpText),
     JS_FN_HELP("setLazyParsingEnabled", SetLazyParsingEnabled, 1, 0,
 "setLazyParsingEnabled(bool)",
 "  Enable or disable lazy parsing in the current compartment.  The default is enabled."),
+
+    JS_FN_HELP("getConstructorName", GetConstructorName, 1, 0,
+"getConstructorName(object)",
+"  If the given object was created with `new Ctor`, return the constructor's display name. "
+"  Otherwise, return null."),
 
     JS_FS_HELP_END
 };

@@ -127,8 +127,8 @@ JS_SplicePrototype(JSContext* cx, HandleObject obj, HandleObject proto)
     return obj->splicePrototype(cx, obj->getClass(), tagged);
 }
 
-JS_FRIEND_API(JSObject *)
-JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject proto)
+JS_FRIEND_API(JSObject*)
+JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject proto)
 {
     /*
      * Create our object with a null proto and then splice in the correct proto
@@ -136,7 +136,7 @@ JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject pro
      * ObjectGroup attached to our proto with information about our object, since
      * we're not going to be using that ObjectGroup anyway.
      */
-    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class *)clasp, NullPtr(),
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, (const js::Class*)clasp, nullptr,
                                                  SingletonObject));
     if (!obj)
         return nullptr;
@@ -145,8 +145,8 @@ JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, HandleObject pro
     return obj;
 }
 
-JS_FRIEND_API(JSObject *)
-JS_NewObjectWithoutMetadata(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto)
+JS_FRIEND_API(JSObject*)
+JS_NewObjectWithoutMetadata(JSContext* cx, const JSClass* clasp, JS::Handle<JSObject*> proto)
 {
     // Use an AutoEnterAnalysis to suppress invocation of the metadata callback.
     AutoEnterAnalysis enter(cx);
@@ -215,6 +215,13 @@ JS_TraceShapeCycleCollectorChildren(JSTracer* trc, JS::GCCellPtr shape)
 {
     MOZ_ASSERT(shape.isShape());
     MarkCycleCollectorChildren(trc, static_cast<Shape*>(shape.asCell()));
+}
+
+JS_FRIEND_API(void)
+JS_TraceObjectGroupCycleCollectorChildren(JSTracer* trc, JS::GCCellPtr group)
+{
+    MOZ_ASSERT(group.isObjectGroup());
+    MarkCycleCollectorChildren(trc, static_cast<ObjectGroup*>(group.asCell()));
 }
 
 static bool
@@ -417,7 +424,7 @@ js::DefineFunctionWithReserved(JSContext* cx, JSObject* objArg, const char* name
     if (!atom)
         return nullptr;
     Rooted<jsid> id(cx, AtomToId(atom));
-    return DefineFunction(cx, obj, id, call, nargs, attrs, JSFunction::ExtendedFinalizeKind);
+    return DefineFunction(cx, obj, id, call, nargs, attrs, gc::AllocKind::FUNCTION_EXTENDED);
 }
 
 JS_FRIEND_API(JSFunction*)
@@ -436,8 +443,8 @@ js::NewFunctionWithReserved(JSContext* cx, JSNative native, unsigned nargs, unsi
     }
 
     return (flags & JSFUN_CONSTRUCTOR) ?
-        NewNativeConstructor(cx, native, nargs, atom, JSFunction::ExtendedFinalizeKind) :
-        NewNativeFunction(cx, native, nargs, atom, JSFunction::ExtendedFinalizeKind);
+        NewNativeConstructor(cx, native, nargs, atom, gc::AllocKind::FUNCTION_EXTENDED) :
+        NewNativeFunction(cx, native, nargs, atom, gc::AllocKind::FUNCTION_EXTENDED);
 }
 
 JS_FRIEND_API(JSFunction *)
@@ -450,8 +457,8 @@ js::NewFunctionByIdWithReserved(JSContext *cx, JSNative native, unsigned nargs, 
 
     RootedAtom atom(cx, JSID_TO_ATOM(id));
     return (flags & JSFUN_CONSTRUCTOR) ?
-        NewNativeConstructor(cx, native, nargs, atom, JSFunction::ExtendedFinalizeKind) :
-        NewNativeFunction(cx, native, nargs, atom, JSFunction::ExtendedFinalizeKind);
+        NewNativeConstructor(cx, native, nargs, atom, gc::AllocKind::FUNCTION_EXTENDED) :
+        NewNativeFunction(cx, native, nargs, atom, gc::AllocKind::FUNCTION_EXTENDED);
 }
 
 JS_FRIEND_API(const Value&)
@@ -947,8 +954,8 @@ DumpHeapVisitChild(JS::CallbackTracer *trc, void** thingp, JSGCTraceKind kind)
 
     DumpHeapTracer* dtrc = static_cast<DumpHeapTracer*>(trc);
     char buffer[1024];
-    fprintf(dtrc->output, "> %p %c %s\n", *thingp, MarkDescriptor(*thingp),
-            dtrc->getTracingEdgeName(buffer, sizeof(buffer)));
+    dtrc->getTracingEdgeName(buffer, sizeof(buffer));
+    fprintf(dtrc->output, "> %p %c %s\n", *thingp, MarkDescriptor(*thingp), buffer);
 }
 
 static void
@@ -959,8 +966,8 @@ DumpHeapVisitRoot(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 
     DumpHeapTracer* dtrc = static_cast<DumpHeapTracer*>(trc);
     char buffer[1024];
-    fprintf(dtrc->output, "%p %c %s\n", *thingp, MarkDescriptor(*thingp),
-            dtrc->getTracingEdgeName(buffer, sizeof(buffer)));
+    dtrc->getTracingEdgeName(buffer, sizeof(buffer));
+    fprintf(dtrc->output, "%p %c %s\n", *thingp, MarkDescriptor(*thingp), buffer);
 }
 
 void
@@ -1044,7 +1051,7 @@ js::GetAnyCompartmentInZone(JS::Zone* zone)
 void
 JS::ObjectPtr::updateWeakPointerAfterGC()
 {
-    if (js::gc::IsObjectAboutToBeFinalized(value.unsafeGet()))
+    if (js::gc::IsAboutToBeFinalizedUnbarriered(value.unsafeGet()))
         value = nullptr;
 }
 
@@ -1252,4 +1259,12 @@ JS_FRIEND_API(bool)
 js::ForwardToNative(JSContext* cx, JSNative native, const CallArgs& args)
 {
     return native(cx, args.length(), args.base());
+}
+
+JS_FRIEND_API(JSAtom*)
+js::GetPropertyNameFromPC(JSScript* script, jsbytecode* pc)
+{
+    if (!IsGetPropPC(pc) && !IsSetPropPC(pc))
+        return nullptr;
+    return script->getName(pc);
 }

@@ -68,7 +68,9 @@ BaseProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
     else
         vp.setUndefined();
 
-    return CallJSGetterOp(cx, desc.getter(), receiver, id, vp);
+    // A proxy object should never have own JSGetterOps.
+    MOZ_ASSERT(desc.object() != proxy);
+    return CallJSGetterOp(cx, desc.getter(), desc.object(), id, vp);
 }
 
 bool
@@ -277,7 +279,7 @@ BaseProxyHandler::hasInstance(JSContext* cx, HandleObject proxy, MutableHandleVa
     assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
     RootedValue val(cx, ObjectValue(*proxy.get()));
     ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
-                     JSDVG_SEARCH_STACK, val, js::NullPtr());
+                     JSDVG_SEARCH_STACK, val, nullptr);
     return false;
 }
 

@@ -44,6 +44,7 @@ const Class RegExpStaticsObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     resc_finalize,
     nullptr, /* call */
@@ -52,13 +53,13 @@ const Class RegExpStaticsObject::class_ = {
     resc_trace
 };
 
-RegExpStaticsObject *
-RegExpStatics::create(ExclusiveContext *cx, Handle<GlobalObject*> parent)
+RegExpStaticsObject*
+RegExpStatics::create(ExclusiveContext* cx, Handle<GlobalObject*> parent)
 {
-    RegExpStaticsObject *obj = NewObjectWithGivenProto<RegExpStaticsObject>(cx, NullPtr());
+    RegExpStaticsObject* obj = NewObjectWithGivenProto<RegExpStaticsObject>(cx, nullptr);
     if (!obj)
         return nullptr;
-    RegExpStatics *res = cx->new_<RegExpStatics>();
+    RegExpStatics* res = cx->new_<RegExpStatics>();
     if (!res)
         return nullptr;
     obj->setPrivate(static_cast<void*>(res));

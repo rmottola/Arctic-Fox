@@ -15,7 +15,6 @@
 
 #include "ds/LifoAlloc.h"
 #include "gc/Nursery.h"
-#include "gc/Tracer.h"
 #include "js/MemoryMetrics.h"
 
 namespace js {
@@ -30,32 +29,8 @@ namespace gc {
 class BufferableRef
 {
   public:
-    virtual void mark(JSTracer* trc) = 0;
+    virtual void trace(JSTracer* trc) = 0;
     bool maybeInRememberedSet(const Nursery&) const { return true; }
-};
-
-/*
- * HashKeyRef represents a reference to a HashMap key. This should normally
- * be used through the HashTableWriteBarrierPost function.
- */
-template <typename Map, typename Key>
-class HashKeyRef : public BufferableRef
-{
-    Map* map;
-    Key key;
-
-  public:
-    HashKeyRef(Map* m, const Key& k) : map(m), key(k) {}
-
-    void mark(JSTracer* trc) {
-        Key prior = key;
-        typename Map::Ptr p = map->lookup(key);
-        if (!p)
-            return;
-        trc->setTracingLocation(&*p);
-        Mark(trc, &key, "HashKeyRef");
-        map->rekeyIfMoved(prior, key);
-    }
 };
 
 typedef HashSet<void*, PointerHasher<void*, 3>, SystemAllocPolicy> EdgeSet;
@@ -146,8 +121,8 @@ class StoreBuffer
             stores_.remove(v);
         }
 
-        /* Mark the source of all edges in the store buffer. */
-        void mark(StoreBuffer* owner, JSTracer* trc);
+        /* Trace the source of all edges in the store buffer. */
+        void trace(StoreBuffer* owner, TenuringTracer& mover);
 
         size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) {
             return stores_.sizeOfExcludingThis(mallocSizeOf);
@@ -183,8 +158,8 @@ class StoreBuffer
                    storage_->availableInCurrentChunk() < LowAvailableThreshold;
         }
 
-        /* Mark all generic edges. */
-        void mark(StoreBuffer* owner, JSTracer* trc);
+        /* Trace all generic edges. */
+        void trace(StoreBuffer* owner, JSTracer* trc);
 
         template <typename T>
         void put(StoreBuffer* owner, const T& t) {
@@ -237,7 +212,7 @@ class StoreBuffer
             return !nursery.isInside(edge);
         }
 
-        void mark(JSTracer* trc) const;
+        void trace(TenuringTracer& mover) const;
 
         CellPtrEdge tagged() const { return CellPtrEdge((Cell**)(uintptr_t(edge) | 1)); }
         CellPtrEdge untagged() const { return CellPtrEdge((Cell**)(uintptr_t(edge) & ~1)); }
@@ -262,7 +237,7 @@ class StoreBuffer
             return !nursery.isInside(edge);
         }
 
-        void mark(JSTracer* trc) const;
+        void trace(TenuringTracer& mover) const;
 
         ValueEdge tagged() const { return ValueEdge((JS::Value*)(uintptr_t(edge) | 1)); }
         ValueEdge untagged() const { return ValueEdge((JS::Value*)(uintptr_t(edge) & ~1)); }
@@ -308,7 +283,7 @@ class StoreBuffer
             return !IsInsideNursery(reinterpret_cast<Cell*>(object()));
         }
 
-        void mark(JSTracer* trc) const;
+        void trace(TenuringTracer& mover) const;
 
         typedef struct {
             typedef SlotsEdge Lookup;
@@ -334,7 +309,7 @@ class StoreBuffer
         static bool supportsDeduplication() { return true; }
         void* deduplicationKey() const { return (void*)edge; }
 
-        void mark(JSTracer* trc) const;
+        void trace(TenuringTracer& mover) const;
 
         typedef PointerEdgeHasher<WholeCellEdges> Hasher;
     };
@@ -342,16 +317,16 @@ class StoreBuffer
     template <typename Key>
     struct CallbackRef : public BufferableRef
     {
-        typedef void (*MarkCallback)(JSTracer* trc, Key* key, void* data);
+        typedef void (*TraceCallback)(JSTracer* trc, Key* key, void* data);
 
-        CallbackRef(MarkCallback cb, Key* k, void* d) : callback(cb), key(k), data(d) {}
+        CallbackRef(TraceCallback cb, Key* k, void* d) : callback(cb), key(k), data(d) {}
 
-        virtual void mark(JSTracer* trc) {
+        virtual void trace(JSTracer* trc) {
             callback(trc, key, data);
         }
 
       private:
-        MarkCallback callback;
+        TraceCallback callback;
         Key* key;
         void* data;
     };
@@ -469,15 +444,14 @@ class StoreBuffer
         putFromAnyThread(bufferGeneric, CallbackRef<Key>(callback, key, data));
     }
 
-    /* Methods to mark the source of all edges in the store buffer. */
-    void markAll(JSTracer* trc);
-    void markValues(JSTracer* trc)            { bufferVal.mark(this, trc); }
-    void markCells(JSTracer* trc)             { bufferCell.mark(this, trc); }
-    void markSlots(JSTracer* trc)             { bufferSlot.mark(this, trc); }
-    void markWholeCells(JSTracer* trc)        { bufferWholeCell.mark(this, trc); }
-    void markRelocatableValues(JSTracer* trc) { bufferRelocVal.mark(this, trc); }
-    void markRelocatableCells(JSTracer* trc)  { bufferRelocCell.mark(this, trc); }
-    void markGenericEntries(JSTracer* trc)    { bufferGeneric.mark(this, trc); }
+    /* Methods to trace the source of all edges in the store buffer. */
+    void traceValues(TenuringTracer& mover)            { bufferVal.trace(this, mover); }
+    void traceCells(TenuringTracer& mover)             { bufferCell.trace(this, mover); }
+    void traceSlots(TenuringTracer& mover)             { bufferSlot.trace(this, mover); }
+    void traceWholeCells(TenuringTracer& mover)        { bufferWholeCell.trace(this, mover); }
+    void traceRelocatableValues(TenuringTracer& mover) { bufferRelocVal.trace(this, mover); }
+    void traceRelocatableCells(TenuringTracer& mover)  { bufferRelocCell.trace(this, mover); }
+    void traceGenericEntries(JSTracer *trc)            { bufferGeneric.trace(this, trc); }
 
     /* For use by our owned buffers and for testing. */
     void setAboutToOverflow();

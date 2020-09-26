@@ -45,19 +45,10 @@ class MacroAssemblerX86Shared : public Assembler
     MacroAssembler& asMasm();
     const MacroAssembler& asMasm() const;
 
-  protected:
-    // Bytes pushed onto the frame by the callee; includes frameDepth_. This is
-    // needed to compute offsets to stack slots while temporary space has been
-    // reserved for unexpected spills or C++ function calls. It is maintained
-    // by functions which track stack alignment, which for clear distinction
-    // use StudlyCaps (for example, Push, Pop).
-    uint32_t framePushed_;
-
   public:
     using Assembler::call;
 
     MacroAssemblerX86Shared()
-      : framePushed_(0)
     { }
 
     void compareDouble(DoubleCondition cond, FloatRegister lhs, FloatRegister rhs) {
@@ -507,6 +498,69 @@ class MacroAssemblerX86Shared : public Assembler
 
 #undef ATOMIC_BITOP_BODY
 
+    // S is Register or Imm32; T is Address or BaseIndex.
+
+    template <typename S, typename T>
+    void atomicAdd8(const S& src, const T& mem) {
+        lock_addb(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicAdd16(const S& src, const T& mem) {
+        lock_addw(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicAdd32(const S& src, const T& mem) {
+        lock_addl(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicSub8(const S& src, const T& mem) {
+        lock_subb(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicSub16(const S& src, const T& mem) {
+        lock_subw(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicSub32(const S& src, const T& mem) {
+        lock_subl(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicAnd8(const S& src, const T& mem) {
+        lock_andb(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicAnd16(const S& src, const T& mem) {
+        lock_andw(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicAnd32(const S& src, const T& mem) {
+        lock_andl(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicOr8(const S& src, const T& mem) {
+        lock_orb(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicOr16(const S& src, const T& mem) {
+        lock_orw(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicOr32(const S& src, const T& mem) {
+        lock_orl(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicXor8(const S& src, const T& mem) {
+        lock_xorb(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicXor16(const S& src, const T& mem) {
+        lock_xorw(src, Operand(mem));
+    }
+    template <typename S, typename T>
+    void atomicXor32(const S& src, const T& mem) {
+        lock_xorl(src, Operand(mem));
+    }
+
     void storeLoadFence() {
         // This implementation follows Linux.
         if (HasSSE2())
@@ -570,25 +624,10 @@ class MacroAssemblerX86Shared : public Assembler
         test32(Operand(address), imm);
         j(cond, label);
     }
-
-    // The following functions are exposed for use in platform-shared code.
-    CodeOffsetLabel PushWithPatch(ImmWord word) {
-        framePushed_ += sizeof(word.value);
-        return pushWithPatch(word);
-    }
-    CodeOffsetLabel PushWithPatch(ImmPtr imm) {
-        return PushWithPatch(ImmWord(uintptr_t(imm.value)));
-    }
-
-    void implicitPop(uint32_t args) {
-        MOZ_ASSERT(args % sizeof(intptr_t) == 0);
-        framePushed_ -= args;
-    }
-    uint32_t framePushed() const {
-        return framePushed_;
-    }
-    void setFramePushed(uint32_t framePushed) {
-        framePushed_ = framePushed;
+    void branchTest32(Condition cond, const Operand& lhs, Imm32 imm, Label* label) {
+        MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == NotSigned);
+        test32(lhs, imm);
+        j(cond, label);
     }
 
     void jump(Label* label) {
@@ -868,11 +907,10 @@ class MacroAssemblerX86Shared : public Assembler
     }
 
     void convertFloat32x4ToInt32x4(FloatRegister src, FloatRegister dest) {
-        // TODO: Note that if the conversion failed (because the converted
+        // Note that if the conversion failed (because the converted
         // result is larger than the maximum signed int32, or less than the
         // least signed int32, or NaN), this will return the undefined integer
-        // value (0x8000000). Spec should define what to do in such cases. See
-        // also bug 1068020.
+        // value (0x8000000).
         vcvttps2dq(src, dest);
     }
     void convertInt32x4ToFloat32x4(FloatRegister src, FloatRegister dest) {
@@ -1392,14 +1430,6 @@ class MacroAssemblerX86Shared : public Assembler
     void callWithExitFrame(Label* target);
     void callWithExitFrame(JitCode* target);
 
-    void call(const CallSiteDesc& desc, Label* label) {
-        call(label);
-        append(desc, currentOffset(), framePushed_);
-    }
-    void call(const CallSiteDesc& desc, Register reg) {
-        call(reg);
-        append(desc, currentOffset(), framePushed_);
-    }
     void callJit(Register callee) {
         call(callee);
     }

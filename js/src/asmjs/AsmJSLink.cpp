@@ -746,8 +746,12 @@ CallAsmJS(JSContext* cx, unsigned argc, Value* vp)
         // that the optimized asm.js-to-Ion FFI call path (which we want to be
         // very fast) can avoid doing so. The JitActivation is marked as
         // inactive so stack iteration will skip over it.
+        //
+        // We needn't provide an entry script pointer; that's only used for
+        // reporting entry points to performance-monitoring tools, and asm.js ->
+        // Ion calls will never be entry points.
         AsmJSActivation activation(cx, module);
-        JitActivation jitActivation(cx, /* active */ false);
+        JitActivation jitActivation(cx, /* entryScript */ nullptr, /* active */ false);
 
         // Call the per-exported-function trampoline created by GenerateEntry.
         AsmJSModule::CodePtr enter = module.entryTrampoline(func);
@@ -801,7 +805,7 @@ NewExportedFunction(JSContext* cx, const AsmJSModule::ExportedFunction& func,
     unsigned numArgs = func.isChangeHeap() ? 1 : func.numArgs();
     JSFunction *fun =
         NewNativeConstructor(cx, CallAsmJS, numArgs, name,
-                             JSFunction::ExtendedFinalizeKind, GenericObject,
+                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject,
                              JSFunction::ASMJS_CTOR);
     if (!fun)
         return nullptr;
@@ -823,8 +827,8 @@ HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& modul
     if (!src)
         return false;
 
-    RootedFunction fun(cx, NewScriptedFunction(cx, 0, JSFunction::INTERPRETED,
-                                               name, JSFunction::FinalizeKind,
+    RootedFunction fun(cx, NewScriptedFunction(cx, 0, JSFunction::INTERPRETED_NORMAL,
+                                               name, gc::AllocKind::FUNCTION,
                                                TenuredObject));
     if (!fun)
         return false;
@@ -860,7 +864,7 @@ HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& modul
                                               : SourceBufferHolder::NoOwnership;
     SourceBufferHolder srcBuf(chars, end - begin, ownership);
     if (!frontend::CompileFunctionBody(cx, &fun, options, formals, srcBuf,
-                                       /* enclosingScope = */ NullPtr()))
+                                       /* enclosingScope = */ nullptr))
         return false;
 
     // Call the function we just recompiled.
@@ -1095,7 +1099,7 @@ js::NewAsmJSModuleFunction(ExclusiveContext* cx, JSFunction* origFun, HandleObje
                                                   : JSFunction::ASMJS_CTOR;
     JSFunction *moduleFun =
         NewNativeConstructor(cx, LinkAsmJS, origFun->nargs(), name,
-                             JSFunction::ExtendedFinalizeKind, TenuredObject,
+                             gc::AllocKind::FUNCTION_EXTENDED, TenuredObject,
                              flags);
     if (!moduleFun)
         return nullptr;

@@ -41,8 +41,8 @@
 #include "GeckoProfiler.h"
 #include "nsIConsoleService.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Preferences.h"
-#include "mozilla/VisualEventTracer.h"
 #include "nsISSLSocketControl.h"
 #include "sslt.h"
 #include "nsContentUtils.h"
@@ -85,6 +85,10 @@
 namespace mozilla { namespace net {
 
 namespace {
+
+// Monotonically increasing ID for generating unique cache entries per
+// intercepted channel.
+static uint64_t gNumIntercepted = 0;
 
 // True if the local cache should be bypassed when processing a request.
 #define BYPASS_LOCAL_CACHE(loadFlags) \
@@ -211,8 +215,6 @@ AutoRedirectVetoNotifier::ReportRedirectResult(bool succeeded)
 
     // Drop after the notification
     channel->mHasAutoRedirectVetoNotifier = false;
-
-    MOZ_EVENT_TRACER_DONE(channel, "net::http::redirect-callbacks");
 }
 
 //-----------------------------------------------------------------------------
@@ -226,6 +228,7 @@ nsHttpChannel::nsHttpChannel()
     , mRequestTime(0)
     , mOfflineCacheLastModifiedTime(0)
     , mInterceptCache(DO_NOT_INTERCEPT)
+    , mInterceptionID(gNumIntercepted++)
     , mCachedContentIsValid(false)
     , mCachedContentIsPartial(false)
     , mCacheOnlyMetadata(false)
@@ -248,6 +251,7 @@ nsHttpChannel::nsHttpChannel()
     , mHasAutoRedirectVetoNotifier(0)
     , mPushedStream(nullptr)
     , mLocalBlocklist(false)
+    , mWarningReporter(nullptr)
     , mDidReval(false)
 {
     LOG(("Creating nsHttpChannel [this=%p]\n", this));
@@ -270,12 +274,6 @@ nsHttpChannel::Init(nsIURI *uri,
                     uint32_t proxyResolveFlags,
                     nsIURI *proxyURI)
 {
-#ifdef MOZ_VISUAL_EVENT_TRACER
-    nsAutoCString url;
-    uri->GetAsciiSpec(url);
-    MOZ_EVENT_TRACER_NAME_OBJECT(this, url.get());
-#endif
-
     nsresult rv = HttpBaseChannel::Init(uri, caps, proxyInfo,
                                         proxyResolveFlags, proxyURI);
     if (NS_FAILED(rv))
@@ -285,6 +283,19 @@ nsHttpChannel::Init(nsIURI *uri,
 
     return rv;
 }
+
+nsresult
+nsHttpChannel::AddSecurityMessage(const nsAString& aMessageTag,
+                                  const nsAString& aMessageCategory)
+{
+    if (mWarningReporter) {
+        return mWarningReporter->ReportSecurityMessage(aMessageTag,
+                                                       aMessageCategory);
+    }
+    return HttpBaseChannel::AddSecurityMessage(aMessageTag,
+                                               aMessageCategory);
+}
+
 //-----------------------------------------------------------------------------
 // nsHttpChannel <private>
 //-----------------------------------------------------------------------------
@@ -2759,8 +2770,6 @@ IsSubRangeRequest(nsHttpRequestHead &aRequestHead)
 nsresult
 nsHttpChannel::OpenCacheEntry(bool isHttps)
 {
-    MOZ_EVENT_TRACER_EXEC(this, "net::http::OpenCacheEntry");
-
     // Handle correctly mCacheEntriesToWaitFor
     AutoCacheWaitFlags waitFlags(this);
 
@@ -2884,12 +2893,16 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         extension.Append(nsPrintfCString("%d", mPostID));
     }
     if (PossiblyIntercepted()) {
-        extension.Append('u');
+        extension.Append(nsPrintfCString("u%lld", mInterceptionID));
     }
 
     // If this channel should be intercepted, we do not open a cache entry for this channel
     // until the interception process is complete and the consumer decides what to do with it.
     if (mInterceptCache == MAYBE_INTERCEPT) {
+        DebugOnly<bool> exists;
+        MOZ_ASSERT(NS_FAILED(cacheStorage->Exists(openURI, extension, &exists)) || !exists,
+                   "The entry must not exist in the cache before we create it here");
+
         nsCOMPtr<nsICacheEntry> entry;
         rv = cacheStorage->OpenTruncate(openURI, extension, getter_AddRefs(entry));
         NS_ENSURE_SUCCESS(rv, rv);
@@ -4479,11 +4492,6 @@ nsHttpChannel::AsyncProcessRedirection(uint32_t redirectType)
     LOG(("nsHttpChannel::AsyncProcessRedirection [this=%p type=%u]\n",
         this, redirectType));
 
-    // The channel is actually starting its operation now, at least because
-    // we want it to appear like being in the waiting phase until now.
-    MOZ_EVENT_TRACER_EXEC(this, "net::http::channel");
-    MOZ_EVENT_TRACER_EXEC(this, "net::http::redirect-callbacks");
-
     const char *location = mResponseHead->PeekHeader(nsHttp::Location);
 
     // if a location header was not given, then we can't perform the redirect,
@@ -4848,8 +4856,6 @@ nsHttpChannel::GetSecurityInfo(nsISupports **securityInfo)
 NS_IMETHODIMP
 nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
 {
-    MOZ_EVENT_TRACER_WAIT(this, "net::http::channel");
-
     LOG(("nsHttpChannel::AsyncOpen [this=%p]\n", this));
 
     NS_ENSURE_ARG_POINTER(listener);
@@ -5763,8 +5769,6 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
         mListener->OnStopRequest(this, mListenerContext, status);
     }
 
-    MOZ_EVENT_TRACER_DONE(this, "net::http::channel");
-
     CloseCacheEntry(!contentComplete);
 
     if (mOfflineCacheEntry)
@@ -5890,9 +5894,6 @@ nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
         // already streamed some data from another source (see, for example,
         // OnDoneReadingPartialCacheEntry).
         //
-        if (!mLogicalOffset)
-            MOZ_EVENT_TRACER_EXEC(this, "net::http::channel");
-
         int64_t offsetBefore = 0;
         nsCOMPtr<nsISeekableStream> seekable = do_QueryInterface(input);
         if (seekable && NS_FAILED(seekable->Tell(&offsetBefore))) {
@@ -6157,35 +6158,6 @@ nsHttpChannel::SetOfflineCacheToken(nsISupports *token)
     return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-class nsHttpChannelCacheKey final : public nsISupportsPRUint32,
-                                    public nsISupportsCString
-{
-    NS_DECL_ISUPPORTS
-
-    NS_DECL_NSISUPPORTSPRIMITIVE
-    NS_FORWARD_NSISUPPORTSPRUINT32(mSupportsPRUint32->)
-
-    // Both interfaces declares toString method with the same signature.
-    // Thus we have to delegate only to nsISupportsPRUint32 implementation.
-    NS_IMETHOD GetData(nsACString & aData) override
-    {
-        return mSupportsCString->GetData(aData);
-    }
-    NS_IMETHOD SetData(const nsACString & aData) override
-    {
-        return mSupportsCString->SetData(aData);
-    }
-
-public:
-    nsresult SetData(uint32_t aPostID, const nsACString& aKey);
-
-protected:
-    ~nsHttpChannelCacheKey() {}
-
-    nsCOMPtr<nsISupportsPRUint32> mSupportsPRUint32;
-    nsCOMPtr<nsISupportsCString> mSupportsCString;
-};
-
 NS_IMPL_ADDREF(nsHttpChannelCacheKey)
 NS_IMPL_RELEASE(nsHttpChannelCacheKey)
 NS_INTERFACE_TABLE_HEAD(nsHttpChannelCacheKey)
@@ -6229,6 +6201,19 @@ nsresult nsHttpChannelCacheKey::SetData(uint32_t aPostID,
     if (NS_FAILED(rv)) return rv;
 
     return NS_OK;
+}
+
+nsresult nsHttpChannelCacheKey::GetData(uint32_t *aPostID,
+                                        nsACString& aKey)
+{
+    nsresult rv;
+
+    rv = mSupportsPRUint32->GetData(aPostID);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    return mSupportsCString->GetData(aKey);
 }
 
 NS_IMETHODIMP
@@ -6568,7 +6553,6 @@ nsHttpChannel::OnRedirectVerifyCallback(nsresult result)
         // We are not waiting for the callback. At this moment we must release
         // reference to the redirect target channel, otherwise we may leak.
         mRedirectChannel = nullptr;
-        MOZ_EVENT_TRACER_DONE(this, "net::http::channel");
     }
 
     // We always resume the pumps here. If all functions on stack have been

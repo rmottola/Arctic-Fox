@@ -44,6 +44,7 @@ class HttpChannelParent final : public PHttpChannelParent
                               , public nsIAuthPromptProvider
                               , public nsINetworkInterceptController
                               , public DisconnectableParent
+                              , public HttpChannelSecurityWarningReporter
 {
   virtual ~HttpChannelParent();
 
@@ -121,6 +122,7 @@ protected:
                    const uint32_t&            aContentPolicyType,
                    const uint32_t&            aInnerWindowID,
                    const OptionalHttpResponseHead& aSynthesizedResponseHead,
+                   const OptionalHttpChannelCacheKey& aCacheKey,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;
@@ -154,6 +156,9 @@ protected:
 
   void OfflineDisconnect() override;
   uint32_t GetAppId() override;
+
+  nsresult ReportSecurityMessage(const nsAString& aMessageTag,
+                                 const nsAString& aMessageCategory) override;
 
 private:
   nsRefPtr<nsHttpChannel>       mChannel;

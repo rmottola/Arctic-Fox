@@ -66,7 +66,9 @@ namespace jit {
     _(ArraySplice)                                                          \
     _(Bail)                                                                 \
     _(Unreachable)                                                          \
+    _(EncodeSnapshot)                                                       \
     _(AssertFloat32)                                                        \
+    _(AssertRecoveredOnBailout)                                             \
     _(GetDynamicName)                                                       \
     _(CallDirectEval)                                                       \
     _(BitNot)                                                               \
@@ -164,6 +166,8 @@ namespace jit {
     _(GuardObjectGroup)                                                     \
     _(GuardObjectIdentity)                                                  \
     _(GuardClass)                                                           \
+    _(GuardUnboxedExpando)                                                  \
+    _(LoadUnboxedExpando)                                                   \
     _(ArrayLength)                                                          \
     _(SetArrayLength)                                                       \
     _(TypedArrayLength)                                                     \
@@ -173,6 +177,9 @@ namespace jit {
     _(SetTypedObjectOffset)                                                 \
     _(InitializedLength)                                                    \
     _(SetInitializedLength)                                                 \
+    _(UnboxedArrayLength)                                                   \
+    _(UnboxedArrayInitializedLength)                                        \
+    _(IncrementUnboxedArrayInitializedLength)                               \
     _(Not)                                                                  \
     _(BoundsCheck)                                                          \
     _(BoundsCheckLower)                                                     \
@@ -191,6 +198,7 @@ namespace jit {
     _(ArrayPopShift)                                                        \
     _(ArrayPush)                                                            \
     _(ArrayConcat)                                                          \
+    _(ArraySlice)                                                           \
     _(ArrayJoin)                                                            \
     _(LoadTypedArrayElementHole)                                            \
     _(LoadTypedArrayElementStatic)                                          \

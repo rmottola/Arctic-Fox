@@ -4,16 +4,18 @@
 
 "use strict";
 
-const gcli = require("gcli/index");
-const { gDevTools } = require("resource://gre/modules/devtools/gDevTools.jsm");
+const l10n = require("gcli/l10n");
+loader.lazyGetter(this, "gDevTools", () => require("resource://gre/modules/devtools/gDevTools.jsm").gDevTools);
 
 exports.items = [
   {
+    item: "command",
+    runAt: "client",
     name: 'splitconsole',
     hidden: true,
     buttonId: "command-button-splitconsole",
     buttonClass: "command-button command-button-invertable",
-    tooltipText: gcli.lookup("splitconsoleTooltip"),
+    tooltipText: l10n.lookup("splitconsoleTooltip"),
     isRemoteSafe: true,
     state: {
       isChecked: function(target) {
@@ -50,12 +52,14 @@ exports.items = [
   },
   {
     name: "console",
-    description: gcli.lookup("consoleDesc"),
-    manual: gcli.lookup("consoleManual")
+    description: l10n.lookup("consoleDesc"),
+    manual: l10n.lookup("consoleManual")
   },
   {
+    item: "command",
+    runAt: "client",
     name: "console clear",
-    description: gcli.lookup("consoleclearDesc"),
+    description: l10n.lookup("consoleclearDesc"),
     exec: function(args, context) {
       let toolbox = gDevTools.getToolbox(context.environment.target);
       if (toolbox == null) {
@@ -71,19 +75,24 @@ exports.items = [
     }
   },
   {
+    item: "command",
+    runAt: "client",
     name: "console close",
-    description: gcli.lookup("consolecloseDesc"),
+    description: l10n.lookup("consolecloseDesc"),
     exec: function(args, context) {
-      // Don't return a value to GCLI
-      return gDevTools.closeToolbox(context.environment.target).then(() => {});
+      return gDevTools.closeToolbox(context.environment.target)
+                      .then(() => {}); // Don't return a value to GCLI
     }
   },
   {
+    item: "command",
+    runAt: "client",
     name: "console open",
-    description: gcli.lookup("consoleopenDesc"),
+    description: l10n.lookup("consoleopenDesc"),
     exec: function(args, context) {
-      // Don't return a value to GCLI
-      return gDevTools.showToolbox(context.environment.target, "webconsole").then(() => {});
+      const target = context.environment.target;
+      return gDevTools.showToolbox(target, "webconsole")
+                      .then(() => {}); // Don't return a value to GCLI
     }
   }
 ];

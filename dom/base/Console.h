@@ -90,6 +90,9 @@ public:
   TimeEnd(JSContext* aCx, const JS::Handle<JS::Value> aTime);
 
   void
+  TimeStamp(JSContext* aCx, const JS::Handle<JS::Value> aData);
+
+  void
   Profile(JSContext* aCx, const Sequence<JS::Value>& aData);
 
   void
@@ -121,6 +124,7 @@ private:
     MethodGroupEnd,
     MethodTime,
     MethodTimeEnd,
+    MethodTimeStamp,
     MethodAssert,
     MethodCount
   };

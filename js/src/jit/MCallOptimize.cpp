@@ -45,6 +45,13 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
     // Default failure reason is observing an unsupported type.
     trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadType);
 
+    if (shouldAbortOnPreliminaryGroups(callInfo.thisArg()))
+        return InliningStatus_NotInlined;
+    for (size_t i = 0; i < callInfo.argc(); i++) {
+        if (shouldAbortOnPreliminaryGroups(callInfo.getArg(i)))
+            return InliningStatus_NotInlined;
+    }
+
     // Atomic natives.
     if (native == atomics_compareExchange)
         return inlineAtomicsCompareExchange(callInfo);
@@ -74,6 +81,8 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
         return inlineArrayPush(callInfo);
     if (native == js::array_concat)
         return inlineArrayConcat(callInfo);
+    if (native == js::array_slice)
+        return inlineArraySlice(callInfo);
     if (native == js::array_splice)
         return inlineArraySplice(callInfo);
 
@@ -249,6 +258,8 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
         return inlineBailout(callInfo);
     if (native == testingFunc_assertFloat32)
         return inlineAssertFloat32(callInfo);
+    if (native == testingFunc_assertRecoveredOnBailout)
+        return inlineAssertRecoveredOnBailout(callInfo);
 
     // Bound function
     if (native == js::CallOrConstructBoundFunction)
@@ -281,6 +292,13 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
 
     BITWISE_COMMONX4_SIMD_OP(INLINE_SIMD_BITWISE_)
 #undef INLINE_SIMD_BITWISE_
+
+    if (native == js::simd_int32x4_shiftLeftByScalar)
+        return inlineBinarySimd<MSimdShift>(callInfo, native, MSimdShift::lsh, SimdTypeDescr::Int32x4);
+    if (native == js::simd_int32x4_shiftRightArithmeticByScalar)
+        return inlineBinarySimd<MSimdShift>(callInfo, native, MSimdShift::rsh, SimdTypeDescr::Int32x4);
+    if (native == js::simd_int32x4_shiftRightLogicalByScalar)
+        return inlineBinarySimd<MSimdShift>(callInfo, native, MSimdShift::ursh, SimdTypeDescr::Int32x4);
 
 #define INLINE_SIMD_COMPARISON_(OP)                                                                \
     if (native == js::simd_int32x4_##OP)                                                           \
@@ -360,37 +378,37 @@ IonBuilder::inlineNativeCall(CallInfo& callInfo, JSFunction* target)
 
     if (native == js::simd_int32x4_load)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Int32x4, 4);
-    if (native == js::simd_int32x4_loadX)
+    if (native == js::simd_int32x4_load1)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Int32x4, 1);
-    if (native == js::simd_int32x4_loadXY)
+    if (native == js::simd_int32x4_load2)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Int32x4, 2);
-    if (native == js::simd_int32x4_loadXYZ)
+    if (native == js::simd_int32x4_load3)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Int32x4, 3);
 
     if (native == js::simd_float32x4_load)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Float32x4, 4);
-    if (native == js::simd_float32x4_loadX)
+    if (native == js::simd_float32x4_load1)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Float32x4, 1);
-    if (native == js::simd_float32x4_loadXY)
+    if (native == js::simd_float32x4_load2)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Float32x4, 2);
-    if (native == js::simd_float32x4_loadXYZ)
+    if (native == js::simd_float32x4_load3)
         return inlineSimdLoad(callInfo, native, SimdTypeDescr::Float32x4, 3);
 
     if (native == js::simd_int32x4_store)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Int32x4, 4);
-    if (native == js::simd_int32x4_storeX)
+    if (native == js::simd_int32x4_store1)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Int32x4, 1);
-    if (native == js::simd_int32x4_storeXY)
+    if (native == js::simd_int32x4_store2)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Int32x4, 2);
-    if (native == js::simd_int32x4_storeXYZ)
+    if (native == js::simd_int32x4_store3)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Int32x4, 3);
     if (native == js::simd_float32x4_store)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Float32x4, 4);
-    if (native == js::simd_float32x4_storeX)
+    if (native == js::simd_float32x4_store1)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Float32x4, 1);
-    if (native == js::simd_float32x4_storeXY)
+    if (native == js::simd_float32x4_store2)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Float32x4, 2);
-    if (native == js::simd_float32x4_storeXYZ)
+    if (native == js::simd_float32x4_store3)
         return inlineSimdStore(callInfo, native, SimdTypeDescr::Float32x4, 3);
 
     return InliningStatus_NotInlined;
@@ -491,7 +509,7 @@ IonBuilder::inlineMathFunction(CallInfo& callInfo, MMathFunction::Function funct
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineArray(CallInfo &callInfo)
+IonBuilder::inlineArray(CallInfo& callInfo)
 {
     uint32_t initLength = 0;
     AllocatingBehaviour allocating = NewArray_Unallocating;
@@ -567,7 +585,7 @@ IonBuilder::inlineArray(CallInfo &callInfo)
 
     MNewArray* ins = MNewArray::New(alloc(), constraints(), initLength, templateConst,
                                     templateArray->group()->initialHeap(constraints()),
-                                    allocating);
+                                    allocating, pc);
     current->add(ins);
     current->push(ins);
 
@@ -584,9 +602,9 @@ IonBuilder::inlineArray(CallInfo &callInfo)
             id = MConstant::New(alloc(), Int32Value(i));
             current->add(id);
 
-            MDefinition *value = callInfo.getArg(i);
+            MDefinition* value = callInfo.getArg(i);
             if (ins->convertDoubleElements()) {
-                MInstruction *valueDouble = MToDouble::New(alloc(), value);
+                MInstruction* valueDouble = MToDouble::New(alloc(), value);
                 current->add(valueDouble);
                 value = valueDouble;
             }
@@ -637,7 +655,10 @@ IonBuilder::inlineArrayPopShift(CallInfo& callInfo, MArrayPopShift::Mode mode)
 
     MDefinition* obj = callInfo.thisArg();
     TemporaryTypeSet* thisTypes = obj->resultTypeSet();
-    if (!thisTypes || thisTypes->getKnownClass(constraints()) != &ArrayObject::class_)
+    if (!thisTypes)
+        return InliningStatus_NotInlined;
+    const Class* clasp = thisTypes->getKnownClass(constraints());
+    if (clasp != &ArrayObject::class_ && clasp != &UnboxedArrayObject::class_)
         return InliningStatus_NotInlined;
     if (thisTypes->hasObjectFlags(constraints(), unhandledFlags)) {
         trackOptimizationOutcome(TrackedOutcome::ArrayBadFlags);
@@ -649,9 +670,17 @@ IonBuilder::inlineArrayPopShift(CallInfo& callInfo, MArrayPopShift::Mode mode)
         return InliningStatus_NotInlined;
     }
 
+    JSValueType unboxedType = JSVAL_TYPE_MAGIC;
+    if (clasp == &UnboxedArrayObject::class_) {
+        unboxedType = UnboxedArrayElementType(constraints(), obj, nullptr);
+        if (unboxedType == JSVAL_TYPE_MAGIC)
+            return InliningStatus_NotInlined;
+    }
+
     callInfo.setImplicitlyUsedUnchecked();
 
-    obj = addMaybeCopyElementsForWrite(obj);
+    if (clasp == &ArrayObject::class_)
+        obj = addMaybeCopyElementsForWrite(obj, /* checkNative = */ false);
 
     TemporaryTypeSet* returnTypes = getInlineReturnTypeSet();
     bool needsHoleCheck = thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_NON_PACKED);
@@ -662,7 +691,8 @@ IonBuilder::inlineArrayPopShift(CallInfo& callInfo, MArrayPopShift::Mode mode)
     if (barrier != BarrierKind::NoBarrier)
         returnType = MIRType_Value;
 
-    MArrayPopShift* ins = MArrayPopShift::New(alloc(), obj, mode, needsHoleCheck, maybeUndefined);
+    MArrayPopShift* ins = MArrayPopShift::New(alloc(), obj, mode,
+                                              unboxedType, needsHoleCheck, maybeUndefined);
     current->add(ins);
     current->push(ins);
     ins->setResultType(returnType);
@@ -765,7 +795,10 @@ IonBuilder::inlineArrayPush(CallInfo& callInfo)
         return InliningStatus_NotInlined;
 
     TemporaryTypeSet* thisTypes = callInfo.thisArg()->resultTypeSet();
-    if (!thisTypes || thisTypes->getKnownClass(constraints()) != &ArrayObject::class_)
+    if (!thisTypes)
+        return InliningStatus_NotInlined;
+    const Class* clasp = thisTypes->getKnownClass(constraints());
+    if (clasp != &ArrayObject::class_ && clasp != &UnboxedArrayObject::class_)
         return InliningStatus_NotInlined;
     if (thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
                                   OBJECT_FLAG_LENGTH_OVERFLOW))
@@ -786,6 +819,13 @@ IonBuilder::inlineArrayPush(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
+    JSValueType unboxedType = JSVAL_TYPE_MAGIC;
+    if (clasp == &UnboxedArrayObject::class_) {
+        unboxedType = UnboxedArrayElementType(constraints(), callInfo.thisArg(), nullptr);
+        if (unboxedType == JSVAL_TYPE_MAGIC)
+            return InliningStatus_NotInlined;
+    }
+
     callInfo.setImplicitlyUsedUnchecked();
     value = callInfo.getArg(0);
 
@@ -797,12 +837,13 @@ IonBuilder::inlineArrayPush(CallInfo& callInfo)
         value = valueDouble;
     }
 
-    obj = addMaybeCopyElementsForWrite(obj);
+    if (unboxedType == JSVAL_TYPE_MAGIC)
+        obj = addMaybeCopyElementsForWrite(obj, /* checkNative = */ false);
 
     if (NeedsPostBarrier(info(), value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
-    MArrayPush* ins = MArrayPush::New(alloc(), obj, value);
+    MArrayPush* ins = MArrayPush::New(alloc(), obj, value, unboxedType);
     current->add(ins);
     current->push(ins);
 
@@ -833,7 +874,8 @@ IonBuilder::inlineArrayConcat(CallInfo& callInfo)
     if (!thisTypes || !argTypes)
         return InliningStatus_NotInlined;
 
-    if (thisTypes->getKnownClass(constraints()) != &ArrayObject::class_)
+    const Class* clasp = thisTypes->getKnownClass(constraints());
+    if (clasp != &ArrayObject::class_ && clasp != &UnboxedArrayObject::class_)
         return InliningStatus_NotInlined;
     if (thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
                                   OBJECT_FLAG_LENGTH_OVERFLOW))
@@ -842,13 +884,22 @@ IonBuilder::inlineArrayConcat(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
-    if (argTypes->getKnownClass(constraints()) != &ArrayObject::class_)
+    if (argTypes->getKnownClass(constraints()) != clasp)
         return InliningStatus_NotInlined;
     if (argTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
                                  OBJECT_FLAG_LENGTH_OVERFLOW))
     {
         trackOptimizationOutcome(TrackedOutcome::ArrayBadFlags);
         return InliningStatus_NotInlined;
+    }
+
+    JSValueType unboxedType = JSVAL_TYPE_MAGIC;
+    if (clasp == &UnboxedArrayObject::class_) {
+        unboxedType = UnboxedArrayElementType(constraints(), callInfo.thisArg(), nullptr);
+        if (unboxedType == JSVAL_TYPE_MAGIC)
+            return InliningStatus_NotInlined;
+        if (unboxedType != UnboxedArrayElementType(constraints(), callInfo.getArg(0), nullptr))
+            return InliningStatus_NotInlined;
     }
 
     // Watch out for indexed properties on the prototype.
@@ -904,13 +955,115 @@ IonBuilder::inlineArrayConcat(CallInfo& callInfo)
     JSObject* templateObj = inspector->getTemplateObjectForNative(pc, js::array_concat);
     if (!templateObj || templateObj->group() != thisGroup)
         return InliningStatus_NotInlined;
-    MOZ_ASSERT(templateObj->is<ArrayObject>());
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MArrayConcat* ins = MArrayConcat::New(alloc(), constraints(), callInfo.thisArg(), callInfo.getArg(0),
-                                          &templateObj->as<ArrayObject>(),
-                                          templateObj->group()->initialHeap(constraints()));
+    MArrayConcat* ins = MArrayConcat::New(alloc(), constraints(),
+                                          callInfo.thisArg(), callInfo.getArg(0),
+                                          templateObj,
+                                          templateObj->group()->initialHeap(constraints()),
+                                          unboxedType);
+    current->add(ins);
+    current->push(ins);
+
+    if (!resumeAfter(ins))
+        return InliningStatus_Error;
+    return InliningStatus_Inlined;
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineArraySlice(CallInfo& callInfo)
+{
+    if (callInfo.constructing()) {
+        trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
+        return InliningStatus_NotInlined;
+    }
+
+    // Ensure |this| and result are objects.
+    if (getInlineReturnType() != MIRType_Object)
+        return InliningStatus_NotInlined;
+    if (callInfo.thisArg()->type() != MIRType_Object)
+        return InliningStatus_NotInlined;
+
+    // Arguments for the sliced region must be integers.
+    if (callInfo.argc() > 0) {
+        if (callInfo.getArg(0)->type() != MIRType_Int32)
+            return InliningStatus_NotInlined;
+        if (callInfo.argc() > 1) {
+            if (callInfo.getArg(1)->type() != MIRType_Int32)
+                return InliningStatus_NotInlined;
+        }
+    }
+
+    // |this| must be a dense array.
+    TemporaryTypeSet* thisTypes = callInfo.thisArg()->resultTypeSet();
+    if (!thisTypes)
+        return InliningStatus_NotInlined;
+
+    const Class* clasp = thisTypes->getKnownClass(constraints());
+    if (clasp != &ArrayObject::class_ && clasp != &UnboxedArrayObject::class_)
+        return InliningStatus_NotInlined;
+    if (thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
+                                  OBJECT_FLAG_LENGTH_OVERFLOW))
+    {
+        trackOptimizationOutcome(TrackedOutcome::ArrayBadFlags);
+        return InliningStatus_NotInlined;
+    }
+
+    JSValueType unboxedType = JSVAL_TYPE_MAGIC;
+    if (clasp == &UnboxedArrayObject::class_) {
+        unboxedType = UnboxedArrayElementType(constraints(), callInfo.thisArg(), nullptr);
+        if (unboxedType == JSVAL_TYPE_MAGIC)
+            return InliningStatus_NotInlined;
+    }
+
+    // Watch out for indexed properties on the prototype.
+    if (ArrayPrototypeHasIndexedProperty(constraints(), script())) {
+        trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
+        return InliningStatus_NotInlined;
+    }
+
+    // The group of the result will be dynamically fixed up to match the input
+    // object, allowing us to handle 'this' objects that might have more than
+    // one group. Make sure that no singletons can be sliced here.
+    for (unsigned i = 0; i < thisTypes->getObjectCount(); i++) {
+        TypeSet::ObjectKey* key = thisTypes->getObject(i);
+        if (key && key->isSingleton())
+            return InliningStatus_NotInlined;
+    }
+
+    // Inline the call.
+    JSObject* templateObj = inspector->getTemplateObjectForNative(pc, js::array_slice);
+    if (!templateObj)
+        return InliningStatus_NotInlined;
+
+    callInfo.setImplicitlyUsedUnchecked();
+
+    MDefinition* begin;
+    if (callInfo.argc() > 0)
+        begin = callInfo.getArg(0);
+    else
+        begin = constant(Int32Value(0));
+
+    MDefinition* end;
+    if (callInfo.argc() > 1) {
+        end = callInfo.getArg(1);
+    } else if (clasp == &ArrayObject::class_) {
+        MElements* elements = MElements::New(alloc(), callInfo.thisArg());
+        current->add(elements);
+
+        end = MArrayLength::New(alloc(), elements);
+        current->add(end->toInstruction());
+    } else {
+        end = MUnboxedArrayLength::New(alloc(), callInfo.thisArg());
+        current->add(end->toInstruction());
+    }
+
+    MArraySlice* ins = MArraySlice::New(alloc(), constraints(),
+                                        callInfo.thisArg(), begin, end,
+                                        templateObj,
+                                        templateObj->group()->initialHeap(constraints()),
+                                        unboxedType);
     current->add(ins);
     current->push(ins);
 
@@ -1178,7 +1331,7 @@ IonBuilder::inlineMathHypot(CallInfo& callInfo)
         return InliningStatus_NotInlined;
 
     for (uint32_t i = 0; i < argc; ++i) {
-        MDefinition * arg = callInfo.getArg(i);
+        MDefinition* arg = callInfo.getArg(i);
         if (!IsNumberType(arg->type()))
             return InliningStatus_NotInlined;
         vector.infallibleAppend(arg);
@@ -1560,7 +1713,7 @@ IonBuilder::inlineConstantStringSplit(CallInfo& callInfo)
 
     MNewArray* ins = MNewArray::New(alloc(), constraints(), initLength, templateConst,
                                     templateObject->group()->initialHeap(constraints()),
-                                    NewArray_FullyAllocating);
+                                    NewArray_FullyAllocating, pc);
 
     current->add(ins);
     current->push(ins);
@@ -2105,7 +2258,7 @@ IonBuilder::inlineUnsafeSetDenseArrayElement(CallInfo& callInfo, uint32_t base)
 
     TemporaryTypeSet::DoubleConversion conversion =
         obj->resultTypeSet()->convertDoubleElements(constraints());
-    if (!jsop_setelem_dense(conversion, SetElem_Unsafe, obj, id, elem))
+    if (!jsop_setelem_dense(conversion, SetElem_Unsafe, obj, id, elem, JSVAL_TYPE_MAGIC))
         return false;
     return true;
 }
@@ -2140,9 +2293,9 @@ IonBuilder::inlineUnsafeSetTypedObjectArrayElement(CallInfo& callInfo,
     // - arr is a typed array
     // - idx < length
 
-    MDefinition *obj = callInfo.getArg(base + 0);
-    MDefinition *id = callInfo.getArg(base + 1);
-    MDefinition *elem = callInfo.getArg(base + 2);
+    MDefinition* obj = callInfo.getArg(base + 0);
+    MDefinition* id = callInfo.getArg(base + 1);
+    MDefinition* elem = callInfo.getArg(base + 2);
 
     if (!jsop_setelem_typed_object(arrayType, SetElem_Unsafe, obj, id, elem))
         return false;
@@ -2191,11 +2344,9 @@ IonBuilder::inlineHasClass(CallInfo& callInfo,
             }
 
             // Convert to bool with the '!!' idiom
-            MNot* resultInverted = MNot::New(alloc(), last);
-            resultInverted->cacheOperandMightEmulateUndefined(constraints());
+            MNot* resultInverted = MNot::New(alloc(), last, constraints());
             current->add(resultInverted);
-            MNot* result = MNot::New(alloc(), resultInverted);
-            result->cacheOperandMightEmulateUndefined(constraints());
+            MNot* result = MNot::New(alloc(), resultInverted, constraints());
             current->add(result);
             current->push(result);
         }
@@ -2589,7 +2740,8 @@ IonBuilder::inlineBailout(CallInfo& callInfo)
 IonBuilder::InliningStatus
 IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
 {
-    callInfo.setImplicitlyUsedUnchecked();
+    if (callInfo.argc() != 2)
+        return InliningStatus_NotInlined;
 
     MDefinition* secondArg = callInfo.getArg(1);
 
@@ -2602,6 +2754,48 @@ IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
     MConstant* undefined = MConstant::New(alloc(), UndefinedValue());
     current->add(undefined);
     current->push(undefined);
+    callInfo.setImplicitlyUsedUnchecked();
+    return InliningStatus_Inlined;
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineAssertRecoveredOnBailout(CallInfo& callInfo)
+{
+    if (callInfo.argc() != 2)
+        return InliningStatus_NotInlined;
+
+    if (js_JitOptions.checkRangeAnalysis) {
+        // If we are checking the range of all instructions, then the guards
+        // inserted by Range Analysis prevent the use of recover
+        // instruction. Thus, we just disable these checks.
+        current->push(constant(UndefinedValue()));
+        callInfo.setImplicitlyUsedUnchecked();
+        return InliningStatus_Inlined;
+    }
+
+    MDefinition* secondArg = callInfo.getArg(1);
+
+    MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
+    MOZ_ASSERT(secondArg->isConstantValue());
+
+    bool mustBeRecovered = secondArg->constantValue().toBoolean();
+    MAssertRecoveredOnBailout* assert =
+        MAssertRecoveredOnBailout::New(alloc(), callInfo.getArg(0), mustBeRecovered);
+    current->add(assert);
+    current->push(assert);
+
+    // Create an instruction sequence which implies that the argument of the
+    // assertRecoveredOnBailout function would be encoded at least in one
+    // Snapshot.
+    MNop* nop = MNop::New(alloc());
+    current->add(nop);
+    if (!resumeAfter(nop))
+        return InliningStatus_Error;
+    current->add(MEncodeSnapshot::New(alloc()));
+
+    current->pop();
+    current->push(constant(UndefinedValue()));
+    callInfo.setImplicitlyUsedUnchecked();
     return InliningStatus_Inlined;
 }
 
@@ -2618,11 +2812,11 @@ IonBuilder::inlineBoundFunction(CallInfo& nativeCallInfo, JSFunction* target)
     // Don't optimize if we're constructing and the callee is not a
     // constructor, so that CallKnown does not have to handle this case
     // (it should always throw).
-    if (nativeCallInfo.constructing() && !scriptedTarget->isInterpretedConstructor() &&
-        !scriptedTarget->isNativeConstructor())
-    {
+    if (nativeCallInfo.constructing() && !scriptedTarget->isConstructor())
         return InliningStatus_NotInlined;
-    }
+
+    if (nativeCallInfo.constructing() && nativeCallInfo.getNewTarget() != nativeCallInfo.fun())
+        return InliningStatus_NotInlined;
 
     if (gc::IsInsideNursery(scriptedTarget))
         return InliningStatus_NotInlined;
@@ -2654,10 +2848,17 @@ IonBuilder::inlineBoundFunction(CallInfo& nativeCallInfo, JSFunction* target)
     if (!callInfo.argv().reserve(argc))
         return InliningStatus_Error;
 
-    for (size_t i = 0; i < target->getBoundFunctionArgumentCount(); i++)
-        callInfo.argv().infallibleAppend(constant(target->getBoundFunctionArgument(i)));
+    for (size_t i = 0; i < target->getBoundFunctionArgumentCount(); i++) {
+        MConstant* argConst = constant(target->getBoundFunctionArgument(i));
+        callInfo.argv().infallibleAppend(argConst);
+    }
     for (size_t i = 0; i < nativeCallInfo.argc(); i++)
         callInfo.argv().infallibleAppend(nativeCallInfo.getArg(i));
+
+    // We only inline when it was not a super-call, so just set the newTarget
+    // to be the target function, per spec.
+    if (nativeCallInfo.constructing())
+        callInfo.setNewTarget(callInfo.fun());
 
     if (!makeCall(scriptedTarget, callInfo))
         return InliningStatus_Error;
@@ -2710,6 +2911,9 @@ IonBuilder::inlineAtomicsCompareExchange(CallInfo& callInfo)
     current->add(cas);
     current->push(cas);
 
+    if (!resumeAfter(cas))
+        return InliningStatus_Error;
+
     return InliningStatus_Inlined;
 }
 
@@ -2727,22 +2931,26 @@ IonBuilder::inlineAtomicsLoad(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction *elements;
-    MDefinition *index;
+    MInstruction* elements;
+    MDefinition* index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MLoadUnboxedScalar *load =
+    MLoadUnboxedScalar* load =
         MLoadUnboxedScalar::New(alloc(), elements, index, arrayType,
                                 DoesRequireMemoryBarrier);
     load->setResultType(getInlineReturnType());
     current->add(load);
     current->push(load);
 
+    // Loads are considered effectful (they execute a memory barrier).
+    if (!resumeAfter(load))
+        return InliningStatus_Error;
+
     return InliningStatus_Inlined;
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineAtomicsStore(CallInfo &callInfo)
+IonBuilder::inlineAtomicsStore(CallInfo& callInfo)
 {
     if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
@@ -2753,26 +2961,29 @@ IonBuilder::inlineAtomicsStore(CallInfo &callInfo)
     if (!atomicsMeetsPreconditions(callInfo, &arrayType))
         return InliningStatus_NotInlined;
 
-    MDefinition *value = callInfo.getArg(2);
+    MDefinition* value = callInfo.getArg(2);
     if (!(value->type() == MIRType_Int32 || value->type() == MIRType_Double))
         return InliningStatus_NotInlined;
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction *elements;
-    MDefinition *index;
+    MInstruction* elements;
+    MDefinition* index;
     atomicsCheckBounds(callInfo, &elements, &index);
 
-    MDefinition *toWrite = value;
+    MDefinition* toWrite = value;
     if (value->type() == MIRType_Double) {
         toWrite = MTruncateToInt32::New(alloc(), value);
         current->add(toWrite->toInstruction());
     }
-    MStoreUnboxedScalar *store =
+    MStoreUnboxedScalar* store =
         MStoreUnboxedScalar::New(alloc(), elements, index, toWrite, arrayType,
                                  DoesRequireMemoryBarrier);
     current->add(store);
     current->push(value);
+
+    if (!resumeAfter(store))
+        return InliningStatus_Error;
 
     return InliningStatus_Inlined;
 }
@@ -2785,11 +2996,18 @@ IonBuilder::inlineAtomicsFence(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
+    if (!JitSupportsAtomics())
+        return InliningStatus_NotInlined;
+
     callInfo.setImplicitlyUsedUnchecked();
 
     MMemoryBarrier* fence = MMemoryBarrier::New(alloc());
     current->add(fence);
     pushConstant(UndefinedValue());
+
+    // Fences are considered effectful (they execute a memory barrier).
+    if (!resumeAfter(fence))
+        return InliningStatus_Error;
 
     return InliningStatus_Inlined;
 }
@@ -2842,12 +3060,18 @@ IonBuilder::inlineAtomicsBinop(CallInfo& callInfo, JSFunction* target)
     current->add(binop);
     current->push(binop);
 
+    if (!resumeAfter(binop))
+        return InliningStatus_Error;
+
     return InliningStatus_Inlined;
 }
 
 bool
 IonBuilder::atomicsMeetsPreconditions(CallInfo& callInfo, Scalar::Type* arrayType)
 {
+    if (!JitSupportsAtomics())
+        return false;
+
     if (callInfo.getArg(0)->type() != MIRType_Object)
         return false;
 
@@ -2958,7 +3182,7 @@ IonBuilder::inlineConstructSimdObject(CallInfo& callInfo, SimdTypeDescr* descr)
     // Generic constructor of SIMD valuesX4.
     MIRType simdType = SimdTypeDescrToMIRType(descr->type());
 
-    // TODO Happens for TYPE_FLOAT64 (Bug 1124205)
+    // TODO Happens for Float64x2 (Bug 1124205)
     if (simdType == MIRType_Undefined)
         return InliningStatus_NotInlined;
 
@@ -2994,8 +3218,8 @@ IonBuilder::inlineConstructSimdObject(CallInfo& callInfo, SimdTypeDescr* descr)
 }
 
 bool
-IonBuilder::checkInlineSimd(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
-                            unsigned numArgs, InlineTypedObject **templateObj)
+IonBuilder::checkInlineSimd(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type,
+                            unsigned numArgs, InlineTypedObject** templateObj)
 {
     if (callInfo.argc() != numArgs)
         return false;
@@ -3011,9 +3235,9 @@ IonBuilder::checkInlineSimd(CallInfo &callInfo, JSNative native, SimdTypeDescr::
 }
 
 IonBuilder::InliningStatus
-IonBuilder::boxSimd(CallInfo &callInfo, MInstruction *ins, InlineTypedObject *templateObj)
+IonBuilder::boxSimd(CallInfo& callInfo, MInstruction* ins, InlineTypedObject* templateObj)
 {
-    MSimdBox *obj = MSimdBox::New(alloc(), constraints(), ins, templateObj,
+    MSimdBox* obj = MSimdBox::New(alloc(), constraints(), ins, templateObj,
                                   templateObj->group()->initialHeap(constraints()));
     current->add(ins);
     current->add(obj);
@@ -3025,10 +3249,10 @@ IonBuilder::boxSimd(CallInfo &callInfo, MInstruction *ins, InlineTypedObject *te
 
 template<typename T>
 IonBuilder::InliningStatus
-IonBuilder::inlineBinarySimd(CallInfo &callInfo, JSNative native, typename T::Operation op,
+IonBuilder::inlineBinarySimd(CallInfo& callInfo, JSNative native, typename T::Operation op,
                              SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 2, &templateObj))
         return InliningStatus_NotInlined;
 
@@ -3038,12 +3262,12 @@ IonBuilder::inlineBinarySimd(CallInfo &callInfo, JSNative native, typename T::Op
     // instructions are supposed to produce a TypeError when they're called
     // with non SIMD-arguments.
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    T *ins = T::New(alloc(), callInfo.getArg(0), callInfo.getArg(1), op, mirType);
+    T* ins = T::New(alloc(), callInfo.getArg(0), callInfo.getArg(1), op, mirType);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineCompSimd(CallInfo &callInfo, JSNative native, MSimdBinaryComp::Operation op,
+IonBuilder::inlineCompSimd(CallInfo& callInfo, JSNative native, MSimdBinaryComp::Operation op,
                            SimdTypeDescr::Type compType)
 {
     InlineTypedObject* templateObj = nullptr;
@@ -3056,62 +3280,62 @@ IonBuilder::inlineCompSimd(CallInfo &callInfo, JSNative native, MSimdBinaryComp:
     // instructions are supposed to produce a TypeError when they're called
     // with non SIMD-arguments.
     MIRType mirType = SimdTypeDescrToMIRType(compType);
-    MSimdBinaryComp *ins = MSimdBinaryComp::New(alloc(), callInfo.getArg(0), callInfo.getArg(1), op, mirType);
+    MSimdBinaryComp* ins = MSimdBinaryComp::New(alloc(), callInfo.getArg(0), callInfo.getArg(1), op, mirType);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineUnarySimd(CallInfo &callInfo, JSNative native, MSimdUnaryArith::Operation op,
+IonBuilder::inlineUnarySimd(CallInfo& callInfo, JSNative native, MSimdUnaryArith::Operation op,
                             SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 1, &templateObj))
         return InliningStatus_NotInlined;
 
     // See comment in inlineBinarySimd
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdUnaryArith *ins = MSimdUnaryArith::New(alloc(), callInfo.getArg(0), op, mirType);
+    MSimdUnaryArith* ins = MSimdUnaryArith::New(alloc(), callInfo.getArg(0), op, mirType);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdSplat(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type)
+IonBuilder::inlineSimdSplat(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 1, &templateObj))
         return InliningStatus_NotInlined;
 
     // See comment in inlineBinarySimd
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdSplatX4 *ins = MSimdSplatX4::New(alloc(), callInfo.getArg(0), mirType);
+    MSimdSplatX4* ins = MSimdSplatX4::New(alloc(), callInfo.getArg(0), mirType);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdWith(CallInfo &callInfo, JSNative native, SimdLane lane,
+IonBuilder::inlineSimdWith(CallInfo& callInfo, JSNative native, SimdLane lane,
                            SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 2, &templateObj))
         return InliningStatus_NotInlined;
 
     // See comment in inlineBinarySimd
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdInsertElement *ins = MSimdInsertElement::New(alloc(), callInfo.getArg(0),
+    MSimdInsertElement* ins = MSimdInsertElement::New(alloc(), callInfo.getArg(0),
                                                       callInfo.getArg(1), mirType, lane);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdConvert(CallInfo &callInfo, JSNative native, bool isCast,
+IonBuilder::inlineSimdConvert(CallInfo& callInfo, JSNative native, bool isCast,
                               SimdTypeDescr::Type from, SimdTypeDescr::Type to)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, to, 1, &templateObj))
         return InliningStatus_NotInlined;
 
     // See comment in inlineBinarySimd
-    MInstruction *ins;
+    MInstruction* ins;
     MIRType fromType = SimdTypeDescrToMIRType(from);
     MIRType toType = SimdTypeDescrToMIRType(to);
     if (isCast)
@@ -3123,29 +3347,29 @@ IonBuilder::inlineSimdConvert(CallInfo &callInfo, JSNative native, bool isCast,
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdSelect(CallInfo &callInfo, JSNative native, bool isElementWise,
+IonBuilder::inlineSimdSelect(CallInfo& callInfo, JSNative native, bool isElementWise,
                              SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 3, &templateObj))
         return InliningStatus_NotInlined;
 
     // See comment in inlineBinarySimd
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdSelect *ins = MSimdSelect::New(alloc(), callInfo.getArg(0), callInfo.getArg(1),
+    MSimdSelect* ins = MSimdSelect::New(alloc(), callInfo.getArg(0), callInfo.getArg(1),
                                         callInfo.getArg(2), mirType, isElementWise);
     return boxSimd(callInfo, ins, templateObj);
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdCheck(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type)
+IonBuilder::inlineSimdCheck(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 1, &templateObj))
         return InliningStatus_NotInlined;
 
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdUnbox *unbox = MSimdUnbox::New(alloc(), callInfo.getArg(0), mirType);
+    MSimdUnbox* unbox = MSimdUnbox::New(alloc(), callInfo.getArg(0), mirType);
     // Make sure not to remove this unbox!
     unbox->setGuard();
 
@@ -3157,15 +3381,15 @@ IonBuilder::inlineSimdCheck(CallInfo &callInfo, JSNative native, SimdTypeDescr::
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdShuffle(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+IonBuilder::inlineSimdShuffle(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type,
                               unsigned numVectors, unsigned numLanes)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, numVectors + numLanes, &templateObj))
         return InliningStatus_NotInlined;
 
     MIRType mirType = SimdTypeDescrToMIRType(type);
-    MSimdGeneralShuffle *ins = MSimdGeneralShuffle::New(alloc(), numVectors, numLanes, mirType);
+    MSimdGeneralShuffle* ins = MSimdGeneralShuffle::New(alloc(), numVectors, numLanes, mirType);
 
     if (!ins->init(alloc()))
         return InliningStatus_Error;
@@ -3190,10 +3414,10 @@ SimdTypeToScalarType(SimdTypeDescr::Type type)
 }
 
 bool
-IonBuilder::prepareForSimdLoadStore(CallInfo &callInfo, Scalar::Type simdType, MInstruction **elements,
-                                    MDefinition **index, Scalar::Type *arrayType)
+IonBuilder::prepareForSimdLoadStore(CallInfo& callInfo, Scalar::Type simdType, MInstruction** elements,
+                                    MDefinition** index, Scalar::Type* arrayType)
 {
-    MDefinition *array = callInfo.getArg(0);
+    MDefinition* array = callInfo.getArg(0);
     *index = callInfo.getArg(1);
 
     if (!ElementAccessIsAnyTypedArray(constraints(), array, *index, arrayType))
@@ -3203,7 +3427,7 @@ IonBuilder::prepareForSimdLoadStore(CallInfo &callInfo, Scalar::Type simdType, M
     current->add(indexAsInt32);
     *index = indexAsInt32;
 
-    MDefinition *indexForBoundsCheck = *index;
+    MDefinition* indexForBoundsCheck = *index;
 
     // Artificially make sure the index is in bounds by adding the difference
     // number of slots needed (e.g. reading from Float32Array we need to make
@@ -3211,8 +3435,8 @@ IonBuilder::prepareForSimdLoadStore(CallInfo &callInfo, Scalar::Type simdType, M
     MOZ_ASSERT(Scalar::byteSize(simdType) % Scalar::byteSize(*arrayType) == 0);
     int32_t suppSlotsNeeded = Scalar::byteSize(simdType) / Scalar::byteSize(*arrayType) - 1;
     if (suppSlotsNeeded) {
-        MConstant *suppSlots = constant(Int32Value(suppSlotsNeeded));
-        MAdd *addedIndex = MAdd::New(alloc(), *index, suppSlots);
+        MConstant* suppSlots = constant(Int32Value(suppSlotsNeeded));
+        MAdd* addedIndex = MAdd::New(alloc(), *index, suppSlots);
         // We're fine even with the add overflows, as long as the generated code
         // for the bounds check uses an unsigned comparison.
         addedIndex->setInt32();
@@ -3220,36 +3444,36 @@ IonBuilder::prepareForSimdLoadStore(CallInfo &callInfo, Scalar::Type simdType, M
         indexForBoundsCheck = addedIndex;
     }
 
-    MInstruction *length;
+    MInstruction* length;
     addTypedArrayLengthAndData(array, SkipBoundsCheck, index, &length, elements);
 
     // It can be that the index is out of bounds, while the added index for the
     // bounds check is in bounds, so we actually need two bounds checks here.
-    MInstruction *positiveCheck = MBoundsCheck::New(alloc(), *index, length);
+    MInstruction* positiveCheck = MBoundsCheck::New(alloc(), *index, length);
     current->add(positiveCheck);
 
-    MInstruction *fullCheck = MBoundsCheck::New(alloc(), indexForBoundsCheck, length);
+    MInstruction* fullCheck = MBoundsCheck::New(alloc(), indexForBoundsCheck, length);
     current->add(fullCheck);
     return true;
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdLoad(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+IonBuilder::inlineSimdLoad(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type,
                            unsigned numElems)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 2, &templateObj))
         return InliningStatus_NotInlined;
 
     Scalar::Type simdType = SimdTypeToScalarType(type);
 
-    MDefinition *index = nullptr;
-    MInstruction *elements = nullptr;
+    MDefinition* index = nullptr;
+    MInstruction* elements = nullptr;
     Scalar::Type arrayType;
     if (!prepareForSimdLoadStore(callInfo, simdType, &elements, &index, &arrayType))
         return InliningStatus_NotInlined;
 
-    MLoadUnboxedScalar *load = MLoadUnboxedScalar::New(alloc(), elements, index, arrayType);
+    MLoadUnboxedScalar* load = MLoadUnboxedScalar::New(alloc(), elements, index, arrayType);
     load->setResultType(SimdTypeDescrToMIRType(type));
     load->setSimdRead(simdType, numElems);
 
@@ -3257,23 +3481,23 @@ IonBuilder::inlineSimdLoad(CallInfo &callInfo, JSNative native, SimdTypeDescr::T
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdStore(CallInfo &callInfo, JSNative native, SimdTypeDescr::Type type,
+IonBuilder::inlineSimdStore(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type,
                             unsigned numElems)
 {
-    InlineTypedObject *templateObj = nullptr;
+    InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 3, &templateObj))
         return InliningStatus_NotInlined;
 
     Scalar::Type simdType = SimdTypeToScalarType(type);
 
-    MDefinition *index = nullptr;
-    MInstruction *elements = nullptr;
+    MDefinition* index = nullptr;
+    MInstruction* elements = nullptr;
     Scalar::Type arrayType;
     if (!prepareForSimdLoadStore(callInfo, simdType, &elements, &index, &arrayType))
         return InliningStatus_NotInlined;
 
-    MDefinition *valueToWrite = callInfo.getArg(2);
-    MStoreUnboxedScalar *store = MStoreUnboxedScalar::New(alloc(), elements, index,
+    MDefinition* valueToWrite = callInfo.getArg(2);
+    MStoreUnboxedScalar* store = MStoreUnboxedScalar::New(alloc(), elements, index,
                                                           valueToWrite, arrayType);
     store->setSimdWrite(simdType, numElems);
 
@@ -3286,6 +3510,34 @@ IonBuilder::inlineSimdStore(CallInfo &callInfo, JSNative native, SimdTypeDescr::
         return InliningStatus_Error;
 
     return InliningStatus_Inlined;
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineSimdBool(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type)
+{
+    InlineTypedObject* templateObj = nullptr;
+    if (!checkInlineSimd(callInfo, native, type, 4, &templateObj))
+        return InliningStatus_NotInlined;
+
+    MOZ_ASSERT(type == SimdTypeDescr::Int32x4, "at the moment, only int32x4.bool is inlined");
+
+    MInstruction* operands[4];
+    for (unsigned i = 0; i < 4; i++) {
+        operands[i] = MNot::New(alloc(), callInfo.getArg(i), constraints());
+        current->add(operands[i]);
+    }
+
+    // Inline int32x4.bool(x, y, z, w) as int32x4(!x - 1, !y - 1, !z - 1, !w - 1);
+    MSimdValueX4* vector = MSimdValueX4::New(alloc(), MIRType_Int32x4, operands[0], operands[1],
+                                             operands[2], operands[3]);
+    current->add(vector);
+
+    MSimdConstant* one = MSimdConstant::New(alloc(), SimdConstant::SplatX4(1), MIRType_Int32x4);
+    current->add(one);
+
+    MSimdBinaryArith* result = MSimdBinaryArith::New(alloc(), vector, one, MSimdBinaryArith::Op_sub,
+                                                     MIRType_Int32x4);
+    return boxSimd(callInfo, result, templateObj);
 }
 
 } // namespace jit

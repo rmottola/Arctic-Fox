@@ -64,9 +64,7 @@ MarkerDetails.prototype = {
     hbox.setAttribute("align", "center");
 
     let bullet = this._document.createElement("hbox");
-    bullet.className = "marker-details-bullet";
-    bullet.style.backgroundColor = blueprint.fill;
-    bullet.style.borderColor = blueprint.stroke;
+    bullet.className = `marker-details-bullet ${blueprint.colorName}`;
 
     let label = this._document.createElement("label");
     label.className = "marker-details-type";
@@ -140,6 +138,9 @@ MarkerDetails.prototype = {
       case "DOMEvent":
         this.renderDOMEventMarker(this._parent, marker);
         break;
+      case "Javascript":
+        this.renderJavascriptMarker(this._parent, marker);
+        break;
       default:
     }
 
@@ -177,16 +178,31 @@ MarkerDetails.prototype = {
     labelName.setAttribute("value", L10N.getStr(property));
     parent.appendChild(labelName);
 
+    let wasAsyncParent = false;
     while (frameIndex > 0) {
       let frame = frames[frameIndex];
       let url = frame.source;
       let displayName = frame.functionDisplayName;
       let line = frame.line;
 
+      // If the previous frame had an async parent, then the async
+      // cause is in this frame and should be displayed.
+      if (wasAsyncParent) {
+        let asyncBox = this._document.createElement("hbox");
+        let asyncLabel = this._document.createElement("label");
+        asyncLabel.className = "devtools-monospace";
+        asyncLabel.setAttribute("value", L10N.getFormatStr("timeline.markerDetail.asyncStack",
+                                                           frame.asyncCause));
+        asyncBox.appendChild(asyncLabel);
+        parent.appendChild(asyncBox);
+        wasAsyncParent = false;
+      }
+
       let hbox = this._document.createElement("hbox");
 
       if (displayName) {
         let functionLabel = this._document.createElement("label");
+        functionLabel.className = "devtools-monospace";
         functionLabel.setAttribute("value", displayName);
         hbox.appendChild(functionLabel);
       }
@@ -206,7 +222,7 @@ MarkerDetails.prototype = {
 
         aNode.addEventListener("click", (event) => {
           event.preventDefault();
-          viewSourceInDebugger(toolbox, url, line);
+          this.emit("view-source", url, line);
         });
       }
 
@@ -218,7 +234,12 @@ MarkerDetails.prototype = {
 
       parent.appendChild(hbox);
 
-      frameIndex = frame.parent;
+      if (frame.asyncParent) {
+        frameIndex = frame.asyncParent;
+        wasAsyncParent = true;
+      } else {
+        frameIndex = frame.parent;
+      }
     }
   },
 
@@ -266,36 +287,21 @@ MarkerDetails.prototype = {
     }
   },
 
+  /**
+   * Render details of a Javascript marker.
+   *
+   * @param nsIDOMNode parent
+   *        The parent node holding the view.
+   * @param object marker
+   *        The marker to display.
+   */
+  renderJavascriptMarker: function(parent, marker) {
+    if ("causeName" in marker) {
+      let cause = this.buildNameValueLabel("timeline.markerDetail.causeName", marker.causeName);
+      this._parent.appendChild(cause);
+    }
+  },
+
 };
-
-/**
- * Opens/selects the debugger in this toolbox and jumps to the specified
- * file name and line number.
- * @param object toolbox
- *        The toolbox.
- * @param string url
- * @param number line
- */
-let viewSourceInDebugger = Task.async(function *(toolbox, url, line) {
-  // If the Debugger was already open, switch to it and try to show the
-  // source immediately. Otherwise, initialize it and wait for the sources
-  // to be added first.
-  let debuggerAlreadyOpen = toolbox.getPanel("jsdebugger");
-  let { panelWin: dbg } = yield toolbox.selectTool("jsdebugger");
-
-  if (!debuggerAlreadyOpen) {
-    yield dbg.once(dbg.EVENTS.SOURCES_ADDED);
-  }
-
-  let { DebuggerView } = dbg;
-  let { Sources } = DebuggerView;
-
-  let item = Sources.getItemForAttachment(a => a.source.url === url);
-  if (item) {
-    return DebuggerView.setEditorLocation(item.attachment.source.actor, line, { noDebug: true });
-  }
-
-  return Promise.reject("Couldn't find the specified source in the debugger.");
-});
 
 exports.MarkerDetails = MarkerDetails;

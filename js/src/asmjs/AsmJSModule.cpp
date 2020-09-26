@@ -43,7 +43,9 @@
 
 #include "jsobjinlines.h"
 
+#include "builtin/AtomicsObject.h"
 #include "frontend/ParseNode-inl.h"
+#include "jit/MacroAssembler-inl.h"
 #include "vm/ArrayBufferObject-inl.h"
 #include "vm/Stack-inl.h"
 
@@ -96,6 +98,10 @@ AsmJSModule::AsmJSModule(ScriptSource* scriptSource, uint32_t srcStart, uint32_t
     pod.strict_ = strict;
     pod.usesSignalHandlers_ = canUseSignalHandlers;
 
+    // AsmJSCheckedImmediateRange should be defined to be at most the minimum
+    // heap length so that offsets can be folded into bounds checks.
+    MOZ_ASSERT(pod.minHeapLength_ - AsmJSCheckedImmediateRange <= pod.minHeapLength_);
+
     scriptSource_->incref();
 }
 
@@ -134,12 +140,12 @@ AsmJSModule::trace(JSTracer* trc)
         globals_[i].trace(trc);
     for (unsigned i = 0; i < exits_.length(); i++) {
         if (exitIndexToGlobalDatum(i).fun)
-            MarkObject(trc, &exitIndexToGlobalDatum(i).fun, "asm.js imported function");
+            TraceEdge(trc, &exitIndexToGlobalDatum(i).fun, "asm.js imported function");
     }
     for (unsigned i = 0; i < exports_.length(); i++)
         exports_[i].trace(trc);
     for (unsigned i = 0; i < names_.length(); i++)
-        MarkStringUnbarriered(trc, &names_[i].name(), "asm.js module function name");
+        TraceManuallyBarrieredEdge(trc, &names_[i].name(), "asm.js module function name");
 #if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
     for (unsigned i = 0; i < profiledFunctions_.length(); i++)
         profiledFunctions_[i].trace(trc);
@@ -149,13 +155,13 @@ AsmJSModule::trace(JSTracer* trc)
         perfProfiledBlocksFunctions_[i].trace(trc);
 #endif
     if (globalArgumentName_)
-        MarkStringUnbarriered(trc, &globalArgumentName_, "asm.js global argument name");
+        TraceManuallyBarrieredEdge(trc, &globalArgumentName_, "asm.js global argument name");
     if (importArgumentName_)
-        MarkStringUnbarriered(trc, &importArgumentName_, "asm.js import argument name");
+        TraceManuallyBarrieredEdge(trc, &importArgumentName_, "asm.js import argument name");
     if (bufferArgumentName_)
-        MarkStringUnbarriered(trc, &bufferArgumentName_, "asm.js buffer argument name");
+        TraceManuallyBarrieredEdge(trc, &bufferArgumentName_, "asm.js buffer argument name");
     if (maybeHeap_)
-        gc::MarkObject(trc, &maybeHeap_, "asm.js heap");
+        TraceEdge(trc, &maybeHeap_, "asm.js heap");
 }
 
 void
@@ -690,6 +696,18 @@ AddressOf(AsmJSImmKind kind, ExclusiveContext* cx)
         return RedirectCall(FuncCast(__aeabi_idivmod), Args_General2);
       case AsmJSImm_aeabi_uidivmod:
         return RedirectCall(FuncCast(__aeabi_uidivmod), Args_General2);
+      case AsmJSImm_AtomicCmpXchg:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t, int32_t)>(js::atomics_cmpxchg_asm_callout), Args_General4);
+      case AsmJSImm_AtomicFetchAdd:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_add_asm_callout), Args_General3);
+      case AsmJSImm_AtomicFetchSub:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_sub_asm_callout), Args_General3);
+      case AsmJSImm_AtomicFetchAnd:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_and_asm_callout), Args_General3);
+      case AsmJSImm_AtomicFetchOr:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_or_asm_callout), Args_General3);
+      case AsmJSImm_AtomicFetchXor:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_xor_asm_callout), Args_General3);
 #endif
       case AsmJSImm_ModD:
         return RedirectCall(FuncCast(NumberMod), Args_Double_DoubleDouble);
@@ -955,6 +973,7 @@ const Class AsmJSModuleObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     AsmJSModuleObject_finalize,
     nullptr, /* call */
@@ -963,13 +982,13 @@ const Class AsmJSModuleObject::class_ = {
     AsmJSModuleObject_trace
 };
 
-AsmJSModuleObject *
-AsmJSModuleObject::create(ExclusiveContext *cx, ScopedJSDeletePtr<AsmJSModule> *module)
+AsmJSModuleObject*
+AsmJSModuleObject::create(ExclusiveContext* cx, ScopedJSDeletePtr<AsmJSModule>* module)
 {
-    JSObject *obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, NullPtr());
+    JSObject* obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, nullptr);
     if (!obj)
         return nullptr;
-    AsmJSModuleObject *nobj = &obj->as<AsmJSModuleObject>();
+    AsmJSModuleObject* nobj = &obj->as<AsmJSModuleObject>();
 
     nobj->setReservedSlot(MODULE_SLOT, PrivateValue(module->forget()));
     return nobj;

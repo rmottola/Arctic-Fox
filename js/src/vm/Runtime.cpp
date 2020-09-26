@@ -126,6 +126,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     asmJSActivationStack_(nullptr),
     asyncStackForNewActivations(nullptr),
     asyncCauseForNewActivations(nullptr),
+    entryMonitor(nullptr),
     parentRuntime(parentRuntime),
     interrupt_(false),
     telemetryCallback(nullptr),
@@ -277,7 +278,7 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
 
     const char* size = getenv("JSGC_MARK_STACK_LIMIT");
     if (size)
-        SetMarkStackLimit(this, atoi(size));
+        gc.setMarkStackLimit(atoi(size));
 
     ScopedJSDeletePtr<Zone> atomsZone(new_<Zone>(this));
     if (!atomsZone || !atomsZone->init(true))
@@ -523,7 +524,7 @@ JSRuntime::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::Runtim
     rtSizes->gc.marker += gc.marker.sizeOfExcludingThis(mallocSizeOf);
     rtSizes->gc.nurseryCommitted += gc.nursery.sizeOfHeapCommitted();
     rtSizes->gc.nurseryDecommitted += gc.nursery.sizeOfHeapDecommitted();
-    rtSizes->gc.nurseryHugeSlots += gc.nursery.sizeOfHugeSlots(mallocSizeOf);
+    rtSizes->gc.nurseryMallocedBuffers += gc.nursery.sizeOfMallocedBuffers(mallocSizeOf);
     gc.storeBuffer.addSizeOfExcludingThis(mallocSizeOf, &rtSizes->gc);
 }
 
@@ -866,21 +867,21 @@ JS::IsProfilingEnabledForRuntime(JSRuntime *runtime)
 }
 
 void
-js::ResetStopwatches(JSRuntime *rt)
+js::ResetStopwatches(JSRuntime* rt)
 {
     MOZ_ASSERT(rt);
     rt->stopwatch.reset();
 }
 
 bool
-js::SetStopwatchActive(JSRuntime *rt, bool isActive)
+js::SetStopwatchActive(JSRuntime* rt, bool isActive)
 {
     MOZ_ASSERT(rt);
     return rt->stopwatch.setIsActive(isActive);
 }
 
 bool
-js::IsStopwatchActive(JSRuntime *rt)
+js::IsStopwatchActive(JSRuntime* rt)
 {
     MOZ_ASSERT(rt);
     return rt->stopwatch.isActive();
@@ -927,7 +928,7 @@ js::PerformanceGroupHolder::unlink()
     js_delete(group);
 }
 
-PerformanceGroup *
+PerformanceGroup*
 js::PerformanceGroupHolder::getGroup()
 {
     if (group_)
@@ -950,7 +951,7 @@ js::PerformanceGroupHolder::getGroup()
 }
 
 PerformanceData*
-js::GetPerformanceData(JSRuntime *rt)
+js::GetPerformanceData(JSRuntime* rt)
 {
     return &rt->stopwatch.performance;
 }

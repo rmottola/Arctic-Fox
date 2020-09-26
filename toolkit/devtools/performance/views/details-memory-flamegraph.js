@@ -9,6 +9,8 @@
  */
 let MemoryFlameGraphView = Heritage.extend(DetailsSubview, {
 
+  shouldUpdateWhileMouseIsActive: true,
+
   rerenderPrefs: [
     "invert-flame-graph",
     "flatten-tree-recursion",
@@ -23,21 +25,27 @@ let MemoryFlameGraphView = Heritage.extend(DetailsSubview, {
 
     this.graph = new FlameGraph($("#memory-flamegraph-view"));
     this.graph.timelineTickUnits = L10N.getStr("graphs.ms");
+    this.graph.setTheme(PerformanceController.getTheme());
     yield this.graph.ready();
 
     this._onRangeChangeInGraph = this._onRangeChangeInGraph.bind(this);
+    this._onThemeChanged = this._onThemeChanged.bind(this);
 
+    PerformanceController.on(EVENTS.THEME_CHANGED, this._onThemeChanged);
     this.graph.on("selecting", this._onRangeChangeInGraph);
   }),
 
   /**
    * Unbinds events.
    */
-  destroy: function () {
+  destroy: Task.async(function* () {
     DetailsSubview.destroy.call(this);
 
+    PerformanceController.off(EVENTS.THEME_CHANGED, this._onThemeChanged);
     this.graph.off("selecting", this._onRangeChangeInGraph);
-  },
+
+    yield this.graph.destroy();
+  }),
 
   /**
    * Method for handling all the set up for rendering a new flamegraph.
@@ -50,11 +58,11 @@ let MemoryFlameGraphView = Heritage.extend(DetailsSubview, {
     let duration = recording.getDuration();
     let allocations = recording.getAllocations();
 
-    let samples = RecordingUtils.getSamplesFromAllocations(allocations);
-    let data = FlameGraphUtils.createFlameGraphDataFromSamples(samples, {
-      invertStack: PerformanceController.getPref("invert-flame-graph"),
-      flattenRecursion: PerformanceController.getPref("flatten-tree-recursion"),
-      showIdleBlocks: PerformanceController.getPref("show-idle-blocks") && L10N.getStr("table.idle")
+    let thread = RecordingUtils.getProfileThreadFromAllocations(allocations);
+    let data = FlameGraphUtils.createFlameGraphDataFromThread(thread, {
+      invertStack: PerformanceController.getOption("invert-flame-graph"),
+      flattenRecursion: PerformanceController.getOption("flatten-tree-recursion"),
+      showIdleBlocks: PerformanceController.getOption("show-idle-blocks") && L10N.getStr("table.idle")
     });
 
     this.graph.setData({ data,
@@ -85,8 +93,16 @@ let MemoryFlameGraphView = Heritage.extend(DetailsSubview, {
   _onRerenderPrefChanged: function() {
     let recording = PerformanceController.getCurrentRecording();
     let allocations = recording.getAllocations();
-    let samples = RecordingUtils.getSamplesFromAllocations(allocations);
-    FlameGraphUtils.removeFromCache(samples);
+    let thread = RecordingUtils.getProfileThreadFromAllocations(allocations);
+    FlameGraphUtils.removeFromCache(thread);
+  },
+
+  /**
+   * Called when `devtools.theme` changes.
+   */
+  _onThemeChanged: function (_, theme) {
+    this.graph.setTheme(theme);
+    this.graph.refresh({ force: true });
   },
 
   toString: () => "[object MemoryFlameGraphView]"

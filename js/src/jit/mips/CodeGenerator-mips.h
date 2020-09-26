@@ -29,36 +29,10 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
     NonAssertingLabel returnLabel_;
     NonAssertingLabel deoptLabel_;
 
-    inline Address ToAddress(const LAllocation& a) {
-        MOZ_ASSERT(a.isMemory());
-        int32_t offset = ToStackOffset(&a);
+    inline Address ToAddress(const LAllocation& a);
+    inline Address ToAddress(const LAllocation* a);
 
-        return Address(StackPointer, offset);
-    }
-
-    inline Address ToAddress(const LAllocation* a) {
-        return ToAddress(*a);
-    }
-
-    inline Operand ToOperand(const LAllocation& a) {
-        if (a.isGeneralReg())
-            return Operand(a.toGeneralReg()->reg());
-        if (a.isFloatReg())
-            return Operand(a.toFloatReg()->reg());
-
-        MOZ_ASSERT(a.isMemory());
-        int32_t offset = ToStackOffset(&a);
-
-        return Operand(StackPointer, offset);
-    }
-    inline Operand ToOperand(const LAllocation* a) {
-        return ToOperand(*a);
-    }
-    inline Operand ToOperand(const LDefinition* def) {
-        return ToOperand(def->output());
-    }
-
-    MoveOperand toMoveOperand(const LAllocation* a) const;
+    MoveOperand toMoveOperand(LAllocation a) const;
 
     template <typename T1, typename T2>
     void bailoutCmp32(Assembler::Condition c, T1 lhs, T2 rhs, LSnapshot* snapshot) {

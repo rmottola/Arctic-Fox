@@ -823,8 +823,8 @@ public:
 
     XPCCallContext(XPCContext::LangType callerLanguage,
                    JSContext* cx,
-                   JS::HandleObject obj    = JS::NullPtr(),
-                   JS::HandleObject funobj = JS::NullPtr(),
+                   JS::HandleObject obj    = nullptr,
+                   JS::HandleObject funobj = nullptr,
                    JS::HandleId id         = JSID_VOIDHANDLE,
                    unsigned argc           = NO_ARGS,
                    jsval* argv             = nullptr,
@@ -1282,7 +1282,7 @@ public:
                           jsval* pval)
         {MOZ_ASSERT(IsConstant(),
                     "Only call this if you're sure this is a constant!");
-         return Resolve(ccx, iface, JS::NullPtr(), pval);}
+         return Resolve(ccx, iface, nullptr, pval);}
 
     bool NewFunctionObject(XPCCallContext& ccx, XPCNativeInterface* iface,
                            JS::HandleObject parent, jsval* pval);
@@ -2494,7 +2494,6 @@ public:
     }
 
     void TraceJS(JSTracer* trc);
-    static void GetTraceName(JSTracer* trc, char* buf, size_t bufsize);
 
     size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
@@ -2533,7 +2532,6 @@ public:
 
 public:
     void TraceJS(JSTracer* trc);
-    static void GetTraceName(JSTracer* trc, char* buf, size_t bufsize);
 
     explicit XPCJSObjectHolder(JSObject* obj);
 
@@ -3341,7 +3339,6 @@ public:
     virtual ~XPCTraceableVariant();
 
     void TraceJS(JSTracer* trc);
-    static void GetTraceName(JSTracer* trc, char* buf, size_t bufsize);
 };
 
 /***************************************************************************/
@@ -3513,7 +3510,7 @@ public:
     { }
 
     JSObject* ToJSObject(JSContext* cx) {
-        JS::RootedObject obj(cx, JS_NewObjectWithGivenProto(cx, nullptr, JS::NullPtr()));
+        JS::RootedObject obj(cx, JS_NewObjectWithGivenProto(cx, nullptr, nullptr));
         if (!obj)
             return nullptr;
 

@@ -399,7 +399,7 @@ class TypeSet
       : flags(0), objectSet(nullptr)
     {}
 
-    void print();
+    void print(FILE* fp = stderr);
 
     /* Whether this set contains a specific type. */
     inline bool hasType(Type type) const;
@@ -438,14 +438,14 @@ class TypeSet
      * TypeSet b can only contain primitives or be any object. No support for
      * specific objects. The result should not be modified further.
      */
-    static TemporaryTypeSet *removeSet(TemporaryTypeSet *a, TemporaryTypeSet *b, LifoAlloc *alloc);
+    static TemporaryTypeSet* removeSet(TemporaryTypeSet* a, TemporaryTypeSet* b, LifoAlloc* alloc);
 
     /* Add a type to this set using the specified allocator. */
     void addType(Type type, LifoAlloc* alloc);
 
     /* Get a list of all types in this set. */
     typedef Vector<Type, 1, SystemAllocPolicy> TypeList;
-    bool enumerateTypes(TypeList* list) const;
+    template <class TypeListT> bool enumerateTypes(TypeListT* list) const;
 
     /*
      * Iterate through the objects in this set. getObjectCount overapproximates
@@ -492,7 +492,7 @@ class TypeSet
         return this->isSubset(other) && other->isSubset(this);
     }
 
-    bool objectsIntersect(const TypeSet *other) const;
+    bool objectsIntersect(const TypeSet* other) const;
 
     /* Forward all types in this set to the specified constraint. */
     bool addTypesToConstraint(JSContext* cx, TypeConstraint* constraint);
@@ -526,13 +526,13 @@ class TypeSet
     // Get the type of a possibly optimized out or uninitialized let value.
     // This generally only happens on unconditional type monitors on bailing
     // out of Ion, such as for argument and local types.
-    static inline Type GetMaybeUntrackedValueType(const Value &val);
+    static inline Type GetMaybeUntrackedValueType(const Value& val);
 
-    static void MarkTypeRoot(JSTracer *trc, Type *v, const char *name);
-    static void MarkTypeUnbarriered(JSTracer *trc, Type *v, const char *name);
-    static bool IsTypeMarked(Type *v);
+    static void MarkTypeRoot(JSTracer* trc, Type* v, const char* name);
+    static void MarkTypeUnbarriered(JSTracer* trc, Type* v, const char* name);
+    static bool IsTypeMarked(Type* v);
     static bool IsTypeAllocatedDuringIncremental(Type v);
-    static bool IsTypeAboutToBeFinalized(Type *v);
+    static bool IsTypeAboutToBeFinalized(Type* v);
 };
 
 /*
@@ -805,19 +805,19 @@ class PreliminaryObjectArrayWithTemplate : public PreliminaryObjectArray
     HeapPtrShape shape_;
 
   public:
-    explicit PreliminaryObjectArrayWithTemplate(Shape *shape)
+    explicit PreliminaryObjectArrayWithTemplate(Shape* shape)
       : shape_(shape)
     {}
 
-    Shape *shape() {
+    Shape* shape() {
         return shape_;
     }
 
-    void maybeAnalyze(ExclusiveContext *cx, ObjectGroup *group, bool force = false);
+    void maybeAnalyze(ExclusiveContext* cx, ObjectGroup* group, bool force = false);
 
-    void trace(JSTracer *trc);
+    void trace(JSTracer* trc);
 
-    static void writeBarrierPre(PreliminaryObjectArrayWithTemplate *preliminaryObjects);
+    static void writeBarrierPre(PreliminaryObjectArrayWithTemplate* preliminaryObjects);
 };
 
 // New script properties analyses overview.
@@ -917,7 +917,7 @@ class TypeNewScript
         js_free(initializerList);
     }
 
-    static void writeBarrierPre(TypeNewScript *newScript);
+    static void writeBarrierPre(TypeNewScript* newScript);
 
     bool analyzed() const {
         return preliminaryObjects == nullptr;
@@ -948,17 +948,17 @@ class TypeNewScript
     bool rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* group);
 
     static void make(JSContext* cx, ObjectGroup* group, JSFunction* fun);
-    static TypeNewScript *makeNativeVersion(JSContext *cx, TypeNewScript *newScript,
-                                            PlainObject *templateObject);
+    static TypeNewScript* makeNativeVersion(JSContext* cx, TypeNewScript* newScript,
+                                            PlainObject* templateObject);
 
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 };
 
 /* Is this a reasonable PC to be doing inlining on? */
-inline bool isInlinableCall(jsbytecode *pc);
+inline bool isInlinableCall(jsbytecode* pc);
 
 bool
-ClassCanHaveExtraProperties(const Class *clasp);
+ClassCanHaveExtraProperties(const Class* clasp);
 
 /*
  * Whether Array.prototype, or an object on its proto chain, has an
@@ -1258,9 +1258,9 @@ enum SpewChannel {
 
 #ifdef DEBUG
 
-const char * InferSpewColorReset();
-const char * InferSpewColor(TypeConstraint* constraint);
-const char * InferSpewColor(TypeSet* types);
+const char* InferSpewColorReset();
+const char* InferSpewColor(TypeConstraint* constraint);
+const char* InferSpewColor(TypeSet* types);
 
 void InferSpew(SpewChannel which, const char* fmt, ...);
 
@@ -1269,9 +1269,9 @@ bool ObjectGroupHasProperty(JSContext* cx, ObjectGroup* group, jsid id, const Va
 
 #else
 
-inline const char * InferSpewColorReset() { return nullptr; }
-inline const char * InferSpewColor(TypeConstraint* constraint) { return nullptr; }
-inline const char * InferSpewColor(TypeSet* types) { return nullptr; }
+inline const char* InferSpewColorReset() { return nullptr; }
+inline const char* InferSpewColor(TypeConstraint* constraint) { return nullptr; }
+inline const char* InferSpewColor(TypeSet* types) { return nullptr; }
 inline void InferSpew(SpewChannel which, const char* fmt, ...) {}
 
 #endif

@@ -117,16 +117,15 @@ nsProfiler::AddMarker(const char *aMarker)
 }
 
 NS_IMETHODIMP
-nsProfiler::GetProfile(char **aProfile)
+nsProfiler::GetProfile(float aSinceTime, char **aProfile)
 {
-  char *profile = profiler_get_profile();
+  mozilla::UniquePtr<char[]> profile = profiler_get_profile(aSinceTime);
   if (profile) {
-    size_t len = strlen(profile);
+    size_t len = strlen(profile.get());
     char *profileStr = static_cast<char *>
-                         (nsMemory::Clone(profile, (len + 1) * sizeof(char)));
+                         (nsMemory::Clone(profile.get(), (len + 1) * sizeof(char)));
     profileStr[len] = '\0';
     *aProfile = profileStr;
-    free(profile);
   }
   return NS_OK;
 }
@@ -201,14 +200,22 @@ nsProfiler::DumpProfileToFile(const char* aFilename)
   return NS_OK;
 }
 
-NS_IMETHODIMP nsProfiler::GetProfileData(JSContext* aCx,
-                                         JS::MutableHandle<JS::Value> aResult)
+NS_IMETHODIMP
+nsProfiler::GetProfileData(float aSinceTime, JSContext* aCx,
+                           JS::MutableHandle<JS::Value> aResult)
 {
-  JS::RootedObject obj(aCx, profiler_get_profile_jsobject(aCx));
+  JS::RootedObject obj(aCx, profiler_get_profile_jsobject(aCx, aSinceTime));
   if (!obj) {
     return NS_ERROR_FAILURE;
   }
   aResult.setObject(*obj);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsProfiler::GetElapsedTime(float* aElapsedTime)
+{
+  *aElapsedTime = static_cast<float>(profiler_time());
   return NS_OK;
 }
 
@@ -246,5 +253,15 @@ nsProfiler::GetFeatures(uint32_t *aCount, char ***aFeatures)
 
   *aFeatures = featureList;
   *aCount = len;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsProfiler::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration)
+{
+  MOZ_ASSERT(aCurrentPosition);
+  MOZ_ASSERT(aTotalSize);
+  MOZ_ASSERT(aGeneration);
+  profiler_get_buffer_info(aCurrentPosition, aTotalSize, aGeneration);
   return NS_OK;
 }

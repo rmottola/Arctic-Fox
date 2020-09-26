@@ -7,10 +7,10 @@
 #ifndef mozilla_CycleCollectedJSRuntime_h__
 #define mozilla_CycleCollectedJSRuntime_h__
 
+#include "mozilla/DeferredFinalize.h"
 #include "mozilla/MemoryReporting.h"
 #include "jsapi.h"
 
-#include "nsCycleCollector.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsDataHashtable.h"
 #include "nsHashKeys.h"
@@ -194,6 +194,8 @@ private:
   static void TraceBlackJS(JSTracer* aTracer, void* aData);
   static void TraceGrayJS(JSTracer* aTracer, void* aData);
   static void GCCallback(JSRuntime* aRuntime, JSGCStatus aStatus, void* aData);
+  static void GCSliceCallback(JSRuntime* aRuntime, JS::GCProgress aProgress,
+                              const JS::GCDescription& aDesc);
   static void OutOfMemoryCallback(JSContext* aContext, void* aData);
   static void LargeAllocationFailureCallback(void* aData);
   static bool ContextCallback(JSContext* aCx, unsigned aOperation,
@@ -307,6 +309,8 @@ private:
   JSZoneParticipant mJSZoneCycleCollectorGlobal;
 
   JSRuntime* mJSRuntime;
+
+  JS::GCSliceCallback mPrevGCSliceCallback;
 
   nsDataHashtable<nsPtrHashKey<void>, nsScriptObjectTracer*> mJSHolders;
 

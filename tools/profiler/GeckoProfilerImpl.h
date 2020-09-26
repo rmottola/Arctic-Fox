@@ -141,15 +141,15 @@ void profiler_set_frame_number(int frameNumber)
 }
 
 static inline
-char* profiler_get_profile()
+mozilla::UniquePtr<char[]> profiler_get_profile(float aSinceTime = 0)
 {
-  return mozilla_sampler_get_profile();
+  return mozilla_sampler_get_profile(aSinceTime);
 }
 
 static inline
-JSObject* profiler_get_profile_jsobject(JSContext* aCx)
+JSObject* profiler_get_profile_jsobject(JSContext* aCx, float aSinceTime = 0)
 {
-  return mozilla_sampler_get_profile_data(aCx);
+  return mozilla_sampler_get_profile_data(aCx, aSinceTime);
 }
 
 static inline
@@ -168,6 +168,13 @@ static inline
 void profiler_print_location()
 {
   return mozilla_sampler_print_location();
+}
+
+static inline
+void profiler_get_buffer_info(uint32_t *aCurrentPosition, uint32_t *aTotalSize,
+                              uint32_t *aGeneration)
+{
+  return mozilla_sampler_get_buffer_info(aCurrentPosition, aTotalSize, aGeneration);
 }
 
 static inline

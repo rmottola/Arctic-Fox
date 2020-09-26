@@ -220,7 +220,7 @@ SandboxCreateCrypto(JSContext* cx, JS::HandleObject obj)
 
     dom::Crypto* crypto = new dom::Crypto();
     crypto->Init(native);
-    JS::RootedObject wrapped(cx, crypto->WrapObject(cx, JS::NullPtr()));
+    JS::RootedObject wrapped(cx, crypto->WrapObject(cx, nullptr));
     return JS_DefineProperty(cx, obj, "crypto", wrapped, JSPROP_ENUMERATE);
 }
 
@@ -235,7 +235,7 @@ SandboxCreateRTCIdentityProvider(JSContext* cx, JS::HandleObject obj)
 
     dom::RTCIdentityProviderRegistrar* registrar =
             new dom::RTCIdentityProviderRegistrar(nativeGlobal);
-    JS::RootedObject wrapped(cx, registrar->WrapObject(cx, JS::NullPtr()));
+    JS::RootedObject wrapped(cx, registrar->WrapObject(cx, nullptr));
     return JS_DefineProperty(cx, obj, "rtcIdentityProvider", wrapped, JSPROP_ENUMERATE);
 }
 #endif
@@ -416,7 +416,7 @@ struct AutoSkipPropertyMirroring
 // add-ons in a separate compartment while still giving them access to the
 // chrome window.
 static bool
-sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp)
+sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v)
 {
     CompartmentPrivate* priv = CompartmentPrivate::Get(obj);
     MOZ_ASSERT(priv->writeToGlobalPrototype);
@@ -459,7 +459,7 @@ sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, MutableHandleV
     // readonly attribute (as it calls JSObject::defineProperty). See bug
     // 1019181.
     if (pd.object() && !pd.configurable()) {
-        if (!JS_SetPropertyById(cx, proto, id, vp))
+        if (!JS_SetPropertyById(cx, proto, id, v))
             return false;
     } else {
         if (!JS_CopyPropertyFrom(cx, id, unwrappedProto, obj,
@@ -470,7 +470,7 @@ sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, MutableHandleV
     if (!JS_GetPropertyDescriptorById(cx, obj, id, &pd))
         return false;
     unsigned attrs = pd.attributes() & ~(JSPROP_GETTER | JSPROP_SETTER);
-    if (!JS_DefinePropertyById(cx, obj, id, vp,
+    if (!JS_DefinePropertyById(cx, obj, id, v,
                                attrs | JSPROP_PROPOP_ACCESSORS | JSPROP_REDEFINE_NONCONFIGURABLE,
                                JS_PROPERTYOP_GETTER(writeToProto_getProperty),
                                JS_PROPERTYOP_SETTER(writeToProto_setProperty)))
@@ -485,7 +485,9 @@ static const js::Class SandboxClass = {
     "Sandbox",
     XPCONNECT_GLOBAL_FLAGS_WITH_EXTRA_SLOTS(1),
     nullptr, nullptr, nullptr, nullptr,
-    sandbox_enumerate, sandbox_resolve, sandbox_convert,  sandbox_finalize,
+    sandbox_enumerate, sandbox_resolve,
+    nullptr,        /* mayResolve */
+    sandbox_convert,  sandbox_finalize,
     nullptr, nullptr, nullptr, JS_GlobalObjectTraceHook,
     JS_NULL_CLASS_SPEC,
     {
@@ -504,7 +506,9 @@ static const js::Class SandboxWriteToProtoClass = {
     "Sandbox",
     XPCONNECT_GLOBAL_FLAGS_WITH_EXTRA_SLOTS(1),
     sandbox_addProperty, nullptr, nullptr, nullptr,
-    sandbox_enumerate, sandbox_resolve, sandbox_convert,  sandbox_finalize,
+    sandbox_enumerate, sandbox_resolve,
+    nullptr,        /* mayResolve */
+    sandbox_convert,  sandbox_finalize,
     nullptr, nullptr, nullptr, JS_GlobalObjectTraceHook,
     JS_NULL_CLASS_SPEC,
     {

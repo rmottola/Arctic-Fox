@@ -192,7 +192,7 @@ static const JSClass parseTaskGlobalClass = {
     "internal-parse-task-global", JSCLASS_GLOBAL_FLAGS,
     nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr, nullptr,
     JS_GlobalObjectTraceHook
 };
 
@@ -767,6 +767,18 @@ GlobalHelperThreadState::canStartGCParallelTask()
     return !gcParallelWorklist().empty();
 }
 
+js::GCParallelTask::~GCParallelTask()
+{
+    // Only most-derived classes' destructors may do the join: base class
+    // destructors run after those for derived classes' members, so a join in a
+    // base class can't ensure that the task is done using the members. All we
+    // can do now is check that someone has previously stopped the task.
+#ifdef DEBUG
+    AutoLockHelperThreadState helperLock;
+    MOZ_ASSERT(state == NotStarted);
+#endif
+}
+
 bool
 js::GCParallelTask::startWithLockHeld()
 {
@@ -1071,6 +1083,7 @@ HelperThread::handleAsmJSWorkload()
                             &asmData->mir->alloc());
 
         int64_t before = PRMJ_Now();
+        jit::AutoSpewEndFunction spewEndFunction(asmData->mir);
 
         if (!OptimizeMIR(asmData->mir))
             break;
@@ -1249,7 +1262,7 @@ HelperThread::handleParseWorkload()
         SourceBufferHolder srcBuf(parseTask->chars, parseTask->length,
                                   SourceBufferHolder::NoOwnership);
         parseTask->script = frontend::CompileScript(parseTask->cx, &parseTask->alloc,
-                                                    NullPtr(), NullPtr(), NullPtr(),
+                                                    nullptr, nullptr, nullptr,
                                                     parseTask->options,
                                                     srcBuf);
     }

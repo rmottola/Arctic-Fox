@@ -437,7 +437,11 @@ WebConsoleFrame.prototype = {
    * @type boolean
    */
   get persistLog() {
-    return Services.prefs.getBoolPref(PREF_PERSISTLOG);
+    // For the browser console, we receive tab navigation
+    // when the original top level window we attached to is closed,
+    // but we don't want to reset console history and just switch to
+    // the next available window.
+    return this.owner._browserConsole || Services.prefs.getBoolPref(PREF_PERSISTLOG);
   },
 
   /**
@@ -2699,7 +2703,7 @@ WebConsoleFrame.prototype = {
     let onClick = () => {
       let target = locationNode.target;
       if (target == "scratchpad" || isScratchpad) {
-        this.owner.viewSourceInScratchpad(url);
+        this.owner.viewSourceInScratchpad(url, line);
         return;
       }
 
@@ -3365,7 +3369,7 @@ JSTerm.prototype = {
 
     let selectedNodeActor = null;
     let inspectorSelection = this.hud.owner.getInspectorSelection();
-    if (inspectorSelection) {
+    if (inspectorSelection && inspectorSelection.nodeFront) {
       selectedNodeActor = inspectorSelection.nodeFront.actorID;
     }
 
@@ -5028,7 +5032,7 @@ WebConsoleConnectionProxy.prototype = {
     this.target.on("navigate", this._onTabNavigated);
 
     this._consoleActor = this.target.form.consoleActor;
-    if (!this.target.chrome) {
+    if (this.target.isTabActor) {
       let tab = this.target.form;
       this.owner.onLocationChange(tab.url, tab.title);
     }

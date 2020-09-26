@@ -50,12 +50,12 @@
 #include "prprf.h"
 #include "nsNodeUtils.h"
 #include "nsJSUtils.h"
-#include "nsCycleCollector.h"
 
 // Nasty hack.  Maybe we could move some of the classinfo utility methods
 // (e.g. WrapNative) over to nsContentUtils?
 #include "nsDOMClassInfo.h"
 
+#include "mozilla/DeferredFinalize.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/ShadowRoot.h"
@@ -93,7 +93,7 @@ static const JSClass gPrototypeJSClass = {
     // Our one reserved slot holds the relevant nsXBLPrototypeBinding
     JSCLASS_HAS_RESERVED_SLOTS(1),
     nullptr, nullptr, nullptr, nullptr,
-    XBLEnumerate, nullptr,
+    XBLEnumerate, nullptr, nullptr,
     nullptr, XBLFinalize,
     nullptr, nullptr, nullptr, nullptr
 };
@@ -941,7 +941,7 @@ GetOrCreateMapEntryForPrototype(JSContext *cx, JS::Handle<JSObject*> proto)
 
   // We don't have an entry. Create one and stick it in the map.
   JS::Rooted<JSObject*> entry(cx);
-  entry = JS_NewObjectWithGivenProto(cx, nullptr, JS::NullPtr());
+  entry = JS_NewObjectWithGivenProto(cx, nullptr, nullptr);
   if (!entry) {
     return nullptr;
   }

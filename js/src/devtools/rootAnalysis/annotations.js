@@ -82,7 +82,7 @@ var ignoreCallees = {
     "z_stream_s.zfree" : true,
     "GrGLInterface.fCallback" : true,
     "std::strstreambuf._M_alloc_fun" : true,
-    "std::strstreambuf._M_free_fun" : true,
+    "std::strstreambuf._M_free_fun" : true
 };
 
 function fieldCallCannotGC(csu, fullfield)
@@ -174,6 +174,12 @@ var ignoreFunctions = {
     // And these are workarounds to avoid even more analysis work,
     // which would sadly still be needed even with bug 898815.
     "void js::AutoCompartment::AutoCompartment(js::ExclusiveContext*, JSCompartment*)": true,
+
+    // The nsScriptNameSpaceManager functions can't actually GC.  They
+    // just use a pldhash which has function pointers, which makes the
+    // analysis think maybe they can.
+    "nsGlobalNameStruct* nsScriptNameSpaceManager::LookupNavigatorName(nsAString_internal*)": true,
+    "nsGlobalNameStruct* nsScriptNameSpaceManager::LookupName(nsAString_internal*, uint16**)": true,
 };
 
 function ignoreGCFunction(mangled)

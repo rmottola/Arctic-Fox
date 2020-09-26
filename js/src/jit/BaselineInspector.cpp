@@ -21,9 +21,9 @@ SetElemICInspector::sawOOBDenseWrite() const
     if (!icEntry_)
         return false;
 
-    // Check for a SetElem_DenseAdd stub.
+    // Check for an element adding stub.
     for (ICStub* stub = icEntry_->firstStub(); stub; stub = stub->next()) {
-        if (stub->isSetElem_DenseAdd())
+        if (stub->isSetElem_DenseOrUnboxedArrayAdd())
             return true;
     }
 
@@ -59,7 +59,7 @@ SetElemICInspector::sawDenseWrite() const
 
     // Check for a SetElem_DenseAdd or SetElem_Dense stub.
     for (ICStub* stub = icEntry_->firstStub(); stub; stub = stub->next()) {
-        if (stub->isSetElem_DenseAdd() || stub->isSetElem_Dense())
+        if (stub->isSetElem_DenseOrUnboxedArrayAdd() || stub->isSetElem_DenseOrUnboxedArray())
             return true;
     }
     return false;
@@ -90,19 +90,28 @@ VectorAppendNoDuplicate(S& list, T value)
     return list.append(value);
 }
 
+static bool
+AddReceiver(const ReceiverGuard& receiver,
+            BaselineInspector::ReceiverVector& receivers,
+            BaselineInspector::ObjectGroupVector& convertUnboxedGroups)
+{
+    if (receiver.group && receiver.group->maybeUnboxedLayout()) {
+        if (receiver.group->unboxedLayout().nativeGroup())
+            return VectorAppendNoDuplicate(convertUnboxedGroups, receiver.group);
+    }
+    return VectorAppendNoDuplicate(receivers, receiver);
+}
+
 bool
-BaselineInspector::maybeInfoForPropertyOp(jsbytecode* pc,
-                                          ShapeVector& nativeShapes,
-                                          ObjectGroupVector& unboxedGroups,
+BaselineInspector::maybeInfoForPropertyOp(jsbytecode* pc, ReceiverVector& receivers,
                                           ObjectGroupVector& convertUnboxedGroups)
 {
-    // Return lists of native shapes and unboxed objects seen by the baseline
-    // IC for the current op. Empty lists indicate no shapes/types are known,
-    // or there was an uncacheable access. convertUnboxedGroups is used for
-    // unboxed object groups which have been seen, but have had instances
-    // converted to native objects and should be eagerly converted by Ion.
-    MOZ_ASSERT(nativeShapes.empty());
-    MOZ_ASSERT(unboxedGroups.empty());
+    // Return a list of the receivers seen by the baseline IC for the current
+    // op. Empty lists indicate no receivers are known, or there was an
+    // uncacheable access. convertUnboxedGroups is used for unboxed object
+    // groups which have been seen, but have had instances converted to native
+    // objects and should be eagerly converted by Ion.
+    MOZ_ASSERT(receivers.empty());
     MOZ_ASSERT(convertUnboxedGroups.empty());
 
     if (!hasBaselineScript())
@@ -113,59 +122,38 @@ BaselineInspector::maybeInfoForPropertyOp(jsbytecode* pc,
 
     ICStub* stub = entry.firstStub();
     while (stub->next()) {
-        Shape* shape = nullptr;
-        ObjectGroup* group = nullptr;
+        ReceiverGuard receiver;
         if (stub->isGetProp_Native()) {
-            shape = stub->toGetProp_Native()->receiverGuard().ownShape();
+            receiver = stub->toGetProp_Native()->receiverGuard();
         } else if (stub->isSetProp_Native()) {
-            shape = stub->toSetProp_Native()->shape();
+            receiver = ReceiverGuard(stub->toSetProp_Native()->group(),
+                                     stub->toSetProp_Native()->shape());
         } else if (stub->isGetProp_Unboxed()) {
-            group = stub->toGetProp_Unboxed()->group();
+            receiver = ReceiverGuard(stub->toGetProp_Unboxed()->group(), nullptr);
         } else if (stub->isSetProp_Unboxed()) {
-            group = stub->toSetProp_Unboxed()->group();
-        }
-
-        if (!shape && !group) {
-            nativeShapes.clear();
-            unboxedGroups.clear();
+            receiver = ReceiverGuard(stub->toSetProp_Unboxed()->group(), nullptr);
+        } else {
+            receivers.clear();
             return true;
         }
 
-        if (group && group->unboxedLayout().nativeGroup()) {
-            if (!VectorAppendNoDuplicate(convertUnboxedGroups, group))
-                return false;
-            shape = group->unboxedLayout().nativeShape();
-            group = nullptr;
-        }
-
-        if (shape) {
-            if (!VectorAppendNoDuplicate(nativeShapes, shape))
-                return false;
-        } else {
-            if (!VectorAppendNoDuplicate(unboxedGroups, group))
-                return false;
-        }
+        if (!AddReceiver(receiver, receivers, convertUnboxedGroups))
+            return false;
 
         stub = stub->next();
     }
 
     if (stub->isGetProp_Fallback()) {
-        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess()) {
-            nativeShapes.clear();
-            unboxedGroups.clear();
-        }
+        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess())
+            receivers.clear();
     } else {
-        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess()) {
-            nativeShapes.clear();
-            unboxedGroups.clear();
-        }
+        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess())
+            receivers.clear();
     }
 
-    // Don't inline if there are more than 5 shapes/groups.
-    if (nativeShapes.length() + unboxedGroups.length() > 5) {
-        nativeShapes.clear();
-        unboxedGroups.clear();
-    }
+    // Don't inline if there are more than 5 receivers.
+    if (receivers.length() > 5)
+        receivers.clear();
 
     return true;
 }
@@ -475,6 +463,25 @@ BaselineInspector::getTemplateObject(jsbytecode* pc)
     return nullptr;
 }
 
+ObjectGroup*
+BaselineInspector::getTemplateObjectGroup(jsbytecode* pc)
+{
+    if (!hasBaselineScript())
+        return nullptr;
+
+    const ICEntry& entry = icEntryFromPC(pc);
+    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
+        switch (stub->kind()) {
+          case ICStub::NewArray_Fallback:
+            return stub->toNewArray_Fallback()->templateGroup();
+          default:
+            break;
+        }
+    }
+
+    return nullptr;
+}
+
 JSFunction*
 BaselineInspector::getSingleCallee(jsbytecode* pc)
 {
@@ -572,16 +579,16 @@ BaselineInspector::templateCallObject()
     return &res->as<CallObject>();
 }
 
-static Shape *
-GlobalShapeForGetPropFunction(ICStub *stub)
+static Shape*
+GlobalShapeForGetPropFunction(ICStub* stub)
 {
     if (stub->isGetProp_CallNative()) {
-        ICGetProp_CallNative *nstub = stub->toGetProp_CallNative();
+        ICGetProp_CallNative* nstub = stub->toGetProp_CallNative();
         if (nstub->isOwnGetter())
             return nullptr;
 
-        const ReceiverGuard &guard = nstub->receiverGuard();
-        if (Shape *shape = guard.shape()) {
+        const HeapReceiverGuard& guard = nstub->receiverGuard();
+        if (Shape* shape = guard.shape()) {
             if (shape->getObjectClass()->flags & JSCLASS_IS_GLOBAL)
                 return shape;
         }
@@ -589,56 +596,29 @@ GlobalShapeForGetPropFunction(ICStub *stub)
     return nullptr;
 }
 
-static bool
-AddReceiver(BaselineInspector::ShapeVector &nativeShapes,
-            BaselineInspector::ObjectGroupVector &unboxedGroups,
-            ReceiverGuard::StackGuard receiver)
-{
-    if (Shape *shape = receiver.ownShape())
-        return VectorAppendNoDuplicate(nativeShapes, shape);
-
-    // Only unboxed objects with no expandos are handled by the common
-    // getprop/setprop optimizations.
-    if (!receiver.shape)
-        return VectorAppendNoDuplicate(unboxedGroups, receiver.group);
-
-    return false;
-}
-
-static bool
-AddReceiverForGetPropFunction(BaselineInspector::ShapeVector &nativeShapes,
-                              BaselineInspector::ObjectGroupVector &unboxedGroups,
-                              ICGetPropCallGetter *stub)
-{
-    if (stub->isOwnGetter())
-        return true;
-
-    return AddReceiver(nativeShapes, unboxedGroups, stub->receiverGuard());
-}
-
 bool
-BaselineInspector::commonGetPropFunction(jsbytecode *pc, JSObject **holder, Shape **holderShape,
-                                         JSFunction **commonGetter, Shape **globalShape,
-                                         bool *isOwnProperty,
-                                         ShapeVector &nativeShapes,
-                                         ObjectGroupVector &unboxedGroups)
+BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
+                                         JSFunction** commonGetter, Shape** globalShape,
+                                         bool* isOwnProperty,
+                                         ReceiverVector& receivers,
+                                         ObjectGroupVector& convertUnboxedGroups)
 {
     if (!hasBaselineScript())
         return false;
 
-    MOZ_ASSERT(nativeShapes.empty());
-    MOZ_ASSERT(unboxedGroups.empty());
+    MOZ_ASSERT(receivers.empty());
+    MOZ_ASSERT(convertUnboxedGroups.empty());
 
     *holder = nullptr;
-    const ICEntry &entry = icEntryFromPC(pc);
+    const ICEntry& entry = icEntryFromPC(pc);
 
-    for (ICStub *stub = entry.firstStub(); stub; stub = stub->next()) {
+    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
         if (stub->isGetProp_CallScripted() ||
             stub->isGetProp_CallNative())
         {
-            ICGetPropCallGetter *nstub = static_cast<ICGetPropCallGetter *>(stub);
+            ICGetPropCallGetter* nstub = static_cast<ICGetPropCallGetter*>(stub);
             bool isOwn = nstub->isOwnGetter();
-            if (!AddReceiverForGetPropFunction(nativeShapes, unboxedGroups, nstub))
+            if (!isOwn && !AddReceiver(nstub->receiverGuard(), receivers, convertUnboxedGroups))
                 return false;
 
             if (!*holder) {
@@ -670,37 +650,38 @@ BaselineInspector::commonGetPropFunction(jsbytecode *pc, JSObject **holder, Shap
     if (!*holder)
         return false;
 
-    MOZ_ASSERT(*isOwnProperty == (nativeShapes.empty() && unboxedGroups.empty()));
+    MOZ_ASSERT(*isOwnProperty == (receivers.empty() && convertUnboxedGroups.empty()));
     return true;
 }
 
 bool
-BaselineInspector::commonSetPropFunction(jsbytecode *pc, JSObject **holder, Shape **holderShape,
-                                         JSFunction **commonSetter, bool *isOwnProperty,
-                                         ShapeVector &nativeShapes,
-                                         ObjectGroupVector &unboxedGroups)
+BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shape** holderShape,
+                                         JSFunction** commonSetter, bool* isOwnProperty,
+                                         ReceiverVector& receivers,
+                                         ObjectGroupVector& convertUnboxedGroups)
 {
     if (!hasBaselineScript())
         return false;
 
-    MOZ_ASSERT(nativeShapes.empty());
-    MOZ_ASSERT(unboxedGroups.empty());
+    MOZ_ASSERT(receivers.empty());
+    MOZ_ASSERT(convertUnboxedGroups.empty());
 
     *holder = nullptr;
-    const ICEntry &entry = icEntryFromPC(pc);
+    const ICEntry& entry = icEntryFromPC(pc);
 
-    for (ICStub *stub = entry.firstStub(); stub; stub = stub->next()) {
+    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
         if (stub->isSetProp_CallScripted() || stub->isSetProp_CallNative()) {
-            ICSetPropCallSetter *nstub = static_cast<ICSetPropCallSetter *>(stub);
-            if (!AddReceiver(nativeShapes, unboxedGroups, nstub->guard()))
+            ICSetPropCallSetter* nstub = static_cast<ICSetPropCallSetter*>(stub);
+            bool isOwn = nstub->isOwnSetter();
+            if (!isOwn && !AddReceiver(nstub->receiverGuard(), receivers, convertUnboxedGroups))
                 return false;
 
             if (!*holder) {
                 *holder = nstub->holder();
                 *holderShape = nstub->holderShape();
                 *commonSetter = nstub->setter();
-                *isOwnProperty = false;
-            } else if (nstub->holderShape() != *holderShape) {
+                *isOwnProperty = isOwn;
+            } else if (nstub->holderShape() != *holderShape || isOwn != *isOwnProperty) {
                 return false;
             } else {
                 MOZ_ASSERT(*commonSetter == nstub->setter());
@@ -717,6 +698,80 @@ BaselineInspector::commonSetPropFunction(jsbytecode *pc, JSObject **holder, Shap
         return false;
 
     return true;
+}
+
+MIRType
+BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
+{
+    if (!hasBaselineScript())
+        return MIRType_Value;
+
+    const ICEntry& entry = icEntryFromPC(pc);
+    MIRType type = MIRType_None;
+
+    for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
+        MIRType stubType;
+        switch (stub->kind()) {
+          case ICStub::GetProp_Fallback:
+            if (stub->toGetProp_Fallback()->hadUnoptimizableAccess())
+                return MIRType_Value;
+            continue;
+
+          case ICStub::GetElem_Fallback:
+            if (stub->toGetElem_Fallback()->hadUnoptimizableAccess())
+                return MIRType_Value;
+            continue;
+
+          case ICStub::GetProp_Generic:
+            return MIRType_Value;
+
+          case ICStub::GetProp_ArgumentsLength:
+          case ICStub::GetElem_Arguments:
+            // Either an object or magic arguments.
+            return MIRType_Value;
+
+          case ICStub::GetProp_ArrayLength:
+          case ICStub::GetProp_Native:
+          case ICStub::GetProp_NativeDoesNotExist:
+          case ICStub::GetProp_NativePrototype:
+          case ICStub::GetProp_Unboxed:
+          case ICStub::GetProp_TypedObject:
+          case ICStub::GetProp_CallScripted:
+          case ICStub::GetProp_CallNative:
+          case ICStub::GetProp_CallDOMProxyNative:
+          case ICStub::GetProp_CallDOMProxyWithGenerationNative:
+          case ICStub::GetProp_DOMProxyShadowed:
+          case ICStub::GetElem_NativeSlot:
+          case ICStub::GetElem_NativePrototypeSlot:
+          case ICStub::GetElem_NativePrototypeCallNative:
+          case ICStub::GetElem_NativePrototypeCallScripted:
+          case ICStub::GetElem_String:
+          case ICStub::GetElem_Dense:
+          case ICStub::GetElem_TypedArray:
+            stubType = MIRType_Object;
+            break;
+
+          case ICStub::GetProp_Primitive:
+            stubType = MIRTypeFromValueType(stub->toGetProp_Primitive()->primitiveType());
+            break;
+
+          case ICStub::GetProp_StringLength:
+            stubType = MIRType_String;
+            break;
+
+          default:
+            MOZ_CRASH("Unexpected stub");
+        }
+
+        if (type != MIRType_None) {
+            if (type != stubType)
+                return MIRType_Value;
+        } else {
+            type = stubType;
+        }
+    }
+
+    return (type == MIRType_None) ? MIRType_Value : type;
 }
 
 bool

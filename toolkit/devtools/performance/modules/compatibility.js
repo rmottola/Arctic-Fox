@@ -4,12 +4,9 @@
 "use strict";
 
 const { Task } = require("resource://gre/modules/Task.jsm");
+const { Promise } = require("resource://gre/modules/Promise.jsm");
 loader.lazyRequireGetter(this, "EventEmitter",
   "devtools/toolkit/event-emitter");
-
-const REQUIRED_MEMORY_ACTOR_METHODS = [
-  "attach", "detach", "startRecordingAllocations", "stopRecordingAllocations", "getAllocations"
-];
 
 /**
  * A dummy front decorated with the provided methods.
@@ -27,7 +24,8 @@ function MockFront (blueprint) {
 
 function MockMemoryFront () {
   MockFront.call(this, [
-    ["initialize"],
+    ["start", 0], // for facade
+    ["stop", 0], // for facade
     ["destroy"],
     ["attach"],
     ["detach"],
@@ -41,7 +39,6 @@ exports.MockMemoryFront = MockMemoryFront;
 
 function MockTimelineFront () {
   MockFront.call(this, [
-    ["initialize"],
     ["destroy"],
     ["start", 0],
     ["stop", 0],
@@ -107,3 +104,75 @@ function timelineActorSupported(target) {
   return target.hasActor("timeline");
 }
 exports.timelineActorSupported = Task.async(timelineActorSupported);
+
+/**
+ * Returns a promise resolving to the location of the profiler actor
+ * within this context.
+ *
+ * @param {TabTarget} target
+ * @return {Promise<ProfilerActor>}
+ */
+function getProfiler (target) {
+  let { promise, resolve } = Promise.defer();
+  // Chrome and content process targets already have obtained a reference
+  // to the profiler tab actor. Use it immediately.
+  if (target.form && target.form.profilerActor) {
+    resolve(target.form.profilerActor);
+  }
+  // Check if we already have a grip to the `listTabs` response object
+  // and, if we do, use it to get to the profiler actor.
+  else if (target.root && target.root.profilerActor) {
+    resolve(target.root.profilerActor);
+  }
+  // Otherwise, call `listTabs`.
+  else {
+    target.client.listTabs(({ profilerActor }) => resolve(profilerActor));
+  }
+  return promise;
+}
+exports.getProfiler = Task.async(getProfiler);
+
+/**
+ * Makes a request to an actor that does not have the modern `Front`
+ * interface.
+ */
+function legacyRequest (target, actor, method, args) {
+  let { promise, resolve } = Promise.defer();
+  let data = args[0] || {};
+  data.to = actor;
+  data.type = method;
+  target.client.request(data, resolve);
+  return promise;
+}
+
+/**
+ * Returns a function to be used as a method on an "Actor" in ./actors.
+ * Calls the underlying actor's method, supporting the modern `Front`
+ * interface if possible, otherwise, falling back to using
+ * `legacyRequest`.
+ */
+function actorCompatibilityBridge (method) {
+  return function () {
+    // If there's no target or client on this actor facade,
+    // abort silently -- this occurs in tests when polling occurs
+    // after the test ends, when tests do not wait for toolbox destruction
+    // (which will destroy the actor facade, turning off the polling).
+    if (!this._target || !this._target.client) {
+      return;
+    }
+    // Check to see if this is a modern ActorFront, which has its
+    // own `request` method. Also, check if its a mock actor, as it mimicks
+    // the ActorFront interface.
+    // The profiler actor does not currently support the modern `Front`
+    // interface, so we have to manually push packets to it.
+    // TODO bug 1159389, fix up profiler actor to not need this, however
+    // we will need it for backwards compat
+    if (this.IS_MOCK || this._actor.request) {
+      return this._actor[method].apply(this._actor, arguments);
+    }
+    else {
+      return legacyRequest(this._target, this._actor, method, arguments);
+    }
+  };
+}
+exports.actorCompatibilityBridge = actorCompatibilityBridge;

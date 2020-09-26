@@ -322,33 +322,6 @@ TokenStream::TokenStream(ExclusiveContext* cx, const ReadOnlyCompileOptions& opt
     isExprEnding[TOK_RP]    = 1;
     isExprEnding[TOK_RB]    = 1;
     isExprEnding[TOK_RC]    = 1;
-
-    memset(isExprStarting, 0, sizeof(isExprStarting));
-    isExprStarting[TOK_INC]              = 1;
-    isExprStarting[TOK_DEC]              = 1;
-    isExprStarting[TOK_LB]               = 1;
-    isExprStarting[TOK_LC]               = 1;
-    isExprStarting[TOK_LP]               = 1;
-    isExprStarting[TOK_NAME]             = 1;
-    isExprStarting[TOK_NUMBER]           = 1;
-    isExprStarting[TOK_STRING]           = 1;
-    isExprStarting[TOK_TEMPLATE_HEAD]    = 1;
-    isExprStarting[TOK_NO_SUBS_TEMPLATE] = 1;
-    isExprStarting[TOK_REGEXP]           = 1;
-    isExprStarting[TOK_TRUE]             = 1;
-    isExprStarting[TOK_FALSE]            = 1;
-    isExprStarting[TOK_NULL]             = 1;
-    isExprStarting[TOK_THIS]             = 1;
-    isExprStarting[TOK_NEW]              = 1;
-    isExprStarting[TOK_DELETE]           = 1;
-    isExprStarting[TOK_YIELD]            = 1;
-    isExprStarting[TOK_CLASS]            = 1;
-    isExprStarting[TOK_ADD]              = 1;
-    isExprStarting[TOK_SUB]              = 1;
-    isExprStarting[TOK_TYPEOF]           = 1;
-    isExprStarting[TOK_VOID]             = 1;
-    isExprStarting[TOK_NOT]              = 1;
-    isExprStarting[TOK_BITNOT]           = 1;
 }
 
 #ifdef _MSC_VER
@@ -1016,6 +989,7 @@ TokenStream::checkForKeyword(const KeywordInfo* kw, TokenKind* ttp)
 #ifndef JS_HAS_CLASSES
         || kw->tokentype == TOK_CLASS
         || kw->tokentype == TOK_EXTENDS
+        || kw->tokentype == TOK_SUPER
 #endif
         )
     {

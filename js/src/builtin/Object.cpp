@@ -555,6 +555,16 @@ js::obj_hasOwnProperty(JSContext* cx, unsigned argc, Value* vp)
     jsid id;
     if (args.thisv().isObject() && ValueToId<NoGC>(cx, idValue, &id)) {
         JSObject* obj = &args.thisv().toObject();
+
+#ifndef RELEASE_BUILD
+        if (obj->is<RegExpObject>() && id == NameToId(cx->names().source)) {
+            if (JSScript* script = cx->currentScript()) {
+                const char* filename = script->filename();
+                cx->compartment()->addTelemetry(filename, JSCompartment::RegExpSourceProperty);
+            }
+        }
+#endif
+
         Shape* prop;
         if (obj->isNative() &&
             NativeLookupOwnProperty<NoGC>(cx, &obj->as<NativeObject>(), id, &prop))
@@ -661,7 +671,7 @@ js::obj_create(JSContext* cx, unsigned argc, Value* vp)
     if (!args[0].isObjectOrNull()) {
         RootedValue v(cx, args[0]);
         UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NullPtr());
+            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, nullptr);
         if (!bytes)
             return false;
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
@@ -1088,7 +1098,7 @@ CreateObjectConstructor(JSContext* cx, JSProtoKey key)
 
     /* Create the Object function now that we have a [[Prototype]] for it. */
     return NewNativeConstructor(cx, obj_construct, 1, HandlePropertyName(cx->names().Object),
-                                JSFunction::FinalizeKind, SingletonObject);
+                                gc::AllocKind::FUNCTION, SingletonObject);
 }
 
 static JSObject*
@@ -1101,7 +1111,7 @@ CreateObjectPrototype(JSContext* cx, JSProtoKey key)
      * Create |Object.prototype| first, mirroring CreateBlankProto but for the
      * prototype of the created object.
      */
-    RootedPlainObject objectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, NullPtr(),
+    RootedPlainObject objectProto(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr,
                                                                            SingletonObject));
     if (!objectProto)
         return nullptr;
@@ -1181,6 +1191,7 @@ const Class PlainObject::class_ = {
     nullptr,  /* setProperty */
     nullptr,  /* enumerate */
     nullptr,  /* resolve */
+    nullptr,  /* mayResolve */
     nullptr,  /* convert */
     nullptr,  /* finalize */
     nullptr,  /* call */

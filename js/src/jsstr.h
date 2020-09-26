@@ -17,17 +17,15 @@
 
 #include "gc/Rooting.h"
 #include "js/RootingAPI.h"
+#include "vm/Printer.h"
 #include "vm/Unicode.h"
 
 class JSAutoByteString;
-class JSFlatString;
 class JSLinearString;
 
 namespace js {
 
 class StringBuffer;
-
-class MutatingRopeSegmentRange;
 
 template <AllowGC allowGC>
 extern JSString*
@@ -346,11 +344,12 @@ extern int
 OneUcs4ToUtf8Char(uint8_t* utf8Buffer, uint32_t ucs4Char);
 
 extern size_t
-PutEscapedStringImpl(char* buffer, size_t size, FILE* fp, JSLinearString* str, uint32_t quote);
+PutEscapedStringImpl(char* buffer, size_t size, GenericPrinter* out, JSLinearString* str,
+                     uint32_t quote);
 
 template <typename CharT>
 extern size_t
-PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const CharT* chars,
+PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, const CharT* chars,
                      size_t length, uint32_t quote);
 
 /*
@@ -383,6 +382,18 @@ PutEscapedString(char* buffer, size_t bufferSize, const CharT* chars, size_t len
     return n;
 }
 
+inline bool
+EscapedStringPrinter(GenericPrinter& out, JSLinearString* str, uint32_t quote)
+{
+    return PutEscapedStringImpl(nullptr, 0, &out, str, quote) != size_t(-1);
+}
+
+inline bool
+EscapedStringPrinter(GenericPrinter& out, const char* chars, size_t length, uint32_t quote)
+{
+    return PutEscapedStringImpl(nullptr, 0, &out, chars, length, quote) != size_t(-1);
+}
+
 /*
  * Write str into file escaping any non-printable or non-ASCII character.
  * If quote is not 0, it must be a single or double quote character that
@@ -391,13 +402,19 @@ PutEscapedString(char* buffer, size_t bufferSize, const CharT* chars, size_t len
 inline bool
 FileEscapedString(FILE* fp, JSLinearString* str, uint32_t quote)
 {
-    return PutEscapedStringImpl(nullptr, 0, fp, str, quote) != size_t(-1);
+    Fprinter out(fp);
+    bool res = EscapedStringPrinter(out, str, quote);
+    out.finish();
+    return res;
 }
 
 inline bool
 FileEscapedString(FILE* fp, const char* chars, size_t length, uint32_t quote)
 {
-    return PutEscapedStringImpl(nullptr, 0, fp, chars, length, quote) != size_t(-1);
+    Fprinter out(fp);
+    bool res = EscapedStringPrinter(out, chars, length, quote);
+    out.finish();
+    return res;
 }
 
 bool
@@ -411,9 +428,6 @@ str_split(JSContext* cx, unsigned argc, Value* vp);
 
 JSObject*
 str_split_string(JSContext* cx, HandleObjectGroup group, HandleString str, HandleString sep);
-
-bool
-str_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp);
 
 bool
 str_replace_regexp_raw(JSContext* cx, HandleString string, HandleObject regexp,

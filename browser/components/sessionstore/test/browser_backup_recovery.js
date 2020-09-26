@@ -54,7 +54,7 @@ add_task(function* test_creation() {
 
   info("Testing situation after a single write");
   yield promiseBrowserLoaded(tab.linkedBrowser);
-  SyncHandlers.get(tab.linkedBrowser).flush();
+  yield TabStateFlusher.flush(tab.linkedBrowser);
   yield SessionSaver.run();
 
   ok((yield File.exists(Paths.recovery)), "After write, recovery sessionstore file exists again");
@@ -67,7 +67,7 @@ add_task(function* test_creation() {
   let URL2 = URL_BASE + "?second_write";
   tab.linkedBrowser.loadURI(URL2);
   yield promiseBrowserLoaded(tab.linkedBrowser);
-  SyncHandlers.get(tab.linkedBrowser).flush();
+  yield TabStateFlusher.flush(tab.linkedBrowser);
   yield SessionSaver.run();
 
   ok((yield File.exists(Paths.recovery)), "After second write, recovery sessionstore file still exists");
@@ -94,7 +94,7 @@ let promiseSource = Task.async(function*(name) {
   let tab = gBrowser.addTab(URL);
 
   yield promiseBrowserLoaded(tab.linkedBrowser);
-  SyncHandlers.get(tab.linkedBrowser).flush();
+  yield TabStateFlusher.flush(tab.linkedBrowser);
   yield SessionSaver.run();
   gBrowser.removeTab(tab);
 

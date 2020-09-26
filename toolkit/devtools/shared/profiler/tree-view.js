@@ -17,9 +17,20 @@ const MILLISECOND_UNITS = L10N.getStr("table.ms");
 const PERCENTAGE_UNITS = L10N.getStr("table.percentage");
 const URL_LABEL_TOOLTIP = L10N.getStr("table.url.tooltiptext");
 const ZOOM_BUTTON_TOOLTIP = L10N.getStr("table.zoom.tooltiptext");
-const CALL_TREE_AUTO_EXPAND = 3; // depth
 const CALL_TREE_INDENTATION = 16; // px
+
 const DEFAULT_SORTING_PREDICATE = (a, b) => a.frame.samples < b.frame.samples ? 1 : -1;
+const DEFAULT_AUTO_EXPAND_DEPTH = 3; // depth
+const DEFAULT_VISIBLE_CELLS = {
+  duration: true,
+  percentage: true,
+  allocations: false,
+  selfDuration: true,
+  selfPercentage: true,
+  selfAllocations: false,
+  samples: true,
+  function: true
+};
 
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 const sum = vals => vals.reduce((a, b) => a + b, 0);
@@ -55,23 +66,25 @@ exports.CallView = CallView;
  *        top-down). Defaults to false.
  * @param function sortingPredicate [optional]
  *        The predicate used to sort the tree items when created. Defaults to
- *        the caller's sortingPredicate if a caller exists, otherwise defaults
+ *        the caller's `sortingPredicate` if a caller exists, otherwise defaults
  *        to DEFAULT_SORTING_PREDICATE. The two passed arguments are FrameNodes.
  * @param number autoExpandDepth [optional]
  *        The depth to which the tree should automatically expand. Defualts to
  *        the caller's `autoExpandDepth` if a caller exists, otherwise defaults
- *        to CALL_TREE_AUTO_EXPAND.
+ *        to DEFAULT_AUTO_EXPAND_DEPTH.
+ * @param object visibleCells
+ *        An object specifying which cells are visible in the tree. Defaults to
+ *        the caller's `visibleCells` if a caller exists, otherwise defaults
+ *        to DEFAULT_VISIBLE_CELLS.
  */
-function CallView({ caller, frame, level, hidden, inverted, sortingPredicate, autoExpandDepth }) {
-  // Assume no indentation if this tree item's level is not specified.
-  level = level || 0;
-
-  // Don't increase indentation if this tree item is hidden.
-  if (hidden) {
-    level--;
-  }
-
-  AbstractTreeItem.call(this, { parent: caller, level });
+function CallView({
+  caller, frame, level, hidden, inverted,
+  sortingPredicate, autoExpandDepth, visibleCells
+}) {
+  AbstractTreeItem.call(this, {
+    parent: caller,
+    level: level|0 - (hidden ? 1 : 0)
+  });
 
   this.sortingPredicate = sortingPredicate != null
     ? sortingPredicate
@@ -81,7 +94,12 @@ function CallView({ caller, frame, level, hidden, inverted, sortingPredicate, au
   this.autoExpandDepth = autoExpandDepth != null
     ? autoExpandDepth
     : caller ? caller.autoExpandDepth
-             : CALL_TREE_AUTO_EXPAND;
+             : DEFAULT_AUTO_EXPAND_DEPTH;
+
+  this.visibleCells = visibleCells != null
+    ? visibleCells
+    : caller ? caller.visibleCells
+             : Object.create(DEFAULT_VISIBLE_CELLS);
 
   this.caller = caller;
   this.frame = frame;
@@ -109,42 +127,56 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     let selfDuration;
     let totalAllocations;
 
-    if (!this._getChildCalls().length) {
-      selfPercentage = framePercentage;
-      selfDuration = this.frame.duration;
-      totalAllocations = this.frame.allocations;
+    let frameKey = this.frame.key;
+    if (this.visibleCells.selfPercentage) {
+      selfPercentage = this._getPercentage(this.root.frame.selfCount[frameKey]);
+    }
+    if (this.visibleCells.selfDuration) {
+      selfDuration = this.root.frame.selfDuration[frameKey];
+    }
+
+    if (!this.frame.calls.length) {
+      if (this.visibleCells.allocations) {
+        totalAllocations = this.frame.allocations;
+      }
     } else {
-      let childrenPercentage = sum(
-        [this._getPercentage(c.samples) for (c of this._getChildCalls())]);
-      let childrenDuration = sum(
-        [c.duration for (c of this._getChildCalls())]);
-      let childrenAllocations = sum(
-        [c.allocations for (c of this._getChildCalls())]);
-
-      selfPercentage = clamp(framePercentage - childrenPercentage, 0, 100);
-      selfDuration = this.frame.duration - childrenDuration;
-      totalAllocations = this.frame.allocations + childrenAllocations;
-
-      if (this.inverted) {
-        selfPercentage = framePercentage - selfPercentage;
-        selfDuration = this.frame.duration - selfDuration;
+      if (this.visibleCells.allocations) {
+        let childrenAllocations = this.frame.calls.reduce((acc, node) => acc + node.allocations, 0);
+        totalAllocations = this.frame.allocations + childrenAllocations;
       }
     }
 
-    let durationCell = this._createTimeCell(this.frame.duration);
-    let selfDurationCell = this._createTimeCell(selfDuration, true);
-    let percentageCell = this._createExecutionCell(framePercentage);
-    let selfPercentageCell = this._createExecutionCell(selfPercentage, true);
-    let allocationsCell = this._createAllocationsCell(totalAllocations);
-    let selfAllocationsCell = this._createAllocationsCell(this.frame.allocations, true);
-    let samplesCell = this._createSamplesCell(this.frame.samples);
-    let functionCell = this._createFunctionCell(arrowNode, frameInfo, this.level);
+    if (this.visibleCells.duration) {
+      var durationCell = this._createTimeCell(this.frame.duration);
+    }
+    if (this.visibleCells.selfDuration) {
+      var selfDurationCell = this._createTimeCell(selfDuration, true);
+    }
+    if (this.visibleCells.percentage) {
+      var percentageCell = this._createExecutionCell(framePercentage);
+    }
+    if (this.visibleCells.selfPercentage) {
+      var selfPercentageCell = this._createExecutionCell(selfPercentage, true);
+    }
+    if (this.visibleCells.allocations) {
+      var allocationsCell = this._createAllocationsCell(totalAllocations);
+    }
+    if (this.visibleCells.selfAllocations) {
+      var selfAllocationsCell = this._createAllocationsCell(this.frame.allocations, true);
+    }
+    if (this.visibleCells.samples) {
+      var samplesCell = this._createSamplesCell(this.frame.samples);
+    }
+    if (this.visibleCells.function) {
+      var functionCell = this._createFunctionCell(arrowNode, frameInfo, this.level);
+    }
 
     let targetNode = document.createElement("hbox");
     targetNode.className = "call-tree-item";
     targetNode.setAttribute("origin", frameInfo.isContent ? "content" : "chrome");
     targetNode.setAttribute("category", frameInfo.categoryData.abbrev || "");
-    targetNode.setAttribute("tooltiptext", this.frame.location || "");
+    targetNode.setAttribute("tooltiptext", frameInfo.isMetaCategory ? frameInfo.categoryData.label :
+                                           this.frame.location || "");
     if (this.hidden) {
       targetNode.style.display = "none";
     }
@@ -155,14 +187,30 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
       functionCell.querySelector(".call-tree-category").hidden = true;
     }
 
-    targetNode.appendChild(durationCell);
-    targetNode.appendChild(percentageCell);
-    targetNode.appendChild(allocationsCell);
-    targetNode.appendChild(selfDurationCell);
-    targetNode.appendChild(selfPercentageCell);
-    targetNode.appendChild(selfAllocationsCell);
-    targetNode.appendChild(samplesCell);
-    targetNode.appendChild(functionCell);
+    if (this.visibleCells.duration) {
+      targetNode.appendChild(durationCell);
+    }
+    if (this.visibleCells.percentage) {
+      targetNode.appendChild(percentageCell);
+    }
+    if (this.visibleCells.allocations) {
+      targetNode.appendChild(allocationsCell);
+    }
+    if (this.visibleCells.selfDuration) {
+      targetNode.appendChild(selfDurationCell);
+    }
+    if (this.visibleCells.selfPercentage) {
+      targetNode.appendChild(selfPercentageCell);
+    }
+    if (this.visibleCells.selfAllocations) {
+      targetNode.appendChild(selfAllocationsCell);
+    }
+    if (this.visibleCells.samples) {
+      targetNode.appendChild(samplesCell);
+    }
+    if (this.visibleCells.function) {
+      targetNode.appendChild(functionCell);
+    }
 
     return targetNode;
   },
@@ -175,13 +223,6 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
   },
 
   /**
-   * Return an array of this frame's child calls.
-   */
-  _getChildCalls: function() {
-    return Object.keys(this.frame.calls).map(k => this.frame.calls[k]);
-  },
-
-  /**
    * Populates this node in the call tree with the corresponding "callees".
    * These are defined in the `frame` data source for this call view.
    * @param array:AbstractTreeItem children
@@ -189,7 +230,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
   _populateSelf: function(children) {
     let newLevel = this.level + 1;
 
-    for (let newFrame of this._getChildCalls()) {
+    for (let newFrame of this.frame.calls) {
       children.push(new CallView({
         caller: this,
         frame: newFrame,
@@ -250,48 +291,53 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     nameNode.className = "plain call-tree-name";
     nameNode.setAttribute("flex", "1");
     nameNode.setAttribute("crop", "end");
-    nameNode.setAttribute("value", frameInfo.functionName || "");
+    nameNode.setAttribute("value", frameInfo.isMetaCategory
+                                     ? frameInfo.categoryData.label
+                                     : frameInfo.functionName || "");
     cell.appendChild(nameNode);
 
-    let urlNode = this.document.createElement("label");
-    urlNode.className = "plain call-tree-url";
-    urlNode.setAttribute("flex", "1");
-    urlNode.setAttribute("crop", "end");
-    urlNode.setAttribute("value", frameInfo.fileName || "");
-    urlNode.setAttribute("tooltiptext", URL_LABEL_TOOLTIP + " → " + frameInfo.url);
-    urlNode.addEventListener("mousedown", this._onUrlClick);
-    cell.appendChild(urlNode);
+    // Don't render detailed labels for meta category frames
+    if (!frameInfo.isMetaCategory) {
+      let urlNode = this.document.createElement("label");
+      urlNode.className = "plain call-tree-url";
+      urlNode.setAttribute("flex", "1");
+      urlNode.setAttribute("crop", "end");
+      urlNode.setAttribute("value", frameInfo.fileName || "");
+      urlNode.setAttribute("tooltiptext", URL_LABEL_TOOLTIP + " → " + frameInfo.url);
+      urlNode.addEventListener("mousedown", this._onUrlClick);
+      cell.appendChild(urlNode);
 
-    let lineNode = this.document.createElement("label");
-    lineNode.className = "plain call-tree-line";
-    lineNode.setAttribute("value", frameInfo.line ? ":" + frameInfo.line : "");
-    cell.appendChild(lineNode);
+      let lineNode = this.document.createElement("label");
+      lineNode.className = "plain call-tree-line";
+      lineNode.setAttribute("value", frameInfo.line ? ":" + frameInfo.line : "");
+      cell.appendChild(lineNode);
 
-    let columnNode = this.document.createElement("label");
-    columnNode.className = "plain call-tree-column";
-    columnNode.setAttribute("value", frameInfo.column ? ":" + frameInfo.column : "");
-    cell.appendChild(columnNode);
+      let columnNode = this.document.createElement("label");
+      columnNode.className = "plain call-tree-column";
+      columnNode.setAttribute("value", frameInfo.column ? ":" + frameInfo.column : "");
+      cell.appendChild(columnNode);
 
-    let hostNode = this.document.createElement("label");
-    hostNode.className = "plain call-tree-host";
-    hostNode.setAttribute("value", frameInfo.hostName || "");
-    cell.appendChild(hostNode);
+      let hostNode = this.document.createElement("label");
+      hostNode.className = "plain call-tree-host";
+      hostNode.setAttribute("value", frameInfo.hostName || "");
+      cell.appendChild(hostNode);
 
-    let zoomNode = this.document.createElement("button");
-    zoomNode.className = "plain call-tree-zoom";
-    zoomNode.setAttribute("tooltiptext", ZOOM_BUTTON_TOOLTIP);
-    zoomNode.addEventListener("mousedown", this._onZoomClick);
-    cell.appendChild(zoomNode);
+      let zoomNode = this.document.createElement("button");
+      zoomNode.className = "plain call-tree-zoom";
+      zoomNode.setAttribute("tooltiptext", ZOOM_BUTTON_TOOLTIP);
+      zoomNode.addEventListener("mousedown", this._onZoomClick);
+      cell.appendChild(zoomNode);
 
-    let spacerNode = this.document.createElement("spacer");
-    spacerNode.setAttribute("flex", "10000");
-    cell.appendChild(spacerNode);
+      let spacerNode = this.document.createElement("spacer");
+      spacerNode.setAttribute("flex", "10000");
+      cell.appendChild(spacerNode);
 
-    let categoryNode = this.document.createElement("label");
-    categoryNode.className = "plain call-tree-category";
-    categoryNode.style.color = frameInfo.categoryData.color;
-    categoryNode.setAttribute("value", frameInfo.categoryData.label || "");
-    cell.appendChild(categoryNode);
+      let categoryNode = this.document.createElement("label");
+      categoryNode.className = "plain call-tree-category";
+      categoryNode.style.color = frameInfo.categoryData.color;
+      categoryNode.setAttribute("value", frameInfo.categoryData.label || "");
+      cell.appendChild(categoryNode);
+    }
 
     let hasDescendants = Object.keys(this.frame.calls).length > 0;
     if (hasDescendants == false) {
@@ -299,18 +345,6 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     }
 
     return cell;
-  },
-
-  /**
-   * Toggles the allocations information hidden or visible.
-   * @param boolean visible
-   */
-  toggleAllocations: function(visible) {
-    if (!visible) {
-      this.container.setAttribute("allocations-hidden", "");
-    } else {
-      this.container.removeAttribute("allocations-hidden");
-    }
   },
 
   /**

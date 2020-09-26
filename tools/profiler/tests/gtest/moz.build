@@ -9,7 +9,6 @@ LOCAL_INCLUDES += [
 ]
 
 UNIFIED_SOURCES += [
-    'JSStreamWriterTest.cpp',
     'ThreadProfileTest.cpp',
 ]
 

@@ -51,9 +51,13 @@ let MemoryCallTreeView = Heritage.extend(DetailsSubview, {
    */
   _onLink: function (_, treeItem) {
     let { url, line } = treeItem.frame.getInfo();
-    viewSourceInDebugger(url, line).then(
-      () => this.emit(EVENTS.SOURCE_SHOWN_IN_JS_DEBUGGER),
-      () => this.emit(EVENTS.SOURCE_NOT_FOUND_IN_JS_DEBUGGER));
+    gToolbox.viewSourceInDebugger(url, line).then(success => {
+      if (success) {
+        this.emit(EVENTS.SOURCE_SHOWN_IN_JS_DEBUGGER);
+      } else {
+        this.emit(EVENTS.SOURCE_NOT_FOUND_IN_JS_DEBUGGER);
+      }
+    });
   },
 
   /**
@@ -61,10 +65,10 @@ let MemoryCallTreeView = Heritage.extend(DetailsSubview, {
    * populate the call tree.
    */
   _prepareCallTree: function (allocations, { startTime, endTime }, options) {
-    let samples = RecordingUtils.getSamplesFromAllocations(allocations);
-    let invertTree = PerformanceController.getPref("invert-call-tree");
+    let thread = RecordingUtils.getProfileThreadFromAllocations(allocations);
+    let invertTree = PerformanceController.getOption("invert-call-tree");
 
-    let threadNode = new ThreadNode(samples,
+    let threadNode = new ThreadNode(thread,
       { startTime, endTime, invertTree });
 
     // If we have an empty profile (no samples), then don't invert the tree, as
@@ -89,6 +93,13 @@ let MemoryCallTreeView = Heritage.extend(DetailsSubview, {
       // Call trees should only auto-expand when not inverted. Passing undefined
       // will default to the CALL_TREE_AUTO_EXPAND depth.
       autoExpandDepth: options.inverted ? 0 : undefined,
+      // Some cells like the time duration and cost percentage don't make sense
+      // for a memory allocations call tree.
+      visibleCells: {
+        allocations: true,
+        selfAllocations: true,
+        function: true
+      }
     });
 
     // Bind events.

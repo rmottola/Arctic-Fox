@@ -13,9 +13,6 @@
 #include "vm/SavedStacks.h"
 #include "vm/Shape.h"
 
-struct JSExnPrivate;
-
-
 namespace js {
 
 /*

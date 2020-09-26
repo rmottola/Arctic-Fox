@@ -110,9 +110,8 @@
 namespace js {
 
 class Bindings;
-class Debugger;
-class Nursery;
 class StaticBlockObject;
+class TenuringTracer;
 
 typedef JSGetterOp GetterOp;
 typedef JSSetterOp SetterOp;
@@ -319,39 +318,6 @@ class Shape;
 class UnownedBaseShape;
 struct StackBaseShape;
 
-// This class is used to add a post barrier on the AccessorShape's getter/setter
-// objects. It updates the shape's entry in the parent's KidsHash table.
-class ShapeGetterSetterRef : public gc::BufferableRef
-{
-    AccessorShape* shape;
-    JSObject** objp;
-
-  public:
-    ShapeGetterSetterRef(AccessorShape* shape, JSObject** objp)
-      : shape(shape), objp(objp)
-    {}
-
-    void mark(JSTracer* trc);
-};
-
-static inline void
-GetterSetterWriteBarrierPost(AccessorShape* shape, JSObject** objp)
-{
-    MOZ_ASSERT(shape);
-    MOZ_ASSERT(objp);
-    MOZ_ASSERT(*objp);
-    gc::Cell** cellp = reinterpret_cast<gc::Cell**>(objp);
-    if (gc::StoreBuffer* sb = (*cellp)->storeBuffer())
-        sb->putGeneric(ShapeGetterSetterRef(shape, objp));
-}
-
-static inline void
-GetterSetterWriteBarrierPostRemove(JSRuntime* rt, JSObject** objp)
-{
-    JS::shadow::Runtime* shadowRuntime = JS::shadow::Runtime::asShadowRuntime(rt);
-    shadowRuntime->gcStoreBufferPtr()->removeRelocatableCellFromAnyThread(reinterpret_cast<gc::Cell**>(objp));
-}
-
 class BaseShape : public gc::TenuredCell
 {
   public:
@@ -490,7 +456,7 @@ class BaseShape : public gc::TenuredCell
 
     static inline ThingRootKind rootKind() { return THING_ROOT_BASE_SHAPE; }
 
-    void markChildren(JSTracer *trc);
+    void traceChildren(JSTracer* trc);
 
     void fixupAfterMovingGC() {}
 
@@ -596,13 +562,12 @@ class Shape : public gc::TenuredCell
     friend class ::JSObject;
     friend class ::JSFunction;
     friend class Bindings;
-    friend class Nursery;
     friend class NativeObject;
     friend class PropertyTree;
     friend class StaticBlockObject;
-    friend class ShapeGetterSetterRef;
-    friend struct StackShape;
+    friend class TenuringTracer;
     friend struct StackBaseShape;
+    friend struct StackShape;
 
   protected:
     HeapPtrBaseShape    base_;
@@ -999,12 +964,13 @@ class Shape : public gc::TenuredCell
 
     static inline ThingRootKind rootKind() { return THING_ROOT_SHAPE; }
 
-    inline void markChildren(JSTracer* trc);
+    void traceChildren(JSTracer* trc);
 
     inline Shape* search(ExclusiveContext* cx, jsid id);
     inline Shape* searchLinear(jsid id);
 
     void fixupAfterMovingGC();
+    void fixupGetterSetterForBarrier(JSTracer* trc);
 
     /* For JIT usage */
     static inline size_t offsetOfBase() { return offsetof(Shape, base_); }
@@ -1026,7 +992,6 @@ class Shape : public gc::TenuredCell
 class AccessorShape : public Shape
 {
     friend class Shape;
-    friend class ShapeGetterSetterRef;
     friend class NativeObject;
 
     union {
@@ -1270,6 +1235,38 @@ Shape::Shape(const StackShape& other, uint32_t nfixed)
     kids.setNull();
 }
 
+// This class is used to add a post barrier on the AccessorShape's getter/setter
+// objects. It updates the pointers and the shape's entry in the parent's
+// KidsHash table.
+class ShapeGetterSetterRef : public gc::BufferableRef
+{
+    AccessorShape* shape_;
+
+  public:
+    explicit ShapeGetterSetterRef(AccessorShape* shape) : shape_(shape) {}
+    void trace(JSTracer* trc) override { shape_->fixupGetterSetterForBarrier(trc); }
+};
+
+static inline void
+GetterSetterWriteBarrierPost(AccessorShape* shape)
+{
+    MOZ_ASSERT(shape);
+    if (shape->hasGetterObject()) {
+        gc::StoreBuffer* sb = reinterpret_cast<gc::Cell*>(shape->getterObject())->storeBuffer();
+        if (sb) {
+            sb->putGeneric(ShapeGetterSetterRef(shape));
+            return;
+        }
+    }
+    if (shape->hasSetterObject()) {
+        gc::StoreBuffer* sb = reinterpret_cast<gc::Cell*>(shape->setterObject())->storeBuffer();
+        if (sb) {
+            sb->putGeneric(ShapeGetterSetterRef(shape));
+            return;
+        }
+    }
+}
+
 inline
 AccessorShape::AccessorShape(const StackShape& other, uint32_t nfixed)
   : Shape(other, nfixed),
@@ -1277,11 +1274,7 @@ AccessorShape::AccessorShape(const StackShape& other, uint32_t nfixed)
     rawSetter(other.rawSetter)
 {
     MOZ_ASSERT(getAllocKind() == gc::AllocKind::ACCESSOR_SHAPE);
-
-    if ((attrs & JSPROP_GETTER) && rawGetter)
-        GetterSetterWriteBarrierPost(this, &this->getterObj);
-    if ((attrs & JSPROP_SETTER) && rawSetter)
-        GetterSetterWriteBarrierPost(this, &this->setterObj);
+    GetterSetterWriteBarrierPost(this);
 }
 
 inline
@@ -1355,21 +1348,6 @@ Shape::searchLinear(jsid id)
     }
 
     return nullptr;
-}
-
-inline void
-Shape::markChildren(JSTracer* trc)
-{
-    MarkBaseShape(trc, &base_, "base");
-    gc::MarkId(trc, &propidRef(), "propid");
-    if (parent)
-        MarkShape(trc, &parent, "parent");
-
-    if (hasGetterObject())
-        gc::MarkObjectUnbarriered(trc, &asAccessorShape().getterObj, "getter");
-
-    if (hasSetterObject())
-        gc::MarkObjectUnbarriered(trc, &asAccessorShape().setterObj, "setter");
 }
 
 /*

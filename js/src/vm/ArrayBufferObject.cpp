@@ -108,6 +108,7 @@ const Class ArrayBufferObject::class_ = {
     nullptr,                 /* setProperty */
     nullptr,                 /* enumerate */
     nullptr,                 /* resolve */
+    nullptr,                 /* mayResolve */
     nullptr,                 /* convert */
     ArrayBufferObject::finalize,
     nullptr,        /* call        */
@@ -972,7 +973,7 @@ ArrayBufferObject::trace(JSTracer* trc, JSObject* obj)
     JSObject* view = MaybeForwarded(buf.firstView());
     MOZ_ASSERT(view && view->is<InlineTransparentTypedObject>());
 
-    gc::MarkObjectUnbarriered(trc, &view, "array buffer inline typed object owner");
+    TraceManuallyBarrieredEdge(trc, &view, "array buffer inline typed object owner");
     buf.setSlot(DATA_SLOT, PrivateValue(view->as<InlineTransparentTypedObject>().inlineTypedMem()));
 }
 
@@ -1093,12 +1094,12 @@ InnerViewTable::removeViews(ArrayBufferObject* obj)
 bool
 InnerViewTable::sweepEntry(JSObject** pkey, ViewVector& views)
 {
-    if (IsObjectAboutToBeFinalized(pkey))
+    if (IsAboutToBeFinalizedUnbarriered(pkey))
         return true;
 
     MOZ_ASSERT(!views.empty());
     for (size_t i = 0; i < views.length(); i++) {
-        if (IsObjectAboutToBeFinalized(&views[i])) {
+        if (IsAboutToBeFinalizedUnbarriered(&views[i])) {
             views[i--] = views.back();
             views.popBack();
         }
@@ -1180,7 +1181,7 @@ ArrayBufferViewObject::trace(JSTracer* trc, JSObject* objArg)
 {
     NativeObject* obj = &objArg->as<NativeObject>();
     HeapSlot& bufSlot = obj->getReservedSlotRef(TypedArrayLayout::BUFFER_SLOT);
-    MarkSlot(trc, &bufSlot, "typedarray.buffer");
+    TraceEdge(trc, &bufSlot, "typedarray.buffer");
 
     // Update obj's data pointer if it moved.
     if (bufSlot.isObject()) {
@@ -1194,7 +1195,7 @@ ArrayBufferViewObject::trace(JSTracer* trc, JSObject* objArg)
             JSObject* view = buf.firstView();
 
             // Mark the object to move it into the tenured space.
-            MarkObjectUnbarriered(trc, &view, "typed array nursery owner");
+            TraceManuallyBarrieredEdge(trc, &view, "typed array nursery owner");
             MOZ_ASSERT(view->is<InlineTypedObject>() && view != obj);
 
             void* srcData = obj->getPrivate();
@@ -1550,8 +1551,8 @@ js::InitArrayBufferClass(JSContext *cx, HandleObject obj)
 
     RootedId byteLengthId(cx, NameToId(cx->names().byteLength));
     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
-    JSObject *getter =
-        NewNativeFunction(cx, ArrayBufferObject::byteLengthGetter, 0, js::NullPtr());
+    JSObject* getter =
+        NewNativeFunction(cx, ArrayBufferObject::byteLengthGetter, 0, nullptr);
     if (!getter)
         return nullptr;
 

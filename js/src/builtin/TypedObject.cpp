@@ -140,7 +140,7 @@ static bool
 ConvertAndCopyTo(JSContext* cx, HandleTypedObject typedObj, HandleValue val)
 {
     Rooted<TypeDescr*> type(cx, &typedObj->typeDescr());
-    return ConvertAndCopyTo(cx, type, typedObj, 0, NullPtr(), val);
+    return ConvertAndCopyTo(cx, type, typedObj, 0, nullptr, val);
 }
 
 /*
@@ -224,6 +224,7 @@ const Class js::ScalarTypeDescr::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     TypeDescr::finalize,
     ScalarTypeDescr::call
@@ -321,6 +322,7 @@ const Class js::ReferenceTypeDescr::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     TypeDescr::finalize,
     ReferenceTypeDescr::call
@@ -488,7 +490,7 @@ CreatePrototypeObjectForComplexTypeInstance(JSContext* cx, HandleObject ctorProt
     if (!ctorPrototypePrototype)
         return nullptr;
 
-    return NewObjectWithProto<TypedProto>(cx, ctorPrototypePrototype, TenuredObject);
+    return NewObjectWithProto<TypedProto>(cx, ctorPrototypePrototype, SingletonObject);
 }
 
 const Class ArrayTypeDescr::class_ = {
@@ -500,6 +502,7 @@ const Class ArrayTypeDescr::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     TypeDescr::finalize,
     nullptr, /* call */
@@ -727,6 +730,7 @@ const Class StructTypeDescr::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     TypeDescr::finalize,
     nullptr, /* call */
@@ -776,11 +780,11 @@ StructMetaTypeDescr::create(JSContext* cx,
     int32_t alignment = 1;             // Alignment of struct.
     bool opaque = false;               // Opacity of struct.
 
-    userFieldOffsets = NewObjectWithProto<PlainObject>(cx, NullPtr(), TenuredObject);
+    userFieldOffsets = NewObjectWithProto<PlainObject>(cx, nullptr, TenuredObject);
     if (!userFieldOffsets)
         return nullptr;
 
-    userFieldTypes = NewObjectWithProto<PlainObject>(cx, NullPtr(), TenuredObject);
+    userFieldTypes = NewObjectWithProto<PlainObject>(cx, nullptr, TenuredObject);
     if (!userFieldTypes)
         return nullptr;
 
@@ -925,7 +929,7 @@ StructMetaTypeDescr::create(JSContext* cx,
     {
         RootedObject fieldNamesVec(cx);
         fieldNamesVec = NewDenseCopiedArray(cx, fieldNames.length(),
-                                            fieldNames.begin(), NullPtr(),
+                                            fieldNames.begin(), nullptr,
                                             TenuredObject);
         if (!fieldNamesVec)
             return nullptr;
@@ -937,7 +941,7 @@ StructMetaTypeDescr::create(JSContext* cx,
     {
         RootedObject fieldTypeVec(cx);
         fieldTypeVec = NewDenseCopiedArray(cx, fieldTypeObjs.length(),
-                                           fieldTypeObjs.begin(), NullPtr(),
+                                           fieldTypeObjs.begin(), nullptr,
                                            TenuredObject);
         if (!fieldTypeVec)
             return nullptr;
@@ -949,7 +953,7 @@ StructMetaTypeDescr::create(JSContext* cx,
     {
         RootedObject fieldOffsetsVec(cx);
         fieldOffsetsVec = NewDenseCopiedArray(cx, fieldOffsets.length(),
-                                              fieldOffsets.begin(), NullPtr(),
+                                              fieldOffsets.begin(), nullptr,
                                               TenuredObject);
         if (!fieldOffsetsVec)
             return nullptr;
@@ -1470,8 +1474,8 @@ OutlineTypedObject::setOwnerAndData(JSObject* owner, uint8_t* data)
 }
 
 /*static*/ OutlineTypedObject*
-OutlineTypedObject::createUnattachedWithClass(JSContext *cx,
-                                              const Class *clasp,
+OutlineTypedObject::createUnattachedWithClass(JSContext* cx,
+                                              const Class* clasp,
                                               HandleTypeDescr descr,
                                               int32_t length,
                                               gc::InitialHeap heap)
@@ -1485,8 +1489,8 @@ OutlineTypedObject::createUnattachedWithClass(JSContext *cx,
     if (!group)
         return nullptr;
 
-    NewObjectKind newKind = (heap == gc::TenuredHeap) ? MaybeSingletonObject : GenericObject;
-    OutlineTypedObject *obj = NewObjectWithGroup<OutlineTypedObject>(cx, group,
+    NewObjectKind newKind = (heap == gc::TenuredHeap) ? TenuredObject : GenericObject;
+    OutlineTypedObject* obj = NewObjectWithGroup<OutlineTypedObject>(cx, group,
                                                                      gc::AllocKind::OBJECT0,
                                                                      newKind);
     if (!obj)
@@ -1628,7 +1632,7 @@ OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 {
     OutlineTypedObject &typedObj = object->as<OutlineTypedObject>();
 
-    MarkShape(trc, &typedObj.shape_, "OutlineTypedObject_shape");
+    TraceEdge(trc, &typedObj.shape_, "OutlineTypedObject_shape");
 
     if (!typedObj.owner_)
         return;
@@ -1640,12 +1644,12 @@ OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
     TypeDescr &descr = typedObj.maybeForwardedTypeDescr();
 
     // Mark the owner, watching in case it is moved by the tracer.
-    JSObject *oldOwner = typedObj.owner_;
-    gc::MarkObjectUnbarriered(trc, &typedObj.owner_, "typed object owner");
-    JSObject *owner = typedObj.owner_;
+    JSObject* oldOwner = typedObj.owner_;
+    TraceManuallyBarrieredEdge(trc, &typedObj.owner_, "typed object owner");
+    JSObject* owner = typedObj.owner_;
 
-    uint8_t *oldData = typedObj.outOfLineTypedMem();
-    uint8_t *newData = oldData;
+    uint8_t* oldData = typedObj.outOfLineTypedMem();
+    uint8_t* newData = oldData;
 
     // Update the data pointer if the owner moved and the owner's data is
     // inline with it. Note that an array buffer pointing to data in an inline
@@ -1670,43 +1674,38 @@ OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 }
 
 bool
-TypedObject::obj_lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
-                                MutableHandleObject objp, MutableHandleShape propp)
+TypeDescr::hasProperty(const JSAtomState& names, jsid id)
 {
-    MOZ_ASSERT(obj->is<TypedObject>());
-
-    Rooted<TypeDescr*> descr(cx, &obj->as<TypedObject>().typeDescr());
-    switch (descr->kind()) {
+    switch (kind()) {
       case type::Scalar:
       case type::Reference:
       case type::Simd:
-        break;
+        return false;
 
       case type::Array:
       {
         uint32_t index;
-        if (IdIsIndex(id, &index))
-            return obj_lookupElement(cx, obj, index, objp, propp);
-
-        if (JSID_IS_ATOM(id, cx->names().length)) {
-            MarkNonNativePropertyFound<CanGC>(propp);
-            objp.set(obj);
-            return true;
-        }
-        break;
+        return IdIsIndex(id, &index) || JSID_IS_ATOM(id, names.length);
       }
 
       case type::Struct:
       {
-        StructTypeDescr& structDescr = descr->as<StructTypeDescr>();
         size_t index;
-        if (structDescr.fieldIndex(id, &index)) {
-            MarkNonNativePropertyFound<CanGC>(propp);
-            objp.set(obj);
-            return true;
-        }
-        break;
+        return as<StructTypeDescr>().fieldIndex(id, &index);
       }
+    }
+
+    MOZ_CRASH("Unexpected kind");
+}
+
+/* static */ bool
+TypedObject::obj_lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
+                                MutableHandleObject objp, MutableHandleShape propp)
+{
+    if (obj->as<TypedObject>().typeDescr().hasProperty(cx->names(), id)) {
+        MarkNonNativePropertyFound<CanGC>(propp);
+        objp.set(obj);
+        return true;
     }
 
     RootedObject proto(cx, obj->getProto());
@@ -1717,16 +1716,6 @@ TypedObject::obj_lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
     }
 
     return LookupProperty(cx, proto, id, objp, propp);
-}
-
-bool
-TypedObject::obj_lookupElement(JSContext* cx, HandleObject obj, uint32_t index,
-                               MutableHandleObject objp, MutableHandleShape propp)
-{
-    MOZ_ASSERT(obj->is<TypedObject>());
-    MarkNonNativePropertyFound<CanGC>(propp);
-    objp.set(obj);
-    return true;
 }
 
 static bool
@@ -1941,7 +1930,7 @@ TypedObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleId id, Handl
             Rooted<TypeDescr*> elementType(cx);
             elementType = &typedObj->typeDescr().as<ArrayTypeDescr>().elementType();
             size_t offset = elementType->size() * index;
-            if (!ConvertAndCopyTo(cx, elementType, typedObj, offset, NullPtr(), v))
+            if (!ConvertAndCopyTo(cx, elementType, typedObj, offset, nullptr, v))
                 return false;
             return result.succeed();
         }
@@ -2134,7 +2123,7 @@ InlineTypedObject::create(JSContext* cx, HandleTypeDescr descr, gc::InitialHeap 
     if (!group)
         return nullptr;
 
-    NewObjectKind newKind = (heap == gc::TenuredHeap) ? MaybeSingletonObject : GenericObject;
+    NewObjectKind newKind = (heap == gc::TenuredHeap) ? TenuredObject : GenericObject;
     return NewObjectWithGroup<InlineTypedObject>(cx, group, allocKind, newKind);
 }
 
@@ -2156,7 +2145,7 @@ InlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 {
     InlineTypedObject &typedObj = object->as<InlineTypedObject>();
 
-    MarkShape(trc, &typedObj.shape_, "InlineTypedObject_shape");
+    TraceEdge(trc, &typedObj.shape_, "InlineTypedObject_shape");
 
     // Inline transparent objects do not have references and do not need more
     // tracing. If there is an entry in the compartment's LazyArrayBufferTable,
@@ -2261,6 +2250,7 @@ OutlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
         nullptr,        /* setProperty */                \
         nullptr,        /* enumerate   */                \
         nullptr,        /* resolve     */                \
+        nullptr,        /* mayResolve  */                \
         nullptr,        /* convert     */                \
         nullptr,        /* finalize    */                \
         nullptr,        /* call        */                \
@@ -2952,26 +2942,24 @@ MemoryTracingVisitor::visitReference(ReferenceTypeDescr& descr, uint8_t* mem)
     switch (descr.type()) {
       case ReferenceTypeDescr::TYPE_ANY:
       {
-        js::HeapValue* heapValue = reinterpret_cast<js::HeapValue*>(mem);
-        gc::MarkValue(trace_, heapValue, "reference-val");
+        HeapValue* heapValue = reinterpret_cast<js::HeapValue*>(mem);
+        TraceEdge(trace_, heapValue, "reference-val");
         return;
       }
 
       case ReferenceTypeDescr::TYPE_OBJECT:
       {
-        js::HeapPtrObject* objectPtr =
-            reinterpret_cast<js::HeapPtrObject*>(mem);
+        HeapPtrObject* objectPtr = reinterpret_cast<js::HeapPtrObject*>(mem);
         if (*objectPtr)
-            gc::MarkObject(trace_, objectPtr, "reference-obj");
+            TraceEdge(trace_, objectPtr, "reference-obj");
         return;
       }
 
       case ReferenceTypeDescr::TYPE_STRING:
       {
-        js::HeapPtrString* stringPtr =
-            reinterpret_cast<js::HeapPtrString*>(mem);
+        HeapPtrString* stringPtr = reinterpret_cast<js::HeapPtrString*>(mem);
         if (*stringPtr)
-            gc::MarkString(trace_, stringPtr, "reference-str");
+            TraceEdge(trace_, stringPtr, "reference-str");
         return;
       }
     }

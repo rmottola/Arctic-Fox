@@ -153,6 +153,8 @@ class UpvarCookie
     F(CLASSMETHOD) \
     F(CLASSMETHODLIST) \
     F(CLASSNAMES) \
+    F(SUPERPROP) \
+    F(SUPERELEM) \
     \
     /* Unary operators. */ \
     F(TYPEOF) \
@@ -1426,6 +1428,37 @@ struct ClassNode : public TernaryNode {
     }
 };
 
+struct SuperProperty : public NullaryNode {
+    SuperProperty(JSAtom* atom, const TokenPos& pos)
+      : NullaryNode(PNK_SUPERPROP, JSOP_NOP, pos, atom)
+    { }
+
+    static bool test(const ParseNode& node) {
+        bool match = node.isKind(PNK_SUPERPROP);
+        MOZ_ASSERT_IF(match, node.isArity(PN_NULLARY));
+        return match;
+    }
+
+    JSAtom* propName() const {
+        return pn_atom;
+    }
+};
+
+struct SuperElement : public UnaryNode {
+    SuperElement(ParseNode* expr, const TokenPos& pos)
+      : UnaryNode(PNK_SUPERELEM, JSOP_NOP, pos, expr)
+    { }
+
+    static bool test(const ParseNode& node) {
+        bool match = node.isKind(PNK_SUPERELEM);
+        MOZ_ASSERT_IF(match, node.isArity(PN_UNARY));
+        return match;
+    }
+
+    ParseNode* expr() const {
+        return pn_kid;
+    }
+};
 
 #ifdef DEBUG
 void DumpParseTree(ParseNode* pn, int indent = 0);
@@ -1661,7 +1694,16 @@ enum ParseReportKind
     ParseStrictError
 };
 
-enum FunctionSyntaxKind { Expression, Statement, Arrow, Method, Lazy };
+enum FunctionSyntaxKind
+{
+    Expression,
+    Statement,
+    Arrow,
+    Method,
+    ClassConstructor,
+    Getter,
+    Setter
+};
 
 static inline ParseNode*
 FunctionArgsList(ParseNode* fn, unsigned* numFormals)

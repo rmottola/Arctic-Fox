@@ -427,6 +427,20 @@
         ]]></getter>
       </property>
 
+      <field name="_permanentKey">({})</field>
+
+      <property name="permanentKey" readonly="true"
+                onget="return this._permanentKey;"/>
+
+      <property name="outerWindowID" readonly="true">
+        <getter><![CDATA[
+          return this.contentWindow
+                     .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                     .getInterface(Components.interfaces.nsIDOMWindowUtils)
+                     .outerWindowID;
+        ]]></getter>
+      </property>
+
       <field name="_lastSearchString">null</field>
       <field name="_lastSearchHighlight">false</field>
 
@@ -1271,6 +1285,11 @@
           event.stopPropagation();
           event.preventDefault();
         }
+
+        // No need to handle "dragover" in e10s, since nsDocShellTreeOwner.cpp in the child process
+        // handles that case using "@mozilla.org/content/dropped-link-handler;1" service.
+        if (this.isRemoteBrowser)
+          return;
 
         let linkHandler = Components.classes["@mozilla.org/content/dropped-link-handler;1"].
                             getService(Components.interfaces.nsIDroppedLinkHandler);

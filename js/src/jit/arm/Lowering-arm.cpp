@@ -585,6 +585,14 @@ LIRGeneratorARM::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop
 
     const LUse elements = useRegister(ins->elements());
     const LAllocation index = useRegisterOrConstant(ins->index());
+    const LAllocation value = useRegister(ins->value());
+
+    if (!ins->hasUses()) {
+        LAtomicTypedArrayElementBinopForEffect* lir =
+            new(alloc()) LAtomicTypedArrayElementBinopForEffect(elements, index, value);
+        add(lir, ins);
+        return;
+    }
 
     // For most operations we don't need any temps because there are
     // enough scratch registers.  tempDef2 is never needed on ARM.
@@ -599,7 +607,6 @@ LIRGeneratorARM::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop
     LDefinition tempDef1 = LDefinition::BogusTemp();
     LDefinition tempDef2 = LDefinition::BogusTemp();
 
-    const LAllocation value = useRegister(ins->value());
     if (ins->arrayType() == Scalar::Uint32 && IsFloatingPointType(ins->type()))
         tempDef1 = temp();
 
@@ -648,6 +655,15 @@ LIRGeneratorARM::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins)
     MDefinition* ptr = ins->ptr();
     MOZ_ASSERT(ptr->type() == MIRType_Int32);
 
+    if (byteSize(ins->accessType()) != 4 && !HasLDSTREXBHD()) {
+        LAsmJSCompareExchangeCallout* lir =
+            new(alloc()) LAsmJSCompareExchangeCallout(useRegister(ptr),
+                                                      useRegister(ins->oldValue()),
+                                                      useRegister(ins->newValue()));
+        defineFixed(lir, ins, LAllocation(AnyRegister(ReturnReg)));
+        return;
+    }
+
     LAsmJSCompareExchangeHeap* lir =
         new(alloc()) LAsmJSCompareExchangeHeap(useRegister(ptr),
                                                useRegister(ins->oldValue()),
@@ -663,6 +679,21 @@ LIRGeneratorARM::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins)
 
     MDefinition* ptr = ins->ptr();
     MOZ_ASSERT(ptr->type() == MIRType_Int32);
+
+    if (byteSize(ins->accessType()) != 4 && !HasLDSTREXBHD()) {
+        LAsmJSAtomicBinopCallout* lir =
+            new(alloc()) LAsmJSAtomicBinopCallout(useRegister(ptr), useRegister(ins->value()));
+        defineFixed(lir, ins, LAllocation(AnyRegister(ReturnReg)));
+        return;
+    }
+
+    if (!ins->hasUses()) {
+        LAsmJSAtomicBinopHeapForEffect* lir =
+            new(alloc()) LAsmJSAtomicBinopHeapForEffect(useRegister(ptr),
+                                                        useRegister(ins->value()));
+        add(lir, ins);
+        return;
+    }
 
     LAsmJSAtomicBinopHeap* lir =
         new(alloc()) LAsmJSAtomicBinopHeap(useRegister(ptr),

@@ -136,13 +136,16 @@ class FunctionContextFlags
         return flags;
     }
 
+    bool needsHomeObject:1;
+
   public:
     FunctionContextFlags()
      :  mightAliasLocals(false),
         hasExtensibleScope(false),
         needsDeclEnvObject(false),
         argumentsHasLocalBinding(false),
-        definitelyNeedsArgsObj(false)
+        definitelyNeedsArgsObj(false),
+        needsHomeObject(false)
     { }
 };
 
@@ -235,17 +238,24 @@ class SharedContext
     bool isDotVariable(JSAtom* atom) const {
         return atom == context->names().dotGenerator || atom == context->names().dotGenRVal;
     }
+
+    virtual bool allowSuperProperty() const = 0;
 };
 
 class GlobalSharedContext : public SharedContext
 {
+  private:
+    bool allowSuperProperty_;
+
   public:
-    GlobalSharedContext(ExclusiveContext *cx,
-                        Directives directives, bool extraWarnings)
-      : SharedContext(cx, directives, extraWarnings)
+    GlobalSharedContext(ExclusiveContext* cx,
+                        Directives directives, bool extraWarnings, bool allowSuperProperty)
+      : SharedContext(cx, directives, extraWarnings),
+        allowSuperProperty_(allowSuperProperty)
     {}
 
-    ObjectBox *toObjectBox() { return nullptr; }
+    ObjectBox* toObjectBox() { return nullptr; }
+    bool allowSuperProperty() const { return allowSuperProperty_; }
 };
 
 class FunctionBox : public ObjectBox, public SharedContext
@@ -298,6 +308,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     bool needsDeclEnvObject()       const { return funCxFlags.needsDeclEnvObject; }
     bool argumentsHasLocalBinding() const { return funCxFlags.argumentsHasLocalBinding; }
     bool definitelyNeedsArgsObj()   const { return funCxFlags.definitelyNeedsArgsObj; }
+    bool needsHomeObject()          const { return funCxFlags.needsHomeObject; }
 
     void setMightAliasLocals()             { funCxFlags.mightAliasLocals         = true; }
     void setHasExtensibleScope()           { funCxFlags.hasExtensibleScope       = true; }
@@ -305,6 +316,8 @@ class FunctionBox : public ObjectBox, public SharedContext
     void setArgumentsHasLocalBinding()     { funCxFlags.argumentsHasLocalBinding = true; }
     void setDefinitelyNeedsArgsObj()       { MOZ_ASSERT(funCxFlags.argumentsHasLocalBinding);
                                              funCxFlags.definitelyNeedsArgsObj   = true; }
+    void setNeedsHomeObject()              { MOZ_ASSERT(allowSuperProperty());
+                                             funCxFlags.needsHomeObject          = true; }
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
         return funCxFlags.flagsForNestedGeneratorComprehensionLambda();
@@ -335,7 +348,12 @@ class FunctionBox : public ObjectBox, public SharedContext
         return bindings.hasAnyAliasedBindings() ||
                hasExtensibleScope() ||
                needsDeclEnvObject() ||
+               needsHomeObject()    ||
                isGenerator();
+    }
+
+    bool allowSuperProperty() const {
+        return function()->allowSuperProperty();
     }
 };
 

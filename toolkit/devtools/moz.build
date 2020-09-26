@@ -40,7 +40,7 @@ if CONFIG['MOZ_DEVTOOLS']:
         'layoutview',
         'markupview',
         'netmonitor',
-        'profiler',
+        'performance',
         'projecteditor',
         'responsivedesign',
         'scratchpad',
@@ -49,17 +49,8 @@ if CONFIG['MOZ_DEVTOOLS']:
         'storage',
         'styleeditor',
         'tilt',
-        'timeline',
         'webaudioeditor',
         'webide',
-    ]
-
-    if CONFIG['MOZ_DEVTOOLS_PERFTOOLS']:
-      DIRS += ['performance']
-
-    EXTRA_COMPONENTS += [
-        'devtools-clhandler.js',
-        'devtools-clhandler.manifest',
     ]
 
 EXTRA_JS_MODULES.devtools += [
@@ -83,11 +74,6 @@ EXTRA_JS_MODULES.devtools += [
     'Loader.jsm',
     'Require.jsm',
 ]
-
-if CONFIG['MOZ_DEVTOOLS']:
-    EXTRA_JS_MODULES.devtools += [
-        'main.js',
-    ]
 
 EXTRA_JS_MODULES.devtools.server.actors += [
     'server/actors/highlighter.css'

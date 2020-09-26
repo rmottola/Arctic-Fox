@@ -1080,8 +1080,56 @@ pref("browser.devedition.theme.enabled", false);
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
 
+// Toolbox preferences
+pref("devtools.toolbox.footer.height", 250);
+pref("devtools.toolbox.sidebar.width", 500);
+pref("devtools.toolbox.host", "bottom");
+pref("devtools.toolbox.selectedTool", "webconsole");
+pref("devtools.toolbox.toolbarSpec", '["splitconsole", "paintflashing toggle","tilt toggle","scratchpad","resize toggle","eyedropper","screenshot --fullpage", "rulers"]');
+pref("devtools.toolbox.sideEnabled", true);
+pref("devtools.toolbox.zoomValue", "1");
+pref("devtools.toolbox.splitconsoleEnabled", false);
+pref("devtools.toolbox.splitconsoleHeight", 100);
+
+// Toolbox Button preferences
+pref("devtools.command-button-pick.enabled", true);
+pref("devtools.command-button-frames.enabled", false);
+pref("devtools.command-button-splitconsole.enabled", true);
+pref("devtools.command-button-paintflashing.enabled", false);
+pref("devtools.command-button-tilt.enabled", false);
+pref("devtools.command-button-scratchpad.enabled", false);
+pref("devtools.command-button-responsive.enabled", true);
+pref("devtools.command-button-eyedropper.enabled", false);
+pref("devtools.command-button-screenshot.enabled", false);
+pref("devtools.command-button-rulers.enabled", false);
+
+// Enable the Performance tools
+pref("devtools.performance.enabled", true);
+
+// The default Performance UI settings
+pref("devtools.performance.memory.sample-probability", "0.05");
+pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31) - 1
+pref("devtools.performance.timeline.hidden-markers", "[]");
+pref("devtools.performance.profiler.buffer-size", 10000000);
+pref("devtools.performance.profiler.sample-frequency-khz", 1);
+pref("devtools.performance.ui.show-jit-optimizations", false);
+// If in aurora (40.0, will revert for 40.1), set default
+// to retro mode.
+// TODO bug 1160313
+#if MOZ_UPDATE_CHANNEL == aurora
+  pref("devtools.performance.ui.retro-mode", true);
+#else
+  pref("devtools.performance.ui.retro-mode", false);
+#endif
+
+
 // The default service workers UI setting
 pref("devtools.serviceWorkers.testing.enabled", false);
+
+// Set imgur upload client ID
+pref("devtools.gcli.imgurClientID", '0df414e888d7240');
+// Imgur's upload URL
+pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
 
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.

@@ -7,16 +7,15 @@
 #ifndef __SYNCPROFILE_H
 #define __SYNCPROFILE_H
 
-struct LinkedUWTBuffer;
-
 class SyncProfile : public ThreadProfile
 {
 public:
   SyncProfile(ThreadInfo* aInfo, int aEntrySize);
   ~SyncProfile();
 
-  bool SetUWTBuffer(LinkedUWTBuffer* aBuff);
-  LinkedUWTBuffer* GetUWTBuffer() { return mUtb; }
+  // SyncProfiles' stacks are deduplicated in the context of the containing
+  // profile in which the backtrace is as a marker payload.
+  void StreamJSON(SpliceableJSONWriter& aWriter, UniqueStacks& aUniqueStacks);
 
   virtual void EndUnwind();
   virtual SyncProfile* AsSyncProfile() { return this; }
@@ -34,8 +33,7 @@ private:
 
   bool ShouldDestroy();
 
-  OwnerState        mOwnerState;
-  LinkedUWTBuffer*  mUtb;
+  OwnerState mOwnerState;
 };
 
 #endif // __SYNCPROFILE_H
