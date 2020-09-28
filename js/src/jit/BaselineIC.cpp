@@ -252,6 +252,8 @@ static const VMFunction DoWarmUpCounterFallbackInfo =
 bool
 ICWarmUpCounter_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // enterStubFrame is going to clobber the BaselineFrameReg, save it in R0.scratchReg()
     // first.
     masm.movePtr(BaselineFrameReg, R0.scratchReg());
@@ -505,6 +507,7 @@ static const VMFunction DoTypeMonitorFallbackInfo =
 bool
 ICTypeMonitor_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -520,6 +523,8 @@ ICTypeMonitor_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeMonitor_PrimitiveSet::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label success;
     if ((flags_ & TypeToFlag(JSVAL_TYPE_INT32)) && !(flags_ & TypeToFlag(JSVAL_TYPE_DOUBLE)))
         masm.branchTestInt32(Assembler::Equal, R0, &success);
@@ -563,6 +568,8 @@ ICTypeMonitor_PrimitiveSet::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeMonitor_SingleObject::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -581,6 +588,8 @@ ICTypeMonitor_SingleObject::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeMonitor_ObjectGroup::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -755,6 +764,8 @@ const VMFunction DoTypeUpdateFallbackInfo =
 bool
 ICTypeUpdate_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // Just store false into R1.scratchReg() and return.
     masm.move32(Imm32(0), R1.scratchReg());
     EmitReturnFromIC(masm);
@@ -764,6 +775,8 @@ ICTypeUpdate_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeUpdate_PrimitiveSet::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label success;
     if ((flags_ & TypeToFlag(JSVAL_TYPE_INT32)) && !(flags_ & TypeToFlag(JSVAL_TYPE_DOUBLE)))
         masm.branchTestInt32(Assembler::Equal, R0, &success);
@@ -810,6 +823,8 @@ ICTypeUpdate_PrimitiveSet::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeUpdate_SingleObject::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -830,6 +845,8 @@ ICTypeUpdate_SingleObject::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeUpdate_ObjectGroup::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -898,6 +915,7 @@ static const VMFunction DoThisFallbackInfo = FunctionInfo<DoThisFallbackFn>(DoTh
 bool
 ICThis_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -951,6 +969,8 @@ static const VMFunction DoNewArrayInfo = FunctionInfo<DoNewArrayFn>(DoNewArray, 
 bool
 ICNewArray_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.push(R0.scratchReg()); // length
@@ -1049,6 +1069,8 @@ static const VMFunction DoNewObjectInfo = FunctionInfo<DoNewObjectFn>(DoNewObjec
 bool
 ICNewObject_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg); // stub.
@@ -1262,6 +1284,8 @@ static const VMFunction DoCompareFallbackInfo =
 bool
 ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -1286,6 +1310,8 @@ ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_String::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
     masm.branchTestString(Assembler::NotEqual, R1, &failure);
@@ -1314,6 +1340,8 @@ ICCompare_String::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_Boolean::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestBoolean(Assembler::NotEqual, R0, &failure);
     masm.branchTestBoolean(Assembler::NotEqual, R1, &failure);
@@ -1342,6 +1370,8 @@ ICCompare_Boolean::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_NumberWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     ValueOperand numberOperand, undefinedOperand;
     if (lhsIsUndefined) {
         numberOperand = R1;
@@ -1374,6 +1404,8 @@ ICCompare_NumberWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_Object::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
     masm.branchTestObject(Assembler::NotEqual, R1, &failure);
@@ -1406,6 +1438,7 @@ ICCompare_Object::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_ObjectWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(IsEqualityOp(op));
 
     ValueOperand objectOperand, undefinedOperand;
@@ -1471,6 +1504,8 @@ ICCompare_ObjectWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCompare_Int32WithBoolean::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     ValueOperand int32Val;
     ValueOperand boolVal;
@@ -1597,6 +1632,7 @@ static const VMFunction fun = FunctionInfo<pf>(DoToBoolFallback, TailCall);
 bool
 ICToBool_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -1617,6 +1653,8 @@ ICToBool_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICToBool_Int32::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestInt32(Assembler::NotEqual, R0, &failure);
 
@@ -1643,6 +1681,8 @@ ICToBool_Int32::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICToBool_String::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
 
@@ -1669,6 +1709,8 @@ ICToBool_String::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICToBool_NullUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure, ifFalse;
     masm.branchTestNull(Assembler::Equal, R0, &ifFalse);
     masm.branchTestUndefined(Assembler::NotEqual, R0, &failure);
@@ -1690,6 +1732,8 @@ ICToBool_NullUndefined::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICToBool_Double::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure, ifTrue;
     masm.branchTestDouble(Assembler::NotEqual, R0, &failure);
     masm.unboxDouble(R0, FloatReg0);
@@ -1715,6 +1759,8 @@ ICToBool_Double::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICToBool_Object::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure, ifFalse, slowPath;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -1764,6 +1810,7 @@ static const VMFunction DoToNumberFallbackInfo =
 bool
 ICToNumber_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -2007,6 +2054,7 @@ static const VMFunction DoBinaryArithFallbackInfo =
 bool
 ICBinaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -2042,6 +2090,8 @@ static const VMFunction DoConcatStringsInfo = FunctionInfo<DoConcatStringsFn>(Do
 bool
 ICBinaryArith_StringConcat::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
     masm.branchTestString(Assembler::NotEqual, R1, &failure);
@@ -2122,6 +2172,8 @@ static const VMFunction DoConcatStringObjectInfo =
 bool
 ICBinaryArith_StringObjectConcat::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     if (lhsIsString_) {
         masm.branchTestString(Assembler::NotEqual, R0, &failure);
@@ -2154,6 +2206,8 @@ ICBinaryArith_StringObjectConcat::Compiler::generateStubCode(MacroAssembler& mas
 bool
 ICBinaryArith_Double::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.ensureDouble(R0, FloatReg0, &failure);
     masm.ensureDouble(R1, FloatReg1, &failure);
@@ -2194,6 +2248,8 @@ ICBinaryArith_Double::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICBinaryArith_BooleanWithInt32::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     if (lhsIsBool_)
         masm.branchTestBoolean(Assembler::NotEqual, R0, &failure);
@@ -2269,6 +2325,7 @@ ICBinaryArith_BooleanWithInt32::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICBinaryArith_DoubleWithInt32::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(op == JSOP_BITOR || op == JSOP_BITAND || op == JSOP_BITXOR);
 
     Label failure;
@@ -2409,6 +2466,7 @@ static const VMFunction DoUnaryArithFallbackInfo =
 bool
 ICUnaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -2428,6 +2486,8 @@ ICUnaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICUnaryArith_Double::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.ensureDouble(R0, FloatReg0, &failure);
 
@@ -3506,6 +3566,7 @@ static const VMFunction DoGetElemFallbackInfo =
 bool
 ICGetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Restore the tail call register.
@@ -3649,6 +3710,8 @@ ICGetElemNativeCompiler::emitCallScripted(MacroAssembler& masm, Register objReg)
 bool
 ICGetElemNativeCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failurePopR1;
     bool popR1 = false;
@@ -3872,6 +3935,8 @@ ICGetElemNativeCompiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetElem_String::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
     masm.branchTestInt32(Assembler::NotEqual, R1, &failure);
@@ -3920,6 +3985,8 @@ ICGetElem_String::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetElem_Dense::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
     masm.branchTestInt32(Assembler::NotEqual, R1, &failure);
@@ -4019,6 +4086,8 @@ ICGetElem_Dense::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetElem_UnboxedArray::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
     masm.branchTestInt32(Assembler::NotEqual, R1, &failure);
@@ -4113,6 +4182,8 @@ CheckForNeuteredTypedObject(JSContext* cx, MacroAssembler& masm, Label* failure)
 bool
 ICGetElem_TypedArray::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     if (layout_ != Layout_TypedArray)
@@ -4175,6 +4246,8 @@ ICGetElem_TypedArray::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetElem_Arguments::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // Variants of GetElem_Arguments can enter stub frames if entered in CallProp
     // context when noSuchMethod support is on.
 #if JS_HAS_NO_SUCH_METHOD
@@ -4685,6 +4758,7 @@ static const VMFunction DoSetElemFallbackInfo =
 bool
 ICSetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     EmitRestoreTailCallReg(masm);
@@ -4747,6 +4821,8 @@ EmitUnboxedPreBarrierForBaseline(MacroAssembler &masm, T address, JSValueType ty
 bool
 ICSetElem_DenseOrUnboxedArray::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // R0 = object
     // R1 = key
     // Stack = { ... rhs-value, <return-addr>? }
@@ -4940,6 +5016,8 @@ ICSetElemDenseOrUnboxedArrayAddCompiler::getStub(ICStubSpace* space)
 bool
 ICSetElemDenseOrUnboxedArrayAddCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // R0 = object
     // R1 = key
     // Stack = { ... rhs-value, <return-addr>? }
@@ -5206,6 +5284,8 @@ StoreToTypedArray(JSContext* cx, MacroAssembler& masm, Scalar::Type type, Addres
 bool
 ICSetElem_TypedArray::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     if (layout_ != Layout_TypedArray)
@@ -5437,6 +5517,8 @@ static const VMFunction DoInFallbackInfo =
 bool
 ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     // Sync for the decompiler.
@@ -5455,6 +5537,8 @@ ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICInNativeCompiler::generateStubCode(MacroAssembler &masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure, failurePopR0Scratch;
 
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
@@ -5530,6 +5614,8 @@ ICInNativeDoesNotExistCompiler::getStub(ICStubSpace* space)
 bool
 ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure, failurePopR0Scratch;
 
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
@@ -5587,6 +5673,8 @@ ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
 bool
 ICIn_Dense::Compiler::generateStubCode(MacroAssembler &masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     masm.branchTestInt32(Assembler::NotEqual, R0, &failure);
@@ -5993,6 +6081,7 @@ static const VMFunction DoGetNameFallbackInfo = FunctionInfo<DoGetNameFallbackFn
 bool
 ICGetName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     EmitRestoreTailCallReg(masm);
@@ -6007,6 +6096,8 @@ ICGetName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetName_Global::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Register obj = R0.scratchReg();
     Register scratch = R1.scratchReg();
@@ -6033,6 +6124,8 @@ template <size_t NumHops>
 bool
 ICGetName_Scope<NumHops>::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
     Register obj = R0.scratchReg();
@@ -6104,6 +6197,7 @@ static const VMFunction DoBindNameFallbackInfo =
 bool
 ICBindName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     EmitRestoreTailCallReg(masm);
@@ -6164,6 +6258,8 @@ static const VMFunction DoGetIntrinsicFallbackInfo =
 bool
 ICGetIntrinsic_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg);
@@ -6175,6 +6271,8 @@ ICGetIntrinsic_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetIntrinsic_Constant::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     masm.loadValue(Address(ICStubReg, ICGetIntrinsic_Constant::offsetOfValue()), R0);
 
     EmitReturnFromIC(masm);
@@ -6939,6 +7037,7 @@ static const VMFunction DoGetPropFallbackInfo =
 bool
 ICGetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     EmitRestoreTailCallReg(masm);
@@ -6988,6 +7087,8 @@ ICGetProp_Fallback::Compiler::postGenerateStubCode(MacroAssembler& masm, Handle<
 bool
 ICGetProp_ArrayLength::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -7016,6 +7117,8 @@ ICGetProp_ArrayLength::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_UnboxedArrayLength::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
 
@@ -7040,6 +7143,8 @@ ICGetProp_UnboxedArrayLength::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_StringLength::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     masm.branchTestString(Assembler::NotEqual, R0, &failure);
 
@@ -7059,6 +7164,8 @@ ICGetProp_StringLength::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_Primitive::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     switch (primitiveType_) {
       case JSVAL_TYPE_STRING:
@@ -7167,6 +7274,8 @@ GuardReceiverObject(MacroAssembler& masm, ReceiverGuard guard,
 bool
 ICGetPropNativeCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
     Register objReg = InvalidReg;
@@ -7311,6 +7420,8 @@ ICGetPropNativeDoesNotExistCompiler::getStub(ICStubSpace* space)
 bool
 ICGetPropNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
@@ -7361,6 +7472,8 @@ ICGetPropNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failureLeaveStubFrame;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
@@ -7450,6 +7563,8 @@ ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
@@ -7524,6 +7639,8 @@ ICGetPropCallDOMProxyNativeCompiler::generateStubCode(MacroAssembler& masm,
                                                       Address* expandoAndGenerationAddr,
                                                       Address* generationAddr)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
     Register scratch = regs.takeAnyExcluding(ICTailCallReg);
@@ -7594,6 +7711,8 @@ ICGetPropCallDOMProxyNativeCompiler::generateStubCode(MacroAssembler& masm,
 bool
 ICGetPropCallDOMProxyNativeCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     if (kind == ICStub::GetProp_CallDOMProxyNative)
         return generateStubCode(masm, nullptr, nullptr);
 
@@ -7664,6 +7783,8 @@ static const VMFunction ProxyGetInfo = FunctionInfo<ProxyGetFn>(ProxyGet);
 bool
 ICGetProp_DOMProxyShadowed::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
@@ -7714,6 +7835,8 @@ ICGetProp_DOMProxyShadowed::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_ArgumentsLength::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     if (which_ == ICGetProp_ArgumentsLength::Magic) {
         // Ensure that this is lazy arguments.
@@ -7774,6 +7897,8 @@ ICGetProp_ArgumentsCallee::ICGetProp_ArgumentsCallee(JitCode* stubCode, ICStub* 
 bool
 ICGetProp_ArgumentsCallee::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     // Ensure that this is lazy arguments.
@@ -7818,6 +7943,8 @@ static const VMFunction DoGetPropGenericInfo = FunctionInfo<DoGetPropGenericFn>(
 bool
 ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
 
     Register scratch = regs.takeAnyExcluding(ICTailCallReg);
@@ -7845,6 +7972,8 @@ ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
@@ -7878,6 +8007,8 @@ ICGetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     CheckForNeuteredTypedObject(cx, masm, &failure);
@@ -8359,6 +8490,7 @@ static const VMFunction DoSetPropFallbackInfo =
 bool
 ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     EmitRestoreTailCallReg(masm);
@@ -8435,6 +8567,8 @@ GuardGroupAndShapeMaybeUnboxedExpando(MacroAssembler& masm, JSObject* obj,
 bool
 ICSetProp_Native::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     // Guard input is an object.
@@ -8532,6 +8666,8 @@ ICSetPropNativeAddCompiler::getStub(ICStubSpace* space)
 bool
 ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failureUnstow;
 
@@ -8665,6 +8801,8 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
 bool
 ICSetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     // Guard input is an object.
@@ -8728,6 +8866,8 @@ ICSetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     CheckForNeuteredTypedObject(cx, masm, &failure);
@@ -8850,6 +8990,8 @@ ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICSetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failureUnstow;
     Label failureLeaveStubFrame;
@@ -8972,6 +9114,8 @@ static const VMFunction DoCallNativeSetterInfo =
 bool
 ICSetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failureUnstow;
 
@@ -10021,6 +10165,8 @@ static const VMFunction DoSpreadCallFallbackInfo =
 bool
 ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     MOZ_ASSERT(R0 == JSReturnOperand);
 
     // Push a stub frame so that we can perform a non-tail call.
@@ -10143,6 +10289,8 @@ static const VMFunction CreateThisInfoBaseline = FunctionInfo<CreateThisFn>(Crea
 bool
 ICCallScriptedCompiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
     bool canUseTailCallReg = regs.has(ICTailCallReg);
@@ -10416,6 +10564,8 @@ static const VMFunction CopyArrayInfo = FunctionInfo<CopyArrayFn>(CopyArray);
 bool
 ICCall_StringSplit::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // Stack Layout: [ ..., CalleeVal, ThisVal, Arg0Val, +ICStackValueOffset+ ]
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
     Label failureRestoreArgc;
@@ -10507,6 +10657,8 @@ ICCall_StringSplit::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCall_IsSuspendedStarGenerator::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // The IsSuspendedStarGenerator intrinsic is only called in self-hosted
     // code, so it's safe to assume we have a single argument and the callee
     // is our intrinsic.
@@ -10549,6 +10701,8 @@ ICCall_IsSuspendedStarGenerator::Compiler::generateStubCode(MacroAssembler& masm
 bool
 ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
 
@@ -10654,6 +10808,8 @@ ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
 
@@ -10742,6 +10898,8 @@ ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
 
@@ -10844,6 +11002,8 @@ ICCall_ScriptedApplyArray::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
 
@@ -10940,6 +11100,8 @@ ICCall_ScriptedApplyArguments::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICCall_ScriptedFunCall::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
     bool canUseTailCallReg = regs.has(ICTailCallReg);
@@ -11077,6 +11239,8 @@ DoubleValueToInt32ForSwitch(Value* v)
 bool
 ICTableSwitch::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label isInt32, notInt32, outOfRange;
     Register scratch = R1.scratchReg();
 
@@ -11198,6 +11362,8 @@ static const VMFunction DoIteratorNewFallbackInfo =
 bool
 ICIteratorNew_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     // Sync stack for the decompiler.
@@ -11254,6 +11420,8 @@ static const VMFunction DoIteratorMoreFallbackInfo =
 bool
 ICIteratorMore_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.unboxObject(R0, R0.scratchReg());
@@ -11271,6 +11439,8 @@ ICIteratorMore_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICIteratorMore_Native::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     Register obj = masm.extractObject(R0, ExtractTemp0);
@@ -11333,6 +11503,8 @@ static const VMFunction DoIteratorCloseFallbackInfo =
 bool
 ICIteratorClose_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.pushValue(R0);
@@ -11435,6 +11607,8 @@ static const VMFunction DoInstanceOfFallbackInfo =
 bool
 ICInstanceOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     // Sync stack for the decompiler.
@@ -11452,6 +11626,8 @@ ICInstanceOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICInstanceOf_Function::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
 
     // Ensure RHS is an object.
@@ -11559,6 +11735,8 @@ static const VMFunction DoTypeOfFallbackInfo =
 bool
 ICTypeOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.pushValue(R0);
@@ -11571,6 +11749,7 @@ ICTypeOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICTypeOf_Typed::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
     MOZ_ASSERT(type_ != JSTYPE_NULL);
     MOZ_ASSERT(type_ != JSTYPE_FUNCTION);
     MOZ_ASSERT(type_ != JSTYPE_OBJECT);
@@ -11650,6 +11829,8 @@ static const VMFunction ThrowInfoBaseline = FunctionInfo<ThrowFn>(js::Throw, Tai
 bool
 ICRetSub_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // If R0 is BooleanValue(true), rethrow R1.
     Label rethrow;
     masm.branchTestBooleanTruthy(true, R0, &rethrow);
@@ -11686,6 +11867,8 @@ ICRetSub_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 bool
 ICRetSub_Resume::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     // If R0 is BooleanValue(true), rethrow R1.
     Label fail, rethrow;
     masm.branchTestBooleanTruthy(true, R0, &rethrow);
@@ -11929,7 +12112,7 @@ ICIn_NativeDoesNotExistImpl<ProtoChainDepth>::ICIn_NativeDoesNotExistImpl(
 
 ICInNativeDoesNotExistCompiler::ICInNativeDoesNotExistCompiler(
         JSContext* cx, HandleObject obj, HandlePropertyName name, size_t protoChainDepth)
-  : ICStubCompiler(cx, ICStub::In_NativeDoesNotExist),
+  : ICStubCompiler(cx, ICStub::In_NativeDoesNotExist, Engine::Baseline),
     obj_(cx, obj),
     name_(cx, name),
     protoChainDepth_(protoChainDepth)
@@ -12047,7 +12230,7 @@ ICGetProp_NativeDoesNotExistImpl<ProtoChainDepth>::ICGetProp_NativeDoesNotExistI
 
 ICGetPropNativeDoesNotExistCompiler::ICGetPropNativeDoesNotExistCompiler(
         JSContext* cx, ICStub* firstMonitorStub, HandleObject obj, size_t protoChainDepth)
-  : ICStubCompiler(cx, ICStub::GetProp_NativeDoesNotExist),
+  : ICStubCompiler(cx, ICStub::GetProp_NativeDoesNotExist, Engine::Baseline),
     firstMonitorStub_(firstMonitorStub),
     obj_(cx, obj),
     protoChainDepth_(protoChainDepth)
@@ -12156,7 +12339,7 @@ ICSetPropNativeAddCompiler::ICSetPropNativeAddCompiler(JSContext* cx, HandleObje
                                                        size_t protoChainDepth,
                                                        bool isFixedSlot,
                                                        uint32_t offset)
-  : ICStubCompiler(cx, ICStub::SetProp_NativeAdd),
+  : ICStubCompiler(cx, ICStub::SetProp_NativeAdd, Engine::Baseline),
     obj_(cx, obj),
     oldShape_(cx, oldShape),
     oldGroup_(cx, oldGroup),
@@ -12321,7 +12504,7 @@ ICGetPropCallDOMProxyNativeCompiler::ICGetPropCallDOMProxyNativeCompiler(JSConte
                                                                          HandleObject holder,
                                                                          HandleFunction getter,
                                                                          uint32_t pcOffset)
-  : ICStubCompiler(cx, kind),
+  : ICStubCompiler(cx, kind, Engine::Baseline),
     firstMonitorStub_(firstMonitorStub),
     proxy_(cx, proxy),
     holder_(cx, holder),
@@ -12409,6 +12592,8 @@ static const VMFunction DoRestFallbackInfo =
 bool
 ICRest_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     EmitRestoreTailCallReg(masm);
 
     masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
