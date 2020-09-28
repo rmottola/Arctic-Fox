@@ -3582,7 +3582,7 @@ js::NewDenseUnallocatedArray(ExclusiveContext* cx, uint32_t length,
     return NewArray<0>(cx, length, proto, newKind);
 }
 
-ArrayObject *
+ArrayObject*
 js::NewDenseArray(ExclusiveContext* cx, uint32_t length, HandleObjectGroup group,
                   AllocatingBehaviour allocating, bool convertDoubleElements)
 {

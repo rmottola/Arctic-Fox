@@ -3603,7 +3603,7 @@ class SplitMatchResult {
 
 template<class Matcher>
 static ArrayObject*
-SplitHelper(JSContext *cx, HandleLinearString str, uint32_t limit, const Matcher &splitMatch,
+SplitHelper(JSContext* cx, HandleLinearString str, uint32_t limit, const Matcher& splitMatch,
             HandleObjectGroup group)
 {
     size_t strLength = str->length();
