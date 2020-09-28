@@ -183,8 +183,8 @@ PrepareOsrTempData(JSContext* cx, ICWarmUpCounter_Fallback* stub, BaselineFrame*
 }
 
 static bool
-DoWarmUpCounterFallback(JSContext* cx, ICWarmUpCounter_Fallback* stub, BaselineFrame* frame,
-                   IonOsrTempData** infoPtr)
+DoWarmUpCounterFallback(JSContext* cx, BaselineFrame* frame, ICWarmUpCounter_Fallback* stub,
+                        IonOsrTempData** infoPtr)
 {
     MOZ_ASSERT(infoPtr);
     *infoPtr = nullptr;
@@ -244,8 +244,8 @@ DoWarmUpCounterFallback(JSContext* cx, ICWarmUpCounter_Fallback* stub, BaselineF
     return true;
 }
 
-typedef bool (*DoWarmUpCounterFallbackFn)(JSContext*, ICWarmUpCounter_Fallback*, BaselineFrame* frame,
-                                     IonOsrTempData** infoPtr);
+typedef bool (*DoWarmUpCounterFallbackFn)(JSContext*, BaselineFrame*,
+                                          ICWarmUpCounter_Fallback*, IonOsrTempData** infoPtr);
 static const VMFunction DoWarmUpCounterFallbackInfo =
     FunctionInfo<DoWarmUpCounterFallbackFn>(DoWarmUpCounterFallback);
 
@@ -253,10 +253,6 @@ bool
 ICWarmUpCounter_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
-
-    // enterStubFrame is going to clobber the BaselineFrameReg, save it in R0.scratchReg()
-    // first.
-    masm.movePtr(BaselineFrameReg, R0.scratchReg());
 
     // Push a stub frame so that we can perform a non-tail call.
     enterStubFrame(masm, R1.scratchReg());
@@ -268,12 +264,10 @@ ICWarmUpCounter_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         masm.subPtr(Imm32(sizeof(void*)), BaselineStackReg);
         masm.push(BaselineStackReg);
 
-        // Push JitFrameLayout pointer.
-        masm.loadBaselineFramePtr(R0.scratchReg(), R0.scratchReg());
-        masm.push(R0.scratchReg());
-
         // Push stub pointer.
         masm.push(ICStubReg);
+
+        pushFramePtr(masm, R0.scratchReg());
 
         if (!callVM(DoWarmUpCounterFallbackInfo, masm))
             return false;
@@ -515,7 +509,7 @@ ICTypeMonitor_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoTypeMonitorFallbackInfo, masm);
 }
@@ -975,7 +969,7 @@ ICNewArray_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg()); // length
     masm.push(ICStubReg); // stub.
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoNewArrayInfo, masm);
 }
@@ -1074,7 +1068,7 @@ ICNewObject_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg); // stub.
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoNewObjectInfo, masm);
 }
@@ -1299,7 +1293,7 @@ ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
     return tailCallVM(DoCompareFallbackInfo, masm);
 }
 
@@ -1641,7 +1635,7 @@ ICToBool_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(fun, masm);
 }
@@ -2068,7 +2062,7 @@ ICBinaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoBinaryArithFallbackInfo, masm);
 }
@@ -2478,7 +2472,7 @@ ICUnaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoUnaryArithFallbackInfo, masm);
 }
@@ -3580,7 +3574,7 @@ ICGetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoGetElemFallbackInfo, masm);
 }
@@ -4787,7 +4781,7 @@ ICSetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.push(R0.scratchReg());
 
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoSetElemFallbackInfo, masm);
 }
@@ -5529,7 +5523,7 @@ ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoInFallbackInfo, masm);
 }
@@ -6088,7 +6082,7 @@ ICGetName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoGetNameFallbackInfo, masm);
 }
@@ -6204,7 +6198,7 @@ ICBindName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoBindNameFallbackInfo, masm);
 }
@@ -6263,7 +6257,7 @@ ICGetIntrinsic_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoGetIntrinsicFallbackInfo, masm);
 }
@@ -7048,7 +7042,7 @@ ICGetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     if (!tailCallVM(DoGetPropFallbackInfo, masm))
         return false;
@@ -7059,6 +7053,7 @@ ICGetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     // Even though the fallback frame doesn't enter a stub frame, the CallScripted
     // frame that we are emulating does. Again, we lie.
+    inStubFrame_ = true;
 #ifdef DEBUG
     entersStubFrame_ = true;
 #endif
@@ -7552,6 +7547,7 @@ ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 
     // Leave stub frame and go to next stub.
     masm.bind(&failureLeaveStubFrame);
+    inStubFrame_ = true;
     leaveStubFrame(masm, false);
 
     // Failure case - jump to next stub
@@ -7957,8 +7953,7 @@ ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.loadPtr(Address(BaselineFrameReg, 0), R0.scratchReg());
-    masm.pushBaselineFramePtr(R0.scratchReg(), R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     if(!callVM(DoGetPropGenericInfo, masm))
         return false;
@@ -8503,7 +8498,7 @@ ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     if (!tailCallVM(DoSetPropFallbackInfo, masm))
         return false;
@@ -8514,6 +8509,7 @@ ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     // Even though the fallback frame doesn't enter a stub frame, the CallScripted
     // frame that we are emulating does. Again, we lie.
+    inStubFrame_ = true;
 #ifdef DEBUG
     entersStubFrame_ = true;
 #endif
@@ -9081,6 +9077,7 @@ ICSetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 
     // Leave stub frame and go to next stub.
     masm.bind(&failureLeaveStubFrame);
+    inStubFrame_ = true;
     leaveStubFrame(masm, false);
 
     // Unstow R0 and R1
@@ -10169,9 +10166,6 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     MOZ_ASSERT(R0 == JSReturnOperand);
 
-    // Push a stub frame so that we can perform a non-tail call.
-    enterStubFrame(masm, R1.scratchReg());
-
     // Values are on the stack left-to-right. Calling convention wants them
     // right-to-left so duplicate them on the stack in reverse order.
     // |this| and callee are pushed last.
@@ -10179,6 +10173,9 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
 
     if (MOZ_UNLIKELY(isSpread_)) {
+        // Push a stub frame so that we can perform a non-tail call.
+        enterStubFrame(masm, R1.scratchReg());
+
         // Use BaselineFrameReg instead of BaselineStackReg, because
         // BaselineFrameReg and BaselineStackReg hold the same value just after
         // calling enterStubFrame.
@@ -10200,8 +10197,7 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         masm.push(BaselineStackReg);
         masm.push(ICStubReg);
 
-        masm.loadPtr(Address(BaselineFrameReg, 0), R0.scratchReg());
-        masm.pushBaselineFramePtr(R0.scratchReg(), R0.scratchReg());
+        pushFramePtr(masm, R0.scratchReg());
 
         if (!callVM(DoSpreadCallFallbackInfo, masm))
             return false;
@@ -10214,6 +10210,9 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         return true;
     }
 
+    // Push a stub frame so that we can perform a non-tail call.
+    enterStubFrame(masm, R1.scratchReg());
+
     regs.take(R0.scratchReg()); // argc.
 
     pushCallArguments(masm, regs, R0.scratchReg(), /* isJitCall = */ false, isConstructing_);
@@ -10222,9 +10221,7 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
 
-    // Load previous frame pointer, push BaselineFrame*.
-    masm.loadPtr(Address(BaselineFrameReg, 0), R0.scratchReg());
-    masm.pushBaselineFramePtr(R0.scratchReg(), R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     if (!callVM(DoCallFallbackInfo, masm))
         return false;
@@ -10236,6 +10233,9 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // into into baseline jitcode. The return address pushed onto the
     // reconstructed baseline stack points here.
     returnOffset_ = masm.currentOffset();
+
+    // Here we are again in a stub frame. Marking as so.
+    inStubFrame_ = true;
 
     // Load passed-in ThisV into R1 just in case it's needed.  Need to do this before
     // we leave the stub frame since that info will be lost.
@@ -10549,6 +10549,7 @@ ICCallScriptedCompiler::generateStubCode(MacroAssembler& masm)
 
     // Leave stub frame and restore argc for the next stub.
     masm.bind(&failureLeaveStubFrame);
+    inStubFrame_ = true;
     leaveStubFrame(masm, false);
     if (argcReg != R0.scratchReg())
         masm.mov(argcReg, R0.scratchReg());
@@ -11371,7 +11372,7 @@ ICIteratorNew_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoIteratorNewFallbackInfo, masm);
 }
@@ -11427,7 +11428,7 @@ ICIteratorMore_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.unboxObject(R0, R0.scratchReg());
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoIteratorMoreFallbackInfo, masm);
 }
@@ -11618,7 +11619,7 @@ ICInstanceOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoInstanceOfFallbackInfo, masm);
 }
@@ -11741,7 +11742,7 @@ ICTypeOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoTypeOfFallbackInfo, masm);
 }
@@ -11839,15 +11840,13 @@ ICRetSub_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         AllocatableGeneralRegisterSet regs(availableGeneralRegs(0));
         regs.take(R1);
         regs.takeUnchecked(ICTailCallReg);
+        Register scratch = regs.getAny();
 
-        Register frame = regs.takeAny();
-        masm.movePtr(BaselineFrameReg, frame);
-
-        enterStubFrame(masm, regs.getAny());
+        enterStubFrame(masm, scratch);
 
         masm.pushValue(R1);
         masm.push(ICStubReg);
-        masm.pushBaselineFramePtr(frame, frame);
+        pushFramePtr(masm, scratch);
 
         if (!callVM(DoRetSubFallbackInfo, masm))
             return false;
@@ -12568,8 +12567,8 @@ ICGetProp_DOMProxyShadowed::Clone(JSContext* cx, ICStubSpace* space, ICStub* fir
 // Rest_Fallback
 //
 
-static bool DoRestFallback(JSContext* cx, ICRest_Fallback* stub,
-                           BaselineFrame* frame, MutableHandleValue res)
+static bool DoRestFallback(JSContext* cx, BaselineFrame* frame, ICRest_Fallback* stub,
+                           MutableHandleValue res)
 {
     unsigned numFormals = frame->numFormalArgs() - 1;
     unsigned numActuals = frame->numActualArgs();
@@ -12584,7 +12583,7 @@ static bool DoRestFallback(JSContext* cx, ICRest_Fallback* stub,
     return true;
 }
 
-typedef bool (*DoRestFallbackFn)(JSContext*, ICRest_Fallback*, BaselineFrame*,
+typedef bool (*DoRestFallbackFn)(JSContext*, BaselineFrame*, ICRest_Fallback*,
                                  MutableHandleValue);
 static const VMFunction DoRestFallbackInfo =
     FunctionInfo<DoRestFallbackFn>(DoRestFallback, TailCall);
@@ -12596,8 +12595,8 @@ ICRest_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     EmitRestoreTailCallReg(masm);
 
-    masm.pushBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
     masm.push(ICStubReg);
+    pushFramePtr(masm, R0.scratchReg());
 
     return tailCallVM(DoRestFallbackInfo, masm);
 }
