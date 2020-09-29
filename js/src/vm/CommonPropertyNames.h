@@ -192,6 +192,7 @@
     macro(signMask, signMask, "signMask") \
     macro(source, source, "source") \
     macro(stack, stack, "stack") \
+    macro(star, star, "*") \
     macro(startTimestamp, startTimestamp, "startTimestamp") \
     macro(static, static_, "static") \
     macro(sticky, sticky, "sticky") \
