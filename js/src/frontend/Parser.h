@@ -525,6 +525,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
 
   private:
     enum InvokedPrediction { PredictUninvoked = false, PredictInvoked = true };
+    enum ForInitLocation { InForInit, NotInForInit };
 
   private:
     /*
@@ -568,8 +569,10 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node expressionStatement(YieldHandling yieldHandling,
                              InvokedPrediction invoked = PredictUninvoked);
     Node variables(YieldHandling yieldHandling,
-                   ParseNodeKind kind, bool* psimple = nullptr,
-                   StaticBlockObject* blockObj = nullptr, VarContext varContext = HoistVars);
+                   ParseNodeKind kind,
+                   ForInitLocation location,
+                   bool* psimple = nullptr, StaticBlockObject* blockObj = nullptr,
+                   VarContext varContext = HoistVars);
     Node expr(InHandling inHandling, YieldHandling yieldHandling,
               InvokedPrediction invoked = PredictUninvoked);
     Node assignExpr(InHandling inHandling, YieldHandling yieldHandling,
