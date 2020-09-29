@@ -193,6 +193,7 @@
     macro(source, source, "source") \
     macro(stack, stack, "stack") \
     macro(star, star, "*") \
+    macro(starDefaultStar, starDefaultStar, "*default*") \
     macro(startTimestamp, startTimestamp, "startTimestamp") \
     macro(static, static_, "static") \
     macro(sticky, sticky, "sticky") \
