@@ -15,7 +15,6 @@
 #include "mozilla/TimeStamp.h"
 #include "nsWindowsHelpers.h"
 #include <windows.h>
-#include <winbase.h>
 
 #include "nsCRT.h"
 #include "mozilla/Logging.h"
