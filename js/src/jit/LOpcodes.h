@@ -74,8 +74,7 @@
     _(Unreachable)                  \
     _(EncodeSnapshot)               \
     _(GetDynamicName)               \
-    _(CallDirectEvalS)              \
-    _(CallDirectEvalV)              \
+    _(CallDirectEval)               \
     _(StackArgT)                    \
     _(StackArgV)                    \
     _(CreateThis)                   \

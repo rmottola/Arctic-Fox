@@ -1870,12 +1870,12 @@ class LGetDynamicName : public LCallInstructionHelper<BOX_PIECES, 2, 3>
     }
 };
 
-class LCallDirectEvalS : public LCallInstructionHelper<BOX_PIECES, 2 + BOX_PIECES, 0>
+class LCallDirectEval : public LCallInstructionHelper<BOX_PIECES, 2 + BOX_PIECES, 0>
 {
   public:
-    LIR_HEADER(CallDirectEvalS)
+    LIR_HEADER(CallDirectEval)
 
-    LCallDirectEvalS(const LAllocation& scopeChain, const LAllocation& string)
+    LCallDirectEval(const LAllocation& scopeChain, const LAllocation& string)
     {
         setOperand(0, scopeChain);
         setOperand(1, string);
@@ -1892,28 +1892,6 @@ class LCallDirectEvalS : public LCallInstructionHelper<BOX_PIECES, 2 + BOX_PIECE
     }
     const LAllocation* getString() {
         return getOperand(1);
-    }
-};
-
-class LCallDirectEvalV : public LCallInstructionHelper<BOX_PIECES, 1 + (2 * BOX_PIECES), 0>
-{
-  public:
-    LIR_HEADER(CallDirectEvalV)
-
-    explicit LCallDirectEvalV(const LAllocation& scopeChain)
-    {
-        setOperand(0, scopeChain);
-    }
-
-    static const size_t Argument = 1;
-    static const size_t ThisValue = 1 + BOX_PIECES;
-
-    MCallDirectEval* mir() const {
-        return mir_->toCallDirectEval();
-    }
-
-    const LAllocation* getScopeChain() {
-        return getOperand(0);
     }
 };
 
