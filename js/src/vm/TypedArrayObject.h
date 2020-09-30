@@ -284,8 +284,8 @@ IsTypedArrayIndex(jsid id, uint64_t* indexp)
  * when the property key is a TypedArray index.
  */
 bool
-DefineTypedArrayElement(JSContext *cx, HandleObject arr, uint64_t index,
-                        Handle<PropertyDescriptor> desc, ObjectOpResult &result);
+DefineTypedArrayElement(JSContext* cx, HandleObject arr, uint64_t index,
+                        Handle<PropertyDescriptor> desc, ObjectOpResult& result);
 
 static inline unsigned
 TypedArrayShift(Scalar::Type viewType)
@@ -318,8 +318,8 @@ TypedArrayElemSize(Scalar::Type viewType)
     return 1u << TypedArrayShift(viewType);
 }
 
-extern JSObject *
-InitDataViewClass(JSContext *cx, HandleObject obj);
+extern JSObject*
+InitDataViewClass(JSContext* cx, HandleObject obj);
 
 class DataViewObject : public NativeObject
 {
