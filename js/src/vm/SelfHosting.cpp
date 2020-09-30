@@ -687,7 +687,7 @@ js::intrinsic_MoveTypedArrayElements(JSContext *cx, unsigned argc, Value *vp)
     }
 #endif
 
-    uint8_t *data = static_cast<uint8_t*>(tarray->viewData());
+    uint8_t* data = static_cast<uint8_t*>(tarray->viewData());
     mozilla::PodMove(&data[byteDest], &data[byteSrc], byteSize);
 
     args.rval().setUndefined();
