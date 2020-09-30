@@ -36,7 +36,7 @@ MOZ_ALWAYS_INLINE int snprintf(char* buffer, size_t n, const char* format, ...)
 // buffer, avoiding the need for the user to pass it in explicitly.
 #ifdef __cplusplus
 template <size_t N>
-int SnprintfLiteral(char (&buffer)[N], const char* format, ...)
+int snprintf_literal(char (&buffer)[N], const char* format, ...)
 {
   va_list args;
   va_start(args, format);
