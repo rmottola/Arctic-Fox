@@ -7696,6 +7696,11 @@ BytecodeEmitter::emitTree(ParseNode* pn)
         ok = emitClass(pn);
         break;
 
+      case PNK_NEWTARGET:
+        if (!emit1(JSOP_NEWTARGET))
+            return false;
+        break;
+
       default:
         MOZ_ASSERT(0);
     }

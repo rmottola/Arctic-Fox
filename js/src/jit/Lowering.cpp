@@ -3516,6 +3516,13 @@ LIRGenerator::visitGetFrameArgument(MGetFrameArgument* ins)
 }
 
 void
+LIRGenerator::visitNewTarget(MNewTarget* ins)
+{
+    LNewTarget* lir = new(alloc()) LNewTarget();
+    defineBox(lir, ins);
+}
+
+void
 LIRGenerator::visitSetFrameArgument(MSetFrameArgument* ins)
 {
     MDefinition* input = ins->input();
