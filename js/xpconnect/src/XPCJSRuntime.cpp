@@ -3316,9 +3316,8 @@ GetCurrentPerfGroupCallback(JSContext* cx) {
     // window.
     nsRefPtr<nsGlobalWindow> win = WindowOrNull(global);
     if (win) {
-        nsCOMPtr<nsIDOMWindow> top;
-        nsresult rv = win->GetScriptableTop(getter_AddRefs(top));
-        NS_ENSURE_SUCCESS(rv, nullptr);
+        nsCOMPtr<nsPIDOMWindow> top;
+        win->GetScriptableTop();
 
         return top.get();
     }
