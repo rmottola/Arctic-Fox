@@ -1466,19 +1466,11 @@ void MediaFormatReader::ReleaseMediaResources()
   }
 }
 
-void MediaFormatReader::NotifyResourcesStatusChanged()
-{
-  if (mDecoder) {
-    mDecoder->NotifyWaitingForResourcesStatusChanged();
-  }
-}
-
 void
 MediaFormatReader::SetIdle()
 {
   if (mSharedDecoderManager && mVideo.mDecoder) {
     mSharedDecoderManager->SetIdle(mVideo.mDecoder);
-    NotifyResourcesStatusChanged();
   }
 }
 
