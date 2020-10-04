@@ -73,6 +73,9 @@ const MESSAGES = [
   // A crashed tab was revived by navigating to a different page. Remove its
   // browser from the list of crashed browsers to stop ignoring its messages.
   "SessionStore:crashedTabRevived",
+
+  // The content script encountered an error.
+  "SessionStore:error",
 ];
 
 // The list of messages we accept from <xul:browser>s that have no tab
@@ -86,6 +89,9 @@ const NOTAB_MESSAGES = new Set([
 
   // For a description see above.
   "SessionStore:update",
+
+  // For a description see above.
+  "SessionStore:error",
 ]);
 
 // The list of messages we accept without an "epoch" parameter.
@@ -96,6 +102,9 @@ const NOEPOCH_MESSAGES = new Set([
 
   // For a description see above.
   "SessionStore:crashedTabRevived",
+
+  // For a description see above.
+  "SessionStore:error",
 ]);
 
 // The list of messages we want to receive even during the short period after a
@@ -107,6 +116,9 @@ const CLOSED_MESSAGES = new Set([
 
   // For a description see above.
   "SessionStore:update",
+
+  // For a description see above.
+  "SessionStore:error",
 ]);
 
 // These are tab events that we listen to.
@@ -814,6 +826,9 @@ let SessionStoreInternal = {
         // The browser was revived by navigating to a different page
         // manually, so we remove it from the ignored browser set.
         this._crashedBrowsers.delete(browser.permanentKey);
+        break;
+      case "SessionStore:error":
+        this.reportInternalError(data);
         break;
       default:
         throw new Error(`received unknown message '${aMessage.name}'`);
@@ -3969,6 +3984,19 @@ let SessionStoreInternal = {
    */
   resetEpoch(browser) {
     this._browserEpochs.delete(browser.permanentKey);
+  },
+
+  /**
+   * Handle an error report from a content process.
+   */
+  reportInternalError(data) {
+    // For the moment, we only report errors through Telemetry.
+    if (data.telemetry) {
+      for (let key of Object.keys(data.telemetry)) {
+        let histogram = Telemetry.getHistogramById(key);
+        histogram.add(data.telemetry[key]);
+      }
+    }
   }
 };
 
