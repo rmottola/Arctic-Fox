@@ -9428,6 +9428,14 @@ IonBuilder::jsop_newtarget()
     }
 
     MOZ_ASSERT(info().funMaybeLazy());
+
+    if (info().funMaybeLazy()->isArrow()) {
+        MArrowNewTarget* arrowNewTarget = MArrowNewTarget::New(alloc(), getCallee());
+        current->add(arrowNewTarget);
+        current->push(arrowNewTarget);
+        return true;
+    }
+
     if (inliningDepth_ == 0) {
         MNewTarget* newTarget = MNewTarget::New(alloc());
         current->add(newTarget);
@@ -11876,10 +11884,11 @@ IonBuilder::jsop_lambda_arrow(JSFunction* fun)
     MOZ_ASSERT(fun->isArrow());
     MOZ_ASSERT(!fun->isNative());
 
+    MDefinition* newTargetDef = current->pop();
     MDefinition* thisDef = current->pop();
 
     MLambdaArrow* ins = MLambdaArrow::New(alloc(), constraints(), current->scopeChain(),
-                                          thisDef, fun);
+                                          thisDef, newTargetDef, fun);
     current->add(ins);
     current->push(ins);
 
