@@ -1870,7 +1870,7 @@ class LGetDynamicName : public LCallInstructionHelper<BOX_PIECES, 2, 3>
     }
 };
 
-class LCallDirectEval : public LCallInstructionHelper<BOX_PIECES, 2 + BOX_PIECES, 0>
+class LCallDirectEval : public LCallInstructionHelper<BOX_PIECES, 2 + (2 * BOX_PIECES), 0>
 {
   public:
     LIR_HEADER(CallDirectEval)
@@ -1882,6 +1882,7 @@ class LCallDirectEval : public LCallInstructionHelper<BOX_PIECES, 2 + BOX_PIECES
     }
 
     static const size_t ThisValue = 2;
+    static const size_t NewTarget = 2 + BOX_PIECES;
 
     MCallDirectEval* mir() const {
         return mir_->toCallDirectEval();

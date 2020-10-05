@@ -6288,7 +6288,7 @@ EvaluateInEnv(JSContext* cx, Handle<Env*> env, HandleValue thisv, AbstractFrameP
 
     script->setActiveEval();
     ExecuteType type = !frame ? EXECUTE_DEBUG_GLOBAL : EXECUTE_DEBUG;
-    return ExecuteKernel(cx, script, *env, thisv, type, frame, rval.address());
+    return ExecuteKernel(cx, script, *env, thisv, NullValue(), type, frame, rval.address());
 }
 
 enum EvalBindings { EvalHasExtraBindings = true, EvalWithDefaultBindings = false };

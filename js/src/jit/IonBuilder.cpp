@@ -6441,6 +6441,10 @@ IonBuilder::jsop_eval(uint32_t argc)
         current->pushSlot(info().thisSlot());
         MDefinition* thisValue = current->pop();
 
+        if (!jsop_newtarget())
+            return false;
+        MDefinition* newTargetValue = current->pop();
+
         // Try to pattern match 'eval(v + "()")'. In this case v is likely a
         // name on the scope chain and the eval is performing a call on that
         // value. Use a dynamic scope chain lookup rather than a full eval.
@@ -6466,7 +6470,8 @@ IonBuilder::jsop_eval(uint32_t argc)
             }
         }
 
-        MInstruction* ins = MCallDirectEval::New(alloc(), scopeChain, string, thisValue, pc);
+        MInstruction* ins = MCallDirectEval::New(alloc(), scopeChain, string,
+                                                 thisValue, newTargetValue, pc);
         current->add(ins);
         current->push(ins);
 
@@ -9416,6 +9421,12 @@ IonBuilder::jsop_arguments()
 bool
 IonBuilder::jsop_newtarget()
 {
+    if (!info().funMaybeLazy()) {
+        MOZ_ASSERT(!info().script()->isForEval());
+        pushConstant(NullValue());
+        return true;
+    }
+
     MOZ_ASSERT(info().funMaybeLazy());
     if (inliningDepth_ == 0) {
         MNewTarget* newTarget = MNewTarget::New(alloc());

@@ -204,6 +204,8 @@ class AbstractFramePtr
     inline Value calleev() const;
     inline Value& thisValue() const;
 
+    inline Value newTarget() const;
+
     inline bool isNonEvalFunctionFrame() const;
     inline bool isNonStrictDirectEvalFrame() const;
     inline bool isStrictEvalFrame() const;
@@ -400,7 +402,8 @@ class InterpreterFrame
 
     /* Used for global and eval frames. */
     void initExecuteFrame(JSContext* cx, HandleScript script, AbstractFramePtr prev,
-                          const Value& thisv, HandleObject scopeChain, ExecuteType type);
+                          const Value& thisv, const Value& newTargetValue,
+                          HandleObject scopeChain, ExecuteType type);
 
   public:
     /*
@@ -743,8 +746,10 @@ class InterpreterFrame
      * frame.
      */
     Value newTarget() const {
-        // new.target in eval() NYI.
-        MOZ_ASSERT(isNonEvalFunctionFrame());
+        MOZ_ASSERT(isFunctionFrame());
+        if (isEvalFrame())
+            return ((Value*)this)[-3];
+
         if (isConstructing()) {
             unsigned pushedArgs = Max(numFormalArgs(), numActualArgs());
             return argv()[pushedArgs];
@@ -1009,8 +1014,8 @@ class InterpreterStack
 
     // For execution of eval or global code.
     InterpreterFrame* pushExecuteFrame(JSContext* cx, HandleScript script, const Value& thisv,
-                                 HandleObject scopeChain, ExecuteType type,
-                                 AbstractFramePtr evalInFrame);
+                                 const Value& newTargetValue, HandleObject scopeChain,
+                                 ExecuteType type, AbstractFramePtr evalInFrame);
 
     // Called to invoke a function.
     InterpreterFrame* pushInvokeFrame(JSContext* cx, const CallArgs& args,
@@ -1745,6 +1750,8 @@ class FrameIter
     // an Ion frame, whereas computedThisValue() will.
     Value       computedThisValue() const;
     Value       thisv(JSContext* cx) const;
+
+    Value       newTarget() const;
 
     Value       returnValue() const;
     void        setReturnValue(const Value& v);
