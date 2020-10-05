@@ -66,6 +66,7 @@
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
@@ -114,11 +115,11 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1180854 - Record and expose Ion IC stub optimization info to Jit
 - 1169731 - [[Call]] on a class constructor should throw.
 - 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
-- 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
 - 1161584 - Add TrackedStrategy::SetProp_InlineCache. 
 - 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
+- Bug 1164602 - Replace js::NullPtr and JS::NullPtr with nullptr_t; r=s
 - Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
 - Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
@@ -135,6 +136,9 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
 - Bug 1149352 - Part 0 to 11
+
+Unboxed Object (enabled - make Forum Manjaro Linux crash)
+- Bug 1162199 - Use unboxed objects by default, r=jandem. 
 
 impacting download and shutdown:
 Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
