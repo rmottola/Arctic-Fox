@@ -2019,8 +2019,11 @@ TabChild::RecvUpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
 
     bool initialSizing = !HasValidInnerSize()
                       && (size.width != 0 && size.height != 0);
+    bool sizeChanged = true;
     if (initialSizing) {
       mHasValidInnerSize = true;
+    } else if (mInnerSize == size) {
+      sizeChanged = false;
     }
 
     mOrientation = orientation;
@@ -2041,7 +2044,9 @@ TabChild::RecvUpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size,
       InitializeRootMetrics();
     }
 
-    HandlePossibleViewportChange(oldScreenSize);
+    if (sizeChanged) {
+      HandlePossibleViewportChange(oldScreenSize);
+    }
 
     return true;
 }

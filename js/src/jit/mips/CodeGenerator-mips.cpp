@@ -23,6 +23,7 @@
 
 #include "jsscriptinlines.h"
 
+#include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
 
 using namespace js;
@@ -32,6 +33,24 @@ using mozilla::FloorLog2;
 using mozilla::NegativeInfinity;
 using JS::GenericNaN;
 using JS::ToInt32;
+
+// inline
+Address
+CodeGeneratorMIPS::ToAddress(const LAllocation& a)
+{
+    MOZ_ASSERT(a.isMemory());
+    int32_t offset = ToStackOffset(&a);
+
+    return Address(StackPointer, offset);
+}
+
+// inline
+Address
+CodeGeneratorMIPS::ToAddress(const LAllocation* a)
+{
+    return ToAddress(*a);
+}
+
 
 // shared
 CodeGeneratorMIPS::CodeGeneratorMIPS(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm)
@@ -948,11 +967,11 @@ CodeGeneratorMIPS::visitPowHalfD(LPowHalfD* ins)
 }
 
 MoveOperand
-CodeGeneratorMIPS::toMoveOperand(const LAllocation* a) const
+CodeGeneratorMIPS::toMoveOperand(LAllocation a) const
 {
-    if (a->isGeneralReg())
+    if (a.isGeneralReg())
         return MoveOperand(ToRegister(a));
-    if (a->isFloatReg()) {
+    if (a.isFloatReg()) {
         return MoveOperand(ToFloatRegister(a));
     }
     int32_t offset = ToStackOffset(a);
@@ -1753,11 +1772,6 @@ CodeGeneratorMIPS::visitGuardObjectGroup(LGuardObjectGroup* guard)
     Register tmp = ToRegister(guard->tempInt());
     MOZ_ASSERT(obj != tmp);
 
-    if (guard->mir()->checkUnboxedExpando()) {
-        masm.loadPtr(Address(obj, UnboxedPlainObject::offsetOfExpando()), tmp);
-        bailoutCmpPtr(Assembler::NotEqual, tmp, ImmWord(0), guard->snapshot());
-    }
-
     masm.loadPtr(Address(obj, JSObject::offsetOfGroup()), tmp);
     Assembler::Condition cond = guard->mir()->bailOnEquality()
                                 ? Assembler::Equal
@@ -1800,13 +1814,6 @@ CodeGeneratorMIPS::generateInvalidateEpilogue()
     // We should never reach this point in JIT code -- the invalidation thunk
     // should pop the invalidated JS frame and return directly to its caller.
     masm.assumeUnreachable("Should have returned directly to its caller instead of here.");
-}
-
-void
-DispatchIonCache::initializeAddCacheState(LInstruction* ins, AddCacheState* addState)
-{
-    // Can always use the scratch register on MIPS.
-    addState->dispatchScratch = ScratchRegister;
 }
 
 void

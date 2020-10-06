@@ -210,6 +210,11 @@
         ]]></getter>
       </property>
 
+      <field name="_outerWindowID">null</field>
+      <property name="outerWindowID"
+                onget="return this._outerWindowID"
+                readonly="true"/>
+
       <property name="autoCompletePopup"
                 onget="return document.getElementById(this.getAttribute('autocompletepopup'))"
                 readonly="true"/>

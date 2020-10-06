@@ -1758,6 +1758,20 @@ GetCompartmentName(JSCompartment* c, nsCString& name, int* anonymizeID,
     }
 }
 
+extern void
+xpc::GetCurrentCompartmentName(JSContext* cx, nsCString& name)
+{
+    RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
+    if (!global) {
+        name.AssignLiteral("no global");
+        return;
+    }
+
+    JSCompartment* compartment = GetObjectCompartment(global);
+    int anonymizeID = 0;
+    GetCompartmentName(compartment, name, &anonymizeID, false);
+}
+
 static int64_t
 JSMainRuntimeGCHeapDistinguishedAmount()
 {
@@ -2532,8 +2546,8 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         KIND_NONHEAP, rtStats.runtime.gc.nurseryCommitted,
         "Memory being used by the GC's nursery.");
 
-    RREPORT_BYTES(rtPath + NS_LITERAL_CSTRING("runtime/gc/nursery-huge-slots"),
-        KIND_NONHEAP, rtStats.runtime.gc.nurseryHugeSlots,
+    RREPORT_BYTES(rtPath + NS_LITERAL_CSTRING("runtime/gc/nursery-malloced-buffers"),
+        KIND_NONHEAP, rtStats.runtime.gc.nurseryMallocedBuffers,
         "Out-of-line slots and elements belonging to objects in the "
         "nursery.");
 
@@ -3272,6 +3286,46 @@ static const JSWrapObjectCallbacks WrapObjectCallbacks = {
     xpc::WrapperFactory::PrepareForWrapping
 };
 
+/**
+ * Group JSCompartments into PerformanceGroups.
+ *
+ * - All JSCompartments from the same add-on belong to the same
+ *   PerformanceGroup.
+ * - All JSCompartments from the same same webpage (including
+ *   frames) belong to the same PerformanceGroup.
+ * - All other JSCompartments (normally, system add-ons)
+ *   belong to to a big uncategorized PerformanceGroup.
+ */
+static void*
+GetCurrentPerfGroupCallback(JSContext* cx) {
+    RootedObject global(cx, CurrentGlobalOrNull(cx));
+    if (!global) {
+        // This can happen for the atom compartments, which is system
+        // code.
+        return nullptr;
+    }
+
+    JSAddonId* addonId = AddonIdOfObject(global);
+    if (addonId) {
+        // If this is an add-on, use the id as key.
+        return addonId;
+    }
+
+    // If the compartment belongs to a webpage, use the address of the
+    // topmost scriptable window, hence regrouping all frames of a
+    // window.
+    nsRefPtr<nsGlobalWindow> win = WindowOrNull(global);
+    if (win) {
+        nsCOMPtr<nsPIDOMWindow> top;
+        win->GetScriptableTop();
+
+        return top.get();
+    }
+
+    // Otherwise, this is platform code, use `nullptr` as key.
+    return nullptr;
+}
+
 XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
    : CycleCollectedJSRuntime(nullptr, JS::DefaultHeapMaxBytes, JS::DefaultNurseryBytes),
    mJSContextStack(new XPCJSContextStack(this)),
@@ -3332,8 +3386,8 @@ XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
     // OSX 64-bit Debug: 7MB stack, 636 stack frames => ~11.3k per stack frame
     // OSX64 Opt: 7MB stack, 2440 stack frames => ~3k per stack frame
     //
-    // Linux 32-bit Debug: 2MB stack, 447 stack frames => ~4.6k per stack frame
-    // Linux 64-bit Debug: 4MB stack, 501 stack frames => ~8.2k per stack frame
+    // Linux 32-bit Debug: 2MB stack, 426 stack frames => ~4.8k per stack frame
+    // Linux 64-bit Debug: 4MB stack, 455 stack frames => ~9.0k per stack frame
     //
     // Windows (Opt+Debug): 900K stack, 235 stack frames => ~3.4k per stack frame
     //
@@ -3365,15 +3419,15 @@ XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
     // were not taken at the time of this writing, so we hazard a guess that
     // ASAN builds have roughly thrice the stack overhead as normal builds.
     // On normal builds, the largest stack frame size we might encounter is
-    // 8.2k, so let's use a buffer of 8.2 * 3 * 10 = 246k.
+    // 9.0k (see above), so let's use a buffer of 9.0 * 5 * 10 = 450k.
     const size_t kStackQuota =  2 * kDefaultStackQuota;
-    const size_t kTrustedScriptBuffer = 246 * 1024;
+    const size_t kTrustedScriptBuffer = 450 * 1024;
 #elif defined(XP_WIN)
     // 1MB is the default stack size on Windows, so use 900k.
     // Windows PGO stack frames have unfortunately gotten pretty large lately. :-(
     const size_t kStackQuota = 900 * 1024;
-    const size_t kTrustedScriptBuffer = (sizeof(size_t) == 8) ? 140 * 1024
-                                                              : 80 * 1024;
+    const size_t kTrustedScriptBuffer = (sizeof(size_t) == 8) ? 180 * 1024   //win64
+                                                              : 120 * 1024;  //win32
     // The following two configurations are linux-only. Given the numbers above,
     // we use 50k and 100k trusted buffers on 32-bit and 64-bit respectively.
 #elif defined(DEBUG)
@@ -3447,6 +3501,8 @@ XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
     // Watch for the JS boolean options.
     ReloadPrefsCallback(nullptr, this);
     Preferences::RegisterCallback(ReloadPrefsCallback, JS_OPTIONS_DOT_STR, this);
+
+    JS_SetCurrentPerfGroupCallback(runtime, ::GetCurrentPerfGroupCallback);
 }
 
 // static

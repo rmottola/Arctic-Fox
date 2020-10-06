@@ -1214,10 +1214,6 @@ RNewArray::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedValue result(cx);
     RootedObjectGroup group(cx);
 
-    // See CodeGenerator::visitNewArrayCallVM
-    if (!templateObject->isSingleton())
-        group = templateObject->group();
-
     JSObject* resultObject = NewDenseArray(cx, count_, group, allocatingBehaviour_);
     if (!resultObject)
         return false;
@@ -1427,6 +1423,27 @@ RArrayState::recover(JSContext* cx, SnapshotIterator& iter) const
     }
 
     result.setObject(*object);
+    iter.storeInstructionResult(result);
+    return true;
+}
+
+bool
+MAssertRecoveredOnBailout::writeRecoverData(CompactBufferWriter &writer) const
+{
+    MOZ_ASSERT(canRecoverOnBailout());
+    MOZ_RELEASE_ASSERT(input()->isRecoveredOnBailout() == mustBeRecovered_,
+        "assertRecoveredOnBailout failed during compilation");
+    writer.writeUnsigned(uint32_t(RInstruction::Recover_AssertRecoveredOnBailout));
+    return true;
+}
+
+RAssertRecoveredOnBailout::RAssertRecoveredOnBailout(CompactBufferReader &reader)
+{ }
+
+bool RAssertRecoveredOnBailout::recover(JSContext *cx, SnapshotIterator &iter) const
+{
+    RootedValue result(cx);
+    result.setUndefined();
     iter.storeInstructionResult(result);
     return true;
 }

@@ -96,6 +96,9 @@ let PerformanceIO = {
       if (recordingData.version === PERF_TOOL_SERIALIZER_LEGACY_VERSION) {
         recordingData = convertLegacyData(recordingData);
       }
+      if (recordingData.profile.meta.version === 2) {
+        RecordingUtils.deflateProfile(recordingData.profile);
+      }
       deferred.resolve(recordingData);
     });
 
@@ -140,7 +143,15 @@ function convertLegacyData (legacyData) {
     memory: [],
     ticks: ticksData,
     allocations: { sites: [], timestamps: [], frames: [], counts: [] },
-    profile: profilerData.profile
+    profile: profilerData.profile,
+    // Fake a configuration object here if there's tick data,
+    // so that it can be rendered
+    configuration: {
+      withTicks: !!ticksData.length,
+      withMarkers: false,
+      withMemory: false,
+      withAllocations: false
+    }
   };
 
   return data;

@@ -29,7 +29,6 @@ if CONFIG['MOZ_DEVTOOLS']:
         'widgets/AbstractTreeItem.jsm',
         'widgets/BreadcrumbsWidget.jsm',
         'widgets/Chart.jsm',
-        'widgets/FlameGraph.jsm',
         'widgets/Graphs.jsm',
         'widgets/GraphsWorker.js',
         'widgets/SideMenuWidget.jsm',
@@ -40,7 +39,9 @@ if CONFIG['MOZ_DEVTOOLS']:
     ]
 
     EXTRA_JS_MODULES.devtools.shared.profiler += [
+	'profiler/frame-utils.js',
         'profiler/global.js',
+	'profiler/jit.js',
         'profiler/tree-model.js',
         'profiler/tree-view.js',
     ]
@@ -49,7 +50,6 @@ if CONFIG['MOZ_DEVTOOLS']:
         'timeline/global.js',
         'timeline/marker-details.js',
         'timeline/markers-overview.js',
-        'timeline/memory-overview.js',
         'timeline/waterfall.js',
     ]
 
@@ -62,6 +62,8 @@ if CONFIG['MOZ_DEVTOOLS']:
         'inplace-editor.js',
         'observable-object.js',
         'options-view.js',
+	'source-utils.js',
+	'telemetry.js',
         'theme-switching.js',
         'theme.js',
         'undo.js',
@@ -70,6 +72,8 @@ if CONFIG['MOZ_DEVTOOLS']:
     EXTRA_JS_MODULES.devtools.shared.widgets += [
         'widgets/CubicBezierWidget.js',
         'widgets/FastListWidget.js',
+        'widgets/FilterWidget.js',
+        'widgets/FlameGraph.js',
         'widgets/Spectrum.js',
         'widgets/TableWidget.js',
         'widgets/Tooltip.js',

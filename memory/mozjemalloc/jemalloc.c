@@ -315,7 +315,7 @@ __FBSDID("$FreeBSD: head/lib/libc/stdlib/malloc.c 180599 2008-07-18 19:35:44Z ja
 #endif
 #include <sys/time.h>
 #include <sys/types.h>
-#if !defined(MOZ_MEMORY_SOLARIS) && !defined(MOZ_MEMORY_ANDROID)
+#if !defined(MOZ_MEMORY_SOLARIS) && !defined(MOZ_MEMORY_ANDROID) && !defined(MOZ_MEMORY_LINUX)
 #include <sys/sysctl.h>
 #endif
 #include <sys/uio.h>

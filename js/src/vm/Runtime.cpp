@@ -126,6 +126,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     asmJSActivationStack_(nullptr),
     asyncStackForNewActivations(nullptr),
     asyncCauseForNewActivations(nullptr),
+    entryMonitor(nullptr),
     parentRuntime(parentRuntime),
     interrupt_(false),
     telemetryCallback(nullptr),
@@ -277,7 +278,7 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
 
     const char* size = getenv("JSGC_MARK_STACK_LIMIT");
     if (size)
-        SetMarkStackLimit(this, atoi(size));
+        gc.setMarkStackLimit(atoi(size));
 
     ScopedJSDeletePtr<Zone> atomsZone(new_<Zone>(this));
     if (!atomsZone || !atomsZone->init(true))
@@ -523,7 +524,7 @@ JSRuntime::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::Runtim
     rtSizes->gc.marker += gc.marker.sizeOfExcludingThis(mallocSizeOf);
     rtSizes->gc.nurseryCommitted += gc.nursery.sizeOfHeapCommitted();
     rtSizes->gc.nurseryDecommitted += gc.nursery.sizeOfHeapDecommitted();
-    rtSizes->gc.nurseryHugeSlots += gc.nursery.sizeOfHugeSlots(mallocSizeOf);
+    rtSizes->gc.nurseryMallocedBuffers += gc.nursery.sizeOfMallocedBuffers(mallocSizeOf);
     gc.storeBuffer.addSizeOfExcludingThis(mallocSizeOf, &rtSizes->gc);
 }
 
@@ -866,24 +867,32 @@ JS::IsProfilingEnabledForRuntime(JSRuntime *runtime)
 }
 
 void
-js::ResetStopwatches(JSRuntime *rt)
+js::ResetStopwatches(JSRuntime* rt)
 {
     MOZ_ASSERT(rt);
     rt->stopwatch.reset();
 }
 
 bool
-js::SetStopwatchActive(JSRuntime *rt, bool isActive)
+js::SetStopwatchIsMonitoringJank(JSRuntime* rt, bool value)
 {
-    MOZ_ASSERT(rt);
-    return rt->stopwatch.setIsActive(isActive);
+    return rt->stopwatch.setIsMonitoringJank(value);
+}
+bool
+js::GetStopwatchIsMonitoringJank(JSRuntime* rt)
+{
+    return rt->stopwatch.isMonitoringJank();
 }
 
 bool
-js::IsStopwatchActive(JSRuntime *rt)
+js::SetStopwatchIsMonitoringCPOW(JSRuntime* rt, bool value)
 {
-    MOZ_ASSERT(rt);
-    return rt->stopwatch.isActive();
+    return rt->stopwatch.setIsMonitoringCPOW(value);
+}
+bool
+js::GetStopwatchIsMonitoringCPOW(JSRuntime* rt)
+{
+    return rt->stopwatch.isMonitoringCPOW();
 }
 
 js::PerformanceGroupHolder::~PerformanceGroupHolder()
@@ -892,15 +901,14 @@ js::PerformanceGroupHolder::~PerformanceGroupHolder()
 }
 
 void*
-js::PerformanceGroupHolder::getHashKey()
+js::PerformanceGroupHolder::getHashKey(JSContext* cx)
 {
-    return compartment_->isSystem() ?
-        (void*)compartment_->addonId :
-        (void*)JS_GetCompartmentPrincipals(compartment_);
-    // This key may be `nullptr` if we have `isSystem() == true`
-    // and `compartment_->addonId`. This is absolutely correct,
-    // and this represents the `PerformanceGroup` used to track
-    // the performance of the the platform compartments.
+    if (runtime_->stopwatch.currentPerfGroupCallback) {
+        return (*runtime_->stopwatch.currentPerfGroupCallback)(cx);
+    }
+
+    // As a fallback, put everything in the same PerformanceGroup.
+    return nullptr;
 }
 
 void
@@ -921,26 +929,26 @@ js::PerformanceGroupHolder::unlink()
 
 
     JSRuntime::Stopwatch::Groups::Ptr ptr =
-        runtime_->stopwatch.groups_.lookup(getHashKey());
+        runtime_->stopwatch.groups_.lookup(group->key_);
     MOZ_ASSERT(ptr);
     runtime_->stopwatch.groups_.remove(ptr);
     js_delete(group);
 }
 
-PerformanceGroup *
-js::PerformanceGroupHolder::getGroup()
+PerformanceGroup*
+js::PerformanceGroupHolder::getGroup(JSContext* cx)
 {
     if (group_)
         return group_;
 
-    void* key = getHashKey();
+    void* key = getHashKey(cx);
     JSRuntime::Stopwatch::Groups::AddPtr ptr =
         runtime_->stopwatch.groups_.lookupForAdd(key);
     if (ptr) {
         group_ = ptr->value();
         MOZ_ASSERT(group_);
     } else {
-        group_ = runtime_->new_<PerformanceGroup>();
+        group_ = runtime_->new_<PerformanceGroup>(key);
         runtime_->stopwatch.groups_.add(ptr, key, group_);
     }
 
@@ -950,7 +958,13 @@ js::PerformanceGroupHolder::getGroup()
 }
 
 PerformanceData*
-js::GetPerformanceData(JSRuntime *rt)
+js::GetPerformanceData(JSRuntime* rt)
 {
     return &rt->stopwatch.performance;
+}
+
+void
+JS_SetCurrentPerfGroupCallback(JSRuntime *rt, JSCurrentPerfGroupCallback cb)
+{
+    rt->stopwatch.currentPerfGroupCallback = cb;
 }

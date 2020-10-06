@@ -8,6 +8,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/Range.h"
 #include "mozilla/Scoped.h"
 #include "mozilla/UniquePtr.h"
 
@@ -32,6 +33,7 @@
 #include "vm/Debugger-inl.h"
 
 using mozilla::Some;
+using mozilla::UniquePtr;
 using JS::HandleValue;
 using JS::Value;
 using JS::ZoneSet;
@@ -43,7 +45,6 @@ using JS::ubi::SimpleEdge;
 using JS::ubi::SimpleEdgeVector;
 using JS::ubi::TracerConcrete;
 using JS::ubi::TracerConcreteWithCompartment;
-using JS::ubi::TracerConcreteWithCompartmentAndClassName;
 
 // All operations on null ubi::Nodes crash.
 const char16_t* Concrete<void>::typeName() const          { MOZ_CRASH("null ubi::Node"); }
@@ -57,33 +58,18 @@ Concrete<void>::size(mozilla::MallocSizeOf mallocSizeof) const
     MOZ_CRASH("null ubi::Node");
 }
 
+struct Node::ConstructFunctor : public BoolDefaultAdaptor<Value, false> {
+    template <typename T> bool operator()(T* t, Node* node) { node->construct(t); return true; }
+};
+
 Node::Node(JSGCTraceKind kind, void* ptr)
 {
-    switch (kind) {
-      case JSTRACE_OBJECT:       construct(static_cast<JSObject*>(ptr));         break;
-      case JSTRACE_SCRIPT:       construct(static_cast<JSScript*>(ptr));         break;
-      case JSTRACE_STRING:       construct(static_cast<JSString*>(ptr));         break;
-      case JSTRACE_SYMBOL:       construct(static_cast<JS::Symbol*>(ptr));       break;
-      case JSTRACE_BASE_SHAPE:   construct(static_cast<js::BaseShape*>(ptr));    break;
-      case JSTRACE_JITCODE:      construct(static_cast<js::jit::JitCode*>(ptr)); break;
-      case JSTRACE_LAZY_SCRIPT:  construct(static_cast<js::LazyScript*>(ptr));   break;
-      case JSTRACE_SHAPE:        construct(static_cast<js::Shape*>(ptr));        break;
-      case JSTRACE_OBJECT_GROUP: construct(static_cast<js::ObjectGroup*>(ptr));  break;
-
-      default:
-        MOZ_CRASH("bad JSGCTraceKind passed to JS::ubi::Node::Node");
-    }
+    CallTyped(ConstructFunctor(), ptr, kind, this);
 }
 
 Node::Node(HandleValue value)
 {
-    if (value.isObject())
-        construct(&value.toObject());
-    else if (value.isString())
-        construct(value.toString());
-    else if (value.isSymbol())
-        construct(value.toSymbol());
-    else
+    if (!DispatchValueTyped(ConstructFunctor(), value, this))
         construct<void>(nullptr);
 }
 
@@ -134,7 +120,8 @@ class SimpleEdgeVectorTracer : public JS::CallbackTracer {
         if (wantNames) {
             // Ask the tracer to compute an edge name for us.
             char buffer[1024];
-            const char* name = getTracingEdgeName(buffer, sizeof(buffer));
+            getTracingEdgeName(buffer, sizeof(buffer));
+            const char* name = buffer;
 
             // Convert the name to char16_t characters.
             name16 = js_pod_malloc<char16_t>(strlen(name) + 1);
@@ -223,17 +210,37 @@ TracerConcreteWithCompartment<Referent>::compartment() const
     return TracerBase::get().compartment();
 }
 
-template<typename Referent>
-const char *
-TracerConcreteWithCompartmentAndClassName<Referent>::jsObjectClassName() const
+const char*
+Concrete<JSObject>::jsObjectClassName() const
 {
-    return TracerBase::get().getClass()->name;
+    return Concrete::get().getClass()->name;
 }
 
-template<> const char16_t TracerConcrete<JSObject>::concreteTypeName[] =
-    MOZ_UTF16("JSObject");
-template<> const char16_t TracerConcrete<JSString>::concreteTypeName[] =
-    MOZ_UTF16("JSString");
+bool
+Concrete<JSObject>::jsObjectConstructorName(JSContext* cx,
+                                            UniquePtr<char16_t[], JS::FreePolicy>& outName) const
+{
+    JSAtom* name = Concrete::get().maybeConstructorDisplayAtom();
+    if (!name) {
+        outName.reset(nullptr);
+        return true;
+    }
+
+    auto len = JS_GetStringLength(name);
+    auto size = len + 1;
+
+    outName.reset(cx->pod_malloc<char16_t>(size * sizeof(char16_t)));
+    if (!outName)
+        return false;
+
+    mozilla::Range<char16_t> chars(outName.get(), size);
+    if (!JS_CopyStringChars(cx, chars, name))
+        return false;
+
+    outName[len] = '\0';
+    return true;
+}
+
 template<> const char16_t TracerConcrete<JS::Symbol>::concreteTypeName[] =
     MOZ_UTF16("JS::Symbol");
 template<> const char16_t TracerConcrete<JSScript>::concreteTypeName[] =
@@ -325,7 +332,7 @@ RootList::init(HandleObject debuggees)
     if (!debuggeeZones.init())
         return false;
 
-    for (js::GlobalObjectSet::Range r = dbg->allDebuggees(); !r.empty(); r.popFront()) {
+    for (js::WeakGlobalObjectSet::Range r = dbg->allDebuggees(); !r.empty(); r.popFront()) {
         if (!debuggeeZones.put(r.front()->zone()))
             return false;
     }
@@ -334,7 +341,7 @@ RootList::init(HandleObject debuggees)
         return false;
 
     // Ensure that each of our debuggee globals are in the root list.
-    for (js::GlobalObjectSet::Range r = dbg->allDebuggees(); !r.empty(); r.popFront()) {
+    for (js::WeakGlobalObjectSet::Range r = dbg->allDebuggees(); !r.empty(); r.popFront()) {
         if (!addRoot(JS::ubi::Node(static_cast<JSObject*>(r.front())),
                      MOZ_UTF16("debuggee global")))
         {

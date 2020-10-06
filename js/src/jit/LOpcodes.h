@@ -8,9 +8,6 @@
 #define jit_LOpcodes_h
 
 #define LIR_COMMON_OPCODE_LIST(_)   \
-    _(Label)                        \
-    _(Nop)                          \
-    _(Mop)                          \
     _(OsiPoint)                     \
     _(MoveGroup)                    \
     _(Integer)                      \
@@ -75,9 +72,9 @@
     _(ApplyArgsGeneric)             \
     _(Bail)                         \
     _(Unreachable)                  \
+    _(EncodeSnapshot)               \
     _(GetDynamicName)               \
-    _(CallDirectEvalS)              \
-    _(CallDirectEvalV)              \
+    _(CallDirectEval)               \
     _(StackArgT)                    \
     _(StackArgV)                    \
     _(CreateThis)                   \
@@ -206,6 +203,8 @@
     _(GuardObjectGroup)             \
     _(GuardObjectIdentity)          \
     _(GuardClass)                   \
+    _(GuardUnboxedExpando)          \
+    _(LoadUnboxedExpando)           \
     _(TypeBarrierV)                 \
     _(TypeBarrierO)                 \
     _(MonitorTypes)                 \
@@ -213,6 +212,9 @@
     _(PostWriteBarrierV)            \
     _(InitializedLength)            \
     _(SetInitializedLength)         \
+    _(UnboxedArrayLength)           \
+    _(UnboxedArrayInitializedLength) \
+    _(IncrementUnboxedArrayInitializedLength) \
     _(BoundsCheck)                  \
     _(BoundsCheckRange)             \
     _(BoundsCheckLower)             \
@@ -233,6 +235,7 @@
     _(ArrayPushV)                   \
     _(ArrayPushT)                   \
     _(ArrayConcat)                  \
+    _(ArraySlice)                   \
     _(ArrayJoin)                    \
     _(StoreElementHoleV)            \
     _(StoreElementHoleT)            \
@@ -242,6 +245,7 @@
     _(StoreTypedArrayElementStatic) \
     _(CompareExchangeTypedArrayElement) \
     _(AtomicTypedArrayElementBinop) \
+    _(AtomicTypedArrayElementBinopForEffect) \
     _(EffectiveAddress)             \
     _(ClampIToUint8)                \
     _(ClampDToUint8)                \
@@ -282,6 +286,7 @@
     _(SetArrayLength)               \
     _(TypedArrayLength)             \
     _(TypedArrayElements)           \
+    _(SetDisjointTypedElements)     \
     _(TypedObjectDescr)             \
     _(TypedObjectElements)          \
     _(SetTypedObjectOffset)         \
@@ -330,6 +335,7 @@
     _(AsmJSCall)                    \
     _(AsmJSCompareExchangeHeap)     \
     _(AsmJSAtomicBinopHeap)         \
+    _(AsmJSAtomicBinopHeapForEffect)\
     _(RecompileCheck)               \
     _(MemoryBarrier)                \
     _(AssertRangeI)                 \
@@ -341,7 +347,9 @@
     _(LexicalCheck)                 \
     _(ThrowUninitializedLexical)    \
     _(NurseryObject)                \
-    _(Debugger)
+    _(Debugger)                     \
+    _(NewTarget)                    \
+    _(ArrowNewTarget)
 
 #if defined(JS_CODEGEN_X86)
 # include "jit/x86/LOpcodes-x86.h"

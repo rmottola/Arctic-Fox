@@ -117,6 +117,9 @@ JitFrameIterator::JitFrameIterator(JSContext* cx)
         current_ = activation_->bailoutData()->fp();
         frameSize_ = activation_->bailoutData()->topFrameSize();
         type_ = JitFrame_Bailout;
+    } else if (activation_->isLazyLinkExitFrame()) {
+        type_ = JitFrame_LazyLink;
+        MOZ_ASSERT(isExitFrameLayout<LazyLinkExitFrameLayout>());
     }
 }
 
@@ -132,6 +135,9 @@ JitFrameIterator::JitFrameIterator(const ActivationIterator& activations)
         current_ = activation_->bailoutData()->fp();
         frameSize_ = activation_->bailoutData()->topFrameSize();
         type_ = JitFrame_Bailout;
+    } else if (activation_->isLazyLinkExitFrame()) {
+        type_ = JitFrame_LazyLink;
+        MOZ_ASSERT(isExitFrameLayout<LazyLinkExitFrameLayout>());
     }
 }
 
@@ -264,6 +270,7 @@ SizeOfFramePrefix(FrameType type)
       case JitFrame_Unwound_Rectifier:
         return IonUnwoundRectifierFrameLayout::Size();
       case JitFrame_Exit:
+      case JitFrame_LazyLink:
         return ExitFrameLayout::Size();
       case JitFrame_IonAccessorIC:
       case JitFrame_Unwound_IonAccessorIC:
@@ -442,10 +449,7 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
                 Debugger::handleUnrecoverableIonBailoutError(cx, rematFrame);
         }
 
-#ifdef DEBUG
-        if (rematFrame)
-            Debugger::assertNotInFrameMaps(rematFrame);
-#endif
+        MOZ_ASSERT_IF(rematFrame, !Debugger::inFrameMaps(rematFrame));
     }
 
     if (!script->hasTrynotes())
@@ -587,7 +591,7 @@ HandleExceptionBaseline(JSContext* cx, const JitFrameIterator& frame, ResumeFrom
 
     RootedValue exception(cx);
     if (cx->isExceptionPending() && cx->compartment()->isDebuggee() &&
-        cx->getPendingException(&exception) && !exception.isMagic(JS_GENERATOR_CLOSING))
+        !cx->isClosingGenerator())
     {
         switch (Debugger::onExceptionUnwind(cx, frame.baselineFrame())) {
           case JSTRAP_ERROR:
@@ -650,9 +654,7 @@ HandleExceptionBaseline(JSContext* cx, const JitFrameIterator& frame, ResumeFrom
             if (cx->isExceptionPending()) {
                 // If we're closing a legacy generator, we have to skip catch
                 // blocks.
-                if (!cx->getPendingException(&exception))
-                    continue;
-                if (exception.isMagic(JS_GENERATOR_CLOSING))
+                if (cx->isClosingGenerator())
                     continue;
 
                 // Ion can compile try-catch, but bailing out to catch
@@ -954,6 +956,7 @@ EnsureExitFrame(CommonFrameLayout* frame)
 
       case JitFrame_Exit:
       case JitFrame_Bailout:
+      case JitFrame_LazyLink:
         // Fall-through to MOZ_CRASH below.
         break;
     }
@@ -969,13 +972,13 @@ MarkCalleeToken(JSTracer* trc, CalleeToken token)
       case CalleeToken_FunctionConstructing:
       {
         JSFunction* fun = CalleeTokenToFunction(token);
-        MarkObjectRoot(trc, &fun, "jit-callee");
+        TraceRoot(trc, &fun, "jit-callee");
         return CalleeToToken(fun, tag == CalleeToken_FunctionConstructing);
       }
       case CalleeToken_Script:
       {
         JSScript* script = CalleeTokenToScript(token);
-        MarkScriptRoot(trc, &script, "jit-script");
+        TraceRoot(trc, &script, "jit-script");
         return CalleeToToken(script);
       }
       default:
@@ -1008,8 +1011,8 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
-    // except when the script's lazy arguments object aliases those formals,
-    // in which case we mark them as well.
+    // except when the script might have lazy arguments, in which case we mark
+    // them as well.
 
     size_t nargs = layout->numActualArgs();
     size_t nformals = 0;
@@ -1021,11 +1024,12 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
     Value* argv = layout->argv();
 
     // Trace |this|.
-    gc::MarkValueRoot(trc, argv, "ion-thisv");
+    TraceRoot(trc, argv, "ion-thisv");
 
-    // Trace actual arguments beyond the formals. Note + 1 for thisv.
-    for (size_t i = nformals + 1; i < nargs + 1; i++)
-        gc::MarkValueRoot(trc, &argv[i], "ion-argv");
+    // Trace actual arguments and newTarget beyond the formals. Note + 1 for thisv.
+    bool constructing = CalleeTokenIsConstructing(layout->calleeToken());
+    for (size_t i = nformals + 1; i < nargs + 1 + constructing; i++)
+        TraceRoot(trc, &argv[i], "ion-argv");
 }
 
 static void
@@ -1077,12 +1081,12 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
 
     while (safepoint.getGcSlot(&entry)) {
         uintptr_t* ref = layout->slotRef(entry);
-        gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(ref), "ion-gc-slot");
+        TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(ref), "ion-gc-slot");
     }
 
     while (safepoint.getValueSlot(&entry)) {
         Value* v = (Value*)layout->slotRef(entry);
-        gc::MarkValueRoot(trc, v, "ion-gc-slot");
+        TraceRoot(trc, v, "ion-gc-slot");
     }
 
     uintptr_t *spill = frame.spillBase();
@@ -1091,9 +1095,9 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
     for (GeneralRegisterBackwardIterator iter(safepoint.allGprSpills()); iter.more(); iter++) {
         --spill;
         if (gcRegs.has(*iter))
-            gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(spill), "ion-gc-spill");
+            TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(spill), "ion-gc-spill");
         else if (valueRegs.has(*iter))
-            gc::MarkValueRoot(trc, reinterpret_cast<Value*>(spill), "ion-value-spill");
+            TraceRoot(trc, reinterpret_cast<Value*>(spill), "ion-value-spill");
     }
 
 #ifdef JS_NUNBOX32
@@ -1104,7 +1108,7 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
         layout.s.payload.uintptr = ReadAllocation(frame, &payload);
 
         Value v = IMPL_TO_JSVAL(layout);
-        gc::MarkValueRoot(trc, &v, "ion-torn-value");
+        TraceRoot(trc, &v, "ion-torn-value");
 
         if (v != IMPL_TO_JSVAL(layout)) {
             // GC moved the value, replace the stored payload.
@@ -1216,7 +1220,7 @@ MarkIonAccessorICFrame(JSTracer* trc, const JitFrameIterator& frame)
 {
     MOZ_ASSERT(frame.type() == JitFrame_IonAccessorIC);
     IonAccessorICFrameLayout* layout = (IonAccessorICFrameLayout*)frame.fp();
-    gc::MarkJitCodeRoot(trc, layout->stubCode(), "ion-ic-accessor-code");
+    TraceRoot(trc, layout->stubCode(), "ion-ic-accessor-code");
 }
 
 void
@@ -1279,7 +1283,7 @@ MarkJitExitFrameCopiedArguments(JSTracer* trc, const VMFunction* f, ExitFooterFr
         if (f->argProperties(explicitArg) == VMFunction::DoubleByRef) {
             // Arguments with double size can only have RootValue type.
             if (f->argRootType(explicitArg) == VMFunction::RootValue)
-                gc::MarkValueRoot(trc, reinterpret_cast<Value*>(doubleArgs), "ion-vm-args");
+                TraceRoot(trc, reinterpret_cast<Value*>(doubleArgs), "ion-vm-args");
             else
                 MOZ_ASSERT(f->argRootType(explicitArg) == VMFunction::RootNone);
             doubleArgs += sizeof(double);
@@ -1317,17 +1321,17 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
         NativeExitFrameLayout* native = frame.exitFrame()->as<NativeExitFrameLayout>();
         size_t len = native->argc() + 2;
         Value* vp = native->vp();
-        gc::MarkValueRootRange(trc, len, vp, "ion-native-args");
+        TraceRootRange(trc, len, vp, "ion-native-args");
         return;
     }
 
     if (frame.isExitFrameLayout<IonOOLNativeExitFrameLayout>()) {
         IonOOLNativeExitFrameLayout* oolnative =
             frame.exitFrame()->as<IonOOLNativeExitFrameLayout>();
-        gc::MarkJitCodeRoot(trc, oolnative->stubCode(), "ion-ool-native-code");
-        gc::MarkValueRoot(trc, oolnative->vp(), "iol-ool-native-vp");
+        TraceRoot(trc, oolnative->stubCode(), "ion-ool-native-code");
+        TraceRoot(trc, oolnative->vp(), "iol-ool-native-vp");
         size_t len = oolnative->argc() + 1;
-        gc::MarkValueRootRange(trc, len, oolnative->thisp(), "ion-ool-native-thisargs");
+        TraceRootRange(trc, len, oolnative->thisp(), "ion-ool-native-thisargs");
         return;
     }
 
@@ -1341,35 +1345,35 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
             frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>()
             ? frame.exitFrame()->as<IonOOLPropertyOpExitFrameLayout>()
             : frame.exitFrame()->as<IonOOLSetterOpExitFrameLayout>();
-        gc::MarkJitCodeRoot(trc, oolgetter->stubCode(), "ion-ool-property-op-code");
-        gc::MarkValueRoot(trc, oolgetter->vp(), "ion-ool-property-op-vp");
-        gc::MarkIdRoot(trc, oolgetter->id(), "ion-ool-property-op-id");
-        gc::MarkObjectRoot(trc, oolgetter->obj(), "ion-ool-property-op-obj");
+        TraceRoot(trc, oolgetter->stubCode(), "ion-ool-property-op-code");
+        TraceRoot(trc, oolgetter->vp(), "ion-ool-property-op-vp");
+        TraceRoot(trc, oolgetter->id(), "ion-ool-property-op-id");
+        TraceRoot(trc, oolgetter->obj(), "ion-ool-property-op-obj");
         return;
     }
 
 
     if (frame.isExitFrameLayout<IonOOLProxyExitFrameLayout>()) {
         IonOOLProxyExitFrameLayout* oolproxy = frame.exitFrame()->as<IonOOLProxyExitFrameLayout>();
-        gc::MarkJitCodeRoot(trc, oolproxy->stubCode(), "ion-ool-proxy-code");
-        gc::MarkValueRoot(trc, oolproxy->vp(), "ion-ool-proxy-vp");
-        gc::MarkIdRoot(trc, oolproxy->id(), "ion-ool-proxy-id");
-        gc::MarkObjectRoot(trc, oolproxy->proxy(), "ion-ool-proxy-proxy");
-        gc::MarkObjectRoot(trc, oolproxy->receiver(), "ion-ool-proxy-receiver");
+        TraceRoot(trc, oolproxy->stubCode(), "ion-ool-proxy-code");
+        TraceRoot(trc, oolproxy->vp(), "ion-ool-proxy-vp");
+        TraceRoot(trc, oolproxy->id(), "ion-ool-proxy-id");
+        TraceRoot(trc, oolproxy->proxy(), "ion-ool-proxy-proxy");
+        TraceRoot(trc, oolproxy->receiver(), "ion-ool-proxy-receiver");
         return;
     }
 
     if (frame.isExitFrameLayout<IonDOMExitFrameLayout>()) {
         IonDOMExitFrameLayout* dom = frame.exitFrame()->as<IonDOMExitFrameLayout>();
-        gc::MarkObjectRoot(trc, dom->thisObjAddress(), "ion-dom-args");
+        TraceRoot(trc, dom->thisObjAddress(), "ion-dom-args");
         if (dom->isMethodFrame()) {
             IonDOMMethodExitFrameLayout* method =
                 reinterpret_cast<IonDOMMethodExitFrameLayout*>(dom);
             size_t len = method->argc() + 2;
             Value* vp = method->vp();
-            gc::MarkValueRootRange(trc, len, vp, "ion-dom-args");
+            TraceRootRange(trc, len, vp, "ion-dom-args");
         } else {
-            gc::MarkValueRoot(trc, dom->vp(), "ion-dom-args");
+            TraceRoot(trc, dom->vp(), "ion-dom-args");
         }
         return;
     }
@@ -1378,7 +1382,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
         LazyLinkExitFrameLayout* ll = frame.exitFrame()->as<LazyLinkExitFrameLayout>();
         JitFrameLayout* layout = ll->jsFrame();
 
-        gc::MarkJitCodeRoot(trc, ll->stubCode(), "lazy-link-code");
+        TraceRoot(trc, ll->stubCode(), "lazy-link-code");
         layout->replaceCalleeToken(MarkCalleeToken(trc, layout->calleeToken()));
         MarkThisAndArguments(trc, layout);
         return;
@@ -1390,7 +1394,7 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
         return;
     }
 
-    MarkJitCodeRoot(trc, footer->addressOfJitCode(), "ion-exit-code");
+    TraceRoot(trc, footer->addressOfJitCode(), "ion-exit-code");
 
     const VMFunction* f = footer->function();
     if (f == nullptr)
@@ -1406,21 +1410,21 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
             // Sometimes we can bake in HandleObjects to nullptr.
             JSObject** pobj = reinterpret_cast<JSObject**>(argBase);
             if (*pobj)
-                gc::MarkObjectRoot(trc, pobj, "ion-vm-args");
+                TraceRoot(trc, pobj, "ion-vm-args");
             break;
           }
           case VMFunction::RootString:
           case VMFunction::RootPropertyName:
-            gc::MarkStringRoot(trc, reinterpret_cast<JSString**>(argBase), "ion-vm-args");
+            TraceRoot(trc, reinterpret_cast<JSString**>(argBase), "ion-vm-args");
             break;
           case VMFunction::RootFunction:
-            gc::MarkObjectRoot(trc, reinterpret_cast<JSFunction**>(argBase), "ion-vm-args");
+            TraceRoot(trc, reinterpret_cast<JSFunction**>(argBase), "ion-vm-args");
             break;
           case VMFunction::RootValue:
-            gc::MarkValueRoot(trc, reinterpret_cast<Value*>(argBase), "ion-vm-args");
+            TraceRoot(trc, reinterpret_cast<Value*>(argBase), "ion-vm-args");
             break;
           case VMFunction::RootCell:
-            gc::MarkGCThingRoot(trc, reinterpret_cast<void**>(argBase), "ion-vm-args");
+            TraceGenericPointerRoot(trc, reinterpret_cast<gc::Cell**>(argBase), "ion-vm-args");
             break;
         }
 
@@ -1441,20 +1445,20 @@ MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
           case VMFunction::RootNone:
             MOZ_CRASH("Handle outparam must have root type");
           case VMFunction::RootObject:
-            gc::MarkObjectRoot(trc, footer->outParam<JSObject*>(), "ion-vm-out");
+            TraceRoot(trc, footer->outParam<JSObject*>(), "ion-vm-out");
             break;
           case VMFunction::RootString:
           case VMFunction::RootPropertyName:
-            gc::MarkStringRoot(trc, footer->outParam<JSString*>(), "ion-vm-out");
+            TraceRoot(trc, footer->outParam<JSString*>(), "ion-vm-out");
             break;
           case VMFunction::RootFunction:
-            gc::MarkObjectRoot(trc, footer->outParam<JSFunction*>(), "ion-vm-out");
+            TraceRoot(trc, footer->outParam<JSFunction*>(), "ion-vm-out");
             break;
           case VMFunction::RootValue:
-            gc::MarkValueRoot(trc, footer->outParam<Value>(), "ion-vm-outvp");
+            TraceRoot(trc, footer->outParam<Value>(), "ion-vm-outvp");
             break;
           case VMFunction::RootCell:
-            gc::MarkGCThingRoot(trc, footer->outParam<void*>(), "ion-vm-out");
+            TraceGenericPointerRoot(trc, footer->outParam<gc::Cell*>(), "ion-vm-out");
             break;
         }
     }
@@ -1470,7 +1474,7 @@ MarkRectifierFrame(JSTracer* trc, const JitFrameIterator& frame)
     // Baseline JIT code generated as part of the ICCall_Fallback stub may use
     // it if we're calling a constructor that returns a primitive value.
     RectifierFrameLayout* layout = (RectifierFrameLayout*)frame.fp();
-    gc::MarkValueRoot(trc, &layout->argv()[0], "ion-thisv");
+    TraceRoot(trc, &layout->argv()[0], "ion-thisv");
 }
 
 static void
@@ -1493,6 +1497,7 @@ MarkJitActivation(JSTracer* trc, const JitActivationIterator& activations)
     for (JitFrameIterator frames(activations); !frames.done(); ++frames) {
         switch (frames.type()) {
           case JitFrame_Exit:
+          case JitFrame_LazyLink:
             MarkJitExitFrame(trc, frames);
             break;
           case JitFrame_BaselineJS:
@@ -1567,7 +1572,7 @@ GetPcScript(JSContext* cx, JSScript** scriptRes, jsbytecode** pcRes)
     JitActivationIterator iter(rt);
     JitFrameIterator it(iter);
     uint8_t* retAddr;
-    if (it.type() == JitFrame_Exit) {
+    if (it.isExitFrame()) {
         ++it;
 
         // Skip rectifier frames.
@@ -1720,7 +1725,7 @@ RInstructionResults::trace(JSTracer* trc)
 {
     // Note: The vector necessary exists, otherwise this object would not have
     // been stored on the activation from where the trace function is called.
-    gc::MarkValueRange(trc, results_->length(), results_->begin(), "ion-recover-results");
+    TraceRange(trc, results_->length(), results_->begin(), "ion-recover-results");
 }
 
 
@@ -2098,7 +2103,7 @@ SnapshotIterator::traceAllocation(JSTracer* trc)
         return;
 
     Value copy = v;
-    gc::MarkValueRoot(trc, &v, "ion-typed-reg");
+    TraceRoot(trc, &v, "ion-typed-reg");
     if (v != copy) {
         MOZ_ASSERT(SameType(v, copy));
         writeAllocationValuePayload(alloc, v);
@@ -2436,7 +2441,8 @@ InlineFrameIterator::findNextFrame()
             MOZ_CRASH("Couldn't deduce the number of arguments of an ionmonkey frame");
 
         // Skip over non-argument slots, as well as |this|.
-        unsigned skipCount = (si_.numAllocations() - 1) - numActualArgs_ - 1;
+        bool skipNewTarget = JSOp(*pc_) == JSOP_NEW;
+        unsigned skipCount = (si_.numAllocations() - 1) - numActualArgs_ - 1 - skipNewTarget;
         for (unsigned j = 0; j < skipCount; j++)
             si_.skip();
 
@@ -2771,6 +2777,7 @@ JitFrameIterator::dump() const
         fprintf(stderr, "Warning! Unwound JS frames are not observable.\n");
         break;
       case JitFrame_Exit:
+      case JitFrame_LazyLink:
         break;
     };
     fputc('\n', stderr);
@@ -3210,7 +3217,7 @@ AssertJitStackInvariants(JSContext* cx)
                   "The frame size is optimal");
             }
 
-            if (frames.type() == JitFrame_Exit) {
+            if (frames.isExitFrame()) {
                 // For the moment, we do not keep the JitStackAlignment
                 // alignment for exit frames.
                 frameSize -= ExitFrameLayout::Size();

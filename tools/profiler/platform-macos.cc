@@ -380,7 +380,6 @@ bool Sampler::RegisterCurrentThread(const char* aName,
 
   sRegisteredThreads->push_back(info);
 
-  uwt__register_thread_for_profiling(stackTop);
   return true;
 }
 

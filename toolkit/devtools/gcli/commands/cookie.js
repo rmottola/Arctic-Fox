@@ -4,11 +4,12 @@
 
 "use strict";
 
-const { Cc, Ci, Cu } = require("chrome");
-const gcli = require("gcli/index");
-const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
+const { Ci, Cc } = require("chrome");
+const l10n = require("gcli/l10n");
+const URL = require("sdk/url").URL;
 
 XPCOMUtils.defineLazyGetter(this, "cookieMgr", function() {
+  const { Cc, Ci } = require("chrome");
   return Cc["@mozilla.org/cookiemanager;1"].getService(Ci.nsICookieManager2);
 });
 
@@ -18,7 +19,7 @@ XPCOMUtils.defineLazyGetter(this, "cookieMgr", function() {
  */
 function sanitizeHost(host) {
   if (host == null || host == "") {
-    throw new Error(gcli.lookup("cookieListOutNonePage"));
+    throw new Error(l10n.lookup("cookieListOutNonePage"));
   }
   return host.split(":")[0];
 }
@@ -31,7 +32,7 @@ function sanitizeHost(host) {
  */
 function translateExpires(expires) {
   if (expires == 0) {
-    return gcli.lookup("cookieListOutSession");
+    return l10n.lookup("cookieListOutSession");
   }
 
   let expires_msec = expires * 1000;
@@ -58,17 +59,18 @@ function isCookieAtHost(cookie, host) {
 exports.items = [
   {
     name: "cookie",
-    description: gcli.lookup("cookieDesc"),
-    manual: gcli.lookup("cookieManual")
+    description: l10n.lookup("cookieDesc"),
+    manual: l10n.lookup("cookieManual")
   },
   {
+    item: "command",
+    runAt: "server",
     name: "cookie list",
-    description: gcli.lookup("cookieListDesc"),
-    manual: gcli.lookup("cookieListManual"),
+    description: l10n.lookup("cookieListDesc"),
+    manual: l10n.lookup("cookieListManual"),
     returnType: "cookies",
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       let cookies = [];
@@ -93,19 +95,20 @@ exports.items = [
     }
   },
   {
+    item: "command",
+    runAt: "server",
     name: "cookie remove",
-    description: gcli.lookup("cookieRemoveDesc"),
-    manual: gcli.lookup("cookieRemoveManual"),
+    description: l10n.lookup("cookieRemoveDesc"),
+    manual: l10n.lookup("cookieRemoveManual"),
     params: [
       {
         name: "name",
         type: "string",
-        description: gcli.lookup("cookieRemoveKeyDesc"),
+        description: l10n.lookup("cookieRemoveKeyDesc"),
       }
     ],
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       while (enm.hasMoreElements()) {
@@ -124,9 +127,9 @@ exports.items = [
     to: "view",
     exec: function(cookies, context) {
       if (cookies.length == 0) {
-        let host = context.environment.document.location.host;
+        let host = new URL(context.environment.target.url).host;
         host = sanitizeHost(host);
-        let msg = gcli.lookupFormat("cookieListOutNoneHost", [ host ]);
+        let msg = l10n.lookupFormat("cookieListOutNoneHost", [ host ]);
         return context.createView({ html: "<span>" + msg + "</span>" });
       }
 
@@ -139,7 +142,7 @@ exports.items = [
                        (cookie.isHttpOnly ? "isHttpOnly " : "") +
                        (cookie.isSecure ? "isSecure " : "") +
                        (cookie.isSession ? "isSession " : "") +
-                       (noAttrs ? gcli.lookup("cookieListOutNone") : ""))
+                       (noAttrs ? l10n.lookup("cookieListOutNone") : ""))
                        .trim();
       }
 
@@ -150,29 +153,29 @@ exports.items = [
           "    <div>${cookie.name}=${cookie.value}</div>" +
           "    <table class='gcli-cookielist-detail'>" +
           "      <tr>" +
-          "        <td>" + gcli.lookup("cookieListOutHost") + "</td>" +
+          "        <td>" + l10n.lookup("cookieListOutHost") + "</td>" +
           "        <td>${cookie.host}</td>" +
           "      </tr>" +
           "      <tr>" +
-          "        <td>" + gcli.lookup("cookieListOutPath") + "</td>" +
+          "        <td>" + l10n.lookup("cookieListOutPath") + "</td>" +
           "        <td>${cookie.path}</td>" +
           "      </tr>" +
           "      <tr>" +
-          "        <td>" + gcli.lookup("cookieListOutExpires") + "</td>" +
+          "        <td>" + l10n.lookup("cookieListOutExpires") + "</td>" +
           "        <td>${cookie.expires}</td>" +
           "      </tr>" +
           "      <tr>" +
-          "        <td>" + gcli.lookup("cookieListOutAttributes") + "</td>" +
+          "        <td>" + l10n.lookup("cookieListOutAttributes") + "</td>" +
           "        <td>${cookie.attrs}</td>" +
           "      </tr>" +
           "      <tr><td colspan='2'>" +
           "        <span class='gcli-out-shortcut' onclick='${onclick}'" +
           "            data-command='cookie set ${cookie.name} '" +
-          "            >" + gcli.lookup("cookieListOutEdit") + "</span>" +
+          "            >" + l10n.lookup("cookieListOutEdit") + "</span>" +
           "        <span class='gcli-out-shortcut'" +
           "            onclick='${onclick}' ondblclick='${ondblclick}'" +
           "            data-command='cookie remove ${cookie.name}'" +
-          "            >" + gcli.lookup("cookieListOutRemove") + "</span>" +
+          "            >" + l10n.lookup("cookieListOutRemove") + "</span>" +
           "      </td></tr>" +
           "    </table>" +
           "  </li>" +
@@ -187,62 +190,63 @@ exports.items = [
     }
   },
   {
+    item: "command",
+    runAt: "server",
     name: "cookie set",
-    description: gcli.lookup("cookieSetDesc"),
-    manual: gcli.lookup("cookieSetManual"),
+    description: l10n.lookup("cookieSetDesc"),
+    manual: l10n.lookup("cookieSetManual"),
     params: [
       {
         name: "name",
         type: "string",
-        description: gcli.lookup("cookieSetKeyDesc")
+        description: l10n.lookup("cookieSetKeyDesc")
       },
       {
         name: "value",
         type: "string",
-        description: gcli.lookup("cookieSetValueDesc")
+        description: l10n.lookup("cookieSetValueDesc")
       },
       {
-        group: gcli.lookup("cookieSetOptionsDesc"),
+        group: l10n.lookup("cookieSetOptionsDesc"),
         params: [
           {
             name: "path",
             type: { name: "string", allowBlank: true },
             defaultValue: "/",
-            description: gcli.lookup("cookieSetPathDesc")
+            description: l10n.lookup("cookieSetPathDesc")
           },
           {
             name: "domain",
             type: "string",
             defaultValue: null,
-            description: gcli.lookup("cookieSetDomainDesc")
+            description: l10n.lookup("cookieSetDomainDesc")
           },
           {
             name: "secure",
             type: "boolean",
-            description: gcli.lookup("cookieSetSecureDesc")
+            description: l10n.lookup("cookieSetSecureDesc")
           },
           {
             name: "httpOnly",
             type: "boolean",
-            description: gcli.lookup("cookieSetHttpOnlyDesc")
+            description: l10n.lookup("cookieSetHttpOnlyDesc")
           },
           {
             name: "session",
             type: "boolean",
-            description: gcli.lookup("cookieSetSessionDesc")
+            description: l10n.lookup("cookieSetSessionDesc")
           },
           {
             name: "expires",
             type: "string",
             defaultValue: "Jan 17, 2038",
-            description: gcli.lookup("cookieSetExpiresDesc")
+            description: l10n.lookup("cookieSetExpiresDesc")
           },
         ]
       }
     ],
     exec: function(args, context) {
-      let host = context.environment.document.location.host;
-      host = sanitizeHost(host);
+      let host = sanitizeHost(context.environment.document.location.host);
       let time = Date.parse(args.expires) / 1000;
 
       cookieMgr.add(args.domain ? "." + args.domain : host,

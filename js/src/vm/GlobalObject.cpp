@@ -236,13 +236,13 @@ GlobalObject::initBuiltinConstructor(JSContext* cx, Handle<GlobalObject*> global
     return true;
 }
 
-GlobalObject *
-GlobalObject::createInternal(JSContext *cx, const Class *clasp)
+GlobalObject*
+GlobalObject::createInternal(JSContext* cx, const Class* clasp)
 {
     MOZ_ASSERT(clasp->flags & JSCLASS_IS_GLOBAL);
     MOZ_ASSERT(clasp->trace == JS_GlobalObjectTraceHook);
 
-    JSObject *obj = NewObjectWithGivenProto(cx, clasp, NullPtr(), SingletonObject);
+    JSObject* obj = NewObjectWithGivenProto(cx, clasp, nullptr, SingletonObject);
     if (!obj)
         return nullptr;
 
@@ -514,12 +514,12 @@ GlobalDebuggees_finalize(FreeOp* fop, JSObject* obj)
 static const Class
 GlobalDebuggees_class = {
     "GlobalDebuggee", JSCLASS_HAS_PRIVATE,
-    nullptr, nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, GlobalDebuggees_finalize
 };
 
 GlobalObject::DebuggerVector*
-GlobalObject::getDebuggers()
+GlobalObject::getDebuggers() const
 {
     Value debuggers = getReservedSlot(DEBUGGERS);
     if (debuggers.isUndefined())
@@ -536,7 +536,7 @@ GlobalObject::getOrCreateDebuggers(JSContext* cx, Handle<GlobalObject*> global)
     if (debuggers)
         return debuggers;
 
-    NativeObject *obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, NullPtr());
+    NativeObject* obj = NewNativeObjectWithGivenProto(cx, &GlobalDebuggees_class, nullptr);
     if (!obj)
         return nullptr;
     debuggers = cx->new_<DebuggerVector>();
@@ -609,7 +609,7 @@ GlobalObject::getSelfHostedFunction(JSContext* cx, HandleAtom selfHostedName, Ha
 
     JSFunction *fun =
         NewScriptedFunction(cx, nargs, JSFunction::INTERPRETED_LAZY,
-                            name, JSFunction::ExtendedFinalizeKind, SingletonObject);
+                            name, gc::AllocKind::FUNCTION_EXTENDED, SingletonObject);
     if (!fun)
         return false;
     fun->setIsSelfHostedBuiltin();

@@ -136,13 +136,16 @@ class FunctionContextFlags
         return flags;
     }
 
+    bool needsHomeObject:1;
+
   public:
     FunctionContextFlags()
      :  mightAliasLocals(false),
         hasExtensibleScope(false),
         needsDeclEnvObject(false),
         argumentsHasLocalBinding(false),
-        definitelyNeedsArgsObj(false)
+        definitelyNeedsArgsObj(false),
+        needsHomeObject(false)
     { }
 };
 
@@ -205,6 +208,7 @@ class SharedContext
     virtual ObjectBox* toObjectBox() = 0;
     inline bool isFunctionBox() { return toObjectBox() && toObjectBox()->isFunctionBox(); }
     inline FunctionBox* asFunctionBox();
+    inline GlobalSharedContext* asGlobalSharedContext();
 
     bool hasExplicitUseStrict()        const { return anyCxFlags.hasExplicitUseStrict; }
     bool bindingsAccessedDynamically() const { return anyCxFlags.bindingsAccessedDynamically; }
@@ -235,17 +239,57 @@ class SharedContext
     bool isDotVariable(JSAtom* atom) const {
         return atom == context->names().dotGenerator || atom == context->names().dotGenRVal;
     }
+
+    enum class AllowedSyntax {
+        NewTarget,
+        SuperProperty
+    };
+    virtual bool allowSyntax(AllowedSyntax allowed) const = 0;
+
+  protected:
+    static bool FunctionAllowsSyntax(JSFunction* func, AllowedSyntax allowed)
+    {
+        MOZ_ASSERT(!func->isArrow());
+
+        switch (allowed) {
+          case AllowedSyntax::NewTarget:
+            // For now, disallow new.target inside generators
+            return !func->isGenerator();
+          case AllowedSyntax::SuperProperty:
+            return func->allowSuperProperty();
+          default:;
+        }
+        MOZ_CRASH("Unknown AllowedSyntax query");
+    }
 };
 
 class GlobalSharedContext : public SharedContext
 {
+  private:
+    Handle<StaticEvalObject*> staticEvalScope_;
+
   public:
-    GlobalSharedContext(ExclusiveContext *cx,
-                        Directives directives, bool extraWarnings)
-      : SharedContext(cx, directives, extraWarnings)
+    GlobalSharedContext(ExclusiveContext* cx,
+                        Directives directives, Handle<StaticEvalObject*> staticEvalScope,
+                        bool extraWarnings)
+      : SharedContext(cx, directives, extraWarnings),
+        staticEvalScope_(staticEvalScope)
     {}
 
-    ObjectBox *toObjectBox() { return nullptr; }
+    ObjectBox* toObjectBox() { return nullptr; }
+    HandleObject evalStaticScope() const { return staticEvalScope_; }
+
+    bool allowSyntax(AllowedSyntax allowed) const {
+        StaticScopeIter<CanGC> it(context, staticEvalScope_);
+        for (; !it.done(); it++) {
+            if (it.type() == StaticScopeIter<CanGC>::Function &&
+                !it.fun().isArrow())
+            {
+                return FunctionAllowsSyntax(&it.fun(), allowed);
+            }
+        }
+        return false;
+    }
 };
 
 class FunctionBox : public ObjectBox, public SharedContext
@@ -298,6 +342,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     bool needsDeclEnvObject()       const { return funCxFlags.needsDeclEnvObject; }
     bool argumentsHasLocalBinding() const { return funCxFlags.argumentsHasLocalBinding; }
     bool definitelyNeedsArgsObj()   const { return funCxFlags.definitelyNeedsArgsObj; }
+    bool needsHomeObject()          const { return funCxFlags.needsHomeObject; }
 
     void setMightAliasLocals()             { funCxFlags.mightAliasLocals         = true; }
     void setHasExtensibleScope()           { funCxFlags.hasExtensibleScope       = true; }
@@ -305,6 +350,8 @@ class FunctionBox : public ObjectBox, public SharedContext
     void setArgumentsHasLocalBinding()     { funCxFlags.argumentsHasLocalBinding = true; }
     void setDefinitelyNeedsArgsObj()       { MOZ_ASSERT(funCxFlags.argumentsHasLocalBinding);
                                              funCxFlags.definitelyNeedsArgsObj   = true; }
+    void setNeedsHomeObject()              { MOZ_ASSERT(function()->allowSuperProperty());
+                                             funCxFlags.needsHomeObject          = true; }
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
         return funCxFlags.flagsForNestedGeneratorComprehensionLambda();
@@ -335,7 +382,17 @@ class FunctionBox : public ObjectBox, public SharedContext
         return bindings.hasAnyAliasedBindings() ||
                hasExtensibleScope() ||
                needsDeclEnvObject() ||
+               needsHomeObject()    ||
                isGenerator();
+    }
+
+    bool allowSyntax(AllowedSyntax allowed) const {
+        // For now (!) we don't allow new.target in generators, and can't
+        // check that for functions we haven't finished parsing, as they
+        // don't have initialized scripts. Check from our stashed bits instead.
+        if (allowed == AllowedSyntax::NewTarget)
+            return !isGenerator();
+        return FunctionAllowsSyntax(function(), allowed);
     }
 };
 
@@ -345,6 +402,14 @@ SharedContext::asFunctionBox()
     MOZ_ASSERT(isFunctionBox());
     return static_cast<FunctionBox*>(this);
 }
+
+inline GlobalSharedContext*
+SharedContext::asGlobalSharedContext()
+{
+    MOZ_ASSERT(!isFunctionBox());
+    return static_cast<GlobalSharedContext*>(this);
+}
+
 
 // In generators, we treat all locals as aliased so that they get stored on the
 // heap.  This way there is less information to copy off the stack when

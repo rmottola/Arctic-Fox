@@ -156,7 +156,7 @@ ReturnedValueMustNotBePrimitive(JSContext* cx, HandleObject proxy, JSAtom* atom,
         if (AtomToPrintableString(cx, atom, &bytes)) {
             RootedValue val(cx, ObjectOrNullValue(proxy));
             ReportValueError2(cx, JSMSG_BAD_TRAP_RETURN_VALUE,
-                              JSDVG_SEARCH_STACK, val, js::NullPtr(), bytes.ptr());
+                              JSDVG_SEARCH_STACK, val, nullptr, bytes.ptr());
         }
         return false;
     }
@@ -203,7 +203,7 @@ ScriptedIndirectProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, 
     RootedObject handler(cx, GetIndirectProxyHandlerObject(proxy));
     RootedValue fval(cx), value(cx);
     return GetFundamentalTrap(cx, handler, cx->names().defineProperty, &fval) &&
-           FromPropertyDescriptor(cx, desc, &value) &&
+           FromPropertyDescriptorToObject(cx, desc, &value) &&
            Trap2(cx, handler, fval, id, value, &value) &&
            result.succeed();
 }
@@ -407,7 +407,6 @@ ScriptedIndirectProxyHandler::derivedSet(JSContext *cx, HandleObject proxy, Hand
     if (!receiver.isObject())
         return result.fail(JSMSG_SET_NON_OBJECT_RECEIVER);
     RootedObject receiverObj(cx, &receiver.toObject());
-    desc.object().set(receiverObj);
     return DefineProperty(cx, receiverObj, id, desc, result);
 }
 
@@ -468,7 +467,7 @@ CallableScriptedIndirectProxyHandler::construct(JSContext* cx, HandleObject prox
     MOZ_ASSERT(ccHolder->getClass() == &CallConstructHolder);
     RootedValue construct(cx, ccHolder->as<NativeObject>().getReservedSlot(1));
     MOZ_ASSERT(construct.isObject() && construct.toObject().isCallable());
-    return InvokeConstructor(cx, construct, args.length(), args.array(), args.rval());
+    return InvokeConstructor(cx, construct, args.length(), args.array(), true, args.rval());
 }
 
 const CallableScriptedIndirectProxyHandler CallableScriptedIndirectProxyHandler::singleton;
@@ -533,7 +532,7 @@ js::proxy_createFunction(JSContext* cx, unsigned argc, Value* vp)
     // Stash the call and construct traps on a holder object that we can stick
     // in a slot on the proxy.
     RootedObject ccHolder(cx, JS_NewObjectWithGivenProto(cx, Jsvalify(&CallConstructHolder),
-                                                         js::NullPtr()));
+                                                         nullptr));
     if (!ccHolder)
         return false;
     ccHolder->as<NativeObject>().setReservedSlot(0, ObjectValue(*call));

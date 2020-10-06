@@ -32,6 +32,48 @@ class nsISSLStatus;
 namespace mozilla { namespace net {
 
 class Http2PushedStream;
+
+class HttpChannelSecurityWarningReporter
+{
+public:
+  virtual nsresult ReportSecurityMessage(const nsAString& aMessageTag,
+                                         const nsAString& aMessageCategory) = 0;
+};
+
+//-----------------------------------------------------------------------------
+// nsHttpChannelCacheKey
+//-----------------------------------------------------------------------------
+
+class nsHttpChannelCacheKey final : public nsISupportsPRUint32,
+                                    public nsISupportsCString
+{
+    NS_DECL_ISUPPORTS
+
+    NS_DECL_NSISUPPORTSPRIMITIVE
+    NS_FORWARD_NSISUPPORTSPRUINT32(mSupportsPRUint32->)
+
+    // Both interfaces declares toString method with the same signature.
+    // Thus we have to delegate only to nsISupportsPRUint32 implementation.
+    NS_IMETHOD GetData(nsACString & aData) override
+    {
+        return mSupportsCString->GetData(aData);
+    }
+    NS_IMETHOD SetData(const nsACString & aData) override
+    {
+        return mSupportsCString->SetData(aData);
+    }
+
+public:
+    nsresult SetData(uint32_t aPostID, const nsACString& aKey);
+    nsresult GetData(uint32_t *aPostID, nsACString& aKey);
+
+protected:
+    ~nsHttpChannelCacheKey() {}
+
+    nsCOMPtr<nsISupportsPRUint32> mSupportsPRUint32;
+    nsCOMPtr<nsISupportsCString> mSupportsCString;
+};
+
 //-----------------------------------------------------------------------------
 // nsHttpChannel
 //-----------------------------------------------------------------------------
@@ -138,6 +180,12 @@ public:
     NS_IMETHOD GetRequestStart(mozilla::TimeStamp *aRequestStart) override;
     NS_IMETHOD GetResponseStart(mozilla::TimeStamp *aResponseStart) override;
     NS_IMETHOD GetResponseEnd(mozilla::TimeStamp *aResponseEnd) override;
+
+    nsresult AddSecurityMessage(const nsAString& aMessageTag,
+                                const nsAString& aMessageCategory) override;
+
+    void SetWarningReporter(HttpChannelSecurityWarningReporter* aReporter)
+      { mWarningReporter = aReporter; }
 
 public: /* internal necko use only */
 
@@ -405,6 +453,8 @@ private:
         MAYBE_INTERCEPT,   // interception in progress, but can be cancelled
         INTERCEPTED,       // a synthesized response has been provided
     } mInterceptCache;
+    // Unique ID of this channel for the interception purposes.
+    const uint64_t mInterceptionID;
 
     bool PossiblyIntercepted() {
         return mInterceptCache != DO_NOT_INTERCEPT;
@@ -476,6 +526,9 @@ private:
     void PopRedirectAsyncFunc(nsContinueRedirectionFunc func);
 
     nsCString mUsername;
+
+    // If non-null, warnings should be reported to this object.
+    HttpChannelSecurityWarningReporter* mWarningReporter;
 
 protected:
     virtual void DoNotifyListenerCleanup() override;

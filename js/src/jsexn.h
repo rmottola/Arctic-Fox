@@ -130,6 +130,9 @@ class AutoClearPendingException
     }
 };
 
+extern const char*
+ValueToSourceForError(JSContext* cx, HandleValue val, JSAutoByteString& bytes);
+
 } // namespace js
 
 #endif /* jsexn_h */

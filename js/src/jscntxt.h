@@ -25,7 +25,6 @@ namespace js {
 
 namespace jit {
 class JitContext;
-class CompileCompartment;
 class DebugModeOSRVolatileJitFrameIterator;
 } // namespace jit
 
@@ -62,8 +61,6 @@ extern void
 TraceCycleDetectionSet(JSTracer* trc, ObjectSet& set);
 
 struct AutoResolving;
-class DtoaCache;
-class RegExpStatics;
 
 namespace frontend { struct CompileError; }
 
@@ -428,6 +425,7 @@ struct JSContext : public js::ExclusiveContext,
     bool getPendingException(JS::MutableHandleValue rval);
 
     bool isThrowingOutOfMemory();
+    bool isClosingGenerator();
 
     void setPendingException(js::Value v);
 
@@ -661,44 +659,9 @@ CheckForInterrupt(JSContext* cx)
 
 /************************************************************************/
 
-class AutoStringVector : public AutoVectorRooter<JSString*>
-{
-  public:
-    explicit AutoStringVector(JSContext* cx
-                              MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<JSString*>(cx, STRINGVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoPropertyNameVector : public AutoVectorRooter<PropertyName*>
-{
-  public:
-    explicit AutoPropertyNameVector(JSContext* cx
-                                    MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<PropertyName*>(cx, STRINGVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoShapeVector : public AutoVectorRooter<Shape*>
-{
-  public:
-    explicit AutoShapeVector(JSContext* cx
-                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<Shape*>(cx, SHAPEVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
+typedef JS::AutoVectorRooter<JSString*> AutoStringVector;
+typedef JS::AutoVectorRooter<PropertyName*> AutoPropertyNameVector;
+typedef JS::AutoVectorRooter<Shape*> AutoShapeVector;
 
 class AutoObjectObjectHashMap : public AutoHashMapRooter<JSObject*, JSObject*>
 {
@@ -822,7 +785,8 @@ bool intrinsic_IsObject(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_ToInteger(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_ToString(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_IsCallable(JSContext* cx, unsigned argc, Value* vp);
-bool intrinsic_ThrowError(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_ThrowRangeError(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_ThrowTypeError(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_NewDenseArray(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_IsConstructing(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_SubstringKernel(JSContext* cx, unsigned argc, Value* vp);
@@ -841,8 +805,19 @@ bool intrinsic_IsSuspendedStarGenerator(JSContext* cx, unsigned argc, Value* vp)
 bool intrinsic_IsArrayIterator(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_IsStringIterator(JSContext* cx, unsigned argc, Value* vp);
 
+bool intrinsic_IsArrayBuffer(JSContext* cx, unsigned argc, Value* vp);
+
 bool intrinsic_IsTypedArray(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_IsPossiblyWrappedTypedArray(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_TypedArrayBuffer(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_TypedArrayByteOffset(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_TypedArrayElementShift(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_TypedArrayLength(JSContext* cx, unsigned argc, Value* vp);
+
+bool intrinsic_MoveTypedArrayElements(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_SetFromTypedArrayApproach(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_SetDisjointTypedElements(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_SetOverlappingTypedElements(JSContext* cx, unsigned argc, Value* vp);
 
 class AutoLockForExclusiveAccess
 {

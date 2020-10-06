@@ -323,7 +323,8 @@ class StartRequestEvent : public ChannelEvent
                     const nsCString& cachedCharset,
                     const nsCString& securityInfoSerialization,
                     const NetAddr& selfAddr,
-                    const NetAddr& peerAddr)
+                    const NetAddr& peerAddr,
+                    const HttpChannelCacheKey& cacheKey)
   : mChild(child)
   , mChannelStatus(channelStatus)
   , mResponseHead(responseHead)
@@ -336,6 +337,7 @@ class StartRequestEvent : public ChannelEvent
   , mSecurityInfoSerialization(securityInfoSerialization)
   , mSelfAddr(selfAddr)
   , mPeerAddr(peerAddr)
+  , mCacheKey(cacheKey)
   {}
 
   void Run()
@@ -344,7 +346,8 @@ class StartRequestEvent : public ChannelEvent
     mChild->OnStartRequest(mChannelStatus, mResponseHead, mUseResponseHead,
                            mRequestHeaders, mIsFromCache, mCacheEntryAvailable,
                            mCacheExpirationTime, mCachedCharset,
-                           mSecurityInfoSerialization, mSelfAddr, mPeerAddr);
+                           mSecurityInfoSerialization, mSelfAddr, mPeerAddr,
+                           mCacheKey);
   }
  private:
   HttpChannelChild* mChild;
@@ -359,6 +362,7 @@ class StartRequestEvent : public ChannelEvent
   nsCString mSecurityInfoSerialization;
   NetAddr mSelfAddr;
   NetAddr mPeerAddr;
+  HttpChannelCacheKey mCacheKey;
 };
 
 bool
@@ -373,7 +377,8 @@ HttpChannelChild::RecvOnStartRequest(const nsresult& channelStatus,
                                      const nsCString& securityInfoSerialization,
                                      const NetAddr& selfAddr,
                                      const NetAddr& peerAddr,
-                                     const int16_t& redirectCount)
+                                     const int16_t& redirectCount,
+                                     const HttpChannelCacheKey& cacheKey)
 {
   LOG(("HttpChannelChild::RecvOnStartRequest [this=%p]\n", this));
   // mFlushedForDiversion and mDivertingToParent should NEVER be set at this
@@ -392,12 +397,12 @@ HttpChannelChild::RecvOnStartRequest(const nsresult& channelStatus,
                                            isFromCache, cacheEntryAvailable,
                                            cacheExpirationTime, cachedCharset,
                                            securityInfoSerialization, selfAddr,
-                                           peerAddr));
+                                           peerAddr, cacheKey));
   } else {
     OnStartRequest(channelStatus, responseHead, useResponseHead, requestHeaders,
                    isFromCache, cacheEntryAvailable, cacheExpirationTime,
                    cachedCharset, securityInfoSerialization, selfAddr,
-                   peerAddr);
+                   peerAddr, cacheKey);
   }
   return true;
 }
@@ -413,7 +418,8 @@ HttpChannelChild::OnStartRequest(const nsresult& channelStatus,
                                  const nsCString& cachedCharset,
                                  const nsCString& securityInfoSerialization,
                                  const NetAddr& selfAddr,
-                                 const NetAddr& peerAddr)
+                                 const NetAddr& peerAddr,
+                                 const HttpChannelCacheKey& cacheKey)
 {
   LOG(("HttpChannelChild::OnStartRequest [this=%p]\n", this));
 
@@ -440,6 +446,10 @@ HttpChannelChild::OnStartRequest(const nsresult& channelStatus,
   mCacheEntryAvailable = cacheEntryAvailable;
   mCacheExpirationTime = cacheExpirationTime;
   mCachedCharset = cachedCharset;
+
+  nsRefPtr<nsHttpChannelCacheKey> tmpKey = new nsHttpChannelCacheKey();
+  tmpKey->SetData(cacheKey.postId(), cacheKey.key());
+  CallQueryInterface(tmpKey.get(), getter_AddRefs(mCacheKey));
 
   AutoEventEnqueuer ensureSerialDispatch(mEventQ);
 
@@ -989,6 +999,14 @@ void
 HttpChannelChild::DeleteSelf()
 {
   Send__delete__(this);
+}
+
+bool
+HttpChannelChild::RecvReportSecurityMessage(const nsString& messageTag,
+                                            const nsString& messageCategory)
+{
+  AddSecurityMessage(messageTag, messageCategory);
+  return true;
 }
 
 class Redirect1Event : public ChannelEvent
@@ -1641,6 +1659,20 @@ HttpChannelChild::ContinueAsyncOpen()
   
   openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
+  if (mCacheKey) {
+    uint32_t postId;
+    nsAutoCString key;
+    nsresult rv = static_cast<nsHttpChannelCacheKey *>(
+      static_cast<nsISupportsPRUint32 *>(mCacheKey.get()))->GetData(&postId,
+                                                                    key);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    openArgs.cacheKey() = HttpChannelCacheKey(postId, key);
+  } else {
+    openArgs.cacheKey() = mozilla::void_t();
+  }
+
   propagateLoadInfo(mLoadInfo, openArgs);
 
   // The socket transport in the chrome process now holds a logical ref to us
@@ -1794,6 +1826,21 @@ HttpChannelChild::GetAllowStaleCacheContent(bool *aAllowStaleCacheContent)
 {
   NS_ENSURE_ARG(aAllowStaleCacheContent);
   *aAllowStaleCacheContent = mAllowStaleCacheContent;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpChannelChild::GetCacheKey(nsISupports **cacheKey)
+{
+  NS_IF_ADDREF(*cacheKey = mCacheKey);
+  return NS_OK;
+}
+NS_IMETHODIMP
+HttpChannelChild::SetCacheKey(nsISupports *cacheKey)
+{
+  ENSURE_CALLED_BEFORE_ASYNC_OPEN();
+
+  mCacheKey = cacheKey;
   return NS_OK;
 }
 

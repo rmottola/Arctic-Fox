@@ -27,6 +27,7 @@ const WATERFALL_SIDEBAR_WIDTH = 150; // px
 const WATERFALL_IMMEDIATE_DRAW_MARKERS_COUNT = 30;
 const WATERFALL_FLUSH_OUTSTANDING_MARKERS_DELAY = 75; // ms
 
+const FIND_OPTIMAL_TICK_INTERVAL_MAX_ITERS = 100;
 const WATERFALL_HEADER_TICKS_MULTIPLE = 5; // ms
 const WATERFALL_HEADER_TICKS_SPACING_MIN = 50; // px
 const WATERFALL_HEADER_TEXT_PADDING = 3; // px
@@ -431,9 +432,7 @@ Waterfall.prototype = {
     sidebar.setAttribute("align", "center");
 
     let bullet = this._document.createElement("hbox");
-    bullet.className = "waterfall-marker-bullet";
-    bullet.style.backgroundColor = blueprint.fill;
-    bullet.style.borderColor = blueprint.stroke;
+    bullet.className = `waterfall-marker-bullet ${blueprint.colorName}`;
     bullet.setAttribute("type", marker.name);
     sidebar.appendChild(bullet);
 
@@ -482,12 +481,8 @@ Waterfall.prototype = {
     let offset = this._isRTL ? this._waterfallWidth : 0;
 
     let bar = this._document.createElement("hbox");
-    bar.className = "waterfall-marker-bar";
-    bar.style.backgroundColor = blueprint.fill;
-    bar.style.borderColor = blueprint.stroke;
+    bar.className = `waterfall-marker-bar ${blueprint.colorName}`;
     bar.style.transform = "translateX(" + (start - offset) + "px)";
-    // Save border color. It will change when marker is selected.
-    bar.setAttribute("borderColor", blueprint.stroke);
     bar.setAttribute("type", marker.name);
     bar.setAttribute("width", Math.max(width, WATERFALL_MARKER_BAR_WIDTH_MIN));
     waterfall.appendChild(bar);
@@ -575,9 +570,18 @@ Waterfall.prototype = {
    */
   _findOptimalTickInterval: function({ ticksMultiple, ticksSpacingMin, dataScale }) {
     let timingStep = ticksMultiple;
+    let maxIters = FIND_OPTIMAL_TICK_INTERVAL_MAX_ITERS;
+    let numIters = 0;
+
+    if (dataScale > ticksSpacingMin) {
+      return dataScale;
+    }
 
     while (true) {
       let scaledStep = dataScale * timingStep;
+      if (++numIters > maxIters) {
+        return scaledStep;
+      }
       if (scaledStep < ticksSpacingMin) {
         timingStep <<= 1;
         continue;

@@ -9,7 +9,6 @@ XPIDL_SOURCES += [
     'nsIConsoleMessage.idl',
     'nsIConsoleService.idl',
     'nsICycleCollectorListener.idl',
-    'nsIDebug.idl',
     'nsIDebug2.idl',
     'nsIErrorService.idl',
     'nsIException.idl',
@@ -26,7 +25,6 @@ XPIDL_SOURCES += [
     'nsISupports.idl',
     'nsIUUIDGenerator.idl',
     'nsIVersionComparator.idl',
-    'nsIVisualEventTracer.idl',
     'nsIWeakReference.idl',
     'nsrootidl.idl',
 ]
@@ -49,6 +47,7 @@ EXPORTS += [
     'nscore.h',
     'nsCycleCollector.h',
     'nsDebugImpl.h',
+    'nsDumpUtils.h',
     'nsError.h',
     'nsGZFileWriter.h',
     'nsIID.h',
@@ -66,9 +65,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
     EXPORTS += [
         'nsWindowsHelpers.h',
     ]
-    if CONFIG['MOZ_DEBUG']:
-        EXPORTS += ['pure.h']
-        SOURCES += ['pure_api.c']
 
 EXPORTS.mozilla += [
     'AvailableMemoryTracker.h',
@@ -76,6 +72,8 @@ EXPORTS.mozilla += [
     'CountingAllocatorBase.h',
     'CycleCollectedJSRuntime.h',
     'Debug.h',
+    'DebuggerOnGCRunnable.h',
+    'DeferredFinalize.h',
     'ErrorNames.h',
     'HoldDropJSObjects.h',
     'LinuxUtils.h',
@@ -84,7 +82,6 @@ EXPORTS.mozilla += [
     'StaticMutex.h',
     'StaticPtr.h',
     'SystemMemoryReporter.h',
-    'VisualEventTracer.h',
 ]
 
 # nsDebugImpl isn't unified because we disable PGO so that NS_ABORT_OOM isn't
@@ -99,6 +96,8 @@ UNIFIED_SOURCES += [
     'ClearOnShutdown.cpp',
     'CycleCollectedJSRuntime.cpp',
     'Debug.cpp',
+    'DebuggerOnGCRunnable.cpp',
+    'DeferredFinalize.cpp',
     'ErrorNames.cpp',
     'HoldDropJSObjects.cpp',
     'nsConsoleMessage.cpp',
@@ -118,7 +117,6 @@ UNIFIED_SOURCES += [
     'nsTraceRefcnt.cpp',
     'nsUUIDGenerator.cpp',
     'nsVersionComparatorImpl.cpp',
-    'VisualEventTracer.cpp',
 ]
 
 # MOZ_STACKWALKING is defined in configure.in when the build configuration meets
@@ -145,8 +143,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     SOURCES += [
         'nsCrashOnException.cpp',
     ]
-
-MSVC_ENABLE_PGO = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

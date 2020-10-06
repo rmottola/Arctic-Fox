@@ -44,15 +44,18 @@
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
+- Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
+- Bug 1244650 - Failure to clear Forms and Search Data on exit. r
 - Bug 1243549 - Add missing bits. r=post-facto 
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
+- Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
@@ -61,7 +64,9 @@
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
+Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
@@ -101,6 +106,7 @@
 - Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
+- Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
@@ -113,6 +119,7 @@
 - 1155788 - Make the Ion inner-window optimizations work again. 
 - 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
+- Bug 1164602 - Replace js::NullPtr and JS::NullPtr with nullptr_t; r=s
 - Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
 - Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
@@ -123,13 +130,20 @@
 -  1102048 style patches, check which still apply
 - Bug 1094888 - part 1 and 2
 
-- Bug 1144366 followup - Stop declaring multiple pointers on a single line
+https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
-- Bug 1097987
 -  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
 - Bug 1151981 - Remove the void* marking functions;
 - Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
 - Bug 1149352 - Part 0 to 11
+
+Unboxed Object (enabled - make Forum Manjaro Linux crash)
+- Bug 1162199 - Use unboxed objects by default, r=jandem. 
+
+impacting download and shutdown:
+Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
+Bug 1150855 - Remove uses of the curly syntax. r=jaws
+Bug 875648 - Use Downloads.jsm functions to get download directories
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
@@ -140,7 +154,9 @@ More session store stuff to check:
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 - Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
 
+Lightweight themes stuff:
 
+- Bug 1148996 - Install a devedition lightweight theme on startup, then
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
@@ -224,3 +240,11 @@ https://github.com/classilla/tenfourfox/issues/526
 * Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
 * Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
 * AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
+# Backlog of Mozilla patches:
+(grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
+
+- Bug 1533969 - Fix build error with newer glibc. (gettid)
+
+- Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
+- 1499861 - issues when backporting on other collections
+- 1477632 - Always inline PLDHashTable::SearchTable(

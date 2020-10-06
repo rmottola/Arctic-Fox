@@ -62,6 +62,10 @@ const Strings = Services.strings.createBundle("chrome://global/locale/devtools/w
  * |name| field
  *   A user-visible label to identify the runtime that will be displayed in a
  *   runtime list.
+ * |prolongedConnection| field
+ *   A boolean value which should be |true| if the connection process is
+ *   expected to take a unknown or large amount of time.  A UI may use this as a
+ *   hint to skip timeouts or other time-based code paths.
  * connect()
  *   Configure the passed |connection| object with any settings need to
  *   successfully connect to the runtime, and call the |connection|'s connect()
@@ -202,7 +206,7 @@ let SimulatorScanner = {
   },
 
   _updateRuntimes() {
-    Simulators.getAll().then(simulators => {
+    Simulators.findSimulators().then(simulators => {
       this._runtimes = [];
       for (let simulator of simulators) {
         this._runtimes.push(new SimulatorRuntime(simulator));
@@ -429,6 +433,9 @@ function WiFiRuntime(deviceName) {
 }
 
 WiFiRuntime.prototype = {
+  type: RuntimeTypes.WIFI,
+  // Mark runtime as taking a long time to connect
+  prolongedConnection: true,
   connect: function(connection) {
     let service = discovery.getRemoteService("devtools", this.deviceName);
     if (!service) {
@@ -436,6 +443,10 @@ WiFiRuntime.prototype = {
     }
     connection.advertisement = service;
     connection.authenticator.sendOOB = this.sendOOB;
+    // Disable the default connection timeout, since QR scanning can take an
+    // unknown amount of time.  This prevents spurious errors (even after
+    // eventual success) from being shown.
+    connection.timeoutDelay = 0;
     connection.connect();
     return promise.resolve();
   },
@@ -530,6 +541,7 @@ function SimulatorRuntime(simulator) {
 }
 
 SimulatorRuntime.prototype = {
+  type: RuntimeTypes.SIMULATOR,
   connect: function(connection) {
     return this.simulator.launch().then(port => {
       connection.host = "localhost";
@@ -538,6 +550,9 @@ SimulatorRuntime.prototype = {
       connection.once(Connection.Events.DISCONNECTED, e => this.simulator.kill());
       connection.connect();
     });
+  },
+  configure() {
+    Simulators.emit("configure", this.simulator);
   },
   get id() {
     return this.simulator.id;
@@ -551,11 +566,13 @@ SimulatorRuntime.prototype = {
 exports._SimulatorRuntime = SimulatorRuntime;
 
 let gLocalRuntime = {
+  type: RuntimeTypes.LOCAL,
   connect: function(connection) {
     if (!DebuggerServer.initialized) {
       DebuggerServer.init();
       DebuggerServer.addBrowserActors();
     }
+    DebuggerServer.allowChromeProcess = true;
     connection.host = null; // Force Pipe transport
     connection.port = null;
     connection.connect();
@@ -573,6 +590,7 @@ let gLocalRuntime = {
 exports._gLocalRuntime = gLocalRuntime;
 
 let gRemoteRuntime = {
+  type: RuntimeTypes.REMOTE,
   connect: function(connection) {
     let win = Services.wm.getMostRecentWindow("devtools:webide");
     if (!win) {

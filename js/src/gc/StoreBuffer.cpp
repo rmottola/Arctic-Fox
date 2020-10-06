@@ -16,91 +16,11 @@
 
 using namespace js;
 using namespace js::gc;
-using mozilla::ReentrancyGuard;
-
-/*** Edges ***/
 
 void
-StoreBuffer::SlotsEdge::mark(JSTracer* trc) const
+StoreBuffer::GenericBuffer::trace(StoreBuffer* owner, JSTracer* trc)
 {
-    NativeObject* obj = object();
-
-    // Beware JSObject::swap exchanging a native object for a non-native one.
-    if (!obj->isNative())
-        return;
-
-    if (IsInsideNursery(obj))
-        return;
-
-    if (kind() == ElementKind) {
-        int32_t initLen = obj->getDenseInitializedLength();
-        int32_t clampedStart = Min(start_, initLen);
-        int32_t clampedEnd = Min(start_ + count_, initLen);
-        gc::MarkArraySlots(trc, clampedEnd - clampedStart,
-                           obj->getDenseElements() + clampedStart, "element");
-    } else {
-        int32_t start = Min(uint32_t(start_), obj->slotSpan());
-        int32_t end = Min(uint32_t(start_) + count_, obj->slotSpan());
-        MOZ_ASSERT(end >= start);
-        MarkObjectSlots(trc, obj, start, end - start);
-    }
-}
-
-void
-StoreBuffer::WholeCellEdges::mark(JSTracer *trc) const
-{
-    MOZ_ASSERT(edge->isTenured());
-    JSGCTraceKind kind = GetGCThingTraceKind(edge);
-    if (kind <= JSTRACE_OBJECT) {
-        JSObject *object = static_cast<JSObject *>(edge);
-        if (object->is<ArgumentsObject>())
-            ArgumentsObject::trace(trc, object);
-        object->markChildren(trc);
-        return;
-    }
-    MOZ_ASSERT(kind == JSTRACE_JITCODE);
-    static_cast<jit::JitCode*>(edge)->trace(trc);
-}
-
-void
-StoreBuffer::CellPtrEdge::mark(JSTracer *trc) const
-{
-    if (!*edge)
-        return;
-
-    MOZ_ASSERT(GetGCThingTraceKind(*edge) == JSTRACE_OBJECT);
-    MarkObjectRoot(trc, reinterpret_cast<JSObject**>(edge), "store buffer edge");
-}
-
-void
-StoreBuffer::ValueEdge::mark(JSTracer* trc) const
-{
-    if (!deref())
-        return;
-
-    MarkValueRoot(trc, edge, "store buffer edge");
-}
-
-/*** MonoTypeBuffer ***/
-
-template <typename T>
-void
-StoreBuffer::MonoTypeBuffer<T>::mark(StoreBuffer* owner, JSTracer* trc)
-{
-    ReentrancyGuard g(*owner);
-    MOZ_ASSERT(owner->isEnabled());
-    MOZ_ASSERT(stores_.initialized());
-    sinkStores(owner);
-    for (typename StoreSet::Range r = stores_.all(); !r.empty(); r.popFront())
-        r.front().mark(trc);
-}
-
-/*** GenericBuffer ***/
-
-void
-StoreBuffer::GenericBuffer::mark(StoreBuffer* owner, JSTracer* trc)
-{
-    ReentrancyGuard g(*owner);
+    mozilla::ReentrancyGuard g(*owner);
     MOZ_ASSERT(owner->isEnabled());
     if (!storage_)
         return;
@@ -109,12 +29,10 @@ StoreBuffer::GenericBuffer::mark(StoreBuffer* owner, JSTracer* trc)
         unsigned size = *e.get<unsigned>();
         e.popFront<unsigned>();
         BufferableRef* edge = e.get<BufferableRef>(size);
-        edge->mark(trc);
+        edge->trace(trc);
         e.popFront(size);
     }
 }
-
-/*** StoreBuffer ***/
 
 bool
 StoreBuffer::enable()
@@ -165,18 +83,6 @@ StoreBuffer::clear()
     bufferGeneric.clear();
 
     return true;
-}
-
-void
-StoreBuffer::markAll(JSTracer* trc)
-{
-    bufferVal.mark(this, trc);
-    bufferCell.mark(this, trc);
-    bufferSlot.mark(this, trc);
-    bufferWholeCell.mark(this, trc);
-    bufferRelocVal.mark(this, trc);
-    bufferRelocCell.mark(this, trc);
-    bufferGeneric.mark(this, trc);
 }
 
 void

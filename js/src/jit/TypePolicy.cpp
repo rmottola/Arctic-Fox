@@ -1003,12 +1003,15 @@ StoreTypedArrayElementStaticPolicy::adjustInputs(TempAllocator& alloc, MInstruct
 bool
 StoreUnboxedObjectOrNullPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
-    SingleObjectPolicy::staticAdjustInputs(alloc, ins);
+    ObjectPolicy<0>::staticAdjustInputs(alloc, ins);
+    ObjectPolicy<3>::staticAdjustInputs(alloc, ins);
 
     // Change the value input to a ToObjectOrNull instruction if it might be
     // a non-null primitive. Insert a post barrier for the instruction's object
     // and whatever its new value is, unless the value is definitely null.
     MStoreUnboxedObjectOrNull* store = ins->toStoreUnboxedObjectOrNull();
+
+    MOZ_ASSERT(store->typedObj()->type() == MIRType_Object);
 
     MDefinition* value = store->value();
     if (value->type() == MIRType_Object ||
@@ -1143,7 +1146,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(FloatingPointPolicy<0>)                                           \
     _(IntPolicy<0>)                                                     \
     _(IntPolicy<1>)                                                     \
-    _(Mix3Policy<ObjectPolicy<0>, BoxExceptPolicy<1, MIRType_String>, BoxPolicy<2> >) \
+    _(Mix3Policy<ObjectPolicy<0>, StringPolicy<1>, BoxPolicy<2> >) \
     _(Mix3Policy<ObjectPolicy<0>, BoxPolicy<1>, BoxPolicy<2> >)         \
     _(Mix3Policy<ObjectPolicy<0>, BoxPolicy<1>, ObjectPolicy<2> >)      \
     _(Mix3Policy<ObjectPolicy<0>, IntPolicy<1>, BoxPolicy<2> >)         \
@@ -1152,6 +1155,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(Mix3Policy<StringPolicy<0>, IntPolicy<1>, IntPolicy<2>>)          \
     _(Mix3Policy<StringPolicy<0>, ObjectPolicy<1>, StringPolicy<2> >)   \
     _(Mix3Policy<StringPolicy<0>, StringPolicy<1>, StringPolicy<2> >)   \
+    _(Mix4Policy<ObjectPolicy<0>, StringPolicy<1>, BoxPolicy<2>, BoxPolicy<3>>) \
     _(Mix4Policy<ObjectPolicy<0>, IntPolicy<1>, IntPolicy<2>, IntPolicy<3>>) \
     _(Mix4Policy<SimdScalarPolicy<0>, SimdScalarPolicy<1>, SimdScalarPolicy<2>, SimdScalarPolicy<3> >) \
     _(MixPolicy<BoxPolicy<0>, ObjectPolicy<1> >)                        \

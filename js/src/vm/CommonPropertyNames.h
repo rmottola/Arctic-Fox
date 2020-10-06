@@ -192,12 +192,16 @@
     macro(signMask, signMask, "signMask") \
     macro(source, source, "source") \
     macro(stack, stack, "stack") \
+    macro(star, star, "*") \
+    macro(starDefaultStar, starDefaultStar, "*default*") \
     macro(startTimestamp, startTimestamp, "startTimestamp") \
     macro(static, static_, "static") \
     macro(sticky, sticky, "sticky") \
     macro(strings, strings, "strings") \
     macro(StructType, StructType, "StructType") \
     macro(style, style, "style") \
+    macro(super, super, "super") \
+    macro(target, target, "target") \
     macro(test, test, "test") \
     macro(throw, throw_, "throw") \
     macro(timestamp, timestamp, "timestamp") \

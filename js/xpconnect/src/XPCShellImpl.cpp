@@ -574,7 +574,7 @@ XPCShellInterruptCallback(JSContext* cx)
 
     JSAutoCompartment ac(cx, &callback.toObject());
     RootedValue rv(cx);
-    if (!JS_CallFunctionValue(cx, JS::NullPtr(), callback, JS::HandleValueArray::empty(), &rv) ||
+    if (!JS_CallFunctionValue(cx, nullptr, callback, JS::HandleValueArray::empty(), &rv) ||
         !rv.isBoolean())
     {
         NS_WARNING("Scripted interrupt callback failed! Terminating script.");

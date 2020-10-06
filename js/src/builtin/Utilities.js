@@ -10,7 +10,8 @@
 */
 
 /*global ToObject: false, ToInteger: false, IsCallable: false,
-         ThrowError: false, AssertionFailed: false,
+         ThrowRangeError: false, ThrowTypeError: false,
+         AssertionFailed: false,
          MakeConstructible: false, DecompileArg: false,
          RuntimeDefaultLocale: false,
          ParallelDo: false, ParallelSlices: false, NewDenseArray: false,
@@ -92,7 +93,7 @@ function ToNumber(v) {
 /* Spec: ECMAScript Language Specification, 5.1 edition, 9.10 */
 function CheckObjectCoercible(v) {
     if (v === undefined || v === null)
-        ThrowError(JSMSG_CANT_CONVERT_TO, ToString(v), "object");
+        ThrowTypeError(JSMSG_CANT_CONVERT_TO, ToString(v), "object");
 }
 
 /* Spec: ECMAScript Draft, 6 edition May 22, 2014, 7.1.15 */
@@ -125,7 +126,7 @@ function GetMethod(O, P) {
 
     // Step 5.
     if (!IsCallable(func))
-        ThrowError(JSMSG_NOT_FUNCTION, typeof func);
+        ThrowTypeError(JSMSG_NOT_FUNCTION, typeof func);
 
     // Step 6.
     return func;
@@ -148,7 +149,7 @@ function GetIterator(obj, method) {
 
     // Step 5.
     if (!IsObject(iterator))
-        ThrowError(JSMSG_NOT_ITERABLE, ToString(iterator));
+        ThrowTypeError(JSMSG_NOT_ITERABLE, ToString(iterator));
 
     // Step 6.
     return iterator;
@@ -165,13 +166,34 @@ function GetBuiltinPrototype(builtinName) {
     return (_builtinCtorsCache[builtinName] || GetBuiltinConstructor(builtinName)).prototype;
 }
 
+// ES6 draft 20150317 7.3.20.
 function SpeciesConstructor(obj, defaultConstructor) {
-    var C = obj.constructor;
-    if (C === undefined) {
+    // Step 1.
+    assert(IsObject(obj), "not passed an object");
+
+    // Steps 2-3.
+    var ctor = obj.constructor;
+
+    // Step 4.
+    if (ctor === undefined)
         return defaultConstructor;
-    }
-    if (!IsConstructor(C)) {
-        ThrowError(JSMSG_NOT_CONSTRUCTOR, DecompileArg(1, C));
-    }
-    return C;
+
+    // Step 5.
+    if (!IsObject(ctor))
+        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, "object's 'constructor' property");
+
+    // Steps 6-7.  We don't yet implement @@species and Symbol.species, so we
+    // don't implement this correctly right now.  Somebody fix this!
+    var s = /* ctor[Symbol.species] */ undefined;
+
+    // Step 8.
+    if (s === undefined || s === null)
+        return defaultConstructor;
+
+    // Step 9.
+    if (IsConstructor(s))
+        return s;
+
+    // Step 10.
+    ThrowTypeError(JSMSG_NOT_CONSTRUCTOR, "@@species property of object's constructor");
 }

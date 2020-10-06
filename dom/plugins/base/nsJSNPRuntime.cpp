@@ -163,7 +163,7 @@ NPClass nsJSObjWrapper::sJSObjWrapperNPClass =
   };
 
 static bool
-NPObjWrapper_AddProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp);
+NPObjWrapper_AddProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id, JS::Handle<JS::Value> v);
 
 static bool
 NPObjWrapper_DelProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
@@ -214,6 +214,7 @@ const static js::Class sNPObjectJSWrapperClass =
     NPObjWrapper_SetProperty,
     nullptr,
     NPObjWrapper_Resolve,
+    nullptr,                                                /* mayResolve */
     NPObjWrapper_Convert,
     NPObjWrapper_Finalize,
     NPObjWrapper_Call,
@@ -266,7 +267,7 @@ static const JSClass sNPObjectMemberClass =
   {
     "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS,
     nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, NPObjectMember_Convert,
+    nullptr, nullptr, nullptr, NPObjectMember_Convert,
     NPObjectMember_Finalize, NPObjectMember_Call,
     nullptr, nullptr, NPObjectMember_Trace
   };
@@ -1254,7 +1255,7 @@ GetNPObject(JSContext *cx, JS::Handle<JSObject*> aObj)
 // Does not actually add a property because this is always followed by a
 // SetProperty call.
 static bool
-NPObjWrapper_AddProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp)
+NPObjWrapper_AddProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id, JS::Handle<JS::Value> v)
 {
   NPObject *npobj = GetNPObject(cx, obj);
 

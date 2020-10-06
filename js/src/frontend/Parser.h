@@ -70,9 +70,6 @@ struct GenericParseContext
     // The following flags are set when parsing enters a particular region of
     // source code, and cleared when that region is exited.
 
-    // true while parsing init expr of for; exclude 'in'
-    bool parsingForInit:1;
-
     // true while we are within a with-statement in the current ParseContext
     // chain (which stops at the top-level or an eval()
     bool parsingWith:1;
@@ -82,7 +79,6 @@ struct GenericParseContext
         sc(sc),
         funHasReturnExpr(false),
         funHasReturnVoid(false),
-        parsingForInit(false),
         parsingWith(parent ? parent->parsingWith : false)
     {}
 };
@@ -327,8 +323,15 @@ struct BindData;
 class CompExprTransplanter;
 
 enum VarContext { HoistVars, DontHoistVars };
-enum FunctionType { Getter, Setter, Normal };
 enum PropListType { ObjectLiteral, ClassBody };
+
+// Specify a value for an ES6 grammar parametrization.  We have no enum for
+// [Return] because its behavior is exactly equivalent to checking whether
+// we're in a function box -- easier and simpler than passing an extra
+// parameter everywhere.
+enum YieldHandling { YieldIsName, YieldIsKeyword };
+enum InHandling { InAllowed, InProhibited };
+enum DefaultHandling { NameRequired, AllowDefaultName };
 
 template <typename ParseHandler>
 class Parser : private JS::AutoGCRooter, public StrictModeGetter
@@ -439,7 +442,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
      * Create a new function object given a name (which is optional if this is
      * a function expression).
      */
-    JSFunction* newFunction(HandleAtom atom, FunctionSyntaxKind kind, HandleObject proto);
+    JSFunction* newFunction(HandleAtom atom, FunctionSyntaxKind kind, GeneratorKind generatorKind,
+                            HandleObject proto);
 
     void trace(JSTracer* trc);
 
@@ -459,10 +463,11 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
 
     Node stringLiteral();
     Node noSubstitutionTemplate();
-    Node templateLiteral();
-    bool taggedTemplate(Node nodeList, TokenKind tt);
+    Node templateLiteral(YieldHandling yieldHandling);
+    bool taggedTemplate(YieldHandling yieldHandling, Node nodeList, TokenKind tt);
     bool appendToCallSiteObj(Node callSiteObj);
-    bool addExprAndGetNextTemplStrToken(Node nodeList, TokenKind* ttp);
+    bool addExprAndGetNextTemplStrToken(YieldHandling yieldHandling, Node nodeList,
+                                        TokenKind* ttp);
 
     inline Node newName(PropertyName* name);
     inline Node newYieldExpression(uint32_t begin, Node expr, bool isYieldStar = false);
@@ -470,9 +475,9 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     inline bool abortIfSyntaxParser();
 
   public:
-
     /* Public entry points for parsing. */
-    Node statement(bool canHaveDirectives = false);
+    Node statement(YieldHandling yieldHandling, bool canHaveDirectives = false);
+
     bool maybeParseDirective(Node list, Node pn, bool* cont);
 
     // Parse a function, given only its body. Used for the Function and
@@ -491,10 +496,11 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
      * statements; pass ExpressionBody if the body is a single expression.
      */
     enum FunctionBodyType { StatementListBody, ExpressionBody };
-    Node functionBody(FunctionSyntaxKind kind, FunctionBodyType type);
+    Node functionBody(InHandling inHandling, YieldHandling yieldHandling, FunctionSyntaxKind kind,
+                      FunctionBodyType type);
 
-    bool functionArgsAndBodyGeneric(Node pn, HandleFunction fun, FunctionType type,
-                                    FunctionSyntaxKind kind);
+    bool functionArgsAndBodyGeneric(InHandling inHandling, YieldHandling yieldHandling, Node pn,
+                                    HandleFunction fun, FunctionSyntaxKind kind);
 
     // Determine whether |yield| is a valid name in the current context, or
     // whether it's prohibited due to strictness, JS version, or occurrence
@@ -516,6 +522,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
 
   private:
     enum InvokedPrediction { PredictUninvoked = false, PredictInvoked = true };
+    enum ForInitLocation { InForInit, NotInForInit };
 
   private:
     /*
@@ -534,65 +541,78 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
      * Some parsers have two versions:  an always-inlined version (with an 'i'
      * suffix) and a never-inlined version (with an 'n' suffix).
      */
-    Node functionStmt();
+    Node functionStmt(YieldHandling yieldHandling, DefaultHandling defaultHandling);
     Node functionExpr(InvokedPrediction invoked = PredictUninvoked);
-    Node statements();
+    Node statements(YieldHandling yieldHandling);
 
-    Node blockStatement();
-    Node ifStatement();
-    Node doWhileStatement();
-    Node whileStatement();
-    Node forStatement();
-    Node switchStatement();
-    Node continueStatement();
-    Node breakStatement();
-    Node returnStatement();
-    Node withStatement();
-    Node labeledStatement();
-    Node throwStatement();
-    Node tryStatement();
+    Node blockStatement(YieldHandling yieldHandling);
+    Node ifStatement(YieldHandling yieldHandling);
+    Node doWhileStatement(YieldHandling yieldHandling);
+    Node whileStatement(YieldHandling yieldHandling);
+    Node forStatement(YieldHandling yieldHandling);
+    Node switchStatement(YieldHandling yieldHandling);
+    Node continueStatement(YieldHandling yieldHandling);
+    Node breakStatement(YieldHandling yieldHandling);
+    Node returnStatement(YieldHandling yieldHandling);
+    Node withStatement(YieldHandling yieldHandling);
+    Node labeledStatement(YieldHandling yieldHandling);
+    Node throwStatement(YieldHandling yieldHandling);
+    Node tryStatement(YieldHandling yieldHandling);
     Node debuggerStatement();
 
-    Node lexicalDeclaration(bool isConst);
+    Node lexicalDeclaration(YieldHandling yieldHandling, bool isConst);
     Node importDeclaration();
     Node exportDeclaration();
-    Node expressionStatement(InvokedPrediction invoked = PredictUninvoked);
-    Node variables(ParseNodeKind kind, bool* psimple = nullptr,
-                   StaticBlockObject* blockObj = nullptr,
+    Node expressionStatement(YieldHandling yieldHandling,
+                             InvokedPrediction invoked = PredictUninvoked);
+    Node variables(YieldHandling yieldHandling,
+                   ParseNodeKind kind,
+                   ForInitLocation location,
+                   bool* psimple = nullptr, StaticBlockObject* blockObj = nullptr,
                    VarContext varContext = HoistVars);
-    Node expr(InvokedPrediction invoked = PredictUninvoked);
-    Node assignExpr(InvokedPrediction invoked = PredictUninvoked);
-    Node assignExprWithoutYield(unsigned err);
-    Node yieldExpression();
-    Node condExpr1(InvokedPrediction invoked = PredictUninvoked);
-    Node orExpr1(InvokedPrediction invoked = PredictUninvoked);
-    Node unaryExpr(InvokedPrediction invoked = PredictUninvoked);
-    Node memberExpr(TokenKind tt, bool allowCallSyntax,
+    Node expr(InHandling inHandling, YieldHandling yieldHandling,
+              InvokedPrediction invoked = PredictUninvoked);
+    Node assignExpr(InHandling inHandling, YieldHandling yieldHandling,
                     InvokedPrediction invoked = PredictUninvoked);
-    Node primaryExpr(TokenKind tt, InvokedPrediction invoked = PredictUninvoked);
-    Node parenExprOrGeneratorComprehension();
-    Node exprInParens();
+    Node assignExprWithoutYield(YieldHandling yieldHandling, unsigned err);
+    Node yieldExpression(InHandling inHandling);
+    Node condExpr1(InHandling inHandling, YieldHandling yieldHandling,
+                   InvokedPrediction invoked = PredictUninvoked);
+    Node orExpr1(InHandling inHandling, YieldHandling yieldHandling,
+                 InvokedPrediction invoked = PredictUninvoked);
+    Node unaryExpr(YieldHandling yieldHandling, InvokedPrediction invoked = PredictUninvoked);
+    Node memberExpr(YieldHandling yieldHandling, TokenKind tt, bool allowCallSyntax,
+                    InvokedPrediction invoked = PredictUninvoked);
+    Node primaryExpr(YieldHandling yieldHandling, TokenKind tt,
+                     InvokedPrediction invoked = PredictUninvoked);
+    Node parenExprOrGeneratorComprehension(YieldHandling yieldHandling);
+    Node exprInParens(InHandling inHandling, YieldHandling yieldHandling);
 
-    bool methodDefinition(PropListType listType, Node propList, Node propname, FunctionType type,
-                          FunctionSyntaxKind kind, GeneratorKind generatorKind,
+    bool checkAllowedNestedSyntax(SharedContext::AllowedSyntax allowed,
+                                  SharedContext** allowingContext = nullptr);
+    bool tryNewTarget(Node& newTarget);
+    bool checkAndMarkSuperScope();
+
+    bool methodDefinition(YieldHandling yieldHandling, PropListType listType, Node propList,
+                          Node propname, FunctionSyntaxKind kind, GeneratorKind generatorKind,
                           bool isStatic, JSOp Op);
 
     /*
      * Additional JS parsers.
      */
-    bool functionArguments(FunctionSyntaxKind kind, FunctionType type, Node* list, Node funcpn,
-                           bool* hasRest);
+    bool functionArguments(YieldHandling yieldHandling, FunctionSyntaxKind kind, Node* list,
+                           Node funcpn, bool* hasRest);
 
-    Node functionDef(HandlePropertyName name, FunctionType type, FunctionSyntaxKind kind,
-                     GeneratorKind generatorKind, InvokedPrediction invoked = PredictUninvoked);
-    bool functionArgsAndBody(Node pn, HandleFunction fun,
-                             FunctionType type, FunctionSyntaxKind kind,
-                             GeneratorKind generatorKind,
+    Node functionDef(InHandling inHandling, YieldHandling uieldHandling, HandlePropertyName name,
+                     FunctionSyntaxKind kind, GeneratorKind generatorKind,
+                     InvokedPrediction invoked = PredictUninvoked);
+    bool functionArgsAndBody(InHandling inHandling, Node pn, HandleFunction fun,
+                             FunctionSyntaxKind kind, GeneratorKind generatorKind,
                              Directives inheritedDirectives, Directives* newDirectives);
 
-    Node unaryOpExpr(ParseNodeKind kind, JSOp op, uint32_t begin);
+    Node unaryOpExpr(YieldHandling yieldHandling, ParseNodeKind kind, JSOp op, uint32_t begin);
 
-    Node condition();
+    Node condition(InHandling inHandling, YieldHandling yieldHandling);
 
     Node generatorComprehensionLambda(GeneratorKind comprehensionKind, unsigned begin,
                                       Node innerStmt);
@@ -610,16 +630,20 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node arrayComprehension(uint32_t begin);
     Node generatorComprehension(uint32_t begin);
 
-    bool argumentList(Node listNode, bool* isSpread);
-    Node destructuringExpr(BindData<ParseHandler>* data, TokenKind tt);
-    Node destructuringExprWithoutYield(BindData<ParseHandler>* data, TokenKind tt, unsigned msg);
+    bool argumentList(YieldHandling yieldHandling, Node listNode, bool* isSpread);
+    Node destructuringExpr(YieldHandling yieldHandling, BindData<ParseHandler>* data,
+                           TokenKind tt);
+    Node destructuringExprWithoutYield(YieldHandling yieldHandling, BindData<ParseHandler>* data,
+                                       TokenKind tt, unsigned msg);
+
+    bool namedImportsOrNamespaceImport(TokenKind tt, Node importSpecSet);
 
     enum ClassContext { ClassStatement, ClassExpression };
-    Node classDefinition(ClassContext classContext);
+    Node classDefinition(YieldHandling yieldHandling, ClassContext classContext, DefaultHandling defaultHandling);
 
-    Node identifierName();
+    Node identifierName(YieldHandling yieldHandling);
 
-    bool matchLabel(MutableHandle<PropertyName*> label);
+    bool matchLabel(YieldHandling yieldHandling, MutableHandle<PropertyName*> label);
 
     bool allowsForEachIn() {
 #if !JS_HAS_FOR_EACH_IN
@@ -633,7 +657,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
         PlainAssignment,
         CompoundAssignment,
         KeyedDestructuringAssignment,
-        IncDecAssignment
+        IncrementAssignment,
+        DecrementAssignment
     };
 
     bool checkAndMarkAsAssignmentLhs(Node pn, AssignmentFlavor flavor);
@@ -649,8 +674,18 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     bool isValidForStatementLHS(Node pn1, JSVersion version, bool forDecl, bool forEach,
                                 ParseNodeKind headKind);
     bool checkForHeadConstInitializers(Node pn1);
-    bool checkAndMarkAsIncOperand(Node kid, TokenKind tt, bool preorder);
+
+    bool isValidSimpleAssignmentTarget(Node node);
+
+    // Invalid assignment targets are handled differently in different places.
+    // Select the desired semantics using |flavor|.
+    bool reportIfArgumentsEvalTarget(Node target);
+    bool reportIfNotValidSimpleAssignmentTarget(Node target, AssignmentFlavor flavor);
+
+    bool checkAndMarkAsIncOperand(Node kid, AssignmentFlavor flavor);
+
     bool checkStrictAssignment(Node lhs);
+
     bool checkStrictBinding(PropertyName* name, Node pn);
     bool defineArg(Node funcpn, HandlePropertyName name,
                    bool disallowDuplicateArgs = false, Node* duplicatedArg = nullptr);
@@ -658,23 +693,22 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node pushLexicalScope(Handle<StaticBlockObject*> blockObj, StmtInfoPC* stmt);
     Node pushLetScope(Handle<StaticBlockObject*> blockObj, StmtInfoPC* stmt);
     bool noteNameUse(HandlePropertyName name, Node pn);
-    Node computedPropertyName(Node literal);
-    Node arrayInitializer();
+    Node computedPropertyName(YieldHandling yieldHandling, Node literal);
+    Node arrayInitializer(YieldHandling yieldHandling);
     Node newRegExp();
 
-    Node propertyList(PropListType type);
+    Node propertyList(YieldHandling yieldHandling, PropListType type);
     Node newPropertyListNode(PropListType type);
 
     bool checkAndPrepareLexical(bool isConst, const TokenPos &errorPos);
     Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos &pos);
 
-    Node newBindingNode(PropertyName *name, bool functionScope, VarContext varContext = HoistVars);
-    bool checkDestructuring(BindData<ParseHandler> *data, Node left);
-    bool checkDestructuringObject(BindData<ParseHandler> *data, Node objectPattern);
-    bool checkDestructuringArray(BindData<ParseHandler> *data, Node arrayPattern);
-    bool bindInitialized(BindData<ParseHandler> *data, Node pn);
-    bool bindDestructuringLHS(Node pn);
-    bool makeSetCall(Node pn, unsigned msg);
+    Node newBindingNode(PropertyName* name, bool functionScope, VarContext varContext = HoistVars);
+    bool checkDestructuring(BindData<ParseHandler>* data, Node left);
+    bool checkDestructuringObject(BindData<ParseHandler>* data, Node objectPattern);
+    bool checkDestructuringArray(BindData<ParseHandler>* data, Node arrayPattern);
+    bool bindInitialized(BindData<ParseHandler>* data, Node pn);
+    bool makeSetCall(Node node, unsigned errnum);
     Node cloneDestructuringDefault(Node opn);
     Node cloneLeftHandSide(Node opn);
     Node cloneParseTree(Node opn);
@@ -713,16 +747,6 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     friend class LegacyCompExprTransplanter;
     friend struct BindData<ParseHandler>;
 };
-
-/* Declare some required template specializations. */
-
-template <>
-bool
-Parser<FullParseHandler>::checkAndMarkAsAssignmentLhs(ParseNode* pn, AssignmentFlavor flavor);
-
-template <>
-bool
-Parser<SyntaxParseHandler>::checkAndMarkAsAssignmentLhs(Node pn, AssignmentFlavor flavor);
 
 } /* namespace frontend */
 } /* namespace js */

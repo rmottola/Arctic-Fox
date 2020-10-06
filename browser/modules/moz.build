@@ -14,6 +14,7 @@ EXTRA_JS_MODULES += [
     'BrowserUITelemetry.jsm',
     'CastingApps.jsm',
     'ContentClick.jsm',
+    'ContentCrashReporters.jsm',
     'ContentLinkHandler.jsm',
     'ContentSearch.jsm',
     'E10SUtils.jsm',

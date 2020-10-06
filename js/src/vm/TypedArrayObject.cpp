@@ -233,9 +233,9 @@ class TypedArrayObjectTemplate : public TypedArrayObject
             return nullptr;
 
         return NewFunctionWithProto(cx, class_constructor, 3,
-                                    JSFunction::NATIVE_CTOR, NullPtr(),
+                                    JSFunction::NATIVE_CTOR, nullptr,
                                     ClassName(key, cx),
-                                    ctorProto, JSFunction::FinalizeKind,
+                                    ctorProto, gc::AllocKind::FUNCTION,
                                     SingletonObject);
     }
 
@@ -253,7 +253,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
 
         RootedFunction fun(cx);
         fun = NewNativeFunction(cx, ArrayBufferObject::createTypedArrayFromBuffer<NativeType>,
-                                0, NullPtr());
+                                0, nullptr);
         if (!fun)
             return false;
 
@@ -774,14 +774,6 @@ TypedArrayObject::protoAccessors[] = {
 };
 
 /* static */ bool
-TypedArrayObject::copyWithin(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    return CallNonGenericMethod<TypedArrayObject::is,
-                                TypedArrayMethods<TypedArrayObject>::copyWithin>(cx, args);
-}
-
-/* static */ bool
 TypedArrayObject::set(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -789,19 +781,15 @@ TypedArrayObject::set(JSContext* cx, unsigned argc, Value* vp)
                                 TypedArrayMethods<TypedArrayObject>::set>(cx, args);
 }
 
-/* static */ bool
-TypedArrayObject::subarray(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    return CallNonGenericMethod<TypedArrayObject::is,
-                                TypedArrayMethods<TypedArrayObject>::subarray>(cx, args);
-}
-
 /* static */ const JSFunctionSpec
 TypedArrayObject::protoFunctions[] = {
-    JS_FN("subarray", TypedArrayObject::subarray, 2, 0),
+    JS_SELF_HOSTED_FN("subarray", "TypedArraySubarray", 2, 0),
+#if 0 /* disabled until perf-testing is completed */
+    JS_SELF_HOSTED_FN("set", "TypedArraySet", 2, 0),
+#else
     JS_FN("set", TypedArrayObject::set, 2, 0),
-    JS_FN("copyWithin", TypedArrayObject::copyWithin, 2, 0),
+#endif
+    JS_SELF_HOSTED_FN("copyWithin", "TypedArrayCopyWithin", 3, 0),
     JS_SELF_HOSTED_FN("every", "TypedArrayEvery", 2, 0),
     JS_SELF_HOSTED_FN("fill", "TypedArrayFill", 3, 0),
     JS_SELF_HOSTED_FN("filter", "TypedArrayFilter", 2, 0),
@@ -852,6 +840,7 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
     nullptr,                /* setProperty */
     nullptr,                /* enumerate */
     nullptr,                /* resolve */
+    nullptr,                /* mayResolve */
     nullptr,                /* convert */
     nullptr,                /* finalize */
     nullptr,                /* call */
@@ -859,7 +848,7 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
     nullptr,                /* construct */
     nullptr,                /* trace */
     {
-        GenericCreateConstructor<TypedArrayConstructor, 3, JSFunction::FinalizeKind>,
+        GenericCreateConstructor<TypedArrayConstructor, 3, gc::AllocKind::FUNCTION>,
         GenericCreatePrototype,
         TypedArrayObject::staticFunctions,
         nullptr,
@@ -1134,7 +1123,7 @@ DataViewObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
-    return construct(cx, bufobj, args, NullPtr());
+    return construct(cx, bufobj, args, nullptr);
 }
 
 template <typename NativeType>
@@ -1819,6 +1808,7 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                 /* setProperty */                                 \
     nullptr,                 /* enumerate   */                                 \
     nullptr,                 /* resolve     */                                 \
+    nullptr,                 /* mayResolve  */                                 \
     nullptr,                 /* convert     */                                 \
     nullptr,                 /* finalize    */                                 \
     nullptr,                 /* call        */                                 \
@@ -1864,6 +1854,7 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
     nullptr, /* setProperty */ \
     nullptr, /* enumerate */ \
     nullptr, /* resolve */ \
+    nullptr, /* mayResolve */ \
     nullptr, /* convert */ \
     nullptr, /* finalize */ \
     nullptr, /* call */ \
@@ -1919,6 +1910,7 @@ const Class DataViewObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
@@ -1971,8 +1963,8 @@ DataViewObject::defineGetter(JSContext* cx, PropertyName* name, HandleNativeObje
     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
 
     Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
-    JSObject *getter =
-        NewNativeFunction(cx, DataViewObject::getter<ValueGetter>, 0, NullPtr());
+    JSObject* getter =
+        NewNativeFunction(cx, DataViewObject::getter<ValueGetter>, 0, nullptr);
     if (!getter)
         return false;
 
@@ -2017,7 +2009,7 @@ DataViewObject::initClass(JSContext* cx)
      * global for use by the DataViewObject constructor.
      */
     RootedFunction fun(cx, NewNativeFunction(cx, ArrayBufferObject::createDataViewForThis,
-                                             0, NullPtr()));
+                                             0, nullptr));
     if (!fun)
         return false;
 
@@ -2126,6 +2118,51 @@ js::StringIsTypedArrayIndex(const char16_t* s, size_t length, uint64_t* indexp);
 
 template bool
 js::StringIsTypedArrayIndex(const Latin1Char* s, size_t length, uint64_t* indexp);
+
+/* ES6 draft rev 34 (2015 Feb 20) 9.4.5.3 [[DefineOwnProperty]] step 3.c. */
+bool
+js::DefineTypedArrayElement(JSContext *cx, HandleObject obj, uint64_t index,
+                            Handle<PropertyDescriptor> desc, ObjectOpResult &result)
+{
+    MOZ_ASSERT(IsAnyTypedArray(obj));
+
+    // These are all substeps of 3.c.
+    // Steps i-vi.
+    // We (wrongly) ignore out of range defines with a value.
+    if (index >= AnyTypedArrayLength(obj))
+        return result.succeed();
+
+    // Step vii.
+    if (desc.isAccessorDescriptor())
+        return result.fail(JSMSG_CANT_REDEFINE_PROP);
+
+    // Step viii.
+    if (desc.hasConfigurable() && desc.configurable())
+        return result.fail(JSMSG_CANT_REDEFINE_PROP);
+
+    // Step ix.
+    if (desc.hasEnumerable() && !desc.enumerable())
+        return result.fail(JSMSG_CANT_REDEFINE_PROP);
+
+    // Step x.
+    if (desc.hasWritable() && !desc.writable())
+        return result.fail(JSMSG_CANT_REDEFINE_PROP);
+
+    // Step xi.
+    if (desc.hasValue()) {
+        double d;
+        if (!ToNumber(cx, desc.value(), &d))
+            return false;
+
+        if (obj->is<TypedArrayObject>())
+            TypedArrayObject::setElement(obj->as<TypedArrayObject>(), index, d);
+        else
+            SharedTypedArrayObject::setElement(obj->as<SharedTypedArrayObject>(), index, d);
+    }
+
+    // Step xii.
+    return result.succeed();
+}
 
 /* JS Friend API */
 

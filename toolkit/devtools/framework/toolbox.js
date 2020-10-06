@@ -10,13 +10,18 @@ const SPLITCONSOLE_ENABLED_PREF = "devtools.toolbox.splitconsoleEnabled";
 const SPLITCONSOLE_HEIGHT_PREF = "devtools.toolbox.splitconsoleHeight";
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
+const OS_HISTOGRAM = "DEVTOOLS_OS_ENUMERATED_PER_USER";
+const OS_IS_64_BITS = "DEVTOOLS_OS_IS_64_BITS_PER_USER";
+const SCREENSIZE_HISTOGRAM = "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER";
 
 let {Cc, Ci, Cu} = require("chrome");
 let {Promise: promise} = require("resource://gre/modules/Promise.jsm");
 let EventEmitter = require("devtools/toolkit/event-emitter");
+let Telemetry = require("devtools/shared/telemetry");
 let {getHighlighterUtils} = require("devtools/framework/toolbox-highlighter-utils");
 let {HUDService} = require("devtools/webconsole/hudservice");
 let {showDoorhanger} = require("devtools/shared/doorhanger");
+let sourceUtils = require("devtools/shared/source-utils");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -47,6 +52,20 @@ loader.lazyGetter(this, "toolboxStrings", () => {
 loader.lazyGetter(this, "Selection", () => require("devtools/framework/selection").Selection);
 loader.lazyGetter(this, "InspectorFront", () => require("devtools/server/actors/inspector").InspectorFront);
 loader.lazyRequireGetter(this, "DevToolsUtils", "devtools/toolkit/DevToolsUtils");
+loader.lazyRequireGetter(this, "getPerformanceActorsConnection", "devtools/performance/front", true);
+
+XPCOMUtils.defineLazyGetter(this, "screenManager", () => {
+  return Cc["@mozilla.org/gfx/screenmanager;1"].getService(Ci.nsIScreenManager);
+});
+
+XPCOMUtils.defineLazyGetter(this, "oscpu", () => {
+  return Cc["@mozilla.org/network/protocol;1?name=http"]
+           .getService(Ci.nsIHttpProtocolHandler).oscpu;
+});
+
+XPCOMUtils.defineLazyGetter(this, "is64Bit", () => {
+  return Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULAppInfo).is64Bit;
+});
 
 // White-list buttons that can be toggled to prevent adding prefs for
 // addons that have manually inserted toolbarbuttons into DOM.
@@ -67,7 +86,8 @@ const ToolboxButtons = [
   { id: "command-button-tilt" },
   { id: "command-button-scratchpad" },
   { id: "command-button-eyedropper" },
-  { id: "command-button-screenshot" }
+  { id: "command-button-screenshot" },
+  { id: "command-button-rulers"}
 ];
 
 /**
@@ -87,6 +107,7 @@ const ToolboxButtons = [
 function Toolbox(target, selectedTool, hostType, hostOptions) {
   this._target = target;
   this._toolPanels = new Map();
+  this._telemetry = new Telemetry();
 
   this._toolRegistered = this._toolRegistered.bind(this);
   this._toolUnregistered = this._toolUnregistered.bind(this);
@@ -102,6 +123,7 @@ function Toolbox(target, selectedTool, hostType, hostOptions) {
   this._saveSplitConsoleHeight = this._saveSplitConsoleHeight.bind(this);
   this._onFocus = this._onFocus.bind(this);
   this._showDevEditionPromo = this._showDevEditionPromo.bind(this);
+  this._updateTextboxMenuItems = this._updateTextboxMenuItems.bind(this);
 
   this._target.on("close", this.destroy);
 
@@ -291,78 +313,98 @@ Toolbox.prototype = {
   /**
    * Open the toolbox
    */
-  open: function() {
-    let deferred = promise.defer();
-
-    return this._host.create().then(iframe => {
-      let deferred = promise.defer();
-
-      let domReady = () => {
-        this.isReady = true;
-
-        let framesPromise = this._listFrames();
-
-        this.closeButton = this.doc.getElementById("toolbox-close");
-        this.closeButton.addEventListener("command", this.destroy, true);
-
-        gDevTools.on("pref-changed", this._prefChanged);
-
-        let framesMenu = this.doc.getElementById("command-button-frames");
-        framesMenu.addEventListener("command", this.selectFrame, true);
-
-        this._buildDockButtons();
-        this._buildOptions();
-        this._buildTabs();
-        this._applyCacheSettings();
-        this._applyServiceWorkersTestingSettings();
-        this._addKeysToWindow();
-        this._addReloadKeys();
-        this._addHostListeners();
-        if (this._hostOptions && this._hostOptions.zoom === false) {
-          this._disableZoomKeys();
-        } else {
-          this._addZoomKeys();
-          this._loadInitialZoom();
-        }
-
-        this.webconsolePanel = this.doc.querySelector("#toolbox-panel-webconsole");
-        this.webconsolePanel.height =
-          Services.prefs.getIntPref(SPLITCONSOLE_HEIGHT_PREF);
-        this.webconsolePanel.addEventListener("resize",
-          this._saveSplitConsoleHeight);
-
-        let buttonsPromise = this._buildButtons();
-
-        this.selectTool(this._defaultToolId).then(panel => {
-
-          // Wait until the original tool is selected so that the split
-          // console input will receive focus.
-          let splitConsolePromise = promise.resolve();
-          if (Services.prefs.getBoolPref(SPLITCONSOLE_ENABLED_PREF)) {
-            splitConsolePromise = this.openSplitConsole();
-          }
-
-          promise.all([
-            splitConsolePromise,
-            buttonsPromise,
-            framesPromise
-          ]).then(() => {
-            this.emit("ready");
-            deferred.resolve();
-          }, deferred.reject);
-        });
-      };
+  open: function () {
+    return Task.spawn(function*() {
+      let iframe = yield this._host.create();
+      let domReady = promise.defer();
 
       // Load the toolbox-level actor fronts and utilities now
-      this._target.makeRemote().then(() => {
-        iframe.setAttribute("src", this._URL);
-        iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"))
-        let domHelper = new DOMHelpers(iframe.contentWindow);
-        domHelper.onceDOMReady(domReady);
-      });
+      yield this._target.makeRemote();
+      iframe.setAttribute("src", this._URL);
+      iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"));
+      let domHelper = new DOMHelpers(iframe.contentWindow);
+      domHelper.onceDOMReady(() => domReady.resolve());
 
-      return deferred.promise;
-    }).then(null, console.error.bind(console));
+      yield domReady.promise;
+
+      this.isReady = true;
+      let framesPromise = this._listFrames();
+
+      this.closeButton = this.doc.getElementById("toolbox-close");
+      this.closeButton.addEventListener("command", this.destroy, true);
+
+      gDevTools.on("pref-changed", this._prefChanged);
+
+      let framesMenu = this.doc.getElementById("command-button-frames");
+      framesMenu.addEventListener("command", this.selectFrame, true);
+
+      this.textboxContextMenuPopup =
+        this.doc.getElementById("toolbox-textbox-context-popup");
+      this.textboxContextMenuPopup.addEventListener("popupshowing",
+        this._updateTextboxMenuItems, true);
+
+      this._buildDockButtons();
+      this._buildOptions();
+      this._buildTabs();
+      this._applyCacheSettings();
+      this._applyServiceWorkersTestingSettings();
+      this._addKeysToWindow();
+      this._addReloadKeys();
+      this._addHostListeners();
+      if (this._hostOptions && this._hostOptions.zoom === false) {
+        this._disableZoomKeys();
+      } else {
+        this._addZoomKeys();
+        this._loadInitialZoom();
+      }
+
+      this.webconsolePanel = this.doc.querySelector("#toolbox-panel-webconsole");
+      this.webconsolePanel.height = Services.prefs.getIntPref(SPLITCONSOLE_HEIGHT_PREF);
+      this.webconsolePanel.addEventListener("resize", this._saveSplitConsoleHeight);
+
+      let buttonsPromise = this._buildButtons();
+
+      this._pingTelemetry();
+
+      let panel = yield this.selectTool(this._defaultToolId);
+
+      // Wait until the original tool is selected so that the split
+      // console input will receive focus.
+      let splitConsolePromise = promise.resolve();
+      if (Services.prefs.getBoolPref(SPLITCONSOLE_ENABLED_PREF)) {
+        splitConsolePromise = this.openSplitConsole();
+      }
+
+      yield promise.all([
+        splitConsolePromise,
+        buttonsPromise,
+        framesPromise
+      ]);
+
+      // Lazily connect to the profiler here and don't wait for it to complete,
+      // used to intercept console.profile calls before the performance tools are open.
+      let profilerReady = this._connectProfiler();
+
+      // However, while testing, we must wait for the performance connection to finish,
+      // as most tests shut down without waiting for a toolbox destruction event,
+      // resulting in the shared profiler connection being opened and closed
+      // outside of the test that originally opened the toolbox.
+      if (gDevTools.testing) {
+        yield profilerReady;
+      }
+
+      this.emit("ready");
+    }.bind(this)).then(null, console.error.bind(console));
+  },
+
+  _pingTelemetry: function() {
+    this._telemetry.toolOpened("toolbox");
+
+    this._telemetry.logOncePerBrowserVersion(OS_HISTOGRAM,
+                                             this._getOsCpu());
+    this._telemetry.logOncePerBrowserVersion(OS_IS_64_BITS, is64Bit ? 1 : 0);
+    this._telemetry.logOncePerBrowserVersion(SCREENSIZE_HISTOGRAM,
+                                             this._getScreenDimensions());
   },
 
   /**
@@ -675,10 +717,13 @@ Toolbox.prototype = {
       this._buildPickerButton();
     }
 
-    let spec = CommandUtils.getCommandbarSpec("devtools.toolbox.toolbarSpec");
-    let environment = CommandUtils.createEnvironment(this, '_target');
-    return CommandUtils.createRequisition(environment).then(requisition => {
+    const options = {
+      environment: CommandUtils.createEnvironment(this, '_target')
+    };
+    return CommandUtils.createRequisition(this.target, options).then(requisition => {
       this._requisition = requisition;
+
+      const spec = CommandUtils.getCommandbarSpec("devtools.toolbox.toolbarSpec");
       return CommandUtils.createButtons(spec, this.target, this.doc,
                                         requisition).then(buttons => {
         let container = this.doc.getElementById("toolbox-buttons");
@@ -1589,6 +1634,41 @@ Toolbox.prototype = {
     return this.doc.getElementById("toolbox-notificationbox");
   },
 
+  _getScreenDimensions: function() {
+    let width = {};
+    let height = {};
+
+    screenManager.primaryScreen.GetRect({}, {}, width, height);
+    let dims = width.value + "x" + height.value;
+
+    if (width.value < 800 || height.value < 600) return 0;
+    if (dims === "800x600")   return 1;
+    if (dims === "1024x768")  return 2;
+    if (dims === "1280x800")  return 3;
+    if (dims === "1280x1024") return 4;
+    if (dims === "1366x768")  return 5;
+    if (dims === "1440x900")  return 6;
+    if (dims === "1920x1080") return 7;
+    if (dims === "2560×1440") return 8;
+    if (dims === "2560×1600") return 9;
+    if (dims === "2880x1800") return 10;
+    if (width.value > 2880 || height.value > 1800) return 12;
+
+    return 11; // Other dimension such as a VM.
+  },
+
+  _getOsCpu: function() {
+    if (oscpu.includes("NT 5.1") || oscpu.includes("NT 5.2")) return 0;
+    if (oscpu.includes("NT 6.0")) return 1;
+    if (oscpu.includes("NT 6.1")) return 2;
+    if (oscpu.includes("NT 6.2")) return 3;
+    if (oscpu.includes("NT 6.3")) return 4;
+    if (oscpu.includes("OS X"))   return 5;
+    if (oscpu.includes("Linux"))  return 6;
+
+    return 12; // Other OS.
+  },
+
   /**
    * Destroy the current host, and remove event listeners from its frame.
    *
@@ -1628,12 +1708,15 @@ Toolbox.prototype = {
     gDevTools.off("pref-changed", this._prefChanged);
 
     this._lastFocusedElement = null;
+
     if (this.webconsolePanel) {
       this._saveSplitConsoleHeight();
       this.webconsolePanel.removeEventListener("resize",
         this._saveSplitConsoleHeight);
     }
     this.closeButton.removeEventListener("command", this.destroy, true);
+    this.textboxContextMenuPopup.removeEventListener("popupshowing",
+      this._updateTextboxMenuItems, true);
 
     let outstanding = [];
     for (let [id, panel] of this._toolPanels) {
@@ -1666,12 +1749,17 @@ Toolbox.prototype = {
       }
     }));
 
+    // Destroy the profiler connection
+    outstanding.push(this._disconnectProfiler());
+
     // We need to grab a reference to win before this._host is destroyed.
     let win = this.frame.ownerGlobal;
 
     if (this._requisition) {
-      this._requisition.destroy();
+      CommandUtils.destroyRequisition(this._requisition, this.target);
     }
+    this._telemetry.toolClosed("toolbox");
+    this._telemetry.destroy();
 
     // Finish all outstanding tasks (which means finish destroying panels and
     // then destroying the host, successfully or not) before destroying the
@@ -1744,5 +1832,94 @@ Toolbox.prototype = {
     }
     let window = this.frame.contentWindow;
     showDoorhanger({ window, type: "deveditionpromo" });
-  }
+  },
+
+  /**
+   * Enable / disable necessary textbox menu items using globalOverlay.js.
+   */
+  _updateTextboxMenuItems: function() {
+    let window = this.doc.defaultView;
+    ['cmd_undo', 'cmd_delete', 'cmd_cut',
+     'cmd_copy', 'cmd_paste','cmd_selectAll'].forEach(window.goUpdateCommand);
+  },
+
+  getPerformanceActorsConnection: function() {
+    if (!this._performanceConnection) {
+      this._performanceConnection = getPerformanceActorsConnection(this.target);
+    }
+    return this._performanceConnection;
+  },
+
+  /**
+   * Connects to the SPS profiler when the developer tools are open. This is
+   * necessary because of the WebConsole's `profile` and `profileEnd` methods.
+   */
+  _connectProfiler: Task.async(function*() {
+    // If target does not have profiler actor (addons), do not
+    // even register the shared performance connection.
+    if (!this.target.hasActor("profiler")) {
+      return;
+    }
+
+    yield this.getPerformanceActorsConnection().open();
+    // Emit an event when connected, but don't wait on startup for this.
+    this.emit("profiler-connected");
+  }),
+
+  /**
+   * Disconnects the underlying Performance Actor Connection. If the connection
+   * has not finished initializing, as opening a toolbox does not wait,
+   * the performance connection destroy method will wait for it on its own.
+   */
+  _disconnectProfiler: Task.async(function*() {
+    if (!this._performanceConnection) {
+      return;
+    }
+    yield this._performanceConnection.destroy();
+    this._performanceConnection = null;
+  }),
+
+  /**
+   * Returns gViewSourceUtils for viewing source.
+   */
+  get gViewSourceUtils() {
+    return this.frame.contentWindow.gViewSourceUtils;
+  },
+
+  /**
+   * Opens source in style editor. Falls back to plain "view-source:".
+   * @see browser/devtools/shared/source-utils.js
+   */
+  viewSourceInStyleEditor: function (sourceURL, sourceLine) {
+    return sourceUtils.viewSourceInStyleEditor(this, sourceURL, sourceLine);
+  },
+
+  /**
+   * Opens source in debugger. Falls back to plain "view-source:".
+   * @see browser/devtools/shared/source-utils.js
+   */
+  viewSourceInDebugger: function (sourceURL, sourceLine) {
+    return sourceUtils.viewSourceInDebugger(this, sourceURL, sourceLine);
+  },
+
+  /**
+   * Opens source in scratchpad. Falls back to plain "view-source:".
+   * TODO The `sourceURL` for scratchpad instances are like `Scratchpad/1`.
+   * If instances are scoped one-per-browser-window, then we should be able
+   * to infer the URL from this toolbox, or use the built in scratchpad IN
+   * the toolbox.
+   *
+   * @see browser/devtools/shared/source-utils.js
+   */
+  viewSourceInScratchpad: function (sourceURL, sourceLine) {
+    return sourceUtils.viewSourceInScratchpad(sourceURL, sourceLine);
+  },
+
+  /**
+   * Opens source in plain "view-source:".
+   * @see browser/devtools/shared/source-utils.js
+   */
+  viewSource: function (sourceURL, sourceLine) {
+    return sourceUtils.viewSource(this, sourceURL, sourceLine);
+  },
 };

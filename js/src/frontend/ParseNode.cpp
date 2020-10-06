@@ -214,18 +214,26 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_EXPORT_BATCH_SPEC:
       case PNK_OBJECT_PROPERTY_NAME:
       case PNK_FRESHENBLOCK:
+      case PNK_SUPERPROP:
+      case PNK_NEWTARGET:
         MOZ_ASSERT(pn->isArity(PN_NULLARY));
         MOZ_ASSERT(!pn->isUsed(), "handle non-trivial cases separately");
         MOZ_ASSERT(!pn->isDefn(), "handle non-trivial cases separately");
         return PushResult::Recyclable;
 
       // Nodes with a single non-null child.
-      case PNK_TYPEOF:
+      case PNK_TYPEOFNAME:
+      case PNK_TYPEOFEXPR:
       case PNK_VOID:
       case PNK_NOT:
       case PNK_BITNOT:
       case PNK_THROW:
-      case PNK_DELETE:
+      case PNK_DELETENAME:
+      case PNK_DELETEPROP:
+      case PNK_DELETESUPERPROP:
+      case PNK_DELETEELEM:
+      case PNK_DELETESUPERELEM:
+      case PNK_DELETEEXPR:
       case PNK_POS:
       case PNK_NEG:
       case PNK_PREINCREMENT:
@@ -237,6 +245,8 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_SPREAD:
       case PNK_MUTATEPROTO:
       case PNK_EXPORT:
+      case PNK_EXPORT_DEFAULT:
+      case PNK_SUPERELEM:
         return PushUnaryNodeChild(pn, stack);
 
       // Nodes with a single nullable child.
@@ -1139,7 +1149,7 @@ ObjectBox::trace(JSTracer* trc)
 {
     ObjectBox* box = this;
     while (box) {
-        MarkObjectRoot(trc, &box->object, "parser.object");
+        TraceRoot(trc, &box->object, "parser.object");
         if (box->isFunctionBox())
             box->asFunctionBox()->bindings.trace(trc);
         box = box->traceLink;

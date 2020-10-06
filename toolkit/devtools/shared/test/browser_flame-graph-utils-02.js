@@ -3,7 +3,7 @@
 
 // Tests consecutive duplicate frames are removed from the flame graph data.
 
-let {FlameGraphUtils} = Cu.import("resource://gre/modules/devtools/FlameGraph.jsm", {});
+let {FlameGraphUtils, FLAME_GRAPH_BLOCK_HEIGHT} = devtools.require("devtools/shared/widgets/FlameGraph");
 
 add_task(function*() {
   yield promiseTab("about:blank");
@@ -12,7 +12,7 @@ add_task(function*() {
 });
 
 function* performTest() {
-  let out = FlameGraphUtils.createFlameGraphDataFromSamples(TEST_DATA, {
+  let out = FlameGraphUtils.createFlameGraphDataFromThread(TEST_DATA, {
     flattenRecursion: true
   });
 
@@ -43,7 +43,7 @@ function* performTest() {
   }
 }
 
-let TEST_DATA = [{
+let TEST_DATA = synthesizeProfileForTest([{
   frames: [{
     location: "A"
   }, {
@@ -58,7 +58,7 @@ let TEST_DATA = [{
     location: "C"
   }],
   time: 50,
-}];
+}]);
 
 let EXPECTED_OUTPUT = [{
   blocks: []
@@ -73,7 +73,7 @@ let EXPECTED_OUTPUT = [{
     x: 0,
     y: 0,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "A"
   }]
 }, {
@@ -83,13 +83,23 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "B"
     },
     x: 0,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "B"
   }]
 }, {
-  blocks: []
+  blocks: [{
+    srcData: {
+      startTime: 0,
+      rawLocation: "C"
+    },
+    x: 0,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
+    width: 50,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
+    text: "C"
+  }]
 }, {
   blocks: []
 }, {

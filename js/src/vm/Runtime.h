@@ -31,6 +31,7 @@
 #include "gc/GCRuntime.h"
 #include "gc/Tracer.h"
 #include "irregexp/RegExpStack.h"
+#include "js/Debug.h"
 #include "js/HashTable.h"
 #ifdef DEBUG
 # include "js/Proxy.h" // For AutoEnterPolicy
@@ -298,27 +299,27 @@ class NewObjectCache
      * nullptr if returning the object could possibly trigger GC (does not
      * indicate failure).
      */
-    inline NativeObject *newObjectFromHit(JSContext *cx, EntryIndex entry, js::gc::InitialHeap heap);
+    inline NativeObject* newObjectFromHit(JSContext* cx, EntryIndex entry, js::gc::InitialHeap heap);
 
     /* Fill an entry after a cache miss. */
-    void fillProto(EntryIndex entry, const Class *clasp, js::TaggedProto proto,
-                   gc::AllocKind kind, NativeObject *obj);
+    void fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto proto,
+                   gc::AllocKind kind, NativeObject* obj);
 
-    inline void fillGlobal(EntryIndex entry, const Class *clasp, js::GlobalObject *global,
-                           gc::AllocKind kind, NativeObject *obj);
+    inline void fillGlobal(EntryIndex entry, const Class* clasp, js::GlobalObject* global,
+                           gc::AllocKind kind, NativeObject* obj);
 
-    void fillGroup(EntryIndex entry, js::ObjectGroup *group, gc::AllocKind kind,
-                   NativeObject *obj)
+    void fillGroup(EntryIndex entry, js::ObjectGroup* group, gc::AllocKind kind,
+                   NativeObject* obj)
     {
         MOZ_ASSERT(obj->group() == group);
         return fill(entry, group->clasp(), group, kind, obj);
     }
 
     /* Invalidate any entries which might produce an object with shape/proto. */
-    void invalidateEntriesForShape(JSContext *cx, HandleShape shape, HandleObject proto);
+    void invalidateEntriesForShape(JSContext* cx, HandleShape shape, HandleObject proto);
 
   private:
-    EntryIndex makeIndex(const Class *clasp, gc::Cell *key, gc::AllocKind kind) {
+    EntryIndex makeIndex(const Class* clasp, gc::Cell* key, gc::AllocKind kind) {
         uintptr_t hash = (uintptr_t(clasp) ^ uintptr_t(key)) + size_t(kind);
         return hash % mozilla::ArrayLength(entries);
     }
@@ -575,8 +576,6 @@ class PerThreadData : public PerThreadDataFriendFields
 };
 
 class AutoLockForExclusiveAccess;
-
-struct AutoStopwatch;
 } // namespace js
 
 struct JSRuntime : public JS::shadow::Runtime,
@@ -680,14 +679,17 @@ struct JSRuntime : public JS::shadow::Runtime,
      * New activations will reset this to nullptr on construction after getting
      * the current value, and will restore the previous value on destruction.
      */
-    js::SavedFrame *asyncStackForNewActivations;
+    js::SavedFrame* asyncStackForNewActivations;
 
     /*
      * Value of asyncCause to be attached to asyncStackForNewActivations.
      */
-    JSString *asyncCauseForNewActivations;
+    JSString* asyncCauseForNewActivations;
 
-    js::Activation *const *addressOfActivation() const {
+    /* If non-null, report JavaScript entry points to this monitor. */
+    JS::dbg::AutoEntryMonitor* entryMonitor;
+
+    js::Activation* const* addressOfActivation() const {
         return &activation_;
     }
     static unsigned offsetOfActivation() {
@@ -914,8 +916,8 @@ struct JSRuntime : public JS::shadow::Runtime,
     bool isSelfHostingGlobal(JSObject* global) {
         return global == selfHostingGlobal_;
     }
-    bool isSelfHostingCompartment(JSCompartment* comp);
-    bool isSelfHostingZone(JS::Zone* zone);
+    bool isSelfHostingCompartment(JSCompartment* comp) const;
+    bool isSelfHostingZone(const JS::Zone* zone) const;
     bool cloneSelfHostedFunctionScript(JSContext* cx, js::Handle<js::PropertyName*> name,
                                        js::Handle<JSFunction*> targetFun);
     bool cloneSelfHostedValue(JSContext* cx, js::Handle<js::PropertyName*> name,
@@ -1260,7 +1262,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     }
 
     // The atoms compartment is the only one in its zone.
-    inline bool isAtomsZone(JS::Zone* zone);
+    inline bool isAtomsZone(const JS::Zone* zone) const;
 
     bool activeGCInAtomsZone();
 
@@ -1478,10 +1480,24 @@ struct JSRuntime : public JS::shadow::Runtime,
          */
         js::PerformanceData performance;
 
+        /**
+         * Callback used to ask the embedding to determine in which
+         * Performance Group the current execution belongs. Typically, this is
+         * used to regroup JSCompartments from several iframes from the same
+         * page or from several compartments of the same addon into a single
+         * Performance Group.
+         *
+         * May be `nullptr`, in which case we put all the JSCompartments
+         * in the same PerformanceGroup.
+         */
+        JSCurrentPerfGroupCallback currentPerfGroupCallback;
+
         Stopwatch()
           : iteration(0)
           , isEmpty(true)
-          , isActive_(false)
+          , currentPerfGroupCallback(nullptr)
+          , isMonitoringJank_(false)
+          , isMonitoringCPOW_(false)
         { }
 
         /**
@@ -1495,9 +1511,8 @@ struct JSRuntime : public JS::shadow::Runtime,
             ++iteration;
             isEmpty = true;
         }
-
         /**
-         * Activate/deactivate stopwatch measurement.
+         * Activate/deactivate stopwatch measurement of jank.
          *
          * Noop if `value` is `true` and the stopwatch is already active,
          * or if `value` is `false` and the stopwatch is already inactive.
@@ -1507,8 +1522,8 @@ struct JSRuntime : public JS::shadow::Runtime,
          *
          * May return `false` if the underlying hashtable cannot be allocated.
          */
-        bool setIsActive(bool value) {
-            if (isActive_ != value)
+        bool setIsMonitoringJank(bool value) {
+            if (isMonitoringJank_ != value)
                 reset();
 
             if (value && !groups_.initialized()) {
@@ -1516,16 +1531,47 @@ struct JSRuntime : public JS::shadow::Runtime,
                     return false;
             }
 
-            isActive_ = value;
+            isMonitoringJank_ = value;
+            return true;
+        }
+        bool isMonitoringJank() const {
+            return isMonitoringJank_;
+        }
+
+
+        /**
+         * Activate/deactivate stopwatch measurement of CPOW.
+         */
+        bool setIsMonitoringCPOW(bool value) {
+            isMonitoringCPOW_ = value;
             return true;
         }
 
-        /**
-         * `true` if the stopwatch is currently monitoring, `false` otherwise.
-         */
-        bool isActive() const {
-            return isActive_;
+        bool isMonitoringCPOW() const {
+            return isMonitoringCPOW_;
         }
+
+        // Some systems have non-monotonic clocks. While we cannot
+        // improve the precision, we can make sure that our measures
+        // are monotonic nevertheless. We do this by storing the
+        // result of the latest call to the clock and making sure
+        // that the next timestamp is greater or equal.
+        struct MonotonicTimeStamp {
+            MonotonicTimeStamp()
+              : latestGood_(0)
+            {}
+            inline uint64_t monotonize(uint64_t stamp)
+            {
+                if (stamp <= latestGood_)
+                    return latestGood_;
+                latestGood_ = stamp;
+                return stamp;
+            }
+          private:
+            uint64_t latestGood_;
+        };
+        MonotonicTimeStamp systemTimeFix;
+        MonotonicTimeStamp userTimeFix;
 
     private:
         /**
@@ -1553,7 +1599,8 @@ struct JSRuntime : public JS::shadow::Runtime,
         /**
          * `true` if stopwatch monitoring is active, `false` otherwise.
          */
-        bool isActive_;
+        bool isMonitoringJank_;
+        bool isMonitoringCPOW_;
     };
     Stopwatch stopwatch;
 };

@@ -6983,17 +6983,6 @@ dnl ========================================================
 MOZ_ARG_HEADER(Profiling and Instrumenting)
 
 dnl ========================================================
-dnl = Enable runtime visual profiling logger
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(visual-event-tracer,
-[  --enable-visual-event-tracer   Enable visual event tracer instrumentation],
-    MOZ_VISUAL_EVENT_TRACER=1,
-    MOZ_VISUAL_EVENT_TRACER=)
-if test -n "$MOZ_VISUAL_EVENT_TRACER"; then
-    AC_DEFINE(MOZ_VISUAL_EVENT_TRACER)
-fi
-
-dnl ========================================================
 dnl = Enable TaskTracer
 dnl ========================================================
 MOZ_ARG_ENABLE_BOOL(tasktracer,
@@ -7283,19 +7272,6 @@ if test -n "$MOZ_DEVTOOLS"; then
 fi
 
 AC_SUBST(MOZ_DEVTOOLS)
-
-dnl =========================================================
-dnl Enable support for revamped devtools Performance Tools
-dnl =========================================================
-
-MOZ_ARG_ENABLE_BOOL(devtools-perf,
-[  --enable-devtools-perf Set compile flags necessary for compiling devtools perftools],
-MOZ_DEVTOOLS_PERFTOOLS=1,
-MOZ_DEVTOOLS_PERFTOOLS= )
-if test -n "$MOZ_DEVTOOLS_PERFTOOLS"; then
-  AC_DEFINE(MOZ_DEVTOOLS_PERFTOOLS)
-fi
-AC_SUBST(MOZ_DEVTOOLS_PERFTOOLS)
 
 dnl =========================================================
 dnl Omnijar packaging (bug 552121)
@@ -8880,9 +8856,6 @@ ac_configure_args="$ac_configure_args --prefix=$dist"
 if test "$MOZ_MEMORY"; then
    ac_configure_args="$ac_configure_args --enable-jemalloc"
 fi
-if test -n "$MOZ_GLUE_IN_PROGRAM"; then
-   export MOZ_GLUE_IN_PROGRAM
-fi
 if test -n "$ZLIB_IN_MOZGLUE"; then
    MOZ_ZLIB_LIBS=
 fi
@@ -8899,6 +8872,7 @@ export STLPORT_LIBS
 export JS_STANDALONE=no
 export MOZ_LINKER
 export ZLIB_IN_MOZGLUE
+export MOZ_MEMORY
 
 if ! test -e js; then
     mkdir js

@@ -39,6 +39,7 @@
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
 #include "vm/Opcodes.h"
+#include "vm/Printer.h"
 #include "vm/RegExpObject.h"
 #include "vm/RegExpStatics.h"
 #include "vm/ScopeObject.h"
@@ -394,8 +395,15 @@ str_enumerate(JSContext* cx, HandleObject obj)
     return true;
 }
 
-bool
-js::str_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
+static bool
+str_mayResolve(const JSAtomState&, jsid id, JSObject*)
+{
+    // str_resolve ignores non-integer ids.
+    return JSID_IS_INT(id);
+}
+
+static bool
+str_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
 {
     if (!JSID_IS_INT(id))
         return true;
@@ -424,7 +432,8 @@ const Class StringObject::class_ = {
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     str_enumerate,
-    str_resolve
+    str_resolve,
+    str_mayResolve
 };
 
 /*
@@ -3594,7 +3603,7 @@ class SplitMatchResult {
 
 template<class Matcher>
 static ArrayObject*
-SplitHelper(JSContext *cx, HandleLinearString str, uint32_t limit, const Matcher &splitMatch,
+SplitHelper(JSContext* cx, HandleLinearString str, uint32_t limit, const Matcher& splitMatch,
             HandleObjectGroup group)
 {
     size_t strLength = str->length();
@@ -4998,19 +5007,19 @@ js::OneUcs4ToUtf8Char(uint8_t* utf8Buffer, uint32_t ucs4Char)
 }
 
 size_t
-js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, JSLinearString* str,
+js::PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, JSLinearString* str,
                          uint32_t quote)
 {
     size_t len = str->length();
     AutoCheckCannotGC nogc;
     return str->hasLatin1Chars()
-           ? PutEscapedStringImpl(buffer, bufferSize, fp, str->latin1Chars(nogc), len, quote)
-           : PutEscapedStringImpl(buffer, bufferSize, fp, str->twoByteChars(nogc), len, quote);
+           ? PutEscapedStringImpl(buffer, bufferSize, out, str->latin1Chars(nogc), len, quote)
+           : PutEscapedStringImpl(buffer, bufferSize, out, str->twoByteChars(nogc), len, quote);
 }
 
 template <typename CharT>
 size_t
-js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const CharT* chars,
+js::PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, const CharT* chars,
                          size_t length, uint32_t quote)
 {
     enum {
@@ -5019,7 +5028,7 @@ js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const CharT*
 
     MOZ_ASSERT(quote == 0 || quote == '\'' || quote == '"');
     MOZ_ASSERT_IF(!buffer, bufferSize == 0);
-    MOZ_ASSERT_IF(fp, !buffer);
+    MOZ_ASSERT_IF(out, !buffer);
 
     if (bufferSize == 0)
         buffer = nullptr;
@@ -5108,8 +5117,8 @@ js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const CharT*
                 buffer[n] = '\0';
                 buffer = nullptr;
             }
-        } else if (fp) {
-            if (fputc(c, fp) < 0)
+        } else if (out) {
+            if (out->put(&c, 1) < 0)
                 return size_t(-1);
         }
         n++;
@@ -5121,15 +5130,15 @@ js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const CharT*
 }
 
 template size_t
-js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const Latin1Char* chars,
+js::PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, const Latin1Char* chars,
                          size_t length, uint32_t quote);
 
 template size_t
-js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const char* chars,
+js::PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, const char* chars,
                          size_t length, uint32_t quote);
 
 template size_t
-js::PutEscapedStringImpl(char* buffer, size_t bufferSize, FILE* fp, const char16_t* chars,
+js::PutEscapedStringImpl(char* buffer, size_t bufferSize, GenericPrinter* out, const char16_t* chars,
                          size_t length, uint32_t quote);
 
 template size_t

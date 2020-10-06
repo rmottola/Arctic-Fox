@@ -48,6 +48,18 @@ XPCOMUtils.defineLazyGetter(Services, "ppmm", () => {
            .QueryInterface(Ci.nsIProcessScriptLoader);
 });
 
+XPCOMUtils.defineLazyGetter(Services, "mm", () => {
+  return Cc["@mozilla.org/globalmessagemanager;1"]
+           .getService(Ci.nsIMessageBroadcaster)
+           .QueryInterface(Ci.nsIFrameScriptLoader);
+});
+
+XPCOMUtils.defineLazyGetter(Services, "ppmm", () => {
+  return Cc["@mozilla.org/parentprocessmessagemanager;1"]
+           .getService(Ci.nsIMessageBroadcaster)
+           .QueryInterface(Ci.nsIProcessScriptLoader);
+});
+
 let initTable = [
 #ifdef MOZ_WIDGET_ANDROID
   ["androidBridge", "@mozilla.org/android/bridge;1", "nsIAndroidBridge"],

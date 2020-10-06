@@ -57,3 +57,12 @@ th {
 th:first-of-type, td:first-of-type {
   text-align: left;
 }
+
+input, select {
+  box-sizing: border-box;
+}
+
+select {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}

@@ -61,7 +61,7 @@ TraceDataRelocations(JSTracer* trc, uint8_t* buffer, CompactBufferReader& reader
             jsval_layout layout;
             layout.asBits = *word;
             Value v = IMPL_TO_JSVAL(layout);
-            gc::MarkValueUnbarriered(trc, &v, "ion-masm-value");
+            TraceManuallyBarrieredEdge(trc, &v, "ion-masm-value");
             *word = JSVAL_TO_IMPL(v).asBits;
             continue;
         }
@@ -74,7 +74,8 @@ TraceDataRelocations(JSTracer* trc, uint8_t* buffer, CompactBufferReader& reader
         MOZ_ASSERT(!(*reinterpret_cast<uintptr_t*>(ptr) & 0x1));
 
         // No barrier needed since these are constants.
-        gc::MarkGCThingUnbarriered(trc, ptr, "ion-masm-ptr");
+        TraceManuallyBarrieredGenericPointerEdge(trc, reinterpret_cast<gc::Cell**>(ptr),
+                                                 "ion-masm-ptr");
     }
 }
 
@@ -131,7 +132,7 @@ AssemblerX86Shared::trace(JSTracer* trc)
         RelativePatch& rp = jumps_[i];
         if (rp.kind == Relocation::JITCODE) {
             JitCode* code = JitCode::FromExecutable((uint8_t*)rp.target);
-            MarkJitCodeUnbarriered(trc, &code, "masmrel32");
+            TraceManuallyBarrieredEdge(trc, &code, "masmrel32");
             MOZ_ASSERT(code == JitCode::FromExecutable((uint8_t*)rp.target));
         }
     }

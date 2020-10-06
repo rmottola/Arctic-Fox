@@ -7,13 +7,13 @@ onfetch = function(ev) {
     ));
   }
 
-  else if (ev.request.url.contains("synthesized-404.txt")) {
+  else if (ev.request.url.includes("synthesized-404.txt")) {
     ev.respondWith(Promise.resolve(
       new Response("synthesized response body", { status: 404 })
     ));
   }
 
-  else if (ev.request.url.contains("synthesized-headers.txt")) {
+  else if (ev.request.url.includes("synthesized-headers.txt")) {
     ev.respondWith(Promise.resolve(
       new Response("synthesized response body", {
         headers: {
@@ -23,17 +23,17 @@ onfetch = function(ev) {
     ));
   }
 
-  else if (ev.request.url.contains("test-respondwith-response.txt")) {
+  else if (ev.request.url.includes("test-respondwith-response.txt")) {
     ev.respondWith(new Response("test-respondwith-response response body", {}));
   }
 
-  else if (ev.request.url.contains("synthesized-redirect-real-file.txt")) {
+  else if (ev.request.url.includes("synthesized-redirect-real-file.txt")) {
     ev.respondWith(Promise.resolve(
       Response.redirect("fetch/real-file.txt")
     ));
   }
 
-  else if (ev.request.url.contains("synthesized-redirect-synthesized.txt")) {
+  else if (ev.request.url.includes("synthesized-redirect-synthesized.txt")) {
     ev.respondWith(Promise.resolve(
       Response.redirect("synthesized.txt")
     ));
@@ -112,18 +112,18 @@ onfetch = function(ev) {
     ));
   }
 
-  else if (ev.request.url.contains("deliver-gzip")) {
+  else if (ev.request.url.includes("deliver-gzip")) {
     // Don't handle the request, this will make Necko perform a network request, at
     // which point SetApplyConversion must be re-enabled, otherwise the request
     // will fail.
     return;
   }
 
-  else if (ev.request.url.contains("hello.gz")) {
+  else if (ev.request.url.includes("hello.gz")) {
     ev.respondWith(fetch("fetch/deliver-gzip.sjs"));
   }
 
-  else if (ev.request.url.contains("hello-after-extracting.gz")) {
+  else if (ev.request.url.includes("hello-after-extracting.gz")) {
     ev.respondWith(fetch("fetch/deliver-gzip.sjs").then(function(res) {
       return res.text().then(function(body) {
         return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
@@ -131,12 +131,12 @@ onfetch = function(ev) {
     }));
   }
 
-  else if (ev.request.url.contains('opaque-on-same-origin')) {
+  else if (ev.request.url.includes('opaque-on-same-origin')) {
     var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200';
     ev.respondWith(fetch(url, { mode: 'no-cors' }));
   }
 
-  else if (ev.request.url.contains('opaque-no-cors')) {
+  else if (ev.request.url.includes('opaque-no-cors')) {
     if (ev.request.mode != "no-cors") {
       ev.respondWith(Promise.reject());
       return;
@@ -146,7 +146,7 @@ onfetch = function(ev) {
     ev.respondWith(fetch(url, { mode: ev.request.mode }));
   }
 
-  else if (ev.request.url.contains('cors-for-no-cors')) {
+  else if (ev.request.url.includes('cors-for-no-cors')) {
     if (ev.request.mode != "no-cors") {
       ev.respondWith(Promise.reject());
       return;
@@ -156,11 +156,11 @@ onfetch = function(ev) {
     ev.respondWith(fetch(url));
   }
 
-  else if (ev.request.url.contains('example.com')) {
+  else if (ev.request.url.includes('example.com')) {
     ev.respondWith(fetch(ev.request));
   }
 
-  else if (ev.request.url.contains("index.html")) {
+  else if (ev.request.url.includes("index.html")) {
     if (seenIndex) {
         var body = "<script>" +
                      "opener.postMessage({status: 'ok', result: " + ev.isReload + "," +

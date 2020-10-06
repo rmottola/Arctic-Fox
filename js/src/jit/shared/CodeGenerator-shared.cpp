@@ -20,6 +20,7 @@
 #include "vm/TraceLogging.h"
 
 #include "jit/JitFrames-inl.h"
+#include "jit/MacroAssembler-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -886,12 +887,15 @@ class ReadTempAttemptsVectorOp : public JS::ForEachTrackedOptimizationAttemptOp
 
 struct ReadTempTypeInfoVectorOp : public IonTrackedOptimizationsTypeInfo::ForEachOp
 {
+    TempAllocator& alloc_;
     TempOptimizationTypeInfoVector* types_;
-    TypeSet::TypeList accTypes_;
+    TempTypeList accTypes_;
 
   public:
-    explicit ReadTempTypeInfoVectorOp(TempOptimizationTypeInfoVector* types)
-      : types_(types)
+    ReadTempTypeInfoVectorOp(TempAllocator& alloc, TempOptimizationTypeInfoVector* types)
+      : alloc_(alloc),
+        types_(types),
+        accTypes_(alloc)
     { }
 
     void readType(const IonTrackedTypeWithAddendum& tracked) override {
@@ -899,7 +903,7 @@ struct ReadTempTypeInfoVectorOp : public IonTrackedOptimizationsTypeInfo::ForEac
     }
 
     void operator()(JS::TrackedTypeSite site, MIRType mirType) override {
-        OptimizationTypeInfo ty(site, mirType);
+        OptimizationTypeInfo ty(alloc_, site, mirType);
         for (uint32_t i = 0; i < accTypes_.length(); i++)
             MOZ_ALWAYS_TRUE(ty.trackType(accTypes_[i]));
         MOZ_ALWAYS_TRUE(types_->append(mozilla::Move(ty)));
@@ -971,7 +975,7 @@ CodeGeneratorShared::verifyCompactTrackedOptimizationsMap(JitCode* code, uint32_
             // decoded.
             IonTrackedOptimizationsTypeInfo typeInfo = typesTable->entry(index);
             TempOptimizationTypeInfoVector tvec(alloc());
-            ReadTempTypeInfoVectorOp top(&tvec);
+            ReadTempTypeInfoVectorOp top(alloc(), &tvec);
             typeInfo.forEach(top, allTypes);
             MOZ_ASSERT(entry.optimizations->matchTypes(tvec));
 
@@ -1057,7 +1061,7 @@ HandleRegisterDump(Op op, MacroAssembler &masm, LiveRegisterSet liveRegs, Regist
             // To use the original value of the activation register (that's
             // now on top of the stack), we need the scratch register.
             masm.push(scratch);
-            masm.loadPtr(Address(StackPointer, sizeof(uintptr_t)), scratch);
+            masm.loadPtr(Address(masm.getStackPointer(), sizeof(uintptr_t)), scratch);
             op(scratch, dump);
             masm.pop(scratch);
         } else {
@@ -1435,7 +1439,7 @@ CodeGeneratorShared::emitAsmJSCall(LAsmJSCall* ins)
                   AsmJSStackAlignment % ABIStackAlignment == 0,
                   "The asm.js stack alignment should subsume the ABI-required alignment");
     Label ok;
-    masm.branchTestPtr(Assembler::Zero, StackPointer, Imm32(AsmJSStackAlignment - 1), &ok);
+    masm.branchTestStackPtr(Assembler::Zero, Imm32(AsmJSStackAlignment - 1), &ok);
     masm.breakpoint();
     masm.bind(&ok);
 #endif
@@ -1485,7 +1489,7 @@ CodeGeneratorShared::labelForBackedgeWithImplicitCheck(MBasicBlock* mir)
     // backedges, so just look for any edge going to an earlier block in RPO.
     if (!gen->compilingAsmJS() && mir->isLoopHeader() && mir->id() <= current->mir()->id()) {
         for (LInstructionIterator iter = mir->lir()->begin(); iter != mir->lir()->end(); iter++) {
-            if (iter->isLabel() || iter->isMoveGroup()) {
+            if (iter->isMoveGroup()) {
                 // Continue searching for an interrupt check.
             } else if (iter->isInterruptCheckImplicit()) {
                 return iter->toInterruptCheckImplicit()->oolEntry();

@@ -95,7 +95,7 @@ InvokeConstructor(JSContext* cx, const CallArgs& args);
 /* See the fval overload of Invoke. */
 extern bool
 InvokeConstructor(JSContext* cx, Value fval, unsigned argc, const Value* argv,
-                  MutableHandleValue rval);
+                  bool newTargetInArgv, MutableHandleValue rval);
 
 /*
  * Executes a script with the given scopeChain/this. The 'type' indicates
@@ -105,7 +105,8 @@ InvokeConstructor(JSContext* cx, Value fval, unsigned argc, const Value* argv,
  */
 extern bool
 ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChain, const Value& thisv,
-              ExecuteType type, AbstractFramePtr evalInFrame, Value* result);
+              const Value& newTargetVal, ExecuteType type, AbstractFramePtr evalInFrame,
+              Value* result);
 
 /* Execute a script with the given scopeChain as global code. */
 extern bool
@@ -163,23 +164,28 @@ class ExecuteState : public RunState
     ExecuteType type_;
 
     RootedValue thisv_;
+    RootedValue newTargetValue_;
     RootedObject scopeChain_;
 
     AbstractFramePtr evalInFrame_;
     Value* result_;
 
   public:
-    ExecuteState(JSContext* cx, JSScript* script, const Value& thisv, JSObject& scopeChain,
-                 ExecuteType type, AbstractFramePtr evalInFrame, Value* result)
+    ExecuteState(JSContext* cx, JSScript* script, const Value& thisv, const Value& newTargetValue,
+                 JSObject& scopeChain, ExecuteType type, AbstractFramePtr evalInFrame,
+                 Value* result)
       : RunState(cx, Execute, script),
         type_(type),
         thisv_(cx, thisv),
+        newTargetValue_(cx, newTargetValue),
         scopeChain_(cx, &scopeChain),
         evalInFrame_(evalInFrame),
         result_(result)
     { }
 
     Value* addressOfThisv() { return thisv_.address(); }
+    Value thisv() { return thisv_; }
+    Value newTarget() { return newTargetValue_; }
     JSObject* scopeChain() const { return scopeChain_; }
     ExecuteType type() const { return type_; }
 
@@ -258,32 +264,75 @@ UnwindAllScopesInFrame(JSContext* cx, ScopeIter& si);
 extern jsbytecode*
 UnwindScopeToTryPc(JSScript* script, JSTryNote* tn);
 
-/*
- * Unwind for an uncatchable exception. This means not running finalizers, etc;
- * just preserving the basic engine stack invariants.
- */
-extern void
-UnwindForUncatchableException(JSContext* cx, const InterpreterRegs& regs);
-
 extern bool
 OnUnknownMethod(JSContext* cx, HandleObject obj, Value idval, MutableHandleValue vp);
 
-class TryNoteIter
+template <class StackDepthOp>
+class MOZ_STACK_CLASS TryNoteIter
 {
-    const InterpreterRegs& regs;
-    RootedScript script; /* TryNotIter is always stack allocated. */
-    uint32_t pcOffset;
-    JSTryNote* tn;
-    JSTryNote* tnEnd;
+    RootedScript script_;
+    uint32_t pcOffset_;
+    JSTryNote* tn_;
+    JSTryNote* tnEnd_;
+    StackDepthOp getStackDepth_;
 
-    void settle();
+    void settle() {
+        for (; tn_ != tnEnd_; ++tn_) {
+            /* If pc is out of range, try the next one. */
+            if (pcOffset_ - tn_->start >= tn_->length)
+                continue;
+
+            /*
+             * We have a note that covers the exception pc but we must check
+             * whether the interpreter has already executed the corresponding
+             * handler. This is possible when the executed bytecode implements
+             * break or return from inside a for-in loop.
+             *
+             * In this case the emitter generates additional [enditer] and [gosub]
+             * opcodes to close all outstanding iterators and execute the finally
+             * blocks. If such an [enditer] throws an exception, its pc can still
+             * be inside several nested for-in loops and try-finally statements
+             * even if we have already closed the corresponding iterators and
+             * invoked the finally blocks.
+             *
+             * To address this, we make [enditer] always decrease the stack even
+             * when its implementation throws an exception. Thus already executed
+             * [enditer] and [gosub] opcodes will have try notes with the stack
+             * depth exceeding the current one and this condition is what we use to
+             * filter them out.
+             */
+            if (tn_->stackDepth <= getStackDepth_())
+                break;
+        }
+    }
 
   public:
-    explicit TryNoteIter(JSContext* cx, const InterpreterRegs& regs);
-    bool done() const;
-    void operator++();
-    JSTryNote* operator*() const { return tn; }
+    TryNoteIter(JSContext* cx, JSScript* script, jsbytecode* pc,
+                StackDepthOp getStackDepth)
+      : script_(cx, script),
+        pcOffset_(pc - script->main()),
+        getStackDepth_(getStackDepth)
+    {
+        if (script->hasTrynotes()) {
+            tn_ = script->trynotes()->vector;
+            tnEnd_ = tn_ + script->trynotes()->length;
+        } else {
+            tn_ = tnEnd_ = nullptr;
+        }
+        settle();
+    }
+
+    void operator++() {
+        ++tn_;
+        settle();
+    }
+
+    bool done() const { return tn_ == tnEnd_; }
+    JSTryNote* operator*() const { return tn_; }
 };
+
+bool
+HandleClosingGeneratorReturn(JSContext *cx, AbstractFramePtr frame, bool ok);
 
 /************************************************************************/
 
@@ -310,7 +359,8 @@ JSObject*
 Lambda(JSContext* cx, HandleFunction fun, HandleObject parent);
 
 JSObject*
-LambdaArrow(JSContext* cx, HandleFunction fun, HandleObject parent, HandleValue thisv);
+LambdaArrow(JSContext* cx, HandleFunction fun, HandleObject parent, HandleValue thisv,
+            HandleValue newTargetv);
 
 bool
 GetElement(JSContext* cx, MutableHandleValue lref, HandleValue rref, MutableHandleValue res);
@@ -359,7 +409,7 @@ bool
 DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain, HandleFunction funArg);
 
 bool
-SetCallOperation(JSContext* cx);
+ThrowMsgOperation(JSContext* cx, const unsigned errorNum);
 
 bool
 GetAndClearException(JSContext* cx, MutableHandleValue res);
@@ -396,14 +446,21 @@ InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, Handl
 
 bool
 SpreadCallOperation(JSContext* cx, HandleScript script, jsbytecode* pc, HandleValue thisv,
-                    HandleValue callee, HandleValue arr, MutableHandleValue res);
+                    HandleValue callee, HandleValue arr, HandleValue newTarget, MutableHandleValue res);
 
-JSObject *
-NewObjectOperation(JSContext *cx, HandleScript script, jsbytecode *pc,
+JSObject*
+NewObjectOperation(JSContext* cx, HandleScript script, jsbytecode* pc,
                    NewObjectKind newKind = GenericObject);
 
-JSObject *
-NewObjectOperationWithTemplate(JSContext *cx, HandleObject templateObject);
+JSObject*
+NewObjectOperationWithTemplate(JSContext* cx, HandleObject templateObject);
+
+JSObject*
+NewArrayOperation(JSContext* cx, HandleScript script, jsbytecode* pc, uint32_t length,
+                  NewObjectKind newKind = GenericObject);
+
+JSObject*
+NewArrayOperationWithTemplate(JSContext* cx, HandleObject templateObject);
 
 inline bool
 SetConstOperation(JSContext* cx, HandleObject varobj, HandlePropertyName name, HandleValue rval)

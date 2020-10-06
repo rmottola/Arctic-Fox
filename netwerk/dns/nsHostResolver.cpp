@@ -33,7 +33,6 @@
 #include "mozilla/HashFunctions.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Telemetry.h"
-#include "mozilla/VisualEventTracer.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Preferences.h"
 
@@ -199,8 +198,6 @@ nsHostRecord::Create(const nsHostKey *key, nsHostRecord **result)
     void *place = ::operator new(size);
     *result = new(place) nsHostRecord(key);
     NS_ADDREF(*result);
-
-    MOZ_EVENT_TRACER_NAME_OBJECT(*result, key->host);
 
     return NS_OK;
 }
@@ -1058,8 +1055,6 @@ nsHostResolver::ConditionallyCreateThread(nsHostRecord *rec)
 nsresult
 nsHostResolver::IssueLookup(nsHostRecord *rec)
 {
-    MOZ_EVENT_TRACER_WAIT(rec, "net::dns::resolve");
-
     nsresult rv = NS_OK;
     NS_ASSERTION(!rec->resolving, "record is already being resolved");
 
@@ -1319,8 +1314,6 @@ nsHostResolver::OnLookupComplete(nsHostRecord* rec, nsresult status, AddrInfo* r
         }
     }
 
-    MOZ_EVENT_TRACER_DONE(rec, "net::dns::resolve");
-
     if (!PR_CLIST_IS_EMPTY(&cbs)) {
         PRCList *node = cbs.next;
         while (node != &cbs) {
@@ -1427,8 +1420,6 @@ nsHostResolver::ThreadFunc(void *arg)
              LOG_HOST(rec->host, rec->netInterface)));
 
         TimeStamp startTime = TimeStamp::Now();
-        MOZ_EVENT_TRACER_EXEC(rec, "net::dns::resolve");
-
 #if TTL_AVAILABLE
         bool getTtl = rec->mGetTtl;
 #else

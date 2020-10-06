@@ -37,7 +37,6 @@
 
 namespace JS {
 
-class Latin1CharsZ;
 class TwoByteChars;
 
 #ifdef JS_DEBUG
@@ -95,20 +94,20 @@ class AutoValueArray : public AutoGCRooter
 };
 
 template<class T>
-class AutoVectorRooter : protected AutoGCRooter
+class AutoVectorRooterBase : protected AutoGCRooter
 {
     typedef js::Vector<T, 8> VectorImpl;
     VectorImpl vector;
 
   public:
-    explicit AutoVectorRooter(JSContext* cx, ptrdiff_t tag
+    explicit AutoVectorRooterBase(JSContext* cx, ptrdiff_t tag
                               MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : AutoGCRooter(cx, tag), vector(cx)
     {
         MOZ_GUARD_OBJECT_NOTIFIER_INIT;
     }
 
-    explicit AutoVectorRooter(js::ContextFriendFields* cx, ptrdiff_t tag
+    explicit AutoVectorRooterBase(js::ContextFriendFields* cx, ptrdiff_t tag
                               MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : AutoGCRooter(cx, tag), vector(cx)
     {
@@ -121,10 +120,10 @@ class AutoVectorRooter : protected AutoGCRooter
     size_t length() const { return vector.length(); }
     bool empty() const { return vector.empty(); }
 
-    bool append(const T &v) { return vector.append(v); }
-    bool appendN(const T &v, size_t len) { return vector.appendN(v, len); }
-    bool append(const T *ptr, size_t len) { return vector.append(ptr, len); }
-    bool appendAll(const AutoVectorRooter<T> &other) {
+    bool append(const T& v) { return vector.append(v); }
+    bool appendN(const T& v, size_t len) { return vector.appendN(v, len); }
+    bool append(const T* ptr, size_t len) { return vector.append(ptr, len); }
+    bool appendAll(const AutoVectorRooterBase<T>& other) {
         return vector.appendAll(other.vector);
     }
 
@@ -190,6 +189,33 @@ class AutoVectorRooter : protected AutoGCRooter
 
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
+
+template <typename T>
+class MOZ_STACK_CLASS AutoVectorRooter : public AutoVectorRooterBase<T>
+{
+  public:
+    explicit AutoVectorRooter(JSContext* cx
+                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+        : AutoVectorRooterBase<T>(cx, this->GetTag(T()))
+    {
+        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    }
+
+    explicit AutoVectorRooter(js::ContextFriendFields* cx
+                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+        : AutoVectorRooterBase<T>(cx, this->GetTag(T()))
+    {
+        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    }
+
+    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
+};
+
+typedef AutoVectorRooter<Value> AutoValueVector;
+typedef AutoVectorRooter<jsid> AutoIdVector;
+typedef AutoVectorRooter<JSObject*> AutoObjectVector;
+typedef AutoVectorRooter<JSFunction*> AutoFunctionVector;
+typedef AutoVectorRooter<JSScript*> AutoScriptVector;
 
 template<class Key, class Value>
 class AutoHashMapRooter : protected AutoGCRooter
@@ -412,78 +438,6 @@ class AutoHashSetRooter : protected AutoGCRooter
     AutoHashSetRooter& operator=(const AutoHashSetRooter& hmr) = delete;
 
     HashSetImpl set;
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class MOZ_STACK_CLASS AutoValueVector : public AutoVectorRooter<Value>
-{
-  public:
-    explicit AutoValueVector(JSContext* cx
-                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<Value>(cx, VALVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoIdVector : public AutoVectorRooter<jsid>
-{
-  public:
-    explicit AutoIdVector(JSContext* cx
-                          MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<jsid>(cx, IDVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoObjectVector : public AutoVectorRooter<JSObject*>
-{
-  public:
-    explicit AutoObjectVector(JSContext* cx
-                              MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<JSObject*>(cx, OBJVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoFunctionVector : public AutoVectorRooter<JSFunction*>
-{
-  public:
-    explicit AutoFunctionVector(JSContext* cx
-                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<JSFunction*>(cx, FUNVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    explicit AutoFunctionVector(js::ContextFriendFields* cx
-                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<JSFunction*>(cx, FUNVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-class AutoScriptVector : public AutoVectorRooter<JSScript*>
-{
-  public:
-    explicit AutoScriptVector(JSContext* cx
-                              MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-        : AutoVectorRooter<JSScript*>(cx, SCRIPTVECTOR)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
 
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
@@ -758,6 +712,18 @@ typedef void
 (* JSCompartmentNameCallback)(JSRuntime* rt, JSCompartment* compartment,
                               char* buf, size_t bufsize);
 
+/**
+ * Callback used to ask the embedding to determine in which
+ * Performance Group the current execution belongs. Typically, this is
+ * used to regroup JSCompartments from several iframes from the same
+ * page or from several compartments of the same addon into a single
+ * Performance Group.
+ *
+ * Returns an opaque key.
+ */
+typedef void*
+(* JSCurrentPerfGroupCallback)(JSContext*);
+
 /************************************************************************/
 
 static MOZ_ALWAYS_INLINE jsval
@@ -977,7 +943,7 @@ extern JS_PUBLIC_API(JSString*)
 JS_ValueToSource(JSContext* cx, JS::Handle<JS::Value> v);
 
 extern JS_PUBLIC_API(bool)
-JS_DoubleIsInt32(double d, int32_t *ip);
+JS_DoubleIsInt32(double d, int32_t* ip);
 
 extern JS_PUBLIC_API(JSType)
 JS_TypeOfValue(JSContext* cx, JS::Handle<JS::Value> v);
@@ -1171,11 +1137,12 @@ namespace JS {
 class JS_PUBLIC_API(RuntimeOptions) {
   public:
     RuntimeOptions()
-      : baseline_(false),
-        ion_(false),
-        asmJS_(false),
-        nativeRegExp_(false),
-        unboxedObjects_(false),
+      : baseline_(true),
+        ion_(true),
+        asmJS_(true),
+        nativeRegExp_(true),
+        unboxedObjects_(false), // Not enabled by default yet
+        unboxedArrays_(false), // Ditto
         werror_(false),
         strictMode_(false),
         extraWarnings_(false),
@@ -1225,6 +1192,12 @@ class JS_PUBLIC_API(RuntimeOptions) {
         return *this;
     }
 
+    bool unboxedArrays() const { return unboxedArrays_; }
+    RuntimeOptions& setUnboxedArrays(bool flag) {
+        unboxedArrays_ = flag;
+        return *this;
+    }
+
     bool werror() const { return werror_; }
     RuntimeOptions& setWerror(bool flag) {
         werror_ = flag;
@@ -1271,6 +1244,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool asmJS_ : 1;
     bool nativeRegExp_ : 1;
     bool unboxedObjects_ : 1;
+    bool unboxedArrays_ : 1;
     bool werror_ : 1;
     bool strictMode_ : 1;
     bool extraWarnings_ : 1;
@@ -1499,6 +1473,9 @@ JS_InitStandardClasses(JSContext* cx, JS::Handle<JSObject*> obj);
  */
 extern JS_PUBLIC_API(bool)
 JS_ResolveStandardClass(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolved);
+
+extern JS_PUBLIC_API(bool)
+JS_MayResolveStandardClass(const JSAtomState& names, jsid id, JSObject* maybeObj);
 
 extern JS_PUBLIC_API(bool)
 JS_EnumerateStandardClasses(JSContext* cx, JS::HandleObject obj);
@@ -2449,8 +2426,8 @@ extern JS_PUBLIC_API(JSRuntime*)
 JS_GetObjectRuntime(JSObject* obj);
 
 /*
- * Unlike JS_NewObject, JS_NewObjectWithGivenProto does not compute a default proto.
- * If proto is JS::NullPtr, the JS object will have `null` as [[Prototype]].
+ * Unlike JS_NewObject, JS_NewObjectWithGivenProto does not compute a default
+ * proto. If proto is nullptr, the JS object will have `null` as [[Prototype]].
  */
 extern JS_PUBLIC_API(JSObject *)
 JS_NewObjectWithGivenProto(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto);
@@ -2595,7 +2572,7 @@ class PropertyDescriptorOperations
             MOZ_ASSERT(!has(JSPROP_IGNORE_READONLY));
             MOZ_ASSERT(!has(JSPROP_IGNORE_VALUE));
             MOZ_ASSERT(!has(SHADOWABLE));
-            MOZ_ASSERT(desc()->value.isUndefined());
+            MOZ_ASSERT(value().isUndefined());
             MOZ_ASSERT_IF(!has(JSPROP_GETTER), !getter());
             MOZ_ASSERT_IF(!has(JSPROP_SETTER), !setter());
         } else {
@@ -2693,7 +2670,19 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         value().set(v);
     }
 
-    void setEnumerable() { desc()->attrs |= JSPROP_ENUMERATE; }
+    void setConfigurable(bool configurable) {
+        setAttributes((desc()->attrs & ~(JSPROP_IGNORE_PERMANENT | JSPROP_PERMANENT)) |
+                      (configurable ? 0 : JSPROP_PERMANENT));
+    }
+    void setEnumerable(bool enumerable) {
+        setAttributes((desc()->attrs & ~(JSPROP_IGNORE_ENUMERATE | JSPROP_ENUMERATE)) |
+                      (enumerable ? JSPROP_ENUMERATE : 0));
+    }
+    void setWritable(bool writable) {
+        MOZ_ASSERT(!(desc()->attrs & (JSPROP_GETTER | JSPROP_SETTER)));
+        setAttributes((desc()->attrs & ~(JSPROP_IGNORE_READONLY | JSPROP_READONLY)) |
+                      (writable ? 0 : JSPROP_READONLY));
+    }
     void setAttributes(unsigned attrs) { desc()->attrs = attrs; }
 
     void setGetter(JSGetterOp op) {
@@ -2704,8 +2693,16 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         MOZ_ASSERT(op != JS_StrictPropertyStub);
         desc()->setter = op;
     }
-    void setGetterObject(JSObject *obj) { desc()->getter = reinterpret_cast<JSGetterOp>(obj); }
-    void setSetterObject(JSObject *obj) { desc()->setter = reinterpret_cast<JSSetterOp>(obj); }
+    void setGetterObject(JSObject* obj) {
+        desc()->getter = reinterpret_cast<JSGetterOp>(obj);
+        desc()->attrs &= ~(JSPROP_IGNORE_VALUE | JSPROP_IGNORE_READONLY | JSPROP_READONLY);
+        desc()->attrs |= JSPROP_GETTER | JSPROP_SHARED;
+    }
+    void setSetterObject(JSObject* obj) {
+        desc()->setter = reinterpret_cast<JSSetterOp>(obj);
+        desc()->attrs &= ~(JSPROP_IGNORE_VALUE | JSPROP_IGNORE_READONLY | JSPROP_READONLY);
+        desc()->attrs |= JSPROP_SETTER | JSPROP_SHARED;
+    }
 
     JS::MutableHandleObject getterObject() {
         MOZ_ASSERT(this->hasGetterObject());
@@ -3149,16 +3146,16 @@ JS_SetReservedSlot(JSObject* obj, uint32_t index, jsval v);
 /*
  * Functions and scripts.
  */
-extern JS_PUBLIC_API(JSFunction *)
-JS_NewFunction(JSContext *cx, JSNative call, unsigned nargs, unsigned flags,
-               const char *name);
+extern JS_PUBLIC_API(JSFunction*)
+JS_NewFunction(JSContext* cx, JSNative call, unsigned nargs, unsigned flags,
+               const char* name);
 
 /*
  * Create the function with the name given by the id. JSID_IS_STRING(id) must
  * be true.
  */
-extern JS_PUBLIC_API(JSFunction *)
-JS_NewFunctionById(JSContext *cx, JSNative call, unsigned nargs, unsigned flags,
+extern JS_PUBLIC_API(JSFunction*)
+JS_NewFunctionById(JSContext* cx, JSNative call, unsigned nargs, unsigned flags,
                    JS::Handle<jsid> id);
 
 namespace JS {
@@ -5413,14 +5410,14 @@ struct PerformanceGroup {
 
     // Mark that an instance of `AutoStopwatch` is monitoring
     // the performance of this group for a given iteration.
-    void acquireStopwatch(uint64_t iteration, const AutoStopwatch *stopwatch) {
+    void acquireStopwatch(uint64_t iteration, const AutoStopwatch* stopwatch) {
         iteration_ = iteration;
         stopwatch_ = stopwatch;
     }
 
     // Mark that no `AutoStopwatch` is monitoring the
     // performance of this group for the iteration.
-    void releaseStopwatch(uint64_t iteration, const AutoStopwatch *stopwatch) {
+    void releaseStopwatch(uint64_t iteration, const AutoStopwatch* stopwatch) {
         if (iteration_ != iteration)
             return;
 
@@ -5428,9 +5425,10 @@ struct PerformanceGroup {
         stopwatch_ = nullptr;
     }
 
-    PerformanceGroup()
+    explicit PerformanceGroup(void* key)
       : stopwatch_(nullptr)
       , iteration_(0)
+      , key_(key)
       , refCount_(0)
     { }
     ~PerformanceGroup()
@@ -5443,11 +5441,14 @@ struct PerformanceGroup {
 
     // The stopwatch currently monitoring the group,
     // or `nullptr` if none. Used ony for comparison.
-    const AutoStopwatch *stopwatch_;
+    const AutoStopwatch* stopwatch_;
 
     // The current iteration of the event loop. If necessary,
     // may safely overflow.
     uint64_t iteration_;
+
+    // The hash key for this PerformanceGroup.
+    void* const key_;
 
     // Increment/decrement the refcounter, return the updated value.
     uint64_t incRefCount() {
@@ -5460,7 +5461,7 @@ struct PerformanceGroup {
     }
     friend struct PerformanceGroupHolder;
 
-  private:
+private:
     // A reference counter. Maintained by PerformanceGroupHolder.
     uint64_t refCount_;
 };
@@ -5473,7 +5474,7 @@ struct PerformanceGroupHolder {
     // Get the group.
     // On first call, this causes a single Hashtable lookup.
     // Successive calls do not require further lookups.
-    js::PerformanceGroup *getGroup();
+    js::PerformanceGroup* getGroup(JSContext*);
 
     // `true` if the this holder is currently associated to a
     // PerformanceGroup, `false` otherwise. Use this method to avoid
@@ -5488,9 +5489,8 @@ struct PerformanceGroupHolder {
     // (new values of `isSystem()`, `principals()` or `addonId`).
     void unlink();
 
-    PerformanceGroupHolder(JSRuntime *runtime, JSCompartment *compartment)
+    explicit PerformanceGroupHolder(JSRuntime* runtime)
       : runtime_(runtime)
-      , compartment_(compartment)
       , group_(nullptr)
     {   }
     ~PerformanceGroupHolder();
@@ -5498,15 +5498,14 @@ private:
     // Return the key representing this PerformanceGroup in
     // Runtime::Stopwatch.
     // Do not deallocate the key.
-    void* getHashKey();
+    void* getHashKey(JSContext* cx);
 
     JSRuntime *runtime_;
-    JSCompartment *compartment_;
 
     // The PerformanceGroup held by this object.
     // Initially set to `nullptr` until the first cal to `getGroup`.
     // May be reset to `nullptr` by a call to `unlink`.
-    js::PerformanceGroup *group_;
+    js::PerformanceGroup* group_;
 };
 
 /**
@@ -5520,11 +5519,19 @@ ResetStopwatches(JSRuntime*);
 /**
  * Turn on/off stopwatch-based CPU monitoring.
  *
- * `SetStopwatchActive` may return `false` if monitoring could not be
- * activated, which may happen if we are out of memory.
+ * `SetStopwatchIsMonitoringCPOW` or `SetStopwatchIsMonitoringJank`
+ * may return `false` if monitoring could not be activated, which may
+ * happen if we are out of memory.
  */
 extern JS_PUBLIC_API(bool)
-SetStopwatchActive(JSRuntime*, bool);
+SetStopwatchIsMonitoringCPOW(JSRuntime*, bool);
+extern JS_PUBLIC_API(bool)
+GetStopwatchIsMonitoringCPOW(JSRuntime*);
+extern JS_PUBLIC_API(bool)
+SetStopwatchIsMonitoringJank(JSRuntime*, bool);
+extern JS_PUBLIC_API(bool)
+GetStopwatchIsMonitoringJank(JSRuntime*);
+
 extern JS_PUBLIC_API(bool)
 IsStopwatchActive(JSRuntime*);
 
@@ -5534,56 +5541,30 @@ IsStopwatchActive(JSRuntime*);
 extern JS_PUBLIC_API(PerformanceData*)
 GetPerformanceData(JSRuntime*);
 
+typedef bool
+(PerformanceStatsWalker)(JSContext* cx, const PerformanceData& stats, void* closure);
+
 /**
- * Performance statistics for a performance group (a process, an
- * add-on, a webpage, the built-ins or a special compartment).
- */
-struct PerformanceStats {
-    /**
-     * If this group represents an add-on, the ID of the addon,
-     * otherwise `nullptr`.
-     */
-    JSAddonId *addonId;
-
-    /**
-     * If this group represents a webpage, the process itself or a special
-     * compartment, a human-readable name. Unspecified for add-ons.
-     */
-    char name[1024];
-
-    /**
-     * `true` if the group represents in system compartments, `false`
-     * otherwise. A group may never contain both system and non-system
-     * compartments.
-     */
-    bool isSystem;
-
-    /**
-     * Performance information.
-     */
-    js::PerformanceData performance;
-
-    PerformanceStats()
-      : addonId(nullptr)
-      , isSystem(false)
-    {
-        name[0] = '\0';
-    }
-};
-
-typedef js::Vector<PerformanceStats, 0, js::SystemAllocPolicy> PerformanceStatsVector;
-
-    /**
  * Extract the performance statistics.
  *
- * After a successful call, `stats` holds the `PerformanceStats` for
- * all performance groups, and `global` holds a `PerformanceStats`
- * representing the entire process.
+ * Note that before calling `walker`, we enter the corresponding context.
  */
 extern JS_PUBLIC_API(bool)
-GetPerformanceStats(JSRuntime *rt, js::PerformanceStatsVector &stats, js::PerformanceStats &global);
+IterPerformanceStats(JSContext* cx, PerformanceStatsWalker* walker, js::PerformanceData* process, void* closure);
 
 } /* namespace js */
+
+/**
+ * Callback used to ask the embedding to determine in which
+ * Performance Group a compartment belongs. Typically, this is used to
+ * regroup JSCompartments from several iframes from the same page or
+ * from several compartments of the same addon into a single
+ * Performance Group.
+ *
+ * Returns an opaque key.
+ */
+extern JS_PUBLIC_API(void)
+JS_SetCurrentPerfGroupCallback(JSRuntime *rt, JSCurrentPerfGroupCallback cb);
 
 
 #endif /* jsapi_h */

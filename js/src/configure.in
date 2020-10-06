@@ -1556,6 +1556,7 @@ case "$target" in
     ;;
 
 *-darwin*)
+    AC_DEFINE(XP_DARWIN)
     MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
     MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
     MOZ_OPTIMIZE_FLAGS="-O3 -fno-stack-protector"
@@ -2954,10 +2955,28 @@ fi
 dnl ========================================================
 dnl = Enable jemalloc
 dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(jemalloc,
-[  --enable-jemalloc       Replace memory allocator with jemalloc],
-    MOZ_MEMORY=1,
-    MOZ_MEMORY=)
+
+LOCAL_MOZ_MEMORY=1
+MOZ_ARG_DISABLE_BOOL(jemalloc,
+[  --disable-jemalloc       Don't replace memory allocator with jemalloc],
+    LOCAL_MOZ_MEMORY=)
+
+dnl Consult the command-line arguments in stand alone-builds only. In
+dnl non-stand-alone builds, we always use the value of MOZ_MEMORY inherited from
+dnl the top-level configure script.
+if test "$JS_STANDALONE"; then
+    MOZ_MEMORY=$LOCAL_MOZ_MEMORY
+fi
+
+case "${OS_TARGET}" in
+Android|WINNT|Darwin)
+  MOZ_GLUE_IN_PROGRAM=
+  ;;
+*)
+  dnl On !Android !Windows !OSX, we only want to link executables against mozglue
+  MOZ_GLUE_IN_PROGRAM=1
+  ;;
+esac
 
 if test "$MOZ_MEMORY"; then
   AC_DEFINE(MOZ_MEMORY)

@@ -3,7 +3,7 @@
 
 // Tests if platform frames are removed from the flame graph data.
 
-let {FlameGraphUtils} = Cu.import("resource://gre/modules/devtools/FlameGraph.jsm", {});
+let {FlameGraphUtils, FLAME_GRAPH_BLOCK_HEIGHT} = devtools.require("devtools/shared/widgets/FlameGraph");
 let {FrameNode} = devtools.require("devtools/shared/profiler/tree-model");
 
 add_task(function*() {
@@ -13,14 +13,16 @@ add_task(function*() {
 });
 
 function* performTest() {
-  let out = FlameGraphUtils.createFlameGraphDataFromSamples(TEST_DATA, {
-    filterFrames: FrameNode.isContent
+  let out = FlameGraphUtils.createFlameGraphDataFromThread(TEST_DATA, {
+    contentOnly: true
   });
 
   ok(out, "Some data was outputted properly");
   is(out.length, 10, "The outputted length is correct.");
 
   info("Got flame graph data:\n" + out.toSource() + "\n");
+
+  dump(JSON.stringify(out, undefined, 2));
 
   for (let i = 0; i < out.length; i++) {
     let found = out[i];
@@ -44,7 +46,7 @@ function* performTest() {
   }
 }
 
-let TEST_DATA = [{
+let TEST_DATA = synthesizeProfileForTest([{
   frames: [{
     location: "http://A"
   }, {
@@ -57,7 +59,7 @@ let TEST_DATA = [{
     location: "resource://E"
   }],
   time: 50,
-}];
+}]);
 
 let EXPECTED_OUTPUT = [{
   blocks: []
@@ -72,7 +74,7 @@ let EXPECTED_OUTPUT = [{
     x: 0,
     y: 0,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "http://A"
   }, {
     srcData: {
@@ -80,15 +82,11 @@ let EXPECTED_OUTPUT = [{
       rawLocation: "file://C"
     },
     x: 0,
-    y: 22,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 2,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "file://C"
   }]
-}, {
-  blocks: []
-}, {
-  blocks: []
 }, {
   blocks: []
 }, {
@@ -99,12 +97,26 @@ let EXPECTED_OUTPUT = [{
   blocks: [{
     srcData: {
       startTime: 0,
+      rawLocation: "Gecko"
+    },
+    x: 0,
+    y: FLAME_GRAPH_BLOCK_HEIGHT * 3,
+    width: 50,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
+    text: "Gecko"
+  }]
+}, {
+  blocks: []
+}, {
+  blocks: [{
+    srcData: {
+      startTime: 0,
       rawLocation: "https://B"
     },
     x: 0,
-    y: 11,
+    y: FLAME_GRAPH_BLOCK_HEIGHT,
     width: 50,
-    height: 11,
+    height: FLAME_GRAPH_BLOCK_HEIGHT,
     text: "https://B"
   }]
 }, {

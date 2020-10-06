@@ -66,7 +66,8 @@ namespace jit {
     _(Lambda)                                   \
     _(SimdBox)                                  \
     _(ObjectState)                              \
-    _(ArrayState)
+    _(ArrayState)                               \
+    _(AssertRecoveredOnBailout)
 
 class RResumePoint;
 class SnapshotIterator;
@@ -737,6 +738,18 @@ class RArrayState final : public RInstruction
     }
 
     bool recover(JSContext* cx, SnapshotIterator& iter) const;
+};
+
+class RAssertRecoveredOnBailout final : public RInstruction
+{
+  public:
+    RINSTRUCTION_HEADER_(AssertRecoveredOnBailout)
+
+    virtual uint32_t numOperands() const {
+        return 1;
+    }
+
+    bool recover(JSContext *cx, SnapshotIterator &iter) const;
 };
 
 #undef RINSTRUCTION_HEADER_

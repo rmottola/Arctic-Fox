@@ -303,7 +303,7 @@ class GlobalObject : public NativeObject
      */
     JSFunction*
     createConstructor(JSContext* cx, JSNative ctor, JSAtom* name, unsigned length,
-                      gc::AllocKind kind = JSFunction::FinalizeKind);
+                      gc::AllocKind kind = gc::AllocKind::FUNCTION);
 
     /*
      * Create an object to serve as [[Prototype]] for instances of the given
@@ -686,7 +686,7 @@ class GlobalObject : public NativeObject
      * The collection of Debugger objects debugging this global. If this global
      * is not a debuggee, this returns either nullptr or an empty vector.
      */
-    DebuggerVector* getDebuggers();
+    DebuggerVector* getDebuggers() const;
 
     /*
      * The same, but create the empty vector if one does not already

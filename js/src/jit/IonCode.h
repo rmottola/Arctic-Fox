@@ -22,13 +22,9 @@
 #include "vm/TypeInference.h"
 
 namespace js {
-
-class AsmJSModule;
-
 namespace jit {
 
 class MacroAssembler;
-class CodeOffsetLabel;
 class PatchableBackedge;
 class IonBuilder;
 
@@ -107,7 +103,7 @@ class JitCode : public gc::TenuredCell
     size_t instructionsSize() const {
         return insnSize_;
     }
-    void trace(JSTracer* trc);
+    void traceChildren(JSTracer* trc);
     void finalize(FreeOp* fop);
     void fixupAfterMovingGC() {}
     void setInvalidated() {
@@ -507,7 +503,6 @@ struct IonScript
     }
     void toggleBarriers(bool enabled);
     void purgeCaches();
-    void destroyCaches();
     void unlinkFromRuntime(FreeOp* fop);
     void copySnapshots(const SnapshotWriter* writer);
     void copyRecovers(const RecoverWriter* writer);
@@ -727,9 +722,6 @@ struct IonScriptCounts
 };
 
 struct VMFunction;
-
-class JitCompartment;
-class JitRuntime;
 
 struct AutoFlushICache
 {

@@ -80,7 +80,7 @@ struct CGYieldOffsetList {
 
     bool append(uint32_t offset) { return list.append(offset); }
     size_t length() const { return list.length(); }
-    void finish(YieldOffsetArray& array, uint32_t prologLength);
+    void finish(YieldOffsetArray& array, uint32_t prologueLength);
 };
 
 struct LoopStmtInfo;
@@ -107,15 +107,15 @@ struct BytecodeEmitter
 {
     typedef StmtInfoBCE StmtInfo;
 
-    SharedContext *const sc;      /* context shared between parsing and bytecode generation */
+    SharedContext* const sc;      /* context shared between parsing and bytecode generation */
 
-    ExclusiveContext *const cx;
+    ExclusiveContext* const cx;
 
-    BytecodeEmitter *const parent;  /* enclosing function or global context */
+    BytecodeEmitter* const parent;  /* enclosing function or global context */
 
     Rooted<JSScript*> script;       /* the JSScript we're ultimately producing */
 
-    Rooted<LazyScript *> lazyScript; /* the lazy script if mode is LazyFunction,
+    Rooted<LazyScript*> lazyScript; /* the lazy script if mode is LazyFunction,
                                         nullptr otherwise. */
 
     struct EmitSection {
@@ -126,21 +126,19 @@ struct BytecodeEmitter
         uint32_t    lastColumn;     /* zero-based column index on currentLine of
                                        last SRC_COLSPAN-annotated opcode */
 
-        EmitSection(ExclusiveContext *cx, uint32_t lineNum)
+        EmitSection(ExclusiveContext* cx, uint32_t lineNum)
           : code(cx), notes(cx), lastNoteOffset(0), currentLine(lineNum), lastColumn(0)
         {}
     };
-    EmitSection prolog, main, *current;
+    EmitSection prologue, main,* current;
 
     /* the parser */
     Parser<FullParseHandler>* const parser;
 
     HandleScript    evalCaller;     /* scripted caller info for eval and dbgapi */
-    Handle<StaticEvalObject*> evalStaticScope;
-                                   /* compile time scope for eval; does not imply stmt stack */
 
-    StmtInfoBCE    *topStmt;       /* top of statement info stack */
-    StmtInfoBCE    *topScopeStmt;  /* top lexical scope statement */
+    StmtInfoBCE*    topStmt;       /* top of statement info stack */
+    StmtInfoBCE*    topScopeStmt;  /* top lexical scope statement */
     Rooted<NestedScopeObject*> staticScope;
                                     /* compile time scope chain */
 
@@ -219,11 +217,10 @@ struct BytecodeEmitter
      * tempLifoAlloc and save the pointer beyond the next BytecodeEmitter
      * destruction.
      */
-    BytecodeEmitter(BytecodeEmitter *parent, Parser<FullParseHandler> *parser, SharedContext *sc,
-                    HandleScript script, Handle<LazyScript *> lazyScript,
+    BytecodeEmitter(BytecodeEmitter* parent, Parser<FullParseHandler>* parser, SharedContext* sc,
+                    HandleScript script, Handle<LazyScript*> lazyScript,
                     bool insideEval, HandleScript evalCaller,
-                    Handle<StaticEvalObject *> evalStaticScope, bool insideNonGlobalEval,
-                    uint32_t lineNum, EmitterMode emitterMode = Normal);
+                    bool insideNonGlobalEval, uint32_t lineNum, EmitterMode emitterMode = Normal);
     bool init();
     bool updateLocalsToFrameSlots();
 
@@ -261,9 +258,9 @@ struct BytecodeEmitter
     BytecodeVector& code() const { return current->code; }
     jsbytecode* code(ptrdiff_t offset) const { return current->code.begin() + offset; }
     ptrdiff_t offset() const { return current->code.end() - current->code.begin(); }
-    ptrdiff_t prologOffset() const { return prolog.code.end() - prolog.code.begin(); }
+    ptrdiff_t prologueOffset() const { return prologue.code.end() - prologue.code.begin(); }
     void switchToMain() { current = &main; }
-    void switchToProlog() { current = &prolog; }
+    void switchToPrologue() { current = &prologue; }
 
     SrcNotesVector& notes() const { return current->notes; }
     ptrdiff_t lastNoteOffset() const { return current->lastNoteOffset; }
@@ -271,8 +268,8 @@ struct BytecodeEmitter
     unsigned lastColumn() const { return current->lastColumn; }
 
     bool reportError(ParseNode* pn, unsigned errorNumber, ...);
-    bool reportStrictWarning(ParseNode *pn, unsigned errorNumber, ...);
-    bool reportStrictModeError(ParseNode *pn, unsigned errorNumber, ...);
+    bool reportStrictWarning(ParseNode* pn, unsigned errorNumber, ...);
+    bool reportStrictModeError(ParseNode* pn, unsigned errorNumber, ...);
 
     // If pn contains a useful expression, return true with *answer set to true.
     // If pn contains a useless expression, return true with *answer set to
@@ -284,7 +281,7 @@ struct BytecodeEmitter
     // statement, we define useless code as code with no side effects, because
     // the main effect, the value left on the stack after the code executes,
     // will be discarded by a pop bytecode.
-    bool checkSideEffects(ParseNode *pn, bool *answer);
+    bool checkSideEffects(ParseNode* pn, bool* answer);
 
     bool inTryBlockWithFinally();
 
@@ -295,28 +292,28 @@ struct BytecodeEmitter
     // Append a new source note of the given type (and therefore size) to the
     // notes dynamic array, updating noteCount. Return the new note's index
     // within the array pointed at by current->notes as outparam.
-    bool newSrcNote(SrcNoteType type, unsigned *indexp = nullptr);
-    bool newSrcNote2(SrcNoteType type, ptrdiff_t offset, unsigned *indexp = nullptr);
+    bool newSrcNote(SrcNoteType type, unsigned* indexp = nullptr);
+    bool newSrcNote2(SrcNoteType type, ptrdiff_t offset, unsigned* indexp = nullptr);
     bool newSrcNote3(SrcNoteType type, ptrdiff_t offset1, ptrdiff_t offset2,
-                     unsigned *indexp = nullptr);
+                     unsigned* indexp = nullptr);
 
-    void copySrcNotes(jssrcnote *destination, uint32_t nsrcnotes);
+    void copySrcNotes(jssrcnote* destination, uint32_t nsrcnotes);
     bool setSrcNoteOffset(unsigned index, unsigned which, ptrdiff_t offset);
 
     // NB: this function can add at most one extra extended delta note.
-    bool addToSrcNoteDelta(jssrcnote *sn, ptrdiff_t delta);
+    bool addToSrcNoteDelta(jssrcnote* sn, ptrdiff_t delta);
 
     // Finish taking source notes in cx's notePool. If successful, the final
     // source note count is stored in the out outparam.
-    bool finishTakingSrcNotes(uint32_t *out);
+    bool finishTakingSrcNotes(uint32_t* out);
 
     void setJumpOffsetAt(ptrdiff_t off);
 
     // Emit code for the tree rooted at pn.
-    bool emitTree(ParseNode *pn);
+    bool emitTree(ParseNode* pn);
 
     // Emit function code for the tree rooted at body.
-    bool emitFunctionScript(ParseNode *body);
+    bool emitFunctionScript(ParseNode* body);
 
     // If op is JOF_TYPESET (see the type barriers comment in TypeInference.h),
     // reserve a type set to store its result.
@@ -326,52 +323,52 @@ struct BytecodeEmitter
     bool updateLineNumberNotes(uint32_t offset);
     bool updateSourceCoordNotes(uint32_t offset);
 
-    bool bindNameToSlot(ParseNode *pn);
-    bool bindNameToSlotHelper(ParseNode *pn);
+    bool bindNameToSlot(ParseNode* pn);
+    bool bindNameToSlotHelper(ParseNode* pn);
 
-    void strictifySetNameNode(ParseNode *pn);
+    void strictifySetNameNode(ParseNode* pn);
     JSOp strictifySetNameOp(JSOp op);
 
-    bool tryConvertFreeName(ParseNode *pn);
+    bool tryConvertFreeName(ParseNode* pn);
 
     void popStatement();
-    void pushStatement(StmtInfoBCE *stmt, StmtType type, ptrdiff_t top);
-    void pushStatementInner(StmtInfoBCE *stmt, StmtType type, ptrdiff_t top);
-    void pushLoopStatement(LoopStmtInfo *stmt, StmtType type, ptrdiff_t top);
+    void pushStatement(StmtInfoBCE* stmt, StmtType type, ptrdiff_t top);
+    void pushStatementInner(StmtInfoBCE* stmt, StmtType type, ptrdiff_t top);
+    void pushLoopStatement(LoopStmtInfo* stmt, StmtType type, ptrdiff_t top);
 
     // Return the enclosing lexical scope, which is the innermost enclosing static
     // block object or compiler created function.
-    JSObject *enclosingStaticScope();
+    JSObject* enclosingStaticScope();
 
     // Compute the number of nested scope objects that will actually be on the
     // scope chain at runtime, given the current staticScope.
     unsigned dynamicNestedScopeDepth();
 
-    bool enterNestedScope(StmtInfoBCE *stmt, ObjectBox *objbox, StmtType stmtType);
-    bool leaveNestedScope(StmtInfoBCE *stmt);
+    bool enterNestedScope(StmtInfoBCE* stmt, ObjectBox* objbox, StmtType stmtType);
+    bool leaveNestedScope(StmtInfoBCE* stmt);
 
-    bool enterBlockScope(StmtInfoBCE *stmtInfo, ObjectBox *objbox, JSOp initialValueOp,
+    bool enterBlockScope(StmtInfoBCE* stmtInfo, ObjectBox* objbox, JSOp initialValueOp,
                          unsigned alreadyPushed = 0);
 
-    bool computeAliasedSlots(Handle<StaticBlockObject *> blockObj);
+    bool computeAliasedSlots(Handle<StaticBlockObject*> blockObj);
 
-    bool lookupAliasedName(HandleScript script, PropertyName *name, uint32_t *pslot,
-                           ParseNode *pn = nullptr);
-    bool lookupAliasedNameSlot(PropertyName *name, ScopeCoordinate *sc);
+    bool lookupAliasedName(HandleScript script, PropertyName* name, uint32_t* pslot,
+                           ParseNode* pn = nullptr);
+    bool lookupAliasedNameSlot(PropertyName* name, ScopeCoordinate* sc);
 
     // Use this function instead of assigning directly to 'hops' to guard for
     // uint8_t overflows.
-    bool assignHops(ParseNode *pn, unsigned src, ScopeCoordinate *dst);
+    bool assignHops(ParseNode* pn, unsigned src, ScopeCoordinate* dst);
 
     // In a function, block-scoped locals go after the vars, and form part of the
     // fixed part of a stack frame.  Outside a function, there are no fixed vars,
     // but block-scoped locals still form part of the fixed part of a stack frame
     // and are thus addressable via GETLOCAL and friends.
-    void computeLocalOffset(Handle<StaticBlockObject *> blockObj);
+    void computeLocalOffset(Handle<StaticBlockObject*> blockObj);
 
-    bool flushPops(int *npops);
+    bool flushPops(int* npops);
 
-    bool emitCheck(ptrdiff_t delta, ptrdiff_t *offset);
+    bool emitCheck(ptrdiff_t delta, ptrdiff_t* offset);
 
     // Emit one bytecode.
     bool emit1(JSOp op);
@@ -397,45 +394,49 @@ struct BytecodeEmitter
 
     // Emit a bytecode followed by an uint16 immediate operand stored in
     // big-endian order.
-    bool emitUint16Operand(JSOp op, uint32_t i);
+    bool emitUint16Operand(JSOp op, uint32_t operand);
+
+    // Emit a bytecode followed by an uint32 immediate operand.
+    bool emitUint32Operand(JSOp op, uint32_t operand);
 
     // Emit (1 + extra) bytecodes, for N bytes of op and its immediate operand.
-    bool emitN(JSOp op, size_t extra, ptrdiff_t *offset = nullptr);
+    bool emitN(JSOp op, size_t extra, ptrdiff_t* offset = nullptr);
 
     bool emitNumberOp(double dval);
 
-    bool emitJump(JSOp op, ptrdiff_t off, ptrdiff_t *jumpOffset = nullptr);
-    bool emitCall(JSOp op, uint16_t argc, ParseNode *pn = nullptr);
+    bool emitJump(JSOp op, ptrdiff_t off, ptrdiff_t* jumpOffset = nullptr);
+    bool emitCall(JSOp op, uint16_t argc, ParseNode* pn = nullptr);
 
-    bool emitLoopHead(ParseNode *nextpn);
-    bool emitLoopEntry(ParseNode *nextpn);
+    bool emitLoopHead(ParseNode* nextpn);
+    bool emitLoopEntry(ParseNode* nextpn);
 
     // Emit a backpatch op with offset pointing to the previous jump of this
     // type, so that we can walk back up the chain fixing up the op and jump
     // offset.
-    bool emitBackPatchOp(ptrdiff_t *lastp);
-    void backPatch(ptrdiff_t last, jsbytecode *target, jsbytecode op);
+    bool emitBackPatchOp(ptrdiff_t* lastp);
+    void backPatch(ptrdiff_t last, jsbytecode* target, jsbytecode op);
 
-    bool emitGoto(StmtInfoBCE *toStmt, ptrdiff_t *lastp, SrcNoteType noteType = SRC_NULL);
+    bool emitGoto(StmtInfoBCE* toStmt, ptrdiff_t* lastp, SrcNoteType noteType = SRC_NULL);
 
     bool emitIndex32(JSOp op, uint32_t index);
     bool emitIndexOp(JSOp op, uint32_t index);
 
-    bool emitAtomOp(JSAtom *atom, JSOp op);
-    bool emitAtomOp(ParseNode *pn, JSOp op);
+    bool emitAtomOp(JSAtom* atom, JSOp op);
+    bool emitAtomOp(ParseNode* pn, JSOp op);
 
-    bool emitArray(ParseNode *pn, uint32_t count);
-    bool emitArrayComp(ParseNode *pn);
+    bool emitArray(ParseNode* pn, uint32_t count, JSOp op);
+    bool emitArrayComp(ParseNode* pn);
 
     bool emitInternedObjectOp(uint32_t index, JSOp op);
-    bool emitObjectOp(ObjectBox *objbox, JSOp op);
-    bool emitObjectPairOp(ObjectBox *objbox1, ObjectBox *objbox2, JSOp op);
+    bool emitObjectOp(ObjectBox* objbox, JSOp op);
+    bool emitObjectPairOp(ObjectBox* objbox1, ObjectBox* objbox2, JSOp op);
     bool emitRegExp(uint32_t index);
 
-    MOZ_NEVER_INLINE bool emitFunction(ParseNode *pn, bool needsProto = false);
-    MOZ_NEVER_INLINE bool emitObject(ParseNode *pn);
+    bool arrowNeedsNewTarget();
+    MOZ_NEVER_INLINE bool emitFunction(ParseNode* pn, bool needsProto = false);
+    MOZ_NEVER_INLINE bool emitObject(ParseNode* pn);
 
-    bool emitPropertyList(ParseNode *pn, MutableHandlePlainObject objp, PropListType type);
+    bool emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp, PropListType type);
 
     // To catch accidental misuse, emitUint16Operand/emit3 assert that they are
     // not used to unconditionally emit JSOP_GETLOCAL. Variable access should
@@ -445,52 +446,52 @@ struct BytecodeEmitter
     bool emitLocalOp(JSOp op, uint32_t slot);
 
     bool emitScopeCoordOp(JSOp op, ScopeCoordinate sc);
-    bool emitAliasedVarOp(JSOp op, ParseNode *pn);
+    bool emitAliasedVarOp(JSOp op, ParseNode* pn);
     bool emitAliasedVarOp(JSOp op, ScopeCoordinate sc, MaybeCheckLexical checkLexical);
     bool emitUnaliasedVarOp(JSOp op, uint32_t slot, MaybeCheckLexical checkLexical);
 
-    bool emitVarOp(ParseNode *pn, JSOp op);
-    bool emitVarIncDec(ParseNode *pn);
+    bool emitVarOp(ParseNode* pn, JSOp op);
+    bool emitVarIncDec(ParseNode* pn);
 
-    bool emitNameOp(ParseNode *pn, bool callContext);
-    bool emitNameIncDec(ParseNode *pn);
+    bool emitNameOp(ParseNode* pn, bool callContext);
+    bool emitNameIncDec(ParseNode* pn);
 
-    bool maybeEmitVarDecl(JSOp prologOp, ParseNode *pn, jsatomid *result);
-    bool emitVariables(ParseNode *pn, VarEmitOption emitOption, bool isLetExpr = false);
+    bool maybeEmitVarDecl(JSOp prologueOp, ParseNode* pn, jsatomid* result);
+    bool emitVariables(ParseNode* pn, VarEmitOption emitOption, bool isLetExpr = false);
 
     bool emitNewInit(JSProtoKey key);
-    bool emitSingletonInitialiser(ParseNode *pn);
+    bool emitSingletonInitialiser(ParseNode* pn);
 
     bool emitPrepareIteratorResult();
     bool emitFinishIteratorResult(bool done);
-    bool iteratorResultShape(unsigned *shape);
+    bool iteratorResultShape(unsigned* shape);
 
-    bool emitYield(ParseNode *pn);
+    bool emitYield(ParseNode* pn);
     bool emitYieldOp(JSOp op);
-    bool emitYieldStar(ParseNode *iter, ParseNode *gen);
+    bool emitYieldStar(ParseNode* iter, ParseNode* gen);
 
-    bool emitPropLHS(ParseNode *pn, JSOp op);
-    bool emitPropOp(ParseNode *pn, JSOp op);
-    bool emitPropIncDec(ParseNode *pn);
+    bool emitPropLHS(ParseNode* pn);
+    bool emitPropOp(ParseNode* pn, JSOp op);
+    bool emitPropIncDec(ParseNode* pn);
 
     // Emit bytecode to put operands for a JSOP_GETELEM/CALLELEM/SETELEM/DELELEM
     // opcode onto the stack in the right order. In the case of SETELEM, the
     // value to be assigned must already be pushed.
-    bool emitElemOperands(ParseNode *pn, JSOp op);
+    bool emitElemOperands(ParseNode* pn, JSOp op);
 
     bool emitElemOpBase(JSOp op);
-    bool emitElemOp(ParseNode *pn, JSOp op);
-    bool emitElemIncDec(ParseNode *pn);
+    bool emitElemOp(ParseNode* pn, JSOp op);
+    bool emitElemIncDec(ParseNode* pn);
 
-    bool emitCatch(ParseNode *pn);
-    bool emitIf(ParseNode *pn);
-    bool emitWith(ParseNode *pn);
+    bool emitCatch(ParseNode* pn);
+    bool emitIf(ParseNode* pn);
+    bool emitWith(ParseNode* pn);
 
-    MOZ_NEVER_INLINE bool emitLabeledStatement(const LabeledStatement *pn);
-    MOZ_NEVER_INLINE bool emitLetBlock(ParseNode *pnLet);
-    MOZ_NEVER_INLINE bool emitLexicalScope(ParseNode *pn);
-    MOZ_NEVER_INLINE bool emitSwitch(ParseNode *pn);
-    MOZ_NEVER_INLINE bool emitTry(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitLabeledStatement(const LabeledStatement* pn);
+    MOZ_NEVER_INLINE bool emitLetBlock(ParseNode* pnLet);
+    MOZ_NEVER_INLINE bool emitLexicalScope(ParseNode* pn);
+    MOZ_NEVER_INLINE bool emitSwitch(ParseNode* pn);
+    MOZ_NEVER_INLINE bool emitTry(ParseNode* pn);
 
     // EmitDestructuringLHS assumes the to-be-destructured value has been pushed on
     // the stack and emits code to destructure a single lhs expression (either a
@@ -502,24 +503,24 @@ struct BytecodeEmitter
     // If emitOption is PushInitialValues, the to-be-destructured value is replaced
     // with the initial values of the N (where 0 <= N) variables assigned in the
     // lhs expression. (Same post-condition as EmitDestructuringOpsHelper)
-    bool emitDestructuringLHS(ParseNode *target, VarEmitOption emitOption);
+    bool emitDestructuringLHS(ParseNode* target, VarEmitOption emitOption);
 
-    bool emitDestructuringOps(ParseNode *pattern, bool isLet = false);
-    bool emitDestructuringOpsHelper(ParseNode *pattern, VarEmitOption emitOption);
-    bool emitDestructuringOpsArrayHelper(ParseNode *pattern, VarEmitOption emitOption);
-    bool emitDestructuringOpsObjectHelper(ParseNode *pattern, VarEmitOption emitOption);
+    bool emitDestructuringOps(ParseNode* pattern, bool isLet = false);
+    bool emitDestructuringOpsHelper(ParseNode* pattern, VarEmitOption emitOption);
+    bool emitDestructuringOpsArrayHelper(ParseNode* pattern, VarEmitOption emitOption);
+    bool emitDestructuringOpsObjectHelper(ParseNode* pattern, VarEmitOption emitOption);
 
     typedef bool
-    (*DestructuringDeclEmitter)(BytecodeEmitter *bce, JSOp prologOp, ParseNode *pn);
+    (*DestructuringDeclEmitter)(BytecodeEmitter* bce, JSOp prologueOp, ParseNode* pn);
 
     template <DestructuringDeclEmitter EmitName>
-    bool emitDestructuringDeclsWithEmitter(JSOp prologOp, ParseNode *pattern);
+    bool emitDestructuringDeclsWithEmitter(JSOp prologueOp, ParseNode* pattern);
 
-    bool emitDestructuringDecls(JSOp prologOp, ParseNode *pattern);
+    bool emitDestructuringDecls(JSOp prologueOp, ParseNode* pattern);
 
     // Emit code to initialize all destructured names to the value on the top of
     // the stack.
-    bool emitInitializeDestructuringDecls(JSOp prologOp, ParseNode *pattern);
+    bool emitInitializeDestructuringDecls(JSOp prologueOp, ParseNode* pattern);
 
     // emitIterator expects the iterable to already be on the stack.
     // It will replace that stack value with the corresponding iterator
@@ -527,49 +528,58 @@ struct BytecodeEmitter
 
     // Pops iterator from the top of the stack. Pushes the result of |.next()|
     // onto the stack.
-    bool emitIteratorNext(ParseNode *pn);
+    bool emitIteratorNext(ParseNode* pn);
 
     // Check if the value on top of the stack is "undefined". If so, replace
     // that value on the stack with the value defined by |defaultExpr|.
-    bool emitDefault(ParseNode *defaultExpr);
+    bool emitDefault(ParseNode* defaultExpr);
 
-    bool emitCallSiteObject(ParseNode *pn);
-    bool emitTemplateString(ParseNode *pn);
-    bool emitAssignment(ParseNode *lhs, JSOp op, ParseNode *rhs);
+    bool emitCallSiteObject(ParseNode* pn);
+    bool emitTemplateString(ParseNode* pn);
+    bool emitAssignment(ParseNode* lhs, JSOp op, ParseNode* rhs);
 
-    bool emitReturn(ParseNode *pn);
-    bool emitStatement(ParseNode *pn);
-    bool emitStatementList(ParseNode *pn, ptrdiff_t top);
-    bool emitSyntheticStatements(ParseNode *pn, ptrdiff_t top);
+    bool emitReturn(ParseNode* pn);
+    bool emitStatement(ParseNode* pn);
+    bool emitStatementList(ParseNode* pn, ptrdiff_t top);
+    bool emitSyntheticStatements(ParseNode* pn, ptrdiff_t top);
 
-    bool emitDelete(ParseNode *pn);
-    bool emitLogical(ParseNode *pn);
-    bool emitUnary(ParseNode *pn);
+    bool emitDeleteName(ParseNode* pn);
+    bool emitDeleteProperty(ParseNode* pn);
+    bool emitDeleteSuperProperty(ParseNode* pn);
+    bool emitDeleteElement(ParseNode* pn);
+    bool emitDeleteSuperElement(ParseNode* pn);
+    bool emitDeleteExpression(ParseNode* pn);
 
-    MOZ_NEVER_INLINE bool emitIncOrDec(ParseNode *pn);
+    // |op| must be JSOP_TYPEOF or JSOP_TYPEOFEXPR.
+    bool emitTypeof(ParseNode* node, JSOp op);
 
-    bool emitConditionalExpression(ConditionalExpression &conditional);
+    bool emitLogical(ParseNode* pn);
+    bool emitUnary(ParseNode* pn);
 
-    bool emitCallOrNew(ParseNode *pn);
-    bool emitSelfHostedCallFunction(ParseNode *pn);
-    bool emitSelfHostedResumeGenerator(ParseNode *pn);
-    bool emitSelfHostedForceInterpreter(ParseNode *pn);
+    MOZ_NEVER_INLINE bool emitIncOrDec(ParseNode* pn);
 
-    bool emitDo(ParseNode *pn);
-    bool emitFor(ParseNode *pn, ptrdiff_t top);
-    bool emitForIn(ParseNode *pn, ptrdiff_t top);
-    bool emitForInOrOfVariables(ParseNode *pn, bool *letDecl);
-    bool emitNormalFor(ParseNode *pn, ptrdiff_t top);
-    bool emitWhile(ParseNode *pn, ptrdiff_t top);
+    bool emitConditionalExpression(ConditionalExpression& conditional);
 
-    bool emitBreak(PropertyName *label);
-    bool emitContinue(PropertyName *label);
+    bool emitCallOrNew(ParseNode* pn);
+    bool emitSelfHostedCallFunction(ParseNode* pn);
+    bool emitSelfHostedResumeGenerator(ParseNode* pn);
+    bool emitSelfHostedForceInterpreter(ParseNode* pn);
 
-    bool emitDefaults(ParseNode *pn);
-    bool emitLexicalInitialization(ParseNode *pn, JSOp globalDefOp);
+    bool emitDo(ParseNode* pn);
+    bool emitFor(ParseNode* pn, ptrdiff_t top);
+    bool emitForIn(ParseNode* pn, ptrdiff_t top);
+    bool emitForInOrOfVariables(ParseNode* pn, bool* letDecl);
+    bool emitNormalFor(ParseNode* pn, ptrdiff_t top);
+    bool emitWhile(ParseNode* pn, ptrdiff_t top);
+
+    bool emitBreak(PropertyName* label);
+    bool emitContinue(PropertyName* label);
+
+    bool emitDefaults(ParseNode* pn);
+    bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
-    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockObject *> blockObj);
+    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockObject*> blockObj);
 
     // emitSpread expects the current index (I) of the array, the array itself
     // and the iterator to be on the stack in that order (iterator on the bottom).
@@ -587,9 +597,16 @@ struct BytecodeEmitter
     //
     // Please refer the comment above emitSpread for additional information about
     // stack convention.
-    bool emitForOf(StmtType type, ParseNode *pn, ptrdiff_t top);
+    bool emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top);
 
-    bool emitClass(ParseNode *pn);
+    bool emitClass(ParseNode* pn);
+    bool emitSuperPropLHS(bool isCall = false);
+    bool emitSuperPropOp(ParseNode* pn, JSOp op, bool isCall = false);
+    bool emitSuperPropIncDec(ParseNode* pn);
+    enum SuperElemOptions { SuperElem_Get, SuperElem_Set, SuperElem_Call, SuperElem_IncDec };
+    bool emitSuperElemOperands(ParseNode* pn, SuperElemOptions opts = SuperElem_Get);
+    bool emitSuperElemOp(ParseNode* pn, JSOp op, bool isCall = false);
+    bool emitSuperElemIncDec(ParseNode* pn);
 };
 
 } /* namespace frontend */

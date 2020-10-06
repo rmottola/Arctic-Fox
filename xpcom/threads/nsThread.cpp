@@ -72,7 +72,6 @@ using namespace mozilla::tasktracer;
 
 using namespace mozilla;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo*
 GetThreadLog()
 {
@@ -82,7 +81,6 @@ GetThreadLog()
   }
   return sLog;
 }
-#endif
 #ifdef LOG
 #undef LOG
 #endif

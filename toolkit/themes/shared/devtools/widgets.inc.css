@@ -868,6 +868,10 @@
   cursor: col-resize;
 }
 
+.graph-widget-canvas[input=adjusting-view-area] {
+  cursor: grabbing;
+}
+
 .graph-widget-canvas[input=hovering-selection-contents] {
   cursor: grab;
 }
@@ -909,7 +913,7 @@
 
 .line-graph-widget-tooltip {
   position: absolute;
-  background: rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.9);
   border-radius: 2px;
   line-height: 15px;
   -moz-padding-start: 6px;

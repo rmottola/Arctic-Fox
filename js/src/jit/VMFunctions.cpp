@@ -25,6 +25,7 @@
 #include "vm/NativeObject-inl.h"
 #include "vm/StringObject-inl.h"
 #include "vm/TypeInference-inl.h"
+#include "vm/UnboxedObject-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -56,9 +57,10 @@ VMFunction::addToFunctions()
 }
 
 bool
-InvokeFunction(JSContext* cx, HandleObject obj, uint32_t argc, Value* argv, Value* rval)
+InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc, Value* argv,
+               MutableHandleValue rval)
 {
-    AutoArrayRooter argvRoot(cx, argc + 1, argv);
+    AutoArrayRooter argvRoot(cx, argc + 1 + constructing, argv);
 
     // Data in the argument vector is arranged for a JIT -> JIT call.
     Value thisv = argv[0];
@@ -67,35 +69,19 @@ InvokeFunction(JSContext* cx, HandleObject obj, uint32_t argc, Value* argv, Valu
     // For constructing functions, |this| is constructed at caller side and we can just call Invoke.
     // When creating this failed / is impossible at caller site, i.e. MagicValue(JS_IS_CONSTRUCTING),
     // we use InvokeConstructor that creates it at the callee side.
-    RootedValue rv(cx);
-    if (thisv.isMagic(JS_IS_CONSTRUCTING)) {
-        if (!InvokeConstructor(cx, ObjectValue(*obj), argc, argvWithoutThis, &rv))
-            return false;
-    } else {
-        if (!Invoke(cx, thisv, ObjectValue(*obj), argc, argvWithoutThis, &rv))
-            return false;
-    }
+    if (thisv.isMagic(JS_IS_CONSTRUCTING))
+        return InvokeConstructor(cx, ObjectValue(*obj), argc, argvWithoutThis, true, rval);
 
-    if (obj->is<JSFunction>()) {
-        jsbytecode* pc;
-        RootedScript script(cx, cx->currentScript(&pc));
-        TypeScript::Monitor(cx, script, pc, rv.get());
-    }
-
-    *rval = rv;
-    return true;
+    return Invoke(cx, thisv, ObjectValue(*obj), argc, argvWithoutThis, rval);
 }
 
-JSObject *
-NewGCObject(JSContext *cx, gc::AllocKind allocKind, gc::InitialHeap initialHeap,
-            size_t ndynamic, const js::Class *clasp)
+bool
+InvokeFunctionShuffleNewTarget(JSContext* cx, HandleObject obj, uint32_t numActualArgs,
+                               uint32_t numFormalArgs, Value* argv, MutableHandleValue rval)
 {
-    JSObject *obj = js::Allocate<JSObject>(cx, allocKind, ndynamic, initialHeap, clasp);
-    if (!obj)
-        return nullptr;
-
-    SetNewObjectMetadata(cx, obj);
-    return obj;
+    MOZ_ASSERT(numFormalArgs > numActualArgs);
+    argv[1 + numActualArgs] = argv[1 + numFormalArgs];
+    return InvokeFunction(cx, obj, true, numActualArgs, argv, rval);
 }
 
 bool
@@ -192,8 +178,8 @@ MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value)
 }
 
 bool
-InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue value,
-         jsbytecode *pc)
+InitProp(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
+         jsbytecode* pc)
 {
     RootedId id(cx, NameToId(name));
     return InitPropertyOperation(cx, JSOp(*pc), obj, id, value);
@@ -201,7 +187,7 @@ InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue v
 
 template<bool Equal>
 bool
-LooselyEqual(JSContext *cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
+LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
 {
     if (!js::LooselyEqual(cx, lhs, rhs, res))
         return false;
@@ -280,7 +266,7 @@ ArraySpliceDense(JSContext* cx, HandleObject obj, uint32_t start, uint32_t delet
 bool
 ArrayPopDense(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
-    MOZ_ASSERT(obj->is<ArrayObject>());
+    MOZ_ASSERT(obj->is<ArrayObject>() || obj->is<UnboxedArrayObject>());
 
     AutoDetectInvalidation adi(cx, rval);
 
@@ -299,21 +285,14 @@ ArrayPopDense(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 }
 
 bool
-ArrayPushDense(JSContext* cx, HandleArrayObject obj, HandleValue v, uint32_t* length)
+ArrayPushDense(JSContext* cx, HandleObject obj, HandleValue v, uint32_t* length)
 {
-    if (MOZ_LIKELY(obj->lengthIsWritable())) {
-        uint32_t idx = obj->length();
-        NativeObject::EnsureDenseResult result = obj->ensureDenseElements(cx, idx, 1);
-        if (result == NativeObject::ED_FAILED)
-            return false;
-
-        if (result == NativeObject::ED_OK) {
-            obj->setDenseElement(idx, v);
-            MOZ_ASSERT(idx < INT32_MAX);
-            *length = idx + 1;
-            obj->setLengthInt32(*length);
-            return true;
-        }
+    *length = GetAnyBoxedOrUnboxedArrayLength(obj);
+    DenseElementResult result =
+        SetOrExtendAnyBoxedOrUnboxedDenseElements(cx, obj, *length, v.address(), 1, DontUpdateTypes);
+    if (result != DenseElementResult::Incomplete) {
+        (*length)++;
+        return result == DenseElementResult::Success;
     }
 
     JS::AutoValueArray<3> argv(cx);
@@ -330,7 +309,7 @@ ArrayPushDense(JSContext* cx, HandleArrayObject obj, HandleValue v, uint32_t* le
 bool
 ArrayShiftDense(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
-    MOZ_ASSERT(obj->is<ArrayObject>());
+    MOZ_ASSERT(obj->is<ArrayObject>() || obj->is<UnboxedArrayObject>());
 
     AutoDetectInvalidation adi(cx, rval);
 
@@ -351,21 +330,17 @@ ArrayShiftDense(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 JSObject*
 ArrayConcatDense(JSContext* cx, HandleObject obj1, HandleObject obj2, HandleObject objRes)
 {
-    Rooted<ArrayObject*> arr1(cx, &obj1->as<ArrayObject>());
-    Rooted<ArrayObject*> arr2(cx, &obj2->as<ArrayObject>());
-    Rooted<ArrayObject*> arrRes(cx, objRes ? &objRes->as<ArrayObject>() : nullptr);
-
-    if (arrRes) {
+    if (objRes) {
         // Fast path if we managed to allocate an object inline.
-        if (!js::array_concat_dense(cx, arr1, arr2, arrRes))
+        if (!js::array_concat_dense(cx, obj1, obj2, objRes))
             return nullptr;
-        return arrRes;
+        return objRes;
     }
 
     JS::AutoValueArray<3> argv(cx);
     argv[0].setUndefined();
-    argv[1].setObject(*arr1);
-    argv[2].setObject(*arr2);
+    argv[1].setObject(*obj1);
+    argv[2].setObject(*obj2);
     if (!js::array_concat(cx, 1, argv.begin()))
         return nullptr;
     return &argv[0].toObject();
@@ -564,7 +539,7 @@ CreateThis(JSContext* cx, HandleObject callee, MutableHandleValue rval)
 
     if (callee->is<JSFunction>()) {
         JSFunction* fun = &callee->as<JSFunction>();
-        if (fun->isInterpretedConstructor()) {
+        if (fun->isInterpreted() && fun->isConstructor()) {
             JSScript* script = fun->getOrCreateScript(cx);
             if (!script || !script->ensureHasTypes(cx))
                 return false;
@@ -883,7 +858,7 @@ InitRestParameter(JSContext* cx, uint32_t length, Value* rest, HandleObject temp
     NewObjectKind newKind = templateObj->group()->shouldPreTenure()
                             ? TenuredObject
                             : GenericObject;
-    ArrayObject* arrRes = NewDenseCopiedArray(cx, length, rest, NullPtr(), newKind);
+    ArrayObject* arrRes = NewDenseCopiedArray(cx, length, rest, nullptr, newKind);
     if (arrRes)
         arrRes->setGroup(templateObj->group());
     return arrRes;
@@ -977,8 +952,23 @@ PopBlockScope(JSContext* cx, BaselineFrame* frame)
 }
 
 bool
-FreshenBlockScope(JSContext *cx, BaselineFrame *frame)
+DebugLeaveThenPopBlockScope(JSContext* cx, BaselineFrame* frame, jsbytecode* pc)
 {
+    MOZ_ALWAYS_TRUE(DebugLeaveBlock(cx, frame, pc));
+    frame->popBlock(cx);
+    return true;
+}
+
+bool
+FreshenBlockScope(JSContext* cx, BaselineFrame* frame)
+{
+    return frame->freshenBlock(cx);
+}
+
+bool
+DebugLeaveThenFreshenBlockScope(JSContext* cx, BaselineFrame* frame, jsbytecode* pc)
+{
+    MOZ_ALWAYS_TRUE(DebugLeaveBlock(cx, frame, pc));
     return frame->freshenBlock(cx);
 }
 
@@ -1086,36 +1076,18 @@ Recompile(JSContext* cx)
 }
 
 bool
-SetDenseElement(JSContext* cx, HandleNativeObject obj, int32_t index, HandleValue value,
-                bool strict)
+SetDenseOrUnboxedArrayElement(JSContext* cx, HandleObject obj, int32_t index,
+                              HandleValue value, bool strict)
 {
     // This function is called from Ion code for StoreElementHole's OOL path.
-    // In this case we know the object is native and we can use setDenseElement
-    // instead of setDenseElementWithType.
+    // In this case we know the object is native or an unboxed array and that
+    // no type changes are needed.
 
-    NativeObject::EnsureDenseResult result = NativeObject::ED_SPARSE;
-    do {
-        if (index < 0)
-            break;
-        bool isArray = obj->is<ArrayObject>();
-        if (isArray && !obj->as<ArrayObject>().lengthIsWritable())
-            break;
-        uint32_t idx = uint32_t(index);
-        result = obj->ensureDenseElements(cx, idx, 1);
-        if (result != NativeObject::ED_OK)
-            break;
-        if (isArray) {
-            ArrayObject& arr = obj->as<ArrayObject>();
-            if (idx >= arr.length())
-                arr.setLengthInt32(idx + 1);
-        }
-        obj->setDenseElement(idx, value);
-        return true;
-    } while (false);
-
-    if (result == NativeObject::ED_FAILED)
-        return false;
-    MOZ_ASSERT(result == NativeObject::ED_SPARSE);
+    DenseElementResult result =
+        SetOrExtendAnyBoxedOrUnboxedDenseElements(cx, obj, index, value.address(), 1,
+                                                  DontUpdateTypes);
+    if (result != DenseElementResult::Incomplete)
+        return result == DenseElementResult::Success;
 
     RootedValue indexVal(cx, Int32Value(index));
     return SetObjectElement(cx, obj, indexVal, value, strict);
@@ -1166,11 +1138,10 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
     }
 
     if (str->isAtom())
-        MOZ_ASSERT(cx->runtime()->isAtomsZone(str->zone()));
+        MOZ_ASSERT(str->zone()->isAtomsZone());
     else
         MOZ_ASSERT(str->zone() == cx->zone());
 
-    MOZ_ASSERT(str->runtimeFromMainThread() == cx->runtime());
     MOZ_ASSERT(str->isAligned());
     MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
 
@@ -1190,12 +1161,12 @@ void
 AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
 {
     // We can't closely inspect symbols from another runtime.
-    if (sym->runtimeFromAnyThread() != cx->runtime())
+    if (sym->runtimeFromAnyThread() != cx->runtime()) {
+        MOZ_ASSERT(sym->isWellKnownSymbol());
         return;
+    }
 
-    MOZ_ASSERT(cx->runtime()->isAtomsZone(sym->zone()));
-
-    MOZ_ASSERT(sym->runtimeFromMainThread() == cx->runtime());
+    MOZ_ASSERT(sym->zone()->isAtomsZone());
     MOZ_ASSERT(sym->isAligned());
     if (JSString* desc = sym->description()) {
         MOZ_ASSERT(desc->isAtom());
@@ -1225,33 +1196,33 @@ ObjectIsCallable(JSObject* obj)
 void
 MarkValueFromIon(JSRuntime* rt, Value* vp)
 {
-    gc::MarkValueUnbarriered(&rt->gc.marker, vp, "write barrier");
+    TraceManuallyBarrieredEdge(&rt->gc.marker, vp, "write barrier");
 }
 
 void
 MarkStringFromIon(JSRuntime* rt, JSString** stringp)
 {
     if (*stringp)
-        gc::MarkStringUnbarriered(&rt->gc.marker, stringp, "write barrier");
+        TraceManuallyBarrieredEdge(&rt->gc.marker, stringp, "write barrier");
 }
 
 void
 MarkObjectFromIon(JSRuntime* rt, JSObject** objp)
 {
     if (*objp)
-        gc::MarkObjectUnbarriered(&rt->gc.marker, objp, "write barrier");
+        TraceManuallyBarrieredEdge(&rt->gc.marker, objp, "write barrier");
 }
 
 void
 MarkShapeFromIon(JSRuntime* rt, Shape** shapep)
 {
-    gc::MarkShapeUnbarriered(&rt->gc.marker, shapep, "write barrier");
+    TraceManuallyBarrieredEdge(&rt->gc.marker, shapep, "write barrier");
 }
 
 void
 MarkObjectGroupFromIon(JSRuntime* rt, ObjectGroup** groupp)
 {
-    gc::MarkObjectGroupUnbarriered(&rt->gc.marker, groupp, "write barrier");
+    TraceManuallyBarrieredEdge(&rt->gc.marker, groupp, "write barrier");
 }
 
 bool

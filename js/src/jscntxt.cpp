@@ -86,8 +86,7 @@ js::TraceCycleDetectionSet(JSTracer* trc, js::ObjectSet& set)
 {
     for (js::ObjectSet::Enum e(set); !e.empty(); e.popFront()) {
         JSObject* key = e.front();
-        trc->setTracingLocation((void*)&e.front());
-        MarkObjectRoot(trc, &key, "cycle detector table entry");
+        TraceRoot(trc, &key, "cycle detector table entry");
         if (key != e.front())
             e.rekeyFront(key);
     }
@@ -765,9 +764,9 @@ js::ReportErrorNumberVA(JSContext* cx, unsigned flags, JSErrorCallback callback,
 }
 
 static bool
-ExpandErrorArguments(ExclusiveContext *cx, JSErrorCallback callback,
-                     void *userRef, const unsigned errorNumber,
-                     char **messagep, JSErrorReport *reportp,
+ExpandErrorArguments(ExclusiveContext* cx, JSErrorCallback callback,
+                     void* userRef, const unsigned errorNumber,
+                     char** messagep, JSErrorReport* reportp,
                      ErrorArgumentsType argumentsType, ...)
 {
     va_list ap;
@@ -993,6 +992,12 @@ JSContext::isThrowingOutOfMemory()
 }
 
 bool
+JSContext::isClosingGenerator()
+{
+    return throwing && unwrappedException_.isMagic(JS_GENERATOR_CLOSING);
+}
+
+bool
 JSContext::saveFrameChain()
 {
     if (!savedFrameChains_.append(SavedFrameChain(compartment(), enterCompartmentDepth_)))
@@ -1129,7 +1134,7 @@ JSContext::mark(JSTracer* trc)
 
     /* Mark other roots-by-definition in the JSContext. */
     if (isExceptionPending())
-        MarkValueRoot(trc, &unwrappedException_, "unwrapped exception");
+        TraceRoot(trc, &unwrappedException_, "unwrapped exception");
 
     TraceCycleDetectionSet(trc, cycleDetectorSet);
 

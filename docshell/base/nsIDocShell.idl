@@ -1051,7 +1051,10 @@ interface nsIDocShell : nsIDocShellTreeItem
    * that execution has stopped.  This only occurs when the Timeline devtool
    * is collecting information.
    */
-  [noscript,notxpcom,nostdcall] void notifyJSRunToCompletionStart(in string aReason);
+  [noscript,notxpcom,nostdcall] void notifyJSRunToCompletionStart(in string aReason,
+                                                                  in wstring functionName,
+                                                                  in wstring fileName,
+                                                                  in unsigned long lineNumber);
   [noscript,notxpcom,nostdcall] void notifyJSRunToCompletionStop();
 
   /**

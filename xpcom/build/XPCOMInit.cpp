@@ -135,10 +135,6 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 
 #include "mozilla/ipc/GeckoChildProcessHost.h"
 
-#ifdef MOZ_VISUAL_EVENT_TRACER
-#include "mozilla/VisualEventTracer.h"
-#endif
-
 #include "ogg/ogg.h"
 
 #include "GeckoProfiler.h"
@@ -150,9 +146,6 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 using namespace mozilla;
 using base::AtExitManager;
 using mozilla::ipc::BrowserProcessSubThread;
-#ifdef MOZ_VISUAL_EVENT_TRACER
-using mozilla::eventtracer::VisualEventTracer;
-#endif
 
 namespace {
 
@@ -204,9 +197,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsBinaryInputStream)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsStorageStream)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsVersionComparatorImpl)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsScriptableBase64Encoder)
-#ifdef MOZ_VISUAL_EVENT_TRACER
-NS_GENERIC_FACTORY_CONSTRUCTOR(VisualEventTracer)
-#endif
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsVariant)
 
@@ -335,12 +325,12 @@ const mozilla::Module kXPCOMModule = {
 };
 
 // gDebug will be freed during shutdown.
-static nsIDebug* gDebug = nullptr;
+static nsIDebug2* gDebug = nullptr;
 
 EXPORT_XPCOM_API(nsresult)
-NS_GetDebug(nsIDebug** aResult)
+NS_GetDebug(nsIDebug2** aResult)
 {
-  return nsDebugImpl::Create(nullptr,  NS_GET_IID(nsIDebug), (void**)aResult);
+  return nsDebugImpl::Create(nullptr,  NS_GET_IID(nsIDebug2), (void**)aResult);
 }
 
 EXPORT_XPCOM_API(nsresult)
@@ -709,10 +699,6 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
     loop->transient_hang_timeout(),
     loop->permanent_hang_timeout());
 
-#ifdef MOZ_VISUAL_EVENT_TRACER
-  mozilla::eventtracer::Init();
-#endif
-
   return NS_OK;
 }
 
@@ -979,10 +965,6 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
   sMainHangMonitor = nullptr;
 
   BackgroundHangMonitor::Shutdown();
-
-#ifdef MOZ_VISUAL_EVENT_TRACER
-  eventtracer::Shutdown();
-#endif
 
   profiler_shutdown();
 

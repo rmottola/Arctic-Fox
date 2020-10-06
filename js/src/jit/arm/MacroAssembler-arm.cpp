@@ -17,6 +17,8 @@
 #include "jit/MacroAssembler.h"
 #include "jit/MoveEmitter.h"
 
+#include "jit/MacroAssembler-inl.h"
+
 using namespace js;
 using namespace jit;
 
@@ -1790,8 +1792,8 @@ MacroAssemblerARM::ma_vstr(VFPRegister src, Register base, Register index, int32
 void
 MacroAssemblerARMCompat::buildFakeExitFrame(Register scratch, uint32_t* offset)
 {
-    DebugOnly<uint32_t> initialDepth = framePushed();
-    uint32_t descriptor = MakeFrameDescriptor(framePushed(), JitFrame_IonJS);
+    DebugOnly<uint32_t> initialDepth = asMasm().framePushed();
+    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS);
 
     asMasm().Push(Imm32(descriptor)); // descriptor_
 
@@ -1806,7 +1808,7 @@ MacroAssemblerARMCompat::buildFakeExitFrame(Register scratch, uint32_t* offset)
     uint32_t pseudoReturnOffset = currentOffset();
     leaveNoPool();
 
-    MOZ_ASSERT(framePushed() == initialDepth + ExitFrameLayout::Size());
+    MOZ_ASSERT(asMasm().framePushed() == initialDepth + ExitFrameLayout::Size());
     MOZ_ASSERT(pseudoReturnOffset - offsetBeforePush == 8);
 
     *offset = pseudoReturnOffset;
@@ -1815,8 +1817,8 @@ MacroAssemblerARMCompat::buildFakeExitFrame(Register scratch, uint32_t* offset)
 bool
 MacroAssemblerARMCompat::buildOOLFakeExitFrame(void* fakeReturnAddr)
 {
-    DebugOnly<uint32_t> initialDepth = framePushed();
-    uint32_t descriptor = MakeFrameDescriptor(framePushed(), JitFrame_IonJS);
+    DebugOnly<uint32_t> initialDepth = asMasm().framePushed();
+    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS);
 
     asMasm().Push(Imm32(descriptor)); // descriptor_
     asMasm().Push(ImmPtr(fakeReturnAddr));
@@ -1827,7 +1829,7 @@ MacroAssemblerARMCompat::buildOOLFakeExitFrame(void* fakeReturnAddr)
 void
 MacroAssemblerARMCompat::callWithExitFrame(Label* target)
 {
-    uint32_t descriptor = MakeFrameDescriptor(framePushed(), JitFrame_IonJS);
+    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS);
     asMasm().Push(Imm32(descriptor)); // descriptor
 
     ma_callJitHalfPush(target);
@@ -1836,7 +1838,7 @@ MacroAssemblerARMCompat::callWithExitFrame(Label* target)
 void
 MacroAssemblerARMCompat::callWithExitFrame(JitCode* target)
 {
-    uint32_t descriptor = MakeFrameDescriptor(framePushed(), JitFrame_IonJS);
+    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS);
     asMasm().Push(Imm32(descriptor)); // descriptor
 
     addPendingJump(m_buffer.nextOffset(), ImmPtr(target->raw()), Relocation::JITCODE);
@@ -1853,7 +1855,7 @@ MacroAssemblerARMCompat::callWithExitFrame(JitCode* target)
 void
 MacroAssemblerARMCompat::callWithExitFrame(JitCode* target, Register dynStack)
 {
-    ma_add(Imm32(framePushed()), dynStack);
+    ma_add(Imm32(asMasm().framePushed()), dynStack);
     makeFrameDescriptor(dynStack, JitFrame_IonJS);
     asMasm().Push(dynStack); // descriptor
 
@@ -1871,11 +1873,11 @@ MacroAssemblerARMCompat::callWithExitFrame(JitCode* target, Register dynStack)
 void
 MacroAssemblerARMCompat::callJit(Register callee)
 {
-    MOZ_ASSERT((framePushed() & 3) == 0);
-    if ((framePushed() & 7) == 4) {
+    MOZ_ASSERT((asMasm().framePushed() & 3) == 0);
+    if ((asMasm().framePushed() & 7) == 4) {
         ma_callJitHalfPush(callee);
     } else {
-        adjustFrame(sizeof(void*));
+        asMasm().adjustFrame(sizeof(void*));
         ma_callJit(callee);
     }
 }
@@ -1890,27 +1892,6 @@ void
 MacroAssembler::restoreFrameAlignmentForICArguments(AfterICSaveLive& aic)
 {
     // Exists for MIPS compatibility.
-}
-
-void
-MacroAssemblerARMCompat::reserveStack(uint32_t amount)
-{
-    if (amount)
-        ma_sub(Imm32(amount), sp);
-    adjustFrame(amount);
-}
-void
-MacroAssemblerARMCompat::freeStack(uint32_t amount)
-{
-    MOZ_ASSERT(amount <= framePushed_);
-    if (amount)
-        ma_add(Imm32(amount), sp);
-    adjustFrame(-amount);
-}
-void
-MacroAssemblerARMCompat::freeStack(Register amount)
-{
-    ma_add(amount, sp);
 }
 
 void
@@ -3988,7 +3969,7 @@ MacroAssemblerARMCompat::callWithABIPre(uint32_t* stackAdjust, bool callFromAsmJ
     uint32_t alignmentAtPrologue = callFromAsmJS ? sizeof(AsmJSFrame) : 0;
 
     if (!dynamicAlignment_) {
-        *stackAdjust += ComputeByteAlignment(framePushed_ + *stackAdjust + alignmentAtPrologue,
+        *stackAdjust += ComputeByteAlignment(asMasm().framePushed() + *stackAdjust + alignmentAtPrologue,
                                              ABIStackAlignment);
     } else {
         // sizeof(intptr_t) accounts for the saved stack pointer pushed by
@@ -3996,7 +3977,7 @@ MacroAssemblerARMCompat::callWithABIPre(uint32_t* stackAdjust, bool callFromAsmJ
         *stackAdjust += ComputeByteAlignment(*stackAdjust + sizeof(intptr_t), ABIStackAlignment);
     }
 
-    reserveStack(*stackAdjust);
+    asMasm().reserveStack(*stackAdjust);
 
     // Position all arguments.
     {
@@ -4074,7 +4055,7 @@ MacroAssemblerARMCompat::callWithABIPost(uint32_t stackAdjust, MoveOp::Type resu
         MOZ_CRASH("unexpected callWithABI result");
     }
 
-    freeStack(stackAdjust);
+    asMasm().freeStack(stackAdjust);
 
     if (dynamicAlignment_) {
         // While the x86 supports pop esp, on ARM that isn't well defined, so
@@ -4749,7 +4730,7 @@ MacroAssemblerARMCompat::compareExchange(int nbytes, bool signExtend, const T& m
     // word-width operations with read-modify-add.  That does not
     // abstract well, so fork.
     //
-    // Bug 1077321: We may further optimize for ARMv8 here.
+    // Bug 1077321: We may further optimize for ARMv8 (AArch32) here.
     if (nbytes < 4 && !HasLDSTREXBHD())
         compareExchangeARMv6(nbytes, signExtend, mem, oldval, newval, output);
     else
@@ -4857,10 +4838,11 @@ void
 MacroAssemblerARMCompat::atomicFetchOp(int nbytes, bool signExtend, AtomicOp op, const Imm32& value,
                                        const T& mem, Register temp, Register output)
 {
-    // The Imm32 value case is not needed yet because lowering always
-    // forces the value into a register at present (bug 1077317).  But
-    // the method must be present for the platform-independent code to
-    // link.
+    // The Imm32 case is not needed yet because lowering always forces
+    // the value into a register at present (bug 1077317).
+    //
+    // This would be useful for immediates small enough to fit into
+    // add/sub/and/or/xor.
     MOZ_CRASH("Feature NYI");
 }
 
@@ -4891,10 +4873,10 @@ MacroAssemblerARMCompat::atomicFetchOp(int nbytes, bool signExtend, AtomicOp op,
 {
     // Fork for non-word operations on ARMv6.
     //
-    // Bug 1077321: We may further optimize for ARMv8 here.
-    if (nbytes < 4 && !HasLDSTREXBHD())
+    // Bug 1077321: We may further optimize for ARMv8 (AArch32) here.
+    if (nbytes < 4 && !HasLDSTREXBHD()) {
         atomicFetchOpARMv6(nbytes, signExtend, op, value, mem, temp, output);
-    else {
+    } else {
         MOZ_ASSERT(temp == InvalidReg);
         atomicFetchOpARMv7(nbytes, signExtend, op, value, mem, output);
     }
@@ -4969,6 +4951,107 @@ MacroAssemblerARMCompat::atomicFetchOpARMv6(int nbytes, bool signExtend, AtomicO
     MOZ_CRASH("NYI");
 }
 
+template<typename T>
+void
+MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Register& value,
+                                        const T& mem)
+{
+    // Fork for non-word operations on ARMv6.
+    //
+    // Bug 1077321: We may further optimize for ARMv8 (AArch32) here.
+    if (nbytes < 4 && !HasLDSTREXBHD())
+        atomicEffectOpARMv6(nbytes, op, value, mem);
+    else
+        atomicEffectOpARMv7(nbytes, op, value, mem);
+}
+
+template<typename T>
+void
+MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Imm32& value,
+                                        const T& mem)
+{
+    // The Imm32 case is not needed yet because lowering always forces
+    // the value into a register at present (bug 1077317).
+    //
+    // This would be useful for immediates small enough to fit into
+    // add/sub/and/or/xor.
+    MOZ_CRASH("NYI");
+}
+
+// Uses both scratch registers, one for the address and one for the temp:
+//
+//     ...    ptr, <addr>         ; compute address of item
+//     dmb
+// L0  ldrex* temp, [ptr]
+//     OP     temp, temp, value   ; compute value to store
+//     strex* temp, temp, [ptr]
+//     cmp    temp, 1
+//     beq    L0                  ; failed - location is dirty, retry
+//     dmb                        ; ordering barrier required
+
+template<typename T>
+void
+MacroAssemblerARMCompat::atomicEffectOpARMv7(int nbytes, AtomicOp op, const Register& value,
+                                             const T& mem)
+{
+    Label Lagain;
+    Register ptr = computePointer(mem, secondScratchReg_);
+    ma_dmb();
+    bind(&Lagain);
+    switch (nbytes) {
+      case 1:
+        as_ldrexb(ScratchRegister, ptr);
+        break;
+      case 2:
+        as_ldrexh(ScratchRegister, ptr);
+        break;
+      case 4:
+        as_ldrex(ScratchRegister, ptr);
+        break;
+    }
+    switch (op) {
+      case AtomicFetchAddOp:
+        as_add(ScratchRegister, ScratchRegister, O2Reg(value));
+        break;
+      case AtomicFetchSubOp:
+        as_sub(ScratchRegister, ScratchRegister, O2Reg(value));
+        break;
+      case AtomicFetchAndOp:
+        as_and(ScratchRegister, ScratchRegister, O2Reg(value));
+        break;
+      case AtomicFetchOrOp:
+        as_orr(ScratchRegister, ScratchRegister, O2Reg(value));
+        break;
+      case AtomicFetchXorOp:
+        as_eor(ScratchRegister, ScratchRegister, O2Reg(value));
+        break;
+    }
+    switch (nbytes) {
+      case 1:
+        as_strexb(ScratchRegister, ScratchRegister, ptr);
+        break;
+      case 2:
+        as_strexh(ScratchRegister, ScratchRegister, ptr);
+        break;
+      case 4:
+        as_strex(ScratchRegister, ScratchRegister, ptr);
+        break;
+    }
+    as_cmp(ScratchRegister, Imm8(1));
+    as_b(&Lagain, Equal);
+    ma_dmb();
+}
+
+template<typename T>
+void
+MacroAssemblerARMCompat::atomicEffectOpARMv6(int nbytes, AtomicOp op, const Register& value,
+                                             const T& mem)
+{
+    // Bug 1077318: Must use read-modify-write with LDREX / STREX.
+    MOZ_ASSERT(nbytes == 1 || nbytes == 2);
+    MOZ_CRASH("NYI");
+}
+
 template void
 js::jit::MacroAssemblerARMCompat::atomicFetchOp(int nbytes, bool signExtend, AtomicOp op,
                                                 const Imm32& value, const Address& mem,
@@ -4985,6 +5068,19 @@ template void
 js::jit::MacroAssemblerARMCompat::atomicFetchOp(int nbytes, bool signExtend, AtomicOp op,
                                                 const Register& value, const BaseIndex& mem,
                                                 Register temp, Register output);
+
+template void
+js::jit::MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Imm32& value,
+                                                 const Address& mem);
+template void
+js::jit::MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Imm32& value,
+                                                 const BaseIndex& mem);
+template void
+js::jit::MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Register& value,
+                                                 const Address& mem);
+template void
+js::jit::MacroAssemblerARMCompat::atomicEffectOp(int nbytes, AtomicOp op, const Register& value,
+                                                 const BaseIndex& mem);
 
 void
 MacroAssemblerARMCompat::profilerEnterFrame(Register framePtr, Register scratch)
@@ -5138,8 +5234,16 @@ MacroAssembler::Pop(Register reg)
 }
 
 void
-MacroAssembler::Pop(const ValueOperand &val)
+MacroAssembler::Pop(const ValueOperand& val)
 {
     popValue(val);
-    framePushed_ -= sizeof(Value);
+    adjustFrame(-sizeof(Value));
+}
+
+void
+MacroAssembler::reserveStack(uint32_t amount)
+{
+    if (amount)
+        ma_sub(Imm32(amount), sp);
+    adjustFrame(amount);
 }

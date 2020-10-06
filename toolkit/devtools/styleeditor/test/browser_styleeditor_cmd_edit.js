@@ -180,14 +180,6 @@ function spawnTest() {
       setup: "edit css#style2",
       check: {
         input: "edit css#style2",
-        args: {
-          resource: {
-            value: function(resource) {
-              let style2 = options.window.document.getElementById("style2");
-              return resource.element.ownerNode == style2;
-            }
-          }
-        }
       },
       exec: { output: "" }
     },

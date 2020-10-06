@@ -1158,6 +1158,12 @@ pref("devtools.telemetry.tools.opened.version", "{}");
 pref("devtools.selfxss.count", 0);
 #endif //MOZ_DEVTOOLS
 
+// URL of the remote JSON catalog used for device simulation
+pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
+
+// URL of the remote JSON catalog used for device simulation
+pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
+
 // view source
 pref("view_source.syntax_highlight", true);
 pref("view_source.wrap_long_lines", false);

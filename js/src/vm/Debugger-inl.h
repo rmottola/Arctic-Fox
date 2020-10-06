@@ -22,7 +22,7 @@ js::Debugger::onLeaveFrame(JSContext* cx, AbstractFramePtr frame, bool ok)
     MOZ_ASSERT_IF(evalTraps, frame.isDebuggee());
     if (frame.isDebuggee())
         ok = slowPathOnLeaveFrame(cx, frame, ok);
-    assertNotInFrameMaps(frame);
+    MOZ_ASSERT(!inFrameMaps(frame));
     return ok;
 }
 
@@ -56,6 +56,29 @@ js::Debugger::onExceptionUnwind(JSContext* cx, AbstractFramePtr frame)
     if (!cx->compartment()->isDebuggee())
         return JSTRAP_CONTINUE;
     return slowPathOnExceptionUnwind(cx, frame);
+}
+
+/* static */ bool
+js::Debugger::observesIonCompilation(JSContext* cx)
+{
+    // If the current compartment is observed by any Debugger.
+    if (!cx->compartment()->isDebuggee())
+        return false;
+
+    // If any attached Debugger watch for Jit compilation results.
+    if (!Debugger::hasLiveHook(cx->global(), Debugger::OnIonCompilation))
+        return false;
+
+    return true;
+}
+
+/* static */ void
+js::Debugger::onIonCompilation(JSContext* cx, AutoScriptVector& scripts, LSprinter& graph)
+{
+    if (!observesIonCompilation(cx))
+        return;
+
+    slowPathOnIonCompilation(cx, scripts, graph);
 }
 
 #endif /* vm_Debugger_inl_h */

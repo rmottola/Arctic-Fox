@@ -580,6 +580,7 @@ const Class DynamicWithObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
@@ -1030,6 +1031,7 @@ const Class UninitializedLexicalObject::class_ = {
     nullptr, /* setProperty */
     nullptr, /* enumerate */
     nullptr, /* resolve */
+    nullptr, /* mayResolve */
     nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
@@ -1225,7 +1227,7 @@ void
 LiveScopeVal::sweep()
 {
     if (staticScope_)
-        MOZ_ALWAYS_FALSE(IsObjectAboutToBeFinalized(staticScope_.unsafeGet()));
+        MOZ_ALWAYS_FALSE(IsAboutToBeFinalized(&staticScope_));
 }
 
 // Live ScopeIter values may be added to DebugScopes::liveScopes, as
@@ -1936,7 +1938,7 @@ DebugScopes::sweep(JSRuntime* rt)
      */
     for (MissingScopeMap::Enum e(missingScopes); !e.empty(); e.popFront()) {
         DebugScopeObject** debugScope = e.front().value().unsafeGet();
-        if (IsObjectAboutToBeFinalized(debugScope)) {
+        if (IsAboutToBeFinalizedUnbarriered(debugScope)) {
             /*
              * Note that onPopCall and onPopBlock rely on missingScopes to find
              * scope objects that we synthesized for the debugger's sake, and
@@ -1974,7 +1976,7 @@ DebugScopes::sweep(JSRuntime* rt)
          * Scopes can be finalized when a debugger-synthesized ScopeObject is
          * no longer reachable via its DebugScopeObject.
          */
-        if (IsObjectAboutToBeFinalized(&scope))
+        if (IsAboutToBeFinalizedUnbarriered(&scope))
             e.removeFront();
         else if (scope != e.front().key())
             e.rekeyFront(scope);
@@ -2499,12 +2501,12 @@ GetDebugScopeForMissing(JSContext* cx, const ScopeIter& si)
 static JSObject *
 GetDebugScopeForNonScopeObject(const ScopeIter &si)
 {
-    JSObject& enclosing = si.enclosingScope();
-    MOZ_ASSERT(IsValidTerminatingScope(&enclosing));
+    JSObject &enclosing = si.enclosingScope();
+    MOZ_ASSERT(!IsSyntacticScope(&enclosing));
 #ifdef DEBUG
     JSObject *o = &enclosing;
     while ((o = o->enclosingScope()))
-        MOZ_ASSERT(!o->is<ScopeObject>());
+        MOZ_ASSERT(!IsSyntacticScope(o));
 #endif
     return &enclosing;
 }
@@ -2544,6 +2546,7 @@ js::GetDebugScopeForFrame(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc)
     assertSameCompartment(cx, frame);
     if (CanUseDebugScopeMaps(cx) && !DebugScopes::updateLiveScopes(cx))
         return nullptr;
+
     ScopeIter si(cx, frame, pc);
     return GetDebugScope(cx, si);
 }

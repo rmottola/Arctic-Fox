@@ -427,6 +427,20 @@
         ]]></getter>
       </property>
 
+      <field name="_permanentKey">({})</field>
+
+      <property name="permanentKey" readonly="true"
+                onget="return this._permanentKey;"/>
+
+      <property name="outerWindowID" readonly="true">
+        <getter><![CDATA[
+          return this.contentWindow
+                     .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                     .getInterface(Components.interfaces.nsIDOMWindowUtils)
+                     .outerWindowID;
+        ]]></getter>
+      </property>
+
       <field name="_lastSearchString">null</field>
       <field name="_lastSearchHighlight">false</field>
 
@@ -1110,6 +1124,12 @@
           if (this.isRemoteBrowser != aOtherBrowser.isRemoteBrowser)
             throw new Error("Can only swap docshells between browsers in the same process.");
 
+          // Give others a chance to swap state.
+          let event = new CustomEvent("SwapDocShells", {"detail": aOtherBrowser});
+          this.dispatchEvent(event);
+          event = new CustomEvent("SwapDocShells", {"detail": this});
+          aOtherBrowser.dispatchEvent(event);
+
           // We need to swap fields that are tied to our docshell or related to
           // the loaded page
           // Fields which are built as a result of notifactions (pageshow/hide,
@@ -1271,6 +1291,11 @@
           event.stopPropagation();
           event.preventDefault();
         }
+
+        // No need to handle "dragover" in e10s, since nsDocShellTreeOwner.cpp in the child process
+        // handles that case using "@mozilla.org/content/dropped-link-handler;1" service.
+        if (this.isRemoteBrowser)
+          return;
 
         let linkHandler = Components.classes["@mozilla.org/content/dropped-link-handler;1"].
                             getService(Components.interfaces.nsIDroppedLinkHandler);

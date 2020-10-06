@@ -34,21 +34,11 @@ if not CONFIG['JS_STANDALONE']:
 
 if not CONFIG['LIBXUL_SDK']:
     DIRS += [
-        'mfbt',
         'config/external/zlib',
+        'memory',
+        'mfbt',
+        'mozglue',
     ]
-
-    if not CONFIG['JS_STANDALONE']:
-
-        if CONFIG['MOZ_MEMORY']:
-            DIRS += ['memory']
-
-        DIRS += [
-            'mozglue',
-            'memory/fallible',
-            'memory/mozalloc',
-            'memory/volatile',
-        ]
 
 if not CONFIG['JS_STANDALONE']:
     DIRS += ['xpcom/xpidl']

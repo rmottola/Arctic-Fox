@@ -46,6 +46,8 @@
   locale/@AB_CD@/global/devtools/debugger.dtd              (%chrome/global/devtools/debugger.dtd)
   locale/@AB_CD@/global/devtools/debugger.properties       (%chrome/global/devtools/debugger.properties)
   locale/@AB_CD@/global/devtools/device.properties         (%chrome/global/devtools/device.properties)
+  locale/@AB_CD@/global/devtools/filterwidget.properties          (%chrome/global/devtools/filterwidget.properties)
+  locale/@AB_CD@/global/devtools/filterwidget.dtd                 (%chrome/global/devtools/filterwidget.dtd)
   locale/@AB_CD@/global/devtools/netmonitor.dtd            (%chrome/global/devtools/netmonitor.dtd)
   locale/@AB_CD@/global/devtools/netmonitor.properties     (%chrome/global/devtools/netmonitor.properties)
   locale/@AB_CD@/global/devtools/shadereditor.dtd          (%chrome/global/devtools/shadereditor.dtd)

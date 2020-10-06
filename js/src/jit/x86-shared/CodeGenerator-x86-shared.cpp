@@ -17,6 +17,7 @@
 #include "jit/RangeAnalysis.h"
 #include "vm/TraceLogging.h"
 
+#include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
 
 using namespace js;
@@ -1528,11 +1529,11 @@ CodeGeneratorX86Shared::visitUrshD(LUrshD* ins)
 }
 
 MoveOperand
-CodeGeneratorX86Shared::toMoveOperand(const LAllocation* a) const
+CodeGeneratorX86Shared::toMoveOperand(LAllocation a) const
 {
-    if (a->isGeneralReg())
+    if (a.isGeneralReg())
         return MoveOperand(ToRegister(a));
-    if (a->isFloatReg())
+    if (a.isFloatReg())
         return MoveOperand(ToFloatRegister(a));
     return MoveOperand(StackPointer, ToStackOffset(a));
 }
@@ -2071,11 +2072,6 @@ CodeGeneratorX86Shared::visitGuardObjectGroup(LGuardObjectGroup* guard)
 {
     Register obj = ToRegister(guard->input());
 
-    if (guard->mir()->checkUnboxedExpando()) {
-        masm.cmpPtr(Address(obj, UnboxedPlainObject::offsetOfExpando()), ImmWord(0));
-        bailoutIf(Assembler::NotEqual, guard->snapshot());
-    }
-
     masm.cmpPtr(Operand(obj, JSObject::offsetOfGroup()), ImmGCPtr(guard->mir()->group()));
 
     Assembler::Condition cond =
@@ -2180,7 +2176,58 @@ CodeGeneratorX86Shared::visitFloat32x4ToInt32x4(LFloat32x4ToInt32x4* ins)
 {
     FloatRegister in = ToFloatRegister(ins->input());
     FloatRegister out = ToFloatRegister(ins->output());
+    Register temp = ToRegister(ins->temp());
+
     masm.convertFloat32x4ToInt32x4(in, out);
+
+    OutOfLineSimdFloatToIntCheck *ool = new(alloc()) OutOfLineSimdFloatToIntCheck(temp, in, ins);
+    addOutOfLineCode(ool, ins->mir());
+
+    static const SimdConstant InvalidResult = SimdConstant::SplatX4(int32_t(-2147483648));
+
+    masm.loadConstantInt32x4(InvalidResult, ScratchSimdReg);
+    masm.packedEqualInt32x4(Operand(out), ScratchSimdReg);
+    // TODO (bug 1156228): If we have SSE4.1, we can use PTEST here instead of
+    // the two following instructions.
+    masm.vmovmskps(ScratchSimdReg, temp);
+    masm.cmp32(temp, Imm32(0));
+    masm.j(Assembler::NotEqual, ool->entry());
+
+    masm.bind(ool->rejoin());
+}
+
+void
+CodeGeneratorX86Shared::visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIntCheck *ool)
+{
+    static const SimdConstant Int32MaxX4 = SimdConstant::SplatX4(2147483647.f);
+    static const SimdConstant Int32MinX4 = SimdConstant::SplatX4(-2147483648.f);
+
+    Label bail;
+    Label* onConversionError = gen->conversionErrorLabel();
+    if (!onConversionError)
+        onConversionError = &bail;
+
+    FloatRegister input = ool->input();
+    Register temp = ool->temp();
+
+    masm.loadConstantFloat32x4(Int32MinX4, ScratchSimdReg);
+    masm.vcmpleps(Operand(input), ScratchSimdReg, ScratchSimdReg);
+    masm.vmovmskps(ScratchSimdReg, temp);
+    masm.cmp32(temp, Imm32(15));
+    masm.j(Assembler::NotEqual, onConversionError);
+
+    masm.loadConstantFloat32x4(Int32MaxX4, ScratchSimdReg);
+    masm.vcmpleps(Operand(input), ScratchSimdReg, ScratchSimdReg);
+    masm.vmovmskps(ScratchSimdReg, temp);
+    masm.cmp32(temp, Imm32(0));
+    masm.j(Assembler::NotEqual, onConversionError);
+
+    masm.jump(ool->rejoin());
+
+    if (bail.used()) {
+        masm.bind(&bail);
+        bailout(ool->ins()->snapshot());
+    }
 }
 
 void
@@ -3102,15 +3149,12 @@ CodeGeneratorX86Shared::visitSimdShift(LSimdShift* ins)
     FloatRegister out = ToFloatRegister(ins->output());
     MOZ_ASSERT(ToFloatRegister(ins->vector()) == out); // defineReuseInput(0);
 
-    // TODO: If the shift count is greater than 31, this will just zero all
-    // lanes by default for lsh and ursh, and set the count to 32 for rsh
-    // (which will just extend the sign bit to all bits). Plain JS doesn't do
-    // this: instead it only keeps the five low bits of the mask. Spec isn't
-    // clear about that topic so this might need to be fixed. See also bug
-    // 1068028.
+    // If the shift count is greater than 31, this will just zero all lanes by
+    // default for lsh and ursh, and for rsh extend the sign bit to all bits,
+    // per the SIMD.js spec (as of March 19th 2015).
     const LAllocation* val = ins->value();
     if (val->isConstant()) {
-        int32_t c = ToInt32(val);
+        uint32_t c = uint32_t(ToInt32(val));
         if (c > 31) {
             switch (ins->operation()) {
               case MSimdShift::lsh:

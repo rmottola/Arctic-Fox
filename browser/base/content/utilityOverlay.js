@@ -348,8 +348,7 @@ function openLinkIn(url, where, params) {
     loadInBackground = !loadInBackground;
     // fall through
   case "tab":
-    let browser = w.gBrowser;
-    browser.loadOneTab(url, {
+    w.gBrowser.loadOneTab(url, {
       referrerURI: aReferrerURI,
       referrerPolicy: aReferrerPolicy,
       charset: aCharset,
@@ -366,8 +365,9 @@ function openLinkIn(url, where, params) {
 
   w.gBrowser.selectedBrowser.focus();
 
-  if (!loadInBackground && w.isBlankPageURL(url))
+  if (!loadInBackground && w.isBlankPageURL(url)) {
     w.focusAndSelectUrlBar();
+  }
 }
 
 // Used as an onclick handler for UI elements with link-like behavior.
@@ -496,6 +496,9 @@ function openAboutDialog() {
   while (enumerator.hasMoreElements()) {
     // Only open one about window (Bug 599573)
     let win = enumerator.getNext();
+    if (win.closed) {
+      continue;
+    }
     win.focus();
     return;
   }

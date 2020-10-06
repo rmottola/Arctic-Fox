@@ -414,10 +414,9 @@ class ObjectGroupCompartment::NewTableRef : public gc::BufferableRef
         : table(table), clasp(clasp), proto(proto), associated(associated)
     {}
 
-    void mark(JSTracer* trc) {
+    void trace(JSTracer* trc) override {
         JSObject* prior = proto;
-        trc->setTracingLocation(&*prior);
-        Mark(trc, &proto, "newObjectGroups set prototype");
+        TraceManuallyBarrieredEdge(trc, &proto, "newObjectGroups set prototype");
         if (prior == proto)
             return;
 
@@ -466,6 +465,8 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
     // unboxed plain object.
     MOZ_ASSERT(!clasp == (associated && associated->is<JSFunction>()));
 
+    AutoEnterAnalysis enter(cx);
+
     ObjectGroupCompartment::NewTable*& table = cx->compartment()->objectGroups.defaultNewTable;
 
     if (!table) {
@@ -473,6 +474,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         if (!table || !table->init()) {
             js_delete(table);
             table = nullptr;
+            ReportOutOfMemory(cx);
             return nullptr;
         }
     }
@@ -492,6 +494,9 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
             clasp = &PlainObject::class_;
     }
 
+    if (proto.isObject() && !proto.toObject()->setDelegate(cx))
+        return nullptr;
+
     ObjectGroupCompartment::NewTable::AddPtr p =
         table->lookupForAdd(ObjectGroupCompartment::NewEntry::Lookup(clasp, proto, associated));
     if (p) {
@@ -503,11 +508,6 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         return group;
     }
 
-    AutoEnterAnalysis enter(cx);
-
-    if (proto.isObject() && !proto.toObject()->setDelegate(cx))
-        return nullptr;
-
     ObjectGroupFlags initialFlags = 0;
     if (!proto.isObject() || proto.toObject()->isNewGroupUnknown())
         initialFlags = OBJECT_FLAG_DYNAMIC_MASK;
@@ -518,8 +518,10 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
     if (!group)
         return nullptr;
 
-    if (!table->add(p, ObjectGroupCompartment::NewEntry(group, associated)))
+    if (!table->add(p, ObjectGroupCompartment::NewEntry(group, associated))) {
+        ReportOutOfMemory(cx);
         return nullptr;
+    }
 
     ObjectGroupCompartment::newTablePostBarrier(cx, table, clasp, proto, associated);
 
@@ -575,6 +577,7 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
     if (!table) {
         table = cx->new_<ObjectGroupCompartment::NewTable>();
         if (!table || !table->init()) {
+            ReportOutOfMemory(cx);
             js_delete(table);
             table = nullptr;
             return nullptr;
@@ -599,8 +602,10 @@ ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, Tagged
     if (!group)
         return nullptr;
 
-    if (!table->add(p, ObjectGroupCompartment::NewEntry(group, nullptr)))
+    if (!table->add(p, ObjectGroupCompartment::NewEntry(group, nullptr))) {
+        ReportOutOfMemory(cx);
         return nullptr;
+    }
 
     ObjectGroupCompartment::newTablePostBarrier(cx, table, clasp, proto, nullptr);
 
@@ -1155,6 +1160,15 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
         }
     }
 
+    if (JSOp(*pc) == JSOP_NEWARRAY && cx->runtime()->options().unboxedArrays()) {
+        PreliminaryObjectArrayWithTemplate* preliminaryObjects =
+            cx->new_<PreliminaryObjectArrayWithTemplate>(nullptr);
+        if (preliminaryObjects)
+            res->setPreliminaryObjects(preliminaryObjects);
+        else
+            cx->recoverFromOutOfMemory();
+    }
+
     if (!table->add(p, key, res))
         return nullptr;
 
@@ -1399,17 +1413,17 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
             bool remove = false;
             if (!key.type.isUnknown() && key.type.isGroup()) {
                 ObjectGroup* group = key.type.groupNoBarrier();
-                if (IsObjectGroupAboutToBeFinalized(&group))
+                if (IsAboutToBeFinalizedUnbarriered(&group))
                     remove = true;
                 else
                     key.type = TypeSet::ObjectType(group);
             }
             if (key.proto && key.proto != TaggedProto::LazyProto &&
-                IsObjectAboutToBeFinalized(&key.proto))
+                IsAboutToBeFinalizedUnbarriered(&key.proto))
             {
                 remove = true;
             }
-            if (IsObjectGroupAboutToBeFinalized(e.front().value().unsafeGet()))
+            if (IsAboutToBeFinalized(&e.front().value()))
                 remove = true;
 
             if (remove)
@@ -1425,27 +1439,18 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
             PlainObjectEntry& entry = e.front().value();
 
             bool remove = false;
-            if (IsObjectGroupAboutToBeFinalized(entry.group.unsafeGet()))
+            if (IsAboutToBeFinalized(&entry.group))
                 remove = true;
-            if (IsShapeAboutToBeFinalized(entry.shape.unsafeGet()))
+            if (IsAboutToBeFinalized(&entry.shape))
                 remove = true;
             for (unsigned i = 0; !remove && i < key.nproperties; i++) {
-                if (JSID_IS_STRING(key.properties[i])) {
-                    JSString* str = JSID_TO_STRING(key.properties[i]);
-                    if (IsStringAboutToBeFinalized(&str))
-                        remove = true;
-                    MOZ_ASSERT(AtomToId((JSAtom*)str) == key.properties[i]);
-                } else if (JSID_IS_SYMBOL(key.properties[i])) {
-                    JS::Symbol* sym = JSID_TO_SYMBOL(key.properties[i]);
-                    if (IsSymbolAboutToBeFinalized(&sym))
-                        remove = true;
-                }
+                if (gc::IsAboutToBeFinalizedUnbarriered(&key.properties[i]))
+                    remove = true;
 
                 MOZ_ASSERT(!entry.types[i].isSingleton());
-                ObjectGroup* group = nullptr;
                 if (entry.types[i].isGroup()) {
-                    group = entry.types[i].groupNoBarrier();
-                    if (IsObjectGroupAboutToBeFinalized(&group))
+                    ObjectGroup* group = entry.types[i].groupNoBarrier();
+                    if (IsAboutToBeFinalizedUnbarriered(&group))
                         remove = true;
                     else if (group != entry.types[i].groupNoBarrier())
                         entry.types[i] = TypeSet::ObjectType(group);
@@ -1463,8 +1468,8 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
     if (allocationSiteTable) {
         for (AllocationSiteTable::Enum e(*allocationSiteTable); !e.empty(); e.popFront()) {
             AllocationSiteKey key = e.front().key();
-            bool keyDying = IsScriptAboutToBeFinalized(&key.script);
-            bool valDying = IsObjectGroupAboutToBeFinalized(e.front().value().unsafeGet());
+            bool keyDying = IsAboutToBeFinalizedUnbarriered(&key.script);
+            bool valDying = IsAboutToBeFinalized(&e.front().value());
             if (keyDying || valDying)
                 e.removeFront();
             else if (key.script != e.front().key().script)
@@ -1482,8 +1487,8 @@ ObjectGroupCompartment::sweepNewTable(NewTable* table)
     if (table && table->initialized()) {
         for (NewTable::Enum e(*table); !e.empty(); e.popFront()) {
             NewEntry entry = e.front();
-            if (IsObjectGroupAboutToBeFinalized(entry.group.unsafeGet()) ||
-                (entry.associated && IsObjectAboutToBeFinalized(&entry.associated)))
+            if (IsAboutToBeFinalized(&entry.group) ||
+                (entry.associated && IsAboutToBeFinalizedUnbarriered(&entry.associated)))
             {
                 e.removeFront();
             } else {
@@ -1556,7 +1561,7 @@ ObjectGroupCompartment::checkNewTableAfterMovingGC(NewTable* table)
 
         NewEntry::Lookup lookup(clasp, proto, entry.associated);
         NewTable::Ptr ptr = table->lookup(lookup);
-        MOZ_ASSERT(ptr.found() && &*ptr == &e.front());
+        MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
     }
 }
 

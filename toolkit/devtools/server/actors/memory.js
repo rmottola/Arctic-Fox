@@ -176,7 +176,12 @@ let MemoryActor = protocol.ActorClass({
    *        See the protocol.js definition of AllocationsRecordingOptions above.
    */
   startRecordingAllocations: method(expectState("attached", function(options = {}) {
+    if (this.dbg.memory.trackingAllocationSites) {
+      return Date.now();
+    }
+
     this._frameCache.initFrames();
+
     this.dbg.memory.allocationSamplingProbability = options.probability != null
       ? options.probability
       : 1.0;
@@ -208,6 +213,23 @@ let MemoryActor = protocol.ActorClass({
     response: {
       // Accept `nullable` in the case of server Gecko <= 37, handled on the front
       value: RetVal(0, "nullable:number")
+    }
+  }),
+
+  /**
+   * Return settings used in `startRecordingAllocations` for `probability`
+   * and `maxLogLength`. Currently only uses in tests.
+   */
+  getAllocationsSettings: method(expectState("attached", function() {
+    return {
+      maxLogLength: this.dbg.memory.maxAllocationsLogLength,
+      probability: this.dbg.memory.allocationSamplingProbability
+    };
+  },
+  `getting allocations settings`), {
+    request: {},
+    response: {
+      options: RetVal(0, "json")
     }
   }),
 
