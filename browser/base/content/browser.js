@@ -1010,7 +1010,6 @@ var gBrowserInit = {
     TabsOnTop.init();
     gPrivateBrowsingUI.init();
     TabsInTitlebar.init();
-    ReadingListUI.init();
     retrieveToolbarIconsizesFromTheme();
     ToolbarIconColor.init();
 
@@ -1202,6 +1201,7 @@ var gBrowserInit = {
     if (gMultiProcessBrowser)
       TabCrashReporter.init();
 #endif
+    ReadingListUI.init();
 
     SidebarUI.startDelayedLoad();
 
