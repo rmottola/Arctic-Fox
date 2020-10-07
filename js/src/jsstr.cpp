@@ -1518,7 +1518,8 @@ RopeMatch(JSContext* cx, JSRope* text, JSLinearString* pat, int* match)
     return true;
 }
 
-/* ES6 2015 ST 21.1.3.7 String.prototype.includes */
+
+/* ES6 draft rc4 21.1.3.7. */
 static bool
 str_includes(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -1575,10 +1576,16 @@ str_includes(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-/* ES6 draft <RC4 String.prototype.contains kept for compatibility */
+/* TODO: remove String.prototype.contains (bug 1103588) */
 static bool
-str_contains(JSContext* cx, unsigned argc, Value* vp)
+str_contains(JSContext *cx, unsigned argc, Value *vp)
 {
+#ifndef RELEASE_BUILD
+    CallArgs args = CallArgsFromVp(argc, vp);
+    RootedObject callee(cx, &args.callee());
+    if (!GlobalObject::warnOnceAboutStringContains(cx, callee))
+        return false;
+#endif
     return str_includes(cx, argc, vp);
 }
 
