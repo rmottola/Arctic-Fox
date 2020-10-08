@@ -7104,15 +7104,12 @@ let gRemoteTabsUI = {
     }
 #endif
 
-    let newRemoteWindow = document.getElementById("menu_newRemoteWindow");
     let newNonRemoteWindow = document.getElementById("menu_newNonRemoteWindow");
 
 #ifdef E10S_TESTING_ONLY
     let autostart = Services.appinfo.browserTabsRemoteAutostart;
-    newRemoteWindow.hidden = autostart;
     newNonRemoteWindow.hidden = !autostart;
 #else
-    newRemoteWindow.hidden = true;
     newNonRemoteWindow.hidden = true;
 #endif
   }

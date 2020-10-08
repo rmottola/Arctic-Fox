@@ -27,10 +27,6 @@
                           accesskey="&newPrivateWindow.accesskey;"
                           command="Tools:PrivateBrowsing"
                           key="key_privatebrowsing"/>
-                <menuitem id="menu_newRemoteWindow"
-                          label="New OOP Window"
-                          hidden="true"
-                          command="Tools:RemoteWindow"/>
                 <menuitem id="menu_newNonRemoteWindow"
                           label="New In-process Window"
                           hidden="true"
