@@ -560,7 +560,7 @@ private:
     // Initialize the output buffer (enough space for padding / a full tag)
     uint32_t dataLen = mData.Length();
     uint32_t maxLen = dataLen + 16;
-    if (!mResult.SetLength(maxLen)) {
+    if (!mResult.SetLength(maxLen, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
     uint32_t outLen = 0;
@@ -684,7 +684,7 @@ private:
 
       // Encrypt and return the wrapped key
       // AES-KW encryption results in a wrapped key 64 bits longer
-      if (!mResult.SetLength(mData.Length() + 8)) {
+      if (!mResult.SetLength(mData.Length() + 8, fallible)) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
       SECItem resultItem = {siBuffer, mResult.Elements(),
@@ -816,7 +816,7 @@ private:
 
     // Ciphertext is an integer mod the modulus, so it will be
     // no longer than mStrength octets
-    if (!mResult.SetLength(mStrength)) {
+    if (!mResult.SetLength(mStrength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -906,7 +906,7 @@ private:
   virtual nsresult DoCrypto() override
   {
     // Initialize the output buffer
-    if (!mResult.SetLength(HASH_LENGTH_MAX)) {
+    if (!mResult.SetLength(HASH_LENGTH_MAX, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -1188,7 +1188,7 @@ private:
   {
     // Resize the result buffer
     uint32_t hashLen = HASH_ResultLenByOidTag(mOidTag);
-    if (!mResult.SetLength(hashLen)) {
+    if (!mResult.SetLength(hashLen, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -2651,7 +2651,7 @@ private:
       return NS_ERROR_DOM_DATA_ERR;
     }
 
-    if (!mResult.SetLength(mLength)) {
+    if (!mResult.SetLength(mLength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -2750,7 +2750,7 @@ private:
       return NS_ERROR_DOM_DATA_ERR;
     }
 
-    if (!mResult.SetLength(mLength)) {
+    if (!mResult.SetLength(mLength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 

@@ -15440,7 +15440,7 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
   }
 
   AutoFallibleTArray<uint8_t, 512> uncompressed;
-  if (NS_WARN_IF(!uncompressed.SetLength(uncompressedLength))) {
+  if (NS_WARN_IF(!uncompressed.SetLength(uncompressedLength, fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -21409,7 +21409,8 @@ ObjectStoreGetRequestOp::GetResponse(RequestResponse& aResponse)
 
     if (!mResponse.IsEmpty()) {
       FallibleTArray<SerializedStructuredCloneReadInfo> fallibleCloneInfos;
-      if (NS_WARN_IF(!fallibleCloneInfos.SetLength(mResponse.Length()))) {
+      if (NS_WARN_IF(!fallibleCloneInfos.SetLength(mResponse.Length(),
+                                                   fallible))) {
         aResponse = NS_ERROR_OUT_OF_MEMORY;
         return;
       }
@@ -21957,7 +21958,8 @@ IndexGetRequestOp::GetResponse(RequestResponse& aResponse)
 
     if (!mResponse.IsEmpty()) {
       FallibleTArray<SerializedStructuredCloneReadInfo> fallibleCloneInfos;
-      if (NS_WARN_IF(!fallibleCloneInfos.SetLength(mResponse.Length()))) {
+      if (NS_WARN_IF(!fallibleCloneInfos.SetLength(mResponse.Length(),
+                                                   fallible))) {
         aResponse = NS_ERROR_OUT_OF_MEMORY;
         return;
       }

@@ -216,7 +216,7 @@ public:
     if (initSegment || !HasCompleteInitData()) {
       if (mParser.mInitEndOffset > 0) {
         MOZ_ASSERT(mParser.mInitEndOffset <= mResource->GetLength());
-        if (!mInitData->SetLength(mParser.mInitEndOffset)) {
+        if (!mInitData->SetLength(mParser.mInitEndOffset, fallible)) {
           // Super unlikely OOM
           return false;
         }
@@ -390,7 +390,7 @@ public:
       MediaByteRange& range = mParser->mInitRange;
       if (range.Length()) {
         mCompleteInitSegmentRange = range;
-        if (!mInitData->SetLength(range.Length())) {
+        if (!mInitData->SetLength(range.Length(), fallible)) {
           // Super unlikely OOM
           return false;
         }
