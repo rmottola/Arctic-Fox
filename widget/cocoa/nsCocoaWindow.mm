@@ -1259,7 +1259,10 @@ NS_IMETHODIMP nsCocoaWindow::HideWindowChrome(bool aShouldHide)
 
   // Show the new window.
   if (isVisible) {
+    bool wasAnimationSuppressed = mIsAnimationSuppressed;
+    mIsAnimationSuppressed = true;
     rv = Show(true);
+    mIsAnimationSuppressed = wasAnimationSuppressed;
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
