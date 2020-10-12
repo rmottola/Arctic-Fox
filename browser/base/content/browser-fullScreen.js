@@ -171,9 +171,7 @@ var FullScreen = {
     // Add listener to detect when the fullscreen window is re-focused.
     // If a fullscreen window loses focus, we show a warning when the
     // fullscreen window is refocused.
-    if (!this.useLionFullScreen) {
-      window.addEventListener("activate", this);
-    }
+    window.addEventListener("activate", this);
 
     // Cancel any "hide the toolbar" animation which is in progress, and make
     // the toolbar hide immediately.
@@ -197,8 +195,7 @@ var FullScreen = {
     gBrowser.tabContainer.removeEventListener("TabOpen", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabClose", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabSelect", this.exitDomFullScreen);
-    if (!this.useLionFullScreen)
-      window.removeEventListener("activate", this);
+    window.removeEventListener("activate", this);
 
     window.messageManager
           .broadcastAsyncMessage("DOMFullscreen:Cleanup");
