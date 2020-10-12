@@ -3328,10 +3328,12 @@ static const NSString* kStateCollectionBehavior = @"collectionBehavior";
   CGFloat topMargin = mUnifiedToolbarHeight - [self titlebarHeight];
   [self setContentBorderThickness:topMargin forEdge:NSMaxYEdge];
 
-  // Redraw the title bar. If we're inside painting, we'll do it right now,
-  // otherwise we'll just invalidate it.
-  BOOL needSyncRedraw = ([NSView focusView] != nil);
-  [self setTitlebarNeedsDisplayInRect:[self titlebarRect] sync:needSyncRedraw];
+  if (![self drawsContentsIntoWindowFrame]) {
+    // Redraw the title bar. If we're inside painting, we'll do it right now,
+    // otherwise we'll just invalidate it.
+    BOOL needSyncRedraw = ([NSView focusView] != nil);
+    [self setTitlebarNeedsDisplayInRect:[self titlebarRect] sync:needSyncRedraw];
+  }
 }
 
 // Extending the content area into the title bar works by resizing the
