@@ -250,6 +250,8 @@ protected:
     void NotifyFlashHang();
     void NotifyPluginCrashed();
     void OnInitFailure();
+    bool MaybeRunDeferredShutdown();
+    bool DoShutdown(NPError* error);
 
     bool GetSetting(NPNVariable aVariable);
     void GetSettings(PluginSettings* aSettings);
@@ -284,6 +286,7 @@ protected:
 
     bool              mIsStartingAsync;
     bool              mNPInitialized;
+    bool              mIsNPShutdownPending;
     nsTArray<nsRefPtr<PluginAsyncSurrogate>> mSurrogateInstances;
     nsresult          mAsyncNewRv;
     uint32_t          mRunID;
