@@ -82,8 +82,13 @@ bool
 mozilla::plugins::SetupBridge(uint32_t aPluginId,
                               dom::ContentParent* aContentParent,
                               bool aForceBridgeNow,
-                              nsresult* rv)
+                              nsresult* rv,
+                              uint32_t* runID)
 {
+    if (NS_WARN_IF(!rv) || NS_WARN_IF(!runID)) {
+        return false;
+    }
+
     PluginModuleChromeParent::ClearInstantiationFlag();
     nsRefPtr<nsPluginHost> host = nsPluginHost::GetInst();
     nsRefPtr<nsNPAPIPlugin> plugin;
@@ -92,6 +97,10 @@ mozilla::plugins::SetupBridge(uint32_t aPluginId,
         return true;
     }
     PluginModuleChromeParent* chromeParent = static_cast<PluginModuleChromeParent*>(plugin->GetLibrary());
+    *rv = chromeParent->GetRunID(runID);
+    if (NS_FAILED(*rv)) {
+        return true;
+    }
     chromeParent->SetContentParent(aContentParent);
     if (!aForceBridgeNow && chromeParent->IsStartingAsync() &&
         PluginModuleChromeParent::DidInstantiate()) {
@@ -351,7 +360,8 @@ PluginModuleContentParent::LoadModule(uint32_t aPluginId)
      */
     dom::ContentChild* cp = dom::ContentChild::GetSingleton();
     nsresult rv;
-    if (!cp->SendLoadPlugin(aPluginId, &rv) ||
+    uint32_t runID;
+    if (!cp->SendLoadPlugin(aPluginId, &rv, &runID) ||
         NS_FAILED(rv)) {
         return nullptr;
     }
@@ -367,6 +377,7 @@ PluginModuleContentParent::LoadModule(uint32_t aPluginId)
     }
 
     parent->mPluginId = aPluginId;
+    parent->mRunID = runID;
 
     return parent;
 }
@@ -601,6 +612,10 @@ PluginModuleContentParent::~PluginModuleContentParent()
     Preferences::UnregisterCallback(TimeoutChanged, kContentTimeoutPref, this);
 }
 
+// We start the Run IDs at 1 so that we can use 0 as a way of detecting
+// errors in retrieving the run ID.
+uint32_t PluginModuleChromeParent::sNextRunID = 1;
+
 bool PluginModuleChromeParent::sInstantiated = false;
 
 PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath, uint32_t aPluginId)
@@ -632,6 +647,7 @@ PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath, uint32
 {
     NS_ASSERTION(mSubprocess, "Out of memory!");
     sInstantiated = true;
+    mRunID = sNextRunID++;
 
     RegisterSettingsCallbacks();
 
@@ -1211,6 +1227,16 @@ PluginModuleParent::ActorDestroy(ActorDestroyReason why)
     default:
         NS_RUNTIMEABORT("Unexpected shutdown reason for toplevel actor.");
     }
+}
+
+nsresult
+PluginModuleParent::GetRunID(uint32_t* aRunID)
+{
+    if (NS_WARN_IF(!aRunID)) {
+      return NS_ERROR_INVALID_POINTER;
+    }
+    *aRunID = mRunID;
+    return NS_OK;
 }
 
 void
