@@ -29,6 +29,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "FormSubmitObserver",
   "resource:///modules/FormSubmitObserver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PageMetadata",
   "resource://gre/modules/PageMetadata.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesUIUtils",
+  "resource:///modules/PlacesUIUtils.jsm");
 
 // Bug 671101 - directly using webNavigation in this context
 // causes docshells to leak
@@ -656,4 +658,11 @@ addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
 
   sendAsyncMessage("ContextMenu:SearchFieldBookmarkData:Result",
                    { spec, title, description, postData, charset });
+});
+
+addMessageListener("ContextMenu:BookmarkFrame", (message) => {
+  let frame = message.objects.target.ownerDocument;
+  sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
+                   { title: frame.title,
+                     description: PlacesUIUtils.getDescriptionFromDocument(frame) });
 });
