@@ -13,7 +13,9 @@
 #include "nsCharSeparatedTokenizer.h"
 #include "nsThreadUtils.h"
 #include "nsIRunnable.h"
+#include "nsIWritablePropertyBag2.h"
 #include "mozIGeckoMediaPluginService.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/unused.h"
 #include "nsIObserverService.h"
@@ -22,6 +24,8 @@
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
 #include "mozilla/SandboxInfo.h"
 #endif
+
+using mozilla::ipc::GeckoChildProcessHost;
 
 #include "mozilla/Telemetry.h"
 
@@ -49,9 +53,7 @@ GMPParent::GMPParent()
   , mChildPid(0)
 {
   LOGD("GMPParent ctor");
-  // Use the parent address to identify it.
-  // We could use any unique-to-the-parent value.
-  mPluginId.AppendInt(reinterpret_cast<uint64_t>(this));
+  mPluginId = GeckoChildProcessHost::GetUniqueID();
 }
 
 GMPParent::~GMPParent()
@@ -722,7 +724,7 @@ GMPParent::GetVersion() const
   return mVersion;
 }
 
-const nsCString&
+const uint32_t
 GMPParent::GetPluginId() const
 {
   return mPluginId;

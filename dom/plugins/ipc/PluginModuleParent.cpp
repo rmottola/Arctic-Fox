@@ -14,6 +14,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/ipc/MessageChannel.h"
 #include "mozilla/plugins/BrowserStreamParent.h"
 #include "mozilla/plugins/PluginAsyncSurrogate.h"
@@ -52,6 +53,7 @@ using base::KillProcess;
 
 using mozilla::PluginLibrary;
 using mozilla::ipc::MessageChannel;
+using mozilla::ipc::GeckoChildProcessHost;
 
 using namespace mozilla;
 using namespace mozilla::plugins;
@@ -613,10 +615,6 @@ PluginModuleContentParent::~PluginModuleContentParent()
     Preferences::UnregisterCallback(TimeoutChanged, kContentTimeoutPref, this);
 }
 
-// We start the Run IDs at 1 so that we can use 0 as a way of detecting
-// errors in retrieving the run ID.
-uint32_t PluginModuleChromeParent::sNextRunID = 1;
-
 bool PluginModuleChromeParent::sInstantiated = false;
 
 PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath, uint32_t aPluginId)
@@ -648,7 +646,7 @@ PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath, uint32
 {
     NS_ASSERTION(mSubprocess, "Out of memory!");
     sInstantiated = true;
-    mRunID = sNextRunID++;
+    mRunID = GeckoChildProcessHost::GetUniqueID();
 
     RegisterSettingsCallbacks();
 

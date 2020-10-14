@@ -28,7 +28,7 @@ public:
   explicit GMPDecryptorParent(GMPContentParent *aPlugin);
 
   // GMPDecryptorProxy
-  virtual const nsACString& GetPluginId() const override;
+  virtual const uint32_t GetPluginId() const override;
 
   virtual nsresult Init(GMPDecryptorProxyCallback* aCallback) override;
 
@@ -111,7 +111,7 @@ private:
   bool mIsOpen;
   bool mShuttingDown;
   nsRefPtr<GMPContentParent> mPlugin;
-  nsCString mPluginId;
+  uint32_t mPluginId;
   GMPDecryptorProxyCallback* mCallback;
 #ifdef DEBUG
   nsIThread* const mGMPThread;

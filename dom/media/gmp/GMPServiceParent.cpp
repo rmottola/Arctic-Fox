@@ -1336,7 +1336,7 @@ GMPServiceParent::RecvLoadGMP(const nsCString& aNodeId,
                               nsTArray<ProcessId>&& aAlreadyBridgedTo,
                               ProcessId* aId,
                               nsCString* aDisplayName,
-                              nsCString* aPluginId)
+                              uint32_t* aPluginId)
 {
   nsRefPtr<GMPParent> gmp = mService->SelectPluginForAPI(aNodeId, aAPI, aTags);
 

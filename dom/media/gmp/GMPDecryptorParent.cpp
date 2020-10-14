@@ -28,7 +28,7 @@ GMPDecryptorParent::~GMPDecryptorParent()
 {
 }
 
-const nsACString&
+const uint32_t
 GMPDecryptorParent::GetPluginId() const
 {
   return mPluginId;

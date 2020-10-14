@@ -507,7 +507,6 @@ private:
     dom::ContentParent* mContentParent;
     nsCOMPtr<nsIObserver> mOfflineObserver;
     bool mIsBlocklisted;
-    static uint32_t sNextRunID;
     static bool sInstantiated;
 };
 
