@@ -355,7 +355,7 @@ MobileMessageManager::Delete(const Sequence<OwningLongOrMozSmsMessageOrMozMmsMes
 {
   const uint32_t size = aParams.Length();
   FallibleTArray<int32_t> idArray;
-  if (!idArray.SetLength(size)) {
+  if (!idArray.SetLength(size, fallible)) {
     aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return nullptr;
   }
@@ -598,13 +598,19 @@ MobileMessageManager::DispatchTrustedDeletedEventToSelf(nsISupports* aDeletedInf
     uint32_t msgIdLength = info->GetData().deletedMessageIds().Length();
     if (msgIdLength) {
       Sequence<int32_t>& deletedMsgIds = init.mDeletedMessageIds.SetValue();
-      deletedMsgIds.AppendElements(info->GetData().deletedMessageIds());
+      if (!deletedMsgIds.AppendElements(info->GetData().deletedMessageIds(),
+                                        fallible)) {
+        return NS_ERROR_OUT_OF_MEMORY;
+      }
     }
 
     uint32_t threadIdLength = info->GetData().deletedThreadIds().Length();
     if (threadIdLength) {
       Sequence<uint64_t>& deletedThreadIds = init.mDeletedThreadIds.SetValue();
-      deletedThreadIds.AppendElements(info->GetData().deletedThreadIds());
+      if (!deletedThreadIds.AppendElements(info->GetData().deletedThreadIds(),
+                                           fallible)) {
+        return NS_ERROR_OUT_OF_MEMORY;
+      }
     }
 
     nsRefPtr<MozMessageDeletedEvent> event =

@@ -116,6 +116,7 @@ public:
   nsresult SetType(const nsString& aType);
   void SetType(KeyType aType);
   void SetExtractable(bool aExtractable);
+  nsresult AddPublicKeyData(SECKEYPublicKey* point);
   void ClearUsages();
   nsresult AddUsage(const nsString& aUsage);
   nsresult AddUsageIntersecting(const nsString& aUsage, uint32_t aUsageMask);
@@ -176,6 +177,13 @@ public:
                                              const CryptoBuffer& aGenerator,
                                              const nsNSSShutDownPreventionLock& /*proofOfLock*/);
   static nsresult PublicDhKeyToRaw(SECKEYPublicKey* aPubKey,
+                                   CryptoBuffer& aRetVal,
+                                   const nsNSSShutDownPreventionLock& /*proofOfLock*/);
+
+  static SECKEYPublicKey* PublicECKeyFromRaw(CryptoBuffer& aKeyData,
+                                             const nsString& aNamedCurve,
+                                             const nsNSSShutDownPreventionLock& /*proofOfLock*/);
+  static nsresult PublicECKeyToRaw(SECKEYPublicKey* aPubKey,
                                    CryptoBuffer& aRetVal,
                                    const nsNSSShutDownPreventionLock& /*proofOfLock*/);
 

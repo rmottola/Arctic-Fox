@@ -1436,7 +1436,7 @@ GetStrokeDashData(nsIFrame* aFrame,
 
   } else {
     uint32_t count = style->mStrokeDasharrayLength;
-    if (!count || !aDashes.SetLength(count)) {
+    if (!count || !aDashes.SetLength(count, fallible)) {
       return false;
     }
 

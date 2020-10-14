@@ -1089,7 +1089,7 @@ nsContextMenu.prototype = {
     urlSecurityCheck(this.target.currentURI.spec, this.principal);
 
     // Confirm since it's annoying if you hit this accidentally.
-    const kDesktopBackgroundURL = 
+    const kDesktopBackgroundURL =
                   "chrome://browser/content/setDesktopBackground.xul";
 #ifdef XP_MACOSX
     // On Mac, the Set Desktop Background window is not modal.
@@ -1132,7 +1132,7 @@ nsContextMenu.prototype = {
     // file picker
     function saveAsListener() {}
     saveAsListener.prototype = {
-      extListener: null, 
+      extListener: null,
 
       onStartRequest: function saveLinkAs_onStartRequest(aRequest, aContext) {
 
@@ -1162,17 +1162,17 @@ nsContextMenu.prototype = {
           return;
         }
 
-        let extHelperAppSvc = 
+        let extHelperAppSvc =
           Cc["@mozilla.org/uriloader/external-helper-app-service;1"].
           getService(Ci.nsIExternalHelperAppService);
         let channel = aRequest.QueryInterface(Ci.nsIChannel);
         this.extListener =
-          extHelperAppSvc.doContent(channel.contentType, aRequest, 
+          extHelperAppSvc.doContent(channel.contentType, aRequest,
                                     null, true, window);
         this.extListener.onStartRequest(aRequest, aContext);
-      }, 
+      },
 
-      onStopRequest: function saveLinkAs_onStopRequest(aRequest, aContext, 
+      onStopRequest: function saveLinkAs_onStopRequest(aRequest, aContext,
                                                        aStatusCode) {
         if (aStatusCode == NS_ERROR_SAVE_LINK_AS_TIMEOUT) {
           // do it the old fashioned way, which will pick the best filename
@@ -1205,12 +1205,12 @@ nsContextMenu.prototype = {
           channel.cancel(NS_ERROR_SAVE_LINK_AS_TIMEOUT);
         }
         throw Cr.NS_ERROR_NO_INTERFACE;
-      } 
+      }
     }
 
-    // if it we don't have the headers after a short time, the user 
+    // if it we don't have the headers after a short time, the user
     // won't have received any feedback from their click.  that's bad.  so
-    // we give up waiting for the filename. 
+    // we give up waiting for the filename.
     function timerCallback() {}
     timerCallback.prototype = {
       notify: function sLA_timer_notify(aTimer) {
@@ -1252,8 +1252,8 @@ nsContextMenu.prototype = {
         channel.forceAllowThirdPartyCookie = true;
     }
 
-    // fallback to the old way if we don't see the headers quickly 
-    var timeToWait = 
+    // fallback to the old way if we don't see the headers quickly
+    var timeToWait =
       gPrefService.getIntPref("browser.download.saveLinkAsFilenameTimeout");
     var timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
     timer.initWithCallback(new timerCallback(), timeToWait,
@@ -1427,7 +1427,7 @@ nsContextMenu.prototype = {
 
   // Generate fully qualified URL for clicked-on link.
   getLinkURL: function() {
-    var href = this.link.href;  
+    var href = this.link.href;
     if (href)
       return href;
 
@@ -1547,30 +1547,35 @@ nsContextMenu.prototype = {
   },
 
   addBookmarkForFrame: function CM_addBookmarkForFrame() {
-    var doc = this.target.ownerDocument;
-    var uri = doc.documentURIObject;
+    let uri = gContextMenuContentData.documentURIObject;
+    let mm = this.browser.messageManager;
 
-    var itemId = PlacesUtils.getMostRecentBookmarkForURI(uri);
-    if (itemId == -1) {
-      var title = doc.title;
-      var description = PlacesUIUtils.getDescriptionFromDocument(doc);
-      PlacesUIUtils.showBookmarkDialog({ action: "add"
-                                       , type: "bookmark"
-                                       , uri: uri
-                                       , title: title
-                                       , description: description
-                                       , hiddenRows: [ "description"
-                                                     , "location"
-                                                     , "loadInSidebar"
-                                                     , "keyword" ]
-                                       }, window.top);
-    }
-    else {
-      PlacesUIUtils.showBookmarkDialog({ action: "edit"
-                                       , type: "bookmark"
-                                       , itemId: itemId
-                                       }, window.top);
-    }
+    let onMessage = (message) => {
+      mm.removeMessageListener("ContextMenu:BookmarkFrame:Result", onMessage);
+
+      let itemId = PlacesUtils.getMostRecentBookmarkForURI(uri);
+      if (itemId == -1) {
+        PlacesUIUtils.showBookmarkDialog({ action: "add"
+                                         , type: "bookmark"
+                                         , uri: uri
+                                         , title: message.data.title
+                                         , description: message.data.description
+                                         , hiddenRows: [ "description"
+                                                       , "location"
+                                                       , "loadInSidebar"
+                                                       , "keyword" ]
+                                         }, window.top);
+      }
+      else {
+        PlacesUIUtils.showBookmarkDialog({ action: "edit"
+                                         , type: "bookmark"
+                                         , itemId: itemId
+                                         }, window.top);
+      }
+    };
+    mm.addMessageListener("ContextMenu:BookmarkFrame:Result", onMessage);
+
+    mm.sendAsyncMessage("ContextMenu:BookmarkFrame", null, { target: this.target });
   },
 
   savePageAs: function CM_savePageAs() {

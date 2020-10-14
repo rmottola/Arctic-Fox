@@ -44,6 +44,7 @@
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
+- Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
@@ -138,6 +139,8 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 - Bug 1149352 - Part 0 to 11
 
 Unboxed Object (enabled - make Forum Manjaro Linux crash)
+- Bug 1166709 - Mark definite properties when replacing the unboxed gro
+- Bug 1166709 - After converting unboxed objects created by some initia
 - Bug 1162199 - Use unboxed objects by default, r=jandem. 
 
 impacting download and shutdown:
