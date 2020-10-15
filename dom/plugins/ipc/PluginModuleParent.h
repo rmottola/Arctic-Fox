@@ -407,7 +407,8 @@ private:
     virtual void ActorDestroy(ActorDestroyReason why) override;
 
     // aFilePath is UTF8, not native!
-    explicit PluginModuleChromeParent(const char* aFilePath, uint32_t aPluginId);
+    explicit PluginModuleChromeParent(const char* aFilePath, uint32_t aPluginId,
+                                      int32_t aSandboxLevel);
 
     void CleanupFromTimeout(const bool aByHangUI);
 
@@ -445,6 +446,7 @@ private:
     PluginHangUIParent *mHangUIParent;
     bool mHangUIEnabled;
     bool mIsTimerReset;
+    int32_t mSandboxLevel;
 
     /**
      * Launches the Plugin Hang UI.

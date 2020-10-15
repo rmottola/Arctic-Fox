@@ -933,8 +933,10 @@ pref("security.sandbox.windows.log", false);
 // On windows these levels are:
 // 0 - sandbox with USER_NON_ADMIN access token level
 // 1 - a more strict sandbox, which causes problems in specific areas
-// 2 - a policy that we can reasonably call an effective sandbox
-// 3 - an equivalent basic policy to the Chromium renderer processes
+// 2 - a more strict sandbox, which might cause functionality issues. This now
+//     includes running at low integrity.
+// 3 - the strongest settings we seem to be able to use without breaking
+//     everything, but will probably cause some functionality restrictions
 pref("security.sandbox.content.level", 0);
 
 // ID (a UUID when set by gecko) that is used as a per profile suffix to a low
