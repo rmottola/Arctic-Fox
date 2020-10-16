@@ -345,10 +345,9 @@ mozilla::plugins::TerminatePlugin(uint32_t aPluginId, const nsString& aBrowserDu
     if (!pluginTag || !pluginTag->mPlugin) {
         return;
     }
-    nsAutoString dumpId(aBrowserDumpId);
     nsRefPtr<nsNPAPIPlugin> plugin = pluginTag->mPlugin;
     PluginModuleChromeParent* chromeParent = static_cast<PluginModuleChromeParent*>(plugin->GetLibrary());
-    chromeParent->TerminateChildProcess(MessageLoop::current(), &dumpId);
+    chromeParent->TerminateChildProcess(MessageLoop::current(), aBrowserDumpId);
 }
 
 /* static */ PluginLibrary*
@@ -1043,8 +1042,7 @@ PluginModuleChromeParent::ShouldContinueFromReplyTimeout()
     // original plugin hang behaviour and kill the plugin container.
     FinishHangUI();
 #endif // XP_WIN
-    nsString dummy;
-    TerminateChildProcess(MessageLoop::current(), &dummy);
+    TerminateChildProcess(MessageLoop::current(), EmptyString());
     GetIPCChannel()->CloseWithTimeout();
     return false;
 }
@@ -1068,7 +1066,7 @@ PluginModuleContentParent::OnExitedSyncSend()
 
 void
 PluginModuleChromeParent::TerminateChildProcess(MessageLoop* aMsgLoop,
-                                                nsAString* aBrowserDumpId)
+                                                const nsAString& aBrowserDumpId)
 {
     mozilla::ipc::ScopedProcessHandle geckoChildProcess;
     bool childOpened = base::OpenProcessHandle(OtherPid(),
