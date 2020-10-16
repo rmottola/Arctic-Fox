@@ -13,7 +13,12 @@
 
 namespace mozilla {
 class TimeStamp;
-}
+
+namespace dom {
+class Promise;
+} // namespace dom
+
+} // namespace mozilla
 
 class ProfilerBacktrace;
 class ProfilerMarkerPayload;
@@ -38,6 +43,8 @@ void mozilla_sampler_save();
 mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime);
 
 JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime);
+void mozilla_sampler_get_profile_data_async(float aSinceTime,
+                                            mozilla::dom::Promise* aPromise);
 
 const char** mozilla_sampler_get_features();
 

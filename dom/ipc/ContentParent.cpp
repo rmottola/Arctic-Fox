@@ -82,6 +82,9 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "mozilla/ProfileGatherer.h"
+#endif
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
@@ -239,6 +242,9 @@ static NS_DEFINE_CID(kCClipboardCID, NS_CLIPBOARD_CID);
 
 using base::ChildPrivileges;
 using base::KillProcess;
+#ifdef MOZ_ENABLE_PROFILER_SPS
+using mozilla::ProfileGatherer;
+#endif
 
 using namespace mozilla::dom::bluetooth;
 using namespace mozilla::dom::cellbroadcast;
@@ -660,6 +666,7 @@ static const char* sObserverTopics[] = {
 #ifdef MOZ_ENABLE_PROFILER_SPS
     "profiler-started",
     "profiler-stopped",
+    "profiler-subprocess-gather",
     "profiler-subprocess",
 #endif
 };
@@ -3174,10 +3181,9 @@ ContentParent::Observe(nsISupports* aSubject,
     else if (!strcmp(aTopic, "profiler-subprocess")) {
         nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
         if (pse) {
-            nsCString result;
-            unused << CallGetProfile(&result);
-            if (!result.IsEmpty()) {
-                pse->AddSubProfile(result.get());
+            if (!mProfile.IsEmpty()) {
+                pse->AddSubProfile(mProfile.get());
+                mProfile.Truncate();
             }
         }
     }
@@ -5106,6 +5112,20 @@ ContentParent::RecvGamepadListenerRemoved()
     }
     mHasGamepadListener = false;
     MaybeStopGamepadMonitoring();
+#endif
+    return true;
+}
+
+bool
+ContentParent::RecvProfile(const nsCString& aProfile)
+{
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    if (NS_WARN_IF(!mGatherer)) {
+        return true;
+    }
+    mProfile = aProfile;
+    mGatherer->GatheredOOPProfile();
+    mGatherer = nullptr;
 #endif
     return true;
 }
