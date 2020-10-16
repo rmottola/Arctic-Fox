@@ -119,6 +119,9 @@ public:
     }
 
     virtual nsresult GetRunID(uint32_t* aRunID) override;
+    virtual void SetHasLocalInstance() override {
+        mHadLocalInstance = true;
+    }
 
 protected:
     virtual mozilla::ipc::RacyInterruptPolicy
@@ -264,6 +267,7 @@ protected:
 
     bool mIsChrome;
     bool mShutdown;
+    bool mHadLocalInstance;
     bool mClearSiteDataSupported;
     bool mGetSitesWithDataSupported;
     NPNetscapeFuncs* mNPNIface;
