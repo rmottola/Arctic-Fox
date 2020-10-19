@@ -553,6 +553,7 @@ image.h
 imagehlp.h
 imm.h
 initguid.h
+initializer_list
 InterfaceDefs.h
 InternetConfig.h
 IntlResources.h
