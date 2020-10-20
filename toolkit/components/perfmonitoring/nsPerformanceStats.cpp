@@ -200,8 +200,8 @@ nsPerformanceSnapshot::GetWindowData(JSContext* cx,
   }
 
   nsCOMPtr<nsIDOMWindow> top;
-  nsresult rv = win->GetTop(getter_AddRefs(top));
-  if (!top || NS_FAILED(rv)) {
+  top = win->GetTop();
+  if (!top) {
     return;
   }
 
