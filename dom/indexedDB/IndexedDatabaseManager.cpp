@@ -849,7 +849,18 @@ IndexedDatabaseManager::LoggingModePrefChangedCallback(
   }
 
   bool useProfiler = 
+#if defined(DEBUG) || defined(MOZ_ENABLE_PROFILER_SPS)
+    Preferences::GetBool(kPrefLoggingProfiler);
+#if !defined(MOZ_ENABLE_PROFILER_SPS)
+  if (useProfiler) {
+    NS_WARNING("IndexedDB cannot create profiler marks because this build does "
+               "not have profiler extensions enabled!");
+    useProfiler = false;
+  }
+#endif
+#else
     false;
+#endif
 
   const bool logDetails = Preferences::GetBool(kPrefLoggingDetails);
 
