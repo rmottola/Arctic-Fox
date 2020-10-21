@@ -584,6 +584,7 @@ if CONFIG['MOZ_WEBRTC']:
         'PeerConnectionImplEnums.webidl',
         'PeerConnectionObserver.webidl',
         'PeerConnectionObserverEnums.webidl',
+	'RTCCertificate.webidl',
         'RTCConfiguration.webidl',
         'RTCIceCandidate.webidl',
         'RTCIdentityAssertion.webidl',

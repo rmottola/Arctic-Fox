@@ -23,6 +23,7 @@ if CONFIG['MOZ_WEBRTC']:
         'MediaEngineWebRTCAudio.cpp',
         'MediaEngineWebRTCVideo.cpp',
         'MediaTrackConstraints.cpp',
+	'RTCCertificate.cpp',
         'RTCIdentityProviderRegistrar.cpp',
     ]
     # MediaEngineWebRTC.cpp needs to be built separately.
