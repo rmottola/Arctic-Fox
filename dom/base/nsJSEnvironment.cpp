@@ -62,6 +62,8 @@
 #ifdef MOZ_NFC
 #include "mozilla/dom/MozNDEFRecord.h"
 #endif // MOZ_NFC
+#include "mozilla/dom/RTCCertificate.h"
+#include "mozilla/dom/RTCCertificateBinding.h"
 #include "mozilla/dom/StructuredClone.h"
 #include "mozilla/dom/SubtleCryptoBinding.h"
 #include "mozilla/ipc/BackgroundUtils.h"
@@ -2551,6 +2553,25 @@ NS_DOMReadStructuredClone(JSContext* cx,
 #endif
   }
 
+  if (tag == SCTAG_DOM_RTC_CERTIFICATE) {
+    nsIGlobalObject *global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(cx));
+    if (!global) {
+      return nullptr;
+    }
+
+    // Prevent the return value from being trashed by a GC during ~nsRefPtr.
+    JS::Rooted<JSObject*> result(cx);
+    {
+      nsRefPtr<RTCCertificate> cert = new RTCCertificate(global);
+      if (!cert->ReadStructuredClone(reader)) {
+        result = nullptr;
+      } else {
+        result = cert->WrapObject(cx, nullptr);
+      }
+    }
+    return result;
+  }
+
   // Don't know what this is. Bail.
   xpc::Throw(cx, NS_ERROR_DOM_DATA_CLONE_ERR);
   return nullptr;
@@ -2573,6 +2594,13 @@ NS_DOMWriteStructuredClone(JSContext* cx,
   if (NS_SUCCEEDED(UNWRAP_OBJECT(CryptoKey, obj, key))) {
     return JS_WriteUint32Pair(writer, SCTAG_DOM_WEBCRYPTO_KEY, 0) &&
            key->WriteStructuredClone(writer);
+  }
+
+  // Handle WebRTC Certificate cloning
+  RTCCertificate* cert;
+  if (NS_SUCCEEDED(UNWRAP_OBJECT(RTCCertificate, obj, cert))) {
+    return JS_WriteUint32Pair(writer, SCTAG_DOM_RTC_CERTIFICATE, 0) &&
+           cert->WriteStructuredClone(writer);
   }
 
   if (xpc::IsReflector(obj)) {
