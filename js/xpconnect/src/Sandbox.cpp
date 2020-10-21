@@ -558,9 +558,6 @@ sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v)
                                JS_PROPERTYOP_SETTER(writeToProto_setProperty)))
         return false;
 
-    if (fetch && !SandboxCreateFetch(cx, obj))
-        return false;
-
     return true;
 }
 
@@ -972,6 +969,9 @@ xpc::GlobalProperties::Define(JSContext* cx, JS::HandleObject obj)
     if (rtcIdentityProvider && !SandboxCreateRTCIdentityProvider(cx, obj))
         return false;
 #endif
+
+    if (fetch && !SandboxCreateFetch(cx, obj))
+        return false;
 
     return true;
 }
