@@ -2868,18 +2868,30 @@ date_toSource(JSContext* cx, unsigned argc, Value* vp)
 }
 #endif
 
-MOZ_ALWAYS_INLINE bool
-date_toString_impl(JSContext* cx, const CallArgs& args)
-{
-    return date_format(cx, args.thisv().toObject().as<DateObject>().UTCTime().toNumber(),
-                       FORMATSPEC_FULL, args.rval());
-}
-
+// ES6 final draft 20.3.4.41.
 static bool
 date_toString(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    return CallNonGenericMethod<IsDate, date_toString_impl>(cx, args);
+    // Step 2.a. (reordered)
+    double tv = GenericNaN();
+    if (args.thisv().isObject()) {
+        // Step 1.
+        RootedObject obj(cx, &args.thisv().toObject());
+        // Step 2.
+        if (ObjectClassIs(obj, ESClass_Date, cx)) {
+            // Step 3.a.
+            RootedValue unboxed(cx);
+            if (!Unbox(cx, obj, &unboxed))
+                return false;\
+            tv = unboxed.toNumber();
+        }
+        // ObjectClassIs can throw for objects from other compartments.
+        if (cx->isExceptionPending())
+            return false;
+    }
+    // Step 4.
+    return date_format(cx, tv, FORMATSPEC_FULL, args.rval());
 }
 
 MOZ_ALWAYS_INLINE bool
