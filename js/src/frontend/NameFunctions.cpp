@@ -374,16 +374,28 @@ class NameResolver
           case PNK_FRESHENBLOCK:
           case PNK_SUPERPROP:
           case PNK_OBJECT_PROPERTY_NAME:
+          case PNK_NEWTARGET:
             MOZ_ASSERT(cur->isArity(PN_NULLARY));
             break;
 
+          case PNK_TYPEOFNAME:
+            MOZ_ASSERT(cur->isArity(PN_UNARY));
+            MOZ_ASSERT(cur->pn_kid->isKind(PNK_NAME));
+            MOZ_ASSERT(!cur->pn_kid->maybeExpr());
+            break;
+
           // Nodes with a single non-null child requiring name resolution.
-          case PNK_TYPEOF:
+          case PNK_TYPEOFEXPR:
           case PNK_VOID:
           case PNK_NOT:
           case PNK_BITNOT:
           case PNK_THROW:
-          case PNK_DELETE:
+          case PNK_DELETENAME:
+          case PNK_DELETEPROP:
+          case PNK_DELETESUPERPROP:
+          case PNK_DELETEELEM:
+          case PNK_DELETESUPERELEM:
+          case PNK_DELETEEXPR:
           case PNK_NEG:
           case PNK_POS:
           case PNK_PREINCREMENT:
@@ -396,6 +408,7 @@ class NameResolver
           case PNK_MUTATEPROTO:
           case PNK_SUPERELEM:
           case PNK_EXPORT:
+          case PNK_EXPORT_DEFAULT:
             MOZ_ASSERT(cur->isArity(PN_UNARY));
             if (!resolve(cur->pn_kid, prefix))
                 return false;

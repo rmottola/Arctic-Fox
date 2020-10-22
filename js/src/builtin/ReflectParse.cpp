@@ -683,7 +683,8 @@ class NodeBuilder
 
     bool importSpecifier(HandleValue importName, HandleValue bindingName, TokenPos* pos, MutableHandleValue dst);
 
-    bool exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue moduleSpec, TokenPos* pos, MutableHandleValue dst);
+    bool exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue moduleSpec,
+                           HandleValue isDefault, TokenPos* pos, MutableHandleValue dst);
 
     bool exportSpecifier(HandleValue bindingName, HandleValue exportName, TokenPos* pos, MutableHandleValue dst);
 
@@ -753,6 +754,8 @@ class NodeBuilder
 
     bool generatorExpression(HandleValue body, NodeVector& blocks, HandleValue filter,
                              bool isLegacy, TokenPos* pos, MutableHandleValue dst);
+
+    bool newTargetExpression(TokenPos* pos, MutableHandleValue dst);
 
     /*
      * declarations
@@ -1597,13 +1600,13 @@ NodeBuilder::importSpecifier(HandleValue importName, HandleValue bindingName, To
 
 bool
 NodeBuilder::exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue moduleSpec,
-                               TokenPos* pos, MutableHandleValue dst)
+                               HandleValue isDefault, TokenPos* pos, MutableHandleValue dst)
 {
     RootedValue array(cx, NullValue());
     if (decl.isNull() && !newArray(elts, &array))
         return false;
 
-    RootedValue cb(cx, callbacks[AST_IMPORT_DECL]);
+    RootedValue cb(cx, callbacks[AST_EXPORT_DECL]);
 
     if (!cb.isNull())
         return callback(cb, decl, array, moduleSpec, pos, dst);
@@ -1612,6 +1615,7 @@ NodeBuilder::exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue m
                    "declaration", decl,
                    "specifiers", array,
                    "source", moduleSpec,
+                   "isDefault", isDefault,
                    dst);
 }
 
@@ -1820,6 +1824,16 @@ NodeBuilder::classDefinition(bool expr, HandleValue name, HandleValue heritage, 
                    dst);
 }
 
+bool
+NodeBuilder::newTargetExpression(TokenPos* pos, MutableHandleValue dst)
+{
+    RootedValue cb(cx, callbacks[AST_NEWTARGET_EXPR]);
+    if (!cb.isNull())
+        return callback(cb, pos, dst);
+
+    return newNode(AST_NEWTARGET_EXPR, pos, dst);
+}
+
 namespace {
 
 /*
@@ -1984,8 +1998,11 @@ ASTSerializer::aop(JSOp op)
 UnaryOperator
 ASTSerializer::unop(ParseNodeKind kind, JSOp op)
 {
-    if (kind == PNK_DELETE)
+    if (IsDeleteKind(kind))
         return UNOP_DELETE;
+
+    if (kind == PNK_TYPEOFNAME || kind == PNK_TYPEOFEXPR)
+        return UNOP_TYPEOF;
 
     switch (op) {
       case JSOP_NEG:
@@ -1996,9 +2013,6 @@ ASTSerializer::unop(ParseNodeKind kind, JSOp op)
         return UNOP_NOT;
       case JSOP_BITNOT:
         return UNOP_BITNOT;
-      case JSOP_TYPEOF:
-      case JSOP_TYPEOFEXPR:
-        return UNOP_TYPEOF;
       case JSOP_VOID:
         return UNOP_VOID;
       default:
@@ -2234,6 +2248,7 @@ bool
 ASTSerializer::importDeclaration(ParseNode* pn, MutableHandleValue dst)
 {
     MOZ_ASSERT(pn->isKind(PNK_IMPORT));
+    MOZ_ASSERT(pn->isArity(PN_BINARY));
     MOZ_ASSERT(pn->pn_left->isKind(PNK_IMPORT_SPEC_LIST));
     MOZ_ASSERT(pn->pn_right->isKind(PNK_STRING));
 
@@ -2268,13 +2283,15 @@ ASTSerializer::importSpecifier(ParseNode* pn, MutableHandleValue dst)
 bool
 ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
 {
-    MOZ_ASSERT(pn->isKind(PNK_EXPORT) || pn->isKind(PNK_EXPORT_FROM));
+    MOZ_ASSERT(pn->isKind(PNK_EXPORT) ||
+               pn->isKind(PNK_EXPORT_FROM) ||
+               pn->isKind(PNK_EXPORT_DEFAULT));
     MOZ_ASSERT_IF(pn->isKind(PNK_EXPORT_FROM), pn->pn_right->isKind(PNK_STRING));
 
     RootedValue decl(cx, NullValue());
     NodeVector elts(cx);
 
-    ParseNode* kid = pn->isKind(PNK_EXPORT) ? pn->pn_kid : pn->pn_left;
+    ParseNode* kid = pn->isKind(PNK_EXPORT_FROM) ? pn->pn_left: pn->pn_kid;
     switch (ParseNodeKind kind = kid->getKind()) {
       case PNK_EXPORT_SPEC_LIST:
         if (!elts.reserve(pn->pn_left->pn_count))
@@ -2298,6 +2315,11 @@ ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
             return false;
         break;
 
+      case PNK_CLASS:
+        if (!classDefinition(kid, false, &decl))
+            return false;
+        break;
+
       case PNK_VAR:
       case PNK_CONST:
       case PNK_GLOBALCONST:
@@ -2307,14 +2329,20 @@ ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
         break;
 
       default:
-        LOCAL_NOT_REACHED("unexpected statement type");
+          if (!expression(kid, &decl))
+              return false;
+          break;
     }
 
     RootedValue moduleSpec(cx, NullValue());
     if (pn->isKind(PNK_EXPORT_FROM) && !literal(pn->pn_right, &moduleSpec))
         return false;
 
-    return builder.exportDeclaration(decl, elts, moduleSpec, &pn->pn_pos, dst);
+    RootedValue isDefault(cx, BooleanValue(false));
+    if (pn->isKind(PNK_EXPORT_DEFAULT))
+        isDefault.setBoolean(true);
+
+    return builder.exportDeclaration(decl, elts, moduleSpec, isDefault, &pn->pn_pos, dst);
 }
 
 bool
@@ -2507,6 +2535,7 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
         return importDeclaration(pn, dst);
 
       case PNK_EXPORT:
+      case PNK_EXPORT_DEFAULT:
       case PNK_EXPORT_FROM:
         return exportDeclaration(pn, dst);
 
@@ -3059,8 +3088,14 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
       case PNK_POW:
         return rightAssociate(pn, dst);
 
-      case PNK_DELETE:
-      case PNK_TYPEOF:
+      case PNK_DELETENAME:
+      case PNK_DELETEPROP:
+      case PNK_DELETESUPERPROP:
+      case PNK_DELETEELEM:
+      case PNK_DELETESUPERELEM:
+      case PNK_DELETEEXPR:
+      case PNK_TYPEOFNAME:
+      case PNK_TYPEOFEXPR:
       case PNK_VOID:
       case PNK_NOT:
       case PNK_BITNOT:
@@ -3299,6 +3334,9 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
 
       case PNK_CLASS:
         return classDefinition(pn, true, dst);
+
+      case PNK_NEWTARGET:
+        return builder.newTargetExpression(&pn->pn_pos, dst);
 
       default:
         LOCAL_NOT_REACHED("unexpected expression type");

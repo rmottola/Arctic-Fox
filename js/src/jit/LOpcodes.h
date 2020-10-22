@@ -74,8 +74,7 @@
     _(Unreachable)                  \
     _(EncodeSnapshot)               \
     _(GetDynamicName)               \
-    _(CallDirectEvalS)              \
-    _(CallDirectEvalV)              \
+    _(CallDirectEval)               \
     _(StackArgT)                    \
     _(StackArgV)                    \
     _(CreateThis)                   \
@@ -287,6 +286,7 @@
     _(SetArrayLength)               \
     _(TypedArrayLength)             \
     _(TypedArrayElements)           \
+    _(SetDisjointTypedElements)     \
     _(TypedObjectDescr)             \
     _(TypedObjectElements)          \
     _(SetTypedObjectOffset)         \
@@ -347,7 +347,9 @@
     _(LexicalCheck)                 \
     _(ThrowUninitializedLexical)    \
     _(NurseryObject)                \
-    _(Debugger)
+    _(Debugger)                     \
+    _(NewTarget)                    \
+    _(ArrowNewTarget)
 
 #if defined(JS_CODEGEN_X86)
 # include "jit/x86/LOpcodes-x86.h"

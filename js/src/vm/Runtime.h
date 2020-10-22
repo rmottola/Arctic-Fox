@@ -1480,10 +1480,24 @@ struct JSRuntime : public JS::shadow::Runtime,
          */
         js::PerformanceData performance;
 
+        /**
+         * Callback used to ask the embedding to determine in which
+         * Performance Group the current execution belongs. Typically, this is
+         * used to regroup JSCompartments from several iframes from the same
+         * page or from several compartments of the same addon into a single
+         * Performance Group.
+         *
+         * May be `nullptr`, in which case we put all the JSCompartments
+         * in the same PerformanceGroup.
+         */
+        JSCurrentPerfGroupCallback currentPerfGroupCallback;
+
         Stopwatch()
           : iteration(0)
           , isEmpty(true)
-          , isActive_(false)
+          , currentPerfGroupCallback(nullptr)
+          , isMonitoringJank_(false)
+          , isMonitoringCPOW_(false)
         { }
 
         /**
@@ -1497,9 +1511,8 @@ struct JSRuntime : public JS::shadow::Runtime,
             ++iteration;
             isEmpty = true;
         }
-
         /**
-         * Activate/deactivate stopwatch measurement.
+         * Activate/deactivate stopwatch measurement of jank.
          *
          * Noop if `value` is `true` and the stopwatch is already active,
          * or if `value` is `false` and the stopwatch is already inactive.
@@ -1509,8 +1522,8 @@ struct JSRuntime : public JS::shadow::Runtime,
          *
          * May return `false` if the underlying hashtable cannot be allocated.
          */
-        bool setIsActive(bool value) {
-            if (isActive_ != value)
+        bool setIsMonitoringJank(bool value) {
+            if (isMonitoringJank_ != value)
                 reset();
 
             if (value && !groups_.initialized()) {
@@ -1518,16 +1531,47 @@ struct JSRuntime : public JS::shadow::Runtime,
                     return false;
             }
 
-            isActive_ = value;
+            isMonitoringJank_ = value;
+            return true;
+        }
+        bool isMonitoringJank() const {
+            return isMonitoringJank_;
+        }
+
+
+        /**
+         * Activate/deactivate stopwatch measurement of CPOW.
+         */
+        bool setIsMonitoringCPOW(bool value) {
+            isMonitoringCPOW_ = value;
             return true;
         }
 
-        /**
-         * `true` if the stopwatch is currently monitoring, `false` otherwise.
-         */
-        bool isActive() const {
-            return isActive_;
+        bool isMonitoringCPOW() const {
+            return isMonitoringCPOW_;
         }
+
+        // Some systems have non-monotonic clocks. While we cannot
+        // improve the precision, we can make sure that our measures
+        // are monotonic nevertheless. We do this by storing the
+        // result of the latest call to the clock and making sure
+        // that the next timestamp is greater or equal.
+        struct MonotonicTimeStamp {
+            MonotonicTimeStamp()
+              : latestGood_(0)
+            {}
+            inline uint64_t monotonize(uint64_t stamp)
+            {
+                if (stamp <= latestGood_)
+                    return latestGood_;
+                latestGood_ = stamp;
+                return stamp;
+            }
+          private:
+            uint64_t latestGood_;
+        };
+        MonotonicTimeStamp systemTimeFix;
+        MonotonicTimeStamp userTimeFix;
 
     private:
         /**
@@ -1555,7 +1599,8 @@ struct JSRuntime : public JS::shadow::Runtime,
         /**
          * `true` if stopwatch monitoring is active, `false` otherwise.
          */
-        bool isActive_;
+        bool isMonitoringJank_;
+        bool isMonitoringCPOW_;
     };
     Stopwatch stopwatch;
 };

@@ -1452,22 +1452,24 @@ BaselineCompiler::emit_JSOP_LAMBDA()
     return true;
 }
 
-typedef JSObject* (*LambdaArrowFn)(JSContext*, HandleFunction, HandleObject, HandleValue);
+typedef JSObject* (*LambdaArrowFn)(JSContext*, HandleFunction, HandleObject,
+                                   HandleValue, HandleValue);
 static const VMFunction LambdaArrowInfo = FunctionInfo<LambdaArrowFn>(js::LambdaArrow);
 
 bool
 BaselineCompiler::emit_JSOP_LAMBDA_ARROW()
 {
-    // Keep pushed |this| in R0.
-    frame.popRegsAndSync(1);
+    // Keep pushed |this| in R0, and newTarget in R1.
+    frame.popRegsAndSync(2);
 
     RootedFunction fun(cx, script->getFunction(GET_UINT32_INDEX(pc)));
 
     prepareVMCall();
-    masm.loadPtr(frame.addressOfScopeChain(), R1.scratchReg());
+    masm.loadPtr(frame.addressOfScopeChain(), R2.scratchReg());
 
+    pushArg(R1);
     pushArg(R0);
-    pushArg(R1.scratchReg());
+    pushArg(R2.scratchReg());
     pushArg(ImmGCPtr(fun));
 
     if (!callVM(LambdaArrowInfo))
@@ -1500,6 +1502,11 @@ BaselineCompiler::storeValue(const StackValue* source, const Address& dest,
         break;
       case StackValue::ThisSlot:
         masm.loadValue(frame.addressOfThis(), scratch);
+        masm.storeValue(scratch, dest);
+        break;
+      case StackValue::EvalNewTargetSlot:
+        MOZ_ASSERT(script->isForEval());
+        masm.loadValue(frame.addressOfEvalNewTarget(), scratch);
         masm.storeValue(scratch, dest);
         break;
       case StackValue::Stack:
@@ -2665,6 +2672,58 @@ BaselineCompiler::emit_JSOP_SETARG()
 
     uint32_t arg = GET_ARGNO(pc);
     return emitFormalArgAccess(arg, /* get = */ false);
+}
+
+bool
+BaselineCompiler::emit_JSOP_NEWTARGET()
+{
+    if (script->isForEval()) {
+        frame.pushEvalNewTarget();
+        return true;
+    }
+
+    MOZ_ASSERT(function());
+    frame.syncStack(0);
+
+    if (function()->isArrow()) {
+        // Arrow functions store their |new.target| value in an
+        // extended slot.
+        Register scratch = R0.scratchReg();
+        masm.loadFunctionFromCalleeToken(frame.addressOfCalleeToken(), scratch);
+        masm.loadValue(Address(scratch, FunctionExtended::offsetOfArrowNewTargetSlot()), R0);
+        frame.push(R0);
+        return true;
+    }
+
+    // if (!isConstructing()) push(undefined)
+    Label constructing, done;
+    masm.branchTestPtr(Assembler::NonZero, frame.addressOfCalleeToken(),
+                       Imm32(CalleeToken_FunctionConstructing), &constructing);
+    masm.moveValue(UndefinedValue(), R0);
+    masm.jump(&done);
+
+    masm.bind(&constructing);
+
+    // else push(argv[Max(numActualArgs, numFormalArgs)])
+    Register argvLen = R0.scratchReg();
+
+    Address actualArgs(BaselineFrameReg, BaselineFrame::offsetOfNumActualArgs());
+    masm.loadPtr(actualArgs, argvLen);
+
+    Label actualArgsSufficient;
+
+    masm.branchPtr(Assembler::AboveOrEqual, argvLen, Imm32(function()->nargs()),
+                   &actualArgsSufficient);
+    masm.move32(Imm32(function()->nargs()), argvLen);
+    masm.bind(&actualArgsSufficient);
+
+    BaseValueIndex newTarget(BaselineFrameReg, argvLen, BaselineFrame::offsetOfArg(0));
+    masm.loadValue(newTarget, R0);
+
+    masm.bind(&done);
+    frame.push(R0);
+
+    return true;
 }
 
 typedef bool (*ThrowUninitializedLexicalFn)(JSContext* cx);

@@ -181,6 +181,10 @@ toolbar[mode="icons"] > #reload-button[displaystop] {
 }
 %endif
 
+#navigator-toolbox[fullscreenShouldAnimate] {
+  transition: 1.5s margin-top ease-out;
+}
+
 #browser-bottombox[lwthemefooter="true"] {
   background-repeat: no-repeat;
   background-position: bottom left;

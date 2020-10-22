@@ -1084,6 +1084,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mAddActiveEventFuzzTime(true),
     mIsFrozen(false),
     mFullScreen(false),
+    mFullscreenMode(false),
     mIsClosed(false),
     mInClose(false),
     mHavePendingClose(false),
@@ -6097,16 +6098,17 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen)
 }
 
 nsresult
-nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aRequireTrust, gfx::VRHMDInfo* aHMD)
+nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
+                                      gfx::VRHMDInfo* aHMD)
 {
   MOZ_ASSERT(IsOuterWindow());
 
   NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
 
-  // Only chrome can change our fullScreen mode, unless we're running in
-  // untrusted mode.
+  // Only chrome can change our fullscreen mode. Otherwise, the state
+  // can only be changed for DOM fullscreen.
   if (aFullScreen == FullScreen() ||
-      (aRequireTrust && !nsContentUtils::IsCallerChrome())) {
+      (aFullscreenMode && !nsContentUtils::IsCallerChrome())) {
     return NS_OK;
   }
 
@@ -6119,7 +6121,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aRequireTrust, gfx:
   if (!window)
     return NS_ERROR_FAILURE;
   if (rootItem != mDocShell)
-    return window->SetFullScreenInternal(aFullScreen, aRequireTrust, aHMD);
+    return window->SetFullScreenInternal(aFullScreen, aFullscreenMode, aHMD);
 
   // make sure we don't try to set full screen on a non-chrome window,
   // which might happen in embedding world
@@ -6129,6 +6131,20 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aRequireTrust, gfx:
   // If we are already in full screen mode, just return.
   if (mFullScreen == aFullScreen)
     return NS_OK;
+
+  // Note that although entering DOM fullscreen could also cause
+  // consequential calls to this method, those calls will be skipped
+  // at the condition above.
+  if (aFullscreenMode) {
+    mFullscreenMode = aFullScreen;
+  } else {
+    // If we are exiting from DOM fullscreen while we
+    // initially make the window fullscreen because of
+    // fullscreen mode, don't restore the window.
+    if (!aFullScreen && mFullscreenMode) {
+      return NS_OK;
+    }
+  }
 
   // dispatch a "fullscreen" DOM event so that XUL apps can
   // respond visually if we are kicked into full screen mode
@@ -6158,6 +6174,9 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aRequireTrust, gfx:
       nsCOMPtr<nsIScreen> screen;
       if (aHMD) {
         screen = aHMD->GetScreen();
+      }
+      if (!aFullscreenMode) {
+        widget->PrepareForDOMFullscreenTransition();
       }
       widget->MakeFullScreen(aFullScreen, screen);
     }

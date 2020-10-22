@@ -366,8 +366,14 @@ TrackBuffer::EvictData(TimeUnit aPlaybackTime,
                   buffered.GetEnd().ToSeconds(), aPlaybackTime.ToSeconds(),
                   time, playbackOffset, decoders[i]->GetResource()->GetSize());
         if (playbackOffset > 0) {
+          ErrorResult rv;
           toEvict -= decoders[i]->GetResource()->EvictData(playbackOffset,
-                                                           playbackOffset);
+                                                           playbackOffset,
+                                                           rv);
+          if (NS_WARN_IF(rv.Failed())) {
+            rv.SuppressException();
+            return EvictDataResult::CANT_EVICT;
+          }
         }
       }
       decoders[i]->GetReader()->NotifyDataRemoved();
@@ -522,7 +528,12 @@ TrackBuffer::EvictBefore(TimeUnit aTime)
     if (endOffset > 0) {
       MSE_DEBUG("decoder=%u offset=%lld",
                 i, endOffset);
-      mInitializedDecoders[i]->GetResource()->EvictBefore(endOffset);
+      ErrorResult rv;
+      mInitializedDecoders[i]->GetResource()->EvictBefore(endOffset, rv);
+      if (NS_WARN_IF(rv.Failed())) {
+        rv.SuppressException();
+        return;
+      }
       mInitializedDecoders[i]->GetReader()->NotifyDataRemoved();
     }
   }
@@ -1107,7 +1118,12 @@ TrackBuffer::RangeRemoval(TimeUnit aStart, TimeUnit aEnd)
                   buffered.GetEnd().ToSeconds(), offset,
                   decoders[i]->GetResource()->GetSize());
         if (offset > 0) {
-          decoders[i]->GetResource()->EvictData(offset, offset);
+          ErrorResult rv;
+          decoders[i]->GetResource()->EvictData(offset, offset, rv);
+          if (NS_WARN_IF(rv.Failed())) {
+            rv.SuppressException();
+            return RangeRemovalPromise::CreateAndResolve(false, __func__);
+          }
         }
       }
       decoders[i]->GetReader()->NotifyDataRemoved();

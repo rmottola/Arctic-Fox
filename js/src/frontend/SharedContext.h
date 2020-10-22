@@ -208,6 +208,7 @@ class SharedContext
     virtual ObjectBox* toObjectBox() = 0;
     inline bool isFunctionBox() { return toObjectBox() && toObjectBox()->isFunctionBox(); }
     inline FunctionBox* asFunctionBox();
+    inline GlobalSharedContext* asGlobalSharedContext();
 
     bool hasExplicitUseStrict()        const { return anyCxFlags.hasExplicitUseStrict; }
     bool bindingsAccessedDynamically() const { return anyCxFlags.bindingsAccessedDynamically; }
@@ -239,23 +240,56 @@ class SharedContext
         return atom == context->names().dotGenerator || atom == context->names().dotGenRVal;
     }
 
-    virtual bool allowSuperProperty() const = 0;
+    enum class AllowedSyntax {
+        NewTarget,
+        SuperProperty
+    };
+    virtual bool allowSyntax(AllowedSyntax allowed) const = 0;
+
+  protected:
+    static bool FunctionAllowsSyntax(JSFunction* func, AllowedSyntax allowed)
+    {
+        MOZ_ASSERT(!func->isArrow());
+
+        switch (allowed) {
+          case AllowedSyntax::NewTarget:
+            // For now, disallow new.target inside generators
+            return !func->isGenerator();
+          case AllowedSyntax::SuperProperty:
+            return func->allowSuperProperty();
+          default:;
+        }
+        MOZ_CRASH("Unknown AllowedSyntax query");
+    }
 };
 
 class GlobalSharedContext : public SharedContext
 {
   private:
-    bool allowSuperProperty_;
+    Handle<StaticEvalObject*> staticEvalScope_;
 
   public:
     GlobalSharedContext(ExclusiveContext* cx,
-                        Directives directives, bool extraWarnings, bool allowSuperProperty)
+                        Directives directives, Handle<StaticEvalObject*> staticEvalScope,
+                        bool extraWarnings)
       : SharedContext(cx, directives, extraWarnings),
-        allowSuperProperty_(allowSuperProperty)
+        staticEvalScope_(staticEvalScope)
     {}
 
     ObjectBox* toObjectBox() { return nullptr; }
-    bool allowSuperProperty() const { return allowSuperProperty_; }
+    HandleObject evalStaticScope() const { return staticEvalScope_; }
+
+    bool allowSyntax(AllowedSyntax allowed) const {
+        StaticScopeIter<CanGC> it(context, staticEvalScope_);
+        for (; !it.done(); it++) {
+            if (it.type() == StaticScopeIter<CanGC>::Function &&
+                !it.fun().isArrow())
+            {
+                return FunctionAllowsSyntax(&it.fun(), allowed);
+            }
+        }
+        return false;
+    }
 };
 
 class FunctionBox : public ObjectBox, public SharedContext
@@ -316,7 +350,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     void setArgumentsHasLocalBinding()     { funCxFlags.argumentsHasLocalBinding = true; }
     void setDefinitelyNeedsArgsObj()       { MOZ_ASSERT(funCxFlags.argumentsHasLocalBinding);
                                              funCxFlags.definitelyNeedsArgsObj   = true; }
-    void setNeedsHomeObject()              { MOZ_ASSERT(allowSuperProperty());
+    void setNeedsHomeObject()              { MOZ_ASSERT(function()->allowSuperProperty());
                                              funCxFlags.needsHomeObject          = true; }
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
@@ -352,8 +386,13 @@ class FunctionBox : public ObjectBox, public SharedContext
                isGenerator();
     }
 
-    bool allowSuperProperty() const {
-        return function()->allowSuperProperty();
+    bool allowSyntax(AllowedSyntax allowed) const {
+        // For now (!) we don't allow new.target in generators, and can't
+        // check that for functions we haven't finished parsing, as they
+        // don't have initialized scripts. Check from our stashed bits instead.
+        if (allowed == AllowedSyntax::NewTarget)
+            return !isGenerator();
+        return FunctionAllowsSyntax(function(), allowed);
     }
 };
 
@@ -363,6 +402,14 @@ SharedContext::asFunctionBox()
     MOZ_ASSERT(isFunctionBox());
     return static_cast<FunctionBox*>(this);
 }
+
+inline GlobalSharedContext*
+SharedContext::asGlobalSharedContext()
+{
+    MOZ_ASSERT(!isFunctionBox());
+    return static_cast<GlobalSharedContext*>(this);
+}
+
 
 // In generators, we treat all locals as aliased so that they get stored on the
 // heap.  This way there is less information to copy off the stack when

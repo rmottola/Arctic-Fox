@@ -155,7 +155,6 @@ private:
   void DrainComplete(TrackType aTrack);
   bool IsSupportedAudioMimeType(const nsACString& aMimeType);
   bool IsSupportedVideoMimeType(const nsACString& aMimeType);
-  void NotifyResourcesStatusChanged();
 
   bool ShouldSkip(bool aSkipToNextKeyframe, media::TimeUnit aTimeThreshold);
 
@@ -182,9 +181,6 @@ private:
     }
     virtual void DrainComplete() override {
       mReader->DrainComplete(mType);
-    }
-    virtual void NotifyResourcesStatusChanged() override {
-      mReader->NotifyResourcesStatusChanged();
     }
     virtual void ReleaseMediaResources() override {
       mReader->ReleaseMediaResources();

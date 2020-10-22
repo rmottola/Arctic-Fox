@@ -17,7 +17,6 @@
 
 #define NOTIFY_GLOBAL_OBSERVERS
 
-#if defined(PR_LOGGING)
 // Log module for nsObserverService logging...
 //
 // To enable logging (see prlog.h for full details):
@@ -36,10 +35,7 @@ GetObserverServiceLog()
   }
   return sLog;
 }
-  #define LOG(x)  PR_LOG(GetObserverServiceLog(), PR_LOG_DEBUG, x)
-#else
-  #define LOG(x)
-#endif /* PR_LOGGING */
+#define LOG(x)  PR_LOG(GetObserverServiceLog(), PR_LOG_DEBUG, x)
 
 namespace mozilla {
 

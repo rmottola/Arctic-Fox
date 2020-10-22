@@ -181,6 +181,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitSetArrayLength(MSetArrayLength* ins);
     void visitTypedArrayLength(MTypedArrayLength* ins);
     void visitTypedArrayElements(MTypedArrayElements* ins);
+    void visitSetDisjointTypedElements(MSetDisjointTypedElements* ins);
     void visitTypedObjectElements(MTypedObjectElements* ins);
     void visitSetTypedObjectOffset(MSetTypedObjectOffset* ins);
     void visitTypedObjectDescr(MTypedObjectDescr* ins);
@@ -295,6 +296,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitThrowUninitializedLexical(MThrowUninitializedLexical* ins);
     void visitDebugger(MDebugger* ins);
     void visitNurseryObject(MNurseryObject* ins);
+    void visitNewTarget(MNewTarget* ins);
+    void visitArrowNewTarget(MArrowNewTarget* ins);
 };
 
 } // namespace jit

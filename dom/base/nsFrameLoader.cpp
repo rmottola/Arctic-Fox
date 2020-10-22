@@ -164,7 +164,7 @@ nsFrameLoader::~nsFrameLoader()
   if (mMessageManager) {
     mMessageManager->Disconnect();
   }
-  nsFrameLoader::Destroy();
+  MOZ_RELEASE_ASSERT(mDestroyCalled);
 }
 
 nsFrameLoader*
@@ -2396,7 +2396,9 @@ public:
   {
     nsInProcessTabChildGlobal* tabChild =
       static_cast<nsInProcessTabChildGlobal*>(mFrameLoader->mChildMessageManager.get());
-    if (tabChild && tabChild->GetInnerManager()) {
+    // Since bug 1126089, messages can arrive even when the docShell is destroyed.
+    // Here we make sure that those messages are not delivered.
+    if (tabChild && tabChild->GetInnerManager() && mFrameLoader->GetExistingDocShell()) {
       nsCOMPtr<nsIXPConnectJSObjectHolder> kungFuDeathGrip(tabChild->GetGlobal());
       ReceiveMessage(static_cast<EventTarget*>(tabChild), mFrameLoader,
                      tabChild->GetInnerManager());

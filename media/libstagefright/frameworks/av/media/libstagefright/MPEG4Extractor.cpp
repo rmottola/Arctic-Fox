@@ -2250,7 +2250,7 @@ status_t MPEG4Extractor::parseMetaData(off64_t offset, size_t size) {
     }
 
     FallibleTArray<uint8_t> bufferBackend;
-    if (!bufferBackend.SetLength(size + 1)) {
+    if (!bufferBackend.SetLength(size + 1, mozilla::fallible)) {
         // OOM ignore metadata.
         return OK;
     }
@@ -3396,7 +3396,7 @@ bool MPEG4Source::ensureSrcBufferAllocated(int32_t aSize) {
     if (mSrcBackend.Length() >= aSize) {
         return true;
     }
-    if (!mSrcBackend.SetLength(aSize)) {
+    if (!mSrcBackend.SetLength(aSize, mozilla::fallible)) {
         ALOGE("Error insufficient memory, requested %u bytes (had:%u)",
               aSize, mSrcBackend.Length());
         return false;

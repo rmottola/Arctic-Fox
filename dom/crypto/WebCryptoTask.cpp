@@ -304,10 +304,6 @@ WebCryptoTask::CalculateResult()
 {
   MOZ_ASSERT(!NS_IsMainThread());
 
-  if (NS_FAILED(mEarlyRv)) {
-    return mEarlyRv;
-  }
-
   if (isAlreadyShutDown()) {
     return NS_ERROR_DOM_UNKNOWN_ERR;
   }
@@ -564,7 +560,7 @@ private:
     // Initialize the output buffer (enough space for padding / a full tag)
     uint32_t dataLen = mData.Length();
     uint32_t maxLen = dataLen + 16;
-    if (!mResult.SetLength(maxLen)) {
+    if (!mResult.SetLength(maxLen, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
     uint32_t outLen = 0;
@@ -572,16 +568,18 @@ private:
     // Perform the encryption/decryption
     if (mEncrypt) {
       rv = MapSECStatus(PK11_Encrypt(symKey.get(), mMechanism, &param,
-                                     mResult.Elements(), &outLen, maxLen,
-                                     mData.Elements(), mData.Length()));
+                                     mResult.Elements(), &outLen,
+                                     mResult.Length(), mData.Elements(),
+                                     mData.Length()));
     } else {
       rv = MapSECStatus(PK11_Decrypt(symKey.get(), mMechanism, &param,
-                                     mResult.Elements(), &outLen, maxLen,
-                                     mData.Elements(), mData.Length()));
+                                     mResult.Elements(), &outLen,
+                                     mResult.Length(), mData.Elements(),
+                                     mData.Length()));
     }
     NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
 
-    mResult.SetLength(outLen);
+    mResult.TruncateLength(outLen);
     return rv;
   }
 };
@@ -688,7 +686,7 @@ private:
 
       // Encrypt and return the wrapped key
       // AES-KW encryption results in a wrapped key 64 bits longer
-      if (!mResult.SetLength(mData.Length() + 8)) {
+      if (!mResult.SetLength(mData.Length() + 8, fallible)) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
       SECItem resultItem = {siBuffer, mResult.Elements(),
@@ -820,7 +818,7 @@ private:
 
     // Ciphertext is an integer mod the modulus, so it will be
     // no longer than mStrength octets
-    if (!mResult.SetLength(mStrength)) {
+    if (!mResult.SetLength(mStrength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -857,7 +855,7 @@ private:
     }
     NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
 
-    mResult.SetLength(outLen);
+    mResult.TruncateLength(outLen);
     return NS_OK;
   }
 };
@@ -910,7 +908,7 @@ private:
   virtual nsresult DoCrypto() override
   {
     // Initialize the output buffer
-    if (!mResult.SetLength(HASH_LENGTH_MAX)) {
+    if (!mResult.SetLength(HASH_LENGTH_MAX, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -943,10 +941,10 @@ private:
     rv = MapSECStatus(PK11_DigestOp(ctx.get(), mData.Elements(), mData.Length()));
     NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
     rv = MapSECStatus(PK11_DigestFinal(ctx.get(), mResult.Elements(),
-                                       &outLen, HASH_LENGTH_MAX));
+                                       &outLen, mResult.Length()));
     NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
 
-    mResult.SetLength(outLen);
+    mResult.TruncateLength(outLen);
     return rv;
   }
 
@@ -1192,7 +1190,7 @@ private:
   {
     // Resize the result buffer
     uint32_t hashLen = HASH_ResultLenByOidTag(mOidTag);
-    if (!mResult.SetLength(hashLen)) {
+    if (!mResult.SetLength(hashLen, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -1653,7 +1651,7 @@ public:
                   const ObjectOrString& aAlgorithm, bool aExtractable,
                   const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
   }
 
   ImportEcKeyTask(JSContext* aCx, const nsAString& aFormat,
@@ -1661,13 +1659,37 @@ public:
                   const ObjectOrString& aAlgorithm, bool aExtractable,
                   const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
 
     SetKeyData(aCx, aKeyData);
     NS_ENSURE_SUCCESS_VOID(mEarlyRv);
+  }
+
+  void Init(JSContext* aCx, const nsAString& aFormat,
+            const ObjectOrString& aAlgorithm, bool aExtractable,
+            const Sequence<nsString>& aKeyUsages)
+  {
+    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    if (NS_FAILED(mEarlyRv)) {
+      return;
+    }
+
+    if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW)) {
+      RootedDictionary<EcKeyImportParams> params(aCx);
+      mEarlyRv = Coerce(aCx, params, aAlgorithm);
+      if (NS_FAILED(mEarlyRv) || !params.mNamedCurve.WasPassed()) {
+        mEarlyRv = NS_ERROR_DOM_SYNTAX_ERR;
+        return;
+      }
+
+      if (!NormalizeToken(params.mNamedCurve.Value(), mNamedCurve)) {
+        mEarlyRv = NS_ERROR_DOM_NOT_SUPPORTED_ERR;
+        return;
+      }
+    }
   }
 
 private:
@@ -1689,14 +1711,19 @@ private:
 
       mKey->SetPrivateKey(privKey.get());
       mKey->SetType(CryptoKey::PRIVATE);
-    } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI) ||
+    } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW) ||
+               mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI) ||
                (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_JWK) &&
                 !mJwk.mD.WasPassed())) {
       // Public key import
-      if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
+      if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW)) {
+        pubKey = CryptoKey::PublicECKeyFromRaw(mKeyData, mNamedCurve, locker);
+      } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
         pubKey = CryptoKey::PublicKeyFromSpki(mKeyData, locker);
-      } else {
+      } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_JWK)) {
         pubKey = CryptoKey::PublicKeyFromJwk(mJwk, locker);
+      } else {
+        MOZ_ASSERT(false);
       }
 
       if (!pubKey) {
@@ -1910,6 +1937,14 @@ private:
         return NS_OK;
       }
 
+      if (mPublicKey && mPublicKey->keyType == ecKey) {
+        nsresult rv = CryptoKey::PublicECKeyToRaw(mPublicKey, mResult, locker);
+        if (NS_FAILED(rv)) {
+          return NS_ERROR_DOM_OPERATION_ERR;
+        }
+        return NS_OK;
+      }
+
       mResult = mSymKey;
       if (mResult.Length() == 0) {
         return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
@@ -1922,9 +1957,13 @@ private:
       }
 
       switch (mPrivateKey->keyType) {
-        case rsaKey:
-          CryptoKey::PrivateKeyToPkcs8(mPrivateKey.get(), mResult, locker);
+        case rsaKey: {
+          nsresult rv = CryptoKey::PrivateKeyToPkcs8(mPrivateKey.get(), mResult, locker);
+          if (NS_FAILED(rv)) {
+            return NS_ERROR_DOM_OPERATION_ERR;
+          }
           return NS_OK;
+        }
         default:
           return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
       }
@@ -1971,7 +2010,9 @@ private:
 
       if (!mKeyUsages.IsEmpty()) {
         mJwk.mKey_ops.Construct();
-        mJwk.mKey_ops.Value().AppendElements(mKeyUsages);
+        if (!mJwk.mKey_ops.Value().AppendElements(mKeyUsages, fallible)) {
+          return NS_ERROR_OUT_OF_MEMORY;
+        }
       }
 
       return NS_OK;
@@ -2334,6 +2375,14 @@ private:
 
     mKeyPair.mPrivateKey.get()->SetPrivateKey(mPrivateKey);
     mKeyPair.mPublicKey.get()->SetPublicKey(mPublicKey);
+
+    // PK11_GenerateKeyPair() does not set a CKA_EC_POINT attribute on the
+    // private key, we need this later when exporting to PKCS8 and JWK though.
+    if (mMechanism == CKM_EC_KEY_PAIR_GEN) {
+      nsresult rv = mKeyPair.mPrivateKey->AddPublicKeyData(mPublicKey);
+      NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
+    }
+
     return NS_OK;
   }
 
@@ -2606,7 +2655,7 @@ private:
       return NS_ERROR_DOM_DATA_ERR;
     }
 
-    if (!mResult.SetLength(mLength)) {
+    if (!mResult.SetLength(mLength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
@@ -2705,7 +2754,7 @@ private:
       return NS_ERROR_DOM_DATA_ERR;
     }
 
-    if (!mResult.SetLength(mLength)) {
+    if (!mResult.SetLength(mLength, fallible)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 

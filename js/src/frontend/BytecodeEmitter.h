@@ -136,8 +136,6 @@ struct BytecodeEmitter
     Parser<FullParseHandler>* const parser;
 
     HandleScript    evalCaller;     /* scripted caller info for eval and dbgapi */
-    Handle<StaticEvalObject*> evalStaticScope;
-                                   /* compile time scope for eval; does not imply stmt stack */
 
     StmtInfoBCE*    topStmt;       /* top of statement info stack */
     StmtInfoBCE*    topScopeStmt;  /* top lexical scope statement */
@@ -222,8 +220,7 @@ struct BytecodeEmitter
     BytecodeEmitter(BytecodeEmitter* parent, Parser<FullParseHandler>* parser, SharedContext* sc,
                     HandleScript script, Handle<LazyScript*> lazyScript,
                     bool insideEval, HandleScript evalCaller,
-                    Handle<StaticEvalObject*> evalStaticScope, bool insideNonGlobalEval,
-                    uint32_t lineNum, EmitterMode emitterMode = Normal);
+                    bool insideNonGlobalEval, uint32_t lineNum, EmitterMode emitterMode = Normal);
     bool init();
     bool updateLocalsToFrameSlots();
 
@@ -435,6 +432,7 @@ struct BytecodeEmitter
     bool emitObjectPairOp(ObjectBox* objbox1, ObjectBox* objbox2, JSOp op);
     bool emitRegExp(uint32_t index);
 
+    bool arrowNeedsNewTarget();
     MOZ_NEVER_INLINE bool emitFunction(ParseNode* pn, bool needsProto = false);
     MOZ_NEVER_INLINE bool emitObject(ParseNode* pn);
 
@@ -545,7 +543,16 @@ struct BytecodeEmitter
     bool emitStatementList(ParseNode* pn, ptrdiff_t top);
     bool emitSyntheticStatements(ParseNode* pn, ptrdiff_t top);
 
-    bool emitDelete(ParseNode* pn);
+    bool emitDeleteName(ParseNode* pn);
+    bool emitDeleteProperty(ParseNode* pn);
+    bool emitDeleteSuperProperty(ParseNode* pn);
+    bool emitDeleteElement(ParseNode* pn);
+    bool emitDeleteSuperElement(ParseNode* pn);
+    bool emitDeleteExpression(ParseNode* pn);
+
+    // |op| must be JSOP_TYPEOF or JSOP_TYPEOFEXPR.
+    bool emitTypeof(ParseNode* node, JSOp op);
+
     bool emitLogical(ParseNode* pn);
     bool emitUnary(ParseNode* pn);
 

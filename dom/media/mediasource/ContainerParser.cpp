@@ -8,6 +8,7 @@
 
 #include "WebMBufferedParser.h"
 #include "mozilla/Endian.h"
+#include "mozilla/ErrorResult.h"
 #include "mp4_demuxer/MoofParser.h"
 #include "mozilla/Logging.h"
 #include "MediaData.h"
@@ -216,7 +217,7 @@ public:
     if (initSegment || !HasCompleteInitData()) {
       if (mParser.mInitEndOffset > 0) {
         MOZ_ASSERT(mParser.mInitEndOffset <= mResource->GetLength());
-        if (!mInitData->SetLength(mParser.mInitEndOffset)) {
+        if (!mInitData->SetLength(mParser.mInitEndOffset, fallible)) {
           // Super unlikely OOM
           return false;
         }
@@ -390,7 +391,7 @@ public:
       MediaByteRange& range = mParser->mInitRange;
       if (range.Length()) {
         mCompleteInitSegmentRange = range;
-        if (!mInitData->SetLength(range.Length())) {
+        if (!mInitData->SetLength(range.Length(), fallible)) {
           // Super unlikely OOM
           return false;
         }
@@ -409,8 +410,13 @@ public:
 
     mCompleteMediaHeaderRange = mParser->FirstCompleteMediaHeader();
     mCompleteMediaSegmentRange = mParser->FirstCompleteMediaSegment();
+    ErrorResult rv;
     if (HasCompleteInitData()) {
-      mResource->EvictData(mParser->mOffset, mParser->mOffset);
+      mResource->EvictData(mParser->mOffset, mParser->mOffset, rv);
+    }
+    if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
+      return false;
     }
 
     if (compositionRange.IsNull()) {

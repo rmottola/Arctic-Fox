@@ -32,8 +32,8 @@ IdIsIndex(jsid id, uint32_t* indexp)
     return js::StringIsArrayIndex(JSID_TO_ATOM(id), indexp);
 }
 
-extern JSObject *
-InitArrayClass(JSContext *cx, js::HandleObject obj);
+extern JSObject*
+InitArrayClass(JSContext* cx, js::HandleObject obj);
 
 class ArrayObject;
 
@@ -73,8 +73,8 @@ enum AllocatingBehaviour {
  * Create a dense array with a set length, but only allocates space for the
  * contents if the length is not excessive.
  */
-extern ArrayObject *
-NewDenseArray(ExclusiveContext *cx, uint32_t length, HandleObjectGroup group,
+extern ArrayObject*
+NewDenseArray(ExclusiveContext* cx, uint32_t length, HandleObjectGroup group,
               AllocatingBehaviour allocating, bool convertDoubleElements = false);
 
 /* Create a dense array with a copy of the dense array elements in src. */
