@@ -1812,12 +1812,12 @@ HTMLInputElement::ConvertStringToNumber(nsAString& aValue,
           return false;
         }
 
-        double date = JS::MakeDate(year, month - 1, day);
-        if (IsNaN(date)) {
+        JS::ClippedTime time = JS::TimeClip(JS::MakeDate(year, month - 1, day));
+        if (!time.isValid()) {
           return false;
         }
 
-        aResultValue = Decimal::fromDouble(date);
+        aResultValue = Decimal::fromDouble(time.toDouble());
         return true;
       }
     case NS_FORM_INPUT_TIME:
@@ -2056,7 +2056,8 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
         return Nullable<Date>();
       }
 
-      return Nullable<Date>(Date(JS::MakeDate(year, month - 1, day)));
+      JS::ClippedTime time = JS::TimeClip(JS::MakeDate(year, month - 1, day));
+      return Nullable<Date>(Date(time));
     }
     case NS_FORM_INPUT_TIME:
     {
@@ -2067,7 +2068,11 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
         return Nullable<Date>();
       }
 
-      return Nullable<Date>(Date(millisecond));
+      JS::ClippedTime time = JS::TimeClip(millisecond);
+      MOZ_ASSERT(time.toDouble() == millisecond,
+                 "HTML times are restricted to the day after the epoch and "
+                 "never clip");
+      return Nullable<Date>(Date(time));
     }
   }
 
@@ -2089,7 +2094,7 @@ HTMLInputElement::SetValueAsDate(Nullable<Date> aDate, ErrorResult& aRv)
     return;
   }
 
-  SetValue(Decimal::fromDouble(aDate.Value().TimeStamp()));
+  SetValue(Decimal::fromDouble(aDate.Value().TimeStamp().toDouble()));
 }
 
 NS_IMETHODIMP
