@@ -3118,11 +3118,16 @@ js::DateConstructor(JSContext* cx, unsigned argc, Value* vp)
     return DateMultipleArguments(cx, args);
 }
 
+// ES6 final draft 20.3.4.
+static JSObject*
+CreateDatePrototype(JSContext* cx, JSProtoKey key)
+{
+    return cx->global()->createBlankPrototype(cx, &DateObject::protoClass_);
+}
+
 static bool
 FinishDateClassInit(JSContext* cx, HandleObject ctor, HandleObject proto)
 {
-    proto->as<DateObject>().setUTCTime(ClippedTime::NaN());
-
     /*
      * Date.prototype.toGMTString has the same initial value as
      * Date.prototype.toUTCString.
@@ -3130,8 +3135,8 @@ FinishDateClassInit(JSContext* cx, HandleObject ctor, HandleObject proto)
     RootedValue toUTCStringFun(cx);
     RootedId toUTCStringId(cx, NameToId(cx->names().toUTCString));
     RootedId toGMTStringId(cx, NameToId(cx->names().toGMTString));
-    return NativeGetProperty(cx, proto.as<DateObject>(), toUTCStringId, &toUTCStringFun) &&
-           NativeDefineProperty(cx, proto.as<DateObject>(), toGMTStringId, toUTCStringFun,
+    return NativeGetProperty(cx, proto.as<NativeObject>(), toUTCStringId, &toUTCStringFun) &&
+           NativeDefineProperty(cx, proto.as<NativeObject>(), toGMTStringId, toUTCStringFun,
                                 nullptr, nullptr, 0);
 }
 
@@ -3154,12 +3159,40 @@ const Class DateObject::class_ = {
     nullptr, /* trace */
     {
         GenericCreateConstructor<DateConstructor, 7, gc::AllocKind::FUNCTION>,
-        GenericCreatePrototype,
+        CreateDatePrototype,
         date_static_methods,
         nullptr,
         date_methods,
         nullptr,
         FinishDateClassInit
+    }
+};
+
+const Class DateObject::protoClass_ = {
+    js_Object_str,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Date),
+    nullptr, /* addProperty */
+    nullptr, /* delProperty */
+    nullptr, /* getProperty */
+    nullptr, /* setProperty */
+    nullptr, /* enumerate */
+    nullptr, /* resolve */
+    nullptr, /* mayResolve */
+    nullptr, /* convert */
+    nullptr, /* finalize */
+    nullptr, /* call */
+    nullptr, /* hasInstance */
+    nullptr, /* construct */
+    nullptr, /* trace  */
+    {
+        DELEGATED_CLASSSPEC(&DateObject::class_.spec),
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        ClassSpec::IsDelegated
     }
 };
 

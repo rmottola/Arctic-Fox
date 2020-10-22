@@ -41,6 +41,7 @@ class DateObject : public NativeObject
 
   public:
     static const Class class_;
+    static const Class protoClass_;
 
     JS::ClippedTime clippedTime() const {
         double t = getFixedSlot(UTC_TIME_SLOT).toDouble();
