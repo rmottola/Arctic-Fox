@@ -1969,14 +1969,6 @@ UINT_TO_JSVAL(uint32_t i)
            : DOUBLE_TO_JSVAL((double)i);
 }
 
-static inline jsval
-OBJECT_TO_JSVAL(JSObject* obj)
-{
-    if (obj)
-        return IMPL_TO_JSVAL(OBJECT_TO_JSVAL_IMPL(obj));
-    return IMPL_TO_JSVAL(BUILD_JSVAL(JSVAL_TAG_NULL, 0));
-}
-
 // JS constants. For efficiency, prefer predicates (e.g. v.isNull()) and
 // constructing values from scratch (e.g. Int32Value(0)).  These constants are
 // stored in memory and initialized at startup, so testing against them and

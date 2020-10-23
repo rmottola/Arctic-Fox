@@ -1906,7 +1906,7 @@ ResolvePrototype(nsIXPConnect *aXPConnect, nsGlobalWindow *aWin, JSContext *cx,
     }
   }
 
-  v = OBJECT_TO_JSVAL(dot_prototype);
+  v.setObject(*dot_prototype);
 
   JSAutoCompartment ac(cx, class_obj);
 

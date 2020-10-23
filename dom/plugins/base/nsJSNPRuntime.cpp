@@ -530,7 +530,7 @@ NPVariantToJSVal(NPP npp, JSContext *cx, const NPVariant *variant)
           nsNPObjWrapper::GetNewOrUsed(npp, cx, NPVARIANT_TO_OBJECT(*variant));
 
         if (obj) {
-          return OBJECT_TO_JSVAL(obj);
+          return JS::ObjectValue(*obj);
         }
       }
 
