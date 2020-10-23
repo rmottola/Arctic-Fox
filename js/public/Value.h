@@ -1977,14 +1977,6 @@ OBJECT_TO_JSVAL(JSObject* obj)
     return IMPL_TO_JSVAL(BUILD_JSVAL(JSVAL_TAG_NULL, 0));
 }
 
-/* To be GC-safe, privates are tagged as doubles. */
-
-static inline jsval
-PRIVATE_TO_JSVAL(void* ptr)
-{
-    return IMPL_TO_JSVAL(PRIVATE_PTR_TO_JSVAL_IMPL(ptr));
-}
-
 // JS constants. For efficiency, prefer predicates (e.g. v.isNull()) and
 // constructing values from scratch (e.g. Int32Value(0)).  These constants are
 // stored in memory and initialized at startup, so testing against them and
