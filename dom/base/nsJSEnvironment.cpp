@@ -945,7 +945,7 @@ nsJSContext::AddSupportsPrimitiveTojsvals(nsISupports *aArg, JS::Value *aArgv)
       JSString *str = ::JS_NewStringCopyN(cx, data.get(), data.Length());
       NS_ENSURE_TRUE(str, NS_ERROR_OUT_OF_MEMORY);
 
-      *aArgv = STRING_TO_JSVAL(str);
+      aArgv->setString(str);
 
       break;
     }
@@ -963,7 +963,7 @@ nsJSContext::AddSupportsPrimitiveTojsvals(nsISupports *aArg, JS::Value *aArgv)
         ::JS_NewUCStringCopyN(cx, data.get(), data.Length());
       NS_ENSURE_TRUE(str, NS_ERROR_OUT_OF_MEMORY);
 
-      *aArgv = STRING_TO_JSVAL(str);
+      aArgv->setString(str);
       break;
     }
     case nsISupportsPrimitive::TYPE_PRBOOL : {
@@ -974,7 +974,7 @@ nsJSContext::AddSupportsPrimitiveTojsvals(nsISupports *aArg, JS::Value *aArgv)
 
       p->GetData(&data);
 
-      *aArgv = BOOLEAN_TO_JSVAL(data);
+      aArgv->setBoolean(data);
 
       break;
     }
@@ -1025,7 +1025,7 @@ nsJSContext::AddSupportsPrimitiveTojsvals(nsISupports *aArg, JS::Value *aArgv)
       JSString *str = ::JS_NewStringCopyN(cx, &data, 1);
       NS_ENSURE_TRUE(str, NS_ERROR_OUT_OF_MEMORY);
 
-      *aArgv = STRING_TO_JSVAL(str);
+      aArgv->setString(str);
 
       break;
     }
