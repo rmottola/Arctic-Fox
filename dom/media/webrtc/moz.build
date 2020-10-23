@@ -56,7 +56,6 @@ XPIDL_SOURCES += [
 UNIFIED_SOURCES += [
     'MediaEngineDefault.cpp',
     'PeerIdentity.cpp',
-    'RTCCertificate.cpp',
 ]
 
 EXPORTS.mozilla += [
