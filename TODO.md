@@ -69,6 +69,7 @@
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
