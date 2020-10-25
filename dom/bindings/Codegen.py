@@ -1081,8 +1081,7 @@ class CGHeaders(CGWrapper):
             elif unrolled.isDictionary():
                 headerSet.add(self.getDeclarationFilename(unrolled.inner))
             elif unrolled.isCallback():
-                # Callbacks are both a type and an object
-                headerSet.add(self.getDeclarationFilename(unrolled))
+                headerSet.add(self.getDeclarationFilename(unrolled.callback))
             elif unrolled.isFloat() and not unrolled.isUnrestricted():
                 # Restricted floats are tested for finiteness
                 bindingHeaders.add("mozilla/FloatingPoint.h")
@@ -1274,7 +1273,7 @@ def UnionTypes(unionTypes, config):
                     # Callbacks always use strong refs, so we need to include
                     # the right header to be able to Release() in our inlined
                     # code.
-                    headers.add(CGHeaders.getDeclarationFilename(f))
+                    headers.add(CGHeaders.getDeclarationFilename(f.callback))
                 elif f.isMozMap():
                     headers.add("mozilla/dom/MozMap.h")
                     # And add headers for the type we're parametrized over
@@ -5065,7 +5064,8 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         assert not type.treatNonObjectAsNull() or type.nullable()
         assert not type.treatNonObjectAsNull() or not type.treatNonCallableAsNull()
 
-        name = type.unroll().identifier.name
+        callback = type.unroll().callback
+        name = callback.identifier.name
         if type.nullable():
             declType = CGGeneric("nsRefPtr<%s>" % name)
         else:
@@ -6168,7 +6168,7 @@ def getRetvalDeclarationForType(returnType, descriptorProvider,
             result = CGGeneric("auto")
         return result, None, None, None, conversion
     if returnType.isCallback():
-        name = returnType.unroll().identifier.name
+        name = returnType.unroll().callback.identifier.name
         return CGGeneric("nsRefPtr<%s>" % name), None, None, None, None
     if returnType.isAny():
         if isMember:
@@ -8721,7 +8721,7 @@ def getUnionAccessorSignatureType(type, descriptorProvider):
         return CGGeneric(type.inner.identifier.name)
 
     if type.isCallback():
-        return CGGeneric("%s&" % type.unroll().identifier.name)
+        return CGGeneric("%s&" % type.unroll().callback.identifier.name)
 
     if type.isAny():
         return CGGeneric("JS::Value")
@@ -12370,7 +12370,7 @@ class CGForwardDeclarations(CGWrapper):
             # Note: Spidermonkey interfaces are typedefs, so can't be
             # forward-declared
             elif t.isCallback():
-                builder.addInMozillaDom(str(t))
+                builder.addInMozillaDom(t.callback.identifier.name)
             elif t.isDictionary():
                 builder.addInMozillaDom(t.inner.identifier.name, isStruct=True)
             elif t.isCallbackInterface():
@@ -12397,12 +12397,12 @@ class CGForwardDeclarations(CGWrapper):
             builder.add(d.nativeType + "Atoms", isStruct=True)
 
         for callback in mainCallbacks:
-            forwardDeclareForType(callback)
+            builder.addInMozillaDom(callback.identifier.name)
             for t in getTypesFromCallback(callback):
                 forwardDeclareForType(t, workerness='mainthreadonly')
 
         for callback in workerCallbacks:
-            forwardDeclareForType(callback)
+            builder.addInMozillaDom(callback.identifier.name)
             for t in getTypesFromCallback(callback):
                 forwardDeclareForType(t, workerness='workeronly')
 
@@ -12785,7 +12785,7 @@ class CGNativeMember(ClassMethod):
             # .forget() to get our already_AddRefed.
             return result.define(), "nullptr", "return ${declName}.forget();\n"
         if type.isCallback():
-            return ("already_AddRefed<%s>" % type.unroll().identifier.name,
+            return ("already_AddRefed<%s>" % type.unroll().callback.identifier.name,
                     "nullptr", "return ${declName}.forget();\n")
         if type.isAny():
             if isMember:
@@ -13015,7 +13015,7 @@ class CGNativeMember(ClassMethod):
                 else:
                     declType = "%s&"
             if type.isCallback():
-                name = type.unroll().identifier.name
+                name = type.unroll().callback.identifier.name
             else:
                 name = type.unroll().inner.identifier.name
             return declType % name, False, False
