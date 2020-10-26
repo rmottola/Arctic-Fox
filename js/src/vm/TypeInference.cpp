@@ -2861,6 +2861,11 @@ ObjectGroup::markUnknown(ExclusiveContext* cx)
             prop->types.setNonDataProperty(cx);
         }
     }
+
+    if (maybeUnboxedLayout() && maybeUnboxedLayout()->nativeGroup())
+        MarkObjectGroupUnknownProperties(cx, maybeUnboxedLayout()->nativeGroup());
+    if (ObjectGroup* unboxedGroup = maybeOriginalUnboxedGroup())
+        MarkObjectGroupUnknownProperties(cx, unboxedGroup);
 }
 
 TypeNewScript*
