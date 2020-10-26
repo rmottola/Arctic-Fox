@@ -1406,6 +1406,12 @@ IsImplicitDenseOrTypedArrayElement(Shape* prop)
     return prop == reinterpret_cast<Shape*>(1);
 }
 
+static inline bool
+IsImplicitNonNativeProperty(Shape *prop)
+{
+    return prop == reinterpret_cast<Shape*>(1);
+}
+
 Shape *
 ReshapeForAllocKind(JSContext *cx, Shape *shape, TaggedProto proto,
                     gc::AllocKind allocKind);
