@@ -6195,9 +6195,6 @@ IonBuilder::jsop_call(uint32_t argc, bool constructing)
 bool
 IonBuilder::testShouldDOMCall(TypeSet* inTypes, JSFunction* func, JSJitInfo::OpType opType)
 {
-    if (IsInsideNursery(func))
-        return false;
-
     if (!func->isNative() || !func->jitInfo())
         return false;
 
@@ -10824,8 +10821,7 @@ IonBuilder::getPropTryCommonGetter(bool* emitted, MDefinition* obj, PropertyName
         }
     }
 
-    JSFunction* tenuredCommonGetter = IsInsideNursery(commonGetter) ? nullptr : commonGetter;
-    if (!makeCall(tenuredCommonGetter, callInfo))
+    if (!makeCall(commonGetter, callInfo))
         return false;
 
     // If the getter could have been inlined, don't track success. The call to
@@ -11315,8 +11311,7 @@ IonBuilder::setPropTryCommonSetter(bool* emitted, MDefinition* obj,
         }
     }
 
-    JSFunction* tenuredCommonSetter = IsInsideNursery(commonSetter) ? nullptr : commonSetter;
-    MCall* call = makeCallHelper(tenuredCommonSetter, callInfo);
+    MCall* call = makeCallHelper(commonSetter, callInfo);
     if (!call)
         return false;
 
