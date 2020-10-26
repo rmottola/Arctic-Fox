@@ -1940,7 +1940,7 @@ class ICGetElem_UnboxedArray : public ICMonitoredStub
           : ICStubCompiler(cx, ICStub::GetElem_UnboxedArray, Engine::Baseline),
             firstMonitorStub_(firstMonitorStub),
             group_(cx, group),
-            elementType_(group->unboxedLayout().elementType())
+            elementType_(group->unboxedLayoutDontCheckGeneration().elementType())
         {}
 
         ICStub* getStub(ICStubSpace* space) {
@@ -2152,7 +2152,9 @@ class ICSetElem_DenseOrUnboxedArray : public ICUpdatedStub
           : ICStubCompiler(cx, ICStub::SetElem_DenseOrUnboxedArray, Engine::Baseline),
             shape_(cx, shape),
             group_(cx, group),
-            unboxedType_(shape ? JSVAL_TYPE_MAGIC : group->unboxedLayout().elementType())
+            unboxedType_(shape
+                         ? JSVAL_TYPE_MAGIC
+                         : group->unboxedLayoutDontCheckGeneration().elementType())
         {}
 
         ICUpdatedStub* getStub(ICStubSpace* space) {
