@@ -215,6 +215,7 @@
     _(UnboxedArrayLength)           \
     _(UnboxedArrayInitializedLength) \
     _(IncrementUnboxedArrayInitializedLength) \
+    _(SetUnboxedArrayInitializedLength) \
     _(BoundsCheck)                  \
     _(BoundsCheckRange)             \
     _(BoundsCheckLower)             \

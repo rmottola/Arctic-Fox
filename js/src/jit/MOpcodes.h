@@ -181,6 +181,7 @@ namespace jit {
     _(UnboxedArrayLength)                                                   \
     _(UnboxedArrayInitializedLength)                                        \
     _(IncrementUnboxedArrayInitializedLength)                               \
+    _(SetUnboxedArrayInitializedLength)                                     \
     _(Not)                                                                  \
     _(BoundsCheck)                                                          \
     _(BoundsCheckLower)                                                     \
