@@ -431,7 +431,7 @@ class BaseShape : public gc::TenuredCell
     uint32_t slotSpan() const { MOZ_ASSERT(isOwned()); return slotSpan_; }
     void setSlotSpan(uint32_t slotSpan) { MOZ_ASSERT(isOwned()); slotSpan_ = slotSpan; }
 
-    JSCompartment *compartment() const { return compartment_; }
+    JSCompartment* compartment() const { return compartment_; }
 
     /*
      * Lookup base shapes from the compartment's baseShapes table, adding if
