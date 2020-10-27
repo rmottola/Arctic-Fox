@@ -1067,7 +1067,9 @@ var gBrowserInit = {
 
     gBrowser.addEventListener("AboutTabCrashedLoad", function(event) {
 #ifdef MOZ_CRASHREPORTER
-      TabCrashReporter.onAboutTabCrashedLoad(gBrowser.getBrowserForDocument(event.target));
+      TabCrashReporter.onAboutTabCrashedLoad(gBrowser.getBrowserForDocument(event.target), {
+        crashedTabCount: SessionStore.crashedTabCount,
+      });
 #endif
     }, false, true);
 
@@ -1099,11 +1101,7 @@ var gBrowserInit = {
         SessionStore.reviveCrashedTab(tab);
         break;
       case "restoreAll":
-        for (let browserWin of browserWindows()) {
-          for (let tab of window.gBrowser.tabs) {
-            SessionStore.reviveCrashedTab(tab);
-          }
-        }
+        SessionStore.reviveAllCrashedTabs();
         break;
       }
     }, false, true);
