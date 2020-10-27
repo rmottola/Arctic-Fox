@@ -29,6 +29,8 @@
 -  Add compositor, layers, and rendering info to nsIGfxInfo. (bug 1179051 part 5, r=mattwoodrow)\
 - Split gfxWindowsPlatform::UpdateRenderMode() into multiple functions.  (bug 1179051 part 1, r=bas)
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
+- Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
+- Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
@@ -44,6 +46,7 @@
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
+- Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
@@ -159,7 +162,6 @@ More session store stuff to check:
 
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-- Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
 
 Lightweight themes stuff:
 
@@ -167,9 +169,6 @@ Lightweight themes stuff:
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
-
-Devtools stuff to check - files not there:
-- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
 
 
 Check with Roy Tam:
