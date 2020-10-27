@@ -2430,6 +2430,17 @@ gfxFont::GetShapedWord(gfxContext *aContext,
     return sw;
 }
 
+template gfxShapedWord*
+gfxFont::GetShapedWord(gfxContext *aContext,
+                       const uint8_t *aText,
+                       uint32_t    aLength,
+                       uint32_t    aHash,
+                       int32_t     aRunScript,
+                       bool        aVertical,
+                       int32_t     aAppUnitsPerDevUnit,
+                       uint32_t    aFlags,
+                       gfxTextPerfMetrics *aTextPerf GFX_MAYBE_UNUSED);
+
 bool
 gfxFont::CacheHashEntry::KeyEquals(const KeyTypePointer aKey) const
 {
