@@ -947,7 +947,7 @@ DumpHeapVisitCell(JSRuntime* rt, void* data, void* thing,
 }
 
 static void
-DumpHeapVisitChild(JS::CallbackTracer *trc, void** thingp, JSGCTraceKind kind)
+DumpHeapVisitChild(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 {
     if (gc::IsInsideNursery((js::gc::Cell*)*thingp))
         return;
