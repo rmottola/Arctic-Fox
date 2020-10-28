@@ -357,6 +357,7 @@ FOR_EACH_GC_LAYOUT(NAMES)
 };
 
 #define FOR_EACH_GC_POINTER_TYPE(D) \
+    D(AccessorShape*) \
     D(BaseShape*) \
     D(UnownedBaseShape*) \
     D(jit::JitCode*) \
