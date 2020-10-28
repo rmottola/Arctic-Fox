@@ -132,8 +132,8 @@ AddonWrapper<Base>::get(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle
 
 template<typename Base>
 bool
-AddonWrapper<Base>::set(JSContext *cx, JS::HandleObject wrapper, JS::HandleId id, JS::HandleValue v,
-                        JS::HandleValue receiver, JS::ObjectOpResult &result) const
+AddonWrapper<Base>::set(JSContext* cx, JS::HandleObject wrapper, JS::HandleId id, JS::HandleValue v,
+                        JS::HandleValue receiver, JS::ObjectOpResult& result) const
 {
     Rooted<JSPropertyDescriptor> desc(cx);
     if (!Interpose(cx, wrapper, nullptr, id, &desc))
@@ -159,9 +159,9 @@ AddonWrapper<Base>::set(JSContext *cx, JS::HandleObject wrapper, JS::HandleId id
 
 template<typename Base>
 bool
-AddonWrapper<Base>::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+AddonWrapper<Base>::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                    Handle<JSPropertyDescriptor> desc,
-                                   ObjectOpResult &result) const
+                                   ObjectOpResult& result) const
 {
     Rooted<JSPropertyDescriptor> interpDesc(cx);
     if (!Interpose(cx, wrapper, nullptr, id, &interpDesc))
@@ -176,8 +176,8 @@ AddonWrapper<Base>::defineProperty(JSContext *cx, HandleObject wrapper, HandleId
 
 template<typename Base>
 bool
-AddonWrapper<Base>::delete_(JSContext *cx, HandleObject wrapper, HandleId id,
-                            ObjectOpResult &result) const
+AddonWrapper<Base>::delete_(JSContext* cx, HandleObject wrapper, HandleId id,
+                            ObjectOpResult& result) const
 {
     Rooted<JSPropertyDescriptor> desc(cx);
     if (!Interpose(cx, wrapper, nullptr, id, &desc))
