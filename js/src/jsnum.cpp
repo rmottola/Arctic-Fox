@@ -1201,7 +1201,7 @@ js::InitNumberClass(JSContext* cx, HandleObject obj)
 
     /* Number.parseInt should be the same function object as global parseInt. */
     RootedId parseIntId(cx, NameToId(cx->names().parseInt));
-    JSFunction *parseInt = DefineFunction(cx, global, parseIntId, num_parseInt, 2, 0);
+    JSFunction* parseInt = DefineFunction(cx, global, parseIntId, num_parseInt, 2, 0);
     if(!parseInt)
         return nullptr;
     RootedValue parseIntValue(cx, ObjectValue(*parseInt));
@@ -1210,7 +1210,7 @@ js::InitNumberClass(JSContext* cx, HandleObject obj)
 
     /* Number.parseFloat should be the same function object as global parseFloat. */
     RootedId parseFloatId(cx, NameToId(cx->names().parseFloat));
-    JSFunction *parseFloat = DefineFunction(cx, global, parseFloatId, num_parseFloat, 1, 0);
+    JSFunction* parseFloat = DefineFunction(cx, global, parseFloatId, num_parseFloat, 1, 0);
     if(!parseFloat)
         return nullptr;
     RootedValue parseFloatValue(cx, ObjectValue(*parseFloat));
@@ -1276,7 +1276,7 @@ js::NumberToCString(JSContext* cx, ToCStringBuf* cbuf, double d, int base/* = 10
 }
 
 template <AllowGC allowGC>
-static JSString *
+static JSString*
 NumberToStringWithBase(ExclusiveContext* cx, double d, int base)
 {
     ToCStringBuf cbuf;
