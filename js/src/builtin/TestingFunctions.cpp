@@ -797,7 +797,7 @@ NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, jsval* vp)
 
 struct JSCountHeapNode {
     void*               thing;
-    JSGCTraceKind       kind;
+    JS::TraceKind       kind;
     JSCountHeapNode*    next;
 };
 
@@ -815,7 +815,7 @@ class CountHeapTracer : public JS::CallbackTracer
 };
 
 static void
-CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
+CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
 {
     CountHeapTracer* countTracer = (CountHeapTracer*)trc;
     void* thing = *thingp;
@@ -850,12 +850,12 @@ CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 
 static const struct TraceKindPair {
     const char*      name;
-    int32_t           kind;
+    int32_t          kind;
 } traceKindNames[] = {
-    { "all",        -1                  },
-    { "object",     JSTRACE_OBJECT      },
-    { "string",     JSTRACE_STRING      },
-    { "symbol",     JSTRACE_SYMBOL      },
+    { "all",        -1                             },
+    { "object",     int32_t(JS::TraceKind::Object) },
+    { "string",     int32_t(JS::TraceKind::String) },
+    { "symbol",     int32_t(JS::TraceKind::Symbol) },
 };
 
 static bool
@@ -934,7 +934,7 @@ CountHeap(JSContext* cx, unsigned argc, jsval* vp)
     while ((node = countTracer.traceList) != nullptr) {
         if (traceThing == nullptr) {
             // We are looking for all nodes with a specific kind
-            if (traceKind == -1 || node->kind == traceKind)
+            if (traceKind == -1 || int32_t(node->kind) == traceKind)
                 counter++;
         } else {
             // We are looking for some specific thing

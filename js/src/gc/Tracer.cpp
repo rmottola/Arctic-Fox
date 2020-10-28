@@ -46,7 +46,7 @@ T
 DoCallback(JS::CallbackTracer* trc, T* thingp, const char* name)
 {
     CheckTracedThing(trc, *thingp);
-    JSGCTraceKind kind = MapTypeToTraceKind<typename mozilla::RemovePointer<T>::Type>::kind;
+    JS::TraceKind kind = MapTypeToTraceKind<typename mozilla::RemovePointer<T>::Type>::kind;
     JS::AutoTracingName ctx(trc, name);
     trc->invoke((void**)thingp, kind);
     return *thingp;
@@ -176,7 +176,7 @@ JS_CallTenuredObjectTracer(JSTracer* trc, JS::TenuredHeap<JSObject*>* objp, cons
 }
 
 JS_PUBLIC_API(void)
-JS_TraceChildren(JSTracer* trc, void* thing, JSGCTraceKind kind)
+JS_TraceChildren(JSTracer* trc, void* thing, JS::TraceKind kind)
 {
     js::TraceChildren(trc, thing, kind);
 }
@@ -189,7 +189,7 @@ struct TraceChildrenFunctor {
 };
 
 void
-js::TraceChildren(JSTracer* trc, void* thing, JSGCTraceKind kind)
+js::TraceChildren(JSTracer* trc, void* thing, JS::TraceKind kind)
 {
     MOZ_ASSERT(thing);
     TraceChildrenFunctor f;
@@ -301,7 +301,7 @@ gc::TraceCycleCollectorChildren(JS::CallbackTracer* trc, Shape* shape)
 
 void
 TraceObjectGroupCycleCollectorChildrenCallback(JS::CallbackTracer* trc,
-                                               void** thingp, JSGCTraceKind kind);
+                                               void** thingp, JS::TraceKind kind);
 
 // Object groups can point to other object groups via an UnboxedLayout or the
 // the original unboxed group link. There can potentially be deep or cyclic
@@ -323,7 +323,7 @@ struct ObjectGroupCycleCollectorTracer : public JS::CallbackTracer
 
 void
 TraceObjectGroupCycleCollectorChildrenCallback(JS::CallbackTracer* trcArg,
-                                               void** thingp, JSGCTraceKind kind)
+                                               void** thingp, JS::TraceKind kind)
 {
     ObjectGroupCycleCollectorTracer* trc = static_cast<ObjectGroupCycleCollectorTracer*>(trcArg);
     JS::GCCellPtr thing(*thingp, kind);
@@ -391,7 +391,7 @@ CountDecimalDigits(size_t num)
 
 JS_PUBLIC_API(void)
 JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc, void* thing,
-                     JSGCTraceKind kind, bool details)
+                     JS::TraceKind kind, bool details)
 {
     const char* name = nullptr; /* silence uninitialized warning */
     size_t n;
@@ -400,43 +400,43 @@ JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc, void* thing,
         return;
 
     switch (kind) {
-      case JSTRACE_OBJECT:
+      case JS::TraceKind::Object:
       {
         name = static_cast<JSObject*>(thing)->getClass()->name;
         break;
       }
 
-      case JSTRACE_SCRIPT:
+      case JS::TraceKind::Script:
         name = "script";
         break;
 
-      case JSTRACE_STRING:
+      case JS::TraceKind::String:
         name = ((JSString*)thing)->isDependent()
                ? "substring"
                : "string";
         break;
 
-      case JSTRACE_SYMBOL:
+      case JS::TraceKind::Symbol:
         name = "symbol";
         break;
 
-      case JSTRACE_BASE_SHAPE:
+      case JS::TraceKind::BaseShape:
         name = "base_shape";
         break;
 
-      case JSTRACE_JITCODE:
+      case JS::TraceKind::JitCode:
         name = "jitcode";
         break;
 
-      case JSTRACE_LAZY_SCRIPT:
+      case JS::TraceKind::LazyScript:
         name = "lazyscript";
         break;
 
-      case JSTRACE_SHAPE:
+      case JS::TraceKind::Shape:
         name = "shape";
         break;
 
-      case JSTRACE_OBJECT_GROUP:
+      case JS::TraceKind::ObjectGroup:
         name = "object_group";
         break;
 
@@ -455,7 +455,7 @@ JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc, void* thing,
 
     if (details && bufsize > 2) {
         switch (kind) {
-          case JSTRACE_OBJECT:
+          case JS::TraceKind::Object:
           {
             JSObject* obj = (JSObject*)thing;
             if (obj->is<JSFunction>()) {
@@ -473,14 +473,14 @@ JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc, void* thing,
             break;
           }
 
-          case JSTRACE_SCRIPT:
+          case JS::TraceKind::Script:
           {
             JSScript* script = static_cast<JSScript*>(thing);
             JS_snprintf(buf, bufsize, " %s:%" PRIuSIZE, script->filename(), script->lineno());
             break;
           }
 
-          case JSTRACE_STRING:
+          case JS::TraceKind::String:
           {
             *buf++ = ' ';
             bufsize--;
@@ -503,7 +503,7 @@ JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc, void* thing,
             break;
           }
 
-          case JSTRACE_SYMBOL:
+          case JS::TraceKind::Symbol:
           {
             JS::Symbol* sym = static_cast<JS::Symbol*>(thing);
             if (JSString* desc = sym->description()) {

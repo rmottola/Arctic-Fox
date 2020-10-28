@@ -349,13 +349,6 @@ AssertRootMarkingPhase(JSTracer* trc)
 
 /*** Tracing Interface ***************************************************************************/
 
-// A C++ version of JSGCTraceKind
-enum class TraceKind {
-#define NAMES(name, _, __) name,
-FOR_EACH_GC_LAYOUT(NAMES)
-#undef NAMES
-};
-
 #define FOR_EACH_GC_POINTER_TYPE(D) \
     D(AccessorShape*) \
     D(BaseShape*) \
@@ -404,18 +397,18 @@ FOR_EACH_GC_LAYOUT(NAMES)
 //   BaseGCType<UnownedBaseShape>::type => BaseShape
 //   etc.
 template <typename T,
-          TraceKind = IsBaseOf<JSObject, T>::value     ? TraceKind::Object
-                    : IsBaseOf<JSString, T>::value     ? TraceKind::String
-                    : IsBaseOf<JS::Symbol, T>::value   ? TraceKind::Symbol
-                    : IsBaseOf<JSScript, T>::value     ? TraceKind::Script
-                    : IsBaseOf<Shape, T>::value        ? TraceKind::Shape
-                    : IsBaseOf<BaseShape, T>::value    ? TraceKind::BaseShape
-                    : IsBaseOf<jit::JitCode, T>::value ? TraceKind::JitCode
-                    : IsBaseOf<LazyScript, T>::value   ? TraceKind::LazyScript
-                    :                                    TraceKind::ObjectGroup>
+          JS::TraceKind = IsBaseOf<JSObject, T>::value     ? JS::TraceKind::Object
+                        : IsBaseOf<JSString, T>::value     ? JS::TraceKind::String
+                        : IsBaseOf<JS::Symbol, T>::value   ? JS::TraceKind::Symbol
+                        : IsBaseOf<JSScript, T>::value     ? JS::TraceKind::Script
+                        : IsBaseOf<Shape, T>::value        ? JS::TraceKind::Shape
+                        : IsBaseOf<BaseShape, T>::value    ? JS::TraceKind::BaseShape
+                        : IsBaseOf<jit::JitCode, T>::value ? JS::TraceKind::JitCode
+                        : IsBaseOf<LazyScript, T>::value   ? JS::TraceKind::LazyScript
+                        :                                    JS::TraceKind::ObjectGroup>
 struct BaseGCType;
 #define IMPL_BASE_GC_TYPE(name, type_, _) \
-    template <typename T> struct BaseGCType<T, TraceKind:: name> { typedef type_ type; };
+    template <typename T> struct BaseGCType<T, JS::TraceKind:: name> { typedef type_ type; };
 FOR_EACH_GC_LAYOUT(IMPL_BASE_GC_TYPE);
 #undef IMPL_BASE_GC_TYPE
 
@@ -532,7 +525,7 @@ js::TraceProcessGlobalRoot(JSTracer* trc, T* thing, const char* name)
     // things so they do not need to go through the mark stack and may simply
     // be marked directly.  Moreover, well-known symbols can refer only to
     // permanent atoms, so likewise require no subsquent marking.
-    CheckTracedThing(trc, thing);
+    CheckTracedThing(trc, *ConvertToBase(&thing));
     if (trc->isMarkingTracer())
         thing->markIfUnmarked(gc::BLACK);
     else
@@ -943,9 +936,9 @@ js::GCMarker::eagerlyMarkChildren(JSRope* rope)
     // other ropes or linear strings, it cannot refer to GC things of other
     // types.
     ptrdiff_t savedPos = stack.position();
-    JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JSTRACE_STRING);
+    JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JS::TraceKind::String);
     while (true) {
-        JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JSTRACE_STRING);
+        JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JS::TraceKind::String);
         JS_DIAGNOSTICS_ASSERT(rope->JSString::isRope());
         AssertZoneIsMarking(rope);
         MOZ_ASSERT(rope->isMarked());
@@ -1809,8 +1802,8 @@ void
 js::gc::StoreBuffer::WholeCellEdges::trace(TenuringTracer& mover) const
 {
     MOZ_ASSERT(edge->isTenured());
-    JSGCTraceKind kind = edge->getTraceKind();
-    if (kind <= JSTRACE_OBJECT) {
+    JS::TraceKind kind = edge->getTraceKind();
+    if (kind == JS::TraceKind::Object) {
         JSObject *object = static_cast<JSObject*>(edge);
         mover.traceObject(object);
 
@@ -1827,7 +1820,7 @@ js::gc::StoreBuffer::WholeCellEdges::trace(TenuringTracer& mover) const
 
         return;
     }
-    MOZ_ASSERT(kind == JSTRACE_JITCODE);
+    MOZ_ASSERT(kind == JS::TraceKind::JitCode);
     static_cast<jit::JitCode*>(edge)->traceChildren(&mover);
 }
 
@@ -1837,7 +1830,7 @@ js::gc::StoreBuffer::CellPtrEdge::trace(TenuringTracer& mover) const
     if (!*edge)
         return;
 
-    MOZ_ASSERT((*edge)->getTraceKind() == JSTRACE_OBJECT);
+    MOZ_ASSERT((*edge)->getTraceKind() == JS::TraceKind::Object);
     mover.traverse(reinterpret_cast<JSObject**>(edge));
 }
 
@@ -2285,7 +2278,7 @@ TypeSet::MarkTypeUnbarriered(JSTracer* trc, TypeSet::Type* v, const char* name)
 
 #ifdef DEBUG
 static void
-AssertNonGrayGCThing(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
+AssertNonGrayGCThing(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
 {
     DebugOnly<Cell*> thing(static_cast<Cell*>(*thingp));
     MOZ_ASSERT_IF(thing->isTenured(), !thing->asTenured().isMarked(js::gc::GRAY));
@@ -2293,7 +2286,7 @@ AssertNonGrayGCThing(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 #endif
 
 static void
-UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind);
+UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind);
 
 struct UnmarkGrayTracer : public JS::CallbackTracer
 {
@@ -2356,7 +2349,7 @@ struct UnmarkGrayTracer : public JS::CallbackTracer
  *   containers.
  */
 static void
-UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
+UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
 {
     int stackDummy;
     if (!JS_CHECK_STACK_SIZE(trc->runtime()->mainThread.nativeStackLimit[StackForSystemCode],
@@ -2395,16 +2388,16 @@ UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
     // The parent will later trace |tenured|. This is done to avoid increasing
     // the stack depth during shape tracing. It is safe to do because a shape
     // can only have one child that is a shape.
-    UnmarkGrayTracer childTracer(tracer, kind == JSTRACE_SHAPE);
+    UnmarkGrayTracer childTracer(tracer, kind == JS::TraceKind::Shape);
 
-    if (kind != JSTRACE_SHAPE) {
+    if (kind != JS::TraceKind::Shape) {
         TraceChildren(&childTracer, &tenured, kind);
         MOZ_ASSERT(!childTracer.previousShape);
         tracer->unmarkedAny |= childTracer.unmarkedAny;
         return;
     }
 
-    MOZ_ASSERT(kind == JSTRACE_SHAPE);
+    MOZ_ASSERT(kind == JS::TraceKind::Shape);
     Shape* shape = static_cast<Shape*>(&tenured);
     if (tracer->tracingShape) {
         MOZ_ASSERT(!tracer->previousShape);
@@ -2414,7 +2407,7 @@ UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 
     do {
         MOZ_ASSERT(!shape->isMarked(js::gc::GRAY));
-        TraceChildren(&childTracer, shape, JSTRACE_SHAPE);
+        TraceChildren(&childTracer, shape, JS::TraceKind::Shape);
         shape = childTracer.previousShape;
         childTracer.previousShape = nullptr;
     } while (shape);
@@ -2422,7 +2415,7 @@ UnmarkGrayChildren(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 }
 
 bool
-js::UnmarkGrayCellRecursively(gc::Cell* cell, JSGCTraceKind kind)
+js::UnmarkGrayCellRecursively(gc::Cell* cell, JS::TraceKind kind)
 {
     MOZ_ASSERT(cell);
 
@@ -2451,7 +2444,7 @@ js::UnmarkGrayCellRecursively(gc::Cell* cell, JSGCTraceKind kind)
 bool
 js::UnmarkGrayShapeRecursively(Shape* shape)
 {
-    return js::UnmarkGrayCellRecursively(shape, JSTRACE_SHAPE);
+    return js::UnmarkGrayCellRecursively(shape, JS::TraceKind::Shape);
 }
 
 JS_FRIEND_API(bool)

@@ -116,7 +116,7 @@ public:
 
 static void
 TraceWeakMappingChild(JS::CallbackTracer* aTrc, void** aThingp,
-                      JSGCTraceKind aKind);
+                      JS::TraceKind aKind);
 
 struct NoteWeakMapChildrenTracer : public JS::CallbackTracer
 {
@@ -136,7 +136,7 @@ struct NoteWeakMapChildrenTracer : public JS::CallbackTracer
 
 static void
 TraceWeakMappingChild(JS::CallbackTracer* aTrc, void** aThingp,
-                      JSGCTraceKind aKind)
+                      JS::TraceKind aKind)
 {
   MOZ_ASSERT(aTrc->hasCallback(TraceWeakMappingChild));
   NoteWeakMapChildrenTracer* tracer =
@@ -255,7 +255,7 @@ private:
     // If nothing that could be held alive by this entry is marked gray, return.
     bool delegateMightNeedMarking = aKey && JS::GCThingIsMarkedGray(aKey);
     bool valueMightNeedMarking = aValue && JS::GCThingIsMarkedGray(aValue) &&
-                                 aValue.kind() != JSTRACE_STRING;
+                                 aValue.kind() != JS::TraceKind::String;
     if (!delegateMightNeedMarking && !valueMightNeedMarking) {
       return;
     }
@@ -276,7 +276,7 @@ private:
     if (aValue && JS::GCThingIsMarkedGray(aValue) &&
         (!aKey || !JS::GCThingIsMarkedGray(aKey)) &&
         (!aMap || !JS::ObjectIsMarkedGray(aMap)) &&
-        aValue.kind() != JSTRACE_SHAPE) {
+        aValue.kind() != JS::TraceKind::Shape) {
       if (JS::UnmarkGrayGCThingRecursively(aValue)) {
         tracer->mAnyMarked = true;
       }
@@ -368,7 +368,7 @@ JSZoneParticipant::Traverse(void* aPtr, nsCycleCollectionTraversalCallback& aCb)
 
 static void
 NoteJSChildTracerShim(JS::CallbackTracer* aTrc, void** aThingp,
-                      JSGCTraceKind aTraceKind);
+                      JS::TraceKind aTraceKind);
 
 struct TraversalTracer : public JS::CallbackTracer
 {
@@ -424,7 +424,7 @@ NoteJSChild(JS::CallbackTracer* aTrc, JS::GCCellPtr aThing)
 
 static void
 NoteJSChildTracerShim(JS::CallbackTracer* aTrc, void** aThingp,
-                      JSGCTraceKind aTraceKind)
+                      JS::TraceKind aTraceKind)
 {
   JS::GCCellPtr thing(*aThingp, aTraceKind);
   NoteJSChild(aTrc, thing);

@@ -50,14 +50,14 @@ using namespace js::gc;
 struct EdgeValue
 {
     void* thing;
-    JSGCTraceKind kind;
+    JS::TraceKind kind;
     const char* label;
 };
 
 struct VerifyNode
 {
     void* thing;
-    JSGCTraceKind kind;
+    JS::TraceKind kind;
     uint32_t count;
     EdgeValue edges[1];
 };
@@ -112,7 +112,7 @@ struct VerifyPreTracer : JS::CallbackTracer
  * node.
  */
 static void
-AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
+AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind)
 {
     VerifyPreTracer* trc = static_cast<VerifyPreTracer*>(jstrc);
 
@@ -134,7 +134,7 @@ AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
 }
 
 static VerifyNode*
-MakeNode(VerifyPreTracer* trc, void* thing, JSGCTraceKind kind)
+MakeNode(VerifyPreTracer* trc, void* thing, JS::TraceKind kind)
 {
     NodeMap::AddPtr p = trc->nodemap.lookupForAdd(thing);
     if (!p) {
@@ -199,7 +199,7 @@ gc::GCRuntime::startVerifyPreBarriers()
         goto oom;
 
     /* Create the root node. */
-    trc->curnode = MakeNode(trc, nullptr, JSGCTraceKind(0));
+    trc->curnode = MakeNode(trc, nullptr, JS::TraceKind(0));
 
     incrementalState = MARK_ROOTS;
 
@@ -270,7 +270,7 @@ static const uint32_t MAX_VERIFIER_EDGES = 1000;
  * been modified) must point to marked objects.
  */
 static void
-CheckEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
+CheckEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind)
 {
     CheckEdgeTracer* trc = static_cast<CheckEdgeTracer*>(jstrc);
     VerifyNode* node = trc->node;
@@ -295,9 +295,9 @@ AssertMarkedOrAllocated(const EdgeValue& edge)
         return;
 
     // Permanent atoms and well-known symbols aren't marked during graph traversal.
-    if (edge.kind == JSTRACE_STRING && static_cast<JSString*>(edge.thing)->isPermanentAtom())
+    if (edge.kind == JS::TraceKind::String && static_cast<JSString*>(edge.thing)->isPermanentAtom())
         return;
-    if (edge.kind == JSTRACE_SYMBOL && static_cast<JS::Symbol*>(edge.thing)->isWellKnownSymbol())
+    if (edge.kind == JS::TraceKind::Symbol && static_cast<JS::Symbol*>(edge.thing)->isWellKnownSymbol())
         return;
 
     char msgbuf[1024];
