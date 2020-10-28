@@ -109,7 +109,7 @@ AddonInterpositionService.prototype = {
     return "generic";
   },
 
-  interpose: function(addon, target, iid, prop) {
+  interposeProperty: function(addon, target, iid, prop) {
     let interp;
     if (iid) {
       interp = this._interfaceInterpositions[iid];
@@ -146,6 +146,11 @@ AddonInterpositionService.prototype = {
     }
 
     return Prefetcher.lookupInCache(addon, target, prop);
+  },
+
+  interposeCall: function(addonId, originalFunc, originalThis, args) {
+    args.splice(0, 0, addonId);
+    return originalFunc.apply(originalThis, args);
   },
 };
 
