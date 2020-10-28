@@ -2799,7 +2799,7 @@ ReportIsNotFunction(JSContext* cx, JS::HandleValue v);
 
 extern JS_FRIEND_API(bool)
 DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                  JS::Handle<JSPropertyDescriptor> descriptor, JS::ObjectOpResult &result);
+                  JS::Handle<JSPropertyDescriptor> descriptor, JS::ObjectOpResult& result);
 
 } /* namespace js */
 
