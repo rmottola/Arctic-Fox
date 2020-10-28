@@ -406,7 +406,7 @@ nsJSIID::Resolve(nsIXPConnectWrappedNative* wrapper,
         *resolvedp = true;
         *_retval = JS_DefinePropertyById(cx, obj, id, val,
                                          JSPROP_ENUMERATE | JSPROP_READONLY |
-                                         JSPROP_PERMANENT);
+                                         JSPROP_PERMANENT | JSPROP_RESOLVING);
     }
 
     return NS_OK;
