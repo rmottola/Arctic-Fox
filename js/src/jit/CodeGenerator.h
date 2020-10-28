@@ -221,9 +221,9 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitPowI(LPowI* lir);
     void visitPowD(LPowD* lir);
     void visitRandom(LRandom* lir);
-    void visitMathFunctionD(LMathFunctionD *ins);
-    void visitMathFunctionF(LMathFunctionF *ins);
-    void visitModD(LModD *ins);
+    void visitMathFunctionD(LMathFunctionD* ins);
+    void visitMathFunctionF(LMathFunctionF* ins);
+    void visitModD(LModD* ins);
     void visitMinMaxI(LMinMaxI* lir);
     void visitBinaryV(LBinaryV* lir);
     void emitCompareS(LInstruction* lir, JSOp op, Register left, Register right, Register output);
