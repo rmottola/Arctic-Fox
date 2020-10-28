@@ -204,7 +204,7 @@ js::CheckTracedThing(JSTracer* trc, T thing)
 
     MOZ_ASSERT(thing->isAligned());
     MOZ_ASSERT(MapTypeToTraceKind<typename mozilla::RemovePointer<T>::Type>::kind ==
-               GetGCThingTraceKind(thing));
+               thing->getTraceKind());
 
     /*
      * Do not check IsMarkingTracer directly -- it should only be used in paths
@@ -942,9 +942,9 @@ js::GCMarker::eagerlyMarkChildren(JSRope* rope)
     // other ropes or linear strings, it cannot refer to GC things of other
     // types.
     ptrdiff_t savedPos = stack.position();
-    JS_DIAGNOSTICS_ASSERT(GetGCThingTraceKind(rope) == JSTRACE_STRING);
+    JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JSTRACE_STRING);
     while (true) {
-        JS_DIAGNOSTICS_ASSERT(GetGCThingTraceKind(rope) == JSTRACE_STRING);
+        JS_DIAGNOSTICS_ASSERT(rope->getTraceKind() == JSTRACE_STRING);
         JS_DIAGNOSTICS_ASSERT(rope->JSString::isRope());
         AssertZoneIsMarking(rope);
         MOZ_ASSERT(rope->isMarked());
@@ -1808,7 +1808,7 @@ void
 js::gc::StoreBuffer::WholeCellEdges::trace(TenuringTracer& mover) const
 {
     MOZ_ASSERT(edge->isTenured());
-    JSGCTraceKind kind = GetGCThingTraceKind(edge);
+    JSGCTraceKind kind = edge->getTraceKind();
     if (kind <= JSTRACE_OBJECT) {
         JSObject *object = static_cast<JSObject*>(edge);
         mover.traceObject(object);
@@ -1836,7 +1836,7 @@ js::gc::StoreBuffer::CellPtrEdge::trace(TenuringTracer& mover) const
     if (!*edge)
         return;
 
-    MOZ_ASSERT(GetGCThingTraceKind(*edge) == JSTRACE_OBJECT);
+    MOZ_ASSERT((*edge)->getTraceKind() == JSTRACE_OBJECT);
     mover.traverse(reinterpret_cast<JSObject**>(edge));
 }
 
