@@ -265,7 +265,7 @@ typedef bool
 // The callback's job is to populate 'properties' with all property keys that the for-in loop
 // should visit.
 typedef bool
-(* JSNewEnumerateOp)(JSContext *cx, JS::HandleObject obj, JS::AutoIdVector &properties);
+(* JSNewEnumerateOp)(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& properties);
 
 // The old-style JSClass.enumerate op should define all lazy properties not
 // yet reflected in obj.
