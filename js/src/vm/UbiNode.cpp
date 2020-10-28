@@ -64,7 +64,7 @@ struct Node::ConstructFunctor : public js::BoolDefaultAdaptor<Value, false> {
 
 Node::Node(JSGCTraceKind kind, void* ptr)
 {
-    js::gc::CallTyped(ConstructFunctor(), ptr, kind, this);
+    CallTyped(ConstructFunctor(), ptr, kind, this);
 }
 
 Node::Node(HandleValue value)
