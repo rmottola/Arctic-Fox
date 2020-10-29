@@ -1184,7 +1184,7 @@ js::CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto)
 }
 
 static bool
-GetScriptArrayObjectElements(JSContext* cx, HandleArrayObject obj, AutoValueVector &values)
+GetScriptArrayObjectElements(JSContext* cx, HandleArrayObject obj, AutoValueVector& values)
 {
     MOZ_ASSERT(!obj->isSingleton());
 
