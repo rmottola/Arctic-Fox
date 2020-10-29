@@ -146,6 +146,9 @@ IsObjectEscaped(MInstruction* ins, JSObject* objDefault = nullptr)
             JitSpewDef(JitSpew_Escape, "  is escaped by\n", def);
             return true;
 
+          case MDefinition::Op_PostWriteBarrier:
+            break;
+
           case MDefinition::Op_Slots: {
 #ifdef DEBUG
             // Assert that MSlots are only used by MStoreSlot and MLoadSlot.
@@ -253,6 +256,7 @@ class ObjectMemoryView : public MDefinitionVisitorDefaultNoop
     void visitObjectState(MObjectState* ins);
     void visitStoreFixedSlot(MStoreFixedSlot* ins);
     void visitLoadFixedSlot(MLoadFixedSlot* ins);
+    void visitPostWriteBarrier(MPostWriteBarrier* ins);
     void visitStoreSlot(MStoreSlot* ins);
     void visitLoadSlot(MLoadSlot* ins);
     void visitGuardShape(MGuardShape* ins);
@@ -454,6 +458,17 @@ ObjectMemoryView::visitLoadFixedSlot(MLoadFixedSlot* ins)
 
     // Replace load by the slot value.
     ins->replaceAllUsesWith(state_->getFixedSlot(ins->slot()));
+
+    // Remove original instruction.
+    ins->block()->discard(ins);
+}
+
+void
+ObjectMemoryView::visitPostWriteBarrier(MPostWriteBarrier* ins)
+{
+    // Skip loads made on other objects.
+    if (ins->object() != obj_)
+        return;
 
     // Remove original instruction.
     ins->block()->discard(ins);
