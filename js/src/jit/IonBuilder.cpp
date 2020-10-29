@@ -11216,6 +11216,7 @@ IonBuilder::jsop_setprop(PropertyName* name)
         return emitted;
 
     // Emit a polymorphic cache.
+    trackOptimizationAttempt(TrackedStrategy::SetProp_InlineCache);
     return setPropTryCache(&emitted, obj, name, value, barrier, objTypes);
 }
 
@@ -11733,6 +11734,7 @@ IonBuilder::setPropTryCache(bool* emitted, MDefinition* obj,
     if (!resumeAfter(ins))
         return false;
 
+    trackOptimizationSuccess();
     *emitted = true;
     return true;
 }
