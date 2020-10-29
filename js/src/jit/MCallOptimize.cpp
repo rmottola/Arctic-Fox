@@ -522,6 +522,11 @@ IonBuilder::inlineArray(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
+    if (templateObject->is<UnboxedArrayObject>()) {
+        if (templateObject->group()->unboxedLayout().nativeGroup())
+            return InliningStatus_NotInlined;
+    }
+
     // Multiple arguments imply array initialization, not just construction.
     if (callInfo.argc() >= 2) {
         initLength = callInfo.argc();
