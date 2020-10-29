@@ -907,7 +907,7 @@ class ParseNode
         AllowObjects
     };
 
-    bool getConstantValue(ExclusiveContext *cx, AllowConstantObjects allowObjects, MutableHandleValue vp,
+    bool getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObjects, MutableHandleValue vp,
                           NewObjectKind newKind = TenuredObject);
     inline bool isConstant();
 
