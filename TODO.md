@@ -137,6 +137,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
 - Bug 1094888 - part 1 and 2
+- Bug 1156598. Remove old, dead scroll layer item code. r=mstange
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
@@ -246,11 +247,3 @@ https://github.com/classilla/tenfourfox/issues/526
 * Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
 * Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
 * AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
-# Backlog of Mozilla patches:
-(grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
-
-- Bug 1533969 - Fix build error with newer glibc. (gettid)
-
-- Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
-- 1499861 - issues when backporting on other collections
-- 1477632 - Always inline PLDHashTable::SearchTable(
