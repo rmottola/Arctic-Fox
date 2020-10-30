@@ -1062,7 +1062,7 @@ void
 MLoadUnboxedScalar::printOpcode(GenericPrinter& out) const
 {
     MDefinition::printOpcode(out);
-    out.printf(" %s", ScalarTypeDescr::typeName(indexType()));
+    out.printf(" %s", ScalarTypeDescr::typeName(storageType()));
 }
 
 void
