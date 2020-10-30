@@ -935,6 +935,9 @@ AsmJSModule::detachHeap(JSContext* cx)
     MOZ_ASSERT_IF(active(), activation()->exitReason() == AsmJSExit::Reason_JitFFI ||
                             activation()->exitReason() == AsmJSExit::Reason_SlowFFI);
 
+    AutoFlushICache afc("AsmJSModule::detachHeap");
+    setAutoFlushICacheRange();
+
     restoreHeapToInitialState(maybeHeap_);
 
     MOZ_ASSERT(hasDetachedHeap());
@@ -1649,11 +1652,13 @@ AsmJSModule::clone(JSContext* cx, ScopedJSDeletePtr<AsmJSModule>* moduleOut) con
         }
     }
 
-    // We already know the exact extent of areas that need to be patched, just make sure we
-    // flush all of them at once.
+
+    // Delay flushing until dynamic linking.
+    AutoFlushICache afc("AsmJSModule::clone", /* inhibit = */ true);
     out.setAutoFlushICacheRange();
 
     out.restoreToInitialState(maybeHeap_, code_, cx);
+    out.staticallyLink(cx);
     return true;
 }
 
@@ -2254,10 +2259,8 @@ js::LookupAsmJSModuleInCache(ExclusiveContext* cx,
         return false;
 
     {
-        // No need to flush the instruction cache now, it will be flushed when
-        // dynamically linking. We already know the exact extent of areas that need
-        // to be patched, just make sure we flush all of them at once.
-        AutoFlushICache afc("LookupAsmJSModuleInCache", /* inhibit= */ true);
+        // Delay flushing until dynamic linking.
+        AutoFlushICache afc("LookupAsmJSModuleInCache", /* inhibit = */ true);
         module->setAutoFlushICacheRange();
 
         module->staticallyLink(cx);
