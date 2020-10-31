@@ -1228,12 +1228,8 @@ BrowserGlue.prototype = {
       if (!importBookmarks) {
         // Now apply distribution customized bookmarks.
         // This should always run after Places initialization.
-        try {
-          this._distributionCustomizer.applyBookmarks();
-          this.ensurePlacesDefaultQueriesInitialized();
-        } catch (e) {
-          Cu.reportError(e);
-        }
+        this._distributionCustomizer.applyBookmarks();
+        this.ensurePlacesDefaultQueriesInitialized();
       }
       else {
         // An import operation is about to run.
