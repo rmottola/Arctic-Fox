@@ -1746,8 +1746,10 @@ BrowserGlue.prototype = {
             get position() { return menuIndex++; },
             newInVersion: 1
           },
-          FirefoxTouch: {
-            title: bundle.GetStringFromName("firefoxTouchTitle"),
+	};
+
+        if (Services.metro && Services.metro.supported) {
+          smartBookmarks.Windows8Touch = {
             title: PlacesUtils.getString("windows8TouchTitle"),
             get uri() {
               let metroBookmarksRoot = PlacesUtils.annotations.getItemsWithAnnotation('metro/bookmarksRoot', {});
@@ -1766,8 +1768,8 @@ BrowserGlue.prototype = {
             parent: PlacesUtils.bookmarksMenuFolderId,
             get position() { return menuIndex++; },
             newInVersion: 7
-          },
-        };
+          };
+        }
 
         // Set current itemId, parent and position if Smart Bookmark exists,
         // we will use these informations to create the new version at the same
