@@ -1684,7 +1684,7 @@ BrowserGlue.prototype = {
     // be set to the version it has been added in, we will compare its value
     // to users' smartBookmarksVersion and add new smart bookmarks without
     // recreating old deleted ones.
-    const SMART_BOOKMARKS_VERSION = 5;
+    const SMART_BOOKMARKS_VERSION = 6;
     const SMART_BOOKMARKS_ANNO = "Places/SmartBookmark";
     const SMART_BOOKMARKS_PREF = "browser.places.smartBookmarksVersion";
 
@@ -1758,7 +1758,7 @@ BrowserGlue.prototype = {
                                 "&excludeQueries=1"),
             parent: PlacesUtils.bookmarksMenuFolderId,
             position: menuIndex++,
-            newInVersion: 5
+            newInVersion: 6
           },
         };
 
