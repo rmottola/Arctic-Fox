@@ -310,6 +310,11 @@ BrowserGlue.prototype = {
         else if (data == "force-places-init") {
           this._initPlaces(false);
         }
+        else if (data == "smart-bookmarks-init") {
+          this.ensurePlacesDefaultQueriesInitialized().then(() => {
+            Services.obs.notifyObservers(null, "test-smart-bookmarks-done", null);
+          });
+        }
         break;
       case "initial-migration-will-import-default-bookmarks":
         this._migrationImportsDefaultBookmarks = true;
@@ -1229,7 +1234,7 @@ BrowserGlue.prototype = {
         // Now apply distribution customized bookmarks.
         // This should always run after Places initialization.
         this._distributionCustomizer.applyBookmarks();
-        this.ensurePlacesDefaultQueriesInitialized();
+        yield this.ensurePlacesDefaultQueriesInitialized();
       }
       else {
         // An import operation is about to run.
@@ -1268,7 +1273,7 @@ BrowserGlue.prototype = {
             this._distributionCustomizer.applyBookmarks();
             // Ensure that smart bookmarks are created once the operation is
             // complete.
-            this.ensurePlacesDefaultQueriesInitialized();
+            yield this.ensurePlacesDefaultQueriesInitialized();
           } catch (e) {
             Cu.reportError(e);
           }
@@ -1672,8 +1677,7 @@ BrowserGlue.prototype = {
     this._sanitizer.sanitize(aParentWindow);
   },
 
-  ensurePlacesDefaultQueriesInitialized:
-  function BG_ensurePlacesDefaultQueriesInitialized() {
+  ensurePlacesDefaultQueriesInitialized: Task.async(function* () {
     // This is actual version of the smart bookmarks, must be increased every
     // time smart bookmarks change.
     // When adding a new smart bookmark below, its newInVersion property must
@@ -1819,7 +1823,7 @@ BrowserGlue.prototype = {
       Services.prefs.setIntPref(SMART_BOOKMARKS_PREF, SMART_BOOKMARKS_VERSION);
       Services.prefs.savePrefFile(null);
     }
-  },
+  }),
 
   // this returns the most recent non-popup browser window
   getMostRecentBrowserWindow: function BG_getMostRecentBrowserWindow() {
