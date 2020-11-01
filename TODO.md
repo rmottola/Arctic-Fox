@@ -133,10 +133,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
-- Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
-- Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
-- Bug 1094888 - part 1 and 2
 - Bug 1156598. Remove old, dead scroll layer item code. r=mstange
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
