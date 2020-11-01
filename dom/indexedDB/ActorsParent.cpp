@@ -2715,7 +2715,8 @@ InsertIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
   }
 
   // Update the array with the new addition.
-  if (NS_WARN_IF(!indexValues.SetCapacity(indexValues.Length() + 1))) {
+  if (NS_WARN_IF(!indexValues.SetCapacity(indexValues.Length() + 1,
+                                          fallible))) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -8029,14 +8030,15 @@ ConvertBlobsToActors(PBackgroundParent* aBackgroundActor,
 
   const uint32_t count = aFiles.Length();
 
-  if (NS_WARN_IF(!aActors.SetCapacity(count))) {
+  if (NS_WARN_IF(!aActors.SetCapacity(count, fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
   const bool collectFileInfos =
     !BackgroundParent::IsOtherProcessActor(aBackgroundActor);
 
-  if (collectFileInfos && NS_WARN_IF(!aFileInfos.SetCapacity(count))) {
+  if (collectFileInfos &&
+      NS_WARN_IF(!aFileInfos.SetCapacity(count, fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -11294,7 +11296,7 @@ Database::Invalidate()
       }
 
       FallibleTArray<nsRefPtr<TransactionBase>> transactions;
-      if (NS_WARN_IF(!transactions.SetCapacity(count))) {
+      if (NS_WARN_IF(!transactions.SetCapacity(count, fallible))) {
         return false;
       }
 
@@ -11646,7 +11648,7 @@ Database::AllocPBackgroundIDBTransactionParent(
   }
 
   FallibleTArray<nsRefPtr<FullObjectStoreMetadata>> fallibleObjectStores;
-  if (NS_WARN_IF(!fallibleObjectStores.SetCapacity(nameCount))) {
+  if (NS_WARN_IF(!fallibleObjectStores.SetCapacity(nameCount, fallible))) {
     return nullptr;
   }
 
@@ -15627,7 +15629,7 @@ DatabaseOperationBase::IndexDataValuesFromUpdateInfos(
     return NS_OK;
   }
 
-  if (NS_WARN_IF(!aIndexValues.SetCapacity(count))) {
+  if (NS_WARN_IF(!aIndexValues.SetCapacity(count, fallible))) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -20046,7 +20048,7 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
   const uint32_t updateInfoCount = updateInfos.Length();
 
   if (NS_WARN_IF(!indexValues.SetCapacity(indexValues.Length() +
-                                          updateInfoCount))) {
+                                          updateInfoCount, fallible))) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -20801,7 +20803,7 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
   if (!files.IsEmpty()) {
     const uint32_t count = files.Length();
 
-    if (NS_WARN_IF(!mStoredFileInfos.SetCapacity(count))) {
+    if (NS_WARN_IF(!mStoredFileInfos.SetCapacity(count, fallible))) {
       return false;
     }
 
