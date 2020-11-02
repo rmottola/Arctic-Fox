@@ -131,6 +131,10 @@ public:
                            mozilla::WidgetGUIEvent* aEvent,
                            nsEventStatus* aEventStatus) override;
 
+  // Return the ratio the scrollbar thumb should move in proportion to the
+  // scrolled frame.
+  float GetThumbRatio() const;
+
 private:
 
   bool GetScrollToClick();
