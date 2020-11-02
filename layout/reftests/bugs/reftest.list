@@ -1872,3 +1872,4 @@ fuzzy-if(d2d,36,304) HTTP(..) == 1116480-1-fakeitalic-overflow.html 1116480-1-fa
 == 1128354-1.html 1128354-1-ref.html
 == 1130231-1-button-padding-rtl.html 1130231-1-button-padding-rtl-ref.html
 == 1130231-2-button-padding-rtl.html 1130231-2-button-padding-rtl-ref.html
+== 1151306-1.html 1151306-1-ref.html
