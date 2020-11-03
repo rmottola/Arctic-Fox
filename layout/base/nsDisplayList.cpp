@@ -805,6 +805,11 @@ nsDisplayScrollLayer::ComputeFrameMetrics(nsIFrame* aForFrame,
       LayoutDeviceIntSize::FromAppUnitsRounded(lineScrollAmount, presContext->AppUnitsPerDevPixel());
     metrics.SetLineScrollAmount(lineScrollAmountInDevPixels);
 
+    nsSize pageScrollAmount = scrollableFrame->GetPageScrollAmount();
+    LayoutDeviceIntSize pageScrollAmountInDevPixels =
+      LayoutDeviceIntSize::FromAppUnitsRounded(pageScrollAmount, presContext->AppUnitsPerDevPixel());
+    metrics.SetPageScrollAmount(pageScrollAmountInDevPixels);
+
     if (!aScrollFrame->GetParent() ||
         EventStateManager::CanVerticallyScrollFrameWithWheel(aScrollFrame->GetParent()))
     {
