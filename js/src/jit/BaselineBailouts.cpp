@@ -1631,7 +1631,20 @@ HandleShapeGuardFailure(JSContext* cx, HandleScript outerScript, HandleScript in
 }
 
 static bool
-HandleLexicalCheckFailure(JSContext *cx, HandleScript outerScript, HandleScript innerScript)
+HandleBaselineInfoBailout(JSContext* cx, JSScript* outerScript, JSScript* innerScript)
+{
+    JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
+            innerScript->filename(), innerScript->lineno(),
+            outerScript->filename(), outerScript->lineno());
+
+    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
+
+    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to invalid baseline info");
+    return Invalidate(cx, outerScript);
+}
+
+static bool
+HandleLexicalCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Lexical check failure %s:%d, inlined into %s:%d",
             innerScript->filename(), innerScript->lineno(),
@@ -1650,19 +1663,6 @@ HandleLexicalCheckFailure(JSContext *cx, HandleScript outerScript, HandleScript 
         return false;
 
     return true;
-}
-
-static bool
-HandleBaselineInfoBailout(JSContext* cx, JSScript* outerScript, JSScript* innerScript)
-{
-    JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
-            innerScript->filename(), innerScript->lineno(),
-            outerScript->filename(), outerScript->lineno());
-
-    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
-
-    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to invalid baseline info");
-    return Invalidate(cx, outerScript);
 }
 
 static bool
