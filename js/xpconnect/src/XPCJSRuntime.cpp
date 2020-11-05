@@ -1351,6 +1351,7 @@ XPCJSRuntime::EnvironmentPreparer::invoke(HandleObject scope, js::ScriptEnvironm
     nsIGlobalObject* global = NativeGlobal(scope);
     NS_ENSURE_TRUE(global && global->GetGlobalJSObject(), false);
     AutoEntryScript aes(global, "JS-engine-initiated execution");
+    aes.TakeOwnershipOfErrorReporting();
     return closure(aes.cx());
 }
 
