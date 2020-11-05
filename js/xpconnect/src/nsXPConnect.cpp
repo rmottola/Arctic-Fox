@@ -974,7 +974,7 @@ nsXPConnect::OnProcessNextEvent(nsIThreadInternal* aThread, bool aMayWait,
 
     // Push a null JSContext so that we don't see any script during
     // event processing.
-    bool ok = PushJSContextNoScriptContext(nullptr);
+    bool ok = PushNullJSContext();
     NS_ENSURE_TRUE(ok, NS_ERROR_FAILURE);
     return NS_OK;
 }
@@ -1000,7 +1000,7 @@ nsXPConnect::AfterProcessNextEvent(nsIThreadInternal* aThread,
 
     Promise::PerformMicroTaskCheckpoint();
 
-    PopJSContextNoScriptContext();
+    PopNullJSContext();
 
     return NS_OK;
 }
@@ -1080,15 +1080,15 @@ nsXPConnect::GetSafeJSContext()
 namespace xpc {
 
 bool
-PushJSContextNoScriptContext(JSContext* aCx)
+PushNullJSContext()
 {
-    MOZ_ASSERT_IF(aCx, !GetScriptContextFromJSContext(aCx));
-    return XPCJSRuntime::Get()->GetJSContextStack()->Push(aCx);
+    return XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
 }
 
 void
-PopJSContextNoScriptContext()
+PopNullJSContext()
 {
+    MOZ_ASSERT(XPCJSRuntime::Get()->GetJSContextStack()->Peek() == nullptr);
     XPCJSRuntime::Get()->GetJSContextStack()->Pop();
 }
 
