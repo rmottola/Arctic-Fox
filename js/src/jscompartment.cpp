@@ -479,7 +479,7 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
  * and when compacting to update cross-compartment pointers.
  */
 void
-JSCompartment::markCrossCompartmentWrappers(JSTracer *trc)
+JSCompartment::markCrossCompartmentWrappers(JSTracer* trc)
 {
     MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->isHeapCompacting());
 
