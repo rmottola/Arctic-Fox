@@ -27,6 +27,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/Services.h"
+#include "mozilla/dom/ScriptSettings.h"
 
 #include "nsContentUtils.h"
 #include "nsCCUncollectableMarker.h"
@@ -55,6 +56,7 @@ using namespace mozilla;
 using namespace xpc;
 using namespace JS;
 using mozilla::dom::PerThreadAtomCache;
+using mozilla::dom::AutoEntryScript;
 
 /***************************************************************************/
 
@@ -1342,11 +1344,14 @@ xpc::SimulateActivityCallback(bool aActive)
 }
 
 // static
-JSContext*
-XPCJSRuntime::DefaultJSContextCallback(JSRuntime* rt)
+bool
+XPCJSRuntime::EnvironmentPreparer::invoke(HandleObject scope, js::ScriptEnvironmentPreparer::Closure& closure)
 {
-    MOZ_ASSERT(rt == Get()->Runtime());
-    return Get()->GetJSContextStack()->GetSafeJSContext();
+    MOZ_ASSERT(NS_IsMainThread());
+    nsIGlobalObject* global = NativeGlobal(scope);
+    NS_ENSURE_TRUE(global && global->GetGlobalJSObject(), false);
+    AutoEntryScript aes(global, "JS-engine-initiated execution");
+    return closure(aes.cx());
 }
 
 // static
@@ -1359,22 +1364,6 @@ XPCJSRuntime::ActivityCallback(void* arg, bool active)
 
     XPCJSRuntime* self = static_cast<XPCJSRuntime*>(arg);
     self->mWatchdogManager->RecordRuntimeActivity(active);
-}
-
-// static
-//
-// JS-CTypes creates and caches a JSContext that it uses when executing JS
-// callbacks. When we're notified that ctypes is about to call into some JS,
-// push the cx to maintain the integrity of the context stack.
-void
-XPCJSRuntime::CTypesActivityCallback(JSContext* cx, js::CTypesActivityType type)
-{
-  if (type == js::CTYPES_CALLBACK_BEGIN) {
-    if (!xpc::PushJSContextNoScriptContext(cx))
-      MOZ_CRASH();
-  } else if (type == js::CTYPES_CALLBACK_END) {
-    xpc::PopJSContextNoScriptContext();
-  }
 }
 
 // static
@@ -3475,9 +3464,8 @@ XPCJSRuntime::XPCJSRuntime(nsXPConnect* aXPConnect)
         stack->sampleRuntime(runtime);
 #endif
     JS_SetAccumulateTelemetryCallback(runtime, AccumulateTelemetryCallback);
-    js::SetDefaultJSContextCallback(runtime, DefaultJSContextCallback);
+    js::SetScriptEnvironmentPreparer(runtime, &mEnvironmentPreparer);
     js::SetActivityCallback(runtime, ActivityCallback, this);
-    js::SetCTypesActivityCallback(runtime, CTypesActivityCallback);
     JS_SetInterruptCallback(runtime, InterruptCallback);
 
     // The JS engine needs to keep the source code around in order to implement
