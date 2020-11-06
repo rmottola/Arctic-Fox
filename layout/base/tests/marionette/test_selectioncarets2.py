@@ -5,7 +5,7 @@
 
 from marionette_driver.by import By
 from marionette_driver.marionette import Actions
-from marionette import MarionetteTestCase
+from marionette_test import MarionetteTestCase
 from marionette_driver.selection import SelectionManager
 from marionette_driver.gestures import long_press_without_contextmenu
 
@@ -71,7 +71,7 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         '''Testing long press on non selectable field.
         We should not select anything when long press on non selectable fields.'''
 
-        self.openTestHtml(enabled=True)
+        self.open_test_html()
         halfY = self._nonsel1.size['height'] / 2
         long_press_without_contextmenu(self.marionette, self._nonsel1, self._long_press_time, 0, halfY)
         sel = SelectionManager(self._nonsel1)
@@ -82,7 +82,7 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         '''Testing drag caret over non selectable field.
         So that the selected content should exclude non selectable field and
         end selection caret should appear in last range's position.'''
-        self.openTestHtml(enabled=True)
+        self.open_test_html()
 
         # Select target element and get target caret location
         self._long_press_to_select_word(self._sel4, 3)
@@ -110,7 +110,7 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         '''Bug 1094056
         Test caret visibility when caret is dragged to beginning of a line
         '''
-        self.openTestHtml(enabled=True)
+        self.open_test_html()
 
         # Select the first word in the second line
         self._long_press_to_select_word(self._sel2, 0)
