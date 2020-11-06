@@ -380,7 +380,7 @@ MarkupView.prototype = {
       }).then(null, e => {
         if (!this._destroyer) {
           console.error(e);
-        } else {
+        } else {
           console.warn("Could not mark node as selected, the markup-view was " +
             "destroyed while showing the node.");
         }
