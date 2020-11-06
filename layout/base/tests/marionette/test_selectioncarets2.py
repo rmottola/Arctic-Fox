@@ -5,12 +5,26 @@
 
 from marionette_driver.by import By
 from marionette_driver.marionette import Actions
-from marionette_test import MarionetteTestCase
+from marionette import MarionetteTestCase, SkipTest
 from marionette_driver.selection import SelectionManager
 from marionette_driver.gestures import long_press_without_contextmenu
 
 
-class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
+def skip_if_not_rotatable(target):
+    def wrapper(self, *args, **kwargs):
+        if not self.marionette.session_capabilities.get('rotatable'):
+            raise SkipTest('skipping due to device not rotatable')
+        return target(self, *args, **kwargs)
+    return wrapper
+
+
+class CommonCaretsTestCase2(object):
+    '''Common test cases for a selection with a two carets.
+
+    To run these test cases, a subclass must inherit from both this class and
+    MarionetteTestCase.
+
+    '''
     _long_press_time = 1        # 1 second
 
     def setUp(self):
@@ -18,15 +32,36 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         MarionetteTestCase.setUp(self)
         self.actions = Actions(self.marionette)
 
-    def openTestHtml(self, enabled=True):
-        # Open html for testing and enable selectioncaret and
-        # non-editable support
-        self.marionette.execute_script(
-            'SpecialPowers.setBoolPref("selectioncaret.enabled", %s);' %
-            ('true' if enabled else 'false'))
-        self.marionette.execute_script(
-            'SpecialPowers.setBoolPref("selectioncaret.noneditable", %s);' %
-            ('true' if enabled else 'false'))
+        # The carets to be tested.
+        self.carets_tested_pref = None
+
+        # The carets to be disabled in this test suite.
+        self.carets_disabled_pref = None
+
+    def set_pref(self, pref_name, value):
+        '''Set a preference to value.
+
+        For example:
+        >>> set_pref('layout.accessiblecaret.enabled', True)
+
+        '''
+        pref_name = repr(pref_name)
+        if isinstance(value, bool):
+            value = 'true' if value else 'false'
+        elif isinstance(value, int):
+            value = str(value)
+        else:
+            value = repr(value)
+
+        script = '''SpecialPowers.pushPrefEnv({"set": [[%s, %s]]}, marionetteScriptFinished);''' % (
+            pref_name, value)
+
+        self.marionette.execute_async_script(script)
+
+    def open_test_html(self, enabled=True):
+        'Open html for testing and enable selectioncaret and non-editable support'
+        self.set_pref(self.carets_tested_pref, enabled)
+        self.set_pref(self.carets_disabled_pref, False)
 
         test_html = self.marionette.absolute_url('test_selectioncarets_multiplerange.html')
         self.marionette.navigate(test_html)
@@ -38,6 +73,27 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         self._sel4 = self.marionette.find_element(By.ID, 'sel4')
         self._sel6 = self.marionette.find_element(By.ID, 'sel6')
         self._nonsel1 = self.marionette.find_element(By.ID, 'nonsel1')
+
+    def open_test_html_long_text(self, enabled=True):
+        'Open html for testing and enable selectioncaret'
+        self.set_pref(self.carets_tested_pref, enabled)
+        self.set_pref(self.carets_disabled_pref, False)
+
+        test_html = self.marionette.absolute_url('test_selectioncarets_longtext.html')
+        self.marionette.navigate(test_html)
+
+        self._body = self.marionette.find_element(By.ID, 'bd')
+        self._longtext = self.marionette.find_element(By.ID, 'longtext')
+
+    def open_test_html_iframe(self, enabled=True):
+        'Open html for testing and enable selectioncaret'
+        self.set_pref(self.carets_tested_pref, enabled)
+        self.set_pref(self.carets_disabled_pref, False)
+
+        test_html = self.marionette.absolute_url('test_selectioncarets_iframe.html')
+        self.marionette.navigate(test_html)
+
+        self._iframe = self.marionette.find_element(By.ID, 'frame')
 
     def _long_press_to_select_word(self, el, wordOrdinal):
         sel = SelectionManager(el)
@@ -106,6 +162,12 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()),
             'this 3\nuser can select this 4\nuser can select this 5\nuser')
 
+        # Drag first caret to target location
+        (caret1_x, caret1_y), (caret2_x, caret2_y) = sel.selection_carets_location()
+        self.actions.flick(self._body, caret1_x, caret1_y, end_caret_x, end_caret_y, 1).perform()
+        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()),
+            '4\nuser can select this 5\nuser')
+
     def test_drag_caret_to_beginning_of_a_line(self):
         '''Bug 1094056
         Test caret visibility when caret is dragged to beginning of a line
@@ -128,3 +190,64 @@ class SelectionCaretsMultipleRangeTest(MarionetteTestCase):
         self.actions.flick(self._body, start_caret_x, start_caret_y, caret2_x, caret2_y).perform()
 
         self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()), 'select')
+
+    @skip_if_not_rotatable
+    def test_caret_position_after_changing_orientation_of_device(self):
+        '''Bug 1094072
+        If positions of carets are updated correctly, they should be draggable.
+        '''
+        self.open_test_html_long_text()
+
+        # Select word in portrait mode, then change to landscape mode
+        self.marionette.set_orientation('portrait')
+        self._long_press_to_select_word(self._longtext, 12)
+        sel = SelectionManager(self._body)
+        (p_start_caret_x, p_start_caret_y), (p_end_caret_x, p_end_caret_y) = sel.selection_carets_location()
+        self.marionette.set_orientation('landscape')
+        (l_start_caret_x, l_start_caret_y), (l_end_caret_x, l_end_caret_y) = sel.selection_carets_location()
+
+        # Drag end caret to the start caret to change the selected content
+        self.actions.flick(self._body, l_end_caret_x, l_end_caret_y, l_start_caret_x, l_start_caret_y).perform()
+
+        # Change orientation back to portrait mode to prevent affecting
+        # other tests
+        self.marionette.set_orientation('portrait')
+
+        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()), 'o')
+
+    def test_select_word_inside_an_iframe(self):
+        '''Bug 1088552
+        The scroll offset in iframe should be taken into consideration properly.
+        In this test, we scroll content in the iframe to the bottom to cause a
+        huge offset. If we use the right coordinate system, selection should
+        work. Otherwise, it would be hard to trigger select word.
+        '''
+        self.open_test_html_iframe()
+
+        # switch to inner iframe and scroll to the bottom
+        self.marionette.switch_to_frame(self._iframe)
+        self.marionette.execute_script(
+         'document.getElementById("bd").scrollTop += 999')
+
+        # long press to select bottom text
+        self._body = self.marionette.find_element(By.ID, 'bd')
+        sel = SelectionManager(self._body)
+        self._bottomtext = self.marionette.find_element(By.ID, 'bottomtext')
+        long_press_without_contextmenu(self.marionette, self._bottomtext, self._long_press_time)
+
+        self.assertNotEqual(self._to_unix_line_ending(sel.selected_content.strip()), '')
+
+
+class SelectionCaretsTestCase2(CommonCaretsTestCase2, MarionetteTestCase):
+    def setUp(self):
+        super(SelectionCaretsTestCase2, self).setUp()
+        self.carets_tested_pref = 'selectioncaret.enabled'
+        self.carets_disabled_pref = 'layout.accessiblecaret.enabled'
+
+
+class AccessibleCaretSelectionModeTestCase2(CommonCaretsTestCase2, MarionetteTestCase):
+    def setUp(self):
+        super(AccessibleCaretSelectionModeTestCase2, self).setUp()
+        self.carets_tested_pref = 'layout.accessiblecaret.enabled'
+        self.carets_disabled_pref = 'selectioncaret.enabled'
+
