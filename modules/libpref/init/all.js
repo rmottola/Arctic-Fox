@@ -4849,6 +4849,13 @@ pref("selectioncaret.enabled", false);
 // user click on selection caret or not. In app units.
 pref("selectioncaret.inflatesize.threshold", 40);
 
+// New implementation to unify touch-caret and selection-carets.
+pref("layout.accessiblecaret.enabled", false);
+
+// Timeout in milliseconds to hide the accessiblecaret under cursor mode while
+// no one touches it. Set the value to 0 to disable this feature.
+pref("layout.accessiblecaret.timeout_ms", 3000);
+
 // Wakelock is disabled by default.
 pref("dom.wakelock.enabled", false);
 

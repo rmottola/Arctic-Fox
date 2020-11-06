@@ -78,6 +78,7 @@
 #include "nsIPermissionManager.h"
 #include "nsIMozBrowserFrame.h"
 #include "nsCaret.h"
+#include "AccessibleCaretEventHub.h"
 #include "TouchCaret.h"
 #include "SelectionCarets.h"
 #include "nsIDOMHTMLDocument.h"
@@ -708,6 +709,7 @@ static uint32_t sNextPresShellId;
 static bool sPointerEventEnabled = true;
 static bool sTouchCaretEnabled = false;
 static bool sSelectionCaretEnabled = false;
+static bool sAccessibleCaretEnabled = false;
 static bool sBeforeAfterKeyboardEventEnabled = false;
 
 /* static */ bool
@@ -730,6 +732,17 @@ PresShell::SelectionCaretPrefEnabled()
     initialized = true;
   }
   return sSelectionCaretEnabled;
+}
+
+/* static */ bool
+PresShell::AccessibleCaretEnabled()
+{
+  static bool initialized = false;
+  if (!initialized) {
+    Preferences::AddBoolVarCache(&sAccessibleCaretEnabled, "layout.accessiblecaret.enabled");
+    initialized = true;
+  }
+  return sAccessibleCaretEnabled;
 }
 
 /* static */ bool
@@ -892,17 +905,21 @@ PresShell::Init(nsIDocument* aDocument,
   // before creating any frames.
   SetPreferenceStyleRules(false);
 
-  if (TouchCaretPrefEnabled()) {
+  if (TouchCaretPrefEnabled() && !AccessibleCaretEnabled()) {
     // Create touch caret handle
     mTouchCaret = new TouchCaret(this);
   }
 
-  if (SelectionCaretPrefEnabled()) {
+  if (SelectionCaretPrefEnabled() && !AccessibleCaretEnabled()) {
     // Create selection caret handle
     mSelectionCarets = new SelectionCarets(this);
     mSelectionCarets->Init();
   }
 
+  if (AccessibleCaretEnabled()) {
+    // Need to happen before nsFrameSelection has been set up.
+    mAccessibleCaretEventHub = new AccessibleCaretEventHub();
+  }
 
   NS_ADDREF(mSelection = new nsFrameSelection());
 
@@ -1170,6 +1187,11 @@ PresShell::Destroy()
   if (mSelectionCarets) {
     mSelectionCarets->Terminate();
     mSelectionCarets = nullptr;
+  }
+
+  if (mAccessibleCaretEventHub) {
+    mAccessibleCaretEventHub->Terminate();
+    mAccessibleCaretEventHub = nullptr;
   }
 
   // release our pref style sheet, if we have one still
@@ -1916,6 +1938,11 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
       mFrameConstructor->EndUpdate();
     }
 
+    // Initialize after nsCanvasFrame is created.
+    if (mAccessibleCaretEventHub) {
+      mAccessibleCaretEventHub->Init(this);
+    }
+
     // nsAutoScriptBlocker going out of scope may have killed us too
     NS_ENSURE_STATE(!mHaveShutDown);
 
@@ -2221,6 +2248,12 @@ already_AddRefed<SelectionCarets> PresShell::GetSelectionCarets() const
 {
   nsRefPtr<SelectionCarets> selectionCaret = mSelectionCarets;
   return selectionCaret.forget();
+}
+
+already_AddRefed<AccessibleCaretEventHub> PresShell::GetAccessibleCaretEventHub() const
+{
+  nsRefPtr<AccessibleCaretEventHub> eventHub = mAccessibleCaretEventHub;
+  return eventHub.forget();
 }
 
 void PresShell::SetCaret(nsCaret *aNewCaret)
@@ -7260,6 +7293,28 @@ PresShell::HandleEvent(nsIFrame* aFrame,
       if (*aEventStatus == nsEventStatus_eConsumeNoDefault) {
         // If the event is consumed by the selection carets, cancel APZC panning by
         // setting mMultipleActionsPrevented.
+        aEvent->mFlags.mMultipleActionsPrevented = true;
+        return NS_OK;
+      }
+    }
+  }
+
+  if (AccessibleCaretEnabled()) {
+    // We have to target the focus window because regardless of where the
+    // touch goes, we want to access the copy paste manager.
+    nsCOMPtr<nsPIDOMWindow> window = GetFocusedDOMWindowInOurWindow();
+    nsCOMPtr<nsIDocument> retargetEventDoc =
+      window ? window->GetExtantDoc() : nullptr;
+    nsCOMPtr<nsIPresShell> presShell =
+      retargetEventDoc ? retargetEventDoc->GetShell() : nullptr;
+
+    nsRefPtr<AccessibleCaretEventHub> eventHub =
+      presShell ? presShell->GetAccessibleCaretEventHub() : nullptr;
+    if (eventHub) {
+      *aEventStatus = eventHub->HandleEvent(aEvent);
+      if (*aEventStatus == nsEventStatus_eConsumeNoDefault) {
+        // If the event is consumed, cancel APZC panning by setting
+        // mMultipleActionsPrevented.
         aEvent->mFlags.mMultipleActionsPrevented = true;
         return NS_OK;
       }
