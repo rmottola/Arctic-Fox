@@ -11,7 +11,7 @@
 #include "nsCoord.h"
 #include "nsIFrame.h"
 #include "nsISelectionListener.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 #include "nsWeakReference.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/UniquePtr.h"
