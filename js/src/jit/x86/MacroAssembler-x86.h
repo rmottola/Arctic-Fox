@@ -242,7 +242,7 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         push(tagOf(addr));
         push(payloadOf(addr));
     }
-    void storePayload(const Value &val, Operand dest) {
+    void storePayload(const Value& val, Operand dest) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         if (val.isMarkable())
             movl(ImmGCPtr((gc::Cell*)jv.s.payload.ptr), ToPayload(dest));
