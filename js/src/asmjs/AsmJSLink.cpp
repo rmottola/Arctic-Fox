@@ -598,6 +598,9 @@ DynamicallyLinkModule(JSContext* cx, const CallArgs& args, AsmJSModule& module)
 
     module.initGlobalNaN();
 
+    // See the comment in AllocateExecutableMemory.
+    ExecutableAllocator::makeExecutable(module.codeBase(), module.codeBytes());
+
     return true;
 }
 
