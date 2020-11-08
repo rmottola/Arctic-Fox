@@ -194,6 +194,9 @@ bool
 CurrentThreadIsIonCompiling();
 
 bool
+CurrentThreadIsIonCompilingSafeForMinorGC();
+
+bool
 CurrentThreadIsGCSweeping();
 
 bool

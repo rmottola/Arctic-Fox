@@ -625,17 +625,20 @@ MDefinition::emptyResultTypeSet() const
 }
 
 MConstant*
-MConstant::New(TempAllocator& alloc, const Value& v, CompilerConstraintList* constraints)
+MConstant::New(TempAllocator& alloc, const Value& v,
+               CompilerConstraintList* constraints, MIRGenerator* gen)
 {
-    return new(alloc) MConstant(v, constraints);
+    return new(alloc) MConstant(v, constraints, gen);
 }
 
 MConstant*
-MConstant::NewTypedValue(TempAllocator& alloc, const Value& v, MIRType type, CompilerConstraintList* constraints)
+MConstant::NewTypedValue(TempAllocator& alloc, const Value& v, MIRType type,
+                         CompilerConstraintList* constraints, MIRGenerator* gen)
 {
     MOZ_ASSERT(!IsSimdType(type));
-    MOZ_ASSERT_IF(type == MIRType_Float32, IsNaN(v.toDouble()) || v.toDouble() == double(float(v.toDouble())));
-    MConstant* constant = new(alloc) MConstant(v, constraints);
+    MOZ_ASSERT_IF(type == MIRType_Float32,
+                  IsNaN(v.toDouble()) || v.toDouble() == double(float(v.toDouble())));
+    MConstant* constant = new(alloc) MConstant(v, constraints, gen);
     constant->setResultType(type);
     return constant;
 }
@@ -649,9 +652,9 @@ MConstant::NewAsmJS(TempAllocator& alloc, const Value& v, MIRType type)
 }
 
 MConstant*
-MConstant::NewConstraintlessObject(TempAllocator& alloc, JSObject* v)
+MConstant::NewConstraintlessObject(TempAllocator& alloc, JSObject* v, MIRGenerator* gen)
 {
-    return new(alloc) MConstant(v);
+    return new(alloc) MConstant(v, gen);
 }
 
 static TemporaryTypeSet*
@@ -707,14 +710,15 @@ jit::IonCompilationCanUseNurseryPointers()
 
 #endif // DEBUG
 
-MConstant::MConstant(const js::Value& vp, CompilerConstraintList* constraints)
+MConstant::MConstant(const js::Value& vp, CompilerConstraintList* constraints, MIRGenerator* gen)
   : value_(vp)
 {
     setResultType(MIRTypeFromValue(vp));
     if (vp.isObject()) {
         // Create a singleton type set for the object. This isn't necessary for
         // other types as the result type encodes all needed information.
-        MOZ_ASSERT(!IsInsideNursery(&vp.toObject()));
+        MOZ_ASSERT(gen);
+        MOZ_ASSERT_IF(IsInsideNursery(&vp.toObject()), !gen->safeForMinorGC());
         setResultTypeSet(MakeSingletonTypeSet(constraints, &vp.toObject()));
     }
     if (vp.isMagic() && vp.whyMagic() == JS_UNINITIALIZED_LEXICAL) {
@@ -733,10 +737,11 @@ MConstant::MConstant(const js::Value& vp, CompilerConstraintList* constraints)
     setMovable();
 }
 
-MConstant::MConstant(JSObject* obj)
+MConstant::MConstant(JSObject* obj, MIRGenerator* gen)
   : value_(ObjectValue(*obj))
 {
-    MOZ_ASSERT(!IsInsideNursery(obj));
+    MOZ_ASSERT(gen);
+    MOZ_ASSERT_IF(IsInsideNursery(obj), !gen->safeForMinorGC());
     setResultType(MIRType_Object);
     setMovable();
 }
@@ -844,39 +849,6 @@ MConstant::canProduceFloat32() const
     if (type() == MIRType_Double)
         return IsFloat32Representable(value_.toDouble());
     return true;
-}
-
-MNurseryObject::MNurseryObject(JSObject* obj, uint32_t index, CompilerConstraintList* constraints)
-  : index_(index)
-{
-    setResultType(MIRType_Object);
-
-    MOZ_ASSERT(IsInsideNursery(obj));
-    MOZ_ASSERT(!obj->isSingleton());
-    setResultTypeSet(MakeSingletonTypeSet(constraints, obj));
-
-    setMovable();
-}
-
-MNurseryObject*
-MNurseryObject::New(TempAllocator& alloc, JSObject* obj, uint32_t index,
-                    CompilerConstraintList* constraints)
-{
-    return new(alloc) MNurseryObject(obj, index, constraints);
-}
-
-HashNumber
-MNurseryObject::valueHash() const
-{
-    return HashNumber(index_);
-}
-
-bool
-MNurseryObject::congruentTo(const MDefinition* ins) const
-{
-    if (!ins->isNurseryObject())
-        return false;
-    return ins->toNurseryObject()->index_ == index_;
 }
 
 MDefinition*
@@ -5002,7 +4974,8 @@ jit::PropertyReadNeedsTypeBarrier(JSContext* propertycx,
 }
 
 BarrierKind
-jit::PropertyReadOnPrototypeNeedsTypeBarrier(CompilerConstraintList* constraints,
+jit::PropertyReadOnPrototypeNeedsTypeBarrier(IonBuilder* builder,
+                                             CompilerConstraintList* constraints,
                                              MDefinition* obj, PropertyName* name,
                                              TemporaryTypeSet* observed)
 {
@@ -5024,7 +4997,8 @@ jit::PropertyReadOnPrototypeNeedsTypeBarrier(CompilerConstraintList* constraints
                 return BarrierKind::TypeSet;
             if (!key->proto().isObject())
                 break;
-            key = TypeSet::ObjectKey::get(key->proto().toObject());
+            JSObject* proto = builder->checkNurseryObject(key->proto().toObject());
+            key = TypeSet::ObjectKey::get(proto);
             BarrierKind kind = PropertyReadNeedsTypeBarrier(constraints, key, name, observed);
             if (kind == BarrierKind::TypeSet)
                 return BarrierKind::TypeSet;
@@ -5216,18 +5190,18 @@ TryAddTypeBarrierForWrite(TempAllocator& alloc, CompilerConstraintList* constrai
 }
 
 static MInstruction*
-AddGroupGuard(TempAllocator& alloc, MBasicBlock* current, MDefinition* obj,
+AddGroupGuard(MIRGenerator* gen, MBasicBlock* current, MDefinition* obj,
               TypeSet::ObjectKey* key, bool bailOnEquality)
 {
     MInstruction* guard;
 
     if (key->isGroup()) {
-        guard = MGuardObjectGroup::New(alloc, obj, key->group(), bailOnEquality,
+        guard = MGuardObjectGroup::New(gen->alloc(), obj, key->group(), bailOnEquality,
                                        Bailout_ObjectIdentityOrTypeGuard);
     } else {
-        MConstant* singletonConst = MConstant::NewConstraintlessObject(alloc, key->singleton());
+        MConstant* singletonConst = MConstant::NewConstraintlessObject(gen->alloc(), key->singleton(), gen);
         current->add(singletonConst);
-        guard = MGuardObjectIdentity::New(alloc, obj, singletonConst, bailOnEquality);
+        guard = MGuardObjectIdentity::New(gen->alloc(), obj, singletonConst, bailOnEquality);
     }
 
     current->add(guard);
@@ -5250,7 +5224,7 @@ jit::CanWriteProperty(TempAllocator& alloc, CompilerConstraintList* constraints,
 }
 
 bool
-jit::PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList* constraints,
+jit::PropertyWriteNeedsTypeBarrier(MIRGenerator* gen, CompilerConstraintList* constraints,
                                    MBasicBlock* current, MDefinition** pobj,
                                    PropertyName* name, MDefinition** pvalue,
                                    bool canModify, MIRType implicitType)
@@ -5283,14 +5257,14 @@ jit::PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
 
         jsid id = name ? NameToId(name) : JSID_VOID;
         HeapTypeSetKey property = key->property(id);
-        if (!CanWriteProperty(alloc, constraints, property, *pvalue, implicitType)) {
+        if (!CanWriteProperty(gen->alloc(), constraints, property, *pvalue, implicitType)) {
             // Either pobj or pvalue needs to be modified to filter out the
             // types which the value could have but are not in the property,
             // or a VM call is required. A VM call is always required if pobj
             // and pvalue cannot be modified.
             if (!canModify)
                 return true;
-            success = TryAddTypeBarrierForWrite(alloc, constraints, current, types, name, pvalue,
+            success = TryAddTypeBarrierForWrite(gen->alloc(), constraints, current, types, name, pvalue,
                                                 implicitType);
             break;
         }
@@ -5304,10 +5278,10 @@ jit::PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
             const UnboxedLayout& layout = key->group()->unboxedLayout();
             if (name) {
                 const UnboxedLayout::Property* property = layout.lookup(name);
-                if (property && !CanStoreUnboxedType(alloc, property->type, *pvalue))
+                if (property && !CanStoreUnboxedType(gen->alloc(), property->type, *pvalue))
                     return true;
             } else {
-                if (layout.isArray() && !CanStoreUnboxedType(alloc, layout.elementType(), *pvalue))
+                if (layout.isArray() && !CanStoreUnboxedType(gen->alloc(), layout.elementType(), *pvalue))
                     return true;
             }
         }
@@ -5333,7 +5307,7 @@ jit::PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
 
         jsid id = name ? NameToId(name) : JSID_VOID;
         HeapTypeSetKey property = key->property(id);
-        if (CanWriteProperty(alloc, constraints, property, *pvalue, implicitType))
+        if (CanWriteProperty(gen->alloc(), constraints, property, *pvalue, implicitType))
             continue;
 
         if ((property.maybeTypes() && !property.maybeTypes()->empty()) || excluded)
@@ -5354,6 +5328,6 @@ jit::PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
         }
     }
 
-    *pobj = AddGroupGuard(alloc, current, *pobj, excluded, /* bailOnEquality = */ true);
+    *pobj = AddGroupGuard(gen, current, *pobj, excluded, /* bailOnEquality = */ true);
     return false;
 }

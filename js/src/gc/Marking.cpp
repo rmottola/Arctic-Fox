@@ -1820,8 +1820,12 @@ js::gc::StoreBuffer::WholeCellEdges::trace(TenuringTracer& mover) const
 
         return;
     }
-    MOZ_ASSERT(kind == JS::TraceKind::JitCode);
-    static_cast<jit::JitCode*>(edge)->traceChildren(&mover);
+    if (kind == JS::TraceKind::Script)
+        static_cast<JSScript*>(edge)->traceChildren(&mover);
+    else if (kind == JS::TraceKind::JitCode)
+        static_cast<jit::JitCode*>(edge)->traceChildren(&mover);
+    else
+        MOZ_CRASH();
 }
 
 void
@@ -1883,11 +1887,11 @@ js::Nursery::collectToFixedPoint(TenuringTracer& mover, TenureCountCache& tenure
         JSObject* obj = static_cast<JSObject*>(p->forwardingAddress());
         mover.traceObject(obj);
 
-        TenureCount& entry = tenureCounts.findEntry(obj->group());
-        if (entry.group == obj->group()) {
+        TenureCount& entry = tenureCounts.findEntry(obj->groupRaw());
+        if (entry.group == obj->groupRaw()) {
             entry.count++;
         } else if (!entry.group) {
-            entry.group = obj->group();
+            entry.group = obj->groupRaw();
             entry.count = 1;
         }
     }
