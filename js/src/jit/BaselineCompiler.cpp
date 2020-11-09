@@ -199,8 +199,10 @@ BaselineCompiler::compile()
                             pcEntries.length(),
                             bytecodeTypeMapEntries,
                             yieldOffsets_.length()));
-    if (!baselineScript)
+    if (!baselineScript) {
+        ReportOutOfMemory(cx);
         return Method_Error;
+    }
 
     baselineScript->setMethod(code);
     baselineScript->setTemplateScope(templateScope);
