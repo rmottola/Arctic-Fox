@@ -3792,7 +3792,7 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     if (bytes && !table)
         return nullptr;
 
-    LazyScript *res = Allocate<LazyScript>(cx);
+    LazyScript* res = Allocate<LazyScript>(cx);
     if (!res)
         return nullptr;
 
