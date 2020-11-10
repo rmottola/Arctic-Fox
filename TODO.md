@@ -2,7 +2,8 @@
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
 - Bug 1533969 - Fix build error with newer glibc. (gettid)
-
+-  Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
+ 
 - Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
@@ -67,11 +68,17 @@
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
+- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
+- Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
+- Bug 1184388 - 2015-10- 30- 3/3
+- Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
@@ -90,10 +97,14 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
 - Bug 1123516 - 2015-06-30 - Implement maplike/setlike
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
+- Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope.
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - remaining parts of Bug 968923 (2015-06)
+- Bug 1171555 - Remove overly verbose ServiceWorker warnings.
+- Bug 1173415 - Fix incorrect mask used for
+- Bug 1167356 - 2015-06-11
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -116,6 +127,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1162986
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
@@ -222,6 +234,7 @@ Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
 
 ### Further Further ToDo:
+- Check for STLPort removal: https://bugzilla.mozilla.org/show_bug.cgi?id=1276927
 - import PPC JIT from TenFourFox
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
