@@ -1171,7 +1171,10 @@ class MOZ_STACK_CLASS ModuleCompiler
             uint32_t funcIndex_;
             uint32_t funcPtrTableIndex_;
             uint32_t ffiIndex_;
-            Scalar::Type viewType_;
+            struct {
+                Scalar::Type viewType_;
+                bool isSharedView_;
+            } viewInfo;
             AsmJSMathBuiltinFunction mathBuiltinFunc_;
             AsmJSAtomicsBuiltinFunction atomicsBuiltinFunc_;
             AsmJSSimdType simdCtorType_;
@@ -1226,7 +1229,11 @@ class MOZ_STACK_CLASS ModuleCompiler
         }
         Scalar::Type viewType() const {
             MOZ_ASSERT(isAnyArrayView());
-            return u.viewType_;
+            return u.viewInfo.viewType_;
+        }
+        bool viewIsSharedView() const {
+            MOZ_ASSERT(isAnyArrayView());
+            return u.viewInfo.isSharedView_;
         }
         bool isMathFunction() const {
             return which_ == MathBuiltinFunction;
@@ -1802,7 +1809,8 @@ class MOZ_STACK_CLASS ModuleCompiler
             return false;
         if (!module_->addArrayView(vt, maybeField, isSharedView))
             return false;
-        global->u.viewType_ = vt;
+        global->u.viewInfo.viewType_ = vt;
+        global->u.viewInfo.isSharedView_ = isSharedView;
         return globals_.putNew(varName, global);
     }
     bool addArrayViewCtor(PropertyName* varName, Scalar::Type vt, PropertyName* fieldName, bool isSharedView) {
@@ -1811,7 +1819,8 @@ class MOZ_STACK_CLASS ModuleCompiler
             return false;
         if (!module_->addArrayViewCtor(vt, fieldName, isSharedView))
             return false;
-        global->u.viewType_ = vt;
+        global->u.viewInfo.viewType_ = vt;
+        global->u.viewInfo.isSharedView_ = isSharedView;
         return globals_.putNew(varName, global);
     }
     bool addMathBuiltinFunction(PropertyName* varName, AsmJSMathBuiltinFunction func, PropertyName* fieldName) {
@@ -3988,6 +3997,7 @@ CheckNewArrayView(ModuleCompiler& m, PropertyName* varName, ParseNode* newExpr)
 
         field = nullptr;
         type = global->viewType();
+        shared = global->viewIsSharedView();
     }
 
     if (!CheckNewArrayViewArgs(m, ctorExpr, bufferName))
