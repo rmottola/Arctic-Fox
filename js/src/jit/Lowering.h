@@ -299,6 +299,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitDebugger(MDebugger* ins);
     void visitNewTarget(MNewTarget* ins);
     void visitArrowNewTarget(MArrowNewTarget* ins);
+    void visitAtomicIsLockFree(MAtomicIsLockFree* ins);
 };
 
 } // namespace jit

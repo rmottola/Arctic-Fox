@@ -244,6 +244,7 @@
     _(LoadTypedArrayElementStatic)  \
     _(StoreTypedArrayElementHole)   \
     _(StoreTypedArrayElementStatic) \
+    _(AtomicIsLockFree)             \
     _(CompareExchangeTypedArrayElement) \
     _(AtomicTypedArrayElementBinop) \
     _(AtomicTypedArrayElementBinopForEffect) \
