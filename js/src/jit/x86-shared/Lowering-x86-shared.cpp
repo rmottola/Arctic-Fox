@@ -360,7 +360,7 @@ LIRGeneratorX86Shared::lowerTruncateFToInt32(MTruncateToInt32* ins)
 }
 
 void
-LIRGeneratorX86Shared::lowerCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement *ins,
+LIRGeneratorX86Shared::lowerCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement* ins,
                                                              bool useI386ByteRegisters)
 {
     MOZ_ASSERT(ins->arrayType() != Scalar::Float32);
@@ -403,7 +403,7 @@ LIRGeneratorX86Shared::lowerCompareExchangeTypedArrayElement(MCompareExchangeTyp
 
     const LAllocation oldval = useRegister(ins->oldval());
 
-    LCompareExchangeTypedArrayElement *lir =
+    LCompareExchangeTypedArrayElement* lir =
         new(alloc()) LCompareExchangeTypedArrayElement(elements, index, oldval, newval, tempDef);
 
     if (fixedOutput)
@@ -413,7 +413,7 @@ LIRGeneratorX86Shared::lowerCompareExchangeTypedArrayElement(MCompareExchangeTyp
 }
 
 void
-LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop *ins,
+LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins,
                                                          bool useI386ByteRegisters)
 {
     MOZ_ASSERT(ins->arrayType() != Scalar::Uint8Clamped);
@@ -524,14 +524,14 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
 }
 
 void
-LIRGeneratorX86Shared::visitSimdBinaryArith(MSimdBinaryArith *ins)
+LIRGeneratorX86Shared::visitSimdBinaryArith(MSimdBinaryArith* ins)
 {
     MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
     MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
     MOZ_ASSERT(IsSimdType(ins->type()));
 
-    MDefinition *lhs = ins->lhs();
-    MDefinition *rhs = ins->rhs();
+    MDefinition* lhs = ins->lhs();
+    MDefinition* rhs = ins->rhs();
 
     if (ins->isCommutative())
         ReorderCommutative(&lhs, &rhs, ins);

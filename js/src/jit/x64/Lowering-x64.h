@@ -24,12 +24,12 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared
     void defineUntypedPhi(MPhi* phi, size_t lirIndex);
 
     // Adds a use at operand |n| of a value-typed insturction.
-    void useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1, Register);
+    void useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1, Register);
 
     // x86 has constraints on what registers can be formatted for 1-byte
     // stores and loads; on x64 all registers are okay.
-    LAllocation useByteOpRegister(MDefinition *mir);
-    LAllocation useByteOpRegisterOrNonDoubleConstant(MDefinition *mir);
+    LAllocation useByteOpRegister(MDefinition* mir);
+    LAllocation useByteOpRegisterOrNonDoubleConstant(MDefinition* mir);
     LDefinition tempByteOpRegister();
 
     LDefinition tempToUnbox();
@@ -40,15 +40,15 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared
     void visitBox(MBox* box);
     void visitUnbox(MUnbox* unbox);
     void visitReturn(MReturn* ret);
-    void visitCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement *ins);
-    void visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop *ins);
+    void visitCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement* ins);
+    void visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins);
     void visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble* ins);
     void visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32* ins);
     void visitAsmJSLoadHeap(MAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(MAsmJSStoreHeap* ins);
     void visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins);
-    void visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap *ins);
-    void visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap *ins);
+    void visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins);
+    void visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins);
     void visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic* ins);
     void visitSubstr(MSubstr* ins);
     void visitRandom(MRandom* ins);

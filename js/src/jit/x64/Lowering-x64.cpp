@@ -122,19 +122,19 @@ LIRGeneratorX64::lowerUntypedPhiInput(MPhi* phi, uint32_t inputPosition, LBlock*
 }
 
 void
-LIRGeneratorX64::visitCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement *ins)
+LIRGeneratorX64::visitCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement* ins)
 {
     lowerCompareExchangeTypedArrayElement(ins, /* useI386ByteRegisters = */ false);
 }
 
 void
-LIRGeneratorX64::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop *ins)
+LIRGeneratorX64::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins)
 {
     lowerAtomicTypedArrayElementBinop(ins, /* useI386ByteRegisters = */ false);
 }
 
 void
-LIRGeneratorX64::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble *ins)
+LIRGeneratorX64::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble* ins)
 {
     MOZ_ASSERT(ins->input()->type() == MIRType_Int32);
     LAsmJSUInt32ToDouble* lir = new(alloc()) LAsmJSUInt32ToDouble(useRegisterAtStart(ins->input()));
@@ -142,7 +142,7 @@ LIRGeneratorX64::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble *ins)
 }
 
 void
-LIRGeneratorX64::visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32 *ins)
+LIRGeneratorX64::visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32* ins)
 {
     MOZ_ASSERT(ins->input()->type() == MIRType_Int32);
     LAsmJSUInt32ToFloat32* lir = new(alloc()) LAsmJSUInt32ToFloat32(useRegisterAtStart(ins->input()));
@@ -150,7 +150,7 @@ LIRGeneratorX64::visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32 *ins)
 }
 
 void
-LIRGeneratorX64::visitAsmJSLoadHeap(MAsmJSLoadHeap *ins)
+LIRGeneratorX64::visitAsmJSLoadHeap(MAsmJSLoadHeap* ins)
 {
     MDefinition* ptr = ins->ptr();
     MOZ_ASSERT(ptr->type() == MIRType_Int32);
@@ -265,7 +265,7 @@ LIRGeneratorX64::visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins)
     LAllocation value = useRegister(ins->value());
     LDefinition tempDef = bitOp ? temp() : LDefinition::BogusTemp();
 
-    LAsmJSAtomicBinopHeap *lir =
+    LAsmJSAtomicBinopHeap* lir =
         new(alloc()) LAsmJSAtomicBinopHeap(useRegister(ptr), value, tempDef);
 
     defineFixed(lir, ins, LAllocation(AnyRegister(eax)));
@@ -299,7 +299,7 @@ LIRGeneratorX64::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic
 void
 LIRGeneratorX64::visitRandom(MRandom* ins)
 {
-    LRandom *lir = new(alloc()) LRandom(temp(),
+    LRandom* lir = new(alloc()) LRandom(temp(),
                                         temp(),
                                         temp(),
                                         temp(),
