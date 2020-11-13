@@ -3188,7 +3188,7 @@ Debugger::construct(JSContext* cx, unsigned argc, Value* vp)
     Debugger* debugger;
     {
         /* Construct the underlying C++ object. */
-        auto dbg = cx->make_unique<Debugger>(cx, obj.get());
+        AutoInitGCManagedObject<Debugger> dbg(cx->make_unique<Debugger>(cx, obj.get()));
         if (!dbg || !dbg->init(cx))
             return false;
 
@@ -7002,7 +7002,7 @@ DebuggerObject_defineProperty(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         ErrorCopier ec(ac);
-        if (!StandardDefineProperty(cx, obj, id, desc))
+        if (!DefineProperty(cx, obj, id, desc))
             return false;
     }
 
@@ -7045,7 +7045,7 @@ DebuggerObject_defineProperties(JSContext* cx, unsigned argc, Value* vp)
 
         ErrorCopier ec(ac);
         for (size_t i = 0; i < n; i++) {
-            if (!StandardDefineProperty(cx, obj, ids[i], descs[i]))
+            if (!DefineProperty(cx, obj, ids[i], descs[i]))
                 return false;
         }
     }
@@ -8001,16 +8001,27 @@ JS::dbg::onPromiseSettled(JSContext* cx, HandleObject promise)
 }
 
 JS_PUBLIC_API(bool)
-JS::dbg::IsDebugger(JS::Value val)
+JS::dbg::IsDebugger(const JSObject& obj)
 {
-    if (!val.isObject())
-        return false;
+    return js::GetObjectClass(&obj) == &Debugger::jsclass &&
+           js::Debugger::fromJSObject(&obj) != nullptr;
+}
 
-    JSObject& obj = val.toObject();
-    if (obj.getClass() != &Debugger::jsclass)
-        return false;
+JS_PUBLIC_API(bool)
+JS::dbg::GetDebuggeeGlobals(JSContext* cx, const JSObject& dbgObj, AutoObjectVector& vector)
+{
+    MOZ_ASSERT(IsDebugger(dbgObj));
+    js::Debugger* dbg = js::Debugger::fromJSObject(&dbgObj);
 
-    return js::Debugger::fromJSObject(&obj) != nullptr;
+    if (!vector.reserve(vector.length() + dbg->debuggees.count())) {
+        JS_ReportOutOfMemory(cx);
+        return false;
+    }
+
+    for (WeakGlobalObjectSet::Range r = dbg->allDebuggees(); !r.empty(); r.popFront())
+        vector.infallibleAppend(static_cast<JSObject*>(r.front()));
+
+    return true;
 }
 
 

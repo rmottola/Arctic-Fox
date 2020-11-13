@@ -29,45 +29,8 @@ using namespace js::jit;
 using JS::GenericNaN;
 using JS::ToInt32;
 
-namespace {
-
-// Emulate a TypeSet logic from a Type object to avoid duplicating the guard
-// logic.
-class TypeWrapper {
-    TypeSet::Type t_;
-
-  public:
-    explicit TypeWrapper(TypeSet::Type t) : t_(t) {}
-
-    inline bool unknown() const {
-        return t_.isUnknown();
-    }
-    inline bool hasType(TypeSet::Type t) const {
-        if (t == TypeSet::Int32Type())
-            return t == t_ || t_ == TypeSet::DoubleType();
-        return t == t_;
-    }
-    inline unsigned getObjectCount() const {
-        if (t_.isAnyObject() || t_.isUnknown() || !t_.isObject())
-            return 0;
-        return 1;
-    }
-    inline JSObject* getSingletonNoBarrier(unsigned) const {
-        if (t_.isSingleton())
-            return t_.singletonNoBarrier();
-        return nullptr;
-    }
-    inline ObjectGroup* getGroupNoBarrier(unsigned) const {
-        if (t_.isGroup())
-            return t_.groupNoBarrier();
-        return nullptr;
-    }
-};
-
-} /* anonymous namespace */
-
-template <typename Source, typename Set> void
-MacroAssembler::guardTypeSet(const Source& address, const Set* types, BarrierKind kind,
+template <typename Source> void
+MacroAssembler::guardTypeSet(const Source& address, const TypeSet *types, BarrierKind kind,
                              Register scratch, Label* miss)
 {
     MOZ_ASSERT(kind == BarrierKind::TypeTagOnly || kind == BarrierKind::TypeSet);
@@ -139,7 +102,7 @@ MacroAssembler::guardTypeSet(const Source& address, const Set* types, BarrierKin
 
         if (obj == scratch)
             extractObject(address, scratch);
-        guardTypeSetMightBeIncomplete(obj, scratch, &matched);
+        guardTypeSetMightBeIncomplete(types, obj, scratch, &matched);
 
         assumeUnreachable("Unexpected object type");
 #endif
@@ -148,29 +111,46 @@ MacroAssembler::guardTypeSet(const Source& address, const Set* types, BarrierKin
     bind(&matched);
 }
 
+template <typename TypeSet>
 void
-MacroAssembler::guardTypeSetMightBeIncomplete(Register obj, Register scratch, Label* label)
+MacroAssembler::guardTypeSetMightBeIncomplete(TypeSet* types, Register obj, Register scratch, Label* label)
 {
     // Type set guards might miss when an object's group changes. In this case
-    // either its properties will become unknown, or it will change to a native
-    // object with an original unboxed group. Jump to label if this might have
-    // happened for the input object.
+    // either its old group's properties will become unknown, or it will change
+    // to a native object with an original unboxed group. Jump to label if this
+    // might have happened for the input object.
+
+    if (types->unknownObject()) {
+        jump(label);
+        return;
+    }
 
     loadPtr(Address(obj, JSObject::offsetOfGroup()), scratch);
     load32(Address(scratch, ObjectGroup::offsetOfFlags()), scratch);
-    branchTest32(Assembler::NonZero, scratch, Imm32(OBJECT_FLAG_UNKNOWN_PROPERTIES), label);
     and32(Imm32(OBJECT_FLAG_ADDENDUM_MASK), scratch);
     branch32(Assembler::Equal,
              scratch, Imm32(ObjectGroup::addendumOriginalUnboxedGroupValue()), label);
+
+    for (size_t i = 0; i < types->getObjectCount(); i++) {
+        if (JSObject* singleton = types->getSingletonNoBarrier(i)) {
+            movePtr(ImmGCPtr(singleton), scratch);
+            loadPtr(Address(scratch, JSObject::offsetOfGroup()), scratch);
+        } else if (ObjectGroup* group = types->getGroupNoBarrier(i)) {
+            movePtr(ImmGCPtr(group), scratch);
+        } else {
+            continue;
+        }
+        branchTest32(Assembler::NonZero, Address(scratch, ObjectGroup::offsetOfFlags()),
+                     Imm32(OBJECT_FLAG_UNKNOWN_PROPERTIES), label);
+    }
 }
 
-template <typename Set> void
-MacroAssembler::guardObjectType(Register obj, const Set* types,
+void
+MacroAssembler::guardObjectType(Register obj, const TypeSet* types,
                                 Register scratch, Label* miss)
 {
     MOZ_ASSERT(!types->unknown());
     MOZ_ASSERT(!types->hasType(TypeSet::AnyObjectType()));
-    MOZ_ASSERT(types->getObjectCount());
     MOZ_ASSERT(scratch != InvalidReg);
 
     // Note: this method elides read barriers on values read from type sets, as
@@ -236,47 +216,16 @@ MacroAssembler::guardObjectType(Register obj, const Set* types,
     return;
 }
 
-template <typename Source> void
-MacroAssembler::guardType(const Source& address, TypeSet::Type type,
-                          Register scratch, Label* miss)
-{
-    TypeWrapper wrapper(type);
-    guardTypeSet(address, &wrapper, BarrierKind::TypeSet, scratch, miss);
-}
-
-template void MacroAssembler::guardTypeSet(const Address& address, const TemporaryTypeSet* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-template void MacroAssembler::guardTypeSet(const ValueOperand& value, const TemporaryTypeSet* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-
-template void MacroAssembler::guardTypeSet(const Address& address, const HeapTypeSet* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-template void MacroAssembler::guardTypeSet(const ValueOperand& value, const HeapTypeSet* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-template void MacroAssembler::guardTypeSet(const TypedOrValueRegister& reg, const HeapTypeSet* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-
 template void MacroAssembler::guardTypeSet(const Address& address, const TypeSet* types,
                                            BarrierKind kind, Register scratch, Label* miss);
 template void MacroAssembler::guardTypeSet(const ValueOperand& value, const TypeSet* types,
                                            BarrierKind kind, Register scratch, Label* miss);
-
-template void MacroAssembler::guardTypeSet(const Address& address, const TypeWrapper* types,
-                                           BarrierKind kind, Register scratch, Label* miss);
-template void MacroAssembler::guardTypeSet(const ValueOperand& value, const TypeWrapper* types,
+template void MacroAssembler::guardTypeSet(const TypedOrValueRegister& value, const TypeSet* types,
                                            BarrierKind kind, Register scratch, Label* miss);
 
-template void MacroAssembler::guardObjectType(Register obj, const TemporaryTypeSet* types,
-                                              Register scratch, Label* miss);
-template void MacroAssembler::guardObjectType(Register obj, const TypeSet* types,
-                                              Register scratch, Label* miss);
-template void MacroAssembler::guardObjectType(Register obj, const TypeWrapper* types,
-                                              Register scratch, Label* miss);
-
-template void MacroAssembler::guardType(const Address& address, TypeSet::Type type,
-                                        Register scratch, Label* miss);
-template void MacroAssembler::guardType(const ValueOperand& value, TypeSet::Type type,
-                                        Register scratch, Label* miss);
+template void MacroAssembler::guardTypeSetMightBeIncomplete(const TemporaryTypeSet* types,
+                                                            Register obj, Register scratch,
+                                                            Label* label);
 
 template<typename S, typename T>
 static void
@@ -542,6 +491,49 @@ MacroAssembler::compareExchangeToTypedIntArray(Scalar::Type arrayType, const Bas
                                                Register oldval, Register newval, Register temp,
                                                AnyRegister output);
 
+template<typename T>
+void
+MacroAssembler::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem,
+                                              Register value, Register temp, AnyRegister output)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+        atomicExchange8SignExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint8:
+        atomicExchange8ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint8Clamped:
+        atomicExchange8ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Int16:
+        atomicExchange16SignExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint16:
+        atomicExchange16ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Int32:
+        atomicExchange32(mem, value, output.gpr());
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        atomicExchange32(mem, value, temp);
+        convertUInt32ToDouble(temp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+MacroAssembler::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const Address& mem,
+                                              Register value, Register temp, AnyRegister output);
+template void
+MacroAssembler::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
+                                              Register value, Register temp, AnyRegister output);
+
 template<typename S, typename T>
 void
 MacroAssembler::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value,
@@ -798,8 +790,16 @@ void
 MacroAssembler::loadUnboxedProperty(T address, JSValueType type, TypedOrValueRegister output)
 {
     switch (type) {
+      case JSVAL_TYPE_INT32: {
+          // Handle loading an int32 into a double reg.
+          if (output.type() == MIRType_Double) {
+              convertInt32ToDouble(address, output.typedReg().fpu());
+              break;
+          }
+          // Fallthrough.
+      }
+
       case JSVAL_TYPE_BOOLEAN:
-      case JSVAL_TYPE_INT32:
       case JSVAL_TYPE_STRING: {
         Register outReg;
         if (output.hasValue()) {
@@ -880,6 +880,20 @@ template void
 MacroAssembler::loadUnboxedProperty(BaseIndex address, JSValueType type,
                                     TypedOrValueRegister output);
 
+static void
+StoreUnboxedFailure(MacroAssembler& masm, Label* failure)
+{
+    // Storing a value to an unboxed property is a fallible operation and
+    // the caller must provide a failure label if a particular unboxed store
+    // might fail. Sometimes, however, a store that cannot succeed (such as
+    // storing a string to an int32 property) will be marked as infallible.
+    // This can only happen if the code involved is unreachable.
+    if (failure)
+        masm.jump(failure);
+    else
+        masm.assumeUnreachable("Incompatible write to unboxed property");
+}
+
 template <typename T>
 void
 MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
@@ -891,12 +905,12 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
             if (value.value().isBoolean())
                 store8(Imm32(value.value().toBoolean()), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else if (value.reg().hasTyped()) {
             if (value.reg().type() == MIRType_Boolean)
                 store8(value.reg().typedReg().gpr(), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else {
             if (failure)
                 branchTestBoolean(Assembler::NotEqual, value.reg().valueReg(), failure);
@@ -909,12 +923,12 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
             if (value.value().isInt32())
                 store32(Imm32(value.value().toInt32()), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else if (value.reg().hasTyped()) {
             if (value.reg().type() == MIRType_Int32)
                 store32(value.reg().typedReg().gpr(), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else {
             if (failure)
                 branchTestInt32(Assembler::NotEqual, value.reg().valueReg(), failure);
@@ -928,7 +942,7 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
                 loadConstantDouble(value.value().toNumber(), ScratchDoubleReg);
                 storeDouble(ScratchDoubleReg, address);
             } else {
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
             }
         } else if (value.reg().hasTyped()) {
             if (value.reg().type() == MIRType_Int32) {
@@ -937,7 +951,7 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
             } else if (value.reg().type() == MIRType_Double) {
                 storeDouble(value.reg().typedReg().fpu(), address);
             } else {
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
             }
         } else {
             ValueOperand reg = value.reg().valueReg();
@@ -959,13 +973,13 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
             if (value.value().isObjectOrNull())
                 storePtr(ImmGCPtr(value.value().toObjectOrNull()), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else if (value.reg().hasTyped()) {
             MOZ_ASSERT(value.reg().type() != MIRType_Null);
             if (value.reg().type() == MIRType_Object)
                 storePtr(value.reg().typedReg().gpr(), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else {
             if (failure) {
                 Label ok;
@@ -982,12 +996,12 @@ MacroAssembler::storeUnboxedProperty(T address, JSValueType type,
             if (value.value().isString())
                 storePtr(ImmGCPtr(value.value().toString()), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else if (value.reg().hasTyped()) {
             if (value.reg().type() == MIRType_String)
                 storePtr(value.reg().typedReg().gpr(), address);
             else
-                jump(failure);
+                StoreUnboxedFailure(*this, failure);
         } else {
             if (failure)
                 branchTestString(Assembler::NotEqual, value.reg().valueReg(), failure);
@@ -1623,8 +1637,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
         regs.take(bailoutInfo);
 
         // Reset SP to the point where clobbering starts.
-        loadPtr(Address(bailoutInfo, offsetof(BaselineBailoutInfo, incomingStack)),
-                BaselineStackReg);
+        loadStackPtr(Address(bailoutInfo, offsetof(BaselineBailoutInfo, incomingStack)));
 
         Register copyCur = regs.takeAny();
         Register copyEnd = regs.takeAny();
@@ -1639,7 +1652,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             bind(&copyLoop);
             branchPtr(Assembler::BelowOrEqual, copyCur, copyEnd, &endOfCopy);
             subPtr(Imm32(4), copyCur);
-            subPtr(Imm32(4), BaselineStackReg);
+            subFromStackPtr(Imm32(4));
             load32(Address(copyCur, 0), temp);
             store32(temp, Address(BaselineStackReg, 0));
             jump(&copyLoop);
@@ -2539,9 +2552,12 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
     jitContext_.emplace(cx, (js::jit::TempAllocator*)nullptr);
     alloc_.emplace(cx);
     moveResolver_.setAllocator(*jitContext_->temp);
-#ifdef JS_CODEGEN_ARM
+#if defined(JS_CODEGEN_ARM)
     initWithAllocator();
     m_buffer.id = GetJitContext()->getNextAssemblerId();
+#elif defined(JS_CODEGEN_ARM64)
+    initWithAllocator();
+    armbuffer_.id = GetJitContext()->getNextAssemblerId();
 #endif
     if (ion) {
         setFramePushed(ion->frameSize());
@@ -2736,12 +2752,12 @@ MacroAssembler::freeStack(uint32_t amount)
 {
     MOZ_ASSERT(amount <= framePushed_);
     if (amount)
-        addPtr(Imm32(amount), StackPointer);
+        addToStackPtr(Imm32(amount));
     framePushed_ -= amount;
 }
 
 void
 MacroAssembler::freeStack(Register amount)
 {
-    addPtr(amount, StackPointer);
+    addToStackPtr(amount);
 }

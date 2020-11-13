@@ -306,6 +306,8 @@ nsDOMCameraControl::nsDOMCameraControl(uint32_t aCameraId,
 nsDOMCameraControl::~nsDOMCameraControl()
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
+  /*invoke DOMMediaStream destroy*/
+  Destroy();
 }
 
 JSObject*
@@ -1370,11 +1372,10 @@ nsDOMCameraControl::OnFacesDetected(const nsTArray<ICameraControl::Face>& aFaces
   Sequence<OwningNonNull<DOMCameraDetectedFace> > faces;
   uint32_t len = aFaces.Length();
 
-  if (faces.SetCapacity(len)) {
-    nsRefPtr<DOMCameraDetectedFace> f;
+  if (faces.SetCapacity(len, fallible)) {
     for (uint32_t i = 0; i < len; ++i) {
-      f = new DOMCameraDetectedFace(static_cast<DOMMediaStream*>(this), aFaces[i]);
-      *faces.AppendElement() = f.forget().take();
+      *faces.AppendElement() =
+        new DOMCameraDetectedFace(static_cast<DOMMediaStream*>(this), aFaces[i]);
     }
   }
 
@@ -1425,6 +1426,10 @@ nsDOMCameraControl::OnUserError(CameraControlListener::UserContext aContext, nsr
   switch (aContext) {
     case CameraControlListener::kInStartCamera:
       promise = mGetCameraPromise.forget();
+      // If we failed to open the camera, we never actually provided a reference
+      // for the application to release explicitly. Thus we must clear our handle
+      // here to ensure everything is freed.
+      mCameraControl = nullptr;
       break;
 
     case CameraControlListener::kInStopCamera:

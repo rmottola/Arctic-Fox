@@ -10,6 +10,8 @@
 
 #include "jit/BaselineIC.h"
 
+#include "vm/ObjectGroup-inl.h"
+
 using namespace js;
 using namespace js::jit;
 
@@ -519,7 +521,7 @@ BaselineInspector::getTemplateObjectForNative(jsbytecode* pc, Native native)
 
 bool
 BaselineInspector::isOptimizableCallStringSplit(jsbytecode* pc, JSString** stringOut, JSString** stringArg,
-                                                NativeObject** objOut)
+                                                JSObject** objOut)
 {
     if (!hasBaselineScript())
         return false;
@@ -731,6 +733,7 @@ BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
             return MIRType_Value;
 
           case ICStub::GetProp_ArrayLength:
+          case ICStub::GetProp_UnboxedArrayLength:
           case ICStub::GetProp_Native:
           case ICStub::GetProp_NativeDoesNotExist:
           case ICStub::GetProp_NativePrototype:
@@ -741,13 +744,19 @@ BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
           case ICStub::GetProp_CallDOMProxyNative:
           case ICStub::GetProp_CallDOMProxyWithGenerationNative:
           case ICStub::GetProp_DOMProxyShadowed:
-          case ICStub::GetElem_NativeSlot:
-          case ICStub::GetElem_NativePrototypeSlot:
-          case ICStub::GetElem_NativePrototypeCallNative:
-          case ICStub::GetElem_NativePrototypeCallScripted:
+          case ICStub::GetElem_NativeSlotName:
+          case ICStub::GetElem_NativeSlotSymbol:
+          case ICStub::GetElem_NativePrototypeSlotName:
+          case ICStub::GetElem_NativePrototypeSlotSymbol:
+          case ICStub::GetElem_NativePrototypeCallNativeName:
+          case ICStub::GetElem_NativePrototypeCallNativeSymbol:
+          case ICStub::GetElem_NativePrototypeCallScriptedName:
+          case ICStub::GetElem_NativePrototypeCallScriptedSymbol:
+          case ICStub::GetElem_UnboxedPropertyName:
           case ICStub::GetElem_String:
           case ICStub::GetElem_Dense:
           case ICStub::GetElem_TypedArray:
+          case ICStub::GetElem_UnboxedArray:
             stubType = MIRType_Object;
             break;
 

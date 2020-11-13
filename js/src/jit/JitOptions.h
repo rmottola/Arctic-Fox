@@ -56,6 +56,7 @@ struct JitOptions
     bool disableEaa;
     bool disableAma;
     bool eagerCompilation;
+    bool forceInlineCaches;
     mozilla::Maybe<uint32_t> forcedDefaultIonWarmUpThreshold;
     mozilla::Maybe<IonRegisterAllocator> forcedRegisterAllocator;
     bool limitScriptSize;
@@ -66,6 +67,9 @@ struct JitOptions
     uint32_t maxStackArgs;
     uint32_t osrPcMismatchesBeforeRecompile;
     uint32_t smallFunctionMaxBytecodeLength_;
+
+    // The options below affect the rest of the VM, and not just the JIT.
+    bool disableUnboxedObjects;
 
     JitOptions();
     bool isSmallFunction(JSScript* script) const;

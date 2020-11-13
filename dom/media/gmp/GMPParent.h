@@ -111,7 +111,7 @@ public:
 
   const nsCString& GetDisplayName() const;
   const nsCString& GetVersion() const;
-  const nsCString& GetPluginId() const;
+  const uint32_t GetPluginId() const;
 
   // Returns true if a plugin can be or is being used across multiple NodeIds.
   bool CanBeSharedCrossNodeIds() const;
@@ -173,7 +173,7 @@ private:
   nsCString mDisplayName; // name of plugin displayed to users
   nsCString mDescription; // description of plugin for display to users
   nsCString mVersion;
-  nsCString mPluginId;
+  uint32_t mPluginId;
   nsTArray<nsAutoPtr<GMPCapability>> mCapabilities;
   GMPProcessParent* mProcess;
   bool mDeleteProcessOnlyOnUnload;

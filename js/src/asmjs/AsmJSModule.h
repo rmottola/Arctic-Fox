@@ -77,7 +77,8 @@ enum AsmJSAtomicsBuiltinFunction
     AsmJSAtomicsBuiltin_sub,
     AsmJSAtomicsBuiltin_and,
     AsmJSAtomicsBuiltin_or,
-    AsmJSAtomicsBuiltin_xor
+    AsmJSAtomicsBuiltin_xor,
+    AsmJSAtomicsBuiltin_isLockFree
 };
 
 // Set of known global object SIMD's attributes, i.e. types
@@ -251,6 +252,7 @@ class AsmJSModule
         friend class AsmJSModule;
 
         Global(Which which, PropertyName* name) {
+            mozilla::PodZero(&pod);  // zero padding for Valgrind
             pod.which_ = which;
             name_ = name;
             MOZ_ASSERT_IF(name_, name_->isTenured());
@@ -453,6 +455,7 @@ class AsmJSModule
             name_ = name;
             maybeFieldName_ = maybeFieldName;
             argCoercions_ = mozilla::Move(argCoercions);
+            mozilla::PodZero(&pod);  // zero padding for Valgrind
             pod.isChangeHeap_ = false;
             pod.returnType_ = returnType;
             pod.codeOffset_ = UINT32_MAX;
@@ -468,6 +471,7 @@ class AsmJSModule
             MOZ_ASSERT_IF(maybeFieldName, maybeFieldName->isTenured());
             name_ = name;
             maybeFieldName_ = maybeFieldName;
+            mozilla::PodZero(&pod);  // zero padding for Valgrind
             pod.isChangeHeap_ = true;
             pod.startOffsetInModule_ = startOffsetInModule;
             pod.endOffsetInModule_ = endOffsetInModule;
@@ -485,6 +489,7 @@ class AsmJSModule
             name_ = rhs.name_;
             maybeFieldName_ = rhs.maybeFieldName_;
             argCoercions_ = mozilla::Move(rhs.argCoercions_);
+            mozilla::PodZero(&pod);  // zero padding for Valgrind
             pod = rhs.pod;
         }
 
@@ -576,6 +581,9 @@ class AsmJSModule
 
         uint32_t begin() const {
             return begin_;
+        }
+        uint32_t profilingEntry() const {
+            return begin();
         }
         uint32_t entry() const {
             MOZ_ASSERT(isFunction());

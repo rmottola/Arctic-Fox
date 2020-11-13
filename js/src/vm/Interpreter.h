@@ -56,7 +56,7 @@ ReportIsNotFunction(JSContext* cx, HandleValue v, int numToSkip,
 
 /* See ReportIsNotFunction comment for the meaning of numToSkip. */
 extern JSObject*
-ValueToCallable(JSContext *cx, HandleValue v, int numToSkip,
+ValueToCallable(JSContext* cx, HandleValue v, int numToSkip,
                 MaybeConstruct construct = NO_CONSTRUCT);
 
 /*
@@ -80,10 +80,10 @@ Invoke(JSContext* cx, const Value& thisv, const Value& fval, unsigned argc, cons
  * getter/setter calls.
  */
 extern bool
-InvokeGetter(JSContext *cx, JSObject *obj, Value fval, MutableHandleValue rval);
+InvokeGetter(JSContext* cx, JSObject* obj, Value fval, MutableHandleValue rval);
 
 extern bool
-InvokeSetter(JSContext *cx, const Value &thisv, Value fval, HandleValue v);
+InvokeSetter(JSContext* cx, const Value& thisv, Value fval, HandleValue v);
 
 /*
  * InvokeConstructor implement a function call from a constructor context
@@ -397,13 +397,16 @@ ModValues(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, Mutable
 bool
 UrshValues(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, MutableHandleValue res);
 
-template <bool strict>
 bool
-DeletePropertyJit(JSContext *ctx, HandleValue val, HandlePropertyName name, bool *bv);
+AtomicIsLockFree(JSContext* cx, HandleValue in, int* out);
 
 template <bool strict>
 bool
-DeleteElementJit(JSContext *cx, HandleValue val, HandleValue index, bool *bv);
+DeletePropertyJit(JSContext* ctx, HandleValue val, HandlePropertyName name, bool* bv);
+
+template <bool strict>
+bool
+DeleteElementJit(JSContext* cx, HandleValue val, HandleValue index, bool* bv);
 
 bool
 DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain, HandleFunction funArg);

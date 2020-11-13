@@ -2738,43 +2738,6 @@ ScrollFrameHelper::AppendScrollPartsTo(nsDisplayListBuilder*   aBuilder,
   }
 }
 
-class ScrollLayerWrapper : public nsDisplayWrapper
-{
-public:
-  ScrollLayerWrapper(nsIFrame* aScrollFrame, nsIFrame* aScrolledFrame)
-    : mCount(0)
-    , mProps(aScrolledFrame->Properties())
-    , mScrollFrame(aScrollFrame)
-    , mScrolledFrame(aScrolledFrame)
-  {
-    SetCount(0);
-  }
-
-  virtual nsDisplayItem* WrapList(nsDisplayListBuilder* aBuilder,
-                                  nsIFrame* aFrame,
-                                  nsDisplayList* aList) override {
-    SetCount(++mCount);
-    return new (aBuilder) nsDisplayScrollLayer(aBuilder, aList, mScrolledFrame, mScrolledFrame, mScrollFrame);
-  }
-
-  virtual nsDisplayItem* WrapItem(nsDisplayListBuilder* aBuilder,
-                                  nsDisplayItem* aItem) override {
-
-    SetCount(++mCount);
-    return new (aBuilder) nsDisplayScrollLayer(aBuilder, aItem, aItem->Frame(), mScrolledFrame, mScrollFrame);
-  }
-
-protected:
-  void SetCount(intptr_t aCount) {
-    mProps.Set(nsIFrame::ScrollLayerCount(), reinterpret_cast<void*>(aCount));
-  }
-
-  intptr_t mCount;
-  FrameProperties mProps;
-  nsIFrame* mScrollFrame;
-  nsIFrame* mScrolledFrame;
-};
-
 /* static */ bool ScrollFrameHelper::sImageVisPrefsCached = false;
 /* static */ uint32_t ScrollFrameHelper::sHorzExpandScrollPort = 0;
 /* static */ uint32_t ScrollFrameHelper::sVertExpandScrollPort = 1;
@@ -3045,8 +3008,8 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     dirtyRect = ExpandRectToNearlyVisible(dirtyRect);
   }
 
-  const nsStylePosition* pos = mOuter->StylePosition();
-  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
+  const nsStyleDisplay* disp = mOuter->StyleDisplay();
+  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
     aBuilder->AddToWillChangeBudget(mOuter, GetScrollPositionClampingScrollPortSize());
   }
 
@@ -3157,10 +3120,6 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   }
 
   if (shouldBuildLayer) {
-    // ScrollLayerWrapper must always be created because it initializes the
-    // scroll layer count. The display lists depend on this.
-    ScrollLayerWrapper wrapper(mOuter, mScrolledFrame);
-
     // Make sure that APZ will dispatch events back to content so we can create
     // a displayport for this frame. We'll add the item later on.
     nsDisplayLayerEventRegions* inactiveRegionItem = nullptr;
@@ -3229,7 +3188,7 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
   bool isRoot = mIsRoot && mOuter->PresContext()->IsRootContentDocument();
 
   *aOutput->AppendElement() =
-      nsDisplayScrollLayer::ComputeFrameMetrics(
+      nsLayoutUtils::ComputeFrameMetrics(
         mScrolledFrame, mOuter, mOuter->GetContent(),
         aContainerReferenceFrame, aLayer, mScrollParentID,
         scrollport, isRoot, aParameters);
@@ -4400,8 +4359,8 @@ ScrollFrameHelper::IsScrollbarOnRight() const
 bool
 ScrollFrameHelper::IsMaybeScrollingActive() const
 {
-  const nsStylePosition* pos = mOuter->StylePosition();
-  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
+  const nsStyleDisplay* disp = mOuter->StyleDisplay();
+  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
     return true;
   }
 
@@ -4413,9 +4372,9 @@ ScrollFrameHelper::IsMaybeScrollingActive() const
 bool
 ScrollFrameHelper::IsScrollingActive(nsDisplayListBuilder* aBuilder) const
 {
-  const nsStylePosition* pos = mOuter->StylePosition();
-  if (pos && (pos->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL) &&
-      aBuilder->IsInWillChangeBudget(mOuter)) {
+  const nsStyleDisplay* disp = mOuter->StyleDisplay();
+  if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL) &&
+    aBuilder->IsInWillChangeBudget(mOuter)) {
     return true;
   }
 

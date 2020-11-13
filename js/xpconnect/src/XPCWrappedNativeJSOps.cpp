@@ -61,7 +61,7 @@ ToStringGuts(XPCCallContext& ccx)
     if (!str)
         return false;
 
-    ccx.SetRetVal(STRING_TO_JSVAL(str));
+    ccx.SetRetVal(JS::StringValue(str));
     return true;
 }
 
@@ -198,6 +198,8 @@ DefinePropertyIfFound(XPCCallContext& ccx,
     XPCJSRuntime* rt = ccx.GetRuntime();
     bool found;
     const char* name;
+
+    propFlags |= JSPROP_RESOLVING;
 
     if (set) {
         if (iface)
@@ -357,13 +359,14 @@ DefinePropertyIfFound(XPCCallContext& ccx,
 
     if (scope->HasInterposition()) {
         Rooted<JSPropertyDescriptor> desc(ccx);
-        if (!xpc::Interpose(ccx, obj, iface->GetIID(), id, &desc))
+        if (!xpc::InterposeProperty(ccx, obj, iface->GetIID(), id, &desc))
             return false;
 
         if (desc.object()) {
             AutoResolveName arn(ccx, id);
             if (resolved)
                 *resolved = true;
+            desc.attributesRef() |= JSPROP_RESOLVING;
             return JS_DefinePropertyById(ccx, obj, id, desc);
         }
     }
@@ -451,7 +454,7 @@ static bool
 XPC_WN_Shared_Convert(JSContext* cx, HandleObject obj, JSType type, MutableHandleValue vp)
 {
     if (type == JSTYPE_OBJECT) {
-        vp.set(OBJECT_TO_JSVAL(obj));
+        vp.setObject(*obj);
         return true;
     }
 
@@ -466,7 +469,7 @@ XPC_WN_Shared_Convert(JSContext* cx, HandleObject obj, JSType type, MutableHandl
                     XPCNativeScriptableInfo* si = wrapper->GetScriptableInfo();
                     if (si && (si->GetFlags().WantCall() ||
                                si->GetFlags().WantConstruct())) {
-                        vp.set(OBJECT_TO_JSVAL(obj));
+                        vp.setObject(*obj);
                         return true;
                     }
                 }
@@ -921,7 +924,8 @@ XPC_WN_Helper_Enumerate(JSContext* cx, HandleObject obj)
 /***************************************************************************/
 
 static bool
-XPC_WN_JSOp_Enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties)
+XPC_WN_JSOp_Enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
+                      bool enumerableOnly)
 {
     XPCCallContext ccx(JS_CALLER, cx, obj);
     XPCWrappedNative* wrapper = ccx.GetWrapper();

@@ -103,14 +103,16 @@ class JitCode : public gc::TenuredCell
     size_t instructionsSize() const {
         return insnSize_;
     }
+    size_t bufferSize() const {
+        return bufferSize_;
+    }
+
     void traceChildren(JSTracer* trc);
     void finalize(FreeOp* fop);
     void fixupAfterMovingGC() {}
     void setInvalidated() {
         invalidated_ = true;
     }
-
-    void fixupNurseryObjects(JSContext* cx, const ObjectVector& nurseryObjects);
 
     void setHasBytecodeMap() {
         hasBytecodeMap_ = true;

@@ -1325,8 +1325,11 @@ GlobalObject::initTypedObjectModule(JSContext* cx, Handle<GlobalObject*> global)
     // Everything is setup, install module on the global object:
     RootedValue moduleValue(cx, ObjectValue(*module));
     global->setConstructor(JSProto_TypedObject, moduleValue);
-    if (!DefineProperty(cx, global, cx->names().TypedObject, moduleValue, nullptr, nullptr, 0))
+    if (!DefineProperty(cx, global, cx->names().TypedObject, moduleValue, nullptr, nullptr,
+                        JSPROP_RESOLVING))
+    {
         return false;
+    }
 
     return module;
 }
@@ -2056,7 +2059,8 @@ TypedObject::obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id, Ob
 }
 
 bool
-TypedObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties)
+TypedObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
+                           bool enumerableOnly)
 {
     MOZ_ASSERT(obj->is<TypedObject>());
     Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());

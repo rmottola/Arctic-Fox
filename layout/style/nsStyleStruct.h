@@ -1338,14 +1338,9 @@ struct nsStylePosition {
 
   nsChangeHint CalcDifference(const nsStylePosition& aOther) const;
   static nsChangeHint MaxDifference() {
-    return nsChangeHint(NS_STYLE_HINT_REFLOW |
-                        nsChangeHint_RecomputePosition |
-                        nsChangeHint_UpdateTransformLayer |
-                        nsChangeHint_UpdateOverflow |
-                        nsChangeHint_UpdateParentOverflow |
-                        nsChangeHint_UpdatePostTransformOverflow |
-                        nsChangeHint_AddOrRemoveTransform |
-                        nsChangeHint_NeutralChange);
+    return NS_CombineHint(NS_STYLE_HINT_REFLOW,
+                          nsChangeHint(nsChangeHint_RecomputePosition |
+                                       nsChangeHint_UpdateParentOverflow));
   }
   static nsChangeHint MaxDifferenceNeverInherited() {
     // CalcDifference can return both nsChangeHint_ClearAncestorIntrinsics and
@@ -1358,7 +1353,6 @@ struct nsStylePosition {
   typedef nsStyleBackground::Position Position;
 
   Position      mObjectPosition;        // [reset]
-  nsRect        mClip;                  // [reset] offsets from upper-left border edge
   nsStyleSides  mOffset;                // [reset] coord, percent, calc, auto
   nsStyleCoord  mWidth;                 // [reset] coord, percent, enum, calc, auto
   nsStyleCoord  mMinWidth;              // [reset] coord, percent, enum, calc
@@ -1371,9 +1365,6 @@ struct nsStylePosition {
   nsStyleCoord  mGridAutoColumnsMax;    // [reset] coord, percent, enum, calc, flex
   nsStyleCoord  mGridAutoRowsMin;       // [reset] coord, percent, enum, calc, flex
   nsStyleCoord  mGridAutoRowsMax;       // [reset] coord, percent, enum, calc, flex
-  nsStyleCoord  mTransformOrigin[3];    // [reset] percent, coord, calc, 3rd param is coord, calc only
-  nsStyleCoord  mChildPerspective;      // [reset] coord
-  nsStyleCoord  mPerspectiveOrigin[2];  // [reset] percent, coord, calc
   uint8_t       mGridAutoFlow;          // [reset] enumerated. See nsStyleConsts.h
   uint8_t       mBoxSizing;             // [reset] see nsStyleConsts.h
   uint8_t       mAlignContent;          // [reset] see nsStyleConsts.h
@@ -1383,15 +1374,6 @@ struct nsStylePosition {
   uint8_t       mFlexWrap;              // [reset] see nsStyleConsts.h
   uint8_t       mJustifyContent;        // [reset] see nsStyleConsts.h
   uint8_t       mObjectFit;             // [reset] see nsStyleConsts.h
-  uint8_t       mClipFlags;             // [reset] see nsStyleConsts.h
-  uint8_t       mBackfaceVisibility;    // [reset] see nsStyleConsts.h
-  uint8_t       mTransformStyle;        // [reset] see nsStyleConsts.h
-  uint8_t       mWillChangeBitField;    // [reset] see nsStyleConsts.h. Stores a
-                                        // bitfield representation of the properties
-                                        // that are frequently queried. This should
-                                        // match mWillChange. Also tracks if any of the
-                                        // properties in the will-change list require
-                                        // a stacking context.
   int32_t       mOrder;                 // [reset] integer
   float         mFlexGrow;              // [reset] float
   float         mFlexShrink;            // [reset] float
@@ -1406,14 +1388,6 @@ struct nsStylePosition {
   nsStyleGridLine mGridColumnEnd;
   nsStyleGridLine mGridRowStart;
   nsStyleGridLine mGridRowEnd;
-
-  // mSpecifiedTransform is the list of transform functions as
-  // specified, or null to indicate there is no transform.  (inherit or
-  // initial are replaced by an actual list of transform functions, or
-  // null, as appropriate.)
-  nsRefPtr<nsCSSValueSharedList> mSpecifiedTransform; // [reset]
-
-  nsAutoTArray<nsString, 1> mWillChange;  // see mWillChangeBitField
 
   bool WidthDependsOnContainer() const
     {
@@ -1457,29 +1431,6 @@ struct nsStylePosition {
   {
     return mOffset.Get(aSide).HasPercent();
   }
-
-  /* Returns whether the element has the -moz-transform property
-   * or a related property. */
-  bool HasTransformStyle() const {
-    return mSpecifiedTransform != nullptr ||
-           mTransformStyle == NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D ||
-           (mWillChangeBitField & NS_STYLE_WILL_CHANGE_TRANSFORM);
-  }
-
-  bool HasPerspectiveStyle() const {
-    return mChildPerspective.GetUnit() == eStyleUnit_Coord;
-  }
-
-  bool BackfaceIsHidden() const {
-    return mBackfaceVisibility == NS_STYLE_BACKFACE_VISIBILITY_HIDDEN;
-  }
-
-  // This method is defined in nsStyleStructInlines.h.
-  /* Returns whether the element has the -moz-transform property
-   * or a related property, and supports CSS transforms. */
-  inline bool HasTransform(const nsIFrame* aContextFrame) const;
-
-  inline bool IsFixedPosContainingBlock(const nsIFrame* aContextFrame) const;
 
 private:
   static bool WidthCoordDependsOnContainer(const nsStyleCoord &aCoord);
@@ -2057,6 +2008,10 @@ struct nsStyleDisplay {
     // All the parts of FRAMECHANGE are present in CalcDifference.
     return nsChangeHint(NS_STYLE_HINT_FRAMECHANGE |
                         nsChangeHint_UpdateOpacityLayer |
+                        nsChangeHint_UpdateTransformLayer |
+                        nsChangeHint_UpdateOverflow |
+                        nsChangeHint_UpdatePostTransformOverflow |
+                        nsChangeHint_AddOrRemoveTransform |
                         nsChangeHint_NeutralChange);
   }
   static nsChangeHint MaxDifferenceNeverInherited() {
@@ -2073,6 +2028,7 @@ struct nsStyleDisplay {
   // We guarantee that if mBinding is non-null, so are mBinding->GetURI() and
   // mBinding->mOriginPrincipal.
   nsRefPtr<mozilla::css::URLValue> mBinding;    // [reset]
+  nsRect  mClip;                // [reset] offsets from upper-left border edge
   float   mOpacity;             // [reset]
   uint8_t mDisplay;             // [reset] see nsStyleConsts.h NS_STYLE_DISPLAY_*
   uint8_t mOriginalDisplay;     // [reset] saved mDisplay for position:absolute/fixed
@@ -2091,9 +2047,17 @@ struct nsStyleDisplay {
   uint8_t mOverflowY;           // [reset] see nsStyleConsts.h
   uint8_t mOverflowClipBox;     // [reset] see nsStyleConsts.h
   uint8_t mResize;              // [reset] see nsStyleConsts.h
+  uint8_t mClipFlags;           // [reset] see nsStyleConsts.h
   uint8_t mOrient;              // [reset] see nsStyleConsts.h
   uint8_t mMixBlendMode;        // [reset] see nsStyleConsts.h
   uint8_t mIsolation;           // [reset] see nsStyleConsts.h
+  uint8_t mWillChangeBitField;  // [reset] see nsStyleConsts.h. Stores a
+                                // bitfield representation of the properties
+                                // that are frequently queried. This should
+                                // match mWillChange. Also tracks if any of the
+                                // properties in the will-change list require
+                                // a stacking context.
+  nsAutoTArray<nsString, 1> mWillChange;
 
   uint8_t mTouchAction;         // [reset] see nsStyleConsts.h
   uint8_t mScrollBehavior;      // [reset] see nsStyleConsts.h NS_STYLE_SCROLL_BEHAVIOR_*
@@ -2103,6 +2067,17 @@ struct nsStyleDisplay {
   nsStyleCoord mScrollSnapPointsY; // [reset]
   Position mScrollSnapDestination; // [reset]
   nsTArray<Position> mScrollSnapCoordinate; // [reset]
+
+  // mSpecifiedTransform is the list of transform functions as
+  // specified, or null to indicate there is no transform.  (inherit or
+  // initial are replaced by an actual list of transform functions, or
+  // null, as appropriate.)
+  uint8_t mBackfaceVisibility;
+  uint8_t mTransformStyle;
+  nsRefPtr<nsCSSValueSharedList> mSpecifiedTransform; // [reset]
+  nsStyleCoord mTransformOrigin[3]; // [reset] percent, coord, calc, 3rd param is coord, calc only
+  nsStyleCoord mChildPerspective; // [reset] coord
+  nsStyleCoord mPerspectiveOrigin[2]; // [reset] percent, coord, calc
 
   nsAutoTArray<mozilla::StyleTransition, 1> mTransitions; // [reset]
   // The number of elements in mTransitions that are not from repeating
@@ -2222,6 +2197,22 @@ struct nsStyleDisplay {
            mOverflowX != NS_STYLE_OVERFLOW_CLIP;
   }
 
+  /* Returns whether the element has the -moz-transform property
+   * or a related property. */
+  bool HasTransformStyle() const {
+    return mSpecifiedTransform != nullptr ||
+           mTransformStyle == NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D ||
+           (mWillChangeBitField & NS_STYLE_WILL_CHANGE_TRANSFORM);
+  }
+
+  bool HasPerspectiveStyle() const {
+    return mChildPerspective.GetUnit() == eStyleUnit_Coord;
+  }
+
+  bool BackfaceIsHidden() const {
+    return mBackfaceVisibility == NS_STYLE_BACKFACE_VISIBILITY_HIDDEN;
+  }
+
   // These are defined in nsStyleStructInlines.h.
 
   // The aContextFrame argument on each of these is the frame this
@@ -2237,6 +2228,22 @@ struct nsStyleDisplay {
   inline bool IsAbsPosContainingBlock(const nsIFrame* aContextFrame) const;
   inline bool IsRelativelyPositioned(const nsIFrame* aContextFrame) const;
   inline bool IsAbsolutelyPositioned(const nsIFrame* aContextFrame) const;
+
+  // These methods are defined in nsStyleStructInlines.h.
+
+  /**
+   * Returns true when the element has the transform property
+   * or a related property, and supports CSS transforms.
+   * aContextFrame is the frame for which this is the nsStylePosition.
+   */
+  inline bool HasTransform(const nsIFrame* aContextFrame) const;
+
+  /**
+   * Returns true when the element is a containing block for its fixed-pos
+   * descendants.
+   * aContextFrame is the frame for which this is the nsStylePosition.
+   */
+  inline bool IsFixedPosContainingBlock(const nsIFrame* aContextFrame) const;
 };
 
 struct nsStyleTable {

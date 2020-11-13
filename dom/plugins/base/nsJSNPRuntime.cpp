@@ -177,7 +177,8 @@ static bool
 NPObjWrapper_GetProperty(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp);
 
 static bool
-NPObjWrapper_Enumerate(JSContext *cx, JS::Handle<JSObject*> obj, JS::AutoIdVector &properties);
+NPObjWrapper_Enumerate(JSContext *cx, JS::Handle<JSObject*> obj, JS::AutoIdVector &properties,
+                       bool enumerableOnly);
 
 static bool
 NPObjWrapper_Resolve(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
@@ -498,7 +499,7 @@ NPVariantToJSVal(NPP npp, JSContext *cx, const NPVariant *variant)
   case NPVariantType_Null :
     return JSVAL_NULL;
   case NPVariantType_Bool :
-    return BOOLEAN_TO_JSVAL(NPVARIANT_TO_BOOLEAN(*variant));
+    return JS::BooleanValue(NPVARIANT_TO_BOOLEAN(*variant));
   case NPVariantType_Int32 :
     {
       // Don't use INT_TO_JSVAL directly to prevent bugs when dealing
@@ -518,7 +519,7 @@ NPVariantToJSVal(NPP npp, JSContext *cx, const NPVariant *variant)
         ::JS_NewUCStringCopyN(cx, utf16String.get(), utf16String.Length());
 
       if (str) {
-        return STRING_TO_JSVAL(str);
+        return JS::StringValue(str);
       }
 
       break;
@@ -530,7 +531,7 @@ NPVariantToJSVal(NPP npp, JSContext *cx, const NPVariant *variant)
           nsNPObjWrapper::GetNewOrUsed(npp, cx, NPVARIANT_TO_OBJECT(*variant));
 
         if (obj) {
-          return OBJECT_TO_JSVAL(obj);
+          return JS::ObjectValue(*obj);
         }
       }
 
@@ -1627,7 +1628,7 @@ CallNPMethod(JSContext *cx, unsigned argc, JS::Value *vp)
 
 static bool
 NPObjWrapper_Enumerate(JSContext *cx, JS::Handle<JSObject*> obj,
-                       JS::AutoIdVector &properties)
+                       JS::AutoIdVector &properties, bool enumerableOnly)
 {
   NPObject *npobj = GetNPObject(cx, obj);
   if (!npobj || !npobj->_class) {

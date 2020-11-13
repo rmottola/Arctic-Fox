@@ -17,6 +17,8 @@
 # include "jit/x64/MacroAssembler-x64.h"
 #elif defined(JS_CODEGEN_ARM)
 # include "jit/arm/MacroAssembler-arm.h"
+#elif defined(JS_CODEGEN_ARM64)
+# include "jit/arm64/MacroAssembler-arm64.h"
 #elif defined(JS_CODEGEN_MIPS)
 # include "jit/mips/MacroAssembler-mips.h"
 #elif defined(JS_CODEGEN_NONE)
@@ -43,6 +45,8 @@
 #elif defined(JS_CODEGEN_X64)
 # define ONLY_X86_X64
 #elif defined(JS_CODEGEN_ARM)
+# define ONLY_X86_X64 = delete
+#elif defined(JS_CODEGEN_ARM64)
 # define ONLY_X86_X64 = delete
 #elif defined(JS_CODEGEN_MIPS)
 # define ONLY_X86_X64 = delete
@@ -233,9 +237,13 @@ class MacroAssembler : public MacroAssemblerSpecific
         }
 
         moveResolver_.setAllocator(*jcx->temp);
-#ifdef JS_CODEGEN_ARM
+
+#if defined(JS_CODEGEN_ARM)
         initWithAllocator();
         m_buffer.id = jcx->getNextAssemblerId();
+#elif defined(JS_CODEGEN_ARM64)
+        initWithAllocator();
+        armbuffer_.id = jcx->getNextAssemblerId();
 #endif
     }
 
@@ -250,9 +258,12 @@ class MacroAssembler : public MacroAssemblerSpecific
       : emitProfilingInstrumentation_(false),
         framePushed_(0)
     {
-#ifdef JS_CODEGEN_ARM
+#if defined(JS_CODEGEN_ARM)
         initWithAllocator();
         m_buffer.id = 0;
+#elif defined(JS_CODEGEN_ARM64)
+        initWithAllocator();
+        armbuffer_.id = 0;
 #endif
     }
 
@@ -350,14 +361,13 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     // Emits a test of a value against all types in a TypeSet. A scratch
     // register is required.
-    template <typename Source, typename TypeSet>
-    void guardTypeSet(const Source& address, const TypeSet* types, BarrierKind kind, Register scratch, Label* miss);
-    template <typename TypeSet>
-    void guardObjectType(Register obj, const TypeSet* types, Register scratch, Label* miss);
     template <typename Source>
-    void guardType(const Source& address, TypeSet::Type type, Register scratch, Label* miss);
+    void guardTypeSet(const Source& address, const TypeSet* types, BarrierKind kind, Register scratch, Label* miss);
 
-    void guardTypeSetMightBeIncomplete(Register obj, Register scratch, Label* label);
+    void guardObjectType(Register obj, const TypeSet* types, Register scratch, Label* miss);
+
+    template <typename TypeSet>
+    void guardTypeSetMightBeIncomplete(TypeSet* types, Register obj, Register scratch, Label* label);
 
     void loadObjShape(Register objReg, Register dest) {
         loadPtr(Address(objReg, JSObject::offsetOfShape()), dest);
@@ -573,7 +583,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         }
 #elif defined(JS_PUNBOX64)
         if (dest.valueReg() != JSReturnReg)
-            movq(JSReturnReg, dest.valueReg());
+            mov(JSReturnReg, dest.valueReg());
 #else
 #error "Bad architecture"
 #endif
@@ -722,6 +732,10 @@ class MacroAssembler : public MacroAssemblerSpecific
     template<typename T>
     void compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem, Register oldval, Register newval,
                                         Register temp, AnyRegister output);
+
+    template<typename T>
+    void atomicExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem, Register value,
+                                       Register temp, AnyRegister output);
 
     // Generating a result.
     template<typename S, typename T>
@@ -940,6 +954,21 @@ class MacroAssembler : public MacroAssemblerSpecific
     {
         loadObjClass(object, scratch);
         branchTestClassIsProxy(proxy, scratch, label);
+    }
+
+    void branchFunctionKind(Condition cond, JSFunction::FunctionKind kind, Register fun,
+                            Register scratch, Label* label)
+    {
+        // 16-bit loads are slow and unaligned 32-bit loads may be too so
+        // perform an aligned 32-bit load and adjust the bitmask accordingly.
+        MOZ_ASSERT(JSFunction::offsetOfNargs() % sizeof(uint32_t) == 0);
+        MOZ_ASSERT(JSFunction::offsetOfFlags() == JSFunction::offsetOfNargs() + 2);
+        Address address(fun, JSFunction::offsetOfNargs());
+        int32_t mask = IMM32_16ADJ(JSFunction::FUNCTION_KIND_MASK);
+        int32_t bit = IMM32_16ADJ(kind << JSFunction::FUNCTION_KIND_SHIFT);
+        load32(address, scratch);
+        and32(Imm32(mask), scratch);
+        branch32(cond, scratch, Imm32(bit), label);
     }
 
   public:

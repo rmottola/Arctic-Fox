@@ -213,8 +213,11 @@ class AssemblerX86Shared : public AssemblerShared
     CompactBufferWriter preBarriers_;
 
     void writeDataRelocation(ImmGCPtr ptr) {
-        if (ptr.value)
+        if (ptr.value) {
+            if (gc::IsInsideNursery(ptr.value))
+                embedsNurseryPointers_ = true;
             dataRelocations_.writeUnsigned(masm.currentOffset());
+        }
     }
     void writePrebarrierOffset(CodeOffsetLabel label) {
         preBarriers_.writeUnsigned(label.offset());
@@ -331,9 +334,6 @@ class AssemblerX86Shared : public AssemblerShared
     }
 
     static void TraceDataRelocations(JSTracer* trc, JitCode* code, CompactBufferReader& reader);
-
-    static void FixupNurseryObjects(JSContext* cx, JitCode* code, CompactBufferReader& reader,
-                                    const ObjectVector& nurseryObjects);
 
     // MacroAssemblers hold onto gcthings, so they are traced by the GC.
     void trace(JSTracer* trc);
@@ -1106,6 +1106,9 @@ class AssemblerX86Shared : public AssemblerShared
           case Operand::MEM_ADDRESS32:
             masm.addl_im(imm.value, op.address());
             break;
+          case Operand::MEM_SCALE:
+            masm.addl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
+            break;
           default:
             MOZ_CRASH("unexpected operand kind");
         }
@@ -1120,6 +1123,9 @@ class AssemblerX86Shared : public AssemblerShared
             break;
           case Operand::MEM_REG_DISP:
             masm.subl_im(imm.value, op.disp(), op.base());
+            break;
+          case Operand::MEM_SCALE:
+            masm.subl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
             break;
           default:
             MOZ_CRASH("unexpected operand kind");
@@ -1202,6 +1208,9 @@ class AssemblerX86Shared : public AssemblerShared
           case Operand::MEM_REG_DISP:
             masm.orl_im(imm.value, op.disp(), op.base());
             break;
+          case Operand::MEM_SCALE:
+            masm.orl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
+            break;
           default:
             MOZ_CRASH("unexpected operand kind");
         }
@@ -1235,6 +1244,9 @@ class AssemblerX86Shared : public AssemblerShared
           case Operand::MEM_REG_DISP:
             masm.xorl_im(imm.value, op.disp(), op.base());
             break;
+          case Operand::MEM_SCALE:
+            masm.xorl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
+            break;
           default:
             MOZ_CRASH("unexpected operand kind");
         }
@@ -1267,6 +1279,9 @@ class AssemblerX86Shared : public AssemblerShared
             break;
           case Operand::MEM_REG_DISP:
             masm.andl_im(imm.value, op.disp(), op.base());
+            break;
+          case Operand::MEM_SCALE:
+            masm.andl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
             break;
           default:
             MOZ_CRASH("unexpected operand kind");
@@ -1678,6 +1693,43 @@ class AssemblerX86Shared : public AssemblerShared
             break;
           case Operand::MEM_SCALE:
             masm.cmpxchgl(src.encoding(), mem.disp(), mem.base(), mem.index(), mem.scale());
+            break;
+          default:
+            MOZ_CRASH("unexpected operand kind");
+        }
+    }
+
+    void xchgb(Register src, const Operand& mem) {
+        switch (mem.kind()) {
+          case Operand::MEM_REG_DISP:
+            masm.xchgb_rm(src.encoding(), mem.disp(), mem.base());
+            break;
+          case Operand::MEM_SCALE:
+            masm.xchgb_rm(src.encoding(), mem.disp(), mem.base(), mem.index(), mem.scale());
+            break;
+          default:
+            MOZ_CRASH("unexpected operand kind");
+        }
+    }
+    void xchgw(Register src, const Operand& mem) {
+        switch (mem.kind()) {
+          case Operand::MEM_REG_DISP:
+            masm.xchgw_rm(src.encoding(), mem.disp(), mem.base());
+            break;
+          case Operand::MEM_SCALE:
+            masm.xchgw_rm(src.encoding(), mem.disp(), mem.base(), mem.index(), mem.scale());
+            break;
+          default:
+            MOZ_CRASH("unexpected operand kind");
+        }
+    }
+    void xchgl(Register src, const Operand& mem) {
+        switch (mem.kind()) {
+          case Operand::MEM_REG_DISP:
+            masm.xchgl_rm(src.encoding(), mem.disp(), mem.base());
+            break;
+          case Operand::MEM_SCALE:
+            masm.xchgl_rm(src.encoding(), mem.disp(), mem.base(), mem.index(), mem.scale());
             break;
           default:
             MOZ_CRASH("unexpected operand kind");

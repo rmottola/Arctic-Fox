@@ -613,12 +613,12 @@ JSVAL_TO_GCTHING_IMPL(jsval_layout l)
 static inline uint32_t
 JSVAL_TRACE_KIND_IMPL(jsval_layout l)
 {
-    static_assert((JSVAL_TAG_STRING & 0x03) == JSTRACE_STRING,
-                  "Value type tags must correspond with JSGCTraceKinds.");
-    static_assert((JSVAL_TAG_SYMBOL & 0x03) == JSTRACE_SYMBOL,
-                  "Value type tags must correspond with JSGCTraceKinds.");
-    static_assert((JSVAL_TAG_OBJECT & 0x03) == JSTRACE_OBJECT,
-                  "Value type tags must correspond with JSGCTraceKinds.");
+    static_assert((JSVAL_TAG_STRING & 0x03) == size_t(JS::TraceKind::String),
+                  "Value type tags must correspond with JS::TraceKinds.");
+    static_assert((JSVAL_TAG_SYMBOL & 0x03) == size_t(JS::TraceKind::Symbol),
+                  "Value type tags must correspond with JS::TraceKinds.");
+    static_assert((JSVAL_TAG_OBJECT & 0x03) == size_t(JS::TraceKind::Object),
+                  "Value type tags must correspond with JS::TraceKinds.");
     return l.s.tag & 0x03;
 }
 
@@ -854,12 +854,12 @@ JSVAL_TO_GCTHING_IMPL(jsval_layout l)
 static inline uint32_t
 JSVAL_TRACE_KIND_IMPL(jsval_layout l)
 {
-    static_assert((JSVAL_TAG_STRING & 0x03) == JSTRACE_STRING,
-                  "Value type tags must correspond with JSGCTraceKinds.");
-    static_assert((JSVAL_TAG_SYMBOL & 0x03) == JSTRACE_SYMBOL,
-                  "Value type tags must correspond with JSGCTraceKinds.");
-    static_assert((JSVAL_TAG_OBJECT & 0x03) == JSTRACE_OBJECT,
-                  "Value type tags must correspond with JSGCTraceKinds.");
+    static_assert((JSVAL_TAG_STRING & 0x03) == size_t(JS::TraceKind::String),
+                  "Value type tags must correspond with JS::TraceKinds.");
+    static_assert((JSVAL_TAG_SYMBOL & 0x03) == size_t(JS::TraceKind::Symbol),
+                  "Value type tags must correspond with JS::TraceKinds.");
+    static_assert((JSVAL_TAG_OBJECT & 0x03) == size_t(JS::TraceKind::Object),
+                  "Value type tags must correspond with JS::TraceKinds.");
     return (uint32_t)(l.asBits >> JSVAL_TAG_SHIFT) & 0x03;
 }
 
@@ -1179,9 +1179,9 @@ class Value
         return JSVAL_IS_TRACEABLE_IMPL(data);
     }
 
-    JSGCTraceKind gcKind() const {
+    JS::TraceKind traceKind() const {
         MOZ_ASSERT(isMarkable());
-        return JSGCTraceKind(JSVAL_TRACE_KIND_IMPL(data));
+        return JS::TraceKind(JSVAL_TRACE_KIND_IMPL(data));
     }
 
     JSWhyMagic whyMagic() const {
@@ -1249,7 +1249,7 @@ class Value
     }
 
     GCCellPtr toGCCellPtr() const {
-        return GCCellPtr(toGCThing(), gcKind());
+        return GCCellPtr(toGCThing(), traceKind());
     }
 
     bool toBoolean() const {
@@ -1967,34 +1967,6 @@ UINT_TO_JSVAL(uint32_t i)
     return i <= JSVAL_INT_MAX
            ? INT_TO_JSVAL((int32_t)i)
            : DOUBLE_TO_JSVAL((double)i);
-}
-
-static inline jsval
-STRING_TO_JSVAL(JSString* str)
-{
-    return IMPL_TO_JSVAL(STRING_TO_JSVAL_IMPL(str));
-}
-
-static inline jsval
-OBJECT_TO_JSVAL(JSObject* obj)
-{
-    if (obj)
-        return IMPL_TO_JSVAL(OBJECT_TO_JSVAL_IMPL(obj));
-    return IMPL_TO_JSVAL(BUILD_JSVAL(JSVAL_TAG_NULL, 0));
-}
-
-static inline jsval
-BOOLEAN_TO_JSVAL(bool b)
-{
-    return IMPL_TO_JSVAL(BOOLEAN_TO_JSVAL_IMPL(b));
-}
-
-/* To be GC-safe, privates are tagged as doubles. */
-
-static inline jsval
-PRIVATE_TO_JSVAL(void* ptr)
-{
-    return IMPL_TO_JSVAL(PRIVATE_PTR_TO_JSVAL_IMPL(ptr));
 }
 
 // JS constants. For efficiency, prefer predicates (e.g. v.isNull()) and

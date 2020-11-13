@@ -7,6 +7,7 @@
 typedef long myLong;
 typedef TestInterface AnotherNameForTestInterface;
 typedef TestInterface? NullableTestInterface;
+typedef CustomEventInit TestDictionaryTypedef;
 
 interface TestExternalInterface;
 
@@ -685,6 +686,7 @@ interface TestInterface {
   attribute byte otherAttributeRenamedFrom;
 
   void passDictionary(optional Dict x);
+  void passDictionary2(Dict x);
   [Cached, Pure]
   readonly attribute Dict readonlyDictionary;
   [Cached, Pure]
@@ -1018,6 +1020,7 @@ dictionary Dict : ParentDict {
   required object requiredObject;
 
   CustomEventInit customEventInit;
+  TestDictionaryTypedef dictionaryTypedef;
 };
 
 dictionary ParentDict : GrandparentDict {

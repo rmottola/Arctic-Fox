@@ -104,12 +104,20 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, jsval* vp)
     if (!JS_SetProperty(cx, info, "x64", value))
         return false;
 
-#ifdef JS_ARM_SIMULATOR
+#ifdef JS_SIMULATOR_ARM
     value = BooleanValue(true);
 #else
     value = BooleanValue(false);
 #endif
     if (!JS_SetProperty(cx, info, "arm-simulator", value))
+        return false;
+
+#ifdef JS_SIMULATOR_ARM64
+    value = BooleanValue(true);
+#else
+    value = BooleanValue(false);
+#endif
+    if (!JS_SetProperty(cx, info, "arm64-simulator", value))
         return false;
 
 #ifdef MOZ_ASAN
@@ -797,7 +805,7 @@ NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, jsval* vp)
 
 struct JSCountHeapNode {
     void*               thing;
-    JSGCTraceKind       kind;
+    JS::TraceKind       kind;
     JSCountHeapNode*    next;
 };
 
@@ -815,7 +823,7 @@ class CountHeapTracer : public JS::CallbackTracer
 };
 
 static void
-CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
+CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
 {
     CountHeapTracer* countTracer = (CountHeapTracer*)trc;
     void* thing = *thingp;
@@ -850,12 +858,12 @@ CountHeapNotify(JS::CallbackTracer* trc, void** thingp, JSGCTraceKind kind)
 
 static const struct TraceKindPair {
     const char*      name;
-    int32_t           kind;
+    int32_t          kind;
 } traceKindNames[] = {
-    { "all",        -1                  },
-    { "object",     JSTRACE_OBJECT      },
-    { "string",     JSTRACE_STRING      },
-    { "symbol",     JSTRACE_SYMBOL      },
+    { "all",        -1                             },
+    { "object",     int32_t(JS::TraceKind::Object) },
+    { "string",     int32_t(JS::TraceKind::String) },
+    { "symbol",     int32_t(JS::TraceKind::Symbol) },
 };
 
 static bool
@@ -934,7 +942,7 @@ CountHeap(JSContext* cx, unsigned argc, jsval* vp)
     while ((node = countTracer.traceList) != nullptr) {
         if (traceThing == nullptr) {
             // We are looking for all nodes with a specific kind
-            if (traceKind == -1 || node->kind == traceKind)
+            if (traceKind == -1 || int32_t(node->kind) == traceKind)
                 counter++;
         } else {
             // We are looking for some specific thing
@@ -958,10 +966,6 @@ CountHeap(JSContext* cx, unsigned argc, jsval* vp)
     args.rval().setNumber(double(counter));
     return true;
 }
-
-// Stolen from jsmath.cpp
-static const uint64_t RNG_MULTIPLIER = 0x5DEECE66DLL;
-static const uint64_t RNG_MASK = (1LL << 48) - 1;
 
 static bool
 SetSavedStacksRNGState(JSContext* cx, unsigned argc, jsval* vp)
@@ -2111,7 +2115,7 @@ static bool
 ReportLargeAllocationFailure(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    void* buf = cx->runtime()->onOutOfMemoryCanGC(NULL, JSRuntime::LARGE_ALLOCATION);
+    void* buf = cx->runtime()->onOutOfMemoryCanGC(AllocFunction::Malloc, JSRuntime::LARGE_ALLOCATION);
     js_free(buf);
     args.rval().setUndefined();
     return true;

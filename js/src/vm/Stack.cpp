@@ -143,11 +143,8 @@ InterpreterFrame::createRestParameter(JSContext* cx)
     unsigned nformal = fun()->nargs() - 1, nactual = numActualArgs();
     unsigned nrest = (nactual > nformal) ? nactual - nformal : 0;
     Value* restvp = argv() + nformal;
-    ArrayObject* obj = NewDenseCopiedArray(cx, nrest, restvp, nullptr);
-    if (!obj)
-        return nullptr;
-    ObjectGroup::fixRestArgumentsGroup(cx, obj);
-    return obj;
+    return ObjectGroup::newArrayObject(cx, restvp, nrest, GenericObject,
+                                       ObjectGroup::NewArrayKind::UnknownIndex);
 }
 
 static inline void
@@ -1660,17 +1657,11 @@ AsmJSActivation::AsmJSActivation(JSContext* cx, AsmJSModule& module)
   : Activation(cx, AsmJS),
     module_(module),
     entrySP_(nullptr),
-    profiler_(nullptr),
     resumePC_(nullptr),
     fp_(nullptr),
     exitReason_(AsmJSExit::None)
 {
     (void) entrySP_;  // squelch GCC warning
-
-    // NB: this is a hack and can be removed once Ion switches over to
-    // JS::ProfilingFrameIterator.
-    if (cx->runtime()->spsProfiler.enabled())
-        profiler_ = &cx->runtime()->spsProfiler;
 
     prevAsmJSForModule_ = module.activation();
     module.activation() = this;

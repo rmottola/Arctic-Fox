@@ -546,7 +546,7 @@ Rule.prototype = {
 
       this._originalSourceStrings = sourceStrings;
       return sourceStrings;
-    }, console.error);
+    });
   },
 
   /**

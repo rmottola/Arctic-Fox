@@ -9,6 +9,8 @@
 
 #if defined(JS_CODEGEN_ARM)
 # include "jit/arm/AtomicOperations-arm.h"
+#elif defined(JS_CODEGEN_ARM64)
+# include "jit/arm64/AtomicOperations-arm64.h"
 #elif defined(JS_CODEGEN_MIPS)
 # include "jit/mips/AtomicOperations-mips.h"
 #elif defined(JS_CODEGEN_NONE)
@@ -19,4 +21,21 @@
 # error "Atomic operations must be defined for this platform"
 #endif
 
-#endif //  jit_AtomicOperations_inl_h
+inline bool
+js::jit::AtomicOperations::isLockfree(int32_t size)
+{
+    // Keep this in sync with visitAtomicIsLockFree() in jit/CodeGenerator.cpp.
+
+    switch (size) {
+      case 1:
+      case 2:
+      case 4:
+        return true;
+      case 8:
+        return AtomicOperations::isLockfree8();
+      default:
+        return false;
+    }
+}
+
+#endif // jit_AtomicOperations_inl_h

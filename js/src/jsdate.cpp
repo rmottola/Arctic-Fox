@@ -50,9 +50,12 @@ using namespace js;
 using mozilla::ArrayLength;
 using mozilla::IsFinite;
 using mozilla::IsNaN;
+using mozilla::NumbersAreIdentical;
 
 using JS::AutoCheckCannotGC;
+using JS::ClippedTime;
 using JS::GenericNaN;
+using JS::TimeClip;
 using JS::ToInteger;
 
 /*
@@ -350,7 +353,7 @@ MakeDate(double day, double time)
 JS_PUBLIC_API(double)
 JS::MakeDate(double year, unsigned month, unsigned day)
 {
-    return TimeClip(::MakeDate(MakeDay(year, month, day), 0));
+    return ::MakeDate(MakeDay(year, month, day), 0);
 }
 
 JS_PUBLIC_API(double)
@@ -566,14 +569,6 @@ RegionMatches(const char* s1, int s1off, const CharT* s2, int s2off, int count)
     return count == 0;
 }
 
-/* find UTC time from given date... no 1900 correction! */
-static double
-date_msecFromDate(double year, double mon, double mday, double hour,
-                  double min, double sec, double msec)
-{
-    return MakeDate(MakeDay(year, mon, mday), MakeTime(hour, min, sec, msec));
-}
-
 /* ES6 20.3.3.4. */
 static bool
 date_UTC(JSContext* cx, unsigned argc, Value* vp)
@@ -644,7 +639,8 @@ date_UTC(JSContext* cx, unsigned argc, Value* vp)
     }
 
     // Step 16.
-    args.rval().setDouble(TimeClip(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
+    ClippedTime time = TimeClip(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli)));
+    args.rval().set(TimeValue(time));
     return true;
 }
 
@@ -777,7 +773,7 @@ DaysInMonth(int year, int month)
  */
 template <typename CharT>
 static bool
-ParseISODate(const CharT* s, size_t length, double* result, DateTimeInfo* dtInfo)
+ParseISODate(const CharT* s, size_t length, ClippedTime* result, DateTimeInfo* dtInfo)
 {
     size_t i = 0;
     int tzMul = 1;
@@ -873,19 +869,16 @@ ParseISODate(const CharT* s, size_t length, double* result, DateTimeInfo* dtInfo
 
     month -= 1; /* convert month to 0-based */
 
-    double msec = date_msecFromDate(dateMul * double(year), month, day,
-                                    hour, min, sec, frac * 1000.0);
+    double msec = MakeDate(MakeDay(dateMul * double(year), month, day),
+                           MakeTime(hour, min, sec, frac * 1000.0));
 
     if (isLocalTime)
         msec = UTC(msec, dtInfo);
     else
         msec -= tzMul * (tzHour * msPerHour + tzMin * msPerMinute);
 
-    if (msec < -8.64e15 || msec > 8.64e15)
-        return false;
-
-    *result = msec;
-    return true;
+    *result = TimeClip(msec);
+    return NumbersAreIdentical(msec, result->toDouble());
 
 #undef PEEK
 #undef NEED
@@ -895,7 +888,7 @@ ParseISODate(const CharT* s, size_t length, double* result, DateTimeInfo* dtInfo
 
 template <typename CharT>
 static bool
-ParseDate(const CharT* s, size_t length, double* result, DateTimeInfo* dtInfo)
+ParseDate(const CharT* s, size_t length, ClippedTime* result, DateTimeInfo* dtInfo)
 {
     if (ParseISODate(s, length, result, dtInfo))
         return true;
@@ -1156,19 +1149,19 @@ ParseDate(const CharT* s, size_t length, double* result, DateTimeInfo* dtInfo)
     if (hour < 0)
         hour = 0;
 
-    double msec = date_msecFromDate(year, mon, mday, hour, min, sec, 0);
+    double msec = MakeDate(MakeDay(year, mon, mday), MakeTime(hour, min, sec, 0));
 
     if (tzOffset == -1) /* no time zone specified, have to use local */
         msec = UTC(msec, dtInfo);
     else
         msec += tzOffset * msPerMinute;
 
-    *result = msec;
+    *result = TimeClip(msec);
     return true;
 }
 
 static bool
-ParseDate(JSLinearString* s, double* result, DateTimeInfo* dtInfo)
+ParseDate(JSLinearString* s, ClippedTime* result, DateTimeInfo* dtInfo)
 {
     AutoCheckCannotGC nogc;
     return s->hasLatin1Chars()
@@ -1193,45 +1186,44 @@ date_parse(JSContext* cx, unsigned argc, Value* vp)
     if (!linearStr)
         return false;
 
-    double result;
+    ClippedTime result;
     if (!ParseDate(linearStr, &result, &cx->runtime()->dateTimeInfo)) {
         args.rval().setNaN();
         return true;
     }
 
-    result = TimeClip(result);
-    args.rval().setNumber(result);
+    args.rval().set(TimeValue(result));
     return true;
 }
 
-static inline double
+static ClippedTime
 NowAsMillis()
 {
-    return (double) (PRMJ_Now() / PRMJ_USEC_PER_MSEC);
+    return TimeClip(static_cast<double>(PRMJ_Now()) / PRMJ_USEC_PER_MSEC);
 }
 
 bool
 js::date_now(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    args.rval().setDouble(NowAsMillis());
+    args.rval().set(TimeValue(NowAsMillis()));
     return true;
 }
 
 void
-DateObject::setUTCTime(double t)
+DateObject::setUTCTime(ClippedTime t)
 {
     for (size_t ind = COMPONENTS_START_SLOT; ind < RESERVED_SLOTS; ind++)
         setReservedSlot(ind, UndefinedValue());
 
-    setFixedSlot(UTC_TIME_SLOT, DoubleValue(t));
+    setFixedSlot(UTC_TIME_SLOT, TimeValue(t));
 }
 
 void
-DateObject::setUTCTime(double t, MutableHandleValue vp)
+DateObject::setUTCTime(ClippedTime t, MutableHandleValue vp)
 {
     setUTCTime(t);
-    vp.setDouble(t);
+    vp.set(TimeValue(t));
 }
 
 void
@@ -1694,7 +1686,7 @@ date_setTime_impl(JSContext* cx, const CallArgs& args)
 {
     Rooted<DateObject*> dateObj(cx, &args.thisv().toObject().as<DateObject>());
     if (args.length() == 0) {
-        dateObj->setUTCTime(GenericNaN(), args.rval());
+        dateObj->setUTCTime(ClippedTime::invalid(), args.rval());
         return true;
     }
 
@@ -1759,7 +1751,7 @@ date_setMilliseconds_impl(JSContext* cx, const CallArgs& args)
     double time = MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), milli);
 
     /* Step 3. */
-    double u = TimeClip(UTC(MakeDate(Day(t), time), &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(MakeDate(Day(t), time), &cx->runtime()->dateTimeInfo));
 
     /* Steps 4-5. */
     dateObj->setUTCTime(u, args.rval());
@@ -1789,7 +1781,7 @@ date_setUTCMilliseconds_impl(JSContext* cx, const CallArgs& args)
     double time = MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), milli);
 
     /* Step 3. */
-    double v = TimeClip(MakeDate(Day(t), time));
+    ClippedTime v = TimeClip(MakeDate(Day(t), time));
 
     /* Steps 4-5. */
     dateObj->setUTCTime(v, args.rval());
@@ -1826,7 +1818,7 @@ date_setSeconds_impl(JSContext* cx, const CallArgs& args)
     double date = MakeDate(Day(t), MakeTime(HourFromTime(t), MinFromTime(t), s, milli));
 
     /* Step 5. */
-    double u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
 
     /* Steps 6-7. */
     dateObj->setUTCTime(u, args.rval());
@@ -1863,7 +1855,7 @@ date_setUTCSeconds_impl(JSContext* cx, const CallArgs& args)
     double date = MakeDate(Day(t), MakeTime(HourFromTime(t), MinFromTime(t), s, milli));
 
     /* Step 5. */
-    double v = TimeClip(date);
+    ClippedTime v = TimeClip(date);
 
     /* Steps 6-7. */
     dateObj->setUTCTime(v, args.rval());
@@ -1905,7 +1897,7 @@ date_setMinutes_impl(JSContext* cx, const CallArgs& args)
     double date = MakeDate(Day(t), MakeTime(HourFromTime(t), m, s, milli));
 
     /* Step 6. */
-    double u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
 
     /* Steps 7-8. */
     dateObj->setUTCTime(u, args.rval());
@@ -1947,7 +1939,7 @@ date_setUTCMinutes_impl(JSContext* cx, const CallArgs& args)
     double date = MakeDate(Day(t), MakeTime(HourFromTime(t), m, s, milli));
 
     /* Step 6. */
-    double v = TimeClip(date);
+    ClippedTime v = TimeClip(date);
 
     /* Steps 7-8. */
     dateObj->setUTCTime(v, args.rval());
@@ -1994,7 +1986,7 @@ date_setHours_impl(JSContext* cx, const CallArgs& args)
     double date = MakeDate(Day(t), MakeTime(h, m, s, milli));
 
     /* Step 6. */
-    double u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(date, &cx->runtime()->dateTimeInfo));
 
     /* Steps 7-8. */
     dateObj->setUTCTime(u, args.rval());
@@ -2041,7 +2033,7 @@ date_setUTCHours_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(Day(t), MakeTime(h, m, s, milli));
 
     /* Step 7. */
-    double v = TimeClip(newDate);
+    ClippedTime v = TimeClip(newDate);
 
     /* Steps 8-9. */
     dateObj->setUTCTime(v, args.rval());
@@ -2073,7 +2065,7 @@ date_setDate_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), date), TimeWithinDay(t));
 
     /* Step 4. */
-    double u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
 
     /* Steps 5-6. */
     dateObj->setUTCTime(u, args.rval());
@@ -2105,7 +2097,7 @@ date_setUTCDate_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), date), TimeWithinDay(t));
 
     /* Step 4. */
-    double v = TimeClip(newDate);
+    ClippedTime v = TimeClip(newDate);
 
     /* Steps 5-6. */
     dateObj->setUTCTime(v, args.rval());
@@ -2162,7 +2154,7 @@ date_setMonth_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(YearFromTime(t), m, date), TimeWithinDay(t));
 
     /* Step 5. */
-    double u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
 
     /* Steps 6-7. */
     dateObj->setUTCTime(u, args.rval());
@@ -2199,7 +2191,7 @@ date_setUTCMonth_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(YearFromTime(t), m, date), TimeWithinDay(t));
 
     /* Step 5. */
-    double v = TimeClip(newDate);
+    ClippedTime v = TimeClip(newDate);
 
     /* Steps 6-7. */
     dateObj->setUTCTime(v, args.rval());
@@ -2257,7 +2249,7 @@ date_setFullYear_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(y, m, date), TimeWithinDay(t));
 
     /* Step 6. */
-    double u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
+    ClippedTime u = TimeClip(UTC(newDate, &cx->runtime()->dateTimeInfo));
 
     /* Steps 7-8. */
     dateObj->setUTCTime(u, args.rval());
@@ -2299,7 +2291,7 @@ date_setUTCFullYear_impl(JSContext* cx, const CallArgs& args)
     double newDate = MakeDate(MakeDay(y, m, date), TimeWithinDay(t));
 
     /* Step 6. */
-    double v = TimeClip(newDate);
+    ClippedTime v = TimeClip(newDate);
 
     /* Steps 7-8. */
     dateObj->setUTCTime(v, args.rval());
@@ -2329,7 +2321,7 @@ date_setYear_impl(JSContext* cx, const CallArgs& args)
 
     /* Step 3. */
     if (IsNaN(y)) {
-        dateObj->setUTCTime(GenericNaN(), args.rval());
+        dateObj->setUTCTime(ClippedTime::invalid(), args.rval());
         return true;
     }
 
@@ -2373,7 +2365,7 @@ static const char * const months[] =
 static void
 print_gmt_string(char* buf, size_t size, double utctime)
 {
-    MOZ_ASSERT(TimeClip(utctime) == utctime);
+    MOZ_ASSERT(NumbersAreIdentical(TimeClip(utctime).toDouble(), utctime));
     JS_snprintf(buf, size, "%s, %.2d %s %.4d %.2d:%.2d:%.2d GMT",
                 days[int(WeekDay(utctime))],
                 int(DateFromTime(utctime)),
@@ -2387,7 +2379,7 @@ print_gmt_string(char* buf, size_t size, double utctime)
 static void
 print_iso_string(char* buf, size_t size, double utctime)
 {
-    MOZ_ASSERT(TimeClip(utctime) == utctime);
+    MOZ_ASSERT(NumbersAreIdentical(TimeClip(utctime).toDouble(), utctime));
     JS_snprintf(buf, size, "%.4d-%.2d-%.2dT%.2d:%.2d:%.2d.%.3dZ",
                 int(YearFromTime(utctime)),
                 int(MonthFromTime(utctime)) + 1,
@@ -2401,7 +2393,7 @@ print_iso_string(char* buf, size_t size, double utctime)
 static void
 print_iso_extended_string(char* buf, size_t size, double utctime)
 {
-    MOZ_ASSERT(TimeClip(utctime) == utctime);
+    MOZ_ASSERT(NumbersAreIdentical(TimeClip(utctime).toDouble(), utctime));
     JS_snprintf(buf, size, "%+.6d-%.2d-%.2dT%.2d:%.2d:%.2d.%.3dZ",
                 int(YearFromTime(utctime)),
                 int(MonthFromTime(utctime)) + 1,
@@ -2557,7 +2549,7 @@ date_format(JSContext* cx, double date, formatspec format, MutableHandleValue rv
     if (!IsFinite(date)) {
         JS_snprintf(buf, sizeof buf, js_NaN_date_str);
     } else {
-        MOZ_ASSERT(TimeClip(date) == date);
+        MOZ_ASSERT(NumbersAreIdentical(TimeClip(date).toDouble(), date));
 
         double local = LocalTime(date, &cx->runtime()->dateTimeInfo);
 
@@ -2876,18 +2868,30 @@ date_toSource(JSContext* cx, unsigned argc, Value* vp)
 }
 #endif
 
-MOZ_ALWAYS_INLINE bool
-date_toString_impl(JSContext* cx, const CallArgs& args)
-{
-    return date_format(cx, args.thisv().toObject().as<DateObject>().UTCTime().toNumber(),
-                       FORMATSPEC_FULL, args.rval());
-}
-
+// ES6 final draft 20.3.4.41.
 static bool
 date_toString(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    return CallNonGenericMethod<IsDate, date_toString_impl>(cx, args);
+    // Step 2.a. (reordered)
+    double tv = GenericNaN();
+    if (args.thisv().isObject()) {
+        // Step 1.
+        RootedObject obj(cx, &args.thisv().toObject());
+        // Step 2.
+        if (ObjectClassIs(obj, ESClass_Date, cx)) {
+            // Step 3.a.
+            RootedValue unboxed(cx);
+            if (!Unbox(cx, obj, &unboxed))
+                return false;\
+            tv = unboxed.toNumber();
+        }
+        // ObjectClassIs can throw for objects from other compartments.
+        if (cx->isExceptionPending())
+            return false;
+    }
+    // Step 4.
+    return date_format(cx, tv, FORMATSPEC_FULL, args.rval());
 }
 
 MOZ_ALWAYS_INLINE bool
@@ -2972,9 +2976,9 @@ static const JSFunctionSpec date_methods[] = {
 };
 
 static bool
-NewDateObject(JSContext* cx, const CallArgs& args, double d)
+NewDateObject(JSContext* cx, const CallArgs& args, ClippedTime t)
 {
-    JSObject* obj = NewDateObjectMsec(cx, d);
+    JSObject* obj = NewDateObjectMsec(cx, t);
     if (!obj)
         return false;
 
@@ -2983,9 +2987,9 @@ NewDateObject(JSContext* cx, const CallArgs& args, double d)
 }
 
 static bool
-ToDateString(JSContext* cx, const CallArgs& args, double d)
+ToDateString(JSContext* cx, const CallArgs& args, ClippedTime t)
 {
-    return date_format(cx, d, FORMATSPEC_FULL, args.rval());
+    return date_format(cx, t.toDouble(), FORMATSPEC_FULL, args.rval());
 }
 
 static bool
@@ -2993,7 +2997,7 @@ DateNoArguments(JSContext* cx, const CallArgs& args)
 {
     MOZ_ASSERT(args.length() == 0);
 
-    double now = NowAsMillis();
+    ClippedTime now = NowAsMillis();
 
     if (args.isConstructing())
         return NewDateObject(cx, args, now);
@@ -3007,7 +3011,7 @@ DateOneArgument(JSContext* cx, const CallArgs& args)
     MOZ_ASSERT(args.length() == 1);
 
     if (args.isConstructing()) {
-        double d;
+        ClippedTime t;
 
         if (!ToPrimitive(cx, args[0]))
             return false;
@@ -3017,17 +3021,16 @@ DateOneArgument(JSContext* cx, const CallArgs& args)
             if (!linearStr)
                 return false;
 
-            if (!ParseDate(linearStr, &d, &cx->runtime()->dateTimeInfo))
-                d = GenericNaN();
-            else
-                d = TimeClip(d);
+            if (!ParseDate(linearStr, &t, &cx->runtime()->dateTimeInfo))
+                t = ClippedTime::invalid();
         } else {
+            double d;
             if (!ToNumber(cx, args[0], &d))
                 return false;
-            d = TimeClip(d);
+            t = TimeClip(d);
         }
 
-        return NewDateObject(cx, args, d);
+        return NewDateObject(cx, args, t);
     }
 
     return ToDateString(cx, args, NowAsMillis());
@@ -3127,11 +3130,16 @@ js::DateConstructor(JSContext* cx, unsigned argc, Value* vp)
     return DateMultipleArguments(cx, args);
 }
 
+// ES6 final draft 20.3.4.
+static JSObject*
+CreateDatePrototype(JSContext* cx, JSProtoKey key)
+{
+    return cx->global()->createBlankPrototype(cx, &DateObject::protoClass_);
+}
+
 static bool
 FinishDateClassInit(JSContext* cx, HandleObject ctor, HandleObject proto)
 {
-    proto->as<DateObject>().setUTCTime(GenericNaN());
-
     /*
      * Date.prototype.toGMTString has the same initial value as
      * Date.prototype.toUTCString.
@@ -3139,8 +3147,8 @@ FinishDateClassInit(JSContext* cx, HandleObject ctor, HandleObject proto)
     RootedValue toUTCStringFun(cx);
     RootedId toUTCStringId(cx, NameToId(cx->names().toUTCString));
     RootedId toGMTStringId(cx, NameToId(cx->names().toGMTString));
-    return NativeGetProperty(cx, proto.as<DateObject>(), toUTCStringId, &toUTCStringFun) &&
-           NativeDefineProperty(cx, proto.as<DateObject>(), toGMTStringId, toUTCStringFun,
+    return NativeGetProperty(cx, proto.as<NativeObject>(), toUTCStringId, &toUTCStringFun) &&
+           NativeDefineProperty(cx, proto.as<NativeObject>(), toGMTStringId, toUTCStringFun,
                                 nullptr, nullptr, 0);
 }
 
@@ -3163,7 +3171,7 @@ const Class DateObject::class_ = {
     nullptr, /* trace */
     {
         GenericCreateConstructor<DateConstructor, 7, gc::AllocKind::FUNCTION>,
-        GenericCreatePrototype,
+        CreateDatePrototype,
         date_static_methods,
         nullptr,
         date_methods,
@@ -3172,13 +3180,41 @@ const Class DateObject::class_ = {
     }
 };
 
-JS_FRIEND_API(JSObject*)
-js::NewDateObjectMsec(JSContext *cx, double msec_time)
+const Class DateObject::protoClass_ = {
+    js_Object_str,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Date),
+    nullptr, /* addProperty */
+    nullptr, /* delProperty */
+    nullptr, /* getProperty */
+    nullptr, /* setProperty */
+    nullptr, /* enumerate */
+    nullptr, /* resolve */
+    nullptr, /* mayResolve */
+    nullptr, /* convert */
+    nullptr, /* finalize */
+    nullptr, /* call */
+    nullptr, /* hasInstance */
+    nullptr, /* construct */
+    nullptr, /* trace  */
+    {
+        DELEGATED_CLASSSPEC(&DateObject::class_.spec),
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        ClassSpec::IsDelegated
+    }
+};
+
+JSObject*
+js::NewDateObjectMsec(JSContext* cx, ClippedTime t)
 {
     JSObject* obj = NewBuiltinClassInstance(cx, &DateObject::class_);
     if (!obj)
         return nullptr;
-    obj->as<DateObject>().setUTCTime(msec_time);
+    obj->as<DateObject>().setUTCTime(t);
     return obj;
 }
 
@@ -3187,8 +3223,8 @@ js::NewDateObject(JSContext *cx, int year, int mon, int mday,
                 int hour, int min, int sec)
 {
     MOZ_ASSERT(mon < 12);
-    double msec_time = date_msecFromDate(year, mon, mday, hour, min, sec, 0);
-    return NewDateObjectMsec(cx, UTC(msec_time, &cx->runtime()->dateTimeInfo));
+    double msec_time = MakeDate(MakeDay(year, mon, mday), MakeTime(hour, min, sec, 0.0));
+    return NewDateObjectMsec(cx, TimeClip(UTC(msec_time, &cx->runtime()->dateTimeInfo)));
 }
 
 JS_FRIEND_API(bool)

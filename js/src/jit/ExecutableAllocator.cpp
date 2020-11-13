@@ -29,6 +29,10 @@
 
 #include "js/MemoryMetrics.h"
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 using namespace js::jit;
 
 size_t ExecutableAllocator::pageSize = 0;
@@ -62,3 +66,8 @@ ExecutableAllocator::addSizeOfCode(JS::CodeSizes* sizes) const
     }
 }
 
+#if TARGET_OS_IPHONE
+bool ExecutableAllocator::nonWritableJitCode = true;
+#else
+bool ExecutableAllocator::nonWritableJitCode = false;
+#endif

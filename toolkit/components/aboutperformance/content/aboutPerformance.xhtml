@@ -85,7 +85,25 @@
     </style>
   </head>
   <body onload="go()">
-    <table id="data">
+
+    <h1>Performance monitor</h1>
+
+    <input type="button" id="playButton" value="Play" />
+    <input type="button" id="pauseButton" value="Pause" />
+    <select id="intervalDropdown">
+      <option value="500">0.5 seconds</option>
+      <option value="1000">1 second</option>
+      <option value="2000">2 seconds</option>
+      <option value="5000" selected="selected">5 seconds</option>
+      <option value="10000">10 seconds</option>
+    </select>
+    <table id="liveData">
     </table>
+
+    <h1>Slow add-ons alerts</h1>
+    <div id="slowAddonsList">
+      (none)
+    </div>
+
   </body>
 </html>

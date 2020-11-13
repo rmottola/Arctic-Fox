@@ -48,17 +48,19 @@ class LIRGeneratorX86Shared : public LIRGeneratorShared
     void lowerUDiv(MDiv* div);
     void lowerUMod(MMod* mod);
     void lowerUrshD(MUrsh* mir);
-    void lowerConstantDouble(double d, MInstruction *ins);
-    void lowerConstantFloat32(float d, MInstruction *ins);
-    void lowerTruncateDToInt32(MTruncateToInt32 *ins);
-    void lowerTruncateFToInt32(MTruncateToInt32 *ins);
-    void visitSimdBinaryArith(MSimdBinaryArith *ins);
-    void visitSimdSelect(MSimdSelect *ins);
-    void visitSimdSplatX4(MSimdSplatX4 *ins);
-    void visitSimdValueX4(MSimdValueX4 *ins);
-    void lowerCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement *ins,
+    void lowerConstantDouble(double d, MInstruction* ins);
+    void lowerConstantFloat32(float d, MInstruction* ins);
+    void lowerTruncateDToInt32(MTruncateToInt32* ins);
+    void lowerTruncateFToInt32(MTruncateToInt32* ins);
+    void visitSimdBinaryArith(MSimdBinaryArith* ins);
+    void visitSimdSelect(MSimdSelect* ins);
+    void visitSimdSplatX4(MSimdSplatX4* ins);
+    void visitSimdValueX4(MSimdValueX4* ins);
+    void lowerCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement* ins,
                                                bool useI386ByteRegisters);
-    void lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop *ins,
+    void lowerAtomicExchangeTypedArrayElement(MAtomicExchangeTypedArrayElement* ins,
+                                              bool useI386ByteRegisters);
+    void lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins,
                                            bool useI386ByteRegisters);
 };
 

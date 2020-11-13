@@ -323,6 +323,10 @@ this.SessionStore = {
     return SessionStoreInternal.reviveCrashedTab(aTab);
   },
 
+  reviveAllCrashedTabs() {
+    return SessionStoreInternal.reviveAllCrashedTabs();
+  },
+
   navigateAndRestore(tab, loadArguments, historyIndex) {
     return SessionStoreInternal.navigateAndRestore(tab, loadArguments, historyIndex);
   },
@@ -2472,6 +2476,19 @@ let SessionStoreInternal = {
     this.restoreTab(aTab, data, {
       forceOnDemand: true,
     });
+  },
+
+  /**
+   * Revive all crashed tabs and reset the crashed tabs count to 0.
+   */
+  reviveAllCrashedTabs() {
+    let windowsEnum = Services.wm.getEnumerator("navigator:browser");
+    while (windowsEnum.hasMoreElements()) {
+      let window = windowsEnum.getNext();
+      for (let tab of window.gBrowser.tabs) {
+        this.reviveCrashedTab(tab);
+      }
+    }
   },
 
   /**

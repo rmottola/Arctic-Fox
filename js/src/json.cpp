@@ -710,16 +710,16 @@ Walk(JSContext* cx, HandleObject holder, HandleId name, HandleValue reviver, Mut
                 if (!Walk(cx, obj, id, reviver, &newElement))
                     return false;
 
+                ObjectOpResult ignored;
                 if (newElement.isUndefined()) {
-                    /* Step 2a(iii)(2). */
-                    ObjectOpResult ignored;
+                    /* Step 2a(iii)(2). The spec deliberately ignores strict failure. */
                     if (!DeleteProperty(cx, obj, id, ignored))
                         return false;
                 } else {
-                    /* Step 2a(iii)(3). */
-                    // XXX This definition should ignore success/failure, when
-                    //     our property-definition APIs indicate that.
-                    if (!DefineProperty(cx, obj, id, newElement))
+                    /* Step 2a(iii)(3). The spec deliberately ignores strict failure. */
+                    Rooted<PropertyDescriptor> desc(cx);
+                    desc.setDataDescriptor(newElement, JSPROP_ENUMERATE);
+                    if (!DefineProperty(cx, obj, id, desc, ignored))
                         return false;
                 }
             }
@@ -738,16 +738,16 @@ Walk(JSContext* cx, HandleObject holder, HandleId name, HandleValue reviver, Mut
                 if (!Walk(cx, obj, id, reviver, &newElement))
                     return false;
 
+                ObjectOpResult ignored;
                 if (newElement.isUndefined()) {
-                    /* Step 2b(ii)(2). */
-                    ObjectOpResult ignored;
+                    /* Step 2b(ii)(2). The spec deliberately ignores strict failure. */
                     if (!DeleteProperty(cx, obj, id, ignored))
                         return false;
                 } else {
-                    /* Step 2b(ii)(3). */
-                    // XXX This definition should ignore success/failure, when
-                    //     our property-definition APIs indicate that.
-                    if (!DefineProperty(cx, obj, id, newElement))
+                    /* Step 2b(ii)(3). The spec deliberately ignores strict failure. */
+                    Rooted<PropertyDescriptor> desc(cx);
+                    desc.setDataDescriptor(newElement, JSPROP_ENUMERATE);
+                    if (!DefineProperty(cx, obj, id, desc, ignored))
                         return false;
                 }
             }
@@ -900,9 +900,11 @@ js::InitJSONClass(JSContext* cx, HandleObject obj)
     if (!JSON)
         return nullptr;
 
-    if (!JS_DefineProperty(cx, global, js_JSON_str, JSON, 0,
+    if (!JS_DefineProperty(cx, global, js_JSON_str, JSON, JSPROP_RESOLVING,
                            JS_STUBGETTER, JS_STUBSETTER))
+    {
         return nullptr;
+    }
 
     if (!JS_DefineFunctions(cx, JSON, json_static_methods))
         return nullptr;

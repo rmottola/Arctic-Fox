@@ -2,7 +2,8 @@
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
 - Bug 1533969 - Fix build error with newer glibc. (gettid)
-
+-  Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
+ 
 - Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
@@ -29,6 +30,8 @@
 -  Add compositor, layers, and rendering info to nsIGfxInfo. (bug 1179051 part 5, r=mattwoodrow)\
 - Split gfxWindowsPlatform::UpdateRenderMode() into multiple functions.  (bug 1179051 part 1, r=bas)
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
+- Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
+- Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
@@ -44,6 +47,7 @@
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
+- Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
@@ -63,14 +67,24 @@
 . Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
+- Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
+- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
+- Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
+- Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
+- Bug 1184388 - 2015-10- 30- 3/3
+- Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
+- Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
+- Bug 1204872 - 2015-09
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
@@ -81,11 +95,16 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
+- Bug 1123516 - 2015-06-30 - Implement maplike/setlike
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
+- Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope.
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - remaining parts of Bug 968923 (2015-06)
+- Bug 1171555 - Remove overly verbose ServiceWorker warnings.
+- Bug 1173415 - Fix incorrect mask used for
+- Bug 1167356 - 2015-06-11
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - 1190495 - Hoist TaskQueue into xpcom
@@ -108,6 +127,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1162986
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
@@ -126,10 +146,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
-- Bug 968520 - 2015-04-10 - Always require fallible argument with FallibleTArray calls
-- Bug 1150253 - 2015-04-25 part 1 to 3
 -  1102048 style patches, check which still apply
-- Bug 1094888 - part 1 and 2
+- Bug 1156598. Remove old, dead scroll layer item code. r=mstange
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
@@ -155,7 +173,6 @@ More session store stuff to check:
 
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
-- Bug 1142034 - Don't show 'Restore All Crashed Tabs' when only one tab
 
 Lightweight themes stuff:
 
@@ -163,9 +180,6 @@ Lightweight themes stuff:
 
 Not applying / Breaking build:
 Bug 1162569 - default engine files should be in the omni.ja file,
-
-Devtools stuff to check - files not there:
-- Bug 1150259 - Deactivating subtest under old Windows/old Linux.
 
 
 Check with Roy Tam:
@@ -205,7 +219,6 @@ Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
 - from nsContextMenu.js : remove unremotePrincipal again
 
-- Update code to work with GCC 7 & GCC 8
 - Update UniquePtr
 - in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
 - inherit principal vs. inherit owner in DocShell see INTERNAL_LOAD_FLAGS_INHERIT_OWNER
@@ -221,6 +234,7 @@ Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 
 
 ### Further Further ToDo:
+- Check for STLPort removal: https://bugzilla.mozilla.org/show_bug.cgi?id=1276927
 - import PPC JIT from TenFourFox
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
@@ -243,11 +257,3 @@ https://github.com/classilla/tenfourfox/issues/526
 * Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
 * Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
 * AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
-# Backlog of Mozilla patches:
-(grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
-
-- Bug 1533969 - Fix build error with newer glibc. (gettid)
-
-- Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
-- 1499861 - issues when backporting on other collections
-- 1477632 - Always inline PLDHashTable::SearchTable(

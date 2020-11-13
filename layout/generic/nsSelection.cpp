@@ -55,6 +55,9 @@ static NS_DEFINE_CID(kFrameTraversalCID, NS_FRAMETRAVERSAL_CID);
 #include "TouchCaret.h"
 #include "SelectionCarets.h"
 
+#include "AccessibleCaretEventHub.h"
+#include "AccessibleCaretManager.h"
+
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TextEvents.h"
 
@@ -846,6 +849,14 @@ nsFrameSelection::Init(nsIPresShell *aShell, nsIContent *aLimiter)
       // so we don't have to worry about that!
       nsRefPtr<SelectionChangeListener> listener = new SelectionChangeListener;
       mDomSelections[index]->AddSelectionListener(listener);
+    }
+  }
+
+  nsRefPtr<AccessibleCaretEventHub> eventHub = mShell->GetAccessibleCaretEventHub();
+  if (eventHub) {
+    int8_t index = GetIndexFromSelectionType(nsISelectionController::SELECTION_NORMAL);
+    if (mDomSelections[index]) {
+      mDomSelections[index]->AddSelectionListener(eventHub);
     }
   }
 }
@@ -3259,6 +3270,12 @@ nsFrameSelection::DisconnectFromPresShell()
     mDomSelections[index]->RemoveSelectionListener(selectionCarets);
   }
 
+  nsRefPtr<AccessibleCaretEventHub> eventHub = mShell->GetAccessibleCaretEventHub();
+  if (eventHub) {
+    int8_t index = GetIndexFromSelectionType(nsISelectionController::SELECTION_NORMAL);
+    mDomSelections[index]->RemoveSelectionListener(eventHub);
+  }
+
   StopAutoScrollTimer();
   for (int32_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES; i++) {
     mDomSelections[i]->Clear(nullptr);
@@ -5164,6 +5181,32 @@ Selection::ReplaceAnchorFocusRange(nsRange* aRange)
     selectFrames(presContext, mAnchorFocusRange, false);
     SetAnchorFocusToRange(aRange);
     selectFrames(presContext, mAnchorFocusRange, true);
+  }
+}
+
+void
+Selection::AdjustAnchorFocusForMultiRange(nsDirection aDirection)
+{
+  if (aDirection == mDirection) {
+    return;
+  }
+  SetDirection(aDirection);
+
+  if (RangeCount() <= 1) {
+    return;
+  }
+
+  nsRange* firstRange = GetRangeAt(0);
+  nsRange* lastRange = GetRangeAt(RangeCount() - 1);
+
+  if (mDirection == eDirPrevious) {
+    firstRange->SetIsGenerated(false);
+    lastRange->SetIsGenerated(true);
+    setAnchorFocusRange(0);
+  } else { // aDir == eDirNext
+    firstRange->SetIsGenerated(true);
+    lastRange->SetIsGenerated(false);
+    setAnchorFocusRange(RangeCount() - 1);
   }
 }
 

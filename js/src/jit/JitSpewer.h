@@ -151,6 +151,16 @@ class AutoSpewEndFunction
 
 void CheckLogging();
 Fprinter& JitSpewPrinter();
+
+class JitSpewIndent
+{
+    JitSpewChannel channel_;
+
+  public:
+    explicit JitSpewIndent(JitSpewChannel channel);
+    ~JitSpewIndent();
+};
+
 void JitSpew(JitSpewChannel channel, const char* fmt, ...);
 void JitSpewStart(JitSpewChannel channel, const char* fmt, ...);
 void JitSpewCont(JitSpewChannel channel, const char* fmt, ...);
@@ -200,6 +210,14 @@ static inline Fprinter& JitSpewPrinter()
 {
     MOZ_CRASH("No empty backend for JitSpewPrinter");
 }
+
+class JitSpewIndent
+{
+  public:
+    explicit JitSpewIndent(JitSpewChannel channel) {}
+    ~JitSpewIndent() {}
+};
+
 static inline void JitSpew(JitSpewChannel, const char* fmt, ...)
 { }
 static inline void JitSpewStart(JitSpewChannel channel, const char* fmt, ...)

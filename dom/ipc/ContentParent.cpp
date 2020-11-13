@@ -82,6 +82,9 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "mozilla/ProfileGatherer.h"
+#endif
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
@@ -226,6 +229,11 @@ using namespace mozilla::system;
 #include "nsIBrowserSearchService.h"
 #endif
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "nsIProfiler.h"
+#include "nsIProfileSaveEvent.h"
+#endif
+
 #ifdef MOZ_GAMEPAD
 #include "mozilla/dom/GamepadMonitoring.h"
 #endif
@@ -234,6 +242,9 @@ static NS_DEFINE_CID(kCClipboardCID, NS_CLIPBOARD_CID);
 
 using base::ChildPrivileges;
 using base::KillProcess;
+#ifdef MOZ_ENABLE_PROFILER_SPS
+using mozilla::ProfileGatherer;
+#endif
 
 using namespace mozilla::dom::bluetooth;
 using namespace mozilla::dom::cellbroadcast;
@@ -652,6 +663,12 @@ static const char* sObserverTopics[] = {
     "a11y-init-or-shutdown",
 #endif
     "app-theme-changed",
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    "profiler-started",
+    "profiler-stopped",
+    "profiler-subprocess-gather",
+    "profiler-subprocess",
+#endif
 };
 
 /* static */ already_AddRefed<ContentParent>
@@ -1058,17 +1075,21 @@ ContentParent::RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
 }
 
 bool
-ContentParent::RecvLoadPlugin(const uint32_t& aPluginId, nsresult* aRv)
+ContentParent::RecvLoadPlugin(const uint32_t& aPluginId, nsresult* aRv, uint32_t* aRunID)
 {
     *aRv = NS_OK;
-    return mozilla::plugins::SetupBridge(aPluginId, this, false, aRv);
+    return mozilla::plugins::SetupBridge(aPluginId, this, false, aRv, aRunID);
 }
 
 bool
 ContentParent::RecvConnectPluginBridge(const uint32_t& aPluginId, nsresult* aRv)
 {
     *aRv = NS_OK;
-    return mozilla::plugins::SetupBridge(aPluginId, this, true, aRv);
+    // We don't need to get the run ID for the plugin, since we already got it
+    // in the first call to SetupBridge in RecvLoadPlugin, so we pass in a dummy
+    // pointer and just throw it away.
+    uint32_t dummy = 0;
+    return mozilla::plugins::SetupBridge(aPluginId, this, true, aRv, &dummy);
 }
 
 bool
@@ -3143,6 +3164,30 @@ ContentParent::Observe(nsISupports* aSubject,
     else if (!strcmp(aTopic, "app-theme-changed")) {
         unused << SendOnAppThemeChanged();
     }
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    else if (!strcmp(aTopic, "profiler-started")) {
+        nsCOMPtr<nsIProfilerStartParams> params(do_QueryInterface(aSubject));
+        uint32_t entries;
+        double interval;
+        params->GetEntries(&entries);
+        params->GetInterval(&interval);
+        const nsTArray<nsCString>& features = params->GetFeatures();
+        const nsTArray<nsCString>& threadFilterNames = params->GetThreadFilterNames();
+        unused << SendStartProfiler(entries, interval, features, threadFilterNames);
+    }
+    else if (!strcmp(aTopic, "profiler-stopped")) {
+        unused << SendStopProfiler();
+    }
+    else if (!strcmp(aTopic, "profiler-subprocess")) {
+        nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
+        if (pse) {
+            if (!mProfile.IsEmpty()) {
+                pse->AddSubProfile(mProfile.get());
+                mProfile.Truncate();
+            }
+        }
+    }
+#endif
     return NS_OK;
 }
 
@@ -5067,6 +5112,20 @@ ContentParent::RecvGamepadListenerRemoved()
     }
     mHasGamepadListener = false;
     MaybeStopGamepadMonitoring();
+#endif
+    return true;
+}
+
+bool
+ContentParent::RecvProfile(const nsCString& aProfile)
+{
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    if (NS_WARN_IF(!mGatherer)) {
+        return true;
+    }
+    mProfile = aProfile;
+    mGatherer->GatheredOOPProfile();
+    mGatherer = nullptr;
 #endif
     return true;
 }

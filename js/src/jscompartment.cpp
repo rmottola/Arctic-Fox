@@ -215,7 +215,7 @@ class WrapperMapRef : public BufferableRef
             key.kind == CrossCompartmentKey::DebuggerSource)
         {
             MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
-                       key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
+                       key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Object);
             TraceManuallyBarrieredEdge(trc, reinterpret_cast<JSObject**>(&key.wrapped),
                                        "CCW wrapped object");
         }
@@ -479,9 +479,10 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
  * and when compacting to update cross-compartment pointers.
  */
 void
-JSCompartment::markCrossCompartmentWrappers(JSTracer *trc)
+JSCompartment::markCrossCompartmentWrappers(JSTracer* trc)
 {
-    MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->isHeapCompacting());
+    MOZ_ASSERT(trc->runtime()->isHeapMajorCollecting());
+    MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->gc.isHeapCompacting());
 
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         Value v = e.front().value();
@@ -616,17 +617,17 @@ JSCompartment::sweepCrossCompartmentWrappers()
           case CrossCompartmentKey::DebuggerEnvironment:
           case CrossCompartmentKey::DebuggerSource:
               MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
-                         key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
+                         key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Object);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSObject**>(&key.wrapped));
               break;
           case CrossCompartmentKey::StringWrapper:
-              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_STRING);
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JS::TraceKind::String);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSString**>(&key.wrapped));
               break;
           case CrossCompartmentKey::DebuggerScript:
-              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_SCRIPT);
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Script);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSScript**>(&key.wrapped));
               break;

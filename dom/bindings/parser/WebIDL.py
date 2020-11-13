@@ -164,6 +164,9 @@ class IDLObject(object):
     def isUnion(self):
         return False
 
+    def isTypedef(self):
+        return False
+
     def getUserData(self, key, default):
         return self.userData.get(key, default)
 
@@ -1429,6 +1432,14 @@ class IDLDictionary(IDLObjectWithScope):
     def isDictionary(self):
         return True;
 
+    def canBeEmpty(self):
+        """
+        Returns true if this dictionary can be empty (that is, it has no
+        required members and neither do any of its ancestors).
+        """
+        return (all(member.optional for member in self.members) and
+                (not self.parent or self.parent.canBeEmpty()))
+
     def finish(self, scope):
         if self._finished:
             return
@@ -1676,7 +1687,16 @@ class IDLType(IDLObject):
     def isArrayBufferView(self):
         return False
 
+    def isSharedArrayBuffer(self):
+        return False
+
+    def isSharedArrayBufferView(self):
+        return False
+
     def isTypedArray(self):
+        return False
+
+    def isSharedTypedArray(self):
         return False
 
     def isCallbackInterface(self):
@@ -1698,7 +1718,10 @@ class IDLType(IDLObject):
             only returns true for the types from the TypedArray spec. """
         return self.isInterface() and (self.isArrayBuffer() or \
                                        self.isArrayBufferView() or \
-                                       self.isTypedArray())
+                                       self.isSharedArrayBuffer() or \
+                                       self.isSharedArrayBufferView() or \
+                                       self.isTypedArray() or \
+                                       self.isSharedTypedArray())
 
     def isDictionary(self):
         return False
@@ -1739,11 +1762,11 @@ class IDLType(IDLObject):
 
     def treatNonCallableAsNull(self):
         assert self.tag() == IDLType.Tags.callback
-        return self.nullable() and self.inner._treatNonCallableAsNull
+        return self.nullable() and self.inner.callback._treatNonCallableAsNull
 
     def treatNonObjectAsNull(self):
         assert self.tag() == IDLType.Tags.callback
-        return self.nullable() and self.inner._treatNonObjectAsNull
+        return self.nullable() and self.inner.callback._treatNonObjectAsNull
 
     def addExtendedAttributes(self, attrs):
         assert len(attrs) == 0
@@ -1783,11 +1806,17 @@ class IDLUnresolvedType(IDLType):
 
         assert obj
         if obj.isType():
-            # obj itself might not be complete; deal with that.
-            assert obj != self
-            if not obj.isComplete():
-                obj = obj.complete(scope)
-            return obj
+            print obj
+        assert not obj.isType()
+        if obj.isTypedef():
+            assert self.name.name == obj.identifier.name
+            typedefType = IDLTypedefType(self.location, obj.innerType,
+                                         obj.identifier)
+            assert not typedefType.isComplete()
+            return typedefType.complete(scope)
+        elif obj.isCallback() and not obj.isInterface():
+            assert self.name.name == obj.identifier.name
+            return IDLCallbackType(self.location, obj)
 
         if self._promiseInnerType and not self._promiseInnerType.isComplete():
             self._promiseInnerType = self._promiseInnerType.complete(scope)
@@ -1874,8 +1903,17 @@ class IDLNullableType(IDLType):
     def isArrayBufferView(self):
         return self.inner.isArrayBufferView()
 
+    def isSharedArrayBuffer(self):
+        return self.inner.isSharedArrayBuffer()
+
+    def isSharedArrayBufferView(self):
+        return self.inner.isSharedArrayBufferView()
+
     def isTypedArray(self):
         return self.inner.isTypedArray()
+
+    def isSharedTypedArray(self):
+        return self.inner.isSharedTypedArray()
 
     def isDictionary(self):
         return self.inner.isDictionary()
@@ -2091,7 +2129,7 @@ class IDLUnionType(IDLType):
         IDLType.__init__(self, location, "")
         self.memberTypes = memberTypes
         self.hasNullableType = False
-        self.hasDictionaryType = False
+        self._dictionaryType = None
         self.flatMemberTypes = None
         self.builtin = False
 
@@ -2147,10 +2185,10 @@ class IDLUnionType(IDLType):
                 if self.hasNullableType:
                     raise WebIDLError("Can't have more than one nullable types in a union",
                                       [nullableType.location, self.flatMemberTypes[i].location])
-                if self.hasDictionaryType:
+                if self.hasDictionaryType():
                     raise WebIDLError("Can't have a nullable type and a "
                                       "dictionary type in a union",
-                                      [dictionaryType.location,
+                                      [self._dictionaryType.location,
                                        self.flatMemberTypes[i].location])
                 self.hasNullableType = True
                 nullableType = self.flatMemberTypes[i]
@@ -2162,8 +2200,7 @@ class IDLUnionType(IDLType):
                                       "dictionary type in a union",
                                       [nullableType.location,
                                        self.flatMemberTypes[i].location])
-                self.hasDictionaryType = True
-                dictionaryType = self.flatMemberTypes[i]
+                self._dictionaryType = self.flatMemberTypes[i]
             elif self.flatMemberTypes[i].isUnion():
                 self.flatMemberTypes[i:i + 1] = self.flatMemberTypes[i].memberTypes
                 continue
@@ -2201,6 +2238,13 @@ class IDLUnionType(IDLType):
                        in self.flatMemberTypes):
                 return False
         return True
+
+    def hasDictionaryType(self):
+        return self._dictionaryType is not None
+
+    def hasPossiblyEmptyDictionaryType(self):
+        return (self._dictionaryType is not None and
+                self._dictionaryType.inner.canBeEmpty())
 
     def _getDependentObjects(self):
         return set(self.memberTypes)
@@ -2302,23 +2346,17 @@ class IDLArrayType(IDLType):
     def _getDependentObjects(self):
         return self.inner._getDependentObjects()
 
-class IDLTypedefType(IDLType, IDLObjectWithIdentifier):
+class IDLTypedefType(IDLType):
     def __init__(self, location, innerType, name):
-        IDLType.__init__(self, location, innerType.name)
-
-        identifier = IDLUnresolvedIdentifier(location, name)
-
-        IDLObjectWithIdentifier.__init__(self, location, None, identifier)
-
+        IDLType.__init__(self, location, name)
         self.inner = innerType
-        self.name = name
         self.builtin = False
 
     def __eq__(self, other):
         return isinstance(other, IDLTypedefType) and self.inner == other.inner
 
     def __str__(self):
-        return self.identifier.name
+        return self.name
 
     def nullable(self):
         return self.inner.nullable()
@@ -2365,8 +2403,17 @@ class IDLTypedefType(IDLType, IDLObjectWithIdentifier):
     def isArrayBufferView(self):
         return self.inner.isArrayBufferView()
 
+    def isSharedArrayBuffer(self):
+        return self.inner.isSharedArrayBuffer()
+
+    def isSharedArrayBufferView(self):
+        return self.inner.isSharedArrayBufferView()
+
     def isTypedArray(self):
         return self.inner.isTypedArray()
+
+    def isSharedTypedArray(self):
+        return self.inner.isSharedTypedArray()
 
     def isInterface(self):
         return self.inner.isInterface()
@@ -2386,16 +2433,6 @@ class IDLTypedefType(IDLType, IDLObjectWithIdentifier):
         assert self.inner.isComplete()
         return self.inner
 
-    def finish(self, parentScope):
-        # Maybe the IDLObjectWithIdentifier for the typedef should be
-        # a separate thing from the type?  If that happens, we can
-        # remove some hackery around avoiding isInterface() in
-        # Configuration.py.
-        self.complete(parentScope)
-
-    def validate(self):
-        pass
-
     # Do we need a resolveType impl?  I don't think it's particularly useful....
 
     def tag(self):
@@ -2409,6 +2446,31 @@ class IDLTypedefType(IDLType, IDLObjectWithIdentifier):
 
     def _getDependentObjects(self):
         return self.inner._getDependentObjects()
+
+class IDLTypedef(IDLObjectWithIdentifier):
+    def __init__(self, location, parentScope, innerType, name):
+        identifier = IDLUnresolvedIdentifier(location, name)
+        IDLObjectWithIdentifier.__init__(self, location, parentScope, identifier)
+        self.innerType = innerType
+
+    def __str__(self):
+        return "Typedef %s %s" % (self.identifier.name, self.innerType)
+
+    def finish(self, parentScope):
+        if not self.innerType.isComplete():
+            self.innerType = self.innerType.complete(parentScope)
+
+    def validate(self):
+        pass
+
+    def isTypedef(self):
+        return True
+
+    def addExtendedAttributes(self, attrs):
+        assert len(attrs) == 0
+
+    def _getDependentObjects(self):
+        return self.innerType._getDependentObjects()
 
 class IDLWrapperType(IDLType):
     def __init__(self, location, inner, promiseInnerType=None):
@@ -2610,6 +2672,8 @@ class IDLBuiltinType(IDLType):
         # Funny stuff
         'ArrayBuffer',
         'ArrayBufferView',
+        'SharedArrayBuffer',
+        'SharedArrayBufferView',
         'Int8Array',
         'Uint8Array',
         'Uint8ClampedArray',
@@ -2618,7 +2682,16 @@ class IDLBuiltinType(IDLType):
         'Int32Array',
         'Uint32Array',
         'Float32Array',
-        'Float64Array'
+        'Float64Array',
+        'SharedInt8Array',
+        'SharedUint8Array',
+        'SharedUint8ClampedArray',
+        'SharedInt16Array',
+        'SharedUint16Array',
+        'SharedInt32Array',
+        'SharedUint32Array',
+        'SharedFloat32Array',
+        'SharedFloat64Array'
         )
 
     TagLookup = {
@@ -2644,6 +2717,8 @@ class IDLBuiltinType(IDLType):
             Types.void: IDLType.Tags.void,
             Types.ArrayBuffer: IDLType.Tags.interface,
             Types.ArrayBufferView: IDLType.Tags.interface,
+            Types.SharedArrayBuffer: IDLType.Tags.interface,
+            Types.SharedArrayBufferView: IDLType.Tags.interface,
             Types.Int8Array: IDLType.Tags.interface,
             Types.Uint8Array: IDLType.Tags.interface,
             Types.Uint8ClampedArray: IDLType.Tags.interface,
@@ -2652,7 +2727,16 @@ class IDLBuiltinType(IDLType):
             Types.Int32Array: IDLType.Tags.interface,
             Types.Uint32Array: IDLType.Tags.interface,
             Types.Float32Array: IDLType.Tags.interface,
-            Types.Float64Array: IDLType.Tags.interface
+            Types.Float64Array: IDLType.Tags.interface,
+            Types.SharedInt8Array: IDLType.Tags.interface,
+            Types.SharedUint8Array: IDLType.Tags.interface,
+            Types.SharedUint8ClampedArray: IDLType.Tags.interface,
+            Types.SharedInt16Array: IDLType.Tags.interface,
+            Types.SharedUint16Array: IDLType.Tags.interface,
+            Types.SharedInt32Array: IDLType.Tags.interface,
+            Types.SharedUint32Array: IDLType.Tags.interface,
+            Types.SharedFloat32Array: IDLType.Tags.interface,
+            Types.SharedFloat64Array: IDLType.Tags.interface
         }
 
     def __init__(self, location, name, type):
@@ -2692,9 +2776,19 @@ class IDLBuiltinType(IDLType):
     def isArrayBufferView(self):
         return self._typeTag == IDLBuiltinType.Types.ArrayBufferView
 
+    def isSharedArrayBuffer(self):
+        return self._typeTag == IDLBuiltinType.Types.SharedArrayBuffer
+
+    def isSharedArrayBufferView(self):
+        return self._typeTag == IDLBuiltinType.Types.SharedArrayBufferView
+
     def isTypedArray(self):
         return self._typeTag >= IDLBuiltinType.Types.Int8Array and \
                self._typeTag <= IDLBuiltinType.Types.Float64Array
+
+    def isSharedTypedArray(self):
+        return self._typeTag >= IDLBuiltinType.Types.SharedInt8Array and \
+               self._typeTag <= IDLBuiltinType.Types.SharedFloat64Array
 
     def isInterface(self):
         # TypedArray things are interface types per the TypedArray spec,
@@ -2702,7 +2796,10 @@ class IDLBuiltinType(IDLType):
         # all of it internally.
         return self.isArrayBuffer() or \
                self.isArrayBufferView() or \
-               self.isTypedArray()
+               self.isSharedArrayBuffer() or \
+               self.isSharedArrayBufferView() or \
+               self.isTypedArray() or \
+               self.isSharedTypedArray()
 
     def isNonCallbackInterface(self):
         # All the interfaces we can be are non-callback
@@ -2720,7 +2817,7 @@ class IDLBuiltinType(IDLType):
                self._typeTag == IDLBuiltinType.Types.unrestricted_double
 
     def isSerializable(self):
-        return self.isPrimitive() or self.isDOMString() or self.isDate()
+        return self.isPrimitive() or self.isString() or self.isDate()
 
     def includesRestrictedFloat(self):
         return self.isFloat() and not self.isUnrestricted()
@@ -2773,15 +2870,20 @@ class IDLBuiltinType(IDLType):
                  # ArrayBuffer is distinguishable from everything
                  # that's not an ArrayBuffer or a callback interface
                  (self.isArrayBuffer() and not other.isArrayBuffer()) or
+                 (self.isSharedArrayBuffer() and not other.isSharedArrayBuffer()) or
                  # ArrayBufferView is distinguishable from everything
                  # that's not an ArrayBufferView or typed array.
                  (self.isArrayBufferView() and not other.isArrayBufferView() and
                   not other.isTypedArray()) or
+                 (self.isSharedArrayBufferView() and not other.isSharedArrayBufferView() and
+                  not other.isSharedTypedArray()) or
                  # Typed arrays are distinguishable from everything
                  # except ArrayBufferView and the same type of typed
                  # array
                  (self.isTypedArray() and not other.isArrayBufferView() and not
-                  (other.isTypedArray() and other.name == self.name)))))
+                  (other.isTypedArray() and other.name == self.name)) or
+                 (self.isSharedTypedArray() and not other.isSharedArrayBufferView() and not
+                  (other.isSharedTypedArray() and other.name == self.name)))))
 
     def _getDependentObjects(self):
         return set()
@@ -2853,6 +2955,12 @@ BuiltinTypes = {
       IDLBuiltinType.Types.ArrayBufferView:
           IDLBuiltinType(BuiltinLocation("<builtin type>"), "ArrayBufferView",
                          IDLBuiltinType.Types.ArrayBufferView),
+      IDLBuiltinType.Types.SharedArrayBuffer:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedArrayBuffer",
+                         IDLBuiltinType.Types.SharedArrayBuffer),
+      IDLBuiltinType.Types.SharedArrayBufferView:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedArrayBufferView",
+                         IDLBuiltinType.Types.SharedArrayBufferView),
       IDLBuiltinType.Types.Int8Array:
           IDLBuiltinType(BuiltinLocation("<builtin type>"), "Int8Array",
                          IDLBuiltinType.Types.Int8Array),
@@ -2879,7 +2987,34 @@ BuiltinTypes = {
                          IDLBuiltinType.Types.Float32Array),
       IDLBuiltinType.Types.Float64Array:
           IDLBuiltinType(BuiltinLocation("<builtin type>"), "Float64Array",
-                         IDLBuiltinType.Types.Float64Array)
+                         IDLBuiltinType.Types.Float64Array),
+      IDLBuiltinType.Types.SharedInt8Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedInt8Array",
+                         IDLBuiltinType.Types.SharedInt8Array),
+      IDLBuiltinType.Types.SharedUint8Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedUint8Array",
+                         IDLBuiltinType.Types.SharedUint8Array),
+      IDLBuiltinType.Types.SharedUint8ClampedArray:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedUint8ClampedArray",
+                         IDLBuiltinType.Types.SharedUint8ClampedArray),
+      IDLBuiltinType.Types.SharedInt16Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedInt16Array",
+                         IDLBuiltinType.Types.SharedInt16Array),
+      IDLBuiltinType.Types.SharedUint16Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedUint16Array",
+                         IDLBuiltinType.Types.SharedUint16Array),
+      IDLBuiltinType.Types.SharedInt32Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedInt32Array",
+                         IDLBuiltinType.Types.SharedInt32Array),
+      IDLBuiltinType.Types.SharedUint32Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedUint32Array",
+                         IDLBuiltinType.Types.SharedUint32Array),
+      IDLBuiltinType.Types.SharedFloat32Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedFloat32Array",
+                         IDLBuiltinType.Types.SharedFloat32Array),
+      IDLBuiltinType.Types.SharedFloat64Array:
+          IDLBuiltinType(BuiltinLocation("<builtin type>"), "SharedFloat64Array",
+                         IDLBuiltinType.Types.SharedFloat64Array)
     }
 
 
@@ -2994,14 +3129,14 @@ class IDLNullValue(IDLObject):
     def coerceToType(self, type, location):
         if (not isinstance(type, IDLNullableType) and
             not (type.isUnion() and type.hasNullableType) and
-            not (type.isUnion() and type.hasDictionaryType) and
+            not (type.isUnion() and type.hasDictionaryType()) and
             not type.isDictionary() and
             not type.isAny()):
             raise WebIDLError("Cannot coerce null value to type %s." % type,
                               [location])
 
         nullValue = IDLNullValue(self.location)
-        if type.isUnion() and not type.nullable() and type.hasDictionaryType:
+        if type.isUnion() and not type.nullable() and type.hasDictionaryType():
             # We're actually a default value for the union's dictionary member.
             # Use its type.
             for t in type.flatMemberTypes:
@@ -3129,6 +3264,12 @@ class IDLInterfaceMember(IDLObjectWithIdentifier, IDLExposureMixins):
                 raise WebIDLError("Interface member is flagged as affecting "
                                   "everything but not depending on everything. "
                                   "That seems rather unlikely.",
+                                  [self.location])
+
+        if self.getExtendedAttribute("NewObject"):
+            if self.dependsOn == "Nothing" or self.dependsOn == "DOMState":
+                raise WebIDLError("A [NewObject] method is not idempotent, "
+                                  "so it has to depend on something other than DOM state.",
                                   [self.location])
 
     def _setDependsOn(self, dependsOn):
@@ -3568,7 +3709,7 @@ class IDLArgument(IDLObjectWithIdentifier):
             self.type = type
 
         if ((self.type.isDictionary() or
-             self.type.isUnion() and self.type.unroll().hasDictionaryType) and
+             self.type.isUnion() and self.type.unroll().hasDictionaryType()) and
             self.optional and not self.defaultValue and not self.variadic):
             # Default optional non-variadic dictionaries to null,
             # for simplicity, so the codegen doesn't have to special-case this.
@@ -3601,11 +3742,9 @@ class IDLArgument(IDLObjectWithIdentifier):
     def canHaveMissingValue(self):
         return self.optional and not self.defaultValue
 
-class IDLCallbackType(IDLType, IDLObjectWithScope):
+class IDLCallback(IDLObjectWithScope):
     def __init__(self, location, parentScope, identifier, returnType, arguments):
         assert isinstance(returnType, IDLType)
-
-        IDLType.__init__(self, location, identifier.name)
 
         self._returnType = returnType
         # Clone the list
@@ -3625,9 +3764,6 @@ class IDLCallbackType(IDLType, IDLObjectWithScope):
 
     def signatures(self):
         return [(self._returnType, self._arguments)]
-
-    def tag(self):
-        return IDLType.Tags.callback
 
     def finish(self, scope):
         if not self._returnType.isComplete():
@@ -3652,14 +3788,6 @@ class IDLCallbackType(IDLType, IDLObjectWithScope):
     def validate(self):
         pass
 
-    def isDistinguishableFrom(self, other):
-        if other.isUnion():
-            # Just forward to the union; it'll deal
-            return other.isDistinguishableFrom(self)
-        return (other.isPrimitive() or other.isString() or other.isEnum() or
-                other.isNonCallbackInterface() or other.isDate() or
-                other.isSequence())
-
     def addExtendedAttributes(self, attrs):
         unhandledAttrs = []
         for attr in attrs:
@@ -3677,6 +3805,28 @@ class IDLCallbackType(IDLType, IDLObjectWithScope):
 
     def _getDependentObjects(self):
         return set([self._returnType] + self._arguments)
+
+class IDLCallbackType(IDLType):
+    def __init__(self, location, callback):
+        IDLType.__init__(self, location, callback.identifier.name)
+        self.callback = callback
+
+    def isCallback(self):
+        return True
+
+    def tag(self):
+        return IDLType.Tags.callback
+
+    def isDistinguishableFrom(self, other):
+        if other.isUnion():
+            # Just forward to the union; it'll deal
+            return other.isDistinguishableFrom(self)
+        return (other.isPrimitive() or other.isString() or other.isEnum() or
+                other.isNonCallbackInterface() or other.isDate() or
+                other.isSequence())
+
+    def _getDependentObjects(self):
+        return self.callback._getDependentObjects()
 
 class IDLMethodOverload:
     """
@@ -3889,45 +4039,7 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
     def finish(self, scope):
         IDLInterfaceMember.finish(self, scope)
 
-        overloadWithPromiseReturnType = None
-        overloadWithoutPromiseReturnType = None
         for overload in self._overloads:
-            variadicArgument = None
-
-            arguments = overload.arguments
-            for (idx, argument) in enumerate(arguments):
-                if not argument.isComplete():
-                    argument.complete(scope)
-                assert argument.type.isComplete()
-
-                if (argument.type.isDictionary() or
-                    (argument.type.isUnion() and
-                     argument.type.unroll().hasDictionaryType)):
-                    # Dictionaries and unions containing dictionaries at the
-                    # end of the list or followed by optional arguments must be
-                    # optional.
-                    if (not argument.optional and
-                        all(arg.optional for arg in arguments[idx+1:])):
-                        raise WebIDLError("Dictionary argument or union "
-                                          "argument containing a dictionary "
-                                          "not followed by a required argument "
-                                          "must be optional",
-                                          [argument.location])
-
-                    # An argument cannot be a Nullable Dictionary
-                    if argument.type.nullable():
-                        raise WebIDLError("An argument cannot be a nullable "
-                                          "dictionary or nullable union "
-                                          "containing a dictionary",
-                                          [argument.location])
-
-                # Only the last argument can be variadic
-                if variadicArgument:
-                    raise WebIDLError("Variadic argument is not last argument",
-                                      [variadicArgument.location])
-                if argument.variadic:
-                    variadicArgument = argument
-
             returnType = overload.returnType
             if not returnType.isComplete():
                 returnType = returnType.complete(scope)
@@ -3936,22 +4048,10 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
                 assert not isinstance(returnType.name, IDLUnresolvedIdentifier)
                 overload.returnType = returnType
 
-            if returnType.isPromise():
-                overloadWithPromiseReturnType = overload
-            else:
-                overloadWithoutPromiseReturnType = overload
-
-        # Make sure either all our overloads return Promises or none do
-        if overloadWithPromiseReturnType and overloadWithoutPromiseReturnType:
-            raise WebIDLError("We have overloads with both Promise and "
-                              "non-Promise return types",
-                              [overloadWithPromiseReturnType.location,
-                               overloadWithoutPromiseReturnType.location])
-
-        if overloadWithPromiseReturnType and self._legacycaller:
-            raise WebIDLError("May not have a Promise return type for a "
-                              "legacycaller.",
-                              [overloadWithPromiseReturnType.location])
+            for argument in overload.arguments:
+                if not argument.isComplete():
+                    argument.complete(scope)
+                assert argument.type.isComplete()
 
         # Now compute various information that will be used by the
         # WebIDL overload resolution algorithm.
@@ -3981,11 +4081,72 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
                              distinguishingIndex),
                             [self.location, overload.location])
 
+        overloadWithPromiseReturnType = None
+        overloadWithoutPromiseReturnType = None
         for overload in self._overloads:
-            if not overload.returnType.unroll().isExposedInAllOf(self.exposureSet):
+            returnType = overload.returnType
+            if not returnType.unroll().isExposedInAllOf(self.exposureSet):
                 raise WebIDLError("Overload returns a type that is not exposed "
                                   "everywhere where the method is exposed",
                                   [overload.location])
+
+            variadicArgument = None
+
+            arguments = overload.arguments
+            for (idx, argument) in enumerate(arguments):
+                assert argument.type.isComplete()
+
+                if ((argument.type.isDictionary() and
+                     argument.type.inner.canBeEmpty())or
+                    (argument.type.isUnion() and
+                     argument.type.unroll().hasPossiblyEmptyDictionaryType())):
+                    # Optional dictionaries and unions containing optional
+                    # dictionaries at the end of the list or followed by
+                    # optional arguments must be optional.
+                    if (not argument.optional and
+                        all(arg.optional for arg in arguments[idx+1:])):
+                        raise WebIDLError("Dictionary argument or union "
+                                          "argument containing a dictionary "
+                                          "not followed by a required argument "
+                                          "must be optional",
+                                          [argument.location])
+
+                    # An argument cannot be a Nullable Dictionary
+                    if argument.type.nullable():
+                        raise WebIDLError("An argument cannot be a nullable "
+                                          "dictionary or nullable union "
+                                          "containing a dictionary",
+                                          [argument.location])
+
+                # Only the last argument can be variadic
+                if variadicArgument:
+                    raise WebIDLError("Variadic argument is not last argument",
+                                      [variadicArgument.location])
+                if argument.variadic:
+                    variadicArgument = argument
+
+            if returnType.isPromise():
+                overloadWithPromiseReturnType = overload
+            else:
+                overloadWithoutPromiseReturnType = overload
+
+        # Make sure either all our overloads return Promises or none do
+        if overloadWithPromiseReturnType and overloadWithoutPromiseReturnType:
+            raise WebIDLError("We have overloads with both Promise and "
+                              "non-Promise return types",
+                              [overloadWithPromiseReturnType.location,
+                               overloadWithoutPromiseReturnType.location])
+
+        if overloadWithPromiseReturnType and self._legacycaller:
+            raise WebIDLError("May not have a Promise return type for a "
+                              "legacycaller.",
+                              [overloadWithPromiseReturnType.location])
+
+        if self.getExtendedAttribute("StaticClassOverride") and not \
+           (self.identifier.scope.isJSImplemented() and self.isStatic()):
+            raise WebIDLError("StaticClassOverride can be applied to static"
+                              " methods on JS-implemented classes only.",
+                              [self.location])
 
     def overloadsForArgCount(self, argc):
         return [overload for overload in self._overloads if
@@ -4106,7 +4267,9 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
               identifier == "Func" or
               identifier == "AvailableIn" or
               identifier == "CheckPermissions" or
-              identifier == "BinaryName"):
+              identifier == "BinaryName" or
+              identifier == "MethodIdentityTestable" or
+              identifier == "StaticClassOverride"):
             # Known attributes that we don't need to do anything with here
             pass
         else:
@@ -4322,6 +4485,7 @@ class Tokenizer(object):
         "<": "LT",
         ">": "GT",
         "ArrayBuffer": "ARRAYBUFFER",
+        "SharedArrayBuffer": "SHAREDARRAYBUFFER",
         "or": "OR"
         }
 
@@ -4680,8 +4844,8 @@ class Parser(Tokenizer):
             CallbackRest : IDENTIFIER EQUALS ReturnType LPAREN ArgumentList RPAREN SEMICOLON
         """
         identifier = IDLUnresolvedIdentifier(self.getLocation(p, 1), p[1])
-        p[0] = IDLCallbackType(self.getLocation(p, 1), self.globalScope(),
-                               identifier, p[3], p[5])
+        p[0] = IDLCallback(self.getLocation(p, 1), self.globalScope(),
+                           identifier, p[3], p[5])
 
     def p_ExceptionMembers(self, p):
         """
@@ -4694,8 +4858,8 @@ class Parser(Tokenizer):
         """
             Typedef : TYPEDEF Type IDENTIFIER SEMICOLON
         """
-        typedef = IDLTypedefType(self.getLocation(p, 1), p[2], p[3])
-        typedef.resolve(self.globalScope())
+        typedef = IDLTypedef(self.getLocation(p, 1), self.globalScope(),
+                             p[2], p[3])
         p[0] = typedef
 
     def p_ImplementsStatement(self, p):
@@ -5369,12 +5533,15 @@ class Parser(Tokenizer):
         """
             NonAnyType : PrimitiveOrStringType TypeSuffix
                        | ARRAYBUFFER TypeSuffix
+                       | SHAREDARRAYBUFFER TypeSuffix
                        | OBJECT TypeSuffix
         """
         if p[1] == "object":
             type = BuiltinTypes[IDLBuiltinType.Types.object]
         elif p[1] == "ArrayBuffer":
             type = BuiltinTypes[IDLBuiltinType.Types.ArrayBuffer]
+        elif p[1] == "SharedArrayBuffer":
+            type = BuiltinTypes[IDLBuiltinType.Types.SharedArrayBuffer]
         else:
             type = BuiltinTypes[p[1]]
 
@@ -5430,8 +5597,12 @@ class Parser(Tokenizer):
         try:
             if self.globalScope()._lookupIdentifier(p[1]):
                 obj = self.globalScope()._lookupIdentifier(p[1])
-                if obj.isType():
-                    type = obj
+                assert not obj.isType()
+                if obj.isTypedef():
+                    type = IDLTypedefType(self.getLocation(p, 1), obj.innerType,
+                                          obj.identifier.name)
+                elif obj.isCallback() and not obj.isInterface():
+                    type = IDLCallbackType(self.getLocation(p, 1), obj)
                 else:
                     type = IDLWrapperType(self.getLocation(p, 1), p[1])
                 p[0] = self.handleModifiers(type, p[2])
@@ -5764,12 +5935,10 @@ class Parser(Tokenizer):
         assert isinstance(scope, IDLScope)
 
         # xrange omits the last value.
-        for x in xrange(IDLBuiltinType.Types.ArrayBuffer, IDLBuiltinType.Types.Float64Array + 1):
+        for x in xrange(IDLBuiltinType.Types.ArrayBuffer, IDLBuiltinType.Types.SharedFloat64Array + 1):
             builtin = BuiltinTypes[x]
             name = builtin.name
-
-            typedef = IDLTypedefType(BuiltinLocation("<builtin type>"), builtin, name)
-            typedef.resolve(scope)
+            typedef = IDLTypedef(BuiltinLocation("<builtin type>"), scope, builtin, name)
 
     @ staticmethod
     def handleModifiers(type, modifiers):
@@ -5827,6 +5996,7 @@ class Parser(Tokenizer):
     _builtins = """
         typedef unsigned long long DOMTimeStamp;
         typedef (ArrayBufferView or ArrayBuffer) BufferSource;
+        typedef (SharedArrayBufferView or SharedArrayBuffer) SharedBufferSource;
     """
 
 def main():

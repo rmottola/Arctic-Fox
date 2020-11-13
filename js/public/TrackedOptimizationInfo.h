@@ -31,6 +31,7 @@ namespace JS {
     _(SetProp_DefiniteSlot)                             \
     _(SetProp_Unboxed)                                  \
     _(SetProp_InlineAccess)                             \
+    _(SetProp_InlineCache)                              \
                                                         \
     _(GetElem_TypedObject)                              \
     _(GetElem_Dense)                                    \
@@ -107,6 +108,7 @@ namespace JS {
     _(CantInlineNoBaseline)                                             \
     _(CantInlineLazy)                                                   \
     _(CantInlineNotConstructor)                                         \
+    _(CantInlineClassConstructor)                                       \
     _(CantInlineDisabledIon)                                            \
     _(CantInlineTooManyArgs)                                            \
     _(CantInlineRecursive)                                              \

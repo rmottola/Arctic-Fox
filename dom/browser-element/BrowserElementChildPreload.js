@@ -576,8 +576,6 @@ BrowserElementChild.prototype = {
     e.stopPropagation();
     let detail = {
       state: e.state,
-      scrollX: e.scrollX,
-      scrollY: e.scrollY,
     };
     sendAsyncMsg('scrollviewchange', detail);
   },

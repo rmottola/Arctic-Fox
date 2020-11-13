@@ -39,7 +39,10 @@ WeakMapBase::WeakMapBase(JSObject* memOf, JSCompartment* c)
 
 WeakMapBase::~WeakMapBase()
 {
-    MOZ_ASSERT(!isInList());
+    MOZ_ASSERT(CurrentThreadIsGCSweeping() || CurrentThreadIsHandlingInitFailure());
+    MOZ_ASSERT_IF(CurrentThreadIsGCSweeping(), !isInList());
+    if (isInList())
+        removeWeakMapFromList(this);
 }
 
 void
@@ -345,7 +348,7 @@ WeakMapPostWriteBarrier(JSRuntime* rt, ObjectValueMap* weakMap, JSObject* key)
     // Strip the barriers from the type before inserting into the store buffer.
     // This will automatically ensure that barriers do not fire during GC.
     if (key && IsInsideNursery(key))
-        rt->gc.storeBuffer.putGeneric(UnbarrieredRef(weakMap, key));
+        rt->gc.storeBuffer.putGeneric(gc::HashKeyRef<ObjectValueMap, JSObject*>(weakMap, key));
 }
 
 static MOZ_ALWAYS_INLINE bool

@@ -832,7 +832,7 @@ js::obj_defineProperty(JSContext *cx, unsigned argc, Value *vp)
         return false;
 
     // Steps 6-8.
-    if (!StandardDefineProperty(cx, obj, id, desc))
+    if (!DefineProperty(cx, obj, id, desc))
         return false;
     args.rval().setObject(*obj);
     return true;
@@ -1134,7 +1134,8 @@ FinishObjectClassInit(JSContext* cx, JS::HandleObject ctor, JS::HandleObject pro
 
     /* ES5 15.1.2.1. */
     RootedId evalId(cx, NameToId(cx->names().eval));
-    JSObject* evalobj = DefineFunction(cx, self, evalId, IndirectEval, 1, JSFUN_STUB_GSOPS);
+    JSObject* evalobj = DefineFunction(cx, self, evalId, IndirectEval, 1,
+                                       JSFUN_STUB_GSOPS | JSPROP_RESOLVING);
     if (!evalobj)
         return false;
     self->setOriginalEval(evalobj);

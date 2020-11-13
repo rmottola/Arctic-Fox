@@ -96,9 +96,9 @@ JS_IsDeadWrapper(JSObject* obj);
  * all cycle-participating data it reaches, using bounded stack space.
  */
 extern JS_FRIEND_API(void)
-JS_TraceShapeCycleCollectorChildren(JSTracer* trc, JS::GCCellPtr shape);
+JS_TraceShapeCycleCollectorChildren(JS::CallbackTracer* trc, JS::GCCellPtr shape);
 extern JS_FRIEND_API(void)
-JS_TraceObjectGroupCycleCollectorChildren(JSTracer* trc, JS::GCCellPtr group);
+JS_TraceObjectGroupCycleCollectorChildren(JS::CallbackTracer* trc, JS::GCCellPtr group);
 
 enum {
     JS_TELEMETRY_GC_REASON,
@@ -116,6 +116,9 @@ enum {
     JS_TELEMETRY_GC_NON_INCREMENTAL,
     JS_TELEMETRY_GC_SCC_SWEEP_TOTAL_MS,
     JS_TELEMETRY_GC_SCC_SWEEP_MAX_PAUSE_MS,
+    JS_TELEMETRY_GC_MINOR_REASON,
+    JS_TELEMETRY_GC_MINOR_REASON_LONG,
+    JS_TELEMETRY_GC_MINOR_US,
     JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT,
     JS_TELEMETRY_ADDON_EXCEPTIONS
 };
@@ -477,6 +480,9 @@ IsSystemZone(JS::Zone* zone);
 extern JS_FRIEND_API(bool)
 IsAtomsCompartment(JSCompartment* comp);
 
+extern JS_FRIEND_API(bool)
+IsAtomsZone(JS::Zone* zone);
+
 /*
  * Returns whether we're in a non-strict property set (in that we're in a
  * non-strict script and the bytecode we're on is a property set).  The return
@@ -525,7 +531,7 @@ VisitGrayWrapperTargets(JS::Zone* zone, GCThingCallback callback, void* closure)
 extern JS_FRIEND_API(JSObject*)
 GetWeakmapKeyDelegate(JSObject* key);
 
-JS_FRIEND_API(JSGCTraceKind)
+JS_FRIEND_API(JS::TraceKind)
 GCThingTraceKind(void* thing);
 
 /*
@@ -1697,6 +1703,12 @@ JS_NewSharedFloat64ArrayWithBuffer(JSContext* cx, JS::HandleObject arrayBuffer,
                                    uint32_t byteOffset, uint32_t length);
 
 /*
+ * Create a new SharedArrayBuffer with the given byte length.
+ */
+extern JS_FRIEND_API(JSObject*)
+JS_NewSharedArrayBuffer(JSContext* cx, uint32_t nbytes);
+
+/*
  * Create a new ArrayBuffer with the given byte length.
  */
 extern JS_FRIEND_API(JSObject*)
@@ -1820,6 +1832,13 @@ UnwrapSharedFloat32Array(JSObject* obj);
 extern JS_FRIEND_API(JSObject*)
 UnwrapSharedFloat64Array(JSObject* obj);
 
+extern JS_FRIEND_API(JSObject*)
+UnwrapSharedArrayBuffer(JSObject* obj);
+
+extern JS_FRIEND_API(JSObject*)
+UnwrapSharedArrayBufferView(JSObject* obj);
+
+
 namespace detail {
 
 extern JS_FRIEND_DATA(const Class* const) Int8ArrayClassPtr;
@@ -1871,6 +1890,16 @@ JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(Uint32, uint32_t)
 JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(Float32, float)
 JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(Float64, double)
 
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedInt8, int8_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedUint8, uint8_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedUint8Clamped, uint8_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedInt16, int16_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedUint16, uint16_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedInt32, int32_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedUint32, uint32_t)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedFloat32, float)
+JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(SharedFloat64, double)
+
 #undef JS_DEFINE_DATA_AND_LENGTH_ACCESSOR
 
 // This one isn't inlined because it's rather tricky (by dint of having to deal
@@ -1878,10 +1907,16 @@ JS_DEFINE_DATA_AND_LENGTH_ACCESSOR(Float64, double)
 extern JS_FRIEND_API(void)
 GetArrayBufferViewLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data);
 
+extern JS_FRIEND_API(void)
+GetSharedArrayBufferViewLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data);
+
 // This one isn't inlined because there are a bunch of different ArrayBuffer
 // classes that would have to be individually handled here.
 extern JS_FRIEND_API(void)
 GetArrayBufferLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data);
+
+extern JS_FRIEND_API(void)
+GetSharedArrayBufferLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data);
 
 } // namespace js
 
@@ -1922,6 +1957,9 @@ JS_GetObjectAsArrayBuffer(JSObject* obj, uint32_t* length, uint8_t** data);
  */
 extern JS_FRIEND_API(js::Scalar::Type)
 JS_GetArrayBufferViewType(JSObject* obj);
+
+extern JS_FRIEND_API(js::Scalar::Type)
+JS_GetSharedArrayBufferViewType(JSObject* obj);
 
 /*
  * Check whether obj supports the JS_GetArrayBuffer* APIs. Note that this may
@@ -2041,6 +2079,27 @@ extern JS_FRIEND_API(float*)
 JS_GetFloat32ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
 extern JS_FRIEND_API(double*)
 JS_GetFloat64ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+
+extern JS_FRIEND_API(uint8_t*)
+JS_GetSharedArrayBufferData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(int8_t*)
+JS_GetSharedInt8ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(uint8_t*)
+JS_GetSharedUint8ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(uint8_t*)
+JS_GetSharedUint8ClampedArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(int16_t*)
+JS_GetSharedInt16ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(uint16_t*)
+JS_GetSharedUint16ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(int32_t*)
+JS_GetSharedInt32ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(uint32_t*)
+JS_GetSharedUint32ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(float*)
+JS_GetSharedFloat32ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
+extern JS_FRIEND_API(double*)
+JS_GetSharedFloat64ArrayData(JSObject* obj, const JS::AutoCheckCannotGC&);
 
 /*
  * Same as above, but for any kind of ArrayBufferView. Prefer the type-specific
@@ -2563,18 +2622,32 @@ IdToValue(jsid id)
 }
 
 /*
- * If the embedder has registered a default JSContext callback, returns the
- * result of the callback. Otherwise, asserts that |rt| has exactly one
- * JSContext associated with it, and returns that context.
+ * If the embedder has registered a ScriptEnvironmentPreparer,
+ * PrepareScriptEnvironmentAndInvoke will call the preparer's 'invoke' method
+ * with the given |closure|, with the assumption that the preparer will set up
+ * any state necessary to run script in |scope|, invoke |closure| with a valid
+ * JSContext*, and return.
+ *
+ * If no preparer is registered, PrepareScriptEnvironmentAndInvoke will assert
+ * that |rt| has exactly one JSContext associated with it, enter the compartment
+ * of |scope| on that context, and invoke |closure|.
  */
-extern JS_FRIEND_API(JSContext*)
-DefaultJSContext(JSRuntime* rt);
 
-typedef JSContext*
-(* DefaultJSContextCallback)(JSRuntime* rt);
+struct ScriptEnvironmentPreparer {
+    struct Closure {
+        virtual bool operator()(JSContext* cx) = 0;
+    };
+
+    virtual bool invoke(JS::HandleObject scope, Closure& closure) = 0;
+};
+
+extern JS_FRIEND_API(bool)
+PrepareScriptEnvironmentAndInvoke(JSRuntime* rt, JS::HandleObject scope,
+                                  ScriptEnvironmentPreparer::Closure& closure);
 
 JS_FRIEND_API(void)
-SetDefaultJSContextCallback(JSRuntime* rt, DefaultJSContextCallback cb);
+SetScriptEnvironmentPreparer(JSRuntime* rt, ScriptEnvironmentPreparer*
+preparer);
 
 /*
  * To help embedders enforce their invariants, we allow them to specify in
@@ -2744,9 +2817,8 @@ GetFirstSubsumedSavedFrame(JSContext* cx, JS::HandleObject savedFrame);
 extern JS_FRIEND_API(bool)
 ReportIsNotFunction(JSContext* cx, JS::HandleValue v);
 
-extern JS_FRIEND_API(bool)
-DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                  JS::Handle<JSPropertyDescriptor> descriptor, JS::ObjectOpResult &result);
+extern JS_FRIEND_API(JSObject*)
+ConvertArgsToArray(JSContext* cx, const JS::CallArgs& args);
 
 } /* namespace js */
 

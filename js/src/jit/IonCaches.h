@@ -9,6 +9,8 @@
 
 #if defined(JS_CODEGEN_ARM)
 # include "jit/arm/Assembler-arm.h"
+#elif defined(JS_CODEGEN_ARM64)
+# include "jit/arm64/Assembler-arm64.h"
 #elif defined(JS_CODEGEN_MIPS)
 # include "jit/mips/Assembler-mips.h"
 #endif
@@ -243,7 +245,7 @@ class IonCache
     {
     }
 
-    virtual void disable();
+    void disable(IonScript* ion);
     inline bool isDisabled() const {
         return disabled_;
     }

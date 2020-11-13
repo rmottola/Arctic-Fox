@@ -71,7 +71,7 @@ stepFunc(JSContext *aCtx,
     return false;
   }
 
-  *_vp = BOOLEAN_TO_JSVAL(hasMore);
+  _vp->setBoolean(hasMore);
   return true;
 }
 
@@ -118,7 +118,7 @@ StatementJSHelper::getRow(Statement *aStatement,
   obj = aStatement->mStatementRowHolder->GetJSObject();
   NS_ENSURE_STATE(obj);
 
-  *_row = OBJECT_TO_JSVAL(obj);
+  _row->setObject(*obj);
   return NS_OK;
 }
 
@@ -164,7 +164,7 @@ StatementJSHelper::getParams(Statement *aStatement,
   obj = aStatement->mStatementParamsHolder->GetJSObject();
   NS_ENSURE_STATE(obj);
 
-  *_params = OBJECT_TO_JSVAL(obj);
+  _params->setObject(*obj);
   return NS_OK;
 }
 
@@ -234,7 +234,7 @@ StatementJSHelper::Resolve(nsIXPConnectWrappedNative *aWrapper,
   JS::RootedObject scope(aCtx, aScopeObj);
   if (::JS_FlatStringEqualsAscii(JSID_TO_FLAT_STRING(aId), "step")) {
     *_retval = ::JS_DefineFunction(aCtx, scope, "step", stepFunc,
-                                   0, 0) != nullptr;
+                                   0, JSPROP_RESOLVING) != nullptr;
     *aResolvedp = true;
     return NS_OK;
   }

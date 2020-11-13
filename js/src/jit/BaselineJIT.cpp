@@ -859,6 +859,8 @@ BaselineScript::toggleDebugTraps(JSScript* script, jsbytecode* pc)
 
     SrcNoteLineScanner scanner(script->notes(), script->lineno());
 
+    AutoWritableJitCode awjc(method());
+
     for (uint32_t i = 0; i < numPCMappingIndexEntries(); i++) {
         PCMappingIndexEntry& entry = pcMappingIndexEntry(i);
 
@@ -905,6 +907,7 @@ BaselineScript::initTraceLogger(JSRuntime* runtime, JSScript* script)
         traceLoggerScriptEvent_ = TraceLoggerEvent(logger, TraceLogger_Scripts);
 
     if (TraceLogTextIdEnabled(TraceLogger_Engine) || TraceLogTextIdEnabled(TraceLogger_Scripts)) {
+        AutoWritableJitCode awjc(method_);
         CodeLocationLabel enter(method_, CodeOffsetLabel(traceLoggerEnterToggleOffset_));
         CodeLocationLabel exit(method_, CodeOffsetLabel(traceLoggerExitToggleOffset_));
         Assembler::ToggleToCmp(enter);
@@ -927,6 +930,8 @@ BaselineScript::toggleTraceLoggerScripts(JSRuntime* runtime, JSScript* script, b
         traceLoggerScriptEvent_ = TraceLoggerEvent(logger, TraceLogger_Scripts, script);
     else
         traceLoggerScriptEvent_ = TraceLoggerEvent(logger, TraceLogger_Scripts);
+
+    AutoWritableJitCode awjc(method());
 
     // Enable/Disable the traceLogger prologue and epilogue.
     CodeLocationLabel enter(method_, CodeOffsetLabel(traceLoggerEnterToggleOffset_));
@@ -953,6 +958,8 @@ BaselineScript::toggleTraceLoggerEngine(bool enable)
 
     MOZ_ASSERT(enable == !traceLoggerEngineEnabled_);
     MOZ_ASSERT(scriptsEnabled == traceLoggerScriptsEnabled_);
+
+    AutoWritableJitCode awjc(method());
 
     // Enable/Disable the traceLogger prologue and epilogue.
     CodeLocationLabel enter(method_, CodeOffsetLabel(traceLoggerEnterToggleOffset_));
@@ -981,6 +988,8 @@ BaselineScript::toggleProfilerInstrumentation(bool enable)
 
     JitSpew(JitSpew_BaselineIC, "  toggling profiling %s for BaselineScript %p",
             enable ? "on" : "off", this);
+
+    AutoWritableJitCode awjc(method());
 
     // Toggle the jump
     CodeLocationLabel enterToggleLocation(method_, CodeOffsetLabel(profilerEnterToggleOffset_));
