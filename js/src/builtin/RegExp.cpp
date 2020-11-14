@@ -202,7 +202,7 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
         RegExpStatics* res = cx->global()->getRegExpStatics(cx);
         if (!res)
             return false;
-        Rooted<JSAtom*> empty(cx, cx->names().emptyRegExp);
+        Rooted<JSAtom*> empty(cx, cx->runtime()->emptyString);
         RegExpObject* reobj = builder.build(empty, res->getFlags());
         if (!reobj)
             return false;
@@ -229,15 +229,18 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
          */
         RootedObject sourceObj(cx, &sourceValue.toObject());
 
+        RootedAtom sourceAtom(cx);
         RegExpFlag flags;
         {
             /*
-             * Only extract the 'flags' out of sourceObj; do not reuse the
-             * RegExpShared since it may be from a different compartment.
+             * Extract the 'source' from sourceObj; do not reuse the RegExpShared
+             * since it may be from a different compartment.
              */
             RegExpGuard g(cx);
             if (!RegExpToShared(cx, sourceObj, &g))
                 return false;
+            sourceAtom = g->getSource();
+
             /*
              * If args[1] is not undefined, then parse the 'flags' from args[1].
              * Otherwise, extract the 'flags' from sourceObj.
@@ -254,17 +257,6 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
             }
         }
 
-        /*
-         * 'toSource' is a permanent read-only property, so this is equivalent
-         * to executing RegExpObject::getSource on the unwrapped object.
-         */
-        RootedValue v(cx);
-        if (!GetProperty(cx, sourceObj, sourceObj, cx->names().source, &v))
-            return false;
-
-        // For proxies like CPOWs, we can't assume the result of a property get
-        // for 'source' is atomized.
-        Rooted<JSAtom*> sourceAtom(cx, AtomizeString(cx, v.toString()));
         RegExpObject* reobj = builder.build(sourceAtom, flags);
         if (!reobj)
             return false;
@@ -316,7 +308,7 @@ IsRegExpObject(HandleValue v)
 }
 
 MOZ_ALWAYS_INLINE bool
-regexp_compile_impl(JSContext *cx, const CallArgs &args)
+regexp_compile_impl(JSContext* cx, const CallArgs& args)
 {
     MOZ_ASSERT(IsRegExpObject(args.thisv()));
     RegExpObjectBuilder builder(cx, &args.thisv().toObject().as<RegExpObject>());
@@ -324,14 +316,14 @@ regexp_compile_impl(JSContext *cx, const CallArgs &args)
 }
 
 static bool
-regexp_compile(JSContext *cx, unsigned argc, Value *vp)
+regexp_compile(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<IsRegExpObject, regexp_compile_impl>(cx, args);
 }
 
 bool
-js::regexp_construct(JSContext *cx, unsigned argc, Value *vp)
+js::regexp_construct(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -591,8 +583,8 @@ const JSPropertySpec js::regexp_static_props[] = {
     JS_PS_END
 };
 
-JSObject *
-js::CreateRegExpPrototype(JSContext *cx, JSProtoKey key)
+JSObject*
+js::CreateRegExpPrototype(JSContext* cx, JSProtoKey key)
 {
     MOZ_ASSERT(key == JSProto_RegExp);
 
@@ -601,7 +593,7 @@ js::CreateRegExpPrototype(JSContext *cx, JSProtoKey key)
         return nullptr;
     proto->NativeObject::setPrivate(nullptr);
 
-    HandlePropertyName empty = cx->names().emptyRegExp;
+    HandlePropertyName empty = cx->names().empty;
     RegExpObjectBuilder builder(cx, proto);
     if (!builder.build(empty, RegExpFlag(0)))
         return nullptr;
