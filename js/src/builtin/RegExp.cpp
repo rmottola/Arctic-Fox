@@ -143,9 +143,8 @@ js::ExecuteRegExpLegacy(JSContext* cx, RegExpStatics* res, RegExpObject& reobj,
  * Compile a new |RegExpShared| for the |RegExpObject|.
  */
 static bool
-CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder,
-                    const CallArgs& args, RegExpStaticsUse staticsUse,
-                    RegExpCreationMode creationMode)
+CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
+                    RegExpStaticsUse staticsUse, RegExpCreationMode creationMode)
 {
     if (args.length() == 0) {
         MOZ_ASSERT(staticsUse == UseRegExpStatics);
@@ -242,14 +241,10 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder,
             return false;
     }
 
-    RootedAtom escapedSourceStr(cx, EscapeRegExpPattern(cx, source));
-    if (!escapedSourceStr)
-        return false;
-
     CompileOptions options(cx);
     frontend::TokenStream dummyTokenStream(cx, options, nullptr, 0, nullptr);
 
-    if (!irregexp::ParsePatternSyntax(dummyTokenStream, cx->tempLifoAlloc(), escapedSourceStr))
+    if (!irregexp::ParsePatternSyntax(dummyTokenStream, cx->tempLifoAlloc(), source))
         return false;
 
     if (staticsUse == UseRegExpStatics) {
@@ -258,7 +253,7 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder,
             return false;
         flags = RegExpFlag(flags | res->getFlags());
     }
-    RegExpObject* reobj = builder.build(escapedSourceStr, flags);
+    RegExpObject* reobj = builder.build(source, flags);
     if (!reobj)
         return false;
 
