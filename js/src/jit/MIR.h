@@ -3266,6 +3266,11 @@ class MSimdUnbox
         return new(alloc) MSimdUnbox(op, type);
     }
 
+    MDefinition* foldsTo(TempAllocator& alloc) override;
+    bool congruentTo(const MDefinition* ins) const override {
+        return congruentIfOperandsEqual(ins);
+    }
+
     AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
