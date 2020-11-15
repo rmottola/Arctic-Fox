@@ -3253,6 +3253,7 @@ class MSimdUnbox
       : MUnaryInstruction(op)
     {
         MOZ_ASSERT(IsSimdType(type));
+        setGuard();
         setMovable();
         setResultType(type);
     }
