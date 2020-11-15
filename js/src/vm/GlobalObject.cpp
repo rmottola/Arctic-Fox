@@ -613,7 +613,7 @@ GlobalObject::getSelfHostedFunction(JSContext* cx, HandleAtom selfHostedName, Ha
     if (cx->global()->maybeGetIntrinsicValue(shId, funVal.address()))
         return true;
 
-    JSFunction *fun =
+    JSFunction* fun =
         NewScriptedFunction(cx, nargs, JSFunction::INTERPRETED_LAZY,
                             name, gc::AllocKind::FUNCTION_EXTENDED, SingletonObject);
     if (!fun)
