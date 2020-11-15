@@ -31,8 +31,7 @@ function f() {
         assertEqX4(SIMD.float32x4.load(u16, (16 << 1) - (4 << 1)), [13,14,15,16]);
         assertEqX4(SIMD.float32x4.load(i8,  (16 << 2) - (4 << 2)), [13,14,15,16]);
         assertEqX4(SIMD.float32x4.load(u8,  (16 << 2) - (4 << 2)), [13,14,15,16]);
-
-
+    }
 
     function testLoad1() {
         assertEqX4(SIMD.float32x4.load1(f64, 0),      [1,0,0,0]);
@@ -106,7 +105,6 @@ function testBailout(uglyDuckling) {
     var i8  = new Int8Array(f32.buffer);
 
     for (var i = 0; i < 150; i++) {
-
         var caught = false;
         try {
             SIMD.float32x4.load(i8, (i < 149) ? 0 : uglyDuckling);
