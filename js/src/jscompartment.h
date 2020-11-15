@@ -284,17 +284,17 @@ struct JSCompartment
 
   public:
     void addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
-                                size_t *tiAllocationSiteTables,
-                                size_t *tiArrayTypeTables,
-                                size_t *tiObjectTypeTables,
-                                size_t *compartmentObject,
-                                size_t *compartmentTables,
-                                size_t *innerViews,
-                                size_t *lazyArrayBuffers,
-                                size_t *objectMetadataTables,
-                                size_t *crossCompartmentWrappers,
-                                size_t *regexpCompartment,
-                                size_t *savedStacksSet);
+                                size_t* tiAllocationSiteTables,
+                                size_t* tiArrayTypeTables,
+                                size_t* tiObjectTypeTables,
+                                size_t* compartmentObject,
+                                size_t* compartmentTables,
+                                size_t* innerViews,
+                                size_t* lazyArrayBuffers,
+                                size_t* objectMetadataTables,
+                                size_t* crossCompartmentWrappers,
+                                size_t* regexpCompartment,
+                                size_t* savedStacksSet);
 
     /*
      * Shared scope property tree, and arena-pool for allocating its nodes.
@@ -326,7 +326,7 @@ struct JSCompartment
 
     // Keep track of the metadata objects which can be associated with each
     // JS object.
-    js::ObjectWeakMap *objectMetadataTable;
+    js::ObjectWeakMap* objectMetadataTable;
 
     // Map from array buffers to views sharing that storage.
     js::InnerViewTable innerViews;
@@ -334,7 +334,7 @@ struct JSCompartment
     // Inline transparent typed objects do not initially have an array buffer,
     // but can have that buffer created lazily if it is accessed later. This
     // table manages references from such typed objects to their buffers.
-    js::ObjectWeakMap *lazyArrayBuffers;
+    js::ObjectWeakMap* lazyArrayBuffers;
 
     // All unboxed layouts in the compartment.
     mozilla::LinkedList<js::UnboxedLayout> unboxedLayouts;
