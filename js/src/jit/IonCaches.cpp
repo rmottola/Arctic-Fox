@@ -1673,7 +1673,7 @@ GetPropertyIC::tryAttachDOMProxyUnshadowed(JSContext* cx, HandleScript outerScri
         // code and we will not have the same generation again for this
         // object, so the generation check in the existing IC would always
         // fail anyway.
-        reset();
+        reset(Reprotect);
     }
 
     Label failures;
@@ -1998,9 +1998,9 @@ GetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
 }
 
 void
-GetPropertyIC::reset()
+GetPropertyIC::reset(ReprotectCode reprotect)
 {
-    IonCache::reset();
+    IonCache::reset(reprotect);
     hasTypedArrayLengthStub_ = false;
     hasSharedTypedArrayLengthStub_ = false;
     hasStrictArgumentsLengthStub_ = false;
@@ -2009,18 +2009,17 @@ GetPropertyIC::reset()
 }
 
 void
-IonCache::disable(IonScript* ion)
+IonCache::disable()
 {
-    AutoWritableJitCode awjc(ion->method());
-    reset();
+    reset(Reprotect);
     this->disabled_ = 1;
 }
 
 void
-IonCache::reset()
+IonCache::reset(ReprotectCode reprotect)
 {
     this->stubCount_ = 0;
-    PatchJump(initialJump_, fallbackLabel_);
+    PatchJump(initialJump_, fallbackLabel_, reprotect);
     lastJump_ = initialJump_;
 }
 
@@ -3207,7 +3206,7 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
                 } else {
                     MOZ_ASSERT(shadows == DoesntShadow || shadows == DoesntShadowUnique);
                     if (shadows == DoesntShadowUnique)
-                        cache.reset();
+                        cache.reset(Reprotect);
                     if (!cache.attachDOMProxyUnshadowed(cx, outerScript, ion, obj, returnAddr))
                         return false;
                     addedSetterStub = true;
@@ -3311,9 +3310,9 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
 }
 
 void
-SetPropertyIC::reset()
+SetPropertyIC::reset(ReprotectCode reprotect)
 {
-    IonCache::reset();
+    IonCache::reset(reprotect);
     hasGenericProxyStub_ = false;
 }
 
@@ -4056,7 +4055,7 @@ GetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
         cache.incFailedUpdates();
         if (cache.shouldDisable()) {
             JitSpew(JitSpew_IonIC, "Disable inline cache");
-            cache.disable(ion);
+            cache.disable();
         }
     } else {
         cache.resetFailedUpdates();
@@ -4068,9 +4067,9 @@ GetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
 }
 
 void
-GetElementIC::reset()
+GetElementIC::reset(ReprotectCode reprotect)
 {
-    IonCache::reset();
+    IonCache::reset(reprotect);
     hasDenseStub_ = false;
     hasStrictArgumentsStub_ = false;
     hasNormalArgumentsStub_ = false;
@@ -4407,9 +4406,9 @@ SetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
 }
 
 void
-SetElementIC::reset()
+SetElementIC::reset(ReprotectCode reprotect)
 {
-    IonCache::reset();
+    IonCache::reset(reprotect);
     hasDenseStub_ = false;
 }
 

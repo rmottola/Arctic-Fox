@@ -245,7 +245,7 @@ class IonCache
     {
     }
 
-    void disable(IonScript* ion);
+    void disable();
     inline bool isDisabled() const {
         return disabled_;
     }
@@ -271,7 +271,7 @@ class IonCache
     void updateBaseAddress(JitCode* code, MacroAssembler& masm);
 
     // Reset the cache around garbage collection.
-    virtual void reset();
+    virtual void reset(ReprotectCode reprotect);
 
     bool canAttachStub() const {
         return stubCount_ < MAX_STUBS;
@@ -414,7 +414,7 @@ class GetPropertyIC : public IonCache
 
     CACHE_HEADER(GetProperty)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -549,7 +549,7 @@ class SetPropertyIC : public IonCache
 
     CACHE_HEADER(SetProperty)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -643,7 +643,7 @@ class GetElementIC : public IonCache
 
     CACHE_HEADER(GetElement)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -752,7 +752,7 @@ class SetElementIC : public IonCache
 
     CACHE_HEADER(SetElement)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
