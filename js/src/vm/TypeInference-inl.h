@@ -397,17 +397,17 @@ HasTypePropertyId(JSObject* obj, jsid id, TypeSet::Type type)
 }
 
 inline bool
-HasTypePropertyId(JSObject *obj, jsid id, const Value &value)
+HasTypePropertyId(JSObject* obj, jsid id, const Value &value)
 {
     return HasTypePropertyId(obj, id, TypeSet::GetValueType(value));
 }
 
-void AddTypePropertyId(ExclusiveContext *cx, ObjectGroup *group, JSObject *obj, jsid id, TypeSet::Type type);
-void AddTypePropertyId(ExclusiveContext *cx, ObjectGroup *group, JSObject *obj, jsid id, const Value &value);
+void AddTypePropertyId(ExclusiveContext* cx, ObjectGroup* group, JSObject* obj, jsid id, TypeSet::Type type);
+void AddTypePropertyId(ExclusiveContext* cx, ObjectGroup* group, JSObject* obj, jsid id, const Value &value);
 
 /* Add a possible type for a property of obj. */
 inline void
-AddTypePropertyId(ExclusiveContext *cx, JSObject *obj, jsid id, TypeSet::Type type)
+AddTypePropertyId(ExclusiveContext* cx, JSObject* obj, jsid id, TypeSet::Type type)
 {
     id = IdToTypeId(id);
     if (TrackPropertyTypes(cx, obj, id))
@@ -415,7 +415,7 @@ AddTypePropertyId(ExclusiveContext *cx, JSObject *obj, jsid id, TypeSet::Type ty
 }
 
 inline void
-AddTypePropertyId(ExclusiveContext *cx, JSObject *obj, jsid id, const Value &value)
+AddTypePropertyId(ExclusiveContext* cx, JSObject* obj, jsid id, const Value& value)
 {
     id = IdToTypeId(id);
     if (TrackPropertyTypes(cx, obj, id))
@@ -423,7 +423,7 @@ AddTypePropertyId(ExclusiveContext *cx, JSObject *obj, jsid id, const Value &val
 }
 
 inline void
-MarkObjectGroupFlags(ExclusiveContext *cx, JSObject *obj, ObjectGroupFlags flags)
+MarkObjectGroupFlags(ExclusiveContext* cx, JSObject* obj, ObjectGroupFlags flags)
 {
     if (!obj->hasLazyGroup() && !obj->group()->hasAllFlags(flags))
         obj->group()->setFlags(cx, flags);
@@ -437,7 +437,7 @@ MarkObjectGroupUnknownProperties(ExclusiveContext* cx, ObjectGroup* obj)
 }
 
 inline void
-MarkTypePropertyNonData(ExclusiveContext *cx, JSObject *obj, jsid id)
+MarkTypePropertyNonData(ExclusiveContext* cx, JSObject* obj, jsid id)
 {
     id = IdToTypeId(id);
     if (TrackPropertyTypes(cx, obj, id))
@@ -445,23 +445,11 @@ MarkTypePropertyNonData(ExclusiveContext *cx, JSObject *obj, jsid id)
 }
 
 inline void
-MarkTypePropertyNonWritable(ExclusiveContext *cx, JSObject *obj, jsid id)
+MarkTypePropertyNonWritable(ExclusiveContext* cx, JSObject* obj, jsid id)
 {
     id = IdToTypeId(id);
     if (TrackPropertyTypes(cx, obj, id))
         obj->group()->markPropertyNonWritable(cx, obj, id);
-}
-
-inline bool
-IsTypePropertyIdMarkedNonData(JSObject *obj, jsid id)
-{
-    return obj->group()->isPropertyNonData(id);
-}
-
-inline bool
-IsTypePropertyIdMarkedNonWritable(JSObject *obj, jsid id)
-{
-    return obj->group()->isPropertyNonWritable(id);
 }
 
 /* Mark a state change on a particular object. */

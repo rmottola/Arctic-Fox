@@ -4884,11 +4884,3 @@ js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* p
 
     ReportUninitializedLexical(cx, name);
 }
-
-void
-js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc, ScopeCoordinate sc)
-{
-    RootedPropertyName name(cx, ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache,
-                                                    script, pc));
-    ReportUninitializedLexical(cx, name);
-}
