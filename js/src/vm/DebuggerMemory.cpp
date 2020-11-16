@@ -202,6 +202,7 @@ DebuggerMemory::drainAllocationsLog(JSContext* cx, unsigned argc, Value* vp)
         // edit them with great care. Use the queue entry in place, and then
         // pop and delete together.
         Debugger::AllocationSite* allocSite = dbg->allocationsLog.getFirst();
+
         RootedValue frame(cx, ObjectOrNullValue(allocSite->frame));
         if (!DefineProperty(cx, obj, cx->names().frame, frame))
             return false;
@@ -221,6 +222,10 @@ DebuggerMemory::drainAllocationsLog(JSContext* cx, unsigned argc, Value* vp)
         if (allocSite->ctorName)
             ctorName.setString(allocSite->ctorName);
         if (!DefineProperty(cx, obj, cx->names().constructor, ctorName))
+            return false;
+
+        RootedValue size(cx, NumberValue(allocSite->size));
+        if (!DefineProperty(cx, obj, cx->names().size, size))
             return false;
 
         result->setDenseElement(i, ObjectValue(*obj));

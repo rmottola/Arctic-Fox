@@ -200,6 +200,7 @@
     macro(set, set, "set") \
     macro(shape, shape, "shape") \
     macro(signMask, signMask, "signMask") \
+    macro(size, size, "size") \
     macro(source, source, "source") \
     macro(stack, stack, "stack") \
     macro(star, star, "*") \

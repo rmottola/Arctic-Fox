@@ -9,6 +9,8 @@
 
 #include "jsobj.h"
 
+#include "mozilla/DebugOnly.h"
+
 #include "jsfun.h"
 
 #include "builtin/MapObject.h"
@@ -253,6 +255,8 @@ ClassCanHaveFixedData(const Class* clasp)
 static MOZ_ALWAYS_INLINE void
 SetNewObjectMetadata(ExclusiveContext* cxArg, JSObject* obj)
 {
+    MOZ_ASSERT(!cxArg->compartment()->hasObjectPendingMetadata());
+
     // The metadata callback is invoked for each object created on the main
     // thread, except when analysis/compilation is active, to avoid recursion.
     if (JSContext* cx = cxArg->maybeJSContext()) {
@@ -287,6 +291,7 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
                   (group->clasp()->flags & JSCLASS_SKIP_NURSERY_FINALIZE));
     MOZ_ASSERT_IF(group->hasUnanalyzedPreliminaryObjects(),
                   heap == js::gc::TenuredHeap);
+    MOZ_ASSERT(!cx->compartment()->hasObjectPendingMetadata());
 
     // Non-native classes cannot have reserved slots or private data, and the
     // objects can't have any fixed slots, for compatibility with
@@ -326,7 +331,10 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
         memset(obj->as<JSFunction>().fixedSlots(), 0, size - sizeof(js::NativeObject));
     }
 
-    SetNewObjectMetadata(cx, obj);
+    if (group->clasp()->shouldDelayMetadataCallback())
+        cx->compartment()->setObjectPendingMetadata(cx, obj);
+    else
+        SetNewObjectMetadata(cx, obj);
 
     js::gc::TraceCreateObject(obj);
 
