@@ -2266,6 +2266,7 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->sweepJitCompartment(fop);
         c->sweepWeakMaps();
         c->sweepNativeIterators();
+        c->sweepTemplateObjects();
     }
 }
 
@@ -4925,6 +4926,7 @@ GCRuntime::beginSweepingZoneGroup()
                 c->sweepDebugScopes();
                 c->sweepJitCompartment(&fop);
                 c->sweepWeakMaps();
+                c->sweepTemplateObjects();
             }
 
             // Bug 1071218: the following two methods have not yet been
