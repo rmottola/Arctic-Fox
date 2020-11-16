@@ -1567,10 +1567,11 @@ CurrentGlobalOrNull(JSContext* cx);
 } // namespace JS
 
 /*
- * Initialize the 'Reflect' object on a global object.
+ * Add 'Reflect.parse', a SpiderMonkey extension, to the Reflect object on the
+ * given global.
  */
-extern JS_PUBLIC_API(JSObject*)
-JS_InitReflect(JSContext* cx, JS::HandleObject global);
+extern JS_PUBLIC_API(bool)
+JS_InitReflectParse(JSContext* cx, JS::HandleObject global);
 
 /*
  * Add various profiling-related functions as properties of the given object.
