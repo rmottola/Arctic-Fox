@@ -3462,6 +3462,83 @@ GetElementIC::attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* 
     return linkAndAttachStub(cx, masm, attacher, ion, "property");
 }
 
+/* static */ bool
+GetElementIC::canAttachDenseElement(JSObject* obj, const Value& idval)
+{
+    return obj->isNative() && idval.isInt32();
+}
+
+static bool
+GenerateDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
+                     JSObject* obj, const Value& idval, Register object,
+                     ConstantOrRegister index, TypedOrValueRegister output)
+{
+    MOZ_ASSERT(GetElementIC::canAttachDenseElement(obj, idval));
+
+    Label failures;
+
+    // Guard object's shape.
+    RootedShape shape(cx, obj->as<NativeObject>().lastProperty());
+    if (!shape)
+        return false;
+    masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
+
+    // Ensure the index is an int32 value.
+    Register indexReg = InvalidReg;
+
+    if (index.reg().hasValue()) {
+        indexReg = output.scratchReg().gpr();
+        MOZ_ASSERT(indexReg != InvalidReg);
+        ValueOperand val = index.reg().valueReg();
+
+        masm.branchTestInt32(Assembler::NotEqual, val, &failures);
+
+        // Unbox the index.
+        masm.unboxInt32(val, indexReg);
+    } else {
+        MOZ_ASSERT(!index.reg().typedReg().isFloat());
+        indexReg = index.reg().typedReg().gpr();
+    }
+
+    // Load elements vector.
+    masm.push(object);
+    masm.loadPtr(Address(object, NativeObject::offsetOfElements()), object);
+
+    Label hole;
+
+    // Guard on the initialized length.
+    Address initLength(object, ObjectElements::offsetOfInitializedLength());
+    masm.branch32(Assembler::BelowOrEqual, initLength, indexReg, &hole);
+
+    // Check for holes & load the value.
+    masm.loadElementTypedOrValue(BaseObjectElementIndex(object, indexReg),
+                                 output, true, &hole);
+
+    masm.pop(object);
+    attacher.jumpRejoin(masm);
+
+    // All failures flow to here.
+    masm.bind(&hole);
+    masm.pop(object);
+    masm.bind(&failures);
+
+    attacher.jumpNextStub(masm);
+
+    return true;
+}
+
+bool
+GetElementIC::attachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                 HandleObject obj, const Value& idval)
+{
+    MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
+    StubAttacher attacher(*this);
+    if (!GenerateDenseElement(cx, masm, attacher, obj, idval, object(), index(), output()))
+        return false;
+
+    setHasDenseStub();
+    return linkAndAttachStub(cx, masm, attacher, ion, "dense array");
+}
 
 /* static */ bool
 GetElementIC::canAttachDenseElementHole(JSObject* obj, const Value& idval, TypedOrValueRegister output)
@@ -3615,84 +3692,6 @@ GetElementIC::attachDenseElementHole(JSContext* cx, HandleScript outerScript, Io
     GenerateDenseElementHole(cx, masm, attacher, ion, obj, idval, object(), index(), output());
 
     return linkAndAttachStub(cx, masm, attacher, ion, "dense hole");
-}
-
-/* static */ bool
-GetElementIC::canAttachDenseElement(JSObject* obj, const Value& idval)
-{
-    return obj->isNative() && idval.isInt32();
-}
-
-static bool
-GenerateDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                     JSObject* obj, const Value& idval, Register object,
-                     ConstantOrRegister index, TypedOrValueRegister output)
-{
-    MOZ_ASSERT(GetElementIC::canAttachDenseElement(obj, idval));
-
-    Label failures;
-
-    // Guard object's shape.
-    RootedShape shape(cx, obj->as<NativeObject>().lastProperty());
-    if (!shape)
-        return false;
-    masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
-
-    // Ensure the index is an int32 value.
-    Register indexReg = InvalidReg;
-
-    if (index.reg().hasValue()) {
-        indexReg = output.scratchReg().gpr();
-        MOZ_ASSERT(indexReg != InvalidReg);
-        ValueOperand val = index.reg().valueReg();
-
-        masm.branchTestInt32(Assembler::NotEqual, val, &failures);
-
-        // Unbox the index.
-        masm.unboxInt32(val, indexReg);
-    } else {
-        MOZ_ASSERT(!index.reg().typedReg().isFloat());
-        indexReg = index.reg().typedReg().gpr();
-    }
-
-    // Load elements vector.
-    masm.push(object);
-    masm.loadPtr(Address(object, NativeObject::offsetOfElements()), object);
-
-    Label hole;
-
-    // Guard on the initialized length.
-    Address initLength(object, ObjectElements::offsetOfInitializedLength());
-    masm.branch32(Assembler::BelowOrEqual, initLength, indexReg, &hole);
-
-    // Check for holes & load the value.
-    masm.loadElementTypedOrValue(BaseObjectElementIndex(object, indexReg),
-                                 output, true, &hole);
-
-    masm.pop(object);
-    attacher.jumpRejoin(masm);
-
-    // All failures flow to here.
-    masm.bind(&hole);
-    masm.pop(object);
-    masm.bind(&failures);
-
-    attacher.jumpNextStub(masm);
-
-    return true;
-}
-
-bool
-GetElementIC::attachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                 HandleObject obj, const Value& idval)
-{
-    MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
-    StubAttacher attacher(*this);
-    if (!GenerateDenseElement(cx, masm, attacher, obj, idval, object(), index(), output()))
-        return false;
-
-    setHasDenseStub();
-    return linkAndAttachStub(cx, masm, attacher, ion, "dense array");
 }
 
 /* static */ bool
