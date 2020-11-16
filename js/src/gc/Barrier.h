@@ -302,7 +302,6 @@ class BarrieredBase : public BarrieredBaseMixins<T>
     T value;
 
     explicit BarrieredBase(T v) : value(v) {}
-    ~BarrieredBase() { pre(); }
 
   public:
     void init(T v) {
@@ -357,6 +356,7 @@ class PreBarriered : public BarrieredBase<T>
     MOZ_IMPLICIT PreBarriered(T v) : BarrieredBase<T>(v) {}
     explicit PreBarriered(const PreBarriered<T>& v)
       : BarrieredBase<T>(v.value) {}
+    ~PreBarriered() { this->pre(); }
 
     /* Use to set the pointer to nullptr. */
     void clear() {
@@ -493,6 +493,7 @@ class RelocatablePtr : public BarrieredBase<T>
     }
 
     ~RelocatablePtr() {
+        this->pre();
         if (GCMethods<T>::needsPostBarrier(this->value))
             relocate();
     }
