@@ -432,6 +432,33 @@ NS_IMPL_ISUPPORTS(VPXReporter, nsIMemoryReporter)
 CountingAllocatorBase<VPXReporter>::sAmount(0);
 #endif /* MOZ_VPX */
 
+#ifdef MOZ_WEBM
+class NesteggReporter final
+  : public nsIMemoryReporter
+  , public CountingAllocatorBase<NesteggReporter>
+{
+public:
+  NS_DECL_ISUPPORTS
+
+private:
+  NS_IMETHODIMP
+  CollectReports(nsIHandleReportCallback* aHandleReport, nsISupports* aData,
+                 bool aAnonymize) override
+  {
+    return MOZ_COLLECT_REPORT(
+      "explicit/media/libnestegg", KIND_HEAP, UNITS_BYTES, MemoryAllocated(),
+      "Memory allocated through libnestegg for WebM media files.");
+  }
+
+  ~NesteggReporter() {}
+};
+
+NS_IMPL_ISUPPORTS(NesteggReporter, nsIMemoryReporter)
+
+/* static */ template<> Atomic<size_t>
+CountingAllocatorBase<NesteggReporter>::sAmount(0);
+#endif /* MOZ_WEBM */
+
 // Note that on OSX, aBinDirectory will point to .app/Contents/Resources/browser
 EXPORT_XPCOM_API(nsresult)
 NS_InitXPCOM2(nsIServiceManager** aResult,
