@@ -207,7 +207,7 @@ class JitcodeGlobalEntry
             return startsBelowPointer(ptr) && endsAbovePointer(ptr);
         }
 
-        bool markJitcodeIfUnmarked(JSTracer *trc);
+        bool markJitcodeIfUnmarked(JSTracer* trc);
         bool isJitcodeMarkedFromAnyThread();
         bool isJitcodeAboutToBeFinalized();
     };
