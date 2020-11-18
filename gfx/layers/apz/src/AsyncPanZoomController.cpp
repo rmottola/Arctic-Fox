@@ -1661,6 +1661,7 @@ nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
 
   mX.EndTouch(aEvent.mTime);
   mY.EndTouch(aEvent.mTime);
+  SetState(NOTHING);
   RequestContentRepaint();
 
   return nsEventStatus_eConsumeNoDefault;
