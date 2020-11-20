@@ -3860,6 +3860,7 @@ JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
+    AutoLastFrameCheck lfc(cx);
 
     script.set(frontend::CompileScript(cx, &cx->tempLifoAlloc(), cx->global(),
                                        nullptr, nullptr, options, srcBuf));
