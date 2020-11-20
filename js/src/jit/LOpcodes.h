@@ -337,6 +337,7 @@
     _(AsmJSPassStackArg)            \
     _(AsmJSCall)                    \
     _(AsmJSCompareExchangeHeap)     \
+    _(AsmJSAtomicExchangeHeap)      \
     _(AsmJSAtomicBinopHeap)         \
     _(AsmJSAtomicBinopHeapForEffect)\
     _(RecompileCheck)               \

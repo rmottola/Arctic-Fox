@@ -2353,7 +2353,13 @@ CASE(JSOP_SETCONST)
 END_CASE(JSOP_SETCONST)
 
 CASE(JSOP_BINDINTRINSIC)
-    PUSH_OBJECT(*cx->global()->intrinsicsHolder());
+{
+    NativeObject* holder = GlobalObject::getIntrinsicsHolder(cx, cx->global());
+    if (!holder)
+        goto error;
+
+    PUSH_OBJECT(*holder);
+}
 END_CASE(JSOP_BINDINTRINSIC)
 
 CASE(JSOP_BINDGNAME)
@@ -4876,13 +4882,5 @@ js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* p
         name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc);
     }
 
-    ReportUninitializedLexical(cx, name);
-}
-
-void
-js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc, ScopeCoordinate sc)
-{
-    RootedPropertyName name(cx, ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache,
-                                                    script, pc));
     ReportUninitializedLexical(cx, name);
 }

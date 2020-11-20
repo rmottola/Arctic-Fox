@@ -236,14 +236,10 @@ class AbstractFramePtr
     inline void setIsDebuggee();
     inline void unsetIsDebuggee();
 
-    JSObject* evalPrevScopeChain(JSContext* cx) const;
-
     inline HandleValue returnValue() const;
     inline void setReturnValue(const Value& rval) const;
 
-    bool hasPushedSPSFrame() const;
-    
-    inline bool freshenBlock(JSContext *cx) const;
+    inline bool freshenBlock(JSContext* cx) const;
 
     inline void popBlock(JSContext* cx) const;
     inline void popWith(JSContext* cx) const;
@@ -373,8 +369,6 @@ class InterpreterFrame
         JS_STATIC_ASSERT(offsetof(InterpreterFrame, rval_) % sizeof(Value) == 0);
         JS_STATIC_ASSERT(sizeof(InterpreterFrame) % sizeof(Value) == 0);
     }
-
-    void writeBarrierPost();
 
     /*
      * The utilities are private since they are not able to assert that only
@@ -1054,6 +1048,7 @@ class InvokeArgs : public JS::CallArgs
     explicit InvokeArgs(JSContext* cx, bool construct = false) : v_(cx) {}
 
     bool init(unsigned argc, bool construct = false) {
+        MOZ_ASSERT(2 + argc + construct > argc);  // no overflow
         if (!v_.resize(2 + argc + construct))
             return false;
         ImplicitCast<CallArgs>(*this) = CallArgsFromVp(argc, v_.begin());

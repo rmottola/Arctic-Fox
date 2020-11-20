@@ -25,6 +25,7 @@
 
 #include "jsatominlines.h"
 #include "jsobjinlines.h"
+#include "jsscriptinlines.h"
 
 #include "jit/AtomicOperations-inl.h"
 
@@ -55,7 +56,7 @@ ConvertDefinitionToDouble(TempAllocator& alloc, MDefinition* def, MInstruction* 
 }
 
 static bool
-CheckUsesAreFloat32Consumers(MInstruction* ins)
+CheckUsesAreFloat32Consumers(const MInstruction* ins)
 {
     bool allConsumerUses = true;
     for (MUseDefIterator use(ins); allConsumerUses && use; use++)
@@ -928,6 +929,24 @@ MSimdSplatX4::foldsTo(TempAllocator& alloc)
     }
 
     return MSimdConstant::New(alloc, cst, type());
+}
+
+MDefinition*
+MSimdUnbox::foldsTo(TempAllocator &alloc)
+{
+    MDefinition* in = input();
+
+    if (in->isSimdBox()) {
+        // If the operand is a MSimdBox, then we just reuse the operand of the
+        // MSimdBox as long as the type corresponds to what we are supposed to
+        // unbox.
+        in = in->toSimdBox()->input();
+        if (in->type() != type())
+            return this;
+        return in;
+    }
+
+    return this;
 }
 
 MDefinition*
@@ -2210,24 +2229,53 @@ MBinaryArithInstruction::foldsTo(TempAllocator& alloc)
 
     MDefinition* lhs = getOperand(0);
     MDefinition* rhs = getOperand(1);
-    if (MDefinition* folded = EvaluateConstantOperands(alloc, this))
+    if (MConstant* folded = EvaluateConstantOperands(alloc, this)) {
+        if (isTruncated()) {
+            if (!folded->block())
+                block()->insertBefore(this, folded);
+            return MTruncateToInt32::New(alloc, folded);
+        }
         return folded;
+    }
 
     // 0 + -0 = 0. So we can't remove addition
     if (isAdd() && specialization_ != MIRType_Int32)
         return this;
 
-    if (IsConstant(rhs, getIdentity()))
+    if (IsConstant(rhs, getIdentity())) {
+        if (isTruncated())
+            return MTruncateToInt32::New(alloc, lhs);
         return lhs;
+    }
 
     // subtraction isn't commutative. So we can't remove subtraction when lhs equals 0
     if (isSub())
         return this;
 
-    if (IsConstant(lhs, getIdentity()))
+    if (IsConstant(lhs, getIdentity())) {
+        if (isTruncated())
+            return MTruncateToInt32::New(alloc, rhs);
         return rhs; // x op id => x
+    }
 
     return this;
+}
+
+void
+MFilterTypeSet::trySpecializeFloat32(TempAllocator& alloc)
+{
+    MDefinition* in = input();
+    if (in->type() != MIRType_Float32)
+        return;
+
+    setResultType(MIRType_Float32);
+}
+
+bool
+MFilterTypeSet::canConsumeFloat32(MUse* operand) const
+{
+    MOZ_ASSERT(getUseFor(0) == operand);
+    return CheckUsesAreFloat32Consumers(this);
 }
 
 void
@@ -2609,53 +2657,39 @@ MBinaryArithInstruction::infer(TempAllocator& alloc, BaselineInspector* inspecto
 
     // Guess a result type based on the inputs.
     // Don't specialize for neither-integer-nor-double results.
-    if (lhs == MIRType_Int32 && rhs == MIRType_Int32)
+    if (lhs == MIRType_Int32 && rhs == MIRType_Int32) {
         setResultType(MIRType_Int32);
-    // Double operations are prioritary over float32 operations (i.e. if any operand needs
-    // a double as an input, convert all operands to doubles)
-    else if (IsFloatingPointType(lhs) || IsFloatingPointType(rhs))
-        setResultType(MIRType_Double);
-    else
-        return inferFallback(inspector, pc);
 
-    // If the operation has ever overflowed, use a double specialization.
-    if (inspector->hasSeenDoubleResult(pc))
-        setResultType(MIRType_Double);
+        // If the operation will always overflow on its constant operands, use a
+        // double specialization so that it can be constant folded later.
+        if (isMul() || isDiv()) {
+            bool typeChange = false;
+            EvaluateConstantOperands(alloc, this, &typeChange);
+            if (typeChange)
+                setResultType(MIRType_Double);
+        }
 
-    // If the operation will always overflow on its constant operands, use a
-    // double specialization so that it can be constant folded later.
-    if ((isMul() || isDiv()) && lhs == MIRType_Int32 && rhs == MIRType_Int32) {
-        bool typeChange = false;
-        EvaluateConstantOperands(alloc, this, &typeChange);
-        if (typeChange)
+        // If the operation has ever overflowed, use a double specialization.
+        if (inspector->hasSeenDoubleResult(pc))
             setResultType(MIRType_Double);
+
+    } else if (IsFloatingPointType(lhs) || IsFloatingPointType(rhs)) {
+        // Double operations take precedence over float32 operations (i.e. if
+        // any operand needs a double as an input, convert all operands to
+        // doubles)
+        setResultType(MIRType_Double);
+    } else {
+        return inferFallback(inspector, pc);
     }
 
     MOZ_ASSERT(lhs < MIRType_String || lhs == MIRType_Value);
     MOZ_ASSERT(rhs < MIRType_String || rhs == MIRType_Value);
 
-    MIRType rval = this->type();
-
-    // Don't specialize values when result isn't double
-    if (lhs == MIRType_Value || rhs == MIRType_Value) {
-        if (!IsFloatingPointType(rval)) {
-            specialization_ = MIRType_None;
-            return;
-        }
-    }
-
-    // Don't specialize as int32 if one of the operands is undefined,
-    // since ToNumber(undefined) is NaN.
-    if (rval == MIRType_Int32 && (lhs == MIRType_Undefined || rhs == MIRType_Undefined)) {
-        specialization_ = MIRType_None;
-        return;
-    }
-
-    specialization_ = rval;
-
     if (isAdd() || isMul())
         setCommutative();
-    setResultType(rval);
+
+    MOZ_ASSERT(IsNumberType(this->type()));
+    specialization_ = this->type();
 }
 
 void
@@ -4107,10 +4141,11 @@ MNewArray::MNewArray(CompilerConstraintList* constraints, uint32_t count, MConst
 {
     setResultType(MIRType_Object);
     if (templateObject()) {
-        TemporaryTypeSet* types = MakeSingletonTypeSet(constraints, templateObject());
-        setResultTypeSet(types);
-        if (types->convertDoubleElements(constraints) == TemporaryTypeSet::AlwaysConvertToDoubles)
-            convertDoubleElements_ = true;
+        if (TemporaryTypeSet* types = MakeSingletonTypeSet(constraints, templateObject())) {
+            setResultTypeSet(types);
+            if (types->convertDoubleElements(constraints) == TemporaryTypeSet::AlwaysConvertToDoubles)
+                convertDoubleElements_ = true;
+        }
     }
 }
 
@@ -4327,12 +4362,43 @@ MLoadElement::foldsTo(TempAllocator& alloc)
     return foldsToStoredValue(alloc, store->value());
 }
 
+// Gets the MDefinition* representing the source/target object's storage.
+// Usually this is just an MElements*, but sometimes there are layers
+// of indirection or inlining, which are handled elsewhere.
+static inline const MElements *
+MaybeUnwrapElements(const MDefinition *elementsOrObj)
+{
+    // Sometimes there is a level of indirection for conversion.
+    if (elementsOrObj->isConvertElementsToDoubles())
+        return MaybeUnwrapElements(elementsOrObj->toConvertElementsToDoubles()->elements());
+
+    // For inline elements, the object may be passed directly, for example as MUnbox.
+    if (elementsOrObj->type() == MIRType_Object)
+        return nullptr;
+
+    // MTypedArrayElements and MTypedObjectElements aren't handled.
+    if (!elementsOrObj->isElements())
+        return nullptr;
+
+    return elementsOrObj->toElements();
+}
+
+// Gets the MDefinition of the target Object for the given store operation.
 static inline const MDefinition*
 GetStoreObject(const MDefinition* store)
 {
     switch (store->op()) {
-      case MDefinition::Op_StoreElement:
-        return store->toStoreElement()->elements()->toElements()->input();
+      case MDefinition::Op_StoreElement: {
+        const MDefinition* elementsOrObj = store->toStoreElement()->elements();
+        if (elementsOrObj->type() == MIRType_Object)
+            return elementsOrObj;
+
+        const MDefinition* elements = MaybeUnwrapElements(elementsOrObj);
+        if (elements)
+            return elements->toElements()->input();
+
+        return nullptr;
+      }
 
       case MDefinition::Op_StoreElementHole:
         return store->toStoreElementHole()->object();
@@ -4342,13 +4408,32 @@ GetStoreObject(const MDefinition* store)
     }
 }
 
-static inline const MElements*
-MaybeUnwrapElements(const MDefinition* elements)
+// Implements mightAlias() logic common to all load operations.
+static bool
+GenericLoadMightAlias(const MDefinition* elementsOrObj, const MDefinition* store)
 {
-    if (elements->isConvertElementsToDoubles())
-        return elements->toConvertElementsToDoubles()->elements()->toElements();
+    const MElements* elements = MaybeUnwrapElements(elementsOrObj);
+    if (elements)
+        return elements->mightAlias(store);
 
-    return elements->toElements();
+    // Unhandled Elements kind.
+    if (elementsOrObj->type() != MIRType_Object)
+        return true;
+
+    // Inline storage for objects.
+    // Refer to IsValidElementsType().
+    const MDefinition* object = elementsOrObj;
+    MOZ_ASSERT(object->type() == MIRType_Object);
+    if (!object->resultTypeSet())
+        return true;
+
+    const MDefinition* storeObject = GetStoreObject(store);
+    if (!storeObject)
+        return true;
+    if (!storeObject->resultTypeSet())
+        return true;
+
+    return object->resultTypeSet()->objectsIntersect(storeObject->resultTypeSet());
 }
 
 bool
@@ -4369,13 +4454,13 @@ MElements::mightAlias(const MDefinition* store) const
 bool
 MLoadElement::mightAlias(const MDefinition* store) const
 {
-    return MaybeUnwrapElements(elements())->mightAlias(store);
+    return GenericLoadMightAlias(elements(), store);
 }
 
 bool
 MInitializedLength::mightAlias(const MDefinition* store) const
 {
-    return MaybeUnwrapElements(elements())->mightAlias(store);
+    return GenericLoadMightAlias(elements(), store);
 }
 
 bool
@@ -4838,15 +4923,14 @@ jit::ElementAccessMightBeCopyOnWrite(CompilerConstraintList* constraints, MDefin
 }
 
 bool
-jit::ElementAccessHasExtraIndexedProperty(CompilerConstraintList* constraints,
-                                          MDefinition* obj)
+jit::ElementAccessHasExtraIndexedProperty(IonBuilder* builder, MDefinition* obj)
 {
     TemporaryTypeSet* types = obj->resultTypeSet();
 
-    if (!types || types->hasObjectFlags(constraints, OBJECT_FLAG_LENGTH_OVERFLOW))
+    if (!types || types->hasObjectFlags(builder->constraints(), OBJECT_FLAG_LENGTH_OVERFLOW))
         return true;
 
-    return TypeCanHaveExtraIndexedProperties(constraints, types);
+    return TypeCanHaveExtraIndexedProperties(builder, types);
 }
 
 MIRType
@@ -5018,7 +5102,6 @@ jit::PropertyReadNeedsTypeBarrier(JSContext* propertycx,
 
 BarrierKind
 jit::PropertyReadOnPrototypeNeedsTypeBarrier(IonBuilder* builder,
-                                             CompilerConstraintList* constraints,
                                              MDefinition* obj, PropertyName* name,
                                              TemporaryTypeSet* observed)
 {
@@ -5036,13 +5119,14 @@ jit::PropertyReadOnPrototypeNeedsTypeBarrier(IonBuilder* builder,
         if (!key)
             continue;
         while (true) {
-            if (!key->hasStableClassAndProto(constraints))
+            if (!key->hasStableClassAndProto(builder->constraints()))
                 return BarrierKind::TypeSet;
             if (!key->proto().isObject())
                 break;
             JSObject* proto = builder->checkNurseryObject(key->proto().toObject());
             key = TypeSet::ObjectKey::get(proto);
-            BarrierKind kind = PropertyReadNeedsTypeBarrier(constraints, key, name, observed);
+            BarrierKind kind = PropertyReadNeedsTypeBarrier(builder->constraints(),
+                                                            key, name, observed);
             if (kind == BarrierKind::TypeSet)
                 return BarrierKind::TypeSet;
 
@@ -5124,6 +5208,58 @@ jit::AddObjectsForPropertyRead(MDefinition* obj, PropertyName* name,
                 observed->addType(TypeSet::ObjectType(key), alloc);
         }
     }
+}
+
+static bool
+PrototypeHasIndexedProperty(IonBuilder* builder, JSObject* obj)
+{
+    do {
+        TypeSet::ObjectKey* key = TypeSet::ObjectKey::get(builder->checkNurseryObject(obj));
+        if (ClassCanHaveExtraProperties(key->clasp()))
+            return true;
+        if (key->unknownProperties())
+            return true;
+        HeapTypeSetKey index = key->property(JSID_VOID);
+        if (index.nonData(builder->constraints()) || index.isOwnProperty(builder->constraints()))
+            return true;
+        obj = obj->getProto();
+    } while (obj);
+
+    return false;
+}
+
+// Whether Array.prototype, or an object on its proto chain, has an indexed property.
+bool
+jit::ArrayPrototypeHasIndexedProperty(IonBuilder* builder, JSScript* script)
+{
+    if (JSObject* proto = script->global().maybeGetArrayPrototype())
+        return PrototypeHasIndexedProperty(builder, proto);
+    return true;
+}
+
+// Whether obj or any of its prototypes have an indexed property.
+bool
+jit::TypeCanHaveExtraIndexedProperties(IonBuilder* builder, TemporaryTypeSet* types)
+{
+    const Class* clasp = types->getKnownClass(builder->constraints());
+
+    // Note: typed arrays have indexed properties not accounted for by type
+    // information, though these are all in bounds and will be accounted for
+    // by JIT paths.
+    if (!clasp || (ClassCanHaveExtraProperties(clasp) && !IsAnyTypedArrayClass(clasp)))
+        return true;
+
+    if (types->hasObjectFlags(builder->constraints(), OBJECT_FLAG_SPARSE_INDEXES))
+        return true;
+
+    JSObject* proto;
+    if (!types->getCommonPrototype(builder->constraints(), &proto))
+        return true;
+
+    if (!proto)
+        return false;
+
+    return PrototypeHasIndexedProperty(builder, proto);
 }
 
 static bool

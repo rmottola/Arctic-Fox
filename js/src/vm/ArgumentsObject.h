@@ -33,7 +33,10 @@ struct ArgumentsData
      * numArgs = Max(numFormalArgs, numActualArgs)
      * The array 'args' has numArgs elements.
      */
-    unsigned    numArgs;
+    uint32_t    numArgs;
+
+    /* Size of ArgumentsData and data allocated after it. */
+    uint32_t    dataBytes;
 
     /*
      * arguments.callee, or MagicValue(JS_OVERWRITTEN_CALLEE) if
@@ -126,8 +129,8 @@ class ArgumentsObject : public NativeObject
 
   protected:
     template <typename CopyArgs>
-    static ArgumentsObject* create(JSContext* cx, HandleScript script, HandleFunction callee,
-                                   unsigned numActuals, CopyArgs& copy);
+    static ArgumentsObject* create(JSContext* cx, HandleFunction callee, unsigned numActuals,
+                                   CopyArgs& copy);
 
     ArgumentsData* data() const {
         return reinterpret_cast<ArgumentsData*>(getFixedSlot(DATA_SLOT).toPrivate());
@@ -138,7 +141,7 @@ class ArgumentsObject : public NativeObject
     static const gc::AllocKind FINALIZE_KIND = gc::AllocKind::OBJECT4_BACKGROUND;
 
     /* Create an arguments object for a frame that is expecting them. */
-    static ArgumentsObject *createExpected(JSContext *cx, AbstractFramePtr frame);
+    static ArgumentsObject* createExpected(JSContext* cx, AbstractFramePtr frame);
 
     /*
      * Purposefully disconnect the returned arguments object from the frame
@@ -146,10 +149,12 @@ class ArgumentsObject : public NativeObject
      * This allows function-local analysis to determine that formals are
      * not aliased and generally simplifies arguments objects.
      */
-    static ArgumentsObject *createUnexpected(JSContext *cx, ScriptFrameIter &iter);
-    static ArgumentsObject *createUnexpected(JSContext *cx, AbstractFramePtr frame);
-    static ArgumentsObject *createForIon(JSContext *cx, jit::JitFrameLayout *frame,
+    static ArgumentsObject* createUnexpected(JSContext* cx, ScriptFrameIter& iter);
+    static ArgumentsObject* createUnexpected(JSContext* cx, AbstractFramePtr frame);
+    static ArgumentsObject* createForIon(JSContext* cx, jit::JitFrameLayout* frame,
                                          HandleObject scopeChain);
+
+    static ArgumentsObject* createTemplateObject(JSContext* cx, bool strict);
 
     /*
      * Return the initial length of the arguments.  This may differ from the
@@ -264,9 +269,13 @@ class ArgumentsObject : public NativeObject
     size_t sizeOfMisc(mozilla::MallocSizeOf mallocSizeOf) const {
         return mallocSizeOf(data());
     }
+    size_t sizeOfData() const {
+        return data()->dataBytes;
+    }
 
     static void finalize(FreeOp* fop, JSObject* obj);
     static void trace(JSTracer* trc, JSObject* obj);
+    static size_t objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject* src);
 
     /* For jit use: */
     static size_t getDataSlotOffset() {

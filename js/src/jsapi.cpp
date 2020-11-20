@@ -131,12 +131,21 @@ JS::CallArgs::requireAtLeast(JSContext* cx, const char* fnname, unsigned require
 }
 
 static bool
-ErrorTakesIdArgument(unsigned msg)
+ErrorTakesArguments(unsigned msg)
 {
     MOZ_ASSERT(msg < JSErr_Limit);
     unsigned argCount = js_ErrorFormatString[msg].argCount;
-    MOZ_ASSERT(argCount <= 1);
-    return argCount == 1;
+    MOZ_ASSERT(argCount <= 2);
+    return argCount == 1 || argCount == 2;
+}
+
+static bool
+ErrorTakesObjectArgument(unsigned msg)
+{
+    MOZ_ASSERT(msg < JSErr_Limit);
+    unsigned argCount = js_ErrorFormatString[msg].argCount;
+    MOZ_ASSERT(argCount <= 2);
+    return argCount == 2;
 }
 
 JS_PUBLIC_API(bool)
@@ -154,7 +163,7 @@ JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, 
         return ReportValueErrorFlags(cx, flags, code_, JSDVG_IGNORE_STACK, val,
                                      nullptr, nullptr, nullptr);
     }
-    if (ErrorTakesIdArgument(code_)) {
+    if (ErrorTakesArguments(code_)) {
         RootedValue idv(cx, IdToValue(id));
         RootedString str(cx, ValueToSource(cx, idv));
         if (!str)
@@ -163,6 +172,11 @@ JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, 
         JSAutoByteString propName(cx, str);
         if (!propName)
             return false;
+
+        if (ErrorTakesObjectArgument(code_)) {
+            return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_,
+                                                obj->getClass()->name, propName.ptr());
+        }
 
         return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_,
                                             propName.ptr());
@@ -175,7 +189,7 @@ JS::ObjectOpResult::reportStrictErrorOrWarning(JSContext* cx, HandleObject obj, 
 {
     MOZ_ASSERT(code_ != Uninitialized);
     MOZ_ASSERT(!ok());
-    MOZ_ASSERT(!ErrorTakesIdArgument(code_));
+    MOZ_ASSERT(!ErrorTakesArguments(code_));
 
     unsigned flags = strict ? JSREPORT_ERROR : (JSREPORT_WARNING | JSREPORT_STRICT);
     return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr, code_);
@@ -233,6 +247,18 @@ JS_PUBLIC_API(bool)
 JS::ObjectOpResult::failCantPreventExtensions()
 {
     return fail(JSMSG_CANT_PREVENT_EXTENSIONS);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failNoNamedSetter()
+{
+    return fail(JSMSG_NO_NAMED_SETTER);
+}
+
+JS_PUBLIC_API(bool)
+JS::ObjectOpResult::failNoIndexedSetter()
+{
+    return fail(JSMSG_NO_INDEXED_SETTER);
 }
 
 JS_PUBLIC_API(int64_t)
@@ -634,6 +660,22 @@ JS_SetICUMemoryFunctions(JS_ICUAllocFn allocFn, JS_ICUReallocFn reallocFn, JS_IC
 #else
     return true;
 #endif
+}
+
+static JS_CurrentEmbedderTimeFunction currentEmbedderTimeFunction;
+
+JS_PUBLIC_API(void)
+JS_SetCurrentEmbedderTimeFunction(JS_CurrentEmbedderTimeFunction timeFn)
+{
+    currentEmbedderTimeFunction = timeFn;
+}
+
+JS_PUBLIC_API(double)
+JS_GetCurrentEmbedderTime()
+{
+    if (currentEmbedderTimeFunction)
+        return currentEmbedderTimeFunction();
+    return PRMJ_Now() / static_cast<double>(PRMJ_USEC_PER_MSEC);
 }
 
 JS_PUBLIC_API(void*)
@@ -1223,12 +1265,15 @@ JS_ResolveStandardClass(JSContext* cx, HandleObject obj, HandleId id, bool* reso
     // If this class is anonymous, then it doesn't exist as a global
     // property, so we won't resolve anything.
     JSProtoKey key = stdnm ? stdnm->key : JSProto_Null;
-    if (key != JSProto_Null && !(ProtoKeyToClass(key)->flags & JSCLASS_IS_ANONYMOUS)) {
-        if (!GlobalObject::ensureConstructor(cx, global, stdnm->key))
-            return false;
+    if (key != JSProto_Null) {
+        const Class* clasp = ProtoKeyToClass(key);
+        if (!clasp || !(clasp->flags & JSCLASS_IS_ANONYMOUS)) {
+            if (!GlobalObject::ensureConstructor(cx, global, key))
+                return false;
 
-        *resolved = true;
-        return true;
+            *resolved = true;
+            return true;
+        }
     }
 
     // There is no such property to resolve. An ordinary resolve hook would
@@ -2445,30 +2490,38 @@ DefineSelfHostedProperty(JSContext* cx, HandleObject obj, HandleId id,
                          const char* getterName, const char* setterName,
                          unsigned attrs, unsigned flags)
 {
-    RootedAtom getterNameAtom(cx, Atomize(cx, getterName, strlen(getterName)));
+    JSAtom* getterNameAtom = Atomize(cx, getterName, strlen(getterName));
     if (!getterNameAtom)
         return false;
+    RootedPropertyName getterNameName(cx, getterNameAtom->asPropertyName());
 
     RootedAtom name(cx, IdToFunctionName(cx, id));
     if (!name)
         return false;
 
     RootedValue getterValue(cx);
-    if (!cx->global()->getSelfHostedFunction(cx, getterNameAtom, name, 0, &getterValue))
+    if (!GlobalObject::getSelfHostedFunction(cx, cx->global(), getterNameName, name, 0,
+                                             &getterValue))
+    {
         return false;
+    }
     MOZ_ASSERT(getterValue.isObject() && getterValue.toObject().is<JSFunction>());
     RootedFunction getterFunc(cx, &getterValue.toObject().as<JSFunction>());
     JSNative getterOp = JS_DATA_TO_FUNC_PTR(JSNative, getterFunc.get());
 
     RootedFunction setterFunc(cx);
     if (setterName) {
-        RootedAtom setterNameAtom(cx, Atomize(cx, setterName, strlen(setterName)));
+        JSAtom* setterNameAtom = Atomize(cx, setterName, strlen(setterName));
         if (!setterNameAtom)
             return false;
+        RootedPropertyName setterNameName(cx, setterNameAtom->asPropertyName());
 
         RootedValue setterValue(cx);
-        if (!cx->global()->getSelfHostedFunction(cx, setterNameAtom, name, 0, &setterValue))
+        if (!GlobalObject::getSelfHostedFunction(cx, cx->global(), setterNameName, name, 0,
+                                                 &setterValue))
+        {
             return false;
+        }
         MOZ_ASSERT(setterValue.isObject() && setterValue.toObject().is<JSFunction>());
         setterFunc = &getterValue.toObject().as<JSFunction>();
     }
@@ -3232,11 +3285,12 @@ JS::GetSelfHostedFunction(JSContext* cx, const char* selfHostedName, HandleId id
     if (!name)
         return nullptr;
 
-    RootedAtom shName(cx, Atomize(cx, selfHostedName, strlen(selfHostedName)));
-    if (!shName)
+    JSAtom* shAtom = Atomize(cx, selfHostedName, strlen(selfHostedName));
+    if (!shAtom)
         return nullptr;
+    RootedPropertyName shName(cx, shAtom->asPropertyName());
     RootedValue funVal(cx);
-    if (!cx->global()->getSelfHostedFunction(cx, shName, name, nargs, &funVal))
+    if (!GlobalObject::getSelfHostedFunction(cx, cx->global(), shName, name, nargs, &funVal))
         return nullptr;
     return &funVal.toObject().as<JSFunction>();
 }
@@ -3493,15 +3547,19 @@ JS_DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
             MOZ_ASSERT(!fs->call.op);
             MOZ_ASSERT(!fs->call.info);
 
-            RootedAtom shName(cx, Atomize(cx, fs->selfHostedName, strlen(fs->selfHostedName)));
-            if (!shName)
+            JSAtom* shAtom = Atomize(cx, fs->selfHostedName, strlen(fs->selfHostedName));
+            if (!shAtom)
                 return false;
+            RootedPropertyName shName(cx, shAtom->asPropertyName());
             RootedAtom name(cx, IdToFunctionName(cx, id));
             if (!name)
                 return false;
             RootedValue funVal(cx);
-            if (!cx->global()->getSelfHostedFunction(cx, shName, name, fs->nargs, &funVal))
+            if (!GlobalObject::getSelfHostedFunction(cx, cx->global(), shName, name, fs->nargs,
+                                                     &funVal))
+            {
                 return false;
+            }
             if (!DefineProperty(cx, obj, id, funVal, nullptr, nullptr, flags))
                 return false;
         } else {

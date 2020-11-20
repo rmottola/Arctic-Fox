@@ -6,12 +6,15 @@
 
 #include "vm/ArgumentsObject-inl.h"
 
+#include "mozilla/PodOperations.h"
+
 #include "jit/JitFrames.h"
 #include "vm/GlobalObject.h"
 #include "vm/Stack.h"
 
 #include "jsobjinlines.h"
 
+#include "gc/Nursery-inl.h"
 #include "vm/Stack-inl.h"
 
 using namespace js;
@@ -154,17 +157,14 @@ struct CopyScriptFrameIterArgs
     }
 };
 
-template <typename CopyArgs>
-/* static */ ArgumentsObject*
-ArgumentsObject::create(JSContext* cx, HandleScript script, HandleFunction callee,
-                        unsigned numActuals, CopyArgs& copy)
+ArgumentsObject*
+ArgumentsObject::createTemplateObject(JSContext* cx, bool strict)
 {
-    RootedObject proto(cx, callee->global().getOrCreateObjectPrototype(cx));
+    const Class* clasp = strict ? &StrictArgumentsObject::class_ : &NormalArgumentsObject::class_;
+
+    RootedObject proto(cx, cx->global()->getOrCreateObjectPrototype(cx));
     if (!proto)
         return nullptr;
-
-    bool strict = callee->strict();
-    const Class* clasp = strict ? &StrictArgumentsObject::class_ : &NormalArgumentsObject::class_;
 
     RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, clasp, TaggedProto(proto.get())));
     if (!group)
@@ -175,6 +175,46 @@ ArgumentsObject::create(JSContext* cx, HandleScript script, HandleFunction calle
     if (!shape)
         return nullptr;
 
+    AutoSetNewObjectMetadata metadata(cx);
+    JSObject* base = JSObject::create(cx, FINALIZE_KIND, gc::TenuredHeap, shape, group);
+    if (!base)
+        return nullptr;
+
+    ArgumentsObject* obj = &base->as<js::ArgumentsObject>();
+    obj->initFixedSlot(ArgumentsObject::DATA_SLOT, PrivateValue(nullptr));
+    return obj;
+}
+
+ArgumentsObject*
+JSCompartment::getOrCreateArgumentsTemplateObject(JSContext* cx, bool strict)
+{
+    ReadBarriered<ArgumentsObject*>& obj =
+        strict ? strictArgumentsTemplate_ : normalArgumentsTemplate_;
+
+    ArgumentsObject* templateObj = obj;
+    if (templateObj)
+        return templateObj;
+
+    templateObj = ArgumentsObject::createTemplateObject(cx, strict);
+    if (!templateObj)
+        return nullptr;
+
+    obj.set(templateObj);
+    return templateObj;
+}
+
+template <typename CopyArgs>
+/* static */ ArgumentsObject*
+ArgumentsObject::create(JSContext* cx, HandleFunction callee, unsigned numActuals, CopyArgs& copy)
+{
+    bool strict = callee->strict();
+    ArgumentsObject* templateObj = cx->compartment()->getOrCreateArgumentsTemplateObject(cx, strict);
+    if (!templateObj)
+        return nullptr;
+
+    RootedShape shape(cx, templateObj->lastProperty());
+    RootedObjectGroup group(cx, templateObj->group());
+
     unsigned numFormals = callee->nargs();
     unsigned numDeletedWords = NumWordsForBitArrayOfLength(numActuals);
     unsigned numArgs = Max(numActuals, numFormals);
@@ -182,32 +222,40 @@ ArgumentsObject::create(JSContext* cx, HandleScript script, HandleFunction calle
                         numDeletedWords * sizeof(size_t) +
                         numArgs * sizeof(Value);
 
-    // Allocate zeroed memory to make the object GC-safe for early attachment.
-    ArgumentsData* data = reinterpret_cast<ArgumentsData*>(
-            cx->zone()->pod_calloc<uint8_t>(numBytes));
-    if (!data)
-        return nullptr;
-
     Rooted<ArgumentsObject*> obj(cx);
-    JSObject* base = JSObject::create(cx, FINALIZE_KIND,
-                                      GetInitialHeap(GenericObject, clasp),
-                                      shape, group);
-    if (!base) {
-        js_free(data);
-        return nullptr;
+    ArgumentsData* data = nullptr;
+    {
+        // The copyArgs call below can allocate objects, so add this block scope
+        // to make sure we set the metadata for this arguments object first.
+        AutoSetNewObjectMetadata metadata(cx);
+
+        JSObject* base = JSObject::create(cx, FINALIZE_KIND, gc::DefaultHeap, shape, group);
+        if (!base)
+            return nullptr;
+        obj = &base->as<ArgumentsObject>();
+
+        data =
+            reinterpret_cast<ArgumentsData*>(AllocateObjectBuffer<uint8_t>(cx, obj, numBytes));
+        if (!data) {
+            // Make the object safe for GC.
+            obj->initFixedSlot(DATA_SLOT, PrivateValue(nullptr));
+            return nullptr;
+        }
+
+        data->numArgs = numArgs;
+        data->dataBytes = numBytes;
+        data->callee.init(ObjectValue(*callee.get()));
+        data->script = callee->nonLazyScript();
+
+        // Zero the argument Values. This sets each value to DoubleValue(0), which
+        // is safe for GC tracing.
+        memset(data->args, 0, numArgs * sizeof(Value));
+        MOZ_ASSERT(DoubleValue(0).asRawBits() == 0x0);
+        MOZ_ASSERT_IF(numArgs > 0, data->args[0].asRawBits() == 0x0);
+
+        obj->initFixedSlot(DATA_SLOT, PrivateValue(data));
     }
-    obj = &base->as<ArgumentsObject>();
-
-    data->numArgs = numArgs;
-    data->callee.init(ObjectValue(*callee.get()));
-    data->script = script;
-
-    // Attach the argument object.
-    // Because the argument object was zeroed by pod_calloc(), each Value in
-    // ArgumentsData is DoubleValue(0) and therefore safe for GC tracing.
-    MOZ_ASSERT(DoubleValue(0).asRawBits() == 0x0);
-    MOZ_ASSERT_IF(numArgs > 0, data->args[0].asRawBits() == 0x0);
-    obj->initFixedSlot(DATA_SLOT, PrivateValue(data));
+    MOZ_ASSERT(data != nullptr);
 
     /* Copy [0, numArgs) into data->slots. */
     copy.copyArgs(cx, data->args, numArgs);
@@ -228,10 +276,9 @@ ArgumentsObject*
 ArgumentsObject::createExpected(JSContext* cx, AbstractFramePtr frame)
 {
     MOZ_ASSERT(frame.script()->needsArgsObj());
-    RootedScript script(cx, frame.script());
     RootedFunction callee(cx, frame.callee());
     CopyFrameArgs copy(frame);
-    ArgumentsObject* argsobj = create(cx, script, callee, frame.numActualArgs(), copy);
+    ArgumentsObject* argsobj = create(cx, callee, frame.numActualArgs(), copy);
     if (!argsobj)
         return nullptr;
 
@@ -242,19 +289,17 @@ ArgumentsObject::createExpected(JSContext* cx, AbstractFramePtr frame)
 ArgumentsObject*
 ArgumentsObject::createUnexpected(JSContext* cx, ScriptFrameIter& iter)
 {
-    RootedScript script(cx, iter.script());
     RootedFunction callee(cx, iter.callee(cx));
     CopyScriptFrameIterArgs copy(iter);
-    return create(cx, script, callee, iter.numActualArgs(), copy);
+    return create(cx, callee, iter.numActualArgs(), copy);
 }
 
 ArgumentsObject*
 ArgumentsObject::createUnexpected(JSContext* cx, AbstractFramePtr frame)
 {
-    RootedScript script(cx, frame.script());
     RootedFunction callee(cx, frame.callee());
     CopyFrameArgs copy(frame);
-    return create(cx, script, callee, frame.numActualArgs(), copy);
+    return create(cx, callee, frame.numActualArgs(), copy);
 }
 
 ArgumentsObject*
@@ -262,11 +307,10 @@ ArgumentsObject::createForIon(JSContext* cx, jit::JitFrameLayout* frame, HandleO
 {
     jit::CalleeToken token = frame->calleeToken();
     MOZ_ASSERT(jit::CalleeTokenIsFunction(token));
-    RootedScript script(cx, jit::ScriptFromCalleeToken(token));
     RootedFunction callee(cx, jit::CalleeTokenToFunction(token));
     RootedObject callObj(cx, scopeChain->is<CallObject>() ? scopeChain.get() : nullptr);
     CopyJitFrameArgs copy(frame, callObj);
-    return create(cx, script, callee, frame->numActualArgs(), copy);
+    return create(cx, callee, frame->numActualArgs(), copy);
 }
 
 static bool
@@ -531,6 +575,7 @@ strictargs_enumerate(JSContext* cx, HandleObject obj)
 void
 ArgumentsObject::finalize(FreeOp* fop, JSObject* obj)
 {
+    MOZ_ASSERT(!IsInsideNursery(obj));
     fop->free_(reinterpret_cast<void*>(obj->as<ArgumentsObject>().data()));
 }
 
@@ -538,10 +583,39 @@ void
 ArgumentsObject::trace(JSTracer* trc, JSObject* obj)
 {
     ArgumentsObject& argsobj = obj->as<ArgumentsObject>();
-    ArgumentsData* data = argsobj.data();
-    TraceEdge(trc, &data->callee, js_callee_str);
-    TraceRange(trc, data->numArgs, data->begin(), js_arguments_str);
-    TraceManuallyBarrieredEdge(trc, &data->script, "script");
+    if (ArgumentsData* data = argsobj.data()) { // Template objects have no ArgumentsData.
+        TraceEdge(trc, &data->callee, js_callee_str);
+        TraceRange(trc, data->numArgs, data->begin(), js_arguments_str);
+        TraceManuallyBarrieredEdge(trc, &data->script, "script");
+    }
+}
+
+/* static */ size_t
+ArgumentsObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject* src)
+{
+    ArgumentsObject* ndst = &dst->as<ArgumentsObject>();
+    ArgumentsObject* nsrc = &src->as<ArgumentsObject>();
+    MOZ_ASSERT(ndst->data() == nsrc->data());
+
+    Nursery& nursery = trc->runtime()->gc.nursery;
+
+    if (!nursery.isInside(nsrc->data())) {
+        nursery.removeMallocedBuffer(nsrc->data());
+        return 0;
+    }
+
+    uint32_t nbytes = nsrc->data()->dataBytes;
+    uint8_t* data = nsrc->zone()->pod_malloc<uint8_t>(nbytes);
+    if (!data)
+        CrashAtUnhandlableOOM("Failed to allocate ArgumentsObject data while tenuring.");
+    ndst->initFixedSlot(DATA_SLOT, PrivateValue(data));
+
+    mozilla::PodCopy(data, reinterpret_cast<uint8_t*>(nsrc->data()), nbytes);
+
+    ArgumentsData* dstData = ndst->data();
+    dstData->deletedBits = reinterpret_cast<size_t*>(dstData->args + dstData->numArgs);
+
+    return nbytes;
 }
 
 /*
@@ -552,9 +626,11 @@ ArgumentsObject::trace(JSTracer* trc, JSObject* obj)
  */
 const Class NormalArgumentsObject::class_ = {
     "Arguments",
-    JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(NormalArgumentsObject::RESERVED_SLOTS) |
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Object) | JSCLASS_BACKGROUND_FINALIZE,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object) |
+    JSCLASS_SKIP_NURSERY_FINALIZE |
+    JSCLASS_BACKGROUND_FINALIZE,
     nullptr,                 /* addProperty */
     args_delProperty,
     nullptr,                 /* getProperty */
@@ -577,9 +653,11 @@ const Class NormalArgumentsObject::class_ = {
  */
 const Class StrictArgumentsObject::class_ = {
     "Arguments",
-    JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(StrictArgumentsObject::RESERVED_SLOTS) |
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Object) | JSCLASS_BACKGROUND_FINALIZE,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object) |
+    JSCLASS_SKIP_NURSERY_FINALIZE |
+    JSCLASS_BACKGROUND_FINALIZE,
     nullptr,                 /* addProperty */
     args_delProperty,
     nullptr,                 /* getProperty */

@@ -70,6 +70,7 @@ enum AsmJSMathBuiltinFunction
 enum AsmJSAtomicsBuiltinFunction
 {
     AsmJSAtomicsBuiltin_compareExchange,
+    AsmJSAtomicsBuiltin_exchange,
     AsmJSAtomicsBuiltin_load,
     AsmJSAtomicsBuiltin_store,
     AsmJSAtomicsBuiltin_fence,
@@ -1570,10 +1571,7 @@ class AsmJSModule
         MOZ_ASSERT(isDynamicallyLinked());
         return maybeHeap_;
     }
-    size_t heapLength() const {
-        MOZ_ASSERT(isDynamicallyLinked());
-        return maybeHeap_ ? maybeHeap_->byteLength() : 0;
-    }
+    size_t heapLength() const;
     bool profilingEnabled() const {
         MOZ_ASSERT(isDynamicallyLinked());
         return profilingEnabled_;

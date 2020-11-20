@@ -71,13 +71,6 @@ JS_SetGrayGCRootsTracer(JSRuntime* rt, JSTraceDataOp traceOp, void* data)
     rt->gc.setGrayRootsTracer(traceOp, data);
 }
 
-JS_FRIEND_API(JSString*)
-JS_GetAnonymousString(JSRuntime* rt)
-{
-    MOZ_ASSERT(rt->hasContexts());
-    return rt->commonNames->anonymous;
-}
-
 JS_FRIEND_API(JSObject*)
 JS_FindCompilationScope(JSContext* cx, HandleObject objArg)
 {
@@ -309,55 +302,23 @@ js::IsAtomsZone(JS::Zone* zone)
 }
 
 JS_FRIEND_API(bool)
-js::IsInNonStrictPropertySet(JSContext* cx)
-{
-    jsbytecode* pc;
-    JSScript* script = cx->currentScript(&pc, JSContext::ALLOW_CROSS_COMPARTMENT);
-    return script && !IsStrictSetPC(pc) && (js_CodeSpec[*pc].format & JOF_SET);
-}
-
-JS_FRIEND_API(bool)
 js::IsFunctionObject(JSObject* obj)
 {
     return obj->is<JSFunction>();
 }
 
-JS_FRIEND_API(bool)
-js::IsScopeObject(JSObject *obj)
-{
-    return obj->is<ScopeObject>();
-}
-
-JS_FRIEND_API(bool)
-js::IsCallObject(JSObject *obj)
-{
-    return obj->is<CallObject>();
-}
-
-JS_FRIEND_API(bool)
-js::CanAccessObjectShape(JSObject *obj)
-{
-    return obj->maybeShape() != nullptr;
-}
-
-JS_FRIEND_API(JSObject *)
-js::GetGlobalForObjectCrossCompartment(JSObject *obj)
+JS_FRIEND_API(JSObject*)
+js::GetGlobalForObjectCrossCompartment(JSObject* obj)
 {
     return &obj->global();
 }
 
-JS_FRIEND_API(JSObject *)
-js::GetPrototypeNoProxy(JSObject *obj)
+JS_FRIEND_API(JSObject*)
+js::GetPrototypeNoProxy(JSObject* obj)
 {
     MOZ_ASSERT(!obj->is<js::ProxyObject>());
     MOZ_ASSERT(!obj->getTaggedProto().isLazy());
     return obj->getTaggedProto().toObjectOrNull();
-}
-
-JS_FRIEND_API(void)
-js::SetPendingExceptionCrossContext(JSContext* cx, JS::HandleValue v)
-{
-    cx->setPendingException(v);
 }
 
 JS_FRIEND_API(void)
@@ -516,19 +477,6 @@ js::SetReservedOrProxyPrivateSlotWithBarrier(JSObject* obj, size_t slot, const j
     } else {
         obj->as<NativeObject>().setSlot(slot, value);
     }
-}
-
-JS_FRIEND_API(bool)
-js::GetGeneric(JSContext* cx, JSObject* objArg, JSObject* receiverArg, jsid idArg,
-               Value* vp)
-{
-    RootedObject obj(cx, objArg), receiver(cx, receiverArg);
-    RootedId id(cx, idArg);
-    RootedValue value(cx);
-    if (!GetProperty(cx, obj, receiver, id, &value))
-        return false;
-    *vp = value;
-    return true;
 }
 
 void
@@ -785,7 +733,7 @@ FormatFrame(JSContext* cx, const ScriptFrameIter& iter, char* buf, int num,
                                         name ? name :"",
                                         name ? " = " : "",
                                         arg.isString() ? "\"" : "",
-                                        value ? value : "?unknown?",
+                                        value,
                                         arg.isString() ? "\"" : "");
                 if (!buf)
                     return buf;
@@ -892,14 +840,25 @@ JS::FormatStackDump(JSContext* cx, char* buf, bool showArgs, bool showLocals, bo
     return buf;
 }
 
-struct DumpHeapTracer : public JS::CallbackTracer
+struct DumpHeapTracer : public JS::CallbackTracer, public WeakMapTracer
 {
-    FILE*  output;
+    const char* prefix;
+    FILE* output;
 
-    DumpHeapTracer(FILE* fp, JSRuntime* rt, JSTraceCallback callback,
-                   WeakMapTraceKind weakTraceKind)
-      : JS::CallbackTracer(rt, callback, weakTraceKind), output(fp)
+    DumpHeapTracer(FILE* fp, JSRuntime* rt, JSTraceCallback callback)
+      : JS::CallbackTracer(rt, callback, DoNotTraceWeakMaps),
+        js::WeakMapTracer(rt), prefix(""), output(fp)
     {}
+
+  private:
+    void trace(JSObject* map, JS::GCCellPtr key, JS::GCCellPtr value) override {
+        JSObject* kdelegate = nullptr;
+        if (key.isObject())
+            kdelegate = js::GetWeakmapKeyDelegate(key.toObject());
+
+        fprintf(output, "WeakMapEntry map=%p key=%p keyDelegate=%p value=%p\n",
+                map, key.asCell(), kdelegate, value.asCell());
+    }
 };
 
 static char
@@ -953,7 +912,7 @@ DumpHeapVisitCell(JSRuntime* rt, void* data, void* thing,
 }
 
 static void
-DumpHeapVisitChild(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
+DumpHeapVisitGCThing(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
 {
     if (gc::IsInsideNursery((js::gc::Cell*)*thingp))
         return;
@@ -961,19 +920,7 @@ DumpHeapVisitChild(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
     DumpHeapTracer* dtrc = static_cast<DumpHeapTracer*>(trc);
     char buffer[1024];
     dtrc->getTracingEdgeName(buffer, sizeof(buffer));
-    fprintf(dtrc->output, "> %p %c %s\n", *thingp, MarkDescriptor(*thingp), buffer);
-}
-
-static void
-DumpHeapVisitRoot(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
-{
-    if (gc::IsInsideNursery((js::gc::Cell*)*thingp))
-        return;
-
-    DumpHeapTracer* dtrc = static_cast<DumpHeapTracer*>(trc);
-    char buffer[1024];
-    dtrc->getTracingEdgeName(buffer, sizeof(buffer));
-    fprintf(dtrc->output, "%p %c %s\n", *thingp, MarkDescriptor(*thingp), buffer);
+    fprintf(dtrc->output, "%s%p %c %s\n", dtrc->prefix, *thingp, MarkDescriptor(*thingp), buffer);
 }
 
 void
@@ -982,12 +929,16 @@ js::DumpHeapComplete(JSRuntime* rt, FILE* fp, js::DumpHeapNurseryBehaviour nurse
     if (nurseryBehaviour == js::CollectNurseryBeforeDump)
         rt->gc.evictNursery(JS::gcreason::API);
 
-    DumpHeapTracer dtrc(fp, rt, DumpHeapVisitRoot, TraceWeakMapKeysValues);
+    DumpHeapTracer dtrc(fp, rt, DumpHeapVisitGCThing);
+    fprintf(dtrc.output, "# Roots.\n");
     TraceRuntime(&dtrc);
+
+    fprintf(dtrc.output, "# Weak maps.\n");
+    WeakMapBase::traceAllMappings(&dtrc);
 
     fprintf(dtrc.output, "==========\n");
 
-    dtrc.setTraceCallback(DumpHeapVisitChild);
+    dtrc.prefix = "> ";
     IterateZonesCompartmentsArenasCells(rt, &dtrc,
                                         DumpHeapVisitZone,
                                         DumpHeapVisitCompartment,
@@ -1020,18 +971,6 @@ JS_FRIEND_API(bool)
 js::IsContextRunningJS(JSContext* cx)
 {
     return cx->currentlyRunning();
-}
-
-JS_FRIEND_API(int64_t)
-GetMaxGCPauseSinceClear(JSRuntime* rt)
-{
-    return rt->gc.stats.getMaxGCPauseSinceClear();
-}
-
-JS_FRIEND_API(int64_t)
-ClearMaxGCPauseAccumulator(JSRuntime* rt)
-{
-    return rt->gc.stats.clearMaxGCPauseAccumulator();
 }
 
 JS_FRIEND_API(void)
@@ -1250,6 +1189,12 @@ JS_StoreStringPostBarrierCallback(JSContext* cx,
     JSRuntime* rt = cx->runtime();
     if (IsInsideNursery(key))
         rt->gc.storeBuffer.putCallback(callback, key, data);
+}
+
+extern JS_FRIEND_API(void)
+JS_ClearAllPostBarrierCallbacks(JSRuntime* rt)
+{
+    rt->gc.clearPostBarrierCallbacks();
 }
 
 JS_FRIEND_API(bool)

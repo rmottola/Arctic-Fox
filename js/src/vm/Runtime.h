@@ -359,8 +359,8 @@ class NewObjectCache
 
     static void copyCachedToObject(NativeObject* dst, NativeObject* src, gc::AllocKind kind) {
         js_memcpy(dst, src, gc::Arena::thingSize(kind));
-        Shape::writeBarrierPost(dst->shape_, &dst->shape_);
-        ObjectGroup::writeBarrierPost(dst->group_, &dst->group_);
+        Shape::writeBarrierPost(&dst->shape_, nullptr, dst->shape_);
+        ObjectGroup::writeBarrierPost(&dst->group_, nullptr, dst->group_);
     }
 };
 
@@ -1373,11 +1373,6 @@ struct JSRuntime : public JS::shadow::Runtime,
     void updateMallocCounter(JS::Zone* zone, size_t nbytes);
 
     void reportAllocationOverflow() { js::ReportAllocationOverflow(nullptr); }
-
-    /*
-     * The function must be called outside the GC lock.
-     */
-    JS_FRIEND_API(void) onTooMuchMalloc();
 
     /*
      * This should be called after system malloc/calloc/realloc returns nullptr

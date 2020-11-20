@@ -3309,8 +3309,10 @@ CreateArrayPrototype(JSContext* cx, JSProtoKey key)
     if (!shape)
         return nullptr;
 
+    AutoSetNewObjectMetadata metadata(cx);
     RootedArrayObject arrayProto(cx, ArrayObject::createArray(cx, gc::AllocKind::OBJECT4,
-                                                              gc::TenuredHeap, shape, group, 0));
+                                                              gc::TenuredHeap, shape, group, 0,
+                                                              metadata));
     if (!arrayProto ||
         !JSObject::setSingleton(cx, arrayProto) ||
         !arrayProto->setDelegate(cx) ||
@@ -3359,7 +3361,7 @@ array_proto_finish(JSContext* cx, JS::HandleObject ctor, JS::HandleObject proto)
 
 const Class ArrayObject::class_ = {
     "Array",
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Array),
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Array) | JSCLASS_DELAY_METADATA_CALLBACK,
     array_addProperty,
     nullptr, /* delProperty */
     nullptr, /* getProperty */
@@ -3428,6 +3430,7 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
         NewObjectCache::EntryIndex entry = -1;
         if (cache.lookupGlobal(&ArrayObject::class_, cx->global(), allocKind, &entry)) {
             gc::InitialHeap heap = GetInitialHeap(newKind, &ArrayObject::class_);
+            AutoSetNewObjectMetadata metadata(cx);
             JSObject* obj = cache.newObjectFromHit(cx, entry, heap);
             if (obj) {
                 /* Fixup the elements pointer and length, which may be incorrect. */
@@ -3463,9 +3466,10 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
     if (!shape)
         return nullptr;
 
+    AutoSetNewObjectMetadata metadata(cxArg);
     RootedArrayObject arr(cxArg, ArrayObject::createArray(cxArg, allocKind,
                                                           GetInitialHeap(newKind, &ArrayObject::class_),
-                                                          shape, group, length));
+                                                          shape, group, length, metadata));
     if (!arr)
         return nullptr;
 
@@ -3524,25 +3528,6 @@ js::NewDenseUnallocatedArray(ExclusiveContext* cx, uint32_t length,
     return NewArray<0>(cx, length, proto, newKind);
 }
 
-ArrayObject*
-js::NewDenseCopiedArray(ExclusiveContext* cx, uint32_t length, HandleArrayObject src,
-                        uint32_t elementOffset, HandleObject proto /* = nullptr */)
-{
-    MOZ_ASSERT(!src->isIndexed());
-
-    ArrayObject* arr = NewArray<UINT32_MAX>(cx, length, proto);
-    if (!arr)
-        return nullptr;
-
-    MOZ_ASSERT(arr->getDenseCapacity() >= length);
-
-    const Value* vp = src->getDenseElements() + elementOffset;
-    arr->setDenseInitializedLength(length);
-    arr->initDenseElements(0, vp, length);
-
-    return arr;
-}
-
 // values must point at already-rooted Value objects
 ArrayObject*
 js::NewDenseCopiedArray(ExclusiveContext* cx, uint32_t length, const Value* values,
@@ -3566,6 +3551,7 @@ js::NewDenseCopiedArray(ExclusiveContext* cx, uint32_t length, const Value* valu
 ArrayObject*
 js::NewDenseFullyAllocatedArrayWithTemplate(JSContext* cx, uint32_t length, JSObject* templateObject)
 {
+    AutoSetNewObjectMetadata metadata(cx);
     gc::AllocKind allocKind = GuessArrayGCKind(length);
     MOZ_ASSERT(CanBeFinalizedInBackground(allocKind, &ArrayObject::class_));
     allocKind = GetBackgroundAllocKind(allocKind);
@@ -3575,7 +3561,7 @@ js::NewDenseFullyAllocatedArrayWithTemplate(JSContext* cx, uint32_t length, JSOb
 
     gc::InitialHeap heap = GetInitialHeap(GenericObject, &ArrayObject::class_);
     Rooted<ArrayObject*> arr(cx, ArrayObject::createArray(cx, allocKind,
-                                                          heap, shape, group, length));
+                                                          heap, shape, group, length, metadata));
     if (!arr)
         return nullptr;
 

@@ -274,22 +274,24 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     struct AllocationSite : public mozilla::LinkedListElement<AllocationSite>
     {
-        AllocationSite(HandleObject frame, int64_t when)
+        AllocationSite(HandleObject frame, double when)
             : frame(frame),
               when(when),
               className(nullptr),
-              ctorName(nullptr)
+              ctorName(nullptr),
+              size(0)
         {
             MOZ_ASSERT_IF(frame, UncheckedUnwrap(frame)->is<SavedFrame>());
         };
 
-        static AllocationSite* create(JSContext* cx, HandleObject frame, int64_t when,
+        static AllocationSite* create(JSContext* cx, HandleObject frame, double when,
                                       HandleObject obj);
 
         RelocatablePtrObject frame;
-        int64_t when;
+        double when;
         const char* className;
         RelocatablePtrAtom ctorName;
+        size_t size;
     };
     typedef mozilla::LinkedList<AllocationSite> AllocationSiteList;
 
@@ -305,7 +307,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static const size_t DEFAULT_MAX_ALLOCATIONS_LOG_LENGTH = 5000;
 
     bool appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
-                              int64_t when);
+                              double when);
     void emptyAllocationsLog();
 
     /*
@@ -551,7 +553,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static void slowPathOnNewScript(JSContext* cx, HandleScript script);
     static void slowPathOnNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global);
     static bool slowPathOnLogAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
-                                            int64_t when, GlobalObject::DebuggerVector& dbgs);
+                                            double when, GlobalObject::DebuggerVector& dbgs);
     static void slowPathPromiseHook(JSContext* cx, Hook hook, HandleObject promise);
     static void slowPathOnIonCompilation(JSContext* cx, AutoScriptVector& scripts, LSprinter& graph);
 
@@ -714,7 +716,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static inline void onNewScript(JSContext* cx, HandleScript script);
     static inline void onNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global);
     static inline bool onLogAllocationSite(JSContext* cx, JSObject* obj, HandleSavedFrame frame,
-                                           int64_t when);
+                                           double when);
     static inline bool observesIonCompilation(JSContext* cx);
     static inline void onIonCompilation(JSContext* cx, AutoScriptVector& scripts, LSprinter& graph);
     static JSTrapStatus onTrap(JSContext* cx, MutableHandleValue vp);
@@ -1017,7 +1019,7 @@ Debugger::onNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global)
 }
 
 /* static */ bool
-Debugger::onLogAllocationSite(JSContext* cx, JSObject* obj, HandleSavedFrame frame, int64_t when)
+Debugger::onLogAllocationSite(JSContext* cx, JSObject* obj, HandleSavedFrame frame, double when)
 {
     GlobalObject::DebuggerVector* dbgs = cx->global()->getDebuggers();
     if (!dbgs || dbgs->empty())

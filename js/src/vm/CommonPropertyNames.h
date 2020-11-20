@@ -21,9 +21,12 @@
     macro(ArrayIteratorNext, ArrayIteratorNext, "ArrayIteratorNext") \
     macro(ArrayType, ArrayType, "ArrayType") \
     macro(ArrayValues, ArrayValues, "ArrayValues") \
+    macro(ArrayValuesAt, ArrayValuesAt, "ArrayValuesAt") \
     macro(Async, Async, "Async") \
+    macro(breakdown, breakdown, "breakdown") \
     macro(buffer, buffer, "buffer") \
     macro(builder, builder, "builder") \
+    macro(by, by, "by") \
     macro(byteLength, byteLength, "byteLength") \
     macro(byteAlignment, byteAlignment, "byteAlignment") \
     macro(byteOffset, byteOffset, "byteOffset") \
@@ -84,11 +87,13 @@
     macro(find, find, "find") \
     macro(findIndex, findIndex, "findIndex") \
     macro(fix, fix, "fix") \
+    macro(flags, flags, "flags") \
     macro(float32, float32, "float32") \
-    macro(float32x4, float32x4, "float32x4") \
+    macro(float32x4, float32x4, "Float32x4") \
     macro(float64, float64, "float64") \
-    macro(float64x2, float64x2, "float64x2") \
+    macro(float64x2, float64x2, "Float64x2") \
     macro(forceInterpreter, forceInterpreter, "forceInterpreter") \
+    macro(forEach, forEach, "forEach") \
     macro(format, format, "format") \
     macro(frame, frame, "frame") \
     macro(from, from, "from") \
@@ -112,7 +117,9 @@
     macro(InitializeNumberFormat, InitializeNumberFormat, "InitializeNumberFormat") \
     macro(innermost, innermost, "innermost") \
     macro(input, input, "input") \
-    macro(int32x4, int32x4, "int32x4") \
+    macro(int8x16, int8x16, "Int8x16") \
+    macro(int16x8, int16x8, "Int16x8") \
+    macro(int32x4, int32x4, "Int32x4") \
     macro(isFinite, isFinite, "isFinite") \
     macro(isNaN, isNaN, "isNaN") \
     macro(isPrototypeOf, isPrototypeOf, "isPrototypeOf") \
@@ -126,6 +133,7 @@
     macro(iteratorIntrinsic, iteratorIntrinsic, "__iterator__") \
     macro(join, join, "join") \
     macro(keys, keys, "keys") \
+    macro(label, label, "label") \
     macro(lastIndex, lastIndex, "lastIndex") \
     macro(LegacyGeneratorCloseInternal, LegacyGeneratorCloseInternal, "LegacyGeneratorCloseInternal") \
     macro(length, length, "length") \
@@ -153,6 +161,7 @@
     macro(NFKC, NFKC, "NFKC") \
     macro(NFKD, NFKD, "NFKD") \
     macro(nonincrementalReason, nonincrementalReason, "nonincrementalReason") \
+    macro(noStack, noStack, "noStack") \
     macro(noSuchMethod, noSuchMethod, "__noSuchMethod__") \
     macro(NumberFormat, NumberFormat, "NumberFormat") \
     macro(NumberFormatFormatGet, NumberFormatFormatGet, "Intl_NumberFormat_format_get") \
@@ -182,6 +191,7 @@
     macro(proxy, proxy, "proxy") \
     macro(reason, reason, "reason") \
     macro(Reify, Reify, "Reify") \
+    macro(RequireObjectCoercible, RequireObjectCoercible, "RequireObjectCoercible") \
     macro(resumeGenerator, resumeGenerator, "resumeGenerator") \
     macro(return, return_, "return") \
     macro(revoke, revoke, "revoke") \
@@ -190,6 +200,7 @@
     macro(set, set, "set") \
     macro(shape, shape, "shape") \
     macro(signMask, signMask, "signMask") \
+    macro(size, size, "size") \
     macro(source, source, "source") \
     macro(stack, stack, "stack") \
     macro(star, star, "*") \
@@ -203,6 +214,7 @@
     macro(super, super, "super") \
     macro(target, target, "target") \
     macro(test, test, "test") \
+    macro(then, then, "then") \
     macro(throw, throw_, "throw") \
     macro(timestamp, timestamp, "timestamp") \
     macro(timeZone, timeZone, "timeZone") \

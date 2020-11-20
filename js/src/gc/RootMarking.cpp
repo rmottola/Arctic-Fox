@@ -467,6 +467,9 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
         }
     }
 
+    if (rt->isHeapMinorCollecting())
+        jit::JitRuntime::MarkJitcodeGlobalTableUnconditionally(trc);
+
     for (ContextIter acx(rt); !acx.done(); acx.next())
         acx->mark(trc);
 
@@ -488,6 +491,8 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
     /* We can't use GCCompartmentsIter if we're called from TraceRuntime. */
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
+        c->markRoots(trc);
+
         if (rt->isHeapMinorCollecting())
             c->globalWriteBarriered = false;
 
@@ -517,14 +522,6 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
     if (!rt->isHeapMinorCollecting()) {
         gcstats::AutoPhase ap(stats, gcstats::PHASE_MARK_EMBEDDING);
-
-        /*
-         * All JSCompartment::markRoots() does is mark the globals for
-         * compartments which have been entered. Globals aren't nursery
-         * allocated so there's no need to do this for minor GCs.
-         */
-        for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
-            c->markRoots(trc);
 
         /*
          * The embedding can register additional roots here.

@@ -2261,11 +2261,13 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->sweepRegExps();
         c->sweepSavedStacks();
         c->sweepGlobalObject(fop);
+        c->sweepObjectPendingMetadata();
         c->sweepSelfHostingScriptSource();
         c->sweepDebugScopes();
         c->sweepJitCompartment(fop);
         c->sweepWeakMaps();
         c->sweepNativeIterators();
+        c->sweepTemplateObjects();
     }
 }
 
@@ -4922,9 +4924,11 @@ GCRuntime::beginSweepingZoneGroup()
 
             for (GCCompartmentGroupIter c(rt); !c.done(); c.next()) {
                 c->sweepGlobalObject(&fop);
+                c->sweepObjectPendingMetadata();
                 c->sweepDebugScopes();
                 c->sweepJitCompartment(&fop);
                 c->sweepWeakMaps();
+                c->sweepTemplateObjects();
             }
 
             // Bug 1071218: the following two methods have not yet been
@@ -6399,6 +6403,13 @@ GCRuntime::minorGC(JSContext* cx, JS::gcreason::Reason reason)
         if (pretenureGroups[i]->canPreTenure())
             pretenureGroups[i]->setShouldPreTenure(cx);
     }
+}
+
+void
+GCRuntime::clearPostBarrierCallbacks()
+{
+    if (storeBuffer.hasPostBarrierCallbacks())
+        evictNursery();
 }
 
 void

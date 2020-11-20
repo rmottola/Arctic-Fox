@@ -14,8 +14,11 @@
 #elif defined(JS_CODEGEN_MIPS)
 # include "jit/mips/Assembler-mips.h"
 #endif
+#include "jit/JitCompartment.h"
 #include "jit/Registers.h"
 #include "jit/shared/Assembler-shared.h"
+#include "js/TrackedOptimizationInfo.h"
+
 #include "vm/TypedArrayCommon.h"
 
 namespace js {
@@ -245,7 +248,7 @@ class IonCache
     {
     }
 
-    void disable(IonScript* ion);
+    void disable();
     inline bool isDisabled() const {
         return disabled_;
     }
@@ -271,7 +274,7 @@ class IonCache
     void updateBaseAddress(JitCode* code, MacroAssembler& masm);
 
     // Reset the cache around garbage collection.
-    virtual void reset();
+    virtual void reset(ReprotectCode reprotect);
 
     bool canAttachStub() const {
         return stubCount_ < MAX_STUBS;
@@ -298,7 +301,8 @@ class IonCache
     // Combine both linkStub and attachStub into one function. In addition, it
     // produces a spew augmented with the attachKind string.
     bool linkAndAttachStub(JSContext* cx, MacroAssembler& masm, StubAttacher& attacher,
-                           IonScript* ion, const char* attachKind);
+                           IonScript* ion, const char* attachKind,
+                           JS::TrackedOutcome = JS::TrackedOutcome::ICOptStub_GenericSuccess);
 
 #ifdef DEBUG
     bool isAllocated() {
@@ -414,7 +418,7 @@ class GetPropertyIC : public IonCache
 
     CACHE_HEADER(GetProperty)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -549,7 +553,7 @@ class SetPropertyIC : public IonCache
 
     CACHE_HEADER(SetProperty)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -643,7 +647,7 @@ class GetElementIC : public IonCache
 
     CACHE_HEADER(GetElement)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;
@@ -752,7 +756,7 @@ class SetElementIC : public IonCache
 
     CACHE_HEADER(SetElement)
 
-    void reset();
+    void reset(ReprotectCode reprotect);
 
     Register object() const {
         return object_;

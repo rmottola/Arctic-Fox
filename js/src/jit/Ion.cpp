@@ -618,10 +618,22 @@ JitRuntime::Mark(JSTracer* trc)
     }
 }
 
+/* static */ void
+JitRuntime::MarkJitcodeGlobalTableUnconditionally(JSTracer* trc)
+{
+    if (trc->runtime()->spsProfiler.enabled() &&
+        trc->runtime()->hasJitRuntime() &&
+        trc->runtime()->jitRuntime()->hasJitcodeGlobalTable())
+    {
+        trc->runtime()->jitRuntime()->getJitcodeGlobalTable()->markUnconditionally(trc);
+    }
+}
+
 /* static */ bool
 JitRuntime::MarkJitcodeGlobalTableIteratively(JSTracer* trc)
 {
-    if (trc->runtime()->hasJitRuntime() &&
+    if (trc->runtime()->spsProfiler.enabled() &&
+        trc->runtime()->hasJitRuntime() &&
         trc->runtime()->jitRuntime()->hasJitcodeGlobalTable())
     {
         return trc->runtime()->jitRuntime()->getJitcodeGlobalTable()->markIteratively(trc);
@@ -1221,7 +1233,7 @@ IonScript::purgeCaches()
 
     AutoWritableJitCode awjc(method());
     for (size_t i = 0; i < numCaches(); i++)
-        getCacheFromIndex(i).reset();
+        getCacheFromIndex(i).reset(DontReprotect);
 }
 
 void

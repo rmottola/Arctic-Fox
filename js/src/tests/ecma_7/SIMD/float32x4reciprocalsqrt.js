@@ -3,10 +3,10 @@ var BUGNUMBER = 946042;
 var float32x4 = SIMD.float32x4;
 var int32x4 = SIMD.int32x4;
 
-var summary = 'float32x4 reciprocalSqrt';
+var summary = 'float32x4 reciprocalSqrtApproximation';
 
 function reciprocalsqrtf(a) {
-    return Math.fround(Math.sqrt(1 / Math.fround(a)));
+    return Math.fround(1 / Math.sqrt(a));
 }
 
 function test() {
@@ -28,10 +28,10 @@ function test() {
 
   var g = float32x4(NaN, -0, Infinity, -Infinity);
   var i = SIMD.float32x4.reciprocalSqrtApproximation(g);
-  assertEq(i.x, NaN);
-  assertEq(i.y, -Infinity);
-  assertEq(i.z, 0);
-  assertEq(i.w, NaN);
+  assertEq(i.x, reciprocalsqrtf(NaN));
+  assertEq(i.y, reciprocalsqrtf(-0));
+  assertEq(i.z, reciprocalsqrtf(Infinity));
+  assertEq(i.w, reciprocalsqrtf(-Infinity));
 
   if (typeof reportCompare === "function")
     reportCompare(true, true);

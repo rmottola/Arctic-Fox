@@ -480,6 +480,13 @@ OnOutOfBounds()
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_INDEX);
 }
 
+static void
+OnImpreciseConversion()
+{
+    JSContext* cx = JSRuntime::innermostAsmJSActivation()->cx();
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SIMD_FAILED_CONVERSION);
+}
+
 static bool
 AsmJSHandleExecutionInterrupt()
 {
@@ -676,6 +683,8 @@ AddressOf(AsmJSImmKind kind, ExclusiveContext* cx)
         return RedirectCall(FuncCast(OnDetached), Args_General0);
       case AsmJSImm_OnOutOfBounds:
         return RedirectCall(FuncCast(OnOutOfBounds), Args_General0);
+      case AsmJSImm_OnImpreciseConversion:
+        return RedirectCall(FuncCast(OnImpreciseConversion), Args_General0);
       case AsmJSImm_HandleExecutionInterrupt:
         return RedirectCall(FuncCast(AsmJSHandleExecutionInterrupt), Args_General0);
       case AsmJSImm_InvokeFromAsmJS_Ignore:
@@ -697,6 +706,8 @@ AddressOf(AsmJSImmKind kind, ExclusiveContext* cx)
         return RedirectCall(FuncCast(__aeabi_uidivmod), Args_General2);
       case AsmJSImm_AtomicCmpXchg:
         return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t, int32_t)>(js::atomics_cmpxchg_asm_callout), Args_General4);
+      case AsmJSImm_AtomicXchg:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_xchg_asm_callout), Args_General3);
       case AsmJSImm_AtomicFetchAdd:
         return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_add_asm_callout), Args_General3);
       case AsmJSImm_AtomicFetchSub:
@@ -851,7 +862,7 @@ AsmJSModule::initHeap(Handle<ArrayBufferObjectMaybeShared*> heap, JSContext* cx)
     // If we have any explicit bounds checks, we need to patch the heap length
     // checks at the right places. All accesses that have been recorded are the
     // only ones that need bound checks (see also
-    // CodeGeneratorX64::visitAsmJS{Load,Store,CompareExchange,AtomicBinop}Heap)
+    // CodeGeneratorX64::visitAsmJS{Load,Store,CompareExchange,Exchange,AtomicBinop}Heap)
     uint32_t heapLength = heap->byteLength();
     for (size_t i = 0; i < heapAccesses_.length(); i++) {
         const jit::AsmJSHeapAccess& access = heapAccesses_[i];
@@ -1006,7 +1017,7 @@ AsmJSModuleObject_trace(JSTracer* trc, JSObject* obj)
 
 const Class AsmJSModuleObject::class_ = {
     "AsmJSModuleObject",
-    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(AsmJSModuleObject::RESERVED_SLOTS),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -1026,12 +1037,14 @@ const Class AsmJSModuleObject::class_ = {
 AsmJSModuleObject*
 AsmJSModuleObject::create(ExclusiveContext* cx, ScopedJSDeletePtr<AsmJSModule>* module)
 {
+    AutoSetNewObjectMetadata metadata(cx);
     JSObject* obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, nullptr);
     if (!obj)
         return nullptr;
     AsmJSModuleObject* nobj = &obj->as<AsmJSModuleObject>();
 
     nobj->setReservedSlot(MODULE_SLOT, PrivateValue(module->forget()));
+
     return nobj;
 }
 
@@ -1727,6 +1740,13 @@ AsmJSModule::changeHeap(Handle<ArrayBufferObject*> newHeap, JSContext* cx)
     restoreHeapToInitialState(maybeHeap_);
     initHeap(newHeap, cx);
     return true;
+}
+
+size_t
+AsmJSModule::heapLength() const
+{
+    MOZ_ASSERT(isDynamicallyLinked());
+    return maybeHeap_ ? maybeHeap_->byteLength() : 0;
 }
 
 bool

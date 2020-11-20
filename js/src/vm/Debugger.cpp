@@ -1654,7 +1654,7 @@ Debugger::slowPathOnNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global)
 
 /* static */ bool
 Debugger::slowPathOnLogAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
-                                      int64_t when, GlobalObject::DebuggerVector& dbgs)
+                                      double when, GlobalObject::DebuggerVector& dbgs)
 {
     MOZ_ASSERT(!dbgs.empty());
     mozilla::DebugOnly<Debugger**> begin = dbgs.begin();
@@ -1702,7 +1702,7 @@ Debugger::isDebuggee(const JSCompartment* compartment) const
 }
 
 /* static */ Debugger::AllocationSite*
-Debugger::AllocationSite::create(JSContext* cx, HandleObject frame, int64_t when, HandleObject obj)
+Debugger::AllocationSite::create(JSContext* cx, HandleObject frame, double when, HandleObject obj)
 {
     assertSameCompartment(cx, frame);
 
@@ -1719,13 +1719,15 @@ Debugger::AllocationSite::create(JSContext* cx, HandleObject frame, int64_t when
 
     allocSite->className = obj->getClass()->name;
     allocSite->ctorName = ctorName.get();
+    allocSite->size = JS::ubi::Node(obj.get()).size(cx->runtime()->debuggerMallocSizeOf);
+
     return allocSite;
 }
 
 
 bool
 Debugger::appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
-                               int64_t when)
+                               double when)
 {
     MOZ_ASSERT(trackingAllocationSites);
 
@@ -6884,12 +6886,14 @@ DebuggerObject_getAllocationSite(JSContext* cx, unsigned argc, Value* vp)
     if (!metadata)
         return null(args);
 
-    metadata = CheckedUnwrap(metadata);
-    if (!metadata || !SavedFrame::isSavedFrameAndNotProto(*metadata))
+    MOZ_ASSERT(!metadata->is<WrapperObject>());
+
+    if (!SavedFrame::isSavedFrameAndNotProto(*metadata))
         return null(args);
 
     if (!cx->compartment()->wrap(cx, &metadata))
         return false;
+
     args.rval().setObject(*metadata);
     return true;
 }

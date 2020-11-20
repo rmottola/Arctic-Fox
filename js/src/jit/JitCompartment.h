@@ -253,11 +253,12 @@ class JitRuntime
     uint8_t* allocateOsrTempData(size_t size);
     void freeOsrTempData();
 
-    static void Mark(JSTracer *trc);
-    static bool MarkJitcodeGlobalTableIteratively(JSTracer *trc);
-    static void SweepJitcodeGlobalTable(JSRuntime *rt);
+    static void Mark(JSTracer* trc);
+    static void MarkJitcodeGlobalTableUnconditionally(JSTracer* trc);
+    static bool MarkJitcodeGlobalTableIteratively(JSTracer* trc);
+    static void SweepJitcodeGlobalTable(JSRuntime* rt);
 
-    ExecutableAllocator &execAlloc() {
+    ExecutableAllocator& execAlloc() {
         return execAlloc_;
     }
 
@@ -441,7 +442,7 @@ class JitCompartment
         return tpl.get();
     }
 
-    JSObject *maybeGetSimdTemplateObjectFor(SimdTypeDescr::Type type) const {
+    JSObject* maybeGetSimdTemplateObjectFor(SimdTypeDescr::Type type) const {
         const ReadBarrieredObject &tpl = simdTemplateObjects_[type];
 
         // This function is used by Eager Simd Unbox phase, so we cannot use the

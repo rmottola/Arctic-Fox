@@ -7666,9 +7666,10 @@ IonBuilder::jsop_intrinsic(PropertyName* name)
         return pushTypeBarrier(ins, types, BarrierKind::TypeSet);
     }
 
-    // Bake in the intrinsic. Make sure that TI agrees with us on the type.
-    Value vp;
-    JS_ALWAYS_TRUE(script()->global().maybeGetIntrinsicValue(name, &vp));
+    // Bake in the intrinsic, guaranteed to exist because a non-empty typeset
+    // means the intrinsic was successfully gotten in the VM call above.
+    // Assert that TI agrees with us on the type.
+    Value vp = script()->global().existingIntrinsicValue(name);
     MOZ_ASSERT(types->hasType(TypeSet::GetValueType(vp)));
 
     pushConstant(vp);
@@ -8153,7 +8154,7 @@ IonBuilder::getElemTryDense(bool* emitted, MDefinition* obj, MDefinition* index)
 
     // Don't generate a fast path if there have been bounds check failures
     // and this access might be on a sparse property.
-    if (ElementAccessHasExtraIndexedProperty(constraints(), obj) && failedBoundsCheck_) {
+    if (ElementAccessHasExtraIndexedProperty(this, obj) && failedBoundsCheck_) {
         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
         return true;
     }
@@ -8187,7 +8188,7 @@ IonBuilder::getStaticTypedArrayObject(MDefinition* obj, MDefinition* index)
         return nullptr;
     }
 
-    if (ElementAccessHasExtraIndexedProperty(constraints(), obj)) {
+    if (ElementAccessHasExtraIndexedProperty(this, obj)) {
         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
         return nullptr;
     }
@@ -8476,6 +8477,43 @@ IonBuilder::getElemTryCache(bool* emitted, MDefinition* obj, MDefinition* index)
     return true;
 }
 
+TemporaryTypeSet*
+IonBuilder::computeHeapType(const TemporaryTypeSet* objTypes, const jsid id)
+{
+    if (objTypes->unknownObject() || objTypes->getObjectCount() == 0)
+        return nullptr;
+
+    TemporaryTypeSet empty;
+    TemporaryTypeSet* acc = &empty;
+    LifoAlloc* lifoAlloc = alloc().lifoAlloc();
+
+    Vector<HeapTypeSetKey, 4, SystemAllocPolicy> properties;
+    if (!properties.reserve(objTypes->getObjectCount()))
+        return nullptr;
+
+    for (unsigned i = 0; i < objTypes->getObjectCount(); i++) {
+        TypeSet::ObjectKey* key = objTypes->getObject(i);
+
+        if (key->unknownProperties())
+            return nullptr;
+
+        HeapTypeSetKey property = key->property(id);
+        HeapTypeSet* currentSet = property.maybeTypes();
+
+        if (!currentSet || currentSet->unknown())
+            return nullptr;
+
+        properties.infallibleAppend(property);
+        acc = TypeSet::unionSets(acc, currentSet, lifoAlloc);
+    }
+
+    // Freeze all the properties associated with the refined type set.
+    for (HeapTypeSetKey* i = properties.begin(); i != properties.end(); i++)
+        i->freeze(constraints());
+
+    return acc;
+}
+
 bool
 IonBuilder::jsop_getelem_dense(MDefinition* obj, MDefinition* index, JSValueType unboxedType)
 {
@@ -8498,7 +8536,7 @@ IonBuilder::jsop_getelem_dense(MDefinition* obj, MDefinition* index, JSValueType
     // cannot hit another indexed property on the object or its prototypes.
     bool readOutOfBounds =
         types->hasType(TypeSet::UndefinedType()) &&
-        !ElementAccessHasExtraIndexedProperty(constraints(), obj);
+        !ElementAccessHasExtraIndexedProperty(this, obj);
 
     MIRType knownType = MIRType_Value;
     if (unboxedType == JSVAL_TYPE_MAGIC && barrier == BarrierKind::NoBarrier)
@@ -8521,12 +8559,21 @@ IonBuilder::jsop_getelem_dense(MDefinition* obj, MDefinition* index, JSValueType
     // If we can load the element as a definite double, make sure to check that
     // the array has been converted to homogenous doubles first.
     TemporaryTypeSet* objTypes = obj->resultTypeSet();
+    bool inBounds = !readOutOfBounds && !needsHoleCheck;
+
+    if (inBounds) {
+        TemporaryTypeSet* heapTypes = computeHeapType(objTypes, JSID_VOID);
+        if (heapTypes && heapTypes->isSubset(types)) {
+            knownType = heapTypes->getKnownMIRType();
+            types = heapTypes;
+        }
+    }
+
     bool loadDouble =
         unboxedType == JSVAL_TYPE_MAGIC &&
         barrier == BarrierKind::NoBarrier &&
         loopDepth_ &&
-        !readOutOfBounds &&
-        !needsHoleCheck &&
+        inBounds &&
         knownType == MIRType_Double &&
         objTypes &&
         objTypes->convertDoubleElements(constraints()) == TemporaryTypeSet::AlwaysConvertToDoubles;
@@ -8562,8 +8609,10 @@ IonBuilder::jsop_getelem_dense(MDefinition* obj, MDefinition* index, JSValueType
         MOZ_ASSERT(knownType == MIRType_Value);
     }
 
-    if (knownType != MIRType_Value)
+    if (knownType != MIRType_Value) {
         load->setResultType(knownType);
+        load->setResultTypeSet(types);
+    }
 
     current->push(load);
     return pushTypeBarrier(load, types, barrier);
@@ -9025,7 +9074,7 @@ IonBuilder::setElemTryDense(bool* emitted, MDefinition* object,
 
     // Don't generate a fast path if there have been bounds check failures
     // and this access might be on a sparse property.
-    if (ElementAccessHasExtraIndexedProperty(constraints(), object) && failedBoundsCheck_) {
+    if (ElementAccessHasExtraIndexedProperty(this, object) && failedBoundsCheck_) {
         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
         return true;
     }
@@ -9091,7 +9140,7 @@ IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
     // from them. If TI can guard that there are no indexed properties on the prototype
     // chain, we know that we anen't missing any setters by overwriting the hole with
     // another value.
-    bool guardHoles = ElementAccessHasExtraIndexedProperty(constraints(), object);
+    bool guardHoles = ElementAccessHasExtraIndexedProperty(this, object);
 
     // Make sure the object being written to doesn't have copy on write elements.
     const Class* clasp = object->resultTypeSet() ? object->resultTypeSet()->getKnownClass(constraints()) : nullptr;
@@ -9127,7 +9176,7 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
 
     // Writes which are on holes in the object do not have to bail out if they
     // cannot hit another indexed property on the object or its prototypes.
-    bool writeOutOfBounds = !ElementAccessHasExtraIndexedProperty(constraints(), obj);
+    bool writeOutOfBounds = !ElementAccessHasExtraIndexedProperty(this, obj);
 
     if (NeedsPostBarrier(info(), value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
@@ -10315,6 +10364,8 @@ IonBuilder::SimdTypeDescrToMIRType(SimdTypeDescr::Type type)
     switch (type) {
       case SimdTypeDescr::Int32x4:   return MIRType_Int32x4;
       case SimdTypeDescr::Float32x4: return MIRType_Float32x4;
+      case SimdTypeDescr::Int8x16:
+      case SimdTypeDescr::Int16x8:
       case SimdTypeDescr::Float64x2: return MIRType_Undefined;
     }
     MOZ_CRASH("unimplemented MIR type for a SimdTypeDescr::Type");
@@ -10350,33 +10401,13 @@ IonBuilder::getPropTrySimdGetter(bool* emitted, MDefinition* obj, PropertyName* 
     const JSAtomState& names = compartment->runtime()->names();
 
     // Reading the signMask property.
-    if (name == names.signMask) {
-        MSimdSignMask* ins = MSimdSignMask::New(alloc(), obj, type);
-        current->add(ins);
-        current->push(ins);
-        trackOptimizationSuccess();
-        *emitted = true;
-        return true;
-    }
-
-    // Reading a lane property.
-    SimdLane lane;
-    if (name == names.x) {
-        lane = LaneX;
-    } else if (name == names.y) {
-        lane = LaneY;
-    } else if (name == names.z) {
-        lane = LaneZ;
-    } else if (name == names.w) {
-        lane = LaneW;
-    } else {
+    if (name != names.signMask) {
         // Unknown getprop access on a SIMD value
         trackOptimizationOutcome(TrackedOutcome::UnknownSimdProperty);
         return true;
     }
 
-    MIRType scalarType = SimdTypeToScalarType(type);
-    MSimdExtractElement* ins = MSimdExtractElement::New(alloc(), obj, type, scalarType, lane);
+    MSimdSignMask* ins = MSimdSignMask::New(alloc(), obj, type);
     current->add(ins);
     current->push(ins);
     trackOptimizationSuccess();
@@ -11022,7 +11053,7 @@ IonBuilder::getPropTryCache(bool* emitted, MDefinition* obj, PropertyName* name,
     // reflect such possible values.
     if (barrier != BarrierKind::TypeSet) {
         BarrierKind protoBarrier =
-            PropertyReadOnPrototypeNeedsTypeBarrier(this, constraints(), obj, name, types);
+            PropertyReadOnPrototypeNeedsTypeBarrier(this, obj, name, types);
         if (protoBarrier != BarrierKind::NoBarrier) {
             MOZ_ASSERT(barrier <= protoBarrier);
             barrier = protoBarrier;
@@ -12335,7 +12366,7 @@ IonBuilder::jsop_in()
                 break;
         }
 
-        if (ElementAccessHasExtraIndexedProperty(constraints(), obj))
+        if (ElementAccessHasExtraIndexedProperty(this, obj))
             break;
 
         return jsop_in_dense(obj, id, unboxedType);
