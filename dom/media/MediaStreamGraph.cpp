@@ -1985,6 +1985,7 @@ MediaStream::SetGraphImpl(MediaStreamGraphImpl* aGraph)
 {
   MOZ_ASSERT(!mGraph, "Should only be called once");
   mGraph = aGraph;
+  mAudioChannelType = static_cast<AudioChannel>(aGraph->AudioChannel());
   mBuffer.InitGraphRate(aGraph->GraphRate());
 }
 
