@@ -12,7 +12,7 @@
 #include "jit/AtomicOp.h"
 #include "jit/IonCaches.h"
 #include "jit/JitFrames.h"
-#include "jit/mips/Assembler-mips.h"
+#include "jit/mips32/Assembler-mips32.h"
 #include "jit/MoveResolver.h"
 
 namespace js {
@@ -84,6 +84,7 @@ class MacroAssemblerMIPS : public Assembler
     void convertBoolToInt32(Register source, Register dest);
     void convertInt32ToDouble(Register src, FloatRegister dest);
     void convertInt32ToDouble(const Address& src, FloatRegister dest);
+    void convertInt32ToDouble(const BaseIndex& src, FloatRegister dest);
     void convertUInt32ToDouble(Register src, FloatRegister dest);
     void convertUInt32ToFloat32(Register src, FloatRegister dest);
     void convertDoubleToFloat32(FloatRegister src, FloatRegister dest);
@@ -402,34 +403,6 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
     }
     void mov(Address src, Register dest) {
         MOZ_CRASH("NYI-IC");
-    }
-
-    void call(const Register reg) {
-        as_jalr(reg);
-        as_nop();
-    }
-
-    void call(Label* label) {
-        ma_bal(label);
-    }
-
-    void call(ImmWord imm) {
-        call(ImmPtr((void*)imm.value));
-    }
-    void call(ImmPtr imm) {
-        BufferOffset bo = m_buffer.nextOffset();
-        addPendingJump(bo, imm, Relocation::HARDCODED);
-        ma_call(imm);
-    }
-    void call(AsmJSImmPtr imm) {
-        movePtr(imm, CallReg);
-        call(CallReg);
-    }
-    void call(JitCode* c) {
-        BufferOffset bo = m_buffer.nextOffset();
-        addPendingJump(bo, ImmPtr(c->raw()), Relocation::JITCODE);
-        ma_liPatchable(ScratchRegister, Imm32((uint32_t)c->raw()));
-        ma_callJitHalfPush(ScratchRegister);
     }
 
     void callAndPushReturnAddress(Label* label) {
@@ -982,6 +955,32 @@ public:
     }
     template<typename T>
     void compareExchange32(const T& mem, Register oldval, Register newval, Register output)
+    {
+        MOZ_CRASH("NYI");
+    }
+
+    template<typename T>
+    void atomicExchange8SignExtend(const T& mem, Register value, Register output)
+    {
+        MOZ_CRASH("NYI");
+    }
+    template<typename T>
+    void atomicExchange8ZeroExtend(const T& mem, Register value, Register output)
+    {
+        MOZ_CRASH("NYI");
+    }
+    template<typename T>
+    void atomicExchange16SignExtend(const T& mem, Register value, Register output)
+    {
+        MOZ_CRASH("NYI");
+    }
+    template<typename T>
+    void atomicExchange16ZeroExtend(const T& mem, Register value, Register output)
+    {
+        MOZ_CRASH("NYI");
+    }
+    template<typename T>
+    void atomicExchange32(const T& mem, Register value, Register output)
     {
         MOZ_CRASH("NYI");
     }

@@ -17,7 +17,7 @@ sys.path.insert(0, here)
 from automationutils import processLeakLog
 from runtests import Mochitest
 from runtests import MochitestUtilsMixin
-from mochitest_options import B2GOptions, MochitestOptions
+from mochitest_options import MochitestArgumentParser
 from marionette import Marionette
 from mozprofile import Profile, Preferences
 from mozlog import structured
@@ -73,12 +73,7 @@ class B2GMochitest(MochitestUtilsMixin):
 
     def buildTestPath(self, options, testsToFilter=None):
         if options.manifestFile != 'tests.json':
-            super(
-                B2GMochitest,
-                self).buildTestPath(
-                options,
-                testsToFilter,
-                disabled=False)
+            super(B2GMochitest, self).buildTestPath(options, testsToFilter, disabled=False)
         return self.buildTestURL(options)
 
     def build_profile(self, options):
@@ -191,7 +186,17 @@ class B2GMochitest(MochitestUtilsMixin):
             self.runner.env.update(self.browserEnv)
 
             self.startServers(options, None)
+
+            # In desktop mochitests buildTestPath is called before buildURLOptions. This
+            # means options.manifestFile has already been converted to the proper json
+            # style manifest. Not so with B2G, that conversion along with updating the URL
+            # option will happen later. So backup and restore options.manifestFile to
+            # prevent us from trying to pass in an instance of TestManifest via url param.
+            manifestFile = options.manifestFile
+            options.manifestFile = None
             self.buildURLOptions(options, {'MOZ_HIDE_RESULTS_TABLE': '1'})
+            options.manifestFile = manifestFile
+
             self.test_script_args.append(not options.emulator)
             self.test_script_args.append(options.wifi)
             self.test_script_args.append(options.chrome)
@@ -409,7 +414,7 @@ class B2GDesktopMochitest(B2GMochitest, Mochitest):
         return self.build_profile(options)
 
 
-def run_remote_mochitests(parser, options):
+def run_remote_mochitests(options):
     # create our Marionette instance
     marionette_args = {
         'adb_path': options.adbPath,
@@ -426,7 +431,6 @@ def run_remote_mochitests(parser, options):
         marionette_args['host'] = host
         marionette_args['port'] = int(port)
 
-    options = parser.verifyRemoteOptions(options)
     if (options is None):
         print "ERROR: Invalid options specified, use --help for a list of valid options"
         sys.exit(1)
@@ -438,7 +442,6 @@ def run_remote_mochitests(parser, options):
         options.xrePath,
         remote_log_file=options.remoteLogFile)
 
-    options = parser.verifyOptions(options, mochitest)
     if (options is None):
         sys.exit(1)
 
@@ -458,10 +461,10 @@ def run_remote_mochitests(parser, options):
 
     mochitest.message_logger.finish()
 
-    sys.exit(retVal)
+    return retVal
 
 
-def run_desktop_mochitests(parser, options):
+def run_desktop_mochitests(options):
     # create our Marionette instance
     marionette_args = {}
     if options.marionette:
@@ -478,7 +481,6 @@ def run_desktop_mochitests(parser, options):
         marionette_args,
         options,
         options.profile_data_dir)
-    options = MochitestOptions.verifyOptions(parser, options, mochitest)
     if options is None:
         sys.exit(1)
 
@@ -490,18 +492,17 @@ def run_desktop_mochitests(parser, options):
     retVal = mochitest.runTests(options, onLaunch=mochitest.startTests)
     mochitest.message_logger.finish()
 
-    sys.exit(retVal)
+    return retVal
 
 
 def main():
-    parser = B2GOptions()
-    structured.commandline.add_logging_group(parser)
+    parser = MochitestArgumentParser(app='b2g')
     options = parser.parse_args()
 
     if options.desktop:
-        run_desktop_mochitests(parser, options)
+        return run_desktop_mochitests(options)
     else:
-        run_remote_mochitests(parser, options)
+        return run_remote_mochitests(options)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

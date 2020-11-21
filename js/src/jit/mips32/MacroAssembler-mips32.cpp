@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "jit/mips/MacroAssembler-mips.h"
+#include "jit/mips32/MacroAssembler-mips32.h"
 
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
@@ -13,7 +13,7 @@
 #include "jit/BaselineFrame.h"
 #include "jit/JitFrames.h"
 #include "jit/MacroAssembler.h"
-#include "jit/mips/Simulator-mips.h"
+#include "jit/mips32/Simulator-mips32.h"
 #include "jit/MoveEmitter.h"
 #include "jit/SharedICRegisters.h"
 
@@ -50,6 +50,13 @@ MacroAssemblerMIPS::convertInt32ToDouble(const Address& src, FloatRegister dest)
     ma_lw(ScratchRegister, src);
     as_mtc1(ScratchRegister, dest);
     as_cvtdw(dest, dest);
+}
+
+void
+MacroAssemblerMIPS::convertInt32ToDouble(const BaseIndex& src, FloatRegister dest)
+{
+    computeScaledAddress(src, SecondScratchReg);
+    convertInt32ToDouble(Address(SecondScratchReg, src.offset), dest);
 }
 
 void
@@ -3438,7 +3445,7 @@ MacroAssemblerMIPSCompat::callWithABI(AsmJSImmPtr imm, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust, /* callFromAsmJS = */ true);
-    call(imm);
+    asMasm().call(imm);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -3451,7 +3458,7 @@ MacroAssemblerMIPSCompat::callWithABI(const Address& fun, MoveOp::Type result)
     ma_lw(t9, Address(fun.base, fun.offset));
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(t9);
+    asMasm().call(t9);
     callWithABIPost(stackAdjust, result);
 
 }
@@ -3463,7 +3470,7 @@ MacroAssemblerMIPSCompat::callWithABI(Register fun, MoveOp::Type result)
     ma_move(t9, fun);
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(t9);
+    asMasm().call(t9);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -3632,16 +3639,16 @@ MacroAssemblerMIPSCompat::profilerExitFrame()
     branch(GetJitContext()->runtime->jitRuntime()->getProfilerExitFrameTail());
 }
 
-MacroAssembler &
+MacroAssembler&
 MacroAssemblerMIPSCompat::asMasm()
 {
-    return *static_cast<MacroAssembler *>(this);
+    return *static_cast<MacroAssembler*>(this);
 }
 
-const MacroAssembler &
+const MacroAssembler&
 MacroAssemblerMIPSCompat::asMasm() const
 {
-    return *static_cast<const MacroAssembler *>(this);
+    return *static_cast<const MacroAssembler*>(this);
 }
 
 // ===============================================================
@@ -3768,4 +3775,50 @@ MacroAssembler::reserveStack(uint32_t amount)
     if (amount)
         ma_subu(StackPointer, StackPointer, Imm32(amount));
     adjustFrame(amount);
+}
+
+// ===============================================================
+// Simple call functions.
+
+void
+MacroAssembler::call(Register reg)
+{
+    as_jalr(reg);
+    as_nop();
+}
+
+void
+MacroAssembler::call(Label* label)
+{
+    ma_bal(label);
+}
+
+void
+MacroAssembler::call(AsmJSImmPtr target)
+{
+    movePtr(target, CallReg);
+    call(CallReg);
+}
+
+void
+MacroAssembler::call(ImmWord target)
+{
+    call(ImmPtr((void*)target.value));
+}
+
+void
+MacroAssembler::call(ImmPtr target)
+{
+    BufferOffset bo = m_buffer.nextOffset();
+    addPendingJump(bo, target, Relocation::HARDCODED);
+    ma_call(target);
+}
+
+void
+MacroAssembler::call(JitCode* c)
+{
+    BufferOffset bo = m_buffer.nextOffset();
+    addPendingJump(bo, ImmPtr(c->raw()), Relocation::JITCODE);
+    ma_liPatchable(ScratchRegister, Imm32((uint32_t)c->raw()));
+    ma_callJitHalfPush(ScratchRegister);
 }

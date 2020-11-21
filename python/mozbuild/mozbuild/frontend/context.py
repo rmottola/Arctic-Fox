@@ -417,6 +417,9 @@ def ContextDerivedTypedList(type, base_class=List):
 BugzillaComponent = TypedNamedTuple('BugzillaComponent',
                         [('product', unicode), ('component', unicode)])
 
+WebPlatformTestManifest = TypedNamedTuple("WebPlatformTestManifest",
+                                          [("manifest_path", unicode),
+                                           ("test_root", unicode)])
 
 class Files(SubContext):
     """Metadata attached to files.
@@ -1230,6 +1233,10 @@ VARIABLES = {
         """List of manifest files defining reftests.
 
         These are commonly named reftest.list.
+        """, None),
+
+    'WEB_PLATFORM_TESTS_MANIFESTS': (TypedList(WebPlatformTestManifest), list,
+        """List of (manifest_path, test_path) defining web-platform-tests.
         """, None),
 
     'WEBRTC_SIGNALLING_TEST_MANIFESTS': (StrictOrderingOnAppendList, list,

@@ -35,6 +35,8 @@ MacroAssemblerX64::loadConstantDouble(double d, FloatRegister dest)
     } else {
         doubleIndex = doubles_.length();
         enoughMemory_ &= doubles_.append(Double(d));
+        if (!enoughMemory_)
+            return;
         enoughMemory_ &= doubleMap_.add(p, d, doubleIndex);
         if (!enoughMemory_)
             return;
@@ -69,6 +71,8 @@ MacroAssemblerX64::loadConstantFloat32(float f, FloatRegister dest)
     } else {
         floatIndex = floats_.length();
         enoughMemory_ &= floats_.append(Float(f));
+        if (!enoughMemory_)
+            return;
         enoughMemory_ &= floatMap_.add(p, f, floatIndex);
         if (!enoughMemory_)
             return;
@@ -97,6 +101,8 @@ MacroAssemblerX64::getSimdData(const SimdConstant& v)
     } else {
         index = simds_.length();
         enoughMemory_ &= simds_.append(SimdData(v));
+        if (!enoughMemory_)
+            return nullptr;
         enoughMemory_ &= simdMap_.add(p, v, index);
         if (!enoughMemory_)
             return nullptr;
@@ -323,7 +329,7 @@ MacroAssemblerX64::callWithABI(void* fun, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(ImmPtr(fun));
+    asMasm().call(ImmPtr(fun));
     callWithABIPost(stackAdjust, result);
 }
 
@@ -332,7 +338,7 @@ MacroAssemblerX64::callWithABI(AsmJSImmPtr imm, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(imm);
+    asMasm().call(imm);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -361,7 +367,7 @@ MacroAssemblerX64::callWithABI(Address fun, MoveOp::Type result)
 
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(Operand(fun));
+    asMasm().call(fun);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -379,7 +385,7 @@ MacroAssemblerX64::callWithABI(Register fun, MoveOp::Type result)
 
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(Operand(fun));
+    asMasm().call(fun);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -513,7 +519,7 @@ MacroAssemblerX64::callWithExitFrame(JitCode* target, Register dynStack)
     addPtr(Imm32(asMasm().framePushed()), dynStack);
     makeFrameDescriptor(dynStack, JitFrame_IonJS);
     asMasm().Push(dynStack);
-    call(target);
+    asMasm().call(target);
 }
 
 void
