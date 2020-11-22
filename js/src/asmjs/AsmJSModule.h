@@ -853,7 +853,7 @@ class AsmJSModule
     uint8_t *                             interruptExit_;
     uint8_t *                             outOfBoundsExit_;
     StaticLinkData                        staticLinkData_;
-    RelocatablePtrArrayBufferObjectMaybeShared maybeHeap_;
+    HeapPtrArrayBufferObjectMaybeShared   maybeHeap_;
     AsmJSModule **                        prevLinked_;
     AsmJSModule *                         nextLinked_;
     bool                                  dynamicallyLinked_;

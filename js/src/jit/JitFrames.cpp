@@ -1714,7 +1714,7 @@ RInstructionResults::frame() const
     return fp_;
 }
 
-RelocatableValue&
+HeapValue&
 RInstructionResults::operator [](size_t index)
 {
     return (*results_)[index];
