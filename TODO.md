@@ -62,6 +62,7 @@
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
+- Bug 1175609 - 2017-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 . Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
@@ -85,6 +86,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1204872 - 2015-09
+- Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
@@ -99,14 +101,18 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
-- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope.
+- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
+- Bug 1174372 - Initialize ExecutableAllocator static fields in JS_Init
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
+- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
+
+- Bug 1167823 - arity side effects, 14 patches
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
@@ -115,6 +121,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
+- 1163423 - 2015-05-12 JS_HasOwnProperty
 - 1142669 part 6 - Don't inline scripts that are known to inline a
 - 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
@@ -166,6 +173,15 @@ Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
 Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
+
+Replay - in case 1165486 fails:
+Bug 915805 - Don't treat unbound names in Function() code as globals
+Bug 1148963 - OdinMonkey: add CompileOptions::lazyParsingDisabled and
+Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
+Bug 1143286 - Fix terminating scope assertion in DebugScopeObject. (r
+Bug 1147144 - OdinMonkey: fix toString() on asm.js module when source
+-> jsapi.c pointer style
+
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
 
@@ -173,6 +189,9 @@ More session store stuff to check:
 
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
+
+ARM fixes to check
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
 Lightweight themes stuff:
 
