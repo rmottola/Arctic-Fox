@@ -1062,7 +1062,7 @@ InitClass(JSContext* cx, Handle<GlobalObject*> global, const Class* clasp, JSPro
         return nullptr;
     proto->setPrivate(nullptr);
 
-    Rooted<JSFunction*> ctor(cx, global->createConstructor(cx, construct, ClassName(key, cx), 1));
+    Rooted<JSFunction*> ctor(cx, global->createConstructor(cx, construct, ClassName(key, cx), 0));
     if (!ctor ||
         !JS_DefineProperties(cx, ctor, staticProperties) ||
         !LinkConstructorAndPrototype(cx, ctor, proto) ||
