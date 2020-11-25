@@ -62,10 +62,11 @@
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
-- Bug 1175609 - 2017-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
-. Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
+- Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
@@ -154,19 +155,9 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
 - Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 -  1102048 style patches, check which still apply
-- Bug 1156598. Remove old, dead scroll layer item code. r=mstange
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
--  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
-- Bug 1151981 - Remove the void* marking functions;
-- Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
-- Bug 1149352 - Part 0 to 11
-
-Unboxed Object (enabled - make Forum Manjaro Linux crash)
-- Bug 1166709 - Mark definite properties when replacing the unboxed gro
-- Bug 1166709 - After converting unboxed objects created by some initia
-- Bug 1162199 - Use unboxed objects by default, r=jandem. 
 
 impacting download and shutdown:
 Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
@@ -178,9 +169,6 @@ Replay - in case 1165486 fails:
 Bug 915805 - Don't treat unbound names in Function() code as globals
 Bug 1148963 - OdinMonkey: add CompileOptions::lazyParsingDisabled and
 Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
-Bug 1143286 - Fix terminating scope assertion in DebugScopeObject. (r
-Bug 1147144 - OdinMonkey: fix toString() on asm.js module when source
--> jsapi.c pointer style
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
