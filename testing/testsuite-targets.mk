@@ -407,7 +407,6 @@ package-tests: \
   stage-marionette \
   stage-cppunittests \
   stage-jittest \
-  stage-steeplechase \
   stage-web-platform-tests \
   test-packages-manifest \
   $(NULL)
@@ -461,6 +460,10 @@ endif
 
 ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
 package-tests: stage-b2g
+endif
+
+ifdef MOZ_WEBRTC
+package-tests: stage-steeplechase
 endif
 
 make-stage-dir:
