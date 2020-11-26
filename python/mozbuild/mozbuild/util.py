@@ -887,12 +887,7 @@ class TypedListMixin(object):
         if isinstance(l, self.__class__):
             return l
 
-        def normalize(e):
-            if not isinstance(e, self.TYPE):
-                e = self.TYPE(e)
-            return e
-
-        return [normalize(e) for e in l]
+        return [self.normalize(e) for e in l]
 
     def __init__(self, iterable=[]):
         iterable = self._ensure_type(iterable)
@@ -937,7 +932,12 @@ def TypedList(type, base_class=List):
        TypedList(unicode, StrictOrderingOnAppendList)
     '''
     class _TypedList(TypedListMixin, base_class):
-        TYPE = type
+        @staticmethod
+        def normalize(e):
+            if not isinstance(e, type):
+                e = type(e)
+            return e
+
     return _TypedList
 
 def group_unified_files(files, unified_prefix, unified_suffix,
