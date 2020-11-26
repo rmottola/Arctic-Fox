@@ -462,10 +462,6 @@ ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
 package-tests: stage-b2g
 endif
 
-ifdef MOZ_WEBRTC
-package-tests: stage-steeplechase
-endif
-
 make-stage-dir:
 	rm -rf $(PKG_STAGE)
 	$(NSINSTALL) -D $(PKG_STAGE)
