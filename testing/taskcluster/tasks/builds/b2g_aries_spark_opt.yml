@@ -1,22 +1,25 @@
 $inherits:
   from: 'tasks/builds/b2g_phone_base.yml'
   variables:
-    build_name: 'flame-kk-eng'
+    build_name: 'aries'
     build_type: 'opt'
 task:
   workerType: flame-kk
   scopes:
-    - 'docker-worker:cache:build-flame-kk-eng'
+    - 'docker-worker:cache:build-aries-opt'
   metadata:
-    name: '[TC] B2G Flame KK Eng'
+    name: '[TC] B2G Aries Opt'
 
   payload:
     cache:
-      build-flame-kk-eng: /home/worker/workspace
+      build-aries-opt: /home/worker/workspace
     env:
-      TARGET: 'flame-kk'
+      TARGET: 'aries'
       DEBUG: 0
-      VARIANT: eng
+      VARIANT: user
+      GAIA_OPTIMIZE: '1'
+      B2G_SYSTEM_APPS: '1'
+      MOZHARNESS_CONFIG: b2g/taskcluster-spark.py
     command:
       - >
         checkout-gecko workspace &&
@@ -27,13 +30,10 @@ task:
       - production
       - staging
     treeherder:
-      symbol: Be
-      groupSymbol: Flame-KK
-      groupName: Flame KitKat Device Image
+      symbol: B
+      groupSymbol: Aries
+      groupName: Aries Device Image
       machine:
         platform: b2g-device-image
     locations:
-      img: 'private/build/flame-kk.zip'
-
-      GAIA_OPTIMIZE: '1'
-      B2G_SYSTEM_APPS: '1'
+      img: 'private/build/aries.zip'
