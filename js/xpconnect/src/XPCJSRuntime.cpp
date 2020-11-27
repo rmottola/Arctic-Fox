@@ -1755,6 +1755,12 @@ xpc::GetCurrentCompartmentName(JSContext* cx, nsCString& name)
     GetCompartmentName(compartment, name, &anonymizeID, false);
 }
 
+JSRuntime*
+xpc::GetJSRuntime()
+{
+    return XPCJSRuntime::Get()->Runtime();
+}
+
 static int64_t
 JSMainRuntimeGCHeapDistinguishedAmount()
 {

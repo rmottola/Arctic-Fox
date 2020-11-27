@@ -540,6 +540,9 @@ DispatchScriptErrorEvent(nsPIDOMWindow* win, JSRuntime* rt, xpc::ErrorReport* xp
 extern void
 GetCurrentCompartmentName(JSContext*, nsCString& name);
 
+JSRuntime*
+GetJSRuntime();
+
 } // namespace xpc
 
 namespace mozilla {
