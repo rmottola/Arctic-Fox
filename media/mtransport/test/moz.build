@@ -14,6 +14,7 @@ if CONFIG['OS_TARGET'] != 'WINNT' and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
         'runnable_utils_unittest',
         'simpletokenbucket_unittest',
         'sockettransportservice_unittest',
+        'test_nr_socket_unittest',
         'TestSyncRunnable',
         'transport_unittests',
         'turn_unittest',
@@ -30,6 +31,8 @@ for var in ('HAVE_STRDUP', 'NR_SOCKET_IS_VOID_PTR', 'SCTP_DEBUG', 'INET'):
     DEFINES[var] = True
 
 if CONFIG['OS_TARGET'] == 'Android':
+    DEFINES['LINUX'] = True
+    DEFINES['ANDROID'] = True
     LOCAL_INCLUDES += [
         '/media/mtransport/third_party/nrappkit/src/port/android/include',
     ]
@@ -37,11 +40,13 @@ else:
     DEFINES['INET6'] = True
 
 if CONFIG['OS_TARGET'] == 'Linux':
+    DEFINES['LINUX'] = True
+    DEFINES['USE_INTERFACE_PRIORITIZER'] = True
     LOCAL_INCLUDES += [
         '/media/mtransport/third_party/nrappkit/src/port/linux/include',
     ]
     USE_LIBS += [
-        'static:/nsprpub/lib/libc/src/plc4',
+        'nspr',
     ]
     OS_LIBS += [
         '-lrt',
@@ -53,13 +58,20 @@ if CONFIG['OS_TARGET'] == 'Darwin':
     ]
 
 if CONFIG['OS_TARGET'] in ('DragonFly', 'FreeBSD', 'NetBSD', 'OpenBSD'):
+    if CONFIG['OS_TARGET'] == 'Darwin':
+        DEFINES['DARWIN'] = True
+    else:
+        DEFINES['BSD'] = True
     LOCAL_INCLUDES += [
         '/media/mtransport/third_party/nrappkit/src/port/darwin/include',
-        '/media/mtransport/third_party/nrappkit/src/port/generic/include',
     ]
 
 # SCTP DEFINES
 if CONFIG['OS_TARGET'] == 'WINNT':
+    DEFINES['WIN'] = True
+    # for stun.h
+    DEFINES['WIN32'] = True
+    DEFINES['NOMINMAX'] = True
     DEFINES['__Userspace_os_Windows'] = 1
 else:
     # Works for Darwin, Linux, Android. Probably doesn't work for others.
@@ -79,6 +91,7 @@ LOCAL_INCLUDES += [
     '/media/mtransport/third_party/nrappkit/src/event',
     '/media/mtransport/third_party/nrappkit/src/log',
     '/media/mtransport/third_party/nrappkit/src/plugin',
+    '/media/mtransport/third_party/nrappkit/src/port/generic/include',
     '/media/mtransport/third_party/nrappkit/src/registry',
     '/media/mtransport/third_party/nrappkit/src/share',
     '/media/mtransport/third_party/nrappkit/src/stats',

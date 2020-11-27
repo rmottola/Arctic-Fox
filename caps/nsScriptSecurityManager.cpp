@@ -45,7 +45,6 @@
 #include "nsIPrompt.h"
 #include "nsIWindowWatcher.h"
 #include "nsIConsoleService.h"
-#include "nsIJSRuntimeService.h"
 #include "nsIObserverService.h"
 #include "nsIContent.h"
 #include "nsAutoPtr.h"
@@ -1300,8 +1299,7 @@ nsresult nsScriptSecurityManager::Init()
 
     //-- Register security check callback in the JS engine
     //   Currently this is used to control access to function.caller
-    rv = nsXPConnect::XPConnect()->GetRuntime(&sRuntime);
-    NS_ENSURE_SUCCESS(rv, rv);
+    sRuntime = xpc::GetJSRuntime();
 
     static const JSSecurityCallbacks securityCallbacks = {
         ContentSecurityPolicyPermitsJSAction,
