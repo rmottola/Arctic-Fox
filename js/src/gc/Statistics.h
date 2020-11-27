@@ -233,7 +233,7 @@ struct Statistics
     size_t slicesLength() const { return slices.length(); }
 
   private:
-    JSRuntime *runtime;
+    JSRuntime* runtime;
 
     int64_t startupTime;
 
