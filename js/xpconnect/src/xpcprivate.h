@@ -608,8 +608,6 @@ public:
 
     void AddGCCallback(xpcGCCallback cb);
     void RemoveGCCallback(xpcGCCallback cb);
-    void AddContextCallback(xpcContextCallback cb);
-    void RemoveContextCallback(xpcContextCallback cb);
 
     struct EnvironmentPreparer : public js::ScriptEnvironmentPreparer {
         bool invoke(JS::HandleObject scope, Closure& closure) override;
@@ -673,7 +671,6 @@ private:
     XPCRootSetElem* mWrappedJSRoots;
     XPCRootSetElem* mObjectHolderRoots;
     nsTArray<xpcGCCallback> extraGCCallbacks;
-    nsTArray<xpcContextCallback> extraContextCallbacks;
     nsRefPtr<WatchdogManager> mWatchdogManager;
     JS::GCSliceCallback mPrevGCSliceCallback;
     JS::PersistentRootedObject mUnprivilegedJunkScope;
