@@ -310,7 +310,7 @@
           'cflags_mozilla': [
           ],
         }],
-        ['OS=="mac"', {
+        ['OS=="mac" or OS=="ios"', {
           'include_dirs': [
           ],
           'defines': [
