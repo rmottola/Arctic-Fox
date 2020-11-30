@@ -164,6 +164,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
   "resource:///modules/FormValidationHandler.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "gWebRTCUI",
+  "resource:///modules/webrtcUI.jsm", "webrtcUI");
+
 #ifdef MOZ_CRASHREPORTER
 XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
   "resource:///modules/ContentCrashReporters.jsm");
@@ -210,7 +213,6 @@ let gInitialPages = [
 #include browser-readinglist.js
 #include browser-sidebar.js
 #include browser-thumbnails.js
-#include browser-webrtcUI.js
 #include browser-gestureSupport.js
 
 #ifdef MOZ_SERVICES_SYNC
@@ -1185,7 +1187,6 @@ var gBrowserInit = {
     OfflineApps.init();
     IndexedDBPromptHelper.init();
     AddonManager.addAddonListener(AddonsMgrListener);
-    WebrtcIndicator.init();
     gRemoteTabsUI.init();
 
     // Ensure login manager is up and running.

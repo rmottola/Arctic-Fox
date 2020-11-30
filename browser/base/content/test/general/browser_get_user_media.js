@@ -161,8 +161,7 @@ function closeStream(aAlreadyClosed) {
   if (!aAlreadyClosed)
     expectNotification("recording-window-ended");
 
-  let statusButton = document.getElementById("webrtc-status-button");
-  ok(statusButton.hidden, "WebRTC status button hidden");
+  assertWebRTCIndicatorStatus(false);
 }
 
 function checkDeviceSelectors(aAudio, aVideo) {
@@ -181,8 +180,8 @@ function checkDeviceSelectors(aAudio, aVideo) {
 
 function checkSharingUI() {
   yield promisePopupNotification("webRTC-sharingDevices");
-  let statusButton = document.getElementById("webrtc-status-button");
-  ok(!statusButton.hidden, "WebRTC status button visible");
+
+  assertWebRTCIndicatorStatus(true);
 }
 
 function checkNotSharing() {
@@ -191,8 +190,7 @@ function checkNotSharing() {
   ok(!PopupNotifications.getNotification("webRTC-sharingDevices"),
      "no webRTC-sharingDevices popup notification");
 
-  let statusButton = document.getElementById("webrtc-status-button");
-  ok(statusButton.hidden, "WebRTC status button hidden");
+  assertWebRTCIndicatorStatus(false);
 }
 
 let gTests = [
