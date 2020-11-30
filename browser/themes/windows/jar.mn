@@ -93,6 +93,9 @@ browser.jar:
         skin/classic/browser/webRTC-shareDevice-16.png
         skin/classic/browser/webRTC-shareDevice-64.png
         skin/classic/browser/webRTC-sharingDevice-16.png
+        skin/classic/browser/webRTC-shareMicrophone-16.png
+        skin/classic/browser/webRTC-shareMicrophone-64.png
+        skin/classic/browser/webRTC-sharingMicrophone-16.png
         skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
         skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
         skin/classic/browser/downloads/download-notification-finish.png (downloads/download-notification-finish.png)
