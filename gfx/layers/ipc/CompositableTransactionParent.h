@@ -33,7 +33,7 @@ public:
 
   virtual void SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage) = 0;
 
-  void SendPendingAsyncMessges();
+  void SendPendingAsyncMessages();
 
   /**
    * Get child side's process Id.

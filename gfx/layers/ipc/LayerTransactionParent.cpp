@@ -211,8 +211,8 @@ public:
 
   ~AutoLayerTransactionParentAsyncMessageSender()
   {
-    mLayerTransaction->SendPendingAsyncMessges();
-    ImageBridgeParent::SendPendingAsyncMessges(mLayerTransaction->GetChildProcessId());
+    mLayerTransaction->SendPendingAsyncMessages();
+    ImageBridgeParent::SendPendingAsyncMessages(mLayerTransaction->GetChildProcessId());
   }
 private:
   LayerTransactionParent* mLayerTransaction;
@@ -918,7 +918,7 @@ LayerTransactionParent::RecvChildAsyncMessages(InfallibleTArray<AsyncChildMessag
         MOZ_ASSERT(ImageBridgeParent::GetInstance(GetChildProcessId()));
         if (ImageBridgeParent::GetInstance(GetChildProcessId())) {
           // send FenceHandle if present via ImageBridge.
-          ImageBridgeParent::SendFenceHandleToTrackerIfPresent(
+          ImageBridgeParent::AppendDeliverFenceMessage(
             GetChildProcessId(),
             op.holderId(),
             op.transactionId(),
