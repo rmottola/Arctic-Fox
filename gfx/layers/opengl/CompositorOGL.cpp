@@ -1298,11 +1298,8 @@ CompositorOGL::SetDispAcquireFence(Layer* aLayer)
     return;
   }
 
-  android::sp<android::Fence> fence = new android::Fence(GetGonkDisplay()->GetPrevDispAcquireFd());
-  if (fence.get() && fence->isValid()) {
-    FenceHandle handle = FenceHandle(fence);
-    mReleaseFenceHandle.Merge(handle);
-  }
+  RefPtr<FenceHandle::FdObj> fence = new FenceHandle::FdObj(GetGonkDisplay()->GetPrevDispAcquireFd());
+  mReleaseFenceHandle.Merge(FenceHandle(fence));
 }
 
 FenceHandle
@@ -1311,7 +1308,9 @@ CompositorOGL::GetReleaseFence()
   if (!mReleaseFenceHandle.IsValid()) {
     return FenceHandle();
   }
-  return FenceHandle(new android::Fence(mReleaseFenceHandle.mFence->dup()));
+
+  nsRefPtr<FenceHandle::FdObj> fdObj = mReleaseFenceHandle.GetDupFdObj();
+  return FenceHandle(fdObj);
 }
 
 #else
