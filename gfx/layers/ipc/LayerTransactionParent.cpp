@@ -662,6 +662,8 @@ LayerTransactionParent::RecvGetOpacity(PLayerParent* aParent,
     return false;
   }
 
+  mShadowLayersManager->ApplyAsyncProperties(this);
+
   *aOpacity = layer->GetLocalOpacity();
   return true;
 }
