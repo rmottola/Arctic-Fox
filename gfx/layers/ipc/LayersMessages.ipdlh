@@ -392,12 +392,6 @@ union MaybeRegion {
   null_t;
 };
 
-struct OpUpdateTexture {
-  PCompositable compositable;
-  PTexture texture;
-  MaybeRegion region;
-};
-
 struct OpDeliverFence {
   uint64_t transactionId;
   PTexture texture;
@@ -431,7 +425,6 @@ union CompositableOperation {
   OpRemoveTexture;
   OpRemoveTextureAsync;
 
-  OpUpdateTexture;
   OpUseTexture;
   OpUseComponentAlphaTextures;
   OpUseOverlaySource;

@@ -242,13 +242,6 @@ public:
                          const gfx::IntRect& aRect) override;
 
   /**
-   * See CompositableForwarder::UpdatedTexture
-   */
-  virtual void UpdatedTexture(CompositableClient* aCompositable,
-                              TextureClient* aTexture,
-                              nsIntRegion* aRegion) override;
-
-  /**
    * See CompositableForwarder::UseTexture
    */
   virtual void UseTexture(CompositableClient* aCompositable,
