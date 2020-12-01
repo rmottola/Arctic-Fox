@@ -298,7 +298,7 @@ DIBTextureHost::DIBTextureHost(TextureFlags aFlags,
 }
 
 void
-DIBTextureHost::Updated(const nsIntRegion* aRegion)
+DIBTextureHost::UpdatedInternal(const nsIntRegion* aRegion)
 {
   if (!mCompositor) {
     // This can happen if we send textures to a compositable that isn't yet
@@ -332,7 +332,7 @@ TextureHostFileMapping::~TextureHostFileMapping()
 }
 
 void
-TextureHostFileMapping::Updated(const nsIntRegion* aRegion)
+TextureHostFileMapping::UpdatedInternal(const nsIntRegion* aRegion)
 {
   if (!mCompositor) {
     // This can happen if we send textures to a compositable that isn't yet
