@@ -253,9 +253,6 @@ public:
   virtual void UseOverlaySource(CompositableClient* aCompositable,
                                 const OverlaySource& aOverlay) override;
 #endif
-  virtual void SendFenceHandle(AsyncTransactionTracker* aTracker,
-                               PTextureChild* aTexture,
-                               const FenceHandle& aFence) override;
 
   /**
    * End the current transaction and forward it to LayerManagerComposite.
