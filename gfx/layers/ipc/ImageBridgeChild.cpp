@@ -174,7 +174,7 @@ ImageBridgeChild::SendFenceHandle(AsyncTransactionTracker* aTracker,
   InfallibleTArray<AsyncChildMessageData> messages;
   messages.AppendElement(OpDeliverFenceFromChild(aTracker->GetId(),
                                                  nullptr, aTexture,
-                                                 FenceHandleFromChild(aFence)));
+                                                 aFence));
   SendChildAsyncMessages(messages);
 }
 
