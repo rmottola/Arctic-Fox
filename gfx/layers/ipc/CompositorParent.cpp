@@ -340,6 +340,23 @@ CompositorVsyncObserver::Composite(TimeStamp aVsyncTimestamp)
   DispatchTouchEvents(aVsyncTimestamp);
 }
 
+void
+CompositorVsyncObserver::OnForceComposeToTarget()
+{
+  /**
+   * bug 1138502 - There are cases such as during long-running window resizing events
+   * where we receive many sync RecvFlushComposites. We also get vsync notifications which
+   * will increment mVsyncNotificationsSkipped because a composite just occurred. After
+   * enough vsyncs and RecvFlushComposites occurred, we will disable vsync. Then at the next
+   * ScheduleComposite, we will enable vsync, then get a RecvFlushComposite, which will
+   * force us to unobserve vsync again. On some platforms, enabling/disabling vsync is not
+   * free and this oscillating behavior causes a performance hit. In order to avoid this problem,
+   * we reset the mVsyncNotificationsSkipped counter to keep vsync enabled.
+   */
+  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
+  mVsyncNotificationsSkipped = 0;
+}
+
 bool
 CompositorVsyncObserver::NeedsComposite()
 {
@@ -1033,6 +1050,10 @@ CompositorParent::ForceComposeToTarget(DrawTarget* aTarget, const gfx::IntRect* 
 {
   PROFILER_LABEL("CompositorParent", "ForceComposeToTarget",
     js::ProfileEntry::Category::GRAPHICS);
+
+  if (mCompositorVsyncObserver) {
+    mCompositorVsyncObserver->OnForceComposeToTarget();
+  }
 
   AutoRestore<bool> override(mOverrideComposeReadiness);
   mOverrideComposeReadiness = true;
