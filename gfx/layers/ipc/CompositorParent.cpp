@@ -1873,8 +1873,7 @@ UpdatePluginWindowState(uint64_t aId)
   }
 
   bool shouldComposePlugin = !!lts.mRoot &&
-                             !!lts.mRoot->GetParent() &&
-                             lts.mUpdatedPluginDataAvailable;
+                             !!lts.mRoot->GetParent();
 
   bool shouldHidePlugin = (!lts.mRoot ||
                            !lts.mRoot->GetParent()) &&
@@ -1887,6 +1886,7 @@ UpdatePluginWindowState(uint64_t aId)
       // calculating clipping.
       nsTArray<uintptr_t> aVisibleIdList;
       unused << lts.mParent->SendUpdatePluginVisibility(aVisibleIdList);
+      lts.mUpdatedPluginDataAvailable = false;
       return;
     }
 
