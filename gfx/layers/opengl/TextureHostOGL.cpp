@@ -247,7 +247,7 @@ TextureImageTextureSourceOGL::GetFormat() const
 
 gfx::IntRect TextureImageTextureSourceOGL::GetTileRect()
 {
-  return ThebesIntRect(mTexImage->GetTileRect());
+  return mTexImage->GetTileRect();
 }
 
 void
