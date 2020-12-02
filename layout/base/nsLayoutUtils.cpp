@@ -7576,7 +7576,7 @@ nsLayoutUtils::GetContentViewerSize(nsPresContext* aPresContext,
 }
 
 /* static */ nsSize
-nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
+nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame, bool aSubtractScrollbars)
 {
   // If we have a scrollable frame, restrict the composition bounds to its
   // scroll port. The scroll port excludes the frame borders and the scroll
@@ -7632,7 +7632,7 @@ nsLayoutUtils::CalculateCompositionSizeForFrame(nsIFrame* aFrame)
         }
       }
 
-      if (scrollableFrame && !LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars)) {
+      if (aSubtractScrollbars && scrollableFrame && !LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars)) {
         nsMargin margins = scrollableFrame->GetActualScrollbarSizes();
         size.width -= margins.LeftRight();
         size.height -= margins.TopBottom();
