@@ -3036,7 +3036,7 @@ void
 ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
                                        nsIFrame* aContainerReferenceFrame,
                                        const ContainerLayerParameters& aParameters,
-                                       nsRect* aClipRect,
+                                       Maybe<nsRect>* aClipRect,
                                        nsTArray<FrameMetrics>* aOutput) const
 {
   nsPoint toReferenceFrame = mOuter->GetOffsetToCrossDoc(aContainerReferenceFrame);
@@ -3056,7 +3056,7 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
     }
     // When using containers, the container layer contains the clip. Otherwise
     // we always include the clip.
-    *aClipRect = clip;
+    *aClipRect = Some(clip);
   }
 
   if (!mShouldBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
