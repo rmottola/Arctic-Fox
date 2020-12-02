@@ -664,10 +664,6 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     }
   }
 
-  // Clear any cached plugin data we might have, now that the
-  // transaction is complete.
-  mPluginWindowData.Clear();
-
   *aSent = true;
   mIsFirstPaint = false;
   MOZ_LAYERS_LOG(("[LayersForwarder] ... done"));
