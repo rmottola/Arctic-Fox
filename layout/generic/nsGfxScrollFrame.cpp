@@ -3081,6 +3081,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       }
     }
 
+    aBuilder->StoreDirtyRectForScrolledContents(mOuter, dirtyRect);
     mOuter->BuildDisplayListForChild(aBuilder, mScrolledFrame, dirtyRect, scrolledContent);
 
     if (idSetter.ShouldForceLayerForScrollParent() &&
