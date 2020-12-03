@@ -101,6 +101,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1123516 - 2015-06-30 - Implement maplike/setlike
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
+
+- Bug 1152326 - When processing plugin updates only update the visibili
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
