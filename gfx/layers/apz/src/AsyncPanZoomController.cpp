@@ -1284,7 +1284,7 @@ nsEventStatus AsyncPanZoomController::OnScaleBegin(const PinchGestureInput& aEve
   SetState(PINCHING);
   mX.SetVelocity(0);
   mY.SetVelocity(0);
-  mLastZoomFocus = aEvent.mLocalFocusPoint - mFrameMetrics.mCompositionBounds.TopLeft();
+  mLastZoomFocus = aEvent.mLocalFocusPoint - mFrameMetrics.GetCompositionBounds().TopLeft();
 
   return nsEventStatus_eConsumeNoDefault;
 }
@@ -1320,7 +1320,7 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
     ReentrantMonitorAutoEnter lock(mMonitor);
 
     CSSToParentLayerScale userZoom = mFrameMetrics.GetZoom().ToScaleFactor();
-    ParentLayerPoint focusPoint = aEvent.mLocalFocusPoint - mFrameMetrics.mCompositionBounds.TopLeft();
+    ParentLayerPoint focusPoint = aEvent.mLocalFocusPoint - mFrameMetrics.GetCompositionBounds().TopLeft();
     CSSPoint cssFocusPoint = focusPoint / mFrameMetrics.GetZoom();
 
     CSSPoint focusChange = (mLastZoomFocus - focusPoint) / userZoom;
@@ -1338,9 +1338,9 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
     CSSToParentLayerScale realMinZoom = mZoomConstraints.mMinZoom;
     CSSToParentLayerScale realMaxZoom = mZoomConstraints.mMaxZoom;
     realMinZoom.scale = std::max(realMinZoom.scale,
-                                 mFrameMetrics.mCompositionBounds.width / mFrameMetrics.GetScrollableRect().width);
+                                 mFrameMetrics.GetCompositionBounds().width / mFrameMetrics.GetScrollableRect().width);
     realMinZoom.scale = std::max(realMinZoom.scale,
-                                 mFrameMetrics.mCompositionBounds.height / mFrameMetrics.GetScrollableRect().height);
+                                 mFrameMetrics.GetCompositionBounds().height / mFrameMetrics.GetScrollableRect().height);
     if (realMaxZoom < realMinZoom) {
       realMaxZoom = realMinZoom;
     }
@@ -1835,7 +1835,7 @@ bool AsyncPanZoomController::Contains(const ScreenIntPoint& aPoint) const
   ParentLayerIntRect cb;
   {
     ReentrantMonitorAutoEnter lock(mMonitor);
-    GetFrameMetrics().mCompositionBounds.ToIntRect(&cb);
+    GetFrameMetrics().GetCompositionBounds().ToIntRect(&cb);
   }
   return cb.Contains(point);
 }
@@ -2799,8 +2799,8 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
   mPaintThrottler.TaskComplete(GetFrameTime());
   bool needContentRepaint = false;
   bool viewportUpdated = false;
-  if (FuzzyEqualsAdditive(aLayerMetrics.mCompositionBounds.width, mFrameMetrics.mCompositionBounds.width) &&
-      FuzzyEqualsAdditive(aLayerMetrics.mCompositionBounds.height, mFrameMetrics.mCompositionBounds.height)) {
+  if (FuzzyEqualsAdditive(aLayerMetrics.GetCompositionBounds().width, mFrameMetrics.GetCompositionBounds().width) &&
+      FuzzyEqualsAdditive(aLayerMetrics.GetCompositionBounds().height, mFrameMetrics.GetCompositionBounds().height)) {
     // Remote content has sync'd up to the composition geometry
     // change, so we can accept the viewport it's calculated.
     if (mFrameMetrics.GetViewport().width != aLayerMetrics.GetViewport().width ||
@@ -2846,7 +2846,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
     // in some things into our local mFrameMetrics because these things are
     // determined by Gecko and our copy in mFrameMetrics may be stale.
 
-    if (FuzzyEqualsAdditive(mFrameMetrics.mCompositionBounds.width, aLayerMetrics.mCompositionBounds.width) &&
+    if (FuzzyEqualsAdditive(mFrameMetrics.GetCompositionBounds().width, aLayerMetrics.GetCompositionBounds().width) &&
         mFrameMetrics.GetDevPixelsPerCSSPixel() == aLayerMetrics.GetDevPixelsPerCSSPixel() &&
         !viewportUpdated) {
       // Any change to the pres shell resolution was requested by APZ and is
@@ -2872,7 +2872,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
       mFrameMetrics.SetScrollableRect(aLayerMetrics.GetScrollableRect());
       needContentRepaint = true;
     }
-    mFrameMetrics.mCompositionBounds = aLayerMetrics.mCompositionBounds;
+    mFrameMetrics.SetCompositionBounds(aLayerMetrics.GetCompositionBounds());
     mFrameMetrics.SetRootCompositionSize(aLayerMetrics.GetRootCompositionSize());
     mFrameMetrics.SetPresShellResolution(aLayerMetrics.GetPresShellResolution());
     mFrameMetrics.SetCumulativeResolution(aLayerMetrics.GetCumulativeResolution());
@@ -2975,7 +2975,7 @@ void AsyncPanZoomController::ZoomToRect(CSSRect aRect) {
   {
     ReentrantMonitorAutoEnter lock(mMonitor);
 
-    ParentLayerRect compositionBounds = mFrameMetrics.mCompositionBounds;
+    ParentLayerRect compositionBounds = mFrameMetrics.GetCompositionBounds();
     CSSRect cssPageRect = mFrameMetrics.GetScrollableRect();
     CSSPoint scrollOffset = mFrameMetrics.GetScrollOffset();
     CSSToParentLayerScale currentZoom = mFrameMetrics.GetZoom().ToScaleFactor();
