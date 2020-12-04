@@ -1,0 +1,574 @@
+diff --git a/dom/media/directshow/moz.build b/dom/media/directshow/moz.build
+index a939640417ee..11e71544ac4b 100644
+--- a/dom/media/directshow/moz.build
++++ b/dom/media/directshow/moz.build
+@@ -28,12 +28,12 @@ SOURCES += [
+ # If WebRTC isn't being built, we need to compile the DirectShow base classes so that
+ # they're available at link time.
+ if not CONFIG['MOZ_WEBRTC']:
+-    SOURCES += [ '%s/%s' % (TOPSRCDIR, p) for p in [
+-        'media/webrtc/trunk/webrtc/modules/video_capture/windows/BaseFilter.cpp',
+-        'media/webrtc/trunk/webrtc/modules/video_capture/windows/BaseInputPin.cpp',
+-        'media/webrtc/trunk/webrtc/modules/video_capture/windows/BasePin.cpp',
+-        'media/webrtc/trunk/webrtc/modules/video_capture/windows/MediaType.cpp',
+-    ]]
++    SOURCES += [
++        '/media/webrtc/trunk/webrtc/modules/video_capture/windows/BaseFilter.cpp',
++        '/media/webrtc/trunk/webrtc/modules/video_capture/windows/BaseInputPin.cpp',
++        '/media/webrtc/trunk/webrtc/modules/video_capture/windows/BasePin.cpp',
++        '/media/webrtc/trunk/webrtc/modules/video_capture/windows/MediaType.cpp',
++    ]
+ 
+ FAIL_ON_WARNINGS = True
+ 
+diff --git a/dom/plugins/test/testplugin/javaplugin/moz.build b/dom/plugins/test/testplugin/javaplugin/moz.build
+index e01c72aa6e6e..1253403a5dd2 100644
+--- a/dom/plugins/test/testplugin/javaplugin/moz.build
++++ b/dom/plugins/test/testplugin/javaplugin/moz.build
+@@ -6,5 +6,5 @@
+ 
+ SharedLibrary('nptestjava')
+ 
+-relative_path = '..'
++relative_path = 'javaplugin'
+ include('../testplugin.mozbuild')
+diff --git a/dom/plugins/test/testplugin/secondplugin/moz.build b/dom/plugins/test/testplugin/secondplugin/moz.build
+index 3bc2bfa966cf..be0f0a85b2ac 100644
+--- a/dom/plugins/test/testplugin/secondplugin/moz.build
++++ b/dom/plugins/test/testplugin/secondplugin/moz.build
+@@ -6,5 +6,5 @@
+ 
+ SharedLibrary('npsecondtest')
+ 
+-relative_path = '..'
++relative_path = 'secondplugin'
+ include('../testplugin.mozbuild')
+diff --git a/dom/plugins/test/testplugin/testplugin.mozbuild b/dom/plugins/test/testplugin/testplugin.mozbuild
+index 68e70522ebdf..d2909bf41a45 100644
+--- a/dom/plugins/test/testplugin/testplugin.mozbuild
++++ b/dom/plugins/test/testplugin/testplugin.mozbuild
+@@ -6,35 +6,35 @@
+ 
+ DIST_INSTALL = False
+ 
+-UNIFIED_SOURCES += [ '%s/%s' % (relative_path, p) for p in [
++UNIFIED_SOURCES += [
+     'nptest.cpp',
+     'nptest_utils.cpp',
+-]]
++]
+ 
+ UNIFIED_SOURCES += [
+-    'nptest_name.cpp',
++    '%s/nptest_name.cpp' % relative_path,
+ ]
+ 
+ toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
+ if toolkit == 'cocoa':
+     UNIFIED_SOURCES += [
+-        relative_path + '/nptest_macosx.mm'
++        'nptest_macosx.mm'
+     ]
+ elif toolkit in ('gtk2', 'gtk3'):
+     UNIFIED_SOURCES += [
+-        relative_path + '/nptest_gtk2.cpp',
++        'nptest_gtk2.cpp',
+     ]
+ elif toolkit == 'android':
+     UNIFIED_SOURCES += [
+-        relative_path + '/nptest_droid.cpp',
++        'nptest_droid.cpp',
+     ]
+ elif toolkit == 'qt':
+     UNIFIED_SOURCES += [
+-        relative_path + '/nptest_qt.cpp',
++        'nptest_qt.cpp',
+     ]
+ elif toolkit == 'windows':
+     UNIFIED_SOURCES += [
+-        relative_path + '/nptest_windows.cpp',
++        'nptest_windows.cpp',
+     ]
+     OS_LIBS += [
+         'msimg32',
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index 803299cac724..f84118748afb 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -29,7 +29,7 @@ UNIFIED_SOURCES += [
+ # Because of gkmedia on windows we won't find these
+ # symbols in xul.dll.
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'windows':
+-    UNIFIED_SOURCES += [ '%s/gfx/2d/unittest/%s' % (TOPSRCDIR, p) for p in [
++    UNIFIED_SOURCES += [ '/gfx/2d/unittest/%s' % p for p in [
+         'TestBase.cpp',
+         'TestBugs.cpp',
+         'TestPoint.cpp',
+diff --git a/intl/unicharutil/util/objs.mozbuild b/intl/unicharutil/util/objs.mozbuild
+index d5c8a31ba310..1cb0cdb79430 100644
+--- a/intl/unicharutil/util/objs.mozbuild
++++ b/intl/unicharutil/util/objs.mozbuild
+@@ -22,6 +22,6 @@ intl_unicharutil_util_lcppsrcs += [
+ ]
+ 
+ intl_unicharutil_util_cppsrcs = [
+-    '%s/intl/unicharutil/util/%s' % (TOPSRCDIR, s) \
++    '/intl/unicharutil/util/%s' % s
+         for s in intl_unicharutil_util_lcppsrcs
+ ]
+diff --git a/intl/unicharutil/util/standalone/moz.build b/intl/unicharutil/util/standalone/moz.build
+index 3f6ba2ba0394..992c5110ca4e 100644
+--- a/intl/unicharutil/util/standalone/moz.build
++++ b/intl/unicharutil/util/standalone/moz.build
+@@ -7,17 +7,10 @@
+ if CONFIG['OS_TARGET'] != 'WINNT' and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
+     Library('unicharutil_standalone')
+ 
+-intl_unicharutil_util_lcppsrcs = [
+-    'nsUnicodeProperties.cpp',
++UNIFIED_SOURCES += [
++    '../nsUnicodeProperties.cpp',
+ ]
+ 
+-intl_unicharutil_util_cppsrcs = [
+-    '%s/intl/unicharutil/util/%s' % (TOPSRCDIR, s) \
+-        for s in intl_unicharutil_util_lcppsrcs
+-]
+-
+-UNIFIED_SOURCES += intl_unicharutil_util_cppsrcs
+-
+ for var in ('MOZILLA_INTERNAL_API', 'MOZILLA_XPCOMRT_API', 'MOZILLA_EXTERNAL_LINKAGE',
+             'NR_SOCKET_IS_VOID_PTR', 'HAVE_STRDUP'):
+     DEFINES[var] = True
+diff --git a/media/mtransport/common.build b/media/mtransport/common.build
+index 6d5556a6e282..01b0e9682ead 100644
+--- a/media/mtransport/common.build
++++ b/media/mtransport/common.build
+@@ -31,7 +31,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+     ]
+ 
+ mtransport_cppsrcs = [
+-    '%s/media/mtransport/%s' % (TOPSRCDIR, s) for s in sorted(mtransport_lcppsrcs)
++    '/media/mtransport/%s' % s for s in sorted(mtransport_lcppsrcs)
+ ]
+ 
+ LOCAL_INCLUDES += [
+diff --git a/mfbt/moz.build b/mfbt/moz.build
+index 7450e623ebf9..4cb0797dc834 100644
+--- a/mfbt/moz.build
++++ b/mfbt/moz.build
+@@ -113,4 +113,4 @@ DISABLE_STL_WRAPPING = True
+ # Suppress warnings in third-party code.
+ if CONFIG['GNU_CXX']:
+     # TODO: Remove this LZ4 warning suppression after bug 993267 is fixed.
+-    SOURCES[TOPSRCDIR + '/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
++    SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
+diff --git a/mfbt/objs.mozbuild b/mfbt/objs.mozbuild
+index dc3cb374bd02..a1badda852df 100644
+--- a/mfbt/objs.mozbuild
++++ b/mfbt/objs.mozbuild
+@@ -23,7 +23,7 @@ mfbt_src_lcppsrcs = [
+ ]
+ 
+ mfbt_src_cppsrcs = [
+-    '%s/mfbt/%s' % (TOPSRCDIR, s) for s in mfbt_src_lcppsrcs
++    '/mfbt/%s' % s for s in mfbt_src_lcppsrcs
+ ]
+ 
+ # Compression.cpp cannot be built in unified mode because it pulls in Windows system headers.
+@@ -34,5 +34,5 @@ mfbt_nonunified_src_lcppsrcs = [
+ ]
+ 
+ mfbt_nonunified_src_cppsrcs = [
+-    '%s/mfbt/%s' % (TOPSRCDIR, s) for s in mfbt_nonunified_src_lcppsrcs
++    '/mfbt/%s' % s for s in mfbt_nonunified_src_lcppsrcs
+ ]
+diff --git a/mfbt/staticruntime/moz.build b/mfbt/staticruntime/moz.build
+index 7dbab8ced7f8..1cdc3a1930a9 100644
+--- a/mfbt/staticruntime/moz.build
++++ b/mfbt/staticruntime/moz.build
+@@ -21,4 +21,4 @@ DISABLE_STL_WRAPPING = True
+ # Suppress warnings in third-party code.
+ if CONFIG['GNU_CXX']:
+     # TODO: Remove this LZ4 warning suppression after bug 993267 is fixed.
+-    SOURCES[TOPSRCDIR + '/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
++    SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
+diff --git a/netwerk/standalone/moz.build b/netwerk/standalone/moz.build
+index 112a07ded90d..61cd73fcf890 100644
+--- a/netwerk/standalone/moz.build
++++ b/netwerk/standalone/moz.build
+@@ -18,7 +18,7 @@ netwerk_base_src = [
+     'nsURLHelper.cpp',
+ ]
+ src_list += [
+-    '%s/netwerk/base/%s' % (TOPSRCDIR, s) for s in netwerk_base_src
++    '/netwerk/base/%s' % s for s in netwerk_base_src
+ ]
+ 
+ netwerk_dns_src = [
+@@ -33,7 +33,7 @@ netwerk_dns_src = [
+     'race.c',
+ ]
+ src_list += [
+-    '%s/netwerk/dns/%s' % (TOPSRCDIR, s) for s in netwerk_dns_src
++    '/netwerk/dns/%s' % s for s in netwerk_dns_src
+ ]
+ 
+ SOURCES += sorted(src_list)
+diff --git a/python/mozbuild/mozbuild/frontend/context.py b/python/mozbuild/mozbuild/frontend/context.py
+index d24002ded7d6..00290d9c9fb1 100644
+--- a/python/mozbuild/mozbuild/frontend/context.py
++++ b/python/mozbuild/mozbuild/frontend/context.py
+@@ -664,7 +664,7 @@ def asdict(self):
+         populated by calling add_android_eclipse{_library}_project().
+         """, 'export'),
+ 
+-    'SOURCES': (StrictOrderingOnAppendListWithFlagsFactory({'no_pgo': bool, 'flags': List}), list,
++    'SOURCES': (ContextDerivedTypedListWithItems(SourcePath, StrictOrderingOnAppendListWithFlagsFactory({'no_pgo': bool, 'flags': List})), list,
+         """Source code files.
+ 
+         This variable contains a list of source code files to compile.
+@@ -683,7 +683,7 @@ def asdict(self):
+ 
+         """, 'None'),
+ 
+-    'UNIFIED_SOURCES': (StrictOrderingOnAppendList, list,
++    'UNIFIED_SOURCES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
+         """Source code files that can be compiled together.
+ 
+         This variable contains a list of source code files to compile,
+@@ -916,7 +916,7 @@ def asdict(self):
+         files by the compiler.
+         """, None),
+ 
+-    'HOST_SOURCES': (StrictOrderingOnAppendList, list,
++    'HOST_SOURCES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
+         """Source code files to compile with the host compiler.
+ 
+         This variable contains a list of source code files to compile.
+diff --git a/python/mozbuild/mozbuild/frontend/emitter.py b/python/mozbuild/mozbuild/frontend/emitter.py
+index 24ba8b06007d..2cb51888a683 100644
+--- a/python/mozbuild/mozbuild/frontend/emitter.py
++++ b/python/mozbuild/mozbuild/frontend/emitter.py
+@@ -720,10 +720,10 @@ def _process_sources(self, context, passthru):
+             context_srcs = context.get(symbol, [])
+             for f in context_srcs:
+                 if symbol.startswith('GENERATED_'):
+-                    full_path = mozpath.join(context.objdir, f)
++                    full_path = mozpath.normpath(
++                        mozpath.join(context.objdir, f))
+                 else:
+-                    full_path = mozpath.join(context.srcdir, f)
+-                full_path = mozpath.normpath(full_path)
++                    full_path = f.full_path
+                 srcs.append(full_path)
+                 if symbol == 'SOURCES':
+                     flags = context_srcs[f]
+diff --git a/python/mozbuild/mozbuild/frontend/gyp_reader.py b/python/mozbuild/mozbuild/frontend/gyp_reader.py
+index 9bff010dbaa5..ade78fec8e9d 100644
+--- a/python/mozbuild/mozbuild/frontend/gyp_reader.py
++++ b/python/mozbuild/mozbuild/frontend/gyp_reader.py
+@@ -12,6 +12,7 @@
+ from mozpack.files import FileFinder
+ from .sandbox import alphabetical_sorted
+ from .context import (
++    SourcePath,
+     TemplateContext,
+     VARIABLES,
+ )
+@@ -156,13 +157,20 @@ def read_from_gyp(config, path, output, vars, non_unified_sources = set()):
+             # The context expects an unicode string.
+             context['LIBRARY_NAME'] = name.decode('utf-8')
+             # gyp files contain headers and asm sources in sources lists.
+-            sources = set(mozpath.normpath(mozpath.join(context.srcdir, f))
+-                for f in spec.get('sources', [])
+-                if mozpath.splitext(f)[-1] != '.h')
+-            asm_sources = set(f for f in sources if f.endswith('.S'))
++            sources = []
++            unified_sources = []
++            extensions = set()
++            for f in spec.get('sources', []):
++                ext = mozpath.splitext(f)[-1]
++                extensions.add(ext)
++                s = SourcePath(context, f)
++                if ext == '.h':
++                    continue
++                if ext != '.S' and s not in non_unified_sources:
++                    unified_sources.append(s)
++                else:
++                    sources.append(s)
+ 
+-            unified_sources = sources - non_unified_sources - asm_sources
+-            sources -= unified_sources
+             # The context expects alphabetical order when adding sources
+             context['SOURCES'] = alphabetical_sorted(sources)
+             context['UNIFIED_SOURCES'] = alphabetical_sorted(unified_sources)
+@@ -201,10 +209,6 @@ def read_from_gyp(config, path, output, vars, non_unified_sources = set()):
+                     '.m': 'CMFLAGS',
+                     '.mm': 'CMMFLAGS',
+                 }
+-                extensions = {
+-                    mozpath.splitext(f)[-1]
+-                    for f in chain(sources, unified_sources)
+-                }
+                 variables = (
+                     suffix_map[e]
+                     for e in extensions if e in suffix_map
+diff --git a/python/mozbuild/mozbuild/frontend/reader.py b/python/mozbuild/mozbuild/frontend/reader.py
+index 0e94dd583e18..712092033ce2 100644
+--- a/python/mozbuild/mozbuild/frontend/reader.py
++++ b/python/mozbuild/mozbuild/frontend/reader.py
+@@ -66,6 +66,7 @@
+     FUNCTIONS,
+     VARIABLES,
+     DEPRECATION_HINTS,
++    SourcePath,
+     SPECIAL_VARIABLES,
+     SUBCONTEXTS,
+     SubContext,
+@@ -1067,8 +1068,8 @@ def _read_mozbuild(self, path, config, descend, metadata):
+             from .gyp_reader import read_from_gyp
+             non_unified_sources = set()
+             for s in gyp_dir.non_unified_sources:
+-                source = mozpath.normpath(mozpath.join(curdir, s))
+-                if not os.path.exists(source):
++                source = SourcePath(context, s)
++                if not os.path.exists(source.full_path):
+                     raise SandboxValidationError('Cannot find %s.' % source,
+                         context)
+                 non_unified_sources.add(source)
+diff --git a/rdf/util/objs.mozbuild b/rdf/util/objs.mozbuild
+index b69000024411..d67babf1fb06 100644
+--- a/rdf/util/objs.mozbuild
++++ b/rdf/util/objs.mozbuild
+@@ -4,10 +4,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-rdf_util_src_lcppsrcs = [
+-    'nsRDFResource.cpp',
+-]
+-
+ rdf_util_src_cppsrcs = [
+-    '%s/rdf/util/%s' % (TOPSRCDIR, s) for s in rdf_util_src_lcppsrcs
++    '/rdf/util/nsRDFResource.cpp',
+ ]
+diff --git a/security/sandbox/moz.build b/security/sandbox/moz.build
+index 86b917b14e57..c45c1c252dd9 100644
+--- a/security/sandbox/moz.build
++++ b/security/sandbox/moz.build
+@@ -36,7 +36,7 @@ elif CONFIG['OS_ARCH'] == 'WINNT':
+ 
+     # Bug 1102853 tracks looking at removing this.
+     if CONFIG['CPU_ARCH'] == 'x86_64':
+-        SOURCES['%s/security/sandbox/chromium/sandbox/win/src/sharedmem_ipc_client.cc' % TOPSRCDIR].no_pgo = True
++        SOURCES['/security/sandbox/chromium/sandbox/win/src/sharedmem_ipc_client.cc'].no_pgo = True
+ 
+     for var in ('UNICODE', '_UNICODE', 'NS_NO_XPCOM', 'SANDBOX_EXPORTS',
+                 'NOMINMAX', '_CRT_RAND_S', 'CHROMIUM_SANDBOX_BUILD'):
+diff --git a/security/sandbox/objs.mozbuild b/security/sandbox/objs.mozbuild
+index 3583ca0642a9..9655bb250834 100644
+--- a/security/sandbox/objs.mozbuild
++++ b/security/sandbox/objs.mozbuild
+@@ -125,6 +125,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
+         ]
+ 
+     security_sandbox_cppsrcs = [
+-        '%s/security/sandbox/%s' % (TOPSRCDIR, s)
++        '/security/sandbox/%s' % s
+             for s in sorted(security_sandbox_lcppsrcs)
+     ]
+diff --git a/security/sandbox/staticruntime/moz.build b/security/sandbox/staticruntime/moz.build
+index 4cffce1480c7..708fd344fd38 100644
+--- a/security/sandbox/staticruntime/moz.build
++++ b/security/sandbox/staticruntime/moz.build
+@@ -14,7 +14,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
+ 
+     # Bug 1102853 tracks looking at removing this.
+     if CONFIG['CPU_ARCH'] == 'x86_64':
+-        SOURCES['%s/security/sandbox/chromium/sandbox/win/src/sharedmem_ipc_client.cc' % TOPSRCDIR].no_pgo = True
++        SOURCES['/security/sandbox/chromium/sandbox/win/src/sharedmem_ipc_client.cc'].no_pgo = True
+ 
+     for var in ('UNICODE', '_UNICODE', 'NS_NO_XPCOM', 'SANDBOX_EXPORTS',
+                 'NOMINMAX', '_CRT_RAND_S', 'CHROMIUM_SANDBOX_BUILD'):
+diff --git a/toolkit/crashreporter/google-breakpad/src/client/windows/crash_generation/objs.mozbuild b/toolkit/crashreporter/google-breakpad/src/client/windows/crash_generation/objs.mozbuild
+index aac1324c0f78..16eb35a9198e 100644
+--- a/toolkit/crashreporter/google-breakpad/src/client/windows/crash_generation/objs.mozbuild
++++ b/toolkit/crashreporter/google-breakpad/src/client/windows/crash_generation/objs.mozbuild
+@@ -13,5 +13,5 @@ lobjs_crash_generation = [
+ 
+ subdir = 'toolkit/crashreporter/google-breakpad/src/client/windows/crash_generation'
+ objs_crash_generation = [
+-    '%s/%s/%s' % (TOPSRCDIR, subdir, s) for s in lobjs_crash_generation
++    '/%s/%s' % (subdir, s) for s in lobjs_crash_generation
+ ]
+diff --git a/toolkit/crashreporter/google-breakpad/src/client/windows/handler/objs.mozbuild b/toolkit/crashreporter/google-breakpad/src/client/windows/handler/objs.mozbuild
+index 4f9ce265c7a1..6f7d4ad9cab6 100644
+--- a/toolkit/crashreporter/google-breakpad/src/client/windows/handler/objs.mozbuild
++++ b/toolkit/crashreporter/google-breakpad/src/client/windows/handler/objs.mozbuild
+@@ -10,5 +10,5 @@ lobjs_handler = [
+ 
+ subdir = 'toolkit/crashreporter/google-breakpad/src/client/windows/handler'
+ objs_handler = [
+-    '%s/%s/%s' % (TOPSRCDIR, subdir, s) for s in lobjs_handler
++    '/%s/%s' % (subdir, s) for s in lobjs_handler
+ ]
+diff --git a/toolkit/crashreporter/google-breakpad/src/client/windows/sender/objs.mozbuild b/toolkit/crashreporter/google-breakpad/src/client/windows/sender/objs.mozbuild
+index 861e5f02a071..36c2952afd21 100644
+--- a/toolkit/crashreporter/google-breakpad/src/client/windows/sender/objs.mozbuild
++++ b/toolkit/crashreporter/google-breakpad/src/client/windows/sender/objs.mozbuild
+@@ -10,5 +10,5 @@ lobjs_sender = [
+ 
+ subdir = 'toolkit/crashreporter/google-breakpad/src/client/windows/sender'
+ objs_sender = [
+-    '%s/%s/%s' % (TOPSRCDIR, subdir, s) for s in lobjs_sender
++    '/%s/%s' % (subdir, s) for s in lobjs_sender
+ ]
+diff --git a/toolkit/crashreporter/google-breakpad/src/common/windows/objs.mozbuild b/toolkit/crashreporter/google-breakpad/src/common/windows/objs.mozbuild
+index 081292d94864..671b390607f8 100644
+--- a/toolkit/crashreporter/google-breakpad/src/common/windows/objs.mozbuild
++++ b/toolkit/crashreporter/google-breakpad/src/common/windows/objs.mozbuild
+@@ -11,5 +11,5 @@ lobjs_common = [
+ 
+ subdir = 'toolkit/crashreporter/google-breakpad/src/common/windows'
+ objs_common = [
+-    '%s/%s/%s' % (TOPSRCDIR, subdir, s) for s in lobjs_common
++    '/%s/%s' % (subdir, s) for s in lobjs_common
+ ]
+diff --git a/toolkit/mozapps/update/updater/updater-common.build b/toolkit/mozapps/update/updater/updater-common.build
+index dda6dc3b4902..ae1d680a630b 100644
+--- a/toolkit/mozapps/update/updater/updater-common.build
++++ b/toolkit/mozapps/update/updater/updater-common.build
+@@ -101,7 +101,7 @@ if have_progressui == 0:
+         'progressui_null.cpp',
+     ]
+ 
+-SOURCES += ['%s%s' % (updater_rel_path, f) for f in sorted(srcs)]
++SOURCES += sorted(srcs)
+ 
+ DEFINES['NS_NO_XPCOM'] = True
+ DISABLE_STL_WRAPPING = True
+diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
+index b5aab835fac9..ac99a564e87c 100644
+--- a/toolkit/profile/moz.build
++++ b/toolkit/profile/moz.build
+@@ -14,10 +14,14 @@ XPIDL_SOURCES += [
+ 
+ XPIDL_MODULE = 'toolkitprofile'
+ 
+-UNIFIED_SOURCES += [ TOPSRCDIR + '/profile/dirserviceprovider/nsProfileLock.cpp' ]
++UNIFIED_SOURCES += [
++    '/profile/dirserviceprovider/nsProfileLock.cpp'
++]
+ 
+ if CONFIG['OS_ARCH'] == 'WINNT':
+-    UNIFIED_SOURCES += [ TOPSRCDIR + '/profile/dirserviceprovider/ProfileUnlockerWin.cpp' ]
++    UNIFIED_SOURCES += [
++        '/profile/dirserviceprovider/ProfileUnlockerWin.cpp'
++    ]
+ 
+ UNIFIED_SOURCES += [
+     'nsToolkitProfileService.cpp'
+diff --git a/xpcom/glue/objs.mozbuild b/xpcom/glue/objs.mozbuild
+index 63dc031b135f..0b21f405e4c0 100644
+--- a/xpcom/glue/objs.mozbuild
++++ b/xpcom/glue/objs.mozbuild
+@@ -34,7 +34,7 @@ xpcom_glue_src_lcppsrcs = [
+ ]
+ 
+ xpcom_glue_src_cppsrcs = [
+-    '%s/xpcom/glue/%s' % (TOPSRCDIR, s) for s in xpcom_glue_src_lcppsrcs
++    '/xpcom/glue/%s' % s for s in xpcom_glue_src_lcppsrcs
+ ]
+ 
+ xpcom_gluens_src_lcppsrcs = [
+@@ -45,5 +45,5 @@ xpcom_gluens_src_lcppsrcs = [
+ ]
+ 
+ xpcom_gluens_src_cppsrcs = [
+-    '%s/xpcom/glue/%s' % (TOPSRCDIR, s) for s in xpcom_gluens_src_lcppsrcs
++    '/xpcom/glue/%s' % s for s in xpcom_gluens_src_lcppsrcs
+ ]
+diff --git a/xpcom/libxpcomrt/moz.build b/xpcom/libxpcomrt/moz.build
+index 48c784727ed1..4179c3238b1d 100644
+--- a/xpcom/libxpcomrt/moz.build
++++ b/xpcom/libxpcomrt/moz.build
+@@ -18,7 +18,7 @@ xpcom_base_src = [
+     'nsUUIDGenerator.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/base/%s' % (TOPSRCDIR, s) for s in xpcom_base_src
++    '/xpcom/base/%s' % s for s in xpcom_base_src
+ ]
+ 
+ xpcom_build_src = [
+@@ -26,7 +26,7 @@ xpcom_build_src = [
+     'Services.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/build/%s' % (TOPSRCDIR, s) for s in xpcom_build_src
++    '/xpcom/build/%s' % s for s in xpcom_build_src
+ ]
+ 
+ xpcom_components_src = [
+@@ -34,7 +34,7 @@ xpcom_components_src = [
+     'nsComponentManager.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/components/%s' % (TOPSRCDIR, s) for s in xpcom_components_src
++    '/xpcom/components/%s' % s for s in xpcom_components_src
+ ]
+ 
+ xpcom_ds_src = [
+@@ -58,7 +58,7 @@ elif CONFIG['OS_ARCH'] == 'Darwin':
+ elif CONFIG['COMPILE_ENVIRONMENT']:
+     error('No TimeStamp implementation on this platform.  Build will not succeed')
+ src_list += [
+-    '%s/xpcom/ds/%s' % (TOPSRCDIR, s) for s in xpcom_ds_src
++    '/xpcom/ds/%s' % s for s in xpcom_ds_src
+ ]
+ 
+ xpcom_glue_src = [
+@@ -84,14 +84,14 @@ xpcom_glue_src = [
+     'pldhash.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/glue/%s' % (TOPSRCDIR, s) for s in xpcom_glue_src
++    '/xpcom/glue/%s' % s for s in xpcom_glue_src
+ ]
+ 
+ xpcom_io_src = [
+     'nsNativeCharsetUtils.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/io/%s' % (TOPSRCDIR, s) for s in xpcom_io_src
++    '/xpcom/io/%s' % s for s in xpcom_io_src
+ ]
+ 
+ xpcom_string_src = [
+@@ -107,7 +107,7 @@ xpcom_string_src = [
+ if CONFIG['INTEL_ARCHITECTURE']:
+     xpcom_string_src += ['nsUTF8UtilsSSE2.cpp']
+ src_list += [
+-    '%s/xpcom/string/%s' % (TOPSRCDIR, s) for s in xpcom_string_src
++    '/xpcom/string/%s' % s for s in xpcom_string_src
+ ]
+ 
+ xpcom_threads_src = [
+@@ -123,14 +123,14 @@ xpcom_threads_src = [
+     'TimerThread.cpp',
+ ]
+ src_list += [
+-    '%s/xpcom/threads/%s' % (TOPSRCDIR, s) for s in xpcom_threads_src
++    '/xpcom/threads/%s' % s for s in xpcom_threads_src
+ ]
+ 
+ 
+ SOURCES += sorted(src_list)
+ 
+ if CONFIG['INTEL_ARCHITECTURE']:
+-    sse_string_path = '%s/xpcom/string/nsUTF8UtilsSSE2.cpp' % TOPSRCDIR
++    sse_string_path = '/xpcom/string/nsUTF8UtilsSSE2.cpp'
+     SOURCES[sse_string_path].flags += CONFIG['SSE2_FLAGS']
+ 
+ GENERATED_INCLUDES += ['..']

@@ -8,7 +8,7 @@
 # internal linkage. Components that use frozen (external) linkage should use
 # unicharutil_external_s.
 
-DIRS += ['internal']
+DIRS += ['internal', 'standalone']
 
 EXPORTS += [
     'GreekCasing.h',
