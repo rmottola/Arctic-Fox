@@ -543,7 +543,6 @@ class TreeMetadataEmitter(LoggingMixin):
             'ANDROID_RES_DIRS',
             'DISABLE_STL_WRAPPING',
             'EXTRA_ASSEMBLER_FLAGS',
-            'EXTRA_COMPILE_FLAGS',
             'EXTRA_COMPONENTS',
             'EXTRA_DSO_LDOPTS',
             'EXTRA_PP_COMPONENTS',
