@@ -450,9 +450,12 @@ class RecursiveMakeBackend(CommonBackend):
                 '.cpp': 'CPPSRCS',
                 '.S': 'SSRCS',
             }
-            var = suffix_map[obj.canonical_suffix]
+            variables = [suffix_map[obj.canonical_suffix]]
+            if isinstance(obj, GeneratedSources):
+                variables.append('GARBAGE')
             for f in sorted(obj.files):
-                backend_file.write('%s += %s\n' % (var, f))
+                for var in variables:
+                    backend_file.write('%s += %s\n' % (var, f))
         elif isinstance(obj, HostSources):
             suffix_map = {
                 '.c': 'HOST_CSRCS',
