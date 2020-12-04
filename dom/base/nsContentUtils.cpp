@@ -247,7 +247,6 @@ nsString* nsContentUtils::sModifierSeparator = nullptr;
 bool nsContentUtils::sInitialized = false;
 bool nsContentUtils::sIsFullScreenApiEnabled = false;
 bool nsContentUtils::sTrustedFullScreenOnly = true;
-bool nsContentUtils::sFullscreenApiIsContentOnly = false;
 bool nsContentUtils::sIsCutCopyAllowed = true;
 bool nsContentUtils::sIsPerformanceTimingEnabled = false;
 bool nsContentUtils::sIsResourceTimingEnabled = false;
@@ -513,12 +512,6 @@ nsContentUtils::Init()
 
   Preferences::AddBoolVarCache(&sIsFullScreenApiEnabled,
                                "full-screen-api.enabled");
-
-  // Note: We deliberately read this pref here because this code runs
-  // before the profile loads, so users' changes to this pref in about:config
-  // won't have any effect on behaviour. We don't really want users messing
-  // with this pref, as it affects the security model of the fullscreen API.
-  sFullscreenApiIsContentOnly = Preferences::GetBool("full-screen-api.content-only", false);
 
   Preferences::AddBoolVarCache(&sTrustedFullScreenOnly,
                                "full-screen-api.allow-trusted-requests-only");
@@ -6677,13 +6670,6 @@ nsContentUtils::IsRequestFullScreenAllowed()
 
 /* static */
 bool
-nsContentUtils::IsFullscreenApiContentOnly()
-{
-  return sFullscreenApiIsContentOnly;
-}
-
-/* static */
-bool
 nsContentUtils::IsCutCopyAllowed()
 {
   return (!IsCutCopyRestricted() &&
@@ -6801,16 +6787,16 @@ nsContentUtils::FireMutationEventsForDirectParsing(nsIDocument* aDoc,
 
 /* static */
 nsIDocument*
-nsContentUtils::GetFullscreenAncestor(nsIDocument* aDoc)
+nsContentUtils::GetRootDocument(nsIDocument* aDoc)
 {
+  if (!aDoc) {
+    return nullptr;
+  }
   nsIDocument* doc = aDoc;
-  while (doc) {
-    if (doc->IsFullScreenDoc()) {
-      return doc;
-    }
+  while (doc->GetParentDocument()) {
     doc = doc->GetParentDocument();
   }
-  return nullptr;
+  return doc;
 }
 
 /* static */
