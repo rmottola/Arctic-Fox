@@ -110,101 +110,6 @@ FlagsToGLFlags(TextureFlags aFlags)
   return static_cast<gl::TextureImage::Flags>(result);
 }
 
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-bool
-TextureHostOGL::SetReleaseFence(const android::sp<android::Fence>& aReleaseFence)
-{
-  if (!aReleaseFence.get() || !aReleaseFence->isValid()) {
-    // HWC might not provide Fence.
-    // In this case, HWC implicitly handles buffer's fence.
-    return false;
-  }
-
-  if (!mReleaseFence.get()) {
-    mReleaseFence = aReleaseFence;
-  } else {
-    android::sp<android::Fence> mergedFence = android::Fence::merge(
-                  android::String8::format("TextureHostOGL"),
-                  mReleaseFence, aReleaseFence);
-    if (!mergedFence.get()) {
-      // synchronization is broken, the best we can do is hope fences
-      // signal in order so the new fence will act like a union.
-      // This error handling is same as android::ConsumerBase does.
-      mReleaseFence = aReleaseFence;
-      return false;
-    }
-    mReleaseFence = mergedFence;
-  }
-  return true;
-}
-
-android::sp<android::Fence>
-TextureHostOGL::GetAndResetReleaseFence()
-{
-  // Hold previous ReleaseFence to prevent Fence delivery failure via gecko IPC.
-  mPrevReleaseFence = mReleaseFence;
-  // Reset current ReleaseFence.
-  mReleaseFence = android::Fence::NO_FENCE;
-  return mPrevReleaseFence;
-}
-
-void
-TextureHostOGL::SetAcquireFence(const android::sp<android::Fence>& aAcquireFence)
-{
-  mAcquireFence = aAcquireFence;
-}
-
-android::sp<android::Fence>
-TextureHostOGL::GetAndResetAcquireFence()
-{
-  android::sp<android::Fence> fence = mAcquireFence;
-  // Reset current AcquireFence.
-  mAcquireFence = android::Fence::NO_FENCE;
-  return fence;
-}
-
-void
-TextureHostOGL::WaitAcquireFenceSyncComplete()
-{
-  if (!mAcquireFence.get() || !mAcquireFence->isValid()) {
-    return;
-  }
-
-  int fenceFd = mAcquireFence->dup();
-  if (fenceFd == -1) {
-    NS_WARNING("failed to dup fence fd");
-    return;
-  }
-
-  EGLint attribs[] = {
-              LOCAL_EGL_SYNC_NATIVE_FENCE_FD_ANDROID, fenceFd,
-              LOCAL_EGL_NONE
-          };
-
-  EGLSync sync = sEGLLibrary.fCreateSync(EGL_DISPLAY(),
-                                         LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID,
-                                         attribs);
-  if (!sync) {
-    NS_WARNING("failed to create native fence sync");
-    return;
-  }
-
-  // Wait sync complete with timeout.
-  // If a source of the fence becomes invalid because of error,
-  // fene complete is not signaled. See Bug 1061435.
-  EGLint status = sEGLLibrary.fClientWaitSync(EGL_DISPLAY(),
-                                              sync,
-                                              0,
-                                              400000000 /*400 usec*/);
-  if (status != LOCAL_EGL_CONDITION_SATISFIED) {
-    NS_ERROR("failed to wait native fence sync");
-  }
-  MOZ_ALWAYS_TRUE( sEGLLibrary.fDestroySync(EGL_DISPLAY(), sync) );
-  mAcquireFence = nullptr;
-}
-
-#endif
-
 bool
 TextureImageTextureSourceOGL::Update(gfx::DataSourceSurface* aSurface,
                                      nsIntRegion* aDestRegion,
@@ -342,7 +247,7 @@ TextureImageTextureSourceOGL::GetFormat() const
 
 gfx::IntRect TextureImageTextureSourceOGL::GetTileRect()
 {
-  return ThebesIntRect(mTexImage->GetTileRect());
+  return mTexImage->GetTileRect();
 }
 
 void

@@ -94,6 +94,21 @@ browser.jar:
         skin/classic/browser/webRTC-shareDevice-16.png
         skin/classic/browser/webRTC-shareDevice-64.png
         skin/classic/browser/webRTC-sharingDevice-16.png
+        skin/classic/browser/webRTC-shareMicrophone-16.png
+        skin/classic/browser/webRTC-shareMicrophone-16@2x.png
+        skin/classic/browser/webRTC-shareMicrophone-64.png
+        skin/classic/browser/webRTC-shareMicrophone-64@2x.png
+        skin/classic/browser/webRTC-sharingMicrophone-16.png
+        skin/classic/browser/webRTC-sharingMicrophone-16@2x.png
+        skin/classic/browser/webRTC-shareScreen-16.png      (../shared/webrtc/webRTC-shareScreen-16.png)
+        skin/classic/browser/webRTC-shareScreen-16@2x.png   (../shared/webrtc/webRTC-shareScreen-16@2x.png)
+        skin/classic/browser/webRTC-shareScreen-64.png      (../shared/webrtc/webRTC-shareScreen-64.png)
+        skin/classic/browser/webRTC-shareScreen-64@2x.png   (../shared/webrtc/webRTC-shareScreen-64@2x.png)
+        skin/classic/browser/webRTC-sharingScreen-16.png    (../shared/webrtc/webRTC-sharingScreen-16.png)
+        skin/classic/browser/webRTC-sharingScreen-16@2x.png (../shared/webrtc/webRTC-sharingScreen-16@2x.png)
+        skin/classic/browser/webRTC-camera-black-16.png
+        skin/classic/browser/webRTC-microphone-black-16.png
+       skin/classic/browser/webRTC-screen-black-16.png
         skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
         skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
         skin/classic/browser/downloads/download-notification-finish.png (downloads/download-notification-finish.png)

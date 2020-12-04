@@ -388,7 +388,7 @@ public:
    * @param aRegion The region that has been changed, if nil, it means that the
    * entire surface should be updated.
    */
-  virtual void Updated(const nsIntRegion* aRegion = nullptr) {}
+   void Updated(const nsIntRegion* aRegion = nullptr);
 
   /**
    * Sets this TextureHost's compositor.
@@ -470,8 +470,6 @@ public:
    */
   PTextureParent* GetIPDLActor();
 
-  FenceHandle GetAndResetReleaseFenceHandle();
-
   /**
    * Specific to B2G's Composer2D
    * XXX - more doc here
@@ -500,11 +498,6 @@ public:
    */
   virtual bool HasInternalBuffer() const { return false; }
 
-  /**
-   * Cast to a TextureHost for each backend.
-   */
-  virtual TextureHostOGL* AsHostOGL() { return nullptr; }
-
   void AddCompositableRef() { ++mCompositableCount; }
 
   void ReleaseCompositableRef()
@@ -518,8 +511,34 @@ public:
 
   int NumCompositableRefs() const { return mCompositableCount; }
 
+  /**
+   * Store a fence that will signal when the current buffer is no longer being read.
+   * Similar to android's GLConsumer::setReleaseFence()
+   */
+  bool SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle);
+
+  /**
+   * Return a releaseFence's Fence and clear a reference to the Fence.
+   */
+  FenceHandle GetAndResetReleaseFenceHandle();
+
+  void SetAcquireFenceHandle(const FenceHandle& aAcquireFenceHandle);
+
+  /**
+   * Return a acquireFence's Fence and clear a reference to the Fence.
+   */
+  FenceHandle GetAndResetAcquireFenceHandle();
+
+  virtual void WaitAcquireFenceHandleSyncComplete() {};
+
 protected:
+  FenceHandle mReleaseFenceHandle;
+
+  FenceHandle mAcquireFenceHandle;
+
   void RecycleTexture(TextureFlags aFlags);
+
+  virtual void UpdatedInternal(const nsIntRegion *Region) {}
 
   PTextureParent* mActor;
   TextureFlags mFlags;
@@ -553,8 +572,6 @@ public:
 
   virtual size_t GetBufferSize() = 0;
 
-  virtual void Updated(const nsIntRegion* aRegion = nullptr) override;
-
   virtual bool Lock() override;
 
   virtual void Unlock() override;
@@ -585,6 +602,8 @@ protected:
   bool MaybeUpload(nsIntRegion *aRegion = nullptr);
 
   void InitSize();
+
+  virtual void UpdatedInternal(const nsIntRegion* aRegion = nullptr) override;
 
   RefPtr<Compositor> mCompositor;
   RefPtr<DataTextureSource> mFirstSource;

@@ -242,13 +242,6 @@ public:
                          const gfx::IntRect& aRect) override;
 
   /**
-   * See CompositableForwarder::UpdatedTexture
-   */
-  virtual void UpdatedTexture(CompositableClient* aCompositable,
-                              TextureClient* aTexture,
-                              nsIntRegion* aRegion) override;
-
-  /**
    * See CompositableForwarder::UseTexture
    */
   virtual void UseTexture(CompositableClient* aCompositable,
@@ -260,9 +253,6 @@ public:
   virtual void UseOverlaySource(CompositableClient* aCompositable,
                                 const OverlaySource& aOverlay) override;
 #endif
-  virtual void SendFenceHandle(AsyncTransactionTracker* aTracker,
-                               PTextureChild* aTexture,
-                               const FenceHandle& aFence) override;
 
   /**
    * End the current transaction and forward it to LayerManagerComposite.
@@ -351,6 +341,7 @@ public:
 
   virtual bool IPCOpen() const override;
   virtual bool IsSameProcess() const override;
+  virtual base::ProcessId ParentPid() const override;
 
   /**
    * Construct a shadow of |aLayer| on the "other side", at the

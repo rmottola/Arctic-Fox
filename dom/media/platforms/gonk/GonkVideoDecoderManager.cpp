@@ -193,7 +193,7 @@ GonkVideoDecoderManager::CreateVideoData(int64_t aStreamOffset, VideoData **v)
     keyFrame = 0;
   }
 
-  gfx::IntRect picture = ToIntRect(mPicture);
+  gfx::IntRect picture = mPicture;
   if (mFrameInfo.mWidth != mInitialFrame.width ||
       mFrameInfo.mHeight != mInitialFrame.height) {
 

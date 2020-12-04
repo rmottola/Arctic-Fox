@@ -43,6 +43,7 @@ ImageHost::UseTextureHost(TextureHost* aTexture)
   CompositableHost::UseTextureHost(aTexture);
   mFrontBuffer = aTexture;
   if (mFrontBuffer) {
+    mFrontBuffer->Updated();
     mFrontBuffer->PrepareTextureSource(mTextureSource);
   }
 }
@@ -105,7 +106,8 @@ ImageHost::Composite(EffectChain& aEffectChain,
   RefPtr<TexturedEffect> effect = CreateTexturedEffect(mFrontBuffer->GetFormat(),
                                                        mTextureSource.get(),
                                                        aFilter,
-                                                       isAlphaPremultiplied);
+                                                       isAlphaPremultiplied,
+                                                       GetRenderState());
   if (!effect) {
     return;
   }
@@ -140,7 +142,7 @@ ImageHost::Composite(EffectChain& aEffectChain,
 
     it->BeginBigImageIteration();
     do {
-      nsIntRect tileRect = it->GetTileRect();
+      IntRect tileRect = it->GetTileRect();
       gfx::Rect rect(tileRect.x, tileRect.y, tileRect.width, tileRect.height);
       if (mHasPictureRect) {
         rect = rect.Intersect(pictureRect);
@@ -297,7 +299,8 @@ ImageHost::GenEffect(const gfx::Filter& aFilter)
   return CreateTexturedEffect(mFrontBuffer->GetFormat(),
                               mTextureSource,
                               aFilter,
-                              isAlphaPremultiplied);
+                              isAlphaPremultiplied,
+                              GetRenderState());
 }
 
 #ifdef MOZ_WIDGET_GONK
@@ -361,6 +364,16 @@ ImageHostOverlay::UseOverlaySource(OverlaySource aOverlay)
   mOverlay = aOverlay;
 }
 
+IntSize
+ImageHostOverlay::GetImageSize() const
+{
+  if (mHasPictureRect) {
+    return IntSize(mPictureRect.width, mPictureRect.height);
+  }
+
+  return IntSize();
+}
+
 void
 ImageHostOverlay::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 {
@@ -377,5 +390,5 @@ ImageHostOverlay::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 }
 
 #endif
-}
-}
+} // namespace layers
+} // namespace mozilla

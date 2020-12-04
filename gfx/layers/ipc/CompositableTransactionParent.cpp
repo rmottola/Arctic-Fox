@@ -145,7 +145,7 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
 
       if (!IsAsync() && ImageBridgeParent::GetInstance(GetChildProcessId())) {
         // send FenceHandle if present via ImageBridge.
-        ImageBridgeParent::SendFenceHandleToTrackerIfPresent(
+        ImageBridgeParent::AppendDeliverFenceMessage(
                              GetChildProcessId(),
                              op.holderId(),
                              op.transactionId(),
@@ -156,15 +156,13 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
         // Send message back via PImageBridge.
         ImageBridgeParent::ReplyRemoveTexture(
                              GetChildProcessId(),
-                             OpReplyRemoveTexture(true, // isMain
-                                                  op.holderId(),
+                             OpReplyRemoveTexture(op.holderId(),
                                                   op.transactionId()));
       } else {
         // send FenceHandle if present.
         SendFenceHandleIfPresent(op.textureParent(), compositable);
 
-        ReplyRemoveTexture(OpReplyRemoveTexture(false, // isMain
-                                                op.holderId(),
+        ReplyRemoveTexture(OpReplyRemoveTexture(op.holderId(),
                                                 op.transactionId()));
       }
       break;
@@ -176,6 +174,14 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
 
       MOZ_ASSERT(tex.get());
       compositable->UseTextureHost(tex);
+
+      MaybeFence maybeFence = op.fence();
+      if (maybeFence.type() == MaybeFence::TFenceHandle) {
+        FenceHandle fence = maybeFence.get_FenceHandle();
+        if (fence.IsValid() && tex) {
+          tex->SetAcquireFenceHandle(fence);
+        }
+      }
 
       if (IsAsync() && compositable->GetLayer()) {
         ScheduleComposition(op);
@@ -208,17 +214,6 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       break;
     }
 #endif
-    case CompositableOperation::TOpUpdateTexture: {
-      const OpUpdateTexture& op = aEdit.get_OpUpdateTexture();
-      RefPtr<TextureHost> texture = TextureHost::AsTextureHost(op.textureParent());
-      MOZ_ASSERT(texture);
-
-      texture->Updated(op.region().type() == MaybeRegion::TnsIntRegion
-                       ? &op.region().get_nsIntRegion()
-                       : nullptr); // no region means invalidate the entire surface
-      break;
-    }
-
     default: {
       MOZ_ASSERT(false, "bad type");
     }
@@ -228,7 +223,7 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
 }
 
 void
-CompositableParentManager::SendPendingAsyncMessges()
+CompositableParentManager::SendPendingAsyncMessages()
 {
   if (mPendingAsyncMessage.empty()) {
     return;

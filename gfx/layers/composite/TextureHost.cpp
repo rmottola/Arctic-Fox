@@ -144,22 +144,39 @@ TextureHost::GetIPDLActor()
   return mActor;
 }
 
+bool
+TextureHost::SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle)
+{
+  if (!aReleaseFenceHandle.IsValid()) {
+    // HWC might not provide Fence.
+    // In this case, HWC implicitly handles buffer's fence.
+    return false;
+  }
+
+  mReleaseFenceHandle.Merge(aReleaseFenceHandle);
+
+  return true;
+}
+
 FenceHandle
 TextureHost::GetAndResetReleaseFenceHandle()
 {
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-  TextureHostOGL* hostOGL = this->AsHostOGL();
-  if (!hostOGL) {
-    return FenceHandle();
-  }
+  FenceHandle fence;
+  mReleaseFenceHandle.TransferToAnotherFenceHandle(fence);
+  return fence;
+}
 
-  android::sp<android::Fence> fence = hostOGL->GetAndResetReleaseFence();
-  if (fence.get() && fence->isValid()) {
-    FenceHandle handle = FenceHandle(fence);
-    return handle;
-  }
-#endif
-  return FenceHandle();
+void
+TextureHost::SetAcquireFenceHandle(const FenceHandle& aAcquireFenceHandle)
+{
+  mAcquireFenceHandle = aAcquireFenceHandle;
+}
+
+FenceHandle
+TextureHost::GetAndResetAcquireFenceHandle()
+{
+  nsRefPtr<FenceHandle::FdObj> fdObj = mAcquireFenceHandle.GetAndResetFdObj();
+  return FenceHandle(fdObj);
 }
 
 // implemented in TextureHostOGL.cpp
@@ -192,6 +209,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
     case SurfaceDescriptor::TSurfaceDescriptorShmem:
     case SurfaceDescriptor::TSurfaceDescriptorMemory:
     case SurfaceDescriptor::TSurfaceDescriptorDIB:
+    case SurfaceDescriptor::TSurfaceDescriptorFileMapping:
       return CreateBackendIndependentTextureHost(aDesc, aDeallocator, aFlags);
 
     case SurfaceDescriptor::TEGLImageDescriptor:
@@ -258,6 +276,10 @@ CreateBackendIndependentTextureHost(const SurfaceDescriptor& aDesc,
 #ifdef XP_WIN
     case SurfaceDescriptor::TSurfaceDescriptorDIB: {
       result = new DIBTextureHost(aFlags, aDesc);
+      break;
+    }
+    case SurfaceDescriptor::TSurfaceDescriptorFileMapping: {
+      result = new TextureHostFileMapping(aFlags, aDesc);
       break;
     }
 #endif
@@ -331,6 +353,13 @@ TextureHost::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 #endif
 }
 
+void
+TextureHost::Updated(const nsIntRegion* aRegion)
+{
+    LayerScope::ContentChanged(this);
+    UpdatedInternal(aRegion);
+}
+
 TextureSource::TextureSource()
 : mCompositableCount(0)
 {
@@ -379,7 +408,7 @@ BufferTextureHost::~BufferTextureHost()
 {}
 
 void
-BufferTextureHost::Updated(const nsIntRegion* aRegion)
+BufferTextureHost::UpdatedInternal(const nsIntRegion* aRegion)
 {
   ++mUpdateSerial;
   // If the last frame wasn't uploaded yet, and we -don't- have a partial update,

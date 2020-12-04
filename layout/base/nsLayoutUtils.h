@@ -8,6 +8,7 @@
 
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/Maybe.h"
 #include "nsBoundingMetrics.h"
 #include "nsChangeHint.h"
 #include "nsAutoPtr.h"
@@ -2168,13 +2169,18 @@ public:
 
   /**
    * Find a suitable scale for an element (aContent) over the course of any
-   * animations and transitions on the element.
+   * animations and transitions of the CSS transform property on the
+   * element that run on the compositor thread.
    * It will check the maximum and minimum scale during the animations and
    * transitions and return a suitable value for performance and quality.
-   * Will return scale(1,1) if there is no animated scaling.
-   * Always return positive value.
+   * Will return scale(1,1) if there are no such animations.
+   * Always returns a positive value.
+   * @param aVisibleSize is the size of the area we want to paint
+   * @param aDisplaySize is the size of the display area of the pres context
    */
-  static gfxSize ComputeSuitableScaleForAnimation(nsIContent* aContent);
+  static gfxSize ComputeSuitableScaleForAnimation(nsIContent* aContent,
+                                                  const nsSize& aVisibleSize,
+                                                  const nsSize& aDisplaySize);
 
   /**
    * Checks if we should forcibly use nearest pixel filtering for the
@@ -2486,7 +2492,7 @@ public:
   * are likely to need special-case handling of the RCD-RSF.
   */
   static nsSize
-  CalculateCompositionSizeForFrame(nsIFrame* aFrame);
+  CalculateCompositionSizeForFrame(nsIFrame* aFrame, bool aSubtractScrollbars = true);
 
  /**
   * Calculate the composition size for the root scroll frame of the root
@@ -2635,8 +2641,22 @@ public:
                                           Layer* aLayer,
                                           ViewID aScrollParentId,
                                           const nsRect& aViewport,
+                                          const mozilla::Maybe<nsRect>& aClipRect,
                                           bool aIsRoot,
                                           const ContainerLayerParameters& aContainerParameters);
+
+  /**
+   * If the given scroll frame needs an area excluded from its composition
+   * bounds due to scrollbars, return that area, otherwise return an empty
+   * margin.
+   * There is no need to exclude scrollbars in the following cases:
+   *   - If the scroll frame is not the RCD-RSF; in that case, the composition
+   *     bounds is calculated based on the scroll port which already excludes
+   *     the scrollbar area.
+   *   - If the scrollbars are overlay, since then they are drawn on top of the
+   *     scrollable content.
+   */
+  static nsMargin ScrollbarAreaToExcludeFromCompositionBoundsFor(nsIFrame* aScrollFrame);
 
 private:
   static uint32_t sFontSizeInflationEmPerLine;

@@ -37,7 +37,7 @@
 #include "nsCSSProperty.h"              // for nsCSSProperty
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for Layer::Release, etc
-#include "nsRect.h"                     // for nsIntRect
+#include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsRegion.h"                   // for nsIntRegion
 #include "nsSize.h"                     // for nsIntSize
 #include "nsString.h"                   // for nsCString
@@ -47,6 +47,7 @@
 #include "mozilla/Logging.h"                      // for PRLogModuleInfo
 #include "nsIWidget.h"                  // For plugin window configuration information structs
 #include "gfxVR.h"
+#include "ImageContainer.h"
 
 class gfxContext;
 
@@ -82,7 +83,6 @@ class PaintedLayer;
 class ContainerLayer;
 class ImageLayer;
 class ColorLayer;
-class ImageContainer;
 class CanvasLayer;
 class ReadbackLayer;
 class ReadbackProcessor;
@@ -435,19 +435,12 @@ public:
    * Can be called anytime, from any thread.
    *
    * Creates an Image container which forwards its images to the compositor within
-   * layer transactions on the main thread.
+   * layer transactions on the main thread or asynchronously using the ImageBridge IPDL protocol.
+   * In the case of asynchronous, If the protocol is not available, the returned ImageContainer
+   * will forward images within layer transactions.
    */
-  static already_AddRefed<ImageContainer> CreateImageContainer();
-
-  /**
-   * Can be called anytime, from any thread.
-   *
-   * Tries to create an Image container which forwards its images to the compositor
-   * asynchronously using the ImageBridge IPDL protocol. If the protocol is not
-   * available, the returned ImageContainer will forward images within layer
-   * transactions, just like if it was created with CreateImageContainer().
-   */
-  static already_AddRefed<ImageContainer> CreateAsynchronousImageContainer();
+  static already_AddRefed<ImageContainer> CreateImageContainer(ImageContainer::Mode flag
+                                                                = ImageContainer::SYNCHRONOUS);
 
   /**
    * Type of layer manager his is. This is to be used sparsely in order to
@@ -817,7 +810,7 @@ public:
    * large displayport. Computing this more exactly is too expensive,
    * but this approximation is sufficient for what we need to use it for.
    */
-  virtual void SetLayerBounds(const nsIntRect& aLayerBounds)
+  virtual void SetLayerBounds(const gfx::IntRect& aLayerBounds)
   {
     if (!mLayerBounds.IsEqualEdges(aLayerBounds)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) LayerBounds", this));
@@ -1223,7 +1216,7 @@ public:
   gfx::CompositionOp GetMixBlendMode() const { return mMixBlendMode; }
   const Maybe<ParentLayerIntRect>& GetClipRect() const { return mClipRect; }
   uint32_t GetContentFlags() { return mContentFlags; }
-  const nsIntRect& GetLayerBounds() const { return mLayerBounds; }
+  const gfx::IntRect& GetLayerBounds() const { return mLayerBounds; }
   const nsIntRegion& GetVisibleRegion() const { return mVisibleRegion; }
   const FrameMetrics& GetFrameMetrics(uint32_t aIndex) const;
   uint32_t GetFrameMetricsCount() const { return mFrameMetrics.Length(); }
@@ -1256,6 +1249,12 @@ public:
   bool IsScrollbarContainer() { return mIsScrollbarContainer; }
   Layer* GetMaskLayer() const { return mMaskLayer; }
 
+  /*
+   * Get the combined clip rect of the Layer clip and all clips on FrameMetrics.
+   * This is intended for use in Layout. The compositor needs to apply async
+   * transforms to find the combined clip.
+   */
+  Maybe<ParentLayerIntRect> GetCombinedClipRect() const;
 
   /**
    * Retrieve the root level visible region for |this| taking into account
@@ -1553,7 +1552,7 @@ public:
   /**
    * Adds to the current invalid rect.
    */
-  void AddInvalidRect(const nsIntRect& aRect) { mInvalidRegion.Or(mInvalidRegion, aRect); }
+  void AddInvalidRect(const gfx::IntRect& aRect) { mInvalidRegion.Or(mInvalidRegion, aRect); }
 
   /**
    * Clear the invalid rect, marking the layer as being identical to what is currently
@@ -1675,7 +1674,7 @@ protected:
   void* mImplData;
   nsRefPtr<Layer> mMaskLayer;
   gfx::UserData mUserData;
-  nsIntRect mLayerBounds;
+  gfx::IntRect mLayerBounds;
   nsIntRegion mVisibleRegion;
   nsTArray<FrameMetrics> mFrameMetrics;
   EventRegions mEventRegions;
@@ -1695,7 +1694,7 @@ protected:
   gfx::CompositionOp mMixBlendMode;
   bool mForceIsolatedGroup;
   Maybe<ParentLayerIntRect> mClipRect;
-  nsIntRect mTileSourceRect;
+  gfx::IntRect mTileSourceRect;
   nsIntRegion mInvalidRegion;
   nsTArray<nsRefPtr<AsyncPanZoomController> > mApzcs;
   uint32_t mContentFlags;
@@ -1711,8 +1710,10 @@ protected:
   nsAutoPtr<StickyPositionData> mStickyPositionData;
   FrameMetrics::ViewID mScrollbarTargetId;
   ScrollDirection mScrollbarDirection;
-  float mScrollbarThumbRatio; // Ratio of the thumb position to the scroll
-                              // position, in app units.
+  // The scrollbar thumb ratio is the ratio of the thumb position (in the CSS
+  // pixels of the scrollframe's parent's space) to the scroll position (in the
+  // CSS pixels of the scrollframe's space).
+  float mScrollbarThumbRatio;
   bool mIsScrollbarContainer;
   DebugOnly<uint32_t> mDebugColorIndex;
   // If this layer is used for OMTA, then this counter is used to ensure we
@@ -2072,7 +2073,7 @@ public:
     }
   }
 
-  void SetBounds(const nsIntRect& aBounds)
+  void SetBounds(const gfx::IntRect& aBounds)
   {
     if (!mBounds.IsEqualEdges(aBounds)) {
       mBounds = aBounds;
@@ -2080,7 +2081,7 @@ public:
     }
   }
 
-  const nsIntRect& GetBounds()
+  const gfx::IntRect& GetBounds()
   {
     return mBounds;
   }
@@ -2107,7 +2108,7 @@ protected:
 
   virtual void DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent) override;
 
-  nsIntRect mBounds;
+  gfx::IntRect mBounds;
   gfxRGBA mColor;
 };
 
@@ -2274,7 +2275,7 @@ protected:
   /**
    * 0, 0, canvaswidth, canvasheight
    */
-  nsIntRect mBounds;
+  gfx::IntRect mBounds;
   PreTransactionCallback* mPreTransCallback;
   void* mPreTransCallbackData;
   DidTransactionCallback mPostTransCallback;
@@ -2402,9 +2403,9 @@ void WriteSnapshotToDumpFile(Compositor* aCompositor, gfx::DrawTarget* aTarget);
 #endif
 
 // A utility function used by different LayerManager implementations.
-nsIntRect ToOutsideIntRect(const gfxRect &aRect);
+gfx::IntRect ToOutsideIntRect(const gfxRect &aRect);
 
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 #endif /* GFX_LAYERS_H */

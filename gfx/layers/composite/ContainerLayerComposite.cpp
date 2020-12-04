@@ -240,17 +240,21 @@ ContainerPrepare(ContainerT* aContainer,
   for (uint32_t i = 0; i < children.Length(); i++) {
     LayerComposite* layerToRender = static_cast<LayerComposite*>(children.ElementAt(i)->ImplData());
 
-    if (layerToRender->GetLayer()->GetEffectiveVisibleRegion().IsEmpty() &&
-        !layerToRender->GetLayer()->AsContainerLayer()) {
-      CULLING_LOG("Sublayer %p has no effective visible region\n", layerToRender->GetLayer());
-      continue;
-    }
-
     RenderTargetIntRect clipRect = layerToRender->GetLayer()->
         CalculateScissorRect(aClipRect);
-    if (clipRect.IsEmpty()) {
-      CULLING_LOG("Sublayer %p has an empty world clip rect\n", layerToRender->GetLayer());
-      continue;
+
+    // We don't want to skip container layers because otherwise their mPrepared
+    // may be null which is not allowed.
+    if (!layerToRender->GetLayer()->AsContainerLayer()) {
+      if (layerToRender->GetLayer()->GetEffectiveVisibleRegion().IsEmpty()) {
+        CULLING_LOG("Sublayer %p has no effective visible region\n", layerToRender->GetLayer());
+        continue;
+      }
+
+      if (clipRect.IsEmpty()) {
+        CULLING_LOG("Sublayer %p has an empty world clip rect\n", layerToRender->GetLayer());
+        continue;
+      }
     }
 
     CULLING_LOG("Preparing sublayer %p\n", layerToRender->GetLayer());
@@ -317,7 +321,8 @@ RenderLayers(ContainerT* aContainer,
     Layer* layer = layerToRender->GetLayer();
 
     gfxRGBA color;
-    if (LayerHasCheckerboardingAPZC(layer, &color)) {
+    if ((layer->GetContentFlags() & Layer::CONTENT_OPAQUE) &&
+        LayerHasCheckerboardingAPZC(layer, &color)) {
       // Ideally we would want to intersect the checkerboard region from the APZ with the layer bounds
       // and only fill in that area. However the layer bounds takes into account the base translation
       // for the painted layer whereas the checkerboard region does not. One does not simply
@@ -357,17 +362,26 @@ RenderLayers(ContainerT* aContainer,
     }
 
     // Draw a border around scrollable layers.
-    for (uint32_t i = 0; i < layer->GetFrameMetricsCount(); i++) {
-      // A layer can be scrolled by multiple scroll frames. Draw a border
-      // for each.
-      if (layer->GetFrameMetrics(i).IsScrollable()) {
+    // A layer can be scrolled by multiple scroll frames. Draw a border
+    // for each.
+    // Within the list of scroll frames for a layer, the layer border for a
+    // scroll frame lower down is affected by the async transforms on scroll
+    // frames higher up, so loop from the top down, and accumulate an async
+    // transform as we go along.
+    Matrix4x4 asyncTransform;
+    for (uint32_t i = layer->GetFrameMetricsCount(); i > 0; --i) {
+      if (layer->GetFrameMetrics(i - 1).IsScrollable()) {
         // Since the composition bounds are in the parent layer's coordinates,
         // use the parent's effective transform rather than the layer's own.
-        ParentLayerRect compositionBounds = layer->GetFrameMetrics(i).mCompositionBounds;
+        ParentLayerRect compositionBounds = layer->GetFrameMetrics(i - 1).GetCompositionBounds();
         aManager->GetCompositor()->DrawDiagnostics(DiagnosticFlags::CONTAINER,
                                                    compositionBounds.ToUnknownRect(),
                                                    gfx::Rect(aClipRect.ToUnknownRect()),
-                                                   aContainer->GetEffectiveTransform());
+                                                   asyncTransform * aContainer->GetEffectiveTransform());
+        if (AsyncPanZoomController* apzc = layer->GetAsyncPanZoomController(i - 1)) {
+          asyncTransform = apzc->GetCurrentAsyncTransformWithOverscroll()
+                         * asyncTransform;
+        }
       }
     }
 

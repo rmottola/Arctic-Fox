@@ -224,7 +224,7 @@ public:
    * If this method is not used, or we pass in nullptr, we target the compositor's
    * usual swap chain and render to the screen.
    */
-  void SetTargetContext(gfx::DrawTarget* aTarget, const nsIntRect& aRect)
+  void SetTargetContext(gfx::DrawTarget* aTarget, const gfx::IntRect& aRect)
   {
     mTarget = aTarget;
     mTargetBounds = aRect;
@@ -337,7 +337,7 @@ public:
    */
   virtual void EndFrame() = 0;
 
-  virtual void SetFBAcquireFence(Layer* aLayer) {}
+  virtual void SetDispAcquireFence(Layer* aLayer) {}
 
   virtual FenceHandle GetReleaseFence()
   {
@@ -500,7 +500,7 @@ protected:
   virtual gfx::IntSize GetWidgetSize() const = 0;
 
   RefPtr<gfx::DrawTarget> mTarget;
-  nsIntRect mTargetBounds;
+  gfx::IntRect mTargetBounds;
 
 private:
   static LayersBackend sBackend;
