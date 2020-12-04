@@ -93,7 +93,6 @@ def read_from_gyp(config, path, output, vars, non_unified_sources = set()):
     """
 
     time_start = time.time()
-    all_sources = set()
 
     # gyp expects plain str instead of unicode. The frontend code gives us
     # unicode strings, so convert them.
@@ -174,7 +173,6 @@ def read_from_gyp(config, path, output, vars, non_unified_sources = set()):
 
             unified_sources = sources - non_unified_sources - asm_sources
             sources -= unified_sources
-            all_sources |= sources
             # The context expects alphabetical order when adding sources
             context['SOURCES'] = alphabetical_sorted(sources)
             context['UNIFIED_SOURCES'] = alphabetical_sorted(unified_sources)
@@ -227,7 +225,3 @@ def read_from_gyp(config, path, output, vars, non_unified_sources = set()):
         context.execution_time = time.time() - time_start
         yield context
         time_start = time.time()
-#    remainder = non_unified_sources - all_sources
-#    if remainder:
-#        raise SandboxValidationError('%s defined as non_unified_source, but is '
-#            'not defined as a source' % ', '.join(remainder))
