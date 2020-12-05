@@ -34,6 +34,7 @@
 #include "mozilla/layers/AsyncCompositionManager.h"
 #include "mozilla/layers/BasicCompositor.h"  // for BasicCompositor
 #include "mozilla/layers/Compositor.h"  // for Compositor
+#include "mozilla/layers/CompositorLRU.h"  // for CompositorLRU
 #include "mozilla/layers/CompositorOGL.h"  // for CompositorOGL
 #include "mozilla/layers/CompositorTypes.h"
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -1670,6 +1671,8 @@ public:
   virtual bool RecvStop() override { return true; }
   virtual bool RecvPause() override { return true; }
   virtual bool RecvResume() override { return true; }
+  virtual bool RecvNotifyHidden(const uint64_t& id) override;
+  virtual bool RecvNotifyVisible(const uint64_t& id) override;
   virtual bool RecvNotifyChildCreated(const uint64_t& child) override;
   virtual bool RecvAdoptChild(const uint64_t& child) override { return false; }
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
@@ -1826,6 +1829,22 @@ CompositorParent::GetIndirectShadowTree(uint64_t aId)
 }
 
 bool
+CrossProcessCompositorParent::RecvNotifyHidden(const uint64_t& id)
+{
+  nsRefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
+  lru->Add(this, id);
+  return true;
+}
+
+bool
+CrossProcessCompositorParent::RecvNotifyVisible(const uint64_t& id)
+{
+  nsRefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
+  lru->Remove(this, id);
+  return true;
+}
+
+bool
 CrossProcessCompositorParent::RecvRequestNotifyAfterRemotePaint()
 {
   mNotifyAfterRemotePaint = true;
@@ -1835,6 +1854,9 @@ CrossProcessCompositorParent::RecvRequestNotifyAfterRemotePaint()
 void
 CrossProcessCompositorParent::ActorDestroy(ActorDestroyReason aWhy)
 {
+  nsRefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
+  lru->Remove(this);
+
   MessageLoop::current()->PostTask(
     FROM_HERE,
     NewRunnableMethod(this, &CrossProcessCompositorParent::DeferredDestroy));
