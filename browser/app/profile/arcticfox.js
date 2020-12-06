@@ -337,6 +337,10 @@ pref("browser.download.panel.firstSessionCompleted", false);
 // search engines URL
 pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
+// Tell the search service to load search plugins from the locale JAR
+pref("browser.search.loadFromJars", true);
+pref("browser.search.jarURIs", "chrome://browser/locale/searchplugins/");
+
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
 

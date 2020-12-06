@@ -3476,19 +3476,25 @@ SearchService.prototype = {
     if (cacheFile.exists())
       cache = this._readCacheFile(cacheFile);
 
-    let loadDirs = [];
+    let loadDirs = [], chromeURIs = [], chromeFiles = [];
+
+    let loadFromJARs = false;
+    try {
+      loadFromJARs = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF)
+                             .getBoolPref("loadFromJars");
+    } catch (ex) {}
+
+    if (loadFromJARs)
+      [chromeFiles, chromeURIs] = this._findJAREngines();
+
     let locations = getDir(NS_APP_SEARCH_DIR_LIST, Ci.nsISimpleEnumerator);
     while (locations.hasMoreElements()) {
       let dir = locations.getNext().QueryInterface(Ci.nsIFile);
+      if (loadFromJARs && dir.equals(getDir(NS_APP_SEARCH_DIR)))
+        continue;
       if (dir.directoryEntries.hasMoreElements())
         loadDirs.push(dir);
     }
-
-    let loadFromJARs = getBoolPref(BROWSER_SEARCH_PREF + "loadFromJars", false);
-    let chromeURIs = [];
-    let chromeFiles = [];
-    if (loadFromJARs)
-      [chromeFiles, chromeURIs] = this._findJAREngines();
 
     let toLoad = chromeFiles.concat(loadDirs);
 
@@ -3542,12 +3548,29 @@ SearchService.prototype = {
       let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
       cache = yield checkForSyncCompletion(this._asyncReadCacheFile(cacheFilePath));
 
-      // Add all the non-empty directories of NS_APP_SEARCH_DIR_LIST to
-      // loadDirs.
-      let loadDirs = [];
+      let loadDirs = [], chromeURIs = [], chromeFiles = [];
+
+      let loadFromJARs = false;
+      try {
+        loadFromJARs = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF)
+                               .getBoolPref("loadFromJars");
+      } catch (ex) {}
+
+      if (loadFromJARs) {
+        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "find-jar-engines");
+        [chromeFiles, chromeURIs] =
+          yield checkForSyncCompletion(this._asyncFindJAREngines());
+      }
+
+      // Add the non-empty directories of NS_APP_SEARCH_DIR_LIST to
+      // loadDirs...
       let locations = getDir(NS_APP_SEARCH_DIR_LIST, Ci.nsISimpleEnumerator);
       while (locations.hasMoreElements()) {
         let dir = locations.getNext().QueryInterface(Ci.nsIFile);
+        // ... but skip the application directory if we are loading from JAR.
+        if (loadFromJARs && dir.equals(getDir(NS_APP_SEARCH_DIR)))
+          continue;
+
         let iterator = new OS.File.DirectoryIterator(dir.path,
                                                      { winPattern: "*.xml" });
         try {
@@ -3559,15 +3582,6 @@ SearchService.prototype = {
         } finally {
           iterator.close();
         }
-      }
-
-      let loadFromJARs = getBoolPref(BROWSER_SEARCH_PREF + "loadFromJars", false);
-      let chromeURIs = [];
-      let chromeFiles = [];
-      if (loadFromJARs) {
-        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "find-jar-engines");
-        [chromeFiles, chromeURIs] =
-          yield checkForSyncCompletion(this._asyncFindJAREngines());
       }
 
       let toLoad = chromeFiles.concat(loadDirs);
@@ -3933,7 +3947,8 @@ SearchService.prototype = {
 
     let rootURIPref = ""
     try {
-      rootURIPref = Services.prefs.getCharPref(BROWSER_SEARCH_PREF + "jarURIs");
+      rootURIPref = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF)
+                            .getCharPref("jarURIs");
     } catch (ex) {}
 
     if (!rootURIPref) {
@@ -3949,27 +3964,25 @@ SearchService.prototype = {
     rootURIs.forEach(function (root) {
       // Find the underlying JAR file for this chrome package (_loadEngines uses
       // it to determine whether it needs to invalidate the cache)
-      let chromeFile;
+      let jarPackaging = false;
       try {
         let chromeURI = gChromeReg.convertChromeURL(makeURI(root));
-        let fileURI = chromeURI; // flat packaging
-        while (fileURI instanceof Ci.nsIJARURI)
-          fileURI = fileURI.JARFile; // JAR packaging
-        fileURI.QueryInterface(Ci.nsIFileURL);
-        chromeFile = fileURI.file;
+        if (chromeURI instanceof Ci.nsIJARURI) {
+          let fileURI = chromeURI;
+          while (fileURI instanceof Ci.nsIJARURI)
+            fileURI = fileURI.JARFile;
+          fileURI.QueryInterface(Ci.nsIFileURL);
+          chromeFiles.push(fileURI.file);
+          jarPackaging = true;
+        }
       } catch (ex) {
         LOG("_findJAREngines: failed to get chromeFile for " + root + ": " + ex);
-      }
-
-      if (!chromeFile)
         return;
-
-      chromeFiles.push(chromeFile);
+      }
 
       // Read list.txt from the chrome package to find the engines we need to
       // load
       let listURL = root + "list.txt";
-      let names = [];
       try {
         let chan = NetUtil.ioService.newChannelFromURI2(makeURI(listURL),
                                                         null,      // aLoadingNode
@@ -3981,14 +3994,22 @@ SearchService.prototype = {
                   createInstance(Ci.nsIScriptableInputStream);
         sis.init(chan.open());
         let list = sis.read(sis.available());
-        names = list.split("\n").filter(function (n) !!n);
+        let names = list.split("\n").filter(function (n) !!n);
+        for (let name of names) {
+          let uri = root + name + ".xml";
+          uris.push(uri);
+          if (!jarPackaging) {
+            // Flat packaging requires that _loadEngines checks the modification
+            // time of each engine file.
+            uri = gChromeReg.convertChromeURL(makeURI(uri));
+            chromeFiles.push(uri.QueryInterface(Ci.nsIFileURL).file);
+          }
+        }
       } catch (ex) {
         LOG("_findJAREngines: failed to retrieve list.txt from " + listURL + ": " + ex);
 
         return;
       }
-
-      names.forEach(function (n) uris.push(root + n + ".xml"));
     });
 
     return [chromeFiles, uris];
@@ -4006,7 +4027,8 @@ SearchService.prototype = {
 
       let rootURIPref = "";
       try {
-        rootURIPref = Services.prefs.getCharPref(BROWSER_SEARCH_PREF + "jarURIs");
+        rootURIPref = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF)
+                              .getCharPref("jarURIs");
       } catch (ex) {}
 
       if (!rootURIPref) {
@@ -4021,23 +4043,21 @@ SearchService.prototype = {
       for (let root of rootURIs) {
         // Find the underlying JAR file for this chrome package (_loadEngines uses
         // it to determine whether it needs to invalidate the cache)
-        let chromeFile;
+        let jarPackaging = false;
         try {
           let chromeURI = gChromeReg.convertChromeURL(makeURI(root));
-          let fileURI = chromeURI; // flat packaging
-          while (fileURI instanceof Ci.nsIJARURI)
-            fileURI = fileURI.JARFile; // JAR packaging
-          fileURI.QueryInterface(Ci.nsIFileURL);
-          chromeFile = fileURI.file;
+          if (chromeURI instanceof Ci.nsIJARURI) {
+            let fileURI = chromeURI;
+            while (fileURI instanceof Ci.nsIJARURI)
+              fileURI = fileURI.JARFile;
+            fileURI.QueryInterface(Ci.nsIFileURL);
+            chromeFiles.push(fileURI.file);
+            jarPackaging = true;
+          }
         } catch (ex) {
           LOG("_asyncFindJAREngines: failed to get chromeFile for " + root + ": " + ex);
-        }
-
-        if (!chromeFile) {
           return;
         }
-
-        chromeFiles.push(chromeFile);
 
         // Read list.txt from the chrome package to find the engines we need to
         // load
@@ -4059,7 +4079,16 @@ SearchService.prototype = {
 
         let names = [];
         names = list.split("\n").filter(function (n) !!n);
-        names.forEach(function (n) uris.push(root + n + ".xml"));
+        for (let name of names) {
+          let uri = root + name + ".xml";
+          uris.push(uri);
+          if (!jarPackaging) {
+            // Flat packaging requires that _loadEngines checks the modification
+            // time of each engine file.
+            uri = gChromeReg.convertChromeURL(makeURI(uri));
+            chromeFiles.push(uri.QueryInterface(Ci.nsIFileURL).file);
+          }
+        }
       }
       throw new Task.Result([chromeFiles, uris]);
     });
