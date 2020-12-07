@@ -27,6 +27,7 @@
 #include "mozilla/EnumeratedArray.h"
 #include "FilterSupport.h"
 #include "nsSVGEffects.h"
+#include "Layers.h"
 
 class nsGlobalWindow;
 class nsXULElement;
@@ -522,6 +523,7 @@ public:
   NS_IMETHOD SetIsOpaque(bool isOpaque) override;
   bool GetIsOpaque() override { return mOpaque; }
   NS_IMETHOD Reset() override;
+  mozilla::layers::PersistentBufferProvider* GetBufferProvider(mozilla::layers::LayerManager* aManager);
   already_AddRefed<CanvasLayer> GetCanvasLayer(nsDisplayListBuilder* aBuilder,
                                                CanvasLayer *aOldLayer,
                                                LayerManager *aManager) override;
@@ -710,11 +712,17 @@ protected:
    */
   void ClearTarget(int32_t aWidth = -1, int32_t aHeight = -1);
 
+  /*
+   * Returns the target to the buffer provider. i.e. this will queue a frame for
+   * rendering.
+   */
+  void ReturnTarget();
+
   /**
    * Check if the target is valid after calling EnsureTarget.
    */
   bool IsTargetValid() const {
-    return mTarget != sErrorTarget && mTarget != nullptr;
+    return (sErrorTarget == nullptr || mTarget != sErrorTarget) && (mBufferProvider != nullptr || mTarget);
   }
 
   /**
@@ -787,6 +795,8 @@ protected:
   // accessing it. In the event of an error it will be equal to
   // sErrorTarget.
   mozilla::RefPtr<mozilla::gfx::DrawTarget> mTarget;
+
+  mozilla::RefPtr<mozilla::layers::PersistentBufferProvider> mBufferProvider;
 
   uint32_t SkiaGLTex() const;
 
