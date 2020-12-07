@@ -8,7 +8,7 @@
 
 #include "ipc/IPCMessageUtils.h"
 #include "js/TypeDecls.h"
-#include "nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 namespace mozilla {
 namespace layers {
