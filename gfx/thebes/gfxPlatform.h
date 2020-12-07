@@ -634,6 +634,7 @@ public:
       return false;
     }
 
+    virtual void FlushContentDrawing() {}
 protected:
     gfxPlatform();
     virtual ~gfxPlatform();
