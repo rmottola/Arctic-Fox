@@ -69,7 +69,6 @@
 #endif
 
 #include "Layers.h"
-#include "mozilla/layers/ShadowLayers.h"
 #include "gfxPrefs.h"
 
 #include "mozilla/dom/Element.h"
@@ -81,6 +80,8 @@
 #include "mozilla/dom/PermissionMessageUtils.h"
 #include "mozilla/dom/quota/PersistenceType.h"
 #include "mozilla/dom/quota/QuotaManager.h"
+#include "mozilla/layers/FrameUniformityData.h"
+#include "mozilla/layers/ShadowLayers.h"
 #include "nsPrintfCString.h"
 #include "nsViewportInfo.h"
 #include "nsIFormControl.h"
@@ -3706,6 +3707,27 @@ nsDOMWindowUtils::SetChromeMargin(int32_t aTop,
     }
   }
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetFrameUniformityTestData(JSContext* aContext,
+                                             JS::MutableHandleValue aOutFrameUniformity)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+  nsIWidget* widget = GetWidget();
+  if (!widget) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  nsRefPtr<LayerManager> manager = widget->GetLayerManager();
+  if (!manager) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  FrameUniformityData outData;
+  manager->GetFrameUniformity(&outData);
+  outData.ToJS(aOutFrameUniformity, aContext);
   return NS_OK;
 }
 
