@@ -114,7 +114,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
-
+- Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
 - Bug 1167823 - arity side effects, 14 patches
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -172,6 +172,7 @@ Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
 
