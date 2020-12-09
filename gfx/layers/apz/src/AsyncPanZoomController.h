@@ -889,6 +889,11 @@ public:
     return !mParent || (mParent->mLayersId != mLayersId);
   }
 
+  bool IsRootForLayersId() const {
+    ReentrantMonitorAutoEnter lock(mMonitor);
+    return mFrameMetrics.IsLayersIdRoot();
+  }
+
 private:
   // This is a raw pointer to avoid introducing a reference cycle between
   // AsyncPanZoomController and APZCTreeManager. Since these objects don't
