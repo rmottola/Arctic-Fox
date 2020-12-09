@@ -67,6 +67,7 @@ public:
     , mLineScrollAmount(0, 0)
     , mPageScrollAmount(0, 0)
     , mAllowVerticalScrollWithWheel(false)
+    , mIsLayersIdRoot(false)
   {
   }
 
@@ -100,7 +101,8 @@ public:
            mLineScrollAmount == aOther.mLineScrollAmount &&
            mPageScrollAmount == aOther.mPageScrollAmount &&
            mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
-           mClipRect == aOther.mClipRect;
+           mClipRect == aOther.mClipRect &&
+           mIsLayersIdRoot == aOther.mIsLayersIdRoot;
   }
   bool operator!=(const FrameMetrics& aOther) const
   {
@@ -534,6 +536,13 @@ public:
     return mClipRect.ref();
   }
 
+  void SetIsLayersIdRoot(bool aValue) {
+    mIsLayersIdRoot = aValue;
+  }
+  bool IsLayersIdRoot() const {
+    return mIsLayersIdRoot;
+  }
+
 private:
 
   // The pres-shell resolution that has been induced on the document containing
@@ -707,6 +716,10 @@ private:
 
   // The clip rect to use when compositing a layer with this FrameMetrics.
   Maybe<ParentLayerIntRect> mClipRect;
+
+  // Whether these framemetrics are for the root scroll frame (root element if
+  // we don't have a root scroll frame) for its layers id.
+  bool mIsLayersIdRoot;
 
   // WARNING!!!!
   //

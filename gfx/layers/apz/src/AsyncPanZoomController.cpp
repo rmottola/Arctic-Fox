@@ -2882,6 +2882,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
     mFrameMetrics.SetLineScrollAmount(aLayerMetrics.GetLineScrollAmount());
     mFrameMetrics.SetPageScrollAmount(aLayerMetrics.GetPageScrollAmount());
     mFrameMetrics.SetClipRect(aLayerMetrics.GetClipRect());
+    mFrameMetrics.SetIsLayersIdRoot(aLayerMetrics.IsLayersIdRoot());
 
     if (scrollOffsetUpdated) {
       APZC_LOG("%p updating scroll offset from %s to %s\n", this,
