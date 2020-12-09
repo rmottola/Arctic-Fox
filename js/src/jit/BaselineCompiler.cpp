@@ -862,7 +862,7 @@ BaselineCompiler::emitProfilerEnterFrame()
     // Starts off initially disabled.
     Label noInstrument;
     CodeOffsetLabel toggleOffset = masm.toggledJump(&noInstrument);
-    masm.profilerEnterFrame(BaselineStackReg, R0.scratchReg());
+    masm.profilerEnterFrame(masm.getStackPointer(), R0.scratchReg());
     masm.bind(&noInstrument);
 
     // Store the start offset in the appropriate location.
@@ -3737,7 +3737,7 @@ BaselineCompiler::emit_JSOP_RESUME()
         AbsoluteAddress addressOfEnabled(cx->runtime()->spsProfiler.addressOfEnabled());
         masm.branch32(Assembler::Equal, addressOfEnabled, Imm32(0), &skip);
         masm.loadPtr(AbsoluteAddress(cx->runtime()->addressOfProfilingActivation()), scratchReg);
-        masm.storePtr(BaselineStackReg,
+        masm.storePtr(masm.getStackPointer(),
                       Address(scratchReg, JitActivation::offsetOfLastProfilingFrame()));
         masm.bind(&skip);
     }
