@@ -1534,7 +1534,7 @@ CodeGeneratorShared::jumpToBlock(MBasicBlock* mir)
 }
 
 // This function is not used for MIPS. MIPS has branchToBlock.
-#ifndef JS_CODEGEN_MIPS
+#ifndef JS_CODEGEN_MIPS32
 void
 CodeGeneratorShared::jumpToBlock(MBasicBlock* mir, Assembler::Condition cond)
 {
