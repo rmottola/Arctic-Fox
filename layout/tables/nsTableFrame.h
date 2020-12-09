@@ -55,6 +55,11 @@ public:
   // cells extending outside them.
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
 
+  virtual nsDisplayItemGeometry* AllocateGeometry(nsDisplayListBuilder* aBuilder) override;
+  virtual void ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
+                                         const nsDisplayItemGeometry* aGeometry,
+                                         nsRegion *aInvalidRegion) override;
+
   void UpdateForFrameBackground(nsIFrame* aFrame);
 
 private:
@@ -108,6 +113,7 @@ class nsTableFrame : public nsContainerFrame
   typedef mozilla::image::DrawResult DrawResult;
 
 public:
+  NS_DECL_QUERYFRAME_TARGET(nsTableFrame)
   NS_DECL_FRAMEARENA_HELPERS
 
   NS_DECLARE_FRAME_PROPERTY(PositionedTablePartArray,
