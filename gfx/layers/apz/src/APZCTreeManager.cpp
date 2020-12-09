@@ -449,13 +449,19 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     // that originated the update, because the only identifying information
     // we are logging about APZCs is the scroll id, and otherwise we could
     // confuse APZCs from different layer trees with the same scroll id.
-    if (aLayersId == aState.mOriginatingLayersId && apzc->GetParent()) {
-      aState.mPaintLogger.LogTestData(aMetrics.GetScrollId(), "parentScrollId",
-          apzc->GetParent()->GetGuid().mScrollId);
+    if (aLayersId == aState.mOriginatingLayersId) {
+      if (apzc->HasNoParentWithSameLayersId()) {
+        aState.mPaintLogger.LogTestData(aMetrics.GetScrollId(),
+            "hasNoParentWithSameLayersId", true);
+      } else {
+        MOZ_ASSERT(apzc->GetParent());
+        aState.mPaintLogger.LogTestData(aMetrics.GetScrollId(),
+            "parentScrollId", apzc->GetParent()->GetGuid().mScrollId);
+      }
     }
 
     if (newApzc) {
-      if (apzc->IsRootForLayersId()) {
+      if (apzc->HasNoParentWithSameLayersId()) {
         // If we just created a new apzc that is the root for its layers ID, then
         // we need to update its zoom constraints which might have arrived before this
         // was created
@@ -1018,7 +1024,7 @@ APZCTreeManager::UpdateZoomConstraints(const ScrollableLayerGuid& aGuid,
 
   // For a given layers id, non-root APZCs inherit the zoom constraints
   // of their root.
-  if (node && node->GetApzc()->IsRootForLayersId()) {
+  if (node && node->GetApzc()->HasNoParentWithSameLayersId()) {
     UpdateZoomConstraintsRecursively(node.get(), aConstraints);
   }
 }
@@ -1035,7 +1041,7 @@ APZCTreeManager::UpdateZoomConstraintsRecursively(HitTestingTreeNode* aNode,
   }
   for (HitTestingTreeNode* child = aNode->GetLastChild(); child; child = child->GetPrevSibling()) {
     // We can have subtrees with their own layers id - leave those alone.
-    if (child->GetApzc() && child->GetApzc()->IsRootForLayersId()) {
+    if (child->GetApzc() && child->GetApzc()->HasNoParentWithSameLayersId()) {
       continue;
     }
     UpdateZoomConstraintsRecursively(child, aConstraints);
@@ -1296,7 +1302,7 @@ APZCTreeManager::BuildOverscrollHandoffChain(const nsRefPtr<AsyncPanZoomControll
     result->Add(apzc);
 
     if (apzc->GetScrollHandoffParentId() == FrameMetrics::NULL_SCROLL_ID) {
-      if (!apzc->IsRootForLayersId()) {
+      if (!apzc->HasNoParentWithSameLayersId()) {
         // This probably indicates a bug or missed case in layout code
         NS_WARNING("Found a non-root APZ with no handoff parent");
       }
@@ -1314,7 +1320,7 @@ APZCTreeManager::BuildOverscrollHandoffChain(const nsRefPtr<AsyncPanZoomControll
     // scroll id.
     AsyncPanZoomController* scrollParent = nullptr;
     AsyncPanZoomController* parent = apzc;
-    while (!parent->IsRootForLayersId()) {
+    while (!parent->HasNoParentWithSameLayersId()) {
       parent = parent->GetParent();
       // While walking up to find the root of the subtree, if we encounter the
       // handoff parent, we don't actually need to do the search so we can
@@ -1657,7 +1663,7 @@ APZCTreeManager::RootAPZCForLayersId(AsyncPanZoomController* aApzc) const
 {
   MonitorAutoLock lock(mTreeLock);
   nsRefPtr<AsyncPanZoomController> apzc = aApzc;
-  while (apzc && !apzc->IsRootForLayersId()) {
+  while (apzc && !apzc->HasNoParentWithSameLayersId()) {
     apzc = apzc->GetParent();
   }
   return apzc.forget();
