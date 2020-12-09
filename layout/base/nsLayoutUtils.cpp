@@ -8206,6 +8206,8 @@ nsLayoutUtils::ComputeFrameMetrics(nsIFrame* aForFrame,
     {
       metrics.SetAllowVerticalScrollWithWheel();
     }
+
+    metrics.SetUsesContainerScrolling(scrollableFrame->UsesContainerScrolling());
   }
 
   // If we have the scrollparent being the same as the scroll id, the

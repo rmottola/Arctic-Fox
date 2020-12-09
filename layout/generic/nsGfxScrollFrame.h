@@ -359,6 +359,7 @@ public:
   bool IsTransformingByAPZ() const {
     return mTransformingByAPZ;
   }
+  bool UsesContainerScrolling() const;
 
   void ScheduleSyntheticMouseMove();
   static void ScrollActivityCallback(nsITimer *aTimer, void* anInstance);
@@ -842,6 +843,9 @@ public:
   virtual void MarkScrollbarsDirtyForReflow() const override {
     mHelper.MarkScrollbarsDirtyForReflow();
   }
+  virtual bool UsesContainerScrolling() const override {
+    return mHelper.UsesContainerScrolling();
+  }
 
   // nsIStatefulFrame
   NS_IMETHOD SaveState(nsPresState** aState) override {
@@ -1302,6 +1306,9 @@ public:
 
   virtual void SetTransformingByAPZ(bool aTransforming) override {
     mHelper.SetTransformingByAPZ(aTransforming);
+  }
+  virtual bool UsesContainerScrolling() const override {
+    return mHelper.UsesContainerScrolling();
   }
   bool IsTransformingByAPZ() const override {
     return mHelper.IsTransformingByAPZ();
