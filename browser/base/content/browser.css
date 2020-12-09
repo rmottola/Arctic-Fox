@@ -695,6 +695,11 @@ toolbarbutton[type="badged"] {
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#toolbarbutton-badged");
 }
 
+/* Translation */
+notification[value="translation"] {
+  -moz-binding: url("chrome://browser/content/translation-infobar.xml#translationbar");
+}
+
 /* Strict icon size for PMkit 'ui/button' */
 toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbutton-icon {
   width: 16px;

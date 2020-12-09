@@ -2517,7 +2517,7 @@ SetImmutablePrototype(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-SetLazyParsingEnabled(JSContext *cx, unsigned argc, Value *vp)
+SetLazyParsingEnabled(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 

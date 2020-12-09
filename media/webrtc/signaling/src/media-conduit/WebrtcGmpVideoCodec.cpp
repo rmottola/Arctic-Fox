@@ -282,12 +282,11 @@ WebrtcGmpVideoEncoder::Encode(const webrtc::I420VideoFrame& aInputImage,
 
   int32_t ret;
   mozilla::SyncRunnable::DispatchToThread(mGMPThread,
-                WrapRunnableRet(this,
+                WrapRunnableRet(&ret, this,
                                 &WebrtcGmpVideoEncoder::Encode_g,
                                 &aInputImage,
                                 aCodecSpecificInfo,
-                                aFrameTypes,
-                                &ret));
+                                aFrameTypes));
 
   return ret;
 }
@@ -415,10 +414,9 @@ WebrtcGmpVideoEncoder::SetRates(uint32_t aNewBitRate, uint32_t aFrameRate)
   int32_t ret;
   MOZ_ASSERT(mGMPThread);
   mozilla::SyncRunnable::DispatchToThread(mGMPThread,
-                WrapRunnableRet(this,
+                WrapRunnableRet(&ret, this,
                                 &WebrtcGmpVideoEncoder::SetRates_g,
-                                aNewBitRate, aFrameRate,
-                                &ret));
+                                aNewBitRate, aFrameRate));
 
   return WEBRTC_VIDEO_CODEC_OK;
 }
@@ -686,14 +684,13 @@ WebrtcGmpVideoDecoder::Decode(const webrtc::EncodedImage& aInputImage,
   int32_t ret;
   MOZ_ASSERT(mGMPThread);
   mozilla::SyncRunnable::DispatchToThread(mGMPThread,
-                WrapRunnableRet(this,
+                WrapRunnableRet(&ret, this,
                                 &WebrtcGmpVideoDecoder::Decode_g,
                                 aInputImage,
                                 aMissingFrames,
                                 aFragmentation,
                                 aCodecSpecificInfo,
-                                aRenderTimeMs,
-                                &ret));
+                                aRenderTimeMs));
 
   return ret;
 }

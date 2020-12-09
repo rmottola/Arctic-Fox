@@ -649,11 +649,11 @@ just addresses the organization to follow, e.g. "This site is run by " -->
 
 <!ENTITY getUserMedia.selectCamera.label "Camera to share:">
 <!ENTITY getUserMedia.selectCamera.accesskey "C">
+<!ENTITY getUserMedia.selectWindowOrScreen.label "Window or screen to share:">
+<!ENTITY getUserMedia.selectWindowOrScreen.accesskey "W">
 <!ENTITY getUserMedia.selectMicrophone.label "Microphone to share:">
 <!ENTITY getUserMedia.selectMicrophone.accesskey "M">
-
-<!ENTITY webrtcIndicatorButton.label "Camera / Microphone Access">
-<!ENTITY webrtcIndicatorButton.tooltip "Display sites you are currently sharing your camera or microphone with">
+<!ENTITY getUserMedia.allWindowsShared.message "All visible windows on your screen will be shared.">
 
 <!-- Bad Content Blocker Doorhanger Notification -->
 <!ENTITY badContentBlocked.moreinfo "Most websites will work properly even if content is blocked.">

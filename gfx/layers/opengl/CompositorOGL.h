@@ -27,14 +27,10 @@
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_ASSERTION, NS_WARNING
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
-#include "nsSize.h"                     // for nsIntSize
 #include "nsTArray.h"                   // for nsAutoTArray, nsTArray, etc
 #include "nsThreadUtils.h"              // for nsRunnable
 #include "nsXULAppAPI.h"                // for XRE_GetProcessType
 #include "nscore.h"                     // for NS_IMETHOD
-#ifdef MOZ_WIDGET_GONK
-#include <ui/GraphicBuffer.h>
-#endif
 #include "gfxVR.h"
 
 class nsIWidget;
@@ -235,7 +231,7 @@ public:
                         const gfx::Matrix4x4 &aTransform) override;
 
   virtual void EndFrame() override;
-  virtual void SetFBAcquireFence(Layer* aLayer) override;
+  virtual void SetDispAcquireFence(Layer* aLayer) override;
   virtual FenceHandle GetReleaseFence() override;
   virtual void EndFrameForExternalComposition(const gfx::Matrix& aTransform) override;
 
@@ -302,6 +298,19 @@ public:
   const gfx::Matrix4x4& GetProjMatrix() const {
     return mProjMatrix;
   }
+
+  void SetProjMatrix(const gfx::Matrix4x4& aProjMatrix) {
+    mProjMatrix = aProjMatrix;
+  }
+
+  const gfx::IntSize GetDestinationSurfaceSize() const {
+    return gfx::IntSize (mSurfaceSize.width, mSurfaceSize.height);
+  }
+
+  const ScreenPoint& GetScreenRenderOffset() const {
+    return mRenderOffset;
+  }
+
 private:
   virtual gfx::IntSize GetWidgetSize() const override
   {

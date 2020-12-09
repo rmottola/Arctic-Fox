@@ -377,8 +377,8 @@ pref("media.webrtc.debug.aec_dump_max_size", 4194304); // 4MB
 #ifdef MOZ_WIDGET_GONK
 pref("media.navigator.video.default_width",320);
 pref("media.navigator.video.default_height",240);
-pref("media.peerconnection.enabled", false);
-pref("media.peerconnection.video.enabled", false);
+pref("media.peerconnection.enabled", true);
+pref("media.peerconnection.video.enabled", true);
 pref("media.navigator.video.max_fs", 1200); // 640x480 == 1200mb
 pref("media.navigator.video.max_fr", 30);
 pref("media.navigator.video.h264.level", 12); // 0x42E00C - level 1.2
@@ -394,8 +394,8 @@ pref("media.peerconnection.video.max_bitrate", 1000);
 #else
 pref("media.navigator.video.default_width",0);  // adaptive default
 pref("media.navigator.video.default_height",0); // adaptive default
-pref("media.peerconnection.enabled", false);
-pref("media.peerconnection.video.enabled", false);
+pref("media.peerconnection.enabled", true);
+pref("media.peerconnection.video.enabled", true);
 pref("media.navigator.video.max_fs", 12288); // Enough for 2048x1536
 pref("media.navigator.video.max_fr", 60);
 pref("media.navigator.video.h264.level", 31); // 0x42E01f - level 3.1
@@ -414,11 +414,7 @@ pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[{\"urls\": [\"stun:stun.services.mozilla.com\"]}]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
 pref("media.peerconnection.use_document_iceservers", true);
-// Do not enable identity before ensuring that the UX cannot be spoofed
-// see Bug 884573 for details
-// Do not enable identity before fixing domain comparison: see Bug 958741
-// Do not enable identity before fixing origin spoofing: see Bug 968335
-pref("media.peerconnection.identity.enabled", false);
+pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
 // These values (aec, agc, and noice) are from media/webrtc/trunk/webrtc/common_types.h
@@ -741,6 +737,8 @@ pref("canvas.hitregions.enabled", false);
 pref("canvas.filters.enabled", false);
 // Add support for canvas path objects
 pref("canvas.path.enabled", true);
+// captureStream() on canvas disabled by default
+pref("canvas.capturestream.enabled", false);
 
 // We want the ability to forcibly disable platform a11y, because
 // some non-a11y-related components attempt to bring it up.  See bug
@@ -4432,6 +4430,9 @@ pref("layers.force-active", false);
 // platform and are the optimal surface type.
 pref("layers.gralloc.disable", false);
 
+// Don't use compositor-lru on this platform
+pref("layers.compositor-lru-size", 0);
+
 // Enable/Disable the geolocation API for content
 pref("geo.enabled", true);
 
@@ -4479,7 +4480,6 @@ pref("alerts.durationImmediate", 20000);
 // DOM full-screen API.
 pref("full-screen-api.enabled", false);
 pref("full-screen-api.allow-trusted-requests-only", true);
-pref("full-screen-api.content-only", false);
 pref("full-screen-api.pointer-lock.enabled", true);
 
 // DOM idle observers API

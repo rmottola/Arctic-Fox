@@ -6,12 +6,15 @@ let Ci = Components.interfaces;
 let Cc = Components.classes;
 let Cu = Components.utils;
 
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/PluralForm.jsm");
 Cu.import("resource://gre/modules/DownloadUtils.jsm");
 Cu.import("resource://gre/modules/AddonManager.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/ForgetAboutSite.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
+                                  "resource://gre/modules/PluralForm.jsm");
 
 let gFaviconService = Cc["@mozilla.org/browser/favicon-service;1"].
                       getService(Ci.nsIFaviconService);
@@ -51,7 +54,7 @@ const MASTER_PASSWORD_MESSAGE = "User canceled master password entry";
  * to testPermission. This is based on what consumers use to test these
  * permissions.
  */
-const TEST_EXACT_PERM_TYPES = ["desktop-notification", "geo", "pointerLock"];
+const TEST_EXACT_PERM_TYPES = ["desktop-notification", "geo", "camera", "microphone", "pointerLock"];
 
 /**
  * Site object represents a single site, uniquely identified by a host.
@@ -432,6 +435,9 @@ let PermissionDefaults = {
     Services.prefs.setBoolPref("full-screen-api.enabled", value);
   },
 
+  get camera() this.UNKNOWN,
+  get microphone() this.UNKNOWN,
+
   get pointerLock() {
     if (!Services.prefs.getBoolPref("full-screen-api.pointer-lock.enabled")) {
       return this.DENY;
@@ -455,7 +461,7 @@ let PermissionDefaults = {
     let value = (aValue != this.DENY);
     Services.prefs.setBoolPref("dom.push.enabled", value);
   },
-}
+};
 
 /**
  * AboutPermissions manages the about:permissions page.
@@ -494,18 +500,18 @@ let AboutPermissions = {
    */
   _supportedPermissions: ["password", "image", "popup", "cookie",
                           "desktop-notification", "install", "geo", "indexedDB",
-                          "fullscreen", "push", "pointerLock"],
+                          "fullscreen", "camera", "microphone", "push", "pointerLock"],
 
   /**
    * Permissions that don't have a global "Allow" option.
    */
-  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "fullscreen", "push"
+  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "fullscreen", "camera", "microphone", "push"
                    "pointerLock"],
 
   /**
    * Permissions that don't have a global "Deny" option.
    */
-  _noGlobalDeny: [],
+  _noGlobalDeny: ["camera", "microphone"],
 
   _stringBundleBrowser: Services.strings
       .createBundle("chrome://browser/locale/browser.properties"),
@@ -559,7 +565,7 @@ let AboutPermissions = {
     Services.obs.addObserver(this, "plugin-info-updated", false);
     Services.obs.addObserver(this, "plugin-list-updated", false);
     Services.obs.addObserver(this, "blocklist-updated", false);
-    
+
     this._observersInitialized = true;
     Services.obs.notifyObservers(null, "browser-permissions-preinit", null);
 
@@ -1231,7 +1237,7 @@ let AboutPermissions = {
       let visitLabel = PluralForm.get(aCount, visitForm)
                        .replace("#1", aCount);
       document.getElementById("site-visit-count").value = visitLabel;
-    });  
+    });
   },
 
   updatePasswordsCount: function() {

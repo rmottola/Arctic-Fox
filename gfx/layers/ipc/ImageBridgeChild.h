@@ -205,13 +205,6 @@ public:
 
   virtual void Connect(CompositableClient* aCompositable) override;
 
-  /**
-   * See CompositableForwarder::UpdatedTexture
-   */
-  virtual void UpdatedTexture(CompositableClient* aCompositable,
-                              TextureClient* aTexture,
-                              nsIntRegion* aRegion) override;
-
   virtual bool IsImageBridgeChild() const override { return true; }
 
   /**
@@ -226,10 +219,6 @@ public:
   virtual void UseOverlaySource(CompositableClient* aCompositable,
                                 const OverlaySource& aOverlay) override;
 #endif
-
-  virtual void SendFenceHandle(AsyncTransactionTracker* aTracker,
-                               PTextureChild* aTexture,
-                               const FenceHandle& aFence) override;
 
   virtual void RemoveTextureFromCompositable(CompositableClient* aCompositable,
                                              TextureClient* aTexture) override;

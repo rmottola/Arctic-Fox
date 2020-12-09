@@ -8,7 +8,6 @@
 
 #include <stddef.h>                     // for size_t
 #include <stdint.h>                     // for uint32_t, uint8_t, uint64_t
-#include "GLContextTypes.h"             // for GLContext (ptr only), etc
 #include "GLTextureImage.h"             // for TextureImage
 #include "ImageTypes.h"                 // for StereoMode
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
@@ -32,10 +31,6 @@
 class gfxImageSurface;
 
 namespace mozilla {
-namespace gl {
-class GLContext;
-class SharedSurface;
-}
 
 // When defined, we track which pool the tile came from and test for
 // any inconsistencies.  This can be defined in release build as well.
@@ -428,17 +423,19 @@ public:
    */
   void ForceRemove(bool sync = false);
 
-  virtual void SetReleaseFenceHandle(FenceHandle aReleaseFenceHandle)
+  virtual void SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle)
   {
     mReleaseFenceHandle.Merge(aReleaseFenceHandle);
   }
 
-  const FenceHandle& GetReleaseFenceHandle() const
+  FenceHandle GetAndResetReleaseFenceHandle()
   {
-    return mReleaseFenceHandle;
+    FenceHandle fence;
+    mReleaseFenceHandle.TransferToAnotherFenceHandle(fence);
+    return fence;
   }
 
-  virtual void SetAcquireFenceHandle(FenceHandle aAcquireFenceHandle)
+  virtual void SetAcquireFenceHandle(const FenceHandle& aAcquireFenceHandle)
   {
     mAcquireFenceHandle = aAcquireFenceHandle;
   }
@@ -474,8 +471,12 @@ public:
    virtual void SetReadbackSink(TextureReadbackSink* aReadbackSink) {
      mReadbackSink = aReadbackSink;
    }
-   
+
    virtual void SyncWithObject(SyncObject* aSyncObject) { }
+
+   void MarkShared() {
+     mShared = true;
+   }
 
 private:
   /**
@@ -686,66 +687,6 @@ public:
 protected:
   uint8_t* mBuffer;
   size_t mBufSize;
-};
-
-/**
- * A TextureClient implementation to share SharedSurfaces.
- */
-class SharedSurfaceTextureClient : public TextureClient
-{
-public:
-  SharedSurfaceTextureClient(ISurfaceAllocator* aAllocator, TextureFlags aFlags,
-                             gl::SharedSurface* surf);
-
-protected:
-  ~SharedSurfaceTextureClient();
-
-public:
-  // Boilerplate start
-  virtual bool IsAllocated() const override { return true; }
-
-  virtual bool Lock(OpenMode) override {
-    MOZ_ASSERT(!mIsLocked);
-    mIsLocked = true;
-    return true;
-  }
-
-  virtual void Unlock() override {
-    MOZ_ASSERT(mIsLocked);
-    mIsLocked = false;
-  }
-
-  virtual bool IsLocked() const override { return mIsLocked; }
-
-  virtual bool HasInternalBuffer() const override { return false; }
-
-  virtual gfx::SurfaceFormat GetFormat() const override {
-    return gfx::SurfaceFormat::UNKNOWN;
-  }
-
-  virtual gfx::IntSize GetSize() const override { return gfx::IntSize(); }
-
-  // This TextureClient should not be used in a context where we use CreateSimilar
-  // (ex. component alpha) because the underlying texture data is always created by
-  // an external producer.
-  virtual already_AddRefed<TextureClient>
-  CreateSimilar(TextureFlags, TextureAllocationFlags) const override {
-    return nullptr;
-  }
-
-  virtual bool AllocateForSurface(gfx::IntSize,
-                                  TextureAllocationFlags) override {
-    MOZ_CRASH("Should never hit this.");
-    return false;
-  }
-  // Boilerplate end
-
-  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) override;
-
-protected:
-  bool mIsLocked;
-  gl::SharedSurface* const mSurf;
-  RefPtr<gl::GLContext> mGL; // Just for reference holding.
 };
 
 struct TextureClientAutoUnlock

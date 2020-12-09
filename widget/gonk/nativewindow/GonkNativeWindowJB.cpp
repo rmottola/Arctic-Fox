@@ -134,6 +134,7 @@ GonkNativeWindow::RecycleCallback(TextureClient* client, void* closure) {
   GonkNativeWindow* nativeWindow =
     static_cast<GonkNativeWindow*>(closure);
 
+  MOZ_ASSERT(client && !client->IsDead());
   client->ClearRecycleCallback();
   nativeWindow->returnBuffer(client);
 }
@@ -146,10 +147,9 @@ void GonkNativeWindow::returnBuffer(TextureClient* client) {
     if (index < 0) {
     }
 
-    sp<Fence> fence = client->GetReleaseFenceHandle().mFence;
-    if (!fence.get()) {
-      fence = Fence::NO_FENCE;
-    }
+    FenceHandle handle = client->GetAndResetReleaseFenceHandle();
+    nsRefPtr<FenceHandle::FdObj> fdObj = handle.GetAndResetFdObj();
+    sp<Fence> fence = new Fence(fdObj->GetAndResetFd());
 
     addReleaseFenceLocked(index, fence);
 

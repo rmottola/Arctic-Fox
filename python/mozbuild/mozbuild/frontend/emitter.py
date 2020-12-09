@@ -5,7 +5,6 @@
 from __future__ import unicode_literals
 
 import itertools
-import json
 import logging
 import os
 import traceback
@@ -29,6 +28,7 @@ from .data import (
     ConfigFileSubstitution,
     ContextWrapped,
     Defines,
+    DistFiles,
     DirectoryTraversal,
     Exports,
     FinalTargetFiles,
@@ -77,6 +77,10 @@ from .reader import SandboxValidationError
 
 from .context import (
     Context,
+    ObjDirPath,
+    SourcePath,
+    ObjDirPath,
+    Path,
     SubContext,
     TemplateContext,
 )
@@ -542,8 +546,6 @@ class TreeMetadataEmitter(LoggingMixin):
             'ANDROID_GENERATED_RESFILES',
             'ANDROID_RES_DIRS',
             'DISABLE_STL_WRAPPING',
-            'EXTRA_ASSEMBLER_FLAGS',
-            'EXTRA_COMPILE_FLAGS',
             'EXTRA_COMPONENTS',
             'EXTRA_DSO_LDOPTS',
             'EXTRA_PP_COMPONENTS',
@@ -556,6 +558,8 @@ class TreeMetadataEmitter(LoggingMixin):
             'DEFFILE',
             'WIN32_EXE_LDFLAGS',
             'LD_VERSION_SCRIPT',
+            'USE_EXTENSION_MANIFEST',
+            'NO_JS_MANIFEST',
         ]
         for v in varlist:
             if v in context and context[v]:
@@ -657,6 +661,16 @@ class TreeMetadataEmitter(LoggingMixin):
         if final_target_files:
             yield FinalTargetFiles(context, final_target_files, context['FINAL_TARGET'])
 
+        dist_files = context.get('DIST_FILES')
+        if dist_files:
+            for f in dist_files:
+                path = os.path.join(context.srcdir, f)
+                if not os.path.exists(path):
+                    raise SandboxValidationError('File listed in DIST_FILES '
+                        'does not exist: %s' % f, context)
+
+            yield DistFiles(context, dist_files, context['FINAL_TARGET'])
+
         branding_files = context.get('BRANDING_FILES')
         if branding_files:
             yield BrandingFiles(context, branding_files)
@@ -690,15 +704,37 @@ class TreeMetadataEmitter(LoggingMixin):
         return sub
 
     def _process_sources(self, context, passthru):
+        sources = defaultdict(list)
+        gen_sources = defaultdict(list)
+        all_flags = {}
         for symbol in ('SOURCES', 'HOST_SOURCES', 'UNIFIED_SOURCES'):
-            for src in (context[symbol] or []):
-                if not os.path.exists(mozpath.join(context.srcdir, src)):
+            srcs = sources[symbol]
+            gen_srcs = gen_sources[symbol]
+            context_srcs = context.get(symbol, [])
+            for f in context_srcs:
+                full_path = f.full_path
+                if isinstance(f, SourcePath):
+                    srcs.append(full_path)
+                else:
+                    assert isinstance(f, ObjDirPath)
+                    gen_srcs.append(full_path)
+                if symbol == 'SOURCES':
+                    flags = context_srcs[f]
+                    if flags:
+                        all_flags[full_path] = flags
+
+                if isinstance(f, SourcePath) and not os.path.exists(full_path):
                     raise SandboxValidationError('File listed in %s does not '
-                        'exist: \'%s\'' % (symbol, src), context)
+                        'exist: \'%s\'' % (symbol, full_path), context)
+
+        # HOST_SOURCES and UNIFIED_SOURCES only take SourcePaths, so
+        # there should be no generated source in here
+        assert not gen_sources['HOST_SOURCES']
+        assert not gen_sources['UNIFIED_SOURCES']
 
         no_pgo = context.get('NO_PGO')
-        sources = context.get('SOURCES', [])
-        no_pgo_sources = [f for f in sources if sources[f].no_pgo]
+        no_pgo_sources = [f for f, flags in all_flags.iteritems()
+                          if flags.no_pgo]
         if no_pgo:
             if no_pgo_sources:
                 raise SandboxValidationError('NO_PGO and SOURCES[...].no_pgo '
@@ -736,38 +772,38 @@ class TreeMetadataEmitter(LoggingMixin):
         # kinds that can be listed therein.
         all_suffixes = list(suffix_map.keys())
         varmap = dict(
-            SOURCES=(Sources, all_suffixes),
-            HOST_SOURCES=(HostSources, ['.c', '.mm', '.cpp']),
-            UNIFIED_SOURCES=(UnifiedSources, ['.c', '.mm', '.cpp']),
-            GENERATED_SOURCES=(GeneratedSources, all_suffixes),
+            SOURCES=(Sources, GeneratedSources, all_suffixes),
+            HOST_SOURCES=(HostSources, None, ['.c', '.mm', '.cpp']),
+            UNIFIED_SOURCES=(UnifiedSources, None, ['.c', '.mm', '.cpp']),
         )
 
-        for variable, (klass, suffixes) in varmap.items():
+        for variable, (klass, gen_klass, suffixes) in varmap.items():
             allowed_suffixes = set().union(*[suffix_map[s] for s in suffixes])
 
             # First ensure that we haven't been given filetypes that we don't
             # recognize.
-            for f in context[variable]:
+            for f in itertools.chain(sources[variable], gen_sources[variable]):
                 ext = mozpath.splitext(f)[1]
                 if ext not in allowed_suffixes:
                     raise SandboxValidationError(
                         '%s has an unknown file type.' % f, context)
-                if variable.startswith('GENERATED_'):
-                    l = passthru.variables.setdefault('GARBAGE', [])
-                    l.append(f)
 
-            # Now sort the files to let groupby work.
-            sorted_files = sorted(context[variable], key=canonical_suffix_for_file)
-            for canonical_suffix, files in itertools.groupby(sorted_files, canonical_suffix_for_file):
-                arglist = [context, list(files), canonical_suffix]
-                if variable.startswith('UNIFIED_') and 'FILES_PER_UNIFIED_FILE' in context:
-                    arglist.append(context['FILES_PER_UNIFIED_FILE'])
-                yield klass(*arglist)
+            for srcs, cls in ((sources[variable], klass),
+                              (gen_sources[variable], gen_klass)):
+                # Now sort the files to let groupby work.
+                sorted_files = sorted(srcs, key=canonical_suffix_for_file)
+                for canonical_suffix, files in itertools.groupby(
+                        sorted_files, canonical_suffix_for_file):
+                    arglist = [context, list(files), canonical_suffix]
+                    if (variable.startswith('UNIFIED_') and
+                            'FILES_PER_UNIFIED_FILE' in context):
+                        arglist.append(context['FILES_PER_UNIFIED_FILE'])
+                    yield cls(*arglist)
 
-        sources_with_flags = [f for f in sources if sources[f].flags]
-        for f in sources_with_flags:
-            ext = mozpath.splitext(f)[1]
-            yield PerSourceFlag(context, f, sources[f].flags)
+        for f, flags in all_flags.iteritems():
+            if flags.flags:
+                ext = mozpath.splitext(f)[1]
+                yield PerSourceFlag(context, f, flags.flags)
 
     def _process_xpidl(self, context):
         # XPIDL source files get processed and turned into .h and .xpt files.
@@ -845,27 +881,28 @@ class TreeMetadataEmitter(LoggingMixin):
                     'Cannot install files to the root of TEST_HARNESS_FILES', context)
 
             for s in strings:
-                if context.is_objdir_path(s):
-                    if s.startswith('!/'):
-                        objdir_files[path].append('$(DEPTH)/%s' % s[2:])
+                # Ideally, TEST_HARNESS_FILES would expose Path instances, but
+                # subclassing HierarchicalStringList to be ContextDerived is
+                # painful, so until we actually kill HierarchicalStringList,
+                # just do Path manipulation here.
+                p = Path(context, s)
+                if isinstance(p, ObjDirPath):
+                    objdir_files[path].append(p.full_path)
+                elif '*' in s:
+                    resolved = p.full_path
+                    if s[0] == '/':
+                        pattern_start = resolved.index('*')
+                        base_path = mozpath.dirname(resolved[:pattern_start])
+                        pattern = resolved[len(base_path)+1:]
                     else:
-                        objdir_files[path].append(s[1:])
+                        base_path = context.srcdir
+                        pattern = s
+                    srcdir_pattern_files[path].append((base_path, pattern));
+                elif not os.path.exists(p.full_path):
+                    raise SandboxValidationError(
+                        'File listed in TEST_HARNESS_FILES does not exist: %s' % s, context)
                 else:
-                    resolved = context.resolve_path(s)
-                    if '*' in s:
-                        if s[0] == '/':
-                            pattern_start = resolved.index('*')
-                            base_path = mozpath.dirname(resolved[:pattern_start])
-                            pattern = resolved[len(base_path)+1:]
-                        else:
-                            base_path = context.srcdir
-                            pattern = s
-                        srcdir_pattern_files[path].append((base_path, pattern));
-                    elif not os.path.exists(resolved):
-                        raise SandboxValidationError(
-                            'File listed in TEST_HARNESS_FILES does not exist: %s' % s, context)
-                    else:
-                        srcdir_files[path].append(resolved)
+                    srcdir_files[path].append(p.full_path)
 
         yield TestHarnessFiles(context, srcdir_files,
                                srcdir_pattern_files, objdir_files)
@@ -939,6 +976,10 @@ class TreeMetadataEmitter(LoggingMixin):
             for path in context.get('%s_MANIFESTS' % flavor.upper(), []):
                 for obj in self._process_reftest_manifest(context, flavor, path):
                     yield obj
+
+        for path in context.get("WEB_PLATFORM_TESTS_MANIFESTS", []):
+            for obj in self._process_web_platform_tests_manifest(context, path):
+                yield obj
 
     def _process_test_manifest(self, context, info, manifest_path):
         flavor, install_root, install_subdir, package_tests = info
@@ -1116,6 +1157,64 @@ class TreeMetadataEmitter(LoggingMixin):
                 'support-files': '',
                 'subsuite': '',
             })
+
+        yield obj
+
+    def _load_web_platform_tests_manifest(self, context, manifest_path, tests_root):
+        old_path = sys.path[:]
+        try:
+            # Setup sys.path to include all the dependencies required to import
+            # the web-platform-tests manifest parser. web-platform-tests provides
+            # a the localpaths.py to do the path manipulation, which we load,
+            # providing the __file__ variable so it can resolve the relative
+            # paths correctly.
+            paths_file = os.path.join(context.config.topsrcdir, "testing",
+                                      "web-platform", "tests", "tools", "localpaths.py")
+            _globals = {"__file__": paths_file}
+            execfile(paths_file, _globals)
+            import manifest as wptmanifest
+        finally:
+            sys.path = old_path
+
+        return wptmanifest.manifest.load(tests_root, manifest_path)
+
+    def _process_web_platform_tests_manifest(self, context, paths):
+        manifest_path, tests_root = paths
+
+        manifest_path = mozpath.normpath(manifest_path)
+        manifest_full_path = mozpath.normpath(mozpath.join(
+            context.srcdir, manifest_path))
+        manifest_reldir = mozpath.dirname(mozpath.relpath(manifest_full_path,
+            context.config.topsrcdir))
+
+        tests_root = mozpath.normpath(mozpath.join(context.srcdir, tests_root))
+
+        manifest = self._load_web_platform_tests_manifest(context, manifest_full_path, tests_root)
+
+        # Create a equivalent TestManifest object
+        obj = TestManifest(context, manifest_full_path, manifest,
+                           flavor="web-platform-tests",
+                           relpath=mozpath.join(manifest_reldir,
+                                                mozpath.basename(manifest_path)),
+                           install_prefix="web-platform/")
+
+
+        for path, tests in manifest:
+            path = mozpath.join(tests_root, path)
+            for test in tests:
+                if test.item_type not in ["testharness", "reftest"]:
+                    continue
+
+                obj.tests.append({
+                    'path': path,
+                    'here': mozpath.dirname(path),
+                    'manifest': manifest_path,
+                    'name': test.id,
+                    'head': '',
+                    'tail': '',
+                    'support-files': '',
+                    'subsuite': '',
+                })
 
         yield obj
 

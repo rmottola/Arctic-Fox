@@ -193,7 +193,7 @@ GonkVideoDecoderManager::CreateVideoData(int64_t aStreamOffset, VideoData **v)
     keyFrame = 0;
   }
 
-  gfx::IntRect picture = ToIntRect(mPicture);
+  gfx::IntRect picture = mPicture;
   if (mFrameInfo.mWidth != mInitialFrame.width ||
       mFrameInfo.mHeight != mInitialFrame.height) {
 
@@ -595,6 +595,7 @@ GonkVideoDecoderManager::GetColorConverterBuffer(int32_t aWidth, int32_t aHeight
 void
 GonkVideoDecoderManager::RecycleCallback(TextureClient* aClient, void* aClosure)
 {
+  MOZ_ASSERT(aClient && !aClient->IsDead());
   GonkVideoDecoderManager* videoManager = static_cast<GonkVideoDecoderManager*>(aClosure);
   GrallocTextureClientOGL* client = static_cast<GrallocTextureClientOGL*>(aClient);
   aClient->ClearRecycleCallback();

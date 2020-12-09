@@ -328,7 +328,7 @@ MacroAssemblerX86::callWithABI(void* fun, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(ImmPtr(fun));
+    asMasm().call(ImmPtr(fun));
     callWithABIPost(stackAdjust, result);
 }
 
@@ -337,7 +337,7 @@ MacroAssemblerX86::callWithABI(AsmJSImmPtr fun, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(fun);
+    asMasm().call(fun);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -346,7 +346,7 @@ MacroAssemblerX86::callWithABI(const Address& fun, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(Operand(fun));
+    asMasm().call(fun);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -355,7 +355,7 @@ MacroAssemblerX86::callWithABI(Register fun, MoveOp::Type result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(Operand(fun));
+    asMasm().call(fun);
     callWithABIPost(stackAdjust, result);
 }
 
@@ -506,7 +506,7 @@ MacroAssemblerX86::callWithExitFrame(JitCode* target, Register dynStack)
     addPtr(ImmWord(asMasm().framePushed()), dynStack);
     makeFrameDescriptor(dynStack, JitFrame_IonJS);
     asMasm().Push(dynStack);
-    call(target);
+    asMasm().call(target);
 }
 
 void
@@ -565,6 +565,7 @@ MacroAssemblerX86::asMasm() const
     return *static_cast<const MacroAssembler*>(this);
 }
 
+//{{{ check_macroassembler_style
 // ===============================================================
 // Stack manipulation functions.
 
@@ -587,3 +588,5 @@ MacroAssembler::reserveStack(uint32_t amount)
     }
     framePushed_ += amount;
 }
+
+//}}} check_macroassembler_style

@@ -62,9 +62,11 @@
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
+- Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
-. Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
+- Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
@@ -85,6 +87,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1204872 - 2015-09
+- Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
@@ -98,15 +101,21 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1123516 - 2015-06-30 - Implement maplike/setlike
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
+
+- Bug 1152326 - When processing plugin updates only update the visibili
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
-- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope.
+- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
+- Bug 1174372 - Initialize ExecutableAllocator static fields in JS_Init
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
+- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
+- Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
+- Bug 1167823 - arity side effects, 14 patches
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
@@ -115,6 +124,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1164427 - Implement elementsFromPoint (= Tests)
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
+- 1163423 - 2015-05-12 JS_HasOwnProperty
 - 1142669 part 6 - Don't inline scripts that are known to inline a
 - 1141862 - 2015-04-03 : 6 parts
 - 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
@@ -144,42 +154,37 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
 - Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
 - Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
-- Bug 1157279. Escaping CSS identifiers should use lowercase letters fo
-- Bug 1032848 - Part 1: Implement WebIDL for HTMLCanvasElement::Capture
 -  1102048 style patches, check which still apply
-- Bug 1156598. Remove old, dead scroll layer item code. r=mstange
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
--  Bug 1149526 - Check HeapPtrs have GC lifetime r=terrence
-- Bug 1151981 - Remove the void* marking functions;
-- Bug 1150639 - Use a stricter off-thread check in triggerZoneGC
-- Bug 1149352 - Part 0 to 11
-
-Unboxed Object (enabled - make Forum Manjaro Linux crash)
-- Bug 1166709 - Mark definite properties when replacing the unboxed gro
-- Bug 1166709 - After converting unboxed objects created by some initia
-- Bug 1162199 - Use unboxed objects by default, r=jandem. 
 
 impacting download and shutdown:
 Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
 Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
+
+Replay - in case 1165486 fails:
+Bug 915805 - Don't treat unbound names in Function() code as globals
+Bug 1148963 - OdinMonkey: add CompileOptions::lazyParsingDisabled and
+Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
+
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
+SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
 
 - Bug 1243549 - Add missing bits. r=post-facto
 - Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 
+ARM fixes to check
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
+
 Lightweight themes stuff:
 
 - Bug 1148996 - Install a devedition lightweight theme on startup, then
-
-Not applying / Breaking build:
-Bug 1162569 - default engine files should be in the omni.ja file,
 
 
 Check with Roy Tam:

@@ -1169,8 +1169,8 @@ public:
   virtual bool IsFullscreenLeaf() override;
   virtual bool IsFullScreenDoc() override;
   virtual void SetApprovedForFullscreen(bool aIsApproved) override;
-  virtual nsresult RemoteFrameFullscreenChanged(nsIDOMElement* aFrameElement,
-                                                const nsAString& aNewOrigin) override;
+  virtual nsresult
+    RemoteFrameFullscreenChanged(nsIDOMElement* aFrameElement) override;
 
   virtual nsresult RemoteFrameFullscreenReverted() override;
   virtual nsIDocument* GetFullscreenRoot() override;
@@ -1207,13 +1207,13 @@ public:
   // This is called asynchronously by nsIDocument::AsyncRequestFullScreen()
   // to move this document into full-screen mode if allowed. aWasCallerChrome
   // should be true when nsIDocument::AsyncRequestFullScreen() was called
-  // by chrome code. aNotifyOnOriginChange denotes whether we should send a
-  // fullscreen-origin-change notification if requesting fullscreen in this
+  // by chrome code. aNotifyOnOriginChange denotes whether we should trigger
+  // a MozFullscreenOriginChanged event if requesting fullscreen in this
   // document causes the origin which is fullscreen to change. We may want to
-  // *not* send this notification if we're calling RequestFullscreen() as part
+  // *not* send this notification if we're calling RequestFullScreen() as part
   // of a continuation of a request in a subdocument, whereupon the caller will
-  // need to send the notification with the origin of the document which
-  // originally requested fullscreen, not *this* document's origin.
+  // need to send some notification itself with the origin of the document
+  // which originally requested fullscreen, not *this* document's origin.
   void RequestFullScreen(Element* aElement,
                          mozilla::dom::FullScreenOptions& aOptions,
                          bool aWasCallerChrome,

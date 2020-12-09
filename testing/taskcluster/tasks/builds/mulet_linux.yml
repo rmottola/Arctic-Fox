@@ -1,20 +1,21 @@
 $inherits:
   from: 'tasks/build.yml'
+  variables:
+    build_name: 'mulet'
+    build_type: 'opt'
 task:
   metadata:
-    name: '[TC] Mulet Linux x64 Opt'
-    description: Mulet Linux x64 Opt
+    name: '[TC] Mulet Linux'
+    description: Mulet Linux
 
   workerType: b2gbuild-desktop
   scopes:
-    - 'docker-worker:cache:sources-goanna'
-    - 'docker-worker:cache:build-mulet-linux-objects'
+    - 'docker-worker:cache:build-mulet-linux-workspace'
     - 'docker-worker:cache:tooltool-cache'
 
   payload:
     cache:
-      sources-goanna: '/home/worker/goanna'
-      build-mulet-linux-objects: '/home/worker/object-folder'
+      build-mulet-linux-workspace: '/home/worker/workspace'
       tooltool-cache: '/home/worker/tools/tooltool-cache'
 
     env:
@@ -23,10 +24,20 @@ task:
     maxRunTime: 3600
 
     command:
-      - bin/build-mulet-linux.sh
+      - /bin/bash
+      - -c
+      - >
+        checkout-gecko workspace &&
+        cd ./workspace/gecko/testing/taskcluster/scripts/builder &&
+        buildbot_step 'Build' ./build-mulet-linux.sh $HOME/workspace
 
   extra:
+    treeherderEnv:
+      - production
+      - staging
     treeherder:
+      # Disable "TC" prefix...
+      groupSymbol: "?"
       machine:
         platform: mulet-linux64
     # Rather then enforcing particular conventions we require that all build
@@ -35,3 +46,4 @@ task:
     locations:
       build: 'public/build/target.linux-x86_64.tar.bz2'
       tests: 'public/build/target.tests.zip'
+

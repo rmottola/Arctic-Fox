@@ -75,6 +75,7 @@ NS_IMPL_ISUPPORTS_INHERITED0(PuppetWidget, nsBaseWidget)
 
 PuppetWidget::PuppetWidget(TabChild* aTabChild)
   : mTabChild(aTabChild)
+  , mMemoryPressureObserver(nullptr)
   , mDPI(-1)
   , mDefaultScale(-1)
   , mNativeKeyCommandsValid(false)
@@ -118,6 +119,11 @@ PuppetWidget::Create(nsIWidget        *aParent,
   else {
     Resize(mBounds.x, mBounds.y, mBounds.width, mBounds.height, false);
   }
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  if (obs) {
+    mMemoryPressureObserver = new MemoryPressureObserver(this);
+    obs->AddObserver(mMemoryPressureObserver, "memory-pressure", false);
+  }
 
   return NS_OK;
 }
@@ -153,6 +159,10 @@ PuppetWidget::Destroy()
   Base::OnDestroy();
   Base::Destroy();
   mPaintTask.Revoke();
+  if (mMemoryPressureObserver) {
+    mMemoryPressureObserver->Remove();
+  }
+  mMemoryPressureObserver = nullptr;
   mChild = nullptr;
   if (mLayerManager) {
     mLayerManager->Destroy();
@@ -173,10 +183,6 @@ PuppetWidget::Show(bool aState)
 
   if (mChild) {
     mChild->mVisible = aState;
-  }
-
-  if (!mVisible && mLayerManager) {
-    mLayerManager->ClearCachedResources();
   }
 
   if (!wasVisible && mVisible) {
@@ -996,9 +1002,7 @@ PuppetWidget::Paint()
                          nsAutoCString("PuppetWidget"), 0);
 #endif
 
-    if (mozilla::layers::LayersBackend::LAYERS_D3D10 == mLayerManager->GetBackendType()) {
-      mAttachedWidgetListener->PaintWindow(this, region);
-    } else if (mozilla::layers::LayersBackend::LAYERS_CLIENT == mLayerManager->GetBackendType()) {
+    if (mozilla::layers::LayersBackend::LAYERS_CLIENT == mLayerManager->GetBackendType()) {
       // Do nothing, the compositor will handle drawing
       if (mTabChild) {
         mTabChild->NotifyPainted();
@@ -1040,6 +1044,36 @@ PuppetWidget::PaintTask::Run()
     mWidget->Paint();
   }
   return NS_OK;
+}
+
+NS_IMPL_ISUPPORTS(PuppetWidget::MemoryPressureObserver, nsIObserver)
+
+NS_IMETHODIMP
+PuppetWidget::MemoryPressureObserver::Observe(nsISupports* aSubject,
+                                              const char* aTopic,
+                                              const char16_t* aData)
+{
+  if (!mWidget) {
+    return NS_OK;
+  }
+
+  if (strcmp("memory-pressure", aTopic) == 0) {
+    if (!mWidget->mVisible && mWidget->mLayerManager &&
+        XRE_GetProcessType() == GeckoProcessType_Content) {
+      mWidget->mLayerManager->ClearCachedResources();
+    }
+  }
+  return NS_OK;
+}
+
+void
+PuppetWidget::MemoryPressureObserver::Remove()
+{
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  if (obs) {
+    obs->RemoveObserver(this, "memory-pressure");
+  }
+  mWidget = nullptr;
 }
 
 bool
@@ -1135,7 +1169,7 @@ PuppetWidget::GetWindowPosition()
 
 NS_METHOD
 PuppetWidget::GetScreenBounds(nsIntRect &aRect) {
-  aRect.MoveTo(gfx::ToIntPoint(LayoutDeviceIntPoint::ToUntyped(WidgetToScreenOffset())));
+  aRect.MoveTo(LayoutDeviceIntPoint::ToUntyped(WidgetToScreenOffset()));
   aRect.SizeTo(mBounds.Size());
   return NS_OK;
 }

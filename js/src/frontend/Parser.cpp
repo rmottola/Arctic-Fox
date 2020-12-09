@@ -637,6 +637,15 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
         FunctionBox* parent = outerpc->sc->asFunctionBox();
         if (parent && parent->inWith)
             inWith = true;
+    } else {
+        // This is like the above case, but when inside eval.
+        //
+        // For example:
+        //
+        //   with(o) { eval("(function() { g(); })();"); }
+        //
+        // In this case, the static scope chain tells us the presence of with.
+        inWith = outerpc->sc->asGlobalSharedContext()->inWith();
     }
 }
 
@@ -4399,13 +4408,6 @@ Parser<FullParseHandler>::exportDeclaration()
         return handler.newExportDefaultDeclaration(kid, TokenPos(begin, pos().end));
       }
 
-      case TOK_NAME:
-        // Handle the form |export a| in the same way as |export let a|, by
-        // acting as if we've just seen the let keyword. Simply unget the token
-        // and fall through.
-        //
-        // XXX This |export foo = 5| syntax is *not* in ES6!  Remove it!
-        tokenStream.ungetToken();
       case TOK_LET:
       case TOK_CONST:
         kid = lexicalDeclaration(YieldIsName, tt == TOK_CONST);

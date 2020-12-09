@@ -209,7 +209,7 @@ ComputeClipRegion(GeckoContentController* aController,
     // root scrollable layer in a process, or for some of the LayerMetrics
     // expansions of a multi-metrics layer), fall back to using the comp
     // bounds which should be equivalent.
-    clipRegion = RoundedToInt(aLayer.Metrics().mCompositionBounds);
+    clipRegion = RoundedToInt(aLayer.Metrics().GetCompositionBounds());
   }
 
   // Optionally, the GeckoContentController can provide a touch-sensitive
@@ -244,7 +244,8 @@ APZCTreeManager::PrintAPZCInfo(const LayerMetricsWrapper& aLayer,
                                const AsyncPanZoomController* apzc)
 {
   const FrameMetrics& metrics = aLayer.Metrics();
-  mApzcTreeLog << "APZC " << apzc->GetGuid() << "\tcb=" << metrics.mCompositionBounds
+  mApzcTreeLog << "APZC " << apzc->GetGuid()
+               << "\tcb=" << metrics.GetCompositionBounds()
                << "\tsr=" << metrics.GetScrollableRect()
                << (aLayer.IsScrollInfoLayer() ? "\tscrollinfo" : "")
                << (apzc->HasScrollgrab() ? "\tscrollgrab" : "") << "\t"
@@ -272,7 +273,7 @@ GetEventRegions(const LayerMetricsWrapper& aLayer)
 {
   if (aLayer.IsScrollInfoLayer()) {
     return EventRegions(nsIntRegion(ParentLayerIntRect::ToUntyped(
-      RoundedToInt(aLayer.Metrics().mCompositionBounds))));
+      RoundedToInt(aLayer.Metrics().GetCompositionBounds()))));
   }
   return aLayer.GetEventRegions();
 }
@@ -878,7 +879,7 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
                                    uint64_t* aOutInputBlockId)
 {
   ScrollWheelInput::ScrollMode scrollMode = ScrollWheelInput::SCROLLMODE_INSTANT;
-  if (Preferences::GetBool("general.smoothScroll")) {
+  if (gfxPrefs::SmoothScrollEnabled() && gfxPrefs::WheelSmoothScrollEnabled()) {
     scrollMode = ScrollWheelInput::SCROLLMODE_SMOOTH;
   }
 
@@ -1301,6 +1302,10 @@ APZCTreeManager::BuildOverscrollHandoffChain(const nsRefPtr<AsyncPanZoomControll
       apzc = apzc->GetParent();
       continue;
     }
+
+    // Guard against a possible infinite-loop condition. If we hit this, the
+    // layout code that generates the handoff parents did something wrong.
+    MOZ_ASSERT(apzc->GetScrollHandoffParentId() != apzc->GetGuid().mScrollId);
 
     // Find the AsyncPanZoomController instance with a matching layersId and
     // the scroll id that matches apzc->GetScrollHandoffParentId(). To do this

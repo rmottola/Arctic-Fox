@@ -15,10 +15,6 @@
 #include "mozilla/gfx/2D.h"             // for DataSourceSurface
 #include "mozilla/gfx/BaseSize.h"       // for BaseSize
 #include "mozilla/gfx/Logging.h"        // for gfxCriticalError
-#ifdef MOZ_WIDGET_GONK
-# include "GrallocImages.h"  // for GrallocImage
-# include "EGLImageHelpers.h"
-#endif
 #include "mozilla/layers/ISurfaceAllocator.h"
 #include "mozilla/layers/YCbCrImageDataSerializer.h"
 #include "mozilla/layers/GrallocTextureHost.h"
@@ -26,11 +22,17 @@
 #include "AndroidSurfaceTexture.h"
 #include "GfxTexturesReporter.h"        // for GfxTexturesReporter
 #include "GLBlitTextureImageHelper.h"
+#include "GeckoProfiler.h"
+
+#ifdef MOZ_WIDGET_GONK
+# include "GrallocImages.h"  // for GrallocImage
+# include "EGLImageHelpers.h"
+#endif
+
 #ifdef XP_MACOSX
-#include "SharedSurfaceIO.h"
 #include "mozilla/layers/MacIOSurfaceTextureHostOGL.h"
 #endif
-#include "GeckoProfiler.h"
+
 
 using namespace mozilla::gl;
 using namespace mozilla::gfx;
@@ -69,7 +71,8 @@ CreateTextureHostOGL(const SurfaceDescriptor& aDesc,
       result = new EGLImageTextureHost(aFlags,
                                        (EGLImage)desc.image(),
                                        (EGLSync)desc.fence(),
-                                       desc.size());
+                                       desc.size(),
+                                       desc.hasAlpha());
       break;
     }
 
@@ -109,101 +112,6 @@ FlagsToGLFlags(TextureFlags aFlags)
 
   return static_cast<gl::TextureImage::Flags>(result);
 }
-
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-bool
-TextureHostOGL::SetReleaseFence(const android::sp<android::Fence>& aReleaseFence)
-{
-  if (!aReleaseFence.get() || !aReleaseFence->isValid()) {
-    // HWC might not provide Fence.
-    // In this case, HWC implicitly handles buffer's fence.
-    return false;
-  }
-
-  if (!mReleaseFence.get()) {
-    mReleaseFence = aReleaseFence;
-  } else {
-    android::sp<android::Fence> mergedFence = android::Fence::merge(
-                  android::String8::format("TextureHostOGL"),
-                  mReleaseFence, aReleaseFence);
-    if (!mergedFence.get()) {
-      // synchronization is broken, the best we can do is hope fences
-      // signal in order so the new fence will act like a union.
-      // This error handling is same as android::ConsumerBase does.
-      mReleaseFence = aReleaseFence;
-      return false;
-    }
-    mReleaseFence = mergedFence;
-  }
-  return true;
-}
-
-android::sp<android::Fence>
-TextureHostOGL::GetAndResetReleaseFence()
-{
-  // Hold previous ReleaseFence to prevent Fence delivery failure via gecko IPC.
-  mPrevReleaseFence = mReleaseFence;
-  // Reset current ReleaseFence.
-  mReleaseFence = android::Fence::NO_FENCE;
-  return mPrevReleaseFence;
-}
-
-void
-TextureHostOGL::SetAcquireFence(const android::sp<android::Fence>& aAcquireFence)
-{
-  mAcquireFence = aAcquireFence;
-}
-
-android::sp<android::Fence>
-TextureHostOGL::GetAndResetAcquireFence()
-{
-  android::sp<android::Fence> fence = mAcquireFence;
-  // Reset current AcquireFence.
-  mAcquireFence = android::Fence::NO_FENCE;
-  return fence;
-}
-
-void
-TextureHostOGL::WaitAcquireFenceSyncComplete()
-{
-  if (!mAcquireFence.get() || !mAcquireFence->isValid()) {
-    return;
-  }
-
-  int fenceFd = mAcquireFence->dup();
-  if (fenceFd == -1) {
-    NS_WARNING("failed to dup fence fd");
-    return;
-  }
-
-  EGLint attribs[] = {
-              LOCAL_EGL_SYNC_NATIVE_FENCE_FD_ANDROID, fenceFd,
-              LOCAL_EGL_NONE
-          };
-
-  EGLSync sync = sEGLLibrary.fCreateSync(EGL_DISPLAY(),
-                                         LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID,
-                                         attribs);
-  if (!sync) {
-    NS_WARNING("failed to create native fence sync");
-    return;
-  }
-
-  // Wait sync complete with timeout.
-  // If a source of the fence becomes invalid because of error,
-  // fene complete is not signaled. See Bug 1061435.
-  EGLint status = sEGLLibrary.fClientWaitSync(EGL_DISPLAY(),
-                                              sync,
-                                              0,
-                                              400000000 /*400 usec*/);
-  if (status != LOCAL_EGL_CONDITION_SATISFIED) {
-    NS_ERROR("failed to wait native fence sync");
-  }
-  MOZ_ALWAYS_TRUE( sEGLLibrary.fDestroySync(EGL_DISPLAY(), sync) );
-  mAcquireFence = nullptr;
-}
-
-#endif
 
 bool
 TextureImageTextureSourceOGL::Update(gfx::DataSourceSurface* aSurface,
@@ -342,7 +250,7 @@ TextureImageTextureSourceOGL::GetFormat() const
 
 gfx::IntRect TextureImageTextureSourceOGL::GetTileRect()
 {
-  return ThebesIntRect(mTexImage->GetTileRect());
+  return mTexImage->GetTileRect();
 }
 
 void
@@ -589,6 +497,8 @@ EGLImageTextureSource::EGLImageTextureSource(CompositorOGL* aCompositor,
   , mWrapMode(aWrapMode)
   , mSize(aSize)
 {
+  MOZ_ASSERT(mTextureTarget == LOCAL_GL_TEXTURE_2D ||
+             mTextureTarget == LOCAL_GL_TEXTURE_EXTERNAL);
 }
 
 void
@@ -602,13 +512,12 @@ EGLImageTextureSource::BindTexture(GLenum aTextureUnit, gfx::Filter aFilter)
   MOZ_ASSERT(DoesEGLContextSupportSharingWithEGLImage(gl()),
              "EGLImage not supported or disabled in runtime");
 
-  GLuint tex = mCompositor->GetTemporaryTexture(GetTextureTarget(), aTextureUnit);
+  GLuint tex = mCompositor->GetTemporaryTexture(mTextureTarget, aTextureUnit);
 
   gl()->fActiveTexture(aTextureUnit);
   gl()->fBindTexture(mTextureTarget, tex);
 
-  MOZ_ASSERT(mTextureTarget == LOCAL_GL_TEXTURE_2D);
-  gl()->fEGLImageTargetTexture2D(LOCAL_GL_TEXTURE_2D, mImage);
+  gl()->fEGLImageTargetTexture2D(mTextureTarget, mImage);
 
   ApplyFilterToBoundTexture(gl(), aFilter, mTextureTarget);
 }
@@ -644,18 +553,18 @@ EGLImageTextureSource::GetTextureTransform()
 EGLImageTextureHost::EGLImageTextureHost(TextureFlags aFlags,
                                          EGLImage aImage,
                                          EGLSync aSync,
-                                         gfx::IntSize aSize)
+                                         gfx::IntSize aSize,
+                                         bool hasAlpha)
   : TextureHost(aFlags)
   , mImage(aImage)
   , mSync(aSync)
   , mSize(aSize)
+  , mHasAlpha(hasAlpha)
   , mCompositor(nullptr)
-{
-}
+{}
 
 EGLImageTextureHost::~EGLImageTextureHost()
-{
-}
+{}
 
 gl::GLContext*
 EGLImageTextureHost::gl() const
@@ -670,14 +579,23 @@ EGLImageTextureHost::Lock()
     return false;
   }
 
-  EGLint status = sEGLLibrary.fClientWaitSync(EGL_DISPLAY(), mSync, 0, LOCAL_EGL_FOREVER);
+  EGLint status = LOCAL_EGL_CONDITION_SATISFIED;
+
+  if (mSync) {
+    MOZ_ASSERT(sEGLLibrary.IsExtensionSupported(GLLibraryEGL::KHR_fence_sync));
+    status = sEGLLibrary.fClientWaitSync(EGL_DISPLAY(), mSync, 0, LOCAL_EGL_FOREVER);
+  }
+
   if (status != LOCAL_EGL_CONDITION_SATISFIED) {
+    MOZ_ASSERT(status != 0,
+               "ClientWaitSync generated an error. Has mSync already been destroyed?");
     return false;
   }
 
   if (!mTextureSource) {
-    gfx::SurfaceFormat format = gfx::SurfaceFormat::R8G8B8A8;
-    GLenum target = LOCAL_GL_TEXTURE_2D;
+    gfx::SurfaceFormat format = mHasAlpha ? gfx::SurfaceFormat::R8G8B8A8
+                                          : gfx::SurfaceFormat::R8G8B8X8;
+    GLenum target = LOCAL_GL_TEXTURE_EXTERNAL;
     GLenum wrapMode = LOCAL_GL_CLAMP_TO_EDGE;
     mTextureSource = new EGLImageTextureSource(mCompositor,
                                                mImage,

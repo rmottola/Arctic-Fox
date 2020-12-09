@@ -40,6 +40,7 @@ class nsRenderingContext;
 class nsDisplayTableItem;
 class nsISelection;
 class nsDisplayLayerEventRegions;
+class nsDisplayScrollInfoLayer;
 class nsCaret;
 
 namespace mozilla {
@@ -844,6 +845,30 @@ public:
                                      const nsIFrame* aStopAtAncestor,
                                      nsIFrame** aOutResult);
 
+  void EnterSVGEffectsContents(nsDisplayList* aHoistedItemsStorage);
+  void ExitSVGEffectsContents();
+
+  bool ShouldBuildScrollInfoItemsForHoisting() const
+  { return mSVGEffectsBuildingDepth > 0; }
+
+  void AppendNewScrollInfoItemForHoisting(nsDisplayScrollInfoLayer* aScrollInfoItem);
+
+  /**
+   * Store the dirty rect of the scrolled contents of aScrollableFrame. This
+   * is a bound for the extents of the new visible region of the scrolled
+   * layer.
+   * @param aScrollableFrame the scrollable frame
+   * @param aDirty           the dirty rect, relative to aScrollableFrame
+   */
+  void StoreDirtyRectForScrolledContents(const nsIFrame* aScrollableFrame, const nsRect& aDirty);
+
+  /**
+   * Retrieve the stored dirty rect for the scrolled contents of aScrollableFrame.
+   * @param  aScrollableFrame the scroll frame
+   * @return                  the dirty rect, relative to aScrollableFrame's *reference frame*
+   */
+  nsRect GetDirtyRectForScrolledContents(const nsIFrame* aScrollableFrame) const;
+
 private:
   void MarkOutOfFlowFrameForDisplay(nsIFrame* aDirtyFrame, nsIFrame* aFrame,
                                     const nsRect& aDirtyRect);
@@ -920,6 +945,10 @@ private:
                                  mWillChangeBudget;
   // Assert that we never check the budget before its fully calculated.
   mutable mozilla::DebugOnly<bool> mWillChangeBudgetCalculated;
+
+  // rects are relative to the frame's reference frame
+  nsDataHashtable<nsPtrHashKey<nsIFrame>, nsRect> mDirtyRectForScrolledContents;
+
   // Relative to mCurrentFrame.
   nsRect                         mDirtyRect;
   nsRegion                       mWindowExcludeGlassRegion;
@@ -927,12 +956,19 @@ private:
   nsIntRegion                    mWindowDraggingRegion;
   // The display item for the Windows window glass background, if any
   nsDisplayItem*                 mGlassDisplayItem;
+  // A temporary list that we append scroll info items to while building
+  // display items for the contents of frames with SVG effects.
+  // Only non-null when ShouldBuildScrollInfoItemsForHoisting() is true.
+  // This is a pointer and not a real nsDisplayList value because the
+  // nsDisplayList class is defined below this class, so we can't use it here.
+  nsDisplayList*                 mScrollInfoItemsForHoisting;
   nsTArray<DisplayItemClip*>     mDisplayItemClipsToDestroy;
   Mode                           mMode;
   ViewID                         mCurrentScrollParentId;
   ViewID                         mCurrentScrollbarTarget;
   uint32_t                       mCurrentScrollbarFlags;
   BlendModeSet                   mContainedBlendModes;
+  int32_t                        mSVGEffectsBuildingDepth;
   bool                           mBuildCaret;
   bool                           mIgnoreSuppression;
   bool                           mHadToIgnoreSuppression;
@@ -3205,20 +3241,18 @@ public:
                                    LayerManager* aManager,
                                    const ContainerLayerParameters& aParameters) override;
 
-  virtual bool ShouldFlattenAway(nsDisplayListBuilder* aBuilder) override;
+  virtual bool ShouldFlattenAway(nsDisplayListBuilder* aBuilder) override
+  { return false; }
 
   virtual void WriteDebugInfo(std::stringstream& aStream) override;
 
   mozilla::UniquePtr<FrameMetrics> ComputeFrameMetrics(Layer* aLayer,
                                                        const ContainerLayerParameters& aContainerParameters);
 
-  void MarkHoisted() { mHoisted = true; }
-
 protected:
   nsIFrame* mScrollFrame;
   nsIFrame* mScrolledFrame;
   ViewID mScrollParentId;
-  bool mHoisted;
 };
 
 /**

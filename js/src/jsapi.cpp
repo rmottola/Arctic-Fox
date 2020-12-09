@@ -1,5 +1,4 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*- * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -1513,7 +1512,7 @@ JS_RemoveExtraGCRootsTracer(JSRuntime* rt, JSTraceDataOp traceOp, void* data)
 }
 
 JS_PUBLIC_API(void)
-JS_GC(JSRuntime *rt)
+JS_GC(JSRuntime* rt)
 {
     AssertHeapIsIdle(rt);
     JS::PrepareForFullGC(rt);
@@ -1799,8 +1798,8 @@ JS_PropertyStub(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue
 }
 
 JS_PUBLIC_API(bool)
-JS_StrictPropertyStub(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
-                      ObjectOpResult &result)
+JS_StrictPropertyStub(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+                      ObjectOpResult& result)
 {
     return result.succeed();
 }
@@ -1902,12 +1901,12 @@ JS_IsExtensible(JSContext* cx, HandleObject obj, bool* extensible)
 }
 
 JS_PUBLIC_API(bool)
-JS_PreventExtensions(JSContext *cx, JS::HandleObject obj, ObjectOpResult &result)
+JS_PreventExtensions(JSContext* cx, JS::HandleObject obj, ObjectOpResult& result)
 {
     return PreventExtensions(cx, obj, result);
 }
 
-JS_PUBLIC_API(JSObject *)
+JS_PUBLIC_API(JSObject*)
 JS_GetConstructor(JSContext* cx, HandleObject proto)
 {
     AssertHeapIsIdle(cx);
@@ -2012,8 +2011,8 @@ JS_FireOnNewGlobalObject(JSContext* cx, JS::HandleObject global)
     Debugger::onNewGlobalObject(cx, globalObject);
 }
 
-JS_PUBLIC_API(JSObject *)
-JS_NewObject(JSContext *cx, const JSClass *jsclasp)
+JS_PUBLIC_API(JSObject*)
+JS_NewObject(JSContext* cx, const JSClass* jsclasp)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     AssertHeapIsIdle(cx);
@@ -2968,41 +2967,41 @@ SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v)
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleValue v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v)
 {
     return SetElement(cx, obj, index, v);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleObject v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleObject v)
 {
     RootedValue value(cx, ObjectOrNullValue(v));
     return SetElement(cx, obj, index, value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleString v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleString v)
 {
     RootedValue value(cx, StringValue(v));
     return SetElement(cx, obj, index, value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, int32_t v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, int32_t v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, uint32_t v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, uint32_t v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, value);
 }
 
 JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, HandleObject obj, uint32_t index, double v)
+JS_SetElement(JSContext* cx, HandleObject obj, uint32_t index, double v)
 {
     RootedValue value(cx, NumberValue(v));
     return SetElement(cx, obj, index, value);
@@ -3050,7 +3049,7 @@ JS_DeleteElement(JSContext* cx, HandleObject obj, uint32_t index, ObjectOpResult
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteProperty(JSContext *cx, HandleObject obj, const char *name, ObjectOpResult &result)
+JS_DeleteProperty(JSContext* cx, HandleObject obj, const char* name, ObjectOpResult& result)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -3063,8 +3062,8 @@ JS_DeleteProperty(JSContext *cx, HandleObject obj, const char *name, ObjectOpRes
 }
 
 JS_PUBLIC_API(bool)
-JS_DeleteUCProperty(JSContext *cx, HandleObject obj, const char16_t *name, size_t namelen,
-                    ObjectOpResult &result)
+JS_DeleteUCProperty(JSContext* cx, HandleObject obj, const char16_t* name, size_t namelen,
+                    ObjectOpResult& result)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -3237,9 +3236,9 @@ JS_InitDestroyPrincipalsCallback(JSRuntime* rt, JSDestroyPrincipalsOp destroyPri
     rt->destroyPrincipals = destroyPrincipals;
 }
 
-JS_PUBLIC_API(JSFunction *)
-JS_NewFunction(JSContext *cx, JSNative native, unsigned nargs, unsigned flags,
-               const char *name)
+JS_PUBLIC_API(JSFunction*)
+JS_NewFunction(JSContext* cx, JSNative native, unsigned nargs, unsigned flags,
+               const char* name)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
 
@@ -3454,7 +3453,7 @@ JS_BindCallable(JSContext* cx, HandleObject target, HandleObject newThis)
 }
 
 static bool
-GenericNativeMethodDispatcher(JSContext *cx, unsigned argc, Value *vp)
+GenericNativeMethodDispatcher(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -3855,12 +3854,13 @@ JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
 }
 
 bool
-JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
             SourceBufferHolder& srcBuf, MutableHandleScript script)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
+    AutoLastFrameCheck lfc(cx);
 
     script.set(frontend::CompileScript(cx, &cx->tempLifoAlloc(), cx->global(),
                                        nullptr, nullptr, options, srcBuf));
@@ -3868,7 +3868,7 @@ JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
 }
 
 bool
-JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
             const char16_t* chars, size_t length, MutableHandleScript script)
 {
     SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
@@ -3876,7 +3876,7 @@ JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
 }
 
 bool
-JS::Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
             const char* bytes, size_t length, MutableHandleScript script)
 {
     mozilla::UniquePtr<char16_t, JS::FreePolicy> chars;
@@ -3964,15 +3964,15 @@ JS::FinishOffThreadScript(JSContext* maybecx, JSRuntime* rt, void* token)
 }
 
 JS_PUBLIC_API(bool)
-JS_CompileScript(JSContext *cx, const char *ascii, size_t length,
-                 const JS::CompileOptions &options, MutableHandleScript script)
+JS_CompileScript(JSContext* cx, const char* ascii, size_t length,
+                 const JS::CompileOptions& options, MutableHandleScript script)
 {
     return Compile(cx, options, ascii, length, script);
 }
 
 JS_PUBLIC_API(bool)
-JS_CompileUCScript(JSContext *cx, const char16_t *chars, size_t length,
-                   const JS::CompileOptions &options, MutableHandleScript script)
+JS_CompileUCScript(JSContext* cx, const char16_t* chars, size_t length,
+                   const JS::CompileOptions& options, MutableHandleScript script)
 {
     return Compile(cx, options, chars, length, script);
 }
@@ -4217,13 +4217,13 @@ ExecuteScript(JSContext* cx, AutoObjectVector& scopeChain, HandleScript scriptAr
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API(bool)
-JS_ExecuteScript(JSContext *cx, HandleScript scriptArg, MutableHandleValue rval)
+JS_ExecuteScript(JSContext* cx, HandleScript scriptArg, MutableHandleValue rval)
 {
     return ExecuteScript(cx, cx->global(), scriptArg, rval.address());
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API(bool)
-JS_ExecuteScript(JSContext *cx, HandleScript scriptArg)
+JS_ExecuteScript(JSContext* cx, HandleScript scriptArg)
 {
     return ExecuteScript(cx, cx->global(), scriptArg, nullptr);
 }
@@ -4259,7 +4259,7 @@ JS::CloneAndExecuteScript(JSContext* cx, HandleScript scriptArg)
 static const unsigned LARGE_SCRIPT_LENGTH = 500*1024;
 
 static bool
-Evaluate(JSContext *cx, HandleObject scope, const ReadOnlyCompileOptions &optionsArg,
+Evaluate(JSContext* cx, HandleObject scope, const ReadOnlyCompileOptions& optionsArg,
          SourceBufferHolder& srcBuf, MutableHandleValue rval)
 {
     CompileOptions options(cx, optionsArg);
@@ -4312,7 +4312,7 @@ Evaluate(JSContext* cx, AutoObjectVector& scopeChain, const ReadOnlyCompileOptio
 }
 
 static bool
-Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
          const char16_t* chars, size_t length, MutableHandleValue rval)
 {
   SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
@@ -4320,8 +4320,8 @@ Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
 }
 
 extern JS_PUBLIC_API(bool)
-JS::Evaluate(JSContext *cx, const ReadOnlyCompileOptions &options,
-             const char *bytes, size_t length, MutableHandleValue rval)
+JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& options,
+             const char* bytes, size_t length, MutableHandleValue rval)
 {
     char16_t* chars;
     if (options.utf8)
@@ -4337,7 +4337,7 @@ JS::Evaluate(JSContext *cx, const ReadOnlyCompileOptions &options,
 }
 
 static bool
-Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
          const char* filename, MutableHandleValue rval)
 {
     FileContents buffer(cx);
@@ -4353,7 +4353,7 @@ Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
 }
 
 JS_PUBLIC_API(bool)
-JS::Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
              SourceBufferHolder& srcBuf, MutableHandleValue rval)
 {
     return ::Evaluate(cx, cx->global(), optionsArg, srcBuf, rval);
@@ -4367,22 +4367,22 @@ JS::Evaluate(JSContext* cx, AutoObjectVector& scopeChain, const ReadOnlyCompileO
 }
 
 JS_PUBLIC_API(bool)
-JS::Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
              const char16_t* chars, size_t length, MutableHandleValue rval)
 {
     return ::Evaluate(cx, optionsArg, chars, length, rval);
 }
 
 JS_PUBLIC_API(bool)
-JS::Evaluate(JSContext *cx, AutoObjectVector &scopeChain, const ReadOnlyCompileOptions &optionsArg,
-             const char16_t *chars, size_t length, MutableHandleValue rval)
+JS::Evaluate(JSContext* cx, AutoObjectVector& scopeChain, const ReadOnlyCompileOptions& optionsArg,
+             const char16_t* chars, size_t length, MutableHandleValue rval)
 {
     SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
     return ::Evaluate(cx, scopeChain, optionsArg, srcBuf, rval);
 }
 
 JS_PUBLIC_API(bool)
-JS::Evaluate(JSContext *cx, const ReadOnlyCompileOptions &optionsArg,
+JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
              const char* filename, MutableHandleValue rval)
 {
     return ::Evaluate(cx, optionsArg, filename, rval);

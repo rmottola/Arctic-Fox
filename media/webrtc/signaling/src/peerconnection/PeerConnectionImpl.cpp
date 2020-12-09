@@ -155,7 +155,7 @@ public:
 class WrappableJSErrorResult {
 public:
   WrappableJSErrorResult() : isCopy(false) {}
-  WrappableJSErrorResult(WrappableJSErrorResult &other) : mRv(), isCopy(true) {}
+  WrappableJSErrorResult(const WrappableJSErrorResult &other) : mRv(), isCopy(true) {}
   ~WrappableJSErrorResult() {
     if (isCopy) {
       MOZ_ASSERT(NS_IsMainThread());

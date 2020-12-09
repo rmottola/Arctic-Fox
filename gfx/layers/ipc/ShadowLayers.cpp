@@ -28,7 +28,6 @@
 #include "mozilla/layers/TextureClient.h"  // for TextureClient
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "nsAutoPtr.h"                  // for nsRefPtr, getter_AddRefs, etc
-#include "nsSize.h"                     // for nsIntSize
 #include "nsTArray.h"                   // for nsAutoTArray, nsTArray, etc
 #include "nsXULAppAPI.h"                // for XRE_GetProcessType, etc
 #include "mozilla/ReentrantMonitor.h"
@@ -359,28 +358,6 @@ ShadowLayerForwarder::UpdatePictureRect(CompositableClient* aCompositable,
 }
 
 void
-ShadowLayerForwarder::UpdatedTexture(CompositableClient* aCompositable,
-                                     TextureClient* aTexture,
-                                     nsIntRegion* aRegion)
-{
-  MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(aTexture);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
-  MOZ_ASSERT(aTexture->GetIPDLActor());
-  MaybeRegion region = aRegion ? MaybeRegion(*aRegion)
-                               : MaybeRegion(null_t());
-  if (aTexture->GetFlags() & TextureFlags::IMMEDIATE_UPLOAD) {
-    mTxn->AddPaint(OpUpdateTexture(nullptr, aCompositable->GetIPDLActor(),
-                                   nullptr, aTexture->GetIPDLActor(),
-                                   region));
-  } else {
-    mTxn->AddNoSwapPaint(OpUpdateTexture(nullptr, aCompositable->GetIPDLActor(),
-                                         nullptr, aTexture->GetIPDLActor(),
-                                         region));
-  }
-}
-
-void
 ShadowLayerForwarder::UseTexture(CompositableClient* aCompositable,
                                  TextureClient* aTexture)
 {
@@ -388,15 +365,18 @@ ShadowLayerForwarder::UseTexture(CompositableClient* aCompositable,
   MOZ_ASSERT(aTexture);
   MOZ_ASSERT(aCompositable->GetIPDLActor());
   MOZ_ASSERT(aTexture->GetIPDLActor());
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-  FenceHandle handle = aTexture->GetAcquireFenceHandle();
-  if (handle.IsValid()) {
-    RefPtr<FenceDeliveryTracker> tracker = new FenceDeliveryTracker(handle);
-    SendFenceHandle(tracker, aTexture->GetIPDLActor(), handle);
-  }
-#endif
+
+  FenceHandle fence = aTexture->GetAcquireFenceHandle();
   mTxn->AddEdit(OpUseTexture(nullptr, aCompositable->GetIPDLActor(),
-                             nullptr, aTexture->GetIPDLActor()));
+                             nullptr, aTexture->GetIPDLActor(),
+                             fence.IsValid() ? MaybeFence(fence) : MaybeFence(null_t())));
+  if (aTexture->GetFlags() & TextureFlags::IMMEDIATE_UPLOAD
+      && aTexture->HasInternalBuffer()) {
+    // We use IMMEDIATE_UPLOAD when we want to be sure that the upload cannot
+    // race with updates on the main thread. In this case we want the transaction
+    // to be synchronous.
+    mTxn->MarkSyncTransaction();
+  }
 }
 
 void
@@ -425,17 +405,6 @@ ShadowLayerForwarder::UseOverlaySource(CompositableClient* aCompositable,
   mTxn->AddEdit(OpUseOverlaySource(nullptr, aCompositable->GetIPDLActor(), aOverlay));
 }
 #endif
-
-void
-ShadowLayerForwarder::SendFenceHandle(AsyncTransactionTracker* aTracker,
-                                        PTextureChild* aTexture,
-                                        const FenceHandle& aFence)
-{
-  if (!HasShadowManager() || !mShadowManager->IPCOpen()) {
-    return;
-  }
-  mShadowManager->SendFenceHandle(aTracker, aTexture, aFence);
-}
 
 void
 ShadowLayerForwarder::RemoveTextureFromCompositable(CompositableClient* aCompositable,
@@ -568,6 +537,13 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     return true;
   }
 
+  if (!mTxn->mPaints.empty()) {
+    // With some platforms, telling the drawing backend that there will be no more
+    // drawing for this frame helps with preventing command queues from spanning
+    // across multiple frames.
+    gfxPlatform::GetPlatform()->FlushContentDrawing();
+  }
+
   MOZ_LAYERS_LOG(("[LayersForwarder] destroying buffers..."));
 
   MOZ_LAYERS_LOG(("[LayersForwarder] building transaction..."));
@@ -694,10 +670,6 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     }
   }
 
-  // Clear any cached plugin data we might have, now that the
-  // transaction is complete.
-  mPluginWindowData.Clear();
-
   *aSent = true;
   mIsFirstPaint = false;
   MOZ_LAYERS_LOG(("[LayersForwarder] ... done"));
@@ -752,6 +724,16 @@ ShadowLayerForwarder::IsSameProcess() const
     return false;
   }
   return mShadowManager->OtherPid() == base::GetCurrentProcId();
+}
+
+base::ProcessId
+ShadowLayerForwarder::ParentPid() const
+{
+  if (!HasShadowManager() || !mShadowManager->IPCOpen()) {
+    return base::ProcessId();
+  }
+
+  return mShadowManager->OtherPid();
 }
 
 /**
@@ -867,22 +849,15 @@ void ShadowLayerForwarder::SendPendingAsyncMessges()
 {
   if (!HasShadowManager() ||
       !mShadowManager->IPCOpen()) {
-    mTransactionsToRespond.clear();
     mPendingAsyncMessages.clear();
     return;
   }
 
-  if (mTransactionsToRespond.empty() && mPendingAsyncMessages.empty()) {
+  if (mPendingAsyncMessages.empty()) {
     return;
   }
 
   InfallibleTArray<AsyncChildMessageData> replies;
-  replies.SetCapacity(mTransactionsToRespond.size());
-  // Prepare OpReplyDeliverFence messages.
-  for (size_t i = 0; i < mTransactionsToRespond.size(); i++) {
-    replies.AppendElement(OpReplyDeliverFence(mTransactionsToRespond[i]));
-  }
-  mTransactionsToRespond.clear();
   // Prepare pending messages.
   for (size_t i = 0; i < mPendingAsyncMessages.size(); i++) {
     replies.AppendElement(mPendingAsyncMessages[i]);
