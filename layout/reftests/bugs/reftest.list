@@ -54,9 +54,9 @@ asserts(2) skip-if(!cocoaWidget) HTTP(..) == 10209-3.html 10209-3-ref.html # Ass
 == 25888-2r-block.html 25888-2r-ref.html
 == 25888-3l-block.html 25888-3l-ref.html
 == 25888-3r-block.html 25888-3r-ref.html
-skip-if(B2G) == 28811-1a.html 28811-1-ref.html
-fuzzy-if(gtk2Widget,6,26200) == 28811-1b.html 28811-1-ref.html  # Bug 1128229
-skip-if(B2G) == 28811-2a.html 28811-2-ref.html
+skip-if(B2G||Mulet) == 28811-1a.html 28811-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
+fuzzy-if(gtkWidget,6,26200) == 28811-1b.html 28811-1-ref.html  # Bug 1128229
+skip-if(B2G||Mulet) == 28811-2a.html 28811-2-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 fuzzy-if(gtk2Widget,6,26200) == 28811-2b.html 28811-2-ref.html  # Bug 1128229
 == 40596-1a.html 40596-1-ref.html
 != 40596-1b.html 40596-1-ref.html
@@ -1875,4 +1875,5 @@ fuzzy-if(d2d,36,304) HTTP(..) == 1116480-1-fakeitalic-overflow.html 1116480-1-fa
 skip-if(B2G||Mulet) == 1150021-1.xul 1150021-1-ref.xul
 == 1151145-1.html 1151145-1-ref.html
 == 1151306-1.html 1151306-1-ref.html
+== 1153845-1.html 1153845-1-ref.html
 == 1156129-1.html 1156129-1-ref.html
