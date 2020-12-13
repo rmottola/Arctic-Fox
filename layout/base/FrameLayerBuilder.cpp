@@ -4504,6 +4504,15 @@ static inline gfxSize RoundToFloatPrecision(const gfxSize& aSize)
   return gfxSize(float(aSize.width), float(aSize.height));
 }
 
+static inline gfxSize NudgedToIntegerSize(const gfxSize& aSize)
+{
+  float width = aSize.width;
+  float height = aSize.height;
+  gfx::NudgeToInteger(&width);
+  gfx::NudgeToInteger(&height);
+  return gfxSize(width, height);
+}
+
 static void RestrictScaleToMaxLayerSize(gfxSize& aScale,
                                         const nsRect& aVisibleRect,
                                         nsIFrame* aContainerFrame,
@@ -4622,7 +4631,7 @@ ChooseScaleAndSetTransform(FrameLayerBuilder* aLayerBuilder,
           scale.height = gfxUtils::ClampToScaleFactor(scale.height);
         }
       } else {
-        // XXX Do we need to move nearly-integer values to integers here?
+        scale = NudgedToIntegerSize(scale);
       }
     }
     // If the scale factors are too small, just use 1.0. The content is being
