@@ -48,6 +48,7 @@
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
+- Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
