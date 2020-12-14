@@ -267,7 +267,7 @@ RasterImage::RasterImage(ProgressTracker* aProgressTracker,
   mSourceBuffer(new SourceBuffer()),
   mFrameCount(0),
   mHasSize(false),
-  mDecodeOnDraw(false),
+  mDecodeOnlyOnDraw(false),
   mTransient(false),
   mSyncLoad(false),
   mDiscardable(false),
@@ -310,18 +310,18 @@ RasterImage::Init(const char* aMimeType,
 
   NS_ENSURE_ARG_POINTER(aMimeType);
 
-  // We must be non-discardable and non-decode-on-draw for
+  // We must be non-discardable and non-decode-only-on-draw for
   // transient images.
   MOZ_ASSERT(!(aFlags & INIT_FLAG_TRANSIENT) ||
                (!(aFlags & INIT_FLAG_DISCARDABLE) &&
-                !(aFlags & INIT_FLAG_DECODE_ON_DRAW) &&
+                !(aFlags & INIT_FLAG_DECODE_ONLY_ON_DRAW) &&
                 !(aFlags & INIT_FLAG_DOWNSCALE_DURING_DECODE)),
              "Illegal init flags for transient image");
 
   // Store initialization data
   mSourceDataMimeType.Assign(aMimeType);
   mDiscardable = !!(aFlags & INIT_FLAG_DISCARDABLE);
-  mDecodeOnDraw = !!(aFlags & INIT_FLAG_DECODE_ON_DRAW);
+  mDecodeOnlyOnDraw = !!(aFlags & INIT_FLAG_DECODE_ONLY_ON_DRAW);
   mTransient = !!(aFlags & INIT_FLAG_TRANSIENT);
   mDownscaleDuringDecode = !!(aFlags & INIT_FLAG_DOWNSCALE_DURING_DECODE);
   mSyncLoad = !!(aFlags & INIT_FLAG_SYNC_LOAD);
@@ -1204,11 +1204,11 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
              (mProgressTracker->GetProgress() & FLAG_SIZE_AVAILABLE),
              "Should have notified that the size is available if we have it");
 
-  if (mDecodeOnDraw) {
-    // For decode-on-draw images, we want to send notifications as if we've
+  if (mDecodeOnlyOnDraw) {
+    // For decode-only-on-draw images, we want to send notifications as if we've
     // already finished decoding. Otherwise some observers will never even try
     // to draw. (We may have already sent some of these notifications from
-    // NotifyForDecodeOnDrawOnly(), but ProgressTracker will ensure no duplicate
+    // NotifyForDecodeOnlyOnDraw(), but ProgressTracker will ensure no duplicate
     // notifications get sent.)
     aProgress |= FLAG_ONLOAD_BLOCKED |
                  FLAG_DECODE_STARTED |
@@ -1227,11 +1227,11 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
 }
 
 void
-RasterImage::NotifyForDecodeOnDrawOnly()
+RasterImage::NotifyForDecodeOnlyOnDraw()
 {
   if (!NS_IsMainThread()) {
     nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(this, &RasterImage::NotifyForDecodeOnDrawOnly);
+      NS_NewRunnableMethod(this, &RasterImage::NotifyForDecodeOnlyOnDraw);
     NS_DispatchToMainThread(runnable);
     return;
   }
@@ -1248,10 +1248,10 @@ RasterImage::OnImageDataAvailable(nsIRequest*,
 {
   nsresult rv;
 
-  if (MOZ_UNLIKELY(mDecodeOnDraw && aOffset == 0)) {
-    // If we're a decode-on-draw image, send notifications as if we've just
+  if (MOZ_UNLIKELY(mDecodeOnlyOnDraw && aOffset == 0)) {
+    // If we're a decode-only-on-draw image, send notifications as if we've just
     // started decoding.
-    NotifyForDecodeOnDrawOnly();
+    NotifyForDecodeOnlyOnDraw();
   }
 
   // WriteToSourceBuffer always consumes everything it gets if it doesn't run
@@ -1467,8 +1467,8 @@ RasterImage::CreateDecoder(const Maybe<IntSize>& aSize, uint32_t aFlags)
 NS_IMETHODIMP
 RasterImage::RequestDecode()
 {
-  // For decode-on-draw images, we only act on RequestDecodeForSize.
-  if (mDecodeOnDraw) {
+  // For decode-only-on-draw images, we only act on RequestDecodeForSize.
+  if (mDecodeOnlyOnDraw) {
     return NS_OK;
   }
 
@@ -1479,8 +1479,8 @@ RasterImage::RequestDecode()
 NS_IMETHODIMP
 RasterImage::StartDecoding()
 {
-  // For decode-on-draw images, we only act on RequestDecodeForSize.
-  if (mDecodeOnDraw) {
+  // For decode-only-on-draw images, we only act on RequestDecodeForSize.
+  if (mDecodeOnlyOnDraw) {
     return NS_OK;
   }
 
