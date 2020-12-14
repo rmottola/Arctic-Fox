@@ -916,7 +916,6 @@ WillHandleWheelEvent(WidgetWheelEvent* aEvent)
 {
   return EventStateManager::WheelEventIsScrollAction(aEvent) &&
          aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
-         !gfxPrefs::MouseWheelHasScrollDeltaOverride() &&
          !EventStateManager::WheelEventNeedsDeltaMultipliers(aEvent);
 }
 
