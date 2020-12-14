@@ -85,7 +85,14 @@ struct ParamTraits<mozilla::dom::AudioChannelState>
                                     mozilla::dom::AUDIO_CHANNEL_STATE_LAST>
 { };
 
-} // namespace IPC
 
+template <>
+struct ParamTraits<nsEventStatus>
+  : public ContiguousEnumSerializer<nsEventStatus,
+                                    nsEventStatus_eIgnore,
+                                    nsEventStatus_eSentinel>
+{ };
+
+} // namespace IPC
 
 #endif
