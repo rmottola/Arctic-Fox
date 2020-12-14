@@ -409,7 +409,7 @@ nsChildView::~nsChildView()
 
   DestroyCompositor();
 
-  if (mAPZC) {
+  if (mAPZC && gfxPrefs::AsyncPanZoomSeparateEventThread()) {
     gNumberOfWidgetsNeedingEventThread--;
     if (gNumberOfWidgetsNeedingEventThread == 0) {
       [EventThreadRunner stop];
@@ -1907,10 +1907,12 @@ nsChildView::ConfigureAPZCTreeManager()
 {
   nsBaseWidget::ConfigureAPZCTreeManager();
 
-  if (gNumberOfWidgetsNeedingEventThread == 0) {
-    [EventThreadRunner start];
+  if (gfxPrefs::AsyncPanZoomSeparateEventThread()) {
+    if (gNumberOfWidgetsNeedingEventThread == 0) {
+      [EventThreadRunner start];
+    }
+    gNumberOfWidgetsNeedingEventThread++;
   }
-  gNumberOfWidgetsNeedingEventThread++;
 }
 
 void
@@ -4858,8 +4860,9 @@ static int32_t RoundUp(double aDouble)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  if ([self apzctm]) {
-    // Disable main-thread scrolling completely when using APZC.
+  if (gfxPrefs::AsyncPanZoomSeparateEventThread() && [self apzctm]) {
+    // Disable main-thread scrolling completely when using APZ with the
+    // separate event thread. This is bug 1013412.
     return;
   }
 
