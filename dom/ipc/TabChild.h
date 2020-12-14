@@ -498,12 +498,12 @@ public:
 
     LayoutDeviceIntPoint GetChromeDisplacement() { return mChromeDisp; };
 
+    bool IPCOpen() { return mIPCOpen; }
+
     bool ParentIsActive()
     {
       return mParentIsActive;
     }
-
-    bool IPCOpen() { return mIPCOpen; }
 
 protected:
     virtual ~TabChild();
