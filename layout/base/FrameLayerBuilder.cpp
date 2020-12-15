@@ -4813,7 +4813,7 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
   if ((aContainerFrame->GetStateBits() & NS_FRAME_NO_COMPONENT_ALPHA) &&
       mRetainingManager &&
       mRetainingManager->ShouldAvoidComponentAlphaLayers() &&
-      !gfxPrefs::AsyncPanZoomEnabled())
+      !nsLayoutUtils::AsyncPanZoomEnabled(aContainerFrame))
   {
     flattenToSingleLayer = true;
   }
@@ -4845,7 +4845,7 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
         mRetainingManager->ShouldAvoidComponentAlphaLayers() &&
         containerLayer->HasMultipleChildren() &&
         !flattenToSingleLayer &&
-        !gfxPrefs::AsyncPanZoomEnabled())
+        !nsLayoutUtils::AsyncPanZoomEnabled(aContainerFrame))
     {
       // Since we don't want any component alpha layers on BasicLayers, we repeat
       // the layer building process with this explicitely forced off.

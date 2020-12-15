@@ -2722,7 +2722,7 @@ TabParent::ApzAwareEventRoutingToChild(ScrollableLayerGuid* aOutTargetGuid,
                                        uint64_t* aOutInputBlockId,
                                        nsEventStatus* aOutApzResponse)
 {
-  if (gfxPrefs::AsyncPanZoomEnabled()) {
+  if (AsyncPanZoomEnabled()) {
     if (aOutTargetGuid) {
       *aOutTargetGuid = InputAPZContext::GetTargetLayerGuid();
 
@@ -2902,7 +2902,7 @@ TabParent::InjectTouchEvent(const nsAString& aType,
 NS_IMETHODIMP
 TabParent::GetUseAsyncPanZoom(bool* useAsyncPanZoom)
 {
-  *useAsyncPanZoom = gfxPrefs::AsyncPanZoomEnabled();
+  *useAsyncPanZoom = AsyncPanZoomEnabled();
   return NS_OK;
 }
 
@@ -3306,6 +3306,13 @@ TabParent::TakeDragVisualization(RefPtr<mozilla::gfx::SourceSurface>& aSurface,
   aSurface = mDnDVisualization.forget();
   aDragAreaX = mDragAreaX;
   aDragAreaY = mDragAreaY;
+}
+
+bool
+TabParent::AsyncPanZoomEnabled() const
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  return widget && widget->AsyncPanZoomEnabled();
 }
 
 NS_IMETHODIMP

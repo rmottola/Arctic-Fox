@@ -265,7 +265,8 @@ CSSToParentLayerScale ConvertScaleForRoot(CSSToScreenScale aScale) {
 bool
 TabChildBase::HandlePossibleViewportChange(const ScreenIntSize& aOldScreenSize)
 {
-  if (!gfxPrefs::AsyncPanZoomEnabled()) {
+  nsIWidget* widget = WebWidget();
+  if (!widget || !widget->AsyncPanZoomEnabled()) {
     return false;
   }
 
@@ -870,6 +871,13 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mIPCOpen(true)
   , mParentIsActive(false)
 {
+  // In the general case having the TabParent tell us if APZ is enabled or not
+  // doesn't really work because the TabParent itself may not have a reference
+  // to the owning widget during initialization. Instead we assume that this
+  // TabChild corresponds to a widget type that would have APZ enabled, and just
+  // check the other conditions necessary for enabling APZ.
+  mAsyncPanZoomEnabled = gfxPlatform::AsyncPanZoomEnabled();
+
   // preloaded TabChild should not be added to child map
   if (mUniqueId) {
     MOZ_ASSERT(NestedTabChildMap().find(mUniqueId) == NestedTabChildMap().end());
@@ -915,7 +923,7 @@ TabChild::Observe(nsISupports *aSubject,
       }
     }
   } else if (!strcmp(aTopic, BEFORE_FIRST_PAINT)) {
-    if (gfxPrefs::AsyncPanZoomEnabled()) {
+    if (AsyncPanZoomEnabled()) {
       nsCOMPtr<nsIDocument> subject(do_QueryInterface(aSubject));
       nsCOMPtr<nsIDocument> doc(GetDocument());
 
@@ -973,7 +981,7 @@ TabChild::OnLocationChange(nsIWebProgress* aWebProgress,
                            nsIURI *aLocation,
                            uint32_t aFlags)
 {
-  if (!gfxPrefs::AsyncPanZoomEnabled()) {
+  if (!AsyncPanZoomEnabled()) {
     return NS_OK;
   }
 
@@ -2004,6 +2012,7 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
     bool res = InitTabChildGlobal();
     ApplyShowInfo(aInfo);
     RecvParentActivated(aParentIsActive);
+
     return res;
 }
 
@@ -2198,7 +2207,7 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
                               const ScrollableLayerGuid& aGuid,
                               const uint64_t& aInputBlockId)
 {
-  if (gfxPrefs::AsyncPanZoomEnabled()) {
+  if (AsyncPanZoomEnabled()) {
     nsCOMPtr<nsIDocument> document(GetDocument());
     APZCCallbackHelper::SendSetTargetAPZCNotification(WebWidget(), document, aEvent, aGuid,
         aInputBlockId);
@@ -2208,7 +2217,7 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
   event.widget = mWidget;
   APZCCallbackHelper::DispatchWidgetEvent(event);
 
-  if (gfxPrefs::AsyncPanZoomEnabled()) {
+  if (AsyncPanZoomEnabled()) {
     mAPZEventState->ProcessWheelEvent(event, aGuid, aInputBlockId);
   }
   return true;
@@ -2390,7 +2399,7 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
   APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
       mWidget->GetDefaultScale(), GetPresShellResolution());
 
-  if (localEvent.message == NS_TOUCH_START && gfxPrefs::AsyncPanZoomEnabled()) {
+  if (localEvent.message == NS_TOUCH_START && AsyncPanZoomEnabled()) {
     if (gfxPrefs::TouchActionEnabled()) {
       APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(WebWidget(),
           localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
@@ -2403,7 +2412,7 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
   // Dispatch event to content (potentially a long-running operation)
   nsEventStatus status = APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (!gfxPrefs::AsyncPanZoomEnabled()) {
+  if (!AsyncPanZoomEnabled()) {
     UpdateTapState(localEvent, status);
     return true;
   }

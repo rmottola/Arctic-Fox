@@ -621,7 +621,8 @@ nsDisplayListBuilder::nsDisplayListBuilder(nsIFrame* aReferenceFrame,
       mHaveScrollableDisplayPort(false),
       mWindowDraggingAllowed(false),
       mIsBuildingForPopup(nsLayoutUtils::IsPopup(aReferenceFrame)),
-      mForceLayerForScrollParent(false)
+      mForceLayerForScrollParent(false),
+      mAsyncPanZoomEnabled(nsLayoutUtils::AsyncPanZoomEnabled(aReferenceFrame))
 {
   MOZ_COUNT_CTOR(nsDisplayListBuilder);
   PL_InitArenaPool(&mPool, "displayListArena", 1024,
@@ -1539,7 +1540,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
   // Add metrics if there are none in the layer tree with the id (create an id
   // if there isn't one already) of the root scroll frame/root content.
   bool ensureMetricsForRootId =
-    gfxPrefs::AsyncPanZoomEnabled() &&
+    nsLayoutUtils::AsyncPanZoomEnabled(frame) &&
     !gfxPrefs::LayoutUseContainersForRootFrames() &&
     aBuilder->IsPaintingToWindow() &&
     !presContext->GetParentPresContext();
@@ -2305,7 +2306,7 @@ nsDisplayBackgroundImage::ShouldFixToViewport(LayerManager* aManager)
 {
   // APZ doesn't (yet) know how to scroll the visible region for these type of
   // items, so don't layerize them if it's enabled.
-  if (nsLayoutUtils::UsesAsyncScrolling() ||
+  if (nsLayoutUtils::UsesAsyncScrolling(mFrame) ||
       (aManager && aManager->ShouldAvoidComponentAlphaLayers())) {
     return false;
   }
@@ -4203,7 +4204,7 @@ nsDisplaySubDocument::ComputeVisibility(nsDisplayListBuilder* aBuilder,
   // If APZ is enabled then don't allow this computation to influence
   // aVisibleRegion, on the assumption that the layer can be asynchronously
   // scrolled so we'll definitely need all the content under it.
-  if (!nsLayoutUtils::UsesAsyncScrolling()) {
+  if (!nsLayoutUtils::UsesAsyncScrolling(mFrame)) {
     bool snap;
     nsRect bounds = GetBounds(aBuilder, &snap);
     nsRegion removed;
