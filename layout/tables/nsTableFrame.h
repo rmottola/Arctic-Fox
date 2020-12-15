@@ -381,8 +381,8 @@ public:
   virtual nsresult GetFrameName(nsAString& aResult) const override;
 #endif
 
-  /** return the width of the column at aColIndex    */
-  int32_t GetColumnWidth(int32_t aColIndex);
+  /** return the isize of the column at aColIndex    */
+  int32_t GetColumnISize(int32_t aColIndex);
 
   /** Helper to get the cell spacing X style value.
    *  The argument refers to the space between column aColIndex and column
