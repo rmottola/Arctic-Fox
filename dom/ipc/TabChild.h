@@ -339,9 +339,6 @@ public:
                                    const Modifiers& aModifiers,
                                    const mozilla::layers::ScrollableLayerGuid& aGuid,
                                    const uint64_t& aInputBlockId) override;
-    virtual bool RecvHandleLongTapUp(const CSSPoint& aPoint,
-                                     const Modifiers& aModifiers,
-                                     const mozilla::layers::ScrollableLayerGuid& aGuid) override;
     virtual bool RecvNotifyAPZStateChange(const ViewID& aViewId,
                                           const APZStateChange& aChange,
                                           const int& aArg) override;
