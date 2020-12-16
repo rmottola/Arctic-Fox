@@ -501,7 +501,7 @@ TabChildBase::UpdateFrameHandler(const FrameMetrics& aFrameMetrics)
 {
   MOZ_ASSERT(aFrameMetrics.GetScrollId() != FrameMetrics::NULL_SCROLL_ID);
 
-  if (aFrameMetrics.GetIsRoot()) {
+  if (aFrameMetrics.IsRootContent()) {
     if (nsCOMPtr<nsIPresShell> shell = GetPresShell()) {
       // Guard against stale updates (updates meant for a pres shell which
       // has since been torn down and destroyed).
