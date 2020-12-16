@@ -1417,7 +1417,7 @@ nsFlexContainerFrame::
   nsHTMLReflowState
     childRSForMeasuringHeight(aPresContext, aParentReflowState,
                               aFlexItem.Frame(), availSize,
-                              -1, -1, nsHTMLReflowState::CALLER_WILL_INIT);
+                              nullptr, nsHTMLReflowState::CALLER_WILL_INIT);
   childRSForMeasuringHeight.mFlags.mIsFlexContainerMeasuringHeight = true;
   childRSForMeasuringHeight.Init(aPresContext);
 

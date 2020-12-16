@@ -316,12 +316,13 @@ nsVideoFrame::Reflow(nsPresContext*           aPresContext,
       nsHTMLReflowMetrics kidDesiredSize(aReflowState);
       WritingMode wm = imageFrame->GetWritingMode();
       LogicalSize availableSize = aReflowState.AvailableSize(wm);
+      LogicalSize cbSize = aMetrics.Size(aMetrics.GetWritingMode()).
+                             ConvertTo(wm, aMetrics.GetWritingMode());
       nsHTMLReflowState kidReflowState(aPresContext,
                                        aReflowState,
                                        imageFrame,
                                        availableSize,
-                                       aMetrics.Width(),
-                                       aMetrics.Height());
+                                       &cbSize);
 
       nsRect posterRenderRect;
       if (ShouldDisplayPoster()) {
@@ -356,12 +357,13 @@ nsVideoFrame::Reflow(nsPresContext*           aPresContext,
       nsHTMLReflowMetrics kidDesiredSize(aReflowState);
       WritingMode wm = child->GetWritingMode();
       LogicalSize availableSize = aReflowState.AvailableSize(wm);
+      LogicalSize cbSize = aMetrics.Size(aMetrics.GetWritingMode()).
+                             ConvertTo(wm, aMetrics.GetWritingMode());
       nsHTMLReflowState kidReflowState(aPresContext,
                                        aReflowState,
                                        child,
                                        availableSize,
-                                       aMetrics.Width(),
-                                       aMetrics.Height());
+                                       &cbSize);
       nsSize size(aReflowState.ComputedWidth(), aReflowState.ComputedHeight());
       size.width -= kidReflowState.ComputedPhysicalBorderPadding().LeftRight();
       size.height -= kidReflowState.ComputedPhysicalBorderPadding().TopBottom();
