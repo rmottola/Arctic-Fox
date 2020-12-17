@@ -162,8 +162,15 @@ public:
   AxisOrientationType GetMainAxis() const  { return mMainAxis;  }
   AxisOrientationType GetCrossAxis() const { return mCrossAxis; }
 
-  bool IsMainAxisHorizontal() const { return IsAxisHorizontal(mMainAxis); }
-  bool IsCrossAxisHorizontal() const { return IsAxisHorizontal(mCrossAxis); }
+  bool IsMainAxisHorizontal() const {
+    // If we're row-oriented, and our writing mode is NOT vertical,
+    // or we're column-oriented and our writing mode IS vertical,
+    // then our main axis is horizontal. This handles all cases:
+    return mIsRowOriented != mWM.IsVertical();
+  }
+  bool IsCrossAxisHorizontal() const {
+    return !IsMainAxisHorizontal();
+  }
   // XXXdholbert [END DEPRECATED]
 
   // Returns true if our main axis is in the reverse direction of our
@@ -268,14 +275,7 @@ private:
   FlexboxAxisTracker(const FlexboxAxisTracker&) = delete;
   FlexboxAxisTracker& operator=(const FlexboxAxisTracker&) = delete;
 
-  // Indicates whether the given AxisOrientationType is horizontal.
-  // XXXdholbert This is private so that callers outside of FlexboxAxisTracker
-  // don't depend on it. This lets us move away from AxisOrientationType to a
-  // logical-axis-relative representation more seamlessly.
   // XXXdholbert [BEGIN DEPRECATED]
-  static inline bool IsAxisHorizontal(AxisOrientationType aAxis) {
-    return eAxis_LR == aAxis || eAxis_RL == aAxis;
-  }
   AxisOrientationType mMainAxis;
   AxisOrientationType mCrossAxis;
   // XXXdholbert [END DEPRECATED]
@@ -3030,9 +3030,6 @@ FlexboxAxisTracker::FlexboxAxisTracker(const nsStylePosition* aStylePosition,
       mIsCrossAxisReversed = !mIsCrossAxisReversed;
     }
   }
-
-  MOZ_ASSERT(IsMainAxisHorizontal() != IsCrossAxisHorizontal(),
-             "main & cross axes should be in different dimensions");
 }
 
 // Allocates a new FlexLine, adds it to the given LinkedList (at the front or
