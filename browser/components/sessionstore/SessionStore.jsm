@@ -1534,17 +1534,11 @@ let SessionStoreInternal = {
     if (RunState.isQuitting)
       return;
     LastSession.clear();
+
     let openWindows = {};
-    this._forEachBrowserWindow(function(aWindow) {
-      let tabs = aWindow.gBrowser.tabs;
-      // Remove pending or restoring tabs instead of just emptying them.
-      for (let i = tabs.length - 1; i >= 0 && tabs.length > 1; i--) {
-        if (tabs[i].linkedBrowser.__SS_restoreState) {
-          aWindow.gBrowser.removeTab(tabs[i], {animate: false});
-        }
-      }
-      openWindows[aWindow.__SSi] = true;
-    });
+    // Collect open windows.
+    this._forEachBrowserWindow(({__SSi: id}) => openWindows[id] = true);
+
     // also clear all data about closed tabs and windows
     for (let ix in this._windows) {
       if (ix in openWindows) {
