@@ -1792,6 +1792,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mResolution(1.0)
   , mScrollPosForLayerPixelAlignment(-1, -1)
   , mLastUpdateImagesPos(-1, -1)
+  , mAncestorClip(nullptr)
   , mNeverHasVerticalScrollbar(false)
   , mNeverHasHorizontalScrollbar(false)
   , mHasVerticalScrollbar(false)
@@ -2757,6 +2758,9 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
   }
 
+  // Clear the scroll port clip that was set during the last paint.
+  mAncestorClip = nullptr;
+
   // We put non-overlay scrollbars in their own layers when this is the root
   // scroll frame and we are a toplevel content document. In this situation,
   // the scrollbar(s) would normally be assigned their own layer anyway, since
@@ -2939,6 +2943,11 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     DisplayListClipState::AutoSaveRestore clipState(aBuilder);
 
     if (usingDisplayport) {
+      // Capture the clip state of the parent scroll frame. This will be saved
+      // on FrameMetrics for layers with this frame as their animated geoemetry
+      // root.
+      mAncestorClip = aBuilder->ClipState().GetCurrentCombinedClip(aBuilder);
+
       // If we are using a display port, then ignore any pre-existing clip
       // passed down from our parents. The pre-existing clip would just defeat
       // the purpose of a display port which is to paint regions that are not
@@ -3069,6 +3078,10 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
       double res = mOuter->PresContext()->PresShell()->GetResolution();
       clip.width = NSToCoordRound(clip.width / res);
       clip.height = NSToCoordRound(clip.height / res);
+    }
+
+    if (mAncestorClip && mAncestorClip->HasClip()) {
+      clip = mAncestorClip->GetClipRect().Intersect(clip);
     }
 
     parentLayerClip = Some(clip);
