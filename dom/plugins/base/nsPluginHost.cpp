@@ -106,6 +106,8 @@
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
+#include "npapi.h"
+
 using namespace mozilla;
 using mozilla::TimeStamp;
 using mozilla::plugins::PluginTag;
@@ -1044,7 +1046,6 @@ nsPluginHost::GetBlocklistStateForType(const nsACString &aMimeType,
                                     aExcludeFlags,
                                     getter_AddRefs(tag));
   NS_ENSURE_SUCCESS(rv, rv);
-
   return tag->GetBlocklistState(aState);
 }
 
