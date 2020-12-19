@@ -623,13 +623,13 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
 }
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_ENCODE> *, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_DECODE> *, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
-JSObject *
-js::CloneFunctionAndScript(JSContext *cx, HandleObject enclosingScope, HandleFunction srcFun,
+JSObject*
+js::CloneFunctionAndScript(JSContext* cx, HandleObject enclosingScope, HandleFunction srcFun,
                            PollutedGlobalScopeOption polluted)
 {
     /* NB: Keep this in sync with XDRInterpretedFunction. */
@@ -758,7 +758,7 @@ js::OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v
  * if v is an object) returning true if .prototype is found.
  */
 static bool
-fun_hasInstance(JSContext *cx, HandleObject objArg, MutableHandleValue v, bool *bp)
+fun_hasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp)
 {
     RootedObject obj(cx, objArg);
 
@@ -825,8 +825,8 @@ ThrowTypeError(JSContext* cx, unsigned argc, Value* vp)
     return false;
 }
 
-static JSObject *
-CreateFunctionConstructor(JSContext *cx, JSProtoKey key)
+static JSObject*
+CreateFunctionConstructor(JSContext* cx, JSProtoKey key)
 {
     Rooted<GlobalObject*> global(cx, cx->global());
     RootedObject functionProto(cx, &global->getPrototype(JSProto_Function).toObject());
@@ -843,7 +843,7 @@ CreateFunctionConstructor(JSContext *cx, JSProtoKey key)
 }
 
 static JSObject*
-CreateFunctionPrototype(JSContext *cx, JSProtoKey key)
+CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
 {
     Rooted<GlobalObject*> self(cx, cx->global());
 
@@ -2164,7 +2164,7 @@ js::NewFunctionWithProto(ExclusiveContext* cx, Native native,
 }
 
 bool
-js::CloneFunctionObjectUseSameScript(JSCompartment *compartment, HandleFunction fun,
+js::CloneFunctionObjectUseSameScript(JSCompartment* compartment, HandleFunction fun,
                                      HandleObject newParent)
 {
     if (compartment != fun->compartment() ||
@@ -2193,8 +2193,8 @@ js::CloneFunctionObjectUseSameScript(JSCompartment *compartment, HandleFunction 
            (fun->hasScript() && fun->nonLazyScript()->hasPollutedGlobalScope());
 }
 
-JSFunction *
-js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
+JSFunction*
+js::CloneFunctionObject(JSContext* cx, HandleFunction fun, HandleObject parent,
                         gc::AllocKind allocKind,
                         NewObjectKind newKindArg /* = GenericObject */,
                         HandleObject proto)
@@ -2227,7 +2227,7 @@ js::CloneFunctionObject(JSContext *cx, HandleFunction fun, HandleObject parent,
     MOZ_ASSERT(!realParent || realParent == cx->global() ||
                realParent->isUnqualifiedVarObj());
 #endif
-    JSObject *cloneobj = NewObjectWithClassProto(cx, &JSFunction::class_, cloneProto,
+    JSObject* cloneobj = NewObjectWithClassProto(cx, &JSFunction::class_, cloneProto,
                                                  allocKind, newKind);
     if (!cloneobj)
         return nullptr;
