@@ -701,8 +701,8 @@ ClonedBlockObject::copyUnaliasedValues(AbstractFramePtr frame)
     }
 }
 
-/* static */ ClonedBlockObject *
-ClonedBlockObject::clone(ExclusiveContext *cx, Handle<ClonedBlockObject*> block)
+/* static */ ClonedBlockObject*
+ClonedBlockObject::clone(ExclusiveContext* cx, Handle<ClonedBlockObject*> block)
 {
     RootedObject enclosing(cx, &block->enclosingScope());
 
@@ -711,11 +711,11 @@ ClonedBlockObject::clone(ExclusiveContext *cx, Handle<ClonedBlockObject*> block)
     RootedObjectGroup cloneGroup(cx, block->group());
     RootedShape cloneShape(cx, block->lastProperty());
 
-    JSObject *obj = JSObject::create(cx, FINALIZE_KIND, gc::TenuredHeap, cloneShape, cloneGroup);
+    JSObject* obj = JSObject::create(cx, FINALIZE_KIND, gc::TenuredHeap, cloneShape, cloneGroup);
     if (!obj)
         return nullptr;
 
-    ClonedBlockObject &copy = obj->as<ClonedBlockObject>();
+    ClonedBlockObject& copy = obj->as<ClonedBlockObject>();
 
     MOZ_ASSERT(!copy.inDictionaryMode());
     MOZ_ASSERT(copy.isDelegate());
@@ -999,8 +999,8 @@ uninitialized_GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver
 }
 
 static bool
-uninitialized_SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                          HandleValue receiver, ObjectOpResult &result)
+uninitialized_SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                          HandleValue receiver, ObjectOpResult& result)
 {
     ReportUninitializedLexicalId(cx, id);
     return false;
@@ -1015,7 +1015,7 @@ uninitialized_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId
 }
 
 static bool
-uninitialized_DeleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+uninitialized_DeleteProperty(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
     ReportUninitializedLexicalId(cx, id);
     return false;
