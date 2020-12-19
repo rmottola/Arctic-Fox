@@ -1223,6 +1223,7 @@ PopScope(JSContext* cx, ScopeIter& si)
         break;
       case ScopeIter::Call:
       case ScopeIter::Eval:
+      case ScopeIter::NonSyntactic:
         break;
     }
 }
@@ -3998,7 +3999,7 @@ CASE(JSOP_SUPERBASE)
 {
     ScopeIter si(cx, REGS.fp()->scopeChain(), REGS.fp()->script()->innermostStaticScope(REGS.pc));
     for (; !si.done(); ++si) {
-        if (si.hasScopeObject() && si.type() == ScopeIter::Call) {
+        if (si.hasSyntacticScopeObject() && si.type() == ScopeIter::Call) {
             JSFunction& callee = si.scope().as<CallObject>().callee();
 
             // Arrow functions don't have the information we're looking for,
