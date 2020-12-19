@@ -2423,13 +2423,13 @@ GetDebugScopeForMissing(JSContext* cx, const ScopeIter& si)
     return debugScope;
 }
 
-static JSObject *
-GetDebugScopeForNonScopeObject(const ScopeIter &si)
+static JSObject*
+GetDebugScopeForNonScopeObject(const ScopeIter& si)
 {
-    JSObject &enclosing = si.enclosingScope();
+    JSObject& enclosing = si.enclosingScope();
     MOZ_ASSERT(!IsSyntacticScope(&enclosing));
 #ifdef DEBUG
-    JSObject *o = &enclosing;
+    JSObject* o = &enclosing;
     while ((o = o->enclosingScope()))
         MOZ_ASSERT(!IsSyntacticScope(o));
 #endif
