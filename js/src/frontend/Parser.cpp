@@ -599,7 +599,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
     bufEnd(0),
     length(0),
     generatorKindBits_(GeneratorKindAsBits(generatorKind)),
-    inWith(false),                  // initialized below
+    inWith_(false),                  // initialized below
     inGenexpLambda(false),
     hasDestructuringArgs(false),
     useAsm(false),
@@ -615,7 +615,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
     MOZ_ASSERT(fun->isTenured());
 
     if (!outerpc) {
-        inWith = false;
+        inWith_ = false;
 
     } else if (outerpc->parsingWith) {
         // This covers cases that don't involve eval().  For example:
@@ -624,7 +624,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
         //
         // In this case, |outerpc| corresponds to global code, and
         // outerpc->parsingWith is true.
-        inWith = true;
+        inWith_ = true;
 
     } else if (outerpc->sc->isFunctionBox()) {
         // This is like the above case, but for more deeply nested functions.
@@ -635,8 +635,8 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
         // In this case, the inner anonymous function needs to inherit the
         // setting of |inWith| from the outer one.
         FunctionBox* parent = outerpc->sc->asFunctionBox();
-        if (parent && parent->inWith)
-            inWith = true;
+        if (parent && parent->inWith())
+            inWith_ = true;
     } else {
         // This is like the above case, but when inside eval.
         //
@@ -645,7 +645,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
         //   with(o) { eval("(function() { g(); })();"); }
         //
         // In this case, the static scope chain tells us the presence of with.
-        inWith = outerpc->sc->asGlobalSharedContext()->inWith();
+        inWith_ = outerpc->sc->inWith();
     }
 }
 
@@ -2244,7 +2244,7 @@ Parser<SyntaxParseHandler>::finishFunctionDefinition(Node pn, FunctionBox* funbo
     // while its ParseContext and associated lexdeps and inner functions are
     // still available.
 
-    if (funbox->inWith)
+    if (funbox->inWith())
         return abortIfSyntaxParser();
 
     size_t numFreeVariables = pc->lexdeps->count();
