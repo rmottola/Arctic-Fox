@@ -127,6 +127,7 @@ class FunctionContextFlags
     bool definitelyNeedsArgsObj:1;
 
     bool needsHomeObject:1;
+    bool isDerivedClassConstructor:1;
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
         FunctionContextFlags flags;
@@ -136,6 +137,7 @@ class FunctionContextFlags
         flags.argumentsHasLocalBinding = false;
         flags.definitelyNeedsArgsObj = false;
         flags.needsHomeObject = false;
+        flags.isDerivedClassConstructor = false;
         return flags;
     }
 
@@ -146,7 +148,8 @@ class FunctionContextFlags
         needsDeclEnvObject(false),
         argumentsHasLocalBinding(false),
         definitelyNeedsArgsObj(false),
-        needsHomeObject(false)
+        needsHomeObject(false),
+        isDerivedClassConstructor(false)
     { }
 };
 
@@ -371,6 +374,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     bool argumentsHasLocalBinding() const { return funCxFlags.argumentsHasLocalBinding; }
     bool definitelyNeedsArgsObj()   const { return funCxFlags.definitelyNeedsArgsObj; }
     bool needsHomeObject()          const { return funCxFlags.needsHomeObject; }
+    bool isDerivedClassConstructor() const { return funCxFlags.isDerivedClassConstructor; }
 
     void setMightAliasLocals()             { funCxFlags.mightAliasLocals         = true; }
     void setHasExtensibleScope()           { funCxFlags.hasExtensibleScope       = true; }
@@ -380,6 +384,8 @@ class FunctionBox : public ObjectBox, public SharedContext
                                              funCxFlags.definitelyNeedsArgsObj   = true; }
     void setNeedsHomeObject()              { MOZ_ASSERT(function()->allowSuperProperty());
                                              funCxFlags.needsHomeObject          = true; }
+    void setDerivedClassConstructor()      { MOZ_ASSERT(function()->isClassConstructor());
+                                             funCxFlags.isDerivedClassConstructor = true; }
 
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
         return funCxFlags.flagsForNestedGeneratorComprehensionLambda();

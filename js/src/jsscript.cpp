@@ -2686,6 +2686,7 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
     script->funHasExtensibleScope_ = funbox ? funbox->hasExtensibleScope() : false;
     script->funNeedsDeclEnvObject_ = funbox ? funbox->needsDeclEnvObject() : false;
     script->needsHomeObject_       = funbox ? funbox->needsHomeObject() : false;
+    script->isDerivedClassConstructor_ = funbox ? funbox->isDerivedClassConstructor() : false;
     script->hasSingletons_ = bce->hasSingletons;
 
     if (funbox) {
@@ -3921,6 +3922,7 @@ LazyScript::CreateRaw(ExclusiveContext *cx, HandleFunction fun,
     p.hasDirectEval = false;
     p.directlyInsideEval = false;
     p.usesArgumentsApplyAndThis = false;
+    p.isDerivedClassConstructor = false;
 
     LazyScript* res = LazyScript::CreateRaw(cx, fun, packedFields, begin, end, lineno, column);
     MOZ_ASSERT_IF(res, res->version() == version);

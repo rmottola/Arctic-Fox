@@ -1732,6 +1732,7 @@ enum FunctionSyntaxKind
     Arrow,
     Method,
     ClassConstructor,
+    DerivedClassConstructor,
     Getter,
     Setter
 };
