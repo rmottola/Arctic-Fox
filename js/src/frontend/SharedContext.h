@@ -126,6 +126,8 @@ class FunctionContextFlags
     //
     bool definitelyNeedsArgsObj:1;
 
+    bool needsHomeObject:1;
+
     FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
         FunctionContextFlags flags;
         flags.mightAliasLocals = mightAliasLocals;
@@ -133,10 +135,9 @@ class FunctionContextFlags
         flags.needsDeclEnvObject = false;
         flags.argumentsHasLocalBinding = false;
         flags.definitelyNeedsArgsObj = false;
+        flags.needsHomeObject = false;
         return flags;
     }
-
-    bool needsHomeObject:1;
 
   public:
     FunctionContextFlags()
