@@ -751,7 +751,7 @@ GeneratorKindFromBits(unsigned val) {
  */
 template<XDRMode mode>
 bool
-XDRScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
           HandleFunction fun, MutableHandleScript scriptp);
 
 enum PollutedGlobalScopeOption {
@@ -759,15 +759,15 @@ enum PollutedGlobalScopeOption {
     HasCleanGlobalScope
 };
 
-JSScript *
-CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
+JSScript*
+CloneScript(JSContext* cx, HandleObject enclosingScope, HandleFunction fun, HandleScript script,
             PollutedGlobalScopeOption polluted = HasCleanGlobalScope,
             NewObjectKind newKind = GenericObject);
 
 template<XDRMode mode>
 bool
-XDRLazyScript(XDRState<mode> *xdr, HandleObject enclosingScope, HandleScript enclosingScript,
-              HandleFunction fun, MutableHandle<LazyScript *> lazy);
+XDRLazyScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+              HandleFunction fun, MutableHandle<LazyScript*> lazy);
 
 /*
  * Code any constant value.

@@ -1156,7 +1156,7 @@ ScopeIter::enclosingScope() const
 }
 
 extern bool
-CreateScopeObjectsForScopeChain(JSContext *cx, AutoObjectVector &scopeChain,
+CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
                                 HandleObject dynamicTerminatingScope,
                                 MutableHandleObject dynamicScopeObj,
                                 MutableHandleObject staticScopeObj);

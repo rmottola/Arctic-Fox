@@ -2526,7 +2526,7 @@ js::GetObjectEnvironmentObjectForFunction(JSFunction *fun)
 }
 
 bool
-js::CreateScopeObjectsForScopeChain(JSContext *cx, AutoObjectVector &scopeChain,
+js::CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
                                     HandleObject dynamicTerminatingScope,
                                     MutableHandleObject dynamicScopeObj,
                                     MutableHandleObject staticScopeObj)
