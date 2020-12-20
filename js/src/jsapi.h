@@ -3687,23 +3687,23 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
  * |script| will always be set. On failure, it will be set to nullptr.
  */
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
         SourceBufferHolder& srcBuf, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
         const char* bytes, size_t length, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
         const char16_t* chars, size_t length, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options, FILE *file,
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options, FILE* file,
         JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options, const char *filename,
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options, const char* filename,
         JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)

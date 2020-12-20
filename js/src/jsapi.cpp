@@ -3854,7 +3854,7 @@ JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
 }
 
 bool
-JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
             SourceBufferHolder& srcBuf, MutableHandleScript script)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
@@ -3868,7 +3868,7 @@ JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
 }
 
 bool
-JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
             const char16_t* chars, size_t length, MutableHandleScript script)
 {
     SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
@@ -3876,7 +3876,7 @@ JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
 }
 
 bool
-JS::Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
+JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
             const char* bytes, size_t length, MutableHandleScript script)
 {
     mozilla::UniquePtr<char16_t, JS::FreePolicy> chars;
