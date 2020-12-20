@@ -620,7 +620,7 @@ IonBuilder::analyzeNewLoopTypes(MBasicBlock* entry, jsbytecode* start, jsbytecod
                 type = MIRType_Undefined;
                 break;
               case JSOP_GIMPLICITTHIS:
-                if (!script()->hasPollutedGlobalScope())
+                if (!script()->hasNonSyntacticScope())
                     type = MIRType_Undefined;
                 break;
               case JSOP_NULL:
@@ -1184,10 +1184,10 @@ IonBuilder::initScopeChain(MDefinition* callee)
                 return false;
         }
     } else {
-        // For global scripts without a polluted global scope, the scope chain
-        // is the global object.
+        // For global scripts without a non-syntactic global scope, the scope
+        // chain is the global object.
         MOZ_ASSERT(!script()->isForEval());
-        MOZ_ASSERT(!script()->hasPollutedGlobalScope());
+        MOZ_ASSERT(!script()->hasNonSyntacticScope());
         scope = constant(ObjectValue(script()->global()));
     }
 
@@ -1802,7 +1802,7 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_GETGNAME:
       {
         PropertyName* name = info().getAtom(pc)->asPropertyName();
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return jsop_getgname(name);
         return jsop_getname(name);
       }
@@ -1811,7 +1811,7 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_STRICTSETGNAME:
       {
         PropertyName* name = info().getAtom(pc)->asPropertyName();
-        if (script()->hasPollutedGlobalScope())
+        if (script()->hasNonSyntacticScope())
             return jsop_setprop(name);
         JSObject* obj = &script()->global();
         return setStaticName(obj, name);
@@ -1830,7 +1830,7 @@ IonBuilder::inspectOpcode(JSOp op)
       }
 
       case JSOP_BINDGNAME:
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return pushConstant(ObjectValue(script()->global()));
         // Fall through to JSOP_BINDNAME
       case JSOP_BINDNAME:
@@ -1977,7 +1977,7 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_debugger();
 
       case JSOP_GIMPLICITTHIS:
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return pushConstant(UndefinedValue());
 
         // Just fall through to the unsupported bytecode case.
@@ -7623,7 +7623,7 @@ bool
 IonBuilder::jsop_getname(PropertyName* name)
 {
     MDefinition* object;
-    if (IsGlobalOp(JSOp(*pc)) && !script()->hasPollutedGlobalScope()) {
+    if (IsGlobalOp(JSOp(*pc)) && !script()->hasNonSyntacticScope()) {
         MInstruction* global = constant(ObjectValue(script()->global()));
         object = global;
     } else {

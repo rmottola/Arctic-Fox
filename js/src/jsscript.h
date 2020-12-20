@@ -935,7 +935,7 @@ class JSScript : public js::gc::TenuredCell
     // True if the script has a non-syntactic scope on its dynamic scope chain.
     // That is, there are objects about which we know nothing between the
     // outermost syntactic scope and the global.
-    bool hasPollutedGlobalScope_:1;
+    bool hasNonSyntacticScope_:1;
 
     // see Parser::selfHostingMode.
     bool selfHosted_:1;
@@ -1175,8 +1175,8 @@ class JSScript : public js::gc::TenuredCell
 
     bool explicitUseStrict() const { return explicitUseStrict_; }
 
-    bool hasPollutedGlobalScope() const {
-        return hasPollutedGlobalScope_;
+    bool hasNonSyntacticScope() const {
+        return hasNonSyntacticScope_;
     }
 
     bool selfHosted() const { return selfHosted_; }

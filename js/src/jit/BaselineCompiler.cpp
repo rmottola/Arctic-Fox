@@ -2056,7 +2056,7 @@ BaselineCompiler::emit_JSOP_IN()
 bool
 BaselineCompiler::emit_JSOP_GETGNAME()
 {
-    if (script->hasPollutedGlobalScope())
+    if (script->hasNonSyntacticScope())
         return emit_JSOP_GETNAME();
 
     RootedPropertyName name(cx, script->getName(pc));
@@ -2091,7 +2091,7 @@ BaselineCompiler::emit_JSOP_GETGNAME()
 bool
 BaselineCompiler::emit_JSOP_BINDGNAME()
 {
-    if (!script->hasPollutedGlobalScope()) {
+    if (!script->hasNonSyntacticScope()) {
         frame.push(ObjectValue(script->global()));
         return true;
     }
@@ -2914,7 +2914,7 @@ BaselineCompiler::emit_JSOP_IMPLICITTHIS()
 bool
 BaselineCompiler::emit_JSOP_GIMPLICITTHIS()
 {
-    if (!script->hasPollutedGlobalScope()) {
+    if (!script->hasNonSyntacticScope()) {
         frame.push(UndefinedValue());
         return true;
     }
