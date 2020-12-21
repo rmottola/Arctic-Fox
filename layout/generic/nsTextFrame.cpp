@@ -4611,7 +4611,7 @@ public:
       aInvalidRegion->Or(oldRect, newRect);
     }
   }
-  
+
   virtual void DisableComponentAlpha() override {
     mDisableSubpixelAA = true;
   }

@@ -231,6 +231,7 @@ struct CommonLayerAttributes {
   nsIntRegion invalidRegion;
   FrameMetrics[] metrics;
   string contentDescription;
+  nsCString displayListLog;
 };
 
 struct PaintedLayerAttributes {

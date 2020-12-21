@@ -70,6 +70,8 @@
 #include "GeckoTouchDispatcher.h"
 #endif
 
+#include "LayerScope.h"
+
 namespace mozilla {
 namespace layers {
 
@@ -675,6 +677,8 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
   }
 
   gfxPlatform::GetPlatform()->ComputeTileSize();
+
+  LayerScope::SetPixelScale(mWidget->GetDefaultScale().scale);
 }
 
 bool
