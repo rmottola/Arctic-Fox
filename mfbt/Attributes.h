@@ -483,7 +483,7 @@
  * MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS: Applies to template class
  *   declarations where an instance of the template should be considered, for
  *   static analysis purposes, to inherit any type annotations (such as
- *   MOZ_MUST_USE_TYPE and MOZ_STACK_CLASS) from its template arguments.
+ *   MOZ_MUST_USE and MOZ_STACK_CLASS) from its template arguments.
  */
 #ifdef MOZ_CLANG_PLUGIN
 #  define MOZ_MUST_OVERRIDE __attribute__((annotate("moz_must_override")))
@@ -506,7 +506,6 @@
 #  define MOZ_UNSAFE_REF(reason) __attribute__((annotate("moz_strong_ref")))
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN __attribute__((annotate("moz_no_addref_release_on_return")))
 #  define MOZ_MUST_USE __attribute__((annotate("moz_must_use")))
-#  define MOZ_MUST_USE_TYPE __attribute__((annotate("moz_must_use_type")))
 #  define MOZ_NEEDS_NO_VTABLE_TYPE __attribute__((annotate("moz_needs_no_vtable_type")))
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS \
     __attribute__((annotate("moz_inherit_type_annotations_from_template_args")))
@@ -537,7 +536,6 @@
 #  define MOZ_UNSAFE_REF(reason) /* nothing */
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN /* nothing */
 #  define MOZ_MUST_USE /* nothing */
-#  define MOZ_MUST_USE_TYPE /* nothing */
 #  define MOZ_NEEDS_NO_VTABLE_TYPE /* nothing */
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS /* nothing */
 #  define MOZ_NON_AUTOABLE /* nothing */
