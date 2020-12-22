@@ -480,10 +480,20 @@
  * MOZ_NEEDS_NO_VTABLE_TYPE: Applies to template class declarations.  Makes it
  *   a compile time error to instantiate this template with a type parameter which
  *   has a VTable.
+ * MOZ_NON_MEMMOVABLE: Applies to class declarations for types that are not safe
+ *   to be moved in memory using memmove().
+ * MOZ_NEEDS_MEMMOVABLE_TYPE: Applies to template class declarations where the
+ *   template arguments are required to be safe to move in memory using
+ *   memmove().  Passing MOZ_NON_MEMMOVABLE types to these templates is a
+ *   compile time error.
  * MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS: Applies to template class
  *   declarations where an instance of the template should be considered, for
  *   static analysis purposes, to inherit any type annotations (such as
  *   MOZ_MUST_USE and MOZ_STACK_CLASS) from its template arguments.
+ * MOZ_NON_AUTOABLE: Applies to class declarations. Makes it a compile time error to
+ *   use `auto` in place of this type in variable declarations.  This is intended to
+ *   be used with types which are intended to be implicitly constructed into other
+ *   other types before being assigned to variables.
  */
 #ifdef MOZ_CLANG_PLUGIN
 #  define MOZ_MUST_OVERRIDE __attribute__((annotate("moz_must_override")))
@@ -507,6 +517,8 @@
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN __attribute__((annotate("moz_no_addref_release_on_return")))
 #  define MOZ_MUST_USE __attribute__((annotate("moz_must_use")))
 #  define MOZ_NEEDS_NO_VTABLE_TYPE __attribute__((annotate("moz_needs_no_vtable_type")))
+#  define MOZ_NON_MEMMOVABLE __attribute__((annotate("moz_non_memmovable")))
+#  define MOZ_NEEDS_MEMMOVABLE_TYPE __attribute__((annotate("moz_needs_memmovable_type")))
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS \
     __attribute__((annotate("moz_inherit_type_annotations_from_template_args")))
 #  define MOZ_NON_AUTOABLE __attribute__((annotate("moz_non_autoable")))
@@ -537,6 +549,8 @@
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN /* nothing */
 #  define MOZ_MUST_USE /* nothing */
 #  define MOZ_NEEDS_NO_VTABLE_TYPE /* nothing */
+#  define MOZ_NON_MEMMOVABLE /* nothing */
+#  define MOZ_NEEDS_MEMMOVABLE_TYPE /* nothing */
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS /* nothing */
 #  define MOZ_NON_AUTOABLE /* nothing */
 #endif /* MOZ_CLANG_PLUGIN */
