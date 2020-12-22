@@ -75,13 +75,20 @@
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
+- remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
+- Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - Bug 1184388 - 2015-10- 30- 3/3
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
+- Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
+- Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
 - Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
