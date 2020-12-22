@@ -16,6 +16,7 @@ SOURCES += [
     'TestMustUse.cpp',
     'TestNANTestingExpr.cpp',
     'TestNANTestingExprC.c',
+    'TestNeedsNoVTableType.cpp',
     'TestNoAddRefReleaseOnReturn.cpp',
     'TestNoArithmeticExprInArgument.cpp',
     'TestNonHeapClass.cpp',
