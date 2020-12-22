@@ -474,6 +474,9 @@
  *   function.  This is intended to be used with operator->() of our smart
  *   pointer classes to ensure that the refcount of an object wrapped in a
  *   smart pointer is not manipulated directly.
+ * MOZ_MUST_USE: Applies to type declarations.  Makes it a compile time error to not
+ *   use the return value of a function which has this type.  This is intended to be
+ *   used with types which it is an error to not use.
  * MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS: Applies to template class
  *   declarations where an instance of the template should be considered, for
  *   static analysis purposes, to inherit any type annotations (such as
@@ -499,6 +502,7 @@
 #  define MOZ_NON_OWNING_REF __attribute__((annotate("moz_weak_ref")))
 #  define MOZ_UNSAFE_REF(reason) __attribute__((annotate("moz_strong_ref")))
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN __attribute__((annotate("moz_no_addref_release_on_return")))
+#  define MOZ_MUST_USE __attribute__((annotate("moz_must_use")))
 #  define MOZ_MUST_USE_TYPE __attribute__((annotate("moz_must_use_type")))
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS \
     __attribute__((annotate("moz_inherit_type_annotations_from_template_args")))
@@ -528,6 +532,7 @@
 #  define MOZ_NON_OWNING_REF /* nothing */
 #  define MOZ_UNSAFE_REF(reason) /* nothing */
 #  define MOZ_NO_ADDREF_RELEASE_ON_RETURN /* nothing */
+#  define MOZ_MUST_USE /* nothing */
 #  define MOZ_MUST_USE_TYPE /* nothing */
 #  define MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS /* nothing */
 #  define MOZ_NON_AUTOABLE /* nothing */
