@@ -82,7 +82,7 @@ private:
   class RefCountedInsideLambdaChecker : public MatchFinder::MatchCallback {
     public:
       virtual void run(const MatchFinder::MatchResult &Result);
-  }
+  };
 
   ScopeChecker stackClassChecker;
   ScopeChecker globalClassChecker;
