@@ -20,6 +20,7 @@ SOURCES += [
     'TestNoAddRefReleaseOnReturn.cpp',
     'TestNoArithmeticExprInArgument.cpp',
     'TestNonHeapClass.cpp',
+    'TestNonMemMovable.cpp',
     'TestNoRefcountedInsideLambdas.cpp',
     'TestStackClass.cpp',
     'TestTrivialCtorDtor.cpp',
