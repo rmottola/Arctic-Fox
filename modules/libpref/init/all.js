@@ -5077,6 +5077,16 @@ pref("dom.secureelement.enabled", false);
 // and compositionend events.
 pref("dom.compositionevent.allow_control_characters", false);
 
+#ifdef MOZ_WIDGET_GONK
+// Bug 1154053: Serialize B2G memory reports; smaller devices are
+// usually overcommitted on memory by using zRAM, so memory reporting
+// causes memory pressure from uncompressing cold heap memory.
+pref("memory.report_concurrency", 1);
+#else
+// Desktop probably doesn't have swapped-out children like that.
+pref("memory.report_concurrency", 10);
+#endif
+
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
