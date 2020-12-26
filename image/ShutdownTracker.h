@@ -16,9 +16,9 @@ namespace image {
 
 /**
  * ShutdownTracker is an imagelib-global service that allows callers to check
- * whether shutdown has started. It exists to avoid the need for registering many
- * 'xpcom-shutdown' notification observers on short-lived objects, which would
- * have an unnecessary performance cost.
+ * whether shutdown has started. It exists to avoid the need for registering
+ * many 'xpcom-shutdown' notification observers on short-lived objects, which
+ * would have an unnecessary performance cost.
  */
 struct ShutdownTracker
 {
