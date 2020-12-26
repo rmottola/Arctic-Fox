@@ -201,9 +201,6 @@ private:
   // try to update or modify the image cache.
   void SetIsInCache(bool cacheable);
 
-  bool IsBlockingOnload() const;
-  void SetBlockingOnload(bool block) const;
-
   bool HasConsumers();
 
   /// Returns true if RequestDecode() was called.
@@ -283,7 +280,6 @@ private:
   bool mGotData : 1;
   bool mIsInCache : 1;
   bool mDecodeRequested : 1;
-  bool mBlockingOnload : 1;
   bool mNewPartPending : 1;
   bool mHadInsecureRedirect : 1;
 };
