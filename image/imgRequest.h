@@ -62,6 +62,7 @@ public:
 
   nsresult Init(nsIURI *aURI,
                 nsIURI *aCurrentURI,
+                bool aHadInsecureRedirect,
                 nsIRequest *aRequest,
                 nsIChannel *aChannel,
                 imgCacheEntry *aCacheEntry,
@@ -108,6 +109,10 @@ public:
   bool CacheChanged(nsIRequest* aNewRequest);
 
   bool GetMultipart() const { return mIsMultiPartChannel; }
+
+  // Returns whether we went through an insecure (non-HTTPS) redirect at some
+  // point during loading. This does not consider the current URI.
+  bool HadInsecureRedirect() const { return mHadInsecureRedirect; }
 
   // The CORS mode for which we loaded this image.
   int32_t GetCORSMode() const { return mCORSMode; }
@@ -266,6 +271,7 @@ private:
   bool mIsInCache : 1;
   bool mBlockingOnload : 1;
   bool mNewPartPending : 1;
+  bool mHadInsecureRedirect : 1;
 };
 
 #endif // mozilla_image_imgRequest_h

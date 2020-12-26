@@ -549,6 +549,8 @@ private:
   nsCOMPtr<nsISupports> mContext;
 
   imgLoader* mImgLoader;
+
+  bool mHadInsecureRedirect;
 };
 
 #endif  // mozilla_image_imgLoader_h
