@@ -180,7 +180,8 @@ public:
   /* The total number of frames in this image. */
   uint32_t GetNumFrames() const { return mFrameCount; }
 
-  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf) const override;
+  virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf)
+    const override;
   virtual size_t SizeOfDecoded(gfxMemoryLocation aLocation,
                                MallocSizeOf aMallocSizeOf) const override;
 
@@ -312,8 +313,9 @@ private:
 
   nsIntRect GetFirstFrameRect();
 
-  size_t SizeOfDecodedWithComputedFallbackIfHeap(gfxMemoryLocation aLocation,
-                                                 MallocSizeOf aMallocSizeOf) const;
+  size_t
+    SizeOfDecodedWithComputedFallbackIfHeap(gfxMemoryLocation aLocation,
+                                            MallocSizeOf aMallocSizeOf) const;
 
   Pair<DrawResult, nsRefPtr<layers::Image>>
     GetCurrentImage(layers::ImageContainer* aContainer, uint32_t aFlags);
@@ -324,7 +326,9 @@ private:
   // that for animated images because in EnsureAnimExists we lock the image and
   // never unlock so that animated images always have their lock count >= 1. In
   // that case we use our animation consumers count as a proxy for lock count.
-  bool IsUnlocked() { return (mLockCount == 0 || (mAnim && mAnimationConsumers == 0)); }
+  bool IsUnlocked() {
+    return (mLockCount == 0 || (mAnim && mAnimationConsumers == 0));
+  }
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -376,7 +380,8 @@ private: // data
   // This is currently only used for statistics
   int32_t                    mDecodeCount;
 
-  // If the image contains multiple resolutions, a hint as to which one should be used
+  // If the image contains multiple resolutions, a hint as to which one
+  // should be used
   nsIntSize                  mRequestedResolution;
 
   // A hint for image decoder that directly scale the image to smaller buffer
@@ -437,9 +442,11 @@ private: // data
   void RequestScale(imgFrame* aFrame, uint32_t aFlags, const nsIntSize& aSize);
 
   // Determines whether we can perform an HQ scale with the given parameters.
-  bool CanScale(GraphicsFilter aFilter, const nsIntSize& aSize, uint32_t aFlags);
+  bool CanScale(GraphicsFilter aFilter, const nsIntSize& aSize,
+                uint32_t aFlags);
 
-  // Determines whether we can downscale during decode with the given parameters.
+  // Determines whether we can downscale during decode with the given
+  // parameters.
   bool CanDownscaleDuringDecode(const nsIntSize& aSize, uint32_t aFlags);
 
   // Called by the HQ scaler when a new scaled frame is ready.
@@ -481,7 +488,8 @@ protected:
   friend class ImageFactory;
 };
 
-inline NS_IMETHODIMP RasterImage::GetAnimationMode(uint16_t *aAnimationMode) {
+inline NS_IMETHODIMP
+RasterImage::GetAnimationMode(uint16_t* aAnimationMode) {
   return GetAnimationModeInternal(aAnimationMode);
 }
 
