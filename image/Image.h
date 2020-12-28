@@ -92,7 +92,7 @@ public:
    * ensure that something reasonable is always returned.
    */
   virtual size_t SizeOfSourceWithComputedFallback(
-                                          MallocSizeOf aMallocSizeOf) const = 0;
+    MallocSizeOf aMallocSizeOf) const = 0;
 
   /**
    * The size, in bytes, occupied by the image's decoded data.
