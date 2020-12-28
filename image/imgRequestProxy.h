@@ -70,12 +70,14 @@ public:
   // Callers to Init or ChangeOwner are required to call NotifyListener after
   // (although not immediately after) doing so.
   nsresult Init(imgRequest* aOwner,
-                nsILoadGroup *aLoadGroup,
+                nsILoadGroup* aLoadGroup,
                 ImageURL* aURI,
-                imgINotificationObserver *aObserver);
+                imgINotificationObserver* aObserver);
 
-  nsresult ChangeOwner(imgRequest *aNewOwner); // this will change mOwner.  Do not call this if the previous
-                                               // owner has already sent notifications out!
+  nsresult ChangeOwner(imgRequest* aNewOwner); // this will change mOwner.
+                                               // Do not call this if the
+                                               // previous owner has already
+                                               // sent notifications out!
 
   void AddToLoadGroup();
   void RemoveFromLoadGroup(bool releaseLoadGroup);
@@ -125,10 +127,11 @@ public:
   // imgRequest::RemoveProxy
   void ClearAnimationConsumers();
 
-  virtual nsresult Clone(imgINotificationObserver* aObserver, imgRequestProxy** aClone);
+  virtual nsresult Clone(imgINotificationObserver* aObserver,
+                         imgRequestProxy** aClone);
   nsresult GetStaticRequest(imgRequestProxy** aReturn);
 
-  nsresult GetURI(ImageURL **aURI);
+  nsresult GetURI(ImageURL** aURI);
 
 protected:
   friend class mozilla::image::ProgressTracker;
@@ -143,7 +146,7 @@ protected:
     public:
       imgCancelRunnable(imgRequestProxy* owner, nsresult status)
         : mOwner(owner), mStatus(status)
-      {}
+      { }
 
       NS_IMETHOD Run() override {
         mOwner->DoCancel(mStatus);
