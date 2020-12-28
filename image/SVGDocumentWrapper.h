@@ -131,7 +131,7 @@ public:
 private:
   ~SVGDocumentWrapper();
 
-  nsresult SetupViewer(nsIRequest *aRequest,
+  nsresult SetupViewer(nsIRequest* aRequest,
                        nsIContentViewer** aViewer,
                        nsILoadGroup** aLoadGroup);
   void     DestroyViewer();
