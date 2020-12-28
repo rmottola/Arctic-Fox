@@ -65,7 +65,8 @@ static StaticRefPtr<SurfaceCacheImpl> sInstance;
  */
 typedef size_t Cost;
 
-static Cost ComputeCost(const IntSize& aSize, uint32_t aBytesPerPixel)
+static Cost
+ComputeCost(const IntSize& aSize, uint32_t aBytesPerPixel)
 {
   MOZ_ASSERT(aBytesPerPixel == 1 || aBytesPerPixel == 4);
   return aSize.width * aSize.height * aBytesPerPixel;
@@ -118,7 +119,7 @@ private:
  */
 class CachedSurface
 {
-  ~CachedSurface() {}
+  ~CachedSurface() { }
 public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(CachedSurface)
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CachedSurface)
@@ -221,10 +222,11 @@ public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(ImageSurfaceCache)
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ImageSurfaceCache)
 
-  typedef nsRefPtrHashtable<nsGenericHashKey<SurfaceKey>, CachedSurface> SurfaceTable;
+  typedef
+    nsRefPtrHashtable<nsGenericHashKey<SurfaceKey>, CachedSurface> SurfaceTable;
 
   bool IsEmpty() const { return mSurfaces.Count() == 0; }
-  
+
   void Insert(const SurfaceKey& aKey, CachedSurface* aSurface)
   {
     MOZ_ASSERT(aSurface, "Should have a surface");
@@ -384,16 +386,18 @@ public:
     , mLockedCost(0)
   {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
-    if (os)
+    if (os) {
       os->AddObserver(mMemoryPressureObserver, "memory-pressure", false);
+    }
   }
 
 private:
   virtual ~SurfaceCacheImpl()
   {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
-    if (os)
+    if (os) {
       os->RemoveObserver(mMemoryPressureObserver, "memory-pressure");
+    }
 
     UnregisterWeakMemoryReporter(this);
   }
@@ -423,7 +427,8 @@ public:
     // Remove elements in order of cost until we can fit this in the cache. Note
     // that locked surfaces aren't in mCosts, so we never remove them here.
     while (aCost > mAvailableCost) {
-      MOZ_ASSERT(!mCosts.IsEmpty(), "Removed everything and it still won't fit");
+      MOZ_ASSERT(!mCosts.IsEmpty(),
+                 "Removed everything and it still won't fit");
       Remove(mCosts.LastElement().GetSurface());
     }
 
@@ -530,12 +535,14 @@ public:
                           const SurfaceKey& aSurfaceKey)
   {
     nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
-    if (!cache)
+    if (!cache) {
       return DrawableFrameRef();  // No cached surfaces for this image.
+    }
 
     nsRefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
-    if (!surface)
+    if (!surface) {
       return DrawableFrameRef();  // Lookup in the per-image cache missed.
+    }
 
     DrawableFrameRef ref = surface->DrawableRef();
     if (!ref) {
@@ -559,8 +566,9 @@ public:
                                    const Maybe<uint32_t>& aAlternateFlags)
   {
     nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
-    if (!cache)
+    if (!cache) {
       return DrawableFrameRef();  // No cached surfaces for this image.
+    }
 
     // Repeatedly look up the best match, trying again if the resulting surface
     // has been freed by the operating system, until we can either lock a
@@ -599,12 +607,14 @@ public:
                      const SurfaceKey& aSurfaceKey)
   {
     nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
-    if (!cache)
+    if (!cache) {
       return;  // No cached surfaces for this image.
+    }
 
     nsRefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
-    if (!surface)
+    if (!surface) {
       return;  // Lookup in the per-image cache missed.
+    }
 
     Remove(surface);
   }
@@ -658,8 +668,9 @@ public:
   void RemoveImage(const ImageKey aImageKey)
   {
     nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
-    if (!cache)
+    if (!cache) {
       return;  // No cached surfaces for this image, so nothing to do.
+    }
 
     // Discard all of the cached surfaces for this image.
     // XXX(seth): This is O(n^2) since for each item in the cache we are
@@ -857,15 +868,16 @@ private:
     virtual ~MemoryPressureObserver() { }
   };
 
-  nsTArray<CostEntry>                                       mCosts;
-  nsRefPtrHashtable<nsPtrHashKey<Image>, ImageSurfaceCache> mImageCaches;
-  SurfaceTracker                                            mExpirationTracker;
-  nsRefPtr<MemoryPressureObserver>                          mMemoryPressureObserver;
-  Mutex                                                     mMutex;
-  const uint32_t                                            mDiscardFactor;
-  const Cost                                                mMaxCost;
-  Cost                                                      mAvailableCost;
-  Cost                                                      mLockedCost;
+  nsTArray<CostEntry>                     mCosts;
+  nsRefPtrHashtable<nsPtrHashKey<Image>,
+    ImageSurfaceCache> mImageCaches;
+  SurfaceTracker                          mExpirationTracker;
+  nsRefPtr<MemoryPressureObserver>        mMemoryPressureObserver;
+  Mutex                                   mMutex;
+  const uint32_t                          mDiscardFactor;
+  const Cost                              mMaxCost;
+  Cost                                    mAvailableCost;
+  Cost                                    mLockedCost;
 };
 
 NS_IMPL_ISUPPORTS(SurfaceCacheImpl, nsIMemoryReporter)
@@ -917,7 +929,8 @@ SurfaceCache::Initialize()
     memorySize = 256 * 1024 * 1024;  // Fall back to 256MB.
   }
   uint64_t proposedSize = memorySize / surfaceCacheSizeFactor;
-  uint64_t surfaceCacheSizeBytes = min(proposedSize, surfaceCacheMaxSizeKB * 1024);
+  uint64_t surfaceCacheSizeBytes = min(proposedSize,
+                                       surfaceCacheMaxSizeKB * 1024);
   uint32_t finalSurfaceCacheSizeBytes =
     min(surfaceCacheSizeBytes, uint64_t(UINT32_MAX));
 
