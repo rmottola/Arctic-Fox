@@ -153,18 +153,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
 - 1199143 - Inline heavyweight functions.
 - 1030095 - Remove restriction on inlining recursive calls
-- 1180854 - Record and expose Ion IC stub optimization info to Jit
-- 1169731 - [[Call]] on a class constructor should throw.
-- 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
-- 1161584 - Add TrackedStrategy::SetProp_InlineCache. 
 - 1155788 - Make the Ion inner-window optimizations work again. 
-- 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
-- Bug 1164602 - Replace js::NullPtr and JS::NullPtr with nullptr_t; r=s
-- Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
-- Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
-- Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
--  1102048 style patches, check which still apply
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
@@ -174,11 +164,6 @@ Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
 Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-Replay - in case 1165486 fails:
-Bug 915805 - Don't treat unbound names in Function() code as globals
-Bug 1148963 - OdinMonkey: add CompileOptions::lazyParsingDisabled and
-Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
@@ -229,6 +214,12 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
+
+Check ALTIVEC/VMX
+- gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
+- gfx/2d/BlurVMX.cpp
+in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
+- correct ifdef for  gfx/2d/Blur.cpp
 
 ### Further ToDo which would help portability:
 
