@@ -1927,9 +1927,8 @@ static bool IsZOrderLEQ(nsDisplayItem* aItem1, nsDisplayItem* aItem2,
   return aItem1->ZIndex() <= aItem2->ZIndex();
 }
 
-void nsDisplayList::SortByZOrder(nsDisplayListBuilder* aBuilder,
-                                 nsIContent* aCommonAncestor) {
-  Sort(aBuilder, IsZOrderLEQ, aCommonAncestor);
+void nsDisplayList::SortByZOrder(nsDisplayListBuilder* aBuilder) {
+  Sort(aBuilder, IsZOrderLEQ, nullptr);
 }
 
 void nsDisplayList::SortByContentOrder(nsDisplayListBuilder* aBuilder,
