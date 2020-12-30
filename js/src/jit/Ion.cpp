@@ -2666,6 +2666,9 @@ InvalidateActivation(FreeOp* fop, const JitActivationIterator& activations, bool
                     it.maybeCallee(), (JSScript*)it.script(), it.returnAddressToFp());
             break;
           }
+          case JitFrame_IonStub:
+            JitSpew(JitSpew_IonInvalidate, "#%d ion stub frame @ %p", frameno, it.fp());
+            break;
           case JitFrame_BaselineStub:
             JitSpew(JitSpew_IonInvalidate, "#%d baseline stub frame @ %p", frameno, it.fp());
             break;
@@ -2673,6 +2676,7 @@ InvalidateActivation(FreeOp* fop, const JitActivationIterator& activations, bool
             JitSpew(JitSpew_IonInvalidate, "#%d rectifier frame @ %p", frameno, it.fp());
             break;
           case JitFrame_Unwound_IonJS:
+          case JitFrame_Unwound_IonStub:
           case JitFrame_Unwound_BaselineJS:
           case JitFrame_Unwound_BaselineStub:
           case JitFrame_Unwound_IonAccessorIC:
