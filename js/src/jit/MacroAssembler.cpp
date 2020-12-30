@@ -2572,6 +2572,9 @@ MacroAssembler::resetForNewCodeGenerator(TempAllocator& alloc)
     setFramePushed(0);
     moveResolver_.clearTempObjectPool();
     moveResolver_.setAllocator(alloc);
+#ifdef DEBUG
+    debugTrackedRegisters_.clear();
+#endif
 }
 
 MacroAssembler::AfterICSaveLive
@@ -2764,3 +2767,33 @@ MacroAssembler::freeStack(Register amount)
 }
 
 //}}} check_macroassembler_style
+
+namespace js {
+namespace jit {
+
+#ifdef DEBUG
+template <class RegisterType>
+AutoGenericRegisterScope<RegisterType>::AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
+  : RegisterType(reg), masm_(masm)
+{
+    masm.debugTrackedRegisters_.add(reg);
+}
+
+template AutoGenericRegisterScope<Register>::AutoGenericRegisterScope(MacroAssembler& masm, Register reg);
+template AutoGenericRegisterScope<FloatRegister>::AutoGenericRegisterScope(MacroAssembler& masm, FloatRegister reg);
+#endif // DEBUG
+
+#ifdef DEBUG
+template <class RegisterType>
+AutoGenericRegisterScope<RegisterType>::~AutoGenericRegisterScope()
+{
+    const RegisterType& reg = *dynamic_cast<RegisterType*>(this);
+    masm_.debugTrackedRegisters_.take(reg);
+}
+
+template AutoGenericRegisterScope<Register>::~AutoGenericRegisterScope();
+template AutoGenericRegisterScope<FloatRegister>::~AutoGenericRegisterScope();
+#endif // DEBUG
+
+} // namespace jit
+} // namespace js
