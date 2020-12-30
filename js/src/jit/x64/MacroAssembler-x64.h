@@ -228,11 +228,11 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         boxValue(type, reg, ScratchReg);
         push(ScratchReg);
     }
-    void pushValue(const Address &addr) {
+    void pushValue(const Address& addr) {
         push(Operand(addr));
     }
 
-    void moveValue(const Value &val, Register dest) {
+    void moveValue(const Value& val, Register dest) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         movWithPatch(ImmWord(jv.asBits), dest);
         writeDataRelocation(val);

@@ -732,7 +732,12 @@ ICStubCompiler::tailCallVM(const VMFunction& fun, MacroAssembler& masm)
 
     MOZ_ASSERT(fun.expectTailCall == TailCall);
     uint32_t argSize = fun.explicitStackSlots() * sizeof(void*);
-    EmitTailCallVM(code, masm, argSize);
+    if (engine_ == Engine::Baseline) {
+        EmitBaselineTailCallVM(code, masm, argSize);
+    } else {
+        uint32_t stackSize = argSize + fun.extraValuesToPop * sizeof(Value);
+        EmitIonTailCallVM(code, masm, stackSize);
+    }
     return true;
 }
 
@@ -746,7 +751,10 @@ ICStubCompiler::callVM(const VMFunction& fun, MacroAssembler& masm)
         return false;
 
     MOZ_ASSERT(fun.expectTailCall == NonTailCall);
-    EmitCallVM(code, masm);
+    if (engine_ == Engine::Baseline)
+        EmitBaselineCallVM(code, masm);
+    else
+        EmitIonCallVM(code, fun.explicitStackSlots(), masm);
     return true;
 }
 
@@ -764,7 +772,10 @@ ICStubCompiler::callTypeUpdateIC(MacroAssembler& masm, uint32_t objectOffset)
 void
 ICStubCompiler::enterStubFrame(MacroAssembler& masm, Register scratch)
 {
-    EmitEnterStubFrame(masm, scratch);
+    if (engine_ == Engine::Baseline)
+        EmitBaselineEnterStubFrame(masm, scratch);
+    else
+        EmitIonEnterStubFrame(masm, scratch);
 
     MOZ_ASSERT(!inStubFrame_);
     inStubFrame_ = true;
@@ -779,12 +790,21 @@ ICStubCompiler::leaveStubFrame(MacroAssembler& masm, bool calledIntoIon)
 {
     MOZ_ASSERT(entersStubFrame_ && inStubFrame_);
     inStubFrame_ = false;
-    EmitLeaveStubFrame(masm, calledIntoIon);
+
+    if (engine_ == Engine::Baseline)
+        EmitBaselineLeaveStubFrame(masm, calledIntoIon);
+    else
+        EmitIonLeaveStubFrame(masm);
 }
 
 void
 ICStubCompiler::pushFramePtr(MacroAssembler& masm, Register scratch)
 {
+    if (engine_ == Engine::IonMonkey) {
+        masm.push(Imm32(0));
+        return;
+    }
+
     if (inStubFrame_) {
         masm.loadPtr(Address(BaselineFrameReg, 0), scratch);
         masm.pushBaselineFramePtr(scratch, scratch);
