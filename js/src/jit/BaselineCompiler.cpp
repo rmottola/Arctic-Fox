@@ -485,7 +485,7 @@ BaselineCompiler::emitOutOfLinePostBarrierSlot()
 #endif
     masm.pushValue(R0);
 
-    masm.setupUnalignedABICall(2, scratch);
+    masm.setupUnalignedABICall(scratch);
     masm.movePtr(ImmPtr(cx->runtime()), scratch);
     masm.passABIArg(scratch);
     masm.passABIArg(objReg);
@@ -580,7 +580,7 @@ BaselineCompiler::emitIsDebuggeeCheck()
 {
     if (compileDebugInstrumentation_) {
         masm.Push(BaselineFrameReg);
-        masm.setupUnalignedABICall(1, R0.scratchReg());
+        masm.setupUnalignedABICall(R0.scratchReg());
         masm.loadBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
         masm.passABIArg(R0.scratchReg());
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, jit::FrameIsDebuggeeCheck));

@@ -1485,7 +1485,7 @@ MacroAssembler::initGCThing(Register obj, Register temp, JSObject* templateObj,
     regs.takeUnchecked(obj);
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(obj);
     movePtr(ImmGCPtr(templateObj->type()), temp);
     passABIArg(temp);
@@ -1623,7 +1623,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
     // Fall-through: overrecursed.
     {
         loadJSContext(ReturnReg);
-        setupUnalignedABICall(1, scratch);
+        setupUnalignedABICall(scratch);
         passABIArg(ReturnReg);
         callWithABI(JS_FUNC_TO_DATA_PTR(void*, BailoutReportOverRecursed));
         jump(exceptionLabel());
@@ -1687,7 +1687,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             push(Address(bailoutInfo, offsetof(BaselineBailoutInfo, monitorStub)));
 
             // Call a stub to free allocated memory and create arguments objects.
-            setupUnalignedABICall(1, temp);
+            setupUnalignedABICall(temp);
             passABIArg(bailoutInfo);
             callWithABI(JS_FUNC_TO_DATA_PTR(void*, FinishBailoutToBaseline));
             branchTest32(Zero, ReturnReg, ReturnReg, exceptionLabel());
@@ -1725,7 +1725,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             push(Address(bailoutInfo, offsetof(BaselineBailoutInfo, resumeAddr)));
 
             // Call a stub to free allocated memory and create arguments objects.
-            setupUnalignedABICall(1, temp);
+            setupUnalignedABICall(temp);
             passABIArg(bailoutInfo);
             callWithABI(JS_FUNC_TO_DATA_PTR(void*, FinishBailoutToBaseline));
             branchTest32(Zero, ReturnReg, ReturnReg, exceptionLabel());
@@ -1800,7 +1800,7 @@ MacroAssembler::assumeUnreachable(const char* output)
         PushRegsInMask(save);
         Register temp = regs.takeAnyGeneral();
 
-        setupUnalignedABICall(1, temp);
+        setupUnalignedABICall(temp);
         movePtr(ImmPtr(output), temp);
         passABIArg(temp);
         callWithABI(JS_FUNC_TO_DATA_PTR(void*, AssumeUnreachable_));
@@ -1843,7 +1843,7 @@ MacroAssembler::printf(const char *output)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(1, temp);
+    setupUnalignedABICall(temp);
     movePtr(ImmPtr(output), temp);
     passABIArg(temp);
     callWithABI(JS_FUNC_TO_DATA_PTR(void*, Printf0_));
@@ -1869,7 +1869,7 @@ MacroAssembler::printf(const char *output, Register value)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     movePtr(ImmPtr(output), temp);
     passABIArg(temp);
     passABIArg(value);
@@ -1892,7 +1892,7 @@ MacroAssembler::tracelogStartId(Register logger, uint32_t textId, bool force)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(logger);
     move32(Imm32(textId), temp);
     passABIArg(temp);
@@ -1912,7 +1912,7 @@ MacroAssembler::tracelogStartId(Register logger, Register textId)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(logger);
     passABIArg(textId);
     callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStartEventPrivate));
@@ -1933,7 +1933,7 @@ MacroAssembler::tracelogStartEvent(Register logger, Register event)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(logger);
     passABIArg(event);
     callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogFunc));
@@ -1954,7 +1954,7 @@ MacroAssembler::tracelogStopId(Register logger, uint32_t textId, bool force)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(logger);
     move32(Imm32(textId), temp);
     passABIArg(temp);
@@ -1975,7 +1975,7 @@ MacroAssembler::tracelogStopId(Register logger, Register textId)
 
     Register temp = regs.takeAnyGeneral();
 
-    setupUnalignedABICall(2, temp);
+    setupUnalignedABICall(temp);
     passABIArg(logger);
     passABIArg(textId);
     callWithABI(JS_FUNC_TO_DATA_PTR(void*, TraceLogStopEventPrivate));
@@ -2809,7 +2809,7 @@ MacroAssembler::setupABICall()
 }
 
 void
-MacroAssembler::setupAlignedABICall(uint32_t args)
+MacroAssembler::setupAlignedABICall()
 {
     setupABICall();
     dynamicAlignment_ = false;

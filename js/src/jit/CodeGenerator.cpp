@@ -382,7 +382,7 @@ CodeGenerator::emitOOLTestObject(Register objreg,
                                  Register scratch)
 {
     saveVolatile(scratch);
-    masm.setupUnalignedABICall(1, scratch);
+    masm.setupUnalignedABICall(scratch);
     masm.passABIArg(objreg);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js::EmulatesUndefined));
     masm.storeCallResult(scratch);
@@ -1149,7 +1149,7 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
     // Execute the RegExp.
     masm.computeEffectiveAddress(Address(masm.getStackPointer(), inputOutputDataStartOffset), temp2);
     masm.PushRegsInMask(volatileRegs);
-    masm.setupUnalignedABICall(1, temp3);
+    masm.setupUnalignedABICall(temp3);
     masm.passABIArg(temp2);
     masm.callWithABI(codePointer);
     masm.PopRegsInMask(volatileRegs);
@@ -2723,7 +2723,7 @@ CodeGenerator::visitOutOfLineCallPostWriteBarrier(OutOfLineCallPostWriteBarrier*
     masm.mov(ImmPtr(GetJitContext()->runtime), runtimereg);
 
     void (*fun)(JSRuntime*, JSObject*) = isGlobal ? PostGlobalWriteBarrier : PostWriteBarrier;
-    masm.setupUnalignedABICall(2, regs.takeAny());
+    masm.setupUnalignedABICall(regs.takeAny());
     masm.passABIArg(runtimereg);
     masm.passABIArg(objreg);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, fun));
@@ -2825,7 +2825,7 @@ CodeGenerator::visitCallNative(LCallNative* call)
     markSafepointAt(safepointOffset, call);
 
     // Construct and execute call.
-    masm.setupUnalignedABICall(3, tempReg);
+    masm.setupUnalignedABICall(tempReg);
     masm.passABIArg(argContextReg);
     masm.passABIArg(argUintNReg);
     masm.passABIArg(argVpReg);
@@ -2944,7 +2944,7 @@ CodeGenerator::visitCallDOMNative(LCallDOMNative* call)
     markSafepointAt(safepointOffset, call);
 
     // Construct and execute call.
-    masm.setupUnalignedABICall(4, argJSContext);
+    masm.setupUnalignedABICall(argJSContext);
 
     masm.loadJSContext(argJSContext);
 
@@ -3485,7 +3485,7 @@ CodeGenerator::visitGetDynamicName(LGetDynamicName* lir)
     masm.adjustStack(-int32_t(sizeof(Value)));
     masm.moveStackPtrTo(temp2);
 
-    masm.setupUnalignedABICall(4, temp1);
+    masm.setupUnalignedABICall(temp1);
     masm.passABIArg(temp3);
     masm.passABIArg(scopeChain);
     masm.passABIArg(name);
@@ -3846,7 +3846,7 @@ CodeGenerator::emitAssertObjectOrStringResult(Register input, MIRType type, cons
 
     // Check that we have a valid GC pointer.
     saveVolatile();
-    masm.setupUnalignedABICall(2, temp);
+    masm.setupUnalignedABICall(temp);
     masm.loadJSContext(temp);
     masm.passABIArg(temp);
     masm.passABIArg(input);
@@ -3919,7 +3919,7 @@ CodeGenerator::emitAssertResultV(const ValueOperand input, const TemporaryTypeSe
     masm.pushValue(input);
     masm.moveStackPtrTo(temp1);
 
-    masm.setupUnalignedABICall(2, temp2);
+    masm.setupUnalignedABICall(temp2);
     masm.loadJSContext(temp2);
     masm.passABIArg(temp2);
     masm.passABIArg(temp1);
@@ -4181,7 +4181,7 @@ CodeGenerator::visitAtan2D(LAtan2D* lir)
     FloatRegister y = ToFloatRegister(lir->y());
     FloatRegister x = ToFloatRegister(lir->x());
 
-    masm.setupUnalignedABICall(2, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(y, MoveOp::DOUBLE);
     masm.passABIArg(x, MoveOp::DOUBLE);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, ecmaAtan2), MoveOp::DOUBLE);
@@ -4194,7 +4194,7 @@ CodeGenerator::visitHypot(LHypot* lir)
 {
     Register temp = ToRegister(lir->temp());
     uint32_t numArgs = lir->numArgs();
-    masm.setupUnalignedABICall(numArgs, temp);
+    masm.setupUnalignedABICall(temp);
 
     for (uint32_t i = 0 ; i < numArgs; ++i)
         masm.passABIArg(ToFloatRegister(lir->getOperand(i)), MoveOp::DOUBLE);
@@ -5063,7 +5063,7 @@ CodeGenerator::visitSetDisjointTypedElements(LSetDisjointTypedElements* lir)
 
     Register temp = ToRegister(lir->temp());
 
-    masm.setupUnalignedABICall(3, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(target);
     masm.passABIArg(targetOffset);
     masm.passABIArg(source);
@@ -5194,10 +5194,7 @@ CodeGenerator::visitPowI(LPowI* ins)
 
     MOZ_ASSERT(power != temp);
 
-    // In all implementations, setupUnalignedABICall() relinquishes use of
-    // its scratch register. We can therefore save an input register by
-    // reusing the scratch register to pass constants to callWithABI.
-    masm.setupUnalignedABICall(2, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(value, MoveOp::DOUBLE);
     masm.passABIArg(power);
 
@@ -5212,7 +5209,7 @@ CodeGenerator::visitPowD(LPowD* ins)
     FloatRegister power = ToFloatRegister(ins->power());
     Register temp = ToRegister(ins->temp());
 
-    masm.setupUnalignedABICall(2, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(value, MoveOp::DOUBLE);
     masm.passABIArg(power, MoveOp::DOUBLE);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, ecmaPow), MoveOp::DOUBLE);
@@ -5227,9 +5224,9 @@ CodeGenerator::visitMathFunctionD(LMathFunctionD* ins)
     FloatRegister input = ToFloatRegister(ins->input());
     MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
 
-    const MathCache* mathCache = ins->mir()->cache();
+    masm.setupUnalignedABICall(temp);
 
-    masm.setupUnalignedABICall(mathCache ? 2 : 1, temp);
+    const MathCache* mathCache = ins->mir()->cache();
     if (mathCache) {
         masm.movePtr(ImmPtr(mathCache), temp);
         masm.passABIArg(temp);
@@ -5328,7 +5325,7 @@ CodeGenerator::visitMathFunctionF(LMathFunctionF* ins)
     FloatRegister input = ToFloatRegister(ins->input());
     MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnFloat32Reg);
 
-    masm.setupUnalignedABICall(1, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(input, MoveOp::FLOAT32);
 
     void* funptr = nullptr;
@@ -5352,7 +5349,7 @@ CodeGenerator::visitModD(LModD* ins)
 
     MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
 
-    masm.setupUnalignedABICall(2, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(lhs, MoveOp::DOUBLE);
     masm.passABIArg(rhs, MoveOp::DOUBLE);
 
@@ -6180,7 +6177,7 @@ JitRuntime::generateMallocStub(JSContext* cx)
     const Register regRuntime = regTemp;
     MOZ_ASSERT(regTemp != regNBytes);
 
-    masm.setupUnalignedABICall(2, regTemp);
+    masm.setupUnalignedABICall(regTemp);
     masm.movePtr(ImmPtr(cx->runtime()), regRuntime);
     masm.passABIArg(regRuntime);
     masm.passABIArg(regNBytes);
@@ -6218,7 +6215,7 @@ JitRuntime::generateFreeStub(JSContext* cx)
     const Register regTemp = regs.takeAnyGeneral();
     MOZ_ASSERT(regTemp != regSlots);
 
-    masm.setupUnalignedABICall(1, regTemp);
+    masm.setupUnalignedABICall(regTemp);
     masm.passABIArg(regSlots);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js_free));
 
@@ -6259,7 +6256,7 @@ JitRuntime::generateLazyLinkStub(JSContext* cx)
     masm.enterFakeExitFrame(LazyLinkExitFrameLayout::Token());
     masm.PushStubCode();
 
-    masm.setupUnalignedABICall(1, temp0);
+    masm.setupUnalignedABICall(temp0);
     masm.loadJSContext(temp0);
     masm.passABIArg(temp0);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, LazyLinkTopActivation));
@@ -7057,7 +7054,7 @@ CodeGenerator::emitArrayPopShift(LInstruction* lir, const MArrayPopShift* mir, R
         temps.add(lengthTemp);
 
         saveVolatile(temps);
-        masm.setupUnalignedABICall(1, lengthTemp);
+        masm.setupUnalignedABICall(lengthTemp);
         masm.passABIArg(obj);
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, js::ArrayShiftMoveElements));
         restoreVolatile(temps);
@@ -8814,7 +8811,7 @@ CodeGenerator::visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool)
     Register obj = masm.extractObject(input, temp);
 
     saveVolatile(output);
-    masm.setupUnalignedABICall(2, output);
+    masm.setupUnalignedABICall(output);
     masm.passABIArg(obj);
     masm.movePtr(ImmPtr(GetJitContext()->runtime), output);
     masm.passABIArg(output);
@@ -9633,7 +9630,7 @@ CodeGenerator::visitGetDOMProperty(LGetDOMProperty* ins)
 
     markSafepointAt(safepointOffset, ins);
 
-    masm.setupUnalignedABICall(4, JSContextReg);
+    masm.setupUnalignedABICall(JSContextReg);
 
     masm.loadJSContext(JSContextReg);
 
@@ -9723,7 +9720,7 @@ CodeGenerator::visitSetDOMProperty(LSetDOMProperty* ins)
 
     markSafepointAt(safepointOffset, ins);
 
-    masm.setupUnalignedABICall(4, JSContextReg);
+    masm.setupUnalignedABICall(JSContextReg);
 
     masm.loadJSContext(JSContextReg);
 
@@ -9791,7 +9788,7 @@ CodeGenerator::visitOutOfLineIsCallable(OutOfLineIsCallable* ool)
     Register output = ToRegister(ins->output());
 
     saveVolatile(output);
-    masm.setupUnalignedABICall(1, output);
+    masm.setupUnalignedABICall(output);
     masm.passABIArg(object);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, ObjectIsCallable));
     masm.storeCallResult(output);
@@ -10158,7 +10155,7 @@ CodeGenerator::visitDebugger(LDebugger* ins)
     Register temp = ToRegister(ins->getTemp(1));
 
     masm.loadJSContext(cx);
-    masm.setupUnalignedABICall(1, temp);
+    masm.setupUnalignedABICall(temp);
     masm.passABIArg(cx);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, GlobalHasLiveOnDebuggerStatement));
 
