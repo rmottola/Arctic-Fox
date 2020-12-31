@@ -1430,10 +1430,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         orq(Imm32(type), frameSizeReg);
     }
 
-    void callWithExitFrame(JitCode *target, Register dynStack);
+    void callWithExitFrame(JitCode* target, Register dynStack);
 
     // See CodeGeneratorX64 calls to noteAsmJSGlobalAccess.
-    void patchAsmJSGlobalAccess(CodeOffsetLabel patchAt, uint8_t *code, uint8_t *globalData,
+    void patchAsmJSGlobalAccess(CodeOffsetLabel patchAt, uint8_t* code, uint8_t* globalData,
                                 unsigned globalDataOffset)
     {
         uint8_t* nextInsn = code + patchAt.offset();
