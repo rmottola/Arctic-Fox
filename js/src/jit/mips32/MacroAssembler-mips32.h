@@ -349,8 +349,8 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
 {
   private:
     // Perform a downcast. Should be removed by Bug 996602.
-    MacroAssembler &asMasm();
-    const MacroAssembler &asMasm() const;
+    MacroAssembler& asMasm();
+    const MacroAssembler& asMasm() const;
 
   private:
     // Number of bytes the stack is adjusted inside a call to C. Calls to C may
@@ -911,11 +911,11 @@ public:
         push(ImmTag(JSVAL_TYPE_TO_TAG(type)));
         ma_push(reg);
     }
-    void pushValue(const Address &addr);
+    void pushValue(const Address& addr);
 
-    void storePayload(const Value &val, Address dest);
+    void storePayload(const Value& val, Address dest);
     void storePayload(Register src, Address dest);
-    void storePayload(const Value &val, const BaseIndex& dest);
+    void storePayload(const Value& val, const BaseIndex& dest);
     void storePayload(Register src, const BaseIndex& dest);
     void storeTypeTag(ImmTag tag, Address dest);
     void storeTypeTag(ImmTag tag, const BaseIndex& dest);
@@ -1247,38 +1247,38 @@ public:
 
     void loadPrivate(const Address& address, Register dest);
 
-    void loadInt32x1(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadInt32x1(const BaseIndex &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadInt32x2(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadInt32x2(const BaseIndex &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadInt32x3(const Address &src, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadInt32x3(const BaseIndex &src, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x1(FloatRegister src, const Address &dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x1(FloatRegister src, const BaseIndex &dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x2(FloatRegister src, const Address &dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x2(FloatRegister src, const BaseIndex &dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x3(FloatRegister src, const Address &dest) { MOZ_CRASH("NYI"); }
-    void storeInt32x3(FloatRegister src, const BaseIndex &dest) { MOZ_CRASH("NYI"); }
-    void loadAlignedInt32x4(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x1(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x1(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x2(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x2(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x3(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x3(const BaseIndex& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x1(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x1(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x2(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x2(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x3(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x3(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
+    void loadAlignedInt32x4(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeAlignedInt32x4(FloatRegister src, Address addr) { MOZ_CRASH("NYI"); }
-    void loadUnalignedInt32x4(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadUnalignedInt32x4(const BaseIndex &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadUnalignedInt32x4(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadUnalignedInt32x4(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeUnalignedInt32x4(FloatRegister src, Address addr) { MOZ_CRASH("NYI"); }
     void storeUnalignedInt32x4(FloatRegister src, BaseIndex addr) { MOZ_CRASH("NYI"); }
 
-    void loadFloat32x3(const Address &src, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadFloat32x3(const BaseIndex &src, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void storeFloat32x3(FloatRegister src, const Address &dest) { MOZ_CRASH("NYI"); }
-    void storeFloat32x3(FloatRegister src, const BaseIndex &dest) { MOZ_CRASH("NYI"); }
-    void loadAlignedFloat32x4(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadFloat32x3(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadFloat32x3(const BaseIndex& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void storeFloat32x3(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
+    void storeFloat32x3(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
+    void loadAlignedFloat32x4(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeAlignedFloat32x4(FloatRegister src, Address addr) { MOZ_CRASH("NYI"); }
-    void loadUnalignedFloat32x4(const Address &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
-    void loadUnalignedFloat32x4(const BaseIndex &addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadUnalignedFloat32x4(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadUnalignedFloat32x4(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeUnalignedFloat32x4(FloatRegister src, Address addr) { MOZ_CRASH("NYI"); }
     void storeUnalignedFloat32x4(FloatRegister src, BaseIndex addr) { MOZ_CRASH("NYI"); }
 
-    void loadDouble(const Address &addr, FloatRegister dest);
-    void loadDouble(const BaseIndex &src, FloatRegister dest);
+    void loadDouble(const Address& addr, FloatRegister dest);
+    void loadDouble(const BaseIndex& src, FloatRegister dest);
 
     // Load a float value into a register, then expand it to a double.
     void loadFloatAsDouble(const Address& addr, FloatRegister dest);
