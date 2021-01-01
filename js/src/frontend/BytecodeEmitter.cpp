@@ -5497,10 +5497,10 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
         return false;
 
     if (type == STMT_SPREAD)
-        stackDepth++;
+        this->stackDepth++;
 
 #ifdef DEBUG
-    int loopDepth = stackDepth;
+    int loopDepth = this->stackDepth;
 #endif
 
     // Emit code to assign result.value to the iteration variable.
@@ -5517,7 +5517,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
             return false;
 
         // The stack should be balanced around the assignment opcode sequence.
-        MOZ_ASSERT(stackDepth == loopDepth);
+        MOZ_ASSERT(this->stackDepth == loopDepth);
 
         // Emit code for the loop body.
         if (!emitTree(forBody))
@@ -5532,7 +5532,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
         if (!emit1(JSOP_INITELEM_INC))                    // ITER ARR (I+1)
             return false;
 
-        MOZ_ASSERT(stackDepth == loopDepth - 1);
+        MOZ_ASSERT(this->stackDepth == loopDepth - 1);
 
         // STMT_SPREAD never contain continue, so do not set "update" offset.
     }
