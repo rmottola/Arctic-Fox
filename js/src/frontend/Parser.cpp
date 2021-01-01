@@ -1300,7 +1300,7 @@ IsNonDominatingInScopedSwitch(ParseContext<FullParseHandler>* pc, HandleAtom nam
 {
     MOZ_ASSERT(dn->isLexical());
     StmtInfoPC* stmt = LexicalLookup(pc, name);
-    if (stmt && stmt->type == STMT_SWITCH)
+    if (stmt && stmt->type == StmtType::SWITCH)
         return dn->pn_cookie.slot() < stmt->firstDominatingLexicalInCase;
     return false;
 }
@@ -2926,7 +2926,7 @@ Parser<ParseHandler>::reportRedeclaration(Node pn, Definition::Kind redeclKind, 
         return false;
 
     StmtInfoPC* stmt = LexicalLookup(pc, name);
-    if (stmt && stmt->type == STMT_CATCH) {
+    if (stmt && stmt->type == StmtType::CATCH) {
         report(ParseError, false, pn, JSMSG_REDECLARED_CATCH_IDENTIFIER, printable.ptr());
     } else {
         if (redeclKind == Definition::ARG) {
@@ -3139,7 +3139,7 @@ LexicalLookup(ContextT* ct, HandleAtom atom, typename ContextT::StmtInfo* stmt)
          * can potentially override any static bindings introduced by statements
          * further up the stack, we have to abort the search.
          */
-        if (stmt->type == STMT_WITH && !ct->sc->isDotVariable(atom))
+        if (stmt->type == StmtType::WITH && !ct->sc->isDotVariable(atom))
             break;
 
         // Skip statements that do not introduce a new scope
@@ -3163,7 +3163,7 @@ OuterLet(ParseContext<ParseHandler>* pc, StmtInfoPC* stmt, HandleAtom atom)
         stmt = LexicalLookup(pc, atom, stmt->downScope);
         if (!stmt)
             return false;
-        if (stmt->type == STMT_BLOCK)
+        if (stmt->type == StmtType::BLOCK)
             return true;
     }
     return false;
@@ -3187,7 +3187,7 @@ Parser<ParseHandler>::bindVarOrGlobalConst(BindData<ParseHandler>* data,
 
     StmtInfoPC* stmt = LexicalLookup(pc, name);
 
-    if (stmt && stmt->type == STMT_WITH) {
+    if (stmt && stmt->type == StmtType::WITH) {
         parser->handler.setFlag(pn, PND_DEOPTIMIZED);
         if (pc->sc->isFunctionBox()) {
             FunctionBox* funbox = pc->sc->asFunctionBox();
@@ -3236,7 +3236,7 @@ Parser<ParseHandler>::bindVarOrGlobalConst(BindData<ParseHandler>* data,
         if (!parser->report(ParseExtraWarning, false, pn, JSMSG_VAR_HIDES_ARG, bytes.ptr()))
             return false;
     } else {
-        bool inCatchBody = (stmt && stmt->type == STMT_CATCH);
+        bool inCatchBody = (stmt && stmt->type == StmtType::CATCH);
         bool error = (isConstDecl ||
                       dn_kind == Definition::CONST ||
                       dn_kind == Definition::GLOBALCONST ||
@@ -3321,9 +3321,9 @@ Parser<ParseHandler>::noteNameUse(HandlePropertyName name, Node pn)
     handler.linkUseToDef(pn, dn);
 
     if (stmt) {
-        if (stmt->type == STMT_WITH) {
+        if (stmt->type == StmtType::WITH) {
             handler.setFlag(pn, PND_DEOPTIMIZED);
-        } else if (stmt->type == STMT_SWITCH && stmt->isBlockScope) {
+        } else if (stmt->type == StmtType::SWITCH && stmt->isBlockScope) {
             // See comments above StmtInfoPC and switchStatement for how
             // firstDominatingLexicalInCase is computed.
             MOZ_ASSERT(stmt->firstDominatingLexicalInCase <= stmt->staticBlock().numVariables());
@@ -3557,7 +3557,7 @@ Parser<ParseHandler>::pushLexicalScope(HandleStaticBlockObject blockObj, StmtInf
     if (!blockbox)
         return null();
 
-    PushStatementPC(pc, stmt, STMT_BLOCK);
+    PushStatementPC(pc, stmt, StmtType::BLOCK);
     blockObj->initEnclosingNestedScopeFromParser(pc->staticScope);
     FinishPushNestedScope(pc, stmt, *blockObj.get());
     stmt->isBlockScope = true;
@@ -3641,7 +3641,7 @@ Parser<ParseHandler>::blockStatement(YieldHandling yieldHandling)
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_LC));
 
     StmtInfoPC stmtInfo(context);
-    if (!PushBlocklikeStatement(tokenStream, &stmtInfo, STMT_BLOCK, pc))
+    if (!PushBlocklikeStatement(tokenStream, &stmtInfo, StmtType::BLOCK, pc))
         return null();
 
     Node list = statements(yieldHandling);
@@ -3915,10 +3915,10 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
          */
         MOZ_ASSERT(!stmt->isBlockScope);
         MOZ_ASSERT(stmt != pc->topScopeStmt);
-        MOZ_ASSERT(stmt->type == STMT_BLOCK ||
-                    stmt->type == STMT_SWITCH ||
-                    stmt->type == STMT_TRY ||
-                    stmt->type == STMT_FINALLY);
+        MOZ_ASSERT(stmt->type == StmtType::BLOCK ||
+                   stmt->type == StmtType::SWITCH ||
+                   stmt->type == StmtType::TRY ||
+                   stmt->type == StmtType::FINALLY);
         MOZ_ASSERT(!stmt->downScope);
 
         /* Convert the block statement into a scope statement. */
@@ -4492,7 +4492,7 @@ Parser<ParseHandler>::doWhileStatement(YieldHandling yieldHandling)
 {
     uint32_t begin = pos().begin;
     StmtInfoPC stmtInfo(context);
-    PushStatementPC(pc, &stmtInfo, STMT_DO_LOOP);
+    PushStatementPC(pc, &stmtInfo, StmtType::DO_LOOP);
     Node body = statement(yieldHandling);
     if (!body)
         return null();
@@ -4519,7 +4519,7 @@ Parser<ParseHandler>::whileStatement(YieldHandling yieldHandling)
 {
     uint32_t begin = pos().begin;
     StmtInfoPC stmtInfo(context);
-    PushStatementPC(pc, &stmtInfo, STMT_WHILE_LOOP);
+    PushStatementPC(pc, &stmtInfo, StmtType::WHILE_LOOP);
     Node cond = condition(InAllowed, yieldHandling);
     if (!cond)
         return null();
@@ -4593,7 +4593,7 @@ Parser<FullParseHandler>::forStatement(YieldHandling yieldHandling)
     uint32_t begin = pos().begin;
 
     StmtInfoPC forStmt(context);
-    PushStatementPC(pc, &forStmt, STMT_FOR_LOOP);
+    PushStatementPC(pc, &forStmt, StmtType::FOR_LOOP);
 
     bool isForEach = false;
     unsigned iflags = 0;
@@ -4745,13 +4745,13 @@ Parser<FullParseHandler>::forStatement(YieldHandling yieldHandling)
          * rhs of 'in'.
          */
         if (headKind == PNK_FOROF) {
-            forStmt.type = STMT_FOR_OF_LOOP;
+            forStmt.type = StmtType::FOR_OF_LOOP;
             if (isForEach) {
                 report(ParseError, false, null(), JSMSG_BAD_FOR_EACH_LOOP);
                 return null();
             }
         } else {
-            forStmt.type = STMT_FOR_IN_LOOP;
+            forStmt.type = StmtType::FOR_IN_LOOP;
             iflags |= JSITER_ENUMERATE;
         }
 
@@ -4942,7 +4942,7 @@ Parser<SyntaxParseHandler>::forStatement(YieldHandling yieldHandling)
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_FOR));
 
     StmtInfoPC forStmt(context);
-    PushStatementPC(pc, &forStmt, STMT_FOR_LOOP);
+    PushStatementPC(pc, &forStmt, StmtType::FOR_LOOP);
 
     /* Don't parse 'for each' loops. */
     if (allowsForEachIn()) {
@@ -5000,7 +5000,7 @@ Parser<SyntaxParseHandler>::forStatement(YieldHandling yieldHandling)
     }
     if (isForIn || isForOf) {
         /* Parse the rest of the for/in or for/of head. */
-        forStmt.type = isForOf ? STMT_FOR_OF_LOOP : STMT_FOR_IN_LOOP;
+        forStmt.type = isForOf ? StmtType::FOR_OF_LOOP : StmtType::FOR_IN_LOOP;
 
         /* Check that the left side of the 'in' or 'of' is valid. */
         if (!isForDecl &&
@@ -5069,7 +5069,7 @@ Parser<ParseHandler>::switchStatement(YieldHandling yieldHandling)
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_SWITCH);
 
     StmtInfoPC stmtInfo(context);
-    PushStatementPC(pc, &stmtInfo, STMT_SWITCH);
+    PushStatementPC(pc, &stmtInfo, StmtType::SWITCH);
 
     if (!GenerateBlockId(tokenStream, pc, pc->topStmt->blockid))
         return null();
@@ -5206,7 +5206,7 @@ Parser<ParseHandler>::continueStatement(YieldHandling yieldHandling)
                 report(ParseError, false, null(), JSMSG_LABEL_NOT_FOUND);
                 return null();
             }
-            if (stmt->type == STMT_LABEL) {
+            if (stmt->type == StmtType::LABEL) {
                 if (stmt->label == label) {
                     if (!stmt2 || !stmt2->isLoop()) {
                         report(ParseError, false, null(), JSMSG_BAD_CONTINUE);
@@ -5252,7 +5252,7 @@ Parser<ParseHandler>::breakStatement(YieldHandling yieldHandling)
                 report(ParseError, false, null(), JSMSG_LABEL_NOT_FOUND);
                 return null();
             }
-            if (stmt->type == STMT_LABEL && stmt->label == label)
+            if (stmt->type == StmtType::LABEL && stmt->label == label)
                 break;
         }
     } else {
@@ -5261,7 +5261,7 @@ Parser<ParseHandler>::breakStatement(YieldHandling yieldHandling)
                 report(ParseError, false, null(), JSMSG_TOUGH_BREAK);
                 return null();
             }
-            if (stmt->isLoop() || stmt->type == STMT_SWITCH)
+            if (stmt->isLoop() || stmt->type == StmtType::SWITCH)
                 break;
         }
     }
@@ -5493,7 +5493,7 @@ Parser<FullParseHandler>::withStatement(YieldHandling yieldHandling)
     pc->parsingWith = true;
 
     StmtInfoPC stmtInfo(context);
-    PushStatementPC(pc, &stmtInfo, STMT_WITH);
+    PushStatementPC(pc, &stmtInfo, StmtType::WITH);
     Rooted<StaticWithObject*> staticWith(context, StaticWithObject::create(context));
     if (!staticWith)
         return null();
@@ -5541,7 +5541,7 @@ Parser<ParseHandler>::labeledStatement(YieldHandling yieldHandling)
     uint32_t begin = pos().begin;
     RootedPropertyName label(context, tokenStream.currentName());
     for (StmtInfoPC* stmt = pc->topStmt; stmt; stmt = stmt->down) {
-        if (stmt->type == STMT_LABEL && stmt->label == label) {
+        if (stmt->type == StmtType::LABEL && stmt->label == label) {
             report(ParseError, false, null(), JSMSG_DUPLICATE_LABEL);
             return null();
         }
@@ -5551,7 +5551,7 @@ Parser<ParseHandler>::labeledStatement(YieldHandling yieldHandling)
 
     /* Push a label struct and parse the statement. */
     StmtInfoPC stmtInfo(context);
-    PushStatementPC(pc, &stmtInfo, STMT_LABEL);
+    PushStatementPC(pc, &stmtInfo, StmtType::LABEL);
     stmtInfo.label = label;
     Node pn = statement(yieldHandling);
     if (!pn)
@@ -5620,7 +5620,7 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
 
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_TRY);
     StmtInfoPC stmtInfo(context);
-    if (!PushBlocklikeStatement(tokenStream, &stmtInfo, STMT_TRY, pc))
+    if (!PushBlocklikeStatement(tokenStream, &stmtInfo, StmtType::TRY, pc))
         return null();
     Node innerBlock = statements(yieldHandling);
     if (!innerBlock)
@@ -5655,7 +5655,7 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
             pnblock = pushLexicalScope(&stmtInfo);
             if (!pnblock)
                 return null();
-            stmtInfo.type = STMT_CATCH;
+            stmtInfo.type = StmtType::CATCH;
 
             /*
              * Legal catch forms are:
@@ -5756,7 +5756,7 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
 
     if (tt == TOK_FINALLY) {
         MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_FINALLY);
-        if (!PushBlocklikeStatement(tokenStream, &stmtInfo, STMT_FINALLY, pc))
+        if (!PushBlocklikeStatement(tokenStream, &stmtInfo, StmtType::FINALLY, pc))
             return null();
         finallyBlock = statements(yieldHandling);
         if (!finallyBlock)
