@@ -58,6 +58,8 @@ ContainsHoistedDeclaration(ExclusiveContext* cx, ParseNode* node, bool* result)
 {
     JS_CHECK_RECURSION(cx, return false);
 
+  restart:
+
     // With a better-typed AST, we would have distinct parse node classes for
     // expressions and for statements and would characterize expressions with
     // ExpressionKind and statements with StatementKind.  Perhaps someday.  In
@@ -164,8 +166,8 @@ ContainsHoistedDeclaration(ExclusiveContext* cx, ParseNode* node, bool* result)
         if (*result)
             return true;
 
-        if (ParseNode* alternative = node->pn_kid3)
-            return ContainsHoistedDeclaration(cx, alternative, result);
+        if ((node = node->pn_kid3))
+            goto restart;
 
         *result = false;
         return true;
@@ -609,12 +611,26 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
      FullParseHandler& handler, const ReadOnlyCompileOptions& options,
      bool inGenexpLambda, SyntacticContext sc)
 {
+    JS_CHECK_RECURSION(cx, return false);
+
+    ParseNode** restartNode = nullptr;
+    SyntacticContext restartContext;
+
+    bool mightHaveHoistedDeclarations = true;
+
+    if (false) {
+      restart:
+        if (!restartNode)
+            return true;
+        pnp = restartNode;
+        sc = restartContext;
+        restartNode = nullptr;
+    }
+
     ParseNode* pn = *pnp;
     ParseNode* pn1 = nullptr;
     ParseNode* pn2 = nullptr;
     ParseNode* pn3 = nullptr;
-
-    JS_CHECK_RECURSION(cx, return false);
 
     // First, recursively fold constants on the children of this node.
     switch (pn->getArity()) {
@@ -676,8 +692,13 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
         pn2 = pn->pn_kid2;
 
         if (pn->pn_kid3) {
-            if (!Fold(cx, &pn->pn_kid3, handler, options, inGenexpLambda, SyntacticContext::Other))
-                return false;
+            if (pn->isKind(PNK_IF) || pn->isKind(PNK_CONDITIONAL)) {
+                restartNode = &pn->pn_kid3;
+                restartContext = SyntacticContext::Other;
+            } else {
+                if (!Fold(cx, &pn->pn_kid3, handler, options, inGenexpLambda, SyntacticContext::Other))
+                    return false;
+            }
         }
         pn3 = pn->pn_kid3;
         break;
@@ -751,11 +772,11 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
     // pn is the immediate child in question. Its descendants were already
     // constant-folded above, so we're done.
     if (sc == SyntacticContext::Delete)
-        return true;
+        goto restart;
 
     switch (pn->getKind()) {
       case PNK_IF:
-        {
+        if (mightHaveHoistedDeclarations) {
             bool result;
             if (ParseNode* consequent = pn2) {
                 if (!ContainsHoistedDeclaration(cx, consequent, &result))
@@ -770,6 +791,7 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
                     break;
             }
         }
+        mightHaveHoistedDeclarations = false;
         /* FALL THROUGH */
 
       case PNK_CONDITIONAL:
@@ -791,7 +813,7 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
             break;
           default:
             /* Early return to dodge common code that copies pn2 to pn. */
-            return true;
+            goto restart;
         }
 
 #if JS_HAS_GENERATOR_EXPRS
@@ -801,6 +823,8 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
 #endif
 
         if (pn2 && !pn2->isDefn()) {
+            if (restartNode && *restartNode == pn2)
+                restartNode = pnp;
             ReplaceNode(pnp, pn2);
             pn = pn2;
         }
@@ -817,8 +841,11 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
             pn->setArity(PN_LIST);
             pn->makeEmpty();
         }
-        if (pn3 && pn3 != pn2)
+        if (pn3 && pn3 != pn2) {
+            if (restartNode && *restartNode == pn3)
+                restartNode = nullptr;
             handler.freeTree(pn3);
+        }
         break;
 
       case PNK_OR:
@@ -1069,7 +1096,7 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
 
               default:
                 /* Return early to dodge the common PNK_NUMBER code. */
-                return true;
+                goto restart;
             }
             pn->setKind(PNK_NUMBER);
             pn->setOp(JSOP_DOUBLE);
@@ -1171,7 +1198,7 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
         }
     }
 
-    return true;
+    goto restart;
 }
 
 bool
