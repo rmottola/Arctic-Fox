@@ -3787,7 +3787,7 @@ reflect_parse(JSContext* cx, uint32_t argc, jsval* vp)
 
     serialize.setParser(&parser);
 
-    ParseNode* pn = parser.parse(nullptr);
+    ParseNode* pn = parser.parse();
     if (!pn)
         return false;
 

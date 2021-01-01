@@ -689,7 +689,7 @@ MarkParser(JSTracer* trc, AutoGCRooter* parser)
  */
 template <typename ParseHandler>
 typename ParseHandler::Node
-Parser<ParseHandler>::parse(JSObject* chain)
+Parser<ParseHandler>::parse()
 {
     MOZ_ASSERT(checkOptionsCalled);
 
