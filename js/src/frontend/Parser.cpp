@@ -2940,8 +2940,8 @@ Parser<ParseHandler>::reportRedeclaration(Node pn, Definition::Kind redeclKind, 
 }
 
 /*
- * Define a lexical binding in a block or comprehension scope. pc
- * must already be in such a scope.
+ * Define a lexical binding in a block, or comprehension scope. pc must
+ * already be in such a scope.
  *
  * Throw a SyntaxError if 'atom' is an invalid name. Otherwise create a
  * property for the new variable on the block object, pc->staticScope;
