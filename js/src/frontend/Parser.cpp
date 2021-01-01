@@ -4773,7 +4773,7 @@ Parser<FullParseHandler>::forStatement(YieldHandling yieldHandling)
          * rhs of 'in'.
          */
         if (headKind == PNK_FOROF) {
-            forStmt.type = (headKind == PNK_FOROF) ? STMT_FOR_OF_LOOP : STMT_FOR_IN_LOOP;
+            forStmt.type = STMT_FOR_OF_LOOP;
             if (isForEach) {
                 report(ParseError, false, null(), JSMSG_BAD_FOR_EACH_LOOP);
                 return null();
@@ -4859,7 +4859,7 @@ Parser<FullParseHandler>::forStatement(YieldHandling yieldHandling)
             return null();
         }
 
-        headKind = PNK_FORHEAD;
+        MOZ_ASSERT(headKind == PNK_FORHEAD);
 
         if (blockObj) {
             // Ensure here that the previously-unchecked assignment mandate for
