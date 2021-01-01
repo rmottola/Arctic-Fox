@@ -545,7 +545,6 @@ struct BytecodeEmitter
     bool emitReturn(ParseNode* pn);
     bool emitStatement(ParseNode* pn);
     bool emitStatementList(ParseNode* pn, ptrdiff_t top);
-    bool emitSyntheticStatements(ParseNode* pn, ptrdiff_t top);
 
     bool emitDeleteName(ParseNode* pn);
     bool emitDeleteProperty(ParseNode* pn);
@@ -579,7 +578,7 @@ struct BytecodeEmitter
     bool emitBreak(PropertyName* label);
     bool emitContinue(PropertyName* label);
 
-    bool emitDefaultsAndDestructuring(ParseNode* pn, ParseNode* pndestruct);
+    bool emitDefaultsAndDestructuring(ParseNode* pn);
     bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
