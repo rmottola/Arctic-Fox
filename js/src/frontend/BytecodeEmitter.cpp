@@ -1904,9 +1904,6 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
 {
     JS_CHECK_RECURSION(cx, return false);
 
-    if (!pn || *answer)
-        return true;
-
     switch (pn->getKind()) {
       // Trivial cases with no side effects.
       case PNK_NEWTARGET:
