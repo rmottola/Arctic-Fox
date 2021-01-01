@@ -579,7 +579,7 @@ struct BytecodeEmitter
     bool emitBreak(PropertyName* label);
     bool emitContinue(PropertyName* label);
 
-    bool emitDefaults(ParseNode* pn);
+    bool emitDefaultsAndDestructuring(ParseNode* pn, ParseNode* pndestruct);
     bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
