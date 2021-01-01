@@ -1737,6 +1737,12 @@ enum FunctionSyntaxKind
     Setter
 };
 
+static inline bool
+IsConstructorKind(FunctionSyntaxKind kind)
+{
+    return kind == ClassConstructor || kind == DerivedClassConstructor;
+}
+
 static inline ParseNode*
 FunctionArgsList(ParseNode* fn, unsigned* numFormals)
 {
