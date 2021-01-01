@@ -532,6 +532,15 @@ JSCompartment::markRoots(JSTracer* trc)
 }
 
 void
+JSCompartment::sweepAfterMinorGC()
+{
+    globalWriteBarriered = false;
+
+    if (innerViews.needsSweepAfterMinorGC())
+        innerViews.sweepAfterMinorGC(runtimeFromMainThread());
+}
+
+void
 JSCompartment::sweepInnerViews()
 {
     innerViews.sweep(runtimeFromAnyThread());
