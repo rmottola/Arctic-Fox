@@ -3102,7 +3102,6 @@ static void
 PopStatementPC(TokenStream& ts, ParseContext<ParseHandler>* pc)
 {
     RootedNestedScopeObject scopeObj(ts.context(), pc->topStmt->staticScope);
-    MOZ_ASSERT(!!scopeObj == pc->topStmt->isNestedScope);
 
     AccumulateBlockScopeDepth(pc);
     FinishPopStatement(pc);
@@ -3936,7 +3935,7 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
          * lacks the SIF_SCOPE flag, it must be a try, catch, or finally
          * block.
          */
-        stmt->isBlockScope = stmt->isNestedScope = true;
+        stmt->isBlockScope = true;
         stmt->downScope = pc->topScopeStmt;
         pc->topScopeStmt = stmt;
 
