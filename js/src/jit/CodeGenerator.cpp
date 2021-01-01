@@ -2818,8 +2818,7 @@ CodeGenerator::visitCallNative(LCallNative* call)
     masm.Push(argUintNReg);
 
     // Construct native exit frame.
-    uint32_t safepointOffset;
-    masm.buildFakeExitFrame(tempReg, &safepointOffset);
+    uint32_t safepointOffset = masm.buildFakeExitFrame(tempReg);
     masm.enterFakeExitFrame(NativeExitFrameLayout::Token());
 
     markSafepointAt(safepointOffset, call);
@@ -2937,8 +2936,7 @@ CodeGenerator::visitCallDOMNative(LCallDOMNative* call)
     masm.moveStackPtrTo(argObj);
 
     // Construct native exit frame.
-    uint32_t safepointOffset;
-    masm.buildFakeExitFrame(argJSContext, &safepointOffset);
+    uint32_t safepointOffset = masm.buildFakeExitFrame(argJSContext);
     masm.enterFakeExitFrame(IonDOMMethodExitFrameLayout::Token());
 
     markSafepointAt(safepointOffset, call);
@@ -9624,8 +9622,7 @@ CodeGenerator::visitGetDOMProperty(LGetDOMProperty* ins)
     // Rooting will happen at GC time.
     masm.moveStackPtrTo(ObjectReg);
 
-    uint32_t safepointOffset;
-    masm.buildFakeExitFrame(JSContextReg, &safepointOffset);
+    uint32_t safepointOffset = masm.buildFakeExitFrame(JSContextReg);
     masm.enterFakeExitFrame(IonDOMExitFrameLayout::GetterToken());
 
     markSafepointAt(safepointOffset, ins);
@@ -9714,8 +9711,7 @@ CodeGenerator::visitSetDOMProperty(LSetDOMProperty* ins)
     // Rooting will happen at GC time.
     masm.moveStackPtrTo(ObjectReg);
 
-    uint32_t safepointOffset;
-    masm.buildFakeExitFrame(JSContextReg, &safepointOffset);
+    uint32_t safepointOffset = masm.buildFakeExitFrame(JSContextReg);
     masm.enterFakeExitFrame(IonDOMExitFrameLayout::SetterToken());
 
     markSafepointAt(safepointOffset, ins);
