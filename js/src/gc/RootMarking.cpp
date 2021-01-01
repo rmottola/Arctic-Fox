@@ -399,7 +399,7 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
         for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
             if (!c->zone()->isCollecting())
-                c->markCrossCompartmentWrappers(trc);
+                c->traceCrossCompartmentWrappers(trc);
         }
         Debugger::markAllCrossCompartmentEdges(trc);
     }
@@ -469,7 +469,7 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
     /* We can't use GCCompartmentsIter if we're called from TraceRuntime. */
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
-        c->markRoots(trc);
+        c->traceRoots(trc);
 
         if (traceOrMark == MarkRuntime && !c->zone()->isCollecting())
             continue;

@@ -482,7 +482,7 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
  * and when compacting to update cross-compartment pointers.
  */
 void
-JSCompartment::markCrossCompartmentWrappers(JSTracer* trc)
+JSCompartment::traceCrossCompartmentWrappers(JSTracer* trc)
 {
     MOZ_ASSERT(trc->runtime()->isHeapMajorCollecting());
     MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->gc.isHeapCompacting());
@@ -508,7 +508,7 @@ JSCompartment::trace(JSTracer* trc)
 }
 
 void
-JSCompartment::markRoots(JSTracer* trc)
+JSCompartment::traceRoots(JSTracer* trc)
 {
     // The object pending metadata is the only compartment root which can be
     // nursery allocated.
