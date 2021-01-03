@@ -203,7 +203,8 @@ ConvertToNSArray(nsTArray<Accessible*>& aArray)
 
   // if we're expired, we don't support any attributes.
   AccessibleWrap* accWrap = [self getGeckoAccessible];
-  if (!accWrap)
+  ProxyAccessible* proxy = [self getProxyAccessible];
+  if (!accWrap && !proxy)
     return [NSArray array];
 
   static NSArray* generalAttributes = nil;
@@ -262,11 +263,11 @@ ConvertToNSArray(nsTArray<Accessible*>& aArray)
 
   NSArray* objectAttributes = generalAttributes;
 
-  if (accWrap->IsTable())
+  if ((accWrap && accWrap->IsTable()) || (proxy && proxy->IsTable()))
     objectAttributes = tableAttrs;
-  else if (accWrap->IsTableRow())
+  else if ((accWrap && accWrap->IsTableRow()) || (proxy && proxy->IsTableRow()))
     objectAttributes = tableRowAttrs;
-  else if (accWrap->IsTableCell())
+  else if ((accWrap && accWrap->IsTableCell()) || (proxy && proxy->IsTableCell()))
     objectAttributes = tableCellAttrs;
 
   NSArray* additionalAttributes = [self additionalAccessibilityAttributeNames];
