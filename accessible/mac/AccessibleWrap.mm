@@ -19,7 +19,7 @@ using namespace mozilla::a11y;
 
 AccessibleWrap::
   AccessibleWrap(nsIContent* aContent, DocAccessible* aDoc) :
-  Accessible(aContent, aDoc), mNativeObject(nil),  
+  Accessible(aContent, aDoc), mNativeObject(nil),
   mNativeInited(false)
 {
 }
@@ -52,7 +52,7 @@ AccessibleWrap::GetNativeInterface(void** aOutInterface)
 // overridden in subclasses to create the right kind of object. by default we create a generic
 // 'mozAccessible' node.
 Class
-AccessibleWrap::GetNativeType () 
+AccessibleWrap::GetNativeType ()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
@@ -206,14 +206,14 @@ AccessibleWrap::RemoveChild(Accessible* aAccessible)
 
 // if we for some reason have no native accessible, we should be skipped over (and traversed)
 // when fetching all unignored children, etc.  when counting unignored children, we will not be counted.
-bool 
-AccessibleWrap::IsIgnored() 
+bool
+AccessibleWrap::IsIgnored()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
-  
+
   mozAccessible* nativeObject = GetNativeObject();
   return (!nativeObject) || [nativeObject accessibilityIsIgnored];
-  
+
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(false);
 }
 
@@ -244,9 +244,9 @@ AccessibleWrap::GetUnignoredParent() const
 {
   // Go up the chain to find a parent that is not ignored.
   AccessibleWrap* parentWrap = static_cast<AccessibleWrap*>(Parent());
-  while (parentWrap && parentWrap->IsIgnored()) 
+  while (parentWrap && parentWrap->IsIgnored())
     parentWrap = static_cast<AccessibleWrap*>(parentWrap->Parent());
-    
+
   return parentWrap;
 }
 
@@ -258,7 +258,7 @@ AccessibleWrap::AncestorIsFlat()
 {
   // We don't create a native object if we're child of a "flat" accessible;
   // for example, on OS X buttons shouldn't have any children, because that
-  // makes the OS confused. 
+  // makes the OS confused.
   //
   // To maintain a scripting environment where the XPCOM accessible hierarchy
   // look the same on all platforms, we still let the C++ objects be created

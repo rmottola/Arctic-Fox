@@ -19,7 +19,7 @@ ToNSRange(id aValue, NSRange* aRange)
 {
   NS_PRECONDITION(aRange, "aRange is nil");
 
-  if ([aValue isKindOfClass:[NSValue class]] && 
+  if ([aValue isKindOfClass:[NSValue class]] &&
       strcmp([(NSValue*)aValue objCType], @encode(NSRange)) == 0) {
     *aRange = [aValue rangeValue];
     return true;
@@ -116,7 +116,7 @@ ToNSString(id aValue)
   if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
     // Apple's SpeechSynthesisServer expects AXValue to return an AXStaticText
     // object's AXSelectedText attribute. See bug 674612 for details.
-    // Also if there is no selected text, we return the full text. 
+    // Also if there is no selected text, we return the full text.
     // See bug 369710 for details.
     if ([[self role] isEqualToString:NSAccessibilityStaticTextRole]) {
       NSString* selectedText = [self selectedText];
@@ -234,7 +234,7 @@ ToNSString(id aValue)
 
   if ([attribute isEqualToString:NSAccessibilityValueAttribute])
     return ![self isReadOnly];
-  
+
   if ([attribute isEqualToString:NSAccessibilitySelectedTextAttribute] ||
       [attribute isEqualToString:NSAccessibilitySelectedTextRangeAttribute] ||
       [attribute isEqualToString:NSAccessibilityVisibleCharacterRangeAttribute])
@@ -254,7 +254,7 @@ ToNSString(id aValue)
 
   if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
     [self setText:ToNSString(value)];
-    
+
     return;
   }
 
@@ -290,7 +290,7 @@ ToNSString(id aValue)
     mGeckoTextAccessible->ScrollSubstringTo(range.location, range.location + range.length,
                                             nsIAccessibleScrollType::SCROLL_TYPE_TOP_EDGE);
     return;
-  } 
+  }
 
   [super accessibilitySetValue:value forAttribute:attribute];
 
