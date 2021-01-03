@@ -89,6 +89,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
+- Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
 - Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
 - Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
