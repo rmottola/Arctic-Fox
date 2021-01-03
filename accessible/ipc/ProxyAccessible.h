@@ -274,6 +274,7 @@ public:
   double Step();
 
   void TakeFocus();
+  ProxyAccessible* FocusedChild();
   ProxyAccessible* ChildAtPoint(int32_t aX, int32_t aY,
                                 Accessible::EWhichChildAtPoint aWhichChild);
   nsIntRect Bounds();
