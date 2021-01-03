@@ -124,7 +124,7 @@ struct ConstArray {
 };
 
 struct ObjectArray {
-    js::HeapPtrObject *vector;  // Array of indexed objects.
+    js::HeapPtrObject* vector;  // Array of indexed objects.
     uint32_t        length;     // Count of indexed objects.
 };
 
@@ -1617,8 +1617,8 @@ class JSScript : public js::gc::TenuredCell
         return getAtom(GET_UINT32_INDEX(pc))->asPropertyName();
     }
 
-    JSObject *getObject(size_t index) {
-        js::ObjectArray *arr = objects();
+    JSObject* getObject(size_t index) {
+        js::ObjectArray* arr = objects();
         MOZ_ASSERT(index < arr->length);
         MOZ_ASSERT(arr->vector[index]->isTenured());
         return arr->vector[index];
@@ -1629,7 +1629,7 @@ class JSScript : public js::gc::TenuredCell
         return savedCallerFun() ? 1 : 0;
     }
 
-    JSObject *getObject(jsbytecode *pc) {
+    JSObject* getObject(jsbytecode* pc) {
         MOZ_ASSERT(containsPC(pc) && containsPC(pc + sizeof(uint32_t)));
         return getObject(GET_UINT32_INDEX(pc));
     }
