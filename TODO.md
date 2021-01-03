@@ -72,6 +72,8 @@
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
+- Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
