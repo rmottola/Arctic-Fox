@@ -336,7 +336,8 @@ struct JS_PUBLIC_API(GCDescription) {
     GCDescription(bool isCompartment, JSGCInvocationKind kind)
       : isCompartment_(isCompartment), invocationKind_(kind) {}
 
-    char16_t* formatMessage(JSRuntime* rt) const;
+    char16_t* formatSliceMessage(JSRuntime* rt) const;
+    char16_t* formatSummaryMessage(JSRuntime* rt) const;
     char16_t* formatJSON(JSRuntime* rt, uint64_t timestamp) const;
 
     JS::dbg::GarbageCollectionEvent::Ptr toGCEvent(JSRuntime* rt) const;
@@ -553,7 +554,7 @@ class JS_PUBLIC_API(AutoCheckCannotGC) : public AutoAssertOnGC
 
 /*
  * Unsets the gray bit for anything reachable from |thing|. |kind| should not be
- * JSTRACE_SHAPE. |thing| should be non-null.
+ * JS::TraceKind::Shape. |thing| should be non-null.
  */
 extern JS_FRIEND_API(bool)
 UnmarkGrayGCThingRecursively(GCCellPtr thing);
@@ -566,7 +567,7 @@ namespace gc {
 static MOZ_ALWAYS_INLINE void
 ExposeGCThingToActiveJS(JS::GCCellPtr thing)
 {
-    MOZ_ASSERT(thing.kind() != JSTRACE_SHAPE);
+    MOZ_ASSERT(thing.kind() != JS::TraceKind::Shape);
 
     /*
      * GC things residing in the nursery cannot be gray: they have no mark bits.

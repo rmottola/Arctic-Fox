@@ -8,6 +8,7 @@
 
 #include <stdint.h>                     // for uint32_t, uint64_t
 #include "Units.h"                      // for CSSRect, CSSPixel, etc
+#include "mozilla/Maybe.h"
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/Rect.h"           // for RoundedIn
 #include "mozilla/gfx/ScaleFactor.h"    // for ScaleFactor
@@ -39,8 +40,8 @@ public:
   static const FrameMetrics sNullMetrics;   // We often need an empty metrics
 
   FrameMetrics()
-    : mCompositionBounds(0, 0, 0, 0)
-    , mPresShellResolution(1)
+    : mPresShellResolution(1)
+    , mCompositionBounds(0, 0, 0, 0)
     , mDisplayPort(0, 0, 0, 0)
     , mCriticalDisplayPort(0, 0, 0, 0)
     , mScrollableRect(0, 0, 0, 0)
@@ -64,6 +65,7 @@ public:
     , mExtraResolution()
     , mBackgroundColor(0, 0, 0, 0)
     , mLineScrollAmount(0, 0)
+    , mPageScrollAmount(0, 0)
     , mAllowVerticalScrollWithWheel(false)
   {
   }
@@ -96,7 +98,9 @@ public:
            mBackgroundColor == aOther.mBackgroundColor &&
            mDoSmoothScroll == aOther.mDoSmoothScroll &&
            mLineScrollAmount == aOther.mLineScrollAmount &&
-           mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel;
+           mPageScrollAmount == aOther.mPageScrollAmount &&
+           mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
+           mClipRect == aOther.mClipRect;
   }
   bool operator!=(const FrameMetrics& aOther) const
   {
@@ -237,27 +241,6 @@ public:
     return copy;
   }
 
-  // ---------------------------------------------------------------------------
-  // The following metrics are all in widget space/device pixels.
-  //
-
-  // This is the area within the widget that we're compositing to. It is in the
-  // same coordinate space as the reference frame for the scrolled frame.
-  //
-  // This is useful because, on mobile, the viewport and composition dimensions
-  // are not always the same. In this case, we calculate the displayport using
-  // an area bigger than the region we're compositing to. If we used the
-  // viewport dimensions to calculate the displayport, we'd run into situations
-  // where we're prerendering the wrong regions and the content may be clipped,
-  // or too much of it prerendered. If the composition dimensions are the same as the
-  // viewport dimensions, there is no need for this and we can just use the viewport
-  // instead.
-  //
-  // This value is valid for nested scrollable layers as well, and is still
-  // relative to the layer tree origin. This value is provided by Gecko at
-  // layout/paint time.
-  ParentLayerRect mCompositionBounds;
-
 public:
   void SetPresShellResolution(float aPresShellResolution)
   {
@@ -269,12 +252,22 @@ public:
     return mPresShellResolution;
   }
 
+  void SetCompositionBounds(const ParentLayerRect& aCompositionBounds)
+  {
+    mCompositionBounds = aCompositionBounds;
+  }
+
+  const ParentLayerRect& GetCompositionBounds() const
+  {
+    return mCompositionBounds;
+  }
+
   void SetDisplayPort(const CSSRect& aDisplayPort)
   {
     mDisplayPort = aDisplayPort;
   }
 
-  CSSRect GetDisplayPort() const
+  const CSSRect& GetDisplayPort() const
   {
     return mDisplayPort;
   }
@@ -284,7 +277,7 @@ public:
     mCriticalDisplayPort = aCriticalDisplayPort;
   }
 
-  CSSRect GetCriticalDisplayPort() const
+  const CSSRect& GetCriticalDisplayPort() const
   {
     return mCriticalDisplayPort;
   }
@@ -294,7 +287,7 @@ public:
     mCumulativeResolution = aCumulativeResolution;
   }
 
-  LayoutDeviceToLayerScale2D GetCumulativeResolution() const
+  const LayoutDeviceToLayerScale2D& GetCumulativeResolution() const
   {
     return mCumulativeResolution;
   }
@@ -304,7 +297,7 @@ public:
     mDevPixelsPerCSSPixel = aDevPixelsPerCSSPixel;
   }
 
-  CSSToLayoutDeviceScale GetDevPixelsPerCSSPixel() const
+  const CSSToLayoutDeviceScale& GetDevPixelsPerCSSPixel() const
   {
     return mDevPixelsPerCSSPixel;
   }
@@ -354,7 +347,7 @@ public:
     mZoom = aZoom;
   }
 
-  CSSToParentLayerScale2D GetZoom() const
+  const CSSToParentLayerScale2D& GetZoom() const
   {
     return mZoom;
   }
@@ -461,7 +454,7 @@ public:
     mExtraResolution = aExtraResolution;
   }
 
-  ScreenToLayerScale2D GetExtraResolution() const
+  const ScreenToLayerScale2D& GetExtraResolution() const
   {
     return mExtraResolution;
   }
@@ -496,6 +489,16 @@ public:
     mLineScrollAmount = size;
   }
 
+  const LayoutDeviceIntSize& GetPageScrollAmount() const
+  {
+    return mPageScrollAmount;
+  }
+
+  void SetPageScrollAmount(const LayoutDeviceIntSize& size)
+  {
+    mPageScrollAmount = size;
+  }
+
   const CSSRect& GetScrollableRect() const
   {
     return mScrollableRect;
@@ -516,6 +519,21 @@ public:
     mAllowVerticalScrollWithWheel = true;
   }
 
+  void SetClipRect(const Maybe<ParentLayerIntRect>& aClipRect)
+  {
+    mClipRect = aClipRect;
+  }
+  const Maybe<ParentLayerIntRect>& GetClipRect() const
+  {
+    return mClipRect;
+  }
+  bool HasClipRect() const {
+    return mClipRect.isSome();
+  }
+  const ParentLayerIntRect& ClipRect() const {
+    return mClipRect.ref();
+  }
+
 private:
 
   // The pres-shell resolution that has been induced on the document containing
@@ -526,6 +544,23 @@ private:
   // This is a plain float rather than a ScaleFactor because in and of itself
   // it does not convert between any coordinate spaces for which we have names.
   float mPresShellResolution;
+
+  // This is the area within the widget that we're compositing to. It is in the
+  // same coordinate space as the reference frame for the scrolled frame.
+  //
+  // This is useful because, on mobile, the viewport and composition dimensions
+  // are not always the same. In this case, we calculate the displayport using
+  // an area bigger than the region we're compositing to. If we used the
+  // viewport dimensions to calculate the displayport, we'd run into situations
+  // where we're prerendering the wrong regions and the content may be clipped,
+  // or too much of it prerendered. If the composition dimensions are the same
+  // as the viewport dimensions, there is no need for this and we can just use
+  // the viewport instead.
+  //
+  // This value is valid for nested scrollable layers as well, and is still
+  // relative to the layer tree origin. This value is provided by Gecko at
+  // layout/paint time.
+  ParentLayerRect mCompositionBounds;
 
   // The area of a frame's contents that has been painted, relative to
   // mCompositionBounds.
@@ -664,8 +699,24 @@ private:
   // The value of GetLineScrollAmount(), for scroll frames.
   LayoutDeviceIntSize mLineScrollAmount;
 
+  // The value of GetPageScrollAmount(), for scroll frames.
+  LayoutDeviceIntSize mPageScrollAmount;
+
   // Whether or not the frame can be vertically scrolled with a mouse wheel.
   bool mAllowVerticalScrollWithWheel;
+
+  // The clip rect to use when compositing a layer with this FrameMetrics.
+  Maybe<ParentLayerIntRect> mClipRect;
+
+  // WARNING!!!!
+  //
+  // When adding new fields to FrameMetrics, the following places should be
+  // updated to include them (as needed):
+  //    FrameMetrics::operator ==
+  //    AsyncPanZoomController::NotifyLayersUpdated
+  //    The ParamTraits specialization in GfxMessageUtils.h
+  //
+  // Please add new fields above this comment.
 };
 
 /**

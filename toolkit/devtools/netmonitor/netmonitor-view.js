@@ -498,8 +498,10 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        Specifies the request's url.
    * @param boolean aIsXHR
    *        True if this request was initiated via XHR.
+   * @param boolean aFromCache
+   *        Indicates if the result came from the browser cache
    */
-  addRequest: function(aId, aStartedDateTime, aMethod, aUrl, aIsXHR) {
+  addRequest: function(aId, aStartedDateTime, aMethod, aUrl, aIsXHR, aFromCache) {
     // Convert the received date/time string to a unix timestamp.
     let unixTime = Date.parse(aStartedDateTime);
 
@@ -517,7 +519,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         startedMillis: unixTime,
         method: aMethod,
         url: aUrl,
-        isXHR: aIsXHR
+        isXHR: aIsXHR,
+        fromCache: aFromCache
       }
     });
 
@@ -1222,19 +1225,27 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             break;
           case "remoteAddress":
             requestItem.attachment.remoteAddress = value;
+            this.updateMenuView(requestItem, key, value);
             break;
           case "remotePort":
             requestItem.attachment.remotePort = value;
             break;
           case "status":
             requestItem.attachment.status = value;
-            this.updateMenuView(requestItem, key, value);
+            this.updateMenuView(requestItem, key, {
+              status: value,
+              cached: requestItem.attachment.fromCache
+            });
             break;
           case "statusText":
             requestItem.attachment.statusText = value;
-            this.updateMenuView(requestItem, key,
-              requestItem.attachment.status + " " +
-              requestItem.attachment.statusText);
+            let text = (requestItem.attachment.status + " " +
+                        requestItem.attachment.statusText);
+            if(requestItem.attachment.fromCache) {
+              text += " (cached)";
+            }
+
+            this.updateMenuView(requestItem, key, text);
             break;
           case "headersSize":
             requestItem.attachment.headersSize = value;
@@ -1244,8 +1255,14 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             this.updateMenuView(requestItem, key, value);
             break;
           case "transferredSize":
-            requestItem.attachment.transferredSize = value;
-            this.updateMenuView(requestItem, key, value);
+            if(requestItem.attachment.fromCache) {
+              requestItem.attachment.transferredSize = 0;
+              this.updateMenuView(requestItem, key, 'cached');
+            }
+            else {
+              requestItem.attachment.transferredSize = value;
+              this.updateMenuView(requestItem, key, value);
+            }
             break;
           case "mimeType":
             requestItem.attachment.mimeType = value;
@@ -1269,7 +1286,9 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             break;
           case "eventTimings":
             requestItem.attachment.eventTimings = value;
-            this._createWaterfallView(requestItem, value.timings);
+            this._createWaterfallView(
+              requestItem, value.timings, requestItem.attachment.fromCache
+            );
             break;
         }
       }
@@ -1375,6 +1394,12 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         domain.setAttribute("tooltiptext", hostPort);
         break;
       }
+      case "remoteAddress":
+        let domain = $(".requests-menu-domain", target);
+        let tooltip = (domain.getAttribute("value") +
+                       (aValue ? " (" + aValue + ")" : ""));
+        domain.setAttribute("tooltiptext", tooltip);
+        break;
       case "securityState": {
         let tooltip = L10N.getStr("netmonitor.security.state." + aValue);
         let icon = $(".requests-security-state-icon", target);
@@ -1386,9 +1411,9 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
       }
       case "status": {
         let node = $(".requests-menu-status", target);
+        node.setAttribute("code", aValue.cached ? "cached" : aValue.status);
         let codeNode = $(".requests-menu-status-code", target);
-        codeNode.setAttribute("value", aValue);
-        node.setAttribute("code", aValue);
+        codeNode.setAttribute("value", aValue.status);
         break;
       }
       case "statusText": {
@@ -1406,15 +1431,22 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         break;
       }
       case "transferredSize": {
+        let node = $(".requests-menu-transferred", target);
+
         let text;
         if (aValue === null) {
           text = L10N.getStr("networkMenu.sizeUnavailable");
-        } else {
+        }
+        else if(aValue === "cached") {
+          text = aValue;
+          node.classList.add('theme-comment');
+        }
+        else {
           let kb = aValue / 1024;
           let size = L10N.numberWithDecimals(kb, CONTENT_SIZE_DECIMALS);
           text = L10N.getFormatStr("networkMenu.sizeKB", size);
         }
-        let node = $(".requests-menu-transferred", target);
+
         node.setAttribute("value", text);
         node.setAttribute("tooltiptext", text);
         break;
@@ -1459,14 +1491,21 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        The network request item in this container.
    * @param object aTimings
    *        An object containing timing information.
+   * @param boolean aFromCache
+   *        Indicates if the result came from the browser cache
    */
-  _createWaterfallView: function(aItem, aTimings) {
+  _createWaterfallView: function(aItem, aTimings, aFromCache) {
     let { target, attachment } = aItem;
     let sections = ["dns", "connect", "send", "wait", "receive"];
     // Skipping "blocked" because it doesn't work yet.
 
     let timingsNode = $(".requests-menu-timings", target);
     let timingsTotal = $(".requests-menu-timings-total", timingsNode);
+
+    if(aFromCache) {
+      timingsTotal.style.display = 'none';
+      return;
+    }
 
     // Add a set of boxes representing timing information.
     for (let key of sections) {
@@ -2356,7 +2395,7 @@ NetworkDetailsView.prototype = {
     }
 
     if (aData.status) {
-      $("#headers-summary-status-circle").setAttribute("code", aData.status);
+      $("#headers-summary-status-circle").setAttribute("code", aData.fromCache ? "cached" : aData.status);
       $("#headers-summary-status-value").setAttribute("value", aData.status + " " + aData.statusText);
       $("#headers-summary-status").removeAttribute("hidden");
     } else {
@@ -2727,7 +2766,9 @@ NetworkDetailsView.prototype = {
 
     let tabboxWidth = $("#details-pane").getAttribute("width");
     let availableWidth = tabboxWidth / 2; // Other nodes also take some space.
-    let scale = Math.max(availableWidth / aResponse.totalTime, 0);
+    let scale = (aResponse.totalTime > 0 ?
+                 Math.max(availableWidth / aResponse.totalTime, 0) :
+                 0);
 
     $("#timings-summary-blocked .requests-menu-timings-box")
       .setAttribute("width", blocked * scale);

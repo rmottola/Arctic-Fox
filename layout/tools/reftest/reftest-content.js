@@ -140,7 +140,7 @@ function StartTestURI(type, uri, timeout)
     LoadURI(gCurrentURL);
 }
 
-function setupZoom(contentRootElement) {
+function setupFullZoom(contentRootElement) {
     if (!contentRootElement || !contentRootElement.hasAttribute('reftest-zoom'))
         return;
     markupDocumentViewer().fullZoom =
@@ -242,12 +242,13 @@ function setupDisplayport(contentRootElement) {
     }
 }
 
+// Returns whether any offsets were updated
 function setupAsyncScrollOffsets(options) {
     var currentDoc = content.document;
     var contentRootElement = currentDoc ? currentDoc.documentElement : null;
 
     if (!contentRootElement) {
-        return;
+        return false;
     }
 
     function setupAsyncScrollOffsetsForElement(element, winUtils) {
@@ -258,31 +259,61 @@ function setupAsyncScrollOffsets(options) {
                 // This might fail when called from RecordResult since layers
                 // may not have been constructed yet
                 winUtils.setAsyncScrollOffset(element, sx, sy);
+                return true;
             } catch (e) {
                 if (!options.allowFailure) {
                     throw e;
                 }
             }
         }
+        return false;
     }
 
     function setupAsyncScrollOffsetsForElementSubtree(element, winUtils) {
-        setupAsyncScrollOffsetsForElement(element, winUtils);
+        var updatedAny = setupAsyncScrollOffsetsForElement(element, winUtils);
         for (var c = element.firstElementChild; c; c = c.nextElementSibling) {
-            setupAsyncScrollOffsetsForElementSubtree(c, winUtils);
+            if (setupAsyncScrollOffsetsForElementSubtree(c, winUtils)) {
+                updatedAny = true;
+            }
         }
         if (element.contentDocument) {
             LogInfo("Descending into subdocument (async offsets)");
-            setupAsyncScrollOffsetsForElementSubtree(element.contentDocument.documentElement,
-                                                     windowUtilsForWindow(element.contentWindow));
+            if (setupAsyncScrollOffsetsForElementSubtree(element.contentDocument.documentElement,
+                                                         windowUtilsForWindow(element.contentWindow))) {
+                updatedAny = true;
+            }
         }
+        return updatedAny;
     }
 
     var asyncScroll = contentRootElement.hasAttribute("reftest-async-scroll");
     if (asyncScroll) {
-        setupAsyncScrollOffsetsForElementSubtree(contentRootElement, windowUtils());
+        return setupAsyncScrollOffsetsForElementSubtree(contentRootElement, windowUtils());
     }
+    return false;
 }
+
+function setupAsyncZoom(options) {
+    var currentDoc = content.document;
+    var contentRootElement = currentDoc ? currentDoc.documentElement : null;
+
+    if (!contentRootElement || !contentRootElement.hasAttribute('reftest-async-zoom'))
+        return false;
+
+    var zoom = attrOrDefault(contentRootElement, "reftest-async-zoom", 1);
+    if (zoom != 1) {
+        try {
+            windowUtils().setAsyncZoom(contentRootElement, zoom);
+            return true;
+        } catch (e) {
+            if (!options.allowFailure) {
+                throw e;
+            }
+        }
+    }
+    return false;
+}
+
 
 function resetDisplayportAndViewport() {
     // XXX currently the displayport configuration lives on the
@@ -621,7 +652,7 @@ function OnDocumentLoad(event)
 
     var contentRootElement = currentDoc ? currentDoc.documentElement : null;
     currentDoc = null;
-    setupZoom(contentRootElement);
+    setupFullZoom(contentRootElement);
     setupViewport(contentRootElement);
     setupDisplayport(contentRootElement);
     var inPrintMode = false;
@@ -794,8 +825,19 @@ function RecordResult()
     }
 
     // Setup async scroll offsets now in case SynchronizeForSnapshot is not
-    // called (due to reftest-no-sync-layers being supplied).
-    setupAsyncScrollOffsets({allowFailure:true});
+    // called (due to reftest-no-sync-layers being supplied, or in the single
+    // process case).
+    var changedAsyncScrollZoom = false;
+    if (setupAsyncScrollOffsets({allowFailure:true})) {
+        changedAsyncScrollZoom = true;
+    }
+    if (setupAsyncZoom({allowFailure:true})) {
+        changedAsyncScrollZoom = true;
+    }
+    if (changedAsyncScrollZoom && !gBrowserIsRemote) {
+        sendAsyncMessage("reftest:UpdateWholeCanvasForInvalidation");
+    }
+
     SendTestDone(currentTestRunTime);
     FinishTestItem();
 }
@@ -874,6 +916,7 @@ function SynchronizeForSnapshot(flags)
     // Setup async scroll offsets now, because any scrollable layers should
     // have had their AsyncPanZoomControllers created.
     setupAsyncScrollOffsets({allowFailure:false});
+    setupAsyncZoom({allowFailure:false});
 }
 
 function RegisterMessageListeners()

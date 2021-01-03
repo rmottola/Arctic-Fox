@@ -32,9 +32,10 @@ ArrayObject::setLength(ExclusiveContext* cx, uint32_t length)
     getElementsHeader()->length = length;
 }
 
-/* static */ inline ArrayObject *
-ArrayObject::createArrayInternal(ExclusiveContext *cx, gc::AllocKind kind, gc::InitialHeap heap,
-                                 HandleShape shape, HandleObjectGroup group)
+/* static */ inline ArrayObject*
+ArrayObject::createArrayInternal(ExclusiveContext* cx, gc::AllocKind kind, gc::InitialHeap heap,
+                                 HandleShape shape, HandleObjectGroup group,
+                                 AutoSetNewObjectMetadata&)
 {
     // Create a new array and initialize everything except for its elements.
     MOZ_ASSERT(shape && group);
@@ -43,26 +44,26 @@ ArrayObject::createArrayInternal(ExclusiveContext *cx, gc::AllocKind kind, gc::I
     MOZ_ASSERT_IF(group->clasp()->finalize, heap == gc::TenuredHeap);
     MOZ_ASSERT_IF(group->hasUnanalyzedPreliminaryObjects(),
                   heap == js::gc::TenuredHeap);
+    MOZ_ASSERT(group->clasp()->shouldDelayMetadataCallback());
 
     // Arrays can use their fixed slots to store elements, so can't have shapes
     // which allow named properties to be stored in the fixed slots.
     MOZ_ASSERT(shape->numFixedSlots() == 0);
 
     size_t nDynamicSlots = dynamicSlotsCount(0, shape->slotSpan(), group->clasp());
-    JSObject *obj = Allocate<JSObject>(cx, kind, nDynamicSlots, heap, group->clasp());
+    JSObject* obj = Allocate<JSObject>(cx, kind, nDynamicSlots, heap, group->clasp());
     if (!obj)
         return nullptr;
 
-    static_cast<ArrayObject *>(obj)->shape_.init(shape);
-    static_cast<ArrayObject *>(obj)->group_.init(group);
+    static_cast<ArrayObject*>(obj)->shape_.init(shape);
+    static_cast<ArrayObject*>(obj)->group_.init(group);
 
-    SetNewObjectMetadata(cx, obj);
-
+    cx->compartment()->setObjectPendingMetadata(cx, obj);
     return &obj->as<ArrayObject>();
 }
 
 /* static */ inline ArrayObject*
-ArrayObject::finishCreateArray(ArrayObject* obj, HandleShape shape)
+ArrayObject::finishCreateArray(ArrayObject* obj, HandleShape shape, AutoSetNewObjectMetadata& metadata)
 {
     size_t span = shape->slotSpan();
     if (span)
@@ -76,9 +77,9 @@ ArrayObject::finishCreateArray(ArrayObject* obj, HandleShape shape)
 /* static */ inline ArrayObject*
 ArrayObject::createArray(ExclusiveContext* cx, gc::AllocKind kind, gc::InitialHeap heap,
                          HandleShape shape, HandleObjectGroup group,
-                         uint32_t length)
+                         uint32_t length, AutoSetNewObjectMetadata& metadata)
 {
-    ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, group);
+    ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, group, metadata);
     if (!obj)
         return nullptr;
 
@@ -87,30 +88,11 @@ ArrayObject::createArray(ExclusiveContext* cx, gc::AllocKind kind, gc::InitialHe
     obj->setFixedElements();
     new (obj->getElementsHeader()) ObjectElements(capacity, length);
 
-    return finishCreateArray(obj, shape);
+    return finishCreateArray(obj, shape, metadata);
 }
 
 /* static */ inline ArrayObject*
-ArrayObject::createArray(ExclusiveContext* cx, gc::InitialHeap heap,
-                         HandleShape shape, HandleObjectGroup group,
-                         HeapSlot* elements)
-{
-    // Use the smallest allocation kind for the array, as it can't have any
-    // fixed slots (see the assert in createArrayInternal) and will not be using
-    // its fixed elements.
-    gc::AllocKind kind = gc::AllocKind::OBJECT0_BACKGROUND;
-
-    ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, group);
-    if (!obj)
-        return nullptr;
-
-    obj->elements_ = elements;
-
-    return finishCreateArray(obj, shape);
-}
-
-/* static */ inline ArrayObject *
-ArrayObject::createCopyOnWriteArray(ExclusiveContext *cx, gc::InitialHeap heap,
+ArrayObject::createCopyOnWriteArray(ExclusiveContext* cx, gc::InitialHeap heap,
                                     HandleArrayObject sharedElementsOwner)
 {
     MOZ_ASSERT(sharedElementsOwner->getElementsHeader()->isCopyOnWrite());
@@ -121,15 +103,16 @@ ArrayObject::createCopyOnWriteArray(ExclusiveContext *cx, gc::InitialHeap heap,
     // its fixed elements.
     gc::AllocKind kind = gc::AllocKind::OBJECT0_BACKGROUND;
 
+    AutoSetNewObjectMetadata metadata(cx);
     RootedShape shape(cx, sharedElementsOwner->lastProperty());
     RootedObjectGroup group(cx, sharedElementsOwner->group());
-    ArrayObject *obj = createArrayInternal(cx, kind, heap, shape, group);
+    ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, group, metadata);
     if (!obj)
         return nullptr;
 
     obj->elements_ = sharedElementsOwner->getDenseElementsAllowCopyOnWrite();
 
-    return finishCreateArray(obj, shape);
+    return finishCreateArray(obj, shape, metadata);
 }
 
 } // namespace js

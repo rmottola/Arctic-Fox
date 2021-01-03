@@ -45,9 +45,22 @@ js::CurrentThreadIsIonCompiling()
 }
 
 bool
+js::CurrentThreadIsIonCompilingSafeForMinorGC()
+{
+    return TlsPerThreadData.get()->ionCompilingSafeForMinorGC;
+}
+
+bool
 js::CurrentThreadIsGCSweeping()
 {
     return js::TlsPerThreadData.get()->gcSweeping;
+}
+
+bool
+js::CurrentThreadIsHandlingInitFailure()
+{
+    JSRuntime* rt = js::TlsPerThreadData.get()->runtimeIfOnOwnerThread();
+    return rt && rt->handlingInitFailure;
 }
 
 #endif // DEBUG
@@ -75,3 +88,17 @@ template void js::PreBarrierFunctor<JS::Value>::operator()<JSObject>(JSObject*);
 template void js::PreBarrierFunctor<JS::Value>::operator()<JSString>(JSString*);
 template void js::PreBarrierFunctor<jsid>::operator()<JS::Symbol>(JS::Symbol*);
 template void js::PreBarrierFunctor<jsid>::operator()<JSString>(JSString*);
+
+JS_PUBLIC_API(void)
+JS::HeapObjectPostBarrier(JSObject** objp, JSObject* prev, JSObject* next)
+{
+    MOZ_ASSERT(objp);
+    js::InternalGCMethods<JSObject*>::postBarrier(objp, prev, next);
+}
+
+JS_PUBLIC_API(void)
+JS::HeapValuePostBarrier(JS::Value* valuep, const Value& prev, const Value& next)
+{
+    MOZ_ASSERT(valuep);
+    js::InternalGCMethods<JS::Value>::postBarrier(valuep, prev, next);
+}

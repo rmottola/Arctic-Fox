@@ -432,6 +432,40 @@ NS_IMPL_ISUPPORTS(VPXReporter, nsIMemoryReporter)
 CountingAllocatorBase<VPXReporter>::sAmount(0);
 #endif /* MOZ_VPX */
 
+#ifdef MOZ_WEBM
+class NesteggReporter final
+  : public nsIMemoryReporter
+  , public CountingAllocatorBase<NesteggReporter>
+{
+public:
+  NS_DECL_ISUPPORTS
+
+private:
+  NS_IMETHODIMP
+  CollectReports(nsIHandleReportCallback* aHandleReport, nsISupports* aData,
+                 bool aAnonymize) override
+  {
+    return MOZ_COLLECT_REPORT(
+      "explicit/media/libnestegg", KIND_HEAP, UNITS_BYTES, MemoryAllocated(),
+      "Memory allocated through libnestegg for WebM media files.");
+  }
+
+  ~NesteggReporter() {}
+};
+
+NS_IMPL_ISUPPORTS(NesteggReporter, nsIMemoryReporter)
+
+/* static */ template<> Atomic<size_t>
+CountingAllocatorBase<NesteggReporter>::sAmount(0);
+#endif /* MOZ_WEBM */
+
+static double
+TimeSinceProcessCreation()
+{
+  bool ignore;
+  return (TimeStamp::Now() - TimeStamp::ProcessCreation(ignore)).ToMilliseconds();
+}
+
 // Note that on OSX, aBinDirectory will point to .app/Contents/Resources/browser
 EXPORT_XPCOM_API(nsresult)
 NS_InitXPCOM2(nsIServiceManager** aResult,
@@ -446,6 +480,10 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
   sInitialized = true;
 
   mozPoisonValueInit();
+
+  NS_LogInit();
+
+  JS_SetCurrentEmbedderTimeFunction(TimeSinceProcessCreation);
 
   char aLocal;
   profiler_init(&aLocal);
@@ -468,8 +506,6 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
   nsSystemInfo::gUserUmask = ::umask(0777);
   ::umask(nsSystemInfo::gUserUmask);
 #endif
-
-  NS_LogInit();
 
   // Set up chromium libs
   NS_ASSERTION(!sExitManager && !sMessageLoop, "Bad logic!");

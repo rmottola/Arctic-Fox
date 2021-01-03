@@ -6,6 +6,8 @@
 #ifndef NSDOMMEDIASTREAM_H_
 #define NSDOMMEDIASTREAM_H_
 
+#include "ImageContainer.h"
+
 #include "nsCycleCollectionParticipant.h"
 #include "nsWrapperCache.h"
 #include "StreamBuffer.h"
@@ -29,12 +31,15 @@
 
 namespace mozilla {
 
+class DOMHwMediaStream;
 class DOMLocalMediaStream;
 class MediaStream;
 class MediaEngineSource;
+class MediaStreamGraph;
 
 namespace dom {
 class AudioNode;
+class HTMLCanvasElement;
 class MediaStreamTrack;
 class AudioStreamTrack;
 class VideoStreamTrack;
@@ -43,6 +48,11 @@ class VideoTrack;
 class AudioTrackList;
 class VideoTrackList;
 class MediaTrackListListener;
+}
+
+namespace layers {
+class ImageContainer;
+class OverlayImage;
 }
 
 class MediaStreamDirectListener;
@@ -112,6 +122,7 @@ public:
   virtual void StopTrack(TrackID aTrackID);
 
   virtual DOMLocalMediaStream* AsDOMLocalMediaStream() { return nullptr; }
+  virtual DOMHwMediaStream* AsDOMHwMediaStream() { return nullptr; }
 
   bool IsFinished();
   /**
@@ -178,14 +189,14 @@ public:
   /**
    * Create an nsDOMMediaStream whose underlying stream is a SourceMediaStream.
    */
-  static already_AddRefed<DOMMediaStream>
-  CreateSourceStream(nsIDOMWindow* aWindow);
+  static already_AddRefed<DOMMediaStream> CreateSourceStream(nsIDOMWindow* aWindow,
+                                                             MediaStreamGraph* aGraph = nullptr);
 
   /**
    * Create an nsDOMMediaStream whose underlying stream is a TrackUnionStream.
    */
-  static already_AddRefed<DOMMediaStream>
-  CreateTrackUnionStream(nsIDOMWindow* aWindow);
+  static already_AddRefed<DOMMediaStream> CreateTrackUnionStream(nsIDOMWindow* aWindow,
+                                                                 MediaStreamGraph* aGraph = nullptr);
 
   void SetLogicalStreamStartTime(StreamTime aTime)
   {
@@ -247,8 +258,10 @@ protected:
   virtual ~DOMMediaStream();
 
   void Destroy();
-  void InitSourceStream(nsIDOMWindow* aWindow);
-  void InitTrackUnionStream(nsIDOMWindow* aWindow);
+  void InitSourceStream(nsIDOMWindow* aWindow,
+                        MediaStreamGraph* aGraph = nullptr);
+  void InitTrackUnionStream(nsIDOMWindow* aWindow,
+                            MediaStreamGraph* aGraph = nullptr);
   void InitStreamCommon(MediaStream* aStream);
   already_AddRefed<AudioTrack> CreateAudioTrack(AudioStreamTrack* aStreamTrack);
   already_AddRefed<VideoTrack> CreateVideoTrack(VideoStreamTrack* aStreamTrack);
@@ -329,13 +342,15 @@ public:
    * Create an nsDOMLocalMediaStream whose underlying stream is a SourceMediaStream.
    */
   static already_AddRefed<DOMLocalMediaStream>
-  CreateSourceStream(nsIDOMWindow* aWindow);
+  CreateSourceStream(nsIDOMWindow* aWindow,
+                     MediaStreamGraph* aGraph = nullptr);
 
   /**
    * Create an nsDOMLocalMediaStream whose underlying stream is a TrackUnionStream.
    */
   static already_AddRefed<DOMLocalMediaStream>
-  CreateTrackUnionStream(nsIDOMWindow* aWindow);
+  CreateTrackUnionStream(nsIDOMWindow* aWindow,
+                         MediaStreamGraph* aGraph = nullptr);
 
 protected:
   virtual ~DOMLocalMediaStream();
@@ -358,7 +373,8 @@ public:
    */
   static already_AddRefed<DOMAudioNodeMediaStream>
   CreateTrackUnionStream(nsIDOMWindow* aWindow,
-                         AudioNode* aNode);
+                         AudioNode* aNode,
+                         MediaStreamGraph* aGraph = nullptr);
 
 protected:
   ~DOMAudioNodeMediaStream();
@@ -367,6 +383,40 @@ private:
   // If this object wraps a stream owned by an AudioNode, we need to ensure that
   // the node isn't cycle-collected too early.
   nsRefPtr<AudioNode> mStreamNode;
+};
+
+class DOMHwMediaStream : public DOMLocalMediaStream
+{
+  typedef mozilla::gfx::IntSize IntSize;
+  typedef layers::ImageContainer ImageContainer;
+#ifdef MOZ_WIDGET_GONK
+  typedef layers::OverlayImage OverlayImage;
+  typedef layers::OverlayImage::Data Data;
+#endif
+
+public:
+  DOMHwMediaStream();
+
+  static already_AddRefed<DOMHwMediaStream> CreateHwStream(nsIDOMWindow* aWindow);
+  virtual DOMHwMediaStream* AsDOMHwMediaStream() override { return this; }
+  int32_t RequestOverlayId();
+  void SetOverlayId(int32_t aOverlayId);
+  void SetImageSize(uint32_t width, uint32_t height);
+
+protected:
+  ~DOMHwMediaStream();
+
+private:
+  void Init(MediaStream* aStream);
+
+#ifdef MOZ_WIDGET_GONK
+  nsRefPtr<ImageContainer> mImageContainer;
+  const int DEFAULT_IMAGE_ID = 0x01;
+  const int DEFAULT_IMAGE_WIDTH = 400;
+  const int DEFAULT_IMAGE_HEIGHT = 300;
+  nsRefPtr<OverlayImage> mOverlayImage;
+  Data mImageData;
+#endif
 };
 
 } // namespace mozilla

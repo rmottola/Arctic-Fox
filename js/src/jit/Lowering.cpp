@@ -456,7 +456,7 @@ LIRGenerator::visitCall(MCall* call)
         MOZ_ASSERT(ok, "How can we not have four temp registers?");
         lir = new(alloc()) LCallDOMNative(tempFixed(cxReg), tempFixed(objReg),
                                           tempFixed(privReg), tempFixed(argsReg));
-    } else if (target) {
+    } else if (target && !(target->isClassConstructor() && !call->isConstructing())) {
         // Call known functions.
         if (target->isNative()) {
             Register cxReg, numReg, vpReg, tmpReg;
@@ -1377,13 +1377,6 @@ LIRGenerator::visitPow(MPow* ins)
 }
 
 void
-LIRGenerator::visitRandom(MRandom* ins)
-{
-    LRandom* lir = new(alloc()) LRandom(tempFixed(CallTempReg0), tempFixed(CallTempReg1));
-    defineReturn(lir, ins);
-}
-
-void
 LIRGenerator::visitMathFunction(MMathFunction* ins)
 {
     MOZ_ASSERT(IsFloatingPointType(ins->type()));
@@ -2233,11 +2226,18 @@ void
 LIRGenerator::visitInterruptCheck(MInterruptCheck* ins)
 {
     // Implicit interrupt checks require asm.js signal handlers to be installed.
+    // They also require writable JIT code: reprotecting in patchIonBackedges
+    // would be expensive and using AutoWritableJitCode in the signal handler
+    // is complicated because there could be another AutoWritableJitCode on the
+    // stack.
     LInstructionHelper<0, 0, 0>* lir;
-    if (GetJitContext()->runtime->canUseSignalHandlers())
+    if (GetJitContext()->runtime->canUseSignalHandlers() &&
+        !ExecutableAllocator::nonWritableJitCode)
+    {
         lir = new(alloc()) LInterruptCheckImplicit();
-    else
+    } else {
         lir = new(alloc()) LInterruptCheck();
+    }
     add(lir, ins);
     assignSafepoint(lir, ins);
 }
@@ -2499,6 +2499,14 @@ void
 LIRGenerator::visitIncrementUnboxedArrayInitializedLength(MIncrementUnboxedArrayInitializedLength* ins)
 {
     add(new(alloc()) LIncrementUnboxedArrayInitializedLength(useRegister(ins->object())), ins);
+}
+
+void
+LIRGenerator::visitSetUnboxedArrayInitializedLength(MSetUnboxedArrayInitializedLength* ins)
+{
+    add(new(alloc()) LSetUnboxedArrayInitializedLength(useRegister(ins->object()),
+                                                       useRegisterOrConstant(ins->length()),
+                                                       temp()), ins);
 }
 
 void
@@ -4176,9 +4184,9 @@ LIRGenerator::visitDebugger(MDebugger* ins)
 }
 
 void
-LIRGenerator::visitNurseryObject(MNurseryObject* ins)
+LIRGenerator::visitAtomicIsLockFree(MAtomicIsLockFree* ins)
 {
-    define(new(alloc()) LNurseryObject(), ins);
+    define(new(alloc()) LAtomicIsLockFree(useRegister(ins->input())), ins);
 }
 
 static void

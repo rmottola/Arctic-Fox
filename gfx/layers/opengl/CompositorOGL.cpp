@@ -35,7 +35,7 @@
 #include "nsIWidget.h"                  // for nsIWidget
 #include "nsLiteralString.h"            // for NS_LITERAL_STRING
 #include "nsMathUtils.h"                // for NS_roundf
-#include "nsRect.h"                     // for nsIntRect
+#include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsServiceManagerUtils.h"      // for do_GetService
 #include "nsString.h"                   // for nsString, nsAutoCString, etc
 #include "ScopedGLHelpers.h"
@@ -131,12 +131,18 @@ CompositorOGL::CreateContext()
                                                  caps, requireCompatProfile);
   }
 
-  if (!context)
+  if (!context) {
     context = gl::GLContextProvider::CreateForWindow(mWidget);
+  }
 
   if (!context) {
     NS_WARNING("Failed to create CompositorOGL context");
   }
+
+#ifdef MOZ_WIDGET_GONK
+  mWidget->SetNativeData(NS_NATIVE_OPENGL_CONTEXT,
+                         reinterpret_cast<uintptr_t>(context.get()));
+#endif
 
   return context.forget();
 }
@@ -425,6 +431,7 @@ CompositorOGL::BindAndDrawQuadWithTextureRect(ShaderProgramOGL *aProg,
                                             aTexCoordRect,
                                             &layerRects,
                                             &textureRects);
+
   BindAndDrawQuads(aProg, rects, layerRects, textureRects);
 }
 
@@ -912,6 +919,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
     DrawVRDistortion(aRect, aClipRect, aEffectChain, aOpacity, aTransform);
     return;
   }
+  LayerScope::DrawBegin();
 
   Rect clipRect = aClipRect;
   // aClipRect is in destination coordinate space (after all
@@ -926,9 +934,6 @@ CompositorOGL::DrawQuad(const Rect& aRect,
 
   gl()->fScissor(intClipRect.x, FlipY(intClipRect.y + intClipRect.height),
                  intClipRect.width, intClipRect.height);
-
-  LayerScope::SendEffectChain(mGLContext, aEffectChain,
-                              aRect.width, aRect.height);
 
   MaskType maskType;
   EffectMask* effectMask;
@@ -1002,7 +1007,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
   ActivateProgram(program);
   program->SetProjectionMatrix(mProjMatrix);
   program->SetLayerTransform(aTransform);
-
+  LayerScope::SetLayerTransform(aTransform);
   if (colorMatrix) {
       EffectColorMatrix* effectColorMatrix =
         static_cast<EffectColorMatrix*>(aEffectChain.mSecondaryEffects[EffectTypes::COLOR_MATRIX].get());
@@ -1011,6 +1016,8 @@ CompositorOGL::DrawQuad(const Rect& aRect,
 
   IntPoint offset = mCurrentRenderTarget->GetOrigin();
   program->SetRenderOffset(offset.x, offset.y);
+  LayerScope::SetRenderOffset(offset.x, offset.y);
+
   if (aOpacity != 1.f)
     program->SetLayerOpacity(aOpacity);
   if (config.mFeatures & ENABLE_TEXTURE_RECT) {
@@ -1080,7 +1087,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
       TextureSourceOGL* sourceCb = sourceYCbCr->GetSubSource(Cb)->AsSourceOGL();
       TextureSourceOGL* sourceCr = sourceYCbCr->GetSubSource(Cr)->AsSourceOGL();
 
-      if (!sourceY && !sourceCb && !sourceCr) {
+      if (!sourceY || !sourceCb || !sourceCr) {
         NS_WARNING("Invalid layer texture.");
         return;
       }
@@ -1209,6 +1216,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
 
   // in case rendering has used some other GL context
   MakeCurrent();
+  LayerScope::DrawEnd(mGLContext, aEffectChain, aRect.width, aRect.height);
 }
 
 void
@@ -1221,9 +1229,9 @@ CompositorOGL::EndFrame()
 
 #ifdef MOZ_DUMP_PAINTING
   if (gfxUtils::sDumpPainting) {
-    nsIntRect rect;
+    IntRect rect;
     if (mUseExternalSurfaceSize) {
-      rect = nsIntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
+      rect = IntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
     } else {
       mWidget->GetBounds(rect);
     }
@@ -1277,12 +1285,12 @@ CompositorOGL::EndFrame()
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
 void
-CompositorOGL::SetFBAcquireFence(Layer* aLayer)
+CompositorOGL::SetDispAcquireFence(Layer* aLayer)
 {
   // OpenGL does not provide ReleaseFence for rendering.
-  // Instead use FBAcquireFence as layer buffer's ReleaseFence
+  // Instead use DispAcquireFence as layer buffer's ReleaseFence
   // to prevent flickering and tearing.
-  // FBAcquireFence is FramebufferSurface's AcquireFence.
+  // DispAcquireFence is DisplaySurface's AcquireFence.
   // AcquireFence will be signaled when a buffer's content is available.
   // See Bug 974152.
 
@@ -1290,11 +1298,8 @@ CompositorOGL::SetFBAcquireFence(Layer* aLayer)
     return;
   }
 
-  android::sp<android::Fence> fence = new android::Fence(GetGonkDisplay()->GetPrevFBAcquireFd());
-  if (fence.get() && fence->isValid()) {
-    FenceHandle handle = FenceHandle(fence);
-    mReleaseFenceHandle.Merge(handle);
-  }
+  RefPtr<FenceHandle::FdObj> fence = new FenceHandle::FdObj(GetGonkDisplay()->GetPrevDispAcquireFd());
+  mReleaseFenceHandle.Merge(FenceHandle(fence));
 }
 
 FenceHandle
@@ -1303,12 +1308,14 @@ CompositorOGL::GetReleaseFence()
   if (!mReleaseFenceHandle.IsValid()) {
     return FenceHandle();
   }
-  return FenceHandle(new android::Fence(mReleaseFenceHandle.mFence->dup()));
+
+  nsRefPtr<FenceHandle::FdObj> fdObj = mReleaseFenceHandle.GetDupFdObj();
+  return FenceHandle(fdObj);
 }
 
 #else
 void
-CompositorOGL::SetFBAcquireFence(Layer* aLayer)
+CompositorOGL::SetDispAcquireFence(Layer* aLayer)
 {
 }
 
@@ -1471,6 +1478,7 @@ CompositorOGL::BindAndDrawQuads(ShaderProgramOGL *aProg,
   // We are using GL_TRIANGLES here because the Mac Intel drivers fail to properly
   // process uniform arrays with GL_TRIANGLE_STRIP. Go figure.
   mGLContext->fDrawArrays(LOCAL_GL_TRIANGLES, 0, 6 * aQuads);
+  LayerScope::SetLayerRects(aQuads, aLayerRects);
 }
 
 GLBlitTextureImageHelper*

@@ -378,28 +378,13 @@ js::TenuringTracer::TenuringTracer(JSRuntime* rt, Nursery* nursery)
   , tenuredSize(0)
   , head(nullptr)
   , tail(&head)
-  , savedRuntimeNeedBarrier(rt->needsIncrementalBarrier())
 {
     rt->gc.incGcNumber();
-
-    // We disable the runtime needsIncrementalBarrier() check so that
-    // pre-barriers do not fire on objects that have been relocated. The
-    // pre-barrier's call to obj->zone() will try to look through shape_,
-    // which is now the relocation magic and will crash. However,
-    // zone->needsIncrementalBarrier() must still be set correctly so that
-    // allocations we make in minor GCs between incremental slices will
-    // allocate their objects marked.
-    rt->setNeedsIncrementalBarrier(false);
 }
 
-js::TenuringTracer::~TenuringTracer()
-{
-    runtime()->setNeedsIncrementalBarrier(savedRuntimeNeedBarrier);
-}
-
-#define TIME_START(name) int64_t timstampStart_##name = enableProfiling_ ? PRMJ_Now() : 0
-#define TIME_END(name) int64_t timstampEnd_##name = enableProfiling_ ? PRMJ_Now() : 0
-#define TIME_TOTAL(name) (timstampEnd_##name - timstampStart_##name)
+#define TIME_START(name) int64_t timestampStart_##name = enableProfiling_ ? PRMJ_Now() : 0
+#define TIME_END(name) int64_t timestampEnd_##name = enableProfiling_ ? PRMJ_Now() : 0
+#define TIME_TOTAL(name) (timestampEnd_##name - timestampStart_##name)
 
 void
 js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList* pretenureGroups)
@@ -427,9 +412,9 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
 
     TraceMinorGCStart();
 
-    TIME_START(total);
+    int64_t timestampStart_total = PRMJ_Now();
 
-    AutoTraceSession session(rt, MinorCollecting);
+    AutoTraceSession session(rt, JS::HeapState::MinorCollecting);
     AutoStopVerifyingBarriers av(rt, false);
     AutoDisableProxyCheck disableStrictProxyChecking(rt);
     mozilla::DebugOnly<AutoEnterOOMUnsafeRegion> oomUnsafeRegion;
@@ -438,6 +423,14 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     TenuringTracer mover(rt, this);
 
     // Mark the store buffer. This must happen first.
+
+    TIME_START(cancelIonCompilations);
+    if (sb.cancelIonCompilations()) {
+        for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
+            jit::StopAllOffThreadCompilations(c);
+    }
+    TIME_END(cancelIonCompilations);
+
     TIME_START(traceValues);
     sb.traceValues(mover);
     TIME_END(traceValues);
@@ -453,14 +446,6 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     TIME_START(traceWholeCells);
     sb.traceWholeCells(mover);
     TIME_END(traceWholeCells);
-
-    TIME_START(traceRelocatableValues);
-    sb.traceRelocatableValues(mover);
-    TIME_END(traceRelocatableValues);
-
-    TIME_START(traceRelocatableCells);
-    sb.traceRelocatableCells(mover);
-    TIME_END(traceRelocatableCells);
 
     TIME_START(traceGenericEntries);
     sb.traceGenericEntries(&mover);
@@ -554,32 +539,34 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     if (rt->gc.usage.gcBytes() >= rt->gc.tunables.gcMaxBytes())
         disable();
 
-    TIME_END(total);
+    int64_t totalTime = PRMJ_Now() - timestampStart_total;
+    rt->addTelemetry(JS_TELEMETRY_GC_MINOR_US, totalTime);
+    rt->addTelemetry(JS_TELEMETRY_GC_MINOR_REASON, reason);
+    if (totalTime > 1000)
+        rt->addTelemetry(JS_TELEMETRY_GC_MINOR_REASON_LONG, reason);
 
     TraceMinorGCEnd();
 
-    int64_t totalTime = TIME_TOTAL(total);
     if (enableProfiling_ && totalTime >= profileThreshold_) {
         static bool printedHeader = false;
         if (!printedHeader) {
             fprintf(stderr,
-                    "MinorGC: Reason               PRate  Size Time   mkVals mkClls mkSlts mkWCll mkRVal mkRCll mkGnrc ckTbls mkRntm mkDbgr clrNOC collct swpABO updtIn runFin frSlts clrSB  sweep resize pretnr\n");
+                    "MinorGC: Reason               PRate  Size Time   mkVals mkClls mkSlts mkWCll mkGnrc ckTbls mkRntm mkDbgr clrNOC collct swpABO updtIn runFin frSlts clrSB  sweep resize pretnr\n");
             printedHeader = true;
         }
 
 #define FMT " %6" PRIu64
         fprintf(stderr,
-                "MinorGC: %20s %5.1f%% %4d" FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT "\n",
+                "MinorGC: %20s %5.1f%% %4d" FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT "\n",
                 js::gcstats::ExplainReason(reason),
                 promotionRate * 100,
                 numActiveChunks_,
                 totalTime,
+                TIME_TOTAL(cancelIonCompilations),
                 TIME_TOTAL(traceValues),
                 TIME_TOTAL(traceCells),
                 TIME_TOTAL(traceSlots),
                 TIME_TOTAL(traceWholeCells),
-                TIME_TOTAL(traceRelocatableValues),
-                TIME_TOTAL(traceRelocatableCells),
                 TIME_TOTAL(traceGenericEntries),
                 TIME_TOTAL(checkHashTables),
                 TIME_TOTAL(markRuntime),

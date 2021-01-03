@@ -117,6 +117,9 @@ JitOptions::JitOptions()
     // Whether functions are compiled immediately.
     SET_DEFAULT(eagerCompilation, false);
 
+    // Whether IonBuilder should prefer IC generation above specialized MIR.
+    SET_DEFAULT(forceInlineCaches, false);
+
     // Force how many invocation or loop iterations are needed before compiling
     // a function with the highest ionmonkey optimization level.
     // (i.e. OptimizationLevel_Normal)
@@ -165,6 +168,9 @@ JitOptions::JitOptions()
 
     // The bytecode length limit for small function.
     SET_DEFAULT(smallFunctionMaxBytecodeLength_, 100);
+
+    // Toggles whether unboxed plain objects can be created by the VM.
+    SET_DEFAULT(disableUnboxedObjects, false);
 }
 
 bool

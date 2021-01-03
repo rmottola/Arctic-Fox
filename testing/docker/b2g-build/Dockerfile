@@ -11,10 +11,12 @@ RUN yum install -y epel-release && \
   GConf2-devel \
   alsa-lib-devel \
   autoconf213 \
+  bc \
   bison \
   bzip2 \
   ccache \
-  cmake \
+  # cmake: is disabled intentionally to work around: bug 1141417
+  # cmake \
   curl \
   curl-devel \
   dbus-devel \

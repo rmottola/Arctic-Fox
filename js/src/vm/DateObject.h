@@ -9,6 +9,7 @@
 
 #include "jsobj.h"
 
+#include "js/Date.h"
 #include "js/Value.h"
 
 namespace js {
@@ -40,14 +41,22 @@ class DateObject : public NativeObject
 
   public:
     static const Class class_;
+    static const Class protoClass_;
 
-    inline const js::Value& UTCTime() const {
+    JS::ClippedTime clippedTime() const {
+        double t = getFixedSlot(UTC_TIME_SLOT).toDouble();
+        JS::ClippedTime clipped = JS::TimeClip(t);
+        MOZ_ASSERT(mozilla::NumbersAreIdentical(clipped.toDouble(), t));
+        return clipped;
+    }
+
+    const js::Value& UTCTime() const {
         return getFixedSlot(UTC_TIME_SLOT);
     }
 
     // Set UTC time to a given time and invalidate cached local time.
-    void setUTCTime(double t);
-    void setUTCTime(double t, MutableHandleValue vp);
+    void setUTCTime(JS::ClippedTime t);
+    void setUTCTime(JS::ClippedTime t, MutableHandleValue vp);
 
     inline double cachedLocalTime(DateTimeInfo* dtInfo);
 

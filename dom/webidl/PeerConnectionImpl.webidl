@@ -23,6 +23,7 @@ interface PeerConnectionImpl  {
   void initialize(PeerConnectionObserver observer, Window window,
                   RTCConfiguration iceServers,
                   nsISupports thread);
+
   /* JSEP calls */
   [Throws]
   void createOffer(optional RTCOfferOptions options);
@@ -63,9 +64,14 @@ interface PeerConnectionImpl  {
   void close();
 
   /* Notify DOM window if this plugin crash is ours. */
-  boolean pluginCrash(unsigned long long pluginId, DOMString name, DOMString pluginDumpID);
+  boolean pluginCrash(unsigned long long pluginId, DOMString name);
 
   /* Attributes */
+  /* This provides the implementation with the certificate it uses to
+   * authenticate itself.  The JS side must set this before calling
+   * createOffer/createAnswer or retrieving the value of fingerprint.  This has
+   * to be delayed because generating the certificate takes some time. */
+  attribute RTCCertificate certificate;
   [Constant]
   readonly attribute DOMString fingerprint;
   readonly attribute DOMString localDescription;

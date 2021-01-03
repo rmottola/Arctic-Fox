@@ -465,7 +465,7 @@ class LAsmJSLoadFuncPtr : public LInstructionHelper<1, 1, 1>
     }
 };
 
-class LAsmJSCompareExchangeCallout : public LInstructionHelper<1, 3, 0>
+class LAsmJSCompareExchangeCallout : public LCallInstructionHelper<1, 3, 0>
 {
   public:
     LIR_HEADER(AsmJSCompareExchangeCallout)
@@ -491,7 +491,29 @@ class LAsmJSCompareExchangeCallout : public LInstructionHelper<1, 3, 0>
     }
 };
 
-class LAsmJSAtomicBinopCallout : public LInstructionHelper<1, 2, 0>
+class LAsmJSAtomicExchangeCallout : public LCallInstructionHelper<1, 2, 0>
+{
+  public:
+    LIR_HEADER(AsmJSAtomicExchangeCallout)
+
+    LAsmJSAtomicExchangeCallout(const LAllocation& ptr, const LAllocation& value)
+    {
+        setOperand(0, ptr);
+        setOperand(1, value);
+    }
+    const LAllocation* ptr() {
+        return getOperand(0);
+    }
+    const LAllocation* value() {
+        return getOperand(1);
+    }
+
+    const MAsmJSAtomicExchangeHeap* mir() const {
+        return mir_->toAsmJSAtomicExchangeHeap();
+    }
+};
+
+class LAsmJSAtomicBinopCallout : public LCallInstructionHelper<1, 2, 0>
 {
   public:
     LIR_HEADER(AsmJSAtomicBinopCallout)
@@ -509,6 +531,23 @@ class LAsmJSAtomicBinopCallout : public LInstructionHelper<1, 2, 0>
 
     const MAsmJSAtomicBinopHeap* mir() const {
         return mir_->toAsmJSAtomicBinopHeap();
+    }
+};
+
+// Math.random().
+class LRandom : public LCallInstructionHelper<1, 0, 2>
+{
+  public:
+    LIR_HEADER(Random)
+    LRandom(const LDefinition& temp, const LDefinition& temp2) {
+        setTemp(0, temp);
+        setTemp(1, temp2);
+    }
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+    const LDefinition* temp2() {
+        return getTemp(1);
     }
 };
 

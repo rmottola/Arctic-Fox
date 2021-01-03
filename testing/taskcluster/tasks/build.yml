@@ -17,13 +17,16 @@ task:
   provisionerId: aws-provisioner
   schedulerId: task-graph-scheduler
 
+  routes:
+    - 'index.gecko.v1.{{project}}.revision.{{head_rev}}.{{build_name}}.{{build_type}}'
+    - 'index.gecko.v1.{{project}}.latest.{{build_name}}.{{build_type}}'
   scopes:
     # Nearly all of our build tasks use tc-vcs so just include the scope across
     # the board.
     - 'docker-worker:cache:tc-vcs'
     - 'docker-worker:image:{{#docker_image}}builder{{/docker_image}}'
-    - 'queue:define-task:aws-provisioner/build-c4-2xlarge'
-    - 'queue:create-task:aws-provisioner/build-c4-2xlarge'
+    - 'queue:define-task:aws-provisioner-v1/build-c4-2xlarge'
+    - 'queue:create-task:aws-provisioner-v1/build-c4-2xlarge'
 
 
   payload:
@@ -51,8 +54,11 @@ task:
       GECKO_HEAD_REF: '{{head_ref}}'
       MOZHARNESS_REPOSITORY: '{{mozharness_repository}}'
       MOZHARNESS_REV: '{{mozharness_rev}}'
+      MOZHARNESS_REF: '{{mozharness_ref}}'
 
   extra:
+    index:
+      rank: {{pushlog_id}}
     treeherder:
       groupSymbol: tc
       groupName: Submitted by taskcluster

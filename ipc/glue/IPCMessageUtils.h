@@ -12,6 +12,7 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/TimeStamp.h"
 #ifdef XP_WIN
 #include "mozilla/TimeStamp_windows.h"
@@ -520,7 +521,7 @@ struct ParamTraits<FallibleTArray<E> >
 
       memcpy(elements, outdata, pickledLength);
     } else {
-      if (!aResult->SetCapacity(length)) {
+      if (!aResult->SetCapacity(length, mozilla::fallible)) {
         return false;
       }
 
@@ -803,6 +804,40 @@ struct ParamTraits<nsIWidget::TouchPointerState>
   : public BitFlagsEnumSerializer<nsIWidget::TouchPointerState,
                                   nsIWidget::TouchPointerState::ALL_BITS>
 {
+};
+
+template<class T>
+struct ParamTraits< mozilla::Maybe<T> >
+{
+  typedef mozilla::Maybe<T> paramType;
+
+  static void Write(Message* msg, const paramType& param)
+  {
+    if (param.isSome()) {
+      WriteParam(msg, true);
+      WriteParam(msg, param.value());
+    } else {
+      WriteParam(msg, false);
+    }
+  }
+
+  static bool Read(const Message* msg, void** iter, paramType* result)
+  {
+    bool isSome;
+    if (!ReadParam(msg, iter, &isSome)) {
+      return false;
+    }
+    if (isSome) {
+      T tmp;
+      if (!ReadParam(msg, iter, &tmp)) {
+        return false;
+      }
+      *result = mozilla::Some(mozilla::Move(tmp));
+    } else {
+      *result = mozilla::Nothing();
+    }
+    return true;
+  }
 };
 
 } /* namespace IPC */

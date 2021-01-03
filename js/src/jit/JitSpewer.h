@@ -116,13 +116,7 @@ class GraphSpewer
     JSONSpewer jsonSpewer_;
 
   public:
-    explicit GraphSpewer(TempAllocator *alloc)
-      : graph_(nullptr),
-        c1Printer_(alloc->lifoAlloc()),
-        jsonPrinter_(alloc->lifoAlloc()),
-        c1Spewer_(c1Printer_),
-        jsonSpewer_(jsonPrinter_)
-    { }
+    explicit GraphSpewer(TempAllocator *alloc);
 
     bool isSpewing() const {
         return graph_;
@@ -151,6 +145,16 @@ class AutoSpewEndFunction
 
 void CheckLogging();
 Fprinter& JitSpewPrinter();
+
+class JitSpewIndent
+{
+    JitSpewChannel channel_;
+
+  public:
+    explicit JitSpewIndent(JitSpewChannel channel);
+    ~JitSpewIndent();
+};
+
 void JitSpew(JitSpewChannel channel, const char* fmt, ...);
 void JitSpewStart(JitSpewChannel channel, const char* fmt, ...);
 void JitSpewCont(JitSpewChannel channel, const char* fmt, ...);
@@ -200,12 +204,26 @@ static inline Fprinter& JitSpewPrinter()
 {
     MOZ_CRASH("No empty backend for JitSpewPrinter");
 }
-static inline void JitSpew(JitSpewChannel, const char* fmt, ...)
+
+class JitSpewIndent
+{
+  public:
+    explicit JitSpewIndent(JitSpewChannel channel) {}
+    ~JitSpewIndent() {}
+};
+
+// The computation of some of the argument of the spewing functions might be
+// costly, thus we use variaidic macros to ignore any argument of these
+// functions.
+static inline void JitSpewCheckArguments(JitSpewChannel channel, const char* fmt)
 { }
-static inline void JitSpewStart(JitSpewChannel channel, const char* fmt, ...)
-{ }
-static inline void JitSpewCont(JitSpewChannel channel, const char* fmt, ...)
-{ }
+
+#define JitSpewCheckExpandedArgs(channel, fmt, ...) JitSpewCheckArguments(channel, fmt)
+#define JitSpewCheckExpandedArgs_(ArgList) JitSpewCheckExpandedArgs ArgList /* Fix MSVC issue */
+#define JitSpew(...) JitSpewCheckExpandedArgs_((__VA_ARGS__))
+#define JitSpewStart(...) JitSpewCheckExpandedArgs_((__VA_ARGS__))
+#define JitSpewCont(...) JitSpewCheckExpandedArgs_((__VA_ARGS__))
+
 static inline void JitSpewFin(JitSpewChannel channel)
 { }
 

@@ -18,13 +18,11 @@ sys.path.insert(
 from automation import Automation
 from remoteautomation import RemoteAutomation, fennecLogcatFilters
 from runtests import Mochitest, MessageLogger
-from mochitest_options import RemoteOptions
-from mozlog import structured
+from mochitest_options import MochitestArgumentParser
 
 from manifestparser import TestManifest
 from manifestparser.filters import chunk_by_slice
 import devicemanager
-import droid
 import mozinfo
 
 SCRIPT_DIR = os.path.abspath(os.path.realpath(os.path.dirname(__file__)))
@@ -510,10 +508,6 @@ def main(args):
         auto.setProduct(options.remoteProductName)
     auto.setAppName(options.remoteappname)
 
-    options = parser.verifyOptions(options, mochitest)
-    if (options is None):
-        return 1
-
     logParent = os.path.dirname(options.remoteLogFile)
     dm.mkDir(logParent)
     auto.setRemoteLog(options.remoteLogFile)
@@ -740,5 +734,12 @@ def main(args):
     return retVal
 
 
+def main(args=sys.argv[1:]):
+    parser = MochitestArgumentParser(app='android')
+    options = parser.parse_args(args)
+
+    return run_test_harness(options)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

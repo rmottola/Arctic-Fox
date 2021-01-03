@@ -85,7 +85,8 @@ def CommandProvider(cls):
         argument_group_names = getattr(value, '_mach_command_arg_group_names', None)
 
         handler = MethodHandler(cls, attr, command_name, category=category,
-            description=description, conditions=conditions, parser=parser,
+            description=description, docstring=value.__doc__,
+            conditions=conditions, parser=parser,
             arguments=arguments, argument_group_names=argument_group_names,
             pass_context=pass_context)
 
@@ -114,6 +115,7 @@ def CommandProvider(cls):
         argument_group_names = getattr(value, '_mach_command_arg_group_names', None)
 
         handler = MethodHandler(cls, attr, subcommand, description=description,
+            docstring=value.__doc__,
             arguments=arguments, argument_group_names=argument_group_names,
             pass_context=pass_context)
         parent = Registrar.command_handlers[command]
@@ -140,8 +142,9 @@ class Command(object):
 
          description -- A brief description of what the command does.
 
-         parser -- an optional argparse.ArgumentParser instance to use as
-             the basis for the command arguments.
+         parser -- an optional argparse.ArgumentParser instance or callable
+             that returns an argparse.ArgumentParser instance to use as the
+             basis for the command arguments.
 
     For example:
 

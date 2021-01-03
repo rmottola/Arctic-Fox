@@ -316,6 +316,9 @@ XRE_InitChildProcess(int aArgc,
   }
 #endif
 
+  // NB: This must be called before profiler_init
+  NS_LogInit();
+
   char aLocal;
   profiler_init(&aLocal);
 
@@ -375,6 +378,9 @@ XRE_InitChildProcess(int aArgc,
   gArgv = aArgv;
   gArgc = aArgc;
 
+#ifdef MOZ_X11
+  XInitThreads();
+#endif
 #if MOZ_WIDGET_GTK == 2
   XRE_GlibInit();
 #endif
@@ -426,8 +432,6 @@ XRE_InitChildProcess(int aArgc,
 
   base::AtExitManager exitManager;
   NotificationService notificationService;
-
-  NS_LogInit();
 
   nsresult rv = XRE_InitCommandLine(aArgc, aArgv);
   if (NS_FAILED(rv)) {

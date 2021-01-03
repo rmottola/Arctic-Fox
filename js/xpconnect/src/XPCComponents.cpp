@@ -328,7 +328,8 @@ nsXPCComponents_Interfaces::Resolve(nsIXPConnectWrappedNative* wrapper,
                     *_retval = JS_DefinePropertyById(cx, obj, id, idobj,
                                                      JSPROP_ENUMERATE |
                                                      JSPROP_READONLY |
-                                                     JSPROP_PERMANENT);
+                                                     JSPROP_PERMANENT |
+                                                     JSPROP_RESOLVING);
                 }
             }
         }
@@ -575,7 +576,8 @@ nsXPCComponents_InterfacesByID::Resolve(nsIXPConnectWrappedNative* wrapper,
                     JS_DefinePropertyById(cx, obj, id, idobj,
                                           JSPROP_ENUMERATE |
                                           JSPROP_READONLY |
-                                          JSPROP_PERMANENT);
+                                          JSPROP_PERMANENT |
+                                          JSPROP_RESOLVING);
             }
         }
     }
@@ -802,7 +804,8 @@ nsXPCComponents_Classes::Resolve(nsIXPConnectWrappedNative* wrapper,
                     *_retval = JS_DefinePropertyById(cx, obj, id, idobj,
                                                      JSPROP_ENUMERATE |
                                                      JSPROP_READONLY |
-                                                     JSPROP_PERMANENT);
+                                                     JSPROP_PERMANENT |
+                                                     JSPROP_RESOLVING);
                 }
             }
         }
@@ -1049,7 +1052,8 @@ nsXPCComponents_ClassesByID::Resolve(nsIXPConnectWrappedNative* wrapper,
                     *_retval = JS_DefinePropertyById(cx, obj, id, idobj,
                                                      JSPROP_ENUMERATE |
                                                      JSPROP_READONLY |
-                                                     JSPROP_PERMANENT);
+                                                     JSPROP_PERMANENT |
+                                                     JSPROP_RESOLVING);
                 }
             }
         }
@@ -1253,7 +1257,8 @@ nsXPCComponents_Results::Resolve(nsIXPConnectWrappedNative* wrapper,
                 if (!JS_DefinePropertyById(cx, obj, id, (uint32_t)rv,
                                            JSPROP_ENUMERATE |
                                            JSPROP_READONLY |
-                                           JSPROP_PERMANENT)) {
+                                           JSPROP_PERMANENT |
+                                           JSPROP_RESOLVING)) {
                     return NS_ERROR_UNEXPECTED;
                 }
             }
@@ -3566,6 +3571,21 @@ nsXPCComponents_Utils::SetAddonInterposition(const nsACString& addonIdStr,
         return NS_ERROR_FAILURE;
     if (!XPCWrappedNativeScope::SetAddonInterposition(addonId, interposition))
         return NS_ERROR_FAILURE;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXPCComponents_Utils::SetAddonCallInterposition(HandleValue target,
+                                                 JSContext* cx)
+{
+    NS_ENSURE_TRUE(target.isObject(), NS_ERROR_INVALID_ARG);
+    RootedObject targetObj(cx, &target.toObject());
+    targetObj = js::CheckedUnwrap(targetObj);
+    NS_ENSURE_TRUE(targetObj, NS_ERROR_INVALID_ARG);
+    XPCWrappedNativeScope* xpcScope = ObjectScope(targetObj);
+    NS_ENSURE_TRUE(xpcScope, NS_ERROR_INVALID_ARG);
+
+    xpcScope->SetAddonCallInterposition();
     return NS_OK;
 }
 

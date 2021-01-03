@@ -21,7 +21,7 @@
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsIObserver.h"                // for nsIObserver
 #include "nsISupportsImpl.h"            // for Layer::Release, etc
-#include "nsRect.h"                     // for nsIntRect
+#include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsTArray.h"                   // for nsTArray
 #include "nscore.h"                     // for nsAString
 #include "mozilla/layers/TransactionIdAllocator.h"
@@ -34,6 +34,7 @@ class ClientPaintedLayer;
 class CompositorChild;
 class ImageLayer;
 class PLayerChild;
+class FrameUniformityData;
 class TextureClientPool;
 
 class ClientLayerManager final : public LayerManager
@@ -200,6 +201,7 @@ public:
   bool NeedsComposite() const { return mNeedsComposite; }
 
   virtual void Composite() override;
+  virtual void GetFrameUniformity(FrameUniformityData* aFrameUniformityData) override;
   virtual bool RequestOverfill(mozilla::dom::OverfillCallback* aCallback) override;
   virtual void RunOverfillCallback(const uint32_t aOverfill) override;
 

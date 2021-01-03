@@ -40,8 +40,7 @@ using namespace JS;
 NS_IMPL_ISUPPORTS(nsXPConnect,
                   nsIXPConnect,
                   nsISupportsWeakReference,
-                  nsIThreadObserver,
-                  nsIJSRuntimeService)
+                  nsIThreadObserver)
 
 nsXPConnect* nsXPConnect::gSelf = nullptr;
 bool         nsXPConnect::gOnceAliveNowDead = false;
@@ -53,7 +52,6 @@ nsIScriptSecurityManager* nsXPConnect::gScriptSecurityManager = nullptr;
 nsIPrincipal* nsXPConnect::gSystemPrincipal = nullptr;
 
 const char XPC_CONTEXT_STACK_CONTRACTID[] = "@mozilla.org/js/xpc/ContextStack;1";
-const char XPC_RUNTIME_CONTRACTID[]       = "@mozilla.org/js/xpc/RuntimeService;1";
 const char XPC_EXCEPTION_CONTRACTID[]     = "@mozilla.org/js/xpc/Exception;1";
 const char XPC_CONSOLE_CONTRACTID[]       = "@mozilla.org/consoleservice;1";
 const char XPC_SCRIPT_ERROR_CONTRACTID[]  = "@mozilla.org/scripterror;1";
@@ -376,7 +374,7 @@ CreateGlobalObject(JSContext* cx, const JSClass* clasp, nsIPrincipal* principal,
     if (!((const js::Class*)clasp)->ext.isWrappedNative)
     {
         VerifyTraceProtoAndIfaceCacheCalledTracer trc(JS_GetRuntime(cx));
-        JS_TraceChildren(&trc, global, JSTRACE_OBJECT);
+        JS_TraceChildren(&trc, global, JS::TraceKind::Object);
         MOZ_ASSERT(trc.ok, "Trace hook on global needs to call TraceXPCGlobal for XPConnect compartments.");
     }
 #endif
@@ -974,7 +972,7 @@ nsXPConnect::OnProcessNextEvent(nsIThreadInternal* aThread, bool aMayWait,
 
     // Push a null JSContext so that we don't see any script during
     // event processing.
-    bool ok = PushJSContextNoScriptContext(nullptr);
+    bool ok = PushNullJSContext();
     NS_ENSURE_TRUE(ok, NS_ERROR_FAILURE);
     return NS_OK;
 }
@@ -1000,7 +998,7 @@ nsXPConnect::AfterProcessNextEvent(nsIThreadInternal* aThread,
 
     Promise::PerformMicroTaskCheckpoint();
 
-    PopJSContextNoScriptContext();
+    PopNullJSContext();
 
     return NS_OK;
 }
@@ -1022,47 +1020,6 @@ nsXPConnect::SetReportAllJSExceptions(bool newval)
     return NS_OK;
 }
 
-/* attribute JSRuntime runtime; */
-NS_IMETHODIMP
-nsXPConnect::GetRuntime(JSRuntime** runtime)
-{
-    if (!runtime)
-        return NS_ERROR_NULL_POINTER;
-
-    JSRuntime* rt = GetRuntime()->Runtime();
-    JS_AbortIfWrongThread(rt);
-    *runtime = rt;
-    return NS_OK;
-}
-
-/* [noscript, notxpcom] void registerGCCallback(in xpcGCCallback func); */
-NS_IMETHODIMP_(void)
-nsXPConnect::RegisterGCCallback(xpcGCCallback func)
-{
-    mRuntime->AddGCCallback(func);
-}
-
-/* [noscript, notxpcom] void unregisterGCCallback(in xpcGCCallback func); */
-NS_IMETHODIMP_(void)
-nsXPConnect::UnregisterGCCallback(xpcGCCallback func)
-{
-    mRuntime->RemoveGCCallback(func);
-}
-
-/* [noscript, notxpcom] void registerContextCallback(in xpcContextCallback func); */
-NS_IMETHODIMP_(void)
-nsXPConnect::RegisterContextCallback(xpcContextCallback func)
-{
-    mRuntime->AddContextCallback(func);
-}
-
-/* [noscript, notxpcom] void unregisterContextCallback(in xpcContextCallback func); */
-NS_IMETHODIMP_(void)
-nsXPConnect::UnregisterContextCallback(xpcContextCallback func)
-{
-    mRuntime->RemoveContextCallback(func);
-}
-
 /* virtual */
 JSContext*
 nsXPConnect::GetCurrentJSContext()
@@ -1080,15 +1037,15 @@ nsXPConnect::GetSafeJSContext()
 namespace xpc {
 
 bool
-PushJSContextNoScriptContext(JSContext* aCx)
+PushNullJSContext()
 {
-    MOZ_ASSERT_IF(aCx, !GetScriptContextFromJSContext(aCx));
-    return XPCJSRuntime::Get()->GetJSContextStack()->Push(aCx);
+    return XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
 }
 
 void
-PopJSContextNoScriptContext()
+PopNullJSContext()
 {
+    MOZ_ASSERT(XPCJSRuntime::Get()->GetJSContextStack()->Peek() == nullptr);
     XPCJSRuntime::Get()->GetJSContextStack()->Pop();
 }
 

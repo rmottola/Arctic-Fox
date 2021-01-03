@@ -31,6 +31,7 @@
 #include "gfxXlibSurface.h"
 #include "cairo-xlib.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/X11Util.h"
 
 /* Undefine the Status from Xlib since it will conflict with system headers on OSX */
 #if defined(__APPLE__) && defined(Status)
@@ -84,6 +85,14 @@ gfxPlatformGtk::~gfxPlatformGtk()
         gfxFontconfigUtils::Shutdown();
         sFontconfigUtils = nullptr;
         gfxPangoFontGroup::Shutdown();
+    }
+}
+
+void
+gfxPlatformGtk::FlushContentDrawing()
+{
+    if (UseXRender()) {
+        XFlush(DefaultXDisplay());
     }
 }
 

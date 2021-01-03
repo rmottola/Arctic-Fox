@@ -171,12 +171,6 @@ class MacroAssemblerNone : public Assembler
     static void TraceJumpRelocations(JSTracer*, JitCode*, CompactBufferReader&) { MOZ_CRASH(); }
     static void TraceDataRelocations(JSTracer*, JitCode*, CompactBufferReader&) { MOZ_CRASH(); }
 
-    static void FixupNurseryObjects(JSContext*, JitCode*, CompactBufferReader&,
-                                    const ObjectVector&)
-    {
-        MOZ_CRASH();
-    }
-
     static bool SupportsFloatingPoint() { return false; }
     static bool SupportsSimd() { return false; }
 
@@ -331,6 +325,11 @@ class MacroAssemblerNone : public Assembler
     template <typename T> void compareExchange16SignExtend(const T& mem, Register oldval, Register newval, Register output) { MOZ_CRASH(); }
     template <typename T> void compareExchange16ZeroExtend(const T& mem, Register oldval, Register newval, Register output) { MOZ_CRASH(); }
     template <typename T> void compareExchange32(const T& mem, Register oldval, Register newval, Register output) { MOZ_CRASH(); }
+    template<typename T> void atomicExchange8SignExtend(const T& mem, Register value, Register output) { MOZ_CRASH(); }
+    template<typename T> void atomicExchange8ZeroExtend(const T& mem, Register value, Register output) { MOZ_CRASH(); }
+    template<typename T> void atomicExchange16SignExtend(const T& mem, Register value, Register output) { MOZ_CRASH(); }
+    template<typename T> void atomicExchange16ZeroExtend(const T& mem, Register value, Register output) { MOZ_CRASH(); }
+    template<typename T> void atomicExchange32(const T& mem, Register value, Register output) { MOZ_CRASH(); }
     template <typename T, typename S> void atomicFetchAdd8SignExtend(const T& value, const S& mem, Register temp, Register output) { MOZ_CRASH(); }
     template <typename T, typename S> void atomicFetchAdd8ZeroExtend(const T& value, const S& mem, Register temp, Register output) { MOZ_CRASH(); }
     template <typename T, typename S> void atomicFetchAdd16SignExtend(const T& value, const S& mem, Register temp, Register output) { MOZ_CRASH(); }
@@ -498,8 +497,14 @@ class ABIArgGenerator
     static const Register NonReturn_VolatileReg1;
 };
 
-static inline void PatchJump(CodeLocationJump&, CodeLocationLabel) { MOZ_CRASH(); }
+static inline void
+PatchJump(CodeLocationJump&, CodeLocationLabel, ReprotectCode reprotect = DontReprotect)
+{
+    MOZ_CRASH();
+}
+
 static inline bool GetTempRegForIntArg(uint32_t, uint32_t, Register*) { MOZ_CRASH(); }
+
 static inline
 void PatchBackedge(CodeLocationJump& jump_, CodeLocationLabel label, JitRuntime::BackedgeTarget target)
 {

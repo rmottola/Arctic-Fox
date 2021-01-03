@@ -1714,7 +1714,7 @@ RInstructionResults::frame() const
     return fp_;
 }
 
-RelocatableValue&
+HeapValue&
 RInstructionResults::operator [](size_t index)
 {
     return (*results_)[index];
@@ -2562,6 +2562,12 @@ MachineState::FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& 
         machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Int32x4), &fpregs[i]);
         machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Float32x4), &fpregs[i]);
     }
+#elif defined(JS_CODEGEN_ARM64)
+    for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single), &fpregs[i]);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double), &fpregs[i]);
+    }
+
 #elif defined(JS_CODEGEN_NONE)
     MOZ_CRASH();
 #else
@@ -3038,7 +3044,7 @@ JitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table, void* pc,
             return false;
 
         type_ = JitFrame_IonJS;
-        returnAddressToFp_ = entry.ionCacheEntry().rejoinAddr();
+        returnAddressToFp_ = pc;
         return true;
     }
 

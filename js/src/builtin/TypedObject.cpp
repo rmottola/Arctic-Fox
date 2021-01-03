@@ -1325,8 +1325,11 @@ GlobalObject::initTypedObjectModule(JSContext* cx, Handle<GlobalObject*> global)
     // Everything is setup, install module on the global object:
     RootedValue moduleValue(cx, ObjectValue(*module));
     global->setConstructor(JSProto_TypedObject, moduleValue);
-    if (!DefineProperty(cx, global, cx->names().TypedObject, moduleValue, nullptr, nullptr, 0))
+    if (!DefineProperty(cx, global, cx->names().TypedObject, moduleValue, nullptr, nullptr,
+                        JSPROP_RESOLVING))
+    {
         return false;
+    }
 
     return module;
 }
@@ -2056,7 +2059,8 @@ TypedObject::obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id, Ob
 }
 
 bool
-TypedObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties)
+TypedObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
+                           bool enumerableOnly)
 {
     MOZ_ASSERT(obj->is<TypedObject>());
     Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
@@ -2613,6 +2617,26 @@ js::GetFloat64x2TypeDescr(JSContext* cx, unsigned argc, Value* vp)
     Rooted<GlobalObject*> global(cx, cx->global());
     MOZ_ASSERT(global);
     args.rval().setObject(global->float64x2TypeDescr());
+    return true;
+}
+
+bool
+js::GetInt8x16TypeDescr(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    Rooted<GlobalObject*> global(cx, cx->global());
+    MOZ_ASSERT(global);
+    args.rval().setObject(global->int8x16TypeDescr());
+    return true;
+}
+
+bool
+js::GetInt16x8TypeDescr(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    Rooted<GlobalObject*> global(cx, cx->global());
+    MOZ_ASSERT(global);
+    args.rval().setObject(global->int16x8TypeDescr());
     return true;
 }
 

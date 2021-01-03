@@ -133,6 +133,7 @@ public:
   void         SetDirection(nsDirection aDir){mDirection = aDir;}
   nsresult     SetAnchorFocusToRange(nsRange *aRange);
   void         ReplaceAnchorFocusRange(nsRange *aRange);
+  void         AdjustAnchorFocusForMultiRange(nsDirection aDirection);
 
   //  NS_IMETHOD   GetPrimaryFrameForRangeEndpoint(nsIDOMNode *aNode, int32_t aOffset, bool aIsEndNode, nsIFrame **aResultFrame);
   NS_IMETHOD   GetPrimaryFrameForAnchorNode(nsIFrame **aResultFrame);

@@ -159,7 +159,7 @@ namespace js {
 namespace jit {
 
 static inline void
-PatchJump(CodeLocationJump jump, CodeLocationLabel label)
+PatchJump(CodeLocationJump jump, CodeLocationLabel label, ReprotectCode reprotect = DontReprotect)
 {
 #ifdef DEBUG
     // Assert that we're overwriting a jump instruction, either:
@@ -169,6 +169,7 @@ PatchJump(CodeLocationJump jump, CodeLocationLabel label)
     MOZ_ASSERT(((*x >= 0x80 && *x <= 0x8F) && *(x - 1) == 0x0F) ||
                (*x == 0xE9));
 #endif
+    MaybeAutoWritableJitCode awjc(jump.raw() - 8, 8, reprotect);
     X86Encoding::SetRel32(jump.raw(), label.raw());
 }
 static inline void
@@ -214,9 +215,6 @@ class Assembler : public AssemblerX86Shared
     void push(ImmGCPtr ptr) {
         masm.push_i32(int32_t(ptr.value));
         writeDataRelocation(ptr);
-    }
-    void push(ImmMaybeNurseryPtr ptr) {
-        push(noteMaybeNurseryPtr(ptr));
     }
     void push(const ImmWord imm) {
         push(Imm32(imm.value));
@@ -367,9 +365,6 @@ class Assembler : public AssemblerX86Shared
           default:
             MOZ_CRASH("unexpected operand kind");
         }
-    }
-    void cmpl(ImmMaybeNurseryPtr rhs, const Operand& lhs) {
-        cmpl(noteMaybeNurseryPtr(rhs), lhs);
     }
     void cmpl(Register rhs, AsmJSAbsoluteAddress lhs) {
         masm.cmpl_rm_disp32(rhs.encoding(), (void*)-1);

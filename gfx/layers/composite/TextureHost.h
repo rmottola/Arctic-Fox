@@ -31,9 +31,6 @@
 #include "mozilla/gfx/Rect.h"
 
 namespace mozilla {
-namespace gl {
-class SharedSurface;
-}
 namespace ipc {
 class Shmem;
 } // namespace ipc
@@ -43,7 +40,6 @@ namespace layers {
 class Compositor;
 class CompositableParentManager;
 class SurfaceDescriptor;
-class SharedSurfaceDescriptor;
 class ISurfaceAllocator;
 class TextureHostOGL;
 class TextureSourceOGL;
@@ -388,7 +384,7 @@ public:
    * @param aRegion The region that has been changed, if nil, it means that the
    * entire surface should be updated.
    */
-  virtual void Updated(const nsIntRegion* aRegion = nullptr) {}
+   void Updated(const nsIntRegion* aRegion = nullptr);
 
   /**
    * Sets this TextureHost's compositor.
@@ -470,8 +466,6 @@ public:
    */
   PTextureParent* GetIPDLActor();
 
-  FenceHandle GetAndResetReleaseFenceHandle();
-
   /**
    * Specific to B2G's Composer2D
    * XXX - more doc here
@@ -500,11 +494,6 @@ public:
    */
   virtual bool HasInternalBuffer() const { return false; }
 
-  /**
-   * Cast to a TextureHost for each backend.
-   */
-  virtual TextureHostOGL* AsHostOGL() { return nullptr; }
-
   void AddCompositableRef() { ++mCompositableCount; }
 
   void ReleaseCompositableRef()
@@ -518,8 +507,34 @@ public:
 
   int NumCompositableRefs() const { return mCompositableCount; }
 
+  /**
+   * Store a fence that will signal when the current buffer is no longer being read.
+   * Similar to android's GLConsumer::setReleaseFence()
+   */
+  bool SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle);
+
+  /**
+   * Return a releaseFence's Fence and clear a reference to the Fence.
+   */
+  FenceHandle GetAndResetReleaseFenceHandle();
+
+  void SetAcquireFenceHandle(const FenceHandle& aAcquireFenceHandle);
+
+  /**
+   * Return a acquireFence's Fence and clear a reference to the Fence.
+   */
+  FenceHandle GetAndResetAcquireFenceHandle();
+
+  virtual void WaitAcquireFenceHandleSyncComplete() {};
+
 protected:
+  FenceHandle mReleaseFenceHandle;
+
+  FenceHandle mAcquireFenceHandle;
+
   void RecycleTexture(TextureFlags aFlags);
+
+  virtual void UpdatedInternal(const nsIntRegion *Region) {}
 
   PTextureParent* mActor;
   TextureFlags mFlags;
@@ -553,8 +568,6 @@ public:
 
   virtual size_t GetBufferSize() = 0;
 
-  virtual void Updated(const nsIntRegion* aRegion = nullptr) override;
-
   virtual bool Lock() override;
 
   virtual void Unlock() override;
@@ -585,6 +598,8 @@ protected:
   bool MaybeUpload(nsIntRegion *aRegion = nullptr);
 
   void InitSize();
+
+  virtual void UpdatedInternal(const nsIntRegion* aRegion = nullptr) override;
 
   RefPtr<Compositor> mCompositor;
   RefPtr<DataTextureSource> mFirstSource;
@@ -660,64 +675,6 @@ public:
 
 protected:
   uint8_t* mBuffer;
-};
-
-/**
- * A TextureHost for SharedSurfaces
- */
-class SharedSurfaceTextureHost : public TextureHost
-{
-public:
-  SharedSurfaceTextureHost(TextureFlags aFlags,
-                           const SharedSurfaceDescriptor& aDesc);
-
-  virtual ~SharedSurfaceTextureHost() {
-    MOZ_ASSERT(!mIsLocked);
-  }
-
-  virtual void DeallocateDeviceData() override {};
-
-  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override {
-    return nullptr; // XXX - implement this (for MOZ_DUMP_PAINTING)
-  }
-
-  virtual void SetCompositor(Compositor* aCompositor) override {
-    MOZ_ASSERT(!mIsLocked);
-
-    if (aCompositor == mCompositor)
-      return;
-
-    mTexSource = nullptr;
-    mCompositor = aCompositor;
-  }
-
-public:
-
-  virtual bool Lock() override;
-  virtual void Unlock() override;
-
-  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override {
-    MOZ_ASSERT(mIsLocked);
-    MOZ_ASSERT(mTexSource);
-    aTexture = mTexSource;
-    return !!aTexture;
-  }
-
-  virtual gfx::SurfaceFormat GetFormat() const override;
-
-  virtual gfx::IntSize GetSize() const override;
-
-#ifdef MOZ_LAYERS_HAVE_LOG
-  virtual const char* Name() override { return "SharedSurfaceTextureHost"; }
-#endif
-
-protected:
-  void EnsureTexSource();
-
-  bool mIsLocked;
-  gl::SharedSurface* const mSurf;
-  RefPtr<Compositor> mCompositor;
-  RefPtr<TextureSource> mTexSource;
 };
 
 class MOZ_STACK_CLASS AutoLockTextureHost

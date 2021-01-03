@@ -2025,7 +2025,7 @@ GCThingIsGrayCCThing(JS::GCCellPtr thing)
 static bool
 ValueIsGrayCCThing(const JS::Value& value)
 {
-    return AddToCCKind(value.gcKind()) &&
+    return AddToCCKind(value.traceKind()) &&
            JS::GCThingIsMarkedGray(value.toGCCellPtr());
 }
 
@@ -2088,7 +2088,7 @@ private:
 public:
   // nsCycleCollectionNoteRootCallback methods.
   NS_IMETHOD_(void) NoteXPCOMRoot(nsISupports* aRoot);
-  NS_IMETHOD_(void) NoteJSRoot(void* aRoot);
+  NS_IMETHOD_(void) NoteJSRoot(JSObject* aRoot);
   NS_IMETHOD_(void) NoteNativeRoot(void* aRoot,
                                    nsCycleCollectionParticipant* aParticipant);
   NS_IMETHOD_(void) NoteWeakMapping(JSObject* aMap, JS::GCCellPtr aKey,
@@ -2135,7 +2135,7 @@ private:
     ++childPi->mInternalRefs;
   }
 
-  JS::Zone* MergeZone(void* aGcthing)
+  JS::Zone* MergeZone(JS::GCCellPtr aGcthing)
   {
     if (!mMergeZones) {
       return nullptr;
@@ -2297,9 +2297,9 @@ CCGraphBuilder::NoteXPCOMRoot(nsISupports* aRoot)
 }
 
 NS_IMETHODIMP_(void)
-CCGraphBuilder::NoteJSRoot(void* aRoot)
+CCGraphBuilder::NoteJSRoot(JSObject* aRoot)
 {
-  if (JS::Zone* zone = MergeZone(aRoot)) {
+  if (JS::Zone* zone = MergeZone(JS::GCCellPtr(aRoot))) {
     NoteRoot(zone, mJSZoneParticipant);
   } else {
     NoteRoot(aRoot, mJSParticipant);
@@ -2411,7 +2411,7 @@ CCGraphBuilder::NoteJSChild(JS::GCCellPtr aChild)
   }
 
   if (GCThingIsGrayCCThing(aChild) || MOZ_UNLIKELY(WantAllTraces())) {
-    if (JS::Zone* zone = MergeZone(aChild.asCell())) {
+    if (JS::Zone* zone = MergeZone(aChild)) {
       NoteChild(zone, mJSZoneParticipant, edgeName);
     } else {
       NoteChild(aChild.asCell(), mJSParticipant, edgeName);
@@ -2436,7 +2436,7 @@ CCGraphBuilder::AddWeakMapNode(JS::GCCellPtr aNode)
     return nullptr;
   }
 
-  if (JS::Zone* zone = MergeZone(aNode.asCell())) {
+  if (JS::Zone* zone = MergeZone(aNode)) {
     return AddNode(zone, mJSZoneParticipant);
   }
   return AddNode(aNode.asCell(), mJSParticipant);

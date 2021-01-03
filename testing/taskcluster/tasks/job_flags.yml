@@ -8,11 +8,12 @@ flags:
     - emulator
     - emulator-jb
     - emulator-kk
-    - linux32_goanna  # b2g desktop linux 32 bit
-    - linux64_goanna  # b2g desktop linux 64 bit
-    - linux64-mulet  # Firefox desktop - b2g goanna linux 64 bit
-    - macosx64_goanna # b2g desktop osx 64 bit
-    - win32_goanna    # b2g desktop win 32 bit
+    - emulator-x86-kk
+    - linux32_gecko  # b2g desktop linux 32 bit
+    - linux64_gecko  # b2g desktop linux 64 bit
+    - linux64-mulet  # Firefox desktop - b2g gecko linux 64 bit
+    - macosx64_gecko # b2g desktop osx 64 bit
+    - win32_gecko    # b2g desktop win 32 bit
 
   tests:
     - cppunit
@@ -63,7 +64,7 @@ builds:
   #     opt: <path to opt task>
   #     debug: <path to debug task>
   #
-  linux64_goanna:
+  linux64_gecko:
     platforms:
       - b2g
     types:

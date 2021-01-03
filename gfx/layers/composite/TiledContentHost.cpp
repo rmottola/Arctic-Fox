@@ -7,6 +7,7 @@
 #include "PaintedLayerComposite.h"      // for PaintedLayerComposite
 #include "mozilla/gfx/BaseSize.h"       // for BaseSize
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4
+#include "mozilla/gfx/Point.h"          // for IntSize
 #include "mozilla/layers/Compositor.h"  // for Compositor
 #include "mozilla/layers/Effects.h"     // for TexturedEffect, Effect, etc
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
@@ -16,7 +17,6 @@
 #include "nsPoint.h"                    // for IntPoint
 #include "nsPrintfCString.h"            // for nsPrintfCString
 #include "nsRect.h"                     // for IntRect
-#include "nsSize.h"                     // for nsIntSize
 #include "mozilla/layers/TiledContentClient.h"
 
 class gfxReusableSurfaceWrapper;
@@ -224,23 +224,6 @@ TiledLayerBufferComposite::SetCompositor(Compositor* aCompositor)
     }
   }
 }
-
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-void
-TiledLayerBufferComposite::SetReleaseFence(const android::sp<android::Fence>& aReleaseFence)
-{
-  for (size_t i = 0; i < mRetainedTiles.Length(); i++) {
-    if (!mRetainedTiles[i].mTextureHost) {
-      continue;
-    }
-    TextureHostOGL* texture = mRetainedTiles[i].mTextureHost->AsHostOGL();
-    if (!texture) {
-      continue;
-    }
-    texture->SetReleaseFence(new android::Fence(aReleaseFence->dup()));
-  }
-}
-#endif
 
 TiledContentHost::TiledContentHost(const TextureInfo& aTextureInfo)
   : ContentHost(aTextureInfo)
@@ -516,7 +499,12 @@ TiledContentHost::RenderTile(const TileHost& aTile,
     return;
   }
 
-  RefPtr<TexturedEffect> effect = CreateTexturedEffect(aTile.mTextureSource, aTile.mTextureSourceOnWhite, aFilter, true);
+  RefPtr<TexturedEffect> effect =
+    CreateTexturedEffect(aTile.mTextureSource,
+                         aTile.mTextureSourceOnWhite,
+                         aFilter,
+                         true,
+                         aTile.mTextureHost->GetRenderState());
   if (!effect) {
     return;
   }

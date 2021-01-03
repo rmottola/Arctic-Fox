@@ -305,7 +305,9 @@ public:
     mozilla::gfx::BackendType GetPreferredCanvasBackend() {
       return mPreferredCanvasBackend;
     }
-
+    mozilla::gfx::BackendType GetFallbackCanvasBackend() {
+      return mFallbackCanvasBackend;
+    }
     /*
      * Font bits
      */
@@ -592,10 +594,10 @@ public:
      */
     mozilla::layers::DiagnosticTypes GetLayerDiagnosticTypes();
 
-    static nsIntRect FrameCounterBounds() {
+    static mozilla::gfx::IntRect FrameCounterBounds() {
       int bits = 16;
       int sizeOfBit = 3;
-      return nsIntRect(0, 0, bits * sizeOfBit, sizeOfBit);
+      return mozilla::gfx::IntRect(0, 0, bits * sizeOfBit, sizeOfBit);
     }
 
     mozilla::gl::SkiaGLGlue* GetSkiaGLGlue();
@@ -618,6 +620,13 @@ public:
     }
 
     /**
+     * True if layout rendering should use ASAP mode, which means
+     * the refresh driver and compositor should render ASAP.
+     * Used for talos testing purposes
+     */
+    static bool IsInLayoutAsapMode();
+
+    /**
      * Used to test which input types are handled via APZ.
      */
     virtual bool SupportsApzWheelInput() const {
@@ -626,6 +635,17 @@ public:
     virtual bool SupportsApzTouchInput() const {
       return false;
     }
+
+    virtual void FlushContentDrawing() {}
+
+    /**
+     * Helper method, creates a draw target for a specific Azure backend.
+     * Used by CreateOffscreenDrawTarget.
+     */
+    already_AddRefed<DrawTarget>
+      CreateDrawTargetForBackend(mozilla::gfx::BackendType aBackend,
+                                 const mozilla::gfx::IntSize& aSize,
+                                 mozilla::gfx::SurfaceFormat aFormat);
 
 protected:
     gfxPlatform();
@@ -638,15 +658,6 @@ protected:
      * Initialized hardware vsync based on each platform.
      */
     virtual already_AddRefed<mozilla::gfx::VsyncSource> CreateHardwareVsyncSource();
-
-    /**
-     * Helper method, creates a draw target for a specific Azure backend.
-     * Used by CreateOffscreenDrawTarget.
-     */
-    already_AddRefed<DrawTarget>
-      CreateDrawTargetForBackend(mozilla::gfx::BackendType aBackend,
-                                 const mozilla::gfx::IntSize& aSize,
-                                 mozilla::gfx::SurfaceFormat aFormat);
 
     /**
      * Initialise the preferred and fallback canvas backends

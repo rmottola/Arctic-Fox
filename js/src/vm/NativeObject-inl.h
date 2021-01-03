@@ -65,7 +65,7 @@ NativeObject::clearShouldConvertDoubleElements()
 }
 
 inline void
-NativeObject::setDenseElementWithType(ExclusiveContext *cx, uint32_t index, const Value &val)
+NativeObject::setDenseElementWithType(ExclusiveContext* cx, uint32_t index, const Value& val)
 {
     // Avoid a slow AddTypePropertyId call if the type is the same as the type
     // of the previous element.
@@ -76,10 +76,13 @@ NativeObject::setDenseElementWithType(ExclusiveContext *cx, uint32_t index, cons
 }
 
 inline void
-NativeObject::initDenseElementWithType(ExclusiveContext *cx, uint32_t index, const Value &val)
+NativeObject::initDenseElementWithType(ExclusiveContext* cx, uint32_t index, const Value& val)
 {
     MOZ_ASSERT(!shouldConvertDoubleElements());
-    AddTypePropertyId(cx, this, JSID_VOID, val);
+    if (val.isMagic(JS_ELEMENTS_HOLE))
+        markDenseElementsNotPacked(cx);
+    else
+        AddTypePropertyId(cx, this, JSID_VOID, val);
     initDenseElement(index, val);
 }
 
@@ -238,29 +241,6 @@ NativeObject::getDenseOrTypedArrayElement(uint32_t idx)
     if (is<SharedTypedArrayObject>())
         return as<SharedTypedArrayObject>().getElement(idx);
     return getDenseElement(idx);
-}
-
-inline void
-NativeObject::initDenseElementsUnbarriered(uint32_t dstStart, const Value* src, uint32_t count) {
-    /*
-     * For use by parallel threads, which since they cannot see nursery
-     * things do not require a barrier.
-     */
-    MOZ_ASSERT(dstStart + count <= getDenseCapacity());
-    MOZ_ASSERT(!denseElementsAreCopyOnWrite());
-#ifdef DEBUG
-    /*
-     * This asserts a global invariant: parallel code does not
-     * observe objects inside the generational GC's nursery.
-     */
-    MOZ_ASSERT(!gc::IsInsideGGCNursery(this));
-    for (uint32_t index = 0; index < count; ++index) {
-        const Value& value = src[index];
-        if (value.isMarkable())
-            MOZ_ASSERT(!gc::IsInsideGGCNursery(static_cast<gc::Cell*>(value.toGCThing())));
-    }
-#endif
-    memcpy(&elements_[dstStart], src, count * sizeof(HeapSlot));
 }
 
 /* static */ inline NativeObject*

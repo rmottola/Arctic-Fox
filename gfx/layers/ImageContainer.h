@@ -22,8 +22,7 @@
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for Image::Release, etc
-#include "nsRect.h"                     // for nsIntRect
-#include "nsSize.h"                     // for nsIntSize
+#include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsTArray.h"                   // for nsTArray
 #include "mozilla/Atomics.h"
 #include "mozilla/WeakPtr.h"
@@ -134,9 +133,9 @@ public:
   void* GetImplData() { return mImplData; }
 
   virtual gfx::IntSize GetSize() = 0;
-  virtual nsIntRect GetPictureRect()
+  virtual gfx::IntRect GetPictureRect()
   {
-    return nsIntRect(0, 0, GetSize().width, GetSize().height);
+    return gfx::IntRect(0, 0, GetSize().width, GetSize().height);
   }
 
   ImageBackendData* GetBackendData(LayersBackend aBackend)
@@ -292,9 +291,9 @@ class ImageContainer final : public SupportsWeakPtr<ImageContainer> {
 public:
   MOZ_DECLARE_WEAKREFERENCE_TYPENAME(ImageContainer)
 
-  enum { DISABLE_ASYNC = 0x0, ENABLE_ASYNC = 0x01 };
+  enum Mode { SYNCHRONOUS = 0x0, ASYNCHRONOUS = 0x01, ASYNCHRONOUS_OVERLAY = 0x02 };
 
-  explicit ImageContainer(int flag = 0);
+  explicit ImageContainer(ImageContainer::Mode flag = SYNCHRONOUS);
 
   /**
    * Create an Image in one of the given formats.
@@ -639,8 +638,8 @@ struct PlanarYCbCrData {
   gfx::IntSize mPicSize;
   StereoMode mStereoMode;
 
-  nsIntRect GetPictureRect() const {
-    return nsIntRect(mPicX, mPicY,
+  gfx::IntRect GetPictureRect() const {
+    return gfx::IntRect(mPicX, mPicY,
                      mPicSize.width,
                      mPicSize.height);
   }
@@ -854,7 +853,7 @@ private:
 };
 #endif
 
-} //namespace
-} //namespace
+} // namespace layers
+} // namespace mozilla
 
 #endif

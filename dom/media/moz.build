@@ -4,6 +4,21 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('*'):
+    BUG_COMPONENT = ('Core', 'Video/Audio')
+
+component_signaling = ('Core', 'WebRTC: Signaling')
+with Files('IdpSandbox.jsm'):
+    BUG_COMPONENT = component_signaling
+with Files('PeerConnection*'):
+    BUG_COMPONENT = component_signaling
+with Files('RTC*'):
+    BUG_COMPONENT = component_signaling
+
+component_av = ('Core', 'WebRTC: Audio/Video')
+with Files('GetUserMedia*'):
+    BUG_COMPONENT = component_av
+
 DIRS += [
     'encoder',
     'gmp',
@@ -159,6 +174,7 @@ EXPORTS.mozilla.dom += [
     'AudioStreamTrack.h',
     'AudioTrack.h',
     'AudioTrackList.h',
+    'CanvasCaptureMediaStream.h',
     'GetUserMediaRequest.h',
     'MediaDeviceInfo.h',
     'MediaDevices.h',
@@ -185,6 +201,7 @@ UNIFIED_SOURCES += [
     'AudioStreamTrack.cpp',
     'AudioTrack.cpp',
     'AudioTrackList.cpp',
+    'CanvasCaptureMediaStream.cpp',
     'CubebUtils.cpp',
     'DecodedStream.cpp',
     'DOMMediaStream.cpp',

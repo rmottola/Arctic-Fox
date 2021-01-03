@@ -30,6 +30,7 @@
 #include "gfxUtils.h"
 #include "GLContextProvider.h"
 #include "GLContext.h"
+#include "GLContextEGL.h"
 #include "nsAutoPtr.h"
 #include "nsAppShell.h"
 #include "nsIdleService.h"
@@ -76,7 +77,6 @@ static nsIntRect sVirtualBounds;
 
 static nsTArray<nsWindow *> sTopWindows;
 static nsWindow *gFocusedWindow = nullptr;
-static bool sUsingHwc;
 static bool sScreenInitialized;
 
 namespace {
@@ -175,8 +175,6 @@ nsWindow::nsWindow()
     if (!ShouldUseOffMainThreadCompositing()) {
         MOZ_CRASH("How can we render apps, then?");
     }
-    // Update sUsingHwc whenever layers.composer2d.enabled changes
-    Preferences::AddBoolVarCache(&sUsingHwc, "layers.composer2d.enabled");
 }
 
 nsWindow::~nsWindow()
@@ -595,9 +593,26 @@ nsWindow::GetNativeData(uint32_t aDataType)
 {
     switch (aDataType) {
     case NS_NATIVE_WINDOW:
+        // Called before primary display's EGLSurface creation.
         return GetGonkDisplay()->GetNativeWindow();
     }
     return nullptr;
+}
+
+void
+nsWindow::SetNativeData(uint32_t aDataType, uintptr_t aVal)
+{
+    switch (aDataType) {
+    case NS_NATIVE_OPENGL_CONTEXT:
+        // Called after primary display's GLContextEGL creation.
+        GLContext* context = reinterpret_cast<GLContext*>(aVal);
+
+        HwcComposer2D* hwc = HwcComposer2D::GetInstance();
+        hwc->SetEGLInfo(GLContextEGL::Cast(context)->GetEGLDisplay(),
+                        GLContextEGL::Cast(context)->GetEGLSurface(),
+                        context);
+        return;
+    }
 }
 
 NS_IMETHODIMP
@@ -857,15 +872,7 @@ nsWindow::NeedsPaint()
 Composer2D*
 nsWindow::GetComposer2D()
 {
-    if (!sUsingHwc) {
-        return nullptr;
-    }
-
-    if (HwcComposer2D* hwc = HwcComposer2D::GetInstance()) {
-        return hwc->Initialized() ? hwc : nullptr;
-    }
-
-    return nullptr;
+    return HwcComposer2D::GetInstance();
 }
 
 // nsScreenGonk.cpp

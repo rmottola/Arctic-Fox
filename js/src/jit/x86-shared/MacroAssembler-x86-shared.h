@@ -659,6 +659,9 @@ class MacroAssemblerX86Shared : public Assembler
     void convertInt32ToDouble(const Address& src, FloatRegister dest) {
         convertInt32ToDouble(Operand(src), dest);
     }
+    void convertInt32ToDouble(const BaseIndex& src, FloatRegister dest) {
+        convertInt32ToDouble(Operand(src), dest);
+    }
     void convertInt32ToDouble(const Operand& src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
         zeroDouble(dest);
@@ -767,6 +770,20 @@ class MacroAssemblerX86Shared : public Assembler
         lock_cmpxchgb(newval, Operand(mem));
         movsbl(output, output);
     }
+    template <typename T>
+    void atomicExchange8ZeroExtend(const T& mem, Register value, Register output) {
+        if (value != output)
+            movl(value, output);
+        xchgb(output, Operand(mem));
+        movzbl(output, output);
+    }
+    template <typename T>
+    void atomicExchange8SignExtend(const T& mem, Register value, Register output) {
+        if (value != output)
+            movl(value, output);
+        xchgb(output, Operand(mem));
+        movsbl(output, output);
+    }
     void load16ZeroExtend(const Address& src, Register dest) {
         movzwl(Operand(src), dest);
     }
@@ -791,6 +808,20 @@ class MacroAssemblerX86Shared : public Assembler
         if (oldval != output)
             movl(oldval, output);
         lock_cmpxchgw(newval, Operand(mem));
+        movswl(output, output);
+    }
+    template <typename T>
+    void atomicExchange16ZeroExtend(const T& mem, Register value, Register output) {
+        if (value != output)
+            movl(value, output);
+        xchgw(output, Operand(mem));
+        movzwl(output, output);
+    }
+    template <typename T>
+    void atomicExchange16SignExtend(const T& mem, Register value, Register output) {
+        if (value != output)
+            movl(value, output);
+        xchgw(output, Operand(mem));
         movswl(output, output);
     }
     void load16SignExtend(const Address& src, Register dest) {
@@ -818,6 +849,12 @@ class MacroAssemblerX86Shared : public Assembler
         if (oldval != output)
             movl(oldval, output);
         lock_cmpxchgl(newval, Operand(mem));
+    }
+    template <typename T>
+    void atomicExchange32(const T& mem, Register value, Register output) {
+        if (value != output)
+            movl(value, output);
+        xchgl(output, Operand(mem));
     }
     template <typename S, typename T>
     void store32_NoSecondScratch(const S& src, const T& dest) {
@@ -1430,19 +1467,9 @@ class MacroAssemblerX86Shared : public Assembler
     void callWithExitFrame(Label* target);
     void callWithExitFrame(JitCode* target);
 
-    void callJit(Register callee) {
-        call(callee);
-    }
-    void callJitFromAsmJS(Register callee) {
-        call(callee);
-    }
-    void call(AsmJSImmPtr target) {
-        mov(target, eax);
-        call(eax);
-    }
-    void callAndPushReturnAddress(Label* label) {
-        call(label);
-    }
+    void callJit(Register callee);
+    void callJitFromAsmJS(Register callee);
+    void callAndPushReturnAddress(Label* label);
 
     void checkStackAlignment() {
         // Exists for ARM compatibility.

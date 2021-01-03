@@ -904,9 +904,9 @@ MapIteratorObject::kind() const
 }
 
 bool
-GlobalObject::initMapIteratorProto(JSContext *cx, Handle<GlobalObject *> global)
+GlobalObject::initMapIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
 {
-    Rooted<JSObject *> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
+    Rooted<JSObject*> base(cx, GlobalObject::getOrCreateIteratorPrototype(cx, global));
     if (!base)
         return false;
     RootedPlainObject proto(cx, NewObjectWithGivenProto<PlainObject>(cx, base));
@@ -918,20 +918,20 @@ GlobalObject::initMapIteratorProto(JSContext *cx, Handle<GlobalObject *> global)
     return true;
 }
 
-MapIteratorObject *
-MapIteratorObject::create(JSContext *cx, HandleObject mapobj, ValueMap *data,
+MapIteratorObject*
+MapIteratorObject::create(JSContext* cx, HandleObject mapobj, ValueMap* data,
                           MapObject::IteratorKind kind)
 {
-    Rooted<GlobalObject *> global(cx, &mapobj->global());
+    Rooted<GlobalObject*> global(cx, &mapobj->global());
     Rooted<JSObject*> proto(cx, GlobalObject::getOrCreateMapIteratorPrototype(cx, global));
     if (!proto)
         return nullptr;
 
-    ValueMap::Range *range = cx->new_<ValueMap::Range>(data->all());
+    ValueMap::Range* range = cx->new_<ValueMap::Range>(data->all());
     if (!range)
         return nullptr;
 
-    MapIteratorObject *iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto);
+    MapIteratorObject* iterobj = NewObjectWithGivenProto<MapIteratorObject>(cx, proto);
     if (!iterobj) {
         js_delete(range);
         return nullptr;
@@ -1062,7 +1062,7 @@ InitClass(JSContext* cx, Handle<GlobalObject*> global, const Class* clasp, JSPro
         return nullptr;
     proto->setPrivate(nullptr);
 
-    Rooted<JSFunction*> ctor(cx, global->createConstructor(cx, construct, ClassName(key, cx), 1));
+    Rooted<JSFunction*> ctor(cx, global->createConstructor(cx, construct, ClassName(key, cx), 0));
     if (!ctor ||
         !JS_DefineProperties(cx, ctor, staticProperties) ||
         !LinkConstructorAndPrototype(cx, ctor, proto) ||
@@ -1196,7 +1196,7 @@ MapObject::set(JSContext* cx, HandleObject obj, HandleValue k, HandleValue v)
     if (!key.setValue(cx, k))
         return false;
 
-    RelocatableValue rval(v);
+    HeapValue rval(v);
     if (!map->put(key, rval)) {
         ReportOutOfMemory(cx);
         return false;
@@ -1291,7 +1291,7 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!hkey.setValue(cx, key))
                     return false;
 
-                RelocatableValue rval(val);
+                HeapValue rval(val);
                 if (!map->put(hkey, rval)) {
                     ReportOutOfMemory(cx);
                     return false;
@@ -1351,7 +1351,6 @@ MapObject::extract(CallReceiver call)
 uint32_t
 MapObject::size(JSContext* cx, HandleObject obj)
 {
-    MOZ_ASSERT(MapObject::is(obj));
     ValueMap& map = extract(obj);
     static_assert(sizeof(map.count()) <= sizeof(uint32_t),
                   "map count must be precisely representable as a JS number");
@@ -1377,8 +1376,6 @@ bool
 MapObject::get(JSContext* cx, HandleObject obj,
                HandleValue key, MutableHandleValue rval)
 {
-    MOZ_ASSERT(MapObject::is(obj));
-
     ValueMap& map = extract(obj);
     AutoHashableValueRooter k(cx);
 
@@ -1410,8 +1407,6 @@ MapObject::get(JSContext* cx, unsigned argc, Value* vp)
 bool
 MapObject::has(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 {
-    MOZ_ASSERT(MapObject::is(obj));
-
     ValueMap& map = extract(obj);
     AutoHashableValueRooter k(cx);
 
@@ -1448,7 +1443,7 @@ MapObject::set_impl(JSContext* cx, const CallArgs& args)
 
     ValueMap& map = extract(args);
     ARG0_KEY(cx, args, key);
-    RelocatableValue rval(args.get(1));
+    HeapValue rval(args.get(1));
     if (!map.put(key, rval)) {
         ReportOutOfMemory(cx);
         return false;
@@ -1466,17 +1461,33 @@ MapObject::set(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
+MapObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    ValueMap &map = extract(obj);
+    AutoHashableValueRooter k(cx);
+
+    if (!k.setValue(cx, key))
+        return false;
+
+    if (!map.remove(k, rval)) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+    return true;
+}
+
+bool
 MapObject::delete_impl(JSContext* cx, const CallArgs& args)
 {
     // MapObject::mark does not mark deleted entries. Incremental GC therefore
-    // requires that no RelocatableValue objects pointing to heap values be
-    // left alive in the ValueMap.
+    // requires that no HeapValue objects pointing to heap values be left alive
+    // in the ValueMap.
     //
     // OrderedHashMap::remove() doesn't destroy the removed entry. It merely
     // calls OrderedHashMap::MapOps::makeEmpty. But that is sufficient, because
     // makeEmpty clears the value by doing e->value = Value(), and in the case
-    // of a ValueMap, Value() means RelocatableValue(), which is the same as
-    // RelocatableValue(UndefinedValue()).
+    // of a ValueMap, Value() means HeapValue(), which is the same as
+    // HeapValue(UndefinedValue()).
     MOZ_ASSERT(MapObject::is(args.thisv()));
 
     ValueMap& map = extract(args);
@@ -1501,7 +1512,6 @@ bool
 MapObject::iterator(JSContext* cx, IteratorKind kind,
                     HandleObject obj, MutableHandleValue iter)
 {
-    MOZ_ASSERT(MapObject::is(obj));
     ValueMap& map = extract(obj);
     Rooted<JSObject*> iterobj(cx, MapIteratorObject::create(cx, obj, &map, kind));
     return iterobj && (iter.setObject(*iterobj), true);
@@ -1571,7 +1581,6 @@ MapObject::clear(JSContext* cx, unsigned argc, Value* vp)
 bool
 MapObject::clear(JSContext* cx, HandleObject obj)
 {
-    MOZ_ASSERT(MapObject::is(obj));
     ValueMap& map = extract(obj);
     if (!map.clear()) {
         ReportOutOfMemory(cx);
@@ -1661,20 +1670,20 @@ GlobalObject::initSetIteratorProto(JSContext* cx, Handle<GlobalObject*> global)
     return true;
 }
 
-SetIteratorObject *
-SetIteratorObject::create(JSContext *cx, HandleObject setobj, ValueSet *data,
+SetIteratorObject*
+SetIteratorObject::create(JSContext* cx, HandleObject setobj, ValueSet* data,
                           SetObject::IteratorKind kind)
 {
-    Rooted<GlobalObject *> global(cx, &setobj->global());
+    Rooted<GlobalObject*> global(cx, &setobj->global());
     Rooted<JSObject*> proto(cx, GlobalObject::getOrCreateSetIteratorPrototype(cx, global));
     if (!proto)
         return nullptr;
 
-    ValueSet::Range *range = cx->new_<ValueSet::Range>(data->all());
+    ValueSet::Range* range = cx->new_<ValueSet::Range>(data->all());
     if (!range)
         return nullptr;
 
-    SetIteratorObject *iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto);
+    SetIteratorObject* iterobj = NewObjectWithGivenProto<SetIteratorObject>(cx, proto);
     if (!iterobj) {
         js_delete(range);
         return nullptr;
@@ -1955,12 +1964,35 @@ SetObject::is(HandleValue v)
     return v.isObject() && v.toObject().hasClass(&class_) && v.toObject().as<SetObject>().getPrivate();
 }
 
-ValueSet&
+bool
+SetObject::is(HandleObject o)
+{
+    return o->hasClass(&class_) && o->as<SetObject>().getPrivate();
+}
+
+ValueSet &
+SetObject::extract(HandleObject o)
+{
+    MOZ_ASSERT(o->hasClass(&SetObject::class_));
+    return *o->as<SetObject>().getData();
+}
+
+ValueSet &
 SetObject::extract(CallReceiver call)
 {
     MOZ_ASSERT(call.thisv().isObject());
     MOZ_ASSERT(call.thisv().toObject().hasClass(&SetObject::class_));
     return *static_cast<SetObject&>(call.thisv().toObject()).getData();
+}
+
+uint32_t
+SetObject::size(JSContext* cx, HandleObject obj)
+{
+    MOZ_ASSERT(SetObject::is(obj));
+    ValueSet &set = extract(obj);
+    static_assert(sizeof(set.count()) <= sizeof(uint32_t),
+                  "set count must be precisely representable as a JS number");
+    return set.count();
 }
 
 bool
@@ -1990,6 +2022,21 @@ SetObject::has_impl(JSContext* cx, const CallArgs& args)
     ValueSet& set = extract(args);
     ARG0_KEY(cx, args, key);
     args.rval().setBoolean(set.has(key));
+    return true;
+}
+
+bool
+SetObject::has(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    MOZ_ASSERT(SetObject::is(obj));
+
+    ValueSet &set = extract(obj);
+    AutoHashableValueRooter k(cx);
+
+    if (!k.setValue(cx, key))
+        return false;
+
+    *rval = set.has(k);
     return true;
 }
 
@@ -2024,6 +2071,24 @@ SetObject::add(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
+SetObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    MOZ_ASSERT(SetObject::is(obj));
+
+    ValueSet &set = extract(obj);
+    AutoHashableValueRooter k(cx);
+
+    if (!k.setValue(cx, key))
+        return false;
+
+    if (!set.remove(k, rval)) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+    return true;
+}
+
+bool
 SetObject::delete_impl(JSContext* cx, const CallArgs& args)
 {
     MOZ_ASSERT(is(args.thisv()));
@@ -2044,6 +2109,16 @@ SetObject::delete_(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<SetObject::is, SetObject::delete_impl>(cx, args);
+}
+
+bool
+SetObject::iterator(JSContext* cx, IteratorKind kind,
+                    HandleObject obj, MutableHandleValue iter)
+{
+    MOZ_ASSERT(SetObject::is(obj));
+    ValueSet &set = extract(obj);
+    Rooted<JSObject*> iterobj(cx, SetIteratorObject::create(cx, obj, &set, kind));
+    return iterobj && (iter.setObject(*iterobj), true);
 }
 
 bool
@@ -2085,6 +2160,18 @@ SetObject::entries(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
+SetObject::clear(JSContext* cx, HandleObject obj)
+{
+    MOZ_ASSERT(SetObject::is(obj));
+    ValueSet &set = extract(obj);
+    if (!set.clear()) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+    return true;
+}
+
+bool
 SetObject::clear_impl(JSContext* cx, const CallArgs& args)
 {
     Rooted<SetObject*> setobj(cx, &args.thisv().toObject().as<SetObject>());
@@ -2121,6 +2208,98 @@ js::InitSelfHostingCollectionIteratorFunctions(JSContext* cx, HandleObject obj)
     return JS_DefineFunctions(cx, obj, selfhosting_collection_iterator_methods);
 }
 
+/*** JS static utility functions *********************************************/
+
+static
+bool
+forEach(const char* funcName, JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisArg)
+{
+    CHECK_REQUEST(cx);
+    RootedId forEachId(cx, NameToId(cx->names().forEach));
+    RootedFunction forEachFunc(cx, JS::GetSelfHostedFunction(cx, funcName, forEachId, 2));
+    if (!forEachFunc)
+        return false;
+    InvokeArgs args(cx);
+    if (!args.init(2))
+        return false;
+    args.setCallee(JS::ObjectValue(*forEachFunc));
+    args.setThis(JS::ObjectValue(*obj));
+    args[0].set(callbackFn);
+    args[1].set(thisArg);
+    return Invoke(cx, args);
+}
+
+// Handles Clear/Size for public jsapi map/set access
+template<typename RetT>
+RetT
+CallObjFunc(RetT(*ObjFunc)(JSContext*, HandleObject), JSContext* cx, HandleObject obj)
+{
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, obj);
+
+    // Always unwrap, in case this is an xray or cross-compartment wrapper.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+
+    // Enter the compartment of the backing object before calling functions on
+    // it.
+    JSAutoCompartment ac(cx, unwrappedObj);
+    return ObjFunc(cx, unwrappedObj);
+}
+
+// Handles Has/Delete for public jsapi map/set access
+bool
+CallObjFunc(bool(*ObjFunc)(JSContext* cx, HandleObject obj, HandleValue key, bool* rval),
+            JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, obj, key);
+
+    // Always unwrap, in case this is an xray or cross-compartment wrapper.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+    JSAutoCompartment ac(cx, unwrappedObj);
+
+    // If we're working with a wrapped map/set, rewrap the key into the
+    // compartment of the unwrapped map/set.
+    RootedValue wrappedKey(cx, key);
+    if (obj != unwrappedObj) {
+        if (!JS_WrapValue(cx, &wrappedKey))
+            return false;
+    }
+    return ObjFunc(cx, unwrappedObj, wrappedKey, rval);
+}
+
+// Handles iterator generation for public jsapi map/set access
+template<typename Iter>
+bool
+CallObjFunc(bool(*ObjFunc)(JSContext* cx, Iter kind,
+                           HandleObject obj, MutableHandleValue iter),
+            JSContext* cx, Iter iterType, HandleObject obj, MutableHandleValue rval)
+{
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, obj);
+
+    // Always unwrap, in case this is an xray or cross-compartment wrapper.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+    {
+        // Retrieve the iterator while in the unwrapped map/set's compartment,
+        // otherwise we'll crash on a compartment assert.
+        JSAutoCompartment ac(cx, unwrappedObj);
+        if (!ObjFunc(cx, iterType, unwrappedObj, rval))
+            return false;
+    }
+
+    // If the caller is in a different compartment than the map/set, rewrap the
+    // iterator object into the caller's compartment.
+    if (obj != unwrappedObj) {
+        if (!JS_WrapValue(cx, rval))
+            return false;
+    }
+    return true;
+}
+
 /*** JS public APIs **********************************************************/
 
 JS_PUBLIC_API(JSObject*)
@@ -2132,63 +2311,182 @@ JS::NewMapObject(JSContext* cx)
 JS_PUBLIC_API(uint32_t)
 JS::MapSize(JSContext* cx, HandleObject obj)
 {
-    CHECK_REQUEST(cx);
-    return MapObject::size(cx, obj);
+    return CallObjFunc<uint32_t>(&MapObject::size, cx, obj);
 }
 
 JS_PUBLIC_API(bool)
-JS::MapGet(JSContext* cx, HandleObject obj,
-           HandleValue key, MutableHandleValue rval)
+JS::MapGet(JSContext* cx, HandleObject obj, HandleValue key, MutableHandleValue rval)
 {
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, key, rval);
-    return MapObject::get(cx, obj, key, rval);
+    assertSameCompartment(cx, obj, key, rval);
+
+    // Unwrap the object, and enter its compartment. If object isn't wrapped,
+    // this is essentially a noop.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+    {
+        JSAutoCompartment ac(cx, unwrappedObj);
+        RootedValue wrappedKey(cx, key);
+
+        // If we passed in a wrapper, wrap our key into its compartment now.
+        if (obj != unwrappedObj) {
+            if (!JS_WrapValue(cx, &wrappedKey))
+                return false;
+        }
+        if (!MapObject::get(cx, unwrappedObj, wrappedKey, rval))
+            return false;
+    }
+
+    // If we passed in a wrapper, wrap our return value on the way out.
+    if (obj != unwrappedObj) {
+        if (!JS_WrapValue(cx, rval))
+            return false;
+    }
+    return true;
+}
+
+JS_PUBLIC_API(bool)
+JS::MapSet(JSContext* cx, HandleObject obj, HandleValue key, HandleValue val)
+{
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, obj, key, val);
+
+    // Unwrap the object, and enter its compartment. If object isn't wrapped,
+    // this is essentially a noop.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+    {
+        JSAutoCompartment ac(cx, unwrappedObj);
+
+        // If we passed in a wrapper, wrap both key and value before adding to
+        // the map
+        RootedValue wrappedKey(cx, key);
+        RootedValue wrappedValue(cx, val);
+        if (obj != unwrappedObj) {
+            if (!JS_WrapValue(cx, &wrappedKey) ||
+                !JS_WrapValue(cx, &wrappedValue)) {
+                return false;
+            }
+        }
+        return MapObject::set(cx, unwrappedObj, wrappedKey, wrappedValue);
+    }
 }
 
 JS_PUBLIC_API(bool)
 JS::MapHas(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 {
-    CHECK_REQUEST(cx);
-    assertSameCompartment(cx, key);
-    return MapObject::has(cx, obj, key, rval);
+    return CallObjFunc(MapObject::has, cx, obj, key, rval);
 }
 
 JS_PUBLIC_API(bool)
-JS::MapSet(JSContext* cx, HandleObject obj,
-           HandleValue key, HandleValue val)
+JS::MapDelete(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 {
-    CHECK_REQUEST(cx);
-    assertSameCompartment(cx, key, val);
-    return MapObject::set(cx, obj, key, val);
+    return CallObjFunc(MapObject::delete_, cx, obj, key, rval);
 }
 
 JS_PUBLIC_API(bool)
 JS::MapClear(JSContext* cx, HandleObject obj)
 {
-    CHECK_REQUEST(cx);
-    return MapObject::clear(cx, obj);
+    return CallObjFunc(&MapObject::clear, cx, obj);
 }
 
 JS_PUBLIC_API(bool)
 JS::MapKeys(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
-    CHECK_REQUEST(cx);
-    assertSameCompartment(cx, rval);
-    return MapObject::iterator(cx, MapObject::Keys, obj, rval);
+    return CallObjFunc(&MapObject::iterator, cx, MapObject::Keys, obj, rval);
 }
 
 JS_PUBLIC_API(bool)
 JS::MapValues(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
-    CHECK_REQUEST(cx);
-    assertSameCompartment(cx, rval);
-    return MapObject::iterator(cx, MapObject::Values, obj, rval);
+    return CallObjFunc(&MapObject::iterator, cx, MapObject::Values, obj, rval);
 }
 
 JS_PUBLIC_API(bool)
 JS::MapEntries(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
+    return CallObjFunc(&MapObject::iterator, cx, MapObject::Entries, obj, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::MapForEach(JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
+{
+    return forEach("MapForEach", cx, obj, callbackFn, thisVal);
+}
+
+JS_PUBLIC_API(JSObject*)
+JS::NewSetObject(JSContext* cx)
+{
+    return SetObject::create(cx);
+}
+
+JS_PUBLIC_API(uint32_t)
+JS::SetSize(JSContext* cx, HandleObject obj)
+{
+    return CallObjFunc<uint32_t>(&SetObject::size, cx, obj);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetAdd(JSContext* cx, HandleObject obj, HandleValue key)
+{
     CHECK_REQUEST(cx);
-    assertSameCompartment(cx, rval);
-    return MapObject::iterator(cx, MapObject::Entries, obj, rval);
+    assertSameCompartment(cx, obj, key);
+
+    // Unwrap the object, and enter its compartment. If object isn't wrapped,
+    // this is essentially a noop.
+    RootedObject unwrappedObj(cx);
+    unwrappedObj = UncheckedUnwrap(obj);
+    {
+        JSAutoCompartment ac(cx, unwrappedObj);
+
+        // If we passed in a wrapper, wrap key before adding to the set
+        RootedValue wrappedKey(cx, key);
+        if (obj != unwrappedObj) {
+            if (!JS_WrapValue(cx, &wrappedKey))
+                return false;
+        }
+        return SetObject::add(cx, unwrappedObj, wrappedKey);
+    }
+}
+
+JS_PUBLIC_API(bool)
+JS::SetHas(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    return CallObjFunc(SetObject::has, cx, obj, key, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetDelete(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+{
+    return CallObjFunc(SetObject::delete_, cx, obj, key, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetClear(JSContext* cx, HandleObject obj)
+{
+    return CallObjFunc(&SetObject::clear, cx, obj);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetKeys(JSContext* cx, HandleObject obj, MutableHandleValue rval)
+{
+    return SetValues(cx, obj, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetValues(JSContext* cx, HandleObject obj, MutableHandleValue rval)
+{
+    return CallObjFunc(&SetObject::iterator, cx, SetObject::Values, obj, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetEntries(JSContext* cx, HandleObject obj, MutableHandleValue rval)
+{
+    return CallObjFunc(&SetObject::iterator, cx, SetObject::Entries, obj, rval);
+}
+
+JS_PUBLIC_API(bool)
+JS::SetForEach(JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
+{
+    return forEach("SetForEach", cx, obj, callbackFn, thisVal);
 }

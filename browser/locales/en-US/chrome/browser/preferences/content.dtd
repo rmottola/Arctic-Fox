@@ -30,6 +30,11 @@
 <!ENTITY  chooseButton.label          "Chooseâ€¦">
 <!ENTITY  chooseButton.accesskey      "o">
 
+<!ENTITY translateWebPages.label      "Translate web content">
+<!ENTITY translateWebPages.accesskey  "T">
+<!ENTITY translateExceptions.label    "Exceptions¿">
+<!ENTITY translateExceptions.accesskey "x">
+
 <!ENTITY  video.label                 "Video">
 <!ENTITY  videoMSE.label              "Enable Media Source Extensions (MSE)">
 <!ENTITY  videoMSE.accesskey          "M">

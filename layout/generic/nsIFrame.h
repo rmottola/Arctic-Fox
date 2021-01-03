@@ -859,8 +859,6 @@ public:
   NS_DECLARE_FRAME_PROPERTY(UsedPaddingProperty, DeleteValue<nsMargin>)
   NS_DECLARE_FRAME_PROPERTY(UsedBorderProperty, DeleteValue<nsMargin>)
 
-  NS_DECLARE_FRAME_PROPERTY(ScrollLayerCount, nullptr)
-
   NS_DECLARE_FRAME_PROPERTY(LineBaselineOffset, nullptr)
 
   NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImage, ReleaseValue<gfxASurface>)
@@ -2635,7 +2633,8 @@ NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
    * rect, with coordinates relative to this frame's origin. aRect must not be
    * null!
    */
-  bool GetClipPropClipRect(nsRect* aRect, const nsSize& aSize) const;
+  bool GetClipPropClipRect(const nsStyleDisplay* aDisp, nsRect* aRect,
+                           const nsSize& aSize) const;
 
   /**
    * Check if this frame is focusable and in the current tab order.

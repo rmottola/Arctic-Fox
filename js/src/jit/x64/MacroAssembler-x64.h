@@ -89,7 +89,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     MoveResolver moveResolver_;
 
   public:
-    using MacroAssemblerX86Shared::call;
     using MacroAssemblerX86Shared::callWithExitFrame;
     using MacroAssemblerX86Shared::branch32;
     using MacroAssemblerX86Shared::branchTest32;
@@ -108,13 +107,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     /////////////////////////////////////////////////////////////////
     // X64 helpers.
     /////////////////////////////////////////////////////////////////
-    void call(ImmWord target) {
-        mov(target, rax);
-        call(rax);
-    }
-    void call(ImmPtr target) {
-        call(ImmWord(uintptr_t(target.value)));
-    }
     void writeDataRelocation(const Value& val) {
         if (val.isMarkable()) {
             gc::Cell* cell = reinterpret_cast<gc::Cell*>(val.toGCThing());
@@ -502,9 +494,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         movePtr(rhs, ScratchReg);
         cmpPtr(lhs, ScratchReg);
     }
-    void cmpPtr(const Operand& lhs, const ImmMaybeNurseryPtr rhs) {
-        cmpPtr(lhs, noteMaybeNurseryPtr(rhs));
-    }
     void cmpPtr(const Operand& lhs, const ImmWord rhs) {
         if ((intptr_t)rhs.value <= INT32_MAX && (intptr_t)rhs.value >= INT32_MIN) {
             cmpPtr(lhs, Imm32((int32_t)rhs.value));
@@ -732,9 +721,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     }
     void movePtr(ImmGCPtr imm, Register dest) {
         movq(imm, dest);
-    }
-    void movePtr(ImmMaybeNurseryPtr imm, Register dest) {
-        movePtr(noteMaybeNurseryPtr(imm), dest);
     }
     void loadPtr(AbsoluteAddress address, Register dest) {
         if (X86Encoding::IsAddressImmediate(address.addr)) {

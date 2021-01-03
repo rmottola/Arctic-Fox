@@ -111,6 +111,7 @@ IF_SAB(real,imaginary)(SharedFloat64Array,      50,     InitViaClassSpec,       
 IF_SAB(real,imaginary)(SharedUint8ClampedArray, 51,     InitViaClassSpec,       SHARED_TYPED_ARRAY_CLASP(Uint8Clamped)) \
     real(TypedArray,            52,     InitViaClassSpec,       &js::TypedArrayObject::sharedTypedArrayPrototypeClass) \
 IF_SAB(real,imaginary)(Atomics,                 53,     InitAtomicsClass, OCLASP(Atomics)) \
+    real(Reflect,               54,      InitReflect,           nullptr) \
 
 
 

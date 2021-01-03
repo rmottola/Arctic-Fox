@@ -33,6 +33,7 @@
 #include "jsstr.h"
 
 #include "builtin/Eval.h"
+#include "jit/AtomicOperations.h"
 #include "jit/BaselineJIT.h"
 #include "jit/Ion.h"
 #include "jit/IonAnalysis.h"
@@ -47,6 +48,7 @@
 #include "jsfuninlines.h"
 #include "jsscriptinlines.h"
 
+#include "jit/AtomicOperations-inl.h"
 #include "jit/JitFrames-inl.h"
 #include "vm/Debugger-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -699,6 +701,11 @@ js::Invoke(JSContext* cx, const CallArgs& args, MaybeConstruct construct)
 
     /* Invoke native functions. */
     JSFunction* fun = &args.callee().as<JSFunction>();
+    if (construct != CONSTRUCT && fun->isClassConstructor()) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_CANT_CALL_CLASS_CONSTRUCTOR);
+        return false;
+    }
+
     if (fun->isNative()) {
         MOZ_ASSERT_IF(construct, !fun->isConstructor());
         return CallJSNative(cx, fun->native(), args);
@@ -2346,7 +2353,13 @@ CASE(JSOP_SETCONST)
 END_CASE(JSOP_SETCONST)
 
 CASE(JSOP_BINDINTRINSIC)
-    PUSH_OBJECT(*cx->global()->intrinsicsHolder());
+{
+    NativeObject* holder = GlobalObject::getIntrinsicsHolder(cx, cx->global());
+    if (!holder)
+        goto error;
+
+    PUSH_OBJECT(*holder);
+}
 END_CASE(JSOP_BINDINTRINSIC)
 
 CASE(JSOP_BINDGNAME)
@@ -2997,7 +3010,9 @@ CASE(JSOP_FUNCALL)
     bool isFunction = IsFunctionObject(args.calleev(), &maybeFun);
 
     /* Don't bother trying to fast-path calls to scripted non-constructors. */
-    if (!isFunction || !maybeFun->isInterpreted() || !maybeFun->isConstructor()) {
+    if (!isFunction || !maybeFun->isInterpreted() || !maybeFun->isConstructor() ||
+        (!construct && maybeFun->isClassConstructor()))
+    {
         if (construct) {
             if (!InvokeConstructor(cx, args))
                 goto error;
@@ -4481,6 +4496,16 @@ js::UrshValues(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, Mu
 }
 
 bool
+js::AtomicIsLockFree(JSContext* cx, HandleValue in, int* out)
+{
+    int i;
+    if (!ToInt32(cx, in, &i))
+        return false;
+    *out = js::jit::AtomicOperations::isLockfree(i);
+    return true;
+}
+
+bool
 js::DeleteNameOperation(JSContext* cx, HandlePropertyName name, HandleObject scopeObj,
                         MutableHandleValue res)
 {
@@ -4681,8 +4706,11 @@ js::NewObjectOperation(JSContext* cx, HandleScript script, jsbytecode* pc,
         group = ObjectGroup::allocationSiteGroup(cx, script, pc, JSProto_Object);
         if (!group)
             return nullptr;
-        if (group->maybePreliminaryObjects())
+        if (group->maybePreliminaryObjects()) {
             group->maybePreliminaryObjects()->maybeAnalyze(cx, group);
+            if (group->maybeUnboxedLayout())
+                group->maybeUnboxedLayout()->setAllocationSite(script, pc);
+        }
 
         if (group->shouldPreTenure() || group->maybePreliminaryObjects())
             newKind = TenuredObject;
@@ -4854,13 +4882,5 @@ js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* p
         name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc);
     }
 
-    ReportUninitializedLexical(cx, name);
-}
-
-void
-js::ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc, ScopeCoordinate sc)
-{
-    RootedPropertyName name(cx, ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache,
-                                                    script, pc));
     ReportUninitializedLexical(cx, name);
 }

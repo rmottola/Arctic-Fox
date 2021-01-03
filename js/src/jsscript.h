@@ -201,7 +201,7 @@ class Bindings
     friend class BindingIter;
     friend class AliasedFormalIter;
 
-    RelocatablePtrShape callObjShape_;
+    HeapPtrShape callObjShape_;
     uintptr_t bindingArrayAndFlag_;
     uint16_t numArgs_;
     uint16_t numBlockScoped_;
@@ -1060,6 +1060,7 @@ class JSScript : public js::gc::TenuredCell
     inline JSPrincipals* principals();
 
     JSCompartment* compartment() const { return compartment_; }
+    JSCompartment* maybeCompartment() const { return compartment(); }
 
     void setVersion(JSVersion v) { version = v; }
 

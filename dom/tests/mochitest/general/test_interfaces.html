@@ -75,6 +75,7 @@ var ecmaGlobals =
     "Proxy",
     "RangeError",
     "ReferenceError",
+    "Reflect",
     "RegExp",
     "Set",
     {name: "SharedArrayBuffer", nightly: true},
@@ -230,6 +231,8 @@ var interfaceNamesInGlobalScope =
     {name: "CameraRecorderVideoProfile", b2g: true},
 // IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "CameraStateChangeEvent", b2g: true},
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    {name: "CanvasCaptureMediaStream", disabled: true},
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "CanvasGradient",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -901,6 +904,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "RGBColor",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "RTCCertificate",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "RTCDataChannelEvent",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "RTCPeerConnectionIceEvent",
@@ -1408,17 +1413,23 @@ function createInterfaceMap(isXBLScope) {
     for (var entry of interfaces) {
       if (typeof(entry) === "string") {
         interfaceMap[entry] = true;
-      } else if ((entry.nightly === !isNightly) ||
-                 (entry.xbl === !isXBLScope) ||
-                 (entry.desktop === !isDesktop) ||
-                 (entry.b2g === !isB2G) ||
-                 (entry.release === !isRelease) ||
-                 (entry.pref && !prefs.getBoolPref(entry.pref))  ||
-                 (entry.permission && !hasPermission(entry.permission)) ||
-                 entry.disabled) {
-        interfaceMap[entry.name] = false;
       } else {
-        interfaceMap[entry.name] = true;
+        ok(!("pref" in entry), "Bogus pref annotation for " + entry.name);
+        if ((entry.nightly === !isNightly) ||
+            (entry.xbl === !isXBLScope) ||
+            (entry.desktop === !isDesktop) ||
+            (entry.b2g === !isB2G) ||
+            (entry.windows === !isWindows) ||
+            (entry.mac === !isMac) ||
+            (entry.linux === !isLinux) ||
+            (entry.android === !isAndroid) ||
+            (entry.release === !isRelease) ||
+            (entry.permission && !hasPermission(entry.permission)) ||
+            entry.disabled) {
+          interfaceMap[entry.name] = false;
+        } else {
+          interfaceMap[entry.name] = true;
+        }
       }
     }
   }

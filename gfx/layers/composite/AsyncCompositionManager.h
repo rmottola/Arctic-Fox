@@ -14,6 +14,7 @@
 #include "mozilla/dom/ScreenOrientation.h"  // for ScreenOrientation
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4
+#include "mozilla/layers/FrameUniformityData.h" // For FrameUniformityData
 #include "mozilla/layers/LayersMessages.h"  // for TargetConfig
 #include "mozilla/nsRefPtr.h"           // for nsRefPtr
 #include "nsISupportsImpl.h"            // for LayerManager::AddRef, etc
@@ -70,19 +71,12 @@ struct ViewTransform {
 class AsyncCompositionManager final
 {
   friend class AutoResolveRefLayers;
-  ~AsyncCompositionManager()
-  {
-  }
+  ~AsyncCompositionManager();
+
 public:
   NS_INLINE_DECL_REFCOUNTING(AsyncCompositionManager)
 
-  explicit AsyncCompositionManager(LayerManagerComposite* aManager)
-    : mLayerManager(aManager)
-    , mIsFirstPaint(true)
-    , mLayersUpdated(false)
-    , mReadyForCompose(true)
-  {
-  }
+  explicit AsyncCompositionManager(LayerManagerComposite* aManager);
 
   /**
    * This forces the is-first-paint flag to true. This is intended to
@@ -95,7 +89,9 @@ public:
 
   // Sample transforms for layer trees.  Return true to request
   // another animation frame.
-  bool TransformShadowTree(TimeStamp aCurrentFrame);
+  enum class TransformsToSkip : uint8_t { NoneOfThem = 0, APZ = 1 };
+  bool TransformShadowTree(TimeStamp aCurrentFrame,
+    TransformsToSkip aSkip = TransformsToSkip::NoneOfThem);
 
   // Calculates the correct rotation and applies the transform to
   // our layer manager
@@ -120,6 +116,10 @@ public:
   // Returns true if the next composition will be the first for a
   // particular document.
   bool IsFirstPaint() { return mIsFirstPaint; }
+
+  // GetFrameUniformity will return the frame uniformity for each layer attached to an APZ
+  // from the recorded data in RecordShadowTransform
+  void GetFrameUniformity(FrameUniformityData* aFrameUniformityData);
 
 private:
   void TransformScrollableLayer(Layer* aLayer);
@@ -188,6 +188,9 @@ private:
    */
   void DetachRefLayers();
 
+  // Records the shadow transforms for the tree of layers rooted at the given layer
+  void RecordShadowTransforms(Layer* aLayer);
+
   TargetConfig mTargetConfig;
   CSSRect mContentRect;
 
@@ -206,7 +209,10 @@ private:
   bool mReadyForCompose;
 
   gfx::Matrix mWorldTransform;
+  LayerTransformRecorder mLayerTransformRecorder;
 };
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(AsyncCompositionManager::TransformsToSkip)
 
 class MOZ_STACK_CLASS AutoResolveRefLayers {
 public:

@@ -491,6 +491,7 @@ fstream
 fstream.h
 ft2build.h
 fts.h
+functional
 gconf/gconf-client.h
 Gdiplus.h
 gdk/gdk.h
@@ -552,6 +553,7 @@ image.h
 imagehlp.h
 imm.h
 initguid.h
+initializer_list
 InterfaceDefs.h
 InternetConfig.h
 IntlResources.h
@@ -568,6 +570,7 @@ ios
 iosfwd
 iostream
 iostream.h
+istream
 iterator
 JavaControl.h
 JavaEmbedding/JavaControl.h

@@ -431,7 +431,8 @@ class BaseShape : public gc::TenuredCell
     uint32_t slotSpan() const { MOZ_ASSERT(isOwned()); return slotSpan_; }
     void setSlotSpan(uint32_t slotSpan) { MOZ_ASSERT(isOwned()); slotSpan_ = slotSpan; }
 
-    JSCompartment *compartment() const { return compartment_; }
+    JSCompartment* compartment() const { return compartment_; }
+    JSCompartment* maybeCompartment() const { return compartment(); }
 
     /*
      * Lookup base shapes from the compartment's baseShapes table, adding if
@@ -686,6 +687,7 @@ class Shape : public gc::TenuredCell
 
     const HeapPtrShape& previous() const { return parent; }
     JSCompartment* compartment() const { return base()->compartment(); }
+    JSCompartment* maybeCompartment() const { return compartment(); }
 
     template <AllowGC allowGC>
     class Range {
@@ -1402,6 +1404,12 @@ MarkDenseOrTypedArrayElementFound(typename MaybeRooted<Shape*, allowGC>::Mutable
 
 static inline bool
 IsImplicitDenseOrTypedArrayElement(Shape* prop)
+{
+    return prop == reinterpret_cast<Shape*>(1);
+}
+
+static inline bool
+IsImplicitNonNativeProperty(Shape *prop)
 {
     return prop == reinterpret_cast<Shape*>(1);
 }

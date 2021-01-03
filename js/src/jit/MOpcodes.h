@@ -12,7 +12,6 @@ namespace jit {
 
 #define MIR_OPCODE_LIST(_)                                                  \
     _(Constant)                                                             \
-    _(NurseryObject)                                                        \
     _(SimdBox)                                                              \
     _(SimdUnbox)                                                            \
     _(SimdValueX4)                                                          \
@@ -181,6 +180,7 @@ namespace jit {
     _(UnboxedArrayLength)                                                   \
     _(UnboxedArrayInitializedLength)                                        \
     _(IncrementUnboxedArrayInitializedLength)                               \
+    _(SetUnboxedArrayInitializedLength)                                     \
     _(Not)                                                                  \
     _(BoundsCheck)                                                          \
     _(BoundsCheckLower)                                                     \
@@ -205,7 +205,9 @@ namespace jit {
     _(LoadTypedArrayElementStatic)                                          \
     _(StoreTypedArrayElementHole)                                           \
     _(StoreTypedArrayElementStatic)                                         \
+    _(AtomicIsLockFree)                                                     \
     _(CompareExchangeTypedArrayElement)                                     \
+    _(AtomicExchangeTypedArrayElement)                                      \
     _(AtomicTypedArrayElementBinop)                                         \
     _(EffectiveAddress)                                                     \
     _(ClampToUint8)                                                         \
@@ -263,6 +265,7 @@ namespace jit {
     _(RecompileCheck)                                                       \
     _(MemoryBarrier)                                                        \
     _(AsmJSCompareExchangeHeap)                                             \
+    _(AsmJSAtomicExchangeHeap)                                              \
     _(AsmJSAtomicBinopHeap)                                                 \
     _(UnknownValue)                                                         \
     _(LexicalCheck)                                                         \

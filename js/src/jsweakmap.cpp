@@ -39,7 +39,10 @@ WeakMapBase::WeakMapBase(JSObject* memOf, JSCompartment* c)
 
 WeakMapBase::~WeakMapBase()
 {
-    MOZ_ASSERT(!isInList());
+    MOZ_ASSERT(CurrentThreadIsGCSweeping() || CurrentThreadIsHandlingInitFailure());
+    MOZ_ASSERT_IF(CurrentThreadIsGCSweeping(), !isInList());
+    if (isInList())
+        removeWeakMapFromList(this);
 }
 
 void
@@ -48,9 +51,9 @@ WeakMapBase::trace(JSTracer *tracer)
     MOZ_ASSERT(isInList());
     if (tracer->isMarkingTracer()) {
         // We don't trace any of the WeakMap entries at this time, just record
-        // record the fact that the WeakMap has been marked. Enties are marked
+        // record the fact that the WeakMap has been marked. Entries are marked
         // in the iterative marking phase by markAllIteratively(), which happens
-        // when many keys as possible have been marked already.
+        // when as many keys as possible have been marked already.
         MOZ_ASSERT(tracer->eagerlyTraceWeakMaps() == DoNotTraceWeakMaps);
         marked = true;
     } else {
@@ -345,7 +348,7 @@ WeakMapPostWriteBarrier(JSRuntime* rt, ObjectValueMap* weakMap, JSObject* key)
     // Strip the barriers from the type before inserting into the store buffer.
     // This will automatically ensure that barriers do not fire during GC.
     if (key && IsInsideNursery(key))
-        rt->gc.storeBuffer.putGeneric(UnbarrieredRef(weakMap, key));
+        rt->gc.storeBuffer.putGeneric(gc::HashKeyRef<ObjectValueMap, JSObject*>(weakMap, key));
 }
 
 static MOZ_ALWAYS_INLINE bool
@@ -646,7 +649,7 @@ InitWeakMapClass(JSContext* cx, HandleObject obj, bool defineMembers)
         return nullptr;
 
     RootedFunction ctor(cx, global->createConstructor(cx, WeakMap_construct,
-                                                      cx->names().WeakMap, 1));
+                                                      cx->names().WeakMap, 0));
     if (!ctor)
         return nullptr;
 

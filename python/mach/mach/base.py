@@ -77,12 +77,16 @@ class MethodHandler(object):
         # Description of the purpose of this command.
         'description',
 
+        # Docstring associated with command.
+        'docstring',
+
         # Functions used to 'skip' commands if they don't meet the conditions
         # in a given context.
         'conditions',
 
         # argparse.ArgumentParser instance to use as the basis for command
         # arguments.
+        '_parser',
         'parser',
 
         # Arguments added to this command's parser. This is a 2-tuple of
@@ -98,7 +102,7 @@ class MethodHandler(object):
     )
 
     def __init__(self, cls, method, name, category=None, description=None,
-        conditions=None, parser=None, arguments=None,
+        docstring=None, conditions=None, parser=None, arguments=None,
         argument_group_names=None, pass_context=False,
         subcommand_handlers=None):
 
@@ -107,9 +111,19 @@ class MethodHandler(object):
         self.name = name
         self.category = category
         self.description = description
+        self.docstring = docstring
         self.conditions = conditions or []
-        self.parser = parser
         self.arguments = arguments or []
         self.argument_group_names = argument_group_names or []
         self.pass_context = pass_context
         self.subcommand_handlers = subcommand_handlers or {}
+        self._parser = parser
+
+    @property
+    def parser(self):
+        # creating cli parsers at command dispatch time can potentially be
+        # expensive, make it possible to lazy load them.
+        if callable(self._parser):
+            self._parser = self._parser()
+        return self._parser
+

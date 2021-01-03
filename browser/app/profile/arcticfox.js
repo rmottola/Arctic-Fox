@@ -337,6 +337,10 @@ pref("browser.download.panel.firstSessionCompleted", false);
 // search engines URL
 pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
+// Tell the search service to load search plugins from the locale JAR
+pref("browser.search.loadFromJars", true);
+pref("browser.search.jarURIs", "chrome://browser/locale/searchplugins/");
+
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
 
@@ -933,8 +937,10 @@ pref("security.sandbox.windows.log", false);
 // On windows these levels are:
 // 0 - sandbox with USER_NON_ADMIN access token level
 // 1 - a more strict sandbox, which causes problems in specific areas
-// 2 - a policy that we can reasonably call an effective sandbox
-// 3 - an equivalent basic policy to the Chromium renderer processes
+// 2 - a more strict sandbox, which might cause functionality issues. This now
+//     includes running at low integrity.
+// 3 - the strongest settings we seem to be able to use without breaking
+//     everything, but will probably cause some functionality restrictions
 pref("security.sandbox.content.level", 0);
 
 // ID (a UUID when set by gecko) that is used as a per profile suffix to a low
@@ -1213,6 +1219,9 @@ pref("network.disable.ipc.security", true);
 
 // Disable ReadingList by default.
 pref("browser.readinglist.enabled", false);
+
+pref("browser.translation.detectLanguage", false);
+pref("browser.translation.neverForLanguages", "");
 
 // Telemetry settings.
 // Determines if Telemetry pings can be archived locally.

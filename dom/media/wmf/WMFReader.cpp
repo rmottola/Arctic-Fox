@@ -104,7 +104,6 @@ WMFReader::InitializeDXVA()
 
   LayersBackend backend = layerManager->GetCompositorBackendType();
   if (backend != LayersBackend::LAYERS_D3D9 &&
-      backend != LayersBackend::LAYERS_D3D10 &&
       backend != LayersBackend::LAYERS_D3D11) {
     return false;
   }
@@ -742,7 +741,7 @@ WMFReader::CreateBasicVideoFrame(IMFSample* aSample,
                                             b,
                                             false,
                                             -1,
-                                            ToIntRect(mPictureRegion));
+                                            mPictureRegion);
   if (twoDBuffer) {
     twoDBuffer->Unlock2D();
   } else {
@@ -784,7 +783,7 @@ WMFReader::CreateD3DVideoFrame(IMFSample* aSample,
                                                      image.forget(),
                                                      false,
                                                      -1,
-                                                     ToIntRect(mPictureRegion));
+                                                     mPictureRegion);
 
   NS_ENSURE_TRUE(v, E_FAIL);
   v.forget(aOutVideoData);

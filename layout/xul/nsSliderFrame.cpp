@@ -1277,5 +1277,15 @@ nsSliderFrame::PageScroll(nscoord aChange)
   PageUpDown(aChange);
 }
 
+float
+nsSliderFrame::GetThumbRatio() const
+{
+  // mRatio is in thumb app units per scrolled css pixels. Convert it to a
+  // ratio of the thumb's CSS pixels per scrolled CSS pixels. (Note the thumb
+  // is in the scrollframe's parent's space whereas the scrolled CSS pixels
+  // are in the scrollframe's space).
+  return mRatio / mozilla::AppUnitsPerCSSPixel();
+}
+
 NS_IMPL_ISUPPORTS(nsSliderMediator,
                   nsIDOMEventListener)

@@ -187,7 +187,9 @@ struct Statistics
     void endSCC(unsigned scc, int64_t start);
 
     char16_t* formatMessage();
-    char16_t* formatJSON(uint64_t timestamp);
+    UniqueChars formatCompactSliceMessage() const;
+    UniqueChars formatCompactSummaryMessage() const;
+    UniqueChars formatJsonMessage(uint64_t timestamp);
     UniqueChars formatDetailedMessage();
 
     JS::GCSliceCallback setSliceCallback(JS::GCSliceCallback callback);
@@ -232,13 +234,16 @@ struct Statistics
     SliceRange sliceRange() const { return slices.all(); }
     size_t slicesLength() const { return slices.length(); }
 
+    /* Create a convenient typedef for referring tables of phase times. */
+    typedef int64_t const (*PhaseTimeTable)[PHASE_LIMIT];
+
   private:
-    JSRuntime *runtime;
+    JSRuntime* runtime;
 
     int64_t startupTime;
 
+    /* File pointer used for MOZ_GCTIMER output. */
     FILE* fp;
-    bool fullFormat;
 
     /*
      * GCs can't really nest, but a second GC can be triggered from within the
@@ -274,7 +279,7 @@ struct Statistics
     size_t preBytes;
 
     /* Records the maximum GC pause in an API-controlled interval (in us). */
-    int64_t maxPauseInInterval;
+    mutable int64_t maxPauseInInterval;
 
     /* Phases that are currently on stack. */
     Phase phaseNesting[MAX_NESTING];
@@ -306,17 +311,23 @@ struct Statistics
 
     void recordPhaseEnd(Phase phase);
 
-    void gcDuration(int64_t* total, int64_t* maxPause);
+    void gcDuration(int64_t* total, int64_t* maxPause) const;
     void sccDurations(int64_t* total, int64_t* maxPause);
     void printStats();
     bool formatData(StatisticsSerializer& ss, uint64_t timestamp);
 
-    UniqueChars formatDescription();
-    UniqueChars formatSliceDescription(unsigned i, const SliceData& slice);
-    UniqueChars formatTotals();
-    UniqueChars formatPhaseTimes(int64_t (*phaseTimes)[PHASE_LIMIT]);
+    UniqueChars formatCompactSlicePhaseTimes(PhaseTimeTable phaseTimes) const;
 
-    double computeMMU(int64_t resolution);
+    UniqueChars formatDetailedDescription();
+    UniqueChars formatDetailedSliceDescription(unsigned i, const SliceData& slice);
+    UniqueChars formatDetailedPhaseTimes(PhaseTimeTable phaseTimes);
+    UniqueChars formatDetailedTotals();
+
+    UniqueChars formatJsonDescription(uint64_t timestamp);
+    UniqueChars formatJsonSliceDescription(unsigned i, const SliceData& slice);
+    UniqueChars formatJsonPhaseTimes(PhaseTimeTable phaseTimes);
+
+    double computeMMU(int64_t resolution) const;
 };
 
 struct AutoGCSlice

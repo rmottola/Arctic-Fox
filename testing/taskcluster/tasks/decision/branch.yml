@@ -64,6 +64,7 @@ tasks:
           - >
             source ./bin/decision.sh &&
             ./mach taskcluster-graph
+            --pushlog-id='{{pushlog_id}}'
             --message='{{comment}}'
             --project='{{project}}'
             --owner='{{owner}}'
@@ -75,4 +76,3 @@ tasks:
       extra:
         treeherder:
           symbol: D
-

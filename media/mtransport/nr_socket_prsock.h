@@ -114,6 +114,9 @@ public:
 
   static TimeStamp short_term_violation_time();
   static TimeStamp long_term_violation_time();
+  const nr_transport_addr& my_addr() const {
+    return my_addr_;
+  }
 
 protected:
   void fire_callback(int how);
@@ -161,7 +164,7 @@ public:
   virtual int write(const void *msg, size_t len, size_t *written) override;
   virtual int read(void* buf, size_t maxlen, size_t *len) override;
 
-private:
+protected:
   virtual ~NrSocket() {
     if (fd_)
       PR_Close(fd_);

@@ -42,6 +42,7 @@
 #include "js/MemoryMetrics.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
+#include "vm/SharedArrayObject.h"
 #include "vm/WrapperObject.h"
 
 #include "jsatominlines.h"
@@ -99,6 +100,7 @@ const Class ArrayBufferObject::protoClass = {
 const Class ArrayBufferObject::class_ = {
     "ArrayBuffer",
     JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS) |
     JSCLASS_HAS_CACHED_PROTO(JSProto_ArrayBuffer) |
     JSCLASS_BACKGROUND_FINALIZE,
@@ -811,6 +813,7 @@ ArrayBufferObject::create(JSContext* cx, uint32_t nbytes, BufferContents content
     MOZ_ASSERT(!(class_.flags & JSCLASS_HAS_PRIVATE));
     gc::AllocKind allocKind = GetGCObjectKind(nslots);
 
+    AutoSetNewObjectMetadata metadata(cx);
     Rooted<ArrayBufferObject*> obj(cx, NewBuiltinClassInstance<ArrayBufferObject>(cx, allocKind, newKind));
     if (!obj) {
         if (allocated)
@@ -1288,6 +1291,14 @@ js::UnwrapArrayBufferView(JSObject* obj)
     return nullptr;
 }
 
+JS_FRIEND_API(JSObject*)
+js::UnwrapSharedArrayBufferView(JSObject* obj)
+{
+    if (JSObject* unwrapped = CheckedUnwrap(obj))
+        return unwrapped->is<SharedTypedArrayObject>() ? unwrapped : nullptr;
+    return nullptr;
+}
+
 JS_FRIEND_API(uint32_t)
 JS_GetArrayBufferByteLength(JSObject* obj)
 {
@@ -1349,6 +1360,13 @@ JS_NewArrayBuffer(JSContext* cx, uint32_t nbytes)
     return ArrayBufferObject::create(cx, nbytes);
 }
 
+JS_FRIEND_API(JSObject*)
+JS_NewSharedArrayBuffer(JSContext* cx, uint32_t nbytes)
+{
+    MOZ_ASSERT(nbytes <= INT32_MAX);
+    return SharedArrayBufferObject::New(cx, nbytes);
+}
+
 JS_PUBLIC_API(JSObject*)
 JS_NewArrayBufferWithContents(JSContext* cx, size_t nbytes, void* data)
 {
@@ -1376,6 +1394,14 @@ js::UnwrapArrayBuffer(JSObject* obj)
 {
     if (JSObject* unwrapped = CheckedUnwrap(obj))
         return unwrapped->is<ArrayBufferObject>() ? unwrapped : nullptr;
+    return nullptr;
+}
+
+JS_FRIEND_API(JSObject*)
+js::UnwrapSharedArrayBuffer(JSObject* obj)
+{
+    if (JSObject* unwrapped = CheckedUnwrap(obj))
+        return unwrapped->is<SharedArrayBufferObject>() ? unwrapped : nullptr;
     return nullptr;
 }
 

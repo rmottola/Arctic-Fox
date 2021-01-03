@@ -13,7 +13,7 @@
 #include "jit/BaselineJIT.h"
 #include "jit/CompileInfo.h"
 #include "jit/JitSpewer.h"
-#include "jit/mips/Simulator-mips.h"
+#include "jit/mips32/Simulator-mips32.h"
 #include "jit/Recover.h"
 #include "jit/RematerializedFrame.h"
 
@@ -1411,7 +1411,7 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
     //      Entry - Interpreter or other calling into Ion.
     //      Rectifier - Arguments rectifier calling into Ion.
     MOZ_ASSERT(iter.isBailoutJS());
-    FrameType prevFrameType = iter.prevType();
+    mozilla::DebugOnly<FrameType> prevFrameType = iter.prevType();
     MOZ_ASSERT(prevFrameType == JitFrame_IonJS ||
                prevFrameType == JitFrame_BaselineStub ||
                prevFrameType == JitFrame_Entry ||
@@ -1572,8 +1572,8 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
     bool overRecursed = false;
     BaselineBailoutInfo *info = builder.info();
     uint8_t* newsp = info->incomingStack - (info->copyStackTop - info->copyStackBottom);
-#if defined(JS_ARM_SIMULATOR) || defined(JS_ARM64_SIMULATOR) || defined(JS_MIPS_SIMULATOR)
-    if (SimulatorType::Current()->overRecursed(uintptr_t(newsp)))
+#ifdef JS_SIMULATOR
+    if (Simulator::Current()->overRecursed(uintptr_t(newsp)))
         overRecursed = true;
 #else
     JS_CHECK_RECURSION_WITH_SP_DONT_REPORT(cx, newsp, overRecursed = true);
@@ -1592,19 +1592,37 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
 }
 
 static bool
+InvalidateAfterBailout(JSContext* cx, HandleScript outerScript, const char* reason)
+{
+    // In some cases, the computation of recover instruction can invalidate the
+    // Ion script before we reach the end of the bailout. Thus, if the outer
+    // script no longer have any Ion script attached, then we just skip the
+    // invalidation.
+    //
+    // For example, such case can happen if the template object for an unboxed
+    // objects no longer match the content of its properties (see Bug 1174547)
+    if (!outerScript->hasIonScript()) {
+        JitSpew(JitSpew_BaselineBailouts, "Ion script is already invalidated");
+        return true;
+    }
+
+    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
+
+    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to %s", reason);
+    return Invalidate(cx, outerScript);
+}
+
+static bool
 HandleBoundsCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Bounds check failure %s:%d, inlined into %s:%d",
             innerScript->filename(), innerScript->lineno(),
             outerScript->filename(), outerScript->lineno());
 
-    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
-
     if (!innerScript->failedBoundsCheck())
         innerScript->setFailedBoundsCheck();
 
-    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to bounds check failure");
-    if (!Invalidate(cx, outerScript))
+    if (!InvalidateAfterBailout(cx, outerScript, "bounds check failure"))
         return false;
 
     if (innerScript->hasIonScript() && !Invalidate(cx, innerScript))
@@ -1620,49 +1638,41 @@ HandleShapeGuardFailure(JSContext* cx, HandleScript outerScript, HandleScript in
             innerScript->filename(), innerScript->lineno(),
             outerScript->filename(), outerScript->lineno());
 
-    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
-
     // TODO: Currently this mimic's Ion's handling of this case.  Investigate setting
     // the flag on innerScript as opposed to outerScript, and maybe invalidating both
     // inner and outer scripts, instead of just the outer one.
     outerScript->setFailedShapeGuard();
-    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to shape guard failure");
-    return Invalidate(cx, outerScript);
+
+    return InvalidateAfterBailout(cx, outerScript, "shape guard failure");
 }
 
 static bool
-HandleLexicalCheckFailure(JSContext *cx, HandleScript outerScript, HandleScript innerScript)
+HandleBaselineInfoBailout(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
+{
+    JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
+            innerScript->filename(), innerScript->lineno(),
+            outerScript->filename(), outerScript->lineno());
+
+    return InvalidateAfterBailout(cx, outerScript, "invalid baseline info");
+}
+
+static bool
+HandleLexicalCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Lexical check failure %s:%d, inlined into %s:%d",
             innerScript->filename(), innerScript->lineno(),
             outerScript->filename(), outerScript->lineno());
 
-    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
-
     if (!innerScript->failedLexicalCheck())
         innerScript->setFailedLexicalCheck();
 
-    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to lexical check failure");
-    if (!Invalidate(cx, outerScript))
+    if (!InvalidateAfterBailout(cx, outerScript, "lexical check failure"))
         return false;
 
     if (innerScript->hasIonScript() && !Invalidate(cx, innerScript))
         return false;
 
     return true;
-}
-
-static bool
-HandleBaselineInfoBailout(JSContext* cx, JSScript* outerScript, JSScript* innerScript)
-{
-    JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
-            innerScript->filename(), innerScript->lineno(),
-            outerScript->filename(), outerScript->lineno());
-
-    MOZ_ASSERT(!outerScript->ionScript()->invalidated());
-
-    JitSpew(JitSpew_BaselineBailouts, "Invalidating due to invalid baseline info");
-    return Invalidate(cx, outerScript);
 }
 
 static bool

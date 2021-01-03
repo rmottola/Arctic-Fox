@@ -12,6 +12,7 @@
 #include "jsgc.h"
 
 #include "jit/BaselineICList.h"
+#include "jit/BaselineJIT.h"
 #include "jit/MacroAssembler.h"
 #include "jit/SharedICList.h"
 #include "jit/SharedICRegisters.h"
@@ -689,10 +690,15 @@ class ICStub
           case Call_ScriptedFunCall:
           case Call_StringSplit:
           case WarmUpCounter_Fallback:
-          case GetElem_NativeSlot:
-          case GetElem_NativePrototypeSlot:
-          case GetElem_NativePrototypeCallNative:
-          case GetElem_NativePrototypeCallScripted:
+          case GetElem_NativeSlotName:
+          case GetElem_NativeSlotSymbol:
+          case GetElem_NativePrototypeSlotName:
+          case GetElem_NativePrototypeSlotSymbol:
+          case GetElem_NativePrototypeCallNativeName:
+          case GetElem_NativePrototypeCallNativeSymbol:
+          case GetElem_NativePrototypeCallScriptedName:
+          case GetElem_NativePrototypeCallScriptedSymbol:
+          case GetElem_UnboxedPropertyName:
           case GetProp_CallScripted:
           case GetProp_CallNative:
           case GetProp_CallDOMProxyNative:

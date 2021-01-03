@@ -1192,10 +1192,6 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
   -moz-image-region: rect(0, 342px, 18px, 324px);
 }
 
-#webrtc-status-button {
-  -moz-image-region: rect(0, 360px, 18px, 342px);
-}
-
 
 /* ::::: fullscreen window controls ::::: */
 

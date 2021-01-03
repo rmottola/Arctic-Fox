@@ -50,19 +50,22 @@ using namespace js::gc;
 struct EdgeValue
 {
     void* thing;
-    JSGCTraceKind kind;
+    JS::TraceKind kind;
     const char* label;
 };
 
 struct VerifyNode
 {
     void* thing;
-    JSGCTraceKind kind;
+    JS::TraceKind kind;
     uint32_t count;
     EdgeValue edges[1];
 };
 
 typedef HashMap<void*, VerifyNode*, DefaultHasher<void*>, SystemAllocPolicy> NodeMap;
+
+static void
+AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind);
 
 /*
  * The verifier data structures are simple. The entire graph is stored in a
@@ -94,8 +97,8 @@ struct VerifyPreTracer : JS::CallbackTracer
     char* term;
     NodeMap nodemap;
 
-    VerifyPreTracer(JSRuntime* rt, JSTraceCallback callback)
-      : JS::CallbackTracer(rt, callback), noggc(rt), number(rt->gc.gcNumber()), count(0),
+    explicit VerifyPreTracer(JSRuntime* rt)
+      : JS::CallbackTracer(rt, AccumulateEdge), noggc(rt), number(rt->gc.gcNumber()), count(0),
         root(nullptr)
     {}
 
@@ -109,9 +112,9 @@ struct VerifyPreTracer : JS::CallbackTracer
  * node.
  */
 static void
-AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
+AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind)
 {
-    VerifyPreTracer* trc = (VerifyPreTracer*)jstrc;
+    VerifyPreTracer* trc = static_cast<VerifyPreTracer*>(jstrc);
 
     MOZ_ASSERT(!IsInsideNursery(*reinterpret_cast<Cell**>(thingp)));
 
@@ -131,7 +134,7 @@ AccumulateEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
 }
 
 static VerifyNode*
-MakeNode(VerifyPreTracer* trc, void* thing, JSGCTraceKind kind)
+MakeNode(VerifyPreTracer* trc, void* thing, JS::TraceKind kind)
 {
     NodeMap::AddPtr p = trc->nodemap.lookupForAdd(thing);
     if (!p) {
@@ -179,17 +182,11 @@ gc::GCRuntime::startVerifyPreBarriers()
 
     number++;
 
-    VerifyPreTracer* trc = js_new<VerifyPreTracer>(rt, JSTraceCallback(nullptr));
+    VerifyPreTracer* trc = js_new<VerifyPreTracer>(rt);
     if (!trc)
         return;
 
     gcstats::AutoPhase ap(stats, gcstats::PHASE_TRACE_HEAP);
-
-    /*
-     * Passing a function pointer directly to js_new trips a compiler bug in
-     * MSVC. Work around by filling the pointer after allocating with nullptr.
-     */
-    trc->setTraceCallback(AccumulateEdge);
 
     const size_t size = 64 * 1024 * 1024;
     trc->root = (VerifyNode*)js_malloc(size);
@@ -202,7 +199,7 @@ gc::GCRuntime::startVerifyPreBarriers()
         goto oom;
 
     /* Create the root node. */
-    trc->curnode = MakeNode(trc, nullptr, JSGCTraceKind(0));
+    trc->curnode = MakeNode(trc, nullptr, JS::TraceKind(0));
 
     incrementalState = MARK_ROOTS;
 
@@ -234,7 +231,6 @@ gc::GCRuntime::startVerifyPreBarriers()
     incrementalState = MARK;
     marker.start();
 
-    rt->setNeedsIncrementalBarrier(true);
     for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next()) {
         PurgeJITCaches(zone);
         zone->setNeedsIncrementalBarrier(true, Zone::UpdateJit);
@@ -255,6 +251,14 @@ IsMarkedOrAllocated(TenuredCell* cell)
     return cell->isMarked() || cell->arenaHeader()->allocatedDuringIncremental;
 }
 
+static void
+CheckEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind);
+
+struct CheckEdgeTracer : public JS::CallbackTracer {
+    VerifyNode* node;
+    explicit CheckEdgeTracer(JSRuntime* rt) : JS::CallbackTracer(rt, CheckEdge), node(nullptr) {}
+};
+
 static const uint32_t MAX_VERIFIER_EDGES = 1000;
 
 /*
@@ -265,10 +269,10 @@ static const uint32_t MAX_VERIFIER_EDGES = 1000;
  * been modified) must point to marked objects.
  */
 static void
-CheckEdge(JS::CallbackTracer* jstrc, void** thingp, JSGCTraceKind kind)
+CheckEdge(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind)
 {
-    VerifyPreTracer* trc = (VerifyPreTracer*)jstrc;
-    VerifyNode* node = trc->curnode;
+    CheckEdgeTracer* trc = static_cast<CheckEdgeTracer*>(jstrc);
+    VerifyNode* node = trc->node;
 
     /* Avoid n^2 behavior. */
     if (node->count > MAX_VERIFIER_EDGES)
@@ -290,9 +294,9 @@ AssertMarkedOrAllocated(const EdgeValue& edge)
         return;
 
     // Permanent atoms and well-known symbols aren't marked during graph traversal.
-    if (edge.kind == JSTRACE_STRING && static_cast<JSString*>(edge.thing)->isPermanentAtom())
+    if (edge.kind == JS::TraceKind::String && static_cast<JSString*>(edge.thing)->isPermanentAtom())
         return;
-    if (edge.kind == JSTRACE_SYMBOL && static_cast<JS::Symbol*>(edge.thing)->isWellKnownSymbol())
+    if (edge.kind == JS::TraceKind::Symbol && static_cast<JS::Symbol*>(edge.thing)->isWellKnownSymbol())
         return;
 
     char msgbuf[1024];
@@ -304,7 +308,7 @@ AssertMarkedOrAllocated(const EdgeValue& edge)
 bool
 gc::GCRuntime::endVerifyPreBarriers()
 {
-    VerifyPreTracer* trc = (VerifyPreTracer*)verifyPreData;
+    VerifyPreTracer* trc = static_cast<VerifyPreTracer*>(verifyPreData);
 
     if (!trc)
         return false;
@@ -323,7 +327,6 @@ gc::GCRuntime::endVerifyPreBarriers()
         zone->setNeedsIncrementalBarrier(false, Zone::UpdateJit);
         PurgeJITCaches(zone);
     }
-    rt->setNeedsIncrementalBarrier(false);
 
     /*
      * We need to bump gcNumber so that the methodjit knows that jitcode has
@@ -336,13 +339,13 @@ gc::GCRuntime::endVerifyPreBarriers()
     incrementalState = NO_INCREMENTAL;
 
     if (!compartmentCreated && IsIncrementalGCSafe(rt)) {
-        trc->setTraceCallback(CheckEdge);
+        CheckEdgeTracer cetrc(rt);
 
         /* Start after the roots. */
         VerifyNode* node = NextNode(trc->root);
         while ((char*)node < trc->edgeptr) {
-            trc->curnode = node;
-            JS_TraceChildren(trc, node->thing, node->kind);
+            cetrc.node = node;
+            JS_TraceChildren(&cetrc, node->thing, node->kind);
 
             if (node->count <= MAX_VERIFIER_EDGES) {
                 for (uint32_t i = 0; i < node->count; i++)
@@ -387,7 +390,7 @@ gc::GCRuntime::maybeVerifyPreBarriers(bool always)
     if (rt->mainThread.suppressGC)
         return;
 
-    if (VerifyPreTracer* trc = (VerifyPreTracer*)verifyPreData) {
+    if (VerifyPreTracer* trc = static_cast<VerifyPreTracer*>(verifyPreData)) {
         if (++trc->count < zealFrequency && !always)
             return;
 
@@ -407,7 +410,7 @@ js::gc::MaybeVerifyBarriers(JSContext* cx, bool always)
 void
 js::gc::GCRuntime::finishVerifier()
 {
-    if (VerifyPreTracer* trc = (VerifyPreTracer*)verifyPreData) {
+    if (VerifyPreTracer* trc = static_cast<VerifyPreTracer*>(verifyPreData)) {
         js_delete(trc);
         verifyPreData = nullptr;
     }

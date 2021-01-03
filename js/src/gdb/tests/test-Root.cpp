@@ -28,7 +28,7 @@ FRAGMENT(Root, handle) {
 }
 
 FRAGMENT(Root, HeapSlot) {
-  JS::Rooted<jsval> plinth(cx, STRING_TO_JSVAL(JS_NewStringCopyZ(cx, "plinth")));
+  JS::Rooted<jsval> plinth(cx, JS::StringValue(JS_NewStringCopyZ(cx, "plinth")));
   JS::Rooted<JSObject*> array(cx, JS_NewArrayObject(cx, JS::HandleValueArray(plinth)));
 
   breakpoint();
@@ -41,21 +41,17 @@ FRAGMENT(Root, barriers) {
   JSObject* obj = JS_NewPlainObject(cx);
   js::PreBarriered<JSObject*> prebarriered(obj);
   js::HeapPtr<JSObject*> heapptr(obj);
-  js::RelocatablePtr<JSObject*> relocatable(obj);
 
   JS::Value val = JS::ObjectValue(*obj);
   js::PreBarrieredValue prebarrieredValue(JS::ObjectValue(*obj));
   js::HeapValue heapValue(JS::ObjectValue(*obj));
-  js::RelocatableValue relocatableValue(JS::ObjectValue(*obj));
 
   breakpoint();
 
   (void) prebarriered;
   (void) heapptr;
-  (void) relocatable;
   (void) val;
   (void) prebarrieredValue;
   (void) heapValue;
-  (void) relocatableValue;
 }
 

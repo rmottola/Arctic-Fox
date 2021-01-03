@@ -4,6 +4,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('*'):
+    BUG_COMPONENT = ('Core', 'WebRTC: Audio/Video')
+
+with Files('PeerIdentity.*'):
+    BUG_COMPONENT = ('Core', 'WebRTC: Signaling')
+
 XPIDL_MODULE = 'content_webrtc'
 
 EXPORTS += [
@@ -23,6 +29,7 @@ if CONFIG['MOZ_WEBRTC']:
         'MediaEngineWebRTCAudio.cpp',
         'MediaEngineWebRTCVideo.cpp',
         'MediaTrackConstraints.cpp',
+	'RTCCertificate.cpp',
         'RTCIdentityProviderRegistrar.cpp',
     ]
     # MediaEngineWebRTC.cpp needs to be built separately.
@@ -59,6 +66,9 @@ UNIFIED_SOURCES += [
 
 EXPORTS.mozilla += [
     'PeerIdentity.h',
+]
+EXPORTS.mozilla.dom += [
+    'RTCCertificate.h',
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')

@@ -183,11 +183,7 @@ class LAllocation : public TempObject
         return bits_;
     }
 
-#ifdef DEBUG
     const char* toString() const;
-#else
-    const char* toString() const { return "???"; }
-#endif
     bool aliases(const LAllocation& other) const;
     void dump() const;
 
@@ -580,11 +576,7 @@ class LDefinition
         }
     }
 
-#ifdef DEBUG
     const char* toString() const;
-#else
-    const char* toString() const { return "???"; }
-#endif
 
     void dump() const;
 };
@@ -1833,8 +1825,10 @@ LAllocation::toRegister() const
 # include "jit/x86-shared/LIR-x86-shared.h"
 #elif defined(JS_CODEGEN_ARM)
 # include "jit/arm/LIR-arm.h"
+#elif defined(JS_CODEGEN_ARM64)
+# include "jit/arm64/LIR-arm64.h"
 #elif defined(JS_CODEGEN_MIPS)
-# include "jit/mips/LIR-mips.h"
+# include "jit/mips32/LIR-mips32.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/LIR-none.h"
 #else

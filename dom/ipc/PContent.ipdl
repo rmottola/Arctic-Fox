@@ -623,8 +623,8 @@ child:
     async StartProfiler(uint32_t aEntries, double aInterval, nsCString[] aFeatures,
                         nsCString[] aThreadNameFilters);
     async StopProfiler();
-    prio(high) sync GetProfile()
-      returns (nsCString aProfile);
+
+    async GatherProfile();
 
     InvokeDragSession(IPCDataTransfer[] transfers, uint32_t action);
 
@@ -697,7 +697,7 @@ parent:
      * via bridging. The corresponding PluginModuleChild will live in the plugin
      * process.
      */
-    sync LoadPlugin(uint32_t pluginId) returns (nsresult rv);
+    sync LoadPlugin(uint32_t aPluginId) returns (nsresult aResult, uint32_t aRunID);
 
     /**
      * This call is used by asynchronous plugin instantiation to notify the
@@ -1057,6 +1057,8 @@ parent:
      * Tells the parent to stop the gamepad listening service if it hasn't already.
      */
     GamepadListenerRemoved();
+
+    async Profile(nsCString aProfile);
 
 both:
      AsyncMessage(nsString aMessage, ClonedMessageData aData,

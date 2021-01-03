@@ -14,6 +14,7 @@
 #include <math.h>
 
 #include "jsapi.h"
+#include "jscntxt.h"
 #include "jscompartment.h"
 #include "jsfriendapi.h"
 #include "jshashutil.h"
@@ -27,6 +28,7 @@
 #include "js/Vector.h"
 #include "vm/Debugger.h"
 #include "vm/StringBuffer.h"
+#include "vm/WrapperObject.h"
 
 #include "jscntxtinlines.h"
 
@@ -397,7 +399,8 @@ SavedFrame::checkThis(JSContext *cx, CallArgs &args, const char *fnName,
     const Value& thisValue = args.thisv();
 
     if (!thisValue.isObject()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, InformalValueTypeName(thisValue));
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT,
+                             InformalValueTypeName(thisValue));
         return false;
     }
 
@@ -1221,18 +1224,11 @@ SavedStacksMetadataCallback(JSContext* cx, JSObject* target)
     if (!stacks.saveCurrentStack(cx, &frame))
         CrashAtUnhandlableOOM("SavedStacksMetadataCallback");
 
-    if (!Debugger::onLogAllocationSite(cx, obj, frame, PRMJ_Now()))
+    if (!Debugger::onLogAllocationSite(cx, obj, frame, JS_GetCurrentEmbedderTime()))
         CrashAtUnhandlableOOM("SavedStacksMetadataCallback");
 
+    MOZ_ASSERT_IF(frame, !frame->is<WrapperObject>());
     return frame;
-}
-
-JS_FRIEND_API(JSPrincipals*)
-GetSavedFramePrincipals(HandleObject savedFrame)
-{
-    MOZ_ASSERT(savedFrame);
-    MOZ_ASSERT(savedFrame->is<SavedFrame>());
-    return savedFrame->as<SavedFrame>().getPrincipals();
 }
 
 #ifdef JS_CRASH_DIAGNOSTICS

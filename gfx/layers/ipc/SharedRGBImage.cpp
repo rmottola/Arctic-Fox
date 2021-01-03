@@ -7,6 +7,7 @@
 #include "Shmem.h"                      // for Shmem
 #include "gfx2DGlue.h"                  // for ImageFormatToSurfaceFormat, etc
 #include "gfxPlatform.h"                // for gfxPlatform, gfxImageFormat
+#include "mozilla/gfx/Point.h"          // for IntSIze
 #include "mozilla/layers/ISurfaceAllocator.h"  // for ISurfaceAllocator, etc
 #include "mozilla/layers/ImageClient.h"  // for ImageClient
 #include "mozilla/layers/ImageDataSerializer.h"  // for ImageDataSerializer
@@ -17,8 +18,7 @@
 #include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsDebug.h"                    // for NS_WARNING, NS_ASSERTION
 #include "nsISupportsImpl.h"            // for Image::AddRef, etc
-#include "nsRect.h"                     // for nsIntRect
-#include "nsSize.h"                     // for nsIntSize
+#include "nsRect.h"                     // for mozilla::gfx::IntRect
 
 // Just big enough for a 1080p RGBA32 frame
 #define MAX_FRAME_SIZE (16 * 1024 * 1024)
@@ -69,7 +69,10 @@ SharedRGBImage::~SharedRGBImage()
 
   if (mCompositable->GetAsyncID() != 0 &&
       !InImageBridgeChildThread()) {
-    ImageBridgeChild::DispatchReleaseTextureClient(mTextureClient.forget().take());
+    ADDREF_MANUALLY(mTextureClient);
+    ImageBridgeChild::DispatchReleaseTextureClient(mTextureClient);
+    mTextureClient = nullptr;
+
     ImageBridgeChild::DispatchReleaseImageClient(mCompositable.forget().take());
   }
 }

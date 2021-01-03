@@ -16,6 +16,13 @@ function dprint(...xs) {
     print(s);
 }
 
+// Clone a function so that we get reliable inlining of primitives with --ion-eager.
+// For eg testMethod and testFunction that are polymorphic in the array a,
+// the inliner gets confused and stops inlining after Int8 -- not what we want.
+function CLONE(f) {
+    return this.eval("(" + f.toSource() + ")");
+}
+
 function testMethod(a, ...indices) {
     dprint("Method: " + a.constructor.name);
     var poison;
@@ -41,6 +48,11 @@ function testMethod(a, ...indices) {
 	assertEq(Atomics.compareExchange(a, x, 5, 9), 5);
 	// val = 9
 	assertEq(Atomics.compareExchange(a, x, 5, 0), 9); // should also fail
+
+ 	// val = 9
+	assertEq(Atomics.exchange(a, x, 4), 9);
+	// val = 4
+	assertEq(Atomics.exchange(a, x, 9), 4);
 
 	// val = 9
 	assertEq(Atomics.load(a, x), 9);
@@ -107,6 +119,11 @@ function testFunction(a, ...indices) {
 	assertEq(gAtomics_compareExchange(a, x, 5, 9), 5);
 	// val = 9
 	assertEq(gAtomics_compareExchange(a, x, 5, 0), 9); // should also fail
+
+	// val = 9
+	assertEq(gAtomics_exchange(a, x, 4), 9);
+	// val = 4
+	assertEq(gAtomics_exchange(a, x, 9), 4);
 
 	// val = 9
 	assertEq(gAtomics_load(a, x), 9);
@@ -202,7 +219,7 @@ function testRangeCAS(a) {
     assertEq(a[0], 0);
 }
 
-// Ad-hoc tests for extreme and out-of-range values 
+// Ad-hoc tests for extreme and out-of-range values.
 // None of these should throw
 
 function testInt8Extremes(a) {
@@ -238,7 +255,10 @@ function testInt8Extremes(a) {
     Atomics.and(a, 10, 256);	// Preserve none
     assertEq(a[10], 0);
     assertEq(Atomics.load(a, 10), 0);
-    
+
+    Atomics.store(a, 10, 255);
+    assertEq(Atomics.exchange(a, 10, 0), -1);
+
     assertEq(a[11], 0);
 }
 
@@ -271,7 +291,10 @@ function testUint8Extremes(a) {
     Atomics.and(a, 10, 256);	// Preserve none
     assertEq(a[10], 0);
     assertEq(Atomics.load(a, 10), 0);
-    
+
+    Atomics.store(a, 10, 255);
+    assertEq(Atomics.exchange(a, 10, 0), 255);
+
     assertEq(a[11], 0);
 }
 
@@ -326,6 +349,59 @@ function testUint32(a) {
     assertEq(sum, k);
 }
 
+// This test is a reliable test of sign extension in the JIT where
+// testInt8Extremes is not (because there may not be enough type
+// information without a loop - see bug 1181062 for a description
+// of the general problem).
+
+function exchangeLoop(ta) {
+    var sum = 0;
+    for ( var i=0 ; i < 100000 ; i++ )
+	sum += Atomics.exchange(ta, i & 15, 255);
+    return sum;
+}
+
+function adHocExchange() {
+    var a = new SharedInt8Array(16)
+    for ( var i=0 ; i < a.length ; i++ )
+	a[i] = 255;
+    assertEq(exchangeLoop(a), -100000);
+}
+
+var sizes   = [    1,     2,     3,     4,     5,     6,     7,  8,
+                   9,    10,    11,    12];
+var answers = [ true,  true, false,  true, false, false, false, {},
+	       false, false, false, false];
+
+function testIsLockFree() {
+    var saved8 = "Invalid";
+
+    // This ought to defeat most compile-time resolution.
+    for ( var i=0 ; i < sizes.length ; i++ ) {
+	var v = Atomics.isLockFree(sizes[i]);
+	var a = answers[i];
+	assertEq(typeof v, 'boolean');
+	if (typeof a == 'boolean')
+	    assertEq(v, a);
+	else
+	    saved8 = v;
+    }
+
+    // This ought to be optimizable.
+    assertEq(Atomics.isLockFree(1), true);
+    assertEq(Atomics.isLockFree(2), true);
+    assertEq(Atomics.isLockFree(3), false);
+    assertEq(Atomics.isLockFree(4), true);
+    assertEq(Atomics.isLockFree(5), false);
+    assertEq(Atomics.isLockFree(6), false);
+    assertEq(Atomics.isLockFree(7), false);
+    assertEq(Atomics.isLockFree(8), saved8);
+    assertEq(Atomics.isLockFree(9), false);
+    assertEq(Atomics.isLockFree(10), false);
+    assertEq(Atomics.isLockFree(11), false);
+    assertEq(Atomics.isLockFree(12), false);
+}
+
 function isLittleEndian() {
     var xxx = new ArrayBuffer(2);
     var xxa = new Int16Array(xxx);
@@ -354,17 +430,18 @@ function runTests() {
 	assertEq(t2[0], 37 << 16);
     t1[0] = 0;
 
-    // Test that invoking as Atomics.whatever() works, on correct arguments
-    testMethod(new SharedInt8Array(sab), 0, 42, 4095);
-    testMethod(new SharedUint8Array(sab), 0, 42, 4095);
-    testMethod(new SharedUint8ClampedArray(sab), 0, 42, 4095);
-    testMethod(new SharedInt16Array(sab), 0, 42, 2047);
-    testMethod(new SharedUint16Array(sab), 0, 42, 2047);
-    testMethod(new SharedInt32Array(sab), 0, 42, 1023);
-    testMethod(new SharedUint32Array(sab), 0, 42, 1023);
+    // Test that invoking as Atomics.whatever() works, on correct arguments.
+    CLONE(testMethod)(new SharedInt8Array(sab), 0, 42, 4095);
+    CLONE(testMethod)(new SharedUint8Array(sab), 0, 42, 4095);
+    CLONE(testMethod)(new SharedUint8ClampedArray(sab), 0, 42, 4095);
+    CLONE(testMethod)(new SharedInt16Array(sab), 0, 42, 2047);
+    CLONE(testMethod)(new SharedUint16Array(sab), 0, 42, 2047);
+    CLONE(testMethod)(new SharedInt32Array(sab), 0, 42, 1023);
+    CLONE(testMethod)(new SharedUint32Array(sab), 0, 42, 1023);
 
-    // Test that invoking as v = Atomics.whatever; v() works, on correct arguments
+    // Test that invoking as v = Atomics.whatever; v() works, on correct arguments.
     gAtomics_compareExchange = Atomics.compareExchange;
+    gAtomics_exchange = Atomics.exchange;
     gAtomics_load = Atomics.load;
     gAtomics_store = Atomics.store;
     gAtomics_fence = Atomics.fence;
@@ -374,42 +451,48 @@ function runTests() {
     gAtomics_or = Atomics.or;
     gAtomics_xor = Atomics.xor;
 
-    testFunction(new SharedInt8Array(sab), 0, 42, 4095);
-    testFunction(new SharedUint8Array(sab), 0, 42, 4095);
-    testFunction(new SharedUint8ClampedArray(sab), 0, 42, 4095);
-    testFunction(new SharedInt16Array(sab), 0, 42, 2047);
-    testFunction(new SharedUint16Array(sab), 0, 42, 2047);
-    testFunction(new SharedInt32Array(sab), 0, 42, 1023);
-    testFunction(new SharedUint32Array(sab), 0, 42, 1023);
+    CLONE(testFunction)(new SharedInt8Array(sab), 0, 42, 4095);
+    CLONE(testFunction)(new SharedUint8Array(sab), 0, 42, 4095);
+    CLONE(testFunction)(new SharedUint8ClampedArray(sab), 0, 42, 4095);
+    CLONE(testFunction)(new SharedInt16Array(sab), 0, 42, 2047);
+    CLONE(testFunction)(new SharedUint16Array(sab), 0, 42, 2047);
+    CLONE(testFunction)(new SharedInt32Array(sab), 0, 42, 1023);
+    CLONE(testFunction)(new SharedUint32Array(sab), 0, 42, 1023);
 
     // Test various range and type conditions
     var v8 = new SharedInt8Array(sab);
     var v32 = new SharedInt32Array(sab);
 
-    testTypeCAS(v8);
-    testTypeCAS(v32);
+    CLONE(testTypeCAS)(v8);
+    CLONE(testTypeCAS)(v32);
 
-    testTypeBinop(v8, Atomics.add);
-    testTypeBinop(v8, Atomics.sub);
-    testTypeBinop(v8, Atomics.and);
-    testTypeBinop(v8, Atomics.or);
-    testTypeBinop(v8, Atomics.xor);
+    CLONE(testTypeBinop)(v8, Atomics.add);
+    CLONE(testTypeBinop)(v8, Atomics.sub);
+    CLONE(testTypeBinop)(v8, Atomics.and);
+    CLONE(testTypeBinop)(v8, Atomics.or);
+    CLONE(testTypeBinop)(v8, Atomics.xor);
 
-    testTypeBinop(v32, Atomics.add);
-    testTypeBinop(v32, Atomics.sub);
-    testTypeBinop(v32, Atomics.and);
-    testTypeBinop(v32, Atomics.or);
-    testTypeBinop(v32, Atomics.xor);
+    CLONE(testTypeBinop)(v32, Atomics.add);
+    CLONE(testTypeBinop)(v32, Atomics.sub);
+    CLONE(testTypeBinop)(v32, Atomics.and);
+    CLONE(testTypeBinop)(v32, Atomics.or);
+    CLONE(testTypeBinop)(v32, Atomics.xor);
 
     // Test out-of-range references
-    testRangeCAS(v8);
-    testRangeCAS(v32);
+    CLONE(testRangeCAS)(v8);
+    CLONE(testRangeCAS)(v32);
 
     // Test extreme values
     testInt8Extremes(new SharedInt8Array(sab));
     testUint8Extremes(new SharedUint8Array(sab));
     testInt16Extremes(new SharedInt16Array(sab));
     testUint32(new SharedUint32Array(sab));
+
+    // Misc ad-hoc tests
+    adHocExchange();
+
+    // Misc
+    testIsLockFree();
 }
 
 if (this.Atomics && this.SharedArrayBuffer && this.SharedInt32Array)

@@ -4,7 +4,7 @@
 
 # Integrates the web-platform-tests test runner with mach.
 
-from __future__ import unicode_literals, print_function
+from __future__ import absolute_import, unicode_literals, print_function
 
 import os
 import sys
@@ -124,6 +124,12 @@ class MachCommands(MachCommandBase):
              parser=wptcommandline.create_parser(["firefox"]))
     def run_web_platform_tests(self, **params):
         self.setup()
+
+        if "test_objects" in params:
+            for item in params["test_objects"]:
+                params["include"].append(item["name"])
+            del params["test_objects"]
+
         wpt_runner = self._spawn(WebPlatformTestsRunner)
 
         if params["list_test_groups"]:

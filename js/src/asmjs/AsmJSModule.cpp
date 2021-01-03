@@ -62,11 +62,11 @@ using mozilla::Swap;
 static uint8_t*
 AllocateExecutableMemory(ExclusiveContext* cx, size_t bytes)
 {
-#ifdef XP_WIN
-    unsigned permissions = PAGE_EXECUTE_READWRITE;
-#else
-    unsigned permissions = PROT_READ | PROT_WRITE | PROT_EXEC;
-#endif
+    // On most platforms, this will allocate RWX memory. On iOS, or when
+    // --non-writable-jitcode is used, this will allocate RW memory. In this
+    // case, DynamicallyLinkModule will reprotect the code as RX.
+    unsigned permissions =
+        ExecutableAllocator::initialProtectionFlags(ExecutableAllocator::Writable);
     void* p = AllocateExecutableMemory(nullptr, bytes, permissions, "asm-js-code", AsmJSPageSize);
     if (!p)
         ReportOutOfMemory(cx);
@@ -295,10 +295,9 @@ AsmJSModule::finish(ExclusiveContext* cx, TokenStream& tokenStream, MacroAssembl
     pod.srcLength_ = endBeforeCurly - srcStart_;
     pod.srcLengthWithRightBrace_ = endAfterCurly - srcStart_;
 
-    // The global data section sits immediately after the executable (and
-    // other) data allocated by the MacroAssembler, so ensure it is
-    // SIMD-aligned.
-    pod.codeBytes_ = AlignBytes(masm.bytesNeeded(), SimdMemoryAlignment);
+    // Start global data on a new page so JIT code may be given independent
+    // protection flags.
+    pod.codeBytes_ = AlignBytes(masm.bytesNeeded(), AsmJSPageSize);
 
     // The entire region is allocated via mmap/VirtualAlloc which requires
     // units of pages.
@@ -481,6 +480,13 @@ OnOutOfBounds()
     JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_INDEX);
 }
 
+static void
+OnImpreciseConversion()
+{
+    JSContext* cx = JSRuntime::innermostAsmJSActivation()->cx();
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SIMD_FAILED_CONVERSION);
+}
+
 static bool
 AsmJSHandleExecutionInterrupt()
 {
@@ -655,7 +661,7 @@ FuncCast(F* pf)
 static void*
 RedirectCall(void* fun, ABIFunctionType type)
 {
-#if defined(JS_ARM_SIMULATOR) || defined(JS_MIPS_SIMULATOR)
+#ifdef JS_SIMULATOR
     fun = Simulator::RedirectNativeFunction(fun, type);
 #endif
     return fun;
@@ -677,6 +683,8 @@ AddressOf(AsmJSImmKind kind, ExclusiveContext* cx)
         return RedirectCall(FuncCast(OnDetached), Args_General0);
       case AsmJSImm_OnOutOfBounds:
         return RedirectCall(FuncCast(OnOutOfBounds), Args_General0);
+      case AsmJSImm_OnImpreciseConversion:
+        return RedirectCall(FuncCast(OnImpreciseConversion), Args_General0);
       case AsmJSImm_HandleExecutionInterrupt:
         return RedirectCall(FuncCast(AsmJSHandleExecutionInterrupt), Args_General0);
       case AsmJSImm_InvokeFromAsmJS_Ignore:
@@ -698,6 +706,8 @@ AddressOf(AsmJSImmKind kind, ExclusiveContext* cx)
         return RedirectCall(FuncCast(__aeabi_uidivmod), Args_General2);
       case AsmJSImm_AtomicCmpXchg:
         return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t, int32_t)>(js::atomics_cmpxchg_asm_callout), Args_General4);
+      case AsmJSImm_AtomicXchg:
+        return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_xchg_asm_callout), Args_General3);
       case AsmJSImm_AtomicFetchAdd:
         return RedirectCall(FuncCast<int32_t (int32_t, int32_t, int32_t)>(js::atomics_add_asm_callout), Args_General3);
       case AsmJSImm_AtomicFetchSub:
@@ -766,17 +776,40 @@ AsmJSModule::staticallyLink(ExclusiveContext* cx)
         RelativeLink link = staticLinkData_.relativeLinks[i];
         uint8_t* patchAt = code_ + link.patchAtOffset;
         uint8_t* target = code_ + link.targetOffset;
+
+        // In the case of function-pointer tables and long-jumps on MIPS, the
+        // RelativeLink is used to patch a pointer to the function entry. If
+        // profiling is enabled (by cloning a module with profiling enabled),
+        // the target should be the profiling entry.
+        if (profilingEnabled_) {
+            const CodeRange* codeRange = lookupCodeRange(target);
+            if (codeRange && codeRange->isFunction() && link.targetOffset == codeRange->entry())
+                target = code_ + codeRange->profilingEntry();
+        }
+
         if (link.isRawPointerPatch())
             *(uint8_t**)(patchAt) = target;
         else
             Assembler::PatchInstructionImmediate(patchAt, PatchedImmPtr(target));
     }
 
-    for (size_t imm = 0; imm < AsmJSImm_Limit; imm++) {
-        const AsmJSModule::OffsetVector& offsets = staticLinkData_.absoluteLinks[imm];
-        void* target = AddressOf(AsmJSImmKind(imm), cx);
+    for (size_t immIndex = 0; immIndex < AsmJSImm_Limit; immIndex++) {
+        AsmJSImmKind imm = AsmJSImmKind(immIndex);
+        const OffsetVector& offsets = staticLinkData_.absoluteLinks[imm];
         for (size_t i = 0; i < offsets.length(); i++) {
-            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code_ + offsets[i]),
+            uint8_t* patchAt = code_ + offsets[i];
+            void* target = AddressOf(imm, cx);
+
+            // Builtin calls are another case where, when profiling is enabled,
+            // we must point to the profiling entry.
+            AsmJSExit::BuiltinKind builtin;
+            if (profilingEnabled_ && ImmKindIsBuiltin(imm, &builtin)) {
+                const CodeRange* codeRange = lookupCodeRange(patchAt);
+                if (codeRange->isFunction())
+                    target = code_ + builtinThunkOffsets_[builtin];
+            }
+
+            Assembler::PatchDataWithValueCheck(CodeLocationLabel(patchAt),
                                                PatchedImmPtr(target),
                                                PatchedImmPtr((void*)-1));
         }
@@ -785,7 +818,7 @@ AsmJSModule::staticallyLink(ExclusiveContext* cx)
     // Initialize global data segment
 
     for (size_t i = 0; i < exits_.length(); i++) {
-        AsmJSModule::ExitDatum& exitDatum = exitIndexToGlobalDatum(i);
+        ExitDatum& exitDatum = exitIndexToGlobalDatum(i);
         exitDatum.exit = interpExitTrampoline(exits_[i]);
         exitDatum.fun = nullptr;
         exitDatum.baselineScript = nullptr;
@@ -829,7 +862,7 @@ AsmJSModule::initHeap(Handle<ArrayBufferObjectMaybeShared*> heap, JSContext* cx)
     // If we have any explicit bounds checks, we need to patch the heap length
     // checks at the right places. All accesses that have been recorded are the
     // only ones that need bound checks (see also
-    // CodeGeneratorX64::visitAsmJS{Load,Store,CompareExchange,AtomicBinop}Heap)
+    // CodeGeneratorX64::visitAsmJS{Load,Store,CompareExchange,Exchange,AtomicBinop}Heap)
     uint32_t heapLength = heap->byteLength();
     for (size_t i = 0; i < heapAccesses_.length(); i++) {
         const jit::AsmJSHeapAccess& access = heapAccesses_[i];
@@ -915,6 +948,24 @@ AsmJSModule::restoreToInitialState(ArrayBufferObjectMaybeShared* maybePrevBuffer
     restoreHeapToInitialState(maybePrevBuffer);
 }
 
+namespace {
+
+class MOZ_STACK_CLASS AutoMutateCode
+{
+    AutoWritableJitCode awjc_;
+    AutoFlushICache afc_;
+
+   public:
+    AutoMutateCode(JSContext* cx, AsmJSModule& module, const char* name)
+      : awjc_(cx->runtime(), module.codeBase(), module.codeBytes()),
+        afc_(name)
+    {
+        module.setAutoFlushICacheRange();
+    }
+};
+
+}; // anonymous namespace
+
 bool
 AsmJSModule::detachHeap(JSContext* cx)
 {
@@ -935,6 +986,7 @@ AsmJSModule::detachHeap(JSContext* cx)
     MOZ_ASSERT_IF(active(), activation()->exitReason() == AsmJSExit::Reason_JitFFI ||
                             activation()->exitReason() == AsmJSExit::Reason_SlowFFI);
 
+    AutoMutateCode amc(cx, *this, "AsmJSModule::detachHeap");
     restoreHeapToInitialState(maybeHeap_);
 
     MOZ_ASSERT(hasDetachedHeap());
@@ -965,7 +1017,7 @@ AsmJSModuleObject_trace(JSTracer* trc, JSObject* obj)
 
 const Class AsmJSModuleObject::class_ = {
     "AsmJSModuleObject",
-    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(AsmJSModuleObject::RESERVED_SLOTS),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -985,12 +1037,14 @@ const Class AsmJSModuleObject::class_ = {
 AsmJSModuleObject*
 AsmJSModuleObject::create(ExclusiveContext* cx, ScopedJSDeletePtr<AsmJSModule>* module)
 {
+    AutoSetNewObjectMetadata metadata(cx);
     JSObject* obj = NewObjectWithGivenProto(cx, &AsmJSModuleObject::class_, nullptr);
     if (!obj)
         return nullptr;
     AsmJSModuleObject* nobj = &obj->as<AsmJSModuleObject>();
 
     nobj->setReservedSlot(MODULE_SLOT, PrivateValue(module->forget()));
+
     return nobj;
 }
 
@@ -1325,6 +1379,7 @@ AsmJSModule::CodeRange::CodeRange(uint32_t nameIndex, uint32_t lineNumber,
     profilingReturn_(l.profilingReturn.offset()),
     end_(l.end.offset())
 {
+    PodZero(&u);  // zero padding for Valgrind
     u.kind_ = Function;
     setDeltas(l.entry.offset(), l.profilingJump.offset(), l.profilingEpilogue.offset());
 
@@ -1349,9 +1404,13 @@ AsmJSModule::CodeRange::setDeltas(uint32_t entry, uint32_t profilingJump, uint32
 }
 
 AsmJSModule::CodeRange::CodeRange(Kind kind, uint32_t begin, uint32_t end)
-  : begin_(begin),
+  : nameIndex_(0),
+    lineNumber_(0),
+    begin_(begin),
+    profilingReturn_(0),
     end_(end)
 {
+    PodZero(&u);  // zero padding for Valgrind
     u.kind_ = kind;
 
     MOZ_ASSERT(begin_ <= end_);
@@ -1359,10 +1418,13 @@ AsmJSModule::CodeRange::CodeRange(Kind kind, uint32_t begin, uint32_t end)
 }
 
 AsmJSModule::CodeRange::CodeRange(Kind kind, uint32_t begin, uint32_t profilingReturn, uint32_t end)
-  : begin_(begin),
+  : nameIndex_(0),
+    lineNumber_(0),
+    begin_(begin),
     profilingReturn_(profilingReturn),
     end_(end)
 {
+    PodZero(&u);  // zero padding for Valgrind
     u.kind_ = kind;
 
     MOZ_ASSERT(begin_ < profilingReturn_);
@@ -1372,10 +1434,13 @@ AsmJSModule::CodeRange::CodeRange(Kind kind, uint32_t begin, uint32_t profilingR
 
 AsmJSModule::CodeRange::CodeRange(AsmJSExit::BuiltinKind builtin, uint32_t begin,
                                   uint32_t profilingReturn, uint32_t end)
-  : begin_(begin),
+  : nameIndex_(0),
+    lineNumber_(0),
+    begin_(begin),
     profilingReturn_(profilingReturn),
     end_(end)
 {
+    PodZero(&u);  // zero padding for Valgrind
     u.kind_ = Thunk;
     u.thunk.target_ = builtin;
 
@@ -1649,11 +1714,13 @@ AsmJSModule::clone(JSContext* cx, ScopedJSDeletePtr<AsmJSModule>* moduleOut) con
         }
     }
 
-    // We already know the exact extent of areas that need to be patched, just make sure we
-    // flush all of them at once.
+
+    // Delay flushing until dynamic linking.
+    AutoFlushICache afc("AsmJSModule::clone", /* inhibit = */ true);
     out.setAutoFlushICacheRange();
 
     out.restoreToInitialState(maybeHeap_, code_, cx);
+    out.staticallyLink(cx);
     return true;
 }
 
@@ -1669,12 +1736,17 @@ AsmJSModule::changeHeap(Handle<ArrayBufferObject*> newHeap, JSContext* cx)
     if (interrupted_)
         return false;
 
-    AutoFlushICache afc("AsmJSModule::changeHeap");
-    setAutoFlushICacheRange();
-
+    AutoMutateCode amc(cx, *this, "AsmJSModule::changeHeap");
     restoreHeapToInitialState(maybeHeap_);
     initHeap(newHeap, cx);
     return true;
+}
+
+size_t
+AsmJSModule::heapLength() const
+{
+    MOZ_ASSERT(isDynamicallyLinked());
+    return maybeHeap_ ? maybeHeap_->byteLength() : 0;
 }
 
 bool
@@ -1715,9 +1787,7 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
         profilingLabels_.clear();
     }
 
-    // Conservatively flush the icache for the entire module.
-    AutoFlushICache afc("AsmJSModule::setProfilingEnabled");
-    setAutoFlushICacheRange();
+    AutoMutateCode amc(cx, *this, "AsmJSModule::setProfilingEnabled");
 
     // Patch all internal (asm.js->asm.js) callsites to call the profiling
     // prologues:
@@ -1735,6 +1805,9 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
         BOffImm calleeOffset;
         callerInsn->as<InstBLImm>()->extractImm(&calleeOffset);
         void* callee = calleeOffset.getDest(callerInsn);
+#elif defined(JS_CODEGEN_ARM64)
+        MOZ_CRASH();
+        void* callee = nullptr;
 #elif defined(JS_CODEGEN_MIPS)
         Instruction* instr = (Instruction*)(callerRetAddr - 4 * sizeof(uint32_t));
         void* callee = (void*)Assembler::ExtractLuiOriValue(instr, instr->next());
@@ -1749,7 +1822,7 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
         if (codeRange->kind() != CodeRange::Function)
             continue;
 
-        uint8_t* profilingEntry = code_ + codeRange->begin();
+        uint8_t* profilingEntry = code_ + codeRange->profilingEntry();
         uint8_t* entry = code_ + codeRange->entry();
         MOZ_ASSERT_IF(profilingEnabled_, callee == profilingEntry);
         MOZ_ASSERT_IF(!profilingEnabled_, callee == entry);
@@ -1759,6 +1832,8 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
         X86Encoding::SetRel32(callerRetAddr, newCallee);
 #elif defined(JS_CODEGEN_ARM)
         new (caller) InstBLImm(BOffImm(newCallee - caller), Assembler::Always);
+#elif defined(JS_CODEGEN_ARM64)
+        MOZ_CRASH();
 #elif defined(JS_CODEGEN_MIPS)
         Assembler::WriteLuiOriInstructions(instr, instr->next(),
                                            ScratchRegister, (uint32_t)newCallee);
@@ -1778,7 +1853,7 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
         for (size_t j = 0; j < funcPtrTable.numElems(); j++) {
             void* callee = array[j];
             const CodeRange* codeRange = lookupCodeRange(callee);
-            uint8_t* profilingEntry = code_ + codeRange->begin();
+            uint8_t* profilingEntry = code_ + codeRange->profilingEntry();
             uint8_t* entry = code_ + codeRange->entry();
             MOZ_ASSERT_IF(profilingEnabled_, callee == profilingEntry);
             MOZ_ASSERT_IF(!profilingEnabled_, callee == entry);
@@ -1822,6 +1897,8 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
             MOZ_ASSERT(reinterpret_cast<Instruction*>(jump)->is<InstBImm>());
             new (jump) InstNOP();
         }
+#elif defined(JS_CODEGEN_ARM64)
+        MOZ_CRASH();
 #elif defined(JS_CODEGEN_MIPS)
         Instruction* instr = (Instruction*)jump;
         if (enabled) {
@@ -2254,10 +2331,8 @@ js::LookupAsmJSModuleInCache(ExclusiveContext* cx,
         return false;
 
     {
-        // No need to flush the instruction cache now, it will be flushed when
-        // dynamically linking. We already know the exact extent of areas that need
-        // to be patched, just make sure we flush all of them at once.
-        AutoFlushICache afc("LookupAsmJSModuleInCache", /* inhibit= */ true);
+        // Delay flushing until dynamic linking.
+        AutoFlushICache afc("LookupAsmJSModuleInCache", /* inhibit = */ true);
         module->setAutoFlushICacheRange();
 
         module->staticallyLink(cx);

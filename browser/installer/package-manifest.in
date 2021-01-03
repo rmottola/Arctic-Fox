@@ -56,7 +56,6 @@
 #endif
 @RESPATH@/hyphenation/*
 @RESPATH@/browser/@PREF_DIR@/palemoon-l10n.js
-@RESPATH@/browser/searchplugins/*
 #ifdef HAVE_MAKENSISU
 @BINPATH@/uninstall/helper.exe
 #endif

@@ -1081,9 +1081,9 @@ void AudioCallbackDriver::CompleteAudioContextOperations(AsyncCubebOperation aOp
   for (int32_t i = array.Length() - 1; i >= 0; i--) {
     StreamAndPromiseForOperation& s = array[i];
     if ((aOperation == AsyncCubebOperation::INIT &&
-         s.mOperation == AudioContextOperation::Resume) ||
+         s.mOperation == dom::AudioContextOperation::Resume) ||
         (aOperation == AsyncCubebOperation::SHUTDOWN &&
-         s.mOperation != AudioContextOperation::Resume)) {
+         s.mOperation != dom::AudioContextOperation::Resume)) {
 
       GraphImpl()->AudioContextOperationCompleted(s.mStream,
                                                   s.mPromise,

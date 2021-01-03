@@ -60,6 +60,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     regExps(runtime_),
     globalWriteBarriered(false),
     neuteredTypedObjects(0),
+    objectMetadataState(ImmediateMetadata()),
     propertyTree(thisForCtor()),
     selfHostingScriptSource(nullptr),
     objectMetadataTable(nullptr),
@@ -77,7 +78,9 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     compartmentStats(nullptr),
     scheduledForDestruction(false),
     maybeAlive(true),
-    jitCompartment_(nullptr)
+    jitCompartment_(nullptr),
+    normalArgumentsTemplate_(nullptr),
+    strictArgumentsTemplate_(nullptr)
 {
     PodArrayZero(sawDeprecatedLanguageExtension);
     runtime_->numCompartments++;
@@ -215,7 +218,7 @@ class WrapperMapRef : public BufferableRef
             key.kind == CrossCompartmentKey::DebuggerSource)
         {
             MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
-                       key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
+                       key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Object);
             TraceManuallyBarrieredEdge(trc, reinterpret_cast<JSObject**>(&key.wrapped),
                                        "CCW wrapped object");
         }
@@ -479,9 +482,10 @@ JSCompartment::wrap(JSContext* cx, MutableHandle<PropertyDescriptor> desc)
  * and when compacting to update cross-compartment pointers.
  */
 void
-JSCompartment::markCrossCompartmentWrappers(JSTracer *trc)
+JSCompartment::markCrossCompartmentWrappers(JSTracer* trc)
 {
-    MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->isHeapCompacting());
+    MOZ_ASSERT(trc->runtime()->isHeapMajorCollecting());
+    MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->gc.isHeapCompacting());
 
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         Value v = e.front().value();
@@ -506,17 +510,25 @@ JSCompartment::trace(JSTracer* trc)
 void
 JSCompartment::markRoots(JSTracer* trc)
 {
-    MOZ_ASSERT(!trc->runtime()->isHeapMinorCollecting());
+    // The object pending metadata is the only compartment root which can be
+    // nursery allocated.
+    if (objectMetadataState.is<PendingMetadata>()) {
+        TraceRoot(trc,
+                  objectMetadataState.as<PendingMetadata>().unsafeGet(),
+                  "on-stack object pending metadata");
+    }
 
-    if (jitCompartment_)
-        jitCompartment_->mark(trc, this);
+    if (!trc->runtime()->isHeapMinorCollecting()) {
+        if (jitCompartment_)
+            jitCompartment_->mark(trc, this);
 
-    /*
-     * If a compartment is on-stack, we mark its global so that
-     * JSContext::global() remains valid.
-     */
-    if (enterCompartmentDepth && global_.unbarrieredGet())
-        TraceRoot(trc, global_.unsafeGet(), "on-stack compartment global");
+        /*
+         * If a compartment is on-stack, we mark its global so that
+         * JSContext::global() remains valid.
+         */
+        if (enterCompartmentDepth && global_.unbarrieredGet())
+            TraceRoot(trc, global_.unsafeGet(), "on-stack compartment global");
+    }
 }
 
 void
@@ -538,6 +550,17 @@ JSCompartment::sweepGlobalObject(FreeOp* fop)
         if (isDebuggee())
             Debugger::detachAllDebuggersFromGlobal(fop, global_);
         global_.set(nullptr);
+    }
+}
+
+void
+JSCompartment::sweepObjectPendingMetadata()
+{
+    if (objectMetadataState.is<PendingMetadata>()) {
+        // We should never finalize an object before it gets its metadata! That
+        // would mean we aren't calling the object metadata callback for every
+        // object!
+        MOZ_ALWAYS_TRUE(!IsAboutToBeFinalized(&objectMetadataState.as<PendingMetadata>()));
     }
 }
 
@@ -616,17 +639,17 @@ JSCompartment::sweepCrossCompartmentWrappers()
           case CrossCompartmentKey::DebuggerEnvironment:
           case CrossCompartmentKey::DebuggerSource:
               MOZ_ASSERT(IsInsideNursery(key.wrapped) ||
-                         key.wrapped->asTenured().getTraceKind() == JSTRACE_OBJECT);
+                         key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Object);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSObject**>(&key.wrapped));
               break;
           case CrossCompartmentKey::StringWrapper:
-              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_STRING);
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JS::TraceKind::String);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSString**>(&key.wrapped));
               break;
           case CrossCompartmentKey::DebuggerScript:
-              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JSTRACE_SCRIPT);
+              MOZ_ASSERT(key.wrapped->asTenured().getTraceKind() == JS::TraceKind::Script);
               keyDying = IsAboutToBeFinalizedUnbarriered(
                   reinterpret_cast<JSScript**>(&key.wrapped));
               break;
@@ -646,7 +669,18 @@ JSCompartment::sweepCrossCompartmentWrappers()
     }
 }
 
-void JSCompartment::fixupAfterMovingGC()
+void
+JSCompartment::sweepTemplateObjects()
+{
+    if (normalArgumentsTemplate_ && IsAboutToBeFinalized(&normalArgumentsTemplate_))
+        normalArgumentsTemplate_.set(nullptr);
+
+    if (strictArgumentsTemplate_ && IsAboutToBeFinalized(&strictArgumentsTemplate_))
+        strictArgumentsTemplate_.set(nullptr);
+}
+
+void
+JSCompartment::fixupAfterMovingGC()
 {
     fixupGlobal();
     fixupInitialShapeTable();
@@ -711,16 +745,17 @@ JSCompartment::clearObjectMetadata()
 void
 JSCompartment::setNewObjectMetadata(JSContext* cx, JSObject* obj)
 {
-    MOZ_ASSERT(this == cx->compartment());
+    assertSameCompartment(cx, this, obj);
 
     if (JSObject* metadata = objectMetadataCallback(cx, obj)) {
+        assertSameCompartment(cx, metadata);
         if (!objectMetadataTable) {
             objectMetadataTable = cx->new_<ObjectWeakMap>(cx);
             if (!objectMetadataTable)
-                CrashAtUnhandlableOOM("setObjectMetadata");
+                CrashAtUnhandlableOOM("setNewObjectMetadata");
         }
         if (!objectMetadataTable->add(cx, obj, metadata))
-            CrashAtUnhandlableOOM("setObjectMetadata");
+            CrashAtUnhandlableOOM("setNewObjectMetadata");
     }
 }
 
@@ -911,3 +946,35 @@ JSCompartment::addTelemetry(const char* filename, DeprecatedLanguageExtension e)
 
     sawDeprecatedLanguageExtension[e] = true;
 }
+
+AutoSetNewObjectMetadata::AutoSetNewObjectMetadata(ExclusiveContext* ecx
+                                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
+    : CustomAutoRooter(ecx)
+    , cx_(ecx->maybeJSContext())
+    , prevState_(ecx->compartment()->objectMetadataState)
+{
+    MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    if (cx_)
+        cx_->compartment()->objectMetadataState = NewObjectMetadataState(DelayMetadata());
+}
+
+AutoSetNewObjectMetadata::~AutoSetNewObjectMetadata()
+{
+    // If we don't have a cx, we didn't change the metadata state, so no need to
+    // reset it here.
+    if (!cx_)
+        return;
+
+    if (!cx_->isExceptionPending() && cx_->compartment()->hasObjectPendingMetadata()) {
+        JSObject* obj = cx_->compartment()->objectMetadataState.as<PendingMetadata>();
+        // Make sure to restore the previous state before setting the object's
+        // metadata. SetNewObjectMetadata asserts that the state is not
+        // PendingMetadata in order to ensure that metadata callbacks are called
+        // in order.
+        cx_->compartment()->objectMetadataState = prevState_;
+        SetNewObjectMetadata(cx_, obj);
+    } else {
+        cx_->compartment()->objectMetadataState = prevState_;
+    }
+}
+

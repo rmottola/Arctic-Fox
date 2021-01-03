@@ -12,6 +12,7 @@
 
 #include "jit/Ion.h"
 #include "jit/MIR.h"
+#include "jit/MIRGenerator.h"
 
 #include "vm/HelperThreads.h"
 
@@ -93,6 +94,13 @@ static mozilla::Atomic<uint32_t, mozilla::Relaxed> filteredOutCompilations(0);
 static const char * const ChannelNames[] =
 {
 #define JITSPEW_CHANNEL(name) #name,
+    JITSPEW_CHANNEL_LIST(JITSPEW_CHANNEL)
+#undef JITSPEW_CHANNEL
+};
+
+static size_t ChannelIndentLevel[] =
+{
+#define JITSPEW_CHANNEL(name) 0,
     JITSPEW_CHANNEL_LIST(JITSPEW_CHANNEL)
 #undef JITSPEW_CHANNEL
 };
@@ -229,6 +237,15 @@ IonSpewer::~IonSpewer()
 
     jsonOutput_.printf("\n]}\n");
     release();
+}
+
+GraphSpewer::GraphSpewer(TempAllocator *alloc)
+  : graph_(nullptr),
+    c1Printer_(alloc->lifoAlloc()),
+    jsonPrinter_(alloc->lifoAlloc()),
+    c1Spewer_(c1Printer_),
+    jsonSpewer_(jsonPrinter_)
+{
 }
 
 void
@@ -498,6 +515,17 @@ jit::CheckLogging()
     JitSpewPrinter().init(stderr);
 }
 
+JitSpewIndent::JitSpewIndent(JitSpewChannel channel)
+  : channel_(channel)
+{
+    ChannelIndentLevel[channel]++;
+}
+
+JitSpewIndent::~JitSpewIndent()
+{
+    ChannelIndentLevel[channel_]--;
+}
+
 void
 jit::JitSpewStartVA(JitSpewChannel channel, const char* fmt, va_list ap)
 {
@@ -505,7 +533,8 @@ jit::JitSpewStartVA(JitSpewChannel channel, const char* fmt, va_list ap)
         return;
 
     JitSpewHeader(channel);
-    vfprintf(stderr, fmt, ap);
+    Fprinter& out = JitSpewPrinter();
+    out.vprintf(fmt, ap);
 }
 
 void
@@ -514,7 +543,8 @@ jit::JitSpewContVA(JitSpewChannel channel, const char* fmt, va_list ap)
     if (!JitSpewEnabled(channel))
         return;
 
-    vfprintf(stderr, fmt, ap);
+    Fprinter& out = JitSpewPrinter();
+    out.vprintf(fmt, ap);
 }
 
 void
@@ -523,7 +553,8 @@ jit::JitSpewFin(JitSpewChannel channel)
     if (!JitSpewEnabled(channel))
         return;
 
-    fprintf(stderr, "\n");
+    Fprinter& out = JitSpewPrinter();
+    out.put("\n");
 }
 
 void
@@ -578,7 +609,10 @@ jit::JitSpewHeader(JitSpewChannel channel)
     if (!JitSpewEnabled(channel))
         return;
 
-    fprintf(stderr, "[%s] ", ChannelNames[channel]);
+    Fprinter& out = JitSpewPrinter();
+    out.printf("[%s] ", ChannelNames[channel]);
+    for (size_t i = ChannelIndentLevel[channel]; i != 0; i--)
+        out.put("  ");
 }
 
 bool

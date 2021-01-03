@@ -22,7 +22,6 @@
 #include "nsArrayEnumerator.h"
 #include "nsCOMArray.h"
 #include "nsDirectoryServiceUtils.h"
-#include "nsIJSRuntimeService.h"
 #include "nsCOMPtr.h"
 #include "nsAutoPtr.h"
 #include "nsJSPrincipals.h"
@@ -700,7 +699,7 @@ env_setProperty(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue
         JS_ReportError(cx, "can't set envariable %s to %s", name.ptr(), value.ptr());
         return false;
     }
-    vp.set(STRING_TO_JSVAL(valstr));
+    vp.setString(valstr);
 #endif /* !defined SOLARIS */
     return result.succeed();
 }
@@ -1364,15 +1363,9 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
             return 1;
         }
 
-        nsCOMPtr<nsIJSRuntimeService> rtsvc = do_GetService("@mozilla.org/js/xpc/RuntimeService;1");
-        // get the JSRuntime from the runtime svc
-        if (!rtsvc) {
-            printf("failed to get nsJSRuntimeService!\n");
-            return 1;
-        }
-
-        if (NS_FAILED(rtsvc->GetRuntime(&rt)) || !rt) {
-            printf("failed to get JSRuntime from nsJSRuntimeService!\n");
+        rt = xpc::GetJSRuntime();
+        if (!rt) {
+            printf("failed to get JSRuntime from XPConnect!\n");
             return 1;
         }
 
@@ -1469,7 +1462,7 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
             JSAutoCompartment ac(cx, glob);
 
-            if (!JS_InitReflect(cx, glob)) {
+            if (!JS_InitReflectParse(cx, glob)) {
                 return 1;
             }
 

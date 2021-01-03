@@ -874,8 +874,9 @@ function ReadManifest(aURL, inherited_status)
         var refPrefSettings = defaultRefPrefSettings.concat();
         var fuzzy_max_delta = 2;
         var fuzzy_max_pixels = 1;
+        var chaosMode = false;
 
-        while (items[0].match(/^(fails|needs-focus|random|skip|asserts|slow|require-or|silentfail|pref|test-pref|ref-pref|fuzzy)/)) {
+        while (items[0].match(/^(fails|needs-focus|random|skip|asserts|slow|require-or|silentfail|pref|test-pref|ref-pref|fuzzy|chaos-mode)/)) {
             var item = items.shift();
             var stat;
             var cond;
@@ -954,6 +955,9 @@ function ReadManifest(aURL, inherited_status)
                 fuzzy_max_delta = Number(m[2]);
                 fuzzy_max_pixels = Number(m[3]);
               }
+            } else if (item == "chaos-mode") {
+                cond = false;
+                chaosMode = true;
             } else {
                 throw "Error in manifest file " + aURL.spec + " line " + lineNo + ": unexpected item " + item;
             }
@@ -1042,7 +1046,8 @@ function ReadManifest(aURL, inherited_status)
                           fuzzyMaxDelta: fuzzy_max_delta,
                           fuzzyMaxPixels: fuzzy_max_pixels,
                           url1: testURI,
-                          url2: null });
+                          url2: null,
+                          chaosMode: chaosMode });
         } else if (items[0] == TYPE_SCRIPT) {
             if (items.length != 2)
                 throw "Error in manifest file " + aURL.spec + " line " + lineNo + ": incorrect number of arguments to script";
@@ -1068,7 +1073,8 @@ function ReadManifest(aURL, inherited_status)
                           fuzzyMaxDelta: fuzzy_max_delta,
                           fuzzyMaxPixels: fuzzy_max_pixels,
                           url1: testURI,
-                          url2: null });
+                          url2: null,
+                          chaosMode: chaosMode });
         } else if (items[0] == TYPE_REFTEST_EQUAL || items[0] == TYPE_REFTEST_NOTEQUAL) {
             if (items.length != 3)
                 throw "Error in manifest file " + aURL.spec + " line " + lineNo + ": incorrect number of arguments to " + items[0];
@@ -1097,7 +1103,8 @@ function ReadManifest(aURL, inherited_status)
                           fuzzyMaxDelta: fuzzy_max_delta,
                           fuzzyMaxPixels: fuzzy_max_pixels,
                           url1: testURI,
-                          url2: refURI });
+                          url2: refURI,
+                          chaosMode: chaosMode });
         } else {
             throw "Error in manifest file " + aURL.spec + " line " + lineNo + ": unknown test type " + items[0];
         }
@@ -1231,6 +1238,9 @@ function StartCurrentTest()
     }
     else {
         gDumpLog("REFTEST TEST-START | " + gURLs[0].prettyPath + "\n");
+        if (gURLs[0].chaosMode) {
+            gWindowUtils.enterChaosMode();
+        }
         if (!gURLs[0].needsFocus) {
             Blur();
         }
@@ -1852,6 +1862,9 @@ function DoAssertionCheck(numAsserts)
         }
     }
 
+    if (gURLs[0].chaosMode) {
+        gWindowUtils.leaveChaosMode();
+    }
     gDumpLog("REFTEST TEST-END | " + gURLs[0].prettyPath + "\n");
 
     // And start the next test.

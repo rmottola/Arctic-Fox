@@ -14,9 +14,7 @@
          AssertionFailed: false,
          MakeConstructible: false, DecompileArg: false,
          RuntimeDefaultLocale: false,
-         ParallelDo: false, ParallelSlices: false, NewDenseArray: false,
-         UnsafePutElements: false,
-         ParallelTestsShouldPass: false,
+         NewDenseArray: false,
          Dump: false,
          callFunction: false,
          TO_UINT32: false,
@@ -90,8 +88,8 @@ function ToNumber(v) {
 }
 
 
-/* Spec: ECMAScript Language Specification, 5.1 edition, 9.10 */
-function CheckObjectCoercible(v) {
+// ES6 7.2.1 (previously, ES5 9.10 under the name "CheckObjectCoercible").
+function RequireObjectCoercible(v) {
     if (v === undefined || v === null)
         ThrowTypeError(JSMSG_CANT_CONVERT_TO, ToString(v), "object");
 }

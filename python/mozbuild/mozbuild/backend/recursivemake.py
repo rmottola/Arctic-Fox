@@ -4,8 +4,6 @@
 
 from __future__ import unicode_literals
 
-import errno
-import json
 import logging
 import os
 import re
@@ -33,6 +31,7 @@ from ..frontend.data import (
     ContextDerived,
     ContextWrapped,
     Defines,
+    DistFiles,
     DirectoryTraversal,
     Exports,
     ExternalLibrary,
@@ -101,6 +100,7 @@ MOZBUILD_VARIABLES = [
     'MODULE',
     'NO_DIST_INSTALL',
     'NO_EXPAND_LIBS',
+    'NO_JS_MANIFEST',
     'OS_LIBS',
     'PARALLEL_DIRS',
     'PREF_JS_EXPORTS',
@@ -116,6 +116,8 @@ MOZBUILD_VARIABLES = [
     'STATIC_LIBRARY_NAME',
     'TEST_DIRS',
     'TOOL_DIRS',
+    # XXX config/Makefile.in specifies this in a make invocation
+    #'USE_EXTENSION_MANIFEST',
     'XPCSHELL_TESTS',
     'XPIDL_MODULE',
 ]
@@ -134,6 +136,7 @@ DEPRECATED_VARIABLES = [
     'MOCHITEST_FILES_PARTS',
     'MOCHITEST_METRO_FILES',
     'MOCHITEST_ROBOCOP_FILES',
+    'MOZ_CHROME_FILE_FORMAT',
     'SHORT_LIBNAME',
     'TESTING_JS_MODULES',
     'TESTING_JS_MODULE_DIR',
@@ -447,9 +450,16 @@ class RecursiveMakeBackend(CommonBackend):
                 '.cpp': 'CPPSRCS',
                 '.S': 'SSRCS',
             }
-            var = suffix_map[obj.canonical_suffix]
+            variables = [suffix_map[obj.canonical_suffix]]
+            if isinstance(obj, GeneratedSources):
+                variables.append('GARBAGE')
+                base = backend_file.objdir
+            else:
+                base = backend_file.srcdir
             for f in sorted(obj.files):
-                backend_file.write('%s += %s\n' % (var, f))
+                f = mozpath.relpath(f, base)
+                for var in variables:
+                    backend_file.write('%s += %s\n' % (var, f))
         elif isinstance(obj, HostSources):
             suffix_map = {
                 '.c': 'HOST_CSRCS',
@@ -458,7 +468,8 @@ class RecursiveMakeBackend(CommonBackend):
             }
             var = suffix_map[obj.canonical_suffix]
             for f in sorted(obj.files):
-                backend_file.write('%s += %s\n' % (var, f))
+                backend_file.write('%s += %s\n' % (
+                    var, mozpath.relpath(f, backend_file.srcdir)))
         elif isinstance(obj, VariablePassthru):
             # Sorted so output is consistent and we don't bump mtimes.
             for k, v in sorted(obj.variables.items()):
@@ -564,6 +575,15 @@ class RecursiveMakeBackend(CommonBackend):
 
         elif isinstance(obj, FinalTargetFiles):
             self._process_final_target_files(obj, obj.files, obj.target)
+
+        elif isinstance(obj, DistFiles):
+            # We'd like to install these via manifests as preprocessed files.
+            # But they currently depend on non-standard flags being added via
+            # some Makefiles, so for now we just pass them through to the
+            # underlying Makefile.in.
+            for f in obj.files:
+                backend_file.write('DIST_FILES += %s\n' % f)
+
         else:
             return
         obj.ack()
@@ -911,7 +931,8 @@ class RecursiveMakeBackend(CommonBackend):
 INSTALL_TARGETS += %(prefix)s
 """ % { 'prefix': prefix,
         'dest': '$(DEPTH)/_tests/%s' % path,
-        'files': ' '.join(files) })
+        'files': ' '.join(mozpath.relpath(f, backend_file.objdir)
+                          for f in files) })
 
     def _process_resources(self, obj, resources, backend_file):
         dep_path = mozpath.join(self.environment.topobjdir, '_build_manifests', '.deps', 'install')

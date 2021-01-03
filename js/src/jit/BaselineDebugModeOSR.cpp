@@ -285,6 +285,7 @@ CollectInterpreterStackScripts(JSContext* cx, const Debugger::ExecutionObservabl
     return true;
 }
 
+#ifdef DEBUG
 static const char*
 ICEntryKindToString(ICEntry::Kind kind)
 {
@@ -309,6 +310,7 @@ ICEntryKindToString(ICEntry::Kind kind)
         MOZ_CRASH("bad ICEntry kind");
     }
 }
+#endif // DEBUG
 
 static void
 SpewPatchBaselineFrame(uint8_t* oldReturnAddress, uint8_t* newReturnAddress,
@@ -679,8 +681,10 @@ RecompileBaselineScriptForDebugMode(JSContext* cx, JSScript* script,
     _(Call_ScriptedApplyArray)                  \
     _(Call_ScriptedApplyArguments)              \
     _(Call_ScriptedFunCall)                     \
-    _(GetElem_NativePrototypeCallNative)        \
-    _(GetElem_NativePrototypeCallScripted)      \
+    _(GetElem_NativePrototypeCallNativeName)    \
+    _(GetElem_NativePrototypeCallNativeSymbol)  \
+    _(GetElem_NativePrototypeCallScriptedName)  \
+    _(GetElem_NativePrototypeCallScriptedSymbol) \
     _(GetProp_CallScripted)                     \
     _(GetProp_CallNative)                       \
     _(GetProp_CallDOMProxyNative)               \
