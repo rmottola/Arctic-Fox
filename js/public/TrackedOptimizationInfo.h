@@ -167,6 +167,7 @@ namespace JS {
     _(CantInlineNativeBadType)                                          \
     _(CantInlineNativeNoTemplateObj)                                    \
     _(CantInlineBound)                                                  \
+    _(CantInlineNativeNoSpecialization)                                 \
                                                                         \
     _(GenericSuccess)                                                   \
     _(Inlined)                                                          \
