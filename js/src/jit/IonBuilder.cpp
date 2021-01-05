@@ -3842,7 +3842,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
         type = TypeSet::intersectSets(&base, oldType, alloc_->lifoAlloc());
     }
 
-    return replaceTypeSet(ins, type, test);
+    return type && replaceTypeSet(ins, type, test);
 }
 
 bool
