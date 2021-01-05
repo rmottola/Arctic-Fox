@@ -6192,7 +6192,7 @@ static const int PrecedenceTable[] = {
     11  /* PNK_POW */
 };
 
-static const int PRECEDENCE_CLASSES = 10;
+static const int PRECEDENCE_CLASSES = 11;
 
 static int
 Precedence(ParseNodeKind pnk) {
