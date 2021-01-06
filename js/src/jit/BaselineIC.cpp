@@ -6,7 +6,6 @@
 
 #include "jit/BaselineIC.h"
 
-#include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/SizePrintfMacros.h"
 #include "mozilla/TemplateLib.h"
@@ -41,7 +40,6 @@
 #include "vm/StringObject-inl.h"
 #include "vm/UnboxedObject-inl.h"
 
-using mozilla::BitwiseCast;
 using mozilla::DebugOnly;
 
 namespace js {

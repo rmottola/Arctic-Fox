@@ -5210,6 +5210,7 @@ class MBitNot
     explicit MBitNot(MDefinition* input)
       : MUnaryInstruction(input)
     {
+        specialization_ = MIRType_None;
         setResultType(MIRType_Int32);
         setMovable();
     }
@@ -5220,7 +5221,10 @@ class MBitNot
     static MBitNot* NewAsmJS(TempAllocator& alloc, MDefinition* input);
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    void infer();
+    void setSpecialization(MIRType type) {
+        specialization_ = type;
+        setResultType(type);
+    }
 
     bool congruentTo(const MDefinition* ins) const override {
         return congruentIfOperandsEqual(ins);
