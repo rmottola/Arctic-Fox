@@ -454,7 +454,7 @@ CodeGeneratorX86::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
                       : Operand(ToRegister(ptr), mir->offset());
 
     memoryBarrier(mir->barrierBefore());
-    OutOfLineLoadTypedArrayOutOfBounds *ool = nullptr;
+    OutOfLineLoadTypedArrayOutOfBounds* ool = nullptr;
     uint32_t maybeCmpOffset = AsmJSHeapAccess::NoLengthCheck;
     if (gen->needsAsmJSBoundsCheckBranch(mir)) {
         ool = new(alloc()) OutOfLineLoadTypedArrayOutOfBounds(ToAnyRegister(out), accessType);
@@ -626,7 +626,7 @@ CodeGeneratorX86::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
                       : Operand(ToRegister(ptr), mir->offset());
 
     memoryBarrier(mir->barrierBefore());
-    Label *rejoin = nullptr;
+    Label* rejoin = nullptr;
     uint32_t maybeCmpOffset = AsmJSHeapAccess::NoLengthCheck;
     if (gen->needsAsmJSBoundsCheckBranch(mir)) {
         rejoin = alloc().lifoAlloc()->new_<Label>();
@@ -699,7 +699,7 @@ CodeGeneratorX86::visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins)
 void
 CodeGeneratorX86::asmJSAtomicComputeAddress(Register addrTemp, Register ptrReg, bool boundsCheck,
                                             int32_t offset, int32_t endOffset, Register out,
-                                            Label &rejoin)
+                                            Label& rejoin)
 {
     uint32_t maybeCmpOffset = AsmJSHeapAccess::NoLengthCheck;
 

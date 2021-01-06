@@ -518,7 +518,7 @@ CodeGeneratorX64::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
                       : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
 
     memoryBarrier(mir->barrierBefore());
-    Label *rejoin = nullptr;
+    Label* rejoin = nullptr;
     uint32_t maybeCmpOffset = AsmJSHeapAccess::NoLengthCheck;
     if (gen->needsAsmJSBoundsCheckBranch(mir)) {
         rejoin = alloc().lifoAlloc()->new_<Label>();
