@@ -5712,7 +5712,7 @@ CodeGenerator::visitIsNullOrLikeUndefinedAndBranchV(LIsNullOrLikeUndefinedAndBra
 }
 
 void
-CodeGenerator::visitIsNullOrLikeUndefinedT(LIsNullOrLikeUndefinedT* lir)
+CodeGenerator::visitIsNullOrLikeUndefinedT(LIsNullOrLikeUndefinedT * lir)
 {
     MOZ_ASSERT(lir->mir()->compareType() == MCompare::Compare_Undefined ||
                lir->mir()->compareType() == MCompare::Compare_Null);
@@ -9396,8 +9396,8 @@ CodeGenerator::visitAtomicTypedArrayElementBinop(LAtomicTypedArrayElementBinop* 
 
 template <typename T>
 static inline void
-AtomicBinopToTypedArray(MacroAssembler &masm, AtomicOp op,
-                        Scalar::Type arrayType, const LAllocation* value, const T &mem)
+AtomicBinopToTypedArray(MacroAssembler& masm, AtomicOp op,
+                        Scalar::Type arrayType, const LAllocation* value, const T& mem)
 {
     if (value->isConstant())
         masm.atomicBinopToTypedIntArray(op, arrayType, Imm32(ToInt32(value)), mem);
@@ -9416,7 +9416,7 @@ CodeGenerator::visitAtomicTypedArrayElementBinopForEffect(LAtomicTypedArrayEleme
     int width = Scalar::byteSize(arrayType);
 
     if (lir->index()->isConstant()) {
-        Address mem(elements, ToInt32(lir->index())*  width);
+        Address mem(elements, ToInt32(lir->index()) * width);
         AtomicBinopToTypedArray(masm, lir->mir()->operation(), arrayType, value, mem);
     } else {
         BaseIndex mem(elements, ToRegister(lir->index()), ScaleFromElemWidth(width));
