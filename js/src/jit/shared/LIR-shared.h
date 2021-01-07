@@ -6721,11 +6721,11 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 2>
     const LDefinition* temp() {
         return getTemp(0);
     }
-    const LDefinition *addrTemp() {
+    const LDefinition* addrTemp() {
         return getTemp(1);
     }
 
-    void setAddrTemp(const LDefinition &addrTemp) {
+    void setAddrTemp(const LDefinition& addrTemp) {
         setTemp(1, addrTemp);
     }
 
@@ -6758,7 +6758,7 @@ class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 1>
         return getTemp(0);
     }
 
-    void setAddrTemp(const LDefinition &addrTemp) {
+    void setAddrTemp(const LDefinition& addrTemp) {
         setTemp(0, addrTemp);
     }
 
