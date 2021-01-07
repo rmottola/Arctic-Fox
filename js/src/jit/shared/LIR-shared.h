@@ -5240,8 +5240,8 @@ class LAtomicTypedArrayElementBinopForEffect : public LInstructionHelper<0, 3, 0
   public:
     LIR_HEADER(AtomicTypedArrayElementBinopForEffect)
 
-    LAtomicTypedArrayElementBinopForEffect(const LAllocation &elements, const LAllocation &index,
-                                           const LAllocation &value)
+    LAtomicTypedArrayElementBinopForEffect(const LAllocation& elements, const LAllocation& index,
+                                           const LAllocation& value)
     {
         setOperand(0, elements);
         setOperand(1, index);
@@ -6732,7 +6732,7 @@ class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 1>
 {
   public:
     LIR_HEADER(AsmJSAtomicBinopHeapForEffect);
-    LAsmJSAtomicBinopHeapForEffect(const LAllocation &ptr, const LAllocation &value)
+    LAsmJSAtomicBinopHeapForEffect(const LAllocation& ptr, const LAllocation& value)
     {
         setOperand(0, ptr);
         setOperand(1, value);
