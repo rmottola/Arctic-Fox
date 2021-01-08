@@ -50,6 +50,7 @@
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
+- Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
@@ -62,6 +63,10 @@
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
+- Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
+- rest of 1198458
+- Bug 1198458: Rollup of changes previously applied to media/webrtc/tru
+- Bug 1198458: Webrtc updated to branch 43
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
