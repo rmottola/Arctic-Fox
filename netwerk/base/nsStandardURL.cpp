@@ -17,7 +17,6 @@
 #include "nsIIDNService.h"
 #include "mozilla/Logging.h"
 #include "nsAutoPtr.h"
-#include "nsIProgrammingLanguage.h"
 #include "nsIURLParser.h"
 #include "nsNetCID.h"
 #include "mozilla/MemoryReporting.h"
@@ -3286,13 +3285,6 @@ nsStandardURL::GetClassID(nsCID * *aClassID)
     if (!*aClassID)
         return NS_ERROR_OUT_OF_MEMORY;
     return GetClassIDNoAlloc(*aClassID);
-}
-
-NS_IMETHODIMP 
-nsStandardURL::GetImplementationLanguage(uint32_t *aImplementationLanguage)
-{
-    *aImplementationLanguage = nsIProgrammingLanguage::CPLUSPLUS;
-    return NS_OK;
 }
 
 NS_IMETHODIMP 

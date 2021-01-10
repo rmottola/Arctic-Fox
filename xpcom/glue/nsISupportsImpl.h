@@ -1112,13 +1112,6 @@ _class::GetClassID(nsCID** _classID)                                          \
 }                                                                             \
                                                                               \
 NS_IMETHODIMP                                                                 \
-_class::GetImplementationLanguage(uint32_t* _language)                        \
-{                                                                             \
-  *_language = nsIProgrammingLanguage::CPLUSPLUS;                             \
-  return NS_OK;                                                               \
-}                                                                             \
-                                                                              \
-NS_IMETHODIMP                                                                 \
 _class::GetFlags(uint32_t* _flags)                                            \
 {                                                                             \
   *_flags = nsIClassInfo::THREADSAFE;                                         \
