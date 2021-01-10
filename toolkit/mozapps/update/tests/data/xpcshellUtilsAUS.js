@@ -3094,7 +3094,7 @@ xhr.prototype = {
   },
   flags: Ci.nsIClassInfo.SINGLETON,
   implementationLanguage: Ci.nsIProgrammingLanguage.JAVASCRIPT,
-  getHelperForLanguage: function(aLanguage) null,
+  getScriptableHelper: function() null,
   getInterfaces: function(aCount) {
     let interfaces = [Ci.nsISupports];
     aCount.value = interfaces.length;
@@ -3152,7 +3152,7 @@ function UpdatePrompt() {
 UpdatePrompt.prototype = {
   flags: Ci.nsIClassInfo.SINGLETON,
   implementationLanguage: Ci.nsIProgrammingLanguage.JAVASCRIPT,
-  getHelperForLanguage: function(aLanguage) null,
+  getScriptableHelper: function() null,
   getInterfaces: function(aCount) {
     let interfaces = [Ci.nsISupports, Ci.nsIUpdatePrompt];
     aCount.value = interfaces.length;
