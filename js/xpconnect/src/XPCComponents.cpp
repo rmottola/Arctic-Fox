@@ -29,6 +29,7 @@
 #include "mozilla/dom/WindowBinding.h"
 #include "nsZipArchive.h"
 #include "nsIDOMFileList.h"
+#include "nsIProgrammingLanguage.h"
 #include "nsWindowMemoryReporter.h"
 #include "nsDOMClassInfo.h"
 #include "ShimInterfaceInfo.h"
