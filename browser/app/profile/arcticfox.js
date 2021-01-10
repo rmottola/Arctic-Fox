@@ -1083,7 +1083,8 @@ pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
 // Developer edition preferences
-pref("browser.devedition.theme.enabled", false);
+sticky_pref("lightweightThemes.selectedThemeID", "firefox-devedition@mozilla.org");
+sticky_pref("browser.devedition.theme.enabled", true);
 
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
@@ -1128,6 +1129,13 @@ pref("devtools.performance.ui.show-jit-optimizations", false);
   pref("devtools.performance.ui.retro-mode", true);
 #else
   pref("devtools.performance.ui.retro-mode", false);
+#endif
+
+// Default theme ("dark" or "light")
+#ifdef MOZ_DEV_EDITION
+sticky_pref("devtools.theme", "dark");
+#else
+sticky_pref("devtools.theme", "light");
 #endif
 
 

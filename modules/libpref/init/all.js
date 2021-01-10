@@ -836,9 +836,9 @@ pref("devtools.errorconsole.deprecation_warnings", false);
 
 // Disable debugging chrome
 #ifdef MOZ_DEV_EDITION
-pref("devtools.chrome.enabled", true);
+sticky_pref("devtools.chrome.enabled", true);
 #else
-pref("devtools.chrome.enabled", false);
+sticky_pref("devtools.chrome.enabled", false);
 #endif
 
 // Disable remote debugging protocol logging
@@ -846,9 +846,9 @@ pref("devtools.debugger.log", false);
 pref("devtools.debugger.log.verbose", false);
 // Disable remote debugging connections
 #ifdef MOZ_DEV_EDITION
-pref("devtools.debugger.remote-enabled", true);
+sticky_pref("devtools.debugger.remote-enabled", true);
 #else
-pref("devtools.debugger.remote-enabled", false);
+sticky_pref("devtools.debugger.remote-enabled", false);
 #endif
 pref("devtools.debugger.remote-port", 6000);
 // Force debugger server binding on the loopback interface
