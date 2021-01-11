@@ -808,7 +808,7 @@
 
 ; [Personal Security Manager]
 ;
-@RESPATH@/@DLL_PREFIX@nssckbi@DLL_SUFFIX@
+@BINPATH@/@DLL_PREFIX@nssckbi@DLL_SUFFIX@
 @RESPATH@/components/pipboot.xpt
 @RESPATH@/components/pipnss.xpt
 @RESPATH@/components/pippki.xpt
