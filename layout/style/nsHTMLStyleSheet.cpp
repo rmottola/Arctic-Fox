@@ -233,18 +233,10 @@ nsHTMLStyleSheet::nsHTMLStyleSheet(nsIDocument* aDocument)
   : mDocument(aDocument)
   , mTableQuirkColorRule(new TableQuirkColorRule())
   , mTableTHRule(new TableTHRule())
+  , mMappedAttrTable(&MappedAttrTable_Ops, sizeof(MappedAttrTableEntry))
+  , mLangRuleTable(&LangRuleTable_Ops, sizeof(LangRuleTableEntry))
 {
   MOZ_ASSERT(aDocument);
-}
-
-nsHTMLStyleSheet::~nsHTMLStyleSheet()
-{
-  if (mLangRuleTable.IsInitialized()) {
-    PL_DHashTableFinish(&mLangRuleTable);
-  }
-  if (mMappedAttrTable.IsInitialized()) {
-    PL_DHashTableFinish(&mMappedAttrTable);
-  }
 }
 
 NS_IMPL_ISUPPORTS(nsHTMLStyleSheet, nsIStyleRuleProcessor)
@@ -420,12 +412,8 @@ nsHTMLStyleSheet::Reset()
   mVisitedRule       = nullptr;
   mActiveRule        = nullptr;
 
-  if (mLangRuleTable.IsInitialized()) {
-    PL_DHashTableFinish(&mLangRuleTable);
-  }
-  if (mMappedAttrTable.IsInitialized()) {
-    PL_DHashTableFinish(&mMappedAttrTable);
-  }
+  mLangRuleTable.Clear();
+  mMappedAttrTable.Clear();
 }
 
 nsresult
@@ -474,10 +462,6 @@ nsHTMLStyleSheet::SetVisitedLinkColor(nscolor aColor)
 already_AddRefed<nsMappedAttributes>
 nsHTMLStyleSheet::UniqueMappedAttributes(nsMappedAttributes* aMapped)
 {
-  if (!mMappedAttrTable.IsInitialized()) {
-    PL_DHashTableInit(&mMappedAttrTable, &MappedAttrTable_Ops,
-                      sizeof(MappedAttrTableEntry));
-  }
   MappedAttrTableEntry *entry =
     static_cast<MappedAttrTableEntry*>
                (PL_DHashTableAdd(&mMappedAttrTable, aMapped, fallible));
@@ -496,7 +480,6 @@ nsHTMLStyleSheet::DropMappedAttributes(nsMappedAttributes* aMapped)
 {
   NS_ENSURE_TRUE_VOID(aMapped);
 
-  NS_ASSERTION(mMappedAttrTable.IsInitialized(), "table uninitialized");
 #ifdef DEBUG
   uint32_t entryCount = mMappedAttrTable.EntryCount() - 1;
 #endif
@@ -509,10 +492,6 @@ nsHTMLStyleSheet::DropMappedAttributes(nsMappedAttributes* aMapped)
 nsIStyleRule*
 nsHTMLStyleSheet::LangRuleFor(const nsString& aLanguage)
 {
-  if (!mLangRuleTable.IsInitialized()) {
-    PL_DHashTableInit(&mLangRuleTable, &LangRuleTable_Ops,
-                      sizeof(LangRuleTableEntry));
-  }
   LangRuleTableEntry *entry = static_cast<LangRuleTableEntry*>
     (PL_DHashTableAdd(&mLangRuleTable, &aLanguage, fallible));
   if (!entry) {
@@ -539,11 +518,9 @@ nsHTMLStyleSheet::DOMSizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
 {
   size_t n = aMallocSizeOf(this);
 
-  if (mMappedAttrTable.IsInitialized()) {
-    n += PL_DHashTableSizeOfExcludingThis(&mMappedAttrTable,
-                                          SizeOfAttributesEntryExcludingThis,
-                                          aMallocSizeOf);
-  }
+  n += PL_DHashTableSizeOfExcludingThis(&mMappedAttrTable,
+                                        SizeOfAttributesEntryExcludingThis,
+                                        aMallocSizeOf);
 
   // Measurement of the following members may be added later if DMD finds it is
   // worthwhile:
