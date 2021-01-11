@@ -1,0 +1,2103 @@
+diff --git a/js/src/jit/CodeGenerator.cpp b/js/src/jit/CodeGenerator.cpp
+index 0eef2084fedf..5f8d9d6007bc 100644
+--- a/js/src/jit/CodeGenerator.cpp
++++ b/js/src/jit/CodeGenerator.cpp
+@@ -10304,5 +10304,128 @@ CodeGenerator::visitNewTarget(LNewTarget *ins)
+     masm.bind(&done);
+ }
+ 
++// Out-of-line math_random_no_outparam call for LRandom.
++class OutOfLineRandom : public OutOfLineCodeBase<CodeGenerator>
++{
++    LRandom* lir_;
++
++  public:
++    explicit OutOfLineRandom(LRandom* lir)
++      : lir_(lir)
++    { }
++
++    void accept(CodeGenerator* codegen) {
++        codegen->visitOutOfLineRandom(this);
++    }
++
++    LRandom* lir() const {
++        return lir_;
++    }
++};
++
++static const uint64_t RNG_HIGH_MASK = (0xFFFFFFFFFFFFFFFFULL >>
++                                       (RNG_STATE_WIDTH - RNG_HIGH_BITS)) << RNG_LOW_BITS;
++static const double RNG_DSCALE_INV = 1 / RNG_DSCALE;
++
++void
++CodeGenerator::visitRandom(LRandom* ins)
++{
++    FloatRegister output = ToFloatRegister(ins->output());
++    Register JSCompartmentReg = ToRegister(ins->temp1());
++#ifdef JS_PUNBOX64
++    Register64 rngStateReg = Register64(ToRegister(ins->tempMaybeEAX()));
++    Register64 highReg = Register64(ToRegister(ins->tempMaybeEDX()));
++#else
++    Register64 rngStateReg = Register64(ToRegister(ins->temp2()), ToRegister(ins->temp3()));
++    Register64 highReg = Register64(ToRegister(ins->tempMaybeEAX()), ToRegister(ins->tempMaybeEDX()));
++#endif
++    // tempReg is used only on x86.
++    Register tempReg = ToRegister(ins->tempMaybeEAX());
++
++    // rngState = cx->compartment()->rngState;
++    masm.loadJSContext(JSCompartmentReg);
++    masm.loadPtr(Address(JSCompartmentReg, JSContext::offsetOfCompartment()), JSCompartmentReg);
++    masm.load64(Address(JSCompartmentReg, JSCompartment::offsetOfRngState()), rngStateReg);
++
++    // if rngState == 0, escape from inlined code and call
++    // math_random_no_outparam.
++    OutOfLineRandom* ool = new(alloc()) OutOfLineRandom(ins);
++    addOutOfLineCode(ool, ins->mir());
++    masm.branchTest64(Assembler::Zero, rngStateReg, rngStateReg, tempReg, ool->entry());
++
++    // rngState = rngState * RNG_MULTIPLIER;
++    masm.mul64(Imm64(RNG_MULTIPLIER), rngStateReg);
++
++    // rngState += RNG_ADDEND;
++    masm.add64(Imm32(RNG_ADDEND), rngStateReg);
++
++    // rngState &= RNG_MASK;
++    masm.and64(Imm64(RNG_MASK), rngStateReg);
++
++    // if rngState == 0, escape from inlined code and call
++    // math_random_no_outparam.
++    masm.branchTest64(Assembler::Zero, rngStateReg, rngStateReg, tempReg, ool->entry());
++
++    // high = (rngState >> (RNG_STATE_WIDTH - RNG_HIGH_BITS)) << RNG_LOW_BITS;
++    masm.move64(rngStateReg, highReg);
++    masm.lshift64(Imm32(RNG_LOW_BITS - (RNG_STATE_WIDTH - RNG_HIGH_BITS)), highReg);
++    masm.and64(Imm64(RNG_HIGH_MASK), highReg);
++#ifdef JS_CODEGEN_X86
++    // eax and edx are overwritten by mul64 on x86.
++    masm.push64(highReg);
++#endif
++
++    // rngState = rngState * RNG_MULTIPLIER;
++    masm.mul64(Imm64(RNG_MULTIPLIER), rngStateReg);
++
++    // rngState += RNG_ADDEND;
++    masm.add64(Imm32(RNG_ADDEND), rngStateReg);
++
++    // rngState &= RNG_MASK;
++    masm.and64(Imm64(RNG_MASK), rngStateReg);
++
++    // cx->compartment()->rngState = rngState;
++    masm.store64(rngStateReg, Address(JSCompartmentReg, JSCompartment::offsetOfRngState()));
++
++    // low = rngState >> (RNG_STATE_WIDTH - RNG_LOW_BITS);
++    const Register64& lowReg = rngStateReg;
++    masm.rshift64(Imm32(RNG_STATE_WIDTH - RNG_LOW_BITS), lowReg);
++
++    // output = double(high | low);
++#ifdef JS_CODEGEN_X86
++    masm.pop64(highReg);
++#endif
++    masm.or64(highReg, lowReg);
++    masm.convertUInt64ToDouble(lowReg, tempReg, output);
++
++    // output = output * RNG_DSCALE_INV;
++    masm.mulDoublePtr(ImmPtr(&RNG_DSCALE_INV), tempReg, output);
++
++    masm.bind(ool->rejoin());
++}
++
++void
++CodeGenerator::visitOutOfLineRandom(OutOfLineRandom* ool)
++{
++    LRandom* ins = ool->lir();
++    Register temp1 = ToRegister(ins->tempMaybeEAX());
++    Register temp2 = ToRegister(ins->tempMaybeEDX());
++    MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
++
++    LiveRegisterSet regs;
++    setReturnDoubleRegs(&regs);
++    saveVolatile(regs);
++
++    masm.loadJSContext(temp1);
++
++    masm.setupUnalignedABICall(temp2);
++    masm.passABIArg(temp1);
++    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, math_random_no_outparam), MoveOp::DOUBLE);
++
++    restoreVolatile(regs);
++
++    masm.jump(ool->rejoin());
++}
++
+ } // namespace jit
+ } // namespace js
+diff --git a/js/src/jit/CodeGenerator.h b/js/src/jit/CodeGenerator.h
+index 49096d64dc03..547b4c526709 100644
+--- a/js/src/jit/CodeGenerator.h
++++ b/js/src/jit/CodeGenerator.h
+@@ -45,6 +45,7 @@ class OutOfLineIsCallable;
+ class OutOfLineRegExpExec;
+ class OutOfLineRegExpTest;
+ class OutOfLineLambdaArrow;
++class OutOfLineRandom;
+ 
+ class CodeGenerator : public CodeGeneratorSpecific
+ {
+@@ -382,6 +383,9 @@ class CodeGenerator : public CodeGeneratorSpecific
+     void visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir);
+     void visitRecompileCheck(LRecompileCheck* ins);
+ 
++    void visitRandom(LRandom* ins);
++    void visitOutOfLineRandom(OutOfLineRandom* ool);
++
+     IonScriptCounts* extractScriptCounts() {
+         IonScriptCounts* counts = scriptCounts_;
+         scriptCounts_ = nullptr;  // prevent delete in dtor
+diff --git a/js/src/jit/MacroAssembler.h b/js/src/jit/MacroAssembler.h
+index 1436fcefc28e..2dca49ba0e1e 100644
+--- a/js/src/jit/MacroAssembler.h
++++ b/js/src/jit/MacroAssembler.h
+@@ -680,6 +680,8 @@ class MacroAssembler : public MacroAssemblerSpecific
+     inline void andPtr(Register src, Register dest) PER_ARCH;
+     inline void andPtr(Imm32 imm, Register dest) PER_ARCH;
+ 
++    inline void and64(Imm64 imm, Register64 dest) PER_ARCH;
++
+     inline void or32(Register src, Register dest) PER_SHARED_ARCH;
+     inline void or32(Imm32 imm, Register dest) PER_SHARED_ARCH;
+     inline void or32(Imm32 imm, const Address& dest) PER_SHARED_ARCH;
+@@ -687,6 +689,8 @@ class MacroAssembler : public MacroAssemblerSpecific
+     inline void orPtr(Register src, Register dest) PER_ARCH;
+     inline void orPtr(Imm32 imm, Register dest) PER_ARCH;
+ 
++    inline void or64(Register64 src, Register64 dest) PER_ARCH;
++
+     inline void xor32(Register src, Register dest) DEFINED_ON(x86_shared);
+     inline void xor32(Imm32 imm, Register dest) PER_SHARED_ARCH;
+ 
+diff --git a/js/src/jit/Registers.h b/js/src/jit/Registers.h
+index 1bcad45302f7..0bde25884d8f 100644
+--- a/js/src/jit/Registers.h
++++ b/js/src/jit/Registers.h
+@@ -93,6 +93,26 @@ struct Register {
+     }
+ };
+ 
++struct Register64
++{
++#ifdef JS_PUNBOX64
++    Register reg;
++#else
++    Register high;
++    Register low;
++#endif
++
++#ifdef JS_PUNBOX64
++    explicit MOZ_CONSTEXPR Register64(Register r)
++      : reg(r)
++    {}
++#else
++    MOZ_CONSTEXPR Register64(Register h, Register l)
++      : high(h), low(l)
++    {}
++#endif
++};
++
+ class RegisterDump
+ {
+   public:
+diff --git a/js/src/jit/arm/CodeGenerator-arm.cpp b/js/src/jit/arm/CodeGenerator-arm.cpp
+index 17759c372ba0..3567018bfa8d 100644
+--- a/js/src/jit/arm/CodeGenerator-arm.cpp
++++ b/js/src/jit/arm/CodeGenerator-arm.cpp
+@@ -10,7 +10,6 @@
+ 
+ #include "jscntxt.h"
+ #include "jscompartment.h"
+-#include "jsmath.h"
+ #include "jsnum.h"
+ 
+ #include "jit/CodeGenerator.h"
+@@ -2675,16 +2674,12 @@ CodeGeneratorARM::visitMemoryBarrier(LMemoryBarrier* ins)
+ }
+ 
+ void
+-CodeGeneratorARM::visitRandom(LRandom* ins)
++CodeGeneratorARM::setReturnDoubleRegs(LiveRegisterSet* regs)
+ {
+-    Register temp = ToRegister(ins->temp());
+-    Register temp2 = ToRegister(ins->temp2());
+-
+-    masm.loadJSContext(temp);
+-
+-    masm.setupUnalignedABICall(temp2);
+-    masm.passABIArg(temp);
+-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, math_random_no_outparam), MoveOp::DOUBLE);
+-
+-    MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
++    MOZ_ASSERT(ReturnFloat32Reg.code_ == FloatRegisters::s0);
++    MOZ_ASSERT(ReturnDoubleReg.code_ == FloatRegisters::s0);
++    FloatRegister s1 = {FloatRegisters::s1, VFPRegister::Single};
++    regs->add(ReturnFloat32Reg);
++    regs->add(s1);
++    regs->add(ReturnDoubleReg);
+ }
+diff --git a/js/src/jit/arm/CodeGenerator-arm.h b/js/src/jit/arm/CodeGenerator-arm.h
+index 7b5dd345de74..8f1520bdbe03 100644
+--- a/js/src/jit/arm/CodeGenerator-arm.h
++++ b/js/src/jit/arm/CodeGenerator-arm.h
+@@ -216,7 +216,7 @@ class CodeGeneratorARM : public CodeGeneratorShared
+ 
+     void generateInvalidateEpilogue();
+ 
+-    void visitRandom(LRandom* ins);
++    void setReturnDoubleRegs(LiveRegisterSet* regs);
+ 
+     // Generating a result.
+     template<typename S, typename T>
+diff --git a/js/src/jit/arm/LIR-arm.h b/js/src/jit/arm/LIR-arm.h
+index 2a6c8a46ceb9..a88bc0b422d7 100644
+--- a/js/src/jit/arm/LIR-arm.h
++++ b/js/src/jit/arm/LIR-arm.h
+@@ -497,23 +497,6 @@ class LAsmJSAtomicBinopCallout : public LCallInstructionHelper<1, 2, 0>
+     }
+ };
+ 
+-// Math.random().
+-class LRandom : public LCallInstructionHelper<1, 0, 2>
+-{
+-  public:
+-    LIR_HEADER(Random)
+-    LRandom(const LDefinition& temp, const LDefinition& temp2) {
+-        setTemp(0, temp);
+-        setTemp(1, temp2);
+-    }
+-    const LDefinition* temp() {
+-        return getTemp(0);
+-    }
+-    const LDefinition* temp2() {
+-        return getTemp(1);
+-    }
+-};
+-
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/arm/Lowering-arm.cpp b/js/src/jit/arm/Lowering-arm.cpp
+index ab5244577f15..3395023fd575 100644
+--- a/js/src/jit/arm/Lowering-arm.cpp
++++ b/js/src/jit/arm/Lowering-arm.cpp
+@@ -741,6 +741,10 @@ LIRGeneratorARM::visitSubstr(MSubstr* ins)
+ void
+ LIRGeneratorARM::visitRandom(MRandom* ins)
+ {
+-    LRandom* lir = new(alloc()) LRandom(tempFixed(CallTempReg0), tempFixed(CallTempReg1));
+-    defineReturn(lir, ins);
++    LRandom *lir = new(alloc()) LRandom(temp(),
++                                        temp(),
++                                        temp(),
++                                        temp(),
++                                        temp());
++    defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+ }
+diff --git a/js/src/jit/arm/MacroAssembler-arm-inl.h b/js/src/jit/arm/MacroAssembler-arm-inl.h
+index 25f7882c50f5..b8584ccc5da0 100644
+--- a/js/src/jit/arm/MacroAssembler-arm-inl.h
++++ b/js/src/jit/arm/MacroAssembler-arm-inl.h
+@@ -63,6 +63,13 @@ MacroAssembler::andPtr(Imm32 imm, Register dest)
+     ma_and(imm, dest);
+ }
+ 
++void
++MacroAssembler::and64(Imm64 imm, Register64 dest)
++{
++    and32(Imm32(imm.value & 0xFFFFFFFFL), dest.low);
++    and32(Imm32((imm.value >> 32) & 0xFFFFFFFFL), dest.high);
++}
++
+ void
+ MacroAssembler::or32(Register src, Register dest)
+ {
+@@ -96,6 +103,13 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
+     ma_orr(imm, dest);
+ }
+ 
++void
++MacroAssembler::or64(Register64 src, Register64 dest)
++{
++    or32(src.low, dest.low);
++    or32(src.high, dest.high);
++}
++
+ void
+ MacroAssembler::xor32(Imm32 imm, Register dest)
+ {
+diff --git a/js/src/jit/arm/MacroAssembler-arm.cpp b/js/src/jit/arm/MacroAssembler-arm.cpp
+index cf2270e70c3f..e81927c89c90 100644
+--- a/js/src/jit/arm/MacroAssembler-arm.cpp
++++ b/js/src/jit/arm/MacroAssembler-arm.cpp
+@@ -90,6 +90,19 @@ MacroAssemblerARM::convertUInt32ToDouble(Register src, FloatRegister dest_)
+     as_vcvt(dest, dest.uintOverlay());
+ }
+ 
++static const double TO_DOUBLE_HIGH_SCALE = 0x100000000;
++
++void
++MacroAssemblerARMCompat::convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest)
++{
++    convertUInt32ToDouble(src.high, dest);
++    movePtr(ImmPtr(&TO_DOUBLE_HIGH_SCALE), ScratchRegister);
++    loadDouble(Address(ScratchRegister, 0), ScratchDoubleReg);
++    mulDouble(ScratchDoubleReg, dest);
++    convertUInt32ToDouble(src.low, ScratchDoubleReg);
++    addDouble(ScratchDoubleReg, dest);
++}
++
+ void
+ MacroAssemblerARM::convertUInt32ToFloat32(Register src, FloatRegister dest_)
+ {
+@@ -3373,6 +3386,22 @@ template void
+ MacroAssemblerARMCompat::storeUnboxedValue(ConstantOrRegister value, MIRType valueType, const BaseIndex& dest,
+                                            MIRType slotType);
+ 
++
++void
++MacroAssemblerARMCompat::branchTest64(Condition cond, Register64 lhs, Register64 rhs,
++                                      Register temp, Label* label)
++{
++    if (cond == Assembler::Zero) {
++        MOZ_ASSERT(lhs.low == rhs.low);
++        MOZ_ASSERT(lhs.high == rhs.high);
++        mov(lhs.low, ScratchRegister);
++        asMasm().or32(lhs.high, ScratchRegister);
++        branchTestPtr(cond, ScratchRegister, ScratchRegister, label);
++    } else {
++        MOZ_CRASH("Unsupported condition");
++    }
++}
++
+ void
+ MacroAssemblerARMCompat::moveValue(const Value& val, Register type, Register data)
+ {
+diff --git a/js/src/jit/arm/MacroAssembler-arm.h b/js/src/jit/arm/MacroAssembler-arm.h
+index 244fdb4934a1..c14b817401ff 100644
+--- a/js/src/jit/arm/MacroAssembler-arm.h
++++ b/js/src/jit/arm/MacroAssembler-arm.h
+@@ -987,6 +987,7 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+         subPtr(imm, lhs);
+         branch32(cond, lhs, Imm32(0), label);
+     }
++    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp, Label* label);
+     void moveValue(const Value& val, Register type, Register data);
+ 
+     CodeOffsetJump jumpWithPatch(RepatchLabel* label, Condition cond = Always,
+@@ -1203,6 +1204,11 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+ 
+     void addPtr(Register src, Register dest);
+     void addPtr(const Address& src, Register dest);
++    void add64(Imm32 imm, Register64 dest) {
++        ma_add(imm, dest.low, SetCC);
++        ma_adc(Imm32(0), dest.high, LeaveCC);
++    }
++    void not32(Register reg);
+ 
+     void move32(Imm32 imm, Register dest);
+     void move32(Register src, Register dest);
+@@ -1212,6 +1218,10 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+     void movePtr(ImmPtr imm, Register dest);
+     void movePtr(AsmJSImmPtr imm, Register dest);
+     void movePtr(ImmGCPtr imm, Register dest);
++    void move64(Register64 src, Register64 dest) {
++        move32(src.low, dest.low);
++        move32(src.high, dest.high);
++    }
+ 
+     void load8SignExtend(const Address& address, Register dest);
+     void load8SignExtend(const BaseIndex& src, Register dest);
+@@ -1228,6 +1238,10 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+     void load32(const Address& address, Register dest);
+     void load32(const BaseIndex& address, Register dest);
+     void load32(AbsoluteAddress address, Register dest);
++    void load64(const Address& address, Register64 dest) {
++        load32(address, dest.low);
++        load32(Address(address.base, address.offset + 4), dest.high);
++    }
+ 
+     void loadPtr(const Address& address, Register dest);
+     void loadPtr(const BaseIndex& src, Register dest);
+@@ -1294,6 +1308,11 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+ 
+     void store32_NoSecondScratch(Imm32 src, const Address& address);
+ 
++    void store64(Register64 src, Address address) {
++        store32(src.low, address);
++        store32(src.high, Address(address.base, address.offset + 4));
++    }
++
+     template <typename T> void storePtr(ImmWord imm, T address);
+     template <typename T> void storePtr(ImmPtr imm, T address);
+     template <typename T> void storePtr(ImmGCPtr imm, T address);
+@@ -1642,6 +1661,39 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+     void mulBy3(const Register& src, const Register& dest) {
+         as_add(dest, src, lsl(src, 1));
+     }
++    void mul64(Imm64 imm, const Register64& dest) {
++        // LOW32  = LOW(LOW(dest) * LOW(imm));
++        // HIGH32 = LOW(HIGH(dest) * LOW(imm)) [multiply imm into upper bits]
++        //        + LOW(LOW(dest) * HIGH(imm)) [multiply dest into upper bits]
++        //        + HIGH(LOW(dest) * LOW(imm)) [carry]
++
++        // HIGH(dest) = LOW(HIGH(dest) * LOW(imm));
++        ma_mov(Imm32(imm.value & 0xFFFFFFFFL), ScratchRegister);
++        as_mul(dest.high, dest.high, ScratchRegister);
++
++        // high:low = LOW(dest) * LOW(imm);
++        as_umull(secondScratchReg_, ScratchRegister, dest.low, ScratchRegister);
++
++        // HIGH(dest) += high;
++        as_add(dest.high, dest.high, O2Reg(secondScratchReg_));
++
++        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
++        if (((imm.value >> 32) & 0xFFFFFFFFL) == 5)
++            as_add(secondScratchReg_, dest.low, lsl(dest.low, 2));
++        else
++            MOZ_CRASH("Not supported imm");
++        as_add(dest.high, dest.high, O2Reg(secondScratchReg_));
++
++        // LOW(dest) = low;
++        ma_mov(ScratchRegister, dest.low);
++    }
++
++    void convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest);
++    void mulDoublePtr(ImmPtr imm, Register temp, FloatRegister dest) {
++        movePtr(imm, ScratchRegister);
++        loadDouble(Address(ScratchRegister, 0), ScratchDoubleReg);
++        mulDouble(ScratchDoubleReg, dest);
++    }
+ 
+     void setStackArg(Register reg, uint32_t arg);
+ 
+@@ -1670,9 +1722,19 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
+     void rshiftPtrArithmetic(Imm32 imm, Register dest) {
+         ma_asr(imm, dest, dest);
+     }
++    void rshift64(Imm32 imm, Register64 dest) {
++        as_mov(dest.low, lsr(dest.low, imm.value));
++        as_orr(dest.low, dest.low, lsl(dest.high, 32 - imm.value));
++        as_mov(dest.high, lsr(dest.high, imm.value));
++    }
+     void lshiftPtr(Imm32 imm, Register dest) {
+         ma_lsl(imm, dest, dest);
+     }
++    void lshift64(Imm32 imm, Register64 dest) {
++        as_mov(dest.high, lsl(dest.high, imm.value));
++        as_orr(dest.high, dest.high, lsr(dest.low, 32 - imm.value));
++        as_mov(dest.low, lsl(dest.low, imm.value));
++    }
+ 
+     // If source is a double, load it into dest. If source is int32, convert it
+     // to double. Else, branch to failure.
+diff --git a/js/src/jit/arm64/CodeGenerator-arm64.cpp b/js/src/jit/arm64/CodeGenerator-arm64.cpp
+index c649bb63417a..0b2ad6916a53 100644
+--- a/js/src/jit/arm64/CodeGenerator-arm64.cpp
++++ b/js/src/jit/arm64/CodeGenerator-arm64.cpp
+@@ -608,12 +608,6 @@ CodeGeneratorARM64::generateInvalidateEpilogue()
+     MOZ_CRASH("generateInvalidateEpilogue");
+ }
+ 
+-void
+-CodeGeneratorARM64::visitRandom(LRandom* ins)
+-{
+-    MOZ_CRASH("visitRandom");
+-}
+-
+ template <class U>
+ Register
+ getBase(U* mir)
+@@ -732,3 +726,14 @@ CodeGeneratorARM64::visitNegF(LNegF* ins)
+ {
+     MOZ_CRASH("visitNegF");
+ }
++
++void
++CodeGeneratorARM64::setReturnDoubleRegs(LiveRegisterSet* regs)
++{
++    MOZ_ASSERT(ReturnFloat32Reg.code_ == FloatRegisters::s0);
++    MOZ_ASSERT(ReturnDoubleReg.code_ == FloatRegisters::d0);
++    FloatRegister s1 = {FloatRegisters::s1, FloatRegisters::Single};
++    regs->add(ReturnFloat32Reg);
++    regs->add(s1);
++    regs->add(ReturnDoubleReg);
++}
+diff --git a/js/src/jit/arm64/CodeGenerator-arm64.h b/js/src/jit/arm64/CodeGenerator-arm64.h
+index 43471347d7c9..313e1fbf858a 100644
+--- a/js/src/jit/arm64/CodeGenerator-arm64.h
++++ b/js/src/jit/arm64/CodeGenerator-arm64.h
+@@ -220,7 +220,7 @@ class CodeGeneratorARM64 : public CodeGeneratorShared
+ 
+     void generateInvalidateEpilogue();
+ 
+-    void visitRandom(LRandom* ins);
++    void setReturnDoubleRegs(LiveRegisterSet* regs);
+ 
+   protected:
+     void postAsmJSCall(LAsmJSCall* lir) {
+diff --git a/js/src/jit/arm64/LIR-arm64.h b/js/src/jit/arm64/LIR-arm64.h
+index 9cb0739c8945..dc729bfd755a 100644
+--- a/js/src/jit/arm64/LIR-arm64.h
++++ b/js/src/jit/arm64/LIR-arm64.h
+@@ -407,23 +407,6 @@ class LAsmJSLoadFuncPtr : public LInstructionHelper<1, 1, 1>
+     }
+ };
+ 
+-// Math.random().
+-class LRandom : public LCallInstructionHelper<1, 0, 2>
+-{
+-  public:
+-    LIR_HEADER(Random)
+-    LRandom(const LDefinition& temp, const LDefinition& temp2) {
+-        setTemp(0, temp);
+-        setTemp(1, temp2);
+-    }
+-    const LDefinition* temp() {
+-        return getTemp(0);
+-    }
+-    const LDefinition* temp2() {
+-        return getTemp(1);
+-    }
+-};
+-
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/arm64/Lowering-arm64.cpp b/js/src/jit/arm64/Lowering-arm64.cpp
+index 5bd9fb86e88e..7d329834e424 100644
+--- a/js/src/jit/arm64/Lowering-arm64.cpp
++++ b/js/src/jit/arm64/Lowering-arm64.cpp
+@@ -304,5 +304,8 @@ LIRGeneratorARM64::visitSubstr(MSubstr* ins)
+ void
+ LIRGeneratorARM64::visitRandom(MRandom* ins)
+ {
+-    MOZ_CRASH("visitRandom");
++    LRandom *lir = new(alloc()) LRandom(temp(),
++                                        temp(),
++                                        temp());
++    defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+ }
+diff --git a/js/src/jit/arm64/MacroAssembler-arm64-inl.h b/js/src/jit/arm64/MacroAssembler-arm64-inl.h
+index 0778b054e3e8..eb2225231689 100644
+--- a/js/src/jit/arm64/MacroAssembler-arm64-inl.h
++++ b/js/src/jit/arm64/MacroAssembler-arm64-inl.h
+@@ -73,6 +73,15 @@ MacroAssembler::andPtr(Imm32 imm, Register dest)
+     And(ARMRegister(dest, 64), ARMRegister(dest, 64), Operand(imm.value));
+ }
+ 
++void
++MacroAssembler::and64(Imm64 imm, Register64 dest)
++{
++    vixl::UseScratchRegisterScope temps(this);
++    const Register scratch = temps.AcquireX().asUnsized();
++    mov(ImmWord(imm.value), scratch);
++    andPtr(scratch, dest.reg);
++}
++
+ void
+ MacroAssembler::or32(Imm32 imm, Register dest)
+ {
+@@ -108,6 +117,12 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
+     Orr(ARMRegister(dest, 64), ARMRegister(dest, 64), Operand(imm.value));
+ }
+ 
++void
++MacroAssembler::or64(Register64 src, Register64 dest)
++{
++    orPtr(src.reg, dest.reg);
++}
++
+ void
+ MacroAssembler::xor32(Imm32 imm, Register dest)
+ {
+diff --git a/js/src/jit/arm64/MacroAssembler-arm64.h b/js/src/jit/arm64/MacroAssembler-arm64.h
+index fe4d9ffc34be..8c7e13b204f8 100644
+--- a/js/src/jit/arm64/MacroAssembler-arm64.h
++++ b/js/src/jit/arm64/MacroAssembler-arm64.h
+@@ -784,6 +784,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         BufferOffset load = movePatchablePtr(ImmPtr(imm.value), dest);
+         writeDataRelocation(imm, load);
+     }
++    void move64(Register64 src, Register64 dest) {
++        movePtr(src.reg, dest.reg);
++    }
+ 
+     void mov(ImmWord imm, Register dest) {
+         movePtr(imm, dest);
+@@ -989,6 +992,10 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         Str(scratch32, MemOperand(ARMRegister(address.base, 64), address.offset));
+     }
+ 
++    void store64(Register64 src, Address address) {
++        storePtr(src.reg, address);
++    }
++
+     // SIMD.
+     void loadInt32x1(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+     void loadInt32x1(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
+@@ -1068,6 +1075,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+     void rshiftPtr(Imm32 imm, Register src, Register dest) {
+         Lsr(ARMRegister(dest, 64), ARMRegister(src, 64), imm.value);
+     }
++    void rshift64(Imm32 imm, Register64 dest) {
++        rshiftPtr(imm, dest.reg);
++    }
+ 
+     void rshiftPtrArithmetic(Imm32 imm, Register dest) {
+         Asr(ARMRegister(dest, 64), ARMRegister(dest, 64), imm.value);
+@@ -1075,6 +1085,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+     void lshiftPtr(Imm32 imm, Register dest) {
+         Lsl(ARMRegister(dest, 64), ARMRegister(dest, 64), imm.value);
+     }
++    void lshift64(Imm32 imm, Register64 dest) {
++        lshiftPtr(imm, dest.reg);
++    }
+ 
+     void testPtr(Register lhs, Register rhs) {
+         Tst(ARMRegister(lhs, 64), Operand(ARMRegister(rhs, 64)));
+@@ -1162,7 +1175,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+     }
+ 
+     void loadDouble(const Address& src, FloatRegister dest) {
+-        Ldr(ARMFPRegister(dest, 64), MemOperand(ARMRegister(src.base,64), src.offset));
++        Ldr(ARMFPRegister(dest, 64), MemOperand(src));
+     }
+     void loadDouble(const BaseIndex& src, FloatRegister dest) {
+         ARMRegister base(src.base, 64);
+@@ -1306,6 +1319,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         movePtr(ImmWord((uintptr_t)address.addr), scratch64.asUnsized());
+         ldr(ARMRegister(dest, 32), MemOperand(scratch64));
+     }
++    void load64(const Address& address, Register64 dest) {
++        loadPtr(address, dest.reg);
++    }
+ 
+     void load8SignExtend(const Address& address, Register dest) {
+         Ldrsb(ARMRegister(dest, 32), MemOperand(ARMRegister(address.base, 64), address.offset));
+@@ -1366,6 +1382,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         Adds(scratch32, scratch32, Operand(imm.value));
+         Str(scratch32, MemOperand(ARMRegister(dest.base, 64), dest.offset));
+     }
++    void add64(Imm32 imm, Register64 dest) {
++        Add(ARMRegister(dest.reg, 64), ARMRegister(dest.reg, 64), Operand(imm.value));
++    }
+ 
+     void sub32(Imm32 imm, Register dest) {
+         Sub(ARMRegister(dest, 32), ARMRegister(dest, 32), Operand(imm.value));
+@@ -1911,6 +1930,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         Cmp(ARMRegister(value.valueReg(), 64), Operand(scratch64));
+         B(label, cond);
+     }
++    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp, Label* label) {
++        branchTestPtr(cond, lhs.reg, rhs.reg, label);
++    }
+ 
+     void compareDouble(DoubleCondition cond, FloatRegister lhs, FloatRegister rhs) {
+         Fcmp(ARMFPRegister(lhs, 64), ARMFPRegister(rhs, 64));
+@@ -2958,6 +2980,27 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
+         Add(xdest, xsrc, Operand(xsrc, vixl::LSL, 1));
+     }
+ 
++    void mul64(Imm64 imm, const Register64& dest) {
++        vixl::UseScratchRegisterScope temps(this);
++        const ARMRegister scratch64 = temps.AcquireX();
++        MOZ_ASSERT(dest.reg != scratch64.asUnsized());
++        mov(ImmWord(imm.value), scratch64.asUnsized());
++        Mul(ARMRegister(dest.reg, 64), ARMRegister(dest.reg, 64), scratch64);
++    }
++
++    void convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest) {
++        Ucvtf(ARMFPRegister(dest, 64), ARMRegister(src.reg, 64));
++    }
++    void mulDoublePtr(ImmPtr imm, Register temp, FloatRegister dest) {
++        vixl::UseScratchRegisterScope temps(this);
++        const Register scratch = temps.AcquireX().asUnsized();
++        MOZ_ASSERT(temp != scratch);
++        movePtr(imm, scratch);
++        const ARMFPRegister scratchDouble = temps.AcquireD();
++        Ldr(scratchDouble, MemOperand(Address(scratch, 0)));
++        fmul(ARMFPRegister(dest, 64), ARMFPRegister(dest, 64), scratchDouble);
++    }
++
+     template <typename T>
+     void branchAdd32(Condition cond, T src, Register dest, Label* label) {
+         adds32(src, dest);
+diff --git a/js/src/jit/mips-shared/LIR-mips-shared.h b/js/src/jit/mips-shared/LIR-mips-shared.h
+index 596acf6b51ef..8ddbaa9cd6bb 100644
+--- a/js/src/jit/mips-shared/LIR-mips-shared.h
++++ b/js/src/jit/mips-shared/LIR-mips-shared.h
+@@ -284,23 +284,6 @@ class LAsmJSLoadFuncPtr : public LInstructionHelper<1, 1, 0>
+     }
+ };
+ 
+-// Math.random().
+-class LRandom : public LCallInstructionHelper<1, 0, 2>
+-{
+-  public:
+-    LIR_HEADER(Random)
+-    LRandom(const LDefinition& temp, const LDefinition& temp2) {
+-        setTemp(0, temp);
+-        setTemp(1, temp2);
+-    }
+-    const LDefinition* temp() {
+-        return getTemp(0);
+-    }
+-    const LDefinition* temp2() {
+-        return getTemp(1);
+-    }
+-};
+-
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/mips-shared/Lowering-mips-shared.cpp b/js/src/jit/mips-shared/Lowering-mips-shared.cpp
+index 653a19d605de..45b26a824539 100644
+--- a/js/src/jit/mips-shared/Lowering-mips-shared.cpp
++++ b/js/src/jit/mips-shared/Lowering-mips-shared.cpp
+@@ -415,6 +415,10 @@ LIRGeneratorMIPSShared::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayEleme
+ void
+ LIRGeneratorMIPSShared::visitRandom(MRandom* ins)
+ {
+-    LRandom* lir = new(alloc()) LRandom(tempFixed(CallTempReg0), tempFixed(CallTempReg1));
+-    defineReturn(lir, ins);
++    LRandom *lir = new(alloc()) LRandom(temp(),
++                                        temp(),
++                                        temp(),
++                                        temp(),
++                                        temp());
++    defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+ }
+diff --git a/js/src/jit/mips32/CodeGenerator-mips32.cpp b/js/src/jit/mips32/CodeGenerator-mips32.cpp
+index bf6f1e62d97d..db71c3bccd39 100644
+--- a/js/src/jit/mips32/CodeGenerator-mips32.cpp
++++ b/js/src/jit/mips32/CodeGenerator-mips32.cpp
+@@ -10,7 +10,6 @@
+ 
+ #include "jscntxt.h"
+ #include "jscompartment.h"
+-#include "jsmath.h"
+ #include "jsnum.h"
+ 
+ #include "jit/CodeGenerator.h"
+@@ -2120,16 +2119,10 @@ CodeGeneratorMIPS::visitNegF(LNegF* ins)
+ }
+ 
+ void
+-CodeGeneratorMIPS::visitRandom(LRandom* ins)
++CodeGeneratorMIPS::setReturnDoubleRegs(LiveRegisterSet* regs)
+ {
+-    Register temp = ToRegister(ins->temp());
+-    Register temp2 = ToRegister(ins->temp2());
+-
+-    masm.loadJSContext(temp);
+-
+-    masm.setupUnalignedABICall(temp2);
+-    masm.passABIArg(temp);
+-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, math_random_no_outparam), MoveOp::DOUBLE);
+-
+-    MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
++    MOZ_ASSERT(ReturnFloat32Reg.code_ == ReturnDoubleReg.code_);
++    regs->add(ReturnFloat32Reg);
++    regs->add(ReturnDoubleReg.singleOverlay(1));
++    regs->add(ReturnDoubleReg);
+ }
+diff --git a/js/src/jit/mips32/CodeGenerator-mips32.h b/js/src/jit/mips32/CodeGenerator-mips32.h
+index 197cbf6dd81c..1e56d0ade080 100644
+--- a/js/src/jit/mips32/CodeGenerator-mips32.h
++++ b/js/src/jit/mips32/CodeGenerator-mips32.h
+@@ -241,7 +241,7 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
+ 
+     void generateInvalidateEpilogue();
+ 
+-    void visitRandom(LRandom* ins);
++    void setReturnDoubleRegs(LiveRegisterSet* regs);
+ 
+   protected:
+     void visitEffectiveAddress(LEffectiveAddress* ins);
+diff --git a/js/src/jit/mips32/Lowering-mips32.cpp b/js/src/jit/mips32/Lowering-mips32.cpp
+index 20ce11faa5dd..aa9a55795bd9 100644
+--- a/js/src/jit/mips32/Lowering-mips32.cpp
++++ b/js/src/jit/mips32/Lowering-mips32.cpp
+@@ -173,3 +173,14 @@ LIRGeneratorMIPS::lowerTruncateFToInt32(MTruncateToInt32* ins)
+ 
+     define(new(alloc()) LTruncateFToInt32(useRegister(opd), LDefinition::BogusTemp()), ins);
+ }
++
++void
++LIRGeneratorMIPS::visitRandom(MRandom* ins)
++{
++    LRandom *lir = new(alloc()) LRandom(temp(),
++                                        temp(),
++                                        temp(),
++                                        temp(),
++                                        temp());
++    defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
++}
+diff --git a/js/src/jit/mips32/MacroAssembler-mips32-inl.h b/js/src/jit/mips32/MacroAssembler-mips32-inl.h
+index 77936954d10d..bb8bbb3eba12 100644
+--- a/js/src/jit/mips32/MacroAssembler-mips32-inl.h
++++ b/js/src/jit/mips32/MacroAssembler-mips32-inl.h
+@@ -61,6 +61,13 @@ MacroAssembler::andPtr(Imm32 imm, Register dest)
+     ma_and(dest, imm);
+ }
+ 
++void
++MacroAssembler::and64(Imm64 imm, Register64 dest)
++{
++    and32(Imm32(imm.value & LOW_32_MASK), dest.low);
++    and32(Imm32((imm.value >> 32) & LOW_32_MASK), dest.high);
++}
++
+ void
+ MacroAssembler::or32(Register src, Register dest)
+ {
+@@ -93,6 +100,13 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
+     ma_or(dest, imm);
+ }
+ 
++void
++MacroAssembler::or64(Register64 src, Register64 dest)
++{
++    or32(src.low, dest.low);
++    or32(src.high, dest.high);
++}
++
+ void
+ MacroAssembler::xor32(Imm32 imm, Register dest)
+ {
+diff --git a/js/src/jit/mips32/MacroAssembler-mips32.cpp b/js/src/jit/mips32/MacroAssembler-mips32.cpp
+index ec00d289ed2f..976aa7db86e4 100644
+--- a/js/src/jit/mips32/MacroAssembler-mips32.cpp
++++ b/js/src/jit/mips32/MacroAssembler-mips32.cpp
+@@ -77,6 +77,63 @@ MacroAssemblerMIPSCompat::convertUInt32ToDouble(Register src, FloatRegister dest
+     as_addd(dest, dest, SecondScratchDoubleReg);
+ }
+ 
++void
++MacroAssemblerMIPSCompat::mul64(Imm64 imm, const Register64& dest)
++{
++    // LOW32  = LOW(LOW(dest) * LOW(imm));
++    // HIGH32 = LOW(HIGH(dest) * LOW(imm)) [multiply imm into upper bits]
++    //        + LOW(LOW(dest) * HIGH(imm)) [multiply dest into upper bits]
++    //        + HIGH(LOW(dest) * LOW(imm)) [carry]
++
++    // HIGH(dest) = LOW(HIGH(dest) * LOW(imm));
++    ma_li(ScratchRegister, Imm32(imm.value & LOW_32_MASK));
++    as_multu(dest.high, ScratchRegister);
++    as_mflo(dest.high);
++
++    // mfhi:mflo = LOW(dest) * LOW(imm);
++    as_multu(dest.low, ScratchRegister);
++
++    // HIGH(dest) += mfhi;
++    as_mfhi(ScratchRegister);
++    as_addu(dest.high, dest.high, ScratchRegister);
++
++    if (((imm.value >> 32) & LOW_32_MASK) == 5) {
++        // Optimized case for Math.random().
++
++        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
++        as_sll(ScratchRegister, dest.low, 2);
++        as_addu(ScratchRegister, ScratchRegister, dest.low);
++        as_addu(dest.high, dest.high, ScratchRegister);
++
++        // LOW(dest) = mflo;
++        as_mflo(dest.low);
++    } else {
++        // tmp = mflo
++        as_mflo(SecondScratchReg);
++
++        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
++        ma_li(ScratchRegister, Imm32((imm.value >> 32) & LOW_32_MASK));
++        as_multu(dest.low, ScratchRegister);
++        as_mflo(ScratchRegister);
++        as_addu(dest.high, dest.high, ScratchRegister);
++
++        // LOW(dest) = tmp;
++        ma_move(dest.low, SecondScratchReg);
++    }
++}
++
++static const double TO_DOUBLE_HIGH_SCALE = 0x100000000;
++
++void
++MacroAssemblerMIPSCompat::convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest)
++{
++    convertUInt32ToDouble(src.high, dest);
++    loadConstantDouble(TO_DOUBLE_HIGH_SCALE, ScratchDoubleReg);
++    mulDouble(ScratchDoubleReg, dest);
++    convertUInt32ToDouble(src.low, ScratchDoubleReg);
++    addDouble(ScratchDoubleReg, dest);
++}
++
+ void
+ MacroAssemblerMIPSCompat::convertUInt32ToFloat32(Register src, FloatRegister dest)
+ {
+@@ -2558,6 +2615,20 @@ MacroAssemblerMIPSCompat::branchTestBooleanTruthy(bool b, const ValueOperand& op
+     ma_b(operand.payloadReg(), operand.payloadReg(), label, b ? NonZero : Zero);
+ }
+ 
++void
++MacroAssemblerMIPSCompat::branchTest64(Condition cond, Register64 lhs, Register64 rhs,
++                                       Register temp, Label* label)
++{
++    if (cond == Assembler::Zero) {
++        MOZ_ASSERT(lhs.low == rhs.low);
++        MOZ_ASSERT(lhs.high == rhs.high);
++        as_or(ScratchRegister, lhs.low, lhs.high);
++        branchTestPtr(cond, ScratchRegister, ScratchRegister, label);
++    } else {
++        MOZ_CRASH("Unsupported condition");
++    }
++}
++
+ Register
+ MacroAssemblerMIPSCompat::extractObject(const Address& address, Register scratch)
+ {
+diff --git a/js/src/jit/mips32/MacroAssembler-mips32.h b/js/src/jit/mips32/MacroAssembler-mips32.h
+index f5cae05ee304..1216a1d7a338 100644
+--- a/js/src/jit/mips32/MacroAssembler-mips32.h
++++ b/js/src/jit/mips32/MacroAssembler-mips32.h
+@@ -65,6 +65,10 @@ static Register CallReg = t9;
+ static const int defaultShift = 3;
+ static_assert(1 << defaultShift == sizeof(JS::Value), "The defaultShift is wrong");
+ 
++static const uint32_t LOW_32_MASK = (1LL << 32) - 1;
++static const int32_t LOW_32_OFFSET = 0;
++static const int32_t HIGH_32_OFFSET = 4;
++
+ class MacroAssemblerMIPS : public Assembler
+ {
+   protected:
+@@ -676,6 +680,8 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+         loadPtr(lhs, SecondScratchReg);
+         branchTestPtr(cond, SecondScratchReg, imm, label);
+     }
++    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp,
++                      Label* label);
+     void branchPtr(Condition cond, Register lhs, Register rhs, Label* label) {
+         ma_b(lhs, rhs, label, cond);
+     }
+@@ -1101,6 +1107,11 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+     void add32(Register src, Register dest);
+     void add32(Imm32 imm, Register dest);
+     void add32(Imm32 imm, const Address& dest);
++    void add64(Imm32 imm, Register64 dest) {
++        as_addiu(dest.low, dest.low, imm.value);
++        as_sltiu(ScratchRegister, dest.low, imm.value);
++        as_addu(dest.high, dest.high, ScratchRegister);
++    }
+     void sub32(Imm32 imm, Register dest);
+     void sub32(Register src, Register dest);
+ 
+@@ -1140,6 +1151,10 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+ 
+     void move32(Imm32 imm, Register dest);
+     void move32(Register src, Register dest);
++    void move64(Register64 src, Register64 dest) {
++        move32(src.low, dest.low);
++        move32(src.high, dest.high);
++    }
+ 
+     void movePtr(Register src, Register dest);
+     void movePtr(ImmWord imm, Register dest);
+@@ -1163,6 +1178,10 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+     void load32(const BaseIndex& address, Register dest);
+     void load32(AbsoluteAddress address, Register dest);
+     void load32(AsmJSAbsoluteAddress address, Register dest);
++    void load64(const Address& address, Register64 dest) {
++        load32(Address(address.base, address.offset + LOW_32_OFFSET), dest.low);
++        load32(Address(address.base, address.offset + HIGH_32_OFFSET), dest.high);
++    }
+ 
+     void loadPtr(const Address& address, Register dest);
+     void loadPtr(const BaseIndex& src, Register dest);
+@@ -1233,6 +1252,11 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+         store32(src, address);
+     }
+ 
++    void store64(Register64 src, Address address) {
++        store32(src.low, Address(address.base, address.offset + LOW_32_OFFSET));
++        store32(src.high, Address(address.base, address.offset + HIGH_32_OFFSET));
++    }
++
+     template <typename T> void storePtr(ImmWord imm, T address);
+     template <typename T> void storePtr(ImmPtr imm, T address);
+     template <typename T> void storePtr(ImmGCPtr imm, T address);
+@@ -1302,6 +1326,15 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+         as_addu(dest, dest, src);
+     }
+ 
++    void mul64(Imm64 imm, const Register64& dest);
++
++    void convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest);
++    void mulDoublePtr(ImmPtr imm, Register temp, FloatRegister dest) {
++        movePtr(imm, ScratchRegister);
++        loadDouble(Address(ScratchRegister, 0), ScratchDoubleReg);
++        mulDouble(ScratchDoubleReg, dest);
++    }
++
+     void breakpoint();
+ 
+     void branchDouble(DoubleCondition cond, FloatRegister lhs, FloatRegister rhs,
+@@ -1322,9 +1355,21 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
+     void rshiftPtrArithmetic(Imm32 imm, Register dest) {
+         ma_sra(dest, dest, imm);
+     }
++    void rshift64(Imm32 imm, Register64 dest) {
++        as_srl(dest.low, dest.low, imm.value);
++        as_sll(ScratchRegister, dest.high, 32 - imm.value);
++        as_or(dest.low, dest.low, ScratchRegister);
++        as_srl(dest.high, dest.high, imm.value);
++    }
+     void lshiftPtr(Imm32 imm, Register dest) {
+         ma_sll(dest, dest, imm);
+     }
++    void lshift64(Imm32 imm, Register64 dest) {
++        as_sll(dest.high, dest.high, imm.value);
++        as_srl(ScratchRegister, dest.low, 32 - imm.value);
++        as_or(dest.high, dest.high, ScratchRegister);
++        as_sll(dest.low, dest.low, imm.value);
++    }
+ 
+     // If source is a double, load it into dest. If source is int32,
+     // convert it to double. Else, branch to failure.
+diff --git a/js/src/jit/none/CodeGenerator-none.h b/js/src/jit/none/CodeGenerator-none.h
+index 6d6164d0d298..ad62ea452b2a 100644
+--- a/js/src/jit/none/CodeGenerator-none.h
++++ b/js/src/jit/none/CodeGenerator-none.h
+@@ -51,6 +51,7 @@ class CodeGeneratorNone : public CodeGeneratorShared
+     ValueOperand ToOutValue(LInstruction*) { MOZ_CRASH(); }
+     ValueOperand ToTempValue(LInstruction*, size_t) { MOZ_CRASH(); }
+     void generateInvalidateEpilogue() { MOZ_CRASH(); }
++    void setReturnDoubleRegs(LiveRegisterSet* regs) { MOZ_CRASH(); }
+ };
+ 
+ typedef CodeGeneratorNone CodeGeneratorSpecific;
+diff --git a/js/src/jit/none/LIR-none.h b/js/src/jit/none/LIR-none.h
+index c4959a392ce0..c61ff5cfe6c7 100644
+--- a/js/src/jit/none/LIR-none.h
++++ b/js/src/jit/none/LIR-none.h
+@@ -112,7 +112,6 @@ class LModPowTwoI : public LInstructionHelper<1, 1, 0>
+ class LGuardShape : public LInstruction {};
+ class LGuardObjectGroup : public LInstruction {};
+ class LMulI : public LInstruction {};
+-class LRandom : public LInstructionHelper<1, 0, 5> {};
+ 
+ } // namespace jit
+ } // namespace js
+diff --git a/js/src/jit/none/Lowering-none.h b/js/src/jit/none/Lowering-none.h
+index ef946427fe04..4f6a8950118c 100644
+--- a/js/src/jit/none/Lowering-none.h
++++ b/js/src/jit/none/Lowering-none.h
+@@ -87,7 +87,6 @@ class LIRGeneratorNone : public LIRGeneratorShared
+     void visitSimdValueX4(MSimdValueX4* lir) { MOZ_CRASH(); }
+     void visitSubstr(MSubstr*) { MOZ_CRASH(); }
+     void visitSimdBinaryArith(js::jit::MSimdBinaryArith*) { MOZ_CRASH(); }
+-    void visitRandom(MRandom* ) { MOZ_CRASH(); }
+ 
+ };
+ 
+diff --git a/js/src/jit/shared/Assembler-shared.h b/js/src/jit/shared/Assembler-shared.h
+index 5f26b43c3019..896a4c95eaff 100644
+--- a/js/src/jit/shared/Assembler-shared.h
++++ b/js/src/jit/shared/Assembler-shared.h
+@@ -125,6 +125,15 @@ struct ImmWord
+     { }
+ };
+ 
++// Used for 64-bit immediates which do not require relocation.
++struct Imm64
++{
++    uint64_t value;
++
++    explicit Imm64(uint64_t value) : value(value)
++    { }
++};
++
+ #ifdef DEBUG
+ static inline bool
+ IsCompilingAsmJS()
+diff --git a/js/src/jit/shared/LIR-shared.h b/js/src/jit/shared/LIR-shared.h
+index 53ca728139ac..56f5416d97eb 100644
+--- a/js/src/jit/shared/LIR-shared.h
++++ b/js/src/jit/shared/LIR-shared.h
+@@ -7176,6 +7176,57 @@ class LArrowNewTarget : public LInstructionHelper<BOX_PIECES, 1, 0>
+     }
+ };
+ 
++// Math.random().
++#ifdef JS_PUNBOX64
++# define LRANDOM_NUM_TEMPS 3
++#else
++# define LRANDOM_NUM_TEMPS 5
++#endif
++
++class LRandom : public LInstructionHelper<1, 0, LRANDOM_NUM_TEMPS>
++{
++  public:
++    LIR_HEADER(Random)
++    LRandom(const LDefinition &tempMaybeEAX, const LDefinition &tempMaybeEDX,
++            const LDefinition &temp1
++#ifndef JS_PUNBOX64
++            , const LDefinition &temp2, const LDefinition &temp3
++#endif
++            )
++    {
++        setTemp(0, tempMaybeEAX);
++        setTemp(1, tempMaybeEDX);
++        setTemp(2, temp1);
++#ifndef JS_PUNBOX64
++        setTemp(3, temp2);
++        setTemp(4, temp3);
++#endif
++    }
++    // On x86, following 2 methods return eax and edx necessary for mull.
++    // On others, following 2 methods return ordinary temporary registers.
++    const LDefinition* tempMaybeEAX() {
++        return getTemp(0);
++    }
++    const LDefinition* tempMaybeEDX() {
++        return getTemp(1);
++    }
++    const LDefinition *temp1() {
++        return getTemp(2);
++    }
++#ifndef JS_PUNBOX64
++    const LDefinition *temp2() {
++        return getTemp(3);
++    }
++    const LDefinition *temp3() {
++        return getTemp(4);
++    }
++#endif
++
++    MRandom* mir() const {
++        return mir_->toRandom();
++    }
++};
++
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/x64/CodeGenerator-x64.cpp b/js/src/jit/x64/CodeGenerator-x64.cpp
+index b2743a38897c..1ec5560a80f3 100644
+--- a/js/src/jit/x64/CodeGenerator-x64.cpp
++++ b/js/src/jit/x64/CodeGenerator-x64.cpp
+@@ -841,129 +841,3 @@ CodeGeneratorX64::visitTruncateFToInt32(LTruncateFToInt32* ins)
+     // call a stub if it fails.
+     emitTruncateFloat32(input, output, ins->mir());
+ }
+-
+-namespace js {
+-namespace jit {
+-
+-// Out-of-line math_random_no_outparam call for LRandom.
+-class OutOfLineRandom : public OutOfLineCodeBase<CodeGeneratorX64>
+-{
+-    LRandom* lir_;
+-
+-  public:
+-    explicit OutOfLineRandom(LRandom* lir)
+-      : lir_(lir)
+-    { }
+-
+-    void accept(CodeGeneratorX64* codegen) {
+-        codegen->visitOutOfLineRandom(this);
+-    }
+-
+-    LRandom* lir() const {
+-        return lir_;
+-    }
+-};
+-
+-} // namespace jit
+-} // namespace js
+-
+-static const double RNG_DSCALE_INV = 1 / RNG_DSCALE;
+-
+-void
+-CodeGeneratorX64::visitRandom(LRandom* ins)
+-{
+-    FloatRegister output = ToFloatRegister(ins->output());
+-
+-    Register JSCompartmentReg = ToRegister(ins->temp());
+-    Register rngStateReg = ToRegister(ins->temp2());
+-    Register highReg = ToRegister(ins->temp3());
+-    Register lowReg = ToRegister(ins->temp4());
+-    Register rngMaskReg = ToRegister(ins->temp5());
+-
+-    // rngState = cx->compartment()->rngState
+-    masm.loadJSContext(JSCompartmentReg);
+-    masm.loadPtr(Address(JSCompartmentReg, JSContext::offsetOfCompartment()), JSCompartmentReg);
+-    masm.loadPtr(Address(JSCompartmentReg, JSCompartment::offsetOfRngState()), rngStateReg);
+-
+-    // if rngState == 0, escape from inlined code and call
+-    // math_random_no_outparam.
+-    OutOfLineRandom* ool = new(alloc()) OutOfLineRandom(ins);
+-    addOutOfLineCode(ool, ins->mir());
+-    masm.branchTestPtr(Assembler::Zero, rngStateReg, rngStateReg, ool->entry());
+-
+-    // nextstate = rngState * RNG_MULTIPLIER;
+-    Register& rngMultiplierReg = lowReg;
+-    masm.movq(ImmWord(RNG_MULTIPLIER), rngMultiplierReg);
+-    masm.imulq(rngMultiplierReg, rngStateReg);
+-
+-    // nextstate += RNG_ADDEND;
+-    masm.addq(Imm32(RNG_ADDEND), rngStateReg);
+-
+-    // nextstate &= RNG_MASK;
+-    masm.movq(ImmWord(RNG_MASK), rngMaskReg);
+-    masm.andq(rngMaskReg, rngStateReg);
+-
+-    // rngState = nextstate
+-
+-    // if rngState == 0, escape from inlined code and call
+-    // math_random_no_outparam.
+-    masm.j(Assembler::Zero, ool->entry());
+-
+-    // high = (nextstate >> (RNG_STATE_WIDTH - RNG_HIGH_BITS)) << RNG_LOW_BITS;
+-    masm.movq(rngStateReg, highReg);
+-    masm.shrq(Imm32(RNG_STATE_WIDTH - RNG_HIGH_BITS), highReg);
+-    masm.shlq(Imm32(RNG_LOW_BITS), highReg);
+-
+-    // nextstate = rngState * RNG_MULTIPLIER;
+-    masm.imulq(rngMultiplierReg, rngStateReg);
+-
+-    // nextstate += RNG_ADDEND;
+-    masm.addq(Imm32(RNG_ADDEND), rngStateReg);
+-
+-    // nextstate &= RNG_MASK;
+-    masm.andq(rngMaskReg, rngStateReg);
+-
+-    // low = nextstate >> (RNG_STATE_WIDTH - RNG_LOW_BITS);
+-    masm.movq(rngStateReg, lowReg);
+-    masm.shrq(Imm32(RNG_STATE_WIDTH - RNG_LOW_BITS), lowReg);
+-
+-    // output = double(high | low);
+-    masm.orq(highReg, lowReg);
+-    masm.vcvtsi2sdq(lowReg, output);
+-
+-    // output = output * RNG_DSCALE_INV;
+-    Register& rngDscaleInvReg = lowReg;
+-    masm.movq(ImmPtr(&RNG_DSCALE_INV), rngDscaleInvReg);
+-    masm.vmulsd(Operand(rngDscaleInvReg, 0), output, output);
+-
+-    // cx->compartment()->rngState = nextstate
+-    masm.storePtr(rngStateReg, Address(JSCompartmentReg, JSCompartment::offsetOfRngState()));
+-
+-    masm.bind(ool->rejoin());
+-}
+-
+-void
+-CodeGeneratorX64::visitOutOfLineRandom(OutOfLineRandom* ool)
+-{
+-    LRandom* ins = ool->lir();
+-    Register temp = ToRegister(ins->temp());
+-    Register temp2 = ToRegister(ins->temp2());
+-    MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
+-
+-    LiveRegisterSet regs;
+-    regs.add(ReturnFloat32Reg);
+-    regs.add(ReturnDoubleReg);
+-    regs.add(ReturnInt32x4Reg);
+-    regs.add(ReturnFloat32x4Reg);
+-    saveVolatile(regs);
+-
+-    masm.loadJSContext(temp);
+-
+-    masm.setupUnalignedABICall(temp2);
+-    masm.passABIArg(temp);
+-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, math_random_no_outparam), MoveOp::DOUBLE);
+-
+-    restoreVolatile(regs);
+-
+-    masm.jump(ool->rejoin());
+-}
+diff --git a/js/src/jit/x64/CodeGenerator-x64.h b/js/src/jit/x64/CodeGenerator-x64.h
+index 6895bdd1dc7c..0d21d7a87f42 100644
+--- a/js/src/jit/x64/CodeGenerator-x64.h
++++ b/js/src/jit/x64/CodeGenerator-x64.h
+@@ -12,8 +12,6 @@
+ namespace js {
+ namespace jit {
+ 
+-class OutOfLineRandom;
+-
+ class CodeGeneratorX64 : public CodeGeneratorX86Shared
+ {
+     CodeGeneratorX64* thisFromCtor() {
+@@ -61,8 +59,6 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared
+     void visitAsmJSLoadFFIFunc(LAsmJSLoadFFIFunc* ins);
+     void visitAsmJSUInt32ToDouble(LAsmJSUInt32ToDouble* lir);
+     void visitAsmJSUInt32ToFloat32(LAsmJSUInt32ToFloat32* lir);
+-    void visitRandom(LRandom* ins);
+-    void visitOutOfLineRandom(OutOfLineRandom* ool);
+ };
+ 
+ typedef CodeGeneratorX64 CodeGeneratorSpecific;
+diff --git a/js/src/jit/x64/LIR-x64.h b/js/src/jit/x64/LIR-x64.h
+index f6dafc9dd6ee..a808a5510fa6 100644
+--- a/js/src/jit/x64/LIR-x64.h
++++ b/js/src/jit/x64/LIR-x64.h
+@@ -99,41 +99,6 @@ class LAsmJSLoadFuncPtr : public LInstructionHelper<1, 1, 1>
+     }
+ };
+ 
+-// Math.random().
+-class LRandom : public LInstructionHelper<1, 0, 5>
+-{
+-  public:
+-    LIR_HEADER(Random)
+-    LRandom(const LDefinition &temp, const LDefinition &temp2, const LDefinition &temp3,
+-            const LDefinition &temp4, const LDefinition &temp5)
+-    {
+-        setTemp(0, temp);
+-        setTemp(1, temp2);
+-        setTemp(2, temp3);
+-        setTemp(3, temp4);
+-        setTemp(4, temp5);
+-    }
+-    const LDefinition* temp() {
+-        return getTemp(0);
+-    }
+-    const LDefinition* temp2() {
+-        return getTemp(1);
+-    }
+-    const LDefinition *temp3() {
+-        return getTemp(2);
+-    }
+-    const LDefinition *temp4() {
+-        return getTemp(3);
+-    }
+-    const LDefinition *temp5() {
+-        return getTemp(4);
+-    }
+-
+-    MRandom* mir() const {
+-        return mir_->toRandom();
+-    }
+-};
+-
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/x64/Lowering-x64.cpp b/js/src/jit/x64/Lowering-x64.cpp
+index 8042020bdc20..af91a9f88e3d 100644
+--- a/js/src/jit/x64/Lowering-x64.cpp
++++ b/js/src/jit/x64/Lowering-x64.cpp
+@@ -337,8 +337,6 @@ void
+ LIRGeneratorX64::visitRandom(MRandom* ins)
+ {
+     LRandom *lir = new(alloc()) LRandom(temp(),
+-                                        temp(),
+-                                        temp(),
+                                         temp(),
+                                         temp());
+     defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+diff --git a/js/src/jit/x64/MacroAssembler-x64-inl.h b/js/src/jit/x64/MacroAssembler-x64-inl.h
+index 6a5ff97927aa..47ae0754fec0 100644
+--- a/js/src/jit/x64/MacroAssembler-x64-inl.h
++++ b/js/src/jit/x64/MacroAssembler-x64-inl.h
+@@ -29,6 +29,13 @@ MacroAssembler::andPtr(Imm32 imm, Register dest)
+     andq(imm, dest);
+ }
+ 
++void
++MacroAssembler::and64(Imm64 imm, Register64 dest)
++{
++    movq(ImmWord(uintptr_t(imm.value)), ScratchReg);
++    andq(ScratchReg, dest.reg);
++}
++
+ void
+ MacroAssembler::orPtr(Register src, Register dest)
+ {
+@@ -41,6 +48,12 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
+     orq(imm, dest);
+ }
+ 
++void
++MacroAssembler::or64(Register64 src, Register64 dest)
++{
++    orq(src.reg, dest.reg);
++}
++
+ void
+ MacroAssembler::xorPtr(Register src, Register dest)
+ {
+diff --git a/js/src/jit/x64/MacroAssembler-x64.h b/js/src/jit/x64/MacroAssembler-x64.h
+index 16207ae70ca1..d5739fd2ae2b 100644
+--- a/js/src/jit/x64/MacroAssembler-x64.h
++++ b/js/src/jit/x64/MacroAssembler-x64.h
+@@ -604,6 +604,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+     void addPtr(const Address& src, Register dest) {
+         addq(Operand(src), dest);
+     }
++    void add64(Imm32 imm, Register64 dest) {
++        addq(imm, dest.reg);
++    }
+     void subPtr(Imm32 imm, Register dest) {
+         subq(imm, dest);
+     }
+@@ -619,6 +622,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+     void mulBy3(const Register& src, const Register& dest) {
+         lea(Operand(src, src, TimesTwo), dest);
+     }
++    void mul64(Imm64 imm, const Register64& dest) {
++        movq(ImmWord(uintptr_t(imm.value)), ScratchReg);
++        imulq(ScratchReg, dest.reg);
++    }
+ 
+     void branch32(Condition cond, AbsoluteAddress lhs, Imm32 rhs, Label* label) {
+         if (X86Encoding::IsAddressImmediate(lhs.addr)) {
+@@ -741,6 +748,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+         j(cond, label);
+     }
+ 
++    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp, Label* label) {
++        branchTestPtr(cond, lhs.reg, rhs.reg, label);
++    }
++
+     void movePtr(Register src, Register dest) {
+         movq(src, dest);
+     }
+@@ -759,6 +770,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+     void movePtr(ImmGCPtr imm, Register dest) {
+         movq(imm, dest);
+     }
++    void move64(Register64 src, Register64 dest) {
++        movq(src.reg, dest.reg);
++    }
+     void loadPtr(AbsoluteAddress address, Register dest) {
+         if (X86Encoding::IsAddressImmediate(address.addr)) {
+             movq(Operand(address), dest);
+@@ -790,6 +804,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+             load32(Address(scratch, 0x0), dest);
+         }
+     }
++    void load64(const Address& address, Register64 dest) {
++        movq(Operand(address), dest.reg);
++    }
+     template <typename T>
+     void storePtr(ImmWord imm, T address) {
+         if ((intptr_t)imm.value <= INT32_MAX && (intptr_t)imm.value >= INT32_MIN) {
+@@ -837,15 +854,24 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+             store32(src, Address(scratch, 0x0));
+         }
+     }
++    void store64(Register64 src, Address address) {
++        movq(src.reg, Operand(address));
++    }
+     void rshiftPtr(Imm32 imm, Register dest) {
+         shrq(imm, dest);
+     }
+     void rshiftPtrArithmetic(Imm32 imm, Register dest) {
+         sarq(imm, dest);
+     }
++    void rshift64(Imm32 imm, Register64 dest) {
++        shrq(imm, dest.reg);
++    }
+     void lshiftPtr(Imm32 imm, Register dest) {
+         shlq(imm, dest);
+     }
++    void lshift64(Imm32 imm, Register64 dest) {
++        shlq(imm, dest.reg);
++    }
+ 
+     void splitTag(Register src, Register dest) {
+         if (src != dest)
+@@ -1370,6 +1396,15 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
+         vcvtsq2ss(src, dest, dest);
+     }
+ 
++    void convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest) {
++        vcvtsi2sdq(src.reg, dest);
++    }
++
++    void mulDoublePtr(ImmPtr imm, Register temp, FloatRegister dest) {
++        movq(imm, ScratchReg);
++        vmulsd(Operand(ScratchReg, 0), dest, dest);
++    }
++
+     void inc64(AbsoluteAddress dest) {
+         if (X86Encoding::IsAddressImmediate(dest.addr)) {
+             addPtr(Imm32(1), Operand(dest));
+diff --git a/js/src/jit/x86-shared/CodeGenerator-x86-shared.cpp b/js/src/jit/x86-shared/CodeGenerator-x86-shared.cpp
+index 31e494fa6b6c..40cff8339825 100644
+--- a/js/src/jit/x86-shared/CodeGenerator-x86-shared.cpp
++++ b/js/src/jit/x86-shared/CodeGenerator-x86-shared.cpp
+@@ -3644,5 +3644,18 @@ CodeGeneratorX86Shared::visitMemoryBarrier(LMemoryBarrier* ins)
+         masm.storeLoadFence();
+ }
+ 
++void
++CodeGeneratorX86Shared::setReturnDoubleRegs(LiveRegisterSet* regs)
++{
++    MOZ_ASSERT(ReturnFloat32Reg.encoding() == X86Encoding::xmm0);
++    MOZ_ASSERT(ReturnDoubleReg.encoding() == X86Encoding::xmm0);
++    MOZ_ASSERT(ReturnInt32x4Reg.encoding() == X86Encoding::xmm0);
++    MOZ_ASSERT(ReturnFloat32x4Reg.encoding() == X86Encoding::xmm0);
++    regs->add(ReturnFloat32Reg);
++    regs->add(ReturnDoubleReg);
++    regs->add(ReturnInt32x4Reg);
++    regs->add(ReturnFloat32x4Reg);
++}
++
+ } // namespace jit
+ } // namespace js
+diff --git a/js/src/jit/x86-shared/CodeGenerator-x86-shared.h b/js/src/jit/x86-shared/CodeGenerator-x86-shared.h
+index 366746478d5e..2200d9152aa5 100644
+--- a/js/src/jit/x86-shared/CodeGenerator-x86-shared.h
++++ b/js/src/jit/x86-shared/CodeGenerator-x86-shared.h
+@@ -300,6 +300,8 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
+     // Generating no result.
+     template<typename S, typename T>
+     void atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value, const T& mem);
++
++    void setReturnDoubleRegs(LiveRegisterSet* regs);
+ };
+ 
+ // An out-of-line bailout thunk.
+diff --git a/js/src/jit/x86-shared/Encoding-x86-shared.h b/js/src/jit/x86-shared/Encoding-x86-shared.h
+index 3f5cb332b038..3a618d828c19 100644
+--- a/js/src/jit/x86-shared/Encoding-x86-shared.h
++++ b/js/src/jit/x86-shared/Encoding-x86-shared.h
+@@ -176,6 +176,7 @@ enum TwoByteOpcodeID {
+     OP2_ANDPD_VpdWpd    = 0x54,
+     OP2_ORPD_VpdWpd     = 0x56,
+     OP2_XORPD_VpdWpd    = 0x57,
++    OP2_PUNPCKLDQ       = 0x62,
+     OP2_PCMPGTD_VdqWdq  = 0x66,
+     OP2_MOVD_VdEd       = 0x6E,
+     OP2_MOVDQ_VsdWsd    = 0x6F,
+@@ -187,11 +188,14 @@ enum TwoByteOpcodeID {
+     OP2_PSRLDQ_Vd       = 0x73,
+     OP2_PCMPEQW         = 0x75,
+     OP2_PCMPEQD_VdqWdq  = 0x76,
++    OP2_HADDPD          = 0x7C,
+     OP2_MOVD_EdVd       = 0x7E,
+     OP2_MOVQ_VdWd       = 0x7E,
+     OP2_MOVDQ_WdqVdq    = 0x7F,
+     OP2_JCC_rel32       = 0x80,
+     OP_SETCC            = 0x90,
++    OP2_SHLD            = 0xA4,
++    OP2_SHRD            = 0xAC,
+     OP_FENCE            = 0xAE,
+     OP2_IMUL_GvEv       = 0xAF,
+     OP2_CMPXCHG_GvEb    = 0xB0,
+diff --git a/js/src/jit/x86/Assembler-x86.h b/js/src/jit/x86/Assembler-x86.h
+index 5809961982da..780d71b020a7 100644
+--- a/js/src/jit/x86/Assembler-x86.h
++++ b/js/src/jit/x86/Assembler-x86.h
+@@ -51,6 +51,7 @@ static MOZ_CONSTEXPR_VAR FloatRegister ReturnFloat32x4Reg = FloatRegister(X86Enc
+ static MOZ_CONSTEXPR_VAR FloatRegister ScratchFloat32Reg = FloatRegister(X86Encoding::xmm7, FloatRegisters::Single);
+ static MOZ_CONSTEXPR_VAR FloatRegister ScratchDoubleReg = FloatRegister(X86Encoding::xmm7, FloatRegisters::Double);
+ static MOZ_CONSTEXPR_VAR FloatRegister ScratchSimdReg = xmm7;
++static MOZ_CONSTEXPR_VAR FloatRegister ScratchInt32x4Reg = FloatRegister(X86Encoding::xmm7, FloatRegisters::Int32x4);
+ 
+ // Avoid ebp, which is the FramePointer, which is unavailable in some modes.
+ static MOZ_CONSTEXPR_VAR Register ArgumentsRectifierReg = esi;
+@@ -375,6 +376,66 @@ class Assembler : public AssemblerX86Shared
+         append(AsmJSAbsoluteLink(CodeOffsetLabel(src.offset()), lhs.kind()));
+     }
+ 
++    void adcl(Imm32 imm, Register dest) {
++        masm.adcl_ir(imm.value, dest.encoding());
++    }
++
++    void mull(Register multiplier) {
++        masm.mull_r(multiplier.encoding());
++    }
++
++    void shldl(const Imm32 imm, Register src, Register dest) {
++        masm.shldl_irr(imm.value, src.encoding(), dest.encoding());
++    }
++    void shrdl(const Imm32 imm, Register src, Register dest) {
++        masm.shrdl_irr(imm.value, src.encoding(), dest.encoding());
++    }
++
++    void vhaddpd(FloatRegister src, FloatRegister dest) {
++        MOZ_ASSERT(HasSSE2());
++        MOZ_ASSERT(src.size() == 16);
++        MOZ_ASSERT(dest.size() == 16);
++        masm.vhaddpd_rr(src.encoding(), dest.encoding());
++    }
++    void vsubpd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
++        MOZ_ASSERT(HasSSE2());
++        MOZ_ASSERT(src0.size() == 16);
++        MOZ_ASSERT(dest.size() == 16);
++        switch (src1.kind()) {
++          case Operand::MEM_REG_DISP:
++            masm.vsubpd_mr(src1.disp(), src1.base(), src0.encoding(), dest.encoding());
++            break;
++          case Operand::MEM_ADDRESS32:
++            masm.vsubpd_mr(src1.address(), src0.encoding(), dest.encoding());
++            break;
++          default:
++            MOZ_CRASH("unexpected operand kind");
++        }
++    }
++
++    void vpunpckldq(FloatRegister src1, FloatRegister src0, FloatRegister dest) {
++        MOZ_ASSERT(HasSSE2());
++        MOZ_ASSERT(src0.size() == 16);
++        MOZ_ASSERT(src1.size() == 16);
++        MOZ_ASSERT(dest.size() == 16);
++        masm.vpunpckldq_rr(src1.encoding(), src0.encoding(), dest.encoding());
++    }
++    void vpunpckldq(const Operand& src1, FloatRegister src0, FloatRegister dest) {
++        MOZ_ASSERT(HasSSE2());
++        MOZ_ASSERT(src0.size() == 16);
++        MOZ_ASSERT(dest.size() == 16);
++        switch (src1.kind()) {
++          case Operand::MEM_REG_DISP:
++            masm.vpunpckldq_mr(src1.disp(), src1.base(), src0.encoding(), dest.encoding());
++            break;
++          case Operand::MEM_ADDRESS32:
++            masm.vpunpckldq_mr(src1.address(), src0.encoding(), dest.encoding());
++            break;
++          default:
++            MOZ_CRASH("unexpected operand kind");
++        }
++    }
++
+     void jmp(ImmPtr target, Relocation::Kind reloc = Relocation::HARDCODED) {
+         JmpSrc src = masm.jmp();
+         addPendingJump(src, target, reloc);
+diff --git a/js/src/jit/x86/BaseAssembler-x86.h b/js/src/jit/x86/BaseAssembler-x86.h
+index c28330092906..25624c61bb0b 100644
+--- a/js/src/jit/x86/BaseAssembler-x86.h
++++ b/js/src/jit/x86/BaseAssembler-x86.h
+@@ -20,6 +20,14 @@ class BaseAssemblerX86 : public BaseAssembler
+ 
+     // Arithmetic operations:
+ 
++    void adcl_ir(int32_t imm, RegisterID dst)
++    {
++        spew("adcl       $%d, %s", imm, GPReg32Name(dst));
++        MOZ_ASSERT(CAN_SIGN_EXTEND_8_32(imm));
++        m_formatter.oneByteOp(OP_GROUP1_EvIb, dst, GROUP1_OP_ADC);
++        m_formatter.immediate8s(imm);
++    }
++
+     void adcl_im(int32_t imm, const void* addr)
+     {
+         spew("adcl       %d, %p", imm, addr);
+@@ -71,6 +79,22 @@ class BaseAssemblerX86 : public BaseAssembler
+         }
+     }
+ 
++    void shldl_irr(int32_t imm, RegisterID src, RegisterID dst)
++    {
++        MOZ_ASSERT(imm < 32);
++        spew("shldl      $%d, %s, %s", imm, GPReg32Name(src), GPReg32Name(dst));
++        m_formatter.twoByteOp8(OP2_SHLD, dst, src);
++        m_formatter.immediate8u(imm);
++    }
++
++    void shrdl_irr(int32_t imm, RegisterID src, RegisterID dst)
++    {
++        MOZ_ASSERT(imm < 32);
++        spew("shrdl      $%d, %s, %s", imm, GPReg32Name(src), GPReg32Name(dst));
++        m_formatter.twoByteOp8(OP2_SHRD, dst, src);
++        m_formatter.immediate8u(imm);
++    }
++
+     // SSE operations:
+ 
+     using BaseAssembler::vcvtsi2sd_mr;
+@@ -91,6 +115,36 @@ class BaseAssemblerX86 : public BaseAssembler
+         twoByteOpSimd("vmovdqa", VEX_PD, OP2_MOVDQ_VdqWdq, address, invalid_xmm, dst);
+     }
+ 
++    void vhaddpd_rr(XMMRegisterID src, XMMRegisterID dst)
++    {
++        twoByteOpSimdFlags("vhaddpd", VEX_PD, OP2_HADDPD, src, dst);
++    }
++
++    void vsubpd_rr(XMMRegisterID src1, XMMRegisterID src0, XMMRegisterID dst)
++    {
++        twoByteOpSimd("vsubpd", VEX_PD, OP2_SUBPS_VpsWps, src1, src0, dst);
++    }
++    void vsubpd_mr(int32_t offset, RegisterID base, XMMRegisterID src0, XMMRegisterID dst)
++    {
++        twoByteOpSimd("vsubpd", VEX_PD, OP2_SUBPS_VpsWps, offset, base, src0, dst);
++    }
++    void vsubpd_mr(const void* address, XMMRegisterID src0, XMMRegisterID dst)
++    {
++        twoByteOpSimd("vsubpd", VEX_PD, OP2_SUBPS_VpsWps, address, src0, dst);
++    }
++
++    void vpunpckldq_rr(XMMRegisterID src1, XMMRegisterID src0, XMMRegisterID dst) {
++        twoByteOpSimd("vpunpckldq", VEX_PD, OP2_PUNPCKLDQ, src1, src0, dst);
++    }
++    void vpunpckldq_mr(int32_t offset, RegisterID base, XMMRegisterID src0, XMMRegisterID dst)
++    {
++        twoByteOpSimd("vpunpckldq", VEX_PD, OP2_PUNPCKLDQ, offset, base, src0, dst);
++    }
++    void vpunpckldq_mr(const void* addr, XMMRegisterID src0, XMMRegisterID dst)
++    {
++        twoByteOpSimd("vpunpckldq", VEX_PD, OP2_PUNPCKLDQ, addr, src0, dst);
++    }
++
+     // Misc instructions:
+ 
+     void pusha()
+diff --git a/js/src/jit/x86/CodeGenerator-x86.cpp b/js/src/jit/x86/CodeGenerator-x86.cpp
+index 4bcbb6034753..8e47c90b4c87 100644
+--- a/js/src/jit/x86/CodeGenerator-x86.cpp
++++ b/js/src/jit/x86/CodeGenerator-x86.cpp
+@@ -9,7 +9,6 @@
+ #include "mozilla/Casting.h"
+ #include "mozilla/DebugOnly.h"
+ 
+-#include "jsmath.h"
+ #include "jsnum.h"
+ 
+ #include "jit/IonCaches.h"
+@@ -1105,18 +1104,3 @@ CodeGeneratorX86::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32* ool)
+ 
+     masm.jump(ool->rejoin());
+ }
+-
+-void
+-CodeGeneratorX86::visitRandom(LRandom* ins)
+-{
+-    Register temp = ToRegister(ins->temp());
+-    Register temp2 = ToRegister(ins->temp2());
+-
+-    masm.loadJSContext(temp);
+-
+-    masm.setupUnalignedABICall(temp2);
+-    masm.passABIArg(temp);
+-    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, math_random_no_outparam), MoveOp::DOUBLE);
+-
+-    MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
+-}
+diff --git a/js/src/jit/x86/CodeGenerator-x86.h b/js/src/jit/x86/CodeGenerator-x86.h
+index 3c3e2ee1eab9..a2b83cb083ce 100644
+--- a/js/src/jit/x86/CodeGenerator-x86.h
++++ b/js/src/jit/x86/CodeGenerator-x86.h
+@@ -72,8 +72,6 @@ class CodeGeneratorX86 : public CodeGeneratorX86Shared
+     void visitOutOfLineTruncate(OutOfLineTruncate* ool);
+     void visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32* ool);
+ 
+-    void visitRandom(LRandom* ins);
+-
+   private:
+     void asmJSAtomicComputeAddress(Register addrTemp, Register ptrReg, bool boundsCheck,
+                                    int32_t offset, int32_t endOffset);
+diff --git a/js/src/jit/x86/LIR-x86.h b/js/src/jit/x86/LIR-x86.h
+index 764ee4498ff1..5a3ec0e8b764 100644
+--- a/js/src/jit/x86/LIR-x86.h
++++ b/js/src/jit/x86/LIR-x86.h
+@@ -122,23 +122,6 @@ class LAsmJSLoadFuncPtr : public LInstructionHelper<1, 1, 0>
+     }
+ };
+ 
+-// Math.random().
+-class LRandom : public LCallInstructionHelper<1, 0, 2>
+-{
+-  public:
+-    LIR_HEADER(Random)
+-    LRandom(const LDefinition& temp, const LDefinition& temp2) {
+-        setTemp(0, temp);
+-        setTemp(1, temp2);
+-    }
+-    const LDefinition* temp() {
+-        return getTemp(0);
+-    }
+-    const LDefinition* temp2() {
+-        return getTemp(1);
+-    }
+-};
+-
+ } // namespace jit
+ } // namespace js
+ 
+diff --git a/js/src/jit/x86/Lowering-x86.cpp b/js/src/jit/x86/Lowering-x86.cpp
+index f1b40cfd5dde..ee5d8c002ef1 100644
+--- a/js/src/jit/x86/Lowering-x86.cpp
++++ b/js/src/jit/x86/Lowering-x86.cpp
+@@ -441,6 +441,11 @@ LIRGeneratorX86::visitSubstr(MSubstr* ins)
+ void
+ LIRGeneratorX86::visitRandom(MRandom* ins)
+ {
+-    LRandom* lir = new(alloc()) LRandom(tempFixed(CallTempReg0), tempFixed(CallTempReg1));
+-    defineReturn(lir, ins);
++    // eax and edx are necessary for mull.
++    LRandom *lir = new(alloc()) LRandom(tempFixed(eax),
++                                        tempFixed(edx),
++                                        temp(),
++                                        temp(),
++                                        temp());
++    defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+ }
+diff --git a/js/src/jit/x86/MacroAssembler-x86-inl.h b/js/src/jit/x86/MacroAssembler-x86-inl.h
+index b5ca8186754f..c4da16960d4c 100644
+--- a/js/src/jit/x86/MacroAssembler-x86-inl.h
++++ b/js/src/jit/x86/MacroAssembler-x86-inl.h
+@@ -29,6 +29,13 @@ MacroAssembler::andPtr(Imm32 imm, Register dest)
+     andl(imm, dest);
+ }
+ 
++void
++MacroAssembler::and64(Imm64 imm, Register64 dest)
++{
++    andl(Imm32(imm.value & 0xFFFFFFFFL), dest.low);
++    andl(Imm32((imm.value >> 32) & 0xFFFFFFFFL), dest.high);
++}
++
+ void
+ MacroAssembler::orPtr(Register src, Register dest)
+ {
+@@ -41,6 +48,13 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
+     orl(imm, dest);
+ }
+ 
++void
++MacroAssembler::or64(Register64 src, Register64 dest)
++{
++    orl(src.low, dest.low);
++    orl(src.high, dest.high);
++}
++
+ void
+ MacroAssembler::xorPtr(Register src, Register dest)
+ {
+diff --git a/js/src/jit/x86/MacroAssembler-x86.cpp b/js/src/jit/x86/MacroAssembler-x86.cpp
+index 17f8ca9c15c3..3c4e55e74cba 100644
+--- a/js/src/jit/x86/MacroAssembler-x86.cpp
++++ b/js/src/jit/x86/MacroAssembler-x86.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "jit/x86/MacroAssembler-x86.h"
+ 
++#include "mozilla/Alignment.h"
+ #include "mozilla/Casting.h"
+ 
+ #include "jit/Bailouts.h"
+@@ -20,6 +21,62 @@
+ using namespace js;
+ using namespace js::jit;
+ 
++// vpunpckldq requires 16-byte boundary for memory operand.
++// See convertUInt64ToDouble for the details.
++MOZ_ALIGNED_DECL(static const uint64_t, 16) TO_DOUBLE[4] = {
++    0x4530000043300000LL,
++    0x0LL,
++    0x4330000000000000LL,
++    0x4530000000000000LL
++};
++
++void
++MacroAssemblerX86::convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest)
++{
++    // Following operation uses entire 128-bit of dest XMM register.
++    // Currently higher 64-bit is free when we have access to lower 64-bit.
++    MOZ_ASSERT(dest.size() == 8);
++    FloatRegister dest128 = FloatRegister(dest.encoding(), FloatRegisters::Int32x4);
++
++    // Assume that src is represented as following:
++    //   src      = 0x HHHHHHHH LLLLLLLL
++
++    // Move src to dest (=dest128) and ScratchInt32x4Reg (=scratch):
++    //   dest     = 0x 00000000 00000000  00000000 LLLLLLLL
++    //   scratch  = 0x 00000000 00000000  00000000 HHHHHHHH
++    vmovd(src.low, dest128);
++    vmovd(src.high, ScratchInt32x4Reg);
++
++    // Unpack and interleave dest and scratch to dest:
++    //   dest     = 0x 00000000 00000000  HHHHHHHH LLLLLLLL
++    vpunpckldq(ScratchInt32x4Reg, dest128, dest128);
++
++    // Unpack and interleave dest and a constant C1 to dest:
++    //   C1       = 0x 00000000 00000000  45300000 43300000
++    //   dest     = 0x 45300000 HHHHHHHH  43300000 LLLLLLLL
++    // here, each 64-bit part of dest represents following double:
++    //   HI(dest) = 0x 1.00000HHHHHHHH * 2**84 == 2**84 + 0x HHHHHHHH 00000000
++    //   LO(dest) = 0x 1.00000LLLLLLLL * 2**52 == 2**52 + 0x 00000000 LLLLLLLL
++    movePtr(ImmPtr(TO_DOUBLE), temp);
++    vpunpckldq(Operand(temp, 0), dest128, dest128);
++
++    // Subtract a constant C2 from dest, for each 64-bit part:
++    //   C2       = 0x 45300000 00000000  43300000 00000000
++    // here, each 64-bit part of C2 represents following double:
++    //   HI(C2)   = 0x 1.0000000000000 * 2**84 == 2**84
++    //   LO(C2)   = 0x 1.0000000000000 * 2**52 == 2**52
++    // after the operation each 64-bit part of dest represents following:
++    //   HI(dest) = double(0x HHHHHHHH 00000000)
++    //   LO(dest) = double(0x 00000000 LLLLLLLL)
++    vsubpd(Operand(temp, sizeof(uint64_t) * 2), dest128, dest128);
++
++    // Add HI(dest) and LO(dest) in double and store it into LO(dest),
++    //   LO(dest) = double(0x HHHHHHHH 00000000) + double(0x 00000000 LLLLLLLL)
++    //            = double(0x HHHHHHHH LLLLLLLL)
++    //            = double(src)
++    vhaddpd(dest128, dest128);
++}
++
+ MacroAssemblerX86::Double*
+ MacroAssemblerX86::getDouble(double d)
+ {
+diff --git a/js/src/jit/x86/MacroAssembler-x86.h b/js/src/jit/x86/MacroAssembler-x86.h
+index 64e079aad67a..cd73064b6168 100644
+--- a/js/src/jit/x86/MacroAssembler-x86.h
++++ b/js/src/jit/x86/MacroAssembler-x86.h
+@@ -240,6 +240,14 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+         push(tagOf(addr));
+         push(payloadOfAfterStackPush(addr));
+     }
++    void push64(Register64 src) {
++        push(src.high);
++        push(src.low);
++    }
++    void pop64(Register64 dest) {
++        pop(dest.low);
++        pop(dest.high);
++    }
+     void storePayload(const Value& val, Operand dest) {
+         jsval_layout jv = JSVAL_TO_IMPL(val);
+         if (val.isMarkable())
+@@ -607,6 +615,10 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void addPtr(const Address& src, Register dest) {
+         addl(Operand(src), dest);
+     }
++    void add64(Imm32 imm, Register64 dest) {
++        addl(imm, dest.low);
++        adcl(Imm32(0), dest.high);
++    }
+     void subPtr(Imm32 imm, Register dest) {
+         sub32(imm, dest);
+     }
+@@ -622,6 +634,38 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void mulBy3(const Register& src, const Register& dest) {
+         lea(Operand(src, src, TimesTwo), dest);
+     }
++    // Note: this function clobbers eax and edx.
++    void mul64(Imm64 imm, const Register64& dest) {
++        // LOW32  = LOW(LOW(dest) * LOW(imm));
++        // HIGH32 = LOW(HIGH(dest) * LOW(imm)) [multiply imm into upper bits]
++        //        + LOW(LOW(dest) * HIGH(imm)) [multiply dest into upper bits]
++        //        + HIGH(LOW(dest) * LOW(imm)) [carry]
++
++        MOZ_ASSERT(dest.low != eax && dest.low != edx);
++        MOZ_ASSERT(dest.high != eax && dest.high != edx);
++
++        // HIGH(dest) = LOW(HIGH(dest) * LOW(imm));
++        movl(Imm32(imm.value & 0xFFFFFFFFL), edx);
++        imull(edx, dest.high);
++
++        // edx:eax = LOW(dest) * LOW(imm);
++        movl(Imm32(imm.value & 0xFFFFFFFFL), edx);
++        movl(dest.low, eax);
++        mull(edx);
++
++        // HIGH(dest) += edx;
++        addl(edx, dest.high);
++
++        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
++        if (((imm.value >> 32) & 0xFFFFFFFFL) == 5)
++            leal(Operand(dest.low, dest.low, TimesFour), edx);
++        else
++            MOZ_CRASH("Unsupported imm");
++        addl(edx, dest.high);
++
++        // LOW(dest) = eax;
++        movl(eax, dest.low);
++    }
+ 
+     void branch32(Condition cond, AbsoluteAddress lhs, Imm32 rhs, Label* label) {
+         cmp32(Operand(lhs), rhs);
+@@ -712,6 +756,18 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+         j(cond, label);
+     }
+ 
++    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp, Label* label) {
++        if (cond == Assembler::Zero) {
++            MOZ_ASSERT(lhs.low == rhs.low);
++            MOZ_ASSERT(lhs.high == rhs.high);
++            movl(lhs.low, temp);
++            orl(lhs.high, temp);
++            branchTestPtr(cond, temp, temp, label);
++        } else {
++            MOZ_CRASH("Unsupported condition");
++        }
++    }
++
+     void movePtr(ImmWord imm, Register dest) {
+         movl(Imm32(imm.value), dest);
+     }
+@@ -724,6 +780,10 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void movePtr(ImmGCPtr imm, Register dest) {
+         movl(imm, dest);
+     }
++    void move64(Register64 src, Register64 dest) {
++        movl(src.low, dest.low);
++        movl(src.high, dest.high);
++    }
+     void loadPtr(const Address& address, Register dest) {
+         movl(Operand(address), dest);
+     }
+@@ -742,6 +802,10 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void load32(AbsoluteAddress address, Register dest) {
+         movl(Operand(address), dest);
+     }
++    void load64(const Address& address, Register64 dest) {
++        movl(Operand(address), dest.low);
++        movl(Operand(Address(address.base, address.offset + 4)), dest.high);
++    }
+     template <typename T>
+     void storePtr(ImmWord imm, T address) {
+         movl(Imm32(imm.value), Operand(address));
+@@ -769,6 +833,10 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void store32(Register src, AbsoluteAddress address) {
+         movl(src, Operand(address));
+     }
++    void store64(Register64 src, Address address) {
++        movl(src.low, Operand(address));
++        movl(src.high, Operand(Address(address.base, address.offset + 4)));
++    }
+ 
+     void setStackArg(Register reg, uint32_t arg) {
+         movl(reg, Operand(esp, arg * sizeof(intptr_t)));
+@@ -1060,9 +1128,17 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+     void rshiftPtrArithmetic(Imm32 imm, Register dest) {
+         sarl(imm, dest);
+     }
++    void rshift64(Imm32 imm, Register64 dest) {
++        shrdl(imm, dest.high, dest.low);
++        shrl(imm, dest.high);
++    }
+     void lshiftPtr(Imm32 imm, Register dest) {
+         shll(imm, dest);
+     }
++    void lshift64(Imm32 imm, Register64 dest) {
++        shldl(imm, dest.low, dest.high);
++        shll(imm, dest.low);
++    }
+ 
+     void loadInstructionPointerAfterCall(Register dest) {
+         movl(Operand(StackPointer, 0x0), dest);
+@@ -1087,6 +1163,13 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
+         convertDoubleToFloat32(dest, dest);
+     }
+ 
++    void convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest);
++
++    void mulDoublePtr(ImmPtr imm, Register temp, FloatRegister dest) {
++        movl(imm, temp);
++        vmulsd(Operand(temp, 0), dest, dest);
++    }
++
+     void inc64(AbsoluteAddress dest) {
+         addl(Imm32(1), Operand(dest));
+         Label noOverflow;

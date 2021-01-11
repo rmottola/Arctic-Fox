@@ -1,0 +1,1335 @@
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+index cc719beb455f..b84e3c655d0c 100644
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -3941,8 +3941,8 @@ nsContentUtils::TraverseListenerManager(nsINode *aNode,
+ 
+   EventListenerManagerMapEntry *entry =
+     static_cast<EventListenerManagerMapEntry *>
+-               (PL_DHashTableLookup(&sEventListenerManagersHash, aNode));
+-  if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++               (PL_DHashTableSearch(&sEventListenerManagersHash, aNode));
++  if (entry) {
+     CycleCollectionNoteChild(cb, entry->mListenerManager.get(),
+                              "[via hash] mListenerManager");
+   }
+@@ -3981,7 +3981,7 @@ nsContentUtils::GetExistingListenerManagerForNode(const nsINode *aNode)
+   if (!aNode->HasFlag(NODE_HAS_LISTENERMANAGER)) {
+     return nullptr;
+   }
+-  
++
+   if (!sEventListenerManagersHash.IsInitialized()) {
+     // We're already shut down, don't bother creating an event listener
+     // manager.
+@@ -3991,8 +3991,8 @@ nsContentUtils::GetExistingListenerManagerForNode(const nsINode *aNode)
+ 
+   EventListenerManagerMapEntry *entry =
+     static_cast<EventListenerManagerMapEntry *>
+-               (PL_DHashTableLookup(&sEventListenerManagersHash, aNode));
+-  if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++               (PL_DHashTableSearch(&sEventListenerManagersHash, aNode));
++  if (entry) {
+     return entry->mListenerManager;
+   }
+ 
+@@ -4006,8 +4006,8 @@ nsContentUtils::RemoveListenerManager(nsINode *aNode)
+   if (sEventListenerManagersHash.IsInitialized()) {
+     EventListenerManagerMapEntry *entry =
+       static_cast<EventListenerManagerMapEntry *>
+-                 (PL_DHashTableLookup(&sEventListenerManagersHash, aNode));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                 (PL_DHashTableSearch(&sEventListenerManagersHash, aNode));
++    if (entry) {
+       nsRefPtr<EventListenerManager> listenerManager;
+       listenerManager.swap(entry->mListenerManager);
+       // Remove the entry and *then* do operations that could cause further
+diff --git a/dom/base/nsDocument.cpp b/dom/base/nsDocument.cpp
+index e5530a032e3f..dff2bd8ba3d2 100644
+--- a/dom/base/nsDocument.cpp
++++ b/dom/base/nsDocument.cpp
+@@ -3959,9 +3959,9 @@ nsDocument::SetSubDocumentFor(Element* aElement, nsIDocument* aSubDoc)
+     if (mSubDocuments) {
+       SubDocMapEntry *entry =
+         static_cast<SubDocMapEntry*>
+-                   (PL_DHashTableLookup(mSubDocuments, aElement));
++                   (PL_DHashTableSearch(mSubDocuments, aElement));
+ 
+-      if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++      if (entry) {
+         PL_DHashTableRawRemove(mSubDocuments, entry);
+       }
+     }
+@@ -4015,9 +4015,9 @@ nsDocument::GetSubDocumentFor(nsIContent *aContent) const
+   if (mSubDocuments && aContent->IsElement()) {
+     SubDocMapEntry *entry =
+       static_cast<SubDocMapEntry*>
+-                 (PL_DHashTableLookup(mSubDocuments, aContent->AsElement()));
++                 (PL_DHashTableSearch(mSubDocuments, aContent->AsElement()));
+ 
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++    if (entry) {
+       return entry->mSubDocument;
+     }
+   }
+diff --git a/dom/base/nsPropertyTable.cpp b/dom/base/nsPropertyTable.cpp
+index 886ee4f0379e..0dec88123e81 100644
+--- a/dom/base/nsPropertyTable.cpp
++++ b/dom/base/nsPropertyTable.cpp
+@@ -94,9 +94,10 @@ nsPropertyTable::TransferOrDeleteAllPropertiesFor(nsPropertyOwner aObject,
+   nsresult rv = NS_OK;
+   for (PropertyList* prop = mPropertyList; prop; prop = prop->mNext) {
+     if (prop->mTransfer) {
+-      PropertyListMapEntry *entry = static_cast<PropertyListMapEntry*>
+-                                               (PL_DHashTableLookup(&prop->mObjectValueMap, aObject));
+-      if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++      PropertyListMapEntry *entry =
++          static_cast<PropertyListMapEntry*>
++                     (PL_DHashTableSearch(&prop->mObjectValueMap, aObject));
++      if (entry) {
+         rv = aOtherTable->SetProperty(aObject, prop->mName,
+                                       entry->value, prop->mDtorFunc,
+                                       prop->mDtorData, prop->mTransfer);
+@@ -125,10 +126,10 @@ nsPropertyTable::Enumerate(nsPropertyOwner aObject,
+   PropertyList* prop;
+   for (prop = mPropertyList; prop; prop = prop->mNext) {
+     PropertyListMapEntry *entry = static_cast<PropertyListMapEntry*>
+-      (PL_DHashTableLookup(&prop->mObjectValueMap, aObject));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++      (PL_DHashTableSearch(&prop->mObjectValueMap, aObject));
++    if (entry) {
+       aCallback(const_cast<void*>(aObject.get()), prop->mName, entry->value,
+-                 aData);
++                aData);
+     }
+   }
+ }
+@@ -172,9 +173,10 @@ nsPropertyTable::GetPropertyInternal(nsPropertyOwner aObject,
+ 
+   PropertyList* propertyList = GetPropertyListFor(aPropertyName);
+   if (propertyList) {
+-    PropertyListMapEntry *entry = static_cast<PropertyListMapEntry*>
+-                                             (PL_DHashTableLookup(&propertyList->mObjectValueMap, aObject));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++    PropertyListMapEntry *entry =
++        static_cast<PropertyListMapEntry*>
++                   (PL_DHashTableSearch(&propertyList->mObjectValueMap, aObject));
++    if (entry) {
+       propValue = entry->value;
+       if (aRemove) {
+         // don't call propertyList->mDtorFunc.  That's the caller's job now.
+@@ -325,9 +327,10 @@ nsPropertyTable::PropertyList::Destroy()
+ bool
+ nsPropertyTable::PropertyList::DeletePropertyFor(nsPropertyOwner aObject)
+ {
+-  PropertyListMapEntry *entry = static_cast<PropertyListMapEntry*>
+-                                           (PL_DHashTableLookup(&mObjectValueMap, aObject));
+-  if (!PL_DHASH_ENTRY_IS_BUSY(entry))
++  PropertyListMapEntry *entry =
++      static_cast<PropertyListMapEntry*>
++                 (PL_DHashTableSearch(&mObjectValueMap, aObject));
++  if (!entry)
+     return false;
+ 
+   void* value = entry->value;
+diff --git a/dom/base/nsScriptNameSpaceManager.cpp b/dom/base/nsScriptNameSpaceManager.cpp
+index 6811dc07d988..b5e10aa8a14f 100644
+--- a/dom/base/nsScriptNameSpaceManager.cpp
++++ b/dom/base/nsScriptNameSpaceManager.cpp
+@@ -172,10 +172,9 @@ nsScriptNameSpaceManager::GetConstructorProto(const nsGlobalNameStruct* aStruct)
+   if (!aStruct->mAlias->mProto) {
+     GlobalNameMapEntry *proto =
+       static_cast<GlobalNameMapEntry *>
+-                 (PL_DHashTableLookup(&mGlobalNames,
++                 (PL_DHashTableSearch(&mGlobalNames,
+                                       &aStruct->mAlias->mProtoName));
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(proto)) {
++    if (proto) {
+       aStruct->mAlias->mProto = &proto->mGlobalName;
+     }
+   }
+@@ -385,9 +384,9 @@ nsScriptNameSpaceManager::LookupNameInternal(const nsAString& aName,
+ {
+   GlobalNameMapEntry *entry =
+     static_cast<GlobalNameMapEntry *>
+-               (PL_DHashTableLookup(&mGlobalNames, &aName));
++               (PL_DHashTableSearch(&mGlobalNames, &aName));
+ 
+-  if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++  if (entry) {
+     if (aClassName) {
+       *aClassName = entry->mKey.get();
+     }
+@@ -405,13 +404,9 @@ nsScriptNameSpaceManager::LookupNavigatorName(const nsAString& aName)
+ {
+   GlobalNameMapEntry *entry =
+     static_cast<GlobalNameMapEntry *>
+-               (PL_DHashTableLookup(&mNavigatorNames, &aName));
++               (PL_DHashTableSearch(&mNavigatorNames, &aName));
+ 
+-  if (!PL_DHASH_ENTRY_IS_BUSY(entry)) {
+-    return nullptr;
+-  }
+-
+-  return &entry->mGlobalName;
++  return entry ? &entry->mGlobalName : nullptr;
+ }
+ 
+ nsresult
+diff --git a/dom/plugins/base/nsJSNPRuntime.cpp b/dom/plugins/base/nsJSNPRuntime.cpp
+index a2d16c3201c6..67daf6334224 100644
+--- a/dom/plugins/base/nsJSNPRuntime.cpp
++++ b/dom/plugins/base/nsJSNPRuntime.cpp
+@@ -1772,12 +1772,12 @@ NPObjWrapper_ObjectMoved(JSObject *obj, const JSObject *old)
+     return;
+   }
+ 
+-  // Calling PL_DHashTableLookup() will not result in GC.
++  // Calling PL_DHashTableSearch() will not result in GC.
+   JS::AutoSuppressGCAnalysis nogc;
+ 
+   NPObjWrapperHashEntry *entry = static_cast<NPObjWrapperHashEntry *>
+-    (PL_DHashTableLookup(&sNPObjWrappers, npobj));
+-  MOZ_ASSERT(PL_DHASH_ENTRY_IS_BUSY(entry) && entry->mJSObj);
++    (PL_DHashTableSearch(&sNPObjWrappers, npobj));
++  MOZ_ASSERT(entry && entry->mJSObj);
+   MOZ_ASSERT(entry->mJSObj == old);
+   entry->mJSObj = obj;
+ }
+@@ -1829,9 +1829,9 @@ nsNPObjWrapper::OnDestroy(NPObject *npobj)
+   }
+ 
+   NPObjWrapperHashEntry *entry = static_cast<NPObjWrapperHashEntry *>
+-    (PL_DHashTableLookup(&sNPObjWrappers, npobj));
++    (PL_DHashTableSearch(&sNPObjWrappers, npobj));
+ 
+-  if (PL_DHASH_ENTRY_IS_BUSY(entry) && entry->mJSObj) {
++  if (entry && entry->mJSObj) {
+     // Found a live NPObject wrapper, null out its JSObjects' private
+     // data.
+ 
+@@ -1913,9 +1913,7 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext *cx, NPObject *npobj)
+       // Reload entry if the JS_NewObject call caused a GC and reallocated
+       // the table (see bug 445229). This is guaranteed to succeed.
+ 
+-      entry = static_cast<NPObjWrapperHashEntry *>
+-        (PL_DHashTableLookup(&sNPObjWrappers, npobj));
+-      NS_ASSERTION(entry && PL_DHASH_ENTRY_IS_BUSY(entry),
++      NS_ASSERTION(PL_DHashTableSearch(&sNPObjWrappers, npobj),
+                    "Hashtable didn't find what we just added?");
+   }
+ 
+diff --git a/dom/xul/XULDocument.cpp b/dom/xul/XULDocument.cpp
+index 2e90e013df0e..9c99e5b2dfc9 100644
+--- a/dom/xul/XULDocument.cpp
++++ b/dom/xul/XULDocument.cpp
+@@ -778,9 +778,9 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
+ 
+     BroadcasterMapEntry* entry =
+         static_cast<BroadcasterMapEntry*>
+-                   (PL_DHashTableLookup(mBroadcasterMap, &aBroadcaster));
++                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
+ 
+-    if (PL_DHASH_ENTRY_IS_FREE(entry)) {
++    if (!entry) {
+         entry =
+             static_cast<BroadcasterMapEntry*>
+                        (PL_DHashTableAdd(mBroadcasterMap, &aBroadcaster));
+@@ -844,9 +844,9 @@ XULDocument::RemoveBroadcastListenerFor(Element& aBroadcaster,
+ 
+     BroadcasterMapEntry* entry =
+         static_cast<BroadcasterMapEntry*>
+-                   (PL_DHashTableLookup(mBroadcasterMap, &aBroadcaster));
++                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
+ 
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++    if (entry) {
+         nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
+         for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
+             BroadcastListener* bl =
+@@ -958,7 +958,7 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
+     if (aAttribute == nsGkAtoms::ref) {
+         AddElementToRefMap(aElement);
+     }
+-    
++
+     nsresult rv;
+ 
+     // Synchronize broadcast listeners
+@@ -966,9 +966,9 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
+         CanBroadcast(aNameSpaceID, aAttribute)) {
+         BroadcasterMapEntry* entry =
+             static_cast<BroadcasterMapEntry*>
+-                       (PL_DHashTableLookup(mBroadcasterMap, aElement));
++                       (PL_DHashTableSearch(mBroadcasterMap, aElement));
+ 
+-        if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++        if (entry) {
+             // We've got listeners: push the value.
+             nsAutoString value;
+             bool attrSet = aElement->GetAttr(kNameSpaceID_None, aAttribute, value);
+@@ -4160,8 +4160,8 @@ XULDocument::BroadcastAttributeChangeFromOverlay(nsIContent* aNode,
+         return rv;
+ 
+     BroadcasterMapEntry* entry = static_cast<BroadcasterMapEntry*>
+-        (PL_DHashTableLookup(mBroadcasterMap, aNode->AsElement()));
+-    if (!PL_DHASH_ENTRY_IS_BUSY(entry))
++        (PL_DHashTableSearch(mBroadcasterMap, aNode->AsElement()));
++    if (!entry)
+         return rv;
+ 
+     // We've got listeners: push the value.
+diff --git a/dom/xul/templates/nsContentSupportMap.h b/dom/xul/templates/nsContentSupportMap.h
+index 8b8dbe176f34..253dbbe989b5 100644
+--- a/dom/xul/templates/nsContentSupportMap.h
++++ b/dom/xul/templates/nsContentSupportMap.h
+@@ -43,8 +43,8 @@ class nsContentSupportMap {
+         if (!mMap.IsInitialized())
+             return false;
+ 
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(&mMap, aElement);
+-        if (PL_DHASH_ENTRY_IS_FREE(hdr))
++        PLDHashEntryHdr* hdr = PL_DHashTableSearch(&mMap, aElement);
++        if (!hdr)
+             return false;
+ 
+         Entry* entry = static_cast<Entry*>(hdr);
+diff --git a/dom/xul/templates/nsTemplateMap.h b/dom/xul/templates/nsTemplateMap.h
+index 0c9a7a87ad98..e87faa41086c 100644
+--- a/dom/xul/templates/nsTemplateMap.h
++++ b/dom/xul/templates/nsTemplateMap.h
+@@ -34,7 +34,7 @@ class nsTemplateMap {
+ 
+     void
+     Put(nsIContent* aContent, nsIContent* aTemplate) {
+-        NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mTable, aContent)),
++        NS_ASSERTION(!PL_DHashTableSearch(&mTable, aContent),
+                      "aContent already in map");
+ 
+         Entry* entry = static_cast<Entry*>(PL_DHashTableAdd(&mTable, aContent));
+@@ -60,9 +60,9 @@ class nsTemplateMap {
+     void
+     GetTemplateFor(nsIContent* aContent, nsIContent** aResult) {
+         Entry* entry =
+-            static_cast<Entry*>(PL_DHashTableLookup(&mTable, aContent));
++            static_cast<Entry*>(PL_DHashTableSearch(&mTable, aContent));
+ 
+-        if (PL_DHASH_ENTRY_IS_BUSY(entry))
++        if (entry)
+             NS_IF_ADDREF(*aResult = entry->mTemplate);
+         else
+             *aResult = nullptr;
+diff --git a/embedding/components/commandhandler/nsCommandParams.cpp b/embedding/components/commandhandler/nsCommandParams.cpp
+index cbcb0a25cda2..2bfc80e670c0 100644
+--- a/embedding/components/commandhandler/nsCommandParams.cpp
++++ b/embedding/components/commandhandler/nsCommandParams.cpp
+@@ -217,20 +217,15 @@ nsCommandParams::RemoveValue(const char* aName)
+ nsCommandParams::HashEntry*
+ nsCommandParams::GetNamedEntry(const char* aName)
+ {
+-  HashEntry *foundEntry =
+-    (HashEntry *)PL_DHashTableLookup(&mValuesHash, (void *)aName);
+-  if (PL_DHASH_ENTRY_IS_BUSY(foundEntry)) {
+-    return foundEntry;
+-  }
+-  return nullptr;
++  return (HashEntry *)PL_DHashTableSearch(&mValuesHash, (void *)aName);
+ }
+ 
+ nsCommandParams::HashEntry*
+ nsCommandParams::GetOrMakeEntry(const char* aName, uint8_t entryType)
+ {
+   HashEntry *foundEntry =
+-    (HashEntry *)PL_DHashTableLookup(&mValuesHash, (void *)aName);
+-  if (PL_DHASH_ENTRY_IS_BUSY(foundEntry)) { // reuse existing entry
++    (HashEntry *)PL_DHashTableSearch(&mValuesHash, (void *)aName);
++  if (foundEntry) { // reuse existing entry
+     foundEntry->Reset(entryType);
+     return foundEntry;
+   }
+diff --git a/js/xpconnect/src/XPCMaps.h b/js/xpconnect/src/XPCMaps.h
+index 9b55af70105b..ffc310112a04 100644
+--- a/js/xpconnect/src/XPCMaps.h
++++ b/js/xpconnect/src/XPCMaps.h
+@@ -111,10 +111,8 @@ class Native2WrappedNativeMap
+     inline XPCWrappedNative* Find(nsISupports* Obj)
+     {
+         NS_PRECONDITION(Obj,"bad param");
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, Obj);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, Obj);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline XPCWrappedNative* Add(XPCWrappedNative* wrapper)
+@@ -179,10 +177,8 @@ class IID2WrappedJSClassMap
+ 
+     inline nsXPCWrappedJSClass* Find(REFNSIID iid)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, &iid);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, &iid);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline nsXPCWrappedJSClass* Add(nsXPCWrappedJSClass* clazz)
+@@ -234,10 +230,8 @@ class IID2NativeInterfaceMap
+ 
+     inline XPCNativeInterface* Find(REFNSIID iid)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, &iid);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, &iid);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline XPCNativeInterface* Add(XPCNativeInterface* iface)
+@@ -292,10 +286,8 @@ class ClassInfo2NativeSetMap
+ 
+     inline XPCNativeSet* Find(nsIClassInfo* info)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, info);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, info);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline XPCNativeSet* Add(nsIClassInfo* info, XPCNativeSet* set)
+@@ -350,10 +342,8 @@ class ClassInfo2WrappedNativeProtoMap
+ 
+     inline XPCWrappedNativeProto* Find(nsIClassInfo* info)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, info);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, info);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline XPCWrappedNativeProto* Add(nsIClassInfo* info, XPCWrappedNativeProto* proto)
+@@ -413,10 +403,8 @@ class NativeSetMap
+ 
+     inline XPCNativeSet* Find(XPCNativeSetKey* key)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, key);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->key_value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, key);
++        return entry ? entry->key_value : nullptr;
+     }
+ 
+     inline XPCNativeSet* Add(const XPCNativeSetKey* key, XPCNativeSet* set)
+@@ -488,10 +476,8 @@ class IID2ThisTranslatorMap
+ 
+     inline nsIXPCFunctionThisTranslator* Find(REFNSIID iid)
+     {
+-        Entry* entry = (Entry*) PL_DHashTableLookup(mTable, &iid);
+-        if (PL_DHASH_ENTRY_IS_FREE(entry))
+-            return nullptr;
+-        return entry->value;
++        Entry* entry = (Entry*) PL_DHashTableSearch(mTable, &iid);
++        return entry ? entry->value : nullptr;
+     }
+ 
+     inline nsIXPCFunctionThisTranslator* Add(REFNSIID iid,
+diff --git a/layout/base/nsFrameManager.cpp b/layout/base/nsFrameManager.cpp
+index ad23dc7489a7..d34d0e581655 100644
+--- a/layout/base/nsFrameManager.cpp
++++ b/layout/base/nsFrameManager.cpp
+@@ -155,9 +155,9 @@ nsFrameManager::GetPlaceholderFrameFor(const nsIFrame* aFrame)
+ 
+   if (mPlaceholderMap.IsInitialized()) {
+     PlaceholderMapEntry *entry = static_cast<PlaceholderMapEntry*>
+-                                            (PL_DHashTableLookup(const_cast<PLDHashTable*>(&mPlaceholderMap),
++                                            (PL_DHashTableSearch(const_cast<PLDHashTable*>(&mPlaceholderMap),
+                                 aFrame));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++    if (entry) {
+       return entry->placeholderFrame;
+     }
+   }
+diff --git a/layout/style/nsCSSRuleProcessor.cpp b/layout/style/nsCSSRuleProcessor.cpp
+index bde6cca0ffed..a2126e266242 100644
+--- a/layout/style/nsCSSRuleProcessor.cpp
++++ b/layout/style/nsCSSRuleProcessor.cpp
+@@ -700,24 +700,24 @@ void RuleHash::EnumerateAllRules(Element* aElement, ElementDependentRuleProcesso
+   // universal rules within the namespace
+   if (kNameSpaceID_Unknown != nameSpace && mNameSpaceTable.IsInitialized()) {
+     RuleHashTableEntry *entry = static_cast<RuleHashTableEntry*>
+-                                           (PL_DHashTableLookup(&mNameSpaceTable, NS_INT32_TO_PTR(nameSpace)));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                                           (PL_DHashTableSearch(&mNameSpaceTable, NS_INT32_TO_PTR(nameSpace)));
++    if (entry) {
+       mEnumList[valueCount++] = ToEnumData(entry->mRules);
+       RULE_HASH_STAT_INCREMENT_LIST_COUNT(entry->mRules, mElementNameSpaceCalls);
+     }
+   }
+   if (mTagTable.IsInitialized()) {
+     RuleHashTableEntry *entry = static_cast<RuleHashTableEntry*>
+-                                           (PL_DHashTableLookup(&mTagTable, tag));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                                           (PL_DHashTableSearch(&mTagTable, tag));
++    if (entry) {
+       mEnumList[valueCount++] = ToEnumData(entry->mRules);
+       RULE_HASH_STAT_INCREMENT_LIST_COUNT(entry->mRules, mElementTagCalls);
+     }
+   }
+   if (id && mIdTable.IsInitialized()) {
+     RuleHashTableEntry *entry = static_cast<RuleHashTableEntry*>
+-                                           (PL_DHashTableLookup(&mIdTable, id));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                                           (PL_DHashTableSearch(&mIdTable, id));
++    if (entry) {
+       mEnumList[valueCount++] = ToEnumData(entry->mRules);
+       RULE_HASH_STAT_INCREMENT_LIST_COUNT(entry->mRules, mElementIdCalls);
+     }
+@@ -725,8 +725,8 @@ void RuleHash::EnumerateAllRules(Element* aElement, ElementDependentRuleProcesso
+   if (mClassTable.IsInitialized()) {
+     for (int32_t index = 0; index < classCount; ++index) {
+       RuleHashTableEntry *entry = static_cast<RuleHashTableEntry*>
+-                                             (PL_DHashTableLookup(&mClassTable, classList->AtomAt(index)));
+-      if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                                             (PL_DHashTableSearch(&mClassTable, classList->AtomAt(index)));
++      if (entry) {
+         mEnumList[valueCount++] = ToEnumData(entry->mRules);
+         RULE_HASH_STAT_INCREMENT_LIST_COUNT(entry->mRules, mElementClassCalls);
+       }
+@@ -2582,8 +2582,8 @@ nsCSSRuleProcessor::RulesMatching(AnonBoxRuleProcessorData* aData)
+ 
+   if (cascade && cascade->mAnonBoxRules.EntryCount()) {
+     RuleHashTagTableEntry* entry = static_cast<RuleHashTagTableEntry*>
+-      (PL_DHashTableLookup(&cascade->mAnonBoxRules, aData->mPseudoTag));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++      (PL_DHashTableSearch(&cascade->mAnonBoxRules, aData->mPseudoTag));
++    if (entry) {
+       nsTArray<RuleValue>& rules = entry->mRules;
+       for (RuleValue *value = rules.Elements(), *end = value + rules.Length();
+            value != end; ++value) {
+@@ -2602,8 +2602,8 @@ nsCSSRuleProcessor::RulesMatching(XULTreeRuleProcessorData* aData)
+ 
+   if (cascade && cascade->mXULTreeRules.EntryCount()) {
+     RuleHashTagTableEntry* entry = static_cast<RuleHashTagTableEntry*>
+-      (PL_DHashTableLookup(&cascade->mXULTreeRules, aData->mPseudoTag));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++      (PL_DHashTableSearch(&cascade->mXULTreeRules, aData->mPseudoTag));
++    if (entry) {
+       NodeMatchContext nodeContext(EventStates(),
+                                    nsCSSRuleProcessor::IsLink(aData->mElement));
+       nsTArray<RuleValue>& rules = entry->mRules;
+@@ -2837,15 +2837,15 @@ nsCSSRuleProcessor::HasAttributeDependentStyle(AttributeRuleProcessorData* aData
+       if (id) {
+         AtomSelectorEntry *entry =
+           static_cast<AtomSelectorEntry*>
+-                     (PL_DHashTableLookup(&cascade->mIdSelectors, id));
+-        if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++                     (PL_DHashTableSearch(&cascade->mIdSelectors, id));
++        if (entry) {
+           EnumerateSelectors(entry->mSelectors, &data);
+         }
+       }
+ 
+       EnumerateSelectors(cascade->mPossiblyNegatedIDSelectors, &data);
+     }
+-    
++
+     if (aData->mAttribute == nsGkAtoms::_class) {
+       const nsAttrValue* elementClasses = aData->mElement->GetClasses();
+       if (elementClasses) {
+@@ -2854,9 +2854,9 @@ nsCSSRuleProcessor::HasAttributeDependentStyle(AttributeRuleProcessorData* aData
+           nsIAtom* curClass = elementClasses->AtomAt(i);
+           AtomSelectorEntry *entry =
+             static_cast<AtomSelectorEntry*>
+-                       (PL_DHashTableLookup(&cascade->mClassSelectors,
++                       (PL_DHashTableSearch(&cascade->mClassSelectors,
+                                             curClass));
+-          if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++          if (entry) {
+             EnumerateSelectors(entry->mSelectors, &data);
+           }
+         }
+@@ -2867,9 +2867,9 @@ nsCSSRuleProcessor::HasAttributeDependentStyle(AttributeRuleProcessorData* aData
+ 
+     AtomSelectorEntry *entry =
+       static_cast<AtomSelectorEntry*>
+-                 (PL_DHashTableLookup(&cascade->mAttributeSelectors,
++                 (PL_DHashTableSearch(&cascade->mAttributeSelectors,
+                                       aData->mAttribute));
+-    if (PL_DHASH_ENTRY_IS_BUSY(entry)) {
++    if (entry) {
+       EnumerateSelectors(entry->mSelectors, &data);
+     }
+   }
+diff --git a/modules/libpref/prefapi.cpp b/modules/libpref/prefapi.cpp
+index 9978f463f6e3..467663e36461 100644
+--- a/modules/libpref/prefapi.cpp
++++ b/modules/libpref/prefapi.cpp
+@@ -728,13 +728,7 @@ PrefHashEntry* pref_HashTableLookup(const void *key)
+     MOZ_ASSERT(NS_IsMainThread());
+ #endif
+ 
+-    PrefHashEntry* result =
+-        static_cast<PrefHashEntry*>(PL_DHashTableLookup(&gHashTable, key));
+-
+-    if (PL_DHASH_ENTRY_IS_FREE(result))
+-        return nullptr;
+-
+-    return result;
++    return static_cast<PrefHashEntry*>(PL_DHashTableSearch(&gHashTable, key));
+ }
+ 
+ nsresult pref_HashPref(const char *key, PrefValue value, PrefType type, uint32_t flags)
+diff --git a/netwerk/base/nsLoadGroup.cpp b/netwerk/base/nsLoadGroup.cpp
+index 6438af325ee6..f9566558dbab 100644
+--- a/netwerk/base/nsLoadGroup.cpp
++++ b/netwerk/base/nsLoadGroup.cpp
+@@ -257,15 +257,9 @@ nsLoadGroup::Cancel(nsresult status)
+ 
+         NS_ASSERTION(request, "NULL request found in list.");
+ 
+-        RequestMapEntry *entry =
+-            static_cast<RequestMapEntry *>
+-                       (PL_DHashTableLookup(&mRequests, request));
+-
+-        if (PL_DHASH_ENTRY_IS_FREE(entry)) {
++        if (!PL_DHashTableSearch(&mRequests, request)) {
+             // |request| was removed already
+-
+             NS_RELEASE(request);
+-
+             continue;
+         }
+ 
+@@ -487,16 +481,8 @@ nsLoadGroup::AddRequest(nsIRequest *request, nsISupports* ctxt)
+     }
+ #endif /* PR_LOGGING */
+ 
+-#ifdef DEBUG
+-    {
+-      RequestMapEntry *entry =
+-          static_cast<RequestMapEntry *>
+-                     (PL_DHashTableLookup(&mRequests, request));
+-
+-      NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(entry),
+-                   "Entry added to loadgroup twice, don't do that");
+-    }
+-#endif
++    NS_ASSERTION(!PL_DHashTableSearch(&mRequests, request),
++                 "Entry added to loadgroup twice, don't do that");
+ 
+     //
+     // Do not add the channel, if the loadgroup is being canceled...
+@@ -610,9 +596,9 @@ nsLoadGroup::RemoveRequest(nsIRequest *request, nsISupports* ctxt,
+     //
+     RequestMapEntry *entry =
+         static_cast<RequestMapEntry *>
+-                   (PL_DHashTableLookup(&mRequests, request));
++                   (PL_DHashTableSearch(&mRequests, request));
+ 
+-    if (PL_DHASH_ENTRY_IS_FREE(entry)) {
++    if (!entry) {
+         LOG(("LOADGROUP [%x]: Unable to remove request %x. Not in group!\n",
+             this, request));
+ 
+diff --git a/netwerk/cache/nsCacheEntry.cpp b/netwerk/cache/nsCacheEntry.cpp
+index 56735d683fdc..60c4e51bc764 100644
+--- a/netwerk/cache/nsCacheEntry.cpp
++++ b/netwerk/cache/nsCacheEntry.cpp
+@@ -425,17 +425,12 @@ nsCacheEntryHashTable::Shutdown()
+ nsCacheEntry *
+ nsCacheEntryHashTable::GetEntry( const nsCString * key)
+ {
+-    PLDHashEntryHdr *hashEntry;
+-    nsCacheEntry    *result = nullptr;
+-
+     NS_ASSERTION(initialized, "nsCacheEntryHashTable not initialized");
+     if (!initialized)  return nullptr;
+-    
+-    hashEntry = PL_DHashTableLookup(&table, key);
+-    if (PL_DHASH_ENTRY_IS_BUSY(hashEntry)) {
+-        result = ((nsCacheEntryHashTableEntry *)hashEntry)->cacheEntry;
+-    }
+-    return result;
++
++    PLDHashEntryHdr *hashEntry = PL_DHashTableSearch(&table, key);
++    return hashEntry ? ((nsCacheEntryHashTableEntry *)hashEntry)->cacheEntry
++                     : nullptr;
+ }
+ 
+ 
+diff --git a/netwerk/cache/nsDiskCacheBinding.cpp b/netwerk/cache/nsDiskCacheBinding.cpp
+index 7356bfc0ef1b..ae735d7e05bb 100644
+--- a/netwerk/cache/nsDiskCacheBinding.cpp
++++ b/netwerk/cache/nsDiskCacheBinding.cpp
+@@ -201,13 +201,13 @@ nsDiskCacheBindery::FindActiveBinding(uint32_t  hashNumber)
+     // find hash entry for key
+     HashTableEntry * hashEntry;
+     hashEntry =
+-      (HashTableEntry *) PL_DHashTableLookup(&table,
++      (HashTableEntry *) PL_DHashTableSearch(&table,
+                                              (void*)(uintptr_t) hashNumber);
+-    if (PL_DHASH_ENTRY_IS_FREE(hashEntry)) return nullptr;
++    if (!hashEntry) return nullptr;
+ 
+     // walk list looking for active entry
+     NS_ASSERTION(hashEntry->mBinding, "hash entry left with no binding");
+-    nsDiskCacheBinding * binding = hashEntry->mBinding;    
++    nsDiskCacheBinding * binding = hashEntry->mBinding;
+     while (binding->mCacheEntry->IsDoomed()) {
+         binding = (nsDiskCacheBinding *)PR_NEXT_LINK(binding);
+         if (binding == hashEntry->mBinding)  return nullptr;
+@@ -298,9 +298,9 @@ nsDiskCacheBindery::RemoveBinding(nsDiskCacheBinding * binding)
+     HashTableEntry * hashEntry;
+     void           * key = (void *)(uintptr_t)binding->mRecord.HashNumber();
+ 
+-    hashEntry = (HashTableEntry*) PL_DHashTableLookup(&table,
++    hashEntry = (HashTableEntry*) PL_DHashTableSearch(&table,
+                                                       (void*)(uintptr_t) key);
+-    if (!PL_DHASH_ENTRY_IS_BUSY(hashEntry)) {
++    if (!hashEntry) {
+         NS_WARNING("### disk cache: binding not in hashtable!");
+         return;
+     }
+diff --git a/netwerk/dns/nsHostResolver.cpp b/netwerk/dns/nsHostResolver.cpp
+index 13c52f7637cf..5ac7e23eb525 100644
+--- a/netwerk/dns/nsHostResolver.cpp
++++ b/netwerk/dns/nsHostResolver.cpp
+@@ -829,12 +829,11 @@ nsHostResolver::ResolveHost(const char            *host,
+                     // First, search for an entry with AF_UNSPEC
+                     const nsHostKey unspecKey = { host, flags, PR_AF_UNSPEC };
+                     nsHostDBEnt *unspecHe = static_cast<nsHostDBEnt *>
+-                        (PL_DHashTableLookup(&mDB, &unspecKey));
+-                    NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(unspecHe) ||
+-                                 (PL_DHASH_ENTRY_IS_BUSY(unspecHe) &&
+-                                  unspecHe->rec),
++                        (PL_DHashTableSearch(&mDB, &unspecKey));
++                    NS_ASSERTION(!unspecHe ||
++                                 (unspecHe && unspecHe->rec),
+                                 "Valid host entries should contain a record");
+-                    if (PL_DHASH_ENTRY_IS_BUSY(unspecHe) &&
++                    if (unspecHe &&
+                         unspecHe->rec &&
+                         unspecHe->rec->HasUsableResult(TimeStamp::NowLoRes(), flags)) {
+ 
+diff --git a/parser/htmlparser/nsHTMLEntities.cpp b/parser/htmlparser/nsHTMLEntities.cpp
+index c372b2210f94..b69c8ddf4440 100644
+--- a/parser/htmlparser/nsHTMLEntities.cpp
++++ b/parser/htmlparser/nsHTMLEntities.cpp
+@@ -155,15 +155,12 @@ nsHTMLEntities::EntityToUnicode(const nsCString& aEntity)
+       temp.Truncate(aEntity.Length()-1);
+       return EntityToUnicode(temp);
+     }
+-      
+-  EntityNodeEntry* entry = 
++
++  EntityNodeEntry* entry =
+     static_cast<EntityNodeEntry*>
+-               (PL_DHashTableLookup(&gEntityToUnicode, aEntity.get()));
++               (PL_DHashTableSearch(&gEntityToUnicode, aEntity.get()));
+ 
+-  if (!entry || PL_DHASH_ENTRY_IS_FREE(entry))
+-  return -1;
+-        
+-  return entry->node->mUnicode;
++  return entry ? entry->node->mUnicode : -1;
+ }
+ 
+ 
+@@ -185,12 +182,9 @@ nsHTMLEntities::UnicodeToEntity(int32_t aUnicode)
+                "no lookup table, needs addref");
+   EntityNodeEntry* entry =
+     static_cast<EntityNodeEntry*>
+-               (PL_DHashTableLookup(&gUnicodeToEntity, NS_INT32_TO_PTR(aUnicode)));
+-                   
+-  if (!entry || PL_DHASH_ENTRY_IS_FREE(entry))
+-  return nullptr;
+-    
+-  return entry->node->mStr;
++               (PL_DHashTableSearch(&gUnicodeToEntity, NS_INT32_TO_PTR(aUnicode)));
++
++  return entry ? entry->node->mStr : nullptr;
+ }
+ 
+ #ifdef DEBUG
+diff --git a/rdf/base/nsInMemoryDataSource.cpp b/rdf/base/nsInMemoryDataSource.cpp
+index e0ef363e8dd8..61de79fe6fc0 100644
+--- a/rdf/base/nsInMemoryDataSource.cpp
++++ b/rdf/base/nsInMemoryDataSource.cpp
+@@ -319,18 +319,14 @@ class InMemoryDataSource : public nsIRDFDataSource,
+     // Implementation methods
+     Assertion*
+     GetForwardArcs(nsIRDFResource* u) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(&mForwardArcs, u);
+-        return PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr = PL_DHashTableSearch(&mForwardArcs, u);
++        return hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+     }
+ 
+     Assertion*
+     GetReverseArcs(nsIRDFNode* v) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(&mReverseArcs, v);
+-        return PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr = PL_DHashTableSearch(&mReverseArcs, v);
++        return hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+     }
+ 
+     void
+@@ -445,11 +441,11 @@ InMemoryAssertionEnumeratorImpl::InMemoryAssertionEnumeratorImpl(
+ 
+         if (mNextAssertion && mNextAssertion->mHashEntry) {
+             // its our magical HASH_ENTRY forward hash for assertions
+-            PLDHashEntryHdr* hdr = PL_DHashTableLookup(mNextAssertion->u.hash.mPropertyHash,
+-                aProperty);
+-            mNextAssertion = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-                ? static_cast<Entry*>(hdr)->mAssertions
+-                : nullptr;
++            PLDHashEntryHdr* hdr =
++                PL_DHashTableSearch(mNextAssertion->u.hash.mPropertyHash,
++                                    aProperty);
++            mNextAssertion =
++                hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         }
+     }
+     else {
+@@ -980,10 +976,9 @@ InMemoryDataSource::GetTarget(nsIRDFResource* source,
+ 
+     Assertion *as = GetForwardArcs(source);
+     if (as && as->mHashEntry) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(as->u.hash.mPropertyHash, property);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(as->u.hash.mPropertyHash, property);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         while (val) {
+             if (tv == val->u.as.mTruthValue) {
+                 *target = val->u.as.mTarget;
+@@ -1026,10 +1021,9 @@ InMemoryDataSource::HasAssertion(nsIRDFResource* source,
+ 
+     Assertion *as = GetForwardArcs(source);
+     if (as && as->mHashEntry) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(as->u.hash.mPropertyHash, property);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(as->u.hash.mPropertyHash, property);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         while (val) {
+             if ((val->u.as.mTarget == target) && (tv == (val->u.as.mTruthValue))) {
+                 *hasAssertion = true;
+@@ -1139,10 +1133,9 @@ InMemoryDataSource::LockedAssert(nsIRDFResource* aSource,
+ 
+     bool    haveHash = (next) ? next->mHashEntry : false;
+     if (haveHash) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(next->u.hash.mPropertyHash, aProperty);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(next->u.hash.mPropertyHash, aProperty);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         while (val) {
+             if (val->u.as.mTarget == aTarget) {
+                 // Wow, we already had the assertion. Make sure that the
+@@ -1180,11 +1173,10 @@ InMemoryDataSource::LockedAssert(nsIRDFResource* aSource,
+ 
+     if (haveHash)
+     {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(next->u.hash.mPropertyHash,
+-            aProperty);
+-        Assertion *asRef = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(next->u.hash.mPropertyHash, aProperty);
++        Assertion *asRef =
++            hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         if (asRef)
+         {
+             as->mNext = asRef->mNext;
+@@ -1281,11 +1273,9 @@ InMemoryDataSource::LockedUnassert(nsIRDFResource* aSource,
+ 
+     bool    haveHash = (next) ? next->mHashEntry : false;
+     if (haveHash) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(next->u.hash.mPropertyHash,
+-            aProperty);
+-        prev = next = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(next->u.hash.mPropertyHash, aProperty);
++        prev = next = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         bool first = true;
+         while (next) {
+             if (aTarget == next->u.as.mTarget) {
+@@ -1584,11 +1574,9 @@ InMemoryDataSource::HasArcOut(nsIRDFResource *aSource, nsIRDFResource *aArc, boo
+ {
+     Assertion* ass = GetForwardArcs(aSource);
+     if (ass && ass->mHashEntry) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(ass->u.hash.mPropertyHash,
+-            aArc);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(ass->u.hash.mPropertyHash, aArc);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         if (val) {
+             *result = true;
+             return NS_OK;
+@@ -1745,11 +1733,8 @@ InMemoryDataSource::EnsureFastContainment(nsIRDFResource* aSource)
+         nextRef = first->mNext;
+         nsIRDFResource *prop = first->u.as.mProperty;
+ 
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(table,
+-            prop);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr = PL_DHashTableSearch(table, prop);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         if (val) {
+             first->mNext = val->mNext;
+             val->mNext = first;
+@@ -1810,11 +1795,9 @@ InMemoryDataSource::Mark(nsIRDFResource* aSource,
+ 
+     Assertion *as = GetForwardArcs(aSource);
+     if (as && as->mHashEntry) {
+-        PLDHashEntryHdr* hdr = PL_DHashTableLookup(as->u.hash.mPropertyHash,
+-            aProperty);
+-        Assertion* val = PL_DHASH_ENTRY_IS_BUSY(hdr)
+-            ? static_cast<Entry*>(hdr)->mAssertions
+-            : nullptr;
++        PLDHashEntryHdr* hdr =
++            PL_DHashTableSearch(as->u.hash.mPropertyHash, aProperty);
++        Assertion* val = hdr ? static_cast<Entry*>(hdr)->mAssertions : nullptr;
+         while (val) {
+             if ((val->u.as.mTarget == aTarget) &&
+                 (aTruthValue == (val->u.as.mTruthValue))) {
+@@ -1946,8 +1929,8 @@ InMemoryDataSource::SweepForwardArcsEntries(PLDHashTable* aTable,
+ 
+             // remove from the reverse arcs
+             PLDHashEntryHdr* hdr =
+-                PL_DHashTableLookup(info->mReverseArcs, as->u.as.mTarget);
+-            NS_ASSERTION(PL_DHASH_ENTRY_IS_BUSY(hdr), "no assertion in reverse arcs");
++                PL_DHashTableSearch(info->mReverseArcs, as->u.as.mTarget);
++            NS_ASSERTION(hdr, "no assertion in reverse arcs");
+ 
+             Entry* rentry = static_cast<Entry*>(hdr);
+             Assertion* ras = rentry->mAssertions;
+diff --git a/rdf/base/nsRDFService.cpp b/rdf/base/nsRDFService.cpp
+index 612f0ddd67e5..ffce7a6cad3d 100644
+--- a/rdf/base/nsRDFService.cpp
++++ b/rdf/base/nsRDFService.cpp
+@@ -861,10 +861,8 @@ RDFServiceImpl::GetResource(const nsACString& aURI, nsIRDFResource** aResource)
+ 
+     // First, check the cache to see if we've already created and
+     // registered this thing.
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mResources, flatURI.get());
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mResources, flatURI.get());
++    if (hdr) {
+         ResourceHashEntry *entry = static_cast<ResourceHashEntry *>(hdr);
+         NS_ADDREF(*aResource = entry->mResource);
+         return NS_OK;
+@@ -1031,10 +1029,8 @@ RDFServiceImpl::GetLiteral(const char16_t* aValue, nsIRDFLiteral** aLiteral)
+         return NS_ERROR_NULL_POINTER;
+ 
+     // See if we have one already cached
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mLiterals, aValue);
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mLiterals, aValue);
++    if (hdr) {
+         LiteralHashEntry *entry = static_cast<LiteralHashEntry *>(hdr);
+         NS_ADDREF(*aLiteral = entry->mLiteral);
+         return NS_OK;
+@@ -1048,10 +1044,8 @@ NS_IMETHODIMP
+ RDFServiceImpl::GetDateLiteral(PRTime aTime, nsIRDFDate** aResult)
+ {
+     // See if we have one already cached
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mDates, &aTime);
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mDates, &aTime);
++    if (hdr) {
+         DateHashEntry *entry = static_cast<DateHashEntry *>(hdr);
+         NS_ADDREF(*aResult = entry->mDate);
+         return NS_OK;
+@@ -1069,10 +1063,8 @@ NS_IMETHODIMP
+ RDFServiceImpl::GetIntLiteral(int32_t aInt, nsIRDFInt** aResult)
+ {
+     // See if we have one already cached
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mInts, &aInt);
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mInts, &aInt);
++    if (hdr) {
+         IntHashEntry *entry = static_cast<IntHashEntry *>(hdr);
+         NS_ADDREF(*aResult = entry->mInt);
+         return NS_OK;
+@@ -1092,10 +1084,8 @@ RDFServiceImpl::GetBlobLiteral(const uint8_t *aBytes, int32_t aLength,
+ {
+     BlobImpl::Data key = { aLength, const_cast<uint8_t *>(aBytes) };
+ 
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mBlobs, &key);
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mBlobs, &key);
++    if (hdr) {
+         BlobHashEntry *entry = static_cast<BlobHashEntry *>(hdr);
+         NS_ADDREF(*aResult = entry->mBlob);
+         return NS_OK;
+@@ -1155,10 +1145,8 @@ RDFServiceImpl::RegisterResource(nsIRDFResource* aResource, bool aReplace)
+     if (! uri)
+         return NS_ERROR_NULL_POINTER;
+ 
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableLookup(&mResources, uri);
+-
+-    if (PL_DHASH_ENTRY_IS_BUSY(hdr)) {
++    PLDHashEntryHdr *hdr = PL_DHashTableSearch(&mResources, uri);
++    if (hdr) {
+         if (!aReplace) {
+             NS_WARNING("resource already registered, and replace not specified");
+             return NS_ERROR_FAILURE;    // already registered
+@@ -1216,7 +1204,7 @@ RDFServiceImpl::UnregisterResource(nsIRDFResource* aResource)
+             aResource, (const char*) uri));
+ 
+ #ifdef DEBUG
+-    if (PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mResources, uri)))
++    if (!PL_DHashTableSearch(&mResources, uri))
+         NS_WARNING("resource was never registered");
+ #endif
+ 
+@@ -1408,13 +1396,10 @@ RDFServiceImpl::RegisterLiteral(nsIRDFLiteral* aLiteral)
+     const char16_t* value;
+     aLiteral->GetValueConst(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mLiterals,
+-                                                            value)),
++    NS_ASSERTION(!PL_DHashTableSearch(&mLiterals, value),
+                  "literal already registered");
+ 
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableAdd(&mLiterals, value);
+-
++    PLDHashEntryHdr *hdr = PL_DHashTableAdd(&mLiterals, value);
+     if (! hdr)
+         return NS_ERROR_OUT_OF_MEMORY;
+ 
+@@ -1441,8 +1426,7 @@ RDFServiceImpl::UnregisterLiteral(nsIRDFLiteral* aLiteral)
+     const char16_t* value;
+     aLiteral->GetValueConst(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_BUSY(PL_DHashTableLookup(&mLiterals,
+-                                                            value)),
++    NS_ASSERTION(PL_DHashTableSearch(&mLiterals, value),
+                  "literal was never registered");
+ 
+     PL_DHashTableRemove(&mLiterals, value);
+@@ -1464,13 +1448,10 @@ RDFServiceImpl::RegisterInt(nsIRDFInt* aInt)
+     int32_t value;
+     aInt->GetValue(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mInts,
+-                                                            &value)),
++    NS_ASSERTION(!PL_DHashTableSearch(&mInts, &value),
+                  "int already registered");
+ 
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableAdd(&mInts, &value);
+-
++    PLDHashEntryHdr *hdr = PL_DHashTableAdd(&mInts, &value);
+     if (! hdr)
+         return NS_ERROR_OUT_OF_MEMORY;
+ 
+@@ -1497,8 +1478,7 @@ RDFServiceImpl::UnregisterInt(nsIRDFInt* aInt)
+     int32_t value;
+     aInt->GetValue(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_BUSY(PL_DHashTableLookup(&mInts,
+-                                                            &value)),
++    NS_ASSERTION(PL_DHashTableSearch(&mInts, &value),
+                  "int was never registered");
+ 
+     PL_DHashTableRemove(&mInts, &value);
+@@ -1520,13 +1500,10 @@ RDFServiceImpl::RegisterDate(nsIRDFDate* aDate)
+     PRTime value;
+     aDate->GetValue(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mDates,
+-                                                            &value)),
++    NS_ASSERTION(!PL_DHashTableSearch(&mDates, &value),
+                  "date already registered");
+ 
+-    PLDHashEntryHdr *hdr =
+-        PL_DHashTableAdd(&mDates, &value);
+-
++    PLDHashEntryHdr *hdr = PL_DHashTableAdd(&mDates, &value);
+     if (! hdr)
+         return NS_ERROR_OUT_OF_MEMORY;
+ 
+@@ -1553,8 +1530,7 @@ RDFServiceImpl::UnregisterDate(nsIRDFDate* aDate)
+     PRTime value;
+     aDate->GetValue(&value);
+ 
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_BUSY(PL_DHashTableLookup(&mDates,
+-                                                            &value)),
++    NS_ASSERTION(PL_DHashTableSearch(&mDates, &value),
+                  "date was never registered");
+ 
+     PL_DHashTableRemove(&mDates, &value);
+@@ -1571,13 +1547,10 @@ RDFServiceImpl::UnregisterDate(nsIRDFDate* aDate)
+ nsresult
+ RDFServiceImpl::RegisterBlob(BlobImpl *aBlob)
+ {
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_FREE(PL_DHashTableLookup(&mBlobs,
+-                                                            &aBlob->mData)),
++    NS_ASSERTION(!PL_DHashTableSearch(&mBlobs, &aBlob->mData),
+                  "blob already registered");
+ 
+-    PLDHashEntryHdr *hdr = 
+-        PL_DHashTableAdd(&mBlobs, &aBlob->mData);
+-
++    PLDHashEntryHdr *hdr = PL_DHashTableAdd(&mBlobs, &aBlob->mData);
+     if (! hdr)
+         return NS_ERROR_OUT_OF_MEMORY;
+ 
+@@ -1599,12 +1572,11 @@ RDFServiceImpl::RegisterBlob(BlobImpl *aBlob)
+ nsresult
+ RDFServiceImpl::UnregisterBlob(BlobImpl *aBlob)
+ {
+-    NS_ASSERTION(PL_DHASH_ENTRY_IS_BUSY(PL_DHashTableLookup(&mBlobs,
+-                                                            &aBlob->mData)),
++    NS_ASSERTION(PL_DHashTableSearch(&mBlobs, &aBlob->mData),
+                  "blob was never registered");
+ 
+     PL_DHashTableRemove(&mBlobs, &aBlob->mData);
+- 
++
+      // N.B. that we _don't_ release the literal: we only held a weak
+      // reference to it in the hashtable.
+     PR_LOG(gLog, PR_LOG_DEBUG,
+diff --git a/security/manager/boot/src/nsSecureBrowserUIImpl.cpp b/security/manager/boot/src/nsSecureBrowserUIImpl.cpp
+index 6ce493962c6e..132855f3ebb4 100644
+--- a/security/manager/boot/src/nsSecureBrowserUIImpl.cpp
++++ b/security/manager/boot/src/nsSecureBrowserUIImpl.cpp
+@@ -968,11 +968,8 @@ nsSecureBrowserUIImpl::OnStateChange(nsIWebProgress* aWebProgress,
+   {
+     { /* scope for the ReentrantMonitorAutoEnter */
+       ReentrantMonitorAutoEnter lock(mReentrantMonitor);
+-      PLDHashEntryHdr *entry = PL_DHashTableLookup(&mTransferringRequests, aRequest);
+-      if (PL_DHASH_ENTRY_IS_BUSY(entry))
+-      {
++      if (PL_DHashTableSearch(&mTransferringRequests, aRequest)) {
+         PL_DHashTableRemove(&mTransferringRequests, aRequest);
+-
+         requestHasTransferedData = true;
+       }
+     }
+diff --git a/uriloader/base/nsDocLoader.cpp b/uriloader/base/nsDocLoader.cpp
+index 59cd99cab314..ae724bc34baa 100644
+--- a/uriloader/base/nsDocLoader.cpp
++++ b/uriloader/base/nsDocLoader.cpp
+@@ -1354,19 +1354,8 @@ void nsDocLoader::RemoveRequestInfo(nsIRequest *aRequest)
+ 
+ nsDocLoader::nsRequestInfo* nsDocLoader::GetRequestInfo(nsIRequest* aRequest)
+ {
+-  nsRequestInfo* info =
+-    static_cast<nsRequestInfo*>
+-               (PL_DHashTableLookup(&mRequestInfoHash, aRequest));
+-
+-  if (PL_DHASH_ENTRY_IS_FREE(info)) {
+-    // Nothing found in the hash, return null.
+-
+-    return nullptr;
+-  }
+-
+-  // Return what we found in the hash...
+-
+-  return info;
++  return static_cast<nsRequestInfo*>
++                    (PL_DHashTableSearch(&mRequestInfoHash, aRequest));
+ }
+ 
+ // PLDHashTable enumeration callback that just removes every entry
+diff --git a/xpcom/base/nsCycleCollector.cpp b/xpcom/base/nsCycleCollector.cpp
+index ce19f692e294..71ea2d6cce1e 100644
+--- a/xpcom/base/nsCycleCollector.cpp
++++ b/xpcom/base/nsCycleCollector.cpp
+@@ -892,11 +892,8 @@ PtrInfo*
+ CCGraph::FindNode(void* aPtr)
+ {
+   PtrToNodeEntry* e =
+-    static_cast<PtrToNodeEntry*>(PL_DHashTableLookup(&mPtrToNodeMap, aPtr));
+-  if (!PL_DHASH_ENTRY_IS_BUSY(e)) {
+-    return nullptr;
+-  }
+-  return e->mNode;
++    static_cast<PtrToNodeEntry*>(PL_DHashTableSearch(&mPtrToNodeMap, aPtr));
++  return e ? e->mNode : nullptr;
+ }
+ 
+ PtrToNodeEntry*
+diff --git a/xpcom/ds/nsPersistentProperties.cpp b/xpcom/ds/nsPersistentProperties.cpp
+index 7911b49ea67e..8584fa0d9194 100644
+--- a/xpcom/ds/nsPersistentProperties.cpp
++++ b/xpcom/ds/nsPersistentProperties.cpp
+@@ -557,9 +557,9 @@ nsPersistentProperties::GetStringProperty(const nsACString& aKey,
+   const nsAFlatCString&  flatKey = PromiseFlatCString(aKey);
+ 
+   PropertyTableEntry* entry = static_cast<PropertyTableEntry*>(
+-    PL_DHashTableLookup(&mTable, flatKey.get()));
++    PL_DHashTableSearch(&mTable, flatKey.get()));
+ 
+-  if (PL_DHASH_ENTRY_IS_FREE(entry)) {
++  if (!entry) {
+     return NS_ERROR_FAILURE;
+   }
+ 
+@@ -628,9 +628,7 @@ nsPersistentProperties::Undefine(const char* aProp)
+ NS_IMETHODIMP
+ nsPersistentProperties::Has(const char* aProp, bool* aResult)
+ {
+-  PropertyTableEntry* entry = static_cast<PropertyTableEntry*>(
+-    PL_DHashTableLookup(&mTable, aProp));
+-  *aResult = (entry && PL_DHASH_ENTRY_IS_BUSY(entry));
++  *aResult = !!PL_DHashTableSearch(&mTable, aProp);
+   return NS_OK;
+ }
+ 
+diff --git a/xpcom/ds/nsStaticNameTable.cpp b/xpcom/ds/nsStaticNameTable.cpp
+index 0e03406bd659..50a39645c0ea 100644
+--- a/xpcom/ds/nsStaticNameTable.cpp
++++ b/xpcom/ds/nsStaticNameTable.cpp
+@@ -191,12 +191,9 @@ nsStaticCaseInsensitiveNameTable::Lookup(const nsACString& aName)
+ 
+   NameTableKey key(&str);
+   NameTableEntry* entry =
+-    static_cast<NameTableEntry*>(PL_DHashTableLookup(&mNameTable, &key));
+-  if (PL_DHASH_ENTRY_IS_FREE(entry)) {
+-    return nsStaticCaseInsensitiveNameTable::NOT_FOUND;
+-  }
++    static_cast<NameTableEntry*>(PL_DHashTableSearch(&mNameTable, &key));
+ 
+-  return entry->mIndex;
++  return entry ? entry->mIndex : nsStaticCaseInsensitiveNameTable::NOT_FOUND;
+ }
+ 
+ int32_t
+@@ -209,12 +206,9 @@ nsStaticCaseInsensitiveNameTable::Lookup(const nsAString& aName)
+ 
+   NameTableKey key(&str);
+   NameTableEntry* entry =
+-    static_cast<NameTableEntry*>(PL_DHashTableLookup(&mNameTable, &key));
+-  if (PL_DHASH_ENTRY_IS_FREE(entry)) {
+-    return nsStaticCaseInsensitiveNameTable::NOT_FOUND;
+-  }
++    static_cast<NameTableEntry*>(PL_DHashTableSearch(&mNameTable, &key));
+ 
+-  return entry->mIndex;
++  return entry ? entry->mIndex : nsStaticCaseInsensitiveNameTable::NOT_FOUND;
+ }
+ 
+ const nsAFlatCString&
+diff --git a/xpcom/glue/nsTHashtable.h b/xpcom/glue/nsTHashtable.h
+index d2cda13e1aab..967df230be2e 100644
+--- a/xpcom/glue/nsTHashtable.h
++++ b/xpcom/glue/nsTHashtable.h
+@@ -129,10 +129,9 @@ class nsTHashtable
+     NS_ASSERTION(mTable.IsInitialized(),
+                  "nsTHashtable was not initialized properly.");
+ 
+-    EntryType* entry = static_cast<EntryType*>(
+-      PL_DHashTableLookup(const_cast<PLDHashTable*>(&mTable),
++    return static_cast<EntryType*>(
++      PL_DHashTableSearch(const_cast<PLDHashTable*>(&mTable),
+                           EntryType::KeyToPointer(aKey)));
+-    return PL_DHASH_ENTRY_IS_BUSY(entry) ? entry : nullptr;
+   }
+ 
+   /**
+diff --git a/xpcom/glue/pldhash.cpp b/xpcom/glue/pldhash.cpp
+index ebd67b2947f6..1b599cd9fa08 100644
+--- a/xpcom/glue/pldhash.cpp
++++ b/xpcom/glue/pldhash.cpp
+@@ -555,6 +555,13 @@ PLDHashTable::Lookup(const void* aKey)
+   return entry;
+ }
+ 
++MOZ_ALWAYS_INLINE PLDHashEntryHdr*
++PLDHashTable::Search(const void* aKey)
++{
++  PLDHashEntryHdr* entry = Lookup(aKey);
++  return PL_DHASH_ENTRY_IS_BUSY(entry) ? entry : nullptr;
++}
++
+ MOZ_ALWAYS_INLINE PLDHashEntryHdr*
+ PLDHashTable::Add(const void* aKey)
+ {
+@@ -660,6 +667,12 @@ PL_DHashTableLookup(PLDHashTable* aTable, const void* aKey)
+   return aTable->Lookup(aKey);
+ }
+ 
++PLDHashEntryHdr* PL_DHASH_FASTCALL
++PL_DHashTableSearch(PLDHashTable* aTable, const void* aKey)
++{
++  return aTable->Search(aKey);
++}
++
+ PLDHashEntryHdr* PL_DHASH_FASTCALL
+ PL_DHashTableAdd(PLDHashTable* aTable, const void* aKey)
+ {
+diff --git a/xpcom/glue/pldhash.h b/xpcom/glue/pldhash.h
+index 5660077b5216..4370e5450a11 100644
+--- a/xpcom/glue/pldhash.h
++++ b/xpcom/glue/pldhash.h
+@@ -259,6 +259,7 @@ class PLDHashTable
+   void Finish();
+ 
+   PLDHashEntryHdr* Lookup(const void* aKey);
++  PLDHashEntryHdr* Search(const void* aKey);
+   PLDHashEntryHdr* Add(const void* aKey);
+   void Remove(const void* aKey);
+ 
+@@ -490,6 +491,17 @@ void PL_DHashTableFinish(PLDHashTable* aTable);
+ PLDHashEntryHdr* PL_DHASH_FASTCALL
+ PL_DHashTableLookup(PLDHashTable* aTable, const void* aKey);
+ 
++/*
++ * To lookup a key in table, call:
++ *
++ *  entry = PL_DHashTableSearch(table, key);
++ *
++ * If |entry| is non-null, key was found and it identifies entry.  If |entry|
++ * is null, key was not found.
++ */
++PLDHashEntryHdr* PL_DHASH_FASTCALL
++PL_DHashTableSearch(PLDHashTable* aTable, const void* aKey);
++
+ /*
+  * To add an entry identified by key to table, call:
+  *

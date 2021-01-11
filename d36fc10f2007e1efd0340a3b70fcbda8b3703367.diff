@@ -1,0 +1,81 @@
+diff --git a/layout/base/nsFrameManager.cpp b/layout/base/nsFrameManager.cpp
+index 7b43cffd5555..41bf4efff4b4 100644
+--- a/layout/base/nsFrameManager.cpp
++++ b/layout/base/nsFrameManager.cpp
+@@ -76,6 +76,17 @@ static const PLDHashTableOps PlaceholderMapOps = {
+   nullptr
+ };
+ 
++nsFrameManagerBase::nsFrameManagerBase()
++  : mPresShell(nullptr)
++  , mStyleSet(nullptr)
++  , mRootFrame(nullptr)
++  , mPlaceholderMap(&PlaceholderMapOps, sizeof(PlaceholderMapEntry))
++  , mUndisplayedMap(nullptr)
++  , mDisplayContentsMap(nullptr)
++  , mIsDestroyingFrames(false)
++{
++}
++
+ //----------------------------------------------------------------------
+ 
+ // XXXldb This seems too complicated for what I think it's doing, and it
+@@ -155,7 +166,7 @@ nsFrameManager::GetPlaceholderFrameFor(const nsIFrame* aFrame)
+ 
+   if (mPlaceholderMap.IsInitialized()) {
+     PlaceholderMapEntry *entry = static_cast<PlaceholderMapEntry*>
+-                                            (PL_DHashTableSearch(const_cast<PLDHashTable*>(&mPlaceholderMap),
++                                            (PL_DHashTableSearch(const_cast<PLDHashTable2*>(&mPlaceholderMap),
+                                 aFrame));
+     if (entry) {
+       return entry->placeholderFrame;
+@@ -171,10 +182,6 @@ nsFrameManager::RegisterPlaceholderFrame(nsPlaceholderFrame* aPlaceholderFrame)
+   NS_PRECONDITION(aPlaceholderFrame, "null param unexpected");
+   NS_PRECONDITION(nsGkAtoms::placeholderFrame == aPlaceholderFrame->GetType(),
+                   "unexpected frame type");
+-  if (!mPlaceholderMap.IsInitialized()) {
+-    PL_DHashTableInit(&mPlaceholderMap, &PlaceholderMapOps,
+-                      sizeof(PlaceholderMapEntry));
+-  }
+   PlaceholderMapEntry *entry = static_cast<PlaceholderMapEntry*>
+     (PL_DHashTableAdd(&mPlaceholderMap,
+                       aPlaceholderFrame->GetOutOfFlowFrame(), fallible));
+@@ -214,7 +221,7 @@ nsFrameManager::ClearPlaceholderFrameMap()
+ {
+   if (mPlaceholderMap.IsInitialized()) {
+     PL_DHashTableEnumerate(&mPlaceholderMap, UnregisterPlaceholders, nullptr);
+-    PL_DHashTableFinish(&mPlaceholderMap);
++    mPlaceholderMap.Clear();
+   }
+ }
+ 
+diff --git a/layout/base/nsFrameManagerBase.h b/layout/base/nsFrameManagerBase.h
+index c6fa6d1bb029..cd820726327d 100644
+--- a/layout/base/nsFrameManagerBase.h
++++ b/layout/base/nsFrameManagerBase.h
+@@ -30,15 +30,7 @@ class nsStyleSet;
+ class nsFrameManagerBase
+ {
+ public:
+-  nsFrameManagerBase()
+-    : mPresShell(nullptr)
+-    , mStyleSet(nullptr)
+-    , mRootFrame(nullptr)
+-    , mUndisplayedMap(nullptr)
+-    , mDisplayContentsMap(nullptr)
+-    , mIsDestroyingFrames(false)
+-  {
+-  }
++  nsFrameManagerBase();
+ 
+   bool IsDestroyingFrames() { return mIsDestroyingFrames; }
+ 
+@@ -64,7 +56,7 @@ class nsFrameManagerBase
+   // the pres shell owns the style set
+   nsStyleSet*                     mStyleSet;
+   nsIFrame*                       mRootFrame;
+-  PLDHashTable                    mPlaceholderMap;
++  PLDHashTable2                   mPlaceholderMap;
+   UndisplayedMap*                 mUndisplayedMap;
+   UndisplayedMap*                 mDisplayContentsMap;
+   bool                            mIsDestroyingFrames;  // The frame manager is destroying some frame(s).

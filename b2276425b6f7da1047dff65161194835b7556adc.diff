@@ -1,0 +1,1082 @@
+diff --git a/js/src/jit/BaselineCompiler.cpp b/js/src/jit/BaselineCompiler.cpp
+index 505feaffd51a..855efe100198 100644
+--- a/js/src/jit/BaselineCompiler.cpp
++++ b/js/src/jit/BaselineCompiler.cpp
+@@ -1710,7 +1710,7 @@ BaselineCompiler::emitCompare()
+     frame.popRegsAndSync(2);
+ 
+     // Call IC.
+-    ICCompare_Fallback::Compiler stubCompiler(cx);
++    ICCompare_Fallback::Compiler stubCompiler(cx, ICStubCompiler::Engine::Baseline);
+     if (!emitOpIC(stubCompiler.getStub(&stubSpace_)))
+         return false;
+ 
+@@ -1745,7 +1745,7 @@ BaselineCompiler::emit_JSOP_CASE()
+     frame.syncStack(0);
+ 
+     // Call IC.
+-    ICCompare_Fallback::Compiler stubCompiler(cx);
++    ICCompare_Fallback::Compiler stubCompiler(cx, ICStubCompiler::Engine::Baseline);
+     if (!emitOpIC(stubCompiler.getStub(&stubSpace_)))
+         return false;
+ 
+diff --git a/js/src/jit/CodeGenerator.cpp b/js/src/jit/CodeGenerator.cpp
+index 111568ea5d9a..c0d215f667de 100644
+--- a/js/src/jit/CodeGenerator.cpp
++++ b/js/src/jit/CodeGenerator.cpp
+@@ -1721,7 +1721,7 @@ CodeGenerator::emitSharedStub(ICStub::Kind kind, LInstruction* lir)
+ void
+ CodeGenerator::visitBinarySharedStub(LBinarySharedStub* lir)
+ {
+-    JSOp jsop = JSOp(*lir->mir()->resumePoint()->pc());
++    JSOp jsop = JSOp(*lir->mirRaw()->toInstruction()->resumePoint()->pc());
+     switch (jsop) {
+       case JSOP_ADD:
+       case JSOP_SUB:
+@@ -1730,6 +1730,16 @@ CodeGenerator::visitBinarySharedStub(LBinarySharedStub* lir)
+       case JSOP_MOD:
+         emitSharedStub(ICStub::Kind::BinaryArith_Fallback, lir);
+         break;
++      case JSOP_LT:
++      case JSOP_LE:
++      case JSOP_GT:
++      case JSOP_GE:
++      case JSOP_EQ:
++      case JSOP_NE:
++      case JSOP_STRICTEQ:
++      case JSOP_STRICTNE:
++        emitSharedStub(ICStub::Kind::Compare_Fallback, lir);
++        break;
+       default:
+         MOZ_CRASH("Unsupported jsop in shared stubs.");
+     }
+@@ -7888,6 +7898,11 @@ CodeGenerator::linkSharedStubs(JSContext* cx)
+             stub = stubCompiler.getStub(&stubSpace_);
+             break;
+           }
++          case ICStub::Kind::Compare_Fallback: {
++            ICCompare_Fallback::Compiler stubCompiler(cx, ICStubCompiler::Engine::IonMonkey);
++            stub = stubCompiler.getStub(&stubSpace_);
++            break;
++          }
+           default:
+             MOZ_CRASH("Unsupported shared stub.");
+         }
+diff --git a/js/src/jit/IonBuilder.cpp b/js/src/jit/IonBuilder.cpp
+index 08a9b976b38a..4ed6dbb54154 100644
+--- a/js/src/jit/IonBuilder.cpp
++++ b/js/src/jit/IonBuilder.cpp
+@@ -4065,10 +4065,11 @@ IonBuilder::processCondSwitchCase(CFGState& state)
+     if (bodyBlock != caseBlock) {
+         MDefinition* caseOperand = current->pop();
+         MDefinition* switchOperand = current->peek(-1);
+-        MCompare* cmpResult = MCompare::New(alloc(), switchOperand, caseOperand, JSOP_STRICTEQ);
+-        cmpResult->infer(constraints(), inspector, pc);
++
++        if (jsop_compare(JSOP_STRICTEQ, switchOperand, caseOperand))
++            return ControlStatus_Error;
++        MInstruction* cmpResult = current->pop()->toInstruction();
+         MOZ_ASSERT(!cmpResult->isEffectful());
+-        current->add(cmpResult);
+         current->end(newTest(cmpResult, bodyBlock, caseBlock));
+ 
+         // Add last case as predecessor of the body if the body is aliasing
+@@ -6696,14 +6697,202 @@ IonBuilder::jsop_compare(JSOp op)
+     MDefinition* right = current->pop();
+     MDefinition* left = current->pop();
+ 
++    return jsop_compare(op, left, right);
++}
++
++bool
++IonBuilder::jsop_compare(JSOp op, MDefinition* left, MDefinition* right)
++{
++    bool emitted = false;
++
++    if (!forceInlineCaches()) {
++        if (!compareTrySpecialized(&emitted, op, left, right) || emitted)
++            return emitted;
++        if (!compareTryBitwise(&emitted, op, left, right) || emitted)
++            return emitted;
++        if (!compareTrySpecializedOnBaselineInspector(&emitted, op, left, right) || emitted)
++            return emitted;
++    }
++
++    if (!compareTrySharedStub(&emitted, op, left, right) || emitted)
++        return emitted;
++
++    // Not possible to optimize. Do a slow vm call.
+     MCompare* ins = MCompare::New(alloc(), left, right, op);
++    ins->cacheOperandMightEmulateUndefined(constraints());
++
+     current->add(ins);
+     current->push(ins);
++    if (ins->isEffectful() && !resumeAfter(ins))
++        return false;
++    return true;
++}
+ 
+-    ins->infer(constraints(), inspector, pc);
++static bool
++ObjectOrSimplePrimitive(MDefinition* op)
++{
++    // Return true if op is either undefined/null/boolean/int32 or an object.
++    return !op->mightBeType(MIRType_String)
++        && !op->mightBeType(MIRType_Symbol)
++        && !op->mightBeType(MIRType_Double)
++        && !op->mightBeType(MIRType_Float32)
++        && !op->mightBeType(MIRType_MagicOptimizedArguments)
++        && !op->mightBeType(MIRType_MagicHole)
++        && !op->mightBeType(MIRType_MagicIsConstructing);
++}
+ 
+-    if (ins->isEffectful() && !resumeAfter(ins))
++bool
++IonBuilder::compareTrySpecialized(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
++{
++    MOZ_ASSERT(*emitted == false);
++
++    // Try to emit an compare based on the input types.
++
++    MCompare::CompareType type = MCompare::determineCompareType(op, left, right);
++    if (type == MCompare::Compare_Unknown)
++        return true;
++
++    MCompare* ins = MCompare::New(alloc(), left, right, op);
++    ins->setCompareType(type);
++    ins->cacheOperandMightEmulateUndefined(constraints());
++
++    // Some compare types need to have the specific type in the rhs.
++    // Swap operands if that is not the case.
++    if (type == MCompare::Compare_StrictString && right->type() != MIRType_String)
++        ins->swapOperands();
++    else if (type == MCompare::Compare_Null && right->type() != MIRType_Null)
++        ins->swapOperands();
++    else if (type == MCompare::Compare_Undefined && right->type() != MIRType_Undefined)
++        ins->swapOperands();
++    else if (type == MCompare::Compare_Boolean && right->type() != MIRType_Boolean)
++        ins->swapOperands();
++
++    // Replace inputs with unsigned variants if needed.
++    if (type == MCompare::Compare_UInt32)
++        ins->replaceWithUnsignedOperands();
++
++    current->add(ins);
++    current->push(ins);
++
++    MOZ_ASSERT(!ins->isEffectful());
++    *emitted = true;
++    return true;
++}
++
++bool
++IonBuilder::compareTryBitwise(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
++{
++    MOZ_ASSERT(*emitted == false);
++
++    // Try to emit a bitwise compare. Check if a bitwise compare equals the wanted
++    // result for all observed operand types.
++
++    // Onlye allow loose and strict equality.
++    if (op != JSOP_EQ && op != JSOP_NE && op != JSOP_STRICTEQ && op != JSOP_STRICTNE)
++        return true;
++
++    // Only primitive (not double/string) or objects are supported.
++    // I.e. Undefined/Null/Boolean/Int32 and Object
++    if (!ObjectOrSimplePrimitive(left) || !ObjectOrSimplePrimitive(right))
++        return true;
++
++    // Objects that emulate undefined are not supported.
++    if (left->maybeEmulatesUndefined(constraints()) || right->maybeEmulatesUndefined(constraints()))
++        return true;
++
++    // In the loose comparison more values could be the same,
++    // but value comparison reporting otherwise.
++    if (op == JSOP_EQ || op == JSOP_NE) {
++
++        // Undefined compared loosy to Null is not supported,
++        // because tag is different, but value can be the same (undefined == null).
++        if ((left->mightBeType(MIRType_Undefined) && right->mightBeType(MIRType_Null)) ||
++            (left->mightBeType(MIRType_Null) && right->mightBeType(MIRType_Undefined)))
++        {
++            return true;
++        }
++
++        // Int32 compared loosy to Boolean is not supported,
++        // because tag is different, but value can be the same (1 == true).
++        if ((left->mightBeType(MIRType_Int32) && right->mightBeType(MIRType_Boolean)) ||
++            (left->mightBeType(MIRType_Boolean) && right->mightBeType(MIRType_Int32)))
++        {
++            return true;
++        }
++
++        // For loosy comparison of an object with a Boolean/Number/String
++        // the valueOf the object is taken. Therefore not supported.
++        bool simpleLHS = left->mightBeType(MIRType_Boolean) || left->mightBeType(MIRType_Int32);
++        bool simpleRHS = right->mightBeType(MIRType_Boolean) || right->mightBeType(MIRType_Int32);
++        if ((left->mightBeType(MIRType_Object) && simpleRHS) ||
++            (right->mightBeType(MIRType_Object) && simpleLHS))
++        {
++            return true;
++        }
++    }
++
++    MCompare* ins = MCompare::New(alloc(), left, right, op);
++    ins->setCompareType(MCompare::Compare_Value);
++    ins->cacheOperandMightEmulateUndefined(constraints());
++
++    current->add(ins);
++    current->push(ins);
++
++    MOZ_ASSERT(!ins->isEffectful());
++    *emitted = true;
++    return true;
++}
++
++bool
++IonBuilder::compareTrySpecializedOnBaselineInspector(bool* emitted, JSOp op, MDefinition* left,
++                                                     MDefinition* right)
++{
++    MOZ_ASSERT(*emitted == false);
++
++    // Try to specialize based on any baseline caches that have been generated
++    // for the opcode. These will cause the instruction's type policy to insert
++    // fallible unboxes to the appropriate input types.
++
++    MCompare::CompareType type = inspector->expectedCompareType(pc);
++    if (type == MCompare::Compare_Unknown)
++        return true;
++
++    MCompare* ins = MCompare::New(alloc(), left, right, op);
++    ins->setCompareType(type);
++    ins->cacheOperandMightEmulateUndefined(constraints());
++
++    current->add(ins);
++    current->push(ins);
++
++    MOZ_ASSERT(!ins->isEffectful());
++    *emitted = true;
++    return true;
++}
++
++bool
++IonBuilder::compareTrySharedStub(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
++{
++    MOZ_ASSERT(*emitted == false);
++
++    // Try to emit a shared stub cache.
++
++    if (js_JitOptions.disableSharedStubs)
++        return true;
++
++    if (JSOp(*pc) == JSOP_CASE)
++        return true;
++
++    MBinarySharedStub* stub = MBinarySharedStub::New(alloc(), left, right);
++    current->add(stub);
++    current->push(stub);
++    if (!resumeAfter(stub))
+         return false;
++
++    MUnbox* unbox = MUnbox::New(alloc(), current->pop(), MIRType_Boolean, MUnbox::Infallible);
++    current->add(unbox);
++    current->push(unbox);
++
++    *emitted = true;
+     return true;
+ }
+ 
+diff --git a/js/src/jit/IonBuilder.h b/js/src/jit/IonBuilder.h
+index 742b7a8378f1..0f8f2053cb70 100644
+--- a/js/src/jit/IonBuilder.h
++++ b/js/src/jit/IonBuilder.h
+@@ -496,6 +496,13 @@ class IonBuilder
+     // jsop_bitnot helpers.
+     bool bitnotTrySpecialized(bool* emitted, MDefinition* input);
+ 
++    // jsop_compare helpes.
++    bool compareTrySpecialized(bool* emitted, JSOp op, MDefinition* left, MDefinition* right);
++    bool compareTryBitwise(bool* emitted, JSOp op, MDefinition* left, MDefinition* right);
++    bool compareTrySpecializedOnBaselineInspector(bool* emitted, JSOp op, MDefinition* left,
++                                                  MDefinition* right);
++    bool compareTrySharedStub(bool* emitted, JSOp op, MDefinition* left, MDefinition* right);
++
+     // binary data lookup helpers.
+     TypedObjectPrediction typedObjectPrediction(MDefinition* typedObj);
+     TypedObjectPrediction typedObjectPrediction(TemporaryTypeSet* types);
+@@ -661,6 +668,7 @@ class IonBuilder
+     bool jsop_dup2();
+     bool jsop_loophead(jsbytecode* pc);
+     bool jsop_compare(JSOp op);
++    bool jsop_compare(JSOp op, MDefinition* left, MDefinition* right);
+     bool getStaticName(JSObject* staticObject, PropertyName* name, bool* psucceeded,
+                        MDefinition* lexicalCheck = nullptr);
+     bool setStaticName(JSObject* staticObject, PropertyName* name);
+diff --git a/js/src/jit/MIR.cpp b/js/src/jit/MIR.cpp
+index a9dd3572fc77..34393f23db01 100644
+--- a/js/src/jit/MIR.cpp
++++ b/js/src/jit/MIR.cpp
+@@ -344,13 +344,13 @@ MInstruction::clearResumePoint()
+     resumePoint_ = nullptr;
+ }
+ 
+-static bool
+-MaybeEmulatesUndefined(CompilerConstraintList* constraints, MDefinition* op)
++bool
++MDefinition::maybeEmulatesUndefined(CompilerConstraintList* constraints)
+ {
+-    if (!op->mightBeType(MIRType_Object))
++    if (!mightBeType(MIRType_Object))
+         return false;
+ 
+-    TemporaryTypeSet* types = op->resultTypeSet();
++    TemporaryTypeSet* types = resultTypeSet();
+     if (!types)
+         return true;
+ 
+@@ -381,8 +381,8 @@ MTest::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
+ {
+     MOZ_ASSERT(operandMightEmulateUndefined());
+ 
+-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)))
+-        markOperandCantEmulateUndefined();
++    if (!getOperand(0)->maybeEmulatesUndefined(constraints))
++        markNoOperandEmulatesUndefined();
+ }
+ 
+ MDefinition*
+@@ -2702,66 +2702,6 @@ SafelyCoercesToDouble(MDefinition* op)
+     return SimpleArithOperand(op) && !op->mightBeType(MIRType_Null);
+ }
+ 
+-static bool
+-ObjectOrSimplePrimitive(MDefinition* op)
+-{
+-    // Return true if op is either undefined/null/boolean/int32 or an object.
+-    return !op->mightBeType(MIRType_String)
+-        && !op->mightBeType(MIRType_Symbol)
+-        && !op->mightBeType(MIRType_Double)
+-        && !op->mightBeType(MIRType_Float32)
+-        && !op->mightBeType(MIRType_MagicOptimizedArguments)
+-        && !op->mightBeType(MIRType_MagicHole)
+-        && !op->mightBeType(MIRType_MagicIsConstructing);
+-}
+-
+-static bool
+-CanDoValueBitwiseCmp(CompilerConstraintList* constraints,
+-                     MDefinition* lhs, MDefinition* rhs, bool looseEq)
+-{
+-    // Only primitive (not double/string) or objects are supported.
+-    // I.e. Undefined/Null/Boolean/Int32 and Object
+-    if (!ObjectOrSimplePrimitive(lhs) || !ObjectOrSimplePrimitive(rhs))
+-        return false;
+-
+-    // Objects that emulate undefined are not supported.
+-    if (MaybeEmulatesUndefined(constraints, lhs) || MaybeEmulatesUndefined(constraints, rhs))
+-        return false;
+-
+-    // In the loose comparison more values could be the same,
+-    // but value comparison reporting otherwise.
+-    if (looseEq) {
+-
+-        // Undefined compared loosy to Null is not supported,
+-        // because tag is different, but value can be the same (undefined == null).
+-        if ((lhs->mightBeType(MIRType_Undefined) && rhs->mightBeType(MIRType_Null)) ||
+-            (lhs->mightBeType(MIRType_Null) && rhs->mightBeType(MIRType_Undefined)))
+-        {
+-            return false;
+-        }
+-
+-        // Int32 compared loosy to Boolean is not supported,
+-        // because tag is different, but value can be the same (1 == true).
+-        if ((lhs->mightBeType(MIRType_Int32) && rhs->mightBeType(MIRType_Boolean)) ||
+-            (lhs->mightBeType(MIRType_Boolean) && rhs->mightBeType(MIRType_Int32)))
+-        {
+-            return false;
+-        }
+-
+-        // For loosy comparison of an object with a Boolean/Number/String
+-        // the valueOf the object is taken. Therefore not supported.
+-        bool simpleLHS = lhs->mightBeType(MIRType_Boolean) || lhs->mightBeType(MIRType_Int32);
+-        bool simpleRHS = rhs->mightBeType(MIRType_Boolean) || rhs->mightBeType(MIRType_Int32);
+-        if ((lhs->mightBeType(MIRType_Object) && simpleRHS) ||
+-            (rhs->mightBeType(MIRType_Object) && simpleLHS))
+-        {
+-            return false;
+-        }
+-    }
+-
+-    return true;
+-}
+-
+ MIRType
+ MCompare::inputType()
+ {
+@@ -2810,6 +2750,8 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
+     }
+ 
+     if (def->isConstantValue()) {
++        if (def->isBox())
++            def = def->toBox()->getOperand(0);
+         *pwrapped = def;
+         return def->constantValue().isInt32()
+             && def->constantValue().toInt32() >= 0;
+@@ -2818,57 +2760,62 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
+     return false;
+ }
+ 
++/* static */ bool
++MBinaryInstruction::unsignedOperands(MDefinition* left, MDefinition* right)
++{
++    MDefinition* replace;
++    if (!MustBeUInt32(left, &replace))
++        return false;
++    if (replace->type() != MIRType_Int32)
++        return false;
++    if (!MustBeUInt32(right, &replace))
++        return false;
++    if (replace->type() != MIRType_Int32)
++        return false;
++    return true;
++}
++
+ bool
+-MBinaryInstruction::tryUseUnsignedOperands()
++MBinaryInstruction::unsignedOperands()
+ {
+-    MDefinition* newlhs;
+-    MDefinition* newrhs;
+-    if (MustBeUInt32(getOperand(0), &newlhs) && MustBeUInt32(getOperand(1), &newrhs)) {
+-        if (newlhs->type() != MIRType_Int32 || newrhs->type() != MIRType_Int32)
+-            return false;
+-        if (newlhs != getOperand(0)) {
+-            getOperand(0)->setImplicitlyUsedUnchecked();
+-            replaceOperand(0, newlhs);
+-        }
+-        if (newrhs != getOperand(1)) {
+-            getOperand(1)->setImplicitlyUsedUnchecked();
+-            replaceOperand(1, newrhs);
+-        }
+-        return true;
+-    }
+-    return false;
++    return unsignedOperands(getOperand(0), getOperand(1));
+ }
+ 
+ void
+-MCompare::infer(CompilerConstraintList* constraints, BaselineInspector* inspector, jsbytecode* pc)
++MBinaryInstruction::replaceWithUnsignedOperands()
+ {
+-    MOZ_ASSERT(operandMightEmulateUndefined());
++    MOZ_ASSERT(unsignedOperands());
+ 
+-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)) &&
+-        !MaybeEmulatesUndefined(constraints, getOperand(1)))
+-    {
+-        markNoOperandEmulatesUndefined();
++    for (size_t i = 0; i < numOperands(); i++) {
++        MDefinition* replace;
++        MustBeUInt32(getOperand(i), &replace);
++        if (replace == getOperand(i))
++            continue;
++
++        getOperand(i)->setImplicitlyUsedUnchecked();
++        replaceOperand(i, replace);
+     }
++}
+ 
+-    MIRType lhs = getOperand(0)->type();
+-    MIRType rhs = getOperand(1)->type();
++MCompare::CompareType
++MCompare::determineCompareType(JSOp op, MDefinition* left, MDefinition* right)
++{
++    MIRType lhs = left->type();
++    MIRType rhs = right->type();
+ 
+-    bool looseEq = jsop() == JSOP_EQ || jsop() == JSOP_NE;
+-    bool strictEq = jsop() == JSOP_STRICTEQ || jsop() == JSOP_STRICTNE;
++    bool looseEq = op == JSOP_EQ || op == JSOP_NE;
++    bool strictEq = op == JSOP_STRICTEQ || op == JSOP_STRICTNE;
+     bool relationalEq = !(looseEq || strictEq);
+ 
+     // Comparisons on unsigned integers may be treated as UInt32.
+-    if (tryUseUnsignedOperands()) {
+-        compareType_ = Compare_UInt32;
+-        return;
+-    }
++    if (unsignedOperands(left, right))
++        return Compare_UInt32;
+ 
+     // Integer to integer or boolean to boolean comparisons may be treated as Int32.
+     if ((lhs == MIRType_Int32 && rhs == MIRType_Int32) ||
+         (lhs == MIRType_Boolean && rhs == MIRType_Boolean))
+     {
+-        compareType_ = Compare_Int32MaybeCoerceBoth;
+-        return;
++        return Compare_Int32MaybeCoerceBoth;
+     }
+ 
+     // Loose/relational cross-integer/boolean comparisons may be treated as Int32.
+@@ -2876,95 +2823,60 @@ MCompare::infer(CompilerConstraintList* constraints, BaselineInspector* inspecto
+         (lhs == MIRType_Int32 || lhs == MIRType_Boolean) &&
+         (rhs == MIRType_Int32 || rhs == MIRType_Boolean))
+     {
+-        compareType_ = Compare_Int32MaybeCoerceBoth;
+-        return;
++        return Compare_Int32MaybeCoerceBoth;
+     }
+ 
+     // Numeric comparisons against a double coerce to double.
+-    if (IsNumberType(lhs) && IsNumberType(rhs)) {
+-        compareType_ = Compare_Double;
+-        return;
+-    }
++    if (IsNumberType(lhs) && IsNumberType(rhs))
++        return Compare_Double;
+ 
+     // Any comparison is allowed except strict eq.
+-    if (!strictEq && IsFloatingPointType(lhs) && SafelyCoercesToDouble(getOperand(1))) {
+-        compareType_ = Compare_DoubleMaybeCoerceRHS;
+-        return;
+-    }
+-    if (!strictEq && IsFloatingPointType(rhs) && SafelyCoercesToDouble(getOperand(0))) {
+-        compareType_ = Compare_DoubleMaybeCoerceLHS;
+-        return;
+-    }
++    if (!strictEq && IsFloatingPointType(rhs) && SafelyCoercesToDouble(left))
++        return Compare_DoubleMaybeCoerceLHS;
++    if (!strictEq && IsFloatingPointType(lhs) && SafelyCoercesToDouble(right))
++        return Compare_DoubleMaybeCoerceRHS;
+ 
+     // Handle object comparison.
+-    if (!relationalEq && lhs == MIRType_Object && rhs == MIRType_Object) {
+-        compareType_ = Compare_Object;
+-        return;
+-    }
++    if (!relationalEq && lhs == MIRType_Object && rhs == MIRType_Object)
++        return Compare_Object;
+ 
+     // Handle string comparisons. (Relational string compares are still unsupported).
+-    if (!relationalEq && lhs == MIRType_String && rhs == MIRType_String) {
+-        compareType_ = Compare_String;
+-        return;
+-    }
+-
+-    if (strictEq && lhs == MIRType_String) {
+-        // Lowering expects the rhs to be definitly string.
+-        compareType_ = Compare_StrictString;
+-        swapOperands();
+-        return;
+-    }
+-
+-    if (strictEq && rhs == MIRType_String) {
+-        compareType_ = Compare_StrictString;
+-        return;
+-    }
++    if (!relationalEq && lhs == MIRType_String && rhs == MIRType_String)
++        return Compare_String;
+ 
+-    // Handle compare with lhs being Undefined or Null.
+-    if (!relationalEq && IsNullOrUndefined(lhs)) {
+-        // Lowering expects the rhs to be null/undefined, so we have to
+-        // swap the operands. This is necessary since we may not know which
+-        // operand was null/undefined during lowering (both operands may have
+-        // MIRType_Value).
+-        compareType_ = (lhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
+-        swapOperands();
+-        return;
+-    }
++    // Handle strict string compare.
++    if (strictEq && lhs == MIRType_String)
++        return Compare_StrictString;
++    if (strictEq && rhs == MIRType_String)
++        return Compare_StrictString;
+ 
+-    // Handle compare with rhs being Undefined or Null.
+-    if (!relationalEq && IsNullOrUndefined(rhs)) {
+-        compareType_ = (rhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
+-        return;
+-    }
++    // Handle compare with lhs or rhs being Undefined or Null.
++    if (!relationalEq && IsNullOrUndefined(lhs))
++        return (lhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
++    if (!relationalEq && IsNullOrUndefined(rhs))
++        return (rhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
+ 
+     // Handle strict comparison with lhs/rhs being typed Boolean.
+     if (strictEq && (lhs == MIRType_Boolean || rhs == MIRType_Boolean)) {
+         // bool/bool case got an int32 specialization earlier.
+         MOZ_ASSERT(!(lhs == MIRType_Boolean && rhs == MIRType_Boolean));
++        return Compare_Boolean;
++    }
+ 
+-        // Ensure the boolean is on the right so that the type policy knows
+-        // which side to unbox.
+-        if (lhs == MIRType_Boolean)
+-             swapOperands();
++    return Compare_Unknown;
++}
+ 
+-        compareType_ = Compare_Boolean;
+-        return;
+-    }
++void
++MCompare::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
++{
++    MOZ_ASSERT(operandMightEmulateUndefined());
+ 
+-    // Determine if we can do the compare based on a quick value check.
+-    if (!relationalEq && CanDoValueBitwiseCmp(constraints, getOperand(0), getOperand(1), looseEq)) {
+-        compareType_ = Compare_Value;
++    if (getOperand(0)->maybeEmulatesUndefined(constraints))
++        return;
++    if (getOperand(1)->maybeEmulatesUndefined(constraints))
+         return;
+-    }
+-
+-    // Type information is not good enough to pick out a particular type of
+-    // comparison we can do here. Try to specialize based on any baseline
+-    // caches that have been generated for the opcode. These will cause the
+-    // instruction's type policy to insert fallible unboxes to the appropriate
+-    // input types.
+ 
+-    if (!strictEq)
+-        compareType_ = inspector->expectedCompareType(pc);
++    markNoOperandEmulatesUndefined();
+ }
+ 
+ MBitNot*
+@@ -3053,7 +2965,7 @@ MTypeOf::cacheInputMaybeCallableOrEmulatesUndefined(CompilerConstraintList* cons
+ {
+     MOZ_ASSERT(inputMaybeCallableOrEmulatesUndefined());
+ 
+-    if (!MaybeEmulatesUndefined(constraints, input()) && !MaybeCallable(constraints, input()))
++    if (!input()->maybeEmulatesUndefined(constraints) && !MaybeCallable(constraints, input()))
+         markInputNotCallableOrEmulatesUndefined();
+ }
+ 
+@@ -3874,8 +3786,8 @@ MNot::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
+ {
+     MOZ_ASSERT(operandMightEmulateUndefined());
+ 
+-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)))
+-        markOperandCantEmulateUndefined();
++    if (!getOperand(0)->maybeEmulatesUndefined(constraints))
++        markNoOperandEmulatesUndefined();
+ }
+ 
+ MDefinition*
+diff --git a/js/src/jit/MIR.h b/js/src/jit/MIR.h
+index 8c1889ebfda2..f48c14ae6ce9 100644
+--- a/js/src/jit/MIR.h
++++ b/js/src/jit/MIR.h
+@@ -653,6 +653,8 @@ class MDefinition : public MNode
+ 
+     bool mightBeMagicType() const;
+ 
++    bool maybeEmulatesUndefined(CompilerConstraintList* constraints);
++
+     // Float32 specialization operations (see big comment in IonAnalysis before the Float32
+     // specialization algorithm).
+     virtual bool isFloat32Commutative() const { return false; }
+@@ -827,6 +829,7 @@ class MDefinition : public MNode
+     bool isEffectful() const {
+         return getAliasSet().isStore();
+     }
++
+ #ifdef DEBUG
+     virtual bool needsResumePoint() const {
+         // Return whether this instruction should have its own resume point.
+@@ -1054,6 +1057,11 @@ class MBinaryInstruction : public MAryInstruction<2>
+     MDefinition* rhs() const {
+         return getOperand(1);
+     }
++    void swapOperands() {
++        MDefinition* temp = getOperand(0);
++        replaceOperand(0, getOperand(1));
++        replaceOperand(1, temp);
++    }
+ 
+   protected:
+     HashNumber valueHash() const
+@@ -1063,12 +1071,6 @@ class MBinaryInstruction : public MAryInstruction<2>
+ 
+         return op() + lhs->id() + rhs->id();
+     }
+-    void swapOperands() {
+-        MDefinition* temp = getOperand(0);
+-        replaceOperand(0, getOperand(1));
+-        replaceOperand(1, temp);
+-    }
+-
+     bool binaryCongruentTo(const MDefinition* ins) const
+     {
+         if (op() != ins->op())
+@@ -1103,10 +1105,14 @@ class MBinaryInstruction : public MAryInstruction<2>
+                right == insRight;
+     }
+ 
+-    // Return true if the operands to this instruction are both unsigned,
+-    // in which case any wrapping operands were replaced with the underlying
+-    // int32 operands.
+-    bool tryUseUnsignedOperands();
++  public:
++    // Return if the operands to this instruction are both unsigned.
++    static bool unsignedOperands(MDefinition* left, MDefinition* right);
++    bool unsignedOperands();
++
++    // Replace any wrapping operands with the underlying int32 operands
++    // in case of unsigned operands.
++    void replaceWithUnsignedOperands();
+ };
+ 
+ class MTernaryInstruction : public MAryInstruction<3>
+@@ -2737,7 +2743,7 @@ class MTest
+     void filtersUndefinedOrNull(bool trueBranch, MDefinition** subject, bool* filtersUndefined,
+                                 bool* filtersNull);
+ 
+-    void markOperandCantEmulateUndefined() {
++    void markNoOperandEmulatesUndefined() {
+         operandMightEmulateUndefined_ = false;
+     }
+     bool operandMightEmulateUndefined() const {
+@@ -4205,8 +4211,6 @@ class MCompare
+     void filtersUndefinedOrNull(bool trueBranch, MDefinition** subject, bool* filtersUndefined,
+                                 bool* filtersNull);
+ 
+-    void infer(CompilerConstraintList* constraints,
+-               BaselineInspector* inspector, jsbytecode* pc);
+     CompareType compareType() const {
+         return compareType_;
+     }
+@@ -4265,6 +4269,9 @@ class MCompare
+     void truncate() override;
+     TruncateKind operandTruncateKind(size_t index) const override;
+ 
++    static CompareType determineCompareType(JSOp op, MDefinition* left, MDefinition* right);
++    void cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints);
++
+ # ifdef DEBUG
+     bool isConsistentFloat32Use(MUse* use) const override {
+         // Both sides of the compare can be Float32
+@@ -7076,6 +7083,7 @@ class MBinarySharedStub
+   : public MBinaryInstruction,
+     public MixPolicy<BoxPolicy<0>, BoxPolicy<1> >::Data
+ {
++  protected:
+     explicit MBinarySharedStub(MDefinition* left, MDefinition* right)
+       : MBinaryInstruction(left, right)
+     {
+@@ -8385,7 +8393,7 @@ class MNot
+ 
+     MDefinition* foldsTo(TempAllocator& alloc) override;
+ 
+-    void markOperandCantEmulateUndefined() {
++    void markNoOperandEmulatesUndefined() {
+         operandMightEmulateUndefined_ = false;
+     }
+     bool operandMightEmulateUndefined() const {
+diff --git a/js/src/jit/RangeAnalysis.cpp b/js/src/jit/RangeAnalysis.cpp
+index e05e8d3928f6..dc02838b838b 100644
+--- a/js/src/jit/RangeAnalysis.cpp
++++ b/js/src/jit/RangeAnalysis.cpp
+@@ -2490,8 +2490,10 @@ MDiv::truncate()
+ 
+     // Divisions where the lhs and rhs are unsigned and the result is
+     // truncated can be lowered more efficiently.
+-    if (tryUseUnsignedOperands())
++    if (unsignedOperands()) {
++        replaceWithUnsignedOperands();
+         unsigned_ = true;
++    }
+ }
+ 
+ bool
+@@ -2511,8 +2513,10 @@ MMod::truncate()
+     specialization_ = MIRType_Int32;
+     setResultType(MIRType_Int32);
+ 
+-    if (tryUseUnsignedOperands())
++    if (unsignedOperands()) {
++        replaceWithUnsignedOperands();
+         unsigned_ = true;
++    }
+ }
+ 
+ bool
+diff --git a/js/src/jit/SharedIC.cpp b/js/src/jit/SharedIC.cpp
+index 84c163adb167..ef88a01609c5 100644
+--- a/js/src/jit/SharedIC.cpp
++++ b/js/src/jit/SharedIC.cpp
+@@ -1575,10 +1575,13 @@ static bool
+ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_, HandleValue lhs,
+                   HandleValue rhs, MutableHandleValue ret)
+ {
++    ICStubCompiler::Engine engine = SharedStubEngine(frame);
++    RootedScript script(cx, SharedStubScript(frame, stub_));
++
+     // This fallback stub may trigger debug mode toggling.
+-    DebugModeOSRVolatileStub<ICCompare_Fallback*> stub(frame, stub_);
++    DebugModeOSRVolatileStub<ICCompare_Fallback*> stub(engine, frame, stub_);
+ 
+-    jsbytecode* pc = stub->icEntry()->pc(frame->script());
++    jsbytecode* pc = stub->icEntry()->pc(script);
+     JSOp op = JSOp(*pc);
+ 
+     FallbackICSpew(cx, stub, "Compare(%s)", js_CodeName[op]);
+@@ -1645,12 +1648,10 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+         return true;
+     }
+ 
+-    JSScript* script = frame->script();
+-
+     // Try to generate new stubs.
+     if (lhs.isInt32() && rhs.isInt32()) {
+         JitSpew(JitSpew_BaselineIC, "  Generating %s(Int32, Int32) stub", js_CodeName[op]);
+-        ICCompare_Int32::Compiler compiler(cx, op);
++        ICCompare_Int32::Compiler compiler(cx, op, engine);
+         ICStub* int32Stub = compiler.getStub(compiler.getStubSpace(script));
+         if (!int32Stub)
+             return false;
+@@ -1668,7 +1669,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+         // Unlink int32 stubs, it's faster to always use the double stub.
+         stub->unlinkStubsWithKind(cx, ICStub::Compare_Int32);
+ 
+-        ICCompare_Double::Compiler compiler(cx, op);
++        ICCompare_Double::Compiler compiler(cx, op, engine);
+         ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+         if (!doubleStub)
+             return false;
+@@ -1683,7 +1684,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+         JitSpew(JitSpew_BaselineIC, "  Generating %s(%s, %s) stub", js_CodeName[op],
+                     rhs.isUndefined() ? "Number" : "Undefined",
+                     rhs.isUndefined() ? "Undefined" : "Number");
+-        ICCompare_NumberWithUndefined::Compiler compiler(cx, op, lhs.isUndefined());
++        ICCompare_NumberWithUndefined::Compiler compiler(cx, op, engine, lhs.isUndefined());
+         ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+         if (!doubleStub)
+             return false;
+@@ -1694,7 +1695,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+ 
+     if (lhs.isBoolean() && rhs.isBoolean()) {
+         JitSpew(JitSpew_BaselineIC, "  Generating %s(Boolean, Boolean) stub", js_CodeName[op]);
+-        ICCompare_Boolean::Compiler compiler(cx, op);
++        ICCompare_Boolean::Compiler compiler(cx, op, engine);
+         ICStub* booleanStub = compiler.getStub(compiler.getStubSpace(script));
+         if (!booleanStub)
+             return false;
+@@ -1707,7 +1708,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+         JitSpew(JitSpew_BaselineIC, "  Generating %s(%s, %s) stub", js_CodeName[op],
+                     rhs.isInt32() ? "Boolean" : "Int32",
+                     rhs.isInt32() ? "Int32" : "Boolean");
+-        ICCompare_Int32WithBoolean::Compiler compiler(cx, op, lhs.isInt32());
++        ICCompare_Int32WithBoolean::Compiler compiler(cx, op, engine, lhs.isInt32());
+         ICStub* optStub = compiler.getStub(compiler.getStubSpace(script));
+         if (!optStub)
+             return false;
+@@ -1719,7 +1720,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+     if (IsEqualityOp(op)) {
+         if (lhs.isString() && rhs.isString() && !stub->hasStub(ICStub::Compare_String)) {
+             JitSpew(JitSpew_BaselineIC, "  Generating %s(String, String) stub", js_CodeName[op]);
+-            ICCompare_String::Compiler compiler(cx, op);
++            ICCompare_String::Compiler compiler(cx, op, engine);
+             ICStub* stringStub = compiler.getStub(compiler.getStubSpace(script));
+             if (!stringStub)
+                 return false;
+@@ -1731,7 +1732,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+         if (lhs.isObject() && rhs.isObject()) {
+             MOZ_ASSERT(!stub->hasStub(ICStub::Compare_Object));
+             JitSpew(JitSpew_BaselineIC, "  Generating %s(Object, Object) stub", js_CodeName[op]);
+-            ICCompare_Object::Compiler compiler(cx, op);
++            ICCompare_Object::Compiler compiler(cx, op, engine);
+             ICStub* objectStub = compiler.getStub(compiler.getStubSpace(script));
+             if (!objectStub)
+                 return false;
+@@ -1748,7 +1749,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
+                     js_CodeName[op]);
+             bool lhsIsUndefined = lhs.isNull() || lhs.isUndefined();
+             bool compareWithNull = lhs.isNull() || rhs.isNull();
+-            ICCompare_ObjectWithUndefined::Compiler compiler(cx, op,
++            ICCompare_ObjectWithUndefined::Compiler compiler(cx, op, engine,
+                                                              lhsIsUndefined, compareWithNull);
+             ICStub* objectStub = compiler.getStub(compiler.getStubSpace(script));
+             if (!objectStub)
+@@ -1772,8 +1773,6 @@ static const VMFunction DoCompareFallbackInfo =
+ bool
+ ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     MOZ_ASSERT(R0 == JSReturnOperand);
+ 
+     // Restore the tail call register.
+@@ -1798,8 +1797,6 @@ ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_String::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     Label failure;
+     masm.branchTestString(Assembler::NotEqual, R0, &failure);
+     masm.branchTestString(Assembler::NotEqual, R1, &failure);
+@@ -1828,8 +1825,6 @@ ICCompare_String::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_Boolean::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     Label failure;
+     masm.branchTestBoolean(Assembler::NotEqual, R0, &failure);
+     masm.branchTestBoolean(Assembler::NotEqual, R1, &failure);
+@@ -1858,8 +1853,6 @@ ICCompare_Boolean::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_NumberWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     ValueOperand numberOperand, undefinedOperand;
+     if (lhsIsUndefined) {
+         numberOperand = R1;
+@@ -1892,8 +1885,6 @@ ICCompare_NumberWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_Object::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     Label failure;
+     masm.branchTestObject(Assembler::NotEqual, R0, &failure);
+     masm.branchTestObject(Assembler::NotEqual, R1, &failure);
+@@ -1926,7 +1917,6 @@ ICCompare_Object::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_ObjectWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+     MOZ_ASSERT(IsEqualityOp(op));
+ 
+     ValueOperand objectOperand, undefinedOperand;
+@@ -1992,8 +1982,6 @@ ICCompare_ObjectWithUndefined::Compiler::generateStubCode(MacroAssembler& masm)
+ bool
+ ICCompare_Int32WithBoolean::Compiler::generateStubCode(MacroAssembler& masm)
+ {
+-    MOZ_ASSERT(engine_ == Engine::Baseline);
+-
+     Label failure;
+     ValueOperand int32Val;
+     ValueOperand boolVal;
+diff --git a/js/src/jit/SharedIC.h b/js/src/jit/SharedIC.h
+index b03bb2efc23c..4d8f46f8d3d0 100644
+--- a/js/src/jit/SharedIC.h
++++ b/js/src/jit/SharedIC.h
+@@ -1479,7 +1479,13 @@ class ICUnaryArith_Double : public ICStub
+ 
+ // Compare
+ //      JSOP_LT
++//      JSOP_LE
+ //      JSOP_GT
++//      JSOP_GE
++//      JSOP_EQ
++//      JSOP_NE
++//      JSOP_STRICTEQ
++//      JSOP_STRICTNE
+ 
+ class ICCompare_Fallback : public ICFallbackStub
+ {
+@@ -1505,8 +1511,8 @@ class ICCompare_Fallback : public ICFallbackStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        explicit Compiler(JSContext* cx)
+-          : ICStubCompiler(cx, ICStub::Compare_Fallback, Engine::Baseline) {}
++        explicit Compiler(JSContext* cx, Engine engine)
++          : ICStubCompiler(cx, ICStub::Compare_Fallback, engine) {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+             return newStub<ICCompare_Fallback>(space, getStubCode());
+@@ -1528,8 +1534,8 @@ class ICCompare_Int32 : public ICStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_Int32, op, Engine::Baseline) {}
++        Compiler(JSContext* cx, JSOp op, Engine engine)
++          : ICMultiStubCompiler(cx, ICStub::Compare_Int32, op, engine) {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+             return newStub<ICCompare_Int32>(space, getStubCode());
+@@ -1551,8 +1557,8 @@ class ICCompare_Double : public ICStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_Double, op, Engine::Baseline)
++        Compiler(JSContext* cx, JSOp op, Engine engine)
++          : ICMultiStubCompiler(cx, ICStub::Compare_Double, op, engine)
+         {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+@@ -1583,8 +1589,8 @@ class ICCompare_NumberWithUndefined : public ICStub
+         bool lhsIsUndefined;
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op, bool lhsIsUndefined)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_NumberWithUndefined, op, Engine::Baseline),
++        Compiler(JSContext* cx, JSOp op, Engine engine, bool lhsIsUndefined)
++          : ICMultiStubCompiler(cx, ICStub::Compare_NumberWithUndefined, op, engine),
+             lhsIsUndefined(lhsIsUndefined)
+         {}
+ 
+@@ -1616,8 +1622,8 @@ class ICCompare_String : public ICStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_String, op, Engine::Baseline)
++        Compiler(JSContext* cx, JSOp op, Engine engine)
++          : ICMultiStubCompiler(cx, ICStub::Compare_String, op, engine)
+         {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+@@ -1640,8 +1646,8 @@ class ICCompare_Boolean : public ICStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_Boolean, op, Engine::Baseline)
++        Compiler(JSContext* cx, JSOp op, Engine engine)
++          : ICMultiStubCompiler(cx, ICStub::Compare_Boolean, op, engine)
+         {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+@@ -1664,8 +1670,8 @@ class ICCompare_Object : public ICStub
+         bool generateStubCode(MacroAssembler& masm);
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_Object, op, Engine::Baseline)
++        Compiler(JSContext* cx, JSOp op, Engine engine)
++          : ICMultiStubCompiler(cx, ICStub::Compare_Object, op, engine)
+         {}
+ 
+         ICStub* getStub(ICStubSpace* space) {
+@@ -1691,8 +1697,8 @@ class ICCompare_ObjectWithUndefined : public ICStub
+         bool compareWithNull;
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op, bool lhsIsUndefined, bool compareWithNull)
+-          : ICMultiStubCompiler(cx, ICStub::Compare_ObjectWithUndefined, op, Engine::Baseline),
++        Compiler(JSContext* cx, JSOp op, Engine engine, bool lhsIsUndefined, bool compareWithNull)
++          : ICMultiStubCompiler(cx, ICStub::Compare_ObjectWithUndefined, op, engine),
+             lhsIsUndefined(lhsIsUndefined),
+             compareWithNull(compareWithNull)
+         {}
+@@ -1741,8 +1747,8 @@ class ICCompare_Int32WithBoolean : public ICStub
+         }
+ 
+       public:
+-        Compiler(JSContext* cx, JSOp op, bool lhsIsInt32)
+-          : ICStubCompiler(cx, ICStub::Compare_Int32WithBoolean, Engine::Baseline),
++        Compiler(JSContext* cx, JSOp op, Engine engine, bool lhsIsInt32)
++          : ICStubCompiler(cx, ICStub::Compare_Int32WithBoolean, engine),
+             op_(op),
+             lhsIsInt32_(lhsIsInt32)
+         {}
