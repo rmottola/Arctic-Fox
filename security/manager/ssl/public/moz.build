@@ -26,7 +26,6 @@ XPIDL_SOURCES += [
     'nsIPKCS11ModuleDB.idl',
     'nsIPKCS11Slot.idl',
     'nsIProtectedAuthThread.idl',
-    'nsISSLErrorListener.idl',
     'nsISSLStatus.idl',
     'nsITokenDialogs.idl',
     'nsITokenPasswordDialogs.idl',
