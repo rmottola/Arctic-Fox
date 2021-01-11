@@ -215,9 +215,7 @@ XULDocument::~XULDocument()
     mPersistenceIds.Clear();
 
     // Destroy our broadcaster map.
-    if (mBroadcasterMap) {
-        PL_DHashTableDestroy(mBroadcasterMap);
-    }
+    delete mBroadcasterMap;
 
     delete mTemplateBuilderTable;
 
@@ -764,7 +762,7 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
     };
 
     if (! mBroadcasterMap) {
-        mBroadcasterMap = PL_NewDHashTable(&gOps, sizeof(BroadcasterMapEntry));
+        mBroadcasterMap = new PLDHashTable2(&gOps, sizeof(BroadcasterMapEntry));
     }
 
     BroadcasterMapEntry* entry =
