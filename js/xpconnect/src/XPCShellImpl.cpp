@@ -54,6 +54,8 @@
 
 using namespace mozilla;
 using namespace JS;
+using mozilla::dom::AutoJSAPI;
+using mozilla::dom::AutoEntryScript;
 
 class XPCShellDirProvider : public nsIDirectoryServiceProvider2
 {
@@ -825,8 +827,9 @@ my_GetErrorMessage(void* userRef, const unsigned errorNumber)
 }
 
 static void
-ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
+ProcessFile(AutoJSAPI& jsapi, const char* filename, FILE* file, bool forceTTY)
 {
+    JSContext* cx = jsapi.cx();
     JS::RootedScript script(cx);
     JS::RootedValue result(cx);
     int lineno, startline;
@@ -857,7 +860,6 @@ ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
             }
         }
         ungetc(ch, file);
-        JS_BeginRequest(cx);
 
         JS::CompileOptions options(cx);
         options.setUTF8(true)
@@ -865,7 +867,6 @@ ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
                .setIsRunOnce(true);
         if (JS::Compile(cx, options, file, &script) && !compileOnly)
             (void)JS_ExecuteScript(cx, script, &result);
-        JS_EndRequest(cx);
 
         return;
     }
@@ -893,7 +894,6 @@ ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
             lineno++;
         } while (!JS_BufferIsCompilableUnit(cx, global, buffer, strlen(buffer)));
 
-        JS_BeginRequest(cx);
         /* Clear any pending exception from previous failed compiles.  */
         JS_ClearPendingException(cx);
         JS::CompileOptions options(cx);
@@ -917,14 +917,13 @@ ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
                 }
             }
         }
-        JS_EndRequest(cx);
     } while (!hitEOF && !gQuitting);
 
     fprintf(gOutFile, "\n");
 }
 
 static void
-Process(JSContext* cx, const char* filename, bool forceTTY)
+Process(AutoJSAPI& jsapi, const char* filename, bool forceTTY)
 {
     FILE* file;
 
@@ -933,7 +932,7 @@ Process(JSContext* cx, const char* filename, bool forceTTY)
     } else {
         file = fopen(filename, "r");
         if (!file) {
-            JS_ReportErrorNumber(cx, my_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(jsapi.cx(), my_GetErrorMessage, nullptr,
                                  JSSMSG_CANT_OPEN,
                                  filename, strerror(errno));
             gExitCode = EXITCODE_FILE_NOT_FOUND;
@@ -941,7 +940,7 @@ Process(JSContext* cx, const char* filename, bool forceTTY)
         }
     }
 
-    ProcessFile(cx, filename, file, forceTTY);
+    ProcessFile(jsapi, filename, file, forceTTY);
     if (file != stdin)
         fclose(file);
 }
@@ -982,8 +981,9 @@ ProcessArgsForCompartment(JSContext* cx, char** argv, int argc)
 }
 
 static int
-ProcessArgs(JSContext* cx, char** argv, int argc, XPCShellDirProvider* aDirProvider)
+ProcessArgs(AutoJSAPI& jsapi, char** argv, int argc, XPCShellDirProvider* aDirProvider)
 {
+    JSContext* cx = jsapi.cx();
     const char rcfilename[] = "xpcshell.js";
     FILE* rcfile;
     int rootPosition;
@@ -995,7 +995,7 @@ ProcessArgs(JSContext* cx, char** argv, int argc, XPCShellDirProvider* aDirProvi
     rcfile = fopen(rcfilename, "r");
     if (rcfile) {
         printf("[loading '%s'...]\n", rcfilename);
-        ProcessFile(cx, rcfilename, rcfile, false);
+        ProcessFile(jsapi, rcfilename, rcfile, false);
         fclose(rcfile);
     }
 
@@ -1074,7 +1074,7 @@ ProcessArgs(JSContext* cx, char** argv, int argc, XPCShellDirProvider* aDirProvi
             if (++i == argc) {
                 return usage();
             }
-            Process(cx, argv[i], false);
+            Process(jsapi, argv[i], false);
             /*
              * XXX: js -f foo.js should interpret foo.js and then
              * drop into interactive mode, but that breaks test
@@ -1127,7 +1127,7 @@ ProcessArgs(JSContext* cx, char** argv, int argc, XPCShellDirProvider* aDirProvi
     }
 
     if (filename || isInteractive)
-        Process(cx, filename, forceTTY);
+        Process(jsapi, filename, forceTTY);
 
     return gExitCode;
 }
@@ -1411,7 +1411,7 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
         JS_SetErrorReporter(rt, XPCShellErrorReporter);
 
-        dom::AutoJSAPI jsapi;
+        AutoJSAPI jsapi;
         jsapi.Init();
         cx = jsapi.cx();
 
@@ -1524,9 +1524,8 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
             // We are almost certainly going to run script here, so we need an
             // AutoEntryScript. This is Gecko-specific and not in any spec.
-            dom::AutoEntryScript aes(backstagePass,
-                                     "xpcshell argument processing");
-            result = ProcessArgs(aes.cx(), argv, argc, &dirprovider);
+            AutoEntryScript aes(backstagePass, "xpcshell argument processing");
+            result = ProcessArgs(aes, argv, argc, &dirprovider);
 
             JS_DropPrincipals(rt, gJSPrincipals);
             JS_SetAllNonReservedSlotsToUndefined(aes.cx(), glob);
