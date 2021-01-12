@@ -153,6 +153,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1041586 - Autogenerate symbol names
 - Bug 1242578
 - Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
+- Bug 1165515 - Part 1: Convert PR_LOG to MOZ_LOG. r=froydnj
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
