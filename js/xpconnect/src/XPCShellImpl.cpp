@@ -31,6 +31,7 @@
 #include "nsIScriptSecurityManager.h"
 #include "nsIPrincipal.h"
 #include "nsJSUtils.h"
+#include "gfxPrefs.h"
 
 #include "base/histogram.h"
 
@@ -1463,6 +1464,9 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
                                                   getter_AddRefs(holder));
         if (NS_FAILED(rv))
             return 1;
+
+        // Initialize graphics prefs on the main thread, if not already done
+        gfxPrefs::GetSingleton();
 
         {
             JS::Rooted<JSObject*> glob(cx, holder->GetJSObject());
