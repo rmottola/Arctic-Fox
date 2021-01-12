@@ -825,7 +825,7 @@ my_GetErrorMessage(void* userRef, const unsigned errorNumber)
 }
 
 static void
-ProcessFile(JSContext *cx, const char *filename, FILE *file, bool forceTTY)
+ProcessFile(JSContext* cx, const char* filename, FILE* file, bool forceTTY)
 {
     JS::RootedScript script(cx);
     JS::RootedValue result(cx);
@@ -924,9 +924,9 @@ ProcessFile(JSContext *cx, const char *filename, FILE *file, bool forceTTY)
 }
 
 static void
-Process(JSContext *cx, const char *filename, bool forceTTY)
+Process(JSContext* cx, const char* filename, bool forceTTY)
 {
-    FILE *file;
+    FILE* file;
 
     if (forceTTY || !filename || strcmp(filename, "-") == 0) {
         file = stdin;
@@ -982,11 +982,11 @@ ProcessArgsForCompartment(JSContext* cx, char** argv, int argc)
 }
 
 static int
-ProcessArgs(JSContext *cx, char **argv, int argc, XPCShellDirProvider* aDirProvider)
+ProcessArgs(JSContext* cx, char** argv, int argc, XPCShellDirProvider* aDirProvider)
 {
     const char rcfilename[] = "xpcshell.js";
     FILE* rcfile;
-    int i;
+    int rootPosition;
     JS::Rooted<JSObject*> argsObj(cx);
     char* filename = nullptr;
     bool isInteractive = true;
@@ -1006,19 +1006,22 @@ ProcessArgs(JSContext *cx, char **argv, int argc, XPCShellDirProvider* aDirProvi
      * before processing any -f options, which must interleave properly with
      * -v and -w options.  This requires two passes, and without getopt, we'll
      * have to keep the option logic here and in the second for loop in sync.
+     * First of all, find out the first argument position which will be passed
+     * as a script file to be executed.
      */
-    for (i = 0; i < argc; i++) {
-        if (argv[i][0] != '-' || argv[i][1] == '\0') {
-            ++i;
+    for (rootPosition = 0; rootPosition < argc; rootPosition++) {
+        if (argv[rootPosition][0] != '-' || argv[rootPosition][1] == '\0') {
+            ++rootPosition;
             break;
         }
-        switch (argv[i][1]) {
-          case 'v':
-          case 'f':
-          case 'e':
-            ++i;
-            break;
-          default:;
+
+        bool isPairedFlag =
+            argv[rootPosition][0] != '\0' &&
+            (argv[rootPosition][1] == 'v' ||
+             argv[rootPosition][1] == 'f' ||
+             argv[rootPosition][1] == 'e');
+        if (isPairedFlag && rootPosition < argc - 1) {
+          ++rootPosition; // Skip over the 'foo' portion of |-v foo|, |-f foo|, or |-e foo|.
         }
     }
 
@@ -1032,15 +1035,15 @@ ProcessArgs(JSContext *cx, char **argv, int argc, XPCShellDirProvider* aDirProvi
     if (!JS_DefineProperty(cx, global, "arguments", argsObj, 0))
         return 1;
 
-    for (size_t j = 0, length = argc - i; j < length; j++) {
-        RootedString str(cx, JS_NewStringCopyZ(cx, argv[i++]));
+    for (int j = 0, length = argc - rootPosition; j < length; j++) {
+        RootedString str(cx, JS_NewStringCopyZ(cx, argv[rootPosition++]));
         if (!str ||
             !JS_DefineElement(cx, argsObj, j, str, JSPROP_ENUMERATE)) {
             return 1;
         }
     }
 
-    for (i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         if (argv[i][0] != '-' || argv[i][1] == '\0') {
             filename = argv[i++];
             isInteractive = false;
