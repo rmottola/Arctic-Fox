@@ -127,6 +127,8 @@ pref("dom.indexedDB.experimental", false);
 pref("dom.indexedDB.logging.enabled", true);
 // Detailed output in log messages.
 pref("dom.indexedDB.logging.details", true);
+// Enable profiler marks for indexedDB events.
+pref("dom.indexedDB.logging.profiler-marks", false);
 
 // Whether or not selection events are enabled
 pref("dom.select_events.enabled", true);
