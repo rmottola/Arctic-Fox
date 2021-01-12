@@ -131,9 +131,6 @@ public:
    */
   EntryType* GetEntry(KeyType aKey) const
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     return static_cast<EntryType*>(
       PL_DHashTableSearch(const_cast<PLDHashTable*>(&mTable),
                           EntryType::KeyToPointer(aKey)));
@@ -154,9 +151,6 @@ public:
    */
   EntryType* PutEntry(KeyType aKey)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     return static_cast<EntryType*>  // infallible add
       (PL_DHashTableAdd(&mTable, EntryType::KeyToPointer(aKey)));
   }
@@ -164,9 +158,6 @@ public:
   MOZ_WARN_UNUSED_RESULT
   EntryType* PutEntry(KeyType aKey, const fallible_t&)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     return static_cast<EntryType*>
       (PL_DHashTableAdd(&mTable, EntryType::KeyToPointer(aKey),
                         mozilla::fallible));
@@ -178,9 +169,6 @@ public:
    */
   void RemoveEntry(KeyType aKey)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     PL_DHashTableRemove(&mTable,
                         EntryType::KeyToPointer(aKey));
   }
@@ -219,9 +207,6 @@ public:
    */
   uint32_t EnumerateEntries(Enumerator aEnumFunc, void* aUserArg)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     s_EnumArgs args = { aEnumFunc, aUserArg };
     return PL_DHashTableEnumerate(&mTable, s_EnumStub, &args);
   }
@@ -231,9 +216,6 @@ public:
    */
   void Clear()
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     PL_DHashTableEnumerate(&mTable, PL_DHashStubEnumRemove, nullptr);
   }
 
@@ -321,9 +303,6 @@ public:
    */
   void MarkImmutable()
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     PL_DHashMarkTableImmutable(&mTable);
   }
 #endif
