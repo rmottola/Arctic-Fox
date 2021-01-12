@@ -186,7 +186,7 @@ MobileMessageCallback::NotifyMessageDeleted(bool *aDeleted, uint32_t aSize)
 {
   if (aSize == 1) {
     AutoJSContext cx;
-    JS::Rooted<JS::Value> val(cx, aDeleted[0] ? JSVAL_TRUE : JSVAL_FALSE);
+    JS::Rooted<JS::Value> val(cx, JS::BooleanValue(*aDeleted));
     return NotifySuccess(val);
   }
 
@@ -215,7 +215,7 @@ NS_IMETHODIMP
 MobileMessageCallback::NotifyMessageMarkedRead(bool aRead)
 {
   AutoJSContext cx;
-  JS::Rooted<JS::Value> val(cx, aRead ? JSVAL_TRUE : JSVAL_FALSE);
+  JS::Rooted<JS::Value> val(cx, JS::BooleanValue(aRead));
   return NotifySuccess(val);
 }
 

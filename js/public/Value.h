@@ -1673,6 +1673,7 @@ class ValueOperations
     bool isFalse() const { return value()->isFalse(); }
     bool isNumber() const { return value()->isNumber(); }
     bool isInt32() const { return value()->isInt32(); }
+    bool isInt32(int32_t i32) const { return value()->isInt32(i32); }
     bool isDouble() const { return value()->isDouble(); }
     bool isString() const { return value()->isString(); }
     bool isSymbol() const { return value()->isSymbol(); }
@@ -1965,17 +1966,6 @@ UINT_TO_JSVAL(uint32_t i)
            ? INT_TO_JSVAL((int32_t)i)
            : DOUBLE_TO_JSVAL((double)i);
 }
-
-// JS constants. For efficiency, prefer predicates (e.g. v.isNull()) and
-// constructing values from scratch (e.g. Int32Value(0)).  These constants are
-// stored in memory and initialized at startup, so testing against them and
-// using them requires memory loads and will be correspondingly slow.
-extern JS_PUBLIC_DATA(const jsval) JSVAL_NULL;
-extern JS_PUBLIC_DATA(const jsval) JSVAL_ZERO;
-extern JS_PUBLIC_DATA(const jsval) JSVAL_ONE;
-extern JS_PUBLIC_DATA(const jsval) JSVAL_FALSE;
-extern JS_PUBLIC_DATA(const jsval) JSVAL_TRUE;
-extern JS_PUBLIC_DATA(const jsval) JSVAL_VOID;
 
 namespace JS {
 

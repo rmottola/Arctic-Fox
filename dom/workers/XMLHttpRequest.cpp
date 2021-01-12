@@ -1184,7 +1184,7 @@ EventRunnable::PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   if (NS_SUCCEEDED(mResponseTextResult)) {
     mResponseResult = mResponseTextResult;
     if (mResponseText.IsVoid()) {
-      mResponse = JSVAL_NULL;
+      mResponse.setNull();
     }
   }
   else {
