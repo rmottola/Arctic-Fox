@@ -55,7 +55,7 @@ protected:
   // the pres shell owns the style set
   nsStyleSet*                     mStyleSet;
   nsIFrame*                       mRootFrame;
-  PLDHashTable2                   mPlaceholderMap;
+  PLDHashTable                    mPlaceholderMap;
   UndisplayedMap*                 mUndisplayedMap;
   UndisplayedMap*                 mDisplayContentsMap;
   bool                            mIsDestroyingFrames;  // The frame manager is destroying some frame(s).

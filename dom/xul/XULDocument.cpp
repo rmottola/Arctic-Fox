@@ -762,7 +762,7 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
     };
 
     if (! mBroadcasterMap) {
-        mBroadcasterMap = new PLDHashTable2(&gOps, sizeof(BroadcasterMapEntry));
+        mBroadcasterMap = new PLDHashTable(&gOps, sizeof(BroadcasterMapEntry));
     }
 
     BroadcasterMapEntry* entry =

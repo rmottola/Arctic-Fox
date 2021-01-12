@@ -1504,7 +1504,7 @@ protected:
 
   nsTArray<nsIObserver*> mCharSetObservers;
 
-  PLDHashTable2 *mSubDocuments;
+  PLDHashTable *mSubDocuments;
 
   // Array of owning references to all children
   nsAttrAndChildArray mChildren;
