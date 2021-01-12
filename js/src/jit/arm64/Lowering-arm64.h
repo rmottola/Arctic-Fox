@@ -22,9 +22,8 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
   protected:
     // Adds a box input to an instruction, setting operand |n| to the type and
     // |n+1| to the payload.
-    void useBox(LInstruction* lir, size_t n, MDefinition* mir,
-                LUse::Policy policy = LUse::REGISTER, bool useAtStart = false);
-    void useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1, Register reg2);
+    void useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1, Register reg2,
+                     bool useAtStart = false);
 
     LAllocation useByteOpRegister(MDefinition* mir);
     LAllocation useByteOpRegisterOrNonDoubleConstant(MDefinition* mir);
@@ -70,8 +69,6 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
 
     void lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
                                  MDefinition* lhs, MDefinition* rhs);
-    void lowerConstantDouble(double d, MInstruction* ins);
-    void lowerConstantFloat32(float d, MInstruction* ins);
     void lowerTruncateDToInt32(MTruncateToInt32* ins);
     void lowerTruncateFToInt32(MTruncateToInt32* ins);
     void lowerDivI(MDiv* div);
@@ -88,7 +85,6 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
                                   MTableSwitch* ins);
 
   public:
-    void visitConstant(MConstant* ins);
     void visitBox(MBox* box);
     void visitUnbox(MUnbox* unbox);
     void visitReturn(MReturn* ret);

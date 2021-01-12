@@ -1155,11 +1155,6 @@ toolbar[iconsize="small"] #feed-button {
   margin-top: 5px;
 }
 
-/* Notification popup */
-#notification-popup {
-  min-width: 280px;
-}
-
 %include ../shared/notification-icons.inc.css
 
 .addon-progress-description {
@@ -1201,6 +1196,42 @@ toolbar[iconsize="small"] #feed-button {
   list-style-image: url(chrome://global/skin/icons/information-16.png);
 }
 
+.popup-notification-icon[popupid="geolocation"] {
+  list-style-image: url(chrome://browser/skin/Geolocation-64.png);
+}
+
+.popup-notification-icon[popupid="xpinstall-disabled"],
+.popup-notification-icon[popupid="addon-progress"],
+.popup-notification-icon[popupid="addon-install-blocked"],
+.popup-notification-icon[popupid="addon-install-failed"],
+.popup-notification-icon[popupid="addon-install-confirmation"],
+.popup-notification-icon[popupid="addon-install-complete"] {
+  list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric.png);
+  width: 32px;
+  height: 32px;
+}
+
+.popup-notification-description[popupid="addon-progress"],
+.popup-notification-description[popupid="addon-install-confirmation"] {
+  width: 27em;
+  max-width: 27em;
+}
+
+.popup-progress-meter {
+  margin-top: .5em;
+}
+
+.addon-install-confirmation-name {
+  font-weight: bold;
+}
+
+.popup-notification-icon[popupid="click-to-play-plugins"] {
+  list-style-image: url(chrome://mozapps/skin/plugins/pluginBlocked-64.png);
+}
+
+.popup-notification-icon[popupid="web-notifications"] {
+  list-style-image: url(chrome://browser/skin/notification-64.png);
+}
 
 .indexedDB-notification-icon,
 #indexedDB-notification-icon {

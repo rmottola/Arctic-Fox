@@ -19,7 +19,7 @@
 # include "jit/arm/Lowering-arm.h"
 #elif defined(JS_CODEGEN_ARM64)
 # include "jit/arm64/Lowering-arm64.h"
-#elif defined(JS_CODEGEN_MIPS)
+#elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/Lowering-mips32.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/Lowering-none.h"
@@ -50,6 +50,7 @@ class LIRGenerator : public LIRGeneratorSpecific
 
     void useBoxAtStart(LInstruction* lir, size_t n, MDefinition* mir,
                        LUse::Policy policy = LUse::REGISTER);
+    void useBoxFixedAtStart(LInstruction* lir, size_t n, MDefinition* mir, ValueOperand op);
 
     void lowerBitOp(JSOp op, MInstruction* ins);
     void lowerShiftOp(JSOp op, MShiftInstruction* ins);
@@ -160,6 +161,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitRegExpTest(MRegExpTest* ins);
     void visitRegExpReplace(MRegExpReplace* ins);
     void visitStringReplace(MStringReplace* ins);
+    void visitBinarySharedStub(MBinarySharedStub* ins);
+    void visitUnarySharedStub(MUnarySharedStub* ins);
     void visitLambda(MLambda* ins);
     void visitLambdaArrow(MLambdaArrow* ins);
     void visitKeepAliveObject(MKeepAliveObject* ins);

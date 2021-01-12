@@ -260,9 +260,6 @@ public:
                        Modifiers aModifiers,
                        const ScrollableLayerGuid& aGuid,
                        uint64_t aInputBlockId);
-    void HandleLongTapUp(const CSSPoint& aPoint,
-                         Modifiers aModifiers,
-                         const ScrollableLayerGuid& aGuid);
     void NotifyAPZStateChange(ViewID aViewId,
                               APZStateChange aChange,
                               int aArg);
@@ -323,7 +320,6 @@ public:
     bool SendRealTouchEvent(WidgetTouchEvent& event);
     bool SendHandleSingleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid);
     bool SendHandleLongTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId);
-    bool SendHandleLongTapUp(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid);
     bool SendHandleDoubleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid);
 
     virtual PDocumentRendererParent*
@@ -502,20 +498,21 @@ private:
 
     CSSPoint AdjustTapToChildWidget(const CSSPoint& aPoint);
 
+    bool AsyncPanZoomEnabled() const;
+
     // Update state prior to routing an APZ-aware event to the child process.
     // |aOutTargetGuid| will contain the identifier
-    // of the APZC instance that handled the event. aOutTargetGuid may be
-    // null.
+    // of the APZC instance that handled the event. aOutTargetGuid may be null.
     // |aOutInputBlockId| will contain the identifier of the input block
-    // that this event was added to, if there was one. aOutInputBlockId may
-    // be null.
+    // that this event was added to, if there was one. aOutInputBlockId may be null.
+    // |aOutApzResponse| will contain the response that the APZ gave when processing
+    // the input block; this is used for generating appropriate pointercancel events.
     void ApzAwareEventRoutingToChild(ScrollableLayerGuid* aOutTargetGuid,
-                                     uint64_t* aOutInputBlockId);
-    // When true, we've initiated normal shutdown and notified our
-    // managing PContent.
+                                     uint64_t* aOutInputBlockId,
+                                     nsEventStatus* aOutApzResponse);
+    // When true, we've initiated normal shutdown and notified our managing PContent.
     bool mMarkedDestroying;
-    // When true, the TabParent is invalid and we should not send IPC messages
-    // anymore.
+    // When true, the TabParent is invalid and we should not send IPC messages anymore.
     bool mIsDestroyed;
     // Whether we have already sent a FileDescriptor for the app package.
     bool mAppPackageFileDescriptorSent;

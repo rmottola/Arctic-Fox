@@ -104,7 +104,9 @@
 namespace js {
 
 template <typename T>
-struct GCMethods {};
+struct GCMethods {
+    static T initial() { return T(); }
+};
 
 template <typename T>
 class RootedBase {};
@@ -627,6 +629,66 @@ struct GCMethods<JSFunction*>
 
 namespace JS {
 
+// If a class containing GC pointers has (or can gain) a vtable, then it can be
+// trivially used with Rooted/Handle/MutableHandle by deriving from
+// DynamicTraceable and overriding |void trace(JSTracer*)|.
+class DynamicTraceable
+{
+  public:
+    static js::ThingRootKind rootKind() { return js::THING_ROOT_DYNAMIC_TRACEABLE; }
+
+    virtual ~DynamicTraceable() {}
+    virtual void trace(JSTracer* trc) = 0;
+};
+
+// To use a static class or struct (e.g. not containing a vtable) as part of a
+// Rooted/Handle/MutableHandle, ensure that it derives from StaticTraceable
+// (i.e. so that automatic upcast via calls works) and ensure that a method
+// |static void trace(T*, JSTracer*)| exists on the class.
+class StaticTraceable
+{
+  public:
+    static js::ThingRootKind rootKind() { return js::THING_ROOT_STATIC_TRACEABLE; }
+};
+
+} /* namespace JS */
+
+namespace js {
+
+template <typename T>
+class DispatchWrapper
+{
+    static_assert(mozilla::IsBaseOf<JS::StaticTraceable, T>::value,
+                  "DispatchWrapper is intended only for usage with a StaticTraceable");
+
+    using TraceFn = void (*)(T*, JSTracer*);
+    TraceFn tracer;
+#if JS_BITS_PER_WORD == 32
+    uint32_t padding; // Ensure the storage fields have CellSize alignment.
+#endif
+    T storage;
+
+  public:
+    // Mimic a pointer type, so that we can drop into Rooted.
+    MOZ_IMPLICIT DispatchWrapper(const T& initial) : tracer(&T::trace), storage(initial) {}
+    T* operator &() { return &storage; }
+    const T* operator &() const { return &storage; }
+    operator T&() { return storage; }
+    operator const T&() const { return storage; }
+
+    // Trace the contained storage (of unknown type) using the trace function
+    // we set aside when we did know the type.
+    static void TraceWrapped(JSTracer* trc, JS::StaticTraceable* thingp, const char* name) {
+        auto wrapper = reinterpret_cast<DispatchWrapper*>(
+                           uintptr_t(thingp) - offsetof(DispatchWrapper, storage));
+        wrapper->tracer(&wrapper->storage, trc);
+    }
+};
+
+} /* namespace js */
+
+namespace JS {
+
 /*
  * Local variable of type T whose value is always rooted. This is typically
  * used for local variables, or for non-rooted values being passed to a
@@ -638,11 +700,15 @@ namespace JS {
 template <typename T>
 class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
 {
+    static_assert(!mozilla::IsConvertible<T, StaticTraceable*>::value &&
+                  !mozilla::IsConvertible<T, DynamicTraceable*>::value,
+                  "Rooted takes pointer or Traceable types but not Traceable* type");
+
     /* Note: CX is a subclass of either ContextFriendFields or PerThreadDataFriendFields. */
     template <typename CX>
     void init(CX* cx) {
         js::ThingRootKind kind = js::RootKind<T>::rootKind();
-        this->stack = &cx->thingGCRooters[kind];
+        this->stack = &cx->roots.stackRoots_[kind];
         this->prev = *stack;
         *stack = reinterpret_cast<Rooted<void*>*>(this);
     }
@@ -656,7 +722,7 @@ class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
         init(js::ContextFriendFields::get(cx));
     }
 
-    Rooted(JSContext* cx, T initial
+    Rooted(JSContext* cx, const T& initial
            MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : ptr(initial)
     {
@@ -672,7 +738,7 @@ class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
         init(cx);
     }
 
-    Rooted(js::ContextFriendFields* cx, T initial
+    Rooted(js::ContextFriendFields* cx, const T& initial
            MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : ptr(initial)
     {
@@ -688,7 +754,7 @@ class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
         init(pt);
     }
 
-    Rooted(js::PerThreadDataFriendFields* pt, T initial
+    Rooted(js::PerThreadDataFriendFields* pt, const T& initial
            MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : ptr(initial)
     {
@@ -704,7 +770,7 @@ class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
         init(js::PerThreadDataFriendFields::getMainThread(rt));
     }
 
-    Rooted(JSRuntime* rt, T initial
+    Rooted(JSRuntime* rt, const T& initial
            MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
       : ptr(initial)
     {
@@ -743,10 +809,18 @@ class MOZ_STACK_CLASS Rooted : public js::RootedBase<T>
     Rooted<void*>* prev;
 
     /*
-     * |ptr| must be the last field in Rooted because the analysis treats all
-     * Rooted as Rooted<void*> during the analysis. See bug 829372.
+     * For pointer types, the TraceKind for tracing is based on the list it is
+     * in (selected via rootKind), so no additional storage is required here.
+     * All StaticTraceable, however, share the same list, so the function to
+     * call for tracing is stored adjacent to the struct. Since C++ cannot
+     * templatize on storage class, this is implemented via the wrapper class
+     * DispatchWrapper.
      */
-    T ptr;
+    using MaybeWrapped = typename mozilla::Conditional<
+        mozilla::IsBaseOf<StaticTraceable, T>::value,
+        js::DispatchWrapper<T>,
+        T>::Type;
+    MaybeWrapped ptr;
 
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 

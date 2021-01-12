@@ -73,7 +73,7 @@ enum CheckboxValue {
 
 - (BOOL)accessibilityIsIgnored
 {
-  return !mGeckoAccessible;
+  return ![self getGeckoAccessible];
 }
 
 - (NSArray*)accessibilityActionNames
@@ -118,12 +118,13 @@ enum CheckboxValue {
 {
   // both buttons and checkboxes have only one action. we should really stop using arbitrary
   // arrays with actions, and define constants for these actions.
-  mGeckoAccessible->DoAction(0);
+  [self getGeckoAccessible]->DoAction(0);
 }
 
 - (BOOL)isTab
 {
-  return (mGeckoAccessible && (mGeckoAccessible->Role() == roles::PAGETAB));
+  AccessibleWrap* accWrap = [self getGeckoAccessible];
+  return (accWrap && (accWrap->Role() == roles::PAGETAB));
 }
 
 @end
@@ -137,10 +138,10 @@ enum CheckboxValue {
   if ([action isEqualToString:NSAccessibilityPressAction]) {
     if ([self isChecked] != kUnchecked)
       return @"uncheck checkbox"; // XXX: localize this later?
-    
+
     return @"check checkbox"; // XXX: localize this later?
   }
-  
+
   return nil;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -148,13 +149,13 @@ enum CheckboxValue {
 
 - (int)isChecked
 {
-  uint64_t state = mGeckoAccessible->NativeState();
+  uint64_t state = [self getGeckoAccessible]->NativeState();
 
   // check if we're checked or in a mixed state
   if (state & states::CHECKED) {
     return (state & states::MIXED) ? kMixed : kChecked;
   }
-  
+
   return kUnchecked;
 }
 
@@ -267,24 +268,24 @@ enum CheckboxValue {
 {
   // standard attributes that are shared and supported by root accessible (AXMain) elements.
   static NSMutableArray* attributes = nil;
-  
+
   if (!attributes) {
     attributes = [[super accessibilityAttributeNames] mutableCopy];
     [attributes addObject:NSAccessibilityContentsAttribute];
     [attributes addObject:NSAccessibilityTabsAttribute];
   }
-  
-  return attributes;  
+
+  return attributes;
 }
 
 - (id)accessibilityAttributeValue:(NSString *)attribute
-{  
+{
   if ([attribute isEqualToString:NSAccessibilityContentsAttribute])
     return [super children];
   if ([attribute isEqualToString:NSAccessibilityTabsAttribute])
     return [self tabs];
-  
-  return [super accessibilityAttributeValue:attribute];  
+
+  return [super accessibilityAttributeValue:attribute];
 }
 
 /**
@@ -292,10 +293,10 @@ enum CheckboxValue {
  */
 - (id)value
 {
-  if (!mGeckoAccessible)
+  if (![self getGeckoAccessible])
     return nil;
 
-  Accessible* accessible = mGeckoAccessible->GetSelectedItem(0);
+  Accessible* accessible = [self getGeckoAccessible]->GetSelectedItem(0);
   if (!accessible)
     return nil;
 
@@ -316,7 +317,7 @@ enum CheckboxValue {
   NSArray* children = [self children];
   NSEnumerator* enumerator = [children objectEnumerator];
   mTabs = [[NSMutableArray alloc] init];
-  
+
   id obj;
   while ((obj = [enumerator nextObject]))
     if ([obj isTab])
@@ -339,29 +340,29 @@ enum CheckboxValue {
 
 - (NSUInteger)accessibilityArrayAttributeCount:(NSString*)attribute
 {
-  if (!mGeckoAccessible)
+  if (![self getGeckoAccessible])
     return 0;
 
   // By default this calls -[[mozAccessible children] count].
   // Since we don't cache mChildren. This is faster.
   if ([attribute isEqualToString:NSAccessibilityChildrenAttribute])
-    return mGeckoAccessible->ChildCount() ? 1 : 0;
+    return [self getGeckoAccessible]->ChildCount() ? 1 : 0;
 
   return [super accessibilityArrayAttributeCount:attribute];
 }
 
 - (NSArray*)children
 {
-  if (!mGeckoAccessible)
+  if (![self getGeckoAccessible])
     return nil;
 
-  nsDeckFrame* deckFrame = do_QueryFrame(mGeckoAccessible->GetFrame());
+  nsDeckFrame* deckFrame = do_QueryFrame([self getGeckoAccessible]->GetFrame());
   nsIFrame* selectedFrame = deckFrame ? deckFrame->GetSelectedBox() : nullptr;
 
   Accessible* selectedAcc = nullptr;
   if (selectedFrame) {
     nsINode* node = selectedFrame->GetContent();
-    selectedAcc = mGeckoAccessible->Document()->GetAccessible(node);
+    selectedAcc = [self getGeckoAccessible]->Document()->GetAccessible(node);
   }
 
   if (selectedAcc) {

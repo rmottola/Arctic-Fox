@@ -47,7 +47,7 @@ public:
     , mScrollableRect(0, 0, 0, 0)
     , mCumulativeResolution()
     , mDevPixelsPerCSSPixel(1)
-    , mIsRoot(false)
+    , mIsRootContent(false)
     , mHasScrollgrab(false)
     , mScrollId(NULL_SCROLL_ID)
     , mScrollParentId(NULL_SCROLL_ID)
@@ -67,6 +67,8 @@ public:
     , mLineScrollAmount(0, 0)
     , mPageScrollAmount(0, 0)
     , mAllowVerticalScrollWithWheel(false)
+    , mIsLayersIdRoot(false)
+    , mUsesContainerScrolling(false)
   {
   }
 
@@ -86,7 +88,7 @@ public:
            mCumulativeResolution == aOther.mCumulativeResolution &&
            mDevPixelsPerCSSPixel == aOther.mDevPixelsPerCSSPixel &&
            mPresShellId == aOther.mPresShellId &&
-           mIsRoot == aOther.mIsRoot &&
+           mIsRootContent == aOther.mIsRootContent &&
            mScrollId == aOther.mScrollId &&
            mScrollParentId == aOther.mScrollParentId &&
            mScrollOffset == aOther.mScrollOffset &&
@@ -100,7 +102,10 @@ public:
            mLineScrollAmount == aOther.mLineScrollAmount &&
            mPageScrollAmount == aOther.mPageScrollAmount &&
            mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
-           mClipRect == aOther.mClipRect;
+           mClipRect == aOther.mClipRect &&
+           mMaskLayerIndex == aOther.mMaskLayerIndex &&
+           mIsLayersIdRoot == aOther.mIsLayersIdRoot &&
+		   mUsesContainerScrolling == aOther.mUsesContainerScrolling;
   }
   bool operator!=(const FrameMetrics& aOther) const
   {
@@ -117,7 +122,7 @@ public:
 
   bool IsRootScrollable() const
   {
-    return mIsRoot;
+    return mIsRootContent;
   }
 
   bool IsScrollable() const
@@ -302,14 +307,14 @@ public:
     return mDevPixelsPerCSSPixel;
   }
 
-  void SetIsRoot(bool aIsRoot)
+  void SetIsRootContent(bool aIsRootContent)
   {
-    mIsRoot = aIsRoot;
+    mIsRootContent = aIsRootContent;
   }
 
-  bool GetIsRoot() const
+  bool IsRootContent() const
   {
-    return mIsRoot;
+    return mIsRootContent;
   }
 
   void SetHasScrollgrab(bool aHasScrollgrab)
@@ -534,6 +539,27 @@ public:
     return mClipRect.ref();
   }
 
+  void SetMaskLayerIndex(const Maybe<size_t>& aIndex) {
+    mMaskLayerIndex = aIndex;
+  }
+  const Maybe<size_t>& GetMaskLayerIndex() const {
+    return mMaskLayerIndex;
+  }
+
+  void SetIsLayersIdRoot(bool aValue) {
+    mIsLayersIdRoot = aValue;
+  }
+  bool IsLayersIdRoot() const {
+    return mIsLayersIdRoot;
+  }
+
+  // Implemented out of line because the implementation needs gfxPrefs.h
+  // and we don't want to include that from FrameMetrics.h.
+  void SetUsesContainerScrolling(bool aValue);
+  bool UsesContainerScrolling() const {
+    return mUsesContainerScrolling;
+  }
+
 private:
 
   // The pres-shell resolution that has been induced on the document containing
@@ -615,7 +641,7 @@ private:
   CSSToLayoutDeviceScale mDevPixelsPerCSSPixel;
 
   // Whether or not this is the root scroll frame for the root content document.
-  bool mIsRoot;
+  bool mIsRootContent;
 
   // Whether or not this frame is for an element marked 'scrollgrab'.
   bool mHasScrollgrab;
@@ -707,6 +733,19 @@ private:
 
   // The clip rect to use when compositing a layer with this FrameMetrics.
   Maybe<ParentLayerIntRect> mClipRect;
+
+  // An extra clip mask layer to use when compositing a layer with this
+  // FrameMetrics. This is an index into the MetricsMaskLayers array on
+  // the Layer.
+  Maybe<size_t> mMaskLayerIndex;
+
+  // Whether these framemetrics are for the root scroll frame (root element if
+  // we don't have a root scroll frame) for its layers id.
+  bool mIsLayersIdRoot;
+
+  // True if scrolling using containers, false otherwise. This can be removed
+  // when containerful scrolling is eliminated.
+  bool mUsesContainerScrolling;
 
   // WARNING!!!!
   //

@@ -1262,6 +1262,13 @@ public:
                          IStart() + aMargin.IStart());
   }
 
+  LogicalMargin operator+=(const LogicalMargin& aMargin)
+  {
+    CHECK_WRITING_MODE(aMargin.GetWritingMode());
+    mMargin += aMargin.mMargin;
+    return *this;
+  }
+
   LogicalMargin operator-(const LogicalMargin& aMargin) const {
     CHECK_WRITING_MODE(aMargin.GetWritingMode());
     return LogicalMargin(GetWritingMode(),

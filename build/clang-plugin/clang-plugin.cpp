@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -82,7 +83,22 @@ private:
   class RefCountedInsideLambdaChecker : public MatchFinder::MatchCallback {
     public:
       virtual void run(const MatchFinder::MatchResult &Result);
-  }
+  };
+
+  class ExplicitOperatorBoolChecker : public MatchFinder::MatchCallback {
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
+  };
+
+  class NeedsNoVTableTypeChecker : public MatchFinder::MatchCallback {
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
+  };
+
+  class NonMemMovableChecker : public MatchFinder::MatchCallback {
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
+  };
 
   ScopeChecker stackClassChecker;
   ScopeChecker globalClassChecker;
@@ -92,16 +108,19 @@ private:
   NaNExprChecker nanExprChecker;
   NoAddRefReleaseOnReturnChecker noAddRefReleaseOnReturnChecker;
   RefCountedInsideLambdaChecker refCountedInsideLambdaChecker;
+  ExplicitOperatorBoolChecker explicitOperatorBoolChecker;
+  NeedsNoVTableTypeChecker needsNoVTableTypeChecker;
+  NonMemMovableChecker nonMemMovableChecker;
   MatchFinder astMatcher;
 };
 
 namespace {
 
-bool isInIgnoredNamespace(const Decl *decl) {
+std::string getDeclarationNamespace(const Decl *decl) {
   const DeclContext *DC = decl->getDeclContext()->getEnclosingNamespaceContext();
   const NamespaceDecl *ND = dyn_cast<NamespaceDecl>(DC);
   if (!ND) {
-    return false;
+    return "";
   }
 
   while (const DeclContext *ParentDC = ND->getParent()) {
@@ -112,8 +131,15 @@ bool isInIgnoredNamespace(const Decl *decl) {
   }
 
   const auto& name = ND->getName();
+  return name;
+}
 
-  // namespace std and icu are ignored for now
+bool isInIgnoredNamespaceForImplicitCtor(const Decl *decl) {
+  std::string name = getDeclarationNamespace(decl);
+  if (name == "") {
+    return false;
+  }
+
   return name == "std" ||               // standard C++ lib
          name == "__gnu_cxx" ||         // gnu C++ lib
          name == "boost" ||             // boost
@@ -129,7 +155,19 @@ bool isInIgnoredNamespace(const Decl *decl) {
          name == "testing";             // gtest
 }
 
-bool isIgnoredPath(const Decl *decl) {
+bool isInIgnoredNamespaceForImplicitConversion(const Decl *decl) {
+  std::string name = getDeclarationNamespace(decl);
+  if (name == "") {
+    return false;
+  }
+
+  return name == "std" ||              // standard C++ lib
+         name == "__gnu_cxx" ||        // gnu C++ lib
+         name == "google_breakpad" ||  // breakpad
+         name == "testing";            // gtest
+}
+
+bool isIgnoredPathForImplicitCtor(const Decl *decl) {
   decl = decl->getCanonicalDecl();
   SourceLocation Loc = decl->getLocation();
   const SourceManager &SM = decl->getASTContext().getSourceManager();
@@ -150,9 +188,30 @@ bool isIgnoredPath(const Decl *decl) {
   return false;
 }
 
-bool isInterestingDecl(const Decl *decl) {
-  return !isInIgnoredNamespace(decl) &&
-         !isIgnoredPath(decl);
+bool isIgnoredPathForImplicitConversion(const Decl *decl) {
+  decl = decl->getCanonicalDecl();
+  SourceLocation Loc = decl->getLocation();
+  const SourceManager &SM = decl->getASTContext().getSourceManager();
+  SmallString<1024> FileName = SM.getFilename(Loc);
+  llvm::sys::fs::make_absolute(FileName);
+  llvm::sys::path::reverse_iterator begin = llvm::sys::path::rbegin(FileName),
+                                    end   = llvm::sys::path::rend(FileName);
+  for (; begin != end; ++begin) {
+    if (begin->compare_lower(StringRef("graphite2")) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool isInterestingDeclForImplicitCtor(const Decl *decl) {
+  return !isInIgnoredNamespaceForImplicitCtor(decl) &&
+         !isIgnoredPathForImplicitCtor(decl);
+}
+
+bool isInterestingDeclForImplicitConversion(const Decl *decl) {
+  return !isInIgnoredNamespaceForImplicitConversion(decl) &&
+         !isIgnoredPathForImplicitConversion(decl);
 }
 
 }
@@ -178,6 +237,25 @@ public:
       return false;
 
     return attr->getAnnotation() == spelling;
+  }
+
+  void HandleUnusedExprResult(const Stmt *stmt) {
+    const Expr* E = dyn_cast_or_null<Expr>(stmt);
+    if (E) {
+      // XXX It would be nice if we could use getAsTagDecl,
+      // but our version of clang is too old.
+      // (getAsTagDecl would also cover enums etc.)
+      QualType T = E->getType();
+      CXXRecordDecl *decl = T->getAsCXXRecordDecl();
+      if (decl) {
+        decl = decl->getDefinition();
+        if (decl && hasCustomAnnotation(decl, "moz_must_use")) {
+          unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+            DiagnosticIDs::Error, "Unused MOZ_MUST_USE value of type %0");
+          Diag.Report(E->getLocStart(), errorID) << T;
+        }
+      }
+    }
   }
 
   bool VisitCXXRecordDecl(CXXRecordDecl *d) {
@@ -232,7 +310,7 @@ public:
       }
     }
 
-    if (!d->isAbstract() && isInterestingDecl(d)) {
+    if (!d->isAbstract() && isInterestingDeclForImplicitCtor(d)) {
       for (CXXRecordDecl::ctor_iterator ctor = d->ctor_begin(),
            e = d->ctor_end(); ctor != e; ++ctor) {
         // Ignore non-converting ctors
@@ -260,6 +338,41 @@ public:
       }
     }
 
+    return true;
+  }
+
+  bool VisitSwitchCase(SwitchCase* stmt) {
+    HandleUnusedExprResult(stmt->getSubStmt());
+    return true;
+  }
+  bool VisitCompoundStmt(CompoundStmt* stmt) {
+    for (CompoundStmt::body_iterator it = stmt->body_begin(), e = stmt->body_end();
+         it != e; ++it) {
+      HandleUnusedExprResult(*it);
+    }
+    return true;
+  }
+  bool VisitIfStmt(IfStmt* Stmt) {
+    HandleUnusedExprResult(Stmt->getThen());
+    HandleUnusedExprResult(Stmt->getElse());
+    return true;
+  }
+  bool VisitWhileStmt(WhileStmt* Stmt) {
+    HandleUnusedExprResult(Stmt->getBody());
+    return true;
+  }
+  bool VisitDoStmt(DoStmt* Stmt) {
+    HandleUnusedExprResult(Stmt->getBody());
+    return true;
+  }
+  bool VisitForStmt(ForStmt* Stmt) {
+    HandleUnusedExprResult(Stmt->getBody());
+    HandleUnusedExprResult(Stmt->getInit());
+    HandleUnusedExprResult(Stmt->getInc());
+    return true;
+  }
+  bool VisitBinComma(BinaryOperator* Op) {
+    HandleUnusedExprResult(Op->getLHS());
     return true;
   }
 };
@@ -416,6 +529,104 @@ bool isClassRefCounted(QualType T) {
   return clazz ? isClassRefCounted(clazz) : RegularClass;
 }
 
+/// A cached data of whether classes are memmovable, and if not, what declaration
+/// makes them non-movable
+typedef DenseMap<const CXXRecordDecl *, const CXXRecordDecl *> InferredMovability;
+InferredMovability inferredMovability;
+
+bool isClassNonMemMovable(QualType T);
+const CXXRecordDecl* isClassNonMemMovableWorker(QualType T);
+
+const CXXRecordDecl* isClassNonMemMovableWorker(const CXXRecordDecl *D) {
+  // If we have a definition, then we want to standardize our reference to point
+  // to the definition node. If we don't have a definition, that means that either
+  // we only have a forward declaration of the type in our file, or we are being
+  // passed a template argument which is not used, and thus never instantiated by
+  // clang.
+  // As the argument isn't used, we can't memmove it (as we don't know it's size),
+  // which means not reporting an error is OK.
+  if (!D->hasDefinition()) {
+    return 0;
+  }
+  D = D->getDefinition();
+
+  // Are we explicitly marked as non-memmovable class?
+  if (MozChecker::hasCustomAnnotation(D, "moz_non_memmovable")) {
+    return D;
+  }
+
+  // Look through all base cases to figure out if the parent is a non-memmovable class.
+  for (CXXRecordDecl::base_class_const_iterator base = D->bases_begin();
+       base != D->bases_end(); ++base) {
+    const CXXRecordDecl *result = isClassNonMemMovableWorker(base->getType());
+    if (result) {
+      return result;
+    }
+  }
+
+  // Look through all members to figure out if a member is a non-memmovable class.
+  for (RecordDecl::field_iterator field = D->field_begin(), e = D->field_end();
+       field != e; ++field) {
+    const CXXRecordDecl *result = isClassNonMemMovableWorker(field->getType());
+    if (result) {
+      return result;
+    }
+  }
+
+  return 0;
+}
+
+const CXXRecordDecl* isClassNonMemMovableWorker(QualType T) {
+  while (const ArrayType *arrTy = T->getAsArrayTypeUnsafe())
+    T = arrTy->getElementType();
+  const CXXRecordDecl *clazz = T->getAsCXXRecordDecl();
+  return clazz ? isClassNonMemMovableWorker(clazz) : 0;
+}
+
+bool isClassNonMemMovable(const CXXRecordDecl *D) {
+  InferredMovability::iterator it =
+    inferredMovability.find(D);
+  if (it != inferredMovability.end())
+    return !!it->second;
+  const CXXRecordDecl *result = isClassNonMemMovableWorker(D);
+  inferredMovability.insert(std::make_pair(D, result));
+  return !!result;
+}
+
+bool isClassNonMemMovable(QualType T) {
+  while (const ArrayType *arrTy = T->getAsArrayTypeUnsafe())
+    T = arrTy->getElementType();
+  const CXXRecordDecl *clazz = T->getAsCXXRecordDecl();
+  return clazz ? isClassNonMemMovable(clazz) : false;
+}
+
+const CXXRecordDecl* findWhyClassIsNonMemMovable(QualType T) {
+  while (const ArrayType *arrTy = T->getAsArrayTypeUnsafe())
+    T = arrTy->getElementType();
+  CXXRecordDecl *clazz = T->getAsCXXRecordDecl();
+  InferredMovability::iterator it =
+    inferredMovability.find(clazz);
+  assert(it != inferredMovability.end());
+  return it->second;
+}
+
+template<class T>
+bool IsInSystemHeader(const ASTContext &AC, const T &D) {
+  auto &SourceManager = AC.getSourceManager();
+  auto ExpansionLoc = SourceManager.getExpansionLoc(D.getLocStart());
+  if (ExpansionLoc.isInvalid()) {
+    return false;
+  }
+  return SourceManager.isInSystemHeader(ExpansionLoc);
+}
+
+bool typeHasVTable(QualType T) {
+  while (const ArrayType *arrTy = T->getAsArrayTypeUnsafe())
+    T = arrTy->getElementType();
+  CXXRecordDecl* offender = T->getAsCXXRecordDecl();
+  return offender && offender->hasDefinition() && offender->isDynamicClass();
+}
+
 }
 
 namespace clang {
@@ -515,12 +726,7 @@ AST_MATCHER(QualType, isFloat) {
 /// isExpansionInSystemHeader in newer clangs, but modified in order to work
 /// with old clangs that we use on infra.
 AST_MATCHER(BinaryOperator, isInSystemHeader) {
-  auto &SourceManager = Finder->getASTContext().getSourceManager();
-  auto ExpansionLoc = SourceManager.getExpansionLoc(Node.getLocStart());
-  if (ExpansionLoc.isInvalid()) {
-    return false;
-  }
-  return SourceManager.isInSystemHeader(ExpansionLoc);
+  return IsInSystemHeader(Finder->getASTContext(), Node);
 }
 
 /// This matcher will match locations in SkScalar.h.  This header contains a
@@ -546,6 +752,51 @@ AST_MATCHER(MemberExpr, isAddRefOrRelease) {
 /// This matcher will select classes which are refcounted.
 AST_MATCHER(QualType, isRefCounted) {
   return isClassRefCounted(Node);
+}
+
+#if CLANG_VERSION_FULL < 304
+
+/// The 'equalsBoundeNode' matcher was added in clang 3.4.
+/// Since infra runs clang 3.3, we polyfill it here.
+AST_POLYMORPHIC_MATCHER_P(equalsBoundNode,
+                          std::string, ID) {
+  BoundNodesTree bindings = Builder->build();
+  bool haveMatchingResult = false;
+  struct Visitor : public BoundNodesTree::Visitor {
+    const NodeType &Node;
+    std::string ID;
+    bool &haveMatchingResult;
+    Visitor(const NodeType &Node, const std::string &ID, bool &haveMatchingResult)
+      : Node(Node), ID(ID), haveMatchingResult(haveMatchingResult) {}
+    void visitMatch(const BoundNodes &BoundNodesView) override {
+      if (BoundNodesView.getNodeAs<NodeType>(ID) == &Node) {
+        haveMatchingResult = true;
+      }
+    }
+  };
+  Visitor visitor(Node, ID, haveMatchingResult);
+  bindings.visitMatches(&visitor);
+  return haveMatchingResult;
+}
+
+#endif
+
+AST_MATCHER(QualType, hasVTable) {
+  return typeHasVTable(Node);
+}
+
+AST_MATCHER(CXXRecordDecl, hasNeedsNoVTableTypeAttr) {
+  return MozChecker::hasCustomAnnotation(&Node, "moz_needs_no_vtable_type");
+}
+
+/// This matcher will select classes which are non-memmovable
+AST_MATCHER(QualType, isNonMemMovable) {
+  return isClassNonMemMovable(Node);
+}
+
+/// This matcher will select classes which require a memmovable template arg
+AST_MATCHER(CXXRecordDecl, needsMemMovable) {
+  return MozChecker::hasCustomAnnotation(&Node, "moz_needs_memmovable_type");
 }
 
 }
@@ -645,10 +896,35 @@ DiagnosticsMatcher::DiagnosticsMatcher()
       )).bind("node"),
     &noAddRefReleaseOnReturnChecker);
 
+  // Match declrefs with type "pointer to object of ref-counted type" inside a
+  // lambda, where the declaration they reference is not inside the lambda.
+  // This excludes arguments and local variables, leaving only captured
+  // variables.
     astMatcher.addMatcher(lambdaExpr(
-            hasDescendant(declRefExpr(hasType(pointerType(pointee(isRefCounted())))).bind("node"))
+            hasDescendant(declRefExpr(hasType(pointerType(pointee(isRefCounted()))),
+                                      to(decl().bind("decl"))).bind("declref")),
+            unless(hasDescendant(decl(equalsBoundNode("decl"))))
         ),
     &refCountedInsideLambdaChecker);
+
+  // Older clang versions such as the ones used on the infra recognize these
+  // conversions as 'operator _Bool', but newer clang versions recognize these
+  // as 'operator bool'.
+  astMatcher.addMatcher(methodDecl(anyOf(hasName("operator bool"),
+                                         hasName("operator _Bool"))).bind("node"),
+    &explicitOperatorBoolChecker);
+
+  astMatcher.addMatcher(classTemplateSpecializationDecl(
+             allOf(hasAnyTemplateArgument(refersToType(hasVTable())),
+                   hasNeedsNoVTableTypeAttr())).bind("node"),
+     &needsNoVTableTypeChecker);
+
+  // Handle non-mem-movable template specializations
+  astMatcher.addMatcher(classTemplateSpecializationDecl(
+      allOf(needsMemMovable(),
+            hasAnyTemplateArgument(refersToType(isNonMemMovable())))
+      ).bind("specialization"),
+      &nonMemMovableChecker);
 }
 
 void DiagnosticsMatcher::ScopeChecker::run(
@@ -851,14 +1127,99 @@ void DiagnosticsMatcher::RefCountedInsideLambdaChecker::run(
     const MatchFinder::MatchResult &Result) {
   DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
   unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
-      DiagnosticIDs::Error, "Refcounted variable %0 of type %1 cannot be used inside a lambda");
+      DiagnosticIDs::Error, "Refcounted variable %0 of type %1 cannot be captured by a lambda");
   unsigned noteID = Diag.getDiagnosticIDs()->getCustomDiagID(
       DiagnosticIDs::Note, "Please consider using a smart pointer");
-  const DeclRefExpr *node = Result.Nodes.getNodeAs<DeclRefExpr>("node");
+  const DeclRefExpr *declref = Result.Nodes.getNodeAs<DeclRefExpr>("declref");
 
-  Diag.Report(node->getLocStart(), errorID) << node->getFoundDecl() <<
-    node->getType()->getPointeeType();
-  Diag.Report(node->getLocStart(), noteID);
+  Diag.Report(declref->getLocStart(), errorID) << declref->getFoundDecl() <<
+    declref->getType()->getPointeeType();
+  Diag.Report(declref->getLocStart(), noteID);
+}
+
+void DiagnosticsMatcher::ExplicitOperatorBoolChecker::run(
+    const MatchFinder::MatchResult &Result) {
+  DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
+  unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Error, "bad implicit conversion operator for %0");
+  unsigned noteID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Note, "consider adding the explicit keyword to %0");
+  const CXXConversionDecl *method = Result.Nodes.getNodeAs<CXXConversionDecl>("node");
+  const CXXRecordDecl *clazz = method->getParent();
+
+  if (!method->isExplicitSpecified() &&
+      !MozChecker::hasCustomAnnotation(method, "moz_implicit") &&
+      !IsInSystemHeader(method->getASTContext(), *method) &&
+      isInterestingDeclForImplicitConversion(method)) {
+    Diag.Report(method->getLocStart(), errorID) << clazz;
+    Diag.Report(method->getLocStart(), noteID) << "'operator bool'";
+  }
+}
+
+void DiagnosticsMatcher::NeedsNoVTableTypeChecker::run(
+    const MatchFinder::MatchResult &Result) {
+  DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
+  unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Error, "%0 cannot be instantiated because %1 has a VTable");
+  unsigned noteID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Note, "bad instantiation of %0 requested here");
+
+  const ClassTemplateSpecializationDecl *specialization =
+    Result.Nodes.getNodeAs<ClassTemplateSpecializationDecl>("node");
+
+  // Get the offending template argument
+  QualType offender;
+  const TemplateArgumentList &args =
+    specialization->getTemplateInstantiationArgs();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    offender = args[i].getAsType();
+    if (typeHasVTable(offender)) {
+      break;
+    }
+  }
+
+  Diag.Report(specialization->getLocStart(), errorID) << specialization << offender;
+  Diag.Report(specialization->getPointOfInstantiation(), noteID) << specialization;
+}
+
+void DiagnosticsMatcher::NonMemMovableChecker::run(
+    const MatchFinder::MatchResult &Result) {
+  DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
+  unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Error, "Cannot instantiate %0 with non-memmovable template argument %1");
+  unsigned note1ID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Note, "instantiation of %0 requested here");
+  unsigned note2ID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Note, "%0 is non-memmovable because of the MOZ_NON_MEMMOVABLE annotation on %1");
+  unsigned note3ID = Diag.getDiagnosticIDs()->getCustomDiagID(DiagnosticIDs::Note, "%0");
+
+  // Get the specialization
+  const ClassTemplateSpecializationDecl *specialization =
+    Result.Nodes.getNodeAs<ClassTemplateSpecializationDecl>("specialization");
+  SourceLocation requestLoc = specialization->getPointOfInstantiation();
+  const CXXRecordDecl *templ =
+    specialization->getSpecializedTemplate()->getTemplatedDecl();
+
+  // Report an error for every template argument which is non-memmovable
+  const TemplateArgumentList &args =
+    specialization->getTemplateInstantiationArgs();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    QualType argType = args[i].getAsType();
+    if (isClassNonMemMovable(args[i].getAsType())) {
+      const CXXRecordDecl *reason = findWhyClassIsNonMemMovable(argType);
+      Diag.Report(specialization->getLocation(), errorID)
+        << specialization << argType;
+      // XXX It would be really nice if we could get the instantiation stack information
+      // from Sema such that we could print a full template instantiation stack, however,
+      // it seems as though that information is thrown out by the time we get here so we
+      // can only report one level of template specialization (which in many cases won't
+      // be useful)
+      Diag.Report(requestLoc, note1ID)
+        << specialization;
+      Diag.Report(reason->getLocation(), note2ID)
+        << argType << reason;
+    }
+  }
 }
 
 class MozCheckAction : public PluginASTAction {

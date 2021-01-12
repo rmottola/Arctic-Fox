@@ -19,17 +19,19 @@ namespace image {
 class ScriptedNotificationObserver : public imgINotificationObserver
 {
 public:
-  explicit ScriptedNotificationObserver(imgIScriptedNotificationObserver* aInner);
+  explicit
+    ScriptedNotificationObserver(imgIScriptedNotificationObserver* aInner);
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_IMGINOTIFICATIONOBSERVER
   NS_DECL_CYCLE_COLLECTION_CLASS(ScriptedNotificationObserver)
 
 private:
-  virtual ~ScriptedNotificationObserver() {}
+  virtual ~ScriptedNotificationObserver() { }
   nsCOMPtr<imgIScriptedNotificationObserver> mInner;
 };
 
-}}
+} // namespace image
+} // namespace mozilla
 
 #endif // mozilla_image_ScriptedNotificationObserver_h

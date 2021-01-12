@@ -113,6 +113,8 @@ EvaluateConstantOperands(TempAllocator& alloc, MBinaryInstruction* ins, bool* pt
     MDefinition* left = ins->getOperand(0);
     MDefinition* right = ins->getOperand(1);
 
+    MOZ_ASSERT(IsNumberType(left->type()) && IsNumberType(right->type()));
+
     if (!left->isConstantValue() || !right->isConstantValue())
         return nullptr;
 
@@ -342,13 +344,13 @@ MInstruction::clearResumePoint()
     resumePoint_ = nullptr;
 }
 
-static bool
-MaybeEmulatesUndefined(CompilerConstraintList* constraints, MDefinition* op)
+bool
+MDefinition::maybeEmulatesUndefined(CompilerConstraintList* constraints)
 {
-    if (!op->mightBeType(MIRType_Object))
+    if (!mightBeType(MIRType_Object))
         return false;
 
-    TemporaryTypeSet* types = op->resultTypeSet();
+    TemporaryTypeSet* types = resultTypeSet();
     if (!types)
         return true;
 
@@ -379,8 +381,8 @@ MTest::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
 {
     MOZ_ASSERT(operandMightEmulateUndefined());
 
-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)))
-        markOperandCantEmulateUndefined();
+    if (!getOperand(0)->maybeEmulatesUndefined(constraints))
+        markNoOperandEmulatesUndefined();
 }
 
 MDefinition*
@@ -1980,15 +1982,6 @@ MCall::addArg(size_t argnum, MDefinition* arg)
     initOperand(argnum + NumNonArgumentOperands, arg);
 }
 
-void
-MBitNot::infer()
-{
-    if (getOperand(0)->mightBeType(MIRType_Object) || getOperand(0)->mightBeType(MIRType_Symbol))
-        specialization_ = MIRType_None;
-    else
-        specialization_ = MIRType_Int32;
-}
-
 static inline bool
 IsConstant(MDefinition* def, double v)
 {
@@ -2219,6 +2212,51 @@ NeedNegativeZeroCheck(MDefinition* def)
         }
     }
     return false;
+}
+
+MBinaryArithInstruction*
+MBinaryArithInstruction::New(TempAllocator& alloc, Opcode op,
+                             MDefinition* left, MDefinition* right)
+{
+    switch (op) {
+      case Op_Add:
+        return MAdd::New(alloc, left, right);
+      case Op_Sub:
+        return MSub::New(alloc, left, right);
+      case Op_Mul:
+        return MMul::New(alloc, left, right);
+      case Op_Div:
+        return MDiv::New(alloc, left, right);
+      case Op_Mod:
+        return MMod::New(alloc, left, right);
+      default:
+        MOZ_CRASH("unexpected binary opcode");
+    }
+}
+
+void
+MBinaryArithInstruction::setNumberSpecialization(TempAllocator& alloc, BaselineInspector* inspector,
+                                                 jsbytecode* pc)
+{
+    setSpecialization(MIRType_Double);
+
+    // Try to specialize as int32.
+    if (getOperand(0)->type() == MIRType_Int32 && getOperand(1)->type() == MIRType_Int32) {
+        bool seenDouble = inspector->hasSeenDoubleResult(pc);
+
+        // Use int32 specialization if the operation doesn't overflow on its
+        // constant operands and if the operation has never overflowed.
+        if (!seenDouble && !constantDoubleResult(alloc))
+            setInt32Specialization();
+    }
+}
+
+bool
+MBinaryArithInstruction::constantDoubleResult(TempAllocator& alloc)
+{
+    bool typeChange = false;
+    EvaluateConstantOperands(alloc, this, &typeChange);
+    return typeChange;
 }
 
 MDefinition*
@@ -2639,147 +2677,12 @@ SimpleArithOperand(MDefinition* op)
         && !op->mightBeType(MIRType_MagicIsConstructing);
 }
 
-void
-MBinaryArithInstruction::infer(TempAllocator& alloc, BaselineInspector* inspector, jsbytecode* pc)
-{
-    MOZ_ASSERT(this->type() == MIRType_Value);
-
-    specialization_ = MIRType_None;
-
-    // Anything complex - strings, symbols, and objects - are not specialized
-    // unless baseline type hints suggest it might be profitable
-    if (!SimpleArithOperand(getOperand(0)) || !SimpleArithOperand(getOperand(1)))
-        return inferFallback(inspector, pc);
-
-    // Retrieve type information of lhs and rhs.
-    MIRType lhs = getOperand(0)->type();
-    MIRType rhs = getOperand(1)->type();
-
-    // Guess a result type based on the inputs.
-    // Don't specialize for neither-integer-nor-double results.
-    if (lhs == MIRType_Int32 && rhs == MIRType_Int32) {
-        setResultType(MIRType_Int32);
-
-        // If the operation will always overflow on its constant operands, use a
-        // double specialization so that it can be constant folded later.
-        if (isMul() || isDiv()) {
-            bool typeChange = false;
-            EvaluateConstantOperands(alloc, this, &typeChange);
-            if (typeChange)
-                setResultType(MIRType_Double);
-        }
-
-        // If the operation has ever overflowed, use a double specialization.
-        if (inspector->hasSeenDoubleResult(pc))
-            setResultType(MIRType_Double);
-
-    } else if (IsFloatingPointType(lhs) || IsFloatingPointType(rhs)) {
-        // Double operations take precedence over float32 operations (i.e. if
-        // any operand needs a double as an input, convert all operands to
-        // doubles)
-        setResultType(MIRType_Double);
-    } else {
-        return inferFallback(inspector, pc);
-    }
-
-    MOZ_ASSERT(lhs < MIRType_String || lhs == MIRType_Value);
-    MOZ_ASSERT(rhs < MIRType_String || rhs == MIRType_Value);
-
-    if (isAdd() || isMul())
-        setCommutative();
-
-    MOZ_ASSERT(IsNumberType(this->type()));
-    specialization_ = this->type();
-}
-
-void
-MBinaryArithInstruction::inferFallback(BaselineInspector* inspector,
-                                       jsbytecode* pc)
-{
-    // Try to specialize based on what baseline observed in practice.
-    specialization_ = inspector->expectedBinaryArithSpecialization(pc);
-    if (specialization_ != MIRType_None) {
-        setResultType(specialization_);
-        return;
-    }
-
-    // If we can't specialize because we have no type information at all for
-    // the lhs or rhs, mark the binary instruction as having no possible types
-    // either to avoid degrading subsequent analysis.
-    if (getOperand(0)->emptyResultTypeSet() || getOperand(1)->emptyResultTypeSet()) {
-        LifoAlloc* alloc = GetJitContext()->temp->lifoAlloc();
-        TemporaryTypeSet* types = alloc->new_<TemporaryTypeSet>();
-        if (types)
-            setResultTypeSet(types);
-    }
-}
-
 static bool
 SafelyCoercesToDouble(MDefinition* op)
 {
     // Strings and symbols are unhandled -- visitToDouble() doesn't support them yet.
     // Null is unhandled -- ToDouble(null) == 0, but (0 == null) is false.
     return SimpleArithOperand(op) && !op->mightBeType(MIRType_Null);
-}
-
-static bool
-ObjectOrSimplePrimitive(MDefinition* op)
-{
-    // Return true if op is either undefined/null/boolean/int32 or an object.
-    return !op->mightBeType(MIRType_String)
-        && !op->mightBeType(MIRType_Symbol)
-        && !op->mightBeType(MIRType_Double)
-        && !op->mightBeType(MIRType_Float32)
-        && !op->mightBeType(MIRType_MagicOptimizedArguments)
-        && !op->mightBeType(MIRType_MagicHole)
-        && !op->mightBeType(MIRType_MagicIsConstructing);
-}
-
-static bool
-CanDoValueBitwiseCmp(CompilerConstraintList* constraints,
-                     MDefinition* lhs, MDefinition* rhs, bool looseEq)
-{
-    // Only primitive (not double/string) or objects are supported.
-    // I.e. Undefined/Null/Boolean/Int32 and Object
-    if (!ObjectOrSimplePrimitive(lhs) || !ObjectOrSimplePrimitive(rhs))
-        return false;
-
-    // Objects that emulate undefined are not supported.
-    if (MaybeEmulatesUndefined(constraints, lhs) || MaybeEmulatesUndefined(constraints, rhs))
-        return false;
-
-    // In the loose comparison more values could be the same,
-    // but value comparison reporting otherwise.
-    if (looseEq) {
-
-        // Undefined compared loosy to Null is not supported,
-        // because tag is different, but value can be the same (undefined == null).
-        if ((lhs->mightBeType(MIRType_Undefined) && rhs->mightBeType(MIRType_Null)) ||
-            (lhs->mightBeType(MIRType_Null) && rhs->mightBeType(MIRType_Undefined)))
-        {
-            return false;
-        }
-
-        // Int32 compared loosy to Boolean is not supported,
-        // because tag is different, but value can be the same (1 == true).
-        if ((lhs->mightBeType(MIRType_Int32) && rhs->mightBeType(MIRType_Boolean)) ||
-            (lhs->mightBeType(MIRType_Boolean) && rhs->mightBeType(MIRType_Int32)))
-        {
-            return false;
-        }
-
-        // For loosy comparison of an object with a Boolean/Number/String
-        // the valueOf the object is taken. Therefore not supported.
-        bool simpleLHS = lhs->mightBeType(MIRType_Boolean) || lhs->mightBeType(MIRType_Int32);
-        bool simpleRHS = rhs->mightBeType(MIRType_Boolean) || rhs->mightBeType(MIRType_Int32);
-        if ((lhs->mightBeType(MIRType_Object) && simpleRHS) ||
-            (rhs->mightBeType(MIRType_Object) && simpleLHS))
-        {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 MIRType
@@ -2830,6 +2733,8 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
     }
 
     if (def->isConstantValue()) {
+        if (def->isBox())
+            def = def->toBox()->getOperand(0);
         *pwrapped = def;
         return def->constantValue().isInt32()
             && def->constantValue().toInt32() >= 0;
@@ -2838,57 +2743,62 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
     return false;
 }
 
-bool
-MBinaryInstruction::tryUseUnsignedOperands()
+/* static */ bool
+MBinaryInstruction::unsignedOperands(MDefinition* left, MDefinition* right)
 {
-    MDefinition* newlhs;
-    MDefinition* newrhs;
-    if (MustBeUInt32(getOperand(0), &newlhs) && MustBeUInt32(getOperand(1), &newrhs)) {
-        if (newlhs->type() != MIRType_Int32 || newrhs->type() != MIRType_Int32)
-            return false;
-        if (newlhs != getOperand(0)) {
-            getOperand(0)->setImplicitlyUsedUnchecked();
-            replaceOperand(0, newlhs);
-        }
-        if (newrhs != getOperand(1)) {
-            getOperand(1)->setImplicitlyUsedUnchecked();
-            replaceOperand(1, newrhs);
-        }
-        return true;
-    }
-    return false;
+    MDefinition* replace;
+    if (!MustBeUInt32(left, &replace))
+        return false;
+    if (replace->type() != MIRType_Int32)
+        return false;
+    if (!MustBeUInt32(right, &replace))
+        return false;
+    if (replace->type() != MIRType_Int32)
+        return false;
+    return true;
+}
+
+bool
+MBinaryInstruction::unsignedOperands()
+{
+    return unsignedOperands(getOperand(0), getOperand(1));
 }
 
 void
-MCompare::infer(CompilerConstraintList* constraints, BaselineInspector* inspector, jsbytecode* pc)
+MBinaryInstruction::replaceWithUnsignedOperands()
 {
-    MOZ_ASSERT(operandMightEmulateUndefined());
+    MOZ_ASSERT(unsignedOperands());
 
-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)) &&
-        !MaybeEmulatesUndefined(constraints, getOperand(1)))
-    {
-        markNoOperandEmulatesUndefined();
+    for (size_t i = 0; i < numOperands(); i++) {
+        MDefinition* replace;
+        MustBeUInt32(getOperand(i), &replace);
+        if (replace == getOperand(i))
+            continue;
+
+        getOperand(i)->setImplicitlyUsedUnchecked();
+        replaceOperand(i, replace);
     }
+}
 
-    MIRType lhs = getOperand(0)->type();
-    MIRType rhs = getOperand(1)->type();
+MCompare::CompareType
+MCompare::determineCompareType(JSOp op, MDefinition* left, MDefinition* right)
+{
+    MIRType lhs = left->type();
+    MIRType rhs = right->type();
 
-    bool looseEq = jsop() == JSOP_EQ || jsop() == JSOP_NE;
-    bool strictEq = jsop() == JSOP_STRICTEQ || jsop() == JSOP_STRICTNE;
+    bool looseEq = op == JSOP_EQ || op == JSOP_NE;
+    bool strictEq = op == JSOP_STRICTEQ || op == JSOP_STRICTNE;
     bool relationalEq = !(looseEq || strictEq);
 
     // Comparisons on unsigned integers may be treated as UInt32.
-    if (tryUseUnsignedOperands()) {
-        compareType_ = Compare_UInt32;
-        return;
-    }
+    if (unsignedOperands(left, right))
+        return Compare_UInt32;
 
     // Integer to integer or boolean to boolean comparisons may be treated as Int32.
     if ((lhs == MIRType_Int32 && rhs == MIRType_Int32) ||
         (lhs == MIRType_Boolean && rhs == MIRType_Boolean))
     {
-        compareType_ = Compare_Int32MaybeCoerceBoth;
-        return;
+        return Compare_Int32MaybeCoerceBoth;
     }
 
     // Loose/relational cross-integer/boolean comparisons may be treated as Int32.
@@ -2896,95 +2806,60 @@ MCompare::infer(CompilerConstraintList* constraints, BaselineInspector* inspecto
         (lhs == MIRType_Int32 || lhs == MIRType_Boolean) &&
         (rhs == MIRType_Int32 || rhs == MIRType_Boolean))
     {
-        compareType_ = Compare_Int32MaybeCoerceBoth;
-        return;
+        return Compare_Int32MaybeCoerceBoth;
     }
 
     // Numeric comparisons against a double coerce to double.
-    if (IsNumberType(lhs) && IsNumberType(rhs)) {
-        compareType_ = Compare_Double;
-        return;
-    }
+    if (IsNumberType(lhs) && IsNumberType(rhs))
+        return Compare_Double;
 
     // Any comparison is allowed except strict eq.
-    if (!strictEq && IsFloatingPointType(lhs) && SafelyCoercesToDouble(getOperand(1))) {
-        compareType_ = Compare_DoubleMaybeCoerceRHS;
-        return;
-    }
-    if (!strictEq && IsFloatingPointType(rhs) && SafelyCoercesToDouble(getOperand(0))) {
-        compareType_ = Compare_DoubleMaybeCoerceLHS;
-        return;
-    }
+    if (!strictEq && IsFloatingPointType(rhs) && SafelyCoercesToDouble(left))
+        return Compare_DoubleMaybeCoerceLHS;
+    if (!strictEq && IsFloatingPointType(lhs) && SafelyCoercesToDouble(right))
+        return Compare_DoubleMaybeCoerceRHS;
 
     // Handle object comparison.
-    if (!relationalEq && lhs == MIRType_Object && rhs == MIRType_Object) {
-        compareType_ = Compare_Object;
-        return;
-    }
+    if (!relationalEq && lhs == MIRType_Object && rhs == MIRType_Object)
+        return Compare_Object;
 
     // Handle string comparisons. (Relational string compares are still unsupported).
-    if (!relationalEq && lhs == MIRType_String && rhs == MIRType_String) {
-        compareType_ = Compare_String;
-        return;
-    }
+    if (!relationalEq && lhs == MIRType_String && rhs == MIRType_String)
+        return Compare_String;
 
-    if (strictEq && lhs == MIRType_String) {
-        // Lowering expects the rhs to be definitly string.
-        compareType_ = Compare_StrictString;
-        swapOperands();
-        return;
-    }
+    // Handle strict string compare.
+    if (strictEq && lhs == MIRType_String)
+        return Compare_StrictString;
+    if (strictEq && rhs == MIRType_String)
+        return Compare_StrictString;
 
-    if (strictEq && rhs == MIRType_String) {
-        compareType_ = Compare_StrictString;
-        return;
-    }
-
-    // Handle compare with lhs being Undefined or Null.
-    if (!relationalEq && IsNullOrUndefined(lhs)) {
-        // Lowering expects the rhs to be null/undefined, so we have to
-        // swap the operands. This is necessary since we may not know which
-        // operand was null/undefined during lowering (both operands may have
-        // MIRType_Value).
-        compareType_ = (lhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
-        swapOperands();
-        return;
-    }
-
-    // Handle compare with rhs being Undefined or Null.
-    if (!relationalEq && IsNullOrUndefined(rhs)) {
-        compareType_ = (rhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
-        return;
-    }
+    // Handle compare with lhs or rhs being Undefined or Null.
+    if (!relationalEq && IsNullOrUndefined(lhs))
+        return (lhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
+    if (!relationalEq && IsNullOrUndefined(rhs))
+        return (rhs == MIRType_Null) ? Compare_Null : Compare_Undefined;
 
     // Handle strict comparison with lhs/rhs being typed Boolean.
     if (strictEq && (lhs == MIRType_Boolean || rhs == MIRType_Boolean)) {
         // bool/bool case got an int32 specialization earlier.
         MOZ_ASSERT(!(lhs == MIRType_Boolean && rhs == MIRType_Boolean));
-
-        // Ensure the boolean is on the right so that the type policy knows
-        // which side to unbox.
-        if (lhs == MIRType_Boolean)
-             swapOperands();
-
-        compareType_ = Compare_Boolean;
-        return;
+        return Compare_Boolean;
     }
 
-    // Determine if we can do the compare based on a quick value check.
-    if (!relationalEq && CanDoValueBitwiseCmp(constraints, getOperand(0), getOperand(1), looseEq)) {
-        compareType_ = Compare_Value;
+    return Compare_Unknown;
+}
+
+void
+MCompare::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
+{
+    MOZ_ASSERT(operandMightEmulateUndefined());
+
+    if (getOperand(0)->maybeEmulatesUndefined(constraints))
         return;
-    }
+    if (getOperand(1)->maybeEmulatesUndefined(constraints))
+        return;
 
-    // Type information is not good enough to pick out a particular type of
-    // comparison we can do here. Try to specialize based on any baseline
-    // caches that have been generated for the opcode. These will cause the
-    // instruction's type policy to insert fallible unboxes to the appropriate
-    // input types.
-
-    if (!strictEq)
-        compareType_ = inspector->expectedCompareType(pc);
+    markNoOperandEmulatesUndefined();
 }
 
 MBitNot*
@@ -3073,7 +2948,7 @@ MTypeOf::cacheInputMaybeCallableOrEmulatesUndefined(CompilerConstraintList* cons
 {
     MOZ_ASSERT(inputMaybeCallableOrEmulatesUndefined());
 
-    if (!MaybeEmulatesUndefined(constraints, input()) && !MaybeCallable(constraints, input()))
+    if (!input()->maybeEmulatesUndefined(constraints) && !MaybeCallable(constraints, input()))
         markInputNotCallableOrEmulatesUndefined();
 }
 
@@ -3897,8 +3772,8 @@ MNot::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
 {
     MOZ_ASSERT(operandMightEmulateUndefined());
 
-    if (!MaybeEmulatesUndefined(constraints, getOperand(0)))
-        markOperandCantEmulateUndefined();
+    if (!getOperand(0)->maybeEmulatesUndefined(constraints))
+        markNoOperandEmulatesUndefined();
 }
 
 MDefinition*

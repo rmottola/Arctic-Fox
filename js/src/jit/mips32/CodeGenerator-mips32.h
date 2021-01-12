@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jit_mips_CodeGenerator_mips_h
-#define jit_mips_CodeGenerator_mips_h
+#ifndef jit_mips32_CodeGenerator_mips32_h
+#define jit_mips32_CodeGenerator_mips32_h
 
 #include "jit/mips32/Assembler-mips32.h"
 #include "jit/shared/CodeGenerator-shared.h"
@@ -25,8 +25,6 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
     }
 
   protected:
-    // Label for the common return path.
-    NonAssertingLabel returnLabel_;
     NonAssertingLabel deoptLabel_;
 
     inline Address ToAddress(const LAllocation& a);
@@ -75,8 +73,6 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
     void bailout(LSnapshot* snapshot);
 
   protected:
-    bool generatePrologue();
-    bool generateEpilogue();
     bool generateOutOfLineCode();
 
     template <typename T>
@@ -293,4 +289,4 @@ class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorMIPS>
 } // namespace jit
 } // namespace js
 
-#endif /* jit_mips_CodeGenerator_mips_h */
+#endif /* jit_mips32_CodeGenerator_mips32_h */

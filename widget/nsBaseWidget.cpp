@@ -296,7 +296,6 @@ void nsBaseWidget::BaseCreate(nsIWidget *aParent,
     mBorderStyle = aInitData->mBorderStyle;
     mPopupLevel = aInitData->mPopupLevel;
     mPopupType = aInitData->mPopupHint;
-    mMultiProcessWindow = aInitData->mMultiProcessWindow;
   }
 
   if (aParent) {
@@ -954,15 +953,8 @@ private:
   nsRefPtr<APZCTreeManager> mTreeManager;
 };
 
-bool nsBaseWidget::IsMultiProcessWindow()
-{
-  return mMultiProcessWindow;
-}
-
 void nsBaseWidget::ConfigureAPZCTreeManager()
 {
-  uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
-  mAPZC = CompositorParent::GetAPZCTreeManager(rootLayerTreeId);
   MOZ_ASSERT(mAPZC);
 
   ConfigureAPZControllerThread();
@@ -974,6 +966,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
 
   nsRefPtr<GeckoContentController> controller = CreateRootContentController();
   if (controller) {
+    uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
     CompositorParent::SetControllerForLayerTree(rootLayerTreeId, controller);
   }
 }
@@ -995,6 +988,12 @@ nsBaseWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
     mAPZC.get(), setTargetApzcFunc, aInputBlockId, mozilla::Move(aTargets)));
 }
 
+bool
+nsBaseWidget::AsyncPanZoomEnabled() const
+{
+  return !!mAPZC;
+}
+
 nsEventStatus
 nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
                                            const ScrollableLayerGuid& aGuid,
@@ -1002,7 +1001,7 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
                                            nsEventStatus aApzResponse)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  InputAPZContext context(aGuid, aInputBlockId);
+  InputAPZContext context(aGuid, aInputBlockId, aApzResponse);
 
   // If this is a touch event and APZ has targeted it to an APZC in the root
   // process, apply that APZC's callback-transform before dispatching the
@@ -1149,14 +1148,9 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
   // Make sure the parent knows it is same process.
   mCompositorParent->SetOtherProcessId(base::GetCurrentProcId());
 
-  if (gfxPrefs::AsyncPanZoomEnabled() &&
-#if defined(XP_WIN) || defined(MOZ_WIDGET_COCOA) || defined(MOZ_WIDGET_GTK)
-      // For desktop platforms we only want to use APZ in e10s-enabled windows.
-      // If we ever get input events off the main thread we can consider
-      // relaxing this requirement.
-      IsMultiProcessWindow() &&
-#endif
-      (WindowType() == eWindowType_toplevel || WindowType() == eWindowType_child)) {
+  uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
+  mAPZC = CompositorParent::GetAPZCTreeManager(rootLayerTreeId);
+  if (mAPZC) {
     ConfigureAPZCTreeManager();
   }
 

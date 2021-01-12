@@ -45,7 +45,7 @@ random-if(cocoaWidget) != impact-bold.html impact.html # bug 539418
 
 # localized font family names should always match just as English names do
 == localized-family-names-001.html localized-family-names-001-ref.html
-== localized-family-names-002.html localized-family-names-002-ref.html
+skip-if(Mulet) == localized-family-names-002.html localized-family-names-002-ref.html # MULET: Bug 1144079: Re-enable Mulet mochitests and reftests taskcluster-specific disables
 == localized-family-names-003.html localized-family-names-003-ref.html
 == localized-family-names-004.html localized-family-names-004-ref.html
 
@@ -81,9 +81,9 @@ skip-if(B2G||Mulet) skip-if(Android&&AndroidVersion>15) HTTP(..) == font-stretch
 # Bug 765906 - synthetic bold should be used if necessary together with system fallback.
 # **NOTE** we skip these on Linux because of bug 769659.
 # test 1 uses Cherokee; expected to pass on OS X and Win7
-random-if(!(cocoaWidget||/^Windows\x20NT\x206\.1/.test(http.oscpu))) skip-if(gtk2Widget) != bold-system-fallback-1.html bold-system-fallback-1-notref.html
+random-if(!(cocoaWidget||/^Windows\x20NT\x206\.1/.test(http.oscpu))) skip-if(gtkWidget) != bold-system-fallback-1.html bold-system-fallback-1-notref.html
 # test 2 uses Chess symbols; expected to pass on Android
-random-if(!Android) skip-if(gtk2Widget) != bold-system-fallback-2.html bold-system-fallback-2-notref.html
+random-if(!Android) skip-if(gtkWidget) != bold-system-fallback-2.html bold-system-fallback-2-notref.html
 
 # Bug 769475 - applying 'italic' to Arabic text in Arial should NOT change family or metrics.
 # Expected to pass on MacOSX and Windows; other platforms unknown, depending on font availability.
@@ -92,7 +92,7 @@ random-if(!(cocoaWidget||winWidget)) == arial-arabic.html arial-arabic-ref.html
 != syntheticbold-rotated.html syntheticbold-rotated-ref.html
 
 HTTP(..) == font-synthesis-1.html font-synthesis-1-ref.html
-HTTP(..) == font-synthesis-2.html font-synthesis-2-ref.html
+skip-if(Mulet) HTTP(..) == font-synthesis-2.html font-synthesis-2-ref.html # MULET: Bug 1144079: Re-enable Mulet mochitests and reftests taskcluster-specific disables
 
 # Bug 1060791 - support for format 10 cmap in Apple Symbols;
 # relevant fonts not present on other platforms.

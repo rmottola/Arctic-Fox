@@ -77,8 +77,8 @@ public:
                                 paramName, paramValue));
   }
 
-
-  ~LogScope() {
+  ~LogScope()
+  {
     PR_LOG(mLog, PR_LOG_DEBUG, ("%d [this=%p] %s {EXIT}\n",
                                 GIVE_ME_MS_NOW(), mFrom, mFunc));
   }
@@ -88,7 +88,6 @@ private:
   void* mFrom;
   const char* mFunc;
 };
-
 
 class LogFunc {
 public:
@@ -155,8 +154,6 @@ public:
 #define LOG_STATIC_FUNC(l, s) LogFunc(l, nullptr, s)
 
 #define LOG_STATIC_FUNC_WITH_PARAM(l, s, pn, pv) LogFunc(l, nullptr, s, pn, pv)
-
-
 
 #define LOG_MSG(l, s, m) LogMessage(l, this, s, m)
 

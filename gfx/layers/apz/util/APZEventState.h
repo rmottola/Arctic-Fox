@@ -18,6 +18,7 @@
 #include "mozilla/nsRefPtr.h"
 
 template <class> class nsCOMPtr;
+class nsIDocument;
 class nsIPresShell;
 class nsIWidget;
 
@@ -59,10 +60,6 @@ public:
                       const ScrollableLayerGuid& aGuid,
                       uint64_t aInputBlockId,
                       float aPresShellResolution);
-  void ProcessLongTapUp(const CSSPoint& aPoint,
-                        Modifiers aModifiers,
-                        const ScrollableLayerGuid& aGuid,
-                        float aPresShellResolution);
   void ProcessTouchEvent(const WidgetTouchEvent& aEvent,
                          const ScrollableLayerGuid& aGuid,
                          uint64_t aInputBlockId,

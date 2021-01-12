@@ -105,8 +105,6 @@ enum VarEmitOption {
 
 struct BytecodeEmitter
 {
-    typedef StmtInfoBCE StmtInfo;
-
     SharedContext* const sc;      /* context shared between parsing and bytecode generation */
 
     ExclusiveContext* const cx;
@@ -137,10 +135,7 @@ struct BytecodeEmitter
 
     HandleScript    evalCaller;     /* scripted caller info for eval and dbgapi */
 
-    StmtInfoBCE*    topStmt;       /* top of statement info stack */
-    StmtInfoBCE*    topScopeStmt;  /* top lexical scope statement */
-    Rooted<NestedScopeObject*> staticScope;
-                                    /* compile time scope chain */
+    StmtInfoStack<StmtInfoBCE> stmtStack;
 
     OwnedAtomIndexMapPtr atomIndices; /* literals indexed for mapping */
     unsigned        firstLine;      /* first line, for JSScript::initFromEmitter */
@@ -223,6 +218,9 @@ struct BytecodeEmitter
                     bool insideNonGlobalEval, uint32_t lineNum, EmitterMode emitterMode = Normal);
     bool init();
     bool updateLocalsToFrameSlots();
+
+    StmtInfoBCE* innermostStmt() const { return stmtStack.innermost(); }
+    StmtInfoBCE* innermostScopeStmt() const { return stmtStack.innermostScopal(); }
 
     bool isAliasedName(ParseNode* pn);
 
@@ -545,7 +543,6 @@ struct BytecodeEmitter
     bool emitReturn(ParseNode* pn);
     bool emitStatement(ParseNode* pn);
     bool emitStatementList(ParseNode* pn, ptrdiff_t top);
-    bool emitSyntheticStatements(ParseNode* pn, ptrdiff_t top);
 
     bool emitDeleteName(ParseNode* pn);
     bool emitDeleteProperty(ParseNode* pn);
@@ -579,7 +576,7 @@ struct BytecodeEmitter
     bool emitBreak(PropertyName* label);
     bool emitContinue(PropertyName* label);
 
-    bool emitDefaults(ParseNode* pn);
+    bool emitDefaultsAndDestructuring(ParseNode* pn);
     bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
@@ -593,10 +590,10 @@ struct BytecodeEmitter
     // iteration count). The stack after iteration will look like |ARRAY INDEX|.
     bool emitSpread();
 
-    // If type is STMT_FOR_OF_LOOP, emit bytecode for a for-of loop.
+    // If type is StmtType::FOR_OF_LOOP, emit bytecode for a for-of loop.
     // pn should be PNK_FOR, and pn->pn_left should be PNK_FOROF.
     //
-    // If type is STMT_SPREAD, emit bytecode for spread operator.
+    // If type is StmtType::SPREAD, emit bytecode for spread operator.
     // pn should be nullptr.
     //
     // Please refer the comment above emitSpread for additional information about

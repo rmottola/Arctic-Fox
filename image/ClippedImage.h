@@ -49,7 +49,8 @@ public:
                                uint32_t aFlags) override;
   NS_IMETHOD RequestDiscard() override;
   NS_IMETHOD_(Orientation) GetOrientation() override;
-  NS_IMETHOD_(nsIntRect) GetImageSpaceInvalidationRect(const nsIntRect& aRect) override;
+  NS_IMETHOD_(nsIntRect) GetImageSpaceInvalidationRect(const nsIntRect& aRect)
+    override;
   nsIntSize OptimalImageSizeForDest(const gfxSize& aDest,
                                     uint32_t aWhichFrame,
                                     GraphicsFilter aFilter,

@@ -339,9 +339,6 @@ public:
                                    const Modifiers& aModifiers,
                                    const mozilla::layers::ScrollableLayerGuid& aGuid,
                                    const uint64_t& aInputBlockId) override;
-    virtual bool RecvHandleLongTapUp(const CSSPoint& aPoint,
-                                     const Modifiers& aModifiers,
-                                     const mozilla::layers::ScrollableLayerGuid& aGuid) override;
     virtual bool RecvNotifyAPZStateChange(const ViewID& aViewId,
                                           const APZStateChange& aChange,
                                           const int& aArg) override;
@@ -366,10 +363,12 @@ public:
                                      const uint64_t& aInputBlockId) override;
     virtual bool RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
                                     const ScrollableLayerGuid& aGuid,
-                                    const uint64_t& aInputBlockId) override;
+                                    const uint64_t& aInputBlockId,
+                                    const nsEventStatus& aApzResponse) override;
     virtual bool RecvRealTouchMoveEvent(const WidgetTouchEvent& aEvent,
                                         const ScrollableLayerGuid& aGuid,
-                                        const uint64_t& aInputBlockId) override;
+                                        const uint64_t& aInputBlockId,
+                                        const nsEventStatus& aApzResponse) override;
     virtual bool RecvKeyEvent(const nsString& aType,
                               const int32_t&  aKeyCode,
                               const int32_t&  aCharCode,
@@ -498,12 +497,13 @@ public:
 
     LayoutDeviceIntPoint GetChromeDisplacement() { return mChromeDisp; };
 
+    bool IPCOpen() { return mIPCOpen; }
+
     bool ParentIsActive()
     {
       return mParentIsActive;
     }
-
-    bool IPCOpen() { return mIPCOpen; }
+    bool AsyncPanZoomEnabled() { return mAsyncPanZoomEnabled; }
 
 protected:
     virtual ~TabChild();
@@ -640,6 +640,7 @@ private:
     double mDefaultScale;
     bool mIPCOpen;
     bool mParentIsActive;
+    bool mAsyncPanZoomEnabled;
 
     DISALLOW_EVIL_CONSTRUCTORS(TabChild);
 };

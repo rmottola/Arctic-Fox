@@ -46,7 +46,7 @@ struct PatchableBackedgeInfo
 };
 
 struct ReciprocalMulConstants {
-    int32_t multiplier;
+    int64_t multiplier;
     int32_t shiftAmount;
 };
 
@@ -63,9 +63,9 @@ struct NativeToTrackedOptimizations
 
 class CodeGeneratorShared : public LElementVisitor
 {
-    js::Vector<OutOfLineCode *, 0, SystemAllocPolicy> outOfLineCode_;
+    js::Vector<OutOfLineCode*, 0, SystemAllocPolicy> outOfLineCode_;
 
-    MacroAssembler &ensureMasm(MacroAssembler *masm);
+    MacroAssembler &ensureMasm(MacroAssembler* masm);
     mozilla::Maybe<MacroAssembler> maybeMasm_;
 
   public:
@@ -85,6 +85,11 @@ class CodeGeneratorShared : public LElementVisitor
     SafepointWriter safepoints_;
     Label invalidate_;
     CodeOffsetLabel invalidateEpilogueData_;
+
+    // Label for the common return path.
+    NonAssertingLabel returnLabel_;
+
+    FallbackICStubSpace stubSpace_;
 
     js::Vector<SafepointIndex, 0, SystemAllocPolicy> safepointIndices_;
     js::Vector<OsiIndex, 0, SystemAllocPolicy> osiIndices_;
@@ -446,14 +451,17 @@ class CodeGeneratorShared : public LElementVisitor
 
     void addCache(LInstruction* lir, size_t cacheIndex);
     bool addCacheLocations(const CacheLocationList& locs, size_t* numLocs, size_t* offset);
-    ReciprocalMulConstants computeDivisionConstants(int d);
+    ReciprocalMulConstants computeDivisionConstants(uint32_t d, int maxLog);
 
   protected:
-    void addOutOfLineCode(OutOfLineCode *code, const MInstruction *mir);
-    void addOutOfLineCode(OutOfLineCode *code, const BytecodeSite *site);
+    bool generatePrologue();
+    bool generateEpilogue();
+
+    void addOutOfLineCode(OutOfLineCode* code, const MInstruction* mir);
+    void addOutOfLineCode(OutOfLineCode* code, const BytecodeSite* site);
     bool generateOutOfLineCode();
 
-    Label *labelForBackedgeWithImplicitCheck(MBasicBlock *mir);
+    Label* labelForBackedgeWithImplicitCheck(MBasicBlock* mir);
 
     // Generate a jump to the start of the specified block, adding information
     // if this is a loop backedge. Use this in place of jumping directly to
@@ -462,7 +470,7 @@ class CodeGeneratorShared : public LElementVisitor
     void jumpToBlock(MBasicBlock* mir);
 
 // This function is not used for MIPS. MIPS has branchToBlock.
-#ifndef JS_CODEGEN_MIPS
+#ifndef JS_CODEGEN_MIPS32
     void jumpToBlock(MBasicBlock* mir, Assembler::Condition cond);
 #endif
 

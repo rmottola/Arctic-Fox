@@ -60,6 +60,7 @@
 #include "ScopedGLHelpers.h"
 #include "HeapCopyOfStackArray.h"
 #include "mozilla/layers/APZCTreeManager.h"
+#include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/GLManager.h"
 #include "mozilla/layers/CompositorOGL.h"
 #include "mozilla/layers/CompositorParent.h"
@@ -408,7 +409,7 @@ nsChildView::~nsChildView()
 
   DestroyCompositor();
 
-  if (mAPZC) {
+  if (mAPZC && gfxPrefs::AsyncPanZoomSeparateEventThread()) {
     gNumberOfWidgetsNeedingEventThread--;
     if (gNumberOfWidgetsNeedingEventThread == 0) {
       [EventThreadRunner stop];
@@ -1901,25 +1902,25 @@ nsChildView::CreateCompositor()
   }
 }
 
-bool
-nsChildView::IsMultiProcessWindow()
-{
-  // On OS X the XULWindowWidget object gets the widget's init-data, which
-  // is what has the electrolysis window flag. So here in the child view
-  // we need to get the flag from that window instead.
-  nsCocoaWindow* parent = GetXULWindowWidget();
-  return parent ? parent->IsMultiProcessWindow() : false;
-}
-
 void
 nsChildView::ConfigureAPZCTreeManager()
 {
   nsBaseWidget::ConfigureAPZCTreeManager();
 
-  if (gNumberOfWidgetsNeedingEventThread == 0) {
-    [EventThreadRunner start];
+  if (gfxPrefs::AsyncPanZoomSeparateEventThread()) {
+    if (gNumberOfWidgetsNeedingEventThread == 0) {
+      [EventThreadRunner start];
+    }
+    gNumberOfWidgetsNeedingEventThread++;
   }
-  gNumberOfWidgetsNeedingEventThread++;
+}
+
+void
+nsChildView::ConfigureAPZControllerThread()
+{
+  // On OS X the EventThreadRunner is the controller thread, but it doesn't
+  // have a MessageLoop.
+  APZThreadUtils::SetControllerThread(nullptr);
 }
 
 nsIntRect
@@ -4859,8 +4860,9 @@ static int32_t RoundUp(double aDouble)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  if ([self apzctm]) {
-    // Disable main-thread scrolling completely when using APZC.
+  if (gfxPrefs::AsyncPanZoomSeparateEventThread() && [self apzctm]) {
+    // Disable main-thread scrolling completely when using APZ with the
+    // separate event thread. This is bug 1013412.
     return;
   }
 

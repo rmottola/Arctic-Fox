@@ -25,7 +25,7 @@ public:
     : mHotspotX(-1)
     , mHotspotY(-1)
     , mLoopCount(-1)
-  {}
+  { }
 
   // Set the metadata this object represents on an image.
   void SetOnImage(RasterImage* image);

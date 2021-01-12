@@ -18,9 +18,8 @@
 #include "js/Vector.h"
 #include "vm/ArrayBufferObject.h"
 #include "vm/ErrorObject.h"
+#include "vm/RegExpStatics.h"
 #include "vm/Runtime.h"
-
-
 
 namespace js {
 

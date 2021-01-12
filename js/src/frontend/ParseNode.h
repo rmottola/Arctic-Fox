@@ -148,7 +148,6 @@ class UpvarCookie
     F(EXPORT_SPEC_LIST) \
     F(EXPORT_SPEC) \
     F(EXPORT_BATCH_SPEC) \
-    F(SEQ) \
     F(FORIN) \
     F(FOROF) \
     F(FORHEAD) \
@@ -257,12 +256,21 @@ IsDeleteKind(ParseNodeKind kind)
  *                          pn_cookie: static level and var index for function
  *                          pn_dflags: PND_* definition/use flags (see below)
  *                          pn_blockid: block id number
- * PNK_ARGSBODY list        list of formal parameters followed by:
+ * PNK_ARGSBODY list        list of formal parameters with
+ *                              PNK_NAME node with non-empty name for
+ *                                SingleNameBinding without Initializer
+ *                              PNK_ASSIGN node for SingleNameBinding with
+ *                                Initializer
+ *                              PNK_NAME node with empty name for destructuring
+ *                                pn_expr: PNK_ARRAY, PNK_OBJECT, or PNK_ASSIGN
+ *                                  PNK_ARRAY or PNK_OBJECT for BindingPattern
+ *                                    without Initializer
+ *                                  PNK_ASSIGN for BindingPattern with
+ *                                    Initializer
+ *                          followed by:
  *                              PNK_STATEMENTLIST node for function body
  *                                statements,
- *                              PNK_RETURN for expression closure, or
- *                              PNK_SEQ for expression closure with
- *                                destructured formal parameters
+ *                              PNK_RETURN for expression closure
  *                          pn_count: 1 + number of formal parameters
  *                          pn_tree: PNK_ARGSBODY or PNK_STATEMENTLIST node
  * PNK_SPREAD   unary       pn_kid: expression being spread
@@ -293,15 +301,13 @@ IsDeleteKind(ParseNodeKind kind)
  *                            PNK_FOROF (for-of) or PNK_FORHEAD (for(;;))
  *                          pn_right: body
  * PNK_FORIN    ternary     pn_kid1:  PNK_VAR to left of 'in', or nullptr
- *                            its pn_xflags may have PNX_POPVAR
- *                            bit set
+ *                            its pn_xflags may have PNX_POPVAR bit set
  *                          pn_kid2: PNK_NAME or destructuring expr
  *                            to left of 'in'; if pn_kid1, then this
  *                            is a clone of pn_kid1->pn_head
  *                          pn_kid3: object expr to right of 'in'
  * PNK_FOROF    ternary     pn_kid1:  PNK_VAR to left of 'of', or nullptr
- *                            its pn_xflags may have PNX_POPVAR
- *                            bit set
+ *                            its pn_xflags may have PNX_POPVAR bit set
  *                          pn_kid2: PNK_NAME or destructuring expr
  *                            to left of 'of'; if pn_kid1, then this
  *                            is a clone of pn_kid1->pn_head
@@ -365,38 +371,34 @@ IsDeleteKind(ParseNodeKind kind)
  * PNK_URSHASSIGN,
  * PNK_MULASSIGN,
  * PNK_DIVASSIGN,
- * PNK_MODASSIGN
+ * PNK_MODASSIGN,
+ * PNK_POWASSIGN
  * PNK_CONDITIONAL ternary  (cond ? trueExpr : falseExpr)
  *                          pn_kid1: cond, pn_kid2: then, pn_kid3: else
- * PNK_OR       binary      pn_left: first in || chain, pn_right: rest of chain
- * PNK_AND      binary      pn_left: first in && chain, pn_right: rest of chain
- * PNK_BITOR    binary      pn_left: left-assoc | expr, pn_right: ^ expr
- * PNK_BITXOR   binary      pn_left: left-assoc ^ expr, pn_right: & expr
- * PNK_BITAND   binary      pn_left: left-assoc & expr, pn_right: EQ expr
- *
- * PNK_EQ,      binary      pn_left: left-assoc EQ expr, pn_right: REL expr
+ * PNK_OR,      list        pn_head; list of pn_count subexpressions
+ * PNK_AND,                 All of these operators are left-associative except (**).
+ * PNK_BITOR,
+ * PNK_BITXOR,
+ * PNK_BITAND,
+ * PNK_EQ,
  * PNK_NE,
  * PNK_STRICTEQ,
- * PNK_STRICTNE
- * PNK_LT,      binary      pn_left: left-assoc REL expr, pn_right: SH expr
+ * PNK_STRICTNE,
+ * PNK_LT,
  * PNK_LE,
  * PNK_GT,
- * PNK_GE
- * PNK_LSH,     binary      pn_left: left-assoc SH expr, pn_right: ADD expr
+ * PNK_GE,
+ * PNK_LSH,
  * PNK_RSH,
- * PNK_URSH
- * PNK_ADD      binary      pn_left: left-assoc ADD expr, pn_right: MUL expr
- *                          pn_xflags: if a left-associated binary PNK_ADD
- *                            tree has been flattened into a list (see above
- *                            under <Expressions>), pn_xflags will contain
- *                            PNX_STRCAT if at least one list element is a
- *                            string literal (PNK_STRING); if such a list has
- *                            any non-string, non-number term, pn_xflags will
- *                            contain PNX_CANTFOLD.
- * PNK_SUB      binary      pn_left: left-assoc SH expr, pn_right: ADD expr
- * PNK_STAR,    binary      pn_left: left-assoc MUL expr, pn_right: UNARY expr
- * PNK_DIV,                 pn_op: JSOP_MUL, JSOP_DIV, JSOP_MOD
- * PNK_MOD
+ * PNK_URSH,
+ * PNK_ADD,
+ * PNK_SUB,
+ * PNK_STAR,
+ * PNK_DIV,
+ * PNK_MOD,
+ * PNK_POW                  (**) is right-associative, but forms a list
+ *                          nonetheless. Special hacks everywhere.
+ *
  * PNK_POS,     unary       pn_kid: UNARY expr
  * PNK_NEG
  * PNK_VOID,    unary       pn_kid: UNARY expr
@@ -731,7 +733,7 @@ class ParseNode
                                            still valid, but this use no longer
                                            optimizable via an upvar opcode */
 #define PND_CLOSED              0x40    /* variable is closed over */
-#define PND_DEFAULT             0x80    /* definition is an arg with a default */
+// 0x80 is available
 #define PND_IMPLICITARGUMENTS  0x100    /* the definition is a placeholder for
                                            'arguments' that has been converted
                                            into a definition after the function
@@ -746,15 +748,13 @@ class ParseNode
 /* PN_LIST pn_xflags bits. */
 #define PNX_POPVAR      0x01            /* PNK_VAR or PNK_CONST last result
                                            needs popping */
-#define PNX_GROUPINIT   0x02            /* var [a, b] = [c, d]; unit list */
-#define PNX_FUNCDEFS    0x04            /* contains top-level function statements */
-#define PNX_SETCALL     0x08            /* call expression in lvalue context */
-#define PNX_DESTRUCT    0x10            /* code evaluating destructuring
-                                           arguments occurs before function body */
-#define PNX_SPECIALARRAYINIT 0x20       /* one or more of
+#define PNX_FUNCDEFS    0x02            /* contains top-level function statements */
+#define PNX_SETCALL     0x04            /* call expression in lvalue context */
+/* 0x08 is available */
+#define PNX_ARRAYHOLESPREAD 0x10        /* one or more of
                                            1. array initialiser has holes
                                            2. array initializer has spread node */
-#define PNX_NONCONST    0x40            /* initialiser has non-constants */
+#define PNX_NONCONST    0x20            /* initialiser has non-constants */
 
     static_assert(PNX_NONCONST < (1 << NumListFlagBits), "Not enough bits");
 
@@ -1732,9 +1732,16 @@ enum FunctionSyntaxKind
     Arrow,
     Method,
     ClassConstructor,
+    DerivedClassConstructor,
     Getter,
     Setter
 };
+
+static inline bool
+IsConstructorKind(FunctionSyntaxKind kind)
+{
+    return kind == ClassConstructor || kind == DerivedClassConstructor;
+}
 
 static inline ParseNode*
 FunctionArgsList(ParseNode* fn, unsigned* numFormals)

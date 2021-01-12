@@ -16,6 +16,7 @@
 #include "nsHTMLReflowState.h"
 #include "nsPresContext.h"
 #include "nsCSSFrameConstructor.h"
+#include "nsGridContainerFrame.h"
 
 #include "mozilla/Snprintf.h"
 
@@ -121,6 +122,14 @@ nsAbsoluteContainingBlock::Reflow(nsContainerFrame*        aDelegatingFrame,
 
   bool reflowAll = aReflowState.ShouldReflowAllKids();
 
+  // The 'width' check below is an optimization to avoid the virtual GetType()
+  // call in most cases.  'aContainingBlock' isn't used for grid items,
+  // each item has its own CB on a frame property instead.
+  // @see nsGridContainerFrame::ReflowChildren
+  const bool isGrid =
+    aContainingBlock.width == nsGridContainerFrame::VERY_LIKELY_A_GRID_CONTAINER &&
+    aDelegatingFrame->GetType() == nsGkAtoms::gridContainerFrame;
+
   nsIFrame* kidFrame;
   nsOverflowContinuationTracker tracker(aDelegatingFrame, true);
   for (kidFrame = mAbsoluteFrames.FirstChild(); kidFrame; kidFrame = kidFrame->GetNextSibling()) {
@@ -129,8 +138,9 @@ nsAbsoluteContainingBlock::Reflow(nsContainerFrame*        aDelegatingFrame,
     if (kidNeedsReflow && !aPresContext->HasPendingInterrupt()) {
       // Reflow the frame
       nsReflowStatus  kidStatus = NS_FRAME_COMPLETE;
-      ReflowAbsoluteFrame(aDelegatingFrame, aPresContext, aReflowState,
-                          aContainingBlock,
+      const nsRect& cb = isGrid ? nsGridContainerFrame::GridItemCB(kidFrame)
+                                : aContainingBlock;
+      ReflowAbsoluteFrame(aDelegatingFrame, aPresContext, aReflowState, cb,
                           aConstrainHeight, kidFrame, kidStatus,
                           aOverflowAreas);
       nsIFrame* nextFrame = kidFrame->GetNextInFlow();
@@ -320,9 +330,7 @@ nsAbsoluteContainingBlock::MarkAllFramesDirty()
 void
 nsAbsoluteContainingBlock::DoMarkFramesDirty(bool aMarkAllDirty)
 {
-  for (nsIFrame* kidFrame = mAbsoluteFrames.FirstChild();
-       kidFrame;
-       kidFrame = kidFrame->GetNextSibling()) {
+  for (nsIFrame* kidFrame : mAbsoluteFrames) {
     if (aMarkAllDirty) {
       kidFrame->AddStateBits(NS_FRAME_IS_DIRTY);
     } else if (FrameDependsOnContainer(kidFrame, true, true)) {
@@ -373,7 +381,8 @@ nsAbsoluteContainingBlock::ReflowAbsoluteFrame(nsIFrame*                aDelegat
 #endif // DEBUG
 
   WritingMode wm = aKidFrame->GetWritingMode();
-  nscoord availISize = LogicalSize(wm, aContainingBlock.Size()).ISize(wm);
+  LogicalSize logicalCBSize(wm, aContainingBlock.Size());
+  nscoord availISize = logicalCBSize.ISize(wm);
   if (availISize == -1) {
     NS_ASSERTION(aReflowState.ComputedSize(wm).ISize(wm) !=
                    NS_UNCONSTRAINEDSIZE,
@@ -386,8 +395,7 @@ nsAbsoluteContainingBlock::ReflowAbsoluteFrame(nsIFrame*                aDelegat
   nsHTMLReflowState kidReflowState(aPresContext, aReflowState, aKidFrame,
                                    LogicalSize(wm, availISize,
                                                NS_UNCONSTRAINEDSIZE),
-                                   aContainingBlock.width,
-                                   aContainingBlock.height);
+                                   &logicalCBSize);
 
   // Get the border values
   const nsMargin& border = aReflowState.mStyleBorder->GetComputedBorder();
@@ -415,28 +423,25 @@ nsAbsoluteContainingBlock::ReflowAbsoluteFrame(nsIFrame*                aDelegat
   // width/height
   if ((NS_AUTOOFFSET == kidReflowState.ComputedPhysicalOffsets().left) ||
       (NS_AUTOOFFSET == kidReflowState.ComputedPhysicalOffsets().top)) {
-    nscoord aContainingBlockWidth = aContainingBlock.width;
-    nscoord aContainingBlockHeight = aContainingBlock.height;
 
-    if (-1 == aContainingBlockWidth) {
+    if (logicalCBSize.Width(wm) == -1) {
       // Get the containing block width/height
-      kidReflowState.ComputeContainingBlockRectangle(aPresContext,
-                                                     &aReflowState,
-                                                     aContainingBlockWidth,
-                                                     aContainingBlockHeight);
+      logicalCBSize =
+        kidReflowState.ComputeContainingBlockRectangle(aPresContext,
+                                                       &aReflowState);
     }
 
     if (NS_AUTOOFFSET == kidReflowState.ComputedPhysicalOffsets().left) {
       NS_ASSERTION(NS_AUTOOFFSET != kidReflowState.ComputedPhysicalOffsets().right,
                    "Can't solve for both left and right");
-      kidReflowState.ComputedPhysicalOffsets().left = aContainingBlockWidth -
+      kidReflowState.ComputedPhysicalOffsets().left = logicalCBSize.Width(wm) -
                                              kidReflowState.ComputedPhysicalOffsets().right -
                                              kidReflowState.ComputedPhysicalMargin().right -
                                              kidDesiredSize.Width() -
                                              kidReflowState.ComputedPhysicalMargin().left;
     }
     if (NS_AUTOOFFSET == kidReflowState.ComputedPhysicalOffsets().top) {
-      kidReflowState.ComputedPhysicalOffsets().top = aContainingBlockHeight -
+      kidReflowState.ComputedPhysicalOffsets().top = logicalCBSize.Height(wm) -
                                             kidReflowState.ComputedPhysicalOffsets().bottom -
                                             kidReflowState.ComputedPhysicalMargin().bottom -
                                             kidDesiredSize.Height() -

@@ -19,7 +19,7 @@
 #include "nsStringGlue.h"
 #include "nsError.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
-#include "mozilla/Atomics.h"
+#include "mozilla/Mutex.h"
 #include "mozilla/net/ReferrerPolicy.h"
 
 class imgCacheValidator;
@@ -42,6 +42,8 @@ class ProgressTracker;
 } // namespace image
 } // namespace mozilla
 
+struct NewPartResult;
+
 class imgRequest final : public nsIStreamListener,
                              public nsIThreadRetargetableStreamListener,
                              public nsIChannelEventSink,
@@ -60,11 +62,12 @@ public:
 
   NS_DECL_THREADSAFE_ISUPPORTS
 
-  nsresult Init(nsIURI *aURI,
-                nsIURI *aCurrentURI,
-                nsIRequest *aRequest,
-                nsIChannel *aChannel,
-                imgCacheEntry *aCacheEntry,
+  nsresult Init(nsIURI* aURI,
+                nsIURI* aCurrentURI,
+                bool aHadInsecureRedirect,
+                nsIRequest* aRequest,
+                nsIChannel* aChannel,
+                imgCacheEntry* aCacheEntry,
                 nsISupports* aCX,
                 nsIPrincipal* aLoadingPrincipal,
                 int32_t aCORSMode,
@@ -73,9 +76,9 @@ public:
   void ClearLoader();
 
   // Callers must call imgRequestProxy::Notify later.
-  void AddProxy(imgRequestProxy *proxy);
+  void AddProxy(imgRequestProxy* proxy);
 
-  nsresult RemoveProxy(imgRequestProxy *proxy, nsresult aStatus);
+  nsresult RemoveProxy(imgRequestProxy* proxy, nsresult aStatus);
 
   // Cancel, but also ensure that all work done in Init() is undone. Call this
   // only when the channel has failed to open, and so calling Cancel() on it
@@ -89,7 +92,7 @@ public:
   void ContinueEvict();
 
   // Request that we start decoding the image as soon as data becomes available.
-  void RequestDecode() { mDecodeRequested = true; }
+  void RequestDecode();
 
   inline uint64_t InnerWindowID() const {
     return mInnerWindowId;
@@ -107,7 +110,11 @@ public:
   // HTTP cache may contain a different data then app cache.
   bool CacheChanged(nsIRequest* aNewRequest);
 
-  bool GetMultipart() const { return mIsMultiPartChannel; }
+  bool GetMultipart() const;
+
+  // Returns whether we went through an insecure (non-HTTPS) redirect at some
+  // point during loading. This does not consider the current URI.
+  bool HadInsecureRedirect() const { return mHadInsecureRedirect; }
 
   // The CORS mode for which we loaded this image.
   int32_t GetCORSMode() const { return mCORSMode; }
@@ -135,8 +142,8 @@ public:
   void ResetCacheEntry();
 
   // OK to use on any thread.
-  nsresult GetURI(ImageURL **aURI);
-  nsresult GetCurrentURI(nsIURI **aURI);
+  nsresult GetURI(ImageURL** aURI);
+  nsresult GetCurrentURI(nsIURI** aURI);
 
   nsresult GetImageErrorCode(void);
 
@@ -187,17 +194,17 @@ private:
   void AdjustPriority(imgRequestProxy *aProxy, int32_t aDelta);
 
   // Return whether we've seen some data at this point
-  bool HasTransferredData() const { return mGotData; }
+  bool HasTransferredData() const;
 
   // Set whether this request is stored in the cache. If it isn't, regardless
   // of whether this request has a non-null mCacheEntry, this imgRequest won't
   // try to update or modify the image cache.
   void SetIsInCache(bool cacheable);
 
-  bool IsBlockingOnload() const;
-  void SetBlockingOnload(bool block) const;
-
   bool HasConsumers();
+
+  /// Returns true if RequestDecode() was called.
+  bool IsDecodeRequested() const;
 
 public:
   NS_DECL_NSISTREAMLISTENER
@@ -208,10 +215,16 @@ public:
   NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
 
   // Sets properties for this image; will dispatch to main thread if needed.
-  void SetProperties(nsIChannel* aChan);
+  void SetProperties(const nsACString& aContentType,
+                     const nsACString& aContentDisposition);
 
 private:
   friend class imgMemoryReporter;
+  friend class FinishPreparingForNewPartRunnable;
+
+  already_AddRefed<Image> GetImage() const;
+
+  void FinishPreparingForNewPart(const NewPartResult& aResult);
 
   // Weak reference to parent loader; this request cannot outlive its owner.
   imgLoader* mLoader;
@@ -222,13 +235,11 @@ private:
   nsRefPtr<ImageURL> mURI;
   // The URI of the resource we ended up loading after all redirects, etc.
   nsCOMPtr<nsIURI> mCurrentURI;
-  // The principal of the document which loaded this image. Used when validating for CORS.
+  // The principal of the document which loaded this image. Used when
+  // validating for CORS.
   nsCOMPtr<nsIPrincipal> mLoadingPrincipal;
   // The principal of this image.
   nsCOMPtr<nsIPrincipal> mPrincipal;
-  // Progress tracker -- transferred to mImage, when it gets instantiated.
-  nsRefPtr<ProgressTracker> mProgressTracker;
-  nsRefPtr<Image> mImage;
   nsCOMPtr<nsIProperties> mProperties;
   nsCOMPtr<nsISupports> mSecurityInfo;
   nsCOMPtr<nsIChannel> mChannel;
@@ -239,11 +250,12 @@ private:
 
   nsCString mContentType;
 
-  nsRefPtr<imgCacheEntry> mCacheEntry; /* we hold on to this to this so long as we have observers */
+  /* we hold on to this to this so long as we have observers */
+  nsRefPtr<imgCacheEntry> mCacheEntry;
 
-  void *mLoadId;
+  void* mLoadId;
 
-  imgCacheValidator *mValidator;
+  imgCacheValidator* mValidator;
   nsCOMPtr<nsIAsyncVerifyRedirectCallback> mRedirectCallback;
   nsCOMPtr<nsIChannel> mNewRedirectChannel;
 
@@ -259,13 +271,19 @@ private:
 
   nsresult mImageErrorCode;
 
-  mozilla::Atomic<bool> mDecodeRequested;
+  mutable mozilla::Mutex mMutex;
 
+  // Member variables protected by mMutex. Note that *all* flags in our bitfield
+  // are protected by mMutex; if you're adding a new flag that isn'protected, it
+  // must not be a part of this bitfield.
+  nsRefPtr<ProgressTracker> mProgressTracker;
+  nsRefPtr<Image> mImage;
   bool mIsMultiPartChannel : 1;
   bool mGotData : 1;
   bool mIsInCache : 1;
-  bool mBlockingOnload : 1;
+  bool mDecodeRequested : 1;
   bool mNewPartPending : 1;
+  bool mHadInsecureRedirect : 1;
 };
 
 #endif // mozilla_image_imgRequest_h

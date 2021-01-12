@@ -711,6 +711,9 @@ getRoleCB(AtkObject *aAtkObj)
     aAtkObj->role = ATK_ROLE_PANEL;
   else if (aAtkObj->role == ATK_ROLE_STATIC && !IsAtkVersionAtLeast(2, 16))
     aAtkObj->role = ATK_ROLE_TEXT;
+  else if ((aAtkObj->role == ATK_ROLE_MATH_FRACTION ||
+            aAtkObj->role == ATK_ROLE_MATH_ROOT) && !IsAtkVersionAtLeast(2, 16))
+    aAtkObj->role = ATK_ROLE_UNKNOWN;
 
   return aAtkObj->role;
 }
@@ -878,6 +881,13 @@ getIndexInParentCB(AtkObject* aAtkObj)
 {
   // We don't use Accessible::IndexInParent() because we don't include text
   // leaf nodes as children in ATK.
+  if (ProxyAccessible* proxy = GetProxy(aAtkObj)) {
+    if (ProxyAccessible* parent = proxy->Parent())
+      return parent->IndexOfEmbeddedChild(proxy);
+
+    return -1;
+  }
+
     AccessibleWrap* accWrap = GetAccessibleWrap(aAtkObj);
     if (!accWrap) {
         return -1;

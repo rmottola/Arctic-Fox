@@ -16,7 +16,7 @@ namespace image {
 /**
  * An interface for observing changes to image state, as reported by
  * ProgressTracker.
- * 
+ *
  * This is the ImageLib-internal version of imgINotificationObserver,
  * essentially, with implementation details that code outside of ImageLib
  * shouldn't see.

@@ -24,7 +24,7 @@ public:
     CloseAndRelease();
   }
 
-  operator bool()
+  explicit operator bool()
   {
     MutexAutoLock lock(mMutex);
     return mPtr;

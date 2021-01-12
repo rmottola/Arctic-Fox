@@ -252,6 +252,9 @@ public:
   void SetTransactionIdAllocator(TransactionIdAllocator* aAllocator) { mTransactionIdAllocator = aAllocator; }
 
   float RequestProperty(const nsAString& aProperty) override;
+
+  bool AsyncPanZoomEnabled() const override;
+
 protected:
   enum TransactionPhase {
     PHASE_NONE, PHASE_CONSTRUCTION, PHASE_DRAWING, PHASE_FORWARD
@@ -386,6 +389,16 @@ public:
   ToClientLayer(Layer* aLayer)
   {
     return static_cast<ClientLayer*>(aLayer->ImplData());
+  }
+
+  template <typename LayerType>
+  static inline void RenderMaskLayers(LayerType* aLayer) {
+    if (aLayer->GetMaskLayer()) {
+      ToClientLayer(aLayer->GetMaskLayer())->RenderLayer();
+    }
+    for (size_t i = 0; i < aLayer->GetAncestorMaskLayerCount(); i++) {
+      ToClientLayer(aLayer->GetAncestorMaskLayerAt(i))->RenderLayer();
+    }
   }
 };
 

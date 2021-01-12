@@ -118,6 +118,12 @@ function testClasses() {
     // Currently, we do not allow default constructors
     assertClassError("class NAME { }", TypeError);
 
+    // For now, disallow arrow functions in derived class constructors
+    assertClassError("class NAME extends null { constructor() { (() => 0); }", InternalError);
+
+    // Derived class constructor must have curly brackets
+    assertClassError("class NAME extends null {  constructor() 1 }", SyntaxError);
+
     // It is an error to have two methods named constructor, but not other
     // names, regardless if one is an accessor or a generator or static.
     assertClassError("class NAME { constructor() { } constructor(a) { } }", SyntaxError);
@@ -408,10 +414,10 @@ function testClasses() {
     assertError("(()=>super['prop'])", SyntaxError);
     assertError("function *foo() { super['prop']; }", SyntaxError);
     assertError("super['prop']", SyntaxError);
-    
+
     // Or inside functions inside method definitions...
     assertClassError("class NAME { constructor() { function nested() { super.prop; }}}", SyntaxError);
-    
+
     // Bare super is forbidden
     assertError("super", SyntaxError);
 
@@ -442,6 +448,17 @@ function testClasses() {
     assertClassError("class NAME { constructor() { super.m(", SyntaxError);
     assertClassError("class NAME { constructor() { super[", SyntaxError);
     assertClassError("class NAME { constructor() { super(", SyntaxError);
+
+    // Can not omit curly brackets
+    assertClassError("class NAME { constructor() ({}) }", SyntaxError);
+    assertClassError("class NAME { constructor() void 0 }", SyntaxError);
+    assertClassError("class NAME { constructor() 1 }", SyntaxError);
+    assertClassError("class NAME { constructor() false }", SyntaxError);
+    assertClassError("class NAME { constructor() {} a() ({}) }", SyntaxError);
+    assertClassError("class NAME { constructor() {} a() void 0 }", SyntaxError);
+    assertClassError("class NAME { constructor() {} a() 1 }", SyntaxError);
+    assertClassError("class NAME { constructor() {} a() false }", SyntaxError);
+
 }
 
 if (classesEnabled())

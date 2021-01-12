@@ -110,23 +110,23 @@ public:
   // safer (albeit grossly suboptimal) to just relayout the whole thing.
   void RestyleTable();
 
-  /** helper to get the cell spacing X style value */
-  nscoord GetCellSpacingX(int32_t aColIndex) override;
+  /** helper to get the column spacing style value */
+  nscoord GetColSpacing(int32_t aColIndex) override;
 
   /** Sums the combined cell spacing between the columns aStartColIndex to
    *  aEndColIndex.
    */
-  nscoord GetCellSpacingX(int32_t aStartColIndex,
-                          int32_t aEndColIndex) override;
+  nscoord GetColSpacing(int32_t aStartColIndex,
+                        int32_t aEndColIndex) override;
 
-  /** helper to get the cell spacing Y style value */
-  nscoord GetCellSpacingY(int32_t aRowIndex) override;
+  /** helper to get the row spacing style value */
+  nscoord GetRowSpacing(int32_t aRowIndex) override;
 
   /** Sums the combined cell spacing between the rows aStartRowIndex to
    *  aEndRowIndex.
    */
-  nscoord GetCellSpacingY(int32_t aStartRowIndex,
-                          int32_t aEndRowIndex) override;
+  nscoord GetRowSpacing(int32_t aStartRowIndex,
+                        int32_t aEndRowIndex) override;
 
   void SetColSpacingArray(const nsTArray<nscoord>& aColSpacing)
   {
@@ -218,7 +218,7 @@ public:
   // helper to restyle and reflow the table -- @see nsMathMLmtableFrame.
   void RestyleTable()
   {
-    nsTableFrame* tableFrame = nsTableFrame::GetTableFrame(this);
+    nsTableFrame* tableFrame = GetTableFrame();
     if (tableFrame && tableFrame->IsFrameOfType(nsIFrame::eMathML)) {
       // relayout the table
       ((nsMathMLmtableFrame*)tableFrame)->RestyleTable();
@@ -238,7 +238,8 @@ public:
   NS_DECL_FRAMEARENA_HELPERS
 
   friend nsContainerFrame* NS_NewMathMLmtdFrame(nsIPresShell* aPresShell,
-                                                nsStyleContext* aContext);
+                                                nsStyleContext* aContext,
+                                                nsTableFrame* aTableFrame);
 
   // overloaded nsTableCellFrame methods
 
@@ -263,12 +264,13 @@ public:
     return nsTableCellFrame::IsFrameOfType(aFlags & ~(nsIFrame::eMathML));
   }
 
-  virtual nsMargin* GetBorderWidth(nsMargin& aBorder) const override;
+  virtual LogicalMargin GetBorderWidth(WritingMode aWM) const override;
 
   virtual nsMargin GetBorderOverflow() override;
 
 protected:
-  explicit nsMathMLmtdFrame(nsStyleContext* aContext) : nsTableCellFrame(aContext) {}
+  nsMathMLmtdFrame(nsStyleContext* aContext, nsTableFrame* aTableFrame)
+    : nsTableCellFrame(aContext, aTableFrame) {}
   virtual ~nsMathMLmtdFrame();
 }; // class nsMathMLmtdFrame
 

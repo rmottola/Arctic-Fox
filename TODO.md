@@ -48,7 +48,9 @@
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
+- Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
+- Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
@@ -61,6 +63,10 @@
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
+- Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
+- rest of 1198458
+- Bug 1198458: Rollup of changes previously applied to media/webrtc/tru
+- Bug 1198458: Webrtc updated to branch 43
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
@@ -71,16 +77,27 @@
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
+- Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
+- remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
+- Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - Bug 1184388 - 2015-10- 30- 3/3
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
+- Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
+- Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
+- Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
+- Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
 - Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
@@ -99,6 +116,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
 - Bug 1123516 - 2015-06-30 - Implement maplike/setlike
+- Bug 1157569 - 2015-06-27 - from part 13 onwards
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
 
@@ -106,6 +124,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
 - Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
+- Bug 1174450 - 2015-06-16 -  part 1 to 14
 - Bug 1174372 - Initialize ExecutableAllocator static fields in JS_Init
 - remaining parts of Bug 968923 (2015-06)
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
@@ -143,18 +162,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
 - 1199143 - Inline heavyweight functions.
 - 1030095 - Remove restriction on inlining recursive calls
-- 1180854 - Record and expose Ion IC stub optimization info to Jit
-- 1169731 - [[Call]] on a class constructor should throw.
-- 1154115 - Rewrite the JSAPI profiling API to use a FrameHandle, a
-- 1161584 - Add TrackedStrategy::SetProp_InlineCache. 
 - 1155788 - Make the Ion inner-window optimizations work again. 
-- 1154997 - Deal with self-hosted builtins when stringifying tracke
 - 1150654 - Add CantInlineNoSpecialization to distinguish natives f
-- Bug 1164602 - Replace js::NullPtr and JS::NullPtr with nullptr_t; r=s
-- Bug 1154053 - 2015-05-06 - Limit concurrency of e10s memory reporting. r=erahm 
-- Bug 1160887 - 2015-05-06 - Fix various unboxed object bugs, r=jandem,terrence. 
-- Bug 1159540 -2015-04-29 - Organize and comment the marking paths; r=sfink 
--  1102048 style patches, check which still apply
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
@@ -164,11 +173,6 @@ Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
 Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-Replay - in case 1165486 fails:
-Bug 915805 - Don't treat unbound names in Function() code as globals
-Bug 1148963 - OdinMonkey: add CompileOptions::lazyParsingDisabled and
-Bug 1148963 - OdinMonkey: throw if link-time failure and discardSourc
 
 Mac Specific
 - Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
@@ -219,6 +223,12 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
+
+Check ALTIVEC/VMX
+- gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
+- gfx/2d/BlurVMX.cpp
+in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
+- correct ifdef for  gfx/2d/Blur.cpp
 
 ### Further ToDo which would help portability:
 

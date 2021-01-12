@@ -1601,6 +1601,55 @@ DocAccessibleChild::RecvTakeFocus(const uint64_t& aID)
 }
 
 bool
+DocAccessibleChild::RecvIndexOfEmbeddedChild(const uint64_t& aID,
+                                             const uint64_t& aChildID,
+                                             uint32_t* aChildIdx)
+{
+  *aChildIdx = 0;
+
+  Accessible* parent = IdToAccessible(aID);
+  Accessible* child = IdToAccessible(aChildID);
+  if (!parent || !child)
+    return true;
+
+  *aChildIdx = parent->GetIndexOfEmbeddedChild(child);
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvEmbeddedChildAt(const uint64_t& aID,
+                                        const uint32_t& aIdx,
+                                        uint64_t* aChildID)
+{
+  *aChildID = 0;
+
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc)
+    return true;
+
+  *aChildID = reinterpret_cast<uintptr_t>(acc->GetEmbeddedChildAt(aIdx));
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvFocusedChild(const uint64_t& aID,
+                                       uint64_t* aChild,
+                                       bool* aOk)
+{
+  *aChild = 0;
+  *aOk = false;
+  Accessible* acc = IdToAccessible(aID);
+  if (acc) {
+    Accessible* child = acc->FocusedChild();
+    if (child) {
+      *aChild = reinterpret_cast<uint64_t>(child->UniqueID());
+      *aOk = true;
+    }
+  }
+  return true;
+}
+
+bool
 DocAccessibleChild::RecvChildAtPoint(const uint64_t& aID,
                                      const int32_t& aX,
                                      const int32_t& aY,

@@ -234,7 +234,7 @@ LayerManagerComposite::ApplyOcclusionCulling(Layer* aLayer, nsIntRegion& aOpaque
   // If we have a simple transform, then we can add our opaque area into
   // aOpaqueRegion.
   if (isTranslation &&
-      !aLayer->GetMaskLayer() &&
+      !aLayer->HasMaskLayers() &&
       aLayer->GetLocalOpacity() == 1.0f) {
     if (aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) {
       localOpaque.Or(localOpaque, composite->GetFullyRenderedRegion());
@@ -1327,6 +1327,12 @@ LayerComposite::SetLayerManager(LayerManagerComposite* aManager)
 {
   mCompositeManager = aManager;
   mCompositor = aManager->GetCompositor();
+}
+
+bool
+LayerManagerComposite::AsyncPanZoomEnabled() const
+{
+  return mCompositor->GetWidget()->AsyncPanZoomEnabled();
 }
 
 nsIntRegion

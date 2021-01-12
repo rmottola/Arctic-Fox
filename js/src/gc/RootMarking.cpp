@@ -56,36 +56,31 @@ MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* 
     pd->trace(trc);
 }
 
-template <class T>
-static inline bool
-IgnoreExactRoot(T* thingp)
+// We cannot instantiate (even indirectly) the abstract JS::DynamicTraceable.
+// Instead we cast to a ConcreteTraceable, then upcast before calling trace so
+// that we get the implementation defined dynamically in the vtable.
+struct ConcreteTraceable : public JS::DynamicTraceable
 {
-    return false;
+    void trace(JSTracer* trc) override {}
+};
+
+static void
+MarkDynamicTraceable(JSTracer* trc, ConcreteTraceable* t, const char* name)
+{
+    static_cast<JS::DynamicTraceable*>(t)->trace(trc);
 }
 
-template <class T>
-inline bool
-IgnoreExactRoot(T** thingp)
-{
-    return IsNullTaggedPointer(*thingp);
-}
+template <typename T>
+using TraceFunction = void (*)(JSTracer* trc, T* ref, const char* name);
 
-template <>
-inline bool
-IgnoreExactRoot(JSObject** thingp)
-{
-    return IsNullTaggedPointer(*thingp) || *thingp == TaggedProto::LazyProto;
-}
-
-template <class T, void MarkFunc(JSTracer* trc, T* ref, const char* name), class Source>
+template <class T, TraceFunction<T> TraceFn = TraceNullableRoot, class Source>
 static inline void
 MarkExactStackRootList(JSTracer* trc, Source* s, const char* name)
 {
-    Rooted<T>* rooter = s->template gcRooters<T>();
+    Rooted<T>* rooter = s->roots.template gcRooters<T>();
     while (rooter) {
         T* addr = rooter->address();
-        if (!IgnoreExactRoot(addr))
-            MarkFunc(trc, addr, name);
+        TraceFn(trc, addr, name);
         rooter = rooter->previous();
     }
 }
@@ -94,22 +89,26 @@ template<class T>
 static void
 MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
 {
-    MarkExactStackRootList<JSObject*, TraceRoot>(trc, context, "exact-object");
-    MarkExactStackRootList<Shape*, TraceRoot>(trc, context, "exact-shape");
-    MarkExactStackRootList<BaseShape*, TraceRoot>(trc, context, "exact-baseshape");
-    MarkExactStackRootList<ObjectGroup*, TraceRoot>(
+    MarkExactStackRootList<JSObject*>(trc, context, "exact-object");
+    MarkExactStackRootList<Shape*>(trc, context, "exact-shape");
+    MarkExactStackRootList<BaseShape*>(trc, context, "exact-baseshape");
+    MarkExactStackRootList<ObjectGroup*>(
         trc, context, "exact-objectgroup");
-    MarkExactStackRootList<JSString*, TraceRoot>(trc, context, "exact-string");
-    MarkExactStackRootList<JS::Symbol*, TraceRoot>(trc, context, "exact-symbol");
-    MarkExactStackRootList<jit::JitCode*, TraceRoot>(trc, context, "exact-jitcode");
-    MarkExactStackRootList<JSScript*, TraceRoot>(trc, context, "exact-script");
-    MarkExactStackRootList<LazyScript*, TraceRoot>(trc, context, "exact-lazy-script");
-    MarkExactStackRootList<jsid, TraceRoot>(trc, context, "exact-id");
-    MarkExactStackRootList<Value, TraceRoot>(trc, context, "exact-value");
-    MarkExactStackRootList<TypeSet::Type, TypeSet::MarkTypeRoot>(trc, context, "TypeSet::Type");
+    MarkExactStackRootList<JSString*>(trc, context, "exact-string");
+    MarkExactStackRootList<JS::Symbol*>(trc, context, "exact-symbol");
+    MarkExactStackRootList<jit::JitCode*>(trc, context, "exact-jitcode");
+    MarkExactStackRootList<JSScript*>(trc, context, "exact-script");
+    MarkExactStackRootList<LazyScript*>(trc, context, "exact-lazy-script");
+    MarkExactStackRootList<jsid>(trc, context, "exact-id");
+    MarkExactStackRootList<Value>(trc, context, "exact-value");
     MarkExactStackRootList<Bindings, MarkBindingsRoot>(trc, context, "Bindings");
     MarkExactStackRootList<JSPropertyDescriptor, MarkPropertyDescriptorRoot>(
         trc, context, "JSPropertyDescriptor");
+    MarkExactStackRootList<JS::StaticTraceable,
+                           js::DispatchWrapper<JS::StaticTraceable>::TraceWrapped>(
+        trc, context, "StaticTraceable");
+    MarkExactStackRootList<ConcreteTraceable, MarkDynamicTraceable>(
+        trc, context, "DynamicTraceable");
 }
 
 static void
@@ -211,18 +210,6 @@ AutoGCRooter::trace(JSTracer* trc)
         return;
       }
 
-      case OBJOBJHASHMAP: {
-        AutoObjectObjectHashMap::HashMapImpl& map = static_cast<AutoObjectObjectHashMap*>(this)->map;
-        for (AutoObjectObjectHashMap::Enum e(map); !e.empty(); e.popFront()) {
-            TraceRoot(trc, &e.front().value(), "AutoObjectObjectHashMap value");
-            JSObject* key = e.front().key();
-            TraceRoot(trc, &key, "AutoObjectObjectHashMap key");
-            if (key != e.front().key())
-                e.rekeyFront(key);
-        }
-        return;
-      }
-
       case OBJU32HASHMAP: {
         AutoObjectUnsigned32HashMap* self = static_cast<AutoObjectUnsigned32HashMap*>(this);
         AutoObjectUnsigned32HashMap::HashMapImpl& map = self->map;
@@ -231,18 +218,6 @@ AutoGCRooter::trace(JSTracer* trc)
             TraceRoot(trc, &key, "AutoObjectUnsignedHashMap key");
             if (key != e.front().key())
                 e.rekeyFront(key);
-        }
-        return;
-      }
-
-      case OBJHASHSET: {
-        AutoObjectHashSet* self = static_cast<AutoObjectHashSet*>(this);
-        AutoObjectHashSet::HashSetImpl& set = self->set;
-        for (AutoObjectHashSet::Enum e(set); !e.empty(); e.popFront()) {
-            JSObject* obj = e.front();
-            TraceRoot(trc, &obj, "AutoObjectHashSet value");
-            if (obj != e.front())
-                e.rekeyFront(obj);
         }
         return;
       }
@@ -306,7 +281,7 @@ AutoGCRooter::traceAll(JSTracer* trc)
 AutoGCRooter::traceAllWrappers(JSTracer* trc)
 {
     for (ContextIter cx(trc->runtime()); !cx.done(); cx.next()) {
-        for (AutoGCRooter* gcr = cx->autoGCRooters; gcr; gcr = gcr->down) {
+        for (AutoGCRooter* gcr = cx->roots.autoGCRooters_; gcr; gcr = gcr->down) {
             if (gcr->tag_ == WRAPVECTOR || gcr->tag_ == WRAPPER)
                 gcr->trace(trc);
         }
@@ -363,19 +338,10 @@ struct PersistentRootedMarker
     typedef void (*MarkFunc)(JSTracer* trc, T* ref, const char* name);
 
     static void
-    markChainIfNotNull(JSTracer* trc, List& list, const char* name)
-    {
-        for (Element* r = list.getFirst(); r; r = r->getNext()) {
-            if (r->get())
-                TraceRoot(trc, r->address(), name);
-        }
-    }
-
-    static void
     markChain(JSTracer* trc, List& list, const char* name)
     {
         for (Element* r = list.getFirst(); r; r = r->getNext())
-            TraceRoot(trc, r->address(), name);
+            TraceNullableRoot(trc, r->address(), name);
     }
 };
 
@@ -387,17 +353,14 @@ js::gc::MarkPersistentRootedChains(JSTracer* trc)
 {
     JSRuntime* rt = trc->runtime();
 
-    // Mark the PersistentRooted chains of types that may be null.
-    PersistentRootedMarker<JSFunction*>::markChainIfNotNull(trc, rt->functionPersistentRooteds,
-                                                            "PersistentRooted<JSFunction*>");
-    PersistentRootedMarker<JSObject*>::markChainIfNotNull(trc, rt->objectPersistentRooteds,
-                                                          "PersistentRooted<JSObject*>");
-    PersistentRootedMarker<JSScript*>::markChainIfNotNull(trc, rt->scriptPersistentRooteds,
-                                                          "PersistentRooted<JSScript*>");
-    PersistentRootedMarker<JSString*>::markChainIfNotNull(trc, rt->stringPersistentRooteds,
-                                                          "PersistentRooted<JSString*>");
-
-    // Mark the PersistentRooted chains of types that are never null.
+    PersistentRootedMarker<JSFunction*>::markChain(trc, rt->functionPersistentRooteds,
+                                                   "PersistentRooted<JSFunction*>");
+    PersistentRootedMarker<JSObject*>::markChain(trc, rt->objectPersistentRooteds,
+                                                 "PersistentRooted<JSObject*>");
+    PersistentRootedMarker<JSScript*>::markChain(trc, rt->scriptPersistentRooteds,
+                                                 "PersistentRooted<JSScript*>");
+    PersistentRootedMarker<JSString*>::markChain(trc, rt->stringPersistentRooteds,
+                                                 "PersistentRooted<JSString*>");
     PersistentRootedMarker<jsid>::markChain(trc, rt->idPersistentRooteds,
                                             "PersistentRooted<jsid>");
     PersistentRootedMarker<Value>::markChain(trc, rt->valuePersistentRooteds,
@@ -418,12 +381,7 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
 
     if (traceOrMark == MarkRuntime) {
         gcstats::AutoPhase ap(stats, gcstats::PHASE_MARK_CCWS);
-
-        for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
-            if (!c->zone()->isCollecting())
-                c->markCrossCompartmentWrappers(trc);
-        }
-        Debugger::markAllCrossCompartmentEdges(trc);
+        JSCompartment::traceIncomingCrossCompartmentEdgesForZoneGC(trc);
     }
 
     {
@@ -489,32 +447,8 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc,
         }
     }
 
-    /* We can't use GCCompartmentsIter if we're called from TraceRuntime. */
-    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
-        c->markRoots(trc);
-
-        if (rt->isHeapMinorCollecting())
-            c->globalWriteBarriered = false;
-
-        if (traceOrMark == MarkRuntime && !c->zone()->isCollecting())
-            continue;
-
-        /* During a GC, these are treated as weak pointers. */
-        if (traceOrMark == TraceRuntime) {
-            if (c->watchpointMap)
-                c->watchpointMap->markAll(trc);
-        }
-
-        /* Mark debug scopes, if present */
-        if (c->debugScopes)
-            c->debugScopes->mark(trc);
-
-        if (c->lazyArrayBuffers)
-            c->lazyArrayBuffers->trace(trc);
-
-        if (c->objectMetadataTable)
-            c->objectMetadataTable->trace(trc);
-    }
+    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
+        c->traceRoots(trc, traceOrMark);
 
     MarkInterpreterActivations(rt, trc);
 
