@@ -3218,13 +3218,46 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
     }
   }
 #endif /* MOZ_WIDGET_GTK */
-
+#ifdef MOZ_X11
+  // Init X11 in thread-safe mode. Must be called prior to the first call to XOpenDisplay 
+  // (called inside gdk_display_open). This is a requirement for off main tread compositing.
+  // This is done only on X11 platforms if the environment variable MOZ_USE_OMTC is set so 
+  // as to avoid overhead when omtc is not used. 
+  //
+  // On nightly builds, we call this by default to enable OMTC for Electrolysis testing. On
+  // aurora, beta, and release builds, there is a small tpaint regression from enabling this
+  // call, so it sits behind an environment variable.
+  //
+  // An environment variable is used instead of a pref on X11 platforms because we start having 
+  // access to prefs long after the first call to XOpenDisplay which is hard to change due to 
+  // interdependencies in the initialization.
+# ifndef NIGHTLY_BUILD
+  if (PR_GetEnv("MOZ_USE_OMTC") ||
+      PR_GetEnv("MOZ_OMTC_ENABLED"))
+# endif
+  {
+    XInitThreads();
+  }
+#endif
+#if defined(MOZ_WIDGET_GTK)
+  {
+    mGdkDisplay = gdk_display_open(display_name);
+    if (!mGdkDisplay) {
+      PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
+      return 1;
+    }
+    gdk_display_manager_set_default_display (gdk_display_manager_get(),
+                                             mGdkDisplay);
+    if (!GDK_IS_X11_DISPLAY(mGdkDisplay))
+      mDisableRemote = true;
+  }
+#endif
 #ifdef MOZ_ENABLE_XREMOTE
   // handle --remote now that xpcom is fired up
   bool newInstance;
   {
     char *e = PR_GetEnv("MOZ_NO_REMOTE");
-    mDisableRemote = (e && *e);
+    mDisableRemote = (mDisableRemote || (e && *e));
     if (mDisableRemote) {
       newInstance = true;
     } else {
@@ -3257,36 +3290,7 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
       return 1;
   }
 #endif
-#ifdef MOZ_X11
-  // Init X11 in thread-safe mode. Must be called prior to the first call to XOpenDisplay
-  // (called inside gdk_display_open). This is a requirement for off main tread compositing.
-  // This is done only on X11 platforms if the environment variable MOZ_USE_OMTC is set so
-  // as to avoid overhead when omtc is not used.
-  //
-  // On nightly builds, we call this by default to enable OMTC for Electrolysis testing. On
-  // aurora, beta, and release builds, there is a small tpaint regression from enabling this
-  // call, so it sits behind an environment variable.
-  //
-  // An environment variable is used instead of a pref on X11 platforms because we start having
-  // access to prefs long after the first call to XOpenDisplay which is hard to change due to
-  // interdependencies in the initialization.
-# ifndef NIGHTLY_BUILD
-  if (PR_GetEnv("MOZ_USE_OMTC") ||
-      PR_GetEnv("MOZ_OMTC_ENABLED"))
-# endif
-  {
-    XInitThreads();
-  }
-#endif
 #if defined(MOZ_WIDGET_GTK)
-  mGdkDisplay = gdk_display_open(display_name);
-  if (!mGdkDisplay) {
-    PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
-    return 1;
-  }
-  gdk_display_manager_set_default_display (gdk_display_manager_get(),
-                                           mGdkDisplay);
-
   // g_set_application_name () is only defined in glib2.2 and higher.
   _g_set_application_name_fn _g_set_application_name =
     (_g_set_application_name_fn)FindFunction("g_set_application_name");
