@@ -543,6 +543,9 @@ pref("app.update.socket.maxErrors", 20);
 // Enable update logging for now, to diagnose growing pains in the
 // field.
 pref("app.update.log", true);
+
+// SystemUpdate API
+pref("dom.system_update.active", "@mozilla.org/updates/update-prompt;1");
 #else
 // Explicitly disable the shutdown watchdog.  It's enabled by default.
 // When the updater is disabled, we want to know about shutdown hangs.
@@ -1033,6 +1036,9 @@ pref("dom.mapped_arraybuffer.enabled", true);
 
 // BroadcastChannel API
 pref("dom.broadcastChannel.enabled", true);
+
+// SystemUpdate API
+pref("dom.system_update.enabled", true);
 
 // UDPSocket API
 pref("dom.udpsocket.enabled", true);
