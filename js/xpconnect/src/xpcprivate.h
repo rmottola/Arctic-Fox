@@ -2144,7 +2144,6 @@ public:
                  XPCNativeInterface* Interface,
                  XPCWrappedNative** wrapper);
 
-public:
     static nsresult
     GetUsedOnly(nsISupports* Object,
                 XPCWrappedNativeScope* Scope,
@@ -2169,7 +2168,6 @@ public:
 
     inline bool HasInterfaceNoQI(const nsIID& iid);
 
-    XPCWrappedNativeTearOff* LocateTearOff(XPCNativeInterface* aInterface);
     XPCWrappedNativeTearOff* FindTearOff(XPCNativeInterface* aInterface,
                                          bool needJSObject = false,
                                          nsresult* pError = nullptr);
@@ -2262,8 +2260,6 @@ private:
         // Flags bits for mFlatJSObject:
         FLAT_JS_OBJECT_VALID = JS_BIT(0)
     };
-
-private:
 
     bool Init(const XPCNativeScriptableCreateInfo* sci);
     bool FinishInit();
