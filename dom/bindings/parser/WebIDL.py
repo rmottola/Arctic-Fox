@@ -1063,6 +1063,45 @@ class IDLInterface(IDLObjectWithScope, IDLExposureMixins):
                     attr = fowardAttr
                     putForwards = attr.getExtendedAttribute("PutForwards")
 
+            # Check that the name of an [Alias] doesn't conflict with an
+            # interface member.
+            if member.isMethod():
+                for alias in member.aliases:
+                    if self.isOnGlobalProtoChain():
+                        raise WebIDLError("[Alias] must not be used on a "
+                                          "[Global] interface operation",
+                                          [member.location])
+                    if (member.getExtendedAttribute("Exposed") or
+                        member.getExtendedAttribute("ChromeOnly") or
+                        member.getExtendedAttribute("Pref") or
+                        member.getExtendedAttribute("Func") or
+                        member.getExtendedAttribute("AvailableIn") or
+                        member.getExtendedAttribute("CheckPermissions")):
+                        raise WebIDLError("[Alias] must not be used on a "
+                                          "conditionally exposed operation",
+                                          [member.location])
+                    if member.isStatic():
+                        raise WebIDLError("[Alias] must not be used on a "
+                                          "static operation",
+                                          [member.location])
+                    if member.isIdentifierLess():
+                        raise WebIDLError("[Alias] must not be used on an "
+                                          "identifierless operation",
+                                          [member.location])
+                    if member.isUnforgeable():
+                        raise WebIDLError("[Alias] must not be used on an "
+                                          "[Unforgeable] operation",
+                                          [member.location])
+                    for m in self.members:
+                        if m.identifier.name == alias:
+                            raise WebIDLError("[Alias=%s] has same name as "
+                                              "interface member" % alias,
+                                              [member.location, m.location])
+                        if m.isMethod() and alias in m.aliases:
+                            raise WebIDLError("duplicate [Alias=%s] definitions" %
+                                              alias,
+                                              [member.location, m.location])
+
         if (self.getExtendedAttribute("Pref") and
             self._exposureGlobalNames != set([self.parentScope.primaryGlobalName])):
             raise WebIDLError("[Pref] used on an interface that is not %s-only" %
@@ -3292,6 +3331,12 @@ class IDLInterfaceMember(IDLObjectWithIdentifier, IDLExposureMixins):
                               [self.location])
         self.affects = affects
 
+    def _addAlias(self, alias):
+        if alias in self.aliases:
+            raise WebIDLError("Duplicate [Alias=%s] on attribute" % alias,
+                              [self.location])
+        self.aliases.append(alias)
+
 class IDLConst(IDLInterfaceMember):
     def __init__(self, location, identifier, type, value):
         IDLInterfaceMember.__init__(self, location, identifier,
@@ -3906,6 +3951,7 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
         self._unforgeable = False
         self.dependsOn = "Everything"
         self.affects = "Everything"
+        self.aliases = []
 
         if static and identifier.name == "prototype":
             raise WebIDLError("The identifier of a static operation must not be 'prototype'",
@@ -4250,6 +4296,11 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
                 raise WebIDLError("[DependsOn] takes an identifier",
                                   [attr.location])
             self._setDependsOn(attr.value())
+        elif identifier == "Alias":
+            if not attr.hasValue():
+                raise WebIDLError("[Alias] takes an identifier or string",
+                                  [attr.location])
+            self._addAlias(attr.value())
         elif identifier == "Unscopable":
             if not attr.noArguments():
                 raise WebIDLError("[Unscopable] must take no arguments",
