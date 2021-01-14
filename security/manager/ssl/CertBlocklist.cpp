@@ -366,7 +366,7 @@ WriteLine(nsIOutputStream* outputStream, const nsACString& string)
 
 // sort blocklist items into lists of serials for each issuer
 PLDHashOperator
-ProcessEntry(BlocklistItemKey* aHashKey, void* aUserArg)
+ProcessBlocklistEntry(BlocklistItemKey* aHashKey, void* aUserArg)
 {
   BlocklistSaveInfo* saveInfo = reinterpret_cast<BlocklistSaveInfo*>(aUserArg);
   CertBlocklistItem item = aHashKey->GetKey();
@@ -483,7 +483,7 @@ CertBlocklist::SaveEntries()
     return rv;
   }
 
-  mBlocklist.EnumerateEntries(ProcessEntry, &saveInfo);
+  mBlocklist.EnumerateEntries(ProcessBlocklistEntry, &saveInfo);
   if (!saveInfo.success) {
     PR_LOG(gCertBlockPRLog, PR_LOG_WARN,
            ("CertBlocklist::SaveEntries writing revocation data failed"));
