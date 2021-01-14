@@ -194,7 +194,7 @@ HTMLStyleElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
 NS_IMETHODIMP
 HTMLStyleElement::GetInnerHTML(nsAString& aInnerHTML)
 {
-  if (!nsContentUtils::GetNodeTextContent(this, false, aInnerHTML)) {
+  if (!nsContentUtils::GetNodeTextContent(this, false, aInnerHTML, fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
   return NS_OK;
