@@ -1051,6 +1051,8 @@ public:
             bool aShowDialog, mozilla::ErrorResult& aError);
   uint64_t GetMozPaintCount(mozilla::ErrorResult& aError);
 
+  bool ShouldResistFingerprinting();
+
   mozilla::dom::MozSelfSupport* GetMozSelfSupport(mozilla::ErrorResult& aError);
 
   already_AddRefed<nsIDOMWindow> OpenDialog(JSContext* aCx,

@@ -255,6 +255,7 @@ bool nsContentUtils::sIsUserTimingLoggingEnabled = false;
 bool nsContentUtils::sIsExperimentalAutocompleteEnabled = false;
 bool nsContentUtils::sEncodeDecodeURLHash = false;
 bool nsContentUtils::sGettersDecodeURLHash = false;
+bool nsContentUtils::sPrivacyResistFingerprinting = false;
 
 uint32_t nsContentUtils::sHandlingInputTimeout = 1000;
 
@@ -537,6 +538,9 @@ nsContentUtils::Init()
 
   Preferences::AddBoolVarCache(&sGettersDecodeURLHash,
                                "dom.url.getters_decode_hash", false);
+
+  Preferences::AddBoolVarCache(&sPrivacyResistFingerprinting,
+                               "privacy.resistFingerprinting", false);
 
   Preferences::AddUintVarCache(&sHandlingInputTimeout,
                                "dom.event.handling-user-input-time-limit",
@@ -2001,6 +2005,16 @@ nsContentUtils::IsCallerChrome()
 
   // If the check failed, look for UniversalXPConnect on the cx compartment.
   return xpc::IsUniversalXPConnectEnabled(GetCurrentJSContext());
+}
+
+bool
+nsContentUtils::ShouldResistFingerprinting(nsIDocShell* aDocShell)
+{
+  if (!aDocShell) {
+    return false;
+  }
+  bool isChrome = nsContentUtils::IsChromeDoc(aDocShell->GetDocument());
+  return !isChrome && sPrivacyResistFingerprinting;
 }
 
 namespace mozilla {
