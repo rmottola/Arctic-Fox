@@ -93,6 +93,7 @@
 #include "nsHostObjectProtocolHandler.h"
 #include "nsHtml5Module.h"
 #include "nsHtml5StringParser.h"
+#include "nsIAppShell.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsICategoryManager.h"
 #include "nsIChannelEventSink.h"
@@ -183,6 +184,7 @@
 #include "nsUnicodeProperties.h"
 #include "nsViewManager.h"
 #include "nsViewportInfo.h"
+#include "nsWidgetsCID.h"
 #include "nsWrapperCacheInlines.h"
 #include "nsXULPopupManager.h"
 #include "xpcprivate.h" // nsXPConnect
@@ -339,6 +341,7 @@ namespace {
 
 static NS_DEFINE_CID(kParserServiceCID, NS_PARSERSERVICE_CID);
 static NS_DEFINE_CID(kCParserCID, NS_PARSER_CID);
+static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
 
 static PLDHashTable* sEventListenerManagersHash;
 
@@ -5164,6 +5167,22 @@ nsContentUtils::AddScriptRunner(nsIRunnable* aRunnable)
   run->Run();
 
   return true;
+}
+
+/* static */
+void
+nsContentUtils::RunInStableState(already_AddRefed<nsIRunnable> aRunnable,
+                                 DispatchFailureHandling aHandling)
+{
+  nsCOMPtr<nsIRunnable> runnable = aRunnable;
+  nsCOMPtr<nsIAppShell> appShell(do_GetService(kAppShellCID));
+  if (!appShell) {
+    MOZ_ASSERT(aHandling == DispatchFailureHandling::IgnoreFailure);
+    return;
+  }
+  DebugOnly<nsresult> rv = appShell->RunInStableState(runnable);
+  MOZ_ASSERT(NS_SUCCEEDED(rv) ||
+             aHandling == DispatchFailureHandling::IgnoreFailure);
 }
 
 void
