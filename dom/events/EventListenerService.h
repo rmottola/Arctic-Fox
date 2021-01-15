@@ -14,8 +14,15 @@
 #include "nsIDOMEventListener.h"
 #include "nsIEventListenerService.h"
 #include "nsString.h"
+#include "nsTObserverArray.h"
+#include "nsDataHashtable.h"
+
+class nsIMutableArray;
 
 namespace mozilla {
+namespace dom {
+class EventTarget;
+};
 
 template<typename T>
 class Maybe;
@@ -57,10 +64,27 @@ protected:
 
 class EventListenerService final : public nsIEventListenerService
 {
-  ~EventListenerService() {}
+  ~EventListenerService();
 public:
+  EventListenerService();
   NS_DECL_ISUPPORTS
   NS_DECL_NSIEVENTLISTENERSERVICE
+
+  static void NotifyAboutMainThreadListenerChange(dom::EventTarget* aTarget)
+  {
+    if (sInstance) {
+      sInstance->NotifyAboutMainThreadListenerChangeInternal(aTarget);
+    }
+  }
+
+  void NotifyPendingChanges();
+private:
+  void NotifyAboutMainThreadListenerChangeInternal(dom::EventTarget* aTarget);
+  nsTObserverArray<nsCOMPtr<nsIListenerChangeListener>> mChangeListeners;
+  nsCOMPtr<nsIMutableArray> mPendingListenerChanges;
+  nsDataHashtable<nsISupportsHashKey, bool> mPendingListenerChangesSet;
+
+  static EventListenerService* sInstance;
 };
 
 } // namespace mozilla
