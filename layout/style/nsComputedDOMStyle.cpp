@@ -1440,7 +1440,7 @@ nsComputedDOMStyle::DoGetFontSizeAdjust()
 }
 
 CSSValue*
-nsComputedDOMStyle::DoGetOSXFontSmoothing()
+nsComputedDOMStyle::DoGetOsxFontSmoothing()
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
   val->SetIdent(nsCSSProps::ValueToKeywordEnum(StyleFont()->mFont.smoothing,
