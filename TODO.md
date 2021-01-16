@@ -161,10 +161,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
-- 1199143 - Inline heavyweight functions.
-- 1030095 - Remove restriction on inlining recursive calls
-- 1155788 - Make the Ion inner-window optimizations work again. 
-- 1150654 - Add CantInlineNoSpecialization to distinguish natives f
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
