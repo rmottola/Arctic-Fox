@@ -135,14 +135,15 @@ PRLogModuleInfo* XULDocument::gXULLog;
 
 //----------------------------------------------------------------------
 
-struct BroadcasterMapEntry : public PLDHashEntryHdr {
-    Element*         mBroadcaster; // [WEAK]
-    nsSmallVoidArray mListeners;   // [OWNING] of BroadcastListener objects
-};
-
 struct BroadcastListener {
     nsWeakPtr mListener;
     nsCOMPtr<nsIAtom> mAttribute;
+};
+
+struct BroadcasterMapEntry : public PLDHashEntryHdr
+{
+    Element* mBroadcaster;  // [WEAK]
+    nsTArray<BroadcastListener*> mListeners;  // [OWNING] of BroadcastListener objects
 };
 
 Element*
@@ -613,13 +614,14 @@ ClearBroadcasterMapEntry(PLDHashTable* aTable, PLDHashEntryHdr* aEntry)
 {
     BroadcasterMapEntry* entry =
         static_cast<BroadcasterMapEntry*>(aEntry);
-    for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        delete (BroadcastListener*)entry->mListeners[i];
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        delete entry->mListeners[i];
     }
+    entry->mListeners.Clear();
 
     // N.B. that we need to manually run the dtor because we
-    // constructed the nsSmallVoidArray object in-place.
-    entry->mListeners.~nsSmallVoidArray();
+    // constructed the nsTArray object in-place.
+    entry->mListeners.~nsTArray<BroadcastListener*>();
 }
 
 static bool
@@ -781,26 +783,22 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
 
         entry->mBroadcaster = &aBroadcaster;
 
-        // N.B. placement new to construct the nsSmallVoidArray object
-        // in-place
-        new (&entry->mListeners) nsSmallVoidArray();
+        // N.B. placement new to construct the nsTArray object in-place
+        new (&entry->mListeners) nsTArray<BroadcastListener*>();
     }
 
     // Only add the listener if it's not there already!
     nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
 
-    BroadcastListener* bl;
-    for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        bl = static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        BroadcastListener* bl = entry->mListeners[i];
         nsCOMPtr<Element> blListener = do_QueryReferent(bl->mListener);
 
         if (blListener == &aListener && bl->mAttribute == attr)
             return;
     }
 
-    bl = new BroadcastListener;
-
+    BroadcastListener* bl = new BroadcastListener;
     bl->mListener  = do_GetWeakReference(&aListener);
     bl->mAttribute = attr;
 
@@ -837,17 +835,15 @@ XULDocument::RemoveBroadcastListenerFor(Element& aBroadcaster,
 
     if (entry) {
         nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
-        for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-            BroadcastListener* bl =
-                static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+        for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+            BroadcastListener* bl = entry->mListeners[i];
             nsCOMPtr<Element> blListener = do_QueryReferent(bl->mListener);
 
             if (blListener == &aListener && bl->mAttribute == attr) {
                 entry->mListeners.RemoveElementAt(i);
                 delete bl;
 
-                if (entry->mListeners.Count() == 0)
+                if (entry->mListeners.IsEmpty())
                     PL_DHashTableRemove(mBroadcasterMap, &aBroadcaster);
 
                 break;
@@ -962,11 +958,8 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
             nsAutoString value;
             bool attrSet = aElement->GetAttr(kNameSpaceID_None, aAttribute, value);
 
-            int32_t i;
-            for (i = entry->mListeners.Count() - 1; i >= 0; --i) {
-                BroadcastListener* bl =
-                    static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+            for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+                BroadcastListener* bl = entry->mListeners[i];
                 if ((bl->mAttribute == aAttribute) ||
                     (bl->mAttribute == nsGkAtoms::_asterisk)) {
                     nsCOMPtr<Element> listenerEl
@@ -4140,10 +4133,8 @@ XULDocument::BroadcastAttributeChangeFromOverlay(nsIContent* aNode,
         return rv;
 
     // We've got listeners: push the value.
-    int32_t i;
-    for (i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        BroadcastListener* bl = static_cast<BroadcastListener*>
-            (entry->mListeners[i]);
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        BroadcastListener* bl = entry->mListeners[i];
 
         if ((bl->mAttribute != aAttribute) &&
             (bl->mAttribute != nsGkAtoms::_asterisk))
