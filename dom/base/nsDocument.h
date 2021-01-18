@@ -1215,6 +1215,10 @@ public:
 
   static void ExitFullscreen(nsIDocument* aDoc);
 
+  // Do the "fullscreen element ready check" from the fullscreen spec.
+  // It returns true if the given element is allowed to go into fullscreen.
+  bool FullscreenElementReadyCheck(Element* aElement, bool aWasCallerChrome);
+
   // This is called asynchronously by nsIDocument::AsyncRequestFullScreen()
   // to move this document into full-screen mode if allowed. aWasCallerChrome
   // should be true when nsIDocument::AsyncRequestFullScreen() was called
