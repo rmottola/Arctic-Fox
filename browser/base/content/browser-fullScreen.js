@@ -188,7 +188,9 @@ var FullScreen = {
     // Add listener to detect when the fullscreen window is re-focused.
     // If a fullscreen window loses focus, we show a warning when the
     // fullscreen window is refocused.
-    window.addEventListener("activate", this);
+    if (!this.useLionFullScreen) {
+      window.addEventListener("activate", this);
+    }
 
     // Cancel any "hide the toolbar" animation which is in progress, and make
     // the toolbar hide immediately.
@@ -212,7 +214,8 @@ var FullScreen = {
     gBrowser.tabContainer.removeEventListener("TabOpen", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabClose", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabSelect", this.exitDomFullScreen);
-    window.removeEventListener("activate", this);
+    if (!this.useLionFullScreen)
+      window.removeEventListener("activate", this);
 
     window.messageManager
           .broadcastAsyncMessage("DOMFullscreen:CleanUp");
@@ -261,9 +264,14 @@ var FullScreen = {
     if (!gPrefService.getBoolPref("browser.fullscreen.autohide"))
       return false;
 
-    // a popup menu is open in chrome: don't collapse chrome
-    if (!forceHide && this._isPopupOpen)
-      return false;
+    if (!forceHide) {
+      // a popup menu is open in chrome: don't collapse chrome
+      if (this._isPopupOpen)
+        return false;
+      // On OS X Lion we don't want to hide toolbars.
+      if (this.useLionFullScreen)
+        return false;
+    }
 
     // a textbox in chrome is focused (location bar anyone?): don't collapse chrome
     if (document.commandDispatcher.focusedElement &&
@@ -471,7 +479,7 @@ var FullScreen = {
 
     // Track whether mouse is near the toolbox
     this._isChromeCollapsed = false;
-    if (trackMouse) {
+    if (trackMouse && !this.useLionFullScreen) {
       let rect = gBrowser.mPanelContainer.getBoundingClientRect();
       this._mouseTargetRect = {
         top: rect.top + 50,
@@ -585,6 +593,14 @@ var FullScreen = {
     } else {
       gNavToolbox.setAttribute("inFullscreen", true);
       document.documentElement.setAttribute("inFullscreen", true);
+    }
+
+    // For Lion fullscreen, all fullscreen controls are hidden, don't
+    // bother to touch them. If we don't stop here, the following code
+    // could cause the native fullscreen button be shown unexpectedly.
+    // See bug 1165570.
+    if (this.useLionFullScreen) {
+      return;
     }
 
     // In tabs-on-top mode, move window controls to the tab bar,
