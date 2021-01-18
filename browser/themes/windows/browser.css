@@ -71,6 +71,21 @@
   -moz-box-flex: 1; /* make menu items expand to fill toolbar height */
 }
 
+#main-window[tabsintitlebar][sizemode="normal"] #toolbar-menubar[autohide="true"][inactive="true"]:not([customizing="true"]) {
+  visibility: hidden;
+}
+
+#main-window[sizemode="normal"] #toolbar-menubar,
+/* We want a 4px gap between the TabsToolbar and the toolbar-menubar when the
+   toolbar-menu is displayed in either restored or maximized mode. */
+#main-window:not([sizemode="fullscreen"]) #toolbar-menubar:-moz-any(:not([autohide="true"]), :not([inactive="true"])) {
+  margin-bottom: 4px;
+}
+
+#toolbar-menubar:not([autohide="true"]) {
+  -moz-binding: url("chrome://global/content/bindings/toolbar.xml#toolbar-drag");
+}
+
 #navigator-toolbox {
   -moz-appearance: none;
   background-color: transparent;
@@ -139,6 +154,16 @@
 }
 
 /* ::::: app menu button ::::: */
+
+/* The app menu button must appear on top of the navigator-toolbox in order
+ * for click and hover mouse events to work properly for the button in the
+ * restored window state. Otherwise, elements in the navigator-toolbox, like the
+ * menubar can swallow these events. It will also place the button above the
+ * fog on themes with Aero Glass.
+ */
+#main-window[tabsintitlebar] #appmenu-button-container {
+  z-index: 1;
+}
 
 #appmenu-button {
   -moz-appearance: none;
@@ -576,13 +601,21 @@
 }
 
 @media (-moz-windows-classic) {
-  #main-window[sizemode="normal"] > #titlebar > #titlebar-content > #appmenu-button-container {
+  #main-window[tabsintitlebar][sizemode="normal"] > #titlebar > #titlebar-content > #appmenu-button-container,
+  #main-window[tabsintitlebar][sizemode="normal"] > #tab-view-deck > #browser-panel > #navigator-toolbox > #toolbar-menubar {
     margin-top: 4px;
   }
 }
 
+/* The button box must appear on top of the navigator-toolbox in order for
+ * click and hover mouse events to work properly for the button in the restored
+ * window state. Otherwise, elements in the navigator-toolbox, like the menubar,
+ * can swallow those events. It will also place the buttons above the fog on
+ * themes with Aero Glass.
+ */
 #titlebar-buttonbox {
   -moz-appearance: -moz-window-button-box;
+  z-index: 1;
 }
 
 #main-window[sizemode="maximized"] #titlebar-buttonbox {
@@ -1885,6 +1918,10 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
 #TabsToolbar:not(:-moz-lwtheme),
 #TabsToolbar[tabsontop=false] {
   background-image: linear-gradient(to top, @toolbarShadowColor@ 1px, rgba(0,0,0,.05) 1px, transparent 50%);
+}
+
+#main-window[tabsintitlebar] #TabsToolbar {
+  background-color: transparent;
 }
 
 .tabbrowser-tab,
