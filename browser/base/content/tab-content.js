@@ -582,15 +582,31 @@ let DOMFullscreenHandler = {
   _fullscreenDoc: null,
 
   init: function() {
+    addMessageListener("DOMFullscreen:Entered", this);
     addMessageListener("DOMFullscreen:Approved", this);
     addMessageListener("DOMFullscreen:CleanUp", this);
-    addEventListener("MozDOMFullscreen:Entered", this);
+    addEventListener("MozDOMFullscreen:Request", this);
     addEventListener("MozDOMFullscreen:NewOrigin", this);
     addEventListener("MozDOMFullscreen:Exited", this);
   },
 
+  get _windowUtils() {
+    return content.QueryInterface(Ci.nsIInterfaceRequestor)
+                  .getInterface(Ci.nsIDOMWindowUtils);
+  },
+
   receiveMessage: function(aMessage) {
     switch(aMessage.name) {
+      case "DOMFullscreen:Entered": {
+        if (!this._windowUtils.handleFullscreenRequests() &&
+            !content.document.mozFullScreen) {
+          // If we don't actually have any pending fullscreen request
+          // to handle, neither we have been in fullscreen, tell the
+          // parent to just exit.
+          sendAsyncMessage("DOMFullscreen:Exited");
+        }
+        break;
+      }
       case "DOMFullscreen:Approved": {
         if (this._fullscreenDoc) {
           Services.obs.notifyObservers(this._fullscreenDoc,
@@ -600,9 +616,7 @@ let DOMFullscreenHandler = {
         break;
       }
       case "DOMFullscreen:CleanUp": {
-        let utils = content.QueryInterface(Ci.nsIInterfaceRequestor)
-                           .getInterface(Ci.nsIDOMWindowUtils);
-        utils.exitFullscreen();
+        this._windowUtils.exitFullscreen();
         this._fullscreenDoc = null;
         break;
       }
@@ -611,8 +625,8 @@ let DOMFullscreenHandler = {
 
   handleEvent: function(aEvent) {
     switch (aEvent.type) {
-      case "MozDOMFullscreen:Entered": {
-        sendAsyncMessage("DOMFullscreen:Entered");
+      case "MozDOMFullscreen:Request": {
+        sendAsyncMessage("DOMFullscreen:Request");
         break;
       }
       case "MozDOMFullscreen:NewOrigin": {
