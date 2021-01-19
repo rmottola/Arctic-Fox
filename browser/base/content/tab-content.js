@@ -587,7 +587,7 @@ let DOMFullscreenHandler = {
     addMessageListener("DOMFullscreen:CleanUp", this);
     addEventListener("MozDOMFullscreen:Request", this);
     addEventListener("MozDOMFullscreen:NewOrigin", this);
-    addEventListener("MozDOMFullscreen:Exited", this);
+    addEventListener("MozDOMFullscreen:Exit", this);
   },
 
   get _windowUtils() {
@@ -603,7 +603,7 @@ let DOMFullscreenHandler = {
           // If we don't actually have any pending fullscreen request
           // to handle, neither we have been in fullscreen, tell the
           // parent to just exit.
-          sendAsyncMessage("DOMFullscreen:Exited");
+          sendAsyncMessage("DOMFullscreen:Exit");
         }
         break;
       }
@@ -636,8 +636,8 @@ let DOMFullscreenHandler = {
         });
         break;
       }
-      case "MozDOMFullscreen:Exited": {
-        sendAsyncMessage("DOMFullscreen:Exited");
+      case "MozDOMFullscreen:Exit": {
+        sendAsyncMessage("DOMFullscreen:Exit");
         break;
       }
     }

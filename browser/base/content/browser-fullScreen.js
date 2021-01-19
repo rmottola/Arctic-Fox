@@ -9,7 +9,7 @@ var FullScreen = {
   _MESSAGES: [
     "DOMFullscreen:Request",
     "DOMFullscreen:NewOrigin",
-    "DOMFullscreen:Exited",
+    "DOMFullscreen:Exit",
   ],
 
   init: function() {
@@ -166,13 +166,8 @@ var FullScreen = {
         this.showWarning(aMessage.data.originNoSuffix);
         break;
       }
-      case "DOMFullscreen:Exited": {
-        // Like entering DOM fullscreen, we also need to exit fullscreen
-        // at the operating system level in the parent process here.
-        if (this._isRemoteBrowser(browser)) {
-          this._windowUtils.remoteFrameFullscreenReverted();
-        }
-        this.cleanupDomFullscreen();
+      case "DOMFullscreen:Exit": {
+        this._windowUtils.remoteFrameFullscreenReverted();
         break;
       }
     }
