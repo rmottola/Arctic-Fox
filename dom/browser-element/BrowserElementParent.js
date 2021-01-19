@@ -903,7 +903,7 @@ BrowserElementParent.prototype = {
 
   _fullscreenOriginChange: function(data) {
     Services.obs.notifyObservers(
-      this._frameElement, "fullscreen-origin-change", data.json.origin);
+      this._frameElement, "fullscreen-origin-change", data.json.originNoSuffix);
   },
 
   _exitedDomFullscreen: function(data) {
