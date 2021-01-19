@@ -10333,9 +10333,7 @@ static const char* kDocumentWarnings[] = {
 bool
 nsIDocument::HasWarnedAbout(DeprecatedOperations aOperation) const
 {
-  static_assert(eDeprecatedOperationCount <= 64,
-                "Too many deprecated operations");
-  return mDeprecationWarnedAbout & (1ull << aOperation);
+  return mDeprecationWarnedAbout[aOperation];
 }
 
 void
@@ -10346,7 +10344,7 @@ nsIDocument::WarnOnceAbout(DeprecatedOperations aOperation,
   if (HasWarnedAbout(aOperation)) {
     return;
   }
-  mDeprecationWarnedAbout |= (1ull << aOperation);
+  mDeprecationWarnedAbout[aOperation] = true;
   uint32_t flags = asError ? nsIScriptError::errorFlag
                            : nsIScriptError::warningFlag;
   nsContentUtils::ReportToConsole(flags,
@@ -10358,9 +10356,7 @@ nsIDocument::WarnOnceAbout(DeprecatedOperations aOperation,
 bool
 nsIDocument::HasWarnedAbout(DocumentWarnings aWarning) const
 {
-  static_assert(eDocumentWarningCount <= 64,
-                "Too many document warnings");
-  return mDocWarningWarnedAbout & (1ull << aWarning);
+  return mDocWarningWarnedAbout[aWarning];
 }
 
 void
@@ -10373,7 +10369,7 @@ nsIDocument::WarnOnceAbout(DocumentWarnings aWarning,
   if (HasWarnedAbout(aWarning)) {
     return;
   }
-  mDocWarningWarnedAbout |= (1ull << aWarning);
+  mDocWarningWarnedAbout[aWarning] = true;
   uint32_t flags = asError ? nsIScriptError::errorFlag
                            : nsIScriptError::warningFlag;
   nsContentUtils::ReportToConsole(flags,

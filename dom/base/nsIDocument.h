@@ -32,6 +32,7 @@
 #include "nsExpirationTracker.h"
 #include "nsClassHashtable.h"
 #include "prclist.h"
+#include <bitset>                        // for member
 
 class imgIRequest;
 class nsAString;
@@ -2634,8 +2635,8 @@ public:
   bool InlineScriptAllowedByCSP();
 
 private:
-  mutable uint64_t mDeprecationWarnedAbout;
-  mutable uint64_t mDocWarningWarnedAbout;
+  mutable std::bitset<eDeprecatedOperationCount> mDeprecationWarnedAbout;
+  mutable std::bitset<eDocumentWarningCount> mDocWarningWarnedAbout;
   SelectorCache mSelectorCache;
 
 protected:
