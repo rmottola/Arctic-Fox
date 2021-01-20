@@ -11007,7 +11007,8 @@ public:
   NS_IMETHOD Run()
   {
     if (mDoc->GetWindow()) {
-      mDoc->GetWindow()->SetFullScreenInternal(mValue, false, mHMD);
+      mDoc->GetWindow()->SetFullscreenInternal(
+        nsPIDOMWindow::eForFullscreenAPI, mValue, mHMD);
     }
     return NS_OK;
   }

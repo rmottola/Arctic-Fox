@@ -6111,7 +6111,7 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen, mozilla::ErrorResult& aError)
 {
   FORWARD_TO_OUTER_OR_THROW(SetFullScreen, (aFullScreen, aError), aError, /* void */);
 
-  aError = SetFullScreenInternal(aFullScreen, true);
+  aError = SetFullscreenInternal(eForFullscreenMode, aFullScreen);
 }
 
 NS_IMETHODIMP
@@ -6119,7 +6119,7 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen)
 {
   FORWARD_TO_OUTER(SetFullScreen, (aFullScreen), NS_ERROR_NOT_INITIALIZED);
 
-  return SetFullScreenInternal(aFullScreen, true);
+  return SetFullscreenInternal(eForFullscreenMode, aFullScreen);
 }
 
 void
@@ -6138,7 +6138,8 @@ FinishDOMFullscreenChange(nsIDocument* aDoc, bool aInDOMFullscreen)
 }
 
 nsresult
-nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
+nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
+                                      bool aFullScreen,
                                       gfx::VRHMDInfo* aHMD)
 {
   MOZ_ASSERT(IsOuterWindow());
@@ -6148,7 +6149,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
   // Only chrome can change our fullscreen mode. Otherwise, the state
   // can only be changed for DOM fullscreen.
   if (aFullScreen == FullScreen() ||
-      (aFullscreenMode && !nsContentUtils::IsCallerChrome())) {
+      (aReason == eForFullscreenMode && !nsContentUtils::IsCallerChrome())) {
     return NS_OK;
   }
 
@@ -6161,7 +6162,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
   if (!window)
     return NS_ERROR_FAILURE;
   if (rootItem != mDocShell)
-    return window->SetFullScreenInternal(aFullScreen, aFullscreenMode, aHMD);
+    return window->SetFullscreenInternal(aReason, aFullScreen, aHMD);
 
   // make sure we don't try to set full screen on a non-chrome window,
   // which might happen in embedding world
@@ -6175,7 +6176,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
   // Note that although entering DOM fullscreen could also cause
   // consequential calls to this method, those calls will be skipped
   // at the condition above.
-  if (aFullscreenMode) {
+  if (aReason == eForFullscreenMode) {
     mFullscreenMode = aFullScreen;
   } else {
     // If we are exiting from DOM fullscreen while we initially make
@@ -6210,7 +6211,7 @@ nsGlobalWindow::SetFullScreenInternal(bool aFullScreen, bool aFullscreenMode,
       if (aHMD) {
         screen = aHMD->GetScreen();
       }
-      if (!aFullscreenMode) {
+      if (aReason == eForFullscreenAPI) {
         widget->PrepareForDOMFullscreenTransition();
       }
       widget->MakeFullScreen(aFullScreen, screen);
