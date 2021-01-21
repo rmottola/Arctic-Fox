@@ -78,6 +78,7 @@
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
+- Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
@@ -92,8 +93,19 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1184388 - 2015-10- 30- 3/3
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
+- Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
+- Bug 1198563
+- Bug 1190316 - Apply fullscreen transition on only the target monitor
+- 1190669 - 4 parts
+- Bug 1191112 - 3 parts
+- Bug 1186384 - Consider device pixel scale on fullscreen transition wi
+- Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1184443 - Make async ExitFullscreen call ask the window to exi
+- Bug 1184201 - Disable fullscreen transition on Windows
+- Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
