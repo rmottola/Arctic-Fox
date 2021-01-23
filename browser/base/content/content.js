@@ -137,12 +137,15 @@ let handleContentContextMenu = function (event) {
                                           .getInterface(Ci.nsIDOMWindowUtils)
                                           .outerWindowID;
 
+  let disableSetDesktopBg = null;
   // Media related cache info parent needs for saving
   let contentType = null;
   let contentDisposition = null;
   if (event.target.nodeType == Ci.nsIDOMNode.ELEMENT_NODE &&
       event.target instanceof Ci.nsIImageLoadingContent &&
       event.target.currentURI) {
+    disableSetDesktopBg = disableSetDesktopBackground(event.target);
+
     try {
       let imageCache = 
         Cc["@mozilla.org/image/tools;1"].getService(Ci.imgITools)
@@ -183,7 +186,7 @@ let handleContentContextMenu = function (event) {
                     { editFlags, spellInfo, customMenuItems, addonInfo,
                       principal, docLocation, charSet, baseURI, referrer,
                       referrerPolicy, contentType, contentDisposition,
-                      frameOuterWindowID, selectionInfo },
+                      frameOuterWindowID, selectionInfo, disableSetDesktopBg },
                     { event, popupNode: event.target });
   }
   else {
@@ -204,6 +207,7 @@ let handleContentContextMenu = function (event) {
       contentType: contentType,
       contentDisposition: contentDisposition,
       selectionInfo: selectionInfo,
+      disableSetDesktopBackground: disableSetDesktopBg,
     };
   }
 }
@@ -671,4 +675,53 @@ addMessageListener("ContextMenu:BookmarkFrame", (message) => {
   sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
                    { title: frame.title,
                      description: PlacesUIUtils.getDescriptionFromDocument(frame) });
+});
+
+function disableSetDesktopBackground(aTarget) {
+  // Disable the Set as Desktop Background menu item if we're still trying
+  // to load the image or the load failed.
+  if (!(aTarget instanceof Ci.nsIImageLoadingContent))
+    return true;
+
+  if (("complete" in aTarget) && !aTarget.complete)
+    return true;
+
+  if (aTarget.currentURI.schemeIs("javascript"))
+    return true;
+
+  let request = aTarget.QueryInterface(Ci.nsIImageLoadingContent)
+                       .getRequest(Ci.nsIImageLoadingContent.CURRENT_REQUEST);
+  if (!request)
+    return true;
+
+  return false;
+}
+
+addMessageListener("ContextMenu:SetAsDesktopBackground", (message) => {
+  let target = message.objects.target;
+
+  // Paranoia: check disableSetDesktopBackground again, in case the
+  // image changed since the context menu was initiated.
+  let disable = disableSetDesktopBackground(target);
+
+  if (!disable) {
+    try {
+      BrowserUtils.urlSecurityCheck(target.currentURI.spec, target.ownerDocument.nodePrincipal);
+      let canvas = content.document.createElement("canvas");
+      canvas.width = target.naturalWidth;
+      canvas.height = target.naturalHeight;
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(target, 0, 0);
+      let dataUrl = canvas.toDataURL();
+      sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result",
+                       { dataUrl });
+    }
+    catch (e) {
+      Cu.reportError(e);
+      disable = true;
+    }
+  }
+
+  if (disable)
+    sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result", { disable });
 });
