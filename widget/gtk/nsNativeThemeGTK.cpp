@@ -33,6 +33,7 @@
 #include "gfxPlatformGtk.h"
 #include "gfxGdkNativeRenderer.h"
 #include <algorithm>
+#include <dlfcn.h>
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -88,6 +89,24 @@ nsNativeThemeGTK::RefreshWidgetWindow(nsIFrame* aFrame)
  
   vm->InvalidateAllViews();
 }
+
+gint
+nsNativeThemeGTK::GdkScaleFactor()
+{
+#if (MOZ_WIDGET_GTK >= 3)
+  // Since GDK 3.10
+  static auto sGdkScreenGetMonitorScaleFactorPtr = (gint (*)(GdkScreen*, gint))
+      dlsym(RTLD_DEFAULT, "gdk_screen_get_monitor_scale_factor");
+  if (sGdkScreenGetMonitorScaleFactorPtr) {
+      // FIXME: In the future, we'll want to fix this for GTK on Wayland which
+      // supports a variable scale factor per display.
+      GdkScreen *screen = gdk_screen_get_default();
+      return sGdkScreenGetMonitorScaleFactorPtr(screen, 0);
+  }
+#endif
+    return 1;
+}
+
 
 static bool IsFrameContentNodeInNamespace(nsIFrame *aFrame, uint32_t aNamespace)
 {
@@ -712,10 +731,10 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
   switch (aWidgetType) {
   case NS_THEME_SCROLLBAR_THUMB_VERTICAL:
     aExtra->top = aExtra->bottom = 1;
-    return true;
+    break;
   case NS_THEME_SCROLLBAR_THUMB_HORIZONTAL:
     aExtra->left = aExtra->right = 1;
-    return true;
+    break;
 
   // Include the indicator spacing (the padding around the control).
   case NS_THEME_CHECKBOX:
@@ -733,7 +752,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
       aExtra->right = indicator_spacing;
       aExtra->bottom = indicator_spacing;
       aExtra->left = indicator_spacing;
-      return true;
+      break;
     }
   case NS_THEME_BUTTON :
     {
@@ -746,7 +765,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
         aExtra->right = right;
         aExtra->bottom = bottom;
         aExtra->left = left;
-        return true;
+        break;
       }
     }
   case NS_THEME_FOCUS_OUTLINE:
@@ -754,7 +773,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
       moz_gtk_get_focus_outline_size(&aExtra->left, &aExtra->top);
       aExtra->right = aExtra->left;
       aExtra->bottom = aExtra->top;
-      return true;
+      break;
     }
   case NS_THEME_TAB :
     {
@@ -776,6 +795,11 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
   default:
     return false;
   }
+  aExtra->top *= GdkScaleFactor();
+  aExtra->right *= GdkScaleFactor();
+  aExtra->bottom *= GdkScaleFactor();
+  aExtra->left *= GdkScaleFactor();
+  return true;
 }
 
 NS_IMETHODIMP
@@ -802,6 +826,7 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
 
   gfxRect rect = presContext->AppUnitsToGfxUnits(aRect);
   gfxRect dirtyRect = presContext->AppUnitsToGfxUnits(aDirtyRect);
+  gint scaleFactor = GdkScaleFactor();
 
   // Align to device pixels where sensible
   // to provide crisper and faster drawing.
@@ -839,8 +864,10 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
 
   // gdk rectangles are wrt the drawing rect.
 
-  GdkRectangle gdk_rect = {-drawingRect.x, -drawingRect.y,
-                           widgetRect.width, widgetRect.height};
+  GdkRectangle gdk_rect = {-drawingRect.x/scaleFactor,
+                           -drawingRect.y/scaleFactor,
+                           widgetRect.width/scaleFactor,
+                           widgetRect.height/scaleFactor};
 
   // translate everything so (0,0) is the top left of the drawingRect
   gfxContextAutoSaveRestore autoSR(ctx);
@@ -849,6 +876,7 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
     tm = ctx->CurrentMatrix();
   }
   tm.Translate(rect.TopLeft() + gfxPoint(drawingRect.x, drawingRect.y));
+  tm.Scale(scaleFactor, scaleFactor); // Draw in GDK coords
   ctx->SetMatrix(tm);
 
   NS_ASSERTION(!IsWidgetTypeDisabled(mDisabledWidgetTypes, aWidgetType),
@@ -1036,6 +1064,11 @@ nsNativeThemeGTK::GetWidgetPadding(nsDeviceContext* aContext,
 
         aResult->left += horizontal_padding;
         aResult->right += horizontal_padding;
+
+        aResult->top *= GdkScaleFactor();
+        aResult->right *= GdkScaleFactor();
+        aResult->bottom *= GdkScaleFactor();
+        aResult->left *= GdkScaleFactor();
 
         return true;
       }
@@ -1298,6 +1331,9 @@ nsNativeThemeGTK::GetMinimumWidgetSize(nsPresContext* aPresContext,
     }
     break;
   }
+
+  *aResult = *aResult * GdkScaleFactor();
+
   return NS_OK;
 }
 
