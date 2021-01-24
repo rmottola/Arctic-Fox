@@ -153,6 +153,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1184634 - Rename MediaTaskQueue to TaskQueue
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
+- Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
+- Bug 1148026 - Add a skeleton of the login fill doorhange
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
 - 1163423 - 2015-05-12 JS_HasOwnProperty
