@@ -998,8 +998,8 @@ var gBrowserInit = {
       goSetCommandEnabled("cmd_newNavigatorTab", false);
     }
 
-#ifdef CAN_DRAW_IN_TITLEBAR
-    updateTitlebarDisplay();
+#ifdef MENUBAR_CAN_AUTOHIDE
+    updateAppButtonDisplay();
 #endif
 
     // Misc. inits.
@@ -5222,8 +5222,14 @@ var TabsInTitlebar = {
   }
 };
 
+#ifdef MENUBAR_CAN_AUTOHIDE
+function updateAppButtonDisplay() {
+  var displayAppButton =
+    !gInPrintPreviewMode &&
+    window.menubar.visible &&
+    document.getElementById("toolbar-menubar").getAttribute("autohide") == "true";
+
 #ifdef CAN_DRAW_IN_TITLEBAR
-function updateTitlebarDisplay() {
   document.getElementById("titlebar").hidden = gInPrintPreviewMode;
 
   if (!gInPrintPreviewMode)
@@ -5231,7 +5237,11 @@ function updateTitlebarDisplay() {
   else
     document.documentElement.removeAttribute("chromemargin");
 
- TabsInTitlebar.allowedBy("drawing-in-titlebar", !gInPrintPreviewMode);
+  TabsInTitlebar.allowedBy("drawing-in-titlebar", !gInPrintPreviewMode);
+#else
+  document.getElementById("appmenu-toolbar-button").hidden =
+    !displayAppButton;
+#endif
 }
 #endif
 
