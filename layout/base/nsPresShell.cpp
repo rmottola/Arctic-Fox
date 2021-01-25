@@ -908,6 +908,7 @@ PresShell::Init(nsIDocument* aDocument,
   if (TouchCaretPrefEnabled() && !AccessibleCaretEnabled()) {
     // Create touch caret handle
     mTouchCaret = new TouchCaret(this);
+    mTouchCaret->Init();
   }
 
   if (SelectionCaretPrefEnabled() && !AccessibleCaretEnabled()) {
