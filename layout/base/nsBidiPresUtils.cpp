@@ -18,6 +18,7 @@
 #include "nsTextFrame.h"
 #include "nsBlockFrame.h"
 #include "nsIFrameInlines.h"
+#include "nsStyleStructInlines.h"
 #include "RubyUtils.h"
 #include "nsRubyFrame.h"
 #include "nsRubyBaseFrame.h"
@@ -1050,7 +1051,7 @@ nsBidiPresUtils::TraverseFrames(nsBlockFrame*              aBlockFrame,
       if (nsGkAtoms::textFrame == frameType) {
         if (content != aBpd->mPrevContent) {
           aBpd->mPrevContent = content;
-          if (!frame->StyleText()->NewlineIsSignificant()) {
+          if (!frame->StyleText()->NewlineIsSignificant(frame)) {
             content->AppendTextTo(aBpd->mBuffer);
           } else {
             /*
