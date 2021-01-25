@@ -5092,5 +5092,3 @@ pref("memory.report_concurrency", 10);
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
-// Thick caret when behind CJK characters
-pref("layout.cjkthickcaret", true);
