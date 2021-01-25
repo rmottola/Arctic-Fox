@@ -4870,6 +4870,9 @@ pref("layout.accessiblecaret.enabled", false);
 // no one touches it. Set the value to 0 to disable this feature.
 pref("layout.accessiblecaret.timeout_ms", 3000);
 
+// Selection carets will fall-back to internal LongTap detector.
+pref("selectioncaret.detects.longtap", true);
+
 // Wakelock is disabled by default.
 pref("dom.wakelock.enabled", false);
 
