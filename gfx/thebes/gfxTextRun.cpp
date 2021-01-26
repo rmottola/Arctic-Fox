@@ -1353,7 +1353,8 @@ gfxTextRun::FetchGlyphExtents(gfxContext *aRefContext)
     for (i = 0; i < runCount; ++i) {
         const GlyphRun& run = mGlyphRuns[i];
         gfxFont *font = run.mFont;
-        if (MOZ_UNLIKELY(font->GetStyle()->size == 0)) {
+        if (MOZ_UNLIKELY(font->GetStyle()->size == 0) ||
+            MOZ_UNLIKELY(font->GetStyle()->sizeAdjust == 0.0f)) {
             continue;
         }
 
@@ -2010,7 +2011,8 @@ gfxFontGroup::MakeSpaceTextRun(const Parameters *aParams, uint32_t aFlags)
     }
 
     gfxFont *font = GetFirstValidFont();
-    if (MOZ_UNLIKELY(GetStyle()->size == 0)) {
+    if (MOZ_UNLIKELY(GetStyle()->size == 0) ||
+        MOZ_UNLIKELY(GetStyle()->sizeAdjust == 0.0f)) {
         // Short-circuit for size-0 fonts, as Windows and ATSUI can't handle
         // them, and always create at least size 1 fonts, i.e. they still
         // render something for size 0 fonts.
@@ -2109,7 +2111,8 @@ gfxFontGroup::MakeTextRun(const uint8_t *aString, uint32_t aLength,
 
     aFlags |= TEXT_IS_8BIT;
 
-    if (GetStyle()->size == 0) {
+    if (MOZ_UNLIKELY(GetStyle()->size == 0) ||
+        MOZ_UNLIKELY(GetStyle()->sizeAdjust == 0.0f)) {
         // Short-circuit for size-0 fonts, as Windows and ATSUI can't handle
         // them, and always create at least size 1 fonts, i.e. they still
         // render something for size 0 fonts.
@@ -2140,7 +2143,8 @@ gfxFontGroup::MakeTextRun(const char16_t *aString, uint32_t aLength,
     if (aLength == 1 && aString[0] == ' ') {
         return MakeSpaceTextRun(aParams, aFlags);
     }
-    if (GetStyle()->size == 0) {
+    if (MOZ_UNLIKELY(GetStyle()->size == 0) ||
+        MOZ_UNLIKELY(GetStyle()->sizeAdjust == 0.0f)) {
         return MakeBlankTextRun(aLength, aParams, aFlags);
     }
 
