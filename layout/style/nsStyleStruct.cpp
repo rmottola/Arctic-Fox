@@ -2607,6 +2607,7 @@ nsStyleDisplay::nsStyleDisplay()
   mChildPerspective.SetNoneValue();
   mBackfaceVisibility = NS_STYLE_BACKFACE_VISIBILITY_VISIBLE;
   mTransformStyle = NS_STYLE_TRANSFORM_STYLE_FLAT;
+  mTransformBox = NS_STYLE_TRANSFORM_BOX_BORDER_BOX;
   mOrient = NS_STYLE_ORIENT_INLINE;
   mMixBlendMode = NS_STYLE_BLEND_NORMAL;
   mIsolation = NS_STYLE_ISOLATION_AUTO;
@@ -2676,6 +2677,7 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
   , mScrollSnapCoordinate(aSource.mScrollSnapCoordinate)
   , mBackfaceVisibility(aSource.mBackfaceVisibility)
   , mTransformStyle(aSource.mTransformStyle)
+  , mTransformBox(aSource.mTransformBox)
   , mSpecifiedTransform(aSource.mSpecifiedTransform)
   , mChildPerspective(aSource.mChildPerspective)
   , mTransitions(aSource.mTransitions)
@@ -2843,7 +2845,8 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
       }
 
     if (mChildPerspective != aOther.mChildPerspective ||
-        mTransformStyle != aOther.mTransformStyle)
+        mTransformStyle != aOther.mTransformStyle ||
+        mTransformBox != aOther.mTransformBox)
       NS_UpdateHint(transformHint, kUpdateOverflowAndRepaintHint);
 
     if (mBackfaceVisibility != aOther.mBackfaceVisibility)
