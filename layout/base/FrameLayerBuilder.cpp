@@ -2483,7 +2483,7 @@ bool
 PaintedLayerData::CanOptimizeToImageLayer(nsDisplayListBuilder* aBuilder)
 {
   if (!mImage) {
-    return nullptr;
+    return false;
   }
 
   return mImage->CanOptimizeToImageLayer(mLayer->Manager(), aBuilder);
