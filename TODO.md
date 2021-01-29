@@ -234,6 +234,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
+And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp ?
 
 Check ALTIVEC/VMX
 - gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
