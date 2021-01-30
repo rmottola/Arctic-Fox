@@ -979,7 +979,7 @@ PLDHashTable::Iterator::Next()
 }
 
 PLDHashTable::RemovingIterator::RemovingIterator(RemovingIterator&& aOther)
-  : Iterator(mozilla::Move(aOther.mTable))
+  : Iterator(mozilla::Move(aOther))
   , mHaveRemoved(aOther.mHaveRemoved)
 {
 }
