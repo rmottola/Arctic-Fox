@@ -167,6 +167,8 @@ public:
                               bool aWasAlternate,
                               nsresult aStatus) override;
 
+  FontFace* GetFontFaceAt(uint32_t aIndex);
+
   // -- Web IDL --------------------------------------------------------------
 
   IMPL_EVENT_HANDLER(loading)
@@ -186,6 +188,8 @@ public:
   bool Delete(FontFace& aFontFace, mozilla::ErrorResult& aRv);
   bool Has(FontFace& aFontFace);
   uint32_t Size();
+  mozilla::dom::FontFaceSetIterator* Entries();
+  mozilla::dom::FontFaceSetIterator* Values();
   FontFace* IndexedGetter(uint32_t aIndex, bool& aFound);
   uint32_t Length() { return Size(); }
 
