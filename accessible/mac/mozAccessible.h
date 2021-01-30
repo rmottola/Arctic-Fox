@@ -31,19 +31,22 @@ GetNativeFromGeckoAccessible(mozilla::a11y::Accessible* aAccessible)
   return native;
 }
 
+// This is OR'd with the Accessible owner to indicate the wrap-ee is a proxy.
+static const uintptr_t IS_PROXY = 1;
+
 @interface mozAccessible : NSObject <mozAccessible>
 {
   /**
    * Weak reference; it owns us.
    */
-  mozilla::a11y::AccessibleWrap* mGeckoAccessible;
-  
+  uintptr_t mGeckoAccessible;
+
   /**
    * Strong ref to array of children
    */
   NSMutableArray* mChildren;
-  
-  /** 
+
+  /**
    * Weak reference to the parent
    */
   mozAccessible* mParent;
@@ -53,6 +56,9 @@ GetNativeFromGeckoAccessible(mozilla::a11y::Accessible* aAccessible)
    */
   mozilla::a11y::role        mRole;
 }
+
+// return the Accessible for this mozAccessible.
+- (mozilla::a11y::AccessibleWrap*) getGeckoAccessible;
 
 // inits with the gecko owner.
 - (id)initWithAccessible:(mozilla::a11y::AccessibleWrap*)geckoParent;
@@ -108,12 +114,15 @@ GetNativeFromGeckoAccessible(mozilla::a11y::Accessible* aAccessible)
 - (void)valueDidChange;
 - (void)selectedTextDidChange;
 
+// internal method to retrieve a child at a given index.
+- (id)childAt:(uint32_t)i;
+
 #pragma mark -
 
 // invalidates and removes all our children from our cached array.
 - (void)invalidateChildren;
 
-/** 
+/**
  * Append a child if they are already cached.
  */
 - (void)appendChild:(mozilla::a11y::Accessible*)aAccessible;

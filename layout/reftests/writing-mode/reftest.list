@@ -7,7 +7,7 @@ HTTP(..) == 1079154-1-vertical-rl-columns.html 1079154-1-vertical-rl-columns-ref
 HTTP(..) == 1083748.html 1083748-ref.html
 HTTP(..) == 1083848-1-inline-border.html 1083848-1-inline-border-ref.html
 HTTP(..) == 1083848-2-inline-background.html 1083848-2-inline-background-ref.html
-fuzzy-if(gtk2Widget,255,2) fuzzy-if(winWidget||Android||B2G,4,8704) HTTP(..) == 1083848-3-inline-background-repeat.html 1083848-3-inline-background-repeat-ref.html
+fuzzy-if(gtkWidget,255,2) fuzzy-if(winWidget||Android||B2G,4,8704) HTTP(..) == 1083848-3-inline-background-repeat.html 1083848-3-inline-background-repeat-ref.html
 == 1083892-1.html 1083892-1-ref.html
 == 1086883-1a.html 1086883-1-ref.html
 == 1086883-1b.html 1086883-1-ref.html
@@ -18,10 +18,10 @@ fuzzy-if(gtk2Widget,255,2) fuzzy-if(winWidget||Android||B2G,4,8704) HTTP(..) == 
 == 1090168-1.html 1090168-1-ref.html
 != 1090168-1.html 1090168-1-notref.html
 == 1090168-2.html 1090168-2-ref.html
-fuzzy-if(B2G,244,173) == 1090168-3.html 1090168-3-ref.html
+fuzzy-if(B2G,244,173) fuzzy-if(Mulet,255,165) == 1090168-3.html 1090168-3-ref.html # bug 1142928: mark fuzzy on Mulet as on B2G
 == 1091058-1.html 1091058-1-ref.html
-random-if(gtk2Widget) == 1094434-1.html 1094434-1-ref.html # bug 1094845
-random-if(gtk2Widget) == 1094434-2.html 1094434-2-ref.html # bug 1094845
+random-if(gtkWidget) == 1094434-1.html 1094434-1-ref.html # bug 1094845
+random-if(gtkWidget) == 1094434-2.html 1094434-2-ref.html # bug 1094845
 == 1094914-1a.html 1094914-1-ref.html
 == 1094914-1b.html 1094914-1-ref.html
 == 1096224-1a.html 1096224-1-ref.html
@@ -104,8 +104,15 @@ HTTP(..) == 1127488-align-start-vertical-lr-ltr.html 1127488-align-top-left-ref.
 HTTP(..) == 1127488-align-end-vertical-lr-ltr.html 1127488-align-bottom-left-ref.html
 HTTP(..) == 1127488-align-left-vertical-lr-ltr.html 1127488-align-top-left-ref.html
 HTTP(..) == 1127488-align-right-vertical-lr-ltr.html 1127488-align-bottom-left-ref.html
+== 1130907-intrinsic-sizing-1.html 1130907-intrinsic-sizing-1-ref.html
+== 1130907-intrinsic-sizing-2.html 1130907-intrinsic-sizing-2-ref.html
 == 1131013-vertical-bidi.html 1131013-vertical-bidi-ref.html
-fails-if(B2G) == 1135361-ruby-justify-1.html 1135361-ruby-justify-1-ref.html # bug 1136067
+== 1134744-radio-checkbox-baseline-1.html 1134744-radio-checkbox-baseline-1-ref.html
+== 1134849-orthogonal-inline.html 1134849-orthogonal-inline-ref.html
+fails-if(B2G||Mulet) == 1135361-ruby-justify-1.html 1135361-ruby-justify-1-ref.html # bug 1136067 # Initial mulet triage: parity with B2G/B2G Desktop
+skip-if(Mulet) fuzzy-if(winWidget,255,163) == 1136557-1-nested-spans.html 1136557-1-nested-spans-ref.html # MULET: Bug 1144079: Re-enable Mulet mochitests and reftests taskcluster-specific disables
+skip-if(Mulet) fuzzy-if(winWidget,255,199) == 1136557-2-nested-spans.html 1136557-2-nested-spans-ref.html # MULET: Bug 1144079: Re-enable Mulet mochitests and reftests taskcluster-specific disables
+skip-if(Mulet) fuzzy-if(winWidget,255,58) == 1136557-3-nested-spans.html 1136557-3-nested-spans-ref.html # MULET: Bug 1144079: Re-enable Mulet mochitests and reftests taskcluster-specific disables
 == 1138356-1-button-contents-alignment.html 1138356-1-button-contents-alignment-ref.html
 != 1138356-2-button-contents-alignment.html 1138356-2-button-contents-alignment-notref.html
 

@@ -27,6 +27,26 @@ using namespace js;
 using namespace js::frontend;
 using mozilla::Maybe;
 
+class MOZ_STACK_CLASS AutoCompilationTraceLogger
+{
+  public:
+    AutoCompilationTraceLogger(ExclusiveContext* cx, const TraceLoggerTextId id);
+
+  private:
+    TraceLoggerThread* logger;
+    TraceLoggerEvent event;
+    AutoTraceLog scriptLogger;
+    AutoTraceLog typeLogger;
+};
+
+AutoCompilationTraceLogger::AutoCompilationTraceLogger(ExclusiveContext* cx, const TraceLoggerTextId id)
+  : logger(cx->isJSContext() ? TraceLoggerForMainThread(cx->asJSContext()->runtime())
+                             : TraceLoggerForCurrentThread()),
+    event(logger, TraceLogger_AnnotateScripts),
+    scriptLogger(logger, event),
+    typeLogger(logger, id)
+{}
+
 static bool
 CheckLength(ExclusiveContext* cx, SourceBufferHolder& srcBuf)
 {
@@ -131,10 +151,12 @@ MaybeCheckEvalFreeVariables(ExclusiveContext* cxArg, HandleScript evalCaller, Ha
 }
 
 static inline bool
-CanLazilyParse(ExclusiveContext* cx, const ReadOnlyCompileOptions& options)
+CanLazilyParse(ExclusiveContext* cx, HandleObject staticScope,
+               const ReadOnlyCompileOptions& options)
 {
     return options.canLazilyParse &&
-           !options.hasPollutedGlobalScope &&
+           !HasNonSyntacticStaticScopeChain(staticScope) &&
+           !cx->compartment()->options().disableLazyParsing() &&
            !cx->compartment()->options().discardSource() &&
            !options.sourceIsLazy;
 }
@@ -208,14 +230,7 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
 
     RootedString source(cx, source_);
 
-    js::TraceLoggerThread* logger = nullptr;
-    if (cx->isJSContext())
-        logger = TraceLoggerForMainThread(cx->asJSContext()->runtime());
-    else
-        logger = TraceLoggerForCurrentThread();
-    js::TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, options);
-    js::AutoTraceLog scriptLogger(logger, event);
-    js::AutoTraceLog typeLogger(logger, TraceLogger_ParserCompileScript);
+    AutoCompilationTraceLogger traceLogger(cx, TraceLogger_ParserCompileScript);
 
     /*
      * The scripted callerFrame can only be given for compile-and-go scripts
@@ -246,7 +261,7 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
             return nullptr;
     }
 
-    bool canLazilyParse = CanLazilyParse(cx, options);
+    bool canLazilyParse = CanLazilyParse(cx, enclosingStaticScope, options);
 
     Maybe<Parser<SyntaxParseHandler> > syntaxParser;
     if (canLazilyParse) {
@@ -457,10 +472,7 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
            .setNoScriptRval(false)
            .setSelfHostingMode(false);
 
-    js::TraceLoggerThread* logger = js::TraceLoggerForMainThread(cx->runtime());
-    js::TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, options);
-    js::AutoTraceLog scriptLogger(logger, event);
-    js::AutoTraceLog typeLogger(logger, TraceLogger_ParserCompileLazy);
+    AutoCompilationTraceLogger traceLogger(cx, TraceLogger_ParserCompileLazy);
 
     Parser<FullParseHandler> parser(cx, &cx->tempLifoAlloc(), options, chars, length,
                                     /* foldConstants = */ true, nullptr, lazy);
@@ -524,10 +536,7 @@ CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyComp
 {
     MOZ_ASSERT(!options.isRunOnce);
 
-    js::TraceLoggerThread* logger = js::TraceLoggerForMainThread(cx->runtime());
-    js::TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, options);
-    js::AutoTraceLog scriptLogger(logger, event);
-    js::AutoTraceLog typeLogger(logger, TraceLogger_ParserCompileFunction);
+    AutoCompilationTraceLogger traceLogger(cx, TraceLogger_ParserCompileFunction);
 
     // FIXME: make Function pass in two strings and parse them as arguments and
     // ProgramElements respectively.
@@ -547,7 +556,7 @@ CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyComp
             return false;
     }
 
-    bool canLazilyParse = CanLazilyParse(cx, options);
+    bool canLazilyParse = CanLazilyParse(cx, enclosingStaticScope, options);
 
     Maybe<Parser<SyntaxParseHandler> > syntaxParser;
     if (canLazilyParse) {

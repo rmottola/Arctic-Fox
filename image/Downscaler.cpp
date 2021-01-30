@@ -209,7 +209,8 @@ Downscaler::DownscaleInputLine()
   typedef skia::ConvolutionFilter1D::Fixed FilterValue;
 
   MOZ_ASSERT(mOutputBuffer);
-  MOZ_ASSERT(mCurrentOutLine < mTargetSize.height, "Writing past end of output");
+  MOZ_ASSERT(mCurrentOutLine < mTargetSize.height,
+             "Writing past end of output");
 
   int32_t filterOffset = 0;
   int32_t filterLength = 0;

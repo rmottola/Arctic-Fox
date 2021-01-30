@@ -16,7 +16,7 @@
 # include "jit/arm/BaselineCompiler-arm.h"
 #elif defined(JS_CODEGEN_ARM64)
 # include "jit/arm64/BaselineCompiler-arm64.h"
-#elif defined(JS_CODEGEN_MIPS)
+#elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/BaselineCompiler-mips32.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/BaselineCompiler-none.h"
@@ -80,6 +80,7 @@ namespace jit {
     _(JSOP_MUL)                \
     _(JSOP_DIV)                \
     _(JSOP_MOD)                \
+    _(JSOP_POW)                \
     _(JSOP_LT)                 \
     _(JSOP_LE)                 \
     _(JSOP_GT)                 \

@@ -28,6 +28,7 @@
 #include "jsscriptinlines.h"
 
 #include "jit/CompileInfo-inl.h"
+#include "jit/shared/Lowering-shared-inl.h"
 #include "vm/NativeObject-inl.h"
 #include "vm/ObjectGroup-inl.h"
 #include "vm/ScopeObject-inl.h"
@@ -373,6 +374,56 @@ IonBuilder::DontInline(JSScript* targetScript, const char* reason)
     return InliningDecision_DontInline;
 }
 
+/*
+ * |hasCommonInliningPath| determines whether the current inlining path has been
+ * seen before based on the sequence of scripts in the chain of |IonBuilder|s.
+ *
+ * An inlining path for a function |f| is the sequence of functions whose
+ * inlinings precede |f| up to any previous occurrences of |f|.
+ * So, if we have the chain of inlinings
+ *
+ *          f1 -> f2 -> f -> f3 -> f4 -> f5 -> f
+ *          --------         --------------
+ *
+ * the inlining paths for |f| are [f2, f1] and [f5, f4, f3].
+ * When attempting to inline |f|, we find all existing inlining paths for |f|
+ * and check whether they share a common prefix with the path created were |f|
+ * inlined.
+ *
+ * For example, given mutually recursive functions |f| and |g|, a possible
+ * inlining is
+ *
+ *                           +---- Inlining stopped here...
+ *                           |
+ *                           v
+ *          a -> f -> g -> f \ -> g -> f -> g -> ...
+ *
+ * where the vertical bar denotes the termination of inlining.
+ * Inlining is terminated because we have already observed the inlining path
+ * [f] when inlining function |g|. Note that this will inline recursive
+ * functions such as |fib| only one level, as |fib| has a zero length inlining
+ * path which trivially prefixes all inlining paths.
+ *
+ */
+bool
+IonBuilder::hasCommonInliningPath(const JSScript* scriptToInline)
+{
+    // Find all previous inlinings of the |scriptToInline| and check for common
+    // inlining paths with the top of the inlining stack.
+    for (IonBuilder* it = this->callerBuilder_; it; it = it->callerBuilder_) {
+        if (it->script() != scriptToInline)
+            continue;
+
+        // This only needs to check the top of each stack for a match,
+        // as a match of length one ensures a common prefix.
+        IonBuilder* path = it->callerBuilder_;
+        if (!path || this->script() == path->script())
+            return true;
+    }
+
+    return false;
+}
+
 IonBuilder::InliningDecision
 IonBuilder::canInlineTarget(JSFunction* target, CallInfo& callInfo)
 {
@@ -469,14 +520,9 @@ IonBuilder::canInlineTarget(JSFunction* target, CallInfo& callInfo)
         return DontInline(inlineScript, "Too many actual args");
     }
 
-    // Allow inlining of recursive calls, but only one level deep.
-    IonBuilder* builder = callerBuilder_;
-    while (builder) {
-        if (builder->script() == inlineScript) {
-            trackOptimizationOutcome(TrackedOutcome::CantInlineRecursive);
-            return DontInline(inlineScript, "Recursive call");
-        }
-        builder = builder->callerBuilder_;
+    if (hasCommonInliningPath(inlineScript)) {
+        trackOptimizationOutcome(TrackedOutcome::HasCommonInliningPath);
+        return DontInline(inlineScript, "Common inlining path");
     }
 
     if (target->isHeavyweight()) {
@@ -620,7 +666,7 @@ IonBuilder::analyzeNewLoopTypes(MBasicBlock* entry, jsbytecode* start, jsbytecod
                 type = MIRType_Undefined;
                 break;
               case JSOP_GIMPLICITTHIS:
-                if (!script()->hasPollutedGlobalScope())
+                if (!script()->hasNonSyntacticScope())
                     type = MIRType_Undefined;
                 break;
               case JSOP_NULL:
@@ -1184,10 +1230,10 @@ IonBuilder::initScopeChain(MDefinition* callee)
                 return false;
         }
     } else {
-        // For global scripts without a polluted global scope, the scope chain
-        // is the global object.
+        // For global scripts without a non-syntactic global scope, the scope
+        // chain is the global object.
         MOZ_ASSERT(!script()->isForEval());
-        MOZ_ASSERT(!script()->hasPollutedGlobalScope());
+        MOZ_ASSERT(!script()->hasNonSyntacticScope());
         scope = constant(ObjectValue(script()->global()));
     }
 
@@ -1605,7 +1651,10 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_MUL:
       case JSOP_DIV:
       case JSOP_MOD:
-        return jsop_binary(op);
+        return jsop_binary_arith(op);
+
+      case JSOP_POW:
+        return jsop_pow();
 
       case JSOP_POS:
         return jsop_pos();
@@ -1802,7 +1851,7 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_GETGNAME:
       {
         PropertyName* name = info().getAtom(pc)->asPropertyName();
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return jsop_getgname(name);
         return jsop_getname(name);
       }
@@ -1811,7 +1860,7 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_STRICTSETGNAME:
       {
         PropertyName* name = info().getAtom(pc)->asPropertyName();
-        if (script()->hasPollutedGlobalScope())
+        if (script()->hasNonSyntacticScope())
             return jsop_setprop(name);
         JSObject* obj = &script()->global();
         return setStaticName(obj, name);
@@ -1830,7 +1879,7 @@ IonBuilder::inspectOpcode(JSOp op)
       }
 
       case JSOP_BINDGNAME:
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return pushConstant(ObjectValue(script()->global()));
         // Fall through to JSOP_BINDNAME
       case JSOP_BINDNAME:
@@ -1977,7 +2026,7 @@ IonBuilder::inspectOpcode(JSOp op)
         return jsop_debugger();
 
       case JSOP_GIMPLICITTHIS:
-        if (!script()->hasPollutedGlobalScope())
+        if (!script()->hasNonSyntacticScope())
             return pushConstant(UndefinedValue());
 
         // Just fall through to the unsupported bytecode case.
@@ -3796,7 +3845,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
         type = TypeSet::intersectSets(&base, oldType, alloc_->lifoAlloc());
     }
 
-    return replaceTypeSet(ins, type, test);
+    return type && replaceTypeSet(ins, type, test);
 }
 
 bool
@@ -4028,10 +4077,11 @@ IonBuilder::processCondSwitchCase(CFGState& state)
     if (bodyBlock != caseBlock) {
         MDefinition* caseOperand = current->pop();
         MDefinition* switchOperand = current->peek(-1);
-        MCompare* cmpResult = MCompare::New(alloc(), switchOperand, caseOperand, JSOP_STRICTEQ);
-        cmpResult->infer(constraints(), inspector, pc);
+
+        if (jsop_compare(JSOP_STRICTEQ, switchOperand, caseOperand))
+            return ControlStatus_Error;
+        MInstruction* cmpResult = current->pop()->toInstruction();
         MOZ_ASSERT(!cmpResult->isEffectful());
-        current->add(cmpResult);
         current->end(newTest(cmpResult, bodyBlock, caseBlock));
 
         // Add last case as predecessor of the body if the body is aliasing
@@ -4443,18 +4493,48 @@ IonBuilder::pushConstant(const Value& v)
 }
 
 bool
+IonBuilder::bitnotTrySpecialized(bool* emitted, MDefinition* input)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit a specialized bitnot instruction based on the input type
+    // of the operand.
+
+    if (input->mightBeType(MIRType_Object) || input->mightBeType(MIRType_Symbol))
+        return true;
+
+    MBitNot* ins = MBitNot::New(alloc(), input);
+    ins->setSpecialization(MIRType_Int32);
+
+    current->add(ins);
+    current->push(ins);
+
+    *emitted = true;
+    return true;
+}
+
+bool
 IonBuilder::jsop_bitnot()
 {
+    bool emitted = false;
+
     MDefinition* input = current->pop();
+
+    if (!forceInlineCaches()) {
+        if (!bitnotTrySpecialized(&emitted, input) || emitted)
+            return emitted;
+    }
+
+    if (!arithTrySharedStub(&emitted, JSOP_BITNOT, nullptr, input) || emitted)
+        return emitted;
+
+    // Not possible to optimize. Do a slow vm call.
     MBitNot* ins = MBitNot::New(alloc(), input);
 
     current->add(ins);
-    ins->infer();
-
     current->push(ins);
-    if (ins->isEffectful() && !resumeAfter(ins))
-        return false;
-    return true;
+    MOZ_ASSERT(ins->isEffectful());
+    return resumeAfter(ins);
 }
 bool
 IonBuilder::jsop_bitop(JSOp op)
@@ -4503,69 +4583,242 @@ IonBuilder::jsop_bitop(JSOp op)
     return true;
 }
 
-bool
-IonBuilder::jsop_binary(JSOp op, MDefinition* left, MDefinition* right)
+MDefinition::Opcode
+JSOpToMDefinition(JSOp op)
 {
-    // Do a string concatenation if adding two inputs that are int or string
-    // and at least one is a string.
-    if (op == JSOP_ADD &&
-        ((left->type() == MIRType_String &&
-          (right->type() == MIRType_String ||
-           right->type() == MIRType_Int32 ||
-           right->type() == MIRType_Double)) ||
-         (left->type() == MIRType_Int32 &&
-          right->type() == MIRType_String) ||
-         (left->type() == MIRType_Double &&
-          right->type() == MIRType_String)))
-    {
-        MConcat* ins = MConcat::New(alloc(), left, right);
-        current->add(ins);
-        current->push(ins);
-        return maybeInsertResume();
-    }
-
-    MBinaryArithInstruction* ins;
     switch (op) {
       case JSOP_ADD:
-        ins = MAdd::New(alloc(), left, right);
-        break;
-
+        return MDefinition::Op_Add;
       case JSOP_SUB:
-        ins = MSub::New(alloc(), left, right);
-        break;
-
+        return MDefinition::Op_Sub;
       case JSOP_MUL:
-        ins = MMul::New(alloc(), left, right);
-        break;
-
+        return MDefinition::Op_Mul;
       case JSOP_DIV:
-        ins = MDiv::New(alloc(), left, right);
-        break;
-
+        return MDefinition::Op_Div;
       case JSOP_MOD:
-        ins = MMod::New(alloc(), left, right);
-        break;
-
+        return MDefinition::Op_Mod;
       default:
         MOZ_CRASH("unexpected binary opcode");
     }
-
-    current->add(ins);
-    ins->infer(alloc(), inspector, pc);
-    current->push(ins);
-
-    if (ins->isEffectful())
-        return resumeAfter(ins);
-    return maybeInsertResume();
 }
 
 bool
-IonBuilder::jsop_binary(JSOp op)
+IonBuilder::binaryArithTryConcat(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to convert an addition into a concat operation if the inputs
+    // indicate this might be a concatenation.
+
+    // Only try to replace this with concat when we have an addition.
+    if (op != JSOP_ADD)
+        return true;
+
+    // Make sure one of the inputs is a string.
+    if (left->type() != MIRType_String && right->type() != MIRType_String)
+        return true;
+
+    // The none-string input (if present) should be atleast a numerical type.
+    // Which we can easily coerce to string.
+    if (right->type() != MIRType_String && !IsNumberType(right->type()))
+        return true;
+    if (left->type() != MIRType_String && !IsNumberType(left->type()))
+        return true;
+
+    MConcat* ins = MConcat::New(alloc(), left, right);
+    current->add(ins);
+    current->push(ins);
+
+    if (!maybeInsertResume())
+        return false;
+
+    *emitted = true;
+    return true;
+}
+
+static inline bool
+SimpleArithOperand(MDefinition* op)
+{
+    return !op->mightBeType(MIRType_Object)
+        && !op->mightBeType(MIRType_String)
+        && !op->mightBeType(MIRType_Symbol)
+        && !op->mightBeType(MIRType_MagicOptimizedArguments)
+        && !op->mightBeType(MIRType_MagicHole)
+        && !op->mightBeType(MIRType_MagicIsConstructing);
+}
+
+bool
+IonBuilder::binaryArithTrySpecialized(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit a specialized binary instruction based on the input types
+    // of the operands.
+
+    // Anything complex - strings, symbols, and objects - are not specialized
+    if (!SimpleArithOperand(left) || !SimpleArithOperand(right))
+        return true;
+
+    // One of the inputs need to be a number.
+    if (!IsNumberType(left->type()) && !IsNumberType(right->type()))
+        return true;
+
+    MDefinition::Opcode defOp = JSOpToMDefinition(op);
+    MBinaryArithInstruction* ins = MBinaryArithInstruction::New(alloc(), defOp, left, right);
+    ins->setNumberSpecialization(alloc(), inspector, pc);
+
+    if (op == JSOP_ADD || op == JSOP_MUL)
+        ins->setCommutative();
+
+    current->add(ins);
+    current->push(ins);
+
+    MOZ_ASSERT(!ins->isEffectful());
+    if (!maybeInsertResume())
+        return false;
+
+    *emitted = true;
+    return true;
+}
+
+bool
+IonBuilder::binaryArithTrySpecializedOnBaselineInspector(bool* emitted, JSOp op,
+                                                         MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit a specialized binary instruction speculating the
+    // type using the baseline caches.
+
+    MIRType specialization = inspector->expectedBinaryArithSpecialization(pc);
+    if (specialization == MIRType_None)
+        return true;
+
+    MDefinition::Opcode def_op = JSOpToMDefinition(op);
+    MBinaryArithInstruction* ins = MBinaryArithInstruction::New(alloc(), def_op, left, right);
+    ins->setSpecialization(specialization);
+
+    current->add(ins);
+    current->push(ins);
+
+    MOZ_ASSERT(!ins->isEffectful());
+    if (!maybeInsertResume())
+        return false;
+
+    *emitted = true;
+    return true;
+}
+
+bool
+IonBuilder::arithTrySharedStub(bool* emitted, JSOp op,
+                               MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+    JSOp actualOp = JSOp(*pc);
+
+    // Try to emit a shared stub cache.
+
+    if (js_JitOptions.disableSharedStubs)
+        return true;
+
+    // The actual jsop 'jsop_pos' is not supported yet.
+    if (actualOp == JSOP_POS)
+        return true;
+
+    MInstruction* stub = nullptr;
+    switch (actualOp) {
+      case JSOP_NEG:
+      case JSOP_BITNOT:
+        MOZ_ASSERT_IF(op == JSOP_MUL, left->isConstantValue() &&
+                                      left->constantValue().toInt32() == -1);
+        MOZ_ASSERT_IF(op != JSOP_MUL, !left);
+
+        stub = MUnarySharedStub::New(alloc(), right);
+        break;
+      case JSOP_ADD:
+      case JSOP_SUB:
+      case JSOP_MUL:
+      case JSOP_DIV:
+      case JSOP_MOD:
+        stub = MBinarySharedStub::New(alloc(), left, right);
+        break;
+      default:
+        MOZ_CRASH("unsupported arith");
+    }
+
+    current->add(stub);
+    current->push(stub);
+
+    // Decrease type from 'any type' to 'empty type' when one of the operands
+    // is 'empty typed'.
+    maybeMarkEmpty(stub);
+
+    if (!resumeAfter(stub))
+        return false;
+
+    *emitted = true;
+    return true;
+}
+
+bool
+IonBuilder::jsop_binary_arith(JSOp op, MDefinition* left, MDefinition* right)
+{
+    bool emitted = false;
+
+    if (!forceInlineCaches()) {
+        if (!binaryArithTryConcat(&emitted, op, left, right) || emitted)
+            return emitted;
+
+        if (!binaryArithTrySpecialized(&emitted, op, left, right) || emitted)
+            return emitted;
+
+        if (!binaryArithTrySpecializedOnBaselineInspector(&emitted, op, left, right) || emitted)
+            return emitted;
+    }
+
+    if (!arithTrySharedStub(&emitted, op, left, right) || emitted)
+        return emitted;
+
+    // Not possible to optimize. Do a slow vm call.
+    MDefinition::Opcode def_op = JSOpToMDefinition(op);
+    MBinaryArithInstruction* ins = MBinaryArithInstruction::New(alloc(), def_op, left, right);
+
+    // Decrease type from 'any type' to 'empty type' when one of the operands
+    // is 'empty typed'.
+    maybeMarkEmpty(ins);
+
+    current->add(ins);
+    current->push(ins);
+    MOZ_ASSERT(ins->isEffectful());
+    return resumeAfter(ins);
+}
+
+bool
+IonBuilder::jsop_binary_arith(JSOp op)
 {
     MDefinition* right = current->pop();
     MDefinition* left = current->pop();
 
-    return jsop_binary(op, left, right);
+    return jsop_binary_arith(op, left, right);
+}
+
+bool
+IonBuilder::jsop_pow()
+{
+    MDefinition* exponent = current->pop();
+    MDefinition* base = current->pop();
+
+    if (inlineMathPowHelper(base, exponent, MIRType_Double) == InliningStatus_Inlined) {
+        base->setImplicitlyUsedUnchecked();
+        exponent->setImplicitlyUsedUnchecked();
+        return true;
+    }
+
+    // For now, use MIRType_Double, as a safe cover-all. See bug 1188079.
+    MPow* pow = MPow::New(alloc(), base, exponent, MIRType_Double);
+    current->add(pow);
+    current->push(pow);
+    return true;
 }
 
 bool
@@ -4584,7 +4837,7 @@ IonBuilder::jsop_pos()
     MConstant* one = MConstant::New(alloc(), Int32Value(1));
     current->add(one);
 
-    return jsop_binary(JSOP_MUL, value, one);
+    return jsop_binary_arith(JSOP_MUL, value, one);
 }
 
 bool
@@ -4597,9 +4850,7 @@ IonBuilder::jsop_neg()
 
     MDefinition* right = current->pop();
 
-    if (!jsop_binary(JSOP_MUL, negator, right))
-        return false;
-    return true;
+    return jsop_binary_arith(JSOP_MUL, negator, right);
 }
 
 class AutoAccumulateReturns
@@ -6458,14 +6709,202 @@ IonBuilder::jsop_compare(JSOp op)
     MDefinition* right = current->pop();
     MDefinition* left = current->pop();
 
+    return jsop_compare(op, left, right);
+}
+
+bool
+IonBuilder::jsop_compare(JSOp op, MDefinition* left, MDefinition* right)
+{
+    bool emitted = false;
+
+    if (!forceInlineCaches()) {
+        if (!compareTrySpecialized(&emitted, op, left, right) || emitted)
+            return emitted;
+        if (!compareTryBitwise(&emitted, op, left, right) || emitted)
+            return emitted;
+        if (!compareTrySpecializedOnBaselineInspector(&emitted, op, left, right) || emitted)
+            return emitted;
+    }
+
+    if (!compareTrySharedStub(&emitted, op, left, right) || emitted)
+        return emitted;
+
+    // Not possible to optimize. Do a slow vm call.
     MCompare* ins = MCompare::New(alloc(), left, right, op);
+    ins->cacheOperandMightEmulateUndefined(constraints());
+
+    current->add(ins);
+    current->push(ins);
+    if (ins->isEffectful() && !resumeAfter(ins))
+        return false;
+    return true;
+}
+
+static bool
+ObjectOrSimplePrimitive(MDefinition* op)
+{
+    // Return true if op is either undefined/null/boolean/int32 or an object.
+    return !op->mightBeType(MIRType_String)
+        && !op->mightBeType(MIRType_Symbol)
+        && !op->mightBeType(MIRType_Double)
+        && !op->mightBeType(MIRType_Float32)
+        && !op->mightBeType(MIRType_MagicOptimizedArguments)
+        && !op->mightBeType(MIRType_MagicHole)
+        && !op->mightBeType(MIRType_MagicIsConstructing);
+}
+
+bool
+IonBuilder::compareTrySpecialized(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit an compare based on the input types.
+
+    MCompare::CompareType type = MCompare::determineCompareType(op, left, right);
+    if (type == MCompare::Compare_Unknown)
+        return true;
+
+    MCompare* ins = MCompare::New(alloc(), left, right, op);
+    ins->setCompareType(type);
+    ins->cacheOperandMightEmulateUndefined(constraints());
+
+    // Some compare types need to have the specific type in the rhs.
+    // Swap operands if that is not the case.
+    if (type == MCompare::Compare_StrictString && right->type() != MIRType_String)
+        ins->swapOperands();
+    else if (type == MCompare::Compare_Null && right->type() != MIRType_Null)
+        ins->swapOperands();
+    else if (type == MCompare::Compare_Undefined && right->type() != MIRType_Undefined)
+        ins->swapOperands();
+    else if (type == MCompare::Compare_Boolean && right->type() != MIRType_Boolean)
+        ins->swapOperands();
+
+    // Replace inputs with unsigned variants if needed.
+    if (type == MCompare::Compare_UInt32)
+        ins->replaceWithUnsignedOperands();
+
     current->add(ins);
     current->push(ins);
 
-    ins->infer(constraints(), inspector, pc);
+    MOZ_ASSERT(!ins->isEffectful());
+    *emitted = true;
+    return true;
+}
 
-    if (ins->isEffectful() && !resumeAfter(ins))
+bool
+IonBuilder::compareTryBitwise(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit a bitwise compare. Check if a bitwise compare equals the wanted
+    // result for all observed operand types.
+
+    // Onlye allow loose and strict equality.
+    if (op != JSOP_EQ && op != JSOP_NE && op != JSOP_STRICTEQ && op != JSOP_STRICTNE)
+        return true;
+
+    // Only primitive (not double/string) or objects are supported.
+    // I.e. Undefined/Null/Boolean/Int32 and Object
+    if (!ObjectOrSimplePrimitive(left) || !ObjectOrSimplePrimitive(right))
+        return true;
+
+    // Objects that emulate undefined are not supported.
+    if (left->maybeEmulatesUndefined(constraints()) || right->maybeEmulatesUndefined(constraints()))
+        return true;
+
+    // In the loose comparison more values could be the same,
+    // but value comparison reporting otherwise.
+    if (op == JSOP_EQ || op == JSOP_NE) {
+
+        // Undefined compared loosy to Null is not supported,
+        // because tag is different, but value can be the same (undefined == null).
+        if ((left->mightBeType(MIRType_Undefined) && right->mightBeType(MIRType_Null)) ||
+            (left->mightBeType(MIRType_Null) && right->mightBeType(MIRType_Undefined)))
+        {
+            return true;
+        }
+
+        // Int32 compared loosy to Boolean is not supported,
+        // because tag is different, but value can be the same (1 == true).
+        if ((left->mightBeType(MIRType_Int32) && right->mightBeType(MIRType_Boolean)) ||
+            (left->mightBeType(MIRType_Boolean) && right->mightBeType(MIRType_Int32)))
+        {
+            return true;
+        }
+
+        // For loosy comparison of an object with a Boolean/Number/String
+        // the valueOf the object is taken. Therefore not supported.
+        bool simpleLHS = left->mightBeType(MIRType_Boolean) || left->mightBeType(MIRType_Int32);
+        bool simpleRHS = right->mightBeType(MIRType_Boolean) || right->mightBeType(MIRType_Int32);
+        if ((left->mightBeType(MIRType_Object) && simpleRHS) ||
+            (right->mightBeType(MIRType_Object) && simpleLHS))
+        {
+            return true;
+        }
+    }
+
+    MCompare* ins = MCompare::New(alloc(), left, right, op);
+    ins->setCompareType(MCompare::Compare_Value);
+    ins->cacheOperandMightEmulateUndefined(constraints());
+
+    current->add(ins);
+    current->push(ins);
+
+    MOZ_ASSERT(!ins->isEffectful());
+    *emitted = true;
+    return true;
+}
+
+bool
+IonBuilder::compareTrySpecializedOnBaselineInspector(bool* emitted, JSOp op, MDefinition* left,
+                                                     MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to specialize based on any baseline caches that have been generated
+    // for the opcode. These will cause the instruction's type policy to insert
+    // fallible unboxes to the appropriate input types.
+
+    MCompare::CompareType type = inspector->expectedCompareType(pc);
+    if (type == MCompare::Compare_Unknown)
+        return true;
+
+    MCompare* ins = MCompare::New(alloc(), left, right, op);
+    ins->setCompareType(type);
+    ins->cacheOperandMightEmulateUndefined(constraints());
+
+    current->add(ins);
+    current->push(ins);
+
+    MOZ_ASSERT(!ins->isEffectful());
+    *emitted = true;
+    return true;
+}
+
+bool
+IonBuilder::compareTrySharedStub(bool* emitted, JSOp op, MDefinition* left, MDefinition* right)
+{
+    MOZ_ASSERT(*emitted == false);
+
+    // Try to emit a shared stub cache.
+
+    if (js_JitOptions.disableSharedStubs)
+        return true;
+
+    if (JSOp(*pc) == JSOP_CASE)
+        return true;
+
+    MBinarySharedStub* stub = MBinarySharedStub::New(alloc(), left, right);
+    current->add(stub);
+    current->push(stub);
+    if (!resumeAfter(stub))
         return false;
+
+    MUnbox* unbox = MUnbox::New(alloc(), current->pop(), MIRType_Boolean, MUnbox::Infallible);
+    current->add(unbox);
+    current->push(unbox);
+
+    *emitted = true;
     return true;
 }
 
@@ -7101,6 +7540,24 @@ IonBuilder::maybeInsertResume()
     return resumeAfter(ins);
 }
 
+void
+IonBuilder::maybeMarkEmpty(MDefinition* ins)
+{
+    MOZ_ASSERT(ins->type() == MIRType_Value);
+
+    // When one of the operands has no type information, mark the output
+    // as having no possible types too. This is to avoid degrading
+    // subsequent analysis.
+    for (size_t i = 0; i < ins->numOperands(); i++) {
+        if (!ins->emptyResultTypeSet())
+            continue;
+
+        TemporaryTypeSet* types = alloc().lifoAlloc()->new_<TemporaryTypeSet>();
+        if (types)
+            ins->setResultTypeSet(types);
+    }
+}
+
 // Return whether property lookups can be performed effectlessly on clasp.
 static bool
 ClassHasEffectlessLookup(const Class* clasp)
@@ -7623,7 +8080,7 @@ bool
 IonBuilder::jsop_getname(PropertyName* name)
 {
     MDefinition* object;
-    if (IsGlobalOp(JSOp(*pc)) && !script()->hasPollutedGlobalScope()) {
+    if (IsGlobalOp(JSOp(*pc)) && !script()->hasNonSyntacticScope()) {
         MInstruction* global = constant(ObjectValue(script()->global()));
         object = global;
     } else {
@@ -10036,6 +10493,27 @@ IonBuilder::maybeUnboxForPropertyAccess(MDefinition* def)
 
     MUnbox* unbox = MUnbox::New(alloc(), def, type, MUnbox::Fallible);
     current->add(unbox);
+
+    // Fixup type information for a common case where a property call
+    // is converted to the following bytecodes
+    //
+    //      a.foo()
+    // ================= Compiles to ================
+    //      LOAD "a"
+    //      DUP
+    //      CALLPROP "foo"
+    //      SWAP
+    //      CALL 0
+    //
+    // If we have better type information to unbox the first copy going into
+    // the CALLPROP operation, we can replace the duplicated copy on the
+    // stack as well.
+    if (*pc == JSOP_CALLPROP || *pc == JSOP_CALLELEM) {
+        uint32_t idx = current->stackDepth() - 1;
+        MOZ_ASSERT(current->getSlot(idx) == def);
+        current->setSlot(idx, unbox);
+    }
+
     return unbox;
 }
 

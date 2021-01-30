@@ -149,6 +149,6 @@ public:
 } // namespace image
 } // namespace mozilla
 
-#endif
+#endif // MOZ_ENABLE_SKIA
 
 #endif // mozilla_image_Downscaler_h

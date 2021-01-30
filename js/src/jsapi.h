@@ -2269,6 +2269,7 @@ class JS_PUBLIC_API(CompartmentOptions)
       , invisibleToDebugger_(false)
       , mergeable_(false)
       , discardSource_(false)
+      , disableLazyParsing_(false)
       , cloneSingletons_(false)
       , traceGlobal_(nullptr)
       , singletonsAsTemplates_(true)
@@ -2310,6 +2311,12 @@ class JS_PUBLIC_API(CompartmentOptions)
     bool discardSource() const { return discardSource_; }
     CompartmentOptions& setDiscardSource(bool flag) {
         discardSource_ = flag;
+        return *this;
+    }
+
+    bool disableLazyParsing() const { return disableLazyParsing_; }
+    CompartmentOptions& setDisableLazyParsing(bool flag) {
+        disableLazyParsing_ = flag;
         return *this;
     }
 
@@ -2365,6 +2372,7 @@ class JS_PUBLIC_API(CompartmentOptions)
     bool invisibleToDebugger_;
     bool mergeable_;
     bool discardSource_;
+    bool disableLazyParsing_;
     bool cloneSingletons_;
     Override extraWarningsOverride_;
     union {
@@ -3430,7 +3438,6 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
         utf8(false),
         lineno(1),
         column(0),
-        hasPollutedGlobalScope(false),
         isRunOnce(false),
         forEval(false),
         noScriptRval(false),
@@ -3470,7 +3477,6 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
     bool utf8;
     unsigned lineno;
     unsigned column;
-    bool hasPollutedGlobalScope;
     // isRunOnce only applies to non-function scripts.
     bool isRunOnce;
     bool forEval;
@@ -3563,7 +3569,6 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
     OwningCompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     OwningCompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    OwningCompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
     OwningCompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     OwningCompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     OwningCompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
@@ -3647,7 +3652,6 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
     }
     CompileOptions& setUTF8(bool u) { utf8 = u; return *this; }
     CompileOptions& setColumn(unsigned c) { column = c; return *this; }
-    CompileOptions& setHasPollutedScope(bool p) { hasPollutedGlobalScope = p; return *this; }
     CompileOptions& setIsRunOnce(bool once) { isRunOnce = once; return *this; }
     CompileOptions& setForEval(bool eval) { forEval = eval; return *this; }
     CompileOptions& setNoScriptRval(bool nsr) { noScriptRval = nsr; return *this; }
@@ -3679,24 +3683,44 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
  * |script| will always be set. On failure, it will be set to nullptr.
  */
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
         SourceBufferHolder& srcBuf, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions &options,
         const char* bytes, size_t length, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options,
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
         const char16_t* chars, size_t length, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options, FILE *file,
-        JS::MutableHandleScript script);
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
+        FILE* file, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
-Compile(JSContext *cx, const ReadOnlyCompileOptions &options, const char *filename,
-        JS::MutableHandleScript script);
+Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
+        const char* filename, JS::MutableHandleScript script);
+
+extern JS_PUBLIC_API(bool)
+CompileForNonSyntacticScope(JSContext* cx, const ReadOnlyCompileOptions& options,
+                            SourceBufferHolder& srcBuf, JS::MutableHandleScript script);
+
+extern JS_PUBLIC_API(bool)
+CompileForNonSyntacticScope(JSContext* cx, const ReadOnlyCompileOptions& options,
+                            const char* bytes, size_t length, JS::MutableHandleScript script);
+
+extern JS_PUBLIC_API(bool)
+CompileForNonSyntacticScope(JSContext* cx, const ReadOnlyCompileOptions& options,
+                            const char16_t* chars, size_t length, JS::MutableHandleScript script);
+
+extern JS_PUBLIC_API(bool)
+CompileForNonSyntacticScope(JSContext* cx, const ReadOnlyCompileOptions& options,
+                            FILE* file, JS::MutableHandleScript script);
+
+extern JS_PUBLIC_API(bool)
+CompileForNonSyntacticScope(JSContext* cx, const ReadOnlyCompileOptions& options,
+                            const char* filename, JS::MutableHandleScript script);
 
 extern JS_PUBLIC_API(bool)
 CanCompileOffThread(JSContext* cx, const ReadOnlyCompileOptions& options, size_t length);

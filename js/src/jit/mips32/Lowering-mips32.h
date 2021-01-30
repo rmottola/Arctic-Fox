@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jit_mips_Lowering_mips_h
-#define jit_mips_Lowering_mips_h
+#ifndef jit_mips32_Lowering_mips32_h
+#define jit_mips32_Lowering_mips32_h
 
 #include "jit/shared/Lowering-shared.h"
 
@@ -22,7 +22,8 @@ class LIRGeneratorMIPS : public LIRGeneratorShared
   protected:
     // Adds a box input to an instruction, setting operand |n| to the type and
     // |n+1| to the payload.
-    void useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Register reg1, Register reg2);
+    void useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1, Register reg2,
+                     bool useAtStart = false);
 
     // x86 has constraints on what registers can be formatted for 1-byte
     // stores and loads; on MIPS all registers are okay.
@@ -66,8 +67,6 @@ class LIRGeneratorMIPS : public LIRGeneratorShared
 
     void lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
                                  MDefinition* lhs, MDefinition* rhs);
-    void lowerConstantDouble(double d, MInstruction* ins);
-    void lowerConstantFloat32(float d, MInstruction* ins);
     void lowerTruncateDToInt32(MTruncateToInt32* ins);
     void lowerTruncateFToInt32(MTruncateToInt32* ins);
     void lowerDivI(MDiv* div);
@@ -83,7 +82,6 @@ class LIRGeneratorMIPS : public LIRGeneratorShared
     LTableSwitchV* newLTableSwitchV(MTableSwitch* ins);
 
   public:
-    void visitConstant(MConstant* ins);
     void visitBox(MBox* box);
     void visitUnbox(MUnbox* unbox);
     void visitReturn(MReturn* ret);
@@ -115,4 +113,4 @@ typedef LIRGeneratorMIPS LIRGeneratorSpecific;
 } // namespace jit
 } // namespace js
 
-#endif /* jit_mips_Lowering_mips_h */
+#endif /* jit_mips32_Lowering_mips32_h */

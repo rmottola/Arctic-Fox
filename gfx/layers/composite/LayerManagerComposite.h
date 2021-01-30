@@ -250,6 +250,8 @@ public:
 
   bool LastFrameMissedHWC() { return mLastFrameMissedHWC; }
 
+  bool AsyncPanZoomEnabled() const override;
+
 private:
   /** Region we're clipping our current drawing to. */
   nsIntRegion mClippingRegion;

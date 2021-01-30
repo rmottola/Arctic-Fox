@@ -67,7 +67,6 @@ public:
   MOCK_METHOD3(HandleDoubleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD3(HandleSingleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD4(HandleLongTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&, uint64_t));
-  MOCK_METHOD3(HandleLongTapUp, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD3(SendAsyncScrollDOMEvent, void(bool aIsRoot, const CSSRect &aContentRect, const CSSSize &aScrollableSize));
   MOCK_METHOD2(PostDelayedTask, void(Task* aTask, int aDelayMs));
   MOCK_METHOD3(NotifyAPZStateChange, void(const ScrollableLayerGuid& aGuid, APZStateChange aChange, int aArg));
@@ -615,7 +614,7 @@ protected:
     fm.SetScrollOffset(CSSPoint(300, 300));
     fm.SetZoom(CSSToParentLayerScale2D(2.0, 2.0));
     // APZC only allows zooming on the root scrollable frame.
-    fm.SetIsRoot(true);
+    fm.SetIsRootContent(true);
     // the visible area of the document in CSS pixels is x=300 y=300 w=50 h=100
     return fm;
   }
@@ -758,7 +757,7 @@ TEST_F(APZCBasicTester, Overzoom) {
   fm.SetScrollableRect(CSSRect(0, 0, 125, 150));
   fm.SetScrollOffset(CSSPoint(10, 0));
   fm.SetZoom(CSSToParentLayerScale2D(1.0, 1.0));
-  fm.SetIsRoot(true);
+  fm.SetIsRootContent(true);
   apzc->SetFrameMetrics(fm);
 
   MakeApzcZoomable();
@@ -1342,9 +1341,9 @@ protected:
       EXPECT_CALL(*mcc, HandleLongTap(CSSPoint(10, 10), 0, apzc->GetGuid(), blockId)).Times(1);
       EXPECT_CALL(check, Call("postHandleLongTap"));
 
-      EXPECT_CALL(check, Call("preHandleLongTapUp"));
-      EXPECT_CALL(*mcc, HandleLongTapUp(CSSPoint(10, 10), 0, apzc->GetGuid())).Times(1);
-      EXPECT_CALL(check, Call("postHandleLongTapUp"));
+      EXPECT_CALL(check, Call("preHandleSingleTap"));
+      EXPECT_CALL(*mcc, HandleSingleTap(CSSPoint(10, 10), 0, apzc->GetGuid())).Times(1);
+      EXPECT_CALL(check, Call("postHandleSingleTap"));
     }
 
     // There is a longpress event scheduled on a timeout
@@ -1371,10 +1370,11 @@ protected:
 
     // Finally, simulate lifting the finger. Since the long-press wasn't
     // prevent-defaulted, we should get a long-tap-up event.
-    check.Call("preHandleLongTapUp");
+    check.Call("preHandleSingleTap");
     status = TouchUp(apzc, 10, 10, time);
+    mcc->RunDelayedTask();
     EXPECT_EQ(nsEventStatus_eConsumeDoDefault, status);
-    check.Call("postHandleLongTapUp");
+    check.Call("postHandleSingleTap");
 
     apzc->AssertStateIsReset();
   }
@@ -1440,7 +1440,7 @@ protected:
     status = apzc->ReceiveInputEvent(mti, nullptr);
     EXPECT_EQ(nsEventStatus_eConsumeDoDefault, status);
 
-    EXPECT_CALL(*mcc, HandleLongTapUp(CSSPoint(touchX, touchEndY), 0, apzc->GetGuid())).Times(0);
+    EXPECT_CALL(*mcc, HandleSingleTap(CSSPoint(touchX, touchEndY), 0, apzc->GetGuid())).Times(0);
     status = TouchUp(apzc, touchX, touchEndY, time);
     EXPECT_EQ(nsEventStatus_eConsumeDoDefault, status);
 
@@ -1688,6 +1688,10 @@ protected:
                                         CSSRect aScrollableRect = CSSRect(-1, -1, -1, -1)) {
     FrameMetrics metrics;
     metrics.SetScrollId(aScrollId);
+    // By convention in this test file, START_SCROLL_ID is the root, so mark it as such.
+    if (aScrollId == FrameMetrics::START_SCROLL_ID) {
+      metrics.SetIsLayersIdRoot(true);
+    }
     IntRect layerBound = aLayer->GetVisibleRegion().GetBounds();
     metrics.SetCompositionBounds(ParentLayerRect(layerBound.x, layerBound.y,
                                                  layerBound.width, layerBound.height));
@@ -2607,9 +2611,10 @@ protected:
   void CreateBug1119497LayerTree() {
     const char* layerTreeSyntax = "c(tt)";
     // LayerID                     0 12
-    // 0 is the root and doesn't have an APZC
-    // 1 is behind 2 and does have an APZC
-    // 2 entirely covers 1 and should take all the input events
+    // 0 is the root and has an APZC
+    // 1 is behind 2 and has an APZC
+    // 2 entirely covers 1 and should take all the input events, but has no APZC
+    // so hits to 2 should go to to the root APZC
     nsIntRegion layerVisibleRegions[] = {
       nsIntRegion(IntRect(0, 0, 100, 100)),
       nsIntRegion(IntRect(0, 0, 100, 100)),
@@ -2617,6 +2622,7 @@ protected:
     };
     root = CreateLayerTree(layerTreeSyntax, layerVisibleRegions, nullptr, lm, layers);
 
+    SetScrollableFrameMetrics(root, FrameMetrics::START_SCROLL_ID);
     SetScrollableFrameMetrics(layers[1], FrameMetrics::START_SCROLL_ID + 1);
 
     registration = MakeUnique<ScopedLayerTreeRegistration>(0, root, mcc);
@@ -2750,8 +2756,8 @@ TEST_F(APZEventRegionsTester, Bug1119497) {
   HitTestResult result;
   nsRefPtr<AsyncPanZoomController> hit = manager->GetTargetAPZC(ScreenPoint(50, 50), &result);
   // We should hit layers[2], so |result| will be HitLayer but there's no
-  // actual APZC in that parent chain, so |hit| should be nullptr.
-  EXPECT_EQ(nullptr, hit.get());
+  // actual APZC on layers[2], so it will be the APZC of the root layer.
+  EXPECT_EQ(ApzcOf(layers[0]), hit.get());
   EXPECT_EQ(HitTestResult::HitLayer, result);
 }
 

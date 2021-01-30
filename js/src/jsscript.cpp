@@ -193,6 +193,18 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, InternalBindingsHandle 
     return true;
 }
 
+bool
+Bindings::initTrivial(ExclusiveContext* cx)
+{
+    Shape* shape = EmptyShape::getInitialShape(cx, &CallObject::class_, TaggedProto(nullptr),
+                                               CallObject::RESERVED_SLOTS,
+                                               BaseShape::QUALIFIED_VAROBJ | BaseShape::DELEGATE);
+    if (!shape)
+        return false;
+    callObjShape_.init(shape);
+    return true;
+}
+
 uint8_t*
 Bindings::switchToScriptStorage(Binding* newBindingArray)
 {
@@ -563,10 +575,10 @@ enum XDRClassKind {
 
 template<XDRMode mode>
 bool
-js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript enclosingScript,
               HandleFunction fun, MutableHandleScript scriptp)
 {
-    /* NB: Keep this in sync with CloneScript. */
+    /* NB: Keep this in sync with CopyScript. */
 
     enum ScriptBits {
         NoScriptRval,
@@ -587,7 +599,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
         HasSingleton,
         TreatAsRunOnce,
         HasLazyScript,
-        HasPollutedGlobalScope,
+        HasNonSyntacticScope,
     };
 
     uint32_t length, lineno, column, nslots, staticLevel;
@@ -600,6 +612,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
 
     JSContext* cx = xdr->cx();
     RootedScript script(cx);
+    RootedObject enclosingScope(cx, enclosingScopeArg);
     natoms = nsrcnotes = 0;
     nconsts = nobjects = nregexps = ntrynotes = nblockscopes = nyieldoffsets = 0;
 
@@ -719,8 +732,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
             scriptBits |= (1 << TreatAsRunOnce);
         if (script->isRelazifiable())
             scriptBits |= (1 << HasLazyScript);
-        if (script->hasPollutedGlobalScope())
-            scriptBits |= (1 << HasPollutedGlobalScope);
+        if (script->hasNonSyntacticScope())
+            scriptBits |= (1 << HasNonSyntacticScope);
     }
 
     if (!xdr->codeUint32(&prologueLength))
@@ -788,10 +801,26 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
             MOZ_ASSERT(enclosingScript->sourceObject()->is<ScriptSourceObject>());
             sourceObject = &enclosingScript->sourceObject()->as<ScriptSourceObject>();
         }
+
+        // If the outermost script has a non-syntactic scope, reflect that on
+        // the static scope chain.
+        if (scriptBits & (1 << HasNonSyntacticScope) && !enclosingScope) {
+            enclosingScope = StaticNonSyntacticScopeObjects::create(cx, nullptr);
+            if (!enclosingScope)
+                return false;
+        }
+
         script = JSScript::Create(cx, enclosingScope, !!(scriptBits & (1 << SavedCallerFun)),
                                   options, /* staticLevel = */ 0, sourceObject, 0, 0);
         if (!script)
             return false;
+
+        // Set the script in its function now so that inner scripts to be
+        // decoded may iterate the static scope chain.
+        if (fun) {
+            fun->initScript(script);
+            script->setFunction(fun);
+        }
     }
 
     /* JSScript::partiallyInit assumes script->bindings is fully initialized. */
@@ -836,8 +865,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
             script->hasSingletons_ = true;
         if (scriptBits & (1 << TreatAsRunOnce))
             script->treatAsRunOnce_ = true;
-        if (scriptBits & (1 << HasPollutedGlobalScope))
-            script->hasPollutedGlobalScope_ = true;
+        if (scriptBits & (1 << HasNonSyntacticScope))
+            script->hasNonSyntacticScope_ = true;
 
         if (scriptBits & (1 << IsLegacyGenerator)) {
             MOZ_ASSERT(!(scriptBits & (1 << IsStarGenerator)));
@@ -969,7 +998,12 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
                     MOZ_ASSERT(enclosingStaticScopeIndex < i);
                     enclosingStaticScope = script->objects()->vector[enclosingStaticScopeIndex];
                 } else {
-                    enclosingStaticScope = fun;
+                    // This is not ternary because MSVC can't typecheck the
+                    // ternary.
+                    if (fun)
+                        enclosingStaticScope = fun;
+                    else
+                        enclosingStaticScope = enclosingScope;
                 }
             }
 
@@ -1006,8 +1040,15 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
 
                 StaticScopeIter<NoGC> ssi(funEnclosingScope);
 
-                if (ssi.done() || ssi.type() == StaticScopeIter<NoGC>::Function) {
-                    MOZ_ASSERT(ssi.done() == !fun);
+                // Starting from a nested function, hitting a non-syntactic
+                // scope on the static scope chain means that its enclosing
+                // function has a non-syntactic scope. Nested functions
+                // themselves never have non-syntactic scope chains.
+                if (ssi.done() ||
+                    ssi.type() == StaticScopeIter<NoGC>::NonSyntactic ||
+                    ssi.type() == StaticScopeIter<NoGC>::Function)
+                {
+                    MOZ_ASSERT_IF(ssi.done() || ssi.type() != StaticScopeIter<NoGC>::Function, !fun);
                     funEnclosingScopeIndex = UINT32_MAX;
                 } else if (ssi.type() == StaticScopeIter<NoGC>::Block) {
                     funEnclosingScopeIndex = FindScopeObjectIndex(script, ssi.block());
@@ -1023,7 +1064,12 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enc
 
             if (mode == XDR_DECODE) {
                 if (funEnclosingScopeIndex == UINT32_MAX) {
-                    funEnclosingScope = fun;
+                    // This is not ternary because MSVC can't typecheck the
+                    // ternary.
+                    if (fun)
+                        funEnclosingScope = fun;
+                    else
+                        funEnclosingScope = enclosingScope;
                 } else {
                     MOZ_ASSERT(funEnclosingScopeIndex < i);
                     funEnclosingScope = script->objects()->vector[funEnclosingScopeIndex];
@@ -1164,9 +1210,13 @@ js::XDRLazyScript(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript
             return false;
         }
 
-        if (mode == XDR_DECODE)
+        if (mode == XDR_DECODE) {
             lazy.set(LazyScript::Create(cx, fun, nullptr, enclosingScope, enclosingScript,
                                         packedFields, begin, end, lineno, column));
+            if (!lazy)
+                return false;
+            fun->initLazyScript(lazy);
+        }
     }
 
     // Code free variables.
@@ -1297,6 +1347,17 @@ JSScript::getPCCounts(jsbytecode* pc) {
     MOZ_ASSERT(containsPC(pc));
     ScriptCountsMap::Ptr p = GetScriptCountsMapEntry(this);
     return p->value().pcCountsVector[pcToOffset(pc)];
+}
+
+void
+JSScript::setIonScript(JSContext* maybecx, js::jit::IonScript* ionScript)
+{
+    MOZ_ASSERT_IF(ionScript != ION_DISABLED_SCRIPT, !baselineScript()->hasPendingIonBuilder());
+    if (hasIonScript())
+        js::jit::IonScript::writeBarrierPre(zone(), ion);
+    ion = ionScript;
+    MOZ_ASSERT_IF(hasIonScript(), hasBaselineScript());
+    updateBaselineOrIonRaw(maybecx);
 }
 
 void
@@ -2422,10 +2483,15 @@ JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCa
     script->savedCallerFun_ = savedCallerFun;
     script->initCompartment(cx);
 
-    script->hasPollutedGlobalScope_ = options.hasPollutedGlobalScope;
     script->selfHosted_ = options.selfHostingMode;
     script->noScriptRval_ = options.noScriptRval;
     script->treatAsRunOnce_ = options.isRunOnce;
+
+    // Compute whether this script is under a non-syntactic scope. We don't
+    // need to walk the entire static scope chain if the script is nested in a
+    // function. In that case, we can propagate the cached value from the
+    // outer script.
+    script->hasNonSyntacticScope_ = HasNonSyntacticStaticScopeChain(enclosingScope);
 
     script->version = options.version;
     MOZ_ASSERT(script->getVersion() == options.version);     // assert that no overflow occurred
@@ -2570,6 +2636,9 @@ JSScript::partiallyInit(ExclusiveContext* cx, HandleScript script, uint32_t ncon
 /* static */ bool
 JSScript::fullyInitTrivial(ExclusiveContext* cx, Handle<JSScript*> script)
 {
+    if (!script->bindings.initTrivial(cx))
+        return false;
+
     if (!partiallyInit(cx, script, 0, 0, 0, 0, 0, 0, 0))
         return false;
 
@@ -2643,6 +2712,7 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
     script->funHasExtensibleScope_ = funbox ? funbox->hasExtensibleScope() : false;
     script->funNeedsDeclEnvObject_ = funbox ? funbox->needsDeclEnvObject() : false;
     script->needsHomeObject_       = funbox ? funbox->needsHomeObject() : false;
+    script->isDerivedClassConstructor_ = funbox ? funbox->isDerivedClassConstructor() : false;
     script->hasSingletons_ = bce->hasSingletons;
 
     if (funbox) {
@@ -2660,10 +2730,13 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
 
     RootedFunction fun(cx, nullptr);
     if (funbox) {
+        // The function should have already been earlier to enable
+        // StaticScopeIter to walk the static scope chain of
+        // currently compiling scripts.
+        MOZ_ASSERT(script->functionNonDelazifying() == funbox->function());
         MOZ_ASSERT(!bce->script->noScriptRval());
         script->isGeneratorExp_ = funbox->inGenexpLambda;
         script->setGeneratorKind(funbox->generatorKind());
-        script->setFunction(funbox->function());
         if (bce->yieldOffsetList.length() != 0)
             bce->yieldOffsetList.finish(script->yieldOffsets(), prologueLength);
     }
@@ -2996,15 +3069,48 @@ Rebase(JSScript* dst, JSScript* src, T* srcp)
     return reinterpret_cast<T*>(dst->data + off);
 }
 
-JSScript *
-js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, HandleScript src,
-                PollutedGlobalScopeOption polluted /* = HasCleanGlobalScope */,
-                NewObjectKind newKind /* = GenericObject */)
+static JSObject*
+CloneInnerInterpretedFunction(JSContext* cx, HandleObject enclosingScope, HandleFunction srcFun)
+{
+    /* NB: Keep this in sync with XDRInterpretedFunction. */
+    RootedObject cloneProto(cx);
+    if (srcFun->isStarGenerator()) {
+        cloneProto = GlobalObject::getOrCreateStarGeneratorFunctionPrototype(cx, cx->global());
+        if (!cloneProto)
+            return nullptr;
+    }
+
+    gc::AllocKind allocKind = srcFun->getAllocKind();
+    RootedFunction clone(cx, NewFunctionWithProto(cx, nullptr, 0,
+                                                  JSFunction::INTERPRETED, nullptr, nullptr,
+                                                  cloneProto, allocKind, TenuredObject));
+    if (!clone)
+        return nullptr;
+
+    JSScript::AutoDelazify srcScript(cx, srcFun);
+    if (!srcScript)
+        return nullptr;
+    JSScript* cloneScript = CloneScriptIntoFunction(cx, enclosingScope, clone, srcScript);
+    if (!cloneScript)
+        return nullptr;
+
+    clone->setArgCount(srcFun->nargs());
+    clone->setFlags(srcFun->flags());
+    clone->initAtom(srcFun->displayAtom());
+    if (!JSFunction::setTypeForScriptedFunction(cx, clone))
+        return nullptr;
+
+    return clone;
+}
+
+bool
+js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScript src,
+                       HandleScript dst)
 {
     if (src->treatAsRunOnce() && !src->functionNonDelazifying()) {
         // Toplevel run-once scripts may not be cloned.
         JS_ReportError(cx, "No cloning toplevel run-once scripts");
-        return nullptr;
+        return false;
     }
 
     /* NB: Keep this in sync with XDRScript. */
@@ -3017,13 +3123,14 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
     uint32_t nregexps  = src->hasRegexps()  ? src->regexps()->length  : 0;
     uint32_t ntrynotes = src->hasTrynotes() ? src->trynotes()->length : 0;
     uint32_t nblockscopes = src->hasBlockScopes() ? src->blockScopes()->length : 0;
+    uint32_t nyieldoffsets = src->hasYieldOffsets() ? src->yieldOffsets().length() : 0;
 
     /* Script data */
 
     size_t size = src->dataSize();
     uint8_t* data = AllocScriptData(cx->zone(), size);
     if (size && !data)
-        return nullptr;
+        return false;
 
     /* Bindings */
 
@@ -3031,7 +3138,7 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
     InternalHandle<Bindings*> bindingsHandle =
         InternalHandle<Bindings*>::fromMarkedLocation(bindings.address());
     if (!Bindings::clone(cx, bindingsHandle, data, src))
-        return nullptr;
+        return false;
 
     /* Objects */
 
@@ -3048,7 +3155,7 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
                 if (NestedScopeObject* enclosingBlock = innerBlock->enclosingNestedScope())
                     enclosingScope = objects[FindScopeObjectIndex(src, *enclosingBlock)];
                 else
-                    enclosingScope = fun;
+                    enclosingScope = scriptStaticScope;
 
                 clone = CloneNestedScopeObject(cx, enclosingScope, innerBlock);
             } else if (obj->is<JSFunction>()) {
@@ -3057,32 +3164,36 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
                     if (cx->compartment() != innerFun->compartment()) {
                         MOZ_ASSERT(innerFun->isAsmJSNative());
                         JS_ReportError(cx, "AsmJS modules do not yet support cloning.");
-                        return nullptr;
+                        return false;
                     }
                     clone = innerFun;
                 } else {
                     if (innerFun->isInterpretedLazy()) {
                         AutoCompartment ac(cx, innerFun);
                         if (!innerFun->getOrCreateScript(cx))
-                            return nullptr;
+                            return false;
                     }
                     RootedObject staticScope(cx, innerFun->nonLazyScript()->enclosingStaticScope());
                     StaticScopeIter<CanGC> ssi(cx, staticScope);
                     RootedObject enclosingScope(cx);
-                    if (ssi.done() || ssi.type() == StaticScopeIter<CanGC>::Function)
-                        enclosingScope = fun;
-                    else if (ssi.type() == StaticScopeIter<CanGC>::Block)
+                    if (ssi.done() || ssi.type() == StaticScopeIter<CanGC>::NonSyntactic) {
+                        enclosingScope = scriptStaticScope;
+                    } else if (ssi.type() == StaticScopeIter<CanGC>::Function) {
+                        MOZ_ASSERT(scriptStaticScope->is<JSFunction>());
+                        enclosingScope = scriptStaticScope;
+                    } else if (ssi.type() == StaticScopeIter<CanGC>::Block) {
                         enclosingScope = objects[FindScopeObjectIndex(src, ssi.block())];
-                    else
+                    } else {
                         enclosingScope = objects[FindScopeObjectIndex(src, ssi.staticWith())];
+                    }
 
-                    clone = CloneFunctionAndScript(cx, enclosingScope, innerFun, polluted);
+                    clone = CloneInnerInterpretedFunction(cx, enclosingScope, innerFun);
                 }
             } else {
                 clone = DeepCloneObjectLiteral(cx, obj, TenuredObject);
             }
             if (!clone || !objects.append(clone))
-                return nullptr;
+                return false;
         }
     }
 
@@ -3090,54 +3201,15 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
 
     AutoObjectVector regexps(cx);
     for (unsigned i = 0; i < nregexps; i++) {
-        HeapPtrObject *vector = src->regexps()->vector;
+        HeapPtrObject* vector = src->regexps()->vector;
         for (unsigned i = 0; i < nregexps; i++) {
-            JSObject *clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
+            JSObject* clone = CloneScriptRegExpObject(cx, vector[i]->as<RegExpObject>());
             if (!clone || !regexps.append(clone))
-                return nullptr;
+                return false;
         }
     }
 
-    /*
-     * Wrap the script source object as needed. Self-hosted scripts may be
-     * in another runtime, so lazily create a new script source object to
-     * use for them.
-     */
-    RootedObject sourceObject(cx);
-    if (cx->runtime()->isSelfHostingCompartment(src->compartment())) {
-        if (!cx->compartment()->selfHostingScriptSource) {
-            CompileOptions options(cx);
-            FillSelfHostingCompileOptions(options);
-
-            ScriptSourceObject* obj = frontend::CreateScriptSourceObject(cx, options);
-            if (!obj)
-                return nullptr;
-            cx->compartment()->selfHostingScriptSource.set(obj);
-        }
-        sourceObject = cx->compartment()->selfHostingScriptSource;
-    } else {
-        sourceObject = src->sourceObject();
-        if (!cx->compartment()->wrap(cx, &sourceObject))
-            return nullptr;
-    }
-
-    /* Now that all fallible allocation is complete, create the GC thing. */
-
-    CompileOptions options(cx);
-    options.setMutedErrors(src->mutedErrors())
-           .setHasPollutedScope(src->hasPollutedGlobalScope() ||
-                                polluted == HasPollutedGlobalScope)
-           .setSelfHostingMode(src->selfHosted())
-           .setNoScriptRval(src->noScriptRval())
-           .setVersion(src->getVersion());
-
-    RootedScript dst(cx, JSScript::Create(cx, enclosingScope, src->savedCallerFun(),
-                                          options, src->staticLevel(),
-                                          sourceObject, src->sourceStart(), src->sourceEnd()));
-    if (!dst) {
-        js_free(data);
-        return nullptr;
-    }
+    /* Now that all fallible allocation is complete, do the copying. */
 
     dst->bindings = bindings;
 
@@ -3196,62 +3268,110 @@ js::CloneScript(JSContext *cx, HandleObject enclosingScope, HandleFunction fun, 
         dst->trynotes()->vector = Rebase<JSTryNote>(dst, src, src->trynotes()->vector);
     if (nblockscopes != 0)
         dst->blockScopes()->vector = Rebase<BlockScopeNote>(dst, src, src->blockScopes()->vector);
+    if (nyieldoffsets != 0)
+        dst->yieldOffsets().vector_ = Rebase<uint32_t>(dst, src, src->yieldOffsets().vector_);
 
     /*
      * Function delazification assumes that their script does not have a
-     * polluted global scope.  We ensure that as follows:
+     * non-syntactic global scope.  We ensure that as follows:
      *
      * 1) Initial parsing only creates lazy functions if
-     *    !hasPollutedGlobalScope.
+     *    !hasNonSyntacticScope.
      * 2) Cloning a lazy function into a non-global scope will always require
      *    that its script be cloned.  See comments in
      *    CloneFunctionObjectUseSameScript.
      * 3) Cloning a script never sets a lazyScript on the clone, so the function
      *    cannot be relazified.
      *
-     * If you decide that lazy functions should be supported with a polluted
-     * global scope, make sure delazification can deal.
+     * If you decide that lazy functions should be supported with a
+     * non-syntactic global scope, make sure delazification can deal.
      */
-    MOZ_ASSERT_IF(dst->hasPollutedGlobalScope(), !dst->maybeLazyScript());
-    MOZ_ASSERT_IF(dst->hasPollutedGlobalScope(), !dst->isRelazifiable());
+    MOZ_ASSERT_IF(dst->hasNonSyntacticScope(), !dst->maybeLazyScript());
+    MOZ_ASSERT_IF(dst->hasNonSyntacticScope(), !dst->isRelazifiable());
+    return true;
+}
+
+static JSScript*
+CreateEmptyScriptForClone(JSContext* cx, HandleObject enclosingScope, HandleScript src)
+{
+    /*
+     * Wrap the script source object as needed. Self-hosted scripts may be
+     * in another runtime, so lazily create a new script source object to
+     * use for them.
+     */
+    RootedObject sourceObject(cx);
+    if (cx->runtime()->isSelfHostingCompartment(src->compartment())) {
+        if (!cx->compartment()->selfHostingScriptSource) {
+            CompileOptions options(cx);
+            FillSelfHostingCompileOptions(options);
+
+            ScriptSourceObject* obj = frontend::CreateScriptSourceObject(cx, options);
+            if (!obj)
+                return nullptr;
+            cx->compartment()->selfHostingScriptSource.set(obj);
+        }
+        sourceObject = cx->compartment()->selfHostingScriptSource;
+    } else {
+        sourceObject = src->sourceObject();
+        if (!cx->compartment()->wrap(cx, &sourceObject))
+            return nullptr;
+    }
+
+    CompileOptions options(cx);
+    options.setMutedErrors(src->mutedErrors())
+           .setSelfHostingMode(src->selfHosted())
+           .setNoScriptRval(src->noScriptRval())
+           .setVersion(src->getVersion());
+
+    return JSScript::Create(cx, enclosingScope, src->savedCallerFun(),
+                            options, src->staticLevel(),
+                            sourceObject, src->sourceStart(), src->sourceEnd());
+}
+
+JSScript*
+js::CloneGlobalScript(JSContext* cx, Handle<ScopeObject*> enclosingScope, HandleScript src)
+{
+    // No enclosingScope means clean global.
+    MOZ_ASSERT(!enclosingScope || enclosingScope->is<StaticNonSyntacticScopeObjects>());
+
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, enclosingScope, src));
+    if (!dst)
+        return nullptr;
+
+    if (!detail::CopyScript(cx, enclosingScope, src, dst))
+        return nullptr;
+
     return dst;
 }
 
-bool
-js::CloneFunctionScript(JSContext *cx, HandleFunction original, HandleFunction clone,
-                        PollutedGlobalScopeOption polluted, NewObjectKind newKind)
+JSScript*
+js::CloneScriptIntoFunction(JSContext* cx, HandleObject enclosingScope, HandleFunction fun,
+                            HandleScript src)
 {
-    RootedScript script(cx, clone->nonLazyScript());
-    MOZ_ASSERT(script);
-    MOZ_ASSERT(script->compartment() == original->compartment());
-    MOZ_ASSERT(cx->compartment() == clone->compartment(),
-               "Otherwise we could relazify clone below!");
+    MOZ_ASSERT(fun->isInterpreted());
 
-    // The only scripts with enclosing static scopes that may be cloned across
-    // compartments are non-strict, indirect eval scripts, as their dynamic
-    // scope chains terminate in the global scope immediately.
-    RootedObject scope(cx, script->enclosingStaticScope());
-    if (script->compartment() != cx->compartment() && scope) {
-        MOZ_ASSERT(!scope->as<StaticEvalObject>().isDirect() &&
-                   !scope->as<StaticEvalObject>().isStrict());
-        scope = StaticEvalObject::create(cx, nullptr);
-        if (!scope)
-            return false;
+    // Allocate the destination script up front and set it as the script of
+    // |fun|, which is to be its container.
+    //
+    // This is so that when cloning nested functions, they can walk the static
+    // scope chain via fun and correctly compute the presence of a
+    // non-syntactic global.
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, enclosingScope, src));
+    if (!dst)
+        return nullptr;
+
+    dst->setFunction(fun);
+    if (fun->isInterpretedLazy())
+        fun->setUnlazifiedScript(dst);
+    else
+        fun->initScript(dst);
+
+    if (!detail::CopyScript(cx, fun, src, dst)) {
+        fun->setScript(nullptr);
+        return nullptr;
     }
 
-    clone->initScript(nullptr);
-
-    JSScript *cscript = CloneScript(cx, scope, clone, script, polluted, newKind);
-    if (!cscript)
-        return false;
-
-    clone->setScript(cscript);
-    cscript->setFunction(clone);
-
-    script = clone->nonLazyScript();
-    Debugger::onNewScript(cx, script);
-
-    return true;
+    return dst;
 }
 
 DebugScript*
@@ -3831,6 +3951,7 @@ LazyScript::CreateRaw(ExclusiveContext *cx, HandleFunction fun,
     p.hasDirectEval = false;
     p.directlyInsideEval = false;
     p.usesArgumentsApplyAndThis = false;
+    p.isDerivedClassConstructor = false;
 
     LazyScript* res = LazyScript::CreateRaw(cx, fun, packedFields, begin, end, lineno, column);
     MOZ_ASSERT_IF(res, res->version() == version);
@@ -3922,15 +4043,14 @@ LazyScript::staticLevel(JSContext* cx) const
 void
 JSScript::updateBaselineOrIonRaw(JSContext* maybecx)
 {
-    if (hasIonScript()) {
-        if (ion->pendingBuilder()) {
-            MOZ_ASSERT(maybecx);
-            baselineOrIonRaw = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
-            baselineOrIonSkipArgCheck = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
-        } else {
-            baselineOrIonRaw = ion->method()->raw();
-            baselineOrIonSkipArgCheck = ion->method()->raw() + ion->getSkipArgCheckEntryOffset();
-        }
+    if (hasBaselineScript() && baseline->hasPendingIonBuilder()) {
+        MOZ_ASSERT(maybecx);
+        MOZ_ASSERT(!isIonCompilingOffThread());
+        baselineOrIonRaw = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
+        baselineOrIonSkipArgCheck = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
+    } else if (hasIonScript()) {
+        baselineOrIonRaw = ion->method()->raw();
+        baselineOrIonSkipArgCheck = ion->method()->raw() + ion->getSkipArgCheckEntryOffset();
     } else if (hasBaselineScript()) {
         baselineOrIonRaw = baseline->method()->raw();
         baselineOrIonSkipArgCheck = baseline->method()->raw();
@@ -4033,11 +4153,29 @@ void
 JSScript::AutoDelazify::holdScript(JS::HandleFunction fun)
 {
     if (fun) {
-        JSAutoCompartment ac(cx_, fun);
-        script_ = fun->getOrCreateScript(cx_);
-        if (script_) {
-            oldDoNotRelazify_ = script_->doNotRelazify_;
-            script_->setDoNotRelazify(true);
+        if (fun->compartment()->isSelfHosting) {
+            // The self-hosting compartment is shared across runtimes, so we
+            // can't use JSAutoCompartment: it could cause races. Functions in
+            // the self-hosting compartment will never be lazy, so we can safely
+            // assume we don't have to delazify.
+            script_ = fun->nonLazyScript();
+        } else {
+            JSAutoCompartment ac(cx_, fun);
+            script_ = fun->getOrCreateScript(cx_);
+            if (script_) {
+                oldDoNotRelazify_ = script_->doNotRelazify_;
+                script_->setDoNotRelazify(true);
+            }
         }
     }
+}
+
+void
+JSScript::AutoDelazify::dropScript()
+{
+    // Don't touch script_ if it's in the self-hosting compartment, see the
+    // comment in holdScript.
+    if (script_ && !script_->compartment()->isSelfHosting)
+        script_->setDoNotRelazify(oldDoNotRelazify_);
+    script_ = nullptr;
 }

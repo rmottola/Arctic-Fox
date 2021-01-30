@@ -299,7 +299,8 @@ class SyntaxParseHandler
     bool addCatchBlock(Node catchList, Node letBlock,
                        Node catchName, Node catchGuard, Node catchBody) { return true; }
 
-    void setLastFunctionArgumentDefault(Node funcpn, Node pn) {}
+    bool setLastFunctionArgumentDefault(Node funcpn, Node pn) { return true; }
+    void setLastFunctionArgumentDestructuring(Node funcpn, Node pn) {}
     Node newFunctionDefinition() { return NodeHoistableDeclaration; }
     void setFunctionBody(Node pn, Node kid) {}
     void setFunctionBox(Node pn, FunctionBox* funbox) {}
@@ -328,6 +329,7 @@ class SyntaxParseHandler
     void setEndPosition(Node pn, Node oth) {}
     void setEndPosition(Node pn, uint32_t end) {}
 
+    void setDerivedClassConstructor(Node pn) {}
 
     void setPosition(Node pn, const TokenPos& pos) {}
     TokenPos getPosition(Node pn) {

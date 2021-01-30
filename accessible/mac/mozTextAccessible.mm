@@ -19,7 +19,7 @@ ToNSRange(id aValue, NSRange* aRange)
 {
   NS_PRECONDITION(aRange, "aRange is nil");
 
-  if ([aValue isKindOfClass:[NSValue class]] && 
+  if ([aValue isKindOfClass:[NSValue class]] &&
       strcmp([(NSValue*)aValue objCType], @encode(NSRange)) == 0) {
     *aRange = [aValue rangeValue];
     return true;
@@ -67,7 +67,7 @@ ToNSString(id aValue)
 
 - (BOOL)accessibilityIsIgnored
 {
-  return !mGeckoAccessible;
+  return ![self getGeckoAccessible];
 }
 
 - (NSArray*)accessibilityAttributeNames
@@ -116,7 +116,7 @@ ToNSString(id aValue)
   if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
     // Apple's SpeechSynthesisServer expects AXValue to return an AXStaticText
     // object's AXSelectedText attribute. See bug 674612 for details.
-    // Also if there is no selected text, we return the full text. 
+    // Also if there is no selected text, we return the full text.
     // See bug 369710 for details.
     if ([[self role] isEqualToString:NSAccessibilityStaticTextRole]) {
       NSString* selectedText = [self selectedText];
@@ -126,11 +126,13 @@ ToNSString(id aValue)
     return [self text];
   }
 
+  AccessibleWrap* accWrap = [self getGeckoAccessible];
+
   if ([attribute isEqualToString:@"AXRequired"])
-    return [NSNumber numberWithBool:!!(mGeckoAccessible->State() & states::REQUIRED)];
+    return [NSNumber numberWithBool:!!(accWrap->State() & states::REQUIRED)];
 
   if ([attribute isEqualToString:@"AXInvalid"])
-    return [NSNumber numberWithBool:!!(mGeckoAccessible->State() & states::INVALID)];
+    return [NSNumber numberWithBool:!!(accWrap->State() & states::INVALID)];
 
   if ([attribute isEqualToString:NSAccessibilityVisibleCharacterRangeAttribute])
     return [self visibleCharacterRange];
@@ -232,7 +234,7 @@ ToNSString(id aValue)
 
   if ([attribute isEqualToString:NSAccessibilityValueAttribute])
     return ![self isReadOnly];
-  
+
   if ([attribute isEqualToString:NSAccessibilitySelectedTextAttribute] ||
       [attribute isEqualToString:NSAccessibilitySelectedTextRangeAttribute] ||
       [attribute isEqualToString:NSAccessibilityVisibleCharacterRangeAttribute])
@@ -252,7 +254,7 @@ ToNSString(id aValue)
 
   if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
     [self setText:ToNSString(value)];
-    
+
     return;
   }
 
@@ -288,7 +290,7 @@ ToNSString(id aValue)
     mGeckoTextAccessible->ScrollSubstringTo(range.location, range.location + range.length,
                                             nsIAccessibleScrollType::SCROLL_TYPE_TOP_EDGE);
     return;
-  } 
+  }
 
   [super accessibilitySetValue:value forAttribute:attribute];
 
@@ -323,7 +325,7 @@ ToNSString(id aValue)
     return YES;
 
   if (mGeckoTextAccessible)
-    return (mGeckoAccessible->State() & states::READONLY) == 0;
+    return ([self getGeckoAccessible]->State() & states::READONLY) == 0;
 
   return NO;
 
@@ -353,7 +355,7 @@ ToNSString(id aValue)
 
 - (NSString*)text
 {
-  if (!mGeckoAccessible || !mGeckoTextAccessible)
+  if (![self getGeckoAccessible] || !mGeckoTextAccessible)
     return nil;
 
   // A password text field returns an empty value
@@ -371,7 +373,7 @@ ToNSString(id aValue)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  if (!mGeckoAccessible || !mGeckoTextAccessible)
+  if (![self getGeckoAccessible] || !mGeckoTextAccessible)
     return 0;
 
   return mGeckoTextAccessible ? mGeckoTextAccessible->CharacterCount() : 0;
@@ -496,18 +498,20 @@ ToNSString(id aValue)
 
 - (NSString*)text
 {
-  if (!mGeckoAccessible)
+  AccessibleWrap* accWrap = [self getGeckoAccessible];
+  if (!accWrap)
     return nil;
 
-  return nsCocoaUtils::ToNSString(mGeckoAccessible->AsTextLeaf()->Text());
+  return nsCocoaUtils::ToNSString(accWrap->AsTextLeaf()->Text());
 }
 
 - (long)textLength
 {
-  if (!mGeckoAccessible)
+  AccessibleWrap* accWrap = [self getGeckoAccessible];
+  if (!accWrap)
     return 0;
 
-  return mGeckoAccessible->AsTextLeaf()->Text().Length();
+  return accWrap->AsTextLeaf()->Text().Length();
 }
 
 @end

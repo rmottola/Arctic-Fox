@@ -68,12 +68,12 @@ skip-if(B2G||Mulet) == background-size-percent-percent-stretch.html background-s
 == background-size-body-percent-percent-not-fixed.html background-size-body-percent-percent-ref.html
 == background-size-body-cover.html background-size-body-cover-ref.html
 == background-size-body-cover-no-repeat.html background-size-body-cover-ref.html
-fails-if(smallScreen&&Android) != background-size-body-cover-not-fixed.html background-size-body-cover-ref.html
+fails-if(smallScreen&&Android&&AndroidVersion!=18) != background-size-body-cover-not-fixed.html background-size-body-cover-ref.html
 != background-size-body-cover-not-fixed.html background-size-body-single-not-fixed.html
 
 # relies on reftest window having greater height than width
 == background-size-body-contain.html background-size-body-cover-ref.html
-fails-if(smallScreen&&Android) != background-size-body-contain-no-repeat.html background-size-body-cover-ref.html
+fails-if(smallScreen&&Android&&AndroidVersion!=18) != background-size-body-contain-no-repeat.html background-size-body-cover-ref.html
 != background-size-body-contain-not-fixed.html background-size-body-cover-ref.html
 != background-size-body-cover-not-fixed.html background-size-body-contain-not-fixed.html
 
@@ -116,7 +116,7 @@ random-if(OSX==1010) == background-size-monster-rem.html background-size-monster
 # the image aren't the issue, because they're being obscured to avoid sampling
 # algorithm dependencies (at least assuming the sampling algorithm in use
 # doesn't sample too far astray from the boundaries).
-fails == background-size-zoom-repeat.html background-size-zoom-repeat-ref.html
+fails-if(supportsRepeatResampling) == background-size-zoom-repeat.html background-size-zoom-repeat-ref.html
 
 # -moz-default-background-color and -moz-default-color (bug 591341)
 == background-moz-default-background-color.html background-moz-default-background-color-ref.html

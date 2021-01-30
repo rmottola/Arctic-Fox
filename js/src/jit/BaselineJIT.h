@@ -119,11 +119,11 @@ struct BaselineScript
 
   private:
     // Code pointer containing the actual method.
-    HeapPtrJitCode method_;
+    RelocatablePtrJitCode method_;
 
     // For heavyweight scripts, template objects to use for the call object and
     // decl env object (linked via the call object's enclosing scope).
-    HeapPtrObject templateScope_;
+    RelocatablePtrObject templateScope_;
 
     // Allocated space for fallback stubs.
     FallbackICStubSpace fallbackStubSpace_;
@@ -223,6 +223,9 @@ struct BaselineScript
     // is updated when we Ion-compile this script. See makeInliningDecision for
     // more info.
     uint8_t maxInliningDepth_;
+
+    // An ion compilation that is ready, but isn't linked yet.
+    IonBuilder *pendingBuilder_;
 
   public:
     // Do not call directly, use BaselineScript::New. This is public for cx->new_.
@@ -456,6 +459,32 @@ struct BaselineScript
             len = UINT16_MAX;
         inlinedBytecodeLength_ = len;
     }
+
+    bool hasPendingIonBuilder() const {
+        return !!pendingBuilder_;
+    }
+
+    js::jit::IonBuilder* pendingIonBuilder() {
+        MOZ_ASSERT(hasPendingIonBuilder());
+        return pendingBuilder_;
+    }
+    void setPendingIonBuilder(JSContext* maybecx, JSScript* script, js::jit::IonBuilder* builder) {
+        MOZ_ASSERT(script->baselineScript() == this);
+        MOZ_ASSERT(!builder || !hasPendingIonBuilder());
+
+        if (script->isIonCompilingOffThread())
+            script->setIonScript(maybecx, ION_PENDING_SCRIPT);
+
+        pendingBuilder_ = builder;
+
+        script->updateBaselineOrIonRaw(maybecx);
+    }
+    void removePendingIonBuilder(JSScript* script) {
+        setPendingIonBuilder(nullptr, script, nullptr);
+        if (script->maybeIonScript() == ION_PENDING_SCRIPT)
+            script->setIonScript(nullptr, nullptr);
+    }
+
 };
 static_assert(sizeof(BaselineScript) % sizeof(uintptr_t) == 0,
               "The data attached to the script must be aligned for fast JIT access.");

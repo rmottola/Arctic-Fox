@@ -142,20 +142,21 @@ class LIRGeneratorShared : public MDefinitionVisitor
     inline void defineBox(LInstructionHelper<BOX_PIECES, Ops, Temps>* lir, MDefinition* mir,
                           LDefinition::Policy policy = LDefinition::REGISTER);
 
-    inline void defineReturn(LInstruction *lir, MDefinition *mir);
+    inline void defineSharedStubReturn(LInstruction* lir, MDefinition* mir);
+    inline void defineReturn(LInstruction* lir, MDefinition* mir);
 
     template <size_t X>
-    inline void define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
+    inline void define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
                        LDefinition::Policy policy = LDefinition::REGISTER);
     template <size_t X>
-    inline void define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
+    inline void define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
                        const LDefinition &def);
 
     template <size_t Ops, size_t Temps>
-    inline void defineReuseInput(LInstructionHelper<1, Ops, Temps> *lir, MDefinition *mir, uint32_t operand);
+    inline void defineReuseInput(LInstructionHelper<1, Ops, Temps>* lir, MDefinition* mir, uint32_t operand);
 
     // Adds a use at operand |n| of a value-typed insturction.
-    inline void useBox(LInstruction *lir, size_t n, MDefinition *mir,
+    inline void useBox(LInstruction* lir, size_t n, MDefinition* mir,
                        LUse::Policy policy = LUse::REGISTER, bool useAtStart = false);
 
     // Rather than defining a new virtual register, sets |ins| to have the same
@@ -208,6 +209,13 @@ class LIRGeneratorShared : public MDefinitionVisitor
                          BailoutKind kind = Bailout_DuringVMCall);
 
   public:
+    void lowerConstantDouble(double d, MInstruction* mir) {
+        define(new(alloc()) LDouble(d), mir);
+    }
+    void lowerConstantFloat32(float f, MInstruction* mir) {
+        define(new(alloc()) LFloat32(f), mir);
+    }
+
     void visitConstant(MConstant* ins);
 
     // Whether to generate typed reads for element accesses with hole checks.

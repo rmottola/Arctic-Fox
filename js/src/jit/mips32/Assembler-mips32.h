@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jit_mips_Assembler_mips_h
-#define jit_mips_Assembler_mips_h
+#ifndef jit_mips32_Assembler_mips32_h
+#define jit_mips32_Assembler_mips32_h
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
@@ -58,6 +58,21 @@ static MOZ_CONSTEXPR_VAR Register ra = { Registers::ra };
 static MOZ_CONSTEXPR_VAR Register ScratchRegister = at;
 static MOZ_CONSTEXPR_VAR Register SecondScratchReg = t8;
 
+// Helper classes for ScratchRegister usage. Asserts that only one piece
+// of code thinks it has exclusive ownership of each scratch register.
+struct ScratchRegisterScope : public AutoRegisterScope
+{
+    explicit ScratchRegisterScope(MacroAssembler& masm)
+      : AutoRegisterScope(masm, ScratchRegister)
+    { }
+};
+struct SecondScratchRegisterScope : public AutoRegisterScope
+{
+    explicit SecondScratchRegisterScope(MacroAssembler& masm)
+      : AutoRegisterScope(masm, SecondScratchReg)
+    { }
+};
+
 // Use arg reg from EnterJIT function as OsrFrameReg.
 static MOZ_CONSTEXPR_VAR Register OsrFrameReg = a3;
 static MOZ_CONSTEXPR_VAR Register ArgumentsRectifierReg = s3;
@@ -80,13 +95,20 @@ static const uint32_t NumCallTempNonArgRegs = mozilla::ArrayLength(CallTempNonAr
 class ABIArgGenerator
 {
     unsigned usedArgSlots_;
-    bool firstArgFloat;
+    unsigned firstArgFloatSize_;
+    // Note: This is not compliant with the system ABI.  The Lowering phase
+    // expects to lower an MAsmJSParameter to only one register.
+    bool useGPRForFloats_;
     ABIArg current_;
 
   public:
     ABIArgGenerator();
     ABIArg next(MIRType argType);
     ABIArg& current() { return current_; }
+
+    void enforceO32ABI() {
+        useGPRForFloats_ = true;
+    }
 
     uint32_t stackBytesConsumedSoFar() const {
         if (usedArgSlots_ <= 4)
@@ -1039,7 +1061,7 @@ class Assembler : public AssemblerShared
     static void TraceDataRelocations(JSTracer* trc, JitCode* code, CompactBufferReader& reader);
 
     static bool SupportsFloatingPoint() {
-#if (defined(__mips_hard_float) && !defined(__mips_single_float)) || defined(JS_SIMULATOR_MIPS)
+#if (defined(__mips_hard_float) && !defined(__mips_single_float)) || defined(JS_SIMULATOR_MIPS32)
         return true;
 #else
         return false;
@@ -1370,4 +1392,4 @@ GetArgStackDisp(uint32_t usedArgSlots)
 } // namespace jit
 } // namespace js
 
-#endif /* jit_mips_Assembler_mips_h */
+#endif /* jit_mips32_Assembler_mips32_h */

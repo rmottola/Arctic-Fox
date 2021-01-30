@@ -2401,44 +2401,6 @@ gfxPlatform::UsesOffMainThreadCompositing()
   return result;
 }
 
-void
-gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
-{
-  if (SupportsApzWheelInput()) {
-    static const char *sBadPrefs[] = {
-      "mousewheel.system_scroll_override_on_root_content.enabled",
-      "mousewheel.default.delta_multiplier_x",
-      "mousewheel.with_alt.delta_multiplier_x",
-      "mousewheel.with_alt.delta_multiplier_x",
-      "mousewheel.with_control.delta_multiplier_x",
-      "mousewheel.with_meta.delta_multiplier_x",
-      "mousewheel.with_shift.delta_multiplier_x",
-      "mousewheel.with_win.delta_multiplier_x",
-      "mousewheel.with_alt.delta_multiplier_y",
-      "mousewheel.with_control.delta_multiplier_y",
-      "mousewheel.with_meta.delta_multiplier_y",
-      "mousewheel.with_shift.delta_multiplier_y",
-      "mousewheel.with_win.delta_multiplier_y",
-    };
-
-    nsString badPref;
-    for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sBadPrefs); i++) {
-      if (Preferences::HasUserValue(sBadPrefs[i])) {
-        badPref.AssignASCII(sBadPrefs[i]);
-        break;
-      }
-    }
-
-    aObj.DefineProperty("ApzWheelInput", 1);
-    if (badPref.Length()) {
-      aObj.DefineProperty("ApzWheelInputWarning", badPref);
-    }
-  }
-
-  if (SupportsApzTouchInput()) {
-    aObj.DefineProperty("ApzTouchInput", 1);
-  }
-}
 
 already_AddRefed<mozilla::gfx::VsyncSource>
 gfxPlatform::CreateHardwareVsyncSource()
@@ -2459,3 +2421,78 @@ gfxPlatform::IsInLayoutAsapMode()
   return Preferences::GetInt("layout.frame_rate", -1) == 0;
 }
 
+static nsString
+DetectBadApzWheelInputPrefs()
+{
+  static const char *sBadMultiplierPrefs[] = {
+    "mousewheel.default.delta_multiplier_x",
+    "mousewheel.with_alt.delta_multiplier_x",
+    "mousewheel.with_control.delta_multiplier_x",
+    "mousewheel.with_meta.delta_multiplier_x",
+    "mousewheel.with_shift.delta_multiplier_x",
+    "mousewheel.with_win.delta_multiplier_x",
+    "mousewheel.with_alt.delta_multiplier_y",
+    "mousewheel.with_control.delta_multiplier_y",
+    "mousewheel.with_meta.delta_multiplier_y",
+    "mousewheel.with_shift.delta_multiplier_y",
+    "mousewheel.with_win.delta_multiplier_y",
+  };
+
+  nsString badPref;
+  for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sBadMultiplierPrefs); i++) {
+    if (Preferences::GetInt(sBadMultiplierPrefs[i], 100) != 100) {
+      badPref.AssignASCII(sBadMultiplierPrefs[i]);
+      break;
+    }
+  }
+
+  return badPref;
+}
+
+void
+gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
+{
+  if (!gfxPlatform::AsyncPanZoomEnabled()) {
+    return;
+  }
+
+  if (SupportsApzWheelInput()) {
+    nsString badPref = DetectBadApzWheelInputPrefs();
+
+    aObj.DefineProperty("ApzWheelInput", 1);
+    if (badPref.Length()) {
+      aObj.DefineProperty("ApzWheelInputWarning", badPref);
+    }
+  }
+
+  if (SupportsApzTouchInput()) {
+    aObj.DefineProperty("ApzTouchInput", 1);
+  }
+}
+
+/*static*/ bool
+gfxPlatform::AsyncPanZoomEnabled()
+{
+#if !defined(MOZ_B2G) && !defined(MOZ_WIDGET_ANDROID)
+  // For XUL applications (everything but B2G on mobile and desktop, and
+  // Firefox on Android) we only want to use APZ when E10S is enabled. If
+  // we ever get input events off the main thread we can consider relaxing
+  // this requirement.
+  if (!BrowserTabsRemoteAutostart()) {
+    return false;
+  }
+#endif
+  return gfxPrefs::AsyncPanZoomEnabledDoNotUseDirectly();
+}
+
+/*virtual*/ bool
+gfxPlatform::UseProgressivePaint()
+{
+  return gfxPrefs::ProgressivePaintDoNotUseDirectly();
+}
+
+/*static*/ bool
+gfxPlatform::PerfWarnings()
+{
+  return gfxPrefs::PerfWarnings();
+}

@@ -230,27 +230,27 @@ ComputeBorderOverflow(nsMathMLmtdFrame* aFrame, nsStyleBorder aStyleBorder)
   nsMargin overflow;
   int32_t rowIndex;
   int32_t columnIndex;
-  nsTableFrame* table = nsTableFrame::GetTableFrame(aFrame);
+  nsTableFrame* table = aFrame->GetTableFrame();
   aFrame->GetCellIndexes(rowIndex, columnIndex);
   if (!columnIndex) {
-    overflow.left = table->GetCellSpacingX(-1);
-    overflow.right = table->GetCellSpacingX(0) / 2;
+    overflow.left = table->GetColSpacing(-1);
+    overflow.right = table->GetColSpacing(0) / 2;
   } else if (columnIndex == table->GetColCount() - 1) {
-    overflow.left = table->GetCellSpacingX(columnIndex - 1) / 2;
-    overflow.right =  table->GetCellSpacingX(columnIndex + 1);
+    overflow.left = table->GetColSpacing(columnIndex - 1) / 2;
+    overflow.right =  table->GetColSpacing(columnIndex + 1);
   } else {
-    overflow.left = table->GetCellSpacingX(columnIndex - 1) / 2;
-    overflow.right = table->GetCellSpacingX(columnIndex) / 2;
+    overflow.left = table->GetColSpacing(columnIndex - 1) / 2;
+    overflow.right = table->GetColSpacing(columnIndex) / 2;
   }
   if (!rowIndex) {
-    overflow.top = table->GetCellSpacingY(-1);
-    overflow.bottom = table->GetCellSpacingY(0) / 2;
+    overflow.top = table->GetRowSpacing(-1);
+    overflow.bottom = table->GetRowSpacing(0) / 2;
   } else if (rowIndex == table->GetRowCount() - 1) {
-    overflow.top = table->GetCellSpacingY(rowIndex - 1) / 2;
-    overflow.bottom = table->GetCellSpacingY(rowIndex + 1);
+    overflow.top = table->GetRowSpacing(rowIndex - 1) / 2;
+    overflow.bottom = table->GetRowSpacing(rowIndex + 1);
   } else {
-    overflow.top = table->GetCellSpacingY(rowIndex - 1) / 2;
-    overflow.bottom = table->GetCellSpacingY(rowIndex) / 2;
+    overflow.top = table->GetRowSpacing(rowIndex - 1) / 2;
+    overflow.bottom = table->GetRowSpacing(rowIndex) / 2;
   }
   return overflow;
 }
@@ -772,9 +772,7 @@ nsMathMLmtableOuterFrame::GetRowFrameAt(nsPresContext* aPresContext,
     nsIFrame* rgFrame = tableFrame->GetFirstPrincipalChild();
     if (!rgFrame || rgFrame->GetType() != nsGkAtoms::tableRowGroupFrame)
       return nullptr;
-    nsTableIterator rowIter(*rgFrame);
-    nsIFrame* rowFrame = rowIter.First();
-    for ( ; rowFrame; rowFrame = rowIter.Next()) {
+    for (nsIFrame* rowFrame : rgFrame->PrincipalChildList()) {
       if (aRowIndex == 0) {
         DEBUG_VERIFY_THAT_FRAME_IS(rowFrame, TABLE_ROW);
         if (rowFrame->GetType() != nsGkAtoms::tableRowFrame)
@@ -925,10 +923,10 @@ nsMathMLmtableFrame::RestyleTable()
 }
 
 nscoord
-nsMathMLmtableFrame::GetCellSpacingX(int32_t aColIndex)
+nsMathMLmtableFrame::GetColSpacing(int32_t aColIndex)
 {
   if (mUseCSSSpacing) {
-    return nsTableFrame::GetCellSpacingX(aColIndex);
+    return nsTableFrame::GetColSpacing(aColIndex);
   }
   if (!mColSpacing.Length()) {
     NS_ERROR("mColSpacing should not be empty");
@@ -946,11 +944,11 @@ nsMathMLmtableFrame::GetCellSpacingX(int32_t aColIndex)
 }
 
 nscoord
-nsMathMLmtableFrame::GetCellSpacingX(int32_t aStartColIndex,
+nsMathMLmtableFrame::GetColSpacing(int32_t aStartColIndex,
                                      int32_t aEndColIndex)
 {
   if (mUseCSSSpacing) {
-    return nsTableFrame::GetCellSpacingX(aStartColIndex, aEndColIndex);
+    return nsTableFrame::GetColSpacing(aStartColIndex, aEndColIndex);
   }
   if (aStartColIndex == aEndColIndex) {
     return 0;
@@ -985,10 +983,10 @@ nsMathMLmtableFrame::GetCellSpacingX(int32_t aStartColIndex,
 }
 
 nscoord
-nsMathMLmtableFrame::GetCellSpacingY(int32_t aRowIndex)
+nsMathMLmtableFrame::GetRowSpacing(int32_t aRowIndex)
 {
   if (mUseCSSSpacing) {
-    return nsTableFrame::GetCellSpacingY(aRowIndex);
+    return nsTableFrame::GetRowSpacing(aRowIndex);
   }
   if (!mRowSpacing.Length()) {
     NS_ERROR("mRowSpacing should not be empty");
@@ -1006,11 +1004,11 @@ nsMathMLmtableFrame::GetCellSpacingY(int32_t aRowIndex)
 }
 
 nscoord
-nsMathMLmtableFrame::GetCellSpacingY(int32_t aStartRowIndex,
+nsMathMLmtableFrame::GetRowSpacing(int32_t aStartRowIndex,
                                      int32_t aEndRowIndex)
 {
   if (mUseCSSSpacing) {
-    return nsTableFrame::GetCellSpacingY(aStartRowIndex, aEndRowIndex);
+    return nsTableFrame::GetRowSpacing(aStartRowIndex, aEndRowIndex);
   }
   if (aStartRowIndex == aEndRowIndex) {
     return 0;
@@ -1107,9 +1105,10 @@ nsMathMLmtrFrame::AttributeChanged(int32_t  aNameSpaceID,
 // implementation of nsMathMLmtdFrame
 
 nsContainerFrame*
-NS_NewMathMLmtdFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
+NS_NewMathMLmtdFrame(nsIPresShell* aPresShell, nsStyleContext* aContext,
+                     nsTableFrame* aTableFrame)
 {
-  return new (aPresShell) nsMathMLmtdFrame(aContext);
+  return new (aPresShell) nsMathMLmtdFrame(aContext, aTableFrame);
 }
 
 NS_IMPL_FRAMEARENA_HELPERS(nsMathMLmtdFrame)
@@ -1238,13 +1237,12 @@ nsMathMLmtdFrame::ProcessBorders(nsTableFrame* aFrame,
   return NS_OK;
 }
 
-nsMargin*
-nsMathMLmtdFrame::GetBorderWidth(nsMargin& aBorder) const
+LogicalMargin
+nsMathMLmtdFrame::GetBorderWidth(WritingMode aWM) const
 {
   nsStyleBorder styleBorder = *StyleBorder();
   ApplyBorderToStyle(this, styleBorder);
-  aBorder = styleBorder.GetComputedBorder();
-  return &aBorder;
+  return LogicalMargin(aWM, styleBorder.GetComputedBorder());
 }
 
 nsMargin

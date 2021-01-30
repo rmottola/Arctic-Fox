@@ -274,6 +274,26 @@ LIRGeneratorX86Shared::visitAsmJSNeg(MAsmJSNeg* ins)
 void
 LIRGeneratorX86Shared::lowerUDiv(MDiv* div)
 {
+    if (div->rhs()->isConstant()) {
+        uint32_t rhs = div->rhs()->toConstant()->value().toInt32();
+        int32_t shift = FloorLog2(rhs);
+
+        LAllocation lhs = useRegisterAtStart(div->lhs());
+        if (rhs != 0 && uint32_t(1) << shift == rhs) {
+            LDivPowTwoI* lir = new(alloc()) LDivPowTwoI(lhs, lhs, shift, false);
+            if (div->fallible())
+                assignSnapshot(lir, Bailout_DoubleOutput);
+            defineReuseInput(lir, div, 0);
+        } else {
+            LUDivOrModConstant* lir = new(alloc()) LUDivOrModConstant(useRegister(div->lhs()),
+                                                                      rhs, tempFixed(eax));
+            if (div->fallible())
+                assignSnapshot(lir, Bailout_DoubleOutput);
+            defineFixed(lir, div, LAllocation(AnyRegister(edx)));
+        }
+        return;
+    }
+
     LUDivOrMod* lir = new(alloc()) LUDivOrMod(useRegister(div->lhs()),
                                               useRegister(div->rhs()),
                                               tempFixed(edx));
@@ -285,6 +305,25 @@ LIRGeneratorX86Shared::lowerUDiv(MDiv* div)
 void
 LIRGeneratorX86Shared::lowerUMod(MMod* mod)
 {
+    if (mod->rhs()->isConstant()) {
+        uint32_t rhs = mod->rhs()->toConstant()->value().toInt32();
+        int32_t shift = FloorLog2(rhs);
+
+        if (rhs != 0 && uint32_t(1) << shift == rhs) {
+            LModPowTwoI* lir = new(alloc()) LModPowTwoI(useRegisterAtStart(mod->lhs()), shift);
+            if (mod->fallible())
+                assignSnapshot(lir, Bailout_DoubleOutput);
+            defineReuseInput(lir, mod, 0);
+        } else {
+            LUDivOrModConstant* lir = new(alloc()) LUDivOrModConstant(useRegister(mod->lhs()),
+                                                                      rhs, tempFixed(edx));
+            if (mod->fallible())
+                assignSnapshot(lir, Bailout_DoubleOutput);
+            defineFixed(lir, mod, LAllocation(AnyRegister(eax)));
+        }
+        return;
+    }
+
     LUDivOrMod* lir = new(alloc()) LUDivOrMod(useRegister(mod->lhs()),
                                               useRegister(mod->rhs()),
                                               tempFixed(eax));
@@ -312,31 +351,6 @@ LIRGeneratorX86Shared::lowerUrshD(MUrsh* mir)
 
     LUrshD* lir = new(alloc()) LUrshD(lhsUse, rhsAlloc, tempCopy(lhs, 0));
     define(lir, mir);
-}
-
-void
-LIRGeneratorX86Shared::lowerConstantDouble(double d, MInstruction* mir)
-{
-    define(new(alloc()) LDouble(d), mir);
-}
-
-void
-LIRGeneratorX86Shared::lowerConstantFloat32(float f, MInstruction* mir)
-{
-    define(new(alloc()) LFloat32(f), mir);
-}
-
-void
-LIRGeneratorX86Shared::visitConstant(MConstant* ins)
-{
-    if (ins->type() == MIRType_Double)
-        lowerConstantDouble(ins->value().toDouble(), ins);
-    else if (ins->type() == MIRType_Float32)
-        lowerConstantFloat32(ins->value().toDouble(), ins);
-    else if (ins->canEmitAtUses())
-        emitAtUses(ins); // Emit non-double constants at their uses.
-    else
-        LIRGeneratorShared::visitConstant(ins);
 }
 
 void
@@ -469,16 +483,13 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
     //
     // We'll emit a single instruction: LOCK ADD, LOCK SUB, LOCK AND,
     // LOCK OR, or LOCK XOR.  We can do this even for the Uint32 case.
-    //
-    // If the operand is 8-bit we shall need to use an 8-bit register
-    // for it on x86 systems.
 
     if (!ins->hasUses()) {
         LAllocation value;
-        if (useI386ByteRegisters && ins->isByteArray())
+        if (useI386ByteRegisters && ins->isByteArray() && !ins->value()->isConstant())
             value = useFixed(ins->value(), ebx);
         else
-            value = useRegister(ins->value());
+            value = useRegisterOrConstant(ins->value());
 
         LAtomicTypedArrayElementBinopForEffect* lir =
             new(alloc()) LAtomicTypedArrayElementBinopForEffect(elements, index, value);
@@ -494,8 +505,7 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
     //    movl       src, output
     //    lock xaddl output, mem
     //
-    // For the 8-bit variants XADD needs a byte register for the
-    // output only.
+    // For the 8-bit variants XADD needs a byte register for the output.
     //
     // For AND/OR/XOR we need to use a CMPXCHG loop:
     //
@@ -519,23 +529,18 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
     //  - eax is the first temp
     //  - we also need a second temp
     //
-    // For simplicity we force the 'value' into a byte register if the
-    // array has 1-byte elements, though that could be worked around.
-    //
-    // For simplicity we also choose fixed byte registers even when
-    // any available byte register would have been OK.
-    //
     // There are optimization opportunities:
-    //  - better register allocation and instruction selection, Bug #1077036.
+    //  - better register allocation in the x86 8-bit case, Bug #1077036.
 
     bool bitOp = !(ins->operation() == AtomicFetchAddOp || ins->operation() == AtomicFetchSubOp);
     bool fixedOutput = true;
+    bool reuseInput = false;
     LDefinition tempDef1 = LDefinition::BogusTemp();
     LDefinition tempDef2 = LDefinition::BogusTemp();
     LAllocation value;
 
     if (ins->arrayType() == Scalar::Uint32 && IsFloatingPointType(ins->type())) {
-        value = useRegister(ins->value());
+        value = useRegisterOrConstant(ins->value());
         fixedOutput = false;
         if (bitOp) {
             tempDef1 = tempFixed(eax);
@@ -544,13 +549,22 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
             tempDef1 = temp();
         }
     } else if (useI386ByteRegisters && ins->isByteArray()) {
-        value = useFixed(ins->value(), ebx);
+        if (ins->value()->isConstant())
+            value = useRegisterOrConstant(ins->value());
+        else
+            value = useFixed(ins->value(), ebx);
         if (bitOp)
             tempDef1 = tempFixed(ecx);
+    } else if (bitOp) {
+        value = useRegisterOrConstant(ins->value());
+        tempDef1 = temp();
+    } else if (ins->value()->isConstant()) {
+        fixedOutput = false;
+        value = useRegisterOrConstant(ins->value());
     } else {
-        value = useRegister(ins->value());
-        if (bitOp)
-            tempDef1 = temp();
+        fixedOutput = false;
+        reuseInput = true;
+        value = useRegisterAtStart(ins->value());
     }
 
     LAtomicTypedArrayElementBinop* lir =
@@ -558,6 +572,8 @@ LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(MAtomicTypedArrayElemen
 
     if (fixedOutput)
         defineFixed(lir, ins, LAllocation(AnyRegister(eax)));
+    else if (reuseInput)
+        defineReuseInput(lir, ins, LAtomicTypedArrayElementBinop::valueOp);
     else
         define(lir, ins);
 }

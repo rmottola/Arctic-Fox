@@ -20,14 +20,14 @@ using mozilla::FloorLog2;
 
 void
 LIRGeneratorMIPS::useBoxFixed(LInstruction* lir, size_t n, MDefinition* mir, Register reg1,
-                              Register reg2)
+                              Register reg2, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);
     MOZ_ASSERT(reg1 != reg2);
 
     ensureDefined(mir);
-    lir->setOperand(n, LUse(reg1, mir->virtualRegister()));
-    lir->setOperand(n + 1, LUse(reg2, VirtualRegisterOfPayload(mir)));
+    lir->setOperand(n, LUse(reg1, mir->virtualRegister(), useAtStart));
+    lir->setOperand(n + 1, LUse(reg2, VirtualRegisterOfPayload(mir), useAtStart));
 }
 
 LAllocation
@@ -46,31 +46,6 @@ LDefinition
 LIRGeneratorMIPS::tempByteOpRegister()
 {
     return temp();
-}
-
-void
-LIRGeneratorMIPS::lowerConstantDouble(double d, MInstruction* mir)
-{
-    return define(new(alloc()) LDouble(d), mir);
-}
-
-void
-LIRGeneratorMIPS::lowerConstantFloat32(float d, MInstruction* mir)
-{
-    define(new(alloc()) LFloat32(d), mir);
-}
-
-void
-LIRGeneratorMIPS::visitConstant(MConstant* ins)
-{
-    if (ins->type() == MIRType_Double)
-        lowerConstantDouble(ins->value().toDouble(), ins);
-    else if (ins->type() == MIRType_Float32)
-        lowerConstantFloat32(ins->value().toDouble(), ins);
-    else if (ins->canEmitAtUses())
-        emitAtUses(ins);
-    else
-        LIRGeneratorShared::visitConstant(ins);
 }
 
 void

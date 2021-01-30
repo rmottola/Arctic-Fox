@@ -4,23 +4,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jit_mips_LOpcodes_mips_h__
-#define jit_mips_LOpcodes_mips_h__
+#ifndef jit_mips32_LOpcodes_mips32_h__
+#define jit_mips32_LOpcodes_mips32_h__
+
+#include "jit/shared/LOpcodes-shared.h"
 
 #define LIR_CPU_OPCODE_LIST(_)  \
-    _(Unbox)                    \
-    _(UnboxFloatingPoint)       \
-    _(Box)                      \
     _(BoxFloatingPoint)         \
-    _(DivI)                     \
-    _(DivPowTwoI)               \
-    _(ModI)                     \
-    _(ModPowTwoI)               \
     _(ModMaskI)                 \
-    _(PowHalfD)                 \
-    _(AsmJSUInt32ToDouble)      \
-    _(AsmJSUInt32ToFloat32)     \
-    _(UDivOrMod)                \
-    _(AsmJSLoadFuncPtr)
+    _(UDivOrMod)
 
-#endif // jit_mips_LOpcodes_mips_h__
+#endif // jit_mips32_LOpcodes_mips32_h__

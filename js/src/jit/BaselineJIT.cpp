@@ -67,7 +67,8 @@ BaselineScript::BaselineScript(uint32_t prologueOffset, uint32_t epilogueOffset,
     postDebugPrologueOffset_(postDebugPrologueOffset),
     flags_(0),
     inlinedBytecodeLength_(0),
-    maxInliningDepth_(UINT8_MAX)
+    maxInliningDepth_(UINT8_MAX),
+    pendingBuilder_(nullptr)
 { }
 
 static const unsigned BASELINE_MAX_ARGS_LENGTH = 20000;
@@ -435,10 +436,7 @@ BaselineScript::trace(JSTracer* trc)
     // Mark all IC stub codes hanging off the IC stub entries.
     for (size_t i = 0; i < numICEntries(); i++) {
         ICEntry& ent = icEntry(i);
-        if (!ent.hasStub())
-            continue;
-        for (ICStub* stub = ent.firstStub(); stub; stub = stub->next())
-            stub->trace(trc);
+        ent.trace(trc);
     }
 }
 
@@ -467,6 +465,8 @@ BaselineScript::Destroy(FreeOp* fop, BaselineScript* script)
      * outside of a GC that we at least emptied the nursery first.
      */
     MOZ_ASSERT(fop->runtime()->gc.nursery.isEmpty());
+
+    MOZ_ASSERT(!script->hasPendingIonBuilder());
 
     script->unlinkDependentAsmJSModules(fop);
 

@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jit_LIR_Common_h
-#define jit_LIR_Common_h
+#ifndef jit_shared_LIR_shared_h
+#define jit_shared_LIR_shared_h
 
 #include "jsutil.h"
 
@@ -17,7 +17,26 @@
 namespace js {
 namespace jit {
 
-class Range;
+class LBox : public LInstructionHelper<BOX_PIECES, 1, 0>
+{
+    MIRType type_;
+
+  public:
+    LIR_HEADER(Box);
+
+    LBox(const LAllocation& payload, MIRType type)
+      : type_(type)
+    {
+        setOperand(0, payload);
+    }
+
+    MIRType type() const {
+        return type_;
+    }
+    const char* extraName() const {
+        return StringFromMIRType(type_);
+    }
+};
 
 template <size_t Temps, size_t ExtraUses = 0>
 class LBinaryMath : public LInstructionHelper<1, 2 + ExtraUses, Temps>
@@ -3667,6 +3686,26 @@ class LFloat32x4ToInt32x4 : public LInstructionHelper<1, 1, 1>
     }
 };
 
+// Double raised to a half power.
+class LPowHalfD : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(PowHalfD);
+    explicit LPowHalfD(const LAllocation& input) {
+        setOperand(0, input);
+    }
+
+    const LAllocation* input() {
+        return getOperand(0);
+    }
+    const LDefinition* output() {
+        return getDef(0);
+    }
+    MPowHalf* mir() const {
+        return mir_->toPowHalf();
+    }
+};
+
 // No-op instruction that is used to hold the entry snapshot. This simplifies
 // register allocation as it doesn't need to sniff the snapshot out of the
 // LIRGraph.
@@ -3880,6 +3919,31 @@ class LStringReplace: public LStrReplace
     const MStringReplace* mir() const {
         return mir_->toStringReplace();
     }
+};
+
+class LBinarySharedStub : public LCallInstructionHelper<BOX_PIECES, 2 * BOX_PIECES, 0>
+{
+  public:
+    LIR_HEADER(BinarySharedStub)
+
+    const MBinarySharedStub* mir() const {
+        return mir_->toBinarySharedStub();
+    }
+
+    static const size_t LhsInput = 0;
+    static const size_t RhsInput = BOX_PIECES;
+};
+
+class LUnarySharedStub : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES, 0>
+{
+  public:
+    LIR_HEADER(UnarySharedStub)
+
+    const MUnarySharedStub* mir() const {
+        return mir_->toUnarySharedStub();
+    }
+
+    static const size_t Input = 0;
 };
 
 class LLambdaForSingleton : public LCallInstructionHelper<1, 1, 0>
@@ -5138,6 +5202,8 @@ class LAtomicTypedArrayElementBinop : public LInstructionHelper<1, 3, 2>
   public:
     LIR_HEADER(AtomicTypedArrayElementBinop)
 
+    static const int32_t valueOp = 2;
+
     LAtomicTypedArrayElementBinop(const LAllocation& elements, const LAllocation& index,
                                   const LAllocation& value, const LDefinition& temp1,
                                   const LDefinition& temp2)
@@ -5156,6 +5222,7 @@ class LAtomicTypedArrayElementBinop : public LInstructionHelper<1, 3, 2>
         return getOperand(1);
     }
     const LAllocation* value() {
+        MOZ_ASSERT(valueOp == 2);
         return getOperand(2);
     }
     const LDefinition* temp1() {
@@ -5171,17 +5238,19 @@ class LAtomicTypedArrayElementBinop : public LInstructionHelper<1, 3, 2>
 };
 
 // Atomic binary operation where the result is discarded.
-class LAtomicTypedArrayElementBinopForEffect : public LInstructionHelper<0, 3, 0>
+class LAtomicTypedArrayElementBinopForEffect : public LInstructionHelper<0, 3, 1>
 {
   public:
     LIR_HEADER(AtomicTypedArrayElementBinopForEffect)
 
-    LAtomicTypedArrayElementBinopForEffect(const LAllocation &elements, const LAllocation &index,
-                                           const LAllocation &value)
+    LAtomicTypedArrayElementBinopForEffect(const LAllocation& elements, const LAllocation& index,
+                                           const LAllocation& value,
+                                           const LDefinition& flagTemp = LDefinition::BogusTemp())
     {
         setOperand(0, elements);
         setOperand(1, index);
         setOperand(2, value);
+        setTemp(0, flagTemp);
     }
 
     const LAllocation* elements() {
@@ -5192,6 +5261,11 @@ class LAtomicTypedArrayElementBinopForEffect : public LInstructionHelper<0, 3, 0
     }
     const LAllocation* value() {
         return getOperand(2);
+    }
+
+    // Temp that may be used on LL/SC platforms for the flag result of the store.
+    const LDefinition* flagTemp() {
+        return getTemp(0);
     }
 
     const MAtomicTypedArrayElementBinop* mir() const {
@@ -6320,6 +6394,7 @@ class LPostWriteBarrierO : public LInstructionHelper<0, 2, 1>
         return getOperand(0);
     }
     const LAllocation* value() {
+        MOZ_ASSERT(valueOp == 1);
         return getOperand(1);
     }
     const LDefinition* temp() {
@@ -6629,17 +6704,22 @@ class LAsmJSAtomicExchangeHeap : public LInstructionHelper<1, 2, 1>
     }
 };
 
-class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 2>
+class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 3>
 {
   public:
     LIR_HEADER(AsmJSAtomicBinopHeap);
+
+    static const int32_t valueOp = 1;
+
     LAsmJSAtomicBinopHeap(const LAllocation& ptr, const LAllocation& value,
-                          const LDefinition& temp)
+                          const LDefinition& temp,
+                          const LDefinition& flagTemp = LDefinition::BogusTemp())
     {
         setOperand(0, ptr);
         setOperand(1, value);
         setTemp(0, temp);
         setTemp(1, LDefinition::BogusTemp());
+        setTemp(2, flagTemp);
     }
     const LAllocation* ptr() {
         return getOperand(0);
@@ -6650,12 +6730,18 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 2>
     const LDefinition* temp() {
         return getTemp(0);
     }
-    const LDefinition *addrTemp() {
+
+    // Temp that may be used on some platforms to hold a computed address.
+    const LDefinition* addrTemp() {
         return getTemp(1);
     }
-
-    void setAddrTemp(const LDefinition &addrTemp) {
+    void setAddrTemp(const LDefinition& addrTemp) {
         setTemp(1, addrTemp);
+    }
+
+    // Temp that may be used on LL/SC platforms for the flag result of the store.
+    const LDefinition* flagTemp() {
+        return getTemp(2);
     }
 
     MAsmJSAtomicBinopHeap* mir() const {
@@ -6664,15 +6750,17 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 2>
 };
 
 // Atomic binary operation where the result is discarded.
-class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 1>
+class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 2>
 {
   public:
     LIR_HEADER(AsmJSAtomicBinopHeapForEffect);
-    LAsmJSAtomicBinopHeapForEffect(const LAllocation &ptr, const LAllocation &value)
+    LAsmJSAtomicBinopHeapForEffect(const LAllocation& ptr, const LAllocation& value,
+                                   const LDefinition& flagTemp = LDefinition::BogusTemp())
     {
         setOperand(0, ptr);
         setOperand(1, value);
         setTemp(0, LDefinition::BogusTemp());
+        setTemp(1, flagTemp);
     }
     const LAllocation* ptr() {
         return getOperand(0);
@@ -6680,15 +6768,18 @@ class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 1>
     const LAllocation* value() {
         return getOperand(1);
     }
-    const LDefinition* temp() {
-        return getTemp(0);
-    }
+
+    // Temp that may be used on some platforms to hold a computed address.
     const LDefinition* addrTemp() {
         return getTemp(0);
     }
-
-    void setAddrTemp(const LDefinition &addrTemp) {
+    void setAddrTemp(const LDefinition& addrTemp) {
         setTemp(0, addrTemp);
+    }
+
+    // Temp that may be used on LL/SC platforms for the flag result of the store.
+    const LDefinition* flagTemp() {
+        return getTemp(1);
     }
 
     MAsmJSAtomicBinopHeap* mir() const {
@@ -7057,4 +7148,4 @@ class LArrowNewTarget : public LInstructionHelper<BOX_PIECES, 1, 0>
 } // namespace jit
 } // namespace js
 
-#endif /* jit_LIR_Common_h */
+#endif /* jit_shared_LIR_shared_h */

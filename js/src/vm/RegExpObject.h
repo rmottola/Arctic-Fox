@@ -120,7 +120,7 @@ class RegExpShared
 
     struct RegExpCompilation
     {
-        HeapPtrJitCode jitCode;
+        RelocatablePtrJitCode jitCode;
         uint8_t* byteCode;
 
         RegExpCompilation() : byteCode(nullptr) {}
@@ -132,7 +132,7 @@ class RegExpShared
     };
 
     /* Source to the RegExp, for lazy compilation. */
-    HeapPtrAtom        source;
+    RelocatablePtrAtom source;
 
     RegExpFlag         flags;
     size_t             parenCount;
@@ -359,6 +359,10 @@ class RegExpObject : public NativeObject
     static const unsigned PRIVATE_SLOT = 7;
 
     static const Class class_;
+
+    // The maximum number of pairs a MatchResult can have, without having to
+    // allocate a bigger MatchResult.
+    static const size_t MaxPairCount = 14;
 
     /*
      * Note: The regexp statics flags are OR'd into the provided flags,

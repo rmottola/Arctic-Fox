@@ -16,7 +16,7 @@
 # include "jit/arm/Architecture-arm.h"
 #elif defined(JS_CODEGEN_ARM64)
 # include "jit/arm64/Architecture-arm64.h"
-#elif defined(JS_CODEGEN_MIPS)
+#elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/Architecture-mips32.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/Architecture-none.h"
@@ -161,6 +161,34 @@ class MachineState
         return fpregs_[reg.code()];
     }
 };
+
+class MacroAssembler;
+
+// Declares a register as owned within the scope of the object.
+// In debug mode, owned register state is tracked within the MacroAssembler,
+// and an assert will fire if ownership is conflicting.
+// In contrast to ARM64's UseScratchRegisterScope, this class has no overhead
+// in non-debug builds.
+template <class RegisterType>
+struct AutoGenericRegisterScope : public RegisterType
+{
+    // Prevent MacroAssembler templates from creating copies,
+    // which causes the destructor to fire more than once.
+    AutoGenericRegisterScope(const AutoGenericRegisterScope& other) = delete;
+
+#ifdef DEBUG
+    MacroAssembler& masm_;
+    explicit AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg);
+    ~AutoGenericRegisterScope();
+#else
+    MOZ_CONSTEXPR explicit AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
+      : RegisterType(reg)
+    { }
+#endif
+};
+
+typedef AutoGenericRegisterScope<Register> AutoRegisterScope;
+typedef AutoGenericRegisterScope<FloatRegister> AutoFloatRegisterScope;
 
 } // namespace jit
 } // namespace js

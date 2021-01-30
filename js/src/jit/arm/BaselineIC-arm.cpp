@@ -10,6 +10,8 @@
 #include "jit/Linker.h"
 #include "jit/SharedICHelpers.h"
 
+#include "jit/MacroAssembler-inl.h"
+
 using namespace js;
 using namespace js::jit;
 
@@ -137,7 +139,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler& masm)
         MOZ_ASSERT(R0 == ValueOperand(r3, r2));
         masm.moveValue(R0, savedValue);
 
-        masm.setupAlignedABICall(2);
+        masm.setupAlignedABICall();
         masm.passABIArg(R0.payloadReg());
         masm.passABIArg(R1.payloadReg());
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, __aeabi_idivmod));
@@ -188,8 +190,9 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler& masm)
             EmitReturnFromIC(masm);
 
             masm.bind(&toUint);
-            masm.convertUInt32ToDouble(scratchReg, ScratchDoubleReg);
-            masm.boxDouble(ScratchDoubleReg, R0);
+            ScratchDoubleScope scratchDouble(masm);
+            masm.convertUInt32ToDouble(scratchReg, scratchDouble);
+            masm.boxDouble(scratchDouble, R0);
         } else {
             masm.j(Assembler::LessThan, &failure);
             // Move result for return.

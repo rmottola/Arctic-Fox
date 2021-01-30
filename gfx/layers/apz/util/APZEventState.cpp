@@ -6,15 +6,29 @@
 #include "APZEventState.h"
 
 #include "ActiveElementManager.h"
+#include "APZCCallbackHelper.h"
+#include "gfxPrefs.h"
 #include "mozilla/BasicEvents.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/TouchEvents.h"
+#include "mozilla/layers/APZCCallbackHelper.h"
 #include "nsCOMPtr.h"
 #include "nsDocShell.h"
+#include "nsIDOMMouseEvent.h"
 #include "nsIDOMWindowUtils.h"
+#include "nsIScrollableFrame.h"
+#include "nsIScrollbarMediator.h"
 #include "nsITimer.h"
 #include "nsIWeakReferenceUtils.h"
 #include "nsIWidget.h"
+#include "nsLayoutUtils.h"
+#include "nsQueryFrame.h"
 #include "TouchManager.h"
+#include "nsIDOMMouseEvent.h"
+#include "nsLayoutUtils.h"
+#include "nsIScrollableFrame.h"
+#include "nsIScrollbarMediator.h"
+#include "mozilla/TouchEvents.h"
 
 #define APZES_LOG(...)
 // #define APZES_LOG(...) printf_stderr("APZCCH: " __VA_ARGS__)
@@ -231,17 +245,6 @@ APZEventState::ProcessLongTap(const nsCOMPtr<nsIPresShell>& aPresShell,
   }
 
   mContentReceivedInputBlockCallback->Run(aGuid, aInputBlockId, eventHandled);
-}
-
-void
-APZEventState::ProcessLongTapUp(const CSSPoint& aPoint,
-                                Modifiers aModifiers,
-                                const ScrollableLayerGuid& aGuid,
-                                float aPresShellResolution)
-{
-  APZES_LOG("Handling long tap up at %s\n", Stringify(aPoint).c_str());
-
-  ProcessSingleTap(aPoint, aModifiers, aGuid, aPresShellResolution);
 }
 
 void

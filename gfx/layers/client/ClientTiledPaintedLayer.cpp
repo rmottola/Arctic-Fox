@@ -261,7 +261,7 @@ ClientTiledPaintedLayer::UseProgressiveDraw() {
     return false;
   }
 
-  if (gfxPrefs::AsyncPanZoomEnabled()) {
+  if (ClientManager()->AsyncPanZoomEnabled()) {
     LayerMetricsWrapper scrollAncestor;
     GetAncestorLayers(&scrollAncestor, nullptr, nullptr);
     MOZ_ASSERT(scrollAncestor); // because mPaintData.mCriticalDisplayPort is non-empty
@@ -447,10 +447,8 @@ ClientTiledPaintedLayer::RenderLayer()
   }
 
   if (!ClientManager()->IsRepeatTransaction()) {
-    // Only paint the mask layer on the first transaction.
-    if (GetMaskLayer()) {
-      ToClientLayer(GetMaskLayer())->RenderLayer();
-    }
+    // Only paint the mask layers on the first transaction.
+    RenderMaskLayers(this);
 
     // For more complex cases we need to calculate a bunch of metrics before we
     // can do the paint.

@@ -373,7 +373,7 @@ struct BaselineStackBuilder
         priorOffset -= sizeof(void*);
         return virtualPointerAtStackOffset(priorOffset);
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-      defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_MIPS)
+      defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_MIPS32)
         // On X64, ARM, ARM64, and MIPS, the frame pointer save location depends on
         // the caller of the rectifier frame.
         BufferPointer<RectifierFrameLayout> priorFrame =
@@ -704,13 +704,14 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
                     scopeChain = fun->environment();
                 }
             } else {
-                // For global scripts without a polluted global scope the scope
+                // For global scripts without a non-syntactic scope the scope
                 // chain is the script's global (Ion does not compile scripts
-                // with a polluted global scope). Also note that it's invalid to
-                // resume into the prologue in this case because the prologue
-                // expects the scope chain in R1 for eval and global scripts.
+                // with a non-syntactic global scope). Also note that it's
+                // invalid to resume into the prologue in this case because
+                // the prologue expects the scope chain in R1 for eval and
+                // global scripts.
                 MOZ_ASSERT(!script->isForEval());
-                MOZ_ASSERT(!script->hasPollutedGlobalScope());
+                MOZ_ASSERT(!script->hasNonSyntacticScope());
                 scopeChain = &(script->global());
             }
         }
