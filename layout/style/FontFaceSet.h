@@ -234,7 +234,12 @@ private:
   // accordingly.
   struct FontFaceRecord {
     nsRefPtr<FontFace> mFontFace;
-    uint8_t mSheetType;
+    uint8_t mSheetType;  // only relevant for mRuleFaces entries
+
+    // When true, indicates that when finished loading, the FontFace should be
+    // included in the subsequent loadingdone/loadingerror event fired at the
+    // FontFaceSet.
+    bool mLoadEventShouldFire;
   };
 
   already_AddRefed<gfxUserFontEntry> FindOrCreateUserFontEntryFromFontFace(
@@ -301,8 +306,8 @@ private:
   nsTArray<FontFaceRecord> mRuleFaces;
 
   // The non rule backed FontFace objects that have been added to this
-  // FontFaceSet and their corresponding user font entries.
-  nsTArray<nsRefPtr<FontFace>> mNonRuleFaces;
+  // FontFaceSet.
+  nsTArray<FontFaceRecord> mNonRuleFaces;
 
   // The non rule backed FontFace objects that have not been added to
   // this FontFaceSet.
