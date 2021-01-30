@@ -336,7 +336,7 @@ FontFaceSet::IndexedGetter(uint32_t aIndex, bool& aFound)
 }
 
 uint32_t
-FontFaceSet::Length()
+FontFaceSet::Size()
 {
   mPresContext->FlushUserFontSet();
 
