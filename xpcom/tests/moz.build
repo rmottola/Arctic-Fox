@@ -63,7 +63,6 @@ GeckoCppUnitTests([
     'TestObserverArray',
     'TestObserverService',
     'TestPipe',
-    'TestPLDHash',
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
