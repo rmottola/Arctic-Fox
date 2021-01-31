@@ -950,7 +950,7 @@ InitializeTrackSize(nscoord aPercentageBasis,
 {
   // http://dev.w3.org/csswg/css-grid/#algo-init
   nscoord& base = aTrackSize->mBase;
-  switch (aMaxCoord.GetUnit()) {
+  switch (aMinCoord.GetUnit()) {
     case eStyleUnit_Enumerated:
     case eStyleUnit_FlexFraction:
       base = 0;
@@ -988,7 +988,7 @@ InitializeTrackSizes(nscoord aPercentageBasis,
   size_t i = 0;
   for (; i < len; ++i) {
     InitializeTrackSize(aPercentageBasis,
-                        aMinSizingFunctions[i], aMinSizingFunctions[i],
+                        aMinSizingFunctions[i], aMaxSizingFunctions[i],
                         &aResults[i]);
   }
   for (; i < aResults.Length(); ++i) {
