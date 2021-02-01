@@ -91,9 +91,10 @@ public:
     return NS_CombineHint(NS_STYLE_HINT_REFLOW,
                           nsChangeHint_NeutralChange);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -338,7 +339,7 @@ struct nsStyleColor {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_VISUAL;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
     // nsChangeHint_ClearAncestorIntrinsics at all.
     return nsChangeHint(0);
@@ -376,7 +377,7 @@ struct nsStyleBackground {
                           NS_CombineHint(NS_STYLE_HINT_VISUAL,
                                          nsChangeHint_NeutralChange));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
     // nsChangeHint_ClearAncestorIntrinsics at all.
     return nsChangeHint(0);
@@ -611,9 +612,9 @@ struct nsStyleMargin {
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference can return both nsChangeHint_ClearAncestorIntrinsics and
-    // nsChangeHint_NeedReflow as inherited hints.
+    // nsChangeHint_NeedReflow as hints not handled for descendants.
     return nsChangeHint(0);
   }
 
@@ -654,9 +655,9 @@ struct nsStylePadding {
     return NS_SubtractHint(NS_STYLE_HINT_REFLOW,
                            nsChangeHint_ClearDescendantIntrinsics);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference can return nsChangeHint_ClearAncestorIntrinsics as an
-    // inherited hint.
+    // hint not handled for descendants.
     return nsChangeHint(0);
   }
 
@@ -847,9 +848,10 @@ struct nsStyleBorder {
                           NS_CombineHint(nsChangeHint_BorderStyleNoneChange,
                                          nsChangeHint_NeutralChange));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -1082,7 +1084,7 @@ struct nsStyleOutline {
                           NS_CombineHint(nsChangeHint_RepaintFrame,
                                          nsChangeHint_NeutralChange));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
     // nsChangeHint_ClearAncestorIntrinsics at all.
     return nsChangeHint(0);
@@ -1175,9 +1177,10 @@ struct nsStyleList {
     return NS_CombineHint(NS_STYLE_HINT_FRAMECHANGE,
                           nsChangeHint_NeutralChange);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -1350,9 +1353,9 @@ struct nsStylePosition {
                           nsChangeHint(nsChangeHint_RecomputePosition |
                                        nsChangeHint_UpdateParentOverflow));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference can return both nsChangeHint_ClearAncestorIntrinsics and
-    // nsChangeHint_NeedReflow as inherited hints.
+    // nsChangeHint_NeedReflow as hints not handled for descendants.
     return nsChangeHint(0);
   }
 
@@ -1586,12 +1589,13 @@ struct nsStyleTextReset {
   nsChangeHint CalcDifference(const nsStyleTextReset& aOther) const;
   static nsChangeHint MaxDifference() {
     return nsChangeHint(
-        NS_STYLE_HINT_REFLOW | 
+        NS_STYLE_HINT_REFLOW |
         nsChangeHint_UpdateSubtreeOverflow);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -1626,9 +1630,10 @@ struct nsStyleText {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -1817,9 +1822,10 @@ struct nsStyleVisibility {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2052,9 +2058,9 @@ struct nsStyleDisplay {
                         nsChangeHint_AddOrRemoveTransform |
                         nsChangeHint_NeutralChange);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference can return both nsChangeHint_ClearAncestorIntrinsics and
-    // nsChangeHint_NeedReflow as inherited hints.
+    // nsChangeHint_NeedReflow as hints not handled for descendants.
     return nsChangeHint(0);
   }
 
@@ -2305,9 +2311,10 @@ struct nsStyleTable {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2335,9 +2342,10 @@ struct nsStyleTableBorder {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2433,9 +2441,10 @@ struct nsStyleQuotes {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2507,9 +2516,10 @@ struct nsStyleContent {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2619,9 +2629,10 @@ struct nsStyleUIReset {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2682,9 +2693,10 @@ struct nsStyleUserInterface {
                           NS_CombineHint(nsChangeHint_UpdateCursor,
                                          nsChangeHint_NeutralChange));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2726,9 +2738,10 @@ struct nsStyleXUL {
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE;
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2762,9 +2775,10 @@ struct nsStyleColumn {
     return NS_CombineHint(NS_STYLE_HINT_FRAMECHANGE,
                           nsChangeHint_NeutralChange);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -2855,9 +2869,10 @@ struct nsStyleSVG {
              NS_CombineHint(nsChangeHint_NeedReflow, nsChangeHint_NeedDirtyReflow)), // XXX remove nsChangeHint_NeedDirtyReflow: bug 876085
                                          nsChangeHint_RepaintFrame);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
-    // CalcDifference never returns nsChangeHint_NeedReflow as an inherited hint
-    // and never returns nsChangeHint_ClearAncestorIntrinsics at all.
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
+    // CalcDifference never returns nsChangeHint_NeedReflow as a hint
+    // not handled for descendants, and never returns
+    // nsChangeHint_ClearAncestorIntrinsics at all.
     return nsChangeHint_NeedReflow;
   }
 
@@ -3135,9 +3150,10 @@ struct nsStyleSVGReset {
     return NS_CombineHint(nsChangeHint_UpdateEffects,
             NS_CombineHint(nsChangeHint_UpdateOverflow, NS_STYLE_HINT_REFLOW));
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
-    // nsChangeHint_ClearAncestorIntrinsics as inherited hints.
+    // nsChangeHint_ClearAncestorIntrinsics as hints not handled for
+    // descendants.
     return NS_CombineHint(nsChangeHint_NeedReflow,
                           nsChangeHint_ClearAncestorIntrinsics);
   }
@@ -3184,7 +3200,7 @@ struct nsStyleVariables {
   static nsChangeHint MaxDifference() {
     return nsChangeHint(0);
   }
-  static nsChangeHint MaxDifferenceNeverInherited() {
+  static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns nsChangeHint_NeedReflow or
     // nsChangeHint_ClearAncestorIntrinsics at all.
     return nsChangeHint(0);
