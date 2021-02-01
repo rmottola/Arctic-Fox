@@ -6701,7 +6701,12 @@ nsCSSFrameConstructor::GetInsertionPrevSibling(InsertionPoint* aInsertion,
         // the container would be inserted.  This is needed when inserting
         // into nested display:contents nodes.
         nsIContent* child = aInsertion->mContainer;
-        InsertionPoint fakeInsertion(aInsertion->mParentFrame, child->GetParent());
+        nsIContent* parent = child->GetParent();
+        aInsertion->mParentFrame =
+          ::GetAdjustedParentFrame(aInsertion->mParentFrame,
+                                   aInsertion->mParentFrame->GetType(),
+                                   parent);
+        InsertionPoint fakeInsertion(aInsertion->mParentFrame, parent);
         nsIFrame* result = GetInsertionPrevSibling(&fakeInsertion, child, aIsAppend,
                                                    aIsRangeInsertSafe, nullptr, nullptr);
         MOZ_ASSERT(aInsertion->mParentFrame->GetContent() ==
@@ -9076,8 +9081,10 @@ nsCSSFrameConstructor::GetInsertionPoint(nsIContent* aContainer,
   InsertionPoint insertion(GetContentInsertionFrameFor(insertionElement),
                            insertionElement);
 
-  // Fieldsets have multiple insertion points.
-  if (insertionElement->IsHTMLElement(nsGkAtoms::fieldset)) {
+  // Fieldset frames have multiple normal flow child frame lists so handle it
+  // the same as if it had multiple content insertion points.
+  if (insertion.mParentFrame &&
+      insertion.mParentFrame->GetType() == nsGkAtoms::fieldSetFrame) {
     insertion.mMultiple = true;
   }
 
