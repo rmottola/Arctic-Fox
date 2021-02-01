@@ -132,3 +132,6 @@ test-pref(dom.meta-viewport.enabled,true) test-pref(font.size.inflation.emPerLin
 == 1156021-text-indent-percent.html 1156021-text-indent-percent-ref.html
 == 1157752-upright-bidi.html 1157752-upright-bidi-ref.html
 == 1158549-1-vertical-block-size-constraints.html 1158549-1-vertical-block-size-constraints-ref.html
+
+# Tests for tables with vertical writing modes
+include tables/reftest.list
