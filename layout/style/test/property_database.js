@@ -2764,6 +2764,7 @@ var gCSSProperties = {
     subproperties: [ "list-style-type", "list-style-position", "list-style-image" ],
     initial_values: [ "outside", "disc", "disc outside", "outside disc", "disc none", "none disc", "none disc outside", "none outside disc", "disc none outside", "disc outside none", "outside none disc", "outside disc none" ],
     other_values: [ "inside none", "none inside", "none none inside", "square", "none", "none none", "outside none none", "none outside none", "none none outside", "none outside", "outside none", "outside outside", "outside inside", "\\32 style", "\\32 style inside",
+      '"-"', "'-'", "inside '-'", "'-' outside", "none '-'", "inside none '-'",
       "symbols(\"*\" \"\\2020\" \"\\2021\" \"\\A7\")",
       "symbols(cyclic \"*\" \"\\2020\" \"\\2021\" \"\\A7\")",
       "inside symbols(\"*\" \"\\2020\" \"\\2021\" \"\\A7\")",
@@ -2841,6 +2842,7 @@ var gCSSProperties = {
       "-moz-ethiopic-halehame-am",
       "-moz-ethiopic-halehame-ti-er", "-moz-ethiopic-halehame-ti-et",
       "other-style", "inside", "outside", "\\32 style",
+      '"-"', "'-'",
       "symbols(\"*\" \"\\2020\" \"\\2021\" \"\\A7\")",
       "symbols(cyclic '*' '\\2020' '\\2021' '\\A7')"
     ],
@@ -5835,6 +5837,8 @@ if (SpecialPowers.getBoolPref("layout.css.grid.enabled")) {
       "max-content",
       "calc(20px + 10%)",
       "minmax(20px, max-content)",
+      "minmax(min-content, auto)",
+      "minmax(auto, max-content)",
       "m\\69nmax(20px, 4Fr)",
       "MinMax(min-content, calc(20px + 10%))",
     ],
@@ -5851,7 +5855,6 @@ if (SpecialPowers.getBoolPref("layout.css.grid.enabled")) {
       "mİnmax(20px, 100px)",
       "minmax(20px, 100px, 200px)",
       "maxmin(100px, 20px)",
-      "minmax(min-content, auto)",
       "minmax(min-content, minmax(30px, max-content))",
     ]
   };
@@ -5876,6 +5879,8 @@ if (SpecialPowers.getBoolPref("layout.css.grid.enabled")) {
       "(normal) 40px () auto ( ) 12%",
       "(foo) 40px min-content ( bar ) calc(20px + 10%) max-content",
       "40px min-content calc(20px + 10%) max-content",
+      "minmax(min-content, auto)",
+      "minmax(auto, max-content)",
       "m\\69nmax(20px, 4Fr)",
       "40px MinMax(min-content, calc(20px + 10%)) max-content",
       "40px 2em",
@@ -5922,7 +5927,6 @@ if (SpecialPowers.getBoolPref("layout.css.grid.enabled")) {
       "mİnmax(20px, 100px)",
       "minmax(20px, 100px, 200px)",
       "maxmin(100px, 20px)",
-      "minmax(min-content, auto)",
       "minmax(min-content, minmax(30px, max-content))",
       "repeat(0, 20px)",
       "repeat(-3, 20px)",
@@ -6223,6 +6227,46 @@ if (SpecialPowers.getBoolPref("layout.css.grid.enabled")) {
 
 if (SpecialPowers.getBoolPref("layout.css.display-contents.enabled")) {
   gCSSProperties["display"].other_values.push("contents");
+}
+
+if (SpecialPowers.getBoolPref("layout.css.contain.enabled")) {
+  gCSSProperties["contain"] = {
+    domProp: "contain",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "none" ],
+    other_values: [
+      "strict",
+      "layout",
+      "style",
+      "layout style",
+      "style layout",
+      "paint",
+      "layout paint",
+      "paint layout",
+      "style paint",
+      "paint style",
+      "layout style paint",
+      "layout paint style",
+      "style paint layout",
+      "paint style layout",
+    ],
+    invalid_values: [
+      "none strict",
+      "strict layout",
+      "strict layout style",
+      "layout strict",
+      "layout style strict",
+      "layout style paint strict",
+      "paint strict",
+      "style strict",
+      "paint paint",
+      "strict strict",
+      "auto",
+      "10px",
+      "0",
+    ]
+  };
 }
 
 if (SpecialPowers.getBoolPref("layout.css.image-orientation.enabled")) {

@@ -51,9 +51,6 @@
 
 using namespace mozilla;
 using namespace mozilla::dom;
-typedef const nsStyleBackground::Position Position;
-typedef const nsStyleBackground::Position::PositionCoord PositionCoord;
-typedef nsStyleTransformMatrix::TransformReferenceBox TransformReferenceBox;
 
 #if defined(DEBUG_bzbarsky) || defined(DEBUG_caillon)
 #define DEBUG_ComputedDOMStyle
@@ -1268,7 +1265,8 @@ nsComputedDOMStyle::DoGetTransform()
    * using the named transforms.  Until a real solution is found, we'll just
    * use this approach.
    */
-  TransformReferenceBox refBox(mInnerFrame, nsSize(0, 0));
+  nsStyleTransformMatrix::TransformReferenceBox refBox(mInnerFrame,
+                                                       nsSize(0, 0));
 
    bool dummy;
    gfx3DMatrix matrix =
@@ -2085,8 +2083,9 @@ nsComputedDOMStyle::DoGetBackgroundOrigin()
 }
 
 void
-nsComputedDOMStyle::SetValueToPositionCoord(const PositionCoord& aCoord,
-                                            nsROCSSPrimitiveValue* aValue)
+nsComputedDOMStyle::SetValueToPositionCoord(
+    const nsStyleBackground::Position::PositionCoord& aCoord,
+    nsROCSSPrimitiveValue* aValue)
 {
   if (!aCoord.mHasPercent) {
     MOZ_ASSERT(aCoord.mPercent == 0.0f,
@@ -2100,8 +2099,9 @@ nsComputedDOMStyle::SetValueToPositionCoord(const PositionCoord& aCoord,
 }
 
 void
-nsComputedDOMStyle::SetValueToPosition(const Position& aPosition,
-                                       nsDOMCSSValueList* aValueList)
+nsComputedDOMStyle::SetValueToPosition(
+    const nsStyleBackground::Position& aPosition,
+    nsDOMCSSValueList* aValueList)
 {
   nsROCSSPrimitiveValue* valX = new nsROCSSPrimitiveValue;
   aValueList->AppendCSSValue(valX);
@@ -3115,15 +3115,17 @@ nsComputedDOMStyle::DoGetListStyleType()
   nsROCSSPrimitiveValue *val = new nsROCSSPrimitiveValue;
   CounterStyle* style = StyleList()->GetCounterStyle();
   AnonymousCounterStyle* anonymous = style->AsAnonymous();
+  nsString tmp;
   if (!anonymous) {
     // want SetIdent
     nsString type;
     StyleList()->GetListStyleType(type);
-    nsString value;
-    nsStyleUtil::AppendEscapedCSSIdent(type, value);
-    val->SetString(value);
+    nsStyleUtil::AppendEscapedCSSIdent(type, tmp);
+  } else if (anonymous->IsSingleString()) {
+    const nsTArray<nsString>& symbols = anonymous->GetSymbols();
+    MOZ_ASSERT(symbols.Length() == 1);
+    nsStyleUtil::AppendEscapedCSSString(symbols[0], tmp);
   } else {
-    nsAutoString tmp;
     tmp.AppendLiteral("symbols(");
 
     uint8_t system = anonymous->GetSystem();
@@ -3147,8 +3149,8 @@ nsComputedDOMStyle::DoGetListStyleType()
       tmp.Append(' ');
     }
     tmp.Replace(tmp.Length() - 1, 1, char16_t(')'));
-    val->SetString(tmp);
   }
+  val->SetString(tmp);
   return val;
 }
 
@@ -4007,6 +4009,31 @@ nsComputedDOMStyle::DoGetDisplay()
   nsROCSSPrimitiveValue *val = new nsROCSSPrimitiveValue;
   val->SetIdent(nsCSSProps::ValueToKeywordEnum(StyleDisplay()->mDisplay,
                                                nsCSSProps::kDisplayKTable));
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetContain()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+
+  int32_t mask = StyleDisplay()->mContain;
+
+  if (mask == 0) {
+    val->SetIdent(eCSSKeyword_none);
+  } else if (mask & NS_STYLE_CONTAIN_STRICT) {
+    NS_ASSERTION(mask == (NS_STYLE_CONTAIN_STRICT | NS_STYLE_CONTAIN_ALL_BITS),
+                 "contain: strict should imply contain: layout style paint");
+    val->SetIdent(eCSSKeyword_strict);
+  } else {
+    nsAutoString valueStr;
+
+    nsStyleUtil::AppendBitmaskCSSValue(eCSSProperty_contain,
+                                       mask, NS_STYLE_CONTAIN_LAYOUT,
+                                       NS_STYLE_CONTAIN_PAINT, valueStr);
+    val->SetString(valueStr);
+  }
+
   return val;
 }
 
@@ -4976,7 +5003,7 @@ nsComputedDOMStyle::GetFrameBoundsWidthForTransform(nscoord& aWidth)
 
   AssertFlushedPendingReflows();
 
-  aWidth = TransformReferenceBox(mInnerFrame).Width();
+  aWidth = nsStyleTransformMatrix::TransformReferenceBox(mInnerFrame).Width();
   return true;
 }
 
@@ -4990,7 +5017,7 @@ nsComputedDOMStyle::GetFrameBoundsHeightForTransform(nscoord& aHeight)
 
   AssertFlushedPendingReflows();
 
-  aHeight = TransformReferenceBox(mInnerFrame).Height();
+  aHeight = nsStyleTransformMatrix::TransformReferenceBox(mInnerFrame).Height();
   return true;
 }
 

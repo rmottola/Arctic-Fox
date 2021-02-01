@@ -167,6 +167,8 @@ public:
                               bool aWasAlternate,
                               nsresult aStatus) override;
 
+  FontFace* GetFontFaceAt(uint32_t aIndex);
+
   // -- Web IDL --------------------------------------------------------------
 
   IMPL_EVENT_HANDLER(loading)
@@ -185,8 +187,12 @@ public:
   void Clear();
   bool Delete(FontFace& aFontFace, mozilla::ErrorResult& aRv);
   bool Has(FontFace& aFontFace);
-  FontFace* IndexedGetter(uint32_t aIndex, bool& aFound);
-  uint32_t Length();
+  uint32_t Size();
+  mozilla::dom::FontFaceSetIterator* Entries();
+  mozilla::dom::FontFaceSetIterator* Values();
+  void ForEach(JSContext* aCx, FontFaceSetForEachCallback& aCallback,
+               JS::Handle<JS::Value> aThisArg,
+               mozilla::ErrorResult& aRv);
 
 private:
   ~FontFaceSet();
@@ -233,7 +239,12 @@ private:
   // accordingly.
   struct FontFaceRecord {
     nsRefPtr<FontFace> mFontFace;
-    uint8_t mSheetType;
+    uint8_t mSheetType;  // only relevant for mRuleFaces entries
+
+    // When true, indicates that when finished loading, the FontFace should be
+    // included in the subsequent loadingdone/loadingerror event fired at the
+    // FontFaceSet.
+    bool mLoadEventShouldFire;
   };
 
   already_AddRefed<gfxUserFontEntry> FindOrCreateUserFontEntryFromFontFace(
@@ -300,8 +311,8 @@ private:
   nsTArray<FontFaceRecord> mRuleFaces;
 
   // The non rule backed FontFace objects that have been added to this
-  // FontFaceSet and their corresponding user font entries.
-  nsTArray<nsRefPtr<FontFace>> mNonRuleFaces;
+  // FontFaceSet.
+  nsTArray<FontFaceRecord> mNonRuleFaces;
 
   // The non rule backed FontFace objects that have not been added to
   // this FontFaceSet.

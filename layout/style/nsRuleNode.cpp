@@ -1394,7 +1394,6 @@ SetFactor(const nsCSSValue& aValue, float& aField, bool& aCanStoreInRuleTree,
   NS_NOTREACHED("SetFactor: inappropriate unit");
 }
 
-// Overloaded new operator that allocates from a presShell arena.
 void*
 nsRuleNode::operator new(size_t sz, nsPresContext* aPresContext) CPP_THROW_NEW
 {
@@ -1554,20 +1553,11 @@ nsRuleNode::Transition(nsIStyleRule* aRule, uint8_t aLevel,
     else {
       next = entry->mRuleNode = new (mPresContext)
         nsRuleNode(mPresContext, this, aRule, aLevel, aIsImportantRule);
-      if (!next) {
-        PL_DHashTableRawRemove(ChildrenHash(), entry);
-        NS_WARNING("out of memory");
-        return this;
-      }
     }
   } else if (!next) {
     // Create the new entry in our list.
     next = new (mPresContext)
       nsRuleNode(mPresContext, this, aRule, aLevel, aIsImportantRule);
-    if (!next) {
-      NS_WARNING("out of memory");
-      return this;
-    }
     next->mNextSibling = ChildrenList();
     SetChildrenList(next);
   }
@@ -2397,18 +2387,19 @@ nsRuleNode::WalkRuleTree(const nsStyleStructID aSID,
       return SetDefaultOnRoot(aSID, aContext);
   }
 
-  // We need to compute the data from the information that the rules specified.
-  const void* res;
-#define STYLE_STRUCT_TEST aSID
-#define STYLE_STRUCT(name, checkdata_cb)                                      \
-  res = Compute##name##Data(startStruct, &ruleData, aContext,                 \
-                            highestNode, detail, ruleData.mCanStoreInRuleTree);
+  typedef const void* (nsRuleNode::*ComputeFunc)(void*, const nsRuleData*,
+                                                 nsStyleContext*, nsRuleNode*,
+                                                 RuleDetail, const bool);
+  static const ComputeFunc sComputeFuncs[] = {
+#define STYLE_STRUCT(name, checkdata_cb) &nsRuleNode::Compute##name##Data,
 #include "nsStyleStructList.h"
 #undef STYLE_STRUCT
-#undef STYLE_STRUCT_TEST
+  };
 
-  // Now return the result.
-  return res;
+  // We need to compute the data from the information that the rules specified.
+  return (this->*sComputeFuncs[aSID])(startStruct, &ruleData, aContext,
+                                      highestNode, detail,
+                                      ruleData.mCanStoreInRuleTree);
 }
 
 const void*
@@ -5258,6 +5249,12 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
               parentDisplay->mDisplay,
               NS_STYLE_DISPLAY_INLINE, 0, 0, 0, 0);
 
+  // contain: none, enum, inherit, initial
+  SetDiscrete(*aRuleData->ValueForContain(), display->mContain, canStoreInRuleTree,
+              SETDSC_ENUMERATED | SETDSC_NONE | SETDSC_UNSET_INITIAL,
+              parentDisplay->mContain,
+              NS_STYLE_CONTAIN_NONE, 0, NS_STYLE_CONTAIN_NONE, 0, 0);
+
   // mix-blend-mode: enum, inherit, initial
   SetDiscrete(*aRuleData->ValueForMixBlendMode(), display->mMixBlendMode,
               canStoreInRuleTree,
@@ -7214,6 +7211,13 @@ nsRuleNode::ComputeListData(void* aStartStruct,
       list->SetListStyleType(typeIdent, mPresContext);
       break;
     }
+    case eCSSUnit_String: {
+      nsString str;
+      typeValue->GetStringValue(str);
+      list->SetListStyleType(NS_LITERAL_STRING(""),
+                             new AnonymousCounterStyle(str));
+      break;
+    }
     case eCSSUnit_Enumerated: {
       // For compatibility with html attribute map.
       // This branch should never be called for value from CSS.
@@ -7241,9 +7245,9 @@ nsRuleNode::ComputeListData(void* aStartStruct,
       break;
     }
     case eCSSUnit_Symbols:
-      list->SetListStyleType(NS_LITERAL_STRING(""),
-                             mPresContext->CounterStyleManager()->
-                               BuildCounterStyle(typeValue->GetArrayValue()));
+      list->SetListStyleType(
+        NS_LITERAL_STRING(""),
+        new AnonymousCounterStyle(typeValue->GetArrayValue()));
       break;
     case eCSSUnit_Null:
       break;
@@ -7342,6 +7346,8 @@ SetGridTrackBreadth(const nsCSSValue& aValue,
   nsCSSUnit unit = aValue.GetUnit();
   if (unit == eCSSUnit_FlexFraction) {
     aResult.SetFlexFractionValue(aValue.GetFloatValue());
+  } else if (unit == eCSSUnit_Auto) {
+    aResult.SetAutoValue();
   } else {
     MOZ_ASSERT(unit != eCSSUnit_Inherit && unit != eCSSUnit_Unset,
                "Unexpected value that would use dummyParentCoord");
@@ -7369,12 +7375,6 @@ SetGridTrackSize(const nsCSSValue& aValue,
                         aStyleContext, aPresContext, aCanStoreInRuleTree);
     SetGridTrackBreadth(func->Item(2), aResultMax,
                         aStyleContext, aPresContext, aCanStoreInRuleTree);
-  } else if (aValue.GetUnit() == eCSSUnit_Auto) {
-    // 'auto' computes to 'minmax(min-content, max-content)'
-    aResultMin.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MIN_CONTENT,
-                           eStyleUnit_Enumerated);
-    aResultMax.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MAX_CONTENT,
-                           eStyleUnit_Enumerated);
   } else {
     // A single <track-breadth>,
     // specifies identical min and max sizing functions.
@@ -7408,12 +7408,10 @@ SetGridAutoColumnsRows(const nsCSSValue& aValue,
   case eCSSUnit_Initial:
   case eCSSUnit_Unset:
     // The initial value is 'auto',
-    // which computes to 'minmax(min-content, max-content)'.
+    // which computes to 'minmax(auto, auto)'.
     // (Explicitly-specified 'auto' values are handled in SetGridTrackSize.)
-    aResultMin.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MIN_CONTENT,
-                           eStyleUnit_Enumerated);
-    aResultMax.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MAX_CONTENT,
-                           eStyleUnit_Enumerated);
+    aResultMin.SetAutoValue();
+    aResultMax.SetAutoValue();
     break;
 
   default:

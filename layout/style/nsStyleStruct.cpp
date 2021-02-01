@@ -32,6 +32,8 @@
 #include "nsIDocument.h"
 #include <algorithm>
 
+using namespace mozilla;
+
 static_assert((((1 << nsStyleStructID_Length) - 1) &
                ~(NS_STYLE_INHERIT_MASK)) == 0,
               "Not enough bits in NS_STYLE_INHERIT_MASK");
@@ -1411,15 +1413,11 @@ nsStylePosition::nsStylePosition(void)
   mFlexBasis.SetAutoValue();
 
   // The initial value of grid-auto-columns and grid-auto-rows is 'auto',
-  // which computes to 'minmax(min-content, max-content)'.
-  mGridAutoColumnsMin.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MIN_CONTENT,
-                                  eStyleUnit_Enumerated);
-  mGridAutoColumnsMax.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MAX_CONTENT,
-                                  eStyleUnit_Enumerated);
-  mGridAutoRowsMin.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MIN_CONTENT,
-                               eStyleUnit_Enumerated);
-  mGridAutoRowsMax.SetIntValue(NS_STYLE_GRID_TRACK_BREADTH_MAX_CONTENT,
-                               eStyleUnit_Enumerated);
+  // which computes to 'minmax(auto, auto)'.
+  mGridAutoColumnsMin.SetAutoValue();
+  mGridAutoColumnsMax.SetAutoValue();
+  mGridAutoRowsMin.SetAutoValue();
+  mGridAutoRowsMax.SetAutoValue();
 
   mGridAutoFlow = NS_STYLE_GRID_AUTO_FLOW_ROW;
   mBoxSizing = NS_STYLE_BOX_SIZING_CONTENT;
@@ -2584,6 +2582,7 @@ nsStyleDisplay::nsStyleDisplay()
   mAppearance = NS_THEME_NONE;
   mDisplay = NS_STYLE_DISPLAY_INLINE;
   mOriginalDisplay = mDisplay;
+  mContain = NS_STYLE_CONTAIN_NONE;
   mPosition = NS_STYLE_POSITION_STATIC;
   mFloats = NS_STYLE_FLOAT_NONE;
   mOriginalFloats = mFloats;
@@ -2649,6 +2648,7 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
   , mOpacity(aSource.mOpacity)
   , mDisplay(aSource.mDisplay)
   , mOriginalDisplay(aSource.mOriginalDisplay)
+  , mContain(aSource.mContain)
   , mAppearance(aSource.mAppearance)
   , mPosition(aSource.mPosition)
   , mFloats(aSource.mFloats)
@@ -2712,6 +2712,7 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
   if (!EqualURIs(mBinding, aOther.mBinding)
       || mPosition != aOther.mPosition
       || mDisplay != aOther.mDisplay
+      || mContain != aOther.mContain
       || (mFloats == NS_STYLE_FLOAT_NONE) != (aOther.mFloats == NS_STYLE_FLOAT_NONE)
       || mOverflowX != aOther.mOverflowX
       || mOverflowY != aOther.mOverflowY

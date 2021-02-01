@@ -12,6 +12,7 @@
 #include "mozilla/dom/CSSFontFaceLoadEvent.h"
 #include "mozilla/dom/CSSFontFaceLoadEventBinding.h"
 #include "mozilla/dom/FontFaceSetBinding.h"
+#include "mozilla/dom/FontFaceSetIterator.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/Preferences.h"
@@ -50,7 +51,9 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(FontFaceSet, DOMEventTargetHel
   for (size_t i = 0; i < tmp->mRuleFaces.Length(); i++) {
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mRuleFaces[i].mFontFace);
   }
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mNonRuleFaces);
+  for (size_t i = 0; i < tmp->mNonRuleFaces.Length(); i++) {
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mNonRuleFaces[i].mFontFace);
+  }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(FontFaceSet, DOMEventTargetHelper)
@@ -60,7 +63,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(FontFaceSet, DOMEventTargetHelpe
   for (size_t i = 0; i < tmp->mRuleFaces.Length(); i++) {
     NS_IMPL_CYCLE_COLLECTION_UNLINK(mRuleFaces[i].mFontFace);
   }
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mNonRuleFaces);
+  for (size_t i = 0; i < tmp->mNonRuleFaces.Length(); i++) {
+    NS_IMPL_CYCLE_COLLECTION_UNLINK(mNonRuleFaces[i].mFontFace);
+  }
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_ADDREF_INHERITED(FontFaceSet, DOMEventTargetHelper)
@@ -234,10 +239,19 @@ FontFaceSet::Add(FontFace& aFontFace, ErrorResult& aRv)
 
   aFontFace.SetIsInFontFaceSet(true);
 
-  MOZ_ASSERT(!mNonRuleFaces.Contains(&aFontFace),
-             "FontFace should not occur in mNonRuleFaces twice");
+#ifdef DEBUG
+  for (const FontFaceRecord& rec : mNonRuleFaces) {
+    MOZ_ASSERT(rec.mFontFace != &aFontFace,
+               "FontFace should not occur in mNonRuleFaces twice");
+  }
+#endif
 
-  mNonRuleFaces.AppendElement(&aFontFace);
+  FontFaceRecord* rec = mNonRuleFaces.AppendElement();
+  rec->mFontFace = &aFontFace;
+  rec->mSheetType = 0;  // unused for mNonRuleFaces
+  rec->mLoadEventShouldFire =
+    aFontFace.Status() == FontFaceLoadStatus::Unloaded ||
+    aFontFace.Status() == FontFaceLoadStatus::Loading;
 
   mNonRuleFacesDirty = true;
   mPresContext->RebuildUserFontSet();
@@ -256,7 +270,7 @@ FontFaceSet::Clear()
   }
 
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
-    FontFace* f = mNonRuleFaces[i];
+    FontFace* f = mNonRuleFaces[i].mFontFace;
     f->SetIsInFontFaceSet(false);
 
     MOZ_ASSERT(!mUnavailableFaces.Contains(f),
@@ -282,7 +296,15 @@ FontFaceSet::Delete(FontFace& aFontFace, ErrorResult& aRv)
     return false;
   }
 
-  if (!mNonRuleFaces.RemoveElement(&aFontFace)) {
+  bool removed = false;
+  for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
+    if (mNonRuleFaces[i].mFontFace == &aFontFace) {
+      mNonRuleFaces.RemoveElementAt(i);
+      removed = true;
+      break;
+    }
+  }
+  if (!removed) {
     return false;
   }
 
@@ -316,27 +338,24 @@ FontFaceSet::Has(FontFace& aFontFace)
 }
 
 FontFace*
-FontFaceSet::IndexedGetter(uint32_t aIndex, bool& aFound)
+FontFaceSet::GetFontFaceAt(uint32_t aIndex)
 {
   mPresContext->FlushUserFontSet();
 
   if (aIndex < mRuleFaces.Length()) {
-    aFound = true;
     return mRuleFaces[aIndex].mFontFace;
   }
 
   aIndex -= mRuleFaces.Length();
   if (aIndex < mNonRuleFaces.Length()) {
-    aFound = true;
-    return mNonRuleFaces[aIndex];
+    return mNonRuleFaces[aIndex].mFontFace;
   }
 
-  aFound = false;
   return nullptr;
 }
 
 uint32_t
-FontFaceSet::Length()
+FontFaceSet::Size()
 {
   mPresContext->FlushUserFontSet();
 
@@ -344,6 +363,34 @@ FontFaceSet::Length()
 
   size_t total = mRuleFaces.Length() + mNonRuleFaces.Length();
   return std::min<size_t>(total, INT32_MAX);
+}
+
+FontFaceSetIterator*
+FontFaceSet::Entries()
+{
+  return new FontFaceSetIterator(this, true);
+}
+
+FontFaceSetIterator*
+FontFaceSet::Values()
+{
+  return new FontFaceSetIterator(this, false);
+}
+
+void
+FontFaceSet::ForEach(JSContext* aCx,
+                     FontFaceSetForEachCallback& aCallback,
+                     JS::Handle<JS::Value> aThisArg,
+                     ErrorResult& aRv)
+{
+  JS::Rooted<JS::Value> thisArg(aCx, aThisArg);
+  for (size_t i = 0; i < Size(); i++) {
+    FontFace* face = GetFontFaceAt(i);
+    aCallback.Call(thisArg, *face, *face, *this, aRv);
+    if (aRv.Failed()) {
+      return;
+    }
+  }
 }
 
 static PLDHashOperator DestroyIterator(nsPtrHashKey<nsFontFaceLoader>* aKey,
@@ -365,7 +412,7 @@ FontFaceSet::DestroyUserFontSet()
     mRuleFaces[i].mFontFace->SetUserFontEntry(nullptr);
   }
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
-    mNonRuleFaces[i]->SetUserFontEntry(nullptr);
+    mNonRuleFaces[i].mFontFace->SetUserFontEntry(nullptr);
   }
   for (size_t i = 0; i < mUnavailableFaces.Length(); i++) {
     mUnavailableFaces[i]->SetUserFontEntry(nullptr);
@@ -565,7 +612,7 @@ FontFaceSet::UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules)
 
   for (size_t i = 0, i_end = mNonRuleFaces.Length(); i < i_end; ++i) {
     // Do the same for the non rule backed FontFace objects.
-    InsertNonRuleFontFace(mNonRuleFaces[i], modified);
+    InsertNonRuleFontFace(mNonRuleFaces[i].mFontFace, modified);
   }
 
   // Remove any residual families that have no font entries (i.e., they were
@@ -761,6 +808,9 @@ FontFaceSet::InsertRuleFontFace(FontFace* aFontFace, uint8_t aSheetType,
   FontFaceRecord rec;
   rec.mFontFace = aFontFace;
   rec.mSheetType = aSheetType;
+  rec.mLoadEventShouldFire =
+    aFontFace->Status() == FontFaceLoadStatus::Unloaded ||
+    aFontFace->Status() == FontFaceLoadStatus::Loading;
 
   aFontFace->SetUserFontEntry(entry);
 
@@ -1374,7 +1424,7 @@ FontFaceSet::UpdateHasLoadingFontFaces()
     }
   }
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
-    if (mNonRuleFaces[i]->Status() == FontFaceLoadStatus::Loading) {
+    if (mNonRuleFaces[i].mFontFace->Status() == FontFaceLoadStatus::Loading) {
       mHasLoadingFontFaces = true;
       return;
     }
@@ -1446,20 +1496,30 @@ FontFaceSet::CheckLoadingFinished()
   nsTArray<FontFace*> failed;
 
   for (size_t i = 0; i < mRuleFaces.Length(); i++) {
+    if (!mRuleFaces[i].mLoadEventShouldFire) {
+      continue;
+    }
     FontFace* f = mRuleFaces[i].mFontFace;
     if (f->Status() == FontFaceLoadStatus::Loaded) {
       loaded.AppendElement(f);
+      mRuleFaces[i].mLoadEventShouldFire = false;
     } else if (f->Status() == FontFaceLoadStatus::Error) {
       failed.AppendElement(f);
+      mRuleFaces[i].mLoadEventShouldFire = false;
     }
   }
 
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
-    FontFace* f = mNonRuleFaces[i];
+    if (!mNonRuleFaces[i].mLoadEventShouldFire) {
+      continue;
+    }
+    FontFace* f = mNonRuleFaces[i].mFontFace;
     if (f->Status() == FontFaceLoadStatus::Loaded) {
       loaded.AppendElement(f);
+      mNonRuleFaces[i].mLoadEventShouldFire = false;
     } else if (f->Status() == FontFaceLoadStatus::Error) {
       failed.AppendElement(f);
+      mNonRuleFaces[i].mLoadEventShouldFire = false;
     }
   }
 
