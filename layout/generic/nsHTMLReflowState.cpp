@@ -1948,13 +1948,15 @@ static eNormalLineHeightControl GetNormalLineHeightCalcControl(void)
 }
 
 static inline bool
-IsSideCaption(nsIFrame* aFrame, const nsStyleDisplay* aStyleDisplay)
+IsSideCaption(nsIFrame* aFrame, const nsStyleDisplay* aStyleDisplay,
+              WritingMode aWM)
 {
-  if (aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_TABLE_CAPTION)
+  if (aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_TABLE_CAPTION) {
     return false;
-  uint8_t captionSide = aFrame->StyleTableBorder()->mCaptionSide;
-  return captionSide == NS_STYLE_CAPTION_SIDE_LEFT ||
-         captionSide == NS_STYLE_CAPTION_SIDE_RIGHT;
+  }
+  uint8_t captionSide = aFrame->StyleTableBorder()->LogicalCaptionSide(aWM);
+  return captionSide == NS_STYLE_CAPTION_SIDE_ISTART ||
+         captionSide == NS_STYLE_CAPTION_SIDE_IEND;
 }
 
 static nsFlexContainerFrame*
@@ -2260,7 +2262,7 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
 
       // Exclude inline tables and flex items from the block margin calculations
       if (isBlock &&
-          !IsSideCaption(frame, mStyleDisplay) &&
+          !IsSideCaption(frame, mStyleDisplay, cbwm) &&
           mStyleDisplay->mDisplay != NS_STYLE_DISPLAY_INLINE_TABLE &&
           !flexContainerFrame) {
         CalculateBlockSideMargins(aFrameType);
