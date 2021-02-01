@@ -166,6 +166,9 @@ SVGDocument::EnsureNonSVGUserAgentStyleSheetsLoaded()
   EnsureOnDemandBuiltInUASheet(nsLayoutStylesheetCache::FormsSheet());
   EnsureOnDemandBuiltInUASheet(nsLayoutStylesheetCache::CounterStylesSheet());
   EnsureOnDemandBuiltInUASheet(nsLayoutStylesheetCache::HTMLSheet());
+  if (nsLayoutUtils::ShouldUseNoScriptSheet(this)) {
+    EnsureOnDemandBuiltInUASheet(nsLayoutStylesheetCache::NoScriptSheet());
+  }
   EnsureOnDemandBuiltInUASheet(nsLayoutStylesheetCache::UASheet());
 
   EndUpdate(UPDATE_STYLE);
