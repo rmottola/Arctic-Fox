@@ -8525,3 +8525,14 @@ nsLayoutUtils::ShouldUseNoScriptSheet(nsIDocument* aDocument)
   }
   return aDocument->IsScriptEnabled();
 }
+
+/* static */ bool
+nsLayoutUtils::ShouldUseNoFramesSheet(nsIDocument* aDocument)
+{
+  bool allowSubframes = true;
+  nsIDocShell* docShell = aDocument->GetDocShell();
+  if (docShell) {
+    docShell->GetAllowSubframes(&allowSubframes);
+  }
+  return !allowSubframes;
+}
