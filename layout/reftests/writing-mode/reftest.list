@@ -137,6 +137,7 @@ fails == 1147834-relative-overconstrained-vertical-rl-rtl.html 1147834-top-left-
 == 1152941-1-orthogonal-blocksize-overflow.html 1152941-1-orthogonal-blocksize-overflow-ref.html
 == 1156021-text-indent-percent.html 1156021-text-indent-percent-ref.html
 == 1157752-upright-bidi.html 1157752-upright-bidi-ref.html
+== 1157758-1-vertical-arabic.html 1157758-1-vertical-arabic-ref.html
 == 1158549-1-vertical-block-size-constraints.html 1158549-1-vertical-block-size-constraints-ref.html
 
 # Tests for tables with vertical writing modes
