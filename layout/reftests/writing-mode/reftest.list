@@ -141,5 +141,8 @@ fails == 1147834-relative-overconstrained-vertical-rl-rtl.html 1147834-top-left-
 == 1158549-1-vertical-block-size-constraints.html 1158549-1-vertical-block-size-constraints-ref.html
 == 1163238-orthogonal-auto-margins.html 1163238-orthogonal-auto-margins-ref.html
 
+# Suite of tests from Gérard Talbot in bug 1079151
+include abspos/reftest.list
+
 # Tests for tables with vertical writing modes
 include tables/reftest.list
