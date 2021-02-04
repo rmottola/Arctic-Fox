@@ -141,6 +141,19 @@ private:
   TabChild *mTabChild;
 };
 
+static bool
+UsingCompositorLRU()
+{
+  static bool sHavePrefs = false;
+  static uint32_t sCompositorLRUSize = 0;
+  if (!sHavePrefs) {
+    sHavePrefs = true;
+    Preferences::AddUintVarCache(&sCompositorLRUSize,
+                                 "layers.compositor-lru-size", 0);
+  }
+  return sCompositorLRUSize != 0;
+}
+
 NS_IMPL_ISUPPORTS(TabChild::DelayedFireContextMenuEvent,
                   nsITimerCallback)
 
@@ -3020,7 +3033,9 @@ void
 TabChild::MakeVisible()
 {
   CompositorChild* compositor = CompositorChild::Get();
-  compositor->SendNotifyVisible(mLayersId);
+  if (UsingCompositorLRU()) {
+    compositor->SendNotifyVisible(mLayersId);
+  }
 
   if (mWidget) {
     mWidget->Show(true);
@@ -3031,7 +3046,14 @@ void
 TabChild::MakeHidden()
 {
   CompositorChild* compositor = CompositorChild::Get();
-  compositor->SendNotifyHidden(mLayersId);
+  if (UsingCompositorLRU()) {
+    compositor->SendNotifyHidden(mLayersId);
+  } else {
+    // Clear cached resources directly. This avoids one extra IPC
+    // round-trip from CompositorChild to CompositorParent when
+    // CompositorLRU is not used.
+    compositor->RecvClearCachedResources(mLayersId);
+  }
 
   if (mWidget) {
     mWidget->Show(false);
