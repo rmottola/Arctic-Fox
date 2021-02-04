@@ -1774,6 +1774,15 @@ nsPresContext::UIResolutionChanged()
   }
 }
 
+void
+nsPresContext::UIResolutionChangedSync()
+{
+  if (!mPendingUIResolutionChanged) {
+    mPendingUIResolutionChanged = true;
+    UIResolutionChangedInternal();
+  }
+}
+
 /*static*/ bool
 nsPresContext::UIResolutionChangedSubdocumentCallback(nsIDocument* aDocument,
                                                       void* aData)
