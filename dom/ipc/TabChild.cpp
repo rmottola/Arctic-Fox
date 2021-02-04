@@ -1737,6 +1737,10 @@ TabChild::RecvLoadURL(const nsCString& aURI,
 
     SetProcessNameToAppName();
 
+    nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    MOZ_ASSERT(swm);
+    swm->LoadRegistrations(aConfiguration.serviceWorkerRegistrations());
+
     nsresult rv = WebNavigation()->LoadURI(NS_ConvertUTF8toUTF16(aURI).get(),
                                            nsIWebNavigation::LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |
                                            nsIWebNavigation::LOAD_FLAGS_DISALLOW_INHERIT_OWNER,
@@ -1744,10 +1748,6 @@ TabChild::RecvLoadURL(const nsCString& aURI,
     if (NS_FAILED(rv)) {
         NS_WARNING("WebNavigation()->LoadURI failed. Eating exception, what else can I do?");
     }
-
-    nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-    MOZ_ASSERT(swm);
-    swm->LoadRegistrations(aConfiguration.serviceWorkerRegistrations());
 
     return true;
 }
