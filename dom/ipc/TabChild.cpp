@@ -3001,6 +3001,13 @@ TabChild::GetDefaultScale(double* aScale)
 }
 
 void
+TabChild::GetMaxTouchPoints(uint32_t* aTouchPoints)
+{
+  // Fallback to a sync call.
+  SendGetMaxTouchPoints(aTouchPoints);
+}
+
+void
 TabChild::NotifyPainted()
 {
     if (!mNotified) {
