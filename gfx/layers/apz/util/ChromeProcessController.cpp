@@ -111,14 +111,6 @@ ChromeProcessController::Destroy()
   mWidget = nullptr;
 }
 
-float
-ChromeProcessController::GetPresShellResolution() const
-{
-  // The document in the chrome process cannot be zoomed, so its pres shell
-  // resolution is 1.
-  return 1.0f;
-}
-
 nsIPresShell*
 ChromeProcessController::GetPresShell() const
 {
@@ -160,7 +152,7 @@ ChromeProcessController::HandleSingleTap(const CSSPoint& aPoint,
     return;
   }
 
-  mAPZEventState->ProcessSingleTap(aPoint, aModifiers, aGuid, GetPresShellResolution());
+  mAPZEventState->ProcessSingleTap(aPoint, aModifiers, aGuid);
 }
 
 void
@@ -177,7 +169,7 @@ ChromeProcessController::HandleLongTap(const mozilla::CSSPoint& aPoint, Modifier
   }
 
   mAPZEventState->ProcessLongTap(GetPresShell(), aPoint, aModifiers, aGuid,
-      aInputBlockId, GetPresShellResolution());
+      aInputBlockId);
 }
 
 void

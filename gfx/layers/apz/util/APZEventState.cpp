@@ -163,8 +163,7 @@ NS_IMPL_ISUPPORTS(DelayedFireSingleTapEvent, nsITimerCallback)
 void
 APZEventState::ProcessSingleTap(const CSSPoint& aPoint,
                                 Modifiers aModifiers,
-                                const ScrollableLayerGuid& aGuid,
-                                float aPresShellResolution)
+                                const ScrollableLayerGuid& aGuid)
 {
   APZES_LOG("Handling single tap at %s on %s with %d\n",
     Stringify(aPoint).c_str(), Stringify(aGuid).c_str(), mTouchEndCancelled);
@@ -179,7 +178,7 @@ APZEventState::ProcessSingleTap(const CSSPoint& aPoint,
   }
 
   LayoutDevicePoint currentPoint =
-      APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid, aPresShellResolution)
+      APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid)
     * widget->GetDefaultScale();;
   if (!mActiveElementManager->ActiveElementUsesStyle()) {
     // If the active element isn't visually affected by the :active style, we
@@ -208,8 +207,7 @@ APZEventState::ProcessLongTap(const nsCOMPtr<nsIPresShell>& aPresShell,
                               const CSSPoint& aPoint,
                               Modifiers aModifiers,
                               const ScrollableLayerGuid& aGuid,
-                              uint64_t aInputBlockId,
-                              float aPresShellResolution)
+                              uint64_t aInputBlockId)
 {
   APZES_LOG("Handling long tap at %s\n", Stringify(aPoint).c_str());
 
@@ -226,7 +224,7 @@ APZEventState::ProcessLongTap(const nsCOMPtr<nsIPresShell>& aPresShell,
   // including in JS code, so it's not trivial to change.
   bool eventHandled =
       APZCCallbackHelper::DispatchMouseEvent(aPresShell, NS_LITERAL_STRING("contextmenu"),
-                         APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid, aPresShellResolution),
+                         APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid),
                          2, 1, WidgetModifiersToDOMModifiers(aModifiers), true,
                          nsIDOMMouseEvent::MOZ_SOURCE_TOUCH);
 
@@ -235,7 +233,7 @@ APZEventState::ProcessLongTap(const nsCOMPtr<nsIPresShell>& aPresShell,
   // If no one handle context menu, fire MOZLONGTAP event
   if (!eventHandled) {
     LayoutDevicePoint currentPoint =
-        APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid, aPresShellResolution)
+        APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid)
       * widget->GetDefaultScale();
     int time = 0;
     nsEventStatus status =
