@@ -36,6 +36,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/MemoryReporting.h"
+#include "ZoomConstraintsClient.h"
 
 class nsRange;
 
@@ -815,6 +816,8 @@ protected:
 
   // TouchManager
   TouchManager              mTouchManager;
+
+  nsRefPtr<ZoomConstraintsClient> mZoomConstraintsClient;
 
   // TouchCaret
   nsRefPtr<mozilla::TouchCaret> mTouchCaret;
