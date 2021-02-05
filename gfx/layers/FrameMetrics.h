@@ -882,6 +882,8 @@ struct ZoomConstraints {
   }
 };
 
+typedef Maybe<ZoomConstraints> MaybeZoomConstraints;
+
 } // namespace layers
 } // namespace mozilla
 

@@ -318,8 +318,7 @@ TabChildBase::HandlePossibleViewportChange(const ScreenIntSize& aOldScreenSize)
       ConvertScaleForRoot(viewportInfo.GetMaxZoom()));
     DoUpdateZoomConstraints(presShellId,
                             viewId,
-                            /* isRoot = */ true,
-                            constraints);
+                            Some(constraints));
   }
 
   float screenW = GetInnerSize().width;
@@ -481,8 +480,7 @@ TabChildBase::HandlePossibleViewportChange(const ScreenIntSize& aOldScreenSize)
         ConvertScaleForRoot(viewportInfo.GetMaxZoom()));
       DoUpdateZoomConstraints(presShellId,
                               viewId,
-                              /* isRoot = */ true,
-                              constraints);
+                              Some(constraints));
     }
   }
 
@@ -1089,12 +1087,20 @@ TabChild::OnSecurityChange(nsIWebProgress* aWebProgress,
 bool
 TabChild::DoUpdateZoomConstraints(const uint32_t& aPresShellId,
                                   const ViewID& aViewId,
-                                  const bool& aIsRoot,
-                                  const ZoomConstraints& aConstraints)
+                                  const Maybe<ZoomConstraints>& aConstraints)
 {
+  ScrollableLayerGuid newGuid(0, aPresShellId, aViewId);
+  if (mLastZoomConstraintsGuid && newGuid != mLastZoomConstraintsGuid.value()) {
+    // The guid has changed, so clear the constraints we sent for the previous
+    // guid.
+    SendUpdateZoomConstraints(mLastZoomConstraintsGuid->mPresShellId,
+                              mLastZoomConstraintsGuid->mScrollId,
+                              mozilla::void_t());
+  }
+  mLastZoomConstraintsGuid = Some(newGuid);
+
   return SendUpdateZoomConstraints(aPresShellId,
                                    aViewId,
-                                   aIsRoot,
                                    aConstraints);
 }
 
@@ -2814,6 +2820,11 @@ TabChild::RecvDestroy()
     mTabChildGlobal->DispatchTrustedEvent(NS_LITERAL_STRING("unload"));
   }
 
+  if (mLastZoomConstraintsGuid) {
+    DoUpdateZoomConstraints(mLastZoomConstraintsGuid->mPresShellId,
+                            mLastZoomConstraintsGuid->mScrollId,
+                            Nothing());
+  }
   nsCOMPtr<nsIObserverService> observerService =
     mozilla::services::GetObserverService();
 
