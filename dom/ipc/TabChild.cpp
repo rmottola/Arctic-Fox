@@ -292,7 +292,7 @@ TabChildBase::GetPageSize(nsCOMPtr<nsIDocument> aDocument, const CSSSize& aViewp
 bool
 TabChildBase::HandlePossibleViewportChange(const ScreenIntSize& aOldScreenSize)
 {
-  nsIWidget* widget = WebWidget();
+  PuppetWidget* widget = WebWidget();
   if (!widget || !widget->AsyncPanZoomEnabled()) {
     return false;
   }
@@ -1120,18 +1120,19 @@ TabChild::Init()
     return NS_ERROR_FAILURE;
   }
 
-  mWidget = nsIWidget::CreatePuppetWidget(this);
-  if (!mWidget) {
+  nsCOMPtr<nsIWidget> widget = nsIWidget::CreatePuppetWidget(this);
+  mPuppetWidget = static_cast<PuppetWidget*>(widget.get());
+  if (!mPuppetWidget) {
     NS_ERROR("couldn't create fake widget");
     return NS_ERROR_FAILURE;
   }
-  mWidget->Create(
+  mPuppetWidget->Create(
     nullptr, 0,              // no parents
     gfx::IntRect(gfx::IntPoint(0, 0), gfx::IntSize(0, 0)),
     nullptr                  // HandleWidgetEvent
   );
 
-  baseWindow->InitWindow(0, mWidget, 0, 0, 0, 0);
+  baseWindow->InitWindow(0, mPuppetWidget, 0, 0, 0, 0);
   baseWindow->Create();
 
   NotifyTabContextUpdated();
@@ -1178,7 +1179,7 @@ TabChild::Init()
     do_QueryInterface(window->GetChromeEventHandler());
   docShell->SetChromeEventHandler(chromeHandler);
 
-  mAPZEventState = new APZEventState(mWidget,
+  mAPZEventState = new APZEventState(mPuppetWidget,
       new TabChildContentReceivedInputBlockCallback(this));
 
   return NS_OK;
@@ -1620,11 +1621,11 @@ TabChild::DestroyWindow()
     if (baseWindow)
         baseWindow->Destroy();
 
-    // NB: the order of mWidget->Destroy() and mRemoteFrame->Destroy()
+    // NB: the order of mPuppetWidget->Destroy() and mRemoteFrame->Destroy()
     // is important: we want to kill off remote layers before their
     // frames
-    if (mWidget) {
-        mWidget->Destroy();
+    if (mPuppetWidget) {
+        mPuppetWidget->Destroy();
     }
 
     if (mRemoteFrame) {
@@ -2083,8 +2084,9 @@ TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
     }
 
     ScreenIntRect screenRect = GetOuterRect();
-    mWidget->Resize(screenRect.x + chromeDisp.x, screenRect.y + chromeDisp.y,
-                    screenSize.width, screenSize.height, true);
+    mPuppetWidget->Resize(screenRect.x + chromeDisp.x,
+                          screenRect.y + chromeDisp.y,
+                          screenSize.width, screenSize.height, true);
 
     nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(WebNavigation());
     baseWin->SetPositionAndSize(0, 0, screenSize.width, screenSize.height,
@@ -2232,7 +2234,7 @@ bool
 TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event)
 {
   WidgetMouseEvent localEvent(event);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
   return true;
 }
@@ -2244,12 +2246,12 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
 {
   if (AsyncPanZoomEnabled()) {
     nsCOMPtr<nsIDocument> document(GetDocument());
-    APZCCallbackHelper::SendSetTargetAPZCNotification(WebWidget(), document, aEvent, aGuid,
-        aInputBlockId);
+    APZCCallbackHelper::SendSetTargetAPZCNotification(
+      mPuppetWidget, document, aEvent, aGuid, aInputBlockId);
   }
 
   WidgetWheelEvent event(aEvent);
-  event.widget = mWidget;
+  event.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(event);
 
   if (AsyncPanZoomEnabled()) {
@@ -2351,9 +2353,12 @@ TabChild::UpdateTapState(const WidgetTouchEvent& aEvent, nsEventStatus aStatus)
 
   case NS_TOUCH_END:
     if (!TouchManager::gPreventMouseEvents) {
-      APZCCallbackHelper::DispatchSynthesizedMouseEvent(NS_MOUSE_MOVE, time, currentPoint, 0, mWidget);
-      APZCCallbackHelper::DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_DOWN, time, currentPoint, 0, mWidget);
-      APZCCallbackHelper::DispatchSynthesizedMouseEvent(NS_MOUSE_BUTTON_UP, time, currentPoint, 0, mWidget);
+      APZCCallbackHelper::DispatchSynthesizedMouseEvent(
+        NS_MOUSE_MOVE, time, currentPoint, 0, mPuppetWidget);
+      APZCCallbackHelper::DispatchSynthesizedMouseEvent(
+        NS_MOUSE_BUTTON_DOWN, time, currentPoint, 0, mPuppetWidget);
+      APZCCallbackHelper::DispatchSynthesizedMouseEvent(
+        NS_MOUSE_BUTTON_UP, time, currentPoint, 0, mPuppetWidget);
     }
     // fall through
   case NS_TOUCH_CANCEL:
@@ -2429,18 +2434,18 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
   TABC_LOG("Receiving touch event of type %d\n", aEvent.message);
 
   WidgetTouchEvent localEvent(aEvent);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
 
   APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
-      mWidget->GetDefaultScale(), GetPresShellResolution());
+      mPuppetWidget->GetDefaultScale(), GetPresShellResolution());
 
   if (localEvent.message == NS_TOUCH_START && AsyncPanZoomEnabled()) {
     if (gfxPrefs::TouchActionEnabled()) {
-      APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(WebWidget(),
+      APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(mPuppetWidget,
           localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
     }
     nsCOMPtr<nsIDocument> document = GetDocument();
-    APZCCallbackHelper::SendSetTargetAPZCNotification(WebWidget(), document,
+    APZCCallbackHelper::SendSetTargetAPZCNotification(mPuppetWidget, document,
         localEvent, aGuid, aInputBlockId);
   }
 
@@ -2471,7 +2476,7 @@ TabChild::RecvRealDragEvent(const WidgetDragEvent& aEvent,
                             const uint32_t& aDropEffect)
 {
   WidgetDragEvent localEvent(aEvent);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
 
   nsCOMPtr<nsIDragSession> dragSession = nsContentUtils::GetDragSession();
   if (dragSession) {
@@ -2534,8 +2539,7 @@ bool
 TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& event,
                            const MaybeNativeKeyBinding& aBindings)
 {
-  PuppetWidget* widget = static_cast<PuppetWidget*>(mWidget.get());
-  AutoCacheNativeKeyCommands autoCache(widget);
+  AutoCacheNativeKeyCommands autoCache(mPuppetWidget);
 
   if (event.message == NS_KEY_PRESS) {
     // If content code called preventDefault() on a keydown event, then we don't
@@ -2554,7 +2558,7 @@ TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& event,
   }
 
   WidgetKeyboardEvent localEvent(event);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
   nsEventStatus status = APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
   if (event.message == NS_KEY_DOWN) {
@@ -2580,7 +2584,10 @@ TabChild::RecvKeyEvent(const nsString& aType,
                        const bool& aPreventDefault)
 {
   bool ignored = false;
-  nsContentUtils::SendKeyEvent(mWidget, aType, aKeyCode, aCharCode,
+  // XXX Why nsContentUtils::SendKeyEvent takes nsCOMPtr<nsIWidget> for the
+  //     first argument? Why not just nsIWidget*?
+  nsCOMPtr<nsIWidget> widget(mPuppetWidget);
+  nsContentUtils::SendKeyEvent(widget, aType, aKeyCode, aCharCode,
                                aModifiers, aPreventDefault, &ignored);
   return true;
 }
@@ -2589,7 +2596,7 @@ bool
 TabChild::RecvCompositionEvent(const WidgetCompositionEvent& event)
 {
   WidgetCompositionEvent localEvent(event);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
   return true;
 }
@@ -2598,7 +2605,7 @@ bool
 TabChild::RecvSelectionEvent(const WidgetSelectionEvent& event)
 {
   WidgetSelectionEvent localEvent(event);
-  localEvent.widget = mWidget;
+  localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
   return true;
 }
@@ -2914,7 +2921,7 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
                              const uint64_t& aLayersId,
                              PRenderFrameChild* aRenderFrame)
 {
-    static_cast<PuppetWidget*>(mWidget.get())->InitIMEState();
+    mPuppetWidget->InitIMEState();
 
     RenderFrameChild* remoteFrame = static_cast<RenderFrameChild*>(aRenderFrame);
     if (!remoteFrame) {
@@ -2953,8 +2960,9 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
     }
 
     ShadowLayerForwarder* lf =
-        mWidget->GetLayerManager(shadowManager, mTextureFactoryIdentifier.mParentBackend)
-               ->AsShadowForwarder();
+        mPuppetWidget->GetLayerManager(
+            shadowManager, mTextureFactoryIdentifier.mParentBackend)
+                ->AsShadowForwarder();
     MOZ_ASSERT(lf && lf->HasShadowManager(),
                "PuppetWidget should have shadow manager");
     lf->IdentifyTextureHost(mTextureFactoryIdentifier);
@@ -3051,8 +3059,8 @@ TabChild::MakeVisible()
     compositor->SendNotifyVisible(mLayersId);
   }
 
-  if (mWidget) {
-    mWidget->Show(true);
+  if (mPuppetWidget) {
+    mPuppetWidget->Show(true);
   }
 }
 
@@ -3069,8 +3077,8 @@ TabChild::MakeHidden()
     compositor->RecvClearCachedResources(mLayersId);
   }
 
-  if (mWidget) {
-    mWidget->Show(false);
+  if (mPuppetWidget) {
+    mPuppetWidget->Show(false);
   }
 }
 
@@ -3205,12 +3213,13 @@ TabChild::GetFrom(uint64_t aLayersId)
 void
 TabChild::DidComposite(uint64_t aTransactionId)
 {
-  MOZ_ASSERT(mWidget);
-  MOZ_ASSERT(mWidget->GetLayerManager());
-  MOZ_ASSERT(mWidget->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT);
+  MOZ_ASSERT(mPuppetWidget);
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager());
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
+               LayersBackend::LAYERS_CLIENT);
 
   nsRefPtr<ClientLayerManager> manager =
-    static_cast<ClientLayerManager*>(mWidget->GetLayerManager());
+    static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
     
   manager->DidComposite(aTransactionId);
 }
@@ -3218,11 +3227,13 @@ TabChild::DidComposite(uint64_t aTransactionId)
 void
 TabChild::ClearCachedResources()
 {
-  MOZ_ASSERT(mWidget);
-  MOZ_ASSERT(mWidget->GetLayerManager());
-  MOZ_ASSERT(mWidget->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT);
+  MOZ_ASSERT(mPuppetWidget);
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager());
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
+               LayersBackend::LAYERS_CLIENT);
 
-  ClientLayerManager *manager = static_cast<ClientLayerManager*>(mWidget->GetLayerManager());
+  ClientLayerManager *manager =
+    static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
   manager->ClearCachedResources();
 }
 
@@ -3260,7 +3271,7 @@ TabChild::RecvUIResolutionChanged()
   ScreenIntSize oldScreenSize = GetInnerSize();
   mDPI = 0;
   mDefaultScale = 0;
-  static_cast<PuppetWidget*>(mWidget.get())->ClearBackingScaleCache();
+  static_cast<PuppetWidget*>(mPuppetWidget.get())->ClearBackingScaleCache();
   nsCOMPtr<nsIDocument> document(GetDocument());
   nsCOMPtr<nsIPresShell> presShell = document->GetShell();
   if (presShell) {
@@ -3273,8 +3284,9 @@ TabChild::RecvUIResolutionChanged()
   ScreenIntSize screenSize = GetInnerSize();
   if (mHasValidInnerSize && oldScreenSize != screenSize) {
     ScreenIntRect screenRect = GetOuterRect();
-    mWidget->Resize(screenRect.x + mChromeDisp.x, screenRect.y + mChromeDisp.y,
-                    screenSize.width, screenSize.height, true);
+    mPuppetWidget->Resize(screenRect.x + mChromeDisp.x,
+                          screenRect.y + mChromeDisp.y,
+                          screenSize.width, screenSize.height, true);
 
     nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(WebNavigation());
     baseWin->SetPositionAndSize(0, 0, screenSize.width, screenSize.height,
@@ -3346,7 +3358,7 @@ ScreenIntSize
 TabChild::GetInnerSize()
 {
   LayoutDeviceIntSize innerSize =
-    RoundedToInt(mUnscaledInnerSize * mWidget->GetDefaultScale());
+    RoundedToInt(mUnscaledInnerSize * mPuppetWidget->GetDefaultScale());
   return ViewAs<ScreenPixel>(innerSize, PixelCastJustification::LayoutDeviceIsScreenForTabDims);
 };
 
@@ -3354,7 +3366,7 @@ ScreenIntRect
 TabChild::GetOuterRect()
 {
   LayoutDeviceIntRect outerRect =
-    RoundedToInt(mUnscaledOuterRect * mWidget->GetDefaultScale());
+    RoundedToInt(mUnscaledOuterRect * mPuppetWidget->GetDefaultScale());
   return ViewAs<ScreenPixel>(outerRect, PixelCastJustification::LayoutDeviceIsScreenForTabDims);
 }
 
