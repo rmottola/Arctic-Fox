@@ -175,7 +175,7 @@ protected:
     {
         uint32_t mOffset;
         uint32_t mLength;
-        WritingMode mWritingMode;
+        mozilla::WritingMode mWritingMode;
 
         Selection()
             : mOffset(UINT32_MAX)
@@ -187,11 +187,11 @@ protected:
         {
             mOffset = UINT32_MAX;
             mLength = UINT32_MAX;
-            mWritingMode = WritingMode();
+            mWritingMode = mozilla::WritingMode();
         }
 
         void Assign(const IMENotification& aIMENotification);
-        void Assign(const WidgetQueryContentEvent& aSelectedTextEvent);
+        void Assign(const mozilla::WidgetQueryContentEvent& aSelectedTextEvent);
 
         bool IsValid() const { return mOffset != UINT32_MAX; }
         bool Collapsed() const { return !mLength; }
@@ -200,8 +200,8 @@ protected:
             if (NS_WARN_IF(!IsValid())) {
                 return UINT32_MAX;
             }
-            CheckedInt<uint32_t> endOffset =
-                CheckedInt<uint32_t>(mOffset) + mLength;
+            mozilla::CheckedInt<uint32_t> endOffset =
+                mozilla::CheckedInt<uint32_t>(mOffset) + mLength;
             if (NS_WARN_IF(!endOffset.isValid())) {
                 return UINT32_MAX;
             }
