@@ -14,6 +14,7 @@
 #include "mozilla/MiscEvents.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/TextEvents.h"
+#include "WritingModes.h"
 
 using namespace mozilla;
 using namespace mozilla::widget;
@@ -92,7 +93,6 @@ nsGtkIMModule::nsGtkIMModule(nsWindow* aOwnerWindow)
     , mComposingContext(nullptr)
     , mCompositionStart(UINT32_MAX)
     , mProcessingKeyEvent(nullptr)
-    , mCompositionTargetOffset(UINT32_MAX)
     , mCompositionState(eCompositionState_NotComposing)
     , mIsIMFocused(false)
     , mIsDeletingSurrounding(false)
@@ -481,7 +481,7 @@ nsGtkIMModule::OnUpdateComposition()
         return;
     }
 
-    SetCursorPosition(GetActiveContext(), mCompositionTargetOffset);
+    SetCursorPosition(GetActiveContext());
 }
 
 void
@@ -765,7 +765,8 @@ nsGtkIMModule::OnStartCompositionNative(GtkIMContext *aContext)
     if (!DispatchCompositionStart(aContext)) {
         return;
     }
-    mCompositionTargetOffset = mCompositionStart;
+    mCompositionTargetRange.mOffset = mCompositionStart;
+    mCompositionTargetRange.mLength = 0;
 }
 
 /* static */
@@ -1136,7 +1137,9 @@ nsGtkIMModule::DispatchCompositionChangeEvent(
     // We cannot call SetCursorPosition for e10s-aware.
     // DispatchEvent is async on e10s, so composition rect isn't updated now
     // on tab parent.
-    mCompositionTargetOffset = targetOffset;
+    mCompositionTargetRange.mOffset = targetOffset;
+    mCompositionTargetRange.mLength =
+        compositionChangeEvent.mRanges->TargetClauseLength();
 
     return true;
 }
@@ -1179,7 +1182,7 @@ nsGtkIMModule::DispatchCompositionCommitEvent(
                                        NS_COMPOSITION_COMMIT_AS_IS;
     mCompositionState = eCompositionState_NotComposing;
     mCompositionStart = UINT32_MAX;
-    mCompositionTargetOffset = UINT32_MAX;
+    mCompositionTargetRange.Clear();
     mDispatchedCompositionString.Truncate();
 
     WidgetCompositionEvent compositionCommitEvent(true, message,
@@ -1334,16 +1337,19 @@ nsGtkIMModule::CreateTextRangeArray(GtkIMContext* aContext,
 }
 
 void
-nsGtkIMModule::SetCursorPosition(GtkIMContext* aContext,
-                                 uint32_t aTargetOffset)
+nsGtkIMModule::SetCursorPosition(GtkIMContext* aContext)
 {
     PR_LOG(gGtkIMLog, PR_LOG_ALWAYS,
-        ("GtkIMModule(%p): SetCursorPosition, aContext=%p, aTargetOffset=%u",
-         this, aContext, aTargetOffset));
+        ("GtkIMModule(%p): SetCursorPosition, aContext=%p, "
+         "mCompositionTargetRange={ mOffset=%u, mLength=%u }"
+         "mSelection.mWritingMode=%s",
+         this, aContext, mCompositionTargetRange.mOffset,
+         mCompositionTargetRange.mLength,
+         GetWritingModeName(mSelection.mWritingMode).get()));
 
-    if (aTargetOffset == UINT32_MAX) {
+    if (!mCompositionTargetRange.IsValid()) {
         PR_LOG(gGtkIMLog, PR_LOG_ALWAYS,
-            ("    FAILED, aTargetOffset is wrong offset"));
+            ("    FAILED, mCompositionTargetRange is invalid"));
         return;
     }
 
@@ -1361,7 +1367,15 @@ nsGtkIMModule::SetCursorPosition(GtkIMContext* aContext,
 
     WidgetQueryContentEvent charRect(true, NS_QUERY_TEXT_RECT,
                                      mLastFocusedWindow);
-    charRect.InitForQueryTextRect(aTargetOffset, 1);
+    if (mSelection.mWritingMode.IsVertical()) {
+        // For preventing the candidate window to overlap the target clause,
+        // we should set fake (typically, very tall) caret rect.
+        uint32_t length = mCompositionTargetRange.mLength ?
+            mCompositionTargetRange.mLength : 1;
+        charRect.InitForQueryTextRect(mCompositionTargetRange.mOffset, length);
+    } else {
+        charRect.InitForQueryTextRect(mCompositionTargetRange.mOffset, 1);
+    }
     InitEvent(charRect);
     nsEventStatus status;
     mLastFocusedWindow->DispatchEvent(&charRect, status);
@@ -1370,6 +1384,7 @@ nsGtkIMModule::SetCursorPosition(GtkIMContext* aContext,
             ("    FAILED, NS_QUERY_TEXT_RECT was failed"));
         return;
     }
+
     nsWindow* rootWindow =
         static_cast<nsWindow*>(mLastFocusedWindow->GetTopLevelWidget());
 
