@@ -96,6 +96,7 @@ nsGtkIMModule::nsGtkIMModule(nsWindow* aOwnerWindow)
     , mCompositionState(eCompositionState_NotComposing)
     , mIsIMFocused(false)
     , mIsDeletingSurrounding(false)
+    , mLayoutChanged(false)
 {
     if (!gGtkIMLog) {
         gGtkIMLog = PR_NewLogModule("nsGtkIMModuleWidgets");
@@ -475,13 +476,28 @@ nsGtkIMModule::EndIMEComposition(nsWindow* aCaller)
 }
 
 void
-nsGtkIMModule::OnUpdateComposition()
+nsGtkIMModule::OnLayoutChange()
 {
     if (MOZ_UNLIKELY(IsDestroyed())) {
         return;
     }
 
     SetCursorPosition(GetActiveContext());
+    mLayoutChanged = true;
+}
+
+void
+nsGtkIMModule::OnUpdateComposition()
+{
+    if (MOZ_UNLIKELY(IsDestroyed())) {
+        return;
+    }
+
+    // If we've already set candidate window position, we don't need to update
+    // the position with update composition notification.
+    if (!mLayoutChanged) {
+        SetCursorPosition(GetActiveContext());
+    }
 }
 
 void
@@ -1125,6 +1141,14 @@ nsGtkIMModule::DispatchCompositionChangeEvent(
 
     mCompositionState = eCompositionState_CompositionChangeEventDispatched;
 
+    // We cannot call SetCursorPosition for e10s-aware.
+    // DispatchEvent is async on e10s, so composition rect isn't updated now
+    // on tab parent.
+    mLayoutChanged = false;
+    mCompositionTargetRange.mOffset = targetOffset;
+    mCompositionTargetRange.mLength =
+        compositionChangeEvent.mRanges->TargetClauseLength();
+
     mLastFocusedWindow->DispatchEvent(&compositionChangeEvent, status);
     if (lastFocusedWindow->IsDestroyed() ||
         lastFocusedWindow != mLastFocusedWindow) {
@@ -1133,14 +1157,6 @@ nsGtkIMModule::DispatchCompositionChangeEvent(
              "compositionchange event"));
         return false;
     }
-
-    // We cannot call SetCursorPosition for e10s-aware.
-    // DispatchEvent is async on e10s, so composition rect isn't updated now
-    // on tab parent.
-    mCompositionTargetRange.mOffset = targetOffset;
-    mCompositionTargetRange.mLength =
-        compositionChangeEvent.mRanges->TargetClauseLength();
-
     return true;
 }
 
