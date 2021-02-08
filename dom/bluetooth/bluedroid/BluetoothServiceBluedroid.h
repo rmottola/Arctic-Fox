@@ -285,7 +285,11 @@ public:
                                       uint16_t aNumPackets) override;
 
   virtual void EnergyInfoNotification(
-    const BluetoothActivityEnergyInfo& aInfo) MOZ_OVERRIDE;
+    const BluetoothActivityEnergyInfo& aInfo) override;
+
+  virtual void BackendErrorNotification(bool aCrashed) override;
+
+  virtual void CompleteToggleBt(bool aEnabled) override;
 
 protected:
   static nsresult StartGonkBluetooth();
@@ -512,6 +516,9 @@ public:
 
   virtual void EnergyInfoNotification(
     const BluetoothActivityEnergyInfo& aInfo) override;
+
+  virtual void BackendErrorNotification(bool aCrashed) override;
+  virtual void CompleteToggleBt(bool aEnabled) override;
 
 protected:
   static nsresult StartGonkBluetooth();
