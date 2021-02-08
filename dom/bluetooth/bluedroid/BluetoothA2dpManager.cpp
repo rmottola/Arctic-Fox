@@ -278,7 +278,11 @@ BluetoothA2dpManager::ResetAvrcp()
   mMediaNumber = 0;
   mTotalMediaCount = 0;
   mPosition = 0;
+#ifdef MOZ_B2G_BT_API_V2
+  mPlayStatus = ControlPlayStatus::PLAYSTATUS_UNKNOWN;
+#else
   mPlayStatus = ControlPlayStatus::PLAYSTATUS_STOPPED;
+#endif
 }
 
 /*
@@ -895,6 +899,9 @@ BluetoothA2dpManager::UpdateRegisterNotification(BluetoothAvrcpEvent aEvent,
       }
       mPlaybackInterval = aParam;
       break;
+#ifdef MOZ_B2G_BT_API_V2
+      // Missing in bluetooth2
+#else
     case AVRCP_EVENT_APP_SETTINGS_CHANGED:
       mAppSettingsChangedNotifyType = AVRCP_NTF_INTERIM;
       param.mNumAttr = 2;
@@ -903,6 +910,7 @@ BluetoothA2dpManager::UpdateRegisterNotification(BluetoothAvrcpEvent aEvent,
       param.mIds[1] = AVRCP_PLAYER_ATTRIBUTE_SHUFFLE;
       param.mValues[1] = AVRCP_PLAYER_VAL_OFF_SHUFFLE;
       break;
+#endif
     default:
       break;
   }
@@ -1018,10 +1026,15 @@ BluetoothA2dpManager::GetPlayStatusNotification()
     return;
   }
 
+#ifdef MOZ_B2G_BT_API_V2
+  bs->DistributeSignal(NS_LITERAL_STRING(REQUEST_MEDIA_PLAYSTATUS_ID),
+                       NS_LITERAL_STRING(KEY_ADAPTER));
+#else
   bs->DistributeSignal(
     BluetoothSignal(NS_LITERAL_STRING(REQUEST_MEDIA_PLAYSTATUS_ID),
                     NS_LITERAL_STRING(KEY_ADAPTER),
                     InfallibleTArray<BluetoothNamedValue>()));
+#endif
 }
 
 /* Player application settings is optional for AVRCP 1.3. B2G
