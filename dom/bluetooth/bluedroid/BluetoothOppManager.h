@@ -48,7 +48,6 @@ public:
 
   static const int MAX_PACKET_LENGTH = 0xFFFE;
 
-  virtual ~BluetoothOppManager();
   static BluetoothOppManager* Get();
   void ClientDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
   void ServerDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
@@ -69,6 +68,9 @@ public:
   void ExtractPacketHeaders(const ObexHeaderSet& aHeader);
   bool ExtractBlobHeaders();
   void CheckPutFinal(uint32_t aNumRead);
+
+protected:
+  virtual ~BluetoothOppManager();
 
 private:
   BluetoothOppManager();

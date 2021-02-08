@@ -72,7 +72,8 @@ IsSupportedChld(const int aChld) {
   return (aChld >= 0 && aChld <= 3);
 }
 
-class BluetoothHfpManager::GetVolumeTask final : public nsISettingsServiceCallback
+class BluetoothHfpManager::GetVolumeTask final
+  : public nsISettingsServiceCallback
 {
 public:
   NS_DECL_ISUPPORTS
@@ -102,6 +103,9 @@ public:
     BT_WARNING("Unable to get value for '" AUDIO_VOLUME_BT_SCO_ID "'");
     return NS_OK;
   }
+
+protected:
+  ~GetVolumeTask() { }
 };
 
 class BluetoothHfpManager::CloseScoTask : public Task
