@@ -1304,10 +1304,16 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow
 // us to change everybody to true in the future, when desired.
 pref("browser.tabs.remote.autostart.1", false);
 pref("browser.tabs.remote.autostart.2", true);
+#endif
+
+#ifdef E10S_TESTING_ONLY
+// Enable e10s add-on interposition by default.
+pref("extensions.interposition.enabled", true);
+pref("extensions.interposition.prefetching", true);
 #endif
