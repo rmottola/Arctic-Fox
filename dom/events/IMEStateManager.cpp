@@ -178,7 +178,6 @@ GetNotifyIMEMessageName(IMEMessage aMessage)
 nsIContent* IMEStateManager::sContent = nullptr;
 nsPresContext* IMEStateManager::sPresContext = nullptr;
 bool IMEStateManager::sInstalledMenuKeyboardListener = false;
-bool IMEStateManager::sIsTestingIME = false;
 bool IMEStateManager::sIsGettingNewIMEState = false;
 
 // sActiveIMEContentObserver points to the currently active IMEContentObserver.
@@ -1202,12 +1201,6 @@ IMEStateManager::CreateIMEContentObserver(nsIEditor* aEditor)
       ("ISM:   IMEStateManager::CreateIMEContentObserver() doesn't create "
        "IMEContentObserver because of non-editable IME state"));
     return;
-  }
-
-  static bool sInitializeIsTestingIME = true;
-  if (sInitializeIsTestingIME) {
-    Preferences::AddBoolVarCache(&sIsTestingIME, "test.IME", false);
-    sInitializeIsTestingIME = false;
   }
 
   PR_LOG(sISMLog, PR_LOG_DEBUG,
