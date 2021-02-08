@@ -74,6 +74,7 @@ private:
   BluetoothOppManager();
   bool Init();
   void HandleShutdown();
+  void HandleVolumeStateChanged(nsISupports* aSubject);
 
   void StartFileTransfer();
   void StartSendingNextFile();
