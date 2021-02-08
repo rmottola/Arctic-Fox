@@ -28,10 +28,6 @@ public:
   bool Listen(const nsAString& aServiceName,
               const BluetoothUuid& aServiceUuid,
               int aChannel);
-  inline void Disconnect()
-  {
-    CloseSocket();
-  }
 
   virtual void OnConnectSuccess() override;
   virtual void OnConnectError() override;
