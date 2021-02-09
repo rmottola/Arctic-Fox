@@ -527,6 +527,13 @@ ShimInterfaceInfo::IsBuiltinClass(bool* aRetVal)
 }
 
 NS_IMETHODIMP
+ShimInterfaceInfo::IsMainProcessScriptableOnly(bool* aRetVal)
+{
+    *aRetVal = false;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
 ShimInterfaceInfo::GetParent(nsIInterfaceInfo** aParent)
 {
     *aParent = nullptr;
