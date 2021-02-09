@@ -139,7 +139,7 @@ private:
 
   ~KeyStore();
 
-  void ReceiveSocketData(nsAutoPtr<UnixSocketRawData>& aMessage);
+  void ReceiveSocketData(nsAutoPtr<UnixSocketBuffer>& aMessage);
 
   void OnConnectSuccess(enum SocketType aSocketType);
   void OnConnectError(enum SocketType aSocketType);
@@ -155,10 +155,10 @@ private:
   void ResetHandlerInfo();
   void Listen();
 
-  bool CheckSize(UnixSocketRawData *aMessage, size_t aExpectSize);
-  ResponseCode ReadCommand(UnixSocketRawData *aMessage);
-  ResponseCode ReadLength(UnixSocketRawData *aMessage);
-  ResponseCode ReadData(UnixSocketRawData *aMessage);
+  bool CheckSize(UnixSocketBuffer *aMessage, size_t aExpectSize);
+  ResponseCode ReadCommand(UnixSocketBuffer *aMessage);
+  ResponseCode ReadLength(UnixSocketBuffer *aMessage);
+  ResponseCode ReadData(UnixSocketBuffer *aMessage);
   void SendResponse(ResponseCode response);
   void SendData(const uint8_t *data, int length);
 
