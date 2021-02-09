@@ -47,8 +47,6 @@ private:
 
 private:
   NfcSocketListener* mListener;
-  nsCString mAddress;
-  bool mShutdown;
 };
 
 } // namespace ipc
