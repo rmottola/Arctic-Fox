@@ -1509,6 +1509,7 @@ BluetoothDaemonProtocol::Send(BluetoothDaemonPDU* aPDU, void* aUserData)
   MOZ_ASSERT(mConnection);
   MOZ_ASSERT(aPDU);
 
+  aPDU->SetConsumer(this);
   aPDU->SetUserData(aUserData);
   aPDU->UpdateHeader();
   return mConnection->Send(aPDU); // Forward PDU to command channel
