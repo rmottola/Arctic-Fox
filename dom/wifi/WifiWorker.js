@@ -3549,9 +3549,11 @@ WifiWorker.prototype = {
     }
     let importedCerts = {
       ServerCert: [],
+      UserCert: [],
     };
     let UsageMapping = {
       SERVERCERT: "ServerCert",
+      USERCERT: "UserCert",
     };
 
     while (certListEnum.hasMoreElements()) {
