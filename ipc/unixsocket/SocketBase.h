@@ -263,7 +263,7 @@ public:
    * Queues the internal representation of socket for deletion. Can be called
    * from main thread.
    */
-  virtual void CloseSocket() = 0;
+  virtual void Close() = 0;
 
   /**
    * Callback for socket connect/accept success. Called after connect/accept has

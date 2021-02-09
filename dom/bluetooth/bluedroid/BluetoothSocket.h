@@ -32,7 +32,7 @@ public:
                     const BluetoothUuid& aServiceUuid,
                     int aChannel);
 
-  void CloseSocket() override;
+  void Close() override;
 
   /**
    * Method to be called whenever data is received. This is only called on the
