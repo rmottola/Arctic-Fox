@@ -266,7 +266,6 @@ private:
 };
 
 NfcService::NfcService()
-  : mConsumer(new NfcConsumer(this))
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!gNfcService);
@@ -311,6 +310,8 @@ NfcService::Start(nsINfcGonkEventListener* aListener)
 
   mListener = aListener;
   mHandler = new NfcMessageHandler();
+
+  mConsumer = new NfcConsumer(this);
 
   return NS_OK;
 }
