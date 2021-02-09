@@ -10,6 +10,7 @@
 #define mozilla_ipc_Nfc_h 1
 
 #include <mozilla/ipc/StreamSocket.h>
+#include <mozilla/ipc/UnixSocketConnector.h>
 
 namespace mozilla {
 namespace ipc {
@@ -26,6 +27,23 @@ public:
   virtual void OnConnectSuccess(enum SocketType aSocketType) = 0;
   virtual void OnConnectError(enum SocketType aSocketType) = 0;
   virtual void OnDisconnect(enum SocketType aSocketType) = 0;
+};
+
+class NfcConnector final : public mozilla::ipc::UnixSocketConnector
+{
+public:
+  NfcConnector()
+  { }
+
+  int Create() override;
+  bool CreateAddr(bool aIsServer,
+                  socklen_t& aAddrSize,
+                  sockaddr_any& aAddr,
+                  const char* aAddress) override;
+  bool SetUp(int aFd) override;
+  bool SetUpListenSocket(int aFd) override;
+  void GetSocketAddr(const sockaddr_any& aAddr,
+                     nsAString& aAddrStr) override;
 };
 
 class NfcConsumer final : public mozilla::ipc::StreamSocket
