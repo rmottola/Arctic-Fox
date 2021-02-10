@@ -536,7 +536,7 @@ nsSynthVoiceRegistry::SpeakUtterance(SpeechSynthesisUtterance& aUtterance,
   } else {
     task = new nsSpeechTask(&aUtterance);
     Speak(aUtterance.mText, lang, uri,
-          aUtterance.Rate(), aUtterance.Pitch(), task);
+          aUtterance.Volume(), aUtterance.Rate(), aUtterance.Pitch(), task);
   }
 
   return task.forget();
@@ -546,6 +546,7 @@ void
 nsSynthVoiceRegistry::Speak(const nsAString& aText,
                             const nsAString& aLang,
                             const nsAString& aUri,
+                            const float& aVolume,
                             const float& aRate,
                             const float& aPitch,
                             nsSpeechTask* aTask)
@@ -580,7 +581,7 @@ nsSynthVoiceRegistry::Speak(const nsAString& aText,
     aTask->BindStream(mStream);
   }
 
-  voice->mService->Speak(aText, voice->mUri, aRate, aPitch, aTask);
+  voice->mService->Speak(aText, voice->mUri, aVolume, aRate, aPitch, aTask);
 }
 
 } // namespace dom
