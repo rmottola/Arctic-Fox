@@ -936,7 +936,8 @@ DisableScreenConfigurationNotifications()
 void
 GetCurrentScreenConfiguration(hal::ScreenConfiguration* aScreenConfiguration)
 {
-  *aScreenConfiguration = nsScreenGonk::GetConfiguration();
+  nsRefPtr<nsScreenGonk> screen = nsScreenManagerGonk::GetPrimaryScreen();
+  *aScreenConfiguration = screen->GetConfiguration();
 }
 
 bool
