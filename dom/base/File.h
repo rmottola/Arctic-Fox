@@ -404,7 +404,7 @@ class BlobImplBase : public BlobImpl
 public:
   BlobImplBase(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, int64_t aLastModifiedDate,
-               BlobDirState aDirState)
+               BlobDirState aDirState = BlobDirState::eUnknownIfDir)
     : mIsFile(true)
     , mImmutable(false)
     , mDirState(aDirState)
@@ -758,8 +758,7 @@ public:
 
   // Create as a file
   explicit BlobImplFile(nsIFile* aFile, bool aTemporary = false)
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -772,8 +771,7 @@ public:
   }
 
   BlobImplFile(nsIFile* aFile, indexedDB::FileInfo* aFileInfo)
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(true)
@@ -791,8 +789,7 @@ public:
   // Create as a file
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile)
-    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -804,8 +801,7 @@ public:
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile,
                int64_t aLastModificationDate)
-    : BlobImplBase(aName, aContentType, aLength, aLastModificationDate,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(aName, aContentType, aLength, aLastModificationDate)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -817,8 +813,7 @@ public:
   // Create as a file with custom name
   BlobImplFile(nsIFile* aFile, const nsAString& aName,
                const nsAString& aContentType)
-    : BlobImplBase(aName, aContentType, UINT64_MAX, INT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(aName, aContentType, UINT64_MAX, INT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -835,8 +830,7 @@ public:
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile,
                indexedDB::FileInfo* aFileInfo)
-    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(true)
@@ -861,8 +855,7 @@ public:
 
   // Create as a file to be later initialized
   BlobImplFile()
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
-                   BlobDirState::eUnknownIfDir)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
     , mWholeFile(true)
     , mStoredFile(false)
     , mIsTemporary(false)
