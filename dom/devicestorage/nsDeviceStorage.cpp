@@ -278,9 +278,7 @@ DeviceStorageTypeChecker::Check(const nsAString& aType, Blob* aBlob)
   MOZ_ASSERT(aBlob);
 
   nsString mimeType;
-  if (NS_FAILED(aBlob->GetType(mimeType))) {
-    return false;
-  }
+  aBlob->GetType(mimeType);
 
   if (aType.EqualsLiteral(DEVICESTORAGE_PICTURES)) {
     return StringBeginsWith(mimeType, NS_LITERAL_STRING("image/"));
@@ -2630,12 +2628,18 @@ public:
   {
     MOZ_ASSERT(!NS_IsMainThread());
 
+    ErrorResult rv;
     nsCOMPtr<nsIInputStream> stream;
-    mBlobImpl->GetInternalStream(getter_AddRefs(stream));
+    mBlobImpl->GetInternalStream(getter_AddRefs(stream), rv);
+    if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
+      nsCOMPtr<nsIRunnable> event =
+        new PostErrorEvent(mRequest.forget(), POST_ERROR_EVENT_UNKNOWN);
+      return NS_DispatchToMainThread(event);
+    }
 
     bool check = false;
     mFile->mFile->Exists(&check);
-    nsresult rv;
 
     if (mRequestType == DEVICE_STORAGE_REQUEST_APPEND) {
       if (!check) {
@@ -2652,7 +2656,8 @@ public:
         return NS_DispatchToMainThread(event);
       }
       rv = mFile->Write(stream);
-      if (NS_FAILED(rv)) {
+      if (NS_WARN_IF(rv.Failed())) {
+        rv.SuppressException();
         mFile->mFile->Remove(false);
       }
     } else {
@@ -2661,7 +2666,9 @@ public:
       return NS_DispatchToMainThread(event);
     }
 
-    if (NS_FAILED(rv)) {
+    if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
+
       nsCOMPtr<nsIRunnable> event =
         new PostErrorEvent(mRequest.forget(), POST_ERROR_EVENT_UNKNOWN);
       return NS_DispatchToMainThread(event);

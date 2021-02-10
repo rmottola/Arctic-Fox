@@ -5824,8 +5824,9 @@ public:
 
     nsCOMPtr<nsIInputStream> inputStream;
     if (mBlobImpl) {
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-        mBlobImpl->GetInternalStream(getter_AddRefs(inputStream))));
+      ErrorResult rv;
+      mBlobImpl->GetInternalStream(getter_AddRefs(inputStream), rv);
+      MOZ_ALWAYS_TRUE(!rv.Failed());
     }
 
     return inputStream.forget();

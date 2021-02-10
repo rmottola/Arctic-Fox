@@ -607,9 +607,12 @@ HTMLCanvasElement::ToBlob(JSContext* aCx,
     nsresult ReceiveBlob(already_AddRefed<Blob> aBlob)
     {
       nsRefPtr<Blob> blob = aBlob;
-      uint64_t size;
-      nsresult rv = blob->GetSize(&size);
-      if (NS_SUCCEEDED(rv)) {
+
+      ErrorResult rv;
+      uint64_t size = blob->GetSize(rv);
+      if (rv.Failed()) {
+        rv.SuppressException();
+      } else {
         AutoJSAPI jsapi;
         if (jsapi.Init(mGlobal)) {
           JS_updateMallocCounter(jsapi.cx(), size);
@@ -618,13 +621,12 @@ HTMLCanvasElement::ToBlob(JSContext* aCx,
 
       nsRefPtr<Blob> newBlob = Blob::Create(mGlobal, blob->Impl());
 
-      mozilla::ErrorResult error;
-      mFileCallback->Call(*newBlob, error);
+      mFileCallback->Call(*newBlob, rv);
 
       mGlobal = nullptr;
       mFileCallback = nullptr;
 
-      return error.StealNSResult();
+      return rv.StealNSResult();
     }
 
     nsCOMPtr<nsIGlobalObject> mGlobal;
