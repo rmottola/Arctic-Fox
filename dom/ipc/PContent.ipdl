@@ -270,6 +270,12 @@ struct FileSystemCreateFileParams
   bool replace;
 };
 
+struct FileSystemGetDirectoryListingParams
+{
+  nsString filesystem;
+  nsString realPath;
+};
+
 struct FileSystemGetFileOrDirectoryParams
 {
   nsString filesystem;
@@ -294,6 +300,7 @@ union FileSystemParams
 {
   FileSystemCreateDirectoryParams;
   FileSystemCreateFileParams;
+  FileSystemGetDirectoryListingParams;
   FileSystemGetFileOrDirectoryParams;
   FileSystemRemoveParams;
 };
