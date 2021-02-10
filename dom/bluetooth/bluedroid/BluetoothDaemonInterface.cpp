@@ -2085,7 +2085,7 @@ BluetoothDaemonInterface::Init(
   BluetoothNotificationHandler* aNotificationHandler,
   BluetoothResultHandler* aRes)
 {
-  static const char BASE_SOCKET_NAME[] = "bluetoothd";
+#define BASE_SOCKET_NAME "bluetoothd"
   static unsigned long POSTFIX_LENGTH = 16;
 
   // If we could not cleanup properly before and an old
@@ -2125,7 +2125,7 @@ BluetoothDaemonInterface::Init(
                                           POSTFIX_LENGTH,
                                           mListenSocketName);
   if (NS_FAILED(rv)) {
-    mListenSocketName = BASE_SOCKET_NAME;
+    mListenSocketName.AssignLiteral(BASE_SOCKET_NAME);
   }
 
   bool success = mListenSocket->Listen(
