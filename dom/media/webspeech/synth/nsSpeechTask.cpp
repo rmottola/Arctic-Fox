@@ -457,11 +457,6 @@ nsSpeechTask::Pause()
 {
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
-  if (mUtterance->IsPaused() ||
-      mUtterance->GetState() == SpeechSynthesisUtterance::STATE_ENDED) {
-    return;
-  }
-
   if (mCallback) {
     DebugOnly<nsresult> rv = mCallback->OnPause();
     NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Unable to call onPause() callback");
@@ -469,19 +464,14 @@ nsSpeechTask::Pause()
 
   if (mStream) {
     mStream->ChangeExplicitBlockerCount(1);
+    DispatchPauseImpl(GetCurrentTime(), GetCurrentCharOffset());
   }
-
-  DispatchPauseImpl(GetCurrentTime(), GetCurrentCharOffset());
 }
 
 void
 nsSpeechTask::Resume()
 {
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
-
-  if (!mUtterance->IsPaused()) {
-    return;
-  }
 
   if (mCallback) {
     DebugOnly<nsresult> rv = mCallback->OnResume();
@@ -490,9 +480,8 @@ nsSpeechTask::Resume()
 
   if (mStream) {
     mStream->ChangeExplicitBlockerCount(-1);
+    DispatchResumeImpl(GetCurrentTime(), GetCurrentCharOffset());
   }
-
-  DispatchResumeImpl(GetCurrentTime(), GetCurrentCharOffset());
 }
 
 void
@@ -509,9 +498,8 @@ nsSpeechTask::Cancel()
 
   if (mStream) {
     mStream->ChangeExplicitBlockerCount(1);
+    DispatchEndImpl(GetCurrentTime(), GetCurrentCharOffset());
   }
-
-  DispatchEndImpl(GetCurrentTime(), GetCurrentCharOffset());
 }
 
 float
