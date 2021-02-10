@@ -51,6 +51,18 @@ class BlobImpl;
 class File;
 class OwningArrayBufferOrArrayBufferViewOrBlobOrString;
 
+/**
+ * Used to indicate when a Blob/BlobImpl that was created from an nsIFile
+ * (when IsFile() will return true) was from an nsIFile for which
+ * nsIFile::IsDirectory() returned true. This is a tri-state to enable us to
+ * assert that the state is always set when callers request it.
+ */
+enum BlobDirState : uint32_t {
+  eIsDir,
+  eIsNotDir,
+  eUnknownIfDir
+};
+
 class Blob : public nsIDOMBlob
            , public nsIXHRSendable
            , public nsIMutable
@@ -95,12 +107,21 @@ public:
 
   bool IsFile() const;
 
+  /**
+   * This may return true if the Blob was created from an nsIFile that is a
+   * directory.
+   */
+  bool IsDirectory() const;
+
   const nsTArray<nsRefPtr<BlobImpl>>* GetSubBlobImpls() const;
 
   // This method returns null if this Blob is not a File; it returns
   // the same object in case this Blob already implements the File interface;
   // otherwise it returns a new File object with the same BlobImpl.
   already_AddRefed<File> ToFile();
+
+  // XXXjwatt Consider having a ToDirectory() method. The need for a FileSystem
+  // object complicates that though.
 
   // This method creates a new File object with the given name and the same
   // BlobImpl.
@@ -184,7 +205,7 @@ public:
   static already_AddRefed<File>
   Create(nsISupports* aParent, const nsAString& aName,
          const nsAString& aContentType, uint64_t aLength,
-         int64_t aLastModifiedDate);
+         int64_t aLastModifiedDate, BlobDirState aDirState);
 
   static already_AddRefed<File>
   Create(nsISupports* aParent, const nsAString& aName,
@@ -334,7 +355,8 @@ public:
   virtual void SetLazyData(const nsAString& aName,
                            const nsAString& aContentType,
                            uint64_t aLength,
-                           int64_t aLastModifiedDate) = 0;
+                           int64_t aLastModifiedDate,
+                           BlobDirState aDirState) = 0;
 
   virtual bool IsMemoryFile() const = 0;
 
@@ -343,6 +365,27 @@ public:
   virtual bool IsDateUnknown() const = 0;
 
   virtual bool IsFile() const = 0;
+
+  /**
+   * Called when this BlobImpl was created from an nsIFile in order to call
+   * nsIFile::IsDirectory() and cache the result so that when the BlobImpl is
+   * copied to another process that informaton is available.
+   * nsIFile::IsDirectory() does synchronous I/O, and BlobImpl objects may be
+   * created on the main thread or in a non-chrome process (where I/O is not
+   * allowed). Do not call this on a non-chrome process, and preferably do not
+   * call it on the main thread.
+   *
+   * Not all creators of BlobImplFile will call this method, in which case
+   * calling IsDirectory will MOZ_ASSERT.
+   */
+  virtual void LookupAndCacheIsDirectory() = 0;
+  virtual bool IsDirectory() const = 0;
+
+  /**
+   * Prefer IsDirectory(). This exists to help consumer code pass on state from
+   * one BlobImpl when creating another.
+   */
+  virtual BlobDirState GetDirState() const = 0;
 
   // True if this implementation can be sent to other threads.
   virtual bool MayBeClonedToOtherThreads() const
@@ -360,9 +403,11 @@ class BlobImplBase : public BlobImpl
 {
 public:
   BlobImplBase(const nsAString& aName, const nsAString& aContentType,
-               uint64_t aLength, int64_t aLastModifiedDate)
+               uint64_t aLength, int64_t aLastModifiedDate,
+               BlobDirState aDirState)
     : mIsFile(true)
     , mImmutable(false)
+    , mDirState(aDirState)
     , mContentType(aContentType)
     , mName(aName)
     , mStart(0)
@@ -377,6 +422,7 @@ public:
                uint64_t aLength)
     : mIsFile(true)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mName(aName)
     , mStart(0)
@@ -390,6 +436,7 @@ public:
   BlobImplBase(const nsAString& aContentType, uint64_t aLength)
     : mIsFile(false)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mStart(0)
     , mLength(aLength)
@@ -403,6 +450,7 @@ public:
                uint64_t aLength)
     : mIsFile(false)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mStart(aStart)
     , mLength(aLength)
@@ -471,7 +519,8 @@ public:
 
   virtual void
   SetLazyData(const nsAString& aName, const nsAString& aContentType,
-              uint64_t aLength, int64_t aLastModifiedDate) override
+              uint64_t aLength, int64_t aLastModifiedDate,
+              BlobDirState aDirState) override
   {
     NS_ASSERTION(aLength, "must have length");
 
@@ -495,6 +544,27 @@ public:
   virtual bool IsFile() const override
   {
     return mIsFile;
+  }
+
+  virtual void LookupAndCacheIsDirectory() override
+  {
+    MOZ_ASSERT(false, "Why is this being called on a non-BlobImplFile?");
+  }
+
+  /**
+   * Returns true if the nsIFile that this object wraps is a directory.
+   */
+  virtual bool IsDirectory() const override
+  {
+    MOZ_ASSERT(mDirState != BlobDirState::eUnknownIfDir,
+               "Must only be used by callers for whom the code paths are "
+               "know to call LookupAndCacheIsDirectory()");
+    return mDirState == BlobDirState::eIsDir;
+  }
+
+  virtual BlobDirState GetDirState() const override
+  {
+    return mDirState;
   }
 
   virtual bool IsStoredFile() const
@@ -531,6 +601,7 @@ protected:
 
   bool mIsFile;
   bool mImmutable;
+  BlobDirState mDirState;
 
   nsString mContentType;
   nsString mName;
@@ -556,7 +627,8 @@ public:
 
   BlobImplMemory(void* aMemoryBuffer, uint64_t aLength, const nsAString& aName,
                  const nsAString& aContentType, int64_t aLastModifiedDate)
-    : BlobImplBase(aName, aContentType, aLength, aLastModifiedDate)
+    : BlobImplBase(aName, aContentType, aLength, aLastModifiedDate,
+                   BlobDirState::eIsNotDir)
     , mDataOwner(new DataOwner(aMemoryBuffer, aLength))
   {
     NS_ASSERTION(mDataOwner && mDataOwner->mData, "must have data");
@@ -686,7 +758,8 @@ public:
 
   // Create as a file
   explicit BlobImplFile(nsIFile* aFile, bool aTemporary = false)
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -699,7 +772,8 @@ public:
   }
 
   BlobImplFile(nsIFile* aFile, indexedDB::FileInfo* aFileInfo)
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(true)
@@ -717,7 +791,8 @@ public:
   // Create as a file
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile)
-    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX)
+    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -729,7 +804,8 @@ public:
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile,
                int64_t aLastModificationDate)
-    : BlobImplBase(aName, aContentType, aLength, aLastModificationDate)
+    : BlobImplBase(aName, aContentType, aLength, aLastModificationDate,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -741,7 +817,8 @@ public:
   // Create as a file with custom name
   BlobImplFile(nsIFile* aFile, const nsAString& aName,
                const nsAString& aContentType)
-    : BlobImplBase(aName, aContentType, UINT64_MAX, INT64_MAX)
+    : BlobImplBase(aName, aContentType, UINT64_MAX, INT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(false)
@@ -758,7 +835,8 @@ public:
   BlobImplFile(const nsAString& aName, const nsAString& aContentType,
                uint64_t aLength, nsIFile* aFile,
                indexedDB::FileInfo* aFileInfo)
-    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX)
+    : BlobImplBase(aName, aContentType, aLength, UINT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mFile(aFile)
     , mWholeFile(true)
     , mStoredFile(true)
@@ -783,7 +861,8 @@ public:
 
   // Create as a file to be later initialized
   BlobImplFile()
-    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
+    : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX,
+                   BlobDirState::eUnknownIfDir)
     , mWholeFile(true)
     , mStoredFile(false)
     , mIsTemporary(false)
@@ -804,6 +883,8 @@ public:
                                  ErrorResult& aRv) override;
 
   void SetPath(const nsAString& aFullPath);
+
+  virtual void LookupAndCacheIsDirectory() override;
 
 protected:
   virtual ~BlobImplFile() {
