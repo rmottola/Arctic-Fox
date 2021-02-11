@@ -1175,6 +1175,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
         asmJS_(true),
         nativeRegExp_(true),
         unboxedArrays_(false),
+        asyncStack_(true),
         werror_(false),
         strictMode_(false),
         extraWarnings_(false),
@@ -1224,6 +1225,12 @@ class JS_PUBLIC_API(RuntimeOptions) {
         return *this;
     }
 
+    bool asyncStack() const { return asyncStack_; }
+    RuntimeOptions& setAsyncStack(bool flag) {
+        asyncStack_ = flag;
+        return *this;
+    }
+
     bool werror() const { return werror_; }
     RuntimeOptions& setWerror(bool flag) {
         werror_ = flag;
@@ -1270,6 +1277,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool asmJS_ : 1;
     bool nativeRegExp_ : 1;
     bool unboxedArrays_ : 1;
+    bool asyncStack_ : 1;
     bool werror_ : 1;
     bool strictMode_ : 1;
     bool extraWarnings_ : 1;
