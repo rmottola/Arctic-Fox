@@ -108,7 +108,7 @@ Assert.AssertionError = function(options) {
   // The part of the stack that comes from this module is not interesting.
   let stack = Components.stack;
   do {
-    stack = stack.caller;
+    stack = stack.asyncCaller || stack.caller;
   } while(stack.filename && stack.filename.includes("Assert.jsm"))
   this.stack = stack;
 };
