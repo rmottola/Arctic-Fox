@@ -281,7 +281,6 @@ class JSAPITest
             return nullptr;
         JS_SetErrorReporter(rt, &reportError);
         setNativeStackQuota(rt);
-        JS::RuntimeOptionsRef(rt).setVarObjFix(true);
         return rt;
     }
 
