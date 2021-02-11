@@ -625,9 +625,6 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
 template bool
 js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
-template bool
-js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
-
 /* ES6 (04-25-16) 19.2.3.6 Function.prototype [ @@hasInstance ] */
 bool
 js::fun_symbolHasInstance(JSContext* cx, unsigned argc, Value* vp)
@@ -2095,7 +2092,14 @@ js::NewFunctionWithProto(ExclusiveContext* cx, Native native,
         newKind = SingletonObject;
 #ifdef DEBUG
     RootedObject nonScopeParent(cx, SkipScopeParent(enclosingDynamicScope));
-    MOZ_ASSERT(!nonScopeParent || nonScopeParent == cx->global());
+    // We'd like to assert that nonScopeParent is null-or-global, but
+    // js::ExecuteInGlobalAndReturnScope and debugger eval bits mess that up.
+    // Assert that it's one of those or a debug scope proxy or the unqualified
+    // var obj, since it should still be ok to parent to the global in that
+    // case.
+    MOZ_ASSERT(!nonScopeParent || nonScopeParent == cx->global() ||
+               nonScopeParent->is<DebugScopeObject>() ||
+               nonScopeParent->isUnqualifiedVarObj());
 #endif
     funobj = NewObjectWithClassProto(cx, &JSFunction::class_, proto, allocKind,
                                      newKind);
