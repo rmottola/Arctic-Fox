@@ -110,7 +110,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
 - Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
-- Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
+- Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
+- 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
