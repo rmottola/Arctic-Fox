@@ -1726,10 +1726,10 @@ GetCallbackFromCallbackObject(T& aObj)
 }
 
 static inline bool
-InternJSString(JSContext* cx, jsid& jid, const char* chars)
+InternJSString(JSContext* cx, jsid& id, const char* chars)
 {
   if (JSString *str = ::JS_InternString(cx, chars)) {
-    jid = INTERNED_STRING_TO_JSID(cx, str);
+    id = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
   return false;
@@ -2377,22 +2377,6 @@ AddStringToIDVector(JSContext* cx, JS::AutoIdVector& vector, const char* name)
          InternJSString(cx, *(vector[vector.length() - 1]).address(), name);
 }
 
-// We use one constructor JSNative to represent all DOM interface objects (so
-// we can easily detect when we need to wrap them in an Xray wrapper). We store
-// the real JSNative in the mNative member of a JSNativeHolder in the
-// CONSTRUCTOR_NATIVE_HOLDER_RESERVED_SLOT slot of the JSFunction object for a
-// specific interface object. We also store the NativeProperties in the
-// JSNativeHolder.
-// Note that some interface objects are not yet a JSFunction but a normal
-// JSObject with a DOMJSClass, those do not use these slots.
-
-enum {
-  CONSTRUCTOR_NATIVE_HOLDER_RESERVED_SLOT = 0
-};
-
-bool
-Constructor(JSContext* cx, unsigned argc, JS::Value* vp);
-
 // Implementation of the bits that XrayWrapper needs
 
 /**
@@ -2482,6 +2466,22 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
 }
 
 extern NativePropertyHooks sEmptyNativePropertyHooks;
+
+// We use one constructor JSNative to represent all DOM interface objects (so
+// we can easily detect when we need to wrap them in an Xray wrapper). We store
+// the real JSNative in the mNative member of a JSNativeHolder in the
+// CONSTRUCTOR_NATIVE_HOLDER_RESERVED_SLOT slot of the JSFunction object for a
+// specific interface object. We also store the NativeProperties in the
+// JSNativeHolder.
+// Note that some interface objects are not yet a JSFunction but a normal
+// JSObject with a DOMJSClass, those do not use these slots.
+
+enum {
+  CONSTRUCTOR_NATIVE_HOLDER_RESERVED_SLOT = 0
+};
+
+bool
+Constructor(JSContext* cx, unsigned argc, JS::Value* vp);
 
 inline bool
 UseDOMXray(JSObject* obj)
