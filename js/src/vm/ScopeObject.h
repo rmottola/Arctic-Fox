@@ -1076,7 +1076,7 @@ IsSyntacticScope(JSObject* scope)
             scope->as<DynamicWithObject>().isSyntactic());
 }
 
-inline const Value &
+inline const Value&
 ScopeObject::aliasedVar(ScopeCoordinate sc)
 {
     MOZ_ASSERT(is<CallObject>() || is<ClonedBlockObject>());
