@@ -1371,16 +1371,16 @@ TabChild::Blur()
 }
 
 NS_IMETHODIMP
-TabChild::FocusNextElement()
+TabChild::FocusNextElement(bool aForDocumentNavigation)
 {
-  SendMoveFocus(true);
+  SendMoveFocus(true, aForDocumentNavigation);
   return NS_OK;
 }
 
 NS_IMETHODIMP
-TabChild::FocusPrevElement()
+TabChild::FocusPrevElement(bool aForDocumentNavigation)
 {
-  SendMoveFocus(false);
+  SendMoveFocus(false, aForDocumentNavigation);
   return NS_OK;
 }
 
@@ -2824,6 +2824,24 @@ TabChild::RecvSetIsDocShellActive(const bool& aIsActive)
       docShell->SetIsActive(aIsActive);
     }
     return true;
+}
+
+bool
+TabChild::RecvNavigateDocument(const bool& aForward)
+{
+  nsIFocusManager* fm = nsFocusManager::GetFocusManager();
+  if (fm) {
+    nsCOMPtr<nsIDOMElement> result;
+    nsCOMPtr<nsPIDOMWindow> window = do_GetInterface(WebNavigation());
+
+    // Move to the first or last document.
+    fm->MoveFocus(window, nullptr, aForward ? nsIFocusManager::MOVEFOCUS_FIRSTDOC :
+                                              nsIFocusManager::MOVEFOCUS_LASTDOC,
+                  nsIFocusManager::FLAG_BYKEY, getter_AddRefs(result));
+    SendRequestFocus(false);
+  }
+
+  return true;
 }
 
 PRenderFrameChild*
