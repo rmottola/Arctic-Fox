@@ -12236,7 +12236,7 @@ class CGResolveSystemBinding(CGAbstractMethod):
         jsidInits = CGList(
             (CGIfWrapper(
                 CGGeneric("return false;\n"),
-                '!InternJSString(aCx, %s, "%s")' %
+                '!AtomizeAndPinJSString(aCx, %s, "%s")' %
                 (descNameToId(desc.name), desc.interface.identifier.name))
              for desc in descriptors),
             "\n")
@@ -14576,7 +14576,7 @@ class GlobalGenRoots():
         def memberToAtomCacheMember(binaryNameFor, m):
             binaryMemberName = binaryNameFor(m.identifier.name)
             return ClassMember(CGDictionary.makeIdName(binaryMemberName),
-                               "InternedStringId", visibility="public")
+                               "PinnedStringId", visibility="public")
         def buildAtomCacheStructure(idlobj, binaryNameFor, members):
             classMembers = [memberToAtomCacheMember(binaryNameFor, m)
                             for m in members]
@@ -14622,7 +14622,7 @@ class GlobalGenRoots():
                                  CGWrapper(structs, pre='\n'))
         curr = CGWrapper(curr, post='\n')
 
-        # Add include statement for InternedStringId.
+        # Add include statement for PinnedStringId.
         declareIncludes = ['mozilla/dom/BindingUtils.h']
         curr = CGHeaders([], [], [], [], declareIncludes, [], 'GeneratedAtomList',
                          curr)
@@ -14799,7 +14799,7 @@ class GlobalGenRoots():
                                                             skipGen=False)]
         defineIncludes.append("nsThreadUtils.h") # For NS_IsMainThread
         defineIncludes.append("js/Id.h") # For jsid
-        defineIncludes.append("mozilla/dom/BindingUtils.h") # InternJSString
+        defineIncludes.append("mozilla/dom/BindingUtils.h") # AtomizeAndPinJSString
 
         curr = CGHeaders([], [], [], [], [], defineIncludes,
                          'ResolveSystemBinding', curr)
