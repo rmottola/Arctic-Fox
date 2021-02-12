@@ -1556,9 +1556,9 @@ CallNPMethodInternal(JSContext* cx, JS::Handle<JSObject*> obj, unsigned argc,
     // the function object.
 
     if (npobj->_class->invoke) {
-      JSFunction* fun = ::JS_GetObjectFunction(funobj);
+      JSFunction *fun = ::JS_GetObjectFunction(funobj);
       JS::Rooted<JSString*> funId(cx, ::JS_GetFunctionId(fun));
-      JSString* name = ::JS_InternJSString(cx, funId);
+      JSString *name = ::JS_InternJSString(cx, funId);
       NPIdentifier id = StringToNPIdentifier(cx, name);
 
       ok = npobj->_class->invoke(npobj, id, npargs, argc, &v);

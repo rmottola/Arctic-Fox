@@ -3070,26 +3070,26 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
  */
 class InternedStringId
 {
-  jsid jid;
+  jsid id;
 
  public:
-  InternedStringId() : jid(JSID_VOID) {}
+  InternedStringId() : id(JSID_VOID) {}
 
   bool init(JSContext *cx, const char *string) {
     JSString* str = JS_InternString(cx, string);
     if (!str)
       return false;
-    jid = INTERNED_STRING_TO_JSID(cx, str);
+    id = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
 
   operator const jsid& () {
-    return jid;
+    return id;
   }
 
   operator JS::Handle<jsid> () {
     /* This is safe because we have interned the string. */
-    return JS::Handle<jsid>::fromMarkedLocation(&jid);
+    return JS::Handle<jsid>::fromMarkedLocation(&id);
   }
 };
 
