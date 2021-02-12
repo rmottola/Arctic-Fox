@@ -3492,13 +3492,6 @@ JS_IsConstructor(JSFunction* fun)
     return fun->isConstructor();
 }
 
-JS_PUBLIC_API(JSObject*)
-JS_BindCallable(JSContext* cx, HandleObject target, HandleObject newThis)
-{
-    RootedValue thisArg(cx, ObjectValue(*newThis));
-    return fun_bind(cx, target, thisArg, nullptr, 0);
-}
-
 static bool
 GenericNativeMethodDispatcher(JSContext* cx, unsigned argc, Value* vp)
 {
