@@ -72,6 +72,7 @@
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
+- Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
