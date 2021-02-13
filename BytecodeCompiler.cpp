@@ -211,7 +211,7 @@ BytecodeCompiler::maybeCompressSource()
         } else if (!scriptSource->setSourceCopy(cx, sourceBuffer, sourceArgumentsNotIncluded,
                                                 sourceCompressor))
         {
-            return nullptr;
+            return false;
         }
     }
 
@@ -342,7 +342,7 @@ BytecodeCompiler::handleStatementParseFailure(HandleObject scopeChain, HandleScr
     // Destroying the parse context will destroy its free
     // variables, so check if any deoptimization is needed.
     if (!maybeCheckEvalFreeVariables(evalCaller, scopeChain, parseContext.ref()))
-        return nullptr;
+        return false;
 
     parseContext.reset();
     if (!createParseContext(parseContext, globalsc, staticLevel, script->bindings.numBlockScoped()))
@@ -433,9 +433,23 @@ BytecodeCompiler::maybeSetSourceMapFromOptions()
 bool
 BytecodeCompiler::checkArgumentsWithinEval(JSContext* cx, HandleFunction fun)
 {
+    if (fun->hasRest()) {
+        // It's an error to use |arguments| in a function that has a rest
+        // parameter.
+        parser->report(ParseError, false, nullptr, JSMSG_ARGUMENTS_AND_REST);
+        return false;
+    }
+
+    // Force construction of arguments objects for functions that use
+    // |arguments| within an eval.
     RootedScript script(cx, fun->getOrCreateScript(cx));
     if (!script)
         return false;
+
+    if (script->argumentsHasVarBinding()) {
+        if (!JSScript::argumentsOptimizationFailed(cx, script))
+            return false;
+    }
 
     // It's an error to use |arguments| in a legacy generator expression.
     if (script->isGeneratorExp() && script->isLegacyGenerator()) {
@@ -513,9 +527,15 @@ BytecodeCompiler::initGlobalBindings(ParseContext<FullParseHandler>& pc)
     // scope dynamically via JSOP_DEFFUN/VAR).  They may have block-scoped
     // locals, however, which are allocated to the fixed part of the stack
     // frame.
-    InternalHandle<Bindings*> bindings(script, &script->bindings);
-    return Bindings::initWithTemporaryStorage(cx, bindings, 0, 0, 0,
-                                              pc.blockScopeDepth, 0, 0, nullptr);
+    Rooted<Bindings> bindings(cx, script->bindings);
+    if (!Bindings::initWithTemporaryStorage(cx, &bindings, 0, 0, 0,
+                                            pc.blockScopeDepth, 0, 0, nullptr))
+    {
+        return false;
+    }
+
+    script->bindings = bindings;
+    return true;
 }
 
 void
@@ -823,7 +843,7 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
 // Compile a JS function body, which might appear as the value of an event
 // handler attribute in an HTML <INPUT> tag, or in a Function() constructor.
 static bool
-CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyCompileOptions &options,
+CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyCompileOptions& options,
                     const AutoNameVector& formals, SourceBufferHolder& srcBuf,
                     Handle<ScopeObject*> enclosingStaticScope, GeneratorKind generatorKind)
 {
