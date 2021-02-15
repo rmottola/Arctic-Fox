@@ -80,7 +80,7 @@ testDeclaration(testVar);
 function testGlobal(pattern, input, binding) {
   binding = binding || 'rest';
   return new Function('input',
-    '(' + pattern + ') = input;' +
+    '(' + pattern + ' = input);' +
     'return ' + binding
   )(input);
 }
@@ -90,7 +90,7 @@ function testClosure(pattern, input, binding) {
   binding = binding || 'rest';
   return new Function('input',
     'var ' + binding + '; (function () {' +
-    '(' + pattern + ') = input;' +
+    '(' + pattern + ' = input);' +
     '})();' +
     'return ' + binding
   )(input);
