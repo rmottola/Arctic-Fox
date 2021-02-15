@@ -886,21 +886,6 @@ BluetoothAdapter::HandleDeviceFound(const BluetoothValue& aValue)
 }
 
 void
-BluetoothAdapter::DispatchAttributeEvent(const Sequence<nsString>& aTypes)
-{
-  NS_ENSURE_TRUE_VOID(aTypes.Length());
-
-  BluetoothAttributeEventInit init;
-  init.mAttrs = aTypes;
-
-  nsRefPtr<BluetoothAttributeEvent> event =
-    BluetoothAttributeEvent::Constructor(
-      this, NS_LITERAL_STRING(ATTRIBUTE_CHANGED_ID), init);
-
-  DispatchTrustedEvent(event);
-}
-
-void
 BluetoothAdapter::HandleDevicePaired(const BluetoothValue& aValue)
 {
   MOZ_ASSERT(aValue.type() == BluetoothValue::TArrayOfBluetoothNamedValue);
@@ -968,6 +953,21 @@ BluetoothAdapter::HandleDeviceUnpaired(const BluetoothValue& aValue)
   BluetoothDeviceEventInit init;
   init.mAddress = deviceAddress;
   DispatchDeviceEvent(NS_LITERAL_STRING("deviceunpaired"), init);
+}
+
+void
+BluetoothAdapter::DispatchAttributeEvent(const Sequence<nsString>& aTypes)
+{
+  NS_ENSURE_TRUE_VOID(aTypes.Length());
+
+  BluetoothAttributeEventInit init;
+  init.mAttrs = aTypes;
+
+  nsRefPtr<BluetoothAttributeEvent> event =
+    BluetoothAttributeEvent::Constructor(
+      this, NS_LITERAL_STRING(ATTRIBUTE_CHANGED_ID), init);
+
+  DispatchTrustedEvent(event);
 }
 
 void
