@@ -223,6 +223,13 @@ private:
   void HandlePropertyChanged(const BluetoothValue& aValue);
 
   /**
+   * Handle "DeviceFound" bluetooth signal.
+   *
+   * @param aValue [in] Properties array of the discovered device.
+   */
+  void HandleDeviceFound(const BluetoothValue& aValue);
+
+  /**
    * Handle DEVICE_PAIRED_ID bluetooth signal.
    *
    * @param aValue [in] Properties array of the paired device.
@@ -241,13 +248,6 @@ private:
    *                    - bool      'Paired'
    */
   void HandleDeviceUnpaired(const BluetoothValue& aValue);
-
-  /**
-   * Handle "DeviceFound" bluetooth signal.
-   *
-   * @param aValue [in] Properties array of the discovered device.
-   */
-  void HandleDeviceFound(const BluetoothValue& aValue);
 
   /**
    * Fire BluetoothAttributeEvent to trigger onattributechanged event handler.
