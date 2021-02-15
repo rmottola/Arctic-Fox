@@ -725,8 +725,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node propertyList(YieldHandling yieldHandling, PropListType type);
     Node newPropertyListNode(PropListType type);
 
-    bool checkAndPrepareLexical(bool isConst, const TokenPos &errorPos);
-    Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos &pos);
+    bool checkAndPrepareLexical(bool isConst, const TokenPos& errorPos);
+    Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos& pos);
 
     Node newBindingNode(PropertyName* name, bool functionScope, VarContext varContext = HoistVars);
     bool checkDestructuring(BindData<ParseHandler>* data, Node left);
