@@ -386,6 +386,34 @@ BluetoothServiceBluedroid::StopInternal(BluetoothReplyRunnable* aRunnable)
 //
 
 void
+BluetoothServiceBluedroid::StartLeScanInternal(
+  const nsTArray<nsString>& aServiceUuids,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->StartLeScan(aServiceUuids, aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::StopLeScanInternal(
+  const nsAString& aScanUuid,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->StopLeScan(aScanUuid, aRunnable);
+}
+
+void
 BluetoothServiceBluedroid::ConnectGattClientInternal(
   const nsAString& aAppUuid, const nsAString& aDeviceAddress,
   BluetoothReplyRunnable* aRunnable)
@@ -572,6 +600,15 @@ BluetoothServiceBluedroid::GattClientWriteDescriptorValueInternal(
       NS_NAMED_LITERAL_STRING(errorStr, "Bluetooth is not ready");     \
       DispatchBluetoothReply(runnable, BluetoothValue(), errorStr);    \
       return result;                                                   \
+    }                                                                  \
+  } while(0)
+
+#define ENSURE_BLUETOOTH_IS_READY_VOID(runnable)                       \
+  do {                                                                 \
+    if (!sBtInterface || !IsEnabled()) {                               \
+      NS_NAMED_LITERAL_STRING(errorStr, "Bluetooth is not ready");     \
+      DispatchBluetoothReply(runnable, BluetoothValue(), errorStr);    \
+      return;                                                          \
     }                                                                  \
   } while(0)
 
@@ -1208,13 +1245,12 @@ private:
   BluetoothReplyRunnable* mRunnable;
 };
 
-nsresult
+void
 BluetoothServiceBluedroid::StartDiscoveryInternal(
   BluetoothReplyRunnable* aRunnable)
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  ENSURE_BLUETOOTH_IS_READY(aRunnable, NS_OK);
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
 
 #ifdef MOZ_B2G_BT_API_V2
   sChangeDiscoveryRunnableArray.AppendElement(aRunnable);
@@ -1223,8 +1259,6 @@ BluetoothServiceBluedroid::StartDiscoveryInternal(
 #endif
 
   sBtInterface->StartDiscovery(new StartDiscoveryResultHandler(aRunnable));
-
-  return NS_OK;
 }
 
 class BluetoothServiceBluedroid::CancelDiscoveryResultHandler final
@@ -1307,13 +1341,12 @@ BluetoothServiceBluedroid::FetchUuidsInternal(
 // Missing in bluetooth1
 #endif
 
-nsresult
+void
 BluetoothServiceBluedroid::StopDiscoveryInternal(
   BluetoothReplyRunnable* aRunnable)
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  ENSURE_BLUETOOTH_IS_READY(aRunnable, NS_OK);
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
 
 #ifdef MOZ_B2G_BT_API_V2
   sChangeDiscoveryRunnableArray.AppendElement(aRunnable);
@@ -1322,8 +1355,6 @@ BluetoothServiceBluedroid::StopDiscoveryInternal(
 #endif
 
   sBtInterface->CancelDiscovery(new CancelDiscoveryResultHandler(aRunnable));
-
-  return NS_OK;
 }
 
 class BluetoothServiceBluedroid::SetAdapterPropertyResultHandler final
