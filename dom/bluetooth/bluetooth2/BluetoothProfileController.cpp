@@ -45,7 +45,6 @@ protected:
     mController = nullptr;
   }
 
-private:
   nsRefPtr<BluetoothProfileController> mController;
 };
 
