@@ -20,7 +20,7 @@ interface nsIURI;
 
 typedef unsigned short CSPDirective;
 
-[scriptable, uuid(1bf8394b-2bdd-47ab-9b75-b75a5a37b3e1)]
+[scriptable, uuid(459fe61a-203e-4460-9ced-352a9bd3aa71)]
 interface nsIContentSecurityPolicy : nsISerializable
 {
   /**
@@ -282,5 +282,10 @@ interface nsIContentSecurityPolicy : nsISerializable
 // nsIObserver topic to fire when the policy encounters a violation.
 #define CSP_VIOLATION_TOPIC "csp-on-violate-policy"
 %}
+
+  /**
+   * Returns the CSP in JSON notation.
+   */
+  AString toJSON();
 
 };
