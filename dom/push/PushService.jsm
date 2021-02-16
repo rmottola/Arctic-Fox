@@ -1329,6 +1329,8 @@ this.PushService = {
           aPushRecord.version < aLatestVersion) {
         debug("Version changed, notifying app and updating DB");
         aPushRecord.version = aLatestVersion;
+        aPushRecord.pushCount = aPushRecord.pushCount + 1;
+        aPushRecord.lastPush = new Date().getTime();
         this._notifyApp(aPushRecord);
         this._updatePushRecord(aPushRecord)
           .then(
@@ -1393,6 +1395,9 @@ this.PushService = {
     notification.pushEndpoint = aPushRecord.pushEndpoint;
     notification.version = aPushRecord.version;
     notification.data = "";
+    notification.lastPush = aPushRecord.lastPush;
+    notification.pushCount = aPushRecord.pushCount;
+
     Services.obs.notifyObservers(
       notification,
       "push-notification",
@@ -1533,6 +1538,8 @@ this.PushService = {
       pushEndpoint: data.pushEndpoint,
       pageURL: aPageRecord.pageURL,
       scope: aPageRecord.scope,
+      pushCount: 0,
+      lastPush: 0,
       version: null
     };
 
@@ -1661,7 +1668,9 @@ this.PushService = {
           if (pushRecord) {
             registration = {
               pushEndpoint: pushRecord.pushEndpoint,
-              version: pushRecord.version
+              version: pushRecord.version,
+              lastPush: pushRecord.lastPush,
+              pushCount: pushRecord.pushCount
             };
           }
           resolve(registration);
