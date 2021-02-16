@@ -90,6 +90,7 @@ WEBIDL_FILES = [
     'Crypto.webidl',
     'CSPReport.webidl',
     'CSS.webidl',
+    'CSSLexer.webidl',
     'CSSPrimitiveValue.webidl',
     'CSSRuleList.webidl',
     'CSSStyleDeclaration.webidl',
