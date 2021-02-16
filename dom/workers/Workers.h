@@ -244,6 +244,8 @@ struct WorkerLoadInfo
 
   nsString mServiceWorkerCacheName;
 
+  nsCString mSecurityInfo;
+
   uint64_t mWindowID;
 
   bool mFromWindow;
