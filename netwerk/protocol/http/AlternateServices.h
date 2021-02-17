@@ -67,6 +67,7 @@ public:
   void SetExpiresAt(int32_t val) { mExpiresAt = val; }
   void SetExpired();
   bool RouteEquals(AltSvcMapping *map);
+  bool HTTPS() { return mHttps; }
 
   void GetConnectionInfo(nsHttpConnectionInfo **outCI, nsProxyInfo *pi);
   int32_t TTL();
@@ -94,7 +95,7 @@ private:
 
   bool mValidated;
   bool mRunning;
-  bool mHttps;
+  bool mHttps; // origin is https://
 
   nsCString mNPNToken;
 };
