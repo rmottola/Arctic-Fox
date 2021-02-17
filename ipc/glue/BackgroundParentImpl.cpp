@@ -426,8 +426,10 @@ private:
 class UnregisterServiceWorkerCallback final : public nsRunnable
 {
 public:
-  explicit UnregisterServiceWorkerCallback(const nsString& aScope)
-    : mScope(aScope)
+  UnregisterServiceWorkerCallback(const PrincipalInfo& aPrincipalInfo,
+                                  const nsString& aScope)
+    : mPrincipalInfo(aPrincipalInfo)
+    , mScope(aScope)
   {
     AssertIsInMainProcess();
     AssertIsOnBackgroundThread();
@@ -443,11 +445,13 @@ public:
       dom::ServiceWorkerRegistrar::Get();
     MOZ_ASSERT(service);
 
-    service->UnregisterServiceWorker(NS_ConvertUTF16toUTF8(mScope));
+    service->UnregisterServiceWorker(mPrincipalInfo,
+                                     NS_ConvertUTF16toUTF8(mScope));
     return NS_OK;
   }
 
 private:
+  const PrincipalInfo mPrincipalInfo;
   nsString mScope;
 };
 
@@ -507,7 +511,8 @@ BackgroundParentImpl::RecvRegisterServiceWorker(
   // Basic validation.
   if (aData.scope().IsEmpty() ||
       aData.scriptSpec().IsEmpty() ||
-      aData.principal().type() == PrincipalInfo::TNullPrincipalInfo) {
+      aData.principal().type() == PrincipalInfo::TNullPrincipalInfo ||
+      aData.principal().type() == PrincipalInfo::TSystemPrincipalInfo) {
     return false;
   }
 
@@ -541,12 +546,13 @@ BackgroundParentImpl::RecvUnregisterServiceWorker(
 
   // Basic validation.
   if (aScope.IsEmpty() ||
-      aPrincipalInfo.type() == PrincipalInfo::TNullPrincipalInfo) {
+      aPrincipalInfo.type() == PrincipalInfo::TNullPrincipalInfo ||
+      aPrincipalInfo.type() == PrincipalInfo::TSystemPrincipalInfo) {
     return false;
   }
 
   nsRefPtr<UnregisterServiceWorkerCallback> callback =
-    new UnregisterServiceWorkerCallback(aScope);
+    new UnregisterServiceWorkerCallback(aPrincipalInfo, aScope);
 
   nsRefPtr<ContentParent> parent = BackgroundParent::GetContentParent(this);
 
