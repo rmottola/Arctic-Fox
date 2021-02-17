@@ -1222,7 +1222,7 @@ nsHttpTransaction::Restart()
     mCaps &= ~NS_HTTP_ALLOW_PIPELINING;
     SetPipelinePosition(0);
 
-    if (!mConnInfo->GetAuthenticationHost().IsEmpty()) {
+    if (!mConnInfo->GetRoutedHost().IsEmpty()) {
         MutexAutoLock lock(*nsHttp::GetLock());
         nsRefPtr<nsHttpConnectionInfo> ci;
          mConnInfo->CloneAsDirectRoute(getter_AddRefs(ci));
