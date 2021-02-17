@@ -125,6 +125,12 @@ UDPSocketParent::Init(const IPC::Principal& aPrincipal,
       return false;
     }
   }
+  // We don't have browser actors in xpcshell, and hence can't run automated
+  // tests without this loophole.
+  if (net::UsingNeckoIPCSecurity() && !mFilter && 
+      (!mPrincipal || ContentParent::IgnoreIPCPrincipal())) {
+    return false;
+  }
   return true;
 }
 
@@ -134,13 +140,6 @@ bool
 UDPSocketParent::RecvBind(const UDPAddressInfo& aAddressInfo,
                           const bool& aAddressReuse, const bool& aLoopback)
 {
-  // We don't have browser actors in xpcshell, and hence can't run automated
-  // tests without this loophole.
-  if (net::UsingNeckoIPCSecurity() && !mFilter) {
-    FireInternalError(__LINE__);
-    return true;
-  }
-
   if (NS_FAILED(BindInternal(aAddressInfo.addr(), aAddressInfo.port(), aAddressReuse, aLoopback))) {
     FireInternalError(__LINE__);
     return true;
