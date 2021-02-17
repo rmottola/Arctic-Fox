@@ -741,6 +741,12 @@ nsHttpTransaction::WritePipeSegment(nsIOutputStream *stream,
         trans->SetResponseStart(TimeStamp::Now(), true);
     }
 
+    // Bug 1153929 - add checks to fix windows crash
+    MOZ_ASSERT(trans->mWriter);
+    if (!trans->mWriter) {
+        return NS_ERROR_UNEXPECTED;
+    }
+
     nsresult rv;
     //
     // OK, now let the caller fill this segment with data.
@@ -775,6 +781,12 @@ nsHttpTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
         return NS_SUCCEEDED(mStatus) ? NS_BASE_STREAM_CLOSED : mStatus;
 
     mWriter = writer;
+
+    // Bug 1153929 - add checks to fix windows crash
+    MOZ_ASSERT(mPipeOut);
+    if (!mPipeOut) {
+        return NS_ERROR_UNEXPECTED;
+    }
 
     nsresult rv = mPipeOut->WriteSegments(WritePipeSegment, this, count, countWritten);
 
