@@ -240,7 +240,8 @@ ServiceWorkerContainer::GetScopeForUrl(const nsAString& aUrl,
     return;
   }
 
-  aRv = swm->GetScopeForUrl(aUrl, aScope);
+  aRv = swm->GetScopeForUrl(GetOwner()->GetExtantDoc()->NodePrincipal(),
+                            aUrl, aScope);
 }
 
 // Testing only.
