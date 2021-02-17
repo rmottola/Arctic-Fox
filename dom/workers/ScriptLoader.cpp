@@ -422,6 +422,7 @@ private:
   bool mFailed;
   nsCOMPtr<nsIInputStreamPump> mPump;
   nsCOMPtr<nsIURI> mBaseURI;
+  nsCString mSecurityInfo;
 };
 
 NS_IMPL_ISUPPORTS(CacheScriptLoader, nsIStreamLoaderObserver)
@@ -1046,7 +1047,7 @@ private:
 
   void
   DataReceivedFromCache(uint32_t aIndex, const uint8_t* aString,
-                        uint32_t aStringLen)
+                        uint32_t aStringLen, const nsCString& aSecurityInfo)
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(aIndex < mLoadInfos.Length());
@@ -1074,6 +1075,7 @@ private:
       MOZ_ASSERT(principal);
       nsILoadGroup* loadGroup = mWorkerPrivate->GetLoadGroup();
       MOZ_ASSERT(loadGroup);
+      mWorkerPrivate->SetSecurityInfo(aSecurityInfo);
       // Needed to initialize the principal info. This is fine because
       // the cache principal cannot change, unlike the channel principal.
       mWorkerPrivate->SetPrincipal(principal, loadGroup);
@@ -1427,10 +1429,11 @@ CacheScriptLoader::ResolvedCallback(JSContext* aCx,
 
   nsCOMPtr<nsIInputStream> inputStream;
   response->GetBody(getter_AddRefs(inputStream));
+  mSecurityInfo = response->GetSecurityInfo();
 
   if (!inputStream) {
     mLoadInfo.mCacheStatus = ScriptLoadInfo::Cached;
-    mRunnable->DataReceivedFromCache(mIndex, (uint8_t*)"", 0);
+    mRunnable->DataReceivedFromCache(mIndex, (uint8_t*)"", 0, mSecurityInfo);
     return;
   }
 
@@ -1486,7 +1489,7 @@ CacheScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aCont
 
   mLoadInfo.mCacheStatus = ScriptLoadInfo::Cached;
 
-  mRunnable->DataReceivedFromCache(mIndex, aString, aStringLen);
+  mRunnable->DataReceivedFromCache(mIndex, aString, aStringLen, mSecurityInfo);
   return NS_OK;
 }
 
