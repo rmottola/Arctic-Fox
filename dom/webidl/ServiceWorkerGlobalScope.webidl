@@ -13,14 +13,8 @@
 [Global=(Worker,ServiceWorker),
  Exposed=ServiceWorker]
 interface ServiceWorkerGlobalScope : WorkerGlobalScope {
-  // FIXME(nsm): Bug 982725
-  // readonly attribute CacheList caches;
-
   readonly attribute Clients clients;
   readonly attribute ServiceWorkerRegistration registration;
-
-  // FIXME(nsm): Bug 995484
-  // ResponsePromise<any> fetch((Request or [EnsureUTF16] DOMString) request);
 
   attribute EventHandler oninstall;
   attribute EventHandler onactivate;
