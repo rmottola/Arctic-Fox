@@ -19,8 +19,6 @@ interface ServiceWorkerGlobalScope : WorkerGlobalScope {
   readonly attribute Clients clients;
   readonly attribute ServiceWorkerRegistration registration;
 
-  [Unforgeable] readonly attribute DOMString scope;
-
   // FIXME(nsm): Bug 995484
   // ResponsePromise<any> fetch((Request or [EnsureUTF16] DOMString) request);
 
