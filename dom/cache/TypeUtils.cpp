@@ -315,7 +315,7 @@ TypeUtils::ToCacheResponseWithoutBody(CacheResponse& aOut,
   }
   ToHeadersEntryList(aOut.headers(), headers);
   aOut.headersGuard() = headers->Guard();
-  aOut.securityInfo() = aIn.GetSecurityInfo();
+  aOut.channelInfo() = aIn.GetChannelInfo().AsIPCChannelInfo();
 }
 
 void
@@ -381,7 +381,7 @@ TypeUtils::ToResponse(const CacheResponse& aIn)
   ir->Headers()->Fill(*internalHeaders, result);
   MOZ_ASSERT(!result.Failed());
 
-  ir->SetSecurityInfo(aIn.securityInfo());
+  ir->InitChannelInfo(aIn.channelInfo());
 
   nsCOMPtr<nsIInputStream> stream = ReadStream::Create(aIn.body());
   ir->SetBody(stream);
