@@ -352,7 +352,6 @@ TypeUtils::ToCacheQueryParams(CacheQueryParams& aOut,
   aOut.ignoreSearch() = aIn.mIgnoreSearch;
   aOut.ignoreMethod() = aIn.mIgnoreMethod;
   aOut.ignoreVary() = aIn.mIgnoreVary;
-  aOut.prefixMatch() = aIn.mPrefixMatch;
   aOut.cacheNameSet() = aIn.mCacheName.WasPassed();
   if (aOut.cacheNameSet()) {
     aOut.cacheName() = aIn.mCacheName.Value();

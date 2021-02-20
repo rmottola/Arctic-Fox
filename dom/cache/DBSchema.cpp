@@ -532,7 +532,7 @@ CachePut(mozIStorageConnection* aConn, CacheId aCacheId,
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(aConn);
 
-  CacheQueryParams params(false, false, false, false, false,
+  CacheQueryParams params(false, false, false, false,
                            NS_LITERAL_STRING(""));
   nsAutoTArray<EntryId, 256> matches;
   nsresult rv = QueryCache(aConn, aCacheId, aRequest, params, matches);
@@ -864,13 +864,7 @@ QueryCache(mozIStorageConnection* aConn, CacheId aCacheId,
     query.AppendLiteral("request_url");
   }
 
-  if (aParams.prefixMatch()) {
-    query.AppendLiteral(" LIKE ?2 ESCAPE '\\'");
-  } else {
-    query.AppendLiteral("=?2");
-  }
-
-  query.AppendLiteral(" GROUP BY entries.id ORDER BY entries.id;");
+  query.AppendLiteral("=?2 GROUP BY entries.id ORDER BY entries.id;");
 
   nsCOMPtr<mozIStorageStatement> state;
   nsresult rv = aConn->CreateStatement(query, getter_AddRefs(state));
@@ -878,14 +872,6 @@ QueryCache(mozIStorageConnection* aConn, CacheId aCacheId,
 
   rv = state->BindInt64Parameter(0, aCacheId);
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
-
-  if (aParams.prefixMatch()) {
-    nsAutoString escapedUrlToMatch;
-    rv = state->EscapeStringForLIKE(urlToMatch, '\\', escapedUrlToMatch);
-    if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
-    urlToMatch = escapedUrlToMatch;
-    urlToMatch.AppendLiteral("%");
-  }
 
   rv = state->BindStringParameter(1, urlToMatch);
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
