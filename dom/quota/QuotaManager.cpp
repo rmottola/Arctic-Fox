@@ -4879,7 +4879,9 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
         return;
       }
 
-      mState = eExpectingDriveLetterOrPathnameComponent;
+      mState =
+        mTokenizer.hasMoreTokens() ? eExpectingDriveLetterOrPathnameComponent
+                                   : eComplete;
 
       return;
     }
@@ -4997,7 +4999,7 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
 void
 OriginParser::HandleTrailingSeparator()
 {
-  MOZ_ASSERT(mState = eComplete);
+  MOZ_ASSERT(mState == eComplete);
   MOZ_ASSERT(mSchemaType == eFile);
 
   mPathnameComponents.AppendElement(EmptyCString());
