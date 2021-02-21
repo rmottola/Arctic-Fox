@@ -13,6 +13,7 @@
 - 1472018 - Limit the lock scope in WebCryptoThreadPool::Shutdown.
 - Bug 1464751 2018-05-28 If there is no JIT, there should be no JIT signal handlers
 - 1469309 - Remove an unused sensor type
+- Bug 1420092 -2017-11-23 - Don't always enable mozjemalloc by default when building the js engine. r=njn
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
 - 1412081 - Call KillClearOnShutdown(ShutdownPhase::ShutdownFinal)
@@ -46,6 +47,7 @@
 - Bug 1159751: Ensure WARP can never be used for Windows 7. r=milan 
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- 1114580 - toStringTag - several diffs still to analyze
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
@@ -106,6 +108,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
 - Bug 1184443 - Make async ExitFullscreen call ask the window to exi
 - Bug 1184201 - Disable fullscreen transition on Windows
+- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
@@ -159,26 +162,14 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1148026 - Add a skeleton of the login fill doorhange
 - 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
 - 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
-- 1163423 - 2015-05-12 JS_HasOwnProperty
-- 1142669 part 6 - Don't inline scripts that are known to inline a
-- 1141862 - 2015-04-03 : 6 parts
-- 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
-- 1114580 - toStringTag - several diffs still to analyze
-- 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
-- 1041586 - Implement Symbol.isConcatSpreadable
-- 1041586 - Autogenerate symbol names
 - Bug 1242578
 - Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
-- Bug 1165515 - Part 1: Convert PR_LOG to MOZ_LOG. r=froydnj
-- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
 - Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1162986
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
-
-https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
 
 impacting download and shutdown:
@@ -188,7 +179,6 @@ Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
 Mac Specific
-- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
 SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
