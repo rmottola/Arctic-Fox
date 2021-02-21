@@ -2884,34 +2884,34 @@ JS_DefinePropertyById(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
                       JS::Handle<JSPropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(JSObject *)
-JS_DefineObject(JSContext *cx, JS::HandleObject obj, const char *name,
-                const JSClass *clasp = nullptr, unsigned attrs = 0);
+JS_DefineObject(JSContext* cx, JS::HandleObject obj, const char* name,
+                const JSClass* clasp = nullptr, unsigned attrs = 0);
 
 extern JS_PUBLIC_API(bool)
-JS_DefineConstDoubles(JSContext *cx, JS::HandleObject obj, const JSConstDoubleSpec *cds);
+JS_DefineConstDoubles(JSContext* cx, JS::HandleObject obj, const JSConstDoubleSpec* cds);
 
 extern JS_PUBLIC_API(bool)
-JS_DefineConstIntegers(JSContext *cx, JS::HandleObject obj, const JSConstIntegerSpec *cis);
+JS_DefineConstIntegers(JSContext* cx, JS::HandleObject obj, const JSConstIntegerSpec* cis);
 
 extern JS_PUBLIC_API(bool)
-JS_DefineProperties(JSContext *cx, JS::HandleObject obj, const JSPropertySpec *ps);
+JS_DefineProperties(JSContext* cx, JS::HandleObject obj, const JSPropertySpec* ps);
 
 
 /* * */
 
 extern JS_PUBLIC_API(bool)
-JS_AlreadyHasOwnProperty(JSContext *cx, JS::HandleObject obj, const char *name,
-                         bool *foundp);
+JS_AlreadyHasOwnProperty(JSContext* cx, JS::HandleObject obj, const char* name,
+                         bool* foundp);
 
 extern JS_PUBLIC_API(bool)
-JS_AlreadyHasOwnPropertyById(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                             bool *foundp);
+JS_AlreadyHasOwnPropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                             bool* foundp);
 
 extern JS_PUBLIC_API(bool)
-JS_HasProperty(JSContext *cx, JS::HandleObject obj, const char *name, bool *foundp);
+JS_HasProperty(JSContext* cx, JS::HandleObject obj, const char* name, bool* foundp);
 
 extern JS_PUBLIC_API(bool)
-JS_HasPropertyById(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool *foundp);
+JS_HasPropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 
 
 extern JS_PUBLIC_API(bool)
@@ -2923,7 +2923,7 @@ JS_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char* nam
                             JS::MutableHandle<JSPropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
-JS_GetOwnUCPropertyDescriptor(JSContext *cx, JS::HandleObject obj, const char16_t *name,
+JS_GetOwnUCPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char16_t* name,
                               JS::MutableHandle<JSPropertyDescriptor> desc);
 
 /*
@@ -2956,21 +2956,21 @@ extern JS_PUBLIC_API(bool)
 JS_SetPropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v);
 
 extern JS_PUBLIC_API(bool)
-JS_ForwardSetPropertyTo(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v,
+JS_ForwardSetPropertyTo(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v,
                         JS::HandleValue receiver, JS::ObjectOpResult &result);
 
 extern JS_PUBLIC_API(bool)
 JS_DeleteProperty(JSContext* cx, JS::HandleObject obj, const char* name);
 
 extern JS_PUBLIC_API(bool)
-JS_DeleteProperty(JSContext *cx, JS::HandleObject obj, const char *name,
+JS_DeleteProperty(JSContext* cx, JS::HandleObject obj, const char* name,
                   JS::ObjectOpResult &result);
 
 extern JS_PUBLIC_API(bool)
 JS_DeletePropertyById(JSContext* cx, JS::HandleObject obj, jsid id);
 
 extern JS_PUBLIC_API(bool)
-JS_DeletePropertyById(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+JS_DeletePropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                       JS::ObjectOpResult &result);
 
 extern JS_PUBLIC_API(bool)
@@ -3004,12 +3004,12 @@ JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, s
                     JSNative getter = nullptr, JSNative setter = nullptr);
 
 extern JS_PUBLIC_API(bool)
-JS_DefineUCProperty(JSContext *cx, JS::HandleObject obj, const char16_t *name, size_t namelen,
+JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
                     JS::Handle<JSPropertyDescriptor> desc,
                     JS::ObjectOpResult &result);
 
 extern JS_PUBLIC_API(bool)
-JS_DefineUCProperty(JSContext *cx, JS::HandleObject obj, const char16_t *name, size_t namelen,
+JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
                     JS::Handle<JSPropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
@@ -3032,7 +3032,7 @@ JS_SetUCProperty(JSContext* cx, JS::HandleObject obj,
                  JS::HandleValue v);
 
 extern JS_PUBLIC_API(bool)
-JS_DeleteUCProperty(JSContext *cx, JS::HandleObject obj, const char16_t *name, size_t namelen,
+JS_DeleteUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
                     JS::ObjectOpResult &result);
 
 extern JS_PUBLIC_API(JSObject*)
@@ -3109,16 +3109,16 @@ extern JS_PUBLIC_API(bool)
 JS_SetElement(JSContext* cx, JS::HandleObject obj, uint32_t index, int32_t v);
 
 extern JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, JS::HandleObject obj, uint32_t index, uint32_t v);
+JS_SetElement(JSContext* cx, JS::HandleObject obj, uint32_t index, uint32_t v);
 
 extern JS_PUBLIC_API(bool)
-JS_SetElement(JSContext *cx, JS::HandleObject obj, uint32_t index, double v);
+JS_SetElement(JSContext* cx, JS::HandleObject obj, uint32_t index, double v);
 
 extern JS_PUBLIC_API(bool)
-JS_DeleteElement(JSContext *cx, JS::HandleObject obj, uint32_t index);
+JS_DeleteElement(JSContext* cx, JS::HandleObject obj, uint32_t index);
 
 extern JS_PUBLIC_API(bool)
-JS_DeleteElement(JSContext *cx, JS::HandleObject obj, uint32_t index, JS::ObjectOpResult &result);
+JS_DeleteElement(JSContext* cx, JS::HandleObject obj, uint32_t index, JS::ObjectOpResult &result);
 
 /*
  * Assign 'undefined' to all of the object's non-reserved slots. Note: this is
