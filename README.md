@@ -25,11 +25,8 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
 * The built package will be in /obj_blah_blah/dist 
 
 
-* To Build on Linux
-* GCC is supported up to version gcc 6.5, later versions show linking issues
-
 * To Build On FreeBSD
-* use clang 6 from ports
+* Up to 12.1 compilation fine with Clang and GCC. On 12.2 clang fails to build, GCC completes, but binary unstable and fails to package
 
 * To Build on OpenBSD
 * latest clang tried (8.0) needs -O0 or it will generate a crashing binary
@@ -37,7 +34,7 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
 * add TAR=gtar
 
 * To Build on NetBSD
-* every gcc version tested worked, system one being OK up to gcc8! compared to Linux, no issues
+* every gcc version tested worked, system one being OK up to gcc8! compared to Linux
 
 If you are under memory pressure, try:
 * use -g0 in your optimization flags (removes debug information, greatly reducing file sizes)
@@ -45,9 +42,9 @@ If you are under memory pressure, try:
 ## What has been removed compared to FireFox?
 * translation support through translations services
 * social panel
-* WebRTC
 * Android support
 * metro support
+* EME
 
 ## Resources
 
