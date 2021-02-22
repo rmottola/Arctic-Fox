@@ -1931,7 +1931,7 @@ MaybeRemoveCorruptDirectory(const nsAString& aLeafName, nsIFile* aDir)
 
   return true;
 #else
-  return false
+  return false;
 #endif // NIGHTLY_BUILD
 }
 
