@@ -3284,7 +3284,7 @@ BlobChild::AssertIsOnOwningThread() const
 void
 BlobChild::Startup(const FriendKey& /* aKey */)
 {
-  MOZ_ASSERT(XRE_GetProcessType() != GeckoProcessType_Default);
+  MOZ_ASSERT(!XRE_IsParentProcess());
 
   CommonStartup();
 }
@@ -3812,7 +3812,7 @@ BlobParent::AssertIsOnOwningThread() const
 void
 BlobParent::Startup(const FriendKey& /* aKey */)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   CommonStartup();
 

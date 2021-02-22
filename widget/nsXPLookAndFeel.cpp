@@ -457,7 +457,7 @@ nsXPLookAndFeel::Init()
     sUseNativeColors = val;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     mozilla::dom::ContentChild* cc =
       mozilla::dom::ContentChild::GetSingleton();
 

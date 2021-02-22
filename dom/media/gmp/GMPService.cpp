@@ -104,7 +104,7 @@ private:
     MOZ_ASSERT(NS_IsMainThread());
 
     if (!sSingletonService) {
-      if (XRE_GetProcessType() == GeckoProcessType_Default) {
+      if (XRE_IsParentProcess()) {
         nsRefPtr<GeckoMediaPluginServiceParent> service =
           new GeckoMediaPluginServiceParent();
         service->Init();

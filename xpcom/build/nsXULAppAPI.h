@@ -395,6 +395,9 @@ XRE_API(GeckoProcessType,
 XRE_API(bool,
         XRE_IsParentProcess, ())
 
+XRE_API(bool,
+        XRE_IsContentProcess, ())
+
 typedef void (*MainFunction)(void* aData);
 
 XRE_API(nsresult,
