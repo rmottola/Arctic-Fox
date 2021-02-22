@@ -239,7 +239,7 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
     if (mainProcessScriptableOnly && XRE_GetProcessType() != GeckoProcessType_Default) {
         nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
         if (console) {
-            char *intfNameChars;
+            char* intfNameChars;
             aInfo->GetName(&intfNameChars);
             nsPrintfCString errorMsg("Use of %s in content process is deprecated.", intfNameChars);
 
