@@ -5585,8 +5585,6 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-using DirectoryLock = mozilla::dom::quota::QuotaManager::DirectoryLock;
-
 class UnlockDirectoryRunnable final
   : public nsRunnable
 {
