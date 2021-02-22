@@ -1495,6 +1495,7 @@ AsyncPanZoomController::AllowScrollHandoffInWheelTransaction() const
 nsEventStatus AsyncPanZoomController::OnScrollWheel(const ScrollWheelInput& aEvent)
 {
   LayoutDevicePoint delta = GetScrollWheelDelta(aEvent);
+  APZC_LOG("%p got a scroll-wheel with delta %s\n", this, Stringify(delta).c_str());
 
   if ((delta.x || delta.y) &&
       !CanScrollWithWheel(delta) &&
