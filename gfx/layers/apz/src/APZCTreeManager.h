@@ -435,6 +435,7 @@ private:
   void UpdateWheelTransaction(WidgetInputEvent& aEvent);
   void UpdateZoomConstraintsRecursively(HitTestingTreeNode* aNode,
                                         const ZoomConstraints& aConstraints);
+  void FlushRepaintsToClearScreenToGeckoTransform();
   void FlushRepaintsRecursively(HitTestingTreeNode* aNode);
 
   already_AddRefed<HitTestingTreeNode> RecycleOrCreateNode(TreeBuildingState& aState,
