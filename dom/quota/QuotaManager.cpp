@@ -668,9 +668,8 @@ class MOZ_STACK_CLASS OriginParser final
     eExpectingEmptyToken3,
     eExpectingHost,
     eExpectingPort,
-    eExpectingDriveLetterOrPathnameComponent,
+    eExpectingEmptyTokenOrDriveLetterOrPathnameComponent,
     eExpectingEmptyTokenOrPathnameComponent,
-    eExpectingPathnameComponent,
     eComplete,
     eHandledTrailingSeparator
   };
@@ -4989,14 +4988,14 @@ void
 OriginParser::HandlePathnameComponent(const nsDependentCSubstring& aToken)
 {
   MOZ_ASSERT(!aToken.IsEmpty());
-  MOZ_ASSERT(mState == eExpectingDriveLetterOrPathnameComponent ||
-             mState == eExpectingEmptyTokenOrPathnameComponent ||
-             mState == eExpectingPathnameComponent);
+  MOZ_ASSERT(mState == eExpectingEmptyTokenOrDriveLetterOrPathnameComponent ||
+             mState == eExpectingEmptyTokenOrPathnameComponent);
   MOZ_ASSERT(mSchemaType == eFile);
 
   mPathnameComponents.AppendElement(aToken);
 
-  mState = mTokenizer.hasMoreTokens() ? eExpectingPathnameComponent : eComplete;
+  mState = mTokenizer.hasMoreTokens() ? eExpectingEmptyTokenOrPathnameComponent
+                                      : eComplete;
 }
 
 void
@@ -5108,9 +5107,9 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
         return;
       }
 
-      mState =
-        mTokenizer.hasMoreTokens() ? eExpectingDriveLetterOrPathnameComponent
-                                   : eComplete;
+      mState = mTokenizer.hasMoreTokens()
+                 ? eExpectingEmptyTokenOrDriveLetterOrPathnameComponent
+                 : eComplete;
 
       return;
     }
@@ -5159,14 +5158,16 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
       return;
     }
 
-    case eExpectingDriveLetterOrPathnameComponent: {
+    case eExpectingEmptyTokenOrDriveLetterOrPathnameComponent: {
       MOZ_ASSERT(mSchemaType == eFile);
 
       if (aToken.IsEmpty()) {
-        QM_WARNING("Expected a drive letter or pathname component "
-                   "(not an empty string)!");
+        mPathnameComponents.AppendElement(EmptyCString());
 
-        mError = true;
+        mState =
+          mTokenizer.hasMoreTokens() ? eExpectingEmptyTokenOrPathnameComponent
+                                     : eComplete;
+
         return;
       }
 
@@ -5190,28 +5191,22 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
     case eExpectingEmptyTokenOrPathnameComponent: {
       MOZ_ASSERT(mSchemaType == eFile);
 
-      if (mMaybeDriveLetter && aToken.IsEmpty()) {
-        MOZ_ASSERT(mPathnameComponents.Length() == 1);
-
-        nsCString& pathnameComponent = mPathnameComponents[0];
-        pathnameComponent.Append(':');
-
-        mState = mTokenizer.hasMoreTokens() ? eExpectingPathnameComponent
-                                            : eComplete;
-
-        return;
-      }
-
-      HandlePathnameComponent(aToken);
-
-      return;
-    }
-
-    case eExpectingPathnameComponent: {
       if (aToken.IsEmpty()) {
-        QM_WARNING("Expected a pathname component (not an empty string)!");
+        if (mMaybeDriveLetter) {
+          MOZ_ASSERT(mPathnameComponents.Length() == 1);
 
-        mError = true;
+          nsCString& pathnameComponent = mPathnameComponents[0];
+          pathnameComponent.Append(':');
+
+          mMaybeDriveLetter = false;
+        } else {
+          mPathnameComponents.AppendElement(EmptyCString());
+        }
+
+        mState =
+          mTokenizer.hasMoreTokens() ? eExpectingEmptyTokenOrPathnameComponent
+                                     : eComplete;
+
         return;
       }
 
