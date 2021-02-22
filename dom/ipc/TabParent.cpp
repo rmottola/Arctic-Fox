@@ -1093,6 +1093,14 @@ TabParent::NotifyMouseScrollTestEvent(const ViewID& aScrollId, const nsString& a
 }
 
 void
+TabParent::NotifyFlushComplete()
+{
+  if (!mIsDestroyed) {
+    unused << SendNotifyFlushComplete();
+  }
+}
+
+void
 TabParent::Activate()
 {
   if (!mIsDestroyed) {
