@@ -11580,10 +11580,6 @@ Factory::Create(const LoggingInfo& aLoggingInfo)
 
   // If this is the first instance then we need to do some initialization.
   if (!sFactoryInstanceCount) {
-    if (!gConnectionPool) {
-      gConnectionPool = new ConnectionPool();
-    }
-
     MOZ_ASSERT(!gLiveDatabaseHashtable);
     gLiveDatabaseHashtable = new DatabaseActorHashtable();
 
@@ -12415,6 +12411,10 @@ Database::RecvPBackgroundIDBTransactionConstructor(
     // This is an expected race. We don't want the child to die here, just don't
     // actually do any work.
     return true;
+  }
+
+  if (!gConnectionPool) {
+    gConnectionPool = new ConnectionPool();
   }
 
   auto* transaction = static_cast<NormalTransaction*>(aActor);
@@ -18308,6 +18308,10 @@ OpenDatabaseOp::DispatchToWorkThread()
 
   if (NS_WARN_IF(!mDatabase->RegisterTransaction(mVersionChangeTransaction))) {
     return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  if (!gConnectionPool) {
+    gConnectionPool = new ConnectionPool();
   }
 
   nsRefPtr<VersionChangeOp> versionChangeOp = new VersionChangeOp(this);
