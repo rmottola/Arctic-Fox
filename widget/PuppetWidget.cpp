@@ -135,9 +135,7 @@ PuppetWidget::InitIMEState()
 {
   MOZ_ASSERT(mTabChild);
   if (mNeedIMEStateInit) {
-    uint32_t chromeSeqno;
-    mTabChild->SendNotifyIMEFocus(false, &mIMEPreferenceOfParent, &chromeSeqno);
-    mIMELastBlurSeqno = mIMELastReceivedSeqno = chromeSeqno;
+    mTabChild->SendNotifyIMEFocus(false, &mIMEPreferenceOfParent);
     mNeedIMEStateInit = false;
   }
 }
@@ -310,24 +308,6 @@ PuppetWidget::DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus)
   }
 
   aStatus = nsEventStatus_eIgnore;
-
-  uint32_t seqno = kLatestSeqno;
-  switch (event->mClass) {
-  case eCompositionEventClass:
-    seqno = event->AsCompositionEvent()->mSeqno;
-    break;
-  case eSelectionEventClass:
-    seqno = event->AsSelectionEvent()->mSeqno;
-    break;
-  default:
-    break;
-  }
-  if (seqno != kLatestSeqno) {
-    mIMELastReceivedSeqno = seqno;
-    if (mIMELastReceivedSeqno < mIMELastBlurSeqno) {
-      return NS_OK;
-    }
-  }
 
   if (mAttachedWidgetListener) {
     aStatus = mAttachedWidgetListener->HandleEvent(event, mUseAttachedEvents);
@@ -599,7 +579,6 @@ PuppetWidget::IMEEndComposition(bool aCancel)
     return NS_OK;
   }
 
-  compositionCommitEvent.mSeqno = mIMELastReceivedSeqno;
   DispatchEvent(&compositionCommitEvent, status);
   return NS_OK;
 }
@@ -716,10 +695,8 @@ PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
     }
   }
 
-  uint32_t chromeSeqno;
   mIMEPreferenceOfParent = nsIMEUpdatePreference();
-  if (!mTabChild->SendNotifyIMEFocus(aFocus, &mIMEPreferenceOfParent,
-                                     &chromeSeqno)) {
+  if (!mTabChild->SendNotifyIMEFocus(aFocus, &mIMEPreferenceOfParent)) {
     return NS_ERROR_FAILURE;
   }
 
@@ -728,8 +705,6 @@ PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
     notification.mSelectionChangeData.mCausedByComposition = false;
     NotifyIMEOfSelectionChange(notification); // Update selection
     NotifyIMEOfEditorRect();
-  } else {
-    mIMELastBlurSeqno = chromeSeqno;
   }
   return NS_OK;
 }
@@ -914,7 +889,6 @@ PuppetWidget::NotifyIMEOfSelectionChange(
     return NS_ERROR_FAILURE;
 
   mTabChild->SendNotifyIMESelection(
-    mIMELastReceivedSeqno,
     aIMENotification.mSelectionChangeData.StartOffset(),
     aIMENotification.mSelectionChangeData.EndOffset(),
     aIMENotification.mSelectionChangeData.GetWritingMode(),
