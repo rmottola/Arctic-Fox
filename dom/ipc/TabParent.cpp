@@ -262,8 +262,6 @@ TabParent::TabParent(nsIContentParent* aManager,
                      uint32_t aChromeFlags)
   : TabContext(aContext)
   , mFrameElement(nullptr)
-  , mIMESelectionAnchor(0)
-  , mIMESelectionFocus(0)
   , mWritingMode()
   , mIMEComposing(false)
   , mIMECompositionEnding(false)
@@ -1929,8 +1927,7 @@ TabParent::RecvNotifyIMEFocus(const bool& aFocus,
   }
 
   mIMETabParent = aFocus ? this : nullptr;
-  mIMESelectionAnchor = 0;
-  mIMESelectionFocus = 0;
+  mContentCache.SetSelection(0);
   widget->NotifyIME(IMENotification(aFocus ? NOTIFY_IME_OF_FOCUS :
                                              NOTIFY_IME_OF_BLUR));
 
@@ -2001,8 +1998,7 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
   if (!widget)
     return true;
 
-  mIMESelectionAnchor = aAnchor;
-  mIMESelectionFocus = aFocus;
+  mContentCache.SetSelection(aAnchor, aFocus);
   mWritingMode = aWritingMode;
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
@@ -2010,14 +2006,10 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
       (updatePreference.WantChangesCausedByComposition() ||
        !aCausedByComposition)) {
     IMENotification notification(NOTIFY_IME_OF_SELECTION_CHANGE);
-    notification.mSelectionChangeData.mOffset =
-      std::min(mIMESelectionAnchor, mIMESelectionFocus);
-    notification.mSelectionChangeData.mLength =
-      mIMESelectionAnchor > mIMESelectionFocus ?
-        mIMESelectionAnchor - mIMESelectionFocus :
-        mIMESelectionFocus - mIMESelectionAnchor;
+    notification.mSelectionChangeData.mOffset = mContentCache.SelectionStart();
+    notification.mSelectionChangeData.mLength = mContentCache.SelectionLength();
     notification.mSelectionChangeData.mReversed =
-      mIMESelectionFocus < mIMESelectionAnchor;
+      mContentCache.SelectionReversed();
     notification.mSelectionChangeData.SetWritingMode(mWritingMode);
     notification.mSelectionChangeData.mCausedByComposition =
       aCausedByComposition;
@@ -2250,22 +2242,18 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
   {
   case NS_QUERY_SELECTED_TEXT:
     {
-      aEvent.mReply.mOffset = std::min(mIMESelectionAnchor, mIMESelectionFocus);
-      if (mIMESelectionAnchor == mIMESelectionFocus) {
+      aEvent.mReply.mOffset = mContentCache.SelectionStart();
+      if (mContentCache.SelectionCollapsed()) {
         aEvent.mReply.mString.Truncate(0);
       } else {
-        if (mIMESelectionAnchor > mContentCache.TextLength() ||
-            mIMESelectionFocus > mContentCache.TextLength()) {
+        if (NS_WARN_IF(mContentCache.SelectionEndIsGraterThanTextLength())) {
           break;
         }
-        uint32_t selLen = mIMESelectionAnchor > mIMESelectionFocus ?
-                          mIMESelectionAnchor - mIMESelectionFocus :
-                          mIMESelectionFocus - mIMESelectionAnchor;
         aEvent.mReply.mString = Substring(mContentCache.Text(),
                                           aEvent.mReply.mOffset,
-                                          selLen);
+                                          mContentCache.SelectionLength());
       }
-      aEvent.mReply.mReversed = mIMESelectionFocus < mIMESelectionAnchor;
+      aEvent.mReply.mReversed = mContentCache.SelectionReversed();
       aEvent.mReply.mHasSelection = true;
       aEvent.mReply.mWritingMode = mWritingMode;
       aEvent.mSucceeded = true;
@@ -2353,7 +2341,7 @@ TabParent::SendCompositionEvent(WidgetCompositionEvent& event)
   }
 
   mIMEComposing = !event.CausesDOMCompositionEndEvent();
-  mIMECompositionStart = std::min(mIMESelectionAnchor, mIMESelectionFocus);
+  mIMECompositionStart = mContentCache.SelectionStart();
   if (mIMECompositionEnding) {
     mIMEEventCountAfterEnding++;
     return true;
@@ -2381,10 +2369,9 @@ TabParent::SendCompositionChangeEvent(WidgetCompositionEvent& event)
   // We must be able to simulate the selection because
   // we might not receive selection updates in time
   if (!mIMEComposing) {
-    mIMECompositionStart = std::min(mIMESelectionAnchor, mIMESelectionFocus);
+    mIMECompositionStart = mContentCache.SelectionStart();
   }
-  mIMESelectionAnchor = mIMESelectionFocus =
-      mIMECompositionStart + event.mData.Length();
+  mContentCache.SetSelection(mIMECompositionStart + event.mData.Length());
   mIMEComposing = !event.CausesDOMCompositionEndEvent();
 
   return PBrowserParent::SendCompositionEvent(event);
@@ -2396,8 +2383,9 @@ TabParent::SendSelectionEvent(WidgetSelectionEvent& event)
   if (mIsDestroyed) {
     return false;
   }
-  mIMESelectionAnchor = event.mOffset + (event.mReversed ? event.mLength : 0);
-  mIMESelectionFocus = event.mOffset + (!event.mReversed ? event.mLength : 0);
+  mContentCache.SetSelection(
+    event.mOffset + (event.mReversed ? event.mLength : 0),
+    event.mOffset + (!event.mReversed ? event.mLength : 0));
   return PBrowserParent::SendSelectionEvent(event);
 }
 
