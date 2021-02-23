@@ -262,7 +262,6 @@ TabParent::TabParent(nsIContentParent* aManager,
                      uint32_t aChromeFlags)
   : TabContext(aContext)
   , mFrameElement(nullptr)
-  , mWritingMode()
   , mRect(0, 0, 0, 0)
   , mDimensions(0, 0)
   , mOrientation(0)
@@ -1922,7 +1921,7 @@ TabParent::RecvNotifyIMEFocus(const bool& aFocus,
   }
 
   mIMETabParent = aFocus ? this : nullptr;
-  mContentCache.SetSelection(0);
+  mContentCache.SetSelection(0, mContentCache.SelectionWritingMode());
   widget->NotifyIME(IMENotification(aFocus ? NOTIFY_IME_OF_FOCUS :
                                              NOTIFY_IME_OF_BLUR));
 
@@ -1994,8 +1993,7 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
   if (!widget)
     return true;
 
-  mContentCache.SetSelection(aAnchor, aFocus);
-  mWritingMode = aWritingMode;
+  mContentCache.SetSelection(aAnchor, aFocus, aWritingMode);
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
   if (updatePreference.WantSelectionChange() &&
@@ -2006,7 +2004,7 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
     notification.mSelectionChangeData.mLength = mContentCache.SelectionLength();
     notification.mSelectionChangeData.mReversed =
       mContentCache.SelectionReversed();
-    notification.mSelectionChangeData.SetWritingMode(mWritingMode);
+    notification.mSelectionChangeData.SetWritingMode(aWritingMode);
     notification.mSelectionChangeData.mCausedByComposition =
       aCausedByComposition;
     widget->NotifyIME(notification);
@@ -2251,7 +2249,7 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
       }
       aEvent.mReply.mReversed = mContentCache.SelectionReversed();
       aEvent.mReply.mHasSelection = true;
-      aEvent.mReply.mWritingMode = mWritingMode;
+      aEvent.mReply.mWritingMode = mContentCache.SelectionWritingMode();
       aEvent.mSucceeded = true;
     }
     break;
@@ -2291,7 +2289,8 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
       }
       aEvent.mReply.mOffset = aEvent.mInput.mOffset;
       aEvent.mReply.mRect -= GetChildProcessOffset();
-      aEvent.mReply.mWritingMode = mWritingMode;
+      // XXX This may be wrong if storing range isn't in the selection range.
+      aEvent.mReply.mWritingMode = mContentCache.SelectionWritingMode();
       aEvent.mSucceeded = true;
     }
     break;
@@ -2336,9 +2335,13 @@ TabParent::SendSelectionEvent(WidgetSelectionEvent& event)
   if (mIsDestroyed) {
     return false;
   }
+  // XXX The writing mode is wrong, but this should cause a call of
+  //     RecvNotifyIMESelection().  If so, why do we need to modify the range
+  //     here??
   mContentCache.SetSelection(
     event.mOffset + (event.mReversed ? event.mLength : 0),
-    event.mOffset + (!event.mReversed ? event.mLength : 0));
+    event.mOffset + (!event.mReversed ? event.mLength : 0),
+    mContentCache.SelectionWritingMode());
   return PBrowserParent::SendSelectionEvent(event);
 }
 
