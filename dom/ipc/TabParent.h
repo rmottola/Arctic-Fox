@@ -8,6 +8,7 @@
 #define mozilla_tabs_TabParent_h
 
 #include "js/TypeDecls.h"
+#include "mozilla/ContentCache.h"
 #include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/dom/PBrowserParent.h"
 #include "mozilla/dom/PFilePickerParent.h"
@@ -479,7 +480,7 @@ protected:
 
     // IME
     static TabParent *mIMETabParent;
-    nsString mIMECacheText;
+    ContentCache mContentCache;
     uint32_t mIMESelectionAnchor;
     uint32_t mIMESelectionFocus;
     mozilla::WritingMode mWritingMode;
