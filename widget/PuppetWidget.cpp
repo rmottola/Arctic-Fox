@@ -594,19 +594,18 @@ PuppetWidget::NotifyIMEInternal(const IMENotification& aIMENotification)
     case REQUEST_TO_CANCEL_COMPOSITION:
       return IMEEndComposition(true);
     case NOTIFY_IME_OF_FOCUS:
-      return NotifyIMEOfFocusChange(true);
     case NOTIFY_IME_OF_BLUR:
-      return NotifyIMEOfFocusChange(false);
+      return NotifyIMEOfFocusChange(aIMENotification);
     case NOTIFY_IME_OF_SELECTION_CHANGE:
       return NotifyIMEOfSelectionChange(aIMENotification);
     case NOTIFY_IME_OF_TEXT_CHANGE:
       return NotifyIMEOfTextChange(aIMENotification);
     case NOTIFY_IME_OF_COMPOSITION_UPDATE:
-      return NotifyIMEOfUpdateComposition();
+      return NotifyIMEOfUpdateComposition(aIMENotification);
     case NOTIFY_IME_OF_MOUSE_BUTTON_EVENT:
       return NotifyIMEOfMouseButtonEvent(aIMENotification);
     case NOTIFY_IME_OF_POSITION_CHANGE:
-      return NotifyIMEOfPositionChange();
+      return NotifyIMEOfPositionChange(aIMENotification);
     default:
       return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -675,7 +674,7 @@ PuppetWidget::GetInputContext()
 }
 
 nsresult
-PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
+PuppetWidget::NotifyIMEOfFocusChange(const IMENotification& aIMENotification)
 {
 #ifndef MOZ_CROSS_PROCESS_IME
   return NS_OK;
@@ -684,9 +683,10 @@ PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
   if (!mTabChild)
     return NS_ERROR_FAILURE;
 
-  if (aFocus) {
+  bool gotFocus = aIMENotification.mMessage == NOTIFY_IME_OF_FOCUS;
+  if (gotFocus) {
     // When IME gets focus, we should initalize all information of the content.
-    if (NS_WARN_IF(!mContentCache.CacheAll(this))) {
+    if (NS_WARN_IF(!mContentCache.CacheAll(this, &aIMENotification))) {
       return NS_ERROR_FAILURE;
     }
   } else {
@@ -695,7 +695,7 @@ PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
   }
 
   mIMEPreferenceOfParent = nsIMEUpdatePreference();
-  if (!mTabChild->SendNotifyIMEFocus(aFocus, mContentCache,
+  if (!mTabChild->SendNotifyIMEFocus(gotFocus, mContentCache,
                                      &mIMEPreferenceOfParent)) {
     return NS_ERROR_FAILURE;
   }
@@ -703,7 +703,8 @@ PuppetWidget::NotifyIMEOfFocusChange(bool aFocus)
 }
 
 nsresult
-PuppetWidget::NotifyIMEOfUpdateComposition()
+PuppetWidget::NotifyIMEOfUpdateComposition(
+                const IMENotification& aIMENotification)
 {
 #ifndef MOZ_CROSS_PROCESS_IME
   return NS_OK;
@@ -711,8 +712,8 @@ PuppetWidget::NotifyIMEOfUpdateComposition()
 
   NS_ENSURE_TRUE(mTabChild, NS_ERROR_FAILURE);
 
-  if (NS_WARN_IF(!mContentCache.CacheTextRects(this)) ||
-      NS_WARN_IF(!mContentCache.CacheSelection(this))) {
+  if (NS_WARN_IF(!mContentCache.CacheTextRects(this, &aIMENotification)) ||
+      NS_WARN_IF(!mContentCache.CacheSelection(this, &aIMENotification))) {
     return NS_ERROR_FAILURE;
   }
   mTabChild->SendNotifyIMESelectedCompositionRect(mContentCache);
@@ -752,9 +753,9 @@ PuppetWidget::NotifyIMEOfTextChange(const IMENotification& aIMENotification)
   //      the cache as far as possible here.
 
   // When text is changed, selection and text rects must be changed too.
-  if (NS_WARN_IF(!mContentCache.CacheText(this)) ||
-      NS_WARN_IF(!mContentCache.CacheTextRects(this)) ||
-      NS_WARN_IF(!mContentCache.CacheSelection(this))) {
+  if (NS_WARN_IF(!mContentCache.CacheText(this, &aIMENotification)) ||
+      NS_WARN_IF(!mContentCache.CacheTextRects(this, &aIMENotification)) ||
+      NS_WARN_IF(!mContentCache.CacheSelection(this, &aIMENotification))) {
     return NS_ERROR_FAILURE;
   }
 
@@ -820,7 +821,7 @@ PuppetWidget::NotifyIMEOfMouseButtonEvent(
 }
 
 nsresult
-PuppetWidget::NotifyIMEOfPositionChange()
+PuppetWidget::NotifyIMEOfPositionChange(const IMENotification& aIMENotification)
 {
 #ifndef MOZ_CROSS_PROCESS_IME
   return NS_OK;
@@ -829,9 +830,9 @@ PuppetWidget::NotifyIMEOfPositionChange()
     return NS_ERROR_FAILURE;
   }
 
-  if (NS_WARN_IF(!mContentCache.CacheEditorRect(this)) ||
-      NS_WARN_IF(!mContentCache.CacheTextRects(this)) ||
-      NS_WARN_IF(!mContentCache.CacheSelection(this))) {
+  if (NS_WARN_IF(!mContentCache.CacheEditorRect(this, &aIMENotification)) ||
+      NS_WARN_IF(!mContentCache.CacheTextRects(this, &aIMENotification)) ||
+      NS_WARN_IF(!mContentCache.CacheSelection(this, &aIMENotification))) {
     return NS_ERROR_FAILURE;
   }
   if (!mTabChild->SendNotifyIMEPositionChange(mContentCache)) {

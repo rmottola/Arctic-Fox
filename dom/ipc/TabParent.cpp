@@ -1922,9 +1922,10 @@ TabParent::RecvNotifyIMEFocus(const bool& aFocus,
   }
 
   mIMETabParent = aFocus ? this : nullptr;
-  mContentCache.AssignContent(aContentCache);
-  widget->NotifyIME(IMENotification(aFocus ? NOTIFY_IME_OF_FOCUS :
-                                             NOTIFY_IME_OF_BLUR));
+  IMENotification notification(aFocus ? NOTIFY_IME_OF_FOCUS :
+                                        NOTIFY_IME_OF_BLUR);
+  mContentCache.AssignContent(aContentCache, &notification);
+  widget->NotifyIME(notification);
 
   if (aFocus) {
     *aPreference = widget->GetIMEUpdatePreference();
@@ -1952,13 +1953,13 @@ TabParent::RecvNotifyIMETextChange(const ContentCache& aContentCache,
     "The widget doesn't want text change notification caused by composition");
 #endif
 
-  mContentCache.AssignContent(aContentCache);
-
   IMENotification notification(NOTIFY_IME_OF_TEXT_CHANGE);
   notification.mTextChangeData.mStartOffset = aStart;
   notification.mTextChangeData.mOldEndOffset = aEnd;
   notification.mTextChangeData.mNewEndOffset = aNewEnd;
   notification.mTextChangeData.mCausedByComposition = aCausedByComposition;
+
+  mContentCache.AssignContent(aContentCache, &notification);
   widget->NotifyIME(notification);
   return true;
 }
@@ -1972,9 +1973,10 @@ TabParent::RecvNotifyIMESelectedCompositionRect(
     return true;
   }
 
-  mContentCache.AssignContent(aContentCache);
+  IMENotification notification(NOTIFY_IME_OF_COMPOSITION_UPDATE);
+  mContentCache.AssignContent(aContentCache, &notification);
 
-  widget->NotifyIME(IMENotification(NOTIFY_IME_OF_COMPOSITION_UPDATE));
+  widget->NotifyIME(notification);
   return true;
 }
 
@@ -1986,14 +1988,18 @@ TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
   if (!widget)
     return true;
 
-  mContentCache.AssignContent(aContentCache);
+  IMENotification notification(NOTIFY_IME_OF_SELECTION_CHANGE);
+  mContentCache.AssignContent(aContentCache, &notification);
 
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
   if (updatePreference.WantSelectionChange() &&
       (updatePreference.WantChangesCausedByComposition() ||
        !aCausedByComposition)) {
-    mContentCache.NotifyIMEOfSelectionChange(widget, aCausedByComposition);
+    mContentCache.InitNotification(notification);
+    notification.mSelectionChangeData.mCausedByComposition =
+      aCausedByComposition;
+    widget->NotifyIME(notification);
   }
   return true;
 }
@@ -2034,12 +2040,13 @@ TabParent::RecvNotifyIMEPositionChange(const ContentCache& aContentCache)
     return true;
   }
 
-  mContentCache.AssignContent(aContentCache);
+  IMENotification notification(NOTIFY_IME_OF_POSITION_CHANGE);
+  mContentCache.AssignContent(aContentCache, &notification);
 
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
   if (updatePreference.WantPositionChanged()) {
-    widget->NotifyIME(IMENotification(NOTIFY_IME_OF_POSITION_CHANGE));
+    widget->NotifyIME(notification);
   }
   return true;
 }
