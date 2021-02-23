@@ -1912,6 +1912,7 @@ TabParent::RecvHideTooltip()
 
 bool
 TabParent::RecvNotifyIMEFocus(const bool& aFocus,
+                              const ContentCache& aContentCache,
                               nsIMEUpdatePreference* aPreference)
 {
   nsCOMPtr<nsIWidget> widget = GetWidget();
@@ -1921,20 +1922,19 @@ TabParent::RecvNotifyIMEFocus(const bool& aFocus,
   }
 
   mIMETabParent = aFocus ? this : nullptr;
-  mContentCache.SetSelection(0, mContentCache.SelectionWritingMode());
+  mContentCache.AssignContent(aContentCache);
   widget->NotifyIME(IMENotification(aFocus ? NOTIFY_IME_OF_FOCUS :
                                              NOTIFY_IME_OF_BLUR));
 
   if (aFocus) {
     *aPreference = widget->GetIMEUpdatePreference();
-  } else {
-    mContentCache.Clear();
   }
   return true;
 }
 
 bool
-TabParent::RecvNotifyIMETextChange(const uint32_t& aStart,
+TabParent::RecvNotifyIMETextChange(const ContentCache& aContentCache,
+                                   const uint32_t& aStart,
                                    const uint32_t& aEnd,
                                    const uint32_t& aNewEnd,
                                    const bool& aCausedByComposition)
@@ -1952,6 +1952,8 @@ TabParent::RecvNotifyIMETextChange(const uint32_t& aStart,
     "The widget doesn't want text change notification caused by composition");
 #endif
 
+  mContentCache.AssignContent(aContentCache);
+
   IMENotification notification(NOTIFY_IME_OF_TEXT_CHANGE);
   notification.mTextChangeData.mStartOffset = aStart;
   notification.mTextChangeData.mOldEndOffset = aEnd;
@@ -1963,37 +1965,29 @@ TabParent::RecvNotifyIMETextChange(const uint32_t& aStart,
 
 bool
 TabParent::RecvNotifyIMESelectedCompositionRect(
-  const uint32_t& aOffset,
-  InfallibleTArray<LayoutDeviceIntRect>&& aRects,
-  const uint32_t& aCaretOffset,
-  const LayoutDeviceIntRect& aCaretRect)
+             const ContentCache& aContentCache)
 {
-  if (!mContentCache.InitTextRectArray(aOffset, aRects)) {
-    NS_WARNING("Failed to set text rect array");
-  }
-  if (!mContentCache.InitCaretRect(aCaretOffset, aCaretRect)) {
-    NS_WARNING("Failed to set caret rect");
-  }
-
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) {
     return true;
   }
+
+  mContentCache.AssignContent(aContentCache);
+
   widget->NotifyIME(IMENotification(NOTIFY_IME_OF_COMPOSITION_UPDATE));
   return true;
 }
 
 bool
-TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
-                                  const uint32_t& aFocus,
-                                  const mozilla::WritingMode& aWritingMode,
+TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
                                   const bool& aCausedByComposition)
 {
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget)
     return true;
 
-  mContentCache.SetSelection(aAnchor, aFocus, aWritingMode);
+  mContentCache.AssignContent(aContentCache);
+
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
   if (updatePreference.WantSelectionChange() &&
@@ -2004,7 +1998,8 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
     notification.mSelectionChangeData.mLength = mContentCache.SelectionLength();
     notification.mSelectionChangeData.mReversed =
       mContentCache.SelectionReversed();
-    notification.mSelectionChangeData.SetWritingMode(aWritingMode);
+    notification.mSelectionChangeData.SetWritingMode(
+      mContentCache.SelectionWritingMode());
     notification.mSelectionChangeData.mCausedByComposition =
       aCausedByComposition;
     widget->NotifyIME(notification);
@@ -2013,9 +2008,9 @@ TabParent::RecvNotifyIMESelection(const uint32_t& aAnchor,
 }
 
 bool
-TabParent::RecvNotifyIMETextHint(const nsString& aText)
+TabParent::RecvNotifyIMETextHint(const ContentCache& aContentCache)
 {
-  mContentCache.SetText(aText);
+  mContentCache.AssignContent(aContentCache);
   return true;
 }
 
@@ -2036,26 +2031,21 @@ TabParent::RecvNotifyIMEMouseButtonEvent(
 }
 
 bool
-TabParent::RecvNotifyIMEEditorRect(const LayoutDeviceIntRect& aRect)
+TabParent::RecvNotifyIMEEditorRect(const ContentCache& aContentCache)
 {
-  mContentCache.SetEditorRect(aRect);
+  mContentCache.AssignContent(aContentCache);
   return true;
 }
 
 bool
-TabParent::RecvNotifyIMEPositionChange(
-             const LayoutDeviceIntRect& aEditorRect,
-             InfallibleTArray<LayoutDeviceIntRect>&& aCompositionRects,
-             const LayoutDeviceIntRect& aCaretRect)
+TabParent::RecvNotifyIMEPositionChange(const ContentCache& aContentCache)
 {
-  mContentCache.SetEditorRect(aEditorRect);
-  mContentCache.UpdateTextRectArray(aCompositionRects);
-  mContentCache.UpdateCaretRect(aCaretRect);
-
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) {
     return true;
   }
+
+  mContentCache.AssignContent(aContentCache);
 
   const nsIMEUpdatePreference updatePreference =
     widget->GetIMEUpdatePreference();
