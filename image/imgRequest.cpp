@@ -448,6 +448,16 @@ imgRequest::GetCurrentURI(nsIURI** aURI)
   return NS_ERROR_FAILURE;
 }
 
+bool
+imgRequest::IsChrome() const
+{
+  bool isChrome = false;
+  if (NS_WARN_IF(NS_FAILED(mURI->SchemeIs("chrome", &isChrome)))) {
+    return false;
+  }
+  return isChrome;
+}
+
 nsresult
 imgRequest::GetImageErrorCode()
 {
@@ -482,7 +492,7 @@ imgRequest::RemoveFromCache()
     if (mCacheEntry) {
       mLoader->RemoveFromCache(mCacheEntry);
     } else {
-      mLoader->RemoveFromCache(mURI);
+      mLoader->RemoveFromCache(ImageCacheKey(mURI));
     }
   }
 
