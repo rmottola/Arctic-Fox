@@ -43,7 +43,6 @@
 
 using namespace mozilla;
 
-#if defined(PR_LOGGING)
 static PRLogModuleInfo *
 GetCspContextLog()
 {
@@ -52,7 +51,6 @@ GetCspContextLog()
     gCspContextPRLog = PR_NewLogModule("CSPContext");
   return gCspContextPRLog;
 }
-#endif
 
 #define CSPCONTEXTLOG(args) PR_LOG(GetCspContextLog(), 4, args)
 
@@ -108,13 +106,11 @@ nsCSPContext::ShouldLoad(nsContentPolicyType aContentType,
                          nsISupports*        aExtra,
                          int16_t*            outDecision)
 {
-#ifdef PR_LOGGING
   {
   nsAutoCString spec;
   aContentLocation->GetSpec(spec);
   CSPCONTEXTLOG(("nsCSPContext::ShouldLoad, aContentLocation: %s", spec.get()));
   }
-#endif
 
   // Since we know whether we are dealing with a preload, we have to convert
   // the internal policytype ot the external policy type before moving on.
@@ -204,13 +200,11 @@ nsCSPContext::ShouldLoad(nsContentPolicyType aContentType,
     mShouldLoadCache.Put(cacheKey, *outDecision);
   }
 
-#ifdef PR_LOGGING
   {
   nsAutoCString spec;
   aContentLocation->GetSpec(spec);
   CSPCONTEXTLOG(("nsCSPContext::ShouldLoad, decision: %s, aContentLocation: %s", *outDecision ? "load" : "deny", spec.get()));
   }
-#endif
   return NS_OK;
 }
 
@@ -1129,13 +1123,11 @@ nsCSPContext::PermitsAncestry(nsIDocShell* aDocShell, bool* outPermitsAncestry)
       // there was one.
       uriClone->SetUserPass(EmptyCString());
 
-#ifdef PR_LOGGING
       {
       nsAutoCString spec;
       uriClone->GetSpec(spec);
       CSPCONTEXTLOG(("nsCSPContext::PermitsAncestry, found ancestor: %s", spec.get()));
       }
-#endif
       ancestorsArray.AppendElement(uriClone);
     }
 
@@ -1151,13 +1143,11 @@ nsCSPContext::PermitsAncestry(nsIDocShell* aDocShell, bool* outPermitsAncestry)
   // restriction not placed on subresource loads.
 
   for (uint32_t a = 0; a < ancestorsArray.Length(); a++) {
-#ifdef PR_LOGGING
     {
     nsAutoCString spec;
     ancestorsArray[a]->GetSpec(spec);
     CSPCONTEXTLOG(("nsCSPContext::PermitsAncestry, checking ancestor: %s", spec.get()));
     }
-#endif
     // omit the ancestor URI in violation reports if cross-origin as per spec
     // (it is a violation of the same-origin policy).
     bool okToSendAncestor = NS_SecurityCompareURIs(ancestorsArray[a], mSelfURI, true);
@@ -1200,7 +1190,6 @@ nsCSPContext::Permits(nsIURI* aURI,
                                 true,     // send violation reports
                                 true);    // send blocked URI in violation reports
 
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aURI->GetSpec(spec);
@@ -1208,7 +1197,6 @@ nsCSPContext::Permits(nsIURI* aURI,
                   spec.get(), aDir,
                   *outPermits ? "allow" : "deny"));
   }
-#endif
 
   return NS_OK;
 }

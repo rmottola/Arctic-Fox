@@ -16,7 +16,6 @@
 
 #define DEFAULT_PORT -1
 
-#if defined(PR_LOGGING)
 static PRLogModuleInfo*
 GetCspUtilsLog()
 {
@@ -25,7 +24,6 @@ GetCspUtilsLog()
     gCspUtilsPRLog = PR_NewLogModule("CSPUtils");
   return gCspUtilsPRLog;
 }
-#endif
 
 #define CSPUTILSLOG(args) PR_LOG(GetCspUtilsLog(), 4, args)
 
@@ -271,13 +269,11 @@ nsCSPBaseSrc::~nsCSPBaseSrc()
 bool
 nsCSPBaseSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPBaseSrc::permits, aUri: %s", spec.get()));
   }
-#endif
   return false;
 }
 
@@ -308,13 +304,11 @@ nsCSPSchemeSrc::~nsCSPSchemeSrc()
 bool
 nsCSPSchemeSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPSchemeSrc::permits, aUri: %s", spec.get()));
   }
-#endif
 
   NS_ASSERTION((!mScheme.EqualsASCII("")), "scheme can not be the empty string");
   nsAutoCString scheme;
@@ -429,13 +423,11 @@ permitsPort(const nsAString& aEnforcementScheme,
 bool
 nsCSPHostSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPHostSrc::permits, aUri: %s", spec.get()));
   }
-#endif
 
   // we are following the enforcement rules from the spec, see:
   // http://www.w3.org/TR/CSP11/#match-source-expression
@@ -620,14 +612,12 @@ nsCSPNonceSrc::~nsCSPNonceSrc()
 bool
 nsCSPNonceSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPNonceSrc::permits, aUri: %s, aNonce: %s",
                 spec.get(), NS_ConvertUTF16toUTF8(aNonce).get()));
   }
-#endif
 
   return mNonce.Equals(aNonce);
 }
@@ -750,13 +740,11 @@ nsCSPDirective::~nsCSPDirective()
 bool
 nsCSPDirective::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPDirective::permits, aUri: %s", spec.get()));
   }
-#endif
 
   for (uint32_t i = 0; i < mSrcs.Length(); i++) {
     if (mSrcs[i]->permits(aUri, aNonce, aWasRedirected)) {
@@ -949,14 +937,12 @@ nsCSPPolicy::permits(CSPDirective aDir,
                      bool aSpecific,
                      nsAString& outViolatedDirective) const
 {
-#ifdef PR_LOGGING
   {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPPolicy::permits, aUri: %s, aDir: %d, aSpecific: %s",
                  spec.get(), aDir, aSpecific ? "true" : "false"));
   }
-#endif
 
   NS_ASSERTION(aUri, "permits needs an uri to perform the check!");
 
