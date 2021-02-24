@@ -818,7 +818,6 @@ imgCacheEntry::UpdateCache(int32_t diff /* = 0 */)
 void
 imgCacheEntry::SetHasNoProxies(bool hasNoProxies)
 {
-#if defined(PR_LOGGING)
   nsRefPtr<ImageURL> uri;
   mRequest->GetURI(getter_AddRefs(uri));
   nsAutoCString spec;
@@ -832,7 +831,6 @@ imgCacheEntry::SetHasNoProxies(bool hasNoProxies)
     LOG_FUNC_WITH_PARAM(GetImgLog(), "imgCacheEntry::SetHasNoProxies false",
                         "uri", spec.get());
   }
-#endif
 
   mHasNoProxies = hasNoProxies;
 }
@@ -1006,7 +1004,6 @@ imgCacheExpirationTracker::NotifyExpired(imgCacheEntry* entry)
   // mechanism doesn't.
   nsRefPtr<imgCacheEntry> kungFuDeathGrip(entry);
 
-#if defined(PR_LOGGING)
   nsRefPtr<imgRequest> req(entry->GetRequest());
   if (req) {
     nsRefPtr<ImageURL> uri;
@@ -1017,7 +1014,6 @@ imgCacheExpirationTracker::NotifyExpired(imgCacheEntry* entry)
                        "imgCacheExpirationTracker::NotifyExpired",
                        "entry", spec.get());
   }
-#endif
 
   // We can be called multiple times on the same entry. Don't do work multiple
   // times.
@@ -1430,13 +1426,11 @@ imgLoader::SetHasNoProxies(imgRequest* aRequest, imgCacheEntry* aEntry)
   nsRefPtr<ImageURL> uri;
   aRequest->GetURI(getter_AddRefs(uri));
 
-#if defined(PR_LOGGING)
   nsAutoCString spec;
   uri->GetSpec(spec);
 
   LOG_STATIC_FUNC_WITH_PARAM(GetImgLog(),
                              "imgLoader::SetHasNoProxies", "uri", spec.get());
-#endif
 
   aEntry->SetHasNoProxies(true);
 
@@ -1522,7 +1516,6 @@ imgLoader::CheckCacheLimits(imgCacheTable& cache, imgCacheQueue& queue)
 
     NS_ASSERTION(entry, "imgLoader::CheckCacheLimits -- NULL entry pointer");
 
-#if defined(PR_LOGGING)
     nsRefPtr<imgRequest> req(entry->GetRequest());
     if (req) {
       nsRefPtr<ImageURL> uri;
@@ -1533,7 +1526,6 @@ imgLoader::CheckCacheLimits(imgCacheTable& cache, imgCacheQueue& queue)
                                  "imgLoader::CheckCacheLimits",
                                  "entry", spec.get());
     }
-#endif
 
     if (entry) {
       RemoveFromCache(entry);
@@ -1763,7 +1755,6 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
     PR_LOG(GetImgLog(), PR_LOG_DEBUG,
            ("imgLoader::ValidateEntry validating cache entry. "
             "validateRequest = %d", validateRequest));
-#if defined(PR_LOGGING)
   } else if (!key) {
     nsAutoCString spec;
     aURI->GetSpec(spec);
@@ -1771,7 +1762,6 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
     PR_LOG(GetImgLog(), PR_LOG_DEBUG,
            ("imgLoader::ValidateEntry BYPASSING cache validation for %s "
             "because of NULL LoadID", spec.get()));
-#endif
   }
 
   // We can't use a cached request if it comes from a different
@@ -2993,13 +2983,11 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
     uri = imageURL->ToIURI();
   }
 
-#if defined(PR_LOGGING)
   nsAutoCString spec;
   uri->GetSpec(spec);
   LOG_MSG_WITH_PARAM(GetImgLog(),
                      "imgCacheValidator::OnStartRequest creating new request",
                      "uri", spec.get());
-#endif
 
   int32_t corsmode = mRequest->GetCORSMode();
   ReferrerPolicy refpol = mRequest->GetReferrerPolicy();
