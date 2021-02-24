@@ -25,7 +25,8 @@ GetCspUtilsLog()
   return gCspUtilsPRLog;
 }
 
-#define CSPUTILSLOG(args) PR_LOG(GetCspUtilsLog(), 4, args)
+#define CSPUTILSLOG(args) PR_LOG(GetCspUtilsLog(), PR_LOG_DEBUG, args)
+#define CSPUTILSLOGENABLED() PR_LOG_TEST(GetCspUtilsLog(), PR_LOG_DEBUG)
 
 void
 CSP_GetLocalizedStr(const char16_t* aName,
@@ -269,7 +270,7 @@ nsCSPBaseSrc::~nsCSPBaseSrc()
 bool
 nsCSPBaseSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPBaseSrc::permits, aUri: %s", spec.get()));
@@ -304,7 +305,7 @@ nsCSPSchemeSrc::~nsCSPSchemeSrc()
 bool
 nsCSPSchemeSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPSchemeSrc::permits, aUri: %s", spec.get()));
@@ -423,7 +424,7 @@ permitsPort(const nsAString& aEnforcementScheme,
 bool
 nsCSPHostSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPHostSrc::permits, aUri: %s", spec.get()));
@@ -612,7 +613,7 @@ nsCSPNonceSrc::~nsCSPNonceSrc()
 bool
 nsCSPNonceSrc::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPNonceSrc::permits, aUri: %s, aNonce: %s",
@@ -740,7 +741,7 @@ nsCSPDirective::~nsCSPDirective()
 bool
 nsCSPDirective::permits(nsIURI* aUri, const nsAString& aNonce, bool aWasRedirected) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPDirective::permits, aUri: %s", spec.get()));
@@ -937,7 +938,7 @@ nsCSPPolicy::permits(CSPDirective aDir,
                      bool aSpecific,
                      nsAString& outViolatedDirective) const
 {
-  {
+  if (CSPUTILSLOGENABLED()) {
     nsAutoCString spec;
     aUri->GetSpec(spec);
     CSPUTILSLOG(("nsCSPPolicy::permits, aUri: %s, aDir: %d, aSpecific: %s",
