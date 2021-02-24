@@ -10,7 +10,7 @@
 
 #include "mozilla/Logging.h"
 
-#if defined(MOZ_FMP4) && defined(PR_LOGGING)
+#if defined(MOZ_FMP4)
 extern PRLogModuleInfo* GetDemuxerLog();
 
 /* Polyfill __func__ on MSVC to pass to the log. */
