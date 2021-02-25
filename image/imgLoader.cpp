@@ -1556,7 +1556,7 @@ imgLoader::ValidateRequestWithNewChannel(imgRequest* request,
 
   // If we're currently in the middle of validating this request, just hand
   // back a proxy to it; the required work will be done for us.
-  if (request->mValidator) {
+  if (request->GetValidator()) {
     rv = CreateNewProxyForRequest(request, aLoadGroup, aObserver,
                                   aLoadFlags, aProxyRequest);
     if (NS_FAILED(rv)) {
@@ -1573,7 +1573,7 @@ imgLoader::ValidateRequestWithNewChannel(imgRequest* request,
       proxy->SetNotificationsDeferred(true);
 
       // Attach the proxy without notifying
-      request->mValidator->AddProxy(proxy);
+      request->GetValidator()->AddProxy(proxy);
     }
 
     return NS_SUCCEEDED(rv);
@@ -1640,7 +1640,7 @@ imgLoader::ValidateRequestWithNewChannel(imgRequest* request,
       listener = corsproxy;
     }
 
-    request->mValidator = hvc;
+    request->SetValidator(hvc);
 
     imgRequestProxy* proxy = static_cast<imgRequestProxy*>
                                (static_cast<imgIRequest*>(req.get()));
@@ -1742,7 +1742,7 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   //      validation is required.
   //
   void *key = (void*)aCX;
-  if (request->mLoadId != key) {
+  if (request->LoadId() != key) {
     // If we would need to revalidate this entry, but we're being told to
     // bypass the cache, we don't allow this entry to be used.
     if (aLoadFlags & nsIRequest::LOAD_BYPASS_CACHE) {
@@ -1769,10 +1769,12 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   nsCOMPtr<nsIApplicationCacheContainer> appCacheContainer;
   nsCOMPtr<nsIApplicationCache> requestAppCache;
   nsCOMPtr<nsIApplicationCache> groupAppCache;
-  if ((appCacheContainer = do_GetInterface(request->mRequest)))
+  if ((appCacheContainer = do_GetInterface(request->GetRequest()))) {
     appCacheContainer->GetApplicationCache(getter_AddRefs(requestAppCache));
-  if ((appCacheContainer = do_QueryInterface(aLoadGroup)))
+  }
+  if ((appCacheContainer = do_QueryInterface(aLoadGroup))) {
     appCacheContainer->GetApplicationCache(getter_AddRefs(groupAppCache));
+  }
 
   if (requestAppCache != groupAppCache) {
     PR_LOG(GetImgLog(), PR_LOG_DEBUG,
@@ -2870,7 +2872,7 @@ imgCacheValidator::imgCacheValidator(nsProgressNotificationProxy* progress,
 imgCacheValidator::~imgCacheValidator()
 {
   if (mRequest) {
-    mRequest->ClearValidator();
+    mRequest->SetValidator(nullptr);
   }
 }
 
@@ -2945,7 +2947,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
       aRequest->Cancel(NS_BINDING_ABORTED);
 
       mRequest->SetLoadId(mContext);
-      mRequest->ClearValidator();
+      mRequest->SetValidator(nullptr);
 
       mRequest = nullptr;
 
@@ -2980,7 +2982,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   // Doom the old request's cache entry
   mRequest->RemoveFromCache();
 
-  mRequest->ClearValidator();
+  mRequest->SetValidator(nullptr);
   mRequest = nullptr;
 
   // We use originalURI here to fulfil the imgIRequest contract on GetURI.
