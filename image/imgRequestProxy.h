@@ -174,9 +174,10 @@ protected:
 
   nsITimedChannel* TimedChannel()
   {
-    if (!GetOwner())
+    if (!GetOwner()) {
       return nullptr;
-    return GetOwner()->mTimedChannel;
+    }
+    return GetOwner()->GetTimedChannel();
   }
 
   already_AddRefed<Image> GetImage() const;
