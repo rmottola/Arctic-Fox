@@ -168,19 +168,18 @@ public:
 
   nsresult GetSecurityInfo(nsISupports** aSecurityInfoOut);
 
-private:
-  friend class imgCacheEntry;
-  friend class imgLoader;
-  friend class imgCacheValidator;
-  friend class imgCacheExpirationTracker;
-  friend class mozilla::image::ProgressTracker;
+  void ClearValidator() { mValidator = nullptr; }
 
-  inline void SetLoadId(void *aLoadId) {
-    mLoadId = aLoadId;
-  }
-  void Cancel(nsresult aStatus);
+  void SetLoadId(void* aLoadId) { mLoadId = aLoadId; }
+
   void EvictFromCache();
   void RemoveFromCache();
+
+private:
+  friend class imgLoader;
+  friend class mozilla::image::ProgressTracker;
+
+  void Cancel(nsresult aStatus);
 
   imgCacheValidator* GetValidator() const { return mValidator; }
 

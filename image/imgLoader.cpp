@@ -2870,7 +2870,7 @@ imgCacheValidator::imgCacheValidator(nsProgressNotificationProxy* progress,
 imgCacheValidator::~imgCacheValidator()
 {
   if (mRequest) {
-    mRequest->mValidator = nullptr;
+    mRequest->ClearValidator();
   }
 }
 
@@ -2914,10 +2914,15 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
     cacheChan->IsFromCache(&isFromCache);
 
     nsCOMPtr<nsIURI> channelURI;
-    bool sameURI = false;
     channel->GetURI(getter_AddRefs(channelURI));
-    if (channelURI)
-      channelURI->Equals(mRequest->mCurrentURI, &sameURI);
+
+    nsCOMPtr<nsIURI> currentURI;
+    mRequest->GetCurrentURI(getter_AddRefs(currentURI));
+
+    bool sameURI = false;
+    if (channelURI && currentURI) {
+      channelURI->Equals(currentURI, &sameURI);
+    }
 
     if (isFromCache && sameURI) {
       uint32_t count = mProxies.Count();
@@ -2940,7 +2945,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
       aRequest->Cancel(NS_BINDING_ABORTED);
 
       mRequest->SetLoadId(mContext);
-      mRequest->mValidator = nullptr;
+      mRequest->ClearValidator();
 
       mRequest = nullptr;
 
@@ -2975,7 +2980,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   // Doom the old request's cache entry
   mRequest->RemoveFromCache();
 
-  mRequest->mValidator = nullptr;
+  mRequest->ClearValidator();
   mRequest = nullptr;
 
   // We use originalURI here to fulfil the imgIRequest contract on GetURI.
