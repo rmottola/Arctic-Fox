@@ -46,9 +46,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
-                                  "resource:///modules/BrowserNewTabPreloader.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "webrtcUI",
                                   "resource:///modules/webrtcUI.jsm");
 
@@ -550,7 +547,6 @@ BrowserGlue.prototype = {
 
     PageThumbs.init();
     NewTabUtils.init();
-    BrowserNewTabPreloader.init();
     webrtcUI.init();
     AboutHome.init();
     SessionStore.init();
