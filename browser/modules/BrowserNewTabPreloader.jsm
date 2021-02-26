@@ -57,6 +57,10 @@ this.BrowserNewTabPreloader = {
   },
 
   newTab: function Preloader_newTab(aTab) {
+    if (!Preferences.enabled) {
+      return false;
+    }
+
     let win = aTab.ownerDocument.defaultView;
     if (win.gBrowser) {
       let utils = win.QueryInterface(Ci.nsIInterfaceRequestor)
