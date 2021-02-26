@@ -560,7 +560,6 @@ BrowserGlue.prototype = {
 
     PageThumbs.init();
     NewTabUtils.init();
-    BrowserNewTabPreloader.init();
     webrtcUI.init();
     AboutHome.init();
     SessionStore.init();
