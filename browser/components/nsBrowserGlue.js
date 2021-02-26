@@ -46,9 +46,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
-                                  "resource:///modules/BrowserNewTabPreloader.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "webrtcUI",
                                   "resource:///modules/webrtcUI.jsm");
 
@@ -760,7 +757,6 @@ BrowserGlue.prototype = {
    * _onPlacesShutdown() and not here.
    */
   _onProfileShutdown: function BG__onProfileShutdown() {
-    BrowserNewTabPreloader.uninit();
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
