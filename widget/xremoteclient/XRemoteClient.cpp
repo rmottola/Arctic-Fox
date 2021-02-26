@@ -69,12 +69,12 @@ XRemoteClient::XRemoteClient()
   mLockData = 0;
   if (!sRemoteLm)
     sRemoteLm = PR_NewLogModule("XRemoteClient");
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::XRemoteClient"));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::XRemoteClient"));
 }
 
 XRemoteClient::~XRemoteClient()
 {
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::~XRemoteClient"));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::~XRemoteClient"));
   if (mInitialized)
     Shutdown();
 }
@@ -96,7 +96,7 @@ static Atom XAtoms[ARRAY_LENGTH(XAtomNames)];
 nsresult
 XRemoteClient::Init()
 {
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::Init"));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::Init"));
 
   if (mInitialized)
     return NS_OK;
@@ -129,7 +129,7 @@ XRemoteClient::Init()
 void
 XRemoteClient::Shutdown (void)
 {
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::Shutdown"));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::Shutdown"));
 
   if (!mInitialized)
     return;
@@ -165,7 +165,7 @@ XRemoteClient::SendCommandLine (const char *aProgram, const char *aUsername,
                                 const char* aDesktopStartupID,
                                 char **aResponse, bool *aWindowFound)
 {
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::SendCommandLine"));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::SendCommandLine"));
 
   return SendCommandInternal(aProgram, aUsername, aProfile,
                              nullptr, argc, argv,
@@ -242,7 +242,7 @@ XRemoteClient::SendCommandInternal(const char *aProgram, const char *aUsername,
 
   XSetErrorHandler(sOldHandler);
 
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("SendCommandInternal returning 0x%x\n", rv));
+  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("SendCommandInternal returning 0x%x\n", rv));
 
   return rv;
 }
@@ -387,7 +387,7 @@ XRemoteClient::GetLock(Window aWindow, bool *aDestroyed)
       /* We tried to grab the lock this time, and failed because someone
 	 else is holding it already.  So, wait for a PropertyDelete event
 	 to come in, and try again. */
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG, 
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, 
 	     ("window 0x%x is locked by %s; waiting...\n",
 	      (unsigned int) aWindow, data));
       waited = True;
@@ -406,11 +406,11 @@ XRemoteClient::GetLock(Window aWindow, bool *aDestroyed)
 			       &select_set, nullptr, nullptr, &delay);
 	// did we time out?
 	if (select_retval == 0) {
-	  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("timed out waiting for window\n"));
+	  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("timed out waiting for window\n"));
           rv = NS_ERROR_FAILURE;
           break;
 	}
-	PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("xevent...\n"));
+	MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("xevent...\n"));
 	XNextEvent (mDisplay, &event);
 	if (event.xany.type == DestroyNotify &&
 	    event.xdestroywindow.window == aWindow) {
@@ -424,7 +424,7 @@ XRemoteClient::GetLock(Window aWindow, bool *aDestroyed)
 		 event.xproperty.atom == mMozLockAtom) {
 	  /* Ok!  Someone deleted their lock, so now we can try
 	     again. */
-	  PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+	  MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
 		 ("(0x%x unlocked, trying again...)\n",
 		  (unsigned int) aWindow));
 		  break;
@@ -436,9 +436,9 @@ XRemoteClient::GetLock(Window aWindow, bool *aDestroyed)
   } while (!locked && !NS_FAILED(rv));
 
   if (waited && locked) {
-    PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("obtained lock.\n"));
+    MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("obtained lock.\n"));
   } else if (*aDestroyed) {
-    PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+    MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
            ("window 0x%x unexpectedly destroyed.\n",
             (unsigned int) aWindow));
   }
@@ -459,13 +459,13 @@ XRemoteClient::FindBestWindow(const char *aProgram, const char *aUsername,
   // Get a list of the children of the root window, walk the list
   // looking for the best window that fits the criteria.
   if (!XQueryTree(mDisplay, root, &root2, &parent, &kids, &nkids)) {
-    PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+    MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
            ("XQueryTree failed in XRemoteClient::FindBestWindow"));
     return 0;
   }
 
   if (!(kids && nkids)) {
-    PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("root window has no children"));
+    MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("root window has no children"));
     return 0;
   }
 
@@ -614,20 +614,20 @@ XRemoteClient::FreeLock(Window aWindow)
                               &nitems, &bytes_after,
                               &data);
   if (result != Success) {
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
              ("unable to read and delete " MOZILLA_LOCK_PROP
               " property\n"));
       return NS_ERROR_FAILURE;
   }
   else if (!data || !*data){
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
              ("invalid data on " MOZILLA_LOCK_PROP
               " of window 0x%x.\n",
               (unsigned int) aWindow));
       return NS_ERROR_FAILURE;
   }
   else if (strcmp((char *)data, mLockData)) {
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
              (MOZILLA_LOCK_PROP " was stolen!  Expected \"%s\", saw \"%s\"!\n",
               mLockData, data));
       return NS_ERROR_FAILURE;
@@ -777,7 +777,7 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
     if (event.xany.type == DestroyNotify &&
         event.xdestroywindow.window == aWindow) {
       /* Print to warn user...*/
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
              ("window 0x%x was destroyed.\n",
               (unsigned int) aWindow));
       *aResponse = strdup("Window was destroyed while reading response.");
@@ -801,7 +801,7 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
                                    &nitems, &bytes_after,
                                    &data);
       if (result != Success) {
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
                ("failed reading " MOZILLA_RESPONSE_PROP
                 " from window 0x%0x.\n",
                 (unsigned int) aWindow));
@@ -809,7 +809,7 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
         done = true;
       }
       else if (!data || strlen((char *) data) < 5) {
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
                ("invalid data on " MOZILLA_RESPONSE_PROP
                 " property of window 0x%0x.\n",
                 (unsigned int) aWindow));
@@ -817,7 +817,7 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
         done = true;
       }
       else if (*data == '1') {  /* positive preliminary reply */
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG,  ("%s\n", data + 4));
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,  ("%s\n", data + 4));
         /* keep going */
         done = false;
       }
@@ -829,14 +829,14 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
       }
 
       else if (*data == '2') {  /* positive completion */
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("%s\n", data + 4));
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("%s\n", data + 4));
         *aResponse = strdup((char *)data);
         accepted = true;
         done = true;
       }
 
       else if (*data == '3') {  /* positive intermediate reply */
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
                ("internal error: "
                 "server wants more information?  (%s)\n",
                 data));
@@ -846,13 +846,13 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
 
       else if (*data == '4' ||  /* transient negative completion */
                *data == '5') {  /* permanent negative completion */
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("%s\n", data + 4));
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG, ("%s\n", data + 4));
         *aResponse = strdup((char *)data);
         done = true;
       }
 
       else {
-        PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+        MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
                ("unrecognised " MOZILLA_RESPONSE_PROP
                 " from window 0x%x: %s\n",
                 (unsigned int) aWindow, data));
@@ -868,7 +868,7 @@ XRemoteClient::WaitForResponse(Window aWindow, char **aResponse,
              event.xproperty.window == aWindow &&
              event.xproperty.state == PropertyDelete &&
              event.xproperty.atom == aCommandAtom) {
-      PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+      MOZ_LOG(sRemoteLm, PR_LOG_DEBUG,
              ("(server 0x%x has accepted "
               MOZILLA_COMMAND_PROP ".)\n",
               (unsigned int) aWindow));

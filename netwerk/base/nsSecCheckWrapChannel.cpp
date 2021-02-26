@@ -19,7 +19,7 @@ GetChannelWrapperLog()
 }
 #endif
 
-#define CHANNELWRAPPERLOG(args) PR_LOG(GetChannelWrapperLog(), 4, args)
+#define CHANNELWRAPPERLOG(args) MOZ_LOG(GetChannelWrapperLog(), 4, args)
 
 NS_IMPL_ADDREF(nsSecCheckWrapChannelBase)
 NS_IMPL_RELEASE(nsSecCheckWrapChannelBase)

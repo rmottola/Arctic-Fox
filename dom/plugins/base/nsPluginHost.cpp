@@ -280,9 +280,9 @@ nsPluginHost::nsPluginHost()
   nsPluginLogging::gNPPLog = PR_NewLogModule(NPP_LOG_NAME);
   nsPluginLogging::gPluginLog = PR_NewLogModule(PLUGIN_LOG_NAME);
 
-  PR_LOG(nsPluginLogging::gNPNLog, PLUGIN_LOG_ALWAYS,("NPN Logging Active!\n"));
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_ALWAYS,("General Plugin Logging Active! (nsPluginHost::ctor)\n"));
-  PR_LOG(nsPluginLogging::gNPPLog, PLUGIN_LOG_ALWAYS,("NPP Logging Active!\n"));
+  MOZ_LOG(nsPluginLogging::gNPNLog, PLUGIN_LOG_ALWAYS,("NPN Logging Active!\n"));
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_ALWAYS,("General Plugin Logging Active! (nsPluginHost::ctor)\n"));
+  MOZ_LOG(nsPluginLogging::gNPPLog, PLUGIN_LOG_ALWAYS,("NPP Logging Active!\n"));
 
   PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("nsPluginHost::ctor\n"));
   PR_LogFlush();
@@ -785,7 +785,7 @@ nsPluginHost::InstantiatePluginInstance(const nsACString& aMimeType, nsIURI* aUR
   if (aURL)
     aURL->GetAsciiSpec(urlSpec);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::InstantiatePlugin Begin mime=%s, url=%s\n",
          PromiseFlatCString(aMimeType).get(), urlSpec.get()));
 
@@ -848,7 +848,7 @@ nsPluginHost::InstantiatePluginInstance(const nsACString& aMimeType, nsIURI* aUR
   nsAutoCString urlSpec2;
   if (aURL != nullptr) aURL->GetAsciiSpec(urlSpec2);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::InstantiatePlugin Finished mime=%s, rv=%d, url=%s\n",
          PromiseFlatCString(aMimeType).get(), rv, urlSpec2.get()));
 
@@ -926,7 +926,7 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
   nsAutoCString urlSpec;
   if (aURL != nullptr) aURL->GetSpec(urlSpec);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::TrySetupPluginInstance Begin mime=%s, owner=%p, url=%s\n",
          PromiseFlatCString(aMimeType).get(), aOwner, urlSpec.get()));
 
@@ -983,7 +983,7 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
   if (aURL)
     aURL->GetSpec(urlSpec2);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
         ("nsPluginHost::TrySetupPluginInstance Finished mime=%s, rv=%d, owner=%p, url=%s\n",
          PromiseFlatCString(aMimeType).get(), rv, aOwner, urlSpec2.get()));
 
@@ -2954,7 +2954,7 @@ nsPluginHost::ReadPluginInfo()
       tag->ImportFlagsToPrefs(tagflag);
     }
 
-    PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+    MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
       ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->mFileName.get()));
     tag->mNext = mCachedPlugins;
     mCachedPlugins = tag;

@@ -820,7 +820,7 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
 
   NS_ENSURE_ARG(_rvChain);
   nsresult rv;
-  PR_LOG(gPIPNSSLog, PR_LOG_DEBUG, ("Getting chain for \"%s\"\n", mCert->nickname));
+  MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG, ("Getting chain for \"%s\"\n", mCert->nickname));
 
   mozilla::pkix::Time now(mozilla::pkix::Now());
 
@@ -854,7 +854,7 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
     if ((usage & otherUsagesToTest) == 0) {
       continue;
     }
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("pipnss: PKIX attempting chain(%d) for '%s'\n",
             usage, mCert->nickname));
     if (certVerifier->VerifyCert(mCert.get(), usage, now,
@@ -872,7 +872,7 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
     // There is not verified path for the chain, howeever we still want to 
     // present to the user as much of a possible chain as possible, in the case
     // where there was a problem with the cert or the issuers.
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("pipnss: getchain :CertVerify failed to get chain for '%s'\n",
             mCert->nickname));
     nssChain = CERT_GetCertChainFromCert(mCert.get(), PR_Now(),
@@ -893,7 +893,7 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
   for (node = CERT_LIST_HEAD(nssChain.get());
        !CERT_LIST_END(node, nssChain.get());
        node = CERT_LIST_NEXT(node)) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("adding %s to chain\n", node->cert->nickname));
     nsCOMPtr<nsIX509Cert> cert = nsNSSCertificate::Create(node->cert);
     array->AppendElement(cert, false);
@@ -919,7 +919,7 @@ nsNSSCertificate::GetAllTokenNames(uint32_t* aLength, char16_t*** aTokenNames)
 
   // Get the slots from NSS
   ScopedPK11SlotList slots;
-  PR_LOG(gPIPNSSLog, PR_LOG_DEBUG, ("Getting slots for \"%s\"\n", mCert->nickname));
+  MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG, ("Getting slots for \"%s\"\n", mCert->nickname));
   slots = PK11_GetAllSlotsForCert(mCert.get(), nullptr);
   if (!slots) {
     if (PORT_GetError() == SEC_ERROR_NO_TOKEN)
@@ -1146,7 +1146,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
 
   ScopedNSSCMSMessage cmsg(NSS_CMSMessage_Create(nullptr));
   if (!cmsg) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - can't create CMS message\n"));
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -1155,7 +1155,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
   ScopedNSSCMSSignedData sigd(
     NSS_CMSSignedData_CreateCertsOnly(cmsg, mCert.get(), false));
   if (!sigd) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - can't create SignedData\n"));
     return NS_ERROR_FAILURE;
   }
@@ -1181,7 +1181,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
           certChain.forget();
         }
         else {
-          PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+          MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
                  ("nsNSSCertificate::ExportAsCMS - can't add chain\n"));
           return NS_ERROR_FAILURE;
         }
@@ -1193,7 +1193,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
           issuerCert.forget();
         }
         else {
-          PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+          MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
                  ("nsNSSCertificate::ExportAsCMS - can't add issuer cert\n"));
           return NS_ERROR_FAILURE;
         }
@@ -1207,14 +1207,14 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
     sigd.forget();
   }
   else {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - can't attach SignedData\n"));
     return NS_ERROR_FAILURE;
   }
 
   ScopedPLArenaPool arena(PORT_NewArena(1024));
   if (!arena) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - out of memory\n"));
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -1225,13 +1225,13 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
                                                    nullptr, nullptr, nullptr,
                                                    nullptr, nullptr);
   if (!ecx) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - can't create encoder context\n"));
     return NS_ERROR_FAILURE;
   }
 
   if (NSS_CMSEncoder_Finish(ecx) != SECSuccess) {
-    PR_LOG(gPIPNSSLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPIPNSSLog, PR_LOG_DEBUG,
            ("nsNSSCertificate::ExportAsCMS - failed to add encoded data\n"));
     return NS_ERROR_FAILURE;
   }

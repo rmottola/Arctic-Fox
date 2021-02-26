@@ -36,7 +36,7 @@
 using mozilla::media::TimeUnit;
 
 PRLogModuleInfo* gMediaResourceLog;
-#define RESOURCE_LOG(msg, ...) PR_LOG(gMediaResourceLog, PR_LOG_DEBUG, \
+#define RESOURCE_LOG(msg, ...) MOZ_LOG(gMediaResourceLog, PR_LOG_DEBUG, \
                                       (msg, ##__VA_ARGS__))
 // Debug logging macro with object pointer and class name.
 #define CMLOG(msg, ...) \

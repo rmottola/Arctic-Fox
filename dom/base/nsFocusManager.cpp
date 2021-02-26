@@ -80,8 +80,8 @@ using namespace mozilla::widget;
 PRLogModuleInfo* gFocusLog;
 PRLogModuleInfo* gFocusNavigationLog;
 
-#define LOGFOCUS(args) PR_LOG(gFocusLog, PR_LOG_DEBUG, args)
-#define LOGFOCUSNAVIGATION(args) PR_LOG(gFocusNavigationLog, PR_LOG_DEBUG, args)
+#define LOGFOCUS(args) MOZ_LOG(gFocusLog, PR_LOG_DEBUG, args)
+#define LOGFOCUSNAVIGATION(args) MOZ_LOG(gFocusNavigationLog, PR_LOG_DEBUG, args)
 
 #define LOGTAG(log, format, content)                            \
   if (PR_LOG_TEST(log, PR_LOG_DEBUG)) {                         \
@@ -89,7 +89,7 @@ PRLogModuleInfo* gFocusNavigationLog;
     if (content) {                                              \
       content->NodeInfo()->NameAtom()->ToUTF8String(tag);       \
     }                                                           \
-    PR_LOG(log, PR_LOG_DEBUG, (format, tag.get()));             \
+    MOZ_LOG(log, PR_LOG_DEBUG, (format, tag.get()));             \
   }
 
 #define LOGCONTENT(format, content) LOGTAG(gFocusLog, format, content)

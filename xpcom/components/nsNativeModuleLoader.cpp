@@ -58,7 +58,7 @@ GetNativeModuleLoaderLog()
   return sLog;
 }
 
-#define LOG(level, args) PR_LOG(GetNativeModuleLoaderLog(), level, args)
+#define LOG(level, args) MOZ_LOG(GetNativeModuleLoaderLog(), level, args)
 
 nsresult
 nsNativeModuleLoader::Init()

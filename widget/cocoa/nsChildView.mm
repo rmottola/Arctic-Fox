@@ -5628,7 +5628,7 @@ static int32_t RoundUp(double aDouble)
   if (!mGeckoChild)
     return NSDragOperationNone;
 
-  PR_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView doDragAction: entered\n"));
+  MOZ_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView doDragAction: entered\n"));
 
   if (!mDragService) {
     CallGetService(kDragServiceContractID, &mDragService);
@@ -5722,7 +5722,7 @@ static int32_t RoundUp(double aDouble)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  PR_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingEntered: entered\n"));
+  MOZ_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingEntered: entered\n"));
 
   // there should never be a globalDragPboard when "draggingEntered:" is
   // called, but just in case we'll take care of it here.
@@ -5740,14 +5740,14 @@ static int32_t RoundUp(double aDouble)
 
 - (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
 {
-  PR_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingUpdated: entered\n"));
+  MOZ_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingUpdated: entered\n"));
 
   return [self doDragAction:NS_DRAGDROP_OVER sender:sender];
 }
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender
 {
-  PR_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingExited: entered\n"));
+  MOZ_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView draggingExited: entered\n"));
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
   [self doDragAction:NS_DRAGDROP_EXIT sender:sender];
@@ -5846,7 +5846,7 @@ static int32_t RoundUp(double aDouble)
 
   nsresult rv;
 
-  PR_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView namesOfPromisedFilesDroppedAtDestination: entering callback for promised files\n"));
+  MOZ_LOG(sCocoaLog, PR_LOG_ALWAYS, ("ChildView namesOfPromisedFilesDroppedAtDestination: entering callback for promised files\n"));
 
   nsCOMPtr<nsIFile> targFile;
   NS_NewLocalFile(EmptyString(), true, getter_AddRefs(targFile));

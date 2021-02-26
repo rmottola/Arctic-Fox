@@ -925,7 +925,7 @@ nsDocShell::nsDocShell()
     gDocShellLeakLog = PR_NewLogModule("nsDocShellLeak");
   }
   if (gDocShellLeakLog) {
-    PR_LOG(gDocShellLeakLog, PR_LOG_DEBUG, ("DOCSHELL %p created\n", this));
+    MOZ_LOG(gDocShellLeakLog, PR_LOG_DEBUG, ("DOCSHELL %p created\n", this));
   }
 
 #ifdef DEBUG
@@ -960,7 +960,7 @@ nsDocShell::~nsDocShell()
   }
 
   if (gDocShellLeakLog) {
-    PR_LOG(gDocShellLeakLog, PR_LOG_DEBUG, ("DOCSHELL %p destroyed\n", this));
+    MOZ_LOG(gDocShellLeakLog, PR_LOG_DEBUG, ("DOCSHELL %p destroyed\n", this));
   }
 
 #ifdef DEBUG
@@ -1097,7 +1097,7 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
     }
 
 #if defined(DEBUG)
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]: returning app cache container %p",
             this, domDoc.get()));
 #endif
@@ -1429,7 +1429,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
   if (PR_LOG_TEST(gDocShellLog, PR_LOG_DEBUG)) {
     nsAutoCString uristr;
     aURI->GetAsciiSpec(uristr);
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]: loading %s with flags 0x%08x",
             this, uristr.get(), aLoadFlags));
   }
@@ -1548,7 +1548,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
 
   if (shEntry) {
 #ifdef DEBUG
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]: loading from session history", this));
 #endif
 
@@ -5318,7 +5318,7 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
       chanName.AssignLiteral("<no channel>");
     }
 
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]::LoadErrorPage(\"%s\", \"%s\", {...}, [%s])\n", this,
             spec.get(), NS_ConvertUTF16toUTF8(aURL).get(), chanName.get()));
   }
@@ -11270,7 +11270,7 @@ nsDocShell::OnNewURI(nsIURI* aURI, nsIChannel* aChannel, nsISupports* aOwner,
       chanName.AssignLiteral("<no channel>");
     }
 
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]::OnNewURI(\"%s\", [%s], 0x%x)\n", this, spec.get(),
             chanName.get(), aLoadType));
   }
@@ -11335,7 +11335,7 @@ nsDocShell::OnNewURI(nsIURI* aURI, nsIChannel* aChannel, nsISupports* aOwner,
   // XXX This log message is almost useless because |updateSHistory|
   //     and |updateGHistory| are not correct at this point.
 
-  PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+  MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
          ("  shAvailable=%i updateSHistory=%i updateGHistory=%i"
           " equalURI=%i\n",
           shAvailable, updateSHistory, updateGHistory, equalUri));
@@ -11908,7 +11908,7 @@ nsDocShell::AddToSessionHistory(nsIURI* aURI, nsIChannel* aChannel,
       chanName.AssignLiteral("<no channel>");
     }
 
-    PR_LOG(gDocShellLog, PR_LOG_DEBUG,
+    MOZ_LOG(gDocShellLog, PR_LOG_DEBUG,
            ("nsDocShell[%p]::AddToSessionHistory(\"%s\", [%s])\n",
             this, spec.get(), chanName.get()));
   }

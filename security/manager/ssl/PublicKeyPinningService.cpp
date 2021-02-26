@@ -59,7 +59,7 @@ EvalCertWithHashType(const CERTCertificate* cert, SECOidTag hashType,
 {
   certMatchesPinset = false;
   if (!dynamicFingerprints) {
-    PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
            ("pkpin: No hashes found for hash type: %d\n", hashType));
     return NS_ERROR_INVALID_ARG;
   }
@@ -67,14 +67,14 @@ EvalCertWithHashType(const CERTCertificate* cert, SECOidTag hashType,
   nsAutoCString base64Out;
   nsresult rv = GetBase64HashSPKI(cert, hashType, base64Out);
   if (NS_FAILED(rv)) {
-    PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
            ("pkpin: GetBase64HashSPKI failed!\n"));
     return rv;
   }
 
   for (size_t i = 0; i < dynamicFingerprints->Length(); i++) {
     if (base64Out.Equals((*dynamicFingerprints)[i])) {
-      PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+        MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
              ("pkpin: found pin base_64 ='%s'\n", base64Out.get()));
       certMatchesPinset = true;
       return NS_OK;
@@ -104,9 +104,9 @@ EvalChainWithHashType(const CERTCertList* certList, SECOidTag hashType,
   for (node = CERT_LIST_HEAD(certList); !CERT_LIST_END(node, certList);
        node = CERT_LIST_NEXT(node)) {
     currentCert = node->cert;
-    PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
            ("pkpin: certArray subject: '%s'\n", currentCert->subjectName));
-    PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
            ("pkpin: certArray issuer: '%s'\n", currentCert->issuerName));
     nsresult rv = EvalCertWithHashType(currentCert, hashType,
                                        dynamicFingerprints,
@@ -118,7 +118,7 @@ EvalChainWithHashType(const CERTCertList* certList, SECOidTag hashType,
       return NS_OK;
     }
   }
-  PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG, ("pkpin: no matches found\n"));
+  MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG, ("pkpin: no matches found\n"));
   return NS_OK;
 }
 
@@ -151,7 +151,7 @@ FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
   char *evalPart;
   // Notice how the (xx = strchr) prevents pins for unqualified domain names.
   while (evalPart = strchr(evalHost, '.')) {
-    PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+    MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
            ("pkpin: Querying pinsets for host: '%s'\n", evalHost));
     // Look up dynamic pins
     nsresult rv;
@@ -164,12 +164,12 @@ FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
       return rv;
     }
     if (found && (evalHost == hostname || includeSubdomains)) {
-      PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+      MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
              ("pkpin: Found dyn match for host: '%s'\n", evalHost));
       dynamicFingerprints = pinArray;
       return NS_OK;
     } else {
-      PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+      MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
              ("pkpin: Didn't find pinset for host: '%s'\n", evalHost));
     }
     // Add one for '.'
@@ -219,7 +219,7 @@ CheckChainAgainstAllNames(const CERTCertList* certList, bool enforceTestMode,
                   /*out*/ bool& chainHasValidPins)
 {
   chainHasValidPins = false;
-  PR_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
+  MOZ_LOG(gPublicKeyPinningLog, PR_LOG_DEBUG,
          ("pkpin: top of checkChainAgainstAllNames"));
   CERTCertListNode* node = CERT_LIST_HEAD(certList);
   if (!node) {
