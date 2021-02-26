@@ -1235,6 +1235,8 @@ pref("browser.readinglist.enabled", false);
 pref("browser.translation.detectLanguage", false);
 pref("browser.translation.neverForLanguages", "");
 
+pref("browser.defaultbrowser.notificationbar", false);
+
 // Telemetry settings.
 // Determines if Telemetry pings can be archived locally.
 pref("toolkit.telemetry.archive.enabled", true);
