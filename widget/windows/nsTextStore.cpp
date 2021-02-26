@@ -1905,7 +1905,7 @@ nsTextStore::GetDisplayAttribute(ITfProperty* aAttrProperty,
 
   HRESULT hr;
 
-  if (PR_LOG_TEST(sTextStoreLog, PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(sTextStoreLog, PR_LOG_DEBUG)) {
     LONG start = 0, length = 0;
     hr = GetRangeExtent(aRange, &start, &length);
     MOZ_LOG(sTextStoreLog, PR_LOG_DEBUG,
@@ -3762,7 +3762,7 @@ nsTextStore::OnUpdateComposition(ITfCompositionView* pComposition,
     return hr;
   }
 
-  if (PR_LOG_TEST(sTextStoreLog, PR_LOG_ALWAYS)) {
+  if (MOZ_LOG_TEST(sTextStoreLog, PR_LOG_ALWAYS)) {
     Selection& currentSel = CurrentSelection();
     if (currentSel.IsDirty()) {
       MOZ_LOG(sTextStoreLog, PR_LOG_ERROR,

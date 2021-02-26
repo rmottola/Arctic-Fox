@@ -1026,7 +1026,7 @@ nsComponentManagerImpl::GetClassObject(const nsCID& aClass, const nsIID& aIID,
 {
   nsresult rv;
 
-  if (PR_LOG_TEST(nsComponentManagerLog, PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(nsComponentManagerLog, PR_LOG_DEBUG)) {
     char* buf = aClass.ToString();
     PR_LogPrint("nsComponentManager: GetClassObject(%s)", buf);
     if (buf) {
@@ -1142,7 +1142,7 @@ nsComponentManagerImpl::CreateInstance(const nsCID& aClass,
     rv = NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-  if (PR_LOG_TEST(nsComponentManagerLog, PR_LOG_WARNING)) {
+  if (MOZ_LOG_TEST(nsComponentManagerLog, PR_LOG_WARNING)) {
     char* buf = aClass.ToString();
     MOZ_LOG(nsComponentManagerLog, PR_LOG_WARNING,
            ("nsComponentManager: CreateInstance(%s) %s", buf,

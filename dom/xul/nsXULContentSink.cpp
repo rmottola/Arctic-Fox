@@ -762,7 +762,7 @@ XULContentSinkImpl::OpenRoot(const char16_t** aAttributes,
     rv = CreateElement(aNodeInfo, &element);
 
     if (NS_FAILED(rv)) {
-        if (PR_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
+        if (MOZ_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
             nsAutoString anodeC;
             aNodeInfo->GetName(anodeC);
             MOZ_LOG(gContentSinkLog, PR_LOG_ERROR,
@@ -803,7 +803,7 @@ XULContentSinkImpl::OpenTag(const char16_t** aAttributes,
     rv = CreateElement(aNodeInfo, &element);
 
     if (NS_FAILED(rv)) {
-        if (PR_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
+        if (MOZ_LOG_TEST(gContentSinkLog, PR_LOG_ERROR)) {
             nsAutoString anodeC;
             aNodeInfo->GetName(anodeC);
             MOZ_LOG(gContentSinkLog, PR_LOG_ERROR,
@@ -1021,7 +1021,7 @@ XULContentSinkImpl::AddAttributes(const char16_t** aAttributes,
                                mDocumentURL);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      if (PR_LOG_TEST(gContentSinkLog, PR_LOG_DEBUG)) {
+      if (MOZ_LOG_TEST(gContentSinkLog, PR_LOG_DEBUG)) {
           nsAutoString extraWhiteSpace;
           int32_t cnt = mContextStack.Depth();
           while (--cnt >= 0)

@@ -313,7 +313,7 @@ nsTimerImpl::Startup()
 void
 nsTimerImpl::Shutdown()
 {
-  if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
     double mean = 0, stddev = 0;
     myNS_MeanAndStdDev(sDeltaNum, sDeltaSum, sDeltaSumSquared, &mean, &stddev);
 
@@ -569,7 +569,7 @@ nsTimerImpl::Fire()
 #endif
 
   TimeStamp now = TimeStamp::Now();
-  if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
     TimeDuration   a = now - mStart; // actual delay in intervals
     TimeDuration   b = TimeDuration::FromMilliseconds(mDelay); // expected delay in intervals
     TimeDuration   delta = (a > b) ? a - b : b - a;
@@ -698,7 +698,7 @@ nsTimerEvent::Run()
     return NS_OK;
   }
 
-  if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
     TimeStamp now = TimeStamp::Now();
     MOZ_LOG(GetTimerLog(), PR_LOG_DEBUG,
            ("[this=%p] time between PostTimerEvent() and Fire(): %fms\n",
@@ -739,7 +739,7 @@ nsTimerImpl::PostTimerEvent(already_AddRefed<nsTimerImpl> aTimerRef)
     return timer.forget();
   }
 
-  if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
     event->mInitTime = TimeStamp::Now();
   }
 
@@ -786,7 +786,7 @@ nsTimerImpl::SetDelayInternal(uint32_t aDelay)
 
   mTimeout += delayInterval;
 
-  if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
     if (mStart.IsNull()) {
       mStart = now;
     } else {
