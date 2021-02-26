@@ -781,7 +781,6 @@ BrowserGlue.prototype = {
    * _onPlacesShutdown() and not here.
    */
   _onProfileShutdown: function BG__onProfileShutdown() {
-    BrowserNewTabPreloader.uninit();
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
@@ -1428,7 +1427,7 @@ BrowserGlue.prototype = {
   },
 
   _migrateUI: function BG__migrateUI() {
-    const UI_VERSION = 16;
+    const UI_VERSION = 24;
     const BROWSER_DOCURL = "chrome://browser/content/browser.xul#";
     let currentUIVersion = 0;
     try {
@@ -1530,15 +1529,6 @@ BrowserGlue.prototype = {
     // Downloads Panel feature before its release. Since migration at version
     // 9 adds the button by default, this step has been removed.
 
-    if (currentUIVersion < 8) {
-      // Reset homepage pref for users who have it set to google.com/firefox
-      let uri = Services.prefs.getComplexValue("browser.startup.homepage",
-                                               Ci.nsIPrefLocalizedString).data;
-      if (uri && /^https?:\/\/(www\.)?google(\.\w{2,3}){1,2}\/firefox\/?$/.test(uri)) {
-        Services.prefs.clearUserPref("browser.startup.homepage");
-      }
-    }
-
     if (currentUIVersion < 9) {
       // This code adds the customizable downloads buttons.
       let currentsetResource = this._rdf.GetResource("currentset");
@@ -1628,6 +1618,32 @@ BrowserGlue.prototype = {
 
     delete this._rdf;
     delete this._dataSource;
+
+    if (currentUIVersion < 24) {
+      // Reset homepage pref for users who have it set to start.mozilla.org
+      // or google.com/firefox.
+      const HOMEPAGE_PREF = "browser.startup.homepage";
+      if (Services.prefs.prefHasUserValue(HOMEPAGE_PREF)) {
+        const DEFAULT =
+          Services.prefs.getDefaultBranch(HOMEPAGE_PREF)
+                        .getComplexValue("", Ci.nsIPrefLocalizedString).data;
+        let value =
+          Services.prefs.getComplexValue(HOMEPAGE_PREF, Ci.nsISupportsString);
+        let updated =
+          value.data.replace(/https?:\/\/start\.mozilla\.org[^|]*/i, DEFAULT)
+                    .replace(/https?:\/\/(www\.)?google\.[a-z.]+\/firefox[^|]*/i,
+                             DEFAULT);
+        if (updated != value.data) {
+          if (updated == DEFAULT) {
+            Services.prefs.clearUserPref(HOMEPAGE_PREF);
+          } else {
+            value.data = updated;
+            Services.prefs.setComplexValue(HOMEPAGE_PREF,
+                                           Ci.nsISupportsString, value);
+          }
+        }
+      }
+    }
 
     // Update the migration version.
     Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
@@ -2312,29 +2328,28 @@ let DefaultBrowserCheck = {
       claimAllTypes = (parseFloat(version) < 6.2);
     } catch (ex) { }
 #endif
-    ShellService.setDefaultBrowser(claimAllTypes, false);
-    this.closePrompt();
+    try {
+      ShellService.setDefaultBrowser(claimAllTypes, false);
+    } catch (ex) {
+      Cu.reportError(ex);
+    }
   },
 
-  _createPopup: function(win, bundle) {
+  _createPopup: function(win, notNowStrings, neverStrings) {
     let doc = win.document;
     let popup = doc.createElement("menupopup");
     popup.id = this.OPTIONPOPUP;
 
     let notNowItem = doc.createElement("menuitem");
     notNowItem.id = "defaultBrowserNotNow";
-    let label = bundle.getString("setDefaultBrowserNotNow.label");
-    notNowItem.setAttribute("label", label);
-    let accesskey = bundle.getString("setDefaultBrowserNotNow.accesskey");
-    notNowItem.setAttribute("accesskey", accesskey);
+    notNowItem.setAttribute("label", notNowStrings.label);
+    notNowItem.setAttribute("accesskey", notNowStrings.accesskey);
     popup.appendChild(notNowItem);
 
     let neverItem = doc.createElement("menuitem");
     neverItem.id = "defaultBrowserNever";
-    let label = bundle.getString("setDefaultBrowserNever.label");
-    neverItem.setAttribute("label", label);
-    let accesskey = bundle.getString("setDefaultBrowserNever.accesskey");
-    neverItem.setAttribute("accesskey", accesskey);
+    neverItem.setAttribute("label", neverStrings.label);
+    neverItem.setAttribute("accesskey", neverStrings.accesskey);
     popup.appendChild(neverItem);
 
     popup.addEventListener("command", this);
@@ -2353,47 +2368,83 @@ let DefaultBrowserCheck = {
   },
 
   prompt: function(win) {
+    let useNotificationBar = Services.prefs.getBoolPref("browser.defaultbrowser.notificationbar");
+
     let brandBundle = win.document.getElementById("bundle_brand");
-    let shellBundle = win.document.getElementById("bundle_shell");
-
     let brandShortName = brandBundle.getString("brandShortName");
-    let promptMessage = shellBundle.getFormattedString("setDefaultBrowserMessage2",
-                                                       [brandShortName]);
 
-    let confirmMessage = shellBundle.getFormattedString("setDefaultBrowserConfirm.label",
-                                                        [brandShortName]);
-    let confirmKey = shellBundle.getString("setDefaultBrowserConfirm.accesskey");
+    let shellBundle = win.document.getElementById("bundle_shell");
+    let buttonPrefix = "setDefaultBrowser" + (useNotificationBar ? "" : "Alert");
+    let yesButton = shellBundle.getFormattedString(buttonPrefix + "Confirm.label",
+                                                   [brandShortName]);
+    let notNowButton = shellBundle.getString(buttonPrefix + "NotNow.label");
 
-    let optionsMessage = shellBundle.getString("setDefaultBrowserOptions.label");
-    let optionsKey = shellBundle.getString("setDefaultBrowserOptions.accesskey");
+    if (useNotificationBar) {
+      let promptMessage = shellBundle.getFormattedString("setDefaultBrowserMessage2",
+                                                         [brandShortName]);
+      let optionsMessage = shellBundle.getString("setDefaultBrowserOptions.label");
+      let optionsKey = shellBundle.getString("setDefaultBrowserOptions.accesskey");
 
-    let selectedBrowser = win.gBrowser.selectedBrowser;
-    let notificationBox = win.document.getElementById("high-priority-global-notificationbox");
+      let neverLabel = shellBundle.getString("setDefaultBrowserNever.label");
+      let neverKey = shellBundle.getString("setDefaultBrowserNever.accesskey");
 
-    this._createPopup(win, shellBundle);
+      let yesButtonKey = shellBundle.getString("setDefaultBrowserConfirm.accesskey");
+      let notNowButtonKey = shellBundle.getString("setDefaultBrowserNotNow.accesskey");
 
-    let buttons = [
-      {
-        label: confirmMessage,
-        accessKey: confirmKey,
-        callback: this.setAsDefault.bind(this)
-      },
-      {
-        label: optionsMessage,
-        accessKey: optionsKey,
-        popup: this.OPTIONPOPUP
+      let notificationBox = win.document.getElementById("high-priority-global-notificationbox");
+
+      this._createPopup(win, {
+        label: notNowButton,
+        accesskey: notNowButtonKey
+      }, {
+        label: neverLabel,
+        accesskey: neverKey
+      });
+
+      let buttons = [
+        {
+          label: yesButton,
+          accessKey: yesButtonKey,
+          callback: () => {
+            this.setAsDefault();
+            this.closePrompt();
+          }
+        },
+        {
+          label: optionsMessage,
+          accessKey: optionsKey,
+          popup: this.OPTIONPOPUP
+        }
+      ];
+
+      let iconPixels = win.devicePixelRatio > 1 ? "32" : "16";
+      let iconURL = "chrome://branding/content/icon" + iconPixels + ".png";
+      const priority = notificationBox.PRIORITY_WARNING_HIGH;
+      let callback = this._onNotificationEvent.bind(this);
+      this._notification = notificationBox.appendNotification(promptMessage, "default-browser",
+                                                              iconURL, priority, buttons,
+                                                              callback);
+    } else {
+      // Modal prompt
+      let promptTitle = shellBundle.getString("setDefaultBrowserTitle");
+      let promptMessage = shellBundle.getFormattedString("setDefaultBrowserMessage",
+                                                         [brandShortName]);
+      let askLabel = shellBundle.getFormattedString("setDefaultBrowserDontAsk",
+                                                    [brandShortName]);
+
+      let ps = Services.prompt;
+      let shouldAsk = { value: true };
+      let buttonFlags = (ps.BUTTON_TITLE_IS_STRING * ps.BUTTON_POS_0) +
+                        (ps.BUTTON_TITLE_IS_STRING * ps.BUTTON_POS_1) +
+                        ps.BUTTON_POS_0_DEFAULT;
+      let rv = ps.confirmEx(win, promptTitle, promptMessage, buttonFlags,
+                            yesButton, notNowButton, null, askLabel, shouldAsk);
+      if (rv == 0) {
+        this.setAsDefault();
+      } else if (!shouldAsk.value) {
+        ShellService.shouldCheckDefaultBrowser = false;
       }
-    ];
-
-
-    let iconPixels = win.devicePixelRatio > 1 ? "32" : "16";
-    let iconURL = "chrome://branding/content/icon" + iconPixels + ".png";
-    const priority = notificationBox.PRIORITY_WARNING_HIGH;
-    let callback = this._onNotificationEvent.bind(this);
-    this._notification = notificationBox.appendNotification(promptMessage, "default-browser",
-                                                            iconURL, priority, buttons,
-                                                            callback);
-    this._notification.persistence = -1;
+    }
   },
 
   _onNotificationEvent: function(eventType) {

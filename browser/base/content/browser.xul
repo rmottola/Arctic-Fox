@@ -1018,6 +1018,7 @@
 
     <splitter id="sidebar-splitter" class="chromeclass-extrachrome sidebar-splitter" hidden="true"/>
     <vbox id="appcontent" flex="1">
+      <notificationbox id="high-priority-global-notificationbox"/>
       <tabbrowser id="content"
                   flex="1" contenttooltip="aHTMLTooltip"
                   tabcontainer="tabbrowser-tabs"
