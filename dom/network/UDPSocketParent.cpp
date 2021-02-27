@@ -28,8 +28,8 @@
 //
 extern PRLogModuleInfo *gUDPSocketLog;
 #endif
-#define UDPSOCKET_LOG(args)     MOZ_LOG(gUDPSocketLog, PR_LOG_DEBUG, args)
-#define UDPSOCKET_LOG_ENABLED() MOZ_LOG_TEST(gUDPSocketLog, PR_LOG_DEBUG)
+#define UDPSOCKET_LOG(args)     MOZ_LOG(gUDPSocketLog, mozilla::LogLevel::Debug, args)
+#define UDPSOCKET_LOG_ENABLED() MOZ_LOG_TEST(gUDPSocketLog, mozilla::LogLevel::Debug)
 
 namespace mozilla {
 namespace dom {

@@ -2375,7 +2375,7 @@ KeyboardLayout::LoadLayout(HKL aLayout)
         UINT scanCode = kExtendedScanCode[i] + j;
         UINT virtualKeyCode =
           ::MapVirtualKeyEx(scanCode, kMapType, mKeyboardLayout);
-        MOZ_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
+        MOZ_LOG(sKeyboardLayoutLogger, LogLevel::Debug,
                ("0x%04X, %s", scanCode, kVirtualKeyName[virtualKeyCode]));
       }
     }

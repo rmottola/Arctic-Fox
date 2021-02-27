@@ -184,7 +184,7 @@ ProgressTracker::Notify(IProgressObserver* aObserver)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsRefPtr<Image> image = GetImage();
     if (image && image->GetURI()) {
       nsRefPtr<ImageURL> uri(image->GetURI());
@@ -253,7 +253,7 @@ ProgressTracker::NotifyCurrentState(IProgressObserver* aObserver)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsRefPtr<Image> image = GetImage();
     nsAutoCString spec;
     if (image && image->GetURI()) {

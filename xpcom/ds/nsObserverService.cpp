@@ -24,7 +24,7 @@
 //    set NSPR_LOG_MODULES=ObserverService:5
 //    set NSPR_LOG_FILE=nspr.log
 //
-// this enables PR_LOG_DEBUG level information and places all output in
+// this enables LogLevel::Debug level information and places all output in
 // the file nspr.log
 static PRLogModuleInfo*
 GetObserverServiceLog()
@@ -35,7 +35,7 @@ GetObserverServiceLog()
   }
   return sLog;
 }
-#define LOG(x)  MOZ_LOG(GetObserverServiceLog(), PR_LOG_DEBUG, x)
+#define LOG(x)  MOZ_LOG(GetObserverServiceLog(), mozilla::LogLevel::Debug, x)
 
 namespace mozilla {
 

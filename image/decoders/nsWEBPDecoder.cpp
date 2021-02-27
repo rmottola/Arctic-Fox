@@ -25,14 +25,14 @@ nsWEBPDecoder::nsWEBPDecoder(RasterImage* aImage)
  , mData(nullptr)
  , mPreviousLastLine(0)
 {
-  MOZ_LOG(gWEBPDecoderAccountingLog, PR_LOG_DEBUG,
+  MOZ_LOG(gWEBPDecoderAccountingLog, LogLevel::Debug,
          ("nsWEBPDecoder::nsWEBPDecoder: Creating WEBP decoder %p",
           this));
 }
 
 nsWEBPDecoder::~nsWEBPDecoder()
 {
-  MOZ_LOG(gWEBPDecoderAccountingLog, PR_LOG_DEBUG,
+  MOZ_LOG(gWEBPDecoderAccountingLog, LogLevel::Debug,
          ("nsWEBPDecoder::~nsWEBPDecoder: Destroying WEBP decoder %p",
           this));
 

@@ -235,7 +235,7 @@ public:
     // Silently cancel if our load has been cancelled.
     if (IsCancelled())
       return NS_OK;
-    LOG_EVENT(PR_LOG_DEBUG, ("%p Dispatching simple event source error", mElement.get()));
+    LOG_EVENT(LogLevel::Debug, ("%p Dispatching simple event source error", mElement.get()));
     return nsContentUtils::DispatchTrustedEvent(mElement->OwnerDoc(),
                                                 mSource,
                                                 NS_LITERAL_STRING("error"),
@@ -855,7 +855,7 @@ void HTMLMediaElement::SelectResource()
     nsCOMPtr<nsIURI> uri;
     nsresult rv = NewURIFromString(src, getter_AddRefs(uri));
     if (NS_SUCCEEDED(rv)) {
-      LOG(PR_LOG_DEBUG, ("%p Trying load from src=%s", this, NS_ConvertUTF16toUTF8(src).get()));
+      LOG(LogLevel::Debug, ("%p Trying load from src=%s", this, NS_ConvertUTF16toUTF8(src).get()));
       NS_ASSERTION(!mIsLoadingFromSourceChildren,
         "Should think we're not loading from source children by default");
 
@@ -888,7 +888,7 @@ void HTMLMediaElement::SelectResource()
 void HTMLMediaElement::NotifyLoadError()
 {
   if (!mIsLoadingFromSourceChildren) {
-    LOG(PR_LOG_DEBUG, ("NotifyLoadError(), no supported media error"));
+    LOG(LogLevel::Debug, ("NotifyLoadError(), no supported media error"));
     NoSupportedMediaSourceError();
   } else if (mSourceLoadCandidate) {
     DispatchAsyncSourceError(mSourceLoadCandidate);
@@ -983,7 +983,7 @@ void HTMLMediaElement::LoadFromSourceChildren()
       ReportLoadError("MediaLoadSourceMediaNotMatched", params, ArrayLength(params));
       continue;
     }
-    LOG(PR_LOG_DEBUG, ("%p Trying load from <source>=%s type=%s media=%s", this,
+    LOG(LogLevel::Debug, ("%p Trying load from <source>=%s type=%s media=%s", this,
       NS_ConvertUTF16toUTF8(src).get(), NS_ConvertUTF16toUTF8(type).get(),
       NS_ConvertUTF16toUTF8(media).get()));
 
@@ -1447,7 +1447,7 @@ HTMLMediaElement::Seek(double aTime,
 
   if (mPlayed && mCurrentPlayRangeStart != -1.0) {
     double rangeEndTime = CurrentTime();
-    LOG(PR_LOG_DEBUG, ("%p Adding \'played\' a range : [%f, %f]", this, mCurrentPlayRangeStart, rangeEndTime));
+    LOG(LogLevel::Debug, ("%p Adding \'played\' a range : [%f, %f]", this, mCurrentPlayRangeStart, rangeEndTime));
     // Multiple seek without playing, or seek while playing.
     if (mCurrentPlayRangeStart != rangeEndTime) {
       mPlayed->Add(mCurrentPlayRangeStart, rangeEndTime);
@@ -1540,7 +1540,7 @@ HTMLMediaElement::Seek(double aTime,
   mPlayingBeforeSeek = IsPotentiallyPlaying();
   // The media backend is responsible for dispatching the timeupdate
   // event if it changes the playback position as a result of the seek.
-  LOG(PR_LOG_DEBUG, ("%p SetCurrentTime(%f) starting seek", this, aTime));
+  LOG(LogLevel::Debug, ("%p SetCurrentTime(%f) starting seek", this, aTime));
   nsresult rv = mDecoder->Seek(aTime, aSeekType);
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
@@ -1554,7 +1554,7 @@ NS_IMETHODIMP HTMLMediaElement::SetCurrentTime(double aCurrentTime)
 {
   // Detect for a NaN and invalid values.
   if (mozilla::IsNaN(aCurrentTime)) {
-    LOG(PR_LOG_DEBUG, ("%p SetCurrentTime(%f) failed: bad time", this, aCurrentTime));
+    LOG(LogLevel::Debug, ("%p SetCurrentTime(%f) failed: bad time", this, aCurrentTime));
     return NS_ERROR_FAILURE;
   }
 
@@ -1658,7 +1658,7 @@ void
 HTMLMediaElement::Pause(ErrorResult& aRv)
 {
   if (mNetworkState == nsIDOMHTMLMediaElement::NETWORK_EMPTY) {
-    LOG(PR_LOG_DEBUG, ("Loading due to Pause()"));
+    LOG(LogLevel::Debug, ("Loading due to Pause()"));
     DoLoad();
   } else if (mDecoder) {
     mDecoder->Pause();
@@ -2214,7 +2214,7 @@ HTMLMediaElement::PlayInternal(bool aCallerIsChrome)
       && !IsScriptedAutoplayEnabled()
       && !EventStateManager::IsHandlingUserInput()
       && !aCallerIsChrome) {
-    LOG(PR_LOG_DEBUG, ("%p Blocked attempt to autoplay media.", this));
+    LOG(LogLevel::Debug, ("%p Blocked attempt to autoplay media.", this));
     return NS_OK;
   }
 
@@ -2236,7 +2236,7 @@ HTMLMediaElement::PlayInternal(bool aCallerIsChrome)
   if (Preferences::GetBool("media.block-play-until-visible", false) &&
       !aCallerIsChrome &&
       OwnerDoc()->Hidden()) {
-    LOG(PR_LOG_DEBUG, ("%p Blocked playback because owner hidden.", this));
+    LOG(LogLevel::Debug, ("%p Blocked playback because owner hidden.", this));
     mPlayBlockedBecauseHidden = true;
     return NS_OK;
   }
@@ -2627,17 +2627,17 @@ HTMLMediaElement::ReportMSETelemetry()
   }
 
   Telemetry::Accumulate(Telemetry::VIDEO_MSE_UNLOAD_STATE, state);
-  LOG(PR_LOG_DEBUG, ("%p VIDEO_MSE_UNLOAD_STATE = %d", this, state));
+  LOG(LogLevel::Debug, ("%p VIDEO_MSE_UNLOAD_STATE = %d", this, state));
 
   Telemetry::Accumulate(Telemetry::VIDEO_MSE_PLAY_TIME_MS, SECONDS_TO_MS(mPlayTime.Total()));
-  LOG(PR_LOG_DEBUG, ("%p VIDEO_MSE_PLAY_TIME_MS = %f", this, mPlayTime.Total()));
+  LOG(LogLevel::Debug, ("%p VIDEO_MSE_PLAY_TIME_MS = %f", this, mPlayTime.Total()));
 
   Telemetry::Accumulate(Telemetry::VIDEO_MSE_BUFFERING_COUNT, mRebufferTime.Count());
-  LOG(PR_LOG_DEBUG, ("%p VIDEO_MSE_BUFFERING_COUNT = %d", this, mRebufferTime.Count()));
+  LOG(LogLevel::Debug, ("%p VIDEO_MSE_BUFFERING_COUNT = %d", this, mRebufferTime.Count()));
 
   double latency = mJoinLatency.Count() ? mJoinLatency.Total() / mJoinLatency.Count() : 0.0;
   Telemetry::Accumulate(Telemetry::VIDEO_MSE_JOIN_LATENCY_MS, SECONDS_TO_MS(latency));
-  LOG(PR_LOG_DEBUG, ("%p VIDEO_MSE_JOIN_LATENCY = %f (%d ms) count=%d\n",
+  LOG(LogLevel::Debug, ("%p VIDEO_MSE_JOIN_LATENCY = %f (%d ms) count=%d\n",
                      this, latency, SECONDS_TO_MS(latency), mJoinLatency.Count()));
 }
 
@@ -2693,7 +2693,7 @@ HTMLMediaElement::CanPlayType(const nsAString& aType, nsAString& aResult)
     break;
   }
 
-  LOG(PR_LOG_DEBUG, ("%p CanPlayType(%s) = \"%s\"", this,
+  LOG(LogLevel::Debug, ("%p CanPlayType(%s) = \"%s\"", this,
                      NS_ConvertUTF16toUTF8(aType).get(),
                      NS_ConvertUTF16toUTF8(aResult).get()));
 
@@ -2712,10 +2712,10 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
   if (!decoder)
     return NS_ERROR_FAILURE;
 
-  LOG(PR_LOG_DEBUG, ("%p Cloned decoder %p from %p", this, decoder.get(), aOriginal));
+  LOG(LogLevel::Debug, ("%p Cloned decoder %p from %p", this, decoder.get(), aOriginal));
 
   if (!decoder->Init(this)) {
-    LOG(PR_LOG_DEBUG, ("%p Failed to init cloned decoder %p", this, decoder.get()));
+    LOG(LogLevel::Debug, ("%p Failed to init cloned decoder %p", this, decoder.get()));
     return NS_ERROR_FAILURE;
   }
 
@@ -2723,7 +2723,7 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
 
   nsRefPtr<MediaResource> resource = originalResource->CloneData(decoder);
   if (!resource) {
-    LOG(PR_LOG_DEBUG, ("%p Failed to cloned stream for decoder %p", this, decoder.get()));
+    LOG(LogLevel::Debug, ("%p Failed to cloned stream for decoder %p", this, decoder.get()));
     return NS_ERROR_FAILURE;
   }
 
@@ -2751,7 +2751,7 @@ nsresult HTMLMediaElement::InitializeDecoderForChannel(nsIChannel* aChannel,
     return NS_ERROR_FAILURE;
   }
 
-  LOG(PR_LOG_DEBUG, ("%p Created decoder %p for type %s", this, decoder.get(), mimeType.get()));
+  LOG(LogLevel::Debug, ("%p Created decoder %p for type %s", this, decoder.get(), mimeType.get()));
 
   nsRefPtr<MediaResource> resource = MediaResource::Create(decoder, aChannel);
   if (!resource)
@@ -2811,7 +2811,7 @@ nsresult HTMLMediaElement::FinishDecoderSetup(MediaDecoder* aDecoder,
   nsresult rv = aDecoder->Load(aListener, aCloneDonor);
   if (NS_FAILED(rv)) {
     SetDecoder(nullptr);
-    LOG(PR_LOG_DEBUG, ("%p Failed to load for decoder %p", this, aDecoder));
+    LOG(LogLevel::Debug, ("%p Failed to load for decoder %p", this, aDecoder));
     return rv;
   }
 
@@ -3340,7 +3340,7 @@ void HTMLMediaElement::PlaybackEnded()
   }
 
   if (mSrcStream || (mDecoder && mDecoder->IsInfinite())) {
-    LOG(PR_LOG_DEBUG, ("%p, got duration by reaching the end of the resource", this));
+    LOG(LogLevel::Debug, ("%p, got duration by reaching the end of the resource", this));
     DispatchAsyncEvent(NS_LITERAL_STRING("durationchange"));
   }
 
@@ -3642,7 +3642,7 @@ void HTMLMediaElement::ChangeReadyState(nsMediaReadyState aState)
     return;
   }
 
-  LOG(PR_LOG_DEBUG, ("%p Ready state changed to %s", this, gReadyStateToString[aState]));
+  LOG(LogLevel::Debug, ("%p Ready state changed to %s", this, gReadyStateToString[aState]));
 
   UpdateAudioChannelPlayingState();
 
@@ -3697,7 +3697,7 @@ void HTMLMediaElement::ChangeNetworkState(nsMediaNetworkState aState)
 
   nsMediaNetworkState oldState = mNetworkState;
   mNetworkState = aState;
-  LOG(PR_LOG_DEBUG, ("%p Network state changed to %s", this, gNetworkStateToString[aState]));
+  LOG(LogLevel::Debug, ("%p Network state changed to %s", this, gNetworkStateToString[aState]));
 
   // TODO: |mBegun| reflects the download status. We should be able to remove
   // it and check |mNetworkState| only.
@@ -3748,7 +3748,7 @@ void HTMLMediaElement::CheckAutoplayDataReady()
 
   if (Preferences::GetBool("media.block-play-until-visible", false) &&
       OwnerDoc()->Hidden()) {
-    LOG(PR_LOG_DEBUG, ("%p Blocked autoplay because owner hidden.", this));
+    LOG(LogLevel::Debug, ("%p Blocked autoplay because owner hidden.", this));
     mPlayBlockedBecauseHidden = true;
     return;
   }
@@ -3820,7 +3820,7 @@ VideoFrameContainer* HTMLMediaElement::GetOverlayImageVideoFrameContainer()
 
 nsresult HTMLMediaElement::DispatchEvent(const nsAString& aName)
 {
-  LOG_EVENT(PR_LOG_DEBUG, ("%p Dispatching event %s", this,
+  LOG_EVENT(LogLevel::Debug, ("%p Dispatching event %s", this,
                           NS_ConvertUTF16toUTF8(aName).get()));
 
   // Save events that occur while in the bfcache. These will be dispatched
@@ -3839,7 +3839,7 @@ nsresult HTMLMediaElement::DispatchEvent(const nsAString& aName)
 
 nsresult HTMLMediaElement::DispatchAsyncEvent(const nsAString& aName)
 {
-  LOG_EVENT(PR_LOG_DEBUG, ("%p Queuing event %s", this,
+  LOG_EVENT(LogLevel::Debug, ("%p Queuing event %s", this,
             NS_ConvertUTF16toUTF8(aName).get()));
 
   // Save events that occur while in the bfcache. These will be dispatched
@@ -3951,7 +3951,7 @@ void HTMLMediaElement::UpdateInitialMediaSize(const nsIntSize& aSize)
 
 void HTMLMediaElement::SuspendOrResumeElement(bool aPauseElement, bool aSuspendEvents)
 {
-  LOG(PR_LOG_DEBUG, ("%p SuspendOrResumeElement(pause=%d, suspendEvents=%d) hidden=%d",
+  LOG(LogLevel::Debug, ("%p SuspendOrResumeElement(pause=%d, suspendEvents=%d) hidden=%d",
       this, aPauseElement, aSuspendEvents, OwnerDoc()->Hidden()));
 
   if (aPauseElement != mPausedForInactiveDocumentOrChannel) {
@@ -4018,7 +4018,7 @@ void HTMLMediaElement::NotifyOwnerDocumentActivityChanged()
   if (!mPausedForInactiveDocumentOrChannel &&
       mPlayBlockedBecauseHidden &&
       !OwnerDoc()->Hidden()) {
-    LOG(PR_LOG_DEBUG, ("%p Resuming playback now that owner doc is visble.", this));
+    LOG(LogLevel::Debug, ("%p Resuming playback now that owner doc is visble.", this));
     mPlayBlockedBecauseHidden = false;
     Play();
   }
@@ -4093,7 +4093,7 @@ HTMLMediaElement::IsNodeOfType(uint32_t aFlags) const
 
 void HTMLMediaElement::DispatchAsyncSourceError(nsIContent* aSourceElement)
 {
-  LOG_EVENT(PR_LOG_DEBUG, ("%p Queuing simple source error event", this));
+  LOG_EVENT(LogLevel::Debug, ("%p Queuing simple source error event", this));
 
   nsCOMPtr<nsIRunnable> event = new nsSourceErrorEventRunner(this, aSourceElement);
   NS_DispatchToMainThread(event);
@@ -4181,7 +4181,7 @@ void HTMLMediaElement::ChangeDelayLoadStatus(bool aDelay)
 
   mDelayingLoadEvent = aDelay;
 
-  LOG(PR_LOG_DEBUG, ("%p ChangeDelayLoadStatus(%d) doc=0x%p", this, aDelay, mLoadBlockedDoc.get()));
+  LOG(LogLevel::Debug, ("%p ChangeDelayLoadStatus(%d) doc=0x%p", this, aDelay, mLoadBlockedDoc.get()));
   if (mDecoder) {
     mDecoder->SetLoadInBackground(!aDelay);
   }

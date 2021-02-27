@@ -818,7 +818,7 @@ imgCacheEntry::UpdateCache(int32_t diff /* = 0 */)
 void
 imgCacheEntry::SetHasNoProxies(bool hasNoProxies)
 {
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     if (hasNoProxies) {
       LOG_FUNC_WITH_PARAM(GetImgLog(), "imgCacheEntry::SetHasNoProxies true",
                           "uri", mRequest->CacheKey().Spec());
@@ -996,7 +996,7 @@ imgCacheExpirationTracker::NotifyExpired(imgCacheEntry* entry)
   // mechanism doesn't.
   nsRefPtr<imgCacheEntry> kungFuDeathGrip(entry);
 
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsRefPtr<imgRequest> req = entry->GetRequest();
     if (req) {
       LOG_FUNC_WITH_PARAM(GetImgLog(),
@@ -1359,20 +1359,20 @@ imgLoader::PutIntoCache(const ImageCacheKey& aKey, imgCacheEntry* entry)
   // the cache.
   nsRefPtr<imgCacheEntry> tmpCacheEntry;
   if (cache.Get(aKey, getter_AddRefs(tmpCacheEntry)) && tmpCacheEntry) {
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("[this=%p] imgLoader::PutIntoCache -- Element already in the cache",
             nullptr));
     nsRefPtr<imgRequest> tmpRequest = tmpCacheEntry->GetRequest();
 
     // If it already exists, and we're putting the same key into the cache, we
     // should remove the old version.
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("[this=%p] imgLoader::PutIntoCache -- Replacing cached element",
             nullptr));
 
     RemoveFromCache(aKey);
   } else {
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("[this=%p] imgLoader::PutIntoCache --"
             " Element NOT already in the cache", nullptr));
   }
@@ -1492,7 +1492,7 @@ imgLoader::CheckCacheLimits(imgCacheTable& cache, imgCacheQueue& queue)
 
     NS_ASSERTION(entry, "imgLoader::CheckCacheLimits -- NULL entry pointer");
 
-    if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+    if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
       nsRefPtr<imgRequest> req = entry->GetRequest();
       if (req) {
         LOG_STATIC_FUNC_WITH_PARAM(GetImgLog(),
@@ -1725,14 +1725,14 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
     // Determine whether the cache aEntry must be revalidated...
     validateRequest = ShouldRevalidateEntry(aEntry, aLoadFlags, hasExpired);
 
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("imgLoader::ValidateEntry validating cache entry. "
             "validateRequest = %d", validateRequest));
-  } else if (!key && MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  } else if (!key && MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsAutoCString spec;
     aURI->GetSpec(spec);
 
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("imgLoader::ValidateEntry BYPASSING cache validation for %s "
             "because of NULL LoadID", spec.get()));
   }
@@ -1750,7 +1750,7 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   }
 
   if (requestAppCache != groupAppCache) {
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("imgLoader::ValidateEntry - Unable to use cached imgRequest "
             "[request=%p] because of mismatched application caches\n",
             address_of(request)));
@@ -2126,7 +2126,7 @@ imgLoader::LoadImage(nsIURI* aURI,
                        getter_AddRefs(request),
                        getter_AddRefs(entry));
 
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("[this=%p] imgLoader::LoadImage -- Created new imgRequest"
             " [request=%p]\n", this, request.get()));
 
@@ -2149,7 +2149,7 @@ imgLoader::LoadImage(nsIURI* aURI,
     // request.
     nsCOMPtr<nsIStreamListener> listener = pl;
     if (corsmode != imgIRequest::CORS_NONE) {
-      MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+      MOZ_LOG(GetImgLog(), LogLevel::Debug,
              ("[this=%p] imgLoader::LoadImage -- Setting up a CORS load",
               this));
       bool withCredentials = corsmode == imgIRequest::CORS_USE_CREDENTIALS;
@@ -2158,7 +2158,7 @@ imgLoader::LoadImage(nsIURI* aURI,
         new nsCORSListenerProxy(pl, aLoadingPrincipal, withCredentials);
       rv = corsproxy->Init(newChannel, DataURIHandling::Allow);
       if (NS_FAILED(rv)) {
-        MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+        MOZ_LOG(GetImgLog(), LogLevel::Debug,
                ("[this=%p] imgLoader::LoadImage -- nsCORSListenerProxy "
                 "creation failed: 0x%x\n", this, rv));
         request->CancelAndAbort(rv);
@@ -2168,7 +2168,7 @@ imgLoader::LoadImage(nsIURI* aURI,
       listener = corsproxy;
     }
 
-    MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+    MOZ_LOG(GetImgLog(), LogLevel::Debug,
            ("[this=%p] imgLoader::LoadImage -- Calling channel->AsyncOpen()\n",
             this));
 
@@ -2178,7 +2178,7 @@ imgLoader::LoadImage(nsIURI* aURI,
     nsresult openRes = newChannel->AsyncOpen(listener, nullptr);
 
     if (NS_FAILED(openRes)) {
-      MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+      MOZ_LOG(GetImgLog(), LogLevel::Debug,
              ("[this=%p] imgLoader::LoadImage -- AsyncOpen() failed: 0x%x\n",
               this, openRes));
       request->CancelAndAbort(openRes);
@@ -2811,7 +2811,7 @@ ProxyListener::CheckListenerChain()
   if (retargetableListener) {
     rv = retargetableListener->CheckListenerChain();
   }
-  MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+  MOZ_LOG(GetImgLog(), LogLevel::Debug,
          ("ProxyListener::CheckListenerChain %s [this=%p listener=%p rv=%x]",
           (NS_SUCCEEDED(rv) ? "success" : "failure"),
           this, (nsIStreamListener*)mDestListener, rv));
@@ -2941,7 +2941,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
     uri = imageURL->ToIURI();
   }
 
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsAutoCString spec;
     uri->GetSpec(spec);
     LOG_MSG_WITH_PARAM(GetImgLog(),
@@ -3033,7 +3033,7 @@ imgCacheValidator::CheckListenerChain()
   if (retargetableListener) {
     rv = retargetableListener->CheckListenerChain();
   }
-  MOZ_LOG(GetImgLog(), PR_LOG_DEBUG,
+  MOZ_LOG(GetImgLog(), LogLevel::Debug,
          ("[this=%p] imgCacheValidator::CheckListenerChain -- rv %d=%s",
           this, NS_SUCCEEDED(rv) ? "succeeded" : "failed", rv));
   return rv;

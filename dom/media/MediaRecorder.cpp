@@ -182,7 +182,7 @@ class MediaRecorder::Session: public nsIObserver
 
     NS_IMETHODIMP Run()
     {
-      LOG(PR_LOG_DEBUG, ("Session.PushBlobRunnable s=(%p)", mSession.get()));
+      LOG(LogLevel::Debug, ("Session.PushBlobRunnable s=(%p)", mSession.get()));
       MOZ_ASSERT(NS_IsMainThread());
 
       nsRefPtr<MediaRecorder> recorder = mSession->mRecorder;
@@ -212,7 +212,7 @@ class MediaRecorder::Session: public nsIObserver
 
     NS_IMETHODIMP Run()
     {
-      LOG(PR_LOG_DEBUG, ("Session.ErrorNotifyRunnable s=(%p)", mSession.get()));
+      LOG(LogLevel::Debug, ("Session.ErrorNotifyRunnable s=(%p)", mSession.get()));
       MOZ_ASSERT(NS_IsMainThread());
 
       nsRefPtr<MediaRecorder> recorder = mSession->mRecorder;
@@ -241,7 +241,7 @@ class MediaRecorder::Session: public nsIObserver
 
     NS_IMETHODIMP Run()
     {
-      LOG(PR_LOG_DEBUG, ("Session.DispatchStartEventRunnable s=(%p)", mSession.get()));
+      LOG(LogLevel::Debug, ("Session.DispatchStartEventRunnable s=(%p)", mSession.get()));
       MOZ_ASSERT(NS_IsMainThread());
 
       NS_ENSURE_TRUE(mSession->mRecorder, NS_OK);
@@ -273,7 +273,7 @@ class MediaRecorder::Session: public nsIObserver
     {
       MOZ_ASSERT(NS_GetCurrentThread() == mSession->mReadThread);
 
-      LOG(PR_LOG_DEBUG, ("Session.ExtractRunnable shutdown = %d", mSession->mEncoder->IsShutdown()));
+      LOG(LogLevel::Debug, ("Session.ExtractRunnable shutdown = %d", mSession->mEncoder->IsShutdown()));
       if (!mSession->mEncoder->IsShutdown()) {
         mSession->Extract(false);
         nsCOMPtr<nsIRunnable> event = new ExtractRunnable(mSession);
@@ -318,7 +318,7 @@ class MediaRecorder::Session: public nsIObserver
         trackTypes |= ContainerWriter::CREATE_VIDEO_TRACK;
       }
 
-      LOG(PR_LOG_DEBUG, ("Session.NotifyTracksAvailable track type = (%d)", trackTypes));
+      LOG(LogLevel::Debug, ("Session.NotifyTracksAvailable track type = (%d)", trackTypes));
       mSession->InitEncoder(trackTypes);
     }
   private:
@@ -334,7 +334,7 @@ class MediaRecorder::Session: public nsIObserver
 
     NS_IMETHODIMP Run()
     {
-      LOG(PR_LOG_DEBUG, ("Session.DestroyRunnable session refcnt = (%d) stopIssued %d s=(%p)",
+      LOG(LogLevel::Debug, ("Session.DestroyRunnable session refcnt = (%d) stopIssued %d s=(%p)",
                          (int)mSession->mRefCnt, mSession->mStopIssued, mSession.get()));
       MOZ_ASSERT(NS_IsMainThread() && mSession.get());
       nsRefPtr<MediaRecorder> recorder = mSession->mRecorder;
@@ -392,7 +392,7 @@ public:
 
   void Start()
   {
-    LOG(PR_LOG_DEBUG, ("Session.Start %p", this));
+    LOG(LogLevel::Debug, ("Session.Start %p", this));
     MOZ_ASSERT(NS_IsMainThread());
 
     SetupStreams();
@@ -400,7 +400,7 @@ public:
 
   void Stop()
   {
-    LOG(PR_LOG_DEBUG, ("Session.Stop %p", this));
+    LOG(LogLevel::Debug, ("Session.Stop %p", this));
     MOZ_ASSERT(NS_IsMainThread());
     mStopIssued = true;
     CleanupStreams();
@@ -409,7 +409,7 @@ public:
 
   nsresult Pause()
   {
-    LOG(PR_LOG_DEBUG, ("Session.Pause"));
+    LOG(LogLevel::Debug, ("Session.Pause"));
     MOZ_ASSERT(NS_IsMainThread());
 
     NS_ENSURE_TRUE(mTrackUnionStream, NS_ERROR_FAILURE);
@@ -420,7 +420,7 @@ public:
 
   nsresult Resume()
   {
-    LOG(PR_LOG_DEBUG, ("Session.Resume"));
+    LOG(LogLevel::Debug, ("Session.Resume"));
     MOZ_ASSERT(NS_IsMainThread());
 
     NS_ENSURE_TRUE(mTrackUnionStream, NS_ERROR_FAILURE);
@@ -431,7 +431,7 @@ public:
 
   nsresult RequestData()
   {
-    LOG(PR_LOG_DEBUG, ("Session.RequestData"));
+    LOG(LogLevel::Debug, ("Session.RequestData"));
     MOZ_ASSERT(NS_IsMainThread());
 
     if (NS_FAILED(NS_DispatchToMainThread(new EncoderErrorNotifierRunnable(this))) ||
@@ -470,7 +470,7 @@ private:
   // Only DestroyRunnable is allowed to delete Session object.
   virtual ~Session()
   {
-    LOG(PR_LOG_DEBUG, ("Session.~Session (%p)", this));
+    LOG(LogLevel::Debug, ("Session.~Session (%p)", this));
     CleanupStreams();
   }
   // Pull encoded media data from MediaEncoder and put into EncodedBufferCache.
@@ -480,7 +480,7 @@ private:
   void Extract(bool aForceFlush)
   {
     MOZ_ASSERT(NS_GetCurrentThread() == mReadThread);
-    LOG(PR_LOG_DEBUG, ("Session.Extract %p", this));
+    LOG(LogLevel::Debug, ("Session.Extract %p", this));
 
     if (!mIsRegisterProfiler) {
       char aLocal;
@@ -583,7 +583,7 @@ private:
 
   void InitEncoder(uint8_t aTrackTypes)
   {
-    LOG(PR_LOG_DEBUG, ("Session.InitEncoder %p", this));
+    LOG(LogLevel::Debug, ("Session.InitEncoder %p", this));
     MOZ_ASSERT(NS_IsMainThread());
 
     // Allocate encoder and bind with union stream.
@@ -670,7 +670,7 @@ private:
   NS_IMETHODIMP Observe(nsISupports *aSubject, const char *aTopic, const char16_t *aData) override
   {
     MOZ_ASSERT(NS_IsMainThread());
-    LOG(PR_LOG_DEBUG, ("Session.Observe XPCOM_SHUTDOWN %p", this));
+    LOG(LogLevel::Debug, ("Session.Observe XPCOM_SHUTDOWN %p", this));
     if (strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID) == 0) {
       // Force stop Session to terminate Read Thread.
       mEncoder->Cancel();
@@ -736,7 +736,7 @@ MediaRecorder::~MediaRecorder()
     mInputPort->Destroy();
     mPipeStream->Destroy();
   }
-  LOG(PR_LOG_DEBUG, ("~MediaRecorder (%p)", this));
+  LOG(LogLevel::Debug, ("~MediaRecorder (%p)", this));
   UnRegisterActivityObserver();
 }
 
@@ -822,7 +822,7 @@ MediaRecorder::GetMimeType(nsString &aMimeType)
 void
 MediaRecorder::Start(const Optional<int32_t>& aTimeSlice, ErrorResult& aResult)
 {
-  LOG(PR_LOG_DEBUG, ("MediaRecorder.Start %p", this));
+  LOG(LogLevel::Debug, ("MediaRecorder.Start %p", this));
   if (mState != RecordingState::Inactive) {
     aResult.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
@@ -864,7 +864,7 @@ MediaRecorder::Start(const Optional<int32_t>& aTimeSlice, ErrorResult& aResult)
 void
 MediaRecorder::Stop(ErrorResult& aResult)
 {
-  LOG(PR_LOG_DEBUG, ("MediaRecorder.Stop %p", this));
+  LOG(LogLevel::Debug, ("MediaRecorder.Stop %p", this));
   MediaRecorderReporter::RemoveMediaRecorder(this);
   if (mState == RecordingState::Inactive) {
     aResult.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -878,7 +878,7 @@ MediaRecorder::Stop(ErrorResult& aResult)
 void
 MediaRecorder::Pause(ErrorResult& aResult)
 {
-  LOG(PR_LOG_DEBUG, ("MediaRecorder.Pause"));
+  LOG(LogLevel::Debug, ("MediaRecorder.Pause"));
   if (mState != RecordingState::Recording) {
     aResult.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
@@ -896,7 +896,7 @@ MediaRecorder::Pause(ErrorResult& aResult)
 void
 MediaRecorder::Resume(ErrorResult& aResult)
 {
-  LOG(PR_LOG_DEBUG, ("MediaRecorder.Resume"));
+  LOG(LogLevel::Debug, ("MediaRecorder.Resume"));
   if (mState != RecordingState::Paused) {
     aResult.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
@@ -1125,7 +1125,7 @@ bool MediaRecorder::CheckPrincipal()
 void
 MediaRecorder::RemoveSession(Session* aSession)
 {
-  LOG(PR_LOG_DEBUG, ("MediaRecorder.RemoveSession (%p)", aSession));
+  LOG(LogLevel::Debug, ("MediaRecorder.RemoveSession (%p)", aSession));
   mSessions.RemoveElement(aSession);
 }
 
@@ -1137,7 +1137,7 @@ MediaRecorder::NotifyOwnerDocumentActivityChanged()
   nsIDocument* doc = window->GetExtantDoc();
   NS_ENSURE_TRUE_VOID(doc);
 
-  LOG(PR_LOG_DEBUG, ("MediaRecorder %p document IsActive %d isVisible %d\n",
+  LOG(LogLevel::Debug, ("MediaRecorder %p document IsActive %d isVisible %d\n",
                      this, doc->IsActive(), doc->IsVisible()));
   if (!doc->IsActive() || !doc->IsVisible()) {
     // Stop the session.

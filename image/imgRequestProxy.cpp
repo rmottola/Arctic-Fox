@@ -866,7 +866,7 @@ imgRequestProxy::Notify(int32_t aType, const mozilla::gfx::IntRect* aRect)
 void
 imgRequestProxy::OnLoadComplete(bool aLastPart)
 {
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
     LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::OnLoadComplete",
@@ -912,7 +912,7 @@ imgRequestProxy::OnLoadComplete(bool aLastPart)
 void
 imgRequestProxy::BlockOnload()
 {
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
     LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::BlockOnload",
@@ -928,7 +928,7 @@ imgRequestProxy::BlockOnload()
 void
 imgRequestProxy::UnblockOnload()
 {
-  if (MOZ_LOG_TEST(GetImgLog(), PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
     LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::UnblockOnload",
