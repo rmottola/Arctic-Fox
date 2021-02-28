@@ -83,7 +83,7 @@ CertListContainsExpectedKeys(const CERTCertList* certList,
                              CertVerifier::PinningMode pinningMode)
 {
   if (pinningMode == CertVerifier::pinningDisabled) {
-    PR_LOG(gCertVerifierLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCertVerifierLog, LogLevel::Debug,
            ("Pinning is disabled; not checking keys."));
     return Success;
   }

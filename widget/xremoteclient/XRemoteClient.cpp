@@ -152,7 +152,7 @@ XRemoteClient::SendCommand (const char *aProgram, const char *aUsername,
                             const char* aDesktopStartupID,
                             char **aResponse, bool *aWindowFound)
 {
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG, ("XRemoteClient::SendCommand"));
+  MOZ_LOG(sRemoteLm, LogLevel::Debug, ("XRemoteClient::SendCommand"));
 
   return SendCommandInternal(aProgram, aUsername, aProfile,
                              aCommand, 0, nullptr,
@@ -647,7 +647,7 @@ XRemoteClient::DoSendCommand(Window aWindow, const char *aCommand,
 {
   *aDestroyed = false;
 
-  PR_LOG(sRemoteLm, PR_LOG_DEBUG,
+  MOZ_LOG(sRemoteLm, LogLevel::Debug,
      ("(writing " MOZILLA_COMMAND_PROP " \"%s\" to 0x%x)\n",
       aCommand, (unsigned int) aWindow));
 
