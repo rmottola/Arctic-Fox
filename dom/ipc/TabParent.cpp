@@ -1961,7 +1961,7 @@ TabParent::RecvNotifyIMETextChange(const ContentCache& aContentCache,
   notification.mTextChangeData.mCausedByComposition = aCausedByComposition;
 
   mContentCache.AssignContent(aContentCache, &notification);
-  IMEStateManager::NotifyIME(notification, widget, true);
+  mContentCache.MaybeNotifyIME(widget, notification);
   return true;
 }
 
@@ -1976,8 +1976,7 @@ TabParent::RecvNotifyIMESelectedCompositionRect(
 
   IMENotification notification(NOTIFY_IME_OF_COMPOSITION_UPDATE);
   mContentCache.AssignContent(aContentCache, &notification);
-
-  IMEStateManager::NotifyIME(notification, widget, true);
+  mContentCache.MaybeNotifyIME(widget, notification);
   return true;
 }
 
@@ -1997,10 +1996,9 @@ TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
   if (updatePreference.WantSelectionChange() &&
       (updatePreference.WantChangesCausedByComposition() ||
        !aCausedByComposition)) {
-    mContentCache.InitNotification(notification);
     notification.mSelectionChangeData.mCausedByComposition =
       aCausedByComposition;
-    IMEStateManager::NotifyIME(notification, widget, true);
+    mContentCache.MaybeNotifyIME(widget, notification);
   }
   return true;
 }
@@ -2057,7 +2055,15 @@ TabParent::RecvOnEventNeedingAckReceived()
 {
   // This is called when the child process receives WidgetCompositionEvent or
   // WidgetSelectionEvent.
-  mContentCache.OnEventNeedingAckReceived();
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  // While calling OnEventNeedingAckReceived(), TabParent *might* be destroyed
+  // since it may send notifications to IME.
+  nsRefPtr<TabParent> kungFuDeathGrip(this);
+  mContentCache.OnEventNeedingAckReceived(widget);
   return true;
 }
 
