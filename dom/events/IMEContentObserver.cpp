@@ -89,6 +89,7 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(IMEContentObserver)
 
 IMEContentObserver::IMEContentObserver()
   : mESM(nullptr)
+  , mSuppressNotifications(0)
   , mPreCharacterDataChangeLength(-1)
   , mIsObserving(false)
   , mIsSelectionChangeEventPending(false)
@@ -1015,6 +1016,11 @@ IMEContentObserver::FlushMergeableNotifications()
   // If this is already detached from the widget, this doesn't need to notify
   // anything.
   if (!mWidget) {
+    return;
+  }
+
+  // Don't notify IME of anything if it's not good time to do it.
+  if (mSuppressNotifications) {
     return;
   }
 
