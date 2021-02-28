@@ -2057,6 +2057,7 @@ TabParent::RecvOnEventNeedingAckReceived()
 {
   // This is called when the child process receives WidgetCompositionEvent or
   // WidgetSelectionEvent.
+  mContentCache.OnEventNeedingAckReceived();
   return true;
 }
 
@@ -2245,6 +2246,7 @@ TabParent::SendSelectionEvent(WidgetSelectionEvent& event)
   if (!widget) {
     return true;
   }
+  mContentCache.OnSelectionEvent(event);
   return PBrowserParent::SendSelectionEvent(event);
 }
 
