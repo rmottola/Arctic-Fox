@@ -90,6 +90,10 @@ nsView::~nsView()
     mParent->RemoveChild(this);
   }
 
+  if (mPreviousWindow) {
+    mPreviousWindow->SetPreviouslyAttachedWidgetListener(nullptr);
+  }
+
   // Destroy and release the widget
   DestroyWidget();
 
@@ -712,6 +716,18 @@ nsresult nsView::DetachFromTopLevelWidget()
   NS_PRECONDITION(mWindow, "null mWindow for DetachFromTopLevelWidget!");
 
   mWindow->SetAttachedWidgetListener(nullptr);
+  nsIWidgetListener* listener = mWindow->GetPreviouslyAttachedWidgetListener();
+
+  if (listener && listener->GetView()) {
+    // Ensure the listener doesn't think it's being used anymore
+    listener->GetView()->SetPreviousWidget(nullptr);
+  }
+
+  // If the new view's frame is paint suppressed then the window
+  // will want to use us instead until that's done
+  mWindow->SetPreviouslyAttachedWidgetListener(this);
+
+  mPreviousWindow = mWindow;
   mWindow = nullptr;
 
   mWidgetIsTopLevel = false;
@@ -1085,4 +1101,10 @@ nsView::HandleEvent(WidgetGUIEvent* aEvent,
   }
 
   return result;
+}
+
+bool
+nsView::IsPrimaryFramePaintSuppressed()
+{
+  return mFrame ? mFrame->PresContext()->PresShell()->IsPaintingSuppressed() : false;
 }
