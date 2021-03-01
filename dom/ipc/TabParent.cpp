@@ -2250,7 +2250,11 @@ TabParent::SendSelectionEvent(WidgetSelectionEvent& event)
     return true;
   }
   mContentCache.OnSelectionEvent(event);
-  return PBrowserParent::SendSelectionEvent(event);
+  if (NS_WARN_IF(!PBrowserParent::SendSelectionEvent(event))) {
+    return false;
+  }
+  event.mSucceeded = true;
+  return true;
 }
 
 /*static*/ TabParent*
