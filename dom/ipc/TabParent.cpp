@@ -1979,7 +1979,8 @@ TabParent::RecvNotifyIMESelectedCompositionRect(
 
 bool
 TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
-                                  const bool& aCausedByComposition)
+                                  const bool& aCausedByComposition,
+                                  const bool& aCausedBySelectionEvent)
 {
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget)
@@ -1995,6 +1996,8 @@ TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
        !aCausedByComposition)) {
     notification.mSelectionChangeData.mCausedByComposition =
       aCausedByComposition;
+    notification.mSelectionChangeData.mCausedBySelectionEvent =
+      aCausedBySelectionEvent;
     mContentCache.MaybeNotifyIME(widget, notification);
   }
   return true;
