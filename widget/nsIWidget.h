@@ -665,16 +665,7 @@ struct IMENotification
         break;
       case NOTIFY_IME_OF_TEXT_CHANGE:
         MOZ_ASSERT(aNotification.mMessage == NOTIFY_IME_OF_TEXT_CHANGE);
-        // TODO: Needs to merge the ranges rather than overwriting.
-        mTextChangeData.mStartOffset =
-          aNotification.mTextChangeData.mStartOffset;
-        mTextChangeData.mRemovedEndOffset =
-          aNotification.mTextChangeData.mRemovedEndOffset;
-        mTextChangeData.mAddedEndOffset =
-          aNotification.mTextChangeData.mAddedEndOffset;
-        mTextChangeData.mCausedByComposition =
-          mTextChangeData.mCausedByComposition &&
-            aNotification.mTextChangeData.mCausedByComposition;
+        mTextChangeData += aNotification.mTextChangeData;
         break;
       case NOTIFY_IME_OF_COMPOSITION_UPDATE:
         MOZ_ASSERT(aNotification.mMessage == NOTIFY_IME_OF_COMPOSITION_UPDATE);
@@ -768,6 +759,17 @@ struct IMENotification
       mStartOffset = UINT32_MAX;
       mRemovedEndOffset = mAddedEndOffset = 0;
     }
+
+    void MergeWith(const TextChangeDataBase& aOther);
+    TextChangeDataBase& operator+=(const TextChangeDataBase& aOther)
+    {
+      MergeWith(aOther);
+      return *this;
+    }
+
+#ifdef DEBUG
+    void Test();
+#endif // #ifdef DEBUG
   };
 
   // TextChangeDataBase cannot have constructors because they are used in union.
