@@ -793,7 +793,7 @@ PuppetWidget::NotifyIMEOfSelectionChange(
   mContentCache.SetSelection(
     this, 
     aIMENotification.mSelectionChangeData.mOffset,
-    aIMENotification.mSelectionChangeData.mLength,
+    aIMENotification.mSelectionChangeData.Length(),
     aIMENotification.mSelectionChangeData.mReversed,
     aIMENotification.mSelectionChangeData.GetWritingMode());
 
