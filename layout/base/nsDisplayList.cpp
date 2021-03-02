@@ -322,13 +322,13 @@ static void AddTransformFunctions(nsCSSValueList* aList,
       }
       case eCSSKeyword_interpolatematrix:
       {
-        gfx3DMatrix matrix;
+        Matrix4x4 matrix;
         nsStyleTransformMatrix::ProcessInterpolateMatrix(matrix, array,
                                                          aContext,
                                                          aPresContext,
                                                          conditions,
                                                          aRefBox);
-        aFunctions.AppendElement(TransformMatrix(gfx::ToMatrix4x4(matrix)));
+        aFunctions.AppendElement(TransformMatrix(matrix));
         break;
       }
       case eCSSKeyword_perspective:
@@ -4866,7 +4866,7 @@ nsDisplayTransform::FrameTransformProperties::FrameTransformProperties(const nsI
  * translates from local coordinate space to transform coordinate space, then
  * hands it back.
  */
-gfx3DMatrix
+Matrix4x4
 nsDisplayTransform::GetResultingTransformMatrix(const FrameTransformProperties& aProperties,
                                                 const nsPoint& aOrigin,
                                                 float aAppUnitsPerPixel,
@@ -4877,7 +4877,7 @@ nsDisplayTransform::GetResultingTransformMatrix(const FrameTransformProperties& 
                                              aBoundsOverride, aOutAncestor, false);
 }
  
-gfx3DMatrix
+Matrix4x4
 nsDisplayTransform::GetResultingTransformMatrix(const nsIFrame* aFrame,
                                                 const nsPoint& aOrigin,
                                                 float aAppUnitsPerPixel,
@@ -4894,7 +4894,7 @@ nsDisplayTransform::GetResultingTransformMatrix(const nsIFrame* aFrame,
                                              aOffsetByOrigin);
 }
 
-gfx3DMatrix
+Matrix4x4
 nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProperties& aProperties,
                                                         const nsPoint& aOrigin,
                                                         float aAppUnitsPerPixel,
@@ -4923,7 +4923,7 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
 
   /* Get the matrix, then change its basis to factor in the origin. */
   RuleNodeCacheConditions dummy;
-  gfx3DMatrix result;
+  Matrix4x4 result;
   // Call IsSVGTransformed() regardless of the value of
   // disp->mSpecifiedTransform, since we still need any transformFromSVGParent.
   Matrix svgTransform, transformFromSVGParent;
@@ -4943,11 +4943,11 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
                              aAppUnitsPerPixel;
     svgTransform._31 *= pixelsPerCSSPx;
     svgTransform._32 *= pixelsPerCSSPx;
-    result = gfx3DMatrix::From2D(ThebesMatrix(svgTransform));
+    result = Matrix4x4::From2D(svgTransform);
   }
 
   if (aProperties.mChildPerspective > 0.0) {
-    gfx3DMatrix perspective;
+    Matrix4x4 perspective;
     perspective._34 =
       -1.0 / NSAppUnitsToFloatPixels(aProperties.mChildPerspective, aAppUnitsPerPixel);
     /* At the point when perspective is applied, we have been translated to the transform origin.
@@ -4978,8 +4978,8 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
       // basis change translation. This is more stable against variation due to
       // insufficient floating point precision than reversing the translation
       // afterwards.
-      result.Translate(-aProperties.mToTransformOrigin);
-      result.TranslatePost(offsets);
+      result.PreTranslate(-aProperties.mToTransformOrigin);
+      result.PostTranslate(offsets);
     } else {
       result.ChangeBasis(offsets);
     }
@@ -5001,15 +5001,15 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
       frame->PresContext()->AppUnitsPerCSSPixel() / aAppUnitsPerPixel;
     transformFromSVGParent._31 *= pixelsPerCSSPx;
     transformFromSVGParent._32 *= pixelsPerCSSPx;
-    result = result * gfx3DMatrix::From2D(ThebesMatrix(transformFromSVGParent));
+    result = result * Matrix4x4::From2D(transformFromSVGParent);
 
     // Similar to the code in the |if| block above, but since we've accounted
     // for mToTransformOrigin so we don't include that. We also need to reapply
     // refBoxOffset.
     Point3D offsets = roundedOrigin + refBoxOffset;
     if (aOffsetByOrigin) {
-      result.Translate(-refBoxOffset);
-      result.TranslatePost(offsets);
+      result.PreTranslate(-refBoxOffset);
+      result.PostTranslate(offsets);
     } else {
       result.ChangeBasis(offsets);
     }
@@ -5029,7 +5029,7 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
     // then we're not a reference frame so no offset to origin will be added. Our
     // parent transform however *is* the reference frame, so we pass true for
     // aOffsetByOrigin to convert into the correct coordinate space.
-    gfx3DMatrix parent =
+    Matrix4x4 parent =
       GetResultingTransformMatrixInternal(props,
                                           aOrigin - frame->GetPosition(),
                                           aAppUnitsPerPixel, nullptr,
@@ -5182,9 +5182,9 @@ nsDisplayTransform::GetTransform()
        * to be an ancestor of the preserve-3d chain, so we only need to do
        * this once.
        */
-      mTransform = ToMatrix4x4(
-        GetResultingTransformMatrix(mFrame, ToReferenceFrame(), scale,
-                                    nullptr, nullptr, mFrame->IsTransformed()));
+      mTransform = GetResultingTransformMatrix(mFrame, ToReferenceFrame(),
+                                               scale, nullptr, nullptr,
+                                               mFrame->IsTransformed());
     }
   }
   return mTransform;
@@ -5416,7 +5416,7 @@ nsRect nsDisplayTransform::GetBounds(nsDisplayListBuilder *aBuilder, bool* aSnap
   // GetTransform always operates in dev pixels.
   float factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   return nsLayoutUtils::MatrixTransformRect(untransformedBounds,
-                                            To3DMatrix(GetTransform()),
+                                            GetTransform(),
                                             factor);
 }
 
@@ -5578,7 +5578,7 @@ bool nsDisplayTransform::UntransformRect(const nsRect &aTransformedBounds,
 
   float factor = aFrame->PresContext()->AppUnitsPerDevPixel();
 
-  gfx3DMatrix transform = GetResultingTransformMatrix(aFrame, aOrigin, factor, nullptr);
+  Matrix4x4 transform = GetResultingTransformMatrix(aFrame, aOrigin, factor, nullptr);
   if (transform.IsSingular()) {
     return false;
   }
@@ -5593,7 +5593,7 @@ bool nsDisplayTransform::UntransformRect(const nsRect &aTransformedBounds,
                       NSAppUnitsToFloatPixels(aChildBounds.width, factor),
                       NSAppUnitsToFloatPixels(aChildBounds.height, factor));
 
-  result = ToMatrix4x4(transform.Inverse()).ProjectRectBounds(result, childGfxBounds);
+  result = transform.Inverse().ProjectRectBounds(result, childGfxBounds);
   *aOutRect = nsLayoutUtils::RoundGfxRectToAppRect(ThebesRect(result), factor);
   return true;
 }
@@ -5601,7 +5601,7 @@ bool nsDisplayTransform::UntransformRect(const nsRect &aTransformedBounds,
 bool nsDisplayTransform::UntransformVisibleRect(nsDisplayListBuilder* aBuilder,
                                                 nsRect *aOutRect)
 {
-  const gfx3DMatrix& matrix = To3DMatrix(GetTransform());
+  const Matrix4x4& matrix = GetTransform();
   if (matrix.IsSingular())
     return false;
 
@@ -5620,7 +5620,7 @@ bool nsDisplayTransform::UntransformVisibleRect(nsDisplayListBuilder* aBuilder,
                       NSAppUnitsToFloatPixels(childBounds.height, factor));
 
   /* We want to untransform the matrix, so invert the transformation first! */
-  result = ToMatrix4x4(matrix.Inverse()).ProjectRectBounds(result, childGfxBounds);
+  result = matrix.Inverse().ProjectRectBounds(result, childGfxBounds);
 
   *aOutRect = nsLayoutUtils::RoundGfxRectToAppRect(ThebesRect(result), factor);
 

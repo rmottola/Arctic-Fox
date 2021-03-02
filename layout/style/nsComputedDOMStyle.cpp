@@ -1269,7 +1269,7 @@ nsComputedDOMStyle::DoGetTransform()
                                                        nsSize(0, 0));
 
    RuleNodeCacheConditions dummy;
-   gfx3DMatrix matrix =
+   gfx::Matrix4x4 matrix =
      nsStyleTransformMatrix::ReadTransforms(display->mSpecifiedTransform->mHead,
                                             mStyleContextHolder,
                                             mStyleContextHolder->PresContext(),
@@ -1291,7 +1291,7 @@ nsComputedDOMStyle::DoGetTransformBox()
 }
 
 /* static */ nsROCSSPrimitiveValue*
-nsComputedDOMStyle::MatrixToCSSValue(gfx3DMatrix& matrix)
+nsComputedDOMStyle::MatrixToCSSValue(const mozilla::gfx::Matrix4x4& matrix)
 {
   bool is3D = !matrix.Is2D();
 
