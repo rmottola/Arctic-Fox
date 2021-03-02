@@ -148,7 +148,8 @@ nsImageFrame::nsImageFrame(nsStyleContext* aContext) :
   mIntrinsicRatio(0, 0),
   mDisplayingIcon(false),
   mFirstFrameComplete(false),
-  mReflowCallbackPosted(false)
+  mReflowCallbackPosted(false),
+  mForceSyncDecoding(false)
 {
   // We assume our size is not constrained and we haven't gotten an
   // initial reflow yet, so don't touch those flags.
@@ -1626,11 +1627,16 @@ nsImageFrame::PaintImage(nsRenderingContext& aRenderingContext, nsPoint aPt,
                                                      StylePosition(),
                                                      &anchorPoint);
 
+  uint32_t flags = aFlags;
+  if (mForceSyncDecoding) {
+    flags |= imgIContainer::FLAG_SYNC_DECODE;
+  }
+
   DrawResult result =
     nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
       PresContext(), aImage,
       nsLayoutUtils::GetGraphicsFilterForFrame(this), dest, aDirtyRect,
-      nullptr, aFlags, &anchorPoint);
+      nullptr, flags, &anchorPoint);
 
   nsImageMap* map = GetImageMap();
   if (map) {
