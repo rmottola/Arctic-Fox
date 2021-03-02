@@ -699,11 +699,7 @@ public:
 
   virtual void OnFocusChangeInGecko(bool aFocus);
 
-  void OnSelectionChange()
-  {
-    mSelectedRange.location = NSNotFound;
-    mRangeForWritingMode.location = NSNotFound;
-  }
+  void OnSelectionChange(const IMENotification& aIMENotification);
 
   /**
    * DispatchCompositionChangeEvent() dispatches a compositionchange event on
