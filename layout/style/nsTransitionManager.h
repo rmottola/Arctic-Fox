@@ -111,13 +111,6 @@ public:
 
   typedef mozilla::AnimationCollection AnimationCollection;
 
-  static AnimationCollection*
-  GetAnimationsForCompositor(nsIContent* aContent, nsCSSProperty aProperty)
-  {
-    return mozilla::css::CommonAnimationManager::GetAnimationsForCompositor(
-      aContent, nsGkAtoms::transitionsProperty, aProperty);
-  }
-
   /**
    * StyleContextChanged
    *

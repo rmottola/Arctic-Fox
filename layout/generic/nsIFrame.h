@@ -2587,7 +2587,7 @@ public:
    *
    * @return whether the frame correspods to generated content
    */
-  bool IsGeneratedContentFrame() {
+  bool IsGeneratedContentFrame() const {
     return (mState & NS_FRAME_GENERATED_CONTENT) != 0;
   }
 
