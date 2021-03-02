@@ -1205,6 +1205,10 @@ pref("security.csp.speccompliant", true);
 pref("security.mixed_content.block_active_content", true);
 
 
+// Required blocklist freshness for OneCRL OCSP bypass
+// (default should be at least as large as extensions.blocklist.interval)
+pref("security.onecrl.maximum_staleness_in_seconds", 0);
+
 // Override the Gecko-default value of false for Firefox.
 pref("plain_text.wrap_long_lines", true);
 
