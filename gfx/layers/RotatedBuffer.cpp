@@ -330,7 +330,7 @@ RotatedContentBuffer::BufferContentType()
 }
 
 bool
-RotatedContentBuffer::BufferSizeOkFor(const nsIntSize& aSize)
+RotatedContentBuffer::BufferSizeOkFor(const IntSize& aSize)
 {
   return (aSize == mBufferRect.Size() ||
           (SizedToVisibleBounds != mBufferSizePolicy &&
