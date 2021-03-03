@@ -339,12 +339,12 @@ public:
                             nsHTMLReflowMetrics&     aDesiredSize,
                             const nsHTMLReflowState& aReflowState,
                             nsReflowStatus&          aStatus,
-                            bool                     aConstrainHeight = true);
+                            bool                     aConstrainBSize = true);
   void FinishReflowWithAbsoluteFrames(nsPresContext*           aPresContext,
                                       nsHTMLReflowMetrics&     aDesiredSize,
                                       const nsHTMLReflowState& aReflowState,
                                       nsReflowStatus&          aStatus,
-                                      bool                     aConstrainHeight = true);
+                                      bool                     aConstrainBSize = true);
 
   /*
    * If this frame is dirty, marks all absolutely-positioned children of this
