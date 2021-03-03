@@ -452,6 +452,19 @@ public:
     mResolution = aResolution;
   }
 
+  void ResetPaintedAndValidState() {
+    mPaintedRegion.SetEmpty();
+    mValidRegion.SetEmpty();
+    mTiles.mSize.width = 0;
+    mTiles.mSize.height = 0;
+    for (size_t i = 0; i < mRetainedTiles.Length(); i++) {
+      if (!mRetainedTiles[i].IsPlaceholderTile()) {
+        mRetainedTiles[i].Release();
+      }
+    }
+    mRetainedTiles.Clear();
+  }
+
 protected:
   TileClient ValidateTile(TileClient aTile,
                           const nsIntPoint& aTileRect,
@@ -460,10 +473,6 @@ protected:
   void PostValidate(const nsIntRegion& aPaintRegion);
 
   void UnlockTile(TileClient aTile);
-
-  void ReleaseTile(TileClient aTile) { aTile.Release(); }
-
-  void SwapTiles(TileClient& aTileA, TileClient& aTileB) { std::swap(aTileA, aTileB); }
 
   TileClient GetPlaceholderTile() const { return TileClient(); }
 
