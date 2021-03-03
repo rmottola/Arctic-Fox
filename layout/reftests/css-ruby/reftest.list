@@ -50,3 +50,5 @@ pref(layout.css.vertical-text.enabled,true) fails == ruby-position-vertical-rl.h
 == ruby-span-1.html ruby-span-1-ref.html
 == ruby-whitespace-1.html ruby-whitespace-1-ref.html
 == ruby-whitespace-2.html ruby-whitespace-2-ref.html
+== bug1181890.html bug1181890-ref.html
+!= bug1181890.html bug1181890-notref.html
