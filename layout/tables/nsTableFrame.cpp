@@ -2647,40 +2647,39 @@ DivideBCBorderSize(BCPixelSize  aPixelSize,
 LogicalMargin
 nsTableFrame::GetOuterBCBorder(const WritingMode aWM) const
 {
-  if (NeedToCalcBCBorders())
+  if (NeedToCalcBCBorders()) {
     const_cast<nsTableFrame*>(this)->CalcBCBorders();
+  }
 
-  nsMargin border(0, 0, 0, 0);
   int32_t d2a = PresContext()->AppUnitsPerDevPixel();
   BCPropertyData* propData = GetBCProperty();
   if (propData) {
-    return LogicalMargin(
-      aWM,
-      BC_BORDER_START_HALF_COORD(d2a, propData->mTopBorderWidth),
-      BC_BORDER_END_HALF_COORD(d2a, propData->mRightBorderWidth),
-      BC_BORDER_END_HALF_COORD(d2a, propData->mBottomBorderWidth),
-      BC_BORDER_START_HALF_COORD(d2a, propData->mLeftBorderWidth));
+    nsMargin r(BC_BORDER_START_HALF_COORD(d2a, propData->mTopBorderWidth),
+               BC_BORDER_END_HALF_COORD(d2a, propData->mRightBorderWidth),
+               BC_BORDER_END_HALF_COORD(d2a, propData->mBottomBorderWidth),
+               BC_BORDER_START_HALF_COORD(d2a, propData->mLeftBorderWidth));
+    return LogicalMargin(aWM, r);
   }
-  return LogicalMargin(GetWritingMode());
+  return LogicalMargin(aWM);
 }
 
 LogicalMargin
 nsTableFrame::GetIncludedOuterBCBorder(const WritingMode aWM) const
 {
-  if (NeedToCalcBCBorders())
+  if (NeedToCalcBCBorders()) {
     const_cast<nsTableFrame*>(this)->CalcBCBorders();
+  }
 
   int32_t d2a = PresContext()->AppUnitsPerDevPixel();
   BCPropertyData* propData = GetBCProperty();
   if (propData) {
-    return LogicalMargin(
-      aWM,
-      BC_BORDER_START_HALF_COORD(d2a, propData->mTopBorderWidth),
-      BC_BORDER_END_HALF_COORD(d2a, propData->mRightCellBorderWidth),
-      BC_BORDER_END_HALF_COORD(d2a, propData->mBottomBorderWidth),
-      BC_BORDER_START_HALF_COORD(d2a, propData->mLeftCellBorderWidth));
+    nsMargin r(BC_BORDER_START_HALF_COORD(d2a, propData->mTopBorderWidth),
+               BC_BORDER_END_HALF_COORD(d2a, propData->mRightCellBorderWidth),
+               BC_BORDER_END_HALF_COORD(d2a, propData->mBottomBorderWidth),
+               BC_BORDER_START_HALF_COORD(d2a, propData->mLeftCellBorderWidth));
+    return LogicalMargin(aWM, r);
   }
-  return LogicalMargin(GetWritingMode());
+  return LogicalMargin(aWM);
 }
 
 LogicalMargin
