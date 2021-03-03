@@ -3335,7 +3335,7 @@ CSS_PROP_DISPLAY(
     transform_box,
     TransformBox,
     CSS_PROPERTY_PARSE_VALUE,
-    "svg.transform-origin.enabled",
+    "svg.transform-box.enabled",
     VARIANT_HK,
     kTransformBoxKTable,
     CSS_PROP_NO_OFFSET,
