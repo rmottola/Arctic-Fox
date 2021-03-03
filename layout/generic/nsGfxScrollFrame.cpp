@@ -440,7 +440,7 @@ nsHTMLScrollFrame::ReflowScrolledFrame(ScrollReflowState* aState,
   nscoord computedBSize = aState->mReflowState.ComputedBSize();
   nscoord computedMinBSize = aState->mReflowState.ComputedMinBSize();
   nscoord computedMaxBSize = aState->mReflowState.ComputedMaxBSize();
-  if (!ShouldPropagateComputedHeightToScrolledContent()) {
+  if (!ShouldPropagateComputedBSizeToScrolledContent()) {
     computedBSize = NS_UNCONSTRAINEDSIZE;
     computedMinBSize = 0;
     computedMaxBSize = NS_UNCONSTRAINEDSIZE;
