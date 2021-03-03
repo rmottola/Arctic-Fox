@@ -5398,7 +5398,7 @@ BCMapCellInfo::SetColGroupBEndContBCBorder()
     currentBorder = CompareBorders(mTableFrame, mColGroup, nullptr, mRowGroup,
                                    mEndRow, nullptr, mTableWM,
                                    eLogicalSideBEnd, ADJACENT);
-    mColGroup->SetContinuousBCBorderWidth(NS_SIDE_BOTTOM, currentBorder.width);
+    mColGroup->SetContinuousBCBorderWidth(eLogicalSideBEnd, currentBorder.width);
   }
 }
 
