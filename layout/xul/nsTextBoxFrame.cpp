@@ -964,7 +964,7 @@ nsTextBoxFrame::DoLayout(nsBoxLayoutState& aBoxLayoutState)
                                              aBoxLayoutState.GetRenderingContext());
 
     WritingMode wm = GetWritingMode();
-    LogicalRect tr(wm, textRect, GetSize().width);
+    LogicalRect tr(wm, textRect, GetSize());
 
     tr.IStart(wm) -= metrics.leftBearing;
     tr.ISize(wm) = metrics.width;
@@ -972,7 +972,7 @@ nsTextBoxFrame::DoLayout(nsBoxLayoutState& aBoxLayoutState)
     tr.BStart(wm) += fontMet->MaxAscent() - metrics.ascent;
     tr.BSize(wm) = metrics.ascent + metrics.descent;
 
-    textRect = tr.GetPhysicalRect(wm, GetSize().width);
+    textRect = tr.GetPhysicalRect(wm, GetSize());
 
     // Our scrollable overflow is our bounds; our visual overflow may
     // extend beyond that.
@@ -1095,7 +1095,7 @@ nsTextBoxFrame::CalcDrawRect(nsRenderingContext &aRenderingContext)
       textRect.IStart(wm) += (outerISize - textRect.ISize(wm));
     }
 
-    mTextDrawRect = textRect.GetPhysicalRect(wm, GetSize().width);
+    mTextDrawRect = textRect.GetPhysicalRect(wm, GetSize());
 }
 
 /**
