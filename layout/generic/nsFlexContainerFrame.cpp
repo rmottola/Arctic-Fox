@@ -343,7 +343,11 @@ public:
            const FlexboxAxisTracker& aAxisTracker);
 
   // Simplified constructor, to be used only for generating "struts":
-  FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize);
+  // (NOTE: This "strut" constructor uses the *container's* writing mode, which
+  // we'll use on this FlexItem instead of the child frame's real writing mode.
+  // This is fine - it doesn't matter what writing mode we use for a
+  // strut, since it won't render any content and we already know its size.)
+  FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize, WritingMode aContainerWM);
 
   // Accessors
   nsIFrame* Frame() const          { return mFrame; }
@@ -376,10 +380,9 @@ public:
       // will matter more (& can be expanded/tested) once we officially support
       // logical directions & vertical writing-modes in flexbox, in bug 1079155
       // or a dependency.
-      WritingMode wm = mFrame->GetWritingMode();
       // Use GetFirstLineBaseline(), or just GetBaseline() if that fails.
-      if (!nsLayoutUtils::GetFirstLineBaseline(wm, mFrame, &mAscent)) {
-        mAscent = mFrame->GetLogicalBaseline(wm);
+      if (!nsLayoutUtils::GetFirstLineBaseline(mWM, mFrame, &mAscent)) {
+        mAscent = mFrame->GetLogicalBaseline(mWM);
       }
     }
     return mAscent;
@@ -431,6 +434,7 @@ public:
   // visibility:collapse.
   bool IsStrut() const             { return mIsStrut; }
 
+  WritingMode GetWritingMode() const { return mWM; }
   uint8_t GetAlignSelf() const     { return mAlignSelf; }
 
   // Returns the flex factor (flex-grow or flex-shrink), depending on
@@ -709,6 +713,7 @@ protected:
   // Does this item need to resolve a min-[width|height]:auto (in main-axis).
   bool mNeedsMinSizeAutoResolution;
 
+  const WritingMode mWM; // The flex item's writing mode.
   uint8_t mAlignSelf; // My "align-self" computed value (with "auto"
                       // swapped out for parent"s "align-items" value,
                       // in our constructor).
@@ -1570,6 +1575,7 @@ FlexItem::FlexItem(nsHTMLReflowState& aFlexItemReflowState,
     mIsStretched(false),
     mIsStrut(false),
     // mNeedsMinSizeAutoResolution is initialized in CheckForMinSizeAuto()
+    mWM(aFlexItemReflowState.GetWritingMode()),
     mAlignSelf(aFlexItemReflowState.mStylePosition->mAlignSelf)
 {
   MOZ_ASSERT(mFrame, "expecting a non-null child frame");
@@ -1621,7 +1627,8 @@ FlexItem::FlexItem(nsHTMLReflowState& aFlexItemReflowState,
 // Simplified constructor for creating a special "strut" FlexItem, for a child
 // with visibility:collapse. The strut has 0 main-size, and it only exists to
 // impose a minimum cross size on whichever FlexLine it ends up in.
-FlexItem::FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize)
+FlexItem::FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize,
+                   WritingMode aContainerWM)
   : mFrame(aChildFrame),
     mFlexGrow(0.0f),
     mFlexShrink(0.0f),
@@ -1645,6 +1652,7 @@ FlexItem::FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize)
     mIsStretched(false),
     mIsStrut(true), // (this is the constructor for making struts, after all)
     mNeedsMinSizeAutoResolution(false),
+    mWM(aContainerWM),
     mAlignSelf(NS_STYLE_ALIGN_ITEMS_FLEX_START)
 {
   MOZ_ASSERT(mFrame, "expecting a non-null child frame");
@@ -3168,7 +3176,8 @@ nsFlexContainerFrame::GenerateFlexLines(
         aStruts[nextStrutIdx].mItemIdx == itemIdxInContainer) {
 
       // Use the simplified "strut" FlexItem constructor:
-      item = new FlexItem(childFrame, aStruts[nextStrutIdx].mStrutCrossSize);
+      item = new FlexItem(childFrame, aStruts[nextStrutIdx].mStrutCrossSize,
+                          aReflowState.GetWritingMode());
       nextStrutIdx++;
     } else {
       item = GenerateFlexItemForChild(aPresContext, childFrame,
