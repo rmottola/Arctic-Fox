@@ -46,7 +46,7 @@ fails == 345369-2.html 345369-2-ref.html
 == bfc-displace-4.html bfc-displace-4-ref.html
 == bfc-shrink-1.html bfc-shrink-1-ref.html
 
-fuzzy-if(OSX==1010,26,7) fuzzy-if(Android,16,2) == orthogonal-floats-1a.html orthogonal-floats-1-ref.html
-fuzzy-if(OSX==1010,26,7) == orthogonal-floats-1b.html orthogonal-floats-1-ref.html
-fuzzy-if(OSX==1010,103,802) fuzzy-if(winWidget,116,700) HTTP(..) == orthogonal-floats-1c.html orthogonal-floats-1-ref.html
-fuzzy-if(OSX==1010,103,802) fuzzy-if(winWidget,116,700) HTTP(..) == orthogonal-floats-1d.html orthogonal-floats-1-ref.html
+pref(layout.css.vertical-text.enabled,true) fuzzy-if(OSX==1010,26,7) fuzzy-if(Android,16,2) == orthogonal-floats-1a.html orthogonal-floats-1-ref.html
+pref(layout.css.vertical-text.enabled,true) fuzzy-if(OSX==1010,26,7) == orthogonal-floats-1b.html orthogonal-floats-1-ref.html
+pref(layout.css.vertical-text.enabled,true) fuzzy-if(OSX==1010,103,802) fuzzy-if(winWidget,116,700) HTTP(..) == orthogonal-floats-1c.html orthogonal-floats-1-ref.html
+pref(layout.css.vertical-text.enabled,true) fuzzy-if(OSX==1010,103,802) fuzzy-if(winWidget,116,700) HTTP(..) == orthogonal-floats-1d.html orthogonal-floats-1-ref.html
