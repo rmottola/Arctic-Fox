@@ -862,6 +862,7 @@ ObjectGroup::newArrayObject(ExclusiveContext* cx,
                                      ShouldUpdateTypes::DontUpdate);
 }
 
+// Try to change the group of |source| to match that of |target|.
 static bool
 GiveObjectGroup(ExclusiveContext* cx, JSObject* source, JSObject* target)
 {
@@ -943,19 +944,19 @@ js::CombineArrayElementTypes(ExclusiveContext* cx, JSObject* newObj,
     if (SameGroup(oldObj, newObj))
         return true;
 
-    if (!GiveObjectGroup(cx, oldObj, newObj))
+    if (!GiveObjectGroup(cx, newObj, oldObj))
         return false;
 
     if (SameGroup(oldObj, newObj))
         return true;
 
-    if (!GiveObjectGroup(cx, newObj, oldObj))
+    if (!GiveObjectGroup(cx, oldObj, newObj))
         return false;
 
     if (SameGroup(oldObj, newObj)) {
         for (size_t i = 1; i < ncompare; i++) {
             if (compare[i].isObject() && !SameGroup(&compare[i].toObject(), newObj)) {
-                if (!GiveObjectGroup(cx, newObj, &compare[i].toObject()))
+                if (!GiveObjectGroup(cx, &compare[i].toObject(), newObj))
                     return false;
             }
         }
@@ -996,13 +997,13 @@ js::CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
             if (SameGroup(oldInnerObj, newInnerObj))
                 continue;
 
-            if (!GiveObjectGroup(cx, oldInnerObj, newInnerObj))
+            if (!GiveObjectGroup(cx, newInnerObj, oldInnerObj))
                 return false;
 
             if (SameGroup(oldInnerObj, newInnerObj))
                 continue;
 
-            if (!GiveObjectGroup(cx, newInnerObj, oldInnerObj))
+            if (!GiveObjectGroup(cx, oldInnerObj, newInnerObj))
                 return false;
 
             if (SameGroup(oldInnerObj, newInnerObj)) {
@@ -1010,7 +1011,7 @@ js::CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
                     if (compare[i].isObject() && SameGroup(&compare[i].toObject(), newObj)) {
                         Value otherValue = compare[i].toObject().as<PlainObject>().getSlot(slot);
                         if (otherValue.isObject() && !SameGroup(&otherValue.toObject(), newInnerObj)) {
-                            if (!GiveObjectGroup(cx, newInnerObj, &otherValue.toObject()))
+                            if (!GiveObjectGroup(cx, &otherValue.toObject(), newInnerObj))
                                 return false;
                         }
                     }
@@ -1035,13 +1036,13 @@ js::CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
             if (!newInnerObj || !oldInnerObj || SameGroup(oldInnerObj, newInnerObj))
                 continue;
 
-            if (!GiveObjectGroup(cx, oldInnerObj, newInnerObj))
+            if (!GiveObjectGroup(cx, newInnerObj, oldInnerObj))
                 return false;
 
             if (SameGroup(oldInnerObj, newInnerObj))
                 continue;
 
-            if (!GiveObjectGroup(cx, newInnerObj, oldInnerObj))
+            if (!GiveObjectGroup(cx, oldInnerObj, newInnerObj))
                 return false;
 
             if (SameGroup(oldInnerObj, newInnerObj)) {
@@ -1050,7 +1051,7 @@ js::CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
                         uint8_t* otherData = compare[i].toObject().as<UnboxedPlainObject>().data();
                         JSObject* otherInnerObj = *reinterpret_cast<JSObject**>(otherData + *traceList);
                         if (otherInnerObj && !SameGroup(otherInnerObj, newInnerObj)) {
-                            if (!GiveObjectGroup(cx, newInnerObj, otherInnerObj))
+                            if (!GiveObjectGroup(cx, otherInnerObj, newInnerObj))
                                 return false;
                         }
                     }
