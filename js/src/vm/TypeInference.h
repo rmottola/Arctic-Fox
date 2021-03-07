@@ -793,6 +793,7 @@ class PreliminaryObjectArray
     }
 
     void registerNewObject(JSObject* res);
+    void unregisterObject(JSObject* obj);
 
     JSObject* get(size_t i) const {
         MOZ_ASSERT(i < COUNT);
