@@ -2311,11 +2311,6 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   max-width: 27em;
 }
 
-.popup-progress-meter,
-#addon-install-confirmation-content {
-  margin-top: 1em;
-}
-
 .addon-install-confirmation-name {
   font-weight: bold;
 }

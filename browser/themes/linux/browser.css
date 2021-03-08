@@ -1217,10 +1217,6 @@ toolbar[iconsize="small"] #feed-button {
   max-width: 27em;
 }
 
-.popup-progress-meter {
-  margin-top: .5em;
-}
-
 .addon-install-confirmation-name {
   font-weight: bold;
 }
