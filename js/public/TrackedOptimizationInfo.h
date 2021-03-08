@@ -140,6 +140,7 @@ namespace JS {
                                                                         \
     _(ICNameStub_ReadSlot)                                              \
     _(ICNameStub_CallGetter)                                            \
+    _(ICNameStub_TypeOfNoProperty)                                      \
                                                                         \
     _(CantInlineGeneric)                                                \
     _(CantInlineNoTarget)                                               \
