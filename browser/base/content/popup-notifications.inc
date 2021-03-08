@@ -102,6 +102,12 @@
       </popupnotificationcontent>
     </popupnotification>
 
+    <vbox id="login-fill-doorhanger" hidden="true">
+      <description id="login-fill-testing"
+                   value="Thanks for testing the login fill doorhanger!"/>
+      <textbox id="login-fill-filter"/>
+      <richlistbox id="login-fill-list"/>
+    </vbox>
 
     <popupnotification id="addon-progress-notification" hidden="true">
       <popupnotificationcontent orient="vertical">
