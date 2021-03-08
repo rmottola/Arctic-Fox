@@ -76,15 +76,15 @@
          Components.classes["@mozilla.org/autocomplete/search;1?name=history"]
                    .getService(Components.interfaces.mozIPlacesAutoComplete);
       </field>
+      <field name="_unifiedComplete" readonly="true">
+         Components.classes["@mozilla.org/autocomplete/search;1?name=unifiedcomplete"]
+                   .getService(Components.interfaces.mozIPlacesAutoComplete);
+      </field>
       <field name="PlacesUtils" readonly="true">
         (Components.utils.import("resource://gre/modules/PlacesUtils.jsm", {})).PlacesUtils;
       </field>
       <field name="AppConstants" readonly="true">
         (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
-      </field>
-      <field name="_unifiedComplete" readonly="true">
-         Components.classes["@mozilla.org/autocomplete/search;1?name=unifiedcomplete"]
-                   .getService(Components.interfaces.mozIPlacesAutoComplete);
       </field>
       <field name="mTabBox" readonly="true">
         document.getAnonymousElementByAttribute(this, "anonid", "tabbox");
