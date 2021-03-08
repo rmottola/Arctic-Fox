@@ -88,7 +88,7 @@
 
     <popupnotification id="webapps-install-progress-notification" hidden="true">
       <popupnotificationcontent id="webapps-install-progress-content" orient="vertical" align="start"/>
-</popupnotification>
+    </popupnotification>
 
     <popupnotification id="servicesInstall-notification" hidden="true">
       <popupnotificationcontent orient="vertical" align="start">
@@ -98,7 +98,7 @@
 
     <popupnotification id="pointerLock-notification" hidden="true">
       <popupnotificationcontent orient="vertical" align="start">
-        <label id="pointerLock-cancel" value="&pointerLock.notification.message;"/>
+        <label id="pointerLock-cancel">&pointerLock.notification.message;</label>
       </popupnotificationcontent>
     </popupnotification>
 
@@ -120,4 +120,4 @@
       <button id="addon-install-confirmation-accept"
               oncommand="gXPInstallObserver.acceptInstallation();
                          PopupNotifications.getNotification('addon-install-confirmation').remove();"/>
-</popupnotification>
+    </popupnotification>
