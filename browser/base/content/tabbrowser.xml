@@ -4908,6 +4908,10 @@
                   PrivateBrowsingUtils.isWindowPrivate(sourceNode.ownerDocument.defaultView))
                 return dt.effectAllowed = "none";
 
+              if (window.gMultiProcessBrowser !=
+                  sourceNode.ownerDocument.defaultView.gMultiProcessBrowser)
+                return dt.effectAllowed = "none";
+
               let copyModifier = this.AppConstants.platform == "macosx" ? event.altKey : event.ctrlKey;
               return dt.effectAllowed = copyModifier ? "copy" : "move";
             }
