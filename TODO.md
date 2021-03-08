@@ -63,7 +63,8 @@
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
-- Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
+- Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- Bug 1160971 - 4 parts
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
 - rest of 1198458
@@ -75,6 +76,8 @@
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 - Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
+- Bug 1238935 - r=jonco 
+- Bug 1214126 - 5 Parts
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
@@ -159,14 +162,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1184634 - Rename MediaPromise to MozPromise
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
-- Bug 1148026 - Add a skeleton of the login fill doorhange
-- 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
-- 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
 - Bug 1242578
-- Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
-- 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
-- Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
-- https://bugzilla.mozilla.org/show_bug.cgi?id=1162986
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
