@@ -167,7 +167,7 @@ let RLSidebar = {
   },
 
   /**
-   * The currently active element in the list.
+   * The list item displayed in the current tab.
    * @type {Element}
    */
   get activeItem() {
@@ -200,7 +200,7 @@ let RLSidebar = {
   },
 
   /**
-   * The currently selected item in the list.
+   * The list item selected with the keyboard.
    * @type {Element}
    */
   get selectedItem() {
@@ -369,15 +369,14 @@ let RLSidebar = {
   },
 
   /**
-   * Handle a mousemove event over the list box.
+   * Handle a mousemove event over the list box:
+   * If the hovered item isn't the selected one, clear the selection.
    * @param {Event} event - Triggering event.
    */
   onListMouseMove(event) {
     let itemNode = this.findParentItemNode(event.target);
-    if (!itemNode)
-      return;
-
-    this.selectedItem = itemNode;
+    if (itemNode != this.selectedItem)
+      this.selectedItem = null;
   },
 
   /**
