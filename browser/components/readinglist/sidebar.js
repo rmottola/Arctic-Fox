@@ -353,6 +353,11 @@ let RLSidebar = {
     if (!itemNode)
       return;
 
+    if (event.target.classList.contains("remove-button")) {
+      ReadingList.deleteItem(this.getItemFromNode(itemNode));
+      return;
+    }
+
     this.activeItem = itemNode;
     this.openActiveItem(event);
   },
