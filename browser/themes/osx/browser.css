@@ -571,8 +571,8 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
     transition: background-color .4s;
 }
 
-:-moz-any(#TabsToolbar, #addon-bar) .toolbarbutton-1,
-:-moz-any(#TabsToolbar, #addon-bar) .toolbarbutton-1 > .toolbarbutton-menubutton-button,
+#TabsToolbar .toolbarbutton-1,
+#TabsToolbar .toolbarbutton-1 > .toolbarbutton-menubutton-button,
 .tabbrowser-arrowscrollbox > .scrollbutton-up,
 .tabbrowser-arrowscrollbox > .scrollbutton-down {
     -moz-appearance: none;
@@ -2231,54 +2231,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 
 .allTabs-preview:focus > * > .allTabs-preview-inner {
     outline: 1px dotted -moz-dialogText;
-}
-
-/* Add-on bar */
-
-#addon-bar {
-    -moz-appearance: none;
-    min-height: 20px;
-    border-top-style: none;
-    border-bottom-style: none;
-    padding-top: 1px;
-    background-image: linear-gradient(rgba(0,0,0,.15) 1px, rgba(255,255,255,.15) 1px);
-    background-size: 100% 2px;
-    background-repeat: no-repeat;
-}
-
-#status-bar {
-    -moz-appearance: none;
-    background-color: transparent;
-    border: none;
-    min-height: 0;
-}
-
-#addon-bar[customizing] > #status-bar {
-    opacity: .5;
-    background-image: repeating-linear-gradient(135deg,
-        rgba(255,255,255,.3), rgba(255,255,255,.3) 5px,
-        rgba(0,0,0,.3) 5px, rgba(0,0,0,.3) 10px);
-}
-
-#status-bar > statusbarpanel {
-    border-width: 0;
-    -moz-appearance: none;
-}
-
-#addonbar-closebutton {
-    border: none;
-    padding: 0 5px;
-    -moz-appearance: none;
-}
-
-toolbar[brighttext] #addonbar-closebutton {
-    list-style-image: url("chrome://global/skin/icons/close-inverted.png");
-}
-
-@media (min-resolution: 2dppx) {
-    toolbar[brighttext] #addonbar-closebutton {
-        list-style-image: url("chrome://global/skin/icons/close-inverted@2x.png");
-    }
 }
 
 /* Status panel */
