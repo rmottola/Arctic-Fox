@@ -6,14 +6,18 @@
  */
 
 const PREF_DEVEDITION_THEME = "browser.devedition.theme.enabled";
-const PREF_LWTHEME = "lightweightThemes.isThemeSelected";
+const PREF_LWTHEME = "lightweightThemes.selectedThemeID";
+const PREF_LWTHEME_USED_THEMES = "lightweightThemes.usedThemes";
 const PREF_DEVTOOLS_THEME = "devtools.theme";
+const {LightweightThemeManager} = Components.utils.import("resource://gre/modules/LightweightThemeManager.jsm", {});
 
 registerCleanupFunction(() => {
   // Set preferences back to their original values
+  LightweightThemeManager.currentTheme = null;
   Services.prefs.clearUserPref(PREF_DEVEDITION_THEME);
   Services.prefs.clearUserPref(PREF_LWTHEME);
   Services.prefs.clearUserPref(PREF_DEVTOOLS_THEME);
+  Services.prefs.clearUserPref(PREF_LWTHEME_USED_THEMES);
 });
 
 function test() {
@@ -31,11 +35,11 @@ function startTests() {
   ok (DevEdition.styleSheet, "There is a devedition stylesheet when no themes are applied and pref is set.");
 
   info ("Adding a lightweight theme.");
-  Services.prefs.setBoolPref(PREF_LWTHEME, true);
+  LightweightThemeManager.currentTheme = dummyLightweightTheme("preview0");
   ok (!DevEdition.styleSheet, "The devedition stylesheet has been removed when a lightweight theme is applied.");
 
   info ("Removing a lightweight theme.");
-  Services.prefs.setBoolPref(PREF_LWTHEME, false);
+  LightweightThemeManager.currentTheme = null;
   ok (DevEdition.styleSheet, "The devedition stylesheet has been added when a lightweight theme is removed.");
 
   info ("Setting browser.devedition.theme.enabled to false.");
@@ -88,16 +92,14 @@ function dummyLightweightTheme(id) {
   return {
     id: id,
     name: id,
-    headerURL: "http://lwttest.invalid/a.png",
-    footerURL: "http://lwttest.invalid/b.png",
+    headerURL: "resource:///chrome/browser/content/browser/defaultthemes/1.header.jpg",
+    iconURL: "resource:///chrome/browser/content/browser/defaultthemes/1.icon.jpg",
     textcolor: "red",
     accentcolor: "blue"
   };
 }
 
 function testLightweightThemePreview() {
-  let {LightweightThemeManager} = Components.utils.import("resource://gre/modules/LightweightThemeManager.jsm", {});
-
   info ("Turning the pref on, then previewing lightweight themes");
   Services.prefs.setBoolPref(PREF_DEVEDITION_THEME, true);
   ok (DevEdition.styleSheet, "The devedition stylesheet is enabled.");

@@ -111,9 +111,8 @@ PrefStore.prototype = {
   },
 
   _setAllPrefs: function (values) {
-    let enabledPref = "lightweightThemes.isThemeSelected";
-    let enabledBefore = this._prefs.get(enabledPref, false);
-    let prevTheme = LightweightThemeManager.currentTheme;
+    let selectedThemeIDPref = "lightweightThemes.selectedThemeID";
+    let selectedThemeIDBefore = this._prefs.get(selectedThemeIDPref, null);
 
     // Update 'services.sync.prefs.sync.foo.pref' before 'foo.pref', otherwise
     // _isSynced returns false when 'foo.pref' doesn't exist (e.g., on a new device).
@@ -138,13 +137,14 @@ PrefStore.prototype = {
       } 
     }
 
-    // Notify the lightweight theme manager of all the new values
-    let enabledNow = this._prefs.get(enabledPref, false);
-    if (enabledBefore && !enabledNow) {
+    // Notify the lightweight theme manager if the selected theme has changed.
+    let selectedThemeIDAfter = this._prefs.get(selectedThemeIDPref, null);
+    if (selectedThemeIDBefore != selectedThemeIDAfter) {
+      // The currentTheme getter will reflect the theme with the new
+      // selectedThemeID (if there is one).  Just reset it to itself
+      let currentTheme = LightweightThemeManager.currentTheme;
       LightweightThemeManager.currentTheme = null;
-    } else if (enabledNow && LightweightThemeManager.usedThemes[0] != prevTheme) {
-      LightweightThemeManager.currentTheme = null;
-      LightweightThemeManager.currentTheme = LightweightThemeManager.usedThemes[0];
+      LightweightThemeManager.currentTheme = currentTheme;
     }
   },
 
