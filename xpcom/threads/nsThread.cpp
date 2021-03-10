@@ -277,7 +277,7 @@ private:
 static void
 SetupCurrentThreadForChaosMode()
 {
-  if (!ChaosMode::isActive(ChaosMode::ThreadScheduling)) {
+  if (!ChaosMode::isActive(ChaosFeature::ThreadScheduling)) {
     return;
   }
 
@@ -889,7 +889,7 @@ nsThread::SetPriority(int32_t aPriority)
     pri = PR_PRIORITY_NORMAL;
   }
   // If chaos mode is active, retain the randomly chosen priority
-  if (!ChaosMode::isActive(ChaosMode::ThreadScheduling)) {
+  if (!ChaosMode::isActive(ChaosFeature::ThreadScheduling)) {
     PR_SetThreadPriority(mThread, pri);
   }
 
