@@ -20,13 +20,6 @@
 
 #include <new>
 
-// helper function for nsTHashtable::Clear()
-PLDHashOperator PL_DHashStubEnumRemove(PLDHashTable* aTable,
-                                       PLDHashEntryHdr* aEntry,
-                                       uint32_t aOrdinal,
-                                       void* aUserArg);
-
-
 /**
  * a base class for templated hashtables.
  *
@@ -223,11 +216,13 @@ public:
   }
 
   /**
-   * remove all entries, return hashtable to "pristine" state ;)
+   * Remove all entries, return hashtable to "pristine" state. It's
+   * conceptually the same as calling the destructor and then re-calling the
+   * constructor.
    */
   void Clear()
   {
-    PL_DHashTableEnumerate(&mTable, PL_DHashStubEnumRemove, nullptr);
+    mTable.Clear();
   }
 
   /**
