@@ -156,6 +156,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 returnValue = action.params.url;
                 break;
               }
+              case "keyword": {
+                returnValue = action.params.input;
+                break;
+              }
             }
           }
 
@@ -293,8 +297,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 if (switchToTabHavingURI(action.params.originalUrl || url) &&
                     isTabEmpty(prevTab))
                   gBrowser.removeTab(prevTab);
+                return;
+              } else if (action.type == "keyword") {
+                url = action.params.url;
               }
-              return;
             }
             continueOperation.call(this);
           }
@@ -985,10 +991,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             // Check if this is meant to be an action
             let action = this.mInput._parseActionUrl(url);
             if (action) {
-              if (action.type == "switchtab")
-                url = action.param;
-              else
-                return;
+              // TODO (bug 1054816): Centralise the implementation of actions
+              // into a JS module.
+              switch (action.type) {
+                case "switchtab": //Fall through.
+                case "keyword": {
+                  url = action.params.url;
+                  break;
+                }
+                default: {
+                  return;
+                }
+              }
             }
 
             // respect the usual clicking subtleties
