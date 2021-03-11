@@ -1235,6 +1235,8 @@ pref("network.disable.ipc.security", true);
 
 // Disable ReadingList by default.
 pref("browser.readinglist.enabled", false);
+pref("readinglist.scheduler.enabled", false);
+pref("readinglist.server", "https://readinglist.services.mozilla.com/v1");
 
 pref("browser.translation.detectLanguage", false);
 pref("browser.translation.neverForLanguages", "");
