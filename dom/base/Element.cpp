@@ -2298,7 +2298,7 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
   nsMutationGuard::DidMutate();
 
   // Copy aParsedValue for later use since it will be lost when we call
-  // SetAndTakeMappedAttr below
+  // SetAndSwapMappedAttr below
   nsAttrValue aValueForAfterSetAttr;
   if (aCallAfterSetAttr) {
     aValueForAfterSetAttr.SetTo(aParsedValue);
@@ -2317,7 +2317,7 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
     // stuff to Element?
     if (!IsAttributeMapped(aName) ||
         !SetMappedAttribute(document, aName, aParsedValue, &rv)) {
-      rv = mAttrsAndChildren.SetAndTakeAttr(aName, aParsedValue);
+      rv = mAttrsAndChildren.SetAndSwapAttr(aName, aParsedValue);
     }
   }
   else {
@@ -2326,7 +2326,7 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
                                                    aNamespaceID,
                                                    nsIDOMNode::ATTRIBUTE_NODE);
 
-    rv = mAttrsAndChildren.SetAndTakeAttr(ni, aParsedValue);
+    rv = mAttrsAndChildren.SetAndSwapAttr(ni, aParsedValue);
   }
   NS_ENSURE_SUCCESS(rv, rv);
 
