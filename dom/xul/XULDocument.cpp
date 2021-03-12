@@ -768,10 +768,8 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
         mBroadcasterMap = new PLDHashTable(&gOps, sizeof(BroadcasterMapEntry));
     }
 
-    BroadcasterMapEntry* entry =
-        static_cast<BroadcasterMapEntry*>
-                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
-
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(&aBroadcaster));
     if (!entry) {
         entry = static_cast<BroadcasterMapEntry*>
             (PL_DHashTableAdd(mBroadcasterMap, &aBroadcaster, fallible));
@@ -829,10 +827,8 @@ XULDocument::RemoveBroadcastListenerFor(Element& aBroadcaster,
     if (! mBroadcasterMap)
         return;
 
-    BroadcasterMapEntry* entry =
-        static_cast<BroadcasterMapEntry*>
-                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
-
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(&aBroadcaster));
     if (entry) {
         nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
         for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
@@ -951,9 +947,8 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
     // Synchronize broadcast listeners
     if (mBroadcasterMap &&
         CanBroadcast(aNameSpaceID, aAttribute)) {
-        BroadcasterMapEntry* entry =
-            static_cast<BroadcasterMapEntry*>
-                       (PL_DHashTableSearch(mBroadcasterMap, aElement));
+        auto entry = static_cast<BroadcasterMapEntry*>
+                                (mBroadcasterMap->Search(aElement));
 
         if (entry) {
             // We've got listeners: push the value.
@@ -4129,8 +4124,8 @@ XULDocument::BroadcastAttributeChangeFromOverlay(nsIContent* aNode,
     if (!aNode->IsElement())
         return rv;
 
-    BroadcasterMapEntry* entry = static_cast<BroadcasterMapEntry*>
-        (PL_DHashTableSearch(mBroadcasterMap, aNode->AsElement()));
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(aNode->AsElement()));
     if (!entry)
         return rv;
 

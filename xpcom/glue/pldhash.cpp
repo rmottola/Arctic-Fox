@@ -558,7 +558,7 @@ PLDHashTable::ComputeKeyHash(const void* aKey)
   return keyHash;
 }
 
-MOZ_ALWAYS_INLINE PLDHashEntryHdr*
+PLDHashEntryHdr*
 PLDHashTable::Search(const void* aKey)
 {
 #ifdef DEBUG
@@ -679,12 +679,6 @@ PLDHashTable::RemoveEntry(PLDHashEntryHdr* aEntry)
 
   RawRemove(aEntry);
   ShrinkIfAppropriate();
-}
-
-PLDHashEntryHdr* PL_DHASH_FASTCALL
-PL_DHashTableSearch(PLDHashTable* aTable, const void* aKey)
-{
-  return aTable->Search(aKey);
 }
 
 PLDHashEntryHdr* PL_DHASH_FASTCALL

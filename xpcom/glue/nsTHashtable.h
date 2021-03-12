@@ -135,8 +135,7 @@ public:
   EntryType* GetEntry(KeyType aKey) const
   {
     return static_cast<EntryType*>(
-      PL_DHashTableSearch(const_cast<PLDHashTable*>(&mTable),
-                          EntryType::KeyToPointer(aKey)));
+      const_cast<PLDHashTable*>(&mTable)->Search(EntryType::KeyToPointer(aKey)));
   }
 
   /**
