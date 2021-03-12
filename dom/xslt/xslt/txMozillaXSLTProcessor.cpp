@@ -1245,7 +1245,8 @@ txMozillaXSLTProcessor::AttributeChanged(nsIDocument* aDocument,
                                          Element* aElement,
                                          int32_t aNameSpaceID,
                                          nsIAtom* aAttribute,
-                                         int32_t aModType)
+                                         int32_t aModType,
+                                         const nsAttrValue* aOldValue)
 {
     mStylesheet = nullptr;
 }
