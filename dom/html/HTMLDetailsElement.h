@@ -39,7 +39,7 @@ public:
                                       int32_t aModType) const override;
 
   nsresult BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                         const nsAttrValueOrString* aValue,
+                         nsAttrValueOrString* aValue,
                          bool aNotify) override;
 
   // WebIDL methods.
