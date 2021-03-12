@@ -150,7 +150,7 @@ nsStyleContext::~nsStyleContext()
 
   mRuleNode->Release();
 
-  styleSet->NotifyStyleContextDestroyed(presContext, this);
+  styleSet->NotifyStyleContextDestroyed(this);
 
   if (mParent) {
     mParent->RemoveChild(this);

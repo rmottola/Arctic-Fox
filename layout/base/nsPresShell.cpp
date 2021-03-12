@@ -1225,7 +1225,7 @@ PresShell::Destroy()
     mViewManager = nullptr;
   }
 
-  mStyleSet->BeginShutdown(mPresContext);
+  mStyleSet->BeginShutdown();
   nsRefreshDriver* rd = GetPresContext()->RefreshDriver();
 
   // This shell must be removed from the document before the frame
@@ -1283,7 +1283,7 @@ PresShell::Destroy()
   }
 
   // Let the style set do its cleanup.
-  mStyleSet->Shutdown(mPresContext);
+  mStyleSet->Shutdown();
 
   if (mPresContext) {
     // We hold a reference to the pres context, and it holds a weak link back
@@ -4143,8 +4143,7 @@ PresShell::DocumentStatesChanged(nsIDocument* aDocument,
   NS_PRECONDITION(aDocument == mDocument, "Unexpected aDocument");
 
   if (mDidInitialize &&
-      mStyleSet->HasDocumentStateDependentStyle(mPresContext,
-                                                mDocument->GetRootElement(),
+      mStyleSet->HasDocumentStateDependentStyle(mDocument->GetRootElement(),
                                                 aStateMask)) {
     mPresContext->RestyleManager()->PostRestyleEvent(mDocument->GetRootElement(),
                                                      eRestyle_Subtree,
