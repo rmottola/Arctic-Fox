@@ -2109,7 +2109,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSKeyframeStyleDeclaration)
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
 css::Declaration*
-nsCSSKeyframeStyleDeclaration::GetCSSDeclaration(bool aAllocate)
+nsCSSKeyframeStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
     return mRule->Declaration();
@@ -2670,7 +2670,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSPageStyleDeclaration)
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
 css::Declaration*
-nsCSSPageStyleDeclaration::GetCSSDeclaration(bool aAllocate)
+nsCSSPageStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
     return mRule->Declaration();
