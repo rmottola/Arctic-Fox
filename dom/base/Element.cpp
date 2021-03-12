@@ -2222,9 +2222,11 @@ Element::SetAttr(int32_t aNamespaceID, nsIAtom* aName,
 
   nsresult rv = BeforeSetAttr(aNamespaceID, aName, &value, aNotify);
   NS_ENSURE_SUCCESS(rv, rv);
+  nsAttrValue* preparsedAttrValue = value.GetStoredAttrValue();
 
   if (aNotify) {
-    nsNodeUtils::AttributeWillChange(this, aNamespaceID, aName, modType);
+    nsNodeUtils::AttributeWillChange(this, aNamespaceID, aName, modType,
+                                     preparsedAttrValue);
   }
 
   // Hold a script blocker while calling ParseAttribute since that can call
@@ -2232,7 +2234,6 @@ Element::SetAttr(int32_t aNamespaceID, nsIAtom* aName,
   nsAutoScriptBlocker scriptBlocker;
 
   nsAttrValue attrValue;
-  nsAttrValue* preparsedAttrValue = value.GetStoredAttrValue();
   if (preparsedAttrValue) {
     attrValue.SwapValueWith(*preparsedAttrValue);
   }
@@ -2277,7 +2278,8 @@ Element::SetParsedAttr(int32_t aNamespaceID, nsIAtom* aName,
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (aNotify) {
-    nsNodeUtils::AttributeWillChange(this, aNamespaceID, aName, modType);
+    nsNodeUtils::AttributeWillChange(this, aNamespaceID, aName, modType,
+                                     &aParsedValue);
   }
 
   return SetAttrAndNotify(aNamespaceID, aName, aPrefix, oldValue,
@@ -2525,7 +2527,8 @@ Element::UnsetAttr(int32_t aNameSpaceID, nsIAtom* aName,
 
   if (aNotify) {
     nsNodeUtils::AttributeWillChange(this, aNameSpaceID, aName,
-                                     nsIDOMMutationEvent::REMOVAL);
+                                     nsIDOMMutationEvent::REMOVAL,
+                                     nullptr);
   }
 
   bool hasMutationListeners = aNotify &&
