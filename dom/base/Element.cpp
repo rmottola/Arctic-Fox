@@ -2299,9 +2299,9 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
 
   // Copy aParsedValue for later use since it will be lost when we call
   // SetAndSwapMappedAttr below
-  nsAttrValue aValueForAfterSetAttr;
+  nsAttrValue valueForAfterSetAttr;
   if (aCallAfterSetAttr) {
-    aValueForAfterSetAttr.SetTo(aParsedValue);
+    valueForAfterSetAttr.SetTo(aParsedValue);
   }
 
   bool hadValidDir = false;
@@ -2328,6 +2328,11 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
 
     rv = mAttrsAndChildren.SetAndSwapAttr(ni, aParsedValue);
   }
+
+  // If the old value owns its own data, we know it is OK to keep using it.
+  const nsAttrValue* oldValue =
+      aParsedValue.StoresOwnData() ? &aParsedValue : &aOldValue;
+
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (document || HasFlag(NODE_FORCE_XBL_BINDINGS)) {
@@ -2341,8 +2346,8 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
 
   nsIDocument* ownerDoc = OwnerDoc();
   if (ownerDoc && GetCustomElementData()) {
-    nsCOMPtr<nsIAtom> oldValueAtom = aOldValue.GetAsAtom();
-    nsCOMPtr<nsIAtom> newValueAtom = aValueForAfterSetAttr.GetAsAtom();
+    nsCOMPtr<nsIAtom> oldValueAtom = oldValue->GetAsAtom();
+    nsCOMPtr<nsIAtom> newValueAtom = valueForAfterSetAttr.GetAsAtom();
     LifecycleCallbackArgs args = {
       nsDependentAtomString(aName),
       aModType == nsIDOMMutationEvent::ADDITION ?
@@ -2354,11 +2359,11 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
   }
 
   if (aCallAfterSetAttr) {
-    rv = AfterSetAttr(aNamespaceID, aName, &aValueForAfterSetAttr, aNotify);
+    rv = AfterSetAttr(aNamespaceID, aName, &valueForAfterSetAttr, aNotify);
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (aNamespaceID == kNameSpaceID_None && aName == nsGkAtoms::dir) {
-      OnSetDirAttr(this, &aValueForAfterSetAttr,
+      OnSetDirAttr(this, &valueForAfterSetAttr,
                    hadValidDir, hadDirAuto, aNotify);
     }
   }
@@ -2382,8 +2387,8 @@ Element::SetAttrAndNotify(int32_t aNamespaceID,
     if (!newValue.IsEmpty()) {
       mutation.mNewAttrValue = do_GetAtom(newValue);
     }
-    if (!aOldValue.IsEmptyString()) {
-      mutation.mPrevAttrValue = aOldValue.GetAsAtom();
+    if (!oldValue->IsEmptyString()) {
+      mutation.mPrevAttrValue = oldValue->GetAsAtom();
     }
     mutation.mAttrChange = aModType;
 
