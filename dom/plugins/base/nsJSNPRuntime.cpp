@@ -1890,8 +1890,8 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext* cx, NPObject* npobj)
     }
   }
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableAdd(sNPObjWrappers, npobj, fallible));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Add(npobj, fallible));
 
   if (!entry) {
     // Out of memory
@@ -2048,8 +2048,8 @@ LookupNPP(NPObject* npobj)
     return o->mNpp;
   }
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableAdd(sNPObjWrappers, npobj, fallible));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Add(npobj, fallible));
 
   if (!entry) {
     return nullptr;
