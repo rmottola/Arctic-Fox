@@ -170,8 +170,7 @@ public:
    */
   void RemoveEntry(KeyType aKey)
   {
-    PL_DHashTableRemove(&mTable,
-                        EntryType::KeyToPointer(aKey));
+    mTable.Remove(EntryType::KeyToPointer(aKey));
   }
 
   /**
