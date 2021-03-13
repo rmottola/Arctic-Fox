@@ -397,7 +397,7 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
 
   if (!existingData) {
     RestyleData* rd = new RestyleData(aRestyleHint, aMinChangeHint);
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
     if (profiler_feature_active("restyle")) {
       rd->mBacktrace.reset(profiler_get_backtrace());
     }
