@@ -168,6 +168,9 @@ CollectRestyles(nsISupports* aElement,
   currentRestyle->mElement = element;
   currentRestyle->mRestyleHint = aData->mRestyleHint;
   currentRestyle->mChangeHint = aData->mChangeHint;
+  // We can move aData since we'll be clearing mPendingRestyles after
+  // we finish enumerating it.
+  currentRestyle->mRestyleHintData = Move(aData->mRestyleHintData);
 #if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
   currentRestyle->mBacktrace = Move(aData->mBacktrace);
 #endif
@@ -184,7 +187,8 @@ CollectRestyles(nsISupports* aElement,
 inline void
 RestyleTracker::ProcessOneRestyle(Element* aElement,
                                   nsRestyleHint aRestyleHint,
-                                  nsChangeHint aChangeHint)
+                                  nsChangeHint aChangeHint,
+                                  const RestyleHintData& aRestyleHintData)
 {
   NS_PRECONDITION((aRestyleHint & eRestyle_LaterSiblings) == 0,
                   "Someone should have handled this before calling us");
@@ -209,7 +213,7 @@ RestyleTracker::ProcessOneRestyle(Element* aElement,
     }
 #endif
     mRestyleManager->RestyleElement(aElement, primaryFrame, aChangeHint,
-                                    *this, aRestyleHint);
+                                    *this, aRestyleHint, aRestyleHintData);
   } else if (aChangeHint &&
              (primaryFrame ||
               (aChangeHint & nsChangeHint_ReconstructFrame))) {
@@ -356,7 +360,8 @@ RestyleTracker::DoProcessRestyles()
           profilerRAII.emplace("Paint", "Styles", Move(data->mBacktrace));
         }
 #endif
-        ProcessOneRestyle(element, data->mRestyleHint, data->mChangeHint);
+        ProcessOneRestyle(element, data->mRestyleHint, data->mChangeHint,
+                          data->mRestyleHintData);
         AddRestyleRootsIfAwaitingRestyle(data->mDescendants);
 
         if (isTimelineRecording) {
@@ -416,7 +421,8 @@ RestyleTracker::DoProcessRestyles()
 
           ProcessOneRestyle(currentRestyle->mElement,
                             currentRestyle->mRestyleHint,
-                            currentRestyle->mChangeHint);
+                            currentRestyle->mChangeHint,
+                            currentRestyle->mRestyleHintData);
 
           if (isTimelineRecording) {
             mozilla::UniquePtr<TimelineMarker> marker =

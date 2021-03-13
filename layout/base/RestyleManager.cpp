@@ -949,11 +949,12 @@ RestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
 }
 
 void
-RestyleManager::RestyleElement(Element*        aElement,
-                               nsIFrame*       aPrimaryFrame,
-                               nsChangeHint    aMinHint,
-                               RestyleTracker& aRestyleTracker,
-                               nsRestyleHint   aRestyleHint)
+RestyleManager::RestyleElement(Element*               aElement,
+                               nsIFrame*              aPrimaryFrame,
+                               nsChangeHint           aMinHint,
+                               RestyleTracker&        aRestyleTracker,
+                               nsRestyleHint          aRestyleHint,
+                               const RestyleHintData& aRestyleHintData)
 {
   MOZ_ASSERT(mReframingStyleContexts, "should have rsc");
   NS_ASSERTION(aPrimaryFrame == aElement->GetPrimaryFrame(),
@@ -990,7 +991,7 @@ RestyleManager::RestyleElement(Element*        aElement,
       nsCSSFrameConstructor::REMOVE_FOR_RECONSTRUCTION, nullptr);
   } else if (aPrimaryFrame) {
     ComputeAndProcessStyleChange(aPrimaryFrame, aMinHint, aRestyleTracker,
-                                 aRestyleHint);
+                                 aRestyleHint, aRestyleHintData);
   } else if (aRestyleHint & ~eRestyle_LaterSiblings) {
     // We're restyling an element with no frame, so we should try to
     // make one if its new style says it should have one.  But in order
@@ -1006,7 +1007,8 @@ RestyleManager::RestyleElement(Element*        aElement,
         newContext->StyleDisplay()->mDisplay == NS_STYLE_DISPLAY_CONTENTS) {
       // Style change for a display:contents node that did not recreate frames.
       ComputeAndProcessStyleChange(newContext, aElement, aMinHint,
-                                   aRestyleTracker, aRestyleHint);
+                                   aRestyleTracker, aRestyleHint,
+                                   aRestyleHintData);
     }
   }
 }
@@ -1604,7 +1606,8 @@ RestyleManager::StartRebuildAllStyleData(RestyleTracker& aRestyleTracker)
   // frame and not the root node's primary frame?  (We could do
   // roughly what we do for aRestyleHint above.)
   ComputeAndProcessStyleChange(rootFrame,
-                               changeHint, aRestyleTracker, restyleHint);
+                               changeHint, aRestyleTracker, restyleHint,
+                               RestyleHintData());
 }
 
 void
@@ -1786,7 +1789,8 @@ RestyleManager::UpdateOnlyAnimationStyles()
 void
 RestyleManager::PostRestyleEvent(Element* aElement,
                                  nsRestyleHint aRestyleHint,
-                                 nsChangeHint aMinChangeHint)
+                                 nsChangeHint aMinChangeHint,
+                                 const RestyleHintData* aRestyleHintData)
 {
   if (MOZ_UNLIKELY(!mPresContext) ||
       MOZ_UNLIKELY(mPresContext->PresShell()->IsDestroying())) {
@@ -1798,7 +1802,8 @@ RestyleManager::PostRestyleEvent(Element* aElement,
     return;
   }
 
-  mPendingRestyles.AddPendingRestyle(aElement, aRestyleHint, aMinChangeHint);
+  mPendingRestyles.AddPendingRestyle(aElement, aRestyleHint, aMinChangeHint,
+                                     aRestyleHintData);
 
   // Set mHavePendingNonAnimationRestyles for any restyle that could
   // possibly contain non-animation styles (i.e., those that require us
@@ -2709,6 +2714,7 @@ ElementRestyler::Restyle(nsRestyleHint aRestyleHint)
   nsTArray<nsRefPtr<Element>> descendants;
 
   nsRestyleHint hintToRestore = nsRestyleHint(0);
+  RestyleHintData hintDataToRestore;
   if (mContent && mContent->IsElement() &&
       // If we're resolving from the root of the frame tree (which
       // we do when mDoRebuildAllStyleData), we need to avoid getting the
@@ -2731,6 +2737,7 @@ ElementRestyler::Restyle(nsRestyleHint aRestyleHint)
         mChangeList->AppendChange(mFrame, mContent, restyleData->mChangeHint);
       }
       hintToRestore = restyleData->mRestyleHint;
+      hintDataToRestore = Move(restyleData->mRestyleHintData);
       aRestyleHint = nsRestyleHint(aRestyleHint | restyleData->mRestyleHint);
       descendants.SwapElements(restyleData->mDescendants);
     }
@@ -3553,11 +3560,12 @@ ElementRestyler::RestyleChildren(nsRestyleHint aChildRestyleHint)
 
 void
 ElementRestyler::RestyleChildrenOfDisplayContentsElement(
-  nsIFrame*       aParentFrame,
-  nsStyleContext* aNewContext,
-  nsChangeHint    aMinHint,
-  RestyleTracker& aRestyleTracker,
-  nsRestyleHint   aRestyleHint)
+  nsIFrame*              aParentFrame,
+  nsStyleContext*        aNewContext,
+  nsChangeHint           aMinHint,
+  RestyleTracker&        aRestyleTracker,
+  nsRestyleHint          aRestyleHint,
+  const RestyleHintData& aRestyleHintData)
 {
   MOZ_ASSERT(!(mHintsHandled & nsChangeHint_ReconstructFrame), "why call me?");
 
@@ -3586,8 +3594,8 @@ ElementRestyler::RestyleChildrenOfDisplayContentsElement(
             !f->GetPrevContinuation()) {
           if (!(f->GetStateBits() & NS_FRAME_OUT_OF_FLOW)) {
             ComputeStyleChangeFor(f, mChangeList, aMinHint, aRestyleTracker,
-                                  aRestyleHint, mContextsToClear,
-                                  mSwappedStructOwners);
+                                  aRestyleHint, aRestyleHintData,
+                                  mContextsToClear, mSwappedStructOwners);
           }
         }
       }
@@ -3604,6 +3612,7 @@ ElementRestyler::ComputeStyleChangeFor(nsIFrame*          aFrame,
                                        nsChangeHint       aMinChange,
                                        RestyleTracker&    aRestyleTracker,
                                        nsRestyleHint      aRestyleHint,
+                                       const RestyleHintData& aRestyleHintData,
                                        nsTArray<ContextToClear>&
                                          aContextsToClear,
                                        nsTArray<nsRefPtr<nsStyleContext>>&
@@ -4057,10 +4066,11 @@ ClearCachedInheritedStyleDataOnDescendants(
 }
 
 void
-RestyleManager::ComputeAndProcessStyleChange(nsIFrame*          aFrame,
-                                             nsChangeHint       aMinChange,
-                                             RestyleTracker&    aRestyleTracker,
-                                             nsRestyleHint      aRestyleHint)
+RestyleManager::ComputeAndProcessStyleChange(nsIFrame*              aFrame,
+                                             nsChangeHint           aMinChange,
+                                             RestyleTracker&        aRestyleTracker,
+                                             nsRestyleHint          aRestyleHint,
+                                             const RestyleHintData& aRestyleHintData)
 {
   MOZ_ASSERT(mReframingStyleContexts, "should have rsc");
   nsStyleChangeList changeList;
@@ -4072,17 +4082,19 @@ RestyleManager::ComputeAndProcessStyleChange(nsIFrame*          aFrame,
   nsTArray<nsRefPtr<nsStyleContext>> swappedStructOwners;
   ElementRestyler::ComputeStyleChangeFor(aFrame, &changeList, aMinChange,
                                          aRestyleTracker, aRestyleHint,
+                                         aRestyleHintData,
                                          contextsToClear, swappedStructOwners);
   ProcessRestyledFrames(changeList);
   ClearCachedInheritedStyleDataOnDescendants(contextsToClear);
 }
 
 void
-RestyleManager::ComputeAndProcessStyleChange(nsStyleContext*    aNewContext,
-                                             Element*           aElement,
-                                             nsChangeHint       aMinChange,
-                                             RestyleTracker&    aRestyleTracker,
-                                             nsRestyleHint      aRestyleHint)
+RestyleManager::ComputeAndProcessStyleChange(nsStyleContext*        aNewContext,
+                                             Element*               aElement,
+                                             nsChangeHint           aMinChange,
+                                             RestyleTracker&        aRestyleTracker,
+                                             nsRestyleHint          aRestyleHint,
+                                             const RestyleHintData& aRestyleHintData)
 {
   MOZ_ASSERT(mReframingStyleContexts, "should have rsc");
   MOZ_ASSERT(aNewContext->StyleDisplay()->mDisplay == NS_STYLE_DISPLAY_CONTENTS);
@@ -4109,7 +4121,8 @@ RestyleManager::ComputeAndProcessStyleChange(nsStyleContext*    aNewContext,
                     visibleKidsOfHiddenElement, contextsToClear,
                     swappedStructOwners);
   r.RestyleChildrenOfDisplayContentsElement(frame, aNewContext, aMinChange,
-                                            aRestyleTracker, aRestyleHint);
+                                            aRestyleTracker,
+                                            aRestyleHint, aRestyleHintData);
   ProcessRestyledFrames(changeList);
   ClearCachedInheritedStyleDataOnDescendants(contextsToClear);
 }
@@ -4190,9 +4203,11 @@ RestyleManager::RestyleHintToString(nsRestyleHint aHint)
 {
   nsCString result;
   bool any = false;
-  const char* names[] = { "Self", "Subtree", "LaterSiblings", "CSSTransitions",
-                          "CSSAnimations", "SVGAttrAnimations", "StyleAttribute",
-                          "StyleAttribute_Animations", "Force", "ForceDescendants" };
+  const char* names[] = {
+    "Self", "SomeDescendants", "Subtree", "LaterSiblings", "CSSTransitions",
+    "CSSAnimations", "SVGAttrAnimations", "StyleAttribute",
+    "StyleAttribute_Animations", "Force", "ForceDescendants"
+  };
   uint32_t hint = aHint & ((1 << ArrayLength(names)) - 1);
   uint32_t rest = aHint & ~((1 << ArrayLength(names)) - 1);
   for (uint32_t i = 0; i < ArrayLength(names); i++) {
