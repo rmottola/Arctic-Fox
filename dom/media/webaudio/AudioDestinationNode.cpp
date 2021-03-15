@@ -29,7 +29,7 @@ namespace dom {
 
 static uint8_t gWebAudioOutputKey;
 
-class OfflineDestinationNodeEngine : public AudioNodeEngine
+class OfflineDestinationNodeEngine final : public AudioNodeEngine
 {
 public:
   typedef AutoFallibleTArray<nsAutoArrayPtr<float>, 2> InputChannels;
@@ -134,7 +134,7 @@ public:
       , mRenderedBuffer(aRenderedBuffer)
     {}
 
-    NS_IMETHOD Run()
+    NS_IMETHOD Run() override
     {
       nsRefPtr<OfflineAudioCompletionEvent> event =
           new OfflineAudioCompletionEvent(mAudioContext, nullptr, nullptr);
@@ -209,7 +209,7 @@ private:
   bool mBufferAllocated;
 };
 
-class InputMutedRunnable : public nsRunnable
+class InputMutedRunnable final : public nsRunnable
 {
 public:
   InputMutedRunnable(AudioNodeStream* aStream,
@@ -219,7 +219,7 @@ public:
   {
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
     nsRefPtr<AudioNode> node = mStream->Engine()->NodeMainThread();
@@ -237,7 +237,7 @@ private:
   bool mInputMuted;
 };
 
-class DestinationNodeEngine : public AudioNodeEngine
+class DestinationNodeEngine final : public AudioNodeEngine
 {
 public:
   explicit DestinationNodeEngine(AudioDestinationNode* aNode)
