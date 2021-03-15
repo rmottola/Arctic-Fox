@@ -475,11 +475,10 @@ DOMMediaStream::NotifyMediaStreamGraphShutdown()
 }
 
 void
-DOMMediaStream::NotifyStreamStateChanged()
+DOMMediaStream::NotifyStreamFinished()
 {
-  if (IsFinished()) {
-    mConsumersToKeepAlive.Clear();
-  }
+  MOZ_ASSERT(IsFinished());
+  mConsumersToKeepAlive.Clear();
 }
 
 void
