@@ -251,7 +251,7 @@ UDPSocketChild::SendDataInternal(const UDPSocketAddr& aAddr,
   NS_ENSURE_ARG(aData);
 
   FallibleTArray<uint8_t> fallibleArray;
-  if (!fallibleArray.InsertElementsAt(0, aData, aByteLength)) {
+  if (!fallibleArray.InsertElementsAt(0, aData, aByteLength, fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 

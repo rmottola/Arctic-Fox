@@ -612,9 +612,11 @@ MediaRawDataWriter::Prepend(const uint8_t* aData, size_t aSize)
   if (!EnsureSize(aSize + mTarget->mSize)) {
     return false;
   }
+
   // Shift the data to the right by aSize to leave room for the new data.
   memmove(mTarget->mData + aSize, mTarget->mData, mTarget->mSize);
   memcpy(mTarget->mData, aData, aSize);
+
   mTarget->mSize += aSize;
   return true;
 }
