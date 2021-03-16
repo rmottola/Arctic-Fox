@@ -311,7 +311,7 @@ gfxDWriteFontFamily::LocalizedName(nsAString &aLocalizedName)
         return;
     }
     
-    if (!famName.SetLength(length + 1)) {
+    if (!famName.SetLength(length + 1, fallible)) {
         // Eeep - running out of memory. Unlikely to end well.
         return;
     }
@@ -400,7 +400,7 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
                 uint32_t tableSize =
                     ::GetFontData(dc.GetDC(), tagBE, 0, nullptr, 0);
                 if (tableSize != GDI_ERROR) {
-                    if (aBuffer.SetLength(tableSize)) {
+                    if (aBuffer.SetLength(tableSize), fallible) {
                         ::GetFontData(dc.GetDC(), tagBE, 0,
                                       aBuffer.Elements(), aBuffer.Length());
                         return NS_OK;
@@ -428,7 +428,7 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
         return NS_ERROR_FAILURE;
     }
 
-    if (aBuffer.SetLength(len)) {
+    if (aBuffer.SetLength(len, fallible)) {
         memcpy(aBuffer.Elements(), tableData, len);
         rv = NS_OK;
     } else {
@@ -1117,7 +1117,7 @@ gfxDWriteFontList::GetFontsFromCollection(IDWriteFontCollection* aCollection)
             continue;
         }
 
-        if (!enName.SetLength(length + 1)) {
+        if (!enName.SetLength(length + 1, fallible)) {
             // Eeep - running out of memory. Unlikely to end well.
             continue;
         }
@@ -1166,7 +1166,7 @@ gfxDWriteFontList::GetFontsFromCollection(IDWriteFontCollection* aCollection)
                 continue;
             }
 
-            if (!localizedName.SetLength(nameLen + 1)) {
+            if (!localizedName.SetLength(nameLen + 1, fallible)) {
                 continue;
             }
 
@@ -1401,7 +1401,7 @@ static HRESULT GetFamilyName(IDWriteFont *aFont, nsString& aFamilyName)
         return hr;
     }
 
-    if (!name.SetLength(length + 1)) {
+    if (!name.SetLength(length + 1, fallible)) {
         return E_FAIL;
     }
     hr = familyNames->GetString(index, name.Elements(), length + 1);
@@ -1582,7 +1582,7 @@ DirectWriteFontInfo::LoadFontFamilyData(const nsAString& aFamilyName)
     nsAutoTArray<wchar_t, 32> famName;
 
     uint32_t len = aFamilyName.Length();
-    famName.SetLength(len + 1);
+    famName.SetLength(len + 1, fallible);
     memcpy(famName.Elements(), aFamilyName.BeginReading(), len * sizeof(char16_t));
     famName[len] = 0;
 
