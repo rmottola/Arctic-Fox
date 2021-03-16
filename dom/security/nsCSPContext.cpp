@@ -1212,7 +1212,7 @@ nsCSPContext::ToJSON(nsAString& outCSPinJSON)
   for (uint32_t p = 0; p < mPolicies.Length(); p++) {
     dom::CSP jsonCSP;
     mPolicies[p]->toDomCSPStruct(jsonCSP);
-    jsonPolicies.mCsp_policies.Value().AppendElement(jsonCSP);
+    jsonPolicies.mCsp_policies.Value().AppendElement(jsonCSP, fallible);
   }
 
   // convert the gathered information to JSON

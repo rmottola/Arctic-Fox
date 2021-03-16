@@ -1860,7 +1860,7 @@ HTMLInputElement::SetValue(const nsAString& aValue, ErrorResult& aRv)
         return;
       }
       Sequence<nsString> list;
-      if (!list.AppendElement(aValue)) {
+      if (!list.AppendElement(aValue, fallible)) {
         aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
         return;
       }
@@ -2450,7 +2450,7 @@ HTMLInputElement::MozSetFileNameArray(const char16_t** aFileNames, uint32_t aLen
 
   Sequence<nsString> list;
   for (uint32_t i = 0; i < aLength; ++i) {
-    if (!list.AppendElement(nsDependentString(aFileNames[i]))) {
+    if (!list.AppendElement(nsDependentString(aFileNames[i]), fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
   }
@@ -2503,7 +2503,7 @@ HTMLInputElement::SetUserInput(const nsAString& aValue)
   if (mType == NS_FORM_INPUT_FILE)
   {
     Sequence<nsString> list;
-    if (!list.AppendElement(aValue)) {
+    if (!list.AppendElement(aValue, fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 

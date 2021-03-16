@@ -2940,7 +2940,7 @@ static void ToRTCIceCandidateStats(
       cand.mMozLocalTransport.Construct(
           NS_ConvertASCIItoUTF16(c->local_addr.transport.c_str()));
     }
-    report->mIceCandidateStats.Value().AppendElement(cand);
+    report->mIceCandidateStats.Value().AppendElement(cand, fallible);
   }
 }
 
@@ -2977,7 +2977,7 @@ static void RecordIceStats_s(
     s.mMozPriority.Construct(p->priority);
     s.mSelected.Construct(p->selected);
     s.mState.Construct(RTCStatsIceCandidatePairState(p->state));
-    report->mIceCandidatePairStats.Value().AppendElement(s);
+    report->mIceCandidatePairStats.Value().AppendElement(s, fallible);
   }
 
   std::vector<NrIceCandidate> candidates;
@@ -3056,7 +3056,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mBytesReceived.Construct(bytesReceived);
             s.mPacketsLost.Construct(packetsLost);
             s.mMozRtt.Construct(rtt);
-            query->report->mInboundRTPStreamStats.Value().AppendElement(s);
+            query->report->mInboundRTPStreamStats.Value().AppendElement(s,
+                                                                        fallible);
           }
         }
         // Then, fill in local side (with cross-link to remote only if present)
@@ -3093,7 +3094,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
               s.mDroppedFrames.Construct(droppedFrames);
             }
           }
-          query->report->mOutboundRTPStreamStats.Value().AppendElement(s);
+          query->report->mOutboundRTPStreamStats.Value().AppendElement(s,
+                                                                       fallible);
         }
         break;
       }
@@ -3125,7 +3127,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mIsRemote = true;
             s.mPacketsSent.Construct(packetsSent);
             s.mBytesSent.Construct(bytesSent);
-            query->report->mOutboundRTPStreamStats.Value().AppendElement(s);
+            query->report->mOutboundRTPStreamStats.Value().AppendElement(s,
+                                                                         fallible);
           }
         }
         // Then, fill in local side (with cross-link to remote only if present)
@@ -3179,7 +3182,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mDiscardedPackets.Construct(discardedPackets);
           }
         }
-        query->report->mInboundRTPStreamStats.Value().AppendElement(s);
+        query->report->mInboundRTPStreamStats.Value().AppendElement(s,
+                                                                    fallible);
         break;
       }
     }

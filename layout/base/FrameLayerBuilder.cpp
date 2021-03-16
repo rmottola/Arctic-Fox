@@ -5397,7 +5397,7 @@ public:
       rect.mY = iterRect->Y();
       rect.mWidth = iterRect->Width();
       rect.mHeight = iterRect->Height();
-      aRectangles.AppendElement(rect);
+      aRectangles.AppendElement(rect, fallible);
     }
   }
 
