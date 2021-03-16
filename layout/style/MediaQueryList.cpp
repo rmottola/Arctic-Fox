@@ -171,7 +171,8 @@ MediaQueryList::RecomputeMatches()
 }
 
 void
-MediaQueryList::MediumFeaturesChanged(NotifyList &aListenersToNotify)
+MediaQueryList::MediumFeaturesChanged(
+    nsTArray<HandleChangeData>& aListenersToNotify)
 {
   mMatchesValid = false;
 
