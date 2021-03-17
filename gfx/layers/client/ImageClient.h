@@ -68,21 +68,16 @@ public:
   ClientLayer* GetLayer() const { return mLayer; }
 
   /**
-   * Create AsyncTransactionTracker that is used for FlushAllImagesAsync().
-   */
-  virtual already_AddRefed<AsyncTransactionTracker> PrepareFlushAllImages() { return nullptr; }
-
-  /**
    * asynchronously remove all the textures used by the image client.
    *
    */
   virtual void FlushAllImages(bool aExceptFront,
-                              AsyncTransactionTracker* aAsyncTransactionTracker) {}
+                              AsyncTransactionWaiter* aAsyncTransactionWaiter) {}
 
   virtual void RemoveTexture(TextureClient* aTexture) override;
 
-  void RemoveTextureWithTracker(TextureClient* aTexture,
-                                AsyncTransactionTracker* aAsyncTransactionTracker = nullptr);
+  void RemoveTextureWithWaiter(TextureClient* aTexture,
+                               AsyncTransactionWaiter* aAsyncTransactionWaiter = nullptr);
 
 protected:
   ImageClient(CompositableForwarder* aFwd, TextureFlags aFlags,
@@ -114,10 +109,8 @@ public:
 
   virtual already_AddRefed<Image> CreateImage(ImageFormat aFormat) override;
 
-  virtual already_AddRefed<AsyncTransactionTracker> PrepareFlushAllImages() override;
-
   virtual void FlushAllImages(bool aExceptFront,
-                              AsyncTransactionTracker* aAsyncTransactionTracker) override;
+                              AsyncTransactionWaiter* aAsyncTransactionWaiter) override;
 
 protected:
   RefPtr<TextureClient> mFrontBuffer;
