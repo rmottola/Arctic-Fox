@@ -77,6 +77,7 @@ protected:
   void DestroyBackBuffer()
   {
     if (mImageClient) {
+      mImageClient->SetLayer(nullptr);
       mImageClient->OnDetach();
       mImageClient = nullptr;
     }
@@ -149,13 +150,10 @@ ClientImageLayer::RenderLayer()
     mImageClient = ImageClient::CreateImageClient(type,
                                                   ClientManager()->AsShadowForwarder(),
                                                   flags);
-    if (type == CompositableType::IMAGE_BRIDGE) {
-      static_cast<ImageClientBridge*>(mImageClient.get())->SetLayer(this);
-    }
-
     if (!mImageClient) {
       return;
     }
+    mImageClient->SetLayer(this);
     if (HasShadow() && !mContainer->IsAsync()) {
       mImageClient->Connect();
       ClientManager()->AsShadowForwarder()->Attach(mImageClient, this);
