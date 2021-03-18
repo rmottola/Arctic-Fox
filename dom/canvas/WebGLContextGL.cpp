@@ -2830,7 +2830,7 @@ WebGLContext::UniformMatrix2fv_base(WebGLUniformLocation* loc, bool transpose,
 {
     GLuint rawLoc;
     GLsizei numElementsToUpload;
-    if (!ValidateUniformMatrixArraySetter(loc, 2, LOCAL_GL_FLOAT, arrayLength,
+    if (!ValidateUniformMatrixArraySetter(loc, 2, 2, LOCAL_GL_FLOAT, arrayLength,
                                           transpose, "uniformMatrix2fv",
                                           &rawLoc, &numElementsToUpload))
     {
@@ -2847,7 +2847,7 @@ WebGLContext::UniformMatrix3fv_base(WebGLUniformLocation* loc, bool transpose,
 {
     GLuint rawLoc;
     GLsizei numElementsToUpload;
-    if (!ValidateUniformMatrixArraySetter(loc, 3, LOCAL_GL_FLOAT, arrayLength,
+    if (!ValidateUniformMatrixArraySetter(loc, 3, 3, LOCAL_GL_FLOAT, arrayLength,
                                           transpose, "uniformMatrix3fv",
                                           &rawLoc, &numElementsToUpload))
     {
@@ -2864,7 +2864,7 @@ WebGLContext::UniformMatrix4fv_base(WebGLUniformLocation* loc, bool transpose,
 {
     GLuint rawLoc;
     GLsizei numElementsToUpload;
-    if (!ValidateUniformMatrixArraySetter(loc, 4, LOCAL_GL_FLOAT, arrayLength,
+    if (!ValidateUniformMatrixArraySetter(loc, 4, 4, LOCAL_GL_FLOAT, arrayLength,
                                           transpose, "uniformMatrix4fv",
                                           &rawLoc, &numElementsToUpload))
     {

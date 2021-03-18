@@ -816,9 +816,8 @@ public:
         UniformMatrix2fv_base(loc, transpose, value.Length(),
                               value.Elements());
     }
-    void UniformMatrix2fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix2fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UniformMatrix3fv(WebGLUniformLocation* loc, WebGLboolean transpose,
                           const dom::Float32Array& value)
@@ -831,9 +830,8 @@ public:
     {
         UniformMatrix3fv_base(loc, transpose, value.Length(), value.Elements());
     }
-    void UniformMatrix3fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix3fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UniformMatrix4fv(WebGLUniformLocation* loc, WebGLboolean transpose,
                           const dom::Float32Array& value)
@@ -841,15 +839,14 @@ public:
         value.ComputeLengthAndData();
         UniformMatrix4fv_base(loc, transpose, value.Length(), value.Data());
     }
-    void UniformMatrix4fv(WebGLUniformLocation* loc, WebGLboolean transpose,
+    void UniformMatrix4fv(WebGLUniformLocation* loc, bool transpose,
                           const dom::Sequence<float>& value)
     {
         UniformMatrix4fv_base(loc, transpose, value.Length(),
                               value.Elements());
     }
-    void UniformMatrix4fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix4fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UseProgram(WebGLProgram* prog);
 
@@ -865,10 +862,13 @@ public:
                                     GLuint* out_rawLoc,
                                     GLsizei* out_numElementsToUpload);
     bool ValidateUniformMatrixArraySetter(WebGLUniformLocation* loc,
-                                          uint8_t setterDims, GLenum setterType,
+                                          uint8_t setterCols,
+                                          uint8_t setterRows,
+                                          GLenum setterType,
                                           size_t setterArraySize,
                                           bool setterTranspose,
-                                          const char* info, GLuint* out_rawLoc,
+                                          const char* info,
+                                          GLuint* out_rawLoc,
                                           GLsizei* out_numElementsToUpload);
     void ValidateProgram(WebGLProgram* prog);
     bool ValidateUniformLocation(const char* info, WebGLUniformLocation* loc);
@@ -1392,6 +1392,7 @@ private:
     virtual bool ValidateBufferTarget(GLenum target, const char* info) = 0;
     virtual bool ValidateBufferIndexedTarget(GLenum target, const char* info) = 0;
     virtual bool ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer, const char* info) = 0;
+    virtual bool ValidateUniformMatrixTranspose(bool transpose, const char* info) = 0;
 
 protected:
     int32_t MaxTextureSizeForTarget(TexTarget target) const {
