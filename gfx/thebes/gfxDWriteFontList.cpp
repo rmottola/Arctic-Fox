@@ -400,7 +400,7 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
                 uint32_t tableSize =
                     ::GetFontData(dc.GetDC(), tagBE, 0, nullptr, 0);
                 if (tableSize != GDI_ERROR) {
-                    if (aBuffer.SetLength(tableSize), fallible) {
+                    if (aBuffer.SetLength(tableSize, fallible)) {
                         ::GetFontData(dc.GetDC(), tagBE, 0,
                                       aBuffer.Elements(), aBuffer.Length());
                         return NS_OK;
