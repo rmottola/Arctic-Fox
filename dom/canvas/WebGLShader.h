@@ -52,6 +52,9 @@ public:
     bool FindUniformByMappedName(const nsACString& mappedName,
                                  nsCString* const out_userName,
                                  bool* const out_isArray) const;
+    bool FindUniformBlockByMappedName(const nsACString& mappedName,
+                                      nsCString* const out_userName,
+                                      bool* const out_isArray) const;
 
     bool IsCompiled() const {
         return mTranslationSuccessful && mCompilationSuccessful;
