@@ -790,7 +790,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             }
         }
 
-        if (IsExtensionSupported(ARB_sync)) {
+        if (IsSupported(GLFeature::sync)) {
             SymLoadStruct syncSymbols[] = {
                 { (PRFuncPtr*) &mSymbols.fFenceSync,      { "FenceSync",      nullptr } },
                 { (PRFuncPtr*) &mSymbols.fIsSync,         { "IsSync",         nullptr } },
@@ -803,7 +803,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             };
 
             if (!LoadSymbols(&syncSymbols[0], trygl, prefix)) {
-                NS_ERROR("GL supports ARB_sync without supplying its functions.");
+                NS_ERROR("GL supports sync without supplying its functions.");
 
                 MarkExtensionUnsupported(ARB_sync);
                 ClearSymbols(syncSymbols);
