@@ -1428,6 +1428,7 @@ protected:
     nsTArray<WebGLRefPtr<WebGLTexture> > mBound2DTextures;
     nsTArray<WebGLRefPtr<WebGLTexture> > mBoundCubeMapTextures;
     nsTArray<WebGLRefPtr<WebGLTexture> > mBound3DTextures;
+    nsTArray<WebGLRefPtr<WebGLSampler> > mBoundSamplers;
 
     void ResolveTexturesForDraw() const;
 
