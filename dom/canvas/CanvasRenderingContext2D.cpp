@@ -4406,7 +4406,8 @@ CanvasRenderingContext2D::DrawImage(const HTMLImageOrCanvasOrVideoElement& image
       return;
     }
 
-    nsRefPtr<mozilla::layers::Image> srcImage = container->LockCurrentImage();
+    AutoLockImage lockImage(container);
+    layers::Image* srcImage = lockImage.GetImage();
     if (!srcImage) {
       error.Throw(NS_ERROR_NOT_AVAILABLE);
       return;
@@ -4434,7 +4435,7 @@ CanvasRenderingContext2D::DrawImage(const HTMLImageOrCanvasOrVideoElement& image
       gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER, LOCAL_GL_LINEAR);
     }
     const gl::OriginPos destOrigin = gl::OriginPos::TopLeft;
-    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage.get(), srcImage->GetSize(),
+    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage, srcImage->GetSize(),
                                                    mVideoTexture, LOCAL_GL_TEXTURE_2D,
                                                    destOrigin);
     if (ok) {
@@ -4455,7 +4456,6 @@ CanvasRenderingContext2D::DrawImage(const HTMLImageOrCanvasOrVideoElement& image
       sh *= (double)imgSize.height / (double)displayHeight;
     }
     srcImage = nullptr;
-    container->UnlockCurrentImage();
 
     if (mCanvasElement) {
       CanvasUtils::DoDrawImageSecurityCheck(mCanvasElement,

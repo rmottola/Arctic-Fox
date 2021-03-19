@@ -1855,10 +1855,13 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
         }
     }
 
+    AutoLockImage lockedImage(container);
+    Image* srcImage = lockedImage.GetImage();
+    if (!srcImage) {
+      return false;
+    }
+
     gl->MakeCurrent();
-    nsRefPtr<mozilla::layers::Image> srcImage = container->LockCurrentImage();
-    if (!srcImage)
-        return false;
 
     WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
 
@@ -1874,7 +1877,7 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
 
     const gl::OriginPos destOrigin = mPixelStoreFlipY ? gl::OriginPos::BottomLeft
                                                       : gl::OriginPos::TopLeft;
-    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage.get(),
+    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage,
                                                    srcImage->GetSize(),
                                                    tex->mGLName,
                                                    texImageTarget.get(),
@@ -1890,9 +1893,6 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
                           WebGLImageDataStatus::InitializedImageData);
         tex->Bind(TexImageTargetToTexTarget(texImageTarget));
     }
-
-    srcImage = nullptr;
-    container->UnlockCurrentImage();
     return ok;
 }
 
