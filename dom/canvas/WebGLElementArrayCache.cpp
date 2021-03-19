@@ -374,7 +374,7 @@ WebGLElementArrayCacheTree<T>::Update(size_t firstByte, size_t lastByte)
     if (requiredNumLeaves != NumLeaves()) {
         // See class comment for why we the tree storage size is 2 * numLeaves.
         if (!mTreeData.SetLength(2 * requiredNumLeaves, fallible)) {
-            mTreeData.SetLength(0);
+            mTreeData.Clear();
             return false;
         }
         MOZ_ASSERT(NumLeaves() == requiredNumLeaves);
@@ -468,7 +468,7 @@ WebGLElementArrayCache::BufferData(const void* ptr, size_t byteLength)
 {
     if (mBytes.Length() != byteLength) {
         if (!mBytes.SetLength(byteLength, fallible)) {
-            mBytes.SetLength(0);
+            mBytes.Clear();
             return false;
         }
     }
