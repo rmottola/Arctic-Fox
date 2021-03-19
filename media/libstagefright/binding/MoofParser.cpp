@@ -191,7 +191,7 @@ MoofParser::Metadata()
     return nullptr;
   }
   nsRefPtr<MediaLargeByteBuffer> metadata = new MediaLargeByteBuffer();
-  if (!metadata->SetLength(ftyp.Length() + moov.Length())) {
+  if (!metadata->SetLength(ftyp.Length() + moov.Length(), fallible)) {
     // OOM
     return nullptr;
   }

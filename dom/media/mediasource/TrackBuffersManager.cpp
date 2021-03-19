@@ -310,7 +310,7 @@ TrackBuffersManager::CompleteResetParserState()
     // Recreate our input buffer. We can't directly assign the initData buffer
     // to mInputBuffer as it will get modified in the Segment Parser Loop.
     mInputBuffer = new MediaLargeByteBuffer;
-    mInputBuffer->AppendElements(*mInitData);
+    mInputBuffer->AppendElements(*mInitData, fallible);
   }
   RecreateParser(true);
 
@@ -525,7 +525,7 @@ TrackBuffersManager::AppendIncomingBuffers()
   for (auto& incomingBuffer : mIncomingBuffers) {
     if (!mInputBuffer) {
       mInputBuffer = incomingBuffer.first();
-    } else if (!mInputBuffer->AppendElements(*incomingBuffer.first())) {
+    } else if (!mInputBuffer->AppendElements(*incomingBuffer.first(), fallible)) {
       RejectAppend(NS_ERROR_OUT_OF_MEMORY, __func__);
     }
     mTimestampOffset = incomingBuffer.second();
@@ -979,7 +979,7 @@ TrackBuffersManager::CodedFrameProcessing()
     uint32_t length =
       mediaRange.mEnd - (mProcessedInput - mInputBuffer->Length());
     nsRefPtr<MediaLargeByteBuffer> segment = new MediaLargeByteBuffer;
-    if (!segment->AppendElements(mInputBuffer->Elements(), length)) {
+    if (!segment->AppendElements(mInputBuffer->Elements(), length, fallible)) {
       return CodedFrameProcessingPromise::CreateAndReject(NS_ERROR_OUT_OF_MEMORY, __func__);
     }
     AppendDataToCurrentInputBuffer(segment);
