@@ -318,8 +318,6 @@ protected:
    */
   void CancelPendingTasks();
 
-  bool IsFinished() const;
-
   bool IsPossiblyOrphanedPendingAnimation() const;
   StickyTimeDuration EffectEnd() const;
 
