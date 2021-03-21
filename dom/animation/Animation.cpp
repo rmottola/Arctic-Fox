@@ -633,7 +633,7 @@ Animation::DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior)
 void
 Animation::DoPause()
 {
-  if (mPendingState == PendingState::PausePending) {
+  if (IsPausedOrPausing()) {
     return;
   }
 
