@@ -186,6 +186,12 @@ public:
   virtual bool
   DeallocPTextureChild(PTextureChild* actor) override;
 
+  PMediaSystemResourceManagerChild*
+  AllocPMediaSystemResourceManagerChild() override;
+
+  bool
+  DeallocPMediaSystemResourceManagerChild(PMediaSystemResourceManagerChild* aActor) override;
+
   virtual bool
   RecvParentAsyncMessages(InfallibleTArray<AsyncParentMessageData>&& aMessages) override;
 

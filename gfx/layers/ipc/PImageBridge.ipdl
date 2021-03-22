@@ -9,6 +9,7 @@ include protocol PCompositable;
 include protocol PLayer;
 include protocol PTexture;
 include ProtocolTypes;
+include protocol PMediaSystemResourceManager;
 
 include "mozilla/GfxMessageUtils.h";
 
@@ -27,6 +28,7 @@ sync protocol PImageBridge
 {
   manages PCompositable;
   manages PTexture;
+  manages PMediaSystemResourceManager;
 
 child:
   async ParentAsyncMessages(AsyncParentMessageData[] aMessages);
@@ -50,6 +52,7 @@ parent:
 
   sync PCompositable(TextureInfo aInfo) returns (uint64_t id);
   async PTexture(SurfaceDescriptor aSharedData, TextureFlags aTextureFlags);
+  async PMediaSystemResourceManager();
 
   async ChildAsyncMessages(AsyncChildMessageData[] aMessages);
 };
