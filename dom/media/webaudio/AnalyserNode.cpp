@@ -240,7 +240,7 @@ bool
 AnalyserNode::FFTAnalysis()
 {
   float* inputBuffer;
-  AlignedFallibleTArray<float> tmpBuffer;
+  AlignedTArray<float> tmpBuffer;
   if (mWriteIndex == 0) {
     inputBuffer = mBuffer.Elements();
   } else {
