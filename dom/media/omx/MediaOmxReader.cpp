@@ -478,15 +478,18 @@ void MediaOmxReader::NotifyDataArrived(const char* aBuffer, uint32_t aLength, in
   if (HasVideo()) {
     return;
   }
-
   if (!mMP3FrameParser.NeedsData()) {
     return;
   }
 
   mMP3FrameParser.Parse(aBuffer, aLength, aOffset);
+  if (!mMP3FrameParser.IsMP3()) {
+    return;
+  }
+
   int64_t duration = mMP3FrameParser.GetDuration();
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   if (duration != mLastParserDuration && mUseParserDuration) {
+    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
     mLastParserDuration = duration;
     mDecoder->UpdateEstimatedMediaDuration(mLastParserDuration);
   }
