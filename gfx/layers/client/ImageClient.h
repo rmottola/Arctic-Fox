@@ -79,7 +79,7 @@ protected:
 
   ClientLayer* mLayer;
   CompositableType mType;
-  int32_t mLastPaintedImageSerial;
+  uint32_t mLastUpdateGenerationCounter;
 };
 
 /**
