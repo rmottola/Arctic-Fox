@@ -350,7 +350,8 @@ TiledLayerBufferComposite::Clear()
 }
 
 void
-TiledContentHost::Composite(EffectChain& aEffectChain,
+TiledContentHost::Composite(LayerComposite* aLayer,
+                            EffectChain& aEffectChain,
                             float aOpacity,
                             const gfx::Matrix4x4& aTransform,
                             const gfx::Filter& aFilter,
