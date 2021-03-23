@@ -51,6 +51,8 @@ let AnimationsPanel = {
 
     this.startListeners();
 
+    yield this.createPlayerWidgets();
+
     this.initialized.resolve();
 
     this.emit(this.PANEL_INITIALIZED);
