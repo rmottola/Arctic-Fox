@@ -39,8 +39,8 @@ struct ElementPropertyTransition : public dom::KeyframeEffectReadOnly
                                   aTiming, EmptyString())
   { }
 
-  virtual ElementPropertyTransition* AsTransition() { return this; }
-  virtual const ElementPropertyTransition* AsTransition() const { return this; }
+  virtual ElementPropertyTransition* AsTransition() override { return this; }
+  virtual const ElementPropertyTransition* AsTransition() const override { return this; }
 
   virtual const nsString& Name() const override;
 
