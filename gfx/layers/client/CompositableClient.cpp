@@ -225,11 +225,6 @@ CompositableClient::AddTextureClient(TextureClient* aClient)
 }
 
 void
-CompositableClient::OnTransaction()
-{
-}
-
-void
 CompositableClient::ClearCachedResources()
 {
   if (mTextureClientRecycler) {

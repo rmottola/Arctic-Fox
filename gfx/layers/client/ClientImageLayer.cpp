@@ -133,10 +133,6 @@ ClientImageLayer::RenderLayer()
      return;
   }
 
-  if (mImageClient) {
-    mImageClient->OnTransaction();
-  }
-
   if (!mImageClient ||
       !mImageClient->UpdateImage(mContainer, GetContentFlags())) {
     CompositableType type = GetImageClientType();
@@ -161,9 +157,6 @@ ClientImageLayer::RenderLayer()
     if (!mImageClient->UpdateImage(mContainer, GetContentFlags())) {
       return;
     }
-  }
-  if (mImageClient) {
-    mImageClient->OnTransaction();
   }
   ClientManager()->Hold(this);
 }
