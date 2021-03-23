@@ -111,6 +111,8 @@ let AnimationsController = {
                                                          "stopAnimationPlayerUpdates");
     this.hasSetPlaybackRate = yield target.actorHasMethod("animationplayer",
                                                           "setPlaybackRate");
+    this.hasTargetNode = yield target.actorHasMethod("domwalker",
+                                                     "getNodeFromActor");
 
     if (this.destroyed) {
       console.warn("Could not fully initialize the AnimationsController");
