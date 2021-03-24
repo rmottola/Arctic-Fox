@@ -185,7 +185,6 @@ public:
     TaskQueue()->Dispatch(runnable.forget());
   }
 
-  void ShutdownReader();
   void FinishShutdown();
 
   bool IsRealTime() const;
