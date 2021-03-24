@@ -368,7 +368,7 @@ MP4Reader::ReadMetadata(MediaInfo* aInfo,
     // an encrypted stream and we need to wait for a CDM to be set, we don't
     // need to reinit the demuxer.
     mDemuxerInitialized = true;
-  } else if (mPlatform && !IsWaitingMediaResources()) {
+  } else if (mPlatform) {
     *aInfo = mInfo;
     *aTags = nullptr;
   }
@@ -1096,19 +1096,11 @@ void MP4Reader::ReleaseMediaResources()
   }
 }
 
-void MP4Reader::NotifyResourcesStatusChanged()
-{
-  if (mDecoder) {
-    mDecoder->NotifyWaitingForResourcesStatusChanged();
-  }
-}
-
 void
 MP4Reader::SetIdle()
 {
   if (mSharedDecoderManager && mVideo.mDecoder) {
     mSharedDecoderManager->SetIdle(mVideo.mDecoder);
-    NotifyResourcesStatusChanged();
   }
 }
 

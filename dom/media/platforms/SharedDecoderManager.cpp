@@ -40,12 +40,6 @@ public:
       mManager->DrainComplete();
     }
   }
-  virtual void NotifyResourcesStatusChanged() override
-  {
-    if (mManager->mActiveCallback) {
-      mManager->mActiveCallback->NotifyResourcesStatusChanged();
-    }
-  }
   virtual void ReleaseMediaResources() override
   {
     if (mManager->mActiveCallback) {

@@ -172,8 +172,6 @@ public:
 
   virtual void DrainComplete() = 0;
 
-  virtual void NotifyResourcesStatusChanged() {};
-
   virtual void ReleaseMediaResources() {};
 };
 
