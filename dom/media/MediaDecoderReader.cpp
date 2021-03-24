@@ -144,6 +144,7 @@ void
 MediaDecoderReader::SetStartTime(int64_t aStartTime)
 {
   mDecoder->GetReentrantMonitor().AssertCurrentThreadIn();
+  MOZ_ASSERT(mStartTime == -1);
   mStartTime = aStartTime;
 }
 
