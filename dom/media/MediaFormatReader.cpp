@@ -1552,6 +1552,12 @@ MediaFormatReader::NotifyDataRemoved()
   GetTaskQueue()->Dispatch(task.forget());
 }
 
+bool
+MediaFormatReader::ForceZeroStartTime() const
+{
+  return !mDemuxer->ShouldComputeStartTime();
+}
+
 int64_t
 MediaFormatReader::ComputeStartTime(const VideoData* aVideo, const AudioData* aAudio)
 {

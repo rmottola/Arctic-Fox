@@ -25,6 +25,9 @@ using layers::ImageContainer;
 using layers::PlanarYCbCrImage;
 using layers::PlanarYCbCrData;
 
+const char* AudioData::sTypeName = "audio";
+const char* VideoData::sTypeName = "video";
+
 void
 AudioData::EnsureAudioBuffer()
 {

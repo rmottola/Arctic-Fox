@@ -74,6 +74,8 @@ public:
 
   virtual media::TimeIntervals GetBuffered() override;
 
+  virtual bool ForceZeroStartTime() const override;
+
   // For Media Resource Management
   virtual void SetIdle() override;
   virtual bool IsDormantNeeded() override;
