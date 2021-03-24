@@ -21,7 +21,6 @@ using namespace android;
 namespace mozilla {
 
 GonkDecoderManager::GonkDecoderManager(MediaTaskQueue* aTaskQueue)
-  : mTaskQueue(aTaskQueue)
 {
 }
 
@@ -259,14 +258,6 @@ GonkMediaDataDecoder::Drain()
     NS_NewRunnableMethod(this, &GonkMediaDataDecoder::ProcessDrain);
   mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
-}
-
-bool
-GonkMediaDataDecoder::IsWaitingMediaResources() {
-  if (!mDecoder.get()) {
-    return true;
-  }
-  return false;
 }
 
 } // namespace mozilla

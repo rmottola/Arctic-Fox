@@ -239,10 +239,6 @@ public:
   // returned.
   virtual nsresult Shutdown() = 0;
 
-  // For Codec Resource Management
-  virtual bool IsWaitingMediaResources() {
-    return false;
-  };
   virtual bool IsHardwareAccelerated() const { return false; }
 
   // ConfigurationChanged will be called to inform the video or audio decoder

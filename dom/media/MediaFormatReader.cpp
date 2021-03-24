@@ -204,10 +204,6 @@ MediaFormatReader::Init(MediaDecoderReader* aCloneDonor)
   return NS_OK;
 }
 
-bool MediaFormatReader::IsWaitingMediaResources() {
-  return mVideo.mDecoder && mVideo.mDecoder->IsWaitingMediaResources();
-}
-
 bool MediaFormatReader::IsWaitingOnCDMResource() {
   // EME Stub
   return false;
