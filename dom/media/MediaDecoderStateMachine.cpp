@@ -1433,8 +1433,6 @@ void MediaDecoderStateMachine::RecomputeDuration()
     fireDurationChanged = true;
   } else if (mInfo.mMetadataDuration.isSome()) {
     duration = mInfo.mMetadataDuration.ref();
-  } else if (mInfo.mMetadataEndTime.isSome() && mStartTime >= 0) {
-    duration = mInfo.mMetadataEndTime.ref() - TimeUnit::FromMicroseconds(mStartTime);
   } else {
     return;
   }
@@ -2199,6 +2197,7 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
   mDecoder->SetMediaSeekable(mReader->IsMediaSeekable());
   mInfo = aMetadata->mInfo;
   mMetadataTags = aMetadata->mTags.forget();
+  nsRefPtr<MediaDecoderStateMachine> self = this;
 
   // Set up the start time rendezvous if it doesn't already exist (which is
   // generally the case, unless we're coming out of dormant mode).
@@ -2207,8 +2206,18 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
                                                    mReader->ForceZeroStartTime() || IsRealTime());
   }
 
-  if (mInfo.mMetadataDuration.isSome() || mInfo.mMetadataEndTime.isSome()) {
+  if (mInfo.mMetadataDuration.isSome()) {
     RecomputeDuration();
+  } else if (mInfo.mUnadjustedMetadataEndTime.isSome()) {
+    mStartTimeRendezvous->AwaitStartTime()->Then(TaskQueue(), __func__,
+      [self] () -> void {
+        NS_ENSURE_TRUE_VOID(!self->IsShutdown());
+        TimeUnit unadjusted = self->mInfo.mUnadjustedMetadataEndTime.ref();
+        TimeUnit adjustment = TimeUnit::FromMicroseconds(self->StartTime());
+        self->mInfo.mMetadataDuration.emplace(unadjusted - adjustment);
+        self->RecomputeDuration();
+      }, [] () -> void { NS_WARNING("Adjusting metadata end time failed"); }
+    );
   }
 
   if (HasVideo()) {
@@ -3200,8 +3209,6 @@ void MediaDecoderStateMachine::SetStartTime(int64_t aStartTimeUsecs)
   // to ensure the audio starts at the correct time.
   mAudioStartTime = mStartTime;
   DECODER_LOG("Set media start time to %lld", mStartTime);
-
-  RecomputeDuration();
 }
 
 void MediaDecoderStateMachine::UpdateNextFrameStatus()
@@ -3392,7 +3399,6 @@ void MediaDecoderStateMachine::PreservesPitchChanged()
 
 bool MediaDecoderStateMachine::IsShutdown()
 {
-  AssertCurrentThreadInMonitor();
   return mState == DECODER_STATE_ERROR ||
          mState == DECODER_STATE_SHUTDOWN;
 }
