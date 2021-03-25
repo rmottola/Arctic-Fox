@@ -540,6 +540,7 @@ nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
     }
 
     nsRefPtr<CSSAnimation> dest = new CSSAnimation(aTimeline, src.GetName());
+    dest->SetOwningElement(*aTarget, aStyleContext->GetPseudoType());
     aAnimations.AppendElement(dest);
 
     AnimationTiming timing;
