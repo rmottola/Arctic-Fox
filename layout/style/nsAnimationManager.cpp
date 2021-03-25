@@ -408,6 +408,8 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
           }
         }
 
+        oldAnim->CopyAnimationIndex(*newAnim->AsCSSAnimation());
+
         if (animationChanged) {
           nsNodeUtils::AnimationChanged(oldAnim);
         }
@@ -541,6 +543,7 @@ nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
 
     nsRefPtr<CSSAnimation> dest = new CSSAnimation(aTimeline, src.GetName());
     dest->SetOwningElement(*aTarget, aStyleContext->GetPseudoType());
+    dest->SetAnimationIndex(static_cast<uint64_t>(animIdx));
     aAnimations.AppendElement(dest);
 
     AnimationTiming timing;
