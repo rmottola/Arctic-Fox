@@ -83,6 +83,8 @@ public:
 
   static bool IsVideoAccelerated(layers::LayersBackend aBackend);
 
+  virtual bool VideoIsHardwareAccelerated() const override;
+
 private:
 
   bool InitDemuxer();

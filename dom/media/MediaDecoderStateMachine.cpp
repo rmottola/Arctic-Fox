@@ -216,7 +216,6 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   mPlaybackRate(1.0),
   mLogicalPlaybackRate(mTaskQueue, 1.0, "MediaDecoderStateMachine::mLogicalPlaybackRate (Mirror)"),
   mPreservesPitch(mTaskQueue, true, "MediaDecoderStateMachine::mPreservesPitch (Mirror)"),
-  mAmpleVideoFrames(MIN_VIDEO_QUEUE_SIZE),
   mLowAudioThresholdUsecs(detail::LOW_AUDIO_USECS),
   mAmpleAudioThresholdUsecs(detail::AMPLE_AUDIO_USECS),
   mQuickBufferingLowDataThresholdUsecs(detail::QUICK_BUFFERING_LOW_DATA_USECS),
@@ -634,7 +633,7 @@ bool MediaDecoderStateMachine::HaveEnoughDecodedVideo()
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
 
-  if (static_cast<uint32_t>(VideoQueue().GetSize()) < mAmpleVideoFrames * mPlaybackRate) {
+  if (static_cast<uint32_t>(VideoQueue().GetSize()) < GetAmpleVideoFrames() * mPlaybackRate) {
     return false;
   }
 
@@ -2217,13 +2216,10 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
   }
 
   if (HasVideo()) {
-    mAmpleVideoFrames = (mReader->IsAsync() && mInfo.mVideo.mIsHardwareAccelerated)
-      ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
-      : std::max<uint32_t>(sVideoQueueDefaultSize, MIN_VIDEO_QUEUE_SIZE);
     DECODER_LOG("Video decode isAsync=%d HWAccel=%d videoQueueSize=%d",
                 mReader->IsAsync(),
-                mInfo.mVideo.mIsHardwareAccelerated,
-                mAmpleVideoFrames);
+                mReader->VideoIsHardwareAccelerated(),
+                GetAmpleVideoFrames());
   }
 
   mDecoder->StartProgressUpdates();
@@ -3533,6 +3529,14 @@ void MediaDecoderStateMachine::RecreateDecodedStream(int64_t aInitialTime)
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   DECODER_LOG("RecreateDecodedStream aInitialTime=%lld!", aInitialTime);
   mDecodedStream.RecreateData(aInitialTime, MediaStreamGraph::GetInstance());
+}
+
+uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
+{
+  AssertCurrentThreadInMonitor();
+  return (mReader->IsAsync() && mReader->VideoIsHardwareAccelerated())
+    ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
+    : std::max<uint32_t>(sVideoQueueDefaultSize, MIN_VIDEO_QUEUE_SIZE);
 }
 
 } // namespace mozilla

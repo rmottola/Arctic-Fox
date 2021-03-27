@@ -1147,4 +1147,10 @@ MP4Reader::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOff
   }
 }
 
+bool
+MP4Reader::VideoIsHardwareAccelerated() const
+{
+  return mVideo.mDecoder && mVideo.mDecoder->IsHardwareAccelerated();
+}
+
 } // namespace mozilla
