@@ -2243,7 +2243,7 @@ protected:
   }
 
   template<typename Allocator>
-  nsAutoArrayBase(nsTArray_Impl<elem_type, Allocator>&& aOther)
+  explicit nsAutoArrayBase(nsTArray_Impl<elem_type, Allocator>&& aOther)
   {
     Init();
     this->SwapElements(aOther);
