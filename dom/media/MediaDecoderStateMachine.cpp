@@ -316,7 +316,8 @@ MediaDecoderStateMachine::InitializationTask()
   mWatchManager.Watch(mLogicallySeeking, &MediaDecoderStateMachine::UpdateStreamBlockingForPlayState);
 }
 
-bool MediaDecoderStateMachine::HasFutureAudio() {
+bool MediaDecoderStateMachine::HasFutureAudio()
+{
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   NS_ASSERTION(HasAudio(), "Should only call HasFutureAudio() when we have audio");
@@ -331,14 +332,16 @@ bool MediaDecoderStateMachine::HasFutureAudio() {
           AudioQueue().IsFinished());
 }
 
-bool MediaDecoderStateMachine::HaveNextFrameData() {
+bool MediaDecoderStateMachine::HaveNextFrameData()
+{
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   return (!HasAudio() || HasFutureAudio()) &&
          (!HasVideo() || VideoQueue().GetSize() > 0);
 }
 
-int64_t MediaDecoderStateMachine::GetDecodedAudioDuration() {
+int64_t MediaDecoderStateMachine::GetDecodedAudioDuration()
+{
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   int64_t audioDecoded = AudioQueue().Duration();
@@ -1387,7 +1390,8 @@ void MediaDecoderStateMachine::VolumeChanged()
   }
 }
 
-bool MediaDecoderStateMachine::IsRealTime() const {
+bool MediaDecoderStateMachine::IsRealTime() const
+{
   return mRealTime;
 }
 
@@ -3298,7 +3302,8 @@ void MediaDecoderStateMachine::ScheduleStateMachineWithLockAndWakeDecoder()
 }
 
 void
-MediaDecoderStateMachine::ScheduleStateMachine() {
+MediaDecoderStateMachine::ScheduleStateMachine()
+{
   AssertCurrentThreadInMonitor();
   if (mDispatchedStateMachine) {
     return;
@@ -3346,6 +3351,7 @@ bool MediaDecoderStateMachine::OnTaskQueue() const
 
 bool MediaDecoderStateMachine::IsStateMachineScheduled() const
 {
+  MOZ_ASSERT(OnTaskQueue());
   return mDispatchedStateMachine || mDelayedScheduler.IsScheduled();
 }
 

@@ -266,15 +266,15 @@ public:
 
   // Must be called with the decode monitor held.
   bool IsBuffering() const {
+    MOZ_ASSERT(OnTaskQueue());
     AssertCurrentThreadInMonitor();
-
     return mState == DECODER_STATE_BUFFERING;
   }
 
   // Must be called with the decode monitor held.
   bool IsSeeking() const {
+    MOZ_ASSERT(OnTaskQueue());
     AssertCurrentThreadInMonitor();
-
     return mState == DECODER_STATE_SEEKING;
   }
 
@@ -329,6 +329,7 @@ public:
 
   // Drop reference to decoder.  Only called during shutdown dance.
   void BreakCycles() {
+    MOZ_ASSERT(NS_IsMainThread());
     if (mReader) {
       mReader->BreakCycles();
     }
@@ -388,10 +389,12 @@ public:
   void OnNotDecoded(MediaData::Type aType, MediaDecoderReader::NotDecodedReason aReason);
   void OnAudioNotDecoded(MediaDecoderReader::NotDecodedReason aReason)
   {
+    MOZ_ASSERT(OnTaskQueue());
     OnNotDecoded(MediaData::AUDIO_DATA, aReason);
   }
   void OnVideoNotDecoded(MediaDecoderReader::NotDecodedReason aReason)
   {
+    MOZ_ASSERT(OnTaskQueue());
     OnNotDecoded(MediaData::VIDEO_DATA, aReason);
   }
 
@@ -482,6 +485,7 @@ protected:
 
   bool OutOfDecodedVideo()
   {
+    MOZ_ASSERT(OnTaskQueue());
     // In buffering mode, we keep the last already-played frame in the queue.
     int emptyVideoSize = mState == DECODER_STATE_BUFFERING ? 1 : 0;
     return IsVideoDecoding() && !VideoQueue().IsFinished() && VideoQueue().GetSize() <= emptyVideoSize;
@@ -774,40 +778,41 @@ public:
 
   // Class for managing delayed dispatches of the state machine.
   class DelayedScheduler {
-    public:
-      explicit DelayedScheduler(MediaDecoderStateMachine* aSelf)
-        : mSelf(aSelf), mMediaTimer(new MediaTimer()) {}
+  public:
+    explicit DelayedScheduler(MediaDecoderStateMachine* aSelf)
+      : mSelf(aSelf), mMediaTimer(new MediaTimer()) {}
 
-      bool IsScheduled() const { return !mTarget.IsNull(); }
+    bool IsScheduled() const { return !mTarget.IsNull(); }
 
-      void Reset()
-      {
-        MOZ_ASSERT(mSelf->OnTaskQueue(), "Must be on state machine queue to disconnect");
-        if (IsScheduled()) {
-          mRequest.Disconnect();
-          mTarget = TimeStamp();
-        }
-      }
-
-      void Ensure(mozilla::TimeStamp& aTarget)
-      {
-        MOZ_ASSERT(mSelf->OnTaskQueue());
-        if (IsScheduled() && mTarget <= aTarget) {
-          return;
-        }
-        Reset();
-        mTarget = aTarget;
-        mRequest.Begin(mMediaTimer->WaitUntil(mTarget, __func__)->Then(
-          mSelf->TaskQueue(), __func__, mSelf,
-          &MediaDecoderStateMachine::OnDelayedSchedule,
-          &MediaDecoderStateMachine::NotReached));
-      }
-
-      void CompleteRequest()
-      {
-        mRequest.Complete();
+    void Reset()
+    {
+      MOZ_ASSERT(mSelf->OnTaskQueue(), "Must be on state machine queue to disconnect");
+      if (IsScheduled()) {
+        mRequest.Disconnect();
         mTarget = TimeStamp();
       }
+    }
+
+    void Ensure(mozilla::TimeStamp& aTarget)
+    {
+      MOZ_ASSERT(mSelf->OnTaskQueue());
+      if (IsScheduled() && mTarget <= aTarget) {
+        return;
+      }
+      Reset();
+      mTarget = aTarget;
+      mRequest.Begin(mMediaTimer->WaitUntil(mTarget, __func__)->Then(
+        mSelf->TaskQueue(), __func__, mSelf,
+        &MediaDecoderStateMachine::OnDelayedSchedule,
+        &MediaDecoderStateMachine::NotReached));
+    }
+
+    void CompleteRequest()
+    {
+      MOZ_ASSERT(mSelf->OnTaskQueue());
+      mRequest.Complete();
+      mTarget = TimeStamp();
+    }
 
   private:
     MediaDecoderStateMachine* mSelf;
@@ -1191,6 +1196,7 @@ protected:
   // samples we must consume before are considered to be finished prerolling.
   uint32_t AudioPrerollUsecs() const
   {
+    MOZ_ASSERT(OnTaskQueue());
     if (IsRealTime()) {
       return 0;
     }
@@ -1201,6 +1207,7 @@ protected:
   }
   uint32_t VideoPrerollFrames() const 
   {
+    MOZ_ASSERT(OnTaskQueue());
     return IsRealTime() ? 0 : GetAmpleVideoFrames() / 2;
   }
 
@@ -1221,6 +1228,7 @@ protected:
 
   void StopPrerollingAudio()
   {
+    MOZ_ASSERT(OnTaskQueue());
     AssertCurrentThreadInMonitor();
     if (mIsAudioPrerolling) {
       mIsAudioPrerolling = false;
@@ -1230,6 +1238,7 @@ protected:
 
   void StopPrerollingVideo()
   {
+    MOZ_ASSERT(OnTaskQueue());
     AssertCurrentThreadInMonitor();
     if (mIsVideoPrerolling) {
       mIsVideoPrerolling = false;
@@ -1261,6 +1270,7 @@ protected:
   MediaPromiseRequestHolder<MediaDecoderReader::WaitForDataPromise> mAudioWaitRequest;
   const char* AudioRequestStatus()
   {
+    MOZ_ASSERT(OnTaskQueue());
     if (mAudioDataRequest.Exists()) {
       MOZ_DIAGNOSTIC_ASSERT(!mAudioWaitRequest.Exists());
       return "pending";
@@ -1274,6 +1284,7 @@ protected:
   MediaPromiseRequestHolder<MediaDecoderReader::VideoDataPromise> mVideoDataRequest;
   const char* VideoRequestStatus()
   {
+    MOZ_ASSERT(OnTaskQueue());
     if (mVideoDataRequest.Exists()) {
       MOZ_DIAGNOSTIC_ASSERT(!mVideoWaitRequest.Exists());
       return "pending";
@@ -1285,6 +1296,7 @@ protected:
 
   MediaPromiseRequestHolder<MediaDecoderReader::WaitForDataPromise>& WaitRequestRef(MediaData::Type aType)
   {
+    MOZ_ASSERT(OnTaskQueue());
     return aType == MediaData::AUDIO_DATA ? mAudioWaitRequest : mVideoWaitRequest;
   }
 
