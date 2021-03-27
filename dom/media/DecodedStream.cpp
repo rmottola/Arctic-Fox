@@ -224,7 +224,7 @@ DecodedStream::DestroyData()
 void
 DecodedStream::RecreateData(int64_t aInitialTime, MediaStreamGraph* aGraph)
 {
-	MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread());
   GetReentrantMonitor().AssertCurrentThreadIn();
   MOZ_ASSERT((aGraph && !mData && OutputStreams().IsEmpty()) || // first time
              (!aGraph && mData)); // 2nd time and later
@@ -233,7 +233,7 @@ DecodedStream::RecreateData(int64_t aInitialTime, MediaStreamGraph* aGraph)
   DestroyData();
   mData.reset(new DecodedStreamData(aInitialTime, source));
 
-	// Note that the delay between removing ports in DestroyDecodedStream
+  // Note that the delay between removing ports in DestroyDecodedStream
   // and adding new ones won't cause a glitch since all graph operations
   // between main-thread stable states take effect atomically.
   auto& outputStreams = OutputStreams();
