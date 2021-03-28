@@ -206,6 +206,7 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   mFragmentEndTime(-1),
   mReader(aReader),
   mCurrentPosition(mTaskQueue, 0, "MediaDecoderStateMachine::mCurrentPosition (Canonical)"),
+  mStreamStartTime(-1),
   mAudioStartTime(-1),
   mAudioEndTime(-1),
   mDecodedAudioEndTime(-1),
@@ -360,7 +361,7 @@ void MediaDecoderStateMachine::SendStreamAudio(AudioData* aAudio,
   // This logic has to mimic AudioSink closely to make sure we write
   // the exact same silences
   CheckedInt64 audioWrittenOffset = aStream->mAudioFramesWritten +
-      UsecsToFrames(mInfo.mAudio.mRate, aStream->mInitialTime + mStartTime);
+      UsecsToFrames(mInfo.mAudio.mRate, mStreamStartTime);
   CheckedInt64 frameOffset = UsecsToFrames(mInfo.mAudio.mRate, aAudio->mTime);
 
   if (!audioWrittenOffset.isValid() ||
@@ -435,6 +436,7 @@ void MediaDecoderStateMachine::SendStreamData()
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   MOZ_ASSERT(!mAudioSink, "Should've been stopped in RunStateMachine()");
+  MOZ_ASSERT(mStreamStartTime != -1);
 
   DecodedStreamData* stream = GetDecodedStream();
 
@@ -453,7 +455,7 @@ void MediaDecoderStateMachine::SendStreamData()
                                    SourceMediaStream::ADDTRACK_QUEUED);
         stream->mStream->DispatchWhenNotEnoughBuffered(audioTrackId,
             TaskQueue(), GetWakeDecoderRunnable());
-        stream->mNextAudioTime = mStartTime + stream->mInitialTime;
+        stream->mNextAudioTime = mStreamStartTime;
       }
       if (mInfo.HasVideo()) {
         TrackID videoTrackId = mInfo.mVideo.mTrackId;
@@ -463,11 +465,7 @@ void MediaDecoderStateMachine::SendStreamData()
         stream->mStream->DispatchWhenNotEnoughBuffered(videoTrackId,
             TaskQueue(), GetWakeDecoderRunnable());
 
-        // TODO: We can't initialize |mNextVideoTime| until |mStartTime|
-        // is set. This is a good indication that DecodedStreamData is in
-        // deep coupling with the state machine and we should move the class
-        // into MediaDecoderStateMachine.
-        stream->mNextVideoTime = mStartTime + stream->mInitialTime;
+        stream->mNextVideoTime = mStreamStartTime;
       }
       mediaStream->FinishAddTracks();
       stream->mStreamInitialized = true;
@@ -555,7 +553,7 @@ void MediaDecoderStateMachine::SendStreamData()
       }
       endPosition = std::max(endPosition,
           mediaStream->MicrosecondsToStreamTimeRoundDown(
-              stream->mNextVideoTime - stream->mInitialTime - mStartTime));
+              stream->mNextVideoTime - mStreamStartTime));
     }
 
     if (!stream->mHaveSentFinish) {
@@ -1870,15 +1868,9 @@ MediaDecoderStateMachine::InitiateSeek()
   mCurrentSeek.mTarget.mTime = seekTime;
 
   if (mAudioCaptured) {
-    // TODO: We should re-create the decoded stream after seek completed as we do
-    // for audio thread since it is until then we know which position we seek to
-    // as far as fast-seek is concerned. It also fix the problem where stream
-    // clock seems to go backwards during seeking.
-    nsCOMPtr<nsIRunnable> event =
-      NS_NewRunnableMethodWithArg<int64_t>(this,
-                                           &MediaDecoderStateMachine::RecreateDecodedStream,
-                                           seekTime - mStartTime);
-    AbstractThread::MainThread()->Dispatch(event.forget());
+    nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethodWithArgs<MediaStreamGraph*>(
+      this, &MediaDecoderStateMachine::RecreateDecodedStream, nullptr);
+    AbstractThread::MainThread()->Dispatch(r.forget());
   }
 
   mDropAudioUntilNextDiscontinuity = HasAudio();
@@ -2466,6 +2458,7 @@ MediaDecoderStateMachine::SeekCompleted()
   } else {
     newCurrentTime = video ? video->mTime : seekTime;
   }
+  mStreamStartTime = newCurrentTime;
   mPlayDuration = newCurrentTime - mStartTime;
 
   mDecoder->StartProgressUpdates();
@@ -2602,11 +2595,6 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
 
   mDelayedScheduler.Reset(); // Must happen on state machine task queue.
   mDispatchedStateMachine = false;
-
-  // If audio is being captured, stop the audio sink if it's running
-  if (mAudioCaptured) {
-    StopAudioThread();
-  }
 
   MediaResource* resource = mDecoder->GetResource();
   NS_ENSURE_TRUE(resource, NS_ERROR_NULL_POINTER);
@@ -2791,6 +2779,7 @@ MediaDecoderStateMachine::Reset()
 
   mVideoFrameEndTime = -1;
   mDecodedVideoEndTime = -1;
+  mStreamStartTime = -1;
   mAudioStartTime = -1;
   mAudioEndTime = -1;
   mDecodedAudioEndTime = -1;
@@ -2872,6 +2861,14 @@ MediaDecoderStateMachine::GetAudioClock() const
          (mAudioSink ? mAudioSink->GetPosition() : 0);
 }
 
+int64_t MediaDecoderStateMachine::GetStreamClock() const
+{
+  MOZ_ASSERT(OnTaskQueue());
+  AssertCurrentThreadInMonitor();
+  MOZ_ASSERT(mStreamStartTime != -1);
+  return mStreamStartTime + GetDecodedStream()->GetPosition();
+}
+
 int64_t MediaDecoderStateMachine::GetVideoStreamPosition() const
 {
   AssertCurrentThreadInMonitor();
@@ -2901,17 +2898,15 @@ int64_t MediaDecoderStateMachine::GetClock() const
     clock_time = mPlayDuration + mStartTime;
   } else {
     if (mAudioCaptured) {
-      clock_time = mStartTime + GetDecodedStream()->GetClock();
+      clock_time = GetStreamClock();
     } else if (HasAudio() && !mAudioCompleted) {
       clock_time = GetAudioClock();
     } else {
       // Audio is disabled on this system. Sync to the system clock.
       clock_time = GetVideoStreamPosition();
     }
-    // Ensure the clock can never go backwards.
-    // Note we allow clock going backwards in capture mode - we should fix this in bug 1162381.
-    NS_ASSERTION(GetMediaTime() <= clock_time || mPlaybackRate <= 0 || mAudioCaptured,
-    "Clock should go forwards.");
+    NS_ASSERTION(GetMediaTime() <= clock_time || mPlaybackRate <= 0,
+                 "Clock should go forwards.");
   }
 
   return clock_time;
@@ -3199,6 +3194,7 @@ void MediaDecoderStateMachine::SetStartTime(int64_t aStartTimeUsecs)
   // first actual audio frame we have, we'll inject silence during playback
   // to ensure the audio starts at the correct time.
   mAudioStartTime = mStartTime;
+  mStreamStartTime = mStartTime;
   DECODER_LOG("Set media start time to %lld", mStartTime);
 }
 
@@ -3473,6 +3469,12 @@ void MediaDecoderStateMachine::DispatchAudioCaptured()
     MOZ_ASSERT(self->OnTaskQueue());
     ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
     if (!self->mAudioCaptured) {
+      // Stop the audio sink if it's running.
+      self->StopAudioThread();
+      // GetMediaTime() could return -1 because we haven't decoded
+      // the 1st frame. But this is OK since we will update mStreamStartTime
+      // again in SetStartTime().
+      self->mStreamStartTime = self->GetMediaTime();
       self->mAudioCaptured = true;
       self->ScheduleStateMachine();
     }
@@ -3488,7 +3490,7 @@ void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
 
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   if (!GetDecodedStream()) {
-    RecreateDecodedStream(mCurrentPosition.ReadOnWrongThread());
+    RecreateDecodedStream(aStream->Graph());
   }
   mDecodedStream.Connect(aStream, aFinishWhenEnded);
   DispatchAudioCaptured();
@@ -3527,12 +3529,11 @@ void MediaDecoderStateMachine::UpdateStreamBlockingForStateMachinePlaying()
   }
 }
 
-void MediaDecoderStateMachine::RecreateDecodedStream(int64_t aInitialTime)
+void MediaDecoderStateMachine::RecreateDecodedStream(MediaStreamGraph* aGraph)
 {
   MOZ_ASSERT(NS_IsMainThread());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  DECODER_LOG("RecreateDecodedStream aInitialTime=%lld!", aInitialTime);
-  mDecodedStream.RecreateData(aInitialTime, MediaStreamGraph::GetInstance());
+  mDecodedStream.RecreateData(aGraph);
 }
 
 uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
