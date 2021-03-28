@@ -189,10 +189,10 @@ DecodedStream::GetData() const
 void
 DecodedStream::DestroyData()
 {
-	MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread());
   GetReentrantMonitor().AssertCurrentThreadIn();
 
-	// Avoid the redundant blocking to output stream.
+  // Avoid the redundant blocking to output stream.
   if (!mData) {
     return;
   }
@@ -247,7 +247,7 @@ DecodedStream::RecreateData(int64_t aInitialTime, MediaStreamGraph* aGraph)
 nsTArray<OutputStreamData>&
 DecodedStream::OutputStreams()
 {
-	GetReentrantMonitor().AssertCurrentThreadIn();
+  GetReentrantMonitor().AssertCurrentThreadIn();
   return mOutputStreams;
 }
 
