@@ -109,6 +109,8 @@ FontFaceSet::FontFaceSet(nsPIDOMWindow* aWindow, nsPresContext* aPresContext)
   }
 
   mDocument->CSSLoader()->AddObserver(this);
+
+  mUserFontSet = new UserFontSet(this);
 }
 
 FontFaceSet::~FontFaceSet()
@@ -146,16 +148,6 @@ FontFaceSet::RemoveDOMContentLoadedListener()
     mDocument->RemoveSystemEventListener(NS_LITERAL_STRING("DOMContentLoaded"),
                                          this, false);
   }
-}
-
-FontFaceSet::UserFontSet*
-FontFaceSet::EnsureUserFontSet(nsPresContext* aPresContext)
-{
-  if (!mUserFontSet) {
-    mUserFontSet = new UserFontSet(this);
-    mPresContext = aPresContext;
-  }
-  return mUserFontSet;
 }
 
 already_AddRefed<Promise>
