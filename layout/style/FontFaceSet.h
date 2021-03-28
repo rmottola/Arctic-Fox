@@ -227,6 +227,12 @@ private:
   void CheckLoadingFinished();
 
   /**
+   * Callback for invoking CheckLoadingFinished after going through the
+   * event loop.  See OnFontFaceStatusChanged.
+   */
+  void CheckLoadingFinishedAfterDelay();
+
+  /**
    * Dispatches a CSSFontFaceLoadEvent to this object.
    */
   void DispatchLoadingFinishedEvent(
@@ -330,6 +336,10 @@ private:
 
   // This variable is only valid when mLoadingDirty is false.
   bool mHasLoadingFontFacesIsDirty;
+
+  // Whether CheckLoadingFinished calls should be ignored.  See comment in
+  // OnFontFaceStatusChanged.
+  bool mDelayedLoadCheck;
 };
 
 } // namespace dom
