@@ -1658,8 +1658,6 @@ public:
   // user.
   bool mAllowRelocking:1;
 
-  bool mAsyncFullscreenPending:1;
-
   // Whether we're observing the "app-theme-changed" observer service
   // notification.  We need to keep track of this because we might get multiple
   // OnPageShow notifications in a row without an OnPageHide in between, if
@@ -1673,6 +1671,8 @@ public:
   // The number of pointer lock requests which are cancelled by the user.
   // The value is saturated to kPointerLockRequestLimit+1 = 3.
   uint8_t mCancelledPointerLockRequests:2;
+
+  uint8_t mPendingFullscreenRequests;
 
   uint8_t mXMLDeclarationBits;
 
