@@ -283,7 +283,7 @@ FontFaceSet::Clear()
 }
 
 bool
-FontFaceSet::Delete(FontFace& aFontFace, ErrorResult& aRv)
+FontFaceSet::Delete(FontFace& aFontFace)
 {
   mPresContext->FlushUserFontSet();
 
