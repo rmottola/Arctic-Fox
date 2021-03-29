@@ -2140,7 +2140,7 @@ nsPresContext::FlushUserFontSet()
       bool changed = false;
 
       if (!mFontFaceSet && !rules.IsEmpty()) {
-        mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), this);
+        mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), mDocument);
       }
       if (mFontFaceSet) {
         changed = mFontFaceSet->UpdateRules(rules);
@@ -2237,7 +2237,7 @@ FontFaceSet*
 nsPresContext::Fonts()
 {
   if (!mFontFaceSet) {
-    mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), this);
+    mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), mDocument);
     GetUserFontSet();  // this will cause the user font set to be created/updated
   }
   return mFontFaceSet;
