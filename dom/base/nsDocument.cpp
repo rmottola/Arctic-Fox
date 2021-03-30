@@ -11600,6 +11600,8 @@ FullscreenRequest::FullscreenRequest(Element* aElement)
   }
 }
 
+static void RedispatchPendingPointerLockRequest(nsIDocument* aDocument);
+
 FullscreenRequest::~FullscreenRequest()
 {
   MOZ_COUNT_DTOR(FullscreenRequest);
@@ -11608,6 +11610,11 @@ FullscreenRequest::~FullscreenRequest()
     return;
   }
   mDocument->mPendingFullscreenRequests--;
+  if (!mDocument->mPendingFullscreenRequests) {
+    // There may be pointer lock request be blocked because of pending
+    // fullscreen requests. Re-dispatch it to ensure it gets handled.
+    RedispatchPendingPointerLockRequest(mDocument);
+  }
 }
 
 // Any fullscreen request waiting for the widget to finish being full-
@@ -11973,6 +11980,7 @@ DispatchPointerLockError(nsIDocument* aTarget)
 
 static const uint8_t kPointerLockRequestLimit = 2;
 
+class nsPointerLockPermissionRequest;
 mozilla::StaticRefPtr<nsPointerLockPermissionRequest> gPendingPointerLockRequest;
 
 class nsPointerLockPermissionRequest : public nsRunnable,
@@ -12173,6 +12181,35 @@ nsDocument::SetApprovedForFullscreen(bool aIsApproved)
   mIsApprovedForFullscreen = aIsApproved;
 }
 
+static void
+RedispatchPendingPointerLockRequest(nsIDocument* aDocument)
+{
+  if (!gPendingPointerLockRequest) {
+    return;
+  }
+  nsCOMPtr<nsIDocument> doc =
+    do_QueryReferent(gPendingPointerLockRequest->mDocument);
+  if (doc != aDocument) {
+    return;
+  }
+  nsCOMPtr<Element> elem =
+    do_QueryReferent(gPendingPointerLockRequest->mElement);
+  if (!elem || elem->GetUncomposedDoc() != aDocument) {
+    gPendingPointerLockRequest->Handled();
+    return;
+  }
+
+  // We have a request pending on the document which may previously be
+  // blocked for fullscreen approval. Create a clone and re-dispatch it
+  // to guarantee that Run() method gets called again.
+  bool userInputOrChromeCaller =
+    gPendingPointerLockRequest->mUserInputOrChromeCaller;
+  gPendingPointerLockRequest->Handled();
+  gPendingPointerLockRequest =
+    new nsPointerLockPermissionRequest(elem, userInputOrChromeCaller);
+  NS_DispatchToMainThread(gPendingPointerLockRequest);
+}
+
 nsresult
 nsDocument::Observe(nsISupports *aSubject,
                     const char *aTopic,
@@ -12184,24 +12221,7 @@ nsDocument::Observe(nsISupports *aSubject,
       return NS_OK;
     }
     SetApprovedForFullscreen(true);
-    if (gPendingPointerLockRequest) {
-      // We have a request pending. Create a clone of it and re-dispatch so that
-      // Run() method gets called again.
-      nsCOMPtr<Element> el =
-        do_QueryReferent(gPendingPointerLockRequest->mElement);
-      nsCOMPtr<nsIDocument> doc =
-        do_QueryReferent(gPendingPointerLockRequest->mDocument);
-      bool userInputOrChromeCaller =
-        gPendingPointerLockRequest->mUserInputOrChromeCaller;
-      gPendingPointerLockRequest->Handled();
-      if (doc == this && el && el->GetUncomposedDoc() == doc) {
-        nsPointerLockPermissionRequest* clone =
-          new nsPointerLockPermissionRequest(el, userInputOrChromeCaller);
-        gPendingPointerLockRequest = clone;
-        nsCOMPtr<nsIRunnable> r = gPendingPointerLockRequest.get();
-        NS_DispatchToMainThread(r);
-      }
-    }
+    RedispatchPendingPointerLockRequest(this);
   } else if (strcmp("app-theme-changed", aTopic) == 0) {
     if (!nsContentUtils::IsSystemPrincipal(NodePrincipal()) &&
         !IsUnstyledDocument()) {
