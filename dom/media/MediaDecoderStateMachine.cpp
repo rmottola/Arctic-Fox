@@ -1851,7 +1851,7 @@ MediaDecoderStateMachine::InitiateSeek()
   seekTime = std::min(seekTime, end);
   seekTime = std::max(mStartTime, seekTime);
   NS_ASSERTION(seekTime >= mStartTime && seekTime <= end,
-  "Can only seek in range [0,duration]");
+               "Can only seek in range [0,duration]");
   mCurrentSeek.mTarget.mTime = seekTime;
 
   if (mAudioCaptured) {
@@ -2989,11 +2989,7 @@ void MediaDecoderStateMachine::AdvanceFrame()
     int64_t delta = currentFrame->mTime - clock_time;
     TimeStamp presTime = nowTime + TimeDuration::FromMicroseconds(delta / mPlaybackRate);
     NS_ASSERTION(currentFrame->mTime >= mStartTime, "Should have positive frame time");
-    // Filter out invalid frames by checking the frame time. FrameTime could be
-    // zero if it's a initial frame.
-    int64_t frameTime = currentFrame->mTime - mStartTime;
-    if (frameTime > 0  || (frameTime == 0 && mPlayDuration == 0) ||
-        IsRealTime()) {
+    {
       ReentrantMonitorAutoExit exitMon(mDecoder->GetReentrantMonitor());
       // If we have video, we want to increment the clock in steps of the frame
       // duration.
