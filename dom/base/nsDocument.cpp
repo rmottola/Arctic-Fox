@@ -11294,29 +11294,21 @@ class nsCallRequestFullScreen : public nsRunnable
 {
 public:
   explicit nsCallRequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
-    : mRequest(Move(aRequest)),
-      mDoc(mRequest->mElement->OwnerDoc())
-  {
-    auto doc = static_cast<nsDocument*>(mDoc.get());
-    doc->mPendingFullscreenRequests++;
-  }
+    : mRequest(Move(aRequest)) { }
 
   NS_IMETHOD Run()
   {
-    nsDocument* doc = static_cast<nsDocument*>(mDoc.get());
-    doc->mPendingFullscreenRequests--;
-    doc->RequestFullScreen(Move(mRequest));
+    mRequest->GetDocument()->RequestFullScreen(Move(mRequest));
     return NS_OK;
   }
 
   UniquePtr<FullscreenRequest> mRequest;
-  nsCOMPtr<nsIDocument> mDoc;
 };
 
 void
 nsDocument::AsyncRequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
 {
-  if (!aRequest->mElement) {
+  if (!aRequest->GetElement()) {
     MOZ_ASSERT_UNREACHABLE(
       "Must pass non-null element to nsDocument::AsyncRequestFullScreen");
     return;
@@ -11599,13 +11591,23 @@ nsDocument::FullscreenElementReadyCheck(Element* aElement,
 
 FullscreenRequest::FullscreenRequest(Element* aElement)
   : mElement(aElement)
+  , mDocument(static_cast<nsDocument*>(aElement->OwnerDoc()))
 {
   MOZ_COUNT_CTOR(FullscreenRequest);
+  mDocument->mPendingFullscreenRequests++;
+  if (MOZ_UNLIKELY(!mDocument->mPendingFullscreenRequests)) {
+    NS_WARNING("Pending fullscreen request counter overflow");
+  }
 }
 
 FullscreenRequest::~FullscreenRequest()
 {
   MOZ_COUNT_DTOR(FullscreenRequest);
+  if (MOZ_UNLIKELY(!mDocument->mPendingFullscreenRequests)) {
+    NS_WARNING("Pending fullscreen request counter underflow");
+    return;
+  }
+  mDocument->mPendingFullscreenRequests--;
 }
 
 // Any fullscreen request waiting for the widget to finish being full-
@@ -11646,7 +11648,7 @@ nsDocument::RequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
 
   // We don't need to check element ready before this point, because
   // if we called ApplyFullscreen, it would check that for us.
-  Element* elem = aRequest->mElement;
+  Element* elem = aRequest->GetElement();
   if (!FullscreenElementReadyCheck(elem, aRequest->mIsCallerChrome)) {
     return;
   }
@@ -11670,8 +11672,7 @@ nsIDocument::HandlePendingFullscreenRequest(const FullscreenRequest& aRequest,
                                             nsIDocShellTreeItem* aRootShell,
                                             bool* aHandled)
 {
-  nsRefPtr<nsDocument> doc =
-    static_cast<nsDocument*>(aRequest.mElement->OwnerDoc());
+  nsDocument* doc = aRequest.GetDocument();
   nsIDocShellTreeItem* shell = doc->GetDocShell();
   if (!shell) {
     return true;
@@ -11718,7 +11719,7 @@ nsIDocument::HandlePendingFullscreenRequests(nsIDocument* aDoc)
 void
 nsDocument::ApplyFullscreen(const FullscreenRequest& aRequest)
 {
-  Element* elem = aRequest.mElement;
+  Element* elem = aRequest.GetElement();
   if (!FullscreenElementReadyCheck(elem, aRequest.mIsCallerChrome)) {
     return;
   }
@@ -11754,7 +11755,7 @@ nsDocument::ApplyFullscreen(const FullscreenRequest& aRequest)
   // Set the full-screen element. This sets the full-screen style on the
   // element, and the full-screen-ancestor styles on ancestors of the element
   // in this document.
-  DebugOnly<bool> x = FullScreenStackPush(aRequest.mElement);
+  DebugOnly<bool> x = FullScreenStackPush(elem);
   NS_ASSERTION(x, "Full-screen state of requesting doc should always change!");
   changed.AppendElement(this);
 
