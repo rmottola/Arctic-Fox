@@ -95,11 +95,14 @@
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 930414 - 22 parts
+- Bug 1188347  - 5 parts
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
+- Bug 1072313 - 2015-09-21 - Never call TextureClient::KeepUntilFullDeallocation off
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
+-  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
 - Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
@@ -150,6 +153,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
+- Bug 1167504 - Part 11: Clean up buffer binding constraints. r=jgilbert 
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
@@ -169,7 +173,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 
 
 impacting download and shutdown:
-Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
 Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
@@ -220,9 +223,15 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
+Remove hack of parserequestcontenttype in nsNetUtil.cpp
+
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
 And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp ?
+
+Fallible hacks:
+appendElements made fallible when not so in original FF:
+media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 
 Check ALTIVEC/VMX
 - gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
