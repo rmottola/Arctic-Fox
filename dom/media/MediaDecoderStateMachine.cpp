@@ -2593,8 +2593,8 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
       AdvanceFrame();
       NS_ASSERTION(!IsPlaying() ||
                    mLogicallySeeking ||
-                   IsStateMachineScheduled() ||
-                   mPlaybackRate == 0.0, "Must have timer scheduled");
+                   IsStateMachineScheduled(),
+                   "Must have timer scheduled");
       return NS_OK;
     }
 
@@ -2667,7 +2667,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
         AdvanceFrame();
         NS_ASSERTION(!IsPlaying() ||
                      mLogicallySeeking ||
-                     mPlaybackRate == 0 || IsStateMachineScheduled(),
+                     IsStateMachineScheduled(),
                      "Must have timer scheduled");
         return NS_OK;
       }
@@ -2854,8 +2854,7 @@ int64_t MediaDecoderStateMachine::GetClock() const
       // Audio is disabled on this system. Sync to the system clock.
       clock_time = GetVideoStreamPosition();
     }
-    NS_ASSERTION(GetMediaTime() <= clock_time || mPlaybackRate <= 0,
-                 "Clock should go forwards.");
+    NS_ASSERTION(GetMediaTime() <= clock_time, "Clock should go forwards.");
   }
 
   return clock_time;
@@ -2869,12 +2868,6 @@ void MediaDecoderStateMachine::AdvanceFrame()
                "Should know audio start time if we have audio.");
 
   if (!IsPlaying() || mLogicallySeeking) {
-    return;
-  }
-
-  // If playbackRate is 0.0, we should stop the progress, but not be in paused
-  // state, per spec.
-  if (mPlaybackRate == 0.0) {
     return;
   }
 
