@@ -2590,7 +2590,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
       // Start playback if necessary so that the clock can be properly queried.
       MaybeStartPlayback();
 
-      AdvanceFrame();
+      UpdateRenderedVideoFrames();
       NS_ASSERTION(!IsPlaying() ||
                    mLogicallySeeking ||
                    IsStateMachineScheduled(),
@@ -2664,7 +2664,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
       {
         // Start playback if necessary to play the remaining media.
         MaybeStartPlayback();
-        AdvanceFrame();
+        UpdateRenderedVideoFrames();
         NS_ASSERTION(!IsPlaying() ||
                      mLogicallySeeking ||
                      IsStateMachineScheduled(),
@@ -2860,7 +2860,7 @@ int64_t MediaDecoderStateMachine::GetClock() const
   return clock_time;
 }
 
-void MediaDecoderStateMachine::AdvanceFrame()
+void MediaDecoderStateMachine::UpdateRenderedVideoFrames()
 {
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
