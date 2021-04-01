@@ -2725,7 +2725,7 @@ private:
   nsCOMPtr<nsIRunnable> mEvent;
 };
 
-} // namespace
+} // anonymous namespace
 
 NS_IMETHODIMP
 WebSocketImpl::Dispatch(nsIRunnable* aEvent, uint32_t aFlags)
