@@ -1025,7 +1025,7 @@ CycleCollectedJSRuntime::DeferredFinalize(nsISupports* aSupports)
 void
 CycleCollectedJSRuntime::DumpJSHeap(FILE* aFile)
 {
-  js::DumpHeapComplete(Runtime(), aFile, js::CollectNurseryBeforeDump);
+  js::DumpHeap(Runtime(), aFile, js::CollectNurseryBeforeDump);
 }
 
 

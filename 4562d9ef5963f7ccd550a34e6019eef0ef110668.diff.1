@@ -1,0 +1,84 @@
+diff --git a/js/src/builtin/TestingFunctions.cpp b/js/src/builtin/TestingFunctions.cpp
+index 220720a2dbe0..9c23f502f4bb 100644
+--- a/js/src/builtin/TestingFunctions.cpp
++++ b/js/src/builtin/TestingFunctions.cpp
+@@ -1209,7 +1209,7 @@ FinalizeCount(JSContext* cx, unsigned argc, jsval* vp)
+ }
+ 
+ static bool
+-DumpHeapComplete(JSContext* cx, unsigned argc, jsval* vp)
++DumpHeap(JSContext* cx, unsigned argc, Value* vp)
+ {
+     CallArgs args = CallArgsFromVp(argc, vp);
+ 
+@@ -1251,11 +1251,11 @@ DumpHeapComplete(JSContext* cx, unsigned argc, jsval* vp)
+     }
+ 
+     if (i != args.length()) {
+-        JS_ReportError(cx, "bad arguments passed to dumpHeapComplete");
++        JS_ReportError(cx, "bad arguments passed to dumpHeap");
+         return false;
+     }
+ 
+-    js::DumpHeapComplete(JS_GetRuntime(cx), dumpFile ? dumpFile : stdout, nurseryBehaviour);
++    js::DumpHeap(JS_GetRuntime(cx), dumpFile ? dumpFile : stdout, nurseryBehaviour);
+ 
+     if (dumpFile)
+         fclose(dumpFile);
+@@ -2788,8 +2788,8 @@ gc::ZealModeHelpText),
+ "isProxy(obj)",
+ "  If true, obj is a proxy of some sort"),
+ 
+-    JS_FN_HELP("dumpHeapComplete", DumpHeapComplete, 1, 0,
+-"dumpHeapComplete(['collectNurseryBeforeDump'], [filename])",
++    JS_FN_HELP("dumpHeap", DumpHeap, 1, 0,
++"dumpHeap(['collectNurseryBeforeDump'], [filename])",
+ "  Dump reachable and unreachable objects to the named file, or to stdout.  If\n"
+ "  'collectNurseryBeforeDump' is specified, a minor GC is performed first,\n"
+ "  otherwise objects in the nursery are ignored."),
+diff --git a/js/src/jit-test/tests/gc/bug-913224.js b/js/src/jit-test/tests/gc/bug-913224.js
+index d410e1b9c35a..815164d764b5 100644
+--- a/js/src/jit-test/tests/gc/bug-913224.js
++++ b/js/src/jit-test/tests/gc/bug-913224.js
+@@ -1 +1 @@
+-dumpHeapComplete();
++dumpHeap();
+diff --git a/js/src/jsfriendapi.cpp b/js/src/jsfriendapi.cpp
+index 9c27fb9c50ed..0716b4be34c7 100644
+--- a/js/src/jsfriendapi.cpp
++++ b/js/src/jsfriendapi.cpp
+@@ -994,7 +994,7 @@ DumpHeapVisitRoot(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind)
+ }
+ 
+ void
+-js::DumpHeapComplete(JSRuntime* rt, FILE* fp, js::DumpHeapNurseryBehaviour nurseryBehaviour)
++js::DumpHeap(JSRuntime* rt, FILE* fp, js::DumpHeapNurseryBehaviour nurseryBehaviour)
+ {
+     if (nurseryBehaviour == js::CollectNurseryBeforeDump)
+         rt->gc.evictNursery(JS::gcreason::API);
+diff --git a/js/src/jsfriendapi.h b/js/src/jsfriendapi.h
+index 6f5de9b75431..953282ef2565 100644
+--- a/js/src/jsfriendapi.h
++++ b/js/src/jsfriendapi.h
+@@ -462,7 +462,7 @@ typedef enum  {
+   * fp is the file for the dump output.
+   */
+ extern JS_FRIEND_API(void)
+-DumpHeapComplete(JSRuntime* rt, FILE* fp, DumpHeapNurseryBehaviour nurseryBehaviour);
++DumpHeap(JSRuntime* rt, FILE* fp, DumpHeapNurseryBehaviour nurseryBehaviour);
+ 
+ #ifdef JS_OLD_GETTER_SETTER_METHODS
+ JS_FRIEND_API(bool) obj_defineGetter(JSContext* cx, unsigned argc, JS::Value* vp);
+diff --git a/xpcom/base/CycleCollectedJSRuntime.cpp b/xpcom/base/CycleCollectedJSRuntime.cpp
+index 665509c60245..c2029a3da586 100644
+--- a/xpcom/base/CycleCollectedJSRuntime.cpp
++++ b/xpcom/base/CycleCollectedJSRuntime.cpp
+@@ -1073,7 +1073,7 @@ CycleCollectedJSRuntime::DeferredFinalize(nsISupports* aSupports)
+ void
+ CycleCollectedJSRuntime::DumpJSHeap(FILE* aFile)
+ {
+-  js::DumpHeapComplete(Runtime(), aFile, js::CollectNurseryBeforeDump);
++  js::DumpHeap(Runtime(), aFile, js::CollectNurseryBeforeDump);
+ }
+ 
+ 
