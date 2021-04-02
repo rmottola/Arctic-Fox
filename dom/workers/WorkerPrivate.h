@@ -72,6 +72,7 @@ class WorkerDebuggerGlobalScope;
 class WorkerGlobalScope;
 class WorkerPrivate;
 class WorkerRunnable;
+class WorkerStructuredCloneClosure;
 class WorkerThread;
 
 // SharedMutex is a small wrapper around an (internal) reference-counted Mutex
@@ -346,7 +347,7 @@ public:
                                JSContext* aCx,
                                uint64_t aMessagePortSerial,
                                JSAutoStructuredCloneBuffer&& aBuffer,
-                               nsTArray<nsCOMPtr<nsISupports>>& aClonedObjects);
+                               WorkerStructuredCloneClosure& aClosure);
 
   void
   UpdateRuntimeOptions(JSContext* aCx,
