@@ -187,8 +187,9 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   mDelayedScheduler(this),
   mState(DECODER_STATE_DECODING_NONE, "MediaDecoderStateMachine::mState"),
   mPlayDuration(0),
+  mDuration(mTaskQueue, NullableTimeUnit(), "MediaDecoderStateMachine::mDuration (Canonical"),
   mEstimatedDuration(mTaskQueue, NullableTimeUnit(),
-                    "MediaDecoderStateMachine::EstimatedDuration (Mirror)"),
+                    "MediaDecoderStateMachine::mEstimatedDuration (Mirror)"),
   mExplicitDuration(mTaskQueue, Maybe<double>(),
                     "MediaDecoderStateMachine::mExplicitDuration (Mirror)"),
   mObservedDuration(TimeUnit(), "MediaDecoderStateMachine::mObservedDuration"),
@@ -1381,11 +1382,11 @@ bool MediaDecoderStateMachine::IsRealTime() const
 int64_t MediaDecoderStateMachine::GetDuration()
 {
   AssertCurrentThreadInMonitor();
-  if (mDuration.isNothing() || mDuration.ref().IsInfinite()) {
+  if (mDuration.Ref().isNothing() || Duration().IsInfinite()) {
     return -1;
   }
 
-  return mDuration.ref().ToMicroseconds();
+  return Duration().ToMicroseconds();
 }
 
 void MediaDecoderStateMachine::RecomputeDuration()
@@ -1422,7 +1423,7 @@ void MediaDecoderStateMachine::RecomputeDuration()
     duration = mObservedDuration;
     fireDurationChanged = true;
   }
-  fireDurationChanged = fireDurationChanged && duration != mDuration.ref();
+  fireDurationChanged = fireDurationChanged && duration != Duration();
 
   MOZ_ASSERT(duration.ToMicroseconds() >= 0);
   mDuration = Some(duration);
@@ -1670,7 +1671,7 @@ void MediaDecoderStateMachine::NotifyDataArrived(const char* aBuffer,
     media::TimeUnit end{buffered.GetEnd(&exists)};
     if (exists) {
       ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-      mDuration = Some(std::max<TimeUnit>(mDuration.ref(), end));
+      mDuration = Some(std::max<TimeUnit>(Duration(), end));
     }
   }
 }
@@ -2185,7 +2186,7 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
   // feeding in the CDM, which we need to decode the first frame (and
   // thus get the metadata). We could fix this if we could compute the start
   // time by demuxing without necessaring decoding.
-  mNotifyMetadataBeforeFirstFrame = mDuration.isSome() || mReader->IsWaitingOnCDMResource();
+  mNotifyMetadataBeforeFirstFrame = mDuration.Ref().isSome() || mReader->IsWaitingOnCDMResource();
   if (mNotifyMetadataBeforeFirstFrame) {
     EnqueueLoadedMetadataEvent();
   }
@@ -2331,8 +2332,8 @@ MediaDecoderStateMachine::FinishDecodeFirstFrame()
   }
 
   // If we don't know the duration by this point, we assume infinity, per spec.
-  if (mDuration.isNothing()) {
-    mDuration.emplace(TimeUnit::FromInfinity());
+  if (mDuration.Ref().isNothing()) {
+    mDuration = Some(TimeUnit::FromInfinity());
   }
 
   DECODER_LOG("Media duration %lld, "
@@ -2498,6 +2499,7 @@ MediaDecoderStateMachine::FinishShutdown()
   mVolume.DisconnectIfConnected();
   mLogicalPlaybackRate.DisconnectIfConnected();
   mPreservesPitch.DisconnectIfConnected();
+  mDuration.DisconnectAll();
   mNextFrameStatus.DisconnectAll();
   mCurrentPosition.DisconnectAll();
 
