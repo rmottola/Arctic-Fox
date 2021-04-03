@@ -25,6 +25,7 @@
 namespace js {
 
 class AutoLockGC;
+class VerifyPreTracer;
 
 namespace gc {
 
@@ -1008,7 +1009,7 @@ class GCRuntime
      * Number of the committed arenas in all GC chunks including empty chunks.
      */
     mozilla::Atomic<uint32_t, mozilla::ReleaseAcquire> numArenasFreeCommitted;
-    void* verifyPreData;
+    VerifyPreTracer* verifyPreData;
     bool chunkAllocationSinceLastGC;
     int64_t nextFullGCTime;
     int64_t lastGCTime;
