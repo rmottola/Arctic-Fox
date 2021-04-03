@@ -1510,10 +1510,7 @@ public:
         result->AppendElement(source);
       }
     }
-    // In the case of failure with this newly allocated runnable, we
-    // intentionally leak the runnable, because we've pawned mOnSuccess and
-    // mOnFailure onto it which are main thread objects unsafe to release here.
-    DeviceSuccessCallbackRunnable* runnable =
+    nsRefPtr<DeviceSuccessCallbackRunnable> runnable =
         new DeviceSuccessCallbackRunnable(mWindowId, mOnSuccess, mOnFailure,
                                           result.forget());
     if (mPrivileged) {
