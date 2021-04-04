@@ -200,7 +200,7 @@ GetLine(JSContext* cx, char* bufp, FILE* file, const char* prompt) {
 }
 
 static bool
-ReadLine(JSContext* cx, unsigned argc, jsval* vp)
+ReadLine(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -244,7 +244,7 @@ ReadLine(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Print(JSContext* cx, unsigned argc, jsval* vp)
+Print(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
@@ -272,7 +272,7 @@ Print(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Dump(JSContext* cx, unsigned argc, jsval* vp)
+Dump(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
@@ -305,7 +305,7 @@ Dump(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Load(JSContext* cx, unsigned argc, jsval* vp)
+Load(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -354,7 +354,7 @@ Load(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Version(JSContext* cx, unsigned argc, jsval* vp)
+Version(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setInt32(JS_GetVersion(cx));
@@ -365,7 +365,7 @@ Version(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Quit(JSContext* cx, unsigned argc, jsval* vp)
+Quit(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -379,7 +379,7 @@ Quit(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-DumpXPC(JSContext* cx, unsigned argc, jsval* vp)
+DumpXPC(JSContext* cx, unsigned argc, Value* vp)
 {
     JS::CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -397,7 +397,7 @@ DumpXPC(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GC(JSContext* cx, unsigned argc, jsval* vp)
+GC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     JSRuntime* rt = JS_GetRuntime(cx);
@@ -411,7 +411,7 @@ GC(JSContext* cx, unsigned argc, jsval* vp)
 
 #ifdef JS_GC_ZEAL
 static bool
-GCZeal(JSContext* cx, unsigned argc, jsval* vp)
+GCZeal(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     uint32_t zeal;
@@ -455,7 +455,7 @@ SendCommand(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-Options(JSContext* cx, unsigned argc, jsval* vp)
+Options(JSContext* cx, unsigned argc, Value* vp)
 {
     JS::CallArgs args = CallArgsFromVp(argc, vp);
     RuntimeOptions oldRuntimeOptions = RuntimeOptionsRef(cx);
@@ -560,7 +560,7 @@ XPCShellInterruptCallback(JSContext* cx)
 }
 
 static bool
-SetInterruptCallback(JSContext* cx, unsigned argc, jsval* vp)
+SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
 {
     MOZ_ASSERT(sScriptedInterruptCallback.initialized());
 
@@ -589,7 +589,7 @@ SetInterruptCallback(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SimulateActivityCallback(JSContext* cx, unsigned argc, jsval* vp)
+SimulateActivityCallback(JSContext* cx, unsigned argc, Value* vp)
 {
     // Sanity-check args.
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
@@ -602,7 +602,7 @@ SimulateActivityCallback(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-RegisterAppManifest(JSContext* cx, unsigned argc, jsval* vp)
+RegisterAppManifest(JSContext* cx, unsigned argc, Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
