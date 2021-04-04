@@ -49,7 +49,7 @@ using mozilla::UniquePtr;
 static bool fuzzingSafe = false;
 
 static bool
-GetBuildConfiguration(JSContext* cx, unsigned argc, jsval* vp)
+GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject info(cx, JS_NewPlainObject(cx));
@@ -221,7 +221,7 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GC(JSContext* cx, unsigned argc, jsval* vp)
+GC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -277,7 +277,7 @@ GC(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-MinorGC(JSContext* cx, unsigned argc, jsval* vp)
+MinorGC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.get(0) == BooleanValue(true))
@@ -451,7 +451,7 @@ IsRelazifiableFunction(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-InternalConst(JSContext* cx, unsigned argc, jsval* vp)
+InternalConst(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() == 0) {
@@ -476,7 +476,7 @@ InternalConst(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GCPreserveCode(JSContext* cx, unsigned argc, jsval* vp)
+GCPreserveCode(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -577,7 +577,7 @@ SelectForGC(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-VerifyPreBarriers(JSContext* cx, unsigned argc, jsval* vp)
+VerifyPreBarriers(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -593,7 +593,7 @@ VerifyPreBarriers(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-VerifyPostBarriers(JSContext* cx, unsigned argc, jsval* vp)
+VerifyPostBarriers(JSContext* cx, unsigned argc, Value* vp)
 {
     // This is a no-op since the post barrier verifier was removed.
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -607,7 +607,7 @@ VerifyPostBarriers(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GCState(JSContext* cx, unsigned argc, jsval* vp)
+GCState(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -638,7 +638,7 @@ GCState(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-DeterministicGC(JSContext* cx, unsigned argc, jsval* vp)
+DeterministicGC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -742,7 +742,7 @@ AbortGC(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-ValidateGC(JSContext* cx, unsigned argc, jsval* vp)
+ValidateGC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -758,7 +758,7 @@ ValidateGC(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-FullCompartmentChecks(JSContext* cx, unsigned argc, jsval* vp)
+FullCompartmentChecks(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -774,7 +774,7 @@ FullCompartmentChecks(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, jsval* vp)
+NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -822,7 +822,7 @@ class HasChildTracer : public JS::CallbackTracer
 };
 
 static bool
-HasChild(JSContext* cx, unsigned argc, jsval* vp)
+HasChild(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedValue parent(cx, args.get(0));
@@ -840,7 +840,7 @@ HasChild(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SetSavedStacksRNGState(JSContext* cx, unsigned argc, jsval* vp)
+SetSavedStacksRNGState(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.requireAtLeast(cx, "setSavedStacksRNGState", 1))
@@ -855,7 +855,7 @@ SetSavedStacksRNGState(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetSavedFrameCount(JSContext* cx, unsigned argc, jsval* vp)
+GetSavedFrameCount(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setNumber(cx->compartment()->savedStacks().count());
@@ -863,7 +863,7 @@ GetSavedFrameCount(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SaveStack(JSContext* cx, unsigned argc, jsval* vp)
+SaveStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -910,7 +910,7 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-CallFunctionWithAsyncStack(JSContext* cx, unsigned argc, jsval* vp)
+CallFunctionWithAsyncStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -941,14 +941,14 @@ CallFunctionWithAsyncStack(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-EnableTrackAllocations(JSContext* cx, unsigned argc, jsval* vp)
+EnableTrackAllocations(JSContext* cx, unsigned argc, Value* vp)
 {
     SetObjectMetadataCallback(cx, SavedStacksMetadataCallback);
     return true;
 }
 
 static bool
-DisableTrackAllocations(JSContext* cx, unsigned argc, jsval* vp)
+DisableTrackAllocations(JSContext* cx, unsigned argc, Value* vp)
 {
     SetObjectMetadataCallback(cx, nullptr);
     return true;
@@ -956,7 +956,7 @@ DisableTrackAllocations(JSContext* cx, unsigned argc, jsval* vp)
 
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
 static bool
-OOMAfterAllocations(JSContext* cx, unsigned argc, jsval* vp)
+OOMAfterAllocations(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
@@ -974,7 +974,7 @@ OOMAfterAllocations(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-OOMAtAllocation(JSContext* cx, unsigned argc, jsval* vp)
+OOMAtAllocation(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
@@ -992,7 +992,7 @@ OOMAtAllocation(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ResetOOMFailure(JSContext* cx, unsigned argc, jsval* vp)
+ResetOOMFailure(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setBoolean(OOM_counter >= OOM_maxAllocations);
@@ -1006,7 +1006,7 @@ static const js::Class FakePromiseClass = {
 };
 
 static bool
-MakeFakePromise(JSContext* cx, unsigned argc, jsval* vp)
+MakeFakePromise(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1020,7 +1020,7 @@ MakeFakePromise(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SettleFakePromise(JSContext* cx, unsigned argc, jsval* vp)
+SettleFakePromise(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.requireAtLeast(cx, "settleFakePromise", 1))
@@ -1057,7 +1057,7 @@ static const JSClass FinalizeCounterClass = {
 };
 
 static bool
-MakeFinalizeObserver(JSContext* cx, unsigned argc, jsval* vp)
+MakeFinalizeObserver(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1070,7 +1070,7 @@ MakeFinalizeObserver(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-FinalizeCount(JSContext* cx, unsigned argc, jsval* vp)
+FinalizeCount(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setInt32(finalizeCount);
@@ -1134,7 +1134,7 @@ DumpHeap(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-Terminate(JSContext* cx, unsigned arg, jsval* vp)
+Terminate(JSContext* cx, unsigned arg, Value* vp)
 {
 #ifdef JS_MORE_DETERMINISTIC
     // Print a message to stderr in more-deterministic builds to help jsfunfuzz
@@ -1151,7 +1151,7 @@ static ProfileEntry SPS_PROFILING_STACK[SPS_PROFILING_STACK_MAX_SIZE];
 static uint32_t SPS_PROFILING_STACK_SIZE = 0;
 
 static bool
-EnableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
+EnableSPSProfiling(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1169,7 +1169,7 @@ EnableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-EnableSPSProfilingWithSlowAssertions(JSContext* cx, unsigned argc, jsval* vp)
+EnableSPSProfilingWithSlowAssertions(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
@@ -1198,7 +1198,7 @@ EnableSPSProfilingWithSlowAssertions(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-DisableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
+DisableSPSProfiling(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (cx->runtime()->spsProfiler.installed())
@@ -1208,7 +1208,7 @@ DisableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ReadSPSProfilingStack(JSContext* cx, unsigned argc, jsval* vp)
+ReadSPSProfilingStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
@@ -1294,7 +1294,7 @@ ReadSPSProfilingStack(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-EnableOsiPointRegisterChecks(JSContext*, unsigned argc, jsval* vp)
+EnableOsiPointRegisterChecks(JSContext*, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 #ifdef CHECK_OSIPOINT_REGISTERS
@@ -1305,7 +1305,7 @@ EnableOsiPointRegisterChecks(JSContext*, unsigned argc, jsval* vp)
 }
 
 static bool
-DisplayName(JSContext* cx, unsigned argc, jsval* vp)
+DisplayName(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject() || !args[0].toObject().is<JSFunction>()) {
@@ -1366,7 +1366,7 @@ ShellObjectMetadataCallback(JSContext* cx, JSObject*)
 }
 
 static bool
-SetObjectMetadataCallback(JSContext* cx, unsigned argc, jsval* vp)
+SetObjectMetadataCallback(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1378,7 +1378,7 @@ SetObjectMetadataCallback(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
+GetObjectMetadata(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1 || !args[0].isObject()) {
@@ -1391,7 +1391,7 @@ GetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
-js::testingFunc_bailout(JSContext* cx, unsigned argc, jsval* vp)
+js::testingFunc_bailout(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1401,7 +1401,7 @@ js::testingFunc_bailout(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
-js::testingFunc_inJit(JSContext* cx, unsigned argc, jsval* vp)
+js::testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1429,7 +1429,7 @@ js::testingFunc_inJit(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
-js::testingFunc_inIon(JSContext* cx, unsigned argc, jsval* vp)
+js::testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1466,7 +1466,7 @@ js::testingFunc_inIon(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
-js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, jsval* vp)
+js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2) {
@@ -1480,7 +1480,7 @@ js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-TestingFunc_assertJitStackInvariants(JSContext* cx, unsigned argc, jsval* vp)
+TestingFunc_assertJitStackInvariants(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1490,7 +1490,7 @@ TestingFunc_assertJitStackInvariants(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 bool
-js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, jsval* vp)
+js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2) {
@@ -1504,7 +1504,7 @@ js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, jsval* vp
 }
 
 static bool
-SetJitCompilerOption(JSContext* cx, unsigned argc, jsval* vp)
+SetJitCompilerOption(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject callee(cx, &args.callee());
@@ -1563,7 +1563,7 @@ SetJitCompilerOption(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetJitCompilerOptions(JSContext* cx, unsigned argc, jsval* vp)
+GetJitCompilerOptions(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject info(cx, JS_NewPlainObject(cx));
@@ -1588,7 +1588,7 @@ GetJitCompilerOptions(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SetIonCheckGraphCoherency(JSContext* cx, unsigned argc, jsval* vp)
+SetIonCheckGraphCoherency(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     jit::js_JitOptions.checkGraphConsistency = ToBoolean(args.get(0));
@@ -1752,7 +1752,7 @@ const JSPropertySpec CloneBufferObject::props_[] = {
 };
 
 static bool
-Serialize(JSContext* cx, unsigned argc, jsval* vp)
+Serialize(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1769,7 +1769,7 @@ Serialize(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Deserialize(JSContext* cx, unsigned argc, jsval* vp)
+Deserialize(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1810,7 +1810,7 @@ Deserialize(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-Neuter(JSContext* cx, unsigned argc, jsval* vp)
+Neuter(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1852,7 +1852,7 @@ Neuter(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-HelperThreadCount(JSContext* cx, unsigned argc, jsval* vp)
+HelperThreadCount(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 #ifdef JS_MORE_DETERMINISTIC
@@ -1868,7 +1868,7 @@ HelperThreadCount(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-TimesAccessed(JSContext* cx, unsigned argc, jsval* vp)
+TimesAccessed(JSContext* cx, unsigned argc, Value* vp)
 {
     static int32_t accessed = 0;
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -1878,7 +1878,7 @@ TimesAccessed(JSContext* cx, unsigned argc, jsval* vp)
 
 #ifdef JS_TRACE_LOGGING
 static bool
-EnableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
+EnableTraceLogger(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
@@ -1890,7 +1890,7 @@ EnableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-DisableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
+DisableTraceLogger(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
@@ -1902,7 +1902,7 @@ DisableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 
 #ifdef DEBUG
 static bool
-DumpObject(JSContext* cx, unsigned argc, jsval* vp)
+DumpObject(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject obj(cx, ToObject(cx, args.get(0)));
@@ -1918,7 +1918,7 @@ DumpObject(JSContext* cx, unsigned argc, jsval* vp)
 
 #ifdef NIGHTLY_BUILD
 static bool
-ObjectAddress(JSContext* cx, unsigned argc, jsval* vp)
+ObjectAddress(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
@@ -1951,7 +1951,7 @@ ObjectAddress(JSContext* cx, unsigned argc, jsval* vp)
 #endif
 
 static bool
-DumpBacktrace(JSContext* cx, unsigned argc, jsval* vp)
+DumpBacktrace(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     DumpBacktrace(cx);
@@ -1960,7 +1960,7 @@ DumpBacktrace(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetBacktrace(JSContext* cx, unsigned argc, jsval* vp)
+GetBacktrace(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -2004,7 +2004,7 @@ GetBacktrace(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ReportOutOfMemory(JSContext* cx, unsigned argc, jsval* vp)
+ReportOutOfMemory(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     JS_ReportOutOfMemory(cx);
@@ -2014,7 +2014,7 @@ ReportOutOfMemory(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ReportLargeAllocationFailure(JSContext* cx, unsigned argc, jsval* vp)
+ReportLargeAllocationFailure(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     void* buf = cx->runtime()->onOutOfMemoryCanGC(AllocFunction::Malloc, JSRuntime::LARGE_ALLOCATION);
@@ -2137,7 +2137,7 @@ struct FindPathHandler {
 } // namespace heaptools
 
 static bool
-FindPath(JSContext* cx, unsigned argc, jsval* vp)
+FindPath(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (argc < 2) {
@@ -2237,7 +2237,7 @@ FindPath(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-EvalReturningScope(JSContext* cx, unsigned argc, jsval* vp)
+EvalReturningScope(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.requireAtLeast(cx, "evalReturningScope", 1))
@@ -2485,7 +2485,7 @@ GetConstructorName(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-AllocationMarker(JSContext* cx, unsigned argc, jsval* vp)
+AllocationMarker(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -2547,7 +2547,7 @@ MinorGC* prevMinorGC = nullptr;
 } /* namespace gcCallback */
 
 static bool
-SetGCCallback(JSContext* cx, unsigned argc, jsval* vp)
+SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
