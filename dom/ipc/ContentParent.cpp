@@ -73,6 +73,7 @@
 #include "mozilla/layers/ImageBridgeParent.h"
 #include "mozilla/layers/SharedBufferManagerParent.h"
 #include "mozilla/LookAndFeel.h"
+#include "mozilla/media/MediaParent.h"
 #include "mozilla/net/NeckoParent.h"
 #include "mozilla/plugins/PluginBridge.h"
 #include "mozilla/Preferences.h"
@@ -253,6 +254,7 @@ using namespace mozilla::dom::mobileconnection;
 using namespace mozilla::dom::mobilemessage;
 using namespace mozilla::dom::telephony;
 using namespace mozilla::dom::voicemail;
+using namespace mozilla::media;
 using namespace mozilla::embedding;
 using namespace mozilla::gmp;
 using namespace mozilla::hal;
@@ -3697,6 +3699,18 @@ ContentParent::DeallocPVoicemailParent(PVoicemailParent* aActor)
 {
     static_cast<VoicemailParent*>(aActor)->Release();
     return true;
+}
+
+media::PMediaParent*
+ContentParent::AllocPMediaParent()
+{
+  return media::AllocPMediaParent();
+}
+
+bool
+ContentParent::DeallocPMediaParent(media::PMediaParent *aActor)
+{
+  return media::DeallocPMediaParent(aActor);
 }
 
 PStorageParent*
