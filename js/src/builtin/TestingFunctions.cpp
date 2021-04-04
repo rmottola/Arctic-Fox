@@ -1208,7 +1208,7 @@ DisableSPSProfiling(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-ReadSPSProfilingStack(JSContext *cx, unsigned argc, jsval *vp)
+ReadSPSProfilingStack(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setUndefined();
@@ -1378,7 +1378,7 @@ SetObjectMetadataCallback(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-GetObjectMetadata(JSContext *cx, unsigned argc, jsval *vp)
+GetObjectMetadata(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1 || !args[0].isObject()) {
@@ -1469,6 +1469,10 @@ bool
 js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 2) {
+        JS_ReportError(cx, "Expects only 2 arguments");
+        return false;
+    }
 
     // NOP when not in IonMonkey
     args.rval().setUndefined();
@@ -1751,10 +1755,6 @@ static bool
 Serialize(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    if (args.length() != 2) {
-        JS_ReportError(cx, "Expects only 2 arguments");
-        return false;
-    }
 
     JSAutoStructuredCloneBuffer clonebuf;
     if (!clonebuf.write(cx, args.get(0), args.get(1)))
