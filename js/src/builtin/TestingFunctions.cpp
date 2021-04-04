@@ -1876,6 +1876,7 @@ TimesAccessed(JSContext* cx, unsigned argc, jsval* vp)
     return true;
 }
 
+#ifdef JS_TRACE_LOGGING
 static bool
 EnableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 {
@@ -1897,6 +1898,7 @@ DisableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 
     return true;
 }
+#endif
 
 #ifdef DEBUG
 static bool
@@ -2978,6 +2980,7 @@ gc::ZealModeHelpText),
 "helperThreadCount()",
 "  Returns the number of helper threads available for off-main-thread tasks."),
 
+#ifdef JS_TRACE_LOGGING
     JS_FN_HELP("startTraceLogger", EnableTraceLogger, 0, 0,
 "startTraceLogger()",
 "  Start logging the mainThread.\n"
@@ -2987,6 +2990,7 @@ gc::ZealModeHelpText),
     JS_FN_HELP("stopTraceLogger", DisableTraceLogger, 0, 0,
 "stopTraceLogger()",
 "  Stop logging the mainThread."),
+#endif
 
     JS_FN_HELP("reportOutOfMemory", ReportOutOfMemory, 0, 0,
 "reportOutOfMemory()",
