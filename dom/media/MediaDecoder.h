@@ -509,7 +509,7 @@ public:
 
   // Called by the state machine to notify the decoder that the duration
   // has changed.
-  void DurationChanged(media::TimeUnit aNewDuration);
+  void DurationChanged();
 
   bool OnStateMachineTaskQueue() const override;
 
@@ -980,10 +980,19 @@ public:
   AbstractCanonical<media::NullableTimeUnit>* CanonicalEstimatedDuration() { return &mEstimatedDuration; }
 protected:
 
-  // Media duration set explicitly by JS. Currently, this is only ever present for MSE.
+  // Media duration set explicitly by JS. At present, this is only ever present
+  // for MSE.
   Canonical<Maybe<double>> mExplicitDuration;
   double ExplicitDuration() { return mExplicitDuration.Ref().ref(); }
-  void SetExplicitDuration(double aValue) { mExplicitDuration.Set(Some(aValue)); }
+  void SetExplicitDuration(double aValue)
+  {
+    mExplicitDuration.Set(Some(aValue));
+
+    // We Invoke DurationChanged explicitly, rather than using a watcher, so
+    // that it takes effect immediately, rather than at the end of the current task.
+    DurationChanged();
+  }
+
 public:
   AbstractCanonical<Maybe<double>>* CanonicalExplicitDuration() { return &mExplicitDuration; }
 protected:
@@ -1074,6 +1083,9 @@ protected:
   // True if audio tracks and video tracks are constructed and added into the
   // track list, false if all tracks are removed from the track list.
   bool mMediaTracksConstructed;
+
+  // True if we've already fired metadataloaded.
+  bool mFiredMetadataLoaded;
 
   // Stores media info, including info of audio tracks and video tracks, should
   // only be accessed from main thread.

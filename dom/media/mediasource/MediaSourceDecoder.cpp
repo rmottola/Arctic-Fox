@@ -238,7 +238,7 @@ MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalActio
   if (!mIsUsingFormatReader && GetReader()) {
     GetReader()->SetMediaSourceDuration(ExplicitDuration());
   }
-  MediaDecoder::DurationChanged(TimeUnit::FromSeconds(ExplicitDuration()));
+
   if (mMediaSource && aAction != MSRangeRemovalAction::SKIP) {
     mMediaSource->DurationChange(oldDuration, aDuration);
   }
