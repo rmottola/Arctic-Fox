@@ -785,7 +785,7 @@ AudioChannelService::WindowDestroyedEnumerator(AudioChannelAgent* aAgent,
   MOZ_ASSERT(data);
 
   nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aAgent->Window());
-  if (!window->IsInnerWindow()) {
+  if (window && !window->IsInnerWindow()) {
     window = window->GetCurrentInnerWindow();
   }
 
