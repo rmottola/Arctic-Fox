@@ -447,9 +447,11 @@ void MediaDecoderStateMachine::SendStreamData()
   bool finished =
       (!mInfo.HasAudio() || AudioQueue().IsFinished()) &&
       (!mInfo.HasVideo() || VideoQueue().IsFinished());
-  if (mDecoder->IsSameOriginMedia()) {
+
+  {
     SourceMediaStream* mediaStream = stream->mStream;
     StreamTime endPosition = 0;
+    const bool isSameOrigin = mDecoder->IsSameOriginMedia();
 
     if (!stream->mStreamInitialized) {
       if (mInfo.HasAudio()) {
@@ -486,6 +488,9 @@ void MediaDecoderStateMachine::SendStreamData()
       AudioSegment output;
       for (uint32_t i = 0; i < audio.Length(); ++i) {
         SendStreamAudio(audio[i], stream, &output);
+      }
+      if (!isSameOrigin) {
+        output.ReplaceWithDisabled();
       }
       // |mNextAudioTime| is updated as we process each audio sample in
       // SendStreamAudio(). This is consistent with how |mNextVideoTime|
@@ -548,6 +553,9 @@ void MediaDecoderStateMachine::SendStreamData()
           VERBOSE_LOG("skipping writing video frame %lldus (end %lldus) to MediaStream",
                       v->mTime, v->GetEndTime());
         }
+      }
+      if (!isSameOrigin) {
+        output.ReplaceWithDisabled();
       }
       if (output.GetDuration() > 0) {
         mediaStream->AppendToTrack(videoTrackId, &output);
