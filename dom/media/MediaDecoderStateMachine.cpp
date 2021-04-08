@@ -2355,7 +2355,6 @@ MediaDecoderStateMachine::FinishDecodeFirstFrame()
   // So we need to check if this has occurred, else our decode pipeline won't
   // run (since it doesn't need to) and we won't detect end of stream.
   CheckIfDecodeComplete();
-  MaybeStartPlayback();
 
   if (mQueuedSeek.Exists()) {
     mPendingSeek.Steal(mQueuedSeek);
@@ -2907,12 +2906,6 @@ void MediaDecoderStateMachine::UpdateRenderedVideoFrames()
       ScheduleStateMachineIn(USECS_PER_S);
       return;
     }
-  }
-
-  // We've got enough data to keep playing until at least the next frame.
-  // Start playing now if need be.
-  if ((mFragmentEndTime >= 0 && clock_time < mFragmentEndTime) || mFragmentEndTime < 0) {
-    MaybeStartPlayback();
   }
 
   // Cap the current time to the larger of the audio and video end time.
