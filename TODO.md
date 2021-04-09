@@ -153,6 +153,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
+- Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
+- Bug 1027560 - 2015-06-02 - Return false from document.execCommand() and friends wh
 - Bug 1167504 - Part 11: Clean up buffer binding constraints. r=jgilbert 
 - Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
