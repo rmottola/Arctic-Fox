@@ -115,7 +115,7 @@ public:
 
   virtual bool OnTaskQueue()
   {
-    return GetTaskQueue()->IsCurrentThreadIn();
+    return TaskQueue()->IsCurrentThreadIn();
   }
 
   // Resets all state related to decoding, emptying all buffers etc.
@@ -264,7 +264,7 @@ public:
   virtual bool IsMediaSeekable() = 0;
   void SetStartTime(int64_t aStartTime);
 
-  MediaTaskQueue* GetTaskQueue() {
+  MediaTaskQueue* TaskQueue() {
     return mTaskQueue;
   }
 

@@ -112,7 +112,7 @@ TrackBuffer::Shutdown()
   RefPtr<MediaTaskQueue> queue = mTaskQueue;
   mTaskQueue = nullptr;
   queue->BeginShutdown()
-       ->Then(mParentDecoder->GetReader()->GetTaskQueue(), __func__, this,
+       ->Then(mParentDecoder->GetReader()->TaskQueue(), __func__, this,
               &TrackBuffer::ContinueShutdown, &TrackBuffer::ContinueShutdown);
 
   return p;
@@ -124,7 +124,7 @@ TrackBuffer::ContinueShutdown()
   ReentrantMonitorAutoEnter mon(mParentDecoder->GetReentrantMonitor());
   if (mDecoders.Length()) {
     mDecoders[0]->GetReader()->Shutdown()
-                ->Then(mParentDecoder->GetReader()->GetTaskQueue(), __func__, this,
+                ->Then(mParentDecoder->GetReader()->TaskQueue(), __func__, this,
                        &TrackBuffer::ContinueShutdown, &TrackBuffer::ContinueShutdown);
     mShutdownDecoders.AppendElement(mDecoders[0]);
     mDecoders.RemoveElementAt(0);
@@ -288,7 +288,7 @@ TrackBuffer::NotifyTimeRangesChanged()
   RefPtr<nsIRunnable> task =
     NS_NewRunnableMethod(mParentDecoder->GetReader(),
                          &MediaSourceReader::NotifyTimeRangesChanged);
-  mParentDecoder->GetReader()->GetTaskQueue()->Dispatch(task.forget());
+  mParentDecoder->GetReader()->TaskQueue()->Dispatch(task.forget());
 }
 
 class DecoderSorter
@@ -580,7 +580,7 @@ TrackBuffer::NewDecoder(TimeUnit aTimestampOffset)
   mLastEndTimestamp.reset();
   mLastTimestampOffset = aTimestampOffset;
 
-  decoder->SetTaskQueue(decoder->GetReader()->GetTaskQueue());
+  decoder->SetTaskQueue(decoder->GetReader()->TaskQueue());
   return decoder.forget();
 }
 
@@ -596,7 +596,7 @@ TrackBuffer::QueueInitializeDecoder(SourceBufferDecoder* aDecoder)
                                                       &TrackBuffer::InitializeDecoder,
                                                       aDecoder);
   // We need to initialize the reader on its own task queue
-  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task.forget());
+  aDecoder->GetReader()->TaskQueue()->Dispatch(task.forget());
   return true;
 }
 
@@ -661,7 +661,7 @@ TrackBuffer::InitializeDecoder(SourceBufferDecoder* aDecoder)
     return;
   }
 
-  MOZ_ASSERT(aDecoder->GetReader()->GetTaskQueue()->IsCurrentThreadIn());
+  MOZ_ASSERT(aDecoder->GetReader()->OnTaskQueue());
 
   MediaDecoderReader* reader = aDecoder->GetReader();
 
@@ -697,7 +697,7 @@ TrackBuffer::InitializeDecoder(SourceBufferDecoder* aDecoder)
   }
 
   mMetadataRequest.Begin(promise
-                           ->Then(reader->GetTaskQueue(), __func__,
+                           ->Then(reader->TaskQueue(), __func__,
                                   recipient.get(),
                                   &MetadataRecipient::OnMetadataRead,
                                   &MetadataRecipient::OnMetadataNotRead));
@@ -708,7 +708,7 @@ TrackBuffer::OnMetadataRead(MetadataHolder* aMetadata,
                             SourceBufferDecoder* aDecoder,
                             bool aWasEnded)
 {
-  MOZ_ASSERT(aDecoder->GetReader()->GetTaskQueue()->IsCurrentThreadIn());
+  MOZ_ASSERT(aDecoder->GetReader()->OnTaskQueue());
 
   mParentDecoder->GetReentrantMonitor().AssertNotCurrentThreadIn();
   ReentrantMonitorAutoEnter mon(mParentDecoder->GetReentrantMonitor());
@@ -768,7 +768,7 @@ void
 TrackBuffer::OnMetadataNotRead(ReadMetadataFailureReason aReason,
                                SourceBufferDecoder* aDecoder)
 {
-  MOZ_ASSERT(aDecoder->GetReader()->GetTaskQueue()->IsCurrentThreadIn());
+  MOZ_ASSERT(aDecoder->GetReader()->TaskQueue()->IsCurrentThreadIn());
 
   mParentDecoder->GetReentrantMonitor().AssertNotCurrentThreadIn();
   ReentrantMonitorAutoEnter mon(mParentDecoder->GetReentrantMonitor());
@@ -1074,7 +1074,7 @@ TrackBuffer::RemoveDecoder(SourceBufferDecoder* aDecoder)
     mInitializedDecoders.RemoveElement(aDecoder);
     mDecoders.RemoveElement(aDecoder);
   }
-  aDecoder->GetReader()->GetTaskQueue()->Dispatch(task.forget());
+  aDecoder->GetReader()->TaskQueue()->Dispatch(task.forget());
 }
 
 nsRefPtr<TrackBuffer::RangeRemovalPromise>
