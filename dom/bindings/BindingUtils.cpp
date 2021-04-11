@@ -43,6 +43,7 @@
 #include "mozilla/dom/HTMLEmbedElementBinding.h"
 #include "mozilla/dom/HTMLAppletElementBinding.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/ResolveSystemBinding.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "WorkerPrivate.h"
 #include "nsDOMClassInfo.h"
@@ -2419,6 +2420,10 @@ bool
 ResolveGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj,
               JS::Handle<jsid> aId, bool* aResolvedp)
 {
+  MOZ_ASSERT(JS_IsGlobalObject(aObj),
+             "Should have a global here, since we plan to resolve standard "
+             "classes!");
+
   return JS_ResolveStandardClass(aCx, aObj, aId, aResolvedp);
 }
 
@@ -2431,6 +2436,10 @@ MayResolveGlobal(const JSAtomState& aNames, jsid aId, JSObject* aMaybeObj)
 bool
 EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj)
 {
+  MOZ_ASSERT(JS_IsGlobalObject(aObj),
+             "Should have a global here, since we plan to enumerate standard "
+             "classes!");
+
   return JS_EnumerateStandardClasses(aCx, aObj);
 }
 
@@ -2844,6 +2853,29 @@ UnwrapArgImpl(JS::Handle<JSObject*> src,
     // nsIPropertyBag. We must use AggregatedQueryInterface in cases where
     // there is an outer to avoid nasty recursion.
     return wrappedJS->QueryInterface(iid, ppArg);
+}
+
+bool
+SystemGlobalResolve(JSContext* cx, JS::Handle<JSObject*> obj,
+                    JS::Handle<jsid> id, bool* resolvedp)
+{
+  if (!ResolveGlobal(cx, obj, id, resolvedp)) {
+    return false;
+  }
+
+  if (*resolvedp) {
+    return true;
+  }
+
+  return ResolveSystemBinding(cx, obj, id, resolvedp);
+}
+
+bool
+SystemGlobalEnumerate(JSContext* cx, JS::Handle<JSObject*> obj)
+{
+  bool ignored = false;
+  return EnumerateGlobal(cx, obj) &&
+         ResolveSystemBinding(cx, obj, JSID_VOIDHANDLE, &ignored);
 }
 
 } // namespace dom
