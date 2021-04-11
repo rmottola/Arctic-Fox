@@ -1419,13 +1419,6 @@ void MediaDecoderStateMachine::RecomputeDuration()
   mDuration = Some(duration);
 }
 
-void MediaDecoderStateMachine::SetFragmentEndTime(int64_t aEndTime)
-{
-  AssertCurrentThreadInMonitor();
-
-  mFragmentEndTime = aEndTime < 0 ? aEndTime : aEndTime;
-}
-
 bool MediaDecoderStateMachine::IsDormantNeeded()
 {
   return mReader->IsDormantNeeded();
