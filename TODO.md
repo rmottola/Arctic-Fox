@@ -64,6 +64,8 @@
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- 1164427 - Implement elementsFromPoint (= Tests)
+- Bug 1230948 - Update web-platform-tests expected data to revision 63b
 - Bug 1160971 - 4 parts
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
@@ -161,17 +163,14 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1167356 - 2015-06-11
 - Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
 - Bug 1027560 - 2015-06-02 - Return false from document.execCommand() and friends wh
-- Bug 1167504 - Part 11: Clean up buffer binding constraints. r=jgilbert 
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 - Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
-- Bug 1167823 - arity side effects, 14 patches
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
 - 1184634 - Rename MediaTaskQueue to TaskQueue
 - 1184634 - Rename MediaPromise to MozPromise
-- 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1227567 - Optimise module namespace imports in Ion where we have
