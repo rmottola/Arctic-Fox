@@ -96,6 +96,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 930414 - 22 parts
 - Bug 1188347  - 5 parts
+- Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - Bug 1072313 - 2015-09-21 - Never call TextureClient::KeepUntilFullDeallocation off
@@ -112,6 +113,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1184429 - 2015-07-17 P1. & P2
+- Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
 - Bug 1184443 - Make async ExitFullscreen call ask the window to exi
 - Bug 1184201 - Disable fullscreen transition on Windows
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
@@ -133,6 +136,9 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 947854 - 2015-05-05 parto 0 to 4
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
+- Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
+- Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
+- Bug 1175768 - 2015-06-27 -  Use mirroring for buffered ranges. r=jya- 
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
@@ -156,7 +162,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
 - Bug 1027560 - 2015-06-02 - Return false from document.execCommand() and friends wh
 - Bug 1167504 - Part 11: Clean up buffer binding constraints. r=jgilbert 
-- Bug 1130028 - Custom elements, set registered prototype in compartmen
 - 1190496 - Hoist SharedThreadPool into xpcom.
 - Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 - Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
@@ -175,7 +180,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 
 
 impacting download and shutdown:
-Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
@@ -276,7 +280,7 @@ Check if NullPtr removal has any effects on our supported platforms. See: Bug 11
 -- consider non taken bugs for platforms we do support compared to TFF (and update list here)
 https://github.com/classilla/tenfourfox/issues/526
 
-## JS Sputink checks:
+## JS Sputnik checks:
 
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
