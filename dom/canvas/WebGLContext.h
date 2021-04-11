@@ -944,6 +944,8 @@ protected:
     WebGLRefPtr<WebGLBuffer>& GetBufferSlotByTargetIndexed(GLenum target,
                                                            GLuint index);
 
+    GLenum GetCurrentBinding(WebGLBuffer* buffer) const;
+
 // -----------------------------------------------------------------------------
 // Queries (WebGL2ContextQueries.cpp)
 protected:
@@ -1400,7 +1402,7 @@ private:
     virtual bool ValidateAttribPointerType(bool integerMode, GLenum type, GLsizei* alignment, const char* info) = 0;
     virtual bool ValidateBufferTarget(GLenum target, const char* info) = 0;
     virtual bool ValidateBufferIndexedTarget(GLenum target, const char* info) = 0;
-    virtual bool ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer, const char* info) = 0;
+    virtual bool ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer, const char* info);
     virtual bool ValidateBufferUsageEnum(GLenum usage, const char* info) = 0;
     virtual bool ValidateQueryTarget(GLenum usage, const char* info) = 0;
     virtual bool ValidateUniformMatrixTranspose(bool transpose, const char* info) = 0;
