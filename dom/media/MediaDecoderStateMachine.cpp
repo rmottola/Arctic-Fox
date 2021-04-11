@@ -2795,6 +2795,7 @@ int64_t MediaDecoderStateMachine::GetStreamClock() const
 
 int64_t MediaDecoderStateMachine::GetVideoStreamPosition() const
 {
+  MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
 
   if (!IsPlaying()) {
@@ -3153,6 +3154,7 @@ void MediaDecoderStateMachine::StartBuffering()
 
 void MediaDecoderStateMachine::SetPlayStartTime(const TimeStamp& aTimeStamp)
 {
+  MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   mPlayStartTime = aTimeStamp;
   if (!mAudioSink) {
