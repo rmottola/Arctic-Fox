@@ -510,7 +510,6 @@ WEBIDL_FILES = [
     'SVGViewElement.webidl',
     'SVGZoomAndPan.webidl',
     'SVGZoomEvent.webidl',
-    'SystemDictionaries.webidl',
     'SystemUpdate.webidl',
     'Telephony.webidl',
     'TelephonyCall.webidl',
