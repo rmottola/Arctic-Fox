@@ -537,6 +537,11 @@ var DebuggerServer = {
       constructor: "AnimationsActor",
       type: { tab: true }
     });
+    this.registerModule("devtools/server/actors/promises", {
+      prefix: "promises",
+      constructor: "PromisesActor",
+      type: { global: true, tab: true }
+    });
   },
 
   /**
