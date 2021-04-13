@@ -238,7 +238,7 @@ PopulateRegistrationData(nsIPrincipal* aPrincipal,
   MOZ_ASSERT(aPrincipal);
   MOZ_ASSERT(aRegistration);
 
-  if (NS_WARN_IF(!BasePrincipal::IsCodebasePrincipal(aPrincipal))) {
+  if (NS_WARN_IF(!BasePrincipal::Cast(aPrincipal)->IsCodebasePrincipal())) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1765,7 +1765,7 @@ public:
 
     nsTArray<nsRefPtr<ServiceWorkerRegistrationMainThread>> array;
 
-    if (NS_WARN_IF(!BasePrincipal::IsCodebasePrincipal(principal))) {
+    if (NS_WARN_IF(!BasePrincipal::Cast(principal)->IsCodebasePrincipal())) {
       return NS_OK;
     }
 
@@ -2796,7 +2796,7 @@ ServiceWorkerManager::PrincipalToScopeKey(nsIPrincipal* aPrincipal,
 {
   MOZ_ASSERT(aPrincipal);
 
-  if (NS_WARN_IF(!BasePrincipal::IsCodebasePrincipal(aPrincipal))) {
+  if (NS_WARN_IF(!BasePrincipal::Cast(aPrincipal)->IsCodebasePrincipal())) {
     return NS_ERROR_FAILURE;
   }
 
