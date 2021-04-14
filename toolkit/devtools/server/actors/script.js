@@ -5831,11 +5831,6 @@ function makeDebuggeeValueIfNeeded(obj, value) {
   return value;
 }
 
-function getInnerId(window) {
-  return window.QueryInterface(Ci.nsIInterfaceRequestor).
-                getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
-};
-
 const symbolProtoToString = Symbol.prototype.toString;
 
 function getSymbolName(symbol) {
