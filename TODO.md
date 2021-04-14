@@ -63,6 +63,7 @@
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
+- Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
@@ -203,6 +204,8 @@ Check with Roy Tam:
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
+# Patches that apply but break things:
+- Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
 
 What with LightweightThemeConsumer.jsm 
 
