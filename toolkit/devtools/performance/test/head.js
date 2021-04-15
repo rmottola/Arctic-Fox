@@ -570,3 +570,13 @@ function synthesizeProfileForTest(samples) {
     markers: []
   }, uniqueStacks);
 }
+
+/**
+* Forces cycle collection and GC, used in AudioNode destruction tests.
+*/
+function forceCC () {
+  info("Triggering GC/CC...");
+  SpecialPowers.DOMWindowUtils.cycleCollect();
+  SpecialPowers.DOMWindowUtils.garbageCollect();
+  SpecialPowers.DOMWindowUtils.garbageCollect();
+}
