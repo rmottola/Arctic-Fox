@@ -8,6 +8,7 @@ let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
 let {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
 const {DOMHelpers} = Cu.import("resource://gre/modules/devtools/DOMHelpers.jsm", {});
 const {Hosts} = require("devtools/framework/toolbox-hosts");
+const {defer} = require("sdk/core/promise");
 
 gDevTools.testing = true;
 SimpleTest.registerCleanupFunction(() => {
