@@ -94,7 +94,7 @@ exports.items = [
         {
           type: "boolean",
           name: "chrome",
-          get hidden() l10n.hiddenByChromePref(),
+          get hidden() gcli.hiddenByChromePref(),
           description: l10n.lookup("paintflashingChromeDesc"),
         }
       ]
@@ -122,7 +122,7 @@ exports.items = [
         {
           type: "boolean",
           name: "chrome",
-          get hidden() l10n.hiddenByChromePref(),
+          get hidden() gcli.hiddenByChromePref(),
           description: l10n.lookup("paintflashingChromeDesc"),
         }
       ]
