@@ -290,18 +290,23 @@ let WebConsoleUtils = {
         if ((desc = Object.getOwnPropertyDescriptor(aObject, aProp))) {
           break;
         }
-      }
-      catch (ex if (ex.name == "NS_ERROR_XPC_BAD_CONVERT_JS" ||
-                    ex.name == "NS_ERROR_XPC_BAD_OP_ON_WN_PROTO" ||
-                    ex.name == "TypeError")) {
+      } catch (ex) {
         // Native getters throw here. See bug 520882.
         // null throws TypeError.
+        if (ex.name != "NS_ERROR_XPC_BAD_CONVERT_JS" &&
+            ex.name != "NS_ERROR_XPC_BAD_OP_ON_WN_PROTO" &&
+            ex.name != "TypeError") {
+          throw ex;
+        }
       }
+
       try {
         aObject = Object.getPrototypeOf(aObject);
-      }
-      catch (ex if (ex.name == "TypeError")) {
-        return desc;
+      } catch (ex) {
+        if (ex.name == "TypeError") {
+          return desc;
+        }
+        throw ex;
       }
     }
     return desc;
@@ -1117,7 +1122,7 @@ function getExactMatch_impl(aObj, aName, {chainIterator, getProperty})
 
 
 let JSObjectSupport = {
-  chainIterator: function(aObj)
+  chainIterator: function*(aObj)
   {
     while (aObj) {
       yield aObj;
@@ -1138,7 +1143,7 @@ let JSObjectSupport = {
 };
 
 let DebuggerObjectSupport = {
-  chainIterator: function(aObj)
+  chainIterator: function*(aObj)
   {
     while (aObj) {
       yield aObj;
@@ -1159,7 +1164,7 @@ let DebuggerObjectSupport = {
 };
 
 let DebuggerEnvironmentSupport = {
-  chainIterator: function(aObj)
+  chainIterator: function*(aObj)
   {
     while (aObj) {
       yield aObj;

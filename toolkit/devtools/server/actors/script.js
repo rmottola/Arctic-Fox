@@ -496,10 +496,15 @@ ThreadActor.prototype = {
     return this.dbg.makeGlobalObjectReference(this._parent.window);
   },
 
-  get state() { return this._state; },
-  get attached() this.state == "attached" ||
-                 this.state == "running" ||
-                 this.state == "paused",
+  get state() {
+    return this._state;
+  },
+
+  get attached() {
+    return this.state == "attached" ||
+           this.state == "running" ||
+           this.state == "paused";
+  },
 
   get threadLifetimePool() {
     if (!this._threadLifetimePool) {
@@ -912,7 +917,7 @@ ThreadActor.prototype = {
     // binding in each _makeOnX method, just do it once here and pass it
     // in to each function.
     const steppingHookState = {
-      pauseAndRespond: (aFrame, onPacket=(k)=>k) => {
+      pauseAndRespond: (aFrame, onPacket=k=>k) => {
         return this._pauseAndRespond(aFrame, { type: "resumeLimit" }, onPacket);
       },
       createValueGrip: this.createValueGrip.bind(this),
@@ -1329,7 +1334,7 @@ ThreadActor.prototype = {
     }
 
     let res;
-    for each (let actorID in aRequest.actors) {
+    for (let actorID of aRequest.actors) {
       let actor = this.threadLifetimePool.get(actorID);
       if (!actor) {
         if (!res) {
@@ -1357,14 +1362,15 @@ ThreadActor.prototype = {
       }
     }
 
-    return all([this.sources.createSourceActors(script.source)
-                for (script of sourcesToScripts.values())]);
+    return all([...sourcesToScripts.values()].map(script => {
+      return this.sources.createSourceActors(script.source);
+    }));
   },
 
   onSources: function (aRequest) {
     return this._discoverSources().then(() => {
       return {
-        sources: [s.form() for (s of this.sources.iter())]
+        sources: this.sources.iter().map(s => s.form())
       };
     });
   },
@@ -1611,7 +1617,7 @@ ThreadActor.prototype = {
     let framePool = new ActorPool(this.conn);
     let frameList = [];
 
-    for each (let frameActor in this._frameActors) {
+    for (let frameActor of this._frameActors) {
       if (frameActor.frame.live) {
         framePool.addActor(frameActor);
         frameList.push(frameActor);
@@ -2446,7 +2452,7 @@ SourceActor.prototype = {
 
     function sortLines(lines) {
       // Converting the Set into an array
-      lines = [line for (line of lines)];
+      lines = [...lines];
       lines.sort((a, b) => {
         return a - b;
       });
@@ -4646,8 +4652,7 @@ FrameActor.prototype = {
       return [];
     }
 
-    return [this.threadActor.createValueGrip(arg)
-            for each (arg in this.frame.arguments)];
+    return this.frame.arguments.map(arg => this.threadActor.createValueGrip(arg));
   },
 
   /**
@@ -4921,8 +4926,10 @@ EnvironmentActor.prototype = {
     let parameterNames;
     if (this.obj.callee) {
       parameterNames = this.obj.callee.parameterNames;
+    } else {
+      parameterNames = [];
     }
-    for each (let name in parameterNames) {
+    for (let name of parameterNames) {
       let arg = {};
       let value = this.obj.getVariable(name);
 
@@ -4951,7 +4958,7 @@ EnvironmentActor.prototype = {
       bindings.arguments.push(arg);
     }
 
-    for each (let name in this.obj.names()) {
+    for (let name of this.obj.names()) {
       if (bindings.arguments.some(function exists(element) {
                                     return !!element[name];
                                   })) {
@@ -5010,10 +5017,14 @@ EnvironmentActor.prototype = {
 
     try {
       this.obj.setVariable(aRequest.name, aRequest.value);
-    } catch (e if e instanceof Debugger.DebuggeeWouldRun) {
+    } catch (e) {
+      if (e instanceof Debugger.DebuggeeWouldRun) {
         return { error: "threadWouldRun",
                  cause: e.cause ? e.cause : "setter",
                  message: "Assigning a value would cause the debuggee to run" };
+      } else {
+        throw e;
+      }
     }
     return { from: this.actorID };
   },

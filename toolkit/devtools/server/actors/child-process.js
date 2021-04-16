@@ -36,7 +36,9 @@ exports.ChildProcessActor = ChildProcessActor;
 ChildProcessActor.prototype = {
   actorPrefix: "process",
 
-  get isRootActor() true,
+  get isRootActor() {
+    return true;
+  },
 
   get exited() {
     return !this._contextPool;
