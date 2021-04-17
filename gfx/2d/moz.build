@@ -108,6 +108,12 @@ elif CONFIG['CPU_ARCH'].startswith('mips'):
             'convolverLS3.cpp',
         ]
 
+if CONFIG['HAVE_ALTIVEC']:
+    SOURCES += [
+        'BlurVMX.cpp',
+    ]
+    DEFINES['USE_VMX'] = True
+
 UNIFIED_SOURCES += [
     'Blur.cpp',
     'DataSourceSurface.cpp',
