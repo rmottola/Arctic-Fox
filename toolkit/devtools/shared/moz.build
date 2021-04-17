@@ -11,7 +11,9 @@ if CONFIG['MOZ_DEVTOOLS']:
     XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
 EXTRA_JS_MODULES.devtools.shared += [
-  'async-storage.js'
+  'async-storage.js',
+  'worker-helper.js',
+  'worker.js'
 ]
 
 if CONFIG['MOZ_DEVTOOLS']:
@@ -66,9 +68,7 @@ if CONFIG['MOZ_DEVTOOLS']:
 	'telemetry.js',
         'theme-switching.js',
         'theme.js',
-        'undo.js',
-        'worker-helper.js',
-        'worker.js',
+        'undo.js'
     ]
 
     EXTRA_JS_MODULES.devtools.shared.widgets += [
