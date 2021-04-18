@@ -5142,6 +5142,20 @@
     "n_buckets": "80 + 1",
     "description": "The time (in milliseconds) after showing a PopupNotification that the mainAction was first triggered"
   },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_ENUMPROPERTIES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'enumProperties' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_ENUMPROPERTIES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'enumProperties' request to go round trip."
+  },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
     "expires_in_version": "40",
     "kind": "enumerated",
