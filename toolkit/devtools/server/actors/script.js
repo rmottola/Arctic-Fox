@@ -461,6 +461,9 @@ ThreadActor.prototype = {
   },
 
   get globalDebugObject() {
+    if (!this._parent.window) {
+      return null;
+    }
     return this.dbg.makeGlobalObjectReference(this._parent.window);
   },
 
@@ -1675,7 +1678,8 @@ ThreadActor.prototype = {
         this.createEnvironmentActor(env, pool),
       promote: () => this.threadObjectGrip(actor),
       isThreadLifetimePool: () =>
-        actor.registeredPool !== this.threadLifetimePool
+        actor.registeredPool !== this.threadLifetimePool,
+      getGlobalDebugObject: () => this.globalDebugObject
     });
     aPool.addActor(actor);
     aPool.objectActors.set(aValue, actor);
