@@ -295,10 +295,10 @@ void loop(int32_t startIdx, int32_t endIdx,
           vector float reciprocal,
           int32_t y)
 {
-  int topLeftIndex = reinterpret_cast<uint32_t>(topLeftBase + startIdx) & 0xf ? 0 : 1;
-  int topRightIndex = reinterpret_cast<uint32_t>(topRightBase + startIdx) & 0xf ? 0 : 1;
-  int bottomRightIndex = reinterpret_cast<uint32_t>(bottomRightBase + startIdx) & 0xf ? 0 : 1;
-  int bottomLeftIndex = reinterpret_cast<uint32_t>(bottomLeftBase + startIdx) & 0xf ? 0 : 1;
+  int topLeftIndex = static_cast<int>(reinterpret_cast<uintptr_t>(topLeftBase + startIdx)) & 0xf ? 0 : 1;
+  int topRightIndex = static_cast<int>(reinterpret_cast<uintptr_t>(topRightBase + startIdx)) & 0xf ? 0 : 1;
+  int bottomRightIndex = static_cast<int>(reinterpret_cast<uintptr_t>(bottomRightBase + startIdx)) & 0xf ? 0 : 1;
+  int bottomLeftIndex = static_cast<int>(reinterpret_cast<uintptr_t>(bottomLeftBase + startIdx)) & 0xf ? 0 : 1;
 
   vector unsigned char topLeftMask = vec_lvsl(0, reinterpret_cast<unsigned char*>(topLeftBase + startIdx));
   vector unsigned int topLeftVector1 = vec_ld(0, topLeftBase + startIdx);
