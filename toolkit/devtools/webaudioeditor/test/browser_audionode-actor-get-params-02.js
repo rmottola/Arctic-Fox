@@ -35,7 +35,7 @@ function compare (actual, expected, type) {
       ok(expected[param](value), type + " has a passing value for " + param);
     }
     else {
-      ise(value, expected[param], type + " has correct default value and type for " + param);
+      is(value, expected[param], type + " has correct default value and type for " + param);
     }
   });
 

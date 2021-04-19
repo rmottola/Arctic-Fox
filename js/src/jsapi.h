@@ -4013,7 +4013,7 @@ namespace JS {
  */
 class MOZ_STACK_CLASS JS_PUBLIC_API(AutoSetAsyncStackForNewCalls)
 {
-    JSContext *cx;
+    JSContext* cx;
     RootedObject oldAsyncStack;
     RootedString oldAsyncCause;
 
@@ -4022,7 +4022,7 @@ class MOZ_STACK_CLASS JS_PUBLIC_API(AutoSetAsyncStackForNewCalls)
     // ambiguous whether that would clear any scheduled async stack and make the
     // normal stack reappear in the new call, or just keep the async stack
     // already scheduled for the new call, if any.
-    AutoSetAsyncStackForNewCalls(JSContext *cx, HandleObject stack,
+    AutoSetAsyncStackForNewCalls(JSContext* cx, HandleObject stack,
                                  HandleString asyncCause);
     ~AutoSetAsyncStackForNewCalls();
 };
