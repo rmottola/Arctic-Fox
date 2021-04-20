@@ -32,8 +32,9 @@ if '86' in CONFIG['OS_TEST']:
             use_sse1 = True
     else:
         use_sse1 = True
-elif CONFIG['HAVE_ALTIVEC']:
-    use_altivec = True
+elif 'ppc' in CONFIG['CPU_ARCH']:
+    if CONFIG['HAVE_ALTIVEC']:
+        use_altivec = False
 
 if use_sse1:
     SOURCES += ['transform-sse1.c']

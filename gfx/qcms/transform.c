@@ -51,6 +51,7 @@
 #include <asm/cputable.h>
 #include <link.h>
 
+#if (0) // disable dynamic AltiVec detection, we only support compile-time
 static inline qcms_bool have_altivec() {
 	static int available = -1;
 	int new_avail = 0;
@@ -111,6 +112,15 @@ static inline qcms_bool have_altivec() {
 #define have_altivec() false
 #endif
 #endif // (defined(__POWERPC__) || defined(__powerpc__))
+#endif // altivec detection disabled
+
+// compile-time AltiVec detection replacement
+#ifdef HAVE_ALTIVEC
+#warning qcms altivec support enabled
+#define have_altivec() true
+#else
+#define have_altivec() false
+#endif
 
 // Build a White point, primary chromas transfer matrix from RGB to CIE XYZ
 // This is just an approximation, I am not handling all the non-linear
@@ -1296,7 +1306,7 @@ qcms_transform* qcms_transform_create(
 #endif
 		    } else
 #endif
-#if (defined(__POWERPC__) || defined(__powerpc__) && !defined(__NO_FPRS__))
+#if HAVE_ALTIVEC
 		    if (have_altivec()) {
 			    if (in_type == QCMS_DATA_RGB_8)
 				    transform->transform_fn = qcms_transform_data_rgb_out_lut_altivec;
