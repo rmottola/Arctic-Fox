@@ -60,9 +60,32 @@ function frameScript() {
   }
 }
 
-function Assert_leq(a, b, msg) {
-  Assert.ok(a <= b, `${msg}: ${a} <= ${b}`);
-}
+// A variant of `Assert` that doesn't spam the logs
+// in case of success.
+let SilentAssert = {
+  equal: function(a, b, msg) {
+    if (a == b) {
+      return;
+    }
+    Assert.equal(a, b, msg);
+  },
+  notEqual: function(a, b, msg) {
+    if (a != b) {
+      return;
+    }
+    Assert.notEqual(a, b, msg);
+  },
+  ok: function(a, msg) {
+    if (a) {
+      return;
+    }
+    Assert.ok(a, msg);
+  },
+  leq: function(a, b, msg) {
+    this.ok(a <= b, `${msg}: ${a} <= ${b}`);
+  }
+};
+
 
 function monotinicity_tester(source, testName) {
   // In the background, check invariants:
@@ -118,9 +141,9 @@ function monotinicity_tester(source, testName) {
 
     // Sanity check on the process data.
     sanityCheck(previous.processData, snapshot.processData);
-    Assert.equal(snapshot.processData.isSystem, true);
-    Assert.equal(snapshot.processData.name, "<process>");
-    Assert.equal(snapshot.processData.addonId, "");
+    SilentAssert.equal(snapshot.processData.isSystem, true);
+    SilentAssert.equal(snapshot.processData.name, "<process>");
+    SilentAssert.equal(snapshot.processData.addonId, "");
     previous.procesData = snapshot.processData;
 
     // Sanity check on components data.
