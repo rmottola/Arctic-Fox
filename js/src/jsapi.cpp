@@ -369,12 +369,12 @@ IterPerformanceStats(JSContext* cx,
             continue;
         }
         js::AutoCompartment autoCompartment(cx, compartment);
-        PerformanceGroup* ownGroup = compartment->performanceMonitoring.getOwnGroup(cx);
+        mozilla::RefPtr<PerformanceGroup> ownGroup = compartment->performanceMonitoring.getOwnGroup();
         if (ownGroup->data.ticks == 0) {
             // Don't report compartments that have never been used.
             continue;
         }
-        PerformanceGroup* sharedGroup = compartment->performanceMonitoring.getSharedGroup(cx);
+        mozilla::RefPtr<PerformanceGroup> sharedGroup = compartment->performanceMonitoring.getSharedGroup(cx);
         if (!(*walker)(cx,
                        ownGroup->data, ownGroup->uid, &sharedGroup->uid,
                        closure)) {
@@ -384,7 +384,7 @@ IterPerformanceStats(JSContext* cx,
     }
 
     // Finally, report the process stats
-    *processStats = rt->stopwatch.performance;
+    *processStats = rt->stopwatch.performance.getOwnGroup()->data;
     return true;
 }
 
