@@ -3674,7 +3674,9 @@ class CompartmentCheckTracer : public JS::CallbackTracer
     void trace(void** thingp, JS::TraceKind kind) override;
 
   public:
-    explicit CompartmentCheckTracer(JSRuntime* rt) : JS::CallbackTracer(rt) {}
+    explicit CompartmentCheckTracer(JSRuntime* rt)
+      : JS::CallbackTracer(rt), src(nullptr), zone(nullptr), compartment(nullptr)
+    {}
 
     Cell* src;
     JS::TraceKind srcKind;
