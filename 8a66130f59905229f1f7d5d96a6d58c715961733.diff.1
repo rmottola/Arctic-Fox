@@ -1,0 +1,115 @@
+diff --git a/js/public/TraceableHashTable.h b/js/public/TraceableHashTable.h
+index a4d189c30d23..256e1f98f77e 100644
+--- a/js/public/TraceableHashTable.h
++++ b/js/public/TraceableHashTable.h
+@@ -9,11 +9,10 @@
+ 
+ #include "js/HashTable.h"
+ #include "js/RootingAPI.h"
++#include "js/TracingAPI.h"
+ 
+ namespace js {
+ 
+-template <typename> struct DefaultTracer;
+-
+ // A TraceableHashMap is a HashMap with an additional trace method that knows
+ // how to visit all keys and values in the table. HashMaps that contain GC
+ // pointers that must be traced to be kept alive will generally want to use
+@@ -176,12 +175,6 @@ class HandleBase<TraceableHashMap<A,B,C,D,E,F>>
+     const Map& extract() const { return *static_cast<const JS::Handle<Map>*>(this)->address(); }
+ };
+ 
+-// The default implementation of DefaultTracer will leave alone POD types.
+-template <typename T> struct DefaultTracer {
+-    static_assert(mozilla::IsPod<T>::value, "non-pod types must not be ignored");
+-    static void trace(JSTracer* trc, T* t, const char* name) {}
+-};
+-
+ } /* namespace js */
+ 
+ #endif /* gc_HashTable_h */
+diff --git a/js/public/TraceableVector.h b/js/public/TraceableVector.h
+index c9734f22927d..5d31254d0451 100644
+--- a/js/public/TraceableVector.h
++++ b/js/public/TraceableVector.h
+@@ -8,13 +8,13 @@
+ #define js_TraceableVector_h
+ 
+ #include "mozilla/Vector.h"
++
+ #include "js/RootingAPI.h"
++#include "js/TracingAPI.h"
+ #include "js/Vector.h"
+ 
+ namespace js {
+ 
+-template <typename> struct DefaultTracer;
+-
+ // A TraceableVector is a Vector with an additional trace method that knows how
+ // to visit all of the items stored in the Vector. For vectors that contain GC
+ // things, this is usually more convenient than manually iterating and marking
+diff --git a/js/public/TracingAPI.h b/js/public/TracingAPI.h
+index a09044fed737..e9ee438eedd1 100644
+--- a/js/public/TracingAPI.h
++++ b/js/public/TracingAPI.h
+@@ -259,6 +259,31 @@ JSTracer::asCallbackTracer()
+     return static_cast<JS::CallbackTracer*>(this);
+ }
+ 
++namespace js {
++
++// Automates static dispatch for tracing for TraceableContainers.
++template <typename, typename=void> struct DefaultTracer;
++
++// The default for POD, non-pointer types is to do nothing.
++template <typename T>
++struct DefaultTracer<T, typename mozilla::EnableIf<!mozilla::IsPointer<T>::value &&
++                                                   mozilla::IsPod<T>::value>::Type> {
++    static void trace(JSTracer* trc, T* t, const char* name) {
++        MOZ_ASSERT(mozilla::IsPod<T>::value);
++        MOZ_ASSERT(!mozilla::IsPointer<T>::value);
++    }
++};
++
++// The default for non-pod (e.g. struct) types is to call the trace method.
++template <typename T>
++struct DefaultTracer<T, typename mozilla::EnableIf<!mozilla::IsPod<T>::value>::Type> {
++    static void trace(JSTracer* trc, T* t, const char* name) {
++        t->trace(trc);
++    }
++};
++
++} // namespace js
++
+ // The JS_Call*Tracer family of functions traces the given GC thing reference.
+ // This performs the tracing action configured on the given JSTracer:
+ // typically calling the JSTracer::callback or marking the thing as live.
+diff --git a/js/src/ctypes/CTypes.h b/js/src/ctypes/CTypes.h
+index bca3ceef9098..7627834cbc24 100644
+--- a/js/src/ctypes/CTypes.h
++++ b/js/src/ctypes/CTypes.h
+@@ -236,6 +236,10 @@ struct FieldInfo
+   JS::Heap<JSObject*> mType;    // CType of the field
+   size_t              mIndex;   // index of the field in the struct (first is 0)
+   size_t              mOffset;  // offset of the field in the struct, in bytes
++
++  void trace(JSTracer* trc) {
++    JS_CallObjectTracer(trc, &mType, "fieldType");
++  }
+ };
+ 
+ struct UnbarrieredFieldInfo
+@@ -534,13 +538,6 @@ namespace UInt64 {
+ } // namespace UInt64
+ 
+ } // namespace ctypes
+-
+-template <> struct DefaultTracer<ctypes::FieldInfo> {
+-    static void trace(JSTracer* trc, ctypes::FieldInfo* t, const char* name) {
+-        JS_CallObjectTracer(trc, &t->mType, "fieldType");
+-    }
+-};
+-
+ } // namespace js
+ 
+ #endif /* ctypes_CTypes_h */
