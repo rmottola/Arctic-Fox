@@ -2496,7 +2496,7 @@ JS_New(JSContext *cx, JS::HandleObject ctor, const JS::HandleValueArray &args);
 /*** Property descriptors ************************************************************************/
 
 struct JSPropertyDescriptor {
-    JSObject *obj;
+    JSObject* obj;
     unsigned attrs;
     JSGetterOp getter;
     JSSetterOp setter;
