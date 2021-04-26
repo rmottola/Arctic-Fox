@@ -54,7 +54,7 @@ struct SavedFrame::Lookup {
         line(line),
         column(column),
         functionDisplayName(functionDisplayName),
-	asyncCause(asyncCause),
+        asyncCause(asyncCause),
         parent(parent),
         principals(principals)
     {
@@ -73,11 +73,11 @@ struct SavedFrame::Lookup {
         MOZ_ASSERT(source);
     }
 
-    JSAtom       *source;
+    JSAtom*      source;
     uint32_t     line;
     uint32_t     column;
     JSAtom*      functionDisplayName;
-    JSAtom       *asyncCause;
+    JSAtom*      asyncCause;
     SavedFrame*  parent;
     JSPrincipals* principals;
 
@@ -102,7 +102,7 @@ class MOZ_STACK_CLASS SavedFrame::AutoLookupVector : public JS::CustomAutoRooter
     { }
 
     typedef Vector<Lookup, 20> LookupVector;
-    inline LookupVector *operator->() { return &lookups; }
+    inline LookupVector* operator->() { return &lookups; }
     inline HandleLookup operator[](size_t i) { return HandleLookup(lookups[i]); }
 
   private:
@@ -153,7 +153,7 @@ SavedFrame::HashPolicy::match(SavedFrame* existing, const Lookup& lookup)
     if (functionDisplayName != lookup.functionDisplayName)
         return false;
 
-    JSAtom *asyncCause = existing->getAsyncCause();
+    JSAtom* asyncCause = existing->getAsyncCause();
     if (asyncCause != lookup.asyncCause)
         return false;
 
@@ -275,13 +275,13 @@ SavedFrame::getFunctionDisplayName()
     return &s->asAtom();
 }
 
-JSAtom *
+JSAtom*
 SavedFrame::getAsyncCause()
 {
-    const Value &v = getReservedSlot(JSSLOT_ASYNCCAUSE);
+    const Value& v = getReservedSlot(JSSLOT_ASYNCCAUSE);
     if (v.isNull())
         return nullptr;
-    JSString *s = v.toString();
+    JSString* s = v.toString();
     return &s->asAtom();
 }
 
@@ -393,7 +393,7 @@ GetFirstSubsumedSavedFrame(JSContext* cx, HandleObject savedFrame)
 }
 
 /* static */ bool
-SavedFrame::checkThis(JSContext *cx, CallArgs &args, const char *fnName,
+SavedFrame::checkThis(JSContext* cx, CallArgs& args, const char* fnName,
                       MutableHandleObject frame)
 {
     const Value& thisValue = args.thisv();
@@ -632,7 +632,7 @@ GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject 
 }
 
 JS_PUBLIC_API(bool)
-BuildStackString(JSContext *cx, HandleObject stack, MutableHandleString stringp)
+BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp)
 {
     js::StringBuffer sb(cx);
 
