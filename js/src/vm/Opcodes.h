@@ -683,7 +683,7 @@
      * Throws the indicated JSMSG.
      *
      *   Category: Statements
-     *   Type: Exceptions
+     *   Type: Exception Handling
      *   Operands: uint16_t msgNumber
      *   Stack: =>
      */ \
