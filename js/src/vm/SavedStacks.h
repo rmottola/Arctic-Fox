@@ -166,23 +166,23 @@ class SavedFrame : public NativeObject {
     static bool lineProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool columnProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool functionDisplayNameProperty(JSContext* cx, unsigned argc, Value* vp);
-    static bool asyncCauseProperty(JSContext *cx, unsigned argc, Value *vp);
-    static bool asyncParentProperty(JSContext *cx, unsigned argc, Value *vp);
+    static bool asyncCauseProperty(JSContext* cx, unsigned argc, Value* vp);
+    static bool asyncParentProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool parentProperty(JSContext* cx, unsigned argc, Value* vp);
     static bool toStringMethod(JSContext* cx, unsigned argc, Value* vp);
 
     // Convenient getters for SavedFrame's reserved slots for use from C++.
-    JSAtom       *getSource();
+    JSAtom*      getSource();
     uint32_t     getLine();
     uint32_t     getColumn();
-    JSAtom       *getFunctionDisplayName();
-    JSAtom       *getAsyncCause();
-    SavedFrame   *getParent();
-    JSPrincipals *getPrincipals();
+    JSAtom*      getFunctionDisplayName();
+    JSAtom*      getAsyncCause();
+    SavedFrame*  getParent();
+    JSPrincipals* getPrincipals();
 
     bool         isSelfHosted();
 
-    static bool isSavedFrameAndNotProto(JSObject &obj) {
+    static bool isSavedFrameAndNotProto(JSObject& obj) {
         return obj.is<SavedFrame>() &&
                !obj.as<SavedFrame>().getReservedSlot(JSSLOT_SOURCE).isNull();
     }
@@ -199,13 +199,13 @@ class SavedFrame : public NativeObject {
     class MOZ_STACK_CLASS HandleLookup {
         friend class AutoLookupVector;
 
-        Lookup &lookup;
+        Lookup& lookup;
 
-        explicit HandleLookup(Lookup &lookup) : lookup(lookup) { }
+        explicit HandleLookup(Lookup& lookup) : lookup(lookup) { }
 
       public:
-        inline Lookup &get() { return lookup; }
-        inline Lookup *operator->() { return &lookup; }
+        inline Lookup& get() { return lookup; }
+        inline Lookup* operator->() { return &lookup; }
     };
 
   private:
@@ -238,7 +238,7 @@ class SavedFrame : public NativeObject {
     bool parentMoved();
     void updatePrivateParent();
 
-    static bool checkThis(JSContext *cx, CallArgs &args, const char *fnName,
+    static bool checkThis(JSContext* cx, CallArgs& args, const char* fnName,
                           MutableHandleObject frame);
 };
 
@@ -296,9 +296,9 @@ class SavedStacks {
     // return a nullptr SavedFrame.
     struct MOZ_STACK_CLASS AutoReentrancyGuard {
         MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
-        SavedStacks &stacks;
+        SavedStacks& stacks;
 
-        explicit AutoReentrancyGuard(SavedStacks &stacks MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+        explicit AutoReentrancyGuard(SavedStacks& stacks MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
             : stacks(stacks)
         {
             MOZ_GUARD_OBJECT_NOTIFIER_INIT;
@@ -311,15 +311,15 @@ class SavedStacks {
         }
     };
 
-    bool       insertFrames(JSContext *cx, FrameIter &iter, MutableHandleSavedFrame frame,
+    bool       insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
                             unsigned maxFrameCount = 0);
-    bool       adoptAsyncStack(JSContext *cx, HandleSavedFrame asyncStack,
+    bool       adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
                                HandleString asyncCause,
                                MutableHandleSavedFrame adoptedStack,
                                unsigned maxFrameCount);
-    SavedFrame *getOrCreateSavedFrame(JSContext *cx, SavedFrame::HandleLookup lookup);
-    SavedFrame *createFrameFromLookup(JSContext *cx, SavedFrame::HandleLookup lookup);
-    void       chooseSamplingProbability(JSContext *cx);
+    SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
+    SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
+    void       chooseSamplingProbability(JSContext* cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 
