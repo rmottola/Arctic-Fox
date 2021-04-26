@@ -176,10 +176,10 @@ enum NewObjectKind {
 /* Type information about an object accessed by a script. */
 class ObjectGroup : public gc::TenuredCell
 {
-    friend void gc::MergeCompartments(JSCompartment *source, JSCompartment *target);
+    friend void gc::MergeCompartments(JSCompartment* source, JSCompartment* target);
 
     /* Class shared by objects in this group. */
-    const Class *clasp_;
+    const Class* clasp_;
 
     /* Prototype shared by objects in this group. */
     HeapPtrObject proto_;
@@ -319,7 +319,7 @@ class ObjectGroup : public gc::TenuredCell
         return nullptr;
     }
 
-    UnboxedLayout &unboxedLayoutDontCheckGeneration() const {
+    UnboxedLayout& unboxedLayoutDontCheckGeneration() const {
         MOZ_ASSERT(addendumKind() == Addendum_UnboxedLayout);
         return *maybeUnboxedLayoutDontCheckGeneration();
     }
