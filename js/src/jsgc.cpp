@@ -2598,6 +2598,7 @@ GCRuntime::updatePointersToRelocatedCells(Zone *zone)
         Debugger::markIncomingCrossCompartmentEdges(&trc);
 
         for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
+            c->trace(&trc);
             WeakMapBase::markAll(c, &trc);
             if (c->watchpointMap)
                 c->watchpointMap->markAll(&trc);
