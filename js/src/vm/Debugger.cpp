@@ -783,10 +783,8 @@ Debugger::wrapEnvironment(JSContext* cx, Handle<Env*> env, MutableHandleValue rv
             return false;
         envobj->setPrivateGCThing(env);
         envobj->setReservedSlot(JSSLOT_DEBUGENV_OWNER, ObjectValue(*object));
-        if (!p.add(cx, environments, env, envobj)) {
-            ReportOutOfMemory(cx);
+        if (!p.add(cx, environments, env, envobj))
             return false;
-        }
 
         CrossCompartmentKey key(CrossCompartmentKey::DebuggerEnvironment, object, env);
         if (!object->compartment()->putWrapper(cx, key, ObjectValue(*envobj))) {
@@ -827,10 +825,8 @@ Debugger::wrapDebuggeeValue(JSContext* cx, MutableHandleValue vp)
             dobj->setPrivateGCThing(obj);
             dobj->setReservedSlot(JSSLOT_DEBUGOBJECT_OWNER, ObjectValue(*object));
 
-            if (!p.add(cx, objects, obj, dobj)) {
-                ReportOutOfMemory(cx);
+            if (!p.add(cx, objects, obj, dobj))
                 return false;
-            }
 
             if (obj->compartment() != object->compartment()) {
                 CrossCompartmentKey key(CrossCompartmentKey::DebuggerObject, object, obj);
@@ -4428,10 +4424,8 @@ Debugger::wrapScript(JSContext* cx, HandleScript script)
         if (!scriptobj)
             return nullptr;
 
-        if (!p.add(cx, scripts, script, scriptobj)) {
-            ReportOutOfMemory(cx);
+        if (!p.add(cx, scripts, script, scriptobj))
             return nullptr;
-        }
 
         CrossCompartmentKey key(CrossCompartmentKey::DebuggerScript, object, script);
         if (!object->compartment()->putWrapper(cx, key, ObjectValue(*scriptobj))) {
@@ -5449,10 +5443,8 @@ Debugger::wrapSource(JSContext* cx, HandleScriptSource source)
         if (!sourceobj)
             return nullptr;
 
-        if (!p.add(cx, sources, source, sourceobj)) {
-            ReportOutOfMemory(cx);
+        if (!p.add(cx, sources, source, sourceobj))
             return nullptr;
-        }
 
         CrossCompartmentKey key(CrossCompartmentKey::DebuggerSource, object, source);
         if (!object->compartment()->putWrapper(cx, key, ObjectValue(*sourceobj))) {
