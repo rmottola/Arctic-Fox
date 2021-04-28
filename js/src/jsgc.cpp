@@ -1393,6 +1393,8 @@ GCRuntime::setParameter(JSGCParamKey key, uint32_t value)
     switch (key) {
       case JSGC_MAX_MALLOC_BYTES:
         setMaxMallocBytes(value);
+        for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next())
+            zone->setGCMaxMallocBytes(maxMallocBytesAllocated() * 0.9);
         break;
       case JSGC_SLICE_TIME_BUDGET:
         sliceBudget = value ? value : SliceBudget::Unlimited;
@@ -1414,6 +1416,10 @@ GCRuntime::setParameter(JSGCParamKey key, uint32_t value)
         break;
       default:
         tunables.setParameter(key, value);
+        for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next()) {
+            zone->threshold.updateAfterGC(zone->usage.gcBytes(), GC_NORMAL, tunables,
+                                         schedulingState);
+        }
     }
 }
 
