@@ -6107,7 +6107,7 @@ GCRuntime::collect(bool incremental, SliceBudget budget, JS::gcreason::Reason re
     JS_AbortIfWrongThread(rt);
 
     /* If we attempt to invoke the GC while we are running in the GC, assert. */
-    MOZ_ALWAYS_TRUE(!rt->isHeapBusy());
+    MOZ_RELEASE_ASSERT(!rt->isHeapBusy());
 
     /* The engine never locks across anything that could GC. */
     MOZ_ASSERT(!rt->currentThreadHasExclusiveAccess());
@@ -6234,7 +6234,7 @@ GCRuntime::abortGC()
 {
     JS_AbortIfWrongThread(rt);
 
-    MOZ_ALWAYS_TRUE(!rt->isHeapBusy());
+    MOZ_RELEASE_ASSERT(!rt->isHeapBusy());
     MOZ_ASSERT(!rt->currentThreadHasExclusiveAccess());
     MOZ_ASSERT(!rt->mainThread.suppressGC);
 
