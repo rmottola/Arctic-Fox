@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 import logging
 import os
@@ -451,6 +451,7 @@ class RecursiveMakeBackend(CommonBackend):
                 '.m': 'CMSRCS',
                 '.mm': 'CMMSRCS',
                 '.cpp': 'CPPSRCS',
+                '.rs': 'RSSRCS',
                 '.S': 'SSRCS',
             }
             variables = [suffix_map[obj.canonical_suffix]]
@@ -495,6 +496,7 @@ class RecursiveMakeBackend(CommonBackend):
             backend_file.write('GENERATED_FILES += %s\n' % obj.output)
             if obj.script:
                 backend_file.write("""{output}: {script}{inputs}
+\t$(REPORT_BUILD)
 \t$(call py_action,file_generate,{script} {method} {output}{inputs})
 
 """.format(output=obj.output,
@@ -507,7 +509,7 @@ class RecursiveMakeBackend(CommonBackend):
 
         elif isinstance(obj, Resources):
             self._process_resources(obj, obj.resources, backend_file)
-        
+
         elif isinstance(obj, BrandingFiles):
             self._process_branding_files(obj, obj.files, backend_file)
 
@@ -722,6 +724,10 @@ class RecursiveMakeBackend(CommonBackend):
             rule.add_dependencies(['$(CURDIR)/%: %'])
 
     def _check_blacklisted_variables(self, makefile_in, makefile_content):
+        if b'EXTERNALLY_MANAGED_MAKE_FILE' in makefile_content:
+            # Bypass the variable restrictions for externally managed makefiles.
+            return
+
         for x in MOZBUILD_VARIABLES:
             if re.search(r'^[^#]*\b%s\s*[:?+]?=' % x, makefile_content, re.M):
                 raise Exception('Variable %s is defined in %s. It should '
