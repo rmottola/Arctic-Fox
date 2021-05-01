@@ -317,7 +317,7 @@ NON_DIST_FILES = \
   classes.dex \
   $(NULL)
 
-UPLOAD_EXTRA_FILES += goanna-unsigned-unaligned.apk
+UPLOAD_EXTRA_FILES += gecko-unsigned-unaligned.apk
 
 DIST_FILES += $(MOZ_CHILD_PROCESS_NAME)
 
@@ -328,9 +328,9 @@ INNER_ROBOCOP_PACKAGE=echo
 ifeq ($(MOZ_BUILD_APP),mobile/android)
 UPLOAD_EXTRA_FILES += robocop.apk
 UPLOAD_EXTRA_FILES += fennec_ids.txt
-UPLOAD_EXTRA_FILES += goannaview_library/goannaview_library.zip
-UPLOAD_EXTRA_FILES += goannaview_library/goannaview_assets.zip
-UPLOAD_EXTRA_FILES += ../embedding/android/goannaview_example/goannaview_example.apk
+UPLOAD_EXTRA_FILES += geckoview_library/geckoview_library.zip
+UPLOAD_EXTRA_FILES += geckoview_library/geckoview_assets.zip
+UPLOAD_EXTRA_FILES += ../embedding/android/geckoview_example/geckoview_example.apk
 
 # Robocop/Robotium tests, Android Background tests, and Fennec need to
 # be signed with the same key, which means release signing them all.
@@ -347,13 +347,13 @@ else
 INNER_ROBOCOP_PACKAGE=echo 'Testing is disabled - No Android Robocop for you'
 endif
 
-# Create goannaview_library/goannaview_{assets,library}.zip for third-party GeckoView consumers.
+# Create geckoview_library/geckoview_{assets,library}.zip for third-party GeckoView consumers.
 ifdef NIGHTLY_BUILD
 ifndef MOZ_DISABLE_GECKOVIEW
 INNER_MAKE_GECKOVIEW_LIBRARY= \
-  $(MAKE) -C ../mobile/android/goannaview_library package
+  $(MAKE) -C ../mobile/android/geckoview_library package
 INNER_MAKE_GECKOVIEW_EXAMPLE= \
-	$(MAKE) -C ../embedding/android/goannaview_example package
+	$(MAKE) -C ../embedding/android/geckoview_example package
 else
 INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GeckoView library packaging is disabled'
 INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GeckoView example packaging is disabled'
@@ -363,29 +363,29 @@ INNER_MAKE_GECKOVIEW_LIBRARY=echo 'GeckoView library packaging is only enabled o
 INNER_MAKE_GECKOVIEW_EXAMPLE=echo 'GeckoView example packaging is only enabled on Nightly'
 endif
 
-# Create goannalibs Android ARchive and metadata for download by local
+# Create geckolibs Android ARchive and metadata for download by local
 # developers using Gradle.
 ifdef MOZ_ANDROID_GECKOLIBS_AAR
-goannalibs-revision := $(BUILDID)
+geckolibs-revision := $(BUILDID)
 
 UPLOAD_EXTRA_FILES += \
-  goannalibs-$(goannalibs-revision).aar \
-  goannalibs-$(goannalibs-revision).aar.sha1 \
-  goannalibs-$(goannalibs-revision).pom \
-  goannalibs-$(goannalibs-revision).pom.sha1 \
-  ivy-goannalibs-$(goannalibs-revision).xml \
-  ivy-goannalibs-$(goannalibs-revision).xml.sha1 \
+  geckolibs-$(geckolibs-revision).aar \
+  geckolibs-$(geckolibs-revision).aar.sha1 \
+  geckolibs-$(geckolibs-revision).pom \
+  geckolibs-$(geckolibs-revision).pom.sha1 \
+  ivy-geckolibs-$(geckolibs-revision).xml \
+  ivy-geckolibs-$(geckolibs-revision).xml.sha1 \
   $(NULL)
 
 INNER_MAKE_GECKOLIBS_AAR= \
-  $(PYTHON) -m mozbuild.action.package_goannalibs_aar \
+  $(PYTHON) -m mozbuild.action.package_geckolibs_aar \
     --verbose \
-    --revision $(goannalibs-revision) \
+    --revision $(geckolibs-revision) \
     --topsrcdir '$(topsrcdir)' \
     --distdir '$(_ABS_DIST)' \
     '$(_ABS_DIST)'
 else
-INNER_MAKE_GECKOLIBS_AAR=echo 'Android goannalibs.aar packaging is disabled'
+INNER_MAKE_GECKOLIBS_AAR=echo 'Android geckolibs.aar packaging is disabled'
 endif
 
 ifdef MOZ_OMX_PLUGIN
@@ -444,25 +444,25 @@ OMNIJAR_NAME := $(notdir $(OMNIJAR_NAME))
 PKG_SUFFIX      = .apk
 INNER_MAKE_PACKAGE	= \
   $(if $(ALREADY_SZIPPED),,$(foreach lib,$(SZIP_LIBRARIES),host/bin/szip $(MOZ_SZIP_FLAGS) $(STAGEPATH)$(MOZ_PKG_DIR)$(_BINPATH)/$(lib) && )) \
-  make -C $(GECKO_APP_AP_PATH) goanna-nodeps.ap_ && \
-  cp $(GECKO_APP_AP_PATH)/goanna-nodeps.ap_ $(_ABS_DIST)/goanna.ap_ && \
+  make -C $(GECKO_APP_AP_PATH) gecko-nodeps.ap_ && \
+  cp $(GECKO_APP_AP_PATH)/gecko-nodeps.ap_ $(_ABS_DIST)/gecko.ap_ && \
   ( (test ! -f $(GECKO_APP_AP_PATH)/R.txt && echo "*** Warning: The R.txt that is being packaged might not agree with the R.txt that was built. This is normal during l10n repacks.") || \
-    diff $(GECKO_APP_AP_PATH)/R.txt $(GECKO_APP_AP_PATH)/goanna-nodeps/R.txt >/dev/null || \
+    diff $(GECKO_APP_AP_PATH)/R.txt $(GECKO_APP_AP_PATH)/gecko-nodeps/R.txt >/dev/null || \
     (echo "*** Error: The R.txt that was built and the R.txt that is being packaged are not the same. Rebuild mobile/android/base and re-package." && exit 1)) && \
   ( cd $(STAGEPATH)$(MOZ_PKG_DIR)$(_BINPATH) && \
-    unzip -o $(_ABS_DIST)/goanna.ap_ && \
-    rm $(_ABS_DIST)/goanna.ap_ && \
-    $(ZIP) $(if $(MOZ_ENABLE_SZIP),-0 )$(_ABS_DIST)/goanna.ap_ $(ASSET_SO_LIBRARIES) && \
-    $(ZIP) -r9D $(_ABS_DIST)/goanna.ap_ $(DIST_FILES) -x $(NON_DIST_FILES) $(SZIP_LIBRARIES) && \
+    unzip -o $(_ABS_DIST)/gecko.ap_ && \
+    rm $(_ABS_DIST)/gecko.ap_ && \
+    $(ZIP) $(if $(MOZ_ENABLE_SZIP),-0 )$(_ABS_DIST)/gecko.ap_ $(ASSET_SO_LIBRARIES) && \
+    $(ZIP) -r9D $(_ABS_DIST)/gecko.ap_ $(DIST_FILES) -x $(NON_DIST_FILES) $(SZIP_LIBRARIES) && \
     $(if $(filter-out ./,$(OMNIJAR_DIR)), \
       mkdir -p $(OMNIJAR_DIR) && mv $(OMNIJAR_NAME) $(OMNIJAR_DIR) && ) \
-    $(ZIP) -0 $(_ABS_DIST)/goanna.ap_ $(OMNIJAR_DIR)$(OMNIJAR_NAME)) && \
-  rm -f $(_ABS_DIST)/goanna.apk && \
-  cp $(_ABS_DIST)/goanna.ap_ $(_ABS_DIST)/goanna.apk && \
-  $(ZIP) -j0 $(_ABS_DIST)/goanna.apk $(STAGEPATH)$(MOZ_PKG_DIR)$(_BINPATH)/classes.dex && \
-  cp $(_ABS_DIST)/goanna.apk $(_ABS_DIST)/goanna-unsigned-unaligned.apk && \
-  $(RELEASE_JARSIGNER) $(_ABS_DIST)/goanna.apk && \
-  $(ZIPALIGN) -f -v 4 $(_ABS_DIST)/goanna.apk $(PACKAGE) && \
+    $(ZIP) -0 $(_ABS_DIST)/gecko.ap_ $(OMNIJAR_DIR)$(OMNIJAR_NAME)) && \
+  rm -f $(_ABS_DIST)/gecko.apk && \
+  cp $(_ABS_DIST)/gecko.ap_ $(_ABS_DIST)/gecko.apk && \
+  $(ZIP) -j0 $(_ABS_DIST)/gecko.apk $(STAGEPATH)$(MOZ_PKG_DIR)$(_BINPATH)/classes.dex && \
+  cp $(_ABS_DIST)/gecko.apk $(_ABS_DIST)/gecko-unsigned-unaligned.apk && \
+  $(RELEASE_JARSIGNER) $(_ABS_DIST)/gecko.apk && \
+  $(ZIPALIGN) -f -v 4 $(_ABS_DIST)/gecko.apk $(PACKAGE) && \
   $(INNER_ROBOCOP_PACKAGE) && \
   $(INNER_MAKE_GECKOLIBS_AAR) && \
   $(INNER_MAKE_GECKOVIEW_LIBRARY) && \
