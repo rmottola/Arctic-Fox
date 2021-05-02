@@ -113,6 +113,10 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1190669 - 4 parts
 - Bug 1191112 - 3 parts
 - Bug 1186384 - Consider device pixel scale on fullscreen transition wi
+- Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
+- Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
+- bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
+- Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
@@ -163,9 +167,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
 - Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
-- Bug 1027560 - 2015-06-02 - Return false from document.execCommand() and friends wh
 - 1190496 - Hoist SharedThreadPool into xpcom.
-- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 - Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
@@ -206,6 +208,7 @@ Check with Roy Tam:
 
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
+- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 
 What with LightweightThemeConsumer.jsm 
 
