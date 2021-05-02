@@ -39,7 +39,6 @@ from mozbuild.util import (
     EmptyValue,
     memoize,
     ReadOnlyDefaultDict,
-    ReadOnlyDict,
 )
 
 from mozbuild.backend.configenvironment import ConfigEnvironment
@@ -53,6 +52,7 @@ from .data import (
 )
 
 from .sandbox import (
+    default_finder,
     SandboxError,
     SandboxExecutionError,
     SandboxLoadError,
@@ -174,10 +174,10 @@ class MozbuildSandbox(Sandbox):
     metadata is a dict of metadata that can be used during the sandbox
     evaluation.
     """
-    def __init__(self, context, metadata={}):
+    def __init__(self, context, metadata={}, finder=default_finder):
         assert isinstance(context, Context)
 
-        Sandbox.__init__(self, context)
+        Sandbox.__init__(self, context, finder=finder)
 
         self._log = logging.getLogger(__name__)
 
@@ -393,7 +393,8 @@ class MozbuildSandbox(Sandbox):
                 'special_variables': self.metadata.get('special_variables', {}),
                 'subcontexts': self.metadata.get('subcontexts', {}),
                 'templates': self.metadata.get('templates', {})
-            })
+            }, finder=self._finder)
+
             template.exec_in_sandbox(sandbox, *args, **kwargs)
 
             # This is gross, but allows the merge to happen. Eventually, the
@@ -855,12 +856,13 @@ class BuildReader(object):
     each sandbox evaluation. Its return value is ignored.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, finder=default_finder):
         self.config = config
 
         self._log = logging.getLogger(__name__)
         self._read_files = set()
         self._execution_stack = []
+        self._finder = finder
 
     def read_topsrcdir(self):
         """Read the tree of linked moz.build files.
@@ -1093,7 +1095,8 @@ class BuildReader(object):
             config.external_source_dir = None
 
         context = Context(VARIABLES, config)
-        sandbox = MozbuildSandbox(context, metadata=metadata)
+        sandbox = MozbuildSandbox(context, metadata=metadata,
+                                  finder=self._finder)
         sandbox.exec_file(path)
         context.execution_time = time.time() - time_start
 
@@ -1129,7 +1132,7 @@ class BuildReader(object):
             non_unified_sources = set()
             for s in gyp_dir.non_unified_sources:
                 source = SourcePath(context, s)
-                if not os.path.exists(source.full_path):
+                if not self._finder.get(source.full_path):
                     raise SandboxValidationError('Cannot find %s.' % source,
                         context)
                 non_unified_sources.add(source)
@@ -1217,7 +1220,7 @@ class BuildReader(object):
 
         @memoize
         def exists(path):
-            return os.path.exists(path)
+            return self._finder.get(path) is not None
 
         def itermozbuild(path):
             subpath = ''
