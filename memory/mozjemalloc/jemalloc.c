@@ -1546,6 +1546,12 @@ void	(*_malloc_message)(const char *p1, const char *p2, const char *p3,
 // Note: MozTaggedAnonymousMmap() could call an LD_PRELOADed mmap
 // instead of the one defined here; use only MozTagAnonymousMemory().
 
+#ifdef MOZ_MEMORY_ANDROID
+// Android's pthread.h does not declare pthread_atfork() until SDK 21.
+extern MOZ_EXPORT
+int pthread_atfork(void (*)(void), void (*)(void), void(*)(void));
+#endif
+
 /* RELEASE_ASSERT calls jemalloc_crash() instead of calling MOZ_CRASH()
  * directly because we want crashing to add a frame to the stack.  This makes
  * it easier to find the failing assertion in crash stacks. */
