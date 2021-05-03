@@ -26,7 +26,8 @@ namespace serviceWorkerScriptCache {
 namespace {
 
 already_AddRefed<CacheStorage>
-CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv)
+CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv,
+                   nsIXPConnectJSObjectHolder** aHolder = nullptr)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aPrincipal);
@@ -47,6 +48,10 @@ CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv)
   if (!sandboxGlobalObject) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
+  }
+
+  if (aHolder) {
+    sandbox.forget(aHolder);
   }
 
   return CacheStorage::CreateOnMainThread(cache::CHROME_ONLY_NAMESPACE,
@@ -297,7 +302,7 @@ public:
     // Always create a CacheStorage since we want to write the network entry to
     // the cache even if there isn't an existing one.
     ErrorResult result;
-    mCacheStorage = CreateCacheStorage(aPrincipal, result);
+    mCacheStorage = CreateCacheStorage(aPrincipal, result, getter_AddRefs(mSandbox));
     if (NS_WARN_IF(result.Failed())) {
       MOZ_ASSERT(!result.IsErrorWithMessage());
       return result.StealNSResult();
@@ -598,6 +603,7 @@ private:
   }
 
   nsRefPtr<CompareCallback> mCallback;
+  nsCOMPtr<nsIXPConnectJSObjectHolder> mSandbox;
   nsRefPtr<CacheStorage> mCacheStorage;
 
   nsRefPtr<CompareNetwork> mCN;
