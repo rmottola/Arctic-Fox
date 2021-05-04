@@ -1401,7 +1401,7 @@ ServiceWorkerManager::Register(nsIDOMWindow* aWindow,
   bool serviceWorkersTestingEnabled =
     outerWindow->GetServiceWorkersTestingEnabled();
 
-  nsCOMPtr<nsIURI> documentURI = doc->GetBaseURI();
+  nsCOMPtr<nsIURI> documentURI = doc->GetDocumentURI();
 
   bool authenticatedOrigin = false;
   if (Preferences::GetBool("dom.serviceWorkers.testing.enabled") ||
