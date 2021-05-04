@@ -1254,6 +1254,11 @@ pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 pref("view_source.tab", true);
 
+// Enable Service Workers for desktop on non-release builds
+#ifndef RELEASE_BUILD
+pref("dom.serviceWorkers.enabled", true);
+#endif
+
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
