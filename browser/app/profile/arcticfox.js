@@ -1257,6 +1257,7 @@ pref("view_source.tab", true);
 // Enable Service Workers for desktop on non-release builds
 #ifndef RELEASE_BUILD
 pref("dom.serviceWorkers.enabled", true);
+pref("dom.serviceWorkers.interception.enabled", true);
 #endif
 
 // Disable reader mode by default.
