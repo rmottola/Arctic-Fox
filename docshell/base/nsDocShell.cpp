@@ -9628,33 +9628,7 @@ nsDocShell::CreatePrincipalFromReferrer(nsIURI* aReferrer,
   NS_ENSURE_SUCCESS(rv, rv);
   return NS_OK;
 }
-/* XXX
-NS_IMETHODIMP
-nsDocShell::InternalLoad(nsIURI* aURI,
-                         nsIURI* aReferrer,
-                         uint32_t aReferrerPolicy,
-                         nsISupports* aOwner,
-                         uint32_t aFlags,
-                         const char16_t* aWindowTarget,
-                         const char* aTypeHint,
-                         const nsAString& aFileName,
-                         nsIInputStream* aPostData,
-                         nsIInputStream* aHeadersData,
-                         uint32_t aLoadType,
-                         nsISHEntry* aSHEntry,
-                         bool aFirstParty,
-                         const nsAString& aSrcdoc,
-                         nsIDocShell* aSourceDocShell,
-                         nsIURI* aBaseURI,
-                         nsIDocShell** aDocShell,
-                         nsIRequest** aRequest)
-{
-  return InternalLoad2(aURI, nullptr, false, false, aReferrer, aReferrerPolicy, aOwner,
-                       aFlags, aWindowTarget, aTypeHint, aFileName, aPostData,
-                       aHeadersData, aLoadType, aSHEntry, aFirstParty, aSrcdoc,
-                       aSourceDocShell, aBaseURI, aDocShell, aRequest);
-}
-*/
+
 NS_IMETHODIMP
 nsDocShell::InternalLoad(nsIURI* aURI,
                          nsIURI* aOriginalURI,
