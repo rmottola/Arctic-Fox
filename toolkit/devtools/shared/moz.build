@@ -51,6 +51,7 @@ if CONFIG['MOZ_DEVTOOLS']:
     EXTRA_JS_MODULES.devtools.shared.timeline += [
         'timeline/global.js',
         'timeline/marker-details.js',
+        'timeline/marker-utils.js',
         'timeline/markers-overview.js',
         'timeline/waterfall.js',
     ]
