@@ -981,7 +981,7 @@ private:
   // True if recording profiles.
   bool mProfileTimelineRecording;
 
-  nsTArray<TimelineMarker*> mProfileTimelineMarkers;
+  nsTArray<mozilla::UniquePtr<TimelineMarker>> mProfileTimelineMarkers;
 
   // Get rid of all the timeline markers accumulated so far
   void ClearProfileTimelineMarkers();
