@@ -18,7 +18,7 @@ Services.prefs.setBoolPref("devtools.timeline.enabled", true);
 let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 let { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 let { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
-let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
+let { gDevTools } = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
 let { devtools } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 let TargetFactory = devtools.TargetFactory;
