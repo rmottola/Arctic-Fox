@@ -13,6 +13,8 @@
 - 1472018 - Limit the lock scope in WebCryptoThreadPool::Shutdown.
 - Bug 1464751 2018-05-28 If there is no JIT, there should be no JIT signal handlers
 - 1469309 - Remove an unused sensor type
+- Bug 1443943 Allow internal callers of performance.now() to opt-out of
+- Bug 1443943 - 2018-03-09 - Port the performance APIs only to only clamping/jittering
 - Bug 1420092 -2017-11-23 - Don't always enable mozjemalloc by default when building the js engine. r=njn
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
@@ -48,6 +50,7 @@
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
 - 1114580 - toStringTag - several diffs still to analyze
+- Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
