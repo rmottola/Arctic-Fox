@@ -91,8 +91,6 @@ public:
   Seek(int64_t aTime, int64_t aEndTime) override;
 
   virtual media::TimeIntervals GetBuffered() override;
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength,
-                                 int64_t aOffset) override;
   virtual int64_t GetEvictionOffset(double aTime) override;
 
   virtual bool IsMediaSeekable() override;
@@ -122,6 +120,9 @@ public:
   uint64_t GetCodecDelay() { return mCodecDelay; }
 
 protected:
+
+  virtual void NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset) override;
+
   // Decode a nestegg packet of audio data. Push the audio data on the
   // audio queue. Returns true when there's more audio to decode,
   // false if the audio is finished, end of file has been reached,
