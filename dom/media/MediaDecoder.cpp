@@ -1104,6 +1104,8 @@ void MediaDecoder::DurationChanged()
 
 void MediaDecoder::UpdateEstimatedMediaDuration(int64_t aDuration)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   if (mPlayState <= PLAY_STATE_LOADING) {
     return;
   }
