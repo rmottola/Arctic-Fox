@@ -22,7 +22,6 @@ class Image;
 class ImageContainer;
 } // namespace layers
 
-class MediaLargeByteBuffer;
 class MediaByteBuffer;
 class SharedTrackInfo;
 

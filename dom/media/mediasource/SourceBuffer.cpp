@@ -398,7 +398,7 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
 {
   MSE_DEBUG("AppendData(aLength=%u)", aLength);
 
-  nsRefPtr<MediaLargeByteBuffer> data = PrepareAppend(aData, aLength, aRv);
+  nsRefPtr<MediaByteBuffer> data = PrepareAppend(aData, aLength, aRv);
   if (!data) {
     return;
   }
@@ -493,7 +493,7 @@ SourceBuffer::AppendError(bool aDecoderError)
   }
 }
 
-already_AddRefed<MediaLargeByteBuffer>
+already_AddRefed<MediaByteBuffer>
 SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult& aRv)
 {
   typedef SourceBufferContentManager::EvictDataResult Result;
@@ -551,7 +551,7 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     return nullptr;
   }
 
-  nsRefPtr<MediaLargeByteBuffer> data = new MediaLargeByteBuffer();
+  nsRefPtr<MediaByteBuffer> data = new MediaByteBuffer();
   if (!data->AppendElements(aData, aLength, fallible)) {
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;

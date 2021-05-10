@@ -297,7 +297,7 @@ MP4Metadata::HasCompleteMetadata(Stream* aSource)
   return parser->HasMetadata();
 }
 
-/*static*/ already_AddRefed<mozilla::MediaLargeByteBuffer>
+/*static*/ already_AddRefed<mozilla::MediaByteBuffer>
 MP4Metadata::Metadata(Stream* aSource)
 {
   // The MoofParser requires a monitor, but we don't need one here.
