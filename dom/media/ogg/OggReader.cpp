@@ -1844,6 +1844,7 @@ nsresult OggReader::SeekBisection(int64_t aTarget,
 
 media::TimeIntervals OggReader::GetBuffered()
 {
+  MOZ_ASSERT(OnTaskQueue());
   NS_ENSURE_TRUE(mStartTime >= 0, media::TimeIntervals());
   {
     mozilla::ReentrantMonitorAutoEnter mon(mMonitor);

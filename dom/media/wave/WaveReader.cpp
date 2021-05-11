@@ -274,6 +274,7 @@ WaveReader::Seek(int64_t aTarget, int64_t aEndTime)
 
 media::TimeIntervals WaveReader::GetBuffered()
 {
+  MOZ_ASSERT(OnTaskQueue());
   if (!mInfo.HasAudio()) {
     return media::TimeIntervals();
   }

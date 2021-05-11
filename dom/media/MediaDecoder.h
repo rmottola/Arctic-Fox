@@ -878,6 +878,9 @@ protected:
   // State-watching manager.
   WatchManager<MediaDecoder> mWatchManager;
 
+  // Buffered range, mirrored from the reader.
+  Mirror<media::TimeIntervals> mBuffered;
+
   // NextFrameStatus, mirrored from the state machine.
   Mirror<MediaDecoderOwner::NextFrameStatus> mNextFrameStatus;
 
