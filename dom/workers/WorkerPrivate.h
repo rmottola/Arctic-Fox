@@ -1273,6 +1273,13 @@ public:
     AssertIsOnWorkerThread();
     return mPreferences[WORKERPREF_INTERCEPTION_ENABLED];
   }
+  
+  bool
+  DOMWorkerNotificationEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_WORKERNOTIFICATION];
+  }
 
   bool
   OnLine() const
