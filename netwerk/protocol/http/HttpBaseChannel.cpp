@@ -2316,6 +2316,14 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
     }
   }
 
+  // Preserve any skip-serviceworker-flag if possible.
+  if (mForceNoIntercept) {
+    nsCOMPtr<nsIHttpChannelInternal> httpChan = do_QueryInterface(newChannel);
+    if (httpChan) {
+      httpChan->ForceNoIntercept();
+    }
+  }
+
   // Propagate our loadinfo if needed.
   newChannel->SetLoadInfo(mLoadInfo);
 

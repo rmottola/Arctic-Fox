@@ -177,6 +177,8 @@ HttpChannelChild::HttpChannelChild()
   , mDivertingToParent(false)
   , mFlushedForDiversion(false)
   , mSuspendSent(false)
+  , mSynthesizedResponse(false)
+  , mShouldParentIntercept(false)
 {
   LOG(("Creating HttpChannelChild @%x\n", this));
 
@@ -1111,6 +1113,14 @@ HttpChannelChild::Redirect1Begin(const uint32_t& newChannelId,
     return;
   }
 
+  nsCOMPtr<nsIHttpChannelChild> httpChannelChild = do_QueryInterface(newChannel);
+  if (mSynthesizedResponse && httpChannelChild) {
+    // In the case where there was a synthesized response that caused a redirection,
+    // we must force the new channel to intercept the request in the parent before a
+    // network transaction is initiated.
+    httpChannelChild->ForceIntercepted();
+  }
+
   mRedirectChannelChild = do_QueryInterface(newChannel);
   if (mRedirectChannelChild) {
     mRedirectChannelChild->ConnectParent(newChannelId);
@@ -1256,7 +1266,7 @@ HttpChannelChild::ConnectParent(uint32_t id)
   // until OnStopRequest, or we do a redirect, or we hit an IPDL error.
   AddIPDLReference();
 
-  HttpChannelConnectArgs connectArgs(id);
+  HttpChannelConnectArgs connectArgs(id, mShouldParentIntercept);
   PBrowserOrId browser = static_cast<ContentChild*>(gNeckoChild->Manager())
                          ->GetBrowserOrId(tabChild);
   if (!gNeckoChild->
@@ -1277,6 +1287,15 @@ HttpChannelChild::CompleteRedirectSetup(nsIStreamListener *listener,
 
   NS_ENSURE_TRUE(!mIsPending, NS_ERROR_IN_PROGRESS);
   NS_ENSURE_TRUE(!mWasOpened, NS_ERROR_ALREADY_OPENED);
+
+  if (mShouldParentIntercept) {
+    // This is a redirected channel, and the corresponding parent channel has started
+    // AsyncOpen but was intercepted and suspended. We must tear it down and start
+    // fresh - we will intercept the child channel this time, before creating a new
+    // parent channel unnecessarily.
+    PHttpChannelChild::Send__delete__(this);
+    return AsyncOpen(listener, aContext);
+  }
 
   /*
    * No need to check for cancel: we don't get here if nsHttpChannel canceled
@@ -2160,6 +2179,10 @@ HttpChannelChild::ResetInterception()
   }
   mInterceptListener = nullptr;
 
+  // The chance to intercept any further requests associated with this channel
+  // (such as redirects) has passed.
+  ForceNoIntercept();
+
   // Continue with the original cross-process request
   nsresult rv = ContinueAsyncOpen();
   NS_ENSURE_SUCCESS_VOID(rv);
@@ -2174,6 +2197,7 @@ HttpChannelChild::OverrideWithSynthesizedResponse(nsAutoPtr<nsHttpResponseHead>&
   SetApplyConversion(false);
 
   mResponseHead = aResponseHead;
+  mSynthesizedResponse = true;
 
   uint16_t status = mResponseHead->Status();
   if (status != 200 && status != 404) {
@@ -2215,6 +2239,13 @@ HttpChannelChild::OverrideWithSynthesizedResponse(nsAutoPtr<nsHttpResponseHead>&
   if (mCanceled) {
     mSynthesizedResponsePump->Cancel(mStatus);
   }
+}
+
+NS_IMETHODIMP
+HttpChannelChild::ForceIntercepted()
+{
+  mShouldParentIntercept = true;
+  return NS_OK;
 }
 
 } // namespace net
