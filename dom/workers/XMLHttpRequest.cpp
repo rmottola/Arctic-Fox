@@ -979,10 +979,10 @@ Proxy::Teardown(bool aSendUnpin)
         }
       }
 
-      mWorkerPrivate = nullptr;
       mOutstandingSendCount = 0;
     }
 
+    mWorkerPrivate = nullptr;
     mXHRUpload = nullptr;
     mXHR = nullptr;
   }
