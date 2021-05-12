@@ -122,7 +122,7 @@ protected:
                    const uint32_t&            aContentPolicyType,
                    const uint32_t&            aInnerWindowID,
                    const OptionalHttpResponseHead& aSynthesizedResponseHead,
-                   const OptionalHttpChannelCacheKey& aCacheKey,
+                   const uint32_t&            aCacheKey,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;
