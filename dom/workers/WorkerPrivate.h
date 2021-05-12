@@ -1268,6 +1268,13 @@ public:
   }
 
   bool
+  ServiceWorkersTestingEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_SERVICEWORKERS_TESTING];
+  }
+
+  bool
   InterceptionEnabled() const
   {
     AssertIsOnWorkerThread();
