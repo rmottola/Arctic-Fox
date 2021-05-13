@@ -10817,7 +10817,8 @@ nsGlobalWindow::GetCaches(ErrorResult& aRv)
 {
   if (!mCacheStorage) {
     mCacheStorage = CacheStorage::CreateOnMainThread(cache::DEFAULT_NAMESPACE,
-                                                     this, GetPrincipal(), aRv);
+                                                     this, GetPrincipal(),
+                                                     IsPrivateBrowsing(), aRv);
   }
 
   nsRefPtr<CacheStorage> ref = mCacheStorage;
