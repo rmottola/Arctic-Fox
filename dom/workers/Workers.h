@@ -262,6 +262,7 @@ struct WorkerLoadInfo
   bool mIsInPrivilegedApp;
   bool mIsInCertifiedApp;
   bool mIndexedDBAllowed;
+  bool mPrivateBrowsing;
 
   WorkerLoadInfo();
   ~WorkerLoadInfo();
