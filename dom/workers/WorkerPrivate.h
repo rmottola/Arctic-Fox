@@ -786,6 +786,13 @@ public:
     return mLoadInfo.mPrivateBrowsing;
   }
 
+  // Determine if the SW testing per-window flag is set by devtools
+  bool
+  ServiceWorkersTestingInWindow() const
+  {
+    return mLoadInfo.mServiceWorkersTestingInWindow;
+  }
+
   void
   GetAllSharedWorkers(nsTArray<nsRefPtr<SharedWorker>>& aSharedWorkers);
 
@@ -1273,6 +1280,7 @@ public:
     return mPreferences[WORKERPREF_SERVICEWORKERS];
   }
 
+  // Determine if the SW testing browser-wide pref is set
   bool
   ServiceWorkersTestingEnabled() const
   {
