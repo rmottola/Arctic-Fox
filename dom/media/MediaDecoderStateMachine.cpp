@@ -200,6 +200,8 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
                  "MediaDecoderStateMachine::mNextPlayState (Mirror)"),
   mLogicallySeeking(mTaskQueue, false,
              "MediaDecoderStateMachine::mLogicallySeeking (Mirror)"),
+  mIsShutdown(mTaskQueue, false,
+              "MediaDecoderStateMachine::mIsShutdown (Canonical)"),
   mNextFrameStatus(mTaskQueue, MediaDecoderOwner::NEXT_FRAME_UNINITIALIZED,
                    "MediaDecoderStateMachine::mNextFrameStatus (Canonical)"),
   mFragmentEndTime(-1),
@@ -1372,6 +1374,8 @@ void MediaDecoderStateMachine::SetState(State aState)
 
   mState = aState;
 
+  mIsShutdown = mState == DECODER_STATE_ERROR || mState == DECODER_STATE_SHUTDOWN;
+
   // Clear state-scoped state.
   mSentPlaybackEndedEvent = false;
 }
@@ -2455,6 +2459,7 @@ MediaDecoderStateMachine::FinishShutdown()
   mLogicalPlaybackRate.DisconnectIfConnected();
   mPreservesPitch.DisconnectIfConnected();
   mDuration.DisconnectAll();
+  mIsShutdown.DisconnectAll();
   mNextFrameStatus.DisconnectAll();
   mCurrentPosition.DisconnectAll();
 
@@ -3240,8 +3245,8 @@ void MediaDecoderStateMachine::PreservesPitchChanged()
 
 bool MediaDecoderStateMachine::IsShutdown()
 {
-  return mState == DECODER_STATE_ERROR ||
-         mState == DECODER_STATE_SHUTDOWN;
+  MOZ_ASSERT(OnTaskQueue());
+  return mIsShutdown;
 }
 
 void MediaDecoderStateMachine::QueueMetadata(int64_t aPublishTime,
