@@ -103,7 +103,6 @@ struct FTPChannelOpenArgs
   uint64_t                  innerWindowID;
   uint64_t                  outerWindowID;
   uint64_t                  parentOuterWindowID;
-  OptionalHttpResponseHead    synthesizedResponseHead;
 };
 
 struct FTPChannelConnectArgs
