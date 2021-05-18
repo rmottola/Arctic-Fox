@@ -1125,6 +1125,13 @@ pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
 pref("devtools.performance.ui.show-jit-optimizations", false);
 
+// Enable experimental options in the UI only in Nightly
+#if defined(NIGHTLY_BUILD)
+pref("devtools.performance.ui.experimental", true);
+#else
+pref("devtools.performance.ui.experimental", false);
+#endif
+
 // Default theme ("dark" or "light")
 #ifdef MOZ_DEV_EDITION
 sticky_pref("devtools.theme", "dark");
