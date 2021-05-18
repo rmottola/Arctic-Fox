@@ -164,6 +164,8 @@ propagateLoadInfo(nsILoadInfo *aLoadInfo,
     openArgs.securityFlags() = aLoadInfo->GetSecurityFlags();
     openArgs.contentPolicyType() = aLoadInfo->InternalContentPolicyType();
     openArgs.innerWindowID() = aLoadInfo->GetInnerWindowID();
+    openArgs.outerWindowID() = aLoadInfo->GetOuterWindowID();
+    openArgs.parentOuterWindowID() = aLoadInfo->GetParentOuterWindowID();
     return;
   }
 
@@ -175,6 +177,8 @@ propagateLoadInfo(nsILoadInfo *aLoadInfo,
   openArgs.securityFlags() = nsILoadInfo::SEC_NORMAL;
   openArgs.contentPolicyType() = nsIContentPolicy::TYPE_OTHER;
   openArgs.innerWindowID() = 0;
+  openArgs.outerWindowID() = 0;
+  openArgs.parentOuterWindowID() = 0;
 }
 
 NS_IMETHODIMP

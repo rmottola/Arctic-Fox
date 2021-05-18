@@ -470,6 +470,8 @@ propagateLoadInfo(nsILoadInfo *aLoadInfo,
   wsArgs.securityFlags() = aLoadInfo->GetSecurityFlags();
   wsArgs.contentPolicyType() = aLoadInfo->InternalContentPolicyType();
   wsArgs.innerWindowID() = aLoadInfo->GetInnerWindowID();
+  wsArgs.outerWindowID() = aLoadInfo->GetOuterWindowID();
+  wsArgs.parentOuterWindowID() = aLoadInfo->GetParentOuterWindowID();
 }
 
 NS_IMETHODIMP

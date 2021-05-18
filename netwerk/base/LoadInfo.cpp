@@ -7,8 +7,11 @@
 #include "mozilla/LoadInfo.h"
 
 #include "mozilla/Assertions.h"
+#include "nsFrameLoader.h"
+#include "nsIDocShell.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
+#include "nsIFrameLoader.h"
 #include "nsISupportsImpl.h"
 #include "nsISupportsUtils.h"
 
@@ -28,8 +31,9 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
   , mBaseURI(aBaseURI)
-  , mInnerWindowID(aLoadingContext ?
-                     aLoadingContext->OwnerDoc()->InnerWindowID() : 0)
+  , mInnerWindowID(0)
+  , mOuterWindowID(0)
+  , mParentOuterWindowID(0)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
@@ -44,18 +48,49 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   if (mSecurityFlags & nsILoadInfo::SEC_SANDBOXED) {
     mSecurityFlags ^= nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL;
   }
+
+  if (aLoadingContext) {
+    nsCOMPtr<nsPIDOMWindow> outerWindow;
+
+    // When the element being loaded is a frame, we choose the frame's window
+    // for the window ID and the frame element's window as the parent
+    // window. This is the behavior that Chrome exposes to add-ons.
+    nsCOMPtr<nsIFrameLoaderOwner> frameLoaderOwner = do_QueryInterface(aLoadingContext);
+    if (frameLoaderOwner) {
+      nsCOMPtr<nsIFrameLoader> fl = frameLoaderOwner->GetFrameLoader();
+      nsCOMPtr<nsIDocShell> docShell;
+      if (fl && NS_SUCCEEDED(fl->GetDocShell(getter_AddRefs(docShell))) && docShell) {
+        outerWindow = do_GetInterface(docShell);
+      }
+    } else {
+      outerWindow = aLoadingContext->OwnerDoc()->GetWindow();
+    }
+
+    if (outerWindow) {
+      nsCOMPtr<nsPIDOMWindow> inner = outerWindow->GetCurrentInnerWindow();
+      mInnerWindowID = inner ? inner->WindowID() : 0;
+      mOuterWindowID = outerWindow->WindowID();
+
+      nsCOMPtr<nsPIDOMWindow> parent = outerWindow->GetScriptableParent();
+      mParentOuterWindowID = parent->WindowID();
+    }
+  }
 }
 
 LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    nsIPrincipal* aTriggeringPrincipal,
                    nsSecurityFlags aSecurityFlags,
                    nsContentPolicyType aContentPolicyType,
-                   uint32_t aInnerWindowID)
+                   uint64_t aInnerWindowID,
+                   uint64_t aOuterWindowID,
+                   uint64_t aParentOuterWindowID)
   : mLoadingPrincipal(aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
   , mInnerWindowID(aInnerWindowID)
+  , mOuterWindowID(aOuterWindowID)
+  , mParentOuterWindowID(aParentOuterWindowID)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
@@ -162,9 +197,23 @@ LoadInfo::BaseURI()
 }
 
 NS_IMETHODIMP
-LoadInfo::GetInnerWindowID(uint32_t* aResult)
+LoadInfo::GetInnerWindowID(uint64_t* aResult)
 {
   *aResult = mInnerWindowID;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetOuterWindowID(uint64_t* aResult)
+{
+  *aResult = mOuterWindowID;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetParentOuterWindowID(uint64_t* aResult)
+{
+  *aResult = mParentOuterWindowID;
   return NS_OK;
 }
 
