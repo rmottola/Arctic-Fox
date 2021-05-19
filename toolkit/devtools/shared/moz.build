@@ -58,7 +58,6 @@ if CONFIG['MOZ_DEVTOOLS']:
 
     EXTRA_JS_MODULES.devtools.shared += [
         'autocomplete-popup.js',
-        'd3.js',
         'devices.js',
         'doorhanger.js',
         'frame-script-utils.js',
