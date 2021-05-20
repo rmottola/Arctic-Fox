@@ -144,7 +144,7 @@ onfetch = function(ev) {
   }
 
   else if (ev.request.url.includes('opaque-on-same-origin')) {
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200';
     ev.respondWith(fetch(url, { mode: 'no-cors' }));
   }
 
@@ -154,7 +154,7 @@ onfetch = function(ev) {
       return;
     }
 
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200';
     ev.respondWith(fetch(url, { mode: ev.request.mode }));
   }
 
@@ -164,7 +164,7 @@ onfetch = function(ev) {
       return;
     }
 
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*';
     ev.respondWith(fetch(url));
   }
 
