@@ -40,7 +40,6 @@
 
 #include "nsIServiceManager.h"
 #include "nsIURI.h"
-#include "nsNetUtil.h"
 #include "nsThreadUtils.h"
 #include "nsDisplayList.h"
 #include "ImageLayers.h"

@@ -11,6 +11,8 @@
 #include "nsNetUtil.h"
 #include "nsStreamUtils.h"
 #include "nsStringStream.h"
+#include "nsComponentManagerUtils.h"
+#include "nsAutoPtr.h"
 
 TEST(CloneInputStream, InvalidInput)
 {

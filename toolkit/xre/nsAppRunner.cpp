@@ -74,6 +74,7 @@
 #include "nsIToolkitProfile.h"
 #include "nsIToolkitProfileService.h"
 #include "nsIURI.h"
+#include "nsIURL.h"
 #include "nsIWindowCreator.h"
 #include "nsIWindowMediator.h"
 #include "nsIWindowWatcher.h"

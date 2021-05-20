@@ -31,6 +31,7 @@
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "nsIDocShellTreeOwner.h"
+#include "nsIInterfaceRequestorUtils.h"
 #include "nsIPermissionManager.h"
 #include "nsIScriptContext.h"
 #include "nsIScriptTimeoutHandler.h"
@@ -40,6 +41,7 @@
 #include "nsWindowMemoryReporter.h"
 #include "WindowNamedPropertiesHandler.h"
 #include "nsFrameSelection.h"
+#include "nsNetUtil.h"
 
 // Helper Classes
 #include "nsJSUtils.h"

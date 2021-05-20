@@ -148,6 +148,7 @@ EXPORTS += [
     'nsInputStreamPump.h',
     'nsMIMEInputStream.h',
     'nsNetUtil.h',
+    'nsNetUtil.inl',
     'nsReadLine.h',
     'nsSerializationHelper.h',
     'nsSimpleNestedURI.h',

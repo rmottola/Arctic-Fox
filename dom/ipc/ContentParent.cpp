@@ -122,6 +122,7 @@
 #include "nsIObserverService.h"
 #include "nsIPresShell.h"
 #include "nsIScriptError.h"
+#include "nsIScriptSecurityManager.h"
 #include "nsISiteSecurityService.h"
 #include "nsISpellChecker.h"
 #include "nsIStyleSheet.h"

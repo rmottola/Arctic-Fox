@@ -8,10 +8,13 @@
 #include "BaseWebSocketChannel.h"
 #include "MainThreadUtils.h"
 #include "nsILoadGroup.h"
+#include "nsINode.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsAutoPtr.h"
 #include "nsProxyRelease.h"
 #include "nsStandardURL.h"
+#include "LoadInfo.h"
+#include "nsIDOMNode.h"
 
 PRLogModuleInfo *webSocketLog = nullptr;
 
