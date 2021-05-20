@@ -24,6 +24,7 @@ const promise = require("resource://gre/modules/Promise.jsm").Promise;
 const {Tooltip} = require("devtools/shared/widgets/Tooltip");
 const EventEmitter = require("devtools/toolkit/event-emitter");
 const Heritage = require("sdk/core/heritage");
+const {setTimeout, clearTimeout, setInterval, clearInterval} = require("sdk/timers");
 const ELLIPSIS = Services.prefs.getComplexValue("intl.ellipsis", Ci.nsIPrefLocalizedString).data;
 
 Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
@@ -257,13 +258,13 @@ MarkupView.prototype = {
     let win = this._frame.contentWindow;
 
     if (this._briefBoxModelTimer) {
-      win.clearTimeout(this._briefBoxModelTimer);
+      clearTimeout(this._briefBoxModelTimer);
       this._briefBoxModelTimer = null;
     }
 
     this._showBoxModel(nodeFront);
 
-    this._briefBoxModelTimer = this._frame.contentWindow.setTimeout(() => {
+    this._briefBoxModelTimer = setTimeout(() => {
       this._hideBoxModel();
     }, NEW_SELECTION_HIGHLIGHTER_TIMER);
   },
@@ -1451,9 +1452,9 @@ MarkupView.prototype = {
     }
     let win = this._frame.contentWindow;
     this._previewBar.classList.add("hide");
-    win.clearTimeout(this._resizePreviewTimeout);
+    clearTimeout(this._resizePreviewTimeout);
 
-    win.setTimeout(() => {
+    setTimeout(() => {
       this._updatePreview();
       this._previewBar.classList.remove("hide");
     }, 1000);
@@ -1656,10 +1657,10 @@ MarkupContainer.prototype = {
       let contentWin = this.markup._frame.contentWindow;
       this.flashed = true;
       if (this._flashMutationTimer) {
-        contentWin.clearTimeout(this._flashMutationTimer);
+        clearTimeout(this._flashMutationTimer);
         this._flashMutationTimer = null;
       }
-      this._flashMutationTimer = contentWin.setTimeout(() => {
+      this._flashMutationTimer = setTimeout(() => {
         this.flashed = false;
       }, this.markup.CONTAINER_FLASHING_DURATION);
     }
