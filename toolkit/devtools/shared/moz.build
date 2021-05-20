@@ -62,6 +62,7 @@ if CONFIG['MOZ_DEVTOOLS']:
         'doorhanger.js',
         'frame-script-utils.js',
         'inplace-editor.js',
+	'node-attribute-parser.js',
         'observable-object.js',
         'options-view.js',
 	'source-utils.js',
