@@ -17,7 +17,7 @@ loader.lazyRequireGetter(this, "actors",
   "devtools/performance/actors");
 
 loader.lazyImporter(this, "gDevTools",
-  "resource://gre/modules/devtools/gDevTools.jsm");
+  "resource:///modules/devtools/gDevTools.jsm");
 loader.lazyImporter(this, "Promise",
   "resource://gre/modules/Promise.jsm");
 
