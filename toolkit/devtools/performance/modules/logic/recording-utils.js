@@ -266,6 +266,7 @@ exports.RecordingUtils.deflateProfile = function deflateProfile(profile) {
   });
 
   profile.meta.version = 3;
+  return profile;
 };
 
 /**
