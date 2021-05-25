@@ -117,7 +117,7 @@ const SUCCESSFUL_OUTCOMES = [
  * @type {number} id
  */
 
-const OptimizationSite = exports.OptimizationSite = function (id, opts) {
+const OptimizationSite = function (id, opts) {
   this.id = id;
   this.data = opts;
   this.samples = 1;
@@ -169,7 +169,7 @@ OptimizationSite.prototype.getIonTypes = function () {
  *                        JIT optimizations. Do not modify this!
  */
 
-const JITOptimizations = exports.JITOptimizations = function (rawSites, stringTable) {
+const JITOptimizations = function (rawSites, stringTable) {
   // Build a histogram of optimization sites.
   let sites = [];
 
@@ -241,3 +241,6 @@ function maybeTypeset(typeset, stringTable) {
     };
   });
 }
+
+exports.OptimizationSite = OptimizationSite;
+exports.JITOptimizations = JITOptimizations;
