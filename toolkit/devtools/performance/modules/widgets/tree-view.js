@@ -9,9 +9,9 @@ loader.lazyRequireGetter(this, "L10N",
   "devtools/shared/profiler/global", true);
 
 loader.lazyImporter(this, "Heritage",
-  "resource://gre/modules/devtools/ViewHelpers.jsm");
+  "resource:///modules/devtools/ViewHelpers.jsm");
 loader.lazyImporter(this, "AbstractTreeItem",
-  "resource://gre/modules/devtools/AbstractTreeItem.jsm");
+  "resource:///modules/devtools/AbstractTreeItem.jsm");
 
 const MILLISECOND_UNITS = L10N.getStr("table.ms");
 const PERCENTAGE_UNITS = L10N.getStr("table.percentage");
