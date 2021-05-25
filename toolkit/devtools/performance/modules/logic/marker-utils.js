@@ -186,11 +186,10 @@ const DOM = {
    * @param object params
    *        An options object with the following members:
    *        string type - String identifier for type of stack ("stack", "startStack" or "endStack")
-   *        integer frameIndex - The index of the topmost stack frame.
+   *        number frameIndex - The index of the topmost stack frame.
    *        array frames - Array of stack frames.
-   * @return {Element}
    */
-  buildStackTrace: function (doc, { type, frameIndex, frames }) {
+  buildStackTrace: function(doc, { type, frameIndex, frames }) {
     let container = doc.createElement("vbox");
     let labelName = doc.createElement("label");
     labelName.className = "plain marker-details-labelname";
@@ -245,7 +244,7 @@ const DOM = {
         hbox.appendChild(aNode);
 
         // Clicking here will bubble up to the parent,
-        // which handles the view source
+        // which handles the view source.
         aNode.setAttribute("data-action", JSON.stringify({
           url, line, action: "view-source"
         }));
