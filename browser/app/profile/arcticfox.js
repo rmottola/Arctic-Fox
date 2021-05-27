@@ -1148,6 +1148,9 @@ pref("devtools.gcli.imgurClientID", '0df414e888d7240');
 // Imgur's upload URL
 pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
 
+// Max number of inputs to store in web console history.
+pref("devtools.webconsole.inputHistoryCount", 50);
+
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
 pref("browser.menu.showCharacterEncoding", "chrome://browser/locale/browser.properties");
