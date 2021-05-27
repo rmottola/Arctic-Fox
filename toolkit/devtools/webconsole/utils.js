@@ -1616,6 +1616,16 @@ function JSTermHelpers(aOwner)
   };
 
   /**
+   * Clears the input history of the JSTerm.
+   */
+  aOwner.sandbox.clearHistory = function JSTH_clearHistory()
+  {
+    aOwner.helperResult = {
+      type: "clearHistory",
+    };
+  };
+
+  /**
    * Returns the result of Object.keys(aObject).
    *
    * @param object aObject
