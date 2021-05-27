@@ -33,8 +33,8 @@ XPCOMUtils.defineLazyGetter(this, "events", () => {
 });
 
 for (let name of ["WebConsoleUtils", "ConsoleServiceListener",
-                  "ConsoleAPIListener", "JSTermHelpers", "JSPropertyProvider",
-                  "ConsoleReflowListener"]) {
+    "ConsoleAPIListener", "addWebConsoleCommands", "JSPropertyProvider",
+    "ConsoleReflowListener"]) {
   Object.defineProperty(this, name, {
     get: function(prop) {
       if (prop == "WebConsoleUtils") {
@@ -297,11 +297,11 @@ WebConsoleActor.prototype =
   consoleReflowListener: null,
 
   /**
-   * The JSTerm Helpers names cache.
+   * The Web Console Commands names cache.
    * @private
    * @type array
    */
-  _jstermHelpersCache: null,
+  _webConsoleCommandsCache: null,
 
   actorPrefix: "console",
 
@@ -362,7 +362,7 @@ WebConsoleActor.prototype =
     }
     this._actorPool = null;
 
-    this._jstermHelpersCache = null;
+    this._webConsoleCommandsCache = null;
     this._lastConsoleInputEvaluation = null;
     this._evalWindow = null;
     this._netEvents.clear();
@@ -897,14 +897,16 @@ WebConsoleActor.prototype =
     // helper functions.
     let lastNonAlphaIsDot = /[.][a-zA-Z0-9$]*$/.test(reqText);
     if (!lastNonAlphaIsDot) {
-      if (!this._jstermHelpersCache) {
+      if (!this._webConsoleCommandsCache) {
         let helpers = {
           sandbox: Object.create(null)
         };
-        JSTermHelpers(helpers);
-        this._jstermHelpersCache = Object.getOwnPropertyNames(helpers.sandbox);
+        addWebConsoleCommands(helpers);
+        this._webConsoleCommandsCache =
+          Object.getOwnPropertyNames(helpers.sandbox);
       }
-      matches = matches.concat(this._jstermHelpersCache.filter(n => n.startsWith(result.matchProp)));
+      matches = matches.concat(this._webConsoleCommandsCache
+          .filter(n => n.startsWith(result.matchProp)));
     }
 
     return {
@@ -981,13 +983,13 @@ WebConsoleActor.prototype =
    * @private
    * @param object aDebuggerGlobal
    *        A Debugger.Object that wraps a content global. This is used for the
-   *        JSTerm helpers.
+   *        Web Console Commands.
    * @return object
    *         The same object as |this|, but with an added |sandbox| property.
    *         The sandbox holds methods and properties that can be used as
    *         bindings during JS evaluation.
    */
-  _getJSTermHelpers: function WCA__getJSTermHelpers(aDebuggerGlobal)
+  _getWebConsoleCommands: function(aDebuggerGlobal)
   {
     let helpers = {
       window: this.evalWindow,
@@ -998,7 +1000,7 @@ WebConsoleActor.prototype =
       helperResult: null,
       consoleActor: this,
     };
-    JSTermHelpers(helpers);
+    addWebConsoleCommands(helpers);
 
     let evalWindow = this.evalWindow;
     function maybeExport(obj, name) {
@@ -1052,9 +1054,9 @@ WebConsoleActor.prototype =
    *
    * The Debugger.Frame comes from the jsdebugger's Debugger instance, which
    * is different from the Web Console's Debugger instance. This means that
-   * for evaluation to work, we need to create a new instance for the jsterm
-   * helpers - they need to be Debugger.Objects coming from the jsdebugger's
-   * Debugger instance.
+   * for evaluation to work, we need to create a new instance for the Web
+   * Console Commands helpers - they need to be Debugger.Objects coming from the
+   * jsdebugger's Debugger instance.
    *
    * When |bindObjectActor| is used objects can come from different iframes,
    * from different domains. To avoid permission-related errors when objects
@@ -1084,7 +1086,8 @@ WebConsoleActor.prototype =
    *         - window: the Debugger.Object for the global where the string was
    *         evaluated.
    *         - result: the result of the evaluation.
-   *         - helperResult: any result coming from a JSTerm helper function.
+   *         - helperResult: any result coming from a Web Console commands
+   *         function.
    *         - url: the url to evaluate the script as. Defaults to
    *         "debugger eval code".
    */
@@ -1140,8 +1143,8 @@ WebConsoleActor.prototype =
       }
     }
 
-    // Get the JSTerm helpers for the given debugger window.
-    let helpers = this._getJSTermHelpers(dbgWindow);
+    // Get the Web Console commands for the given debugger window.
+    let helpers = this._getWebConsoleCommands(dbgWindow);
     let bindings = helpers.sandbox;
     if (bindSelf) {
       bindings._self = bindSelf;
@@ -1155,7 +1158,8 @@ WebConsoleActor.prototype =
     }
 
     // Check if the Debugger.Frame or Debugger.Object for the global include
-    // $ or $$. We will not overwrite these functions with the jsterm helpers.
+    // $ or $$. We will not overwrite these functions with the Web Console
+    // commands.
     let found$ = false, found$$ = false;
     if (frame) {
       let env = frame.environment;
