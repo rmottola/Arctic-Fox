@@ -34,7 +34,7 @@ XPCOMUtils.defineLazyGetter(this, "events", () => {
 
 for (let name of ["WebConsoleUtils", "ConsoleServiceListener",
     "ConsoleAPIListener", "addWebConsoleCommands", "JSPropertyProvider",
-    "ConsoleReflowListener"]) {
+    "ConsoleReflowListener", "CONSOLE_WORKER_IDS"]) {
   Object.defineProperty(this, name, {
     get: function(prop) {
       if (prop == "WebConsoleUtils") {
@@ -928,6 +928,10 @@ WebConsoleActor.prototype =
                               .getService(Ci.nsIConsoleAPIStorage);
     ConsoleAPIStorage.clearEvents(windowId);
 
+    CONSOLE_WORKER_IDS.forEach((aId) => {
+      ConsoleAPIStorage.clearEvents(aId);
+    });
+
     if (this.parentActor.isRootActor) {
       Services.console.logStringMessage(null); // for the Error Console
       Services.console.reset();
@@ -1447,6 +1451,10 @@ WebConsoleActor.prototype =
   function WCA_prepareConsoleMessageForRemote(aMessage)
   {
     let result = WebConsoleUtils.cloneObject(aMessage);
+
+    result.workerType = CONSOLE_WORKER_IDS.indexOf(result.innerID) == -1
+                          ? 'none' : result.innerID;
+
     delete result.wrappedJSObject;
     delete result.ID;
     delete result.innerID;
