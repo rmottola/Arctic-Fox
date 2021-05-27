@@ -15,9 +15,9 @@ loader.lazyImporter(this, "LayoutHelpers", "resource://gre/modules/devtools/Layo
 
 // TODO: Bug 842672 - toolkit/ imports modules from browser/.
 // Note that these are only used in JSTermHelpers, see $0 and pprint().
-loader.lazyImporter(this, "gDevTools", "resource://gre/modules/devtools/gDevTools.jsm");
+loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/gDevTools.jsm");
 loader.lazyImporter(this, "devtools", "resource://gre/modules/devtools/Loader.jsm");
-loader.lazyImporter(this, "VariablesView", "resource://gre/modules/devtools/VariablesView.jsm");
+loader.lazyImporter(this, "VariablesView", "resource:///modules/devtools/VariablesView.jsm");
 loader.lazyImporter(this, "DevToolsUtils", "resource://gre/modules/devtools/DevToolsUtils.jsm");
 
 // Match the function name from the result of toString() or toSource().
