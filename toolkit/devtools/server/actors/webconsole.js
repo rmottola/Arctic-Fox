@@ -750,8 +750,6 @@ WebConsoleActor.prototype =
       }
     }
 
-    messages.sort(function(a, b) { return a.timeStamp - b.timeStamp; });
-
     return {
       from: this.actorID,
       messages: messages,
@@ -1621,6 +1619,7 @@ NetworkEventActor.prototype =
     return {
       actor: this.actorID,
       startedDateTime: this._startedDateTime,
+      timeStamp: Date.parse(this._startedDateTime),
       url: this._request.url,
       method: this._request.method,
       isXHR: this._isXHR,
