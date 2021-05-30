@@ -1132,7 +1132,7 @@ typedef HashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy> Initial
 struct StackShape
 {
     /* For performance, StackShape only roots when absolutely necessary. */
-    UnownedBaseShape *base;
+    UnownedBaseShape* base;
     jsid propid;
     GetterOp rawGetter;
     SetterOp rawSetter;
