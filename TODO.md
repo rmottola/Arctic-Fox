@@ -16,6 +16,7 @@
 - Bug 1443943 Allow internal callers of performance.now() to opt-out of
 - Bug 1443943 - 2018-03-09 - Port the performance APIs only to only clamping/jittering
 - Bug 1420092 -2017-11-23 - Don't always enable mozjemalloc by default when building the js engine. r=njn
+- Bug 1423875. Fix InitializePropertiesFromCompatibleNativeObject to ge
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
 - 1412081 - Call KillClearOnShutdown(ShutdownPhase::ShutdownFinal)
@@ -171,7 +172,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1167356 - 2015-06-11
 - Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
 - 1190496 - Hoist SharedThreadPool into xpcom.
-- Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
