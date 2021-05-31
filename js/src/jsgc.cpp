@@ -7359,14 +7359,14 @@ DummyGetter(JSContext* cx, unsigned argc, Value* vp)
 
 } /* namespace MemInfo */
 
-JSObject *
-NewMemoryInfoObject(JSContext *cx)
+JSObject*
+NewMemoryInfoObject(JSContext* cx)
 {
     RootedObject obj(cx, JS_NewObject(cx, nullptr));
 
     using namespace MemInfo;
     struct {
-        const char *name;
+        const char* name;
         JSNative getter;
     } getters[] = {
         { "gcBytes", GCBytesGetter },
@@ -7401,7 +7401,7 @@ NewMemoryInfoObject(JSContext *cx)
         return nullptr;
 
     struct {
-        const char *name;
+        const char* name;
         JSNative getter;
     } zoneGetters[] = {
         { "gcBytes", ZoneGCBytesGetter },
