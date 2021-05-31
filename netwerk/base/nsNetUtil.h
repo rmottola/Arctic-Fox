@@ -493,9 +493,9 @@ nsresult NS_ParseRequestContentType(const nsACString &rawContentType,
                                     nsCString        &contentType,
                                     nsCString        &contentCharset);
 
-nsresult NS_ParseContentType(const nsACString &rawContentType,
-                             nsCString        &contentType,
-                             nsCString        &contentCharset);
+nsresult NS_ParseResponseContentType(const nsACString &rawContentType,
+                                     nsCString        &contentType,
+                                     nsCString        &contentCharset);
 
 nsresult NS_ExtractCharsetFromContentType(const nsACString &rawContentType,
                                           nsCString        &contentCharset,
