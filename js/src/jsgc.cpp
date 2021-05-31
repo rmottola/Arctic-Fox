@@ -1337,6 +1337,7 @@ GCRuntime::finish()
 
     /* Delete all remaining zones. */
     if (rt->gcInitialized) {
+        AutoSetThreadIsSweeping threadIsSweeping;
         for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next()) {
             for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next())
                 js_delete(comp.get());
