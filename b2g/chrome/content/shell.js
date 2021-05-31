@@ -68,11 +68,9 @@ XPCOMUtils.defineLazyGetter(this, "libcutils", function () {
 });
 #endif
 
-#ifdef MOZ_CAPTIVEDETECT
 XPCOMUtils.defineLazyServiceGetter(Services, 'captivePortalDetector',
                                   '@mozilla.org/toolkit/captive-detector;1',
                                   'nsICaptivePortalDetector');
-#endif
 
 function getContentWindow() {
   return shell.contentBrowser.contentWindow;

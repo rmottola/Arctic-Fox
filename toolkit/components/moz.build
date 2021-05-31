@@ -78,8 +78,7 @@ if CONFIG['MOZ_XUL']:
 if CONFIG['MOZ_TOOLKIT_SEARCH']:
     DIRS += ['search']
 
-if CONFIG['MOZ_CAPTIVEDETECT']:
-    DIRS += ['captivedetect']
+DIRS += ['captivedetect']
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] != "gonk" and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android':
     DIRS += ['terminator']
