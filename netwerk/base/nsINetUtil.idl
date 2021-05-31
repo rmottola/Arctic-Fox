@@ -11,7 +11,7 @@ interface nsIPrefBranch;
 /**
  * nsINetUtil provides various network-related utility methods.
  */
-[scriptable, uuid(ff0b3233-7ec5-4bf4-830f-6b2edaa53661)]
+[scriptable, uuid(fe2625ec-b884-4df1-b39c-9e830e47aa94)]
 interface nsINetUtil : nsISupports
 {
   /**
@@ -31,7 +31,7 @@ interface nsINetUtil : nsISupports
                                       out AUTF8String aCharset,
                                       out boolean aHadCharset);
 
-    /**
+  /**
    * Parse a Content-Type header value in relaxed mode.  This is a more
    * permissive parser that ignores things that go against RFC 7231 section
    * 3.1.1.1.  This is typically useful for parsing Content-Type header values
