@@ -128,7 +128,12 @@ nsScriptLoader::~nsScriptLoader()
     req->FireScriptAvailable(NS_ERROR_ABORT);
   }
 
-  for (nsScriptLoadRequest* req = mAsyncRequests.getFirst(); req;
+  for (nsScriptLoadRequest* req = mLoadingAsyncRequests.getFirst(); req;
+       req = req->getNext()) {
+    req->FireScriptAvailable(NS_ERROR_ABORT);
+  }
+
+  for (nsScriptLoadRequest* req = mLoadedAsyncRequests.getFirst(); req;
        req = req->getNext()) {
     req->FireScriptAvailable(NS_ERROR_ABORT);
   }
@@ -622,11 +627,13 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
 
     if (aElement->GetScriptAsync()) {
       request->mIsAsync = true;
-      mAsyncRequests.AppendElement(request);
       if (!request->mLoading) {
+        mLoadedAsyncRequests.AppendElement(request);
         // The script is available already. Run it ASAP when the event
         // loop gets a chance to spin.
         ProcessPendingRequestsAsync();
+      } else {
+        mLoadingAsyncRequests.AppendElement(request);
       }
       return false;
     }
@@ -1170,18 +1177,9 @@ nsScriptLoader::ProcessPendingRequests()
     ProcessRequest(request);
   }
 
-  // The refcounting here is dumb, but it's going away in the next
-  // patch in the queue.
-  nsRefPtr<nsScriptLoadRequest> req = mAsyncRequests.getFirst();
-  while (mEnabled && req && req->isInList()) {
-    if (!req->mLoading) {
-      nsRefPtr<nsScriptLoadRequest> next = req->getNext();
-      request = mAsyncRequests.Steal(req);
-      ProcessRequest(request);
-      req.swap(next);
-      continue;
-    }
-    req = req->getNext();
+  while (mEnabled && !mLoadedAsyncRequests.isEmpty()) {
+    request = mLoadedAsyncRequests.StealFirst();
+    ProcessRequest(request);
   }
 
   while (mEnabled && !mNonAsyncExternalScriptInsertedRequests.isEmpty() &&
@@ -1208,7 +1206,8 @@ nsScriptLoader::ProcessPendingRequests()
   }
 
   if (mDocumentParsingDone && mDocument &&
-      !mParserBlockingRequest && mAsyncRequests.isEmpty() &&
+      !mParserBlockingRequest && mLoadingAsyncRequests.isEmpty() &&
+      mLoadedAsyncRequests.isEmpty() &&
       mNonAsyncExternalScriptInsertedRequests.isEmpty() &&
       mXSLTRequests.isEmpty() && mDeferRequests.isEmpty()) {
     if (MaybeRemovedDeferRequests()) {
@@ -1423,7 +1422,7 @@ nsScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader,
       }
     } else if (request->mIsAsync) {
       if (request->isInList()) {
-        nsRefPtr<nsScriptLoadRequest> req = mAsyncRequests.Steal(request);
+        nsRefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(request);
         FireScriptAvailable(rv, req);
       }
     } else if (request->mIsNonAsyncScriptInserted) {
@@ -1543,7 +1542,7 @@ nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
   // so if you see this assertion it is likely something else that is
   // wrong, especially if you see it more than once.
   NS_ASSERTION(mDeferRequests.Contains(aRequest) ||
-               mAsyncRequests.Contains(aRequest) ||
+               mLoadingAsyncRequests.Contains(aRequest) ||
                mNonAsyncExternalScriptInsertedRequests.Contains(aRequest) ||
                mXSLTRequests.Contains(aRequest)  ||
                mPreloads.Contains(aRequest, PreloadRequestComparator()) ||
@@ -1552,6 +1551,12 @@ nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
 
   // Mark this as loaded
   aRequest->mLoading = false;
+
+  // And if it's async, move it to the loaded list.
+  if (aRequest->mIsAsync) {
+    nsRefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(aRequest);
+    mLoadedAsyncRequests.AppendElement(req);
+  }
 
   return NS_OK;
 }
@@ -1567,7 +1572,8 @@ nsScriptLoader::ParsingComplete(bool aTerminated)
   mDeferEnabled = false;
   if (aTerminated) {
     mDeferRequests.Clear();
-    mAsyncRequests.Clear();
+    mLoadingAsyncRequests.Clear();
+    mLoadedAsyncRequests.Clear();
     mNonAsyncExternalScriptInsertedRequests.Clear();
     mXSLTRequests.Clear();
     mParserBlockingRequest = nullptr;
