@@ -195,7 +195,6 @@ function waitForNetworkEvents(aMonitor, aGetRequests, aPostRequests = 0) {
 
   let panel = aMonitor.panelWin;
   let events = panel.EVENTS;
-  let menu = panel.NetMonitorView.RequestsMenu;
 
   let progress = {};
   let genericEvents = 0;
@@ -240,13 +239,12 @@ function waitForNetworkEvents(aMonitor, aGetRequests, aPostRequests = 0) {
     maybeResolve(event, actor);
   }
 
-  function maybeResolve(event, actor) {
+  function maybeResolve(event, [actor, url]) {
     info("> Network events progress: " +
       genericEvents + "/" + ((aGetRequests + aPostRequests) * 13) + ", " +
       postEvents + "/" + (aPostRequests * 2) + ", " +
       "got " + event + " for " + actor);
 
-    let url = menu.getItemByValue(actor).attachment.url;
     updateProgressForURL(url, event);
     info("> Current state: " + JSON.stringify(progress, null, 2));
 
