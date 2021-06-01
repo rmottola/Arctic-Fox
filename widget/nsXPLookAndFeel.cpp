@@ -462,7 +462,7 @@ nsXPLookAndFeel::Init()
       mozilla::dom::ContentChild::GetSingleton();
 
     nsTArray<LookAndFeelInt> lookAndFeelIntCache;
-    cc->SendGetLookAndFeelCache(lookAndFeelIntCache);
+    cc->SendGetLookAndFeelCache(&lookAndFeelIntCache);
     LookAndFeel::SetIntCache(lookAndFeelIntCache);
   }
 }
