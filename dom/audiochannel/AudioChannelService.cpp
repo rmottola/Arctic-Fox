@@ -40,6 +40,9 @@ using namespace mozilla::hal;
 
 namespace {
 
+// If true, any new AudioChannelAgent will be muted when created.
+bool sAudioChannelMutedByDefault = false;
+
 void
 NotifyChannelActive(uint64_t aWindowID, AudioChannel aAudioChannel,
                     bool aActive)
@@ -167,6 +170,9 @@ AudioChannelService::AudioChannelService()
 #endif
     }
   }
+
+  Preferences::AddBoolVarCache(&sAudioChannelMutedByDefault,
+                               "dom.audiochannel.mutedByDefault");
 }
 
 AudioChannelService::~AudioChannelService()
@@ -840,6 +846,12 @@ AudioChannelService::ChildStatusReceived(uint64_t aChildID,
   AudioChannelChildStatus* data = mPlayingChildren.LookupOrAdd(aChildID);
   data->mActiveTelephonyChannel = aTelephonyChannel;
   data->mActiveContentOrNormalChannel = aContentOrNormalChannel;
+}
+
+/* static */ bool
+AudioChannelService::IsAudioChannelMutedByDefault()
+{
+  return sAudioChannelMutedByDefault;
 }
 
 /* static */ PLDHashOperator
