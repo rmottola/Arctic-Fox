@@ -1076,7 +1076,7 @@ class IDLInterface(IDLObjectWithScope, IDLExposureMixins):
                         member.getExtendedAttribute("Pref") or
                         member.getExtendedAttribute("Func") or
                         member.getExtendedAttribute("AvailableIn") or
-                        member.getExtendedAttribute("CheckPermissions") or
+                        member.getExtendedAttribute("CheckAnyPermissions") or
                         member.getExtendedAttribute("CheckAllPermissions")):
                         raise WebIDLError("[Alias] must not be used on a "
                                           "conditionally exposed operation",
@@ -1109,7 +1109,7 @@ class IDLInterface(IDLObjectWithScope, IDLExposureMixins):
                               self.parentScope.primaryGlobalName,
                               [self.location])
 
-        for attribute in ["CheckPermissions", "CheckAllPermissions"]:
+        for attribute in ["CheckAnyPermissions", "CheckAllPermissions"]:
             if (self.getExtendedAttribute(attribute) and
                 self._exposureGlobalNames != set([self.parentScope.primaryGlobalName])):
                 raise WebIDLError("[%s] used on an interface that is "
@@ -1329,7 +1329,7 @@ class IDLInterface(IDLObjectWithScope, IDLExposureMixins):
                   identifier == "NavigatorProperty" or
                   identifier == "AvailableIn" or
                   identifier == "Func" or
-                  identifier == "CheckPermissions" or
+                  identifier == "CheckAnyPermissions" or
                   identifier == "CheckAllPermissions"):
                 # Known extended attributes that take a string value
                 if not attr.hasValue():
@@ -1458,7 +1458,7 @@ class IDLInterface(IDLObjectWithScope, IDLExposureMixins):
                 self.getExtendedAttribute("ChromeOnly") or
                 self.getExtendedAttribute("Func") or
                 self.getExtendedAttribute("AvailableIn") or
-                self.getExtendedAttribute("CheckPermissions") or
+                self.getExtendedAttribute("CheckAnyPermissions") or
                 self.getExtendedAttribute("CheckAllPermissions"))
 
 class IDLDictionary(IDLObjectWithScope):
@@ -3303,7 +3303,7 @@ class IDLInterfaceMember(IDLObjectWithIdentifier, IDLExposureMixins):
                               "%s-only" % self._globalScope.primaryGlobalName,
                               [self.location])
 
-        for attribute in ["CheckPermissions", "CheckAllPermissions"]:
+        for attribute in ["CheckAnyPermissions", "CheckAllPermissions"]:
             if (self.getExtendedAttribute(attribute) and
                 self.exposureSet != set([self._globalScope.primaryGlobalName])):
                 raise WebIDLError("[%s] used on an interface member that is "
@@ -3400,7 +3400,7 @@ class IDLConst(IDLInterfaceMember):
               identifier == "ChromeOnly" or
               identifier == "Func" or
               identifier == "AvailableIn" or
-              identifier == "CheckPermissions" or
+              identifier == "CheckAnyPermissions" or
               identifier == "CheckAllPermissions"):
             # Known attributes that we don't need to do anything with here
             pass
@@ -3674,7 +3674,7 @@ class IDLAttribute(IDLInterfaceMember):
               identifier == "Func" or
               identifier == "Frozen" or
               identifier == "AvailableIn" or
-              identifier == "CheckPermissions" or
+              identifier == "CheckAnyPermissions" or
               identifier == "CheckAllPermissions" or
               identifier == "BinaryName"):
             # Known attributes that we don't need to do anything with here
@@ -4332,7 +4332,7 @@ class IDLMethod(IDLInterfaceMember, IDLScope):
               identifier == "Deprecated" or
               identifier == "Func" or
               identifier == "AvailableIn" or
-              identifier == "CheckPermissions" or
+              identifier == "CheckAnyPermissions" or
               identifier == "CheckAllPermissions" or
               identifier == "BinaryName" or
               identifier == "MethodIdentityTestable" or
