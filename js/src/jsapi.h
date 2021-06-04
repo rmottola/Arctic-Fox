@@ -2520,7 +2520,7 @@ namespace JS {
 template <typename Outer>
 class PropertyDescriptorOperations
 {
-    const JSPropertyDescriptor * desc() const { return static_cast<const Outer*>(this)->extract(); }
+    const JSPropertyDescriptor* desc() const { return static_cast<const Outer*>(this)->extract(); }
 
     bool has(unsigned bit) const {
         MOZ_ASSERT(bit != 0);
@@ -2763,16 +2763,11 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
 namespace js {
 
 template <>
-struct GCMethods<JSPropertyDescriptor> {
-    static JSPropertyDescriptor initial() { return JSPropertyDescriptor(); }
-};
-
-template <>
 class RootedBase<JSPropertyDescriptor>
-  : public JS::MutablePropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor> >
+  : public JS::MutablePropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor>>
 {
-    friend class JS::PropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor> >;
-    friend class JS::MutablePropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor> >;
+    friend class JS::PropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor>>;
+    friend class JS::MutablePropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor>>;
     const JSPropertyDescriptor* extract() const {
         return static_cast<const JS::Rooted<JSPropertyDescriptor>*>(this)->address();
     }
@@ -2783,9 +2778,9 @@ class RootedBase<JSPropertyDescriptor>
 
 template <>
 class HandleBase<JSPropertyDescriptor>
-  : public JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor> >
+  : public JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor>>
 {
-    friend class JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor> >;
+    friend class JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor>>;
     const JSPropertyDescriptor* extract() const {
         return static_cast<const JS::Handle<JSPropertyDescriptor>*>(this)->address();
     }
@@ -2793,10 +2788,10 @@ class HandleBase<JSPropertyDescriptor>
 
 template <>
 class MutableHandleBase<JSPropertyDescriptor>
-  : public JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor> >
+  : public JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor>>
 {
-    friend class JS::PropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor> >;
-    friend class JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor> >;
+    friend class JS::PropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor>>;
+    friend class JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor>>;
     const JSPropertyDescriptor* extract() const {
         return static_cast<const JS::MutableHandle<JSPropertyDescriptor>*>(this)->address();
     }
