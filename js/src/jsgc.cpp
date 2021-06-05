@@ -2134,8 +2134,8 @@ static bool ShouldRelocateZone(size_t arenaCount, size_t relocCount, JS::gcreaso
 }
 
 bool
-ArenaLists::relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason reason,
-                           SliceBudget &sliceBudget, gcstats::Statistics& stats)
+ArenaLists::relocateArenas(ArenaHeader*& relocatedListOut, JS::gcreason::Reason reason,
+                           SliceBudget& sliceBudget, gcstats::Statistics& stats)
 {
 
     // This is only called from the main thread while we are doing a GC, so
@@ -2151,8 +2151,8 @@ ArenaLists::relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason 
     if (ShouldRelocateAllArenas(reason)) {
         for (auto i : AllAllocKinds()) {
             if (CanRelocateAllocKind(i)) {
-                ArenaList &al = arenaLists[i];
-                ArenaHeader *allArenas = al.head();
+                ArenaList& al = arenaLists[i];
+                ArenaHeader* allArenas = al.head();
                 al.clear();
                 relocatedListOut = al.relocateArenas(allArenas, relocatedListOut, sliceBudget, stats);
             }
@@ -2160,7 +2160,7 @@ ArenaLists::relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason 
     } else {
         size_t arenaCount = 0;
         size_t relocCount = 0;
-        AllAllocKindArray<ArenaHeader **> toRelocate;
+        AllAllocKindArray<ArenaHeader**> toRelocate;
 
         for (auto i : AllAllocKinds()) {
             toRelocate[i] = nullptr;
@@ -2173,8 +2173,8 @@ ArenaLists::relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason 
 
         for (auto i : AllAllocKinds()) {
             if (toRelocate[i]) {
-                ArenaList &al = arenaLists[i];
-                ArenaHeader *arenas = al.removeRemainingArenas(toRelocate[i]);
+                ArenaList& al = arenaLists[i];
+                ArenaHeader* arenas = al.removeRemainingArenas(toRelocate[i]);
                 relocatedListOut = al.relocateArenas(arenas, relocatedListOut, sliceBudget, stats);
             }
         }
@@ -2229,20 +2229,20 @@ MovingTracer::onObjectEdge(JSObject** objp)
 }
 
 void
-GCRuntime::sweepTypesAfterCompacting(Zone *zone)
+GCRuntime::sweepTypesAfterCompacting(Zone* zone)
 {
-    FreeOp *fop = rt->defaultFreeOp();
+    FreeOp* fop = rt->defaultFreeOp();
     zone->beginSweepTypes(fop, rt->gc.releaseObservedTypes && !zone->isPreservingCode());
 
     AutoClearTypeInferenceStateOnOOM oom(zone);
 
     for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
-        JSScript *script = i.get<JSScript>();
+        JSScript* script = i.get<JSScript>();
         script->maybeSweepTypes(&oom);
     }
 
     for (ZoneCellIterUnderGC i(zone, AllocKind::OBJECT_GROUP); !i.done(); i.next()) {
-        ObjectGroup *group = i.get<ObjectGroup>();
+        ObjectGroup* group = i.get<ObjectGroup>();
         group->maybeSweep(&oom);
     }
 

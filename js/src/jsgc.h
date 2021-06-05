@@ -803,11 +803,11 @@ class ArenaLists
         MOZ_ASSERT(freeLists[kind].isEmpty());
     }
 
-    bool relocateArenas(ArenaHeader *&relocatedListOut, JS::gcreason::Reason reason,
-                        SliceBudget &sliceBudget, gcstats::Statistics& stats);
+    bool relocateArenas(ArenaHeader*& relocatedListOut, JS::gcreason::Reason reason,
+                        SliceBudget& sliceBudget, gcstats::Statistics& stats);
 
-    void queueForegroundObjectsForSweep(FreeOp *fop);
-    void queueForegroundThingsForSweep(FreeOp *fop);
+    void queueForegroundObjectsForSweep(FreeOp* fop);
+    void queueForegroundThingsForSweep(FreeOp* fop);
 
     void mergeForegroundSweptObjectArenas();
 
