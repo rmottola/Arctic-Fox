@@ -2349,19 +2349,19 @@ struct ArenasToUpdate
         BACKGROUND = 2,
         ALL = FOREGROUND | BACKGROUND
     };
-    ArenasToUpdate(Zone *zone, KindsToUpdate kinds);
-    bool done() { return initialized && arena == nullptr; }
-    ArenaHeader* next(AutoLockHelperThreadState& lock);
+    ArenasToUpdate(Zone* zone, KindsToUpdate kinds);
+    bool done() { return kind == AllocKind::LIMIT; }
     ArenaHeader* getArenasToUpdate(AutoLockHelperThreadState& lock, unsigned max);
 
   private:
-    bool initialized;
-    KindsToUpdate kinds;
-    Zone *zone;          // Zone to process
+    KindsToUpdate kinds; // Selects which thing kinds to iterate
+    Zone* zone;          // Zone to process
     AllocKind kind;      // Current alloc kind to process
-    ArenaHeader *arena;  // Next arena to process
+    ArenaHeader* arena;  // Next arena to process
 
+    AllocKind nextAllocKind(AllocKind i) { return AllocKind(uint8_t(i) + 1); }
     bool shouldProcessKind(AllocKind kind);
+    ArenaHeader* next(AutoLockHelperThreadState& lock);
 };
 
 bool ArenasToUpdate::shouldProcessKind(AllocKind kind)
@@ -2392,8 +2392,8 @@ bool ArenasToUpdate::shouldProcessKind(AllocKind kind)
     }
 }
 
-ArenasToUpdate::ArenasToUpdate(Zone *zone, KindsToUpdate kinds)
-  : initialized(false), kinds(kinds), zone(zone)
+ArenasToUpdate::ArenasToUpdate(Zone* zone, KindsToUpdate kinds)
+  : kinds(kinds), zone(zone), kind(AllocKind::FIRST), arena(nullptr)
 {
     MOZ_ASSERT(zone->isGCCompacting());
     MOZ_ASSERT(kinds && !(kinds & ~ALL));
@@ -2404,48 +2404,34 @@ ArenasToUpdate::next(AutoLockHelperThreadState& lock)
 {
     // Find the next arena to update.
     //
-    // The first time this is called, we initialize the kind and arena and loop
-    // over all alloc kinds, returning the first arena found. In subsequent
-    // invocations we go through the remaining arenas first, then increment the
-    // kind manually before looping over the remaining kinds.
+    // This iterates through the GC thing kinds filtered by shouldProcessKind(),
+    // and then through thea arenas of that kind.  All state is held in the
+    // object and we just return when we find an arena.
 
-    if (initialized) {
-        MOZ_ASSERT(arena);
-        MOZ_ASSERT(shouldProcessKind(kind));
-        MOZ_ASSERT(zone);
-        arena = arena->next;
-        if (arena)
-            return arena;
-        kind = AllocKind(uint8_t(kind) + 1);
-    } else {
-        initialized = true;
-        arena = nullptr;
-        kind = AllocKind::FIRST;
-    }
-
-    for (auto i : SomeAllocKinds(kind)) {
-        if (shouldProcessKind(i)) {
-            arena = zone->arenas.getFirstArena(i);
-            if (arena) {
-                kind = i;
+    for (; kind < AllocKind::LIMIT; kind = nextAllocKind(kind)) {
+        if (shouldProcessKind(kind)) {
+            if (!arena)
+                arena = zone->arenas.getFirstArena(kind);
+            else
+                arena = arena->next;
+            if (arena)
                 return arena;
-            }
         }
     }
 
-    kind = AllocKind::LIMIT;
-    zone = nullptr;
+    MOZ_ASSERT(!arena);
+    MOZ_ASSERT(done());
     return nullptr;
 }
 
-ArenaHeader *
+ArenaHeader*
 ArenasToUpdate::getArenasToUpdate(AutoLockHelperThreadState& lock, unsigned count)
 {
-    if (!zone)
+    if (done())
         return nullptr;
 
-    ArenaHeader *head = nullptr;
-    ArenaHeader *tail = nullptr;
+    ArenaHeader* head = nullptr;
+    ArenaHeader* tail = nullptr;
 
     for (unsigned i = 0; i < count; ++i) {
         ArenaHeader* arena = next(lock);
