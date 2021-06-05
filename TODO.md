@@ -80,6 +80,7 @@
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
+- Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 - Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
@@ -116,6 +117,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
 - 1190669 - 4 parts
 - Bug 1191112 - 3 parts
+- Bug 1189809 - 2015-07-31 Remove the ill-fated DynamicTraceable
 - Bug 1186384 - Consider device pixel scale on fullscreen transition wi
 - Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
