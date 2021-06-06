@@ -122,25 +122,27 @@ var FullScreen = {
           this.cancelWarning();
         break;
       case "MozDOMFullscreen:Entered": {
-        // The original target is the element which requested the DOM
+        // The event target is the element which requested the DOM
         // fullscreen. If we were entering DOM fullscreen for a remote
-        // browser, this element would be that browser element, which
-        // was the parameter of `remoteFrameFullscreenChanged` call.
-        // If the fullscreen request was initiated from an in-process
-        // browser, we need to get its corresponding browser element.
-        let originalTarget = event.originalTarget;
+        // browser, the target would be `gBrowser` and the original
+        // target would be the browser which was the parameter of
+        // `remoteFrameFullscreenChanged` call. If the fullscreen
+        // request was initiated from an in-process browser, we need
+        // to get its corresponding browser here.
         let browser;
-        if (this._isBrowser(originalTarget)) {
-          browser = originalTarget;
+        if (event.target == gBrowser) {
+          browser = event.originalTarget;
         } else {
-          let topWin = originalTarget.ownerDocument.defaultView.top;
+          let topWin = event.target.ownerDocument.defaultView.top;
           browser = gBrowser.getBrowserForContentWindow(topWin);
           if (!browser) {
             document.mozCancelFullScreen();
             break;
           }
         }
-        this.enterDomFullscreen(browser);
+        if (!this.enterDomFullscreen(browser)) {
+          break;
+        }
         // If it is a remote browser, send a message to ask the content
         // to enter fullscreen state. We don't need to do so if it is an
         // in-process browser, since all related document should have
@@ -180,7 +182,7 @@ var FullScreen = {
 
   enterDomFullscreen : function(aBrowser) {
     if (!document.mozFullScreen)
-      return;
+      return false;
 
     // If we've received a fullscreen notification, we have to ensure that the
     // element that's requesting fullscreen belongs to the browser that's currently
@@ -188,7 +190,7 @@ var FullScreen = {
     // actually visible now.
     if (gBrowser.selectedBrowser != aBrowser) {
       document.mozCancelFullScreen();
-      return;
+      return false;
     }
 
     let focusManager = Services.focus;
@@ -196,7 +198,7 @@ var FullScreen = {
       // The top-level window has lost focus since the request to enter
       // full-screen was made. Cancel full-screen.
       document.mozCancelFullScreen();
-      return;
+      return false;
     }
 
     document.documentElement.setAttribute("inDOMFullscreen", true);
@@ -220,6 +222,7 @@ var FullScreen = {
     // the toolbar hide immediately.
     this.hideNavToolbox(true);
     this._fullScrToggler.hidden = true;
+    return true;
   },
 
   cleanup: function () {
@@ -252,13 +255,6 @@ var FullScreen = {
           .broadcastAsyncMessage("DOMFullscreen:CleanUp");
   },
 
-  _isBrowser: function (aNode) {
-    if (aNode.tagName != "xul:browser") {
-      return false;
-    }
-    let systemPrincipal = Services.scriptSecurityManager.getSystemPrincipal();
-    return aNode.nodePrincipal == systemPrincipal;
-  },
   _isRemoteBrowser: function (aBrowser) {
     return gMultiProcessBrowser && aBrowser.getAttribute("remote") == "true";
   },
