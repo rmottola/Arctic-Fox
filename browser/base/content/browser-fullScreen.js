@@ -61,23 +61,20 @@ var FullScreen = {
       this._fullScrToggler.addEventListener("dragenter", this._expandCallback, false);
     }
 
-    // On OS X Lion we don't want to hide toolbars when entering fullscreen, unless
-    // we're entering DOM fullscreen, in which case we should hide the toolbars.
-    // If we're leaving fullscreen, then we'll go through the exit code below to
-    // make sure toolbars are made visible in the case of DOM fullscreen.
-    if (enterFS && this.useLionFullScreen) {
-      if (document.mozFullScreen) {
-        this.showXULChrome("toolbar", false);
-      }
-      else {
-        gNavToolbox.setAttribute("inFullscreen", true);
-        document.documentElement.setAttribute("inFullscreen", true);
-      }
-      return;
+    if (enterFS) {
+      gNavToolbox.setAttribute("inFullscreen", true);
+      document.documentElement.setAttribute("inFullscreen", true);
+    } else {
+      gNavToolbox.removeAttribute("inFullscreen");
+      document.documentElement.removeAttribute("inFullscreen");
     }
 
     // show/hide menubars, toolbars (except the full screen toolbar)
-    this.showXULChrome("toolbar", !enterFS);
+    // On OS X Lion, we don't want to hide toolbars when entering
+    // fullscreen, unless we're entering DOM fullscreen.
+    if (document.mozFullScreen || !this.useLionFullScreen) {
+      this.showXULChrome("toolbar", !enterFS);
+    }
 
     if (enterFS) {
       document.addEventListener("keypress", this._keyToggleCallback, false);
@@ -619,14 +616,6 @@ var FullScreen = {
         else
           el.setAttribute("moz-collapsed", "true");
       }
-    }
-
-    if (aShow) {
-      gNavToolbox.removeAttribute("inFullscreen");
-      document.documentElement.removeAttribute("inFullscreen");
-    } else {
-      gNavToolbox.setAttribute("inFullscreen", true);
-      document.documentElement.setAttribute("inFullscreen", true);
     }
 
     // For Lion fullscreen, all fullscreen controls are hidden, don't
