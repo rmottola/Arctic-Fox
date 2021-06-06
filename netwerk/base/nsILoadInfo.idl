@@ -17,7 +17,7 @@ typedef unsigned long nsSecurityFlags;
 /**
  * An nsILoadOwner represents per-load information about who started the load.
  */
-[scriptable, builtinclass, uuid(dcf54f49-2d63-4c34-9da1-54df235f354c)]
+[scriptable, builtinclass, uuid(f6bce897-1a4a-4664-b96b-abacd6543e95)]
 interface nsILoadInfo : nsISupports
 {
   /**
@@ -183,7 +183,6 @@ interface nsILoadInfo : nsISupports
    */
   [noscript, notxpcom]
   nsContentPolicyType internalContentPolicyType();
-
 
   /**
    * A base URI for use in situations where it cannot otherwise be inferred.

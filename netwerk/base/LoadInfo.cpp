@@ -14,6 +14,7 @@
 #include "nsIFrameLoader.h"
 #include "nsISupportsImpl.h"
 #include "nsISupportsUtils.h"
+#include "nsContentUtils.h"
 
 namespace mozilla {
 
