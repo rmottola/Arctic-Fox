@@ -615,6 +615,8 @@ var FullScreen = {
       }
     }
 
+    ToolbarIconColor.inferFromText();
+
     // For Lion fullscreen, all fullscreen controls are hidden, don't
     // bother to touch them. If we don't stop here, the following code
     // could cause the native fullscreen button be shown unexpectedly.
@@ -641,8 +643,6 @@ var FullScreen = {
       navbar.appendChild(fullscreenctls);
     }
     fullscreenctls.hidden = aShow;
-    
-    ToolbarIconColor.inferFromText();
   }
 };
 XPCOMUtils.defineLazyGetter(FullScreen, "useLionFullScreen", function() {
