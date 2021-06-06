@@ -317,10 +317,6 @@ public:
     return GetReferrerPolicy();
   }
 
-  void SetReferrer(const nsACString& aReferrer) {
-    mReferrer = aReferrer;
-  }
-
   /**
    * Set the principal responsible for this document.
    */
