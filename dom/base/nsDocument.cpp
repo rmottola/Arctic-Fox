@@ -231,6 +231,7 @@
 #include "mozilla/dom/FontFaceSet.h"
 #include "mozilla/dom/BoxObject.h"
 #include "gfxVR.h"
+#include "gfxPrefs.h"
 
 #include "nsISpeculativeConnect.h"
 
@@ -7875,7 +7876,7 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
                           /*allowDoubleTapZoom*/ true);
   }
 
-  if (!Preferences::GetBool("dom.meta-viewport.enabled", false)) {
+  if (!gfxPrefs::MetaViewportEnabled()) {
     return nsViewportInfo(aDisplaySize,
                           defaultScale,
                           /*allowZoom*/ false,
