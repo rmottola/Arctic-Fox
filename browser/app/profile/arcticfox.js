@@ -249,7 +249,7 @@ pref("browser.warnOnQuit", true);
 // might still show the window closing dialog with showQuitWarning == false.
 pref("browser.showQuitWarning", false);
 pref("browser.fullscreen.autohide", true);
-pref("browser.fullscreen.animateUp", 0);
+pref("browser.fullscreen.animate", true);
 pref("browser.overlink-delay", 80);
 
 pref("browser.urlbar.clickSelectsAll", true);
