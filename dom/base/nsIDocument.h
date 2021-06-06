@@ -233,7 +233,7 @@ public:
    * MayStartLayout() until SetMayStartLayout(true) is called on it.  Making
    * sure this happens is the responsibility of the caller of
    * StartDocumentLoad().
-   */  
+   */
   virtual nsresult StartDocumentLoad(const char* aCommand,
                                      nsIChannel* aChannel,
                                      nsILoadGroup* aLoadGroup,
@@ -369,8 +369,8 @@ public:
   }
 
   /**
-   * Set the document's character encoding. |aCharSetID| should be canonical. 
-   * That is, callers are responsible for the charset alias resolution. 
+   * Set the document's character encoding. |aCharSetID| should be canonical.
+   * That is, callers are responsible for the charset alias resolution.
    */
   virtual void SetDocumentCharacterSet(const nsACString& aCharSetID) = 0;
 
@@ -469,7 +469,7 @@ public:
   {
     mBidiEnabled = true;
   }
-  
+
   /**
    * Check if the document contains (or has contained) any MathML elements.
    */
@@ -477,7 +477,7 @@ public:
   {
     return mMathMLEnabled;
   }
-  
+
   void SetMathMLEnabled()
   {
     mMathMLEnabled = true;
@@ -490,7 +490,7 @@ public:
   {
     return mIsInitialDocumentInWindow;
   }
-  
+
   /**
    * Tell this document that it's the initial document in its window.  See
    * comments on mIsInitialDocumentInWindow for when this should be called.
@@ -499,7 +499,7 @@ public:
   {
     mIsInitialDocumentInWindow = aIsInitialDocument;
   }
-  
+
 
   /**
    * Get the bidi options for this document.
@@ -700,7 +700,7 @@ public:
   {
     mParentDocument = aParent;
   }
-  
+
   /**
    * Are plugins allowed in this document ?
    */
@@ -853,7 +853,7 @@ public:
   Element* GetHeadElement() {
     return GetHtmlChildElement(nsGkAtoms::head);
   }
-  
+
   /**
    * Accessors to the collection of stylesheets owned by this document.
    * Style sheets are ordered, most significant last.
@@ -888,7 +888,7 @@ public:
    * @throws no exceptions
    */
   virtual int32_t GetNumberOfStyleSheets() const = 0;
-  
+
   /**
    * Get a particular stylesheet
    * @param aIndex the index the stylesheet lives at.  This is zero-based
@@ -896,7 +896,7 @@ public:
    * @throws no exceptions
    */
   virtual nsIStyleSheet* GetStyleSheetAt(int32_t aIndex) const = 0;
-  
+
   /**
    * Insert a sheet at a particular spot in the stylesheet list (zero-based)
    * @param aSheet the sheet to insert
@@ -940,7 +940,7 @@ public:
    * and that observers should be notified and style sets updated
    */
   virtual void SetStyleSheetApplicableState(nsIStyleSheet* aSheet,
-                                            bool aApplicable) = 0;  
+                                            bool aApplicable) = 0;
 
   enum additionalSheetType {
     eAgentSheet,
@@ -1044,7 +1044,7 @@ public:
     nsPIDOMWindow* outer = mWindow ? mWindow->GetOuterWindow() : nullptr;
     return outer && outer->IsBackground();
   }
-  
+
   /**
    * Return the inner window used as the script compilation scope for
    * this document. If you're not absolutely sure you need this, use
@@ -1075,7 +1075,7 @@ public:
 
   /**
    * Get the script loader for this document
-   */ 
+   */
   virtual nsScriptLoader* ScriptLoader() = 0;
 
   /**
@@ -1174,7 +1174,7 @@ public:
    * exit fullscreen.
    *
    * If aDocument is non null, all documents from aDocument's fullscreen root
-   * to the fullscreen leaf exit fullscreen. 
+   * to the fullscreen leaf exit fullscreen.
    *
    * Note that the fullscreen leaf is the bottom-most document which is
    * fullscreen, it may have non-fullscreen child documents. The fullscreen
@@ -1489,7 +1489,7 @@ public:
    * The document should save form control state.
    */
   virtual void RemovedFromDocShell() = 0;
-  
+
   /**
    * Get the layout history state that should be used to save and restore state
    * for nodes in this document.  This may return null; if that happens state
@@ -1598,7 +1598,7 @@ public:
   nsCompatibility GetCompatibilityMode() const {
     return mCompatMode;
   }
-  
+
   /**
    * Check whether we've ever fired a DOMTitleChanged event for this
    * document.
@@ -1760,7 +1760,7 @@ public:
   {
     return mDisplayDocument;
   }
-  
+
   /**
    * Set the display document for this document.  aDisplayDocument must not be
    * null.
@@ -1802,7 +1802,7 @@ public:
       return mObservers;
     }
   protected:
-    nsAutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;    
+    nsAutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;
   };
 
   /**
@@ -2212,9 +2212,9 @@ public:
 
   virtual Element* FindImageMap(const nsAString& aNormalizedMapName) = 0;
 
-  // Add aLink to the set of links that need their status resolved. 
+  // Add aLink to the set of links that need their status resolved.
   void RegisterPendingLinkUpdate(mozilla::dom::Link* aLink);
-  
+
   // Remove aLink from the set of links that need their status resolved.
   // This function must be called when links are removed from the document.
   void UnregisterPendingLinkUpdate(mozilla::dom::Link* aElement);
@@ -2246,7 +2246,7 @@ public:
                      uint32_t aParamsLength = 0) const;
 
   virtual void PostVisibilityUpdateEvent() = 0;
-  
+
   bool IsSyntheticDocument() const { return mIsSyntheticDocument; }
 
   void SetNeedLayoutFlush() {
@@ -2767,7 +2767,7 @@ protected:
   // If true, whoever is creating the document has gotten it to the
   // point where it's safe to start layout on it.
   bool mMayStartLayout;
-  
+
   // True iff we've ever fired a DOMTitleChanged event for this document
   bool mHaveFiredTitleChange;
 
@@ -2786,7 +2786,7 @@ protected:
   // True iff DNS prefetch is allowed for this document.  Note that if the
   // document has no window, DNS prefetch won't be performed no matter what.
   bool mAllowDNSPrefetch;
-  
+
   // True when this document is a static clone of a normal document
   bool mIsStaticDocument;
 
@@ -2934,7 +2934,7 @@ protected:
   // if this document is part of a multipart document,
   // the ID can be used to distinguish it from the other parts.
   uint32_t mPartID;
-  
+
   // Cycle collector generation in which we're certain that this document
   // won't be collected
   uint32_t mMarkedCCGeneration;
@@ -3086,8 +3086,8 @@ NS_NewVideoDocument(nsIDocument** aInstancePtrResult);
 // Also, both aDocumentURI and aBaseURI must not be null.
 nsresult
 NS_NewDOMDocument(nsIDOMDocument** aInstancePtrResult,
-                  const nsAString& aNamespaceURI, 
-                  const nsAString& aQualifiedName, 
+                  const nsAString& aNamespaceURI,
+                  const nsAString& aQualifiedName,
                   nsIDOMDocumentType* aDoctype,
                   nsIURI* aDocumentURI,
                   nsIURI* aBaseURI,
