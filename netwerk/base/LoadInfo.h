@@ -55,6 +55,7 @@ private:
            nsIPrincipal* aTriggeringPrincipal,
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType,
+           bool aUpgradeInsecureRequests,
            uint64_t aInnerWindowID,
            uint64_t aOuterWindowID,
            uint64_t aParentOuterWindowID);
@@ -67,13 +68,14 @@ private:
 
   nsCOMPtr<nsIPrincipal> mLoadingPrincipal;
   nsCOMPtr<nsIPrincipal> mTriggeringPrincipal;
-  nsWeakPtr mLoadingContext;
-  nsSecurityFlags mSecurityFlags;
-  nsContentPolicyType mInternalContentPolicyType;
-  nsCOMPtr<nsIURI> mBaseURI;
-  uint64_t mInnerWindowID;
-  uint64_t mOuterWindowID;
-  uint64_t mParentOuterWindowID;
+  nsWeakPtr              mLoadingContext;
+  nsSecurityFlags        mSecurityFlags;
+  nsContentPolicyType    mInternalContentPolicyType;
+  nsCOMPtr<nsIURI>       mBaseURI;
+  bool                   mUpgradeInsecureRequests;
+  uint64_t               mInnerWindowID;
+  uint64_t               mOuterWindowID;
+  uint64_t               mParentOuterWindowID;
 
   // Is true if this load was triggered by processing the attributes of the
   // browsing context container.
