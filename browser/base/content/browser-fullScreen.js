@@ -127,12 +127,14 @@ var FullScreen = {
         } else {
           let topWin = event.target.ownerDocument.defaultView.top;
           browser = gBrowser.getBrowserForContentWindow(topWin);
-          if (!browser) {
-            document.mozCancelFullScreen();
-            break;
-          }
         }
-        if (!this.enterDomFullscreen(browser)) {
+        if (!browser || !this.enterDomFullscreen(browser)) {
+          if (document.mozFullScreen) {
+            // MozDOMFullscreen:Entered is dispatched synchronously in
+            // fullscreen change, hence we have to avoid calling this
+            // method synchronously here.
+            setTimeout(() => document.mozCancelFullScreen(), 0);
+          }
           break;
         }
         // If it is a remote browser, send a message to ask the content
@@ -181,7 +183,6 @@ var FullScreen = {
     // active. If not, we exit fullscreen since the "full-screen document" isn't
     // actually visible now.
     if (gBrowser.selectedBrowser != aBrowser) {
-      document.mozCancelFullScreen();
       return false;
     }
 
@@ -189,7 +190,6 @@ var FullScreen = {
     if (focusManager.activeWindow != window) {
       // The top-level window has lost focus since the request to enter
       // full-screen was made. Cancel full-screen.
-      document.mozCancelFullScreen();
       return false;
     }
 
