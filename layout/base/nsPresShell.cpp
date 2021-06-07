@@ -7802,7 +7802,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
               // ESC key released while in DOM fullscreen mode.
               // Fully exit all browser windows and documents from
               // fullscreen mode.
-              nsIDocument::ExitFullscreen(nullptr, /* async */ true);
+              nsIDocument::AsyncExitFullscreen(nullptr);
             }
           }
           nsCOMPtr<nsIDocument> pointerLockedDoc =

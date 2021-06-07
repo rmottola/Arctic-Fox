@@ -1708,7 +1708,7 @@ Element::UnbindFromTree(bool aDeep, bool aNullParent)
                                       nsContentUtils::eDOM_PROPERTIES,
                                       "RemovedFullScreenElement");
       // Fully exit full-screen.
-      nsIDocument::ExitFullscreen(OwnerDoc(), /* async */ false);
+      nsIDocument::ExitFullscreenInDocTree(OwnerDoc());
     }
     if (HasPointerLock()) {
       nsIDocument::UnlockPointer();
