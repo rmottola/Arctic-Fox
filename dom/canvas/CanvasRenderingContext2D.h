@@ -1064,7 +1064,7 @@ protected:
     mozilla::gfx::Float miterLimit;
     mozilla::gfx::Float globalAlpha;
     mozilla::gfx::Float shadowBlur;
-    FallibleTArray<mozilla::gfx::Float> dash;
+    nsTArray<mozilla::gfx::Float> dash;
     mozilla::gfx::Float dashOffset;
 
     mozilla::gfx::CompositionOp op;
