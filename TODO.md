@@ -112,6 +112,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
+- Bug 1167409 - for parts
 - Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
@@ -126,9 +127,11 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
+- Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
+- Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
 - Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
-- Bug 1184443 - Make async ExitFullscreen call ask the window to exi
 - Bug 1184201 - Disable fullscreen transition on Windows
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1160014 - part 1 to 4
