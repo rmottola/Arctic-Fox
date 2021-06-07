@@ -2225,6 +2225,12 @@ ContentChild::RecvAppInfo(const nsCString& version, const nsCString& buildID,
     mAppInfo.ID.Assign(ID);
     mAppInfo.vendor.Assign(vendor);
 
+    return true;
+}
+
+bool
+ContentChild::RecvAppInit()
+{
     if (!Preferences::GetBool("dom.ipc.processPrelaunch.enabled", false)) {
         return true;
     }
