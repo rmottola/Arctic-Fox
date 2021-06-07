@@ -1112,7 +1112,6 @@ ChannelMediaResource::IsSuspendedByCache()
 bool
 ChannelMediaResource::IsSuspended()
 {
-  MutexAutoLock lock(mLock);
   return mSuspendCount > 0;
 }
 
