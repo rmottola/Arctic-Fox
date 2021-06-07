@@ -730,7 +730,7 @@ parent:
 
     PFileSystemRequest(FileSystemParams params);
 
-    sync GetRandomValues(uint32_t length)
+    prio(urgent) sync GetRandomValues(uint32_t length)
         returns (uint8_t[] randomValues);
 
     async GetSystemMemory(uint64_t getterId);
