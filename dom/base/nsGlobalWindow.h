@@ -1627,6 +1627,7 @@ protected:
   nsRefPtr<mozilla::dom::Navigator> mNavigator;
   nsRefPtr<nsScreen>            mScreen;
   nsRefPtr<nsDOMWindowList>     mFrames;
+  // All BarProps are inner window only.
   nsRefPtr<mozilla::dom::BarProp> mMenubar;
   nsRefPtr<mozilla::dom::BarProp> mToolbar;
   nsRefPtr<mozilla::dom::BarProp> mLocationbar;
