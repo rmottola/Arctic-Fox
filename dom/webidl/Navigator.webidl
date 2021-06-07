@@ -429,6 +429,11 @@ partial interface Navigator {
   readonly attribute InputPortManager inputPortManager;
 };
 
+partial interface Navigator {
+  [Throws, Pref="dom.presentation.enabled", CheckAnyPermissions="presentation", AvailableIn="PrivilegedApps"]
+  readonly attribute Presentation? presentation;
+};
+
 #ifdef NIGHTLY_BUILD
 partial interface Navigator {
   [Func="Navigator::IsE10sEnabled"]

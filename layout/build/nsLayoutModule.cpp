@@ -255,7 +255,7 @@ static void Shutdown();
 
 #include "GMPService.h"
 
-#include "mozilla/dom/presentation/PresentationDeviceManager.h"
+#include "mozilla/dom/PresentationDeviceManager.h"
 
 #include "mozilla/TextInputProcessor.h"
 
