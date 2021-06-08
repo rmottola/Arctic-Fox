@@ -478,7 +478,8 @@ def write_interface(iface, fd):
 
     fd.write(iface_template_epilog)
 
-if __name__ == '__main__':
+
+def main():
     from optparse import OptionParser
     o = OptionParser()
     o.add_option('-I', action='append', dest='incdirs', default=['.'],
@@ -546,3 +547,6 @@ if __name__ == '__main__':
         print >>depfd, "%s: %s" % (options.outfile, " ".join(deps))
         for dep in deps:
             print >>depfd, "%s:" % dep
+
+if __name__ == '__main__':
+    main()
