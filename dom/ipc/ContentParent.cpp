@@ -3059,6 +3059,11 @@ ContentParent::Observe(nsISupports* aSubject,
     else if (!strcmp(aTopic, "profiler-stopped")) {
         unused << SendStopProfiler();
     }
+    else if (!strcmp(aTopic, "profiler-subprocess-gather")) {
+        mGatherer = static_cast<ProfileGatherer*>(aSubject);
+        mGatherer->WillGatherOOPProfile();
+        unused << SendGatherProfile();
+    }
     else if (!strcmp(aTopic, "profiler-subprocess")) {
         nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
         if (pse) {
