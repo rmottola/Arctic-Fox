@@ -667,6 +667,8 @@ static const char* sObserverTopics[] = {
 #ifdef MOZ_ENABLE_PROFILER_SPS
     "profiler-started",
     "profiler-stopped",
+    "profiler-paused",
+    "profiler-resumed",
     "profiler-subprocess-gather",
     "profiler-subprocess",
 #endif
@@ -3058,6 +3060,12 @@ ContentParent::Observe(nsISupports* aSubject,
     }
     else if (!strcmp(aTopic, "profiler-stopped")) {
         unused << SendStopProfiler();
+    }
+    else if (!strcmp(aTopic, "profiler-paused")) {
+        unused << SendPauseProfiler(true);
+    }
+    else if (!strcmp(aTopic, "profiler-resumed")) {
+        unused << SendPauseProfiler(false);
     }
     else if (!strcmp(aTopic, "profiler-subprocess-gather")) {
         mGatherer = static_cast<ProfileGatherer*>(aSubject);
