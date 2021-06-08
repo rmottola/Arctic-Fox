@@ -197,6 +197,10 @@ let UI = {
         UI.autoOpenToolbox();
         break;
       case "project-stopped":
+        UI.destroyToolbox();
+        this.updateCommands();
+        projectList.update();
+        break;
       case "runtime-global-actors":
         this.updateCommands();
         projectList.update();
