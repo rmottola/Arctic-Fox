@@ -27,6 +27,7 @@ Interface members const/method/attribute conform to the following pattern:
         'returns the member signature as IDL'
 """
 
+
 def attlistToIDL(attlist):
     if len(attlist) == 0:
         return ''
@@ -41,6 +42,7 @@ _paramsHardcode = {
     2: ('array', 'shared', 'iid_is', 'size_is', 'retval'),
     3: ('array', 'size_is', 'const'),
 }
+
 
 def paramAttlistToIDL(attlist):
     if len(attlist) == 0:
@@ -66,11 +68,13 @@ def paramAttlistToIDL(attlist):
     return '[%s] ' % ', '.join(["%s%s" % (name, value is not None and ' (%s)' % value or '')
                                 for name, value, aloc in sorted])
 
+
 def unaliasType(t):
     while t.kind == 'typedef':
         t = t.realtype
     assert t is not None
     return t
+
 
 def getBuiltinOrNativeTypeName(t):
     t = unaliasType(t)
@@ -82,12 +86,14 @@ def getBuiltinOrNativeTypeName(t):
     else:
         return None
 
+
 class BuiltinLocation(object):
     def get(self):
         return "<builtin type>"
 
     def __str__(self):
         return self.get()
+
 
 class Builtin(object):
     kind = 'builtin'
@@ -139,6 +145,7 @@ builtinMap = {}
 for b in builtinNames:
     builtinMap[b.name] = b
 
+
 class Location(object):
     _line = None
 
@@ -177,6 +184,7 @@ class Location(object):
         self.resolve()
         return "%s line %s:%s\n%s\n%s" % (self._file, self._lineno, self._colno,
                                           self._line, self.pointerline())
+
 
 class NameMap(object):
     """Map of name -> object. Each object must have a .name and .location property.
@@ -218,6 +226,7 @@ class NameMap(object):
         except KeyError:
             raise IDLError("Name '%s' not found", location)
 
+
 class IDLError(Exception):
     def __init__(self, message, location, warning=False):
         self.message = message
@@ -227,6 +236,7 @@ class IDLError(Exception):
     def __str__(self):
         return "%s: %s, %s" % (self.warning and 'warning' or 'error',
                                self.message, self.location)
+
 
 class Include(object):
     kind = 'include'
@@ -255,6 +265,7 @@ class Include(object):
             return
 
         raise IDLError("File '%s' not found" % self.filename, self.location)
+
 
 class IDL(object):
     def __init__(self, productions):
@@ -297,6 +308,7 @@ class IDL(object):
                 return True
         return False
 
+
 class CDATA(object):
     kind = 'cdata'
     _re = re.compile(r'\n+')
@@ -313,6 +325,7 @@ class CDATA(object):
 
     def count(self):
         return 0
+
 
 class Typedef(object):
     kind = 'typedef'
@@ -339,6 +352,7 @@ class Typedef(object):
 
     def __str__(self):
         return "typedef %s %s\n" % (self.type, self.name)
+
 
 class Forward(object):
     kind = 'forward'
@@ -373,6 +387,7 @@ class Forward(object):
 
     def __str__(self):
         return "forward-declared %s\n" % self.name
+
 
 class Native(object):
     kind = 'native'
@@ -458,6 +473,7 @@ class Native(object):
 
     def __str__(self):
         return "native %s(%s)\n" % (self.name, self.nativename)
+
 
 class Interface(object):
     kind = 'interface'
@@ -575,6 +591,7 @@ class Interface(object):
             total += realbase.countEntries()
         return total
 
+
 class InterfaceAttributes(object):
     uuid = None
     scriptable = False
@@ -652,6 +669,7 @@ class InterfaceAttributes(object):
             l.append("\tmain_process_scriptable_only\n")
         return "".join(l)
 
+
 class ConstMember(object):
     kind = 'const'
     def __init__(self, type, name, value, location, doccomments):
@@ -680,6 +698,7 @@ class ConstMember(object):
 
     def count(self):
         return 0
+
 
 class Attribute(object):
     kind = 'attribute'
@@ -784,6 +803,7 @@ class Attribute(object):
     def count(self):
         return self.readonly and 1 or 2
 
+
 class Method(object):
     kind = 'method'
     noscript = False
@@ -886,6 +906,7 @@ class Method(object):
     def count(self):
         return 1
 
+
 class Param(object):
     size_is = None
     iid_is = None
@@ -978,6 +999,7 @@ class Param(object):
                                self.type,
                                self.name)
 
+
 class Array(object):
     def __init__(self, basetype):
         self.type = basetype
@@ -988,6 +1010,7 @@ class Array(object):
     def nativeType(self, calltype, const=False):
         return "%s%s*" % (const and 'const ' or '',
                           self.type.nativeType(calltype))
+
 
 class IDLParser(object):
     keywords = {

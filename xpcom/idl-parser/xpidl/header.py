@@ -19,11 +19,14 @@ else:
     def printComments(fd, clist, indent):
         pass
 
+
 def firstCap(str):
     return str[0].upper() + str[1:]
 
+
 def attributeParamName(a):
     return "a" + firstCap(a.name)
+
 
 def attributeParamNames(a):
     l = [attributeParamName(a)]
@@ -31,9 +34,11 @@ def attributeParamNames(a):
         l.insert(0, "cx")
     return ", ".join(l)
 
+
 def attributeNativeName(a, getter):
     binaryname = a.binaryname is not None and a.binaryname or firstCap(a.name)
     return "%s%s" % (getter and 'Get' or 'Set', binaryname)
+
 
 def attributeReturnType(a, macro):
     """macro should be NS_IMETHOD or NS_IMETHODIMP"""
@@ -41,6 +46,7 @@ def attributeReturnType(a, macro):
         return macro == "NS_IMETHOD" and "virtual nsresult" or "nsresult"
     else:
         return macro
+
 
 def attributeParamlist(a, getter):
     l = ["%s%s" % (a.realtype.nativeType(getter and 'out' or 'in'),
@@ -50,6 +56,7 @@ def attributeParamlist(a, getter):
 
     return ", ".join(l)
 
+
 def attributeAsNative(a, getter):
         deprecated = a.deprecated and "NS_DEPRECATED " or ""
         params = {'deprecated': deprecated,
@@ -58,8 +65,10 @@ def attributeAsNative(a, getter):
                   'paramlist': attributeParamlist(a, getter)}
         return "%(deprecated)s%(returntype)s %(binaryname)s(%(paramlist)s)" % params
 
+
 def methodNativeName(m):
     return m.binaryname is not None and m.binaryname or firstCap(m.name)
+
 
 def methodReturnType(m, macro):
     """macro should be NS_IMETHOD or NS_IMETHODIMP"""
@@ -73,10 +82,12 @@ def methodReturnType(m, macro):
     else:
         return macro
 
+
 def methodAsNative(m):
     return "%s %s(%s)" % (methodReturnType(m, 'NS_IMETHOD'),
                           methodNativeName(m),
                           paramlistAsNative(m))
+
 
 def paramlistAsNative(m, empty='void'):
     l = [paramAsNative(p) for p in m.params]
@@ -100,9 +111,11 @@ def paramlistAsNative(m, empty='void'):
 
     return ", ".join(l)
 
+
 def paramAsNative(p):
     return "%s%s" % (p.nativeType(),
                      p.name)
+
 
 def paramlistNames(m):
     names = [p.name for p in m.params]
@@ -157,9 +170,11 @@ forward_decl = """class %(name)s; /* forward declaration */
 
 """
 
+
 def idl_basename(f):
     """returns the base name of a file with the last extension stripped"""
     return os.path.basename(f).rpartition('.')[0]
+
 
 def print_header(idl, fd, filename):
     fd.write(header % {'filename': filename,
@@ -301,6 +316,7 @@ attr_infallible_tmpl = """\
     return result;
   }
 """
+
 
 def write_interface(iface, fd):
     if iface.namemap is None:
