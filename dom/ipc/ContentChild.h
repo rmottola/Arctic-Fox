@@ -21,7 +21,7 @@
 
 struct ChromePackage;
 class nsIObserver;
-struct ResourceMapping;
+struct SubstitutionMapping;
 struct OverrideMapping;
 class nsIDomainPolicy;
 
@@ -281,7 +281,7 @@ public:
     virtual bool DeallocPSpeechSynthesisChild(PSpeechSynthesisChild* aActor) override;
 
     virtual bool RecvRegisterChrome(InfallibleTArray<ChromePackage>&& packages,
-                                    InfallibleTArray<ResourceMapping>&& resources,
+                                    InfallibleTArray<SubstitutionMapping>&& resources,
                                     InfallibleTArray<OverrideMapping>&& overrides,
                                     const nsCString& locale,
                                     const bool& reset) override;
