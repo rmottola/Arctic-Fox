@@ -27,7 +27,7 @@ const {showDoorhanger} = require("devtools/shared/doorhanger");
 const ProjectList = require("devtools/webide/project-list");
 const {Simulators} = require("devtools/webide/simulators");
 
-const Strings = Services.strings.createBundle("chrome://global/locale/devtools/webide.properties");
+const Strings = Services.strings.createBundle("chrome://browser/locale/devtools/webide.properties");
 
 const HTML = "http://www.w3.org/1999/xhtml";
 const HELP_URL = "https://developer.mozilla.org/docs/Tools/WebIDE/Troubleshooting";
@@ -185,13 +185,18 @@ let UI = {
           UI.updateCommands();
           UI.updateProjectButton();
           UI.openProject();
-          UI.autoStartProject();
+          yield UI.autoStartProject();
+          UI.autoOpenToolbox();
           UI.saveLastSelectedProject();
           projectList.update();
         });
         return;
-      case "project-stopped":
       case "project-started":
+        this.updateCommands();
+        projectList.update();
+        UI.autoOpenToolbox();
+        break;
+      case "project-stopped":
       case "runtime-global-actors":
         this.updateCommands();
         projectList.update();
@@ -658,7 +663,7 @@ let UI = {
     }, console.error);
   },
 
-  autoStartProject: function() {
+  autoStartProject: Task.async(function*() {
     let project = AppManager.selectedProject;
 
     if (!project) {
@@ -670,15 +675,27 @@ let UI = {
       return; // For something that is not an editable app, we're done.
     }
 
-    Task.spawn(function() {
-      // Do not force opening apps that are already running, as they may have
-      // some activity being opened and don't want to dismiss them.
-      if (project.type == "runtimeApp" && !AppManager.isProjectRunning()) {
-        yield UI.busyUntil(AppManager.launchRuntimeApp(), "running app");
-      }
-      yield UI.createToolbox();
-    });
-  },
+    // Do not force opening apps that are already running, as they may have
+    // some activity being opened and don't want to dismiss them.
+    if (project.type == "runtimeApp" && !AppManager.isProjectRunning()) {
+      yield UI.busyUntil(AppManager.launchRuntimeApp(), "running app");
+    }
+  }),
+
+  autoOpenToolbox: Task.async(function*() {
+    let project = AppManager.selectedProject;
+
+    if (!project) {
+      return;
+    }
+    if (!(project.type == "runtimeApp" ||
+          project.type == "mainProcess" ||
+          project.type == "tab")) {
+      return; // For something that is not an editable app, we're done.
+    }
+
+    yield UI.createToolbox();
+  }),
 
   importAndSelectApp: Task.async(function* (source) {
     let isPackaged = !!source.path;
