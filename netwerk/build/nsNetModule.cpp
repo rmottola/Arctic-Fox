@@ -270,10 +270,12 @@ namespace net {
 #ifdef NECKO_PROTOCOL_res
 // resource
 #include "nsResProtocolHandler.h"
+#include "ExtensionProtocolHandler.h"
 #include "SubstitutingProtocolHandler.h"
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsResProtocolHandler, Init)
 
 namespace mozilla {
+NS_GENERIC_FACTORY_CONSTRUCTOR(ExtensionProtocolHandler)
 NS_GENERIC_FACTORY_CONSTRUCTOR(SubstitutingURL)
 } // namespace mozilla
 #endif
@@ -759,6 +761,7 @@ NS_DEFINE_NAMED_CID(NS_FTPPROTOCOLHANDLER_CID);
 #endif
 #ifdef NECKO_PROTOCOL_res
 NS_DEFINE_NAMED_CID(NS_RESPROTOCOLHANDLER_CID);
+NS_DEFINE_NAMED_CID(NS_EXTENSIONPROTOCOLHANDLER_CID);
 NS_DEFINE_NAMED_CID(NS_SUBSTITUTINGURL_CID);
 #endif
 NS_DEFINE_NAMED_CID(NS_ABOUTPROTOCOLHANDLER_CID);
@@ -904,6 +907,7 @@ static const mozilla::Module::CIDEntry kNeckoCIDs[] = {
 #endif
 #ifdef NECKO_PROTOCOL_res
     { &kNS_RESPROTOCOLHANDLER_CID, false, nullptr, nsResProtocolHandlerConstructor },
+    { &kNS_EXTENSIONPROTOCOLHANDLER_CID, false, nullptr, mozilla::ExtensionProtocolHandlerConstructor },
     { &kNS_SUBSTITUTINGURL_CID, false, nullptr, mozilla::SubstitutingURLConstructor },
 #endif
     { &kNS_ABOUTPROTOCOLHANDLER_CID, false, nullptr, nsAboutProtocolHandlerConstructor },
@@ -1059,6 +1063,7 @@ static const mozilla::Module::ContractIDEntry kNeckoContracts[] = {
 #endif
 #ifdef NECKO_PROTOCOL_res
     { NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "resource", &kNS_RESPROTOCOLHANDLER_CID },
+    { NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "moz-extension", &kNS_EXTENSIONPROTOCOLHANDLER_CID },
 #endif
     { NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "about", &kNS_ABOUTPROTOCOLHANDLER_CID },
     { NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "moz-safe-about", &kNS_SAFEABOUTPROTOCOLHANDLER_CID },
