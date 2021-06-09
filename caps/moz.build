@@ -9,6 +9,7 @@ TEST_DIRS += ['tests/mochitest']
 XPCSHELL_TESTS_MANIFESTS += ['tests/unit/xpcshell.ini']
 
 XPIDL_SOURCES += [
+    'nsIAddonPolicyService.idl',
     'nsIDomainPolicy.idl',
     'nsIPrincipal.idl',
     'nsIScriptSecurityManager.idl',
