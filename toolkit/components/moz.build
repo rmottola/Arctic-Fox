@@ -49,6 +49,7 @@ DIRS += [
     'statusfilter',
     'telemetry',
     'thumbnails',
+    'timermanager',
     'typeaheadfind',
     'urlformatter',
     'viewconfig',
