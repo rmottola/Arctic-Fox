@@ -20,6 +20,7 @@ UNIFIED_SOURCES += [
     'TestSynchronization.cpp',
     'TestTArray.cpp',
     'TestThreadPool.cpp',
+    'TestThreads.cpp',
     'TestTimeStamp.cpp',
     'TestUTF.cpp',
     'TestXPIDLString.cpp',
