@@ -11,6 +11,7 @@
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
 
 #include "mozilla/Logging.h"
+#include "mozilla/Services.h"
 #include "prprf.h"
 
 #include "gfxPlatform.h"
@@ -512,7 +513,7 @@ gfxPlatform::Init()
      * incase that code crashes. See bug #591561. */
     nsCOMPtr<nsIGfxInfo> gfxInfo;
     /* this currently will only succeed on Windows */
-    gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    gfxInfo = services::GetGfxInfo();
 
 #if defined(XP_WIN)
     gPlatform = new gfxWindowsPlatform;
@@ -2263,7 +2264,7 @@ InitLayersAccelerationPrefs()
     gfxPrefs::GetSingleton();
     sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
 
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     int32_t status;
 #ifdef XP_WIN
     if (gfxPrefs::LayersAccelerationForceEnabled()) {
