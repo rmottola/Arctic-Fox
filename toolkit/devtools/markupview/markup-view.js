@@ -1814,6 +1814,7 @@ MarkupContainer.prototype = {
     this.hovered = false;
     this.markup.navigate(this);
     event.stopPropagation();
+    event.preventDefault();
 
     // Start dragging the container after a delay.
     this.markup._dragStartEl = target;
